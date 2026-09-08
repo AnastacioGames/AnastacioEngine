@@ -48,6 +48,16 @@ Crie projetos, mantenha os arquivos organizados e prepare distribuições com o 
 
 ![RangeArmor Panel](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20192117.png)
 
+### GPU Skinning
+
+O modo **RanGE GPU Skinning** move a deformação do esqueleto para a GPU. Para
+usá-lo, selecione esse modo no painel da Armature e habilite **GPU Skinning**
+nas opções do material que será usado pelo objeto.
+
+![Seleção de RanGE GPU Skinning na Armature](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20194142.png)
+
+![Opção GPU Skinning nas configurações do material](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20194403.png)
+
 ## Status de plataformas
 
 | Plataforma | Estado |
@@ -72,4 +82,3 @@ AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine
 
 - [Releases e downloads](https://github.com/AnastacioGames/AnastacioEngine/releases)
 - [Relatório de melhorias](relatorio-melhorias-anastacioengine.md)
-
