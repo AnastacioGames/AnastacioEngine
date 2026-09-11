@@ -35,13 +35,13 @@ Esta é a distribuição pronta da AnastacioEngine para Windows x64. Escolha o p
 
 Configure clima diretamente na cena e ajuste o sistema de sombras CSM pelo editor.
 
-![Weather Effects: chuva, nuvens e lens flare](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20184701.png)
+![Weather Effects: chuva, nuvens e lens flare]()
 
 ### Veículos e simulação
 
 Transforme um Rigid Body em veículo, configure as rodas e ajuste a física em tempo real pelo Vehicle Lab.
 
-![Configuração nativa de Vehicle](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20190545.png)
+![Configuração nativa de Vehicle]()
 
 ### RangeArmor
 
@@ -77,7 +77,7 @@ nas opções do material que será usado pelo objeto.
 
 AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b / Blender 2.79, e concentra seu desenvolvimento em performance, renderização, ferramentas de runtime e fluxo de produção para jogos.
 
-![Janela About da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20192236.png)
+![Janela About da AnastacioEngine]()
 
 ## Links
 
