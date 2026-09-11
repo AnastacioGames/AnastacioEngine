@@ -1,12 +1,8 @@
 # AnastacioEngine
-
 > Game engine para criação de jogos 3D, baseada na Range Engine 1.6 Rev1 e na linhagem UPBGE / Blender 2.79.
-
 > [!IMPORTANT]
 > **Para baixar a engine, use os links da seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
 > O botão verde **Code → Download ZIP** do GitHub baixa somente uma cópia do repositório (README e imagens); ele **não** contém os executáveis da AnastacioEngine.
-
-![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20192214.png)
 
 ## Download
 
@@ -30,45 +26,23 @@ Esta é a distribuição pronta da AnastacioEngine para Windows x64. Escolha o p
 - Consulte `SHA256SUMS.txt` caso queira verificar a integridade do download.
 
 ## Ferramentas para criar jogos
-
 ### World, clima e iluminação
-
 Configure clima diretamente na cena e ajuste o sistema de sombras CSM pelo editor.
-
-![Weather Effects: chuva, nuvens e lens flare]()
-
 ### Veículos e simulação
-
 Transforme um Rigid Body em veículo, configure as rodas e ajuste a física em tempo real pelo Vehicle Lab.
-
-![Configuração nativa de Vehicle]()
-
 ### RangeArmor
-
 Crie projetos, mantenha os arquivos organizados e prepare distribuições com o RangeArmor Panel.
-
-![RangeArmor Panel](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20192117.png)
-
 ### GPU Skinning
-
 O modo **RanGE GPU Skinning** move a deformação do esqueleto para a GPU. Para
 usá-lo, selecione esse modo no painel da Armature e habilite **GPU Skinning**
 nas opções do material que será usado pelo objeto.
-
-![Seleção de RanGE GPU Skinning na Armature](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20194142.png)
-
-![Opção GPU Skinning nas configurações do material](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.1.0/Captura%20de%20tela%202026-09-08%20194403.png)
-
 ## Status de plataformas
-
 | Plataforma | Estado |
 |---|---|
 | Windows x64 | Suportada nesta release. |
 | Linux x64 | Experimental; ainda não há pacote oficial publicado. |
 | 32-bit | Não suportado. |
-
 ## Estrutura da distribuição
-
 - `RangeEngine.exe`: editor para criar e configurar projetos.
 - `RangeRuntime.exe`: player standalone para arquivos `.range`.
 - `RangeArmor/`: painel, launcher e scripts de empacotamento; presente somente no pacote completo.
@@ -76,8 +50,6 @@ nas opções do material que será usado pelo objeto.
 ## Sobre
 
 AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b / Blender 2.79, e concentra seu desenvolvimento em performance, renderização, ferramentas de runtime e fluxo de produção para jogos.
-
-![Janela About da AnastacioEngine]()
 
 ## Links
 
