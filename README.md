@@ -4,6 +4,8 @@
 > **Para baixar a engine, use os links da seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
 > O botão verde **Code → Download ZIP** do GitHub baixa somente uma cópia do repositório (README e imagens); ele **não** contém os executáveis da AnastacioEngine.
 
+![Splash Screen da AnastacioEngine 0.2.0](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.2.0/splash.png)
+
 ## Download
 
 A versão atual é **[AnastacioEngine 0.2.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.2.0)**, para Windows x64.
