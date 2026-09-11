@@ -10,27 +10,26 @@
 
 ## Download
 
-A versão atual é **[AnastacioEngine 0.1.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.1.0)**, para Windows x64.
+A versão atual é **[AnastacioEngine 0.2.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.2.0)**, para Windows x64.
 
 | Pacote | Conteúdo |
 |---|---|
-| [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.1.0/AnastacioEngine-0.1.0-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos. |
-| [AnastacioEngine + RangeArmor](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.1.0/AnastacioEngine-0.1.0-windows-x64-with-RangeArmor.zip) | Pacote completo, com a engine e a ferramenta RangeArmor para criar e empacotar projetos. |
-| [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.1.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
+| [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/AnastacioEngine-0.2.0-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos. |
+| [AnastacioEngine + RangeArmor](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/AnastacioEngine-0.2.0-windows-x64-with-RangeArmor.zip) | Pacote completo, com a engine e a ferramenta RangeArmor para criar e empacotar projetos. |
+| [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
 
 Extraia o ZIP em uma pasta própria e abra `RangeEngine.exe`. Para executar um jogo exportado, use `RangeRuntime.exe`.
 
-## Destaques da versão 0.1.0
+## Destaques da versão 0.2.0
 
-- **Weather Effects:** chuva, nuvens e lens flare configuráveis no World.
-- **Partículas GPU:** presets, curvas, colisão, debug em tempo real e controle por Logic Bricks.
-- **Veículos nativos:** chassi, rodas, suspensão, tração e Vehicle Lab para ajuste em runtime.
-- **ImGui no jogo:** menus, widgets, opções em abas, console e ferramentas de debug.
-- **Runtime API nos Logic Bricks:** Sensors e Actuators podem acessar propriedades expostas dos objetos.
-- **Renderização e sombras:** CSM, filtros 2D, FXAA, SSR, Bloom, SSAO, Tonemap e Light Scattering.
-- **RangeArmor atualizado:** painel e launcher modernizados parcialmente em Rust, incluídos no pacote completo.
+- **Resolução dinâmica:** ajusta a escala interna de renderização pelo tempo de GPU, com alvo de FPS, limites, suavização e histerese.
+- **Cutscenes nativas:** sequências persistentes, operadores, API Python, importação/exportação JSON e eventos `WAIT_*`.
+- **External Files mais robusto:** bibliotecas, Groups e Texts ficam visíveis no Outliner, com importação explícita de scripts ausentes.
+- **Renderização e desempenho:** OpenGL Core Profile no runtime, CSM, GPU skinning, partículas GPU, LOD/impostores, instancing e pós-processamento.
+- **Ferramentas de jogo:** veículos nativos, ImGui, console, Logic Bricks ampliados, World/Weather e RangeArmor para Windows x64.
+- **Editor refinado:** painéis de Render, World, Scene e splash/About reorganizados para o fluxo atual da AnastacioEngine.
 
-Leia a lista detalhada de recursos, correções e limitações nas [notas completas da Release 0.1.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.1.0).
+Leia a lista detalhada de recursos, correções e limitações nas [notas completas da Release 0.2.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.2.0).
 
 ## Ferramentas para criar jogos
 
