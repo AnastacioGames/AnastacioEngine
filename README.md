@@ -20,16 +20,14 @@ A versão atual é **[AnastacioEngine 0.2.0](https://github.com/AnastacioGames/A
 
 Extraia o ZIP em uma pasta própria e abra `RangeEngine.exe`. Para executar um jogo exportado, use `RangeRuntime.exe`.
 
-## Destaques da versão 0.2.0
+## Versão 0.2.0
 
-- **Resolução dinâmica:** ajusta a escala interna de renderização pelo tempo de GPU, com alvo de FPS, limites, suavização e histerese.
-- **Cutscenes nativas:** sequências persistentes, operadores, API Python, importação/exportação JSON e eventos `WAIT_*`.
-- **External Files mais robusto:** bibliotecas, Groups e Texts ficam visíveis no Outliner, com importação explícita de scripts ausentes.
-- **Renderização e desempenho:** OpenGL Core Profile no runtime, CSM, GPU skinning, partículas GPU, LOD/impostores, instancing e pós-processamento.
-- **Ferramentas de jogo:** veículos nativos, ImGui, console, Logic Bricks ampliados, World/Weather e RangeArmor para Windows x64.
-- **Editor refinado:** painéis de Render, World, Scene e splash/About reorganizados para o fluxo atual da AnastacioEngine.
+Esta é a distribuição pronta da AnastacioEngine para Windows x64. Escolha o pacote desejado na seção **Download**, extraia-o em uma pasta própria e execute `RangeEngine.exe`.
 
-Leia a lista detalhada de recursos, correções e limitações nas [notas completas da Release 0.2.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.2.0).
+- O pacote padrão contém a engine, o editor, o runtime e as dependências necessárias.
+- O pacote **com RangeArmor** inclui também as ferramentas para criar e empacotar projetos.
+- Use `RangeRuntime.exe` para executar um jogo exportado (`.range`).
+- Consulte `SHA256SUMS.txt` caso queira verificar a integridade do download.
 
 ## Ferramentas para criar jogos
 
