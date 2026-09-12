@@ -879,7 +879,7 @@ function(data_to_c
 	add_custom_command(
 		OUTPUT ${file_to}
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${_file_to_path}
-		COMMAND "$<TARGET_FILE:datatoc>" ${file_from} ${file_to}
+		COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:datatoc>" ${file_from} ${file_to}
 		DEPENDS ${file_from} datatoc)
 
 	set_source_files_properties(${file_to} PROPERTIES GENERATED TRUE)
@@ -906,7 +906,7 @@ function(data_to_c_simple
 	add_custom_command(
 		OUTPUT  ${_file_to}
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${_file_to_path}
-		COMMAND "$<TARGET_FILE:datatoc>" ${_file_from} ${_file_to}
+		COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:datatoc>" ${_file_from} ${_file_to}
 		DEPENDS ${_file_from} datatoc)
 
 	set_source_files_properties(${_file_to} PROPERTIES GENERATED TRUE)
@@ -942,8 +942,8 @@ function(data_to_c_simple_icons
 		OUTPUT  ${_file_from} ${_file_to}
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${_file_to_path}
 		#COMMAND python3 ${CMAKE_SOURCE_DIR}/source/blender/datatoc/datatoc_icon.py ${_path_from_abs} ${_file_from}
-		COMMAND "$<TARGET_FILE:datatoc_icon>" ${_path_from_abs} ${_file_from}
-		COMMAND "$<TARGET_FILE:datatoc>" ${_file_from} ${_file_to}
+		COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:datatoc_icon>" ${_path_from_abs} ${_file_from}
+		COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:datatoc>" ${_file_from} ${_file_to}
 		DEPENDS
 			${_icon_files}
 			datatoc_icon

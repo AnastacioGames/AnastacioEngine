@@ -301,3 +301,108 @@ arquivo literal é o mesmo mecanismo).
   de decodificar via FFmpeg — isso é aceitável como substituição, ou o
   formato `.range` de cutscene nativo (ver `cutscene-native-integration-plan.md`)
   já resolve isso independentemente de FFmpeg?
+
+## Segunda tentativa: build real de `RangeRuntime` (2026-09)
+
+Depois do levantamento acima, o bug do `OPENGLES_LIBRARY` foi corrigido de
+verdade em `CMakeLists.txt` (pular a exigência quando `EMSCRIPTEN` é
+verdadeiro) e o build avançou bem além do ponto anterior, expondo uma série
+de bugs genuínos e distintos, corrigidos um a um:
+
+1. `CMAKE_CROSSCOMPILING_EMULATOR` ausente para rodar geradores de dados
+   (datatoc/makesdna/makesrna) cross-compilados — precisa apontar para `node`.
+2. `NODERAWFS` necessário para esses geradores lerem/escreverem arquivos reais
+   durante o build (não só memória virtual do wasm).
+3. `WITH_MOD_FLUID`/`WITH_MOD_SMOKE`/`WITH_FFTW3`/`WITH_MOD_OCEANSIM`
+   desabilitados — dependem de libs nativas sem porta Emscripten viável no
+   momento.
+4. `extern/glew-es/src/glew.c`: guardas de GLX ausentes para Emscripten em 6
+   pontos — adicionado `#if !defined(__EMSCRIPTEN__)` ao redor de código GLX.
+5. `LEGACY_GL_EMULATION=1` habilitado via flag do Emscripten (`-s`) para
+   suprir chamadas `glBegin`/`GL_QUADS` de OpenGL fixo usadas pelo engine.
+6. Portas oficiais do Emscripten ativadas: `-sUSE_ZLIB=1 -sUSE_FREETYPE=1`.
+7. `source/blender/blenlib/intern/storage.c`: `statvfs` só existe em alguns
+   unixes — adicionado `__EMSCRIPTEN__` ao guard `USE_STATFS_STATVFS`.
+8. `-Wno-sign-conversion` adicionado às flags do Emscripten para tolerar
+   conversões de sinal que o toolchain do sistema não reclamava.
+9. `WITH_GL_PROFILE_COMPAT=ON` reativado (necessário para declarações de GL
+   legado/`glBegin` que `GLEW_ES_ONLY` removia).
+10. Bug de interação genuíno entre os itens 5 e 9: com
+    `WITH_GL_PROFILE_ES20` **e** `WITH_GL_PROFILE_COMPAT` juntos (combinação
+    nunca exercida antes nesta fork), a lógica de "eliminar símbolos ES1"
+    do `CMakeLists.txt` (linha ~1353, `-DGL_ES_VERSION_1_0=0 ...`) suprime
+    typedefs (`GLfixed`, `PFNGL*XPROC`) que outras seções do mesmo
+    `glew.h` ainda referenciam sem depender desse define. Fix: essas defines
+    só são aplicadas quando `NOT (WITH_GL_PROFILE_CORE OR
+    WITH_GL_PROFILE_COMPAT)`, replicando o padrão já usado para
+    `GLEW_ES_ONLY` no mesmo bloco.
+11. `source/blender/blenlib/BLI_strict_flags.h`: os `#pragma GCC diagnostic
+    error "-Wsign-conversion"` (e afins) são incondicionais para qualquer
+    compilador que reporte `__GNUC__` — o clang do Emscripten reporta, então
+    esses pragmas sobrescreviam o `-Wno-sign-conversion` da linha de comando
+    e quebravam `string_utf8.c`/`MOD_solidify.c`. Fix: todo o bloco agora é
+    pulado também quando `__EMSCRIPTEN__` está definido.
+12. `source/blender/gpu/intern/gpu_shader.c`: usa `GLEW_VERSION_4_3/4_4/4_5`
+    sem guarda, mas esse fork do glew-es só declara até `GLEW_VERSION_4_2`
+    (não existe `GL_VERSION_4_3+` nos headers vendorizados) — identificador
+    não declarado. Fix: envolvidas em `#ifdef GL_VERSION_4_x` antes de cada
+    checagem.
+
+### Bloqueio atual (real, arquitetural — não um bug pontual)
+
+Com os fixes acima, o build avança até compilar módulos do
+`gameengine` (`ge_ketsji`, `ge_expressions`, `ge_converter`, etc.) e falha em
+massa porque:
+
+- O game engine usa a API do Python (`PyObject`, `PyImport_ImportModule`,
+  etc.) **incondicionalmente** em dezenas de arquivos (`KX_AnimationEvent.cpp`,
+  `EXP_PythonCallBack.h`, `KX_ChangeColorActuator.h`, `KX_PythonJoystick.h`,
+  entre outros) — não há guardas `#ifdef WITH_PYTHON`. O preset Web atual usa
+  `WITH_PYTHON=OFF` (assim como Android/iOS), o que quebra a compilação do
+  BGE inteiro, não só de features isoladas.
+- Também apareceram, no mesmo lote: `boost/format.hpp` e `tbb/tbb.h` não
+  encontrados (Boost/TBB não portados para este alvo Emscripten), e faltam
+  `jpeglib.h`/`png.h`/`openjpeg.h`/`tiffio.h` (codecs de imagem que `imbuf`
+  usa sem gate de `WITH_IMAGE_*` em `jpeg.c`/`png.c`/`jp2.c`/`tiff.c`) — ainda
+  não investigados a fundo porque o bloqueio do Python é anterior na ordem
+  de build e é estruturalmente maior.
+
+**Decisão tomada com o usuário**: como o `docs/web-export-plan.md` já previa
+(seção "Python embarcado" acima), a rota correta é **não** tentar arrancar o
+Python do game engine (reescrever dezenas de arquivos, alto risco de quebrar
+lógica de jogo via script), e sim **cross-compilar CPython 3.11 para o alvo
+`wasm32-emscripten`** e ligar com `WITH_PYTHON=ON`. Isso é um sub-projeto à
+parte (não existe build pré-compilado disponível no `emsdk` nem no
+repositório — confirmado por busca em `extern/` e `emsdk/`), com escopo de
+dias, não um fix pontual dentro do ciclo atual. **Pausado aqui por decisão
+explícita do usuário** — não iniciado. Próximo passo, quando retomado: seguir
+o suporte oficial `Tools/wasm/emscripten` do próprio CPython 3.11+ para gerar
+`libpython3.11.a` + headers, depois apontar `PYTHON_LIBRARY`/
+`PYTHON_INCLUDE_DIR` no preset `web-runtime` e retomar o ciclo de build.
+
+### Retomada: ambiente de build para CPython wasm (2026-09-12)
+
+Decisão do usuário: retomar o cross-compile de CPython 3.11 para
+`wasm32-emscripten`, usando a automação oficial `Tools/wasm/wasm_build.py`
+do próprio CPython. Essa ferramenta assume um ambiente POSIX
+(`./configure && make`) e não roda nativamente em PowerShell/Git Bash no
+Windows.
+
+- **Ambiente escolhido**: WSL2 com Ubuntu, já presente na máquina (não
+  precisou de instalação nova — uma tentativa de `wsl --install -d Ubuntu`
+  retornou `ERROR_ALREADY_EXISTS`, revelando que a distro já existia).
+- **Realocação para o drive D:** por pedido explícito do usuário (mais
+  espaço livre), a distro foi movida de C: para `D:\WSL\Ubuntu` via
+  `wsl --shutdown` seguido de `wsl --manage Ubuntu --move D:\WSL\Ubuntu`
+  (comando de gerência do WSL 2.6.1.0, evita export/import manual).
+  Verificado após a mudança: `wsl --list --verbose` mostra a distro em
+  versão 2, e `df -h` dentro dela confirma o filesystem montado a partir de
+  D:.
+- **Dependências de build** (build-essential, git, python3.11 +
+  dev/venv, pkg-config, zlib1g-dev, libffi-dev, cmake) instaladas via
+  `apt-get` dentro da distro.
+- **Pendente**: configurar um emsdk nativo Linux dentro do WSL (o
+  `D:\emsdk` existente é uma instalação Windows, cujos binários ativados não
+  rodam a partir do ambiente Linux do WSL), clonar CPython 3.11 e rodar
+  `Tools/wasm/wasm_build.py` para gerar `libpython3.11.a` + headers para
+  `wasm32-emscripten`.

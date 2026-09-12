@@ -27,6 +27,12 @@ set(SRC
 
 # SRC_DNA_INC is defined in the parent dir
 add_executable(datatoc ${SRC})
+if(EMSCRIPTEN)
+	# datatoc roda no host via node (CMAKE_CROSSCOMPILING_EMULATOR) durante o
+	# proprio build, nao no browser: precisa acessar arquivos reais do disco,
+	# nao a MEMFS sandboxed padrao do Emscripten.
+	set_target_properties(datatoc PROPERTIES LINK_FLAGS "-sNODERAWFS=1")
+endif()
 
 
 # -----------------------------------------------------------------------------
@@ -58,6 +64,9 @@ if(NOT WITH_HEADLESS)
 	link_directories(${PNG_LIBPATH} ${ZLIB_LIBPATH})
 
 	add_executable(datatoc_icon ${SRC})
+	if(EMSCRIPTEN)
+		set_target_properties(datatoc_icon PROPERTIES LINK_FLAGS "-sNODERAWFS=1")
+	endif()
 
 	target_link_libraries(datatoc_icon ${PNG_LIBRARIES} ${ZLIB_LIBRARIES})
 	# PNG library uses pow() and floow(), so seems -lm is required for proper

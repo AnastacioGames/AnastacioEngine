@@ -56,6 +56,9 @@ add_cc_flags_custom_test(makesdna)
 setup_platform_linker_flags()
 
 add_executable(makesdna ${SRC} ${SRC_DNA_INC})
+if(EMSCRIPTEN)
+	set_target_properties(makesdna PROPERTIES LINK_FLAGS "-sNODERAWFS=1")
+endif()
 
 # Output dna.c
 add_custom_command(
@@ -63,6 +66,7 @@ add_custom_command(
 		${CMAKE_CURRENT_BINARY_DIR}/dna.c
 		${CMAKE_CURRENT_BINARY_DIR}/dna_type_offsets.h
 	COMMAND
+		${CMAKE_CROSSCOMPILING_EMULATOR}
 		"$<TARGET_FILE:makesdna>"
 		${CMAKE_CURRENT_BINARY_DIR}/dna.c
 		${CMAKE_CURRENT_BINARY_DIR}/dna_type_offsets.h

@@ -367,6 +367,9 @@ add_cc_flags_custom_test(makesrna)
 setup_platform_linker_flags()
 
 add_executable(makesrna ${SRC} ${SRC_RNA_INC} ${SRC_DNA_INC})
+if(EMSCRIPTEN)
+	set_target_properties(makesrna PROPERTIES LINK_FLAGS "-sNODERAWFS=1")
+endif()
 
 target_link_libraries(makesrna bf_dna)
 target_link_libraries(makesrna bf_dna_blenlib)
@@ -375,7 +378,7 @@ target_link_libraries(makesrna bf_dna_blenlib)
 # note (linux only): with crashes try add this after COMMAND: valgrind --leak-check=full --track-origins=yes
 add_custom_command(
 	OUTPUT ${GENSRC}
-	COMMAND "$<TARGET_FILE:makesrna>" ${CMAKE_CURRENT_BINARY_DIR}/
+	COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:makesrna>" ${CMAKE_CURRENT_BINARY_DIR}/
 	DEPENDS makesrna
 )
 

@@ -150,16 +150,28 @@ static const char *gpu_shader_version(void)
 #endif
 
 	if (GLEW_ARB_compatibility) {
+		/* This glew-es fork's headers stop declaring GL_VERSION_x_y
+		 * (and therefore GLEW_VERSION_x_y) constants above 4.2, so guard
+		 * the higher checks out instead of referencing undeclared identifiers. */
+#ifdef GL_VERSION_4_5
 		if (GLEW_VERSION_4_5) {
 			return "#version 450 compatibility\n";
 		}
-		else if (GLEW_VERSION_4_4) {
+		else
+#endif
+#ifdef GL_VERSION_4_4
+		if (GLEW_VERSION_4_4) {
 			return "#version 440 compatibility\n";
 		}
-		else if (GLEW_VERSION_4_3) {
+		else
+#endif
+#ifdef GL_VERSION_4_3
+		if (GLEW_VERSION_4_3) {
 			return "#version 430 compatibility\n";
 		}
-		else if (GLEW_VERSION_4_2) {
+		else
+#endif
+		if (GLEW_VERSION_4_2) {
 			return "#version 420 compatibility\n";
 		}
 		else if (GLEW_VERSION_4_1) {

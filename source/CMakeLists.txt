@@ -1138,6 +1138,13 @@ elseif(WITH_GL_PROFILE_ES20)
 
 		list(APPEND BLENDER_GL_LIBRARIES OPENGLES_LIBRARY)
 
+	elseif(EMSCRIPTEN)
+		# Emscripten resolve os simbolos GL/GLES internamente via o proprio toolchain
+		# (ex: -sUSE_SDL=2, -sFULL_ES3=1), nao existe um arquivo libGL de sistema para
+		# apontar. OPENGLES_LIBRARY e uma CACHE FILEPATH, e o Ninja trata qualquer string
+		# ali como caminho de arquivo literal a resolver no disco, entao a exigencia normal
+		# (abaixo) e estruturalmente incompativel com este alvo.
+
 	else()
 		set(OPENGLES_LIBRARY "" CACHE FILEPATH "OpenGL ES 2.0 library file")
 		mark_as_advanced(OPENGLES_LIBRARY)
@@ -1343,7 +1350,12 @@ else()
 			# (for example, without modification it eliminates too many symbols)
 			# so there are lots of modifications to GLEW to make this work,
 			# and no attempt to make it work beyond Blender at this point.
-			list(APPEND GL_DEFINITIONS -DGL_ES_VERSION_1_0=0 -DGL_ES_VERSION_CL_1_1=0 -DGL_ES_VERSION_CM_1_1=0)
+			# Only safe in pure ES mode: with COMPAT/CORE also enabled, glew.h's
+			# ES-extension sections still reference the GLfixed/GLclampx typedefs
+			# these defines suppress, causing undeclared-type errors.
+			if(NOT (WITH_GL_PROFILE_CORE OR WITH_GL_PROFILE_COMPAT))
+				list(APPEND GL_DEFINITIONS -DGL_ES_VERSION_1_0=0 -DGL_ES_VERSION_CL_1_1=0 -DGL_ES_VERSION_CM_1_1=0)
+			endif()
 		endif()
 
 		if(WITH_GL_EGL)

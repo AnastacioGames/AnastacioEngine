@@ -23,7 +23,11 @@
  * to ensure don't do conversions without us knowing about it.
  */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__EMSCRIPTEN__)
+/* Emscripten's clang reports a __GNUC__ version but these pragma-based
+ * errors are unconditional (no way to pass -Wno-... to override them),
+ * and the web/Emscripten target already tolerates sign conversions
+ * elsewhere via -Wno-sign-conversion, so skip them here too. */
 #  if (__GNUC__ * 100 + __GNUC_MINOR__) >= 406  /* gcc4.6+ only */
 #    pragma GCC diagnostic error "-Wsign-compare"
 #  endif

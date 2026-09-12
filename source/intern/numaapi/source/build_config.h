@@ -43,7 +43,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 // A set of macros to use for platform detection.
 
-#if defined(__native_client__)
+#if defined(__EMSCRIPTEN__)
+// Emscripten deve ser checado antes de __linux__: o toolchain simula alguns
+// aspectos de POSIX mas nao tem NUMA real nem syscalls Linux de verdade;
+// mantido sem nenhum OS_* setado para cair no stub (!OS_LINUX && !OS_WIN),
+// mesma logica ja usada para plataformas sem suporte NUMA nativo.
+#elif defined(__native_client__)
 // __native_client__ must be first, so that other OS_ defines are not set.
 #  define OS_NACL 1
 #elif defined(_AIX)
@@ -280,8 +285,11 @@
 #  define ARCH_CPU_ARM64 1
 #  define ARCH_CPU_64_BITS 1
 #  define ARCH_CPU_LITTLE_ENDIAN 1
-#elif defined(__pnacl__)
+#elif defined(__pnacl__) || defined(__wasm32__)
 #  define ARCH_CPU_32_BITS 1
+#  define ARCH_CPU_LITTLE_ENDIAN 1
+#elif defined(__wasm64__)
+#  define ARCH_CPU_64_BITS 1
 #  define ARCH_CPU_LITTLE_ENDIAN 1
 #elif defined(__MIPSEL__)
 #  if defined(__LP64__)

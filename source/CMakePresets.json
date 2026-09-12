@@ -129,16 +129,15 @@
         "WITH_SYSTEM_GLEW": "OFF",
         "WITH_GLEW_ES": "ON",
         "WITH_GL_EGL": "OFF",
-        "WITH_GL_PROFILE_COMPAT": "OFF",
+        "WITH_GL_PROFILE_COMPAT": "ON",
         "WITH_GL_PROFILE_ES20": "ON",
         "WITH_SYSTEM_GLES": "OFF",
-        "OPENGLES_LIBRARY": "-lGL",
         "WITH_X11": "OFF",
         "WITH_SDL": "ON",
         "WITH_GHOST_SDL": "ON",
-        "CMAKE_C_FLAGS": "-sUSE_SDL=2",
-        "CMAKE_CXX_FLAGS": "-sUSE_SDL=2",
-        "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2",
+        "CMAKE_C_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_FREETYPE=1 -sLEGACY_GL_EMULATION=1 -Wno-sign-conversion",
+        "CMAKE_CXX_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_FREETYPE=1 -sLEGACY_GL_EMULATION=1 -Wno-sign-conversion",
+        "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_FREETYPE=1 -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0",
         "WITH_OPENAL": "OFF",
         "WITH_AUDASPACE": "OFF",
         "WITH_ALEMBIC": "OFF",
@@ -156,7 +155,11 @@
         "WITH_CODEC_AVI": "OFF",
         "WITH_CODEC_FFMPEG": "OFF",
         "WITH_INPUT_NDOF": "OFF",
-        "WITH_JACK": "OFF"
+        "WITH_JACK": "OFF",
+        "WITH_MOD_FLUID": "OFF",
+        "WITH_MOD_SMOKE": "OFF",
+        "WITH_FFTW3": "OFF",
+        "WITH_MOD_OCEANSIM": "OFF"
       }
     }
   ],

@@ -256,7 +256,9 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 		if (is_relative_path) {
 			if ((prop = RNA_struct_find_property(op->ptr, "relative_path"))) {
 				if (!RNA_property_is_set_ex(op->ptr, prop, false)) {
-					RNA_property_boolean_set(op->ptr, prop, (U.flag & USER_RELPATHS) != 0);
+					/* AnastacioEngine: always default "Relative Path" to enabled in file browsers,
+					 * independent of the user's Save & Load preference. */
+					RNA_property_boolean_set(op->ptr, prop, true);
 				}
 			}
 		}

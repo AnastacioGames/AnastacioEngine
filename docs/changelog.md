@@ -3977,3 +3977,27 @@ necessário dado o caráter mecânico da mudança.
   Exposure` fica aninhado em `Environment`.
 - A alteração foi instalada em `build/bin/2.79/scripts/startup/flowmenu` e
   validada com `ninja RangeEngine` concluído com sucesso (exit 0).
+
+## 2026-09-12 — Web export: fixes de build sob Emscripten e retomada do CPython wasm
+
+- Série de bugs genuínos corrigidos para destravar o build `web-runtime` sob
+  Emscripten: `OPENGLES_LIBRARY` exigido incondicionalmente mesmo sem libGL de
+  sistema, `CMAKE_CROSSCOMPILING_EMULATOR`/`NODERAWFS` para os geradores de
+  dados cross-compilados, guardas de GLX ausentes em `glew-es/src/glew.c`,
+  `statvfs` guardado para `__EMSCRIPTEN__` em `blenlib/intern/storage.c`,
+  interação `WITH_GL_PROFILE_ES20` + `WITH_GL_PROFILE_COMPAT` eliminando
+  typedefs ainda referenciados no glew-es, pragmas de `-Wsign-conversion` etc.
+  em `BLI_strict_flags.h` agora pulados sob `__EMSCRIPTEN__`, e uso de
+  `GLEW_VERSION_4_3/4_4/4_5` em `gpu_shader.c` sem guarda (fork só declara até
+  4.2).
+- Bloqueio arquitetural identificado: o game engine (BGE) usa a API do Python
+  incondicionalmente em dezenas de arquivos, sem `#ifdef WITH_PYTHON` — quebra
+  o preset Web (`WITH_PYTHON=OFF`, como Android/iOS). Decisão tomada com o
+  usuário: cross-compilar CPython 3.11 para `wasm32-emscripten` via
+  `Tools/wasm/wasm_build.py` em vez de reescrever o BGE.
+- Ambiente de build POSIX necessário para essa ferramenta foi montado em uma
+  distro WSL2 Ubuntu já existente na máquina, realocada para `D:\WSL\Ubuntu`
+  a pedido do usuário (mais espaço em D:), com dependências de build
+  instaladas. Próximo passo: emsdk Linux dentro do WSL + clone do CPython 3.11
+  + `wasm_build.py`. Detalhes em `docs/web-export-plan.md`.
+
