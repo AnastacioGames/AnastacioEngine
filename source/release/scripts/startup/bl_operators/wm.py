@@ -2574,14 +2574,60 @@ class WM_OT_export_with_rangearmor(Operator):
     bl_label = ""
     bl_options = {'INTERNAL'}
 
+    def _write_export_preset(self, context):
+        """Sync product name/version from Scene.rangearmor_export into the
+        project's launcher/config.json, without touching any other key.
+
+        RangeArmor Panel validates config.json against a strict key
+        whitelist (see welcome.gd _validate_data): only known keys may be
+        written, or the project fails to load there. GameName/Version are
+        already part of that schema, so this is safe for old and new
+        projects alike; it silently does nothing if the file is missing or
+        the current file isn't part of a RangeArmor project structure.
+        """
+        export_settings = getattr(context.scene, "rangearmor_export", None)
+        if export_settings is None:
+            return
+
+        filepath = bpy.data.filepath
+        if not filepath:
+            return
+
+        data_dir = os.path.dirname(filepath)
+        if os.path.basename(data_dir) != "data":
+            return
+
+        project_dir = os.path.dirname(data_dir)
+        config_path = os.path.join(project_dir, "launcher", "config.json")
+        if not os.path.isfile(config_path):
+            return
+
+        try:
+            with open(config_path, "r", encoding="utf-8") as config_file:
+                config_data = json.load(config_file)
+        except (OSError, ValueError):
+            return
+
+        if export_settings.product_name:
+            config_data["GameName"] = export_settings.product_name
+        if export_settings.product_version:
+            config_data["Version"] = export_settings.product_version
+
+        try:
+            with open(config_path, "w", encoding="utf-8") as config_file:
+                json.dump(config_data, config_file, indent="\t")
+        except OSError:
+            pass
 
     def execute(self, context):
         import os, sys, subprocess
-        
+
+        self._write_export_preset(context)
+
         if sys.platform == "win32":
             os.startfile(bpy.app.binary_path[:-15] + "rangearmor\RangeArmor Panel.exe")
             return {'FINISHED'}
-    
+
         exe_path = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel")
         subprocess.run([exe_path])
         return {'FINISHED'}

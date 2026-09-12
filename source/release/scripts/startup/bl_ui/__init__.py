@@ -105,6 +105,7 @@ def register():
         StringProperty,
         IntProperty,
         CollectionProperty,
+        PointerProperty,
     )
     from bpy.types import WindowManager
 
@@ -244,9 +245,21 @@ def register():
     )
     
     ########### End Range Input System ###########
-        
+
+    ########### RangeArmor Export Presets ###########
+    from bpy.types import Scene
+    from . import properties_scene
+
+    Scene.rangearmor_export = PointerProperty(type=properties_scene.RangeArmorExportSettings)
+    ########### End RangeArmor Export Presets ###########
+
 
 def unregister():
+    from bpy.types import Scene
+
+    if hasattr(Scene, "rangearmor_export"):
+        del Scene.rangearmor_export
+
     from bpy.utils import unregister_class
     for mod in reversed(_modules_loaded):
         for cls in reversed(mod.classes):

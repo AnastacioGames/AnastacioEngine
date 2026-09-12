@@ -462,6 +462,67 @@ class SCENE_PT_custom_props(SceneButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Scene
 
 
+class RangeArmorExportSettings(bpy.types.PropertyGroup):
+    """Project-level export preferences written to launcher/config.json before RangeArmor Panel opens."""
+
+    export_windows64: bpy.props.BoolProperty(
+        name="Windows 64-bit",
+        description="Include a Windows 64-bit build when exporting with RangeArmor Panel",
+        default=True,
+    )
+    export_linux64: bpy.props.BoolProperty(
+        name="Linux 64-bit",
+        description="Include a Linux 64-bit build when exporting with RangeArmor Panel",
+        default=True,
+    )
+    product_name: bpy.props.StringProperty(
+        name="Product Name",
+        description="Name shown to players and used for the exported executable/package",
+        default="",
+    )
+    product_version: bpy.props.StringProperty(
+        name="Version",
+        description="Version string embedded in the exported package",
+        default="1.0.0",
+    )
+    company_name: bpy.props.StringProperty(
+        name="Company Name",
+        description="Publisher/company name embedded in the exported package",
+        default="",
+    )
+    icon_path: bpy.props.StringProperty(
+        name="Icon",
+        description="Icon file used for the exported game (leave empty to keep RangeArmor Panel's default)",
+        default="",
+        subtype='FILE_PATH',
+    )
+
+
+class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
+    bl_label = "Export (RangeArmor)"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        export = context.scene.rangearmor_export
+
+        box = layout.box()
+        box.label(text="Platforms:", icon="EXPORT")
+        row = box.row(align=True)
+        row.prop(export, "export_windows64", toggle=True)
+        row.prop(export, "export_linux64", toggle=True)
+
+        box = layout.box()
+        box.label(text="Package Info:", icon="INFO")
+        box.prop(export, "product_name")
+        box.prop(export, "product_version")
+        box.prop(export, "company_name")
+        box.prop(export, "icon_path")
+
+        layout.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
+
+
 classes = (
     SCENE_MT_units_length_presets,
     SCENE_UL_keying_set_paths,
@@ -477,6 +538,8 @@ classes = (
     SCENE_PT_rigid_body_field_weights,
     SCENE_PT_simplify,
     # SCENE_PT_custom_props,  # disabled: Custom Properties panel unused
+    RangeArmorExportSettings,
+    SCENE_PT_rangearmor_export,
 )
 
 if __name__ == "__main__":  # only for live edit.
