@@ -1,0 +1,37 @@
+[gd_scene load_steps=8 format=2]
+
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/2b05.tres" type="Texture" id=18]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/1f4c2.tres" type="Texture" id=24]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/2705.tres" type="Texture" id=246]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/2795.tres" type="Texture" id=247]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/1f4c1.tres" type="Texture" id=536]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/1f4da.tres" type="Texture" id=537]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/1f4d1.tres" type="Texture" id=581]
+[ext_resource path="res://addons/emojis-for-godot/emojis/36x36/1f4c4.tres" type="Texture" id=597]
+
+
+[node name="EmojisGrid" type="GridContainer"]
+
+[node name="books" type="Button" parent="."]
+icon = ExtResource( 537 )
+
+[node name="page_facing_up" type="Button" parent="."]
+icon = ExtResource( 597 )
+
+[node name="bookmark_tabs" type="Button" parent="."]
+icon = ExtResource( 581 )
+
+[node name="file_folder" type="Button" parent="."]
+icon = ExtResource( 536 )
+
+[node name="open_file_folder" type="Button" parent="."]
+icon = ExtResource( 24 )
+
+[node name="arrow_left" type="Button" parent="."]
+icon = ExtResource( 18 )
+
+[node name="white_check_mark" type="Button" parent="."]
+icon = ExtResource( 246 )
+
+[node name="heavy_plus_sign" type="Button" parent="."]
+icon = ExtResource( 247 )

@@ -1,0 +1,128 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "v142-ninja",
+      "displayName": "AnastacioEngine (Ninja, MSVC v142)",
+      "description": "Usa o toolset v142 (14.51.36231) via Ninja, compat\u00edvel com as libs pr\u00e9-compiladas win64_vc15",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe",
+        "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+        "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
+      },
+      "environment": {
+        "INCLUDE": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/include;C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/include;C:/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/VS/include;C:/Program Files (x86)/Windows Kits/10/include/10.0.26100.0/ucrt;C:/Program Files (x86)/Windows Kits/10/include/10.0.26100.0/um;C:/Program Files (x86)/Windows Kits/10/include/10.0.26100.0/shared;C:/Program Files (x86)/Windows Kits/10/include/10.0.26100.0/winrt;C:/Program Files (x86)/Windows Kits/10/include/10.0.26100.0/cppwinrt",
+        "LIB": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64;C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64;C:/Program Files (x86)/Windows Kits/10/lib/10.0.26100.0/ucrt/x64;C:/Program Files (x86)/Windows Kits/10/lib/10.0.26100.0/um/x64",
+        "LIBPATH": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64;C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64",
+        "PATH": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64;C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64;C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja;$penv{PATH}"
+      }
+    },
+    {
+      "name": "linux-runtime",
+      "displayName": "AnastacioEngine Runtime (Linux x86_64)",
+      "description": "Player portatil com dependencias do sistema; requer validacao em Linux real.",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/../build-linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PYTHON_VERSION": "3.11",
+        "PYTHON_ROOT_DIR": "/opt/anastacio-python311",
+			"WITH_BLENDER": "OFF",
+			"WITH_PLAYER": "ON",
+        "WITH_INSTALL_PORTABLE": "ON",
+        "WITH_PYTHON_INSTALL": "OFF",
+        "WITH_PYTHON_INSTALL_NUMPY": "OFF",
+        "WITH_PYTHON_INSTALL_REQUESTS": "OFF",
+        "WITH_DOC_MANPAGE": "OFF",
+        "WITH_SYSTEM_GLEW": "ON",
+        "WITH_SYSTEM_GLES": "OFF",
+        "WITH_ALEMBIC": "OFF",
+        "WITH_CYCLES": "OFF",
+        "WITH_CYCLES_OSL": "OFF",
+        "WITH_COMPOSITOR": "OFF",
+        "WITH_FREESTYLE": "OFF",
+        "WITH_LIBMV": "OFF",
+        "WITH_OPENCOLLADA": "OFF",
+        "WITH_OPENSUBDIV": "OFF",
+        "WITH_OPENVDB": "OFF",
+        "WITH_OPENIMAGEIO": "OFF",
+        "WITH_OPENIMAGEDENOISE": "OFF",
+        "WITH_OPENCOLORIO": "OFF",
+        "WITH_CODEC_AVI": "OFF",
+        "WITH_CODEC_FFMPEG": "OFF",
+        "WITH_INPUT_NDOF": "OFF",
+        "WITH_JACK": "OFF"
+      }
+    },
+    {
+      "name": "android-runtime",
+      "displayName": "AnastacioEngine Runtime (Android arm64)",
+      "description": "Preliminar/experimental: preset base para cross-compile Android via NDK r30. Nao existe backend GHOST Android ainda (ver docs/mobile-export-plan.md); este preset so configura a toolchain, o build vai falhar antes de chegar no rasterizer/janela.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build-android",
+      "toolchainFile": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe",
+        "ANDROID_ABI": "arm64-v8a",
+        "ANDROID_PLATFORM": "android-24",
+        "WITH_BLENDER": "OFF",
+        "WITH_PYTHON": "OFF",
+        "WITH_PLAYER": "ON",
+        "WITH_INSTALL_PORTABLE": "ON",
+        "WITH_PYTHON_INSTALL": "OFF",
+        "WITH_PYTHON_INSTALL_NUMPY": "OFF",
+        "WITH_PYTHON_INSTALL_REQUESTS": "OFF",
+        "WITH_DOC_MANPAGE": "OFF",
+        "WITH_SYSTEM_GLEW": "OFF",
+        "WITH_GLEW_ES": "ON",
+        "WITH_GL_EGL": "ON",
+        "WITH_GL_PROFILE_ES20": "ON",
+        "WITH_SYSTEM_GLES": "OFF",
+        "OPENGLES_EGL_LIBRARY": "$env{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so",
+        "OPENGLES_gl_LIBRARY": "$env{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv2.so",
+        "OPENGL_INCLUDE_DIR": "$env{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include",
+        "WITH_ALEMBIC": "OFF",
+        "WITH_CYCLES": "OFF",
+        "WITH_CYCLES_OSL": "OFF",
+        "WITH_COMPOSITOR": "OFF",
+        "WITH_FREESTYLE": "OFF",
+        "WITH_LIBMV": "OFF",
+        "WITH_OPENCOLLADA": "OFF",
+        "WITH_OPENSUBDIV": "OFF",
+        "WITH_OPENVDB": "OFF",
+        "WITH_OPENIMAGEIO": "OFF",
+        "WITH_OPENIMAGEDENOISE": "OFF",
+        "WITH_OPENCOLORIO": "OFF",
+        "WITH_CODEC_AVI": "OFF",
+        "WITH_CODEC_FFMPEG": "OFF",
+        "WITH_INPUT_NDOF": "OFF",
+        "WITH_JACK": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "v142-ninja",
+      "configurePreset": "v142-ninja"
+    },
+    {
+      "name": "linux-runtime",
+      "configurePreset": "linux-runtime",
+      "targets": ["RangeRuntime"]
+    },
+    {
+      "name": "android-runtime",
+      "configurePreset": "android-runtime",
+      "targets": ["RangeRuntime"]
+    }
+  ]
+}

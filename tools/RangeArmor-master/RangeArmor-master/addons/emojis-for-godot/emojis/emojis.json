@@ -1,0 +1,158 @@
+[
+  {
+    "name": "people",
+    "emojis": [
+      {
+        "unicode": "1f4da",
+        "unicode_alt": "",
+        "code_decimal": "&#128218;",
+        "name": "books",
+        "shortname": ":books:",
+        "category": "objects",
+        "emoji_order": "1880",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "object",
+          "office",
+          "write",
+          "book",
+          "books"
+        ],
+        "hex": "1f4da",
+        "char": "📚"
+      },
+      {
+        "unicode": "1f4c4",
+        "unicode_alt": "",
+        "code_decimal": "&#128196;",
+        "name": "page facing up",
+        "shortname": ":page_facing_up:",
+        "category": "objects",
+        "emoji_order": "1885",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "work",
+          "office",
+          "write",
+          "page_facing_up"
+        ],
+        "hex": "1f4c4",
+        "char": "📄"
+      },
+      {
+        "unicode": "1f4f0",
+        "unicode_alt": "",
+        "code_decimal": "&#128240;",
+        "name": "newspaper",
+        "shortname": ":newspaper:",
+        "category": "objects",
+        "emoji_order": "1886",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "office",
+          "write",
+          "newspaper"
+        ],
+        "hex": "1f4f0",
+        "char": "📰"
+      },
+      {
+        "unicode": "1f4d1",
+        "unicode_alt": "",
+        "code_decimal": "&#128209;",
+        "name": "bookmark tabs",
+        "shortname": ":bookmark_tabs:",
+        "category": "objects",
+        "emoji_order": "1888",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "office",
+          "write",
+          "bookmark_tabs"
+        ],
+        "hex": "1f4d1",
+        "char": "📑"
+      },
+      {
+        "unicode": "1f4c1",
+        "unicode_alt": "",
+        "code_decimal": "&#128193;",
+        "name": "file folder",
+        "shortname": ":file_folder:",
+        "category": "objects",
+        "emoji_order": "1922",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "work",
+          "office",
+          "file_folder"
+        ],
+        "hex": "1f4c1",
+        "char": "📁"
+      },
+      {
+        "unicode": "1f4c2",
+        "unicode_alt": "",
+        "code_decimal": "&#128194;",
+        "name": "open file folder",
+        "shortname": ":open_file_folder:",
+        "category": "objects",
+        "emoji_order": "1923",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "work",
+          "office",
+          "open_file_folder"
+        ],
+        "hex": "1f4c2",
+        "char": "📂"
+      },
+      {
+        "unicode": "2b05",
+        "unicode_alt": "2b05-fe0f",
+        "code_decimal": "&#11013;",
+        "name": "leftwards black arrow",
+        "shortname": ":arrow_left:",
+        "category": "symbols",
+        "emoji_order": "2008",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "arrow",
+          "symbol",
+          "arrow_left"
+        ],
+        "hex": "2b05",
+        "char": "⬅"
+      },
+      {
+        "unicode": "2795",
+        "unicode_alt": "",
+        "code_decimal": "&#10133;",
+        "name": "heavy plus sign",
+        "shortname": ":heavy_plus_sign:",
+        "category": "symbols",
+        "emoji_order": "2084",
+        "aliases": [],
+        "aliases_ascii": [],
+        "keywords": [
+          "math",
+          "symbol",
+          "heavy_plus_sign"
+        ],
+        "hex": "2795",
+        "char": "➕"
+      }
+    ],
+    "icon": {
+      "unicode": "1f1e6",
+      "char": "🇦"
+    }
+  }
+]

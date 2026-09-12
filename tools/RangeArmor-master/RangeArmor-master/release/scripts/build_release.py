@@ -1,0 +1,121 @@
+import common as _common
+from pathlib import Path
+
+ARCHIVE_EXT = "zip" if __import__("platform").system() == "Windows" else "xztar"
+
+args = _common.getArgs()
+data = _common.getProjectData()
+
+
+def main():
+    # type: () -> None
+
+    print("Started game release build")
+    
+    if data:
+        _performRelease()
+
+
+def _performRelease():
+    # type: () -> None
+
+    import os
+    import shutil
+
+    curPath = data["CurPath"]  # type: Path
+    targets = [args.get("--target")] if args.get("--target") else []  # type: list[str]
+    compress = args.get("--compress", False)
+
+    if "All" in targets:
+        targets = [i for i in data["EngineExecutables"].keys()]
+
+    releaseDir = curPath / "release"  # type: Path
+
+    if not releaseDir.exists():
+        releaseDir.mkdir()
+        print("> Directory of release created:", releaseDir.as_posix())
+
+    launcherDir = curPath / "launcher"
+    engineDir = curPath / "engine"
+    gameDataDir = curPath / "data"
+    # dataFile = curPath / data["DataFile"]  # type: Path XXX RANGEARMOR: DEPRECATED XXX
+
+    if not releaseDir.exists():
+        print("X Release directory do not exist:", releaseDir)
+        return
+
+    elif not launcherDir.exists():
+        print("X Launcher directory do not exist:", launcherDir)
+        return
+
+    elif not targets:
+        print("X At least one target must be specified")
+        return
+
+    else:
+
+        for target in targets:
+            hasErrors = False
+
+            print("\n> Building target:", target)
+            launcherExt = ".exe" if "Windows" in target else ""
+            releaseTargetPath = releaseDir / ("-".join([_common.formatFileName(data["GameName"], spaces=False), data["Version"], target]))
+            releaseTargetLauncherPath = releaseTargetPath / "launcher"
+            releaseTargetEnginePath = releaseTargetPath / "engine"
+            releaseTargetGameDataPath = releaseTargetPath / "data"
+
+            print("STAGE 1: Folders")
+            if releaseTargetPath.exists():
+                print("    > Removing existing directory:", releaseTargetPath)
+                shutil.rmtree(releaseTargetPath.as_posix(), True)
+
+            if not releaseTargetPath.exists():
+                print("    > Creating directory:", releaseTargetPath)
+                releaseTargetPath.mkdir()
+                releaseTargetLauncherPath.mkdir()
+                releaseTargetEnginePath.mkdir()
+
+            print("STAGE 2: Game Data")
+            print("    > Copying all game data file to:", releaseTargetPath)
+            shutil.copytree(gameDataDir.as_posix(), releaseTargetGameDataPath.as_posix())
+
+            print("STAGE 3: Launcher Files")
+            print("    > Copying launcher files from:", launcherDir)
+            print("        > Copying launcher config:", releaseTargetLauncherPath / "config.json")
+            shutil.copy2(Path(data["ProjectFile"]).as_posix(), (releaseTargetLauncherPath / "config.json").as_posix())
+
+            launcherExecutable = launcherDir / ("Launcher" + launcherExt)  # type: Path
+
+            if launcherExecutable.is_file():
+                launcherExecutableTarget = releaseTargetPath / (_common.formatFileName(data["GameName"]) + launcherExt)
+                print("        > Copying launcher executable to:", launcherExecutableTarget)
+                shutil.copy2(launcherExecutable.as_posix(), launcherExecutableTarget.as_posix())
+                if launcherExt == "":
+                    launcherExecutableTarget.chmod(launcherExecutableTarget.stat().st_mode | 0o111)
+
+            else:
+                hasErrors = True
+                print("        X Could not find launcher executable for " + target + " on:", launcherDir)
+                
+            print("STAGE 4: RanGE Engine")
+            print("    > Copying engine files to:", releaseTargetEnginePath / target)
+            shutil.copytree((engineDir / target).as_posix(), (releaseTargetEnginePath / target).as_posix())
+
+            if compress:
+                if not hasErrors:
+                    archive_suffix = ".zip" if ARCHIVE_EXT == "zip" else ".tar.xz"
+                    print("    > Compressing target release to:", releaseTargetPath.as_posix() + archive_suffix)
+                    os.chdir(releaseTargetPath.parent.as_posix())
+                    shutil.make_archive(releaseTargetPath.name, ARCHIVE_EXT, releaseTargetPath.parent.as_posix(), releaseTargetPath.name)
+                    os.chdir(curPath.as_posix())
+                else:
+                    print("    > Errors happened, will not compress this release")
+
+            if not hasErrors:
+                print("    > Build successful:", target)
+
+
+try:
+    main()
+except Exception as e:
+    print(e)

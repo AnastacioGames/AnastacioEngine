@@ -1,0 +1,16 @@
+build/
+build_core/
+install/
+.vs/
+lib/
+projects-teste/**/*.range
+projects-teste/**/*.range1
+projects-teste/**/*.rasec
+projects-teste/__pycache__/
+projects-teste/scripts/__pycache__/
+projects-teste/benchmarks/
+.vscode/
+logs/archive/
+build_log*.txt
+*.log
+imgui.ini
