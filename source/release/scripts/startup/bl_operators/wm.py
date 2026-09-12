@@ -2568,106 +2568,275 @@ class WM_OT_create_project(Operator):
         return {'FINISHED'}
 
 
+def _rangearmor_write_export_preset(context):
+    """Sync the export preset fields from Scene.rangearmor_export into the
+    project's launcher/config.json, without touching any other key.
+
+    RangeArmor Panel validates config.json against a strict key
+    whitelist (see welcome.gd _validate_data / globals.gd
+    DEFAULT_FIELDS): only known keys may be written, or the project
+    fails to load there. GameName, Version, CompanyName, IconPath,
+    ExportWindows64 and ExportLinux64 are all part of that schema, so
+    this is safe for old and new projects alike; it silently does
+    nothing if the file is missing or the current file isn't part of a
+    RangeArmor project structure.
+    """
+    filepath = bpy.data.filepath
+    if not filepath:
+        return
+
+    data_dir = os.path.dirname(filepath)
+    if os.path.basename(data_dir) != "data":
+        return
+
+    project_dir = os.path.dirname(data_dir)
+    config_path = os.path.join(project_dir, "launcher", "config.json")
+    if not os.path.isfile(config_path):
+        return
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            config_data = json.load(config_file)
+    except (OSError, ValueError):
+        return
+
+    # The engine only ships the encrypted .rasec sibling of the currently
+    # open .range file (*.range is excluded from the release data via
+    # DEFAULT_FIELDS["Ignore"]), so MainFile must always track it -
+    # otherwise the exported Launcher can't find its game data and quits
+    # immediately after opening. If the .rasec was never saved (project
+    # was not created through "New Project"), generate it now the same
+    # way "New Project" does.
+    rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
+    rasec_path = os.path.join(data_dir, rasec_name)
+    if not os.path.isfile(rasec_path):
+        bpy.ops.wm.save_as_mainfile_protected(
+            'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    if os.path.isfile(rasec_path):
+        config_data["MainFile"] = rasec_name
+
+    export_settings = getattr(context.scene, "rangearmor_export", None)
+    if export_settings is None:
+        try:
+            with open(config_path, "w", encoding="utf-8") as config_file:
+                json.dump(config_data, config_file, indent="\t")
+        except OSError:
+            pass
+        return
+
+    if export_settings.product_name:
+        config_data["GameName"] = export_settings.product_name
+    if export_settings.product_version:
+        config_data["Version"] = export_settings.product_version
+    if export_settings.company_name:
+        config_data["CompanyName"] = export_settings.company_name
+    if export_settings.icon_path:
+        config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
+    config_data["ExportWindows64"] = export_settings.export_windows64
+    config_data["ExportLinux64"] = export_settings.export_linux64
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            json.dump(config_data, config_file, indent="\t")
+    except OSError:
+        pass
+
+
+_RANGEARMOR_DEFAULT_FIELDS = {
+    "GameName": "Game",
+    "Version": "1.0.0",
+    "BGArmorVersion": 0,
+    "MainFile": "Example Game.rasec",
+    "DataFile": "./data.dat",
+    "DataSource": "./data",
+    "DataChunkSize": 32,
+    "CompressionLevel": 1,
+    "CompileScripts": False,
+    "ExportCompress": False,
+    "CompanyName": "",
+    "IconPath": "",
+    "ExportWindows64": True,
+    "ExportLinux64": True,
+    "EngineWindows64": "./engine/Windows64/RangeRuntime.exe",
+    "EngineLinux64": "./engine/Linux64/RangeRuntime",
+    "PythonWindows64": "./engine/Windows64/2.79/python/bin/python.exe",
+    "PythonLinux64": "./engine/Linux64/2.79/python/bin/python3.11",
+    "AlternativePython": "/2.79/python/bin/python.exe",
+    "AlternativePythonLinux": "/2.79/python/bin/python3.11",
+    "Persistent": ["*.bgeconf"],
+    "Ignore": ["*.pyc", "*.range"],
+}
+
+
+def _rangearmor_ensure_launcher_template_fresh(template_dir):
+    # type: (str) -> None
+    """Auto-rebuild the Launcher(.exe) template if it's older than its own
+    Rust source (source/launcher/src/main.rs).
+
+    tools/RangeArmor-master/.../release/launcher/Launcher.exe is a
+    prebuilt binary, not versioned in git. If it's ever stale (e.g. the
+    launcher's tools/RangeArmor-master folder gets reinstalled/reset
+    from an older source snapshot), every scaffolded project ships a
+    broken launcher that panics on startup ("abre e fecha"). Rather than
+    surface that as an export error, rebuild automatically here whenever
+    a fresher main.rs is available and cargo is on PATH; best-effort and
+    silent on any failure, since the shipped template still works most
+    of the time and export shouldn't be blocked by this.
+    """
+    import subprocess
+
+    launcher_ext = ".exe" if sys.platform == "win32" else ""
+    template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
+
+    # tools/RangeArmor-master/RangeArmor-master/release -> .../source/launcher
+    rangearmor_root = os.path.dirname(template_dir)
+    launcher_src_dir = os.path.join(rangearmor_root, "source", "launcher")
+    main_rs = os.path.join(launcher_src_dir, "src", "main.rs")
+    if not os.path.isfile(main_rs):
+        return
+
+    if os.path.isfile(template_launcher_bin):
+        if os.path.getmtime(template_launcher_bin) >= os.path.getmtime(main_rs):
+            return
+
+    if not shutil.which("cargo"):
+        return
+
+    target = "x86_64-pc-windows-msvc" if sys.platform == "win32" else "x86_64-unknown-linux-gnu"
+    try:
+        result = subprocess.run(
+            ["cargo", "build", "--release", "--target", target],
+            cwd=launcher_src_dir, capture_output=True, text=True, timeout=300,
+        )
+    except Exception:
+        return
+    if result.returncode != 0:
+        return
+
+    built_bin = os.path.join(launcher_src_dir, "target", target, "release", "rangearmor" + launcher_ext)
+    if not os.path.isfile(built_bin):
+        return
+
+    try:
+        os.makedirs(os.path.dirname(template_launcher_bin), exist_ok=True)
+        shutil.copy2(built_bin, template_launcher_bin)
+    except OSError:
+        pass
+
+
+def _rangearmor_scaffold_project(project_dir):
+    # type: (str) -> str | None
+    """Recreate, in pure Python, what "Open RangeArmor Panel" + "New
+    Project" would have set up for this project: launcher/config.json,
+    the Launcher(.exe) binary and the engine/Windows64, engine/Linux64,
+    launcher and icons folders.
+
+    This lets "Export Game (1 Click)" work on a project that was never
+    opened in RangeArmor Panel before, instead of just telling the user
+    to go open it once. Returns an error message string on failure, or
+    None on success.
+    """
+    import sys
+
+    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+    template_dir = os.path.join(rangearmor_dir, "release")
+    if not os.path.isdir(template_dir):
+        return "RangeArmor Panel template files not found at %s" % template_dir
+
+    for folder in ("data", "engine", "engine/Linux64", "engine/Windows64", "launcher", "icons"):
+        try:
+            os.makedirs(os.path.join(project_dir, *folder.split("/")), exist_ok=True)
+        except OSError as e:
+            return "Could not create project folder %s: %s" % (folder, e)
+
+    config_path = os.path.join(project_dir, "launcher", "config.json")
+    if not os.path.isfile(config_path):
+        try:
+            with open(config_path, "w", encoding="utf-8") as config_file:
+                json.dump(_RANGEARMOR_DEFAULT_FIELDS, config_file, indent="\t")
+        except OSError as e:
+            return "Could not create launcher/config.json: %s" % e
+
+    # O binário template (tools/RangeArmor-master/.../release/launcher/Launcher.exe) não é
+    # versionado em git e pode ficar desatualizado (ex.: reinstalação do tools/RangeArmor-master
+    # a partir de uma fonte externa), causando um launcher que panica ao abrir ("abre e fecha").
+    # _rangearmor_ensure_launcher_template_fresh recompila automaticamente com cargo quando
+    # detecta que o binário é mais antigo que o source Rust, antes de copiá-lo para o projeto.
+    _rangearmor_ensure_launcher_template_fresh(template_dir)
+
+    launcher_ext = ".exe" if sys.platform == "win32" else ""
+    launcher_bin = os.path.join(project_dir, "launcher", "Launcher" + launcher_ext)
+    if not os.path.isfile(launcher_bin):
+        template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
+        if os.path.isfile(template_launcher_bin):
+            try:
+                shutil.copy2(template_launcher_bin, launcher_bin)
+                if launcher_ext == "":
+                    os.chmod(launcher_bin, os.stat(launcher_bin).st_mode | 0o111)
+            except OSError as e:
+                return "Could not copy Launcher%s: %s" % (launcher_ext, e)
+
+    for icon_name in ("icon-engine.ico", "icon-launcher.ico"):
+        icon_path = os.path.join(project_dir, "icons", icon_name)
+        if not os.path.isfile(icon_path):
+            template_icon = os.path.join(template_dir, "icons", icon_name)
+            if os.path.isfile(template_icon):
+                try:
+                    shutil.copy2(template_icon, icon_path)
+                except OSError:
+                    pass
+
+    return None
+
+
+def _rangearmor_ensure_launcher_script(context):
+    """Copy the panel's bundled launcher.py into the current project's
+    launcher/ folder if it's missing.
+
+    Some RangeArmor Panel builds don't include launcher.py when
+    scaffolding a new project (only Launcher.exe/Launcher), which makes
+    both "Run" and "Export" fail with "Could not find script
+    launcher.py" / a copy error. Since this comes from the project
+    template, not from config.json, it's outside the config-writing
+    whitelist above; this just makes sure the file is there before the
+    panel is used, using the panel's own bundled copy as the source.
+    """
+    filepath = bpy.data.filepath
+    if not filepath:
+        return
+
+    data_dir = os.path.dirname(filepath)
+    if os.path.basename(data_dir) != "data":
+        return
+
+    project_dir = os.path.dirname(data_dir)
+    launcher_dir = os.path.join(project_dir, "launcher")
+    launcher_script = os.path.join(launcher_dir, "launcher.py")
+    if os.path.isfile(launcher_script) or not os.path.isdir(launcher_dir):
+        return
+
+    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+    template_script = os.path.join(rangearmor_dir, "release", "launcher", "launcher.py")
+    if not os.path.isfile(template_script):
+        return
+
+    try:
+        shutil.copy2(template_script, launcher_script)
+    except OSError:
+        pass
+
+
 class WM_OT_export_with_rangearmor(Operator):
     """Open RANGEARMOR to export you game"""
     bl_idname = "wm.export_with_rangearmor"
     bl_label = ""
     bl_options = {'INTERNAL'}
 
-    def _write_export_preset(self, context):
-        """Sync the export preset fields from Scene.rangearmor_export into the
-        project's launcher/config.json, without touching any other key.
-
-        RangeArmor Panel validates config.json against a strict key
-        whitelist (see welcome.gd _validate_data / globals.gd
-        DEFAULT_FIELDS): only known keys may be written, or the project
-        fails to load there. GameName, Version, CompanyName, IconPath,
-        ExportWindows64 and ExportLinux64 are all part of that schema, so
-        this is safe for old and new projects alike; it silently does
-        nothing if the file is missing or the current file isn't part of a
-        RangeArmor project structure.
-        """
-        export_settings = getattr(context.scene, "rangearmor_export", None)
-        if export_settings is None:
-            return
-
-        filepath = bpy.data.filepath
-        if not filepath:
-            return
-
-        data_dir = os.path.dirname(filepath)
-        if os.path.basename(data_dir) != "data":
-            return
-
-        project_dir = os.path.dirname(data_dir)
-        config_path = os.path.join(project_dir, "launcher", "config.json")
-        if not os.path.isfile(config_path):
-            return
-
-        try:
-            with open(config_path, "r", encoding="utf-8") as config_file:
-                config_data = json.load(config_file)
-        except (OSError, ValueError):
-            return
-
-        if export_settings.product_name:
-            config_data["GameName"] = export_settings.product_name
-        if export_settings.product_version:
-            config_data["Version"] = export_settings.product_version
-        if export_settings.company_name:
-            config_data["CompanyName"] = export_settings.company_name
-        if export_settings.icon_path:
-            config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
-        config_data["ExportWindows64"] = export_settings.export_windows64
-        config_data["ExportLinux64"] = export_settings.export_linux64
-
-        try:
-            with open(config_path, "w", encoding="utf-8") as config_file:
-                json.dump(config_data, config_file, indent="\t")
-        except OSError:
-            pass
-
-    def _ensure_launcher_script(self, context):
-        """Copy the panel's bundled launcher.py into the current project's
-        launcher/ folder if it's missing.
-
-        Some RangeArmor Panel builds don't include launcher.py when
-        scaffolding a new project (only Launcher.exe/Launcher), which makes
-        both "Run" and "Export" fail with "Could not find script
-        launcher.py" / a copy error. Since this comes from the project
-        template, not from config.json, it's outside the config-writing
-        whitelist above; this just makes sure the file is there before the
-        panel is used, using the panel's own bundled copy as the source.
-        """
-        filepath = bpy.data.filepath
-        if not filepath:
-            return
-
-        data_dir = os.path.dirname(filepath)
-        if os.path.basename(data_dir) != "data":
-            return
-
-        project_dir = os.path.dirname(data_dir)
-        launcher_dir = os.path.join(project_dir, "launcher")
-        launcher_script = os.path.join(launcher_dir, "launcher.py")
-        if os.path.isfile(launcher_script) or not os.path.isdir(launcher_dir):
-            return
-
-        rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
-        template_script = os.path.join(rangearmor_dir, "release", "launcher", "launcher.py")
-        if not os.path.isfile(template_script):
-            return
-
-        try:
-            shutil.copy2(template_script, launcher_script)
-        except OSError:
-            pass
-
     def execute(self, context):
         import os, sys, subprocess
 
-        self._write_export_preset(context)
-        self._ensure_launcher_script(context)
+        _rangearmor_write_export_preset(context)
+        _rangearmor_ensure_launcher_script(context)
 
         if sys.platform == "win32":
             os.startfile(bpy.app.binary_path[:-15] + "rangearmor\RangeArmor Panel.exe")
@@ -2676,7 +2845,126 @@ class WM_OT_export_with_rangearmor(Operator):
         exe_path = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel")
         subprocess.run([exe_path])
         return {'FINISHED'}
-        
+
+
+class WM_OT_one_click_export_rangearmor(Operator):
+    """Export the game straight to the release folder, without opening RangeArmor Panel"""
+    bl_idname = "wm.one_click_export_rangearmor"
+    bl_label = "Export Game (1 Click)"
+    bl_options = {'INTERNAL'}
+
+    def _resolve_python(self, project_dir, config_data):
+        # type: (str, dict) -> str | None
+        """Mirror editor.gd _get_python_current_os(): prefer the Python
+        bundled with the RangeEngine install running this Blender, falling
+        back to the one bundled inside the project's own engine/ folder.
+        """
+        import sys
+
+        cur_os = "Windows" if sys.platform == "win32" else "Linux"
+        engine_dir = os.path.dirname(bpy.app.binary_path)
+        alt_key = "AlternativePython" if cur_os == "Windows" else "AlternativePythonLinux"
+        alt_rel = config_data.get(alt_key, "")
+        if alt_rel:
+            candidate = engine_dir + alt_rel
+            if os.path.isfile(candidate):
+                return candidate
+
+        proj_rel = config_data.get("Python" + cur_os + "64", "")
+        if proj_rel:
+            candidate = os.path.normpath(os.path.join(project_dir, proj_rel))
+            if os.path.isfile(candidate):
+                return candidate
+
+        return None
+
+    def execute(self, context):
+        import sys
+        import subprocess
+
+        filepath = bpy.data.filepath
+        if not filepath:
+            self.report({'ERROR'}, "Save the .blend file inside the project's data/ folder first")
+            return {'CANCELLED'}
+
+        data_dir = os.path.dirname(filepath)
+        if os.path.basename(data_dir) != "data":
+            self.report({'ERROR'}, "Current file is not inside a RangeArmor project (expected <project>/data/*.blend)")
+            return {'CANCELLED'}
+
+        project_dir = os.path.dirname(data_dir)
+        config_path = os.path.join(project_dir, "launcher", "config.json")
+
+        wm = context.window_manager
+        wm.progress_begin(0, 5)
+        context.window.cursor_set('WAIT')
+        try:
+            scaffold_error = _rangearmor_scaffold_project(project_dir)
+            wm.progress_update(1)
+            if scaffold_error:
+                self.report({'ERROR'}, scaffold_error)
+                return {'CANCELLED'}
+
+            _rangearmor_write_export_preset(context)
+            _rangearmor_ensure_launcher_script(context)
+            wm.progress_update(2)
+
+            try:
+                with open(config_path, "r", encoding="utf-8") as config_file:
+                    config_data = json.load(config_file)
+            except (OSError, ValueError) as e:
+                self.report({'ERROR'}, "Could not read config.json: %s" % e)
+                return {'CANCELLED'}
+
+            rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+            build_script = os.path.join(rangearmor_dir, "release", "scripts", "build_release.py")
+            if not os.path.isfile(build_script):
+                self.report({'ERROR'}, "build_release.py not found next to RangeArmor Panel (expected %s)" % build_script)
+                return {'CANCELLED'}
+
+            python_exe = self._resolve_python(project_dir, config_data)
+            if not python_exe:
+                self.report({'ERROR'}, "Could not find a Python interpreter for the export. Open RangeArmor Panel and click 'Get RanGE' once, then try again.")
+                return {'CANCELLED'}
+
+            get_range_script = os.path.join(rangearmor_dir, "release", "scripts", "get_rangeengine_currentplatform.py")
+            engine_windows = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
+            engine_linux = os.path.join(project_dir, "engine", "Linux64", "RangeRuntime")
+            if os.path.isfile(get_range_script) and not (os.path.isfile(engine_windows) or os.path.isfile(engine_linux)):
+                subprocess.run(
+                    [python_exe, get_range_script, "--project", config_path, "--all-platforms"],
+                    cwd=project_dir, capture_output=True, text=True, timeout=600,
+                )
+            wm.progress_update(3)
+
+            args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress"]
+            try:
+                result = subprocess.run(args, cwd=project_dir, capture_output=True, text=True, timeout=600)
+            except Exception as e:
+                self.report({'ERROR'}, "Export failed to start: %s" % e)
+                return {'CANCELLED'}
+            wm.progress_update(4)
+
+            output = (result.stdout or "") + (result.stderr or "")
+            print(output)
+            if result.returncode != 0 or "X " in output:
+                self.report({'ERROR'}, "Export finished with errors, see console for details")
+                return {'CANCELLED'}
+
+            release_dir = os.path.join(project_dir, "release")
+            if os.path.isdir(release_dir):
+                if sys.platform == "win32":
+                    os.startfile(release_dir)
+                else:
+                    subprocess.run(["xdg-open", release_dir])
+
+            wm.progress_update(5)
+            self.report({'INFO'}, "Game exported to: %s" % release_dir)
+            return {'FINISHED'}
+        finally:
+            wm.progress_end()
+            context.window.cursor_set('DEFAULT')
+
 ############################ Input System #####################################
 class INPUTMAPS_UL_list(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
@@ -3113,6 +3401,7 @@ classes = (
     WM_MT_splash_about,
     WM_OT_create_project,
     WM_OT_export_with_rangearmor,
+    WM_OT_one_click_export_rangearmor,
     INPUTMAPS_UL_list,
     INPUTTABLE_UL_list,
     WM_OT_inputsystem_save_binding,

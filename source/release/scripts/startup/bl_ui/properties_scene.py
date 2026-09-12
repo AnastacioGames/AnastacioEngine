@@ -520,6 +520,7 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box.prop(export, "company_name")
         box.prop(export, "icon_path")
 
+        layout.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
         layout.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
 
 

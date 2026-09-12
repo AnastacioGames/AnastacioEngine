@@ -89,6 +89,15 @@ ferramenta correspondente.
   automaticamente a partir desses dados — não é mais só um marcador de design. `KX_GameObject::getVehicle()`
   expõe o veículo já pronto para Python. O painel Vehicle também tem um botão para criar/anexar o
   `vehicle_player_component.py` de controle jogável direto no objeto.
+- "Export Game (1 Click)" (`Scene > Export (RangeArmor)`) empacota o jogo direto do Blender sem
+  precisar abrir o RangeArmor Panel manualmente antes: scaffold do projeto (`config.json`,
+  `Launcher.exe`, ícones, runtime), geração do `.rasec` protegido e chamada do `build_release.py`
+  são todos automáticos, com barra de progresso/cursor de espera durante o processo. O template de
+  `Launcher.exe` usado no scaffold também se mantém sempre atualizado sozinho: se estiver mais
+  antigo que seu source Rust (`source/launcher/src/main.rs`), é recompilado automaticamente com
+  `cargo build --release` antes de ser copiado, sem diálogo nem passo manual — evita que um
+  binário desatualizado volte a causar o jogo exportado "abrindo e fechando" na hora. Ver
+  `docs/export-presets-plan.md` e `docs/changelog.md` (2026-09-12).
 
 ## Decisões técnicas vigentes
 

@@ -8,6 +8,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 | Data | Resumo |
 |---|---|
+| [2026-09-12 (Export 1 clique — rebuild automático do template Launcher.exe)](#2026-09-12--export-1-clique--rebuild-automatico-do-template-launcherexe) | Scaffold detecta sozinho se `Launcher.exe` template está mais antigo que `main.rs` e recompila com `cargo build --release` automaticamente, sem confirmação nem passo manual — elimina de vez a classe de bug "abre e fecha" mesmo após reinstalar `tools/RangeArmor-master` |
+| [2026-09-12 (Export 1 clique — scaffold automático, progresso e Launcher.exe corrompido)](#2026-09-12--export-1-clique--scaffold-automatico-progresso-e-launcherexe-corrompido) | Scaffolding do projeto (`config.json`/`Launcher.exe`/ícones/runtime) e `.rasec` agora são gerados automaticamente pelo botão; barra de progresso + cursor de espera durante o export; `Launcher.exe` template estava compilado de um `main.rs` antigo com `.unwrap()` e sempre crashava ("abre e fecha") — recompilado |
+| [2026-09-12 (Export — botão 1 clique)](#2026-09-12--export--botao-1-clique) | Novo `wm.one_click_export_rangearmor` roda `build_release.py` direto (sem abrir o RangeArmor Panel) e abre a pasta `release/` no final |
 | [2026-09-11 (Modo seguro — pastas de config ausentes)](#2026-09-11--modo-seguro--wm_init-recria-pastas-de-config-ausentes) | `WM_init()` recria `config`/`scripts`/`datafiles` se ausentes; crash de config ausente corrigido; fix é cross-platform (mesmo código C, sem `#ifdef _WIN32`) |
 | [2026-09-10 (View 3D — gizmo de navegação)](#2026-09-10--view-3d--gizmo-de-navegacao) | Indicador de eixos legado substituído pelo gizmo visual da Range 1.6 Rev2; aguarda inspeção visual |
 | [2026-09-10 (Iluminação — preset padrão de Sun)](#2026-09-10--iluminacao--preset-padrao-de-sun) | Novas Lamps usam o preset CSM de sombra solicitado |
@@ -150,6 +153,99 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `%APPDATA%\RangeEngine` de verdade e rodando `RangeEngine.exe`: antes deste fix, crash
   (`EXCEPTION_ACCESS_VIOLATION` na tela de splash); depois, o processo abre e permanece rodando
   normalmente, com as três pastas (`config`/`datafiles`/`scripts`) recriadas vazias como esperado.
+
+## 2026-09-12 — Export 1 clique — rebuild automático do template Launcher.exe
+
+- **Motivação**: o Fix 4 da entrada abaixo resolveu o bug corrigindo manualmente o binário
+  `Launcher.exe` uma vez (via `cargo build --release` rodado à mão no terminal), mas o problema
+  podia voltar silenciosamente se `tools/RangeArmor-master` fosse reinstalado/reclonado (o binário
+  não é rastreado em git). Usuário pediu para eliminar esse passo manual de vez: detectar o caso e
+  já corrigir sozinho, de forma automática, sem diálogo de confirmação nem intervenção manual.
+- **Fix — `_rangearmor_ensure_launcher_template_fresh(template_dir)`**
+  (`source/release/scripts/startup/bl_operators/wm.py`), chamada no início de
+  `_rangearmor_scaffold_project` antes de copiar `Launcher.exe` para o projeto: compara a data de
+  modificação do `Launcher.exe` template com a de `source/launcher/src/main.rs`; se o `.rasec`/
+  Launcher template estiver mais antigo que o source (ou não existir), e `cargo` estiver disponível
+  no PATH, roda `cargo build --release --target x86_64-pc-windows-msvc` (ou
+  `x86_64-unknown-linux-gnu` em Linux) dentro de `source/launcher` e copia o binário resultante
+  por cima do template automaticamente, antes do resto do scaffold prosseguir. Melhor-esforço e
+  silencioso em qualquer falha (cargo ausente, build falhar, `main.rs` não encontrado): nesses
+  casos apenas mantém o comportamento anterior (usa o template como está), sem bloquear o export.
+- **Efeito**: qualquer clique em "Export Game (1 Click)" agora garante — sozinho, sem passo
+  manual — que o `Launcher.exe` usado no scaffold nunca fica desatualizado em relação ao source
+  Rust atual, eliminando de vez a classe de bug "abre e fecha" descrita no Fix 4 abaixo, mesmo após
+  reinstalações futuras de `tools/RangeArmor-master`.
+
+## 2026-09-12 — Export 1 clique — scaffold automático, progresso e Launcher.exe corrompido
+
+- **Motivação**: usuário reportou que o botão "Export Game (1 Click)" ainda exigia abrir o
+  RangeArmor Panel manualmente uma vez antes (para gerar `launcher/config.json`, `Launcher.exe`,
+  ícones e runtime do engine), e pediu para automatizar isso no próprio clique. Também pediu um
+  indicador visual de carregamento durante o export ("faça o mais fácil").
+- **Fix 1 — scaffold automático**: `WM_OT_one_click_export_rangearmor.execute()`
+  (`source/release/scripts/startup/bl_operators/wm.py`) agora chama
+  `_rangearmor_scaffold_project(project_dir)` no início, que recria em Python puro a mesma
+  estrutura que o RangeArmor Panel criaria (`welcome.gd:_create_new_project`/
+  `scripts/globals.gd:DEFAULT_PROJECT_FOLDERS`/`DEFAULT_PROJECT_FILES`/`DEFAULT_FIELDS`): pastas
+  `data`/`engine`/`engine/Linux64`/`engine/Windows64`/`launcher`/`icons`, `launcher/config.json`
+  com os defaults, e cópia de `Launcher(.exe)`/ícones a partir do template empacotado com o
+  RangeArmor Panel, se ainda não existirem. Também dispara automaticamente
+  `get_rangeengine_currentplatform.py --all-platforms` se `engine/<plataforma>` ainda não tiver o
+  runtime copiado. Abrir o painel manualmente continua funcionando, mas deixou de ser necessário.
+- **Fix 2 — indicador de progresso**: todo o corpo do operador foi envolto em
+  `wm.progress_begin(0, 5)`/`wm.progress_update(n)`/`wm.progress_end()` (percentual ao lado do
+  cursor) e `context.window.cursor_set('WAIT'/'DEFAULT')`, dentro de um `try/finally` para garantir
+  que o cursor volte ao normal mesmo se o export falhar no meio do caminho.
+- **Fix 3 — `MainFile` desatualizado ("abre e fecha", causa nº 1)**: `_rangearmor_write_export_preset`
+  deixava `MainFile` no valor default `"Example Game.rasec"` quando o projeto nunca tinha sido
+  salvo como protegido (`.rasec`) antes — o launcher exportado procurava um arquivo que não
+  existia e fechava sozinho. Agora, se o `.rasec` correspondente ao `.blend` atual não existir em
+  `data/`, ele é gerado automaticamente via `bpy.ops.wm.save_as_mainfile_protected(...)` (mesma
+  lógica do botão "Save as Protected"), e `MainFile` é sempre sincronizado com o nome real do
+  `.rasec`.
+- **Fix 4 — `Launcher.exe` desatualizado ("abre e fecha", causa nº 2, mais grave)**: mesmo depois
+  do fix 3, o executável exportado continuava abrindo e fechando na hora. Investigação (formato
+  binário do `.rasec` byte-a-byte, `RangeRuntime.exe` chamado direto, `launcher.py` legado) não
+  encontrou nada quebrado — até rodar o `.exe` renomeado direto pelo terminal, que revelou um
+  panic do Rust: `thread 'main' panicked at 'called Option::unwrap() on a None value',
+  src\main.rs:137:60`. O `Launcher.exe` template usado no scaffold
+  (`tools/RangeArmor-master/RangeArmor-master/release/launcher/Launcher.exe`) estava compilado de
+  uma versão antiga de `source/launcher/src/main.rs` (o launcher Rust real, não confundir com o
+  painel Godot nem com o `gui-rs` do editor do RangeArmor Panel) que ainda tinha um `.unwrap()`
+  problemático; o `main.rs` atual no repositório já usa `map_err`/`ok_or_else` em todos os pontos
+  equivalentes e não tem esse bug. **Recompilado** com
+  `cargo build --release --target x86_64-pc-windows-msvc` a partir do source atual, e o `.exe`
+  resultante substituiu o template em `release/launcher/Launcher.exe` (usado pelo scaffold para
+  todo projeto novo) — validado rodando o launcher reconstruído no projeto de teste do usuário
+  (`D:\teste_export\MyProject`), que agora inicia o `RangeRuntime.exe` corretamente sem panic.
+  **Ainda não versionado**: o binário `release/launcher/Launcher.exe` não está rastreado em git
+  (é um artefato binário); qualquer reinstalação/cópia futura desse diretório a partir de uma
+  fonte externa (ex.: reclonar `tools/RangeArmor-master`) vai trazer de volta o binário antigo —
+  se isso acontecer, repetir o `cargo build --release` acima e recopiar o `.exe`.
+
+## 2026-09-12 — Export — botão 1 clique
+
+- **Motivação**: o fluxo existente (`Scene > Export (RangeArmor)` → "Open RangeArmor Panel")
+  ainda exigia abrir o painel Godot separado e clicar em "Export All" lá dentro, além de copiar
+  manualmente os arquivos gerados para outro lugar.
+- **Achado**: `_on_ButtonExport_pressed` do painel (`editor.gd`) só chama `_run_script`, que roda
+  `python release/scripts/build_release.py --project <config.json> --target <alvo> [--compress]`
+  via `OS.execute`. Não há lógica adicional na UI Godot — o empacotamento inteiro (STAGE 1-4 de
+  `build_release.py`: pastas, dados do jogo, launcher, engine, compressão) é um script Python
+  autocontido, então dá para chamá-lo direto do Blender sem abrir o executável do painel.
+- **Fix**: novo operador `wm.one_click_export_rangearmor`
+  (`source/release/scripts/startup/bl_operators/wm.py`, `WM_OT_one_click_export_rangearmor`) e
+  botão "Export Game (1 Click)" no painel `Scene > Export (RangeArmor)`
+  (`bl_ui/properties_scene.py`). Reaproveita `_write_export_preset`/`_ensure_launcher_script` do
+  operador existente, resolve o Python do projeto do mesmo jeito que `editor.gd`
+  (`AlternativePython`/`AlternativePythonLinux` relativo à instalação do RangeEngine atual, com
+  fallback para `PythonWindows64`/`PythonLinux64` do próprio projeto), roda
+  `build_release.py --target All --compress` via `subprocess.run` e abre a pasta `release/`
+  resultante no Explorer/`xdg-open` ao final. Nenhuma mudança no RangeArmor Panel (Godot) foi
+  necessária.
+- **Fora de escopo / não testado nesta sessão**: execução end-to-end real dentro do Blender
+  (precisa de um projeto RangeArmor completo com `engine/Windows64` já populado via "Get RanGE").
+  Testar com um projeto real antes de confiar no botão para builds de release.
 
 ## 2026-09-11 — Modo seguro — `WM_init()` recria pastas de config ausentes
 

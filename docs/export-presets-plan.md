@@ -67,6 +67,36 @@
 5. **Sem migração de dados existente**: projetos antigos sem o bloco `rangearmor_export` na
    cena continuam funcionando exatamente como hoje (RNA com defaults, sem erro ao abrir).
 
+## Atualização 2026-09-12: botão "Export Game (1 Click)"
+
+Adicionado `wm.one_click_export_rangearmor` no mesmo painel `Scene > Export (RangeArmor)`, que
+chama `release/scripts/build_release.py --target All --compress` diretamente (mesmo script que o
+botão "Export All" do RangeArmor Panel usa via `OS.execute`), sem precisar abrir o executável do
+painel nem copiar arquivos manualmente depois — o resultado já sai compactado em
+`<projeto>/release/`, cuja pasta é aberta automaticamente ao final. Ver `docs/changelog.md`
+(2026-09-12) para detalhes de implementação.
+
+**Atualização 2026-09-12 (mesmo dia): scaffold automático + progresso + fix do Launcher.exe.**
+Testado end-to-end com um projeto real (`D:\teste_export\MyProject`). O botão agora funciona sem
+nenhum passo manual prévio (nem abrir o RangeArmor Panel, nem gerar `.rasec` à mão): scaffold do
+projeto, geração do `.rasec`, download do runtime do engine e barra de progresso/cursor de espera
+foram todos automatizados dentro do próprio operador. Um bug separado foi encontrado e corrigido
+durante o teste: o `Launcher.exe` usado como template do scaffold estava compilado de uma versão
+antiga do launcher Rust (`source/launcher/src/main.rs`) com um `.unwrap()` que sempre dava panic
+ao iniciar (sintoma: o jogo exportado "abre e fecha" instantaneamente). Recompilado via `cargo
+build --release` a partir do source atual — ver `docs/changelog.md` (2026-09-12, "scaffold
+automático, progresso e Launcher.exe corrompido") para o detalhamento completo, incluindo o aviso
+de que o `.exe` recompilado não é rastreado em git e precisa ser regerado se o diretório
+`tools/RangeArmor-master` for reinstalado a partir de uma fonte externa.
+
+**Atualização 2026-09-12 (mesmo dia): rebuild automático do template.** Esse passo manual de
+regerar o `.exe` deixou de ser necessário: `_rangearmor_ensure_launcher_template_fresh`
+(`source/release/scripts/startup/bl_operators/wm.py`) agora roda automaticamente no início do
+scaffold, comparando a data do `Launcher.exe` template com a de `source/launcher/src/main.rs` e
+recompilando sozinho via `cargo build --release` quando o template está desatualizado — sem
+diálogo de confirmação, sem passo manual. Ver `docs/changelog.md` (2026-09-12, "rebuild automático
+do template Launcher.exe").
+
 ## Fora de escopo nesta fase
 
 - Mudar formato/local de empacotamento (`.zip`/`.tar.xz`), já resolvido.
