@@ -208,7 +208,7 @@ endif()
 # Options
 
 # First platform specific non-cached vars
-if(UNIX AND NOT (APPLE OR HAIKU OR ANDROID))
+if(UNIX AND NOT (APPLE OR HAIKU OR ANDROID OR EMSCRIPTEN))
 	set(WITH_X11 ON)
 endif()
 
@@ -982,6 +982,8 @@ endif()
 
 if(ANDROID)
 	include(platform_android)
+elseif(EMSCRIPTEN)
+	include(platform_web)
 elseif(UNIX AND NOT APPLE)
 	include(platform_unix)
 elseif(WIN32)

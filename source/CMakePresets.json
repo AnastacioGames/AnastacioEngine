@@ -107,6 +107,57 @@
         "WITH_INPUT_NDOF": "OFF",
         "WITH_JACK": "OFF"
       }
+    },
+    {
+      "name": "web-runtime",
+      "displayName": "AnastacioEngine Runtime (Web/Emscripten wasm32)",
+      "description": "Preliminar/experimental: preset base para cross-compile via Emscripten. Nao existe adaptacao do loop principal para emscripten_set_main_loop ainda (ver docs/web-export-plan.md); este preset so configura a toolchain, o build pode falhar antes de chegar no rasterizer/janela.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build-web",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe",
+        "WITH_BLENDER": "OFF",
+        "WITH_PYTHON": "OFF",
+        "WITH_PLAYER": "ON",
+        "WITH_INSTALL_PORTABLE": "ON",
+        "WITH_PYTHON_INSTALL": "OFF",
+        "WITH_PYTHON_INSTALL_NUMPY": "OFF",
+        "WITH_PYTHON_INSTALL_REQUESTS": "OFF",
+        "WITH_DOC_MANPAGE": "OFF",
+        "WITH_SYSTEM_GLEW": "OFF",
+        "WITH_GLEW_ES": "ON",
+        "WITH_GL_EGL": "OFF",
+        "WITH_GL_PROFILE_COMPAT": "OFF",
+        "WITH_GL_PROFILE_ES20": "ON",
+        "WITH_SYSTEM_GLES": "OFF",
+        "OPENGLES_LIBRARY": "-lGL",
+        "WITH_X11": "OFF",
+        "WITH_SDL": "ON",
+        "WITH_GHOST_SDL": "ON",
+        "CMAKE_C_FLAGS": "-sUSE_SDL=2",
+        "CMAKE_CXX_FLAGS": "-sUSE_SDL=2",
+        "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2",
+        "WITH_OPENAL": "OFF",
+        "WITH_AUDASPACE": "OFF",
+        "WITH_ALEMBIC": "OFF",
+        "WITH_CYCLES": "OFF",
+        "WITH_CYCLES_OSL": "OFF",
+        "WITH_COMPOSITOR": "OFF",
+        "WITH_FREESTYLE": "OFF",
+        "WITH_LIBMV": "OFF",
+        "WITH_OPENCOLLADA": "OFF",
+        "WITH_OPENSUBDIV": "OFF",
+        "WITH_OPENVDB": "OFF",
+        "WITH_OPENIMAGEIO": "OFF",
+        "WITH_OPENIMAGEDENOISE": "OFF",
+        "WITH_OPENCOLORIO": "OFF",
+        "WITH_CODEC_AVI": "OFF",
+        "WITH_CODEC_FFMPEG": "OFF",
+        "WITH_INPUT_NDOF": "OFF",
+        "WITH_JACK": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -122,6 +173,11 @@
     {
       "name": "android-runtime",
       "configurePreset": "android-runtime",
+      "targets": ["RangeRuntime"]
+    },
+    {
+      "name": "web-runtime",
+      "configurePreset": "web-runtime",
       "targets": ["RangeRuntime"]
     }
   ]

@@ -27,6 +27,38 @@ e detalhados no [`changelog.md`](changelog.md).
   nativo; ainda não há release Linux oficial.
 - **Associação de arquivos**: permitir abrir `.blend` e `.range` diretamente com os executáveis adequados,
   definindo instalação/registro no Windows e comportamento de duplo clique.
+- **Export para Web (WebGL/WebAssembly)**: levantamento concluído em
+  [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
+  Conclusão: Web é o candidato de menor esforço entre Web/Android/iOS para esta engine, porque o
+  Emscripten já entrega pronto as três peças que mais pesam num port de plataforma — porta SDL2
+  (reaproveitaria o `GHOST_SystemSDL` já existente, sem escrever backend novo), alvo oficial
+  `wasm32-emscripten` do CPython (mais maduro que cross-compile mobile) e criação automática de
+  contexto WebGL via `SDL_GL_CreateContext`. Ainda é um port real: falta adaptar o loop principal
+  para `emscripten_set_main_loop`, resolver gaps de GLSL ES/WebGL, decidir persistência de save
+  (IDBFS) e confirmar dependência de threads reais (afeta requisitos de deploy).
+  Tentativa real de build (2026-09-12, mesma metodologia da exploração Android de 2026-09-09):
+  `platform_web.cmake` + preset `web-runtime` criados, dispatch `EMSCRIPTEN` e `WITH_X11`
+  corrigidos no `CMakeLists.txt`, SDL2 confirmado reaproveitável (com `-sUSE_SDL=2` como flag de
+  compilador), bug de cascata `WITH_GLU`/`WITH_GL_PROFILE_COMPAT` encontrado e contornado via
+  preset. Build travou num bug genuíno e ainda não corrigido do `CMakeLists.txt`: a exigência de
+  `OPENGLES_LIBRARY` (perfil ES20 sem EGL) é tratada como caminho de arquivo literal pelo Ninja,
+  incompatível com Emscripten (que não tem `libGL` de sistema) — corrigir exige mudar a lógica em
+  `CMakeLists.txt`, não só o preset. Detalhes completos em `web-export-plan.md`. Nenhuma decisão de
+  implementação tomada ainda; perguntas em aberto no próprio documento.
+- **Export mobile (Android/iOS)**: levantamento em [`mobile-export-plan.md`](mobile-export-plan.md),
+  incluindo uma tentativa real de build Android (2026-09-09) que provou o CMake navegável (preset
+  `android-runtime` chega a "Configure done") mas travou em dois bugs de código genuínos
+  (`malloc_stats` ausente na Bionic, `GL/glu.h` inexistente no NDK) antes mesmo de faltar o backend
+  GHOST Android completo. Mais caro que Web pelo mesmo eixo de comparação (sem atalho equivalente
+  ao Emscripten/SDL2/Pyodide). Nenhuma decisão de implementação tomada.
+- **Export presets (in-Blender)**: implementado o painel `Scene > Export (RangeArmor)` com
+  `RangeArmorExportSettings` (RNA Python, sem DNA/C) e a gravação de `product_name`/`product_version`
+  em `GameName`/`Version` de `launcher/config.json` antes de abrir o RangeArmor Panel, preservando as
+  demais chaves. Achado importante: `_validate_data` no RangeArmor Panel usa whitelist estrita de
+  chaves — por isso os campos `company_name`, `icon_path` e toggle de plataforma ainda aparecem no
+  painel mas não são gravados (não há chave correspondente aceita hoje); habilitá-los exige estender
+  `DEFAULT_FIELDS`/`_validate_data` no lado Godot, decidido explicitamente como fora desta fase. Falta
+  o teste manual (projeto novo e projeto antigo) descrito no [plano](export-presets-plan.md).
 - **World Status**: as oito Global Properties automáticas foram implementadas e compiladas, mas não
   apareceram em um `World` novo no teste real. Diagnosticar criação, versionamento e atualização da UI.
 - **Auditoria de `source/source/blender`**: confirmar ou descartar os candidatos registrados em
