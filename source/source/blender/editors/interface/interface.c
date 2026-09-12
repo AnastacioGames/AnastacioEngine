@@ -4973,6 +4973,14 @@ void UI_init(void)
 /* after reading userdef file */
 void UI_init_userdef(void)
 {
+	/* Safe mode: the startup/userpref blend (file or built-in factory fallback) may
+	 * legitimately contain zero themes (e.g. first run with no user config at all).
+	 * Every theme lookup in the UI code assumes U.themes is never empty, so seed the
+	 * factory default here before any versioning or drawing code can dereference it. */
+	if (BLI_listbase_is_empty(&U.themes)) {
+		ui_theme_init_default();
+	}
+
 	/* fix saved themes */
 	init_userdef_do_versions();
 	uiStyleInit();

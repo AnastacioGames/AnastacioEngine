@@ -36,6 +36,8 @@
 #  endif
 #  include <windows.h>
 #  include <float.h>
+#  include <dbghelp.h>
+#  pragma comment(lib, "dbghelp.lib")
 #endif
 
 #include <stdlib.h>
@@ -271,6 +273,42 @@ LONG WINAPI windows_exception_handler(EXCEPTION_POINTERS *ExceptionInfo)
 		if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, address, &mod)) {
 			if (GetModuleFileName(mod, modulename, MAX_PATH)) {
 				fprintf(stderr, "Module  : %s\n", modulename);
+			}
+		}
+
+		/* Temporary diagnostic: resolve crashing address + call stack to symbol names. */
+		{
+			HANDLE process = GetCurrentProcess();
+			SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+			if (SymInitialize(process, NULL, TRUE)) {
+				void *stack[62];
+				USHORT frames = CaptureStackBackTrace(0, 62, stack, NULL);
+				char symbol_buf[sizeof(SYMBOL_INFO) + 256];
+				SYMBOL_INFO *symbol = (SYMBOL_INFO *)symbol_buf;
+				symbol->MaxNameLen = 255;
+				symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+
+				fprintf(stderr, "\n# symbolized backtrace\n");
+				for (USHORT i = 0; i < frames; i++) {
+					DWORD64 addr = (DWORD64)(uintptr_t)stack[i];
+					DWORD64 disp = 0;
+					DWORD line_disp = 0;
+					IMAGEHLP_LINE64 line;
+					line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+
+					if (SymFromAddr(process, addr, &disp, symbol)) {
+						fprintf(stderr, "%2u: %s + 0x%llx", i, symbol->Name, (unsigned long long)disp);
+					}
+					else {
+						fprintf(stderr, "%2u: 0x%p", i, stack[i]);
+					}
+					if (SymGetLineFromAddr64(process, addr, &line_disp, &line)) {
+						fprintf(stderr, "  (%s:%lu)", line.FileName, line.LineNumber);
+					}
+					fprintf(stderr, "\n");
+				}
+				fflush(stderr);
+				SymCleanup(process);
 			}
 		}
 

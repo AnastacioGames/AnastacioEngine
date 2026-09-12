@@ -126,6 +126,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ---
 
+## 2026-09-11 (continuação) — Crash na primeira execução com tema vazio (`U.themes` sem entradas)
+
+- **Bug**: mesmo depois do fix acima (pastas recriadas), rodar `RangeEngine.exe` com
+  `%APPDATA%\RangeEngine` totalmente ausente ainda crashava (`EXCEPTION_ACCESS_VIOLATION`), agora
+  mais adiante — na tela de splash ou logo na primeira janela desenhada.
+- **Causa raiz**: sem `userpref.blend`/`startup.blend` do usuário, o carregamento cai no
+  `datatoc_startup_blend` embutido no binário (`wm_homefile_read()` em `wm_files.c`); esse blend de
+  fábrica não contém nenhum `Theme`, então `U.themes` fica vazia. Nada no caminho de inicialização
+  chamava `ui_theme_init_default()` automaticamente — essa função só era acionada pelo operador
+  manual "Reset to Default Theme" (`interface_ops.c`). Dezenas de pontos do código de UI (desenho
+  de widgets, splash screen, etc.) fazem `UI_GetTheme()->...`/`U.themes.first->...` sem checar NULL,
+  então o primeiro que rodava after essa condição derrubava o processo — confirmado com uma
+  backtrace simbolizada (`SymFromAddr`/`CaptureStackBackTrace`, adicionada e depois mantida em
+  `windows_exception_handler` de `creator_signals.c` como diagnóstico permanente) apontando para
+  `wm_block_splash_image_roundcorners_add` (`wm_splash_screen.c:184`) e, numa segunda repetição,
+  `widget_state_pulldown` (`interface_widgets.c:2266`) — ambos lendo campos de um `bTheme*` nulo.
+- **Fix**: `UI_init_userdef()` (`source/blender/editors/interface/interface.c`) agora chama
+  `ui_theme_init_default()` sempre que `U.themes` está vazia, antes de `init_userdef_do_versions()`
+  e de qualquer código de desenho rodar — garante um tema "Default" válido em qualquer cenário de
+  primeira execução, independente do blend de fábrica conter ou não um Theme.
+- **Validação**: `ninja RangeEngine` limpo (exit 0). Reproduzido apagando
+  `%APPDATA%\RangeEngine` de verdade e rodando `RangeEngine.exe`: antes deste fix, crash
+  (`EXCEPTION_ACCESS_VIOLATION` na tela de splash); depois, o processo abre e permanece rodando
+  normalmente, com as três pastas (`config`/`datafiles`/`scripts`) recriadas vazias como esperado.
+
 ## 2026-09-11 — Modo seguro — `WM_init()` recria pastas de config ausentes
 
 - **Bug original**: apagar `%APPDATA%\RangeEngine` inteira (reset manual de config) fazia o
