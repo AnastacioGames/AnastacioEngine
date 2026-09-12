@@ -27,7 +27,7 @@ def _performRelease():
     compress = args.get("--compress", False)
 
     if "All" in targets:
-        targets = [i for i in data["EngineExecutables"].keys()]
+        targets = [i for i in data["EngineExecutables"].keys() if data.get("Export" + i, True)]
 
     releaseDir = curPath / "release"  # type: Path
 

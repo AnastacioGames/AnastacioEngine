@@ -47,11 +47,23 @@
    (← `product_name`) e `Version` (← `product_version`), preservando todas as outras chaves.
    Não cria o arquivo se ele não existir (evita risco de gerar um config incompleto antes de o
    RangeArmor Panel tê-lo inicializado). **Implementado.**
-4. **Campos ainda sem efeito nesta fase**: `export_windows64`, `export_linux64`,
-   `company_name`, `icon_path` continuam visíveis no painel do Blender, mas não são
-   gravados em lugar nenhum ainda — não há chave correspondente no `config.json` que o
-   RangeArmor Panel aceite. Habilitar isso é um passo futuro explícito (ver abaixo), não
-   silencioso.
+4. **Todos os campos agora têm efeito.** O whitelist do RangeArmor Panel
+   (`scripts/globals.gd` `DEFAULT_FIELDS`) foi estendido de forma aditiva com
+   `CompanyName` (""), `IconPath` (""), `ExportWindows64` (true) e `ExportLinux64` (true) —
+   `welcome.gd:_validate_data` preenche esses defaults automaticamente em projetos antigos
+   que não os têm, então nada quebra ao reabrir um projeto existente. `wm.py` agora grava
+   `company_name`→`CompanyName`, `icon_path`→`IconPath` (resolvido para caminho absoluto via
+   `bpy.path.abspath`) e sempre grava `export_windows64`/`export_linux64` →
+   `ExportWindows64`/`ExportLinux64`.
+   - `release/scripts/build_release.py`: ao expandir o target `"All"`, agora filtra por
+     `data.get("Export" + platform, True)` — desmarcar uma plataforma no painel do Blender faz
+     o botão "Export All" pular aquela plataforma. Os botões de export individuais
+     (`ButtonExportWindows64`/`ButtonExportLinux64`) continuam funcionando independentemente do
+     toggle, como atalho manual.
+   - `release/scripts/set_icons.py`: se `IconPath` estiver preenchido e o arquivo existir, ele é
+     usado como ícone tanto do launcher quanto do engine Windows, no lugar dos arquivos fixos
+     `icons/icon-launcher.ico`/`icons/icon-engine.ico`. Se o arquivo não existir, cai de volta
+     para o comportamento antigo com um aviso no log.
 5. **Sem migração de dados existente**: projetos antigos sem o bloco `rangearmor_export` na
    cena continuam funcionando exatamente como hoje (RNA com defaults, sem erro ao abrir).
 
@@ -61,9 +73,8 @@
 - Adicionar novas plataformas (Android/iOS) — depende de `mobile-export-plan.md`, que ainda
   não tem backend GHOST/CMake pronto.
 - Alterar `export_presets.cfg` do RangeArmor Panel (isso é build do launcher, não do jogo).
-- Estender `DEFAULT_FIELDS`/`_validate_data` do RangeArmor Panel (Godot) para aceitar
-  `CompanyName`/`IconPath`/toggle de plataforma — necessário para os campos do item 4
-  passarem a fazer algo; decidido explicitamente por ora **não** entrar nesta fase.
+- ~~Estender `DEFAULT_FIELDS`/`_validate_data` do RangeArmor Panel (Godot) para aceitar
+  `CompanyName`/`IconPath`/toggle de plataforma~~ — feito (ver item 4 acima).
 
 ## Próximos passos concretos
 
@@ -75,11 +86,36 @@
    adicionada/removida, e campos vazios no painel não sobrescrevem valores existentes.
 4. ~~Validar projeto antigo sem `launcher/config.json`~~ — feito no mesmo teste: o write é
    pulado silenciosamente (`skip: no config.json`), nada é criado.
-5. **Ainda pendente**: teste end-to-end real dentro do Blender (`install/` não tem um
-   RangeArmor Panel buildado hoje, só `RangeEngine.exe`/`RangeRuntime.exe`) — abrir o painel de
-   Scene de um build funcional, preencher os campos, clicar em "Open RangeArmor Panel" e
-   confirmar visualmente que o RangeArmor Panel carrega o projeto normalmente com o nome/versão
-   atualizados. Requer um build do fork com esse `wm.py`/`bl_ui` e o executável do RangeArmor
-   Panel disponível.
-6. Decisão futura (não agora): estender o whitelist do RangeArmor Panel para habilitar
-   `company_name`/`icon_path`/toggle de plataforma de fato.
+5. ~~Teste end-to-end real dentro do Blender~~ — feito. Validado com o RangeArmor Panel
+   instalado em `build/bin/rangearmor/` (build separado do que está em
+   `tools/RangeArmor-master`, não regenerado pelo `ninja install` — ver nota abaixo), em
+   projeto novo e em projeto antigo (`export_ROLIMARACER`), export e "Run".
+6. ~~Decisão futura: estender o whitelist do RangeArmor Panel para habilitar
+   `company_name`/`icon_path`/toggle de plataforma de fato~~ — feito.
+
+## Bug encontrado durante o teste end-to-end: `launcher.py` ausente no scaffolding
+
+Durante a validação do item 5, apareceu um bug não relacionado ao escopo original: o
+RangeArmor Panel instalado em `build/bin/rangearmor/` não coloca `launcher.py` na pasta
+`launcher/` do projeto ao criar um projeto novo (a lógica de "New Project" está compilada
+dentro do `.pck`, não é editável diretamente). Isso quebrava tanto "Export"
+(`build_release.py`, STAGE 3) quanto "Run" (`run_launcher.py` → `Launcher.exe`), com o erro
+`Could not find script launcher.py` / `[Errno 2] No such file or directory`. Reproduzido em
+projeto novo e em projeto antigo pré-existente — não é um problema de projeto desatualizado.
+
+Correções aplicadas (aditivas, sem quebrar projetos que já têm `launcher.py`):
+
+- `release/scripts/build_release.py` (STAGE 3): se `launcher/launcher.py` não existir no
+  projeto, cai de volta para o `launcher.py` template empacotado com o próprio painel
+  (`release/launcher/launcher.py`, ao lado do script via `Path(__file__).resolve().parent.parent`),
+  com aviso no log. **Nota:** esse arquivo faz parte do build separado em
+  `build/bin/rangearmor/`, não é rastreado em `tools/RangeArmor-master` nem em nenhum lugar do
+  git — o fix se perde se esse RangeArmor Panel for reinstalado/substituído e precisa ser
+  reaplicado manualmente nesse cenário.
+- `source/release/scripts/startup/bl_operators/wm.py`
+  (`WM_OT_export_with_rangearmor._ensure_launcher_script`): toda vez que o usuário clica em
+  "Open RangeArmor Panel" no Blender, se o projeto atual tiver pasta `launcher/` mas não tiver
+  `launcher.py`, copia automaticamente a partir do template empacotado junto do executável do
+  painel (`<pasta do RangeEngine>/rangearmor/release/launcher/launcher.py`). Esse fix é
+  rastreado em git e vale para qualquer projeto (novo ou antigo) a partir do momento em que o
+  painel é aberto pelo Blender.

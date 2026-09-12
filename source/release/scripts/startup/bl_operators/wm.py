@@ -2575,15 +2575,17 @@ class WM_OT_export_with_rangearmor(Operator):
     bl_options = {'INTERNAL'}
 
     def _write_export_preset(self, context):
-        """Sync product name/version from Scene.rangearmor_export into the
+        """Sync the export preset fields from Scene.rangearmor_export into the
         project's launcher/config.json, without touching any other key.
 
         RangeArmor Panel validates config.json against a strict key
-        whitelist (see welcome.gd _validate_data): only known keys may be
-        written, or the project fails to load there. GameName/Version are
-        already part of that schema, so this is safe for old and new
-        projects alike; it silently does nothing if the file is missing or
-        the current file isn't part of a RangeArmor project structure.
+        whitelist (see welcome.gd _validate_data / globals.gd
+        DEFAULT_FIELDS): only known keys may be written, or the project
+        fails to load there. GameName, Version, CompanyName, IconPath,
+        ExportWindows64 and ExportLinux64 are all part of that schema, so
+        this is safe for old and new projects alike; it silently does
+        nothing if the file is missing or the current file isn't part of a
+        RangeArmor project structure.
         """
         export_settings = getattr(context.scene, "rangearmor_export", None)
         if export_settings is None:
@@ -2612,6 +2614,12 @@ class WM_OT_export_with_rangearmor(Operator):
             config_data["GameName"] = export_settings.product_name
         if export_settings.product_version:
             config_data["Version"] = export_settings.product_version
+        if export_settings.company_name:
+            config_data["CompanyName"] = export_settings.company_name
+        if export_settings.icon_path:
+            config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
+        config_data["ExportWindows64"] = export_settings.export_windows64
+        config_data["ExportLinux64"] = export_settings.export_linux64
 
         try:
             with open(config_path, "w", encoding="utf-8") as config_file:
@@ -2619,10 +2627,47 @@ class WM_OT_export_with_rangearmor(Operator):
         except OSError:
             pass
 
+    def _ensure_launcher_script(self, context):
+        """Copy the panel's bundled launcher.py into the current project's
+        launcher/ folder if it's missing.
+
+        Some RangeArmor Panel builds don't include launcher.py when
+        scaffolding a new project (only Launcher.exe/Launcher), which makes
+        both "Run" and "Export" fail with "Could not find script
+        launcher.py" / a copy error. Since this comes from the project
+        template, not from config.json, it's outside the config-writing
+        whitelist above; this just makes sure the file is there before the
+        panel is used, using the panel's own bundled copy as the source.
+        """
+        filepath = bpy.data.filepath
+        if not filepath:
+            return
+
+        data_dir = os.path.dirname(filepath)
+        if os.path.basename(data_dir) != "data":
+            return
+
+        project_dir = os.path.dirname(data_dir)
+        launcher_dir = os.path.join(project_dir, "launcher")
+        launcher_script = os.path.join(launcher_dir, "launcher.py")
+        if os.path.isfile(launcher_script) or not os.path.isdir(launcher_dir):
+            return
+
+        rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+        template_script = os.path.join(rangearmor_dir, "release", "launcher", "launcher.py")
+        if not os.path.isfile(template_script):
+            return
+
+        try:
+            shutil.copy2(template_script, launcher_script)
+        except OSError:
+            pass
+
     def execute(self, context):
         import os, sys, subprocess
 
         self._write_export_preset(context)
+        self._ensure_launcher_script(context)
 
         if sys.platform == "win32":
             os.startfile(bpy.app.binary_path[:-15] + "rangearmor\RangeArmor Panel.exe")

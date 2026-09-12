@@ -22,8 +22,15 @@ def main():
             launcherPath = data["CurPath"] / "launcher/Launcher.exe"  # type: _Path
             enginePaths = data["EngineExecutables"]  # type: dict[str, _Path]
 
+            customIconPath = data.get("IconPath")  # type: str
+            customIcon = data["CurPath"] / customIconPath if customIconPath else None  # type: _Path | None
+
+            if customIcon and not customIcon.exists():
+                print("\nX Custom icon not found, falling back to icons/ folder:", customIcon.as_posix())
+                customIcon = None
+
             if launcherPath.exists():
-                launcherIconPath = data["CurPath"] / "icons/icon-launcher.ico"  # type: _Path
+                launcherIconPath = customIcon or data["CurPath"] / "icons/icon-launcher.ico"  # type: _Path
                 command = _getResourceHackerCommand(launcherPath, launcherIconPath)
                 print("\n> Setting icon of launcher...")
                 print("Command:", " ".join(command))
@@ -35,7 +42,7 @@ def main():
             for enginePath in enginePaths.values():
 
                 if "Windows" in enginePath.parent.name:
-                    engineIconPath = data["CurPath"] / "icons/icon-engine.ico"  # type: _Path
+                    engineIconPath = customIcon or data["CurPath"] / "icons/icon-engine.ico"  # type: _Path
                     command = _getResourceHackerCommand(enginePath, engineIconPath)
                     print("\n> Setting icon of engine...")
                     print("Command:", " ".join(command))
