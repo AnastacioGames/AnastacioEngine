@@ -12,6 +12,11 @@ e detalhados no [`changelog.md`](changelog.md).
 
 ## Prioridade atual
 
+- **Perfil Range Engine Web e validador**: levantamento e regras em
+  [web-profile-validation-plan.md](web-profile-validation-plan.md). Manter autoria na Range Engine e
+  implementar verificação Web, propriedades persistidas, análise de dependências e relatório; teste/export dependem do
+  runtime Web integrado. Interface e regras ainda não implementadas.
+
 - **Cutscene nativo**: Fases 0–2 e 4–5 implementadas, incluindo dados persistidos,
   aba Properties depois de World com ícone `SEQUENCE`, operadores nativos,
   runtime C++, API Python, import/export JSON e exemplo `.blend`. Permanecem

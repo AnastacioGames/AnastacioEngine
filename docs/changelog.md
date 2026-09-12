@@ -3978,6 +3978,19 @@ necessário dado o caráter mecânico da mudança.
 - A alteração foi instalada em `build/bin/2.79/scripts/startup/flowmenu` e
   validada com `ninja RangeEngine` concluído com sucesso (exit 0).
 
+## 2026-09-12 — Plano do perfil Web e validação de exportação
+
+- Direção ajustada a pedido do usuário: autoria na própria Range Engine, Web como destino de exportação
+  e verificação de compatibilidade durante edição. A proposta inicial de entrada virtual no seletor foi
+  substituída; destinos desktop coexistem e erros Web bloqueiam somente o fluxo Web.
+
+- Levantados seletor em `properties_render.py`, identidade `BLENDER_GAME` no C/C++ e painéis,
+  propriedades de exportação existentes e pontos de conexão com o runtime em desenvolvimento.
+- Criado `web-profile-validation-plan.md`: opção visual Range Engine Web preservando identidade
+  interna, catálogo de regras, distinção entre erro confirmado e análise inconclusiva, manifesto,
+  fluxo de diagnóstico/export, marcos e testes. Regras propostas, ainda não implementadas.
+- Verificação documental de links locais; sem alterações no código, build ou arquivos da PoC.
+
 ## 2026-09-12 — Web export: fixes de build sob Emscripten e retomada do CPython wasm
 
 - Série de bugs genuínos corrigidos para destravar o build `web-runtime` sob

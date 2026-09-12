@@ -5,6 +5,9 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 
 ## Estado atual
 
+- [Perfil Web e validação de exportação](web-profile-validation-plan.md): autoria na Range Engine com compatibilidade Web,
+  catálogo de avisos/bloqueios, manifesto de capacidades e marcos de implementação; ainda não implementado.
+
 - [Roadmap](roadmap.md): somente trabalho aberto ou validação pendente.
 - [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): inventário conciso do que a engine já
   possui e das decisões técnicas vigentes.
