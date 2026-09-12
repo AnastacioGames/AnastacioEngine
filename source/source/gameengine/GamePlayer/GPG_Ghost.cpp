@@ -805,11 +805,11 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 
 		fflush(stderr);
 
-#ifdef NDEBUG
-		TerminateProcess(GetCurrentProcess(), SIGSEGV);
-#else
+		/* Always write the crash backtrace (blender.crash.txt / <file>.crash.txt
+		 * in the temp dir), even in Release/NDEBUG builds. It used to be skipped
+		 * here, which meant the Standalone player's access violations left no
+		 * trace beyond the bare address/module printed above. */
 		sigHandleCrash(SIGSEGV);
-#endif
 	}
 
 	return EXCEPTION_EXECUTE_HANDLER;

@@ -5021,6 +5021,18 @@ static void lib_link_object(FileData *fd, Main *main)
 						else {
 							eoa->ob = newlibadr(fd, ob->id.lib, eoa->ob);
 							eoa->me = newlibadr(fd, ob->id.lib, eoa->me);
+							/* An AddObject actuator target linked purely through the
+							 * Outliner's External Files entry (not placed in any scene)
+							 * has no other real user, so id->us can be 0 even though this
+							 * actuator depends on it. Without a real user here,
+							 * write_libraries() (writefile.c) treats it as unused and
+							 * drops the linked object -- and its library -- from any file
+							 * saved after this load. Give it a real user so the link
+							 * survives every subsequent save, including the Standalone /
+							 * "Start Game In Player" save-as-copy path. */
+							if (eoa->type == ACT_EDOB_ADD_OBJECT && eoa->ob && eoa->ob->id.lib) {
+								id_us_plus(&eoa->ob->id);
+							}
 						}
 						break;
 					}
@@ -10835,6 +10847,18 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					if (fd == NULL) {
 						blo_reportf_wrap(basefd->reports, RPT_WARNING, TIP_("Cannot find lib '%s'"),
 						                 mainptr->curlib->filepath);
+						/* AnastacioEngine debug: External Files / linked library failed to
+						 * resolve. Print unconditionally (not gated behind G.debug or a
+						 * ReportList consumer) so this is visible even in the Standalone
+						 * player console, where report lists are often not displayed. */
+						fprintf(stderr,
+						        "[AnastacioEngine] Linked library NOT FOUND:\n"
+						        "  absolute path tried : %s\n"
+						        "  stored relative name : %s\n"
+						        "  relabase (base dir)  : %s\n",
+						        mainptr->curlib->filepath,
+						        mainptr->curlib->name,
+						        basefd->relabase ? basefd->relabase : "(null)");
 					}
 				}
 				if (fd) {

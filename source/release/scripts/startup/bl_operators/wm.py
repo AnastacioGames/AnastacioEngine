@@ -1546,7 +1546,15 @@ class WM_OT_blenderplayer_start(Operator):
             return {'CANCELLED'}
 
         filepath = bpy.data.filepath + '~' if bpy.data.is_saved else os.path.join(bpy.app.tempdir, "game.blend")
-        bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True)
+        # relative_remap defaults to True, and with copy=True it makes
+        # save_as_mainfile absolutize every library path before writing (see
+        # writefile.c's G_FILE_SAVE_COPY + G_FILE_RELATIVE_REMAP handling),
+        # even though this test copy always lives in the same folder as the
+        # original file. That turned relative External Files links (e.g.
+        # "//libloads\...") into machine-specific absolute paths in the
+        # throwaway '~' copy, so the standalone test could silently fail to
+        # resolve them. Disable it since no remap is ever needed here.
+        bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True, relative_remap=False)
 
         # start the command line call with the player path
         args = [player_path]
@@ -2604,14 +2612,15 @@ def _rangearmor_write_export_preset(context):
     # open .range file (*.range is excluded from the release data via
     # DEFAULT_FIELDS["Ignore"]), so MainFile must always track it -
     # otherwise the exported Launcher can't find its game data and quits
-    # immediately after opening. If the .rasec was never saved (project
-    # was not created through "New Project"), generate it now the same
-    # way "New Project" does.
+    # immediately after opening. Always (re)generate it from the current
+    # in-memory .range on every export, even if a .rasec already exists on
+    # disk: a stale .rasec silently ships outdated data (e.g. an External
+    # Files library link added/edited after the last export), so exporting
+    # again must never reuse an old snapshot.
     rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
     rasec_path = os.path.join(data_dir, rasec_name)
-    if not os.path.isfile(rasec_path):
-        bpy.ops.wm.save_as_mainfile_protected(
-            'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    bpy.ops.wm.save_as_mainfile_protected(
+        'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
     if os.path.isfile(rasec_path):
         config_data["MainFile"] = rasec_name
 
@@ -2684,6 +2693,7 @@ def _rangearmor_ensure_launcher_template_fresh(template_dir):
     of the time and export shouldn't be blocked by this.
     """
     import subprocess
+    import sys
 
     launcher_ext = ".exe" if sys.platform == "win32" else ""
     template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)

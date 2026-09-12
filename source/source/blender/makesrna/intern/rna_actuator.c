@@ -1456,7 +1456,14 @@ static void rna_def_edit_object_actuator(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "Object");
 	RNA_def_property_pointer_sdna(prop, NULL, "ob");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
+	/* PROP_ID_REFCOUNT is required here: an AddObject target linked purely
+	 * through the Outliner's External Files entry has no scene/other user,
+	 * so without a refcounted pointer id->us stays 0 and write_libraries()
+	 * (writefile.c) silently drops the linked object (and its library) from
+	 * any saved copy of the file -- breaking the Standalone/"Start Game In
+	 * Player" test even though the same in-memory pointer still works when
+	 * testing with "P" inside the already-loaded editor session. */
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Object", "Add this Object and all its children (can't be on a visible layer)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 

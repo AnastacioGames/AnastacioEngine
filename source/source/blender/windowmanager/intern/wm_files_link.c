@@ -573,8 +573,12 @@ static int wm_link_to_libload_exec(bContext *C, wmOperator *op)
 		}
 	}
 
-	/* Always link (never append), never instantiate anywhere: no scene, no view3d. */
-	const short flag = FILE_LINK;
+	/* Always link (never append), never instantiate anywhere: no scene, no view3d.
+	 * FILE_RELPATH keeps the library path relative to this .blend ("//lib.blend")
+	 * instead of baking in the absolute path of the machine that registered it -
+	 * otherwise the reference breaks once the project is exported to Standalone,
+	 * where only a same-directory copy of the external file ships inside data/. */
+	const short flag = FILE_LINK | FILE_RELPATH;
 
 	/* from here down, no error returns */
 

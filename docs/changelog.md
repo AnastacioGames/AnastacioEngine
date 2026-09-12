@@ -8,6 +8,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 | Data | Resumo |
 |---|---|
+| [2026-09-12 (AddObject + External Files — objeto linkado sumia após save/export)](#2026-09-12--addobject--external-files--objeto-linkado-sumia-apos-saveexport) | `id->us == 0` num objeto referenciado só por um ator AddObject fazia `write_libraries()` descartá-lo (e a lib) silenciosamente em qualquer save, inclusive o copy-save de "Start Game In Player"; corrigido com `PROP_ID_REFCOUNT` na RNA + `id_us_plus()` no relink do `readfile.c`; validado via script Python (`Range.logic`/`KX_PythonComponent`) reproduzindo o mesmo `scene.addObject()` do ator |
 | [2026-09-12 (Export 1 clique — rebuild automático do template Launcher.exe)](#2026-09-12--export-1-clique--rebuild-automatico-do-template-launcherexe) | Scaffold detecta sozinho se `Launcher.exe` template está mais antigo que `main.rs` e recompila com `cargo build --release` automaticamente, sem confirmação nem passo manual — elimina de vez a classe de bug "abre e fecha" mesmo após reinstalar `tools/RangeArmor-master` |
 | [2026-09-12 (Export 1 clique — scaffold automático, progresso e Launcher.exe corrompido)](#2026-09-12--export-1-clique--scaffold-automatico-progresso-e-launcherexe-corrompido) | Scaffolding do projeto (`config.json`/`Launcher.exe`/ícones/runtime) e `.rasec` agora são gerados automaticamente pelo botão; barra de progresso + cursor de espera durante o export; `Launcher.exe` template estava compilado de um `main.rs` antigo com `.unwrap()` e sempre crashava ("abre e fecha") — recompilado |
 | [2026-09-12 (Export — botão 1 clique)](#2026-09-12--export--botao-1-clique) | Novo `wm.one_click_export_rangearmor` roda `build_release.py` direto (sem abrir o RangeArmor Panel) e abre a pasta `release/` no final |
@@ -153,6 +154,48 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `%APPDATA%\RangeEngine` de verdade e rodando `RangeEngine.exe`: antes deste fix, crash
   (`EXCEPTION_ACCESS_VIOLATION` na tela de splash); depois, o processo abre e permanece rodando
   normalmente, com as três pastas (`config`/`datafiles`/`scripts`) recriadas vazias como esperado.
+
+## 2026-09-12 — AddObject + External Files — objeto linkado sumia após save/export
+
+- **Sintoma**: um objeto vinculado via "External Files" (linkado na library, sem instanciar na
+  cena) e referenciado apenas por um ator AddObject de Logic Bricks funcionava normalmente no
+  editor logo após o link, mas desaparecia depois de fechar/reabrir o `.range` (ou usar "Start
+  Game In Player", que salva uma cópia antes de rodar) — o ator disparava e não achava o objeto.
+- **Causa raiz**: o ID do objeto linkado ficava com `id->us == 0` por dois motivos combinados: (a)
+  a propriedade RNA do alvo do ator AddObject (`rna_actuator.c`) não tinha a flag
+  `PROP_ID_REFCOUNT`, então nada incrementava o contador ao apontar o ator para o objeto; (b) o
+  passe de relink de ponteiros do `readfile.c` para esse tipo de ator nunca chamava `id_us_plus`.
+  `writefile.c`'s `write_libraries()` só grava IDs com `id->us > 0`, então qualquer save (incluindo
+  o copy-save interno de "Start Game In Player") descartava silenciosamente o objeto e sua library
+  do arquivo de saída.
+- **Fix**:
+  - `source/source/blender/makesrna/intern/rna_actuator.c` — adicionada `PROP_ID_REFCOUNT` nas
+    flags da propriedade "object" do EditObjectActuator.
+  - `source/source/blender/blenloader/intern/readfile.c` — no relink de atuadores, caso
+    `ACT_EDIT_OBJECT`: `if (eoa->type == ACT_EDOB_ADD_OBJECT && eoa->ob && eoa->ob->id.lib) {
+    id_us_plus(&eoa->ob->id); }`.
+  - `source/source/blender/windowmanager/intern/wm_files_link.c` — link via "External Files" passa
+    a usar `FILE_LINK | FILE_RELPATH`, mantendo o caminho da library relativo ao `.blend`
+    (`//lib.blend`) em vez de gravar o caminho absoluto da máquina que registrou o link —
+    necessário para a referência sobreviver à exportação para Standalone, onde só uma cópia da
+    library ao lado do projeto é distribuída.
+  - `source/release/scripts/startup/bl_operators/wm.py` (`WM_OT_blenderplayer_start`) — o
+    copy-save de "Start Game In Player" passa a usar `relative_remap=False`: por padrão
+    `relative_remap=True` com `copy=True` absolutiza todos os caminhos de library antes de salvar
+    (`writefile.c`, `G_FILE_SAVE_COPY` + `G_FILE_RELATIVE_REMAP`), mesmo a cópia `~` ficando sempre
+    na mesma pasta do arquivo original — isso transformava links relativos de External Files em
+    caminhos absolutos específicos da máquina na cópia descartável, quebrando silenciosamente o
+    teste em outra máquina.
+  - `source/release/scripts/startup/bl_operators/wm.py` (export RangeArmor) — o `.rasec` de
+    `MainFile` agora é sempre regravado a cada export (antes só era gerado se ainda não existisse),
+    evitando que um `.rasec` desatualizado embarque dados antigos (ex.: um link de External Files
+    adicionado depois do último export).
+- **Validação**: rebuild limpo de `RangeEngine`/`RangeRuntime` com as três primeiras correções.
+  Reproduzido o caminho de código do ator (`KX_Scene::AddReplicaObject`) via script Python
+  standalone, dos dois jeitos — `KX_PythonComponent` com argumentos configuráveis no painel, e
+  sensor Keyboard + controlador Python chamando `scene.addObject()` — confirmando que o objeto
+  linkado (`Group_car`) aparece corretamente em `objectsInactive` e é instanciado com sucesso após
+  fechar/reabrir o projeto. Note que o módulo Python deste fork se chama `Range`, não `bge`.
 
 ## 2026-09-12 — Export 1 clique — rebuild automático do template Launcher.exe
 
