@@ -662,17 +662,29 @@ CcdPhysicsEnvironment::CcdPhysicsEnvironment(PHY_SolverType solverType, bool use
 	m_ghostPairCallback(nullptr),
 	m_ownDispatcher(nullptr)
 {
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] ctor begin solver=%d dbvt=%d\n", solverType, useDbvtCulling);
+#endif
 	for (int i = 0; i < PHY_NUM_RESPONSE; i++) {
 		m_triggerCallbacks[i] = nullptr;
 	}
 
 	m_collisionConfiguration = new btSoftBodyRigidBodyCollisionConfiguration();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] collision config created\n");
+#endif
 
 	btCollisionDispatcher *dispatcher = new btCollisionDispatcher(m_collisionConfiguration);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] dispatcher created\n");
+#endif
 	btGImpactCollisionAlgorithm::registerAlgorithm(dispatcher);
 	m_ownDispatcher = dispatcher;
 
 	m_broadphase = new btDbvtBroadphase();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] broadphase created\n");
+#endif
 	// avoid any collision in the culling tree
 	if (useDbvtCulling) {
 		m_cullingCache = new btNullPairCache();
@@ -685,8 +697,14 @@ CcdPhysicsEnvironment::CcdPhysicsEnvironment(PHY_SolverType solverType, bool use
 	m_broadphase->getOverlappingPairCache()->setInternalGhostPairCallback(m_ghostPairCallback);
 
 	SetSolverType(solverType);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] solver created\n");
+#endif
 
 	m_dynamicsWorld = new btSoftRigidDynamicsWorld(dispatcher, m_broadphase, m_solver, m_collisionConfiguration);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] world created\n");
+#endif
 	m_dynamicsWorld->setInternalTickCallback(&CcdPhysicsEnvironment::StaticSimulationSubtickCallback, this);
 
 	SetGravity(0.0f, 0.0f, -9.81f);
@@ -3123,6 +3141,9 @@ CcdPhysicsEnvironment *CcdPhysicsEnvironment::Create(Scene *blenderscene, bool v
 		PHY_SOLVER_MLCP_LEMKE // GAME_SOLVER_MLCP_LEMKE
 	};
 
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-bullet] create solver index=%d mode=%d\n", blenderscene->gm.solverType, blenderscene->gm.mode);
+#endif
 	CcdPhysicsEnvironment *ccdPhysEnv = new CcdPhysicsEnvironment(solverTypeTable[blenderscene->gm.solverType],
 	                                                              (blenderscene->gm.mode & WO_DBVT_CULLING) != 0);
 

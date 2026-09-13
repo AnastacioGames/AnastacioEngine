@@ -527,13 +527,22 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	// otherwise step the simulation multiple times per frame). Drawn as camera-facing
 	// billboards, one buffer per opted-in object (Fase I.2).
 	for (KX_GameObject *particleObj : scene->GetGpuParticleObjects()) {
-		RAS_ParticleBuffer *particleBuffer = particleObj->GetParticleBuffer();
 		// Fase N: mirrors the visibility gate in KX_Scene::UpdateGpuParticleEmitters -- an
 		// invisible emitter isn't simulated this frame, so its buffer holds stale positions.
 		// Also mirrors the frustum-culling gate (Override Culling included) so particles from
 		// an emitter outside this camera's view aren't drawn.
-		if (particleBuffer && particleObj->GetVisible() && !particleObj->GetCullingNode().GetCulled()) {
+		if (!particleObj->GetVisible() || particleObj->GetCullingNode().GetCulled()) {
+			continue;
+		}
+		RAS_ParticleBuffer *particleBuffer = particleObj->GetParticleBuffer();
+		if (particleBuffer) {
 			particleBuffer->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
+		}
+		// Fase Q: second "Mix" emitter, drawn right after the first so the two looks blend on
+		// the same object instead of one replacing the other.
+		RAS_ParticleBuffer *particleBufferMix = particleObj->GetParticleBufferMix();
+		if (particleBufferMix) {
+			particleBufferMix->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
 		}
 	}
 

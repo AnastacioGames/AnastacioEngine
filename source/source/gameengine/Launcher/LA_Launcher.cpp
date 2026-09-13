@@ -302,15 +302,33 @@ void LA_Launcher::InitEngine()
 
 	// Convert scene data.
 	m_converter->ConvertScene(m_kxStartScene);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] scene converted\n");
+#endif
 	m_converter->ConvertCustomMouseCursor(m_kxStartScene, gm.cursorimage_path);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] cursor converted\n");
+#endif
 
 	m_ketsjiEngine->AddScene(m_kxStartScene);
 	m_kxStartScene->Release();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] scene added\n");
+#endif
 
 	m_rasterizer->Init();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] rasterizer initialized\n");
+#endif
 	m_imgui->Init(m_inputDevice);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] imgui initialized\n");
+#endif
 
 	m_ketsjiEngine->StartEngine();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-launcher] engine started\n");
+#endif
 
 	// Init Canvas.
 	m_canvas->Init();

@@ -47,13 +47,13 @@ void main() {
 	mask *= 0.6 + 0.4 * shimmer;
 
 	// Matiz desliza lentamente entre verde e violeta/azul, típico de aurora, modulado pela
-	// altura (base mais verde, topo mais violeta) e por v_lifeFrac (usa u_color/u_endColor
-	// como âncoras de matiz via mix simples de RGB, sem depender de HSV do usuário).
+	// altura (base mais verde, topo mais violeta). Ignora u_color/u_endColor de propósito --
+	// cor fixa no shader, não muda ao trocar de preset na UI (ver rainbow_trail.glsl pro
+	// mesmo princípio aplicado a outro efeito).
 	float hue = 0.33 + 0.25 * sin(u_time * 0.15 + uv.y * 1.5);
-	vec3 auroraColor = hsv2rgb(vec3(hue, 0.75, 1.0));
-	vec3 rgb = mix(auroraColor, mix(u_color.rgb, u_endColor.rgb, v_lifeFrac), 0.25);
+	vec3 rgb = hsv2rgb(vec3(hue, 0.75, 1.0));
 
-	float alpha = mask * v_alpha * u_color.a;
+	float alpha = mask * v_alpha;
 	if (alpha <= 0.001) {
 		discard;
 	}

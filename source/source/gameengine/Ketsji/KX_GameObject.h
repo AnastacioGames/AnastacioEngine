@@ -195,6 +195,13 @@ protected:
 	/// otherwise. Replaces the old scene-wide RAS_ParticleBuffer.
 	std::unique_ptr<RAS_ParticleBuffer> m_particleBuffer;
 
+	/// Fase Q: second, independent GPU particle emitter (Object.gpu_particles_mix), created for
+	/// objects with use_gpu_particles_mix set, drawn together with m_particleBuffer above.
+	std::unique_ptr<RAS_ParticleBuffer> m_particleBufferMix;
+
+	/// Shared implementation for SetupGPUParticles/SetupGPUParticlesMix below.
+	void SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> &bufferSlot, const RangeGPUParticleSettings &settings);
+
 	/// Ground Plane collision: optional object whose world-space Z overrides the emitter's
 	/// fixed collision_height every frame. Resolved from Object.gpu_particles.collision_ground_object
 	/// in a second pass after scene conversion (may reference an object converted later in the
@@ -397,13 +404,20 @@ public:
 	/// only for objects with use_gpu_particles set.
 	void SetupGPUParticles(const RangeGPUParticleSettings &settings);
 
-	/// Steps this object's particle emitter (if any) by one frame, reading the object's
+	/// Fase Q: same as SetupGPUParticles, for the second "Mix GPU Particle System" emitter
+	/// (Object.gpu_particles_mix / use_gpu_particles_mix), drawn together with the first.
+	void SetupGPUParticlesMix(const RangeGPUParticleSettings &settings);
+
+	/// Steps this object's particle emitter(s) (if any) by one frame, reading the object's
 	/// current world position as the emitter origin. Called once per frame from
 	/// KX_Scene::UpdateGpuParticleEmitters, after the scenegraph's world transforms are updated.
 	void UpdateParticles(float deltaTime);
 
 	/// The GPU particle emitter owned by this object, or nullptr if use_gpu_particles is unset.
 	RAS_ParticleBuffer *GetParticleBuffer() const;
+
+	/// The second "Mix" GPU particle emitter, or nullptr if use_gpu_particles_mix is unset.
+	RAS_ParticleBuffer *GetParticleBufferMix() const;
 
 	/// Sets the Ground Plane collision height reference object, resolved at scene conversion time.
 	void SetCollisionGroundObject(KX_GameObject *ob) { m_collisionGroundObject = ob; }

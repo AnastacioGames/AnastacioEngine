@@ -293,7 +293,7 @@ void GPU_clear_tpage(bool force)
 	GTS.lasttface = NULL;
 	GTS.curtile = 0;
 	GTS.curima = NULL;
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	if (GTS.curtilemode != 0) {
 		glMatrixMode(GL_TEXTURE);
 		glLoadIdentity();
@@ -306,7 +306,7 @@ void GPU_clear_tpage(bool force)
 	GTS.alphablend = -1;
 
 	glDisable(GL_BLEND);
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_TEXTURE_GEN_S);
 	glDisable(GL_TEXTURE_GEN_T);
@@ -316,7 +316,7 @@ void GPU_clear_tpage(bool force)
 
 static void gpu_set_alpha_blend(GPUBlendMode alphablend)
 {
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	if (alphablend == GPU_BLEND_SOLID) {
 		glDisable(GL_BLEND);
 		glDisable(GL_ALPHA_TEST);
@@ -2228,7 +2228,7 @@ static void gpu_multisample(bool enable)
 
 void GPU_state_init(void)
 {
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	float mat_ambient[] = { 0.0, 0.0, 0.0, 0.0 };
 	float mat_specular[] = { 0.5, 0.5, 0.5, 1.0 };
 
@@ -2240,10 +2240,16 @@ void GPU_state_init(void)
 #endif
 
 	GPU_default_lights();
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-gpu-state] default lights set\n");
+#endif
 
 	glDepthFunc(GL_LEQUAL);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-gpu-state] depth func set\n");
+#endif
 
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	/* scaling matrices */
 	glEnable(GL_NORMALIZE);
 
@@ -2279,8 +2285,11 @@ void GPU_state_init(void)
 	glPixelTransferi(GL_DEPTH_SCALE, 1);
 #endif
 	glDepthRange(0.0, 1.0);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-gpu-state] depth range set\n");
+#endif
 
-#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	glMatrixMode(GL_TEXTURE);
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
@@ -2291,8 +2300,14 @@ void GPU_state_init(void)
 	glDisable(GL_CULL_FACE);
 
 	gpu_multisample(false);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-gpu-state] multisample set\n");
+#endif
 
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[web-gpu-state] basic shader bound\n");
+#endif
 }
 
 #ifdef WITH_OPENSUBDIV

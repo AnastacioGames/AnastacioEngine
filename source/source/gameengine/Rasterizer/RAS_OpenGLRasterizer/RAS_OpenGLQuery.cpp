@@ -32,6 +32,8 @@
 #endif  // GL_QUERY_RESULT_NO_WAIT
 
 RAS_OpenGLQuery::RAS_OpenGLQuery(RAS_Query::QueryType type)
+	:m_id(0),
+	 m_target(0)
 {
 	static const GLenum targetTable[] = {
 		GL_SAMPLES_PASSED, // SAMPLES
@@ -43,26 +45,46 @@ RAS_OpenGLQuery::RAS_OpenGLQuery(RAS_Query::QueryType type)
 
 	m_target = targetTable[type];
 
+#ifdef __EMSCRIPTEN__
+	/* WebGL2 only exposes boolean occlusion queries. The engine also creates
+	 * sample-count, primitive-count and timer queries during startup; their
+	 * desktop GL entry points are unavailable in the browser. Keep those
+	 * optional metrics disabled instead of calling null GLEW function pointers. */
+	if (type != RAS_Query::ANY_SAMPLES && type != RAS_Query::ANY_SAMPLES_CONSERVATIVE) {
+		return;
+	}
+#endif
+
 	glGenQueries(1, &m_id);
 }
 
 RAS_OpenGLQuery::~RAS_OpenGLQuery()
 {
-	glDeleteQueries(1, &m_id);
+	if (m_id) {
+		glDeleteQueries(1, &m_id);
+	}
 }
 
 void RAS_OpenGLQuery::Begin()
 {
-	glBeginQuery(m_target, m_id);
+	if (m_id) {
+		glBeginQuery(m_target, m_id);
+	}
 }
 
 void RAS_OpenGLQuery::End()
 {
-	glEndQuery(m_target);
+	if (m_id) {
+		glEndQuery(m_target);
+	}
 }
 
 bool RAS_OpenGLQuery::Available()
 {
+	if (!m_id) {
+		return true;
+	}
+
 	GLint result;
 	glGetQueryObjectiv(m_id, GL_QUERY_RESULT_AVAILABLE, &result);
 	return result;
@@ -70,6 +92,10 @@ bool RAS_OpenGLQuery::Available()
 
 int RAS_OpenGLQuery::ResultNoWait()
 {
+	if (!m_id) {
+		return 0;
+	}
+
 	GLint result;
 	glGetQueryObjectiv(m_id, GL_QUERY_RESULT_NO_WAIT, &result);
 	return result;
@@ -77,6 +103,10 @@ int RAS_OpenGLQuery::ResultNoWait()
 
 int RAS_OpenGLQuery::Result()
 {
+	if (!m_id) {
+		return 0;
+	}
+
 	GLint result;
 	glGetQueryObjectiv(m_id, GL_QUERY_RESULT, &result);
 	return result;

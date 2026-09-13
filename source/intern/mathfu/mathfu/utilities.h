@@ -512,7 +512,12 @@ inline void *AllocateAligned(size_t n) {
 #elif defined(__APPLE__)
   return malloc(n);
 #elif defined(__GNUC__)
-  return aligned_alloc(MATHFU_ALIGNMENT, n);
+  // C11 aligned_alloc requires the allocation size to be an exact multiple
+  // of the requested alignment. Class sizes do not necessarily satisfy that
+  // constraint (notably on wasm32), so round up before allocating.
+  const size_t aligned_size =
+      (n + MATHFU_ALIGNMENT - 1) & ~(static_cast<size_t>(MATHFU_ALIGNMENT) - 1);
+  return aligned_alloc(MATHFU_ALIGNMENT, aligned_size);
 #else
   // We need to allocate extra bytes to guarantee alignment,
   // and to store the pointer to the original buffer.
