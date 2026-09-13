@@ -103,6 +103,11 @@ public:
 	static int pyattr_set_collision_bounce(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_collision_friction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_collision_friction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+
+	/// Fase P: external .glsl fragment shader file path, hot-reloaded at runtime. See
+	/// RAS_ParticleBuffer::LoadFragShaderFromPath.
+	static PyObject *pyattr_get_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 };
 
 #endif  // WITH_PYTHON

@@ -730,6 +730,12 @@ void KX_GameObject::SetupGPUParticles(const RangeGPUParticleSettings &settings)
 	m_particleBuffer->SetCollisionBounce(settings.collision_bounce);
 	m_particleBuffer->SetCollisionFriction(settings.collision_friction);
 
+	if (settings.use_custom_frag_shader && settings.frag_shader_path[0] != '\0') {
+		if (!m_particleBuffer->LoadFragShaderFromPath(settings.frag_shader_path)) {
+			CM_Error("KX_GameObject::SetupGPUParticles: custom fragment shader failed to load/compile for object \"" << m_name << "\", using default look (see log above)");
+		}
+	}
+
 	if (settings.texture_path[0] != '\0') {
 		m_particleBuffer->LoadTextureFromPath(settings.texture_path);
 	}

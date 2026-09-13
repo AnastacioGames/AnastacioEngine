@@ -125,6 +125,22 @@ private:
 	unsigned int m_sizeCurveTexture;
 	unsigned int m_colorCurveTexture;
 
+	/// Fase P: optional user-supplied GLSL fragment "main" body (see drawFragmentPreamble in
+	/// RAS_ParticleShaderCache.cpp), replacing the built-in sprite color/mask logic entirely.
+	/// Empty = default look. Changing it swaps m_shaderCache for a differently-keyed one (see
+	/// SetCustomFragShader) rather than mutating the shared cache in place.
+	std::string m_customFragShader;
+
+	/// Fase P: source path for m_customFragShader, hot-reloaded from disk (see
+	/// PollFragShaderReload). Empty when no external script is in use.
+	std::string m_fragShaderPath;
+	/// Last seen mtime of m_fragShaderPath (0 if never successfully loaded), used to detect
+	/// on-disk edits without re-reading the file's contents every poll.
+	long m_fragShaderMTime = 0;
+	/// Seconds since the last hot-reload check, so PollFragShaderReload only stats the file a
+	/// few times a second instead of every Update() call.
+	float m_fragShaderPollAccum = 0.0f;
+
 	/// Builds a staggered-age initial pool (position/velocity/age, 7 floats/particle) for
 	/// `count` particles, same layout as Create()'s inline version -- shared with Resize().
 	std::vector<float> BuildInitialPool(unsigned int count) const;
@@ -255,6 +271,30 @@ public:
 	/// later re-enable doesn't need to reallocate.
 	void ClearSizeCurve() { m_useSizeCurve = false; }
 	void ClearColorCurve() { m_useColorCurve = false; }
+
+	/// Fase P: custom fragment shader script. See drawFragmentPreamble in
+	/// RAS_ParticleShaderCache.cpp for the varyings/uniforms available to the script and the
+	/// contract (must write `fragColor`). Empty string restores the default look.
+	const std::string &GetCustomFragShader() const { return m_customFragShader; }
+	/// Recompiles (or looks up an already-compiled cache for identical text) immediately, so a
+	/// failed compile is reported right away rather than silently on the next Draw(). Returns
+	/// false (buffer's shader cache left unchanged) if compilation fails; check CM_Error output
+	/// for the GLSL compiler log.
+	bool SetCustomFragShader(const std::string &source);
+
+	/// Fase P: loads (or clears, for an empty path) the custom fragment shader from an external
+	/// .glsl file -- path may use Blender's blend-relative "//" convention, same as
+	/// LoadTextureFromPath. Returns false (buffer's shader cache left unchanged) on read or
+	/// compile failure. Subsequent Update() calls poll the file's mtime and hot-reload on change
+	/// (see PollFragShaderReload).
+	bool LoadFragShaderFromPath(const std::string &path);
+	const std::string &GetFragShaderPath() const { return m_fragShaderPath; }
+
+	/// Checks (at most a few times a second) whether m_fragShaderPath changed on disk since it
+	/// was last loaded, and reloads it if so. Called from Update(); failures are logged and
+	/// leave the currently-compiled shader in place rather than falling back to the default look,
+	/// so a saved-but-broken edit doesn't make the effect flicker back and forth.
+	void PollFragShaderReload(float deltaTime);
 };
 
 #endif // __RAS_PARTICLEBUFFER_H__

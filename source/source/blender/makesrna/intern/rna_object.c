@@ -1922,6 +1922,21 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Friction", "Velocity damping applied tangentially to the surface on collision");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	/* Fase P: custom GLSL fragment shader file, see frag_shader_path in DNA_object_types.h. */
+	prop = RNA_def_property(srna, "fragment_shader_path", PROP_STRING, PROP_FILEPATH);
+	RNA_def_property_string_sdna(prop, NULL, "frag_shader_path");
+	RNA_def_property_ui_text(prop, "Fragment Shader File",
+	                          "External .glsl file replacing the default sprite color/mask logic, hot-reloaded "
+	                          "while the game runs. Must define its own void main() writing fragColor; "
+	                          "available inputs: v_uv (-0.5..0.5 quad corner), v_lifeFrac, v_alpha, u_color, "
+	                          "u_endColor, u_texture, u_useTexture, u_time. Empty = default look");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_fragment_shader", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_custom_frag_shader", 1);
+	RNA_def_property_ui_text(prop, "Custom Fragment Shader", "Use the Fragment Shader File instead of the default sprite look");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 
 static void rna_def_object_game_settings(BlenderRNA *brna)

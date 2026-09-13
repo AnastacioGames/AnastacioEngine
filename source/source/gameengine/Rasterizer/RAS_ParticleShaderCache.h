@@ -39,6 +39,7 @@
 #include "RAS_TransformFeedbackShader.h"
 
 #include <memory>
+#include <string>
 
 class RAS_ParticleShaderCache
 {
@@ -49,6 +50,8 @@ private:
 	int m_drawViewLoc, m_drawProjLoc, m_drawLifetimeLoc, m_drawSizeLoc, m_drawColorLoc;
 	int m_drawTextureLoc, m_drawUseTextureLoc, m_drawEndColorLoc, m_drawEndSizeLoc;
 	int m_drawBillboardModeLoc;
+	/// Fase P: animated custom fragment scripts (see custom_frag_shader below) can read this.
+	int m_drawTimeLoc;
 
 	/// Fase K: optional curve-driven size/color over lifetime.
 	int m_drawUseSizeCurveLoc, m_drawSizeCurveTexLoc, m_drawUseColorCurveLoc, m_drawColorCurveTexLoc;
@@ -63,8 +66,11 @@ private:
 
 	bool m_valid;
 
-	/// Compiles both programs. Only called by Get() -- use Get() to obtain an instance.
-	RAS_ParticleShaderCache();
+	/// Fase P: compiles both programs, with an optional user-supplied GLSL fragment "main" body
+	/// (see custom_frag_shader in DNA_object_types.h) replacing the built-in sprite color/mask
+	/// logic. Empty = default draw fragment shader, unchanged from before Fase P. Only called by
+	/// Get() -- use Get() to obtain an instance.
+	explicit RAS_ParticleShaderCache(const std::string &customFragShader);
 
 public:
 	~RAS_ParticleShaderCache();
@@ -84,6 +90,7 @@ public:
 	int GetDrawBillboardModeLoc() const { return m_drawBillboardModeLoc; }
 	int GetDrawEndColorLoc() const { return m_drawEndColorLoc; }
 	int GetDrawEndSizeLoc() const { return m_drawEndSizeLoc; }
+	int GetDrawTimeLoc() const { return m_drawTimeLoc; }
 
 	int GetDrawUseSizeCurveLoc() const { return m_drawUseSizeCurveLoc; }
 	int GetDrawSizeCurveTexLoc() const { return m_drawSizeCurveTexLoc; }
@@ -109,10 +116,12 @@ public:
 	int GetCollisionDepthTexLoc() const { return m_collisionDepthTexLoc; }
 	int GetCollisionDepthTexValidLoc() const { return m_collisionDepthTexValidLoc; }
 
-	/// Returns the process-wide shared cache, compiling it on first call (or the first call
-	/// after every previous RAS_ParticleBuffer referencing it was destroyed). Returns nullptr
-	/// if compilation fails; a later call retries rather than staying poisoned.
-	static std::shared_ptr<RAS_ParticleShaderCache> Get();
+	/// Returns a shared cache for the given custom fragment script text (empty = the default
+	/// built-in look). Compiles on first call for that exact script text (or the first call
+	/// after every previous RAS_ParticleBuffer referencing it was destroyed); a later call with
+	/// the same text reuses the compiled program instead of recompiling. Returns nullptr if
+	/// compilation fails; a later call retries rather than staying poisoned.
+	static std::shared_ptr<RAS_ParticleShaderCache> Get(const std::string &customFragShader = std::string());
 };
 
 #endif // __RAS_PARTICLESHADERCACHE_H__

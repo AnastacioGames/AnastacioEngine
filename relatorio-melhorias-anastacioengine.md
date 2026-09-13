@@ -44,6 +44,10 @@ ferramenta correspondente.
 - LOD de impostor possui billboard cilíndrico e bake automático de atlas multiângulo.
 - Partículas GPU por objeto usam transform feedback, shader cache compartilhado, sprites/texturas, curvas,
   presets, debug ImGui e colisão Ground Plane/Screen-Space.
+- Fragment shader customizado por emissor (Fase P): arquivo `.glsl` externo (`object.particles.fragmentShaderPath`
+  em Python, campo "Fragment Shader File" na UI), com hot-reload automático (poll de mtime a cada ~0,5s) —
+  edita-se o arquivo com o jogo rodando e o efeito atualiza sozinho. Exemplos prontos em
+  [`projects-teste/shaders/particles/`](projects-teste/shaders/particles/).
 
 ### Iluminação e renderização
 

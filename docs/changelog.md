@@ -133,6 +133,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 | [2026-09-02 §1](#física-para-o-sistema-de-partículas-gpu-fase-o) | Física (colisão) para GPU Particles — Ground Plane e Screen-Space, confirmado em jogo |
 | [2026-09-02 §2](#varredura-estática-de-bugs-silenciosos---correções-às-cegas) | Varredura estática — 2 lotes de correções às cegas (buffer overflow, leaks, ponteiros nulos) |
 | [2026-09-02 §2](#ground-plane-com-objeto-de-referência-e-screen-space-via-gpu-particle-collider) | Ground Plane ganha objeto de referência; Screen-Space via `use_gpu_particle_collider` |
+| [2026-09-13](#fragment-shader-customizado-por-emissor-fase-p) | Fragment shader customizado (arquivo `.glsl` externo, hot-reload) para GPU Particles + exemplos |
 
 
 ---
@@ -4021,3 +4022,54 @@ necessário dado o caráter mecânico da mudança.
   instaladas. Próximo passo: emsdk Linux dentro do WSL + clone do CPython 3.11
   + `wasm_build.py`. Detalhes em `docs/web-export-plan.md`.
 
+
+## Fragment shader customizado por emissor (Fase P)
+
+- **Pedido do usuário**: em vez de mais presets em C++, um campo pra escrever GLSL próprio por
+  emissor de GPU Particles. Design evoluiu em três voltas durante a conversa: string de uma
+  linha embutida → Text datablock (multi-linha, salvo no `.blend`) → **arquivo `.glsl` externo
+  no disco**, escolha final do usuário, com hot-reload pra poder editar num editor de texto de
+  verdade enquanto o jogo roda.
+- **DNA/RNA**: `RangeGPUParticleSettings` ganhou `frag_shader_path[1024]` (mesma convenção
+  blend-relative `"//"` do campo `texture_path` já existente) e `use_custom_frag_shader`
+  (`DNA_object_types.h`). RNA correspondente em `rna_object.c`: `fragment_shader_path`
+  (`PROP_FILEPATH`) e `use_fragment_shader` (bool).
+- **UI**: nova seção recolhível "Custom Shader (GLSL)" em `properties_particle.py`, com o
+  checkbox, o seletor de arquivo e um lembrete inline do contrato de variáveis disponíveis.
+- **Shader cache** (`RAS_ParticleShaderCache`): `Get()`/construtor passaram a receber
+  `const std::string &customFragShader`; cache singleton original preservado para o caso vazio
+  (zero mudança de comportamento pra cenas existentes), e um `std::map<std::string,
+  std::weak_ptr<...>>` novo para shaders customizados — múltiplos emissores com o mesmo texto de
+  shader compartilham um único programa compilado, mesmo padrão de refcounting do cache padrão.
+  Fonte fragment dividida em `drawFragmentPreamble` (varyings/uniforms, incluindo `u_time` novo)
+  + `drawFragmentDefaultMain` (corpo original) ou o script customizado no lugar do corpo — os
+  `glBindAttribLocation` (0/1/2) são idênticos nos dois casos, então trocar de shader em runtime
+  não quebra os VAOs existentes.
+- **Hot-reload** (`RAS_ParticleBuffer`): `LoadFragShaderFromPath()` resolve o caminho
+  blend-relative (`BLI_path_abs`) e lê o arquivo; `PollFragShaderReload()`, chamado a cada
+  `Update()`, faz `BLI_stat()` no arquivo no máximo 2x/segundo (acumulador `m_fragShaderPollAccum`,
+  não every-frame) e recompila só se o `mtime` mudou. Se a recompilação falhar (erro de sintaxe),
+  o shader anterior continua ativo e o erro vai pro console — sem flicker nem crash por causa de
+  um edit incompleto salvo no meio do caminho.
+- **Python**: `object.particles.fragmentShaderPath` (get retorna o caminho atual; set recarrega
+  na hora, levanta `ValueError` se a compilação falhar) em `KX_ParticleSystem.cpp`/`.h`.
+- **Bridging**: `KX_GameObject::SetupGPUParticles()` chama `LoadFragShaderFromPath` quando
+  `use_custom_frag_shader` e o caminho não estão vazios, antes do bloco de textura já existente.
+- **Contrato do shader**: o script fornece só o corpo (`void main() { ... }` escrevendo
+  `fragColor`); o preâmbulo já declara `v_uv`, `v_lifeFrac`, `v_alpha`, `u_color`, `u_endColor`,
+  `u_texture`, `u_useTexture`, `u_colorCurveTex`, `u_useColorCurve` e o `u_time` novo (tempo de
+  simulação acumulado do emissor, pra animação).
+- **Exemplos criados** em `projects-teste/shaders/particles/` (ver README nessa pasta pro
+  contrato completo): `fire.glsl` (chama com ruído procedural e flicker), `smoke.glsl` (fumaça
+  difusa com fade longo), `sparkle.glsl` (glitter piscando por partícula via hash+`u_time`),
+  `dissolve.glsl` (textura dissolvendo por ruído conforme a vida avança, com borda "queimando"),
+  `rainbow_trail.glsl` (matiz variando no tempo via HSV, sem textura). Todos usam só matemática
+  de shader — sem sampler extra além dos já fornecidos — pra ficarem baratos.
+- **Efeitos adicionados a pedido do usuário** (mesma pasta): `tornado.glsl` (funil com listras
+  radiais de poeira girando mais rápido perto do centro via `atan`+`u_time`), `wind.glsl`
+  (rajada como listra horizontal fina translúcida com ondulação leve) e `aurora.glsl` (cortinas
+  onduladas com matiz verde→violeta deslizando no tempo via HSV, pensado pra sprites grandes/
+  esticados em vez de partículas pontuais).
+- **Build**: `ge_rasterizer`, `bf_rna`, `ge_ketsji`, `ge_converter` recompilados limpos (exit 0,
+  sem `error C`/`error LNK` no log). Teste visual no editor/runtime ainda pendente de validação
+  pelo usuário.

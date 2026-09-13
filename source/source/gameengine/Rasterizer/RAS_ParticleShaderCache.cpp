@@ -33,6 +33,8 @@
 
 #include "GPU_glew.h"
 
+#include <map>
+
 namespace {
 
 const char *updateVertexSource =
@@ -190,7 +192,13 @@ const char *drawVertexSource =
 	"	v_alpha = clamp(v_alpha, 0.0, 1.0);\n"
 	"}\n";
 
-const char *drawFragmentSource =
+// Fase P: split into a fixed preamble (varyings/uniforms every draw fragment shader needs,
+// custom or default) and a default main body, so RAS_ParticleShaderCache can splice in a
+// user-supplied GLSL "main" (custom_frag_shader in DNA_object_types.h / KX_ParticleSystem's
+// fragment_shader attribute) instead of drawFragmentDefaultMain -- same varyings/uniforms
+// available either way, so a script can read v_uv/v_lifeFrac/v_alpha/u_color/u_endColor/... and
+// must write `fragColor` (discard is allowed, e.g. for a non-round mask).
+const char *drawFragmentPreamble =
 	"#version 130\n"
 	"in vec2 v_uv;\n"
 	"in float v_alpha;\n"
@@ -202,6 +210,9 @@ const char *drawFragmentSource =
 	"uniform bool u_useTexture;\n"
 	"uniform sampler2D u_colorCurveTex;\n"
 	"uniform bool u_useColorCurve;\n"
+	"uniform float u_time;\n";
+
+const char *drawFragmentDefaultMain =
 	"void main() {\n"
 	"	vec4 baseColor;\n"
 	"	if (u_useColorCurve) {\n"
@@ -228,14 +239,20 @@ const char *drawFragmentSource =
 	"	fragColor = vec4(rgb, alpha);\n"
 	"}\n";
 
-unsigned int CompileDrawProgram()
+unsigned int CompileDrawProgram(const std::string &customFragShader)
 {
 	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vert, 1, &drawVertexSource, nullptr);
 	glCompileShader(vert);
 
+	// A custom script supplies its own `void main()`; the preamble already declares every
+	// varying/uniform it might use (see drawFragmentPreamble above).
+	const std::string fragSourceStr = std::string(drawFragmentPreamble) +
+		(customFragShader.empty() ? drawFragmentDefaultMain : customFragShader);
+	const char *fragSource = fragSourceStr.c_str();
+
 	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(frag, 1, &drawFragmentSource, nullptr);
+	glShaderSource(frag, 1, &fragSource, nullptr);
 	glCompileShader(frag);
 
 	GLint status;
@@ -284,9 +301,16 @@ unsigned int CompileDrawProgram()
 
 std::weak_ptr<RAS_ParticleShaderCache> g_particleShaderCache;
 
+// Fase P: one compiled cache per unique custom fragment script text, alongside the single
+// default (empty-script) cache above. Keyed by the raw script text rather than a hash -- scripts
+// are short, this map is only touched when an emitter's script changes (not per frame), and a
+// weak_ptr entry left behind after its cache is destroyed is just an inert map slot, recompiled
+// in place next time that exact text is used again.
+std::map<std::string, std::weak_ptr<RAS_ParticleShaderCache>> g_customParticleShaderCaches;
+
 } // namespace
 
-RAS_ParticleShaderCache::RAS_ParticleShaderCache()
+RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragShader)
 	:m_drawProgram(0),
 	m_drawViewLoc(-1),
 	m_drawProjLoc(-1),
@@ -297,6 +321,7 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache()
 	m_drawUseTextureLoc(-1),
 	m_drawEndColorLoc(-1),
 	m_drawEndSizeLoc(-1),
+	m_drawTimeLoc(-1),
 	m_drawUseSizeCurveLoc(-1),
 	m_drawSizeCurveTexLoc(-1),
 	m_drawUseColorCurveLoc(-1),
@@ -328,7 +353,7 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache()
 		return;
 	}
 
-	m_drawProgram = CompileDrawProgram();
+	m_drawProgram = CompileDrawProgram(customFragShader);
 	if (!m_drawProgram) {
 		return;
 	}
@@ -343,6 +368,7 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache()
 	m_drawBillboardModeLoc = glGetUniformLocation(m_drawProgram, "u_billboardMode");
 	m_drawEndColorLoc = glGetUniformLocation(m_drawProgram, "u_endColor");
 	m_drawEndSizeLoc = glGetUniformLocation(m_drawProgram, "u_endSize");
+	m_drawTimeLoc = glGetUniformLocation(m_drawProgram, "u_time");
 	m_drawUseSizeCurveLoc = glGetUniformLocation(m_drawProgram, "u_useSizeCurve");
 	m_drawSizeCurveTexLoc = glGetUniformLocation(m_drawProgram, "u_sizeCurveTex");
 	m_drawUseColorCurveLoc = glGetUniformLocation(m_drawProgram, "u_useColorCurve");
@@ -378,18 +404,34 @@ RAS_ParticleShaderCache::~RAS_ParticleShaderCache()
 	}
 }
 
-std::shared_ptr<RAS_ParticleShaderCache> RAS_ParticleShaderCache::Get()
+std::shared_ptr<RAS_ParticleShaderCache> RAS_ParticleShaderCache::Get(const std::string &customFragShader)
 {
-	std::shared_ptr<RAS_ParticleShaderCache> existing = g_particleShaderCache.lock();
+	if (customFragShader.empty()) {
+		std::shared_ptr<RAS_ParticleShaderCache> existing = g_particleShaderCache.lock();
+		if (existing) {
+			return existing;
+		}
+
+		std::shared_ptr<RAS_ParticleShaderCache> created(new RAS_ParticleShaderCache(customFragShader));
+		if (!created->Ok()) {
+			return nullptr;
+		}
+
+		g_particleShaderCache = created;
+		return created;
+	}
+
+	std::weak_ptr<RAS_ParticleShaderCache> &slot = g_customParticleShaderCaches[customFragShader];
+	std::shared_ptr<RAS_ParticleShaderCache> existing = slot.lock();
 	if (existing) {
 		return existing;
 	}
 
-	std::shared_ptr<RAS_ParticleShaderCache> created(new RAS_ParticleShaderCache());
+	std::shared_ptr<RAS_ParticleShaderCache> created(new RAS_ParticleShaderCache(customFragShader));
 	if (!created->Ok()) {
 		return nullptr;
 	}
 
-	g_particleShaderCache = created;
+	slot = created;
 	return created;
 }

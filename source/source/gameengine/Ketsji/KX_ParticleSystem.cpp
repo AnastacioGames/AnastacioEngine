@@ -95,6 +95,7 @@ PyAttributeDef KX_ParticleSystem::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("collisionHeight", KX_ParticleSystem, pyattr_get_collision_height, pyattr_set_collision_height),
 	EXP_PYATTRIBUTE_RW_FUNCTION("collisionBounce", KX_ParticleSystem, pyattr_get_collision_bounce, pyattr_set_collision_bounce),
 	EXP_PYATTRIBUTE_RW_FUNCTION("collisionFriction", KX_ParticleSystem, pyattr_get_collision_friction, pyattr_set_collision_friction),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fragmentShaderPath", KX_ParticleSystem, pyattr_get_fragment_shader, pyattr_set_fragment_shader),
 	EXP_PYATTRIBUTE_NULL // Sentinel
 };
 
@@ -299,6 +300,29 @@ int KX_ParticleSystem::pyattr_set_texture(EXP_PyObjectPlus *self_v, const EXP_PY
 
 	if (!self->m_buffer->LoadTextureFromPath(filepath)) {
 		PyErr_Format(PyExc_ValueError, "could not load texture '%s'", filepath);
+		return PY_SET_ATTR_FAIL;
+	}
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_ParticleSystem::pyattr_get_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	return PyUnicode_FromString(self->m_buffer->GetFragShaderPath().c_str());
+}
+
+int KX_ParticleSystem::pyattr_set_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+
+	if (!PyUnicode_Check(value)) {
+		PyErr_SetString(PyExc_TypeError, "expected a string filepath to a .glsl file (empty string restores the default look)");
+		return PY_SET_ATTR_FAIL;
+	}
+	const char *filepath = _PyUnicode_AsString(value);
+
+	if (!self->m_buffer->LoadFragShaderFromPath(filepath)) {
+		PyErr_Format(PyExc_ValueError, "could not load/compile fragment shader '%s', see console for details", filepath);
 		return PY_SET_ATTR_FAIL;
 	}
 	return PY_SET_ATTR_SUCCESS;

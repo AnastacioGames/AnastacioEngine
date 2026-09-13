@@ -42,6 +42,14 @@
 #include "DNA_image_types.h"
 #include "MEM_guardedalloc.h"
 
+#include "BLI_fileops.h"
+#include "BLI_path_util.h"
+#include "BLI_string.h"
+#include "KX_Globals.h"
+
+#include <fstream>
+#include <sstream>
+
 namespace {
 
 // Hardcoded simulation/emitter parameters for Fase B/C -- no Python API yet (Fase D).
@@ -125,6 +133,93 @@ RAS_ParticleBuffer::RAS_ParticleBuffer(unsigned int particleCount)
 	m_emissionAngle = 180.0f;
 }
 
+bool RAS_ParticleBuffer::SetCustomFragShader(const std::string &source)
+{
+	if (source == m_customFragShader) {
+		return true;
+	}
+
+	std::shared_ptr<RAS_ParticleShaderCache> newCache = RAS_ParticleShaderCache::Get(source);
+	if (!newCache) {
+		return false;
+	}
+
+	m_customFragShader = source;
+	// Attribute locations (0/1/2) are the same fixed layout in every compiled draw program (see
+	// CompileDrawProgram), so the existing draw VAOs stay valid -- only the program/uniform
+	// locations need to change.
+	m_shaderCache = newCache;
+	return true;
+}
+
+bool RAS_ParticleBuffer::LoadFragShaderFromPath(const std::string &path)
+{
+	if (path.empty()) {
+		m_fragShaderPath.clear();
+		m_fragShaderMTime = 0;
+		return SetCustomFragShader(std::string());
+	}
+
+	char expanded[1024];
+	BLI_strncpy(expanded, path.c_str(), sizeof(expanded));
+	BLI_path_abs(expanded, KX_GetMainPath().c_str());
+
+	std::ifstream file(expanded);
+	if (!file.is_open()) {
+		CM_Error("could not open particle fragment shader file '" << expanded << "'");
+		return false;
+	}
+	std::ostringstream contents;
+	contents << file.rdbuf();
+
+	if (!SetCustomFragShader(contents.str())) {
+		return false;
+	}
+
+	m_fragShaderPath = path;
+	BLI_stat_t st;
+	m_fragShaderMTime = (BLI_stat(expanded, &st) == 0) ? (long)st.st_mtime : 0;
+	m_fragShaderPollAccum = 0.0f;
+	return true;
+}
+
+void RAS_ParticleBuffer::PollFragShaderReload(float deltaTime)
+{
+	if (m_fragShaderPath.empty()) {
+		return;
+	}
+
+	// A handful of stat() calls per second per emitter is negligible next to the GL work
+	// Update()/Draw() already do each frame, but there's no reason to hit the filesystem every
+	// single frame either.
+	m_fragShaderPollAccum += deltaTime;
+	if (m_fragShaderPollAccum < 0.5f) {
+		return;
+	}
+	m_fragShaderPollAccum = 0.0f;
+
+	char expanded[1024];
+	BLI_strncpy(expanded, m_fragShaderPath.c_str(), sizeof(expanded));
+	BLI_path_abs(expanded, KX_GetMainPath().c_str());
+
+	BLI_stat_t st;
+	if (BLI_stat(expanded, &st) != 0) {
+		// File missing/unreadable (e.g. mid-save) -- keep the last successfully compiled shader
+		// and just retry on the next poll instead of falling back to the default look.
+		return;
+	}
+	if ((long)st.st_mtime == m_fragShaderMTime) {
+		return;
+	}
+
+	// LoadFragShaderFromPath only overwrites m_fragShaderPath/m_fragShaderMTime on success, so a
+	// failed reload here leaves both as they were -- the previous shader keeps running and the
+	// next poll (still seeing the changed mtime) retries automatically.
+	if (!LoadFragShaderFromPath(m_fragShaderPath)) {
+		CM_Error("particle fragment shader hot-reload failed for '" << m_fragShaderPath << "', keeping previous shader");
+	}
+}
+
 RAS_ParticleBuffer::~RAS_ParticleBuffer()
 {
 	if (m_vao[0]) {
@@ -149,7 +244,7 @@ RAS_ParticleBuffer::~RAS_ParticleBuffer()
 
 bool RAS_ParticleBuffer::Create()
 {
-	m_shaderCache = RAS_ParticleShaderCache::Get();
+	m_shaderCache = RAS_ParticleShaderCache::Get(m_customFragShader);
 	if (!m_shaderCache) {
 		return false;
 	}
@@ -221,6 +316,7 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	}
 
 	m_simTime += deltaTime;
+	PollFragShaderReload(deltaTime);
 
 	const unsigned int writeIndex = 1 - m_readIndex;
 
@@ -300,6 +396,7 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 	glUniform1f(m_shaderCache->GetDrawEndSizeLoc(), m_endSize);
 	glUniform4fv(m_shaderCache->GetDrawColorLoc(), 1, m_color);
 	glUniform4fv(m_shaderCache->GetDrawEndColorLoc(), 1, m_endColor);
+	glUniform1f(m_shaderCache->GetDrawTimeLoc(), m_simTime);
 	glUniform1i(m_shaderCache->GetDrawBillboardModeLoc(), (int)m_billboardMode);
 	glUniform1i(m_shaderCache->GetDrawUseTextureLoc(), m_texture != 0 ? 1 : 0);
 	if (m_texture != 0) {

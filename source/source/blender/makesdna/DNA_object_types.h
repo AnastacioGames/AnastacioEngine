@@ -221,6 +221,17 @@ typedef struct RangeGPUParticleSettings {
 	/* Ground Plane collision: optional object whose world-space Z overrides collision_height
 	 * every frame. NULL falls back to the fixed collision_height float above. */
 	struct Object *collision_ground_object;
+	/* Fase P: optional custom GLSL fragment shader, replacing the built-in sprite color/mask
+	 * logic (round soft mask + linear/curve color mix). Path to an external .glsl file (same
+	 * blend-relative "//" convention as texture_path above), not embedded in the .blend --
+	 * RAS_ParticleBuffer polls its mtime at runtime and hot-reloads on change, so it can be
+	 * edited in a real text editor while the game is running. Empty or use_custom_frag_shader ==
+	 * 0 = default look. Must define its own `void main()` writing `fragColor`; see
+	 * drawFragmentPreamble in RAS_ParticleShaderCache.cpp for the varyings/uniforms available
+	 * (v_uv, v_lifeFrac, v_alpha, u_color, u_endColor, u_texture, u_useTexture, u_time, ...). */
+	char frag_shader_path[1024]; /* FILE_MAX */
+	short use_custom_frag_shader;
+	char pad4[6];
 } RangeGPUParticleSettings;
 
 enum {
