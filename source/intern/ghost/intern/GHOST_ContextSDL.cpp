@@ -31,11 +31,6 @@
 #include <cstdio>
 #include <cstring>
 
-#ifdef __EMSCRIPTEN__
-#  include <emscripten/html5_webgl.h>
-#endif
-
-
 SDL_GLContext GHOST_ContextSDL::s_sharedContext = NULL;
 int           GHOST_ContextSDL::s_sharedCount   = 0;
 
@@ -118,11 +113,9 @@ GHOST_TSuccess GHOST_ContextSDL::initializeDrawingContext()
 #endif
 
 #ifdef __EMSCRIPTEN__
-	/* Emscripten maps SDL's EGL context to WebGL.  Its EGL shim requires an
-	 * explicit GLES 2 request; the native default (OpenGL 0.0) is treated as
-	 * GLES 1 and is rejected with EGL_BAD_CONFIG. */
+	/* Emscripten maps an explicit GLES 3 SDL context to WebGL 2. */
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
 	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 0);
@@ -168,12 +161,6 @@ GHOST_TSuccess GHOST_ContextSDL::initializeDrawingContext()
 
 		success = (SDL_GL_MakeCurrent(m_window, m_context) < 0) ?
 		           GHOST_kFailure : GHOST_kSuccess;
-		#ifdef __EMSCRIPTEN__
-		if (!emscripten_webgl_enable_OES_vertex_array_object(emscripten_webgl_get_current_context())) {
-			fprintf(stderr, "[web] OES_vertex_array_object is unavailable\n");
-		}
-		#endif
-
 		initContextGLEW();
 
 		initClearGL();

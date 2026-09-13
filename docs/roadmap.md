@@ -148,7 +148,7 @@ e detalhados no [`changelog.md`](changelog.md).
 
 ## Validações pendentes
 
-- **Export para Web — atualização 2026-09-13**: o runtime wasm já inicializa Python, lê `untitled.range` até `ENDB` e cria um canvas WebGL de 640×480. Foram corrigidos o underflow de `POINTER_OFFSET`, o alinhamento de 8 bytes para reconstruções SDNA/`Main`, a solicitação explícita de contexto GLES 2, os placeholders de textura incompatíveis e o acesso a VAO pela extensão WebGL. O bloqueio atual é a compilação dos shaders GLSL desktop (`#version 120`) no GLSL ES; falta portar a injeção/código dos shaders e então executar a cena.
+- **Export para Web — atualização 2026-09-13**: o runtime wasm já inicializa Python, lê `untitled.range` até `ENDB`, cria o canvas WebGL2, compila os shaders básicos em GLSL ES 300 e cria os framebuffers e suas texturas. O caminho Web usa as entradas GLES3 diretas para shader, VAO, framebuffer e renderbuffer, pois os ponteiros de extensão desktop do GLEW ficam nulos no Emscripten; a chamada singular `glDrawBuffer` é traduzida para `glDrawBuffers`. O bloqueio atual está isolado em `RAS_Query::RAS_Query`, ainda ligado às funções de GPU query do GLEW desktop. Depois dessa adaptação ainda falta alcançar e validar visualmente a primeira cena.
 
 - Cutscene nativo: executar no editor o roteiro de
   [`cutscene-native-example.md`](cutscene-native-example.md), cobrindo

@@ -25,7 +25,7 @@ void main(void)
 	vec2 co = texCoordVarying;
 #ifdef STIPPLE
 	if (stippleid == STIPPLE_ROW) {
-		int result = int(mod(gl_FragCoord.y, 2));
+		int result = int(mod(gl_FragCoord.y, 2.0));
 		if (result != 0) {
 			fragColor = texture(lefteyetex, co);
 		}
@@ -34,7 +34,7 @@ void main(void)
 		}
 	}
 	else if (stippleid == STIPPLE_COLUMN) {
-		int result = int(mod(gl_FragCoord.x, 2));
+		int result = int(mod(gl_FragCoord.x, 2.0));
 		if (result == 0) {
 			fragColor = texture(lefteyetex, co);
 		}
@@ -59,7 +59,7 @@ void main()
 	vec2 co = gl_TexCoord[0].xy;
 #ifdef STIPPLE
 	if (stippleid == STIPPLE_ROW) {
-		int result = int(mod(gl_FragCoord.y, 2));
+		int result = int(mod(gl_FragCoord.y, 2.0));
 		if (result != 0) {
 			gl_FragData[0] = texture2D(lefteyetex, co);
 		}
@@ -68,7 +68,7 @@ void main()
 		}
 	}
 	else if (stippleid == STIPPLE_COLUMN) {
-		int result = int(mod(gl_FragCoord.x, 2));
+		int result = int(mod(gl_FragCoord.x, 2.0));
 		if (result == 0) {
 			gl_FragData[0] = texture2D(lefteyetex, co);
 		}

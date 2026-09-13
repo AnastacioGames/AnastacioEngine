@@ -31,6 +31,44 @@
 
 #include "GPU_material.h"
 #include "GPU_glew.h"
+
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+
+EM_JS(void, ras_gl_bind_buffer_webgl, (GLenum target, GLuint buffer), {
+	GLctx.bindBuffer(target, buffer ? GL.buffers[buffer] : null);
+});
+
+extern "C" {
+extern void emscripten_glGenBuffers(GLsizei n, GLuint *buffers);
+extern void emscripten_glBufferData(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+extern void emscripten_glDeleteBuffers(GLsizei n, const GLuint *buffers);
+extern void emscripten_glEnableVertexAttribArray(GLuint index);
+extern void emscripten_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+extern void emscripten_glVertexAttribDivisor(GLuint index, GLuint divisor);
+extern void emscripten_glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount);
+extern void emscripten_glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount);
+}
+
+#  undef glGenBuffers
+#  undef glBindBuffer
+#  undef glBufferData
+#  undef glDeleteBuffers
+#  undef glEnableVertexAttribArray
+#  undef glVertexAttribPointer
+#  undef glVertexAttribDivisorARB
+#  undef glDrawArraysInstancedARB
+#  undef glDrawElementsInstancedARB
+#  define glGenBuffers emscripten_glGenBuffers
+#  define glBindBuffer ras_gl_bind_buffer_webgl
+#  define glBufferData emscripten_glBufferData
+#  define glDeleteBuffers emscripten_glDeleteBuffers
+#  define glEnableVertexAttribArray emscripten_glEnableVertexAttribArray
+#  define glVertexAttribPointer emscripten_glVertexAttribPointer
+#  define glVertexAttribDivisorARB emscripten_glVertexAttribDivisor
+#  define glDrawArraysInstancedARB emscripten_glDrawArraysInstanced
+#  define glDrawElementsInstancedARB emscripten_glDrawElementsInstanced
+#endif
 #include "GPU_shader.h"
 #include "GPU_vertex_array.h"
 

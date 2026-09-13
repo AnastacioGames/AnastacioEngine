@@ -105,6 +105,10 @@ ferramenta correspondente.
 
 ## Decisões técnicas vigentes
 
+- O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
+  framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são
+  considerados disponíveis no Emscripten; adaptações Web devem usar a API GLES3 correspondente. O
+  runtime já cria o canvas e os offscreens, mas ainda para em `RAS_Query` antes de executar a cena.
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

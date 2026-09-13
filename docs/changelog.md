@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-13 — WebGL2: shaders, VAO e framebuffers alcançam a criação do canvas
+
+- O preset Web passou a exigir WebGL2/GLES3 e o backend SDL solicita o contexto correspondente. A compatibilidade de shaders usa GLSL ES 300 e chamadas diretas do Emscripten para criação, compilação, consulta de atributos e uniforms.
+- As operações de VAO, debug draw, framebuffer e renderbuffer deixaram de depender dos ponteiros de extensão desktop do GLEW, que permanecem nulos no wasm. `glDrawBuffer` é encaminhado para `glDrawBuffers`, disponível no WebGL2.
+- O build incremental de `RangeRuntime` terminou com sucesso. No Chrome headless, os shaders básicos compilaram e todos os framebuffers e texturas observados foram criados; a inicialização alcançou a criação do canvas.
+- O próximo bloqueio confirmado é uma chamada nula no construtor `RAS_Query::RAS_Query`, durante `LA_Launcher::InitEngine`. A cena ainda não foi executada nem validada visualmente.
+
 ## 2026-09-13 — Web/Emscripten: alinhamento na leitura SDNA e avanço do carregamento
 
 - O carregamento de `untitled.range` no `RangeRuntime` wasm32 deixou de abortar na leitura de `GLOB`. A causa era alinhamento de 64 bits: `MEM_callocN` podia devolver apenas alinhamento de 4 bytes no wasm32, enquanto `FileGlobal` e `Main` contêm `uint64_t`.

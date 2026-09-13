@@ -987,7 +987,7 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 	// Draw frame buffer shader.
 	{
 		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_DRAW_FRAME_BUFFER);
-		if (!GPU_shader_get_interface(shader)) {
+		if (shader && !GPU_shader_get_interface(shader)) {
 			OverrideShaderDrawFrameBufferInterface *interface = (OverrideShaderDrawFrameBufferInterface *)MEM_mallocN(sizeof(OverrideShaderDrawFrameBufferInterface), "OverrideShaderDrawFrameBufferInterface");
 
 			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
@@ -999,7 +999,7 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 	// Stipple stereo shader.
 	{
 		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_STEREO_STIPPLE);
-		if (!GPU_shader_get_interface(shader)) {
+		if (shader && !GPU_shader_get_interface(shader)) {
 			OverrideShaderStereoStippleInterface *interface = (OverrideShaderStereoStippleInterface *)MEM_mallocN(sizeof(OverrideShaderStereoStippleInterface), "OverrideShaderStereoStippleInterface");
 
 			interface->leftEyeTexLoc = GPU_shader_get_uniform(shader, "lefteyetex");
@@ -1013,7 +1013,7 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 	// Anaglyph stereo shader.
 	{
 		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_STEREO_ANAGLYPH);
-		if (!GPU_shader_get_interface(shader)) {
+		if (shader && !GPU_shader_get_interface(shader)) {
 			OverrideShaderStereoAnaglyph *interface = (OverrideShaderStereoAnaglyph *)MEM_mallocN(sizeof(OverrideShaderStereoAnaglyph), "OverrideShaderStereoAnaglyph");
 
 			interface->leftEyeTexLoc = GPU_shader_get_uniform(shader, "lefteyetex");

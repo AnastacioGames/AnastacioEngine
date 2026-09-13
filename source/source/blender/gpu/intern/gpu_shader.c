@@ -37,6 +37,24 @@
 #include "GPU_material.h"
 #include "gpu_codegen.h"
 
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+#  include <emscripten.h>
+
+extern GLint emscripten_glGetUniformLocation(GLuint program, const GLchar *name);
+extern GLint emscripten_glGetAttribLocation(GLuint program, const GLchar *name);
+
+EM_JS(void, gpu_shader_source_webgl,
+      (GLuint shader, GLsizei count, const GLchar *const *strings, const GLint *lengths),
+      {
+        var source = "";
+        for (var i = 0; i < count; ++i) {
+          var length = lengths ? HEAP32[(lengths >> 2) + i] : undefined;
+          source += UTF8ToString(HEAPU32[(strings >> 2) + i], length);
+        }
+        WebGL2RenderingContext.prototype.shaderSource.call(GLctx, GL.shaders[shader], source);
+      });
+#endif
+
 /* TODO(sergey): Find better default values for this constants. */
 #define MAX_DEFINE_LENGTH 1024
 #define MAX_EXT_DEFINE_LENGTH 1024
@@ -146,7 +164,13 @@ static void shader_print_errors(const char *task, const char *log, const char **
 static const char *gpu_shader_version(void)
 {
 #ifdef WITH_GL_PROFILE_CORE
+	#ifdef __EMSCRIPTEN__
+	return "#version 300 es\n"
+	       "precision highp float;\n"
+	       "precision highp int;\n";
+	#else
 	return "#version 330 core\n";
+	#endif
 #endif
 
 	if (GLEW_ARB_compatibility) {
@@ -217,6 +241,18 @@ static const char *gpu_shader_version(void)
 		return "#version 120\n";
 		/* minimum supported */
 	}
+}
+
+static void gpu_shader_source(GLuint shader, GLsizei count, const GLchar *const *source)
+{
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+	/* LEGACY_GL_EMULATION is still needed by non-core helper code, but its
+	 * glShaderSource wrapper prepends compatibility declarations ahead of the
+	 * mandatory GLSL ES #version line. */
+	gpu_shader_source_webgl(shader, count, source, NULL);
+#else
+	glShaderSource(shader, count, source, NULL);
+#endif
 }
 
 
@@ -474,7 +510,7 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 		gpu_dump_shaders(source, num_source, DEBUG_SHADER_VERTEX);
 
 		glAttachShader(shader->program, shader->vertex);
-		glShaderSource(shader->vertex, num_source, source, NULL);
+		gpu_shader_source(shader->vertex, num_source, source);
 
 		glCompileShader(shader->vertex);
 		glGetShaderiv(shader->vertex, GL_COMPILE_STATUS, &status);
@@ -516,7 +552,7 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 		gpu_dump_shaders(source, num_source, DEBUG_SHADER_FRAGMENT);
 
 		glAttachShader(shader->program, shader->fragment);
-		glShaderSource(shader->fragment, num_source, source, NULL);
+		gpu_shader_source(shader->fragment, num_source, source);
 
 		glCompileShader(shader->fragment);
 		glGetShaderiv(shader->fragment, GL_COMPILE_STATUS, &status);
@@ -545,7 +581,7 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 		gpu_dump_shaders(source, num_source, DEBUG_SHADER_GEOMETRY);
 
 		glAttachShader(shader->program, shader->geometry);
-		glShaderSource(shader->geometry, num_source, source, NULL);
+		gpu_shader_source(shader->geometry, num_source, source);
 
 		glCompileShader(shader->geometry);
 		glGetShaderiv(shader->geometry, GL_COMPILE_STATUS, &status);
@@ -684,7 +720,11 @@ int GPU_shader_get_uniform_infos(GPUShader *shader, GPUUniformInfo **infos)
 
 int GPU_shader_get_uniform(GPUShader *shader, const char *name)
 {
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+	return emscripten_glGetUniformLocation(shader->program, name);
+#else
 	return glGetUniformLocation(shader->program, name);
+#endif
 }
 
 void *GPU_shader_get_interface(GPUShader *shader)
@@ -793,7 +833,11 @@ int GPU_shader_get_attribute(GPUShader *shader, const char *name)
 {
 	int index;
 
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+	GPU_CHECK_ERRORS_AROUND(index = emscripten_glGetAttribLocation(shader->program, name));
+#else
 	GPU_CHECK_ERRORS_AROUND(index = glGetAttribLocation(shader->program, name));
+#endif
 
 	return index;
 }

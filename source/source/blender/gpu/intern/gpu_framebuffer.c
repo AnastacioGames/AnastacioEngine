@@ -32,6 +32,86 @@
 #include "GPU_texture.h"
 #include "GPU_vertex_array.h"
 
+#ifdef __EMSCRIPTEN__
+/* GLEW stores the desktop EXT entry points in function pointers. Emscripten's
+ * WebGL2 implementation exports the equivalent core GLES3 functions directly,
+ * while those GLEW extension pointers remain null. Keep the compatibility names
+ * used by this legacy file, but route them to the WebGL2 entry points. */
+#  undef glGenFramebuffers
+#  undef glBindFramebuffer
+#  undef glDeleteFramebuffers
+#  undef glCheckFramebufferStatus
+#  undef glFramebufferTexture2D
+#  undef glGenRenderbuffers
+#  undef glBindRenderbuffer
+#  undef glDeleteRenderbuffers
+#  undef glRenderbufferStorage
+#  undef glRenderbufferStorageMultisample
+#  undef glFramebufferRenderbuffer
+#  undef glBlitFramebuffer
+#  undef glReadBuffer
+#  undef glDrawBuffers
+#  undef glDrawBuffer
+extern void glGenFramebuffers(GLsizei n, GLuint *framebuffers);
+extern void glBindFramebuffer(GLenum target, GLuint framebuffer);
+extern void glDeleteFramebuffers(GLsizei n, const GLuint *framebuffers);
+extern GLenum glCheckFramebufferStatus(GLenum target);
+extern void glFramebufferTexture2D(
+    GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+extern void glGenRenderbuffers(GLsizei n, GLuint *renderbuffers);
+extern void glBindRenderbuffer(GLenum target, GLuint renderbuffer);
+extern void glDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers);
+extern void glRenderbufferStorage(
+    GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
+extern void glRenderbufferStorageMultisample(
+    GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+extern void glFramebufferRenderbuffer(
+    GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
+extern void glBlitFramebuffer(GLint srcX0,
+                              GLint srcY0,
+                              GLint srcX1,
+                              GLint srcY1,
+                              GLint dstX0,
+                              GLint dstY0,
+                              GLint dstX1,
+                              GLint dstY1,
+                              GLbitfield mask,
+                              GLenum filter);
+extern void glReadBuffer(GLenum src);
+extern void glDrawBuffers(GLsizei n, const GLenum *bufs);
+
+static void web_glDrawBuffer(GLenum buf)
+{
+	glDrawBuffers(1, &buf);
+}
+
+#  define glDrawBuffer web_glDrawBuffer
+#  undef glGenFramebuffersEXT
+#  undef glBindFramebufferEXT
+#  undef glDeleteFramebuffersEXT
+#  undef glCheckFramebufferStatusEXT
+#  undef glFramebufferTexture2DEXT
+#  undef glGenRenderbuffersEXT
+#  undef glBindRenderbufferEXT
+#  undef glDeleteRenderbuffersEXT
+#  undef glRenderbufferStorageEXT
+#  undef glRenderbufferStorageMultisampleEXT
+#  undef glFramebufferRenderbufferEXT
+#  undef glBlitFramebufferEXT
+#  define glGenFramebuffersEXT glGenFramebuffers
+#  define glBindFramebufferEXT glBindFramebuffer
+#  define glDeleteFramebuffersEXT glDeleteFramebuffers
+#  define glCheckFramebufferStatusEXT glCheckFramebufferStatus
+#  define glFramebufferTexture2DEXT glFramebufferTexture2D
+#  define glGenRenderbuffersEXT glGenRenderbuffers
+#  define glBindRenderbufferEXT glBindRenderbuffer
+#  define glDeleteRenderbuffersEXT glDeleteRenderbuffers
+#  define glRenderbufferStorageEXT glRenderbufferStorage
+#  define glRenderbufferStorageMultisampleEXT glRenderbufferStorageMultisample
+#  define glFramebufferRenderbufferEXT glFramebufferRenderbuffer
+#  define glBlitFramebufferEXT glBlitFramebuffer
+#endif
+
 static struct GPUFrameBufferGlobal {
 	GLuint currentfb;
 } GG = {0};
@@ -165,11 +245,13 @@ GPUFrameBuffer *GPU_framebuffer_create(void)
 {
 	GPUFrameBuffer *fb;
 
+#ifndef __EMSCRIPTEN__
 	if (!(GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object ||
 	      (GLEW_EXT_framebuffer_object && GLEW_EXT_framebuffer_blit)))
 	{
 		return NULL;
 	}
+#endif
 
 	fb = MEM_callocN(sizeof(GPUFrameBuffer), "GPUFrameBuffer");
 	glGenFramebuffersEXT(1, &fb->object);
