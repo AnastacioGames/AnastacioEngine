@@ -231,8 +231,34 @@ typedef struct RangeGPUParticleSettings {
 	 * (v_uv, v_lifeFrac, v_alpha, u_color, u_endColor, u_texture, u_useTexture, u_time, ...). */
 	char frag_shader_path[1024]; /* FILE_MAX */
 	short use_custom_frag_shader;
-	char pad4[6];
+	/* Fase Q: built-in look baked into the engine (GPU_PARTICLE_LOOK_*), used by the Mix GPU
+	 * Particle System panel instead of an external .glsl file. Independent of
+	 * use_custom_frag_shader/frag_shader_path above -- LOOK_DEFAULT (0) keeps the normal
+	 * texture/round-sprite draw. */
+	short particle_look;
+	/* Fase R: vortex/cone motion (tornado funnel). When enabled, each particle's XY position is
+	 * snapped every frame onto a rotating cone around the emitter's vertical (Z) axis: radius
+	 * grows from emitter_radius at the emitter up to vortex_radius_top at vortex_height, while
+	 * the angle advances by vortex_rotation_speed (degrees/sec). Z motion still comes from the
+	 * usual gravity/velocity integration -- this only reshapes XY into a funnel. */
+	short use_vortex;
+	short pad5;
+	float vortex_rotation_speed;
+	float vortex_radius_top;
+	float vortex_height;
+	char pad4[4];
 } RangeGPUParticleSettings;
+
+enum {
+	GPU_PARTICLE_LOOK_DEFAULT = 0,
+	GPU_PARTICLE_LOOK_SMOKE = 1,
+	GPU_PARTICLE_LOOK_SPARKLE = 2,
+	GPU_PARTICLE_LOOK_DISSOLVE = 3,
+	GPU_PARTICLE_LOOK_RAINBOW_TRAIL = 4,
+	GPU_PARTICLE_LOOK_TORNADO = 5,
+	GPU_PARTICLE_LOOK_WIND = 6,
+	GPU_PARTICLE_LOOK_AURORA = 7,
+};
 
 enum {
 	GPU_PARTICLE_BLEND_ALPHA = 0,
@@ -508,6 +534,9 @@ typedef struct Object {
 
 	/* GPU particle emitter (RAS_ParticleBuffer), opt-in per object via gameflag2 & OB_GPU_PARTICLES */
 	struct RangeGPUParticleSettings gpu_particles;
+	/* Fase Q: second GPU particle emitter, opt-in via gameflag2 & OB_GPU_PARTICLES_MIX, drawn
+	 * together with gpu_particles above (see "Mix GPU Particle System" panel). */
+	struct RangeGPUParticleSettings gpu_particles_mix;
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -817,6 +846,11 @@ enum {
 	 * objects. Native designer-facing marker only; runtime vehicle creation still
 	 * goes through KX_VehicleWrapper/vehicle preset. */
 	OB_VEHICLE                       = 1 << 11,
+
+	/* Fase Q: second, independent GPU particle emitter on the same object (gpu_particles_mix),
+	 * drawn together with the primary one instead of replacing it -- lets two looks (e.g. Fire
+	 * + Smoke) mix on one emitter object. */
+	OB_GPU_PARTICLES_MIX             = 1 << 12,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };

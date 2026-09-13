@@ -4080,3 +4080,45 @@ necessário dado o caráter mecânico da mudança.
 - **Build**: `ge_rasterizer`, `bf_rna`, `ge_ketsji`, `ge_converter` recompilados limpos (exit 0,
   sem `error C`/`error LNK` no log). Teste visual no editor/runtime ainda pendente de validação
   pelo usuário.
+
+## 2026-09-13 — GPU Particles: movimento em vórtex/cone (funil de tornado)
+
+- **Pedido do usuário**: o Look TORNADO deveria não só *parecer* um funil (fragment shader), mas
+  fazer as partículas se moverem de fato em cone giratório — estreito na base, alargando conforme
+  sobem, girando em torno do eixo vertical do emissor.
+- **DNA** (`DNA_object_types.h`, `RangeGPUParticleSettings`, compartilhada por `gpu_particles` e
+  `gpu_particles_mix`): campos novos `use_vortex` (short), `vortex_rotation_speed`,
+  `vortex_radius_top`, `vortex_height` (float). Precisou de `short pad5` explícito entre
+  `use_vortex` e o primeiro float seguinte — o checker de alinhamento do `makesdna` exige múltiplo
+  de 4 bytes ali, e sem o padding o build falha com `Align 4 error`/`Sizeerror` (não é erro de
+  compilador comum, é validação em tempo de build).
+- **RNA** (`rna_object.c`): propriedades `use_vortex`/`vortex_rotation_speed`/`vortex_radius_top`/
+  `vortex_height` expostas; `rna_GPUParticleSettings_particle_look_update` zera `use_vortex` em
+  todos os Looks que não são TORNADO (evita vazar o modo cone ao trocar de Look) e preenche os
+  valores padrão do funil quando TORNADO é selecionado (também ajustou `emitter_radius` pra 0.2,
+  `velocity.z` pra 1.5 e `velocity_randomness` pra 0.15, pra combinar com o cone).
+- **Update shader** (`RAS_ParticleShaderCache.cpp`, `updateVertexSource`, transform feedback):
+  quando `u_useVortex` está ativo, depois da integração normal de posição, a posição XY da
+  partícula é reprojetada pro raio-alvo do cone (`mix(emitter_radius, vortex_radius_top,
+  heightFrac)`, `heightFrac` calculado a partir de `vortex_height`) e girada em torno do eixo Z do
+  emissor por `vortex_rotation_speed` (graus/segundo). Uniforms novos resolvidos e cacheados em
+  `RAS_ParticleShaderCache`/enviados a cada `Update()` em `RAS_ParticleBuffer`.
+- **Wiring DNA → runtime**: `KX_GameObject::SetupGPUParticlesBuffer` copia os 4 campos novos pro
+  `RAS_ParticleBuffer` recém-criado, mesmo padrão dos campos de colisão existentes.
+- **UI**: seção "Vortex / Cone (Tornado)" nova em `properties_particle.py`, tanto no painel
+  primário (Motion) quanto no painel Mix GPU Particle System — checkbox + rotation speed/top
+  radius/height condicionais.
+- **Debug overlay standalone** (`KX_ParticleDebugUI.cpp`, ImGui): mesma seção Vortex/Cone
+  adicionada ao painel de debug ao vivo do `RangeRuntime`, com os sliders sincronizados nos dois
+  caminhos de persistência existentes — `ApplyToBpy` (quando há `bpy`/Python embutido) e o sidecar
+  `gpu_particles_debug.json` (fallback sem Python), e leitura de volta em
+  `_apply_gpu_debug_values` (`properties_particle.py`) pro operador "Import Debug Values".
+- **Look TORNADO (fragment shader)**: reescrito pra densidade volumétrica em camadas (FBM) com
+  núcleo escuro e brilho de borda âmbar, no lugar do padrão de faixas senoidais simples anterior —
+  junto com `projects-teste/shaders/particles/tornado.glsl` (exemplo customizável).
+- **Presets** (`scripts/presets/gpu_particle/`): `tornado.py` reescrito com os novos campos de
+  vórtex; os outros 10 presets ganharam `gp.use_vortex = False` explícito pra não herdar o modo
+  cone por acidente.
+- **Build**: dois rebuilds completos de `RangeEngine` — o primeiro falhou no checker de DNA
+  (corrigido com o `pad5`), o segundo (após o fix) e um terceiro (debug UI) fecharam com exit 0.
+  Testado pelo usuário no editor: funcionando.

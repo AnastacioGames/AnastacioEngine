@@ -1,6 +1,8 @@
 import bpy
 gp = bpy.context.object.gpu_particles
 
+gp.particle_look = 'DEFAULT'
+gp.use_vortex = False
 gp.gravity = (0.0, 0.0, -0.3)
 gp.lifetime = 1.8
 gp.emitter_position = (0.0, 0.0, 0.0)

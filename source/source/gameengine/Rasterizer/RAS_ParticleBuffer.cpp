@@ -345,6 +345,11 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	glUniform1f(m_shaderCache->GetCollisionBounceLoc(), m_collisionBounce);
 	glUniform1f(m_shaderCache->GetCollisionFrictionLoc(), m_collisionFriction);
 
+	glUniform1i(m_shaderCache->GetUseVortexLoc(), (int)m_useVortex);
+	glUniform1f(m_shaderCache->GetVortexRotationSpeedLoc(), m_vortexRotationSpeed);
+	glUniform1f(m_shaderCache->GetVortexRadiusTopLoc(), m_vortexRadiusTop);
+	glUniform1f(m_shaderCache->GetVortexHeightLoc(), m_vortexHeight);
+
 	if (m_collisionMode == 2 /* GPU_PARTICLE_COLLISION_DEPTH */) {
 		// Reuses the dedicated collider depth texture populated by objects flagged
 		// use_gpu_particle_collider (KX_KetsjiEngine::RenderCollisionDepthBuffer) -- necessarily

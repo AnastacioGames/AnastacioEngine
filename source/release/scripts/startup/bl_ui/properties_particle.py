@@ -368,6 +368,15 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             col.prop(gp, "velocity", text="")
             box.prop(gp, "velocity_randomness")
 
+            box = main_box.box()
+            box.prop(gp, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
+            if gp.use_vortex:
+                box.label(text="Radius grows from Emitter Radius (base) to Top Radius over Height as particles rise:")
+                box.prop(gp, "vortex_rotation_speed")
+                row = box.row()
+                row.prop(gp, "vortex_radius_top")
+                row.prop(gp, "vortex_height")
+
         # ---- Appearance ----
         row = main_box.row(align=True)
         row.prop(ob, "show_expanded_gpu_appearance", text="Appearance",
@@ -375,6 +384,7 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
 
         if ob.show_expanded_gpu_appearance:
             box = main_box.box()
+            box.prop(gp, "particle_look", text="Look")
             box.label(text="Sprite:", icon="COLOR")
             split = box.split()
             col = split.column()
@@ -422,27 +432,59 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             if gp.use_color_curve and gp.color_curve:
                 box.template_curve_mapping(gp, "color_curve", brush=False)
 
-        # ---- Custom Shader ----
+        # ---- Mix GPU Particle System ----
         row = main_box.row(align=True)
-        row.prop(ob, "show_expanded_gpu_shader", text="Custom Shader (GLSL)",
-                 icon='TRIA_DOWN' if ob.show_expanded_gpu_shader else 'TRIA_RIGHT', emboss=True)
+        row.prop(ob, "show_expanded_gpu_mix", text="Mix GPU Particle System",
+                 icon='TRIA_DOWN' if ob.show_expanded_gpu_mix else 'TRIA_RIGHT', emboss=True)
 
-        if ob.show_expanded_gpu_shader:
+        if ob.show_expanded_gpu_mix:
+            gpm = ob.gpu_particles_mix
             box = main_box.box()
-            box.prop(gp, "use_fragment_shader")
+            row = box.row()
+            row.prop(ob, "use_gpu_particles_mix", text="")
+            row.label(text="Second emitter, drawn together with the one above")
             col = box.column()
-            col.enabled = gp.use_fragment_shader
-            col.label(text="Fragment shader .glsl file (replaces the default sprite look, hot-reloaded):")
-            col.prop(gp, "fragment_shader_path", text="")
-            col.label(text="Must define void main() writing fragColor.", icon="INFO")
-            col.label(text="Available: v_uv, v_lifeFrac, v_alpha, u_color, u_endColor, u_texture, u_useTexture, u_time")
+            col.enabled = ob.use_gpu_particles_mix
+
+            col.prop(gpm, "particle_look", text="Look")
+
+            split = col.split()
+            sub = split.column()
+            sub.label(text="Emitter:", icon="OUTLINER_DATA_EMPTY")
+            sub.prop(gpm, "emitter_position")
+            sub.prop(gpm, "emitter_radius")
+            sub.prop(gpm, "particle_count")
+            sub.prop(gpm, "lifetime", text="Seconds")
+            sub = split.column()
+            sub.label(text="Motion:", icon="FORCE_FORCE")
+            sub.prop(gpm, "gravity")
+            sub.prop(gpm, "velocity")
+            sub.prop(gpm, "velocity_randomness")
+            sub.prop(gpm, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
+            if gpm.use_vortex:
+                sub.prop(gpm, "vortex_rotation_speed")
+                sub.prop(gpm, "vortex_radius_top")
+                sub.prop(gpm, "vortex_height")
+
+            split = col.split()
+            sub = split.column()
+            sub.label(text="Sprite:", icon="COLOR")
+            sub.prop(gpm, "size")
+            sub.prop(gpm, "color")
+            sub.prop(gpm, "end_size")
+            sub.prop(gpm, "end_color")
+            sub = split.column()
+            sub.label(text="Blending:", icon="IMAGE_RGB_ALPHA")
+            sub.prop(gpm, "texture", text="")
+            sub.prop(gpm, "blend_mode", text="")
+            sub.prop(gpm, "billboard_mode", text="")
 
 
 bpy.types.Object.show_expanded_gpu_emitter = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Object.show_expanded_gpu_motion = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Object.show_expanded_gpu_appearance = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Object.show_expanded_gpu_curves = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Object.show_expanded_gpu_shader = bpy.props.BoolProperty(name="Expanded", default=False)
+bpy.types.Object.show_expanded_gpu_mix = bpy.props.BoolProperty(name="Expanded", default=False)
 
 
 class PARTICLE_PT_emission(ParticleButtonsPanel, Panel):
@@ -1651,7 +1693,8 @@ def _apply_gpu_debug_values(filepath):
                     "velocity_randomness", "size", "color", "end_color",
                     "end_size", "particle_count", "emission_direction",
                     "emission_angle", "billboard_mode", "use_backface_culling",
-                    "collision_mode", "collision_height", "collision_bounce", "collision_friction"):
+                    "collision_mode", "collision_height", "collision_bounce", "collision_friction",
+                    "use_vortex", "vortex_rotation_speed", "vortex_radius_top", "vortex_height"):
             if key in values:
                 setattr(gp, key, values[key])
         applied.append(object_name)

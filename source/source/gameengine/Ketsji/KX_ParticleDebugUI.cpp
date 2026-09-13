@@ -114,6 +114,27 @@ bool Draw(KX_GameObject *gameobj, RAS_ParticleBuffer *buffer)
 	}
 
 	ImGui::Separator();
+	ImGui::Text("Vortex / Cone (Tornado)");
+	bool useVortex = buffer->GetUseVortex();
+	if (ImGui::Checkbox("Use Vortex", &useVortex)) {
+		buffer->SetUseVortex(useVortex);
+	}
+	if (useVortex) {
+		float vortexRotationSpeed = buffer->GetVortexRotationSpeed();
+		if (ImGui::SliderFloat("Rotation Speed", &vortexRotationSpeed, -720.0f, 720.0f)) {
+			buffer->SetVortexRotationSpeed(vortexRotationSpeed);
+		}
+		float vortexRadiusTop = buffer->GetVortexRadiusTop();
+		if (ImGui::SliderFloat("Top Radius", &vortexRadiusTop, 0.0f, 20.0f)) {
+			buffer->SetVortexRadiusTop(vortexRadiusTop);
+		}
+		float vortexHeight = buffer->GetVortexHeight();
+		if (ImGui::SliderFloat("Height", &vortexHeight, 0.01f, 50.0f)) {
+			buffer->SetVortexHeight(vortexHeight);
+		}
+	}
+
+	ImGui::Separator();
 	ImGui::Text("Emission Cone");
 	float emissionDir[3];
 	memcpy(emissionDir, buffer->GetEmissionDirection(), sizeof(emissionDir));
@@ -247,6 +268,10 @@ static bool ApplyToBpy(const std::string &objectName, RAS_ParticleBuffer *buffer
 					TrySetAttr(gp, "collision_height", PyFloat_FromDouble(buffer->GetCollisionHeight()));
 					TrySetAttr(gp, "collision_bounce", PyFloat_FromDouble(buffer->GetCollisionBounce()));
 					TrySetAttr(gp, "collision_friction", PyFloat_FromDouble(buffer->GetCollisionFriction()));
+					TrySetAttr(gp, "use_vortex", PyBool_FromLong(buffer->GetUseVortex() ? 1 : 0));
+					TrySetAttr(gp, "vortex_rotation_speed", PyFloat_FromDouble(buffer->GetVortexRotationSpeed()));
+					TrySetAttr(gp, "vortex_radius_top", PyFloat_FromDouble(buffer->GetVortexRadiusTop()));
+					TrySetAttr(gp, "vortex_height", PyFloat_FromDouble(buffer->GetVortexHeight()));
 
 					applied = true;
 					Py_DECREF(gp);
@@ -322,6 +347,10 @@ static void WriteJsonSidecar(const std::string &objectName, RAS_ParticleBuffer *
 	cJSON_AddNumberToObject(entry, "collision_height", buffer->GetCollisionHeight());
 	cJSON_AddNumberToObject(entry, "collision_bounce", buffer->GetCollisionBounce());
 	cJSON_AddNumberToObject(entry, "collision_friction", buffer->GetCollisionFriction());
+	cJSON_AddBoolToObject(entry, "use_vortex", buffer->GetUseVortex());
+	cJSON_AddNumberToObject(entry, "vortex_rotation_speed", buffer->GetVortexRotationSpeed());
+	cJSON_AddNumberToObject(entry, "vortex_radius_top", buffer->GetVortexRadiusTop());
+	cJSON_AddNumberToObject(entry, "vortex_height", buffer->GetVortexHeight());
 
 	cJSON_AddItemToObject(root, objectName.c_str(), entry);
 

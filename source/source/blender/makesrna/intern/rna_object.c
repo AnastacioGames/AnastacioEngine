@@ -259,6 +259,135 @@ static void rna_Object_use_gpu_particles_update(Main *UNUSED(bmain), Scene *UNUS
 	}
 }
 
+/* Fase Q: filling in "vem tudo zerado" -- picking a built-in Look seeds sensible emitter/motion/
+ * appearance values for that look, the same way choosing a preset from the file-based preset menu
+ * does. Only fires from an actual UI/Python change to particle_look (RNA update callback), so it
+ * never fights a value the user tweaked afterward. */
+static void rna_GPUParticleSettings_particle_look_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	RangeGPUParticleSettings *gp = (RangeGPUParticleSettings *)ptr->data;
+
+	switch (gp->particle_look) {
+		case GPU_PARTICLE_LOOK_SMOKE:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.3f;
+			gp->lifetime = 3.0f;
+			gp->emitter_radius = 0.3f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 0.6f;
+			gp->velocity_randomness = 0.4f;
+			gp->size = 0.5f; gp->end_size = 1.5f;
+			gp->color[0] = 0.6f; gp->color[1] = 0.6f; gp->color[2] = 0.6f; gp->color[3] = 0.5f;
+			gp->end_color[0] = 0.3f; gp->end_color[1] = 0.3f; gp->end_color[2] = 0.3f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 60;
+			gp->emission_angle = 25.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ALPHA;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
+			break;
+		case GPU_PARTICLE_LOOK_SPARKLE:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = -1.0f;
+			gp->lifetime = 1.0f;
+			gp->emitter_radius = 0.2f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 1.5f;
+			gp->velocity_randomness = 2.0f;
+			gp->size = 0.08f; gp->end_size = 0.02f;
+			gp->color[0] = 1.0f; gp->color[1] = 1.0f; gp->color[2] = 0.6f; gp->color[3] = 1.0f;
+			gp->end_color[0] = 1.0f; gp->end_color[1] = 0.6f; gp->end_color[2] = 0.1f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 150;
+			gp->emission_angle = 180.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_CAMERA_FACING;
+			break;
+		case GPU_PARTICLE_LOOK_DISSOLVE:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.0f;
+			gp->lifetime = 2.0f;
+			gp->emitter_radius = 0.3f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 0.2f;
+			gp->velocity_randomness = 0.3f;
+			gp->size = 0.4f; gp->end_size = 0.4f;
+			gp->color[0] = 1.0f; gp->color[1] = 1.0f; gp->color[2] = 1.0f; gp->color[3] = 1.0f;
+			gp->end_color[0] = 1.0f; gp->end_color[1] = 1.0f; gp->end_color[2] = 1.0f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 40;
+			gp->emission_angle = 60.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ALPHA;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_CAMERA_FACING;
+			break;
+		case GPU_PARTICLE_LOOK_RAINBOW_TRAIL:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.0f;
+			gp->lifetime = 1.2f;
+			gp->emitter_radius = 0.1f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 2.0f;
+			gp->velocity_randomness = 0.5f;
+			gp->size = 0.15f; gp->end_size = 0.05f;
+			gp->color[0] = 1.0f; gp->color[1] = 1.0f; gp->color[2] = 1.0f; gp->color[3] = 1.0f;
+			gp->end_color[0] = 1.0f; gp->end_color[1] = 1.0f; gp->end_color[2] = 1.0f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 80;
+			gp->emission_angle = 15.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_CAMERA_FACING;
+			break;
+		case GPU_PARTICLE_LOOK_TORNADO:
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.1f;
+			gp->lifetime = 2.5f;
+			gp->emitter_radius = 0.2f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 1.5f;
+			gp->velocity_randomness = 0.15f;
+			gp->size = 0.6f; gp->end_size = 0.2f;
+			gp->color[0] = 0.6f; gp->color[1] = 0.5f; gp->color[2] = 0.4f; gp->color[3] = 0.6f;
+			gp->end_color[0] = 0.5f; gp->end_color[1] = 0.45f; gp->end_color[2] = 0.4f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 100;
+			gp->emission_angle = 180.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ALPHA;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
+			/* Cone/vortex motion: narrow funnel at the emitter widening into the supercell as
+			 * particles rise, spinning around the vertical axis -- this is what actually gives
+			 * the tornado its cone silhouette instead of a straight-up puff. */
+			gp->use_vortex = 1;
+			gp->vortex_rotation_speed = 260.0f;
+			gp->vortex_radius_top = 1.8f;
+			gp->vortex_height = 2.5f;
+			break;
+		case GPU_PARTICLE_LOOK_WIND:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.0f;
+			gp->lifetime = 1.0f;
+			gp->emitter_radius = 0.2f;
+			gp->velocity[0] = 2.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 0.0f;
+			gp->velocity_randomness = 0.3f;
+			gp->size = 1.0f; gp->end_size = 1.0f;
+			gp->color[0] = 1.0f; gp->color[1] = 1.0f; gp->color[2] = 1.0f; gp->color[3] = 0.3f;
+			gp->end_color[0] = 1.0f; gp->end_color[1] = 1.0f; gp->end_color[2] = 1.0f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 40;
+			gp->emission_angle = 10.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ALPHA;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_CAMERA_FACING;
+			break;
+		case GPU_PARTICLE_LOOK_AURORA:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 0.0f;
+			gp->lifetime = 4.0f;
+			gp->emitter_radius = 0.5f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 0.05f;
+			gp->velocity_randomness = 0.1f;
+			gp->size = 1.5f; gp->end_size = 1.5f;
+			gp->color[0] = 0.2f; gp->color[1] = 1.0f; gp->color[2] = 0.5f; gp->color[3] = 0.5f;
+			gp->end_color[0] = 0.6f; gp->end_color[1] = 0.2f; gp->end_color[2] = 1.0f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 30;
+			gp->emission_angle = 20.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
+			break;
+		case GPU_PARTICLE_LOOK_DEFAULT:
+		default:
+			/* No preset -- leave whatever values the emitter already had. */
+			break;
+	}
+
+	rna_Object_internal_update(bmain, scene, ptr);
+}
+
 static void rna_Object_hide_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
 	DAG_id_type_tag(bmain, ID_OB);
@@ -1765,6 +1894,18 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static const EnumPropertyItem rna_enum_gpu_particle_look_items[] = {
+		{GPU_PARTICLE_LOOK_DEFAULT, "DEFAULT", 0, "Default", "Normal texture/round-sprite look"},
+		{GPU_PARTICLE_LOOK_SMOKE, "SMOKE", 0, "Smoke", "Soft diffuse mask with slow drifting noise, fading out over its lifetime"},
+		{GPU_PARTICLE_LOOK_SPARKLE, "SPARKLE", 0, "Sparkle", "Glitter/spark look that blinks at a random phase per particle"},
+		{GPU_PARTICLE_LOOK_DISSOLVE, "DISSOLVE", 0, "Dissolve", "Texture dissolving into a noisy burnt edge as the particle ages"},
+		{GPU_PARTICLE_LOOK_RAINBOW_TRAIL, "RAINBOW_TRAIL", 0, "Rainbow Trail", "Hue shifting over time and age, ignoring Color/End Color"},
+		{GPU_PARTICLE_LOOK_TORNADO, "TORNADO", 0, "Tornado", "Rotating radial dust stripes, spinning faster near the center"},
+		{GPU_PARTICLE_LOOK_WIND, "WIND", 0, "Wind", "Thin translucent horizontal streak with a subtle wobble"},
+		{GPU_PARTICLE_LOOK_AURORA, "AURORA", 0, "Aurora", "Wavy vertical light curtain, best on tall stretched sprites"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	srna = RNA_def_struct(brna, "RangeGPUParticleSettings", NULL);
 	RNA_def_struct_sdna(srna, "RangeGPUParticleSettings");
 	RNA_def_struct_nested(brna, srna, "Object");
@@ -1842,6 +1983,30 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 180.0f);
 	RNA_def_property_ui_text(prop, "Emission Angle",
 	                          "Full cone angle in degrees around the emission direction (180 = uniform sphere)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_vortex", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_vortex", 1);
+	RNA_def_property_ui_text(prop, "Vortex / Cone",
+	                          "Reshape particle motion into a rotating cone around the emitter's vertical axis "
+	                          "(tornado/hurricane funnel), instead of the plain gravity/velocity path");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "vortex_rotation_speed", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, -3600.0f, 3600.0f);
+	RNA_def_property_ui_text(prop, "Vortex Rotation Speed", "Spin speed around the vertical axis, in degrees per second");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "vortex_radius_top", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_text(prop, "Vortex Top Radius",
+	                          "Cone radius once a particle has risen vortex_height above the emitter "
+	                          "(Emitter Radius is the radius at the base)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "vortex_height", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.01f, 1000.0f);
+	RNA_def_property_ui_text(prop, "Vortex Height", "Height over which the cone widens from Emitter Radius to Vortex Top Radius");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "size_curve", PROP_POINTER, PROP_NONE);
@@ -1937,6 +2102,14 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "use_custom_frag_shader", 1);
 	RNA_def_property_ui_text(prop, "Custom Fragment Shader", "Use the Fragment Shader File instead of the default sprite look");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	/* Fase Q: built-in look, baked into the engine (no external file), used by the Mix GPU
+	 * Particle System panel. */
+	prop = RNA_def_property(srna, "particle_look", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "particle_look");
+	RNA_def_property_enum_items(prop, rna_enum_gpu_particle_look_items);
+	RNA_def_property_ui_text(prop, "Look", "Built-in particle appearance. Picking one also seeds Emitter/Motion/Appearance below with values tuned for that look (like a preset) -- change them afterward freely, this only fires when the Look itself changes");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_GPUParticleSettings_particle_look_update");
 }
 
 static void rna_def_object_game_settings(BlenderRNA *brna)
@@ -3164,6 +3337,18 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "gpu_particles");
 	RNA_def_property_struct_type(prop, "RangeGPUParticleSettings");
 	RNA_def_property_ui_text(prop, "GPU Particle Settings", "");
+
+	/* Fase Q: second, independent GPU particle emitter drawn together with the one above. */
+	prop = RNA_def_property(srna, "use_gpu_particles_mix", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_GPU_PARTICLES_MIX);
+	RNA_def_property_ui_text(prop, "Mix GPU Particles", "Emit a second GPU particle emitter from this object, mixed with the one above");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_Object_use_gpu_particles_update");
+
+	prop = RNA_def_property(srna, "gpu_particles_mix", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "gpu_particles_mix");
+	RNA_def_property_struct_type(prop, "RangeGPUParticleSettings");
+	RNA_def_property_ui_text(prop, "Mix GPU Particle Settings", "");
 
 	/* vertex groups */
 	prop = RNA_def_property(srna, "vertex_groups", PROP_COLLECTION, PROP_NONE);

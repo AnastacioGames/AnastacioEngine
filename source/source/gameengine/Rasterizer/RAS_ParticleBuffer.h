@@ -111,6 +111,13 @@ private:
 	float m_collisionBounce = 0.4f;
 	float m_collisionFriction = 0.9f;
 
+	/// Fase R: vortex/cone motion (tornado funnel), see RangeGPUParticleSettings.use_vortex in
+	/// DNA_object_types.h and the u_useVortex branch in RAS_ParticleShaderCache's update shader.
+	bool m_useVortex = false;
+	float m_vortexRotationSpeed = 0.0f;
+	float m_vortexRadiusTop = 0.0f;
+	float m_vortexHeight = 1.0f;
+
 	/// Fase E: optional sprite texture, GL bindcode of a GPUTexture owned by the loaded Image
 	/// datablock (0 = untextured, falls back to the procedural round mask). Path kept only so
 	/// the Python getter can round-trip what was set.
@@ -241,6 +248,19 @@ public:
 
 	float GetCollisionFriction() const { return m_collisionFriction; }
 	void SetCollisionFriction(float v) { m_collisionFriction = v; }
+
+	/// Fase R: vortex/cone motion. See RangeGPUParticleSettings.use_vortex in DNA_object_types.h.
+	bool GetUseVortex() const { return m_useVortex; }
+	void SetUseVortex(bool v) { m_useVortex = v; }
+
+	float GetVortexRotationSpeed() const { return m_vortexRotationSpeed; }
+	void SetVortexRotationSpeed(float v) { m_vortexRotationSpeed = v; }
+
+	float GetVortexRadiusTop() const { return m_vortexRadiusTop; }
+	void SetVortexRadiusTop(float v) { m_vortexRadiusTop = v; }
+
+	float GetVortexHeight() const { return m_vortexHeight; }
+	void SetVortexHeight(float v) { m_vortexHeight = v; }
 
 	/// Fase F: pool size, resizable at runtime via Resize() (respecifies m_vbo[2] in place,
 	/// VAOs/programs untouched -- see Resize()).

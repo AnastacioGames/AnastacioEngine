@@ -41,6 +41,13 @@
 #include <memory>
 #include <string>
 
+/// Fase Q: returns the `void main()` body (writing fragColor, same contract as a user .glsl
+/// script -- see drawFragmentPreamble in RAS_ParticleShaderCache.cpp) for a built-in
+/// GPU_PARTICLE_LOOK_* value, or an empty string for GPU_PARTICLE_LOOK_DEFAULT (normal
+/// texture/round-sprite look). Used by the Mix GPU Particle System panel instead of an
+/// external file, so it can be handed straight to RAS_ParticleBuffer::SetCustomFragShader.
+const char *RAS_GetBuiltinParticleLookSource(int look);
+
 class RAS_ParticleShaderCache
 {
 private:
@@ -63,6 +70,9 @@ private:
 	/// Fase O: collision (Ground Plane / Screen-Space).
 	int m_collisionModeLoc, m_collisionHeightLoc, m_collisionBounceLoc, m_collisionFrictionLoc;
 	int m_collisionViewProjLoc, m_collisionDepthTexLoc, m_collisionDepthTexValidLoc;
+
+	/// Fase R: vortex/cone motion (tornado funnel).
+	int m_useVortexLoc, m_vortexRotationSpeedLoc, m_vortexRadiusTopLoc, m_vortexHeightLoc;
 
 	bool m_valid;
 
@@ -115,6 +125,11 @@ public:
 	int GetCollisionViewProjLoc() const { return m_collisionViewProjLoc; }
 	int GetCollisionDepthTexLoc() const { return m_collisionDepthTexLoc; }
 	int GetCollisionDepthTexValidLoc() const { return m_collisionDepthTexValidLoc; }
+
+	int GetUseVortexLoc() const { return m_useVortexLoc; }
+	int GetVortexRotationSpeedLoc() const { return m_vortexRotationSpeedLoc; }
+	int GetVortexRadiusTopLoc() const { return m_vortexRadiusTopLoc; }
+	int GetVortexHeightLoc() const { return m_vortexHeightLoc; }
 
 	/// Returns a shared cache for the given custom fragment script text (empty = the default
 	/// built-in look). Compiles on first call for that exact script text (or the first call

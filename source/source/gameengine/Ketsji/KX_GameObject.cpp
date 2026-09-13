@@ -77,6 +77,7 @@
 #include "KX_BatchGroup.h"
 #include "KX_CollisionContactPoints.h"
 #include "RAS_ParticleBuffer.h"
+#include "RAS_ParticleShaderCache.h"
 #include "KX_ParticleSystem.h"
 
 #include "BKE_object.h"
@@ -699,57 +700,77 @@ void KX_GameObject::SetActionLayerWeight(short layer, float layer_weight)
 	GetActionManager()->SetActionLayerWeight(layer, layer_weight);
 }
 
-void KX_GameObject::SetupGPUParticles(const RangeGPUParticleSettings &settings)
+void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> &bufferSlot, const RangeGPUParticleSettings &settings)
 {
-	m_particleBuffer.reset(new RAS_ParticleBuffer(settings.particle_count > 0 ? settings.particle_count : 1));
-	if (!m_particleBuffer->Create()) {
+	bufferSlot.reset(new RAS_ParticleBuffer(settings.particle_count > 0 ? settings.particle_count : 1));
+	if (!bufferSlot->Create()) {
 		CM_Error("KX_GameObject::SetupGPUParticles: RAS_ParticleBuffer::Create() failed, particle emitter disabled for object \"" << m_name << "\"");
-		m_particleBuffer.reset();
+		bufferSlot.reset();
 		return;
 	}
 
-	m_particleBuffer->SetGravity(settings.gravity);
-	m_particleBuffer->SetLifetime(settings.lifetime);
-	m_particleBuffer->SetEmitterPos(settings.emitter_position);
-	m_particleBuffer->SetEmitterRadius(settings.emitter_radius);
-	m_particleBuffer->SetVelocityBase(settings.velocity);
-	m_particleBuffer->SetVelocityRandomness(settings.velocity_randomness);
-	m_particleBuffer->SetBillboardSize(settings.size);
-	m_particleBuffer->SetColor(settings.color);
-	m_particleBuffer->SetEndColor(settings.end_color);
-	m_particleBuffer->SetEndSize(settings.end_size);
-	m_particleBuffer->SetEmissionDirection(settings.emission_direction);
-	m_particleBuffer->SetEmissionAngle(settings.emission_angle);
-	m_particleBuffer->SetDebugUI(settings.use_debug_ui != 0);
-	m_particleBuffer->SetBlendMode(settings.blend_mode);
-	m_particleBuffer->SetBillboardMode(settings.billboard_mode);
-	m_particleBuffer->SetBackfaceCulling(settings.use_backface_culling != 0);
-	m_particleBuffer->SetEnabled(settings.disable_emission == 0);
-	m_particleBuffer->SetCollisionMode(settings.collision_mode);
-	m_particleBuffer->SetCollisionHeight(settings.collision_height);
-	m_particleBuffer->SetCollisionBounce(settings.collision_bounce);
-	m_particleBuffer->SetCollisionFriction(settings.collision_friction);
+	bufferSlot->SetGravity(settings.gravity);
+	bufferSlot->SetLifetime(settings.lifetime);
+	bufferSlot->SetEmitterPos(settings.emitter_position);
+	bufferSlot->SetEmitterRadius(settings.emitter_radius);
+	bufferSlot->SetVelocityBase(settings.velocity);
+	bufferSlot->SetVelocityRandomness(settings.velocity_randomness);
+	bufferSlot->SetBillboardSize(settings.size);
+	bufferSlot->SetColor(settings.color);
+	bufferSlot->SetEndColor(settings.end_color);
+	bufferSlot->SetEndSize(settings.end_size);
+	bufferSlot->SetEmissionDirection(settings.emission_direction);
+	bufferSlot->SetEmissionAngle(settings.emission_angle);
+	bufferSlot->SetDebugUI(settings.use_debug_ui != 0);
+	bufferSlot->SetBlendMode(settings.blend_mode);
+	bufferSlot->SetBillboardMode(settings.billboard_mode);
+	bufferSlot->SetBackfaceCulling(settings.use_backface_culling != 0);
+	bufferSlot->SetEnabled(settings.disable_emission == 0);
+	bufferSlot->SetCollisionMode(settings.collision_mode);
+	bufferSlot->SetCollisionHeight(settings.collision_height);
+	bufferSlot->SetCollisionBounce(settings.collision_bounce);
+	bufferSlot->SetCollisionFriction(settings.collision_friction);
+	bufferSlot->SetUseVortex(settings.use_vortex != 0);
+	bufferSlot->SetVortexRotationSpeed(settings.vortex_rotation_speed);
+	bufferSlot->SetVortexRadiusTop(settings.vortex_radius_top);
+	bufferSlot->SetVortexHeight(settings.vortex_height);
 
 	if (settings.use_custom_frag_shader && settings.frag_shader_path[0] != '\0') {
-		if (!m_particleBuffer->LoadFragShaderFromPath(settings.frag_shader_path)) {
+		if (!bufferSlot->LoadFragShaderFromPath(settings.frag_shader_path)) {
 			CM_Error("KX_GameObject::SetupGPUParticles: custom fragment shader failed to load/compile for object \"" << m_name << "\", using default look (see log above)");
 		}
 	}
 
+	// Fase Q: built-in look, baked into the engine -- takes priority over the file-based custom
+	// shader above if both are somehow set, since it's the one exposed by the Mix panel.
+	if (settings.particle_look != GPU_PARTICLE_LOOK_DEFAULT) {
+		bufferSlot->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(settings.particle_look));
+	}
+
 	if (settings.texture_path[0] != '\0') {
-		m_particleBuffer->LoadTextureFromPath(settings.texture_path);
+		bufferSlot->LoadTextureFromPath(settings.texture_path);
 	}
 
 	if (settings.use_size_curve && settings.size_curve) {
-		m_particleBuffer->BakeSizeCurve(settings.size_curve);
+		bufferSlot->BakeSizeCurve(settings.size_curve);
 	} else {
-		m_particleBuffer->ClearSizeCurve();
+		bufferSlot->ClearSizeCurve();
 	}
 	if (settings.use_color_curve && settings.color_curve) {
-		m_particleBuffer->BakeColorCurve(settings.color_curve);
+		bufferSlot->BakeColorCurve(settings.color_curve);
 	} else {
-		m_particleBuffer->ClearColorCurve();
+		bufferSlot->ClearColorCurve();
 	}
+}
+
+void KX_GameObject::SetupGPUParticles(const RangeGPUParticleSettings &settings)
+{
+	SetupGPUParticlesBuffer(m_particleBuffer, settings);
+}
+
+void KX_GameObject::SetupGPUParticlesMix(const RangeGPUParticleSettings &settings)
+{
+	SetupGPUParticlesBuffer(m_particleBufferMix, settings);
 }
 
 void KX_GameObject::UpdateParticles(float deltaTime)
@@ -762,11 +783,21 @@ void KX_GameObject::UpdateParticles(float deltaTime)
 		}
 		m_particleBuffer->Update(deltaTime, NodeGetWorldPosition());
 	}
+	if (m_particleBufferMix) {
+		const bool enabled = (GetPropertyNumber("GPU_Particles_Enabled", 1.0f) != 0.0f);
+		m_particleBufferMix->SetEnabled(enabled);
+		m_particleBufferMix->Update(deltaTime, NodeGetWorldPosition());
+	}
 }
 
 RAS_ParticleBuffer *KX_GameObject::GetParticleBuffer() const
 {
 	return m_particleBuffer.get();
+}
+
+RAS_ParticleBuffer *KX_GameObject::GetParticleBufferMix() const
+{
+	return m_particleBufferMix.get();
 }
 
 void KX_GameObject::SetActionLayerSpeed(short layer, float speed)

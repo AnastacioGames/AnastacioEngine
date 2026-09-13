@@ -33,6 +33,8 @@
 
 #include "GPU_glew.h"
 
+#include "DNA_object_types.h"
+
 #include <map>
 
 namespace {
@@ -65,6 +67,12 @@ const char *updateVertexSource =
 	"uniform mat4 u_collisionViewProj;\n"
 	"uniform sampler2D u_collisionDepthTex;\n"
 	"uniform bool u_collisionDepthTexValid;\n"
+	// Fase R: vortex/cone motion (tornado funnel). Reshapes XY every frame onto a rotating cone
+	// around the emitter's vertical axis, independent of the gravity/velocity integration below.
+	"uniform bool u_useVortex;\n"
+	"uniform float u_vortexRotationSpeed;\n"
+	"uniform float u_vortexRadiusTop;\n"
+	"uniform float u_vortexHeight;\n"
 	"float hash(float n) {\n"
 	"	return fract(sin(n) * 43758.5453123);\n"
 	"}\n"
@@ -102,6 +110,19 @@ const char *updateVertexSource =
 	"	} else {\n"
 	"		vel += u_gravity * u_deltaTime;\n"
 	"		pos += vel * u_deltaTime;\n"
+	"		if (u_useVortex) {\n"
+	// Snap XY onto a cone around the emitter's vertical axis: radius grows from
+	// u_emitterRadius at the base to u_vortexRadiusTop after u_vortexHeight of rise, and the
+	// angle keeps advancing every frame -- Z (and thus the height fraction) still comes from
+	// the normal gravity/velocity integration above.
+	"			vec2 rel = pos.xy - u_emitterPos.xy;\n"
+	"			float curRadius = length(rel);\n"
+	"			vec2 dir = (curRadius > 0.0001) ? rel / curRadius : vec2(1.0, 0.0);\n"
+	"			float heightFrac = clamp((pos.z - u_emitterPos.z) / max(u_vortexHeight, 0.0001), 0.0, 1.0);\n"
+	"			float targetRadius = mix(u_emitterRadius, u_vortexRadiusTop, heightFrac);\n"
+	"			float ang = atan(dir.y, dir.x) + radians(u_vortexRotationSpeed) * u_deltaTime;\n"
+	"			pos.xy = u_emitterPos.xy + vec2(cos(ang), sin(ang)) * targetRadius;\n"
+	"		}\n"
 	// Fase O: collision response. Purely kinematic (no Bullet, no particle-particle) --
 	// see RAS_ParticleShaderCache.h and the collision plan doc for the accepted limitations.
 	"		if (u_collisionMode == 1) {\n"
@@ -238,6 +259,239 @@ const char *drawFragmentDefaultMain =
 	"	}\n"
 	"	fragColor = vec4(rgb, alpha);\n"
 	"}\n";
+
+// Fase Q: built-in looks baked into the engine, ported from the example .glsl scripts in
+// projects-teste/shaders/particles/ (see that folder's README.md for the effect descriptions).
+// Each is a full `void main()` body (same contract as a user-supplied custom script) handed to
+// RAS_ParticleBuffer::SetCustomFragShader -- no file I/O, no hot-reload polling needed.
+
+const char *lookSmokeSource = R"GLSL(
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+void main() {
+	float d = length(v_uv) * 2.0;
+	float drift = noise(v_uv * 3.0 + u_time * 0.15) - 0.5;
+	float mask = smoothstep(1.0, 0.0, d + drift * 0.35);
+	vec3 rgb = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac);
+	float fadeByLife = (1.0 - v_lifeFrac) * 0.7;
+	float alpha = mask * v_alpha * fadeByLife * u_color.a;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+const char *lookSparkleSource = R"GLSL(
+float hash11(float p) {
+	p = fract(p * 0.1031);
+	p *= p + 33.33;
+	p *= p + p;
+	return fract(p);
+}
+void main() {
+	float d = length(v_uv) * 2.0;
+	float mask = smoothstep(1.0, 0.0, d);
+	float seed = hash11(v_lifeFrac * 97.0 + u_time * 0.001);
+	float blink = 0.5 + 0.5 * sin(u_time * (8.0 + seed * 12.0) + seed * 6.2831);
+	blink = pow(max(blink, 0.0), 3.0);
+	vec3 rgb = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac) * (1.0 + blink * 2.0);
+	float alpha = mask * v_alpha * (0.25 + blink * 0.75);
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+const char *lookDissolveSource = R"GLSL(
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+void main() {
+	vec2 uv = v_uv + 0.5;
+	vec4 baseColor = mix(u_color, u_endColor, v_lifeFrac);
+	vec3 rgb;
+	float baseMask;
+	if (u_useTexture) {
+		vec4 texColor = texture2D(u_texture, uv);
+		rgb = baseColor.rgb * texColor.rgb;
+		baseMask = texColor.a;
+	} else {
+		float d = length(v_uv) * 2.0;
+		baseMask = smoothstep(1.0, 0.0, d);
+		rgb = baseColor.rgb;
+	}
+	float grain = noise(uv * 18.0);
+	float dissolveMask = step(v_lifeFrac, grain);
+	float edge = smoothstep(0.0, 0.12, grain - v_lifeFrac);
+	vec3 edgeGlow = mix(vec3(1.6, 0.9, 0.3), vec3(0.0), edge);
+	float alpha = baseMask * dissolveMask * v_alpha * baseColor.a;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb + edgeGlow * (1.0 - edge) * dissolveMask, alpha);
+}
+)GLSL";
+
+const char *lookRainbowTrailSource = R"GLSL(
+vec3 hsv2rgb(vec3 c) {
+	vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
+	return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
+}
+void main() {
+	float d = length(v_uv) * 2.0;
+	float mask = smoothstep(1.0, 0.0, d);
+	float hue = fract(u_time * 0.25 + v_lifeFrac * 0.4);
+	vec3 rgb = hsv2rgb(vec3(hue, 0.85, 1.0));
+	float alpha = mask * v_alpha * (1.0 - v_lifeFrac);
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+const char *lookTornadoSource = R"GLSL(
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm(vec2 p) {
+	float v = 0.0;
+	float amp = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += amp * noise(p);
+		p *= 2.02;
+		amp *= 0.55;
+	}
+	return v;
+}
+void main() {
+	vec2 uv = v_uv;
+	float d = length(uv) * 2.0;
+	// Suction/vortex twist -- faster near the core, like the original, but the density comes
+	// from layered FBM now instead of a flat sine so the funnel reads as thick volumetric dust.
+	float spin = 3.0 + 5.0 / max(d, 0.12);
+	float ang = atan(uv.y, uv.x) + u_time * spin;
+	vec2 bandCoord = vec2(ang * 1.6, d * 3.0 - u_time * 0.4);
+	float density = fbm(bandCoord + fbm(bandCoord * 1.7) * 0.6);
+	float bands = smoothstep(0.25, 0.85, density);
+	float grain = hash21(vec2(v_lifeFrac * 53.0, floor(ang * 6.0)));
+	float dust = mix(bands, grain, 0.3);
+	float mask = smoothstep(1.0, 0.0, d) * (0.3 + 0.7 * dust);
+	// Dark charcoal core with a warm amber rim on one side, like golden-hour sun breaking
+	// through the storm and grazing the rotating vortex edge.
+	vec3 darkCore = vec3(0.05, 0.05, 0.06);
+	vec3 amberRim = vec3(1.0, 0.6, 0.25);
+	float rim = smoothstep(0.35, 1.0, d) * clamp(dot(normalize(uv + vec2(1e-4)), vec2(0.75, 0.4)), 0.0, 1.0);
+	vec3 stormColor = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac);
+	vec3 rgb = mix(mix(darkCore, stormColor, 0.6), amberRim, rim * 0.6);
+	float alpha = mask * v_alpha * u_color.a;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+const char *lookWindSource = R"GLSL(
+void main() {
+	vec2 uv = v_uv;
+	float wobble = sin(uv.x * 18.0 + u_time * 10.0) * 0.04;
+	float lengthMask = smoothstep(0.5, 0.15, abs(uv.x));
+	float thicknessMask = smoothstep(0.5, 0.0, abs(uv.y - wobble) * 6.0);
+	float mask = lengthMask * thicknessMask;
+	vec3 rgb = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac);
+	float alpha = mask * v_alpha * u_color.a * (1.0 - v_lifeFrac * v_lifeFrac) * 0.6;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+const char *lookAuroraSource = R"GLSL(
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+vec3 hsv2rgb(vec3 c) {
+	vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
+	return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
+}
+void main() {
+	vec2 uv = v_uv + 0.5;
+	float wave = sin(uv.y * 5.0 + u_time * 0.6) * 0.12 + sin(uv.y * 11.0 - u_time * 0.9) * 0.05;
+	float distFromCenter = abs(uv.x - 0.5 - wave);
+	float width = mix(0.06, 0.22, uv.y);
+	float mask = smoothstep(width, 0.0, distFromCenter);
+	mask *= smoothstep(0.0, 0.15, uv.y) * smoothstep(1.0, 0.75, uv.y);
+	float shimmer = noise(vec2(uv.x * 30.0, uv.y * 4.0 - u_time * 0.5));
+	mask *= 0.6 + 0.4 * shimmer;
+	float hue = 0.33 + 0.25 * sin(u_time * 0.15 + uv.y * 1.5);
+	vec3 auroraColor = hsv2rgb(vec3(hue, 0.75, 1.0));
+	vec3 rgb = mix(auroraColor, mix(u_color.rgb, u_endColor.rgb, v_lifeFrac), 0.25);
+	float alpha = mask * v_alpha * u_color.a;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
+} // namespace
+
+const char *RAS_GetBuiltinParticleLookSource(int look)
+{
+	switch (look) {
+		case GPU_PARTICLE_LOOK_SMOKE: return lookSmokeSource;
+		case GPU_PARTICLE_LOOK_SPARKLE: return lookSparkleSource;
+		case GPU_PARTICLE_LOOK_DISSOLVE: return lookDissolveSource;
+		case GPU_PARTICLE_LOOK_RAINBOW_TRAIL: return lookRainbowTrailSource;
+		case GPU_PARTICLE_LOOK_TORNADO: return lookTornadoSource;
+		case GPU_PARTICLE_LOOK_WIND: return lookWindSource;
+		case GPU_PARTICLE_LOOK_AURORA: return lookAuroraSource;
+		default: return "";
+	}
+}
+
+namespace {
 
 unsigned int CompileDrawProgram(const std::string &customFragShader)
 {
@@ -393,6 +647,11 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_collisionViewProjLoc = glGetUniformLocation(updateProgram, "u_collisionViewProj");
 	m_collisionDepthTexLoc = glGetUniformLocation(updateProgram, "u_collisionDepthTex");
 	m_collisionDepthTexValidLoc = glGetUniformLocation(updateProgram, "u_collisionDepthTexValid");
+
+	m_useVortexLoc = glGetUniformLocation(updateProgram, "u_useVortex");
+	m_vortexRotationSpeedLoc = glGetUniformLocation(updateProgram, "u_vortexRotationSpeed");
+	m_vortexRadiusTopLoc = glGetUniformLocation(updateProgram, "u_vortexRadiusTop");
+	m_vortexHeightLoc = glGetUniformLocation(updateProgram, "u_vortexHeight");
 
 	m_valid = true;
 }
