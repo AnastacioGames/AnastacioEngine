@@ -601,6 +601,30 @@ void GPU_basic_shader_light_set(int light_num, GPULightData *light)
 	GPU_MATERIAL_STATE.lights_enabled &= ~light_bit;
 	GPU_MATERIAL_STATE.lights_directional &= ~light_bit;
 
+#ifdef __EMSCRIPTEN__
+	/* GL_LIGHTx / glLightfv / glLightModeli are desktop fixed-function-pipeline
+	 * entry points with no WebGL/GLES2 equivalent; Emscripten's GL bindings
+	 * leave them as null function pointers, which crashes on call. The basic
+	 * shader always renders through GLSL on this platform, so only the state
+	 * bookkeeping below (used to pick shader variants) is needed here -
+	 * skip the actual fixed-function calls. */
+	if (light) {
+		float position[4];
+
+		if (light->type == GPU_LIGHT_SUN) {
+			position[3] = 0.0f;
+		}
+		else {
+			position[3] = 1.0f;
+		}
+
+		GPU_MATERIAL_STATE.lights_enabled |= light_bit;
+		if (position[3] == 0.0f)
+			GPU_MATERIAL_STATE.lights_directional |= light_bit;
+	}
+	return;
+#endif
+
 	if (light) {
 		float position[4], diffuse[4], specular[4];
 
@@ -669,6 +693,12 @@ void GPU_basic_shader_light_set(int light_num, GPULightData *light)
 
 void GPU_basic_shader_light_set_viewer(bool local)
 {
+#ifdef __EMSCRIPTEN__
+	/* GL_LIGHT_MODEL_LOCAL_VIEWER is fixed-function-only state with no
+	 * WebGL/GLES2 equivalent (see GPU_basic_shader_light_set() above). */
+	(void)local;
+	return;
+#endif
 	glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, (local) ? GL_TRUE: GL_FALSE);
 }
 

@@ -4122,3 +4122,43 @@ necessário dado o caráter mecânico da mudança.
 - **Build**: dois rebuilds completos de `RangeEngine` — o primeiro falhou no checker de DNA
   (corrigido com o `pad5`), o segundo (após o fix) e um terceiro (debug UI) fecharam com exit 0.
   Testado pelo usuário no editor: funcionando.
+
+## 2026-09-13 — Web export: `null function` em GPU_state_init (fixed-function GL sob Emscripten)
+
+Continuação do handoff Codex (`HANDOFF-codex-webcrash.md` / commit `af48d99`): com o alocador já
+corrigido, `LA_Launcher::InitEngine` avançava até travar num novo ponteiro OpenGL nulo. Reproduzido
+com Chrome headless (`--dump-dom`, `--virtual-time-budget=60000`) servindo `build-web/bin/` via
+`python -m http.server`, usando a instrumentação `fprintf(stderr, "[web-launcher] ...")` /
+`"[web-rasterizer] ...")` já commitada.
+
+- **Diagnóstico**: o log mostrou o crash entre `[web-rasterizer] GPU_state_init begin` e o próximo
+  print — ou seja, dentro de `RAS_Rasterizer::Init()` → `GPU_state_init()` (`gpu_draw.c`), antes de
+  qualquer chamada de aplicação. Instrumentação adicional (`[web-gpu-state] ...`) dentro de
+  `GPU_state_init()` isolou dois pontos de `null function` em sequência:
+  1. `GPU_default_lights()` → `GPU_basic_shader_light_set()` / `GPU_basic_shader_light_set_viewer()`
+     (`gpu_basic_shader.c`) chamavam incondicionalmente `glLightfv`/`glMaterialfv`/`glLightModeli`
+     — API do pipeline fixo do OpenGL desktop, sem equivalente em WebGL/GLES2. Sob Emscripten esses
+     símbolos ficam como ponteiro de função nulo no binding e o `RuntimeError: null function` ocorre
+     na primeira chamada.
+  2. Depois de corrigir o item 1, o crash reapareceu um passo à frente: `glDepthRange(double, double)`
+     (versão desktop) também não existe em GLES2/WebGL, que só expõe `glDepthRangef(float, float)`.
+- **Fix aplicado** (mesmo padrão de `#ifdef __EMSCRIPTEN__` já usado em `RAS_OpenGLQuery.cpp`):
+  - `gpu_basic_shader.c`: `GPU_basic_shader_light_set()` e `GPU_basic_shader_light_set_viewer()`
+    pulam as chamadas de pipeline fixo sob `__EMSCRIPTEN__`, mantendo só a contabilidade de estado
+    (`lights_enabled`/`lights_directional`) que já era usada apenas para escolher a variante do
+    shader GLSL (`solid_compatible_lighting()`), não para ler estado de volta da GL.
+  - `gpu_draw.c`: `GPU_state_init()` usa `glDepthRangef(0.0f, 1.0f)` sob `__EMSCRIPTEN__` em vez de
+    `glDepthRange(0.0, 1.0)`.
+- **Resultado**: rebuild do preset `web-runtime` (via `emsdk_env.bat` + `ninja` do CMake bundle da
+  VS 18, ambiente sem `ninja` no PATH padrão) fechou com exit 0; novo teste headless mostrou
+  `LA_Launcher::InitEngine` completo (`[web-launcher] engine started`) e o runtime chegando a
+  `LA_Launcher::RenderEngine()` — WebGL2 inicializado, shaders básicos e da cena compilados
+  (compat GLSL ES 3.00, ainda com vários erros de shaders legados — pendência separada de
+  `RAS_ParticleShaderCache`/ImGui, não deste bloqueio).
+- **Novo bloqueio já localizado (não corrigido nesta sessão)**: `RuntimeError: null function` em
+  `RAS_OpenGLRasterizer::SetLines(bool)` (`RAS_OpenGLRasterizer.cpp`), chamado a partir de
+  `RAS_Rasterizer::SetLines()` dentro de `LA_Launcher::RenderEngine()`. A função usa
+  `glPolygonMode(GL_FRONT_AND_BACK, GL_LINE/GL_FILL)`, também exclusivo do pipeline desktop —
+  mesma categoria de bug, mesmo fix esperado (`#ifdef __EMSCRIPTEN__`, pular a chamada ou usar
+  alternativa via shader). Instrumentação temporária `[web-launcher]`/`[web-rasterizer]`/
+  `[web-gpu-state]` mantida no código para a próxima sessão.

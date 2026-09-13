@@ -2284,7 +2284,14 @@ void GPU_state_init(void)
 	glPixelTransferi(GL_DEPTH_BIAS, 0);
 	glPixelTransferi(GL_DEPTH_SCALE, 1);
 #endif
+#ifdef __EMSCRIPTEN__
+	/* glDepthRange (double-precision) is desktop-GL-only; GLES2/WebGL only
+	 * expose the float variant glDepthRangef. Under Emscripten glDepthRange
+	 * resolves to a null import and crashes on call. */
+	glDepthRangef(0.0f, 1.0f);
+#else
 	glDepthRange(0.0, 1.0);
+#endif
 #ifdef __EMSCRIPTEN__
 	fprintf(stderr, "[web-gpu-state] depth range set\n");
 #endif
