@@ -3,7 +3,9 @@
 
 #include "SG_Node.h"
 
+#ifdef WITH_TBB
 #include "tbb/tbb.h"
+#endif  // WITH_TBB
 
 class CullTask
 {
@@ -21,17 +23,19 @@ public:
 	{
 	}
 
+#ifdef WITH_TBB
 	CullTask(const CullTask& other, tbb::split)
 		:m_objects(other.m_objects),
 		m_handler(other.m_handler),
 		m_layer(other.m_layer)
 	{
 	}
+#endif  // WITH_TBB
 
-	void operator()(const tbb::blocked_range<size_t>& r)
+	void operator()(size_t begin, size_t end)
 	{
-		m_activeObjects.reserve(m_activeObjects.size() + r.size());
-		for (unsigned int i = r.begin(), end = r.end(); i < end; ++i) {
+		m_activeObjects.reserve(m_activeObjects.size() + (end - begin));
+		for (size_t i = begin; i < end; ++i) {
 			KX_GameObject *obj = m_objects->GetValue(i);
 			if (obj->Renderable(m_layer)) {
 				++m_testedCount;
@@ -48,6 +52,13 @@ public:
 			}
 		}
 	}
+
+#ifdef WITH_TBB
+	void operator()(const tbb::blocked_range<size_t>& r)
+	{
+		(*this)(r.begin(), r.end());
+	}
+#endif  // WITH_TBB
 
 	void join(const CullTask& other)
 	{
@@ -85,7 +96,11 @@ bool KX_CullingHandler::Test(const mt::mat3x4& trans, const mt::vec3& scale, con
 std::vector<KX_GameObject *> KX_CullingHandler::Process()
 {
 	CullTask task(m_objects, *this, m_layer);
+#ifdef WITH_TBB
 	tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_objects->GetCount()), task);
+#else  // WITH_TBB
+	task(0, m_objects->GetCount());
+#endif  // WITH_TBB
 	m_lastTestedCount = task.m_testedCount;
 	return task.m_activeObjects;
 }

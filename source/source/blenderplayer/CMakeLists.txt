@@ -85,6 +85,21 @@ else()
 	endif()
 endif()
 
+if(EMSCRIPTEN)
+	# Empacota a stdlib do CPython wasm no filesystem virtual do RangeRuntime.
+	# Escopado só a este target (nao ao CMAKE_EXE_LINKER_FLAGS global do preset)
+	# porque as ferramentas geradoras nativas (datatoc/makesdna/makesrna) usam
+	# -sNODERAWFS=1 para rodar via node durante o proprio build, e
+	# --preload-file/--embed-file sao incompativeis com NODERAWFS.
+	target_link_options(RangeRuntime PRIVATE
+		"--preload-file=${PYTHON_ROOT_DIR}/lib/python311.zip@/usr/local/lib/python311.zip"
+		"--preload-file=${PYTHON_ROOT_DIR}/lib/python3.11@/usr/local/lib/python3.11"
+		# TEMP (validacao de sessao, remover apos o teste): empacota uma cena
+		# minima para validar carregamento de .range no navegador.
+		"--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/../../../build-web/bin/untitled.range@/untitled.range"
+	)
+endif()
+
 add_dependencies(RangeRuntime makesdna)
 
 if(WITH_PLAYER)

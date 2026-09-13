@@ -87,11 +87,15 @@ data_to_c_simple(shaders/gpu_shader_2d_box_vert.glsl SRC)
 set(LIB ${BLENDER_GL_LIBRARIES})
 
 # System GLEW is selected by the Linux runtime preset, so do not retain an
-# unresolved dependency on the bundled extern_glew target.
+# unresolved dependency on the bundled extern_glew target. When system GLEW
+# isn't used, link whichever bundled GLEW variant this configuration actually
+# builds (desktop extern_glew, or extern_glew_es + bf_intern_glew_mx when
+# WITH_GLEW_ES is on, e.g. the web-runtime preset) instead of hardcoding the
+# desktop target, which has no library file when only the ES variant is built.
 if(WITH_SYSTEM_GLEW)
 	list(APPEND LIB ${GLEW_LIBRARY})
 else()
-	list(APPEND LIB extern_glew)
+	list(APPEND LIB ${BLENDER_GLEW_LIBRARIES})
 endif()
 
 data_to_c_simple(shaders/gpu_shader_geometry.glsl SRC)

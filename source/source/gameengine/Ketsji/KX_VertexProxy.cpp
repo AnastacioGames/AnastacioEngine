@@ -40,7 +40,7 @@
 
 #include "EXP_ListWrapper.h"
 
-#include <boost/format.hpp>
+#include <string>
 
 PyTypeObject KX_VertexProxy::Type = {
 	PyVarObject_HEAD_INIT(nullptr, 0)
@@ -431,7 +431,7 @@ int KX_VertexProxy::pyattr_set_uvs(EXP_PyObjectPlus *self_v, const struct EXP_PY
 				self->m_array->SetUv(self->m_vertexIndex, i, vec);
 			}
 			else {
-				PyErr_SetString(PyExc_AttributeError, ((boost::format("list[%d] was not a vector") % i).str().c_str()));
+				PyErr_SetString(PyExc_AttributeError, (std::string("list[") + std::to_string(i) + "] was not a vector").c_str());
 				return PY_SET_ATTR_FAIL;
 			}
 		}
@@ -464,7 +464,7 @@ int KX_VertexProxy::pyattr_set_colors(EXP_PyObjectPlus *self_v, const struct EXP
 				self->m_array->SetColor(self->m_vertexIndex, i, vec);
 			}
 			else {
-				PyErr_SetString(PyExc_AttributeError, ((boost::format("list[%d] was not a vector") % i).str().c_str()));
+				PyErr_SetString(PyExc_AttributeError, (std::string("list[") + std::to_string(i) + "] was not a vector").c_str());
 				return PY_SET_ATTR_FAIL;
 			}
 		}

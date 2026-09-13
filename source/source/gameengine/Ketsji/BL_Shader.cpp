@@ -39,8 +39,6 @@
 #  include "EXP_PythonCallBack.h"
 #endif  // WITH_PYTHON
 
-#include <boost/format.hpp>
-
 #include "CM_Message.h"
 
 BL_Shader::BL_Shader(CM_UpdateServer<RAS_IMaterial> *materialUpdateServer)
@@ -81,8 +79,8 @@ std::string BL_Shader::GetName()
 
 std::string BL_Shader::GetText()
 {
-	return (boost::format("BL_Shader\n\tvertex shader:%s\n\n\tfragment shader%s\n\n") %
-	        m_progs[VERTEX_PROGRAM] % m_progs[FRAGMENT_PROGRAM]).str();
+	return "BL_Shader\n\tvertex shader:" + m_progs[VERTEX_PROGRAM] +
+	       "\n\n\tfragment shader" + m_progs[FRAGMENT_PROGRAM] + "\n\n";
 }
 
 

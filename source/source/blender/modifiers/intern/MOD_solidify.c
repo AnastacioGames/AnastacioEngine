@@ -39,7 +39,7 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_util.h"
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__EMSCRIPTEN__)
 #  pragma GCC diagnostic error "-Wsign-conversion"
 #endif
 

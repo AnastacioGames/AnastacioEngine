@@ -186,6 +186,7 @@ struct wmWindowManager;
 #include "../blender/render/extern/include/RE_pipeline.h"
 #include "../blender/render/extern/include/RE_render_ext.h"
 #include "../blender/render/extern/include/RE_shader_ext.h"
+#include "../blender/makesrna/RNA_enum_types.h"
 #include "../blender/windowmanager/WM_api.h"
 
 
@@ -524,7 +525,9 @@ void		WM_event_fileselect_event(struct wmWindowManager *wm, void *ophandle, int 
 void WM_event_free_ui_handler_all(
         struct bContext *C, ListBase *handlers,
         wmUIHandlerFunc ui_handle, wmUIHandlerRemoveFunc ui_remove) RET_NONE
+#ifdef WITH_INPUT_IME
 bool        WM_event_is_ime_switch(const struct wmEvent *event) RET_ZERO
+#endif
 bool		WM_event_is_last_mousemove(const struct wmEvent *event) RET_ZERO
 bool		WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event) RET_ZERO
 #ifdef WITH_INPUT_NDOF
@@ -698,6 +701,27 @@ struct ARegion;
 struct rcti;
 struct wmEvent;
 
+void wm_cursor_position_from_ghost(struct wmWindow *win, int *x, int *y);
+void wm_draw_region_clear(struct wmWindow *win, struct ARegion *ar);
+void wm_event_free_all(struct wmWindow *win);
+void wm_get_screensize(int *r_width, int *r_height);
+void wm_subwindow_close(struct wmWindow *win, int swinid);
+void wm_subwindow_matrix_get(struct wmWindow *win, int swinid, float mat[4][4]);
+int  wm_subwindow_open(struct wmWindow *win, const struct rcti *winrct, bool activate);
+void wm_subwindow_position(struct wmWindow *win, int swinid, const struct rcti *winrct, bool activate);
+void wm_subwindow_rect_set(struct wmWindow *win, int swinid, const struct rcti *rect);
+void wm_subwindow_size_get(struct wmWindow *win, int swinid, int *x, int *y);
+#ifdef WITH_INPUT_IME
+void wm_window_IME_begin(struct wmWindow *win, int x, int y, int w, int h, bool complete);
+void wm_window_IME_end(struct wmWindow *win);
+#endif
+void wm_window_lower(struct wmWindow *win);
+void wm_window_make_drawable(struct wmWindowManager *wm, struct wmWindow *win);
+void wm_window_raise(struct wmWindow *win);
+void wm_window_set_order(struct wmWindow *win, int order);
+void wm_window_set_swap_interval(struct wmWindow *win, int interval);
+void wm_window_swap_buffers(struct wmWindow *win);
+
 void wm_cursor_position_from_ghost(struct wmWindow *win, int *x, int *y) RET_NONE
 void wm_draw_region_clear(struct wmWindow *win, struct ARegion *ar) RET_NONE
 void wm_event_free_all(struct wmWindow *win) RET_NONE
@@ -708,8 +732,10 @@ int  wm_subwindow_open(struct wmWindow *win, const struct rcti *winrct, bool act
 void wm_subwindow_position(struct wmWindow *win, int swinid, const struct rcti *winrct, bool activate) RET_NONE
 void wm_subwindow_rect_set(struct wmWindow *win, int swinid, const struct rcti *rect) RET_NONE
 void wm_subwindow_size_get(struct wmWindow *win, int swinid, int *x, int *y) RET_NONE
+#ifdef WITH_INPUT_IME
 void wm_window_IME_begin(struct wmWindow *win, int x, int y, int w, int h, bool complete) RET_NONE
 void wm_window_IME_end(struct wmWindow *win) RET_NONE
+#endif
 void wm_window_lower(struct wmWindow *win) RET_NONE
 void wm_window_make_drawable(struct wmWindowManager *wm, struct wmWindow *win) RET_NONE
 void wm_window_raise(struct wmWindow *win) RET_NONE

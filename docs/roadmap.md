@@ -48,8 +48,28 @@ e detalhados no [`changelog.md`](changelog.md).
   preset. Build travou num bug genuíno e ainda não corrigido do `CMakeLists.txt`: a exigência de
   `OPENGLES_LIBRARY` (perfil ES20 sem EGL) é tratada como caminho de arquivo literal pelo Ninja,
   incompatível com Emscripten (que não tem `libGL` de sistema) — corrigir exige mudar a lógica em
-  `CMakeLists.txt`, não só o preset. Detalhes completos em `web-export-plan.md`. Nenhuma decisão de
-  implementação tomada ainda; perguntas em aberto no próprio documento.
+  `CMakeLists.txt`, não só o preset. Detalhes completos em `web-export-plan.md`.
+  Progresso desde então (sessões seguintes, ver
+  [`web-python-poc-plan.md`](web-python-poc-plan.md) para o detalhe completo):
+  bug do `OPENGLES_LIBRARY` corrigido, dual-toolchain (ferramentas geradoras
+  `makesdna`/`datatoc`/`makesrna` nativas vs. runtime wasm) resolvido,
+  `WITH_PYTHON=ON` religado com CPython compilado para `wasm32-emscripten`, e
+  série de gaps de link fechados um a um (Boost, TBB, GL query, GLEW,
+  OpenMP/mpdec/expat, stub de áudio, flags de porta bz2/sqlite3, shims de
+  emulação GL/GLU usados pelo módulo Python `bgl`: `glLightf`, `glMaterialf`,
+  `glLogicOp`, `gluPickMatrix`). **Build web hoje fecha limpo**
+  (`BUILD_EXIT=0`, `RangeRuntime.js`/`RangeRuntime.wasm` gerados). Primeiro
+  teste real no navegador (harness local + Chrome headless, na ausência de
+  ferramenta de automação de navegador dedicada) mostrou que o wasm e a
+  emulação GL inicializam e o `Py_Initialize` do CPython chega a rodar, mas
+  falha com `Fatal Python error: init_fs_encoding` /
+  `ModuleNotFoundError: No module named 'encodings'` — a stdlib do CPython
+  nunca é empacotada no filesystem virtual do Emscripten porque o preset
+  `web-runtime` ainda não tem a flag `--preload-file` (o plano já a
+  especifica; falta implementá-la). **Nenhuma cena chega a carregar** —
+  a inicialização não passa do arranque do Python. Build limpo é apenas um
+  marco, não validação de que o port funciona; a barra de aceite continua
+  sendo o cubo real, controlado por Python, rodando no navegador.
 - **Export mobile (Android/iOS)**: levantamento em [`mobile-export-plan.md`](mobile-export-plan.md),
   incluindo uma tentativa real de build Android (2026-09-09) que provou o CMake navegável (preset
   `android-runtime` chega a "Configure done") mas travou em dois bugs de código genuínos
@@ -66,9 +86,36 @@ e detalhados no [`changelog.md`](changelog.md).
   o teste manual (projeto novo e projeto antigo) descrito no [plano](export-presets-plan.md).
 - **World Status**: as oito Global Properties automáticas foram implementadas e compiladas, mas não
   apareceram em um `World` novo no teste real. Diagnosticar criação, versionamento e atualização da UI.
+- **Contorno pendente `USE_RNA_RANGE_CHECK` (Emscripten)**: o Emscripten é o
+  primeiro toolchain deste projeto a definir `__STDC_VERSION__ >= 201112L`
+  (MSVC nativo nunca define), o que ativa checagens de range em tempo de
+  compilação (`rna_internal.h`) que expõem incompatibilidades reais e
+  pré-existentes entre o tipo do campo DNA e o hardmax definido na RNA —
+  encontrados até agora: `ImageUser.fie_ima` e `Material.seed1`/`seed2`.
+  A checagem foi **desativada só para Emscripten** (`#if ... &&
+  !defined(__EMSCRIPTEN__)` em `rna_internal.h`) como **contorno
+  temporário**, não correção — permanece pendente resolver cada caso
+  individualmente (tipo do campo DNA vs. definição de range da RNA), sem
+  presumir de antemão "alargar o tipo do campo DNA", e considerando
+  explicitamente compatibilidade retroativa com `.blend` legado em cada
+  caso.
 - **Auditoria de `source/source/blender`**: confirmar ou descartar os candidatos registrados em
   [`relatorio-varredura-bugs-silenciosos.md`](relatorio-varredura-bugs-silenciosos.md), com reprodução,
   correção isolada e teste aplicável.
+- **Fix `WITH_INPUT_IME` no `RangeRuntime` nativo**: `bad_level_call_stubs/CMakeLists.txt`
+  não propagava `-DWITH_INPUT_IME` como faz para as demais opções
+  (`WITH_INPUT_NDOF`, `WITH_GAMEENGINE`, etc.), então os stubs de IME em
+  `stubs.c` ficavam sempre compilados fora, mesmo com `WITH_INPUT_IME=ON`
+  (padrão no Windows) usado por `interface_handlers.c`/`wm_window.c` —
+  causava `LNK2019` (`WM_event_is_ime_switch`, `wm_window_IME_begin`,
+  `wm_window_IME_end`) só no link do player, não do Blender completo.
+  Corrigido adicionando o bloco `if(WITH_INPUT_IME)` espelhando o padrão
+  existente. Build nativo `v142-ninja` (com `WITH_AUDASPACE=ON`, padrão do
+  `CMakeLists.txt`) validado limpo após o fix; execução manual do
+  `RangeRuntime.exe` confirmada (inicializa GPU real, roda establemente,
+  sem crash) — validação de áudio ficou limitada a "sem erro visível no
+  caminho `AUD_init`/`OpenAL32.dll` presente", não uma verificação audível
+  fim a fim, por falta de um asset de teste com fonte de som à mão.
 - **Vehicle System / Vehicle Lab**: executar por marcos o
   [plano 2](vehicle-system-plan-2.md) — Fase B (Steering & Brakes, incl. volante visual),
   Fase C (Powertrain: drive type, torque/RPM, marchas), Fase A (Chassis: Center of Mass

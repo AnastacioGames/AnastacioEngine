@@ -34,7 +34,7 @@
 
 #include "BLI_string_utf8.h"  /* own include */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__EMSCRIPTEN__)
 #  pragma GCC diagnostic error "-Wsign-conversion"
 #endif
 

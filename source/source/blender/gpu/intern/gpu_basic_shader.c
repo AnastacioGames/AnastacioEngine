@@ -41,6 +41,43 @@
 #include "GPU_glew.h"
 #include "GPU_shader.h"
 
+#ifdef __EMSCRIPTEN__
+/* Emscripten's fixed-function GL emulation (src/lib/libglemu.js) implements
+ * glLightfv but never added the scalar glLightf variant used below for the
+ * attenuation/spot parameters, so it's left undefined at link time. Forward
+ * it to the vector form, which is what glLightf itself does in real GL. */
+void glLightf(GLenum light, GLenum pname, GLfloat param)
+{
+	glLightfv(light, pname, &param);
+}
+
+/* Same gap as glLightf above: libglemu.js implements glMaterialfv but not
+ * the scalar glMaterialf, which the Python bgl module (bgl.c) exposes
+ * directly. Forward to the vector form. */
+void glMaterialf(GLenum face, GLenum pname, GLfloat param)
+{
+	glMaterialfv(face, pname, &param);
+}
+
+/* glLogicOp has no equivalent in libglemu.js at all (WebGL/GLES have no
+ * fixed-function logic-op blending stage). Also only reachable through the
+ * Python bgl module, not the engine's own rendering path, so a no-op is a
+ * safe stand-in rather than trying to emulate it. */
+void glLogicOp(GLenum UNUSED(opcode))
+{
+}
+
+/* gluPickMatrix is GLU selection/picking support; libglemu.js implements
+ * gluLookAt/gluOrtho2D but not this. Only reachable through the Python bgl
+ * module (used for GPU-based picking in scripts), not the engine's own
+ * rendering path, so a no-op is a safe stand-in rather than trying to
+ * emulate GLU's picking matrix math. */
+void gluPickMatrix(GLdouble UNUSED(x), GLdouble UNUSED(y), GLdouble UNUSED(width),
+                    GLdouble UNUSED(height), GLint *UNUSED(viewport))
+{
+}
+#endif
+
 /* State */
 
 static struct {

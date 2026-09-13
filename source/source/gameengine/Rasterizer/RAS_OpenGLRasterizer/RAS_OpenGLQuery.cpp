@@ -26,6 +26,11 @@
 
 #include "RAS_OpenGLQuery.h"
 
+#ifndef GL_QUERY_RESULT_NO_WAIT
+/* Not available in GLES/WebGL; fall back to the blocking query result. */
+#define GL_QUERY_RESULT_NO_WAIT GL_QUERY_RESULT
+#endif  // GL_QUERY_RESULT_NO_WAIT
+
 RAS_OpenGLQuery::RAS_OpenGLQuery(RAS_Query::QueryType type)
 {
 	static const GLenum targetTable[] = {

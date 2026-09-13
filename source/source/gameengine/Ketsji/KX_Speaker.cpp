@@ -77,17 +77,21 @@ KX_Speaker::KX_Speaker(void *sgReplicationInfo,
   m_startinit = startinit;
   m_is3d = is3d;
   m_settings = settings;
+#ifdef WITH_AUDASPACE
   m_playback = nullptr;
+#endif  // WITH_AUDASPACE
   m_playback_catkey = 0;
   m_type = type;
   m_isplaying = false;
-  
+
+#ifdef WITH_AUDASPACE
   // Cache sound
   if (settings.cache_sound) {
       AUD_Sound *cached = AUD_Sound_cache(m_sound);
       AUD_Sound_free(m_sound);
       m_sound = cached;
   }
+#endif  // WITH_AUDASPACE
 }
 
 KX_Speaker::~KX_Speaker()
@@ -255,6 +259,7 @@ void KX_Speaker::Update()
 
 void KX_Speaker::UpdateEffect()
 {
+#ifdef WITH_AUDASPACE
   if (!m_handle)
     return;
 
@@ -288,6 +293,7 @@ void KX_Speaker::UpdateEffect()
       AUD_EFFECT_setFilterGainLF(m_handle, m_settings.filter_gainlf);
       AUD_EFFECT_setFilterGainHF(m_handle, m_settings.filter_gainhf);
   }
+#endif  // WITH_AUDASPACE
 }
 
 #ifdef WITH_PYTHON
@@ -566,17 +572,17 @@ EXP_PYMETHODDEF_DOC(KX_Speaker, SetEffect, "SetEffect(effectType): Add Sound Eff
     m_settings.active_effect_type = type;
     m_settings.active_filter_type = filterType;
 
+#ifdef WITH_AUDASPACE
     if (!m_handle) {
         Py_RETURN_NONE;
     }
 
-#ifdef WITH_AUDASPACE
     if (AUD_EFFECT_hasEffect(m_handle)) {
         AUD_EFFECT_removeEffect(m_handle);
     }
-    
+
     AUD_EFFECT_setEffect(m_handle, type, filterType);
-  
+
 #endif  // WITH_AUDASPACE
 
     Py_RETURN_NONE;
@@ -587,10 +593,10 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_Speaker,
                            "RemoveEffect()\n"
                            "\tRemove the effect.\n")
 {
+#ifdef WITH_AUDASPACE
     if (!m_handle) {
         Py_RETURN_NONE;
     }
-#ifdef WITH_AUDASPACE
     if (AUD_EFFECT_hasEffect(m_handle)) {
         AUD_EFFECT_removeEffect(m_handle);
     }
@@ -901,6 +907,7 @@ int KX_Speaker::pyattr_set_reverb_effect_property(EXP_PyObjectPlus *self,
     return PY_SET_ATTR_FAIL;
   }
 
+#ifdef WITH_AUDASPACE
   // if sound is working and has reverb effect, set the new setting
   if (!speaker->m_handle) {
     return 0;
@@ -911,7 +918,10 @@ int KX_Speaker::pyattr_set_reverb_effect_property(EXP_PyObjectPlus *self,
   if (AUD_EFFECT_getEffectType(speaker->m_handle) != 1) { // 1 = REVERB, see aud::SoundEffectType
     return 0;
   }
-  
+#else
+  return 0;
+#endif  // WITH_AUDASPACE
+
   if (prop == "reverb_density") {
       // set value limit, avoid problems
       prop_value = mt::Clamp(prop_value, 0.0f, 1.0f);
@@ -1048,6 +1058,7 @@ int KX_Speaker::pyattr_set_effect_filter_property(EXP_PyObjectPlus *self,
     return PY_SET_ATTR_FAIL;
   }
 
+#ifdef WITH_AUDASPACE
   // if sound is working and has reverb effect, set the new setting
   if (!speaker->m_handle) {
     return 0;
@@ -1058,7 +1069,10 @@ int KX_Speaker::pyattr_set_effect_filter_property(EXP_PyObjectPlus *self,
   if (!AUD_EFFECT_getFilterType(speaker->m_handle)) {
     return 0;
   }
-  
+#else
+  return 0;
+#endif  // WITH_AUDASPACE
+
   if (prop == "filter_gain") {
       // set value limit, avoid problems
       prop_value = mt::Clamp(prop_value, 0.0f, 1.0f);

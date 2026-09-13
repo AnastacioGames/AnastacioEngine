@@ -13,4 +13,14 @@
 # reconhecido por FindPythonLibsUnix.cmake, apontado via PYTHON_ROOT_DIR.
 if(WITH_PYTHON)
 	find_package(PythonLibsUnix REQUIRED)
+
+	# This CPython wasm build keeps mpdecimal (decimal module) and expat
+	# (xml.parsers.expat / plistlib et al.) as separate static libs instead
+	# of folding them into libpython3.11.a (see docs/web-python-poc-plan.md).
+	# PYTHON_LIBRARIES is what every consumer of Python already links
+	# against, so extend it here rather than patching each call site.
+	find_library(PYTHON_MPDEC_LIBRARY NAMES mpdec HINTS ${PYTHON_LIBPATH})
+	find_library(PYTHON_EXPAT_LIBRARY NAMES expat HINTS ${PYTHON_LIBPATH})
+	list(APPEND PYTHON_LIBRARIES ${PYTHON_MPDEC_LIBRARY} ${PYTHON_EXPAT_LIBRARY})
+	mark_as_advanced(PYTHON_MPDEC_LIBRARY PYTHON_EXPAT_LIBRARY)
 endif()

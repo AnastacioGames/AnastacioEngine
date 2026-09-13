@@ -111,6 +111,14 @@ ferramenta correspondente.
   precisam persistir o controle devem alterar essa property.
 - Mudanças em DNA exigem clean rebuild. O procedimento completo está em
   [`docs/build-notes.md`](docs/build-notes.md).
+- A checagem de range em tempo de compilação da RNA (`USE_RNA_RANGE_CHECK`,
+  `rna_internal.h`) está desativada apenas para o toolchain Emscripten —
+  é um **contorno temporário** para incompatibilidades reais e
+  pré-existentes entre tipo do campo DNA e hardmax da RNA (ex.:
+  `ImageUser.fie_ima`, `Material.seed1`/`seed2`), não uma correção. Não
+  presumir "alargar o tipo do campo DNA" como solução padrão — cada caso
+  exige análise individual e consideração explícita de compatibilidade
+  com `.blend` legado. Detalhes em [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Fontes relacionadas
 

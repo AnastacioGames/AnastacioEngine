@@ -42,10 +42,10 @@
 
 #include "CM_Format.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
-
-#include <boost/algorithm/string.hpp>
 
 SCA_PropertySensor::SCA_PropertySensor(SCA_EventManager *eventmgr,
                                        SCA_IObject *gameobj,
@@ -205,7 +205,8 @@ bool SCA_PropertySensor::CheckPropertyCondition()
 				// bool tests. It's stupid the prop's identity is lost
 				// on the way here...
 				if ((testprop == EXP_BoolValue::sTrueString) || (testprop == EXP_BoolValue::sFalseString)) {
-					boost::to_upper(m_checkpropval);
+					std::transform(m_checkpropval.begin(), m_checkpropval.end(), m_checkpropval.begin(),
+					               [](unsigned char c) { return std::toupper(c); });
 				}
 				result = (testprop == m_checkpropval);
 

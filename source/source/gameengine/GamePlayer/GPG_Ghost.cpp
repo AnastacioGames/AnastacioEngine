@@ -126,8 +126,6 @@ extern char datatoc_roboto_mono_medium_ttf[];
 #  include "SpindleEncryption.h"
 #endif  // WITH_GAMEENGINE_BPPLAYER
 
-#include <boost/algorithm/string.hpp>
-
 #include "BKE_blender_version.h"
 
 #define BLEND_VERSION_FMT "Blender %d.%02d (sub %d)"
@@ -1531,19 +1529,17 @@ int main(int argc,
 #endif
 								// Strip the path so that we have the name of the game file
 								std::string path = titlename;
-								std::vector<std::string> parts;
-#ifndef WIN32
-								boost::split(parts, path, boost::is_any_of("/"));
-#else  // WIN32
-								boost::split(parts, path, boost::is_any_of("\\"));
-#endif // WIN32
 								std::string title;
-								if (parts.size()) {
-									title = parts[parts.size() - 1];
-									std::vector<std::string> sublastparts;
-									boost::split(sublastparts, title, boost::is_any_of("."));
-									if (sublastparts.size() > 1) {
-										title = sublastparts[0];
+#ifndef WIN32
+								size_t sep = path.find_last_of('/');
+#else  // WIN32
+								size_t sep = path.find_last_of('\\');
+#endif // WIN32
+								title = (sep == std::string::npos) ? path : path.substr(sep + 1);
+								if (!title.empty()) {
+									size_t dot = title.find_first_of('.');
+									if (dot != std::string::npos) {
+										title = title.substr(0, dot);
 									}
 								}
 								else {

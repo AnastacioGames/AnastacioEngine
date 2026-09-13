@@ -22,8 +22,6 @@
 #include "EXP_ErrorValue.h"
 //#include "CM_Message.h"
 
-#include <boost/format.hpp>
-
 EXP_FloatValue::EXP_FloatValue()
 {
 }

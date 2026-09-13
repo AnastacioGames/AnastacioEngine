@@ -47,8 +47,6 @@ extern "C" {
 
 #include "CM_Message.h"
 
-#include <boost/format.hpp>
-
 #include "BLI_task.h"
 
 #include "KX_DebugMode.h"

@@ -328,6 +328,67 @@ rodando no navegador — validação visual + logs sem falha.
   compilar essas ferramentas geradoras como binários nativos dentro do
   preset `web-runtime`.
 
+### Status (2026-09-12, continuação — build limpo + primeiro teste no navegador)
+
+- O dual-toolchain (`makesdna`/`datatoc`/`makesrna` nativos vs. runtime
+  wasm) foi resolvido em sessões seguintes; o preset `web-runtime` hoje
+  compila essas ferramentas geradoras nativamente e o restante do alvo
+  como wasm. Detalhes incrementais dessas correções (guarda de áudio,
+  remoção de Boost, fallback de TBB, fallback de GL query,
+  `BLI_STATIC_ASSERT` + contorno de RNA range-check, stubs de protótipo,
+  fix da lib GLEW, OpenMP/mpdec/expat, stub de `sound.c`, flags de porta
+  bz2/sqlite3) ficaram registrados nos logs de build da sessão
+  (`build-web-log*.txt`, não versionados) e nas mensagens de commit
+  correspondentes.
+- Nesta continuação, restavam três símbolos indefinidos no link final,
+  todos vindos de `libbf_python_ext.a(bgl.c.o)` — ou seja, do módulo
+  Python `bgl` (`source/blender/python/generic/bgl.c`), que expõe
+  chamadas GL/GLU cruas a scripts Python via as macros `BGL_Wrap`/
+  `BGLU_Wrap`, e não do caminho de renderização C++ da engine:
+  - `glLogicOp` — sem equivalente em `libglemu.js` (WebGL/GLES não têm
+    estágio de logic-op de função fixa); resolvido com um stub no-op em
+    `source/blender/gpu/intern/gpu_basic_shader.c` (`#ifdef __EMSCRIPTEN__`).
+  - `glMaterialf` — `libglemu.js` implementa `glMaterialfv` mas não a
+    variante escalar; resolvido encaminhando para `glMaterialfv` (mesmo
+    padrão já usado para `glLightf` em sessão anterior).
+  - `gluPickMatrix` — seleção/picking do GLU, fora do subconjunto mínimo
+    de GLU do Emscripten (`gluLookAt`/`gluOrtho2D`/etc.); resolvido com
+    stub no-op.
+- **Build web limpo**: com esses três shims, `build-web-log20.txt` fechou
+  com `BUILD_EXIT=0`, sem símbolos indefinidos, produzindo
+  `build-web/bin/RangeRuntime.js` (692.753 bytes) e
+  `build-web/bin/RangeRuntime.wasm` (19.810.531 bytes).
+- **Primeiro teste no navegador** (harness mínimo `build-web/bin/test.html`
+  + `python -m http.server` local + Chrome headless com log verboso,
+  na ausência de uma ferramenta de automação de navegador dedicada):
+  o wasm carrega, a emulação de OpenGL de função fixa inicializa (aviso
+  esperado do próprio Emscripten sobre `LEGACY_GL_EMULATION`), e o
+  `Py_Initialize` do CPython embarcado começa e imprime corretamente toda
+  a configuração de `sys.path`/`sys.prefix` apontando para
+  `/usr/local/lib/python3.11` — mas falha em seguida com:
+  ```
+  Fatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding
+  ModuleNotFoundError: No module named 'encodings'
+  ```
+  **Causa raiz identificada**: `CMAKE_EXE_LINKER_FLAGS` do preset
+  `web-runtime` (`source/CMakePresets.json`) nunca inclui a flag
+  `--preload-file=<...>/usr/local@/usr/local` que o próprio plano já
+  especifica (ver Etapa 2/3 acima) — sem ela, a stdlib do CPython nunca é
+  empacotada no filesystem virtual do Emscripten, então `encodings` (e
+  qualquer outro módulo da stdlib) não existe em tempo de execução, mesmo
+  que `sys.path` aponte para os caminhos "certos". Resultado: a
+  inicialização não passa do arranque do CPython — nenhuma cena chega a
+  ser carregada, porque o carregamento de `.range`/Python Controller só
+  acontece depois de `Py_Initialize` completar.
+  **Isto é apenas um build limpo, não uma validação de que o port
+  funciona** — a barra de aceite da Etapa 6 (cubo real, controlado por
+  Python, rodando no navegador) ainda não foi atingida.
+  **Próximo passo concreto**: adicionar `--preload-file` ao
+  `CMAKE_EXE_LINKER_FLAGS` do preset `web-runtime`, apontando para o
+  prefixo `/usr/local` do CPython wasm compilado (`D:\python-wasm-web`),
+  e reexecutar o teste no navegador para confirmar que `encodings` passa
+  a ser encontrado.
+
 ## Etapa 7 — Depois do cubo: rumo a um jogo exportável
 
 - Áudio (OpenAL via Emscripten), saves persistentes (IDBFS, agora sim

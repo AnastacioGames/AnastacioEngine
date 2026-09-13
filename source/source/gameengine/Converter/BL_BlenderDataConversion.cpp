@@ -1094,13 +1094,17 @@ static KX_Speaker *BL_SpeakerFromBlenderSpeaker(Object *ob, KX_Scene *kxscene, i
   Speaker *speaker = static_cast<Speaker *>(ob->data);
 
   if (speaker->sound) {
+#ifdef WITH_AUDASPACE
     AUD_Sound *snd_sound = speaker->sound->playback_handle;
+#endif  // WITH_AUDASPACE
     bool is3d = (speaker->flag & SPK_USE_3DSOUND);
 
+#ifdef WITH_AUDASPACE
 	// if sound shall be 3D but isn't mono, we have to make it mono!
     if (is3d) {
       snd_sound = AUD_Sound_rechannel(snd_sound, AUD_CHANNELS_MONO);
     }
+#endif  // WITH_AUDASPACE
 
     KX_SpeakerSoundSettings settings;
     settings.start_at = speaker->start_at;
@@ -1161,7 +1165,9 @@ static KX_Speaker *BL_SpeakerFromBlenderSpeaker(Object *ob, KX_Scene *kxscene, i
 
     KX_Speaker *KX_speaker = new KX_Speaker(kxscene,
                                             KX_Scene::m_callbacks,
+#ifdef WITH_AUDASPACE
                                             snd_sound,
+#endif  // WITH_AUDASPACE
                                             speaker->volume,
                                             speaker->pitch,
                                             (speaker->flag & SPK_START_INIT),
@@ -1169,10 +1175,12 @@ static KX_Speaker *BL_SpeakerFromBlenderSpeaker(Object *ob, KX_Scene *kxscene, i
                                             settings,
                                             soundSpeakerType);
 
+#ifdef WITH_AUDASPACE
 	// if we made it mono, we have to free it
     if (snd_sound != speaker->sound->playback_handle) {
 		AUD_Sound_free(snd_sound);
 	}
+#endif  // WITH_AUDASPACE
 	return KX_speaker;
   }
   return nullptr;

@@ -36,7 +36,6 @@
 #endif
 
 #include <algorithm>
-#include <boost/format.hpp>
 
 #include "KX_Scene.h"
 #include "KX_AnimationEvent.h"
@@ -1594,7 +1593,7 @@ void KX_Scene::RenderDebugPropertiesImGui(int sceneIndex) {
 					// Open Popup, edit value.
 					if (ImGui::IsMouseClicked(0)) {
 						//printf("For loop: %i Scene Index: %i ID: %s \n", (i + 1), sceneIndex + i, id.c_str());
-						std::string popup = boost::str(boost::format("EditValue##%s%s%i") % objname.c_str() % propname.c_str() % sceneIndex);
+						std::string popup = "EditValue##" + objname + propname + std::to_string(sceneIndex);
 						debugMode->imgui_debugPropID = popup;
 						debugMode->imgui_debugListProp_Index = i;
 						debugMode->imgui_sceneProp_Index = sceneIndex;
@@ -1629,7 +1628,7 @@ void KX_Scene::RenderDebugPropertiesImGui(int sceneIndex) {
 		const std::string proptext = propval->GetText();
 
 		// Now we can edit the value.
-		std::string id = boost::str(boost::format("Value##%s") % popup.c_str());
+		std::string id = "Value##" + popup;
 
 		switch (propval->GetValueType()) {
 			case VALUE_DATA_TYPE::VALUE_BOOL_TYPE: {

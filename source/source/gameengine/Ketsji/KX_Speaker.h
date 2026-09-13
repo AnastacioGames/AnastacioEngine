@@ -98,7 +98,9 @@ protected:
   bool m_startinit;
   bool m_is3d;
   KX_SpeakerSoundSettings m_settings;
+#ifdef WITH_AUDASPACE
   PlaybackManagerP *m_playback; // an playbackManager to play sound
+#endif  // WITH_AUDASPACE
   int m_playback_catkey;
 
   void startInitPlay();

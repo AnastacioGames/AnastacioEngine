@@ -25,7 +25,7 @@
 #include "KX_GameObject.h"
 #include "KX_PyMath.h"
 
-#include <boost/format.hpp>
+#include <sstream>
 
 #ifdef WITH_PYTHON
 
@@ -49,7 +49,9 @@ std::string KX_BoundingBox::GetText()
 	if (!IsValidOwner()) {
 		return "KX_BoundingBox of invalid object";
 	}
-	return (boost::format("KX_BoundingBox of object %1%, min: %2%, max: %3%") % m_owner->GetName() % GetMin() % GetMax()).str();
+	std::ostringstream oss;
+	oss << "KX_BoundingBox of object " << m_owner->GetName() << ", min: " << GetMin() << ", max: " << GetMax();
+	return oss.str();
 }
 
 bool KX_BoundingBox::IsValidOwner()

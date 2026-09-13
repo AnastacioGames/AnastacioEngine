@@ -23,8 +23,6 @@
 
 #include "CM_Message.h"
 
-#include <boost/format.hpp>
-
 EXP_IntValue::EXP_IntValue()
 {
 }
@@ -312,7 +310,7 @@ int EXP_IntValue::GetValueType()
 
 std::string EXP_IntValue::GetText()
 {
-	return (boost::format("%lld") % m_int).str();
+	return std::to_string(m_int);
 }
 
 EXP_Value *EXP_IntValue::GetReplica()

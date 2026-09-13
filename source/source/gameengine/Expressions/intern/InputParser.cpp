@@ -34,8 +34,18 @@
 
 #include "CM_Message.h"
 
-#include <boost/format.hpp>
-#include <boost/algorithm/string.hpp>
+#include <algorithm>
+#include <cctype>
+
+static bool EXP_IEquals(const std::string &a, const std::string &b)
+{
+	if (a.size() != b.size()) {
+		return false;
+	}
+	return std::equal(a.begin(), a.end(), b.begin(), [](unsigned char c1, unsigned char c2) {
+		return std::tolower(c1) == std::tolower(c2);
+	});
+}
 
 // this is disable at the moment, I expected a memleak from it, but the error-cleanup was the reason
 // well, looks we don't need it anyway, until maybe the Curved Surfaces are integrated into CSG
@@ -322,29 +332,29 @@ void EXP_Parser::NextSym()
 				start = chcount;
 				CharRep();
 				GrabString(start);
-				if (boost::iequals(const_as_string, "SUM")) {
+				if (EXP_IEquals(const_as_string, "SUM")) {
 					sym = sumsym;
 				}
-				else if (boost::iequals(const_as_string, "NOT")) {
+				else if (EXP_IEquals(const_as_string, "NOT")) {
 					sym = opsym;
 					opkind = OPnot;
 				}
-				else if (boost::iequals(const_as_string, "AND")) {
+				else if (EXP_IEquals(const_as_string, "AND")) {
 					sym = opsym; opkind = OPand;
 				}
-				else if (boost::iequals(const_as_string, "OR")) {
+				else if (EXP_IEquals(const_as_string, "OR")) {
 					sym = opsym; opkind = OPor;
 				}
-				else if (boost::iequals(const_as_string, "IF")) {
+				else if (EXP_IEquals(const_as_string, "IF")) {
 					sym = ifsym;
 				}
-				else if (boost::iequals(const_as_string, "WHOMADE")) {
+				else if (EXP_IEquals(const_as_string, "WHOMADE")) {
 					sym = whocodedsym;
 				}
-				else if (boost::iequals(const_as_string, "FALSE")) {
+				else if (EXP_IEquals(const_as_string, "FALSE")) {
 					sym = constsym; constkind = booltype; boolvalue = false;
 				}
-				else if (boost::iequals(const_as_string, "TRUE")) {
+				else if (EXP_IEquals(const_as_string, "TRUE")) {
 					sym = constsym; constkind = booltype; boolvalue = true;
 				}
 				else {
@@ -352,7 +362,7 @@ void EXP_Parser::NextSym()
 				}
 			}
 			else {
-				std::string str = (boost::format("Unexpected character '%c'") % ch).str();
+				std::string str = std::string("Unexpected character '") + ch + "'";
 				NextCh();
 				ScanError(str);
 				return;
