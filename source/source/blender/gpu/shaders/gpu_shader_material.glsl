@@ -612,7 +612,7 @@ void vec_math_average(vec3 v1, vec3 v2, out vec3 outvec, out float outval)
 }
 void vec_math_mix(float strength, vec3 v1, vec3 v2, out vec3 outvec)
 {
-	outvec = strength * v1 + (1 - strength) * v2;
+	outvec = strength * v1 + (1.0 - strength) * v2;
 }
 
 void vec_math_dot(vec3 v1, vec3 v2, out vec3 outvec, out float outval)
@@ -1142,7 +1142,7 @@ void node_sprites_animation(float frame, float columns, float rows, float column
   remainder(floor(frame), columns, rows, remainder_temp1, quotient_floored1);
   remainder((remainder_temp1 - 0.00001), floor(columns), 1.0, remainder_temp2, quotient_floored2);
 
-  outLocation = vec3(((1 - remainder_temp2) - floor(columns_offset)), (quotient_floored2 + (floor(rows_offset) + 1.0)), 0.0);
+  outLocation = vec3(((1.0 - remainder_temp2) - floor(columns_offset)), (quotient_floored2 + (floor(rows_offset) + 1.0)), 0.0);
   outScale = vec3(floor(columns), floor(rows), 1.0);
 }
 
@@ -1969,7 +1969,7 @@ void mtex_bump_bicubic(
 		                          dHdST.x * TexDy.x + dHdST.y * TexDy.y);
 
 		// blend between the two
-		dHdxy = dHdxy * (1 - fBlend) + dHdxy_bicubic * fBlend;
+		dHdxy = dHdxy * (1.0 - fBlend) + dHdxy_bicubic * fBlend;
 	}
 
 	dBs = hScale * dHdxy.x;
@@ -2326,7 +2326,7 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 	float pMie = (3.0 / (16.0 * M_PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg))) * sunSize;
 
 	// Sample the primary ray.
-	for (int i = 0; i < iSteps; i++) {
+	for (int i = 0; i < int(iSteps); i++) {
 		// Calculate the primary ray sample position.
 		vec3 iPos = r0 + r * (iStepSize * 0.5);
 
@@ -2345,7 +2345,7 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 		float jOdMie = 0.0;
 
 		// Sample the secondary ray.
-		for (int j = 0; j < jSteps; j++) {
+		for (int j = 0; j < int(jSteps); j++) {
 			// Calculate the secondary ray sample position.
 			vec3 jPos = iPos + pSun * (jStepSize * 0.5);
 

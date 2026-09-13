@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-13 — Web/Emscripten: SetLines/glPolygonMode, ImGui #version 120 e início do GLSL ES sweep
+
+- `RAS_OpenGLRasterizer::SetLines` chamava `glPolygonMode`, sem equivalente em WebGL/GLES2; corrigido com guard `#ifdef __EMSCRIPTEN__` que ignora a chamada (sem estado a preservar).
+- `KX_Imgui::Init` inicializava o backend ImGui com `#version 120` (GLSL desktop) incondicionalmente; sob Emscripten isso falhava ao compilar/linkar o shader do ImGui no WebGL2. Corrigido para usar `#version 300 es` sob `__EMSCRIPTEN__`, mantendo `#version 120` em desktop.
+- Diagnóstico de testes headless: `chrome.exe --headless` (modo antigo) combinado com `--user-data-dir` relativo abre uma janela real do Chrome com um diálogo de erro em vez de rodar sem interface — usar `--headless=new` e caminho absoluto evita o problema; mesmo `chrome.exe --version` pode abrir uma janela cheia nesta máquina, então testes automatizados via linha de comando precisam de `taskkill //F //IM chrome.exe` de segurança após cada tentativa.
+- Com os dois bugs acima corrigidos, o teste em Chrome headless avançou até compilar o shader do ImGui, revelando um problema bem maior em `gpu_shader_material.glsl` (5411 linhas): dezenas de erros de tipo GLSL ES (int/float sem conversão implícita, `sampler2DShadow` sem precisão, `mod()` sem overload para inteiro) espalhados pelo arquivo. Cinco ocorrências do padrão int/float corrigidas nesta sessão (`~615`, `~1145`, `~1972`, `~2329`, `~2348`); erros adicionais confirmados entre as linhas `~2702` e `~4639` seguem pendentes — ver `docs/roadmap.md`.
+
 ## 2026-09-13 — WebGL2: shaders, VAO e framebuffers alcançam a criação do canvas
 
 - O preset Web passou a exigir WebGL2/GLES3 e o backend SDL solicita o contexto correspondente. A compatibilidade de shaders usa GLSL ES 300 e chamadas diretas do Emscripten para criação, compilação, consulta de atributos e uniforms.

@@ -72,7 +72,12 @@ void KX_Imgui::Init(DEV_InputDevice *inputDevice)
 
 	// Init
 	KX_ImGui_Impl_Inputs_InitForOpenGL(inputDevice, nullptr);
+#ifdef __EMSCRIPTEN__
+	/* WebGL2/GLES3 does not accept desktop GLSL 120; use the ES3 shader variant. */
+	ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
 	ImGui_ImplOpenGL3_Init("#version 120");
+#endif
 
 	// Load imgui.ini file
 	imguiConfigPath = std::string(BKE_appdir_program_dir()) + "\\imgui.ini";

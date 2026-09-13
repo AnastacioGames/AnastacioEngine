@@ -58,18 +58,28 @@ e detalhados no [`changelog.md`](changelog.md).
   OpenMP/mpdec/expat, stub de áudio, flags de porta bz2/sqlite3, shims de
   emulação GL/GLU usados pelo módulo Python `bgl`: `glLightf`, `glMaterialf`,
   `glLogicOp`, `gluPickMatrix`). **Build web hoje fecha limpo**
-  (`BUILD_EXIT=0`, `RangeRuntime.js`/`RangeRuntime.wasm` gerados). Primeiro
-  teste real no navegador (harness local + Chrome headless, na ausência de
-  ferramenta de automação de navegador dedicada) mostrou que o wasm e a
-  emulação GL inicializam e o `Py_Initialize` do CPython chega a rodar, mas
-  falha com `Fatal Python error: init_fs_encoding` /
-  `ModuleNotFoundError: No module named 'encodings'` — a stdlib do CPython
-  nunca é empacotada no filesystem virtual do Emscripten porque o preset
-  `web-runtime` ainda não tem a flag `--preload-file` (o plano já a
-  especifica; falta implementá-la). **Nenhuma cena chega a carregar** —
-  a inicialização não passa do arranque do Python. Build limpo é apenas um
-  marco, não validação de que o port funciona; a barra de aceite continua
-  sendo o cubo real, controlado por Python, rodando no navegador.
+  (`BUILD_EXIT=0`, `RangeRuntime.js`/`RangeRuntime.wasm` gerados). Testes reais
+  no navegador (harness local + Chrome headless via `--headless=new` com
+  `--user-data-dir` absoluto — `--headless` antigo e caminho relativo abrem
+  uma janela real do Chrome em vez de rodar sem interface) foram avançando a
+  runtime além do arranque do Python, revelando e corrigindo, um de cada vez,
+  bugs de pipeline fixo desktop-only sob Emscripten: `GPU_state_init`
+  (corrigido, commit `c9871b0`), `RAS_OpenGLRasterizer::SetLines`/
+  `glPolygonMode` (sem equivalente em WebGL/GLES2, guard `#ifdef __EMSCRIPTEN__`
+  que pula a chamada) e o shader do ImGui inicializado com `#version 120`
+  (GLSL desktop, rejeitado pelo WebGL2; corrigido para `#version 300 es` sob
+  Emscripten em `KX_Imgui.cpp`). Com esses três corrigidos, o teste chegou a
+  compilar o shader do ImGui, mas revelou um problema bem maior e sistêmico em
+  `gpu_shader_material.glsl` (5411 linhas): dezenas de erros de tipo GLSL ES
+  espalhados pelo arquivo inteiro — operações int/float sem conversão
+  implícita (GLSL desktop permite, GLSL ES não), `sampler2DShadow` sem
+  precisão declarada e `mod()` sem overload para inteiro. Cinco ocorrências
+  do padrão int/float já corrigidas (linhas ~615, ~1145, ~1972, ~2329, ~2348),
+  mas a varredura de 2026-09-13 mostrou erros adicionais entre as linhas
+  ~2702 e ~4639 do arquivo — trabalho sistemático ainda pendente, não apenas
+  pontual. Build limpo é apenas um marco, não validação de que o port
+  funciona; a barra de aceite continua sendo o cubo real, controlado por
+  Python, rodando no navegador.
 - **Export mobile (Android/iOS)**: levantamento em [`mobile-export-plan.md`](mobile-export-plan.md),
   incluindo uma tentativa real de build Android (2026-09-09) que provou o CMake navegável (preset
   `android-runtime` chega a "Configure done") mas travou em dois bugs de código genuínos

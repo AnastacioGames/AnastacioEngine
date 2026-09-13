@@ -343,6 +343,13 @@ void RAS_OpenGLRasterizer::SetScissor(int x, int y, int width, int height)
 
 void RAS_OpenGLRasterizer::SetLines(bool enable)
 {
+#ifdef __EMSCRIPTEN__
+	/* glPolygonMode is desktop-fixed-function-pipeline only; WebGL/GLES2 have
+	 * no wireframe fill mode and no equivalent entry point. Skip it here
+	 * instead of calling a null function pointer. */
+	(void)enable;
+	return;
+#endif
 	if (enable) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	}
