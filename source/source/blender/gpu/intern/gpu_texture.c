@@ -716,9 +716,18 @@ int GPU_texture_get_global_collider_depth_viewproj(float r_viewproj[16])
 void GPU_invalid_tex_init(void)
 {
 	const float color[4] = {1.0f, 0.0f, 1.0f, 1.0f};
+
+#ifdef __EMSCRIPTEN__
+	/* WebGL 1 has no 1D or 3D texture targets.  These are only placeholder
+	 * textures used when a caller tries to bind a missing texture, so leave
+	 * unsupported targets empty instead of creating invalid GL objects. */
+	GG.invalid_tex_1D = NULL;
+	GG.invalid_tex_3D = NULL;
+#else
 	GG.invalid_tex_1D = GPU_texture_create_1D(1, color, NULL);
-	GG.invalid_tex_2D = GPU_texture_create_2D(1, 1, color, GPU_HDR_NONE, NULL);
 	GG.invalid_tex_3D = GPU_texture_create_3D(1, 1, 1, 4, color);
+#endif
+	GG.invalid_tex_2D = GPU_texture_create_2D(1, 1, color, GPU_HDR_NONE, NULL);
 	GG.jitter_64_tex = GPU_texture_create_jitter(64);
 	GG.depth_tex = GG.invalid_tex_2D;
 	GG.collider_depth_tex = GG.invalid_tex_2D;
@@ -728,14 +737,22 @@ void GPU_invalid_tex_bind(int mode)
 {
 	switch (mode) {
 		case GL_TEXTURE_1D:
+		#ifdef __EMSCRIPTEN__
+			break;
+		#else
 			glBindTexture(GL_TEXTURE_1D, GG.invalid_tex_1D->bindcode);
 			break;
+		#endif
 		case GL_TEXTURE_2D:
 			glBindTexture(GL_TEXTURE_2D, GG.invalid_tex_2D->bindcode);
 			break;
 		case GL_TEXTURE_3D:
+		#ifdef __EMSCRIPTEN__
+			break;
+		#else
 			glBindTexture(GL_TEXTURE_3D, GG.invalid_tex_3D->bindcode);
 			break;
+		#endif
 	}
 }
 

@@ -1356,7 +1356,11 @@ void BKE_library_free(Library *lib)
 
 Main *BKE_main_new(void)
 {
-	Main *bmain = MEM_callocN(sizeof(Main), "new main");
+	/* Main contains uint64_t build metadata.  wasm32's regular calloc path
+	 * only guarantees 4-byte alignment, so use an 8-byte aligned,
+	 * zero-initialized allocation here. */
+	Main *bmain = MEM_mallocN_aligned(sizeof(Main), 8, "new main");
+	memset(bmain, 0, sizeof(Main));
 	bmain->eval_ctx = DEG_evaluation_context_new(DAG_EVAL_VIEWPORT);
 	bmain->lock = MEM_mallocN(sizeof(SpinLock), "main lock");
 	BLI_spin_init((SpinLock *)bmain->lock);

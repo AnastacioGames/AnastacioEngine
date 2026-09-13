@@ -20,9 +20,17 @@
 #include "GPU_glew.h"
 #include "GPU_vertex_array.h"
 
+#ifdef __EMSCRIPTEN__
+extern void emscripten_glGenVertexArraysOES(GLsizei n, GLuint *arrays);
+extern void emscripten_glBindVertexArrayOES(GLuint array);
+extern void emscripten_glDeleteVertexArraysOES(GLsizei n, const GLuint *arrays);
+#endif
+
 void GPU_create_vertex_arrays(int n, unsigned int *arrays)
 {
-#ifndef __APPLE__
+#ifdef __EMSCRIPTEN__
+	emscripten_glGenVertexArraysOES(n, arrays);
+#elif !defined(__APPLE__)
 	glGenVertexArrays(n, arrays);
 #else
 	glGenVertexArraysAPPLE(n, arrays);
@@ -31,7 +39,9 @@ void GPU_create_vertex_arrays(int n, unsigned int *arrays)
 
 void GPU_bind_vertex_array(unsigned int array)
 {
-#ifndef __APPLE__
+#ifdef __EMSCRIPTEN__
+	emscripten_glBindVertexArrayOES(array);
+#elif !defined(__APPLE__)
 	glBindVertexArray(array);
 #else
 	glBindVertexArrayAPPLE(array);
@@ -40,7 +50,9 @@ void GPU_bind_vertex_array(unsigned int array)
 
 void GPU_unbind_vertex_array(void)
 {
-#ifndef __APPLE__
+#ifdef __EMSCRIPTEN__
+	emscripten_glBindVertexArrayOES(0);
+#elif !defined(__APPLE__)
 	glBindVertexArray(0);
 #else
 	glBindVertexArrayAPPLE(0);
@@ -49,7 +61,9 @@ void GPU_unbind_vertex_array(void)
 
 void GPU_delete_vertex_arrays(int n, const unsigned int *arrays)
 {
-#ifndef __APPLE__
+#ifdef __EMSCRIPTEN__
+	emscripten_glDeleteVertexArraysOES(n, arrays);
+#elif !defined(__APPLE__)
 	glDeleteVertexArrays(n, arrays);
 #else
 	glDeleteVertexArraysAPPLE(n, arrays);

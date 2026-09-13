@@ -148,6 +148,8 @@ e detalhados no [`changelog.md`](changelog.md).
 
 ## Validações pendentes
 
+- **Export para Web — atualização 2026-09-13**: o runtime wasm já inicializa Python, lê `untitled.range` até `ENDB` e cria um canvas WebGL de 640×480. Foram corrigidos o underflow de `POINTER_OFFSET`, o alinhamento de 8 bytes para reconstruções SDNA/`Main`, a solicitação explícita de contexto GLES 2, os placeholders de textura incompatíveis e o acesso a VAO pela extensão WebGL. O bloqueio atual é a compilação dos shaders GLSL desktop (`#version 120`) no GLSL ES; falta portar a injeção/código dos shaders e então executar a cena.
+
 - Cutscene nativo: executar no editor o roteiro de
   [`cutscene-native-example.md`](cutscene-native-example.md), cobrindo
   salvar/reabrir, Play → Stop → Play e execução standalone; confirmar que o

@@ -31,6 +31,10 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten/html5_webgl.h>
+#endif
+
 
 SDL_GLContext GHOST_ContextSDL::s_sharedContext = NULL;
 int           GHOST_ContextSDL::s_sharedCount   = 0;
@@ -113,12 +117,22 @@ GHOST_TSuccess GHOST_ContextSDL::initializeDrawingContext()
 	const bool needStencil = false;
 #endif
 
+#ifdef __EMSCRIPTEN__
+	/* Emscripten maps SDL's EGL context to WebGL.  Its EGL shim requires an
+	 * explicit GLES 2 request; the native default (OpenGL 0.0) is treated as
+	 * GLES 1 and is rejected with EGL_BAD_CONFIG. */
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, m_contextProfileMask);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, m_contextMajorVersion);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, m_contextMinorVersion);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, m_contextFlags);
-
 	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -154,6 +168,11 @@ GHOST_TSuccess GHOST_ContextSDL::initializeDrawingContext()
 
 		success = (SDL_GL_MakeCurrent(m_window, m_context) < 0) ?
 		           GHOST_kFailure : GHOST_kSuccess;
+		#ifdef __EMSCRIPTEN__
+		if (!emscripten_webgl_enable_OES_vertex_array_object(emscripten_webgl_get_current_context())) {
+			fprintf(stderr, "[web] OES_vertex_array_object is unavailable\n");
+		}
+		#endif
 
 		initContextGLEW();
 

@@ -201,7 +201,11 @@ void gpu_extensions_init(void)
 	/* make sure double side isn't used by default and only getting enabled in places where it's
 	 * really needed to prevent different unexpected behaviors like with intel gme965 card (sergey) */
 #if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE)
+	#ifdef __EMSCRIPTEN__
+	glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE);
+	#else
 	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE);
+	#endif
 #endif
 
 #ifdef _WIN32

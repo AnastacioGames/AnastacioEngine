@@ -450,3 +450,10 @@ convergirem.
 - [Emscripten: packaging files](https://emscripten.org/docs/porting/files/packaging_files.html)
 - [Emscripten: Filesystem API](https://emscripten.org/docs/api_reference/Filesystem-API.html)
 - [Emscripten: runtime environment](https://emscripten.org/docs/porting/emscripten-runtime-environment.html)
+
+### Atualização 2026-09-13 — leitura de `.range` no wasm32
+
+- O preload da stdlib foi incorporado ao alvo web e o `Py_Initialize` passou da falha de `encodings`. A leitura de `untitled.range` chegou ao bloco `GLOB` e ao `ENDB` sem crash.
+- Foram corrigidos dois casos de alinhamento estrito do wasm32: structs reconstruídas pelo SDNA agora usam alocação alinhada a 8 bytes, e `Main` também é alocado com esse alinhamento. O primeiro acesso que comprovava o problema era `FileGlobal.build_commit_timestamp` (`uint64_t`).
+- `blo_nextbhead` também passou a calcular o endereço do `BHeadN` com aritmética explícita em `char *`, evitando o underflow unsigned de `POINTER_OFFSET`.
+- O build incremental de `RangeRuntime` terminou com sucesso após a limpeza da instrumentação temporária. O teste em Chrome com janela real confirmou que `could not create main window` também ocorria fora do headless. O SDL agora solicita GLES 2 explicitamente e cria um canvas WebGL de 640×480; a inicialização também usa a extensão WebGL de VAO e ignora placeholders 1D/3D inexistentes no WebGL 1. O bloqueio seguinte é portar os shaders GLSL desktop (`#version 120`) para GLSL ES antes de executar a cena.

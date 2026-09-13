@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-13 — Web/Emscripten: alinhamento na leitura SDNA e avanço do carregamento
+
+- O carregamento de `untitled.range` no `RangeRuntime` wasm32 deixou de abortar na leitura de `GLOB`. A causa era alinhamento de 64 bits: `MEM_callocN` podia devolver apenas alinhamento de 4 bytes no wasm32, enquanto `FileGlobal` e `Main` contêm `uint64_t`.
+- `DNA_struct_reconstruct` e `BKE_main_new` passaram a usar alocação alinhada a 8 bytes, mantendo a inicialização zerada. `blo_nextbhead` passou a fazer aritmética de ponteiro por `char *`, evitando o underflow unsigned de `POINTER_OFFSET` ao recuperar `BHeadN`.
+- O build web incremental terminou com exit 0. O Chrome headless percorre os blocos até `ENDB` sem `alignment fault`, segmentation fault ou erro do Python; o teste para em `could not create main window`, pois o harness não fornece uma janela gráfica real. A validação visual com janela permanece pendente.
+- O teste em Chrome normal confirmou que a falha de janela não era exclusiva do headless. O backend SDL passou a solicitar GLES 2 explicitamente, eliminando `EGL_BAD_CONFIG`; o canvas WebGL de 640×480 é criado. A inicialização web também evita texturas-placeholder 1D/3D, ausentes no WebGL 1, e usa `OES_vertex_array_object` pelas entradas diretas do Emscripten.
+- O runtime agora alcança `LA_PlayerLauncher::InitEngine()`. O bloqueio vigente são os shaders GLSL desktop (`#version 120` e sintaxe associada), rejeitados pelo GLSL ES; usar o shader nulo após essa falha ainda causa o abort. A próxima etapa é a adaptação dos shaders para WebGL, não o carregamento do arquivo.
 ## Índice
 
 | Data | Resumo |

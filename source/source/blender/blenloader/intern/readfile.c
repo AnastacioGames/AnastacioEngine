@@ -777,11 +777,6 @@ static BHeadN *get_bhead(FileData *fd)
 			else {
 				bhead8.code = DATA;
 				readsize = fd->read(fd, &bhead8, sizeof(bhead8));
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[getbhead] step1 read bhead8: sizeof(bhead8)=%d sizeof(bhead4)=%d sizeof(bhead)=%d readsize=%d code=%d len=%d SDNAnr=%d nr=%d old=%lld\n",
-					(int)sizeof(bhead8), (int)sizeof(bhead4), (int)sizeof(bhead), readsize,
-					bhead8.code, bhead8.len, bhead8.SDNAnr, bhead8.nr, (long long)bhead8.old);
-#endif
 
 				if (readsize == sizeof(bhead8) || bhead8.code == ENDB) {
 					if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
@@ -790,10 +785,6 @@ static BHeadN *get_bhead(FileData *fd)
 
 					if (fd->flags & FD_FLAGS_POINTSIZE_DIFFERS) {
 						bh4_from_bh8(&bhead, &bhead8, (fd->flags & FD_FLAGS_SWITCH_ENDIAN));
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-						printf("[getbhead] step2 bh4_from_bh8: bhead.code=%d bhead.len=%d bhead.SDNAnr=%d bhead.nr=%d bhead.old(as int)=%d\n",
-							bhead.code, bhead.len, bhead.SDNAnr, bhead.nr, (int)(long)bhead.old);
-#endif
 					}
 					else {
 						/* MIN2 is only to quiet '-Warray-bounds' compiler warning. */
@@ -804,9 +795,6 @@ static BHeadN *get_bhead(FileData *fd)
 				else {
 					fd->eof = 1;
 					bhead.len = 0;
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-					printf("[getbhead] step1 SHORT READ -> eof=1, readsize=%d expected=%d\n", readsize, (int)sizeof(bhead8));
-#endif
 				}
 			}
 
@@ -817,22 +805,12 @@ static BHeadN *get_bhead(FileData *fd)
 			 * the associated data and put everything in a BHeadN (creative naming !)
 			 */
 			if (!fd->eof) {
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[getbhead] step3 before malloc: sizeof(BHeadN)=%d bhead.len=%d total=%d\n",
-					(int)sizeof(BHeadN), bhead.len, (int)(sizeof(BHeadN) + bhead.len));
-#endif
 				new_bhead = MEM_mallocN(sizeof(BHeadN) + bhead.len, "new_bhead");
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[getbhead] step4 after malloc: new_bhead=%p\n", (void*)new_bhead);
-#endif
 				if (new_bhead) {
 					new_bhead->next = new_bhead->prev = NULL;
 					new_bhead->bhead = bhead;
 
 					readsize = fd->read(fd, new_bhead + 1, bhead.len);
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-					printf("[getbhead] step5 after data read: readsize=%d expected=%d\n", readsize, bhead.len);
-#endif
 
 					if (readsize != bhead.len) {
 						fd->eof = 1;
@@ -854,10 +832,6 @@ static BHeadN *get_bhead(FileData *fd)
 		BLI_addtail(&fd->listbase, new_bhead);
 	}
 
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-	printf("[get_bhead] step6 return: new_bhead=%p listbase.first=%p listbase.last=%p\n",
-		(void*)new_bhead, (void*)fd->listbase.first, (void*)fd->listbase.last);
-#endif
 
 	return(new_bhead);
 }
@@ -898,7 +872,7 @@ BHead *blo_nextbhead(FileData *fd, BHead *thisblock)
 	if (thisblock) {
 		/* bhead is actually a sub part of BHeadN
 		 * We calculate the BHeadN pointer from the BHead pointer below */
-		new_bhead = (BHeadN *)POINTER_OFFSET(thisblock, -offsetof(BHeadN, bhead));
+		new_bhead = (BHeadN *)((char *)thisblock - offsetof(BHeadN, bhead));
 
 		/* get the next BHeadN. If it doesn't exist we read in the next one */
 		new_bhead = new_bhead->next;
@@ -973,40 +947,14 @@ static bool read_file_dna(FileData *fd, const char **r_error_message)
 	BHead *bhead;
 
 	for (bhead = blo_firstbhead(fd); bhead; bhead = blo_nextbhead(fd, bhead)) {
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-		printf("[read_file_dna] loop bhead=%p code=%d len=%d SDNAnr=%d nr=%d usePtrFile=%d DNA1=%d DNA2=%d ENDB=%d\n",
-			(void*)bhead, bhead ? bhead->code : -1, bhead ? bhead->len : -1,
-			bhead ? bhead->SDNAnr : -1, bhead ? bhead->nr : -1, (int)G.usePtrFile, DNA1, DNA2, ENDB);
-#endif
 		if (bhead->code == (G.usePtrFile ? DNA2 : DNA1)) {
 			const bool do_endian_swap = (fd->flags & FD_FLAGS_SWITCH_ENDIAN) != 0;
 
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-			printf("[read_file_dna] before DNA_sdna_from_data: data=%p len=%d do_endian_swap=%d\n",
-				(void*)&bhead[1], bhead->len, (int)do_endian_swap);
-#endif
 			fd->filesdna = DNA_sdna_from_data(&bhead[1], bhead->len, do_endian_swap, true, r_error_message);
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-			printf("[read_file_dna] after DNA_sdna_from_data: filesdna=%p error=%s\n",
-				(void*)fd->filesdna, (r_error_message && *r_error_message) ? *r_error_message : "(null)");
-#endif
 			if (fd->filesdna) {
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[read_file_dna] before DNA_struct_get_compareflags: filesdna=%p memsdna=%p\n",
-					(void*)fd->filesdna, (void*)fd->memsdna);
-#endif
 				fd->compflags = DNA_struct_get_compareflags(fd->filesdna, fd->memsdna);
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[read_file_dna] after DNA_struct_get_compareflags: compflags=%p\n", (void*)fd->compflags);
-#endif
 				/* used to retrieve ID names from (bhead+1) */
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[read_file_dna] before DNA_elem_offset\n");
-#endif
 				fd->id_name_offs = DNA_elem_offset(fd->filesdna, "ID", "char", "name[]");
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-				printf("[read_file_dna] after DNA_elem_offset: id_name_offs=%d\n", fd->id_name_offs);
-#endif
 
 				return true;
 			}
@@ -8421,10 +8369,6 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const int ta
 {
 	/* this routine reads a libblock and its direct data. Use link functions to connect it all
 	 */
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-	printf("[read_libblock] enter bhead=%p code=%d len=%d SDNAnr=%d nr=%d\n",
-		(void*)bhead, bhead->code, bhead->len, bhead->SDNAnr, bhead->nr);
-#endif
 	ID *id;
 	ListBase *lb;
 	const char *allocname;
@@ -8963,10 +8907,6 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 	}
 
 	while (bhead) {
-#ifdef WITH_TEMP_GETBHEAD_DEBUG
-		printf("[blo_read_file_internal] main-loop bhead=%p code=%d len=%d SDNAnr=%d nr=%d\n",
-			(void*)bhead, bhead->code, bhead->len, bhead->SDNAnr, bhead->nr);
-#endif
 		switch (bhead->code) {
 			case DATA:
 			case DNA1:

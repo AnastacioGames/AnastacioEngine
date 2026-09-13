@@ -1303,7 +1303,14 @@ void *DNA_struct_reconstruct(
 		return NULL;
 	}
 
-	cur = MEM_callocN(blocks * curlen, "reconstruct");
+	/* Reconstructed DNA structs can contain 64-bit members (for example
+	 * FileGlobal.build_commit_timestamp).  The lock-free allocator used by
+	 * the Web build only guarantees the minimum alignment for callocN,
+	 * which can be 4 bytes on wasm32.  Use an 8-byte aligned allocation so
+	 * accesses to uint64_t/double members remain valid on strict-alignment
+	 * targets, while preserving callocN's zero-initialized result. */
+	cur = MEM_mallocN_aligned(blocks * curlen, 8, "reconstruct");
+	memset(cur, 0, blocks * curlen);
 	cpc = cur;
 	cpo = data;
 	for (a = 0; a < blocks; a++) {
