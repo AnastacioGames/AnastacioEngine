@@ -95,7 +95,11 @@ e detalhados no [`changelog.md`](changelog.md).
   `JUSTACTIVATED` quando presente em qualquer ponto da fila do tick; não
   mexe na lógica de sensores (`SCA_KeyboardSensor::Evaluate`), que já lida
   com a fila corretamente. Build Web e nativo recompilados sem erro.
-  **Reteste do usuário pendente.** Detalhes no changelog de 2026-09-14.
+  **Confirmado em 2026-09-14**: toque único instantâneo (down+up sem
+  intervalo, o pior caso) em ArrowRight e ArrowLeft, dois testes isolados
+  com reload limpo — cubo respondeu nos dois, sem precisar de múltiplas
+  tentativas. **Bug de input no export Web (teclado, mouse e joystick)
+  considerado totalmente resolvido.** Detalhes no changelog de 2026-09-14.
 
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.

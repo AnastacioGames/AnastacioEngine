@@ -29,9 +29,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   checam `input.Find(SCA_InputEvent::JUSTACTIVATED)` e priorizam reportar a
   ativação quando ela aparece em qualquer ponto da fila do tick. Build Web e
   nativo (`RangeRuntime`) recompilados com sucesso após a mudança.
-- Pendente: reteste real do usuário/peer apertando as setas normalmente (sem
-  segurar) para confirmar que o problema de "precisa apertar várias vezes"
-  desapareceu.
+- **Confirmado em 2026-09-14**: reload limpo, clique único instantâneo
+  (down+up de volta-a-volta, 0ms de intervalo — o pior caso, que antes do fix
+  caía direto em `JUSTRELEASED`) em `ArrowRight` e `ArrowLeft`, dois testes
+  isolados: `[web-smoke] keyboard moved cube` apareceu nos dois, sem precisar
+  de sorte de timing entre ticks. Investigação de input Web encerrada.
 
 ## 2026-09-14 — Web: causa raiz real do teclado — segundo consumidor da fila SDL
 
