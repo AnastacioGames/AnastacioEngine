@@ -4,6 +4,35 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Input Web: toques rápidos perdidos na leitura Python (events dict)
+
+- Depois do fix da fila SDL, usuário reportou "o controle funciona mas eu
+  tenho que ficar apertando várias vezes para funcionar" — de "nunca funciona"
+  para "não confiável".
+- Testes de bisecção confirmaram captura SDL/GHOST 100% confiável (6/6 toques
+  capturados mesmo com down+up sem intervalo nenhum): o problema não está na
+  captura, está numa camada acima.
+- Causa raiz: `KX_PythonKeyboard.cpp::pyattr_get_events` (que alimenta
+  `Range.logic.keyboard.events`, a forma mais comum de ler teclado via Python
+  neste engine) e `KX_PythonMouse.cpp::pyattr_get_events` liam apenas o
+  ÚLTIMO elemento da fila de transições do tick (`m_queue.back()`). Quando um
+  toque físico completo (down+up) cai dentro do mesmo tick de lógica — bem
+  mais provável no Web pelo overhead do wasm/Python rodando mais devagar que
+  o nativo — o valor final reportado é `JUSTRELEASED`, não
+  `JUSTACTIVATED`/`ACTIVE`, e o toque é descartado silenciosamente. Padrão
+  antigo do BGE, raramente visível a 60fps nativo (toque completo em <16ms é
+  incomum para um humano), exposto pelo tick mais lento do Web.
+- Não é bug na lógica de sensores (`SCA_KeyboardSensor::Evaluate`), que já usa
+  `Find()`/`End()` corretamente sobre a fila inteira — o problema era só nos
+  getters de conveniência Python `keyboard.events`/`mouse.events`.
+- Correção: antes de usar o último elemento da fila, os dois getters agora
+  checam `input.Find(SCA_InputEvent::JUSTACTIVATED)` e priorizam reportar a
+  ativação quando ela aparece em qualquer ponto da fila do tick. Build Web e
+  nativo (`RangeRuntime`) recompilados com sucesso após a mudança.
+- Pendente: reteste real do usuário/peer apertando as setas normalmente (sem
+  segurar) para confirmar que o problema de "precisa apertar várias vezes"
+  desapareceu.
+
 ## 2026-09-14 — Web: causa raiz real do teclado — segundo consumidor da fila SDL
 
 - Retomando o ponto em aberto da entrada anterior ("Pendente: mesmo com o

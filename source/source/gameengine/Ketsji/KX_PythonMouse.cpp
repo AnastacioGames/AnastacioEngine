@@ -110,6 +110,12 @@ PyObject *KX_PythonMouse::pyattr_get_events(EXP_PyObjectPlus *self_v, const EXP_
 		if (input.m_queue.empty()) {
 			event = input.m_status[input.m_status.size() - 1];
 		}
+		else if (input.Find(SCA_InputEvent::JUSTACTIVATED)) {
+			/* A press and release can both land in the same logic tick (slow frame rate,
+			 * e.g. the Web build). Report the activation rather than silently losing the
+			 * click to whichever transition happens to be last in the queue. */
+			event = SCA_InputEvent::JUSTACTIVATED;
+		}
 		else {
 			event = input.m_queue[input.m_queue.size() - 1];
 		}

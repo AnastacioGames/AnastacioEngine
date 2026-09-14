@@ -81,8 +81,21 @@ e detalhados no [`changelog.md`](changelog.md).
   Python: `keyboard moved cube`, `mouse click flipped spin direction`,
   `joystick moved cube`, `joystick button flipped spin direction`), mas essa
   segunda rodada foi validada via evento sintético/CDP, não observação visual
-  direta do usuário. Bug de input no export Web considerado resolvido.
-  Detalhes no changelog de 2026-09-14.
+  direta do usuário.
+
+  **Terceira causa raiz (2026-09-14):** usuário testou manualmente e reportou
+  "funciona mas preciso apertar várias vezes". Captura SDL/GHOST confirmada
+  100% confiável (6/6 toques mesmo sem intervalo); o problema estava um nível
+  acima, nos getters de conveniência Python `keyboard.events`/`mouse.events`
+  (`KX_PythonKeyboard.cpp`/`KX_PythonMouse.cpp`), que liam só o último
+  elemento da fila de transições do tick — se um toque completo (down+up)
+  cabe no mesmo tick de lógica (mais provável no Web, tick mais lento que o
+  nativo), o valor final vira `JUSTRELEASED` e o toque some silenciosamente.
+  Padrão antigo do BGE, raro de ver a 60fps nativo. Corrigido priorizando
+  `JUSTACTIVATED` quando presente em qualquer ponto da fila do tick; não
+  mexe na lógica de sensores (`SCA_KeyboardSensor::Evaluate`), que já lida
+  com a fila corretamente. Build Web e nativo recompilados sem erro.
+  **Reteste do usuário pendente.** Detalhes no changelog de 2026-09-14.
 
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
