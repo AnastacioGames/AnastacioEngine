@@ -76,8 +76,13 @@ e detalhados no [`changelog.md`](changelog.md).
   (`code` preenchido): a cadeia completa SDL → `GHOST_SystemSDL::processEvents`
   → `DEV_EventConsumer::HandleKeyEvent` recebe `SDL_KEYDOWN`/`SDL_KEYUP`
   corretamente. **Aceite visual confirmado pelo usuário em 2026-09-14**: cubo
-  controlável pelas setas no navegador real (`test-smoke.html`). Falta ainda
-  testar o mouse. Detalhes no changelog de 2026-09-14.
+  controlável pelas setas no navegador real (`test-smoke.html`). Mouse e
+  joystick também confirmados de ponta a ponta (log ground-truth do script
+  Python: `keyboard moved cube`, `mouse click flipped spin direction`,
+  `joystick moved cube`, `joystick button flipped spin direction`), mas essa
+  segunda rodada foi validada via evento sintético/CDP, não observação visual
+  direta do usuário. Bug de input no export Web considerado resolvido.
+  Detalhes no changelog de 2026-09-14.
 
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
