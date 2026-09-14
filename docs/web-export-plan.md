@@ -106,12 +106,13 @@ Gaps específicos de WebGL, além dos já conhecidos do Core Profile
 mas **depende de `WITH_AUDASPACE`** — se audaspace estiver desligado,
 `WITH_OPENAL` é forçado a `OFF` com warning, `CMakeLists.txt:695-697`).
 
-Emscripten tem porta própria de OpenAL Soft (`-sUSE_OPENAL=1`), que traduz
-para Web Audio API automaticamente — mesma lógica da porta SDL2, evita
-cross-compilar OpenAL Soft manualmente como Android/iOS exigiriam. Restrição
-conhecida do navegador (não específica desta engine): a maioria exige um
-gesto do usuário (clique) antes de liberar áudio — precisa de tratamento no
-ponto de entrada do jogo, não é um bloqueio de engine.
+Correção verificada em 2026-09-13: Emscripten fornece implementação própria de
+OpenAL 1.1 sobre Web Audio, ligada com `-lopenal`; não é uma porta de OpenAL Soft
+com `-sUSE_OPENAL=1`. O backend OpenAL local usa uma thread de streaming que exige
+avaliação para Web, e EFX não pode ser presumido disponível. Audaspace também já
+possui backend SDL, candidato a uma prova inicial. O navegador pode exigir um gesto
+do usuário antes de liberar áudio. Evidências, fontes e próximos passos em
+[web-audio-analysis.md](web-audio-analysis.md).
 
 ### 6. Python embarcado
 
@@ -203,7 +204,7 @@ especificamente, por reaproveitar mais trabalho de terceiros já maduro.
   separado como no mobile).
 - **Nenhuma lib nova vendorizada é necessária a priori** — SDL2, OpenAL e
   Python já têm porta oficial dentro do próprio emsdk (`-sUSE_SDL=2
-  -sUSE_OPENAL=1`, mais o build `wasm32-emscripten` do CPython/Pyodide como
+  -lopenal`, mais o build `wasm32-emscripten` do CPython/Pyodide como
   peça separada a integrar).
 
 ## Ambiente de teste

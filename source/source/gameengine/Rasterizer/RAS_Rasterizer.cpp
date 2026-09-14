@@ -145,18 +145,9 @@ void RAS_Rasterizer::SetFog(short type, float start, float dist, float intensity
 
 void RAS_Rasterizer::Init()
 {
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-rasterizer] GPU_state_init begin\n");
-#endif
 	GPU_state_init();
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-rasterizer] GPU_state_init end\n");
-#endif
 
 	Disable(RAS_BLEND);
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-rasterizer] blend disabled\n");
-#endif
 	Disable(RAS_ALPHA_TEST);
 	//m_last_alphablend = GPU_BLEND_SOLID;
 	GPU_set_material_alpha_blend(GPU_BLEND_SOLID);
@@ -164,14 +155,8 @@ void RAS_Rasterizer::Init()
 	SetFrontFace(true);
 
 	SetColorMask(true, true, true, true);
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-rasterizer] fixed state set\n");
-#endif
 
 	m_impl->Init();
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-rasterizer] implementation initialized\n");
-#endif
 }
 
 void RAS_Rasterizer::Exit()

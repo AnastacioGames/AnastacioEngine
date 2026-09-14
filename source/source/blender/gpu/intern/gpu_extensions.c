@@ -131,20 +131,40 @@ void gpu_extensions_init(void)
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &GG.maxtexsize);
 	glGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, &GG.maxcubemapsize);
 
+#ifdef __EMSCRIPTEN__
+	/* Emscripten's GLEW shim reports EXT_texture_filter_anisotropic from the
+	 * extension string alone, without actually enabling it via
+	 * getExtension(), so getParameter(MAX_TEXTURE_MAX_ANISOTROPY_EXT) still
+	 * throws INVALID_ENUM on WebGL2. */
+	GG.max_anisotropy = 1.0f;
+#else
 	if (GLEW_EXT_texture_filter_anisotropic)
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &GG.max_anisotropy);
 	else
 		GG.max_anisotropy = 1.0f;
+#endif
 
+#ifdef __EMSCRIPTEN__
+	/* GL_RED_BITS/GREEN_BITS/BLUE_BITS query the default framebuffer's
+	 * fixed-function state, which GLES3/WebGL2 removed from getParameter. */
+	GG.colordepth = 24;
+#else
 	GLint r, g, b;
 	glGetIntegerv(GL_RED_BITS, &r);
 	glGetIntegerv(GL_GREEN_BITS, &g);
 	glGetIntegerv(GL_BLUE_BITS, &b);
 	GG.colordepth = r + g + b; /* assumes same depth for RGB */
+#endif
 
+#ifndef __EMSCRIPTEN__
+	/* GLES3/WebGL2 has no multisample texture support (glTexImage2DMultisample
+	 * is a desktop-only ARB_texture_multisample extension), so
+	 * GL_MAX_COLOR_TEXTURE_SAMPLES is not a recognized getParameter name there
+	 * even though emscripten's GLEW shim reports the feature macros as set. */
 	if (GLEW_VERSION_3_2 || GLEW_ARB_texture_multisample) {
 		glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &GG.samples_color_texture_max);
 	}
+#endif
 
 	const char *vendor = (const char *)glGetString(GL_VENDOR);
 	const char *renderer = (const char *)glGetString(GL_RENDERER);

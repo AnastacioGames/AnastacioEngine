@@ -1,4 +1,8 @@
 
+#ifdef GL_ES
+  precision highp sampler2DShadow;
+#endif
+
 #if __VERSION__ < 130
   #define texelFetch texelFetch2D
   #define textureLod texture2DLod
@@ -1956,10 +1960,10 @@ void mtex_bump_bicubic(
 		float x = t.x, y = t.y;
 		float x2 = x * x, x3 = x2 * x, y2 = y * y, y3 = y2 * y;
 
-		vec4 X  = vec4(-0.5 * (x3 + x) + x2,    1.5 * x3 - 2.5 * x2 + 1, -1.5 * x3 + 2 * x2 + 0.5 * x, 0.5 * (x3 - x2));
-		vec4 Y  = vec4(-0.5 * (y3 + y) + y2,    1.5 * y3 - 2.5 * y2 + 1, -1.5 * y3 + 2 * y2 + 0.5 * y, 0.5 * (y3 - y2));
-		vec4 dX = vec4(-1.5 * x2 + 2 * x - 0.5, 4.5 * x2 - 5 * x,        -4.5 * x2 + 4 * x + 0.5,      1.5 * x2 - x);
-		vec4 dY = vec4(-1.5 * y2 + 2 * y - 0.5, 4.5 * y2 - 5 * y,        -4.5 * y2 + 4 * y + 0.5,      1.5 * y2 - y);
+		vec4 X  = vec4(-0.5 * (x3 + x) + x2,    1.5 * x3 - 2.5 * x2 + 1.0, -1.5 * x3 + 2.0 * x2 + 0.5 * x, 0.5 * (x3 - x2));
+		vec4 Y  = vec4(-0.5 * (y3 + y) + y2,    1.5 * y3 - 2.5 * y2 + 1.0, -1.5 * y3 + 2.0 * y2 + 0.5 * y, 0.5 * (y3 - y2));
+		vec4 dX = vec4(-1.5 * x2 + 2.0 * x - 0.5, 4.5 * x2 - 5.0 * x,        -4.5 * x2 + 4.0 * x + 0.5,      1.5 * x2 - x);
+		vec4 dY = vec4(-1.5 * y2 + 2.0 * y - 0.5, 4.5 * y2 - 5.0 * y,        -4.5 * y2 + 4.0 * y + 0.5,      1.5 * y2 - y);
 
 		// complete derivative in normalized coordinates (mul by vDim)
 		vec2 dHdST = vDim * vec2(dot(Y, H * dX), dot(dY, H * X));
@@ -2624,8 +2628,8 @@ void shade_translucent(float nl, vec3 n, vec3 l, vec3 v,
 void lamp_visible(int lay, int oblay, vec3 col, float energy, out vec3 outcol, out float outenergy)
 {
 	int mask = min((lay & oblay), 1);
-	outcol = col * mask;
-	outenergy = energy * mask;
+	outcol = col * float(mask);
+	outenergy = energy * float(mask);
 }
 
 void shade_diffuse_toon(vec3 n, vec3 l, vec3 v, float size, float tsmooth, out float is)
@@ -3081,7 +3085,7 @@ float dither(float c) {
 		19,59,27,49,17,57,25,15,47,7,39,13,45,5,37,63,31,55,23,61,29,53,21);
 
 	ivec2 i = ivec2(mod(gl_FragCoord.xy, vec2(8.0)));
-	return floor((c + (bayer[i.y * 8 + i.x] / 64.0 - 0.5)) + 0.5);
+	return floor((c + (float(bayer[i.y * 8 + i.x]) / 64.0 - 0.5)) + 0.5);
 }
 
 void shade_dither(float c, out float outc){
@@ -3090,8 +3094,8 @@ void shade_dither(float c, out float outc){
 
 float test_shadow_simple(sampler2DShadow shadowmap, vec4 co, float type)
 {
-	     if (type == 1) return step(0.6, shadow2DProj(shadowmap, co).x);
-	else if (type == 2) return dither(shadow2DProj(shadowmap, co).x);
+	     if (type == 1.0) return step(0.6, shadow2DProj(shadowmap, co).x);
+	else if (type == 2.0) return dither(shadow2DProj(shadowmap, co).x);
 				        return shadow2DProj(shadowmap, co).x;
 }
 
@@ -3136,7 +3140,7 @@ float test_shadow_pcf_early_bail(sampler2DShadow shadowmap, vec4 co, float sampl
 
 float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, int samples, float size, float shadowtype)
 {
-	float pixel = size / samples / 2.0;
+	float pixel = size / float(samples) / 2.0;
 
 	const vec2 direct[4] = vec2[](
 		vec2( 1.0, 0.0),
@@ -3173,7 +3177,7 @@ float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, i
 
 			float dist = length(vec2(x, y));
 
-			float expo = exp(-dist * dist / (samples * samples));
+			float expo = exp(-dist * dist / float(samples * samples));
 
 			float shad = co.z - texture(shadowmap, co.xy + offset * rot).x;
 
@@ -3742,7 +3746,7 @@ int floor_to_int(float x)
 
 int quick_floor(float x)
 {
-	return int(x) - ((x < 0) ? 1 : 0);
+	return int(x) - ((x < 0.0) ? 1 : 0);
 }
 
 #ifdef BIT_OPERATIONS
@@ -3814,7 +3818,7 @@ vec3 cellnoise_color(vec3 p)
 float floorfrac(float x, out int i)
 {
 	i = floor_to_int(x);
-	return x - i;
+	return x - float(i);
 }
 
 
@@ -4003,7 +4007,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 
 			float Cdlum = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b; // luminance approx.
 
-			vec3 Ctint = Cdlum > 0 ? base_color.rgb / Cdlum : vec3(1.0); // normalize lum. to isolate hue+sat
+			vec3 Ctint = Cdlum > 0.0 ? base_color.rgb / Cdlum : vec3(1.0); // normalize lum. to isolate hue+sat
 			vec3 Cspec0 = mix(specular * 0.08 * mix(vec3(1.0), Ctint, specular_tint), base_color.rgb, metallic);
 			vec3 Csheen = mix(vec3(1.0), Ctint, sheen_tint);
 
@@ -4292,7 +4296,7 @@ float calc_gradient(vec3 p, int gradient_type)
 		return (x + y) * 0.5;
 	}
 	else if (gradient_type == 4) {  /* radial */
-		return atan(y, x) / (M_PI * 2) + 0.5;
+		return atan(y, x) / (M_PI * 2.0) + 0.5;
 	}
 	else {
 		/* Bias a little bit for the case where p is a unit length vector,
@@ -4331,7 +4335,7 @@ void node_tex_checker(vec3 co, vec4 color1, vec4 color2, float scale, out vec4 c
 	int yi = int(abs(floor(p.y)));
 	int zi = int(abs(floor(p.z)));
 
-	bool check = ((mod(xi, 2) == mod(yi, 2)) == bool(mod(zi, 2)));
+	bool check = (((xi & 1) == (yi & 1)) == bool(zi & 1));
 
 	color = check ? color1 : color2;
 	fac = check ? 1.0 : 0.0;
@@ -4534,37 +4538,37 @@ void node_tex_magic(vec3 co, float scale, float distortion, float depth, out vec
 	float y = cos((-p.x + p.y - p.z) * 5.0);
 	float z = -cos((-p.x - p.y + p.z) * 5.0);
 
-	if (depth > 0) {
+	if (depth > 0.0) {
 		x *= distortion;
 		y *= distortion;
 		z *= distortion;
 		y = -cos(x - y + z);
 		y *= distortion;
-		if (depth > 1) {
+		if (depth > 1.0) {
 			x = cos(x - y - z);
 			x *= distortion;
-			if (depth > 2) {
+			if (depth > 2.0) {
 				z = sin(-x - y - z);
 				z *= distortion;
-				if (depth > 3) {
+				if (depth > 3.0) {
 					x = -cos(-x + y - z);
 					x *= distortion;
-					if (depth > 4) {
+					if (depth > 4.0) {
 						y = -sin(-x + y + z);
 						y *= distortion;
-						if (depth > 5) {
+						if (depth > 5.0) {
 							y = -cos(-x + y + z);
 							y *= distortion;
-							if (depth > 6) {
+							if (depth > 6.0) {
 								x = cos(x + y + z);
 								x *= distortion;
-								if (depth > 7) {
+								if (depth > 7.0) {
 									z = sin(x + y - z);
 									z *= distortion;
-									if (depth > 8) {
+									if (depth > 8.0) {
 										x = -cos(-x - y + z);
 										x *= distortion;
-										if (depth > 9) {
+										if (depth > 9.0) {
 											y = -sin(x - y + z);
 											y *= distortion;
 										}
@@ -5047,7 +5051,7 @@ void node_tex_wave(
 	fac = f;
 #else  // BIT_OPERATIONS
 	color = vec4(1.0);
-	fac = 1;
+	fac = 1.0;
 #endif  // BIT_OPERATIONS
 }
 
@@ -5209,8 +5213,8 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	 */
 
 	// Linear sample from top.
-	for (int i = 0; i < numsteps; ++i) {
-		height = textureLod(ima, texco.xy - delta * (1.0 - depth), 0)[ci];
+	for (int i = 0; float(i) < numsteps; ++i) {
+		height = textureLod(ima, texco.xy - delta * (1.0 - depth), 0.0)[ci];
 		// Stop if the texture height is greater than current depth.
 		if (height > depth) {
 			break;
@@ -5233,7 +5237,7 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	// The shift between the texture height and the last depth.
 	float depthshiftcurlay = height - depth;
 	// The shift between the texture height with precedent uv computed with pre detph and the pre depth.
-	float depthshiftprelay = textureLod(ima, texuvprelay, 0)[ci] - depthprelay;
+	float depthshiftprelay = textureLod(ima, texuvprelay, 0.0)[ci] - depthprelay;
 
 	float weight = 1.0;
 	// If the height is right in the middle of two step the difference of the two shifts will be null.

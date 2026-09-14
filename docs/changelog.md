@@ -4,6 +4,84 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: tela preta e divisor residual no quad
+
+- Usuário testou no navegador e reportou tela preta com piscadas brancas.
+  Logs de inicialização não demonstravam falha nos draws; muitas mensagens
+  vermelhas eram diagnósticos enviados pelo `printErr` do harness.
+- Auditoria de dados via editor nativo: `build-web/bin/untitled.range` tem
+  zero objetos e nenhuma câmera (`build-web/scene-audit.log`). Os testes
+  anteriores de seis draws/frame cobriam fundo, quatro filtros e cópia final,
+  não geometria nem lógica Python de jogo.
+- Instrumentação CDP encontrou atributo UV (localização 1) com divisor 1.
+  O VBO e os offsets estavam corretos, mas o quad usava UV constante. Testes
+  temporários com cor constante e UV derivado da posição isolaram o problema.
+  A emulação legacy não isola os divisores como o caminho nativo de VAOs.
+- `RAS_OpenGLRasterizer.cpp`, `ScreenPlane::Render`: sob Emscripten, salva
+  divisores 0/1, define ambos como zero durante o draw e restaura ao terminar.
+  Usa entradas GLES diretas; sem mudança de header, shader ou flags globais.
+- Build Web via vcvars64: exit 0, três passos (`screen-divisor-build.log`).
+  Validação com shaders originais: **6.192 draws, zero erros GL**. Pixel central
+  do fundo e da saída FXAA agora coincidem; tela final RGBA `[102,103,98,255]`
+  no primeiro frame e `[102,103,99,255]` no frame 101, antes perto de preto.
+  Logs em `build-web/screen-divisor-diagnostic.log`. Leituras numéricas não
+  substituem aceite visual; nenhuma captura automatizada foi usada.
+- `tools/create_web_smoke_scene.py` gera cena separada com cubo laranja,
+  câmera e controlador Python (rotação + setas). Gerador executado no editor
+  nativo; harness local `test-smoke.html` carrega a cena por preRun/fetch.
+  O runtime Web aborta com **alignment fault em test_pointer_array**, antes
+  de iniciar a cena. Reprodução: `build-web/smoke-diagnostic.log`; ainda não
+  corrigido nem validado Python/teclado. O harness original foi preservado.
+- Próxima unidade: carregamento de arrays de ponteiros de arquivos 64 bits
+  no runtime wasm32. Aceite visual da correção do quad continua pendente.
+
+## 2026-09-14 — Web: saídas dos filtros de pós-processamento
+
+- `RAS_2DFilter.cpp/.h`: no Emscripten, reconhece os shaders nativos de FXAA,
+  chuva, nuvens, lens flare e tonemap comparando as fontes completas no link.
+  A classificação é atualizada em relinks, sem tratar todo CUSTOMFILTER como
+  saída única (os efeitos de clima também usam esse modo). Fontes diferentes
+  mantêm o roteamento existente, inclusive filtros personalizados com MRT.
+- Durante esses draws, salva os draw buffers e ativa somente o primeiro;
+  o guard de escopo restaura todos os slots antes de desassociar o destino.
+  Os anexos adicionais continuam alocados e seu conteúdo é preservado.
+- Build Web `RangeRuntime` com vcvars64: exit 0, 15 passos, sem crash após
+  alteração do header. Log: `build-web/filters-build.log`.
+- Chrome/CDP com cache desativado, mesma `untitled.range` com dois anexos:
+  **6.222 draws, 1.037 frames, zero erros GL nos draws**. Antes desta unidade
+  havia quatro erros por frame. Os 1.037 draws restantes com o segundo anexo
+  ativo dão evidência de restauração entre passes. Diagnóstico preservado em
+  `build-web/filters-diagnostic.log`; não houve captura nem aceite visual.
+- Pendentes: teste visual e Python/teclado no navegador real, cena dedicada
+  de MRT/lacunas e demais filtros nativos. O export Web ainda não está concluído.
+
+## 2026-09-14 — Web: roteamento de draw buffers nos materiais gerados
+
+- Retomada preservando as alterações locais anteriores. Diagnóstico via Chrome
+  headless/CDP, sem captura de imagem: a cena `build-web/bin/untitled.range`
+  possui dois anexos ativos. O primeiro draw inválido era o fundo em
+  `KX_WorldInfo::RenderBackground`, com somente `fragData0` no shader.
+- `gpu_material.c`: consulta as saídas `fragDataN` no programa ligado uma vez
+  na construção; no bind, conserva apenas os slots com saída, mantendo os
+  índices e usando `GL_NONE` nas lacunas. O unbind restaura o roteamento no
+  framebuffer original, preservando inclusive o binding atual se ele mudou.
+  Mudança restrita a Emscripten, sem editar headers ou flags globais.
+- Build `RangeRuntime` em `build-web`, passando pelo `vcvars64.bat`: exit 0
+  (três passos). Diagnóstico com cache desativado: 6.228 draws, incluindo
+  1.038 draws do fundo, com **zero erros GL no fundo**. Os 5.190 draws dos
+  outros passes voltam a encontrar o segundo anexo ativo, confirmando a
+  restauração. Restam 4.152 erros: quatro draws por frame, contra cinco antes.
+- Os primeiros três erros restantes pertencem a FXAA, chuva e nuvens. São
+  shaders de pós-processamento, fora do bind de `GPUMaterial`; precisam de
+  uma próxima unidade de correção. Não reduzir todos os offscreens a um
+  anexo, pois isso descartaria os dados MRT usados por outros materiais.
+- Artefatos locais: `build-web/diagnose.cjs`, `resume-before.log`,
+  `resume-diagnostic.log` e `resume-build.log`. O harness abre uma página nova
+  por teste e desativa cache; eventos de uma página reutilizada podem incluir
+  logs antigos e não servem para comparar os binários.
+- Export Web **não concluído**: faltam correção dos filtros, validação de
+  materiais MRT/lacunas em cena dedicada e aceite visual com Python/teclado.
+
 ## 2026-09-13 — Barra inferior da 3D View: câmera e camadas
 
 - Os controles de bloqueio de câmera/camadas e seleção de camadas, antes isolados no extremo direito do cabeçalho da 3D View, foram transferidos para o fim da barra flutuante no canto inferior esquerdo.

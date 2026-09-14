@@ -2240,14 +2240,8 @@ void GPU_state_init(void)
 #endif
 
 	GPU_default_lights();
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-gpu-state] default lights set\n");
-#endif
 
 	glDepthFunc(GL_LEQUAL);
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-gpu-state] depth func set\n");
-#endif
 
 #if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	/* scaling matrices */
@@ -2292,9 +2286,6 @@ void GPU_state_init(void)
 #else
 	glDepthRange(0.0, 1.0);
 #endif
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-gpu-state] depth range set\n");
-#endif
 
 #if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	glMatrixMode(GL_TEXTURE);
@@ -2307,14 +2298,8 @@ void GPU_state_init(void)
 	glDisable(GL_CULL_FACE);
 
 	gpu_multisample(false);
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-gpu-state] multisample set\n");
-#endif
 
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-gpu-state] basic shader bound\n");
-#endif
 }
 
 #ifdef WITH_OPENSUBDIV

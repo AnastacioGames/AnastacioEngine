@@ -157,10 +157,12 @@ RAS_StorageVao::RAS_StorageVao(const RAS_DisplayArrayLayout &layout, RAS_Display
 	glClientActiveTexture(GL_TEXTURE0);
 #endif
 
-	// VBO are not tracked by the VAO excepted for IBO.
-	vbo->UnbindVertexBuffer();
-
+	// VBO are not tracked by the VAO excepted for IBO. Unbind the VAO first: under
+	// Emscripten's legacy GL emulation, an ARRAY_BUFFER unbind performed while a VAO
+	// is still bound is recorded as that VAO's own vertex-buffer reference, erasing
+	// the pointer/offset state just configured above.
 	GPU_unbind_vertex_array();
+	vbo->UnbindVertexBuffer();
 }
 
 RAS_StorageVao::~RAS_StorageVao()

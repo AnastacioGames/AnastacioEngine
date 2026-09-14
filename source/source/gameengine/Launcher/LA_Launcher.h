@@ -105,6 +105,11 @@ protected:
 		std::vector<SCA_IInputDevice::SCA_EnumInputs> keys;
 	} m_pythonConsole;
 
+#ifdef __EMSCRIPTEN__
+	/// Estado de saída atualizado a cada frame pelo callback do emscripten_set_main_loop.
+	KX_ExitInfo m_emscriptenExitInfo;
+#endif  // __EMSCRIPTEN__
+
 #ifdef WITH_PYTHON
 	void HandlePythonConsole();
 #endif  // WITH_PYTHON

@@ -22,6 +22,10 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 
 ## Referência e manutenção
 
+- [Pesquisa de áudio Web](web-audio-analysis.md): Audaspace/SDL2 e OpenAL do Emscripten,
+  streaming, codecs e roteiro de validação para integração.
+- [Auditoria da emulação OpenGL Web](web-gl-emulation-analysis.md): flags verificadas,
+  incompatibilidade FULL_ES3/legacy e reprodução isolada de perda do VBO no VAO emulado.
 - [Arquitetura](architecture.md): fluxo do runtime e mapa dos módulos.
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.

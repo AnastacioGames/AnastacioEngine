@@ -60,6 +60,12 @@
 
 #include "gpu_codegen.h"
 
+#ifdef __EMSCRIPTEN__
+extern GLint emscripten_glGetFragDataLocation(GLuint program, const GLchar *name);
+extern void emscripten_glDrawBuffers(GLsizei n, const GLenum *bufs);
+extern void emscripten_glBindFramebuffer(GLenum target, GLuint framebuffer);
+#endif
+
 #ifdef WITH_OPENSUBDIV
 #  include "BKE_DerivedMesh.h"
 #endif
@@ -105,6 +111,12 @@ struct GPUMaterial {
 
 	/* for binding the material */
 	GPUPass *pass;
+#ifdef __EMSCRIPTEN__
+	unsigned int web_output_mask;
+	GLenum web_draw_buffers[8];
+	GLint web_draw_framebuffer;
+	int web_draw_buffer_count;
+#endif
 	GPUVertexAttribs attribs;
 	int builtins;
 	int alpha, obcolalpha;
@@ -347,6 +359,19 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 
 		if (!material->pass)
 			return 0;
+
+#ifdef __EMSCRIPTEN__
+		/* Query the linked shader once: unused outputs may have been optimized out. */
+		for (int i = 0; i < 8; ++i) {
+			char name[32];
+			BLI_snprintf(name, sizeof(name), "fragData%d", i);
+			GLint location = emscripten_glGetFragDataLocation(
+			        GPU_shader_program(GPU_pass_shader(material->pass)), name);
+			if (location >= 0 && location < 8) {
+				material->web_output_mask |= 1u << location;
+			}
+		}
+#endif
 
 #ifdef WITH_GL_PROFILE_CORE
 		/* gpu_shader_vertex.glsl always reads view/object/projection/normal matrices as
@@ -620,6 +645,24 @@ void GPU_material_bind(
 		/* note material must be bound before setting uniforms */
 		GPU_pass_bind(material->pass, time, mipmap);
 
+#ifdef __EMSCRIPTEN__
+		/* WebGL rejects active color attachments without matching fragment outputs.
+		 * Preserve slot indices (including holes) and restore the pass's routing
+		 * on unbind, so a world/material cannot disable another material's MRT. */
+		GLenum buffers[8];
+		GLint count;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &material->web_draw_framebuffer);
+		glGetIntegerv(GL_MAX_DRAW_BUFFERS, &count);
+		material->web_draw_buffer_count = material->web_draw_framebuffer ? MIN2(count, 8) : 1;
+		for (int i = 0; i < material->web_draw_buffer_count; ++i) {
+			GLint buffer;
+			glGetIntegerv(GL_DRAW_BUFFER0 + i, &buffer);
+			material->web_draw_buffers[i] = buffer;
+			buffers[i] = (material->web_output_mask & (1u << i)) ? buffer : GL_NONE;
+		}
+		emscripten_glDrawBuffers(material->web_draw_buffer_count, buffers);
+#endif
+
 		/* handle per material built-ins */
 		if (material->builtins & GPU_VIEW_MATRIX) {
 			GPU_shader_uniform_vector(shader, material->viewmatloc, 16, 1, (float *)viewmat);
@@ -757,6 +800,20 @@ void GPU_material_bind_uniforms(
 void GPU_material_unbind(GPUMaterial *material)
 {
 	if (material->pass) {
+#ifdef __EMSCRIPTEN__
+		if (material->bound && material->web_draw_buffer_count) {
+			GLint framebuffer;
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebuffer);
+			if (framebuffer != material->web_draw_framebuffer) {
+				emscripten_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, material->web_draw_framebuffer);
+			}
+			emscripten_glDrawBuffers(material->web_draw_buffer_count, material->web_draw_buffers);
+			if (framebuffer != material->web_draw_framebuffer) {
+				emscripten_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+			}
+			material->web_draw_buffer_count = 0;
+		}
+#endif
 		material->bound = 0;
 		GPU_pass_unbind(material->pass);
 	}

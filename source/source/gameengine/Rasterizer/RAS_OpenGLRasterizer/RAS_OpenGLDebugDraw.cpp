@@ -138,8 +138,8 @@ RAS_OpenGLDebugDraw::RAS_OpenGLDebugDraw()
 	glGenBuffers(MAX_VBO, m_vbos);
 
 	// Initialize static IBOs and VBOs.
-	glBindBuffer(GL_ARRAY_BUFFER, m_ibos[BOX_IBO]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(boxIndices), (void *)boxIndices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibos[BOX_IBO]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(boxIndices), (void *)boxIndices, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbos[BOX_UNIT_VBO]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(unitBoxVertices), (void *)unitBoxVertices, GL_STATIC_DRAW);

@@ -108,7 +108,19 @@ ferramenta correspondente.
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
   framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são
   considerados disponíveis no Emscripten; adaptações Web devem usar a API GLES3 correspondente. O
-  runtime já cria o canvas e os offscreens, mas ainda para em `RAS_Query` antes de executar a cena.
+  runtime já carrega a cena e executa frames. No Web, materiais gerados ativam
+  apenas draw buffers com saídas presentes no shader ligado, restaurando o
+  roteamento anterior ao terminar. FXAA, chuva, nuvens, lens flare e tonemap
+  são reconhecidos pelo código-fonte no link e usam temporariamente apenas
+  o primeiro anexo. Filtros personalizados mantêm o roteamento existente.
+  O quad de tela também salva/restaura os divisores dos atributos e usa zero
+  durante o draw Web: a emulação deixava o UV com divisor 1, produzindo imagem
+  preta apesar de draws válidos. Após correção: 6.192 draws sem erro GL e cor
+  confirmada por leitura numérica dos passes; aceite visual ainda pendente.
+  O arquivo original do harness está vazio. O novo teste com cubo/Python
+  encontra `alignment fault` no carregamento (`test_pointer_array`), ainda
+  não corrigido. Permanecem testes funcionais, MRT e demais filtros.
+  Ver roadmap e changelog de 2026-09-14.
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

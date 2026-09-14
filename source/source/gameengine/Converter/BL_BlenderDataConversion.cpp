@@ -1630,15 +1630,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
                               bool libloading)
 {
 
-#ifdef __EMSCRIPTEN__
-#  define WEB_CONVERT_TRACE(message) fprintf(stderr, "[web-convert] %s\n", message)
-#  define WEB_CONVERT_TRACE_OBJECT(object) \
-	fprintf(stderr, "[web-convert] object begin: %.64s type=%d\n", (object)->id.name + 2, (object)->type)
-#else
-#  define WEB_CONVERT_TRACE(message) ((void)0)
-#  define WEB_CONVERT_TRACE_OBJECT(object) ((void)0)
-#endif
-	WEB_CONVERT_TRACE("begin");
 
 #define BL_CONVERTBLENDEROBJECT_SINGLE                                 \
 	bl_ConvertBlenderObject_Single(converter,                          \
@@ -1719,7 +1710,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	}
 
 	// Convert world.
-	WEB_CONVERT_TRACE("world begin");
 	KX_WorldInfo *worldinfo = new KX_WorldInfo(blenderscene, blenderscene->world);
 	worldinfo->UpdateWorldSettings(rendertools);
 	worldinfo->UpdateBackGround(rendertools, nullptr);
@@ -1727,7 +1717,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		BL_ConvertWorldProperties(blenderscene->world, worldinfo);
 	}
 	kxscene->SetWorldInfo(worldinfo);
-	WEB_CONVERT_TRACE("world end");
 
 	const bool showObstacleSimulation = (blenderscene->gm.flag & GAME_SHOW_OBSTACLE_SIMULATION) != 0;
 	KX_ObstacleSimulation *obstacleSimulation = nullptr;
@@ -1769,7 +1758,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	Base *base;
 	for (SETLOOPER(blenderscene, sce_iter, base)) {
 		Object *blenderobject = base->object;
-		WEB_CONVERT_TRACE_OBJECT(blenderobject);
 		allblobj.insert(blenderobject);
 
 		KX_GameObject *gameobj = (blenderobject->gameflag & OB_TASK_CONVERT) ?
@@ -1781,7 +1769,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 
 			// Macro calls object conversion funcs.
 			BL_CONVERTBLENDEROBJECT_SINGLE;
-			WEB_CONVERT_TRACE("object single converted");
 
 			if (gameobj->IsDupliGroup()) {
 				grouplist.insert(blenderobject->dup_group);
@@ -1797,9 +1784,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			 */
 			gameobj->Release();
 		}
-		WEB_CONVERT_TRACE("object end");
 	}
-	WEB_CONVERT_TRACE("main object loop end");
 
 	if (!grouplist.empty()) {
 		/* Now convert the group referenced by dupli group object
@@ -1950,7 +1935,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			kxscene->AddAnimatedObject(gameobj);
 		}
 	}
-	WEB_CONVERT_TRACE("mesh users end");
 
 	// Create graphic controller for culling.
 	if (kxscene->GetDbvtCulling()) {
@@ -2011,7 +1995,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			}
 		}
 	}
-	WEB_CONVERT_TRACE("deformers end");
 
 	// Create physics information.
 	for (unsigned short i = 0; i < 2; ++i) {
@@ -2046,7 +2029,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			BL_CreatePhysicsObjectNew(gameobj, blenderobject, meshobj, kxscene, layerMask, converter, processCompoundChildren);
 		}
 	}
-	WEB_CONVERT_TRACE("physics objects end");
 
 	// Create and set bounding volume.
 	for (KX_GameObject *gameobj : sumolist) {
@@ -2306,7 +2288,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		bool isInActiveLayer = (blenderobj->lay & layerMask) != 0;
 		BL_ConvertActuators(maggie->name, blenderobj, gameobj, logicmgr, kxscene, ketsjiEngine, layerMask, isInActiveLayer, converter);
 	}
-	WEB_CONVERT_TRACE("actuators end");
 
 	for (KX_GameObject *gameobj : logicbrick_conversionlist) {
 		Object *blenderobj = gameobj->GetBlenderObject();
@@ -2314,7 +2295,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		bool isInActiveLayer = (blenderobj->lay & layerMask) != 0;
 		BL_ConvertControllers(blenderobj, gameobj, logicmgr, layerMask, isInActiveLayer, converter, libloading);
 	}
-	WEB_CONVERT_TRACE("controllers end");
 
 	for (KX_GameObject *gameobj : logicbrick_conversionlist) {
 		Object *blenderobj = gameobj->GetBlenderObject();
@@ -2324,7 +2304,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		// Set the init state to all objects.
 		gameobj->SetInitState((blenderobj->init_state) ? blenderobj->init_state : blenderobj->state);
 	}
-	WEB_CONVERT_TRACE("sensors end");
 
 	// Apply the initial state to controllers, only on the active objects as this registers the sensors.
 	for (KX_GameObject *gameobj : objectlist) {
@@ -2336,9 +2315,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	// Cleanup converted set of group objects.
 	convertedlist->Release();
 	logicbrick_conversionlist->Release();
-	WEB_CONVERT_TRACE("end");
-#undef WEB_CONVERT_TRACE
-#undef WEB_CONVERT_TRACE_OBJECT
 }
 
 void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sceneconverter)

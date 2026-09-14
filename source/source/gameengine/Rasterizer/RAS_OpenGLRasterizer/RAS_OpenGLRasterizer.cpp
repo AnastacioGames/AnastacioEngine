@@ -44,6 +44,10 @@
 
 extern "C" {
 #  include "BLF_api.h"
+#ifdef __EMSCRIPTEN__
+extern void emscripten_glGetVertexAttribiv(GLuint index, GLenum pname, GLint *params);
+extern void emscripten_glVertexAttribDivisor(GLuint index, GLuint divisor);
+#endif
 }
 
 #include "MEM_guardedalloc.h"
@@ -156,10 +160,11 @@ RAS_OpenGLRasterizer::ScreenPlane::ScreenPlane()
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 5, ((char *)nullptr) + sizeof(float) * 3);
 
-	// Unbind VBO
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+	// Unbind the VAO before the VBO: under Emscripten's legacy GL emulation, an
+	// ARRAY_BUFFER unbind performed while a VAO is still bound is recorded as that
+	// VAO's own vertex-buffer reference, erasing the pointer/offset state above.
 	GPU_unbind_vertex_array();
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 RAS_OpenGLRasterizer::ScreenPlane::~ScreenPlane()
@@ -173,9 +178,24 @@ RAS_OpenGLRasterizer::ScreenPlane::~ScreenPlane()
 inline void RAS_OpenGLRasterizer::ScreenPlane::Render()
 {
 	GPU_bind_vertex_array(m_vao);
+#ifdef __EMSCRIPTEN__
+	/* Legacy GL emulation replays vertex pointers on VAO bind, but does not
+	 * isolate attribute divisors. Instanced debug geometry can leave UVs at
+	 * divisor 1, making every screen vertex sample the texture's first corner. */
+	GLint divisors[2];
+	for (GLuint i = 0; i < 2; ++i) {
+		emscripten_glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_DIVISOR, &divisors[i]);
+		emscripten_glVertexAttribDivisor(i, 0);
+	}
+#endif
 	// Draw in triangle fan mode to reduce IBO size.
 	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_BYTE, 0);
 
+#ifdef __EMSCRIPTEN__
+	for (GLuint i = 0; i < 2; ++i) {
+		emscripten_glVertexAttribDivisor(i, divisors[i]);
+	}
+#endif
 	GPU_unbind_vertex_array();
 }
 
@@ -190,6 +210,11 @@ RAS_OpenGLRasterizer::~RAS_OpenGLRasterizer()
 
 unsigned short RAS_OpenGLRasterizer::GetNumLights() const
 {
+#ifdef __EMSCRIPTEN__
+	/* GL_MAX_LIGHTS is a fixed-function lighting enum removed from
+	 * GLES3/WebGL2's getParameter; the legacy emulation path supports 8. */
+	return 8;
+#else
 	int numlights = 0;
 	glGetIntegerv(GL_MAX_LIGHTS, (GLint *)&numlights);
 
@@ -197,6 +222,7 @@ unsigned short RAS_OpenGLRasterizer::GetNumLights() const
 		return 8;
 	}
 	return numlights;
+#endif
 }
 
 void RAS_OpenGLRasterizer::Enable(RAS_Rasterizer::EnableBit bit)

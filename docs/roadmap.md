@@ -32,7 +32,29 @@ e detalhados no [`changelog.md`](changelog.md).
   nativo; ainda não há release Linux oficial.
 - **Associação de arquivos**: permitir abrir `.blend` e `.range` diretamente com os executáveis adequados,
   definindo instalação/registro no Windows e comportamento de duplo clique.
-- **Export para Web (WebGL/WebAssembly)**: levantamento concluído em
+- **Export para Web (WebGL/WebAssembly)**:
+  **Teste real após a retomada:** usuário reportou tela preta com piscadas.
+  Corrigido divisor de instância residual no quad de tela: UVs ficavam constantes
+  e os filtros amostravam o canto da textura. Build passou; 6.192 draws sem erro
+  GL e amostras numéricas confirmam cor atravessando FXAA e chegando à tela.
+  Aguardando novo aceite visual. A `untitled.range` do harness está vazia
+  (sem objetos/câmera); uma nova `web-smoke.range`, gerada por
+  `tools/create_web_smoke_scene.py`, expôs `alignment fault` em
+  `test_pointer_array` ao carregar objetos. Resolver esse bloqueio antes de
+  validar cubo, Python e teclado. Detalhes no changelog de 2026-09-14.
+
+  **Retomada 2026-09-14:** confirmado `offscreen attachments=2`. O bind dos
+  materiais gerados agora desativa temporariamente saídas ausentes no shader
+  e restaura os draw buffers ao terminar. Build e execução Web passaram para
+  materiais e filtros FXAA, chuva, nuvens, lens flare e tonemap: os filtros
+  reconhecidos pelo código-fonte usam somente o primeiro anexo durante o draw.
+  Última execução: 6.222 draws em 1.037 frames, sem erro GL nesta cena.
+  Pendentes: aceite visual e Python/teclado no navegador, cena dedicada com
+  MRT/lacunas e cobertura dos demais filtros nativos. Detalhes no changelog
+  de 2026-09-14. O histórico abaixo
+  descreve os bloqueios anteriores e não substitui esta atualização.
+
+  Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
   Conclusão: Web é o candidato de menor esforço entre Web/Android/iOS para esta engine, porque o
   Emscripten já entrega pronto as três peças que mais pesam num port de plataforma — porta SDL2

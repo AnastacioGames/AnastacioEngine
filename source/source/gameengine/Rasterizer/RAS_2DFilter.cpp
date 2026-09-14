@@ -37,6 +37,14 @@
 
 extern "C" {
 extern char datatoc_RAS_VertexShader2DFilter_glsl[];
+#ifdef __EMSCRIPTEN__
+extern char datatoc_RAS_Fxaa2DFilter_glsl[];
+extern char datatoc_RAS_Rain2DFilter_glsl[];
+extern char datatoc_RAS_Clouds2DFilter_glsl[];
+extern char datatoc_RAS_LensFlare2DFilter_glsl[];
+extern char datatoc_RAS_Tonemaps2DFilter_glsl[];
+extern void emscripten_glDrawBuffers(GLsizei n, const GLenum *bufs);
+#endif
 }
 
 namespace {
@@ -203,6 +211,30 @@ RAS_OffScreen *RAS_2DFilter::Render(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, 
 
 	ApplyShader();
 
+#ifdef __EMSCRIPTEN__
+	/* WebGL rejects a draw if an enabled attachment has no fragment output.
+	 * Keep the other attachments intact and restore routing before unbinding. */
+	GLenum savedDrawBuffers[8];
+	GLint drawBufferCount = 0;
+	if (m_webSingleColorOutput) {
+		GLint framebuffer;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebuffer);
+		glGetIntegerv(GL_MAX_DRAW_BUFFERS, &drawBufferCount);
+		drawBufferCount = framebuffer ? std::min(drawBufferCount, 8) : 1;
+		for (int i = 0; i < drawBufferCount; ++i) {
+			GLint buffer;
+			glGetIntegerv(GL_DRAW_BUFFER0 + i, &buffer);
+			savedDrawBuffers[i] = buffer;
+		}
+		emscripten_glDrawBuffers(1, savedDrawBuffers);
+	}
+	auto drawBuffersRestore = MakeScopeExit([&]() {
+		if (drawBufferCount) {
+			emscripten_glDrawBuffers(drawBufferCount, savedDrawBuffers);
+		}
+	});
+#endif
+
 	rasty->DrawOverlayPlane();
 
 	return outputofs;
@@ -215,6 +247,17 @@ bool RAS_2DFilter::LinkProgram()
 	}
 
 	m_uniformInitialized = false;
+
+#ifdef __EMSCRIPTEN__
+	/* Compare complete sources on each link, including Python-triggered relinks.
+	 * Weather uses CUSTOMFILTER too, so filterMode cannot identify native shaders. */
+	const std::string& fragment = m_progs[FRAGMENT_PROGRAM];
+	m_webSingleColorOutput = fragment == datatoc_RAS_Fxaa2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Rain2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Clouds2DFilter_glsl ||
+	                        fragment == datatoc_RAS_LensFlare2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Tonemaps2DFilter_glsl;
+#endif
 
 	return true;
 }

@@ -231,26 +231,13 @@ void BL_Converter::ConvertScene(KX_Scene *scene)
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
 {
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] begin\n");
-#endif
 	KX_Scene *scene = converter.GetScene();
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] scene=%p\n", (void *)scene);
-#endif
 	// Find out which physics engine
 	Scene *blenderscene = scene->GetBlenderScene();
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] blender scene=%p\n", (void *)blenderscene);
-#endif
 
 	PHY_IPhysicsEnvironment *phy_env = nullptr;
 
 	e_PhysicsEngine physics_engine = UseBullet;
-
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] physics selector=%d\n", blenderscene->gm.physicsEngine);
-#endif
 
 	// This doesn't really seem to do anything except cause potential issues
 	// when doing threaded conversion, so it's disabled for now.
@@ -260,9 +247,6 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 #ifdef WITH_BULLET
 		case WOPHY_BULLET:
 		{
-#ifdef __EMSCRIPTEN__
-			fprintf(stderr, "[web-converter] bullet begin\n");
-#endif
 			SYS_SystemHandle syshandle = SYS_GetSystem(); /*unused*/
 			int visualizePhysics = SYS_GetCommandLineInt(syshandle, "show_physics", 0);
 
@@ -274,9 +258,6 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 		default:
 		case WOPHY_NONE:
 		{
-#ifdef __EMSCRIPTEN__
-			fprintf(stderr, "[web-converter] dummy begin\n");
-#endif
 			// We should probably use some sort of factory here
 			phy_env = new DummyPhysicsEnvironment();
 			physics_engine = UseNone;
@@ -284,15 +265,7 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 		}
 	}
 
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] physics created\n");
-#endif
-
 	scene->SetPhysicsEnvironment(phy_env);
-
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] calling object conversion\n");
-#endif
 
 	BL_ConvertBlenderObjects(
 		m_maggie,
@@ -305,10 +278,6 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 		m_alwaysUseExpandFraming,
 		m_camZoom,
 		libloading);
-
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[web-converter] object conversion returned\n");
-#endif
 
 	// Handle actions.
 	if (actions) {

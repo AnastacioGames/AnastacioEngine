@@ -84,6 +84,10 @@ protected:
 	bool m_uniformInitialized;
 	/// True if generate mipmap of input color texture.
 	bool m_mipmap;
+#ifdef __EMSCRIPTEN__
+	/// Known native shaders with one color output; custom MRT shaders keep their routing.
+	bool m_webSingleColorOutput = false;
+#endif
 
 	/** A set of vec2 coordinates that the shaders use to sample nearby pixels from incoming textures.
 	The computation should be left to the glsl shader, I keep it for backward compatibility. */
