@@ -98,8 +98,24 @@ e detalhados no [`changelog.md`](changelog.md).
   **Confirmado em 2026-09-14**: toque único instantâneo (down+up sem
   intervalo, o pior caso) em ArrowRight e ArrowLeft, dois testes isolados
   com reload limpo — cubo respondeu nos dois, sem precisar de múltiplas
-  tentativas. **Bug de input no export Web (teclado, mouse e joystick)
-  considerado totalmente resolvido.** Detalhes no changelog de 2026-09-14.
+  tentativas. Teclado e mouse considerados resolvidos. Detalhes no
+  changelog de 2026-09-14.
+
+  **Gamepad físico (2026-09-14, aberto):** com controle físico real, D-pad
+  intermitente (mesma classe do bug de teclado) e, mais grave, movimento que
+  não para ao soltar o direcional. Causa provável isolada na própria porta
+  SDL2 do Emscripten (fora do repositório, cache do emsdk:
+  `EMSCRIPTEN_JoystickUpdate` em `SDL_sysjoystick.c`), que só processa
+  botão/eixo quando o `Gamepad.timestamp` do browser muda — timestamp
+  conhecidamente pouco confiável, pode travar o estado do D-pad em `ACTIVE`
+  para sempre. Fix experimental aplicado (remove o gate de timestamp) e
+  build recompilado, mas **teste real com hardware físico ainda pendente**
+  (nem esta sessão nem a de teste em browser têm um gamepad conectado).
+  Além disso, o fix vive num arquivo fora do controle de versão deste
+  repositório (cache de toolchain do emsdk) — não sobrevive a uma
+  reinstalação limpa nem se propaga para outra máquina; falta decidir como
+  torná-lo permanente antes de considerar este ponto encerrado. Detalhes no
+  changelog de 2026-09-14.
 
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.

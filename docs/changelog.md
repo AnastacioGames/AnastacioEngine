@@ -4,6 +4,39 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: gamepad físico — D-pad intermitente e movimento que não para
+
+- Depois dos fixes de teclado/mouse confirmados, usuário testou com um
+  controle físico (gamepad) e reportou dois sintomas: (1) D-pad às vezes
+  precisa de mais de um toque para o movimento registrar (mesma classe de
+  bug do teclado); (2) mais grave — o cubo não para de se mover mesmo
+  soltando o direcional, ficando preso em movimento contínuo.
+- Investigação apontou não para código deste repositório
+  (`DEV_Joystick.cpp`/`DEV_JoystickEvents.cpp`), mas para a própria porta
+  SDL2 do Emscripten (fora do repositório, no cache do emsdk:
+  `.../cache/ports/sdl2/SDL-release-2.32.10/src/joystick/emscripten/SDL_sysjoystick.c`,
+  função `EMSCRIPTEN_JoystickUpdate`). Ela só processa mudanças de
+  botão/eixo quando `gamepadState.timestamp != item->timestamp` — e o
+  `Gamepad.timestamp` do browser é conhecidamente pouco confiável entre
+  browsers/SOs (pode não avançar mesmo com estado real mudando). Se isso
+  travar bem no momento do release do D-pad, o evento de soltar nunca é
+  gerado e o estado fica preso em `ACTIVE` indefinidamente — explica os
+  dois sintomas (perda intermitente de transições em ambas as direções).
+- Correção aplicada nesse arquivo (fora do repo, cache do emsdk): removido
+  o gate de timestamp; botões e eixos são comparados e processados
+  diretamente a cada chamada (os checks internos por elemento já evitam
+  reprocessar quando nada mudou de verdade). Diagnóstico adicionado: printf
+  disparado só quando os botões 13/14 (D-pad direita/esquerda) mudam de
+  estado, com timestamp antigo vs. novo, para confirmar a causa quando o
+  usuário testar com hardware real.
+- **Atenção**: essa correção vive num arquivo fora do controle de versão
+  deste repositório (cache de toolchain do emsdk). Funciona nesta máquina,
+  mas não sobrevive a uma reinstalação limpa do emsdk nem se propaga para
+  outra máquina de build. Ainda não decidido como torná-la permanente
+  (patch aplicado no processo de build, port SDL2 customizado versionado no
+  repo, etc.) — pendente de decisão antes de considerar este ponto
+  encerrado. Teste real com controle físico também pendente.
+
 ## 2026-09-14 — Input Web: toques rápidos perdidos na leitura Python (events dict)
 
 - Depois do fix da fila SDL, usuário reportou "o controle funciona mas eu
