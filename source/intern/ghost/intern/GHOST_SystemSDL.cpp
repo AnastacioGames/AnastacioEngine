@@ -30,13 +30,41 @@
 #include "GHOST_EventButton.h"
 #include "GHOST_EventWheel.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/html5.h>
+
+static EM_BOOL web_input_diag_keydown(int eventType, const EmscriptenKeyboardEvent *e, void *userData)
+{
+	printf("[web-input] raw emscripten_set_keydown_callback fired key=%s code=%s\n", e->key, e->code);
+	return EM_FALSE;
+}
+#endif
+
 GHOST_SystemSDL::GHOST_SystemSDL()
     :
       GHOST_System()
 {
+#ifdef __EMSCRIPTEN__
+	/* Emscripten's SDL2 port defaults SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT to "#window",
+	 * but emscripten_set_keydown_callback on "#window" returns EMSCRIPTEN_RESULT_NOT_SUPPORTED
+	 * in this build, so SDL's keyboard listener never actually attaches. "#canvas" works. */
+	SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
 		printf("Error initializing SDL:  %s\n", SDL_GetError());
 	}
+#ifdef __EMSCRIPTEN__
+	else {
+		printf("[web-input] SDL_Init OK, SDL_VideoDriverName=%s\n", SDL_GetCurrentVideoDriver());
+	}
+	{
+		EMSCRIPTEN_RESULT r1 = emscripten_set_keydown_callback("#window", NULL, EM_TRUE, web_input_diag_keydown);
+		EMSCRIPTEN_RESULT r2 = emscripten_set_keydown_callback("#document", NULL, EM_TRUE, web_input_diag_keydown);
+		EMSCRIPTEN_RESULT r3 = emscripten_set_keydown_callback("#canvas", NULL, EM_TRUE, web_input_diag_keydown);
+		printf("[web-input] emscripten_set_keydown_callback registered: window=%d document=%d canvas=%d\n",
+		       (int)r1, (int)r2, (int)r3);
+	}
+#endif
 
 	/* SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1); */
 	/* SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); */
@@ -89,8 +117,15 @@ GHOST_SystemSDL::createWindow(const STR_String& title,
 		if (window->getValid()) {
 			m_windowManager->addWindow(window);
 			pushEvent(new GHOST_Event(getMilliSeconds(), GHOST_kEventWindowSize, window));
+#ifdef __EMSCRIPTEN__
+			printf("[web-input] GHOST_SystemSDL::createWindow valid, sdl_win=%p sdl_windowID=%u\n",
+			       (void *)window->getSDLWindow(), window->getSDLWindow() ? SDL_GetWindowID(window->getSDLWindow()) : 0);
+#endif
 		}
 		else {
+#ifdef __EMSCRIPTEN__
+			printf("[web-input] GHOST_SystemSDL::createWindow INVALID, discarding\n");
+#endif
 			delete window;
 			window = NULL;
 		}
@@ -420,6 +455,10 @@ GHOST_SystemSDL::processEvent(SDL_Event *sdl_event)
 			SDL_KeyboardEvent &sdl_sub_evt = sdl_event->key;
 			SDL_Keycode sym = sdl_sub_evt.keysym.sym;
 			GHOST_TEventType type = (sdl_sub_evt.state == SDL_PRESSED) ? GHOST_kEventKeyDown : GHOST_kEventKeyUp;
+#ifdef __EMSCRIPTEN__
+			printf("[web-input] GHOST_SystemSDL SDL_KEYDOWN/UP scancode=%d sym=%d state=%d\n",
+			       (int)sdl_sub_evt.keysym.scancode, (int)sym, (int)sdl_sub_evt.state);
+#endif
 
 			GHOST_WindowSDL *window = findGhostWindow(SDL_GetWindowFromID_fallback(sdl_sub_evt.windowID));
 			assert(window != NULL);
@@ -582,7 +621,16 @@ GHOST_SystemSDL::processEvents(bool waitForEvent)
 		}
 
 		SDL_Event sdl_event;
+#ifdef __EMSCRIPTEN__
+		static int s_web_input_frame_count = 0;
+		if ((s_web_input_frame_count++ % 180) == 0) {
+			printf("[web-input] GHOST_SystemSDL::processEvents alive, frame=%d\n", s_web_input_frame_count);
+		}
+#endif
 		while (SDL_PollEvent(&sdl_event)) {
+#ifdef __EMSCRIPTEN__
+			printf("[web-input] GHOST_SystemSDL::processEvents polled sdl_event.type=%d\n", (int)sdl_event.type);
+#endif
 			processEvent(&sdl_event);
 			anyProcessed = true;
 		}

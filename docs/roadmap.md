@@ -54,6 +54,16 @@ e detalhados no [`changelog.md`](changelog.md).
   de 2026-09-14. O histórico abaixo
   descreve os bloqueios anteriores e não substitui esta atualização.
 
+  **Input de teclado/mouse no Web (2026-09-14):** causa raiz encontrada e corrigida —
+  a porta SDL2 do Emscripten usava por padrão o alvo `"#window"` para o listener
+  de teclado, que falha silenciosamente (`EMSCRIPTEN_RESULT_NOT_SUPPORTED`) neste
+  ambiente; `SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas")` em
+  `GHOST_SystemSDL.cpp` corrige o registro (confirmado via diagnóstico direto na
+  porta SDL2: `keyElement=#canvas`, registro e `SDL_PushEvent` com sucesso).
+  Ainda não confirmado se `GHOST_SystemSDL::processEvents` está de fato
+  recebendo esses eventos via `SDL_PollEvent` — diagnóstico adicional já
+  instrumentado, teste real pendente. Detalhes no changelog de 2026-09-14.
+
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
   Conclusão: Web é o candidato de menor esforço entre Web/Android/iOS para esta engine, porque o

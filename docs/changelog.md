@@ -4,6 +4,45 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: input de teclado/mouse não chegava ao jogo
+
+- Usuário reportou que teclado/mouse não funcionam no export Web, apesar da
+  mesma cena funcionar perfeitamente no player nativo Windows (confirmado:
+  cubo se move com as setas e gira com o mouse).
+- Diagnóstico em camadas, do DOM do navegador até o C++ compilado: (1) listeners
+  JS crus confirmaram que o navegador entrega `keydown`/`keyup` corretos ao
+  `canvas`; (2) instrumentação direta da API HTML5 do Emscripten
+  (`emscripten_set_keydown_callback`) mostrou que o registro em `"#window"` e
+  `"#document"` retorna `EMSCRIPTEN_RESULT_NOT_SUPPORTED` (`-4`) neste ambiente,
+  enquanto `"#canvas"` funciona; (3) leitura do fonte real da porta SDL2 usada
+  pelo build (fora do repositório, no cache do emsdk:
+  `.../cache/ports/sdl2/SDL-release-2.32.10/src/video/emscripten/SDL_emscriptenevents.c`,
+  não o submódulo `source/extern/SDL2`, que é código morto para este build)
+  confirmou a causa raiz: `Emscripten_InitKeyboard`/`Emscripten_RegisterEventHandlers`
+  usa `SDL_GetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT)` e cai no padrão
+  `"#window"` quando o hint não está definido, sem checar o retorno de erro das
+  chamadas `emscripten_set_key*_callback` — o listener de teclado do SDL nunca
+  chegava a existir.
+- Correção aplicada em `GHOST_SystemSDL.cpp` (construtor de `GHOST_SystemSDL`):
+  `SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas")` antes do
+  `SDL_Init`, sob `#ifdef __EMSCRIPTEN__`. Sem efeito nos demais backends (X11,
+  Win32, SDL nativo).
+- Validado via diagnóstico dentro da própria porta SDL2 (rebuild forçado do
+  cache do emsdk): com o hint aplicado, `Emscripten_RegisterEventHandlers`
+  de fato usa `keyElement=#canvas` e os três registros (`keydown`/`keyup`/
+  `keypress`) retornam sucesso (0). `Emscripten_HandleKey` também confirma
+  `posted=1` e `SDL_GetEventState(SDL_KEYDOWN/KEYUP)` habilitado — ou seja, o
+  evento entra corretamente na fila de eventos do SDL.
+- Pendente: mesmo com o evento entrando na fila do SDL com sucesso, o
+  `GHOST_SystemSDL::processEvents` ainda não demonstrou receber
+  `SDL_KEYDOWN`/`SDL_KEYUP` via `SDL_PollEvent` nos testes do navegador (nota:
+  um teste anterior que indicava falha aqui foi descartado — usava simulação de
+  teclado de automação de navegador que não preenche `KeyboardEvent.code`,
+  invalidando o teste, não o código). Diagnóstico adicional já instrumentado
+  logo no início do laço `while (SDL_PollEvent(...))` em `processEvents`,
+  logando todo `sdl_event.type` recebido, para confirmar se o polling do GHOST
+  enxerga qualquer evento da fila ou nenhum. Teste real ainda não concluído.
+
 ## 2026-09-14 — Web: tela preta e divisor residual no quad
 
 - Usuário testou no navegador e reportou tela preta com piscadas brancas.
