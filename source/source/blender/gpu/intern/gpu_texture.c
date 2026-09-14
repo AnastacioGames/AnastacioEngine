@@ -149,9 +149,18 @@ static GPUTexture *GPU_texture_create_nD(
 	glBindTexture(tex->target, tex->bindcode);
 
 	if (tex->depth) {
-		type = GL_UNSIGNED_BYTE;
 		format = GL_DEPTH_COMPONENT;
+#ifdef __EMSCRIPTEN__
+		/* WebGL2/GLES3 reject the unsized GL_DEPTH_COMPONENT as a texImage2D
+		 * internalformat; a sized format is mandatory there. GL_DEPTH_COMPONENT16
+		 * is only a valid combination with GL_UNSIGNED_SHORT (GL_UNSIGNED_BYTE
+		 * triggers "Invalid combination of format, type and internalFormat"). */
+		internalformat = GL_DEPTH_COMPONENT16;
+		type = GL_UNSIGNED_SHORT;
+#else
 		internalformat = GL_DEPTH_COMPONENT;
+		type = GL_UNSIGNED_BYTE;
+#endif
 	}
 	else {
 		type = GL_FLOAT;
@@ -191,9 +200,15 @@ static GPUTexture *GPU_texture_create_nD(
 			}
 		}
 
-		if (fpixels && hdr_type == GPU_HDR_NONE) {
+		if (hdr_type == GPU_HDR_NONE) {
+			/* GL_RGBA8/GL_RG8 are only valid with GL_UNSIGNED_BYTE data under
+			 * WebGL2/GLES3 (glTexImage2D rejects RGBA8+FLOAT as an invalid
+			 * format/type/internalformat combination), so this must apply even
+			 * when there are no initial pixels to upload. */
 			type = GL_UNSIGNED_BYTE;
-			pixels = GPU_texture_convert_pixels((size_t)w * (size_t)h, fpixels);
+			if (fpixels) {
+				pixels = GPU_texture_convert_pixels((size_t)w * (size_t)h, fpixels);
+			}
 		}
 	}
 
@@ -241,7 +256,11 @@ static GPUTexture *GPU_texture_create_nD(
 			glTexParameteri(tex->target_base, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
 			glTexParameteri(tex->target_base, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 		}
+#ifndef __EMSCRIPTEN__
+		/* GL_DEPTH_TEXTURE_MODE was removed in GLES3/WebGL2 (core profile);
+		 * shadow shaders there read the depth channel directly. */
 		glTexParameteri(tex->target_base, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
+#endif
 	}
 	else {
 		glTexParameteri(tex->target_base, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

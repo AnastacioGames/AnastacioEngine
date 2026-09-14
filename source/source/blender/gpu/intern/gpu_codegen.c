@@ -56,6 +56,15 @@ extern char datatoc_gpu_shader_geometry_glsl[];
 
 static char *glsl_material_library = NULL;
 
+#ifdef __EMSCRIPTEN__
+/* GLEW_VERSION_3_0 reflects a queried desktop GL version that Emscripten never
+ * populates; the WebGL2/GLES3 shaders this build always targets require the
+ * modern in/out/attribute keywords regardless. */
+#define GPU_CODEGEN_USE_MODERN_QUALIFIERS true
+#else
+#define GPU_CODEGEN_USE_MODERN_QUALIFIERS (GLEW_VERSION_3_0)
+#endif
+
 
 /* type definitions and constants */
 
@@ -580,12 +589,12 @@ static int codegen_print_uniforms_functions(DynStr *ds, ListBase *nodes)
 						// GPU_INSTANCING_LAYER is an integer, it must be flat in GLSL.
 						if (input->builtin == GPU_INSTANCING_LAYER) {
 							BLI_dynstr_appendf(ds, "%s %s %s;\n",
-								GLEW_VERSION_3_0 ? "flat in" : "flat varying",
+								GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "flat in" : "flat varying",
 								GPU_DATATYPE_STR[input->type], name);
 						}
 						else {
 							BLI_dynstr_appendf(ds, "%s %s %s;\n",
-								GLEW_VERSION_3_0 ? "in" : "varying",
+								GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "varying",
 								GPU_DATATYPE_STR[input->type], name);
 						}
 					}
@@ -613,7 +622,7 @@ static int codegen_print_uniforms_functions(DynStr *ds, ListBase *nodes)
 				}
 #endif
 				BLI_dynstr_appendf(ds, "%s %s var%d;\n",
-					GLEW_VERSION_3_0 ? "in" : "varying",
+					GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "varying",
 					GPU_DATATYPE_STR[input->type], input->attribid);
 #ifdef WITH_OPENSUBDIV
 				if (skip_opensubdiv) {
@@ -717,7 +726,10 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 	for (unsigned short i = 0; i < 8; ++i) {
 		if (finaloutputs[i]) {
 			output = finaloutputs[i]->output;
-			BLI_dynstr_appendf(ds, "\n\tgl_FragData[%i] = ", i);
+			if (GPU_CODEGEN_USE_MODERN_QUALIFIERS)
+				BLI_dynstr_appendf(ds, "\n\tfragData%i = ", i);
+			else
+				BLI_dynstr_appendf(ds, "\n\tgl_FragData[%i] = ", i);
 			codegen_convert_datatype(ds, output->type, GPU_VEC4, "tmp", output->id);
 			BLI_dynstr_append(ds, ";\n");
 		}
@@ -742,6 +754,20 @@ static char *code_generate_fragment(ListBase *nodes, char *usercode, const GPUMa
 
 	codegen_set_unique_ids(nodes);
 	builtins = codegen_print_uniforms_functions(ds, nodes);
+
+	if (GPU_CODEGEN_USE_MODERN_QUALIFIERS) {
+		/* GLES3/WebGL2 has no gl_FragData; declare explicit output(s) instead.
+		 * An explicit location is mandatory here: without it, GLSL ES assigns
+		 * locations by declaration order starting at 0, which mismatches the
+		 * active draw buffers (glDrawBuffers) whenever the output index isn't
+		 * contiguous from 0, and ANGLE rejects the draw with "Active draw
+		 * buffers with missing fragment shader outputs". */
+		for (int i = 0; i < 8; ++i) {
+			if (outputs[i]) {
+				BLI_dynstr_appendf(ds, "layout(location = %d) out vec4 fragData%d;\n", i, i);
+			}
+		}
+	}
 
 	if (usercode) {
 		BLI_dynstr_append(ds, "void fragment();\n\n");
@@ -825,11 +851,11 @@ static char *code_generate_vertex(ListBase *nodes, char *usercode, const GPUMatT
 				}
 #endif
 				BLI_dynstr_appendf(ds, "%s %s att%d;\n",
-					GLEW_VERSION_3_0 ? "in" : "attribute",
+					GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "attribute",
 					GPU_DATATYPE_STR[input->type], input->attribid);
 				BLI_dynstr_appendf(ds, "uniform int att%d_info;\n",  input->attribid);
 				BLI_dynstr_appendf(ds, "%s %s var%d;\n",
-					GLEW_VERSION_3_0 ? "out" : "varying",
+					GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "out" : "varying",
 					GPU_DATATYPE_STR[input->type], input->attribid);
 #ifdef WITH_OPENSUBDIV
 				if (skip_opensubdiv) {

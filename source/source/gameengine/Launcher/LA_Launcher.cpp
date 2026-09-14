@@ -65,6 +65,10 @@
 
 #include "CM_Message.h"
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#endif
+
 extern "C" {
 #  include "GPU_extensions.h"
 
@@ -202,6 +206,7 @@ void LA_Launcher::InitEngine()
 			attachments.push_back({(unsigned short)attach->size, hdrTable[attach->hdr]});
 		}
 	}
+	fprintf(stderr, "[web-launcher] offscreen attachments=%d\n", (int)attachments.size());
 
 	// Create the canvas, rasterizer and rendertools.
 	int AAsamples = (m_startScene->gm.aasamples > 1) ? m_startScene->gm.aasamples : 0;
@@ -555,12 +560,32 @@ KX_ExitInfo LA_Launcher::EngineMainLoop()
 		pynextframestate.func = nullptr;
 #endif  // WITH_PYTHON
 
+#ifdef __EMSCRIPTEN__
+	/* O loop bloqueante abaixo trava a aba no navegador: o Emscripten não
+	 * processa eventos/rAF/repaint enquanto o thread principal não devolve o
+	 * controle. `emscripten_set_main_loop` registra EngineNextFrame() como
+	 * callback por frame (via requestAnimationFrame) e retorna imediatamente,
+	 * deixando o navegador seguir rodando. Ver docs/web-export-plan.md. */
+	m_emscriptenExitInfo = KX_ExitInfo();
+	emscripten_set_main_loop_arg(
+		[](void *launcher) {
+			LA_Launcher *self = static_cast<LA_Launcher *>(launcher);
+			self->m_emscriptenExitInfo = self->EngineNextFrame();
+			if (self->m_emscriptenExitInfo.m_code != KX_ExitInfo::NO_REQUEST) {
+				emscripten_cancel_main_loop();
+			}
+		},
+		this, 0, 1);
+
+	return m_emscriptenExitInfo;
+#else
 	KX_ExitInfo exitInfo;
 	while (exitInfo.m_code == KX_ExitInfo::NO_REQUEST) {
 		exitInfo = EngineNextFrame();
 	}
 
 	return exitInfo;
+#endif  // __EMSCRIPTEN__
 
 #ifdef WITH_PYTHON
 }
