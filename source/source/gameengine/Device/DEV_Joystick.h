@@ -150,9 +150,7 @@ public:
 
 	void cSetPrecision(int val);
 
-	int GetAxisPosition(int index) {
-		return m_axis_array[index];
-	}
+	int GetAxisPosition(int index);
 
 	bool IsTrigAxis(void) {
 		return m_istrig_axis;

@@ -4,6 +4,59 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: gamepad físico — D-pad/analógico travando (resolvido)
+
+- Depois de confirmado que o botão do gamepad funcionava perfeitamente, o
+  usuário reportou que o D-pad/analógico não funcionava bem (engasgado,
+  travando). Instrumentação com duas camadas de log — uma dentro da porta
+  SDL2 do Emscripten (`EMSCRIPTEN_JoystickUpdate`, valor bruto reportado
+  pelo browser) e outra em `DEV_Joystick::OnAxisEvent` (valor que
+  efetivamente chega ao motor) — permitiu comparar as duas pontas em tempo
+  real. O log de teste do usuário mostrou, numa janela de ~300ms, 13
+  mudanças reais de `axis[0]` no browser e **zero** chamadas correspondentes
+  a `OnAxisEvent` no motor: prova direta de que a maioria dos eventos de
+  eixo estava sendo perdida antes de chegar ao consumidor.
+- Causa raiz: `GHOST_SystemSDL::processEvents()` (via `SDL_PollEvent`
+  irrestrito, sem checar tipo) e `DEV_Joystick::HandleEvents()` (via
+  `SDL_PeepEvents` filtrado por tipo joystick/controller) cada um faz seu
+  próprio `SDL_PumpEvents`/`SDL_JoystickUpdate()` uma vez por frame,
+  operando sobre a MESMA fila global do SDL — a mesma raiz estrutural do bug
+  de teclado/mouse já documentado acima (no Web, `sdlew` resolve os mesmos
+  símbolos estáticos do binário para os dois consumidores). O `PollEvent`
+  irrestrito de GHOST silenciosamente drena e descarta eventos
+  `SDL_CONTROLLERAXISMOTION` antes do `PeepEvents` filtrado do joystick
+  conseguir lê-los, sempre que o estado do gamepad muda entre os dois pumps
+  no mesmo frame.
+- Por que o botão nunca sofreu com isso: `aButtonPressIsPositive`/
+  `aAnyButtonPressIsPositive`/`aButtonReleaseIsPositive` chamam
+  `SDL_GameControllerGetButton()` AO VIVO, lendo o estado interno do
+  joystick no SDL (`joystick->buttons[]`), que é atualizado dentro de
+  `SDL_PrivateJoystickButton()` ANTES até do evento correspondente ser
+  colocado na fila — não importa se o evento em si se perde depois.
+- Fix aplicado em `DEV_Joystick.cpp`/`DEV_Joystick.h`: `GetAxisPosition()`
+  deixou de ser um getter inline que só lia o cache `m_axis_array`
+  (populado exclusivamente por `OnAxisEvent` ao consumir um evento da fila)
+  e passou a ler `SDL_GameControllerGetAxis()` diretamente, no mesmo padrão
+  já comprovado confiável dos botões. `aAxisIsPositive`, `pGetAxis` e
+  `pAxisTest` foram atualizados para usar esse getter em vez do cache bruto.
+  Isso elimina a corrida de fila por completo para leitura de eixo, sem
+  precisar reordenar a chamada de `HandleEvents`/`processEvents` nem tocar
+  no GHOST. `DEV_JoystickEvents.cpp` (que mantém `OnAxisEvent`/
+  `IsTrigAxis()`) não foi alterado — o cache fica inofensivo, só não é mais
+  usado para posição.
+- **Confirmado pelo usuário em 2026-09-14** com controle físico real, após
+  rebuild: D-pad/analógico responde de forma suave e consistente, sem
+  travar, inclusive em segurar/soltar/movimentos rápidos.
+- Ponto separado, ainda em aberto: o gate de timestamp
+  (`gamepadState.timestamp != item->timestamp`) da porta SDL2 do emsdk
+  (ver entrada anterior) foi mantido removido como reforço — `Gamepad.timestamp`
+  do browser é documentadamente pouco confiável e é um problema
+  independente que a corrida de fila mascarava. Esse patch e os printfs de
+  diagnóstico continuam vivendo fora do controle de versão deste
+  repositório (cache de toolchain do emsdk) — não sobrevivem a uma
+  reinstalação limpa nem se propagam para outra máquina. Formalizar isso
+  (patch de build, port SDL2 vendorizado, etc.) segue pendente.
+
 ## 2026-09-14 — Web: gamepad físico — D-pad intermitente e movimento que não para
 
 - Depois dos fixes de teclado/mouse confirmados, usuário testou com um

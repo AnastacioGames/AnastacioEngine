@@ -86,8 +86,17 @@ void DEV_Joystick::Init()
 		return;
 	}
 
-	/* Initializing Game Controller related subsystems */
-	bool success = (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != -1);
+	/* Initializing Game Controller related subsystems.
+	 * Emscripten's SDL2 port has no haptic/force-feedback backend, so requesting
+	 * SDL_INIT_HAPTIC there fails the whole SDL_InitSubSystem call and silently
+	 * disables joystick support in the Web build (confirmed via
+	 * "SDL not built with haptic (force feedback) support" in the browser console). */
+#ifdef __EMSCRIPTEN__
+	Uint32 controller_init_flags = SDL_INIT_GAMECONTROLLER;
+#else
+	Uint32 controller_init_flags = SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC;
+#endif
+	bool success = (SDL_InitSubSystem(controller_init_flags) != -1);
 
 	if (success) {
 		// Loading mapping file from blender datafiles directory
@@ -119,7 +128,11 @@ void DEV_Joystick::Close()
 
 	/* Closing SDL Game controller system */
 	if (SDL_CHECK(SDL_QuitSubSystem)) {
+#ifdef __EMSCRIPTEN__
+		SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+#else
 		SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC);
+#endif
 	}
 #endif
 }
@@ -184,7 +197,7 @@ bool DEV_Joystick::aAxisPairDirectionIsPositive(int axis, int dir)
 
 bool DEV_Joystick::aAxisIsPositive(int axis_single)
 {
-	return std::abs(m_axis_array[axis_single]) > m_prec ? true : false;
+	return std::abs(GetAxisPosition(axis_single)) > m_prec ? true : false;
 }
 
 bool DEV_Joystick::aAnyButtonPressIsPositive(void)
@@ -216,6 +229,26 @@ bool DEV_Joystick::aButtonPressIsPositive(int button)
 	return false;
 }
 
+
+/* Reads the axis value live from SDL instead of the m_axis_array cache
+ * populated by OnAxisEvent(). On the Web build, GHOST_SystemSDL::processEvents()
+ * and DEV_Joystick::HandleEvents() each pump the single shared SDL event queue
+ * once per frame; GHOST's unfiltered SDL_PollEvent() can silently drain
+ * SDL_CONTROLLERAXISMOTION events before our filtered SDL_PeepEvents() call
+ * sees them, leaving m_axis_array stuck on a stale value (confirmed via
+ * browser-vs-OnAxisEvent diagnostic logs showing most axis updates never
+ * reaching OnAxisEvent). SDL_GameControllerGetAxis() reads the controller's
+ * internal state directly, the same way the button methods already do,
+ * bypassing the event queue race entirely. */
+int DEV_Joystick::GetAxisPosition(int index)
+{
+#ifdef WITH_SDL
+	if (SDL_CHECK(SDL_GameControllerGetAxis)) {
+		return SDL_GameControllerGetAxis(m_private->m_gamecontroller, (SDL_GameControllerAxis)index);
+	}
+#endif
+	return m_axis_array[index];
+}
 
 bool DEV_Joystick::aButtonReleaseIsPositive(int button)
 {
@@ -300,7 +333,12 @@ bool DEV_Joystick::CreateJoystickDevice(void)
 			m_buttonmax = SDL_CONTROLLER_BUTTON_MAX;
 		}
 
-		/* Haptic configuration */
+		/* Haptic configuration. Emscripten's SDL2 port never initializes the haptic
+		 * subsystem (no force-feedback backend there, see DEV_Joystick::Init()), so
+		 * calling SDL_HapticOpen() on Web is unsupported and must be skipped rather
+		 * than attempted - confirmed as a crash source when a real controller is
+		 * connected in the browser. */
+#ifndef __EMSCRIPTEN__
 		if (!joy_error && SDL_CHECK(SDL_HapticOpen)) {
 			m_private->m_haptic = SDL_HapticOpen(m_joyindex);
 			if (!m_private->m_haptic) {
@@ -308,6 +346,7 @@ bool DEV_Joystick::CreateJoystickDevice(void)
 				                               << " has not force feedback (vibration) available");
 			}
 		}
+#endif
 	}
 #endif /* WITH_SDL */
 
@@ -358,7 +397,7 @@ int DEV_Joystick::Connected(void)
 int DEV_Joystick::pGetAxis(int axisnum, int udlr)
 {
 #ifdef WITH_SDL
-	return m_axis_array[(axisnum * 2) + udlr];
+	return GetAxisPosition((axisnum * 2) + udlr);
 #endif
 	return 0;
 }
@@ -369,8 +408,8 @@ int DEV_Joystick::pAxisTest(int axisnum)
 	/* Use ints instead of shorts here to avoid problems when we get -32768.
 	 * When we take the negative of that later, we should get 32768, which is greater
 	 * than what a short can hold. In other words, abs(MIN_SHORT) > MAX_SHRT. */
-	int i1 = m_axis_array[(axisnum * 2)];
-	int i2 = m_axis_array[(axisnum * 2) + 1];
+	int i1 = GetAxisPosition(axisnum * 2);
+	int i2 = GetAxisPosition((axisnum * 2) + 1);
 
 	/* long winded way to do:
 	 * return max_ff(absf(i1), absf(i2))
