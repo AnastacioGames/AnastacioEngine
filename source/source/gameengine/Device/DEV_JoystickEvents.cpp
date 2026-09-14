@@ -57,12 +57,29 @@ void DEV_Joystick::OnNothing(SDL_Event *sdl_event)
 	m_istrig_axis = m_istrig_button = 0;
 }
 
+/* SDL has a single process-wide event queue. GHOST_SystemSDL::processEvents() also
+ * polls that same queue for keyboard/mouse/window events. A bare SDL_PollEvent() loop
+ * here would drain and silently discard every pending event of every type (see the
+ * `default:` case below), starving GHOST whenever this runs first - confirmed as the
+ * root cause of keyboard input never reaching the Web/Emscripten build, where sdlew's
+ * dynamically-resolved SDL_PollEvent ends up bound to the same real SDL event queue
+ * GHOST uses (unlike native Windows, where sdlew loads a separate SDL2.dll instance).
+ * SDL_PeepEvents() restricted to the joystick/controller type ranges only removes the
+ * events this code actually owns, leaving everything else in the queue for GHOST. */
+static int DEV_Joystick_NextEvent(SDL_Event *sdl_event)
+{
+	if (SDL_PeepEvents(sdl_event, 1, SDL_GETEVENT, SDL_JOYAXISMOTION, SDL_JOYDEVICEREMOVED) > 0) {
+		return 1;
+	}
+	return SDL_PeepEvents(sdl_event, 1, SDL_GETEVENT, SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERSENSORUPDATE);
+}
+
 bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 {
 	SDL_Event sdl_event;
 	bool remap = false;
 
-	if (SDL_PollEvent == (void *)0) {
+	if (SDL_PumpEvents == (void *)0 || SDL_PeepEvents == (void *)0) {
 		return 0;
 	}
 
@@ -72,7 +89,9 @@ bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 		}
 	}
 
-	while (SDL_PollEvent(&sdl_event)) {
+	SDL_PumpEvents();
+
+	while (DEV_Joystick_NextEvent(&sdl_event) > 0) {
 		/* Note! m_instance[instance]
 		 * will segfault if over JOYINDEX_MAX, not too nice but what are the chances? */
 

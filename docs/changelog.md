@@ -4,6 +4,63 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: causa raiz real do teclado — segundo consumidor da fila SDL
+
+- Retomando o ponto em aberto da entrada anterior ("Pendente: mesmo com o
+  evento entrando na fila do SDL com sucesso, `GHOST_SystemSDL::processEvents`
+  ainda não demonstrou receber `SDL_KEYDOWN`/`SDL_KEYUP`..."): reproduzido via
+  Chrome headless + CDP (`build-web/keyboard-diagnose.cjs`,
+  `build-web/keyboard-diagnose2.cjs`), dispatch real de tecla
+  (`Input.dispatchKeyEvent` com `code` preenchido, após focar o `#canvas`) —
+  não uma simulação de automação sem `KeyboardEvent.code` (essa já havia sido
+  descartada antes por invalidar o teste).
+- Confirmado, em ordem: o DOM entrega `keydown`/`keyup` reais ao canvas
+  (`RAW_KEYDOWN`/`RAW_KEYUP`), o callback do Emscripten dispara, e
+  `Emscripten_HandleKey` (porta SDL2, instrumentada anteriormente) reporta
+  `posted=1` e `KEYDOWN_state=1`/`KEYUP_state=1` — ou seja, o evento realmente
+  entra na fila global do SDL. Mas `GHOST_SystemSDL::processEvents` não
+  reportava nenhum `polled sdl_event.type=` em nenhum frame seguinte, nem
+  mesmo os eventos de janela (`SDL_WINDOWEVENT`) — sinal de que algo mais
+  drenava a fila inteira antes de GHOST chegar a ela.
+- Causa raiz: `DEV_Joystick::HandleEvents`
+  (`source/source/gameengine/Device/DEV_JoystickEvents.cpp`) tinha seu próprio
+  laço `while (SDL_PollEvent(&sdl_event))`, sem filtro de tipo — o `default:`
+  do switch descarta silenciosamente qualquer evento que não seja de
+  joystick/controller. SDL só tem uma fila de eventos por processo; esse
+  segundo consumidor a esvaziava por completo (teclado incluso) antes de
+  `GHOST_SystemSDL::processEvents` fazer seu próprio `SDL_PollEvent`.
+  Não afeta o Windows nativo porque lá o `sdlew` (usado por
+  `DEV_JoystickEvents.cpp`) carrega dinamicamente um `SDL2.dll` **separado**
+  (biblioteca própria, fila própria) via `LoadLibrary`; sob Emscripten,
+  `sdlew` resolve os mesmos símbolos já linkados estaticamente no próprio
+  binário (mesma fila que `GHOST_SystemSDL` usa), então os dois consumidores
+  colidem de fato só no build Web.
+- Fix em `DEV_JoystickEvents.cpp`: substituído o `SDL_PollEvent` genérico por
+  `SDL_PeepEvents(..., SDL_GETEVENT, min, max)` restrito às duas faixas de
+  tipo de evento que este código realmente trata (`SDL_JOYAXISMOTION`..
+  `SDL_JOYDEVICEREMOVED` e `SDL_CONTROLLERAXISMOTION`..
+  `SDL_CONTROLLERSENSORUPDATE`), precedido de `SDL_PumpEvents()` explícito
+  (necessário porque, ao contrário de `SDL_PollEvent`, `SDL_PeepEvents` não
+  bombeia a fila sozinho). Guard de disponibilidade do `sdlew` atualizado de
+  `SDL_PollEvent == (void*)0` para `SDL_PumpEvents`/`SDL_PeepEvents`. Nenhuma
+  mudança de comportamento para joystick/controller, que continuam recebendo
+  exatamente os mesmos eventos de antes.
+- Validado via rebuild + reteste com o mesmo harness CDP: agora
+  `GHOST_SystemSDL::processEvents polled sdl_event.type=768/769` aparece para
+  cada tecla, seguido de `GHOST_SystemSDL SDL_KEYDOWN/UP scancode=79 ...` e
+  `HandleKeyEvent key=268 down=1`/`down=0` — a cadeia completa até
+  `DEV_EventConsumer::HandleKeyEvent` (entrada real no sistema de input do
+  jogo) confirmada de ponta a ponta pela primeira vez. Logs em
+  `build-web/keyboard-diagnostic.log` (antes do fix, zero eventos
+  `polled`) e `build-web/keyboard-diagnostic2.log` (depois do fix).
+- Pendente: esse teste cobre só a cadeia SDL → GHOST → `DEV_EventConsumer`,
+  não a aceitação visual completa (mover o cubo com as setas, visível no
+  navegador por uma pessoa) — a cena usada (`untitled.range`) está vazia.
+  Ainda é preciso o teste manual real do usuário para o aceite final,
+  incluindo o mouse (não testado nesta sessão, mesmo mecanismo pode ou não
+  se aplicar). Diagnóstico ainda não removido do código (mantido sob
+  `#ifdef __EMSCRIPTEN__`, ver nota da entrada anterior).
+
 ## 2026-09-14 — Web: input de teclado/mouse não chegava ao jogo
 
 - Usuário reportou que teclado/mouse não funcionam no export Web, apesar da

@@ -39,9 +39,13 @@ e detalhados no [`changelog.md`](changelog.md).
   GL e amostras numéricas confirmam cor atravessando FXAA e chegando à tela.
   Aguardando novo aceite visual. A `untitled.range` do harness está vazia
   (sem objetos/câmera); uma nova `web-smoke.range`, gerada por
-  `tools/create_web_smoke_scene.py`, expôs `alignment fault` em
-  `test_pointer_array` ao carregar objetos. Resolver esse bloqueio antes de
-  validar cubo, Python e teclado. Detalhes no changelog de 2026-09-14.
+  `tools/create_web_smoke_scene.py`, havia exposto `alignment fault` em
+  `test_pointer_array` ao carregar objetos. **Retestado em 2026-09-14 após o
+  fix de teclado**: o `alignment fault` não reproduziu mais — `test-smoke.html`
+  agora carrega `web-smoke.range`, inicia o controlador Python e desenha sem
+  falhas (`build-web/smoke-diagnostic.log`). **Aceite visual confirmado pelo
+  usuário em 2026-09-14**: cubo controlável pelas setas no navegador,
+  em `test-smoke.html`.
 
   **Retomada 2026-09-14:** confirmado `offscreen attachments=2`. O bind dos
   materiais gerados agora desativa temporariamente saídas ausentes no shader
@@ -54,15 +58,26 @@ e detalhados no [`changelog.md`](changelog.md).
   de 2026-09-14. O histórico abaixo
   descreve os bloqueios anteriores e não substitui esta atualização.
 
-  **Input de teclado/mouse no Web (2026-09-14):** causa raiz encontrada e corrigida —
-  a porta SDL2 do Emscripten usava por padrão o alvo `"#window"` para o listener
-  de teclado, que falha silenciosamente (`EMSCRIPTEN_RESULT_NOT_SUPPORTED`) neste
-  ambiente; `SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas")` em
-  `GHOST_SystemSDL.cpp` corrige o registro (confirmado via diagnóstico direto na
-  porta SDL2: `keyElement=#canvas`, registro e `SDL_PushEvent` com sucesso).
-  Ainda não confirmado se `GHOST_SystemSDL::processEvents` está de fato
-  recebendo esses eventos via `SDL_PollEvent` — diagnóstico adicional já
-  instrumentado, teste real pendente. Detalhes no changelog de 2026-09-14.
+  **Input de teclado/mouse no Web (2026-09-14):** duas causas raiz encontradas e
+  corrigidas. (1) A porta SDL2 do Emscripten usava por padrão o alvo `"#window"`
+  para o listener de teclado, que falha silenciosamente
+  (`EMSCRIPTEN_RESULT_NOT_SUPPORTED`) neste ambiente;
+  `SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas")` em
+  `GHOST_SystemSDL.cpp` corrige o registro. (2) Mesmo com o evento entrando na
+  fila do SDL, `GHOST_SystemSDL::processEvents` nunca via nada: um segundo
+  consumidor não filtrado da mesma fila global do SDL (`DEV_Joystick::HandleEvents`
+  em `DEV_JoystickEvents.cpp`, `while (SDL_PollEvent(...))` sem checar o tipo)
+  drenava e descartava todo evento não-joystick antes de GHOST processá-lo —
+  só colide no Web porque lá o `sdlew` usado pelo código de joystick resolve os
+  mesmos símbolos estáticos do binário (fila compartilhada), diferente do
+  Windows nativo, onde `sdlew` carrega um `SDL2.dll` próprio e isolado. Corrigido
+  trocando por `SDL_PeepEvents` restrito às faixas de tipo joystick/controller.
+  Validado de ponta a ponta via Chrome headless/CDP com dispatch real de tecla
+  (`code` preenchido): a cadeia completa SDL → `GHOST_SystemSDL::processEvents`
+  → `DEV_EventConsumer::HandleKeyEvent` recebe `SDL_KEYDOWN`/`SDL_KEYUP`
+  corretamente. **Aceite visual confirmado pelo usuário em 2026-09-14**: cubo
+  controlável pelas setas no navegador real (`test-smoke.html`). Falta ainda
+  testar o mouse. Detalhes no changelog de 2026-09-14.
 
   Levantamento original em
   [`web-export-plan.md`](web-export-plan.md), comparando com o levantamento mobile já existente.
