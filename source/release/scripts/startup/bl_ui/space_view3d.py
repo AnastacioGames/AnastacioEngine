@@ -119,47 +119,7 @@ class VIEW3D_HT_header(Header):
                         
         layout.separator_spacer()
         
-        # Mode & Transform Settings
-        # Orientation
-        if object_mode in {'OBJECT', 'EDIT', 'POSE', 'GPENCIL_EDIT'}:
-            orientation = scene.transform_orientation
-            current_orientation = scene.current_orientation
-
-            if not current_orientation:
-                trans_orientation = \
-                    bpy.types.Scene.bl_rna.properties["transform_orientation"].enum_items[orientation]
-                trans_icon = getattr(trans_orientation, "icon", "BLANK1")
-                trans_name = getattr(trans_orientation, "name", "Orientation")
-            else:
-                trans_icon = 'VISIBLE_IPO_OFF'
-                trans_name = getattr(current_orientation, "name", "Orientation")
-                
-            
-            sub = layout.row(align=True)
-            sub.ui_units_x = 8
-            
-            sub.prop(view, "show_manipulator", toggle=False, text="")
-            if view.show_manipulator:
-                sub.prop(view, "transform_manipulators", expand=True, text="")
-            
-            sub.popover(
-                panel="VIEW3D_PT_transform_orientations",
-                text=trans_name,
-                icon="DOWNARROW_HLT",
-            )
-        
-        # Pivot
-        if object_mode in {'OBJECT', 'EDIT', 'POSE', 'GPENCIL_EDIT', 'GPENCIL_SCULPT'}:
-            pivot_point = view.pivot_point
-            act_pivot_point = bpy.types.SpaceView3D.bl_rna.properties["pivot_point"].enum_items[pivot_point]
-            row = layout.row(align=True)
-            row.popover(
-                panel="VIEW3D_PT_pivot_point",
-                icon=act_pivot_point.icon,
-                text="",
-            )
-        
-        # Snap
+        # Snap controls are drawn in the floating 3D View controls.
         show_snap = False
         if obj is None:
             show_snap = True
@@ -176,7 +136,7 @@ class VIEW3D_HT_header(Header):
                     if brush and brush.stroke_method == 'CURVE':
                         show_snap = True
 
-        if show_snap:
+        if False and show_snap:
             snap_items = bpy.types.ToolSettings.bl_rna.properties['snap_element'].enum_items
             # TODO: Display multiple icons.
             # (Currently only one of the enabled modes icons is displayed)
@@ -192,8 +152,8 @@ class VIEW3D_HT_header(Header):
                 text="",
             )
         
-        # Proportional editing
-        if obj:
+        # Proportional editing is drawn in the floating 3D View controls.
+        if False and obj:
             gpd = context.gpencil_data
             if gpd is not None and obj.type == 'GPENCIL':
                 if gpd.use_stroke_edit_mode or gpd.is_stroke_sculpt_mode:
@@ -225,71 +185,8 @@ class VIEW3D_HT_header(Header):
                 sub.active = tool_settings.proportional_edit != 'DISABLED'
                 sub.prop(tool_settings, "proportional_edit_falloff", icon_only=True)
         
-        row_play = layout.row(align=True)
-        row_play.operator("view3d.game_start", text="Play", icon="PLAY")
-        row_play.operator("wm.blenderplayer_start", text="Standalone", icon="GHOST_ENABLED")
-        row_play.prop(scene.game_settings, "show_console", text="", icon="CONSOLE", toggle=True)
-
-        
         layout.separator_spacer()
-        
-        if obj:
-            # AutoMerge editing
-            if (object_mode == 'EDIT' and obj.type == 'MESH'):
-                row = layout.row(align=True)
-                row.prop(tool_settings, "use_mesh_automerge", text="", icon='AUTOMERGE_ON')
 
-            # Occlude geometry
-            if ((view.viewport_shade not in {'BOUNDBOX', 'WIREFRAME'} and (object_mode == 'PARTICLE_EDIT' or (object_mode == 'EDIT' and obj.type == 'MESH'))) or
-                    (object_mode in {'WEIGHT_PAINT', 'VERTEX_PAINT'})):
-                        row = layout.row(align=True)
-                        row.prop(view, "use_occlude_geometry", text="")
-
-        # Overlay
-        row = layout.row(align=True)
-        row.prop(view, "realtime_viewport_shading", toggle=True, icon="RESTRICT_RENDER_OFF", text="")
-        row.prop(view, "always_render", toggle=True, text="Always Render (CPU+)")
-        row.prop(view, "show_only_render", toggle=True, icon="RESTRICT_VIEW_ON" if view.show_only_render else "RESTRICT_VIEW_OFF", text="")
-        
-        if object_mode in {'OBJECT', 'EDIT', 'POSE', 'GPENCIL_EDIT'}:
-            row.popover(
-                panel="VIEW3D_PT_overlay",
-                icon="DOWNARROW_HLT",
-                text=""
-            )
-        
-        row = layout.row(align=True)
-        
-        if (object_mode == 'EDIT' and obj.type == 'MESH'):
-            row.popover(
-            panel="VIEW3D_PT_meshdisplay",
-            icon="IMAGE_COL",
-            text=""
-            )
-            
-        row.prop(view, "lock_camera_and_layers", text="")
-        row = layout.row(align=True)
-        
-        if (object_mode != 'EDIT'):
-            row.popover(
-                    panel="VIEW3D_PT_layer",
-                    icon='RENDERLAYERS',
-                    text="",
-            )
-        
-        sub = row.row(align=True)
-        sub.ui_units_x = 1
-        sub.active = not view.show_only_render
-
-        # Render
-        row.prop(view, "viewport_shade", expand=True, text="")
-        sub = row.row(align=True)
-        sub.ui_units_x = 1
-        sub.popover(
-            panel="VIEW3D_PT_shading",
-            icon="DOWNARROW_HLT",
-            text=""
-        )
         # # OpenGL render
         # row = layout.row(align=True)
         # row.operator("render.opengl", text="", icon='RENDER_STILL')

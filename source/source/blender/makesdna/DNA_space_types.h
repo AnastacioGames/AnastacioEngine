@@ -280,6 +280,7 @@ typedef enum eSpaceOutliner_Flag {
 	SO_HIDE_RESTRICTCOLS    = (1 << 2),
 	SO_HIDE_KEYINGSETINFO   = (1 << 3),
 	SO_SKIP_SORT_ALPHA      = (1 << 4),
+	SO_SHOW_ALTERNATING_ROWS = (1 << 5),
 } eSpaceOutliner_Flag;
 
 /* SpaceOops.outlinevis */

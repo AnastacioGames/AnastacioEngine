@@ -84,6 +84,8 @@
 #include "ED_screen_types.h"
 #include "ED_transform.h"
 
+#include "RNA_access.h"
+
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
 #include "UI_resources.h"
@@ -4318,6 +4320,79 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 	}
 }
 
+static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
+{
+	bScreen *screen = CTX_wm_screen(C);
+	PointerRNA v3dptr;
+	PointerRNA gameptr;
+	PointerRNA toolptr;
+	uiBlock *block;
+	uiLayout *layout;
+	uiLayout *row;
+	const Object *ob = CTX_data_active_object(C);
+	const bool edit_mode = (ob != NULL) && ((ob->mode & OB_MODE_EDIT) != 0);
+	int x = UI_UNIT_X / 2;
+	int y = (UI_UNIT_Y / 2) + 20;
+
+	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
+	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
+	RNA_pointer_create(&scene->id, &RNA_ToolSettings, scene->toolsettings, &toolptr);
+
+	block = UI_block_begin(C, ar, "view3d_floating_controls", UI_EMBOSS);
+	layout = UI_block_layout(
+	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
+	row = uiLayoutRow(layout, true);
+
+	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
+	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "WM_OT_blenderplayer_start");
+	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
+	uiItemS(row);
+
+	uiItemR(row,
+	        &v3dptr,
+	        "viewport_shade",
+	        UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY,
+	        "",
+	        ICON_NONE);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
+	uiItemR(row, &v3dptr, "always_render", UI_ITEM_R_TOGGLE, "Always Render (CPU+)", ICON_NONE);
+	uiItemR(row,
+	        &v3dptr,
+	        "show_only_render",
+	        UI_ITEM_R_TOGGLE,
+	        "",
+	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_TOGGLE, "", ICON_NONE);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
+	uiItemR(row, &v3dptr, "transform_manipulators", UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_transform_orientations", "", ICON_DOWNARROW_HLT);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_pivot_point", "", ICON_ROTATECOLLECTION);
+	uiItemS(row);
+	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
+	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_snapping", "", ICON_DOWNARROW_HLT);
+	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
+	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	if (edit_mode) {
+		uiItemS(row);
+		uiItemR(row, &toolptr, "use_mesh_automerge", UI_ITEM_R_TOGGLE, "", ICON_AUTOMERGE_ON);
+		uiItemR(row, &v3dptr, "use_occlude_geometry", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_VIEW_ON);
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_meshdisplay", "", ICON_IMAGE_COL);
+	}
+
+	UI_block_layout_resolve(block, NULL, NULL);
+	UI_block_end(C, block);
+	UI_block_draw(C, block);
+}
+
 void view3d_main_region_draw(const bContext *C, ARegion *ar)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -4349,6 +4424,7 @@ void view3d_main_region_draw(const bContext *C, ARegion *ar)
 		view3d_main_region_draw_engine(C, scene, ar, v3d, clip_border, &border_rect);
 
 	view3d_main_region_draw_info(C, scene, ar, v3d, grid_unit, render_border);
+	view3d_draw_floating_controls(C, ar, v3d, scene);
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
 

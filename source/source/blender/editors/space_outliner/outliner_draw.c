@@ -1807,37 +1807,29 @@ static void outliner_draw_tree(bContext *C, uiBlock *block, Scene *scene, ARegio
 }
 
 
-static void outliner_back(ARegion *ar)
+static void outliner_draw_alternating_rows(ARegion *ar, const SpaceOops *soops, int xmin)
 {
-	int ystart;
+	if ((soops->flag & SO_SHOW_ALTERNATING_ROWS) == 0) {
+		return;
+	}
 
 	UI_ThemeColorShade(TH_BACK, 6);
-	ystart = (int)ar->v2d.tot.ymax;
-	ystart = UI_UNIT_Y * (ystart / (UI_UNIT_Y)) - OL_Y_OFFSET;
+	int ystart = (int)ar->v2d.tot.ymax;
+	ystart = UI_UNIT_Y * (ystart / UI_UNIT_Y) - OL_Y_OFFSET;
 
 	while (ystart + 2 * UI_UNIT_Y > ar->v2d.cur.ymin) {
-		glRecti(0, ystart, (int)ar->v2d.cur.xmax, ystart + UI_UNIT_Y);
+		glRecti(xmin, ystart, (int)ar->v2d.cur.xmax, ystart + UI_UNIT_Y);
 		ystart -= 2 * UI_UNIT_Y;
 	}
 }
 
-static void outliner_draw_restrictcols(ARegion *ar)
+static void outliner_draw_restrictcols(ARegion *ar, const SpaceOops *soops)
 {
-	int ystart;
-
 	/* background underneath */
 	UI_ThemeColor(TH_BACK);
 	glRecti((int)(ar->v2d.cur.xmax - OL_TOGW),
 	        (int)(ar->v2d.cur.ymin - 1), (int)ar->v2d.cur.xmax, (int)ar->v2d.cur.ymax);
-
-	UI_ThemeColorShade(TH_BACK, 6);
-	ystart = (int)ar->v2d.tot.ymax;
-	ystart = UI_UNIT_Y * (ystart / (UI_UNIT_Y)) - OL_Y_OFFSET;
-
-	while (ystart + 2 * UI_UNIT_Y > ar->v2d.cur.ymin) {
-		glRecti((int)ar->v2d.cur.xmax - OL_TOGW, ystart, (int)ar->v2d.cur.xmax, ystart + UI_UNIT_Y);
-		ystart -= 2 * UI_UNIT_Y;
-	}
+	outliner_draw_alternating_rows(ar, soops, (int)ar->v2d.cur.xmax - OL_TOGW);
 
 	UI_ThemeColorShadeAlpha(TH_BACK, -15, -200);
 
@@ -1921,7 +1913,7 @@ void draw_outliner(const bContext *C)
 	UI_view2d_view_ortho(v2d);
 
 	/* draw outliner stuff (background, hierarchy lines and names) */
-	outliner_back(ar);
+	outliner_draw_alternating_rows(ar, soops, 0);
 	block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
 	outliner_draw_tree((bContext *)C, block, scene, ar, soops, &te_edit);
 
@@ -1932,12 +1924,12 @@ void draw_outliner(const bContext *C)
 	}
 	else if ((soops->outlinevis == SO_ID_ORPHANS) && !(soops->flag & SO_HIDE_RESTRICTCOLS)) {
 		/* draw user toggle columns */
-		//outliner_draw_restrictcols(ar);
+		//outliner_draw_restrictcols(ar, soops);
 		outliner_draw_userbuts(block, ar, soops, &soops->tree);
 	}
 	else if (!(soops->flag & SO_HIDE_RESTRICTCOLS)) {
 		/* draw restriction columns */
-		//outliner_draw_restrictcols(ar);
+		//outliner_draw_restrictcols(ar, soops);
 		outliner_draw_restrictbuts(block, scene, ar, soops, &soops->tree);
 	}
 

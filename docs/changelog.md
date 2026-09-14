@@ -4,6 +4,63 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-13 — Barra inferior da 3D View: câmera e camadas
+
+- Os controles de bloqueio de câmera/camadas e seleção de camadas, antes isolados no extremo direito do cabeçalho da 3D View, foram transferidos para o fim da barra flutuante no canto inferior esquerdo.
+- Validação: rebuild incremental de `RangeEngine` concluído; smoke test confirmou a propriedade `lock_camera_and_layers` e o painel `VIEW3D_PT_layer` na inicialização.
+
+## 2026-09-13 — Barra inferior da 3D View: transformação
+
+- Os controles de manipulador, eixos, orientação e pivô foram adicionados ao fim da mesma barra flutuante, mantendo a sequência dos grupos já transferidos.
+- As versões correspondentes foram removidas do cabeçalho.
+
+## 2026-09-13 — Barra inferior da 3D View: controles do modo Edit
+
+- Auto Merge, Occlude Geometry e o painel de visualização da malha foram adicionados ao fim da barra inferior.
+- Os controles condicionais que apareciam no cabeçalho ao entrar no modo Edit foram removidos de lá; na barra inferior eles agora só são desenhados com um objeto ativo em Edit Mode.
+- Validação: rebuild incremental de `RangeEngine` e smoke test de troca para Edit Mode concluídos.
+
+## 2026-09-13 — WebGL2: texImage2D/texParameter e getParameter (GL_MAX_LIGHTS)
+
+- `gpu_texture.c` (`GPU_texture_create_nD`): textura de profundidade usava `GL_DEPTH_COMPONENT` (não dimensionado) como `internalformat` de `texImage2D`, rejeitado pelo WebGL2/GLES3 (exige formato dimensionado); corrigido para `GL_DEPTH_COMPONENT16` sob `__EMSCRIPTEN__`. `glTexParameteri(..., GL_DEPTH_TEXTURE_MODE, ...)` também foi pulado sob Emscripten — o enum não existe em GLES3/WebGL2 core.
+- `RAS_OpenGLRasterizer.cpp` (`GetNumLights`): `glGetIntegerv(GL_MAX_LIGHTS, ...)` (pipeline fixo, sem equivalente em GLES3/WebGL2) era a causa raiz de um erro `getParameter: invalid parameter name` no console — mascarado porque o Chrome deduplica mensagens de erro com texto idêntico, então uma única linha no console podia corresponder a chamadas inválidas diferentes. Corrigido retornando 8 fixo sob `__EMSCRIPTEN__` (mesmo teto que a rota desktop já aplicava com `numlights > 8`).
+- Localização da causa raiz do `getParameter` exigiu instrumentação: monkeypatch de `WebGL2RenderingContext.prototype.getParameter`/`WebGLRenderingContext.prototype.getParameter` no harness de teste (`build-web/bin/test.html`, temporário, revertido depois), chamando `getError()` a cada `getParameter` e logando `pname`/stack via `console.log` — capturado com Chrome headless via `--enable-logging=stderr --v=1` sem `--dump-dom` (que trava no loop de render em tempo real da página e é morto antes de gravar saída).
+- `gpu_extensions.c` (`gpu_extensions_init`): três consultas adicionais de `getParameter`/estado desktop-only guardadas sob `__EMSCRIPTEN__` como endurecimento de espec (nenhuma isoladamente foi a causa raiz acima, mas são inválidas em WebGL2/GLES3 e ficariam pendentes de qualquer forma): `GL_RED_BITS`/`GREEN_BITS`/`BLUE_BITS` (colordepth fixado em 24), `GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT` (o shim GLEW do Emscripten reporta a extensão pela string, sem `getExtension()` real; anisotropia fixada em 1.0), `GL_MAX_COLOR_TEXTURE_SAMPLES` (textura multisample não existe em GLES3/WebGL2; consulta pulada).
+- Validação: rebuild limpo de `RangeRuntime` e teste em Chrome headless (`test.html` + `untitled.range`) confirmou, por grep no log real do navegador, zero linhas `WebGL:` e presença de `"[web-launcher] engine started"`. **Isso valida apenas ausência de erro de console — não é validação visual nem funcional.** Achado à parte, não investigado: a mesma instrumentação revelou `getParameter(GL_ELEMENT_ARRAY_BUFFER_BINDING)` retornando `INVALID_FRAMEBUFFER_OPERATION` (6x), não visível no log final sem instrumentação; impacto real ainda desconhecido.
+- Combinado com os fixes de VAO/VBO e IBO da sessão anterior, todas as quatro classes de erro de console rastreadas até agora no port Web estão confirmadas ausentes; falta validar visualmente o cubo e o controle via Python/teclado — ver `docs/roadmap.md`.
+
+## 2026-09-13 — WebGL2: depth texture format/type e draw buffers do offscreen
+
+- Teste real em navegador (screenshots do usuário, não Chrome headless) revelou dois erros WebGL2 sequenciais no fluxo de renderização do cubo.
+- **Corrigido e confirmado pelo usuário**: `gpu_texture.c` (`GPU_texture_create_nD`) definia `internalformat = GL_DEPTH_COMPONENT16` para textura de profundidade sob `__EMSCRIPTEN__`, mas deixava `type = GL_UNSIGNED_BYTE` — combinação inválida em WebGL2/GLES3 (`GL_DEPTH_COMPONENT16` só é válido com `GL_UNSIGNED_SHORT`), rejeitada pelo ANGLE com `glTexImage2DRobustANGLE: Invalid combination of format, type and internalFormat`, que por sua vez deixava a textura com tamanho zero e cascateava em `GL_INVALID_FRAMEBUFFER_OPERATION: ... Attachment has zero size` em todo `glClear`/`glDrawElements` seguinte. Corrigido setando `type = GL_UNSIGNED_SHORT` no branch Emscripten. Retest do usuário confirmou as duas mensagens de erro completamente ausentes.
+- **Ainda não resolvido**: com o bug acima corrigido, apareceu (ou ficou visível) `GL_INVALID_OPERATION: glDrawElements: Active draw buffers with missing fragment shader outputs` (256 ocorrências, atingiu o teto de log do Chrome). Mecanismo: `RAS_OffScreen::Bind()` chama `GPU_framebuffer_bind_all_attachments(fb, m_numColorSlots)`, que faz `glDrawBuffers(numAttachment, ...)`; se o fragment shader ativo no draw não declarar saída para cada slot ativo, o ANGLE rejeita o draw.
+- Tentativa de fix: `gpu_codegen.c` (`code_generate_fragment`) passou a declarar `layout(location = %d) out vec4 fragData%d;` explícito por saída (antes sem `layout(location=...)`, dependendo da ordem de declaração). **Rebuild e retest do usuário mostraram o erro idêntico, sem mudança** — descarta, para esta cena, a hipótese de que a falta de location explícita fosse a causa: o material padrão do cubo só popula `outputs[0]` (`GPU_material_output_link` é chamado com `index=0` em todos os call sites exceto `node_shader_output_attachment.c`, ligado ao mecanismo de anexos extras `gm.attachments[]`), então o fix deveria ter sido um no-op — e foi.
+- Hipótese em aberto (não confirmada): `m_numColorSlots` (= `RAS_OffScreen::AttachmentList::size()`, construída em `LA_Launcher.cpp` a partir de `gm.attachments[0..6]`) pode ser maior que 1 para esta cena `.range` específica, enquanto o material só escreve em location 0. Diagnóstico adicionado: `fprintf(stderr, "[web-launcher] offscreen attachments=%d\n", ...)` em `LA_Launcher.cpp`, rebuild concluído; **retest ainda pendente no momento em que a sessão foi encerrada** (fim de expediente do usuário).
+- Se a hipótese cair (`attachments=1`), próximos suspeitos a investigar: `gpu_shader_basic_frag.glsl` (shader legado de pipeline fixo, usa `gl_FragColor`/`varying`, sintaxe incompatível com GLSL ES 3.00 — não confirmado se é realmente compilado/usado sob o caminho Emscripten), os avisos de "emscripten GL emulation"/"immediate mode emulation" no console (não conectados ao bug ainda), ou outro FBO (sombra, filtro 2D) fora do offscreen principal da cena.
+- **Reforço explícito do usuário nesta sessão**: console sem uma mensagem de erro específica, ou mesmo `"[web-launcher] engine started"` no log, não é validação visual nem funcional. A barra de aceite (cubo real renderizando corretamente e controlável por Python/teclado, confirmado visualmente pelo usuário via captura manual de tela, sem automação de captura) continua pendente e é o próximo passo assim que o console estiver de fato sem erros WebGL.
+
+## 2026-09-13 — Pesquisa de áudio para o port Web
+
+- Segunda revisão para apoiar Claude: localizados inicialização SDL sem `SDL_INIT_AUDIO`,
+  fontes GEEffects incluídas fora do bloco `WITH_OPENAL` e fallback silencioso para `None`.
+  Acrescentado roteiro concreto de integração e diagnóstico ao documento de áudio;
+  achados estáticos, sem execução do áudio ou mudança nas fontes.
+- Confirmados Audaspace/OpenAL desativados no preset/cache e backend SDL existente.
+- Documentados streaming com `std::thread`, limites de EFX e dependência de decodificadores.
+- Corrigida no plano Web a referência incorreta a OpenAL Soft/`USE_OPENAL`: a implementação
+  própria do Emscripten usa `-lopenal`. Fontes e roteiro em [web-audio-analysis.md](web-audio-analysis.md).
+- Auditoria documental e estática; sem alterações de engine, build ou teste audível.
+
+## 2026-09-13 — Auditoria da emulação GL para apoiar a integração Web
+
+- Verificados preset/cache, SDK 6.0.9, renderer, logs existentes e wrappers do JS gerado.
+  `LEGACY_GL_EMULATION` já está ativo e não pode ser combinado com `FULL_ES3` nesse SDK.
+- Probe `tools/web_gl_emulation_probe.cjs` executado com exit 0: a sequência atual de
+  unbind apaga o VBO do VAO emulado; o controle com ordem invertida preserva a referência.
+  Contexto GL simulado, sem comprovação de correção no navegador ou novo build da engine.
+- Evidências, limites, uso potencial de FULL_ES3 no zsort e próximos testes para Claude
+  em [web-gl-emulation-analysis.md](web-gl-emulation-analysis.md). Renderer e flags preservados.
+
 ## 2026-09-13 — Web/Emscripten: SetLines/glPolygonMode, ImGui #version 120 e início do GLSL ES sweep
 
 - `RAS_OpenGLRasterizer::SetLines` chamava `glPolygonMode`, sem equivalente em WebGL/GLES2; corrigido com guard `#ifdef __EMSCRIPTEN__` que ignora a chamada (sem estado a preservar).
@@ -4169,3 +4226,23 @@ com Chrome headless (`--dump-dom`, `--virtual-time-budget=60000`) servindo `buil
   mesma categoria de bug, mesmo fix esperado (`#ifdef __EMSCRIPTEN__`, pular a chamada ou usar
   alternativa via shader). Instrumentação temporária `[web-launcher]`/`[web-rasterizer]`/
   `[web-gpu-state]` mantida no código para a próxima sessão.
+
+## 2026-09-13 — Outliner com fundo sólido
+
+- Removido o desenho das faixas alternadas em outliner_draw.c, tanto na árvore quanto nas colunas de restrição. O clareamento fixo de TH_BACK em 6 fazia as duas faixas acompanharem a mesma cor do tema.
+- Fundo passa a usar somente a cor do tema; destaques de seleção e linhas de hierarquia continuam existentes. Remoção direta solicitada como alternativa a uma opção, sem novos campos DNA ou alterações no exportador Web.
+- Validação: ninja RangeEngine via vcvars64 concluído (19 passos); build/bin/RangeEngine.exe iniciou com --background --factory-startup e confirmou OUTLINER_SMOKE_OK True, saindo com código 0. Conferência visual no editor pendente.
+
+## 2026-09-13 — Opção de faixas no menu View do Outliner
+
+- Adicionado Show Alternating Rows, abaixo de Show Restriction Columns, disponível também nos modos de datablocks e preferências. Desligado por padrão, restaura as faixas herdadas quando ligado.
+- RNA show_alternating_rows usa o bit livre 5 de SpaceOops.flag, sem mudar campos, tamanho ou offsets da estrutura DNA. Notificador do Outliner atualiza a interface; estado salvo por espaço no projeto.
+- Build RangeEngine via vcvars64 passou (465 passos). Script da UI atualizado em build/bin. Teste em background confirmou presença da opção no menu, padrão desligado, alternância e save/reload para ambos os estados: OUTLINER_TOGGLE_AND_PERSISTENCE_OK, saída 0. Validação visual manual pendente.
+
+## 2026-09-13 — Controles flutuantes na 3D View
+
+- Reunidos em uma única barra compacta, 20 px acima do canto inferior esquerdo, `Play`, `Standalone` e Debug/Console, seguidos pelos modos de sombreamento e sua seta de opções.
+- A mesma barra agora inclui os controles de viewport antes presentes no cabeçalho: atualização de render, `Always Render (CPU+)`, Only Render e a seta do painel `VIEW3D_PT_overlay`.
+- Os controles realocados foram removidos do cabeçalho. A barra usa os mesmos dados RNA e operadores existentes.
+- A região principal passou a registrar os handlers padrão de UI para clique e interação com os novos botões.
+- Builds incrementais de `RangeEngine` via `vcvars64.bat` concluídos. Inicialização `--background --factory-startup` confirmou o painel, os dois operadores e a propriedade de console, terminando com `FLOATING_VIEW3D_LAYOUT_RUNTIME_OK`, código 0. Posição, aparência e cliques aguardam validação na janela real.

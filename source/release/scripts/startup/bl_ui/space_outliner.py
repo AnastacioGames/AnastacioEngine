@@ -93,6 +93,9 @@ class OUTLINER_MT_view(Menu):
         if space.display_mode not in {'DATABLOCKS', 'USER_PREFERENCES'}:
             layout.prop(space, "use_sort_alpha")
             layout.prop(space, "show_restrict_columns")
+        layout.prop(space, "show_alternating_rows")
+
+        if space.display_mode not in {'DATABLOCKS', 'USER_PREFERENCES'}:
             layout.separator(factor=1)
             layout.operator("outliner.show_active")
 

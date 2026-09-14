@@ -2139,6 +2139,11 @@ static void rna_def_space_outliner(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SO_HIDE_RESTRICTCOLS);
 	RNA_def_property_ui_text(prop, "Show Restriction Columns", "Show column");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+
+	prop = RNA_def_property(srna, "show_alternating_rows", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", SO_SHOW_ALTERNATING_ROWS);
+	RNA_def_property_ui_text(prop, "Show Alternating Rows", "Shade alternating rows to help distinguish items");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 }
 
 static void rna_def_background_image(BlenderRNA *brna)

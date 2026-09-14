@@ -76,10 +76,67 @@ e detalhados no [`changelog.md`](changelog.md).
   precisão declarada e `mod()` sem overload para inteiro. Cinco ocorrências
   do padrão int/float já corrigidas (linhas ~615, ~1145, ~1972, ~2329, ~2348),
   mas a varredura de 2026-09-13 mostrou erros adicionais entre as linhas
-  ~2702 e ~4639 do arquivo — trabalho sistemático ainda pendente, não apenas
-  pontual. Build limpo é apenas um marco, não validação de que o port
-  funciona; a barra de aceite continua sendo o cubo real, controlado por
-  Python, rodando no navegador.
+  ~2702 e ~4639 do arquivo. **Varredura concluída em 2026-09-13**: corrigidos
+  também `test_shadow_pcf_penumbra` (`samples` int em divisão/exponente),
+  `floorfrac`, `calc_gradient` (radial), o bloco spline Catmull-Rom,
+  `test_shadow_simple` (`type == 1/2`), `node_tex_checker` (`mod()` em int
+  trocado por `&`), Principled BSDF (`Cdlum > 0`), `node_tex_magic` (10
+  comparações `depth > N`), `mtex_parallax` (`textureLod` com lod inteiro e
+  loop `i < numsteps`), `node_tex_wave` (`fac = 1`), `lamp_visible`
+  (`col`/`energy` * `mask` inteiro) e `dither()` (`bayer[i]` inteiro dividido
+  por `64.0`). Também corrigido, em `gpu_codegen.c`: (a) `GLEW_VERSION_3_0`
+  sempre falso sob Emscripten fazia o codegen emitir `varying`/`attribute`
+  legado mesmo alvejando `#version 300 es` — introduzida a macro
+  `GPU_CODEGEN_USE_MODERN_QUALIFIERS` que força `in`/`out`/`attribute`
+  modernos sob `__EMSCRIPTEN__`; (b) `gl_FragData[i]` (built-in legado,
+  inexistente em GLSL ES 3.00) — `code_generate_fragment` agora declara
+  `out vec4 fragDataN;` explícito por índice de saída usado e
+  `codegen_call_functions` escreve nessas variáveis em vez de `gl_FragData[i]`
+  quando `GPU_CODEGEN_USE_MODERN_QUALIFIERS`. Resultado: `gpu_shader_material.glsl`
+  agora compila **sem nenhum erro** no teste Chrome headless (antes: dezenas de
+  erros de tipo). Método usado para localizar bugs cujo número de linha do erro
+  do driver não bate com o arquivo fonte (porque `GPU_shader_create_ex` concatena
+  várias strings GLSL antes de compilar): calibrar um deslocamento fixo a partir
+  de um erro já confirmado (`lamp_visible`, deslocamento ~75 linhas) e localizar
+  os demais por conteúdo/padrão do operador, não pelo número absoluto.
+  Build limpo do shader não é mais o bloqueio: o teste avançou para dentro do
+  loop de renderização e revelou um problema de camada diferente — bind de
+  buffers WebGL (`vertexAttribPointer`/`drawElements` reportando
+  `INVALID_OPERATION`/`no buffer is bound`), provavelmente no rasterizer
+  (`RAS_OpenGLRasterizer`/VAO-VBO) sob emulação GL do Emscripten, corrigido em
+  sessão posterior (ver changelog). Progresso 2026-09-13 (teste real em
+  navegador com prints de tela do usuário, não Chrome headless): corrigido
+  `gpu_texture.c` — textura de profundidade usava `GL_DEPTH_COMPONENT16`
+  como internalformat mas manteve `type = GL_UNSIGNED_BYTE`, combinação
+  inválida em WebGL2/GLES3 (`GL_DEPTH_COMPONENT16` exige
+  `GL_UNSIGNED_SHORT`); confirmado pelo usuário que os erros
+  `glTexImage2DRobustANGLE: Invalid combination...` e `Attachment has zero
+  size` desapareceram após o fix. Restou um segundo bug, ainda **não
+  resolvido**: `GL_INVALID_OPERATION: glDrawElements: Active draw buffers
+  with missing fragment shader outputs` (256 ocorrências, teto de log do
+  Chrome atingido). Tentativa de fix em `gpu_codegen.c` (declarar
+  `layout(location = i)` explícito em cada `out vec4 fragDataN` gerado)
+  **não resolveu** — erro idêntico após rebuild, descartando a hipótese de
+  que a ausência de location explícita fosse a causa para este cenário
+  (material padrão só popula `outputs[0]`; ver `gpu_material.c`,
+  `GPU_material_output_link` sempre chamado com `index=0` exceto em
+  `node_shader_output_attachment.c`). Hipótese em aberto no fim da sessão:
+  `RAS_OffScreen::m_numColorSlots` (contagem de anexos passada a
+  `glDrawBuffers` via `GPU_framebuffer_bind_all_attachments`, ver
+  `LA_Launcher.cpp`/`RAS_OffScreen.cpp`/`gpu_framebuffer.c`) pode ser maior
+  que 1 para esta cena de teste, enquanto o material do cubo só escreve em
+  location 0 — foi adicionado um `fprintf` diagnóstico em `LA_Launcher.cpp`
+  (`offscreen attachments=N`) para confirmar; ainda sem retest do usuário no
+  momento em que a sessão foi encerrada (fim de expediente). Se `N=1`, a
+  hipótese cai e resta investigar o shader legado de pipeline fixo
+  (`gpu_shader_basic_frag.glsl`, usa `gl_FragColor`/`varying`, incompatível
+  com GLES3) ou algum outro FBO (sombra, filtro 2D) como fonte real do erro.
+  **Importante, reforçado pelo usuário nesta sessão**: console sem um erro
+  específico (ou até "engine started" no log) não é validação visual nem
+  funcional — o critério de aceite (cubo real renderizando corretamente e
+  controlável por Python/teclado, confirmado visualmente pelo usuário no
+  navegador, sem captura automatizada) continua pendente e é o próximo
+  passo assim que o console estiver realmente limpo.
 - **Export mobile (Android/iOS)**: levantamento em [`mobile-export-plan.md`](mobile-export-plan.md),
   incluindo uma tentativa real de build Android (2026-09-09) que provou o CMake navegável (preset
   `android-runtime` chega a "Configure done") mas travou em dois bugs de código genuínos
@@ -160,6 +217,7 @@ e detalhados no [`changelog.md`](changelog.md).
 
 - **Export para Web — atualização 2026-09-13**: o runtime wasm já inicializa Python, lê `untitled.range` até `ENDB`, cria o canvas WebGL2, compila os shaders básicos em GLSL ES 300 e cria os framebuffers e suas texturas. O caminho Web usa as entradas GLES3 diretas para shader, VAO, framebuffer e renderbuffer, pois os ponteiros de extensão desktop do GLEW ficam nulos no Emscripten; a chamada singular `glDrawBuffer` é traduzida para `glDrawBuffers`. O bloqueio atual está isolado em `RAS_Query::RAS_Query`, ainda ligado às funções de GPU query do GLEW desktop. Depois dessa adaptação ainda falta alcançar e validar visualmente a primeira cena.
 - **Export para Web — atualização 2026-09-13 (2)**: com o alocador corrigido (handoff Codex), `LA_Launcher::InitEngine` avançou até um novo `null function` dentro de `RAS_Rasterizer::Init()`/`GPU_state_init()`. Diagnosticado e corrigido: (1) `GPU_basic_shader_light_set`/`GPU_basic_shader_light_set_viewer` (`gpu_basic_shader.c`) chamavam `glLightfv`/`glMaterialfv`/`glLightModeli` (pipeline fixo, inexistente em WebGL/GLES2) incondicionalmente dentro de `GPU_default_lights()`; agora esses caminhos são pulados sob `__EMSCRIPTEN__`, mantendo só a contabilidade de estado (`lights_enabled`/`lights_directional`) usada para escolher a variante do shader GLSL. (2) `GPU_state_init()` (`gpu_draw.c`) chamava `glDepthRange` (double), que não existe em GLES2/WebGL (só `glDepthRangef`); agora usa `glDepthRangef` sob `__EMSCRIPTEN__`. Com isso `LA_Launcher::InitEngine` completa e o loop chega a `LA_Launcher::RenderEngine()`. **Novo bloqueio, já localizado**: `RAS_OpenGLRasterizer::SetLines(bool)` chama `glPolygonMode(GL_FRONT_AND_BACK, GL_LINE/GL_FILL)`, também desktop-only (sem equivalente em GLES2/WebGL) — próximo `null function` a corrigir, mesmo padrão dos fixes acima.
+- **Export para Web — atualização 2026-09-13 (3)**: com o shader `gpu_shader_material.glsl` compilando sem erros, o teste avançou para dentro do loop de render e passou por três classes de erro de console no Chrome headless, todas corrigidas e confirmadas ausentes por log real do navegador: (1) ordem de unbind VAO/VBO em `RAS_StorageVao.cpp`/`RAS_OpenGLRasterizer.cpp` fazia o WebGL2 derrubar a referência do VBO no VAO emulado; (2) IBO do DebugDraw (`RAS_OpenGLDebugDraw.cpp`) usava o target errado; (3) `texImage2D: invalid internalformat` — textura de sombra criada com `GL_DEPTH_COMPONENT` (não dimensionado, inválido em WebGL2/GLES3), corrigido para `GL_DEPTH_COMPONENT16` sob `__EMSCRIPTEN__` (`gpu_texture.c`); (4) `texParameter: invalid parameter name` — `GL_DEPTH_TEXTURE_MODE` não existe em GLES3/WebGL2 core, chamada pulada sob Emscripten; (5) `getParameter: invalid parameter name` — Chrome deduplica mensagens de erro idênticas no console, o que escondeu que a causa real era `RAS_OpenGLRasterizer::GetNumLights()` consultando `GL_MAX_LIGHTS` (pipeline fixo, sem equivalente em GLES3/WebGL2); corrigido retornando 8 fixo sob `__EMSCRIPTEN__` (mesmo teto que o código desktop já aplicava). Localizado por instrumentação temporária (monkeypatch de `getParameter` no harness de teste, com `console.log` capturado via `--enable-logging=stderr`, já que `--dump-dom` trava no loop de render em tempo real desta página). Endurecimentos adicionais de correção em `gpu_extensions.c` (colordepth via `GL_RED/GREEN/BLUE_BITS`, anisotropia via `GLEW_EXT_texture_filter_anisotropic`, `GL_MAX_COLOR_TEXTURE_SAMPLES`) também aplicados sob guards `__EMSCRIPTEN__`; nenhum dos três isoladamente eliminou o erro observado, mas permanecem como correções de espec válidas. **Importante — distinção entre validado e pendente**: console limpo (sem nenhuma linha `WebGL:`) e `"[web-launcher] engine started"` foram confirmados via log real do Chrome headless; isso NÃO é validação visual nem funcional. Ainda faltam: (a) confirmar visualmente que o cubo aparece corretamente renderizado e iluminado no canvas; (b) confirmar que o controle via Python/teclado do cubo funciona em tempo real no navegador. Um achado à parte, não investigado: a mesma instrumentação temporária revelou `getParameter(GL_ELEMENT_ARRAY_BUFFER_BINDING)` retornando erro `INVALID_FRAMEBUFFER_OPERATION` (0x8895/1286, 6x) — não visível no log final sem instrumentação; impacto real desconhecido, requer investigação futura antes de ser descartado.
 
 - Cutscene nativo: executar no editor o roteiro de
   [`cutscene-native-example.md`](cutscene-native-example.md), cobrindo
@@ -271,3 +329,11 @@ e detalhados no [`changelog.md`](changelog.md).
 - Atualização completa do Bullet apenas para obter solver multithread.
 - Edição de cena durante o jogo com persistência automática.
 - Reimplementação de recursos herdados listados no relatório de melhorias.
+
+## Validação visual do Outliner
+
+- Confirmar visualmente `View > Show Alternating Rows` ligado/desligado: alterar a cor de fundo no tema, rolar a lista e verificar seleção e colunas de restrição. Build, inicialização e persistência dos dois estados ao salvar/reabrir passaram em 2026-09-13.
+
+## Validação visual da 3D View
+
+- Confirmar a barra flutuante da 3D View no canto inferior esquerdo: testar Play, Standalone e Debug/Console, todos os modos de sombreamento e sua seta de opções, a atualização de render, `Always Render (CPU+)`, Only Render, o painel de overlay, o bloqueio de câmera/camadas, o seletor de camadas e a entrada/saída de Edit Mode (controles Auto Merge, Occlude Geometry e Mesh Display). Redimensionar a área e verificar conflitos com textos informativos. Build e inicialização passaram em 2026-09-13.

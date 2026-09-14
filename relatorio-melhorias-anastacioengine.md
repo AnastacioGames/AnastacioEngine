@@ -134,3 +134,11 @@ ferramenta correspondente.
 - [Histórico técnico](docs/changelog.md)
 - [Arquitetura](docs/architecture.md)
 - [Guia de manutenção](docs/maintenance-guide.md)
+
+### Interface do Outliner
+
+- `Outliner > View > Show Alternating Rows` liga/desliga as faixas alternadas. Desligado por padrão, usa fundo sólido na cor do tema. Escolha por Outliner salva no projeto; destaques de seleção preservados.
+
+### Interface da 3D View
+
+- Uma única barra flutuante, 20 px acima do canto inferior esquerdo da 3D View, traz `Play`, `Standalone` e Debug/Console, os modos de sombreamento e sua seta de opções, os controles de viewport (atualização de render, `Always Render (CPU+)`, Only Render e painel de overlay), o bloqueio de câmera/camadas e o seletor de camadas, e os controles de transformação (manipulador, eixos, orientação e pivô). Ao entrar em Edit Mode, acrescenta Auto Merge, Occlude Geometry e visualização da malha; ao sair, esses controles desaparecem. Os controles correspondentes foram removidos do cabeçalho.
