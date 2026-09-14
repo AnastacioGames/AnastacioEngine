@@ -32,7 +32,7 @@ void main() {
 	vec2 rough_metal = unpackFloat2(Gbuff0.b);
 	rough_metal.x *= rough_metal.x;
 
-	vec2 pixel = (rough_metal.x * 16.0) / textureSize(ssr_buffer, 0);
+	vec2 pixel = (rough_metal.x * 16.0) / vec2(textureSize(ssr_buffer, 0));
 
 	vec3 result = texture(ssr_buffer, texcoord).rgb;
 
@@ -49,8 +49,8 @@ void main() {
 	vec3 image = texture(bgl_RenderedTexture, texcoord).rgb;
 
 	if (rough_metal.y < 0.1) {
-		gl_FragColor.rgb = image + result;
+		gl_FragColor = vec4(image + result, 1.0);
 	} else {
-		gl_FragColor.rgb = mix(image, image * result * 2.0, length(result));
+		gl_FragColor = vec4(mix(image, image * result * 2.0, length(result)), 1.0);
 	}
 }

@@ -94,6 +94,12 @@ if(EMSCRIPTEN)
 	target_link_options(RangeRuntime PRIVATE
 		"--preload-file=${PYTHON_ROOT_DIR}/lib/python311.zip@/usr/local/lib/python311.zip"
 		"--preload-file=${PYTHON_ROOT_DIR}/lib/python3.11@/usr/local/lib/python3.11"
+		# scripts/ do Blender (inclui scripts/bge, o modulo Python da BGE API) --
+		# BKE_appdir_folder_id resolve BLENDER_SYSTEM_SCRIPTS para
+		# "<bprogdir>/2.79/scripts" (get_path_local em appdir.c), e sob Emscripten
+		# bprogdir e a raiz do MEMFS ("/"), entao empacotamos no mesmo caminho
+		# relativo usado pelo layout de instalacao nativo (install/2.79/scripts).
+		"--preload-file=${CMAKE_SOURCE_DIR}/release/scripts@/2.79/scripts"
 		# TEMP (validacao de sessao, remover apos o teste): empacota uma cena
 		# minima para validar carregamento de .range no navegador.
 		"--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/../../../build-web/bin/untitled.range@/untitled.range"

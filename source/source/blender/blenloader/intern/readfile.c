@@ -2047,15 +2047,22 @@ static void test_pointer_array(FileData *fd, void **mat)
 		len = MEM_allocN_len(*mat) / fd->filesdna->pointerlen;
 
 		if (fd->filesdna->pointerlen == 8 && fd->memsdna->pointerlen == 4) {
+			int64_t val64;
+			char *rawpoin;
+
 			ipoin = imat = MEM_malloc_arrayN(len, 4, "newmatar");
-			lpoin = *mat;
+			rawpoin = (char *)*mat;
 
 			while (len-- > 0) {
+				/* rawpoin comes from a raw file buffer with no alignment
+				 * guarantee; dereferencing it directly as int64_t traps
+				 * on strict-alignment targets (e.g. wasm32/Emscripten). */
+				memcpy(&val64, rawpoin, sizeof(val64));
 				if ((fd->flags & FD_FLAGS_SWITCH_ENDIAN))
-					BLI_endian_switch_int64(lpoin);
-				*ipoin = (int)((*lpoin) >> 3);
+					BLI_endian_switch_int64(&val64);
+				*ipoin = (int)(val64 >> 3);
 				ipoin++;
-				lpoin++;
+				rawpoin += sizeof(val64);
 			}
 			MEM_freeN(*mat);
 			*mat = imat;

@@ -27,10 +27,10 @@ void main() {
 	vec3 result = vec3(0.0);
 
 	for (int i = -5; i <= 5; i++) {
-		vec2 offset = vec2(pixel * i, 0.0);
+		vec2 offset = vec2(pixel * float(i), 0.0);
 
 		result += texture(bgl_RenderedBloomB, texcoord + offset).rgb * weights[i + 5];
 	}
 
-	gl_FragColor.rgb = result;
+	gl_FragColor = vec4(result, 1.0);
 }

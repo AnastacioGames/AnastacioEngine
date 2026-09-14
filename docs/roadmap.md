@@ -53,10 +53,56 @@ e detalhados no [`changelog.md`](changelog.md).
   materiais e filtros FXAA, chuva, nuvens, lens flare e tonemap: os filtros
   reconhecidos pelo código-fonte usam somente o primeiro anexo durante o draw.
   Última execução: 6.222 draws em 1.037 frames, sem erro GL nesta cena.
-  Pendentes: aceite visual e Python/teclado no navegador, cena dedicada com
-  MRT/lacunas e cobertura dos demais filtros nativos. Detalhes no changelog
-  de 2026-09-14. O histórico abaixo
-  descreve os bloqueios anteriores e não substitui esta atualização.
+  Pendentes: aceite visual do usuário para os filtros nativos ampliados (cena
+  dedicada de MRT/filtros já criada e validada por CDP, ver abaixo; aceite
+  visual e Python/teclado do caminho original já confirmados em cena
+  separada, ver "Input de teclado/mouse no Web" abaixo). Detalhes no
+  changelog de 2026-09-14. O histórico abaixo descreve os bloqueios
+  anteriores e não substitui esta atualização.
+
+  **Cobertura dos filtros nativos restantes (2026-09-14):** o fix de draw
+  buffers acima (`m_webSingleColorOutput`, `RAS_2DFilter.cpp`) cobria só
+  FXAA, Rain, Clouds, LensFlare e Tonemaps. Estendido para os demais filtros
+  nativos de saída única confirmados por leitura de fonte: SSAO, Blur,
+  Sharpen, Dilation, Erosion, Laplacian, Sobel, Prewitt, GrayScale, Sepia,
+  Invert, OutLine, e os passes finais de composição de Bloom/SSR/Light
+  Scattering que não têm off screen próprio (os passes intermediários desses
+  três, que já bindam off screen dedicado de um anexo só, ficaram de fora de
+  propósito). Build Web limpo (exit 0, `RangeRuntime`) e smoke test via CDP
+  sem regressão (2.055 draws, zero falhas, 685 com MRT ativo).
+
+  **Cena dedicada — tentativa inicial invalidada, refeita com binding de
+  teclado (2026-09-14, mesmo dia):** a primeira versão desta cena empilhava
+  os 15 filtros como `SCA_2DFilterActuator` "sempre ativos" via
+  `controller.link(actuator=act)`, e o smoke test reportou 2.046 draws sem
+  falha — **mas essa validação estava incorreta**: `link()` só declara a
+  ligação lógica, um `SCA_PythonController` só dispara o actuator quando o
+  script chama `cont.activate()` explicitamente, e a cena nunca fazia essa
+  chamada — nenhum dos 15 filtros chegou a ser criado. O usuário confirmou
+  visualmente ("apareceu mas sem efeitos"). Refeita a pedido do usuário
+  ("colocar os efeitos em teclas do teclado"): cada filtro agora é
+  ativado por uma tecla dedicada (`1`-`9`/`0`/`Q` para os 11 filtros simples,
+  `W`/`E`/`R`/`T` para os 4 built-in SSAO/Bloom/LightScatter/SSR), via
+  `cont.activate()` por nome de actuator. Achado um segundo bug que teria
+  mascarado o teste mesmo com `activate()`: os 11 filtros simples
+  compartilhavam `filter_pass=0`, corrigido dando um `filter_pass` único
+  0-10 a cada um. Gotcha de teste automatizado: eventos de teclado
+  sintéticos via CDP não chegam ao SDL/Emscripten sem um clique do mouse no
+  canvas primeiro (foco) — sem isso, todo teste de tecla falha em silêncio,
+  inclusive testes que antes funcionavam (falso-negativo de regressão).
+  Com o binding de teclado ativando os filtros pela primeira vez de verdade,
+  **apareceram 5 bugs reais de shader** (WebGL2/GLSL ES 3.00 rejeita tipagem
+  mista int/float que compiladores desktop aceitam): `RAS_SSAO2DFilter.glsl`,
+  `RAS_OutLine2DFilter.glsl`, `RAS_Bloom2DFilter_bufH/V.glsl`,
+  `RAS_LightScaterring_Buffer2DFilter.glsl`, `RAS_SSR2DFilter.glsl` e
+  `RAS_SSR_Blur2DFilter.glsl` — todos corrigidos. Rebuild `RangeRuntime` exit
+  0; sweep completo via CDP das 15 teclas: **zero erros de compilação de
+  shader e zero falhas de draw em todas as 15**. **Ainda falta**: aceite
+  visual do usuário no navegador real (o teste automatizado agora confirma
+  que os 15 filtros executam sem erro de GL/shader, não a aparência visual
+  correta de cada efeito — não há objetos refletivos para SSR nem luz
+  configurada para Light Scattering/SSAO nesta cena mínima). Detalhes no
+  changelog de 2026-09-14.
 
   **Input de teclado/mouse no Web (2026-09-14):** duas causas raiz encontradas e
   corrigidas. (1) A porta SDL2 do Emscripten usava por padrão o alvo `"#window"`

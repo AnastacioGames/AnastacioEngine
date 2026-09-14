@@ -2,7 +2,7 @@ uniform sampler2D bgl_RenderedTexture;
 uniform sampler2D bgl_DepthTexture;
 uniform sampler2D bgl_DataTextures[1];
 
-uniform mat2 rot = mat2(vec2(0, -1), vec2(1, 0));
+const mat2 rot = mat2(vec2(0, -1), vec2(1, 0));
 
 #if __VERSION__ >= 130
 

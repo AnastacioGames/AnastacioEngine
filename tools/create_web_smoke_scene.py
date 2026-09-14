@@ -73,6 +73,56 @@ if joy:
     obj["joy_button_prev"] = joy_button_down
 
 obj.applyRotation((0, 0, 0.01 * spin_dir), True)
+
+# 2D filter toggles. Each simple filter has 3 linked actuators (create/on/off,
+# see tools/create_web_smoke_scene.py for why) and each built-in filter has a
+# single "on" actuator (the engine's actuator switch only ever calls
+# SetBuiltinFilterEnabled(mode, True), so built-ins cannot be disabled again
+# through logic bricks -- this is a known limitation, not a bug in this script).
+SIMPLE_FILTER_KEYS = [
+    (Range.events.ONEKEY, 'BLUR'), (Range.events.TWOKEY, 'SHARPEN'),
+    (Range.events.THREEKEY, 'DILATION'), (Range.events.FOURKEY, 'EROSION'),
+    (Range.events.FIVEKEY, 'LAPLACIAN'), (Range.events.SIXKEY, 'SOBEL'),
+    (Range.events.SEVENKEY, 'PREWITT'), (Range.events.EIGHTKEY, 'GRAYSCALE'),
+    (Range.events.NINEKEY, 'SEPIA'), (Range.events.ZEROKEY, 'INVERT'),
+    (Range.events.QKEY, 'OUTLINE'),
+]
+BUILTIN_FILTER_KEYS = [
+    (Range.events.WKEY, 'SSAO'), (Range.events.EKEY, 'BLOOM'),
+    (Range.events.RKEY, 'LIGHTSCATTER'), (Range.events.TKEY, 'SSR'),
+]
+def key_edge(key):
+    # Rising edge tracked by hand instead of relying on the engine's
+    # JUST_ACTIVATED (value 1) sample, which a synthetic/CDP keydown+keyup
+    # pair can land between logic ticks and miss entirely; this only needs
+    # any single tick to observe the key as down after a tick that didn't.
+    down = keys[key] in (1, 2)
+    prev_prop = 'kbprev_' + str(key)
+    was_down = obj.get(prev_prop, False)
+    obj[prev_prop] = down
+    return down and not was_down
+
+for key, mode in SIMPLE_FILTER_KEYS:
+    if key_edge(key):
+        on_prop = 'flt_on_' + mode
+        created_prop = 'flt_created_' + mode
+        is_on = obj.get(on_prop, False)
+        if not is_on:
+            if obj.get(created_prop, False):
+                cont.activate(mode + '_ON')
+            else:
+                cont.activate(mode + '_CREATE')
+                obj[created_prop] = True
+            obj[on_prop] = True
+            print('[web-smoke] filter ON:', mode, flush=True)
+        else:
+            cont.activate(mode + '_OFF')
+            obj[on_prop] = False
+            print('[web-smoke] filter OFF:', mode, flush=True)
+for key, mode in BUILTIN_FILTER_KEYS:
+    if key_edge(key):
+        cont.activate(mode + '_ON')
+        print('[web-smoke] built-in filter ON (cannot toggle off):', mode, flush=True)
 ''')
 bpy.ops.logic.sensor_add(type='ALWAYS', object=cube.name)
 sensor = cube.game.sensors[-1]
@@ -81,6 +131,46 @@ bpy.ops.logic.controller_add(type='PYTHON', object=cube.name)
 controller = cube.game.controllers[-1]
 controller.text = script
 sensor.link(controller)
+
+# Every native 2D filter newly covered by the Web m_webSingleColorOutput fix
+# (2026-09-14), bound to keyboard keys (see the Python controller script
+# above) instead of always-on, so each one can be visually inspected on its
+# own in a real browser. Linking an actuator to a controller does NOT run it
+# automatically (confirmed via SCA_PythonController::Update, which only fires
+# actuators the script explicitly passes to cont.activate()) -- the earlier
+# always-on version of this scene never actually activated any of them.
+#
+# Simple filters (SCA_2DFilterActuator's "default" switch case) are added via
+# RAS_2DFilterManager::AddFilter(..., use_reserved=false), which stores them
+# at filter_pass + reservedPassIndex (17), so any distinct filter_pass keeps
+# them from colliding with each other or with the built-in reserved passes
+# (0-17). Each gets 3 actuators: CREATE (mode=<filter>, adds it enabled),
+# ON (mode=ENABLE) and OFF (mode=DISABLE), so the key handler can toggle it
+# after the first activation.
+simple_filter_modes = [
+    'BLUR', 'SHARPEN', 'DILATION', 'EROSION', 'LAPLACIAN', 'SOBEL', 'PREWITT',
+    'GRAYSCALE', 'SEPIA', 'INVERT', 'OUTLINE',
+]
+for filter_pass, mode in enumerate(simple_filter_modes):
+    for suffix, act_mode in (('_CREATE', mode), ('_ON', 'ENABLE'), ('_OFF', 'DISABLE')):
+        bpy.ops.logic.actuator_add(type='FILTER_2D', object=cube.name)
+        act = cube.game.actuators[-1]
+        act.name = mode + suffix
+        act.mode = act_mode
+        act.filter_pass = filter_pass
+        controller.link(actuator=act)
+
+# Built-in multi-pass filters (Bloom, SSAO, LightScatter, SSR) go through
+# RAS_2DFilterManager::SetBuiltinFilterEnabled(), which the actuator only
+# ever calls with enabled=True -- there is no logic-brick path to disable
+# them again, so only an "ON" actuator is created for these.
+builtin_filter_modes = ['SSAO', 'BLOOM', 'LIGHTSCATTER', 'SSR']
+for mode in builtin_filter_modes:
+    bpy.ops.logic.actuator_add(type='FILTER_2D', object=cube.name)
+    act = cube.game.actuators[-1]
+    act.name = mode + '_ON'
+    act.mode = mode
+    controller.link(actuator=act)
 
 camera = bpy.data.objects.new('WebCamera', bpy.data.cameras.new('WebCamera'))
 scene.objects.link(camera)

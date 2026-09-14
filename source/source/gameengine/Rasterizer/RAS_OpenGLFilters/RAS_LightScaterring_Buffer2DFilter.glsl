@@ -37,7 +37,7 @@ void main() {
 	vec3 result = vec3(0.0);
 	float weights = 1.0;
 
-	for (int i = 0; i < ge_LightScatterParams.x; i++) {
+	for (int i = 0; i < int(ge_LightScatterParams.x); i++) {
 		vec2 offset = uvcoord - delta * (float(i) / ge_LightScatterParams.x);
 
 		vec3 color = texture(bgl_RenderedTexture, offset).rgb - ge_LightScatterParams.z;
@@ -48,5 +48,5 @@ void main() {
 
 	float ocluder = max(0.0, 1.0 - distance(ge_LightScatterSunPos, vec2(0.5)));
 
-	gl_FragColor.rgb = saturation(result) * ocluder * ge_LightScatterParams.w;
+	gl_FragColor = vec4(saturation(result) * ocluder * ge_LightScatterParams.w, 1.0);
 }

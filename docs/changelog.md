@@ -4,6 +4,144 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-14 — Web: cobertura dos filtros nativos restantes no fix de draw buffers
+
+- Retomando o item pendente da entrada "roteamento de draw buffers nos materiais gerados"/"saídas dos
+  filtros de pós-processamento": `m_webSingleColorOutput` em `RAS_2DFilter.cpp` cobria só cinco filtros
+  nativos (FXAA, Rain, Clouds, LensFlare, Tonemaps) por comparação de fonte completa do fragment shader,
+  porque `filterMode` sozinho não distingue nativo de custom (o clima também usa `FILTER_CUSTOMFILTER`).
+- Levantamento dos `.glsl` em `RAS_OpenGLFilters/` e de `KX_2DFilterManager.cpp`/`RAS_2DFilterManager.cpp`
+  confirmou que todos os filtros nativos restantes que desenham direto no off screen compartilhado da cena
+  (sem off screen próprio via `SetOffScreen`) declaram só um output `fragColor`, igual aos cinco já
+  cobertos: SSAO, Blur, Sharpen, Dilation, Erosion, Laplacian, Sobel, Prewitt, GrayScale, Sepia, Invert,
+  OutLine, e os passes finais de composição de Bloom (`RAS_Bloom2DFilter_Image`), SSR
+  (`RAS_SSR_Blur2DFilter`) e Light Scattering (`RAS_LightScaterring_Image2DFilter`) — esses três últimos
+  têm passes intermediários com off screen próprio (não precisam do fix), mas o pass final de composição
+  não tem e sofreria o mesmo `GL_INVALID_OPERATION: missing fragment shader outputs` no Web assim que
+  habilitado numa cena com MRT ativo.
+- `RAS_2DFilter.cpp`: lista de comparação estendida para as 15 fontes adicionais confirmadas
+  (Bloom buf/bufH/bufV, SSR buffer e Light Scattering buffer ficaram de fora de propósito, por já
+  usarem off screen próprio de um anexo só). Nenhuma mudança de header, flag global ou comportamento
+  fora de `__EMSCRIPTEN__`.
+- Build `RangeRuntime` em `build-web` via `vcvars64.bat` + `emsdk_env.bat` na mesma chamada: exit 0, 5
+  passos. Smoke test via Chrome/CDP (`build-web/smoke-diagnose.cjs`, cache desativado,
+  `web-smoke.range`): **2.055 draws, zero falhas, 685 com o segundo anexo (MRT) ativo** — confirma
+  ausência de regressão no caminho já validado, não valida os filtros novos em si (a cena de smoke não
+  os habilita).
+- Pendente (resolvido a seguir nesta mesma data): nenhuma cena local hoje habilita SSAO/Blur/Sharpen/etc.
+  para exercitar o fix igual foi feito para FXAA/Rain/Clouds antes; falta uma cena dedicada de MRT/filtros
+  (o item já registrado no roadmap) para validar por CDP e depois aceite visual do usuário.
+
+## 2026-09-14 — Web: cena dedicada valida os 15 filtros nativos recém-cobertos
+
+- Seguindo o pendente da entrada anterior: `tools/create_web_smoke_scene.py` ganhou um bloco que empilha
+  15 `SCA_2DFilterActuator` no `WebKeyboardCube` (todos ligados ao mesmo controller Python, sempre ativos
+  via o sensor `ALWAYS` já existente): `BLUR`, `SHARPEN`, `DILATION`, `EROSION`, `LAPLACIAN`, `SOBEL`,
+  `PREWITT`, `GRAYSCALE`, `SEPIA`, `INVERT`, `OUTLINE`, `SSAO`, `BLOOM`, `LIGHTSCATTER`, `SSR` — exatamente
+  os 15 filtros adicionados à cobertura do `m_webSingleColorOutput` na entrada anterior. Os filtros
+  built-in (SSAO/Bloom/Light Scattering/SSR) não exigem setup extra de cena: `RAS_2DFilterManager::
+  SetBuiltinFilterEnabled` cria os passes internos sozinho a partir só do actuator.
+  - Gotcha de API: `sensor.link(actuator)` falha (`AlwaysSensor.link()` só aceita `Controller`); o link
+    correto de um actuator a um controller já criado é `controller.link(actuator=act)`.
+- Cena regerada via `build/bin/RangeEngine.exe -b --python tools/create_web_smoke_scene.py` (editor nativo,
+  não o player Web) sobrescrevendo `build-web/bin/web-smoke.range`.
+- Smoke test via Chrome/CDP (`build-web/smoke-diagnose.cjs`, servidor HTTP e Chrome debugging já ativos de
+  sessão anterior): **2.046 draws, zero falhas, 682 com MRT (segundo anexo) ativo**, sem nenhuma entrada de
+  erro/exceção no log (`build-web/smoke-diagnostic.log`). Isso valida de fato o fix da entrada anterior —
+  antes só havia sido validada a ausência de regressão no caminho de 5 filtros já cobertos, agora os 15
+  filtros novos foram exercitados e não produziram `GL_INVALID_OPERATION`.
+- Segue faltando: aceite visual do usuário no navegador real (este teste só confirma ausência de erro de
+  GL via CDP, não a corretude visual de cada filtro — não há objetos refletivos para SSR nem luz
+  configurada para Light Scattering/SSAO nesta cena mínima).
+
+## 2026-09-14 — Web: correção da entrada anterior — os 15 filtros nunca tinham sido de fato ativados, mais 5 bugs reais de shader achados e corrigidos
+
+- **A validação "15 filtros exercitados, zero `GL_INVALID_OPERATION`" da entrada anterior estava incorreta.**
+  O usuário reportou visualmente "apareceu mas sem efeitos" — investigação confirmou que nenhum dos 15
+  filtros era de fato executado: `controller.link(actuator=act)` só declara a ligação lógica, mas um
+  `SCA_PythonController` (`SCA_PythonController.cpp`) só dispara um actuator ligado quando o script chama
+  `cont.activate(actuator_ou_nome)` explicitamente — a cena anterior nunca fazia essa chamada, então
+  `SCA_2DFilterActuator::Update()` nunca rodava e nenhum filtro era criado. O "sem falhas" reportado antes
+  media apenas o caminho sem filtro nenhum ativo.
+- Bug adicional que teria mascarado o resultado mesmo com `activate()`: os 11 filtros simples (não
+  built-in) compartilhavam `filter_pass=0` por não terem sido configurados individualmente — via
+  `RAS_2DFilterManager::AddFilter`, isso faz o segundo filtro criado no mesmo pass logar aviso e não fazer
+  nada (`SCA_2DFilterActuator.cpp`, case `default`), então só o primeiro filtro ativado teria efeito.
+- **Fix**: `tools/create_web_smoke_scene.py` reescrito a pedido do usuário ("colocar os efeitos em teclas
+  do teclado") — cada um dos 15 filtros agora é ativado por uma tecla dedicada em vez de sempre-ligado:
+  `1`-`9`/`0`/`Q` para os 11 filtros simples (Blur, Sharpen, Dilation, Erosion, Laplacian, Sobel, Prewitt,
+  GrayScale, Sepia, Invert, Outline — cada um com `filter_pass` único 0-10 e 3 actuators ligados
+  `<nome>_CREATE`/`_ON`/`_OFF`, ativados via `cont.activate()` por nome), `W`/`E`/`R`/`T` para os 4
+  built-in (SSAO, Bloom, LightScatter, SSR — só actuator `_ON`, já que o actuator clássico só chama
+  `SetBuiltinFilterEnabled(mode, True)`, sem caminho de desligar por logic brick — limitação do engine,
+  não bug desta cena). Borda de tecla detectada por variável própria no objeto (`key_edge()`), não pelo
+  valor `JUST_ACTIVATED` puro do engine, por robustez a testes automatizados.
+- **Gotcha de teste automatizado via CDP** (`build-web/filters-smoke-diagnose.cjs`): eventos de teclado
+  sintéticos (`Input.dispatchKeyEvent`) não chegam ao handler SDL/Emscripten sem o canvas primeiro receber
+  foco de mouse — confirmado pelo texto na tela ("Clique no jogo e use as setas"), mas não documentado em
+  nenhum lugar do código. Sem um clique sintético (`Input.dispatchMouseEvent`) antes das teclas, todo teste
+  automatizado por teclado falha silenciosamente, inclusive testes que já tinham funcionado antes (ex.:
+  seta direita), causando falso-negativo de regressão. Fix do script de teste: clique no canvas antes de
+  qualquer tecla.
+- **Com o binding de teclado realmente ativando os filtros pela primeira vez, apareceram 5 bugs reais de
+  shader, específicos de WebGL2/GLSL ES 3.00 (tipagem estrita, aceito em compiladores desktop mas rejeitado
+  aqui)**, um por filtro, todos corrigidos:
+  - `RAS_SSAO2DFilter.glsl`: `float * int`/`float - int` em `createJitter()` (faltavam `.0`) e
+    `int < float` no loop de amostragem (faltava `int()` no limite).
+  - `RAS_OutLine2DFilter.glsl`: `uniform mat2 rot = mat2(...)` — GLSL ES não permite inicializador em
+    declaração de `uniform`; trocado para `const mat2`.
+  - `RAS_Bloom2DFilter_bufH.glsl`/`RAS_Bloom2DFilter_bufV.glsl`: `pixel * i` (float * int) no cálculo do
+    offset do blur gaussiano; `i` envolvido em `float()`.
+  - `RAS_LightScaterring_Buffer2DFilter.glsl`: `i < ge_LightScatterParams.x` (int < float) no loop de
+    raymarching; limite envolvido em `int()`.
+  - `RAS_SSR2DFilter.glsl`: `v.z < 0` (float < int literal) em `decode_octa()`; trocado para `0.0`.
+  - `RAS_SSR_Blur2DFilter.glsl`: `float / textureSize(...)` — `textureSize` retorna `ivec2`, divisão com
+    `float` à esquerda não existe; resultado envolvido em `vec2()`.
+- Rebuild `RangeRuntime` em `build-web` (vcvars64 + emsdk_env na mesma chamada): exit 0, 14 passos.
+  Sweep completo via CDP das 15 teclas (`filters-smoke-diagnose.cjs` estendido para cobrir todas, não só
+  Blur/SSAO): **zero erros de compilação de shader e zero falhas de draw em todas as 15 teclas**, contra 5
+  filtros com erro de compilação confirmado no run anterior ao fix (Outline, Bloom, LightScatter, SSR, e
+  SSAO já corrigido antes desse sweep).
+- Segue faltando (igual à entrada anterior, ainda não resolvido): aceite visual do usuário no navegador
+  real — o teste automatizado agora confirma que os 15 filtros *executam* sem erro de GL/shader, mas não
+  confirma a aparência visual correta de cada efeito.
+
+## 2026-09-14 — Web: LightScatter e SSR renderizando tela branca (aceite visual do usuário, 6º bug de shader)
+
+- Usuário testou os 15 filtros no navegador real (primeiro aceite visual desta série): 13 funcionam
+  corretamente, mas `LightScatter` (tecla `R`) e `SSR` (tecla `T`) pintam a tela inteira de branco.
+- Achado por comparação com os shaders que funcionam: `RAS_Bloom2DFilter_Image.glsl` (compose final do
+  Bloom, funciona) escreve `gl_FragColor = vec4(cor, 1.0)` — atribuição completa do `vec4`, canal alfa
+  incluído. Os dois passes finais de composição problemáticos faziam só `gl_FragColor.rgb = ...`, sem
+  nunca escrever `.a`: `RAS_LightScaterring_Image2DFilter.glsl` (compose final do LightScatter) e
+  `RAS_SSR_Blur2DFilter.glsl` (compose final do SSR — o primeiro pass, `RAS_SSR2DFilter.glsl`, já
+  escrevia `.a = 1.0` corretamente, só o pass de blur final tinha o bug). Alfa não inicializado em
+  `out vec4 fragColor` é indefinido (não zerado por padrão), consistente com o sintoma de tela branca.
+- **Fix**: as duas atribuições passaram a escrever o `vec4` inteiro com `.a = 1.0`, no mesmo padrão do
+  Bloom e dos demais filtros que já funcionavam.
+- Rebuild `RangeRuntime` (vcvars64 + emsdk_env): exit 0, 6 passos. Sweep completo via CDP das 15 teclas
+  novamente: zero erros de compilação, zero falhas de draw (sem regressão). **Aceite visual de `R`/`T`
+  pós-fix ainda pendente com o usuário** — esta entrada registra o diagnóstico e o fix aplicado, não a
+  confirmação visual final.
+
+## 2026-09-14 — Web: varredura de todos os `.glsl` de filtro por escrita de alfa indefinida (pós 6º bug)
+
+- A pedido do usuário ("verifica os outros que tem vec4 tmb"), grep em todos os 25 `.glsl` de
+  `RAS_OpenGLFilters/` por `gl_FragColor`/`fragColor` para achar outras ocorrências do mesmo padrão do
+  6º bug (atribuição só de `.rgb`, sem `.a`, em `out vec4 fragColor`).
+- Achados mais 3 casos com o mesmo bug latente, todos em passes intermediários (escrevem num off screen
+  próprio consumido depois só via `.rgb` por outro pass, por isso nunca deram tela branca visível, mas
+  têm o mesmo alfa indefinido do 6º bug): `RAS_Bloom2DFilter_bufH.glsl` e `RAS_Bloom2DFilter_bufV.glsl`
+  (blur horizontal/vertical do Bloom) e `RAS_LightScaterring_Buffer2DFilter.glsl` (buffer de oclusão do
+  Light Scattering). Os demais 22 arquivos já faziam atribuição completa do `vec4` ou setavam `.a`
+  explicitamente (confirmado por leitura de cada ocorrência de `gl_FragColor`/`fragColor`).
+- **Fix**: as três atribuições passaram de `gl_FragColor.rgb = <expr>;` para
+  `gl_FragColor = vec4(<expr>, 1.0);`, mesmo padrão dos fixes anteriores.
+- Rebuild `RangeRuntime` (vcvars64 + emsdk_env): exit 0, 8 passos. Sweep completo via CDP das 15 teclas
+  (rodado da raiz do repo, `node build-web/filters-smoke-diagnose.cjs`, pois o script assume cwd em
+  `D:\AnastacioEngine`): zero erros de compilação, zero falhas de draw em todos os 15 filtros, incluindo
+  LightScatter e SSR — sem regressão. Aceite visual final de `R`/`T` continua pendente com o usuário.
+
 ## 2026-09-14 — Web: gamepad físico — D-pad/analógico travando (resolvido)
 
 - Depois de confirmado que o botão do gamepad funcionava perfeitamente, o

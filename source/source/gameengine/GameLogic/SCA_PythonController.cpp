@@ -142,7 +142,7 @@ bool SCA_PythonController::IsTriggered(class SCA_ISensor *sensor)
 #ifdef WITH_PYTHON
 
 /* warning, self is not the SCA_PythonController, its a EXP_PyObjectPlus_Proxy */
-PyObject *SCA_PythonController::sPyGetCurrentController(PyObject *self)
+PyObject *SCA_PythonController::sPyGetCurrentController(PyObject *self, PyObject *args)
 {
 	if (m_sCurrentController == nullptr) {
 		PyErr_SetString(PyExc_SystemError, "bge.logic.getCurrentController(), this function is being run outside the python controllers context, or blenders internal state is corrupt.");

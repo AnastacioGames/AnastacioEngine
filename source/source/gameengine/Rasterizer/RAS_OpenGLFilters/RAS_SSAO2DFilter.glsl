@@ -91,8 +91,8 @@ vec3 calculate_view_space_normal(in vec3 viewposition)
 
 vec2 createJitter(vec2 xy)
 {
-    float jitter_x = fract(sin(dot(xy, vec2(12.9898, 78.233))) * 43758.5453)*2-1;
-    float jitter_y = fract(sin(dot(xy, vec2(98.2340, 34.982))) * 23452.9876)*2-1;
+    float jitter_x = fract(sin(dot(xy, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 - 1.0;
+    float jitter_y = fract(sin(dot(xy, vec2(98.2340, 34.982))) * 23452.9876) * 2.0 - 1.0;
     return normalize(vec2(jitter_x, jitter_y)) * (1.0 / ssao_sample_params.x);
 }
 
@@ -128,7 +128,7 @@ float calculate_ssao_factor(float depth)
 	float factor = 0.0;
 	int x;
 
-	for (x = 0; x < ge_ssaoparams.x; x++) {
+	for (x = 0; x < int(ge_ssaoparams.x); x++) {
         vec2 dir_sample = spiralSampling((float(x) + 0.5) * ssao_sample_params.x);
 		/* rotate with random direction to get jittered result */
 		vec2 dir_jittered = vec2(dot(dir_sample, rotX), dot(dir_sample, rotY));

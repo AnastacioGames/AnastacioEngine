@@ -167,19 +167,25 @@ void set_var_from_attr(vec4 attr, int info, out vec4 var)
 /* end color code */
 
 /* inputs for user code */
-#ifdef USE_CORE_PROFILE
-vec3 VERTEX = att_Position;
-vec3 NORMAL = att_Normal;
-#else
-vec3 VERTEX = gl_Vertex.xyz;
-vec3 NORMAL = gl_Normal;
-#endif
-float TIME = unftime;
+/* Core profile GLSL only allows constant expressions in global initializers, so these
+ * are assigned at runtime at the top of main() instead of at declaration. */
+vec3 VERTEX;
+vec3 NORMAL;
+float TIME;
 
 void vertex(); /* declare here but user provides definition. */
 
 void main()
 {
+#ifdef USE_CORE_PROFILE
+	VERTEX = att_Position;
+	NORMAL = att_Normal;
+#else
+	VERTEX = gl_Vertex.xyz;
+	NORMAL = gl_Normal;
+#endif
+	TIME = unftime;
+
 #ifndef USE_OPENSUBDIV
 #ifdef USE_CORE_PROFILE
 	vec4 position = vec4(att_Position, 1.0);

@@ -94,7 +94,12 @@ class SCA_PythonController : public SCA_IController
 	
 #ifdef WITH_PYTHON
 	static const char *sPyGetCurrentController__doc__;
-	static PyObject   *sPyGetCurrentController(PyObject *self);
+	/* Declared taking the full (self, args) PyCFunction signature -- METH_NOARGS
+	 * still invokes through a PyCFunction-typed pointer (args always nullptr), and a
+	 * 1-arg C++ signature cast to PyCFunction is UB that WASM's strict indirect-call
+	 * type checking rejects ("function signature mismatch"), unlike native ABIs that
+	 * silently tolerate the extra argument. */
+	static PyObject   *sPyGetCurrentController(PyObject *self, PyObject *args);
 	static const char *sPyAddActiveActuator__doc__;
 	static PyObject   *sPyAddActiveActuator(PyObject *self,
 	                                        PyObject *args);

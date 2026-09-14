@@ -192,10 +192,15 @@ public: \
 		return ((class_name *)EXP_PROXY_REF(self))->Py##method_name(args); \
 	}
 
+/* sPy##method_name takes the full (self, args) PyCFunction signature even
+ * though METH_NOARGS always passes args=nullptr: WASM's indirect-call type
+ * checking rejects a 1-arg C++ function cast to PyCFunction and invoked
+ * through PyObject_Vectorcall ("function signature mismatch"), where native
+ * ABIs silently tolerated that mismatched cast. */
 #define EXP_PYMETHOD_NOARGS(class_name, method_name) \
 	PyObject * Py##method_name(); \
 	static PyObject * \
-	sPy##method_name(PyObject * self) \
+	sPy##method_name(PyObject * self, PyObject *) \
 	{ \
 		if (EXP_PROXY_REF(self) == nullptr) { \
 			PyErr_SetString(PyExc_RuntimeError, \
@@ -262,10 +267,11 @@ public: \
 	} \
 	static const char method_name##_doc[];
 
+/* See EXP_PYMETHOD_NOARGS above re: (self, args) signature under WASM. */
 #define EXP_PYMETHOD_DOC_NOARGS(class_name, method_name) \
 	PyObject * Py##method_name(); \
 	static PyObject * \
-	sPy##method_name(PyObject * self) \
+	sPy##method_name(PyObject * self, PyObject *) \
 	{ \
 		if (EXP_PROXY_REF(self) == nullptr) { \
 			PyErr_SetString(PyExc_RuntimeError, \

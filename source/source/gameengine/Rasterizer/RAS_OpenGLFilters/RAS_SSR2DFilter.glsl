@@ -35,7 +35,7 @@ vec2 unpackFloat2(float f) {
 vec3 decode_octa(vec2 e) {
 	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
 
-	if (v.z < 0)
+	if (v.z < 0.0)
 		v.xy = (1.0 - abs(v.yx)) * vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
 
 	return -(gl_ModelViewMatrix * vec4(normalize(v), 0.0)).xyz;

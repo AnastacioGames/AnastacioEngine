@@ -21,5 +21,5 @@ void main() {
 	vec3 image = texture(bgl_RenderedTexture, texcoord).rgb;
 	vec3 scatter = texture(bgl_LightScatter,  texcoord).rgb;
 
-	gl_FragColor.rgb = image + scatter;
+	gl_FragColor = vec4(image + scatter, 1.0);
 }

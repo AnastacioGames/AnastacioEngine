@@ -35,6 +35,10 @@
 #include <functional>
 #include <memory>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 extern "C" {
 extern char datatoc_RAS_VertexShader2DFilter_glsl[];
 #ifdef __EMSCRIPTEN__
@@ -43,6 +47,21 @@ extern char datatoc_RAS_Rain2DFilter_glsl[];
 extern char datatoc_RAS_Clouds2DFilter_glsl[];
 extern char datatoc_RAS_LensFlare2DFilter_glsl[];
 extern char datatoc_RAS_Tonemaps2DFilter_glsl[];
+extern char datatoc_RAS_SSAO2DFilter_glsl[];
+extern char datatoc_RAS_Blur2DFilter_glsl[];
+extern char datatoc_RAS_Sharpen2DFilter_glsl[];
+extern char datatoc_RAS_Dilation2DFilter_glsl[];
+extern char datatoc_RAS_Erosion2DFilter_glsl[];
+extern char datatoc_RAS_Laplacian2DFilter_glsl[];
+extern char datatoc_RAS_Sobel2DFilter_glsl[];
+extern char datatoc_RAS_Prewitt2DFilter_glsl[];
+extern char datatoc_RAS_GrayScale2DFilter_glsl[];
+extern char datatoc_RAS_Sepia2DFilter_glsl[];
+extern char datatoc_RAS_Invert2DFilter_glsl[];
+extern char datatoc_RAS_OutLine2DFilter_glsl[];
+extern char datatoc_RAS_Bloom2DFilter_Image_glsl[];
+extern char datatoc_RAS_SSR_Blur2DFilter_glsl[];
+extern char datatoc_RAS_LightScaterring_Image2DFilter_glsl[];
 extern void emscripten_glDrawBuffers(GLsizei n, const GLenum *bufs);
 #endif
 }
@@ -237,6 +256,41 @@ RAS_OffScreen *RAS_2DFilter::Render(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, 
 
 	rasty->DrawOverlayPlane();
 
+#ifdef __EMSCRIPTEN__
+	if (EM_ASM_INT({ return (typeof window !== 'undefined' && window.RAS_2DFILTER_DEBUG) ? 1 : 0; })) {
+		GLenum err = glGetError();
+		GLint framebuffer = 0;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebuffer);
+		const std::string& frag = m_progs[FRAGMENT_PROGRAM];
+		const char *name =
+		    frag == datatoc_RAS_Fxaa2DFilter_glsl ? "FXAA" :
+		    frag == datatoc_RAS_Rain2DFilter_glsl ? "RAIN" :
+		    frag == datatoc_RAS_Clouds2DFilter_glsl ? "CLOUDS" :
+		    frag == datatoc_RAS_LensFlare2DFilter_glsl ? "LENSFLARE" :
+		    frag == datatoc_RAS_Tonemaps2DFilter_glsl ? "TONEMAPS" :
+		    frag == datatoc_RAS_SSAO2DFilter_glsl ? "SSAO" :
+		    frag == datatoc_RAS_Blur2DFilter_glsl ? "BLUR" :
+		    frag == datatoc_RAS_Sharpen2DFilter_glsl ? "SHARPEN" :
+		    frag == datatoc_RAS_Dilation2DFilter_glsl ? "DILATION" :
+		    frag == datatoc_RAS_Erosion2DFilter_glsl ? "EROSION" :
+		    frag == datatoc_RAS_Laplacian2DFilter_glsl ? "LAPLACIAN" :
+		    frag == datatoc_RAS_Sobel2DFilter_glsl ? "SOBEL" :
+		    frag == datatoc_RAS_Prewitt2DFilter_glsl ? "PREWITT" :
+		    frag == datatoc_RAS_GrayScale2DFilter_glsl ? "GRAYSCALE" :
+		    frag == datatoc_RAS_Sepia2DFilter_glsl ? "SEPIA" :
+		    frag == datatoc_RAS_Invert2DFilter_glsl ? "INVERT" :
+		    frag == datatoc_RAS_OutLine2DFilter_glsl ? "OUTLINE" :
+		    frag == datatoc_RAS_Bloom2DFilter_Image_glsl ? "BLOOM_IMAGE" :
+		    frag == datatoc_RAS_SSR_Blur2DFilter_glsl ? "SSR" :
+		    frag == datatoc_RAS_LightScaterring_Image2DFilter_glsl ? "LIGHTSCATTER" :
+		    "OTHER(custom/buffer)";
+		printf("[web-filter] name=%s singleColorOutput=%d offScreen=%d framebuffer=%d drawBufferCount=%d "
+		       "glError=0x%x\n",
+		       name, (int)m_webSingleColorOutput, m_offScreen ? 1 : 0, framebuffer,
+		       drawBufferCount, (unsigned int)err);
+	}
+#endif
+
 	return outputofs;
 }
 
@@ -250,13 +304,33 @@ bool RAS_2DFilter::LinkProgram()
 
 #ifdef __EMSCRIPTEN__
 	/* Compare complete sources on each link, including Python-triggered relinks.
-	 * Weather uses CUSTOMFILTER too, so filterMode cannot identify native shaders. */
+	 * Weather uses CUSTOMFILTER too, so filterMode cannot identify native shaders.
+	 * Covers every native 2D filter that draws straight onto the shared scene off
+	 * screen (single "fragColor" output) instead of a private single-attachment
+	 * off screen of its own (Bloom buf/bufH/bufV, SSR buffer and Light Scattering
+	 * buffer already bind their own off screen via SetOffScreen(), so they never
+	 * see the scene's extra draw buffers and don't need this list). */
 	const std::string& fragment = m_progs[FRAGMENT_PROGRAM];
 	m_webSingleColorOutput = fragment == datatoc_RAS_Fxaa2DFilter_glsl ||
 	                        fragment == datatoc_RAS_Rain2DFilter_glsl ||
 	                        fragment == datatoc_RAS_Clouds2DFilter_glsl ||
 	                        fragment == datatoc_RAS_LensFlare2DFilter_glsl ||
-	                        fragment == datatoc_RAS_Tonemaps2DFilter_glsl;
+	                        fragment == datatoc_RAS_Tonemaps2DFilter_glsl ||
+	                        fragment == datatoc_RAS_SSAO2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Blur2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Sharpen2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Dilation2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Erosion2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Laplacian2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Sobel2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Prewitt2DFilter_glsl ||
+	                        fragment == datatoc_RAS_GrayScale2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Sepia2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Invert2DFilter_glsl ||
+	                        fragment == datatoc_RAS_OutLine2DFilter_glsl ||
+	                        fragment == datatoc_RAS_Bloom2DFilter_Image_glsl ||
+	                        fragment == datatoc_RAS_SSR_Blur2DFilter_glsl ||
+	                        fragment == datatoc_RAS_LightScaterring_Image2DFilter_glsl;
 #endif
 
 	return true;
