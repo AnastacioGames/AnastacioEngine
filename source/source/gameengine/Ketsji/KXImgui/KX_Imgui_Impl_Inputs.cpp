@@ -352,6 +352,12 @@ void KX_ImGui_Impl_Inputs_Shutdown()
 {
     ImGui_ImplSDL2_Data* bd = ImGui_ImplSDL2_GetBackendData();
     IM_ASSERT(bd != nullptr && "No platform backend to shutdown, or already shutdown?");
+    /* In Release builds IM_ASSERT is a no-op, so without this early-out a null
+     * bd (backend already shut down, or the current ImGui context isn't the one
+     * that ran Init) falls through to bd->ClipboardTextData below and crashes.
+     * This is what was closing the whole editor on ESC after "P". */
+    if (bd == nullptr)
+        return;
     ImGuiIO& io = ImGui::GetIO();
 
     if (bd->ClipboardTextData)

@@ -29,6 +29,10 @@
  *  \ingroup device
  */
 
+#if defined(WITH_SDL) && defined(_MSC_VER)
+#  include <excpt.h>
+#endif
+
 #ifdef WITH_SDL
 #  include <SDL.h>
 
@@ -47,6 +51,35 @@ extern "C" {
 
 #ifdef WITH_SDL
 #  define SDL_CHECK(x) ((x) != (void *)0)
+#endif
+
+#if defined(WITH_SDL) && defined(_MSC_VER)
+/* Some physical controllers trip a crash *inside* SDL2.dll itself while it
+ * enumerates/initializes joystick hardware during SDL_InitSubSystem(), before
+ * our code gets any chance to react (observed with a "G-Shark GS-GP702" pad:
+ * the whole engine, editor included, hard-closed on "P" with the crash log
+ * pointing into SDL_InitSubSystem via DEV_Joystick::Init). Unplugging the
+ * controller avoided it, confirming the fault is in SDL's HID/XInput
+ * enumeration path for that device, not in our logic. We can't fix SDL2
+ * here, but we can keep one bad controller from taking down the whole
+ * engine by catching the structured exception and disabling joystick
+ * support for this session instead of crashing.
+ * This helper must stay a "leaf" function with no C++ objects that need
+ * unwinding, since __try/__except cannot coexist with automatic
+ * destructible objects in the same function on MSVC. */
+static bool DEV_Joystick_SEH_InitSubSystem(Uint32 flags)
+{
+	__try {
+		return (SDL_InitSubSystem(flags) != -1);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		CM_Error("SDL_InitSubSystem(joystick) crashed (structured exception) - "
+		         "disabling joystick support for this session. "
+		         "This usually means a connected controller is not "
+		         "handled correctly by SDL2; unplugging it works around it.");
+		return false;
+	}
+}
 #endif
 
 DEV_Joystick::DEV_Joystick(short index)
@@ -96,7 +129,11 @@ void DEV_Joystick::Init()
 #else
 	Uint32 controller_init_flags = SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC;
 #endif
+#ifdef _MSC_VER
+	bool success = DEV_Joystick_SEH_InitSubSystem(controller_init_flags);
+#else
 	bool success = (SDL_InitSubSystem(controller_init_flags) != -1);
+#endif
 
 	if (success) {
 		// Loading mapping file from blender datafiles directory

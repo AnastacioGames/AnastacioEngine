@@ -340,8 +340,15 @@ void LA_Launcher::ExitEngine()
 	Texture::FreeAllTextures(nullptr);
 #endif  // WITH_PYTHON
 
-	DEV_Joystick::Close();
+	/* StopEngine() must run before DEV_Joystick::Close(): it tears down the
+	 * ImGui SDL backend (KX_ImGui_Impl_Inputs_Shutdown), which closes its own
+	 * SDL_GameController handle. If DEV_Joystick::Close() already called
+	 * SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER) by then, that handle is
+	 * invalid and SDL_GameControllerClose() on it crashes - only reproducible
+	 * with a physical controller connected, since that's the only time
+	 * ImGui's backend has opened a GameController at all. */
 	m_ketsjiEngine->StopEngine();
+	DEV_Joystick::Close();
 
 	// Set anisotropic settign back to its original value.
 	m_rasterizer->SetAnisotropicFiltering(m_savedData.anisotropic);
