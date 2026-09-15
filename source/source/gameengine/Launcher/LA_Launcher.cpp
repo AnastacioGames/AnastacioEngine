@@ -207,6 +207,17 @@ void LA_Launcher::InitEngine()
 		}
 	}
 
+	// Materiais com blend "Alpha Blend Hashed" (GPU_BLEND_ALPHA_TO_COVERAGE) caem para um
+	// dither por shader (gpu_material.c, shade_dither) quando gm.aasamples <= 1, em vez de
+	// usar alpha-to-coverage real via MSAA. Alguns drivers (ex.: NVIDIA proprietario) honram
+	// literalmente "0 amostras" pedidas e entregam framebuffer single-sample, expondo esse
+	// dither cru como ruido tipo "chiado de TV" -- o Mesa/Intel mascara isso por padrao mesmo
+	// sem pedido explicito. Forcamos um minimo aqui para sempre passar pelo caminho de
+	// alpha-to-coverage real, independente do valor configurado na cena e da GPU/driver.
+	if (m_startScene->gm.aasamples <= 1) {
+		m_startScene->gm.aasamples = 4;
+	}
+
 	// Create the canvas, rasterizer and rendertools.
 	int AAsamples = (m_startScene->gm.aasamples > 1) ? m_startScene->gm.aasamples : 0;
 	m_canvas = CreateCanvas(m_rasterizer, attachments, AAsamples);

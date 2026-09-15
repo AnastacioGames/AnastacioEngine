@@ -57,6 +57,12 @@ INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(SndFile DEFAULT_MSG
     LIBSNDFILE_LIBRARY LIBSNDFILE_INCLUDE_DIR)
 
+# FIND_PACKAGE_HANDLE_STANDARD_ARGS define SndFile_FOUND (a partir do nome do
+# pacote passado acima), nao LIBSNDFILE_FOUND -- mas e esse ultimo nome que o
+# resto deste modulo e os callers (platform_unix.cmake) checam. Sem esta ponte,
+# WITH_CODEC_SNDFILE era sempre desligado de volta mesmo com a lib instalada.
+SET(LIBSNDFILE_FOUND ${SndFile_FOUND})
+
 IF(LIBSNDFILE_FOUND)
 	SET(LIBSNDFILE_LIBRARIES ${LIBSNDFILE_LIBRARY})
 	SET(LIBSNDFILE_INCLUDE_DIRS ${LIBSNDFILE_INCLUDE_DIR})

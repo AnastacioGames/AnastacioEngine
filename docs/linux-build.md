@@ -1,5 +1,32 @@
 # Build no Linux (em preparacao)
 
+## Estado em 15 de setembro de 2026 — validacao em Linux nativo (Ubuntu 24.04, GPU NVIDIA real)
+
+Primeira validacao fora do WSLg, num notebook com grafica hibrida Intel+NVIDIA (Optimus/PRIME):
+`RangeRuntime` compila, instala e roda o jogo `RolimaRacer.range` do usuario com audio audivel e GPU NVIDIA
+dedicada em uso — **confirmado diretamente pelo usuario** (nao so por log), depois de tres bugs reais
+encontrados e corrigidos nesta rodada:
+
+1. **Binario instalado nao abria fora do ambiente de build**
+   (`libpython3.11.so.1.0: cannot open shared object file`) — RPATH ausente para o Python isolado. Corrigido
+   em `source/source/blenderplayer/CMakeLists.txt`. Ver `docs/changelog.md` (2026-09-15) para o bug
+   secundario de RPATH_CHECK que isso revelou.
+2. **Audio nao tocava** (assets `.ogg`/`.mp3` do jogo) — `WITH_CODEC_SNDFILE` era sempre revertido para
+   `OFF` por um bug de nome de variavel em `build_files/cmake/Modules/FindSndFile.cmake`
+   (`SndFile_FOUND` vs `LIBSNDFILE_FOUND`). Corrigido nesse modulo.
+3. **Jogo lento, rodando na iGPU Intel em vez da NVIDIA dedicada** — notebooks Optimus/PRIME usam a iGPU por
+   padrao. Precisa de `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` (o
+   `tools/linux/quickstart.sh` agora detecta isso sozinho via `xrandr --listproviders` e injeta as variaveis
+   automaticamente).
+4. **Bug visual so na NVIDIA**: arvores/grama (materiais "Alpha Blend Hashed") apareciam com ruido tipo
+   "chiado de TV analogica". Causa: fallback de dither por shader que so fica correto com MSAA real, e a
+   NVIDIA (ao contrario do Mesa/Intel) honra literalmente "0 amostras pedidas". Corrigido forcando um minimo
+   de amostras em `LA_Launcher.cpp` e `BL_Converter.cpp::ConvertScene` (por cena, ja que a pista do jogo e
+   carregada como uma cena separada em runtime). Ver `docs/changelog.md` (2026-09-15) para os detalhes.
+
+Se voce tem um notebook com GPU NVIDIA hibrida (Optimus/PRIME) e vai rodar o jogo manualmente sem passar
+pelo `quickstart.sh`, lembre de exportar as duas variaveis do item 3 antes de `./RangeRuntime jogo.range`.
+
 ## Atalho automatico (recomendado)
 
 Para quem nao tem experiencia com Linux: um unico script cobre instalacao de dependencias
@@ -92,6 +119,20 @@ sudo apt install build-essential cmake ninja-build git pkg-config \\
 
 Se o CMake acusar outra biblioteca ausente, instale o pacote `-dev` correspondente e registre o nome e o
 erro no changelog; nao habilite recursos extras antes de o runtime basico iniciar.
+
+**Python 3.11 nao vem mais pelo apt em distros recentes** (confirmado em Ubuntu 24.04: so ha
+`python3.12` nos repositorios). Como o preset exige o ABI 3.11 especificamente, compile-o isolado com:
+
+```bash
+bash tools/linux/install-python311.sh
+```
+
+O script instala as dependencias de build do CPython, baixa o codigo-fonte oficial e instala via
+`make altinstall` em `/opt/anastacio-python311` (nao mexe no Python do sistema). E idempotente — rodar
+de novo so reinstala se `FORCE=1` for passado. Se sua distro ja tiver `python3.11`/`python3.11-dev` pelo
+apt (ex: Debian 13), o script continua funcionando do mesmo jeito, so que compilando a partir do fonte
+em vez de usar o pacote do sistema, para garantir o mesmo layout em `/opt/anastacio-python311` esperado
+pelo preset.
 
 Antes de configurar, rode a verificacao sem alterar o sistema:
 

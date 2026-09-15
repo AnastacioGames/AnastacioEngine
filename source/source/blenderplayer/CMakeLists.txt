@@ -83,6 +83,29 @@ else()
 			DESTINATION "."
 		)
 	endif()
+
+	if(NOT EMSCRIPTEN AND PYTHON_ROOT_DIR)
+		# WITH_INSTALL_PORTABLE liga CMAKE_SKIP_BUILD_RPATH (source/CMakeLists.txt) para
+		# nao gravar caminhos absolutos da maquina de build no binario -- mas o preset
+		# linux-runtime linka contra um libpython isolado fora do ld.so padrao
+		# (PYTHON_ROOT_DIR, ver docs/linux-build.md), entao sem RPATH explicito o
+		# RangeRuntime instalado falha com "libpython3.11.so.1.0: cannot open shared
+		# object file" ao rodar fora do ambiente de build.
+		#
+		# Aqui DESTINATION "." + CMAKE_INSTALL_PREFIX=bin/ fazem o "install" apontar para o
+		# MESMO caminho onde o binario acabou de ser linkado. O install gerado roda
+		# file(RPATH_CHECK ... RPATH "<INSTALL_RPATH>") no arquivo ja existente antes de
+		# copiar; se o RPATH atual do arquivo nao bater com o RPATH esperado, CMake APAGA
+		# o arquivo achando que vai recopia-lo da origem -- mas origem e destino sao o
+		# mesmo caminho, entao a copia seguinte falha com "cannot find" (o arquivo já foi
+		# apagado). BUILD_RPATH e INSTALL_RPATH iguais fazem o RPATH esperado bater com o
+		# que ja foi gravado no link, evitando essa autodestruicao.
+		set_target_properties(RangeRuntime PROPERTIES
+			SKIP_BUILD_RPATH FALSE
+			BUILD_RPATH "${PYTHON_ROOT_DIR}/lib"
+			INSTALL_RPATH "${PYTHON_ROOT_DIR}/lib"
+		)
+	endif()
 endif()
 
 if(EMSCRIPTEN)

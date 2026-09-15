@@ -58,6 +58,7 @@
         "WITH_OPENCOLORIO": "OFF",
         "WITH_CODEC_AVI": "OFF",
         "WITH_CODEC_FFMPEG": "OFF",
+        "WITH_CODEC_SNDFILE": "ON",
         "WITH_INPUT_NDOF": "OFF",
         "WITH_JACK": "OFF"
       }

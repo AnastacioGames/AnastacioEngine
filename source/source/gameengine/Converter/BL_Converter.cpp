@@ -235,6 +235,19 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	// Find out which physics engine
 	Scene *blenderscene = scene->GetBlenderScene();
 
+	// Materiais com blend "Alpha Blend Hashed" (GPU_BLEND_ALPHA_TO_COVERAGE) caem para um
+	// dither por shader (gpu_material.c, shade_dither) quando gm.aasamples <= 1, em vez de
+	// usar alpha-to-coverage real via MSAA. Alguns drivers (ex.: NVIDIA proprietario) honram
+	// literalmente "0 amostras" pedidas e entregam framebuffer single-sample, expondo esse
+	// dither cru como ruido tipo "chiado de TV" em qualquer objeto com esse material (ex.:
+	// arvores/grama) -- o Mesa/Intel mascara isso por padrao mesmo sem pedido explicito.
+	// Forcamos um minimo aqui, por cena (cobre a cena inicial e as adicionadas em runtime via
+	// LibLoad/AddScene, ja que cada uma tem seu proprio Scene->gm.aasamples independente),
+	// para sempre passar pelo caminho de alpha-to-coverage real.
+	if (blenderscene->gm.aasamples <= 1) {
+		blenderscene->gm.aasamples = 4;
+	}
+
 	PHY_IPhysicsEnvironment *phy_env = nullptr;
 
 	e_PhysicsEngine physics_engine = UseBullet;

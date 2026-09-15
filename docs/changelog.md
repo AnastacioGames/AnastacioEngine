@@ -4,6 +4,104 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-15 — Linux nativo: RangeRuntime compila e roda com GPU real (fix de RPATH do Python isolado)
+
+- **Máquina**: Ubuntu 24.04 nativo (notebook do usuário, `fabio-ASUS-Linux`), primeira validação fora do
+  WSLg usado na referência de 8 de setembro. Com `cmake`/`ninja`/libs de sistema instalados via apt e o
+  Python 3.11 isolado (`tools/linux/install-python311.sh`), `cmake --preset linux-runtime -S source` +
+  `cmake --build build-linux --target RangeRuntime` compilaram sem erros (~1847 passos).
+- **Bug encontrado e corrigido — RangeRuntime instalado não abria fora do ambiente de build**: rodar
+  `build-linux/bin/RangeRuntime` diretamente falhava com `error while loading shared libraries:
+  libpython3.11.so.1.0: cannot open shared object file`. Causa: o alvo `RangeRuntime` no Linux
+  (`source/blenderplayer/CMakeLists.txt`) nunca definia RPATH nenhum, e `WITH_INSTALL_PORTABLE` (ligado no
+  preset) liga `CMAKE_SKIP_BUILD_RPATH` globalmente (`source/CMakeLists.txt`), então o binário linkado
+  contra `/opt/anastacio-python311/lib/libpython3.11.so` não carregava sem `LD_LIBRARY_PATH` manual.
+  Corrigido adicionando `BUILD_RPATH`/`INSTALL_RPATH` = `${PYTHON_ROOT_DIR}/lib` só para o alvo
+  `RangeRuntime` em Unix (guardado por `NOT EMSCRIPTEN AND PYTHON_ROOT_DIR`, sem afetar Windows/macOS/wasm).
+- **Segundo bug, mais sutil, descoberto ao corrigir o primeiro**: com `INSTALL_RPATH` deixado no default
+  (vazio) e só `BUILD_RPATH` setado, `cmake --install build-linux` passou a **apagar o próprio binário e
+  falhar** (`file INSTALL cannot find .../RangeRuntime`). Causa: como o preset instala com `DESTINATION "."`
+  e `CMAKE_INSTALL_PREFIX` = `build-linux/bin` (mesma pasta do link), a origem e o destino do install são o
+  mesmo arquivo; o script gerado roda `file(RPATH_CHECK FILE <arquivo> RPATH "<INSTALL_RPATH>")` antes de
+  copiar, e como o RPATH já gravado no binário (pelo `BUILD_RPATH`) não batia com o `INSTALL_RPATH` (vazio)
+  esperado, o CMake apagava o arquivo achando que ia recopiá-lo da origem — que era o próprio arquivo que
+  acabara de apagar. Corrigido deixando `BUILD_RPATH` e `INSTALL_RPATH` **iguais**, para o RPATH_CHECK nunca
+  achar divergência nesse layout de instalação "self-referencing".
+- **Resultado**: `RangeRuntime` instalado roda direto (`./RangeRuntime jogo.range`, sem env var nenhuma) sem
+  o erro de `libpython3.11.so.1.0`. Testado com o jogo do usuário (`RolimaRacer.range`,
+  `/home/fabio/Documentos/jogos/ProjetoRolimaRacer/`): carregou e rodou sem crash. **Atenção**: nesse primeiro
+  teste eu reportei incorretamente que a GPU usada era "Mesa Intel(R) Graphics real" como se fosse o
+  resultado esperado — na verdade essa é a iGPU Intel, e a máquina do usuário tem uma NVIDIA RTX 5060 Laptop
+  dedicada que **não** estava sendo usada; o jogo também estava sem áudio. Ver entrada abaixo
+  ("GPU NVIDIA, áudio OGG/MP3 e bug de dither alpha") para o diagnóstico e correção reais desses dois
+  problemas, confirmados pelo usuário só depois de mais uma rodada de fixes.
+- Isso resolve a limitação principal registrada em 8 de setembro ("ainda falta validar em Linux nativo com
+  GPU real") — a build deixa de depender só do WSLg com renderização por software — mas só depois dos fixes
+  de GPU/áudio/alpha da entrada seguinte a validação ficou realmente completa.
+
+## 2026-09-15 — Linux nativo: GPU NVIDIA (Optimus/PRIME), áudio OGG/MP3 e bug de dither alpha na NVIDIA
+
+Continuação da entrada acima: o usuário testou `RolimaRacer.range` no notebook (`fabio-ASUS-Linux`, Intel
+Core Ultra + NVIDIA RTX 5060 Laptop, Optimus/PRIME) e reportou três problemas reais: áudio não tocava, jogo
+lento porque estava rodando na iGPU Intel em vez da NVIDIA dedicada, e (depois de corrigir os dois primeiros)
+um bug visual sério só na NVIDIA — árvores/grama com aparência de "chiado de TV analógica" (ruído
+preto-e-branco denso cobrindo qualquer objeto com esse tipo de material).
+
+- **Áudio não tocava**: `WITH_CODEC_SNDFILE` e `WITH_CODEC_FFMPEG` estavam ambos `OFF` no preset
+  `linux-runtime`, e os assets de som do jogo são `.ogg`/`.mp3` — o OpenAL inicializava normalmente (log
+  mostrava device/context criados), mas não havia decoder para os arquivos. Causa raiz real, mais sutil:
+  `WITH_CODEC_SNDFILE=ON` no preset **não bastava**, porque `build_files/cmake/Modules/FindSndFile.cmake`
+  tinha um bug de nome de variável — `FIND_PACKAGE_HANDLE_STANDARD_ARGS(SndFile ...)` define `SndFile_FOUND`,
+  não `LIBSNDFILE_FOUND`, mas é esse segundo nome que `platform_unix.cmake` checa para decidir se desliga
+  `WITH_CODEC_SNDFILE` de volta — então a flag era sempre revertida para `OFF` silenciosamente, mesmo com
+  `libsndfile1-dev` instalado e a flag pedida no preset. Corrigido com uma ponte
+  `SET(LIBSNDFILE_FOUND ${SndFile_FOUND})` em `FindSndFile.cmake`, logo após o `FIND_PACKAGE_HANDLE_STANDARD_ARGS`.
+  Esse bug provavelmente afeta (afetava) qualquer build Linux que tentasse ligar sndfile, não só este preset.
+- **Jogo lento / GPU errada**: notebook com gráfica híbrida Intel+NVIDIA (Optimus/PRIME). Sem nenhuma
+  variável de ambiente, o driver usa a iGPU Intel por padrão mesmo com o driver NVIDIA instalado e
+  funcionando (`nvidia-smi` ok). Corrigido rodando com `__NV_PRIME_RENDER_OFFLOAD=1
+  __GLX_VENDOR_LIBRARY_NAME=nvidia` — confirmado via log (`Using Device: NVIDIA Corporation - NVIDIA GeForce
+  RTX 5060 Laptop GPU/PCIe/SSE2`, `OpenGL 4.6.0 NVIDIA 595.84`). `tools/linux/quickstart.sh` agora detecta
+  automaticamente (via `xrandr --listproviders` procurando `NVIDIA-G0`) se a máquina tem esse tipo de GPU
+  híbrida e injeta essas variáveis sozinho ao rodar o jogo, sem o usuário precisar lembrar.
+- **Bug de dither alpha só na NVIDIA ("chiado de TV")**: materiais com blend "Alpha Blend Hashed"
+  (`GPU_BLEND_ALPHA_TO_COVERAGE`) usam, em `source/source/blender/gpu/intern/gpu_material.c`
+  (`gpu_material_construct_end`, função `shade_dither`), um dither por shader (padrão Bayer) como fallback
+  de transparência quando `scene->gm.aasamples <= 1`, combinado com `GL_ALPHA_TEST` +
+  `GL_SAMPLE_ALPHA_TO_COVERAGE` no estado fixo (`gpu_draw.c`). Sem multisample real no framebuffer, esse
+  dither aparece cru — e o driver proprietário da NVIDIA honra literalmente "0 amostras pedidas" (framebuffer
+  single-sample de verdade), enquanto o Mesa/Intel aparentemente entrega algum multisample por padrão mesmo
+  sem pedido explícito, mascarando o problema. Corrigido forçando um mínimo de 4 amostras sempre que
+  `gm.aasamples <= 1`, em dois pontos: `LA_Launcher.cpp` (samples do canvas/framebuffer principal, cena
+  inicial) e `BL_Converter.cpp::ConvertScene` (por cena — **necessário porque a pista/árvores do jogo é uma
+  cena carregada em runtime via LibLoad/AddScene, com seu próprio `Scene->gm.aasamples` independente da cena
+  inicial do menu**; corrigir só a cena inicial não bastou, foi preciso instrumentar com prints de debug
+  temporários para descobrir que `mat->scene` nos materiais da pista apontava para um `Scene*` diferente do
+  `m_startScene` do launcher).
+- **Resultado confirmado pelo usuário** (via screenshot e mensagem direta, não só log): áudio tocando, GPU
+  NVIDIA em uso, árvores/grama renderizando normalmente sem ruído.
+
+## 2026-09-15 — Linux nativo: script para instalar Python 3.11 isolado (apt nao tem mais o pacote)
+
+- **Motivo**: preparando o ambiente de trabalho em Linux nativo (Ubuntu 24.04, fora do WSL usado na
+  referência de 8 de setembro), `sudo apt install python3.11 python3.11-dev` falhou com "Impossível
+  encontrar o pacote" — confirmado que o repositório do Ubuntu 24.04 só oferece `python3.12`. O preset
+  `linux-runtime` exige `PYTHON_ROOT_DIR=/opt/anastacio-python311` (ABI 3.11 especificamente), então o
+  Python do sistema (3.12) não serve mesmo que estivesse disponível.
+- Criado `tools/linux/install-python311.sh`: compila CPython 3.11.9 a partir do fonte oficial
+  (`--enable-shared`, `make altinstall`) direto em `/opt/anastacio-python311`, instala `pip`/`numpy`
+  isolados nesse prefixo e é idempotente (só reinstala com `FORCE=1`).
+- `tools/linux/quickstart.sh` atualizado: removida a tentativa de `apt install python3.11` (que quebrava
+  o script inteiro via `set -e` em distros sem esse pacote) e adicionado o passo que chama
+  `install-python311.sh` antes do preflight; `preflight.sh` agora roda com
+  `PYTHON_EXECUTABLE=/opt/anastacio-python311/bin/python3.11` por padrão em vez do `python3.11` genérico
+  do PATH.
+- `docs/linux-build.md` atualizado para apontar o novo script em vez de descrever a compilação manual de
+  forma vaga.
+- **Pendente**: rodar `install-python311.sh` + `quickstart.sh` de ponta a ponta nesta máquina Linux nativa
+  (com GPU real, ao contrário da referência WSLg) e confirmar `RangeRuntime` compilando/rodando — ainda
+  não executado nesta sessão.
+
 ## 2026-09-14 — Web: encerramento da etapa de filtros 2D
 
 - Filtros nativos originais confirmados funcionando no navegador.
