@@ -6,9 +6,10 @@
 
 ## RangeArmor
 
-O fluxo de runtime Windows/Linux x86_64 foi concluÃ­do e estÃ¡ documentado em
+O fluxo de runtime Windows/Linux x86_64 foi concluído e está documentado em
 [`rangearmor-modernization-plan.md`](rangearmor-modernization-plan.md). A interface 32-bit foi retirada;
-resta apenas validar o runtime em uma distribuiÃ§Ã£o Linux nativa fora do WSL.
+o runtime já foi validado em Linux nativo fora do WSL (ver item "Linux x86_64" em Prioridade atual abaixo
+para o que ainda falta).
 
 Somente itens abertos, pendentes de validação ou explicitamente adiados ficam neste arquivo. Recursos
 concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](../relatorio-melhorias-anastacioengine.md)
@@ -29,11 +30,14 @@ e detalhados no [`changelog.md`](changelog.md).
   validação manual de Play → Stop → Play e standalone. Ver o
   [plano de integração](cutscene-native-integration-plan.md) e o
   [roteiro do exemplo](cutscene-native-example.md).
-- **Runtime Linux x86_64**: preflight e configuração passaram no Debian 13 via WSL com Python 3.11 isolado,
-  e todos os objetos de `RangeRuntime` foram compilados. A primeira ligação falha porque dependências
-  transitivas ainda pedem `bf_editor_animation`, `bf_editor_interface`, `bf_editor_space_api` e `extern_glew`
-  apesar de `WITH_BLENDER=OFF`. Corrigir esse grafo, repetir a ligação, instalar, empacotar e validar em Linux
-  nativo; ainda não há release Linux oficial.
+- **Linux x86_64 (RangeRuntime e RangeEngine)**: ambos compilam, linkam, instalam e rodam em Linux nativo
+  (Ubuntu 24.04, GPU NVIDIA real) desde 2026-09-15 — ver `docs/linux-build.md` e `docs/changelog.md`
+  (entradas de 2026-09-15) para os bugs corrigidos em cada validação. Pendente: (1) empacotar e validar o
+  `RangeRuntime` extraído numa máquina Linux limpa antes de anunciar suporte oficial
+  (`tools/linux/package-runtime.sh`); (2) validar a janela real do `RangeEngine` com sessão gráfica
+  (GHOST/X11, ícones, i18n, addons Python — só foi testado em modo `--background` até agora); (3) portar
+  `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` do editor para as APIs atuais de OpenColorIO 2.x/FFmpeg 5+
+  (desligados por incompatibilidade de API, não por ausência de lib — ver changelog 2026-09-15).
 - **Associação de arquivos**: permitir abrir `.blend` e `.range` diretamente com os executáveis adequados,
   definindo instalação/registro no Windows e comportamento de duplo clique.
 - **Export para Web (WebGL/WebAssembly)**:

@@ -4,6 +4,67 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-15 — Linux nativo: RangeEngine (editor completo) compila e roda pela primeira vez, 6 bugs corrigidos
+
+- **Máquina**: mesma do `RangeRuntime` (Ubuntu 24.04 nativo, `fabio-ASUS-Linux`). Primeira tentativa de build
+  do alvo `RangeEngine` (`WITH_BLENDER=ON`, preset `linux-editor` introduzido no commit
+  `feat(linux): preparar preset e script para compilar o RangeEngine (editor)`), nunca compilado em Linux
+  antes.
+- **Bug 1 — FFmpeg, ponteiros `const` na API nova**: `avcodec_find_decoder`/`avcodec_find_encoder` e
+  `AVFormatContext::oformat` passaram a devolver ponteiros `const` a partir do FFmpeg 5.0; o Ubuntu 24.04 tem
+  libavcodec60 (FFmpeg 6.1), mas o wrapper `audaspace` (`extern/audaspace/plugins/ffmpeg/FFMPEGReader.cpp` e
+  `FFMPEGWriter.cpp`) ainda atribuía a ponteiros não-`const`. Corrigido tipando `aCodec`/`codec` como
+  `const AVCodec*` e trocando a escrita direta em `outputFmt->audio_codec` (agora inacessível, `outputFmt`
+  virou `const AVOutputFormat*`) por uma variável local `AVCodecID audio_codec`.
+- **Bug 2 — OpenColorIO, API v1 removida na 2.x**: `intern/opencolorio/ocio_impl.cc`/`ocio_impl_glsl.cc` usam
+  chamadas da API antiga da OpenColorIO (`Config::getDisplayColorSpaceName`, `Processor::apply`/`applyRGB`/
+  `applyRGBA`, `DisplayTransformRcPtr`) que não existem mais na OpenColorIO 2.x — e o Ubuntu 24.04 só tem
+  `libopencolorio-dev` 2.1+. Portar essas chamadas para a API 2.x é um trabalho de várias dezenas de call
+  sites, fora do escopo de uma validação de build; **desliguei `WITH_OPENCOLORIO`** no preset `linux-editor`
+  (`source/CMakePresets.json`) em vez de tentar um fix parcial.
+- **Bug 3 — FFmpeg (export de vídeo), API pré-3.1 removida**: `source/blender/blenkernel/intern/writeffmpeg.c`
+  usa `AVStream::codec`, `avcodec_encode_video2`/`avcodec_encode_audio2`, `av_free_packet`,
+  `avpicture_get_size`/`avpicture_fill`, `AVFormatContext::filename` — todos removidos do FFmpeg há vários
+  anos (a maior parte já no 3.1~4.0). Mesmo caso de escopo do bug 2: **desliguei `WITH_CODEC_FFMPEG`** no
+  mesmo preset. Consequência: o RangeEngine linux atual não exporta vídeo nem decodifica os codecs FFmpeg da
+  libavformat/libavcodec do sistema (o `WITH_CODEC_SNDFILE`/OpenAL para tocar áudio de jogo, já validado no
+  `RangeRuntime`, não depende disso).
+- **Bug 4 — declaração implícita de `strcmp`**: `source/blender/editors/interface/interface_context_menu.c`
+  usa `strcmp` (via `BLI_string.h`) sem incluir `<string.h>` diretamente; o gcc do Ubuntu 24.04 trata
+  declaração implícita de função como erro (`-Werror=implicit-function-declaration`, já visto antes em outro
+  contexto). Corrigido com `#include <string.h>` no topo do arquivo.
+- **Bug 5 — link falhava por `-lge_player` ausente**: `source/gameengine/Launcher/CMakeLists.txt` linka a
+  biblioteca `ge_player` incondicionalmente na lista `LIB` do `ge_launcher`, mas
+  `source/gameengine/CMakeLists.txt` só faz `add_subdirectory(GamePlayer)` (onde `ge_player` é definida)
+  quando `WITH_PLAYER=ON` — e o preset `linux-editor` usa `WITH_PLAYER=OFF` (é o editor, não o player
+  standalone). Bug de wiring do CMake exposto pela primeira combinação real de `WITH_BLENDER=ON` +
+  `WITH_PLAYER=OFF` em Linux. Corrigido guardando essa entrada da lista com `if(WITH_PLAYER)`.
+- **Bug 6 — link falhava por símbolos OpenImageIO indefinidos**: `undefined reference to
+  'OpenImageIO_v2_4::TypeDesc::basesize() const'` e `'...ParamValue::clear_value()'` ao linkar
+  `bf_imbuf_openimageio`. Causa: o Ubuntu 24.04 divide a OpenImageIO em `libOpenImageIO.so` (core) e
+  `libOpenImageIO_Util.so` (tipos/utilidades, onde esses dois símbolos realmente vivem — confirmado com
+  `nm -D`); `build_files/cmake/Modules/FindOpenImageIO.cmake` só procurava e linkava a primeira. Corrigido
+  adicionando `FIND_LIBRARY(OPENIMAGEIO_UTIL_LIBRARY NAMES OpenImageIO_Util ...)` e anexando o resultado a
+  `OPENIMAGEIO_LIBRARIES` quando encontrado.
+- **Bug 7 — mesmo bug de RPATH do RangeRuntime, faltando no editor**: `libpython3.11.so.1.0: cannot open
+  shared object file` ao rodar `build-linux-editor/bin/RangeEngine` fora do ambiente de build — o fix de
+  `BUILD_RPATH`/`INSTALL_RPATH` aplicado ao `RangeRuntime` em 15/09 (`source/blenderplayer/CMakeLists.txt`,
+  entrada acima) nunca tinha sido replicado para o alvo `RangeEngine`. Corrigido aplicando o mesmo padrão em
+  `source/creator/CMakeLists.txt` (bloco `WITH_INSTALL_PORTABLE`, guardado por `UNIX AND NOT APPLE AND NOT
+  EMSCRIPTEN AND PYTHON_ROOT_DIR`).
+- **Bug menor sem relação com portabilidade Linux**: `install(FILES
+  release/datafiles/debugmode_configfile/imgui.ini ...)` em `source/creator/CMakeLists.txt` era
+  incondicional, mas esse arquivo nunca existiu no repositório (sem histórico git) — quebrava `cmake --install`
+  em qualquer plataforma, não só Linux. Corrigido guardando com `if(EXISTS ...)`, no mesmo padrão já usado
+  para outros datafiles opcionais logo acima no arquivo.
+- **Resultado**: `RangeEngine` compila (2707 passos), linka e instala sem erros. Smoke test:
+  `build-linux-editor/bin/RangeEngine --background --factory-startup --python-expr "import bpy;
+  print(bpy.app.version_string)"` roda e imprime a versão, confirmando Python/bpy operacionais e o RPATH do
+  Python isolado correto. **Não testado ainda**: abrir a janela real do editor (GHOST/X11, contexto OpenGL da
+  UI, ícones, i18n, addons Python) — o smoke test acima rodou inteiro em modo `--background`, sem criar
+  janela. Ver `docs/linux-build.md` (seção "Editor (RangeEngine)") para o resumo consolidado e o estado atual
+  das flags `WITH_*`.
+
 ## 2026-09-15 — Linux nativo: RangeRuntime compila e roda com GPU real (fix de RPATH do Python isolado)
 
 - **Máquina**: Ubuntu 24.04 nativo (notebook do usuário, `fabio-ASUS-Linux`), primeira validação fora do

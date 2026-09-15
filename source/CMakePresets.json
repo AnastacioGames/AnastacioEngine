@@ -66,7 +66,7 @@
     {
       "name": "linux-editor",
       "displayName": "AnastacioEngine Editor (Linux x86_64)",
-      "description": "Editor completo (RangeEngine); requer validacao em Linux real. Espelha os WITH_* que o editor Windows (v142-ninja) realmente usa por padrao: Compositor/OpenImageIO/OpenColorIO/FFmpeg ligados, Cycles/Alembic/OpenVDB desligados.",
+      "description": "Editor completo (RangeEngine); validado em Linux real 2026-09-15 (ver docs/linux-build.md). Espelha os WITH_* que o editor Windows (v142-ninja) realmente usa por padrao: Compositor/OpenImageIO ligados, Cycles/Alembic/OpenVDB desligados. OpenColorIO e FFmpeg (export de video) desligados nesta plataforma: ambos os wrappers (intern/opencolorio/ocio_impl.cc e source/blender/blenkernel/intern/writeffmpeg.c) usam APIs antigas (OpenColorIO v1 e FFmpeg pre-3.1) que o Ubuntu 24.04 nao tem mais (libopencolorio-dev 2.1+, libavcodec60+); portar exigiria reescrever varias dezenas de chamadas, fora do escopo desta validacao de build.",
       "generator": "Ninja",
       "condition": {
         "type": "equals",
@@ -98,9 +98,9 @@
         "WITH_OPENVDB": "OFF",
         "WITH_OPENIMAGEIO": "ON",
         "WITH_OPENIMAGEDENOISE": "OFF",
-        "WITH_OPENCOLORIO": "ON",
+        "WITH_OPENCOLORIO": "OFF",
         "WITH_CODEC_AVI": "OFF",
-        "WITH_CODEC_FFMPEG": "ON",
+        "WITH_CODEC_FFMPEG": "OFF",
         "WITH_CODEC_SNDFILE": "ON",
         "WITH_INPUT_NDOF": "OFF",
         "WITH_JACK": "OFF"

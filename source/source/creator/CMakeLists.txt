@@ -510,10 +510,12 @@ if(WITH_GAMEENGINE AND WITH_SDL)
 endif()
 
 # Debug Mode Config File
-install(
-	FILES ${CMAKE_SOURCE_DIR}/release/datafiles/debugmode_configfile/imgui.ini
-	DESTINATION "."
-	)
+if(EXISTS ${CMAKE_SOURCE_DIR}/release/datafiles/debugmode_configfile/imgui.ini)
+	install(
+		FILES ${CMAKE_SOURCE_DIR}/release/datafiles/debugmode_configfile/imgui.ini
+		DESTINATION "."
+		)
+endif()
 
 # helpful tip when using make
 if("${CMAKE_GENERATOR}" MATCHES ".*Makefiles.*")
@@ -561,6 +563,22 @@ if(UNIX AND NOT APPLE)
 			TARGETS RangeEngine
 			DESTINATION "."
 		)
+
+		if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND PYTHON_ROOT_DIR)
+			# Mesmo bug do RangeRuntime (ver source/blenderplayer/CMakeLists.txt e
+			# docs/linux-build.md): WITH_INSTALL_PORTABLE liga CMAKE_SKIP_BUILD_RPATH,
+			# mas o preset linux-editor linka contra um libpython isolado fora do
+			# ld.so padrao (PYTHON_ROOT_DIR). Sem RPATH explicito, o RangeEngine
+			# instalado falha com "libpython3.11.so.1.0: cannot open shared object
+			# file" ao rodar fora do ambiente de build. BUILD_RPATH == INSTALL_RPATH
+			# evita que o install() apague o binario recem-linkado (DESTINATION "."
+			# aponta para o mesmo caminho da saida do link).
+			set_target_properties(RangeEngine PROPERTIES
+				SKIP_BUILD_RPATH FALSE
+				BUILD_RPATH "${PYTHON_ROOT_DIR}/lib"
+				INSTALL_RPATH "${PYTHON_ROOT_DIR}/lib"
+			)
+		endif()
 
 		if(WITH_DOC_MANPAGE)
 			install(

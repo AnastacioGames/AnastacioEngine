@@ -27,6 +27,10 @@ encontrados e corrigidos nesta rodada:
 Se voce tem um notebook com GPU NVIDIA hibrida (Optimus/PRIME) e vai rodar o jogo manualmente sem passar
 pelo `quickstart.sh`, lembre de exportar as duas variaveis do item 3 antes de `./RangeRuntime jogo.range`.
 
+Nessa mesma maquina, no mesmo dia, o editor completo (`RangeEngine`, preset `linux-editor`) tambem foi
+validado pela primeira vez em Linux real: compila, linka e roda (`--background` + `import bpy`) depois de
+mais seis bugs corrigidos. Ver secao "Editor (RangeEngine)" abaixo para os detalhes.
+
 ## Atalho automatico (recomendado)
 
 Para quem nao tem experiencia com Linux: um unico script cobre instalacao de dependencias
@@ -94,23 +98,66 @@ O preset `linux-runtime` compila somente o player, com OpenGL/X11, Python, SDL e
 OpenColorIO, Cycles, compositor e outros recursos ficam desligados nesta primeira etapa (o player nao precisa
 deles). Isso preserva o Windows e reduz o primeiro problema de portabilidade a um alvo verificavel.
 
-## Editor (RangeEngine) — preset `linux-editor`, ainda nao validado em Linux real
+## Editor (RangeEngine) — preset `linux-editor`, validado em Linux real em 15 de setembro de 2026
 
 O preset `linux-editor` (mesmo `source/CMakePresets.json`) builda o alvo `RangeEngine` com `WITH_BLENDER=ON`.
-Ele espelha os `WITH_*` que o editor Windows (`v142-ninja`) realmente usa hoje por padrao — conferido direto no
-`CMakeCache.txt` do build Windows existente, e nao apenas nos defaults do `source/CMakeLists.txt`:
+Primeira compilacao completa do editor fora do Windows, no mesmo notebook Ubuntu 24.04/NVIDIA Optimus usado na
+validacao do `RangeRuntime`: **compila, linka e roda (`RangeEngine --background --python-expr "import bpy"`
+confirma Python/bpy operacionais)** depois de seis bugs reais encontrados e corrigidos:
 
-- **Ligados**: `WITH_COMPOSITOR`, `WITH_OPENIMAGEIO`, `WITH_OPENCOLORIO`, `WITH_CODEC_FFMPEG` (usados por
-  nodes de material/textura e import/export de imagem/video no editor).
-- **Desligados**: `WITH_CYCLES`, `WITH_ALEMBIC`, `WITH_OPENVDB` (nao usados pelo RangeEngine; ja desligados
-  tambem no Windows).
+1. **FFmpeg: ponteiros `const` na API nova** — `avcodec_find_decoder`/`avcodec_find_encoder` e
+   `AVFormatContext::oformat` passaram a devolver ponteiros `const` a partir do FFmpeg 5.0 (aqui:
+   libavcodec60/FFmpeg 6.1 do Ubuntu 24.04); o wrapper `audaspace` ainda atribuia a ponteiros nao-`const`.
+   Corrigido em `extern/audaspace/plugins/ffmpeg/FFMPEGReader.cpp` e `FFMPEGWriter.cpp` (o segundo tambem
+   precisou de uma variavel local `AVCodecID` em vez de escrever direto em `outputFmt->audio_codec`, que
+   agora e `const`).
+2. **OpenColorIO: API v1 incompativel com OCIO 2.1+** — `intern/opencolorio/ocio_impl.cc`/`ocio_impl_glsl.cc`
+   usam a API antiga da OpenColorIO (`getDisplayColorSpaceName`, `Processor::apply`/`applyRGB`/`applyRGBA`,
+   `DisplayTransformRcPtr`), removida na 2.x; o Ubuntu 24.04 só tem `libopencolorio-dev` 2.1+. Portar
+   exigiria reescrever dezenas de chamadas — fora do escopo desta validacao de build. **`WITH_OPENCOLORIO`
+   desligado** para o preset `linux-editor` (`source/CMakePresets.json`).
+3. **FFmpeg (export de video): API pre-3.1 removida** — `source/blender/blenkernel/intern/writeffmpeg.c` usa
+   `AVStream::codec`, `avcodec_encode_video2`/`avcodec_encode_audio2`, `av_free_packet`, `avpicture_fill`,
+   `AVFormatContext::filename`, todos removidos do FFmpeg ha varios anos. Mesmo caso do item 2 em escopo:
+   **`WITH_CODEC_FFMPEG` desligado** para o preset `linux-editor`. Sem isso, o RangeEngine linux nao exporta
+   video nem tem os codecs FFmpeg da libavformat/libavcodec do sistema; import/export de imagem estatica via
+   OpenImageIO continua ligado normalmente.
+4. **`strcmp` sem declaracao implicita** — `source/blender/editors/interface/interface_context_menu.c` usava
+   `strcmp` (via `BLI_string.h`) sem incluir `<string.h>` diretamente; o gcc do Ubuntu 24.04 trata declaracao
+   implicita de funcao como erro (`-Werror=implicit-function-declaration`). Corrigido com
+   `#include <string.h>` no topo do arquivo.
+5. **Link falhava por `-lge_player` ausente** — `source/gameengine/Launcher/CMakeLists.txt` linkava a
+   biblioteca `ge_player` incondicionalmente, mas `source/gameengine/CMakeLists.txt` só adiciona o
+   subdiretorio `GamePlayer` (que a gera) quando `WITH_PLAYER=ON`; o preset `linux-editor` usa
+   `WITH_PLAYER=OFF` (é o editor, não o player). Corrigido guardando essa dependencia com
+   `if(WITH_PLAYER)`.
+6. **Link falhava por simbolos OpenImageIO indefinidos** (`TypeDesc::basesize()`, `ParamValue::clear_value()`)
+   — o Ubuntu 24.04 divide a OpenImageIO em duas bibliotecas (`libOpenImageIO.so` e
+   `libOpenImageIO_Util.so`), e esses simbolos vivem só na segunda; `FindOpenImageIO.cmake` so procurava e
+   linkava a primeira. Corrigido adicionando a busca por `OpenImageIO_Util` e anexando-a a
+   `OPENIMAGEIO_LIBRARIES` (`build_files/cmake/Modules/FindOpenImageIO.cmake`).
+7. **Mesmo bug de RPATH do `RangeRuntime`** (`libpython3.11.so.1.0: cannot open shared object file`) —
+   faltava no alvo `RangeEngine` a mesma correcao ja aplicada ao `RangeRuntime`
+   (`source/blenderplayer/CMakeLists.txt`). Aplicada agora tambem em `source/creator/CMakeLists.txt`
+   (`BUILD_RPATH`/`INSTALL_RPATH` = `${PYTHON_ROOT_DIR}/lib`, guardado por `UNIX AND NOT APPLE AND NOT
+   EMSCRIPTEN AND PYTHON_ROOT_DIR`, mesmo racional documentado la).
 
-Essas quatro libs que entram novas (OIIO/OCIO/FFmpeg) se auto-desligam com aviso no log de configuracao caso
-o CMake nao encontre a `-dev` correspondente no Linux (`build_files/cmake/platform/platform_unix.cmake`,
-mesmo padrao ja visto no bug do sndfile) — ou seja, o pior caso e uma feature saindo faltando, nao o build
-inteiro quebrando.
+Bug menor adicional, sem relacao com portabilidade Linux especificamente: o `install()` de
+`release/datafiles/debugmode_configfile/imgui.ini` em `source/creator/CMakeLists.txt` era incondicional, mas
+esse arquivo nunca existiu no repositorio (nao ha historico git dele). Guardado com `if(EXISTS ...)`, igual ao
+padrao ja usado para outros datafiles opcionais nesse mesmo arquivo.
 
-Atalho automatico (mesmo padrao do runtime, mas instala tambem as libs de FFmpeg/OIIO/OCIO):
+`WITH_*` do preset apos essa rodada:
+
+- **Ligados**: `WITH_COMPOSITOR`, `WITH_OPENIMAGEIO` (import/export de imagem parada em nodes de
+  material/textura e no editor de imagem).
+- **Desligados**: `WITH_CYCLES`, `WITH_ALEMBIC`, `WITH_OPENVDB` (nao usados pelo RangeEngine, mesmo no
+  Windows), `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` (API antiga incompativel com as versoes do Ubuntu
+  24.04 — ver itens 2 e 3 acima; portar fica para uma rodada futura dedicada, nao bloqueia o editor abrir
+  e rodar).
+
+Atalho automatico (mesmo padrao do runtime, mas instala tambem as libs de FFmpeg/OIIO/OCIO — usadas so na
+etapa de configuracao/preflight; as flags acima decidem o que de fato entra no binario):
 
 ```bash
 bash tools/linux/quickstart-editor.sh
@@ -124,10 +171,11 @@ cmake --build build-linux-editor --target RangeEngine -j"$(nproc)"
 cmake --install build-linux-editor
 ```
 
-O executavel fica em `build-linux-editor/bin/RangeEngine`. **Nada disso foi testado em Linux real ainda** —
-o proximo passo e rodar o quickstart numa maquina Linux de verdade e registrar aqui/no changelog os erros de
-CMake e de execucao (janela do editor, ícones, i18n, addons Python) encontrados, do mesmo jeito que foi feito
-para o `RangeRuntime`.
+O executavel fica em `build-linux-editor/bin/RangeEngine`. Testado ate agora: compilacao completa, instalacao
+portable e `RangeEngine --background --factory-startup --python-expr "import bpy; print(bpy.app.version_string)"`
+(confirma Python/bpy operacionais e RPATH do Python isolado correto). **Ainda falta**: abrir a janela do
+editor de verdade (interface grafica, icones, i18n, addons Python) numa sessao com display — o teste acima
+rodou so em modo `--background`, sem GHOST/X11 nem contexto OpenGL da UI.
 
 O checkout atual contem apenas `lib/win64_vc15`; estas bibliotecas nao funcionam no Linux. O preset usa
 as bibliotecas da distribuicao, sem alterar `build/` nem o preset Windows.
