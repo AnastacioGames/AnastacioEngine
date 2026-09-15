@@ -64,6 +64,49 @@
       }
     },
     {
+      "name": "linux-editor",
+      "displayName": "AnastacioEngine Editor (Linux x86_64)",
+      "description": "Editor completo (RangeEngine); requer validacao em Linux real. Espelha os WITH_* que o editor Windows (v142-ninja) realmente usa por padrao: Compositor/OpenImageIO/OpenColorIO/FFmpeg ligados, Cycles/Alembic/OpenVDB desligados.",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/../build-linux-editor",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PYTHON_VERSION": "3.11",
+        "PYTHON_ROOT_DIR": "/opt/anastacio-python311",
+        "WITH_BLENDER": "ON",
+        "WITH_PLAYER": "OFF",
+        "WITH_INSTALL_PORTABLE": "ON",
+        "WITH_PYTHON_INSTALL": "OFF",
+        "WITH_PYTHON_INSTALL_NUMPY": "OFF",
+        "WITH_PYTHON_INSTALL_REQUESTS": "OFF",
+        "WITH_DOC_MANPAGE": "OFF",
+        "WITH_SYSTEM_GLEW": "ON",
+        "WITH_SYSTEM_GLES": "OFF",
+        "WITH_ALEMBIC": "OFF",
+        "WITH_CYCLES": "OFF",
+        "WITH_CYCLES_OSL": "OFF",
+        "WITH_COMPOSITOR": "ON",
+        "WITH_FREESTYLE": "OFF",
+        "WITH_LIBMV": "OFF",
+        "WITH_OPENCOLLADA": "OFF",
+        "WITH_OPENSUBDIV": "OFF",
+        "WITH_OPENVDB": "OFF",
+        "WITH_OPENIMAGEIO": "ON",
+        "WITH_OPENIMAGEDENOISE": "OFF",
+        "WITH_OPENCOLORIO": "ON",
+        "WITH_CODEC_AVI": "OFF",
+        "WITH_CODEC_FFMPEG": "ON",
+        "WITH_CODEC_SNDFILE": "ON",
+        "WITH_INPUT_NDOF": "OFF",
+        "WITH_JACK": "OFF"
+      }
+    },
+    {
       "name": "android-runtime",
       "displayName": "AnastacioEngine Runtime (Android arm64)",
       "description": "Preliminar/experimental: preset base para cross-compile Android via NDK r30. Nao existe backend GHOST Android ainda (ver docs/mobile-export-plan.md); este preset so configura a toolchain, o build vai falhar antes de chegar no rasterizer/janela.",
@@ -182,6 +225,11 @@
       "name": "linux-runtime",
       "configurePreset": "linux-runtime",
       "targets": ["RangeRuntime"]
+    },
+    {
+      "name": "linux-editor",
+      "configurePreset": "linux-editor",
+      "targets": ["RangeEngine"]
     },
     {
       "name": "android-runtime",

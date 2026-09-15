@@ -90,11 +90,44 @@ experimental, nao uma versao oficial distribuivel.
 
 ## Escopo inicial
 
-O preset `linux-runtime` compila somente o player, com OpenGL/X11, Python, SDL e OpenAL. O codec FFmpeg fica
-desligado temporariamente: a base atual usa APIs removidas no FFmpeg 7 e precisa de uma migracao propria antes
-de habilitar video. Editor, Cycles, compositor e outros recursos que trazem dependencias pesadas tambem ficam
-desligados nesta primeira etapa. Isso
-preserva o Windows e reduz o primeiro problema de portabilidade a um alvo verificavel.
+O preset `linux-runtime` compila somente o player, com OpenGL/X11, Python, SDL e OpenAL. FFmpeg, OpenImageIO,
+OpenColorIO, Cycles, compositor e outros recursos ficam desligados nesta primeira etapa (o player nao precisa
+deles). Isso preserva o Windows e reduz o primeiro problema de portabilidade a um alvo verificavel.
+
+## Editor (RangeEngine) — preset `linux-editor`, ainda nao validado em Linux real
+
+O preset `linux-editor` (mesmo `source/CMakePresets.json`) builda o alvo `RangeEngine` com `WITH_BLENDER=ON`.
+Ele espelha os `WITH_*` que o editor Windows (`v142-ninja`) realmente usa hoje por padrao — conferido direto no
+`CMakeCache.txt` do build Windows existente, e nao apenas nos defaults do `source/CMakeLists.txt`:
+
+- **Ligados**: `WITH_COMPOSITOR`, `WITH_OPENIMAGEIO`, `WITH_OPENCOLORIO`, `WITH_CODEC_FFMPEG` (usados por
+  nodes de material/textura e import/export de imagem/video no editor).
+- **Desligados**: `WITH_CYCLES`, `WITH_ALEMBIC`, `WITH_OPENVDB` (nao usados pelo RangeEngine; ja desligados
+  tambem no Windows).
+
+Essas quatro libs que entram novas (OIIO/OCIO/FFmpeg) se auto-desligam com aviso no log de configuracao caso
+o CMake nao encontre a `-dev` correspondente no Linux (`build_files/cmake/platform/platform_unix.cmake`,
+mesmo padrao ja visto no bug do sndfile) — ou seja, o pior caso e uma feature saindo faltando, nao o build
+inteiro quebrando.
+
+Atalho automatico (mesmo padrao do runtime, mas instala tambem as libs de FFmpeg/OIIO/OCIO):
+
+```bash
+bash tools/linux/quickstart-editor.sh
+```
+
+Manual:
+
+```bash
+cmake --preset linux-editor -S source
+cmake --build build-linux-editor --target RangeEngine -j"$(nproc)"
+cmake --install build-linux-editor
+```
+
+O executavel fica em `build-linux-editor/bin/RangeEngine`. **Nada disso foi testado em Linux real ainda** —
+o proximo passo e rodar o quickstart numa maquina Linux de verdade e registrar aqui/no changelog os erros de
+CMake e de execucao (janela do editor, ícones, i18n, addons Python) encontrados, do mesmo jeito que foi feito
+para o `RangeRuntime`.
 
 O checkout atual contem apenas `lib/win64_vc15`; estas bibliotecas nao funcionam no Linux. O preset usa
 as bibliotecas da distribuicao, sem alterar `build/` nem o preset Windows.
