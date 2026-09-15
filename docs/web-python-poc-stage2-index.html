@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Stage 2 - CPython wasm32-emscripten PoC</title></head>
+<body>
+<pre id="output">carregando...</pre>
+<script>
+var Module = {
+  print: function(text) {
+    document.getElementById('output').textContent += text + "\n";
+  },
+  printErr: function(text) {
+    document.getElementById('output').textContent += "[stderr] " + text + "\n";
+  }
+};
+</script>
+<script src="stage2_test.js"></script>
+</body>
+</html>

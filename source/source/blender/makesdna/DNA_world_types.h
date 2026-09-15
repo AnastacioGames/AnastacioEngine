@@ -1,0 +1,232 @@
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
+ * All rights reserved.
+ */
+
+/** \file DNA_world_types.h
+ *  \ingroup DNA
+ */
+
+#ifndef __DNA_WORLD_TYPES_H__
+#define __DNA_WORLD_TYPES_H__
+
+#include "DNA_defs.h"
+#include "DNA_ID.h"
+
+struct AnimData;
+struct Ipo;
+struct MTex;
+struct bNodeTree;
+
+#ifndef MAX_MTEX
+#define MAX_MTEX	18
+#endif
+
+
+/**
+ * World defines general modeling data such as a background fill,
+ * gravity, color model etc. It mixes game-data, rendering
+ * data and modeling data. */
+typedef struct World {
+	ID id;
+	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */
+
+	short colormodel, totex;
+	short texact, mistype;
+
+	float horr, horg, horb;
+	float zenr, zeng, zenb;
+	float nadr, nadg, nadb;
+	float ambr, ambg, ambb;
+	float pad1;
+
+	/**
+	 * Exposure= mult factor. unused now, but maybe back later. Kept in to be upward compat.
+	 * New is exp/range control. linfac & logfac are constants... don't belong in
+	 * file, but allocating 8 bytes for temp mem isn't useful either.
+	 */
+	float exposure, exp, range;
+	float linfac, logfac;
+
+	float sun_size, turbidity, ground;
+	short pad2[2];
+
+	/**
+	 * Gravitation constant for the game world
+	 */
+	float gravity; // XXX moved to scene->gamedata in 2.5
+
+	/**
+	 * Radius of the activity bubble, in Manhattan length. Objects
+	 * outside the box are activity-culled. */
+	float activityBoxRadius; // XXX moved to scene->gamedata in 2.5
+
+	short skytype;
+	/**
+	 * Some world modes
+	 * bit 0: Do mist
+	 * bit 1: Do stars
+	 * bit 2: (reserved) depth of field
+	 * bit 3: (gameengine): Activity culling is enabled.
+	 * bit 4: ambient occlusion
+	 * bit 5: (gameengine) : enable Bullet DBVT tree for view frustum culling
+	 */
+	short mode;												// partially moved to scene->gamedata in 2.5
+	short occlusionRes;		/* resolution of occlusion Z buffer in pixel */	// XXX moved to scene->gamedata in 2.5
+	short physicsEngine;	/* here it's aligned */					// XXX moved to scene->gamedata in 2.5
+	short ticrate, maxlogicstep, physubstep, maxphystep;	// XXX moved to scene->gamedata in 2.5
+
+	float misi, miststa, mistdist, misthi;
+	float mistheight, mistdensity; // height fog exp parameters
+
+	float starr  DNA_DEPRECATED, starg  DNA_DEPRECATED, starb  DNA_DEPRECATED, stark  DNA_DEPRECATED; /* Deprecated */
+	float starsize DNA_DEPRECATED, starmindist DNA_DEPRECATED;
+	float stardist DNA_DEPRECATED, starcolnoise DNA_DEPRECATED;
+
+	/* unused now: DOF */
+	short dofsta, dofend, dofmin, dofmax;
+
+	/* ambient occlusion */
+	float aodist, aodistfac, aoenergy, aobias;
+	short aomode, aosamp, aomix, aocolor;
+	float ao_adapt_thresh, ao_adapt_speed_fac;
+	float ao_approx_error, ao_approx_correction;
+	float ao_indirect_energy, ao_env_energy, ao_pad2;
+	short ao_indirect_bounces, ao_pad;
+	short ao_samp_method, ao_gather_method, ao_approx_passes;
+
+	/* assorted settings (in the middle of ambient occlusion settings for padding reasons) */
+	short flag;
+
+	/* ambient occlusion (contd...) */
+	float *aosphere, *aotables;
+
+
+	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
+	struct MTex *mtex[18];		/* MAX_MTEX */
+	short pr_texture, use_nodes, pad[2];
+
+	/* previews */
+	struct PreviewImage *preview;
+
+	/* nodes */
+	struct bNodeTree *nodetree;
+
+	/* weather */
+	short weather_flag;      /* WO_WEATHER_RAIN, WO_WEATHER_CLOUDS, WO_WEATHER_LENSFLARE (bits) */
+	short rain_style;        /* WO_RAIN_STYLE_CLASSIC, WO_RAIN_STYLE_VOLUMETRIC */
+	short weather_expand_flag; /* show_expanded_* dos efeitos de weather na UI, reusa os bits WO_WEATHER_* */
+	short weather_pad3;
+
+	float rain_intensity, rain_speed, rain_wind, rain_darken, rain_ripple;
+	float rain_color[3];
+
+	float cloud_coverage, cloud_scale, cloud_speed;
+	float cloud_color[3];
+
+	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
+	float flare_scale, flare_intensity;
+
+	ListBase gpumaterial;		/* runtime */
+
+	/* game engine: properties shared by all objects through the World ("Global Properties") */
+	ListBase prop;
+} World;
+
+/* **************** WORLD ********************* */
+
+/* skytype */
+#define WO_SKYBLEND             (1 << 0)
+#define WO_SKYREAL              (1 << 1)
+#define WO_SKYPAPER             (1 << 2)
+#define WO_SKYATMOSPHERIC       (1 << 3)
+#define WO_SKYATMOSPHERIC_STARS (1 << 4) // Draw stars
+/* while render: */
+#define WO_SKYTEX               (1 << 5)
+#define WO_ZENUP                (1 << 6)
+
+/* mode */
+#define WO_MIST                (1 << 0)
+//#define WO_STARS               (1 << 1) /* deprecated */
+/*#define WO_DOF                 (1 << 2) */
+#define WO_ACTIVITY_CULLING    (1 << 3)
+#define WO_ENV_LIGHT          (1 << 4)
+#define WO_DBVT_CULLING       (1 << 5)
+#define WO_AMB_OCC            (1 << 6)
+#define WO_INDIRECT_LIGHT     (1 << 7)
+
+/* weather_flag */
+#define WO_WEATHER_RAIN            (1 << 0)
+#define WO_WEATHER_CLOUDS          (1 << 1)
+#define WO_WEATHER_LENSFLARE       (1 << 2)
+#define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
+#define WO_WEATHER_RAIN_RIPPLE     (1 << 4)
+
+/* rain_style */
+#define WO_RAIN_STYLE_CLASSIC      0
+#define WO_RAIN_STYLE_VOLUMETRIC   1
+
+/* aomix */
+enum {
+	WO_AOADD    = 0,
+#ifdef DNA_DEPRECATED
+	WO_AOSUB    = 1,  /* deprecated */
+	WO_AOADDSUB = 2,  /* deprecated */
+#endif
+	WO_AOMUL    = 3,
+};
+
+/* ao_samp_method - methods for sampling the AO hemi */
+#define WO_AOSAMP_CONSTANT			0
+#define WO_AOSAMP_HALTON			1
+#define WO_AOSAMP_HAMMERSLEY		2
+
+/* aomode (use distances & random sampling modes) */
+#define WO_AODIST       (1 << 0)
+#define WO_AORNDSMP     (1 << 1)
+#define WO_AOCACHE      (1 << 2)
+
+/* aocolor */
+#define WO_AOPLAIN	0
+#define WO_AOSKYCOL	1
+#define WO_AOSKYTEX	2
+
+/* ao_gather_method */
+#define WO_AOGATHER_RAYTRACE	0
+#define WO_AOGATHER_APPROX		1
+
+/* texco (also in DNA_material_types.h) */
+#define TEXCO_ANGMAP      (1 << 6)
+#define TEXCO_H_SPHEREMAP (1 << 8)
+#define TEXCO_H_TUBEMAP   (1 << 10)
+#define TEXCO_EQUIRECTMAP (1 << 11)
+
+/* mapto */
+#define WOMAP_BLEND     (1 << 0)
+#define WOMAP_HORIZ     (1 << 1)
+#define WOMAP_ZENUP     (1 << 2)
+#define WOMAP_ZENDOWN   (1 << 3)
+// #define WOMAP_MIST   (1 << 4) /* Deprecated */
+
+/* flag */
+#define WO_DS_EXPAND	(1<<0)
+	/* NOTE: this must have the same value as MA_DS_SHOW_TEXS,
+	 * otherwise anim-editors will not read correctly
+	 */
+#define WO_DS_SHOW_TEXS	(1<<2)
+
+#endif

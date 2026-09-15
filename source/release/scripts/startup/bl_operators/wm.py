@@ -1,0 +1,3425 @@
+# ##### BEGIN GPL LICENSE BLOCK #####
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software Foundation,
+#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# ##### END GPL LICENSE BLOCK #####
+
+# <pep8 compliant>
+from __future__ import annotations
+
+import bpy, os, json, shutil
+from bpy.types import (
+    Menu,
+    Operator,
+    UIList,
+)
+
+from bpy.props import (
+    BoolProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
+    StringProperty,
+)
+
+from bpy.app.translations import pgettext_tip as tip_
+
+
+rna_path_prop = StringProperty(
+    name="Context Attributes",
+    description="RNA context string",
+    maxlen=1024,
+)
+
+rna_reverse_prop = BoolProperty(
+    name="Reverse",
+    description="Cycle backwards",
+    default=False,
+)
+
+rna_wrap_prop = BoolProperty(
+    name="Wrap",
+    description="Wrap back to the first/last values",
+    default=False,
+)
+
+rna_relative_prop = BoolProperty(
+    name="Relative",
+    description="Apply relative to the current value (delta)",
+    default=False,
+)
+
+
+def context_path_validate(context, data_path):
+    try:
+        value = eval("context.%s" % data_path) if data_path else Ellipsis
+    except AttributeError as ex:
+        if str(ex).startswith("'NoneType'"):
+            # One of the items in the rna path is None, just ignore this
+            value = Ellipsis
+        else:
+            # We have a real error in the rna path, don't ignore that
+            raise
+
+    return value
+
+
+def operator_value_is_undo(value):
+    if value in {None, Ellipsis}:
+        return False
+
+    # typical properties or objects
+    id_data = getattr(value, "id_data", Ellipsis)
+
+    if id_data is None:
+        return False
+    elif id_data is Ellipsis:
+        # handle mathutils types
+        id_data = getattr(getattr(value, "owner", None), "id_data", None)
+
+        if id_data is None:
+            return False
+
+    # return True if its a non window ID type
+    return (isinstance(id_data, bpy.types.ID) and
+            (not isinstance(id_data, (bpy.types.WindowManager,
+                                      bpy.types.Screen,
+                                      bpy.types.Brush,
+                                      ))))
+
+
+def operator_path_is_undo(context, data_path):
+    # note that if we have data paths that use strings this could fail
+    # luckily we don't do this!
+    #
+    # When we can't find the data owner assume no undo is needed.
+    data_path_head = data_path.rpartition(".")[0]
+
+    if not data_path_head:
+        return False
+
+    value = context_path_validate(context, data_path_head)
+
+    return operator_value_is_undo(value)
+
+
+def operator_path_undo_return(context, data_path):
+    return {'FINISHED'} if operator_path_is_undo(context, data_path) else {'CANCELLED'}
+
+
+def operator_value_undo_return(value):
+    return {'FINISHED'} if operator_value_is_undo(value) else {'CANCELLED'}
+
+
+def execute_context_assign(self, context):
+    data_path = self.data_path
+    if context_path_validate(context, data_path) is Ellipsis:
+        return {'PASS_THROUGH'}
+
+    if getattr(self, "relative", False):
+        exec("context.%s += self.value" % data_path)
+    else:
+        exec("context.%s = self.value" % data_path)
+
+    return operator_path_undo_return(context, data_path)
+
+
+def module_filesystem_remove(path_base, module_name):
+    import os
+    module_name = os.path.splitext(module_name)[0]
+    for f in os.listdir(path_base):
+        f_base = os.path.splitext(f)[0]
+        if f_base == module_name:
+            f_full = os.path.join(path_base, f)
+
+            if os.path.isdir(f_full):
+                os.rmdir(f_full)
+            else:
+                os.remove(f_full)
+
+
+class BRUSH_OT_active_index_set(Operator):
+    """Set active sculpt/paint brush from it's number"""
+    bl_idname = "brush.active_index_set"
+    bl_label = "Set Brush Number"
+
+    mode: StringProperty(
+        name="Mode",
+        description="Paint mode to set brush for",
+        maxlen=1024,
+    )
+    index: IntProperty(
+        name="Number",
+        description="Brush number",
+    )
+
+    _attr_dict = {
+        "sculpt": "use_paint_sculpt",
+        "vertex_paint": "use_paint_vertex",
+        "weight_paint": "use_paint_weight",
+        "image_paint": "use_paint_image",
+    }
+
+    def execute(self, context):
+        attr = self._attr_dict.get(self.mode)
+        if attr is None:
+            return {'CANCELLED'}
+
+        tool_settings = context.tool_settings
+        for i, brush in enumerate((cur for cur in bpy.data.brushes if getattr(cur, attr))):
+            if i == self.index:
+                getattr(tool_settings, self.mode).brush = brush
+                return {'FINISHED'}
+
+        return {'CANCELLED'}
+
+
+class WM_OT_context_set_boolean(Operator):
+    """Set a context value"""
+    bl_idname = "wm.context_set_boolean"
+    bl_label = "Context Set Boolean"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: BoolProperty(
+        name="Value",
+        description="Assignment value",
+        default=True,
+    )
+
+    execute = execute_context_assign
+
+
+class WM_OT_context_set_int(Operator):  # same as enum
+    """Set a context value"""
+    bl_idname = "wm.context_set_int"
+    bl_label = "Context Set"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: IntProperty(
+        name="Value",
+        description="Assign value",
+        default=0,
+    )
+    relative: rna_relative_prop
+
+    execute = execute_context_assign
+
+
+class WM_OT_context_scale_float(Operator):
+    """Scale a float context value"""
+    bl_idname = "wm.context_scale_float"
+    bl_label = "Context Scale Float"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: FloatProperty(
+        name="Value",
+        description="Assign value",
+        default=1.0,
+    )
+
+    def execute(self, context):
+        data_path = self.data_path
+        if context_path_validate(context, data_path) is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        value = self.value
+
+        if value == 1.0:  # nothing to do
+            return {'CANCELLED'}
+
+        exec("context.%s *= value" % data_path)
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_scale_int(Operator):
+    """Scale an int context value"""
+    bl_idname = "wm.context_scale_int"
+    bl_label = "Context Scale Int"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: FloatProperty(
+        name="Value",
+        description="Assign value",
+        default=1.0,
+    )
+    always_step: BoolProperty(
+        name="Always Step",
+        description="Always adjust the value by a minimum of 1 when 'value' is not 1.0",
+        default=True,
+    )
+
+    def execute(self, context):
+        data_path = self.data_path
+        if context_path_validate(context, data_path) is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        value = self.value
+
+        if value == 1.0:  # nothing to do
+            return {'CANCELLED'}
+
+        if getattr(self, "always_step", False):
+            if value > 1.0:
+                add = "1"
+                func = "max"
+            else:
+                add = "-1"
+                func = "min"
+            exec("context.%s = %s(round(context.%s * value), context.%s + %s)" %
+                 (data_path, func, data_path, data_path, add))
+        else:
+            exec("context.%s *= value" % data_path)
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_set_float(Operator):  # same as enum
+    """Set a context value"""
+    bl_idname = "wm.context_set_float"
+    bl_label = "Context Set Float"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: FloatProperty(
+        name="Value",
+        description="Assignment value",
+        default=0.0,
+    )
+    relative: rna_relative_prop
+
+    execute = execute_context_assign
+
+
+class WM_OT_context_set_string(Operator):  # same as enum
+    """Set a context value"""
+    bl_idname = "wm.context_set_string"
+    bl_label = "Context Set String"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: StringProperty(
+        name="Value",
+        description="Assign value",
+        maxlen=1024,
+    )
+
+    execute = execute_context_assign
+
+
+class WM_OT_context_set_enum(Operator):
+    """Set a context value"""
+    bl_idname = "wm.context_set_enum"
+    bl_label = "Context Set Enum"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: StringProperty(
+        name="Value",
+        description="Assignment value (as a string)",
+        maxlen=1024,
+    )
+
+    execute = execute_context_assign
+
+
+class WM_OT_context_set_value(Operator):
+    """Set a context value"""
+    bl_idname = "wm.context_set_value"
+    bl_label = "Context Set Value"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: StringProperty(
+        name="Value",
+        description="Assignment value (as a string)",
+        maxlen=1024,
+    )
+
+    def execute(self, context):
+        data_path = self.data_path
+        if context_path_validate(context, data_path) is Ellipsis:
+            return {'PASS_THROUGH'}
+        exec("context.%s = %s" % (data_path, self.value))
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_toggle(Operator):
+    """Toggle a context value"""
+    bl_idname = "wm.context_toggle"
+    bl_label = "Context Toggle"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+
+    def execute(self, context):
+        data_path = self.data_path
+
+        if context_path_validate(context, data_path) is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        exec("context.%s = not (context.%s)" % (data_path, data_path))
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_toggle_enum(Operator):
+    """Toggle a context value"""
+    bl_idname = "wm.context_toggle_enum"
+    bl_label = "Context Toggle Values"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value_1: StringProperty(
+        name="Value",
+        description="Toggle enum",
+        maxlen=1024,
+    )
+    value_2: StringProperty(
+        name="Value",
+        description="Toggle enum",
+        maxlen=1024,
+    )
+
+    def execute(self, context):
+        data_path = self.data_path
+
+        if context_path_validate(context, data_path) is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        # failing silently is not ideal, but we don't want errors for shortcut
+        # keys that some values that are only available in a particular context
+        try:
+            exec("context.%s = ('%s', '%s')[context.%s != '%s']" %
+                 (data_path, self.value_1,
+                  self.value_2, data_path,
+                  self.value_2,
+                  ))
+        except:
+            return {'PASS_THROUGH'}
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_cycle_int(Operator):
+    """Set a context value (useful for cycling active material, """ \
+        """vertex keys, groups, etc.)"""
+    bl_idname = "wm.context_cycle_int"
+    bl_label = "Context Int Cycle"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    reverse: rna_reverse_prop
+    wrap: rna_wrap_prop
+
+    def execute(self, context):
+        data_path = self.data_path
+        value = context_path_validate(context, data_path)
+        if value is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        if self.reverse:
+            value -= 1
+        else:
+            value += 1
+
+        exec("context.%s = value" % data_path)
+
+        if self.wrap:
+            if value != eval("context.%s" % data_path):
+                # relies on rna clamping integers out of the range
+                if self.reverse:
+                    value = (1 << 31) - 1
+                else:
+                    value = -1 << 31
+
+                exec("context.%s = value" % data_path)
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_cycle_enum(Operator):
+    """Toggle a context value"""
+    bl_idname = "wm.context_cycle_enum"
+    bl_label = "Context Enum Cycle"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    reverse: rna_reverse_prop
+    wrap: rna_wrap_prop
+
+    def execute(self, context):
+        data_path = self.data_path
+        value = context_path_validate(context, data_path)
+        if value is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        orig_value = value
+
+        # Have to get rna enum values
+        rna_struct_str, rna_prop_str = data_path.rsplit('.', 1)
+        i = rna_prop_str.find('[')
+
+        # just in case we get "context.foo.bar[0]"
+        if i != -1:
+            rna_prop_str = rna_prop_str[0:i]
+
+        rna_struct = eval("context.%s.rna_type" % rna_struct_str)
+
+        rna_prop = rna_struct.properties[rna_prop_str]
+
+        if type(rna_prop) != bpy.types.EnumProperty:
+            raise Exception("expected an enum property")
+
+        enums = rna_struct.properties[rna_prop_str].enum_items.keys()
+        orig_index = enums.index(orig_value)
+
+        # Have the info we need, advance to the next item.
+        #
+        # When wrap's disabled we may set the value to its self,
+        # this is done to ensure update callbacks run.
+        if self.reverse:
+            if orig_index == 0:
+                advance_enum = enums[-1] if self.wrap else enums[0]
+            else:
+                advance_enum = enums[orig_index - 1]
+        else:
+            if orig_index == len(enums) - 1:
+                advance_enum = enums[0] if self.wrap else enums[-1]
+            else:
+                advance_enum = enums[orig_index + 1]
+
+        # set the new value
+        exec("context.%s = advance_enum" % data_path)
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_cycle_array(Operator):
+    """Set a context array value """ \
+        """(useful for cycling the active mesh edit mode)"""
+    bl_idname = "wm.context_cycle_array"
+    bl_label = "Context Array Cycle"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    reverse: rna_reverse_prop
+
+    def execute(self, context):
+        data_path = self.data_path
+        value = context_path_validate(context, data_path)
+        if value is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        def cycle(array):
+            if self.reverse:
+                array.insert(0, array.pop())
+            else:
+                array.append(array.pop(0))
+            return array
+
+        exec("context.%s = cycle(context.%s[:])" % (data_path, data_path))
+
+        return operator_path_undo_return(context, data_path)
+
+
+class WM_OT_context_menu_enum(Operator):
+    bl_idname = "wm.context_menu_enum"
+    bl_label = "Context Enum Menu"
+    bl_options = {'UNDO', 'INTERNAL'}
+    
+    data_path: rna_path_prop
+
+    def execute(self, context):
+        data_path = self.data_path
+        value = context_path_validate(context, data_path)
+
+        if value is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        base_path, prop_string = data_path.rsplit(".", 1)
+        value_base = context_path_validate(context, base_path)
+        prop = value_base.bl_rna.properties[prop_string]
+
+        def draw_cb(self, context):
+            layout = self.layout
+            layout.prop(value_base, prop_string, expand=True)
+
+        context.window_manager.popup_menu(draw_func=draw_cb, title=prop.name, icon=prop.icon)
+
+        return {'FINISHED'}
+
+
+class WM_OT_context_pie_enum(Operator):
+    bl_idname = "wm.context_pie_enum"
+    bl_label = "Context Enum Pie"
+    bl_options = {'UNDO', 'INTERNAL'}
+    
+    data_path: rna_path_prop
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        data_path = self.data_path
+        value = context_path_validate(context, data_path)
+
+        if value is Ellipsis:
+            return {'PASS_THROUGH'}
+
+        base_path, prop_string = data_path.rsplit(".", 1)
+        value_base = context_path_validate(context, base_path)
+        prop = value_base.bl_rna.properties[prop_string]
+
+        def draw_cb(self, context):
+            layout = self.layout
+            layout.prop(value_base, prop_string, expand=True)
+
+        wm.popup_menu_pie(draw_func=draw_cb, title=prop.name, icon=prop.icon, event=event)
+
+        return {'FINISHED'}
+
+
+class WM_OT_operator_pie_enum(Operator):
+    bl_idname = "wm.operator_pie_enum"
+    bl_label = "Operator Enum Pie"
+    bl_options = {'UNDO', 'INTERNAL'}
+    
+    data_path: StringProperty(
+        name="Operator",
+        description="Operator name (in python as string)",
+        maxlen=1024,
+    )
+    prop_string: StringProperty(
+        name="Property",
+        description="Property name (as a string)",
+        maxlen=1024,
+    )
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+
+        data_path = self.data_path
+        prop_string = self.prop_string
+
+        # same as eval("bpy.ops." + data_path)
+        op_mod_str, ob_id_str = data_path.split(".", 1)
+        op = getattr(getattr(bpy.ops, op_mod_str), ob_id_str)
+        del op_mod_str, ob_id_str
+
+        try:
+            op_rna = op.get_rna_type()
+        except KeyError:
+            self.report({'ERROR'}, "Operator not found: bpy.ops.%s" % data_path)
+            return {'CANCELLED'}
+
+        def draw_cb(self, context):
+            layout = self.layout
+            pie = layout.menu_pie()
+            pie.operator_enum(data_path, prop_string)
+
+        wm.popup_menu_pie(draw_func=draw_cb, title=op_rna.name, event=event)
+
+        return {'FINISHED'}
+
+
+class WM_OT_context_set_id(Operator):
+    """Set a context value to an ID data-block"""
+    bl_idname = "wm.context_set_id"
+    bl_label = "Set Library ID"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path_prop
+    value: StringProperty(
+        name="Value",
+        description="Assign value",
+        maxlen=1024,
+    )
+
+    def execute(self, context):
+        value = self.value
+        data_path = self.data_path
+
+        # match the pointer type from the target property to bpy.data.*
+        # so we lookup the correct list.
+        data_path_base, data_path_prop = data_path.rsplit(".", 1)
+        data_prop_rna = eval("context.%s" % data_path_base).rna_type.properties[data_path_prop]
+        data_prop_rna_type = data_prop_rna.fixed_type
+
+        id_iter = None
+
+        for prop in bpy.data.rna_type.properties:
+            if prop.rna_type.identifier == "CollectionProperty":
+                if prop.fixed_type == data_prop_rna_type:
+                    id_iter = prop.identifier
+                    break
+
+        if id_iter:
+            value_id = getattr(bpy.data, id_iter).get(value)
+            exec("context.%s = value_id" % data_path)
+
+        return operator_path_undo_return(context, data_path)
+
+
+doc_id = StringProperty(
+    name="Doc ID",
+    maxlen=1024,
+    options={'HIDDEN'},
+)
+
+data_path_iter = StringProperty(
+    description="The data path relative to the context, must point to an iterable")
+
+data_path_item = StringProperty(
+    description="The data path from each iterable to the value (int or float)")
+
+
+class WM_OT_context_collection_boolean_set(Operator):
+    """Set boolean values for a collection of items"""
+    bl_idname = "wm.context_collection_boolean_set"
+    bl_label = "Context Collection Boolean Set"
+    bl_options = {'UNDO', 'REGISTER', 'INTERNAL'}
+
+    data_path_iter: data_path_iter
+    data_path_item: data_path_item
+
+    type: EnumProperty(
+        name="Type",
+        items=(('TOGGLE', "Toggle", ""),
+               ('ENABLE', "Enable", ""),
+               ('DISABLE', "Disable", ""),
+               ),
+    )
+
+    def execute(self, context):
+        data_path_iter = self.data_path_iter
+        data_path_item = self.data_path_item
+
+        items = list(getattr(context, data_path_iter))
+        items_ok = []
+        is_set = False
+        for item in items:
+            try:
+                value_orig = eval("item." + data_path_item)
+            except:
+                continue
+
+            if value_orig is True:
+                is_set = True
+            elif value_orig is False:
+                pass
+            else:
+                self.report({'WARNING'}, "Non boolean value found: %s[ ].%s" %
+                            (data_path_iter, data_path_item))
+                return {'CANCELLED'}
+
+            items_ok.append(item)
+
+        # avoid undo push when nothing to do
+        if not items_ok:
+            return {'CANCELLED'}
+
+        if self.type == 'ENABLE':
+            is_set = True
+        elif self.type == 'DISABLE':
+            is_set = False
+        else:
+            is_set = not is_set
+
+        exec_str = "item.%s = %s" % (data_path_item, is_set)
+        for item in items_ok:
+            exec(exec_str)
+
+        return operator_value_undo_return(item)
+
+
+class WM_OT_context_modal_mouse(Operator):
+    """Adjust arbitrary values with mouse input"""
+    bl_idname = "wm.context_modal_mouse"
+    bl_label = "Context Modal Mouse"
+    bl_options = {'GRAB_CURSOR', 'BLOCKING', 'UNDO', 'INTERNAL'}
+
+    data_path_iter: data_path_iter
+    data_path_item: data_path_item
+    header_text: StringProperty(
+        name="Header Text",
+        description="Text to display in header during scale",
+    )
+
+    input_scale: FloatProperty(
+        description="Scale the mouse movement by this value before applying the delta",
+        default=0.01,
+    )
+    invert: BoolProperty(
+        description="Invert the mouse input",
+        default=False,
+    )
+    initial_x: IntProperty(options={'HIDDEN'})
+
+    def _values_store(self, context):
+        data_path_iter = self.data_path_iter
+        data_path_item = self.data_path_item
+
+        self._values = values = {}
+
+        for item in getattr(context, data_path_iter):
+            try:
+                value_orig = eval("item." + data_path_item)
+            except:
+                continue
+
+            # check this can be set, maybe this is library data.
+            try:
+                exec("item.%s = %s" % (data_path_item, value_orig))
+            except:
+                continue
+
+            values[item] = value_orig
+
+    def _values_delta(self, delta):
+        delta *= self.input_scale
+        if self.invert:
+            delta = - delta
+
+        data_path_item = self.data_path_item
+        for item, value_orig in self._values.items():
+            if type(value_orig) == int:
+                exec("item.%s = int(%d)" % (data_path_item, round(value_orig + delta)))
+            else:
+                exec("item.%s = %f" % (data_path_item, value_orig + delta))
+
+    def _values_restore(self):
+        data_path_item = self.data_path_item
+        for item, value_orig in self._values.items():
+            exec("item.%s = %s" % (data_path_item, value_orig))
+
+        self._values.clear()
+
+    def _values_clear(self):
+        self._values.clear()
+
+    def modal(self, context, event):
+        event_type = event.type
+
+        if event_type == 'MOUSEMOVE':
+            delta = event.mouse_x - self.initial_x
+            self._values_delta(delta)
+            header_text = self.header_text
+            if header_text:
+                if len(self._values) == 1:
+                    (item, ) = self._values.keys()
+                    header_text = header_text % eval("item.%s" % self.data_path_item)
+                else:
+                    header_text = (self.header_text % delta) + " (delta)"
+                context.area.header_text_set(header_text)
+
+        elif 'LEFTMOUSE' == event_type:
+            item = next(iter(self._values.keys()))
+            self._values_clear()
+            context.area.header_text_set()
+            return operator_value_undo_return(item)
+
+        elif event_type in {'RIGHTMOUSE', 'ESC'}:
+            self._values_restore()
+            context.area.header_text_set()
+            return {'CANCELLED'}
+
+        return {'RUNNING_MODAL'}
+
+    def invoke(self, context, event):
+        self._values_store(context)
+
+        if not self._values:
+            self.report({'WARNING'}, "Nothing to operate on: %s[ ].%s" %
+                        (self.data_path_iter, self.data_path_item))
+
+            return {'CANCELLED'}
+        else:
+            self.initial_x = event.mouse_x
+
+            context.window_manager.modal_handler_add(self)
+            return {'RUNNING_MODAL'}
+
+
+class WM_OT_url_open(Operator):
+    """Open a website in the web-browser"""
+    bl_idname = "wm.url_open"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    url: StringProperty(
+        name="URL",
+        description="URL to open",
+    )
+
+    def execute(self, context):
+        import webbrowser
+        webbrowser.open(self.url)
+        return {'FINISHED'}
+
+
+class WM_OT_path_open(Operator):
+    """Open a path in a file browser"""
+    bl_idname = "wm.path_open"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+        options={'SKIP_SAVE'},
+    )
+
+    def execute(self, context):
+        import sys
+        import os
+        import subprocess
+
+        filepath = self.filepath
+
+        if not filepath:
+            self.report({'ERROR'}, "File path was not set")
+            return {'CANCELLED'}
+
+        filepath = bpy.path.abspath(filepath)
+        filepath = os.path.normpath(filepath)
+
+        if not os.path.exists(filepath):
+            self.report({'ERROR'}, "File '%s' not found" % filepath)
+            return {'CANCELLED'}
+
+        if sys.platform[:3] == "win":
+            os.startfile(filepath)
+        elif sys.platform == "darwin":
+            subprocess.check_call(["open", filepath])
+        else:
+            try:
+                subprocess.check_call(["xdg-open", filepath])
+            except:
+                # xdg-open *should* be supported by recent Gnome, KDE, Xfce
+                import traceback
+                traceback.print_exc()
+
+        return {'FINISHED'}
+
+
+def _wm_doc_get_id(doc_id, do_url=True, url_prefix=""):
+
+    def operator_exists_pair(a, b):
+        # Not fast, this is only for docs.
+        return b in dir(getattr(bpy.ops, a))
+
+    def operator_exists_single(a):
+        a, b = a.partition("_OT_")[::2]
+        return operator_exists_pair(a.lower(), b)
+
+    id_split = doc_id.split(".")
+    url = rna = None
+
+    if len(id_split) == 1:  # rna, class
+        if do_url:
+            url = "%s/bpy.types.%s.html" % (url_prefix, id_split[0])
+        else:
+            rna = "bpy.types.%s" % id_split[0]
+
+    elif len(id_split) == 2:  # rna, class.prop
+        class_name, class_prop = id_split
+
+        # an operator (common case - just button referencing an op)
+        if operator_exists_pair(class_name, class_prop):
+            if do_url:
+                url = (
+                    "%s/bpy.ops.%s.html#bpy.ops.%s.%s" %
+                    (url_prefix, class_name, class_name, class_prop)
+                )
+            else:
+                rna = "bpy.ops.%s.%s" % (class_name, class_prop)
+        elif operator_exists_single(class_name):
+            # note: ignore the prop name since we don't have a way to link into it
+            class_name, class_prop = class_name.split("_OT_", 1)
+            class_name = class_name.lower()
+            if do_url:
+                url = (
+                    "%s/bpy.ops.%s.html#bpy.ops.%s.%s" %
+                    (url_prefix, class_name, class_name, class_prop)
+                )
+            else:
+                rna = "bpy.ops.%s.%s" % (class_name, class_prop)
+        else:
+            # an RNA setting, common case
+            rna_class = getattr(bpy.types, class_name)
+
+            # detect if this is a inherited member and use that name instead
+            rna_parent = rna_class.bl_rna
+            rna_prop = rna_parent.properties.get(class_prop)
+            if rna_prop:
+                rna_parent = rna_parent.base
+                while rna_parent and rna_prop == rna_parent.properties.get(class_prop):
+                    class_name = rna_parent.identifier
+                    rna_parent = rna_parent.base
+
+                if do_url:
+                    url = (
+                        "%s/bpy.types.%s.html#bpy.types.%s.%s" %
+                        (url_prefix, class_name, class_name, class_prop)
+                    )
+                else:
+                    rna = "bpy.types.%s.%s" % (class_name, class_prop)
+            else:
+                # We assume this is custom property, only try to generate generic url/rna_id...
+                if do_url:
+                    url = ("%s/bpy.types.bpy_struct.html#bpy.types.bpy_struct.items" % (url_prefix,))
+                else:
+                    rna = "bpy.types.bpy_struct"
+
+    return url if do_url else rna
+
+
+class WM_OT_doc_view_manual(Operator):
+    """Load online manual"""
+    bl_idname = "wm.doc_view_manual"
+    bl_label = "View Manual"
+
+    doc_id: doc_id
+
+    @staticmethod
+    def _find_reference(rna_id, url_mapping, verbose=True):
+        if verbose:
+            print("online manual check for: '%s'... " % rna_id)
+        from fnmatch import fnmatchcase
+        # XXX, for some reason all RNA ID's are stored lowercase
+        # Adding case into all ID's isn't worth the hassle so force lowercase.
+        rna_id = rna_id.lower()
+        for pattern, url_suffix in url_mapping:
+            if fnmatchcase(rna_id, pattern):
+                if verbose:
+                    print("            match found: '%s' --> '%s'" % (pattern, url_suffix))
+                return url_suffix
+        if verbose:
+            print("match not found")
+        return None
+
+    @staticmethod
+    def _lookup_rna_url(rna_id, verbose=True):
+        for prefix, url_manual_mapping in bpy.utils.manual_map():
+            rna_ref = WM_OT_doc_view_manual._find_reference(rna_id, url_manual_mapping, verbose=verbose)
+            if rna_ref is not None:
+                url = prefix + rna_ref
+                return url
+
+    def execute(self, context):
+        rna_id = _wm_doc_get_id(self.doc_id, do_url=False)
+        if rna_id is None:
+            return {'PASS_THROUGH'}
+
+        url = self._lookup_rna_url(rna_id)
+
+        if url is None:
+            self.report(
+                {'WARNING'},
+                "No reference available %r, "
+                "Update info in 'rna_manual_reference.py' "
+                "or callback to bpy.utils.manual_map()" %
+                self.doc_id
+            )
+            return {'CANCELLED'}
+        else:
+            import webbrowser
+            webbrowser.open(url)
+            return {'FINISHED'}
+
+
+class WM_OT_doc_view(Operator):
+    """Load online reference docs"""
+    bl_idname = "wm.doc_view"
+    bl_label = "View Documentation"
+
+    doc_id: doc_id
+    if bpy.app.version_cycle == "release":
+        _prefix = ("https://docs.blender.org/api/current")
+    else:
+        _prefix = ("https://docs.blender.org/api/blender2.7")
+
+    def execute(self, context):
+        url = _wm_doc_get_id(self.doc_id, do_url=True, url_prefix=self._prefix)
+        if url is None:
+            return {'PASS_THROUGH'}
+
+        import webbrowser
+        webbrowser.open(url)
+
+        return {'FINISHED'}
+
+
+rna_path = StringProperty(
+    name="Property Edit",
+    description="Property data_path edit",
+    maxlen=1024,
+    options={'HIDDEN'},
+)
+
+rna_value = StringProperty(
+    name="Property Value",
+    description="Property value edit",
+    maxlen=1024,
+)
+
+rna_property = StringProperty(
+    name="Property Name",
+    description="Property name edit",
+    maxlen=1024,
+)
+
+rna_min = FloatProperty(
+    name="Min",
+    default=-10000.0,
+    precision=3,
+)
+
+rna_max = FloatProperty(
+    name="Max",
+    default=10000.0,
+    precision=3,
+)
+
+rna_use_soft_limits = BoolProperty(
+    name="Use Soft Limits",
+)
+
+
+class WM_OT_properties_edit(Operator):
+    bl_idname = "wm.properties_edit"
+    bl_label = "Edit Property"
+    # register only because invoke_props_popup requires.
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    data_path: rna_path
+    property: rna_property
+    value: rna_value
+    min: rna_min
+    max: rna_max
+    use_soft_limits: rna_use_soft_limits
+    soft_min: rna_min
+    soft_max: rna_max
+    description: StringProperty(
+        name="Tooltip",
+    )
+
+    def _cmp_props_get(self):
+        # Changing these properties will refresh the UI
+        return {
+            "use_soft_limits": self.use_soft_limits,
+            "soft_range": (self.soft_min, self.soft_max),
+            "hard_range": (self.min, self.max),
+        }
+
+    def execute(self, context):
+        from rna_prop_ui import (
+            rna_idprop_ui_prop_get,
+            rna_idprop_ui_prop_clear,
+            rna_idprop_ui_prop_update,
+        )
+
+        data_path = self.data_path
+        value = self.value
+        prop = self.property
+
+        prop_old = getattr(self, "_last_prop", [None])[0]
+
+        if prop_old is None:
+            self.report({'ERROR'}, "Direct execution not supported")
+            return {'CANCELLED'}
+
+        try:
+            value_eval = eval(value)
+            # assert else None -> None, not "None", see [#33431]
+            assert(type(value_eval) in {str, float, int, bool, tuple, list})
+        except:
+            value_eval = value
+
+        # First remove
+        item = eval("context.%s" % data_path)
+        prop_type_old = type(item[prop_old])
+
+        rna_idprop_ui_prop_clear(item, prop_old)
+        exec_str = "del item[%r]" % prop_old
+        # print(exec_str)
+        exec(exec_str)
+
+        # Reassign
+        exec_str = "item[%r] = %s" % (prop, repr(value_eval))
+        # print(exec_str)
+        exec(exec_str)
+
+        rna_idprop_ui_prop_update(item, prop)
+
+        self._last_prop[:] = [prop]
+
+        prop_type = type(item[prop])
+
+        prop_ui = rna_idprop_ui_prop_get(item, prop)
+
+        if prop_type in {float, int}:
+            prop_ui["min"] = prop_type(self.min)
+            prop_ui["max"] = prop_type(self.max)
+
+            if self.use_soft_limits:
+                prop_ui["soft_min"] = prop_type(self.soft_min)
+                prop_ui["soft_max"] = prop_type(self.soft_max)
+            else:
+                prop_ui["soft_min"] = prop_type(self.min)
+                prop_ui["soft_max"] = prop_type(self.max)
+
+        prop_ui["description"] = self.description
+
+        # If we have changed the type of the property, update its potential anim curves!
+        if prop_type_old != prop_type:
+            data_path = '["%s"]' % bpy.utils.escape_identifier(prop)
+            done = set()
+
+            def _update(fcurves):
+                for fcu in fcurves:
+                    if fcu not in done and fcu.data_path == data_path:
+                        fcu.update_autoflags(item)
+                        done.add(fcu)
+
+            def _update_strips(strips):
+                for st in strips:
+                    if st.type == 'CLIP' and st.action:
+                        _update(st.action.fcurves)
+                    elif st.type == 'META':
+                        _update_strips(st.strips)
+
+            adt = getattr(item, "animation_data", None)
+            if adt is not None:
+                if adt.action:
+                    _update(adt.action.fcurves)
+                if adt.drivers:
+                    _update(adt.drivers)
+                if adt.nla_tracks:
+                    for nt in adt.nla_tracks:
+                        _update_strips(nt.strips)
+
+        # otherwise existing buttons which reference freed
+        # memory may crash blender [#26510]
+        # context.area.tag_redraw()
+        for win in context.window_manager.windows:
+            for area in win.screen.areas:
+                area.tag_redraw()
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        from rna_prop_ui import rna_idprop_ui_prop_get
+
+        data_path = self.data_path
+
+        if not data_path:
+            self.report({'ERROR'}, "Data path not set")
+            return {'CANCELLED'}
+
+        self._last_prop = [self.property]
+
+        item = eval("context.%s" % data_path)
+
+        # setup defaults
+        prop_ui = rna_idprop_ui_prop_get(item, self.property, False)  # don't create
+        if prop_ui:
+            self.min = prop_ui.get("min", -1000000000)
+            self.max = prop_ui.get("max", 1000000000)
+            self.description = prop_ui.get("description", "")
+
+            self.soft_min = prop_ui.get("soft_min", self.min)
+            self.soft_max = prop_ui.get("soft_max", self.max)
+            self.use_soft_limits = (
+                self.min != self.soft_min or
+                self.max != self.soft_max
+            )
+
+        # store for comparison
+        self._cmp_props = self._cmp_props_get()
+
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def check(self, context):
+        cmp_props = self._cmp_props_get()
+        changed = False
+        if self._cmp_props != cmp_props:
+            if cmp_props["use_soft_limits"]:
+                if cmp_props["soft_range"] != self._cmp_props["soft_range"]:
+                    self.min = min(self.min, self.soft_min)
+                    self.max = max(self.max, self.soft_max)
+                    changed = True
+                if cmp_props["hard_range"] != self._cmp_props["hard_range"]:
+                    self.soft_min = max(self.min, self.soft_min)
+                    self.soft_max = min(self.max, self.soft_max)
+                    changed = True
+            else:
+                if cmp_props["soft_range"] != cmp_props["hard_range"]:
+                    self.soft_min = self.min
+                    self.soft_max = self.max
+                    changed = True
+
+            changed |= (cmp_props["use_soft_limits"] != self._cmp_props["use_soft_limits"])
+
+            if changed:
+                cmp_props = self._cmp_props_get()
+
+            self._cmp_props = cmp_props
+
+        return changed
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "property")
+        layout.prop(self, "value")
+        row = layout.row(align=True)
+        row.prop(self, "min")
+        row.prop(self, "max")
+
+        layout.prop(self, "use_soft_limits")
+
+        row = layout.row(align=True)
+        row.enabled = self.use_soft_limits
+        row.prop(self, "soft_min", text="Soft Min")
+        row.prop(self, "soft_max", text="Soft Max")
+        layout.prop(self, "description")
+
+
+class WM_OT_properties_add(Operator):
+    bl_idname = "wm.properties_add"
+    bl_label = "Add Property"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path
+
+    def execute(self, context):
+        from rna_prop_ui import (
+            rna_idprop_ui_prop_get,
+            rna_idprop_ui_prop_update,
+        )
+
+        data_path = self.data_path
+        item = eval("context.%s" % data_path)
+
+        def unique_name(names):
+            prop = "prop"
+            prop_new = prop
+            i = 1
+            while prop_new in names:
+                prop_new = prop + str(i)
+                i += 1
+
+            return prop_new
+
+        prop = unique_name({
+            *item.keys(),
+            *type(item).bl_rna.properties.keys(),
+        })
+
+        item[prop] = 1.0
+        rna_idprop_ui_prop_update(item, prop)
+
+        # not essential, but without this we get [#31661]
+        prop_ui = rna_idprop_ui_prop_get(item, prop)
+        prop_ui["soft_min"] = prop_ui["min"] = 0.0
+        prop_ui["soft_max"] = prop_ui["max"] = 1.0
+
+        return {'FINISHED'}
+
+
+class WM_OT_properties_context_change(Operator):
+    """Jump to a different tab inside the properties editor"""
+    bl_idname = "wm.properties_context_change"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    context: StringProperty(
+        name="Context",
+        maxlen=64,
+    )
+
+    def execute(self, context):
+        context.space_data.context = self.context
+        return {'FINISHED'}
+
+
+class WM_OT_properties_remove(Operator):
+    """Internal use (edit a property data_path)"""
+    bl_idname = "wm.properties_remove"
+    bl_label = "Remove Property"
+    bl_options = {'UNDO', 'INTERNAL'}
+
+    data_path: rna_path
+    property: rna_property
+
+    def execute(self, context):
+        from rna_prop_ui import (
+            rna_idprop_ui_prop_clear,
+            rna_idprop_ui_prop_update,
+        )
+        data_path = self.data_path
+        item = eval("context.%s" % data_path)
+        prop = self.property
+        rna_idprop_ui_prop_update(item, prop)
+        del item[prop]
+        rna_idprop_ui_prop_clear(item, prop)
+
+        return {'FINISHED'}
+
+
+class WM_OT_keyconfig_activate(Operator):
+    bl_idname = "wm.keyconfig_activate"
+    bl_label = "Activate Keyconfig"
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        if bpy.utils.keyconfig_set(self.filepath, report=self.report):
+            return {'FINISHED'}
+        else:
+            return {'CANCELLED'}
+
+
+class WM_OT_appconfig_default(Operator):
+    bl_idname = "wm.appconfig_default"
+    bl_label = "Default Application Configuration"
+
+    def execute(self, context):
+        import os
+
+        context.window_manager.keyconfigs.active = context.window_manager.keyconfigs.default
+
+        filepath = os.path.join(bpy.utils.preset_paths("interaction")[0], "blender.py")
+
+        if os.path.exists(filepath):
+            bpy.ops.script.execute_preset(
+                filepath=filepath,
+                menu_idname="USERPREF_MT_interaction_presets",
+            )
+
+        return {'FINISHED'}
+
+
+class WM_OT_appconfig_activate(Operator):
+    bl_idname = "wm.appconfig_activate"
+    bl_label = "Activate Application Configuration"
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        import os
+        filepath = self.filepath
+        bpy.utils.keyconfig_set(filepath)
+        dirname, filename = os.path.split(filepath)
+        filepath = os.path.normpath(os.path.join(dirname, os.pardir, "interaction", filename))
+        if os.path.exists(filepath):
+            bpy.ops.script.execute_preset(
+                filepath=filepath,
+                menu_idname="USERPREF_MT_interaction_presets",
+            )
+
+        return {'FINISHED'}
+
+
+class WM_OT_sysinfo(Operator):
+    """Generate system information, saved into a text file"""
+
+    bl_idname = "wm.sysinfo"
+    bl_label = "Save System Info"
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+        options={'SKIP_SAVE'},
+    )
+
+    def execute(self, context):
+        import sys_info
+        sys_info.write_sysinfo(self.filepath)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        import os
+
+        if not self.filepath:
+            self.filepath = os.path.join(
+                os.path.expanduser("~"), "system-info.txt")
+
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+class WM_OT_copy_prev_settings(Operator):
+    """Copy settings from previous version"""
+    bl_idname = "wm.copy_prev_settings"
+    bl_label = "Copy Previous Settings"
+
+    @staticmethod
+    def previous_version():
+        ver = bpy.app.version
+        ver_old = ((ver[0] * 100) + ver[1]) - 1
+        return ver_old // 100, ver_old % 100
+
+    @staticmethod
+    def _old_path():
+        ver = bpy.app.version
+        ver_old = ((ver[0] * 100) + ver[1]) - 1
+        return bpy.utils.resource_path('USER', ver_old // 100, ver_old % 100)
+
+    @staticmethod
+    def _new_path():
+        return bpy.utils.resource_path('USER')
+
+    
+    @classmethod
+    def poll(cls, context):
+        import os
+        
+        old = cls._old_path()
+        new = cls._new_path()
+        if os.path.isdir(old) and not os.path.isdir(new):
+            return True
+        
+        old_userpref = os.path.join(old, "config", "userpref.blend")
+        new_userpref = os.path.join(new, "config", "userpref.blend")
+        return os.path.isfile(old_userpref) and not os.path.isfile(new_userpref)
+        
+    def execute(self, context):
+        import os
+        import shutil
+
+        shutil.copytree(self._old_path(), self._new_path(), symlinks=True)
+
+        # reload recent-files.txt
+        bpy.ops.wm.read_history()
+
+        # don't loose users work if they open the splash later.
+        if bpy.data.is_saved is bpy.data.is_dirty is False:
+            bpy.ops.wm.read_homefile()
+        else:
+            self.report({'INFO'}, "Reload Start-Up file to restore settings")
+
+        return {'FINISHED'}
+
+class WM_OT_blenderplayer_start(Operator):
+    """Launch the RangeRuntime with the current range-file"""
+    bl_idname = "wm.blenderplayer_start"
+    bl_label = "Start Game In Player"
+
+    def execute(self, context):
+        import os
+        import sys
+        import subprocess
+
+        gs = context.scene.game_settings
+
+        # these remain the same every execution
+        blender_bin_path = bpy.app.binary_path
+        blender_bin_dir = os.path.dirname(blender_bin_path)
+        ext = os.path.splitext(blender_bin_path)[-1]
+        player_path = os.path.join(blender_bin_dir, "RangeRuntime" + ext)
+        # done static vars
+
+        if sys.platform == "darwin":
+            player_path = os.path.join(blender_bin_dir, "../../../blenderplayer.app/Contents/MacOS/RangeRuntime")
+
+        if not os.path.exists(player_path):
+            self.report({'ERROR'}, "Player path: %r not found" % player_path)
+            return {'CANCELLED'}
+
+        filepath = bpy.data.filepath + '~' if bpy.data.is_saved else os.path.join(bpy.app.tempdir, "game.blend")
+        # relative_remap defaults to True, and with copy=True it makes
+        # save_as_mainfile absolutize every library path before writing (see
+        # writefile.c's G_FILE_SAVE_COPY + G_FILE_RELATIVE_REMAP handling),
+        # even though this test copy always lives in the same folder as the
+        # original file. That turned relative External Files links (e.g.
+        # "//libloads\...") into machine-specific absolute paths in the
+        # throwaway '~' copy, so the standalone test could silently fail to
+        # resolve them. Disable it since no remap is ever needed here.
+        bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True, relative_remap=False)
+
+        # start the command line call with the player path
+        args = [player_path]
+
+        # handle some UI options as command line arguments
+        args.extend([
+            "-g", "show_framerate", "=", "%d" % gs.show_framerate_profile,
+            "-g", "show_profile", "=", "%d" % gs.show_framerate_profile,
+            "-g", "show_debug_mode", "=", "%d" % gs.show_debug_mode,
+            "-g", "show_console", "=", "%d" % gs.show_console,
+            "-g", "show_properties", "=", "%d" % gs.show_debug_properties,
+            "-g", "ignore_deprecation_warnings", "=", "%d" % (not gs.use_deprecation_warnings),
+        ])
+
+        # finish the call with the path to the blend file
+        args.append(filepath)
+
+        subprocess.call(args)
+        os.remove(filepath)
+        return {'FINISHED'}
+
+
+class WM_OT_keyconfig_test(Operator):
+    """Test key-config for conflicts"""
+    bl_idname = "wm.keyconfig_test"
+    bl_label = "Test Key Configuration for Conflicts"
+
+    def execute(self, context):
+        from bpy_extras import keyconfig_utils
+
+        wm = context.window_manager
+        kc = wm.keyconfigs.default
+
+        if keyconfig_utils.keyconfig_test(kc):
+            print("CONFLICT")
+
+        return {'FINISHED'}
+
+
+class WM_OT_keyconfig_import(Operator):
+    """Import key configuration from a python script"""
+    bl_idname = "wm.keyconfig_import"
+    bl_label = "Import Key Configuration..."
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+        default="keymap.py",
+    )
+    filter_folder: BoolProperty(
+        name="Filter folders",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_text: BoolProperty(
+        name="Filter text",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_python: BoolProperty(
+        name="Filter python",
+        default=True,
+        options={'HIDDEN'},
+    )
+    keep_original: BoolProperty(
+        name="Keep original",
+        description="Keep original file after copying to configuration folder",
+        default=True,
+    )
+
+    def execute(self, context):
+        import os
+        from os.path import basename
+        import shutil
+
+        if not self.filepath:
+            self.report({'ERROR'}, "Filepath not set")
+            return {'CANCELLED'}
+
+        config_name = basename(self.filepath)
+
+        path = bpy.utils.user_resource('SCRIPTS', os.path.join("presets", "keyconfig"), create=True)
+        path = os.path.join(path, config_name)
+
+        try:
+            if self.keep_original:
+                shutil.copy(self.filepath, path)
+            else:
+                shutil.move(self.filepath, path)
+        except Exception as ex:
+            self.report({'ERROR'}, "Installing keymap failed: %s" % ex)
+            return {'CANCELLED'}
+
+        # sneaky way to check we're actually running the code.
+        if bpy.utils.keyconfig_set(path, report=self.report):
+            return {'FINISHED'}
+        else:
+            return {'CANCELLED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+# This operator is also used by interaction presets saving - AddPresetBase
+
+
+class WM_OT_keyconfig_export(Operator):
+    """Export key configuration to a python script"""
+    bl_idname = "wm.keyconfig_export"
+    bl_label = "Export Key Configuration..."
+
+    all: BoolProperty(
+        name="All Keymaps",
+        default=False,
+        description="Write all keymaps (not just user modified)",
+    )
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+        default="keymap.py",
+    )
+    filter_folder: BoolProperty(
+        name="Filter folders",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_text: BoolProperty(
+        name="Filter text",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_python: BoolProperty(
+        name="Filter python",
+        default=True,
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        from bpy_extras import keyconfig_utils
+
+        if not self.filepath:
+            raise Exception("Filepath not set")
+
+        if not self.filepath.endswith(".py"):
+            self.filepath += ".py"
+
+        wm = context.window_manager
+
+        keyconfig_utils.keyconfig_export(
+            wm,
+            wm.keyconfigs.active,
+            self.filepath,
+            all_keymaps=self.all,
+        )
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+class WM_OT_keymap_restore(Operator):
+    """Restore key map(s)"""
+    bl_idname = "wm.keymap_restore"
+    bl_label = "Restore Key Map(s)"
+
+    all: BoolProperty(
+        name="All Keymaps",
+        description="Restore all keymaps to default",
+    )
+
+    def execute(self, context):
+        wm = context.window_manager
+
+        if self.all:
+            for km in wm.keyconfigs.user.keymaps:
+                km.restore_to_default()
+        else:
+            km = context.keymap
+            km.restore_to_default()
+
+        return {'FINISHED'}
+
+
+class WM_OT_keyitem_restore(Operator):
+    """Restore key map item"""
+    bl_idname = "wm.keyitem_restore"
+    bl_label = "Restore Key Map Item"
+
+    item_id: IntProperty(
+        name="Item Identifier",
+        description="Identifier of the item to remove",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        keymap = getattr(context, "keymap", None)
+        return keymap
+
+    def execute(self, context):
+        km = context.keymap
+        kmi = km.keymap_items.from_id(self.item_id)
+
+        if (not kmi.is_user_defined) and kmi.is_user_modified:
+            km.restore_item_to_default(kmi)
+
+        return {'FINISHED'}
+
+
+class WM_OT_keyitem_add(Operator):
+    """Add key map item"""
+    bl_idname = "wm.keyitem_add"
+    bl_label = "Add Key Map Item"
+
+    def execute(self, context):
+        km = context.keymap
+
+        if km.is_modal:
+            km.keymap_items.new_modal("", 'A', 'PRESS')
+        else:
+            km.keymap_items.new("none", 'A', 'PRESS')
+
+        # clear filter and expand keymap so we can see the newly added item
+        if context.space_data.filter_text != "":
+            context.space_data.filter_text = ""
+            km.show_expanded_items = True
+            km.show_expanded_children = True
+
+        return {'FINISHED'}
+
+
+class WM_OT_keyitem_remove(Operator):
+    """Remove key map item"""
+    bl_idname = "wm.keyitem_remove"
+    bl_label = "Remove Key Map Item"
+
+    item_id: IntProperty(
+        name="Item Identifier",
+        description="Identifier of the item to remove",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return hasattr(context, "keymap")
+
+    def execute(self, context):
+        km = context.keymap
+        kmi = km.keymap_items.from_id(self.item_id)
+        km.keymap_items.remove(kmi)
+        return {'FINISHED'}
+
+
+class WM_OT_keyconfig_remove(Operator):
+    """Remove key config"""
+    bl_idname = "wm.keyconfig_remove"
+    bl_label = "Remove Key Config"
+
+    @classmethod
+    def poll(cls, context):
+        wm = context.window_manager
+        keyconf = wm.keyconfigs.active
+        return keyconf and keyconf.is_user_defined
+
+    def execute(self, context):
+        wm = context.window_manager
+        keyconfig = wm.keyconfigs.active
+        wm.keyconfigs.remove(keyconfig)
+        return {'FINISHED'}
+
+
+class WM_OT_operator_cheat_sheet(Operator):
+    """List all the Operators in a text-block, useful for scripting"""
+    bl_idname = "wm.operator_cheat_sheet"
+    bl_label = "Operator Cheat Sheet"
+
+    def execute(self, context):
+        op_strings = []
+        tot = 0
+        for op_module_name in dir(bpy.ops):
+            op_module = getattr(bpy.ops, op_module_name)
+            for op_submodule_name in dir(op_module):
+                op = getattr(op_module, op_submodule_name)
+                text = repr(op)
+                if text.split("\n")[-1].startswith("bpy.ops."):
+                    op_strings.append(text)
+                    tot += 1
+
+            op_strings.append('')
+
+        textblock = bpy.data.texts.new("OperatorList.txt")
+        textblock.write('# %d Operators\n\n' % tot)
+        textblock.write('\n'.join(op_strings))
+        self.report({'INFO'}, "See OperatorList.txt textblock")
+        return {'FINISHED'}
+
+
+# -----------------------------------------------------------------------------
+# Add-on Operators
+
+class WM_OT_addon_enable(Operator):
+    """Enable an add-on"""
+    bl_idname = "wm.addon_enable"
+    bl_label = "Enable Add-on"
+
+    module: StringProperty(
+        name="Module",
+        description="Module name of the add-on to enable",
+    )
+
+    def execute(self, context):
+        import addon_utils
+
+        err_str = ""
+
+        def err_cb(ex):
+            import traceback
+            nonlocal err_str
+            err_str = traceback.format_exc()
+            print(err_str)
+
+        mod = addon_utils.enable(self.module, default_set=True, handle_error=err_cb)
+
+        if mod:
+            info = addon_utils.module_bl_info(mod)
+
+            info_ver = info.get("blender", (0, 0, 0))
+
+            if info_ver > bpy.app.version:
+                self.report(
+                    {'WARNING'},
+                    "This script was written Blender "
+                    "version %d.%d.%d and might not "
+                    "function (correctly), "
+                    "though it is enabled" %
+                    info_ver
+                )
+            return {'FINISHED'}
+        else:
+
+            if err_str:
+                self.report({'ERROR'}, err_str)
+
+            return {'CANCELLED'}
+
+
+class WM_OT_addon_disable(Operator):
+    """Disable an add-on"""
+    bl_idname = "wm.addon_disable"
+    bl_label = "Disable Add-on"
+
+    module: StringProperty(
+        name="Module",
+        description="Module name of the add-on to disable",
+    )
+
+    def execute(self, context):
+        import addon_utils
+
+        err_str = ""
+
+        def err_cb(ex):
+            import traceback
+            nonlocal err_str
+            err_str = traceback.format_exc()
+            print(err_str)
+
+        addon_utils.disable(self.module, default_set=True, handle_error=err_cb)
+
+        if err_str:
+            self.report({'ERROR'}, err_str)
+
+        return {'FINISHED'}
+
+
+class WM_OT_theme_install(Operator):
+    """Load and apply a Blender XML theme file"""
+    bl_idname = "wm.theme_install"
+    bl_label = "Install Theme..."
+
+    overwrite: BoolProperty(
+        name="Overwrite",
+        description="Remove existing theme file if exists",
+        default=True,
+    )
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+    )
+    filter_folder: BoolProperty(
+        name="Filter folders",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_glob: StringProperty(
+        default="*.xml",
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        import os
+        import shutil
+        import traceback
+
+        xmlfile = self.filepath
+
+        path_themes = bpy.utils.user_resource('SCRIPTS', "presets/interface_theme", create=True)
+
+        if not path_themes:
+            self.report({'ERROR'}, "Failed to get themes path")
+            return {'CANCELLED'}
+
+        path_dest = os.path.join(path_themes, os.path.basename(xmlfile))
+
+        if not self.overwrite:
+            if os.path.exists(path_dest):
+                self.report({'WARNING'}, "File already installed to %r\n" % path_dest)
+                return {'CANCELLED'}
+
+        try:
+            shutil.copyfile(xmlfile, path_dest)
+            bpy.ops.script.execute_preset(
+                filepath=path_dest,
+                menu_idname="USERPREF_MT_interface_theme_presets",
+            )
+
+        except:
+            traceback.print_exc()
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+class WM_OT_addon_refresh(Operator):
+    """Scan add-on directories for new modules"""
+    bl_idname = "wm.addon_refresh"
+    bl_label = "Refresh"
+
+    def execute(self, context):
+        import addon_utils
+
+        addon_utils.modules_refresh()
+
+        return {'FINISHED'}
+
+
+# Note: shares some logic with WM_OT_app_template_install
+# but not enough to de-duplicate. Fixed here may apply to both.
+class WM_OT_addon_install(Operator):
+    """Install an add-on"""
+    bl_idname = "wm.addon_install"
+    bl_label = "Install Add-on from File..."
+
+    overwrite: BoolProperty(
+        name="Overwrite",
+        description="Remove existing add-ons with the same ID",
+        default=True,
+    )
+    target: EnumProperty(
+        name="Target Path",
+        items=(('DEFAULT', "Default", ""),
+               ('PREFS', "User Prefs", "")),
+    )
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+    )
+    filter_folder: BoolProperty(
+        name="Filter folders",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_python: BoolProperty(
+        name="Filter python",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_glob: StringProperty(
+        default="*.py;*.zip",
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        import addon_utils
+        import traceback
+        import zipfile
+        import shutil
+        import os
+
+        pyfile = self.filepath
+
+        if self.target == 'DEFAULT':
+            # don't use bpy.utils.script_paths("addons") because we may not be able to write to it.
+            path_addons = bpy.utils.user_resource('SCRIPTS', "addons", create=True)
+        else:
+            path_addons = context.user_preferences.filepaths.script_directory
+            if path_addons:
+                path_addons = os.path.join(path_addons, "addons")
+
+        if not path_addons:
+            self.report({'ERROR'}, "Failed to get add-ons path")
+            return {'CANCELLED'}
+
+        if not os.path.isdir(path_addons):
+            try:
+                os.makedirs(path_addons, exist_ok=True)
+            except:
+                traceback.print_exc()
+
+        # Check if we are installing from a target path,
+        # doing so causes 2+ addons of same name or when the same from/to
+        # location is used, removal of the file!
+        addon_path = ""
+        pyfile_dir = os.path.dirname(pyfile)
+        for addon_path in addon_utils.paths():
+            if os.path.samefile(pyfile_dir, addon_path):
+                self.report({'ERROR'}, "Source file is in the add-on search path: %r" % addon_path)
+                return {'CANCELLED'}
+        del addon_path
+        del pyfile_dir
+        # done checking for exceptional case
+
+        addons_old = {mod.__name__ for mod in addon_utils.modules()}
+
+        # check to see if the file is in compressed format (.zip)
+        if zipfile.is_zipfile(pyfile):
+            try:
+                file_to_extract = zipfile.ZipFile(pyfile, 'r')
+            except:
+                traceback.print_exc()
+                return {'CANCELLED'}
+
+            if self.overwrite:
+                for f in file_to_extract.namelist():
+                    module_filesystem_remove(path_addons, f)
+            else:
+                for f in file_to_extract.namelist():
+                    path_dest = os.path.join(path_addons, os.path.basename(f))
+                    if os.path.exists(path_dest):
+                        self.report({'WARNING'}, "File already installed to %r\n" % path_dest)
+                        return {'CANCELLED'}
+
+            try:  # extract the file to "addons"
+                file_to_extract.extractall(path_addons)
+            except:
+                traceback.print_exc()
+                return {'CANCELLED'}
+
+        else:
+            path_dest = os.path.join(path_addons, os.path.basename(pyfile))
+
+            if self.overwrite:
+                module_filesystem_remove(path_addons, os.path.basename(pyfile))
+            elif os.path.exists(path_dest):
+                self.report({'WARNING'}, "File already installed to %r\n" % path_dest)
+                return {'CANCELLED'}
+
+            # if not compressed file just copy into the addon path
+            try:
+                shutil.copyfile(pyfile, path_dest)
+            except:
+                traceback.print_exc()
+                return {'CANCELLED'}
+
+        addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
+        addons_new.discard("modules")
+
+        # disable any addons we may have enabled previously and removed.
+        # this is unlikely but do just in case. bug [#23978]
+        for new_addon in addons_new:
+            addon_utils.disable(new_addon, default_set=True)
+
+        # possible the zip contains multiple addons, we could disallow this
+        # but for now just use the first
+        for mod in addon_utils.modules(refresh=False):
+            if mod.__name__ in addons_new:
+                info = addon_utils.module_bl_info(mod)
+
+                # show the newly installed addon.
+                context.window_manager.addon_filter = 'All'
+                context.window_manager.addon_search = info["name"]
+                break
+
+        # in case a new module path was created to install this addon.
+        bpy.utils.refresh_script_paths()
+
+        # print message
+        msg = (
+            tip_("Modules Installed (%s) from %r into %r") %
+            (", ".join(sorted(addons_new)), pyfile, path_addons)
+        )
+        print(msg)
+        self.report({'INFO'}, msg)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+class WM_OT_addon_remove(Operator):
+    """Delete the add-on from the file system"""
+    bl_idname = "wm.addon_remove"
+    bl_label = "Remove Add-on"
+
+    module: StringProperty(
+        name="Module",
+        description="Module name of the add-on to remove",
+    )
+
+    @staticmethod
+    def path_from_addon(module):
+        import os
+        import addon_utils
+
+        for mod in addon_utils.modules():
+            if mod.__name__ == module:
+                filepath = mod.__file__
+                if os.path.exists(filepath):
+                    if os.path.splitext(os.path.basename(filepath))[0] == "__init__":
+                        return os.path.dirname(filepath), True
+                    else:
+                        return filepath, False
+        return None, False
+
+    def execute(self, context):
+        import addon_utils
+        import os
+
+        path, isdir = WM_OT_addon_remove.path_from_addon(self.module)
+        if path is None:
+            self.report({'WARNING'}, "Add-on path %r could not be found" % path)
+            return {'CANCELLED'}
+
+        # in case its enabled
+        addon_utils.disable(self.module, default_set=True)
+
+        import shutil
+        if isdir:
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+
+        addon_utils.modules_refresh()
+
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+    # lame confirmation check
+    def draw(self, context):
+        self.layout.label(text="Remove Add-on: %r?" % self.module)
+        path, isdir = WM_OT_addon_remove.path_from_addon(self.module)
+        self.layout.label(text="Path: %r" % path)
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self, width=600)
+
+
+class WM_OT_addon_expand(Operator):
+    """Display information and preferences for this add-on"""
+    bl_idname = "wm.addon_expand"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    module: StringProperty(
+        name="Module",
+        description="Module name of the add-on to expand",
+    )
+
+    def execute(self, context):
+        import addon_utils
+
+        module_name = self.module
+
+        mod = addon_utils.addons_fake_modules.get(module_name)
+        if mod is not None:
+            info = addon_utils.module_bl_info(mod)
+            info["show_expanded"] = not info["show_expanded"]
+
+        return {'FINISHED'}
+
+
+class WM_OT_addon_userpref_show(Operator):
+    """Show add-on user preferences"""
+    bl_idname = "wm.addon_userpref_show"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    module: StringProperty(
+        name="Module",
+        description="Module name of the add-on to expand",
+    )
+
+    def execute(self, context):
+        import addon_utils
+
+        module_name = self.module
+
+        modules = addon_utils.modules(refresh=False)
+        mod = addon_utils.addons_fake_modules.get(module_name)
+        if mod is not None:
+            info = addon_utils.module_bl_info(mod)
+            info["show_expanded"] = True
+
+            context.user_preferences.active_section = 'ADDONS'
+            context.window_manager.addon_filter = 'All'
+            context.window_manager.addon_search = info["name"]
+            bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
+
+        return {'FINISHED'}
+
+
+# Note: shares some logic with WM_OT_addon_install
+# but not enough to de-duplicate. Fixes here may apply to both.
+class WM_OT_app_template_install(Operator):
+    """Install an application-template"""
+    bl_idname = "wm.app_template_install"
+    bl_label = "Install Template from File..."
+
+    overwrite: BoolProperty(
+        name="Overwrite",
+        description="Remove existing template with the same ID",
+        default=True,
+    )
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+    )
+    filter_folder: BoolProperty(
+        name="Filter folders",
+        default=True,
+        options={'HIDDEN'},
+    )
+    filter_glob: StringProperty(
+        default="*.zip",
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        import traceback
+        import zipfile
+        import os
+
+        filepath = self.filepath
+
+        path_app_templates = bpy.utils.user_resource(
+            'SCRIPTS', os.path.join("startup", "bl_app_templates_user"),
+            create=True,
+        )
+
+        if not path_app_templates:
+            self.report({'ERROR'}, "Failed to get add-ons path")
+            return {'CANCELLED'}
+
+        if not os.path.isdir(path_app_templates):
+            try:
+                os.makedirs(path_app_templates, exist_ok=True)
+            except:
+                traceback.print_exc()
+
+        app_templates_old = set(os.listdir(path_app_templates))
+
+        # check to see if the file is in compressed format (.zip)
+        if zipfile.is_zipfile(filepath):
+            try:
+                file_to_extract = zipfile.ZipFile(filepath, 'r')
+            except:
+                traceback.print_exc()
+                return {'CANCELLED'}
+
+            if self.overwrite:
+                for f in file_to_extract.namelist():
+                    module_filesystem_remove(path_app_templates, f)
+            else:
+                for f in file_to_extract.namelist():
+                    path_dest = os.path.join(path_app_templates, os.path.basename(f))
+                    if os.path.exists(path_dest):
+                        self.report({'WARNING'}, "File already installed to %r\n" % path_dest)
+                        return {'CANCELLED'}
+
+            try:  # extract the file to "bl_app_templates_user"
+                file_to_extract.extractall(path_app_templates)
+            except:
+                traceback.print_exc()
+                return {'CANCELLED'}
+
+        else:
+            # Only support installing zipfiles
+            self.report({'WARNING'}, "Expected a zip-file %r\n" % filepath)
+            return {'CANCELLED'}
+
+        app_templates_new = set(os.listdir(path_app_templates)) - app_templates_old
+
+        # in case a new module path was created to install this addon.
+        bpy.utils.refresh_script_paths()
+
+        # print message
+        msg = (
+            tip_("Template Installed (%s) from %r into %r") %
+            (", ".join(sorted(app_templates_new)), filepath, path_app_templates)
+        )
+        print(msg)
+        self.report({'INFO'}, msg)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+        
+class WM_MT_splash(Menu):
+    bl_label = "Splash"
+
+    def draw_setup(self, context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+
+        layout.label(text="Quick Setup")
+
+        split = layout.split(factor=0.25)
+        split.label()
+        split = split.split(factor=2.0/3.0)
+
+        col = split.column()
+
+        sub = col.column(align=True)
+        sub.label(text="Input and Shortcuts:")
+        text = bpy.path.display_name(context.window_manager.keyconfigs.active.name)
+        if not text:
+            text = "Blender (default)"
+        sub.menu("USERPREF_MT_appconfigs", text=text)
+
+        col.separator()
+
+        sub = col.column(align=True)
+        sub.label(text="Theme:")
+        label = bpy.types.USERPREF_MT_interface_theme_presets.bl_label
+        if label == "Presets":
+            label = "Blender Dark"
+        sub.menu("USERPREF_MT_interface_theme_presets", text=label)
+
+        # We need to make switching to a language easier first
+        #sub = col.column(align=False)
+        #sub.label(text="Language:")
+        #userpref = context.user_preferences
+        #sub.prop(userpref.system, "language", text="")
+
+        col.label()
+
+        layout.label()
+
+        row = layout.row()
+
+        sub = row.row()
+        if bpy.types.WM_OT_copy_prev_settings.poll(context):
+            old_version = bpy.types.WM_OT_copy_prev_settings.previous_version()
+            sub.operator("wm.copy_prev_settings", text="Load %d.%d Settings" % old_version)
+            sub.operator("wm.save_userpref", text="Save New Settings")
+        else:
+            sub.label()
+            sub.label()
+            sub.operator("wm.save_userpref", text="Next")
+
+        layout.separator()
+
+    def draw(self, context):
+        # Draw setup screen if no user preferences have been saved yet.
+        import os, sys
+
+        user_path = bpy.utils.resource_path('USER')
+        userdef_path = os.path.join(user_path, "config", "userpref.blend")
+
+        if not os.path.isfile(userdef_path):
+            self.draw_setup(context)
+            return
+
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+        split = layout.split(factor=0.5)
+
+        # Keep the splash actions visually light, like Blender's modern splash.
+        col1 = split.column()
+        col1.emboss = 'NONE'
+        col1.label(text="Project")
+        col1.operator_context = "INVOKE_DEFAULT"
+        col1.operator("wm.create_project", text="Create Project", icon='FILE_FOLDER')
+        col1.separator()
+        col1.operator("wm.open_mainfile", text="Open Project", icon='FILE_FOLDER')
+        col1.operator_context = "EXEC_DEFAULT"
+        col1.operator("wm.recover_last_session", icon='RECOVER_LAST')
+        col1.separator()
+        col1.label(text="Range Engine Network")
+        col1.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col1.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
+        api_url = ("https://rangeengine.tech/api/" +
+                   (bpy.app.range_version_string[0] + bpy.app.range_version_string[2]) + "/html/index.html")
+        col1.operator("wm.url_open", text="Range Engine - Python API", icon='FILE_SCRIPT').url = api_url
+        col1.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+
+        col2 = split.column()
+        col2.emboss = 'NONE'
+        col2.label(text="Recent Files")
+        found_recent = col2.template_recent_files(rows=8)
+        if not found_recent:
+            col2.label(text="No recent files")
+        col2.separator()
+        col2.operator("wm.url_open", text="AnastacioGames - GitHub", icon='URL').url = "https://github.com/AnastacioGames"
+
+class WM_MT_splash_about(Menu):
+    """RanGE Splash About"""
+    bl_label = "About"
+
+    def draw(self, context):
+
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+        split = layout.split()
+        
+        col = split.column(align=True)
+        col.scale_y = 0.8
+        col.label(text="Anastacio Engine 0.2.0", translate=False)
+        col.label(text="Built on Range Engine 1.6 / Blender {version}".format(version=bpy.app.version_string), translate=False)
+        col.separator(factor=2.5)
+        col.label(text="Powered by Anastacio Games", translate=False)
+        col.operator("wm.url_open", text="AnastacioGames - GitHub", icon='URL', emboss=False).url = "https://github.com/AnastacioGames"
+
+        col = split.column(align=True)
+        
+        col.emboss = 'PULLDOWN_MENU'
+        col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
+        col.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
+        col.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+
+class WM_OT_create_project(Operator):
+    """Create a RangeArmor-ready project folder and its initial files"""
+    bl_idname = "wm.create_project"
+    bl_label = "Create Project"
+    bl_options = {'REGISTER'}
+
+    project_name: StringProperty(
+        name="Project Name",
+        description="Name used for the project folder and initial .range files",
+        default="MyProject",
+        maxlen=64,
+    )
+    directory: StringProperty(
+        name="Location",
+        description="Folder where the new project folder will be created",
+        subtype='DIR_PATH',
+        default=os.path.expanduser("~"),
+        maxlen=1024,
+        options={'HIDDEN', 'SKIP_SAVE'},
+    )
+    filter_folder: BoolProperty(
+        default=True,
+        options={'HIDDEN', 'SKIP_SAVE'},
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "project_name")
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        name = self.project_name.strip()
+        invalid_characters = '<>:"/\\|?*'
+        if not name or name in {'.', '..'} or any(char in invalid_characters for char in name):
+            self.report({'ERROR'}, "Project name contains invalid characters")
+            return {'CANCELLED'}
+
+        parent_directory = bpy.path.abspath(self.directory)
+        if not os.path.isdir(parent_directory):
+            self.report({'ERROR'}, "The selected location does not exist")
+            return {'CANCELLED'}
+
+        project_directory = os.path.join(parent_directory, name)
+        if os.path.exists(project_directory):
+            self.report({'ERROR'}, "A project with this name already exists")
+            return {'CANCELLED'}
+
+        try:
+            os.makedirs(os.path.join(project_directory, "data", "scripts"))
+            for directory in (
+                    "textures", "models", "audio", "fonts", "scenes", "libloads"):
+                os.makedirs(os.path.join(project_directory, "data", directory))
+            for directory in ("engine", "launcher", "icons", "release"):
+                os.makedirs(os.path.join(project_directory, directory))
+        except OSError as ex:
+            self.report({'ERROR'}, "Could not create project folders: %s" % ex)
+            return {'CANCELLED'}
+
+        range_filepath = os.path.join(project_directory, "data", name + ".range")
+        rasec_filepath = os.path.join(project_directory, "data", name + ".rasec")
+
+        # Start with the normal template, then save the paired protected copy.
+        bpy.ops.wm.read_homefile()
+        if 'FINISHED' not in bpy.ops.wm.save_as_mainfile(
+                'EXEC_DEFAULT', filepath=range_filepath, check_existing=False):
+            self.report({'ERROR'}, "Project folders were created, but the .range file could not be saved")
+            return {'CANCELLED'}
+        if 'FINISHED' not in bpy.ops.wm.save_as_mainfile_protected(
+                'EXEC_DEFAULT', filepath=rasec_filepath, check_existing=False, copy=True):
+            self.report({'ERROR'}, "Project folders and .range file were created, but the .rasec file could not be saved")
+            return {'CANCELLED'}
+
+        self.report({'INFO'}, "Project created: %s" % project_directory)
+        return {'FINISHED'}
+
+
+def _rangearmor_write_export_preset(context):
+    """Sync the export preset fields from Scene.rangearmor_export into the
+    project's launcher/config.json, without touching any other key.
+
+    RangeArmor Panel validates config.json against a strict key
+    whitelist (see welcome.gd _validate_data / globals.gd
+    DEFAULT_FIELDS): only known keys may be written, or the project
+    fails to load there. GameName, Version, CompanyName, IconPath,
+    ExportWindows64 and ExportLinux64 are all part of that schema, so
+    this is safe for old and new projects alike; it silently does
+    nothing if the file is missing or the current file isn't part of a
+    RangeArmor project structure.
+    """
+    filepath = bpy.data.filepath
+    if not filepath:
+        return
+
+    data_dir = os.path.dirname(filepath)
+    if os.path.basename(data_dir) != "data":
+        return
+
+    project_dir = os.path.dirname(data_dir)
+    config_path = os.path.join(project_dir, "launcher", "config.json")
+    if not os.path.isfile(config_path):
+        return
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            config_data = json.load(config_file)
+    except (OSError, ValueError):
+        return
+
+    # The engine only ships the encrypted .rasec sibling of the currently
+    # open .range file (*.range is excluded from the release data via
+    # DEFAULT_FIELDS["Ignore"]), so MainFile must always track it -
+    # otherwise the exported Launcher can't find its game data and quits
+    # immediately after opening. Always (re)generate it from the current
+    # in-memory .range on every export, even if a .rasec already exists on
+    # disk: a stale .rasec silently ships outdated data (e.g. an External
+    # Files library link added/edited after the last export), so exporting
+    # again must never reuse an old snapshot.
+    rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
+    rasec_path = os.path.join(data_dir, rasec_name)
+    bpy.ops.wm.save_as_mainfile_protected(
+        'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    if os.path.isfile(rasec_path):
+        config_data["MainFile"] = rasec_name
+
+    export_settings = getattr(context.scene, "rangearmor_export", None)
+    if export_settings is None:
+        try:
+            with open(config_path, "w", encoding="utf-8") as config_file:
+                json.dump(config_data, config_file, indent="\t")
+        except OSError:
+            pass
+        return
+
+    if export_settings.product_name:
+        config_data["GameName"] = export_settings.product_name
+    if export_settings.product_version:
+        config_data["Version"] = export_settings.product_version
+    if export_settings.company_name:
+        config_data["CompanyName"] = export_settings.company_name
+    if export_settings.icon_path:
+        config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
+    config_data["ExportWindows64"] = export_settings.export_windows64
+    config_data["ExportLinux64"] = export_settings.export_linux64
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            json.dump(config_data, config_file, indent="\t")
+    except OSError:
+        pass
+
+
+_RANGEARMOR_DEFAULT_FIELDS = {
+    "GameName": "Game",
+    "Version": "1.0.0",
+    "BGArmorVersion": 0,
+    "MainFile": "Example Game.rasec",
+    "DataFile": "./data.dat",
+    "DataSource": "./data",
+    "DataChunkSize": 32,
+    "CompressionLevel": 1,
+    "CompileScripts": False,
+    "ExportCompress": False,
+    "CompanyName": "",
+    "IconPath": "",
+    "ExportWindows64": True,
+    "ExportLinux64": True,
+    "EngineWindows64": "./engine/Windows64/RangeRuntime.exe",
+    "EngineLinux64": "./engine/Linux64/RangeRuntime",
+    "PythonWindows64": "./engine/Windows64/2.79/python/bin/python.exe",
+    "PythonLinux64": "./engine/Linux64/2.79/python/bin/python3.11",
+    "AlternativePython": "/2.79/python/bin/python.exe",
+    "AlternativePythonLinux": "/2.79/python/bin/python3.11",
+    "Persistent": ["*.bgeconf"],
+    "Ignore": ["*.pyc", "*.range"],
+}
+
+
+def _rangearmor_ensure_launcher_template_fresh(template_dir):
+    # type: (str) -> None
+    """Auto-rebuild the Launcher(.exe) template if it's older than its own
+    Rust source (source/launcher/src/main.rs).
+
+    tools/RangeArmor-master/.../release/launcher/Launcher.exe is a
+    prebuilt binary, not versioned in git. If it's ever stale (e.g. the
+    launcher's tools/RangeArmor-master folder gets reinstalled/reset
+    from an older source snapshot), every scaffolded project ships a
+    broken launcher that panics on startup ("abre e fecha"). Rather than
+    surface that as an export error, rebuild automatically here whenever
+    a fresher main.rs is available and cargo is on PATH; best-effort and
+    silent on any failure, since the shipped template still works most
+    of the time and export shouldn't be blocked by this.
+    """
+    import subprocess
+    import sys
+
+    launcher_ext = ".exe" if sys.platform == "win32" else ""
+    template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
+
+    # tools/RangeArmor-master/RangeArmor-master/release -> .../source/launcher
+    rangearmor_root = os.path.dirname(template_dir)
+    launcher_src_dir = os.path.join(rangearmor_root, "source", "launcher")
+    main_rs = os.path.join(launcher_src_dir, "src", "main.rs")
+    if not os.path.isfile(main_rs):
+        return
+
+    if os.path.isfile(template_launcher_bin):
+        if os.path.getmtime(template_launcher_bin) >= os.path.getmtime(main_rs):
+            return
+
+    if not shutil.which("cargo"):
+        return
+
+    target = "x86_64-pc-windows-msvc" if sys.platform == "win32" else "x86_64-unknown-linux-gnu"
+    try:
+        result = subprocess.run(
+            ["cargo", "build", "--release", "--target", target],
+            cwd=launcher_src_dir, capture_output=True, text=True, timeout=300,
+        )
+    except Exception:
+        return
+    if result.returncode != 0:
+        return
+
+    built_bin = os.path.join(launcher_src_dir, "target", target, "release", "rangearmor" + launcher_ext)
+    if not os.path.isfile(built_bin):
+        return
+
+    try:
+        os.makedirs(os.path.dirname(template_launcher_bin), exist_ok=True)
+        shutil.copy2(built_bin, template_launcher_bin)
+    except OSError:
+        pass
+
+
+def _rangearmor_scaffold_project(project_dir):
+    # type: (str) -> str | None
+    """Recreate, in pure Python, what "Open RangeArmor Panel" + "New
+    Project" would have set up for this project: launcher/config.json,
+    the Launcher(.exe) binary and the engine/Windows64, engine/Linux64,
+    launcher and icons folders.
+
+    This lets "Export Game (1 Click)" work on a project that was never
+    opened in RangeArmor Panel before, instead of just telling the user
+    to go open it once. Returns an error message string on failure, or
+    None on success.
+    """
+    import sys
+
+    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+    template_dir = os.path.join(rangearmor_dir, "release")
+    if not os.path.isdir(template_dir):
+        return "RangeArmor Panel template files not found at %s" % template_dir
+
+    for folder in ("data", "engine", "engine/Linux64", "engine/Windows64", "launcher", "icons"):
+        try:
+            os.makedirs(os.path.join(project_dir, *folder.split("/")), exist_ok=True)
+        except OSError as e:
+            return "Could not create project folder %s: %s" % (folder, e)
+
+    config_path = os.path.join(project_dir, "launcher", "config.json")
+    if not os.path.isfile(config_path):
+        try:
+            with open(config_path, "w", encoding="utf-8") as config_file:
+                json.dump(_RANGEARMOR_DEFAULT_FIELDS, config_file, indent="\t")
+        except OSError as e:
+            return "Could not create launcher/config.json: %s" % e
+
+    # O binário template (tools/RangeArmor-master/.../release/launcher/Launcher.exe) não é
+    # versionado em git e pode ficar desatualizado (ex.: reinstalação do tools/RangeArmor-master
+    # a partir de uma fonte externa), causando um launcher que panica ao abrir ("abre e fecha").
+    # _rangearmor_ensure_launcher_template_fresh recompila automaticamente com cargo quando
+    # detecta que o binário é mais antigo que o source Rust, antes de copiá-lo para o projeto.
+    _rangearmor_ensure_launcher_template_fresh(template_dir)
+
+    launcher_ext = ".exe" if sys.platform == "win32" else ""
+    launcher_bin = os.path.join(project_dir, "launcher", "Launcher" + launcher_ext)
+    if not os.path.isfile(launcher_bin):
+        template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
+        if os.path.isfile(template_launcher_bin):
+            try:
+                shutil.copy2(template_launcher_bin, launcher_bin)
+                if launcher_ext == "":
+                    os.chmod(launcher_bin, os.stat(launcher_bin).st_mode | 0o111)
+            except OSError as e:
+                return "Could not copy Launcher%s: %s" % (launcher_ext, e)
+
+    for icon_name in ("icon-engine.ico", "icon-launcher.ico"):
+        icon_path = os.path.join(project_dir, "icons", icon_name)
+        if not os.path.isfile(icon_path):
+            template_icon = os.path.join(template_dir, "icons", icon_name)
+            if os.path.isfile(template_icon):
+                try:
+                    shutil.copy2(template_icon, icon_path)
+                except OSError:
+                    pass
+
+    return None
+
+
+def _rangearmor_ensure_launcher_script(context):
+    """Copy the panel's bundled launcher.py into the current project's
+    launcher/ folder if it's missing.
+
+    Some RangeArmor Panel builds don't include launcher.py when
+    scaffolding a new project (only Launcher.exe/Launcher), which makes
+    both "Run" and "Export" fail with "Could not find script
+    launcher.py" / a copy error. Since this comes from the project
+    template, not from config.json, it's outside the config-writing
+    whitelist above; this just makes sure the file is there before the
+    panel is used, using the panel's own bundled copy as the source.
+    """
+    filepath = bpy.data.filepath
+    if not filepath:
+        return
+
+    data_dir = os.path.dirname(filepath)
+    if os.path.basename(data_dir) != "data":
+        return
+
+    project_dir = os.path.dirname(data_dir)
+    launcher_dir = os.path.join(project_dir, "launcher")
+    launcher_script = os.path.join(launcher_dir, "launcher.py")
+    if os.path.isfile(launcher_script) or not os.path.isdir(launcher_dir):
+        return
+
+    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+    template_script = os.path.join(rangearmor_dir, "release", "launcher", "launcher.py")
+    if not os.path.isfile(template_script):
+        return
+
+    try:
+        shutil.copy2(template_script, launcher_script)
+    except OSError:
+        pass
+
+
+class WM_OT_export_with_rangearmor(Operator):
+    """Open RANGEARMOR to export you game"""
+    bl_idname = "wm.export_with_rangearmor"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        import os, sys, subprocess
+
+        _rangearmor_write_export_preset(context)
+        _rangearmor_ensure_launcher_script(context)
+
+        if sys.platform == "win32":
+            os.startfile(bpy.app.binary_path[:-15] + "rangearmor\RangeArmor Panel.exe")
+            return {'FINISHED'}
+
+        exe_path = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel")
+        subprocess.run([exe_path])
+        return {'FINISHED'}
+
+
+class WM_OT_one_click_export_rangearmor(Operator):
+    """Export the game straight to the release folder, without opening RangeArmor Panel"""
+    bl_idname = "wm.one_click_export_rangearmor"
+    bl_label = "Export Game (1 Click)"
+    bl_options = {'INTERNAL'}
+
+    def _resolve_python(self, project_dir, config_data):
+        # type: (str, dict) -> str | None
+        """Mirror editor.gd _get_python_current_os(): prefer the Python
+        bundled with the RangeEngine install running this Blender, falling
+        back to the one bundled inside the project's own engine/ folder.
+        """
+        import sys
+
+        cur_os = "Windows" if sys.platform == "win32" else "Linux"
+        engine_dir = os.path.dirname(bpy.app.binary_path)
+        alt_key = "AlternativePython" if cur_os == "Windows" else "AlternativePythonLinux"
+        alt_rel = config_data.get(alt_key, "")
+        if alt_rel:
+            candidate = engine_dir + alt_rel
+            if os.path.isfile(candidate):
+                return candidate
+
+        proj_rel = config_data.get("Python" + cur_os + "64", "")
+        if proj_rel:
+            candidate = os.path.normpath(os.path.join(project_dir, proj_rel))
+            if os.path.isfile(candidate):
+                return candidate
+
+        return None
+
+    def execute(self, context):
+        import sys
+        import subprocess
+
+        filepath = bpy.data.filepath
+        if not filepath:
+            self.report({'ERROR'}, "Save the .blend file inside the project's data/ folder first")
+            return {'CANCELLED'}
+
+        data_dir = os.path.dirname(filepath)
+        if os.path.basename(data_dir) != "data":
+            self.report({'ERROR'}, "Current file is not inside a RangeArmor project (expected <project>/data/*.blend)")
+            return {'CANCELLED'}
+
+        project_dir = os.path.dirname(data_dir)
+        config_path = os.path.join(project_dir, "launcher", "config.json")
+
+        wm = context.window_manager
+        wm.progress_begin(0, 5)
+        context.window.cursor_set('WAIT')
+        try:
+            scaffold_error = _rangearmor_scaffold_project(project_dir)
+            wm.progress_update(1)
+            if scaffold_error:
+                self.report({'ERROR'}, scaffold_error)
+                return {'CANCELLED'}
+
+            _rangearmor_write_export_preset(context)
+            _rangearmor_ensure_launcher_script(context)
+            wm.progress_update(2)
+
+            try:
+                with open(config_path, "r", encoding="utf-8") as config_file:
+                    config_data = json.load(config_file)
+            except (OSError, ValueError) as e:
+                self.report({'ERROR'}, "Could not read config.json: %s" % e)
+                return {'CANCELLED'}
+
+            rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
+            build_script = os.path.join(rangearmor_dir, "release", "scripts", "build_release.py")
+            if not os.path.isfile(build_script):
+                self.report({'ERROR'}, "build_release.py not found next to RangeArmor Panel (expected %s)" % build_script)
+                return {'CANCELLED'}
+
+            python_exe = self._resolve_python(project_dir, config_data)
+            if not python_exe:
+                self.report({'ERROR'}, "Could not find a Python interpreter for the export. Open RangeArmor Panel and click 'Get RanGE' once, then try again.")
+                return {'CANCELLED'}
+
+            get_range_script = os.path.join(rangearmor_dir, "release", "scripts", "get_rangeengine_currentplatform.py")
+            engine_windows = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
+            engine_linux = os.path.join(project_dir, "engine", "Linux64", "RangeRuntime")
+            if os.path.isfile(get_range_script) and not (os.path.isfile(engine_windows) or os.path.isfile(engine_linux)):
+                subprocess.run(
+                    [python_exe, get_range_script, "--project", config_path, "--all-platforms"],
+                    cwd=project_dir, capture_output=True, text=True, timeout=600,
+                )
+            wm.progress_update(3)
+
+            args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress"]
+            try:
+                result = subprocess.run(args, cwd=project_dir, capture_output=True, text=True, timeout=600)
+            except Exception as e:
+                self.report({'ERROR'}, "Export failed to start: %s" % e)
+                return {'CANCELLED'}
+            wm.progress_update(4)
+
+            output = (result.stdout or "") + (result.stderr or "")
+            print(output)
+            if result.returncode != 0 or "X " in output:
+                self.report({'ERROR'}, "Export finished with errors, see console for details")
+                return {'CANCELLED'}
+
+            release_dir = os.path.join(project_dir, "release")
+            if os.path.isdir(release_dir):
+                if sys.platform == "win32":
+                    os.startfile(release_dir)
+                else:
+                    subprocess.run(["xdg-open", release_dir])
+
+            wm.progress_update(5)
+            self.report({'INFO'}, "Game exported to: %s" % release_dir)
+            return {'FINISHED'}
+        finally:
+            wm.progress_end()
+            context.window.cursor_set('DEFAULT')
+
+############################ Input System #####################################
+class INPUTMAPS_UL_list(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        wm = context.window_manager
+        
+        layout.label(text=item.name, icon='TEXT')
+        
+        renameButton = layout.operator("wm.input_map_rename", text="", icon="GREASEPENCIL", emboss=False)
+        renameButton.input_map_name = item.name # wm.input_map_selected
+
+class INPUTTABLE_UL_list(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        wm = context.window_manager
+        
+        layout.label(text=item.name, icon='COPY_ID')
+        row = layout.row(align=True)
+        
+        renameButton = row.operator("wm.input_table_rename", text="", icon="GREASEPENCIL", emboss=False)
+        renameButton.input_map_name = wm.input_map_selected
+        renameButton.input_table_name = item.name
+        
+        AddBindingButton = row.operator("wm.input_binding_save", text="", icon='ZOOMIN', emboss=False)
+        AddBindingButton.input_map_name = wm.input_map_selected
+        AddBindingButton.input_table_name = item.name # wm.input_table_selected_name
+        
+class WM_OT_inputsystem_save_binding(Operator):
+    """Save Binding"""
+    bl_idname = "wm.input_sys_save_binding"
+    bl_label = "Save Bind Input System"
+
+    input_map_name: StringProperty(default="", options={'HIDDEN'})
+    input_table_name: StringProperty(default="", options={'HIDDEN'})
+    
+    # For Save Processors
+    replicate_times: StringProperty(default="", options={'HIDDEN'}) # dict
+    processor_type: StringProperty(default="", options={'HIDDEN'}) # dict
+    orderVector: StringProperty(default="", options={'HIDDEN'}) # list
+    
+    def saveBindings(self, context, loadedDict):
+        wm = context.window_manager
+        Bindings = loadedDict["Bindings"]
+        
+        for bind in Bindings:
+            Bindings[bind]["PERIPHERALTYPE"]["TYPE"] = getattr(wm, f"dynamic_enum_{bind}")
+            Bindings[bind]["PERIPHERALTYPE"]["INDEX"] = int(getattr(wm, f"dynamic_enum_joystick_index_{bind}"))
+            Bindings[bind]["PERIPHERALTYPE"]["SENSITIVITY"] = round(getattr(wm, f"dynamic_float_sensitivity_{bind}"), 3)
+            
+            peripheralType = getattr(wm, f"dynamic_enum_{bind}")
+            
+            for bindType in Bindings[bind]:
+                if bindType == "BINDING":
+                    key_name = bind
+                    useCustomKey = getattr(wm, f"dynamic_bool_{key_name}")
+                    
+                    if not useCustomKey:
+                        value = wm.GetGameEngineKey(wm["InputSystem_Keymap_Capture"][key_name]) if peripheralType != "JOYSTICK" else getattr(wm, f"dynamic_enum_joystick_{key_name}")
+                    else:
+                        value = wm.GetGameEngineKey(getattr(wm, f"dynamic_string_custom_key_{key_name}"))
+                    
+                    Bindings[bind][bindType]["BUTTON"] = value
+                elif bindType == "COMPOSITEPADS" or bindType == "COMPOSITEPADS3D":
+                    order = ["UP", "DOWN", "LEFT", "RIGHT", "FORWARD", "BACKWARD"]
+                    for index in range(4 if bindType == "COMPOSITEPADS" else 6):
+                        key_name = bind+str(index)
+                        useCustomKey = getattr(wm, f"dynamic_bool_{key_name}")
+                        
+                        if not useCustomKey:
+                            value = wm.GetGameEngineKey(wm["InputSystem_Keymap_Capture"][key_name]) if peripheralType != "JOYSTICK" else getattr(wm, f"dynamic_enum_joystick_{key_name}")
+                        else:
+                            value = wm.GetGameEngineKey(getattr(wm, f"dynamic_string_custom_key_{key_name}"))
+                        
+                        # Save
+                        Bindings[bind][bindType][order[index]] = value
+                        
+    def saveProcessors(self, context, loadedDict):
+        wm = context.window_manager
+        Processors = loadedDict["Processors"]
+        
+         # To dict/list again ... (There is a less expensive way to solve this but I'm too lazy to do it :D)
+        replicate_times = eval(self.replicate_times)
+        processor_type = eval(self.processor_type)
+        orderVector = eval(self.orderVector)
+           
+        for process in Processors:
+            process_type = processor_type[process]
+            
+            for index in range(replicate_times[process]):
+                propertyType = None
+                
+                if process_type == "BOOL":
+                    propertyType = "dynamic_bool"
+                elif process_type[0] == "FLOAT":
+                    propertyType = "dynamic_float"
+                    
+                attr_name = f"{propertyType}_{process+str(index)}"
+                value = round(getattr(wm, attr_name), 3)
+
+                # Save
+                Processors[process][orderVector[index]] = value
+    
+    def execute(self, context):
+        wm = context.window_manager
+        
+        path = bpy.path.abspath("//KeyMapping/")
+        filepath = os.path.join(path, self.input_map_name)
+        
+        binding_props_dict = json.loads(wm["input_table_dict"])[self.input_table_name] # Get Binding That we will save
+        #print(wm["input_table_dict"])
+        
+        # Save Parameters
+        binding_props_dict["Type"] = wm.binding_type_enum
+        binding_props_dict["ControlType"] = wm.binding_control_type_enum
+        self.saveBindings(context, binding_props_dict)
+        self.saveProcessors(context, binding_props_dict)
+        
+        # Save in File
+        with open(filepath, 'r+') as file: 
+            input_table_list = json.load(file)
+            
+            file.seek(0)
+            
+            # Save Binding
+            input_table_list[self.input_table_name] = binding_props_dict
+            self.report({'INFO'}, "Binding Saved!")
+            
+            # Save File
+            json.dump(input_table_list, file, indent=4)
+            file.truncate()
+            
+        return {'FINISHED'}
+        
+class WM_OT_inputsystem_remove_binding(Operator):
+    """Remove Binding/Processor"""
+    bl_idname = "wm.input_sys_remove_binding"
+    bl_label = "Remove Bind Input System"
+
+    input_table_name: StringProperty(default="", options={'HIDDEN'})
+    input_name: StringProperty(default="", options={'HIDDEN'})
+    input_section_type: StringProperty(default="Bindings", options={'HIDDEN'})
+   
+    def execute(self, context):
+        wm = context.window_manager
+        
+        binding_props_dict = json.loads(wm["input_table_dict"]) # Get Binding dict loaded in windowmanager
+
+        # Remove Parameter
+        del binding_props_dict[self.input_table_name][self.input_section_type][self.input_name]
+
+        # Save Input Table to windowmanager
+        wm["input_table_dict"] = json.dumps(binding_props_dict)
+        
+        # Save Bindings, this way the "removed" bind will REALLY be removed, this avoids unexpected situations when you want to change the binds again via the editor
+        wm.force_save_bindings = True
+        
+        return {'FINISHED'}
+        
+class WM_OT_inputsystem_remove_input_map(Operator):
+    """Remove an Input Map"""
+    bl_idname = "wm.input_map_remove"
+    bl_label = "Remove Active Input Map"
+
+    remove_active: StringProperty(default="", options={'HIDDEN'})
+    
+    def execute(self, context):
+        if self.remove_active == "": # None
+            return {'FINISHED'}
+        
+        wm = context.window_manager
+        path = bpy.path.abspath("//KeyMapping/")
+        
+        if bpy.data.is_saved:
+            # Remove Input Map
+            if self.remove_active != "":
+                filepath = os.path.join(path, self.remove_active)
+                os.remove(filepath)
+                self.report({'INFO'}, "Input map removed: {}".format(filepath))
+                
+                # remove KeyMapping folder if necessary
+                if os.path.exists(path) and os.path.isdir(path):
+                    if not os.listdir(path):
+                        shutil.rmtree(path)
+                        
+                if (wm.input_map_index > 0):
+                    wm.input_map_index -= 1 # Input Map Update
+                else: wm.input_map_index = -1 # Force Input Map Update
+                        
+                return {'FINISHED'}
+        else:
+            self.report({'ERROR'}, "You need to save the .range file first!")
+            
+        return {'FINISHED'}
+        
+class WM_OT_inputsystem_remove_input_table(Operator):
+    """Remove an Input Table"""
+    bl_idname = "wm.input_table_remove"
+    bl_label = "Remove Active Input Table"
+
+    input_map_name: StringProperty(default="", options={'HIDDEN'})
+    remove_active: StringProperty(default="", options={'HIDDEN'})
+    
+    def execute(self, context):
+        if self.remove_active == "": # None
+            return {'FINISHED'}
+    
+        wm = context.window_manager
+        path = bpy.path.abspath("//KeyMapping/")
+        filepath = os.path.join(path, self.input_map_name)
+        
+        with open(filepath, 'r+') as file: 
+            input_table_list = json.load(file)
+            
+            # Delete Table
+            del input_table_list[self.remove_active]
+            self.report({'INFO'}, "Input Table Removed")
+            
+            # Save
+            file.seek(0)
+            json.dump(input_table_list, file, indent=4)
+            file.truncate()
+          
+        if (wm.input_table_index > 0):
+            wm.input_table_index -= 1 # Input Table Update
+        else: wm.input_table_index = -1 # Force Input Table Update
+        
+        return {'FINISHED'}
+        
+class WM_OT_inputsystem_toggle_expand(Operator):
+    bl_idname = "wm.input_toggle_expand"
+    bl_label = "Toggle Expand"
+    
+    value: StringProperty(default="", options={'HIDDEN'})
+    
+    def execute(self, context):
+        wm = context.window_manager
+        wm["input_bindings_expanded_values"][self.value] = not wm["input_bindings_expanded_values"][self.value] # switch
+        
+        return {'FINISHED'} 
+        
+class WM_OT_inputsystem_capture_key(Operator):
+    bl_idname = "wm.input_capture_key"
+    bl_label = "Capture Key"
+    
+    key: bpy.props.StringProperty(name="Captured Key")
+    is_mouse: bpy.props.BoolProperty(default=False)
+    prev_mouse_x: int = None
+    prev_mouse_y: int = None
+    mouse_threshold: int = 2
+
+    def modal(self, context, event):
+        wm = context.window_manager
+
+        if self.is_mouse and event.type == "MOUSEMOVE":
+            if self.prev_mouse_x is not None or self.prev_mouse_y is not None:
+                direction = "None"
+                if event.mouse_x > self.prev_mouse_x + self.mouse_threshold:
+                    wm["InputSystem_Keymap_Capture"][self.key] = "MOUSEX"
+                    return {"FINISHED"}
+                elif event.mouse_y < self.prev_mouse_y - self.mouse_threshold:
+                    wm["InputSystem_Keymap_Capture"][self.key] = "MOUSEY"
+                    return {"FINISHED"}
+                elif event.mouse_x < self.prev_mouse_x - self.mouse_threshold:
+                    wm["InputSystem_Keymap_Capture"][self.key] = "MOUSEX"
+                    return {"FINISHED"}
+                elif event.mouse_y > self.prev_mouse_y + self.mouse_threshold:
+                    wm["InputSystem_Keymap_Capture"][self.key] = "MOUSEY"
+                    return {"FINISHED"}
+
+            # update last mouse position
+            self.prev_mouse_x = event.mouse_x
+            self.prev_mouse_y = event.mouse_y
+
+        elif event.type not in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE", "TIMER_REPORT"}:
+            wm["InputSystem_Keymap_Capture"][self.key] = event.type
+            return {"FINISHED"}
+
+        return {"RUNNING_MODAL"}
+        
+    def invoke(self, context, event):
+        wm = context.window_manager
+
+        context.window_manager.modal_handler_add(self)
+        wm["InputSystem_Keymap_Capture"][self.key] = "Press a key"  # Workaround i think
+        
+        # Store last mouse position
+        self.prev_mouse_x = event.mouse_x
+        self.prev_mouse_y = event.mouse_y
+
+        return {"RUNNING_MODAL"}
+        
+class WM_OT_inputsystem_copy_input_map(Operator):
+    """Copy an Input Map"""
+    bl_idname = "wm.input_map_copy"
+    bl_label = "Copy Input Map"
+    
+    def execute(self, context):
+        wm = context.window_manager
+        path = bpy.path.abspath("//KeyMapping/")
+        
+        if wm.input_map_index < 0:
+            self.report({'WARNING'}, "Copy InputMap Failed! Select an InputMap")
+            return {'CANCELLED'}
+        
+        input_map_data = {}
+        
+        if bpy.data.is_saved:
+            # Make dir or remove Input Map
+            if not os.path.exists(path):
+                os.makedirs(path)
+                    
+            # Copy Input Map
+            filepath = os.path.join(path, wm.input_map_selected)
+            with open(filepath, 'r') as file: 
+                input_map_data = json.load(file)
+                    
+            # Save
+            inputMapName = wm.input_map_selected
+            filepath = os.path.join(path, inputMapName[:-5] + "_copy.json")
+
+            with open(filepath, 'w') as file:
+                json.dump(input_map_data, file, indent=4)
+                
+            wm.input_map_index += 1 # Input Map Update
+                
+            self.report({'INFO'}, "Input map copied to {}".format(filepath))
+            
+        else:
+            self.report({'ERROR'}, "You need to save the .range file first!")
+        return {'FINISHED'}
+        
+class WM_OT_inputsystem_copy_input_table(Operator):
+    """Copy an Input Table"""
+    bl_idname = "wm.input_map_table"
+    bl_label = "Copy Input Table"
+    
+    def execute(self, context):
+        wm = context.window_manager
+        path = bpy.path.abspath("//KeyMapping/")
+        
+        if wm.input_map_index < 0:
+            self.report({'WARNING'}, "Copy InputTable Failed! Select an InputTable")
+            return {'CANCELLED'}
+        
+        if bpy.data.is_saved:
+            # Make dir or remove Input Map
+            if not os.path.exists(path):
+                os.makedirs(path)
+                   
+            inputMapName = wm.input_map_selected
+            filepath = os.path.join(path, inputMapName)
+            # Copy Input Table
+            input_table_list = ""
+                    
+            # Save
+            filepath = os.path.join(path, inputMapName)
+            with open(filepath, 'r+') as file: 
+                input_table_list = json.load(file)
+                
+                # Copy Table
+                inputTable = input_table_list[wm.input_table_selected_name]
+                
+                # Save Table
+                input_table_list[wm.input_table_selected_name + "_copy"] = inputTable
+                self.report({'INFO'}, "Input Table Copied")
+                
+                # Save
+                file.seek(0)
+                json.dump(input_table_list, file, indent=4)
+                file.truncate()
+
+            wm.input_table_index += 1 # Input Table Update
+                
+            self.report({'INFO'}, "Input table copied")
+            
+        else:
+            self.report({'ERROR'}, "You need to save the .range file first!")
+        return {'FINISHED'}
+        
+############################ End Input System #####################################
+
+classes = (
+    BRUSH_OT_active_index_set,
+    WM_OT_addon_disable,
+    WM_OT_addon_enable,
+    WM_OT_addon_expand,
+    WM_OT_addon_install,
+    WM_OT_addon_refresh,
+    WM_OT_addon_remove,
+    WM_OT_addon_userpref_show,
+    WM_OT_app_template_install,
+    WM_OT_appconfig_activate,
+    WM_OT_appconfig_default,
+    WM_OT_blenderplayer_start,
+    WM_OT_context_collection_boolean_set,
+    WM_OT_context_cycle_array,
+    WM_OT_context_cycle_enum,
+    WM_OT_context_cycle_int,
+    WM_OT_context_menu_enum,
+    WM_OT_context_modal_mouse,
+    WM_OT_context_pie_enum,
+    WM_OT_context_scale_float,
+    WM_OT_context_scale_int,
+    WM_OT_context_set_boolean,
+    WM_OT_context_set_enum,
+    WM_OT_context_set_float,
+    WM_OT_context_set_id,
+    WM_OT_context_set_int,
+    WM_OT_context_set_string,
+    WM_OT_context_set_value,
+    WM_OT_context_toggle,
+    WM_OT_context_toggle_enum,
+    WM_OT_copy_prev_settings,
+    WM_OT_doc_view,
+    WM_OT_doc_view_manual,
+    WM_OT_keyconfig_activate,
+    WM_OT_keyconfig_export,
+    WM_OT_keyconfig_import,
+    WM_OT_keyconfig_remove,
+    WM_OT_keyconfig_test,
+    WM_OT_keyitem_add,
+    WM_OT_keyitem_remove,
+    WM_OT_keyitem_restore,
+    WM_OT_keymap_restore,
+    WM_OT_operator_cheat_sheet,
+    WM_OT_operator_pie_enum,
+    WM_OT_path_open,
+    WM_OT_properties_add,
+    WM_OT_properties_context_change,
+    WM_OT_properties_edit,
+    WM_OT_properties_remove,
+    WM_OT_sysinfo,
+    WM_OT_theme_install,
+    WM_OT_url_open,
+    WM_MT_splash,
+    WM_MT_splash_about,
+    WM_OT_create_project,
+    WM_OT_export_with_rangearmor,
+    WM_OT_one_click_export_rangearmor,
+    INPUTMAPS_UL_list,
+    INPUTTABLE_UL_list,
+    WM_OT_inputsystem_save_binding,
+    WM_OT_inputsystem_remove_binding,
+    WM_OT_inputsystem_remove_input_map,
+    WM_OT_inputsystem_remove_input_table,
+    WM_OT_inputsystem_toggle_expand,
+    WM_OT_inputsystem_capture_key,
+    WM_OT_inputsystem_copy_input_map,
+    WM_OT_inputsystem_copy_input_table,
+)
