@@ -4344,7 +4344,7 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	row = uiLayoutRow(layout, true);
 
 	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
-	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "WM_OT_blenderplayer_start");
+	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
 	uiItemS(row);
 

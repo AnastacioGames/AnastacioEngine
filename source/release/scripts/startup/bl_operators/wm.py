@@ -1554,7 +1554,11 @@ class WM_OT_blenderplayer_start(Operator):
         # "//libloads\...") into machine-specific absolute paths in the
         # throwaway '~' copy, so the standalone test could silently fail to
         # resolve them. Disable it since no remap is ever needed here.
-        bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True, relative_remap=False)
+        try:
+            bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True, relative_remap=False)
+        except Exception as ex:
+            self.report({'ERROR'}, "Could not save test copy %r: %s" % (filepath, ex))
+            return {'CANCELLED'}
 
         # start the command line call with the player path
         args = [player_path]
@@ -1572,8 +1576,15 @@ class WM_OT_blenderplayer_start(Operator):
         # finish the call with the path to the blend file
         args.append(filepath)
 
-        subprocess.call(args)
-        os.remove(filepath)
+        try:
+            subprocess.call(args)
+        except Exception as ex:
+            self.report({'ERROR'}, "Failed to launch %r: %s" % (player_path, ex))
+            return {'CANCELLED'}
+        finally:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
         return {'FINISHED'}
 
 
