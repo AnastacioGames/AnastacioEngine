@@ -32,12 +32,20 @@ e detalhados no [`changelog.md`](changelog.md).
   [roteiro do exemplo](cutscene-native-example.md).
 - **Linux x86_64 (RangeRuntime e RangeEngine)**: ambos compilam, linkam, instalam e rodam em Linux nativo
   (Ubuntu 24.04, GPU NVIDIA real) desde 2026-09-15 — ver `docs/linux-build.md` e `docs/changelog.md`
-  (entradas de 2026-09-15) para os bugs corrigidos em cada validação. Pendente: (1) empacotar e validar o
-  `RangeRuntime` extraído numa máquina Linux limpa antes de anunciar suporte oficial
-  (`tools/linux/package-runtime.sh`); (2) validar a janela real do `RangeEngine` com sessão gráfica
-  (GHOST/X11, ícones, i18n, addons Python — só foi testado em modo `--background` até agora); (3) portar
+  (entradas de 2026-09-15) para os bugs corrigidos em cada validação. O pacote portátil 0.3.0 também foi
+  validado em máquina limpa. Pendente: (1) validar a janela real do `RangeEngine` com sessão gráfica
+  (GHOST/X11, ícones, i18n, addons Python — só foi testado em modo `--background` até agora); (2) portar
   `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` do editor para as APIs atuais de OpenColorIO 2.x/FFmpeg 5+
   (desligados por incompatibilidade de API, não por ausência de lib — ver changelog 2026-09-15).
+- **Release 0.3.0 — concluída**: pacotes Linux e Windows x86_64 publicados na mesma release `v0.3.0` do
+  GitHub (`AnastacioGames/AnastacioEngine`), com `SHA256SUMS.txt` cobrindo os três arquivos. A RangeArmor
+  passou a ser distribuída como asset separado (`RangeArmor-0.3.0-windows-x64.zip`) na mesma página, em vez
+  de embutida no zip da engine — ver `docs/distribution-0.1.md` e changelog de 2026-09-15.
+- **Export Web/Android após Linux nativo**: a validação Linux confirma que o runtime já é portável fora do
+  Windows/MSVC e fornece um modelo concreto para Python isolado, RPATH/empacotamento e seleção de bibliotecas
+  por plataforma. Isso ajuda Web e Android, mas não elimina seus backends específicos: Web ainda precisa
+  fechamento visual/deploy, e Android ainda precisa resolver NDK, ciclo de vida, janela/input e APK. O plano
+  consolidado está em [`android-web-export-roadmap.md`](android-web-export-roadmap.md).
 - **Associação de arquivos**: permitir abrir `.blend` e `.range` diretamente com os executáveis adequados,
   definindo instalação/registro no Windows e comportamento de duplo clique.
 - **Export para Web (WebGL/WebAssembly)**:

@@ -34,20 +34,26 @@ No GitHub, mantenha o código-fonte no repositório e anexe o ZIP à Release com
 `build/dist/` é a área local de entrega. Ela é ignorada pelo Git e contém somente arquivos finais
 prontos para anexar a uma GitHub Release; **nunca** deve ser commitada como código-fonte.
 
-Para a versão `0.1.0`, os artefatos Windows são:
+A partir da versão `0.3.0`, os artefatos Windows são:
 
 ```text
 build/dist/
-  AnastacioEngine-0.1.0-windows-x64.zip
-  AnastacioEngine-0.1.0-windows-x64-with-RangeArmor.zip
+  AnastacioEngine-0.3.0-windows-x64.zip
+  RangeArmor-0.3.0-windows-x64.zip
   SHA256SUMS.txt
 ```
 
 - `AnastacioEngine-<versao>-windows-x64.zip`: editor, runtime, DLLs, `2.79/` e licenças necessárias.
-- `AnastacioEngine-<versao>-windows-x64-with-RangeArmor.zip`: o mesmo pacote da engine, acrescido de
-  `RangeArmor/`, com o painel, launcher, scripts de exportação e a licença MIT da ferramenta.
-- `SHA256SUMS.txt`: hashes SHA-256 dos ZIPs; publicar junto dos arquivos para permitir verificação de
-  integridade por quem baixar.
+- `RangeArmor-<versao>-windows-x64.zip`: **asset separado**, não mais embutido no zip da engine — o
+  painel, launcher, scripts de exportação e a licença MIT da ferramenta (© BGEmpire Studio). Publicado na
+  mesma página/release do GitHub que a engine, mas como arquivo distinto, já que o código-fonte da
+  RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git).
+- `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
+  arquivos para permitir verificação de integridade por quem baixar.
+
+Convenção anterior (até `0.2.0`): um único
+`AnastacioEngine-<versao>-windows-x64-with-RangeArmor.zip` com a RangeArmor embutida. Descontinuada a
+partir de `0.3.0` em favor do asset separado acima.
 
 A criação dos ZIPs deve preservar o build original. Primeiro monte as pastas descartáveis em
 `build/release-staging/`, valide que `RangeEngine.exe`, `RangeRuntime.exe` e, no pacote ampliado, o
@@ -65,9 +71,8 @@ Quando disponível, o atlas legado da UPBGE deve ficar em:
 Antes de publicar, confirme que `RangeEngine.exe` e `RangeRuntime.exe` iniciam a partir de uma cópia limpa
 do pacote e que os scripts, datafiles e DLLs necessários continuam presentes.
 
-## Linux x86_64 (ainda não publicado)
+## Linux x86_64
 
-Quando o build Linux for validado, distribua o conteúdo completo de `build-linux/bin/` em
-`AnastacioEngine-<versao>-linux-x86_64.tar.xz`. Inclua um arquivo `SHA-256`, a licença e o código-fonte
-correspondente. Não publique um pacote Linux antes de executá-lo em uma instalação Linux limpa; WSLg não
-é validação suficiente de driver, áudio e janela.
+Publicado a partir da versão `0.3.0` como `AnastacioEngine-0.3.0-linux-x64.tar.gz`, com o conteúdo
+completo de `build-linux/bin/` e `SHA256SUMS.txt` na mesma release. Validado em máquina Linux limpa (fora
+do WSL) antes da publicação — ver `docs/changelog.md` (entradas de 2026-09-15).

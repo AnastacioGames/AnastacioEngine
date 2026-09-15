@@ -4,6 +4,37 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-15 — Release 0.3.0: pacote Windows publicado, RangeArmor como asset separado
+
+- **Windows x86_64 0.3.0 publicado**: `RangeEngine.exe`/`RangeRuntime.exe` recompilados (ninja, preset
+  nativo) após o commit `72d661c6` (tema AnastacioGames), empacotados em
+  `AnastacioEngine-0.3.0-windows-x64.zip` seguindo a convenção de `distribution-0.1.md` (sem logs, `.pdb`,
+  `.map`, `.lib`, `.exp`, ferramentas internas, cenas de teste; DLLs redistribuíveis do Visual C++ —
+  `concrt140`, `msvcp140*`, `vccorlib140`, `vcruntime140` — incluídas a partir do VS 2026 Community
+  instalado na máquina).
+- **RangeArmor publicado como asset separado, não mais embutido no zip da engine**: o código-fonte da
+  RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git); o pacote
+  `RangeArmor-0.3.0-windows-x64.zip` foi montado a partir do bundle presente em `build/bin/rangearmor/`
+  (painel, launcher, scripts de build/export Python, ícones) mais a licença MIT (`LICENSE.txt`, © 2020
+  BGEmpire Studio) recuperada de um artefato 0.2.0 anterior. Publicado na mesma release `v0.3.0` do GitHub,
+  como página compartilhada mas asset distinto — não como um repositório novo.
+- `SHA256SUMS.txt` da release `v0.3.0` atualizado com as três entradas (Linux, Windows, RangeArmor).
+- Upload feito via `gh release upload v0.3.0 ... --clobber` após autenticação do GitHub CLI na máquina de
+  desenvolvimento.
+
+## 2026-09-15 — Documentação: Linux nativo como base para Web/Android
+
+- Atualizados `docs/README.md`, `docs/roadmap.md`, `relatorio-melhorias-anastacioengine.md` e
+  `docs/android-web-export-roadmap.md` para registrar que a validação nativa em Linux x86_64 ajuda a reduzir
+  o risco dos exports Web/Android.
+- Conclusão registrada: Linux não implementa Web/Android automaticamente, mas prova que o runtime já saiu do
+  eixo Windows/MSVC com toolchain Unix, Python 3.11 isolado, OpenAL, SDL/X11, RPATH e empacotamento próprio.
+  Isso vira referência prática para Web (HTML/JS/WASM) e Android (NDK/APK/AAB), principalmente em Python
+  embarcado, seleção explícita de features por plataforma e validação em hardware real.
+- Android continua sem backend GHOST/APK funcional. O próximo passo técnico deve começar pelos bloqueios
+  concretos do NDK já conhecidos (`malloc_stats` ausente na Bionic e `GL/glu.h` inexistente), antes de criar
+  infraestrutura maior.
+
 ## 2026-09-15 — Release 0.3.0: pacote Linux portátil, tema padrão AnastacioGames
 
 - **Empacotamento portátil validado em máquina limpa**: o `RUNPATH` absoluto (`/opt/anastacio-python311/lib`)

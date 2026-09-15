@@ -15,15 +15,26 @@ O projeto concentra-se em performance, renderização e ferramentas de runtime.
 
 Para agentes de código, as regras operacionais estão em [AGENTS.md](AGENTS.md).
 
+## Download
+
+A versão mais recente publicada é a `0.3.0`, disponível em
+[Releases → v0.3.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.3.0):
+
+- `AnastacioEngine-0.3.0-windows-x64.zip`: editor e runtime para Windows x64;
+- `AnastacioEngine-0.3.0-linux-x64.tar.gz`: editor e runtime para Linux x86_64;
+- `RangeArmor-0.3.0-windows-x64.zip`: ferramenta de empacotamento/exportação RangeArmor, publicada como
+  asset separado (código-fonte de terceiros, não incluído neste repositório);
+- `SHA256SUMS.txt`: hashes para verificar a integridade dos arquivos acima.
+
 ## Executáveis
 
-O build gera os artefatos atuais em `build/bin/`:
+O build gera os artefatos atuais em `build/bin/` (Windows) e `build-linux/bin/` (Linux):
 
 - `RangeEngine.exe`: editor;
 - `RangeRuntime.exe`: player standalone para arquivos `.range`.
 
-O suporte a Linux x86_64 esta em preparacao: existe um preset isolado para o `RangeRuntime`, mas ainda nao
-ha build ou pacote Linux oficialmente validado.
+O Linux x86_64 já é suportado e validado nativamente (fora do WSL) a partir da versão `0.3.0` — ver
+[docs/linux-build.md](docs/linux-build.md) e [docs/changelog.md](docs/changelog.md).
 
 Consulte `docs/build-notes.md` antes de compilar. A pasta `install/` da raiz pode ser uma cópia antiga e
 não deve ser usada para validar mudanças.
