@@ -4,27 +4,31 @@
 > **Para baixar a engine, use os links da seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
 > O botão verde **Code → Download ZIP** do GitHub baixa somente uma cópia do repositório (README e imagens); ele **não** contém os executáveis da AnastacioEngine.
 
-![Splash Screen da AnastacioEngine 0.2.0](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.2.0/splash.png)
+![Splash Screen da AnastacioEngine 0.3.0](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.2.0/splash.png)
 
 ## Download
 
-A versão atual é **[AnastacioEngine 0.2.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.2.0)**, para Windows x64.
+A versão atual é **[AnastacioEngine 0.3.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.3.0)**, para Windows x64 e Linux x86_64.
 
 | Pacote | Conteúdo |
 |---|---|
-| [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/AnastacioEngine-0.2.0-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos. |
-| [AnastacioEngine + RangeArmor](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/AnastacioEngine-0.2.0-windows-x64-with-RangeArmor.zip) | Pacote completo, com a engine e a ferramenta RangeArmor para criar e empacotar projetos. |
-| [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.2.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
+| [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.3.0/AnastacioEngine-0.3.0-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos no Windows. |
+| [AnastacioEngine Linux x86_64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.3.0/AnastacioEngine-0.3.0-linux-x64.tar.gz) | Editor e runtime nativos para Linux x86_64 (validado fora do WSL). |
+| [RangeArmor (Windows)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.3.0/RangeArmor-0.3.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos (painel, launcher e scripts de exportação). |
+| [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.3.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
 
-Extraia o ZIP em uma pasta própria e abra `RangeEngine.exe`. Para executar um jogo exportado, use `RangeRuntime.exe`.
+Extraia o pacote da sua plataforma em uma pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine`
+(Linux). Para executar um jogo exportado, use `RangeRuntime`/`RangeRuntime.exe`. A partir da 0.3.0, a
+RangeArmor é distribuída como arquivo separado — baixe-a à parte se quiser criar/empacotar projetos.
 
-## Versão 0.2.0
+## Versão 0.3.0
 
-Esta é a distribuição pronta da AnastacioEngine para Windows x64. Escolha o pacote desejado na seção **Download**, extraia-o em uma pasta própria e execute `RangeEngine.exe`.
+Esta é a distribuição pronta da AnastacioEngine para Windows x64 e, agora, Linux x86_64 nativo. Escolha o
+pacote desejado na seção **Download**, extraia-o em uma pasta própria e execute `RangeEngine`.
 
-- O pacote padrão contém a engine, o editor, o runtime e as dependências necessárias.
-- O pacote **com RangeArmor** inclui também as ferramentas para criar e empacotar projetos.
-- Use `RangeRuntime.exe` para executar um jogo exportado (`.range`).
+- O pacote da engine contém o editor, o runtime e as dependências necessárias para cada plataforma.
+- A **RangeArmor** agora é um pacote à parte, com as ferramentas para criar e empacotar projetos.
+- Use `RangeRuntime`/`RangeRuntime.exe` para executar um jogo exportado (`.range`).
 - Consulte `SHA256SUMS.txt` caso queira verificar a integridade do download.
 
 ## Ferramentas para criar jogos
@@ -42,12 +46,12 @@ nas opções do material que será usado pelo objeto.
 | Plataforma | Estado |
 |---|---|
 | Windows x64 | Suportada nesta release. |
-| Linux x64 | Experimental; ainda não há pacote oficial publicado. |
+| Linux x86_64 | Suportada nativamente (fora do WSL) a partir da 0.3.0. |
 | 32-bit | Não suportado. |
 ## Estrutura da distribuição
-- `RangeEngine.exe`: editor para criar e configurar projetos.
-- `RangeRuntime.exe`: player standalone para arquivos `.range`.
-- `RangeArmor/`: painel, launcher e scripts de empacotamento; presente somente no pacote completo.
+- `RangeEngine`/`RangeEngine.exe`: editor para criar e configurar projetos.
+- `RangeRuntime`/`RangeRuntime.exe`: player standalone para arquivos `.range`.
+- `RangeArmor`: painel, launcher e scripts de empacotamento; distribuído como pacote separado a partir da 0.3.0.
 
 ## Sobre
 
