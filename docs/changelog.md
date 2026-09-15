@@ -4,6 +4,24 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-15 — Release 0.3.0: pacote Linux portátil, tema padrão AnastacioGames
+
+- **Empacotamento portátil validado em máquina limpa**: o `RUNPATH` absoluto (`/opt/anastacio-python311/lib`)
+  embutido no `RangeEngine`/`RangeRuntime` pelo preset `linux-editor`/`linux-runtime` foi trocado por
+  `$ORIGIN/python311/lib` via patch binário direto na tabela de strings do ELF (sem `patchelf`/`chrpath`
+  disponíveis no sistema), e o runtime isolado do Python 3.11 (`/opt/anastacio-python311`) passou a ser
+  copiado para dentro do próprio pacote (`python311/lib/`). Testado rodando os dois binários a partir de um
+  diretório isolado, sem qualquer dependência do caminho original — resolve a pendência do roadmap de validar
+  o tarball numa máquina limpa.
+- **Tema AnastacioGames como padrão na primeira execução**: novo script de startup
+  `source/release/scripts/startup/anastacio_default_theme.py` aplica o preset
+  `scripts/presets/interface_theme/anastaciogames.xml` via `rna_xml.xml_file_run` (chamando a API de baixo
+  nível em vez do operador `script.execute_preset`, que depende de contexto de janela indisponível no
+  registro de scripts de startup) e salva as preferências do usuário. Um arquivo-marcador na pasta de config
+  evita reaplicar o tema em execuções seguintes; se o salvamento falhar, a lógica tenta de novo na próxima
+  abertura em vez de travar num estado sem tema.
+- **Versão exibida bump para 0.3.0** em `source/release/scripts/startup/bl_operators/wm.py` (splash screen).
+
 ## 2026-09-15 — Linux nativo: RangeEngine (editor completo) compila e roda pela primeira vez, 6 bugs corrigidos
 
 - **Máquina**: mesma do `RangeRuntime` (Ubuntu 24.04 nativo, `fabio-ASUS-Linux`). Primeira tentativa de build
