@@ -1,5 +1,24 @@
 # Build no Linux (em preparacao)
 
+## Atalho automatico (recomendado)
+
+Para quem nao tem experiencia com Linux: um unico script cobre instalacao de dependencias
+(via `apt`), checagem de ambiente, configuracao, compilacao e instalacao:
+
+```bash
+bash tools/linux/quickstart.sh
+```
+
+Para compilar e ja rodar um jogo `.range` ao final:
+
+```bash
+bash tools/linux/quickstart.sh /caminho/para/seu_jogo.range
+```
+
+O script assume Debian/Ubuntu (`apt`). Para outra distro, siga os passos manuais abaixo trocando
+os comandos de instalacao de pacotes pelo gerenciador correspondente. Em caso de erro, cole a saida
+completa do script para um assistente (Claude/ChatGPT) rodando na propria maquina Linux investigar.
+
 ## Estado em 8 de setembro de 2026
 
 O `RangeRuntime` agora liga e roda no ambiente de referencia Debian 13 via WSL. Duas causas de link
