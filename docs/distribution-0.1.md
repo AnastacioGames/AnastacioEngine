@@ -9,6 +9,9 @@ AnastacioEngine-0.1-windows-x64/
   RangeEngine.exe
   RangeRuntime.exe
   *.dll
+  blender.crt/
+    blender.crt.manifest
+    *.dll
   2.79/
     datafiles/
     scripts/
@@ -19,12 +22,20 @@ portátil real gerada pelo projeto; a pasta `install/` da raiz pode estar obsole
 de build literalmente: exclua logs, arquivos `.pdb`/`.map`/`.lib`/`.exp`, ferramentas internas
 (`datatoc`, `makesdna`, `makesrna`), cenas de teste, backups e configurações locais do ImGui.
 
-**Runtime do Visual C++:** a máquina de desenvolvimento pode ter o runtime instalado e esconder uma
-dependência ausente no pacote. Junto de `RangeEngine.exe` e `RangeRuntime.exe`, inclua as DLLs x64 do
-Microsoft Visual C++ Redistributable usadas no build: `concrt140.dll`, `msvcp140*.dll`, `vccorlib140.dll`
-e `vcruntime140*.dll`. Sem elas, uma instalação limpa do Windows pode mostrar o erro de configuração
-"lado a lado" ao abrir a engine. Antes de publicar, valide em uma máquina sem o Visual Studio ou em uma
-instalação limpa.
+**Runtime do Visual C++ (pasta `blender.crt/`):** `RangeEngine.exe`/`RangeRuntime.exe` têm um manifesto
+embutido que declara dependência de uma assembly privada chamada `blender.crt` (mecanismo herdado do
+Blender/UPBGE para versionar o runtime do VC++ via side-by-side). Essa assembly só é resolvida se existir
+uma **subpasta `blender.crt/`** ao lado do `.exe`, contendo o `blender.crt.manifest` gerado pelo CMake
+(`platform_win32_bundle_crt.cmake`) e os DLLs do runtime (`vcruntime140.dll`, `vcruntime140_1.dll`,
+`msvcp140.dll`, `msvcp140_1.dll`, `msvcp140_2.dll`, `msvcp140_atomic_wait.dll`,
+`msvcp140_codecvt_ids.dll`, `concrt140.dll`, `vcomp140.dll` e os `api-ms-win-*.dll` correspondentes,
+todos já presentes em `build/bin/blender.crt/` após o build). **Copiar apenas os DLLs soltos ao lado do
+`.exe` (sem a subpasta e sem o `.manifest`) não resolve a dependência** e produz exatamente o erro "Falha
+na inicialização do aplicativo devido à configuração lado a lado incorreta" em uma instalação limpa do
+Windows, mesmo com os DLLs presentes no diretório. `ucrtbase.dll` fica fora da pasta `blender.crt/`, solto
+junto do `.exe` (não pode entrar no manifesto — ver comentário em `platform_win32_bundle_crt.cmake`).
+Antes de publicar, valide em uma máquina sem o Visual Studio ou em uma instalação limpa, extraindo o ZIP
+de fato (não apenas rodando a partir de `build/bin/`).
 
 No GitHub, mantenha o código-fonte no repositório e anexe o ZIP à Release como
 `AnastacioEngine-0.1-windows-x64.zip`. O diretório de build permanece ignorado pelo Git.
@@ -47,7 +58,10 @@ build/dist/
 - `RangeArmor-<versao>-windows-x64.zip`: **asset separado**, não mais embutido no zip da engine — o
   painel, launcher, scripts de exportação e a licença MIT da ferramenta (© BGEmpire Studio). Publicado na
   mesma página/release do GitHub que a engine, mas como arquivo distinto, já que o código-fonte da
-  RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git).
+  RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git). O painel (GUI,
+  Godot) só roda no Windows; não existe nem é necessário um pacote `RangeArmor-<versao>-linux-x64`
+  separado, porque o painel já exporta jogos para Linux x86_64 embutindo o launcher Rust compilado para
+  `x86_64-unknown-linux-gnu` (ver `docs/rangearmor-modernization-plan.md`).
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
   arquivos para permitir verificação de integridade por quem baixar.
 
