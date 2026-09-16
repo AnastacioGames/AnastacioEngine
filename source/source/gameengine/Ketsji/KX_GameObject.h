@@ -999,6 +999,15 @@ public:
 	void SuspendPhysics(bool freeConstraints);
 	void RestorePhysics();
 
+	/// Suspend/resume this object's BL_ActionManager, so KX_Scene::UpdateAnimations skips it
+	/// entirely (IsActionsSuspended()) instead of still dispatching an update task every frame
+	/// for an object whose actions were merely stopped (stopAction only clears layers, it never
+	/// removes the object from KX_Scene::m_animatedlist -- that only happens when the object is
+	/// destroyed). Meant for pooled/recycled objects (e.g. particle effects) that are hidden but
+	/// never actually removed from the scene.
+	void SuspendAnimations();
+	void ResumeAnimations();
+
 	/**
 	 * Get the negative scaling state
 	 */
@@ -1116,6 +1125,8 @@ public:
 	EXP_PYMETHOD_O(KX_GameObject,GetAxisVect);
 	EXP_PYMETHOD_VARARGS(KX_GameObject,SuspendPhysics);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,RestorePhysics);
+	EXP_PYMETHOD_NOARGS(KX_GameObject,SuspendAnimations);
+	EXP_PYMETHOD_NOARGS(KX_GameObject,ResumeAnimations);
 	EXP_PYMETHOD_VARARGS(KX_GameObject,SuspendDynamics);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,RestoreDynamics);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,EnableRigidBody);

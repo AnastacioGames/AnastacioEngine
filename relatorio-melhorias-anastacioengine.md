@@ -13,6 +13,11 @@ somente para leitura de projetos legados.
 A AnastacioEngine é um fork da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b e do Blender 2.79. As
 frentes principais são performance, iluminação/renderização e ferramentas de runtime.
 
+A validação nativa em Linux x86_64 de 2026-09-15 também é uma evidência importante para os exports Web e
+Android: o runtime já roda fora do Windows/MSVC com toolchain Unix, Python 3.11 isolado, OpenAL, SDL/X11,
+RPATH e empacotamento próprio. Isso não substitui o trabalho específico de Emscripten/NDK, mas reduz o risco
+de portabilidade e fornece um modelo concreto para runtimes empacotados por plataforma.
+
 Um item só entra no roadmap de engine quando exige mudança em `source/` e recompilação. Configuração de
 cena, preparação de assets e scripts independentes são registrados no changelog ou na documentação da
 ferramenta correspondente.
@@ -48,6 +53,12 @@ ferramenta correspondente.
   em Python, campo "Fragment Shader File" na UI), com hot-reload automático (poll de mtime a cada ~0,5s) —
   edita-se o arquivo com o jogo rodando e o efeito atualiza sozinho. Exemplos prontos em
   [`projects-teste/shaders/particles/`](projects-teste/shaders/particles/).
+- **Animações de objetos de pool**: objetos reciclados que já chamaram `playAction()` uma vez ficavam permanentemente
+  registrados em `KX_Scene::m_animatedlist`, gerando custo de dispatch de atualização de animação a cada frame mesmo
+  quando suspensos no pool. Corrigido expondo `KX_GameObject::SuspendAnimations()`/`ResumeAnimations()` (wrappers
+  Python para `BL_ActionManager::Suspend/Resume`), wired no sistema de pool para suspender/resumir objetos ao
+  reciclar/reativar. Elimina o custo residual de "Animations" relatado em efeitos de piscina (fumaça, faísca,
+  terra/asfalto, slipstream) após terminar — GPU particles (sistema separado) não são afetadas.
 
 ### Iluminação e renderização
 
@@ -115,12 +126,16 @@ ferramenta correspondente.
   o primeiro anexo. Filtros personalizados mantêm o roteamento existente.
   O quad de tela também salva/restaura os divisores dos atributos e usa zero
   durante o draw Web: a emulação deixava o UV com divisor 1, produzindo imagem
-  preta apesar de draws válidos. Após correção: 6.192 draws sem erro GL e cor
-  confirmada por leitura numérica dos passes; aceite visual ainda pendente.
-  O arquivo original do harness está vazio. O novo teste com cubo/Python
-  encontra `alignment fault` no carregamento (`test_pointer_array`), ainda
-  não corrigido. Permanecem testes funcionais, MRT e demais filtros.
+  preta apesar de draws válidos. Após correção: milhares de draws sem erro GL,
+  cor confirmada por leitura numérica dos passes e cubo/Python/input validados
+  no navegador real. Permanecem validações visuais dos filtros ampliados, smoke
+  test de persistência IDBFS e documentação de deploy.
   Ver roadmap e changelog de 2026-09-14.
+- O export Android deve partir das lições já validadas em Linux e Web: runtime 64-bit, Python 3.11 isolado
+  como parte do pacote, features desligadas explicitamente quando a API da plataforma divergir, e validação
+  em hardware real antes de anunciar suporte. O Android ainda não tem backend GHOST/APK funcional; os primeiros
+  bloqueios concretos conhecidos são `malloc_stats` ausente na Bionic e `GL/glu.h` inexistente no NDK. O plano
+  consolidado fica em [`docs/android-web-export-roadmap.md`](docs/android-web-export-roadmap.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

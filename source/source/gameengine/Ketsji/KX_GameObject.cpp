@@ -2137,6 +2137,23 @@ void KX_GameObject::RestorePhysics()
 	}
 }
 
+void KX_GameObject::SuspendAnimations()
+{
+	// Don't lazily create an action manager (and register in m_animatedlist via
+	// GetActionManager()) just to suspend it -- if it never played an action, there's
+	// nothing to suspend and nothing being iterated in KX_Scene::UpdateAnimations either.
+	if (m_actionManager) {
+		m_actionManager->Suspend();
+	}
+}
+
+void KX_GameObject::ResumeAnimations()
+{
+	if (m_actionManager) {
+		m_actionManager->Resume();
+	}
+}
+
 void KX_GameObject::UnregisterCollisionCallbacks()
 {
 	if (!m_physicsController) {
@@ -2694,6 +2711,8 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{"setParent", (PyCFunction)KX_GameObject::sPySetParent, METH_VARARGS | METH_KEYWORDS},
 	{"setVisible", (PyCFunction)KX_GameObject::sPySetVisible, METH_VARARGS},
 	{"setHalfAnimations", (PyCFunction)KX_GameObject::sPySetHalfAnimations, METH_VARARGS},
+	{"suspendAnimations", (PyCFunction)KX_GameObject::sPySuspendAnimations, METH_NOARGS},
+	{"resumeAnimations", (PyCFunction)KX_GameObject::sPyResumeAnimations, METH_NOARGS},
 	{"setOcclusion", (PyCFunction)KX_GameObject::sPySetOcclusion, METH_VARARGS},
 	{"removeParent", (PyCFunction)KX_GameObject::sPyRemoveParent, METH_NOARGS},
 
@@ -5065,6 +5084,20 @@ PyObject *KX_GameObject::PySuspendPhysics(PyObject *args)
 PyObject *KX_GameObject::PyRestorePhysics()
 {
 	RestorePhysics();
+
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PySuspendAnimations()
+{
+	SuspendAnimations();
+
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PyResumeAnimations()
+{
+	ResumeAnimations();
 
 	Py_RETURN_NONE;
 }

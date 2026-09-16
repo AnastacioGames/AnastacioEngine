@@ -4,6 +4,17 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-16 — Correção de engine + script: animações de objetos de pool deixam de acumular em KX_Scene::m_animatedlist
+
+- **Problema relatado**: objetos de efeito em pool (fumaça, faíscas, terra/asfalto, slipstream) ao queimar pneu causavam aumento contínuo da porcentagem de "Animations" no profiler até ~16%, mesmo após o efeito terminar e o objeto retornar ao pool.
+- **Diagnóstico**: o custo residual era causado por um gap arquitetural na engine: `KX_GameObject::playAction()` registra o objeto uma única vez em `KX_Scene::m_animatedlist` (via `AddAnimatedObject` chamado pela primeira vez que `GetActionManager()` é criado), mas `stopAction()` **apenas limpa as layers de ação** — ele **nunca remove o objeto da lista**. A remoção só ocorre quando o objeto é destruído (via `RemoveObject`). Objetos de pool são reciclados, nunca destruídos, então ficam registrados para sempre. A cada frame, `KX_Scene::UpdateAnimations()` itera sobre todos os objetos da lista (inclusive os "inativos" no pool) e despacha tarefas de update de animação, mesmo quando não há nada a fazer.
+- **Solução implementada**:
+  1. **Engine (C++)**: expusemos `BL_ActionManager::Suspend()/Resume()/IsSuspended()` (métodos pré-existentes, mas nunca acessíveis do Python) através de novos métodos em `KX_GameObject`: `SuspendAnimations()` e `ResumeAnimations()` (implementação em `KX_GameObject.cpp` ~linha 2126-2138, espelhando o padrão de `SuspendPhysics()`/`RestorePhysics()`), e registrados na tabela de métodos Python (~linha 2685-2698) com macros `EXP_PYMETHOD_NOARGS` (header `KX_GameObject.h` ~linha 999-1000).
+  2. **Jogo (Python)**: editado `pool_add_object.py` para chamar `obj.suspendAnimations()` em `_recursive_stop_and_hide()` (executado ao desativar/reciclar um objeto para o pool) e `obj.resumeAnimations()` em `_activate()` (executado ao reativar um objeto), removendo as checagens de `hasattr(inst, "suspend")`/`hasattr(inst, "resume")` que nunca funcionavam (esses métodos nunca existiram no engine).
+  3. **Mecanismo**: `KX_Scene::UpdateAnimations()` respeita `IsActionsSuspended()` (que lê `BL_ActionManager::IsSuspended()`), pulando o dispatch de tarefa de atualização para objetos suspensos — o objeto permanece em `m_animatedlist`, mas não gera custo de CPU por frame enquanto suspenso.
+- **Build**: recompilado incrementalmente (`ninja RangeEngine RangeRuntime`) após corrigir o `LNK1104` (executável `RangeEngine.exe` foi fechado manualmente pelo usuário), link bem-sucedido com exit code 0; novos binários instalados em `build/bin/`.
+- **Próximos passos**: validação em-jogo (queimar pneu, monitorar profiler "Animations" durante e após o efeito) para confirmar que a porcentagem não sobe mais ou permanece baixa com a correção aplicada.
+
 ## 2026-09-15 — Release 0.3.0: pacote Windows publicado, RangeArmor como asset separado
 
 - **Windows x86_64 0.3.0 publicado**: `RangeEngine.exe`/`RangeRuntime.exe` recompilados (ninja, preset
