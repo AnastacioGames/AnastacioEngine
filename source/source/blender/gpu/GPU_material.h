@@ -304,6 +304,8 @@ void GPU_material_bind_uniforms(
 		int oblay, float autobumpscale, GPUParticleInfo *pi, float object_info[3]);
 void GPU_material_unbind(GPUMaterial *material);
 bool GPU_material_bound(GPUMaterial *material);
+/** Set the runtime camera/player reference used by foliage distance optimization. */
+void GPU_material_set_foliage_reference_position(GPUMaterial *material, const float position[3]);
 struct Scene *GPU_material_scene(GPUMaterial *material);
 GPUMatType GPU_Material_get_type(GPUMaterial *material);
 

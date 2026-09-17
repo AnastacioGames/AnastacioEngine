@@ -123,6 +123,14 @@ void KX_SimulationPipeline::Update()
 		}
 		if (!scene->IsSuspended()) {
 
+			// Publish one shared player/camera reference after physics. Distance-based
+			// systems (currently foliage wind) all consume this same frame position.
+			scene->UpdateOptimizationReference();
+
+			// Run after physics so the active camera has its final frame position;
+			// the scenegraph pass below publishes the light transform for rendering.
+			scene->UpdateAutoWorldSun();
+
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph_physics);
 			scene->UpdateParents();
 

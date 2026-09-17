@@ -155,6 +155,9 @@ struct GPUMaterial {
 	bool use_skinning;
 
 	int infoliageparamsloc;
+	float foliagecamera[3];
+	bool foliagecamera_set;
+	float foliagetime;
 
 	bool use_foliage;
 
@@ -709,11 +712,8 @@ void GPU_material_bind(
 			float ftime = (float)time;
 			GPU_shader_uniform_vector(shader, material->timeloc, 1, 1, &ftime);
 		}
-
 		if (material->use_foliage && material->ma) {
-			Material *ma = material->ma;
-			float params[3] = {ma->foliage_strength, (time * ma->foliage_turbulence), ma->foliage_grass};
-			GPU_shader_uniform_vector(shader, material->infoliageparamsloc, 3, 1, (float *)params);
+			material->foliagetime = (float)(time * material->ma->foliage_turbulence);
 		}
 
 		GPU_pass_update_uniforms(material->pass);
@@ -736,6 +736,21 @@ void GPU_material_bind_uniforms(
 		float invmat[4][4], col[4];
 		float localtoviewmat[4][4];
 		float invlocaltoviewmat[4][4];
+
+		if (material->use_foliage && material->ma) {
+			Material *ma = material->ma;
+			float strength = ma->foliage_strength;
+			if (ma->foliage_optimization && material->foliagecamera_set) {
+				const float dx = obmat[3][0] - material->foliagecamera[0];
+				const float dy = obmat[3][1] - material->foliagecamera[1];
+				const float dz = obmat[3][2] - material->foliagecamera[2];
+				if ((dx * dx + dy * dy + dz * dz) > (ma->foliage_distance * ma->foliage_distance)) {
+					strength = 0.0f;
+				}
+			}
+			float params[3] = {strength, material->foliagetime, ma->foliage_grass};
+			GPU_shader_uniform_vector(shader, material->infoliageparamsloc, 3, 1, params);
+		}
 
 		/* handle per object builtins */
 		if (material->builtins & GPU_OBJECT_MATRIX) {
@@ -822,6 +837,16 @@ void GPU_material_unbind(GPUMaterial *material)
 bool GPU_material_bound(GPUMaterial *material)
 {
 	return material->bound;
+}
+
+void GPU_material_set_foliage_reference_position(GPUMaterial *material, const float position[3])
+{
+	if (material && material->use_foliage) {
+		material->foliagecamera[0] = position[0];
+		material->foliagecamera[1] = position[1];
+		material->foliagecamera[2] = position[2];
+		material->foliagecamera_set = true;
+	}
 }
 
 Scene *GPU_material_scene(GPUMaterial *material)

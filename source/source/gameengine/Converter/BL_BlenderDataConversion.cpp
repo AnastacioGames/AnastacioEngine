@@ -123,6 +123,10 @@
 
 #include "GPU_texture.h"
 
+extern "C" {
+#include "BKE_idprop.h"
+}
+
 // This little block needed for linking to Blender...
 #ifdef WIN32
 #include "BLI_winstuff.h"
@@ -1203,6 +1207,11 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 			// world sun
 			if (ob == blenderscene->world_sun) {
 				kxscene->SetWorldSun(gamelight);
+				if (ob->id.properties) {
+					IDProperty *automaticSun = IDP_GetPropertyTypeFromGroup(
+						ob->id.properties, "_range_auto_world_sun", IDP_INT);
+					kxscene->SetAutoWorldSun(automaticSun && IDP_Int(automaticSun));
+				}
 			}
 
 			break;

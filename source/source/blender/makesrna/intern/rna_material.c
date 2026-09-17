@@ -2046,6 +2046,16 @@ void RNA_def_material(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Foliage turbulence", "Amount of turbulence applied to foliage");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
+	prop = RNA_def_property(srna, "use_foliage_optimization", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "foliage_optimization", 1);
+	RNA_def_property_ui_text(prop, "Foliage Optimization", "Stop foliage and grass wind beyond the active camera distance");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
+	prop = RNA_def_property(srna, "foliage_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 1.0f, 10000.0f);
+	RNA_def_property_ui_text(prop, "Wind Distance", "Maximum active-camera distance where foliage and grass animate");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
 	prop = RNA_def_property(srna, "point_size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Point Size", "Changes the point size to the HALO material type");

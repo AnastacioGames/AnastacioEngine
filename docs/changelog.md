@@ -4,6 +4,16 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-17 - Shared optimization reference and foliage wind distance
+
+- `KX_Scene` now publishes one optimization-reference position after physics each frame. It uses the active
+  camera today and is the single extension point for a future Player reference.
+- Game Material settings add optional `Foliage Optimization` and `Wind Distance` (50 m default). With the
+  option enabled, Foliage Shader and Grass use the shared reference; an object outside the radius exits the
+  vertex wind routine before evaluating procedural noise. Existing materials stay unrestricted until enabled.
+- Camera Properties in Game Engine mode now identifies the active Scene camera as the source of this shared
+  reference, keeping the relationship visible while configuring distance-based systems.
+
 ## 2026-09-16 — Correção de engine + script: animações de objetos de pool deixam de acumular em KX_Scene::m_animatedlist
 
 - **Problema relatado**: objetos de efeito em pool (fumaça, faíscas, terra/asfalto, slipstream) ao queimar pneu causavam aumento contínuo da porcentagem de "Animations" no profiler até ~16%, mesmo após o efeito terminar e o objeto retornar ao pool.

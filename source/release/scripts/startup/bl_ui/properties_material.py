@@ -735,6 +735,10 @@ class MATERIAL_PT_game_settings(MaterialButtonsPanel, Panel):
         col.active = mat.use_foliage
         col.prop(mat, "foliage_strength")
         col.prop(mat, "foliage_turbulence")
+        col.prop(mat, "use_foliage_optimization")
+        distance_row = col.row()
+        distance_row.active = mat.use_foliage_optimization
+        distance_row.prop(mat, "foliage_distance")
 
         box = split.box()
         box.label(text="Constant Values:", icon="SETTINGS")

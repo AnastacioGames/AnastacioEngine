@@ -92,6 +92,11 @@ void foliage_wind(in vec4 position, in float time, in float strength, in float g
 {
     transpos = position;
 
+	/* A zero strength is sent for foliage objects outside their material's
+	 * optimization radius. Return before evaluating the procedural noise. */
+	if (strength == 0.0)
+		return;
+
 	if (grass == 1 && transpos.z < 0.1)
 		return;
 

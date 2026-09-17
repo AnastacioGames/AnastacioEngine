@@ -140,6 +140,8 @@ void BKE_material_init(Material *ma)
 	ma->roughness_bsdf = 0.5f;
 	ma->metallic_bsdf = 0.5f;
 	ma->shade_flag |= MA_ENERGY_CONSERV;
+	/* Existing materials preserve their unrestricted wind until this option is enabled. */
+	ma->foliage_distance = 50.0f;
 
 	ma->strand_sta = ma->strand_end = 1.0f;
 

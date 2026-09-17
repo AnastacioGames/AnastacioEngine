@@ -261,6 +261,14 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
                 col = box.column()
                 col.prop(cam, "lod_factor", text="Distance Factor")
 
+            box = main_box.box()
+            box.label(text="Optimization Reference:", icon="CAMERA_DATA")
+            if context.object == scene.camera:
+                box.label(text="This active camera supplies the runtime distance reference.")
+            else:
+                box.label(text="The active Scene camera supplies the runtime distance reference.")
+            box.label(text="Foliage and Grass use it when Foliage Optimization is enabled.")
+
         # --- Culling (game only) ---
         if engine == 'BLENDER_GAME':
             row = main_box.row(align=True)

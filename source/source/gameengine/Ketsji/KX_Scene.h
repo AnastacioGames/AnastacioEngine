@@ -225,12 +225,24 @@ private:
 
 	/// Stores Object used to calculate sun direction in world background.
 	KX_LightObject *m_worldSun;
+	/// True only when World Sun was created through Scene > Automatic Sun.
+	bool m_autoWorldSun;
+	/// Avoid warning every frame when an automatic Sun has no active camera.
+	bool m_autoWorldSunMissingCameraWarned;
+	/// The active camera height on the first valid automatic-Sun update. It
+	/// establishes the ground reference without requiring a ground object.
+	bool m_autoWorldSunGroundReferenceInitialized;
+	float m_autoWorldSunInitialCameraHeight;
+	KX_Camera *m_autoWorldSunReferenceCamera;
 
 	/// Network scene.
 	KX_NetworkMessageScene *m_networkScene;
 
 	/// The active camera for the scene.
 	KX_Camera *m_activeCamera;
+	/// One per-frame reference point for distance-based runtime optimizations.
+	/// Until a Player reference exists, it is the active camera world position.
+	mt::vec3 m_optimizationReferencePosition;
 	/// The active camera for scene culling.
 	KX_Camera *m_overrideCullingCamera;
 
@@ -422,6 +434,10 @@ public:
 
 	/// Return the currently active camera.
 	KX_Camera *GetActiveCamera();
+	/// Position shared by runtime systems that optimize relative to the player.
+	const mt::vec3& GetOptimizationReferencePosition() const;
+	/// Refresh the reference after physics/camera movement. Uses the active camera for now.
+	void UpdateOptimizationReference();
 
 	/// Object counters from the last main-camera (non-shadow) culling pass. See m_lastCullingTotalObjects.
 	int GetLastCullingTotalObjects() const;
@@ -471,6 +487,9 @@ public:
 
 	void SetWorldSun(KX_LightObject *light);
 	KX_LightObject *GetWorldSun() const;
+	void SetAutoWorldSun(bool enabled);
+	/// Place and orient the generated World Sun from the active camera and World sun_hour.
+	void UpdateAutoWorldSun();
 
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, RAS_Rasterizer::StereoEye eye, int layer, bool is_shadowbuf);
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf);

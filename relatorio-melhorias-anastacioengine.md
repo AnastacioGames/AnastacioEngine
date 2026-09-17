@@ -75,6 +75,12 @@ ferramenta correspondente.
   passes reservadas.
 - Depth Transparency possui captura de profundidade dedicada e comportamento seguro fora do jogo.
 - Weather nativo no `World` oferece chuva, nuvens e lens flare; a chuva inclui modos Classic e Volumetric.
+- Automatic Sun orbits a ground reference 5 m ahead of the active camera at a 10 m radius and always targets it.
+  The reference estimates ground elevation from the camera's initial height. Its `Sun Hour` is backed by the
+  World Global Property `sun_hour` (Float, 0-24; 12 is directly overhead), so Logic Bricks can control it.
+- `Scene > Automatic Sun` cria um Sun e o atribui ao `World Sun`; somente esse Sun marcado orbita a referÃªncia
+  de chÃ£o 5 m Ã  frente da cÃ¢mera ativa, mirando-a durante o runtime. Suns escolhidos manualmente em `World Sun`
+  preservam seu comportamento e transformaÃ§Ã£o normais.
 
 ### Runtime e ferramentas
 
@@ -115,6 +121,12 @@ ferramenta correspondente.
   `docs/export-presets-plan.md` e `docs/changelog.md` (2026-09-12).
 
 ## Decisões técnicas vigentes
+
+- `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, updated after physics by
+  `UpdateOptimizationReference()`. It currently follows the active Scene camera and will be replaceable by the
+  Player later. The Camera Properties tab identifies this active reference. Foliage/Grass material wind can opt
+  into it through `Foliage Optimization` and `Wind Distance`; outside the chosen radius the vertex shader skips
+  procedural wind.
 
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
   framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são

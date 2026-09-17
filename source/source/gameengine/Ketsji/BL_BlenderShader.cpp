@@ -47,7 +47,8 @@
 
 BL_BlenderShader::BL_BlenderShader(KX_Scene *scene, struct Material *ma,
 		CM_UpdateServer<RAS_IMaterial> *materialUpdateServer)
-	:m_blenderScene(scene->GetBlenderScene()),
+	:m_scene(scene),
+	m_blenderScene(scene->GetBlenderScene()),
 	m_mat(ma),
 	m_alphaBlend(GPU_BLEND_SOLID),
 	m_gpuMat(nullptr),
@@ -174,6 +175,7 @@ void BL_BlenderShader::BindProg(RAS_Rasterizer *rasty)
 	GPU_material_bind(m_gpuMat, m_blenderScene->lay, rasty->GetTime(), 1,
 					  rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data(), nullptr, false,
 					  rasty->GetProjectionMatrix().Data());
+	GPU_material_set_foliage_reference_position(m_gpuMat, m_scene->GetOptimizationReferencePosition().Data());
 }
 
 void BL_BlenderShader::UnbindProg()

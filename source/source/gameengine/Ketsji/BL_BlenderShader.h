@@ -55,6 +55,7 @@ class RAS_IMaterial;
 class BL_BlenderShader
 {
 private:
+	KX_Scene *m_scene;
 	Scene *m_blenderScene;
 	Material *m_mat;
 	int m_alphaBlend;

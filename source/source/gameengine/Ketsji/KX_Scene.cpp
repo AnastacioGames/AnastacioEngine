@@ -36,6 +36,7 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 
 #include "KX_Scene.h"
 #include "KX_AnimationEvent.h"
@@ -59,6 +60,7 @@
 #include "SCA_ActuatorEventManager.h"
 #include "SCA_BasicEventManager.h"
 #include "KX_Camera.h"
+#include "KX_WorldInfo.h"
 #include "KX_Speaker.h"
 #include "KX_NavMeshObject.h"
 #include "SCA_JoystickManager.h"
@@ -167,7 +169,13 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_physicsEnvironment(0),
 	m_sceneName(sceneName),
 	m_worldSun(nullptr),
+	m_autoWorldSun(false),
+	m_autoWorldSunMissingCameraWarned(false),
+	m_autoWorldSunGroundReferenceInitialized(false),
+	m_autoWorldSunInitialCameraHeight(0.0f),
+	m_autoWorldSunReferenceCamera(nullptr),
 	m_activeCamera(nullptr),
+	m_optimizationReferencePosition(mt::zero3),
 	m_overrideCullingCamera(nullptr),
 	m_lastCullingTotalObjects(0),
 	m_lastCullingTestedObjects(0),
@@ -521,11 +529,82 @@ KX_WorldInfo *KX_Scene::GetWorldInfo() const
 void KX_Scene::SetWorldSun(KX_LightObject *light)
 {
 	m_worldSun = light;
+	if (!light) {
+		m_autoWorldSun = false;
+	}
 }
 
 KX_LightObject *KX_Scene::GetWorldSun() const
 {
 	return m_worldSun;
+}
+
+void KX_Scene::SetAutoWorldSun(bool enabled)
+{
+	m_autoWorldSun = enabled;
+	m_autoWorldSunMissingCameraWarned = false;
+	m_autoWorldSunGroundReferenceInitialized = false;
+	m_autoWorldSunReferenceCamera = nullptr;
+}
+
+void KX_Scene::UpdateAutoWorldSun()
+{
+	if (!m_autoWorldSun || !m_worldSun) {
+		return;
+	}
+
+	KX_Camera *camera = GetActiveCamera();
+	if (!camera) {
+		if (!m_autoWorldSunMissingCameraWarned) {
+			CM_Warning("automatic World Sun in scene \"" << GetName() << "\" has no active camera; keeping its current position.");
+			m_autoWorldSunMissingCameraWarned = true;
+		}
+		return;
+	}
+
+	m_autoWorldSunMissingCameraWarned = false;
+
+	const mt::vec3 cameraPosition = camera->NodeGetWorldPosition();
+	if (!m_autoWorldSunGroundReferenceInitialized || m_autoWorldSunReferenceCamera != camera) {
+		// A camera normally starts at a fixed height above the player ground.
+		// Subtracting that first height makes the reference follow terrain/player
+		// elevation without needing a ray cast or a separately tagged floor.
+		m_autoWorldSunInitialCameraHeight = cameraPosition.z;
+		m_autoWorldSunGroundReferenceInitialized = true;
+		m_autoWorldSunReferenceCamera = camera;
+	}
+
+	// Keep the shadow focus 5 m in front of the player, projected on the ground
+	// plane. Camera pitch must not move this focus up into the air.
+	mt::vec3 cameraForward = -camera->NodeGetWorldOrientation().GetColumn(2);
+	cameraForward.z = 0.0f;
+	cameraForward = cameraForward.SafeNormalized(mt::axisY3);
+	mt::vec3 groundReference = cameraPosition + cameraForward * 5.0f;
+	groundReference.z -= m_autoWorldSunInitialCameraHeight;
+
+	// `sun_hour` is a World Global Property, so a Property Actuator set to
+	// Global Property can change the time of day without a Python script.
+	float hour = 12.0f;
+	if (m_worldinfo) {
+		if (EXP_Value *hourProperty = m_worldinfo->GetProperty("sun_hour")) {
+			hour = static_cast<float>(hourProperty->GetNumber());
+		}
+	}
+	hour = std::fmod(hour, 24.0f);
+	if (hour < 0.0f) {
+		hour += 24.0f;
+	}
+
+	// Orbit around the ground reference instead of spinning the Sun in place.
+	// Its local -Z is then always aimed at that reference, keeping shadows over
+	// the player area at every hour.
+	static const float kHourToRadians = 0.2617993877991494f; // pi / 12
+	const float sunAngle = (hour - 12.0f) * kHourToRadians;
+	const mt::vec3 sunPosition = groundReference + mt::vec3(0.0f, -std::sin(sunAngle) * 10.0f, std::cos(sunAngle) * 10.0f);
+	m_worldSun->NodeSetWorldPosition(sunPosition);
+	// Blender lamps illuminate along local -Z, so align local +Z away from the
+	// ground reference. This leaves local -Z pointing directly at it.
+	m_worldSun->AlignAxisToVect(sunPosition - groundReference, 2);
 }
 
 void KX_Scene::Suspend()
@@ -1285,9 +1364,22 @@ KX_Camera *KX_Scene::GetActiveCamera()
 	return m_activeCamera;
 }
 
+const mt::vec3& KX_Scene::GetOptimizationReferencePosition() const
+{
+	return m_optimizationReferencePosition;
+}
+
+void KX_Scene::UpdateOptimizationReference()
+{
+	if (m_activeCamera) {
+		m_optimizationReferencePosition = m_activeCamera->NodeGetWorldPosition();
+	}
+}
+
 void KX_Scene::SetActiveCamera(KX_Camera *cam)
 {
 	m_activeCamera = cam;
+	UpdateOptimizationReference();
 }
 
 int KX_Scene::GetLastCullingTotalObjects() const

@@ -118,7 +118,9 @@ typedef struct Material {
 	short shade_flag;		/* like Cubic interpolation */
 
 	float foliage_strength, foliage_turbulence; /* foliage shader */
-	short foliage_grass, pad8;
+	float foliage_distance; /* maximum camera distance for foliage wind */
+	short foliage_grass, foliage_optimization;
+	int pad8;
 	float point_size;  // For HALO rendering, gameengine.
 
 	int mode, mode_l;		/* mode_l is the or-ed result of all layer modes */

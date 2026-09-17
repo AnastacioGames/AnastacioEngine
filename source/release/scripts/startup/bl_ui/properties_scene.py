@@ -18,6 +18,8 @@
 
 # <pep8 compliant>
 import bpy
+from math import cos, radians, sin
+from mathutils import Vector
 from bpy.types import (
     Menu,
     Panel,
@@ -29,6 +31,133 @@ from rna_prop_ui import PropertyPanel
 from .properties_physics_common import (
     point_cache_ui,
     effector_weights_ui,
+)
+
+
+# This marker is stored on the generated Object so it persists in .blend files
+# and lets the runtime distinguish it from a manually selected World Sun.
+AUTO_WORLD_SUN_MARKER = "_range_auto_world_sun"
+AUTO_WORLD_SUN_HOUR_PROPERTY = "sun_hour"
+AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT = "_range_auto_world_sun_camera_initial_height"
+
+
+def _get_auto_sun_hour_property(scene):
+    """Return the World Global Property reserved for the automatic sun."""
+    world = scene.world
+    if not world:
+        return None
+
+    for prop in world.properties:
+        if prop.name == AUTO_WORLD_SUN_HOUR_PROPERTY:
+            return prop
+    return None
+
+
+def _ensure_auto_sun_hour_property(scene):
+    prop = _get_auto_sun_hour_property(scene)
+    if prop:
+        return prop
+
+    # The World operator is the public Blender 2.79 API for inserting a
+    # persistent Game/Global Property. It is intentionally created only when
+    # Automatic Sun is enabled, never merely by drawing the panel.
+    if scene.world and bpy.context.scene == scene:
+        bpy.ops.world.game_property_new(type='FLOAT', name=AUTO_WORLD_SUN_HOUR_PROPERTY)
+        prop = _get_auto_sun_hour_property(scene)
+        if prop:
+            prop.value = 12.0
+    return prop
+
+
+def _auto_sun_ground_reference(scene, sun):
+    """Ground point 5 m ahead, using initial camera height as the floor offset."""
+    camera = scene.camera
+    if not camera:
+        return Vector((0.0, 0.0, 0.0))
+
+    camera_position = camera.matrix_world.to_translation()
+    if AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT not in sun:
+        sun[AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT] = camera_position.z
+
+    forward = camera.matrix_world.to_quaternion() * Vector((0.0, 0.0, -1.0))
+    forward.z = 0.0
+    if forward.length_squared == 0.0:
+        forward = Vector((0.0, 1.0, 0.0))
+    else:
+        forward.normalize()
+    return camera_position + forward * 5.0 - Vector((0.0, 0.0, sun[AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT]))
+
+
+def _set_auto_sun_transform(scene, sun, hour):
+    ground_reference = _auto_sun_ground_reference(scene, sun)
+    angle = radians((hour - 12.0) * 15.0)
+    sun.location = ground_reference + Vector((0.0, -sin(angle) * 10.0, cos(angle) * 10.0))
+    # Sun lamps emit along local -Z. Track the ground reference rather than
+    # spinning locally, so light always falls across the player area.
+    sun.rotation_euler = (ground_reference - sun.location).to_track_quat('-Z', 'Y').to_euler()
+
+
+def _get_auto_world_sun_hour(scene):
+    prop = _get_auto_sun_hour_property(scene)
+    return prop.value if prop else 12.0
+
+
+def _set_auto_world_sun_hour(scene, hour):
+    prop = _ensure_auto_sun_hour_property(scene)
+    if prop:
+        prop.value = hour
+
+    world_sun = scene.world_sun_set
+    if world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
+        _set_auto_sun_transform(scene, world_sun, hour)
+
+
+def _get_use_auto_world_sun(scene):
+    world_sun = scene.world_sun_set
+    return bool(world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False))
+
+
+def _set_use_auto_world_sun(scene, enabled):
+    world_sun = scene.world_sun_set
+
+    if enabled:
+        if world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
+            return
+
+        lamp = bpy.data.lamps.new(name="Auto World Sun", type='SUN')
+        sun = bpy.data.objects.new(name="Auto World Sun", object_data=lamp)
+        scene.objects.link(sun)
+        sun[AUTO_WORLD_SUN_MARKER] = True
+
+        hour = _get_auto_world_sun_hour(scene)
+        _set_auto_sun_transform(scene, sun, hour)
+        _ensure_auto_sun_hour_property(scene)
+
+        scene.world_sun_set = sun
+    elif world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
+        # This object belongs to the checkbox, so disabling it removes both
+        # the World Sun assignment and the generated lamp datablock.
+        scene.world_sun_set = None
+        scene.objects.unlink(world_sun)
+        bpy.data.objects.remove(world_sun)
+
+
+bpy.types.Scene.use_auto_world_sun = bpy.props.BoolProperty(
+    name="Automatic Sun",
+    description="Create a World Sun that orbits the ground reference 5 meters in front of the active camera in the game runtime",
+    get=_get_use_auto_world_sun,
+    set=_set_use_auto_world_sun,
+)
+
+bpy.types.Scene.auto_world_sun_hour = bpy.props.FloatProperty(
+    name="Sun Hour",
+    description="Time used by the automatic sun (also stored in World Global Property 'sun_hour')",
+    min=0.0,
+    max=24.0,
+    soft_min=0.0,
+    soft_max=24.0,
+    get=_get_auto_world_sun_hour,
+    set=_set_auto_world_sun_hour,
 )
 
 
@@ -77,6 +206,10 @@ class SCENE_PT_scene(SceneButtonsPanel, Panel):
         box.label(text="Scene:", icon="SCENE_DATA")
         box.prop(scene, "camera")
         box.prop(scene, "world_sun_set")
+        box.prop(scene, "use_auto_world_sun")
+        hour_row = box.row()
+        hour_row.active = scene.use_auto_world_sun
+        hour_row.prop(scene, "auto_world_sun_hour")
         box.prop(scene, "background_set", text="Background")
         if context.scene.render.engine != 'BLENDER_GAME':
             box.prop(scene, "active_clip", text="Active Clip")
