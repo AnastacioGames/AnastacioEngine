@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-18 - Web: manifesto do runtime (marco D, parcial)
+
+- `tools/web/make-runtime-manifest.py` gera `RangeRuntime.manifest.json` ao lado de `RangeRuntime.{js,wasm,data}`: hashes/tamanhos, módulos Python (stdlib do `python311.zip` + símbolos `PyInit_*` de `libpython3.11.a` + núcleo + `Range`/`mathutils`/`bgl`/`blf`) e capacidades do preset (`audio`, `threads`, `touch`, `video`, `network` = `disabled`; `gamepad`, `save` = `unvalidated`). Nada vira `validated` sem `--evidence capacidade=teste`. `aud` fica fora: só existe com `WITH_AUDASPACE`.
+- `range_web/runtime.py` (puro): `find_runtime` escolhe o primeiro diretório com manifesto e devolve WEB-PKG-001 para manifesto ausente, inválido, de outro `runtime_id` ou com artefato divergente. O Validar Web usa os módulos do manifesto no lugar do fallback de stdlib; sem manifesto, mantém o fallback e reporta PKG-001. Diretórios: `RANGE_WEB_RUNTIME_DIR` e, em árvore de desenvolvimento, `build-web-release/bin` (`build-web/bin` para `web-runtime`); o layout de instalação fica para o marco F.
+- Limites: `engine_revision` é o HEAD ao gerar (não prova a fonte do wasm) e a lista de módulos é derivada do build, não confirmada por import no navegador. O aceite do marco D (cubo + Python controller + A/D no navegador) segue com o smoke manual já registrado em `web-deploy.md`; falta o teste automatizado.
+- Testes: `test_runtime.py` (6 puros; suíte com 53) e 3 verificações novas em `engine_web_ui.py` (runtime válido, módulos vindos do manifesto, artefato divergente).
+
 ## 2026-09-18 - Web: operador Validar Web e resultados no painel
 
 - `bl_ui/properties_web.py`: operadores `scene.range_web_validate` (roda `collect_bpy.collect_report()` e guarda o `Report` num global transitório, fora do `.blend`) e `scene.range_web_locate` (troca para a cena de origem via `context.screen.scene` e seleciona o objeto; objeto do pool de spawn só informa a cadeia). O painel mostra o resumo, até 30 resultados (regra, mensagem, cadeia, correção sugerida, Localizar) e "Nenhuma verificação executada" até a primeira validação. O `draw()` só lê o resultado guardado; a coleta nunca roda nele. Texto do resultado indica que é da última validação. O motivo de Exportar Web indisponível agora aponta o marco F.

@@ -15,6 +15,28 @@ _MAX_ROWS_SHOWN = 30
 _ENGINE_API_MODULES = frozenset(("Range", "mathutils", "bgl", "blf", "aud"))
 _SEVERITY_ICONS = {'ERROR': 'CANCEL', 'WARNING': 'ERROR', 'INFO': 'INFO'}
 
+# Onde procurar o runtime instalado: variável de ambiente e, em árvore de desenvolvimento,
+# a saída dos presets web-runtime*. Sem layout de instalação definido (marco F).
+_DEV_RUNTIME_DIRS = {"web-runtime-release": "build-web-release/bin", "web-runtime": "build-web/bin"}
+
+
+def _runtime_candidates():
+    import os
+    dirs = []
+    env = os.environ.get("RANGE_WEB_RUNTIME_DIR")
+    if env:
+        dirs.append(env)
+    rel = _DEV_RUNTIME_DIRS.get(bpy.context.scene.range_web.runtime_id)
+    here = os.path.dirname(os.path.abspath(__file__))
+    while rel and here != os.path.dirname(here):
+        here = os.path.dirname(here)
+        candidate = os.path.join(here, rel)
+        if os.path.isdir(candidate):
+            dirs.append(candidate)
+            break
+    return dirs
+
+
 # Último Report da validação. Transitório: não vai para o .blend e é descartado ao recarregar.
 _last_report = None
 
@@ -111,13 +133,17 @@ class SCENE_OT_range_web_validate(Operator):
     def execute(self, context):
         global _last_report
         import sys
-        from range_web import collect_bpy
+        from range_web import collect_bpy, runtime
 
-        # Sem manifesto de runtime instalado (frente do runtime Web), a biblioteca padrão
-        # do interpretador em uso serve de aproximação para WEB-PY-001/PKG-003. Os módulos
-        # da API do motor (KX_PythonInit.cpp) contam como presentes.
-        stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
+        # Com manifesto do runtime, os módulos Python vêm dele. Sem manifesto (WEB-PKG-001 já
+        # vai no relatório), a biblioteca padrão do interpretador em uso serve de aproximação
+        # para WEB-PY-001/PKG-003; os módulos da API do motor (KX_PythonInit.cpp) contam como presentes.
+        info = runtime.find_runtime(context.scene.range_web.runtime_id, _runtime_candidates())
+        stdlib = info.python_modules()
+        if stdlib is None:
+            stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
         _last_report = collect_bpy.collect_report(stdlib=stdlib)
+        _last_report.extend(info.findings)
         self.report({'WARNING' if _last_report.errors else 'INFO'}, _last_report.summary())
         return {'FINISHED'}
 
