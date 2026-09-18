@@ -3,13 +3,20 @@
 # e ainda nao valida nem exporta; o botao Exportar Web fica indisponivel com motivo unico.
 
 import bpy
-from bpy.types import Panel, PropertyGroup
+from bpy.types import Operator, Panel, PropertyGroup
 
 from .properties_scene import SceneButtonsPanel
 
 WEB_SCHEMA_VERSION = 1
 WEB_RUNTIME_ID = "web-runtime-release"
-WEB_EXPORT_BLOCKED_REASON = "Validador Web ainda não implementado (marco B)."
+WEB_EXPORT_BLOCKED_REASON = "Empacotamento Web ainda não implementado (marco F)."
+
+_MAX_ROWS_SHOWN = 30
+_ENGINE_API_MODULES = frozenset(("Range", "mathutils", "bgl", "blf", "aud"))
+_SEVERITY_ICONS = {'ERROR': 'CANCEL', 'WARNING': 'ERROR', 'INFO': 'INFO'}
+
+# Último Report da validação. Transitório: não vai para o .blend e é descartado ao recarregar.
+_last_report = None
 
 
 class RangeWebSettings(PropertyGroup):
@@ -60,17 +67,94 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         col.prop(web, "output_directory")
 
         layout.separator()
-        layout.label(text="Nenhuma verificação executada.", icon='INFO')
+        layout.operator("scene.range_web_validate", icon='FILE_REFRESH')
+        self._draw_report(layout)
 
+        layout.separator()
         col = layout.column()
         col.enabled = False
         col.label(text="Exportar Web indisponível:")
         col.label(text=WEB_EXPORT_BLOCKED_REASON)
         layout.label(text="Prévia desktop (tecla P) não é Teste Web.")
 
+    @staticmethod
+    def _draw_report(layout):
+        # Só lê o resultado guardado; a coleta roda no operador, nunca aqui.
+        report = _last_report
+        if report is None:
+            layout.label(text="Nenhuma verificação executada.", icon='INFO')
+            return
+        layout.label(text=report.summary(), icon='CANCEL' if report.errors else 'FILE_TICK')
+        layout.label(text="Resultado da última validação; revalide após editar.")
+        for index, finding in enumerate(report.findings[:_MAX_ROWS_SHOWN]):
+            box = layout.box()
+            row = box.row()
+            row.label(text="%s  %s" % (finding.rule_id, finding.message),
+                      icon=_SEVERITY_ICONS[finding.severity])
+            loc = finding.location
+            if loc.get("object") or loc.get("scene"):
+                row.operator("scene.range_web_locate", text="Localizar").index = index
+            if loc.get("chain"):
+                box.label(text=loc["chain"])
+            if finding.fix:
+                box.label(text=finding.fix)
+        hidden = len(report.findings) - _MAX_ROWS_SHOWN
+        if hidden > 0:
+            layout.label(text="... e mais %d resultado(s)." % hidden)
+
+
+class SCENE_OT_range_web_validate(Operator):
+    """Analisa cenas, controllers, scripts e assets do arquivo contra o perfil Web"""
+    bl_idname = "scene.range_web_validate"
+    bl_label = "Validar Web"
+
+    def execute(self, context):
+        global _last_report
+        import sys
+        from range_web import collect_bpy
+
+        # Sem manifesto de runtime instalado (frente do runtime Web), a biblioteca padrão
+        # do interpretador em uso serve de aproximação para WEB-PY-001/PKG-003. Os módulos
+        # da API do motor (KX_PythonInit.cpp) contam como presentes.
+        stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
+        _last_report = collect_bpy.collect_report(stdlib=stdlib)
+        self.report({'WARNING' if _last_report.errors else 'INFO'}, _last_report.summary())
+        return {'FINISHED'}
+
+
+class SCENE_OT_range_web_locate(Operator):
+    """Seleciona a origem do resultado (cena e objeto)"""
+    bl_idname = "scene.range_web_locate"
+    bl_label = "Localizar"
+
+    index: bpy.props.IntProperty(options={'HIDDEN', 'SKIP_SAVE'})
+
+    def execute(self, context):
+        report = _last_report
+        if report is None or not (0 <= self.index < len(report.findings)):
+            self.report({'WARNING'}, "Resultado desatualizado; valide novamente.")
+            return {'CANCELLED'}
+        loc = report.findings[self.index].location
+        scene = bpy.data.scenes.get(loc.get("scene", ""))
+        if scene is not None and context.screen is not None:
+            context.screen.scene = scene
+        scene = scene or context.scene
+        ob = scene.objects.get(loc.get("object", ""))
+        if ob is None:
+            self.report({'INFO'}, loc.get("chain") or "Origem fora das cenas (objeto do pool de spawn).")
+            return {'FINISHED'}
+        for other in scene.objects:
+            other.select = False
+        ob.select = True
+        scene.objects.active = ob
+        self.report({'INFO'}, loc.get("chain", ob.name))
+        return {'FINISHED'}
+
 
 classes = (
     RangeWebSettings,
+    SCENE_OT_range_web_validate,
+    SCENE_OT_range_web_locate,
     SCENE_PT_range_web,
 )
 

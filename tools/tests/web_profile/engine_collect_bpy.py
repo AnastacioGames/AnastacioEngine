@@ -1,0 +1,93 @@
+"""Teste de integracao do coletor bpy (marco C). Precisa do motor:
+
+    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_collect_bpy.py
+
+Sai com codigo != 0 se alguma verificacao falhar.
+"""
+
+import os
+import shutil
+import sys
+import tempfile
+
+import bpy
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.insert(0, os.path.join(ROOT, "source", "release", "scripts", "modules"))
+
+from range_web import collect_bpy  # noqa: E402
+
+STDLIB = {"sys", "os", "math", "random"}
+failures = []
+
+
+def check(cond, what):
+    print(("ok   " if cond else "FAIL ") + what)
+    if not cond:
+        failures.append(what)
+
+
+tmp = tempfile.mkdtemp()
+try:
+    with open(os.path.join(tmp, "door.py"), "w", encoding="utf-8") as f:
+        f.write("import helper\n")
+    with open(os.path.join(tmp, "helper.py"), "w", encoding="utf-8") as f:
+        f.write("import subprocess\nsubprocess.run(['x'])\n")
+    blend = os.path.join(tmp, "fase.blend")
+    bpy.ops.wm.save_as_mainfile(filepath=blend)
+
+    text = bpy.data.texts.new("intern.py")
+    text.write("import math\n")
+
+    scene = bpy.context.scene
+    ob = bpy.data.objects.new("Porta", None)
+    scene.objects.link(ob)
+    bpy.context.scene.objects.active = ob
+
+    def add_controller(name, mode, **kw):
+        bpy.ops.logic.controller_add(type='PYTHON', name=name, object="Porta")
+        c = ob.game.controllers[name]
+        c.mode = mode
+        for k, v in kw.items():
+            setattr(c, k, v)
+
+    add_controller("Abrir", 'MODULE', module="door.open")
+    add_controller("Interno", 'SCRIPT', text=text)
+    add_controller("Ausente", 'MODULE', module="nao_existe.f")
+    add_controller("Vazio", 'SCRIPT')
+
+    # Objeto fora de qualquer cena (pool de spawn) tambem e coletado.
+    pool = bpy.data.objects.new("Bala", None)
+    bpy.context.scene.objects.link(pool)
+    bpy.context.scene.objects.unlink(pool)
+    bpy.context.scene.objects.active = ob
+
+    img = bpy.data.images.new("gerada", 4, 4)  # gerada: sem arquivo, nao vira asset
+    check(all(a[2]["datablock"] != "Image:gerada" for a in collect_bpy.collect_assets()),
+          "imagem gerada nao e asset")
+
+    report = collect_bpy.collect_report(stdlib=STDLIB)
+    by_rule = {}
+    for f in report.findings:
+        by_rule.setdefault(f.rule_id, []).append(f)
+
+    missing = by_rule.get("WEB-PKG-003", [])
+    check(any(f.location.get("source") == "nao_existe" for f in missing), "modulo ausente reportado")
+    check(any("sem Text definido" in f.message for f in missing), "controller sem Text reportado")
+    check(not any(f.location.get("source") == "door" for f in missing), "door.py resolvido no projeto")
+    proc = by_rule.get("WEB-PY-002", [])
+    check(len(proc) == 1 and proc[0].location["source"].endswith("helper.py"),
+          "dependencia transitiva analisada (helper.py)")
+    check(proc and proc[0].location.get("object") == "Porta" and "Abrir" in proc[0].location["chain"],
+          "Localizar: objeto e cadeia de origem")
+    check(len(report.snapshot_hash) == 64, "hash do snapshot")
+    check(collect_bpy.collect_report(stdlib=STDLIB).snapshot_hash == report.snapshot_hash,
+          "hash estavel sem alteracoes")
+    text.write("x = 1\n")
+    check(collect_bpy.collect_report(stdlib=STDLIB).snapshot_hash != report.snapshot_hash,
+          "hash muda ao editar Text")
+finally:
+    shutil.rmtree(tmp, ignore_errors=True)
+
+print("FALHAS: %d" % len(failures))
+sys.exit(1 if failures else 0)

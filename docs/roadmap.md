@@ -20,7 +20,7 @@ e detalhados no [`changelog.md`](changelog.md).
 - **Perfil Range Engine Web e validador**: levantamento e regras em
   [web-profile-validation-plan.md](web-profile-validation-plan.md). Manter autoria na Range Engine e
   implementar verificação Web, propriedades persistidas, análise de dependências e relatório; teste/export dependem do
-  runtime Web integrado. Marco A feito (2026-09-18: `Scene.range_web` e painel "Web (Range)", sem validador; Exportar Web indisponível com motivo). Marco B feito (núcleo puro `range_web`: manifesto do runtime, resultados e regras de arquivos/Python, 33 testes; ainda sem UI). Próximo: marco C (coleta de cenas, bibliotecas, controllers e assets).
+  runtime Web integrado. Marco A feito (2026-09-18: `Scene.range_web` e painel "Web (Range)", sem validador; Exportar Web indisponível com motivo). Marco B feito (núcleo puro `range_web`: manifesto do runtime, resultados e regras de arquivos/Python, 33 testes; ainda sem UI). Marco C feito (coleta `bpy` + resolução transitiva de controllers/components/imports/assets, 47 testes + integração no motor). Operador Validar Web e resultados com Localizar no painel (2026-09-18; desenho no editor ainda não verificado). Próximo: marco D (convergência com o runtime Web).
 
 - **Cutscene nativo**: Fases 0–2 e 4–5 implementadas, incluindo dados persistidos,
   aba Properties depois de World com ícone `SEQUENCE`, operadores nativos,
