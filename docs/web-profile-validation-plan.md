@@ -1,6 +1,7 @@
 # Range Engine — compatibilidade Web e validação de exportação
 
-Data: 2026-09-12. Estado: **plano e levantamento estático; nenhuma interface ou regra implementada**.
+Data: 2026-09-12. Estado: **marcos A e B implementados (2026-09-18: `Scene.range_web`/painel Web e núcleo puro `range_web`, sem coleta nem UI de validação); marcos C–G pendentes**.
+O runtime Web já existe e foi aceito manualmente (ver [web-deploy.md](web-deploy.md)); referências abaixo à "Etapa 6"/frente Claude são históricas.
 
 Este documento define a criação de jogos na própria Range Engine com compatibilidade Web,
 o catálogo inicial de regras e a sequência de implementação. Complementa a
@@ -266,8 +267,8 @@ o jogador recebe mensagem simples e opção de tentar novamente quando aplicáve
 
 | Marco | Entrega pequena | Aceite e dependência |
 |---|---|---|
-| A — Autoria | PropertyGroup + opção de verificar compatibilidade Web + painel de estado | Salvar/reabrir, Undo/Redo, troca de cena e export desktop preservados; seletor continua Range Engine. Export Web indisponível com motivo. Não exige runtime Web. |
-| B — Núcleo | Schema do manifesto, resultados e regras de arquivos/Python | Testes puros com casos positivos/negativos e integração `bpy`; nenhuma execução de scripts analisados. |
+| A — Autoria (**feito**; painel conferido pelo usuário: pendente) | PropertyGroup + opção de verificar compatibilidade Web + painel de estado | Salvar/reabrir, Undo/Redo, troca de cena e export desktop preservados; seletor continua Range Engine. Export Web indisponível com motivo. Não exige runtime Web. |
+| B — Núcleo (**feito**, núcleo puro; integração `bpy` é do marco C) | Schema do manifesto, resultados e regras de arquivos/Python | Testes puros com casos positivos/negativos e integração `bpy`; nenhuma execução de scripts analisados. |
 | C — Coleta | Cenas, bibliotecas, controllers/components, assets e referências | Fixtures de dependências transitivas, ciclos e referências dinâmicas; Localizar aponta origem correta. |
 | D — Convergência | Consumir runtime da Etapa 6, manifesto e pacote mínimo | Cubo da engine + Python controller + A/D no navegador. PoC C→Python isolada não fecha este marco. |
 | E — Validação Web | Pré-voo, logs, testes de shader e execução | Falhas de contexto/arquivo/import chegam ao relatório; desktop Play identificado como desktop. |

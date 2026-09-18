@@ -4,6 +4,38 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-18 - Web: marco B (núcleo puro `range_web`)
+
+- Novo pacote `release/scripts/modules/range_web/`, sem `bpy` e sem executar/importar os scripts analisados: `results.py` (`Finding` com gravidade e evidência independentes; `ERROR` exige evidência `CONFIRMED`; `Report` com JSON e resumo "Nenhuma incompatibilidade detectada", nunca "garantido"), `manifest.py` (schema `range-web-runtime` v1 do manifesto do **runtime**, distinto do `manifest.json` do pacote; `validated` exige `evidence`; capacidade ausente conta como não validada; manifesto ausente/ilegível/inválido/hash divergente vira um único WEB-PKG-001), `rules_files.py` (WEB-PKG-004/005/006/008/009: caminho do host, destinos virtuais, `..`, colisão e caixa, symlink fora das raízes, `.pyc` por magic, extensão nativa por assinatura, `.rasec`) e `rules_python.py` (AST: WEB-PY-001/002/003/004/005/006/007/008/009 e WEB-PKG-007).
+- Política do scanner Python: `ERROR/CONFIRMED` só quando o script é declarado necessário e o uso está no nível do módulo, sem guard desconhecido nem `try/except ImportError`; senão `WARNING/POTENTIAL`. Guards resolvíveis para o alvo `emscripten` (`sys.platform`, `os.name`, `platform.system()`) escolhem o ramo. Aliases simples, reatribuição e parâmetros que escondem o nome são tratados; `eval`/`exec`/import dinâmico só geram aviso de cobertura parcial.
+- Testes em `tools/tests/web_profile/test_range_web.py` (33 casos): passam com o Python do sistema e com `RangeEngine -b --python` (Python 3.11 do motor). Cópia do pacote em `build/bin/2.79/scripts/modules/` para o teste.
+- Ainda não ligado à UI: coleta de cenas/bibliotecas/assets (marco C), pré-voo no navegador e botão Validar/Exportar não existem; o painel continua com Exportar Web indisponível. Pendentes das regras WEB-GFX/MEDIA/INPUT/NET/SAVE/DEPLOY (dependem do runtime e do navegador).
+
+## 2026-09-18 - Web: marco A (Scene.range_web e painel Web)
+
+- Novo `bl_ui/properties_web.py`: `RangeWebSettings` (`schema_version`, `check_compatibility`, `runtime_id`, `entry_scene`, `output_directory`) registrado como `Scene.range_web` em `bl_ui/__init__.py` (Python puro, sem DNA/C++, padrão `rangearmor_export`). Propriedades como anotações: com atribuição simples esta engine as deixa como `_PropertyDeferred`.
+- Painel "Web (Range)" na aba Cena (motor `BLENDER_GAME`, fechado por padrão): opção de verificar compatibilidade, campos, "Nenhuma verificação executada", Exportar Web indisponível com motivo único (validador é o marco B) e nota de que a tecla P é prévia desktop. Sem I/O no `draw()`.
+- Verificado com `RangeEngine -b`: defaults, salvar/reabrir, Undo/Redo, cena nova e cópia de cena. Não verificado: desenho do painel e export desktop (dependem do editor).
+
+## 2026-09-18 - Web: empacotador de export e verificador de pacote
+
+- Novo `tools/web/package-web.py` (equivalente Web de `tools/linux/package-runtime.sh`): valida `.range` e runtime, gera pasta hospedável com `index.html` de produção (progresso, erro visível, botão Jogar, `?debug=1`), `manifest.json` (hashes, requisitos WebGL 2/sem threads, avisos), `SHA256SUMS.txt`, `serve.py`, `HOSTING.md` e ZIP opcional. Não compila nada; consome `build-web/bin`. Arquivos extras (`--extra`) ficam ao lado do `.range` no FS virtual.
+- Novo `tools/web/verify-package.cjs`: abre o pacote via CDP em tempo real, clica em Jogar, envia uma seta e falha se houver erro visível/aborto/exceção.
+- Verificado com `web-smoke.range` (pacote de 51,5 MiB): cena carregada de `game/`, WebGL 2, controlador Python iniciado, seta moveu o cubo, exit 0. Validação por log, sem julgamento visual.
+- Achado: `--dump-dom` com `--virtual-time-budget` trava o runtime em `idbfs-initial-sync` (IndexedDB não avança em tempo virtual) — não é bug do pacote; usar CDP em tempo real.
+- Achado: Node 24 no Windows dispara assert do libuv se `process.exit()` roda com WebSocket aberto.
+- Novo preset `web-runtime-release` (herda de `web-runtime`, `build-web-release/`): sem `SAFE_HEAP`/`ASSERTIONS=2`/`-g2`. Removido o preload TEMP de `untitled.range` em `source/blenderplayer/CMakeLists.txt`. Build completo OK (exit 0).
+- Release vs debug: `.wasm` 19,9 MB vs 25,4 MB, `.js` 0,9 MB vs 2,1 MB, `.data` ~25 MB (domina); pacote 44,8 MiB (zip 16,3 MB). `verify-package.cjs` no pacote de release: exit 0, WebGL 2, controlador Python e tecla movendo o cubo. Só log, sem julgamento visual.
+- Novo `tools/web/verify-persistence.cjs`: grava token em `/saves`, `syncfs(false)`, recarrega a página e confere o retorno do IndexedDB (8 checagens OK, exit 0). Para isso o pre-js expõe `Module["FS"]`. Cobre a camada IDBFS.
+- Novo `tools/create_web_save_scene.py` + `tools/web/verify-save.cjs`: cena mínima que chama `Range.logic.saveGlobalDict('ci')` no 1º frame e, após recarregar, `loadGlobalDict` devolve o dict (token + dict aninhado); o verificador lê o console do runtime (4 checagens OK, exit 0, pacote release).
+- Pendente: integração à UI. Ver [web-deploy.md](web-deploy.md).
+
+## 2026-09-18 - Actuators: propriedade string para nome de objeto; Global Property renomeada para World Property
+
+- Edit Object > Add Object e Track To ganharam os checkboxes `From Property` e `World Property`: o nome do objeto vem de uma propriedade string do dono ou do World. Com `World Property` ligado, o campo lista só as propriedades do tipo string do World.
+- Track To só encontra objetos já ativos na cena; Add Object também busca objetos em camadas inativas.
+- Renomeado "Global Property/Properties" para "World Property/Properties" em todos os labels da UI (painel do World, botão `Add World Property`, operadores, Property Actuator, Edit Object), comentários e docs vigentes. Os identificadores internos (`GLOBAL_PROPERTY`, `world.game_property_new`, etc.) não mudaram; entradas antigas deste changelog preservam o nome anterior.
+
 ## 2026-09-17 - 3D View: atualização contínua unificada
 
 - Removido o botão textual `Always Render (CPU+)` da barra flutuante. O ícone de câmera `Realtime Shading` é agora o único controle de atualização contínua da 3D View.

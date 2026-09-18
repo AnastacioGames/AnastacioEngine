@@ -20,7 +20,7 @@ e detalhados no [`changelog.md`](changelog.md).
 - **Perfil Range Engine Web e validador**: levantamento e regras em
   [web-profile-validation-plan.md](web-profile-validation-plan.md). Manter autoria na Range Engine e
   implementar verificação Web, propriedades persistidas, análise de dependências e relatório; teste/export dependem do
-  runtime Web integrado. Interface e regras ainda não implementadas.
+  runtime Web integrado. Marco A feito (2026-09-18: `Scene.range_web` e painel "Web (Range)", sem validador; Exportar Web indisponível com motivo). Marco B feito (núcleo puro `range_web`: manifesto do runtime, resultados e regras de arquivos/Python, 33 testes; ainda sem UI). Próximo: marco C (coleta de cenas, bibliotecas, controllers e assets).
 
 - **Cutscene nativo**: Fases 0–2 e 4–5 implementadas, incluindo dados persistidos,
   aba Properties depois de World com ícone `SEQUENCE`, operadores nativos,
@@ -49,6 +49,10 @@ e detalhados no [`changelog.md`](changelog.md).
 - **Associação de arquivos**: permitir abrir `.blend` e `.range` diretamente com os executáveis adequados,
   definindo instalação/registro no Windows e comportamento de duplo clique.
 - **Export para Web (WebGL/WebAssembly)**:
+  **Empacotamento (2026-09-18):** `tools/web/package-web.py` + `tools/web/verify-package.cjs` implementados e
+  verificados com `web-smoke.range` (ver [web-deploy.md](web-deploy.md)). Preset `web-runtime-release` e remoção do preload
+  TEMP feitos. Smoke test de persistência IDBFS feito
+  (`tools/web/verify-persistence.cjs`). Próxima peça: marco A do perfil/validador na UI (`Scene.range_web`).
   **Teste real após a retomada:** usuário reportou tela preta com piscadas.
   Corrigido divisor de instância residual no quad de tela: UVs ficavam constantes
   e os filtros amostravam o canto da textura. Build passou; 6.192 draws sem erro
@@ -69,7 +73,8 @@ e detalhados no [`changelog.md`](changelog.md).
   materiais e filtros FXAA, chuva, nuvens, lens flare e tonemap: os filtros
   reconhecidos pelo código-fonte usam somente o primeiro anexo durante o draw.
   Última execução: 6.222 draws em 1.037 frames, sem erro GL nesta cena.
-  Pendentes: aceite visual do usuário para os filtros nativos ampliados (cena
+  **Aceite manual do usuário em 2026-09-18** (pacote `web-smoke-release`): movimento, filtros simples (1–9, 0, Q),
+  filtros embutidos (W/E/R/T) e gamepad OK. Antes pendente: filtros nativos ampliados (cena
   dedicada de MRT/filtros já criada e validada por CDP, ver abaixo; aceite
   visual e Python/teclado do caminho original já confirmados em cena
   separada, ver "Input de teclado/mouse no Web" abaixo). Detalhes no
@@ -202,9 +207,9 @@ e detalhados no [`changelog.md`](changelog.md).
   sincroniza do IndexedDB antes do `main()` iniciar, e `saveGamePythonConfig()`
   dispara `FS.syncfs(false, ...)` após cada escrita para persistir de volta.
   Build `RangeRuntime` limpo (exit 0), IDBFS confirmado embutido no
-  `RangeRuntime.js` gerado. **Pendente**: nenhuma cena local chama
-  save/load hoje, falta smoke test dedicado (salvar → recarregar página →
-  confirmar persistência) e aceite visual do usuário. Detalhes no changelog
+  `RangeRuntime.js` gerado. Ponta a ponta verificado por
+  `tools/web/verify-save.cjs` (cena `tools/create_web_save_scene.py`: `saveGlobalDict` numa sessão, `loadGlobalDict` após
+  recarregar). **Aceite manual do usuário em 2026-09-18**: `SAVED` na 1ª sessão e `LOADED` após F5 no navegador. Detalhes no changelog
   de 2026-09-14.
 
   Levantamento original em
@@ -326,7 +331,7 @@ e detalhados no [`changelog.md`](changelog.md).
   painel mas não são gravados (não há chave correspondente aceita hoje); habilitá-los exige estender
   `DEFAULT_FIELDS`/`_validate_data` no lado Godot, decidido explicitamente como fora desta fase. Falta
   o teste manual (projeto novo e projeto antigo) descrito no [plano](export-presets-plan.md).
-- **World Status**: as oito Global Properties automáticas foram implementadas e compiladas, mas não
+- **World Status**: as oito World Properties automáticas foram implementadas e compiladas, mas não
   apareceram em um `World` novo no teste real. Diagnosticar criação, versionamento e atualização da UI.
 - **Contorno pendente `USE_RNA_RANGE_CHECK` (Emscripten)**: o Emscripten é o
   primeiro toolchain deste projeto a definir `__STDC_VERSION__ >= 201112L`

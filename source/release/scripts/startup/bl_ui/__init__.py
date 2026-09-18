@@ -60,6 +60,7 @@ _modules = [
     "properties_render_layer",
     "properties_scene",
     "properties_cutscene",
+    "properties_web",
     "properties_texture",
     "properties_world",
     "space_clip",
@@ -253,9 +254,18 @@ def register():
     Scene.rangearmor_export = PointerProperty(type=properties_scene.RangeArmorExportSettings)
     ########### End RangeArmor Export Presets ###########
 
+    ########### Range Web Profile ###########
+    from . import properties_web
+
+    Scene.range_web = PointerProperty(type=properties_web.RangeWebSettings)
+    ########### End Range Web Profile ###########
+
 
 def unregister():
     from bpy.types import Scene
+
+    if hasattr(Scene, "range_web"):
+        del Scene.range_web
 
     if hasattr(Scene, "rangearmor_export"):
         del Scene.rangearmor_export

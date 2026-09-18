@@ -7,6 +7,8 @@
 // "/saves" só sob __EMSCRIPTEN__) e o EM_ASM de FS.syncfs(false, ...) logo
 // após a escrita do save, que manda a mudança de volta para o IndexedDB.
 Module["preRun"] = (Module["preRun"] || []).concat([function () {
+	// Exposto para o smoke test de persistencia (tools/web/verify-persistence.cjs).
+	Module["FS"] = FS;
 	FS.mkdir("/saves");
 	FS.mount(IDBFS, {}, "/saves");
 

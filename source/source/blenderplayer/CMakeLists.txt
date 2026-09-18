@@ -123,9 +123,6 @@ if(EMSCRIPTEN)
 		# bprogdir e a raiz do MEMFS ("/"), entao empacotamos no mesmo caminho
 		# relativo usado pelo layout de instalacao nativo (install/2.79/scripts).
 		"--preload-file=${CMAKE_SOURCE_DIR}/release/scripts@/2.79/scripts"
-		# TEMP (validacao de sessao, remover apos o teste): empacota uma cena
-		# minima para validar carregamento de .range no navegador.
-		"--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/../../../build-web/bin/untitled.range@/untitled.range"
 		# Persistencia de save (bge.logic.saveGlobalDict/loadGlobalDict) via
 		# IndexedDB: -lidbfs.js traz a lib IDBFS do Emscripten, o --pre-js
 		# monta "/saves" e sincroniza do IndexedDB antes de main() rodar (ver
