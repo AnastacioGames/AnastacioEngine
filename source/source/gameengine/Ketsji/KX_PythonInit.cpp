@@ -139,6 +139,7 @@ extern "C" {
 #include "KX_PythonInitTypes.h"
 
 #include "CM_Message.h"
+#include "CM_LogBuffer.h"
 
 /* we only need this to get a list of libraries from the main struct */
 #include "DNA_ID.h"
@@ -2397,6 +2398,92 @@ void exitPlayerPython()
 	Py_Finalize();
 }
 
+namespace {
+
+/* Mirrors game-logic Python print()/sys.stderr output into the in-game
+ * ImGui console (KX_ConsoleWindow), the same panel fed by CM_Message/
+ * CM_Warning/CM_Error on the C++ side. Without this the panel stays empty
+ * during normal gameplay: CPython's sys.stdout/sys.stderr are separate
+ * FILE-backed streams from std::cout, so the CM_LogBuffer tee installed on
+ * std::cout (see CM_LogBuffer.cpp) never sees Python's output. */
+PyObject *KX_Console_LogPush(PyObject * /*self*/, PyObject *args)
+{
+	int level;
+	const char *text;
+	if (!PyArg_ParseTuple(args, "is", &level, &text)) {
+		return nullptr;
+	}
+	CM_LogBuffer::Get().Push(static_cast<CM_LogLevel>(level), text);
+	Py_RETURN_NONE;
+}
+
+PyMethodDef kx_console_methods[] = {
+	{"push", KX_Console_LogPush, METH_VARARGS, ""},
+	{nullptr, nullptr, 0, nullptr}
+};
+
+PyModuleDef kx_console_module = {
+	PyModuleDef_HEAD_INIT, "_kx_console", nullptr, -1, kx_console_methods,
+	nullptr, nullptr, nullptr, nullptr
+};
+
+const char *kx_console_redirect_install =
+"import sys as _kx_sys, _kx_console\n"
+"if not getattr(_kx_sys, '_kx_console_installed', False):\n"
+"    class _KXConsoleRedir:\n"
+"        def __init__(self, orig, level):\n"
+"            self._orig = orig\n"
+"            self._level = level\n"
+"        def write(self, text):\n"
+"            if self._orig is not None:\n"
+"                try:\n"
+"                    self._orig.write(text)\n"
+"                except Exception:\n"
+"                    pass\n"
+"            for line in text.split('\\n'):\n"
+"                if line:\n"
+"                    _kx_console.push(self._level, line)\n"
+"        def flush(self):\n"
+"            if self._orig is not None:\n"
+"                try:\n"
+"                    self._orig.flush()\n"
+"                except Exception:\n"
+"                    pass\n"
+"        def isatty(self):\n"
+"            return False\n"
+"    _kx_sys._kx_stdout_orig = _kx_sys.stdout\n"
+"    _kx_sys._kx_stderr_orig = _kx_sys.stderr\n"
+"    _kx_sys.stdout = _KXConsoleRedir(_kx_sys._kx_stdout_orig, 0)\n"
+"    _kx_sys.stderr = _KXConsoleRedir(_kx_sys._kx_stderr_orig, 2)\n"
+"    _kx_sys._kx_console_installed = True\n";
+
+const char *kx_console_redirect_restore =
+"import sys as _kx_sys\n"
+"if getattr(_kx_sys, '_kx_console_installed', False):\n"
+"    _kx_sys.stdout = _kx_sys._kx_stdout_orig\n"
+"    _kx_sys.stderr = _kx_sys._kx_stderr_orig\n"
+"    del _kx_sys._kx_stdout_orig\n"
+"    del _kx_sys._kx_stderr_orig\n"
+"    _kx_sys._kx_console_installed = False\n";
+
+void KX_Python_InstallConsoleRedirect()
+{
+	PyObject *modules = PyImport_GetModuleDict();
+	if (!PyDict_GetItemString(modules, "_kx_console")) {
+		PyObject *mod = PyModule_Create(&kx_console_module);
+		PyDict_SetItemString(modules, "_kx_console", mod);
+		Py_DECREF(mod);
+	}
+	PyRun_SimpleString(kx_console_redirect_install);
+}
+
+void KX_Python_RestoreConsoleRedirect()
+{
+	PyRun_SimpleString(kx_console_redirect_restore);
+}
+
+}  // namespace
+
 void initGamePython(Main *main, PyObject *pyGlobalDict)
 {
 	PyObject *modules = PyImport_GetModuleDict();
@@ -2432,10 +2519,14 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	PyObject *gameLogic = PyDict_GetItemString(modules, "GameLogic");
 	PyModule_AddObject(gameLogic, "globalDict", pyGlobalDict);
 	Py_INCREF(pyGlobalDict);
+
+	KX_Python_InstallConsoleRedirect();
 }
 
 void exitGamePython()
 {
+	KX_Python_RestoreConsoleRedirect();
+
 	// Clean up the Python mouse and keyboard.
 	gp_PythonKeyboard.reset(nullptr);
 	gp_PythonMouse.reset(nullptr);

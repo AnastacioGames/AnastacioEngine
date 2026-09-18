@@ -134,6 +134,20 @@ static void rna_Actuator_type_set(struct PointerRNA *ptr, int value)
 	}
 }
 
+static void rna_PropertyActuator_weather_category_set(PointerRNA *ptr, int value)
+{
+	bActuator *act = (bActuator *)ptr->data;
+	bPropertyActuator *pa = (bPropertyActuator *)act->data;
+
+	pa->runtime_enabled = value;
+	switch (value) {
+		case 1: pa->runtime_property = ACT_RUNTIME_PROP_WEATHER_CLOUDS; break;
+		case 2: pa->runtime_property = ACT_RUNTIME_PROP_WEATHER_LENS_FLARE; break;
+		case 3: pa->runtime_property = ACT_RUNTIME_PROP_WEATHER_MIST; break;
+		default: pa->runtime_property = ACT_RUNTIME_PROP_WEATHER_RAIN; break;
+	}
+}
+
 static void rna_ConstraintActuator_type_set(struct PointerRNA *ptr, int value)
 {
 	bActuator *act = (bActuator *)ptr->data;
@@ -542,7 +556,6 @@ static void rna_def_actuator(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-
 	srna = RNA_def_struct(brna, "Actuator", NULL);
 	RNA_def_struct_ui_text(srna, "Actuator", "Actuator to apply actions in the game engine");
 	RNA_def_struct_sdna(srna, "bActuator");
@@ -1082,6 +1095,13 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	static const EnumPropertyItem actuator_mode_items[] = {
+		{0, "NONE", 0, "None", "Normal object Game Property actuator"},
+		{1, "RUNTIME_API", 0, "Use Runtime API", "Write an exposed runtime property"},
+		{2, "WEATHER_EFFECTS", 0, "Weather Effects", "Change a World weather effect"},
+		{3, "GLOBAL_PROPERTY", 0, "Global Property", "Read/write a Game Property on the current World"},
+		{0, NULL, 0, NULL, NULL}
+	};
 	static const EnumPropertyItem runtime_property_items[] = {
 		{ACT_RUNTIME_PROP_LOCAL_POSITION, "LOCAL_POSITION", 0, "Local Position", "Object local position (Vector3)"},
 		{ACT_RUNTIME_PROP_VISIBLE, "VISIBLE", 0, "Visible", "Object render visibility (Boolean)"},
@@ -1090,6 +1110,54 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 		{ACT_RUNTIME_PROP_ANGULAR_VELOCITY, "ANGULAR_VELOCITY", 0, "Angular Velocity", "Physics angular velocity (Vector3)"},
 		{ACT_RUNTIME_PROP_GRAVITY, "GRAVITY", 0, "Gravity", "Physics gravity (Vector3)"},
 		{ACT_RUNTIME_PROP_LOCAL_SCALE, "LOCAL_SCALE", 0, "Local Scale", "Object local scale (Vector3)"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_INTENSITY, "WEATHER_RAIN_INTENSITY", 0, "Rain Intensity", "World weather rain intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_DENSITY, "WEATHER_RAIN_DENSITY", 0, "Rain Density", "World weather rain density"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_SPEED, "WEATHER_RAIN_SPEED", 0, "Rain Fall Speed", "World weather fall speed"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_WIND, "WEATHER_RAIN_WIND", 0, "Rain Wind", "World weather wind"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_DARKEN, "WEATHER_RAIN_DARKEN", 0, "Rain Darken", "World weather darken"},
+		{ACT_RUNTIME_PROP_WEATHER_RIPPLE_INTENSITY, "WEATHER_RIPPLE_INTENSITY", 0, "Ripple Intensity", "World weather ripple intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN, "WEATHER_RAIN", 0, "Rain Enabled", "Enable or disable rain"},
+		{ACT_RUNTIME_PROP_WEATHER_RIPPLES, "WEATHER_RIPPLES", 0, "Ripples Enabled", "Enable or disable rain ripples"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem weather_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_INTENSITY, "WEATHER_RAIN_INTENSITY", 0, "Rain Intensity", "World weather rain intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_DENSITY, "WEATHER_RAIN_DENSITY", 0, "Rain Density", "World weather rain density"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_SPEED, "WEATHER_RAIN_SPEED", 0, "Rain Fall Speed", "World weather fall speed"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_WIND, "WEATHER_RAIN_WIND", 0, "Rain Wind", "World weather wind"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN_DARKEN, "WEATHER_RAIN_DARKEN", 0, "Rain Darken", "World weather darken"},
+		{ACT_RUNTIME_PROP_WEATHER_RIPPLE_INTENSITY, "WEATHER_RIPPLE_INTENSITY", 0, "Ripple Intensity", "World weather ripple intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_RAIN, "WEATHER_RAIN", 0, "Rain Enabled", "Enable or disable rain"},
+		{ACT_RUNTIME_PROP_WEATHER_RIPPLES, "WEATHER_RIPPLES", 0, "Ripples Enabled", "Enable or disable rain ripples"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem weather_category_items[] = {
+		{0, "RAIN", 0, "Rain", "Rain and ripples settings"},
+		{1, "CLOUDS", 0, "Clouds", "Procedural cloud settings"},
+		{2, "LENS_FLARE", 0, "Lens Flare", "Lens flare settings"},
+		{3, "MIST", 0, "Fog / Mist", "World fog and mist settings"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem cloud_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_CLOUDS, "WEATHER_CLOUDS", 0, "Clouds Enabled", "Enable or disable clouds"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_COVERAGE, "WEATHER_CLOUD_COVERAGE", 0, "Coverage", "Amount of sky covered by clouds"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_SCALE, "WEATHER_CLOUD_SCALE", 0, "Scale", "Cloud noise scale"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_SPEED, "WEATHER_CLOUD_SPEED", 0, "Speed", "Cloud drift speed"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem lens_flare_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_LENS_FLARE, "WEATHER_LENS_FLARE", 0, "Lens Flare Enabled", "Enable or disable lens flare"},
+		{ACT_RUNTIME_PROP_WEATHER_FLARE_SCALE, "WEATHER_FLARE_SCALE", 0, "Scale", "Lens flare scale"},
+		{ACT_RUNTIME_PROP_WEATHER_FLARE_INTENSITY, "WEATHER_FLARE_INTENSITY", 0, "Intensity", "Lens flare intensity"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem mist_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_MIST, "WEATHER_MIST", 0, "Fog / Mist Enabled", "Enable or disable world fog"},
+		{ACT_RUNTIME_PROP_WEATHER_MIST_INTENSITY, "WEATHER_MIST_INTENSITY", 0, "Intensity", "Fog intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_MIST_START, "WEATHER_MIST_START", 0, "Start", "Fog start distance"},
+		{ACT_RUNTIME_PROP_WEATHER_MIST_DEPTH, "WEATHER_MIST_DEPTH", 0, "Depth", "Fog depth distance"},
+		{ACT_RUNTIME_PROP_WEATHER_MIST_HEIGHT, "WEATHER_MIST_HEIGHT", 0, "Height", "Fog height"},
+		{ACT_RUNTIME_PROP_WEATHER_MIST_DENSITY, "WEATHER_MIST_DENSITY", 0, "Density", "Fog density"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1105,6 +1173,43 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 	srna = RNA_def_struct(brna, "PropertyActuator", "Actuator");
 	RNA_def_struct_ui_text(srna, "Property Actuator", "Actuator to handle properties");
 	RNA_def_struct_sdna_from(srna, "bPropertyActuator", "data");
+
+	prop = RNA_def_property(srna, "actuator_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "pad");
+	RNA_def_property_enum_items(prop, actuator_mode_items);
+	RNA_def_property_ui_text(prop, "Property Source", "Select which property system this actuator controls");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "weather_category", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_enabled");
+	RNA_def_property_enum_funcs(prop, NULL, "rna_PropertyActuator_weather_category_set", NULL);
+	RNA_def_property_enum_items(prop, weather_category_items);
+	RNA_def_property_ui_text(prop, "Weather Effect", "Select the weather effect to control");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "weather_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_items(prop, weather_effect_items);
+	RNA_def_property_ui_text(prop, "Weather Effect", "Weather effect to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "cloud_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_items(prop, cloud_effect_items);
+	RNA_def_property_ui_text(prop, "Cloud Property", "Cloud setting to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "lens_flare_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_items(prop, lens_flare_effect_items);
+	RNA_def_property_ui_text(prop, "Lens Flare Property", "Lens flare setting to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "mist_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_items(prop, mist_effect_items);
+	RNA_def_property_ui_text(prop, "Fog / Mist Property", "Fog or mist setting to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "use_runtime_property", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "runtime_enabled", 1);
@@ -1136,7 +1241,7 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_world_property", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_world_property", 1);
-	RNA_def_property_ui_text(prop, "World", "Read/write a Game Property on the current World instead of this Object");
+	RNA_def_property_ui_text(prop, "Global Property", "Read/write a Game Property on the current World instead of this Object");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "property", PROP_STRING, PROP_NONE);

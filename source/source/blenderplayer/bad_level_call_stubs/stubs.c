@@ -228,8 +228,8 @@ bool BPY_string_is_keyword(const char *str) { return false; }
 /* -------------------------------------------------------------------- */
 /* Stubs */
 
-#ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_view3d_always_render_update) */
-void ED_view3d_always_render_update(struct wmWindowManager *wm) RET_NONE
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_view3d_realtime_viewport_update) */
+void ED_view3d_realtime_viewport_update(struct wmWindowManager *wm) RET_NONE
 #endif
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiTemplateScreenTabs) */
 void uiTemplateScreenTabs(struct uiLayout *layout, struct bContext *C) RET_NONE

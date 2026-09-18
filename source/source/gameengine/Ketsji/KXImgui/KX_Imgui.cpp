@@ -288,7 +288,43 @@ bool KX_Imgui::LoadSection_Config(std::string SectionName)
 	return false;
 }
 
-int KX_Imgui::LoadIntValue() {
+int KX_Imgui::LoadIntValue(int defaultValue) {
+    std::string line;
+	// get line.
+    std::getline(streamImguiConfig_Read, line);
+
+	// Check if have a value.
+    size_t equalSignPos = line.find('=');
+    if (equalSignPos != std::string::npos) {
+		try {
+			return std::stoi(line.substr(equalSignPos + 1));
+		}
+		catch (const std::exception&) {
+			return defaultValue;
+		}
+	}
+    return defaultValue;
+}
+
+float KX_Imgui::LoadFloatValue(float defaultValue) {
+    std::string line;
+	// get line.
+    std::getline(streamImguiConfig_Read, line);
+
+	// Check if have a value.
+    size_t equalSignPos = line.find('=');
+    if (equalSignPos != std::string::npos) {
+		try {
+			return std::stof(line.substr(equalSignPos + 1));
+		}
+		catch (const std::exception&) {
+			return defaultValue;
+		}
+	}
+    return defaultValue;
+}
+
+bool KX_Imgui::LoadBoolValue(bool defaultValue) {
     std::string line;
 	// get line.
     std::getline(streamImguiConfig_Read, line);
@@ -297,48 +333,19 @@ int KX_Imgui::LoadIntValue() {
     size_t equalSignPos = line.find('=');
     if (equalSignPos != std::string::npos) {
         std::string value = line.substr(equalSignPos + 1);
-		return std::stoi(value);
+
+		if (value == "true") {
+			return true;
+		}
+		if (value == "false") {
+			return false;
+		}
+		return defaultValue;
 	}
-	// Error!
-	printf("Load from imgui.ini: Int value -> Error! \n");
-    return 0;
+    return defaultValue;
 }
 
-float KX_Imgui::LoadFloatValue() {
-    std::string line;
-	// get line.
-    std::getline(streamImguiConfig_Read, line);
-
-	// Check if have a value.
-    size_t equalSignPos = line.find('=');
-    if (equalSignPos != std::string::npos) {
-        std::string value = line.substr(equalSignPos + 1);
-
-        return std::stof(value);
-	}
-	// Error!
-	printf("Load from imgui.ini: Float value -> Error! \n");
-    return 0.f;
-}
-
-bool KX_Imgui::LoadBoolValue() {
-    std::string line;
-	// get line.
-    std::getline(streamImguiConfig_Read, line);
-
-	// Check if have a value.
-    size_t equalSignPos = line.find('=');
-    if (equalSignPos != std::string::npos) {
-        std::string value = line.substr(equalSignPos + 1);
-
-        return (value == "true") ? true : false;
-	}
-	// Error!
-	printf("Load from imgui.ini: Bool value -> Error! \n");
-    return false;
-}
-
-std::string KX_Imgui::LoadStringValue() {
+std::string KX_Imgui::LoadStringValue(const std::string& defaultValue) {
     std::string line;
 	// get line.
     std::getline(streamImguiConfig_Read, line);
@@ -350,9 +357,7 @@ std::string KX_Imgui::LoadStringValue() {
 
         return value;
 	}
-	// Error!
-	printf("Load from imgui.ini: String value -> Error! \n");
-    return "";
+    return defaultValue;
 }
 
 void KX_Imgui::CloseImgui_Config() {

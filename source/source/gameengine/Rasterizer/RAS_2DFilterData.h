@@ -72,10 +72,13 @@ typedef struct BuildInFilters {
 	int rain_style;
 	float rain_time;
 	float rain_intensity;
+	float rain_density;
 	float rain_speed;
 	float rain_wind;
 	float rain_darken;
 	float rain_ripple;
+	float rain_ripple_distance;
+	float rain_ripple_min_up;
 	float rain_color[3];
 
 	/* Clouds (native World weather) */

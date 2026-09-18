@@ -110,6 +110,7 @@ public:
 	void setAmbientColor(const mt::vec3& ambientcolor);
 	void UpdateBackGround(RAS_Rasterizer *rasty, KX_LightObject *light);
 	void UpdateWorldSettings(RAS_Rasterizer *rasty);
+	bool SetWeatherRuntimeProperty(const char *identifier, float value, bool boolValue, bool useBool);
 	void RenderBackground(RAS_Rasterizer *rasty);
 
 #ifdef WITH_PYTHON

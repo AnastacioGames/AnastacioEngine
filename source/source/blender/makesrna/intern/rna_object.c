@@ -3756,7 +3756,7 @@ static void rna_def_object(BlenderRNA *brna)
 	/* Game Object Tasks */
 	prop = RNA_def_property(srna, "convert_object", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag", OB_TASK_CONVERT);
-	RNA_def_property_ui_text(prop, "Convert", "Convert Object to KX_GameObject, disable only for objects that may be useless for the game, this can save loading time");
+	RNA_def_property_ui_text(prop, "Convert", "Creates this object in the game at load time. Disable only for editor-only helpers: it will not render, run logic or physics, or be available to game scripts.");
 
 	/* Animation Event */
 	prop = RNA_def_property(srna, "anim_events", PROP_COLLECTION, PROP_NONE);

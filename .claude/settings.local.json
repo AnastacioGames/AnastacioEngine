@@ -41,7 +41,8 @@
       "Bash(ninja bf_editor_screen)",
       "PowerShell(tail -n -25)",
       "PowerShell(& \"C:\\\\Users\\\\f_bro\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--AnastacioEngine\\\\f4e55587-cabb-4eb8-a4ee-630ea1f87e62\\\\scratchpad\\\\rebuild.bat\" 2>&1)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "PowerShell(Get-ChildItem \"D:\\\\ProjetoRolimaRacer\\\\docs\\\\code\\\\\" | Where-Object { $_.Name -match \"readme|index\" })"
     ],
     "additionalDirectories": [
       "D:\\AnastacioEngine\\source\\release\\scripts\\startup\\flowmenu\\*",

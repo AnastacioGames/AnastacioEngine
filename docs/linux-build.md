@@ -1,4 +1,4 @@
-# Build no Linux (em preparacao)
+# Build no Linux
 
 ## Estado em 15 de setembro de 2026 — validacao em Linux nativo (Ubuntu 24.04, GPU NVIDIA real)
 
@@ -30,6 +30,11 @@ pelo `quickstart.sh`, lembre de exportar as duas variaveis do item 3 antes de `.
 Nessa mesma maquina, no mesmo dia, o editor completo (`RangeEngine`, preset `linux-editor`) tambem foi
 validado pela primeira vez em Linux real: compila, linka e roda (`--background` + `import bpy`) depois de
 mais seis bugs corrigidos. Ver secao "Editor (RangeEngine)" abaixo para os detalhes.
+
+O pacote portatil 0.3.0 tambem foi validado em maquina limpa em 2026-09-15, com Python 3.11 embutido em
+`python311/`, `RUNPATH` relativo a `$ORIGIN/python311/lib`, assinatura SHA-256 e inclusao do codigo-fonte
+correspondente. O estado publico atual e **Linux x86_64 validado para runtime portatil**; o editor Linux ainda
+precisa de validacao de janela real antes de ser tratado como distribuicao final do editor.
 
 ## Atalho automatico (recomendado)
 
@@ -70,7 +75,7 @@ Com essas correcoes, `RangeRuntime` compila, linka (exit 0) e roda: abre janela 
 contexto OpenGL 4.5 (Mesa/llvmpipe) e carrega um `.range` real, permanecendo em loop de jogo estavel por
 varios minutos sem crash. Teste feito via WSLg, que usa renderizacao por software (llvmpipe) — ainda falta
 validar em Linux nativo com GPU real, e testar audio/input a fundo. Portanto o binario existe e roda, mas
-o pacote/distribuicao ainda nao foram validados.
+essa observacao ficou superada pela validacao nativa e pelo pacote 0.3.0 de 2026-09-15 descritos acima.
 
 Teste com um jogo real (`RolimaRacer.range`) via WSLg apontou dois pontos:
 
@@ -89,8 +94,8 @@ Teste com um jogo real (`RolimaRacer.range`) via WSLg apontou dois pontos:
   itens acima).
 
 Este roteiro prepara o **RangeRuntime** para Linux x86_64. A base CMake do projeto possui caminhos Unix/X11,
-mas esta variante ainda nao foi compilada nem executada em Linux real. Portanto, o resultado e uma build
-experimental, nao uma versao oficial distribuivel.
+e a variante ja foi compilada, executada e empacotada em Linux real. As notas historicas abaixo permanecem
+para explicar a evolucao do port.
 
 ## Escopo inicial
 
@@ -267,5 +272,5 @@ Ele cria `build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz`, o arqu
 instalado em `build-linux/bin/`.
 
 Distribua esse arquivo, seu checksum e o codigo-fonte correspondente.
-Somente anuncie suporte oficial apos validar o pacote extraido em uma maquina Linux limpa. O estado publico
-ate la e **"Linux x86_64: experimental, sem build oficial"**.
+O pacote 0.3.0 ja passou por esse criterio em maquina limpa; para novas versoes, repetir a validacao do pacote
+extraido antes de anunciar a release.

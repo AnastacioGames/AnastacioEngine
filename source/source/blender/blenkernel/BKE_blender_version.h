@@ -34,7 +34,7 @@
 
 #define RANGE_VERSION			1
 #define RANGE_SUBVERSION		6
-#define RANGE_MINSUBVERSION		110 /* it's the preview versions, 100 is treated as the final version. 101 and 102 is A and B final version. */
+#define RANGE_MINSUBVERSION		113 /* it's the preview versions, 100 is treated as the final version. 101 and 102 is A and B final version. */
 
 /* used by packaging tools */
 /* can be left blank, otherwise a,b,c... etc with no quotes */

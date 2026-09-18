@@ -36,6 +36,10 @@
 #include <csignal>
 #include <exception>
 
+#ifdef WIN32
+#  include <io.h>
+#endif
+
 #ifdef __linux__
 #  ifdef __alpha__
 #    include <signal.h>
@@ -941,7 +945,12 @@ int main(int argc,
 		char logPath[FILE_MAX];
 		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
 		freopen(logPath, "w", stdout);
-		freopen(logPath, "a", stderr);
+		/* Route stderr through the same OS file handle as stdout (rather than
+		 * freopen()'ing it separately to the same path) so both streams share
+		 * one file position. Two independent FILE* opened on the same file
+		 * keep their own cursors and race/interleave their writes, which
+		 * corrupted the log with duplicated, run-together lines. */
+		_dup2(_fileno(stdout), _fileno(stderr));
 		setvbuf(stdout, nullptr, _IONBF, 0);
 		setvbuf(stderr, nullptr, _IONBF, 0);
 		printf("RangeRuntime log started, writing to: %s\n", logPath);

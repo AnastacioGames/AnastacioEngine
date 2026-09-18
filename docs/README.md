@@ -7,6 +7,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 
 - [Perfil Web e validação de exportação](web-profile-validation-plan.md): autoria na Range Engine com compatibilidade Web,
   catálogo de avisos/bloqueios, manifesto de capacidades e marcos de implementação; ainda não implementado.
+- [Roadmap Web/Android](android-web-export-roadmap.md): consolida o estado do runtime Web e usa a validação
+  Linux nativa como evidência de portabilidade para planejar o export Android.
 
 - [Roadmap](roadmap.md): somente trabalho aberto ou validação pendente.
 - [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): inventário conciso do que a engine já
@@ -19,6 +21,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Roteiro de teste de veículo](vehicle-test-guide.md): cena padrão, automação por componente e validação manual.
 - [Relatório de bugs silenciosos](relatorio-varredura-bugs-silenciosos.md): candidatos da auditoria estática
   de `source/source/blender`.
+- [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
+  validação para CPU, memória, GPU e ciclo de vida.
 
 ## Referência e manutenção
 
@@ -30,7 +34,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.
 - [Notas de build](build-notes.md): ambiente Windows, alvos e validação.
-- [Build experimental no Linux](linux-build.md): preset do runtime, dependências e validação ainda pendente.
+- [Build no Linux](linux-build.md): presets do runtime/editor, dependências, empacotamento e validações em
+  Linux nativo.
 - [Guia de manutenção](maintenance-guide.md): arquivos normalmente afetados por cada tipo de mudança.
 - [Checklist de bugs silenciosos](checklist-varredura-bugs-silenciosos.md): roteiro reutilizável de auditoria.
 - [Atlas de ícones](icon-atlas-notes.md): formato e carregamento do atlas externo.

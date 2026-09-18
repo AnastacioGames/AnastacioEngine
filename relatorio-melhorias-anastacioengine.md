@@ -122,10 +122,10 @@ ferramenta correspondente.
 
 ## Decisões técnicas vigentes
 
-- `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, updated after physics by
-  `UpdateOptimizationReference()`. It currently follows the active Scene camera and will be replaceable by the
-  Player later. The Camera Properties tab identifies this active reference. Foliage/Grass material wind can opt
-  into it through `Foliage Optimization` and `Wind Distance`; outside the chosen radius the vertex shader skips
+- `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity
+  Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
+  will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity
+  Culling and Foliage/Grass material wind consume it; outside the chosen `Wind Distance`, the vertex shader skips
   procedural wind.
 
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
@@ -180,4 +180,4 @@ ferramenta correspondente.
 
 ### Interface da 3D View
 
-- Uma única barra flutuante, 20 px acima do canto inferior esquerdo da 3D View, traz `Play`, `Standalone` e Debug/Console, os modos de sombreamento e sua seta de opções, os controles de viewport (atualização de render, `Always Render (CPU+)`, Only Render e painel de overlay), o bloqueio de câmera/camadas e o seletor de camadas, e os controles de transformação (manipulador, eixos, orientação e pivô). Ao entrar em Edit Mode, acrescenta Auto Merge, Occlude Geometry e visualização da malha; ao sair, esses controles desaparecem. Os controles correspondentes foram removidos do cabeçalho.
+- Uma única barra flutuante, 20 px acima do canto inferior esquerdo da 3D View, traz `Play`, `Standalone` e Debug/Console, os modos de sombreamento e sua seta de opções, os controles de viewport (o ícone de câmera para atualização contínua, Only Render e painel de overlay), o bloqueio de câmera/camadas e o seletor de camadas, e os controles de transformação (manipulador, eixos, orientação e pivô). Ao entrar em Edit Mode, acrescenta Auto Merge, Occlude Geometry e visualização da malha; ao sair, esses controles desaparecem. Os controles correspondentes foram removidos do cabeçalho.

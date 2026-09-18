@@ -205,11 +205,6 @@ class SCENE_PT_scene(SceneButtonsPanel, Panel):
         box = layout.box()
         box.label(text="Scene:", icon="SCENE_DATA")
         box.prop(scene, "camera")
-        box.prop(scene, "world_sun_set")
-        box.prop(scene, "use_auto_world_sun")
-        hour_row = box.row()
-        hour_row.active = scene.use_auto_world_sun
-        hour_row.prop(scene, "auto_world_sun_hour")
         box.prop(scene, "background_set", text="Background")
         if context.scene.render.engine != 'BLENDER_GAME':
             box.prop(scene, "active_clip", text="Active Clip")

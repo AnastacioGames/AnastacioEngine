@@ -318,18 +318,12 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	ScrArea *sa = CTX_wm_area(C);
 	View3D *v3d = sa->spacedata.first;
 	Scene *scene = CTX_data_scene(C);
-	ToolSettings *ts = CTX_data_tool_settings(C);
-	PointerRNA v3dptr, toolsptr, sceneptr;
+	PointerRNA v3dptr, sceneptr;
 	Object *ob = OBACT;
 	Object *obedit = CTX_data_edit_object(C);
-	bGPdata *gpd = CTX_data_gpencil_data(C);
 	uiBlock *block;
-	uiLayout *row;
-	bool is_paint = false;
-	int modeselect;
 
 	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
-	RNA_pointer_create(&scene->id, &RNA_ToolSettings, ts, &toolsptr);
 	RNA_pointer_create(&scene->id, &RNA_Scene, scene, &sceneptr);
 
 	block = uiLayoutGetBlock(layout);
@@ -338,60 +332,10 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	/* other buttons: */
 	UI_block_emboss_set(block, UI_EMBOSS);
 
-	/* mode */
-	if ((gpd) && (gpd->flag & GP_DATA_STROKE_EDITMODE)) {
-		modeselect = OB_MODE_GPENCIL;
-	}
-	else if (ob) {
-		modeselect = ob->mode;
-		is_paint = ELEM(ob->mode, OB_MODE_SCULPT, OB_MODE_VERTEX_PAINT, OB_MODE_WEIGHT_PAINT, OB_MODE_TEXTURE_PAINT);
-	}
-	else {
-		modeselect = OB_MODE_OBJECT;
-	}
-
-	row = uiLayoutRow(layout, false);
-	{
-		const EnumPropertyItem *item = rna_enum_object_mode_items;
-		const char *name = "";
-		int icon = ICON_OBJECT_DATAMODE;
-
-		while (item->identifier) {
-			if (item->value == modeselect && item->identifier[0]) {
-				name = IFACE_(item->name);
-				icon = item->icon;
-				break;
-			}
-			item++;
-		}
-
-		uiItemMenuEnumO(row, C, "OBJECT_OT_mode_set", "mode", name, icon);
-	}
-
-	/* Draw type */
-	uiItemR(layout, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-
-	row = uiLayoutRow(layout, true);
-	uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	if (!ob || ELEM(ob->mode, OB_MODE_OBJECT, OB_MODE_POSE, OB_MODE_WEIGHT_PAINT)) {
-		uiItemR(row, &v3dptr, "use_pivot_point_align", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	}
-
-	if (obedit == NULL && is_paint) {
-		/* Currently Python calls this directly. */
-#if 0
-		uiTemplatePaintModeSelection(layout, C);
-#endif
-	}
-	else {
-		/* Transform widget / manipulators */
-		row = uiLayoutRow(layout, true);
-		uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-		if (v3d->twflag & V3D_USE_MANIPULATOR) {
-			uiItemR(row, &v3dptr, "transform_manipulators", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-		}
-		uiItemR(row, &sceneptr, "transform_orientation", 0, "", ICON_NONE);
-	}
+	/* Mode dropdown, viewport shading, pivot point and the transform
+	 * manipulator toggles are already drawn once in the Python header
+	 * (mode) and in the floating 3D View controls (shading/manipulators) —
+	 * keeping them here too just duplicated the same buttons side by side. */
 
 	if (obedit == NULL && v3d->localvd == NULL) {
 		unsigned int ob_lay = ob ? ob->lay : 0;
@@ -399,8 +343,8 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		/* Layers */
 		uiTemplateLayers(layout, v3d->scenelock ? &sceneptr : &v3dptr, "layers", &v3dptr, "layers_used", ob_lay);
 
-		/* Scene lock */
-		uiItemR(layout, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+		/* Scene lock button removed from the header; it already lives in the
+		 * floating 3D View controls next to the layers popover. */
 	}
 
 	/* Currently Python calls this directly. */

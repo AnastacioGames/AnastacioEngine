@@ -437,7 +437,7 @@ def _get_context_val(context, path):
     return value
 
 
-def xml_file_run(context, filepath, rna_map):
+def xml_file_run(context, filepath, rna_map, *, verbose=True):
 
     import xml.dom.minidom
 
@@ -453,7 +453,8 @@ def xml_file_run(context, filepath, rna_map):
         value = _get_context_val(context, rna_path)
 
         if value is not Ellipsis and value is not None:
-            print("  loading XML: %r -> %r" % (filepath, rna_path))
+            if verbose:
+                print("  loading XML: %r -> %r" % (filepath, rna_path))
             xml2rna(xml_node, root_rna=value)
 
 

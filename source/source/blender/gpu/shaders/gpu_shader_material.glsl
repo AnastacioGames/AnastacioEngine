@@ -2373,8 +2373,23 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 	return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
 }
 
+void sky_moon(vec3 view, vec3 sundir, float enabled, float size, float brightness, out vec3 moon)
+{
+	/* Visual only: a cool disc with a deliberately short, dim halo.
+	 * Mirror only around the vertical axis: a full 3D inverse would put the
+	 * moon below the horizon whenever the sun is up, making the effect absent
+	 * during the hours in which it is meant to be seen. */
+	vec3 moonDir = normalize(vec3(-sundir.x, -sundir.y, sundir.z));
+	float radius = max(size * 0.05, 0.00005);
+	float alignment = dot(normalize(view), moonDir);
+	float disk = smoothstep(1.0 - radius, 1.0, alignment);
+	float halo = smoothstep(1.0 - radius * 4.0, 1.0, alignment) - disk;
+	float aboveHorizon = smoothstep(-0.02, 0.02, moonDir.z);
+	moon = vec3(0.72, 0.78, 0.90) * brightness * enabled * aboveHorizon * (disk + halo * 0.08);
+}
+
 void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float sunsize,
-				  float turbid, float ground, float rough,
+				  float turbid, float ground, float moonEnabled, float moonSize, float moonBrightness, float rough,
 				  vec4 hor, vec4 zen, vec4 nad, float env_sky, out vec4 outcol)
 {
 	if (view.z < 0.0 && ground == 0.0) view.z *= -1.0; // mirrored
@@ -2409,13 +2424,16 @@ void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float suns
 
 	mix_screen(1.0 - turbid, hor, horpoint.rgbr * (1.0 + bright), outcol);
 	outcol.rgb *= min(energy * 0.1 * daynight, 1.0);
+	vec3 moon;
+	sky_moon(view, sundir, moonEnabled, moonSize, moonBrightness, moon);
+	outcol.rgb += moon;
 
 	float starFactor = step(env_sky, 0.001);
 	outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
 }
 
 void do_sky_atmospheric(vec3 view, vec3 hor, vec3 sundir, vec3 suncolor, float energy,
-								float sunsize, float env_sky, float rough, out vec4 outcol)
+								float sunsize, float moonEnabled, float moonSize, float moonBrightness, float env_sky, float rough, out vec4 outcol)
 {
 	view.z /= pow(rough + 1.0, 3.0);
 
@@ -2434,6 +2452,9 @@ void do_sky_atmospheric(vec3 view, vec3 hor, vec3 sundir, vec3 suncolor, float e
 //	outcol.rgb += sun * suncolor * energy * sunVisibility * sunFactor;
 
 	outcol.rgb += clamp(sun, 0.0, 1.0) * suncolor * energy * sunVisibility * sunFactor * sunEnergy;
+	vec3 moon;
+	sky_moon(-view, sundir, moonEnabled, moonSize, moonBrightness, moon);
+	outcol.rgb += moon;
 
 	// Stars, only if (env_sky == 0.0)
 	float starFactor = step(env_sky, 0.001);
@@ -2955,18 +2976,18 @@ void env_sky(vec4 hor, vec4 zen, vec4 nad, float ground, float rough, float turb
 					vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
 	wn *= -0.31831;
-	do_sky_simple(wr, sundir, suncol, energy, size, turbid, ground, rough, hor, zen, nad, 1.0, mirror);
-	do_sky_simple(wn, sundir, suncol, energy, size, turbid, ground, 1.831, hor, zen, nad, 1.0, diffibl);
-	do_sky_simple(wv, sundir, suncol, energy, size, turbid, ground, rough, hor, zen, nad, 1.0, transmit);
+	do_sky_simple(wr, sundir, suncol, energy, size, turbid, ground, 0.0, 0.01, 0.25, rough, hor, zen, nad, 1.0, mirror);
+	do_sky_simple(wn, sundir, suncol, energy, size, turbid, ground, 0.0, 0.01, 0.25, 1.831, hor, zen, nad, 1.0, diffibl);
+	do_sky_simple(wv, sundir, suncol, energy, size, turbid, ground, 0.0, 0.01, 0.25, rough, hor, zen, nad, 1.0, transmit);
 }
 
 void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 						vec3 hor, float energy, float sunsize, vec3 suncol, float env_sky,
 						out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
-	do_sky_atmospheric(wr, hor, sundir, suncol, energy, sunsize, env_sky, rough, mirror);
-	do_sky_atmospheric(-wn, hor, sundir, suncol, energy, sunsize, env_sky, 1.318, diffibl);
-	do_sky_atmospheric(wv, hor, sundir, suncol, energy, sunsize, env_sky, rough, transmit);
+	do_sky_atmospheric(wr, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
+	do_sky_atmospheric(-wn, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.318, diffibl);
+	do_sky_atmospheric(wv, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);
 }
 
 void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)

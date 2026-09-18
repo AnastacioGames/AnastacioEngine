@@ -3320,7 +3320,7 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 {
 	GPUShadeInput shi;
 	GPUShadeResult shr;
-	GPUNodeLink *hor, *zen, *nad, *sunDir, *sunCol, *sunEnergy, *sunSize, *ray, *blend;
+	GPUNodeLink *hor, *zen, *nad, *sunDir, *sunCol, *sunEnergy, *sunSize, *moonEnabled, *moonSize, *moonBrightness, *ray, *blend;
 
 	shi.gpumat = mat;
 
@@ -3372,21 +3372,27 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 					GPU_link(mat, "set_rgb", GPU_dynamic_uniform(&sun->r, GPU_DYNAMIC_WORLD_SUN_COLOR, NULL), &sunCol);
 					GPU_link(mat, "set_rgb", GPU_dynamic_uniform(&sun->energy, GPU_DYNAMIC_WORLD_SUN_ENERGY, NULL), &sunEnergy);
 					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
+					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_enabled, GPU_DYNAMIC_WORLD_MOON_ENABLED, NULL), &moonEnabled);
+					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_size, GPU_DYNAMIC_WORLD_MOON_SIZE, NULL), &moonSize);
+					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_brightness, GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS, NULL), &moonBrightness);
 				}
 				else {
 					float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
 					float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
 					float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
 					float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
+					float moonDisabled = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&moonDisabled), &moonEnabled);
+					float moonDefaultSize = 0.01f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultSize), &moonSize);
+					float moonDefaultBrightness = 0.25f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultBrightness), &moonBrightness);
 				}
 
 				float env_sky = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 0.0f : 1.0f;
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
-					GPU_link(mat, "do_sky_atmospheric", shi.view, hor, sunDir, sunCol, sunEnergy, sunSize, GPU_uniform(&env_sky), blend, &shi.rgb);
+					GPU_link(mat, "do_sky_atmospheric", shi.view, hor, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(&env_sky), blend, &shi.rgb);
 
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
-						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), blend, hor, zen, nad, GPU_uniform(&env_sky), &shi.rgb);
+						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(&env_sky), &shi.rgb);
 				}
 
 				if (GPUWorld.mistype == 3) { // use Height Fog

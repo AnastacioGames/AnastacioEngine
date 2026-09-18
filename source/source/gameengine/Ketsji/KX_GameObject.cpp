@@ -2293,7 +2293,8 @@ void KX_GameObject::UpdateComponents()
 {
 #ifdef WITH_PYTHON
 	if (m_components) {
-		if ((m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) && (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC)) {
+		if (!m_suspended && (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) &&
+		    (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC)) {
 			for (KX_PythonComponent *comp : m_components) {
 				if (comp->GetActiveState()) {
 					comp->Update();

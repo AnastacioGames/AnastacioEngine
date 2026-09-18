@@ -41,8 +41,10 @@ class VIEW3D_HT_header(Header):
 
         row = layout.row(align=True)
         row.template_header()
-        
+
         object_mode = 'OBJECT' if obj is None else obj.mode
+
+        VIEW3D_MT_editor_menus.draw_collapsible(context, layout)
 
         act_mode_item = bpy.types.Object.bl_rna.properties["mode"].enum_items[object_mode]
 
@@ -50,9 +52,19 @@ class VIEW3D_HT_header(Header):
         sub.operator_menu_enum("object.mode_set", "mode", text=act_mode_item.name, icon=act_mode_item.icon)
         del act_mode_item
 
-        layout.template_header_3D_mode()
+        # Object name field, placed right after the Object Mode dropdown so
+        # the header reads: menus -> mode -> name -> layers -> lock icon.
+        if obj and object_mode != 'EDIT':
+            layout.label(text="", icon='OBJECT_DATA')
+            layout.prop(obj, "name", text="")
 
-        # Contains buttons like Mode, Pivot, Manipulator, Layer, Mesh Select Mode...
+        # Viewport shading, pivot point and the manipulator toggles now live
+        # only in the floating 3D View controls (bottom-left) to avoid
+        # duplicating the same buttons in the header. template_header_3D_mode()
+        # (mesh/paint select mode) moved down there too, next to the
+        # manipulator toggle it used to sit beside. template_header_3D() also
+        # draws the layers grid and the lock-camera-and-layers icon last.
+        layout.template_header_3D()
 
         if obj:
             # Particle edit
@@ -85,22 +97,6 @@ class VIEW3D_HT_header(Header):
                     (object_mode in {'WEIGHT_PAINT', 'VERTEX_PAINT'})):
                 row = layout.row()
                 row.prop(view, "use_occlude_geometry", text="")
-        
-        VIEW3D_MT_editor_menus.draw_collapsible(context, layout)
-
-        # --- Layers inline (UPBGE-style) ------------------------------------
-        if object_mode != 'EDIT':
-            row_layers = layout.row(align=True)
-            # scale_y so the 2-row grid fits the header's actual pixel height
-            # (user-adjustable via Preferences > Interface > Header Size).
-            # Mirrors C's widget_unit formula: (pixelsize*dpi*20+36)//72,
-            # then leaves ~20% headroom (0.8x) so buttons don't touch the edges.
-            system = context.user_preferences.system
-            widget_unit_px = (system.pixel_size * system.dpi * 20 + 36) // 72
-            scale_y = 0.8 * context.region.height / (2 * widget_unit_px)
-            row_layers.scale_y = min(1.0, max(0.3, scale_y))
-            row_layers.ui_units_x = 5      # largura total reservada à grade
-            row_layers.template_layer_layout_object(2, 2)
 
         # Layer
         if view.local_view:
@@ -250,11 +246,9 @@ class VIEW3D_MT_editor_menus(Menu):
         elif obj:
             if mode_string != 'PAINT_TEXTURE':
                 layout.menu("VIEW3D_MT_%s" % mode_string.lower())
-                
-                # Edit Object name.
-                layout.label(text="", icon='OBJECT_DATA')
-                layout.prop(obj, "name", text="")
-                
+                # Object name field is drawn later in VIEW3D_HT_header.draw(),
+                # after the Object Mode dropdown, to keep header order fixed.
+
             if mode_string in {'SCULPT', 'PAINT_VERTEX', 'PAINT_WEIGHT', 'PAINT_TEXTURE'}:
                 layout.menu("VIEW3D_MT_brush")
             if mode_string == 'SCULPT':

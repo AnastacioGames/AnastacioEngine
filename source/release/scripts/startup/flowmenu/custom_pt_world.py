@@ -79,15 +79,29 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
         row.prop(world, "use_sky_paper", text="Paper", toggle=True)
         row.prop(world, "use_sky_blend", text="Blend", toggle=True)
         row.prop(world, "use_sky_real", text="Real", toggle=True)
-        
-        split2 = box2.split()
-        
-        col1 = split2.column()
-        col1.prop(world, "use_sky_atmospheric", text="Atmospheric")
-        col1.prop(world, "use_sky_stars", text="Stars")
-        
-        col2 = split2.column()
-        col2.prop(world, "sun_size")
+
+        sun_box = box2.box()
+        sun_box.label(text="World Sun", icon="LAMP_SUN")
+        # The assignment belongs to Scene (the runtime reads Scene.world_sun),
+        # but it is presented with the World sky controls deliberately.
+        sun_box.prop(context.scene, "world_sun_set")
+        sun_box.prop(context.scene, "use_auto_world_sun")
+        hour_row = sun_box.row()
+        hour_row.active = context.scene.use_auto_world_sun
+        hour_row.prop(context.scene, "auto_world_sun_hour")
+
+        sky_box = box2.box()
+        sky_box.label(text="Sky Objects", icon="WORLD")
+        sky_box.prop(world, "use_sky_atmospheric", text="Atmospheric")
+        sky_box.prop(world, "sun_size", text="Sun Size")
+        sky_box.prop(world, "use_sky_stars", text="Stars")
+
+        moon_row = sky_box.row()
+        moon_row.prop(world, "use_sky_moon", text="Moon")
+        moon_col = sky_box.column()
+        moon_col.active = world.use_sky_moon
+        moon_col.prop(world, "moon_size")
+        moon_col.prop(world, "moon_brightness")
 
         if not world.use_sky_atmospheric:
             box3 = layout.box()
@@ -215,7 +229,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "rain_style")
             col.prop(weather, "rain_intensity", slider=True)
             col.prop(weather, "rain_speed", text="Fall Speed")
-            col.prop(weather, "rain_wind", text="Wind")
+            if weather.rain_style == 'CLASSIC':
+                col.prop(weather, "rain_density")
+                col.prop(weather, "rain_wind", text="Wind")
             col.prop(weather, "rain_darken", slider=True)
             col.prop(weather, "rain_color", text="Rain Color")
 
@@ -229,6 +245,8 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub = col.column()
             sub.active = weather.use_rain_ripple
             sub.prop(weather, "rain_ripple_intensity")
+            sub.prop(weather, "rain_ripple_distance")
+            sub.prop(weather, "rain_ripple_min_up")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)

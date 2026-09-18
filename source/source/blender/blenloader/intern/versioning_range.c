@@ -441,4 +441,30 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       scene->gm.dynamicResolutionStep = 5;
     }
   }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 111)) {
+    /* Preserve the original weather appearance in old files while constraining
+     * ripples to nearby upward-facing surfaces. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_density = 1.0f;
+      wo->rain_ripple = 0.4f;
+      wo->rain_ripple_distance = 20.0f;
+      wo->rain_ripple_min_up = 0.5f;
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 112)) {
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_ripple = 0.4f;
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 113)) {
+    /* The moon is opt-in so existing skies retain their exact appearance. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->moon_enabled = 0.0f;
+      wo->moon_size = 0.01f;
+      wo->moon_brightness = 0.25f;
+    }
+  }
 }

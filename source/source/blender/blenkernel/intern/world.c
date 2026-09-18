@@ -95,6 +95,9 @@ void BKE_world_init(World *wrld)
 	wrld->sun_size = 0.2f;
 	wrld->turbidity = 0.2f;
 	wrld->ground = 1.0f;
+	wrld->moon_enabled = 0.0f;
+	wrld->moon_size = 0.01f;
+	wrld->moon_brightness = 0.25f;
 
 	wrld->aodist = 10.0f;
 	wrld->aosamp = 5;
@@ -115,10 +118,13 @@ void BKE_world_init(World *wrld)
 	/* weather (rain/clouds/lens flare) */
 	wrld->weather_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE);
 	wrld->rain_intensity = 0.5f;
+	wrld->rain_density = 1.0f;
 	wrld->rain_speed = 1.0f;
 	wrld->rain_wind = 0.1f;
 	wrld->rain_darken = 0.3f;
-	wrld->rain_ripple = 0.15f;
+	wrld->rain_ripple = 0.4f;
+	wrld->rain_ripple_distance = 20.0f;
+	wrld->rain_ripple_min_up = 0.5f;
 	wrld->rain_color[0] = 0.8f;
 	wrld->rain_color[1] = 0.8f;
 	wrld->rain_color[2] = 0.8f;

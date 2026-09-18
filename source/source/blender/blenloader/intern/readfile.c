@@ -7320,6 +7320,11 @@ void blo_do_versions_view3d_split_250(View3D *v3d, ListBase *regions)
 	/* this was not initialized correct always */
 	if (v3d->twtype == 0)
 		v3d->twtype = V3D_MANIP_TRANSLATE;
+	/* Saved files (including the bundled startup.blend) can carry twflag
+	 * without V3D_USE_MANIPULATOR set, which leaves the header/floating
+	 * toggle showing "on" state controls while BIF_draw_manipulator()
+	 * silently no-ops and never draws the move/rotate/scale arrows. */
+	v3d->twflag |= V3D_USE_MANIPULATOR;
 	if (v3d->gridsubdiv == 0)
 		v3d->gridsubdiv = 10;
 }

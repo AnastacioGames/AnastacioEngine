@@ -63,7 +63,9 @@ typedef struct World {
 	float linfac, logfac;
 
 	float sun_size, turbidity, ground;
-	short pad2[2];
+	/* Visual moon only: it mirrors the World Sun and never creates a Lamp. */
+	float moon_enabled, moon_size, moon_brightness;
+	short pad2[4];
 
 	/**
 	 * Gravitation constant for the game world
@@ -132,7 +134,9 @@ typedef struct World {
 	short weather_expand_flag; /* show_expanded_* dos efeitos de weather na UI, reusa os bits WO_WEATHER_* */
 	short weather_pad3;
 
-	float rain_intensity, rain_speed, rain_wind, rain_darken, rain_ripple;
+	float rain_intensity, rain_density, rain_speed, rain_wind, rain_darken, rain_ripple;
+	float rain_ripple_distance, rain_ripple_min_up;
+	float rain_weather_pad;
 	float rain_color[3];
 
 	float cloud_coverage, cloud_scale, cloud_speed;

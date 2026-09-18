@@ -110,6 +110,16 @@ static void rna_World_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
 	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
 }
 
+static bool rna_World_use_sky_moon_get(PointerRNA *ptr)
+{
+	return ((World *)ptr->data)->moon_enabled > 0.0f;
+}
+
+static void rna_World_use_sky_moon_set(PointerRNA *ptr, bool value)
+{
+	((World *)ptr->data)->moon_enabled = value ? 1.0f : 0.0f;
+}
+
 static void rna_World_use_nodes_update(bContext *C, PointerRNA *ptr)
 {
 	World *wrld = (World *)ptr->data;
@@ -505,9 +515,16 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Rain Style", "Rendering technique used for the falling rain streaks");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
-	prop = RNA_def_property(srna, "rain_intensity", PROP_FLOAT, PROP_FACTOR);
+	prop = RNA_def_property(srna, "rain_intensity", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0, 1.0);
-	RNA_def_property_ui_text(prop, "Rain Intensity", "Overall intensity of the rain effect");
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 3);
+	RNA_def_property_ui_text(prop, "Rain Intensity", "Overall brightness/strength of the rain effect");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_density", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.25f, 10.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Rain Density", "Number of falling rain streaks (1.0 is the classic default)");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "use_rain_droplets", PROP_BOOLEAN, PROP_NONE);
@@ -523,7 +540,7 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "rain_speed", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "rain_speed");
 	RNA_def_property_range(prop, 0.0, FLT_MAX);
-	RNA_def_property_ui_range(prop, 0.0, 10.0, 1, 2);
+	RNA_def_property_ui_range(prop, 0.0, 20.0, 1, 2);
 	RNA_def_property_ui_text(prop, "Fall Speed", "Speed of falling rain streaks");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
@@ -541,6 +558,17 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "rain_ripple");
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Ripple Intensity", "Intensity of rain ripples on ground puddles");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_ripple_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 100.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Ripple Radius", "Maximum distance from the active camera where ripples are drawn");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_ripple_min_up", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Ripple Upward Surface", "Minimum upward-facing normal for ripples; 0.5 accepts slopes up to 60 degrees and rejects vertical sides");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "rain_color", PROP_FLOAT, PROP_COLOR);
@@ -673,6 +701,23 @@ void RNA_def_world(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "sun_size", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Sun Size", "Sun Size");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "use_sky_moon", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_funcs(prop, "rna_World_use_sky_moon_get", "rna_World_use_sky_moon_set");
+	RNA_def_property_ui_text(prop, "Moon", "Render a visual moon opposite the World Sun without lighting the scene");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "moon_size", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "moon_size");
+	RNA_def_property_range(prop, 0.001f, 0.1f);
+	RNA_def_property_ui_text(prop, "Moon Size", "Angular size of the visual moon");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "moon_brightness", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "moon_brightness");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Moon Brightness", "Brightness of the moon disc and its short halo");
 	RNA_def_property_update(prop, 0, "rna_World_update");
 
 	prop = RNA_def_property(srna, "ground_color", PROP_FLOAT, PROP_FACTOR);

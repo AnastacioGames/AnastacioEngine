@@ -74,10 +74,10 @@ public:
 	void		OpenImgui_Config_ToLoad();
 
 	bool		LoadSection_Config(std::string SectionName);
-	int			LoadIntValue();
-	float		LoadFloatValue();
-	bool		LoadBoolValue();
-	std::string	LoadStringValue();
+	int			LoadIntValue(int defaultValue = 0);
+	float		LoadFloatValue(float defaultValue = 0.0f);
+	bool		LoadBoolValue(bool defaultValue = false);
+	std::string	LoadStringValue(const std::string& defaultValue = "");
 
 	void		CloseImgui_Config();
 };

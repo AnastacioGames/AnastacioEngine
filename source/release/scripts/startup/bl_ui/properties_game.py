@@ -1528,7 +1528,7 @@ class OBJECT_MT_lod_tools(Menu):
         layout.operator("object.lod_generate", text="Generate")
         layout.operator("object.lod_clear_all", text="Clear All", icon='PANEL_CLOSE')
         
-class OBJECT_PT_game_object_tasks(ObjectButtonsPanel, Panel):
+class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
     bl_label = "Game Object Tasks"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -1559,7 +1559,7 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
         layout.label(text="Predefined Bound:")
         layout.prop(game, "predefined_bound", "")
 
-class OBJECT_PT_activity_culling(ObjectButtonsPanel, Panel):
+class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
     bl_label = "Activity Culling"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -1900,7 +1900,7 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         row.operator("object.lod_add", text="Add", icon='ZOOMIN')
         row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
         
-class OBJECT_PT_animation_events(ObjectButtonsPanel, Panel):
+class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 

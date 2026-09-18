@@ -50,7 +50,7 @@
 
 #include "ED_space_api.h"
 #include "ED_screen.h"
-//#include "ED_view3d.h"
+#include "ED_view3d.h"
 
 #include "GPU_compositing.h"
 #include "GPU_framebuffer.h"
@@ -515,9 +515,18 @@ static void view3d_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void view3d_init(wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
+static void view3d_init(wmWindowManager *wm, ScrArea *sa)
 {
+	View3D *v3d = sa->spacedata.first;
 
+	/* The old independent Always Render bit was folded into realtime shading.
+	 * Convert it while opening old workspaces so the single visible toggle can
+	 * still be used to turn continuous drawing off. */
+	if (v3d->flag2 & V3D_ALWAYS_RENDER) {
+		v3d->flag2 |= V3D_REATIME_VIEWPORT;
+		v3d->flag2 &= ~V3D_ALWAYS_RENDER;
+	}
+	ED_view3d_realtime_viewport_update(wm);
 }
 
 static SpaceLink *view3d_duplicate(SpaceLink *sl)
@@ -1373,14 +1382,13 @@ const char *view3d_context_dir[] = {
 	"active_base", "active_object", NULL
 };
 
-/* Range: single global timer backing the "Always Render" toggle. It just
- * reposts NC_OBJECT | ND_DRAW on a fixed interval so 3D viewports keep
- * redrawing (e.g. decal projectors moved by hand) without depending on a
- * context poll or a real input event to pump the wm event loop. Shared by
- * all viewports; only removed once none of them has the flag set anymore. */
-static wmTimer *g_always_render_timer = NULL;
+/* Range: single global timer backing realtime viewport shading. It both keeps
+ * animated shading time moving and redraws projectors/decals without relying
+ * on input events. Shared by all viewports, and removed only when no viewport
+ * has realtime shading enabled. */
+static wmTimer *g_realtime_viewport_timer = NULL;
 
-void ED_view3d_always_render_update(wmWindowManager *wm)
+void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 {
 	wmWindow *win;
 	bool want_timer = false;
@@ -1392,7 +1400,7 @@ void ED_view3d_always_render_update(wmWindowManager *wm)
 		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
 			if (sa->spacetype == SPACE_VIEW3D) {
 				View3D *v3d = sa->spacedata.first;
-				if (v3d->flag2 & V3D_ALWAYS_RENDER) {
+				if (v3d->flag2 & V3D_REATIME_VIEWPORT) {
 					want_timer = true;
 					break;
 				}
@@ -1400,12 +1408,12 @@ void ED_view3d_always_render_update(wmWindowManager *wm)
 		}
 	}
 
-	if (want_timer && !g_always_render_timer) {
-		g_always_render_timer = WM_event_add_timer_notifier(wm, NULL, NC_OBJECT | ND_DRAW, 0.1);
+	if (want_timer && !g_realtime_viewport_timer) {
+		g_realtime_viewport_timer = WM_event_add_timer_notifier(wm, NULL, NC_OBJECT | ND_DRAW, 0.1);
 	}
-	else if (!want_timer && g_always_render_timer) {
-		WM_event_remove_timer(wm, NULL, g_always_render_timer);
-		g_always_render_timer = NULL;
+	else if (!want_timer && g_realtime_viewport_timer) {
+		WM_event_remove_timer(wm, NULL, g_realtime_viewport_timer);
+		g_realtime_viewport_timer = NULL;
 	}
 }
 

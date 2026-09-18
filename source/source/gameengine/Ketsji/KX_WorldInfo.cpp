@@ -31,6 +31,7 @@
 
 
 #include "KX_WorldInfo.h"
+#include <cstring>
 #include "KX_LightObject.h"
 #include "KX_PyMath.h"
 #include "RAS_Rasterizer.h"
@@ -143,6 +144,46 @@ KX_WorldInfo::~KX_WorldInfo()
 std::string KX_WorldInfo::GetName()
 {
 	return m_name;
+}
+
+bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value, bool boolValue, bool useBool)
+{
+	if (!m_scene || !m_scene->world || !identifier) return false;
+	World *world = m_scene->world;
+	if (std::strcmp(identifier, "weather.rain_intensity") == 0) world->rain_intensity = value;
+	else if (std::strcmp(identifier, "weather.rain_density") == 0) world->rain_density = value;
+	else if (std::strcmp(identifier, "weather.rain_speed") == 0) world->rain_speed = value;
+	else if (std::strcmp(identifier, "weather.rain_wind") == 0) world->rain_wind = value;
+	else if (std::strcmp(identifier, "weather.rain_darken") == 0) world->rain_darken = value;
+	else if (std::strcmp(identifier, "weather.ripple_intensity") == 0) world->rain_ripple = value;
+	else if (std::strcmp(identifier, "weather.rain") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN; else world->weather_flag &= ~WO_WEATHER_RAIN;
+	}
+	else if (std::strcmp(identifier, "weather.ripples") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_RIPPLE; else world->weather_flag &= ~WO_WEATHER_RAIN_RIPPLE;
+	}
+	else if (std::strcmp(identifier, "weather.clouds") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_CLOUDS; else world->weather_flag &= ~WO_WEATHER_CLOUDS;
+	}
+	else if (std::strcmp(identifier, "weather.cloud_coverage") == 0) world->cloud_coverage = value;
+	else if (std::strcmp(identifier, "weather.cloud_scale") == 0) world->cloud_scale = value;
+	else if (std::strcmp(identifier, "weather.cloud_speed") == 0) world->cloud_speed = value;
+	else if (std::strcmp(identifier, "weather.lens_flare") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_LENSFLARE; else world->weather_flag &= ~WO_WEATHER_LENSFLARE;
+	}
+	else if (std::strcmp(identifier, "weather.flare_scale") == 0) world->flare_scale = value;
+	else if (std::strcmp(identifier, "weather.flare_intensity") == 0) world->flare_intensity = value;
+	else if (std::strcmp(identifier, "weather.mist") == 0 && useBool) {
+		m_hasmist = boolValue;
+		if (boolValue) world->mode |= WO_MIST; else world->mode &= ~WO_MIST;
+	}
+	else if (std::strcmp(identifier, "weather.mist_intensity") == 0) { world->misi = value; m_mistintensity = value; }
+	else if (std::strcmp(identifier, "weather.mist_start") == 0) { world->miststa = value; m_miststart = value; }
+	else if (std::strcmp(identifier, "weather.mist_depth") == 0) { world->mistdist = value; m_mistdistance = value; }
+	else if (std::strcmp(identifier, "weather.mist_height") == 0) { world->mistheight = value; m_mistheight = value; }
+	else if (std::strcmp(identifier, "weather.mist_density") == 0) { world->mistdensity = value; m_mistdensity = value; }
+	else return false;
+	return true;
 }
 
 bool KX_WorldInfo::hasWorld()

@@ -1157,6 +1157,9 @@ void ui_theme_init_default(void)
 	btheme->tuserpref = btheme->tv3d;
 	btheme->tglobal = btheme->tv3d;
 	btheme->tglobal_ui = btheme->tui;
+	rgba_char_args_set_fl(btheme->tglobal.title, 0.6f, 0.6f, 0.6f, 1.0f);
+	rgba_char_args_set_fl(btheme->tglobal.navigation_bar, 0.03f, 0.03f, 0.03f, 1.0f);
+	rgba_char_args_set_fl(btheme->tglobal_ui.wcol_regular.item, 0.39f, 0.162f, 0.02f, 1.0f);
 	btheme->global_theme_spaces = 0;
 	rgba_char_args_set_fl(btheme->tuserpref.back, 0.45, 0.45, 0.45, 1.0);
 

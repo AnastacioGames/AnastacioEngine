@@ -85,6 +85,7 @@
 #include "ED_transform.h"
 
 #include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
@@ -4344,21 +4345,22 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	row = uiLayoutRow(layout, true);
 
 	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
-	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "WM_OT_blenderplayer_start");
+	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
 	uiItemS(row);
 
-	uiItemR(row,
-	        &v3dptr,
-	        "viewport_shade",
-	        UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY,
-	        "",
-	        ICON_NONE);
+	/* Object Mode dropdown now lives only in the header; keep the shading
+	 * popover here so shading options are still one click away. */
 	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
 	uiItemS(row);
 
+	/* Viewport shading (solid/wireframe/...) as a single dropdown button,
+	 * matching the style previously used in the header. Icon only, no
+	 * label text — the current mode name still shows up as a tooltip. */
+	uiItemR(row, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	uiItemS(row);
+
 	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
-	uiItemR(row, &v3dptr, "always_render", UI_ITEM_R_TOGGLE, "Always Render (CPU+)", ICON_NONE);
 	uiItemR(row,
 	        &v3dptr,
 	        "show_only_render",
@@ -4373,7 +4375,13 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	uiItemS(row);
 
 	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
-	uiItemR(row, &v3dptr, "transform_manipulators", UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	uiItemR(row,
+	        &v3dptr,
+	        "transform_manipulators",
+	        UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY,
+	        "",
+	        ICON_NONE);
+	uiTemplateHeader3D_mode(row, (bContext *)C);
 	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_transform_orientations", "", ICON_DOWNARROW_HLT);
 	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_pivot_point", "", ICON_ROTATECOLLECTION);
 	uiItemS(row);

@@ -41,6 +41,7 @@
 #include "EXP_Operator2Expr.h"
 #include "EXP_ConstExpr.h"
 #include "CM_Format.h"
+#include "KX_WorldInfo.h"
 
 /* ------------------------------------------------------------------------- */
 /* Native functions                                                          */
@@ -81,6 +82,15 @@ bool SCA_PropertyActuator::Update()
 		SCA_RuntimePropertyValue value;
 		const char *error = nullptr;
 		SCA_IObject *target = m_sourceObj ? m_sourceObj : GetParent();
+		if (m_worldPropOwner && m_runtimeProperty.rfind("weather.", 0) == 0) {
+			float weatherValue = 0.0f;
+			bool weatherBool = false;
+			const bool isBool = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1" || m_exprtxt == "False" || m_exprtxt == "false" || m_exprtxt == "0");
+			if (isBool) weatherBool = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1");
+			else if (!CM_StringTo(m_exprtxt, weatherValue)) return false;
+			KX_WorldInfo *world = dynamic_cast<KX_WorldInfo *>(m_worldPropOwner);
+			return world && world->SetWeatherRuntimeProperty(m_runtimeProperty.c_str(), weatherValue, weatherBool, isBool);
+		}
 		if (m_runtimeProperty == "render.visible") {
 			value.type = SCA_RUNTIME_PROPERTY_BOOL;
 			value.boolValue = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1");

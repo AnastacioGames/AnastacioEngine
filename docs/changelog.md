@@ -4,6 +4,17 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-17 - 3D View: atualização contínua unificada
+
+- Removido o botão textual `Always Render (CPU+)` da barra flutuante. O ícone de câmera `Realtime Shading` é agora o único controle de atualização contínua da 3D View.
+- Ligado, ele atualiza materiais/nós animados e também força os redraws necessários para decals e projetores seguirem objetos em movimento; desligado, o timer é removido e o consumo extra de CPU para esses redraws cessa.
+- Workspaces antigos com `Always Render` ativo são convertidos ao abrir para o novo toggle, permitindo desligar a função normalmente.
+
+## 2026-09-17 - Inicialização: configurações ImGui e tema padrão silenciosos
+
+- O leitor da seção `KX_DebugMode` em `imgui.ini` agora tolera linhas ausentes ou inválidas: preserva o valor padrão atual em vez de emitir `Load from imgui.ini: Float value -> Error!` ou substituir a preferência por zero. Isso também evita uma exceção caso um `imgui.ini` antigo tenha um valor numérico malformado.
+- A aplicação automática, no primeiro uso, do tema AnastacioGames não escreve mais uma linha de log para cada parte do mesmo XML. O carregamento manual de presets XML continua verboso para diagnóstico.
+
 ## 2026-09-17 - Shared optimization reference and foliage wind distance
 
 - `KX_Scene` now publishes one optimization-reference position after physics each frame. It uses the active
@@ -13,6 +24,34 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   vertex wind routine before evaluating procedural noise. Existing materials stay unrestricted until enabled.
 - Camera Properties in Game Engine mode now identifies the active Scene camera as the source of this shared
   reference, keeping the relationship visible while configuring distance-based systems.
+
+## 2026-09-16 — Auditoria estruturada de performance
+
+- Corrigido o painel flutuante da 3D View: os botões individuais de mover,
+  rotacionar e escala agora só aparecem quando o manipulador principal está
+  ligado, igual ao cabeçalho original. Build de `RangeEngine` concluído;
+  confirmação visual na janela real pendente.
+
+- Criada a taxonomia LIFE, DUP, CPU, MEM, GPU, SYNC, POOL e ALG para separar
+  vazamento de trabalho, duplicação, alocação, sincronização e custo de
+  renderização.
+- Registrados dois problemas já confirmados (animações persistentes e
+  componentes ignorando suspensão) e candidatos que precisam de medição:
+  duplicação nas listas GPU/sombra, cópia/crescimento de mapas em mensagens de
+  rede, possível espera em GL_QUERY_RESULT, alocações de culling e sorting
+  por frame nos buckets, além de registros duplicados em callbacks de colisão.
+- Segunda rodada estática encontrou ainda alocações por frame no culling,
+  sorting/batching e snapshot de componentes Python. O registro de componentes
+  tem um único call site hoje, então não foi classificado como duplicação
+  confirmada; os itens permanecem separados como hotspots ou contratos frágeis
+
+- As listas de objetos de partículas GPU e shadow casters passaram a aceitar
+  cada ponteiro apenas uma vez (`KX_Scene::Add*`). A correção é preventiva para
+  réplicas/reentrada de cena e foi validada compilando `ge_ketsji` e ligando
+  `RangeRuntime`.
+  para validação posterior.
+- O inventário completo está em docs/performance-audit.md; nenhum candidato
+  foi alterado sem reprodução.
 
 ## 2026-09-16 — Correção de engine + script: animações de objetos de pool deixam de acumular em KX_Scene::m_animatedlist
 
@@ -4941,3 +4980,41 @@ com Chrome headless (`--dump-dom`, `--virtual-time-budget=60000`) servindo `buil
 - Os controles realocados foram removidos do cabeçalho. A barra usa os mesmos dados RNA e operadores existentes.
 - A região principal passou a registrar os handlers padrão de UI para clique e interação com os novos botões.
 - Builds incrementais de `RangeEngine` via `vcvars64.bat` concluídos. Inicialização `--background --factory-startup` confirmou o painel, os dois operadores e a propriedade de console, terminando com `FLOATING_VIEW3D_LAYOUT_RUNTIME_OK`, código 0. Posição, aparência e cliques aguardam validação na janela real.
+## 2026-09-17 â€” Sun automÃ¡tico da cena
+
+- UI: moved `World Sun`, `Automatic Sun`, and `Sun Hour` from `Scene` to `World > Sky Render`.
+  The controls still edit the active `Scene`: the pointer remains `Scene.world_sun_set`, while `Sun Hour`
+  remains the World Global Property `sun_hour`. Generated-Sun creation/removal and runtime conversion are unchanged.
+- Sky Render: added an opt-in visual Moon on the opposite side of the sky from the World Sun. It mirrors the
+  Sun only around the vertical axis, keeping it above the horizon while the Sun is above; it is a low-brightness,
+  short-halo sky disc only, creates no Lamp, and has no effect on scene lighting, shadows, or lens flare.
+  Existing Worlds keep it disabled.
+- Adicionado `Automatic Sun` no painel `Scene`, logo abaixo de `World Sun`. Ao ativar, cria uma Lamp
+  do tipo Sun, marca-a no `.blend` e a atribui ao campo `World Sun`; a posiÃ§Ã£o inicial no editor Ã© a
+  da cÃ¢mera da cena mais 5 m na direÃ§Ã£o local `-Z` da cÃ¢mera e 10 m em Z (ou `(0, 0, 10)` sem cÃ¢mera).
+- No runtime, apenas a luz marcada pelo checkbox Ã© atualizada a cada frame para a cÃ¢mera ativa mais 5 m
+  Ã  frente e 10 m acima; uma luz escolhida manualmente em `World Sun` nunca recebe esse comportamento.
+  Sem cÃ¢mera ativa, o runtime conserva a Ãºltima posiÃ§Ã£o e emite um Ãºnico aviso, sem interromper a cena.
+- Ao desligar o checkbox, a luz criada pelo checkbox Ã© removida da cena e de `World Sun`. A organizaÃ§Ã£o
+  dessa luz sob `World` no Outliner ficou deliberadamente para uma etapa posterior.
+- Automatic Sun now uses the ground point 5 m in front of the active camera as its shadow reference. It records
+  the initial camera height, subtracts it from the live camera position to estimate ground elevation, orbits that
+  reference at a 10 m radius, and aims its local `-Z` back at it; it no longer spins in place or points away
+  from the player area. `Sun Hour` creates the World Float Global Property `sun_hour` with default `12`; runtime
+  maps its circular 0-24 value to that orbit (12 = directly overhead, 6/18 = horizon), including writes from a
+  Global Property Property Actuator.
+
+## 2026-09-17 — Organização dos painéis de objeto Game
+
+- O seletor de objeto e o checkbox `Fake User` agora ocupam a mesma linha na aba Object.
+- `Game Object Tasks`, `Activity Culling` e `Animation Events` passaram da aba Object para a aba Game.
+- Validação: sintaxe Python dos dois módulos de UI e `ninja RangeEngine` via `vcvars64.bat` concluídos; os scripts foram instalados em `build/bin/2.79/scripts/startup/bl_ui/`.
+
+## 2026-09-17 — Descrição de Convert
+
+- O tooltip de `Game Object Tasks > Convert` agora explica que a opção cria o objeto no runtime e que, desativada, ele não renderiza, executa lógica ou física, nem fica acessível por scripts. O caso de uso indicado é somente para helpers exclusivos do editor.
+
+## 2026-09-17 — Activity Culling usa a referência de otimização
+
+- `Physics Radius` e `Logic Radius` continuam usando distância euclidiana ao quadrado, mas agora a medem contra `KX_Scene::GetOptimizationReferencePosition()`: a câmera ativa hoje e, futuramente, a referência do Player.
+- A atualização ocorre antes da avaliação de Activity Culling, evitando usar a posição do frame anterior. Câmeras inativas deixam de manter objetos ativos; para habilitar o recurso, a câmera ativa precisa ter `Activity Culling` marcado.

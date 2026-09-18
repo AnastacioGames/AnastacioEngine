@@ -1125,14 +1125,14 @@ void KX_DebugMode::LoadDebugMode_Values() {
   }
 
   // Load vars ... Keep in sync with SaveDebugMode_Values!!
-  m_hideDebugMode = imgui->LoadBoolValue();
-  m_autoResize = imgui->LoadBoolValue();
-  m_history = imgui->LoadFloatValue();
-  m_axisCondition = imgui->LoadIntValue();
-  m_axisLimit = imgui->LoadFloatValue();
-  m_cameraSpeed = imgui->LoadFloatValue();
-  m_profileSize = imgui->LoadFloatValue();
-  m_debugPropertiesSize = imgui->LoadFloatValue();
+  m_hideDebugMode = imgui->LoadBoolValue(m_hideDebugMode);
+  m_autoResize = imgui->LoadBoolValue(m_autoResize);
+  m_history = imgui->LoadFloatValue(m_history);
+  m_axisCondition = imgui->LoadIntValue(m_axisCondition);
+  m_axisLimit = imgui->LoadFloatValue(m_axisLimit);
+  m_cameraSpeed = imgui->LoadFloatValue(m_cameraSpeed);
+  m_profileSize = imgui->LoadFloatValue(m_profileSize);
+  m_debugPropertiesSize = imgui->LoadFloatValue(m_debugPropertiesSize);
 
   imgui->CloseImgui_Config();
 }

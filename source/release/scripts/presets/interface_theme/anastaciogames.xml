@@ -327,7 +327,7 @@
     <global_theme>
       <ThemeGlobal
         back="0.223529 0.223529 0.223529"
-        title="0 0 0"
+        title="0.6 0.6 0.6"
         text="0.894118 0.894118 0.894118"
         text_hi="0.8 0.8 0.8"
         header="0.235294 0.235294 0.235294"
@@ -337,7 +337,7 @@
         button_title="0.780392 0.780392 0.780392"
         button_text="0.705882 0.705882 0.705882"
         button_text_hi="0.231373 0.231373 0.231373"
-        navigation_bar="0 0 0"
+        navigation_bar="0.03 0.03 0.03"
         tab_active="0.658824 0.439216 0.156863"
         tab_inactive="0.101961 0.101961 0.101961"
         tab_back="#1a1a1aff"
@@ -377,7 +377,7 @@
             outline="0.239216 0.239216 0.239216"
             inner="#545454ff"
             inner_sel="#a87028ff"
-            item="#ffffffff"
+            item="0.39 0.162 0.02 1.0"
             text="0.854902 0.854902 0.854902"
             text_sel="1 1 1"
             show_shaded="TRUE"

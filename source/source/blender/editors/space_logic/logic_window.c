@@ -2061,27 +2061,56 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 	Object *ob_from= pa->ob;
 	World *world = CTX_data_scene(C)->world;
 	PointerRNA settings_ptr, obj_settings_ptr;
+	const int actuator_mode = RNA_enum_get(ptr, "actuator_mode");
 
 	uiLayout *row, *sub;
 
-	if (RNA_boolean_get(ptr, "use_world_property") && world)
+	if ((RNA_boolean_get(ptr, "use_world_property") || actuator_mode == 3) && world)
 		RNA_id_pointer_create((ID *)world, &settings_ptr);
 	else
 		RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
 
-	uiItemR(layout, ptr, "use_runtime_property", 0, NULL, ICON_NONE);
-	if (RNA_boolean_get(ptr, "use_runtime_property")) {
+	uiItemR(layout, ptr, "actuator_mode", 0, NULL, ICON_NONE);
+	if (actuator_mode == 1 || actuator_mode == 2) {
 		uiLayout *runtime_box = uiLayoutBox(layout);
-		uiItemL(runtime_box, "Runtime API", ICON_INFO);
-		uiItemR(runtime_box, ptr, "object", 0, "Target (empty = self)", ICON_NONE);
-		uiItemR(runtime_box, ptr, "runtime_property", 0, "Exposed Property", ICON_NONE);
+		const int runtime_property = RNA_enum_get(ptr, "runtime_property");
+		if (actuator_mode == 1) {
+			uiItemL(runtime_box, "Runtime API", ICON_INFO);
+			uiItemR(runtime_box, ptr, "object", 0, "Target (empty = self)", ICON_NONE);
+			uiItemR(runtime_box, ptr, "runtime_property", 0, "Exposed Property", ICON_NONE);
+		}
+		else {
+			const int weather_category = RNA_enum_get(ptr, "weather_category");
+			uiItemR(runtime_box, ptr, "weather_category", 0, NULL, ICON_NONE);
+			if (weather_category == 1)
+				uiItemR(runtime_box, ptr, "cloud_effect", 0, "Property", ICON_NONE);
+			else if (weather_category == 2)
+				uiItemR(runtime_box, ptr, "lens_flare_effect", 0, "Property", ICON_NONE);
+			else if (weather_category == 3)
+				uiItemR(runtime_box, ptr, "mist_effect", 0, "Property", ICON_NONE);
+			else
+				uiItemR(runtime_box, ptr, "weather_effect", 0, "Property", ICON_NONE);
+		}
 		uiItemR(runtime_box, ptr, "mode", 0, NULL, ICON_NONE);
-		if (RNA_enum_get(ptr, "runtime_property") == ACT_RUNTIME_PROP_VISIBLE) {
-			uiItemL(runtime_box, "Category: Render  |  Type: Boolean", ICON_NONE);
+		if (runtime_property == ACT_RUNTIME_PROP_VISIBLE ||
+		    runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN ||
+		    runtime_property == ACT_RUNTIME_PROP_WEATHER_RIPPLES ||
+		    runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUDS ||
+		    runtime_property == ACT_RUNTIME_PROP_WEATHER_LENS_FLARE ||
+		    runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST) {
+			uiItemL(runtime_box, actuator_mode == 2 ?
+			        "Category: Weather  |  Type: Boolean" : "Category: Render  |  Type: Boolean", ICON_NONE);
 			uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
 		}
-		else if (RNA_enum_get(ptr, "runtime_property") == ACT_RUNTIME_PROP_MASS) {
-			uiItemL(runtime_box, "Category: Physics  |  Type: Float", ICON_NONE);
+		else if (runtime_property == ACT_RUNTIME_PROP_MASS ||
+		         runtime_property >= ACT_RUNTIME_PROP_WEATHER_RAIN_INTENSITY) {
+			uiItemL(runtime_box, actuator_mode == 2 ?
+			        "Category: Weather  |  Type: Float" : "Category: Physics  |  Type: Float", ICON_NONE);
+			uiItemR(runtime_box, ptr, "runtime_value", 0, "Value", ICON_NONE);
+		}
+		else if (actuator_mode == 2) {
+			/* Weather controls are Boolean or scalar Float, never Vector3. */
+			uiItemL(runtime_box, "Category: Weather  |  Type: Float", ICON_NONE);
 			uiItemR(runtime_box, ptr, "runtime_value", 0, "Value", ICON_NONE);
 		}
 		else {
@@ -2099,9 +2128,8 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 
 	row = uiLayoutRow(layout, false);
 	uiItemR(row, ptr, "mode", 0, NULL, ICON_NONE);
-	uiItemR(row, ptr, "use_world_property", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 
-	if (RNA_boolean_get(ptr, "use_world_property") && !world)
+	if ((RNA_boolean_get(ptr, "use_world_property") || actuator_mode == 3) && !world)
 		uiItemL(layout, "No World in this scene", ICON_ERROR);
 	else
 		uiItemPointerR(layout, ptr, "property", &settings_ptr, "properties", NULL, ICON_NONE);

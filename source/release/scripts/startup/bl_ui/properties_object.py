@@ -42,7 +42,7 @@ class OBJECT_PT_context_object(ObjectButtonsPanel, Panel):
         else:
             row = layout.row()
             row.template_ID(context.scene.objects, "active", filter='AVAILABLE')
-            layout.prop(ob, "use_fake_user")
+            row.prop(ob, "use_fake_user", text="Fake User")
 
 class OBJECT_PT_transform(ObjectButtonsPanel, Panel):
     bl_label = "Transform"

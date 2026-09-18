@@ -260,10 +260,13 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.useRainRipple = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE) ? true : false;
 			filters.rain_style = world->rain_style;
 			filters.rain_intensity = world->rain_intensity;
+			filters.rain_density = world->rain_density;
 			filters.rain_speed = world->rain_speed;
 			filters.rain_wind = world->rain_wind;
 			filters.rain_darken = world->rain_darken;
 			filters.rain_ripple = world->rain_ripple;
+			filters.rain_ripple_distance = world->rain_ripple_distance;
+			filters.rain_ripple_min_up = world->rain_ripple_min_up;
 			filters.rain_color[0] = world->rain_color[0];
 			filters.rain_color[1] = world->rain_color[1];
 			filters.rain_color[2] = world->rain_color[2];
@@ -2127,7 +2130,9 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 
 void KX_Scene::AddGpuParticleObject(KX_GameObject *gameobj)
 {
-	m_gpuParticleObjects.push_back(gameobj);
+	if (std::find(m_gpuParticleObjects.begin(), m_gpuParticleObjects.end(), gameobj) == m_gpuParticleObjects.end()) {
+		m_gpuParticleObjects.push_back(gameobj);
+	}
 }
 
 void KX_Scene::RemoveGpuParticleObject(KX_GameObject *gameobj)
@@ -2143,7 +2148,9 @@ const std::vector<KX_GameObject *> &KX_Scene::GetGpuParticleObjects() const
 
 void KX_Scene::AddGpuParticleColliderObject(KX_GameObject *gameobj)
 {
-	m_gpuParticleColliderObjects.push_back(gameobj);
+	if (std::find(m_gpuParticleColliderObjects.begin(), m_gpuParticleColliderObjects.end(), gameobj) == m_gpuParticleColliderObjects.end()) {
+		m_gpuParticleColliderObjects.push_back(gameobj);
+	}
 }
 
 void KX_Scene::RemoveGpuParticleColliderObject(KX_GameObject *gameobj)
@@ -2159,8 +2166,10 @@ const std::vector<KX_GameObject *> &KX_Scene::GetGpuParticleColliderObjects() co
 
 void KX_Scene::AddStaticShadowCasterObject(KX_GameObject *gameobj)
 {
-	m_staticShadowCasterObjects.push_back(gameobj);
-	m_staticShadowCasterListDirty = true;
+	if (std::find(m_staticShadowCasterObjects.begin(), m_staticShadowCasterObjects.end(), gameobj) == m_staticShadowCasterObjects.end()) {
+		m_staticShadowCasterObjects.push_back(gameobj);
+		m_staticShadowCasterListDirty = true;
+	}
 }
 
 void KX_Scene::RemoveStaticShadowCasterObject(KX_GameObject *gameobj)
@@ -2177,7 +2186,9 @@ const std::vector<KX_GameObject *> &KX_Scene::GetStaticShadowCasterObjects() con
 
 void KX_Scene::AddDynamicShadowCasterObject(KX_GameObject *gameobj)
 {
-	m_dynamicShadowCasterObjects.push_back(gameobj);
+	if (std::find(m_dynamicShadowCasterObjects.begin(), m_dynamicShadowCasterObjects.end(), gameobj) == m_dynamicShadowCasterObjects.end()) {
+		m_dynamicShadowCasterObjects.push_back(gameobj);
+	}
 }
 
 void KX_Scene::RemoveDynamicShadowCasterObject(KX_GameObject *gameobj)
@@ -2207,33 +2218,23 @@ void KX_Scene::UpdateObjectActivity()
 		return;
 	}
 
-	std::vector<mt::vec3, mt::simd_allocator<mt::vec3> > camPositions;
-
-	for (KX_Camera *cam : m_cameralist) {
-		if (cam->GetActivityCulling()) {
-			camPositions.push_back(cam->NodeGetWorldPosition());
-		}
-	}
-
-	// None cameras are using object activity culling?
-	if (camPositions.size() == 0) {
+	// Activity culling follows the same reference as the other distance-based
+	// optimizations: the active game camera today, and the Player reference when
+	// it is introduced. This avoids treating an inactive editor/cutscene camera
+	// as a reason to keep objects active.
+	KX_Camera *activeCamera = GetActiveCamera();
+	if (!activeCamera || !activeCamera->GetActivityCulling()) {
 		return;
 	}
 
-	for (KX_GameObject *gameobj : m_cullinglist) {
-		// If the object doesn't manage activity culling we don't compute distance.
-		//if (gameobj->GetActivityCullingInfo().m_flags == KX_GameObject::ActivityCullingInfo::ACTIVITY_NONE) {
-		//	continue;
-		//}
+	// Refresh here because activity is evaluated at the beginning of the
+	// simulation frame, before the post-physics refresh used by rendering.
+	UpdateOptimizationReference();
+	const mt::vec3& referencePosition = GetOptimizationReferencePosition();
 
-		// For each camera compute the distance to objects and keep the minimum distance.
+	for (KX_GameObject *gameobj : m_cullinglist) {
 		const mt::vec3& obpos = gameobj->NodeGetWorldPosition();
-		float dist = FLT_MAX;
-		for (const mt::vec3& campos : camPositions) {
-			// Keep the minimum distance.
-			dist = std::min((obpos - campos).LengthSquared(), dist);
-		}
-		gameobj->UpdateActivity(dist);
+		gameobj->UpdateActivity((obpos - referencePosition).LengthSquared());
 	}
 }
 

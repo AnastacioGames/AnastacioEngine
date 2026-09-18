@@ -23,7 +23,10 @@ A versão mais recente publicada é a `0.3.0`, disponível em
 - `AnastacioEngine-0.3.0-windows-x64.zip`: editor e runtime para Windows x64;
 - `AnastacioEngine-0.3.0-linux-x64.tar.gz`: editor e runtime para Linux x86_64;
 - `RangeArmor-0.3.0-windows-x64.zip`: ferramenta de empacotamento/exportação RangeArmor, publicada como
-  asset separado (código-fonte de terceiros, não incluído neste repositório);
+  asset separado (código-fonte de terceiros, não incluído neste repositório). O painel (GUI) roda somente
+  no Windows, mas exporta jogos para **Windows e Linux x86_64**: o launcher Rust já é compilado para
+  ambas as plataformas e o painel embute o binário Linux automaticamente no pacote `.tar.xz` quando
+  `build-linux/bin` está disponível — não há (nem é necessário) um `RangeArmor Panel` separado para Linux;
 - `SHA256SUMS.txt`: hashes para verificar a integridade dos arquivos acima.
 
 ## Executáveis

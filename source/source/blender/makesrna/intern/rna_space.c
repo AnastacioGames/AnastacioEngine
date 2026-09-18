@@ -411,11 +411,13 @@ static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA 
 	}
 }
 
-static void rna_SpaceView3D_always_render_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
+static void rna_SpaceView3D_realtime_viewport_update(Main *bmain,
+                                                      Scene *UNUSED(scene),
+                                                      PointerRNA *UNUSED(ptr))
 {
 	wmWindowManager *wm = bmain->wm.first;
 	if (wm) {
-		ED_view3d_always_render_update(wm);
+		ED_view3d_realtime_viewport_update(wm);
 	}
 }
 
@@ -504,6 +506,17 @@ static void rna_SpaceView3D_viewport_shade_update(Main *bmain, Scene *UNUSED(sce
 	ScrArea *sa = rna_area_from_space(ptr);
 
 	ED_view3d_shade_update(bmain, v3d, sa);
+}
+
+/* The floating 3D View controls are drawn inside the region instead of the
+ * normal header.  Tag that region immediately when manipulator state changes
+ * so the widget is redrawn on the same click. */
+static void rna_SpaceView3D_manipulator_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	ScrArea *sa = rna_area_from_space(ptr);
+	if (sa != NULL) {
+		ED_area_tag_redraw(sa);
+	}
 }
 
 static void rna_SpaceView3D_matcap_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
@@ -2600,8 +2613,11 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "realtime_viewport_shading", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_REATIME_VIEWPORT);
-	RNA_def_property_ui_text(prop, "Realtime Shading", "Use Real-Time Shading in the Viewport");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_ui_text(prop,
+	                          "Realtime Shading",
+	                          "Continuously redraw this viewport for animated shading, decals and projectors");
+	RNA_def_property_update(
+	    prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_realtime_viewport_update");
 
 	prop = RNA_def_property(srna, "show_icon_components", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_RENDER_SHOW_COMPONENTS);
@@ -2612,13 +2628,6 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_LOD_INVISIBLE_SHOW);
 	RNA_def_property_ui_text(prop, "Show Invisible LODs", "Shows all objects that have invisible lod enabled");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
-
-	prop = RNA_def_property(srna, "always_render", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_ALWAYS_RENDER);
-	RNA_def_property_ui_text(prop, "Always Render",
-	                          "Keep this viewport redrawing continuously (needed for decals/projectors "
-	                          "to follow moved objects live); increases CPU usage while enabled");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_always_render_update");
 
 	prop = RNA_def_property(srna, "show_world", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_WORLD);
@@ -2665,14 +2674,14 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "twflag", V3D_USE_MANIPULATOR);
 	RNA_def_property_ui_text(prop, "Manipulator", "Use a 3D manipulator widget for controlling transforms");
 	RNA_def_property_ui_icon(prop, ICON_MANIPUL, 0);
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_manipulator_update");
 
 	prop = RNA_def_property(srna, "transform_manipulators", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "twtype");
 	RNA_def_property_enum_items(prop, manipulators_items);
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
 	RNA_def_property_ui_text(prop, "Transform Manipulators", "Transformation manipulators");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_manipulator_update");
 
 	prop = RNA_def_property(srna, "lock_camera_and_layers", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "scenelock", 1);

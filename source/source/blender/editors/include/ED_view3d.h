@@ -91,7 +91,7 @@ void   ED_view3d_cursor3d_update(struct bContext *C, const int mval[2]);
 
 struct Camera *ED_view3d_camera_data_get(struct View3D *v3d, struct RegionView3D *rv3d);
 
-void ED_view3d_always_render_update(struct wmWindowManager *wm);
+void ED_view3d_realtime_viewport_update(struct wmWindowManager *wm);
 
 void ED_view3d_to_m4(float mat[4][4], const float ofs[3], const float quat[4], const float dist);
 void ED_view3d_from_m4(float mat[4][4], float ofs[3], float quat[4], float *dist);

@@ -16,6 +16,7 @@ uniform mat4 unfinvprojmat;
 
 uniform vec4 ge_RainParams1; // intensity, speed, wind, darken
 uniform vec4 ge_RainParams2; // ripple intensity, time, use droplets, use ripple
+uniform vec4 ge_RainParams3; // density, ripple radius, minimum upward normal, unused
 uniform vec3 ge_RainColor;
 uniform float ge_RainStyle; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
 
@@ -166,6 +167,12 @@ void main()
 	float time = ge_RainParams2.y;
 	bool useDroplets = ge_RainParams2.z > 0.5;
 	bool useRipple = ge_RainParams2.w > 0.5;
+	/* Files saved before the density field was added have zero in that slot.
+	 * Keep them visually compatible with the original Classic rain instead of
+	 * multiplying every layer by zero. */
+	float density = max(ge_RainParams3.x, 0.25);
+	float rippleRadius = ge_RainParams3.y;
+	float rippleMinUp = ge_RainParams3.z;
 
 	if (intensity <= 0.001) {
 		gl_FragColor = direct;
@@ -196,10 +203,13 @@ void main()
 			/* Classic: two screen-space layers for a sense of parallax -- a few thick,
 			 * fast, sharply-defined streaks up close, and many thin, slower, softer
 			 * ones further back. */
-			streaks = rainLayer(texcoord, 15.0, speed * 1.3, 12.0, wind, time) * 0.55;
+			/* The former 12/30 power masks retained only exceptionally bright noise
+			 * samples, so Classic could look entirely dry at ordinary resolutions.
+			 * These narrower, lower-power layers keep individual streaks visible. */
+			streaks = rainLayer(texcoord, 15.0 * density, speed * 1.3, 6.0, wind, time) * 0.75;
 
-			streaks += rainLayer(texcoord + vec2(3.7, 1.3), 55.0, speed * 0.6, 30.0, wind * 0.7, time) * 0.35;
-			streaks += rainLayer(texcoord + vec2(9.1, 5.2), 80.0, speed * 0.5, 26.0, wind * 0.7, time) * 0.25;
+			streaks += rainLayer(texcoord + vec2(3.7, 1.3), 55.0 * density, speed * 0.6, 12.0, wind * 0.7, time) * 0.50;
+			streaks += rainLayer(texcoord + vec2(9.1, 5.2), 80.0 * density, speed * 0.5, 14.0, wind * 0.7, time) * 0.35;
 		}
 
 		finalColor += ge_RainColor * streaks * intensity;
@@ -211,8 +221,19 @@ void main()
 
 		if (isBackground < 0.5) {
 			vec3 worldPos = getWorldPositionFromDepth(texcoord, depth);
-			float rippleNoise = rainRipples3D(worldPos * 6.0, time);
-			finalColor += vec3(rippleNoise * rippleIntensity * 0.15);
+			vec3 camPos = (unfinvviewmat * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+			vec3 normal = normalize(cross(dFdx(worldPos), dFdy(worldPos)));
+			/* Derivative orientation is screen-dependent. Point it at the camera so
+			 * undersides remain down-facing and cannot receive puddle ripples. */
+			if (dot(normal, camPos - worldPos) < 0.0) {
+				normal = -normal;
+			}
+			/* Blender/Range uses Z as the world-up axis. Testing Y here rejects
+			 * horizontal floors and lets some vertical faces through. */
+			if (length(worldPos - camPos) <= rippleRadius && normal.z >= rippleMinUp) {
+				float rippleNoise = rainRipples3D(worldPos * 6.0, time);
+				finalColor += vec3(rippleNoise * rippleIntensity * 0.15);
+			}
 		}
 	}
 
