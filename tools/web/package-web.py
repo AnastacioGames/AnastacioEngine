@@ -162,11 +162,23 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     el("canvas").focus();
   }
 
+  // Alguns avisos da emulacao GL saem direto por console.error (antes do printErr).
+  var _consoleError = console.error.bind(console);
+  console.error = function () {
+    var t = arguments.length ? String(arguments[0]) : "";
+    if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn.apply(console, arguments);
+    else _consoleError.apply(null, arguments);
+  };
+
   window.Module = {
     canvas: el("canvas"),
     arguments: [GAME],
     print: function (t) { log("[out] " + t); console.log(t); },
-    printErr: function (t) { log("[err] " + t); console.error(t); },
+    printErr: function (t) {
+      log("[err] " + t);
+      // Avisos conhecidos e inofensivos da emulacao GL legada do emscripten.
+      if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn(t); else console.error(t);
+    },
     onAbort: function (w) { fail("O runtime foi interrompido: " + w); },
     setStatus: function (t) {
       if (failed) return;

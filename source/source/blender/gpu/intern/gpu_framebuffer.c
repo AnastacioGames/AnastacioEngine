@@ -718,7 +718,17 @@ void GPU_framebuffer_blit(GPUFrameBuffer *srcfb, GPUFrameBuffer *dstfb, int widt
 	}
 
 	for (unsigned short i = 0; i < numAttachment; ++i) {
+#ifdef __EMSCRIPTEN__
+		/* WebGL2: o anexo i so pode ficar na posicao i do array de drawBuffers; as demais NONE. */
+		GLenum bufs[16];
+		const int nbufs = (i < 15) ? i + 1 : 16;
+		for (int j = 0; j < nbufs; ++j) {
+			bufs[j] = (j == i) ? (GLenum)(GL_COLOR_ATTACHMENT0 + i) : GL_NONE;
+		}
+		glDrawBuffers(nbufs, bufs);
+#else
 		glDrawBuffer(GL_COLOR_ATTACHMENT0 + i);
+#endif
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + i);
 
 		glBlitFramebufferEXT(0, 0, width, height, 0, 0, width, height, mask, GL_NEAREST);
@@ -764,11 +774,17 @@ GPURenderBuffer *GPU_renderbuffer_create(int width, int height, int samples, GPU
 	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rb->bindcode);
 
 	if (type == GPU_RENDERBUFFER_DEPTH) {
+#ifdef __EMSCRIPTEN__
+		/* WebGL2/GLES3 rejeita o formato de profundidade sem tamanho em renderbuffers. */
+		const GLenum depthformat = GL_DEPTH_COMPONENT24;
+#else
+		const GLenum depthformat = GL_DEPTH_COMPONENT;
+#endif
 		if (samples > 0) {
-			glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER_EXT, samples, GL_DEPTH_COMPONENT, width, height);
+			glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER_EXT, samples, depthformat, width, height);
 		}
 		else {
-			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT, width, height);
+			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, depthformat, width, height);
 		}
 		rb->depth = true;
 	}

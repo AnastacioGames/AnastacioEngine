@@ -499,7 +499,9 @@ TaskScheduler *BLI_task_scheduler_create(int num_threads)
 			initialize_task_tls(&thread->tls);
 
 			if (pthread_create(&scheduler->threads[i], NULL, task_scheduler_thread_run, thread) != 0) {
+#ifndef __EMSCRIPTEN__ /* Web runtime sem pthreads: falha esperada, sem ruido. */
 				fprintf(stderr, "TaskScheduler failed to launch thread %d/%d\n", i, num_threads);
+#endif
 			}
 		}
 	}
