@@ -183,6 +183,17 @@ class FilesTest(unittest.TestCase):
 
 
 class PythonTest(unittest.TestCase):
+    def test_host_path_in_runtime_calls(self):
+        f = analyze("f = open('C:\\\\Users\\\\a\\\\x.txt')\n").findings
+        self.assertEqual(ids(f), ["WEB-PKG-004"])
+        self.assertEqual(f[0].severity, SEVERITY_ERROR)
+        f = analyze("import bge\nbge.logic.LibLoad('/home/u/lib.blend', 'Scene')\n",
+                    available=STDLIB | {"bge"}).findings
+        self.assertEqual(ids(f), ["WEB-PKG-004"])
+        f = analyze("def g():\n  open('D:/x/y.png')\n").findings  # dentro de funcao: so potencial
+        self.assertEqual(f[0].severity, SEVERITY_WARNING)
+        self.assertEqual(ids(analyze("open('data/x.txt')\nopen('//rel.png')\n").findings), [])
+
     def test_syntax_error(self):
         f = analyze("def x(:\n  pass\n").findings
         self.assertEqual(ids(f), ["WEB-PY-008"])

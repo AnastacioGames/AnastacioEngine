@@ -11,6 +11,7 @@
 
 import ast
 
+from . import rules_files
 from .results import (
     EVIDENCE_CONFIRMED, EVIDENCE_POTENTIAL, SEVERITY_ERROR, SEVERITY_WARNING, Finding,
 )
@@ -34,6 +35,10 @@ _THREAD_CALLS = frozenset(("threading.Thread", "threading.Timer", "_thread.start
 _BLOCKING_CALLS = frozenset(("time.sleep", "input"))
 _EVAL_CALLS = frozenset(("eval", "exec"))
 _IMPORT_CALLS = frozenset(("__import__", "importlib.import_module", "importlib.__import__"))
+_PATH_CALLS = frozenset(("open", "io.open", "os.listdir", "os.scandir", "os.makedirs", "os.mkdir",
+                         "os.remove", "os.path.exists", "os.path.isfile", "os.path.isdir",
+                         "shutil.copy", "shutil.copyfile", "pathlib.Path", "pathlib.PurePath"))
+_PATH_CALL_SUFFIXES = (".LibLoad", ".Factory", ".Factory.file")
 _IMPORT_ERRORS = frozenset(("ImportError", "ModuleNotFoundError", "Exception", "BaseException"))
 
 
@@ -324,6 +329,8 @@ class _Analyzer(ast.NodeVisitor):
             self.result.has_dynamic = True
             self._emit("WEB-PY-009", node, "%s: análise estática cobre só parte do código." % name,
                        "Validar esse caminho no navegador.", hard=False)
+        elif name in _PATH_CALLS or name.endswith(_PATH_CALL_SUFFIXES):
+            self._check_host_path(name, node)
         elif name in _IMPORT_CALLS:
             arg = node.args[0] if node.args else None
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
@@ -334,6 +341,16 @@ class _Analyzer(ast.NodeVisitor):
                            "Declarar o módulo explicitamente e validar no navegador.", hard=False)
                 self._emit("WEB-PKG-007", node, "Módulo formado dinamicamente não é descoberto.",
                            "Declarar o conjunto adicional de módulos no pacote.", hard=False)
+
+
+    def _check_host_path(self, name, node):
+        """WEB-PKG-004: literal de caminho do host no 1o argumento de uma chamada de arquivo."""
+        arg = node.args[0] if node.args else None
+        if not (isinstance(arg, ast.Constant) and isinstance(arg.value, str)):
+            return
+        if rules_files.looks_like_host_path(arg.value):
+            self._emit("WEB-PKG-004", node, "Caminho do host usado no runtime: %s (%s)." % (arg.value, name),
+                       "Remapear para o FS virtual (caminho relativo ao jogo).")
 
 
 def _has_exit(body):

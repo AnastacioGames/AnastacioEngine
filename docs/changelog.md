@@ -39,6 +39,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Testes: `tools/tests/web_profile/test_collect.py` (14 casos puros; suíte total 47) e `engine_collect_bpy.py` (integração via `RangeEngine -b --python`, passou).
 - Limites conhecidos: imports relativos e `from pkg import submódulo` não são seguidos; PY-005 (main loop) não é coletado porque não há propriedade RNA para ele; PKG-005 por raiz/symlink fica para o marco F (exige raízes explícitas); entry scene ainda não restringe a coleta (todas as cenas entram); sem UI ligada.
 
+## 2026-09-18 - Web: WEB-PKG-004 no scanner Python
+
+- `rules_python.py`: literal de caminho do host (drive Windows, UNC, `/home`, `/Users`…) no 1º argumento de `open`, `os.*` de arquivo, `pathlib.Path`, `LibLoad` e `aud.Factory` gera WEB-PKG-004 (ERROR/CONFIRMED no nível do módulo em script necessário; senão WARNING/POTENTIAL). Caminhos formados dinamicamente não são cobertos (ficam para o navegador). Teste novo em `test_range_web.py` (34 casos, passam nos dois Pythons).
+
 ## 2026-09-18 - Web: marco B (núcleo puro `range_web`)
 
 - Novo pacote `release/scripts/modules/range_web/`, sem `bpy` e sem executar/importar os scripts analisados: `results.py` (`Finding` com gravidade e evidência independentes; `ERROR` exige evidência `CONFIRMED`; `Report` com JSON e resumo "Nenhuma incompatibilidade detectada", nunca "garantido"), `manifest.py` (schema `range-web-runtime` v1 do manifesto do **runtime**, distinto do `manifest.json` do pacote; `validated` exige `evidence`; capacidade ausente conta como não validada; manifesto ausente/ilegível/inválido/hash divergente vira um único WEB-PKG-001), `rules_files.py` (WEB-PKG-004/005/006/008/009: caminho do host, destinos virtuais, `..`, colisão e caixa, symlink fora das raízes, `.pyc` por magic, extensão nativa por assinatura, `.rasec`) e `rules_python.py` (AST: WEB-PY-001/002/003/004/005/006/007/008/009 e WEB-PKG-007).
