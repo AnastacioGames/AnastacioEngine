@@ -2,7 +2,7 @@
 # collect_bpy monta o Snapshot; aqui so se percorre o grafo. Scripts nunca sao importados nem
 # executados: so lidos e analisados por AST (rules_python).
 #
-# Limites: imports relativos e `from pkg import submodulo` nao sao seguidos (o analisador
+# Limites: imports relativos nao sao seguidos (o analisador
 # registra so o modulo nomeado); import dinamico vira WEB-PKG-007/WEB-PY-009 (aviso).
 
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
@@ -16,9 +16,9 @@ KIND_MODULE = "module"  # controller em modo Module / component: "pacote.modulo.
 class Reference:
     """Uma referencia do runtime a um script. `chain` = cadeia legivel ate a origem (Localizar)."""
 
-    __slots__ = ("kind", "target", "chain", "scene", "object", "datablock", "required")
+    __slots__ = ("kind", "target", "chain", "scene", "object", "datablock", "required", "is_module")
 
-    def __init__(self, kind, target, chain, scene="", object="", datablock="", required=True):
+    def __init__(self, kind, target, chain, scene="", object="", datablock="", required=True, is_module=False):
         self.kind = kind
         self.target = target
         self.chain = list(chain)
@@ -26,9 +26,10 @@ class Reference:
         self.object = object
         self.datablock = datablock
         self.required = required
+        self.is_module = is_module  # alvo ja e o modulo (import), nao "modulo.funcao"
 
     def location(self, **extra):
-        d = {"chain": " → ".join(self.chain), "scene": self.scene, "object": self.object,
+        d = {"chain": " > ".join(self.chain), "scene": self.scene, "object": self.object,
              "datablock": self.datablock}
         d.update(extra)
         return d
@@ -100,7 +101,7 @@ def resolve(snapshot):
             found = ("Text:" + name, snapshot.texts[name]) if name in snapshot.texts else None
             what = "Text"
         else:
-            name = _module_of(ref.target)
+            name = ref.target if ref.is_module else _module_of(ref.target)
             key = ("module", name)
             found = _lookup(snapshot, name)
             what = "Módulo"
@@ -123,7 +124,7 @@ def resolve(snapshot):
             if guarded or _lookup(snapshot, imp) is None:
                 continue
             sub = Reference(KIND_MODULE, imp, ref.chain + [imp], ref.scene, ref.object,
-                            ref.datablock, ref.required)
+                            ref.datablock, ref.required, is_module=True)
             queue.append(sub)
     return findings, visited
 

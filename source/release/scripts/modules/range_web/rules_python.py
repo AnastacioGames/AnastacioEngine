@@ -281,6 +281,12 @@ class _Analyzer(ast.NodeVisitor):
         for a in node.names:
             self._bind(a.asname or a.name, "%s.%s" % (node.module, a.name))
         self._check_import(node.module, node)
+        # `from pkg import util` pode ser submodulo: candidato para o coletor, que so segue
+        # o que existe no projeto (nao gera WEB-PY-001 se for um atributo).
+        for a in node.names:
+            if a.name != "*":
+                self.result.imports.append(("%s.%s" % (node.module, a.name),
+                                            getattr(node, "lineno", None), self.import_guard > 0))
 
     def _check_import(self, name, node):
         self.result.imports.append((name, getattr(node, "lineno", None), self.import_guard > 0))

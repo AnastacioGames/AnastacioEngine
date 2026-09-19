@@ -87,6 +87,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+<link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; height: 100%; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
   #stage { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -143,7 +144,12 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       if (!r.ok) throw new Error(url + ": HTTP " + r.status);
       return r.arrayBuffer();
     }).then(function (buf) {
-      Module.FS_createDataFile("/", fsName, new Uint8Array(buf), true, false);
+      var parts = fsName.split("/"), dir = "/";
+      for (var i = 0; i < parts.length - 1; i++) {
+        try { Module.FS_createPath(dir, parts[i], true, true); } catch (e) {}
+        dir += parts[i] + "/";
+      }
+      Module.FS_createDataFile(dir, parts[parts.length - 1], new Uint8Array(buf), true, false);
       log("[fs] /" + fsName + " (" + buf.byteLength + " bytes)");
     });
   }
@@ -209,8 +215,12 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 
 SERVE_PY = '''#!/usr/bin/env python3
 """Servidor local para testar o pacote Web: python serve.py [porta]"""
+import functools
 import http.server
+import os
 import sys
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -229,7 +239,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 print(f"Servindo em http://localhost:{port}/  (Ctrl+C para parar)")
-http.server.ThreadingHTTPServer(("", port), Handler).serve_forever()
+handler = functools.partial(Handler, directory=ROOT)
+http.server.ThreadingHTTPServer(("", port), handler).serve_forever()
 '''
 
 HOSTING_MD = """# Hospedagem do pacote Web
@@ -249,11 +260,23 @@ Este pacote e estatico: basta servir a pasta por HTTP(S). Nao abra `index.html` 
 """
 
 
+def extra_rel(path, root):
+    """Caminho do extra no FS virtual: relativo a `root` se estiver dentro dele, senao o nome."""
+    if root:
+        try:
+            return path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            pass
+    return path.name
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--game", required=True, type=Path, help="arquivo .range do jogo")
     ap.add_argument("--extra", action="append", default=[], type=Path,
                     help="arquivo extra colocado ao lado do .range (ex.: modulo .py); repetivel")
+    ap.add_argument("--extra-root", type=Path,
+                    help="pasta base: extras dentro dela mantem o caminho relativo no FS virtual")
     ap.add_argument("--runtime-dir", type=Path, default=REPO_ROOT / "build-web" / "bin")
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "build-web" / "dist")
     ap.add_argument("--name", help="nome do pacote (padrao: nome do .range)")
@@ -274,9 +297,10 @@ def main():
     for x in args.extra:
         if not x.is_file():
             die(f"arquivo extra nao encontrado: {x}")
-        if not NAME_RE.match(x.name):
-            die(f"nome de arquivo extra invalido: {x.name}")
-    names = [args.game.name] + [x.name for x in args.extra]
+        rel = extra_rel(x, args.extra_root)
+        if not all(NAME_RE.match(part) and part not in (".", "..") for part in rel.split("/")):
+            die(f"nome de arquivo extra invalido: {rel}")
+    names = [args.game.name] + [extra_rel(x, args.extra_root) for x in args.extra]
     if len(set(names)) != len(names):
         die("nomes duplicados entre jogo e extras (colidiriam no FS virtual)")
 
@@ -294,13 +318,15 @@ def main():
         shutil.copy2(args.runtime_dir / n, tmp / n)
     shutil.copy2(args.game, tmp / "game" / args.game.name)
     for x in args.extra:
-        shutil.copy2(x, tmp / "game" / x.name)
+        dst = tmp / "game" / extra_rel(x, args.extra_root)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(x, dst)
 
     title = args.title or name
     html = (INDEX_TEMPLATE
             .replace("__TITLE__", title.replace("<", "&lt;").replace(">", "&gt;"))
             .replace("__GAME__", args.game.name)
-            .replace("__EXTRAS__", json.dumps([x.name for x in args.extra]))
+            .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
             .replace("__VERSION__", args.version)
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))

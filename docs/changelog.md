@@ -4,6 +4,20 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-18 - Web: export com validação (marco F, parcial)
+
+- `range_web/export.py`: `export_package` bloqueia por erros, gera em diretório temporário e troca o destino; falha ou cancelamento preserva o export anterior. Testes puros em `test_export.py`.
+- Botão Exportar Web (`scene.range_web_export`) valida de novo pelo mesmo caminho do Validar Web, exige arquivo salvo e chama `tools/web/package-web.py` (só em árvore de desenvolvimento). Teste no motor: `tools/tests/web_profile/engine_web_export.py`. O painel/botão não foi exercitado numa janela gráfica.
+- Comando de linha: `RangeEngine -b jogo.blend --python tools/web/validate-web.py -- [--json out.json] [--export] [--out-dir D]` usa `_run_validation` e o operador de export (mesmo validador do painel); sai com 1 se houver erros. Teste: `tools/tests/web_profile/engine_web_cli.py`.
+- Módulos `.py` do projeto (inclusive em subpastas) e assets externos dentro da pasta do `.blend` entram no pacote mantendo o caminho relativo (`--extra-root` no empacotador). Arquivos fora da pasta do projeto ficam de fora. A criação de diretórios no FS virtual (`FS_createPath` em index.html) foi confirmada no navegador (log `[fs] /pkg/util.py`). Painel Web (Range) verificado à mão no editor: Validar, Exportar, Localizar, bloqueio por erro e aviso de arquivo não salvo. O analisador agora segue `from pkg import util` e `import pkg.util` até o submódulo (antes o alvo era truncado para `pkg`).
+- Assets externos (imagem, som, fonte, biblioteca) fora da pasta do `.blend`, ou symlinks que escapam dela, agora geram erro `WEB-PKG-005` no Validar Web e bloqueiam a exportação. Antes ficavam de fora do pacote sem aviso.
+- O Validar Web também confere os arquivos que entram no pacote (módulos alcançados e assets dentro da pasta do projeto): destinos duplicados ou que só diferem na caixa (`WEB-PKG-005/006`) e tipo de arquivo (`.rasec` = `WEB-PKG-009`; `.pyd`/`.dll`/`.so` = `WEB-PKG-008`; `.pyc` sem o magic do runtime só avisa). Implementado em `collect_bpy._check_package_files`. Sem limite de tamanho de asset: o plano só prevê orçamento de textura (WEB-GFX-004), de outro marco.
+
+## 2026-09-18 - Web: leitura do pré-voo (marco E, parcial)
+
+- `range_web/preflight.py` transforma o relatório JSON do navegador (isolamento, WebGL, arquivos/MIME/hash, contexto perdido, shaders, erros Python) em Findings WEB-DEPLOY-001/002/003, WEB-GFX-001/002, WEB-PY-001, WEB-PKG-003 e WEB-PY-009. Testes puros em `tools/tests/web_profile/test_preflight.py`.
+- Falta a página de pré-voo que produz esse JSON, a captura de logs e o teste no navegador (exigem Node.js/Chrome, ausentes nesta máquina).
+
 ## 2026-09-18 - Web: manifesto do runtime (marco D, parcial)
 
 - `tools/web/make-runtime-manifest.py` gera `RangeRuntime.manifest.json` ao lado de `RangeRuntime.{js,wasm,data}`: hashes/tamanhos, módulos Python (stdlib do `python311.zip` + símbolos `PyInit_*` de `libpython3.11.a` + núcleo + `Range`/`mathutils`/`bgl`/`blf`) e capacidades do preset (`audio`, `threads`, `touch`, `video`, `network` = `disabled`; `gamepad`, `save` = `unvalidated`). Nada vira `validated` sem `--evidence capacidade=teste`. `aud` fica fora: só existe com `WITH_AUDASPACE`.

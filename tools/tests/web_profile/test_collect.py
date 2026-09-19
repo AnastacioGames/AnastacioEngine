@@ -48,7 +48,7 @@ class ResolveTests(unittest.TestCase):
         findings, _ = collect.resolve(snap([ref(KIND_MODULE, "door_logic.open")]))
         self.assertEqual(ids(findings), ["WEB-PKG-003"])
         loc = findings[0].location
-        self.assertEqual(loc["chain"], "fase.range → Porta → Abrir")
+        self.assertEqual(loc["chain"], "fase.range > Porta > Abrir")
         self.assertEqual(loc["object"], "Porta")
         self.assertEqual(loc["source"], "door_logic")
 
@@ -67,7 +67,7 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(ids(findings), ["WEB-PY-001"])
         self.assertIn(("module", "b"), visited)
         self.assertEqual(findings[0].location["source"], "/proj/b.py")
-        self.assertEqual(findings[0].location["chain"], "fase.range → Porta → Abrir → b")
+        self.assertEqual(findings[0].location["chain"], "fase.range > Porta > Abrir > b")
 
     def test_cycle_terminates_and_analyzes_once(self):
         files = {"a": "import b\nimport subprocess\nsubprocess.run(['x'])\n", "b": "import a\n"}
@@ -102,6 +102,14 @@ class ResolveTests(unittest.TestCase):
         findings, _ = collect.resolve(snap([ref(KIND_MODULE, "game.logic.Comp")], files))
         self.assertEqual(findings, [])
 
+    def test_from_package_import_submodule_is_followed(self):
+        files = {"a": "from pkg import util, CONST\n", "pkg": "CONST = 1\n",
+                 "pkg.util": "import subprocess\nsubprocess.run(['x'])\n"}
+        findings, visited = collect.resolve(snap([ref(KIND_MODULE, "a.f")], files))
+        self.assertEqual(ids(findings), ["WEB-PY-002"])
+        self.assertIn(("module", "pkg.util"), visited)
+        self.assertNotIn(("module", "pkg.CONST"), visited)
+
     def test_syntax_error_in_dependency(self):
         findings, _ = collect.resolve(snap([ref(KIND_MODULE, "a.f")], {"a": "def (:\n"}))
         self.assertEqual(ids(findings), ["WEB-PY-008"])
@@ -109,13 +117,23 @@ class ResolveTests(unittest.TestCase):
 
 class AssetTests(unittest.TestCase):
     def test_missing_asset_error_with_origin(self):
-        origin = {"datablock": "Image:wall", "chain": "Imagem → wall"}
+        origin = {"datablock": "Image:wall", "chain": "Imagem > wall"}
         findings = collect.check_assets([("Imagem", "/x/wall.png", origin)], lambda p: False)
         self.assertEqual(ids(findings), ["WEB-PKG-003"])
         self.assertEqual(findings[0].location["datablock"], "Image:wall")
 
     def test_present_asset_ok(self):
         self.assertEqual(collect.check_assets([("Som", "/x/a.ogg", {})], lambda p: True), [])
+
+    def test_asset_outside_project_root_is_pkg005(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as proj, tempfile.TemporaryDirectory() as other:
+            inside, outside = os.path.join(proj, "a.png"), os.path.join(other, "b.png")
+            for p in (inside, outside):
+                open(p, "wb").close()
+            findings = collect.check_assets([("Imagem", inside, {}), ("Imagem", outside, {})],
+                                            os.path.isfile, roots=(proj,))
+            self.assertEqual(ids(findings), ["WEB-PKG-005"])
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import os
 import bpy
 
 from . import collect
+from . import rules_files
 from .results import Report
 
 ASSET_IMAGE = "Imagem"
@@ -110,20 +111,20 @@ def collect_assets():
         if img.users == 0:
             continue
         assets.append((ASSET_IMAGE, _abs(img.filepath), {"datablock": "Image:" + img.name,
-                                                          "chain": "Imagem → " + img.name}))
+                                                          "chain": "Imagem > " + img.name}))
     for snd in bpy.data.sounds:
         if snd.packed_file or not snd.filepath or snd.users == 0:
             continue
         assets.append((ASSET_SOUND, _abs(snd.filepath), {"datablock": "Sound:" + snd.name,
-                                                          "chain": "Som → " + snd.name}))
+                                                          "chain": "Som > " + snd.name}))
     for font in bpy.data.fonts:
         if font.packed_file or not font.filepath or font.filepath.startswith("<"):
             continue
         assets.append((ASSET_FONT, _abs(font.filepath), {"datablock": "Font:" + font.name,
-                                                          "chain": "Fonte → " + font.name}))
+                                                          "chain": "Fonte > " + font.name}))
     for lib in bpy.data.libraries:
         assets.append((ASSET_LIBRARY, _abs(lib.filepath), {"datablock": "Library:" + lib.name,
-                                                            "chain": "Biblioteca → " + lib.name}))
+                                                            "chain": "Biblioteca > " + lib.name}))
     return assets
 
 
@@ -152,6 +153,19 @@ def snapshot_hash(snapshot, assets, file_hashes):
     return h.hexdigest()
 
 
+def collect_extra_files(scenes=None, stdlib=None):
+    """Arquivos do projeto para o `--extra` do empacotador: modulos .py alcancados pelos
+    controllers e assets externos, desde que estejam dentro da pasta do projeto (o caminho
+    relativo e mantido via --extra-root). Fora dela nao ha caminho estavel no pacote."""
+    scenes = list(scenes if scenes is not None else bpy.data.scenes)
+    snapshot, assets, seen = build_snapshot(scenes, stdlib=stdlib)
+    collect.resolve(snapshot)
+    root = project_root()
+    prefix = root + os.sep
+    paths = set(seen) | {p for _kind, p, _origin in assets if os.path.isfile(p)}
+    return sorted(p for p in paths if p.startswith(prefix))
+
+
 def collect_report(scenes=None, stdlib=None):
     """Coleta e resolve. `scenes` None = todas as cenas do arquivo. Retorna Report (sem regras
     de renderizacao/midia, que pertencem a marcos posteriores)."""
@@ -162,6 +176,27 @@ def collect_report(scenes=None, stdlib=None):
     report = Report(snapshot_hash(snapshot, assets, file_hashes))
     findings, _visited = collect.resolve(snapshot)
     report.extend(findings)
-    # Sem `roots`: raizes explicitas do pacote (PKG-005 por symlink) chegam no marco F.
-    report.extend(collect.check_assets(assets, os.path.isfile))
+    # Asset fora da pasta do projeto (ou symlink que escapa) nao entra no pacote: PKG-005.
+    report.extend(collect.check_assets(assets, os.path.isfile, roots=(project_root(),)))
+    report.extend(_check_package_files(project_root(), assets, file_hashes))
     return report
+
+
+def _check_package_files(root, assets, module_files):
+    """Destinos virtuais (colisao/caixa: PKG-005/006) e tipo de arquivo (PKG-008/009) do que
+    entra no pacote: modulos alcancados e assets dentro da pasta do projeto."""
+    if not root:
+        return []
+    prefix = root + os.sep
+    paths = set(module_files) | {p for _kind, p, _origin in assets if os.path.isfile(p)}
+    inside = sorted(p for p in paths if p.startswith(prefix))
+    findings = rules_files.check_destinations(
+        [(p[len(prefix):].replace(os.sep, "/"), p) for p in inside])
+    for p in inside:
+        try:
+            with open(p, "rb") as f:
+                head = f.read(4)
+        except OSError:
+            continue  # ilegivel: o empacotador reporta
+        findings.extend(rules_files.check_file_kind(os.path.basename(p), head, source=p))
+    return findings

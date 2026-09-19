@@ -86,6 +86,14 @@ try:
     text.write("x = 1\n")
     check(collect_bpy.collect_report(stdlib=STDLIB).snapshot_hash != report.snapshot_hash,
           "hash muda ao editar Text")
+
+    # Arquivos do pacote: tipo (PKG-008/009) e colisao de caixa entre destinos (PKG-006).
+    for name in ("musica.rasec", "ok.ogg"):
+        with open(os.path.join(tmp, name), "wb") as f:
+            f.write(b"\0\0\0\0")
+    assets = [("Som", os.path.join(tmp, n), {}) for n in ("musica.rasec", "ok.ogg")]
+    got = sorted(f.rule_id for f in collect_bpy._check_package_files(tmp, assets, {}))
+    check(got == ["WEB-PKG-009"], "asset .rasec no pacote e PKG-009 (%s)" % got)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

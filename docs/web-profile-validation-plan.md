@@ -271,8 +271,8 @@ o jogador recebe mensagem simples e opção de tentar novamente quando aplicáve
 | B — Núcleo (**feito**, núcleo puro; integração `bpy` é do marco C) | Schema do manifesto, resultados e regras de arquivos/Python | Testes puros com casos positivos/negativos e integração `bpy`; nenhuma execução de scripts analisados. |
 | C — Coleta (**feito**, sem UI) | Cenas, bibliotecas, controllers/components, assets e referências | Fixtures de dependências transitivas, ciclos e referências dinâmicas; Localizar aponta origem correta. |
 | D — Convergência (**parcial**: manifesto gerado e consumido; falta teste automatizado no navegador) | Consumir runtime da Etapa 6, manifesto e pacote mínimo | Cubo da engine + Python controller + A/D no navegador. PoC C→Python isolada não fecha este marco. |
-| E — Validação Web | Pré-voo, logs, testes de shader e execução | Falhas de contexto/arquivo/import chegam ao relatório; desktop Play identificado como desktop. |
-| F — Export | Pacote reproduzível e regras obrigatórias em todo entry point | Export via UI e comando usam mesmo validador; snapshot sem alterações ocultas; falha preserva export anterior. |
+| E — Validação Web (**parcial**: leitura do pré-voo em `preflight.py`; falta página de pré-voo e teste no navegador) | Pré-voo, logs, testes de shader e execução | Falhas de contexto/arquivo/import chegam ao relatório; desktop Play identificado como desktop. |
+| F — Export (**parcial**: botão e núcleo de export; comando de linha feito; módulos e assets do projeto incluídos (subpastas no FS virtual confirmadas no navegador)) | Pacote reproduzível e regras obrigatórias em todo entry point | Export via UI e comando usam mesmo validador; snapshot sem alterações ocultas; falha preserva export anterior. |
 | G — Expansão | Áudio, saves, render avançado, transições e dispositivos | Cada capacidade sai de N somente com teste específico no runtime e navegadores declarados. |
 
 A/B/C podem ser desenvolvidos antes do port final, em arquivos próprios, após coordenar ownership.

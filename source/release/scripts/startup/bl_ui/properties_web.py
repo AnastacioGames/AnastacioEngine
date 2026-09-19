@@ -9,7 +9,7 @@ from .properties_scene import SceneButtonsPanel
 
 WEB_SCHEMA_VERSION = 1
 WEB_RUNTIME_ID = "web-runtime-release"
-WEB_EXPORT_BLOCKED_REASON = "Empacotamento Web ainda não implementado (marco F)."
+WEB_EXPORT_BLOCKED_REASON = "Exporte a partir de uma árvore de desenvolvimento com tools/web/package-web.py."
 
 _MAX_ROWS_SHOWN = 30
 _ENGINE_API_MODULES = frozenset(("Range", "mathutils", "bgl", "blf", "aud"))
@@ -35,6 +35,34 @@ def _runtime_candidates():
             dirs.append(candidate)
             break
     return dirs
+
+
+def _packager_path():
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    while here != os.path.dirname(here):
+        here = os.path.dirname(here)
+        candidate = os.path.join(here, "tools", "web", "package-web.py")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _run_validation(context):
+    """Coleta e valida agora; é o único caminho usado pelo botão Validar e pelo Exportar."""
+    import sys
+    from range_web import collect_bpy, runtime
+
+    # Com manifesto do runtime, os módulos Python vêm dele. Sem manifesto (WEB-PKG-001 já
+    # vai no relatório), a biblioteca padrão do interpretador em uso serve de aproximação
+    # para WEB-PY-001/PKG-003; os módulos da API do motor (KX_PythonInit.cpp) contam como presentes.
+    info = runtime.find_runtime(context.scene.range_web.runtime_id, _runtime_candidates())
+    stdlib = info.python_modules()
+    if stdlib is None:
+        stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
+    report = collect_bpy.collect_report(stdlib=stdlib)
+    report.extend(info.findings)
+    return report, info
 
 
 # Último Report da validação. Transitório: não vai para o .blend e é descartado ao recarregar.
@@ -93,10 +121,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         self._draw_report(layout)
 
         layout.separator()
-        col = layout.column()
-        col.enabled = False
-        col.label(text="Exportar Web indisponível:")
-        col.label(text=WEB_EXPORT_BLOCKED_REASON)
+        layout.operator("scene.range_web_export", icon='EXPORT')
         layout.label(text="Prévia desktop (tecla P) não é Teste Web.")
 
     @staticmethod
@@ -132,19 +157,70 @@ class SCENE_OT_range_web_validate(Operator):
 
     def execute(self, context):
         global _last_report
-        import sys
-        from range_web import collect_bpy, runtime
-
-        # Com manifesto do runtime, os módulos Python vêm dele. Sem manifesto (WEB-PKG-001 já
-        # vai no relatório), a biblioteca padrão do interpretador em uso serve de aproximação
-        # para WEB-PY-001/PKG-003; os módulos da API do motor (KX_PythonInit.cpp) contam como presentes.
-        info = runtime.find_runtime(context.scene.range_web.runtime_id, _runtime_candidates())
-        stdlib = info.python_modules()
-        if stdlib is None:
-            stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
-        _last_report = collect_bpy.collect_report(stdlib=stdlib)
-        _last_report.extend(info.findings)
+        _last_report, _info = _run_validation(context)
         self.report({'WARNING' if _last_report.errors else 'INFO'}, _last_report.summary())
+        return {'FINISHED'}
+
+
+class SCENE_OT_range_web_export(Operator):
+    """Valida de novo e gera o pacote Web; erros bloqueiam e o export anterior é preservado"""
+    bl_idname = "scene.range_web_export"
+    bl_label = "Exportar Web"
+
+    def execute(self, context):
+        global _last_report
+        import os
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
+        from range_web import export
+
+        web = context.scene.range_web
+        # Em modo background is_dirty nunca zera (não há janela para reiniciá-lo).
+        if not bpy.data.filepath or (bpy.data.is_dirty and not bpy.app.background):
+            self.report({'WARNING'}, "Salve o arquivo antes de exportar: o pacote usa o .range salvo.")
+            return {'CANCELLED'}
+        packager = _packager_path()
+        python = shutil.which("python") or shutil.which("python3")
+        if packager is None or python is None:
+            self.report({'WARNING'}, WEB_EXPORT_BLOCKED_REASON)
+            return {'CANCELLED'}
+
+        _last_report, info = _run_validation(context)
+        if not info.usable:
+            self.report({'WARNING'}, "Runtime Web indisponível; veja WEB-PKG-001 no relatório.")
+            return {'CANCELLED'}
+        dest = bpy.path.abspath(web.output_directory)
+        game = bpy.data.filepath
+        from range_web import collect_bpy
+        extras = collect_bpy.collect_extra_files()
+
+        def build(out):
+            with tempfile.TemporaryDirectory() as scratch:
+                name = "pkg"
+                game_copy = os.path.join(scratch, os.path.splitext(os.path.basename(game))[0] + ".range")
+                shutil.copy2(game, game_copy)
+                cmd = [python, packager, "--game", game_copy, "--name", name,
+                       "--runtime-dir", info.directory, "--out-dir", scratch]
+                cmd += ["--extra-root", collect_bpy.project_root()]
+                for extra in extras:
+                    cmd += ["--extra", extra]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise RuntimeError(result.stderr.strip() or "empacotador falhou")
+                for entry in os.listdir(os.path.join(scratch, name)):
+                    shutil.move(os.path.join(scratch, name, entry), os.path.join(out, entry))
+
+        try:
+            export.export_package(_last_report, dest, build)
+        except export.ExportBlocked as exc:
+            self.report({'WARNING'}, "%s Corrija e valide novamente." % exc)
+            return {'CANCELLED'}
+        except Exception as exc:
+            self.report({'WARNING'}, "Export falhou; o anterior foi preservado: %s" % exc)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Pacote Web gerado em %s" % dest)
         return {'FINISHED'}
 
 
@@ -181,6 +257,7 @@ classes = (
     RangeWebSettings,
     SCENE_OT_range_web_validate,
     SCENE_OT_range_web_locate,
+    SCENE_OT_range_web_export,
     SCENE_PT_range_web,
 )
 
