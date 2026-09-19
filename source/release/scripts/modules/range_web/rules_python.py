@@ -301,6 +301,9 @@ class _Analyzer(ast.NodeVisitor):
         if top in EDITOR_MODULES:
             self._emit("WEB-PY-007", node, "Import de %s (API exclusiva do editor)." % top,
                        "Separar a ferramenta de autoria da lógica do jogo.")
+        elif top == "bge" and (self.available is None or top not in self.available):
+            self._emit("WEB-PY-001", node, "Import não resolvido: %s (o motor expõe a API como Range)." % name,
+                       "Trocar `import bge` por `import Range` (bge.logic -> Range.logic, bge.types -> Range.types).")
         elif self.available is not None and top not in self.available:
             self._emit("WEB-PY-001", node, "Import não resolvido: %s." % name,
                        "Incluir o módulo no pacote ou usar um módulo presente no runtime.")

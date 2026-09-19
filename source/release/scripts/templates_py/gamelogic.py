@@ -1,7 +1,7 @@
 # This script must be assigned to a python controller
 # where it can access the object that owns it and the sensors/actuators that it connects to.
 
-import bge
+import Range
 
 # support for Vector(), Matrix() types and advanced functions like Matrix.Scale(...) and Matrix.Rotation(...)
 # import mathutils
@@ -11,7 +11,7 @@ import bge
 
 
 def main():
-    cont = bge.logic.getCurrentController()
+    cont = Range.logic.getCurrentController()
 
     # The KX_GameObject that owns this controller.
     own = cont.owner
@@ -53,7 +53,7 @@ def main():
     # actu_motion = cont.actuators["motion"]
 
     # Loop through all other objects in the scene
-    sce = bge.logic.getCurrentScene()
+    sce = Range.logic.getCurrentScene()
     print("Scene Objects:", sce.name)
     for ob in sce.objects:
         print("   ", ob.name, ob.worldPosition)

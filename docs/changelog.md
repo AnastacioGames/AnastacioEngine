@@ -42,6 +42,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 ## 2026-09-18 - Web: WEB-PKG-004 no scanner Python
 
 - `rules_python.py`: literal de caminho do host (drive Windows, UNC, `/home`, `/Users`…) no 1º argumento de `open`, `os.*` de arquivo, `pathlib.Path`, `LibLoad` e `aud.Factory` gera WEB-PKG-004 (ERROR/CONFIRMED no nível do módulo em script necessário; senão WARNING/POTENTIAL). Caminhos formados dinamicamente não são cobertos (ficam para o navegador). Teste novo em `test_range_web.py` (34 casos, passam nos dois Pythons).
+- `import bge` (nome legado; o motor só expõe `Range`) gera WEB-PY-001 com a correção `import Range`. Template `templates_py/gamelogic.py` migrado para `import Range`.
 
 ## 2026-09-18 - Web: marco B (núcleo puro `range_web`)
 

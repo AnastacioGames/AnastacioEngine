@@ -194,6 +194,14 @@ class PythonTest(unittest.TestCase):
         self.assertEqual(f[0].severity, SEVERITY_WARNING)
         self.assertEqual(ids(analyze("open('data/x.txt')\nopen('//rel.png')\n").findings), [])
 
+    def test_legacy_bge_import(self):
+        for src in ("import bge\n", "from bge import logic\n", "import bge.types\n"):
+            f = analyze(src).findings
+            self.assertEqual(ids(f), ["WEB-PY-001"], src)
+            self.assertIn("import Range", f[0].fix)
+        self.assertEqual(ids(analyze("import bge\n", available=None).findings), ["WEB-PY-001"])
+        self.assertEqual(ids(analyze("import Range\n", available=STDLIB | {"Range"}).findings), [])
+
     def test_syntax_error(self):
         f = analyze("def x(:\n  pass\n").findings
         self.assertEqual(ids(f), ["WEB-PY-008"])
