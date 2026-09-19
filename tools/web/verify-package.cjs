@@ -3,6 +3,8 @@
 // imprime o log do runtime. Sai com codigo != 0 se houver erro visivel, aborto ou excecao.
 //
 // Uso: node tools/web/verify-package.cjs http://127.0.0.1:8791/ [porta-cdp=9333] [segundos=25]
+// Com PREFLIGHT_OUT=arquivo.json a pagina abre com ?preflight=1 e o relatorio "range-web-preflight"
+// (window.rangePreflight()) e gravado nesse arquivo, para range_web.preflight.check_preflight.
 // Requer Chrome ja aberto com --remote-debugging-port=<porta-cdp> (ver docs/web-deploy.md).
 const url = process.argv[2];
 const port = process.argv[3] || '9333';
@@ -26,7 +28,7 @@ if (!url) { console.error('uso: verify-package.cjs <url> [porta-cdp] [segundos]'
 
   await call('Runtime.enable'); await call('Page.enable');
   await call('Network.enable'); await call('Network.setCacheDisabled', { cacheDisabled: true });
-  await call('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'debug=1' });
+  await call('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'debug=1' + (process.env.PREFLIGHT_OUT ? '&preflight=1' : '') });
 
   // Espera o botao Jogar liberar (runtime + dados carregados) ou erro visivel.
   let state = '';
@@ -44,6 +46,11 @@ if (!url) { console.error('uso: verify-package.cjs <url> [porta-cdp] [segundos]'
       await sleep(300);
     }
     await sleep(2000);
+  }
+  if (process.env.PREFLIGHT_OUT) {
+    const r = await call('Runtime.evaluate', { expression: 'window.rangePreflight()', awaitPromise: true, returnByValue: true });
+    require('fs').writeFileSync(process.env.PREFLIGHT_OUT, JSON.stringify(r.result?.value ?? null, null, 2));
+    console.log('pre-voo gravado em', process.env.PREFLIGHT_OUT);
   }
   const runtimeLog = await evalJs(`document.getElementById('log').textContent`);
   const errText = await evalJs(`document.getElementById('error').textContent`);

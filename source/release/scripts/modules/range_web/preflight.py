@@ -10,6 +10,8 @@
 #   shader_errors: [{material, stage, log}]
 #   python_errors: [{kind: "ImportError"|"FileNotFoundError"|..., module, file, text}]
 
+import json
+
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 
 PREFLIGHT_SCHEMA = "range-web-preflight"
@@ -21,6 +23,18 @@ _WASM_MIME = "application/wasm"
 def _err(rule_id, message, fix="", location=None, capability=""):
     return Finding(rule_id, SEVERITY_ERROR, EVIDENCE_CONFIRMED, message, fix=fix,
                    location=location, capability=capability)
+
+
+def load_preflight(path, runtime_manifest=None):
+    """Le o JSON gravado pela pagina de pre-voo e devolve seus Findings; arquivo ilegivel vira WEB-DEPLOY-002."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        return [_err("WEB-DEPLOY-002", "Não foi possível ler o relatório de pré-voo: %s" % exc,
+                     fix="Gerar o relatório com PREFLIGHT_OUT=arquivo.json no verify-package.cjs.",
+                     location={"source": str(path)})]
+    return check_preflight(data, runtime_manifest)
 
 
 def check_preflight(data, runtime_manifest=None):
@@ -95,14 +109,23 @@ def _check_context(data):
 
 
 def _check_shaders(data):
-    return [_err("WEB-GFX-002", "Shader não compilou (%s, material %s)." % (s.get("stage", "?"), s.get("material", "?")),
-                 fix=s.get("log", ""), location={"source": s.get("material", "")})
-            for s in data.get("shader_errors", ())]
+    out = []
+    for s in data.get("shader_errors", ()):
+        where = ", material %s" % s["material"] if s.get("material") else ""
+        out.append(_err("WEB-GFX-002", "Shader não compilou (estágio %s%s)." % (s.get("stage", "?"), where),
+                        fix=s.get("log", ""), location={"source": s.get("material", "")}))
+    return out
 
 
 def _check_python(data):
     out = []
+    seen = set()
     for e in data.get("python_errors", ()):
+        # O mesmo erro repete a cada frame do controller; um resultado por causa.
+        key = (e.get("kind"), e.get("module"), e.get("file"), e.get("text"))
+        if key in seen:
+            continue
+        seen.add(key)
         kind = e.get("kind", "")
         if kind in ("ImportError", "ModuleNotFoundError"):
             out.append(_err("WEB-PY-001", "Import falhou no runtime: %s." % (e.get("module") or e.get("text", "?")),

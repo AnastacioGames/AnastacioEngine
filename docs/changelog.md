@@ -4,6 +4,28 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Pré-voo Web: casos positivos reais de Python e shader
+
+- Três cenas com falha proposital (import de módulo inexistente, `int("abc")`, filtro 2D custom com GLSL inválido) empacotadas com o runtime release e abertas no Chrome headless. O pré-voo agora acusa: WEB-PY-001 (módulo), WEB-PY-009 (ValueError) e WEB-GFX-002 (shader, com o log `ERROR: 0:1: ...` do compilador).
+- Defeitos achados e corrigidos: o mesmo erro de Python se repetia a cada frame (47 entradas; agora um por causa, na página e em `check_preflight`); o log do shader chegava só como cabeçalho (as linhas `ERROR:` seguintes agora são anexadas); `ValueError` sem "Traceback" na mesma linha era perdido (a página passou a rastrear o traceback aberto). Códigos ANSI removidos do texto.
+- Ainda heurístico: estágio do shader sai `?` e o material vem vazio (o runtime não informa); só esses três tipos de falha foram exercitados.
+
+## 2026-09-19 - Pré-voo Web importado no editor
+
+- `range_web/preflight.py`: `load_preflight(path)` lê o JSON do pré-voo e devolve Findings; arquivo ilegível ou JSON inválido vira WEB-DEPLOY-002. Teste novo em `test_preflight.py` (68 testes passam).
+- `properties_web.py`: botão "Importar pré-voo Web" escolhe o JSON e junta os resultados ao relatório atual (marcados `origin: preflight`, substituídos a cada importação). Validar/Exportar não rodam o navegador nem reaproveitam o pré-voo. Só o import de módulo foi compilado; o botão não foi exercitado no editor.
+
+## 2026-09-19 - Pré-voo Web (marco E, página)
+
+- `tools/web/package-web.py`: `index.html` aceita `?preflight=1` e monta o relatório `range-web-preflight` v1 (WebGL, isolamento, arquivos com MIME/hash, contexto perdido, erros de shader/Python por heurística). `verify-package.cjs` grava o relatório com `PREFLIGHT_OUT`.
+- Verificado no Chrome headless (SwiftShader) com `web-smoke.range` e o runtime recém-compilado: jogo rodou, relatório sem findings em `check_preflight`; relatório adulterado (hash, MIME) gera WEB-DEPLOY-002. Não exercitados: casos positivos reais de shader/Python.
+- Hook do manifesto verificado: `cmake --build --preset web-runtime-release` linkou e regenerou `RangeRuntime.manifest.json` (240 módulos).
+
+## 2026-09-19 - Manifesto do runtime Web regenerado no build
+
+- `source/source/blenderplayer/CMakeLists.txt`: sob Emscripten, `RangeRuntime` ganhou um `POST_BUILD` que roda `tools/web/make-runtime-manifest.py` no diretório do binário, usando `PYTHON_EXECUTABLE` do host. Evita manifesto com hashes antigos bloqueando o export com WEB-PKG-001. Sem `PYTHON_EXECUTABLE` só emite aviso de configuração.
+- Verificado depois em build real (ver entrada do pré-voo acima).
+
 ## 2026-09-19 - Release 0.4.0
 
 - Versão do splash atualizada para 0.4.0 (`wm.py`). Pacote Windows `AnastacioEngine-0.4.0-windows-x64.zip` montado a partir de `build/bin/` e validado extraindo o ZIP: `RangeEngine.exe` e `RangeRuntime.exe` (com `demos/Example_ImgGui`) iniciam, sem erros SideBySide.

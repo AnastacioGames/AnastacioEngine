@@ -4,6 +4,13 @@ Estado em 2026-09-18: empacotador e verificador implementados e exercitados com 
 Ainda **não** integrados à interface da Range Engine (ver [web-profile-validation-plan.md](web-profile-validation-plan.md),
 marco F) e o runtime tem preset de release (`web-runtime-release`).
 
+## Pré-voo no navegador
+
+Abrir o pacote com `?preflight=1` mostra e expõe (`window.rangePreflight()`) o relatório `range-web-preflight` v1:
+isolamento de origem, WebGL, status/MIME/SHA-256 de cada arquivo contra o `manifest.json`, perda de contexto e
+erros de shader/Python extraídos do log. `PREFLIGHT_OUT=pf.json node tools/web/verify-package.cjs <url>` grava o
+relatório; `range_web.preflight.check_preflight` o converte em resultados. A extração de shader/Python é heurística.
+
 ## Gerar o pacote
 
 Pré-requisito: `RangeRuntime.{js,wasm,data}` gerados (a partir de `source/`, com o emsdk ativo) por

@@ -123,6 +123,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         layout.separator()
         layout.operator("scene.range_web_export", icon='EXPORT')
         layout.label(text="Prévia desktop (tecla P) não é Teste Web.")
+        layout.operator("scene.range_web_import_preflight", icon='FILE_FOLDER')
 
     @staticmethod
     def _draw_report(layout):
@@ -221,6 +222,36 @@ class SCENE_OT_range_web_export(Operator):
             self.report({'WARNING'}, "Export falhou; o anterior foi preservado: %s" % exc)
             return {'CANCELLED'}
         self.report({'INFO'}, "Pacote Web gerado em %s" % dest)
+        return {'FINISHED'}
+
+
+class SCENE_OT_range_web_import_preflight(Operator):
+    """Lê o relatório de pré-voo (JSON) do pacote no navegador e junta os resultados ao relatório"""
+    bl_idname = "scene.range_web_import_preflight"
+    bl_label = "Importar pré-voo Web"
+
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'})
+    filter_glob: bpy.props.StringProperty(default="*.json", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        global _last_report
+        from range_web import preflight, results
+
+        # Pré-voo descreve um pacote já publicado; o Exportar revalida e não o reaproveita.
+        if _last_report is None:
+            _last_report = results.Report()
+        _last_report.findings = [f for f in _last_report.findings
+                                 if f.location.get("origin") != "preflight"]
+        found = preflight.load_preflight(bpy.path.abspath(self.filepath))
+        for finding in found:
+            finding.location["origin"] = "preflight"
+        _last_report.extend(found)
+        self.report({'WARNING' if found else 'INFO'},
+                    "Pré-voo: %d problema(s)." % len(found) if found else "Pré-voo sem problemas.")
         return {'FINISHED'}
 
 

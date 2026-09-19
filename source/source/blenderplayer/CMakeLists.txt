@@ -133,6 +133,20 @@ if(EMSCRIPTEN)
 		"-sFORCE_FILESYSTEM=1"
 		"--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/web_idbfs_prerun.js"
 	)
+
+	# Regenera RangeRuntime.manifest.json a cada link: um manifesto velho (hashes dos
+	# artefatos antigos) bloqueia o export Web com WEB-PKG-001. Roda no python do host.
+	if(PYTHON_EXECUTABLE)
+		add_custom_command(TARGET RangeRuntime POST_BUILD
+			COMMAND ${PYTHON_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/../tools/web/make-runtime-manifest.py
+				--runtime-dir $<TARGET_FILE_DIR:RangeRuntime>
+			COMMENT "Gerando RangeRuntime.manifest.json"
+			VERBATIM
+		)
+	else()
+		message(WARNING "PYTHON_EXECUTABLE ausente: o manifesto do runtime Web nao sera regenerado no build")
+	endif()
 endif()
 
 add_dependencies(RangeRuntime makesdna)

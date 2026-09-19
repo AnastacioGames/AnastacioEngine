@@ -1,7 +1,9 @@
 """Testes puros da leitura do relatorio de pre-voo (marco E). Sem bpy."""
 
+import json
 import os
 import sys
+import tempfile
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -21,6 +23,18 @@ def ids(findings):
 
 
 class PreflightTests(unittest.TestCase):
+    def test_load_preflight_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            good = os.path.join(d, "ok.json")
+            with open(good, "w", encoding="utf-8") as fh:
+                json.dump(report(context_lost=True), fh)
+            bad = os.path.join(d, "bad.json")
+            with open(bad, "w", encoding="utf-8") as fh:
+                fh.write("{nao e json")
+            self.assertEqual(ids(preflight.load_preflight(good)), ["WEB-DEPLOY-003"])
+            self.assertEqual(ids(preflight.load_preflight(bad)), ["WEB-DEPLOY-002"])
+            self.assertEqual(ids(preflight.load_preflight(os.path.join(d, "x.json"))), ["WEB-DEPLOY-002"])
+
     def test_clean_report_has_no_findings(self):
         data = report(cross_origin_isolated=True, webgl={"version": 2},
                       files=[{"name": "a.wasm", "status": 200, "mime": "application/wasm"}])
@@ -51,6 +65,11 @@ class PreflightTests(unittest.TestCase):
         found = preflight.check_preflight(data)
         self.assertEqual(ids(found), ["WEB-DEPLOY-002"] * 3)
         self.assertEqual([f.location["source"] for f in found], ["g.data", "r.wasm", "r.js"])
+
+    def test_repeated_python_error_reported_once(self):
+        e = {"kind": "ModuleNotFoundError", "module": "m", "file": "", "text": "No module named 'm'"}
+        self.assertEqual(ids(preflight.check_preflight(report(python_errors=[e, dict(e), dict(e)]))),
+                         ["WEB-PY-001"])
 
     def test_webgl_and_context(self):
         found = preflight.check_preflight(report(webgl={"version": 0, "error": "blocklisted"}, context_lost=True))

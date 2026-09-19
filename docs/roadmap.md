@@ -58,9 +58,7 @@ e detalhados no [`changelog.md`](changelog.md).
   runtime: `null function` em `GPU_texture_from_blender` (sem `glGetTexLevelParameteriv` no GLES), blit de profundidade
   entre formatos diferentes (texturas de profundidade Web agora 24 bits) e cubo preto sob luz GLSL (NaN no
   Cook-Torrance com Roughness 0). Abertos: normal map `.dds` aparece um pouco diferente do desktop; aviso
-  `glBlitFramebuffer` depth/stencil que já aparece uma vez no console; regenerar o manifesto do runtime
-  (`tools/web/make-runtime-manifest.py`) automaticamente a cada build Web, pois manifesto velho bloqueia o export com
-  WEB-PKG-001; página de pré-voo do marco E; marco G. Detalhes no [changelog](changelog.md).
+  `glBlitFramebuffer` depth/stencil que já aparece uma vez no console; o pré-voo do marco E só é consumido pelo botão "Importar pré-voo Web" (JSON manual; Validar/Exportar não o rodam sozinhos) e a extração de erros de shader/Python é heurística sobre o texto do runtime (calibrada com um import inexistente, um ValueError e um GLSL inválido; estágio/material do shader não são informados); marco G. Detalhes no [changelog](changelog.md).
   **Teste real após a retomada:** usuário reportou tela preta com piscadas.
   Corrigido divisor de instância residual no quad de tela: UVs ficavam constantes
   e os filtros amostravam o canto da textura. Build passou; 6.192 draws sem erro

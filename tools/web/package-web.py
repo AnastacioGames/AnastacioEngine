@@ -217,6 +217,100 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     el("play").disabled = false;
   };
   el("play").addEventListener("click", tryStart);
+
+  // Pre-voo (marco E): ?preflight=1 monta o relatorio "range-web-preflight" v1 lido por
+  // range_web/preflight.py. Erros de shader e de Python sao extraidos do texto do runtime
+  // por heuristica; falso negativo e possivel, entao a ausencia deles nao prova sucesso.
+  var preflight = /[?&]preflight=1/.test(location.search);
+  var pf = { shaders: [], python: [], contextLost: false };
+  var pfOpenShader = null, pfPyOpen = false, pfSeen = {};
+  function pfAddPy(rec) {
+    // O mesmo erro se repete a cada frame do controller; um registro por causa basta.
+    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + rec.text;
+    if (!pfSeen[key]) { pfSeen[key] = true; pf.python.push(rec); }
+  }
+  function pfLine(t) {
+    t = t.replace(/\\x1b\\[[0-9;]*m/g, "");
+    // O log do compilador GLSL chega em linhas soltas depois do cabecalho; outra linha fecha.
+    if (pfOpenShader) {
+      if (/^\\s*(ERROR|WARNING):/.test(t)) { pfOpenShader.log += "\\n" + t; return; }
+      pfOpenShader = null;
+    }
+    var m = /(ModuleNotFoundError|ImportError)\\b.*?['"]([\\w.]+)['"]/.exec(t);
+    if (m) { pfAddPy({ kind: m[1], module: m[2], file: "", text: t }); return; }
+    m = /FileNotFoundError.*?['"]([^'"]+)['"]/.exec(t);
+    if (m) { pfAddPy({ kind: "FileNotFoundError", file: m[1], text: t }); return; }
+    if (/Traceback \\(most recent/.test(t) || /Python\\W*.*script error/i.test(t)) { pfPyOpen = true; return; }
+    if (pfPyOpen) {
+      m = /^([\\w.]*(Error|Exception))\\b/.exec(t);
+      if (m) { pfPyOpen = false; pfAddPy({ kind: m[1], text: t, file: "" }); return; }
+    }
+    if (/shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
+      var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t };
+      pf.shaders.push(rec);
+      pfOpenShader = rec;
+    }
+  }
+  function pfProbeGL() {
+    try {
+      var c = document.createElement("canvas");
+      var gl = c.getContext("webgl2");
+      if (gl) return { version: 2, missing_extensions: [] };
+      return { version: c.getContext("webgl") ? 1 : 0, missing_extensions: [],
+               error: "WebGL 2 indisponivel" };
+    } catch (e) { return { version: 0, missing_extensions: [], error: String(e) }; }
+  }
+  function hex(buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+  }
+  function pfFiles() {
+    return fetch("manifest.json?v=" + encodeURIComponent(VERSION), { cache: "no-store" })
+      .then(function (r) { return r.json(); }).catch(function () { return { files: {} }; })
+      .then(function (man) {
+        var names = Object.keys(man.files || {}).filter(function (n) {
+          return n !== "manifest.json" && n !== "SHA256SUMS.txt";
+        });
+        return Promise.all(names.map(function (n) {
+          var rec = { name: n, status: null, mime: "", error: "", expected_sha256: man.files[n].sha256 };
+          return fetch(n + "?v=" + encodeURIComponent(VERSION), { cache: "no-store" }).then(function (r) {
+            rec.status = r.status;
+            rec.mime = (r.headers.get("content-type") || "").split(";")[0];
+            return r.arrayBuffer();
+          }).then(function (buf) {
+            if (window.crypto && crypto.subtle) return crypto.subtle.digest("SHA-256", buf).then(function (d) { rec.sha256 = hex(d); });
+          }).catch(function (e) { rec.error = String(e); }).then(function () { return rec; });
+        }));
+      });
+  }
+  function pfBuild(files) {
+    return { schema: "range-web-preflight", schema_version: 1,
+             cross_origin_isolated: !!window.crossOriginIsolated,
+             webgl: pfProbeGL(), files: files, context_lost: pf.contextLost,
+             shader_errors: pf.shaders, python_errors: pf.python };
+  }
+  if (preflight) {
+    document.body.classList.add("debug");
+    var _print = Module.print, _printErr = Module.printErr;
+    Module.print = function (t) { pfLine(String(t)); _print(t); };
+    Module.printErr = function (t) { pfLine(String(t)); _printErr(t); };
+    el("canvas").addEventListener("webglcontextlost", function () { pf.contextLost = true; }, false);
+    var pfFilesCache = null;
+    window.rangePreflight = function () {
+      var p = pfFilesCache ? Promise.resolve(pfFilesCache) : pfFiles().then(function (f) { return (pfFilesCache = f); });
+      return p.then(pfBuild);
+    };
+    var box = document.createElement("pre");
+    box.id = "preflight";
+    box.style.cssText = "position:fixed;top:0;right:0;max-width:45%;max-height:60%;overflow:auto;margin:0;" +
+                        "background:rgba(0,0,0,.85);color:#8cf;font:11px monospace;padding:6px;z-index:9";
+    document.body.appendChild(box);
+    var pfRefresh = function () {
+      window.rangePreflight().then(function (r) { box.textContent = JSON.stringify(r, null, 2); });
+    };
+    setInterval(pfRefresh, 2000);
+    pfRefresh();
+  }
+
   document.body.appendChild(script);
 })();
 </script>
