@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: áudio no runtime Web (Audaspace + SDL2)
+
+- `WITH_AUDASPACE=ON` no preset `web-runtime`; backend SDL2 (Web Audio/ScriptProcessor). OpenAL e libsndfile seguem desligados.
+- Emscripten não tem `efx.h`: `extern/audaspace/compat/web-no-openal` traz stubs EFX (no-op) para os efeitos OpenAL sempre compilados.
+- Leitor WAV embutido (`plugins/wav`, PCM 8/16/24/32 e float; sem OGG/MP3) registrado como plugin estático.
+- Módulo Python `aud` (audaspace-py) não é compilado no Web (exigiria numpy): `AUD_PyInit.cpp` vira stub (módulo vazio) e as pontes `AUD_getSoundFromPython`/`AUD_getPythonSound`/`checkPlaybackManager` retornam nulo. `bpy_types.Sound.factory` não funciona no Web.
+- `GPG_Ghost`: força o dispositivo "SDL" no Web (a ordem da lista muda); `LA_Launcher` não aplica o áudio 3D no Web (com fallback None a conversão nula derrubava o boot).
+- Prova (`verify-capabilities.cjs audio`, jogo `tools/create_web_audio_scene.py`, tom WAV em loop via Sound Actuator, Chrome headless): AudioContext `running` a 48 kHz, 579 mil frames, pico 0,35. Regressão sim (9/9) e toque OK. **Falta a confirmação audível pelo usuário** e áudio 3D/efeitos/OGG.
+
 ## 2026-09-19 - Marco G: provas de capacidade no runtime Web (parcial)
 
 - Novo `tools/web/verify-capabilities.cjs` (Chrome/CDP, sem julgamento visual) e `tools/create_web_capabilities_scene.py` (jogo de teste de física, `addObject`/`endObject`, `addScene` e `replace`).

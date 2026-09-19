@@ -113,4 +113,4 @@ nem compilou o runtime.
 Aceite: som audível no jogo real, controle pelo usuário e scripts, retomada sem travar,
 ausência de erros de carregamento e teste nos navegadores de destino. Logs e build são
 necessários, mas não substituem a confirmação audível. A pesquisa está concluída;
-o port de áudio continua pendente.
+o port foi implementado (Audaspace + SDL2, WAV) e provado por sonda de Web Audio em 2026-09-19; falta a confirmação audível.

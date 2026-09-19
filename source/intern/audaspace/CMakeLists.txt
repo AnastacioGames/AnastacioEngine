@@ -64,7 +64,8 @@ if(WITH_PYTHON)
       ${PYTHON_LINKFLAGS}
       ${PYTHON_LIBRARIES}
 	)
-	if(NOT WITH_SYSTEM_AUDASPACE)
+	# O modulo Python 'aud' nao existe no runtime Web (AUD_PyInit.cpp vira stub).
+	if(NOT WITH_SYSTEM_AUDASPACE AND NOT EMSCRIPTEN)
 		list(APPEND LIB
 			audaspace-py
 		)

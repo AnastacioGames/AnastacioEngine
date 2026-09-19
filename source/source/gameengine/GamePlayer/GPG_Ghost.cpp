@@ -1041,6 +1041,10 @@ int main(int argc,
 	U.use_gpu_mipmap = 1;
 
 	BKE_sound_init_once();
+#ifdef __EMSCRIPTEN__
+	// A ordem da lista de dispositivos nao e estavel no Web (so ha None e SDL): pedir o SDL pelo nome.
+	BKE_sound_force_device("SDL");
+#endif
 
 	// Initialize a default material for meshes without materials.
 	init_def_material();

@@ -24,6 +24,22 @@
 
 #include "AUD_PyInit.h"
 
+#ifdef __EMSCRIPTEN__
+/* Web: audaspace-py (modulo aud) nao e compilado; o import devolve um modulo vazio
+ * (KX_PythonInit importa 'aud' no boot e nao tolera falha). */
+extern "C" PyObject *AUD_initPython(void)
+{
+	static PyModuleDef def = {PyModuleDef_HEAD_INIT, "aud", NULL, -1, NULL, NULL, NULL, NULL, NULL};
+	return PyModule_Create(&def);
+}
+
+/* Ketsji referencia estas pontes; sem o modulo Python nao ha objeto aud.Sound para converter. */
+#include <python/PyAPI.h>
+#include <python/PyPlaybackManager.h>
+AUD_API void *AUD_getSoundFromPython(PyObject *) { return NULL; }
+AUD_API PyObject *AUD_getPythonSound(void *) { Py_RETURN_NONE; }
+AUD_API PlaybackManagerP *checkPlaybackManager(PyObject *) { return NULL; }
+#else
 #include <AUD_Sound.h>
 #include <python/PySound.h>
 #include <python/PyAPI.h>
@@ -71,4 +87,4 @@ PyObject *AUD_initPython(void)
 
 	return module;
 }
-
+#endif

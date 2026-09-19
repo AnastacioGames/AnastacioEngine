@@ -308,7 +308,12 @@ void LA_Launcher::InitEngine()
 #ifdef WITH_AUDASPACE
 	// Initialize 3D Audio Settings.
 	AUD_Device *device = BKE_sound_get_device();
+#  ifdef __EMSCRIPTEN__
+	// No Web o indice do dispositivo muda e, se o SDL falhar, cai no None (sem I3DDevice): pular evita desreferenciar nulo.
+	if (false) {
+#  else
 	if (U.audiodevice != 3) { // Hardcoded, Currently 3 is None Device.
+#  endif
 		AUD_Device_setSpeedOfSound(device, m_startScene->audio.speed_of_sound);
 		AUD_Device_setDopplerFactor(device, m_startScene->audio.doppler_factor);
 		AUD_Device_setDistanceModel(device, AUD_DistanceModel(m_startScene->audio.distance_model));

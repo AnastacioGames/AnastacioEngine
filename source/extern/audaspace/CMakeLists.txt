@@ -572,6 +572,13 @@ if(WITH_LIBSNDFILE)
 	endif()
 endif()
 
+# Leitor WAV embutido: so no runtime Web, onde libsndfile nao existe (plugins/wav/WAVFile.cpp).
+if(EMSCRIPTEN AND NOT WITH_LIBSNDFILE)
+	list(APPEND SRC plugins/wav/WAVFile.cpp)
+	list(APPEND HDR plugins/wav/WAVFile.h)
+	list(APPEND STATIC_PLUGINS WAVFile)
+endif()
+
 # OpenAL
 if(WITH_OPENAL)
 	if(AUDASPACE_STANDALONE)
@@ -625,7 +632,9 @@ if(WITH_PYTHON)
 			endif()
 		endif()
 
-		set(AUDASPACE_PY_LIBRARY -laudaspace-py)
+		if(NOT EMSCRIPTEN)
+			set(AUDASPACE_PY_LIBRARY -laudaspace-py)
+		endif()
 
 		if(WIN32 AND AUDASPACE_STANDALONE)
 			file(GLOB PYTHON_DLLS ${LIBRARY_PATH}/Python/bin/*.dll)
@@ -726,6 +735,12 @@ if(WITH_FFTW)
 endif()
 
 # directories
+
+# Web/Emscripten sem OpenAL: os efeitos EFX (fx/GEEffects) entram sempre na lista de fontes e
+# precisam de efx.h; o OpenAL do Emscripten nao tem. Usa stubs (ver compat/web-no-openal/efx.h).
+if(EMSCRIPTEN AND NOT WITH_OPENAL)
+	list(APPEND INCLUDE compat/web-no-openal)
+endif()
 
 include_directories(${INCLUDE})
 link_directories()
@@ -897,7 +912,7 @@ if(WITH_C)
 	endif()
 endif()
 
-if(WITH_PYTHON)
+if(WITH_PYTHON AND NOT EMSCRIPTEN)
 	set(PYTHON_SRC
 		bindings/python/PyAPI.cpp
 		bindings/python/PyDevice.cpp

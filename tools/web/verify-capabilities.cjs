@@ -5,10 +5,11 @@
 // Uso: node tools/web/verify-capabilities.cjs <url> <modo> [porta-cdp=9333]
 //   modo touch    : toque (touchStart/End) no canvas deve virar clique de mouse ("mouse click flipped")
 //   modo sim      : jogo web-capabilities: fisica, addObject/endObject, addScene (overlay) e replace de cena
+//   modo audio    : jogo web-audio: tom WAV em loop; confere mixer ativo e amplitude nao nula na saida Web Audio
 //   modo filters  : 1..0,Q (filtros simples ligam/desligam) e W,E,R,T (embutidos) sem erro de shader
 // Requer Chrome ja aberto com --remote-debugging-port=<porta-cdp>. Sai com 0 se todas as expectativas baterem.
 const [url, mode, port = '9333'] = process.argv.slice(2);
-if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|filters|sim> [porta-cdp]'); process.exit(2); }
+if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|filters|sim|audio> [porta-cdp]'); process.exit(2); }
 
 (async () => {
   const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
@@ -31,6 +32,22 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
     }
   };
 
+  if (mode === 'audio') {
+    // Espia a saida Web Audio (SDL usa ScriptProcessor): conta frames e a amplitude maxima do que o jogo mixou.
+    await call('Page.addScriptToEvaluateOnNewDocument', { source: `(function(){
+      var A = window.__aud = { ctx: 0, procs: 0, frames: 0, peak: 0 };
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      var desc = Object.getOwnPropertyDescriptor(ScriptProcessorNode.prototype, 'onaudioprocess');
+      var W = function () { var c = new (Function.prototype.bind.apply(AC, [null].concat([].slice.call(arguments))))(); A.ctx++; A.last = c;
+        var orig = c.createScriptProcessor.bind(c);
+        c.createScriptProcessor = function () { var n = orig.apply(null, arguments); A.procs++;
+          Object.defineProperty(n, 'onaudioprocess', { configurable: true, get: function () { return desc.get.call(n); },
+            set: function (f) { desc.set.call(n, function (e) { f.call(this, e); var b = e.outputBuffer; A.frames += b.length;
+              for (var ch = 0; ch < b.numberOfChannels; ch++) { var d = b.getChannelData(ch); for (var i = 0; i < d.length; i++) { var v = Math.abs(d[i]); if (v > A.peak) A.peak = v; } } }); } });
+          return n; };
+        return c; };
+      W.prototype = AC.prototype; window.AudioContext = W; window.webkitAudioContext = W; })();` });
+  }
   await call('Runtime.enable'); await call('Page.enable');
   await call('Network.enable'); await call('Network.setCacheDisabled', { cacheDisabled: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -45,7 +62,7 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
   const expect = (name, ok) => checks.push([name, !!ok]);
   expect('pacote carregou', state === 'ready');
   if (state === 'ready') {
-    await evalJs(`document.getElementById('play').click()`);
+    await call('Runtime.evaluate', { expression: `document.getElementById('play').click()`, userGesture: true });
     await sleep(3000);
     const box = JSON.parse(await evalJs(`JSON.stringify(document.getElementById('canvas').getBoundingClientRect())`));
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
@@ -73,6 +90,19 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
       expect('replace troca para a cena C', has(/\[cap\] scene C running/));
       expect('cena C segue viva', has(/\[cap\] scene C alive after 60 ticks/));
       logs.filter(l => /\[cap\]/.test(l)).forEach(l => console.log('  ' + l));
+    } else if (mode === 'audio') {
+      await sleep(9000);
+      const has = re => logs.some(l => re.test(l));
+      const a = JSON.parse(await evalJs(`JSON.stringify({ctx:__aud.ctx,procs:__aud.procs,frames:__aud.frames,peak:__aud.peak,state:__aud.last&&__aud.last.state,rate:__aud.last&&__aud.last.sampleRate})`));
+      console.log('web audio:', JSON.stringify(a));
+      expect('cena de audio rodando', has(/\[aud\] scene running/));
+      expect('actuator de som ativado', has(/\[aud\] sound actuator activated/));
+      expect('jogo segue vivo', has(/\[aud\] still alive/));
+      expect('AudioContext criado pelo runtime', a.ctx >= 1 && a.procs >= 1);
+      expect('AudioContext em execucao', a.state === 'running');
+      expect('mixer avancou (frames)', a.frames > 0);
+      expect('saida com amplitude (tom audivel)', a.peak > 0.05);
+      logs.filter(l => /\[aud\]|audio|Audaspace|aud:/i.test(l)).slice(0, 15).forEach(l => console.log('  ' + l.slice(0, 200)));
     } else if (mode === 'filters') {
       const KEYS = [['1', 'Digit1', 49, 'BLUR'], ['2', 'Digit2', 50, 'SHARPEN'], ['3', 'Digit3', 51, 'DILATION'],
         ['4', 'Digit4', 52, 'EROSION'], ['5', 'Digit5', 53, 'LAPLACIAN'], ['6', 'Digit6', 54, 'SOBEL'],

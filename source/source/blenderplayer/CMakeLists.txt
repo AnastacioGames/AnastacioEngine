@@ -163,9 +163,11 @@ list(APPEND BLENDER_LINK_LIBS
 )
 
 if(WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE)
-	list(APPEND BLENDER_LINK_LIBS
-		audaspace
-		audaspace-py)
+	list(APPEND BLENDER_LINK_LIBS audaspace)
+	# O modulo Python 'aud' nao e compilado no runtime Web (ver extern/audaspace/blender_config.cmake).
+	if(NOT EMSCRIPTEN)
+		list(APPEND BLENDER_LINK_LIBS audaspace-py)
+	endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -265,6 +267,10 @@ endif()
 		extern_wcwidth
 		extern_sdlew
 	)
+
+	if(EMSCRIPTEN)
+		list(REMOVE_ITEM BLENDER_SORTED_LIBS audaspace-py)
+	endif()
 
 	if(NOT WITH_SYSTEM_GLOG)
 		list(APPEND BLENDER_SORTED_LIBS extern_glog)

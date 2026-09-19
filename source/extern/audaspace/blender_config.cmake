@@ -24,6 +24,11 @@ set(NUMPY_FOUND TRUE)
 set(NUMPY_INCLUDE_DIRS ${PYTHON_NUMPY_INCLUDE_DIRS})
 set(SDL_FOUND ${WITH_SDL})
 
+if(EMSCRIPTEN)
+  # Web: sem o modulo Python 'aud' (exigiria os cabecalhos do numpy, que o Python Web nao traz).
+  set(NUMPY_INCLUDE_DIRS "")
+endif()
+
 if(WIN32)
   set(DEFAULT_PLUGIN_PATH "plugins" CACHE STRING "Default plugin installation and loading path.")
 endif()
