@@ -93,19 +93,28 @@ Publicado a partir da versão `0.3.0` como `AnastacioEngine-<versao>-linux-x64.t
 completo de `build-linux/bin/` e `SHA256SUMS.txt` na mesma release. Validado em máquina Linux limpa (fora
 do WSL) antes da publicação — ver `docs/changelog.md` (entradas de 2026-09-15).
 
-### Pacote Linux 0.4.0 (pendente — passo a passo na máquina Linux)
+### Pacote Linux 0.4.0 (concluído — 2026-09-19)
 
-O pacote Windows 0.4.0 já está na release `v0.4.0`; falta anexar o Linux, que precisa ser compilado em Linux nativo:
+Publicado em `v0.4.0` como `AnastacioEngine-0.4.0-linux-x64.tar.gz`. Como o preset `linux-editor` (target
+`RangeEngine`) e o preset `linux-runtime` (target `RangeRuntime`) usam diretórios de build separados
+(`build-linux-editor/bin/` e `build-linux/bin/`, ver `source/CMakePresets.json`), o pacote final mescla os
+dois — mesma estrutura usada na `0.3.0`:
 
 ```bash
-git fetch origin && git checkout linux-sync && git pull      # trazer tudo de 0.4.0
-bash tools/linux/quickstart-editor.sh                        # build do RangeEngine + RangeRuntime (ver docs/linux-build.md)
-# conferir build-linux/bin/RangeEngine e RangeRuntime; rodar uma demo antes de empacotar
-tar -czf AnastacioEngine-0.4.0-linux-x64.tar.gz -C build-linux bin   # conteúdo completo de build-linux/bin/, sem logs
+git fetch origin && git checkout linux-sync && git pull
+cmake --preset linux-editor -S source && cmake --build build-linux-editor --target RangeEngine -j"$(nproc)" && cmake --install build-linux-editor
+cmake --preset linux-runtime -S source && cmake --build build-linux --target RangeRuntime -j"$(nproc)" && cmake --install build-linux
+
+STAGE=AnastacioEngine-0.4.0-linux-x64
+rm -rf "$STAGE" && mkdir "$STAGE"
+cp -a build-linux-editor/bin/. "$STAGE/"
+cp -a build-linux/bin/RangeRuntime "$STAGE/"
+rm -f "$STAGE/2.79/scripts/addons/Range_Components_Label.rar"   # addon não usado, não deve entrar no pacote
+tar -czf AnastacioEngine-0.4.0-linux-x64.tar.gz "$STAGE"
 sha256sum AnastacioEngine-0.4.0-linux-x64.tar.gz
 ```
 
 Depois: baixar o `SHA256SUMS.txt` da release, acrescentar a linha do tar.gz (mantendo as do Windows), e rodar
-`gh release upload v0.4.0 AnastacioEngine-0.4.0-linux-x64.tar.gz SHA256SUMS.txt --clobber`. O splash já mostra 0.4.0
-(`wm.py`). O addon `Range_Components_Label` não é mais usado e não deve entrar no pacote. Depois de anexar, remova o
-"ainda será anexado" da linha Linux do README.
+`gh release upload v0.4.0 AnastacioEngine-0.4.0-linux-x64.tar.gz SHA256SUMS.txt --clobber`. Editar mudanças em
+`DNA_*.h` no pull exigiram `ninja -t clean` + rebuild completo dos dois alvos antes de empacotar (ver
+regra em `AGENTS.md`).
