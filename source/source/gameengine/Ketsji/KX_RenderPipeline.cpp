@@ -593,15 +593,21 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 
 			// screenPos.w is the projected depth: zero or negative means the sun is behind the
 			// camera or parallel to the view plane, which would divide by (near) zero below and
-			// feed NaN/Inf into the Light Scattering/Lens Flare shader uniforms. Skip the update
-			// and keep sunPos at its default in that case; no warning, since this is a normal
-			// camera angle, not a data error.
+			// feed NaN/Inf into the Light Scattering/Lens Flare shader uniforms. In that case push
+			// sunPos off the [0,1] screen range instead of leaving it at a default in-range value,
+			// so the Lens Flare shader's own off-screen check (which only tests [0,1]) hides it
+			// instead of drawing a stray flare at that default position; no warning, since this is
+			// a normal camera angle, not a data error.
 			if (std::isfinite(screenPos.w) && screenPos.w > FLT_EPSILON) {
 				mt::vec2 sunScreenPos = mt::vec2(screenPos.x / screenPos.w, screenPos.y / screenPos.w);
 				sunScreenPos = (sunScreenPos + mt::one2) * 0.5f;
 
 				sunPos[0] = sunScreenPos.x;
 				sunPos[1] = sunScreenPos.y;
+			}
+			else {
+				sunPos[0] = -1.0f;
+				sunPos[1] = -1.0f;
 			}
 		}
 	}

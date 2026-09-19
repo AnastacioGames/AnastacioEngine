@@ -235,6 +235,11 @@ private:
 	float m_autoWorldSunInitialCameraHeight;
 	KX_Camera *m_autoWorldSunReferenceCamera;
 
+	/// Scene gravity as authored (World > Weather > Earthquake shakes around
+	/// this instead of replacing it), captured on first earthquake update.
+	mt::vec3 m_earthquakeBaseGravity;
+	bool m_earthquakeBaseGravityInitialized;
+
 	/// Network scene.
 	KX_NetworkMessageScene *m_networkScene;
 
@@ -490,6 +495,9 @@ public:
 	void SetAutoWorldSun(bool enabled);
 	/// Place and orient the generated World Sun from the active camera and World sun_hour.
 	void UpdateAutoWorldSun();
+
+	/// Shake scene gravity from World > Weather > Earthquake (curtime in seconds).
+	void UpdateEarthquake(double curtime);
 
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, RAS_Rasterizer::StereoEye eye, int layer, bool is_shadowbuf);
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf);

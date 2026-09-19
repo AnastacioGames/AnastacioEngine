@@ -42,7 +42,12 @@
       "PowerShell(tail -n -25)",
       "PowerShell(& \"C:\\\\Users\\\\f_bro\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--AnastacioEngine\\\\f4e55587-cabb-4eb8-a4ee-630ea1f87e62\\\\scratchpad\\\\rebuild.bat\" 2>&1)",
       "Bash(git add *)",
-      "PowerShell(Get-ChildItem \"D:\\\\ProjetoRolimaRacer\\\\docs\\\\code\\\\\" | Where-Object { $_.Name -match \"readme|index\" })"
+      "PowerShell(Get-ChildItem \"D:\\\\ProjetoRolimaRacer\\\\docs\\\\code\\\\\" | Where-Object { $_.Name -match \"readme|index\" })",
+      "Bash(copy /Y \"D:\\\\AnastacioEngine\\\\source\\\\release\\\\scripts\\\\startup\\\\bl_ui\\\\properties_scene.py\" \"D:\\\\AnastacioEngine\\\\build\\\\bin\\\\2.79\\\\scripts\\\\startup\\\\bl_ui\\\\properties_scene.py\")",
+      "PowerShell(Copy-Item -Path \"D:\\\\AnastacioEngine\\\\source\\\\release\\\\scripts\\\\startup\\\\flowmenu\\\\custom_pt_world.py\" -Destination \"D:\\\\AnastacioEngine\\\\build\\\\bin\\\\2.79\\\\scripts\\\\startup\\\\flowmenu\\\\custom_pt_world.py\" -Force)",
+      "PowerShell(Copy-Item -Path \"D:\\\\AnastacioEngine\\\\source\\\\release\\\\datafiles\\\\startup.blend\" -Destination \"D:\\\\AnastacioEngine\\\\build\\\\bin\\\\2.79\\\\datafiles\\\\startup.blend\" -Force)",
+      "Bash(cmd /c '\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\" >nul && cd /d D:\\\\AnastacioEngine\\\\build && ninja RangeEngine 2>&1')",
+      "Bash(cmd /c '\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\" >nul && cd /d D:\\\\AnastacioEngine\\\\build && ninja -t clean && ninja RangeEngine 2>&1')"
     ],
     "additionalDirectories": [
       "D:\\AnastacioEngine\\source\\release\\scripts\\startup\\flowmenu\\*",

@@ -3747,6 +3747,20 @@ static void direct_link_world(FileData *fd, World *wrld)
 		if (prop->poin == NULL)
 			prop->poin = &prop->data;
 	}
+
+	/* Files saved before the Clouds weather effect existed have this field
+	 * zeroed out (never present in the file), which the compositor shader
+	 * reads as "coverage 0" and silently skips drawing anything. cloud_scale
+	 * can never legitimately be 0 (its RNA range starts at 0.0001), so it is
+	 * a safe sentinel for "this World predates the feature". */
+	if (wrld->cloud_scale == 0.0f) {
+		wrld->cloud_coverage = 0.5f;
+		wrld->cloud_scale = 1.0f;
+		wrld->cloud_speed = 0.3f;
+		wrld->cloud_color[0] = 1.0f;
+		wrld->cloud_color[1] = 1.0f;
+		wrld->cloud_color[2] = 1.0f;
+	}
 }
 
 

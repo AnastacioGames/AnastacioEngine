@@ -77,7 +77,7 @@ ferramenta correspondente.
 - Weather nativo no `World` oferece chuva, nuvens e lens flare; a chuva inclui modos Classic e Volumetric.
 - Automatic Sun orbits a ground reference 5 m ahead of the active camera at a 10 m radius and always targets it.
   The reference estimates ground elevation from the camera's initial height. Its `Sun Hour` is backed by the
-  World Global Property `sun_hour` (Float, 0-24; 12 is directly overhead), so Logic Bricks can control it.
+  World World Property `sun_hour` (Float, 0-24; 12 is directly overhead), so Logic Bricks can control it.
 - `Scene > Automatic Sun` cria um Sun e o atribui ao `World Sun`; somente esse Sun marcado orbita a referÃªncia
   de chÃ£o 5 m Ã  frente da cÃ¢mera ativa, mirando-a durante o runtime. Suns escolhidos manualmente em `World Sun`
   preservam seu comportamento e transformaÃ§Ã£o normais.
@@ -96,7 +96,7 @@ ferramenta correspondente.
 - Menu in-game em ImGui com suporte por mouse, teclado e bindings de gamepad.
 - Debug Mode expõe bounding boxes, frusta de câmera/sombra e render queries.
 - Console ImGui espelha o log da engine no Play e no standalone.
-- Global Properties podem ser compartilhadas pelo `World` no runtime. A criação automática das propriedades
+- World Properties podem ser compartilhadas pelo `World` no runtime. A criação automática das propriedades
   de World Status continua pendente e está no roadmap.
 - Runtime Properties tipadas ampliam Property Sensors/Actuators; detalhes e pendências estão em
   [`docs/logic-bricks-modernization.md`](docs/logic-bricks-modernization.md).

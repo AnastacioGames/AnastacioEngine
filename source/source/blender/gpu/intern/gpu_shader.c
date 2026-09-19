@@ -84,6 +84,9 @@ extern char datatoc_gpu_shader_fx_tonemap_frag_glsl[];
 extern char datatoc_gpu_shader_fx_light_scatter_frag_glsl[];
 extern char datatoc_gpu_shader_fx_ssr_frag_glsl[];
 extern char datatoc_gpu_shader_fx_fxaa_frag_glsl[];
+extern char datatoc_gpu_shader_fx_lensflare_frag_glsl[];
+extern char datatoc_gpu_shader_fx_rain_frag_glsl[];
+extern char datatoc_gpu_shader_fx_clouds_frag_glsl[];
 extern char datatoc_gpu_shader_fx_dof_frag_glsl[];
 extern char datatoc_gpu_shader_fx_dof_vert_glsl[];
 extern char datatoc_gpu_shader_fx_dof_hq_frag_glsl[];
@@ -1092,6 +1095,18 @@ GPUShader *GPU_shader_get_builtin_fx_shader(int effect, bool persp)
 
 			case GPU_SHADER_FX_FXAA:
 				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_fxaa_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
+				break;
+
+			case GPU_SHADER_FX_LENSFLARE:
+				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_lensflare_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
+				break;
+
+			case GPU_SHADER_FX_RAIN:
+				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_rain_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
+				break;
+
+			case GPU_SHADER_FX_CLOUDS:
+				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_clouds_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
 				break;
 		}
 

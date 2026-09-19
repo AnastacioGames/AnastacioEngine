@@ -1768,7 +1768,7 @@ static void draw_actuator_constraint(uiLayout *layout, PointerRNA *ptr, bContext
 	}
 }
 
-static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr)
+static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	Object *ob = (Object *)ptr->id.data;
 	uiLayout *row, *split, *sub;
@@ -1777,8 +1777,27 @@ static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr)
 	switch (RNA_enum_get(ptr, "mode")) {
 		case ACT_EDOB_ADD_OBJECT:
 			row = uiLayoutRow(layout, false);
-			uiItemR(row, ptr, "object", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_object_from_property")) {
+				World *world = CTX_data_scene(C)->world;
+				if (RNA_boolean_get(ptr, "use_global_object_property") && world) {
+					PointerRNA world_ptr;
+					RNA_id_pointer_create((ID *)world, &world_ptr);
+					uiItemPointerR(row, ptr, "object_property", &world_ptr, "string_properties", NULL, ICON_NONE);
+				}
+				else {
+					uiItemR(row, ptr, "object_property", 0, NULL, ICON_NONE);
+				}
+			}
+			else {
+				uiItemR(row, ptr, "object", 0, NULL, ICON_NONE);
+			}
 			uiItemR(row, ptr, "time", 0, NULL, ICON_NONE);
+
+			row = uiLayoutRow(layout, false);
+			uiItemR(row, ptr, "use_object_from_property", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_object_from_property")) {
+				uiItemR(row, ptr, "use_global_object_property", 0, NULL, ICON_NONE);
+			}
 
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);
@@ -1805,10 +1824,29 @@ static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr)
 			break;
 		case ACT_EDOB_TRACK_TO:
 			split = uiLayoutSplit(layout, 0.5, false);
-			uiItemR(split, ptr, "track_object", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_object_from_property")) {
+				World *world = CTX_data_scene(C)->world;
+				if (RNA_boolean_get(ptr, "use_global_object_property") && world) {
+					PointerRNA world_ptr;
+					RNA_id_pointer_create((ID *)world, &world_ptr);
+					uiItemPointerR(split, ptr, "object_property", &world_ptr, "string_properties", NULL, ICON_NONE);
+				}
+				else {
+					uiItemR(split, ptr, "object_property", 0, NULL, ICON_NONE);
+				}
+			}
+			else {
+				uiItemR(split, ptr, "track_object", 0, NULL, ICON_NONE);
+			}
 			sub = uiLayoutSplit(split, 0.7f, false);
 			uiItemR(sub, ptr, "time", 0, NULL, ICON_NONE);
 			uiItemR(sub, ptr, "use_3d_tracking", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+
+			row = uiLayoutRow(layout, false);
+			uiItemR(row, ptr, "use_object_from_property", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_object_from_property")) {
+				uiItemR(row, ptr, "use_global_object_property", 0, NULL, ICON_NONE);
+			}
 
 			row = uiLayoutRow(layout, false);
 			uiItemR(row, ptr, "up_axis", 0, NULL, ICON_NONE);
@@ -2459,7 +2497,7 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			draw_actuator_constraint(box, ptr, C);
 			break;
 		case ACT_EDIT_OBJECT:
-			draw_actuator_edit_object(box, ptr);
+			draw_actuator_edit_object(box, ptr, C);
 			break;
 		case ACT_2DFILTER:
 			draw_actuator_filter_2d(box, ptr);

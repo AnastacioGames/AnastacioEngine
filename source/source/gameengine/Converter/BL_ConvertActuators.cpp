@@ -519,6 +519,11 @@ void BL_ConvertActuators(const char *maggiename,
 							mt::vec3(editobact->angVelocity),
 							(editobact->localflag & ACT_EDOB_LOCAL_ANGV) != 0);
 
+						if (editobact->flag & ACT_EDOB_ADD_FROM_PROP) {
+							tmpaddact->SetObjectProperty(editobact->name,
+							                             (editobact->flag & ACT_EDOB_ADD_PROP_GLOBAL) != 0);
+						}
+
 						//editobact->ob to gameobj
 						baseact = tmpaddact;
 						break;
@@ -559,9 +564,13 @@ void BL_ConvertActuators(const char *maggiename,
 							gameobj,
 							originalval,
 							editobact->time,
-							editobact->flag,
+							(editobact->flag & ACT_TRACK_3D) != 0,
 							editobact->trackflag,
 							editobact->upflag);
+						if (editobact->flag & ACT_EDOB_ADD_FROM_PROP) {
+							tmptrackact->SetObjectProperty(editobact->name,
+							                               (editobact->flag & ACT_EDOB_ADD_PROP_GLOBAL) != 0);
+						}
 						baseact = tmptrackact;
 						break;
 					}

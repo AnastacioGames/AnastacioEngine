@@ -42,7 +42,7 @@ AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT = "_range_auto_world_sun_camera_initial_hei
 
 
 def _get_auto_sun_hour_property(scene):
-    """Return the World Global Property reserved for the automatic sun."""
+    """Return the World World Property reserved for the automatic sun."""
     world = scene.world
     if not world:
         return None
@@ -59,7 +59,7 @@ def _ensure_auto_sun_hour_property(scene):
         return prop
 
     # The World operator is the public Blender 2.79 API for inserting a
-    # persistent Game/Global Property. It is intentionally created only when
+    # persistent Game/World Property. It is intentionally created only when
     # Automatic Sun is enabled, never merely by drawing the panel.
     if scene.world and bpy.context.scene == scene:
         bpy.ops.world.game_property_new(type='FLOAT', name=AUTO_WORLD_SUN_HOUR_PROPERTY)
@@ -134,9 +134,18 @@ def _set_use_auto_world_sun(scene, enabled):
         _ensure_auto_sun_hour_property(scene)
 
         scene.world_sun_set = sun
+        # Rendering (lens flare, sky, light scatter) always reads Scene.world_sun.
+        # The Lens Flare panel's "Sun Object" field is a separate, purely cosmetic
+        # UI pointer (World.weather_settings.sun_object_name) that isn't consumed
+        # by any render code, so keep it in sync here too or the panel would show
+        # a stale/empty sun.
+        if scene.world:
+            scene.world.weather_settings.sun_object_name = sun.name
     elif world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
         # This object belongs to the checkbox, so disabling it removes both
         # the World Sun assignment and the generated lamp datablock.
+        if scene.world and scene.world.weather_settings.sun_object_name == world_sun.name:
+            scene.world.weather_settings.sun_object_name = ""
         scene.world_sun_set = None
         scene.objects.unlink(world_sun)
         bpy.data.objects.remove(world_sun)
@@ -151,7 +160,7 @@ bpy.types.Scene.use_auto_world_sun = bpy.props.BoolProperty(
 
 bpy.types.Scene.auto_world_sun_hour = bpy.props.FloatProperty(
     name="Sun Hour",
-    description="Time used by the automatic sun (also stored in World Global Property 'sun_hour')",
+    description="Time used by the automatic sun (also stored in World World Property 'sun_hour')",
     min=0.0,
     max=24.0,
     soft_min=0.0,

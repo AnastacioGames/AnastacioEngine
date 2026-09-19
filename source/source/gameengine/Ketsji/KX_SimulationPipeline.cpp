@@ -111,6 +111,9 @@ void KX_SimulationPipeline::Update()
 		}
 
 		if (!scene->IsSuspended()) {
+			// Before physics so the shaken gravity is what this frame's solve uses.
+			scene->UpdateEarthquake(m_engine->GetFrameTime());
+
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_physics);
 			// Perform physics calculations on the scene. This can involve
 			// many iterations of the physics solver.

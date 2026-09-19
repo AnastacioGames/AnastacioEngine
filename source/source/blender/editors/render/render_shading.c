@@ -662,7 +662,7 @@ static bool world_game_property_poll(bContext *C)
 void WORLD_OT_game_property_new(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "New Global Property";
+	ot->name = "New World Property";
 	ot->description = "Create a new property shared by all objects through the World";
 	ot->idname = "WORLD_OT_game_property_new";
 
@@ -703,8 +703,8 @@ static int world_game_property_remove_exec(bContext *C, wmOperator *op)
 void WORLD_OT_game_property_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Remove Global Property";
-	ot->description = "Remove a Global Property from the World";
+	ot->name = "Remove World Property";
+	ot->description = "Remove a World Property from the World";
 	ot->idname = "WORLD_OT_game_property_remove";
 
 	/* api callbacks */
@@ -767,8 +767,8 @@ void WORLD_OT_game_property_move(wmOperatorType *ot)
 	PropertyRNA *prop;
 
 	/* identifiers */
-	ot->name = "Move Global Property";
-	ot->description = "Move a Global Property in the list";
+	ot->name = "Move World Property";
+	ot->description = "Move a World Property in the list";
 	ot->idname = "WORLD_OT_game_property_move";
 
 	/* api callbacks */

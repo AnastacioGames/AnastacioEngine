@@ -893,7 +893,15 @@ typedef enum eSCENEFXFlags {
   SCENE_FX_FLAG_LIGHTSCATTER = (1 << 2),
   SCENE_FX_FLAG_SSR          = (1 << 3),
   SCENE_FX_FLAG_SSAO         = (1 << 4),
-  SCENE_FX_FLAG_FXAA         = (1 << 5)
+  SCENE_FX_FLAG_FXAA         = (1 << 5),
+  /* Not user-toggleable in scenefx_flag: derived at runtime from
+   * World > Weather > Lens Flare / Rain / Clouds (World.weather_flag &
+   * WO_WEATHER_LENSFLARE/RAIN/CLOUDS), see GPU_fx_compositor_initialize_passes().
+   * Kept in this enum so they share fx->sce_effects bit handling with the other
+   * scene effects. */
+  SCENE_FX_FLAG_LENSFLARE    = (1 << 6),
+  SCENE_FX_FLAG_RAIN         = (1 << 7),
+  SCENE_FX_FLAG_CLOUDS       = (1 << 8)
 } eSCENEFXFlags;
 
 /* RecastData.partitioning */

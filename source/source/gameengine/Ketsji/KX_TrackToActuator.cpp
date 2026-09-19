@@ -42,6 +42,8 @@
 #include <math.h>
 #include <iostream>
 #include "KX_GameObject.h"
+#include "KX_Scene.h"
+#include "KX_WorldInfo.h"
 
 #include "EXP_PyObjectPlus.h"
 
@@ -331,6 +333,26 @@ bool KX_TrackToActuator::Update(double curtime)
 	bool result = false;
 	bool bNegativeEvent = IsNegativeEvent();
 	RemoveAllEvents();
+
+	if (!bNegativeEvent && !m_objectProperty.empty()) {
+		KX_GameObject *self = (KX_GameObject *)GetParent();
+		KX_Scene *scene = self->GetScene();
+		EXP_Value *owner = m_objectPropertyGlobal ?
+		    static_cast<EXP_Value *>(scene->GetWorldInfo()) : static_cast<EXP_Value *>(self);
+		const std::string name = owner ? owner->GetPropertyText(m_objectProperty) : "";
+		if (!m_object || m_object->GetName() != name) {
+			KX_GameObject *target = name.empty() ? nullptr : scene->GetObjectList()->FindValue(name);
+			if (target != m_object) {
+				if (m_object) {
+					m_object->UnregisterActuator(this);
+				}
+				m_object = target;
+				if (m_object) {
+					m_object->RegisterActuator(this);
+				}
+			}
+		}
+	}
 
 	if (bNegativeEvent) {
 		// do nothing on negative events

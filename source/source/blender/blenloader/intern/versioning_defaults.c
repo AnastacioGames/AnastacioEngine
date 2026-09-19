@@ -23,6 +23,7 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_brush_types.h"
+#include "DNA_curve_types.h"
 #include "DNA_freestyle_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_material_types.h"
@@ -75,6 +76,109 @@ void BLO_update_defaults_userpref_blend(void)
 #else
   U.flag &= ~USER_SCRIPT_AUTOEXEC_DISABLE;
 #endif
+
+  /* AnastacioEngine factory defaults (Preferences panels) */
+
+  /* Interface */
+  U.header_size = 26;
+  U.flag |= USER_TOOLTIPS | USER_TOOLTIPS_PYTHON | USER_DEVELOPER_UI | USER_SCENEGLOBAL;
+  U.uiflag |= USER_SHOW_VIEWPORTNAME | USER_SHOW_FPS | USER_SHOW_ROTVIEWICON;
+  U.uiflag &= ~USER_SPLASH_DISABLE; /* Show Splash */
+  U.app_flag &= ~(USER_APP_LOCK_UI_LAYOUT | USER_APP_VIEW3D_HIDE_CURSOR); /* Show Layout Widgets / Show 3D View Cursor */
+  U.obcenter_dia = 6;
+  U.rvisize = 25;
+  U.rvibright = 8;
+
+  /* View Manipulation */
+  U.uiflag |= USER_LOCKAROUND | USER_CAM_LOCK_NO_PARENT;
+  U.uiflag &= ~(USER_DEPTH_NAVIGATE | USER_ZOOM_TO_MOUSEPOS | USER_ORBIT_SELECTION | USER_AUTOPERSP);
+  U.smooth_viewtx = 200;
+  U.pad_rot_angle = 15.0f;
+  U.v2d_min_gridsize = 35;
+
+  /* Menus / Pie Menus */
+  U.uiflag |= USER_MENUOPENAUTO;
+  U.menuthreshold1 = 5;
+  U.menuthreshold2 = 2;
+  U.pie_initial_timeout = 0;
+  U.pie_animation_timeout = 6;
+  U.pie_menu_radius = 100;
+  U.pie_menu_threshold = 12;
+  U.pie_menu_confirm = 0;
+
+  /* Editing */
+  U.flag &= ~USER_MAT_ON_OB; /* Link Materials To: ObData */
+  U.flag &= ~USER_ADD_EDITMODE; /* Enter Edit Mode (new objects) */
+  U.gp_eraser = 25;
+  U.gp_manhattendist = 1;
+  U.gp_euclideandist = 2;
+  U.gp_settings &= ~GP_PAINT_DOSIMPLIFY; /* Simplify Stroke */
+  copy_v4_fl4(U.gpencil_new_layer_col, 0.0f, 0.0f, 0.0f, 0.9f);
+  U.uiflag |= USER_GLOBALUNDO;
+  U.undosteps = 32;
+  U.undomemory = 0;
+  U.flag &= ~USER_NONEGFRAMES; /* Allow Negative Frames */
+  U.node_margin = 80;
+  U.fcu_inactive_alpha = 0.25f;
+  U.autokey_mode = AUTOKEY_MODE_NORMAL; /* Auto Keyframing on + Show Auto Keying Warning */
+  U.autokey_flag &= ~(AUTOKEY_FLAG_AUTOMATKEY | AUTOKEY_FLAG_INSERTNEEDED |
+                       AUTOKEY_FLAG_INSERTAVAIL | AUTOKEY_FLAG_NOWARNING);
+  U.ipo_new = BEZT_IPO_BEZ;
+  U.keyhandles_new = HD_AUTO_ANIM;
+  U.autokey_flag |= AUTOKEY_FLAG_XYZ2RGB;
+  U.dupflag = USER_DUP_MESH | USER_DUP_SURF | USER_DUP_CURVE | USER_DUP_FONT |
+              USER_DUP_MBALL | USER_DUP_ARM | USER_DUP_LAMP | USER_DUP_ACT;
+
+  /* Input */
+  U.dragthreshold = 5;
+  U.tweak_threshold = 10;
+  U.dbl_click_time = 350;
+  U.flag &= ~USER_NONUMPAD; /* Emulate Numpad */
+  U.flag &= ~USER_TRACKBALL; /* Orbit Style: Turntable */
+  U.viewzoom = USER_ZOOM_DOLLY;
+  U.uiflag &= ~(USER_ZOOM_INVERT | USER_ZOOM_HORIZ | USER_WHEELZOOMDIR);
+  U.navigation_mode = VIEW_NAVIGATION_WALK;
+  U.walk_navigation.mouse_speed = 1.0f;
+  U.walk_navigation.walk_speed = 2.5f;
+  U.walk_navigation.walk_speed_factor = 5.0f;
+  U.walk_navigation.teleport_time = 0.2f;
+  U.walk_navigation.flag &= ~(USER_WALK_GRAVITY | USER_WALK_MOUSE_REVERSE);
+  U.ndof_sensitivity = 1.0f;
+  U.ndof_orbit_sensitivity = 1.0f;
+  U.ndof_deadzone = 0.1f;
+  U.ndof_flag &= ~NDOF_MODE_ORBIT; /* Navigation Style: Free */
+  U.ndof_flag |= NDOF_TURNTABLE; /* Rotation Style: Turntable */
+
+  /* System / General */
+  U.frameserverport = 8080;
+  U.scrollback = 256;
+  U.mixbufsize = 2048;
+  U.glalphaclip = 0.004f;
+  U.use_gpu_mipmap = 1;
+  U.use_16bit_textures = 1;
+  U.gameflags &= ~USER_DISABLE_MIPMAP;
+  U.gpu_select_method = USER_SELECT_AUTO; /* Selection: Automatic (also clears OpenGL Depth Picking) */
+  U.wmdrawmethod = USER_DRAW_AUTOMATIC;
+  U.ogl_multisamples = USER_MULTISAMPLE_NONE;
+  U.uiflag2 &= ~USER_REGION_OVERLAP;
+  U.text_render &= ~USER_TEXT_DISABLE_AA;
+  U.textimeout = 120;
+  U.texcollectrate = 60;
+  U.image_draw_method = IMAGE_DRAW_METHOD_2DTEXTURE;
+  U.memcachelimit = 1024;
+
+  /* Files */
+  U.flag |= USER_RELPATHS;
+  U.flag &= ~USER_FILECOMPRESS; /* Compress File */
+  U.uiflag |= USER_FILTERFILEEXTS | USER_HIDE_DOT;
+  U.flag &= ~USER_FILENOUI; /* Load UI */
+  U.uiflag &= ~(USER_HIDE_RECENT | USER_HIDE_SYSTEM_BOOKMARKS | USER_SHOW_THUMBNAILS);
+  U.versions = 1;
+  U.recent_files = 10;
+  U.flag |= USER_SAVE_PREVIEWS;
+  U.uiflag2 &= ~USER_KEEP_SESSION;
+  U.flag |= USER_AUTOSAVE;
+  U.flag &= ~USER_TXT_TABSTOSPACES_DISABLE;
 }
 
 /**

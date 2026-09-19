@@ -114,7 +114,7 @@ public:
 	void RenderBackground(RAS_Rasterizer *rasty);
 
 #ifdef WITH_PYTHON
-	/* shared Global Properties dict (own.scene.world["key"]), values that don't convert to EXP_Value */
+	/* shared World Properties dict (own.scene.world["key"]), values that don't convert to EXP_Value */
 	PyObject *m_attr_dict;
 	static PyMappingMethods Mapping;
 

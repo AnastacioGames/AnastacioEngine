@@ -27,6 +27,7 @@
 #include "rna_internal.h"
 
 #include "DNA_material_types.h"
+#include "DNA_property_types.h"
 #include "DNA_texture_types.h"
 #include "DNA_world_types.h"
 
@@ -42,6 +43,7 @@
 #include "BKE_texture.h"
 
 #include "ED_node.h"
+#include "ED_view3d.h"
 
 #include "WM_api.h"
 
@@ -59,6 +61,17 @@ static PointerRNA rna_World_mist_get(PointerRNA *ptr)
 static PointerRNA rna_World_weather_get(PointerRNA *ptr)
 {
 	return rna_pointer_inherit_refine(ptr, &RNA_WorldWeatherSettings, ptr->id.data);
+}
+
+static int rna_World_string_properties_skip(CollectionPropertyIterator *UNUSED(iter), void *data)
+{
+	return ((bProperty *)data)->type != GPROP_STRING;
+}
+
+static void rna_World_string_properties_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	World *wo = (World *)ptr->data;
+	rna_iterator_listbase_begin(iter, &wo->prop, rna_World_string_properties_skip);
 }
 
 static void rna_World_mtex_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
@@ -101,13 +114,20 @@ static void rna_World_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
 }
 #endif
 
-static void rna_World_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	World *wo = ptr->id.data;
 
 	DAG_id_tag_update(&wo->id, 0);
 	WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, wo);
 	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+
+	/* Rain/Clouds speed or the weather toggles themselves may need the
+	 * viewport's realtime redraw timer started (or stopped) so the weather
+	 * shaders keep animating outside Play/input events. */
+	if (bmain->wm.first) {
+		ED_view3d_realtime_viewport_update((wmWindowManager *)bmain->wm.first);
+	}
 }
 
 static bool rna_World_use_sky_moon_get(PointerRNA *ptr)
@@ -612,6 +632,23 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Cloud Color", "Color tint of the clouds");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	/* earthquake */
+	prop = RNA_def_property(srna, "use_earthquake", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_EARTHQUAKE);
+	RNA_def_property_ui_text(prop, "Use Earthquake", "Shake the scene gravity to simulate an earthquake while playing");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_expanded_earthquake", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_EARTHQUAKE);
+	RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "earthquake_level", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 0, 5);
+	RNA_def_property_ui_text(prop, "Level", "Earthquake intensity, from 0 (off) to 5 (extreme); drives lateral gravity shake while playing");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	/* lens flare */
 	prop = RNA_def_property(srna, "use_lens_flare", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_LENSFLARE);
@@ -699,7 +736,8 @@ void RNA_def_world(BlenderRNA *brna)
 
 	/* sun_size, turbidity, ground */
 	prop = RNA_def_property(srna, "sun_size", PROP_FLOAT, PROP_FACTOR);
-	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_range(prop, 0.0, 0.08);
+	RNA_def_property_ui_range(prop, 0.0, 0.08, 0.001, 4);
 	RNA_def_property_ui_text(prop, "Sun Size", "Sun Size");
 	RNA_def_property_update(prop, 0, "rna_World_update");
 
@@ -794,6 +832,12 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_collection_sdna(prop, NULL, "prop", NULL);
 	RNA_def_property_struct_type(prop, "GameProperty"); /* rna_property.c */
 	RNA_def_property_ui_text(prop, "Properties", "Game engine properties shared by all objects through the World");
+
+	prop = RNA_def_property(srna, "string_properties", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_funcs(prop, "rna_World_string_properties_begin", "rna_iterator_listbase_next",
+	                                  "rna_iterator_listbase_end", "rna_iterator_listbase_get", NULL, NULL, NULL, NULL);
+	RNA_def_property_struct_type(prop, "GameProperty");
+	RNA_def_property_ui_text(prop, "String Properties", "Game engine string properties shared through the World");
 
 	rna_def_lighting(brna);
 	rna_def_world_mist(brna);

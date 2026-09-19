@@ -65,7 +65,15 @@ class KX_AddObjectActuator : public SCA_IActuator
 	bool m_localAngvFlag; 
 	
 	KX_GameObject*	m_lastCreatedObject;
-	
+
+	/// Optional string property holding the name of the object to add (empty = use m_OriginalObject).
+	std::string m_objectProperty;
+	/// The property lives in the World (World Property) instead of the owner object.
+	bool m_objectPropertyGlobal;
+
+	/// Object to replicate: the one named by the property when set, otherwise m_OriginalObject.
+	KX_GameObject *ResolveOriginalObject();
+
 public:
 
 	/** 
@@ -101,6 +109,12 @@ public:
 	) const;
 
 	void	InstantAddObject();
+
+	void SetObjectProperty(const std::string& name, bool global)
+	{
+		m_objectProperty = name;
+		m_objectPropertyGlobal = global;
+	}
 
 #ifdef WITH_PYTHON
 

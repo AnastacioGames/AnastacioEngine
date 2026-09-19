@@ -174,6 +174,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_autoWorldSunGroundReferenceInitialized(false),
 	m_autoWorldSunInitialCameraHeight(0.0f),
 	m_autoWorldSunReferenceCamera(nullptr),
+	m_earthquakeBaseGravity(mt::zero3),
+	m_earthquakeBaseGravityInitialized(false),
 	m_activeCamera(nullptr),
 	m_optimizationReferencePosition(mt::zero3),
 	m_overrideCullingCamera(nullptr),
@@ -585,8 +587,8 @@ void KX_Scene::UpdateAutoWorldSun()
 	mt::vec3 groundReference = cameraPosition + cameraForward * 5.0f;
 	groundReference.z -= m_autoWorldSunInitialCameraHeight;
 
-	// `sun_hour` is a World Global Property, so a Property Actuator set to
-	// Global Property can change the time of day without a Python script.
+	// `sun_hour` is a World World Property, so a Property Actuator set to
+	// World Property can change the time of day without a Python script.
 	float hour = 12.0f;
 	if (m_worldinfo) {
 		if (EXP_Value *hourProperty = m_worldinfo->GetProperty("sun_hour")) {
@@ -608,6 +610,49 @@ void KX_Scene::UpdateAutoWorldSun()
 	// Blender lamps illuminate along local -Z, so align local +Z away from the
 	// ground reference. This leaves local -Z pointing directly at it.
 	m_worldSun->AlignAxisToVect(sunPosition - groundReference, 2);
+}
+
+void KX_Scene::UpdateEarthquake(double curtime)
+{
+	World *world = m_blenderScene->world;
+	const bool active = world && (world->weather_flag & WO_WEATHER_EARTHQUAKE) && world->earthquake_level > 0;
+
+	if (!m_earthquakeBaseGravityInitialized) {
+		m_earthquakeBaseGravity = GetGravity();
+		m_earthquakeBaseGravityInitialized = true;
+	}
+
+	if (!active) {
+		// Only reset if the effect had actually displaced gravity (avoid
+		// clobbering gravity changes made by the user/logic while off).
+		const mt::vec3 currentGravity = GetGravity();
+		if (currentGravity.x != m_earthquakeBaseGravity.x ||
+		    currentGravity.y != m_earthquakeBaseGravity.y ||
+		    currentGravity.z != m_earthquakeBaseGravity.z)
+		{
+			SetGravity(m_earthquakeBaseGravity);
+		}
+		return;
+	}
+
+	// Same two-wave-per-axis shake as the reference implementation: a single
+	// sine looks too mechanical/repetitive, two summed at different phases
+	// and frequencies read as more chaotic ground motion.
+	static const float kLevelStrength[6] = {0.0f, 0.8f, 1.8f, 3.5f, 5.8f, 8.5f};
+	static const float kLevelFrequency[6] = {0.0f, 3.0f, 4.0f, 5.5f, 7.0f, 8.5f};
+
+	const int level = std::min(std::max(world->earthquake_level, 0), 5);
+	const float strength = kLevelStrength[level];
+	const float frequency = kLevelFrequency[level];
+	const float t = (float)curtime;
+
+	const float gx = strength * (std::sin(t * frequency * 6.28318f) +
+	                              0.45f * std::sin(t * frequency * 11.7f));
+	const float gy = strength * (std::sin(t * frequency * 8.1f + 1.4f) +
+	                              0.35f * std::sin(t * frequency * 15.9f));
+	const float gz = m_earthquakeBaseGravity.z + strength * 0.12f * std::sin(t * frequency * 10.4f);
+
+	SetGravity(mt::vec3(m_earthquakeBaseGravity.x + gx, m_earthquakeBaseGravity.y + gy, gz));
 }
 
 void KX_Scene::Suspend()

@@ -38,3 +38,5 @@ shader-test*.log
 edge-dump*.html
 edge-run*.err
 cube-screenshot.png
+build-web-release/
+__pycache__/

@@ -4136,8 +4136,15 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	}
 #endif
 
-	/* framebuffer fx needed, we need to draw offscreen first */
-	if ((v3d->fx_settings.fx_flag || scene->scenefx_settings.scenefx_flag) && v3d->drawtype >= OB_SOLID) {
+	/* framebuffer fx needed, we need to draw offscreen first.
+	 * Lens Flare/Rain/Clouds have no scenefx_flag bit of their own (they mirror
+	 * World > Weather directly), so they need their own check here to enter the
+	 * compositor path at all when one of them is the only effect turned on. */
+	if ((v3d->fx_settings.fx_flag || scene->scenefx_settings.scenefx_flag ||
+	     (scene->world && (scene->world->weather_flag &
+	                        (WO_WEATHER_LENSFLARE | WO_WEATHER_RAIN | WO_WEATHER_CLOUDS)))) &&
+	    v3d->drawtype >= OB_SOLID)
+	{
 		GPUFXSettings fx_settings;
 		BKE_screen_gpu_fx_validate(&v3d->fx_settings);
 		BKE_scene_fx_validate(scene);

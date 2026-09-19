@@ -38,6 +38,10 @@
 #include "KX_AddObjectActuator.h"
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
+#include "KX_WorldInfo.h"
+#include "KX_Globals.h"
+#include "BL_Converter.h"
+#include "CM_Message.h"
 
 /* ------------------------------------------------------------------------- */
 /* Native functions                                                          */
@@ -51,7 +55,8 @@ KX_AddObjectActuator::KX_AddObjectActuator(KX_GameObject *gameobj, KX_GameObject
 	m_linear_velocity(linvel),
 	m_localLinvFlag(linv_local),
 	m_angular_velocity(angvel),
-	m_localAngvFlag(angv_local)
+	m_localAngvFlag(angv_local),
+	m_objectPropertyGlobal(false)
 {
 	if (m_OriginalObject) {
 		m_OriginalObject->RegisterActuator(this);
@@ -252,12 +257,42 @@ PyObject *KX_AddObjectActuator::PyInstantAddObject()
 
 #endif // WITH_PYTHON
 
+KX_GameObject *KX_AddObjectActuator::ResolveOriginalObject()
+{
+	if (m_objectProperty.empty()) {
+		return m_OriginalObject;
+	}
+
+	EXP_Value *owner = m_objectPropertyGlobal ?
+	    static_cast<EXP_Value *>(m_scene->GetWorldInfo()) : static_cast<EXP_Value *>(GetParent());
+	if (!owner) {
+		return nullptr;
+	}
+
+	const std::string name = owner->GetPropertyText(m_objectProperty);
+	if (name.empty()) {
+		return nullptr;
+	}
+
+	KX_GameObject *ob = m_scene->FindInactiveObjectAcrossScenes(name);
+	if (!ob) {
+		// Linked object registered in bmain but not instantiated in any scene yet.
+		ob = KX_GetActiveEngine()->GetConverter()->FindOrConvertMainObject(name, m_scene);
+	}
+	if (!ob) {
+		CM_Warning("AddObject actuator \"" << GetName() << "\": no inactive object named \"" << name
+		           << "\" (from property \"" << m_objectProperty << "\").");
+	}
+	return ob;
+}
+
 void KX_AddObjectActuator::InstantAddObject()
 {
-	if (m_OriginalObject) {
+	KX_GameObject *original = ResolveOriginalObject();
+	if (original) {
 		// Add an identical object, with properties inherited from the original object
 		// Now it needs to be added to the current scene.
-		KX_GameObject *replica = m_scene->AddReplicaObject(m_OriginalObject, static_cast<KX_GameObject *>(GetParent()), m_timeProp);
+		KX_GameObject *replica = m_scene->AddReplicaObject(original, static_cast<KX_GameObject *>(GetParent()), m_timeProp);
 		replica->ApplyForce(m_linear_velocity, m_localLinvFlag);
 		replica->SetAngularVelocity(m_angular_velocity, m_localAngvFlag);
 

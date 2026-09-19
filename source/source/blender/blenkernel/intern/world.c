@@ -139,7 +139,9 @@ void BKE_world_init(World *wrld)
 	wrld->flare_scale = 1.0f;
 	wrld->flare_intensity = 1.0f;
 
-	/* World Status: default Global Properties, mirroring existing weather/mist state
+	wrld->earthquake_level = 0;
+
+	/* World Status: default World Properties, mirroring existing weather/mist state
 	 * plus placeholders for status not backed by a real effect yet. */
 	{
 		struct { const char *name; int type; float fval; int ival; } wo_status[] = {

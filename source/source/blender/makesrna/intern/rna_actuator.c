@@ -1099,7 +1099,7 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 		{0, "NONE", 0, "None", "Normal object Game Property actuator"},
 		{1, "RUNTIME_API", 0, "Use Runtime API", "Write an exposed runtime property"},
 		{2, "WEATHER_EFFECTS", 0, "Weather Effects", "Change a World weather effect"},
-		{3, "GLOBAL_PROPERTY", 0, "Global Property", "Read/write a Game Property on the current World"},
+		{3, "GLOBAL_PROPERTY", 0, "World Property", "Read/write a Game Property on the current World"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	static const EnumPropertyItem runtime_property_items[] = {
@@ -1241,7 +1241,7 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_world_property", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_world_property", 1);
-	RNA_def_property_ui_text(prop, "Global Property", "Read/write a Game Property on the current World instead of this Object");
+	RNA_def_property_ui_text(prop, "World Property", "Read/write a Game Property on the current World instead of this Object");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "property", PROP_STRING, PROP_NONE);
@@ -1570,6 +1570,23 @@ static void rna_def_edit_object_actuator(BlenderRNA *brna)
 	 * testing with "P" inside the already-loaded editor session. */
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Object", "Add this Object and all its children (can't be on a visible layer)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_object_from_property", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_EDOB_ADD_FROM_PROP);
+	RNA_def_property_ui_text(prop, "From Property",
+	                         "Get the name of the Object to add from a string property instead of the Object field");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_global_object_property", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_EDOB_ADD_PROP_GLOBAL);
+	RNA_def_property_ui_text(prop, "World Property",
+	                         "Read the property from the World Properties instead of this Object");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "object_property", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "name");
+	RNA_def_property_ui_text(prop, "Property", "Name of the string property holding the name of the Object to add");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "track_object", PROP_POINTER, PROP_NONE);

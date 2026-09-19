@@ -2376,10 +2376,9 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 void sky_moon(vec3 view, vec3 sundir, float enabled, float size, float brightness, out vec3 moon)
 {
 	/* Visual only: a cool disc with a deliberately short, dim halo.
-	 * Mirror only around the vertical axis: a full 3D inverse would put the
-	 * moon below the horizon whenever the sun is up, making the effect absent
-	 * during the hours in which it is meant to be seen. */
-	vec3 moonDir = normalize(vec3(-sundir.x, -sundir.y, sundir.z));
+	 * Full inverse of the sun direction, so the moon sits opposite the sun
+	 * across the sky and rises above the horizon precisely when the sun sets. */
+	vec3 moonDir = normalize(-sundir);
 	float radius = max(size * 0.05, 0.00005);
 	float alignment = dot(normalize(view), moonDir);
 	float disk = smoothstep(1.0 - radius, 1.0, alignment);
@@ -2453,7 +2452,7 @@ void do_sky_atmospheric(vec3 view, vec3 hor, vec3 sundir, vec3 suncolor, float e
 
 	outcol.rgb += clamp(sun, 0.0, 1.0) * suncolor * energy * sunVisibility * sunFactor * sunEnergy;
 	vec3 moon;
-	sky_moon(-view, sundir, moonEnabled, moonSize, moonBrightness, moon);
+	sky_moon(view, sundir, moonEnabled, moonSize, moonBrightness, moon);
 	outcol.rgb += moon;
 
 	// Stars, only if (env_sky == 0.0)

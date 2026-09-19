@@ -27,6 +27,7 @@
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_world_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -414,7 +415,7 @@ static SpaceLink *view3d_new(const bContext *C)
 	v3d->gridflag = V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_FLOOR;
 
 	v3d->flag = V3D_SELECT_OUTLINE;
-	v3d->flag2 = V3D_SHOW_RECONSTRUCTION | V3D_SHOW_GPENCIL | V3D_RENDER_SHOW_COMPONENTS;
+	v3d->flag2 = V3D_SHOW_RECONSTRUCTION | V3D_SHOW_GPENCIL | V3D_RENDER_SHOW_COMPONENTS | V3D_SHOW_WORLD;
 
 	v3d->lens = 35.0f;
 	v3d->near = 0.01f;
@@ -1397,6 +1398,21 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 		ScrArea *sa;
 		if (!win->screen)
 			continue;
+
+		/* Rain/Clouds streaks in the 3D Viewport compositor are driven by real
+		 * elapsed time (see GPU_fx_compositor_initialize_passes), same as this
+		 * timer already does for realtime shading -- without it the viewport is
+		 * never redrawn outside input events/animation playback, so the weather
+		 * would look frozen mid-motion instead of animating. */
+		World *world = win->screen->scene ? win->screen->scene->world : NULL;
+		if (world &&
+		    ((world->weather_flag & WO_WEATHER_RAIN && world->rain_speed != 0.0f) ||
+		     (world->weather_flag & WO_WEATHER_CLOUDS && world->cloud_speed != 0.0f)))
+		{
+			want_timer = true;
+			break;
+		}
+
 		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
 			if (sa->spacetype == SPACE_VIEW3D) {
 				View3D *v3d = sa->spacedata.first;

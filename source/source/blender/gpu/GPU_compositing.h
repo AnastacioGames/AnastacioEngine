@@ -72,10 +72,16 @@ typedef enum GPUFXShaderEffect {
 	GPU_SHADER_FX_SSR = 14,
 	/* FXAA shader */
 	GPU_SHADER_FX_FXAA = 15,
+	/* Lens Flare shader */
+	GPU_SHADER_FX_LENSFLARE = 16,
+	/* Rain shader */
+	GPU_SHADER_FX_RAIN = 17,
+	/* Clouds shader */
+	GPU_SHADER_FX_CLOUDS = 18,
 } GPUFXShaderEffect;
 
 /* keep in synch with enum above! */
-#define MAX_FX_SHADERS 16
+#define MAX_FX_SHADERS 19
 
 /* generate a new FX compositor */
 GPUFX *GPU_fx_compositor_create(void);

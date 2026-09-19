@@ -454,10 +454,11 @@ static void outliner_add_line_styles(SpaceOops *soops, ListBase *lb, Scene *sce,
 }
 #endif
 
-static void outliner_add_scene_contents(SpaceOops *soops, ListBase *lb, Scene *sce, TreeElement *te)
+static TreeElement *outliner_add_scene_contents(SpaceOops *soops, ListBase *lb, Scene *sce, TreeElement *te)
 {
 	SceneRenderLayer *srl;
 	TreeElement *tenla = outliner_add_element(soops, lb, sce, te, TSE_R_LAYER_BASE, 0);
+	TreeElement *world_te;
 	int a;
 
 	tenla->name = IFACE_("RenderLayers");
@@ -480,12 +481,14 @@ static void outliner_add_scene_contents(SpaceOops *soops, ListBase *lb, Scene *s
 
 	outliner_add_element(soops, lb, sce->gpd, te, 0, 0);
 
-	outliner_add_element(soops,  lb, sce->world, te, 0, 0);
+	world_te = outliner_add_element(soops,  lb, sce->world, te, 0, 0);
 
 #ifdef WITH_FREESTYLE
 	if (STREQ(sce->r.engine, RE_engine_id_BLENDER_RENDER) && (sce->r.mode & R_EDGE_FRS))
 		outliner_add_line_styles(soops, lb, sce, te);
 #endif
+
+	return world_te;
 }
 
 // can be inlined if necessary
@@ -1844,11 +1847,18 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 			if (sce == scene && show_opened)
 				tselem->flag &= ~TSE_CLOSED;
 
-			outliner_add_element(soops, &te->subtree, sce->world, te, 0, 0);
+			{
+				TreeElement *world_te = outliner_add_element(soops, &te->subtree, sce->world, te, 0, 0);
 
-			for (base = sce->base.first; base; base = base->next) {
-				ten = outliner_add_element(soops, &te->subtree, base->object, te, 0, 0);
-				ten->directdata = base;
+				for (base = sce->base.first; base; base = base->next) {
+					if (world_te && base->object == sce->world_sun) {
+						ten = outliner_add_element(soops, &world_te->subtree, base->object, world_te, 0, 0);
+					}
+					else {
+						ten = outliner_add_element(soops, &te->subtree, base->object, te, 0, 0);
+					}
+					ten->directdata = base;
+				}
 			}
 			outliner_make_hierarchy(&te->subtree);
 			/* clear id.newid, to prevent objects be inserted in wrong scenes (parent in other scene) */
@@ -1857,11 +1867,18 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 	}
 	else if (soops->outlinevis == SO_CUR_SCENE) {
 
-		outliner_add_scene_contents(soops, &soops->tree, scene, NULL);
+		{
+			TreeElement *world_te = outliner_add_scene_contents(soops, &soops->tree, scene, NULL);
 
-		for (base = scene->base.first; base; base = base->next) {
-			ten = outliner_add_element(soops, &soops->tree, base->object, NULL, 0, 0);
-			ten->directdata = base;
+			for (base = scene->base.first; base; base = base->next) {
+				if (world_te && base->object == scene->world_sun) {
+					ten = outliner_add_element(soops, &world_te->subtree, base->object, world_te, 0, 0);
+				}
+				else {
+					ten = outliner_add_element(soops, &soops->tree, base->object, NULL, 0, 0);
+				}
+				ten->directdata = base;
+			}
 		}
 		outliner_make_hierarchy(&soops->tree);
 	}

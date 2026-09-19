@@ -142,12 +142,15 @@ typedef struct World {
 	float cloud_coverage, cloud_scale, cloud_speed;
 	float cloud_color[3];
 
+	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
+	float earthquake_pad;
+
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
 	float flare_scale, flare_intensity;
 
 	ListBase gpumaterial;		/* runtime */
 
-	/* game engine: properties shared by all objects through the World ("Global Properties") */
+	/* game engine: properties shared by all objects through the World ("World Properties") */
 	ListBase prop;
 } World;
 
@@ -179,6 +182,7 @@ typedef struct World {
 #define WO_WEATHER_LENSFLARE       (1 << 2)
 #define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
 #define WO_WEATHER_RAIN_RIPPLE     (1 << 4)
+#define WO_WEATHER_EARTHQUAKE      (1 << 5)
 
 /* rain_style */
 #define WO_RAIN_STYLE_CLASSIC      0

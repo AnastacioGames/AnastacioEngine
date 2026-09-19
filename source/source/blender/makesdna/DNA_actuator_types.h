@@ -499,6 +499,11 @@ typedef struct bActuator {
 #define ACT_EDOB_REPLACE_MESH_NOGFX		2 /* use for replace mesh actuator */
 #define ACT_EDOB_REPLACE_MESH_PHYS		4
 
+/* editObjectActuator->flag for add object actuator: take the object name from a string
+ * property (bEditObjectActuator->name) instead of the Object pointer. */
+#define ACT_EDOB_ADD_FROM_PROP			8
+#define ACT_EDOB_ADD_PROP_GLOBAL		16 /* property lives on the World (World Property) instead of the owner Object */
+
 /* editObjectActuator->dyn_operation */
 #define ACT_EDOB_RESTORE_DYN	0
 #define ACT_EDOB_SUSPEND_DYN	1

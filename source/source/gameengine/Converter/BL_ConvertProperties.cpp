@@ -263,7 +263,7 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 	}
 
 	/* World Status: keep the mirrored entries in sync with the real weather/mist
-	 * state at scene conversion time (authored Global Property values are only
+	 * state at scene conversion time (authored World Property values are only
 	 * used as defaults/fallback if the user removed one of these keys). */
 	struct { const char *name; bool bval; } wo_status_bools[] = {
 		{"chuva_ligada",   (blenderworld->weather_flag & WO_WEATHER_RAIN) != 0},

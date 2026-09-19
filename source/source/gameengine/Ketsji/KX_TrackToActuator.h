@@ -52,12 +52,21 @@ class KX_TrackToActuator : public SCA_IActuator, public mt::SimdClassAllocator
 	
 	mt::mat3 m_parentlocalmat;
 	KX_GameObject* m_parentobj;
+	// Optional: target object name read from a string property (owner or World)
+	std::string m_objectProperty;
+	bool m_objectPropertyGlobal = false;
 
 public:
 
 	KX_TrackToActuator(SCA_IObject* gameobj, SCA_IObject *ob, int time,
 	                   bool threedee,int trackflag,int upflag);
 	virtual ~KX_TrackToActuator();
+
+	void SetObjectProperty(const std::string& name, bool global)
+	{
+		m_objectProperty = name;
+		m_objectPropertyGlobal = global;
+	}
 	virtual EXP_Value* GetReplica() {
 		KX_TrackToActuator* replica = new KX_TrackToActuator(*this);
 		replica->ProcessReplica();

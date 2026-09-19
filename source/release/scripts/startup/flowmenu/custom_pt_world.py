@@ -52,63 +52,66 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        scene = context.scene
         world = context.world
 
-        world_panel = layout.box()
-        box = world_panel.box()
-        box.label(text="Background Colors:", icon="COLOR")
-        split = box.split()
-        
-        col = split.column()
-        col.prop(world, "horizon_color", text="Horizon/Ambient")
-        col.prop(world, "ambient_color", text="Ambient")
-        
-        col = split.column()
-        if not world.use_sky_atmospheric:
-            col.prop(world, "zenith_color", text="Zenith")
-            col.prop(world, "nadir_color", text="Nadir")
-            col.active = world.use_sky_blend
-        else:
-            col.prop(world, "zenith_color", text="Extinction")
-            col.prop(world, "nadir_color", text="Inscattering")
+        main_box = layout.box()
+        main_box.label(text="World Settings:", icon="WORLD")
 
-        box2 = box.box()
-        box2.label(text="Sky Render:", icon="WORLD")
-        
-        row = box2.row(align=True)
+        row = main_box.row(align=True)
         row.prop(world, "use_sky_paper", text="Paper", toggle=True)
         row.prop(world, "use_sky_blend", text="Blend", toggle=True)
         row.prop(world, "use_sky_real", text="Real", toggle=True)
 
-        sun_box = box2.box()
-        sun_box.label(text="World Sun", icon="LAMP_SUN")
-        # The assignment belongs to Scene (the runtime reads Scene.world_sun),
-        # but it is presented with the World sky controls deliberately.
-        sun_box.prop(context.scene, "world_sun_set")
-        sun_box.prop(context.scene, "use_auto_world_sun")
-        hour_row = sun_box.row()
-        hour_row.active = context.scene.use_auto_world_sun
-        hour_row.prop(context.scene, "auto_world_sun_hour")
+        # Colors
+        main_box.prop(world, "flow_expand_colors", text="Colors", emboss=True)
+        if world.flow_expand_colors:
+            split = main_box.split()
+            col = split.column()
+            col.prop(world, "horizon_color", text="Horizon")
+            col.prop(world, "ambient_color", text="Ambient")
 
-        sky_box = box2.box()
-        sky_box.label(text="Sky Objects", icon="WORLD")
-        sky_box.prop(world, "use_sky_atmospheric", text="Atmospheric")
-        sky_box.prop(world, "sun_size", text="Sun Size")
-        sky_box.prop(world, "use_sky_stars", text="Stars")
+            col = split.column()
+            if world.use_sky_atmospheric:
+                col.prop(world, "zenith_color", text="Extinction")
+                col.prop(world, "nadir_color", text="Inscattering")
+            else:
+                col.active = world.use_sky_blend
+                col.prop(world, "zenith_color", text="Zenith")
+                col.prop(world, "nadir_color", text="Nadir")
 
-        moon_row = sky_box.row()
-        moon_row.prop(world, "use_sky_moon", text="Moon")
-        moon_col = sky_box.column()
-        moon_col.active = world.use_sky_moon
-        moon_col.prop(world, "moon_size")
-        moon_col.prop(world, "moon_brightness")
+        # Sun
+        main_box.prop(world, "flow_expand_sun", text="Sun", emboss=True)
+        if world.flow_expand_sun:
+            col = main_box.column(align=True)
+            # The assignment belongs to Scene (the runtime reads Scene.world_sun),
+            # but it is presented with the World sky controls deliberately.
+            col.prop(scene, "world_sun_set", text="Object")
+            col.prop(scene, "use_auto_world_sun", text="Automatic")
+            hour_row = col.row()
+            hour_row.active = scene.use_auto_world_sun
+            hour_row.prop(scene, "auto_world_sun_hour", text="Hour")
+            col.prop(world, "sun_size", text="Size")
 
-        if not world.use_sky_atmospheric:
-            box3 = layout.box()
-            box3.label(text="Atmosphere Settings:", icon="NLA")
-            row = box3.row()
-            row.prop(world, "sky_turbidity")
-            row.prop(world, "ground_color")
+        # Sky Objects
+        main_box.prop(world, "flow_expand_sky", text="Sky Objects", emboss=True)
+        if world.flow_expand_sky:
+            split = main_box.split()
+            col = split.column()
+            col.prop(world, "use_sky_atmospheric", text="Atmospheric")
+            col.prop(world, "use_sky_stars", text="Stars")
+
+            col = split.column()
+            col.prop(world, "use_sky_moon", text="Moon")
+            moon_col = col.column()
+            moon_col.active = world.use_sky_moon
+            moon_col.prop(world, "moon_size", text="Size")
+            moon_col.prop(world, "moon_brightness", text="Brightness")
+
+            if not world.use_sky_atmospheric:
+                row = main_box.row()
+                row.prop(world, "sky_turbidity", text="Turbidity")
+                row.prop(world, "ground_color", text="Ground")
 
 
 # ==============================================================================
@@ -124,29 +127,29 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
         scene = context.scene
         return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        light = context.world.light_settings
-        self.layout.prop(light, "use_environment_light", text="")
-
     def draw(self, context):
         layout = self.layout
         light = context.world.light_settings
         world = context.world
 
-        environment_box = layout.box()
-        main_box = environment_box.box()
-        main_box.active = light.use_environment_light
+        main_box = layout.box()
+        main_box.label(text="Environment Effects:", icon="LAMP_SUN")
 
-        main_box.label(text="Environment Lighting:", icon="LAMP_SUN")
-        split = main_box.split()
-        split.prop(light, "environment_energy", text="Energy")
-        split.prop(light, "environment_color", text="Color")
+        row = main_box.row(align=True)
+        row.prop(world, "flow_expand_env_light", text="Environment Lighting", emboss=True)
+        row.prop(light, "use_environment_light", text="")
 
-        exp_box = environment_box.box()
-        exp_box.label(text="Camera Exposure:", icon="CAMERA_DATA")
-        row = exp_box.row()
-        row.prop(world, "exposure")
-        row.prop(world, "color_range", text="Color Range")
+        if world.flow_expand_env_light:
+            col = main_box.column(align=True)
+            col.active = light.use_environment_light
+            col.prop(light, "environment_energy", text="Energy")
+            col.prop(light, "environment_color", text="Color")
+
+        main_box.prop(world, "flow_expand_exposure", text="Camera Exposure", emboss=True)
+        if world.flow_expand_exposure:
+            col = main_box.column(align=True)
+            col.prop(world, "exposure")
+            col.prop(world, "color_range", text="Color Range")
 
 
 # ==============================================================================
@@ -162,40 +165,39 @@ class CUSTOM_PT_game_mist(CustomWorldButtonsPanel, Panel):
         scene = context.scene
         return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        world = context.world
-        self.layout.prop(world.mist_settings, "use_mist", text="")
-
     def draw(self, context):
         layout = self.layout
         world = context.world
+        mist = world.mist_settings
 
         main_box = layout.box()
-        main_box.active = world.mist_settings.use_mist
+        main_box.label(text="Fog Effects:", icon="IMAGE_ZDEPTH")
 
         row = main_box.row(align=True)
-        row.prop(world.mist_settings, "mist_blend_type", text="")
+        row.prop(world, "flow_expand_mist", text="Mist", emboss=True)
+        row.prop(mist, "use_mist", text="")
 
-        main_box.prop(world.mist_settings, "falloff")
+        if world.flow_expand_mist:
+            col = main_box.column(align=True)
+            col.active = mist.use_mist
+            col.prop(mist, "mist_blend_type", text="")
+            col.prop(mist, "falloff")
+            col.prop(mist, "intensity", text="Minimum Intensity", slider=True)
 
-        dist_box = main_box.box()
-        dist_box.label(text="Distance:", icon="IMAGE_ZDEPTH")
-        split = dist_box.split()
-        col = split.column()
-        col.prop(world.mist_settings, "start")
-        col = split.column()
-        col.prop(world.mist_settings, "depth")
+        main_box.prop(world, "flow_expand_mist_distance", text="Distance", emboss=True)
+        if world.flow_expand_mist_distance:
+            col = main_box.column(align=True)
+            col.active = mist.use_mist
+            col.prop(mist, "start")
+            col.prop(mist, "depth")
 
-        if world.mist_settings.falloff == 'HEIGHT':
-            h_box = main_box.box()
-            h_box.label(text="Height Fog:", icon="MOD_WAVE")
-            split_h = h_box.split()
-            col_h = split_h.column()
-            col_h.prop(world.mist_settings, "height_fog")
-            col_h = split_h.column()
-            col_h.prop(world.mist_settings, "density_fog")
-
-        main_box.prop(world.mist_settings, "intensity", text="Minimum Intensity", slider=True)
+        if mist.falloff == 'HEIGHT':
+            main_box.prop(world, "flow_expand_mist_height", text="Height Fog", emboss=True)
+            if world.flow_expand_mist_height:
+                col = main_box.column(align=True)
+                col.active = mist.use_mist
+                col.prop(mist, "height_fog")
+                col.prop(mist, "density_fog")
 
 
 # ==============================================================================
@@ -271,12 +273,21 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "flare_scale")
             col.prop(weather, "flare_intensity")
 
+        row = main_box.row(align=True)
+        row.prop(weather, "show_expanded_earthquake", text="Earthquake", emboss=True)
+        row.prop(weather, "use_earthquake", text="")
+
+        if weather.show_expanded_earthquake:
+            col = main_box.column(align=True)
+            col.active = weather.use_earthquake
+            col.prop(weather, "earthquake_level", slider=True, text="Level")
+
 
 # ==============================================================================
 # GLOBAL PROPERTIES (COMPARTILHADAS ENTRE OBJETOS VIA WORLD)
 # ==============================================================================
 class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
-    bl_label = "Global Properties"
+    bl_label = "World Properties"
     bl_idname = "WORLD_PT_game_global_properties_custom"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -289,7 +300,7 @@ class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
         layout = self.layout
         world = context.world
 
-        props = layout.operator("world.game_property_new", text="Add Global Property", icon='PLUS')
+        props = layout.operator("world.game_property_new", text="Add World Property", icon='PLUS')
         props.name = ""
 
         for i, prop in enumerate(world.properties):

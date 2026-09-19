@@ -33,6 +33,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_gpu_types.h"
 #include "DNA_object_types.h"
+#include "DNA_world_types.h"
 
 #include "GPU_compositing.h"
 #include "GPU_extensions.h"
@@ -42,6 +43,8 @@
 #include "GPU_texture.h"
 
 #include "MEM_guardedalloc.h"
+
+#include "PIL_time.h"
 
 static const float fullscreencos[4][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, 1.0f}};
 static const float fullscreenuvs[4][2] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}};
@@ -89,6 +92,31 @@ typedef struct {
   int color_uniform;
   int viewport_size_uniform;
 } GPUFXAAShaderInterface;
+
+typedef struct {
+  int color_uniform;
+  int depth_uniform;
+  int sunpos_uniform;
+  int flare_params_uniform;
+  int viewport_size_uniform;
+} GPULENSFLAREShaderInterface;
+
+typedef struct {
+  int color_uniform;
+  int depth_uniform;
+  int rain_params1_uniform;
+  int rain_params2_uniform;
+  int rain_params3_uniform;
+  int rain_color_uniform;
+  int rain_style_uniform;
+} GPURAINShaderInterface;
+
+typedef struct {
+  int color_uniform;
+  int depth_uniform;
+  int clouds_params_uniform;
+  int clouds_color_uniform;
+} GPUCLOUDSShaderInterface;
 
 typedef struct {
 	int invrendertargetdim_uniform;
@@ -442,6 +470,30 @@ bool GPU_fx_compositor_initialize_passes(
 	scenefx_flag &= (SCENE_FX_FLAG_BLOOM | SCENE_FX_FLAG_TONEMAP | SCENE_FX_FLAG_LIGHTSCATTER |
 	                  SCENE_FX_FLAG_SSR | SCENE_FX_FLAG_SSAO | SCENE_FX_FLAG_FXAA);
 
+	/* Lens Flare/Rain/Clouds have no separate viewport on/off toggle: they mirror the
+	 * existing World > Weather settings directly, same World data used by the
+	 * in-game filters, so there is nothing new to configure. */
+	if (scene->world && (scene->world->weather_flag & WO_WEATHER_LENSFLARE)) {
+		scenefx_flag |= SCENE_FX_FLAG_LENSFLARE;
+	}
+	else {
+		scenefx_flag &= ~SCENE_FX_FLAG_LENSFLARE;
+	}
+
+	if (scene->world && (scene->world->weather_flag & WO_WEATHER_RAIN)) {
+		scenefx_flag |= SCENE_FX_FLAG_RAIN;
+	}
+	else {
+		scenefx_flag &= ~SCENE_FX_FLAG_RAIN;
+	}
+
+	if (scene->world && (scene->world->weather_flag & WO_WEATHER_CLOUDS)) {
+		scenefx_flag |= SCENE_FX_FLAG_CLOUDS;
+	}
+	else {
+		scenefx_flag &= ~SCENE_FX_FLAG_CLOUDS;
+	}
+
 	/* The ping-pong textures are laid out according to the active pass chain.
 	 * Recreate them when a scene effect is toggled so removing the final FXAA
 	 * pass cannot reuse targets from the previous chain. */
@@ -497,6 +549,15 @@ bool GPU_fx_compositor_initialize_passes(
 	if (scenefx_flag & SCENE_FX_FLAG_FXAA)
 		num_passes++;
 
+	if (scenefx_flag & SCENE_FX_FLAG_LENSFLARE)
+		num_passes++;
+
+	if (scenefx_flag & SCENE_FX_FLAG_RAIN)
+		num_passes++;
+
+	if (scenefx_flag & SCENE_FX_FLAG_CLOUDS)
+		num_passes++;
+
 	if (!fx->gbuffer) {
 		fx->gbuffer = GPU_framebuffer_create();
 
@@ -547,7 +608,10 @@ bool GPU_fx_compositor_initialize_passes(
 		}
 	}
 
-	if (scenefx_flag & SCENE_FX_FLAG_FXAA || scenefx_flag & SCENE_FX_FLAG_LIGHTSCATTER) {
+	if (scenefx_flag & SCENE_FX_FLAG_FXAA || scenefx_flag & SCENE_FX_FLAG_LIGHTSCATTER ||
+	    scenefx_flag & SCENE_FX_FLAG_LENSFLARE || scenefx_flag & SCENE_FX_FLAG_RAIN ||
+	    scenefx_flag & SCENE_FX_FLAG_CLOUDS)
+	{
 		fx->viewsize_w = w;
 		fx->viewsize_h = h;
 	}
@@ -1169,6 +1233,185 @@ bool GPU_fx_do_composite_pass(
 
 			/* disable bindings */
 			GPU_texture_unbind(src);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
+	/* lens flare pass, mirrors World > Weather > Lens Flare from the in-game filter */
+	if (fx->sce_effects & SCENE_FX_FLAG_LENSFLARE) {
+		GPUShader *lensflare_shader;
+		lensflare_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_LENSFLARE, is_persp);
+		if (lensflare_shader && scene->world) {
+			float sunpos[3] = {0.5f, 0.0f, 0.0f};
+
+			/* Same convention as the light scatter pass above: world-space direction
+			 * of the World Sun object, projected to screen space in the shader. */
+			if (scene->world_sun) {
+				Object *sun = scene->world_sun;
+				copy_v3_v3(sunpos, sun->obmat[2]);
+			}
+
+			/* Not animated (timer = 0): the 3D View isn't redrawn every frame outside
+			 * Play/animation playback, so a moving flicker would just look stuck between
+			 * redraws. Position, scale and sun occlusion still update live. */
+			float flare_params[4] = {scene->world->flare_scale, scene->world->flare_intensity, 0.0f, 0.0f};
+			float viewport_size[2] = {fx->viewsize_w, fx->viewsize_h};
+
+			GPULENSFLAREShaderInterface *interface = GPU_shader_get_interface(lensflare_shader);
+
+			GPU_shader_bind(lensflare_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(lensflare_shader, interface->color_uniform, src);
+
+			GPU_texture_bind(fx->depth_buffer, numslots++);
+			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
+			GPU_shader_uniform_texture(lensflare_shader, interface->depth_uniform, fx->depth_buffer);
+
+			GPU_shader_uniform_vector(lensflare_shader, interface->sunpos_uniform, 3, 1, sunpos);
+			GPU_shader_uniform_vector(lensflare_shader, interface->flare_params_uniform, 4, 1, flare_params);
+			GPU_shader_uniform_vector(lensflare_shader, interface->viewport_size_uniform, 2, 1, viewport_size);
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+			GPU_texture_unbind(fx->depth_buffer);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
+	/* rain pass, mirrors World > Weather > Rain from the in-game filter (RAS_Rain2DFilter.glsl) */
+	if (fx->sce_effects & SCENE_FX_FLAG_RAIN) {
+		GPUShader *rain_shader;
+		rain_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_RAIN, is_persp);
+		if (rain_shader && scene->world) {
+			World *world = scene->world;
+
+			/* Real elapsed time, not frame time: the viewport isn't redrawn every
+			 * frame outside Play/animation playback, so scene->r.cfra-based time
+			 * would look frozen. ED_view3d_realtime_viewport_update() (triggered
+			 * from rna_World_draw_update) keeps a timer redrawing the viewport
+			 * while rain/clouds speed is non-zero, so this keeps advancing. */
+			float rain_params1[4] = {world->rain_intensity, world->rain_speed, world->rain_wind, world->rain_darken};
+			float rain_params2[4] = {
+			    world->rain_ripple, (float)fmod(PIL_check_seconds_timer(), 10000.0),
+			    (world->weather_flag & WO_WEATHER_RAIN_DROPLETS) ? 1.0f : 0.0f,
+			    (world->weather_flag & WO_WEATHER_RAIN_RIPPLE) ? 1.0f : 0.0f};
+			float rain_params3[4] = {world->rain_density, world->rain_ripple_distance, world->rain_ripple_min_up, 0.0f};
+			float rain_style = (world->rain_style == WO_RAIN_STYLE_VOLUMETRIC) ? 1.0f : 0.0f;
+
+			GPURAINShaderInterface *interface = GPU_shader_get_interface(rain_shader);
+
+			GPU_shader_bind(rain_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(rain_shader, interface->color_uniform, src);
+
+			GPU_texture_bind(fx->depth_buffer, numslots++);
+			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
+			GPU_shader_uniform_texture(rain_shader, interface->depth_uniform, fx->depth_buffer);
+
+			GPU_shader_uniform_vector(rain_shader, interface->rain_params1_uniform, 4, 1, rain_params1);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_params2_uniform, 4, 1, rain_params2);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_params3_uniform, 4, 1, rain_params3);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_color_uniform, 3, 1, world->rain_color);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_style_uniform, 1, 1, &rain_style);
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+			GPU_texture_unbind(fx->depth_buffer);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
+	/* clouds pass, mirrors World > Weather > Clouds from the in-game filter (RAS_Clouds2DFilter.glsl) */
+	if (fx->sce_effects & SCENE_FX_FLAG_CLOUDS) {
+		GPUShader *clouds_shader;
+		clouds_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_CLOUDS, is_persp);
+		if (clouds_shader && scene->world) {
+			World *world = scene->world;
+
+			/* Real elapsed time, same reasoning as the rain pass above. */
+			float clouds_params[4] = {
+			    world->cloud_coverage, world->cloud_scale, world->cloud_speed,
+			    (float)fmod(PIL_check_seconds_timer(), 10000.0)};
+
+			GPUCLOUDSShaderInterface *interface = GPU_shader_get_interface(clouds_shader);
+
+			GPU_shader_bind(clouds_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(clouds_shader, interface->color_uniform, src);
+
+			GPU_texture_bind(fx->depth_buffer, numslots++);
+			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
+			GPU_shader_uniform_texture(clouds_shader, interface->depth_uniform, fx->depth_buffer);
+
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_params_uniform, 4, 1, clouds_params);
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_color_uniform, 3, 1, world->cloud_color);
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+			GPU_texture_unbind(fx->depth_buffer);
 
 			/* may not be attached, in that case this just returns */
 			if (target) {
@@ -1828,6 +2071,49 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 
 			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
 			interface->viewport_size_uniform = GPU_shader_get_uniform(shader, "viewport_size");
+
+			GPU_shader_set_interface(shader, interface);
+			break;
+		}
+
+		case GPU_SHADER_FX_LENSFLARE:
+		{
+			GPULENSFLAREShaderInterface *interface = MEM_mallocN(sizeof(GPULENSFLAREShaderInterface), "GPULENSFLAREShaderInterface");
+
+			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
+			interface->sunpos_uniform = GPU_shader_get_uniform(shader, "sunpos");
+			interface->flare_params_uniform = GPU_shader_get_uniform(shader, "flare_params");
+			interface->viewport_size_uniform = GPU_shader_get_uniform(shader, "viewport_size");
+
+			GPU_shader_set_interface(shader, interface);
+			break;
+		}
+
+		case GPU_SHADER_FX_RAIN:
+		{
+			GPURAINShaderInterface *interface = MEM_mallocN(sizeof(GPURAINShaderInterface), "GPURAINShaderInterface");
+
+			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
+			interface->rain_params1_uniform = GPU_shader_get_uniform(shader, "rain_params1");
+			interface->rain_params2_uniform = GPU_shader_get_uniform(shader, "rain_params2");
+			interface->rain_params3_uniform = GPU_shader_get_uniform(shader, "rain_params3");
+			interface->rain_color_uniform = GPU_shader_get_uniform(shader, "rain_color");
+			interface->rain_style_uniform = GPU_shader_get_uniform(shader, "rain_style");
+
+			GPU_shader_set_interface(shader, interface);
+			break;
+		}
+
+		case GPU_SHADER_FX_CLOUDS:
+		{
+			GPUCLOUDSShaderInterface *interface = MEM_mallocN(sizeof(GPUCLOUDSShaderInterface), "GPUCLOUDSShaderInterface");
+
+			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
+			interface->clouds_params_uniform = GPU_shader_get_uniform(shader, "clouds_params");
+			interface->clouds_color_uniform = GPU_shader_get_uniform(shader, "clouds_color");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

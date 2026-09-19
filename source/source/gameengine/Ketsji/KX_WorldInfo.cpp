@@ -363,7 +363,7 @@ void KX_WorldInfo::RenderBackground(RAS_Rasterizer *rasty)
  * ------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------
- * Global Properties mapping protocol (own.scene.world["key"])
+ * World Properties mapping protocol (own.scene.world["key"])
  * ------------------------------------------------------------------------- */
 static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 {
