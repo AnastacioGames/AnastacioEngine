@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: provas de capacidade no runtime Web (parcial)
+
+- Novo `tools/web/verify-capabilities.cjs` (Chrome/CDP, sem julgamento visual) e `tools/create_web_capabilities_scene.py` (jogo de teste de física, `addObject`/`endObject`, `addScene` e `replace`).
+- Toque: `touchStart`/`touchEnd` no canvas viram clique de mouse no runtime atual (3 de 3), pela emulação de mouse do SDL; não há API multitouch nem `Range` de toque.
+- Filtros 2D: 11 simples ligam e desligam e 4 embutidos (SSAO, Bloom, LightScatter, SSR) ligam, sem erro de shader (28 verificações, web-smoke release, SwiftShader).
+- **Defeito do runtime achado:** `Range.logic.getCurrentScene()` derruba o runtime com `function signature mismatch`. `METH_NOARGS` declarado com função de 1 parâmetro; o CPython chama com 2, o que no desktop passa e em WebAssembly é trap. Varredura estática (`find_bad`, heurística) achou cerca de 210 declarações com contagem de parâmetros diferente do flag, em `KX_PythonInit.cpp` (43), `KX_PyConstraintBinding.cpp` (28), `mathutils` (Vector, Matrix, Quaternion, Euler, Color, geometry, noise) e `blf`. Chamadas como `vec.normalize()` estão no mesmo risco.
+- Tentativa de contorno: `-sEMULATE_FUNCTION_POINTER_CASTS=1` falha no `wasm-opt --fpcast-emu` ("max-func-params needs to be at least 17"); o emscripten não expõe esse limite. Revertido; runtime release restaurado (hash igual ao anterior).
+- Pendente: escolher entre corrigir as declarações na fonte (recompilar) ou executar o `wasm-opt` manualmente com `--pass-arg=max-func-params@N`.
+
 ## 2026-09-19 - Pré-voo Web automático no editor
 
 - Novo `range_web/preflight_run.py`: serve o pacote numa porta local livre, abre Chrome/Edge headless (`RANGE_WEB_BROWSER` ou detecção) com `?preflight=1&post=1` e recebe o relatório por `POST /__preflight`. Sem node nem CDP; fecha só o processo que abriu. Falhas de ambiente (sem navegador, sem resposta em 60 s) voltam como "Pré-voo não executado", nunca como erro do jogo.
