@@ -31,6 +31,9 @@
 #include "BLI_alloca.h"
 
 #include "BKE_global.h"
+#include "BKE_image.h"
+
+#include "IMB_imbuf_types.h"
 
 #include "GPU_debug.h"
 #include "GPU_draw.h"
@@ -484,6 +487,18 @@ GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, int textarget
 		else
 			gettarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X;
 
+#ifdef __EMSCRIPTEN__
+		/* GLES/WebGL nao tem glGetTexLevelParameteriv (chamada vira "null function" no wasm):
+		 * as dimensoes vem do ImBuf da imagem. */
+		(void)gettarget; (void)border; (void)w; (void)h;
+		{
+			void *lock;
+			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock);
+			tex->w = ibuf ? ibuf->x : 0;
+			tex->h = ibuf ? ibuf->y : 0;
+			BKE_image_release_ibuf(ima, ibuf, lock);
+		}
+#else
 		glBindTexture(textarget, tex->bindcode);
 		glGetTexLevelParameteriv(gettarget, 0, GL_TEXTURE_WIDTH, &w);
 		glGetTexLevelParameteriv(gettarget, 0, GL_TEXTURE_HEIGHT, &h);
@@ -491,6 +506,7 @@ GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, int textarget
 
 		tex->w = w - border;
 		tex->h = h - border;
+#endif
 	}
 
 	glBindTexture(textarget, 0);
@@ -531,12 +547,18 @@ GPUTexture *GPU_texture_from_preview(PreviewImage *prv, int mipmap)
 	else {
 		GLint w, h;
 
+#ifdef __EMSCRIPTEN__
+		(void)w; (void)h;
+		tex->w = prv->w[0];
+		tex->h = prv->h[0];
+#else
 		glBindTexture(GL_TEXTURE_2D, tex->bindcode);
 		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
 		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
 
 		tex->w = w;
 		tex->h = h;
+#endif
 	}
 
 	glBindTexture(GL_TEXTURE_2D, 0);
