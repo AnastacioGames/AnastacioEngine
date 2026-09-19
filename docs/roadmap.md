@@ -53,6 +53,14 @@ e detalhados no [`changelog.md`](changelog.md).
   verificados com `web-smoke.range` (ver [web-deploy.md](web-deploy.md)). Preset `web-runtime-release` e remoção do preload
   TEMP feitos. Smoke test de persistência IDBFS feito
   (`tools/web/verify-persistence.cjs`). Próxima peça: marco A do perfil/validador na UI (`Scene.range_web`).
+  **Export com validação testado no navegador (2026-09-18):** `bom_cubo.blend` (cubo com textura difusa, normal map,
+  Sun e Point, teclado e Motion) validado e exportado pelo comando de linha e rodando em `localhost`. Corrigidos no
+  runtime: `null function` em `GPU_texture_from_blender` (sem `glGetTexLevelParameteriv` no GLES), blit de profundidade
+  entre formatos diferentes (texturas de profundidade Web agora 24 bits) e cubo preto sob luz GLSL (NaN no
+  Cook-Torrance com Roughness 0). Abertos: normal map `.dds` aparece um pouco diferente do desktop; aviso
+  `glBlitFramebuffer` depth/stencil que já aparece uma vez no console; regenerar o manifesto do runtime
+  (`tools/web/make-runtime-manifest.py`) automaticamente a cada build Web, pois manifesto velho bloqueia o export com
+  WEB-PKG-001; página de pré-voo do marco E; marco G. Detalhes no [changelog](changelog.md).
   **Teste real após a retomada:** usuário reportou tela preta com piscadas.
   Corrigido divisor de instância residual no quad de tela: UVs ficavam constantes
   e os filtros amostravam o canto da textura. Build passou; 6.192 draws sem erro
