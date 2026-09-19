@@ -21,7 +21,7 @@ A versão mais recente publicada é a `0.4.0`, disponível em
 [Releases → v0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.0):
 
 - `AnastacioEngine-0.4.0-windows-x64.zip`: editor e runtime para Windows x64;
-- `AnastacioEngine-0.4.0-linux-x64.tar.gz`: editor e runtime para Linux x86_64;
+- `AnastacioEngine-0.4.0-linux-x64.tar.gz`: editor e runtime para Linux x86_64 (**ainda será anexado à release**; enquanto isso, o Linux 0.3.0 continua em [v0.3.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.3.0));
 - `RangeArmor-0.4.0-windows-x64.zip`: ferramenta de empacotamento/exportação RangeArmor, publicada como
   asset separado (código-fonte de terceiros, não incluído neste repositório). O painel (GUI) roda somente
   no Windows, mas exporta jogos para **Windows e Linux x86_64**: o launcher Rust já é compilado para

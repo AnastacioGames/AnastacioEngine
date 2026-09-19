@@ -92,3 +92,20 @@ do pacote e que os scripts, datafiles e DLLs necessários continuam presentes.
 Publicado a partir da versão `0.3.0` como `AnastacioEngine-<versao>-linux-x64.tar.gz`, com o conteúdo
 completo de `build-linux/bin/` e `SHA256SUMS.txt` na mesma release. Validado em máquina Linux limpa (fora
 do WSL) antes da publicação — ver `docs/changelog.md` (entradas de 2026-09-15).
+
+### Pacote Linux 0.4.0 (pendente — passo a passo na máquina Linux)
+
+O pacote Windows 0.4.0 já está na release `v0.4.0`; falta anexar o Linux, que precisa ser compilado em Linux nativo:
+
+```bash
+git fetch origin && git checkout linux-sync && git pull      # trazer tudo de 0.4.0
+bash tools/linux/quickstart-editor.sh                        # build do RangeEngine + RangeRuntime (ver docs/linux-build.md)
+# conferir build-linux/bin/RangeEngine e RangeRuntime; rodar uma demo antes de empacotar
+tar -czf AnastacioEngine-0.4.0-linux-x64.tar.gz -C build-linux bin   # conteúdo completo de build-linux/bin/, sem logs
+sha256sum AnastacioEngine-0.4.0-linux-x64.tar.gz
+```
+
+Depois: baixar o `SHA256SUMS.txt` da release, acrescentar a linha do tar.gz (mantendo as do Windows), e rodar
+`gh release upload v0.4.0 AnastacioEngine-0.4.0-linux-x64.tar.gz SHA256SUMS.txt --clobber`. O splash já mostra 0.4.0
+(`wm.py`). O addon `Range_Components_Label` não é mais usado e não deve entrar no pacote. Depois de anexar, remova o
+"ainda será anexado" da linha Linux do README.
