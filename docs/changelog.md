@@ -4,6 +4,12 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-18 - Web: sombreamento com lâmpadas e profundidade no navegador
+
+- `gpu_shader_material.glsl`: `shade_cooktorr_spec` usa piso `max(rough * rough, 0.001)`, como `shade_phong_spec`. Com Roughness 0 o cálculo dava 1/0 e depois 0 * inf = NaN; o desktop absorve o NaN no `max()`, mas ANGLE/WebGL propaga e o objeto ficava preto sob luz GLSL. Vale também no desktop, mas só para roughness abaixo de cerca de 0,03 (antes indefinido). Confirmado no navegador com `bom_cubo.blend` (cubo com textura difusa, normal map, Sun e Point).
+- `gpu_texture.c`: no Web, texturas de profundidade passam a `GL_DEPTH_COMPONENT24`/`GL_UNSIGNED_INT` (antes 16 bits). O WebGL2 recusa `glBlitFramebuffer` entre profundidades de formatos diferentes, e os renderbuffers já eram de 24 bits; com lâmpada a cena quebrava com centenas de `GL_INVALID_OPERATION`.
+- Observado no teste: o normal map (`.dds`) aparece no Web um pouco diferente do desktop; ainda não investigado. Components de template (`templates_components`) precisam estar na pasta do projeto para o export Web (WEB-PKG-003).
+
 ## 2026-09-18 - Web: export com validação (marco F, parcial)
 
 - `range_web/export.py`: `export_package` bloqueia por erros, gera em diretório temporário e troca o destino; falha ou cancelamento preserva o export anterior. Testes puros em `test_export.py`.

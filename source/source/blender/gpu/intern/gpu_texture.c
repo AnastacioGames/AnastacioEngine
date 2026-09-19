@@ -155,11 +155,14 @@ static GPUTexture *GPU_texture_create_nD(
 		format = GL_DEPTH_COMPONENT;
 #ifdef __EMSCRIPTEN__
 		/* WebGL2/GLES3 reject the unsized GL_DEPTH_COMPONENT as a texImage2D
-		 * internalformat; a sized format is mandatory there. GL_DEPTH_COMPONENT16
-		 * is only a valid combination with GL_UNSIGNED_SHORT (GL_UNSIGNED_BYTE
-		 * triggers "Invalid combination of format, type and internalFormat"). */
-		internalformat = GL_DEPTH_COMPONENT16;
-		type = GL_UNSIGNED_SHORT;
+		 * internalformat; a sized format is mandatory there. GL_DEPTH_COMPONENT24
+		 * is only a valid combination with GL_UNSIGNED_INT (GL_UNSIGNED_BYTE
+		 * triggers "Invalid combination of format, type and internalFormat").
+		 * It must match the depth renderbuffers (GL_DEPTH_COMPONENT24 in
+		 * GPU_renderbuffer_create): WebGL2 refuses glBlitFramebuffer between
+		 * depth attachments of different formats. */
+		internalformat = GL_DEPTH_COMPONENT24;
+		type = GL_UNSIGNED_INT;
 #else
 		internalformat = GL_DEPTH_COMPONENT;
 		type = GL_UNSIGNED_BYTE;

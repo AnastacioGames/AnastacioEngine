@@ -2804,7 +2804,9 @@ void shade_phong_spec(float nl, vec3 n, vec3 l, vec3 v, float rough, out float s
 
 void shade_cooktorr_spec(vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 {
-	float hard = 1.0 / (rough * rough);
+	/* rough == 0 (comum) dava 1/0 = inf e depois 0 * inf = NaN; o desktop absorve o NaN no max(),
+	 * mas ANGLE/WebGL propaga e o pixel fica preto. Mesmo piso de shade_phong_spec. */
+	float hard = 1.0 / max(rough * rough, 0.001);
 	hard = hard * hard;
 
 	vec3 h = normalize(v + l);
