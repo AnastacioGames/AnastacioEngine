@@ -29,6 +29,10 @@ A versão mais recente publicada é a `0.4.0`, disponível em
   `build-linux/bin` está disponível — não há (nem é necessário) um `RangeArmor Panel` separado para Linux;
 - `SHA256SUMS.txt`: hashes para verificar a integridade dos arquivos acima.
 
+## Exportação para Web (em desenvolvimento)
+
+O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a exportação para o navegador **ainda não está finalizada**: há validações e comportamentos em aberto (por exemplo, o normal map `.dds` aparece diferente do desktop) e o recurso não deve ser usado para projetos de produção. O estado atual está em [docs/roadmap.md](docs/roadmap.md).
+
 ## Executáveis
 
 O build gera os artefatos atuais em `build/bin/` (Windows) e `build-linux/bin/` (Linux):
