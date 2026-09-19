@@ -42,3 +42,20 @@ Abra http://localhost:8080/ (Chrome ou Edge).
    `FS.readdir('/pkg')` (ou `Module.FS.readdir('/pkg')`). Esperado: `util.py` na lista.
    Isso valida o `FS_createPath` do `index.html`, que nunca foi executado.
 4. Anote o que falhar (mensagem do console) e me passe.
+
+## D. Pré-voo importado no editor
+
+Arquivos de exemplo em `build/web-manual/preflight/` (gerados a mão; o `make_manual_project.py` não os recria):
+`pf-limpo.json`, `pf-problemas.json`, `pf-invalido.json`. Use `bom.blend` no painel **Web (Range)**.
+
+1. Clique **Importar pré-voo Web** e escolha `pf-limpo.json`. Esperado: mensagem "Pré-voo sem problemas.".
+2. Importe `pf-problemas.json`. Esperado: mensagem "Pré-voo: 3 problema(s).", e no painel **WEB-GFX-002**,
+   **WEB-PY-001** (numpy) e **WEB-PY-009** (ValueError). Só o WEB-PY-* mostra origem em `meu_mod.py`.
+3. Clique **Validar Web**. Esperado: os 3 resultados do pré-voo continuam na lista, junto do resumo novo.
+4. Importe `pf-limpo.json` de novo. Esperado: os 3 resultados de pré-voo somem (substitui, não acumula).
+5. Importe `pf-invalido.json`. Esperado: um único **WEB-DEPLOY-002** ("Não foi possível ler...").
+6. Importe `pf-problemas.json` duas vezes seguidas. Esperado: continuam 3 resultados, sem duplicar.
+7. Com resultados de pré-voo na lista, clique **Exportar Web**. Esperado: o export segue a validação normal
+   (o pré-voo não bloqueia) e a lista passa a mostrar só a revalidação, sem os resultados de pré-voo.
+8. Real: sirva `build/web-manual/web`, abra `http://localhost:8080/?preflight=1`, chame `rangePreflight()` no console,
+   salve o JSON e importe. Esperado: sem problemas num pacote saudável.
