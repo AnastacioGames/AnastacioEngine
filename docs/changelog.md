@@ -11,7 +11,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Filtros 2D: 11 simples ligam e desligam e 4 embutidos (SSAO, Bloom, LightScatter, SSR) ligam, sem erro de shader (28 verificações, web-smoke release, SwiftShader).
 - **Defeito do runtime achado:** `Range.logic.getCurrentScene()` derruba o runtime com `function signature mismatch`. `METH_NOARGS` declarado com função de 1 parâmetro; o CPython chama com 2, o que no desktop passa e em WebAssembly é trap. Varredura estática (`find_bad`, heurística) achou cerca de 210 declarações com contagem de parâmetros diferente do flag, em `KX_PythonInit.cpp` (43), `KX_PyConstraintBinding.cpp` (28), `mathutils` (Vector, Matrix, Quaternion, Euler, Color, geometry, noise) e `blf`. Chamadas como `vec.normalize()` estão no mesmo risco.
 - Tentativa de contorno: `-sEMULATE_FUNCTION_POINTER_CASTS=1` falha no `wasm-opt --fpcast-emu` ("max-func-params needs to be at least 17"); o emscripten não expõe esse limite. Revertido; runtime release restaurado (hash igual ao anterior).
-- Pendente: escolher entre corrigir as declarações na fonte (recompilar) ou executar o `wasm-opt` manualmente com `--pass-arg=max-func-params@N`.
+- **Corrigido na fonte** (opção escolhida): métodos `METH_NOARGS` ganham o segundo parâmetro (`Py_UNUSED(ignored)`) em `KX_PythonInit`, `mathutils`, `bpy*`, `bgl`, `imbuf`, `idprop`, `gpu_offscreen`, VideoTexture e ImGui; os helpers `*_apply_to_copy` do mathutils passam o argumento extra. `EXP_PYMETHODTABLE` passa a `METH_VARARGS | METH_KEYWORDS` (as funções do macro já recebiam 3 parâmetros) e ganha `EXP_PYMETHODTABLE_VARARGS` para métodos de 2 parâmetros. `KX_Speaker::GetActiveEffect*` viram NOARGS de fato.
+- Resultado no runtime release: `getCurrentScene`, física, `addObject`/`endObject`, `addScene` (overlay) e `replace` passam (9 de 9 em `verify-capabilities.cjs ... sim`).
+- Pendente: `KX_PyConstraintBinding.cpp` (28 declarações, arquivo com alterações locais do usuário) e diretórios ainda não varridos (bmesh, gpu, blf).
 
 ## 2026-09-19 - Pré-voo Web automático no editor
 

@@ -137,7 +137,7 @@ PyDoc_STRVAR(Euler_to_quaternion_doc,
 "   :return: Quaternion representation of the euler.\n"
 "   :rtype: :class:`Quaternion`\n"
 );
-static PyObject *Euler_to_quaternion(EulerObject *self)
+static PyObject *Euler_to_quaternion(EulerObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float quat[4];
 
@@ -158,7 +158,7 @@ PyDoc_STRVAR(Euler_to_matrix_doc,
 "   :return: A 3x3 rotation matrix representation of the euler.\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Euler_to_matrix(EulerObject *self)
+static PyObject *Euler_to_matrix(EulerObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float mat[9];
 
@@ -175,7 +175,7 @@ PyDoc_STRVAR(Euler_zero_doc,
 "\n"
 "   Set all values to zero.\n"
 );
-static PyObject *Euler_zero(EulerObject *self)
+static PyObject *Euler_zero(EulerObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_Prepare_ForWrite(self) == -1)
 		return NULL;
@@ -298,7 +298,7 @@ PyDoc_STRVAR(Euler_copy_doc,
 "   .. note:: use this to get a copy of a wrapped euler with\n"
 "      no reference to the original data.\n"
 );
-static PyObject *Euler_copy(EulerObject *self)
+static PyObject *Euler_copy(EulerObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -310,7 +310,7 @@ static PyObject *Euler_deepcopy(EulerObject *self, PyObject *args)
 	if (!PyC_CheckArgs_DeepCopy(args)) {
 		return NULL;
 	}
-	return Euler_copy(self);
+	return Euler_copy(self, NULL);
 }
 
 /* ----------------------------print object (internal)--------------

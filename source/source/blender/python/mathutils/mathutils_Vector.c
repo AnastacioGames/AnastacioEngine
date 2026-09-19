@@ -46,7 +46,7 @@
 #define SWIZZLE_VALID_AXIS 0x4
 #define SWIZZLE_AXIS       0x3
 
-static PyObject *Vector_copy(VectorObject *self);
+static PyObject *Vector_copy(VectorObject *self, PyObject *Py_UNUSED(ignored));
 static PyObject *Vector_deepcopy(VectorObject *self, PyObject *args);
 static PyObject *Vector_to_tuple_ext(VectorObject *self, int ndigits);
 static int row_vector_multiplication(float rvec[MAX_DIMENSIONS], VectorObject *vec, MatrixObject *mat);
@@ -94,10 +94,10 @@ static PyObject *Vector_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return Vector_CreatePyObject_alloc(vec, size, type);
 }
 
-static PyObject* vec__apply_to_copy(PyObject* (*vec_func)(VectorObject*), VectorObject* self)
+static PyObject* vec__apply_to_copy(PyObject* (*vec_func)(VectorObject *, PyObject *), VectorObject* self)
 {
-	PyObject *ret = Vector_copy(self);
-	PyObject* ret_dummy = vec_func((VectorObject*)ret);
+	PyObject *ret = Vector_copy(self, NULL);
+	PyObject* ret_dummy = vec_func((VectorObject*)ret, NULL);
 	if (ret_dummy) {
 		Py_DECREF(ret_dummy);
 		return (PyObject *)ret;
@@ -336,7 +336,7 @@ PyDoc_STRVAR(Vector_zero_doc,
 "\n"
 "   Set all values to zero.\n"
 );
-static PyObject *Vector_zero(VectorObject *self)
+static PyObject *Vector_zero(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_Prepare_ForWrite(self) == -1)
 		return NULL;
@@ -359,7 +359,7 @@ PyDoc_STRVAR(Vector_normalize_doc,
 "   .. note:: Normalize works for vectors of all sizes,\n"
 "      however 4D Vectors w axis is left untouched.\n"
 );
-static PyObject *Vector_normalize(VectorObject *self)
+static PyObject *Vector_normalize(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	int size = (self->size == 4 ? 3 : self->size);
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
@@ -378,7 +378,7 @@ PyDoc_STRVAR(Vector_normalized_doc,
 "   :return: a normalized copy of the vector\n"
 "   :rtype: :class:`Vector`\n"
 );
-static PyObject *Vector_normalized(VectorObject *self)
+static PyObject *Vector_normalized(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return vec__apply_to_copy(Vector_normalize, self);
 }
@@ -478,7 +478,7 @@ PyDoc_STRVAR(Vector_resize_2d_doc,
 "\n"
 "   Resize the vector to 2D  (x, y).\n"
 );
-static PyObject *Vector_resize_2d(VectorObject *self)
+static PyObject *Vector_resize_2d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (self->flag & BASE_MATH_FLAG_IS_WRAP) {
 		PyErr_SetString(PyExc_TypeError,
@@ -510,7 +510,7 @@ PyDoc_STRVAR(Vector_resize_3d_doc,
 "\n"
 "   Resize the vector to 3D  (x, y, z).\n"
 );
-static PyObject *Vector_resize_3d(VectorObject *self)
+static PyObject *Vector_resize_3d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (self->flag & BASE_MATH_FLAG_IS_WRAP) {
 		PyErr_SetString(PyExc_TypeError,
@@ -545,7 +545,7 @@ PyDoc_STRVAR(Vector_resize_4d_doc,
 "\n"
 "   Resize the vector to 4D (x, y, z, w).\n"
 );
-static PyObject *Vector_resize_4d(VectorObject *self)
+static PyObject *Vector_resize_4d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (self->flag & BASE_MATH_FLAG_IS_WRAP) {
 		PyErr_SetString(PyExc_TypeError,
@@ -586,7 +586,7 @@ PyDoc_STRVAR(Vector_to_2d_doc,
 "   :return: a new vector\n"
 "   :rtype: :class:`Vector`\n"
 );
-static PyObject *Vector_to_2d(VectorObject *self)
+static PyObject *Vector_to_2d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -601,7 +601,7 @@ PyDoc_STRVAR(Vector_to_3d_doc,
 "   :return: a new vector\n"
 "   :rtype: :class:`Vector`\n"
 );
-static PyObject *Vector_to_3d(VectorObject *self)
+static PyObject *Vector_to_3d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float tvec[3] = {0.0f};
 
@@ -619,7 +619,7 @@ PyDoc_STRVAR(Vector_to_4d_doc,
 "   :return: a new vector\n"
 "   :rtype: :class:`Vector`\n"
 );
-static PyObject *Vector_to_4d(VectorObject *self)
+static PyObject *Vector_to_4d(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float tvec[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 
@@ -815,7 +815,7 @@ PyDoc_STRVAR(Vector_orthogonal_doc,
 "\n"
 "   .. note:: the axis is undefined, only use when any orthogonal vector is acceptable.\n"
 );
-static PyObject *Vector_orthogonal(VectorObject *self)
+static PyObject *Vector_orthogonal(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float vec[3];
 
@@ -1310,7 +1310,7 @@ PyDoc_STRVAR(Vector_copy_doc,
 "   .. note:: use this to get a copy of a wrapped vector with\n"
 "      no reference to the original data.\n"
 );
-static PyObject *Vector_copy(VectorObject *self)
+static PyObject *Vector_copy(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -1322,7 +1322,7 @@ static PyObject *Vector_deepcopy(VectorObject *self, PyObject *args)
 	if (!PyC_CheckArgs_DeepCopy(args)) {
 		return NULL;
 	}
-	return Vector_copy(self);
+	return Vector_copy(self, NULL);
 }
 
 static PyObject *Vector_repr(VectorObject *self)
@@ -2807,7 +2807,7 @@ PyDoc_STRVAR(Vector_negate_doc,
 "\n"
 "   Set all values to their negative.\n"
 );
-static PyObject *Vector_negate(VectorObject *self)
+static PyObject *Vector_negate(VectorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;

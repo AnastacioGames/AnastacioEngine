@@ -90,7 +90,7 @@ BPy_StructRNA *bpy_context_module = NULL; /* for fast access */
 #define USE_POSTPONED_ANNOTATIONS
 
 static PyObject *pyrna_struct_Subtype(PointerRNA *ptr);
-static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self);
+static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored));
 
 static PyObject *pyrna_register_class(PyObject *self, PyObject *py_class);
 static PyObject *pyrna_unregister_class(PyObject *self, PyObject *py_class);
@@ -3323,7 +3323,7 @@ PyDoc_STRVAR(pyrna_struct_keys_doc,
 "\n"
 BPY_DOC_ID_PROP_TYPE_NOTE
 );
-static PyObject *pyrna_struct_keys(BPy_PropertyRNA *self)
+static PyObject *pyrna_struct_keys(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	IDProperty *group;
 
@@ -3351,7 +3351,7 @@ PyDoc_STRVAR(pyrna_struct_items_doc,
 "\n"
 BPY_DOC_ID_PROP_TYPE_NOTE
 );
-static PyObject *pyrna_struct_items(BPy_PropertyRNA *self)
+static PyObject *pyrna_struct_items(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	IDProperty *group;
 
@@ -3379,7 +3379,7 @@ PyDoc_STRVAR(pyrna_struct_values_doc,
 "\n"
 BPY_DOC_ID_PROP_TYPE_NOTE
 );
-static PyObject *pyrna_struct_values(BPy_PropertyRNA *self)
+static PyObject *pyrna_struct_values(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	IDProperty *group;
 
@@ -3644,7 +3644,7 @@ PyDoc_STRVAR(pyrna_prop_path_from_id_doc,
 "   :return: The path from :class:`bpy.types.bpy_struct.id_data` to this property.\n"
 "   :rtype: str\n"
 );
-static PyObject *pyrna_prop_path_from_id(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_path_from_id(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	const char *path;
 	PropertyRNA *prop = self->prop;
@@ -3673,7 +3673,7 @@ PyDoc_STRVAR(pyrna_prop_as_bytes_doc,
 "   :return: The string as bytes.\n"
 "   :rtype: bytes\n"
 );
-static PyObject *pyrna_prop_as_bytes(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_as_bytes(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 
 	if (RNA_property_type(self->prop) != PROP_STRING) {
@@ -3708,7 +3708,7 @@ PyDoc_STRVAR(pyrna_prop_update_doc,
 "      This is called when assigning a property,\n"
 "      however in rare cases its useful to call explicitly.\n"
 );
-static PyObject *pyrna_prop_update(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_update(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
 	Py_RETURN_NONE;
@@ -3723,7 +3723,7 @@ PyDoc_STRVAR(pyrna_struct_type_recast_doc,
 "   :return: a new instance of this object with the type initialized again.\n"
 "   :rtype: subclass of :class:`bpy.types.bpy_struct`\n"
 );
-static PyObject *pyrna_struct_type_recast(BPy_StructRNA *self)
+static PyObject *pyrna_struct_type_recast(BPy_StructRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PointerRNA r_ptr;
 
@@ -3931,7 +3931,7 @@ static void pyrna_dir_members_rna(PyObject *list, PointerRNA *ptr)
 }
 
 
-static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
+static PyObject *pyrna_struct_dir(BPy_StructRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret;
 
@@ -4255,7 +4255,7 @@ static int pyrna_struct_setattro(BPy_StructRNA *self, PyObject *pyname, PyObject
 	}
 }
 
-static PyObject *pyrna_prop_dir(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_dir(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret;
 	PointerRNA r_ptr;
@@ -4399,7 +4399,7 @@ static int pyrna_prop_collection_setattro(BPy_PropertyRNA *self, PyObject *pynam
 }
 
 /* odd case, we need to be able return a python method from a tp_getset */
-static PyObject *pyrna_prop_collection_idprop_add(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_idprop_add(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PointerRNA r_ptr;
 
@@ -4442,7 +4442,7 @@ static PyObject *pyrna_prop_collection_idprop_remove(BPy_PropertyRNA *self, PyOb
 	Py_RETURN_NONE;
 }
 
-static PyObject *pyrna_prop_collection_idprop_clear(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_idprop_clear(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 #ifdef USE_PEDANTIC_WRITE
 	if (rna_disallow_writes && rna_id_write_error(&self->ptr, NULL)) {
@@ -4546,7 +4546,7 @@ PyDoc_STRVAR(pyrna_prop_collection_keys_doc,
 "   :return: the identifiers for each member of this collection.\n"
 "   :rtype: list of strings\n"
 );
-static PyObject *pyrna_prop_collection_keys(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_keys(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret = PyList_New(0);
 	char name[256], *nameptr;
@@ -4578,7 +4578,7 @@ PyDoc_STRVAR(pyrna_prop_collection_items_doc,
 "   :return: (key, value) pairs for each member of this collection.\n"
 "   :rtype: list of tuples\n"
 );
-static PyObject *pyrna_prop_collection_items(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_items(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret = PyList_New(0);
 	PyObject *item;
@@ -4622,7 +4622,7 @@ PyDoc_STRVAR(pyrna_prop_collection_values_doc,
 "   :return: the members of this collection.\n"
 "   :rtype: list\n"
 );
-static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	/* re-use slice*/
 	return pyrna_prop_collection_subscript_slice(self, 0, PY_SSIZE_T_MAX);
@@ -4738,7 +4738,7 @@ PyDoc_STRVAR(pyrna_struct_as_pointer_doc,
 "   .. note:: This is intended only for advanced script writers who need to\n"
 "      pass blender data to their own C/Python modules.\n"
 );
-static PyObject *pyrna_struct_as_pointer(BPy_StructRNA *self)
+static PyObject *pyrna_struct_as_pointer(BPy_StructRNA *self, PyObject *Py_UNUSED(ignored))
 {
 	return PyLong_FromVoidPtr(self->ptr.data);
 }
@@ -5171,7 +5171,7 @@ static PyObject *pyrna_prop_collection_iter(BPy_PropertyRNA *self)
 	/* Try get values from a collection */
 	PyObject *ret;
 	PyObject *iter = NULL;
-	ret = pyrna_prop_collection_values(self);
+	ret = pyrna_prop_collection_values(self, NULL);
 
 	/* we know this is a list so no need to PyIter_Check
 	 * otherwise it could be NULL (unlikely) if conversion failed */
@@ -5202,7 +5202,7 @@ static struct PyMethodDef pyrna_struct_methods[] = {
 	{"driver_add", (PyCFunction)pyrna_struct_driver_add, METH_VARARGS, pyrna_struct_driver_add_doc},
 	{"driver_remove", (PyCFunction)pyrna_struct_driver_remove, METH_VARARGS, pyrna_struct_driver_remove_doc},
 
-	{"is_property_set", (PyCFunction)pyrna_struct_is_property_set, METH_VARARGS, pyrna_struct_is_property_set_doc},
+	{"is_property_set", (PyCFunction)(void (*)(void))pyrna_struct_is_property_set, METH_VARARGS | METH_KEYWORDS, pyrna_struct_is_property_set_doc},
 	{"property_unset", (PyCFunction)pyrna_struct_property_unset, METH_VARARGS, pyrna_struct_property_unset_doc},
 	{"is_property_hidden", (PyCFunction)pyrna_struct_is_property_hidden, METH_VARARGS, pyrna_struct_is_property_hidden_doc},
 	{"is_property_readonly", (PyCFunction)pyrna_struct_is_property_readonly, METH_VARARGS, pyrna_struct_is_property_readonly_doc},
@@ -7164,7 +7164,7 @@ static PyObject *bpy_types_module_getattro(PyObject *self, PyObject *pyname)
 	return ret;
 }
 
-static PyObject* bpy_types_module_dir(PyObject *self)
+static PyObject* bpy_types_module_dir(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
 	struct BPy_TypesModule_State *state = PyModule_GetState(self);
 	PyObject *ret = PyList_New(0);

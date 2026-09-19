@@ -283,8 +283,12 @@ public: \
 	} \
 	static const char method_name##_doc[];
 
-/// Method table macro (with doc).
+/// Method table macro (with doc). All sPy wrappers used with it take (self, args, kwds): the flags must match the
+/// real signature or WebAssembly traps with "function signature mismatch".
 #define EXP_PYMETHODTABLE(class_name, method_name) \
+	{#method_name, (PyCFunction)(void (*)(void)) class_name::sPy##method_name, METH_VARARGS | METH_KEYWORDS, (const char *)class_name::method_name##_doc}
+
+#define EXP_PYMETHODTABLE_VARARGS(class_name, method_name) \
 	{#method_name, (PyCFunction) class_name::sPy##method_name, METH_VARARGS, (const char *)class_name::method_name##_doc}
 
 #define EXP_PYMETHODTABLE_O(class_name, method_name) \

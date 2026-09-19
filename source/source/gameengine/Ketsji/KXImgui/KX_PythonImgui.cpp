@@ -63,7 +63,7 @@ static PyObject *gPyImgui_Begin(PyObject *, PyObject *args, PyObject *kwds)
 	return result;
 }
 
-static PyObject *gPyImgui_End(PyObject *)
+static PyObject *gPyImgui_End(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::End();
 	Py_RETURN_NONE;
@@ -329,13 +329,13 @@ static PyObject *gPyImgui_BeginPopupModal(PyObject *, PyObject *args, PyObject *
 	return result;
 }
 
-static PyObject *gPyImgui_EndPopup(PyObject *)
+static PyObject *gPyImgui_EndPopup(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::EndPopup();
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_CloseCurrentPopup(PyObject *)
+static PyObject *gPyImgui_CloseCurrentPopup(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::CloseCurrentPopup();
 	Py_RETURN_NONE;
@@ -405,13 +405,13 @@ static PyObject *gPyImgui_PushFont(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_PopFont(PyObject *)
+static PyObject *gPyImgui_PopFont(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::PopFont();
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_GetDisplaySize(PyObject *)
+static PyObject *gPyImgui_GetDisplaySize(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGuiIO &io = ImGui::GetIO();
 	PyObject *result = PyTuple_New(2);
@@ -435,13 +435,13 @@ static PyObject *gPyImgui_DrawRectFilled(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_Separator(PyObject *)
+static PyObject *gPyImgui_Separator(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::Separator();
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_SameLine(PyObject *)
+static PyObject *gPyImgui_SameLine(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	ImGui::SameLine();
 	Py_RETURN_NONE;
@@ -507,7 +507,7 @@ static PyObject *gPyImgui_SetCursorPos(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyImgui_GetCursorPos(PyObject *)
+static PyObject *gPyImgui_GetCursorPos(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	const ImVec2 pos = ImGui::GetCursorPos();
 	PyObject *result = PyTuple_New(2);
@@ -516,7 +516,7 @@ static PyObject *gPyImgui_GetCursorPos(PyObject *)
 	return result;
 }
 
-static PyObject *gPyImgui_GetCursorScreenPos(PyObject *)
+static PyObject *gPyImgui_GetCursorScreenPos(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	const ImVec2 pos = ImGui::GetCursorScreenPos();
 	PyObject *result = PyTuple_New(2);
@@ -525,12 +525,12 @@ static PyObject *gPyImgui_GetCursorScreenPos(PyObject *)
 	return result;
 }
 
-static PyObject *gPyImgui_GetIOWantCaptureMouse(PyObject *)
+static PyObject *gPyImgui_GetIOWantCaptureMouse(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyBool_FromLong(ImGui::GetIO().WantCaptureMouse);
 }
 
-static PyObject *gPyImgui_GetIOWantCaptureKeyboard(PyObject *)
+static PyObject *gPyImgui_GetIOWantCaptureKeyboard(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyBool_FromLong(ImGui::GetIO().WantCaptureKeyboard);
 }

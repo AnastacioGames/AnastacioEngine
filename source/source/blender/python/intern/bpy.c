@@ -68,7 +68,7 @@ PyDoc_STRVAR(bpy_script_paths_doc,
 "   :return: (system, user) strings will be empty when not found.\n"
 "   :rtype: tuple of strings\n"
 );
-static PyObject *bpy_script_paths(PyObject *UNUSED(self))
+static PyObject *bpy_script_paths(PyObject *UNUSED(self), PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret = PyTuple_New(2);
 	PyObject *item;

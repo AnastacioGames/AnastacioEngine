@@ -280,7 +280,7 @@ PyDoc_STRVAR(M_Noise_random_doc,
 "   :return: The random number.\n"
 "   :rtype: float\n"
 );
-static PyObject *M_Noise_random(PyObject *UNUSED(self))
+static PyObject *M_Noise_random(PyObject *UNUSED(self), PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(frand());
 }

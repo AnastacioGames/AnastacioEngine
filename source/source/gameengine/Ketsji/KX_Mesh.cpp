@@ -120,14 +120,14 @@ PyTypeObject KX_Mesh::Type = {
 };
 
 PyMethodDef KX_Mesh::Methods[] = {
-	{"getMaterialName", (PyCFunction)KX_Mesh::sPyGetMaterialName, METH_VARARGS},
-	{"getTextureName", (PyCFunction)KX_Mesh::sPyGetTextureName, METH_VARARGS},
-	{"getVertexArrayLength", (PyCFunction)KX_Mesh::sPyGetVertexArrayLength, METH_VARARGS},
-	{"getVertex", (PyCFunction)KX_Mesh::sPyGetVertex, METH_VARARGS},
-	{"getPolygon", (PyCFunction)KX_Mesh::sPyGetPolygon, METH_VARARGS},
-	{"transform", (PyCFunction)KX_Mesh::sPyTransform, METH_VARARGS},
-	{"transformUV", (PyCFunction)KX_Mesh::sPyTransformUV, METH_VARARGS},
-	{"replaceMaterial", (PyCFunction)KX_Mesh::sPyReplaceMaterial, METH_VARARGS},
+	{"getMaterialName", (PyCFunction)(void (*)(void))KX_Mesh::sPyGetMaterialName, METH_VARARGS | METH_KEYWORDS},
+	{"getTextureName", (PyCFunction)(void (*)(void))KX_Mesh::sPyGetTextureName, METH_VARARGS | METH_KEYWORDS},
+	{"getVertexArrayLength", (PyCFunction)(void (*)(void))KX_Mesh::sPyGetVertexArrayLength, METH_VARARGS | METH_KEYWORDS},
+	{"getVertex", (PyCFunction)(void (*)(void))KX_Mesh::sPyGetVertex, METH_VARARGS | METH_KEYWORDS},
+	{"getPolygon", (PyCFunction)(void (*)(void))KX_Mesh::sPyGetPolygon, METH_VARARGS | METH_KEYWORDS},
+	{"transform", (PyCFunction)(void (*)(void))KX_Mesh::sPyTransform, METH_VARARGS | METH_KEYWORDS},
+	{"transformUV", (PyCFunction)(void (*)(void))KX_Mesh::sPyTransformUV, METH_VARARGS | METH_KEYWORDS},
+	{"replaceMaterial", (PyCFunction)(void (*)(void))KX_Mesh::sPyReplaceMaterial, METH_VARARGS | METH_KEYWORDS},
 	{"copy", (PyCFunction)KX_Mesh::sPyCopy, METH_NOARGS},
 	{"constructBvh", (PyCFunction)KX_Mesh::sPyConstructBvh, METH_VARARGS | METH_KEYWORDS},
 	{"destruct", (PyCFunction) KX_Mesh::sPyDestruct, METH_NOARGS},

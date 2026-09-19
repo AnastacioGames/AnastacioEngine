@@ -40,10 +40,10 @@ typedef enum eMatrixAccess_t {
 } eMatrixAccess_t;
 
 static PyObject *Matrix_copy_notest(MatrixObject *self, const float *matrix);
-static PyObject *Matrix_copy(MatrixObject *self);
+static PyObject *Matrix_copy(MatrixObject *self, PyObject *Py_UNUSED(ignored));
 static PyObject *Matrix_deepcopy(MatrixObject *self, PyObject *args);
 static int Matrix_ass_slice(MatrixObject *self, int begin, int end, PyObject *value);
-static PyObject* matrix__apply_to_copy(PyObject* (*matrix_func)(MatrixObject*),
+static PyObject* matrix__apply_to_copy(PyObject* (*matrix_func)(MatrixObject *, PyObject *),
 	MatrixObject* self);
 static PyObject *MatrixAccess_CreatePyObject(MatrixObject *matrix, const eMatrixAccess_t type);
 
@@ -381,12 +381,12 @@ static PyObject *Matrix_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return NULL;
 }
 
-static PyObject* matrix__apply_to_copy(PyObject* (*matrix_func)(MatrixObject*),
+static PyObject* matrix__apply_to_copy(PyObject* (*matrix_func)(MatrixObject *, PyObject *),
 	MatrixObject* self)
 {
-	PyObject *ret = Matrix_copy(self);
+	PyObject *ret = Matrix_copy(self, NULL);
 	if (ret) {
-		PyObject* ret_dummy = matrix_func((MatrixObject*)ret);
+		PyObject* ret_dummy = matrix_func((MatrixObject*)ret, NULL);
 		if (ret_dummy) {
 			Py_DECREF(ret_dummy);
 			return ret;
@@ -1069,7 +1069,7 @@ PyDoc_STRVAR(Matrix_to_quaternion_doc,
 "   :return: Quaternion representation of the rotation matrix.\n"
 "   :rtype: :class:`Quaternion`\n"
 );
-static PyObject *Matrix_to_quaternion(MatrixObject *self)
+static PyObject *Matrix_to_quaternion(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float quat[4];
 
@@ -1172,7 +1172,7 @@ PyDoc_STRVAR(Matrix_resize_4x4_doc,
 "\n"
 "   Resize the matrix to 4x4.\n"
 );
-static PyObject *Matrix_resize_4x4(MatrixObject *self)
+static PyObject *Matrix_resize_4x4(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float mat[4][4];
 	int col;
@@ -1220,7 +1220,7 @@ PyDoc_STRVAR(Matrix_to_4x4_doc,
 "   :return: a new matrix.\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_to_4x4(MatrixObject *self)
+static PyObject *Matrix_to_4x4(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -1249,7 +1249,7 @@ PyDoc_STRVAR(Matrix_to_3x3_doc,
 "   :return: a new matrix.\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_to_3x3(MatrixObject *self)
+static PyObject *Matrix_to_3x3(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float mat[3][3];
 
@@ -1275,7 +1275,7 @@ PyDoc_STRVAR(Matrix_to_translation_doc,
 "   :return: Return the translation of a matrix.\n"
 "   :rtype: :class:`Vector`\n"
 );
-static PyObject *Matrix_to_translation(MatrixObject *self)
+static PyObject *Matrix_to_translation(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -1300,7 +1300,7 @@ PyDoc_STRVAR(Matrix_to_scale_doc,
 "\n"
 "   .. note:: This method does not return a negative scale on any axis because it is not possible to obtain this data from the matrix alone.\n"
 );
-static PyObject *Matrix_to_scale(MatrixObject *self)
+static PyObject *Matrix_to_scale(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float rot[3][3];
 	float mat[3][3];
@@ -1504,7 +1504,7 @@ PyDoc_STRVAR(Matrix_invert_safe_doc,
 "\n"
 "   .. seealso:: `Inverse Matrix <https://en.wikipedia.org/wiki/Inverse_matrix>` on Wikipedia.\n"
 );
-static PyObject *Matrix_invert_safe(MatrixObject *self)
+static PyObject *Matrix_invert_safe(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
 		return NULL;
@@ -1529,7 +1529,7 @@ PyDoc_STRVAR(Matrix_inverted_safe_doc,
 "   :return: the inverted matrix.\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_inverted_safe(MatrixObject *self)
+static PyObject *Matrix_inverted_safe(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	float mat[MATRIX_MAX_DIM * MATRIX_MAX_DIM];
 
@@ -1555,7 +1555,7 @@ PyDoc_STRVAR(Matrix_adjugate_doc,
 "\n"
 "   .. seealso:: `Adjugate matrix <https://en.wikipedia.org/wiki/Adjugate_matrix>` on Wikipedia.\n"
 );
-static PyObject *Matrix_adjugate(MatrixObject *self)
+static PyObject *Matrix_adjugate(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
 		return NULL;
@@ -1593,7 +1593,7 @@ PyDoc_STRVAR(Matrix_adjugated_doc,
 "\n"
 "   .. note:: When the matrix cant be adjugated a :exc:`ValueError` exception is raised.\n"
 );
-static PyObject *Matrix_adjugated(MatrixObject *self)
+static PyObject *Matrix_adjugated(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return matrix__apply_to_copy(Matrix_adjugate, self);
 }
@@ -1643,7 +1643,7 @@ PyDoc_STRVAR(Matrix_decompose_doc,
 "   :return: tuple of translation, rotation, and scale\n"
 "   :rtype: (:class:`Vector`, :class:`Quaternion`, :class:`Vector`)"
 );
-static PyObject *Matrix_decompose(MatrixObject *self)
+static PyObject *Matrix_decompose(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *ret;
 	float loc[3];
@@ -1741,7 +1741,7 @@ PyDoc_STRVAR(Matrix_determinant_doc,
 "\n"
 "   .. seealso:: `Determinant <https://en.wikipedia.org/wiki/Determinant>` on Wikipedia.\n"
 );
-static PyObject *Matrix_determinant(MatrixObject *self)
+static PyObject *Matrix_determinant(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -1763,7 +1763,7 @@ PyDoc_STRVAR(Matrix_transpose_doc,
 "\n"
 "   .. seealso:: `Transpose <https://en.wikipedia.org/wiki/Transpose>` on Wikipedia.\n"
 );
-static PyObject *Matrix_transpose(MatrixObject *self)
+static PyObject *Matrix_transpose(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
 		return NULL;
@@ -1799,7 +1799,7 @@ PyDoc_STRVAR(Matrix_transposed_doc,
 "   :return: a transposed matrix\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_transposed(MatrixObject *self)
+static PyObject *Matrix_transposed(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return matrix__apply_to_copy(Matrix_transpose, self);
 }
@@ -1810,7 +1810,7 @@ PyDoc_STRVAR(Matrix_normalize_doc,
 "\n"
 "   Normalize each of the matrix columns.\n"
 );
-static PyObject *Matrix_normalize(MatrixObject *self)
+static PyObject *Matrix_normalize(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
 		return NULL;
@@ -1846,7 +1846,7 @@ PyDoc_STRVAR(Matrix_normalized_doc,
 "   :return: a column normalized matrix\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_normalized(MatrixObject *self)
+static PyObject *Matrix_normalized(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return matrix__apply_to_copy(Matrix_normalize, self);
 }
@@ -1859,7 +1859,7 @@ PyDoc_STRVAR(Matrix_zero_doc,
 "\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_zero(MatrixObject *self)
+static PyObject *Matrix_zero(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_Prepare_ForWrite(self) == -1)
 		return NULL;
@@ -1898,7 +1898,7 @@ PyDoc_STRVAR(Matrix_identity_doc,
 "\n"
 "   .. seealso:: `Identity matrix <https://en.wikipedia.org/wiki/Identity_matrix>` on Wikipedia.\n"
 );
-static PyObject *Matrix_identity(MatrixObject *self)
+static PyObject *Matrix_identity(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback_ForWrite(self) == -1)
 		return NULL;
@@ -1933,7 +1933,7 @@ PyDoc_STRVAR(Matrix_copy_doc,
 "   :return: an instance of itself\n"
 "   :rtype: :class:`Matrix`\n"
 );
-static PyObject *Matrix_copy(MatrixObject *self)
+static PyObject *Matrix_copy(MatrixObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -1945,7 +1945,7 @@ static PyObject *Matrix_deepcopy(MatrixObject *self, PyObject *args)
 	if (!PyC_CheckArgs_DeepCopy(args)) {
 		return NULL;
 	}
-	return Matrix_copy(self);
+	return Matrix_copy(self, NULL);
 }
 
 /*----------------------------print object (internal)-------------*/

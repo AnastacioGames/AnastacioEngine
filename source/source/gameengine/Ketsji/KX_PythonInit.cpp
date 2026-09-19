@@ -210,7 +210,7 @@ PyDoc_STRVAR(gPyGetRandomFloat_doc,
              "getRandomFloat()\n"
              "returns a random floating point value in the range [0..1]"
              );
-static PyObject *gPyGetRandomFloat(PyObject *)
+static PyObject *gPyGetRandomFloat(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(mt::Random<float>());
 }
@@ -274,7 +274,7 @@ PyDoc_STRVAR(gPyEndGame_doc,
              "endGame()\n"
              "Ends the current game"
              );
-static PyObject *gPyEndGame(PyObject *)
+static PyObject *gPyEndGame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
 
@@ -285,7 +285,7 @@ PyDoc_STRVAR(gPyRestartGame_doc,
              "restartGame()\n"
              "Restarts the current game by reloading the .range file"
              );
-static PyObject *gPyRestartGame(PyObject *)
+static PyObject *gPyRestartGame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	KX_GetActiveEngine()->RequestExit(KX_ExitInfo::RESTART_GAME, KX_GetMainPath());
 
@@ -332,7 +332,7 @@ PyDoc_STRVAR(gPyGetProfileInfo_doc,
              "getProfileInfo()\n"
              "returns a dictionary with profiling information"
              );
-static PyObject *gPyGetProfileInfo(PyObject *)
+static PyObject *gPyGetProfileInfo(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return KX_GetActiveEngine()->GetPyProfileDict();
 }
@@ -368,7 +368,7 @@ static PyObject *gPySendMessage(PyObject *, PyObject *args)
 }
 
 // this gets a pointer to an array filled with floats
-static PyObject *gPyGetSpectrum(PyObject *)
+static PyObject *gPyGetSpectrum(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *resultlist = PyList_New(512);
 
@@ -391,7 +391,7 @@ static PyObject *gPySetLogicTicRate(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetLogicTicRate(PyObject *)
+static PyObject *gPyGetLogicTicRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetTicRate());
 }
@@ -408,7 +408,7 @@ static PyObject *gPySetRenderRate(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetRenderRate(PyObject *)
+static PyObject *gPyGetRenderRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetRenderRate());
 }
@@ -424,7 +424,7 @@ static PyObject *gPySetAnimationRate(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetAnimationRate(PyObject *)
+static PyObject *gPyGetAnimationRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetAnimationRate());
 }
@@ -439,7 +439,7 @@ static PyObject *gPySetExitKey(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetExitKey(PyObject *)
+static PyObject *gPyGetExitKey(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyLong_FromLong(KX_GetActiveEngine()->GetExitKey());
 }
@@ -454,7 +454,7 @@ static PyObject *gPySetRender(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetRender(PyObject *)
+static PyObject *gPyGetRender(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyBool_FromLong(KX_GetActiveEngine()->GetRender());
 }
@@ -471,7 +471,7 @@ static PyObject *gPySetMaxLogicFrame(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetMaxLogicFrame(PyObject *)
+static PyObject *gPyGetMaxLogicFrame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyLong_FromLong(KX_GetActiveEngine()->GetMaxLogicFrame());
 }
@@ -487,7 +487,7 @@ static PyObject *gPySetMaxPhysicsFrame(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetMaxPhysicsFrame(PyObject *)
+static PyObject *gPyGetMaxPhysicsFrame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyLong_FromLong(KX_GetActiveEngine()->GetMaxPhysicsFrame());
 }
@@ -527,17 +527,17 @@ static PyObject *gPySetPhysicsDebug(PyObject *, PyObject *args)
 #endif
 
 
-static PyObject *gPyGetPhysicsTicRate(PyObject *)
+static PyObject *gPyGetPhysicsTicRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetPhysicsEnvironment()->GetFixedTimeStep());
 }
 
-static PyObject *gPyGetAverageFrameRate(PyObject *)
+static PyObject *gPyGetAverageFrameRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetAverageFrameRate());
 }
 
-static PyObject *gPyGetUseExternalClock(PyObject *)
+static PyObject *gPyGetUseExternalClock(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyBool_FromLong(KX_GetActiveEngine()->GetFlag(KX_KetsjiEngine::USE_EXTERNAL_CLOCK));
 }
@@ -554,7 +554,7 @@ static PyObject *gPySetUseExternalClock(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetClockTime(PyObject *)
+static PyObject *gPyGetClockTime(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetClockTime());
 }
@@ -571,17 +571,17 @@ static PyObject *gPySetClockTime(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetFrameTime(PyObject *)
+static PyObject *gPyGetFrameTime(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetFrameTime());
 }
 
-static PyObject *gPyGetRealTime(PyObject *)
+static PyObject *gPyGetRealTime(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetRealTime());
 }
 
-static PyObject *gPyGetTimeScale(PyObject *)
+static PyObject *gPyGetTimeScale(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetTimeScale());
 }
@@ -598,7 +598,7 @@ static PyObject *gPySetTimeScale(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetDeltaTime(PyObject*)
+static PyObject *gPyGetDeltaTime(PyObject*, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetEngineDeltaTime());
 }
@@ -609,7 +609,7 @@ static PyObject *gPyGetBlendFileList(PyObject*, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetRangeFileList(PyObject *, PyObject *args, bool is_rasec = false)
+static PyObject *gPyGetRangeFileListImpl(PyObject *, PyObject *args, bool is_rasec)
 {
 	char cpath[FILE_MAX];
 	char *searchpath = nullptr;
@@ -653,7 +653,12 @@ static PyObject *gPyGetRangeFileList(PyObject *, PyObject *args, bool is_rasec =
 
 static PyObject *gPyGetRasecFileList(PyObject *object, PyObject *args)
 {
-  return gPyGetRangeFileList(object, args, true);
+  return gPyGetRangeFileListImpl(object, args, true);
+}
+
+static PyObject *gPyGetRangeFileList(PyObject *object, PyObject *args)
+{
+	return gPyGetRangeFileListImpl(object, args, false);
 }
 
 PyDoc_STRVAR(gPyAddScene_doc,
@@ -680,7 +685,7 @@ PyDoc_STRVAR(gPyGetCurrentScene_doc,
              "getCurrentScene()\n"
              "Gets a reference to the current scene."
              );
-static PyObject *gPyGetCurrentScene(PyObject *self)
+static PyObject *gPyGetCurrentScene(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return KX_GetActiveScene()->GetProxy();
 }
@@ -689,7 +694,7 @@ PyDoc_STRVAR(gPyGetSceneList_doc,
              "getSceneList()\n"
              "Return a list of converted scenes."
              );
-static PyObject *gPyGetSceneList(PyObject *self)
+static PyObject *gPyGetSceneList(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
 	return KX_GetActiveEngine()->CurrentScenes()->GetProxy();
 }
@@ -698,7 +703,7 @@ PyDoc_STRVAR(gPyGetInactiveSceneNames_doc,
              "getInactiveSceneNames()\n"
              "Get all inactive scenes names"
              );
-static PyObject *gPyGetInactiveSceneNames(PyObject *self)
+static PyObject *gPyGetInactiveSceneNames(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
 	EXP_ListValue<EXP_StringValue> *list = KX_GetActiveEngine()->GetConverter()->GetInactiveSceneNames();
 
@@ -707,13 +712,13 @@ static PyObject *gPyGetInactiveSceneNames(PyObject *self)
 
 
 
-static PyObject *pyPrintStats(PyObject *, PyObject *, PyObject *)
+static PyObject *pyPrintStats(PyObject *, PyObject *)
 {
 	KX_GetActiveEngine()->GetConverter()->PrintStats();
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetGraphicsCardVendor(PyObject *, PyObject *, PyObject *)
+static PyObject *gPyGetGraphicsCardVendor(PyObject *, PyObject *)
 {
   RAS_Rasterizer *rasterizer = KX_GetActiveEngine()->GetRasterizer();
   if (rasterizer) {
@@ -726,7 +731,7 @@ static PyObject *gPyGetGraphicsCardVendor(PyObject *, PyObject *, PyObject *)
   }
 }
 
-static PyObject *gPyGetGraphicsCardRenderer(PyObject *, PyObject *, PyObject *)
+static PyObject *gPyGetGraphicsCardRenderer(PyObject *, PyObject *)
 {
 	RAS_Rasterizer *rasterizer = KX_GetActiveEngine()->GetRasterizer();
 	if (rasterizer) {
@@ -750,7 +755,7 @@ static float EstimateCpuFrequency()
 }
 #  endif
 
-static PyObject *gPyGetProcessorName(PyObject *, PyObject *, PyObject *)
+static PyObject *gPyGetProcessorName(PyObject *, PyObject *)
 {
   std::string cpuName;
   float cpuFrequency;
@@ -970,7 +975,7 @@ static PyObject *gLibList(PyObject *, PyObject *args)
 }
 
 struct PyNextFrameState pynextframestate;
-static PyObject *gPyNextFrame(PyObject *)
+static PyObject *gPyNextFrame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (pynextframestate.func == nullptr) {
 		Py_RETURN_NONE;
@@ -1195,7 +1200,7 @@ static PyObject *gPySetEyeSeparation(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetEyeSeparation(PyObject *)
+static PyObject *gPyGetEyeSeparation(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.getEyeSeparation(), Rasterizer not available");
@@ -1222,7 +1227,7 @@ static PyObject *gPySetFocalLength(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetFocalLength(PyObject *, PyObject *, PyObject *)
+static PyObject *gPyGetFocalLength(PyObject *, PyObject *)
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.getFocalLength(), Rasterizer not available");
@@ -1234,7 +1239,7 @@ static PyObject *gPyGetFocalLength(PyObject *, PyObject *, PyObject *)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetStereoEye(PyObject *, PyObject *, PyObject *)
+static PyObject *gPyGetStereoEye(PyObject *, PyObject *)
 {
 	RAS_Rasterizer *rasterizer = KX_GetActiveEngine()->GetRasterizer();
 
@@ -1281,7 +1286,7 @@ static PyObject *gPyEnableMotionBlur(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyDisableMotionBlur(PyObject *)
+static PyObject *gPyDisableMotionBlur(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.disableMotionBlur(), Rasterizer not available");
@@ -1319,8 +1324,7 @@ static int getGLSLSettingFlag(const std::string& setting)
 }
 
 static PyObject *gPySetGLSLMaterialSetting(PyObject *,
-                                           PyObject *args,
-                                           PyObject *)
+                                           PyObject *args)
 {
 	GlobalSettings *gs = KX_GetActiveEngine()->GetGlobalSettings();
 	char *setting;
@@ -1366,8 +1370,7 @@ static PyObject *gPySetGLSLMaterialSetting(PyObject *,
 }
 
 static PyObject *gPyGetGLSLMaterialSetting(PyObject *,
-                                           PyObject *args,
-                                           PyObject *)
+                                           PyObject *args)
 {
 	GlobalSettings *gs = KX_GetActiveEngine()->GetGlobalSettings();
 	char *setting;
@@ -1392,15 +1395,14 @@ static PyObject *gPyGetGLSLMaterialSetting(PyObject *,
 #define KX_BLENDER_GLSL_MATERIAL        2
 
 static PyObject *gPySetMaterialType(PyObject *,
-                                    PyObject *args,
-                                    PyObject *)
+                                    PyObject *args)
 {
 	EXP_ShowDeprecationWarning("setMaterialMode(mode)", "nothing");
 
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetMaterialType(PyObject *)
+static PyObject *gPyGetMaterialType(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	EXP_ShowDeprecationWarning("getMaterialMode()", "nothing");
 
@@ -1518,7 +1520,7 @@ static PyObject *gPySetFullScreen(PyObject *, PyObject *value)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetFullScreen(PyObject *)
+static PyObject *gPyGetFullScreen(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyBool_FromLong(KX_GetActiveEngine()->GetCanvas()->GetFullScreen());
 }
@@ -1545,7 +1547,7 @@ static PyObject *gPySetMipmapping(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetMipmapping(PyObject *)
+static PyObject *gPyGetMipmapping(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.getMipmapping(): Rasterizer not available");
@@ -1571,7 +1573,7 @@ static PyObject *gPySetVsync(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetVsync(PyObject *)
+static PyObject *gPyGetVsync(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyLong_FromLong(KX_GetActiveEngine()->GetCanvas()->GetSwapControl());
 }
@@ -1591,7 +1593,7 @@ static PyObject *gPySetMasterVolume(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetMasterVolume(PyObject *)
+static PyObject *gPyGetMasterVolume(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 #ifdef WITH_AUDASPACE
 	return PyFloat_FromDouble(AUD_Device_getVolume(BKE_sound_get_device()));
@@ -1644,7 +1646,7 @@ static PyObject *gPyAutoDebugList(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyClearDebugList(PyObject *)
+static PyObject *gPyClearDebugList(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	KX_Scene *scene = KX_GetActiveScene();
 	if (scene) {
@@ -1654,7 +1656,7 @@ static PyObject *gPyClearDebugList(PyObject *)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gPyGetDisplayDimensions(PyObject *)
+static PyObject *gPyGetDisplayDimensions(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *result;
 	int width, height;

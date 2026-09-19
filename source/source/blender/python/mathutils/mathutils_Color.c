@@ -109,7 +109,7 @@ PyDoc_STRVAR(Color_copy_doc,
 "   .. note:: use this to get a copy of a wrapped color with\n"
 "      no reference to the original data.\n"
 );
-static PyObject *Color_copy(ColorObject *self)
+static PyObject *Color_copy(ColorObject *self, PyObject *Py_UNUSED(ignored))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
@@ -121,7 +121,7 @@ static PyObject *Color_deepcopy(ColorObject *self, PyObject *args)
 	if (!PyC_CheckArgs_DeepCopy(args)) {
 		return NULL;
 	}
-	return Color_copy(self);
+	return Color_copy(self, NULL);
 }
 
 /* ----------------------------print object (internal)-------------- */

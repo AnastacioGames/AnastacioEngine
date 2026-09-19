@@ -107,8 +107,8 @@ PyTypeObject KX_ConstraintWrapper::Type = {
 
 PyMethodDef KX_ConstraintWrapper::Methods[] = {
 	{"getConstraintId", (PyCFunction)KX_ConstraintWrapper::sPyGetConstraintId, METH_NOARGS},
-	{"setParam", (PyCFunction)KX_ConstraintWrapper::sPySetParam, METH_VARARGS},
-	{"getParam", (PyCFunction)KX_ConstraintWrapper::sPyGetParam, METH_VARARGS},
+	{"setParam", (PyCFunction)(void (*)(void))KX_ConstraintWrapper::sPySetParam, METH_VARARGS | METH_KEYWORDS},
+	{"getParam", (PyCFunction)(void (*)(void))KX_ConstraintWrapper::sPyGetParam, METH_VARARGS | METH_KEYWORDS},
 	{nullptr, nullptr} //Sentinel
 };
 

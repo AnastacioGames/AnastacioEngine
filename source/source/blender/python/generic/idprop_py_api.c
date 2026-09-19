@@ -897,7 +897,7 @@ PyDoc_STRVAR(BPy_IDGroup_iter_items_doc,
 "\n"
 "   Iterate through the items in the dict; behaves like dictionary method iteritems.\n"
 );
-static PyObject *BPy_IDGroup_iter_items(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_iter_items(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	BPy_IDGroup_Iter *iter = PyObject_New(BPy_IDGroup_Iter, &BPy_IDGroup_Iter_Type);
 	iter->group = self;
@@ -996,7 +996,7 @@ PyDoc_STRVAR(BPy_IDGroup_keys_doc,
 "\n"
 "   Return the keys associated with this group as a list of strings.\n"
 );
-static PyObject *BPy_IDGroup_keys(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_keys(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	return BPy_Wrap_GetKeys(self->prop);
 }
@@ -1006,7 +1006,7 @@ PyDoc_STRVAR(BPy_IDGroup_values_doc,
 "\n"
 "   Return the values associated with this group.\n"
 );
-static PyObject *BPy_IDGroup_values(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_values(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	return BPy_Wrap_GetValues(self->id, self->prop);
 }
@@ -1016,7 +1016,7 @@ PyDoc_STRVAR(BPy_IDGroup_items_doc,
 "\n"
 "   Return the items associated with this group.\n"
 );
-static PyObject *BPy_IDGroup_items(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_items(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	return BPy_Wrap_GetItems(self->id, self->prop);
 }
@@ -1079,7 +1079,7 @@ PyDoc_STRVAR(BPy_IDGroup_to_dict_doc,
 "\n"
 "   Return a purely python version of the group.\n"
 );
-static PyObject *BPy_IDGroup_to_dict(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_to_dict(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	return BPy_IDGroup_MapDataToPy(self->prop);
 }
@@ -1089,7 +1089,7 @@ PyDoc_STRVAR(BPy_IDGroup_clear_doc,
 "\n"
 "   Clear all members from this group.\n"
 );
-static PyObject *BPy_IDGroup_clear(BPy_IDProperty *self)
+static PyObject *BPy_IDGroup_clear(BPy_IDProperty *self, PyObject *Py_UNUSED(ignored))
 {
 	IDP_ClearProperty(self->prop);
 	Py_RETURN_NONE;
@@ -1267,7 +1267,7 @@ PyDoc_STRVAR(BPy_IDArray_to_list_doc,
 "\n"
 "   Return the array as a list.\n"
 );
-static PyObject *BPy_IDArray_to_list(BPy_IDArray *self)
+static PyObject *BPy_IDArray_to_list(BPy_IDArray *self, PyObject *Py_UNUSED(ignored))
 {
 	return BPy_IDGroup_MapDataToPy(self->prop);
 }

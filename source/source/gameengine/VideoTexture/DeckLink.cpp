@@ -365,7 +365,7 @@ static PyObject *DeckLink_new(PyTypeObject *type, PyObject *args, PyObject *kwds
 
 
 // forward declaration
-PyObject *DeckLink_close(DeckLink *self);
+PyObject *DeckLink_close(DeckLink *self, PyObject *Py_UNUSED(ignored));
 int DeckLink_setSource(DeckLink *self, PyObject *value, void *closure);
 
 
@@ -376,7 +376,7 @@ static void DeckLink_dealloc(DeckLink *self)
 	Py_XDECREF(self->m_leftEye);
 	Py_XDECREF(self->m_rightEye);
 	// close decklink
-	PyObject *ret = DeckLink_close(self);
+	PyObject *ret = DeckLink_close(self, NULL);
 	Py_DECREF(ret);
 	// release object
 	Py_TYPE((PyObject *)self)->tp_free((PyObject *)self);
@@ -538,7 +538,7 @@ static int DeckLink_init(DeckLink *self, PyObject *args, PyObject *kwds)
 
 
 // close added decklink
-PyObject *DeckLink_close(DeckLink *self)
+PyObject *DeckLink_close(DeckLink *self, PyObject *Py_UNUSED(ignored))
 {
 	if (self->mLeftFrame) {
 		self->mLeftFrame->Release();

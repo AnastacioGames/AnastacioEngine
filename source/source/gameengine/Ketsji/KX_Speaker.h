@@ -152,8 +152,8 @@ protected:
   EXP_PYMETHOD_DOC_NOARGS(KX_Speaker, Pause);
   EXP_PYMETHOD_DOC_NOARGS(KX_Speaker, Stop);
   EXP_PYMETHOD_DOC(KX_Speaker, SetSound);
-  EXP_PYMETHOD_DOC(KX_Speaker, GetActiveEffect);
-  EXP_PYMETHOD_DOC(KX_Speaker, GetActiveEffectFilter);
+  EXP_PYMETHOD_DOC_NOARGS(KX_Speaker, GetActiveEffect);
+  EXP_PYMETHOD_DOC_NOARGS(KX_Speaker, GetActiveEffectFilter);
   EXP_PYMETHOD_DOC(KX_Speaker, SetEffect);
   EXP_PYMETHOD_DOC_NOARGS(KX_Speaker, RemoveEffect);
 

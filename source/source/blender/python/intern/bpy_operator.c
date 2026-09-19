@@ -386,7 +386,7 @@ static PyObject *pyop_as_string(PyObject *UNUSED(self), PyObject *args)
 	return pybuf;
 }
 
-static PyObject *pyop_dir(PyObject *UNUSED(self))
+static PyObject *pyop_dir(PyObject *UNUSED(self), PyObject *Py_UNUSED(ignored))
 {
 	GHashIterator iter;
 	PyObject *list;

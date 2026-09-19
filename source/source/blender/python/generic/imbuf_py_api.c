@@ -111,7 +111,7 @@ PyDoc_STRVAR(py_imbuf_copy_doc,
 "   :return: A copy of the image.\n"
 "   :rtype: :class:`ImBuf`\n"
 );
-static PyObject *py_imbuf_copy(Py_ImBuf *self)
+static PyObject *py_imbuf_copy(Py_ImBuf *self, PyObject *Py_UNUSED(ignored))
 {
 	PY_IMBUF_CHECK_OBJ(self);
 	return Py_ImBuf_CreatePyObject(self->ibuf);
@@ -122,7 +122,7 @@ static PyObject *py_imbuf_deepcopy(Py_ImBuf *self, PyObject *args)
 	if (!PyC_CheckArgs_DeepCopy(args)) {
 		return NULL;
 	}
-	return py_imbuf_copy(self);
+	return py_imbuf_copy(self, NULL);
 }
 
 
@@ -131,7 +131,7 @@ PyDoc_STRVAR(py_imbuf_free_doc,
 "\n"
 "   Clear image data immediately (causing an error on re-use).\n"
 );
-static PyObject *py_imbuf_free(Py_ImBuf *self)
+static PyObject *py_imbuf_free(Py_ImBuf *self, PyObject *Py_UNUSED(ignored))
 {
 	if (self->ibuf) {
 		IMB_freeImBuf(self->ibuf);

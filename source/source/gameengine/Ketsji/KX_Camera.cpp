@@ -474,16 +474,16 @@ KX_GameObject::RayCastData KX_Camera::GetScreenRayCast(float x, float y, float d
 
 
 PyMethodDef KX_Camera::Methods[] = {
-	EXP_PYMETHODTABLE(KX_Camera, sphereInsideFrustum),
+	EXP_PYMETHODTABLE_VARARGS(KX_Camera, sphereInsideFrustum),
 	EXP_PYMETHODTABLE_O(KX_Camera, boxInsideFrustum),
 	EXP_PYMETHODTABLE_O(KX_Camera, pointInsideFrustum),
 	EXP_PYMETHODTABLE_NOARGS(KX_Camera, getCameraToWorld),
 	EXP_PYMETHODTABLE_NOARGS(KX_Camera, getWorldToCamera),
-	EXP_PYMETHODTABLE(KX_Camera, setViewport),
+	EXP_PYMETHODTABLE_VARARGS(KX_Camera, setViewport),
 	EXP_PYMETHODTABLE_NOARGS(KX_Camera, setOnTop),
 	EXP_PYMETHODTABLE_O(KX_Camera, getScreenPosition),
-	EXP_PYMETHODTABLE(KX_Camera, getScreenVect),
-	EXP_PYMETHODTABLE(KX_Camera, getScreenRay),
+	EXP_PYMETHODTABLE_VARARGS(KX_Camera, getScreenVect),
+	EXP_PYMETHODTABLE_VARARGS(KX_Camera, getScreenRay),
 	{nullptr, nullptr} //Sentinel
 };
 

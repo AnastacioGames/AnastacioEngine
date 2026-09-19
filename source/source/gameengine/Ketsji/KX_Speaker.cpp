@@ -548,13 +548,13 @@ EXP_PYMETHODDEF_DOC(KX_Speaker, SetSound,
 /*********************** OpenALHandle PyHandle Effects *************************/
 /******************************************************************************/
 
-EXP_PYMETHODDEF_DOC(KX_Speaker, GetActiveEffect, "GetActiveEffect(): Get Active Sound Effect\n")
+EXP_PYMETHODDEF_DOC_NOARGS(KX_Speaker, GetActiveEffect, "GetActiveEffect(): Get Active Sound Effect\n")
 {
     int effect = m_settings.active_effect_type;
     return PyLong_FromLong(effect);
 }
 
-EXP_PYMETHODDEF_DOC(KX_Speaker, GetActiveEffectFilter, "GetActiveEffectFilter(): Get Active Filter Sound Effect\n")
+EXP_PYMETHODDEF_DOC_NOARGS(KX_Speaker, GetActiveEffectFilter, "GetActiveEffectFilter(): Get Active Filter Sound Effect\n")
 {
   int filter = m_settings.active_filter_type;
   return PyLong_FromLong(filter);

@@ -547,7 +547,7 @@ static PyObject *Buffer_to_list(Buffer *self)
 	return list;
 }
 
-static PyObject *Buffer_to_list_recursive(Buffer *self)
+static PyObject *Buffer_to_list_recursive(Buffer *self, PyObject *Py_UNUSED(ignored))
 {
 	PyObject *list;
 
@@ -557,7 +557,7 @@ static PyObject *Buffer_to_list_recursive(Buffer *self)
 
 		for (i = 0; i < len; i++) {
 			Buffer *sub = (Buffer *)Buffer_item(self, i);
-			PyList_SET_ITEM(list, i, Buffer_to_list_recursive(sub));
+			PyList_SET_ITEM(list, i, Buffer_to_list_recursive(sub, NULL));
 			Py_DECREF(sub);
 		}
 	}
@@ -1027,7 +1027,7 @@ static void Buffer_dealloc(Buffer *self)
 
 static PyObject *Buffer_repr(Buffer *self)
 {
-	PyObject *list = Buffer_to_list_recursive(self);
+	PyObject *list = Buffer_to_list_recursive(self, NULL);
 	PyObject *repr;
 	const char *typestr;
 

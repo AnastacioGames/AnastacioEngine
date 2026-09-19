@@ -228,7 +228,7 @@ PyDoc_STRVAR(pygpu_offscreen_free_doc,
 "   Free the offscreen object\n"
 "   The framebuffer, texture and render objects will no longer be accessible.\n"
 );
-static PyObject *pygpu_offscreen_free(BPy_GPUOffScreen *self)
+static PyObject *pygpu_offscreen_free(BPy_GPUOffScreen *self, PyObject *Py_UNUSED(ignored))
 {
 	BPY_GPU_OFFSCREEN_CHECK_OBJ(self);
 

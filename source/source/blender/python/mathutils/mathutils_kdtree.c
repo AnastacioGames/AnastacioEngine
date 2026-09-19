@@ -176,7 +176,7 @@ PyDoc_STRVAR(py_kdtree_balance_doc,
 "\n"
 "   This builds the entire tree, avoid calling after each insertion.\n"
 );
-static PyObject *py_kdtree_balance(PyKDTree *self)
+static PyObject *py_kdtree_balance(PyKDTree *self, PyObject *Py_UNUSED(ignored))
 {
 	BLI_kdtree_balance(self->obj);
 	self->count_balance = self->count;

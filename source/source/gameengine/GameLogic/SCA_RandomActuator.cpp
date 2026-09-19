@@ -354,18 +354,18 @@ PyTypeObject SCA_RandomActuator::Type = {
 };
 
 PyMethodDef SCA_RandomActuator::Methods[] = {
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setBoolConst),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setBoolConst),
 	EXP_PYMETHODTABLE_NOARGS(SCA_RandomActuator, setBoolUniform),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setBoolBernouilli),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setBoolBernouilli),
 
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setIntConst),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setIntUniform),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setIntPoisson),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setIntConst),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setIntUniform),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setIntPoisson),
 
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setFloatConst),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setFloatUniform),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setFloatNormal),
-	EXP_PYMETHODTABLE(SCA_RandomActuator, setFloatNegativeExponential),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setFloatConst),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setFloatUniform),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setFloatNormal),
+	EXP_PYMETHODTABLE_VARARGS(SCA_RandomActuator, setFloatNegativeExponential),
 	{nullptr, nullptr} //Sentinel
 };
 

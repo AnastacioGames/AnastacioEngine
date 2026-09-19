@@ -555,7 +555,7 @@ static PyObject *ImageRender_refresh(PyImage *self, PyObject *args)
 }
 
 // refresh image
-static PyObject *ImageRender_render(PyImage *self)
+static PyObject *ImageRender_render(PyImage *self, PyObject *Py_UNUSED(ignored))
 {
 	ImageRender *imageRender = getImageRender(self);
 
