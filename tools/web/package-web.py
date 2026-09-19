@@ -309,6 +309,15 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     };
     setInterval(pfRefresh, 2000);
     pfRefresh();
+    // &post=1: o editor (range_web/preflight_run.py) espera o relatorio em POST /__preflight.
+    if (/[?&]post=1/.test(location.search)) {
+      var pfDelay = Number((/[?&]delay=(\\d+)/.exec(location.search) || [0, 12])[1]) * 1000;
+      setTimeout(function () {
+        window.rangePreflight().then(function (r) {
+          return fetch("__preflight", { method: "POST", body: JSON.stringify(r) });
+        });
+      }, pfDelay);
+    }
   }
 
   document.body.appendChild(script);

@@ -57,5 +57,8 @@ Arquivos de exemplo em `build/web-manual/preflight/` (gerados a mão; o `make_ma
 6. Importe `pf-problemas.json` duas vezes seguidas. Esperado: continuam 3 resultados, sem duplicar.
 7. Com resultados de pré-voo na lista, clique **Exportar Web**. Esperado: o export segue a validação normal
    (o pré-voo não bloqueia) e a lista passa a mostrar só a revalidação, sem os resultados de pré-voo.
-8. Real: sirva `build/web-manual/web`, abra `http://localhost:8080/?preflight=1`, chame `rangePreflight()` no console,
+8. Automático: em `bom.blend`, deixe **Pré-voo após exportar** ligado e clique **Exportar Web**. Esperado: a engine
+   fica ocupada uns 15 s e a mensagem termina com "Pré-voo sem problemas.". Depois clique **Testar pacote no navegador**:
+   mesma mensagem. Sem Chrome/Edge (ou com `RANGE_WEB_BROWSER` inválido): "Pré-voo não executado: ..." sem erro do jogo.
+9. Real (manual): sirva `build/web-manual/web`, abra `http://localhost:8080/?preflight=1`, chame `rangePreflight()` no console,
    salve o JSON e importe. Esperado: sem problemas num pacote saudável.

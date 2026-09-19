@@ -65,6 +65,23 @@ def _run_validation(context):
     return report, info
 
 
+def _merge_preflight(report, package_dir):
+    """Roda o pré-voo no navegador sobre o pacote e junta os achados ao relatório.
+
+    Devolve a mensagem para o usuário; falha de ambiente (sem navegador, sem resposta)
+    nunca vira erro do jogo."""
+    from range_web import preflight_run
+
+    found, why = preflight_run.run_preflight(package_dir)
+    report.findings = [f for f in report.findings if f.location.get("origin") != "preflight"]
+    if found is None:
+        return "Pré-voo não executado: %s" % why
+    for finding in found:
+        finding.location["origin"] = "preflight"
+    report.extend(found)
+    return "Pré-voo: %d problema(s)." % len(found) if found else "Pré-voo sem problemas."
+
+
 # Último Report da validação. Transitório: não vai para o .blend e é descartado ao recarregar.
 _last_report = None
 
@@ -92,6 +109,12 @@ class RangeWebSettings(PropertyGroup):
         description="Cena inicial do pacote Web; vazio usa a cena atual",
         default="",
     )
+    auto_preflight: bpy.props.BoolProperty(
+        name="Pré-voo após exportar",
+        description="Depois de exportar, abre o pacote num Chrome/Edge sem janela (cerca de 15 s) "
+                    "e junta ao relatório os problemas vistos no navegador",
+        default=True,
+    )
     output_directory: bpy.props.StringProperty(
         name="Destino",
         description="Diretório de saída do pacote Web",
@@ -115,6 +138,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         col.prop(web, "runtime_id")
         col.prop(web, "entry_scene")
         col.prop(web, "output_directory")
+        col.prop(web, "auto_preflight")
 
         layout.separator()
         layout.operator("scene.range_web_validate", icon='FILE_REFRESH')
@@ -123,6 +147,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         layout.separator()
         layout.operator("scene.range_web_export", icon='EXPORT')
         layout.label(text="Prévia desktop (tecla P) não é Teste Web.")
+        layout.operator("scene.range_web_preflight", icon='PLAY')
         layout.operator("scene.range_web_import_preflight", icon='FILE_FOLDER')
 
     @staticmethod
@@ -225,7 +250,27 @@ class SCENE_OT_range_web_export(Operator):
         except Exception as exc:
             self.report({'WARNING'}, "Export falhou; o anterior foi preservado: %s" % exc)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Pacote Web gerado em %s" % dest)
+        message = "Pacote Web gerado em %s" % dest
+        if web.auto_preflight:
+            message += ". " + _merge_preflight(_last_report, dest)
+        self.report({'WARNING' if _last_report.errors else 'INFO'}, message)
+        return {'FINISHED'}
+
+
+class SCENE_OT_range_web_preflight(Operator):
+    """Abre o pacote exportado num Chrome/Edge sem janela e junta ao relatório o que o navegador viu (cerca de 15 s)"""
+    bl_idname = "scene.range_web_preflight"
+    bl_label = "Testar pacote no navegador"
+
+    def execute(self, context):
+        global _last_report
+        from range_web import results
+
+        dest = bpy.path.abspath(context.scene.range_web.output_directory)
+        if _last_report is None:
+            _last_report = results.Report()
+        message = _merge_preflight(_last_report, dest)
+        self.report({'WARNING' if _last_report.errors else 'INFO'}, message)
         return {'FINISHED'}
 
 
@@ -293,6 +338,7 @@ classes = (
     SCENE_OT_range_web_validate,
     SCENE_OT_range_web_locate,
     SCENE_OT_range_web_export,
+    SCENE_OT_range_web_preflight,
     SCENE_OT_range_web_import_preflight,
     SCENE_PT_range_web,
 )

@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Pré-voo Web automático no editor
+
+- Novo `range_web/preflight_run.py`: serve o pacote numa porta local livre, abre Chrome/Edge headless (`RANGE_WEB_BROWSER` ou detecção) com `?preflight=1&post=1` e recebe o relatório por `POST /__preflight`. Sem node nem CDP; fecha só o processo que abriu. Falhas de ambiente (sem navegador, sem resposta em 60 s) voltam como "Pré-voo não executado", nunca como erro do jogo.
+- `package-web.py`: a página postou o relatório após `delay` segundos (padrão 12) quando `&post=1`. Pacotes gerados antes disso não respondem (o editor avisa por timeout): reexporte.
+- Editor: opção "Pré-voo após exportar" (ligada por padrão) e botão "Testar pacote no navegador". Validar continua sem abrir navegador (não há pacote); preserva os resultados de pré-voo já obtidos.
+- Verificado: 75 testes puros (6 novos, navegador falso) e Chrome real sobre um pacote do `bom.blend` (13,5 s, sem problemas, nenhum processo restante). O fluxo dentro do editor ainda não foi exercitado.
+
 ## 2026-09-19 - Pré-voo Web: casos positivos reais de Python e shader
 
 - Três cenas com falha proposital (import de módulo inexistente, `int("abc")`, filtro 2D custom com GLSL inválido) empacotadas com o runtime release e abertas no Chrome headless. O pré-voo agora acusa: WEB-PY-001 (módulo), WEB-PY-009 (ValueError) e WEB-GFX-002 (shader, com o log `ERROR: 0:1: ...` do compilador).
