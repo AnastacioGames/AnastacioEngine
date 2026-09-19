@@ -39,6 +39,9 @@ Abra http://localhost:8080/, espere o botão **Jogar** e clique (dá foco ao can
 Verificação automatizada (só logs/estado, **não** julga o visual): com um Chrome aberto com
 `--remote-debugging-port=9333`, rode `node tools/web/verify-package.cjs http://127.0.0.1:8080/ 9333`.
 Sai com 0 se o botão liberar, sem erro visível, aborto ou exceção.
+Se `node` não estiver no PATH, use o do emsdk (ex.: `D:\emsdk
+ode.19.0_64bit
+ode.exe`).
 `node tools/web/verify-persistence.cjs <url> 9333` testa a persistência: grava um token em `/saves`, faz `syncfs`, recarrega
 e confere que o arquivo voltou do IndexedDB (usa `Module.FS`, exposto pelo pre-js). Cobre a camada IDBFS.
 `node tools/web/verify-save.cjs <url> 9333` testa `saveGlobalDict`/`loadGlobalDict` de ponta a ponta num pacote gerado de

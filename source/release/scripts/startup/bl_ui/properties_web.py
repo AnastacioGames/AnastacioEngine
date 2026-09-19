@@ -158,7 +158,11 @@ class SCENE_OT_range_web_validate(Operator):
 
     def execute(self, context):
         global _last_report
+        # O pré-voo importado descreve o pacote no navegador, não o .blend; sobrevive a um novo Validar.
+        kept = [f for f in (_last_report.findings if _last_report else [])
+                if f.location.get("origin") == "preflight"]
         _last_report, _info = _run_validation(context)
+        _last_report.extend(kept)
         self.report({'WARNING' if _last_report.errors else 'INFO'}, _last_report.summary())
         return {'FINISHED'}
 
