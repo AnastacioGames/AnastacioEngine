@@ -8,12 +8,12 @@
 
 ## Download
 
-A versão atual é **[AnastacioEngine 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.0)** para Windows x64. O pacote Linux x86_64 da 0.4.0 será anexado em breve; até lá, o Linux mais recente é o da 0.3.0.
+A versão atual é **[AnastacioEngine 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.0)** para Windows x64 e Linux x86_64.
 
 | Pacote | Conteúdo |
 |---|---|
 | [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/AnastacioEngine-0.4.0-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos no Windows. |
-| [AnastacioEngine Linux x86_64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.3.0/AnastacioEngine-0.3.0-linux-x64.tar.gz) | Editor e runtime nativos para Linux x86_64 (validado fora do WSL). **Versão 0.3.0**; a 0.4.0 chega em breve. |
+| [AnastacioEngine Linux x86_64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/AnastacioEngine-0.4.0-linux-x64.tar.gz) | Editor e runtime nativos para Linux x86_64 (validado fora do WSL). **Versão 0.4.0**. |
 | [RangeArmor (painel Windows, exporta para Windows e Linux)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos (painel, launcher e scripts de exportação). O painel roda apenas no Windows, mas exporta e empacota jogos para Windows **e** Linux x86_64. |
 | [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
 
