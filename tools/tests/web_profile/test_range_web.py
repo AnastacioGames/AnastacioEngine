@@ -187,8 +187,8 @@ class PythonTest(unittest.TestCase):
         f = analyze("f = open('C:\\\\Users\\\\a\\\\x.txt')\n").findings
         self.assertEqual(ids(f), ["WEB-PKG-004"])
         self.assertEqual(f[0].severity, SEVERITY_ERROR)
-        f = analyze("import bge\nbge.logic.LibLoad('/home/u/lib.blend', 'Scene')\n",
-                    available=STDLIB | {"bge"}).findings
+        f = analyze("import Range\nRange.logic.LibLoad('/home/u/lib.blend', 'Scene')\n",
+                    available=STDLIB | {"Range"}).findings
         self.assertEqual(ids(f), ["WEB-PKG-004"])
         f = analyze("def g():\n  open('D:/x/y.png')\n").findings  # dentro de funcao: so potencial
         self.assertEqual(f[0].severity, SEVERITY_WARNING)
