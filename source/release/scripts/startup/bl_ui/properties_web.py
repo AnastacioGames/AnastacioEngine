@@ -293,6 +293,7 @@ classes = (
     SCENE_OT_range_web_validate,
     SCENE_OT_range_web_locate,
     SCENE_OT_range_web_export,
+    SCENE_OT_range_web_import_preflight,
     SCENE_PT_range_web,
 )
 
