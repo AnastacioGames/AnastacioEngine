@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Release 0.4.0
+
+- Versão do splash atualizada para 0.4.0 (`wm.py`). Pacote Windows `AnastacioEngine-0.4.0-windows-x64.zip` montado a partir de `build/bin/` e validado extraindo o ZIP: `RangeEngine.exe` e `RangeRuntime.exe` (com `demos/Example_ImgGui`) iniciam, sem erros SideBySide.
+- Correção de empacotamento: a `0.3.0` levava DLLs do VC++ soltas ao lado do `.exe` além de `blender.crt/`; com elas o `RangeRuntime.exe` sai com código 11 ao abrir um `.range`. A `0.4.0` não as inclui.
+- `RangeArmor-0.4.0-windows-x64.zip` é o mesmo conteúdo da 0.3.0, só renomeado para acompanhar a versão.
+- O pacote Linux `0.4.0` precisa ser compilado na máquina Linux e anexado à release com `gh release upload`.
+
 ## 2026-09-18 - Web: sombreamento com lâmpadas e profundidade no navegador
 
 - `gpu_shader_material.glsl`: `shade_cooktorr_spec` usa piso `max(rough * rough, 0.001)`, como `shade_phong_spec`. Com Roughness 0 o cálculo dava 1/0 e depois 0 * inf = NaN; o desktop absorve o NaN no `max()`, mas ANGLE/WebGL propaga e o objeto ficava preto sob luz GLSL. Vale também no desktop, mas só para roughness abaixo de cerca de 0,03 (antes indefinido). Confirmado no navegador com `bom_cubo.blend` (cubo com textura difusa, normal map, Sun e Point).

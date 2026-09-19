@@ -45,7 +45,7 @@ No GitHub, mantenha o código-fonte no repositório e anexe o ZIP à Release com
 `build/dist/` é a área local de entrega. Ela é ignorada pelo Git e contém somente arquivos finais
 prontos para anexar a uma GitHub Release; **nunca** deve ser commitada como código-fonte.
 
-A partir da versão `0.3.0`, os artefatos Windows são:
+A partir da versão `0.3.0` (exemplo abaixo na `0.4.0`), os artefatos Windows são:
 
 ```text
 build/dist/
@@ -69,6 +69,8 @@ Convenção anterior (até `0.2.0`): um único
 `AnastacioEngine-<versao>-windows-x64-with-RangeArmor.zip` com a RangeArmor embutida. Descontinuada a
 partir de `0.3.0` em favor do asset separado acima.
 
+**Não copie `concrt140.dll`, `msvcp140*.dll`, `vcruntime140.dll` nem `vccorlib140.dll` soltos ao lado do `.exe`**: além de não resolverem a dependência, com eles presentes o `RangeRuntime.exe` encerra com código 11 ao abrir um `.range` (o `RangeEngine.exe` continua abrindo). A `0.3.0` foi publicada assim; a `0.4.0` usa só `blender.crt/` + `ucrtbase.dll`.
+
 A criação dos ZIPs deve preservar o build original. Primeiro monte as pastas descartáveis em
 `build/release-staging/`, valide que `RangeEngine.exe`, `RangeRuntime.exe` e, no pacote ampliado, o
 `RangeArmor Panel.exe` e `release/launcher/Launcher.exe` existem. Depois compacte para `build/dist/`
@@ -87,6 +89,6 @@ do pacote e que os scripts, datafiles e DLLs necessários continuam presentes.
 
 ## Linux x86_64
 
-Publicado a partir da versão `0.3.0` como `AnastacioEngine-0.3.0-linux-x64.tar.gz`, com o conteúdo
+Publicado a partir da versão `0.3.0` como `AnastacioEngine-<versao>-linux-x64.tar.gz`, com o conteúdo
 completo de `build-linux/bin/` e `SHA256SUMS.txt` na mesma release. Validado em máquina Linux limpa (fora
 do WSL) antes da publicação — ver `docs/changelog.md` (entradas de 2026-09-15).
