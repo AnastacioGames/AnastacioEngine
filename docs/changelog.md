@@ -13,8 +13,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Segunda rodada (mesmo método): `SyntaxError` no controller -> `WEB-PY-009`; mensagem com aspas, quebra de linha,
   Unicode (acentos e japonês) e 3000 caracteres chegou íntegra ao relatório (3028 caracteres, sem truncar);
   o mesmo erro em 3 objetos gerou 3 eventos distintos.
-- Ainda sem teste de runtime: exceção em componente/callback, falha de vertex/link, importação de relatório de
-  versão antiga/nova/desconhecida no editor e execução sem pré-voo.
+- Terceira rodada: exceção em `start()` de componente Python (`KX_PythonComponent`) e em callback `pre_draw`
+  geraram evento `python` com `exception_type` RuntimeError e traceback -> `WEB-PY-009` ERROR (o callback repete
+  o evento a cada frame).
+- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL), importação de
+  relatório de versão antiga/nova/desconhecida no editor e execução sem pré-voo.
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
