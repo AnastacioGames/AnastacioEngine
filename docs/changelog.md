@@ -4,6 +4,26 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: gamepad — sensores de joystick avaliam pelo estado vivo do SDL
+
+- Sintoma (teste do patch do SDL2 no navegador): o D-pad exigia vários toques e, quando respondia, o cubo ficava
+  girando sem parar. O monitor `navigator.getGamepads()` injetado numa cópia do pacote mostrou que o navegador
+  entregava tudo certo (mapeamento "Standard Gamepad", eixo 0 em rampa e voltando a 0, `timestamp` avançando),
+  então o patch do SDL2 não era a causa.
+- Causa raiz: `SCA_JoystickSensor` só avalia quando `DEV_Joystick::IsTrigAxis()`/`IsTrigButton()` estão ligados, e
+  essas flags só subiam ao consumir um evento SDL em `HandleEvents`. No Web o `SDL_PollEvent` do GHOST drena esses
+  eventos antes (mesma raiz da fila compartilhada das entradas de 2026-09-14): evento de apertar perdido = vários
+  toques; evento de soltar perdido = sensor nunca vê a soltura. A correção de 14/09 só trocou a leitura do valor
+  (`SDL_GameControllerGetAxis`), o gate por evento ficou.
+- Fix (`DEV_JoystickEvents.cpp`, `DEV_Joystick.h/.cpp`): `SyncLiveState()` compara eixos e botões vivos do SDL com
+  o quadro anterior ao fim de `HandleEvents` e liga as flags mesmo sem evento. Semântica nativa inalterada.
+- Confirmado pelo usuário com controle físico no navegador (runtime `build-web-release` religado). Regressão geral
+  (render, sombras, teclado, console sem erro vermelho), World Status no editor, export Web e idioma também
+  aceitos. Não testado: save (IDBFS), pois a cena de teste não tem save.
+- Observação: um segundo controle ("USB Joystick", vendor 0079 produto 0006) chega ao navegador com `mapping=""`,
+  12 botões, 10 eixos e D-pad como hat no eixo 9 (repouso 3.29). O SDL pode não mapear o hat sem uma entrada no
+  banco de controles; não foi reproduzido nem tratado.
+
 ## 2026-09-20 - Web: patch do SDL2 (gamepad) versionado
 
 - Novo `tools/web/patch-sdl2-gamepad.py`: aplica no cache do emsdk (SDL 2.32.10,
