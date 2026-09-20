@@ -2,6 +2,12 @@
 
 Preparado em 2026-09-20 para execução pelo Claude, a partir da análise somente leitura do runtime Web. Este documento é um roteiro, não comprovação de implementação. As constatações estáticas devem ser reconferidas contra a revisão efetivamente trabalhada.
 
+## Estado de execução (2026-09-20)
+
+- **M0 implementado, validação de navegador pendente** no commit `1c9d1562`: o manifesto passou a declarar `bge` e `aud` condicionado a `WITH_AUDASPACE`; o pré-voo exige WebGL 2 e reprova abort, falha e inicialização incompleta; o empacotador registra essas condições. A suite `tools/tests/web_profile` passou com 83 testes. Falta exportar/executar um pacote Web real.
+- **M1 parcialmente implementado, não concluído** no commit `8251b0dc`: falhas de compilação/link do shader comum em WebGL emitem `Module.onDiagnostic` estruturado, com operação, estágio, origem e log; a origem do material/world agora é propagada de `GPU_generate_pass`. `package-web.py` grava relatório v2 e conserva a heurística como fallback; `preflight.py` aceita v1/v2. O lado Python, os shaders especiais/filtros e a execução Web real ainda faltam.
+- **Validação feita para o checkpoint M1:** `python -m unittest tools.tests.web_profile.test_preflight -v` (11 testes), `py_compile` dos scripts Python alterados e `git diff --check`, todos aprovados. Uma tentativa de build não é evidência: o diretório `build-android` da worktree apontava para a árvore principal, portanto não compilou este diff. Reconfigurar um build Web limpo da worktree antes de compilar.
+
 ## Instrução para o Claude
 
 Execute este plano por marcos, seguindo `AGENTS.md`. Comece pelo M0. Preserve mudanças existentes no workspace. Implemente e valide uma peça autocontida por vez; antes de avançar entre peças grandes ou arriscadas de C++, apresente o resultado e peça confirmação, conforme a regra do repositório, salvo autorização explícita do usuário para execução autônoma.
@@ -46,7 +52,7 @@ Estimativas em dias de trabalho de um desenvolvedor familiarizado com o projeto;
 
 Sequência principal: M0 → M1 → M2 → M3. M4 depende das medições de M3; M5/M6 dependem do jogo. Fazer a triagem dos riscos R1–R3 antes de encerrar a rodada; uma falha reproduzida que aborte o runtime ou perca dados pode exigir reordenar as prioridades.
 
-## M0 — Tornar confiáveis as informações de compatibilidade
+## M0 — Tornar confiáveis as informações de compatibilidade (implementado; validação Web pendente)
 
 ### Problemas encontrados
 
@@ -72,7 +78,7 @@ Arquivos principais: `tools/web/make-runtime-manifest.py`, `tools/web/package-we
 - Relatório válido continua importável pelo fluxo existente.
 - Ampliar testes pertinentes em `tools/tests/web_profile/`, especialmente `test_runtime.py`, `test_range_web.py`, `test_preflight.py` e `test_preflight_run.py`; executar o fluxo real de exportação/pré-voo.
 
-## M1 — Diagnósticos estruturados de shader e Python
+## M1 — Diagnósticos estruturados de shader e Python (parcial: shader comum)
 
 ### Decisão de arquitetura
 
