@@ -331,7 +331,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 
 
 SERVE_PY = '''#!/usr/bin/env python3
-"""Servidor local para testar o pacote Web: python serve.py [porta]"""
+"""Servidor local para testar o pacote Web: python serve.py [porta] (0 = porta livre)"""
 import functools
 import http.server
 import os
@@ -354,10 +354,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-print(f"Servindo em http://localhost:{port}/  (Ctrl+C para parar)")
+port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080  # 0 escolhe uma porta livre
 handler = functools.partial(Handler, directory=ROOT)
-http.server.ThreadingHTTPServer(("", port), handler).serve_forever()
+server = http.server.ThreadingHTTPServer(("", port), handler)
+print(f"Servindo em http://localhost:{server.server_address[1]}/  (Ctrl+C para parar)", flush=True)
+server.serve_forever()
 '''
 
 HOSTING_MD = """# Hospedagem do pacote Web

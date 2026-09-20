@@ -4,6 +4,14 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: "Abrir no navegador" com um clique
+
+- Novo botão **Abrir no navegador** (servidor local em thread daemon, porta livre, `range_web/local_server.py`),
+  **Parar servidor**, linha de estado e opção **Abrir após exportar**. Botões de servir e de pré-voo usam `poll`
+  e mostram o motivo no painel quando o ambiente não está pronto (sem pacote, pacote desatualizado, sem
+  Chrome/Edge). `serve.py` do pacote aceita porta 0. Testes: `test_local_server.py` (78 unitários OK) e
+  `engine_web_serve.py`. O pré-voo mantém seu servidor próprio, de propósito.
+
 ## 2026-09-20 - Web: fluxo do editor aceito pelo usuário
 
 - Teste manual no editor concluído (Validar, Exportar Web, Testar pacote no navegador, Importar pré-voo, bloqueio

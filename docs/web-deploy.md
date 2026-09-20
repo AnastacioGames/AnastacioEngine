@@ -30,6 +30,14 @@ python tools/web/package-web.py --game caminho/jogo.range --name meu-jogo --vers
 
 ## Testar localmente
 
+**No editor (recomendado):** em Properties > Scene > Web (Range), **Abrir no navegador** sobe um servidor local numa
+porta livre e abre o jogo no navegador padrão (clique em **Jogar**). O botão só fica ativo com o pacote exportado e
+atualizado em relação ao `.range` salvo; caso contrário o painel mostra o motivo. **Parar servidor** encerra
+(o servidor também morre com o editor). A opção **Abrir após exportar** faz isso ao fim do Exportar Web.
+**Testar pacote no navegador** (pré-voo) também só libera com pacote e Chrome/Edge disponíveis.
+
+Na linha de comando:
+
 ```
 cd build-web/dist/meu-jogo && python serve.py 8080
 ```

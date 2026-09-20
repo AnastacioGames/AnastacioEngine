@@ -31,3 +31,9 @@ Abra `build/bin/RangeEngine.exe`, depois `File > Open` este `.range`. Painel: **
 - [OK] **Localizar** num resultado seleciona o objeto/cena de origem.
 
 Anote o que falhar (texto exato da mensagem) e me passe.
+
+## 6. Abrir no navegador (novo)
+- [ ] Sem `web/` exportado, **Abrir no navegador** aparece apagado e o painel explica por quê.
+- [ ] Após Exportar Web, o botão libera; clicar abre o navegador padrão com o jogo (clique em **Jogar**).
+- [ ] Salve o `.range` de novo sem exportar: o botão apaga com "desatualizado".
+- [ ] **Parar servidor** faz a página parar de carregar ao recarregar. Feche o editor: a porta é liberada.
