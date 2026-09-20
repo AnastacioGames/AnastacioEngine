@@ -13,7 +13,7 @@ from pathlib import Path
 out_dir = Path(__file__).resolve().parents[1] / 'build-web' / 'bin'
 out_dir.mkdir(parents=True, exist_ok=True)
 
-# RENDER_OFF=rot,shadow,ao,mist,glsl,alpha (lista) desliga recursos para isolar defeitos do runtime.
+# RENDER_OFF=rot,shadow,ao,mist,glsl,alpha,spec,smooth (lista) desliga recursos para isolar defeitos do runtime.
 OFF = set(filter(None, os.environ.get('RENDER_OFF', '').split(',')))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -81,7 +81,10 @@ def add(kind, name, loc, m, **kw):
 
 floor = add('plane', 'Floor', (0, 0, 0), mat('Floor', (0.6, 0.6, 0.6)), radius=40)
 add('cube', 'Cube', (-2.5, 0, 1), mat('Red', (0.8, 0.1, 0.1), spec=0.8))
-add('uv_sphere', 'Sphere', (0, 0, 1), mat('Metal', (0.8, 0.8, 0.9), spec=1.0))
+sph = add('uv_sphere', 'Sphere', (0, 0, 1), mat('Metal', (0.8, 0.8, 0.9), spec=0.0 if 'spec' in OFF else 1.0))
+if 'smooth' in OFF:
+    for p in sph.data.polygons:
+        p.use_smooth = True
 add('cube', 'Glass', (2.5, -2, 1), mat('Glass', (0.2, 0.7, 0.9), spec=0.5, alpha=0.4))
 add('cone', 'Far', (0, 12, 1), mat('Far', (0.1, 0.7, 0.2)))
 
@@ -98,7 +101,8 @@ tex = bpy.data.textures.new('Checker', 'IMAGE')
 tex.image = img
 slot = floor.data.materials[0].texture_slots.add()
 slot.texture = tex
-slot.texture_coords = 'UV'
+slot.texture_coords = 'ORCO'  # o plano primitivo nao tem UV
+tex.repeat_x = tex.repeat_y = 4
 
 script = bpy.data.texts.new('render.py')
 script.write('''import Range
