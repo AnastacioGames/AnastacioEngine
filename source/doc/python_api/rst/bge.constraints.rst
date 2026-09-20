@@ -208,6 +208,21 @@ Functions
    :arg numiter: New number of iterations.
    :type numiter: int
 
+.. function:: setLinearSlop(slop)
+
+   Sets the contact penetration tolerance for the active physics scene.
+   A positive value allows objects to overlap by up to ``slop`` Blender units
+   before the Bullet solver applies positional correction. The default is ``0.0``.
+
+   This is a scene-wide solver setting: it affects every physical contact in
+   the active scene. It does not change an object's collision margin or the
+   point at which collisions are detected. Use small values appropriate to the
+   scene scale.
+
+   :arg slop: Penetration tolerance in Blender units. Use a finite,
+      non-negative value.
+   :type slop: float
+
 .. function:: setNumTimeSubSteps(numsubstep)
 
    Sets the number of substeps for each physics proceed. Tradeoff quality for performance.

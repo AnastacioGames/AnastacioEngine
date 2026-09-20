@@ -148,8 +148,9 @@ PyDoc_STRVAR(gPySetSplitImpulseTurnErp__doc__,
              );
 
 PyDoc_STRVAR(gPySetLinearSlop__doc__,
-             "setLinearSlop(float numiter)\n"
-             "Defines the penetration depth for object collisions. A value of 1 equals to 1 world unit penetration depth (overlapping)."
+             "setLinearSlop(float slop)\n"
+             "Sets the contact penetration tolerance for the active physics scene. "
+             "A value of 1 allows up to 1 world unit of overlap before the solver corrects it."
              );
 
 PyDoc_STRVAR(gPySetWarmstartingFactor__doc__,
