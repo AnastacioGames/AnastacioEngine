@@ -24,9 +24,10 @@ Pendências que só o clique na UI ou um material GLSL real fecham. Use o `edito
 2. Sirva (`python serve.py 8080`) e abra a página **sem** `?preflight=1`.
 3. Esperado: o jogo roda igual, sem erro no console causado pelo relatório, e `window.rangePreflight` não é exigido.
 
-## C. Falha de vertex/link de shader (não testado)
+## C. Falha de vertex/link de shader (vertex testado em 2026-09-20; ver changelog)
 Só o fragment do Filter2D foi exercitado. O `shader_quebrado.py` (nesta pasta) injeta um vertex shader inválido
 via `getShader().setSource()`, sem montar material pela UI.
+0. Atalho: `criar_m1c.py` (`RangeEngine.exe -b --python criar_m1c.py`) gera o `m1c-shader.range` pronto.
 1. Copie `shader_quebrado.py` para a pasta do seu `.range` de teste (mesma pasta do arquivo).
 2. No `.range`: um Cubo com **qualquer material** (Game Engine > Shading: GLSL). Logic Editor: Sensor **Always**
    (Pulse desligado) > Controller **Python**, Modo **Module**, `shader_quebrado.quebrar` > sem atuador.

@@ -33,7 +33,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   WEB-PKG-003 "Módulo não foi encontrado: scripts". O coletor tratava `comp.module` como "modulo.funcao" e cortava o
   último segmento; corrigido com `is_module=True` em `collect_bpy.py`, com teste em `test_collect.py`. Ainda não
   reconferido no editor.
-- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL).
+- Falha de vertex de `BL_Shader` testada em runtime (`criar_m1c.py` + `shader_quebrado.py`, headless): o log chega ao relatório e vira `WEB-GFX-002`, mas pelo fallback de texto do console: `stage` "?" e `material` vazio, porque o `GPUShader: compile error:` não passa por `Module.onDiagnostic`. Lacuna aberta: emitir diagnóstico estruturado (estágio e material) no caminho `GPUShader`/`BL_Shader`. Link e materiais de nós não testados.
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
