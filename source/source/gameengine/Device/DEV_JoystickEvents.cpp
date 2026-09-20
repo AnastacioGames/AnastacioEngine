@@ -57,6 +57,35 @@ void DEV_Joystick::OnNothing(SDL_Event *sdl_event)
 	m_istrig_axis = m_istrig_button = 0;
 }
 
+/* The sensors only evaluate when IsTrigAxis()/IsTrigButton() is set, and those were only set by
+ * consuming an SDL event. On the Web build GHOST's unfiltered SDL_PollEvent() can drain the
+ * controller events first (see below), so a press or a release could be missed: the axis sensor
+ * then either needed several presses or never saw the release (input stuck active, cube spinning).
+ * The live state is authoritative (same source GetAxisPosition()/aButtonPressIsPositive() read),
+ * so any change since the previous frame raises the flags even if the event itself was lost. */
+void DEV_Joystick::SyncLiveState()
+{
+	if (!m_private->m_gamecontroller || SDL_GameControllerGetAxis == (void *)0 || SDL_GameControllerGetButton == (void *)0) {
+		return;
+	}
+
+	for (int i = 0; i < JOYAXIS_MAX && i < SDL_CONTROLLER_AXIS_MAX; i++) {
+		const int value = SDL_GameControllerGetAxis(m_private->m_gamecontroller, (SDL_GameControllerAxis)i);
+		if (value != m_live_axis[i]) {
+			m_live_axis[i] = value;
+			m_istrig_axis = 1;
+		}
+	}
+
+	for (int i = 0; i < 32 && i < SDL_CONTROLLER_BUTTON_MAX; i++) {
+		const bool down = SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)i) != 0;
+		if (down != m_live_button[i]) {
+			m_live_button[i] = down;
+			m_istrig_button = 1;
+		}
+	}
+}
+
 /* SDL has a single process-wide event queue. GHOST_SystemSDL::processEvents() also
  * polls that same queue for keyboard/mouse/window events. A bare SDL_PollEvent() loop
  * here would drain and silently discard every pending event of every type (see the
@@ -178,6 +207,13 @@ bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 			}
 		}
 	}
+
+	for (int i = 0; i < JOYINDEX_MAX; i++) {
+		if (DEV_Joystick::m_instance[i]) {
+			DEV_Joystick::m_instance[i]->SyncLiveState();
+		}
+	}
+
 	return remap;
 }
 #endif /* WITH_SDL */

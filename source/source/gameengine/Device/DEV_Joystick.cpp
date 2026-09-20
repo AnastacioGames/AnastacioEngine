@@ -94,6 +94,10 @@ DEV_Joystick::DEV_Joystick(short index)
 {
 	for (int i = 0; i < JOYAXIS_MAX; i++) {
 		m_axis_array[i] = 0;
+		m_live_axis[i] = 0;
+	}
+	for (int i = 0; i < 32; i++) {
+		m_live_button[i] = false;
 	}
 
 #ifdef WITH_SDL

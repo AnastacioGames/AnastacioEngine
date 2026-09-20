@@ -72,6 +72,10 @@ class DEV_Joystick
 	 *support for JOYAXIS_MAX axes (in pairs)
 	 */
 	int m_axis_array[JOYAXIS_MAX];
+
+	/** live SDL state seen on the previous frame, see SyncLiveState() */
+	int m_live_axis[JOYAXIS_MAX];
+	bool m_live_button[32];
 	
 	/**
 	 * Precision or range of the axes
@@ -100,6 +104,7 @@ class DEV_Joystick
 	void OnAxisEvent(SDL_Event *sdl_event);
 	void OnButtonEvent(SDL_Event *sdl_event);
 	void OnNothing(SDL_Event *sdl_event);
+	void SyncLiveState();
 		
 #endif /* WITH_SDL */
 	/**
