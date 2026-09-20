@@ -4,6 +4,16 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Marco G: normal map .dds conferido no runtime Web
+
+- `tools/create_web_normalmap_scene.py` abre `source/release/datafiles/startup.blend` (cubo e plano com
+  `projects-teste/cubo_normal.dds`, DXT1 256x256, como normal map), empacota as imagens e gera
+  `build-web/bin/web-normalmap.range`, para rodar igual no desktop e no pacote Web (8211).
+- **O usuário aceitou o resultado no Web** ("positivo"), o que fecha o item aberto do normal map `.dds`. Uma
+  primeira versão com cubos próprios ficou ruim para comparar e foi substituída pela cena do startup.blend.
+- O aviso `glBlitFramebuffer` depth/stencil não apareceu em Chrome headless (`debug=1`) nos pacotes 8201–8208
+  e 8210; segue sem reprodução.
+
 ## 2026-09-19 - Marco G: módulo Python `aud` no runtime Web
 
 - O `audaspace-py` passou a ser compilado no Emscripten (antes `AUD_PyInit.cpp` devolvia um módulo vazio). Ajustes:
