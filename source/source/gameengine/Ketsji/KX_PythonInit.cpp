@@ -2340,7 +2340,112 @@ PyMODINIT_FUNC initRANGE()
 	addSubModule(modules, mod, initImguiPythonBinding(), "Range.imgui");
 	addSubModule(modules, mod, initVideoTexturePythonBinding(), "Range.texture");
 
+	/* Keep projects authored for BGE/UPBGE working without modifying their scripts.
+	 * The aliases deliberately share the Range module objects, so state such as
+	 * bge.logic.globalDict is identical when a project imports both spellings. */
+	PyDict_SetItemString(modules, "bge", mod);
+	PyDict_SetItemString(modules, "bge.application", PyDict_GetItemString(modules, "Range.application"));
+	PyDict_SetItemString(modules, "bge.constraints", PyDict_GetItemString(modules, "Range.constraints"));
+	PyDict_SetItemString(modules, "bge.events", PyDict_GetItemString(modules, "Range.events"));
+	PyDict_SetItemString(modules, "bge.logic", PyDict_GetItemString(modules, "Range.logic"));
+	PyDict_SetItemString(modules, "bge.render", PyDict_GetItemString(modules, "Range.render"));
+	PyDict_SetItemString(modules, "bge.types", PyDict_GetItemString(modules, "Range.types"));
+	PyDict_SetItemString(modules, "bge.imgui", PyDict_GetItemString(modules, "Range.imgui"));
+	PyDict_SetItemString(modules, "bge.texture", PyDict_GetItemString(modules, "Range.texture"));
+
 	return mod;
+}
+
+/* Python 3.10 moved the collection ABCs to collections.abc.  A fair amount of
+ * BGE/UPBGE content bundles older third-party modules (for example TinyTag)
+ * which still imports them from collections, as Python 3.9 and older allowed.
+ * Restore only the removed aliases on the standard module, keeping modern
+ * scripts and the collections.abc implementations themselves unchanged. */
+static void installLegacyCollectionsAliases()
+{
+	static const char *const names[] = {
+		"Awaitable", "Coroutine", "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+		"Hashable", "Iterable", "Iterator", "Reversible", "Generator", "Sized",
+		"Container", "Collection", "Callable", "Set", "MutableSet", "Mapping",
+		"MutableMapping", "MappingView", "KeysView", "ItemsView", "ValuesView",
+		"Sequence", "MutableSequence", nullptr};
+
+	PyObject *collections = PyImport_ImportModule("collections");
+	PyObject *collectionsABC = PyImport_ImportModule("collections.abc");
+	int restored = 0;
+	if (!collections || !collectionsABC) {
+		Py_XDECREF(collections);
+		Py_XDECREF(collectionsABC);
+		PyErr_Clear();
+		return;
+	}
+
+	for (const char *const *name = names; *name; ++name) {
+		PyObject *existing = PyObject_GetAttrString(collections, *name);
+		if (existing) {
+			Py_DECREF(existing);
+			continue;
+		}
+		PyErr_Clear();
+
+		PyObject *alias = PyObject_GetAttrString(collectionsABC, *name);
+		if (alias) {
+			if (PyObject_SetAttrString(collections, *name, alias) == 0) {
+				restored++;
+			}
+			else {
+				PyErr_Clear();
+			}
+			Py_DECREF(alias);
+		}
+		else {
+			PyErr_Clear();
+		}
+	}
+
+	Py_DECREF(collectionsABC);
+	Py_DECREF(collections);
+
+	if (restored) {
+		CM_Warning("Python compatibility: restored " << restored
+			       << " legacy collections aliases from collections.abc.");
+	}
+}
+
+/* Audaspace renamed its Python-facing Factory type to Sound. The underlying
+ * object and its API are the same: Sound(filename), Sound.buffer(sound), etc.
+ * Keeping the former name lets older BGE projects retain their audio scripts. */
+static void installLegacyAudFactoryAlias()
+{
+	PyObject *aud = PyImport_ImportModule("aud");
+	if (!aud) {
+		PyErr_Clear();
+		return;
+	}
+
+	PyObject *factory = PyObject_GetAttrString(aud, "Factory");
+	if (factory) {
+		Py_DECREF(factory);
+		Py_DECREF(aud);
+		return;
+	}
+	PyErr_Clear();
+
+	PyObject *sound = PyObject_GetAttrString(aud, "Sound");
+	if (sound) {
+		if (PyObject_SetAttrString(aud, "Factory", sound) == 0) {
+			CM_Warning("Python compatibility: exposed legacy aud.Factory as aud.Sound.");
+		}
+		else {
+			PyErr_Clear();
+		}
+		Py_DECREF(sound);
+	}
+	else {
+		PyErr_Clear();
+	}
+
+	Py_DECREF(aud);
 }
 
 /* minimal required range modules to run the player */
@@ -2515,6 +2620,8 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	PyObject *mod = initRANGE();
 	PyDict_SetItemString(modules, "Range", mod);
 	Py_DECREF(mod);
+	installLegacyCollectionsAliases();
+	installLegacyAudFactoryAlias();
 
 	EXP_PyObjectPlus::NullDeprecationWarning();
 

@@ -84,6 +84,15 @@ ferramenta correspondente.
 
 ### Runtime e ferramentas
 
+- Compatibilidade de scripts BGE/UPBGE: `import bge` e seus submódulos (`bge.logic`, `bge.events`,
+  `bge.types`, `bge.constraints`, `bge.render`, `bge.application`, `bge.imgui` e `bge.texture`) são aliases
+  dos mesmos objetos de `Range`. Jogos legados podem rodar sem renomear esses imports; scripts novos devem
+  continuar usando `Range`.
+- Compatibilidade Python legada: a inicialização do jogo restaura em `collections` as ABCs que o Python
+  moderno moveu para `collections.abc` (inclusive `MutableMapping`). Dependências antigas como TinyTag
+  podem manter `from collections import MutableMapping`, sem modificação dentro de cada projeto. O console
+  expõe `aud.Factory` como alias de `aud.Sound`, para scripts de áudio BGE antigos. O console informa quando
+  algum alias de compatibilidade foi aplicado.
 - `External Files` registra bibliotecas sem misturá-las a Links/Appends
   normais, inclusive quando o conteúdo é um Group. O Outliner lista seus
   datablocks `Text`; uma dependência ausente é marcada como quebrada e pode

@@ -30,6 +30,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Range.logic`), preservando também estado compartilhado como `globalDict` quando um projeto usa as duas
   grafias. Scripts legados com `import bge`, `import bge.logic` ou `from bge import events` não precisam
   ser editados; a documentação para código novo continua sendo `import Range`.
+- A mesma inicialização restaura em `collections` os aliases de ABCs removidos no Python 3.10 e mantidos em
+  `collections.abc` (`MutableMapping`, `Mapping`, `Sequence`, `Iterable` e relacionados). Isso permite
+  dependências antigas embutidas em jogos, como TinyTag, sem alterar seus fontes; os objetos continuam sendo
+  as implementações padrão de `collections.abc`.
+- `aud.Factory` volta a existir como alias de `aud.Sound`. A chamada antiga `aud.Factory(arquivo)` e seus métodos,
+  como `buffer`, usam o mesmo tipo atual e não exigem editar o jogo. O console informa os aliases de
+  compatibilidade que forem aplicados.
 
 ## 2026-09-19 - Marco G: sombra de spot (buffer) no runtime Web
 
