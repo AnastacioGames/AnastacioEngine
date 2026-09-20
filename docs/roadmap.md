@@ -22,8 +22,8 @@ Aberto:
 
 - **Patch do SDL2/Emscripten** (gate de timestamp do gamepad): versionado em `tools/web/patch-sdl2-gamepad.py`
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
-  corrigido em `DEV_Joystick`, ver changelog). Aberto: controle sem mapeamento standard ("USB Joystick", D-pad como
-  hat no eixo 9) não tratado; save (IDBFS) sem teste manual nesta rodada ([roteiro](web-sdl2-gamepad-test.md)).
+  corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat
+  no eixo 9) e save (IDBFS) testados e aceitos pelo usuário em 2026-09-20 ([roteiro](web-sdl2-gamepad-test.md)).
 - **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
