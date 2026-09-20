@@ -29,6 +29,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   aberta sem `?preflight=1`, jogo renderizou e o console mostrou só avisos habituais (emulação GL, ScriptProcessorNode),
   sem erro. Achado: nome de arquivo com espaço (`melhores graficos .range`) é recusado no export
   ("nome do arquivo do jogo invalido para o FS virtual"); o editor só reporta isso na falha do empacotador.
+- Bug achado pelo usuário: component em `scripts/` (módulo `scripts.cinematic_lighting_component`) virava
+  WEB-PKG-003 "Módulo não foi encontrado: scripts". O coletor tratava `comp.module` como "modulo.funcao" e cortava o
+  último segmento; corrigido com `is_module=True` em `collect_bpy.py`, com teste em `test_collect.py`. Ainda não
+  reconferido no editor.
 - Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL).
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
