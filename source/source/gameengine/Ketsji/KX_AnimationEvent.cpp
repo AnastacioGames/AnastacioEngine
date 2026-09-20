@@ -26,6 +26,7 @@
 
 #include "KX_AnimationEvent.h"
 #include "EXP_Value.h"
+#include "EXP_PythonCallBack.h"
 
 KX_AnimationEvent::KX_AnimationEvent(const char *actionName, std::vector<std::pair<int, const char*>> *triggers, std::vector<int> *alreadyTriggered, const char *pythonEvent)
 	:EXP_Value(),
@@ -54,6 +55,7 @@ KX_AnimationEvent::KX_AnimationEvent(const char *actionName, std::vector<std::pa
 
 		module = PyImport_ImportModule(mod_path.c_str());
 		if (!module) {
+			EXP_ReportPythonDiagnostic("animation.event.import", mod_path.c_str());
 			PyErr_Print();
 			PyErr_Clear();
 
@@ -61,6 +63,7 @@ KX_AnimationEvent::KX_AnimationEvent(const char *actionName, std::vector<std::pa
 		}
 		function = PyObject_GetAttrString(module, function_string.c_str());
 		if (!function) {
+			EXP_ReportPythonDiagnostic("animation.event.function", function_string.c_str());
 			PyErr_Print();
 			PyErr_Clear();
 			Py_DECREF(module);
