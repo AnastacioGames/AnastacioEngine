@@ -1,8 +1,8 @@
 # Web — empacotamento e hospedagem
 
-Estado em 2026-09-18: empacotador e verificador implementados e exercitados com `web-smoke.range`.
-Ainda **não** integrados à interface da Range Engine (ver [web-profile-validation-plan.md](web-profile-validation-plan.md),
-marco F) e o runtime tem preset de release (`web-runtime-release`).
+Estado em 2026-09-20: empacotador, verificador e integração ao editor (Exportar Web) implementados; deploy no GitHub Pages
+aceito em Chrome, Edge, Firefox e celular. Falta só o teste manual do fluxo no editor (ver
+[web-profile-validation-plan.md](web-profile-validation-plan.md)). O runtime tem preset de release (`web-runtime-release`).
 
 ## Pré-voo no navegador
 
