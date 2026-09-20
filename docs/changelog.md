@@ -18,7 +18,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   o evento a cada frame).
 - Importação de relatório por arquivo (`load_preflight`, sem bpy): versão 1 e 2 são lidas (`WEB-PY-009` com
   `python_errors`); versão 3, ausente ou não numérica degrada para um único `WEB-DEPLOY-002`. Os 30 testes
-  `test_preflight*` passam. Não foi feito o clique na UI do editor, só a camada de leitura.
+  `test_preflight*` passam.
+- Importação pela UI do editor (roteiro `projects-teste/teste-editor-web/ROTEIRO-M1.md`, passos A.1 a A.6, feitos pelo
+  usuário): versão 1 e 2 mostram `WEB-PY-009`; versão 3 mostra um único `WEB-DEPLOY-002`; importar `pf-ok.json`
+  limpa os resultados do pré-voo anterior. Resultado importado não tem **Locate** (o `origin` é só texto).
+  Um build antigo (só versão 1) rejeitava a versão 2: abrir o `RangeEngine.exe` da worktree.
+- Painel Web: mensagem e traceback com quebras de linha apareciam como quadrados; agora uma linha por label
+  (`properties_web.py`). Ainda não conferido visualmente.
 - Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL). Execução sem
   pré-voo só tem cobertura unitária (`test_preflight_run.py`).
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.

@@ -1,0 +1,2 @@
+{"schema": "range-web-preflight",
+ "python_errors": [{"kind": "ValueError", "text": "m1-injected-exception", "context": "controller", "origin": "Cube", "traceback": "Traceback (most recent call last):\n  File \"boom.py\", line 2, in <module>\nValueError: m1-injected-exception"}]}
