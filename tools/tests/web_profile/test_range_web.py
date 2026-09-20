@@ -46,8 +46,8 @@ class ResultsTest(unittest.TestCase):
 
     def test_summary_never_guarantees(self):
         r = Report()
-        self.assertEqual(r.summary(), "Nenhuma incompatibilidade detectada")
-        self.assertNotIn("garant", r.summary().lower())
+        self.assertEqual(r.summary(), "No incompatibility detected")
+        self.assertNotIn("guarant", r.summary().lower())
         r.add(Finding("X", SEVERITY_WARNING, EVIDENCE_POTENTIAL, "m"))
         self.assertFalse(r.blocks_export)
         r.add(Finding("Y", SEVERITY_ERROR, EVIDENCE_CONFIRMED, "m"))

@@ -4,6 +4,32 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Idioma: English + Português (i18n do editor)
+
+- O editor passa a compilar com `WITH_INTERNATIONAL`: o submódulo `locale` do Blender 2.79 não existia e o
+  CMake desligava a opção sozinho (o alvo `msgfmt` sumia do Ninja). Vendorizado só o necessário em
+  `source/release/datafiles/locale` (`po/pt_BR.po`, `po/pt.po` e um `languages` reduzido a Default/English/pt_BR/pt_PT;
+  origem e commit em `locale/README.md`, branch `blender-v2.79-release` de `blender/blender-translations`). O
+  menu de idioma lista só o que existe.
+- Correções que o i18n ligado expôs: `interface_style.c` ainda usava `datatoc_bfont_ttf`/`bmonofont` (fontes trocadas
+  por Roboto neste fork) → agora `roboto_medium`/`roboto_mono_medium`; o `install()` gravava o catálogo como
+  `RangeEngine.mo` mas o código carrega o domínio `blender` (`TEXT_DOMAIN_NAME`) → `RENAME blender.mo`;
+  `blenderplayer/.../stubs.c` duplicava `BPY_app_translations_py_pgettext` (guardado com `#ifndef WITH_BLENDER`, como
+  os demais).
+- Presets: `WITH_INTERNATIONAL` explícito (`ON` em `linux-editor`; `OFF` em `linux-runtime`, `android-runtime` e
+  `web-runtime`, que não têm editor e evitam exigir Boost).
+- Painel Web: textos em inglês (idioma-fonte); pt_BR em `range_web/translations.py`, registrado em `bl_ui.register()`.
+  Módulos puros usam `range_web/i18n.py` (`_()` traduz no editor, devolve o texto fora dele). `_open_in_browser` agora
+  devolve `(ok, mensagem)` em vez de o operador testar o começo do texto.
+- Espanhol (`es`) e russo (`ru_RU`) adicionados ao menu: `po/es.po`, `po/ru.po` (mesmo commit) e `range_web/translations_es_ru.py`; coberto por `engine_i18n.py`.
+- Testes: 78 unitários OK (asserções de texto atualizadas); `engine_i18n.py` novo (13 verificações: catálogo do Blender,
+  dicionário `range_web`, dica, formato `%s`, acentos, desligar tradução); os 5 `engine_*` existentes passam.
+- Padrão do Blender 2.79 mantido: tradução vem desligada (Preferências > System > **International Fonts**, depois
+  **Language** e **Interface**).
+- Não verificado: desenho na janela real (fonte Droid Sans, acentos, menu de idioma) e o Linux.
+- Fora desta entrega: mensagens das regras (`rules_*.py`, `runtime.py`, `manifest.py`, `collect.py`, `preflight.py`) ainda em
+  português; o export.py/results só traduzem o que já era texto de interface.
+
 ## 2026-09-20 - Web: "Abrir no navegador" com um clique
 
 - Novo botão **Abrir no navegador** (servidor local em thread daemon, porta livre, `range_web/local_server.py`),

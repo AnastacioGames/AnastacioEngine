@@ -182,6 +182,12 @@ portable e `RangeEngine --background --factory-startup --python-expr "import bpy
 editor de verdade (interface grafica, icones, i18n, addons Python) numa sessao com display — o teste acima
 rodou so em modo `--background`, sem GHOST/X11 nem contexto OpenGL da UI.
 
+**i18n (2026-09-20, so validado no Windows)**: o preset agora liga `WITH_INTERNATIONAL` (locale vendorizado em
+`source/release/datafiles/locale`, com so pt_BR/pt). Requer `libboost-locale-dev` (ja em `libboost-all-dev`). O
+`msgfmt` e compilado junto, nao usa o gettext do sistema. Ao recompilar, conferir que
+`build-linux-editor/bin/*/datafiles/locale/pt_BR/LC_MESSAGES/blender.mo` existe e rodar
+`RangeEngine -b --python tools/tests/web_profile/engine_i18n.py`. O seletor na janela ainda precisa de teste.
+
 O checkout atual contem apenas `lib/win64_vc15`; estas bibliotecas nao funcionam no Linux. O preset usa
 as bibliotecas da distribuicao, sem alterar `build/` nem o preset Windows.
 

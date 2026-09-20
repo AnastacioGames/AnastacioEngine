@@ -33,6 +33,19 @@ Aberto:
   Resolver caso a caso (`ImageUser.fie_ima`, `Material.seed1`/`seed2`: tipo do campo DNA vs. hardmax da RNA),
   considerando compatibilidade com `.blend` legado.
 
+### Idioma (English + Português)
+
+Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 2026-09-20). Pendente:
+
+- Conferir na janela real do Windows: Preferências > System > **International Fonts**, escolher **Language** e ligar
+  **Interface**; ver fonte, acentos e o menu (só Default, English, Português). Decidir se o padrão de fábrica deve vir
+  com a tradução ligada (hoje segue o 2.79: desligada).
+- Traduzir as mensagens das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`, `manifest.py`, `collect.py`,
+  `preflight.py`), ainda em português, e os demais textos em português da Range fora do painel Web.
+- Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
+  `libboost-all-dev`), rodar `engine_i18n.py` e conferir o seletor na janela; confirmar que o pacote leva `locale/*/LC_MESSAGES/blender.mo`.
+- Roteiros manuais citam os botões pelo nome em português; em inglês são Validate Web, Export Web, Open in browser.
+
 ### Linux x86_64
 
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver

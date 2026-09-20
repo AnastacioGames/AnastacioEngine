@@ -6,6 +6,8 @@ import http.server
 import os
 import threading
 
+from .i18n import _
+
 _SERVER = None  # (ThreadingHTTPServer, directory)
 
 
@@ -29,11 +31,11 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
 def package_problem(package_dir, source_file=None):
     """Motivo pelo qual o pacote nao pode ser servido/esta velho, ou None."""
     if not os.path.isfile(os.path.join(package_dir, "index.html")):
-        return "Pacote não encontrado em %s. Clique em Exportar Web primeiro." % package_dir
+        return _("Package not found at %s. Click Export Web first.") % package_dir
     manifest = os.path.join(package_dir, "manifest.json")
     if source_file and os.path.isfile(source_file) and os.path.isfile(manifest) \
             and os.path.getmtime(source_file) > os.path.getmtime(manifest):
-        return "O pacote está desatualizado em relação ao .range salvo. Clique em Exportar Web primeiro."
+        return _("The package is older than the saved .range. Click Export Web first.")
     return None
 
 

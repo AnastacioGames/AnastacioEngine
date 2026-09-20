@@ -55,12 +55,12 @@ class RunPreflightTests(unittest.TestCase):
     def test_unreadable_report_is_not_a_game_error(self):
         found, note = self.run_with("{nao json", timeout=20)
         self.assertIsNone(found)
-        self.assertIn("ilegível", note)
+        self.assertIn("Unreadable", note)
 
     def test_no_report_times_out_with_reason(self):
         found, note = self.run_with("none", timeout=2)
         self.assertIsNone(found)
-        self.assertIn("não enviou", note)
+        self.assertIn("did not send", note)
 
     def test_missing_browser_and_index(self):
         with tempfile.TemporaryDirectory() as d:

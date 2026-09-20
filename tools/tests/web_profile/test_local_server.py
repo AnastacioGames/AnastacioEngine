@@ -44,14 +44,14 @@ class LocalServerTest(unittest.TestCase):
 
     def test_package_problem(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertIn("Exportar Web", local_server.package_problem(tmp))
+            self.assertIn("Export Web", local_server.package_problem(tmp))
             make_package(tmp)
             self.assertIsNone(local_server.package_problem(tmp))
             src = os.path.join(tmp, "jogo.range")
             open(src, "w").close()
             future = time.time() + 100
             os.utime(src, (future, future))
-            self.assertIn("desatualizado", local_server.package_problem(tmp, src))
+            self.assertIn("older than", local_server.package_problem(tmp, src))
 
 
 if __name__ == "__main__":

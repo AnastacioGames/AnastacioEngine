@@ -256,8 +256,10 @@ def register():
 
     ########### Range Web Profile ###########
     from . import properties_web
+    from range_web import translations as range_web_translations
 
     Scene.range_web = PointerProperty(type=properties_web.RangeWebSettings)
+    range_web_translations.register()
     ########### End Range Web Profile ###########
 
 
@@ -265,6 +267,8 @@ def unregister():
     from bpy.types import Scene
 
     if hasattr(Scene, "range_web"):
+        from range_web import translations as range_web_translations
+        range_web_translations.unregister()
         del Scene.range_web
 
     if hasattr(Scene, "rangearmor_export"):

@@ -2,6 +2,8 @@
 
 import json
 
+from .i18n import _
+
 SEVERITY_ERROR = "ERROR"
 SEVERITY_WARNING = "WARNING"
 SEVERITY_INFO = "INFO"
@@ -84,10 +86,10 @@ class Report:
         e = len(self.errors)
         w = len(self.by_severity(SEVERITY_WARNING))
         if e:
-            return "%d erro(s), %d aviso(s)" % (e, w)
+            return _("%d error(s), %d warning(s)") % (e, w)
         if w:
-            return "Nenhuma incompatibilidade detectada (%d aviso(s))" % w
-        return "Nenhuma incompatibilidade detectada"
+            return _("No incompatibility detected (%d warning(s))") % w
+        return _("No incompatibility detected")
 
     def to_dict(self):
         return {

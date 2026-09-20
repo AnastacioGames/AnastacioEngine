@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as tmp:
     web = bpy.context.scene.range_web
     web.output_directory = os.path.join(tmp, "web")
     check(not bpy.ops.scene.range_web_serve.poll(), "sem pacote: botao bloqueado (poll)")
-    check("Exportar Web" in pw._serve_blocked_reason(bpy.context), "sem pacote: motivo aparece no painel")
+    check("Export Web" in pw._serve_blocked_reason(bpy.context), "sem pacote: motivo aparece no painel")
     check(not bpy.ops.scene.range_web_preflight.poll(), "sem pacote: pre-voo bloqueado")
     check(local_server.url() is None, "sem pacote: nenhum servidor")
 

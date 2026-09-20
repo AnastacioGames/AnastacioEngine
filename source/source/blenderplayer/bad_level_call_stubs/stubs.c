@@ -1814,7 +1814,9 @@ bool pyrna_id_CheckPyObject(struct PyObject *obj) RET_ZERO
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (BPY_context_update) */
 void BPY_context_update(struct bContext *C) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (BPY_app_translations_py_pgettext) */
 const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *msgid) RET_ARG(msgid)
+#endif
 
 /* intern/dualcon */
 

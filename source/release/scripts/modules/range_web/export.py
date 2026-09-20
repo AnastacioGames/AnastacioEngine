@@ -4,6 +4,8 @@
 import os
 import shutil
 
+from .i18n import _
+
 
 class ExportBlocked(Exception):
     def __init__(self, findings):
@@ -32,7 +34,7 @@ def export_package(report, dest, build):
     try:
         build(tmp)
         if not os.listdir(tmp):
-            raise RuntimeError("o empacotador não gerou arquivos")
+            raise RuntimeError(_("the packager produced no files"))
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise

@@ -13,6 +13,7 @@ import tempfile
 import threading
 
 from .preflight import check_preflight
+from .i18n import _
 
 _BROWSER_NAMES = ("chrome", "google-chrome", "chromium", "chromium-browser", "msedge", "microsoft-edge")
 _WINDOWS_BROWSERS = (
@@ -107,7 +108,7 @@ def run_preflight(package_dir, browser=None, timeout=60, delay=12, launcher=_lau
             try:
                 proc = launcher(browser, url, profile)
             except OSError as exc:
-                return None, "Não foi possível abrir o navegador: %s" % exc
+                return None, _("Could not open the browser: %s") % exc
             try:
                 got = server.got_report.wait(timeout)
             finally:
@@ -118,10 +119,10 @@ def run_preflight(package_dir, browser=None, timeout=60, delay=12, launcher=_lau
                     proc.kill()
                     proc.wait()
         if not got:
-            return None, "O navegador não enviou o relatório em %d s." % timeout
+            return None, _("The browser did not send the report within %d s.") % timeout
         data = server.report_box[0]
         if data is None:
-            return None, "Relatório de pré-voo ilegível."
+            return None, _("Unreadable preflight report.")
         return check_preflight(data), None
     finally:
         server.shutdown()

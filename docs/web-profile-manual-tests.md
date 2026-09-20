@@ -2,6 +2,9 @@
 
 Só o que precisa de janela ou navegador. O resto roda em `tools/tests/web_profile/`.
 
+Os botões estão em inglês por padrão (Validate Web, Export Web, Open in browser, Stop server, Locate); com
+Idioma Português (Preferências > System) aparecem como Validar Web, Exportar Web, Abrir no navegador, Parar servidor, Localizar.
+
 ## Preparação
 
     build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_manual_project.py

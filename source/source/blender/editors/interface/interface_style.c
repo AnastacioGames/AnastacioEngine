@@ -437,8 +437,8 @@ void uiStyleInit(void)
 
 		if (font->uifont_id == UIFONT_DEFAULT) {
 #ifdef WITH_INTERNATIONAL
-			int font_size = datatoc_bfont_ttf_size;
-			uchar *font_ttf = (uchar *)datatoc_bfont_ttf;
+			int font_size = datatoc_roboto_medium_ttf_size;
+			uchar *font_ttf = (uchar *)datatoc_roboto_medium_ttf;
 			static int last_font_size = 0;
 
 			/* use unicode font for translation */
@@ -447,8 +447,8 @@ void uiStyleInit(void)
 
 				if (!font_ttf) {
 					/* fall back if not found */
-					font_size = datatoc_bfont_ttf_size;
-					font_ttf = (uchar *)datatoc_bfont_ttf;
+					font_size = datatoc_roboto_medium_ttf_size;
+					font_ttf = (uchar *)datatoc_roboto_medium_ttf;
 				}
 			}
 
@@ -498,8 +498,8 @@ void uiStyleInit(void)
 
 		if (!monofont_ttf) {
 			/* fall back if not found */
-			monofont_size = datatoc_bmonofont_ttf_size;
-			monofont_ttf = (uchar *)datatoc_bmonofont_ttf;
+			monofont_size = datatoc_roboto_mono_medium_ttf_size;
+			monofont_ttf = (uchar *)datatoc_roboto_mono_medium_ttf;
 		}
 	}
 #endif

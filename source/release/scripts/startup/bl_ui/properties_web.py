@@ -5,11 +5,13 @@
 import bpy
 from bpy.types import Operator, Panel, PropertyGroup
 
+from bpy.app.translations import pgettext_iface as _
+
 from .properties_scene import SceneButtonsPanel
 
 WEB_SCHEMA_VERSION = 1
 WEB_RUNTIME_ID = "web-runtime-release"
-WEB_EXPORT_BLOCKED_REASON = "Exporte a partir de uma árvore de desenvolvimento com tools/web/package-web.py."
+WEB_EXPORT_BLOCKED_REASON = "Export from a development tree with tools/web/package-web.py."
 
 _MAX_ROWS_SHOWN = 30
 _ENGINE_API_MODULES = frozenset(("Range", "mathutils", "bgl", "blf", "aud"))
@@ -75,11 +77,11 @@ def _merge_preflight(report, package_dir):
     found, why = preflight_run.run_preflight(package_dir)
     report.findings = [f for f in report.findings if f.location.get("origin") != "preflight"]
     if found is None:
-        return "Pré-voo não executado: %s" % why
+        return _("Preflight not run: %s") % why
     for finding in found:
         finding.location["origin"] = "preflight"
     report.extend(found)
-    return "Pré-voo: %d problema(s)." % len(found) if found else "Pré-voo sem problemas."
+    return _("Preflight: %d problem(s).") % len(found) if found else _("Preflight found no problems.")
 
 
 def _package_dir(context):
@@ -98,25 +100,25 @@ def _preflight_blocked_reason(context):
     if why:
         return why
     if preflight_run.find_browser() is None:
-        return "Chrome ou Edge não encontrado para o teste automático."
+        return _("Chrome or Edge not found for the automatic test.")
     return None
 
 
 def _open_in_browser(package_dir, source_file):
-    """Sobe o servidor local e abre o navegador padrão. Devolve a mensagem para o usuário."""
+    """Sobe o servidor local e abre o navegador padrão. Devolve (ok, mensagem para o usuário)."""
     import webbrowser
     from range_web import local_server
 
     why = local_server.package_problem(package_dir, source_file)
     if why:
-        return why
+        return False, why
     try:
         url = local_server.start(package_dir)
     except OSError as exc:
-        return "Não foi possível iniciar o servidor local: %s" % exc
+        return False, _("Could not start the local server: %s") % exc
     if not bpy.app.background:
         webbrowser.open(url)
-    return "Servindo em %s (clique em Jogar na página)." % url
+    return True, _("Serving at %s (click Play on the page).") % url
 
 
 # Último Report da validação. Transitório: não vai para o .blend e é descartado ao recarregar.
@@ -126,40 +128,40 @@ _last_report = None
 class RangeWebSettings(PropertyGroup):
     schema_version: bpy.props.IntProperty(
         name="Schema",
-        description="Versão das configurações do perfil Web",
+        description="Version of the Web profile settings",
         default=WEB_SCHEMA_VERSION,
         options={'HIDDEN'},
     )
     check_compatibility: bpy.props.BoolProperty(
-        name="Verificar compatibilidade Web",
-        description="Mostra avisos de compatibilidade Web durante a edição. "
-                    "A exportação Web sempre valida, independentemente desta opção",
+        name="Check Web compatibility",
+        description="Shows Web compatibility warnings while editing. "
+                    "Web export always validates, regardless of this option",
         default=False,
     )
     runtime_id: bpy.props.StringProperty(
         name="Runtime",
-        description="Runtime Web usado no pacote; a disponibilidade é verificada na exportação",
+        description="Web runtime used in the package; availability is checked on export",
         default=WEB_RUNTIME_ID,
     )
     entry_scene: bpy.props.StringProperty(
-        name="Cena de entrada",
-        description="Cena inicial do pacote Web; vazio usa a cena atual",
+        name="Entry scene",
+        description="Initial scene of the Web package; empty uses the current scene",
         default="",
     )
     auto_preflight: bpy.props.BoolProperty(
-        name="Pré-voo após exportar",
-        description="Depois de exportar, abre o pacote num Chrome/Edge sem janela (cerca de 15 s) "
-                    "e junta ao relatório os problemas vistos no navegador",
+        name="Preflight after export",
+        description="After exporting, opens the package in a windowless Chrome/Edge (about 15 s) "
+                    "and adds the problems seen in the browser to the report",
         default=True,
     )
     open_after_export: bpy.props.BoolProperty(
-        name="Abrir após exportar",
-        description="Depois de exportar, sobe um servidor local e abre o jogo no navegador padrão",
+        name="Open after export",
+        description="After exporting, starts a local server and opens the game in the default browser",
         default=False,
     )
     output_directory: bpy.props.StringProperty(
-        name="Destino",
-        description="Diretório de saída do pacote Web",
+        name="Destination",
+        description="Output directory of the Web package",
         subtype='DIR_PATH',
         default="//web/",
     )
@@ -189,7 +191,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
 
         layout.separator()
         layout.operator("scene.range_web_export", icon='EXPORT')
-        layout.label(text="Prévia desktop (tecla P) não é Teste Web.")
+        layout.label(text="Desktop preview (P key) is not a Web test.")
         from range_web import local_server
         # Botões só liberam com o ambiente pronto; o motivo aparece em vez de um clique mudo.
         why = _serve_blocked_reason(context)
@@ -204,7 +206,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
             layout.label(text=reason, icon='INFO')
         served = local_server.url()
         if served:
-            layout.label(text="Servindo em %s" % served, icon='WORLD')
+            layout.label(text=_("Serving at %s") % served, icon='WORLD')
             layout.operator("scene.range_web_stop_server", icon='PAUSE')
         layout.operator("scene.range_web_import_preflight", icon='FILE_FOLDER')
 
@@ -213,10 +215,10 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         # Só lê o resultado guardado; a coleta roda no operador, nunca aqui.
         report = _last_report
         if report is None:
-            layout.label(text="Nenhuma verificação executada.", icon='INFO')
+            layout.label(text="No check has been run.", icon='INFO')
             return
         layout.label(text=report.summary(), icon='CANCEL' if report.errors else 'FILE_TICK')
-        layout.label(text="Resultado da última validação; revalide após editar.")
+        layout.label(text="Result of the last validation; revalidate after editing.")
         for index, finding in enumerate(report.findings[:_MAX_ROWS_SHOWN]):
             box = layout.box()
             row = box.row()
@@ -224,20 +226,20 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
                       icon=_SEVERITY_ICONS[finding.severity])
             loc = finding.location
             if loc.get("object") or loc.get("scene"):
-                row.operator("scene.range_web_locate", text="Localizar").index = index
+                row.operator("scene.range_web_locate", text="Locate").index = index
             if loc.get("chain"):
                 box.label(text=loc["chain"])
             if finding.fix:
                 box.label(text=finding.fix)
         hidden = len(report.findings) - _MAX_ROWS_SHOWN
         if hidden > 0:
-            layout.label(text="... e mais %d resultado(s)." % hidden)
+            layout.label(text=_("... and %d more result(s).") % hidden)
 
 
 class SCENE_OT_range_web_validate(Operator):
-    """Analisa cenas, controllers, scripts e assets do arquivo contra o perfil Web"""
+    """Analyzes the file's scenes, controllers, scripts and assets against the Web profile"""
     bl_idname = "scene.range_web_validate"
-    bl_label = "Validar Web"
+    bl_label = "Validate Web"
 
     def execute(self, context):
         global _last_report
@@ -251,9 +253,9 @@ class SCENE_OT_range_web_validate(Operator):
 
 
 class SCENE_OT_range_web_export(Operator):
-    """Valida de novo e gera o pacote Web; erros bloqueiam e o export anterior é preservado"""
+    """Validates again and generates the Web package; errors block it and the previous export is preserved"""
     bl_idname = "scene.range_web_export"
-    bl_label = "Exportar Web"
+    bl_label = "Export Web"
 
     def execute(self, context):
         global _last_report
@@ -267,17 +269,17 @@ class SCENE_OT_range_web_export(Operator):
         web = context.scene.range_web
         # Em modo background is_dirty nunca zera (não há janela para reiniciá-lo).
         if not bpy.data.filepath or (bpy.data.is_dirty and not bpy.app.background):
-            self.report({'WARNING'}, "Salve o arquivo antes de exportar: o pacote usa o .range salvo.")
+            self.report({'WARNING'}, _("Save the file before exporting: the package uses the saved .range."))
             return {'CANCELLED'}
         packager = _packager_path()
         python = shutil.which("python") or shutil.which("python3")
         if packager is None or python is None:
-            self.report({'WARNING'}, WEB_EXPORT_BLOCKED_REASON)
+            self.report({'WARNING'}, _(WEB_EXPORT_BLOCKED_REASON))
             return {'CANCELLED'}
 
         _last_report, info = _run_validation(context)
         if not info.usable:
-            self.report({'WARNING'}, "Runtime Web indisponível; veja WEB-PKG-001 no relatório.")
+            self.report({'WARNING'}, _("Web runtime unavailable; see WEB-PKG-001 in the report."))
             return {'CANCELLED'}
         dest = bpy.path.abspath(web.output_directory)
         game = bpy.data.filepath
@@ -303,24 +305,24 @@ class SCENE_OT_range_web_export(Operator):
         try:
             export.export_package(_last_report, dest, build)
         except export.ExportBlocked as exc:
-            self.report({'WARNING'}, "%s Corrija e valide novamente." % exc)
+            self.report({'WARNING'}, _("%s Fix and validate again.") % exc)
             return {'CANCELLED'}
         except Exception as exc:
-            self.report({'WARNING'}, "Export falhou; o anterior foi preservado: %s" % exc)
+            self.report({'WARNING'}, _("Export failed; the previous one was preserved: %s") % exc)
             return {'CANCELLED'}
-        message = "Pacote Web gerado em %s" % dest
+        message = _("Web package generated at %s") % dest
         if web.auto_preflight:
             message += ". " + _merge_preflight(_last_report, dest)
         if web.open_after_export and not bpy.app.background and not _last_report.errors:
-            message += ". " + _open_in_browser(dest, None)
+            message += ". " + _open_in_browser(dest, None)[1]
         self.report({'WARNING' if _last_report.errors else 'INFO'}, message)
         return {'FINISHED'}
 
 
 class SCENE_OT_range_web_preflight(Operator):
-    """Abre o pacote exportado num Chrome/Edge sem janela e junta ao relatório o que o navegador viu (cerca de 15 s)"""
+    """Opens the exported package in a windowless Chrome/Edge and adds what the browser saw to the report (about 15 s)"""
     bl_idname = "scene.range_web_preflight"
-    bl_label = "Testar pacote no navegador"
+    bl_label = "Test package in browser"
 
     @classmethod
     def poll(cls, context):
@@ -339,9 +341,9 @@ class SCENE_OT_range_web_preflight(Operator):
 
 
 class SCENE_OT_range_web_serve(Operator):
-    """Sobe um servidor local com o pacote exportado e abre o jogo no navegador padrão"""
+    """Starts a local server with the exported package and opens the game in the default browser"""
     bl_idname = "scene.range_web_serve"
-    bl_label = "Abrir no navegador"
+    bl_label = "Open in browser"
 
     @classmethod
     def poll(cls, context):
@@ -349,28 +351,27 @@ class SCENE_OT_range_web_serve(Operator):
 
     def execute(self, context):
         dest = bpy.path.abspath(context.scene.range_web.output_directory)
-        message = _open_in_browser(dest, bpy.data.filepath)
-        ok = message.startswith("Servindo")
+        ok, message = _open_in_browser(dest, bpy.data.filepath)
         self.report({'INFO' if ok else 'WARNING'}, message)
         return {'FINISHED' if ok else 'CANCELLED'}
 
 
 class SCENE_OT_range_web_stop_server(Operator):
-    """Para o servidor local do pacote Web"""
+    """Stops the local server of the Web package"""
     bl_idname = "scene.range_web_stop_server"
-    bl_label = "Parar servidor"
+    bl_label = "Stop server"
 
     def execute(self, context):
         from range_web import local_server
         local_server.stop()
-        self.report({'INFO'}, "Servidor local parado.")
+        self.report({'INFO'}, _("Local server stopped."))
         return {'FINISHED'}
 
 
 class SCENE_OT_range_web_import_preflight(Operator):
-    """Lê o relatório de pré-voo (JSON) do pacote no navegador e junta os resultados ao relatório"""
+    """Reads the preflight report (JSON) of the package in the browser and adds the results to the report"""
     bl_idname = "scene.range_web_import_preflight"
-    bl_label = "Importar pré-voo Web"
+    bl_label = "Import Web preflight"
 
     filepath: bpy.props.StringProperty(subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'})
     filter_glob: bpy.props.StringProperty(default="*.json", options={'HIDDEN'})
@@ -393,21 +394,21 @@ class SCENE_OT_range_web_import_preflight(Operator):
             finding.location["origin"] = "preflight"
         _last_report.extend(found)
         self.report({'WARNING' if found else 'INFO'},
-                    "Pré-voo: %d problema(s)." % len(found) if found else "Pré-voo sem problemas.")
+                    _("Preflight: %d problem(s).") % len(found) if found else _("Preflight found no problems."))
         return {'FINISHED'}
 
 
 class SCENE_OT_range_web_locate(Operator):
-    """Seleciona a origem do resultado (cena e objeto)"""
+    """Selects the origin of the result (scene and object)"""
     bl_idname = "scene.range_web_locate"
-    bl_label = "Localizar"
+    bl_label = "Locate"
 
     index: bpy.props.IntProperty(options={'HIDDEN', 'SKIP_SAVE'})
 
     def execute(self, context):
         report = _last_report
         if report is None or not (0 <= self.index < len(report.findings)):
-            self.report({'WARNING'}, "Resultado desatualizado; valide novamente.")
+            self.report({'WARNING'}, _("Stale result; validate again."))
             return {'CANCELLED'}
         loc = report.findings[self.index].location
         scene = bpy.data.scenes.get(loc.get("scene", ""))
@@ -416,7 +417,7 @@ class SCENE_OT_range_web_locate(Operator):
         scene = scene or context.scene
         ob = scene.objects.get(loc.get("object", ""))
         if ob is None:
-            self.report({'INFO'}, loc.get("chain") or "Origem fora das cenas (objeto do pool de spawn).")
+            self.report({'INFO'}, loc.get("chain") or _("Origin outside the scenes (spawn pool object)."))
             return {'FINISHED'}
         for other in scene.objects:
             other.select = False

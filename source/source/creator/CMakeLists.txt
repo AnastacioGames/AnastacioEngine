@@ -479,7 +479,7 @@ if(WITH_INTERNATIONAL)
 		install(
 			FILES ${_mo_file}
 			DESTINATION ${_locale_target_dir}/${_locale_name}/LC_MESSAGES
-			RENAME RangeEngine.mo
+			RENAME blender.mo
 		)
 		unset(_locale_name)
 	endforeach()
