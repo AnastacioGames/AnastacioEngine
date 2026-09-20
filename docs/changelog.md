@@ -4,6 +4,14 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: testes de runtime do M1 (diagnósticos Python e shader)
+
+- Três jogos com falha injetada foram empacotados com `package-web.py --runtime-dir build-web/bin`, servidos e
+  executados no Edge via `verify-package.cjs` com `PREFLIGHT_OUT`. `check_preflight` emitiu apenas o achado
+  esperado em cada um: exceção Python -> `WEB-PY-009`, import inexistente -> `WEB-PY-001`, GLSL inválido em
+  Filter2D (`mode = CUSTOMFILTER`) -> `WEB-GFX-002`, todos ERROR.
+- O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
+
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
 
 - M0 no commit `1c9d1562`: `make-runtime-manifest.py` declara o alias `bge` e `aud` conforme
