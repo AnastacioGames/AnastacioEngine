@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - docs: roadmap reconciliado com o git log
+
+- `docs/roadmap.md` reescrito só com pendências reais (de 526 para cerca de 140 linhas). A narrativa histórica
+  do bloco Web (bloqueios de shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) já estava
+  nas entradas de 2026-09-12 a 2026-09-18 deste changelog e foi removida do roadmap. Marco D e pré-voo saíram
+  da lista de abertos; o item FFmpeg do editor Linux continua aberto (só o wrapper audaspace foi ajustado).
+
 ## 2026-09-20 - Web: verificação automática do xadrez por pixels
 
 - `tools/web/verify-capabilities.cjs` (modo `render`) captura a tela e conta transições de luminância nas
@@ -11,6 +18,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Pacote `teste-render`: 173 transições, verificação passou.
 - Marco D: modo `keys` do `verify-capabilities.cjs` (pacote `web-smoke`): clique de foco, setas por CDP e conferência
   de "Python controller started" e "keyboard moved cube" (controller Python + teclado no navegador, 4/4 OK).
+- `glBlitFramebuffer`: sonda CDP no pacote `web-render` (Chrome/SwiftShader) mostrou uma única chamada (0,0,960,540,
+  máscara COLOR|DEPTH, NEAREST) sem `getError` e sem aviso do navegador; o único aviso do log é a depreciação do
+  `ScriptProcessorNode` (SDL). O aviso antigo de depth/stencil não reproduz mais; item encerrado como não reproduzível.
+- `loadGlobalDict` sem arquivo de save deixa de logar erro: vira aviso "could not open ... (no save yet)"
+  (`KX_PythonInit.cpp`), pois é o caso esperado da 1ª abertura.
 - Deploy: compressão medida (gzip 6) e receitas por host (Netlify, GitHub Pages, itch.io, nginx, Apache) com
   `curl -sI` de conferência no `HOSTING.md` do pacote e em `docs/web-deploy.md`; download ~46 → ~17 MiB. A prova
   em hospedagem real (Chrome/Firefox/Edge em URL pública) segue pendente do usuário.
