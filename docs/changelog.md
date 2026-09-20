@@ -22,6 +22,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Módulos puros usam `range_web/i18n.py` (`_()` traduz no editor, devolve o texto fora dele). `_open_in_browser` agora
   devolve `(ok, mensagem)` em vez de o operador testar o começo do texto.
 - Espanhol (`es`) e russo (`ru_RU`) adicionados ao menu: `po/es.po`, `po/ru.po` (mesmo commit) e `range_web/translations_es_ru.py`; coberto por `engine_i18n.py`.
+- Textos de UI da Range/UPBGE fora do catálogo do Blender (1 459 rótulos e dicas de RNA) traduzidos em pt_BR/es/ru_RU em `range_web/translations_ui.py`; auditoria por `tools/tests/web_profile/i18n_audit.py` (pt_BR: 2 698 → 1 281 sem tradução, o resto é ícone, identificador ou nome igual nos dois idiomas; ru tem mais lacunas no catálogo do Blender).
 - Testes: 78 unitários OK (asserções de texto atualizadas); `engine_i18n.py` novo (13 verificações: catálogo do Blender,
   dicionário `range_web`, dica, formato `%s`, acentos, desligar tradução); os 5 `engine_*` existentes passam.
 - Padrão do Blender 2.79 mantido: tradução vem desligada (Preferências > System > **International Fonts**, depois

@@ -89,10 +89,13 @@ class USERPREF_PT_navigation(Panel):
 
         userpref = context.user_preferences
 
-        col = layout.column()
-
-        col.scale_x = 1.3
-        col.scale_y = 1.3
+        # Keep the navigation compact and visually grouped.  The old 1.3x
+        # scaling made the sidebar consume too much space before the content
+        # could breathe, especially on smaller editor windows.
+        box = layout.box()
+        col = box.column()
+        col.scale_x = 1.05
+        col.scale_y = 1.12
         col.prop(userpref, "active_section", expand=True)
 
 
@@ -180,7 +183,9 @@ class USERPREF_PT_interface(Panel):
 
         row = layout.row()
 
+        # Use boxed groups so each part reads as an independent settings panel.
         col = row.column()
+        col = col.box()
         col.label(text="Display:")
         col.prop(view, "ui_scale", text="Scale")
         col.prop(view, "ui_line_width", text="Line Width")
@@ -214,6 +219,7 @@ class USERPREF_PT_interface(Panel):
         row.separator(factor=1)
 
         col = row.column()
+        col = col.box()
         col.label(text="View Manipulation:")
         col.prop(view, "use_mouse_depth_cursor")
         col.prop(view, "use_cursor_lock_adjust")
@@ -245,6 +251,7 @@ class USERPREF_PT_interface(Panel):
         row.separator(factor=1)
 
         col = row.column()
+        col = col.box()
         # Toolbox doesn't exist yet
         # col.label(text="Toolbox:")
         #col.prop(view, "show_column_layout")

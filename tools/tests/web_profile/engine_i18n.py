@@ -59,6 +59,10 @@ for lang, obj, web in (('es', "Objeto", "Validar Web"), ('ru_RU', "Объект"
     check(bpy.app.translations.locale == lang, "idioma %s ativo" % lang)
     check(pgettext_iface("Object") == obj, "%s: catalogo do Blender traduz Object" % lang)
     check(pgettext_iface("Validate Web") == web, "%s: dicionario range_web traduz o rotulo" % lang)
+    # Texto de UI da Range/UPBGE fora do catalogo do Blender (translations_ui.py), rotulo e dica.
+    check(pgettext_iface("Vortex Height") != "Vortex Height", "%s: rotulo da Range (translations_ui) traduzido" % lang)
+    check(pgettext_tip("Distance to begin suspend physics of this object") != "Distance to begin suspend physics of this object",
+          "%s: dica da Range (translations_ui) traduzida" % lang)
 
 # Sem o interruptor de traducao de interface, nada muda mesmo em pt_BR.
 system.language = 'pt_BR'
