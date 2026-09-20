@@ -27,6 +27,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   pacote `web-render` 0.1.2): `application/wasm` e `Content-Encoding: gzip` corretos (`.wasm` 8,5 MB, `.data` 8,9 MB no
   fio); `verify-capabilities.cjs render` (xadrez por pixels, 445 transições) e `verify-persistence.cjs` (IDBFS em HTTPS)
   passaram na URL pública. A prova em Firefox/Edge/outros aparelhos segue com o usuário.
+- Aceite do usuário na URL pública (2026-09-20): Chrome, Edge e Firefox renderizam xadrez, luz e sombra. Avisos
+  vistos e classificados: o erro vermelho "Permissions policy violation: unload" no Edge vem de `content.js` (extensão
+  do navegador, não do pacote); no Firefox aparecem só avisos de WebGL (comparação de profundidade com filtro LINEAR e
+  destino menor que o viewport, uma vez cada) e o AudioContext bloqueado até o clique em Jogar (esperado).
 - Achado do deploy: o botão Jogar liberava no `onload` do script, antes de `.data`/`.wasm` terminarem em rede lenta;
   agora libera em `onRuntimeInitialized` (`tools/web/package-web.py`).
 - Deploy: compressão medida (gzip 6) e receitas por host (Netlify, GitHub Pages, itch.io, nginx, Apache) com
