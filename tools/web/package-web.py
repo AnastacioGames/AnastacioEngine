@@ -365,6 +365,14 @@ Este pacote e estatico: basta servir a pasta por HTTP(S). Nao abra `index.html` 
 - Teste local: `python serve.py 8080` e abra http://localhost:8080/
 - MIME: `.wasm` como `application/wasm` (senao o navegador recusa a compilacao em streaming).
 - Compressao: habilite gzip/brotli para `.wasm`, `.js` e `.data` no servidor; reduz muito o download.
+  Medido: `.wasm` 20,3 MiB -> 8,0 MiB, `.data` 24,8 MiB -> 8,4 MiB, `.js` 0,9 MiB -> 0,2 MiB (gzip nivel 6);
+  o download total cai de ~46 MiB para ~17 MiB.
+- Receitas: Netlify/Cloudflare Pages ja comprimem e servem `application/wasm` sozinhos. GitHub Pages tambem
+  (gzip). itch.io: envie o zip (`--zip`) como projeto HTML, com `index.html` na raiz. nginx: `gzip on;
+  gzip_types application/wasm application/javascript application/octet-stream;` e `types { application/wasm wasm; }`.
+  Apache: `AddType application/wasm .wasm` e `AddOutputFilterByType DEFLATE application/wasm application/javascript application/octet-stream`.
+- Conferir apos publicar: `curl -sI -H "Accept-Encoding: gzip" <url>/RangeRuntime.wasm` deve mostrar
+  `content-type: application/wasm` e `content-encoding: gzip` (ou `br`).
 - Cache: os arquivos sao referenciados com `?v=<versao>`; ao publicar uma versao nova, mude a versao
   (`--version`) para nao misturar arquivos antigos e novos.
 - COOP/COEP: **nao sao necessarios**. Este runtime nao usa pthreads/SharedArrayBuffer.
