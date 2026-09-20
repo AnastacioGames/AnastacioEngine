@@ -6,6 +6,7 @@
 //   modo touch    : toque (touchStart/End) no canvas deve virar clique de mouse ("mouse click flipped")
 //   modo sim      : jogo web-capabilities: fisica, addObject/endObject, addScene (overlay) e replace de cena
 //   modo audio    : jogo web-audio: tom WAV em loop; confere mixer ativo e amplitude nao nula na saida Web Audio
+//   modo render   : jogo web-render: sobe e roda 8 s sem excecao (o visual e julgado pelo usuario)
 //   modo filters  : 1..0,Q (filtros simples ligam/desligam) e W,E,R,T (embutidos) sem erro de shader
 // Requer Chrome ja aberto com --remote-debugging-port=<porta-cdp>. Sai com 0 se todas as expectativas baterem.
 const [url, mode, port = '9333'] = process.argv.slice(2);
@@ -20,7 +21,7 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
     const m = JSON.parse(e.data);
     if (m.id) { pending.get(m.id)?.(m.result); pending.delete(m.id); }
     else if (m.method === 'Runtime.consoleAPICalled') logs.push(m.params.args.map(a => a.value ?? a.description).join(' '));
-    else if (m.method === 'Runtime.exceptionThrown') logs.push('[exception] ' + JSON.stringify(m.params.exceptionDetails.text) + ' ' + ((m.params.exceptionDetails.exception || {}).description || '').slice(0, 600));
+    else if (m.method === 'Runtime.exceptionThrown') logs.push('[exception] ' + JSON.stringify(m.params.exceptionDetails.text) + ' ' + ((m.params.exceptionDetails.exception || {}).description || '').slice(0, 1500));
   };
   const call = (method, params = {}) => new Promise(r => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
   const evalJs = async expr => (await call('Runtime.evaluate', { expression: expr, returnByValue: true })).result?.value;
@@ -103,6 +104,11 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
       expect('mixer avancou (frames)', a.frames > 0);
       expect('saida com amplitude (tom audivel)', a.peak > 0.05);
       logs.filter(l => /\[aud\]|audio|Audaspace|aud:/i.test(l)).slice(0, 15).forEach(l => console.log('  ' + l.slice(0, 200)));
+    } else if (mode === 'render') {
+      await sleep(8000);
+      const has = re => logs.some(l => re.test(l));
+      expect('cena de render rodando', has(/\[render\] scene running/));
+      expect('sem excecao/aborto no loop', !has(/\[exception\]|Aborted|\[ABORT\]/));
     } else if (mode === 'filters') {
       const KEYS = [['1', 'Digit1', 49, 'BLUR'], ['2', 'Digit2', 50, 'SHARPEN'], ['3', 'Digit3', 51, 'DILATION'],
         ['4', 'Digit4', 52, 'EROSION'], ['5', 'Digit5', 53, 'LAPLACIAN'], ['6', 'Digit6', 54, 'SOBEL'],

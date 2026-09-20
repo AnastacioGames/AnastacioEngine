@@ -4449,6 +4449,59 @@ GLboolean __GLEW_OES_single_precision = GL_FALSE;
 
 #ifdef GL_VERSION_1_1
 
+#if defined(__EMSCRIPTEN__)
+/* WebGL nao tem glPushAttrib/glPopAttrib (glewGetProcAddress devolve NULL e a chamada vira "null function").
+ * Emulacao minima do que o motor usa: ENABLE_BIT, VIEWPORT_BIT, SCISSOR_BIT e DEPTH_BUFFER_BIT. */
+#define WEB_ATTRIB_DEPTH 16
+#define WEB_ATTRIB_ENABLES 7
+static const GLenum web_attrib_caps[WEB_ATTRIB_ENABLES] = {
+  GL_SCISSOR_TEST, GL_DEPTH_TEST, GL_BLEND, GL_CULL_FACE, GL_STENCIL_TEST, GL_DITHER, GL_POLYGON_OFFSET_FILL
+};
+static struct {
+  GLbitfield mask;
+  GLint viewport[4], scissor[4], depth_func;
+  GLboolean enabled[WEB_ATTRIB_ENABLES], depth_mask;
+} web_attrib_stack[WEB_ATTRIB_DEPTH];
+static int web_attrib_top = 0;
+
+static void GLAPIENTRY web_glPushAttrib (GLbitfield mask)
+{
+  int i;
+  if (web_attrib_top >= WEB_ATTRIB_DEPTH) return;
+  {
+    GLint d = 0;
+    GLboolean m = GL_TRUE;
+    typeof(web_attrib_stack[0]) *e = &web_attrib_stack[web_attrib_top++];
+    e->mask = mask;
+    glGetIntegerv(GL_VIEWPORT, e->viewport);
+    glGetIntegerv(GL_SCISSOR_BOX, e->scissor);
+    glGetIntegerv(GL_DEPTH_FUNC, &d);
+    e->depth_func = d;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &m);
+    e->depth_mask = m;
+    for (i = 0; i < WEB_ATTRIB_ENABLES; i++) e->enabled[i] = glIsEnabled(web_attrib_caps[i]);
+  }
+}
+
+static void GLAPIENTRY web_glPopAttrib (void)
+{
+  int i;
+  if (web_attrib_top <= 0) return;
+  {
+    typeof(web_attrib_stack[0]) *e = &web_attrib_stack[--web_attrib_top];
+    if (e->mask & GL_VIEWPORT_BIT) glViewport(e->viewport[0], e->viewport[1], e->viewport[2], e->viewport[3]);
+    if (e->mask & GL_SCISSOR_BIT) glScissor(e->scissor[0], e->scissor[1], e->scissor[2], e->scissor[3]);
+    if (e->mask & GL_DEPTH_BUFFER_BIT) { glDepthFunc(e->depth_func); glDepthMask(e->depth_mask); }
+    for (i = 0; i < WEB_ATTRIB_ENABLES; i++) {
+      GLbitfield bit = (web_attrib_caps[i] == GL_SCISSOR_TEST) ? GL_SCISSOR_BIT :
+                       (web_attrib_caps[i] == GL_DEPTH_TEST) ? GL_DEPTH_BUFFER_BIT : GL_ENABLE_BIT;
+      if (!(e->mask & (GL_ENABLE_BIT | bit))) continue;
+      if (e->enabled[i]) glEnable(web_attrib_caps[i]); else glDisable(web_attrib_caps[i]);
+    }
+  }
+}
+#endif /* __EMSCRIPTEN__ */
+
 static GLboolean _glewInit_GL_VERSION_1_1 (GLEW_CONTEXT_ARG_DEF_INIT)
 {
   GLboolean r = GL_FALSE;
@@ -4613,6 +4666,10 @@ static GLboolean _glewInit_GL_VERSION_1_1 (GLEW_CONTEXT_ARG_DEF_INIT)
   r = ((glPopName = (PFNGLPOPNAMEPROC)glewGetProcAddress((const GLubyte*)"glPopName")) == NULL) || r;
   r = ((glPrioritizeTextures = (PFNGLPRIORITIZETEXTURESPROC)glewGetProcAddress((const GLubyte*)"glPrioritizeTextures")) == NULL) || r;
   r = ((glPushAttrib = (PFNGLPUSHATTRIBPROC)glewGetProcAddress((const GLubyte*)"glPushAttrib")) == NULL) || r;
+#if defined(__EMSCRIPTEN__)
+  if (glPushAttrib == NULL) { glPushAttrib = web_glPushAttrib; }
+  if (glPopAttrib == NULL) { glPopAttrib = web_glPopAttrib; }
+#endif
   r = ((glPushClientAttrib = (PFNGLPUSHCLIENTATTRIBPROC)glewGetProcAddress((const GLubyte*)"glPushClientAttrib")) == NULL) || r;
   r = ((glPushName = (PFNGLPUSHNAMEPROC)glewGetProcAddress((const GLubyte*)"glPushName")) == NULL) || r;
   r = ((glRasterPos2d = (PFNGLRASTERPOS2DPROC)glewGetProcAddress((const GLubyte*)"glRasterPos2d")) == NULL) || r;
@@ -16754,6 +16811,11 @@ GLenum glewInit ()
 {
   GLenum r;
   if ( (r = glewContextInit()) ) return r;
+#if defined(__EMSCRIPTEN__)
+  /* o init do GL 1.1 nao roda em ES; sem isso glPushAttrib/glPopAttrib ficam nulos */
+  if (glPushAttrib == NULL) glPushAttrib = web_glPushAttrib;
+  if (glPopAttrib == NULL) glPopAttrib = web_glPopAttrib;
+#endif
 #if defined (GLEW_INC_EGL)
   return eglewContextInit(eglGetCurrentDisplay());
 #elif defined(_WIN32)

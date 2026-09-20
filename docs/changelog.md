@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: sombra de spot (buffer) no runtime Web
+
+- Sintoma (teste manual do pacote `web-render`): `RuntimeError: null function` em `GPU_texture_bind_as_framebuffer`, chamado de `RAS_OpenGLLight::BindShadowBuffer`, logo após a cena iniciar. Isolado por bissecção de variantes da cena (`RENDER_OFF=shadow`) e por trace com `--profiling-funcs`.
+- Causa: `glPushAttrib`/`glPopAttrib` são ponteiros do GLEW-ES e ficam `NULL` no Web (o init do GL 1.1 não roda em ES e o WebGL não tem essas funções). Só o caminho de sombra os exercitava.
+- Correção: `extern/glew-es/src/glew.c` instala substitutos no `glewInit` (Emscripten) que emulam ENABLE/VIEWPORT/SCISSOR/DEPTH_BUFFER bits.
+- Novos: `tools/create_web_render_scene.py` (com `RENDER_OFF=rot,shadow,ao,mist,alpha`), `tools/create_web_devices_scene.py` e modo `render` em `verify-capabilities.cjs`. Regressão: sim 9/9, áudio, toque e filtros passam. O aspecto visual da sombra ainda depende de aceite do usuário.
+
 ## 2026-09-19 - Marco G: áudio no runtime Web (Audaspace + SDL2)
 
 - `WITH_AUDASPACE=ON` no preset `web-runtime`; backend SDL2 (Web Audio/ScriptProcessor). OpenAL e libsndfile seguem desligados.

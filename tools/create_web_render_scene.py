@@ -5,6 +5,7 @@ sombra de spot (buffer), sol, material com especular, transparencia (alpha blend
 ambient occlusion do mundo e textura procedural no chao. As teclas 1..0/Q/W/E/R/T dependem dos filtros
 do jogo de smoke, entao aqui o foco e o render 3D. Saida: build-web/bin/web-render.range.
 """
+import os
 import bpy
 from mathutils import Vector
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 out_dir = Path(__file__).resolve().parents[1] / 'build-web' / 'bin'
 out_dir.mkdir(parents=True, exist_ok=True)
 
+# RENDER_OFF=rot,shadow,ao,mist,glsl,alpha (lista) desliga recursos para isolar defeitos do runtime.
+OFF = set(filter(None, os.environ.get('RENDER_OFF', '').split(',')))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene.name = 'Render'
@@ -30,8 +33,8 @@ scene.world = world
 world.horizon_color = (0.45, 0.6, 0.8)
 world.zenith_color = (0.1, 0.2, 0.5)
 world.ambient_color = (0.15, 0.15, 0.2)
-world.light_settings.use_ambient_occlusion = True
-world.mist_settings.use_mist = True
+world.light_settings.use_ambient_occlusion = 'ao' not in OFF
+world.mist_settings.use_mist = 'mist' not in OFF
 world.mist_settings.start = 8
 world.mist_settings.depth = 25
 
@@ -51,7 +54,7 @@ spot.location = (3, -3, 8)
 spot.rotation_euler = (Vector((0, 0, 0)) - spot.location).to_track_quat('-Z', 'Y').to_euler()
 spot.data.energy = 1.5
 spot.data.spot_size = 1.2
-spot.data.shadow_method = 'BUFFER_SHADOW'
+spot.data.shadow_method = 'NOSHADOW' if 'shadow' in OFF else 'BUFFER_SHADOW'
 spot.data.shadow_buffer_size = 2048
 
 
@@ -60,7 +63,7 @@ def mat(name, color, spec=0.0, alpha=1.0):
     m.diffuse_color = color
     m.specular_intensity = spec
     m.specular_hardness = 80
-    if alpha < 1.0:
+    if alpha < 1.0 and 'alpha' not in OFF:
         m.use_transparency = True
         m.alpha = alpha
         m.game_settings.alpha_blend = 'ALPHA'
@@ -104,8 +107,9 @@ obj = cont.owner
 obj["t"] = obj.get("t", 0) + 1
 if obj["t"] == 1:
     print("[render] scene running", flush=True)
-obj.applyRotation((0, 0, 0.01), False)
-''')
+if not %s:
+    obj.applyRotation((0, 0, 0.01), False)
+''' % ('rot' in OFF))
 cube = bpy.data.objects['Cube']
 bpy.ops.logic.sensor_add(type='ALWAYS', object=cube.name)
 s = cube.game.sensors[-1]
@@ -115,6 +119,6 @@ c = cube.game.controllers[-1]
 c.text = script
 s.link(c)
 
-output = out_dir / 'web-render.range'
+output = out_dir / ('web-render%s.range' % ('-' + '-'.join(sorted(OFF)) if OFF else ''))
 bpy.ops.wm.save_as_mainfile(filepath=str(output))
 print('[web-render] saved', str(output))
