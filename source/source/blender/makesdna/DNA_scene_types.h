@@ -1652,7 +1652,7 @@ typedef struct ToolSettings {
 	struct Object *skgen_template;
 	char bone_sketching;
 	char bone_sketching_convert;
-	char skgen_subdivision_number;
+	unsigned char skgen_subdivision_number;
 	char skgen_retarget_options;
 	char skgen_retarget_roll;
 	char skgen_side_string[8];

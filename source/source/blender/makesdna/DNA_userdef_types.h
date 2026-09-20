@@ -310,7 +310,7 @@ typedef struct ThemeSpace {
 	char handle_vertex[4];
 	char handle_vertex_select[4];
 
-	char handle_vertex_size;
+	unsigned char handle_vertex_size;
 
 	char clipping_border_3d[4];
 

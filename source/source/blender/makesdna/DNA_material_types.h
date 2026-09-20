@@ -107,7 +107,7 @@ typedef struct Material {
 	float tx_limit, tx_falloff;
 	short ray_depth, ray_depth_tra;
 	short har;
-	char seed1, seed2;
+	unsigned char seed1, seed2;
 
 	float gloss_mir, gloss_tra;
 	short samp_gloss_mir, samp_gloss_tra;
