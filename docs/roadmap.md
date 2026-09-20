@@ -49,10 +49,9 @@ Aberto:
 
 ### Cutscene nativo
 
-Fases 0–2 e 4–5 implementadas. Abertos: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`) e
-validação manual de Play → Stop → Play e standalone, incluindo `Spawn Object` disparar uma vez e limpar a
-réplica no Stop/Restart. Ver [plano](cutscene-native-integration-plan.md) e
-[roteiro](cutscene-native-example.md).
+Fases 0–2 e 4–5 implementadas; validação manual (Play → Stop → Play e standalone) aceita em 2026-09-20.
+Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ver
+[plano](cutscene-native-integration-plan.md) e [roteiro](cutscene-native-example.md).
 
 ### World Status
 
@@ -96,8 +95,8 @@ NDK e backend GHOST/APK inexistente. Ver [mobile-export-plan.md](mobile-export-p
 
 ## Iluminação e gráficos
 
-- **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`. Falta validar numa cena
-  GPU-bound, ligado/desligado, sem oscilação de escala nem artefatos nos efeitos.
+- **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
+  (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
 - Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado, clipping de
@@ -105,27 +104,13 @@ NDK e backend GHOST/APK inexistente. Ver [mobile-export-plan.md](mobile-export-p
 
 ## Validações manuais pendentes
 
-- **Sombras (Ketsji / Planos 1A e 5)**: validar no jogo real Play → Stop → Play e standalone, com múltiplas
-  luzes/cenas, a transição do 9º para o 10º frame elegível de CSM, o cache de cascata e o split
-  estático/dinâmico. Registrar separadamente os avisos de textura sem nível-base vistos em `-d gpu` (origem
-  desconhecida). Ver [plano mestre](ketsji-engine-modernization-plan.md).
-- **Migração de `shadowCulling`**: testar arquivo antigo com `maxphystep` gravado em 0/1/5/10 e confirmar que o
-  comportamento de sombra é preservado.
-- **Sol em `PostRenderScene`**: confirmar que Light Scattering/Lens Flare não piscam ao cruzar ângulos com
-  `screenPos.w` nulo/negativo.
+Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
+migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
+menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
+
+- **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
-- **Splash e About**: popup sobe em 1,2 s; painel inferior sem caixas cinzas; `Create Project`, recentes e
-  links de rede interativos.
-- **Outliner**: `View > Show Alternating Rows` ligado/desligado (cor de fundo do tema, rolagem, seleção,
-  colunas de restrição).
-- **Barra da 3D View**: Play, Standalone, Debug/Console, modos de sombreamento, atualização contínua (materiais
-  animados e decals/projetores), Only Render, overlay, bloqueio de câmera/camadas, Edit Mode, redimensionamento.
-- **Particles/UI**: aba Particles em objetos Empty e ordens ajustadas nos painéis Render Layers e Physics.
-- **Gamepad no menu ImGui**: testar bindings com gamepad físico e ajustar áreas clicáveis.
-- **Runtime Property Sensors/Actuators**: cena de regressão física (massa, velocidades, gravidade, referências
-  a objetos removidos).
-- **Captura de vídeo e OpenAL**: stress de start/stop de captura e múltiplos efeitos.
 
 ## Fora do escopo atual
 

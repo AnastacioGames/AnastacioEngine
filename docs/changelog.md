@@ -15,7 +15,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `docs/roadmap.md` reescrito só com pendências reais (de 526 para cerca de 140 linhas). A narrativa histórica
   do bloco Web (bloqueios de shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) já estava
   nas entradas de 2026-09-12 a 2026-09-18 deste changelog e foi removida do roadmap. Marco D e pré-voo saíram
-  da lista de abertos; o item FFmpeg do editor Linux continua aberto (só o wrapper audaspace foi ajustado).
+  da lista de abertos; o item FFmpeg do editor Linux continua aberto (só o wrapper audaspace foi ajustado). Aceites manuais do usuário no mesmo dia (cutscene Play/Stop/Play e standalone, sombras, migração de `maxphystep`, Sol/Lens Flare, resolução dinâmica, splash/About, Outliner, barra da 3D View, Particles, gamepad ImGui, sensores/actuators de física) removidos das pendências.
 
 ## 2026-09-20 - Web: verificação automática do xadrez por pixels
 
