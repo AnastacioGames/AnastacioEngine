@@ -4,6 +4,12 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: verificação automática do xadrez por pixels
+
+- `tools/web/verify-capabilities.cjs` (modo `render`) captura a tela e conta transições de luminância nas
+  linhas do chão; um chão liso (UV constante, como no bug dos divisores de atributo, `63b3664d`) reprova.
+  Pacote `teste-render`: 173 transições, verificação passou.
+
 ## 2026-09-20 - Marco G: normal map .dds conferido no runtime Web
 
 - `tools/create_web_normalmap_scene.py` abre `source/release/datafiles/startup.blend` (cubo e plano com

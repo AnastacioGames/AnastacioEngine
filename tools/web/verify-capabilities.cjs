@@ -6,7 +6,7 @@
 //   modo touch    : toque (touchStart/End) no canvas deve virar clique de mouse ("mouse click flipped")
 //   modo sim      : jogo web-capabilities: fisica, addObject/endObject, addScene (overlay) e replace de cena
 //   modo audio    : jogo web-audio: tom WAV em loop; confere mixer ativo e amplitude nao nula na saida Web Audio
-//   modo render   : jogo web-render: sobe e roda 8 s sem excecao (o visual e julgado pelo usuario)
+//   modo render   : jogo web-render: sobe, roda 8 s sem excecao e confere o padrao xadrez do chao por pixels da captura
 //   modo filters  : 1..0,Q (filtros simples ligam/desligam) e W,E,R,T (embutidos) sem erro de shader
 // Requer Chrome ja aberto com --remote-debugging-port=<porta-cdp>. Sai com 0 se todas as expectativas baterem.
 const [url, mode, port = '9333'] = process.argv.slice(2);
@@ -24,7 +24,7 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
     else if (m.method === 'Runtime.exceptionThrown') logs.push('[exception] ' + JSON.stringify(m.params.exceptionDetails.text) + ' ' + ((m.params.exceptionDetails.exception || {}).description || '').slice(0, 1500));
   };
   const call = (method, params = {}) => new Promise(r => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
-  const evalJs = async expr => (await call('Runtime.evaluate', { expression: expr, returnByValue: true })).result?.value;
+  const evalJs = async expr => (await call('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true })).result?.value;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const key = async (k, code, vk) => {
     for (const type of ['keyDown', 'keyUp']) {
@@ -109,6 +109,27 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
       const has = re => logs.some(l => re.test(l));
       expect('cena de render rodando', has(/\[render\] scene running/));
       expect('sem excecao/aborto no loop', !has(/\[exception\]|Aborted|\[ABORT\]/));
+      // Pixels: o chao xadrez ocupa a parte de baixo da tela; um chao liso (UV constante) tem quase nenhuma
+      // transicao de luminancia ao longo de uma linha. Pega regressoes como o divisor de atributo residual.
+      const shot = await call('Page.captureScreenshot', { format: 'png' });
+      const m = JSON.parse(await evalJs(`(async function(){
+        var img = new Image(); img.src = 'data:image/png;base64,${shot.data}'; await img.decode();
+        var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+        var g = c.getContext('2d'); g.drawImage(img, 0, 0);
+        var best = 0, colors = {};
+        for (var f = 0.70; f < 0.98; f += 0.04) {
+          var y = Math.floor(img.height * f), d = g.getImageData(0, y, img.width, 1).data, prev = null, n = 0;
+          for (var x = 0; x < img.width; x++) {
+            var l = (d[x*4] + d[x*4+1] + d[x*4+2]) / 765;
+            if (prev !== null && Math.abs(l - prev) > 0.04) n++;
+            prev = l; colors[(d[x*4]>>4)+','+(d[x*4+1]>>4)+','+(d[x*4+2]>>4)] = 1;
+          }
+          if (n > best) best = n;
+        }
+        return JSON.stringify({ transitions: best, colors: Object.keys(colors).length, w: img.width, h: img.height });
+      })()`) || 'null');
+      console.log('pixels:', JSON.stringify(m));
+      expect('chao com padrao (xadrez, transicoes de luminancia)', m && m.transitions >= 6);
     } else if (mode === 'filters') {
       const KEYS = [['1', 'Digit1', 49, 'BLUR'], ['2', 'Digit2', 50, 'SHARPEN'], ['3', 'Digit3', 51, 'DILATION'],
         ['4', 'Digit4', 52, 'EROSION'], ['5', 'Digit5', 53, 'LAPLACIAN'], ['6', 'Digit6', 54, 'SOBEL'],
