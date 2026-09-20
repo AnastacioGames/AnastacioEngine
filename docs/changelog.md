@@ -4,6 +4,22 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: UV/normais constantes em malhas no runtime Web
+
+- Sintoma: chão da cena `web-render` sem o xadrez e iluminação fraca na Web (desktop correto). O UV chegava constante em (0,0) ao fragment shader e as normais também eram constantes.
+- Diagnóstico (sondas CDP em `WebGL2RenderingContext`): ponteiros, buffer (UV 0..4 no offset 160), location (`att0@2`) e link estavam corretos; `VERTEX_ATTRIB_ARRAY_DIVISOR` valia 1 nos locations 1-6 durante o draw de malha, então cada vértice lia o primeiro elemento. Trocar o VS por `gl_Position`/constante propagava o varying; só `att0` vinha zerado.
+- Causa: o desenho instanciado de debug/partículas deixa divisor 1 nesses locations e a emulação legacy de VAO do Emscripten não isola divisores (mesmo defeito já corrigido em `ScreenPlane::Render`).
+- Correção: `RAS_StorageVao::BindPrimitives` zera os divisores 0-7 no Web; o instancing reaplica os seus depois (`ActivateInstancing`). Verificado: xadrez, cubo vermelho, especular, névoa e sombras corretos no pacote `web-render`.
+- `tools/create_web_render_scene.py`: chão com UV explícito (4x4); `RENDER_OFF=orco` mantém o caminho ORCO.
+
+## 2026-09-19 - Compatibilidade Python para projetos BGE/UPBGE
+
+- `KX_PythonInit.cpp`: depois de criar a API `Range`, a engine agora registra `bge` e todos os seus
+  submódulos públicos como aliases no `sys.modules`. Eles referenciam os mesmos objetos (`bge.logic is
+  Range.logic`), preservando também estado compartilhado como `globalDict` quando um projeto usa as duas
+  grafias. Scripts legados com `import bge`, `import bge.logic` ou `from bge import events` não precisam
+  ser editados; a documentação para código novo continua sendo `import Range`.
+
 ## 2026-09-19 - Marco G: sombra de spot (buffer) no runtime Web
 
 - Sintoma (teste manual do pacote `web-render`): `RuntimeError: null function` em `GPU_texture_bind_as_framebuffer`, chamado de `RAS_OpenGLLight::BindShadowBuffer`, logo após a cena iniciar. Isolado por bissecção de variantes da cena (`RENDER_OFF=shadow`) e por trace com `--profiling-funcs`.

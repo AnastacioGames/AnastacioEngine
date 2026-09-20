@@ -13,7 +13,7 @@ from pathlib import Path
 out_dir = Path(__file__).resolve().parents[1] / 'build-web' / 'bin'
 out_dir.mkdir(parents=True, exist_ok=True)
 
-# RENDER_OFF=rot,shadow,ao,mist,glsl,alpha,spec,smooth (lista) desliga recursos para isolar defeitos do runtime.
+# RENDER_OFF=rot,shadow,ao,mist,glsl,alpha,spec,smooth,orco (lista) desliga recursos para isolar defeitos do runtime.
 OFF = set(filter(None, os.environ.get('RENDER_OFF', '').split(',')))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -101,8 +101,16 @@ tex = bpy.data.textures.new('Checker', 'IMAGE')
 tex.image = img
 slot = floor.data.materials[0].texture_slots.add()
 slot.texture = tex
-slot.texture_coords = 'ORCO'  # o plano primitivo nao tem UV
-tex.repeat_x = tex.repeat_y = 4
+if 'orco' in OFF:
+    slot.texture_coords = 'ORCO'  # o plano primitivo nao tem UV
+    tex.repeat_x = tex.repeat_y = 4
+else:
+    # UV explicito (o plano primitivo nao traz camada UV): 4x4 repeticoes
+    layer = floor.data.uv_textures.new('UVMap')
+    for i, uv in enumerate(floor.data.uv_layers[0].data):
+        uv.uv = [(0, 0), (4, 0), (4, 4), (0, 4)][i % 4]
+    slot.texture_coords = 'UV'
+    slot.uv_layer = 'UVMap'
 
 script = bpy.data.texts.new('render.py')
 script.write('''import Range

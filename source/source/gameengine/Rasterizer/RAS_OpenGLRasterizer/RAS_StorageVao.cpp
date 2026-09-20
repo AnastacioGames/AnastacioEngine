@@ -26,6 +26,10 @@
 #include "RAS_StorageVbo.h"
 #include "GPU_vertex_array.h"
 
+#ifdef __EMSCRIPTEN__
+extern "C" void emscripten_glVertexAttribDivisor(GLuint index, GLuint divisor);
+#endif
+
 /* Core profile has no client-state/fixed-function attribute slots (glVertexPointer etc.), so
  * position/normal/color must bind to explicit attribute locations instead. These numbers are a
  * contract with gpu_shader_vertex.glsl, which must declare matching
@@ -173,6 +177,15 @@ RAS_StorageVao::~RAS_StorageVao()
 void RAS_StorageVao::BindPrimitives()
 {
 	GPU_bind_vertex_array(m_id);
+#ifdef __EMSCRIPTEN__
+	/* Legacy GL emulation replays vertex pointers on VAO bind but does not isolate attribute
+	 * divisors: instanced debug/particle draws leave locations 1-6 at divisor 1, which makes
+	 * every vertex read the first element of UV/normal/tangent (constant UV, flat lighting).
+	 * Instancing re-applies its own divisors after this bind (ActivateInstancing). */
+	for (GLuint loc = 0; loc < 8; ++loc) {
+		emscripten_glVertexAttribDivisor(loc, 0);
+	}
+#endif
 }
 
 void RAS_StorageVao::UnbindPrimitives()
