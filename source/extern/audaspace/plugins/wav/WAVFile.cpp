@@ -5,6 +5,7 @@
 #include "file/FileManager.h"
 #include "util/Buffer.h"
 #include "../mp3/MP3File.h"
+#include "../ogg/OGGFile.h"
 
 #include <cstdint>
 #include <cstring>
@@ -168,17 +169,23 @@ void WAVFile::registerPlugin()
 	FileManager::registerInput(std::shared_ptr<WAVFile>(new WAVFile));
 }
 
-/** Dado que nao e RIFF/WAVE: tenta MP3 sem lancar (Emscripten sem excecoes); so lanca se nada servir. */
+/** Dado que nao e RIFF/WAVE: tenta OGG ("OggS") e MP3 sem lancar (Emscripten sem excecoes); so lanca se nada servir. */
 static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
 {
 	if (data.size() >= 12 && memcmp(data.data(), "RIFF", 4) == 0 && memcmp(data.data() + 8, "WAVE", 4) == 0) {
 		return std::shared_ptr<IReader>(new WAVReader(data));
 	}
-	std::shared_ptr<IReader> mp3 = createMP3Reader(std::move(data));
-	if (!mp3) {
-		AUD_THROW(FileException, "Not a RIFF/WAVE or MP3 file.");
+	std::shared_ptr<IReader> decoded;
+	if (data.size() >= 4 && memcmp(data.data(), "OggS", 4) == 0) {
+		decoded = createOGGReader(std::move(data));
 	}
-	return mp3;
+	else {
+		decoded = createMP3Reader(std::move(data));
+	}
+	if (!decoded) {
+		AUD_THROW(FileException, "Not a RIFF/WAVE, Ogg Vorbis or MP3 file.");
+	}
+	return decoded;
 }
 
 std::shared_ptr<IReader> WAVFile::createReader(std::string filename)

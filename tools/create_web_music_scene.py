@@ -1,8 +1,8 @@
 """Run with RangeEngine -b --python tools/create_web_music_scene.py.
 
-Jogo de teste de MP3 no runtime Web: um Sound Actuator toca em loop um MP3 empacotado no .range
+Jogo de teste de MP3/OGG no runtime Web: um Sound Actuator toca em loop um MP3 empacotado no .range
 (padrao projects-teste/music/Anastacio Music.mp3; outro arquivo via variavel MUSIC_MP3). Depende do
-leitor MP3 embutido do Audaspace (plugins/mp3). Saida: build-web/bin/web-music.range.
+leitor MP3/OGG embutido do Audaspace (plugins/mp3, plugins/ogg). Saida: build-web/bin/web-music.range.
 """
 import os
 import bpy

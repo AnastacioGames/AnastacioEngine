@@ -4,6 +4,14 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: OGG Vorbis no áudio do runtime Web
+
+- `plugins/ogg/OGGFile.cpp` (stb_vorbis v1.22 vendorizado, domínio público/MIT) segue o mesmo padrão do MP3:
+  `createOGGReader` devolve `nullptr` em vez de lançar, e o `WAVFile` o chama quando o dado começa com "OggS".
+  Streaming com seek e loop, 1 ou 2 canais.
+- Prova: `tools/create_web_music_scene.py` com `MUSIC_MP3=projects-teste/music/capaceton.ogg` no pacote 8209;
+  **o usuário confirmou que o som toca**. Segue fora: OpenAL/efeitos e o módulo Python `aud`.
+
 ## 2026-09-19 - Marco G: MP3 no áudio do runtime Web
 
 - O runtime Web não tem exceções C++: qualquer `throw` vira `Aborted(undefined)`. O Audaspace escolhe o leitor
