@@ -100,6 +100,17 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(ids(found), ["WEB-GFX-002", "WEB-PY-001", "WEB-PKG-003", "WEB-PY-009"])
         self.assertTrue(all(f.severity == "ERROR" and f.evidence == "CONFIRMED" for f in found))
 
+    def test_structured_python_error_keeps_origin_and_traceback(self):
+        found = preflight.check_preflight(report(python_errors=[
+            {"kind": "ValueError", "text": "linha1\nlinha2 \"aspas\" ção", "origin": "Cube", "context": "controller",
+             "traceback": "Traceback...", "structured": True},
+            {"kind": "ValueError", "text": "linha1\nlinha2 \"aspas\" ção", "origin": "Sphere", "context": "controller",
+             "traceback": "Traceback...", "structured": True}]))
+        self.assertEqual(ids(found), ["WEB-PY-009", "WEB-PY-009"])
+        self.assertIn("controller em Cube", found[0].message)
+        self.assertEqual(found[1].location["source"], "Sphere")
+        self.assertEqual(found[0].fix, "Traceback...")
+
     def test_v1_and_v2_reports_are_accepted(self):
         legacy = report(schema_version=1, shader_errors=[{"material": "", "stage": "?", "log": "old"}])
         self.assertEqual(ids(preflight.check_preflight(legacy)), ["WEB-GFX-002"])

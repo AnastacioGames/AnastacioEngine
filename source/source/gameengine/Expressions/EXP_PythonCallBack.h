@@ -45,4 +45,11 @@ void EXP_RunPythonCallback(PyObject *value, PyObject **arglist, unsigned int min
  */
 void EXP_RunPythonCallBackList(PyObject *functionlist, PyObject **arglist, unsigned int minargcount, unsigned int maxargcount);
 
+/** Report the pending Python exception to the Web pre-flight collector (Emscripten only, no-op elsewhere).
+ * The exception is fetched, described and restored, so the caller can still PyErr_Print/PyErr_Clear it.
+ * \param context Where it happened (e.g. "controller", "component.update", "callback").
+ * \param origin Name of the object/component/brick when known, otherwise nullptr.
+ */
+void EXP_ReportPythonDiagnostic(const char *context, const char *origin);
+
 #endif // __EXP_PYTHON_CALLBACK_H__

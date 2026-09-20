@@ -140,7 +140,7 @@ def _check_python(data):
     seen = set()
     for e in data.get("python_errors", ()):
         # O mesmo erro repete a cada frame do controller; um resultado por causa.
-        key = (e.get("kind"), e.get("module"), e.get("file"), e.get("text"))
+        key = (e.get("kind"), e.get("module"), e.get("file"), e.get("text"), e.get("origin"))
         if key in seen:
             continue
         seen.add(key)
@@ -152,6 +152,7 @@ def _check_python(data):
             out.append(_err("WEB-PKG-003", "Arquivo não encontrado no runtime: %s." % (e.get("file") or e.get("text", "?")),
                             fix="Incluir o arquivo no pacote.", location={"source": e.get("file", "")}))
         else:
-            out.append(_err("WEB-PY-009", "%s no runtime: %s" % (kind or "Erro", e.get("text", "")),
-                            location={"source": e.get("file", "")}))
+            where = " (%s%s)" % (e.get("context", ""), " em %s" % e["origin"] if e.get("origin") else "")                 if e.get("context") or e.get("origin") else ""
+            out.append(_err("WEB-PY-009", "%s no runtime%s: %s" % (kind or "Erro", where, e.get("text", "")),
+                            fix=e.get("traceback", ""), location={"source": e.get("origin") or e.get("file", "")}))
     return out

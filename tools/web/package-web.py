@@ -231,9 +231,12 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   var pf = { shaders: [], python: [], diagnostics: [], contextLost: false, runtimeInitialized: false,
              runtimeAborted: "", failure: "" };
   var pfOpenShader = null, pfPyOpen = false, pfSeen = {}, pfStructuredShader = false;
+  var pfStructuredPyKinds = {};
   function pfAddPy(rec) {
     // O mesmo erro se repete a cada frame do controller; um registro por causa basta.
-    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + rec.text;
+    // Heuristica de console nao duplica um erro que ja chegou como evento estruturado.
+    if (!rec.structured && pfStructuredPyKinds[rec.kind]) return;
+    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + (rec.origin || "") + "|" + rec.text;
     if (!pfSeen[key]) { pfSeen[key] = true; pf.python.push(rec); }
   }
   function pfAddShader(rec) {
@@ -247,6 +250,15 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       pfStructuredShader = true;
       pfAddShader({ material: rec.origin || "", stage: rec.stage || "", operation: rec.operation || "",
                     log: rec.log || "", structured: true });
+    }
+    else if (rec.category === "python" && rec.severity === "error") {
+      var kind = rec.exception_type || "Exception";
+      pfStructuredPyKinds[kind] = true;
+      var mod = "";
+      var mm = /(?:ModuleNotFoundError|ImportError).*?['"]([\\w.]+)['"]/.exec(rec.message || "");
+      if (mm) mod = mm[1];
+      pfAddPy({ kind: kind, module: mod, file: "", text: rec.message || "", origin: rec.origin || "",
+                context: rec.context || "", traceback: rec.traceback || "", structured: true });
     }
   }
   function pfLine(t) {
