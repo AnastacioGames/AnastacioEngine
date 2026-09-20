@@ -4,6 +4,11 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: fluxo do editor aceito pelo usuário
+
+- Teste manual no editor concluído (Validar, Exportar Web, Testar pacote no navegador, Importar pré-voo, bloqueio
+  por erro e Localizar): passou. Marco E fechado; o item saiu do roadmap.
+
 ## 2026-09-20 - docs: celular confirmado e roteiro do teste no editor
 
 - Deploy no GitHub Pages confirmado pelo usuário também no celular. Roadmap e `web-deploy.md` atualizados; o item

@@ -20,9 +20,6 @@ pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-v
 
 Aberto:
 
-- **Teste manual do fluxo no editor** (Exportar Web, "Testar pacote no navegador", "Importar pré-voo Web"):
-  roteiro em `projects-teste/teste-editor-web/LEIA-ME.md`. Deploy real (GitHub Pages) já aceito em Chrome, Edge,
-  Firefox e celular em 2026-09-20; o aviso `glBlitFramebuffer` não reproduz mais.
 - **Patch customizado do SDL2/Emscripten** (remoção do gate de timestamp do gamepad): mora no cache de
   toolchain do emsdk, fora do controle de versão; não sobrevive a reinstalação limpa nem se propaga para outra
   máquina. Versionar (patch aplicado no build ou port SDL2 próprio).
