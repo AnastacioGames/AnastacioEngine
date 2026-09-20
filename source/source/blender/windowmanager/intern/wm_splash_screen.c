@@ -162,17 +162,17 @@ static void get_version_string_splash_screen(char *ver, const int max_length)
 
   if (!isPostRelease) {
 	  if (previewVer) {
-		BLI_snprintf(ver, max_length, "AnastacioEngine 0.2.0 Preview %d", RANGE_MINSUBVERSION);
+		BLI_snprintf(ver, max_length, "AnastacioEngine 0.4.0 Preview %d", RANGE_MINSUBVERSION);
 	  }
 	  else {
-		BLI_snprintf(ver, max_length, "AnastacioEngine 0.2.0 Release");
+		BLI_snprintf(ver, max_length, "AnastacioEngine 0.4.0 Release");
 	  }
   }
   else {
     // A and B Releases.
     BLI_snprintf(ver,
                  max_length,
-                 "AnastacioEngine 0.2.0 Release Candidate");
+                 "AnastacioEngine 0.4.0 Release Candidate");
   }
 }
 
