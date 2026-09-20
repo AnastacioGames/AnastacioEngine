@@ -74,8 +74,22 @@ class PreflightTests(unittest.TestCase):
     def test_webgl_and_context(self):
         found = preflight.check_preflight(report(webgl={"version": 0, "error": "blocklisted"}, context_lost=True))
         self.assertEqual(ids(found), ["WEB-GFX-001", "WEB-DEPLOY-003"])
+        found = preflight.check_preflight(report(webgl={"version": 1, "error": "WebGL 2 indisponível"}))
+        self.assertEqual(ids(found), ["WEB-GFX-001"])
         found = preflight.check_preflight(report(webgl={"version": 2, "missing_extensions": ["EXT_x"]}))
         self.assertEqual(ids(found), ["WEB-GFX-001"])
+
+    def test_manifest_fetch_failure_is_a_file_failure(self):
+        found = preflight.check_preflight(report(files=[{
+            "name": "manifest.json", "status": None, "error": "HTTP 404",
+        }]))
+        self.assertEqual(ids(found), ["WEB-DEPLOY-002"])
+        self.assertEqual(found[0].location["source"], "manifest.json")
+
+    def test_runtime_must_initialize_without_failure(self):
+        self.assertEqual(ids(preflight.check_preflight(report(runtime_initialized=False))), ["WEB-DEPLOY-002"])
+        self.assertEqual(ids(preflight.check_preflight(report(runtime_aborted="OOM"))), ["WEB-DEPLOY-002"])
+        self.assertEqual(ids(preflight.check_preflight(report(runtime_failure="HTTP 404"))), ["WEB-DEPLOY-002"])
 
     def test_shader_and_python_errors(self):
         found = preflight.check_preflight(report(

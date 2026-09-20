@@ -7,6 +7,9 @@
 #   webgl: {version: 0|1|2, missing_extensions: [str], error: str}
 #   files: [{name, status (int|null), mime, error, expected_sha256, sha256}]
 #   context_lost: bool
+#   runtime_initialized: bool
+#   runtime_aborted: str
+#   runtime_failure: str
 #   shader_errors: [{material, stage, log}]
 #   python_errors: [{kind: "ImportError"|"FileNotFoundError"|..., module, file, text}]
 
@@ -49,6 +52,7 @@ def check_preflight(data, runtime_manifest=None):
     findings += _check_isolation(data, runtime_manifest)
     findings += _check_webgl(data)
     findings += _check_files(data)
+    findings += _check_runtime(data)
     findings += _check_context(data)
     findings += _check_shaders(data)
     findings += _check_python(data)
@@ -71,10 +75,10 @@ def _check_webgl(data):
     if gl is None:
         return []
     out = []
-    if not gl.get("version"):
+    if gl.get("version", 0) < 2:
         out.append(_err("WEB-GFX-001", "WebGL indisponível no navegador%s." % (
             ": " + gl["error"] if gl.get("error") else ""),
-            fix="Ativar aceleração de hardware ou usar outro navegador.", capability="webgl"))
+            fix="Usar um navegador com WebGL 2 e aceleração de hardware.", capability="webgl"))
     for ext in gl.get("missing_extensions", ()):
         out.append(_err("WEB-GFX-001", "Extensão WebGL obrigatória ausente: %s." % ext, capability="webgl"))
     return out
@@ -99,6 +103,19 @@ def _check_files(data):
             out.append(_err("WEB-DEPLOY-002", "%s diverge do manifesto (cache de versões misturadas?)." % name,
                             fix="Limpar o cache e republicar todos os arquivos do pacote juntos.", location=loc))
     return out
+
+
+def _check_runtime(data):
+    if data.get("runtime_aborted"):
+        return [_err("WEB-DEPLOY-002", "Runtime abortou durante o pré-voo: %s." % data["runtime_aborted"],
+                     fix="Consultar o log do runtime e corrigir o erro antes de publicar.")]
+    if data.get("runtime_failure"):
+        return [_err("WEB-DEPLOY-002", "Runtime falhou durante o pré-voo: %s." % data["runtime_failure"],
+                     fix="Consultar o log do runtime e conferir os arquivos do pacote.")]
+    if data.get("runtime_initialized") is False:
+        return [_err("WEB-DEPLOY-002", "Runtime não concluiu a inicialização durante o pré-voo.",
+                     fix="Aumentar o tempo de pré-voo ou corrigir a falha de carregamento do runtime.")]
+    return []
 
 
 def _check_context(data):

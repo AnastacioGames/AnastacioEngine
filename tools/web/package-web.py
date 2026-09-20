@@ -130,6 +130,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   function fail(msg) {
     if (failed) return;
     failed = true;
+    if (pf) pf.failure = String(msg);
     el("progress").hidden = true;
     el("play").hidden = true;
     el("status").textContent = "Nao foi possivel iniciar o jogo.";
@@ -179,7 +180,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       // Avisos conhecidos e inofensivos da emulacao GL legada do emscripten.
       if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn(t); else console.error(t);
     },
-    onAbort: function (w) { fail("O runtime foi interrompido: " + w); },
+    onAbort: function (w) {
+      if (pf) pf.runtimeAborted = String(w);
+      fail("O runtime foi interrompido: " + w);
+    },
     setStatus: function (t) {
       if (failed) return;
       var m = /(.+) \\((\\d+(?:\\.\\d+)?)\\/(\\d+)\\)/.exec(t);
@@ -195,6 +199,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       }).catch(function (e) { fail("Falha ao baixar arquivos do jogo: " + e.message); });
     }],
     onRuntimeInitialized: function () {
+      if (pf) pf.runtimeInitialized = true;
       log("[event] runtime inicializado");
       markReady();
     }
@@ -224,7 +229,8 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   // range_web/preflight.py. Erros de shader e de Python sao extraidos do texto do runtime
   // por heuristica; falso negativo e possivel, entao a ausencia deles nao prova sucesso.
   var preflight = /[?&]preflight=1/.test(location.search);
-  var pf = { shaders: [], python: [], contextLost: false };
+  var pf = { shaders: [], python: [], contextLost: false, runtimeInitialized: false,
+             runtimeAborted: "", failure: "" };
   var pfOpenShader = null, pfPyOpen = false, pfSeen = {};
   function pfAddPy(rec) {
     // O mesmo erro se repete a cada frame do controller; um registro por causa basta.
@@ -267,8 +273,19 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   }
   function pfFiles() {
     return fetch("manifest.json?v=" + encodeURIComponent(VERSION), { cache: "no-store" })
-      .then(function (r) { return r.json(); }).catch(function () { return { files: {} }; })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (man) {
+        if (!man || typeof man.files !== "object") throw new Error("manifesto sem lista de arquivos");
+        return man;
+      }).catch(function (e) {
+        return { files: {}, preflight_manifest_error: String(e) };
+      })
       .then(function (man) {
+        if (man.preflight_manifest_error) {
+          return [{ name: "manifest.json", status: null, mime: "", error: man.preflight_manifest_error }];
+        }
         var names = Object.keys(man.files || {}).filter(function (n) {
           return n !== "manifest.json" && n !== "SHA256SUMS.txt";
         });
@@ -288,6 +305,8 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     return { schema: "range-web-preflight", schema_version: 1,
              cross_origin_isolated: !!window.crossOriginIsolated,
              webgl: pfProbeGL(), files: files, context_lost: pf.contextLost,
+             runtime_initialized: pf.runtimeInitialized, runtime_aborted: pf.runtimeAborted,
+             runtime_failure: pf.failure,
              shader_errors: pf.shaders, python_errors: pf.python };
   }
   if (preflight) {
