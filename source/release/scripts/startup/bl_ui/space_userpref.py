@@ -92,11 +92,21 @@ class USERPREF_PT_navigation(Panel):
         # Keep the navigation compact and visually grouped.  The old 1.3x
         # scaling made the sidebar consume too much space before the content
         # could breathe, especially on smaller editor windows.
-        box = layout.box()
-        col = box.column()
-        col.scale_x = 1.05
-        col.scale_y = 1.12
-        col.prop(userpref, "active_section", expand=True)
+        # Draw each category in its own panel.  Keeping the enum items
+        # explicit preserves the RNA enum and existing translation keys.
+        def draw_group(title, sections, icon):
+            group = layout.box()
+            group.scale_x = 1.05
+            group.scale_y = 1.12
+            group.label(text=title, icon=icon)
+            for section in sections:
+                group.prop_enum(userpref, "active_section", section, icon=icon)
+
+        draw_group("User Preferences:",
+                   ('INTERFACE', 'EDITING', 'INPUT', 'ADDONS', 'THEMES'),
+                   'PREFERENCES')
+        draw_group("Game Engine:", ('INPUTSYSTEM',), 'GAME')
+        draw_group("System:", ('SYSTEM_GENERAL', 'SYSTEM_FILES'), 'SETTINGS')
 
 
 class USERPREF_MT_interaction_presets(Menu):
@@ -218,8 +228,8 @@ class USERPREF_PT_interface(Panel):
         row.separator(factor=1)
         row.separator(factor=1)
 
-        col = row.column()
-        col = col.box()
+        view_panel = row.column()
+        col = view_panel.box()
         col.label(text="View Manipulation:")
         col.prop(view, "use_mouse_depth_cursor")
         col.prop(view, "use_cursor_lock_adjust")
@@ -238,6 +248,8 @@ class USERPREF_PT_interface(Panel):
         col.separator(factor=1)
         col.separator(factor=1)
 
+        # Keep the viewport timing/grid controls in their own sub-panel.
+        col = view_panel.box()
         col.label(text="2D Viewports:")
         col.prop(view, "view2d_grid_spacing_min", text="Minimum Grid Spacing")
         col.prop(view, "timecode_style")
@@ -250,8 +262,8 @@ class USERPREF_PT_interface(Panel):
         row.separator(factor=1)
         row.separator(factor=1)
 
-        col = row.column()
-        col = col.box()
+        manip_panel = row.column()
+        col = manip_panel.box()
         # Toolbox doesn't exist yet
         # col.label(text="Toolbox:")
         #col.prop(view, "show_column_layout")
@@ -269,6 +281,8 @@ class USERPREF_PT_interface(Panel):
         col.separator(factor=1)
         col.separator(factor=1)
 
+        # Menus and pie-menu timing are independent groups of controls.
+        col = manip_panel.box()
         col.label(text="Menus:")
         col.prop(view, "use_mouse_over_open")
         sub = col.column()
@@ -278,6 +292,7 @@ class USERPREF_PT_interface(Panel):
         sub.prop(view, "open_sublevel_delay", text="Sub Level")
 
         col.separator(factor=1)
+        col = manip_panel.box()
         col.label(text="Pie Menus:")
         sub = col.column(align=True)
         sub.prop(view, "pie_animation_timeout")
@@ -316,109 +331,82 @@ class USERPREF_PT_edit(Panel):
         row = layout.row()
 
         col = row.column()
-        col.label(text="Link Materials To:")
-        col.prop(edit, "material_link", text="")
-
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        col.label(text="New Objects:")
-        col.prop(edit, "use_enter_edit_mode")
-        col.label(text="Align To:")
-        col.prop(edit, "object_align", text="")
-
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        col.label(text="Undo:")
-        col.prop(edit, "use_global_undo")
-        col.prop(edit, "undo_steps", text="Steps")
-        col.prop(edit, "undo_memory_limit", text="Memory Limit")
+        panel = col.box()
+        panel.label(text="Link Materials To:")
+        panel.prop(edit, "material_link", text="")
+        panel = col.box()
+        panel.label(text="New Objects:")
+        panel.prop(edit, "use_enter_edit_mode")
+        panel.label(text="Align To:")
+        panel.prop(edit, "object_align", text="")
+        panel = col.box()
+        panel.label(text="Undo:")
+        panel.prop(edit, "use_global_undo")
+        panel.prop(edit, "undo_steps", text="Steps")
+        panel.prop(edit, "undo_memory_limit", text="Memory Limit")
 
         row.separator(factor=1)
         row.separator(factor=1)
 
         col = row.column()
-        col.label(text="Grease Pencil:")
-        col.prop(edit, "grease_pencil_eraser_radius", text="Eraser Radius")
-        col.separator(factor=1)
-        col.prop(edit, "grease_pencil_manhattan_distance", text="Manhattan Distance")
-        col.prop(edit, "grease_pencil_euclidean_distance", text="Euclidean Distance")
-        col.separator(factor=1)
-        col.prop(edit, "grease_pencil_default_color", text="Default Color")
-        col.separator(factor=1)
-        col.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.label(text="Playback:")
-        col.prop(edit, "use_negative_frames")
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.label(text="Node Editor:")
-        col.prop(edit, "node_margin")
-        col.label(text="Animation Editors:")
-        col.prop(edit, "fcurve_unselected_alpha", text="F-Curve Visibility")
+        panel = col.box()
+        panel.label(text="Grease Pencil:")
+        panel.prop(edit, "grease_pencil_eraser_radius", text="Eraser Radius")
+        panel.prop(edit, "grease_pencil_manhattan_distance", text="Manhattan Distance")
+        panel.prop(edit, "grease_pencil_euclidean_distance", text="Euclidean Distance")
+        panel.prop(edit, "grease_pencil_default_color", text="Default Color")
+        panel.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
+        panel = col.box()
+        panel.label(text="Playback:")
+        panel.prop(edit, "use_negative_frames")
+        panel = col.box()
+        panel.label(text="Node Editor:")
+        panel.prop(edit, "node_margin")
+        panel = col.box()
+        panel.label(text="Animation Editors:")
+        panel.prop(edit, "fcurve_unselected_alpha", text="F-Curve Visibility")
 
         row.separator(factor=1)
         row.separator(factor=1)
 
         col = row.column()
-        col.label(text="Keyframing:")
-        col.prop(edit, "use_visual_keying")
-        col.prop(edit, "use_keyframe_insert_needed", text="Only Insert Needed")
-
-        col.separator(factor=1)
-
-        col.prop(edit, "use_auto_keying", text="Auto Keyframing:")
-        col.prop(edit, "use_auto_keying_warning")
-
-        sub = col.column()
-
-        # ~ sub.active = edit.use_keyframe_insert_auto # incorrect, time-line can enable
-        sub.prop(edit, "use_keyframe_insert_available", text="Only Insert Available")
-
-        col.separator(factor=1)
-
-        col.label(text="New F-Curve Defaults:")
-        col.prop(edit, "keyframe_new_interpolation_type", text="Interpolation")
-        col.prop(edit, "keyframe_new_handle_type", text="Handles")
-        col.prop(edit, "use_insertkey_xyz_to_rgb", text="XYZ to RGB")
-
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        col.label(text="Transform:")
-        col.prop(edit, "use_drag_immediately")
+        panel = col.box()
+        panel.label(text="Keyframing:")
+        panel.prop(edit, "use_visual_keying")
+        panel.prop(edit, "use_keyframe_insert_needed", text="Only Insert Needed")
+        panel.prop(edit, "use_auto_keying", text="Auto Keyframing:")
+        panel.prop(edit, "use_auto_keying_warning")
+        panel.prop(edit, "use_keyframe_insert_available", text="Only Insert Available")
+        panel = col.box()
+        panel.label(text="New F-Curve Defaults:")
+        panel.prop(edit, "keyframe_new_interpolation_type", text="Interpolation")
+        panel.prop(edit, "keyframe_new_handle_type", text="Handles")
+        panel.prop(edit, "use_insertkey_xyz_to_rgb", text="XYZ to RGB")
+        panel = col.box()
+        panel.label(text="Transform:")
+        panel.prop(edit, "use_drag_immediately")
 
         row.separator(factor=1)
         row.separator(factor=1)
 
         col = row.column()
-        col.prop(edit, "sculpt_paint_overlay_color", text="Sculpt Overlay Color")
-
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        col.label(text="Duplicate Data:")
-        col.prop(edit, "use_duplicate_mesh", text="Mesh")
-        col.prop(edit, "use_duplicate_surface", text="Surface")
-        col.prop(edit, "use_duplicate_curve", text="Curve")
-        col.prop(edit, "use_duplicate_text", text="Text")
-        col.prop(edit, "use_duplicate_metaball", text="Metaball")
-        col.prop(edit, "use_duplicate_armature", text="Armature")
-        col.prop(edit, "use_duplicate_lamp", text="Lamp")
-        col.prop(edit, "use_duplicate_material", text="Material")
-        col.prop(edit, "use_duplicate_texture", text="Texture")
+        panel = col.box()
+        panel.label(text="Sculpt Overlay Color:")
+        panel.prop(edit, "sculpt_paint_overlay_color", text="")
+        panel = col.box()
+        panel.label(text="Duplicate Data:")
+        panel.prop(edit, "use_duplicate_mesh", text="Mesh")
+        panel.prop(edit, "use_duplicate_surface", text="Surface")
+        panel.prop(edit, "use_duplicate_curve", text="Curve")
+        panel.prop(edit, "use_duplicate_text", text="Text")
+        panel.prop(edit, "use_duplicate_metaball", text="Metaball")
+        panel.prop(edit, "use_duplicate_armature", text="Armature")
+        panel.prop(edit, "use_duplicate_lamp", text="Lamp")
+        panel.prop(edit, "use_duplicate_material", text="Material")
+        panel.prop(edit, "use_duplicate_texture", text="Texture")
         #col.prop(edit, "use_duplicate_fcurve", text="F-Curve")
-        col.prop(edit, "use_duplicate_action", text="Action")
-        col.prop(edit, "use_duplicate_particle", text="Particle")
+        panel.prop(edit, "use_duplicate_action", text="Action")
+        panel.prop(edit, "use_duplicate_particle", text="Particle")
 
 
 class USERPREF_PT_system_general(Panel):
@@ -435,6 +423,7 @@ class USERPREF_PT_system_general(Panel):
     def draw(self, context):
         import sys
         layout = self.layout
+        layout = layout.box()
 
         userpref = context.user_preferences
         system = userpref.system
@@ -821,6 +810,7 @@ class USERPREF_PT_theme(Panel):
         layout = self.layout
 
         theme = context.user_preferences.themes[0]
+        layout = layout.box()
 
         split_themes = layout.split(factor=0.2)
 
@@ -1000,6 +990,7 @@ class USERPREF_PT_file(Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout = layout.box()
 
         userpref = context.user_preferences
         paths = userpref.filepaths
@@ -1178,6 +1169,9 @@ class USERPREF_PT_input(Panel):
     def draw_input_prefs(inputs, layout):
         import sys
 
+        # Keep the input preferences visually independent from the keymap.
+        layout = layout.box()
+
         # General settings
         row = layout.row()
         col = row.column()
@@ -1298,7 +1292,7 @@ class USERPREF_PT_input(Panel):
         self.draw_input_prefs(inputs, split)
 
         # Keymap Settings
-        draw_keymaps(context, split)
+        draw_keymaps(context, split.box())
 
         #print("runtime", time.time() - start)
 
