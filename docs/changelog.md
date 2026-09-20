@@ -4,6 +4,17 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: MP3 no áudio do runtime Web
+
+- O runtime Web não tem exceções C++: qualquer `throw` vira `Aborted(undefined)`. O Audaspace escolhe o leitor
+  tentando cada `IFileInput` com `try/catch`, então um plugin MP3 separado abortava o runtime quando o WAV
+  rejeitava o arquivo (pacote 8208 v0.1.2).
+- `plugins/wav/WAVFile.cpp` agora reconhece RIFF/WAVE e, se não for, delega a `createMP3Reader`
+  (`plugins/mp3/MP3File.cpp`, dr_mp3 v0.7.4 vendorizado, domínio público/MIT-0), que devolve `nullptr` em vez
+  de lançar. Só lança se o arquivo não for WAV nem MP3. Streaming com seek e loop.
+- Prova: `tools/create_web_music_scene.py` (MP3 empacotado, Sound Actuator em loop) no pacote 8208 v0.1.3;
+  **o usuário confirmou que a música toca**. OGG segue fora.
+
 ## 2026-09-19 - Marco G: UV/normais constantes em malhas no runtime Web
 
 - Sintoma: chão da cena `web-render` sem o xadrez e iluminação fraca na Web (desktop correto). O UV chegava constante em (0,0) ao fragment shader e as normais também eram constantes.

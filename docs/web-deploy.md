@@ -62,5 +62,5 @@ e confere que o arquivo voltou do IndexedDB (usa `Module.FS`, exposto pelo pre-j
 - O `.data` do runtime embute a stdlib do Python e `release/scripts`; o jogo vem de `game/`. O preload `untitled.range` (TEMP) foi removido.
 - Release (`-O2`, sem `SAFE_HEAP`/`ASSERTIONS`): `.wasm` 19,9 MB (debug 25,4 MB), `.js` 0,9 MB (debug 2,1 MB); pacote ~44,8 MiB
   (zip 16,3 MB). O `.data` (~25 MB) domina e ainda é candidato a enxugar.
-- Áudio: Audaspace + SDL2 (Web Audio), WAV apenas (sem OGG/MP3, sem efeitos OpenAL, sem módulo Python `aud`); o navegador só libera o som após um gesto do usuário (botão Jogar). Toque vira clique de mouse (emulação do SDL); não há API multitouch.
+- Áudio: Audaspace + SDL2 (Web Audio), WAV e MP3 (MP3 via dr_mp3, domínio público/MIT-0; sem OGG, sem efeitos OpenAL, sem módulo Python `aud`); o navegador só libera o som após um gesto do usuário (botão Jogar). Toque vira clique de mouse (emulação do SDL); não há API multitouch.
 - Aceite manual do usuário (2026-09-18): entrada, filtros 2D, gamepad e save (`SAVED`/`LOADED` após recarregar) OK. Persistência IDBFS verificada.

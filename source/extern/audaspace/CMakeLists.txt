@@ -574,8 +574,8 @@ endif()
 
 # Leitor WAV embutido: so no runtime Web, onde libsndfile nao existe (plugins/wav/WAVFile.cpp).
 if(EMSCRIPTEN AND NOT WITH_LIBSNDFILE)
-	list(APPEND SRC plugins/wav/WAVFile.cpp)
-	list(APPEND HDR plugins/wav/WAVFile.h)
+	list(APPEND SRC plugins/wav/WAVFile.cpp plugins/mp3/MP3File.cpp)  # MP3 via WAVFile (dr_mp3), sem excecoes
+	list(APPEND HDR plugins/wav/WAVFile.h plugins/mp3/MP3File.h)
 	list(APPEND STATIC_PLUGINS WAVFile)
 endif()
 

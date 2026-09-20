@@ -4,6 +4,7 @@
 #include "IReader.h"
 #include "file/FileManager.h"
 #include "util/Buffer.h"
+#include "../mp3/MP3File.h"
 
 #include <cstdint>
 #include <cstring>
@@ -167,6 +168,19 @@ void WAVFile::registerPlugin()
 	FileManager::registerInput(std::shared_ptr<WAVFile>(new WAVFile));
 }
 
+/** Dado que nao e RIFF/WAVE: tenta MP3 sem lancar (Emscripten sem excecoes); so lanca se nada servir. */
+static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
+{
+	if (data.size() >= 12 && memcmp(data.data(), "RIFF", 4) == 0 && memcmp(data.data() + 8, "WAVE", 4) == 0) {
+		return std::shared_ptr<IReader>(new WAVReader(data));
+	}
+	std::shared_ptr<IReader> mp3 = createMP3Reader(std::move(data));
+	if (!mp3) {
+		AUD_THROW(FileException, "Not a RIFF/WAVE or MP3 file.");
+	}
+	return mp3;
+}
+
 std::shared_ptr<IReader> WAVFile::createReader(std::string filename)
 {
 	std::ifstream in(filename, std::ios::binary);
@@ -174,14 +188,14 @@ std::shared_ptr<IReader> WAVFile::createReader(std::string filename)
 		AUD_THROW(FileException, "The WAV file couldn't be opened.");
 	}
 	std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-	return std::shared_ptr<IReader>(new WAVReader(data));
+	return makeReader(std::move(data));
 }
 
 std::shared_ptr<IReader> WAVFile::createReader(std::shared_ptr<Buffer> buffer)
 {
 	const uint8_t *p = reinterpret_cast<const uint8_t *>(buffer->getBuffer());
 	std::vector<uint8_t> data(p, p + buffer->getSize());
-	return std::shared_ptr<IReader>(new WAVReader(data));
+	return makeReader(std::move(data));
 }
 
 AUD_NAMESPACE_END
