@@ -16,8 +16,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Terceira rodada: exceção em `start()` de componente Python (`KX_PythonComponent`) e em callback `pre_draw`
   geraram evento `python` com `exception_type` RuntimeError e traceback -> `WEB-PY-009` ERROR (o callback repete
   o evento a cada frame).
-- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL), importação de
-  relatório de versão antiga/nova/desconhecida no editor e execução sem pré-voo.
+- Importação de relatório por arquivo (`load_preflight`, sem bpy): versão 1 e 2 são lidas (`WEB-PY-009` com
+  `python_errors`); versão 3, ausente ou não numérica degrada para um único `WEB-DEPLOY-002`. Os 30 testes
+  `test_preflight*` passam. Não foi feito o clique na UI do editor, só a camada de leitura.
+- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL). Execução sem
+  pré-voo só tem cobertura unitária (`test_preflight_run.py`).
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
