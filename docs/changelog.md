@@ -10,6 +10,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   executados no Edge via `verify-package.cjs` com `PREFLIGHT_OUT`. `check_preflight` emitiu apenas o achado
   esperado em cada um: exceção Python -> `WEB-PY-009`, import inexistente -> `WEB-PY-001`, GLSL inválido em
   Filter2D (`mode = CUSTOMFILTER`) -> `WEB-GFX-002`, todos ERROR.
+- Segunda rodada (mesmo método): `SyntaxError` no controller -> `WEB-PY-009`; mensagem com aspas, quebra de linha,
+  Unicode (acentos e japonês) e 3000 caracteres chegou íntegra ao relatório (3028 caracteres, sem truncar);
+  o mesmo erro em 3 objetos gerou 3 eventos distintos.
+- Ainda sem teste de runtime: exceção em componente/callback, falha de vertex/link, importação de relatório de
+  versão antiga/nova/desconhecida no editor e execução sem pré-voo.
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
