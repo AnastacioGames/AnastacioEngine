@@ -16,6 +16,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `tools/web/verify-capabilities.cjs` (modo `render`) captura a tela e conta transições de luminância nas
   linhas do chão; um chão liso (UV constante, como no bug dos divisores de atributo, `63b3664d`) reprova.
   Pacote `teste-render`: 173 transições, verificação passou.
+- Marco F reverificado: `python -m unittest discover` em `tools/tests/web_profile` (75 testes) e os testes de integração
+  `engine_web_export`, `engine_web_cli`, `engine_web_ui` e `engine_collect_bpy` (`RangeEngine -b --python`) passam;
+  cobrem bloqueio por erro, export atômico que preserva o anterior, CLI e painel usando o mesmo validador. Component
+  fora da pasta do projeto segue bloqueando com WEB-PKG-003 e mensagem de correção (comportamento desejado).
 - Marco D: modo `keys` do `verify-capabilities.cjs` (pacote `web-smoke`): clique de foco, setas por CDP e conferência
   de "Python controller started" e "keyboard moved cube" (controller Python + teclado no navegador, 4/4 OK).
 - `glBlitFramebuffer`: sonda CDP no pacote `web-render` (Chrome/SwiftShader) mostrou uma única chamada (0,0,960,540,
