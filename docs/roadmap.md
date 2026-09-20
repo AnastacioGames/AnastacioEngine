@@ -24,8 +24,11 @@ Aberto:
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat
   no eixo 9) e save (IDBFS) testados e aceitos pelo usuário em 2026-09-20 ([roteiro](web-sdl2-gamepad-test.md)).
-- **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
-  estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
+- **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
+  `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
+  shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
+  "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
+  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como

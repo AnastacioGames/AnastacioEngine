@@ -4,6 +4,20 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
+
+- M0 no commit `1c9d1562`: `make-runtime-manifest.py` declara o alias `bge` e `aud` conforme
+  `WITH_AUDASPACE`; o pré-voo requer WebGL 2 e torna abort, falha e inicialização incompleta estados
+  explícitos. `package-web.py` deixa de ocultar erro de leitura do manifesto. A suite Web Profile passou com
+  83 testes; falta exportar e executar pacote Web real.
+- Checkpoint parcial de M1 no commit `8251b0dc`: `gpu_shader.c` chama `Module.onDiagnostic` em falha de
+  compilação/link WebGL, com operação, estágio, origem e log. `GPU_generate_pass` preserva o nome de
+  material/world para essa origem. O coletor do pacote exporta relatório v2 e usa a heurística antiga só como
+  fallback; o leitor aceita v1 e v2. Testes de `test_preflight` (11), `py_compile` e `git diff --check` passaram.
+- Não concluído: captura segura de exceções Python, shaders especiais/filtros e validação em navegador.
+  A tentativa de build não vale como validação porque `build-android` da worktree apontava para a árvore
+  principal; o próximo agente deve configurar build Web limpo da própria worktree.
+
 ## 2026-09-20 - Web: gamepad — sensores de joystick avaliam pelo estado vivo do SDL
 
 - Sintoma (teste do patch do SDL2 no navegador): o D-pad exigia vários toques e, quando respondia, o cubo ficava
