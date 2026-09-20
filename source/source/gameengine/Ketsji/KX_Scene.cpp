@@ -2016,6 +2016,7 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 								PyObject *ret = PyObject_Call(function, args, nullptr);
 
 								if (!ret) {
+									EXP_ReportPythonDiagnostic("scene.animation.event", gameobj->GetName().c_str());
 									PyErr_Print();
 									PyErr_Clear();
 								}
@@ -2025,6 +2026,7 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 								}
 							}
 							else {
+								EXP_ReportPythonDiagnostic("scene.animation.event.callable", gameobj->GetName().c_str());
 								PyErr_Print();
 								PyErr_Clear();
 								Py_DECREF(args);
