@@ -23,6 +23,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `ScriptProcessorNode` (SDL). O aviso antigo de depth/stencil não reproduz mais; item encerrado como não reproduzível.
 - `loadGlobalDict` sem arquivo de save deixa de logar erro: vira aviso "could not open ... (no save yet)"
   (`KX_PythonInit.cpp`), pois é o caso esperado da 1ª abertura.
+- **Deploy real no GitHub Pages** (https://anastaciogames.github.io/range-web-demo/, repo `AnastacioGames/range-web-demo`,
+  pacote `web-render` 0.1.2): `application/wasm` e `Content-Encoding: gzip` corretos (`.wasm` 8,5 MB, `.data` 8,9 MB no
+  fio); `verify-capabilities.cjs render` (xadrez por pixels, 445 transições) e `verify-persistence.cjs` (IDBFS em HTTPS)
+  passaram na URL pública. A prova em Firefox/Edge/outros aparelhos segue com o usuário.
+- Achado do deploy: o botão Jogar liberava no `onload` do script, antes de `.data`/`.wasm` terminarem em rede lenta;
+  agora libera em `onRuntimeInitialized` (`tools/web/package-web.py`).
 - Deploy: compressão medida (gzip 6) e receitas por host (Netlify, GitHub Pages, itch.io, nginx, Apache) com
   `curl -sI` de conferência no `HOSTING.md` do pacote e em `docs/web-deploy.md`; download ~46 → ~17 MiB. A prova
   em hospedagem real (Chrome/Firefox/Edge em URL pública) segue pendente do usuário.

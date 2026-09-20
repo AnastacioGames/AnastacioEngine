@@ -196,6 +196,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     }],
     onRuntimeInitialized: function () {
       log("[event] runtime inicializado");
+      markReady();
     }
   };
 
@@ -208,14 +209,15 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   var script = document.createElement("script");
   script.src = "RangeRuntime.js?v=" + encodeURIComponent(VERSION);
   script.onerror = function () { fail("RangeRuntime.js nao foi encontrado no servidor."); };
-  script.onload = function () {
-    if (failed) return;
-    // O runtime ja esta rodando quando os dados terminam de carregar; o botao apenas confirma o inicio.
+  // Liberar o botao so quando o runtime terminou de inicializar (onRuntimeInitialized): com rede lenta o
+  // script carrega antes do .data/.wasm e o botao ficava ativo cedo demais (achado no GitHub Pages).
+  function markReady() {
+    if (failed || ready) return;
     ready = true;
     el("progress").hidden = true;
     el("status").textContent = "Pronto.";
     el("play").disabled = false;
-  };
+  }
   el("play").addEventListener("click", tryStart);
 
   // Pre-voo (marco E): ?preflight=1 monta o relatorio "range-web-preflight" v1 lido por
