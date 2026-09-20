@@ -138,6 +138,8 @@ protected:
 	std::string m_progs[MAX_PROGRAM];
 	bool m_error;
 	bool m_dirty;
+	/// Owner label used only in Web diagnostics (Module.onDiagnostic); not part of shader behaviour.
+	std::string m_diagnosticName;
 
 	// Stored uniform variables
 	RAS_UniformVec m_uniforms;

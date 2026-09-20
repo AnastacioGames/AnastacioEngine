@@ -128,6 +128,7 @@ RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
 	m_uniformInitialized(false),
 	m_mipmap(data.mipmap)
 {
+	m_diagnosticName = "2d-filter";
 	for (unsigned int i = 0; i < TEXTURE_OFFSETS_SIZE; i++) {
 		m_textureOffsets[i] = 0;
 	}

@@ -37,6 +37,21 @@
 
 #include <map>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* Best-effort bridge to Module.onDiagnostic (version 1); never alters normal error handling. */
+EM_JS(void, particle_shader_web_diagnostic,
+      (const char *operation, const char *stage, const char *origin, const char *log),
+      {
+        if (typeof Module === 'undefined' || typeof Module.onDiagnostic !== 'function') return;
+        try {
+          Module.onDiagnostic({version: 1, category: 'shader', severity: 'error',
+                               operation: UTF8ToString(operation), stage: UTF8ToString(stage),
+                               origin: UTF8ToString(origin), log: UTF8ToString(log)});
+        } catch (e) {}
+      });
+#endif
+
 namespace {
 
 const char *updateVertexSource =
@@ -516,6 +531,9 @@ unsigned int CompileDrawProgram(const std::string &customFragShader)
 	glGetShaderiv(vert, GL_COMPILE_STATUS, &status);
 	if (!status) {
 		glGetShaderInfoLog(vert, sizeof(log), &length, log);
+#ifdef __EMSCRIPTEN__
+		particle_shader_web_diagnostic("compile", "vertex", "particle-draw", log);
+#endif
 		CM_Error("particle draw vertex shader compile failed:\n" << log);
 		glDeleteShader(vert);
 		glDeleteShader(frag);
@@ -524,6 +542,9 @@ unsigned int CompileDrawProgram(const std::string &customFragShader)
 	glGetShaderiv(frag, GL_COMPILE_STATUS, &status);
 	if (!status) {
 		glGetShaderInfoLog(frag, sizeof(log), &length, log);
+#ifdef __EMSCRIPTEN__
+		particle_shader_web_diagnostic("compile", "fragment", "particle-draw", log);
+#endif
 		CM_Error("particle draw fragment shader compile failed:\n" << log);
 		glDeleteShader(vert);
 		glDeleteShader(frag);
@@ -545,6 +566,9 @@ unsigned int CompileDrawProgram(const std::string &customFragShader)
 	glDeleteShader(frag);
 	if (!status) {
 		glGetProgramInfoLog(program, sizeof(log), &length, log);
+#ifdef __EMSCRIPTEN__
+		particle_shader_web_diagnostic("link", "", "particle-draw", log);
+#endif
 		CM_Error("particle draw program link failed:\n" << log);
 		glDeleteProgram(program);
 		return 0;
