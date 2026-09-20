@@ -25,10 +25,15 @@ Pendências que só o clique na UI ou um material GLSL real fecham. Use o `edito
 3. Esperado: o jogo roda igual, sem erro no console causado pelo relatório, e `window.rangePreflight` não é exigido.
 
 ## C. Falha de vertex/link de shader (não testado)
-Só o fragment do Filter2D foi exercitado. Para cobrir vertex/link é preciso um material GLSL que falhe:
-1. Cena com **Game Engine > Shading: GLSL** e um material cujo shader seja inválido (por exemplo, nó de script
-   ou GLSL customizado com sintaxe quebrada), usado em um objeto visível.
-2. Exporte e rode `verify-package.cjs` com `PREFLIGHT_OUT=pf.json`.
-3. Esperado no JSON: `shader_errors` com `stage` `vertex` ou `link` e o nome do material; importado no editor
-   vira `WEB-GFX-002` com o log em "fix".
-4. Se não houver como montar esse material pela UI, registre "não testado" no changelog e siga para o M2.
+Só o fragment do Filter2D foi exercitado. O `shader_quebrado.py` (nesta pasta) injeta um vertex shader inválido
+via `getShader().setSource()`, sem montar material pela UI.
+1. Copie `shader_quebrado.py` para a pasta do seu `.range` de teste (mesma pasta do arquivo).
+2. No `.range`: um Cubo com **qualquer material** (Game Engine > Shading: GLSL). Logic Editor: Sensor **Always**
+   (Pulse desligado) > Controller **Python**, Modo **Module**, `shader_quebrado.quebrar` > sem atuador.
+3. Salve, **Export Web** com **Preflight after export** ligado.
+4. Sirva, abra com `?preflight=1`, clique em Jogar e espere o log `[shader_quebrado] ...` no console.
+5. Rode `verify-package.cjs` com `PREFLIGHT_OUT=pf.json` (ou copie o relatório do console) e importe
+   no editor com **Import Web preflight**.
+6. Esperado: `shader_errors` com stage `vertex`; no editor `WEB-GFX-002` com o log em "fix".
+7. Se o log aparecer no console mas `shader_errors` vier vazio, anote o texto exato: é lacuna do coletor.
+8. Se `getShader()` devolver None ou o objeto sem material, registre e siga para o M2.
