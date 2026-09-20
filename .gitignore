@@ -40,3 +40,4 @@ edge-run*.err
 cube-screenshot.png
 build-web-release/
 __pycache__/
+chrome-profile-web-test-vscode/
