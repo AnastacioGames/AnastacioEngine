@@ -13,7 +13,7 @@ from range_web import preflight  # noqa: E402
 
 
 def report(**kw):
-    d = {"schema": preflight.PREFLIGHT_SCHEMA, "schema_version": 1}
+    d = {"schema": preflight.PREFLIGHT_SCHEMA, "schema_version": preflight.PREFLIGHT_SCHEMA_VERSION}
     d.update(kw)
     return d
 
@@ -99,6 +99,18 @@ class PreflightTests(unittest.TestCase):
                            {"kind": "ValueError", "text": "x"}]))
         self.assertEqual(ids(found), ["WEB-GFX-002", "WEB-PY-001", "WEB-PKG-003", "WEB-PY-009"])
         self.assertTrue(all(f.severity == "ERROR" and f.evidence == "CONFIRMED" for f in found))
+
+    def test_v1_and_v2_reports_are_accepted(self):
+        legacy = report(schema_version=1, shader_errors=[{"material": "", "stage": "?", "log": "old"}])
+        self.assertEqual(ids(preflight.check_preflight(legacy)), ["WEB-GFX-002"])
+        structured = report(shader_errors=[{"material": "MAMaterial", "stage": "fragment",
+                                             "operation": "compile", "log": "bad", "structured": True}],
+                            diagnostics=[{"version": 1, "category": "shader", "severity": "error",
+                                          "operation": "compile", "stage": "fragment",
+                                          "origin": "MAMaterial", "log": "bad"}])
+        finding = preflight.check_preflight(structured)[0]
+        self.assertEqual(finding.rule_id, "WEB-GFX-002")
+        self.assertEqual(finding.location["source"], "MAMaterial")
 
 
 if __name__ == "__main__":

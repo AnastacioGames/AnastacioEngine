@@ -1848,7 +1848,7 @@ static void gpu_nodes_prune(ListBase *nodes, GPUNodeLink *outlinks[8])
 GPUPass *GPU_generate_pass(
         ListBase *nodes, GPUNodeLink *outlinks[8],
         GPUVertexAttribs *attribs, int *builtins, const char *fragcode, const char *vertcode,
-        const GPUMatType type, const char *UNUSED(name),
+        const GPUMatType type, const char *name,
         const bool use_opensubdiv,
 		const bool use_instancing,
 		const bool use_skinning,
@@ -1896,7 +1896,7 @@ GPUPass *GPU_generate_pass(
 	if (vertcode) {
 		flags |= GPU_SHADER_FLAGS_USER_CODE;
 	}
-	shader = GPU_shader_create_ex(vertexcode,
+	shader = GPU_shader_create_ex_named(vertexcode,
 	                              fragmentcode,
 	                              geometrycode,
 	                              glsl_material_library,
@@ -1904,7 +1904,8 @@ GPUPass *GPU_generate_pass(
 	                              0,
 	                              0,
 	                              0,
-	                              flags);
+	                              flags,
+	                              name);
 
 	/* failed? */
 	if (!shader) {

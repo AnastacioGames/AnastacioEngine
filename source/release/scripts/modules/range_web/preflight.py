@@ -18,7 +18,8 @@ import json
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 
 PREFLIGHT_SCHEMA = "range-web-preflight"
-PREFLIGHT_SCHEMA_VERSION = 1
+PREFLIGHT_SCHEMA_VERSION = 2
+_SUPPORTED_SCHEMA_VERSIONS = (1, PREFLIGHT_SCHEMA_VERSION)
 
 _WASM_MIME = "application/wasm"
 
@@ -45,7 +46,7 @@ def check_preflight(data, runtime_manifest=None):
     if not isinstance(data, dict) or data.get("schema") != PREFLIGHT_SCHEMA:
         return [_err("WEB-DEPLOY-002", "Relatório de pré-voo ausente ou com schema desconhecido.",
                      fix="Rodar o Testar Web com a página de pré-voo do pacote.")]
-    if data.get("schema_version") != PREFLIGHT_SCHEMA_VERSION:
+    if data.get("schema_version") not in _SUPPORTED_SCHEMA_VERSIONS:
         return [_err("WEB-DEPLOY-002", "Versão do relatório de pré-voo incompatível: %r." % data.get("schema_version"))]
 
     findings = []

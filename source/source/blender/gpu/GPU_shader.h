@@ -60,6 +60,16 @@ GPUShader *GPU_shader_create_ex(
         const char *defines,
         int input, int output, int number,
         const int flags);
+/* `name` identifies the owner in diagnostics only. It is not retained by the shader. */
+GPUShader *GPU_shader_create_ex_named(
+        const char *vertexcode,
+        const char *fragcode,
+        const char *geocode,
+        const char *libcode,
+        const char *defines,
+        int input, int output, int number,
+        const int flags,
+        const char *name);
 char *GPU_shader_validate(GPUShader *shader);
 void GPU_shader_free(GPUShader *shader);
 
