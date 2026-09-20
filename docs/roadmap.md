@@ -20,9 +20,9 @@ pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-v
 
 Aberto:
 
-- **Patch customizado do SDL2/Emscripten** (remoção do gate de timestamp do gamepad): mora no cache de
-  toolchain do emsdk, fora do controle de versão; não sobrevive a reinstalação limpa nem se propaga para outra
-  máquina. Versionar (patch aplicado no build ou port SDL2 próprio).
+- **Patch do SDL2/Emscripten** (gate de timestamp do gamepad): versionado em `tools/web/patch-sdl2-gamepad.py`
+  e aplicado no configure (`platform_web.cmake`). `RangeRuntime` Web relinkado com a porta recompilada; falta
+  reconferir o gamepad físico no navegador.
 - **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por

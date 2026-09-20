@@ -89,7 +89,7 @@ O runtime **já inicializa, carrega a cena e executa frames**. Console limpo de 
 
 ### Limitações conhecidas de Web
 
-- Threads: patch SDL2 temporário do emsdk não é versionado (fora deste repo)
+- Gamepad: patch SDL2 do emsdk versionado em `tools/web/patch-sdl2-gamepad.py` (aplicação manual, ver roadmap)
 - GLSL ES precision: alguns shaders usam `precision mediump` hardcoded, pode gerar truncamento em GPUs fracas
 - Memory: `FS.syncfs()` é síncrono, em cenas grandes pode congelar o navegador
 

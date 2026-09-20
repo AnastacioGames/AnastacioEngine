@@ -4,6 +4,19 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: patch do SDL2 (gamepad) versionado
+
+- Novo `tools/web/patch-sdl2-gamepad.py`: aplica no cache do emsdk (SDL 2.32.10,
+  `src/joystick/emscripten/SDL_sysjoystick.c`) a remoção do gate `gamepadState.timestamp != item->timestamp`.
+  Idempotente (marcador no fonte), preserva o EOL, `--check` informa o estado, apaga `libSDL2*.a` para forçar a
+  recompilação da porta. Só a correção entra; os `printf [web-input]` de diagnóstico da época não foram mantidos.
+- Testado num emsdk falso a partir do arquivo original do zip da porta (diff de 5 linhas). No emsdk real:
+  arquivo restaurado do zip, patch aplicado e `embuilder build sdl2` recompilou `libSDL2.a` sem erro.
+- Ligado ao build: `source/build_files/cmake/platform/platform_web.cmake` roda o script a cada configure (avisa
+  se falhar). `RangeRuntime` (preset `web-runtime-release`) relinkado com a porta recompilada sem erro; o cache de
+  `build-web-release` e `build-web` estavam com `WITH_INTERNATIONAL=ON` (divergia do preset) e foram realinhados para OFF.
+- Não verificado: gamepad físico no navegador com o novo `RangeRuntime`.
+
 ## 2026-09-20 - Idioma: English + Português (i18n do editor)
 
 - O editor passa a compilar com `WITH_INTERNATIONAL`: o submódulo `locale` do Blender 2.79 não existia e o

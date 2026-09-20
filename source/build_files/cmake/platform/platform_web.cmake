@@ -24,3 +24,25 @@ if(WITH_PYTHON)
 	list(APPEND PYTHON_LIBRARIES ${PYTHON_MPDEC_LIBRARY} ${PYTHON_EXPAT_LIBRARY})
 	mark_as_advanced(PYTHON_MPDEC_LIBRARY PYTHON_EXPAT_LIBRARY)
 endif()
+
+# SDL2 do Emscripten: o gate de timestamp do gamepad precisa estar removido (entrada presa em ACTIVE no
+# navegador). O cache do emsdk fica fora do repo; tools/web/patch-sdl2-gamepad.py e a fonte versionada
+# do patch, idempotente. Aplica no configure e avisa se nao der (ex: porta sdl2 ainda nao baixada).
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+	set(_sdl2_patch "${CMAKE_SOURCE_DIR}/../tools/web/patch-sdl2-gamepad.py")
+	if(NOT EXISTS "${_sdl2_patch}")
+		set(_sdl2_patch "${CMAKE_SOURCE_DIR}/tools/web/patch-sdl2-gamepad.py")
+	endif()
+	if(EXISTS "${_sdl2_patch}")
+		execute_process(COMMAND ${Python3_EXECUTABLE} ${_sdl2_patch}
+		                RESULT_VARIABLE _sdl2_patch_rc OUTPUT_VARIABLE _sdl2_patch_out)
+		string(STRIP "${_sdl2_patch_out}" _sdl2_patch_out)
+		if(_sdl2_patch_rc EQUAL 0)
+			message(STATUS "${_sdl2_patch_out}")
+		else()
+			message(WARNING "Patch do SDL2 (gamepad) nao aplicado: ${_sdl2_patch_out}\n"
+			                "Rode: python tools/web/patch-sdl2-gamepad.py")
+		endif()
+	endif()
+endif()
