@@ -1,8 +1,8 @@
 # Web — empacotamento e hospedagem
 
 Estado em 2026-09-20: empacotador, verificador e integração ao editor (Exportar Web) implementados; deploy no GitHub Pages
-aceito em Chrome, Edge, Firefox e celular. Falta só o teste manual do fluxo no editor (ver
-[web-profile-validation-plan.md](web-profile-validation-plan.md)). O runtime tem preset de release (`web-runtime-release`).
+aceito em Chrome, Edge, Firefox e celular. Fluxo do editor (Validar, Exportar e Abrir no navegador) aceito pelo
+usuário em 2026-09-20 (ver [web-profile-validation-plan.md](web-profile-validation-plan.md)). O runtime tem preset de release (`web-runtime-release`).
 
 ## Pré-voo no navegador
 
