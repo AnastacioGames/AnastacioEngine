@@ -25,8 +25,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Um build antigo (só versão 1) rejeitava a versão 2: abrir o `RangeEngine.exe` da worktree.
 - Painel Web: mensagem e traceback com quebras de linha apareciam como quadrados; agora uma linha por label
   (`properties_web.py`). Ainda não conferido visualmente.
-- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL). Execução sem
-  pré-voo só tem cobertura unitária (`test_preflight_run.py`).
+- Execução sem pré-voo testada pelo usuário no navegador: export com "Preflight after export" desligado, página
+  aberta sem `?preflight=1`, jogo renderizou e o console mostrou só avisos habituais (emulação GL, ScriptProcessorNode),
+  sem erro. Achado: nome de arquivo com espaço (`melhores graficos .range`) é recusado no export
+  ("nome do arquivo do jogo invalido para o FS virtual"); o editor só reporta isso na falha do empacotador.
+- Ainda sem teste de runtime: falha de vertex/link (Filter2D só tem fragment; exige material GLSL).
 - O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
 
 ## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
