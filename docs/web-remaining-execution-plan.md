@@ -8,6 +8,21 @@ Preparado em 2026-09-20 para execução pelo Claude, a partir da análise soment
 - **M1 parcialmente implementado, não concluído** no commit `8251b0dc`: falhas de compilação/link do shader comum em WebGL emitem `Module.onDiagnostic` estruturado, com operação, estágio, origem e log; a origem do material/world agora é propagada de `GPU_generate_pass`. `package-web.py` grava relatório v2 e conserva a heurística como fallback; `preflight.py` aceita v1/v2. Depois disso entraram a captura Python, os shaders especiais/filtros e testes Web reais (Edge, build de depuração) de exceção, import, SyntaxError, Unicode/aspas/log longo, repetição em vários objetos, exceção em componente e em callback, e fragment em filtro 2D. Faltam: componente/callback, vertex/link, importação no editor e execução sem pré-voo.
 - **Validação feita para o checkpoint M1:** `python -m unittest tools.tests.web_profile.test_preflight -v` (11 testes), `py_compile` dos scripts Python alterados e `git diff --check`, todos aprovados. Uma tentativa de build não é evidência: o diretório `build-android` da worktree apontava para a árvore principal, portanto não compilou este diff. Reconfigurar um build Web limpo da worktree antes de compilar.
 
+- **M1 encerrado com uma lacuna (2026-09-20, branch `claude/web-m1-python-diag`, `f0330724`):** importação de relatório Python no editor (versões 1, 2 e desconhecida), execução sem pré-voo e falha de vertex de `BL_Shader` foram testadas pelo usuário/Claude. Lacuna aberta: o `GPUShader: compile error:` de `BL_Shader` não passa por `Module.onDiagnostic`; o relatório traz `WEB-GFX-002` com `stage "?"` e `material` vazio (fallback de texto). Link e materiais de nós não foram testados. Corrigir exige rebuild do runtime Web; fica para depois de M2/M3 ou para quem tocar `gpu_shader.c`/`RAS_Shader.cpp` de novo. Também corrigido: falso `WEB-PKG-003` em componente com módulo pontilhado (`scripts.x`).
+- **M2 (Claude):** os dois commits já existem na branch (`9d008486` DNA `unsigned char` nos cinco campos, `dfae0be0` reativa `USE_RNA_RANGE_CHECK` no Emscripten). **Nada foi validado ainda.** Falta o aceite: SDNA/offsets iguais antes/depois, builds limpos (nativo e os dois presets Web), roundtrip nas fronteiras e `userpref.blend`. Ver seção M2.
+- **R1 (Codex, em paralelo):** ver "Divisão de trabalho".
+
+## Divisão de trabalho (Claude e Codex)
+
+Para não disputar árvore de build nem arquivo, cada frente tem sua worktree e seus arquivos.
+
+| Frente | Dono | Worktree / branch | Arquivos que pode tocar | Não tocar |
+|---|---|---|---|---|
+| M2 (DNA/RNA) e depois M3 | Claude | `D:\AnastacioEngine-claude-rna`, `claude/web-m1-python-diag` | `makesdna/*`, `makesrna/*`, consumidores citados em M2; depois `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine` | — |
+| R1 (ABI de constraints Python) | Codex | nova worktree a partir de `f0330724`, branch `codex/r1-constraint-abi` | `source/source/gameengine/Ketsji/KX_PyConstraintBinding.cpp` e teste próprio | DNA/RNA, filtros, `build/`, `build-web*` da worktree do Claude |
+
+Regras: Codex faz build só no diretório da sua worktree (nunca reaproveita `build*` de outra worktree; ver o aviso do `build-android` no estado de M1). Ao terminar, entrega commit(s) na sua branch e um resumo com o que foi executado; o Claude integra. Sem push nem merge sem pedido do usuário.
+
 ## Instrução para o Claude
 
 Execute este plano por marcos, seguindo `AGENTS.md`. Comece pelo M0. Preserve mudanças existentes no workspace. Implemente e valide uma peça autocontida por vez; antes de avançar entre peças grandes ou arriscadas de C++, apresente o resultado e peça confirmação, conforme a regra do repositório, salvo autorização explícita do usuário para execução autônoma.
@@ -78,7 +93,7 @@ Arquivos principais: `tools/web/make-runtime-manifest.py`, `tools/web/package-we
 - Relatório válido continua importável pelo fluxo existente.
 - Ampliar testes pertinentes em `tools/tests/web_profile/`, especialmente `test_runtime.py`, `test_range_web.py`, `test_preflight.py` e `test_preflight_run.py`; executar o fluxo real de exportação/pré-voo.
 
-## M1 — Diagnósticos estruturados de shader e Python (parcial: shader comum)
+## M1 — Diagnósticos estruturados de shader e Python (encerrado com lacuna registrada)
 
 ### Decisão de arquitetura
 
