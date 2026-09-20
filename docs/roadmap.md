@@ -33,13 +33,16 @@ Aberto:
   Resolver caso a caso (`ImageUser.fie_ima`, `Material.seed1`/`seed2`: tipo do campo DNA vs. hardmax da RNA),
   considerando compatibilidade com `.blend` legado.
 
-### Idioma (English + Português)
+### Idioma (English, Português, Español, Русский)
 
 Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 2026-09-20). Pendente:
 
 - Conferir na janela real do Windows: Preferências > System > **International Fonts**, escolher **Language** e ligar
-  **Interface**; ver fonte, acentos e o menu (só Default, English, Português). Decidir se o padrão de fábrica deve vir
+  **Interface**; ver fonte, acentos e o menu (Default, English, Português, Español, Русский; cirílico depende da fonte Roboto). Decidir se o padrão de fábrica deve vir
   com a tradução ligada (hoje segue o 2.79: desligada).
+- Auditoria: `RangeEngine -b --python tools/tests/web_profile/i18n_audit.py -- <idioma> [saida.txt]` lista textos sem
+  tradução. Restam lacunas do catálogo do Blender 2.79 (pt_BR ~455, es ~511, ru ~1 124) e os textos de `layout.label(text=...)`
+  em Python/C fora do RNA (scan estático ainda por fazer). O russo (e o es) de `translations_ui.py` precisa de revisão nativa.
 - Traduzir as mensagens das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`, `manifest.py`, `collect.py`,
   `preflight.py`), ainda em português, e os demais textos em português da Range fora do painel Web.
 - Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
