@@ -3232,7 +3232,7 @@ void loadGamePythonConfig(char *saveName, char *extName)
 		fclose(fp);
 	}
 	else {
-		CM_Error("could not open '" << marshal_path << "'");
+		CM_Warning("could not open '" << marshal_path << "' (no save yet)");
 	}
 }
 
