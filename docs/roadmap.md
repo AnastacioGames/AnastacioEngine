@@ -68,9 +68,9 @@ Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ve
 
 ### World Status
 
-As oito World Properties automáticas (`BKE_world_init`, `BL_ConvertWorldProperties`) foram implementadas e
-compilam, mas não aparecem em um World novo (File > New) no teste real. Diagnosticar criação, versionamento e
-atualização da UI. Ver changelog, seção "World Status".
+Causa raiz achada e corrigida em 2026-09-20 (o World do `startup.blend` não passava por `BKE_world_init`); as oito
+propriedades aparecem em `scene.world.properties` num File > New. Falta conferir o painel Global Properties na janela
+do editor. Ver changelog, seção "World Status".
 
 ### Vehicle System / Vehicle Lab
 

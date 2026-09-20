@@ -33,10 +33,12 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
+#include "DNA_world_types.h"
 
 #include "BKE_brush.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_world.h"
 
 #include "BLO_readfile.h"
 
@@ -186,6 +188,11 @@ void BLO_update_defaults_userpref_blend(void)
  * This function can be emptied each time the startup.blend is updated. */
 void BLO_update_defaults_startup_blend(Main *bmain)
 {
+  /* The embedded startup.blend already holds a World, so BKE_world_init() never runs for it. */
+  for (World *wrld = bmain->world.first; wrld; wrld = wrld->id.next) {
+    BKE_world_status_props_ensure(wrld);
+  }
+
   for (Scene *scene = bmain->scene.first; scene; scene = scene->id.next) {
     scene->r.im_format.planes = R_IMF_PLANES_RGBA;
     scene->r.im_format.compress = 15;

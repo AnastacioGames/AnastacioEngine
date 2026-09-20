@@ -74,6 +74,46 @@ void BKE_world_free(World *wrld)
 	BKE_previewimg_free(&wrld->preview);
 }
 
+/**
+ * World Status: default World Properties, mirroring existing weather/mist state plus placeholders
+ * for status not backed by a real effect yet. Only adds the ones missing by name, so it is safe to
+ * call on a World that came from the embedded startup.blend (which never goes through BKE_world_init).
+ */
+void BKE_world_status_props_ensure(World *wrld)
+{
+	struct { const char *name; int type; float fval; int ival; } wo_status[] = {
+		{"chuva_ligada",       GPROP_BOOL,  0.0f, 0},
+		{"chuva_densidade",    GPROP_FLOAT, wrld->rain_intensity, 0},
+		{"nuvens_ligadas",     GPROP_BOOL,  0.0f, 0},
+		{"neblina_ligada",     GPROP_BOOL,  0.0f, 0},
+		{"neblina_densidade",  GPROP_FLOAT, wrld->mistdensity, 0},
+		{"horario_sol",        GPROP_FLOAT, 12.0f, 0},
+		{"tipo_nuvem",         GPROP_INT,   0.0f, 0},
+		{"player_area_coberta", GPROP_BOOL, 0.0f, 0},
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(wo_status); i++) {
+		bProperty *prop;
+
+		if (BLI_findstring(&wrld->prop, wo_status[i].name, offsetof(bProperty, name))) {
+			continue;
+		}
+
+		prop = BKE_bproperty_new(wo_status[i].type);
+		BLI_strncpy(prop->name, wo_status[i].name, sizeof(prop->name));
+
+		if (wo_status[i].type == GPROP_FLOAT) {
+			*((float *)prop->poin) = wo_status[i].fval;
+		}
+		else {
+			*((int *)prop->poin) = wo_status[i].ival;
+		}
+
+		BLI_addtail(&wrld->prop, prop);
+	}
+}
+
 void BKE_world_init(World *wrld)
 {
 	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(wrld, id));
@@ -141,35 +181,7 @@ void BKE_world_init(World *wrld)
 
 	wrld->earthquake_level = 0;
 
-	/* World Status: default World Properties, mirroring existing weather/mist state
-	 * plus placeholders for status not backed by a real effect yet. */
-	{
-		struct { const char *name; int type; float fval; int ival; } wo_status[] = {
-			{"chuva_ligada",       GPROP_BOOL,  0.0f, 0},
-			{"chuva_densidade",    GPROP_FLOAT, wrld->rain_intensity, 0},
-			{"nuvens_ligadas",     GPROP_BOOL,  0.0f, 0},
-			{"neblina_ligada",     GPROP_BOOL,  0.0f, 0},
-			{"neblina_densidade",  GPROP_FLOAT, wrld->mistdensity, 0},
-			{"horario_sol",        GPROP_FLOAT, 12.0f, 0},
-			{"tipo_nuvem",         GPROP_INT,   0.0f, 0},
-			{"player_area_coberta", GPROP_BOOL, 0.0f, 0},
-		};
-		int i;
-
-		for (i = 0; i < ARRAY_SIZE(wo_status); i++) {
-			bProperty *prop = BKE_bproperty_new(wo_status[i].type);
-			BLI_strncpy(prop->name, wo_status[i].name, sizeof(prop->name));
-
-			if (wo_status[i].type == GPROP_FLOAT) {
-				*((float *)prop->poin) = wo_status[i].fval;
-			}
-			else {
-				*((int *)prop->poin) = wo_status[i].ival;
-			}
-
-			BLI_addtail(&wrld->prop, prop);
-		}
-	}
+	BKE_world_status_props_ensure(wrld);
 }
 
 World *BKE_world_add(Main *bmain, const char *name)
