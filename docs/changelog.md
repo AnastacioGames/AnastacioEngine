@@ -19,10 +19,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   o quadro anterior ao fim de `HandleEvents` e liga as flags mesmo sem evento. Semântica nativa inalterada.
 - Confirmado pelo usuário com controle físico no navegador (runtime `build-web-release` religado). Regressão geral
   (render, sombras, teclado, console sem erro vermelho), World Status no editor, export Web e idioma também
-  aceitos. Não testado: save (IDBFS), pois a cena de teste não tem save.
-- Observação: um segundo controle ("USB Joystick", vendor 0079 produto 0006) chega ao navegador com `mapping=""`,
+  aceitos. Save (IDBFS) validado com o pacote `projects-teste/teste-save-web` (SAVED, recarregar, LOADED),
+  automático (`verify-save.cjs`) e manual pelo usuário.
+- Segundo controle ("USB Joystick", vendor 0079 produto 0006) chega ao navegador com `mapping=""`,
   12 botões, 10 eixos e D-pad como hat no eixo 9 (repouso 3.29). O SDL pode não mapear o hat sem uma entrada no
-  banco de controles; não foi reproduzido nem tratado.
+  banco de controles. Testado pelo usuário: o D-pad desse controle funciona igual, nenhum mapeamento necessário.
 
 ## 2026-09-20 - Web: patch do SDL2 (gamepad) versionado
 
