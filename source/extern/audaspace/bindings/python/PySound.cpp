@@ -66,8 +66,10 @@
 
 #include <cstring>
 #include <structmember.h>
+#ifndef __EMSCRIPTEN__  /* Web: sem numpy no Python embutido; data()/buffer() levantam NotImplementedError */
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/ndarrayobject.h>
+#endif
 
 using namespace aud;
 
@@ -120,6 +122,14 @@ PyDoc_STRVAR(M_aud_Sound_data_doc,
 			 "   :rtype: :class:`numpy.ndarray`\n\n"
 			 "   .. note:: Best efficiency with cached sounds.");
 
+#ifdef __EMSCRIPTEN__
+static PyObject *
+Sound_data(Sound* self)
+{
+	PyErr_SetString(PyExc_NotImplementedError, "Sound.data() needs numpy, which is not available in the Web runtime.");
+	return nullptr;
+}
+#else
 static PyObject *
 Sound_data(Sound* self)
 {
@@ -143,6 +153,7 @@ Sound_data(Sound* self)
 
 	return reinterpret_cast<PyObject*>(array);
 }
+#endif
 
 PyDoc_STRVAR(M_aud_Sound_write_doc,
 			 ".. classmethod:: write(filename, rate, channels, format, container, codec, bitrate, buffersize)\n\n"
@@ -295,6 +306,14 @@ PyDoc_STRVAR(M_aud_Sound_buffer_doc,
 			 "   :return: The created :class:`Sound` object.\n"
 			 "   :rtype: :class:`Sound`");
 
+#ifdef __EMSCRIPTEN__
+static PyObject *
+Sound_buffer(PyTypeObject* type, PyObject* args)
+{
+	PyErr_SetString(PyExc_NotImplementedError, "Sound.buffer() needs numpy, which is not available in the Web runtime.");
+	return nullptr;
+}
+#else
 static PyObject *
 Sound_buffer(PyTypeObject* type, PyObject* args)
 {
@@ -354,6 +373,7 @@ Sound_buffer(PyTypeObject* type, PyObject* args)
 
 	return (PyObject *)self;
 }
+#endif
 
 PyDoc_STRVAR(M_aud_Sound_cache_doc,
 			 ".. classmethod:: cache()\n\n"
@@ -2016,7 +2036,9 @@ AUD_API Sound* checkSound(PyObject* sound)
 
 bool initializeSound()
 {
+#ifndef __EMSCRIPTEN__
 	import_array();
+#endif
 
 	return PyType_Ready(&SoundType) >= 0;
 }

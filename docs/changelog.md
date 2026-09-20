@@ -4,6 +4,16 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-19 - Marco G: módulo Python `aud` no runtime Web
+
+- O `audaspace-py` passou a ser compilado no Emscripten (antes `AUD_PyInit.cpp` devolvia um módulo vazio). Ajustes:
+  `intern/audaspace` e `extern/audaspace` deixam de excluir o Web; em `PySound.cpp`, `Sound.data()` e
+  `Sound.buffer()` levantam `NotImplementedError` no Web (dependem de numpy, ausente no Python Web) e
+  `import_array()` não roda.
+- Prova: `tools/create_web_aud_module_scene.py`, pacote 8210: `aud.Device()`, `Sound.sine().limit()`, `device.play`
+  e volume/pitch do Handle; **o usuário confirmou os dois tons**. Exceções C++ seguem abortando o runtime, então
+  erros de uso da API `aud` que dependam de `throw` derrubam o jogo.
+
 ## 2026-09-19 - Marco G: OGG Vorbis no áudio do runtime Web
 
 - `plugins/ogg/OGGFile.cpp` (stb_vorbis v1.22 vendorizado, domínio público/MIT) segue o mesmo padrão do MP3:

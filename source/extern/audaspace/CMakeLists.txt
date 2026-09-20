@@ -632,9 +632,7 @@ if(WITH_PYTHON)
 			endif()
 		endif()
 
-		if(NOT EMSCRIPTEN)
-			set(AUDASPACE_PY_LIBRARY -laudaspace-py)
-		endif()
+		set(AUDASPACE_PY_LIBRARY -laudaspace-py)
 
 		if(WIN32 AND AUDASPACE_STANDALONE)
 			file(GLOB PYTHON_DLLS ${LIBRARY_PATH}/Python/bin/*.dll)
@@ -912,7 +910,7 @@ if(WITH_C)
 	endif()
 endif()
 
-if(WITH_PYTHON AND NOT EMSCRIPTEN)
+if(WITH_PYTHON)
 	set(PYTHON_SRC
 		bindings/python/PyAPI.cpp
 		bindings/python/PyDevice.cpp

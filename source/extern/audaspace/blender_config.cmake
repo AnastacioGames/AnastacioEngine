@@ -25,7 +25,7 @@ set(NUMPY_INCLUDE_DIRS ${PYTHON_NUMPY_INCLUDE_DIRS})
 set(SDL_FOUND ${WITH_SDL})
 
 if(EMSCRIPTEN)
-  # Web: sem o modulo Python 'aud' (exigiria os cabecalhos do numpy, que o Python Web nao traz).
+  # Web: o modulo 'aud' e compilado sem numpy (Sound.data()/buffer() ficam desativados).
   set(NUMPY_INCLUDE_DIRS "")
 endif()
 
