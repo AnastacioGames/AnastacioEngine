@@ -7,6 +7,7 @@
 //   modo sim      : jogo web-capabilities: fisica, addObject/endObject, addScene (overlay) e replace de cena
 //   modo audio    : jogo web-audio: tom WAV em loop; confere mixer ativo e amplitude nao nula na saida Web Audio
 //   modo render   : jogo web-render: sobe, roda 8 s sem excecao e confere o padrao xadrez do chao por pixels da captura
+//   modo keys     : jogo web-smoke: seta direita (teclado real) move o cubo via controller Python ("keyboard moved cube")
 //   modo filters  : 1..0,Q (filtros simples ligam/desligam) e W,E,R,T (embutidos) sem erro de shader
 // Requer Chrome ja aberto com --remote-debugging-port=<porta-cdp>. Sai com 0 se todas as expectativas baterem.
 const [url, mode, port = '9333'] = process.argv.slice(2);
@@ -130,6 +131,19 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
       })()`) || 'null');
       console.log('pixels:', JSON.stringify(m));
       expect('chao com padrao (xadrez, transicoes de luminancia)', m && m.transitions >= 6);
+    } else if (mode === 'keys') {
+      await call('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+      await call('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+      await sleep(500);
+      for (const [k, code, vk] of [['ArrowRight', 'ArrowRight', 39], ['ArrowLeft', 'ArrowLeft', 37]]) {
+        await call('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+        await sleep(600);
+        await call('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+        await sleep(300);
+      }
+      expect('controller Python iniciou', logs.some(l => /\[web-smoke\] Python controller started/.test(l)));
+      expect('teclado moveu o cubo', logs.some(l => /\[web-smoke\] keyboard moved cube/.test(l)));
+      expect('sem excecao/aborto', !logs.some(l => /\[exception\]|Aborted|\[ABORT\]/.test(l)));
     } else if (mode === 'filters') {
       const KEYS = [['1', 'Digit1', 49, 'BLUR'], ['2', 'Digit2', 50, 'SHARPEN'], ['3', 'Digit3', 51, 'DILATION'],
         ['4', 'Digit4', 52, 'EROSION'], ['5', 'Digit5', 53, 'LAPLACIAN'], ['6', 'Digit6', 54, 'SOBEL'],

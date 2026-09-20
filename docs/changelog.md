@@ -9,6 +9,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `tools/web/verify-capabilities.cjs` (modo `render`) captura a tela e conta transições de luminância nas
   linhas do chão; um chão liso (UV constante, como no bug dos divisores de atributo, `63b3664d`) reprova.
   Pacote `teste-render`: 173 transições, verificação passou.
+- Marco D: modo `keys` do `verify-capabilities.cjs` (pacote `web-smoke`): clique de foco, setas por CDP e conferência
+  de "Python controller started" e "keyboard moved cube" (controller Python + teclado no navegador, 4/4 OK).
 - Deploy: compressão medida (gzip 6) e receitas por host (Netlify, GitHub Pages, itch.io, nginx, Apache) com
   `curl -sI` de conferência no `HOSTING.md` do pacote e em `docs/web-deploy.md`; download ~46 → ~17 MiB. A prova
   em hospedagem real (Chrome/Firefox/Edge em URL pública) segue pendente do usuário.
