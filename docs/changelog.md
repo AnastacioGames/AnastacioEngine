@@ -15,12 +15,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - **Resize do bloom**: os 7 offscreens do bloom eram criados uma vez com o tamanho do canvas / `lod`. Agora usam a
   flag interna `RAS_CANVAS_DIVISOR` (`RAS_2DFilterOffScreen::Update` recalcula e recria), e um callback
   (`KX_2DFilterManager::RefreshBloomTextures`) reaplica os bind codes nos filtros que amostram essas texturas
-  (`KX_2DFilter::UpdateTextureBindCode`). **Nao verificado em runtime**: falta redimensionar a janela com bloom ligado
-  e conferir que nao ha erro de GL e que as dimensoes seguem o canvas.
+  (`KX_2DFilter::UpdateTextureBindCode`). **Verificado em runtime Web** (`claude_m3_resize.py`/`claude_m3_criar.py`/
+  `claude_m3_resize.cjs`, Edge headless isolado, debug `RAS_2DFILTER_DEBUG` com o novo campo `offScreenSize`): bloom ligado
+  via `changeBloomValues` e `render.setWindowSize` 1280x720 -> 640x360 -> 1024x600 -> 400x300 -> 960x540; os offscreens do
+  bloom seguem canvas/2, /4 e /8 em cada tamanho (ex. 1024x600 -> 512x300, 256x150, 128x75) e `glError=0x0` em todas as
+  ~860 linhas de debug. Igual em `build-web` e `build-web-release`. Nao comparado com o build anterior ao fix (nao se sabe
+  se o bug antigo era reproduzivel neste cenario).
 - **Timer de GPU**: na Web o query `TIME` nao tem objeto GL, `Available()` dava true e o resultado era 0, o que subia
   a resolucao dinamica ate o maximo. `RAS_Query::IsSupported()` novo; `UpdateDynamicResolution` nao ajusta a escala
-  sem timer (avisa uma vez) e descarta amostras <= 0. **Nao testado em runtime.**
-- Builds: nativo (143/143) e `build-web` (139/139) com codigo 0. `build-web-release` continua desatualizado.
+  sem timer (avisa uma vez) e descarta amostras <= 0. Testado no mesmo pacote (resolucao dinamica ligada, alvo 60 fps, 50-100%): o aviso "dynamic resolution needs a GPU timer"
+  sai uma unica vez e os offscreens ficam no tamanho cheio. Limite: a escala nasce em 100% (o maximo), entao o defeito antigo
+  (subir a escala com resultado 0) nao e observavel neste cenario; o teste confirma o caminho novo, nao a regressao.
+- Builds: nativo (143/143) e `build-web` (139/139) com codigo 0. `build-web-release` reconstruido depois (163/163, codigo 0) e o teste de resize repetido nele com o mesmo resultado.
 - **Nao feito**: selecao do ultimo filtro/blit final (o fluxo ja esta correto, so custa um blit; e otimizacao para o M4),
   medicoes em desktop e celular fisico, tabela de p50/p95 e decisao sobre o M4.
 
