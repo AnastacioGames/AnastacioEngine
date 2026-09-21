@@ -31,7 +31,7 @@ Aberto:
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
   constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) integrado, mas com
-  segfault reproduzido em arquivo inválido encadeado com efeito (`Sound.file(x).volume()`), tarefa T3 do Codex. M4 recomendado adiar até
+  segfault reproduzido em arquivo inválido encadeado com efeito (`Sound.file(x).volume()`), tarefa T3 do Codex (a branch `codex/r3-audio-fix-new` ainda nao checa o leitor nulo). Diagnosticos de shader agora trazem o nome real do material e cobrem falha de link (falta material de nos). Sonda `frame-time-perf.js` (`?perf=1`) integrada mas ainda nao ligada ao `index.html`. M4 recomendado adiar até
   medir p50/p95 em celular físico. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por

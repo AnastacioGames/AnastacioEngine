@@ -279,7 +279,7 @@ Estado: `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`. M0-
 
 **Claude (arquivos: `KX_2DFilter*`, `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine.cpp`, `RAS_Query*`, `BL_Shader*`, `RAS_Shader*`, `gpu_shader.c`, docs; integração):**
 1. (Feito) integração e regressões. Ao receber T3/T4 do Codex, integrar de novo, recompilar e repetir as mesmas verificações mais `claude_r3_probe`.
-2. Nome de material/origem em `shader_errors` (hoje `engine-shader`/`2d-filter`) e teste de falha de link e de material de nós, que continuam sem teste.
+2. (Feito) nome de material em `shader_errors` e teste de falha de link; falta teste de material de nós. T4 integrado. T5 parcial: `frame-time-perf.js` integrado, sem ligação ao `index.html` e sem script CDP. T3 aberto (`codex/r3-audio-fix-new` incompleto).
 3. SSAO na Web: aguarda a comparação do usuário.
 4. Registrar a decisão do M4 assim que houver a tabela p50/p95.
 

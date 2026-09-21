@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: nome do material e falha de link nos diagnosticos de shader; T4 e T5 do Codex integrados
+
+- `KX_BlenderMaterial::getShader()` passa o nome do material ao `BL_Shader` (`RAS_Shader::SetDiagnosticName`); em `shader_errors[]` o campo `material` sai como o nome real do ID (ex.: `MAMatQuebrado`, com o prefixo `MA` do Blender) em vez de `engine-shader`. Filtros 2D continuam `2d-filter`.
+- Testado com `build-web` recompilado (19/19, codigo 0), pacote real e Edge headless isolado (`claude_m1c_diag.cjs`): vertex invalido -> `operation` "compile", `stage` "vertex", `material` "MAMatQuebrado"; **falha de link** (vertex valido, fragment com `in` sem `out` correspondente; `criar_m1c.py -- --link` + `shader_quebrado.quebrar_link`) -> `operation` "link", `stage` "", log `FRAGMENT varying varying_inexistente does not match any VERTEX varying`, `material` "MAMatQuebradoLink". Nao testado: shader de material de nos. Nota: o runtime usa GLSL ES 3 (`ftransform`, `varying` e `gl_FragColor` nao existem), entao shaders escritos para o desktop falham no Web.
+- Suite `tools/tests/web_profile`: 98 testes OK.
+- Merges locais (sem push): `codex/r1-guard` (T4: guard estatico tolera stubs `Range` quebrados; `constraint_abi_test.py` -> `PASS (31 methods)`) e `codex/perf-tool` (T5 parcial: `tools/web/frame-time-perf.js` + `docs/web-frame-time-perf.md`; validado aqui so em Node com rAF sintetico, p50/p95 corretos). A ferramenta **nao esta ligada** ao `index.html` gerado (o Codex nao editou `package-web.py`) e nao ha script CDP; o usuario ainda nao consegue medir no celular sem incluir o script a mao.
+- **T3 nao integrado:** `codex/r3-audio-fix-new` (`ad95c2e8`) so troca `assert` por guarda em `AUD_Sound_getSpecs/getLength`, mas ainda chama `createReader()->` sem checar o leitor nulo, que e a causa do segfault; sem build Web nem sonda. R3 segue **aberto**.
+- Nao refeitos nesta rodada: nativo, `build-web-release`, regressao de audio, resize do bloom e `claude_r3_probe` (nenhuma mudanca de C++ alem do nome do shader; so `build-web` foi recompilado).
+
 ## 2026-09-20 - Web: integração de R1 e R3 e verificação no runtime integrado
 
 - Merges locais (sem push) na `claude/web-m1-python-diag`: `codex/r3-audio-m3-tests` e `codex/r1-constraint-abi`; único conflito foi o topo do changelog (mantidas as duas entradas).
