@@ -83,7 +83,11 @@ void BLO_update_defaults_userpref_blend(void)
 
   /* Interface */
   U.header_size = 26;
-  U.flag |= USER_TOOLTIPS | USER_TOOLTIPS_PYTHON | USER_DEVELOPER_UI | USER_SCENEGLOBAL;
+  /* USER_TOOLTIPS_PYTHON usa RNA_def_property_boolean_negative_sdna: o bit ligado
+   * deixa a checkbox "Python Tooltips" desmarcada. Deixamos o bit desligado para
+   * a checkbox vir marcada por padrao (testa o caminho de tooltip Python). */
+  U.flag |= USER_TOOLTIPS | USER_DEVELOPER_UI | USER_SCENEGLOBAL;
+  U.flag &= ~USER_TOOLTIPS_PYTHON;
   U.uiflag |= USER_SHOW_VIEWPORTNAME | USER_SHOW_FPS | USER_SHOW_ROTVIEWICON;
   U.uiflag &= ~USER_SPLASH_DISABLE; /* Show Splash */
   U.app_flag &= ~(USER_APP_LOCK_UI_LAYOUT | USER_APP_VIEW3D_HIDE_CURSOR); /* Show Layout Widgets / Show 3D View Cursor */

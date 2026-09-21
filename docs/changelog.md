@@ -10,7 +10,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - CMake de `RangeRuntime`/`RangeEngine` passou a usar `$ORIGIN/lib` e copiar o libpython real para `lib/`; `package-runtime.sh` aceita `BIN_DIR` e valida o libpython no pacote.
 - **Validado em Linux nativo (Ubuntu, GPU local):** build do `RangeEngine` (`linux-editor`), `readelf -d` confirma RUNPATH `$ORIGIN/lib:/opt/anastacio-python311/lib:` (na ordem certa, `$ORIGIN/lib` primeiro), `bin/lib/libpython3.11.so.1.0` presente. Empacotado com `BIN_DIR=build-linux-editor/bin tools/linux/package-runtime.sh 0.4.1`. Extraido em diretorio limpo (`/tmp/pkgtest`): `LD_DEBUG=libs` confirma que o linker resolve `libpython3.11.so.1.0` via `$ORIGIN/lib` do proprio pacote, sem sequer tentar `/opt/anastacio-python311/lib` (nao precisou remover o `/opt` da maquina de teste, que ja tinha o path). `./RangeEngine -b` roda e sai limpo (exit 0), sem erro de `encodings`/stdlib. Fix confirmado correto.
 - Build no Linux (GCC) expos um erro pre-existente nao relacionado ao RUNPATH: `source/intern/locale/boost_locale_wrapper.cpp` usava `std::cout` sem incluir `<iostream>` (so tinha `<stdio.h>`); no MSVC algum header do boost arrastava `<iostream>` transitivamente, no GCC/libstdc++ nao. Corrigido com `#include <iostream>`.
-- Pendente: crash do tooltip (ver abaixo e `linux-build.md`) ainda sem causa confirmada por reproducao real; publicar 0.4.1 so depois de decidir sobre o tooltip (ver secao de handoff).
+- Crash do tooltip: investigado, corrigido e validado em sessao grafica real (ver entradas abaixo e `linux-build.md`). 0.4.1 pronto para empacotar.
 
 ## 2026-09-21 - Investigacao (nao confirmada): crash de tooltip
 
@@ -34,6 +34,46 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   interativa real). Nenhuma correcao aplicada ainda.
 - Perguntas para o Kitsuy: (a) "Python Tooltips" esta marcada nas preferencias dele? (b) qual botao/painel
   exato crasha? (c) reproduz em cena default/vazia?
+
+## 2026-09-21 - Segunda rodada: fix defensivo aplicado ao crash de tooltip (nao reproduzido)
+
+- Segundo agente aprofundou a investigacao acima. Releu `interface_region_tooltip.c` e
+  `UI_but_string_info_get` por completo: nesse fluxo tudo e recalculado a partir do `uiBut*` ja validado,
+  sem ponteiro obsoleto. Seguiu a cadeia do timer em `interface_handlers.c:7345` e viu que
+  `UI_region_active_but_get()` **revalida** o `uiBut*` a cada disparo — o que torna H1 (ID RNA obsoleto
+  dentro de `but->rnapoin`) menos provavel do que se pensava.
+- Achado novo, um nivel acima: em `source/source/blender/windowmanager/intern/wm_tooltip.c`,
+  `screen->tool_tip->region_from` (o `ARegion*` capturado quando o hover comeca) **nunca e revalidado**
+  antes de ser usado em `WM_tooltip_init()`, disparado ~`UI_TOOLTIP_DELAY` (0.5s) depois. Operacoes de
+  layout nesse intervalo (`ED_area_data_copy` em `area.c` — maximizar/restaurar area, trocar tipo de
+  editor, split/join, fullscreen) liberam `ARegion`s inteiros sem passar por nenhuma limpeza do estado de
+  tooltip pendente. Use-after-free plausivel, coerente com um crash intermitente ao "passar o mouse" em
+  fluxo de uso exploratorio (hover rapido entre paineis/abas). Padrao existe tambem no Blender upstream,
+  nao e regressao do fork.
+- **Fix aplicado** (nao commitado, aguardando revisao): `wm_tooltip_region_is_valid()` percorre
+  `screen->areabase`/`regionbase` vivos e confirma que `region_from` ainda existe antes de usa-lo em
+  `WM_tooltip_init()`; se nao existir, limpa o estado (`WM_tooltip_clear`) e sai sem dereferenciar.
+  Tambem adicionado null-check de `screen->tool_tip` (hardening, os 2 call sites atuais ja garantiam
+  nao-nulo). Build `linux-editor`/`RangeEngine` limpo apos o fix.
+- Sem `Xvfb`/`xdotool`/sudo no ambiente do agente, nao foi possivel montar sessao grafica headless para
+  simular hover + mudanca de layout sob gdb; validacao ficou pendente de sessao grafica real (ver abaixo).
+
+## 2026-09-21 - Terceira rodada: fix de tooltip validado em sessao grafica; padrao de fabrica corrigido
+
+- Validado manualmente por Fabio em sessao grafica local (`DISPLAY` real, nao `--background`): com
+  "Python Tooltips" ligado (caminho de codigo mais exposto), hover em botoes seguido de Ctrl+Espaco
+  (maximizar/restaurar area) repetido em varios paineis, antes do disparo do timer (~0.5s) — sem crash,
+  processo sai limpo. Repetido tambem com `HOME` limpo simulando primeira execucao (sem config previa):
+  preferencias carregam corretamente, sem crash. Fix em `wm_tooltip.c` considerado validado.
+- `versioning_defaults.c`: `USER_TOOLTIPS_PYTHON` deixava a checkbox "Python Tooltips" **desmarcada** por
+  padrao (por causa do `RNA_def_property_boolean_negative_sdna`), o que fazia o caminho de codigo mais
+  exposto ao bug nunca rodar numa instalacao limpa. Corrigido para a checkbox vir **marcada** por padrao
+  (bit desligado), para exercitar o caminho real em vez de mascarar o problema por omissao.
+- `source/release/datafiles/startup.blend` (arquivo de fabrica embutido no build) atualizado com as
+  demais preferencias de interface confirmadas por Fabio pela UI (`~/.config/range/2.79/config/startup.blend`
+  copiado por cima do arquivo do fonte).
+- Bug 2 (crash de tooltip) considerado **resolvido** para efeito de release; falta so empacotar 0.4.1 e o
+  teste final em pacote extraido (ver roadmap).
 
 ## 2026-09-20 - Android: revisão técnica do plano de exportação
 

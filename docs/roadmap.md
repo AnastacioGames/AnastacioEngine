@@ -55,7 +55,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver
 [linux-build.md](linux-build.md). Pendente:
 
-- **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor). RUNPATH `$ORIGIN/lib`: **validado em Linux nativo 2026-09-21** (build, pacote 0.4.1, execucao em dir limpo, ver `linux-build.md`/`changelog.md`). Crash do tooltip: investigado (2 hipoteses levantadas, ver `linux-build.md`/`changelog.md`), causa ainda **nao confirmada** por reproducao real — falta sessao interativa com gdb + resposta do Kitsuy sobre "Python Tooltips"/botao exato. 0.4.1 so publica depois disso.
+- **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor) — **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado por padrao para exercitar o caminho de codigo, ver `linux-build.md`/`changelog.md`). Falta empacotar e publicar 0.4.1.
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`

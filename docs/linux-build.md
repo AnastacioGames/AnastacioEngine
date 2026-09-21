@@ -13,6 +13,32 @@ Build, empacotamento e execucao em diretorio limpo confirmados nesta maquina (ve
 `#include <iostream>` em `source/intern/locale/boost_locale_wrapper.cpp` (usava `std::cout`; so
 compilava no MSVC por inclusao transitiva). Falta so publicar 0.4.1 (depois de decidir sobre o item 2).
 
+### 2. Crash de tooltip — fix aplicado e VALIDADO em sessao grafica real (2026-09-21)
+
+Investigacao estatica (2 rodadas) descartou a hipotese original de "checkbox invertida" (comportamento
+padrao do Blender upstream, nao bug) e a hipotese de uso-apos-liberacao de ID dentro do `PointerRNA` do
+`uiBut` (esse caminho revalida o `but` a cada disparo do timer). Encontrada uma falha estrutural mais
+generica em `source/source/blender/windowmanager/intern/wm_tooltip.c`: o timer do tooltip guarda um
+`ARegion *region_from` bruto por ate `UI_TOOLTIP_DELAY` (~0.5s); operacoes de layout nesse intervalo
+(maximizar/restaurar area, trocar tipo de editor, split/join, fullscreen) liberam `ARegion`s sem passar
+por nenhuma limpeza do estado de tooltip pendente — use-after-free plausivel ao disparar o timer.
+Corrigido com `wm_tooltip_region_is_valid()`: antes de usar `region_from` em `WM_tooltip_init()`,
+confirma que a regiao ainda esta na lista viva de `screen->areabase`/`regionbase`; se nao estiver, limpa
+o estado e sai sem dereferenciar. Build (`linux-editor`/`RangeEngine`) limpo apos o fix.
+
+**Validado em sessao grafica real** (DISPLAY local, nao `--background`): "Python Tooltips" foi ligado
+(esse e o caminho de codigo mais exposto, ver H1 acima) e o fix foi promovido a padrao de fabrica (ver
+abaixo). Hover em botoes seguido de Ctrl+Espaco (maximizar/restaurar area) repetido em varios paineis,
+antes do disparo do timer (~0.5s): sem crash, saida limpa do processo. Testado tambem com `HOME` limpo
+simulando primeira execucao (sem config previa): preferencias carregam corretamente, sem crash.
+
+**Padrao de fabrica atualizado**: `versioning_defaults.c` deixava `USER_TOOLTIPS_PYTHON` ligado por
+padrao, o que (por usar `RNA_def_property_boolean_negative_sdna`) fazia a checkbox "Python Tooltips"
+aparecer **desmarcada** e o caminho de codigo mais exposto ao bug nunca rodar em instalacao limpa.
+Corrigido para deixar a checkbox marcada por padrao (bit desligado), testando o caminho de codigo real
+em vez de mascarar o problema por omissao. `source/release/datafiles/startup.blend` tambem foi
+atualizado com as demais preferencias de interface confirmadas pelo usuario.
+
 ### (texto original abaixo, preservado como historico da preparacao no Windows)
 
 Causa: o pacote 0.4.0 saiu com RUNPATH absoluto `/opt/anastacio-python311/lib` (so existe na maquina de build).
