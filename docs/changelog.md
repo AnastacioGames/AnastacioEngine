@@ -4,6 +4,25 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web/R1: ABI dos callbacks Python de constraints
+
+- Inventário executado de `physicsconstraints_methods`: 31 registros (30 `METH_VARARGS`, um
+  `METH_VARARGS | METH_KEYWORDS`, nenhum `METH_NOARGS`). Vinte e oito callbacks `METH_VARARGS`
+  tinham a assinatura de três parâmetros; `gPyCreateVehicle` e `gPyExportBulletFile` já tinham
+  dois, e `gPyCreateConstraint` já estava correto com três e `METH_KEYWORDS`.
+- Em `KX_PyConstraintBinding.cpp`, removido o parâmetro `kwds` das 28 funções `METH_VARARGS`.
+  As flags não mudaram: setters continuam posicionais e `createConstraint` conserva a API de
+  keywords existente.
+- Novo `tools/tests/constraint_abi_test.py`: guarda estática das 31 assinaturas/flags e cena
+  Python que cobre argumentos válidos e inválidos dos setters, rejeição de keyword em
+  `setGravity` e aridades inválidas das demais APIs expostas.
+- Antes da correção, a cena passou no `RangeRuntime` nativo em Windows x64: a incompatibilidade
+  ABI não se reproduziu nessa plataforma. Após a correção, o mesmo teste passou nativamente.
+- Executados com sucesso: `cmake --build --preset web-runtime` (1817 etapas),
+  `package-web.py` para a cena de regressão e execução Web em Chrome headless/WebGL2 via CDP;
+  o log da cena correta registrou `CONSTRAINT_ABI_TEST: PASS`. O pacote usou runtime de
+  depuração (`SAFE_HEAP`/`ASSERTIONS`), somente para validação.
+
 ## 2026-09-20 - Web: testes de runtime do M1 (diagnósticos Python e shader)
 
 - Três jogos com falha injetada foram empacotados com `package-web.py --runtime-dir build-web/bin`, servidos e
