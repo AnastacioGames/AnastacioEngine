@@ -155,7 +155,12 @@ if __name__ == "__main__" and "--make-scene" in __import__("sys").argv:
 else:
     try:
         import Range
-    except ImportError:
-        run_static()
-    else:
+        constraints = getattr(Range, "constraints", None)
+        usable_runtime = constraints is not None and all(
+            hasattr(constraints, name) for name in ("setGravity", "setNumIterations"))
+    except Exception:
+        usable_runtime = False
+    if usable_runtime:
         run_runtime()
+    else:
+        run_static()
