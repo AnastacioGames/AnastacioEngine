@@ -176,6 +176,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_autoWorldSunReferenceCamera(nullptr),
 	m_earthquakeBaseGravity(mt::zero3),
 	m_earthquakeBaseGravityInitialized(false),
+	m_earthquakeCameraShaking(false),
 	m_activeCamera(nullptr),
 	m_optimizationReferencePosition(mt::zero3),
 	m_overrideCullingCamera(nullptr),
@@ -632,27 +633,67 @@ void KX_Scene::UpdateEarthquake(double curtime)
 		{
 			SetGravity(m_earthquakeBaseGravity);
 		}
+		if (m_earthquakeCameraShaking) {
+			for (KX_Camera *camera : *GetCameraList()) {
+				camera->SetShakeShift(0.0f, 0.0f);
+			}
+			m_earthquakeCameraShaking = false;
+		}
 		return;
 	}
 
-	// Same two-wave-per-axis shake as the reference implementation: a single
-	// sine looks too mechanical/repetitive, two summed at different phases
-	// and frequencies read as more chaotic ground motion.
-	static const float kLevelStrength[6] = {0.0f, 0.8f, 1.8f, 3.5f, 5.8f, 8.5f};
+	// Two summed waves per axis (different phase/frequency) read as chaotic
+	// ground motion; a single sine looks mechanical.
+	// Horizontal strength is a lateral gravity acceleration; it has to beat
+	// friction (~mu*g) to actually move resting objects, hence the high values.
+	static const float kLevelStrength[6] = {0.0f, 2.0f, 4.5f, 9.0f, 15.0f, 24.0f};
 	static const float kLevelFrequency[6] = {0.0f, 3.0f, 4.0f, 5.5f, 7.0f, 8.5f};
+	// Camera lens-shift amplitude (fraction of the frame) per level.
+	static const float kLevelCamera[6] = {0.0f, 0.004f, 0.008f, 0.014f, 0.022f, 0.032f};
 
 	const int level = std::min(std::max(world->earthquake_level, 0), 5);
-	const float strength = kLevelStrength[level];
+	// Ground scale multiplies the strength (0 = value from an older file, treated as 1).
+	const float groundScale = world->earthquake_scale > 0.0f ? std::min(world->earthquake_scale, 5.0f) : 1.0f;
+	const float strength = kLevelStrength[level] * groundScale;
 	const float frequency = kLevelFrequency[level];
 	const float t = (float)curtime;
 
-	const float gx = strength * (std::sin(t * frequency * 6.28318f) +
-	                              0.45f * std::sin(t * frequency * 11.7f));
-	const float gy = strength * (std::sin(t * frequency * 8.1f + 1.4f) +
-	                              0.35f * std::sin(t * frequency * 15.9f));
-	const float gz = m_earthquakeBaseGravity.z + strength * 0.12f * std::sin(t * frequency * 10.4f);
+	const bool horizontal = world->earthquake_mode != WO_EARTHQUAKE_VERTICAL;
+	const bool vertical = world->earthquake_mode != WO_EARTHQUAKE_HORIZONTAL;
 
-	SetGravity(mt::vec3(m_earthquakeBaseGravity.x + gx, m_earthquakeBaseGravity.y + gy, gz));
+	const float waveX = std::sin(t * frequency * 6.28318f) + 0.45f * std::sin(t * frequency * 11.7f);
+	const float waveY = std::sin(t * frequency * 8.1f + 1.4f) + 0.35f * std::sin(t * frequency * 15.9f);
+	const float waveZ = std::sin(t * frequency * 10.4f) + 0.4f * std::sin(t * frequency * 17.3f + 0.7f);
+
+	const float gx = horizontal ? strength * waveX : 0.0f;
+	const float gy = horizontal ? strength * waveY : 0.0f;
+	// Vertical shake can pull objects off the ground when it exceeds gravity; that is intended at high levels.
+	const float gz = vertical ? strength * (horizontal ? 0.35f : 0.7f) * waveZ : 0.0f;
+
+	// setGravity only reaches ACTIVE bodies, so sleeping ones would ignore the
+	// quake: wake everything first (no need to disable sleeping per object).
+	PHY_IPhysicsEnvironment *physics = GetPhysicsEnvironment();
+	if (physics) {
+		physics->WakeAllBodies();
+	}
+	SetGravity(mt::vec3(m_earthquakeBaseGravity.x + gx, m_earthquakeBaseGravity.y + gy, m_earthquakeBaseGravity.z + gz));
+
+	// Camera tremor through the lens shift of the active camera.
+	KX_Camera *camera = GetActiveCamera();
+	const float cameraAmount = std::min(std::max(world->earthquake_camera, 0.0f), 2.0f);
+	if (camera && cameraAmount > 0.0f) {
+		const float amp = kLevelCamera[level] * cameraAmount;
+		const float sx = horizontal ? 1.0f : 0.3f;
+		const float sy = vertical ? 1.0f : 0.3f;
+		camera->SetShakeShift(amp * sx * waveX * 0.6f, amp * sy * waveZ * 0.6f);
+		m_earthquakeCameraShaking = true;
+	}
+	else if (m_earthquakeCameraShaking) {
+		for (KX_Camera *cam : *GetCameraList()) {
+			cam->SetShakeShift(0.0f, 0.0f);
+		}
+		m_earthquakeCameraShaking = false;
+	}
 }
 
 void KX_Scene::Suspend()

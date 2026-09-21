@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Terremoto: direção, escala, tremor de câmera e corpos dormindo
+
+- **Problema:** o terremoto (World > Weather > Earthquake) era fraco e só sacudia a gravidade lateralmente. Além disso, `btDiscreteDynamicsWorld::setGravity` e `applyGravity` só atuam em corpos **ativos** (`isActive()`): objeto dormindo (sleep) ignorava o terremoto e nunca acordava. Não é preciso desligar o sleep por objeto.
+- **Correção (`KX_Scene::UpdateEarthquake`):** enquanto o terremoto está ligado, `PHY_IPhysicsEnvironment::WakeAllBodies()` (novo; implementado em `CcdPhysicsEnvironment`, no-op no Dummy) acorda os corpos dinâmicos antes de aplicar a gravidade. Níveis 1-5 ficaram ~2,5x mais fortes (força 2, 4.5, 9, 15, 24), pois o tremor lateral precisa vencer o atrito.
+- **Novas opções no World:** `earthquake_scale` (0,1-5, multiplica a força do chão), `earthquake_mode` (Horizontal, Vertical ou Both; o vertical pode levantar objetos em nível alto) e `earthquake_camera` (Camera Shake Scale, 0-2).
+- **Tremor de câmera:** `KX_Camera::SetShakeShift` soma um deslocamento temporário ao `shift_x`/`shift_y` (lens shift) da câmera ativa ao montar a projeção; o `shift` autorado não é alterado e o deslocamento é zerado quando o terremoto termina. Segue o Level e a Direction.
+- **DNA:** `weather_pad3` virou `earthquake_mode` e `earthquake_pad` virou `earthquake_camera` (short/float de padding, zerados em arquivos antigos: direção Horizontal, câmera desligada); `earthquake_scale` e `earthquake_pad2` são novos (o tamanho de `World` cresce 8 bytes). `earthquake_scale` 0 (arquivo antigo) vale 1. Mundos novos: scale 1, câmera 1. Traduções PT/ES/RU adicionadas.
+- **Validação:** `ninja -t clean` + `RangeEngine RangeRuntime` no worktree `claude-rna`: 0 erros. **Testado pelo usuário no editor (Windows nativo): "funciona bem"** (cena `projects-teste/teste-terremoto/terremoto.range`). Um teste automatizado por script (posições dos cubos) rodou sem imprimir nada e não serve como evidência. **Não** foi feito rebuild Web nem teste Web (a DNA mudou; o Web precisa de rebuild limpo).
+
 ## 2026-09-21 - WebAssembly: integração aud + R3 sobre linux-sync; sonda R3 passa com -fexceptions
 
 - Branch `claude/web-aud-r3-integ` (base `linux-sync` 3c0b9fcf): correção de aridade do `aud` (ea2cfd04) e o R3 do Codex (ad95c2e8, aplicado como bab82233), que protege `AUD_Sound_getSpecs` e `AUD_Sound_getLength` contra `AUD_Sound` nulo.

@@ -180,6 +180,9 @@ void BKE_world_init(World *wrld)
 	wrld->flare_intensity = 1.0f;
 
 	wrld->earthquake_level = 0;
+	wrld->earthquake_mode = WO_EARTHQUAKE_HORIZONTAL;
+	wrld->earthquake_camera = 1.0f;
+	wrld->earthquake_scale = 1.0f;
 
 	BKE_world_status_props_ensure(wrld);
 }

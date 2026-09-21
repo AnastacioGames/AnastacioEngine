@@ -152,6 +152,16 @@ void KX_Camera::InvalidateProjectionMatrix()
 	GetScene()->GetTextureRendererManager()->InvalidateRenderersProjectionMatrix();
 }
 
+void KX_Camera::SetShakeShift(float x, float y)
+{
+	if (x == m_shakeShiftX && y == m_shakeShiftY) {
+		return;
+	}
+	m_shakeShiftX = x;
+	m_shakeShiftY = y;
+	InvalidateProjectionMatrix();
+}
+
 void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterizer::StereoMode stereoMode,
 		RAS_Rasterizer::StereoEye eye, const RAS_Rect& viewport, const RAS_Rect& area)
 {
@@ -173,8 +183,8 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 				m_camdata.m_sensor_x,
 				m_camdata.m_sensor_y,
 				m_camdata.m_sensor_fit,
-				m_camdata.m_shift_x,
-				m_camdata.m_shift_y,
+				m_camdata.m_shift_x + m_shakeShiftX,
+				m_camdata.m_shift_y + m_shakeShiftY,
 				m_camdata.m_clipstart,
 				m_camdata.m_clipend,
 				frustum);
@@ -197,8 +207,8 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 				m_camdata.m_clipstart,
 				m_camdata.m_clipend,
 				m_camdata.m_sensor_fit,
-				m_camdata.m_shift_x,
-				m_camdata.m_shift_y,
+				m_camdata.m_shift_x + m_shakeShiftX,
+				m_camdata.m_shift_y + m_shakeShiftY,
 				frustum);
 
 			if (!m_camdata.m_useViewport) {

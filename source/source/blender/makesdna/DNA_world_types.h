@@ -132,7 +132,7 @@ typedef struct World {
 	short weather_flag;      /* WO_WEATHER_RAIN, WO_WEATHER_CLOUDS, WO_WEATHER_LENSFLARE (bits) */
 	short rain_style;        /* WO_RAIN_STYLE_CLASSIC, WO_RAIN_STYLE_VOLUMETRIC */
 	short weather_expand_flag; /* show_expanded_* dos efeitos de weather na UI, reusa os bits WO_WEATHER_* */
-	short weather_pad3;
+	short earthquake_mode;   /* WO_EARTHQUAKE_HORIZONTAL/VERTICAL/BOTH (era weather_pad3; arquivos antigos = 0 = horizontal) */
 
 	float rain_intensity, rain_density, rain_speed, rain_wind, rain_darken, rain_ripple;
 	float rain_ripple_distance, rain_ripple_min_up;
@@ -143,7 +143,9 @@ typedef struct World {
 	float cloud_color[3];
 
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
-	float earthquake_pad;
+	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */
+	float earthquake_pad2;
+	float earthquake_camera; /* tremor da camera ativa, 0 (off) a 2 (era earthquake_pad; arquivos antigos = 0) */
 
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
 	float flare_scale, flare_intensity;
@@ -183,6 +185,11 @@ typedef struct World {
 #define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
 #define WO_WEATHER_RAIN_RIPPLE     (1 << 4)
 #define WO_WEATHER_EARTHQUAKE      (1 << 5)
+
+/* earthquake_mode */
+#define WO_EARTHQUAKE_HORIZONTAL   0
+#define WO_EARTHQUAKE_VERTICAL     1
+#define WO_EARTHQUAKE_BOTH         2
 
 /* rain_style */
 #define WO_RAIN_STYLE_CLASSIC      0

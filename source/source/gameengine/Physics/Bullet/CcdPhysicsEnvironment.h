@@ -199,6 +199,7 @@ public:
 	virtual int GetDebugMode() const;
 
 	virtual void SetGravity(float x, float y, float z);
+	virtual void WakeAllBodies();
 	virtual mt::vec3 GetGravity() const;
 
 

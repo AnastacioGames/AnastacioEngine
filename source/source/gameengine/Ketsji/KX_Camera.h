@@ -57,6 +57,9 @@ protected:
 	 * here? It doesn't really have a function here. */
 	RAS_CameraData	m_camdata;
 
+	float m_shakeShiftX = 0.0f;
+	float m_shakeShiftY = 0.0f;
+
 	/// Setting for a view: left or right eye or default (left eye).
 	struct View
 	{
@@ -138,6 +141,10 @@ public:
 	 *  recalculated.
 	 */
 	void				InvalidateProjectionMatrix();
+
+	/** Transient lens-shift offset (earthquake camera shake). Added to shift_x/shift_y
+	 *  when the projection is built, so the authored shift stays untouched. */
+	void				SetShakeShift(float x, float y);
 	
 	/** Gets the modelview matrix that is used by the rasterizer. 
 	 *  \warning If the Camera is a dynamic object then this method may return garbage.  Use GetWorldToCamera() instead.
