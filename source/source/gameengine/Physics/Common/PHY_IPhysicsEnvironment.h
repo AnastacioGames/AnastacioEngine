@@ -222,6 +222,8 @@ public:
 	}
 
 	virtual void SetGravity(float x, float y, float z) = 0;
+	/// Wake every sleeping dynamic body (gravity changes do not reach sleeping bodies).
+	virtual void WakeAllBodies() {}
 	virtual mt::vec3 GetGravity() const = 0;
 
 	virtual PHY_IConstraint *CreateConstraint(class PHY_IPhysicsController *ctrl, class PHY_IPhysicsController *ctrl2, PHY_ConstraintType type,

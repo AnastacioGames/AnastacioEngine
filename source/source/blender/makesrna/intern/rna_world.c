@@ -646,7 +646,32 @@ static void rna_def_world_weather(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "earthquake_level", PROP_INT, PROP_NONE);
 	RNA_def_property_range(prop, 0, 5);
-	RNA_def_property_ui_text(prop, "Level", "Earthquake intensity, from 0 (off) to 5 (extreme); drives lateral gravity shake while playing");
+	RNA_def_property_ui_text(prop, "Level", "Earthquake intensity, from 0 (off) to 5 (extreme); drives the gravity shake while playing");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	static const EnumPropertyItem earthquake_mode_items[] = {
+		{WO_EARTHQUAKE_HORIZONTAL, "HORIZONTAL", 0, "Horizontal", "Shake the ground sideways (X/Y)"},
+		{WO_EARTHQUAKE_VERTICAL, "VERTICAL", 0, "Vertical", "Shake the ground up and down (Z)"},
+		{WO_EARTHQUAKE_BOTH, "BOTH", 0, "Both", "Shake the ground sideways and vertically"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	prop = RNA_def_property(srna, "earthquake_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "earthquake_mode");
+	RNA_def_property_enum_items(prop, earthquake_mode_items);
+	RNA_def_property_ui_text(prop, "Direction", "Direction of the earthquake ground shake");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "earthquake_scale", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.1f, 5.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 5.0f, 0.05, 2);
+	RNA_def_property_ui_text(prop, "Scale", "Multiplier of the earthquake ground shake strength (1 = default for the chosen Level)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "earthquake_camera", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 0.05, 2);
+	RNA_def_property_ui_text(prop, "Camera Shake Scale", "Camera tremor during the earthquake, from 0 (off) to 2 (strong); scales with Level");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	/* lens flare */

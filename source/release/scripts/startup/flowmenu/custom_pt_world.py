@@ -281,6 +281,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col = main_box.column(align=True)
             col.active = weather.use_earthquake
             col.prop(weather, "earthquake_level", slider=True, text="Level")
+            col.prop(weather, "earthquake_scale", slider=True, text="Scale")
+            col.prop(weather, "earthquake_mode", text="Direction")
+            col.prop(weather, "earthquake_camera", slider=True, text="Camera Shake Scale")
 
 
 # ==============================================================================

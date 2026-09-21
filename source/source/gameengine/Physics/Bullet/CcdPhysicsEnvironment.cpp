@@ -1456,6 +1456,17 @@ void CcdPhysicsEnvironment::SetGravity(float x, float y, float z)
 	m_dynamicsWorld->getWorldInfo().m_gravity.setValue(x, y, z);
 }
 
+void CcdPhysicsEnvironment::WakeAllBodies()
+{
+	btCollisionObjectArray& objects = m_dynamicsWorld->getCollisionObjectArray();
+	for (int i = 0; i < objects.size(); ++i) {
+		btRigidBody *body = btRigidBody::upcast(objects[i]);
+		if (body && !body->isStaticOrKinematicObject() && !body->isActive()) {
+			body->activate(true);
+		}
+	}
+}
+
 static int gConstraintUid = 1;
 
 void CcdPhysicsEnvironment::RemoveConstraintById(int constraintId, bool free)

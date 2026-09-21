@@ -239,6 +239,8 @@ private:
 	/// this instead of replacing it), captured on first earthquake update.
 	mt::vec3 m_earthquakeBaseGravity;
 	bool m_earthquakeBaseGravityInitialized;
+	/// True while a shake offset is applied to cameras, so it can be cleared when the quake ends.
+	bool m_earthquakeCameraShaking;
 
 	/// Network scene.
 	KX_NetworkMessageScene *m_networkScene;
