@@ -30,8 +30,8 @@
     document.body.appendChild(overlay);
     setInterval(() => {
       const r = window.__rangePerf();
-      overlay.textContent = 'perf count ' + r.count + '\\np50 ' + r.p50_ms.toFixed(2) + ' ms\\np95 ' +
-        r.p95_ms.toFixed(2) + ' ms\\nDPR ' + r.devicePixelRatio + '\\ncanvas ' + r.canvasWidth + 'x' + r.canvasHeight;
+      overlay.textContent = ['perf count ' + r.count, 'p50 ' + r.p50_ms.toFixed(2) + ' ms', 'p95 ' + r.p95_ms.toFixed(2) + ' ms',
+        'DPR ' + r.devicePixelRatio, 'canvas ' + r.canvasWidth + 'x' + r.canvasHeight].join(String.fromCharCode(10));
     }, 2000);
   };
   if (document.body) installOverlay(); else document.addEventListener('DOMContentLoaded', installOverlay, { once: true });
