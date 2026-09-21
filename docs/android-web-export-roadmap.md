@@ -1,5 +1,10 @@
 # Roadmap — Export para Web e Android
 
+> **Revisão de 2026-09-20:** a sequência Android vigente está em
+> [android-export-plan.md](android-export-plan.md): provar um APK WebView mínimo no aparelho real antes do
+> exportador/editor. As fases Android nativas abaixo são referência histórica da trilha NDK congelada;
+> a validação Web desktop não comprova suporte Android.
+
 ## Contexto de sequência
 
 Neste momento, `RangeRuntime` já roda em:

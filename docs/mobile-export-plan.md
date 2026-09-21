@@ -1,5 +1,8 @@
 # Plano — Export para celular (Android/iOS)
 
+> **Atualização 2026-09-20:** este documento é o levantamento da rota **nativa** (trilha B), agora congelada.
+> O caminho vigente do Android é o APK com WebView sobre o pacote Web: ver [android-export-plan.md](android-export-plan.md).
+
 ## Objetivo
 
 Levantar o estado atual da engine em relação a portabilidade mobile e traçar o

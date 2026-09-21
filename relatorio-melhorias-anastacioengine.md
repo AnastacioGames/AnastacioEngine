@@ -152,11 +152,12 @@ ferramenta correspondente.
   no navegador real. Permanecem validações visuais dos filtros ampliados, smoke
   test de persistência IDBFS e documentação de deploy.
   Ver roadmap e changelog de 2026-09-14.
-- O export Android deve partir das lições já validadas em Linux e Web: runtime 64-bit, Python 3.11 isolado
-  como parte do pacote, features desligadas explicitamente quando a API da plataforma divergir, e validação
-  em hardware real antes de anunciar suporte. O Android ainda não tem backend GHOST/APK funcional; os primeiros
-  bloqueios concretos conhecidos são `malloc_stats` ausente na Bionic e `GL/glu.h` inexistente no NDK. O plano
-  consolidado fica em [`docs/android-web-export-roadmap.md`](docs/android-web-export-roadmap.md).
+- A rota recomendada para Android v1 (revisão de 2026-09-20) é um APK com WebView que embute o pacote Web,
+  condicionada à prova com o jogo real em aparelho físico; ainda não há execução Android comprovada.
+  Primeiro validar APK mínimo, toque simultâneo, memória/desempenho, save e pausa/retomada; depois CLI e editor.
+  Sensores podem usar adaptador Android pequeno quando necessário. NDK fica congelado até limitação medida
+  que justifique reabertura (bloqueios conhecidos: `malloc_stats` na Bionic, `GL/glu.h`, sem GHOST Android).
+  Plano em [`docs/android-export-plan.md`](docs/android-export-plan.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

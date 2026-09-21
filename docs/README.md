@@ -9,6 +9,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
   catálogo de avisos/bloqueios, manifesto de capacidades e marcos de implementação; marcos A (painel) e B (núcleo puro) implementados.
 - [Empacotamento e hospedagem Web](web-deploy.md): `tools/web/package-web.py` gera pasta/ZIP hospedável a partir
   do build Emscripten; `tools/web/verify-package.cjs` verifica o carregamento por CDP.
+- [Plano Android (APK WebView sobre o Web)](android-export-plan.md): plano revisado; prova em APK/aparelho
+  real antes do exportador, com critérios de input, persistência, desempenho e ciclo de vida.
 - [Roadmap Web/Android](android-web-export-roadmap.md): consolida o estado do runtime Web e usa a validação
   Linux nativa como evidência de portabilidade para planejar o export Android.
 
