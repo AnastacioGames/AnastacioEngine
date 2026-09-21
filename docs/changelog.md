@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Branch integracao: validacao dos builds e da sonda R3
+
+- Branch `integracao` (dc0a5639) reune os historicos claude/* e codex/* sobre `linux-sync`.
+- Build nativo (`RangeEngine`, `RangeRuntime`, preset `v142-ninja`) e build Web limpo (`web-runtime-release`, `.wasm` de 21,6 MB) concluidos com exit 0.
+- Sonda R3 de 10 casos rodou no Chrome headless sobre o build Web da `integracao`: terminou em `[r3] TODOS`, sem `Aborted`. As correcoes do Codex (leitor nulo, `WAVReader`) e do Claude (`-fexceptions`, guards de `AUD_Sound`) convivem.
+- Nao executado nesta validacao: regressoes R1 (nativo e Web), audio com som valido e resize do bloom.
+
 ## 2026-09-21 - Terremoto: direção, escala, tremor de câmera e corpos dormindo
 
 - **Problema:** o terremoto (World > Weather > Earthquake) era fraco e só sacudia a gravidade lateralmente. Além disso, `btDiscreteDynamicsWorld::setGravity` e `applyGravity` só atuam em corpos **ativos** (`isActive()`): objeto dormindo (sleep) ignorava o terremoto e nunca acordava. Não é preciso desligar o sleep por objeto.
