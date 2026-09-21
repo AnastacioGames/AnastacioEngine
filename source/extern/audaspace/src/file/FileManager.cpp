@@ -54,7 +54,13 @@ std::shared_ptr<IReader> FileManager::createReader(std::string filename)
 		catch(Exception&) {}
 	}
 
+#ifdef __EMSCRIPTEN__
+	/* Emscripten is built without C++ exceptions.  A decode failure is an
+	 * expected result for user supplied media, not a reason to abort Wasm. */
+	return nullptr;
+#else
 	AUD_THROW(FileException, "The file couldn't be read with any installed file reader.");
+#endif
 }
 
 std::shared_ptr<IReader> FileManager::createReader(std::shared_ptr<Buffer> buffer)
@@ -68,7 +74,11 @@ std::shared_ptr<IReader> FileManager::createReader(std::shared_ptr<Buffer> buffe
 		catch(Exception&) {}
 	}
 
+#ifdef __EMSCRIPTEN__
+	return nullptr;
+#else
 	AUD_THROW(FileException, "The file couldn't be read with any installed file reader.");
+#endif
 }
 
 std::shared_ptr<IWriter> FileManager::createWriter(std::string filename, DeviceSpecs specs, Container format, Codec codec, unsigned int bitrate)

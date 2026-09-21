@@ -29,6 +29,28 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Resta: o campo `material`/`origin` sai como o nome generico `engine-shader` (`RAS_Shader::m_diagnosticName`; filtros 2D usam
   `2d-filter`). Nao ha o nome do material do Blender; melhoria pequena, nao feita. Link e materiais de nos continuam sem teste.
 
+## 2026-09-20 - Web: R3 audio sem excecoes e sondas M3 no navegador
+
+- **R3, causa e correcao:** o runtime Wasm e compilado sem unwinding C++; portanto um `AUD_THROW` de arquivo/codec
+  invalido aborta o processo antes dos `catch(Exception&)` historicos. No Web, `FileManager` devolve leitor nulo
+  quando nenhum decoder aceita o arquivo, e o leitor WAV devolve nulo para arquivo ausente ou formato desconhecido.
+  `SoftwareDevice::play` rejeita leitor/som nulo antes de criar os wrappers. Tambem foi protegido o binding C
+  `AUD_Device`: ausencia de device (falha/indisponibilidade do backend) e device sem `I3DDevice` nao podem mais
+  desreferenciar nulo; getters devolvem sentinelas e setters sao no-op. Isso nao habilita audio 3D nem OpenAL.
+- **Limite R3:** RIFF/WAV malformado ainda percorre validacoes antigas que usam `AUD_THROW`; o caso completo precisa
+  converter essas validacoes para retorno de erro antes de poder afirmar cobertura de todo arquivo corrompido.
+  A configuracao de um build Web limpo desta worktree foi iniciada, mas nao terminou dentro da janela; nenhum build
+  em `D:/AnastacioEngine-claude-rna/build-web` foi alterado. A compilacao/runtime desta correcao fica pendente.
+- **Sondas M3 novas:** `criar_m3_bloom_resize.py`/`m3_bloom_resize.py` geram uma cena que chama
+  `changeBloomValues` e `render.setWindowSize(320,240)` e `(960,540)`; `criar_m3_dynamic_resolution_no_timer.py`/
+  `m3_dynamic_resolution_no_timer.py` geram a cena com escala dinamica 50--100% por 180 frames. Ambas foram
+  empacotadas com `package-web.py --runtime-dir D:/AnastacioEngine-claude-rna/build-web/bin` somente em leitura,
+  servidas em portas 8797/8798 e executadas por `verify-package.cjs` no Edge headless isolado (CDP 9347/9348).
+  Resize terminou com `RESULTADO OK`, sem abort/excecao; a sonda de escala emitiu uma vez
+  `dynamic resolution needs a GPU timer query ... render scale is not adjusted`, confirmando o caminho sem subida.
+  O runtime fornecido ainda nao tinha o trace `offScreenSize`, portanto nao houve medicao numerica dos sete
+  offscreens nem afirmacao de `glError=0`; a instrumentacao reservada em `RAS_2DFilter.cpp` continua necessaria.
+
 ## 2026-09-20 - Web: M3, correcoes de base dos filtros 2D (indice, resize do bloom, timer de GPU)
 
 - **Colisao de indice**: `reservedPassIndex` era 17 e `FILTERPASS_LENSFLARE` tambem, entao o filtro customizado de

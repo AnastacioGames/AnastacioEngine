@@ -183,7 +183,9 @@ static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
 		decoded = createMP3Reader(std::move(data));
 	}
 	if (!decoded) {
-		AUD_THROW(FileException, "Not a RIFF/WAVE, Ogg Vorbis or MP3 file.");
+		/* The browser build has no C++ exception unwinder.  Report an
+		 * unsupported codec as a failed reader instead of aborting Wasm. */
+		return nullptr;
 	}
 	return decoded;
 }
@@ -192,7 +194,7 @@ std::shared_ptr<IReader> WAVFile::createReader(std::string filename)
 {
 	std::ifstream in(filename, std::ios::binary);
 	if (!in) {
-		AUD_THROW(FileException, "The WAV file couldn't be opened.");
+		return nullptr;
 	}
 	std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	return makeReader(std::move(data));

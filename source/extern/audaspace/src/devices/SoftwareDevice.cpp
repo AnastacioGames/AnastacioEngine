@@ -854,6 +854,9 @@ DeviceSpecs SoftwareDevice::getSpecs() const
 
 std::shared_ptr<IHandle> SoftwareDevice::play(std::shared_ptr<IReader> reader, bool keep)
 {
+	if(!reader)
+		return std::shared_ptr<IHandle>();
+
 	// prepare the reader
 	// pitch
 
@@ -891,6 +894,8 @@ std::shared_ptr<IHandle> SoftwareDevice::play(std::shared_ptr<IReader> reader, b
 
 std::shared_ptr<IHandle> SoftwareDevice::play(std::shared_ptr<ISound> sound, bool keep)
 {
+	if(!sound)
+		return std::shared_ptr<IHandle>();
 	return play(sound->createReader(), keep);
 }
 
