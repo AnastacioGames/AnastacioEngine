@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: R3 trata leitores de áudio inválidos sem abortar Wasm
+
+- No Emscripten, falhas de leitura WAV retornam leitor nulo em vez de executar `AUD_THROW`; WAV, MP3 e Vorbis
+  passam a ter a mesma fronteira de erro. As interfaces C/Python verificam esse resultado em `specs`, `length`
+  e `write`; `Device.play` levanta `aud.error` em vez de devolver um Handle vazio.
+- Os encadeamentos `volume`, `limit` e `pitch` propagam a falha sem construir um reader que desreferencie nulo.
+  A sonda R3 foi ampliada para esses efeitos e para `write`. A evidência de build/pacote/Edge será registrada
+  nesta entrada somente depois da execução.
+
 ## 2026-09-20 - Web: integração de R1 e R3 e verificação no runtime integrado
 
 - Merges locais (sem push) na `claude/web-m1-python-diag`: `codex/r3-audio-m3-tests` e `codex/r1-constraint-abi`; único conflito foi o topo do changelog (mantidas as duas entradas).

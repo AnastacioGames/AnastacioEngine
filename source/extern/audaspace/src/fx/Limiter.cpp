@@ -39,7 +39,8 @@ double Limiter::getEnd() const
 
 std::shared_ptr<IReader> Limiter::createReader()
 {
-	return std::shared_ptr<IReader>(new LimiterReader(getReader(), m_start, m_end));
+	std::shared_ptr<IReader> reader = getReader();
+	return reader ? std::shared_ptr<IReader>(new LimiterReader(reader, m_start, m_end)) : nullptr;
 }
 
 AUD_NAMESPACE_END

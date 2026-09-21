@@ -33,9 +33,7 @@ class WAVReader : public IReader
 public:
 	explicit WAVReader(const std::vector<uint8_t> &data)
 	{
-		if (data.size() < 12 || memcmp(data.data(), "RIFF", 4) != 0 || memcmp(data.data() + 8, "WAVE", 4) != 0) {
-			AUD_THROW(FileException, "Not a RIFF/WAVE file.");
-		}
+		/* makeReader validates RIFF/WAVE before constructing this reader. */
 
 		uint16_t format = 0, channels = 0, bits = 0;
 		uint32_t rate = 0;
@@ -69,18 +67,12 @@ public:
 			pos += 8 + size + (size & 1);
 		}
 
-		if (!have_fmt || !pcm) {
-			AUD_THROW(FileException, "WAV file without fmt or data chunk.");
-		}
-		if (channels < 1 || channels > 8 || rate == 0) {
-			AUD_THROW(FileException, "Unsupported WAV channel count or sample rate.");
-		}
+		if (!have_fmt || !pcm || channels < 1 || channels > 8 || rate == 0)
+			return;
 		const bool is_float = (format == 3);
 		if (!((format == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) ||
 		      (is_float && (bits == 32 || bits == 64))))
-		{
-			AUD_THROW(FileException, "Unsupported WAV sample format (only PCM 8/16/24/32 and float 32/64).");
-		}
+			return;
 
 		const size_t bytes = bits / 8;
 		const size_t total = pcm_size / bytes;
@@ -173,7 +165,9 @@ void WAVFile::registerPlugin()
 static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
 {
 	if (data.size() >= 12 && memcmp(data.data(), "RIFF", 4) == 0 && memcmp(data.data() + 8, "WAVE", 4) == 0) {
-		return std::shared_ptr<IReader>(new WAVReader(data));
+		std::shared_ptr<WAVReader> reader(new WAVReader(data));
+		Specs specs = reader->getSpecs();
+		return specs.rate > 0 && specs.channels != CHANNELS_INVALID ? reader : nullptr;
 	}
 	std::shared_ptr<IReader> decoded;
 	if (data.size() >= 4 && memcmp(data.data(), "OggS", 4) == 0) {

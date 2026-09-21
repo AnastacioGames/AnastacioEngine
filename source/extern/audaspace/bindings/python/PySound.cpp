@@ -195,6 +195,11 @@ Sound_write(Sound* self, PyObject* args, PyObject* kwds)
 	try
 	{
 		std::shared_ptr<IReader> reader = (*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound))->createReader();
+		if(!reader)
+		{
+			PyErr_SetString(AUDError, "The sound could not be read.");
+			return nullptr;
+		}
 
 		DeviceSpecs specs;
 		specs.specs = reader->getSpecs();
@@ -1934,7 +1939,13 @@ Sound_get_specs(Sound* self, void* nothing)
 {
 	try
 	{
-		Specs specs = (*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound))->createReader()->getSpecs();
+		std::shared_ptr<IReader> reader = (*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound))->createReader();
+		if(!reader)
+		{
+			PyErr_SetString(AUDError, "The sound could not be read.");
+			return nullptr;
+		}
+		Specs specs = reader->getSpecs();
 		return Py_BuildValue("(di)", specs.rate, specs.channels);
 	}
 	catch(Exception& e)
@@ -1952,7 +1963,13 @@ Sound_get_length(Sound* self, void* nothing)
 {
 	try
 	{
-		int length = (*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound))->createReader()->getLength();
+		std::shared_ptr<IReader> reader = (*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound))->createReader();
+		if(!reader)
+		{
+			PyErr_SetString(AUDError, "The sound could not be read.");
+			return nullptr;
+		}
+		int length = reader->getLength();
 		return Py_BuildValue("i", length);
 	}
 	catch(Exception& e)

@@ -11,6 +11,9 @@ def rodar(cont):
         ("arquivo inexistente + play", lambda: aud.Device().play(aud.Sound.file('/nao_existe.wav'))),
         ("arquivo corrompido + play", lambda: aud.Device().play(aud.Sound.file('/lixo.wav'))),
         ("corrompido + volume + play", lambda: aud.Device().play(aud.Sound.file('/lixo.wav').volume(0.5))),
+        ("corrompido + limit + play", lambda: aud.Device().play(aud.Sound.file('/lixo.wav').limit(0, 1))),
+        ("corrompido + pitch + play", lambda: aud.Device().play(aud.Sound.file('/lixo.wav').pitch(1.2))),
+        ("corrompido .write", lambda: aud.Sound.file('/lixo.wav').write('/saida.wav')),
         ("corrompido .length", lambda: aud.Sound.file('/lixo.wav').length),
         ("corrompido .specs", lambda: aud.Sound.file('/lixo.wav').specs),
     ]

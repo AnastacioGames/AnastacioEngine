@@ -27,7 +27,8 @@ Pitch::Pitch(std::shared_ptr<ISound> sound, float pitch) :
 
 std::shared_ptr<IReader> Pitch::createReader()
 {
-	return std::shared_ptr<IReader>(new PitchReader(getReader(), m_pitch));
+	std::shared_ptr<IReader> reader = getReader();
+	return reader ? std::shared_ptr<IReader>(new PitchReader(reader, m_pitch)) : nullptr;
 }
 
 AUD_NAMESPACE_END

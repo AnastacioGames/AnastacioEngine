@@ -198,7 +198,14 @@ Device_play(Device* self, PyObject* args, PyObject* kwds)
 	{
 		try
 		{
-			handle->handle = new std::shared_ptr<IHandle>((*reinterpret_cast<std::shared_ptr<IDevice>*>(self->device))->play(*reinterpret_cast<std::shared_ptr<ISound>*>(sound->sound), keep));
+			std::shared_ptr<IHandle> played = (*reinterpret_cast<std::shared_ptr<IDevice>*>(self->device))->play(*reinterpret_cast<std::shared_ptr<ISound>*>(sound->sound), keep);
+			if(!played)
+			{
+				Py_DECREF(handle);
+				PyErr_SetString(AUDError, "The sound could not be played.");
+				return nullptr;
+			}
+			handle->handle = new std::shared_ptr<IHandle>(played);
 		}
 		catch(Exception& e)
 		{
