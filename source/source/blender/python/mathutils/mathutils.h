@@ -83,7 +83,7 @@ PyObject *BaseMathObject_is_wrapped_get(BaseMathObject *self, void *);
 PyObject *BaseMathObject_is_frozen_get(BaseMathObject *self, void *);
 
 extern char BaseMathObject_freeze_doc[];
-PyObject *BaseMathObject_freeze(BaseMathObject *self, PyObject *UNUSED(args));
+PyObject *BaseMathObject_freeze(BaseMathObject *self, PyObject *args_unused);
 
 int BaseMathObject_traverse(BaseMathObject *self, visitproc visit, void *arg);
 int BaseMathObject_clear(BaseMathObject *self);

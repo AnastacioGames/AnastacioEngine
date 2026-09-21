@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - WebAssembly: integração aud + R3 sobre linux-sync; sonda R3 ainda aborta
+
+- Branch `claude/web-aud-r3-integ` (base `linux-sync` 3c0b9fcf): correção de aridade do `aud` (ea2cfd04) e o R3 do Codex (ad95c2e8, aplicado como bab82233), que protege `AUD_Sound_getSpecs` e `AUD_Sound_getLength` contra `AUD_Sound` nulo.
+- **Erro encontrado no 3c0b9fcf:** `mathutils.h:86` declarava `BaseMathObject_freeze(..., PyObject *UNUSED(args))` em protótipo. `UNUSED()` só vale em definição, então todos os `.c` de `mathutils` falhavam no build Web. Corrigido para `PyObject *args_unused` (a definição em `mathutils.c` não muda). O `linux-sync` remoto ainda contém o header quebrado até esta correção ser enviada.
+- Rebuild Web release (`web-runtime-release`): `exit=0`, 280 passos, 240 módulos Python no manifesto.
+- Sonda R3 (`claude_r3_probe.py`, pacote `package-web.py`, Chrome headless): **falhou no primeiro caso**. `aud.Device().play(aud.Sound.file('/nao_existe.wav'))` imprime `[r3] INICIO` e aborta com `Aborted(undefined)` em `__cxa_throw` → `__Unwind_RaiseException`. Os demais casos (WAV corrompido, `.volume(0.5)`+`play`, `.length`, `.specs`) não chegaram a rodar, e `cache()`, `reverse()`, `handle.pause()` e `handle.stop()` não foram sondados.
+- Causa: o runtime Web é compilado sem captura de exceções C++ do Emscripten, então qualquer `AUD_THROW` (`FileException` ao abrir arquivo inexistente ou ilegível) aborta o processo, apesar do `catch (Exception&)` nos bindings Python. O guard do R3 cobre só ponteiro nulo na API C e não alcança esse caminho.
+- Próximo passo em aberto: ou habilitar `-fexceptions` nos alvos do audaspace e no link Web, ou validar o arquivo antes de criar o reader (só cobre arquivo inexistente, não WAV corrompido). Sem decisão ainda.
+
 ## 2026-09-21 - WebAssembly: assinaturas Python METH corrigidas em bmesh
 
 - Auditadas as tabelas `PyMethodDef` e as definições C em `mathutils`, `blf`, `bmesh` e `gpu` para conferir a aridade exigida por `METH_NOARGS`, `METH_O`, `METH_VARARGS` e `METH_VARARGS | METH_KEYWORDS`.
