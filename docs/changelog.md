@@ -4,11 +4,22 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Pacote Windows 0.4.1
+
+- Splash atualizado para 0.4.1 (`wm.py`). Build completo da `linux-sync` (`ninja -t clean` + `RangeEngine RangeRuntime`, 2335 alvos, exit 0), incluindo a DNA do terremoto e os guards de audio; o pacote Linux 0.4.1 nao tem o terremoto.
+- `lib/win64_vc15` havia sido apagada na limpeza de worktrees (nao estava em Lixeira nem em outro disco) e foi restaurada de backup em SSD externo antes do build. A primeira tentativa do build parou com "Permission denied" em alguns `.obj` (transitorio); a retomada passou sem falhas.
+- Pacote `AnastacioEngine-0.4.1-windows-x64.zip` (149 MB) montado em `build/release-staging/` com o layout da 0.4.0 (`blender.crt/` + `ucrtbase.dll`, sem DLLs do VC++ soltas), addons ausentes da fonte (cycles, add_curve_extra_objects etc.) herdados do pacote 0.4.0, e `startup.blend` local excluido. Validado extraindo o zip em pasta limpa: `RangeEngine.exe --version` ok e janela viva apos 12 s; `RangeRuntime.exe` abre `demos/Example_ImgGui` e segue rodando; sem eventos SideBySide. `RangeRuntime.exe` sem argumentos sai com codigo 11, igual ao da 0.4.0.
+- Ainda nao publicado na release `v0.4.1`.
+
+## 2026-09-21 - Teste no Linux da linux-sync: tudo ok
+
+- O usuario baixou a `linux-sync` no Linux, compilou e testou: "esta funcionando tudo ok". Sem falhas relatadas. Nao foi detalhado quais cenarios foram exercitados (editor, runtime, Web); o registro vale como validacao geral informada pelo usuario.
+
 ## 2026-09-21 - Limpeza de branches/worktrees; Web reconstruido limpo a partir da linux-sync
 
 - A `integracao` estava totalmente contida na `linux-sync` (883c1558). Worktree `D:\AnastacioEngine-integracao` e branch local `integracao` removidos; sobram os worktrees da `linux-sync` e da `master`. Branches remotas antigas e o `perf-artifact` tambem foram apagados a pedido do usuario. Nada foi enviado ao GitHub nesta limpeza.
 - Rebuild Web limpo da `linux-sync` (`web-runtime-release`, 1817/1817 alvos, exit 0, 242 modulos Python). Sonda R3 rodada duas vezes no Edge headless: `[r3] TODOS`, sem `Aborted`. Isso substitui a validacao feita na `integracao`.
-- `linux-sync` (origin e local iguais) e a branch a baixar no Linux para build e teste; o teste no Linux e feito pelo usuario e ainda nao foi registrado.
+- `linux-sync` (origin e local iguais) e a branch a baixar no Linux para build e teste; o teste no Linux e feito pelo usuario (resultado registrado na entrada acima).
 
 ## 2026-09-21 - Branch integracao: guards de leitor nulo do Codex sobre o som silencioso
 
