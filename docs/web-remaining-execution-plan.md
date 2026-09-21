@@ -275,3 +275,18 @@ Ao terminar cada peça, apresentar:
 Atualizar documentação conforme `AGENTS.md`: estado aberto no roadmap, decisão vigente no relatório e detalhes de implementação/validação no changelog. Não registrar como concluído um efeito visual ou audível ainda não conferido. Manter este plano marcado por marcos durante a execução e remover o handoff quando terminado, conforme as regras documentais do repositório.
 
 Critério de encerramento desta rodada: M0–M3 implementados e validados, ou bloqueios explicitamente documentados; R1–R3 triados com decisão registrada; M4–M6 classificados com base em medição/requisito, sem apresentar adiamento como implementação concluída.
+
+## Handoff (2026-09-20, fim da sessao longa)
+
+Estado: worktree `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`, HEAD com M2 validado e M3 (correcoes) commitado. R1 (Codex) concluido em `codex/r1-constraint-abi`; ainda nao integrado aqui.
+
+**Claude (arquivos: `KX_2DFilter*`, `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine.cpp`, `RAS_Query*`, `RAS_OpenGLQuery*`; nao editar em paralelo):**
+1. Teste de resize do bloom no Web (`changeBloomValues` + `render.setWindowSize`), conferindo erro de GL e dimensoes dos offscreens. Falta acrescentar `offScreenSize` ao printf de debug em `RAS_2DFilter.cpp` (edicao nao aplicada).
+2. Teste da resolucao dinamica sem timer de GPU.
+3. Rebuild do `build-web-release`; medicoes em celular fisico (depende do usuario); decisao do M4.
+4. Lacuna do M1 (BL_Shader com `stage "?"`) e SSAO na Web (aguarda comparacao do usuario no desktop).
+
+**Codex (nao toca nos arquivos acima):**
+- **T1 (R3, audio):** triagem e correcao dos aborts de audio no Web, em `source/extern/audaspace` e binding `aud`; sem mexer em M5/M6. Entregar causa, reproducao e teste.
+- **T2 (testes Web do M3, somente arquivos novos em `projects-teste/teste-editor-web/`):** scripts e geradores de `.range` para (a) bloom ligado + redimensionar a janela e (b) resolucao dinamica sem timer de GPU. Rodar contra `--runtime-dir D:/AnastacioEngine-claude-rna/build-web/bin` **somente leitura** (nao compilar nesse diretorio). Usar Edge headless isolado (`--user-data-dir` temporario, porta propria), nunca encerrar processos por nome.
+- Ambos: branch propria a partir do HEAD desta branch, sem push/merge, commit com trailer do Codex, e atualizar changelog com evidencia executada.
