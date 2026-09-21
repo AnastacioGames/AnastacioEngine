@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: integração de R1 e R3 e verificação no runtime integrado
+
+- Merges locais (sem push) na `claude/web-m1-python-diag`: `codex/r3-audio-m3-tests` e `codex/r1-constraint-abi`; único conflito foi o topo do changelog (mantidas as duas entradas).
+- Builds com código 0 depois dos merges: nativo (11/11), `build-web` (8/8) e `build-web-release` (8/8).
+- **R1 verificado:** `constraint_abi_test` passa no `RangeRuntime.exe` nativo (`constraint_abi_test_result.txt` = PASS) e no runtime Web (Edge headless, `CONSTRAINT_ABI_TEST: PASS` no console).
+- **Regressão de áudio:** cena `create_web_audio_scene.py` (`verify-capabilities.cjs audio`) 8/8 OK (AudioContext ativo, mixer avançou, amplitude não nula); módulo `aud` (`create_web_aud_module_scene.py`) importa, cria Device e toca seno.
+- **M3 no runtime integrado:** `claude_m3_resize` repetido, mesmos resultados (offscreens canvas/2,/4,/8, `glError=0x0`, aviso único do timer).
+- **R3 NÃO está resolvido:** sonda `claude_r3_probe.py`/`claude_r3_criar.py` no runtime integrado. `Sound.file()` de arquivo inexistente ou de texto corrompido + `Device.play` não aborta, mas devolve um `Handle` (deveria falhar); **`Sound.file(corrompido).volume(0.5)` + `play` termina em `Aborted(segmentation fault)`**. Confirma a previsão da revisão estática: o leitor nulo é desreferenciado pelos leitores de efeito. Os casos `.length` e `.specs` não chegaram a rodar (o abort veio antes). Tarefa T3 do Codex.
+
 ## 2026-09-20 - Web: revisão do trabalho do Codex (R1, R3, T2) e nova divisão
 
 - Branches lidas por diff, sem integrar: `codex/r1-constraint-abi` (`9ff97884`) e `codex/r3-audio-m3-tests` (`7544073e`).
