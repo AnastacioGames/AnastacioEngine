@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: R3 corrigido (audio invalido nao aborta mais); perf e teste de link do Codex integrados
+
+- **R3 corrigido no runtime Web.** Causa: o Wasm nao tem excecoes (`AUD_THROW` aborta) e `FileManager` devolvia leitor nulo, desreferenciado pelos leitores de efeito (`volume`, `limit`, `pitch`). Correcao: sob `__EMSCRIPTEN__`, `FileManager::createReader` (arquivo e buffer) devolve um `UnreadableReader` silencioso de comprimento zero (44100 Hz, mono) e loga `[aud] file could not be decoded`; `WAVReader` nao lanca mais (flag `ok()`, `makeReader` devolve nulo). Nativo inalterado (continua lancando).
+- Evidencia: `build-web` recompilado; `claude_r3_probe` (10 casos: inexistente, corrompido, RIFF/WAVE quebrado, com volume/limit/pitch, `.length`, `.specs`) empacotado e rodado no Edge headless isolado (`claude_r3_run.cjs`): termina com `[r3] TODOS: true`, sem abort. Builds nativo (`RangeRuntime RangeEngine`, 9/9) e `build-web-release` (22/22) terminaram com codigo 0.
+- `codex/r3-audio-fix-new` (`ad95c2e8`) fica **superado** (nao chegava a causa); nao integrado.
+- **Bug geral de `aud` achado, nao corrigido:** metodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle` (ex.: `sine.cache()`, `reverse()`, `handle.pause()/stop()`) dao `function signature mismatch` no Wasm (cast de ponteiro com aridade diferente). Confirmado com som valido (`claude_aud_noargs_probe.py`, so o 1o caso executado); ~16 metodos. A sonda R3 nao cobre `.cache`. Correcao depende de autorizacao.
+- Codex integrado (merges locais, sem push): `codex/perf-run` (`perf-run.cjs`, overlay `?perf=1` em `frame-time-perf.js`; corrigi o `'\\n'` do overlay) e `codex/shader-node-test` (`NOTA-SHADER-MATERIAL-NODES.md`, `preflight-link.json` e teste de link; teste de node-material justificado como nao injetavel). Suite `web_profile`: 99 OK. `perf-run.cjs` rodou em Edge headless (SwiftShader: count 130, p50 97 ms, p95 127 ms, DPR 1, 1280x720) so para provar a ferramenta; **nao e medicao de celular**. Gancho `--perf` em `package-web.py` esta so proposto (`docs/web-perf-hook-proposal.md`), nao aplicado.
+- **Nao repetidos apos a mudanca de audio:** regressao de audio (`verify-capabilities.cjs audio`, exige Chrome com CDP), resize do bloom, resolucao dinamica sem timer e R1 nativo/Web. Ficam para a proxima sessao.
+
 ## 2026-09-20 - Web: nome do material e falha de link nos diagnosticos de shader; T4 e T5 do Codex integrados
 
 - `KX_BlenderMaterial::getShader()` passa o nome do material ao `BL_Shader` (`RAS_Shader::SetDiagnosticName`); em `shader_errors[]` o campo `material` sai como o nome real do ID (ex.: `MAMatQuebrado`, com o prefixo `MA` do Blender) em vez de `engine-shader`. Filtros 2D continuam `2d-filter`.

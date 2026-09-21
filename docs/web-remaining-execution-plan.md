@@ -254,6 +254,8 @@ Validar dois jogos na mesma origem, atualização do mesmo jogo, reload, erro de
 
 ### R3 — Falhas de áudio que abortam o Wasm
 
+> **Atualização 2026-09-20 (fim da rodada 3):** corrigido no Web (leitor silencioso em `FileManager`, `WAVReader` sem exceção); `claude_r3_probe` termina com `[r3] TODOS`. Pendente: bug `METH_NOARGS` do `aud` (autorização), gancho `--perf` (autorização) e repetir regressões de áudio/bloom/resolução dinâmica/R1. Ver changelog.
+
 O histórico contém aborts por exceções C++ de áudio. Testar arquivos inválidos, codec indisponível e operações inválidas de `aud`; localizar a fronteira que deve converter erro em exceção Python/diagnóstico. Não habilitar exceções globalmente sem avaliar configuração, tamanho e comportamento. Corrigir com caso reproduzível e validar que a cena continua operando após erro tratável.
 
 Os outros riscos adicionais — manifesto incorreto, pré-voo incompleto tratado como sucesso, colisão de índices de filtros e GPU timer zero — já estão incorporados em M0/M1/M3.
