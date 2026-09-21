@@ -55,8 +55,9 @@ public:
 		FILTERPASS_CLOUDS       = 16,
 		FILTERPASS_LENSFLARE    = 17
 	};
-	// number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps
-	const int reservedPassIndex = 17;
+	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
+	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
+	const int reservedPassIndex = FILTERPASS_LENSFLARE + 1;
 
 	enum FILTER_MODE {
 		FILTER_ENABLED = -2,

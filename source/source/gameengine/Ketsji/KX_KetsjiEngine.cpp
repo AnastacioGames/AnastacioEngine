@@ -463,6 +463,18 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 		return;
 	}
 
+	/* Without a GPU timer (the Web build disables it) the query "result" is a constant zero and
+	 * looks like an instant GPU, which would raise the scale forever. Keep the scale as set. */
+	if (!m_dynamicResolutionQuery.IsSupported()) {
+		static bool warned = false;
+		if (!warned) {
+			warned = true;
+			CM_Warning("dynamic resolution needs a GPU timer query, unavailable here: the render scale is not adjusted");
+		}
+		m_dynamicResolutionQueryPending = false;
+		return;
+	}
+
 	/* GL_TIME_ELAPSED cannot overlap the query used by SHOW_RENDER_QUERIES. Preserve that
 	 * diagnostic path exactly; it temporarily pauses automatic adjustments instead of risking
 	 * GL_INVALID_OPERATION or changing the debug measurement's scope. */
@@ -473,28 +485,31 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 	if (m_dynamicResolutionQueryPending && m_dynamicResolutionQuery.Available()) {
 		const float gpuMs = (float)m_dynamicResolutionQuery.ResultNoWait() / 1000000.0f;
 		m_dynamicResolutionQueryPending = false;
-		m_dynamicResolutionSmoothedGpuMs = (m_dynamicResolutionSmoothedGpuMs == 0.0f) ? gpuMs :
-		                                  (m_dynamicResolutionSmoothedGpuMs * 0.9f + gpuMs * 0.1f);
+		// A zero or negative result is not a measurement (empty or discarded query), so it must not raise the scale.
+		if (gpuMs > 0.0f) {
+			m_dynamicResolutionSmoothedGpuMs = (m_dynamicResolutionSmoothedGpuMs == 0.0f) ? gpuMs :
+			                                  (m_dynamicResolutionSmoothedGpuMs * 0.9f + gpuMs * 0.1f);
 
-		if (m_dynamicResolutionCooldown > 0) {
-			--m_dynamicResolutionCooldown;
-		}
-		else {
-			const float targetMs = 1000.0f / (float)m_dynamicResolutionTargetFPS;
-			float scale = m_canvas->GetRenderScale();
-			if (m_dynamicResolutionSmoothedGpuMs > targetMs * 1.05f) {
-				scale = std::max(m_dynamicResolutionMinScale, scale - m_dynamicResolutionStep);
-			}
-			else if (m_dynamicResolutionSmoothedGpuMs < targetMs * 0.85f) {
-				scale = std::min(m_dynamicResolutionMaxScale, scale + m_dynamicResolutionStep);
+			if (m_dynamicResolutionCooldown > 0) {
+				--m_dynamicResolutionCooldown;
 			}
 			else {
-				scale = m_canvas->GetRenderScale();
-			}
+				const float targetMs = 1000.0f / (float)m_dynamicResolutionTargetFPS;
+				float scale = m_canvas->GetRenderScale();
+				if (m_dynamicResolutionSmoothedGpuMs > targetMs * 1.05f) {
+					scale = std::max(m_dynamicResolutionMinScale, scale - m_dynamicResolutionStep);
+				}
+				else if (m_dynamicResolutionSmoothedGpuMs < targetMs * 0.85f) {
+					scale = std::min(m_dynamicResolutionMaxScale, scale + m_dynamicResolutionStep);
+				}
+				else {
+					scale = m_canvas->GetRenderScale();
+				}
 
-			if (scale != m_canvas->GetRenderScale()) {
-				m_canvas->SetRenderScale(scale);
-				m_dynamicResolutionCooldown = 10;
+				if (scale != m_canvas->GetRenderScale()) {
+					m_canvas->SetRenderScale(scale);
+					m_dynamicResolutionCooldown = 10;
+				}
 			}
 		}
 	}

@@ -46,6 +46,8 @@ public:
 	void Begin();
 	void End();
 
+	/// False when the query has no GL object (unavailable on this platform): its results are not measurements.
+	bool IsSupported() const;
 	bool Available();
 	int ResultNoWait();
 	int Result();

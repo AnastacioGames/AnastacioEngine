@@ -63,6 +63,8 @@ public:
 	/// End the query and made the functions Available, ResultNoWait and Result usable.
 	void End();
 
+	/// \return True when the query really measures something. Unsupported queries report Available with a zero result.
+	bool IsSupported() const;
 	/// \return True when the query result is ready.
 	bool Available();
 	/// \return The value of the query even if the query is not ready.

@@ -48,6 +48,9 @@ public:
 	 * Processing Shaders" checkbox started off. No-op if already built.
 	 */
 	void EnsureBloomFilters(BuildInFilters filters);
+	/** The bloom buffers follow the canvas, so their textures can be recreated. Point the bloom filters
+	 * at the current textures again. */
+	void RefreshBloomTextures();
 	void EnsureSSRFilters(BuildInFilters filters);
 	void EnsureLightScatterFilters(BuildInFilters filters);
 

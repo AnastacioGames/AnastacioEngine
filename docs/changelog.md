@@ -4,6 +4,26 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: M3, correcoes de base dos filtros 2D (indice, resize do bloom, timer de GPU)
+
+- **Colisao de indice**: `reservedPassIndex` era 17 e `FILTERPASS_LENSFLARE` tambem, entao o filtro customizado de
+  indice 0 caia no slot do Lens Flare. Agora `reservedPassIndex = FILTERPASS_LENSFLARE + 1`. Teste no runtime Web
+  (`m3_filtros.py` + `criar_m3.py`, Edge isolado, Lens Flare ligado): antes (`build-web-release`, anterior ao fix)
+  `addFilter(0)` falhava com "found existing filter in index (0)", `removeFilter(-1)` era aceito e
+  `removeFilter(0)` apagava o Lens Flare; depois (`build-web`) os quatro checks passam. `removeFilter` com indice
+  negativo agora levanta `ValueError` (o `unsigned` dava wrap para 16, o filtro Clouds).
+- **Resize do bloom**: os 7 offscreens do bloom eram criados uma vez com o tamanho do canvas / `lod`. Agora usam a
+  flag interna `RAS_CANVAS_DIVISOR` (`RAS_2DFilterOffScreen::Update` recalcula e recria), e um callback
+  (`KX_2DFilterManager::RefreshBloomTextures`) reaplica os bind codes nos filtros que amostram essas texturas
+  (`KX_2DFilter::UpdateTextureBindCode`). **Nao verificado em runtime**: falta redimensionar a janela com bloom ligado
+  e conferir que nao ha erro de GL e que as dimensoes seguem o canvas.
+- **Timer de GPU**: na Web o query `TIME` nao tem objeto GL, `Available()` dava true e o resultado era 0, o que subia
+  a resolucao dinamica ate o maximo. `RAS_Query::IsSupported()` novo; `UpdateDynamicResolution` nao ajusta a escala
+  sem timer (avisa uma vez) e descarta amostras <= 0. **Nao testado em runtime.**
+- Builds: nativo (143/143) e `build-web` (139/139) com codigo 0. `build-web-release` continua desatualizado.
+- **Nao feito**: selecao do ultimo filtro/blit final (o fluxo ja esta correto, so custa um blit; e otimizacao para o M4),
+  medicoes em desktop e celular fisico, tabela de p50/p95 e decisao sobre o M4.
+
 ## 2026-09-20 - Web: M2, DNA `unsigned char` e checagem de range da RNA reativada no Emscripten
 
 - Cinco campos DNA passam de `char` para `unsigned char` (`ImageUser.fie_ima`, `Material.seed1`/`seed2`,

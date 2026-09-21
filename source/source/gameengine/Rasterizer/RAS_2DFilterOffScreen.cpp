@@ -27,14 +27,17 @@
 #include "RAS_2DFilterOffScreen.h"
 #include "RAS_ICanvas.h"
 
+#include <algorithm>
+
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 
 RAS_2DFilterOffScreen::RAS_2DFilterOffScreen(unsigned short colorSlots, Flag flag, unsigned int width, unsigned int height,
-                                             RAS_Rasterizer::HdrType hdr)
+                                             RAS_Rasterizer::HdrType hdr, float sizeDivisor)
 	:m_flag(flag),
 	m_colorSlots(colorSlots),
 	m_hdr(hdr),
+	m_sizeDivisor(std::max(sizeDivisor, 1.0f)),
 	m_width(width),
 	m_height(height),
 	m_frameBuffer(GPU_framebuffer_create()),
@@ -113,6 +116,18 @@ void RAS_2DFilterOffScreen::MipmapTexture()
 	}
 }
 
+void RAS_2DFilterOffScreen::SetRebuildCallback(const std::function<void ()>& callback)
+{
+	m_rebuildCallback = callback;
+}
+
+void RAS_2DFilterOffScreen::NotifyRebuilt()
+{
+	if (m_rebuildCallback) {
+		m_rebuildCallback();
+	}
+}
+
 bool RAS_2DFilterOffScreen::Update(RAS_ICanvas *canvas)
 {
 	if (m_flag & RAS_VIEWPORT_SIZE) {
@@ -123,6 +138,19 @@ bool RAS_2DFilterOffScreen::Update(RAS_ICanvas *canvas)
 			m_height = height;
 
 			Construct();
+			NotifyRebuilt();
+		}
+	}
+	else if (m_flag & RAS_CANVAS_DIVISOR) {
+		// Follow the canvas (resize, fullscreen), the creation size is only the initial one.
+		const unsigned int width = std::max(1u, (unsigned int)(canvas->GetWidth() / m_sizeDivisor));
+		const unsigned int height = std::max(1u, (unsigned int)(canvas->GetHeight() / m_sizeDivisor));
+		if (m_width != width || m_height != height) {
+			m_width = width;
+			m_height = height;
+
+			Construct();
+			NotifyRebuilt();
 		}
 	}
 

@@ -56,6 +56,11 @@ void RAS_Query::End()
 	m_impl->End();
 }
 
+bool RAS_Query::IsSupported() const
+{
+	return m_impl && m_impl->IsSupported();
+}
+
 bool RAS_Query::Available()
 {
 	return m_impl->Available();

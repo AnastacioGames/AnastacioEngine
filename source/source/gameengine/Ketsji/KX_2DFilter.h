@@ -47,6 +47,9 @@ public:
 
 	virtual bool LinkProgram();
 
+	/// Replace the bind code of an already set texture unit; unlike SetTexture it never raises Python errors.
+	void UpdateTextureBindCode(int index, int bindCode);
+
 #ifdef WITH_PYTHON
 	bool CheckTexture(int index, int bindCode, const std::string& prefix) const;
 	bool SetTextureUniform(int index, const char *samplerName);

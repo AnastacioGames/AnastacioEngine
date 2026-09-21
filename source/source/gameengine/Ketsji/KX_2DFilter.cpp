@@ -45,6 +45,14 @@ bool KX_2DFilter::LinkProgram()
 	return RAS_2DFilter::LinkProgram();
 }
 
+void KX_2DFilter::UpdateTextureBindCode(int index, int bindCode)
+{
+	const auto it = m_textures.find(index);
+	if (it != m_textures.end()) {
+		it->second.second = bindCode;
+	}
+}
+
 #ifdef WITH_PYTHON
 
 bool KX_2DFilter::CheckTexture(int index, int bindCode, const std::string& prefix) const

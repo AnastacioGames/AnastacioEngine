@@ -79,6 +79,11 @@ void RAS_OpenGLQuery::End()
 	}
 }
 
+bool RAS_OpenGLQuery::IsSupported() const
+{
+	return m_id != 0;
+}
+
 bool RAS_OpenGLQuery::Available()
 {
 	if (!m_id) {

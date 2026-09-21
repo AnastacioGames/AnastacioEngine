@@ -34,7 +34,8 @@ class KX_2DFilterOffScreen : public EXP_Value, public RAS_2DFilterOffScreen
 {
 	Py_Header
 public:
-	KX_2DFilterOffScreen(unsigned short colorSlots, Flag flag, unsigned int width, unsigned int height, RAS_Rasterizer::HdrType hdr);
+	KX_2DFilterOffScreen(unsigned short colorSlots, Flag flag, unsigned int width, unsigned int height, RAS_Rasterizer::HdrType hdr,
+	                     float sizeDivisor = 1.0f);
 	virtual ~KX_2DFilterOffScreen();
 
 	virtual std::string GetName();
