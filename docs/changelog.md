@@ -13,6 +13,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Causa: o runtime Web é compilado sem captura de exceções C++ do Emscripten, então qualquer `AUD_THROW` (`FileException` ao abrir arquivo inexistente ou ilegível) aborta o processo, apesar do `catch (Exception&)` nos bindings Python. O guard do R3 cobre só ponteiro nulo na API C e não alcança esse caminho.
 - **Correção:** `-fexceptions` nos alvos `audaspace`, `audaspace-py` e `audaspace-c` (só Emscripten, `extern/audaspace/CMakeLists.txt`) e no link do RangeRuntime (`blenderplayer/CMakeLists.txt`). Rebuild Web release: `exit=0`; `RangeRuntime.wasm` foi de 21,4 MB para 21,6 MB.
 - **Sonda R3 após a correção (Chrome headless, `[r3] TODOS` alcançado, sem `Aborted`):** arquivo inexistente + `play`, arquivo/texto corrompido + `play`, corrompido + `.volume(0.5)` + `play`, corrompido `.length` e corrompido `.specs` levantam todos a exceção Python `error: The file couldn't be read with any installed file reader.` e o runtime continua vivo. Não sondados: `cache()`, `reverse()`, `handle.pause()` e `handle.stop()` (exigem um som válido); a aridade deles foi corrigida em ea2cfd04, mas não foi exercitada em runtime.
+- **Commits no `linux-sync`** (3c0b9fcf → ae0a5609): ea2cfd04 (aridade `aud`), bab82233 (R3, guard C), 870a37e9 (`mathutils.h` + sonda), ae0a5609 (`-fexceptions` + changelog). O `linux-sync` anterior (3c0b9fcf) **não compilava o Web** por causa do `mathutils.h`; quem construir Web precisa desta versão.
+- **Como reproduzir a sonda:** `tools/web/package-web.py --game projects-teste/teste-editor-web/claude-r3-probe.range --extra projects-teste/teste-editor-web/claude_r3_probe.py --runtime-dir build-web-release/bin --out-dir build-web-r3pkg --name r3probe`; servir com o `serve.py` do pacote e abrir `index.html` (o script `claude_r3_probe.py` imprime `[r3] ...` e termina com `[r3] TODOS`). `claude_r3_criar.py` recria o `.range`.
+- **Linux (outra máquina):** `git pull --rebase --autostash origin linux-sync`. As mudanças de CMake do audaspace são condicionadas a `EMSCRIPTEN` e não afetam o build nativo; o `mathutils.h` só troca o nome do parâmetro do protótipo. Nenhum rebuild especial é necessário além do incremental.
+- **Pendências ligadas a este assunto:** exercitar `cache()`, `reverse()`, `handle.pause()`/`stop()` com som válido; conferir o custo de desempenho do `-fexceptions` (M3, celular); o R3 do Codex não commitado em `AnastacioEngine-codex-r3-audio-fix` não foi integrado (só o commit ad95c2e8).
 
 ## 2026-09-21 - WebAssembly: assinaturas Python METH corrigidas em bmesh
 
@@ -248,8 +252,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `Sound.buffer()` levantam `NotImplementedError` no Web (dependem de numpy, ausente no Python Web) e
   `import_array()` não roda.
 - Prova: `tools/create_web_aud_module_scene.py`, pacote 8210: `aud.Device()`, `Sound.sine().limit()`, `device.play`
-  e volume/pitch do Handle; **o usuário confirmou os dois tons**. Exceções C++ seguem abortando o runtime, então
-  erros de uso da API `aud` que dependam de `throw` derrubam o jogo.
+  e volume/pitch do Handle; **o usuário confirmou os dois tons**. Nesta data as exceções C++ ainda abortavam o
+  runtime (erros de uso da API `aud` derrubavam o jogo). **Superado em 2026-09-21:** `-fexceptions` no audaspace e no
+  link Web faz esses erros virarem exceção Python (ver a entrada "integração aud + R3").
 
 ## 2026-09-19 - Marco G: OGG Vorbis no áudio do runtime Web
 

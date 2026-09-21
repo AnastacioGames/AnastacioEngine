@@ -239,6 +239,8 @@ Validar dois jogos na mesma origem, atualização do mesmo jogo, reload, erro de
 
 O histórico contém aborts por exceções C++ de áudio. Testar arquivos inválidos, codec indisponível e operações inválidas de `aud`; localizar a fronteira que deve converter erro em exceção Python/diagnóstico. Não habilitar exceções globalmente sem avaliar configuração, tamanho e comportamento. Corrigir com caso reproduzível e validar que a cena continua operando após erro tratável.
 
+**Estado (2026-09-21): resolvido para arquivo inexistente/corrompido.** A causa era a ausência de captura de exceções no Emscripten (todo `AUD_THROW` virava `abort()`). A avaliação pedida acima foi feita: `-fexceptions` só nos alvos `audaspace`, `audaspace-py`, `audaspace-c` e no link do RangeRuntime (não global), com `.wasm` de 21,4 para 21,6 MB. A sonda `claude_r3_probe.py` (5 casos: inexistente, corrompido, `.volume`+`play`, `.length`, `.specs`) termina em `[r3] TODOS`, com exceção Python e runtime vivo. Ainda sem sonda: `cache()`, `reverse()`, `pause()`/`stop()`, e o custo em celular (medir em M3). Detalhes no changelog de 2026-09-21.
+
 Os outros riscos adicionais — manifesto incorreto, pré-voo incompleto tratado como sucesso, colisão de índices de filtros e GPU timer zero — já estão incorporados em M0/M1/M3.
 
 ## Entrega e acompanhamento por marco

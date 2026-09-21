@@ -26,6 +26,9 @@ Aberto:
   no eixo 9) e save (IDBFS) testados e aceitos pelo usuário em 2026-09-20 ([roteiro](web-sdl2-gamepad-test.md)).
 - **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
+- **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
+  audaspace; não abortam mais). Aberto: sondar `cache()`, `reverse()`, `pause()`/`stop()` com som válido e medir o
+  custo de desempenho em celular (M3). Ver changelog de 2026-09-21.
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como
