@@ -158,7 +158,7 @@ else:
         constraints = getattr(Range, "constraints", None)
         usable_runtime = constraints is not None and all(
             hasattr(constraints, name) for name in ("setGravity", "setNumIterations"))
-    except ImportError:
+    except Exception:
         usable_runtime = False
     if usable_runtime:
         run_runtime()
