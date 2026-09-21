@@ -4,6 +4,15 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: lacuna do M1 (BL_Shader com stage "?") ja estava fechada
+
+- Reexecutado o teste de `criar_m1c.py` + `shader_quebrado.py` contra o `build-web` atual (Edge headless isolado,
+  `verify-package.cjs` com `PREFLIGHT_OUT`): o relatorio traz `diagnostics[]` e `shader_errors[]` com `stage` "vertex",
+  `operation` "compile", log do compilador completo e `structured: true`. O `stage "?"` da entrada anterior vinha de um
+  runtime anterior ao commit `54c15f9e` (diagnosticos estruturados para `RAS_Shader`).
+- Resta: o campo `material`/`origin` sai como o nome generico `engine-shader` (`RAS_Shader::m_diagnosticName`; filtros 2D usam
+  `2d-filter`). Nao ha o nome do material do Blender; melhoria pequena, nao feita. Link e materiais de nos continuam sem teste.
+
 ## 2026-09-20 - Web: M3, correcoes de base dos filtros 2D (indice, resize do bloom, timer de GPU)
 
 - **Colisao de indice**: `reservedPassIndex` era 17 e `FILTERPASS_LENSFLARE` tambem, entao o filtro customizado de
