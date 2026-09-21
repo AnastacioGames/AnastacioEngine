@@ -9,7 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Branch `integracao` (dc0a5639) reune os historicos claude/* e codex/* sobre `linux-sync`.
 - Build nativo (`RangeEngine`, `RangeRuntime`, preset `v142-ninja`) e build Web limpo (`web-runtime-release`, `.wasm` de 21,6 MB) concluidos com exit 0.
 - Sonda R3 de 10 casos rodou no Chrome headless sobre o build Web da `integracao`: terminou em `[r3] TODOS`, sem `Aborted`. As correcoes do Codex (leitor nulo, `WAVReader`) e do Claude (`-fexceptions`, guards de `AUD_Sound`) convivem.
-- Nao executado nesta validacao: regressoes R1 (nativo e Web), audio com som valido e resize do bloom.
+- Arquivos de audio invalidos no Web agora devolvem um som silencioso vazio (`[aud] file could not be decoded; using a silent empty sound`) em vez de lancar excecao; a sonda R3 passa 10/10 sem `Aborted`.
+- Regressoes no Web: R1 (nativo e Web) PASS; bloom/resize sem `glError`; `aud` sem argumentos (`cache`, `reverse`, `pause`, `stop`) sem erro; dois `.blend` de nos (Aula6, Aula8-Fim) compilam sem `shader_errors` (so compilacao, sem conferir frames).
+- Audio: o teste automatizado com tom de seno (22050 Hz, reamostrado para 48000 Hz, em loop) mostrou um clique por volta (~1 s), pois o `JOSResampleReader` reinicia no `seek(0)` e perde ~2 amostras por volta. Comportamento herdado do Audaspace, presente tambem no nativo. **Com musica real (mp3/ogg) o usuario ouviu o som perfeito no navegador**; a perda medida e 0 a ~1 amostra em 480000. O clique e um artefato do tom de teste, nao do motor; nenhuma alteracao no Audaspace foi feita.
+- Artefatos locais (pacotes `build-web-*pkg`, `.range` de teste, `projects-teste/node`) e `.log` nao vao para o Git.
 
 ## 2026-09-21 - Terremoto: direção, escala, tremor de câmera e corpos dormindo
 
