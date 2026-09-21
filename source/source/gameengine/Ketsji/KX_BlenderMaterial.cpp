@@ -899,6 +899,7 @@ EXP_PYMETHODDEF_DOC(KX_BlenderMaterial, getShader, "getShader()")
 
 	if (!m_shader) {
 		m_shader = new BL_Shader(this);
+		m_shader->SetDiagnosticName(GetName());
 	}
 
 	if (!m_shader->GetError()) {

@@ -166,6 +166,9 @@ public:
 	RAS_Shader();
 	virtual ~RAS_Shader();
 
+	/// Label reported in Web diagnostics (e.g. the owning material name).
+	void SetDiagnosticName(const std::string& name) { m_diagnosticName = name; }
+
 
 	bool GetError();
 	bool Ok() const;
