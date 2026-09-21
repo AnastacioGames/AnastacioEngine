@@ -4,6 +4,12 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Limpeza de branches/worktrees; Web reconstruido limpo a partir da linux-sync
+
+- A `integracao` estava totalmente contida na `linux-sync` (883c1558). Worktree `D:\AnastacioEngine-integracao` e branch local `integracao` removidos; sobram os worktrees da `linux-sync` e da `master`. Branches remotas antigas e o `perf-artifact` tambem foram apagados a pedido do usuario. Nada foi enviado ao GitHub nesta limpeza.
+- Rebuild Web limpo da `linux-sync` (`web-runtime-release`, 1817/1817 alvos, exit 0, 242 modulos Python). Sonda R3 rodada duas vezes no Edge headless: `[r3] TODOS`, sem `Aborted`. Isso substitui a validacao feita na `integracao`.
+- `linux-sync` (origin e local iguais) e a branch a baixar no Linux para build e teste; o teste no Linux e feito pelo usuario e ainda nao foi registrado.
+
 ## 2026-09-21 - Branch integracao: guards de leitor nulo do Codex sobre o som silencioso
 
 - Incorporados os guards de `codex/r3-audio-fix` (leitor nulo em `AUD_Sound`, `AUD_Special`, `PySound`, `PyDevice.play`, `Limiter`, `Pitch`, `VolumeSound`), sem o `WAVFile.cpp` do Codex, que desfaria o som silencioso.

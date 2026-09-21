@@ -28,7 +28,8 @@ Aberto:
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
   audaspace; não abortam mais). Aberto: sondar `cache()`, `reverse()`, `pause()`/`stop()` com som válido e medir o
-  custo de desempenho em celular (M3). Ver changelog de 2026-09-21.
+  custo de desempenho em celular (M3). Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
+  (sonda R3 `[r3] TODOS`); a branch `integracao` foi removida por estar contida nela.
 - **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
   `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
   shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
