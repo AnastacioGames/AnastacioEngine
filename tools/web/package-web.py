@@ -30,6 +30,7 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_FILES = ("RangeRuntime.js", "RangeRuntime.wasm", "RangeRuntime.data")
+PERF_FILE = "frame-time-perf.js"
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -116,6 +117,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 <pre id="log"></pre>
+__PERF_SCRIPT__
 <script>
 (function () {
   var GAME = "__GAME__";
@@ -455,6 +457,8 @@ def main():
     ap.add_argument("--version", default="0.0.0")
     ap.add_argument("--width", type=int, default=960)
     ap.add_argument("--height", type=int, default=540)
+    ap.add_argument("--perf", action="store_true",
+                    help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
     args = ap.parse_args()
 
@@ -487,6 +491,8 @@ def main():
 
     for n in RUNTIME_FILES:
         shutil.copy2(args.runtime_dir / n, tmp / n)
+    if args.perf:
+        shutil.copy2(Path(__file__).with_name(PERF_FILE), tmp / PERF_FILE)
     shutil.copy2(args.game, tmp / "game" / args.game.name)
     for x in args.extra:
         dst = tmp / "game" / extra_rel(x, args.extra_root)
@@ -498,6 +504,7 @@ def main():
             .replace("__TITLE__", title.replace("<", "&lt;").replace(">", "&gt;"))
             .replace("__GAME__", args.game.name)
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
+            .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))

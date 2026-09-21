@@ -1,6 +1,6 @@
 # Proposta: ligar `frame-time-perf.js` ao pacote Web
 
-Estado: **proposta, não aplicada**. O plano proíbe editar `tools/web/package-web.py` nesta frente; este diff só
+Estado: **aplicada** em `package-web.py` (`--perf`; verificada em 2026-09-21: com `--perf` o pacote inclui o script e o manifesto o lista, `perf-run.cjs` recebe frames em Edge headless; sem `--perf`, sem arquivo, sem tag e `__rangePerf` indefinido). O texto abaixo é o original da proposta. O plano proíbe editar `tools/web/package-web.py` nesta frente; este diff só
 descreve o gancho para quem for autorizado a aplicá-lo. Nada abaixo foi executado.
 
 ## Comportamento desejado

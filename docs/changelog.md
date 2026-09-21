@@ -4,6 +4,11 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Web: gancho `--perf` aplicado em `package-web.py`
+
+- `package-web.py --perf` copia `frame-time-perf.js` para o pacote e o carrega no `index.html` (opt-in; ativo so com `?perf=1`). Sem a flag o pacote sai como antes. O manifesto e `SHA256SUMS.txt` ja incluem o arquivo por varredura do diretorio.
+- Verificado: pacote com e sem `--perf` (8 e 7 arquivos); `perf-run.cjs` em Edge headless/SwiftShader recebeu frames (count 12, DPR 1, 1280x720) so como prova da ferramenta, nao e medicao de celular; sem `--perf`, `__rangePerf` fica indefinido. `validate-web.py` nao rodou aqui (exige o `bpy` da engine, o do pip quebra no import).
+
 ## 2026-09-20 - Web: R3 corrigido (audio invalido nao aborta mais); perf e teste de link do Codex integrados
 
 - **R3 corrigido no runtime Web.** Causa: o Wasm nao tem excecoes (`AUD_THROW` aborta) e `FileManager` devolvia leitor nulo, desreferenciado pelos leitores de efeito (`volume`, `limit`, `pitch`). Correcao: sob `__EMSCRIPTEN__`, `FileManager::createReader` (arquivo e buffer) devolve um `UnreadableReader` silencioso de comprimento zero (44100 Hz, mono) e loga `[aud] file could not be decoded`; `WAVReader` nao lanca mais (flag `ok()`, `makeReader` devolve nulo). Nativo inalterado (continua lancando).
