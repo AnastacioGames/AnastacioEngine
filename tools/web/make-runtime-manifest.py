@@ -36,12 +36,12 @@ PYC_MAGIC_3_11 = "a70d0d0a"  # importlib.util.MAGIC_NUMBER do CPython 3.11
 # Modulos que existem sem PyInit_* proprio (Modules/config.c e nucleo do interpretador).
 CORE_BUILTINS = ("sys", "builtins", "marshal", "_warnings", "_frozen_importlib",
                  "_frozen_importlib_external", "zipimport", "_imp")
-# KX_PythonInit.cpp: inittab da engine; 'aud' so existe com WITH_AUDASPACE (desligado no preset).
-ENGINE_MODULES = ("Range", "mathutils", "bgl", "blf")
+# KX_PythonInit.cpp sempre instala ``bge`` como alias de ``Range``. ``aud`` e
+# condicionado por WITH_AUDASPACE, portanto nao pode ficar numa lista fixa.
+ENGINE_MODULES = ("Range", "bge", "mathutils", "bgl", "blf")
 
-# Capacidades conhecidas do preset atual. O estado reflete configuracao, nunca comprovacao.
+# Estados que independem das opcoes do build. Audio e derivado do CMakeCache.
 CAPABILITIES = {
-    "audio": ("disabled", "OpenAL/Audaspace desligados em platform_web.cmake"),
     "threads": ("disabled", "preset sem pthreads; TaskScheduler roda serial"),
     "touch": ("disabled", "sem suporte a toque no runtime atual"),
     "gamepad": ("unvalidated", None),
@@ -67,6 +67,42 @@ def cmake_cache_value(build_dir, key):
         if line.startswith(key + ":"):
             return line.split("=", 1)[1].strip()
     return None
+
+
+def cmake_cache_enabled(build_dir, key):
+    """Retorna a opcao booleana do CMake, ou None quando o cache nao a registra."""
+    value = cmake_cache_value(build_dir, key)
+    if value is None:
+        return None
+    return value.upper() in ("1", "ON", "TRUE", "YES")
+
+
+def engine_modules(build_dir):
+    modules = set(ENGINE_MODULES)
+    if cmake_cache_enabled(build_dir, "WITH_AUDASPACE"):
+        modules.add("aud")
+    return modules
+
+
+def capabilities(build_dir):
+    caps = {}
+    for name, (state, why) in CAPABILITIES.items():
+        entry = {"state": state}
+        if why:
+            entry["note"] = why
+        caps[name] = entry
+
+    audaspace = cmake_cache_enabled(build_dir, "WITH_AUDASPACE")
+    if audaspace:
+        caps["audio"] = {"state": "unvalidated",
+                         "note": "Audaspace habilitado no build (WITH_AUDASPACE)."}
+    elif audaspace is False:
+        caps["audio"] = {"state": "disabled",
+                         "note": "Audaspace desabilitado no build (WITH_AUDASPACE=OFF)."}
+    else:
+        caps["audio"] = {"state": "unvalidated",
+                         "note": "CMakeCache nao informa WITH_AUDASPACE; requer teste no navegador."}
+    return caps
 
 
 def stdlib_modules(zip_path):
@@ -107,16 +143,12 @@ def build(runtime_dir, python_root, evidence):
     if root is None or not (root / "lib" / "python311.zip").is_file():
         sys.exit("erro: informe --python-root (CPython wasm com lib/python311.zip)")
 
+    build_dir = runtime_dir.parent
     modules = (stdlib_modules(root / "lib" / "python311.zip")
                | linked_c_modules(root / "lib" / "libpython3.11.a")
-               | set(CORE_BUILTINS) | set(ENGINE_MODULES))
+               | set(CORE_BUILTINS) | engine_modules(build_dir))
 
-    caps = {}
-    for name, (state, why) in CAPABILITIES.items():
-        entry = {"state": state}
-        if why:
-            entry["note"] = why
-        caps[name] = entry
+    caps = capabilities(build_dir)
     for item in evidence:
         name, _, text = item.partition("=")
         if name not in caps or not text:

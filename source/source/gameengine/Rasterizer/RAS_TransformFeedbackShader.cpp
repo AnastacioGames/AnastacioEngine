@@ -33,6 +33,21 @@
 
 #include "GPU_glew.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* Best-effort bridge to Module.onDiagnostic (version 1); never alters normal error handling. */
+EM_JS(void, tf_shader_web_diagnostic,
+      (const char *operation, const char *stage, const char *origin, const char *log),
+      {
+        if (typeof Module === 'undefined' || typeof Module.onDiagnostic !== 'function') return;
+        try {
+          Module.onDiagnostic({version: 1, category: 'shader', severity: 'error',
+                               operation: UTF8ToString(operation), stage: UTF8ToString(stage),
+                               origin: UTF8ToString(origin), log: UTF8ToString(log)});
+        } catch (e) {}
+      });
+#endif
+
 RAS_TransformFeedbackShader::RAS_TransformFeedbackShader()
 	:m_program(0),
 	m_valid(false)
@@ -60,6 +75,9 @@ bool RAS_TransformFeedbackShader::Create(const char *vertexSource, const std::ve
 	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
 	if (!status) {
 		glGetShaderInfoLog(vertexShader, sizeof(log), &length, log);
+#ifdef __EMSCRIPTEN__
+		tf_shader_web_diagnostic("compile", "vertex", "particle-transform-feedback", log);
+#endif
 		CM_Error("particle transform feedback shader compile failed:\n" << log);
 		glDeleteShader(vertexShader);
 		return false;
@@ -90,6 +108,9 @@ bool RAS_TransformFeedbackShader::Create(const char *vertexSource, const std::ve
 
 	if (!status) {
 		glGetProgramInfoLog(m_program, sizeof(log), &length, log);
+#ifdef __EMSCRIPTEN__
+		tf_shader_web_diagnostic("link", "", "particle-transform-feedback", log);
+#endif
 		CM_Error("particle transform feedback program link failed:\n" << log);
 		glDeleteProgram(m_program);
 		m_program = 0;

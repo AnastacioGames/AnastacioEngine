@@ -29,6 +29,7 @@
 
 #include "RAS_Rasterizer.h"
 
+#include <functional>
 #include <memory>
 
 class RAS_ICanvas;
@@ -47,7 +48,10 @@ public:
 	enum Flag {
 		RAS_VIEWPORT_SIZE = (1 << 0),
 		RAS_DEPTH = (1 << 1),
-		RAS_MIPMAP = (1 << 2)
+		RAS_MIPMAP = (1 << 2),
+		/** Size is the canvas size divided by the size divisor, kept up to date by Update.
+		 * Unlike RAS_VIEWPORT_SIZE the viewport is set when binding. Internal use. */
+		RAS_CANVAS_DIVISOR = (1 << 3)
 	};
 
 	enum {
@@ -59,6 +63,9 @@ private:
 	const unsigned short m_colorSlots;
 	const RAS_Rasterizer::HdrType m_hdr;
 
+	const float m_sizeDivisor;
+	/// Called after Update recreated the textures (their OpenGL bind codes changed).
+	std::function<void ()> m_rebuildCallback;
 	unsigned int m_width;
 	unsigned int m_height;
 
@@ -68,11 +75,13 @@ private:
 
 	/// Construct the frame buffer and the textures with the current settings.
 	void Construct();
+	void NotifyRebuilt();
 	/// Generate mipmap levels for color textures of the off screen.
 	void MipmapTexture();
 
 public:
-	RAS_2DFilterOffScreen(unsigned short colorSlots, Flag flag, unsigned int width, unsigned int height, RAS_Rasterizer::HdrType hdr);
+	RAS_2DFilterOffScreen(unsigned short colorSlots, Flag flag, unsigned int width, unsigned int height, RAS_Rasterizer::HdrType hdr,
+	                      float sizeDivisor = 1.0f);
 	virtual ~RAS_2DFilterOffScreen();
 
 	/** Update the off screen to the new canvas dimensions if allowed.
@@ -85,6 +94,8 @@ public:
 	void Unbind(RAS_Rasterizer *rasty, RAS_ICanvas *canvas);
 	/// Return true of the off screen is valid from the OpenGL rules for frame buffers.
 	bool GetValid() const;
+
+	void SetRebuildCallback(const std::function<void ()>& callback);
 
 	int GetColorBindCode(unsigned short index) const;
 	int GetDepthBindCode() const;

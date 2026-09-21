@@ -27,6 +27,7 @@
 #include "EXP_PythonCallBack.h"
 #include <iostream>
 #include <stdarg.h>
+#include <string>
 
 #include "BLI_alloca.h"
 
@@ -84,6 +85,87 @@ static PyObject *CreatePythonTuple(unsigned int argcount, PyObject **arglist)
 	return tuple;
 }
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+
+/* Best-effort bridge: Module.onDiagnostic exists only while a pre-flight report is collected, and
+ * a failing callback must never affect the normal Python error handling. */
+EM_JS(void, exp_python_web_diagnostic,
+      (const char *context, const char *origin, const char *type, const char *message, const char *trace),
+      {
+        if (typeof Module === 'undefined' || typeof Module.onDiagnostic !== 'function') return;
+        try {
+          Module.onDiagnostic({version: 1, category: 'python', severity: 'error',
+                               context: UTF8ToString(context), origin: UTF8ToString(origin),
+                               exception_type: UTF8ToString(type), message: UTF8ToString(message),
+                               traceback: UTF8ToString(trace)});
+        } catch (e) {}
+      });
+
+static std::string exp_py_to_string(PyObject *obj)
+{
+	std::string out;
+	if (obj) {
+		PyObject *str = PyObject_Str(obj);
+		if (str) {
+			const char *c = PyUnicode_AsUTF8(str);
+			if (c) {
+				out = c;
+			}
+			Py_DECREF(str);
+		}
+		if (PyErr_Occurred()) {
+			PyErr_Clear();
+		}
+	}
+	return out;
+}
+#endif
+
+void EXP_ReportPythonDiagnostic(const char *context, const char *origin)
+{
+#ifdef __EMSCRIPTEN__
+	if (!PyErr_Occurred()) {
+		return;
+	}
+
+	PyObject *type, *value, *tb;
+	PyErr_Fetch(&type, &value, &tb);
+	PyErr_NormalizeException(&type, &value, &tb);
+
+	std::string type_name = (type && PyExceptionClass_Check(type)) ? ((PyTypeObject *)type)->tp_name : "";
+	std::string message = exp_py_to_string(value);
+	std::string trace;
+
+	PyObject *tbmod = PyImport_ImportModule("traceback");
+	if (tbmod) {
+		PyObject *lines = PyObject_CallMethod(tbmod, "format_exception", "OOO", type ? type : Py_None,
+		                                      value ? value : Py_None, tb ? tb : Py_None);
+		if (lines) {
+			PyObject *sep = PyUnicode_FromString("");
+			PyObject *joined = sep ? PyUnicode_Join(sep, lines) : nullptr;
+			trace = exp_py_to_string(joined);
+			Py_XDECREF(joined);
+			Py_XDECREF(sep);
+			Py_DECREF(lines);
+		}
+		Py_DECREF(tbmod);
+	}
+	if (PyErr_Occurred()) {
+		PyErr_Clear();
+	}
+
+	/* PyErr_Restore steals the references; the exception is now normalized but still pending. */
+	PyErr_Restore(type, value, tb);
+
+	exp_python_web_diagnostic(context ? context : "", origin ? origin : "", type_name.c_str(), message.c_str(),
+	                          trace.c_str());
+#else
+	(void)context;
+	(void)origin;
+#endif
+}
+
 void EXP_RunPythonCallback(PyObject *value, PyObject **arglist, unsigned int minargcount, unsigned int maxargcount)
 {
 		unsigned int funcargcount = 0;
@@ -91,6 +173,7 @@ void EXP_RunPythonCallback(PyObject *value, PyObject **arglist, unsigned int min
 		PyObject *func = CheckPythonFunction(value, minargcount, maxargcount, funcargcount);
 		// This value fails the check.
 		if (!func) {
+			EXP_ReportPythonDiagnostic("callback.check", nullptr);
 			PyErr_Print();
 			PyErr_Clear();
 			return;
@@ -101,6 +184,7 @@ void EXP_RunPythonCallback(PyObject *value, PyObject **arglist, unsigned int min
 
 		PyObject *ret = PyObject_Call(func, tuple, nullptr);
 		if (!ret) { // If ret is nullptr this seems that the function doesn't work.
+			EXP_ReportPythonDiagnostic("callback", nullptr);
 			PyErr_Print();
 			PyErr_Clear();
 		}

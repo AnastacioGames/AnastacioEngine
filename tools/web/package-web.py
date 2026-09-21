@@ -30,6 +30,7 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_FILES = ("RangeRuntime.js", "RangeRuntime.wasm", "RangeRuntime.data")
+PERF_FILE = "frame-time-perf.js"
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -116,6 +117,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 <pre id="log"></pre>
+__PERF_SCRIPT__
 <script>
 (function () {
   var GAME = "__GAME__";
@@ -130,6 +132,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   function fail(msg) {
     if (failed) return;
     failed = true;
+    if (pf) pf.failure = String(msg);
     el("progress").hidden = true;
     el("play").hidden = true;
     el("status").textContent = "Nao foi possivel iniciar o jogo.";
@@ -179,7 +182,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       // Avisos conhecidos e inofensivos da emulacao GL legada do emscripten.
       if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn(t); else console.error(t);
     },
-    onAbort: function (w) { fail("O runtime foi interrompido: " + w); },
+    onAbort: function (w) {
+      if (pf) pf.runtimeAborted = String(w);
+      fail("O runtime foi interrompido: " + w);
+    },
     setStatus: function (t) {
       if (failed) return;
       var m = /(.+) \\((\\d+(?:\\.\\d+)?)\\/(\\d+)\\)/.exec(t);
@@ -195,6 +201,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       }).catch(function (e) { fail("Falha ao baixar arquivos do jogo: " + e.message); });
     }],
     onRuntimeInitialized: function () {
+      if (pf) pf.runtimeInitialized = true;
       log("[event] runtime inicializado");
       markReady();
     }
@@ -220,16 +227,41 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   }
   el("play").addEventListener("click", tryStart);
 
-  // Pre-voo (marco E): ?preflight=1 monta o relatorio "range-web-preflight" v1 lido por
-  // range_web/preflight.py. Erros de shader e de Python sao extraidos do texto do runtime
-  // por heuristica; falso negativo e possivel, entao a ausencia deles nao prova sucesso.
+  // Pre-voo: eventos estruturados do runtime tem precedencia; o parser de console
+  // permanece apenas para binarios antigos e caminhos que ainda nao emitem eventos.
   var preflight = /[?&]preflight=1/.test(location.search);
-  var pf = { shaders: [], python: [], contextLost: false };
-  var pfOpenShader = null, pfPyOpen = false, pfSeen = {};
+  var pf = { shaders: [], python: [], diagnostics: [], contextLost: false, runtimeInitialized: false,
+             runtimeAborted: "", failure: "" };
+  var pfOpenShader = null, pfPyOpen = false, pfSeen = {}, pfStructuredShader = false;
+  var pfStructuredPyKinds = {};
   function pfAddPy(rec) {
     // O mesmo erro se repete a cada frame do controller; um registro por causa basta.
-    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + rec.text;
+    // Heuristica de console nao duplica um erro que ja chegou como evento estruturado.
+    if (!rec.structured && pfStructuredPyKinds[rec.kind]) return;
+    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + (rec.origin || "") + "|" + rec.text;
     if (!pfSeen[key]) { pfSeen[key] = true; pf.python.push(rec); }
+  }
+  function pfAddShader(rec) {
+    var key = rec.operation + "|" + rec.stage + "|" + (rec.material || "") + "|" + rec.log;
+    if (!pfSeen[key]) { pfSeen[key] = true; pf.shaders.push(rec); }
+  }
+  function pfDiagnostic(rec) {
+    if (!rec || rec.version !== 1 || typeof rec.category !== "string") return;
+    pf.diagnostics.push(rec);
+    if (rec.category === "shader" && rec.severity === "error") {
+      pfStructuredShader = true;
+      pfAddShader({ material: rec.origin || "", stage: rec.stage || "", operation: rec.operation || "",
+                    log: rec.log || "", structured: true });
+    }
+    else if (rec.category === "python" && rec.severity === "error") {
+      var kind = rec.exception_type || "Exception";
+      pfStructuredPyKinds[kind] = true;
+      var mod = "";
+      var mm = /(?:ModuleNotFoundError|ImportError).*?['"]([\\w.]+)['"]/.exec(rec.message || "");
+      if (mm) mod = mm[1];
+      pfAddPy({ kind: kind, module: mod, file: "", text: rec.message || "", origin: rec.origin || "",
+                context: rec.context || "", traceback: rec.traceback || "", structured: true });
+    }
   }
   function pfLine(t) {
     t = t.replace(/\\x1b\\[[0-9;]*m/g, "");
@@ -247,9 +279,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       m = /^([\\w.]*(Error|Exception))\\b/.exec(t);
       if (m) { pfPyOpen = false; pfAddPy({ kind: m[1], text: t, file: "" }); return; }
     }
-    if (/shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
-      var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t };
-      pf.shaders.push(rec);
+    if (!pfStructuredShader && /shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
+      var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t,
+                  structured: false };
+      pfAddShader(rec);
       pfOpenShader = rec;
     }
   }
@@ -267,8 +300,19 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   }
   function pfFiles() {
     return fetch("manifest.json?v=" + encodeURIComponent(VERSION), { cache: "no-store" })
-      .then(function (r) { return r.json(); }).catch(function () { return { files: {} }; })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (man) {
+        if (!man || typeof man.files !== "object") throw new Error("manifesto sem lista de arquivos");
+        return man;
+      }).catch(function (e) {
+        return { files: {}, preflight_manifest_error: String(e) };
+      })
       .then(function (man) {
+        if (man.preflight_manifest_error) {
+          return [{ name: "manifest.json", status: null, mime: "", error: man.preflight_manifest_error }];
+        }
         var names = Object.keys(man.files || {}).filter(function (n) {
           return n !== "manifest.json" && n !== "SHA256SUMS.txt";
         });
@@ -285,16 +329,19 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
       });
   }
   function pfBuild(files) {
-    return { schema: "range-web-preflight", schema_version: 1,
+    return { schema: "range-web-preflight", schema_version: 2,
              cross_origin_isolated: !!window.crossOriginIsolated,
              webgl: pfProbeGL(), files: files, context_lost: pf.contextLost,
-             shader_errors: pf.shaders, python_errors: pf.python };
+             runtime_initialized: pf.runtimeInitialized, runtime_aborted: pf.runtimeAborted,
+             runtime_failure: pf.failure,
+             diagnostics: pf.diagnostics, shader_errors: pf.shaders, python_errors: pf.python };
   }
   if (preflight) {
     document.body.classList.add("debug");
     var _print = Module.print, _printErr = Module.printErr;
     Module.print = function (t) { pfLine(String(t)); _print(t); };
     Module.printErr = function (t) { pfLine(String(t)); _printErr(t); };
+    Module.onDiagnostic = pfDiagnostic;
     el("canvas").addEventListener("webglcontextlost", function () { pf.contextLost = true; }, false);
     var pfFilesCache = null;
     window.rangePreflight = function () {
@@ -410,6 +457,8 @@ def main():
     ap.add_argument("--version", default="0.0.0")
     ap.add_argument("--width", type=int, default=960)
     ap.add_argument("--height", type=int, default=540)
+    ap.add_argument("--perf", action="store_true",
+                    help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
     args = ap.parse_args()
 
@@ -442,6 +491,8 @@ def main():
 
     for n in RUNTIME_FILES:
         shutil.copy2(args.runtime_dir / n, tmp / n)
+    if args.perf:
+        shutil.copy2(Path(__file__).with_name(PERF_FILE), tmp / PERF_FILE)
     shutil.copy2(args.game, tmp / "game" / args.game.name)
     for x in args.extra:
         dst = tmp / "game" / extra_rel(x, args.extra_root)
@@ -453,6 +504,7 @@ def main():
             .replace("__TITLE__", title.replace("<", "&lt;").replace(">", "&gt;"))
             .replace("__GAME__", args.game.name)
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
+            .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))

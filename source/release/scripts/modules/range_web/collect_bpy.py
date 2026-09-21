@@ -91,7 +91,7 @@ def _object_references(scene_name, ob):
                                     "Controller:%s%s" % (c.name, " @ " + lib_path if lib_path else ""))
     for comp in ob.game.components:
         yield collect.Reference(collect.KIND_MODULE, comp.module, where + [comp.name],
-                                scene_name, ob.name, "Component:%s" % comp.name)
+                                scene_name, ob.name, "Component:%s" % comp.name, is_module=True)
 
 
 def collect_references(scenes):

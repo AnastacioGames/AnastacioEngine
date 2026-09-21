@@ -44,6 +44,14 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(findings, [])
         self.assertIn(("module", "door"), visited)
 
+    def test_component_dotted_module_is_not_truncated(self):
+        # Component guarda o modulo completo ("scripts.luz"); nao e "modulo.funcao".
+        r = Reference(KIND_MODULE, "scripts.luz", ["Cena", "Cubo", "Luz"], scene="Cena", object="Cubo",
+                      datablock="Component:Luz", is_module=True)
+        findings, visited = collect.resolve(snap([r], {"scripts.luz": "import math\n"}))
+        self.assertEqual(findings, [])
+        self.assertIn(("module", "scripts.luz"), visited)
+
     def test_missing_module_reports_chain(self):
         findings, _ = collect.resolve(snap([ref(KIND_MODULE, "door_logic.open")]))
         self.assertEqual(ids(findings), ["WEB-PKG-003"])

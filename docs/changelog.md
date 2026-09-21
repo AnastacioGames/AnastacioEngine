@@ -117,6 +117,211 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   roadmap, relatório, README e `mobile-export-plan.md` apontam para ele. Só documentação, nenhum código alterado.
 - Diferencial mobile incorporado ao marco A1: multitouch e sensores de movimento (orientação, aceleração, giro,
   vibração) via APIs Web, primeiro traduzidos para teclado/gamepad no harness JS, depois expostos em Python.
+## 2026-09-21 - Web: gancho `--perf` aplicado em `package-web.py`
+
+- `package-web.py --perf` copia `frame-time-perf.js` para o pacote e o carrega no `index.html` (opt-in; ativo so com `?perf=1`). Sem a flag o pacote sai como antes. O manifesto e `SHA256SUMS.txt` ja incluem o arquivo por varredura do diretorio.
+- Verificado: pacote com e sem `--perf` (8 e 7 arquivos); `perf-run.cjs` em Edge headless/SwiftShader recebeu frames (count 12, DPR 1, 1280x720) so como prova da ferramenta, nao e medicao de celular; sem `--perf`, `__rangePerf` fica indefinido. `validate-web.py` nao rodou aqui (exige o `bpy` da engine, o do pip quebra no import).
+
+## 2026-09-20 - Web: R3 corrigido (audio invalido nao aborta mais); perf e teste de link do Codex integrados
+
+- **R3 corrigido no runtime Web.** Causa: o Wasm nao tem excecoes (`AUD_THROW` aborta) e `FileManager` devolvia leitor nulo, desreferenciado pelos leitores de efeito (`volume`, `limit`, `pitch`). Correcao: sob `__EMSCRIPTEN__`, `FileManager::createReader` (arquivo e buffer) devolve um `UnreadableReader` silencioso de comprimento zero (44100 Hz, mono) e loga `[aud] file could not be decoded`; `WAVReader` nao lanca mais (flag `ok()`, `makeReader` devolve nulo). Nativo inalterado (continua lancando).
+- Evidencia: `build-web` recompilado; `claude_r3_probe` (10 casos: inexistente, corrompido, RIFF/WAVE quebrado, com volume/limit/pitch, `.length`, `.specs`) empacotado e rodado no Edge headless isolado (`claude_r3_run.cjs`): termina com `[r3] TODOS: true`, sem abort. Builds nativo (`RangeRuntime RangeEngine`, 9/9) e `build-web-release` (22/22) terminaram com codigo 0.
+- `codex/r3-audio-fix-new` (`ad95c2e8`) fica **superado** (nao chegava a causa); nao integrado.
+- **Bug geral de `aud` achado, nao corrigido:** metodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle` (ex.: `sine.cache()`, `reverse()`, `handle.pause()/stop()`) dao `function signature mismatch` no Wasm (cast de ponteiro com aridade diferente). Confirmado com som valido (`claude_aud_noargs_probe.py`, so o 1o caso executado); ~16 metodos. A sonda R3 nao cobre `.cache`. Correcao depende de autorizacao.
+- Codex integrado (merges locais, sem push): `codex/perf-run` (`perf-run.cjs`, overlay `?perf=1` em `frame-time-perf.js`; corrigi o `'\\n'` do overlay) e `codex/shader-node-test` (`NOTA-SHADER-MATERIAL-NODES.md`, `preflight-link.json` e teste de link; teste de node-material justificado como nao injetavel). Suite `web_profile`: 99 OK. `perf-run.cjs` rodou em Edge headless (SwiftShader: count 130, p50 97 ms, p95 127 ms, DPR 1, 1280x720) so para provar a ferramenta; **nao e medicao de celular**. Gancho `--perf` em `package-web.py` esta so proposto (`docs/web-perf-hook-proposal.md`), nao aplicado.
+- **Nao repetidos apos a mudanca de audio:** regressao de audio (`verify-capabilities.cjs audio`, exige Chrome com CDP), resize do bloom, resolucao dinamica sem timer e R1 nativo/Web. Ficam para a proxima sessao.
+
+## 2026-09-20 - Web: nome do material e falha de link nos diagnosticos de shader; T4 e T5 do Codex integrados
+
+- `KX_BlenderMaterial::getShader()` passa o nome do material ao `BL_Shader` (`RAS_Shader::SetDiagnosticName`); em `shader_errors[]` o campo `material` sai como o nome real do ID (ex.: `MAMatQuebrado`, com o prefixo `MA` do Blender) em vez de `engine-shader`. Filtros 2D continuam `2d-filter`.
+- Testado com `build-web` recompilado (19/19, codigo 0), pacote real e Edge headless isolado (`claude_m1c_diag.cjs`): vertex invalido -> `operation` "compile", `stage` "vertex", `material` "MAMatQuebrado"; **falha de link** (vertex valido, fragment com `in` sem `out` correspondente; `criar_m1c.py -- --link` + `shader_quebrado.quebrar_link`) -> `operation` "link", `stage` "", log `FRAGMENT varying varying_inexistente does not match any VERTEX varying`, `material` "MAMatQuebradoLink". Nao testado: shader de material de nos. Nota: o runtime usa GLSL ES 3 (`ftransform`, `varying` e `gl_FragColor` nao existem), entao shaders escritos para o desktop falham no Web.
+- Suite `tools/tests/web_profile`: 98 testes OK.
+- Merges locais (sem push): `codex/r1-guard` (T4: guard estatico tolera stubs `Range` quebrados; `constraint_abi_test.py` -> `PASS (31 methods)`) e `codex/perf-tool` (T5 parcial: `tools/web/frame-time-perf.js` + `docs/web-frame-time-perf.md`; validado aqui so em Node com rAF sintetico, p50/p95 corretos). A ferramenta **nao esta ligada** ao `index.html` gerado (o Codex nao editou `package-web.py`) e nao ha script CDP; o usuario ainda nao consegue medir no celular sem incluir o script a mao.
+- **T3 nao integrado:** `codex/r3-audio-fix-new` (`ad95c2e8`) so troca `assert` por guarda em `AUD_Sound_getSpecs/getLength`, mas ainda chama `createReader()->` sem checar o leitor nulo, que e a causa do segfault; sem build Web nem sonda. R3 segue **aberto**.
+- Nao refeitos nesta rodada: nativo, `build-web-release`, regressao de audio, resize do bloom e `claude_r3_probe` (nenhuma mudanca de C++ alem do nome do shader; so `build-web` foi recompilado).
+
+## 2026-09-20 - Web: integração de R1 e R3 e verificação no runtime integrado
+
+- Merges locais (sem push) na `claude/web-m1-python-diag`: `codex/r3-audio-m3-tests` e `codex/r1-constraint-abi`; único conflito foi o topo do changelog (mantidas as duas entradas).
+- Builds com código 0 depois dos merges: nativo (11/11), `build-web` (8/8) e `build-web-release` (8/8).
+- **R1 verificado:** `constraint_abi_test` passa no `RangeRuntime.exe` nativo (`constraint_abi_test_result.txt` = PASS) e no runtime Web (Edge headless, `CONSTRAINT_ABI_TEST: PASS` no console).
+- **Regressão de áudio:** cena `create_web_audio_scene.py` (`verify-capabilities.cjs audio`) 8/8 OK (AudioContext ativo, mixer avançou, amplitude não nula); módulo `aud` (`create_web_aud_module_scene.py`) importa, cria Device e toca seno.
+- **M3 no runtime integrado:** `claude_m3_resize` repetido, mesmos resultados (offscreens canvas/2,/4,/8, `glError=0x0`, aviso único do timer).
+- **R3 NÃO está resolvido:** sonda `claude_r3_probe.py`/`claude_r3_criar.py` no runtime integrado. `Sound.file()` de arquivo inexistente ou de texto corrompido + `Device.play` não aborta, mas devolve um `Handle` (deveria falhar); **`Sound.file(corrompido).volume(0.5)` + `play` termina em `Aborted(segmentation fault)`**. Confirma a previsão da revisão estática: o leitor nulo é desreferenciado pelos leitores de efeito. Os casos `.length` e `.specs` não chegaram a rodar (o abort veio antes). Tarefa T3 do Codex.
+
+## 2026-09-20 - Web: revisão do trabalho do Codex (R1, R3, T2) e nova divisão
+
+- Branches lidas por diff, sem integrar: `codex/r1-constraint-abi` (`9ff97884`) e `codex/r3-audio-m3-tests` (`7544073e`).
+- **R1:** `grep` de `kwds` só em `createConstraint`; `python -S tools/tests/constraint_abi_test.py` deu
+  `CONSTRAINT_ABI_STATIC_TEST: PASS (31 methods)`. Sem `-S` o guard falha com `NameError: EXP_PyObjectPlus` por causa
+  de um pacote `Range` de stubs no `site-packages` desta máquina. Build/execução Web do Codex não foram repetidos.
+- **R3:** não compilado pelo Codex e revisado só estaticamente: `createReader()` passa a poder devolver nulo no Web, e
+  `AUD_Sound_getSpecs`/`getLength`, `Sound.write`/`specs`/`length` (PySound) e `AUD_Special` o desreferenciam sem checar,
+  assim como leitores de efeito que chamam `reader->getSpecs()` no construtor. Risco de trocar abort por exceção em
+  segfault por nulo com arquivo inválido; não reproduzido (falta build). R3 segue **aberto**, tarefa T3.
+- **T2:** sondas M3 do Codex rodaram no runtime antigo (sem `offScreenSize`); a medição numérica está na entrada do
+  resize do bloom acima. Suíte `tools/tests/web_profile`: 98 testes OK nesta branch.
+- Documentos atualizados: plano (status, divisão e handoff da rodada 2), roadmap e esta entrada. Nova divisão:
+  Claude integra e recompila depois do OK do usuário; Codex faz T3 (fechar R3), T4 (guard do R1) e T5 (ferramenta de
+  medição p50/p95).
+
+## 2026-09-20 - Web: lacuna do M1 (BL_Shader com stage "?") ja estava fechada
+
+- Reexecutado o teste de `criar_m1c.py` + `shader_quebrado.py` contra o `build-web` atual (Edge headless isolado,
+  `verify-package.cjs` com `PREFLIGHT_OUT`): o relatorio traz `diagnostics[]` e `shader_errors[]` com `stage` "vertex",
+  `operation` "compile", log do compilador completo e `structured: true`. O `stage "?"` da entrada anterior vinha de um
+  runtime anterior ao commit `54c15f9e` (diagnosticos estruturados para `RAS_Shader`).
+- Resta: o campo `material`/`origin` sai como o nome generico `engine-shader` (`RAS_Shader::m_diagnosticName`; filtros 2D usam
+  `2d-filter`). Nao ha o nome do material do Blender; melhoria pequena, nao feita. Link e materiais de nos continuam sem teste.
+
+## 2026-09-20 - Web: R3 audio sem excecoes e sondas M3 no navegador
+
+- **R3, causa e correcao:** o runtime Wasm e compilado sem unwinding C++; portanto um `AUD_THROW` de arquivo/codec
+  invalido aborta o processo antes dos `catch(Exception&)` historicos. No Web, `FileManager` devolve leitor nulo
+  quando nenhum decoder aceita o arquivo, e o leitor WAV devolve nulo para arquivo ausente ou formato desconhecido.
+  `SoftwareDevice::play` rejeita leitor/som nulo antes de criar os wrappers. Tambem foi protegido o binding C
+  `AUD_Device`: ausencia de device (falha/indisponibilidade do backend) e device sem `I3DDevice` nao podem mais
+  desreferenciar nulo; getters devolvem sentinelas e setters sao no-op. Isso nao habilita audio 3D nem OpenAL.
+- **Limite R3:** RIFF/WAV malformado ainda percorre validacoes antigas que usam `AUD_THROW`; o caso completo precisa
+  converter essas validacoes para retorno de erro antes de poder afirmar cobertura de todo arquivo corrompido.
+  A configuracao de um build Web limpo desta worktree foi iniciada, mas nao terminou dentro da janela; nenhum build
+  em `D:/AnastacioEngine-claude-rna/build-web` foi alterado. A compilacao/runtime desta correcao fica pendente.
+- **Sondas M3 novas:** `criar_m3_bloom_resize.py`/`m3_bloom_resize.py` geram uma cena que chama
+  `changeBloomValues` e `render.setWindowSize(320,240)` e `(960,540)`; `criar_m3_dynamic_resolution_no_timer.py`/
+  `m3_dynamic_resolution_no_timer.py` geram a cena com escala dinamica 50--100% por 180 frames. Ambas foram
+  empacotadas com `package-web.py --runtime-dir D:/AnastacioEngine-claude-rna/build-web/bin` somente em leitura,
+  servidas em portas 8797/8798 e executadas por `verify-package.cjs` no Edge headless isolado (CDP 9347/9348).
+  Resize terminou com `RESULTADO OK`, sem abort/excecao; a sonda de escala emitiu uma vez
+  `dynamic resolution needs a GPU timer query ... render scale is not adjusted`, confirmando o caminho sem subida.
+  O runtime fornecido ainda nao tinha o trace `offScreenSize`, portanto nao houve medicao numerica dos sete
+  offscreens nem afirmacao de `glError=0`; a instrumentacao reservada em `RAS_2DFilter.cpp` continua necessaria.
+
+## 2026-09-20 - Web: M3, correcoes de base dos filtros 2D (indice, resize do bloom, timer de GPU)
+
+- **Colisao de indice**: `reservedPassIndex` era 17 e `FILTERPASS_LENSFLARE` tambem, entao o filtro customizado de
+  indice 0 caia no slot do Lens Flare. Agora `reservedPassIndex = FILTERPASS_LENSFLARE + 1`. Teste no runtime Web
+  (`m3_filtros.py` + `criar_m3.py`, Edge isolado, Lens Flare ligado): antes (`build-web-release`, anterior ao fix)
+  `addFilter(0)` falhava com "found existing filter in index (0)", `removeFilter(-1)` era aceito e
+  `removeFilter(0)` apagava o Lens Flare; depois (`build-web`) os quatro checks passam. `removeFilter` com indice
+  negativo agora levanta `ValueError` (o `unsigned` dava wrap para 16, o filtro Clouds).
+- **Resize do bloom**: os 7 offscreens do bloom eram criados uma vez com o tamanho do canvas / `lod`. Agora usam a
+  flag interna `RAS_CANVAS_DIVISOR` (`RAS_2DFilterOffScreen::Update` recalcula e recria), e um callback
+  (`KX_2DFilterManager::RefreshBloomTextures`) reaplica os bind codes nos filtros que amostram essas texturas
+  (`KX_2DFilter::UpdateTextureBindCode`). **Verificado em runtime Web** (`claude_m3_resize.py`/`claude_m3_criar.py`/
+  `claude_m3_resize.cjs`, Edge headless isolado, debug `RAS_2DFILTER_DEBUG` com o novo campo `offScreenSize`): bloom ligado
+  via `changeBloomValues` e `render.setWindowSize` 1280x720 -> 640x360 -> 1024x600 -> 400x300 -> 960x540; os offscreens do
+  bloom seguem canvas/2, /4 e /8 em cada tamanho (ex. 1024x600 -> 512x300, 256x150, 128x75) e `glError=0x0` em todas as
+  ~860 linhas de debug. Igual em `build-web` e `build-web-release`. Nao comparado com o build anterior ao fix (nao se sabe
+  se o bug antigo era reproduzivel neste cenario).
+- **Timer de GPU**: na Web o query `TIME` nao tem objeto GL, `Available()` dava true e o resultado era 0, o que subia
+  a resolucao dinamica ate o maximo. `RAS_Query::IsSupported()` novo; `UpdateDynamicResolution` nao ajusta a escala
+  sem timer (avisa uma vez) e descarta amostras <= 0. Testado no mesmo pacote (resolucao dinamica ligada, alvo 60 fps, 50-100%): o aviso "dynamic resolution needs a GPU timer"
+  sai uma unica vez e os offscreens ficam no tamanho cheio. Limite: a escala nasce em 100% (o maximo), entao o defeito antigo
+  (subir a escala com resultado 0) nao e observavel neste cenario; o teste confirma o caminho novo, nao a regressao.
+- Builds: nativo (143/143) e `build-web` (139/139) com codigo 0. `build-web-release` reconstruido depois (163/163, codigo 0) e o teste de resize repetido nele com o mesmo resultado.
+- **Nao feito**: selecao do ultimo filtro/blit final (o fluxo ja esta correto, so custa um blit; e otimizacao para o M4),
+  medicoes em desktop e celular fisico, tabela de p50/p95 e decisao sobre o M4.
+
+## 2026-09-20 - Web: M2, DNA `unsigned char` e checagem de range da RNA reativada no Emscripten
+
+- Cinco campos DNA passam de `char` para `unsigned char` (`ImageUser.fie_ima`, `Material.seed1`/`seed2`,
+  `ToolSettings.skgen_subdivision_number`, `ThemeSpace.handle_vertex_size`), e `USE_RNA_RANGE_CHECK` volta a valer
+  no Emscripten (`rna_internal.h`). Commits `9d008486` e `dfae0be0`. O hardmax 200/255 da RNA contradizia o tipo `char` do campo (com sinal, valores acima de 127 não cabem);
+  o comportamento anterior não foi reproduzido em runtime.
+- **SDNA preservado**: o `makesdna` descarta `unsigned`, então o `dna.c` e os offsets gerados são idênticos
+  antes (`ed6c1f8f`) e depois. Nativo: `dna.c` 418262 B e offsets 23236 B; wasm32: 414162 B e 22585 B. Os dois
+  "depois" batem com o `dna.c` dos diretórios de build.
+- **Checagem ativa no Web**: compilando `rna_image.c`/`rna_material.c`/`rna_scene.c`/`rna_userdef.c` com os
+  headers anteriores ao M2 a checagem dá 7 erros (imagem 1, material 2, cena 1, tema 3 = as 7 propriedades do
+  inventário); com o HEAD, 0 erros. O compilador nativo MSVC não define `__STDC_VERSION__ >= 201112L`, então lá a
+  checagem nunca rodou nem roda; a cobertura dela é só do Emscripten. Builds completos após os commits: nativo,
+  `build-web` e `build-web-release` terminaram com código 0.
+- **Roundtrip nativo** (`RangeEngine.exe -b --python`, salvar `.range` e reabrir): `halo.seed` e `halo.flare_seed`
+  em 0/1/127/128/255, `fields_per_frame` em 1/2/127/128/200, `etch_subdivision_number` em 1/2/127/128/200/255,
+  todos voltaram iguais. `handle_vertex_size` em 0/128/255 nos temas Graph/Image/Clip sobreviveu a salvar e recarregar
+  o `userpref.blend`; os temas padrão trazem 5. `userpref.blend` reais do usuário (2.79 do RangeEngine, 2.67 e 2.68)
+  carregam sem erro.
+- **Animação**: com o material ligado a um objeto, `halo.seed` 200->255 e `flare_seed` 3->250 animam corretamente,
+  também depois de salvar e reabrir. Material sem objeto não é reavaliado após o load, igual a `size` e `hardness`
+  (não é do M2).
+- **Fora da faixa via RNA**: o setter faz clamp e não levanta erro. `seed` 256 vira 255 e -1 vira 0;
+  `fields_per_frame` 0 vira 1 e 201 vira 200; `etch_subdivision_number` 0 vira 1 e 256 vira 255;
+  `handle_vertex_size` 256 vira 255 e -1 vira 0.
+- Treze `.blend`/`.range` do repositório carregam sem erro e com seeds, `fields_per_frame` e subdivisão dentro da
+  faixa. Exceção: `preview.blend` traz `etch_subdivision_number` 0, valor já gravado no arquivo (byte 0 é igual
+  em `char` e `unsigned char`), fora da faixa 1-255 da RNA.
+- **Consumidores revisados**: nenhum depende do sinal. `resources.c::UI_ThemeGetColorPtr` já usava
+  `unsigned char *`, e o `hashvectf + ma->seed2` de `rendercore.c` deixa de indexar negativo para seed > 127.
+  O cast `(char)tex->fie_ima` em `versioning_legacy.c:2471` é inofensivo (o legado grava 2) e foi mantido.
+- **Não coberto**: um build nativo com a checagem ativa não existe (o MSVC não a executa); os `.blend` legados só
+  provam carregamento e valores, não o comportamento anterior ao M2 com valores acima de 127. O
+  `build-web-release` tem 49 passos pendentes por `GPU_shader.h` (alterado no M1, não no M2), então deve ser
+  reconstruído antes de qualquer publicação.
+
+## 2026-09-20 - Web/R1: ABI dos callbacks Python de constraints
+
+- Inventário executado de `physicsconstraints_methods`: 31 registros (30 `METH_VARARGS`, um
+  `METH_VARARGS | METH_KEYWORDS`, nenhum `METH_NOARGS`). Vinte e oito callbacks `METH_VARARGS`
+  tinham a assinatura de três parâmetros; `gPyCreateVehicle` e `gPyExportBulletFile` já tinham
+  dois, e `gPyCreateConstraint` já estava correto com três e `METH_KEYWORDS`.
+- Em `KX_PyConstraintBinding.cpp`, removido o parâmetro `kwds` das 28 funções `METH_VARARGS`.
+  As flags não mudaram: setters continuam posicionais e `createConstraint` conserva a API de
+  keywords existente.
+- Novo `tools/tests/constraint_abi_test.py`: guarda estática das 31 assinaturas/flags e cena
+  Python que cobre argumentos válidos e inválidos dos setters, rejeição de keyword em
+  `setGravity` e aridades inválidas das demais APIs expostas.
+- Antes da correção, a cena passou no `RangeRuntime` nativo em Windows x64: a incompatibilidade
+  ABI não se reproduziu nessa plataforma. Após a correção, o mesmo teste passou nativamente.
+- Executados com sucesso: `cmake --build --preset web-runtime` (1817 etapas),
+  `package-web.py` para a cena de regressão e execução Web em Chrome headless/WebGL2 via CDP;
+  o log da cena correta registrou `CONSTRAINT_ABI_TEST: PASS`. O pacote usou runtime de
+  depuração (`SAFE_HEAP`/`ASSERTIONS`), somente para validação.
+
+## 2026-09-20 - Web: testes de runtime do M1 (diagnósticos Python e shader)
+
+- Três jogos com falha injetada foram empacotados com `package-web.py --runtime-dir build-web/bin`, servidos e
+  executados no Edge via `verify-package.cjs` com `PREFLIGHT_OUT`. `check_preflight` emitiu apenas o achado
+  esperado em cada um: exceção Python -> `WEB-PY-009`, import inexistente -> `WEB-PY-001`, GLSL inválido em
+  Filter2D (`mode = CUSTOMFILTER`) -> `WEB-GFX-002`, todos ERROR.
+- Segunda rodada (mesmo método): `SyntaxError` no controller -> `WEB-PY-009`; mensagem com aspas, quebra de linha,
+  Unicode (acentos e japonês) e 3000 caracteres chegou íntegra ao relatório (3028 caracteres, sem truncar);
+  o mesmo erro em 3 objetos gerou 3 eventos distintos.
+- Terceira rodada: exceção em `start()` de componente Python (`KX_PythonComponent`) e em callback `pre_draw`
+  geraram evento `python` com `exception_type` RuntimeError e traceback -> `WEB-PY-009` ERROR (o callback repete
+  o evento a cada frame).
+- Importação de relatório por arquivo (`load_preflight`, sem bpy): versão 1 e 2 são lidas (`WEB-PY-009` com
+  `python_errors`); versão 3, ausente ou não numérica degrada para um único `WEB-DEPLOY-002`. Os 30 testes
+  `test_preflight*` passam.
+- Importação pela UI do editor (roteiro `projects-teste/teste-editor-web/ROTEIRO-M1.md`, passos A.1 a A.6, feitos pelo
+  usuário): versão 1 e 2 mostram `WEB-PY-009`; versão 3 mostra um único `WEB-DEPLOY-002`; importar `pf-ok.json`
+  limpa os resultados do pré-voo anterior. Resultado importado não tem **Locate** (o `origin` é só texto).
+  Um build antigo (só versão 1) rejeitava a versão 2: abrir o `RangeEngine.exe` da worktree.
+- Painel Web: mensagem e traceback com quebras de linha apareciam como quadrados; agora uma linha por label
+  (`properties_web.py`). Ainda não conferido visualmente.
+- Execução sem pré-voo testada pelo usuário no navegador: export com "Preflight after export" desligado, página
+  aberta sem `?preflight=1`, jogo renderizou e o console mostrou só avisos habituais (emulação GL, ScriptProcessorNode),
+  sem erro. Achado: nome de arquivo com espaço (`melhores graficos .range`) é recusado no export
+  ("nome do arquivo do jogo invalido para o FS virtual"); o editor só reporta isso na falha do empacotador.
+- Bug achado pelo usuário: component em `scripts/` (módulo `scripts.cinematic_lighting_component`) virava
+  WEB-PKG-003 "Módulo não foi encontrado: scripts". O coletor tratava `comp.module` como "modulo.funcao" e cortava o
+  último segmento; corrigido com `is_module=True` em `collect_bpy.py`, com teste em `test_collect.py`. Ainda não
+  reconferido no editor.
+- Falha de vertex de `BL_Shader` testada em runtime (`criar_m1c.py` + `shader_quebrado.py`, headless): o log chega ao relatório e vira `WEB-GFX-002`, mas pelo fallback de texto do console: `stage` "?" e `material` vazio, porque o `GPUShader: compile error:` não passa por `Module.onDiagnostic`. Lacuna aberta: emitir diagnóstico estruturado (estágio e material) no caminho `GPUShader`/`BL_Shader`. Link e materiais de nós não testados.
+- O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
+
+## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
+
+- M0 no commit `1c9d1562`: `make-runtime-manifest.py` declara o alias `bge` e `aud` conforme
+  `WITH_AUDASPACE`; o pré-voo requer WebGL 2 e torna abort, falha e inicialização incompleta estados
+  explícitos. `package-web.py` deixa de ocultar erro de leitura do manifesto. A suite Web Profile passou com
+  83 testes; falta exportar e executar pacote Web real.
+- Checkpoint parcial de M1 no commit `8251b0dc`: `gpu_shader.c` chama `Module.onDiagnostic` em falha de
+  compilação/link WebGL, com operação, estágio, origem e log. `GPU_generate_pass` preserva o nome de
+  material/world para essa origem. O coletor do pacote exporta relatório v2 e usa a heurística antiga só como
+  fallback; o leitor aceita v1 e v2. Testes de `test_preflight` (11), `py_compile` e `git diff --check` passaram.
+- Não concluído: captura segura de exceções Python, shaders especiais/filtros e validação em navegador.
+  A tentativa de build não vale como validação porque `build-android` da worktree apontava para a árvore
+  principal; o próximo agente deve configurar build Web limpo da própria worktree.
 
 ## 2026-09-20 - Web: gamepad — sensores de joystick avaliam pelo estado vivo do SDL
 

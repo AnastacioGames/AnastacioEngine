@@ -34,7 +34,7 @@ public:
 	explicit WAVReader(const std::vector<uint8_t> &data)
 	{
 		if (data.size() < 12 || memcmp(data.data(), "RIFF", 4) != 0 || memcmp(data.data() + 8, "WAVE", 4) != 0) {
-			AUD_THROW(FileException, "Not a RIFF/WAVE file.");
+			return;  // Not a RIFF/WAVE file (sem excecao: o runtime Web nao tem unwinding)
 		}
 
 		uint16_t format = 0, channels = 0, bits = 0;
@@ -70,16 +70,16 @@ public:
 		}
 
 		if (!have_fmt || !pcm) {
-			AUD_THROW(FileException, "WAV file without fmt or data chunk.");
+			return;  // WAV file without fmt or data chunk (sem excecao: o runtime Web nao tem unwinding)
 		}
 		if (channels < 1 || channels > 8 || rate == 0) {
-			AUD_THROW(FileException, "Unsupported WAV channel count or sample rate.");
+			return;  // Unsupported WAV channel count or sample rate (sem excecao: o runtime Web nao tem unwinding)
 		}
 		const bool is_float = (format == 3);
 		if (!((format == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) ||
 		      (is_float && (bits == 32 || bits == 64))))
 		{
-			AUD_THROW(FileException, "Unsupported WAV sample format (only PCM 8/16/24/32 and float 32/64).");
+			return;  // Unsupported WAV sample format (only PCM 8/16/24/32 and float 32/64) (sem excecao: o runtime Web nao tem unwinding)
 		}
 
 		const size_t bytes = bits / 8;
@@ -120,7 +120,11 @@ public:
 
 		m_specs.rate = rate;
 		m_specs.channels = Channels(channels);
+		m_ok = true;
 	}
+
+	/** false quando o cabecalho e invalido; o construtor nao lanca (Wasm sem excecoes). */
+	bool ok() const { return m_ok; }
 
 	virtual bool isSeekable() const { return true; }
 
@@ -152,6 +156,7 @@ public:
 	}
 
 private:
+	bool m_ok = false;
 	std::vector<float> m_samples;
 	int m_length = 0;
 	int m_position = 0;
@@ -173,7 +178,8 @@ void WAVFile::registerPlugin()
 static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
 {
 	if (data.size() >= 12 && memcmp(data.data(), "RIFF", 4) == 0 && memcmp(data.data() + 8, "WAVE", 4) == 0) {
-		return std::shared_ptr<IReader>(new WAVReader(data));
+		std::shared_ptr<WAVReader> wav(new WAVReader(data));
+		return wav->ok() ? std::shared_ptr<IReader>(wav) : std::shared_ptr<IReader>();
 	}
 	std::shared_ptr<IReader> decoded;
 	if (data.size() >= 4 && memcmp(data.data(), "OggS", 4) == 0) {
@@ -183,7 +189,9 @@ static std::shared_ptr<IReader> makeReader(std::vector<uint8_t> data)
 		decoded = createMP3Reader(std::move(data));
 	}
 	if (!decoded) {
-		AUD_THROW(FileException, "Not a RIFF/WAVE, Ogg Vorbis or MP3 file.");
+		/* The browser build has no C++ exception unwinder.  Report an
+		 * unsupported codec as a failed reader instead of aborting Wasm. */
+		return nullptr;
 	}
 	return decoded;
 }
@@ -192,7 +200,7 @@ std::shared_ptr<IReader> WAVFile::createReader(std::string filename)
 {
 	std::ifstream in(filename, std::ios::binary);
 	if (!in) {
-		AUD_THROW(FileException, "The WAV file couldn't be opened.");
+		return nullptr;
 	}
 	std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	return makeReader(std::move(data));

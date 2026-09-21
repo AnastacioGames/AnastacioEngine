@@ -128,6 +128,7 @@ RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
 	m_uniformInitialized(false),
 	m_mipmap(data.mipmap)
 {
+	m_diagnosticName = "2d-filter";
 	for (unsigned int i = 0; i < TEXTURE_OFFSETS_SIZE; i++) {
 		m_textureOffsets[i] = 0;
 	}
@@ -286,9 +287,10 @@ RAS_OffScreen *RAS_2DFilter::Render(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, 
 		    frag == datatoc_RAS_LightScaterring_Image2DFilter_glsl ? "LIGHTSCATTER" :
 		    "OTHER(custom/buffer)";
 		printf("[web-filter] name=%s singleColorOutput=%d offScreen=%d framebuffer=%d drawBufferCount=%d "
-		       "glError=0x%x\n",
+		       "offScreenSize=%ux%u glError=0x%x\n",
 		       name, (int)m_webSingleColorOutput, m_offScreen ? 1 : 0, framebuffer,
-		       drawBufferCount, (unsigned int)err);
+		       drawBufferCount, m_offScreen ? m_offScreen->GetWidth() : 0u,
+		       m_offScreen ? m_offScreen->GetHeight() : 0u, (unsigned int)err);
 	}
 #endif
 

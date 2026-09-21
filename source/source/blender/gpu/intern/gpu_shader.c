@@ -53,6 +53,20 @@ EM_JS(void, gpu_shader_source_webgl,
         }
         WebGL2RenderingContext.prototype.shaderSource.call(GLctx, GL.shaders[shader], source);
       });
+
+/* The launcher installs Module.onDiagnostic only while collecting a pre-flight report.
+ * Keep this bridge best-effort: an application callback must never change shader failure
+ * handling or hide the normal stderr diagnostic. */
+EM_JS(void, gpu_shader_web_diagnostic,
+      (const char *operation, const char *stage, const char *origin, const char *log),
+      {
+        if (typeof Module === 'undefined' || typeof Module.onDiagnostic !== 'function') return;
+        try {
+          Module.onDiagnostic({version: 1, category: 'shader', severity: 'error',
+                               operation: UTF8ToString(operation), stage: UTF8ToString(stage),
+                               origin: UTF8ToString(origin), log: UTF8ToString(log)});
+        } catch (e) {}
+      });
 #endif
 
 /* TODO(sergey): Find better default values for this constants. */
@@ -434,15 +448,16 @@ static void gpu_dump_shaders(const char **code, const int num_shaders, const cha
 	printf("Shader file written to disk: %s\n", shader_path);
 }
 
-GPUShader *GPU_shader_create_ex(const char *vertexcode,
-                                const char *fragcode,
-                                const char *geocode,
-                                const char *libcode,
-                                const char *defines,
-                                int input,
-                                int output,
-                                int number,
-                                const int flags)
+static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
+                                            const char *fragcode,
+                                            const char *geocode,
+                                            const char *libcode,
+                                            const char *defines,
+                                            int input,
+                                            int output,
+                                            int number,
+                                            const int flags,
+                                            const char *diagnostic_name)
 {
 #ifdef WITH_OPENSUBDIV
 	/* TODO(sergey): used to add #version 150 to the geometry shader.
@@ -520,6 +535,9 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 
 		if (!status) {
 			glGetShaderInfoLog(shader->vertex, sizeof(log), &length, log);
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+			gpu_shader_web_diagnostic("compile", "vertex", diagnostic_name ? diagnostic_name : "", log);
+#endif
 			shader_print_errors("compile", log, source, num_source);
 
 			GPU_shader_free(shader);
@@ -562,6 +580,9 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 
 		if (!status) {
 			glGetShaderInfoLog(shader->fragment, sizeof(log), &length, log);
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+			gpu_shader_web_diagnostic("compile", "fragment", diagnostic_name ? diagnostic_name : "", log);
+#endif
 			shader_print_errors("compile", log, source, num_source);
 
 			GPU_shader_free(shader);
@@ -591,6 +612,9 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 
 		if (!status) {
 			glGetShaderInfoLog(shader->geometry, sizeof(log), &length, log);
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+			gpu_shader_web_diagnostic("compile", "geometry", diagnostic_name ? diagnostic_name : "", log);
+#endif
 			shader_print_errors("compile", log, source, num_source);
 
 			GPU_shader_free(shader);
@@ -617,12 +641,16 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
 	if (!status) {
 		glGetProgramInfoLog(shader->program, sizeof(log), &length, log);
+		/* Emit before the legacy stderr text so the browser collector can suppress its
+		 * heuristic duplicate from this same failure. */
+#if defined(__EMSCRIPTEN__) && defined(WITH_GL_PROFILE_CORE)
+		gpu_shader_web_diagnostic("link", "", diagnostic_name ? diagnostic_name : "", log);
+#endif
 		/* print attached shaders in pipeline order */
 		if (vertexcode) shader_print_errors("linking", log, &vertexcode, 1);
 		if (geocode) shader_print_errors("linking", log, &geocode, 1);
 		if (libcode) shader_print_errors("linking", log, &libcode, 1);
 		if (fragcode) shader_print_errors("linking", log, &fragcode, 1);
-
 		GPU_shader_free(shader);
 		return NULL;
 	}
@@ -641,6 +669,35 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 #endif
 
 	return shader;
+}
+
+GPUShader *GPU_shader_create_ex(const char *vertexcode,
+                                const char *fragcode,
+                                const char *geocode,
+                                const char *libcode,
+                                const char *defines,
+                                int input,
+                                int output,
+                                int number,
+                                const int flags)
+{
+	return gpu_shader_create_ex_impl(vertexcode, fragcode, geocode, libcode, defines,
+	                                 input, output, number, flags, NULL);
+}
+
+GPUShader *GPU_shader_create_ex_named(const char *vertexcode,
+                                      const char *fragcode,
+                                      const char *geocode,
+                                      const char *libcode,
+                                      const char *defines,
+                                      int input,
+                                      int output,
+                                      int number,
+                                      const int flags,
+                                      const char *name)
+{
+	return gpu_shader_create_ex_impl(vertexcode, fragcode, geocode, libcode, defines,
+	                                 input, output, number, flags, name);
 }
 
 char *GPU_shader_validate(GPUShader *shader)

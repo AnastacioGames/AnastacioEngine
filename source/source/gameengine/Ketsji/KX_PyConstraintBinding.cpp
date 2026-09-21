@@ -245,8 +245,7 @@ PyDoc_STRVAR(gPyGetAppliedImpulse__doc__,
 
 
 static PyObject *gPySetGravity(PyObject *self,
-                               PyObject *args,
-                               PyObject *kwds)
+                               PyObject *args)
 {
 	float x, y, z;
 	if (PyArg_ParseTuple(args, "fff", &x, &y, &z)) {
@@ -262,8 +261,7 @@ static PyObject *gPySetGravity(PyObject *self,
 }
 
 static PyObject *gPySetDebugMode(PyObject *self,
-                                 PyObject *args,
-                                 PyObject *kwds)
+                                 PyObject *args)
 {
 	int mode;
 	if (PyArg_ParseTuple(args, "i", &mode)) {
@@ -283,8 +281,7 @@ static PyObject *gPySetDebugMode(PyObject *self,
 
 
 static PyObject *gPySetNumTimeSubSteps(PyObject *self,
-                                       PyObject *args,
-                                       PyObject *kwds)
+                                       PyObject *args)
 {
 	int substep;
 	if (PyArg_ParseTuple(args, "i", &substep)) {
@@ -300,8 +297,7 @@ static PyObject *gPySetNumTimeSubSteps(PyObject *self,
 
 
 static PyObject *gPySetNumIterations(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
+                                     PyObject *args)
 {
 	int iter;
 	if (PyArg_ParseTuple(args, "i", &iter)) {
@@ -320,8 +316,7 @@ static PyObject *gPySetNumIterations(PyObject *self,
 
 
 static PyObject *gPySetErp(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+                                    PyObject *args)
 {
 	float erp;
 	if (PyArg_ParseTuple(args, "f", &erp)) {
@@ -336,8 +331,7 @@ static PyObject *gPySetErp(PyObject *self,
 }
 
 static PyObject *gPySetErp2(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+                                    PyObject *args)
 {
 	float erp2;
 	if (PyArg_ParseTuple(args, "f", &erp2)) {
@@ -352,8 +346,7 @@ static PyObject *gPySetErp2(PyObject *self,
 }
 
 static PyObject *gPySetGlobalCfm(PyObject *self,
-                                 PyObject *args,
-                                 PyObject *kwds)
+                                 PyObject *args)
 {
 	float globalCfm;
 	if (PyArg_ParseTuple(args, "f", &globalCfm)) {
@@ -368,8 +361,7 @@ static PyObject *gPySetGlobalCfm(PyObject *self,
 }
 
 static PyObject *gPySetSplitImpulse(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+                                    PyObject *args)
 {
 	int splitImpulse;
 	if (PyArg_ParseTuple(args, "i", &splitImpulse)) {
@@ -384,8 +376,7 @@ static PyObject *gPySetSplitImpulse(PyObject *self,
 }
 
 static PyObject *gPySetSplitImpulsePenetrationThreshold(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+                                    PyObject *args)
 {
 	float splitImpulsePenetrationThreshold;
 	if (PyArg_ParseTuple(args, "f", &splitImpulsePenetrationThreshold)) {
@@ -400,8 +391,7 @@ static PyObject *gPySetSplitImpulsePenetrationThreshold(PyObject *self,
 }
 
 static PyObject *gPySetSplitImpulseTurnErp(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+                                    PyObject *args)
 {
 	float splitImpulseTurnErp;
 	if (PyArg_ParseTuple(args, "f", &splitImpulseTurnErp)) {
@@ -416,8 +406,7 @@ static PyObject *gPySetSplitImpulseTurnErp(PyObject *self,
 }
 
 static PyObject *gPySetLinearSlop(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
+                                  PyObject *args)
 {
 	float slop;
 	if (PyArg_ParseTuple(args, "f", &slop)) {
@@ -433,8 +422,7 @@ static PyObject *gPySetLinearSlop(PyObject *self,
 
 
 static PyObject *gPySetWarmstartingFactor(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
+                                          PyObject *args)
 {
 	float factor;
 	if (PyArg_ParseTuple(args, "f", &factor)) {
@@ -449,8 +437,7 @@ static PyObject *gPySetWarmstartingFactor(PyObject *self,
 }
 
 static PyObject *gPySetMaxGyroscopicForce(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
+                                          PyObject *args)
 {
 	float maxGyroscopicForce;
 	if (PyArg_ParseTuple(args, "f", &maxGyroscopicForce)) {
@@ -469,8 +456,7 @@ static PyObject *gPySetMaxGyroscopicForce(PyObject *self,
 
 
 static PyObject *gPySetDeactivationTime(PyObject *self,
-                                        PyObject *args,
-                                        PyObject *kwds)
+                                        PyObject *args)
 {
 	float deactive_time;
 	if (PyArg_ParseTuple(args, "f", &deactive_time)) {
@@ -486,8 +472,7 @@ static PyObject *gPySetDeactivationTime(PyObject *self,
 
 
 static PyObject *gPySetDeactivationLinearTreshold(PyObject *self,
-                                                  PyObject *args,
-                                                  PyObject *kwds)
+                                                  PyObject *args)
 {
 	float linearDeactivationTreshold;
 	if (PyArg_ParseTuple(args, "f", &linearDeactivationTreshold)) {
@@ -503,8 +488,7 @@ static PyObject *gPySetDeactivationLinearTreshold(PyObject *self,
 
 
 static PyObject *gPySetDeactivationAngularTreshold(PyObject *self,
-                                                   PyObject *args,
-                                                   PyObject *kwds)
+                                                   PyObject *args)
 {
 	float angularDeactivationTreshold;
 	if (PyArg_ParseTuple(args, "f", &angularDeactivationTreshold)) {
@@ -519,8 +503,7 @@ static PyObject *gPySetDeactivationAngularTreshold(PyObject *self,
 }
 
 static PyObject *gPySetContactBreakingTreshold(PyObject *self,
-                                               PyObject *args,
-                                               PyObject *kwds)
+                                               PyObject *args)
 {
 	float contactBreakingTreshold;
 	if (PyArg_ParseTuple(args, "f", &contactBreakingTreshold)) {
@@ -536,8 +519,7 @@ static PyObject *gPySetContactBreakingTreshold(PyObject *self,
 
 
 static PyObject *gPySetCcdMode(PyObject *self,
-                               PyObject *args,
-                               PyObject *kwds)
+                               PyObject *args)
 {
 	float ccdMode;
 	if (PyArg_ParseTuple(args, "f", &ccdMode)) {
@@ -552,8 +534,7 @@ static PyObject *gPySetCcdMode(PyObject *self,
 }
 
 static PyObject *gPySetSorConstant(PyObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
+                                   PyObject *args)
 {
 	float sor;
 	if (PyArg_ParseTuple(args, "f", &sor)) {
@@ -568,8 +549,7 @@ static PyObject *gPySetSorConstant(PyObject *self,
 }
 
 static PyObject *gPySetSolverTau(PyObject *self,
-                                 PyObject *args,
-                                 PyObject *kwds)
+                                 PyObject *args)
 {
 	float tau;
 	if (PyArg_ParseTuple(args, "f", &tau)) {
@@ -585,8 +565,7 @@ static PyObject *gPySetSolverTau(PyObject *self,
 
 
 static PyObject *gPySetSolverDamping(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
+                                     PyObject *args)
 {
 	float damping;
 	if (PyArg_ParseTuple(args, "f", &damping)) {
@@ -601,8 +580,7 @@ static PyObject *gPySetSolverDamping(PyObject *self,
 }
 
 static PyObject *gPySetLinearAirDamping(PyObject *self,
-                                        PyObject *args,
-                                        PyObject *kwds)
+                                        PyObject *args)
 {
 	float damping;
 	if (PyArg_ParseTuple(args, "f", &damping)) {
@@ -618,8 +596,7 @@ static PyObject *gPySetLinearAirDamping(PyObject *self,
 
 
 static PyObject *gPySetUseEpa(PyObject *self,
-                              PyObject *args,
-                              PyObject *kwds)
+                              PyObject *args)
 {
 	int epa;
 	if (PyArg_ParseTuple(args, "i", &epa)) {
@@ -633,8 +610,7 @@ static PyObject *gPySetUseEpa(PyObject *self,
 	Py_RETURN_NONE;
 }
 static PyObject *gPySetSolverType(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
+                                  PyObject *args)
 {
 	int solverType;
 	if (PyArg_ParseTuple(args, "i", &solverType)) {
@@ -651,8 +627,7 @@ static PyObject *gPySetSolverType(PyObject *self,
 
 
 static PyObject *gPyGetVehicleConstraint(PyObject *self,
-                                         PyObject *args,
-                                         PyObject *kwds)
+                                         PyObject *args)
 {
 #if defined(_WIN64)
 	__int64 constraintid;
@@ -680,8 +655,7 @@ static PyObject *gPyGetVehicleConstraint(PyObject *self,
 }
 
 static PyObject *gPyGetCharacter(PyObject *self,
-                                 PyObject *args,
-                                 PyObject *kwds)
+                                 PyObject *args)
 {
 	PyObject *pyob;
 	KX_GameObject *ob;
@@ -801,8 +775,7 @@ static PyObject *gPyCreateVehicle(PyObject *self, PyObject *args)
 }
 
 static PyObject *gPyGetAppliedImpulse(PyObject *self,
-                                      PyObject *args,
-                                      PyObject *kwds)
+                                      PyObject *args)
 {
 	float appliedImpulse = 0.f;
 
@@ -827,8 +800,7 @@ static PyObject *gPyGetAppliedImpulse(PyObject *self,
 
 
 static PyObject *gPyRemoveConstraint(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
+                                     PyObject *args)
 {
 #if defined(_WIN64)
 	__int64 constraintid;

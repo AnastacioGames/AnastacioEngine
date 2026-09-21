@@ -33,6 +33,7 @@
  */
 
 #include "SCA_PythonController.h"
+#include "EXP_PythonCallBack.h"
 #include "SCA_LogicManager.h"
 #include "SCA_ISensor.h"
 #include "SCA_IActuator.h"
@@ -226,6 +227,7 @@ void SCA_PythonController::ErrorPrint(const char *error_msg)
 	// can be a bad pointer if GetParent() is nullptr, so better be safe and
 	// flag it as unavailable as well
 	CM_LogicBrickError(this, error_msg);
+	EXP_ReportPythonDiagnostic("controller", GetParent() ? GetName().c_str() : nullptr);
 	PyErr_Print();
 
 	/* Added in 2.48a, the last_traceback can reference Objects for example, increasing

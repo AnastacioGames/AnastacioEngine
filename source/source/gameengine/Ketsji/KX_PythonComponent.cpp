@@ -23,6 +23,7 @@
 #ifdef WITH_PYTHON
 
 #include "KX_PythonComponent.h"
+#include "EXP_PythonCallBack.h"
 #include "KX_GameObject.h"
 
 #include "CM_Message.h"
@@ -107,6 +108,7 @@ void KX_PythonComponent::Awake()
 
 	if (PyErr_Occurred()) {
 		CM_Error("PythonComponent '" << m_name << "' Awake() the function was not initialized correctly.");
+		EXP_ReportPythonDiagnostic("component.awake", m_name.c_str());
 		PyErr_Print();
 		m_failed = true;
 	}
@@ -123,6 +125,7 @@ void KX_PythonComponent::Start()
 
 	if (PyErr_Occurred()) {
 		CM_Error("PythonComponent '" << m_name << "' Start() the function was not initialized correctly.");
+		EXP_ReportPythonDiagnostic("component.start", m_name.c_str());
 		PyErr_Print();
 		m_failed = true;
 	}
@@ -154,6 +157,7 @@ void KX_PythonComponent::Update()
 	PyObject *pycomp = GetProxy();
 	if (!PyObject_CallMethod(pycomp, "update", "")) {
 		CM_Error("PythonComponent '" << m_name << "' Update() the function was not initialized correctly.");
+		EXP_ReportPythonDiagnostic("component.update", m_name.c_str());
 		PyErr_Print();
 		m_failed = true;
 	}
@@ -168,6 +172,7 @@ void KX_PythonComponent::Dispose()
 	if (item) {
 		Py_XDECREF(item);
 		if (!PyObject_CallMethod(pycomp, "dispose", "")) {
+			EXP_ReportPythonDiagnostic("component.dispose", m_name.c_str());
 			PyErr_Print();
 		}
 	}

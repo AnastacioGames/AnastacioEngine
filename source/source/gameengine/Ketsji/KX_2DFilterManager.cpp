@@ -174,6 +174,34 @@ void KX_2DFilterManager::EnsureBloomFilters(BuildInFilters filters)
 	bloomI->SetTexture(1, bloomV1->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomI1");
 	bloomI->SetTexture(2, bloomV2->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomI2");
 	bloomI->SetTexture(3, bloomB0->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomB");
+
+	for (int i = 0; i < 7; ++i) {
+		RAS_2DFilterOffScreen *offScreen = GetFilterPass(FILTERPASS_BLOOM + i, true)->GetOffScreen();
+		offScreen->SetRebuildCallback([this]() { RefreshBloomTextures(); });
+	}
+}
+
+void KX_2DFilterManager::RefreshBloomTextures()
+{
+	KX_2DFilter *pass[8];
+	for (int i = 0; i < 8; ++i) {
+		pass[i] = static_cast<KX_2DFilter *>(GetFilterPass(FILTERPASS_BLOOM + i, true));
+		if (!pass[i] || (i < 7 && !pass[i]->GetOffScreen())) {
+			return;
+		}
+	}
+
+	// Same links as EnsureBloomFilters: {filter, texture unit, source off screen}. A missing texture has no bind code.
+	const struct { int filter; int unit; int source; } links[] = {
+		{1, 0, 0}, {2, 0, 1}, {3, 0, 0}, {4, 0, 3}, {5, 0, 0}, {6, 0, 5},
+		{7, 0, 2}, {7, 1, 4}, {7, 2, 6}, {7, 3, 0}
+	};
+	for (const auto& link : links) {
+		const int bindCode = pass[link.source]->GetOffScreen()->GetColorBindCode(0);
+		if (bindCode >= 0) {
+			pass[link.filter]->UpdateTextureBindCode(link.unit, bindCode);
+		}
+	}
 }
 
 void KX_2DFilterManager::EnsureSSRFilters(BuildInFilters filters)
@@ -342,8 +370,9 @@ KX_2DFilter *KX_2DFilterManager::BloomPass(BuildInFilters filters, int time, int
 		bloomData.shaderText = datatoc_RAS_Bloom2DFilter_bufV_glsl;
 
 	bloom = static_cast<KX_2DFilter *>(AddFilter(bloomData, true));
-	KX_2DFilterOffScreen *offScreen = new KX_2DFilterOffScreen(1, (RAS_2DFilterOffScreen::Flag)0, (w / lod), (h / lod),
-																   RAS_Rasterizer::HdrType::RAS_HDR_NONE);
+	// The bloom buffers follow the canvas size divided by lod, so resize/fullscreen do not leave them stale.
+	KX_2DFilterOffScreen *offScreen = new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR, (w / lod), (h / lod),
+																   RAS_Rasterizer::HdrType::RAS_HDR_NONE, lod);
 	bloom->SetOffScreen(offScreen);
 
 	return bloom;
@@ -462,6 +491,12 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, removeFilter, " removeFilter(index)")
 	int index = 0;
 
 	if (!PyArg_ParseTuple(args, "i:removeFilter", &index)) {
+		return nullptr;
+	}
+
+	// RemoveFilterPass takes an unsigned index: a negative value would wrap onto a built-in filter.
+	if (index < 0) {
+		PyErr_SetString(PyExc_ValueError, "The index cannot be negative.");
 		return nullptr;
 	}
 

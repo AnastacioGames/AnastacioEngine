@@ -41,6 +41,7 @@ extern "C" {
 #include "MEM_guardedalloc.h"
 
 #include "EXP_PyObjectPlus.h"
+#include "EXP_PythonCallBack.h"
 #include <structmember.h>
 
 #include "FilterBase.h"
@@ -452,6 +453,7 @@ void Image_dealloc(PyImage *self)
 		if (self->m_image->m_exports > 0) {
 			PyErr_SetString(PyExc_SystemError,
 			                "deallocated Image object has exported buffers");
+			EXP_ReportPythonDiagnostic("videotexture.dealloc", nullptr);
 			PyErr_Print();
 		}
 		// if release requires deleting of object, do it

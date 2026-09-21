@@ -222,15 +222,20 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         for index, finding in enumerate(report.findings[:_MAX_ROWS_SHOWN]):
             box = layout.box()
             row = box.row()
-            row.label(text="%s  %s" % (finding.rule_id, finding.message),
-                      icon=_SEVERITY_ICONS[finding.severity])
+            # Mensagens do runtime trazem quebras de linha; o label as desenharia como quadrados.
+            lines = "%s  %s" % (finding.rule_id, finding.message)
+            head, *rest = lines.splitlines() or [""]
+            row.label(text=head, icon=_SEVERITY_ICONS[finding.severity])
             loc = finding.location
             if loc.get("object") or loc.get("scene"):
                 row.operator("scene.range_web_locate", text="Locate").index = index
             if loc.get("chain"):
                 box.label(text=loc["chain"])
             if finding.fix:
-                box.label(text=finding.fix)
+                rest += finding.fix.splitlines()
+            for line in rest:
+                if line.strip():
+                    box.label(text=line)
         hidden = len(report.findings) - _MAX_ROWS_SHOWN
         if hidden > 0:
             layout.label(text=_("... and %d more result(s).") % hidden)

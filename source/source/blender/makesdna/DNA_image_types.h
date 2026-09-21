@@ -43,7 +43,8 @@ typedef struct ImageUser {
 	int framenr;				/* movies, sequences: current to display */
 	int frames;					/* total amount of frames to use */
 	int offset, sfra;			/* offset within movie, start frame in global time */
-	char fie_ima, cycl;		/* fields/image in movie, cyclic flag */
+	unsigned char fie_ima;	/* fields/image in movie */
+	char cycl;				/* cyclic flag */
 	char ok;
 
 	char multiview_eye;			/* multiview current eye - for internal use of drawing routines */

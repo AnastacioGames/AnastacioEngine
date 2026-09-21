@@ -98,6 +98,7 @@
 #include "KX_ObstacleSimulation.h"
 #include "KX_PyConstraintBinding.h"
 #include "KX_PythonComponent.h"
+#include "EXP_PythonCallBack.h"
 #include "KX_Scene.h"
 #include "KX_SoftBodyDeformer.h"
 #include "KX_Speaker.h"
@@ -1450,6 +1451,7 @@ static void BL_ConvertComponentsObject(KX_GameObject *gameobj, Object *blenderob
 
 		if (mod == nullptr) {
 			if (PyErr_Occurred()) {
+				EXP_ReportPythonDiagnostic("component.import", pc->module);
 				PyErr_Print();
 			}
 			CM_Error("coulding import the module '" << pc->module << "'");
@@ -1461,6 +1463,7 @@ static void BL_ConvertComponentsObject(KX_GameObject *gameobj, Object *blenderob
 		cls = PyObject_GetAttrString(mod, pc->name);
 		if (cls == nullptr) {
 			if (PyErr_Occurred()) {
+				EXP_ReportPythonDiagnostic("component.class", pc->name);
 				PyErr_Print();
 			}
 			CM_Error("python module found, but failed to find the component '" << pc->name << "'");
@@ -1482,6 +1485,7 @@ static void BL_ConvertComponentsObject(KX_GameObject *gameobj, Object *blenderob
 
 		if (PyErr_Occurred()) {
 			// The component is invalid, drop it
+			EXP_ReportPythonDiagnostic("component.create", pc->name);
 			PyErr_Print();
 		}
 		else {

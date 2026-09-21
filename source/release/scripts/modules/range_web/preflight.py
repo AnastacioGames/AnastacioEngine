@@ -7,6 +7,9 @@
 #   webgl: {version: 0|1|2, missing_extensions: [str], error: str}
 #   files: [{name, status (int|null), mime, error, expected_sha256, sha256}]
 #   context_lost: bool
+#   runtime_initialized: bool
+#   runtime_aborted: str
+#   runtime_failure: str
 #   shader_errors: [{material, stage, log}]
 #   python_errors: [{kind: "ImportError"|"FileNotFoundError"|..., module, file, text}]
 
@@ -15,7 +18,8 @@ import json
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 
 PREFLIGHT_SCHEMA = "range-web-preflight"
-PREFLIGHT_SCHEMA_VERSION = 1
+PREFLIGHT_SCHEMA_VERSION = 2
+_SUPPORTED_SCHEMA_VERSIONS = (1, PREFLIGHT_SCHEMA_VERSION)
 
 _WASM_MIME = "application/wasm"
 
@@ -42,13 +46,14 @@ def check_preflight(data, runtime_manifest=None):
     if not isinstance(data, dict) or data.get("schema") != PREFLIGHT_SCHEMA:
         return [_err("WEB-DEPLOY-002", "Relatório de pré-voo ausente ou com schema desconhecido.",
                      fix="Rodar o Testar Web com a página de pré-voo do pacote.")]
-    if data.get("schema_version") != PREFLIGHT_SCHEMA_VERSION:
+    if data.get("schema_version") not in _SUPPORTED_SCHEMA_VERSIONS:
         return [_err("WEB-DEPLOY-002", "Versão do relatório de pré-voo incompatível: %r." % data.get("schema_version"))]
 
     findings = []
     findings += _check_isolation(data, runtime_manifest)
     findings += _check_webgl(data)
     findings += _check_files(data)
+    findings += _check_runtime(data)
     findings += _check_context(data)
     findings += _check_shaders(data)
     findings += _check_python(data)
@@ -71,10 +76,10 @@ def _check_webgl(data):
     if gl is None:
         return []
     out = []
-    if not gl.get("version"):
+    if gl.get("version", 0) < 2:
         out.append(_err("WEB-GFX-001", "WebGL indisponível no navegador%s." % (
             ": " + gl["error"] if gl.get("error") else ""),
-            fix="Ativar aceleração de hardware ou usar outro navegador.", capability="webgl"))
+            fix="Usar um navegador com WebGL 2 e aceleração de hardware.", capability="webgl"))
     for ext in gl.get("missing_extensions", ()):
         out.append(_err("WEB-GFX-001", "Extensão WebGL obrigatória ausente: %s." % ext, capability="webgl"))
     return out
@@ -101,6 +106,19 @@ def _check_files(data):
     return out
 
 
+def _check_runtime(data):
+    if data.get("runtime_aborted"):
+        return [_err("WEB-DEPLOY-002", "Runtime abortou durante o pré-voo: %s." % data["runtime_aborted"],
+                     fix="Consultar o log do runtime e corrigir o erro antes de publicar.")]
+    if data.get("runtime_failure"):
+        return [_err("WEB-DEPLOY-002", "Runtime falhou durante o pré-voo: %s." % data["runtime_failure"],
+                     fix="Consultar o log do runtime e conferir os arquivos do pacote.")]
+    if data.get("runtime_initialized") is False:
+        return [_err("WEB-DEPLOY-002", "Runtime não concluiu a inicialização durante o pré-voo.",
+                     fix="Aumentar o tempo de pré-voo ou corrigir a falha de carregamento do runtime.")]
+    return []
+
+
 def _check_context(data):
     if not data.get("context_lost"):
         return []
@@ -122,7 +140,7 @@ def _check_python(data):
     seen = set()
     for e in data.get("python_errors", ()):
         # O mesmo erro repete a cada frame do controller; um resultado por causa.
-        key = (e.get("kind"), e.get("module"), e.get("file"), e.get("text"))
+        key = (e.get("kind"), e.get("module"), e.get("file"), e.get("text"), e.get("origin"))
         if key in seen:
             continue
         seen.add(key)
@@ -134,6 +152,7 @@ def _check_python(data):
             out.append(_err("WEB-PKG-003", "Arquivo não encontrado no runtime: %s." % (e.get("file") or e.get("text", "?")),
                             fix="Incluir o arquivo no pacote.", location={"source": e.get("file", "")}))
         else:
-            out.append(_err("WEB-PY-009", "%s no runtime: %s" % (kind or "Erro", e.get("text", "")),
-                            location={"source": e.get("file", "")}))
+            where = " (%s%s)" % (e.get("context", ""), " em %s" % e["origin"] if e.get("origin") else "")                 if e.get("context") or e.get("origin") else ""
+            out.append(_err("WEB-PY-009", "%s no runtime%s: %s" % (kind or "Erro", where, e.get("text", "")),
+                            fix=e.get("traceback", ""), location={"source": e.get("origin") or e.get("file", "")}))
     return out

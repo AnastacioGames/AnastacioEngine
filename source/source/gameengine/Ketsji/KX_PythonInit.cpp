@@ -135,6 +135,7 @@ extern "C" {
 #include "KX_PyMath.h"
 
 #include "EXP_PyObjectPlus.h"
+#include "EXP_PythonCallBack.h"
 
 #include "KX_PythonInitTypes.h"
 
@@ -3085,6 +3086,7 @@ PyMODINIT_FUNC initApplicationPythonBinding()
 
 	// Check for errors
 	if (PyErr_Occurred()) {
+		EXP_ReportPythonDiagnostic("python.init", nullptr);
 		PyErr_Print();
 		PyErr_Clear();
 	}

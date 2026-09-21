@@ -29,13 +29,22 @@ Aberto:
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
   audaspace; não abortam mais). Aberto: sondar `cache()`, `reverse()`, `pause()`/`stop()` com som válido e medir o
   custo de desempenho em celular (M3). Ver changelog de 2026-09-21.
+- **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
+  `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
+  shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
+  "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
+  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
+- **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
+  constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido** no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`; `codex/r3-audio-fix-new` superada). Aberto: bug geral de `aud` com `METH_NOARGS` (`cache()`, `reverse()`, `handle.pause()/stop()` dão `function signature mismatch`), aguardando autorização. Diagnosticos de shader trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js` (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto. Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado adiar até
+  medir p50/p95 em celular físico. Divisão vigente e pendências em
+  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como
   opcionais na Internet.
-- **Contorno `USE_RNA_RANGE_CHECK` (Emscripten)**: checagem desativada só para Emscripten em `rna_internal.h`.
-  Resolver caso a caso (`ImageUser.fie_ima`, `Material.seed1`/`seed2`: tipo do campo DNA vs. hardmax da RNA),
-  considerando compatibilidade com `.blend` legado.
+- **`USE_RNA_RANGE_CHECK` no Emscripten (resolvido no M2)**: checagem reativada. Os cinco campos DNA
+  (`fie_ima`, `seed1`/`seed2`, `skgen_subdivision_number`, `handle_vertex_size`) viraram `unsigned char`, com SDNA
+  idêntico. Evidência em `docs/changelog.md` (2026-09-20). O MSVC nativo não executa essa checagem.
 
 ### Idioma (English, Português, Español, Русский)
 

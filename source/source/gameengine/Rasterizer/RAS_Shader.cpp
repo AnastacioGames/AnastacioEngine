@@ -167,7 +167,8 @@ RAS_Shader::RAS_Shader()
 	:m_shader(nullptr),
 	m_use(false),
 	m_error(false),
-	m_dirty(true)
+	m_dirty(true),
+	m_diagnosticName("engine-shader")
 {
 	for (unsigned short i = 0; i < MAX_PROGRAM; ++i) {
 		m_progs[i] = "";
@@ -307,8 +308,8 @@ bool RAS_Shader::LinkProgram()
 	vert = GetParsedProgram(VERTEX_PROGRAM);
 	frag = GetParsedProgram(FRAGMENT_PROGRAM);
 	geom = GetParsedProgram(GEOMETRY_PROGRAM);
-	m_shader = GPU_shader_create(vert.c_str(), frag.c_str(), geom.empty() ? nullptr : geom.c_str(),
-	                             nullptr, nullptr, 0, 0, 0);
+	m_shader = GPU_shader_create_ex_named(vert.c_str(), frag.c_str(), geom.empty() ? nullptr : geom.c_str(),
+	                                  nullptr, nullptr, 0, 0, 0, 0, m_diagnosticName.c_str());
 	if (!m_shader) {
 		m_error = true;
 		return false;
