@@ -44,7 +44,7 @@ PyDoc_STRVAR(M_aud_Handle_pause_doc,
 			 "   :rtype: bool");
 
 static PyObject *
-Handle_pause(Handle* self)
+Handle_pause(Handle* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -64,7 +64,7 @@ PyDoc_STRVAR(M_aud_Handle_resume_doc,
 			 "   :rtype: bool");
 
 static PyObject *
-Handle_resume(Handle* self)
+Handle_resume(Handle* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -85,7 +85,7 @@ PyDoc_STRVAR(M_aud_Handle_stop_doc,
 			 "   .. note:: This makes the handle invalid.");
 
 static PyObject *
-Handle_stop(Handle* self)
+Handle_stop(Handle* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{

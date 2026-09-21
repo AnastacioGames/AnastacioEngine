@@ -124,14 +124,14 @@ PyDoc_STRVAR(M_aud_Sound_data_doc,
 
 #ifdef __EMSCRIPTEN__
 static PyObject *
-Sound_data(Sound* self)
+Sound_data(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyErr_SetString(PyExc_NotImplementedError, "Sound.data() needs numpy, which is not available in the Web runtime.");
 	return nullptr;
 }
 #else
 static PyObject *
-Sound_data(Sound* self)
+Sound_data(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	std::shared_ptr<ISound> sound = *reinterpret_cast<std::shared_ptr<ISound>*>(self->sound);
 
@@ -389,7 +389,7 @@ PyDoc_STRVAR(M_aud_Sound_cache_doc,
 			 "      short factories.");
 
 static PyObject *
-Sound_cache(Sound* self)
+Sound_cache(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
@@ -1357,7 +1357,7 @@ PyDoc_STRVAR(M_aud_Sound_reverse_doc,
 			 "      you'll likely hear skips/jumps/cracks.");
 
 static PyObject *
-Sound_reverse(Sound* self)
+Sound_reverse(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
@@ -1386,7 +1386,7 @@ PyDoc_STRVAR(M_aud_Sound_sum_doc,
 			 "   :rtype: :class:`Sound`");
 
 static PyObject *
-Sound_sum(Sound* self)
+Sound_sum(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
@@ -1581,7 +1581,7 @@ PyDoc_STRVAR(M_aud_Sound_pingpong_doc,
 			 "   :rtype: :class:`Sound`");
 
 static PyObject *
-Sound_pingpong(Sound* self)
+Sound_pingpong(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
@@ -1647,7 +1647,7 @@ PyDoc_STRVAR(M_aud_Sound_mutable_doc,
 	"   :rtype: :class:`Sound`");
 
 static PyObject *
-Sound_mutable(Sound* self)
+Sound_mutable(Sound* self, PyObject* Py_UNUSED(ignored))
 {
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
