@@ -142,6 +142,9 @@ if(EMSCRIPTEN)
 		# mesmo que nenhum outro caminho de codigo already force sua inclusao.
 		"-lidbfs.js"
 		"-sFORCE_FILESYSTEM=1"
+		# Sem isto o Emscripten transforma todo AUD_THROW do audaspace em abort(); o audaspace e compilado com
+		# -fexceptions (extern/audaspace/CMakeLists.txt) para que o catch dos bindings Python funcione.
+		"-fexceptions"
 		"--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/web_idbfs_prerun.js"
 	)
 

@@ -756,6 +756,10 @@ set(LIB_DESTINATION "lib${LIB_SUFFIX}")
 # library
 
 add_library(audaspace ${LIBRARY_TYPE} ${SRC} ${HDR})
+if(EMSCRIPTEN)
+	# AUD_THROW (arquivo inexistente/corrompido) vira abort() sem captura de excecoes; ver source/blenderplayer.
+	target_compile_options(audaspace PRIVATE -fexceptions)
+endif()
 target_link_libraries(audaspace ${LIBRARIES})  
 set_target_properties(audaspace PROPERTIES SOVERSION ${AUDASPACE_VERSION})  
 
@@ -896,6 +900,9 @@ endif()
 if(WITH_C)
 	if(SEPARATE_C)
 		add_library(audaspace-c ${LIBRARY_TYPE} ${C_SRC} ${C_HDR})
+		if(EMSCRIPTEN)
+			target_compile_options(audaspace-c PRIVATE -fexceptions)
+		endif()
 		target_link_libraries(audaspace-c audaspace)
 		set_target_properties(audaspace-c PROPERTIES SOVERSION ${AUDASPACE_VERSION})
 		install(TARGETS audaspace-c
@@ -948,6 +955,9 @@ if(WITH_PYTHON)
 	endif()
 
 	add_library(audaspace-py ${LIBRARY_TYPE} ${PYTHON_SRC} ${PYTHON_HDR})
+	if(EMSCRIPTEN)
+		target_compile_options(audaspace-py PRIVATE -fexceptions)
+	endif()
 	target_link_libraries(audaspace-py audaspace ${PYTHON_LIBRARIES})
 	set_target_properties(audaspace-py PROPERTIES SOVERSION ${AUDASPACE_VERSION})
 
