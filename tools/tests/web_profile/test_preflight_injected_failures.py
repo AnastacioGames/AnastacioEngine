@@ -1,6 +1,7 @@
 """Falhas injetadas no relatorio de pre-voo: shader, Python estruturado e versao desconhecida. Sem bpy."""
 
 import os
+import json
 import sys
 import unittest
 
@@ -42,6 +43,15 @@ class ShaderFailureTests(unittest.TestCase):
 
     def test_link(self):
         self.check_shader("link", "link")
+
+    def test_link_event_without_stage_keeps_material_and_log(self):
+        fixture = os.path.join(os.path.dirname(__file__), "fixtures", "preflight-link.json")
+        with open(fixture, "r") as handle:
+            found = preflight.check_preflight(json.load(handle))
+        self.assertEqual([f.rule_id for f in found], ["WEB-GFX-002"])
+        self.assertIn("MatQuebradoLink", found[0].message)
+        self.assertNotIn("link, material", found[0].message)
+        self.assertEqual(found[0].fix, "ERROR: 0: program link failed")
 
     def test_shader_without_material_still_reported(self):
         found = preflight.check_preflight(shader_report("vertex", "compile", "bad", material=""))
