@@ -2,9 +2,18 @@
 
 ## PENDENTE NA MAQUINA LINUX (handoff de 2026-09-21) - LEIA PRIMEIRO
 
-Relatado por Kitsuy (tester Linux) sobre o pacote 0.4.0. Preparado no Windows, **nada disto foi executado em Linux**.
+Relatado por Kitsuy (tester Linux) sobre o pacote 0.4.0.
 
-### 1. `libpython3.11.so.1.0: cannot open shared object file` (correcao pronta, falta validar)
+### 1. `libpython3.11.so.1.0: cannot open shared object file` — VALIDADO EM LINUX (2026-09-21)
+
+Build, empacotamento e execucao em diretorio limpo confirmados nesta maquina (ver `docs/changelog.md`
+2026-09-21). Resumo: `readelf -d` mostra RUNPATH `$ORIGIN/lib:/opt/anastacio-python311/lib:`;
+`LD_DEBUG=libs` confirma resolucao via `$ORIGIN/lib` do pacote (nunca tenta o `/opt` absoluto);
+`./RangeEngine -b` roda e sai limpo. Precisou de um fix extra nao relacionado ao RUNPATH: faltava
+`#include <iostream>` em `source/intern/locale/boost_locale_wrapper.cpp` (usava `std::cout`; so
+compilava no MSVC por inclusao transitiva). Falta so publicar 0.4.1 (depois de decidir sobre o item 2).
+
+### (texto original abaixo, preservado como historico da preparacao no Windows)
 
 Causa: o pacote 0.4.0 saiu com RUNPATH absoluto `/opt/anastacio-python311/lib` (so existe na maquina de build).
 Alteracoes ja no repo (nao commitadas ate este handoff):

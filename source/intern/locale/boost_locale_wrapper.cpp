@@ -17,6 +17,7 @@
  * All rights reserved.
  */
 
+#include <iostream>
 #include <stdio.h>
 #include <boost/locale.hpp>
 

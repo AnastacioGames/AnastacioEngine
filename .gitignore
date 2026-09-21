@@ -3,6 +3,7 @@ build_core/
 build-web/
 build-android/
 build-linux/
+build-linux-editor/
 install/
 .vs/
 lib/

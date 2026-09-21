@@ -4,11 +4,36 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
-## 2026-09-21 - Linux: correcao de RUNPATH do libpython (preparada, nao validada)
+## 2026-09-21 - Linux: RUNPATH do libpython validado; crash do tooltip investigado
 
 - Kitsuy reportou no 0.4.0 `libpython3.11.so.1.0` nao encontrado e crash em tooltips. O pacote levava RUNPATH absoluto `/opt/anastacio-python311/lib`.
 - CMake de `RangeRuntime`/`RangeEngine` passou a usar `$ORIGIN/lib` e copiar o libpython real para `lib/`; `package-runtime.sh` aceita `BIN_DIR` e valida o libpython no pacote.
-- Nao executado em Linux; validacao e crash do tooltip pendentes (ver `linux-build.md`, secao de handoff).
+- **Validado em Linux nativo (Ubuntu, GPU local):** build do `RangeEngine` (`linux-editor`), `readelf -d` confirma RUNPATH `$ORIGIN/lib:/opt/anastacio-python311/lib:` (na ordem certa, `$ORIGIN/lib` primeiro), `bin/lib/libpython3.11.so.1.0` presente. Empacotado com `BIN_DIR=build-linux-editor/bin tools/linux/package-runtime.sh 0.4.1`. Extraido em diretorio limpo (`/tmp/pkgtest`): `LD_DEBUG=libs` confirma que o linker resolve `libpython3.11.so.1.0` via `$ORIGIN/lib` do proprio pacote, sem sequer tentar `/opt/anastacio-python311/lib` (nao precisou remover o `/opt` da maquina de teste, que ja tinha o path). `./RangeEngine -b` roda e sai limpo (exit 0), sem erro de `encodings`/stdlib. Fix confirmado correto.
+- Build no Linux (GCC) expos um erro pre-existente nao relacionado ao RUNPATH: `source/intern/locale/boost_locale_wrapper.cpp` usava `std::cout` sem incluir `<iostream>` (so tinha `<stdio.h>`); no MSVC algum header do boost arrastava `<iostream>` transitivamente, no GCC/libstdc++ nao. Corrigido com `#include <iostream>`.
+- Pendente: crash do tooltip (ver abaixo e `linux-build.md`) ainda sem causa confirmada por reproducao real; publicar 0.4.1 so depois de decidir sobre o tooltip (ver secao de handoff).
+
+## 2026-09-21 - Investigacao (nao confirmada): crash de tooltip
+
+- Revisao estatica de `interface_region_tooltip.c`, `interface_handlers.c` (timer de tooltip), `rna_access.c`
+  (`RNA_path_full_struct_py`/`RNA_path_full_property_py_ex`) e `rna_userdef.c`/`versioning_defaults.c`.
+- Achado: a checkbox "Python Tooltips" **nao esta invertida** por bug — `rna_userdef.c` usa
+  `RNA_def_property_boolean_negative_sdna` com `USER_TOOLTIPS_PYTHON`, padrao ja usado no Blender upstream.
+  Com o default atual (bit ligado por `versioning_defaults.c:86`), a checkbox aparece desmarcada e o ramo que
+  gera os campos "Python: ..." do tooltip **nao roda** em preferencias limpas — entao a causa do crash do
+  Kitsuy provavelmente nao esta nesse ramo, a menos que ele tenha um `userpref.blend` antigo com o bit zerado.
+- Hipotese mais provavel (H1): uso-apos-liberacao em `RNA_path_full_property_py_ex`/`RNA_path_full_struct_py`
+  (`rna_access.c`) quando o ID referenciado por `but->rnapoin` e removido/trocado entre o hover e o disparo do
+  timer do tooltip (delay), que so revalida o `uiBut` (`UI_region_active_but_get`), nao o ID dentro do RNA
+  pointer. So roda se `USER_TOOLTIPS_PYTHON` estiver com o bit OFF (checkbox marcada).
+- Hipotese secundaria (H2, mais fraca): getters RNA de propriedades registradas em Python chamados sem
+  garantia de GIL/estado de interpretador, se o motor liberar o GIL em algum ponto proximo ao hover.
+- "Show Profile" (`GameSettings.show_framerate_profile`) nao tem nenhuma relacao de codigo com o tooltip;
+  a hipotese mais provavel (H3) e que ligar essa opcao desloca o layout do header e o mouse deixa de cair
+  sobre o widget problematico — coincidencia de layout, nao correcao real.
+- Nao reproduzido com gdb (sem `xdotool`/similar no ambiente do agente para simular hover; precisa de sessao
+  interativa real). Nenhuma correcao aplicada ainda.
+- Perguntas para o Kitsuy: (a) "Python Tooltips" esta marcada nas preferencias dele? (b) qual botao/painel
+  exato crasha? (c) reproduz em cena default/vazia?
 
 ## 2026-09-20 - Android: revisão técnica do plano de exportação
 
