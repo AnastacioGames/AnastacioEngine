@@ -1,5 +1,46 @@
 # Build no Linux
 
+## PENDENTE NA MAQUINA LINUX (handoff de 2026-09-21) - LEIA PRIMEIRO
+
+Relatado por Kitsuy (tester Linux) sobre o pacote 0.4.0. Preparado no Windows, **nada disto foi executado em Linux**.
+
+### 1. `libpython3.11.so.1.0: cannot open shared object file` (correcao pronta, falta validar)
+
+Causa: o pacote 0.4.0 saiu com RUNPATH absoluto `/opt/anastacio-python311/lib` (so existe na maquina de build).
+Alteracoes ja no repo (nao commitadas ate este handoff):
+
+- `source/source/blenderplayer/CMakeLists.txt` e `source/source/creator/CMakeLists.txt`: `BUILD_RPATH`/`INSTALL_RPATH`
+  = `$ORIGIN/lib`, e o `libpython3.11.so.1.0` real (SONAME) e copiado para `bin/lib/` (POST_BUILD) e instalado em `lib/`.
+- `tools/linux/package-runtime.sh`: aceita `BIN_DIR` (para empacotar o editor), embute `python311/lib`, faz patch do
+  RUNPATH antigo (so em builds velhos) e falha se o libpython nao estiver no pacote.
+
+Passos:
+
+1. `bash tools/linux/install-python311.sh` (se `/opt/anastacio-python311` nao existir).
+2. `cmake --preset linux-editor -S source && cmake --build build-linux-editor --target RangeEngine -j"$(nproc)" && cmake --install build-linux-editor`
+   (idem `linux-runtime`/`build-linux` para o `RangeRuntime`).
+3. `readelf -d build-linux-editor/bin/RangeEngine | grep -E 'RPATH|RUNPATH'` -> deve ser `$ORIGIN/lib`; `ls build-linux-editor/bin/lib`
+   -> `libpython3.11.so.1.0`; `ldd build-linux-editor/bin/RangeEngine | grep "not found"` -> vazio.
+4. `BIN_DIR=build-linux-editor/bin bash tools/linux/package-runtime.sh 0.4.1` (o `.tar.xz` sai em `build-linux/dist/`).
+5. Extrair o tar num diretorio limpo, renomear `/opt/anastacio-python311` temporariamente e rodar `./RangeEngine` (janela) e `-b`.
+   Se o Python reclamar de `encodings`/stdlib, o problema e a stdlib (ver `python311/lib/python3.11`), nao o libpython.
+6. Corrigir se algo falhar, atualizar changelog/este doc e so entao publicar 0.4.1 (seguir `docs/distribution-*.md`/AGENTS.md).
+
+### 2. Crash ao passar o mouse sobre tooltips (causa NAO identificada)
+
+Relato: tooltips crasham o editor; so nao crasha com a opcao de "profile" ligada (provavelmente Show Profile em
+Info > Header, `show_framerate_profile`; confirmar com o Kitsuy). Ele viu o mesmo bug no fork dele.
+Codigo: `source/source/blender/editors/interface/interface_region_tooltip.c` (ramos de `USER_TOOLTIPS_PYTHON`;
+default em `versioning_defaults.c:86`; checkbox "Python Tooltips" e invertido, `rna_userdef.c:3587`).
+
+Passos: compilar o editor com simbolos, rodar `gdb --args build-linux-editor/bin/RangeEngine`, passar o mouse nos
+tooltips do painel de profile / botoes que crasham, `bt`. Testar alternando Show Profile e Python Tooltips. Corrigir a
+causa (ponteiro invalido, `strinfo`/RNA nulo, etc.), nao so o default. Registrar no changelog.
+
+### 3. Ao terminar
+
+Atualizar `docs/changelog.md` e `docs/roadmap.md` (secao Linux) e commitar com push para a branch `linux-sync`.
+
 ## Estado em 15 de setembro de 2026 — validacao em Linux nativo (Ubuntu 24.04, GPU NVIDIA real)
 
 Primeira validacao fora do WSLg, num notebook com grafica hibrida Intel+NVIDIA (Optimus/PRIME):

@@ -84,13 +84,20 @@ else()
 		)
 	endif()
 
-	if(NOT EMSCRIPTEN AND PYTHON_ROOT_DIR)
-		# WITH_INSTALL_PORTABLE liga CMAKE_SKIP_BUILD_RPATH (source/CMakeLists.txt) para
-		# nao gravar caminhos absolutos da maquina de build no binario -- mas o preset
-		# linux-runtime linka contra um libpython isolado fora do ld.so padrao
-		# (PYTHON_ROOT_DIR, ver docs/linux-build.md), entao sem RPATH explicito o
-		# RangeRuntime instalado falha com "libpython3.11.so.1.0: cannot open shared
-		# object file" ao rodar fora do ambiente de build.
+	if(NOT EMSCRIPTEN AND PYTHON_ROOT_DIR AND WITH_INSTALL_PORTABLE)
+		# O Python isolado nao existe na maquina do jogador. Instale a biblioteca no
+		# proprio pacote e use um RUNPATH relativo, nunca PYTHON_ROOT_DIR (um caminho
+		# absoluto da maquina de build). O nome real e importante: o loader procura o
+		# SONAME, por exemplo libpython3.11.so.1.0, e nao necessariamente o symlink .so.
+		get_filename_component(_python_runtime_library "${PYTHON_LIBRARY}" REALPATH)
+		get_filename_component(_python_runtime_library_name "${_python_runtime_library}" NAME)
+		install(FILES "${_python_runtime_library}" DESTINATION "lib")
+		add_custom_command(TARGET RangeRuntime POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:RangeRuntime>/lib"
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${_python_runtime_library}"
+				"$<TARGET_FILE_DIR:RangeRuntime>/lib/${_python_runtime_library_name}")
+
 		#
 		# Aqui DESTINATION "." + CMAKE_INSTALL_PREFIX=bin/ fazem o "install" apontar para o
 		# MESMO caminho onde o binario acabou de ser linkado. O install gerado roda
@@ -99,12 +106,16 @@ else()
 		# o arquivo achando que vai recopia-lo da origem -- mas origem e destino sao o
 		# mesmo caminho, entao a copia seguinte falha com "cannot find" (o arquivo já foi
 		# apagado). BUILD_RPATH e INSTALL_RPATH iguais fazem o RPATH esperado bater com o
-		# que ja foi gravado no link, evitando essa autodestruicao.
+		# que ja foi gravado no link, evitando essa autodestruicao. O lib/ tambem e
+		# criado no diretorio de build, portanto o executavel pode ser testado antes
+		# de gerar o tarball.
 		set_target_properties(RangeRuntime PROPERTIES
 			SKIP_BUILD_RPATH FALSE
-			BUILD_RPATH "${PYTHON_ROOT_DIR}/lib"
-			INSTALL_RPATH "${PYTHON_ROOT_DIR}/lib"
+			BUILD_RPATH "$ORIGIN/lib"
+			INSTALL_RPATH "$ORIGIN/lib"
 		)
+		unset(_python_runtime_library_name)
+		unset(_python_runtime_library)
 	endif()
 endif()
 

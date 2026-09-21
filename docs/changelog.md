@@ -4,6 +4,34 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Linux: correcao de RUNPATH do libpython (preparada, nao validada)
+
+- Kitsuy reportou no 0.4.0 `libpython3.11.so.1.0` nao encontrado e crash em tooltips. O pacote levava RUNPATH absoluto `/opt/anastacio-python311/lib`.
+- CMake de `RangeRuntime`/`RangeEngine` passou a usar `$ORIGIN/lib` e copiar o libpython real para `lib/`; `package-runtime.sh` aceita `BIN_DIR` e valida o libpython no pacote.
+- Nao executado em Linux; validacao e crash do tooltip pendentes (ver `linux-build.md`, secao de handoff).
+
+## 2026-09-20 - Android: revisão técnica do plano de exportação
+
+- Revisado `android-export-plan.md` contra código local, estado dos presets e fontes oficiais Android,
+  Chromium, Emscripten e W3C. WebView mantido como rota recomendada, condicionada à prova no aparelho.
+- Antecipado APK mínimo com jogo real (A0b/A2) antes da CLI/editor; definido núcleo de toque digital,
+  persistência confirmada e pausa/retomada. Sensores/analógico/API Python e AAB ficam para etapas posteriores,
+  salvo requisito essencial do jogo. Ponte Kotlin pequena passa a ser alternativa antes de reabrir NDK.
+- Corrigidas premissas sobre `syncfs` assíncrono, pausa de JavaScript, gamepad virtual, compressão dos assets,
+  capacidades do WebView, offline em TWA e campos de presets já implementados. Acrescentados critérios de
+  memória de carga, frame time sustentado, atualização preservando save e recuperação do renderer.
+- Alinhados índice, roadmap, relatório e nota no antigo roadmap Android/Web, preservando o histórico anterior.
+- Somente documentação: nenhuma implementação, compilação ou execução Android nesta revisão. Inspeção de
+  fontes e consistência documental não substitui os testes A0/A5 nem comprova suporte mobile.
+
+## 2026-09-20 - Android: replanejamento sobre o runtime Web
+
+- Com o Web funcionando, o export Android v1 passa a ser um APK-casca (WebView) embutindo o pacote Web; o backend
+  nativo NDK fica congelado com critério de reabertura. Novo `docs/android-export-plan.md` (marcos A0–A5);
+  roadmap, relatório, README e `mobile-export-plan.md` apontam para ele. Só documentação, nenhum código alterado.
+- Diferencial mobile incorporado ao marco A1: multitouch e sensores de movimento (orientação, aceleração, giro,
+  vibração) via APIs Web, primeiro traduzidos para teclado/gamepad no harness JS, depois expostos em Python.
+
 ## 2026-09-20 - Web: gamepad — sensores de joystick avaliam pelo estado vivo do SDL
 
 - Sintoma (teste do patch do SDL2 no navegador): o D-pad exigia vários toques e, quando respondia, o cubo ficava

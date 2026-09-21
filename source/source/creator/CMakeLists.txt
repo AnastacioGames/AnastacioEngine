@@ -565,19 +565,26 @@ if(UNIX AND NOT APPLE)
 		)
 
 		if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND PYTHON_ROOT_DIR)
-			# Mesmo bug do RangeRuntime (ver source/blenderplayer/CMakeLists.txt e
-			# docs/linux-build.md): WITH_INSTALL_PORTABLE liga CMAKE_SKIP_BUILD_RPATH,
-			# mas o preset linux-editor linka contra um libpython isolado fora do
-			# ld.so padrao (PYTHON_ROOT_DIR). Sem RPATH explicito, o RangeEngine
-			# instalado falha com "libpython3.11.so.1.0: cannot open shared object
-			# file" ao rodar fora do ambiente de build. BUILD_RPATH == INSTALL_RPATH
-			# evita que o install() apague o binario recem-linkado (DESTINATION "."
-			# aponta para o mesmo caminho da saida do link).
+			# O pacote portatil leva o libpython com o nome real do SONAME e o
+			# executavel o encontra relativo a si mesmo, sem depender do /opt da
+			# maquina que compilou. BUILD_RPATH == INSTALL_RPATH evita que install()
+			# apague o binario recem-linkado (DESTINATION "." aponta para a propria
+			# pasta de saida).
+			get_filename_component(_python_runtime_library "${PYTHON_LIBRARY}" REALPATH)
+			get_filename_component(_python_runtime_library_name "${_python_runtime_library}" NAME)
+			install(FILES "${_python_runtime_library}" DESTINATION "lib")
+			add_custom_command(TARGET RangeEngine POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:RangeEngine>/lib"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different
+					"${_python_runtime_library}"
+					"$<TARGET_FILE_DIR:RangeEngine>/lib/${_python_runtime_library_name}")
 			set_target_properties(RangeEngine PROPERTIES
 				SKIP_BUILD_RPATH FALSE
-				BUILD_RPATH "${PYTHON_ROOT_DIR}/lib"
-				INSTALL_RPATH "${PYTHON_ROOT_DIR}/lib"
+				BUILD_RPATH "$ORIGIN/lib"
+				INSTALL_RPATH "$ORIGIN/lib"
 			)
+			unset(_python_runtime_library_name)
+			unset(_python_runtime_library)
 		endif()
 
 		if(WITH_DOC_MANPAGE)

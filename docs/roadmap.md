@@ -55,6 +55,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver
 [linux-build.md](linux-build.md). Pendente:
 
+- **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor). Correcao de RUNPATH pronta e nao validada; crash sem causa. Passo a passo na secao "PENDENTE NA MAQUINA LINUX" de [linux-build.md](linux-build.md).
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
@@ -81,16 +82,20 @@ fechada.
 
 ### Android / iOS
 
-Sem decisão de implementação. Bloqueios conhecidos: `malloc_stats` ausente na Bionic, `GL/glu.h` ausente no
-NDK e backend GHOST/APK inexistente. Ver [mobile-export-plan.md](mobile-export-plan.md).
+Android v1: rota proposta de APK com WebView embutindo o pacote Web, ainda sem execução Android comprovada.
+Próximo passo: referência no Chrome Android e APK mínimo no mesmo aparelho físico com o jogo real;
+validar carga, desempenho, toque simultâneo, save e ciclo de vida antes do exportador/editor.
+Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). Sensores/API Python e AAB
+vêm depois do núcleo jogável, salvo requisito do jogo. NDK congelado, reaberto somente por limitação medida;
+bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
 ### Outros
 
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
   no Windows, duplo clique).
 - **Export presets (RangeArmor)**: falta o teste manual (projeto novo e antigo) do [plano](export-presets-plan.md).
-  `company_name`, `icon_path` e toggle de plataforma não são gravados (whitelist do RangeArmor Panel); estender
-  exige mudança no lado Godot, fora desta fase.
+  `company_name`, `icon_path` e toggles desktop já são gravados por `wm.py`, com extensão do schema
+  registrada no plano; a pendência é de validação manual, não de implementação desses campos.
 - **Auditoria de `source/blender`**: confirmar ou descartar os candidatos de
   [`relatorio-varredura-bugs-silenciosos.md`](relatorio-varredura-bugs-silenciosos.md), com reprodução,
   correção isolada e teste.
