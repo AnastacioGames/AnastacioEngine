@@ -167,14 +167,12 @@ ferramenta correspondente.
   precisam persistir o controle devem alterar essa property.
 - Mudanças em DNA exigem clean rebuild. O procedimento completo está em
   [`docs/build-notes.md`](docs/build-notes.md).
-- A checagem de range em tempo de compilação da RNA (`USE_RNA_RANGE_CHECK`,
-  `rna_internal.h`) está desativada apenas para o toolchain Emscripten —
-  é um **contorno temporário** para incompatibilidades reais e
-  pré-existentes entre tipo do campo DNA e hardmax da RNA (ex.:
-  `ImageUser.fie_ima`, `Material.seed1`/`seed2`), não uma correção. Não
-  presumir "alargar o tipo do campo DNA" como solução padrão — cada caso
-  exige análise individual e consideração explícita de compatibilidade
-  com `.blend` legado. Detalhes em [`docs/roadmap.md`](docs/roadmap.md).
+- A checagem de range em tempo de compilação da RNA (`USE_RNA_RANGE_CHECK`, `rna_internal.h`) está ativa
+  também no Emscripten desde o M2. Cinco campos DNA (`ImageUser.fie_ima`, `Material.seed1`/`seed2`,
+  `ToolSettings.skgen_subdivision_number`, `ThemeSpace.handle_vertex_size`) passaram de `char` para `unsigned char`;
+  o `makesdna` descarta `unsigned`, então SDNA, tamanhos e offsets não mudam (comparados antes/depois). Não alargar
+  o tipo nem reduzir o hardmax para satisfazer o compilador. O MSVC nativo não define `__STDC_VERSION__` C11 e
+  portanto nunca executa a checagem. Evidência em [`docs/changelog.md`](docs/changelog.md) (2026-09-20).
 
 ## Fontes relacionadas
 

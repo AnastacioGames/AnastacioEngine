@@ -33,9 +33,9 @@ Aberto:
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como
   opcionais na Internet.
-- **Contorno `USE_RNA_RANGE_CHECK` (Emscripten)**: checagem desativada só para Emscripten em `rna_internal.h`.
-  Resolver caso a caso (`ImageUser.fie_ima`, `Material.seed1`/`seed2`: tipo do campo DNA vs. hardmax da RNA),
-  considerando compatibilidade com `.blend` legado.
+- **`USE_RNA_RANGE_CHECK` no Emscripten (resolvido no M2)**: checagem reativada. Os cinco campos DNA
+  (`fie_ima`, `seed1`/`seed2`, `skgen_subdivision_number`, `handle_vertex_size`) viraram `unsigned char`, com SDNA
+  idêntico. Evidência em `docs/changelog.md` (2026-09-20). O MSVC nativo não executa essa checagem.
 
 ### Idioma (English, Português, Español, Русский)
 

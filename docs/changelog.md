@@ -4,6 +4,42 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: M2, DNA `unsigned char` e checagem de range da RNA reativada no Emscripten
+
+- Cinco campos DNA passam de `char` para `unsigned char` (`ImageUser.fie_ima`, `Material.seed1`/`seed2`,
+  `ToolSettings.skgen_subdivision_number`, `ThemeSpace.handle_vertex_size`), e `USE_RNA_RANGE_CHECK` volta a valer
+  no Emscripten (`rna_internal.h`). Commits `9d008486` e `dfae0be0`. O hardmax 200/255 da RNA contradizia o tipo `char` do campo (com sinal, valores acima de 127 não cabem);
+  o comportamento anterior não foi reproduzido em runtime.
+- **SDNA preservado**: o `makesdna` descarta `unsigned`, então o `dna.c` e os offsets gerados são idênticos
+  antes (`ed6c1f8f`) e depois. Nativo: `dna.c` 418262 B e offsets 23236 B; wasm32: 414162 B e 22585 B. Os dois
+  "depois" batem com o `dna.c` dos diretórios de build.
+- **Checagem ativa no Web**: compilando `rna_image.c`/`rna_material.c`/`rna_scene.c`/`rna_userdef.c` com os
+  headers anteriores ao M2 a checagem dá 7 erros (imagem 1, material 2, cena 1, tema 3 = as 7 propriedades do
+  inventário); com o HEAD, 0 erros. O compilador nativo MSVC não define `__STDC_VERSION__ >= 201112L`, então lá a
+  checagem nunca rodou nem roda; a cobertura dela é só do Emscripten. Builds completos após os commits: nativo,
+  `build-web` e `build-web-release` terminaram com código 0.
+- **Roundtrip nativo** (`RangeEngine.exe -b --python`, salvar `.range` e reabrir): `halo.seed` e `halo.flare_seed`
+  em 0/1/127/128/255, `fields_per_frame` em 1/2/127/128/200, `etch_subdivision_number` em 1/2/127/128/200/255,
+  todos voltaram iguais. `handle_vertex_size` em 0/128/255 nos temas Graph/Image/Clip sobreviveu a salvar e recarregar
+  o `userpref.blend`; os temas padrão trazem 5. `userpref.blend` reais do usuário (2.79 do RangeEngine, 2.67 e 2.68)
+  carregam sem erro.
+- **Animação**: com o material ligado a um objeto, `halo.seed` 200->255 e `flare_seed` 3->250 animam corretamente,
+  também depois de salvar e reabrir. Material sem objeto não é reavaliado após o load, igual a `size` e `hardness`
+  (não é do M2).
+- **Fora da faixa via RNA**: o setter faz clamp e não levanta erro. `seed` 256 vira 255 e -1 vira 0;
+  `fields_per_frame` 0 vira 1 e 201 vira 200; `etch_subdivision_number` 0 vira 1 e 256 vira 255;
+  `handle_vertex_size` 256 vira 255 e -1 vira 0.
+- Treze `.blend`/`.range` do repositório carregam sem erro e com seeds, `fields_per_frame` e subdivisão dentro da
+  faixa. Exceção: `preview.blend` traz `etch_subdivision_number` 0, valor já gravado no arquivo (byte 0 é igual
+  em `char` e `unsigned char`), fora da faixa 1-255 da RNA.
+- **Consumidores revisados**: nenhum depende do sinal. `resources.c::UI_ThemeGetColorPtr` já usava
+  `unsigned char *`, e o `hashvectf + ma->seed2` de `rendercore.c` deixa de indexar negativo para seed > 127.
+  O cast `(char)tex->fie_ima` em `versioning_legacy.c:2471` é inofensivo (o legado grava 2) e foi mantido.
+- **Não coberto**: um build nativo com a checagem ativa não existe (o MSVC não a executa); os `.blend` legados só
+  provam carregamento e valores, não o comportamento anterior ao M2 com valores acima de 127. O
+  `build-web-release` tem 49 passos pendentes por `GPU_shader.h` (alterado no M1, não no M2), então deve ser
+  reconstruído antes de qualquer publicação.
+
 ## 2026-09-20 - Web: testes de runtime do M1 (diagnósticos Python e shader)
 
 - Três jogos com falha injetada foram empacotados com `package-web.py --runtime-dir build-web/bin`, servidos e
