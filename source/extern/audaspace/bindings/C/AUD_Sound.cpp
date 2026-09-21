@@ -84,14 +84,18 @@ AUD_API AUD_Specs AUD_Sound_getSpecs(AUD_Sound* sound)
 {
 	if(!sound || !*sound) return AUD_Specs{};
 
-	return convSpecToC((*sound)->createReader()->getSpecs());
+	std::shared_ptr<IReader> reader = (*sound)->createReader();
+	if(!reader)
+		return convSpecToC(Specs());
+	return convSpecToC(reader->getSpecs());
 }
 
 AUD_API int AUD_Sound_getLength(AUD_Sound* sound)
 {
 	if(!sound || !*sound) return 0;
 
-	return (*sound)->createReader()->getLength();
+	std::shared_ptr<IReader> reader = (*sound)->createReader();
+	return reader ? reader->getLength() : 0;
 }
 
 AUD_API sample_t* AUD_Sound_data(AUD_Sound* sound, int* length, AUD_Specs* specs)
@@ -128,6 +132,8 @@ AUD_API const char* AUD_Sound_write(AUD_Sound* sound, const char* filename, AUD_
 	try
 	{
 		std::shared_ptr<IReader> reader = (*sound)->createReader();
+		if(!reader)
+			return "The sound could not be read.";
 
 		DeviceSpecs specs;
 		specs.specs = reader->getSpecs();

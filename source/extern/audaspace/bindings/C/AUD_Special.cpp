@@ -122,6 +122,8 @@ AUD_API float* AUD_readSoundBuffer(const char* filename, float low, float high,
 	try
 	{
 		std::shared_ptr<IReader> reader = file->createReader();
+		if(!reader)
+			return nullptr;
 
 		SampleRate rate = reader->getSpecs().rate;
 
@@ -144,6 +146,8 @@ AUD_API float* AUD_readSoundBuffer(const char* filename, float low, float high,
 			sound = std::shared_ptr<ISound>(new Sum(sound));
 
 		reader = sound->createReader();
+		if(!reader)
+			return nullptr;
 
 		if(!reader.get())
 			return nullptr;

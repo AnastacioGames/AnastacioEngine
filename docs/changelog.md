@@ -4,6 +4,11 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - Branch integracao: guards de leitor nulo do Codex sobre o som silencioso
+
+- Incorporados os guards de `codex/r3-audio-fix` (leitor nulo em `AUD_Sound`, `AUD_Special`, `PySound`, `PyDevice.play`, `Limiter`, `Pitch`, `VolumeSound`), sem o `WAVFile.cpp` do Codex, que desfaria o som silencioso.
+- Build Web incremental e sonda R3 reexecutada: 10/10, `[r3] TODOS`, sem `Aborted`.
+
 ## 2026-09-21 - Branch integracao: validacao dos builds e da sonda R3
 
 - Branch `integracao` (dc0a5639) reune os historicos claude/* e codex/* sobre `linux-sync`.
