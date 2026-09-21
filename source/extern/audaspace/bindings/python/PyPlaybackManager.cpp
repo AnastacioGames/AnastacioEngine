@@ -273,7 +273,7 @@ PyDoc_STRVAR(M_aud_PlaybackManager_clean_doc,
 	"   Cleans all the invalid and finished sound from the playback manager.\n\n");
 
 static PyObject *
-PlaybackManager_clean(PlaybackManagerP* self)
+PlaybackManager_clean(PlaybackManagerP* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{

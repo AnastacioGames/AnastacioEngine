@@ -137,7 +137,7 @@ PyDoc_STRVAR(M_aud_Device_lock_doc,
 			 "      as short as possible to avoid clicks.");
 
 static PyObject *
-Device_lock(Device* self)
+Device_lock(Device* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -216,7 +216,7 @@ PyDoc_STRVAR(M_aud_Device_stopAll_doc,
 			 "   Stops all playing and paused sounds.");
 
 static PyObject *
-Device_stopAll(Device* self)
+Device_stopAll(Device* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -236,7 +236,7 @@ PyDoc_STRVAR(M_aud_Device_unlock_doc,
 			 "   details.");
 
 static PyObject *
-Device_unlock(Device* self)
+Device_unlock(Device* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{

@@ -131,7 +131,7 @@ PyDoc_STRVAR(M_aud_DynamicMusic_resume_doc,
 	"   :rtype: bool");
 
 static PyObject *
-DynamicMusic_resume(DynamicMusicP* self)
+DynamicMusic_resume(DynamicMusicP* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -151,7 +151,7 @@ PyDoc_STRVAR(M_aud_DynamicMusic_pause_doc,
 	"   :rtype: bool");
 
 static PyObject *
-DynamicMusic_pause(DynamicMusicP* self)
+DynamicMusic_pause(DynamicMusicP* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
@@ -171,7 +171,7 @@ PyDoc_STRVAR(M_aud_DynamicMusic_stop_doc,
 	"   :rtype: bool\n\n");
 
 static PyObject *
-DynamicMusic_stop(DynamicMusicP* self)
+DynamicMusic_stop(DynamicMusicP* self, PyObject* Py_UNUSED(ignored))
 {
 	try
 	{
