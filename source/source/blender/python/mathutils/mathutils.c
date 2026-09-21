@@ -550,7 +550,7 @@ char BaseMathObject_freeze_doc[] =
 "\n"
 "   :return: An instance of this object.\n"
 ;
-PyObject *BaseMathObject_freeze(BaseMathObject *self)
+PyObject *BaseMathObject_freeze(BaseMathObject *self, PyObject *UNUSED(args))
 {
 	if ((self->flag & BASE_MATH_FLAG_IS_WRAP) || (self->cb_user != NULL)) {
 		PyErr_SetString(PyExc_TypeError, "Cannot freeze wrapped/owned data");

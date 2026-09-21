@@ -4,6 +4,13 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-21 - WebAssembly: assinaturas Python METH corrigidas em bmesh
+
+- Auditadas as tabelas `PyMethodDef` e as definições C em `mathutils`, `blf`, `bmesh` e `gpu` para conferir a aridade exigida por `METH_NOARGS`, `METH_O`, `METH_VARARGS` e `METH_VARARGS | METH_KEYWORDS`.
+- Encontrados 38 callbacks C distintos de `bmesh` marcados `METH_NOARGS` que declaravam somente `self`, além de `BaseMathObject_freeze` em `mathutils`. Todos agora recebem também `PyObject *UNUSED(args)`, preservando integralmente os corpos e o comportamento; as entradas repetidas de `index_update`/`ensure_lookup_table` reutilizam as duas definições corrigidas.
+- Nenhuma incompatibilidade foi encontrada em `blf` ou `gpu`. Não foram alterados `intern/audaspace`, `KX_PythonInit.cpp` nem `KX_PyConstraintBinding.cpp`.
+- A revarredura após o patch não encontrou incompatibilidades de aridade nos quatro módulos. Validação nativa: `ninja RangeEngine` com `vcvars64.bat` concluído com exit 0; nenhum rebuild Web foi executado.
+
 ## 2026-09-21 - Linux: RUNPATH do libpython validado; crash do tooltip investigado
 
 - Kitsuy reportou no 0.4.0 `libpython3.11.so.1.0` nao encontrado e crash em tooltips. O pacote levava RUNPATH absoluto `/opt/anastacio-python311/lib`.

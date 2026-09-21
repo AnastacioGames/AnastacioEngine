@@ -66,7 +66,7 @@ PyDoc_STRVAR(bpy_bmeditselseq_validate_doc,
 "\n"
 "   Ensures all elements in the selection history are selected.\n"
 );
-static PyObject *bpy_bmeditselseq_validate(BPy_BMEditSelSeq *self)
+static PyObject *bpy_bmeditselseq_validate(BPy_BMEditSelSeq *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	BM_select_history_validate(self->bm);
@@ -78,7 +78,7 @@ PyDoc_STRVAR(bpy_bmeditselseq_clear_doc,
 "\n"
 "   Empties the selection history.\n"
 );
-static PyObject *bpy_bmeditselseq_clear(BPy_BMEditSelSeq *self)
+static PyObject *bpy_bmeditselseq_clear(BPy_BMEditSelSeq *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	BM_select_history_clear(self->bm);

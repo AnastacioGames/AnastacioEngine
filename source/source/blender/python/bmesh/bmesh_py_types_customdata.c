@@ -315,7 +315,7 @@ PyDoc_STRVAR(bpy_bmlayercollection_verify_doc,
 "   :return: The newly verified layer.\n"
 "   :rtype: :class:`BMLayerItem`\n"
 );
-static PyObject *bpy_bmlayercollection_verify(BPy_BMLayerCollection *self)
+static PyObject *bpy_bmlayercollection_verify(BPy_BMLayerCollection *self, PyObject *UNUSED(args))
 {
 	int index;
 	CustomData *data;
@@ -428,7 +428,7 @@ PyDoc_STRVAR(bpy_bmlayercollection_keys_doc,
 "   :return: the identifiers for each member of this collection.\n"
 "   :rtype: list of strings\n"
 );
-static PyObject *bpy_bmlayercollection_keys(BPy_BMLayerCollection *self)
+static PyObject *bpy_bmlayercollection_keys(BPy_BMLayerCollection *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	PyObject *item;
@@ -461,7 +461,7 @@ PyDoc_STRVAR(bpy_bmlayercollection_items_doc,
 "   :return: (key, value) pairs for each member of this collection.\n"
 "   :rtype: list of tuples\n"
 );
-static PyObject *bpy_bmlayercollection_items(BPy_BMLayerCollection *self)
+static PyObject *bpy_bmlayercollection_items(BPy_BMLayerCollection *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	PyObject *item;
@@ -497,7 +497,7 @@ PyDoc_STRVAR(bpy_bmlayercollection_values_doc,
 "   :return: the members of this collection.\n"
 "   :rtype: list\n"
 );
-static PyObject *bpy_bmlayercollection_values(BPy_BMLayerCollection *self)
+static PyObject *bpy_bmlayercollection_values(BPy_BMLayerCollection *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	PyObject *item;

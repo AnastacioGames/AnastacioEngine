@@ -623,7 +623,7 @@ PyDoc_STRVAR(bpy_bmdeformvert_keys_doc,
 "   :return: the deform group this vertex uses\n"
 "   :rtype: list of ints\n"
 );
-static PyObject *bpy_bmdeformvert_keys(BPy_BMDeformVert *self)
+static PyObject *bpy_bmdeformvert_keys(BPy_BMDeformVert *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	int i;
@@ -646,7 +646,7 @@ PyDoc_STRVAR(bpy_bmdeformvert_values_doc,
 "   :return: The weights that influence this vertex\n"
 "   :rtype: list of floats\n"
 );
-static PyObject *bpy_bmdeformvert_values(BPy_BMDeformVert *self)
+static PyObject *bpy_bmdeformvert_values(BPy_BMDeformVert *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	int i;
@@ -669,7 +669,7 @@ PyDoc_STRVAR(bpy_bmdeformvert_items_doc,
 "   :return: (key, value) pairs for each deform weight of this vertex.\n"
 "   :rtype: list of tuples\n"
 );
-static PyObject *bpy_bmdeformvert_items(BPy_BMDeformVert *self)
+static PyObject *bpy_bmdeformvert_items(BPy_BMDeformVert *self, PyObject *UNUSED(args))
 {
 	PyObject *ret;
 	PyObject *item;
@@ -726,7 +726,7 @@ PyDoc_STRVAR(bpy_bmdeformvert_clear_doc,
 "\n"
 "   Clears all weights.\n"
 );
-static PyObject *bpy_bmdeformvert_clear(BPy_BMDeformVert *self)
+static PyObject *bpy_bmdeformvert_clear(BPy_BMDeformVert *self, PyObject *UNUSED(args))
 {
 	defvert_clear(self->data);
 

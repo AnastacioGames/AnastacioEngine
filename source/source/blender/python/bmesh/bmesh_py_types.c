@@ -800,7 +800,7 @@ PyDoc_STRVAR(bpy_bmesh_copy_doc,
 "   :return: A copy of this BMesh.\n"
 "   :rtype: :class:`BMesh`\n"
 );
-static PyObject *bpy_bmesh_copy(BPy_BMesh *self)
+static PyObject *bpy_bmesh_copy(BPy_BMesh *self, PyObject *UNUSED(args))
 {
 	BMesh *bm;
 	BMesh *bm_copy;
@@ -825,7 +825,7 @@ PyDoc_STRVAR(bpy_bmesh_clear_doc,
 "\n"
 "   Clear all mesh data.\n"
 );
-static PyObject *bpy_bmesh_clear(BPy_BMesh *self)
+static PyObject *bpy_bmesh_clear(BPy_BMesh *self, PyObject *UNUSED(args))
 {
 	BMesh *bm;
 
@@ -849,7 +849,7 @@ PyDoc_STRVAR(bpy_bmesh_free_doc,
 "      However in some cases its hard to predict when this will be and its useful to\n"
 "      explicitly free the data.\n"
 );
-static PyObject *bpy_bmesh_free(BPy_BMesh *self)
+static PyObject *bpy_bmesh_free(BPy_BMesh *self, PyObject *UNUSED(args))
 {
 	if (self->bm) {
 		BMesh *bm = self->bm;
@@ -1086,7 +1086,7 @@ PyDoc_STRVAR(bpy_bmesh_select_flush_mode_doc,
 "\n"
 "   flush selection based on the current mode current :class:`BMesh.select_mode`.\n"
 );
-static PyObject *bpy_bmesh_select_flush_mode(BPy_BMesh *self)
+static PyObject *bpy_bmesh_select_flush_mode(BPy_BMesh *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -1130,7 +1130,7 @@ PyDoc_STRVAR(bpy_bmesh_normal_update_doc,
 "\n"
 "   Update mesh normals.\n"
 );
-static PyObject *bpy_bmesh_normal_update(BPy_BMesh *self)
+static PyObject *bpy_bmesh_normal_update(BPy_BMesh *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -1245,7 +1245,7 @@ PyDoc_STRVAR(bpy_bmesh_calc_tessface_doc,
 "   :return: The triangulated faces.\n"
 "   :rtype: list of :class:`BMLoop` tuples\n"
 );
-static PyObject *bpy_bmesh_calc_tessface(BPy_BMElem *self)
+static PyObject *bpy_bmesh_calc_tessface(BPy_BMElem *self, PyObject *UNUSED(args))
 {
 	BMesh *bm;
 
@@ -1485,7 +1485,7 @@ PyDoc_STRVAR(bpy_bmvert_calc_shell_factor_doc,
 "   :return: offset multiplier\n"
 "   :rtype: float\n"
 );
-static PyObject *bpy_bmvert_calc_shell_factor(BPy_BMVert *self)
+static PyObject *bpy_bmvert_calc_shell_factor(BPy_BMVert *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	return PyFloat_FromDouble(BM_vert_calc_shell_factor(self->v));
@@ -1496,7 +1496,7 @@ PyDoc_STRVAR(bpy_bmvert_normal_update_doc,
 "\n"
 "   Update vertex normal.\n"
 );
-static PyObject *bpy_bmvert_normal_update(BPy_BMVert *self)
+static PyObject *bpy_bmvert_normal_update(BPy_BMVert *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -1515,7 +1515,7 @@ PyDoc_STRVAR(bpy_bmedge_calc_length_doc,
 "   :return: The length between both verts.\n"
 "   :rtype: float\n"
 );
-static PyObject *bpy_bmedge_calc_length(BPy_BMEdge *self)
+static PyObject *bpy_bmedge_calc_length(BPy_BMEdge *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	return PyFloat_FromDouble(len_v3v3(self->e->v1->co, self->e->v2->co));
@@ -1671,7 +1671,7 @@ PyDoc_STRVAR(bpy_bmedge_normal_update_doc,
 "\n"
 "   Update edges vertex normals.\n"
 );
-static PyObject *bpy_bmedge_normal_update(BPy_BMEdge *self)
+static PyObject *bpy_bmedge_normal_update(BPy_BMEdge *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -1773,7 +1773,7 @@ PyDoc_STRVAR(bpy_bmface_calc_area_doc,
 "   :return: Return the area of the face.\n"
 "   :rtype: float\n"
 );
-static PyObject *bpy_bmface_calc_area(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_area(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	return PyFloat_FromDouble(BM_face_calc_area(self->f));
@@ -1788,7 +1788,7 @@ PyDoc_STRVAR(bpy_bmface_calc_perimeter_doc,
 "   :return: Return the perimeter of the face.\n"
 "   :rtype: float\n"
 );
-static PyObject *bpy_bmface_calc_perimeter(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_perimeter(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	return PyFloat_FromDouble(BM_face_calc_perimeter(self->f));
@@ -1803,7 +1803,7 @@ PyDoc_STRVAR(bpy_bmface_calc_tangent_edge_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_tangent_edge(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_tangent_edge(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float tangent[3];
 
@@ -1825,7 +1825,7 @@ PyDoc_STRVAR(bpy_bmface_calc_tangent_edge_pair_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_tangent_edge_pair(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_tangent_edge_pair(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float tangent[3];
 
@@ -1843,7 +1843,7 @@ PyDoc_STRVAR(bpy_bmface_calc_tangent_edge_diagonal_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_tangent_edge_diagonal(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_tangent_edge_diagonal(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float tangent[3];
 
@@ -1861,7 +1861,7 @@ PyDoc_STRVAR(bpy_bmface_calc_tangent_vert_diagonal_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_tangent_vert_diagonal(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_tangent_vert_diagonal(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float tangent[3];
 
@@ -1879,7 +1879,7 @@ PyDoc_STRVAR(bpy_bmface_calc_center_median_doc,
 "   :return: a 3D vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_center_mean(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_center_mean(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float cent[3];
 
@@ -1896,7 +1896,7 @@ PyDoc_STRVAR(bpy_bmface_calc_center_median_weighted_doc,
 "   :return: a 3D vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_center_median_weighted(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_center_median_weighted(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float cent[3];
 
@@ -1913,7 +1913,7 @@ PyDoc_STRVAR(bpy_bmface_calc_center_bounds_doc,
 "   :return: a 3D vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmface_calc_center_bounds(BPy_BMFace *self)
+static PyObject *bpy_bmface_calc_center_bounds(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	float cent[3];
 
@@ -1928,7 +1928,7 @@ PyDoc_STRVAR(bpy_bmface_normal_update_doc,
 "\n"
 "   Update face's normal.\n"
 );
-static PyObject *bpy_bmface_normal_update(BPy_BMFace *self)
+static PyObject *bpy_bmface_normal_update(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -1943,7 +1943,7 @@ PyDoc_STRVAR(bpy_bmface_normal_flip_doc,
 "\n"
 "   Reverses winding of a face, which flips its normal.\n"
 );
-static PyObject *bpy_bmface_normal_flip(BPy_BMFace *self)
+static PyObject *bpy_bmface_normal_flip(BPy_BMFace *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
@@ -2005,7 +2005,7 @@ PyDoc_STRVAR(bpy_bmloop_calc_angle_doc,
 "   :return: The angle in radians.\n"
 "   :rtype: float\n"
 );
-static PyObject *bpy_bmloop_calc_angle(BPy_BMLoop *self)
+static PyObject *bpy_bmloop_calc_angle(BPy_BMLoop *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 	return PyFloat_FromDouble(BM_loop_calc_face_angle(self->l));
@@ -2020,7 +2020,7 @@ PyDoc_STRVAR(bpy_bmloop_calc_normal_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmloop_calc_normal(BPy_BMLoop *self)
+static PyObject *bpy_bmloop_calc_normal(BPy_BMLoop *self, PyObject *UNUSED(args))
 {
 	float vec[3];
 	BPY_BM_CHECK_OBJ(self);
@@ -2037,7 +2037,7 @@ PyDoc_STRVAR(bpy_bmloop_calc_tangent_doc,
 "   :return: a normalized vector.\n"
 "   :rtype: :class:`mathutils.Vector`\n"
 );
-static PyObject *bpy_bmloop_calc_tangent(BPy_BMLoop *self)
+static PyObject *bpy_bmloop_calc_tangent(BPy_BMLoop *self, PyObject *UNUSED(args))
 {
 	float vec[3];
 	BPY_BM_CHECK_OBJ(self);
@@ -2449,7 +2449,7 @@ PyDoc_STRVAR(bpy_bmelemseq_index_update_doc,
 "      Running this on sequences besides :class:`BMesh.verts`, :class:`BMesh.edges`, :class:`BMesh.faces`\n"
 "      works but wont result in each element having a valid index, instead its order in the sequence will be set.\n"
 );
-static PyObject *bpy_bmelemseq_index_update(BPy_BMElemSeq *self)
+static PyObject *bpy_bmelemseq_index_update(BPy_BMElemSeq *self, PyObject *UNUSED(args))
 {
 	BMesh *bm = self->bm;
 
@@ -2495,7 +2495,7 @@ PyDoc_STRVAR(bpy_bmelemseq_ensure_lookup_table_doc,
 "\n"
 "   This needs to be called again after adding/removing data in this sequence."
 );
-static PyObject *bpy_bmelemseq_ensure_lookup_table(BPy_BMElemSeq *self)
+static PyObject *bpy_bmelemseq_ensure_lookup_table(BPy_BMElemSeq *self, PyObject *UNUSED(args))
 {
 	BPY_BM_CHECK_OBJ(self);
 
