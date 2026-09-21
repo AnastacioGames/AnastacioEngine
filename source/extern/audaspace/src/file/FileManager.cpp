@@ -18,8 +18,43 @@
 #include "file/IFileInput.h"
 #include "file/IFileOutput.h"
 #include "Exception.h"
+#include "IReader.h"
+
+#ifdef __EMSCRIPTEN__
+#include <cstdio>
+#endif
 
 AUD_NAMESPACE_BEGIN
+
+#ifdef __EMSCRIPTEN__
+namespace {
+
+/** Leitor de um som que nao pode ser decodificado. O Wasm nao tem excecoes, e um leitor nulo
+ *  derrubaria os leitores de efeito (volume, limit, pitch...) que desreferenciam o filho; este
+ *  toca silencio de comprimento zero e deixa .specs/.length/.play seguros. */
+class UnreadableReader : public IReader
+{
+public:
+	virtual bool isSeekable() const { return true; }
+	virtual void seek(int) {}
+	virtual int getLength() const { return 0; }
+	virtual int getPosition() const { return 0; }
+	virtual Specs getSpecs() const { Specs s; s.rate = RATE_44100; s.channels = CHANNELS_MONO; return s; }
+	virtual void read(int &length, bool &eos, sample_t *)
+	{
+		length = 0;
+		eos = true;
+	}
+};
+
+std::shared_ptr<IReader> unreadableReader()
+{
+	fprintf(stderr, "[aud] file could not be decoded; using a silent empty sound\n");
+	return std::make_shared<UnreadableReader>();
+}
+
+}  // namespace
+#endif
 
 std::list<std::shared_ptr<IFileInput>>& FileManager::inputs()
 {
@@ -49,7 +84,12 @@ std::shared_ptr<IReader> FileManager::createReader(std::string filename)
 	{
 		try
 		{
-			return input->createReader(filename);
+			std::shared_ptr<IReader> reader = input->createReader(filename);
+#ifdef __EMSCRIPTEN__
+			if(!reader)
+				continue;
+#endif
+			return reader;
 		}
 		catch(Exception&) {}
 	}
@@ -57,7 +97,7 @@ std::shared_ptr<IReader> FileManager::createReader(std::string filename)
 #ifdef __EMSCRIPTEN__
 	/* Emscripten is built without C++ exceptions.  A decode failure is an
 	 * expected result for user supplied media, not a reason to abort Wasm. */
-	return nullptr;
+	return unreadableReader();
 #else
 	AUD_THROW(FileException, "The file couldn't be read with any installed file reader.");
 #endif
@@ -69,13 +109,18 @@ std::shared_ptr<IReader> FileManager::createReader(std::shared_ptr<Buffer> buffe
 	{
 		try
 		{
-			return input->createReader(buffer);
+			std::shared_ptr<IReader> reader = input->createReader(buffer);
+#ifdef __EMSCRIPTEN__
+			if(!reader)
+				continue;
+#endif
+			return reader;
 		}
 		catch(Exception&) {}
 	}
 
 #ifdef __EMSCRIPTEN__
-	return nullptr;
+	return unreadableReader();
 #else
 	AUD_THROW(FileException, "The file couldn't be read with any installed file reader.");
 #endif
