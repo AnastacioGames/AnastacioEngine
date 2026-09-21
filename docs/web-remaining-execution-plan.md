@@ -9,20 +9,15 @@ Preparado em 2026-09-20 para execução pelo Claude, a partir da análise soment
 - **Validação feita para o checkpoint M1:** `python -m unittest tools.tests.web_profile.test_preflight -v` (11 testes), `py_compile` dos scripts Python alterados e `git diff --check`, todos aprovados. Uma tentativa de build não é evidência: o diretório `build-android` da worktree apontava para a árvore principal, portanto não compilou este diff. Reconfigurar um build Web limpo da worktree antes de compilar.
 
 - **M1 encerrado com uma lacuna (2026-09-20, branch `claude/web-m1-python-diag`, `f0330724`):** importação de relatório Python no editor (versões 1, 2 e desconhecida), execução sem pré-voo e falha de vertex de `BL_Shader` foram testadas pelo usuário/Claude. Lacuna do `stage "?"` **fechada**: reexecutado contra o runtime atual, o relatório traz `stage` "vertex" e `structured: true` (o teste antigo usou runtime anterior a `54c15f9e`). Resta só o nome do material sair como `engine-shader` genérico; link e materiais de nós não foram testados. Também corrigido: falso `WEB-PKG-003` em componente com módulo pontilhado (`scripts.x`).
-- **M2 (Claude) validado (2026-09-20):** `9d008486` (DNA `unsigned char` nos cinco campos) e `dfae0be0` (reativa `USE_RNA_RANGE_CHECK` no Emscripten). SDNA/offsets idênticos antes/depois (nativo e wasm32), 7 erros de checagem pré-M2 e 0 depois, roundtrip nas fronteiras, `userpref.blend`, animação e clamp via RNA testados; builds nativo e Web terminaram com código 0. Detalhes e limites do que não foi coberto no changelog de 2026-09-20. Pendente: rebuild do `build-web-release` (`GPU_shader.h` do M1) antes de publicar.
+- **M2 (Claude) validado (2026-09-20):** `9d008486` (DNA `unsigned char` nos cinco campos) e `dfae0be0` (reativa `USE_RNA_RANGE_CHECK` no Emscripten). SDNA/offsets idênticos antes/depois (nativo e wasm32), 7 erros de checagem pré-M2 e 0 depois, roundtrip nas fronteiras, `userpref.blend`, animação e clamp via RNA testados; builds nativo e Web terminaram com código 0. Detalhes e limites do que não foi coberto no changelog de 2026-09-20. `build-web-release` reconstruído depois (163/163, código 0).
 - **M3 (Claude), correções validadas em runtime Web:** indice de filtro (antes/depois), resize do bloom (offscreens seguem canvas/2,/4,/8, sem erro de GL) e resolução dinâmica sem timer (aviso único, escala inalterada); `build-web-release` reconstruído. Faltam as medições em celular físico (usuário). **M4: recomendação é adiar** — sem tabela p50/p95 medida não há evidência de que os passes de filtro sejam o gargalo, e o plano exige ganho medível para manter a complexidade. Detalhes no changelog de 2026-09-20.
-- **R1 (Codex, em paralelo):** ver "Divisão de trabalho".
+- **R1 (Codex) concluído, ainda não integrado** (`codex/r1-constraint-abi`, `9ff97884`, base `87a67fd8`): os 28 callbacks `METH_VARARGS` de `Range.constraints` perdem o parâmetro `kwds` (ABI de `PyCFunction`); relatado build Web (1817 etapas) e cena de regressão passando no Chrome headless e no nativo. **Verificado por Claude (2026-09-20, sem compilar):** `grep` mostra `kwds` só em `createConstraint` (correto, `METH_KEYWORDS`); `python -S tools/tests/constraint_abi_test.py` -> `CONSTRAINT_ABI_STATIC_TEST: PASS (31 methods)`. Ressalva: sem `-S` o guard estático falha aqui com `NameError: EXP_PyObjectPlus` porque há um pacote `Range` de stubs em `site-packages` (o `except ImportError` não pega); a incompatibilidade de ABI não se reproduziu no nativo antes da correção (só é comprovada por leitura da ABI do CPython/Emscripten).
+- **R3 (Codex, áudio) implementado, NÃO compilado e com lacuna** (`codex/r3-audio-m3-tests`, `7544073e`, base `58b1d767`): no Wasm sem unwinding, `AUD_THROW` aborta o processo; `FileManager`/`WAVFile` passam a devolver leitor nulo, `SoftwareDevice::play` rejeita nulo e `AUD_Device` tolera device ausente. O build Web da worktree do Codex não terminou; nenhuma execução da correção. **Revisão de Claude (estática):** o nulo agora chega a chamadores que o desreferenciam sem checar — `AUD_Sound_getSpecs`/`AUD_Sound_getLength` (`bindings/C/AUD_Sound.cpp:87,94`), `Sound.write`/`specs`/`length` (`bindings/python/PySound.cpp:197,1937,1955`), `AUD_Special.cpp:92,124,146`, e os leitores de efeitos (`ChannelMapper`, `Delay`, `Volume` etc.) que chamam `reader->getSpecs()` no construtor. Ou seja, o abort por exceção pode virar segfault/abort por nulo num arquivo inválido encadeado com efeito. RIFF/WAV malformado ainda usa `AUD_THROW` (limite já admitido pelo Codex).
+- **T2 (Codex, sondas M3) entregue:** `criar_m3_bloom_resize.py`/`m3_bloom_resize.py` e `criar_m3_dynamic_resolution_no_timer.py`/`m3_dynamic_resolution_no_timer.py` (mesma branch). Rodaram contra o `build-web` antigo (sem `offScreenSize`): resize sem abort e aviso único de timer. A medição numérica dos offscreens e `glError=0` foi feita por Claude com `claude_m3_resize.*` (ver changelog).
 
 ## Divisão de trabalho (Claude e Codex)
 
-Para não disputar árvore de build nem arquivo, cada frente tem sua worktree e seus arquivos.
-
-| Frente | Dono | Worktree / branch | Arquivos que pode tocar | Não tocar |
-|---|---|---|---|---|
-| M2 (DNA/RNA) e depois M3 | Claude | `D:\AnastacioEngine-claude-rna`, `claude/web-m1-python-diag` | `makesdna/*`, `makesrna/*`, consumidores citados em M2; depois `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine` | — |
-| R1 (ABI de constraints Python) | Codex | nova worktree a partir de `f0330724`, branch `codex/r1-constraint-abi` | `source/source/gameengine/Ketsji/KX_PyConstraintBinding.cpp` e teste próprio | DNA/RNA, filtros, `build/`, `build-web*` da worktree do Claude |
-
-Regras: Codex faz build só no diretório da sua worktree (nunca reaproveita `build*` de outra worktree; ver o aviso do `build-android` no estado de M1). Ao terminar, entrega commit(s) na sua branch e um resumo com o que foi executado; o Claude integra. Sem push nem merge sem pedido do usuário.
+Rodada 2 (2026-09-20): a divisão da rodada anterior terminou; ver o "Handoff" no fim do arquivo para a divisão vigente. Regras que continuam valendo: cada frente tem worktree e arquivos próprios; o Codex compila só no build da sua worktree (nunca em `build*` de outra); ao terminar entrega commit na sua branch e resumo do que foi executado; o Claude integra; sem push nem merge sem pedido do usuário.
 
 ## Instrução para o Claude
 
@@ -276,17 +271,21 @@ Atualizar documentação conforme `AGENTS.md`: estado aberto no roadmap, decisã
 
 Critério de encerramento desta rodada: M0–M3 implementados e validados, ou bloqueios explicitamente documentados; R1–R3 triados com decisão registrada; M4–M6 classificados com base em medição/requisito, sem apresentar adiamento como implementação concluída.
 
-## Handoff (2026-09-20, fim da sessao longa)
+## Handoff (2026-09-20, rodada 2)
 
-Estado: worktree `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`, HEAD com M2 validado e M3 (correcoes) commitado. R1 (Codex) concluido em `codex/r1-constraint-abi`; ainda nao integrado aqui.
+Estado: `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`. M0-M3 (correções) validados; `build-web` e `build-web-release` atualizados com o HEAD desta branch. Codex terminou R1, T1 (R3) e T2; nada disso está integrado (duas branches: `codex/r1-constraint-abi` a partir de `87a67fd8`, `codex/r3-audio-m3-tests` a partir de `58b1d767`; ambas mexem em `docs/changelog.md`, conflito trivial no topo).
 
-**Claude (arquivos: `KX_2DFilter*`, `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine.cpp`, `RAS_Query*`, `RAS_OpenGLQuery*`; nao editar em paralelo):**
-1. Teste de resize do bloom no Web (`changeBloomValues` + `render.setWindowSize`), conferindo erro de GL e dimensoes dos offscreens. Falta acrescentar `offScreenSize` ao printf de debug em `RAS_2DFilter.cpp` (edicao nao aplicada).
-2. Teste da resolucao dinamica sem timer de GPU.
-3. Rebuild do `build-web-release`; medicoes em celular fisico (depende do usuario); decisao do M4.
-4. Lacuna do M1 (BL_Shader com `stage "?"`) e SSAO na Web (aguarda comparacao do usuario no desktop).
+**Decisões que dependem do usuário:** (1) autorizar o Claude a integrar as duas branches do Codex na branch atual (merge local, sem push); (2) medir em celular físico (procedimento no fim); (3) comparar o SSAO no desktop; (4) confirmar o adiamento do M4.
 
-**Codex (nao toca nos arquivos acima):**
-- **T1 (R3, audio):** triagem e correcao dos aborts de audio no Web, em `source/extern/audaspace` e binding `aud`; sem mexer em M5/M6. Entregar causa, reproducao e teste.
-- **T2 (testes Web do M3, somente arquivos novos em `projects-teste/teste-editor-web/`):** scripts e geradores de `.range` para (a) bloom ligado + redimensionar a janela e (b) resolucao dinamica sem timer de GPU. Rodar contra `--runtime-dir D:/AnastacioEngine-claude-rna/build-web/bin` **somente leitura** (nao compilar nesse diretorio). Usar Edge headless isolado (`--user-data-dir` temporario, porta propria), nunca encerrar processos por nome.
-- Ambos: branch propria a partir do HEAD desta branch, sem push/merge, commit com trailer do Codex, e atualizar changelog com evidencia executada.
+**Claude (arquivos: `KX_2DFilter*`, `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine.cpp`, `RAS_Query*`, `BL_Shader*`, `RAS_Shader*`, `gpu_shader.c`, docs; integração):**
+1. Depois do OK do usuário: integrar `codex/r1-constraint-abi` e `codex/r3-audio-m3-tests`, resolver o changelog, recompilar nativo, `build-web` e `build-web-release` (uma vez cada, no build dir do Claude) e rodar: `constraint_abi_test` (nativo e Web), `claude_m3_resize` e as sondas de áudio do Codex.
+2. Nome de material/origem em `shader_errors` (hoje `engine-shader`/`2d-filter`) e teste de falha de link e de material de nós, que continuam sem teste.
+3. SSAO na Web: aguarda a comparação do usuário.
+4. Registrar a decisão do M4 assim que houver a tabela p50/p95.
+
+**Codex (não toca nos arquivos acima; branch nova a partir do HEAD desta branch, commit com trailer do Codex, changelog com evidência executada):**
+- **T3 (fechar R3):** (a) checar o nulo em todos os chamadores de `createReader()` listados no status de R3 e nos construtores de leitores de efeito, ou garantir que nunca recebam nulo no Web; (b) converter as validações de RIFF/WAV/Vorbis/MP3 que ainda usam `AUD_THROW` para retorno de erro no Emscripten; (c) **compilar e executar** no build Web da sua própria worktree e provar com pacote real: arquivo inexistente, arquivo corrompido, formato não suportado, e o mesmo encadeado com efeito (`volume`, `limit`, `pitch`) e com `.write`/`.specs`/`.length`, sem abort. Sem T3 executado, R3 não pode ser marcado como resolvido.
+- **T4 (R1, pequeno):** tornar o guard estático de `constraint_abi_test.py` robusto ao pacote `Range` de stubs (`except Exception`, ou detectar `EXP_PyObjectPlus`), e refazer a base da branch em cima do HEAD atual para facilitar a integração.
+- **T5 (só arquivos novos em `tools/web/` e `docs/`):** ferramenta de medição para o M3: script Node/CDP que abre um pacote no Edge headless isolado e registra tempo de frame p50/p95, número de passes de filtro e tamanho da escala, e um snippet/parâmetro de URL (`?perf=1`) para o usuário medir no celular sem depender do editor. Não editar `package-web.py`; se precisar de gancho na página, propor o diff em documento.
+
+**Procedimento do usuário para o celular (M3):** exportar o jogo real, abrir no aparelho com a ferramenta do T5 (ou cronômetro do navegador), anotar aparelho, navegador, resolução, escala e filtros ativos, 3 execuções de ~60 s em trecho reproduzível, e enviar p50/p95. Só com isso o M4 pode ser decidido.

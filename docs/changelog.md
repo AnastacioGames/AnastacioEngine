@@ -4,6 +4,22 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
+## 2026-09-20 - Web: revisão do trabalho do Codex (R1, R3, T2) e nova divisão
+
+- Branches lidas por diff, sem integrar: `codex/r1-constraint-abi` (`9ff97884`) e `codex/r3-audio-m3-tests` (`7544073e`).
+- **R1:** `grep` de `kwds` só em `createConstraint`; `python -S tools/tests/constraint_abi_test.py` deu
+  `CONSTRAINT_ABI_STATIC_TEST: PASS (31 methods)`. Sem `-S` o guard falha com `NameError: EXP_PyObjectPlus` por causa
+  de um pacote `Range` de stubs no `site-packages` desta máquina. Build/execução Web do Codex não foram repetidos.
+- **R3:** não compilado pelo Codex e revisado só estaticamente: `createReader()` passa a poder devolver nulo no Web, e
+  `AUD_Sound_getSpecs`/`getLength`, `Sound.write`/`specs`/`length` (PySound) e `AUD_Special` o desreferenciam sem checar,
+  assim como leitores de efeito que chamam `reader->getSpecs()` no construtor. Risco de trocar abort por exceção em
+  segfault por nulo com arquivo inválido; não reproduzido (falta build). R3 segue **aberto**, tarefa T3.
+- **T2:** sondas M3 do Codex rodaram no runtime antigo (sem `offScreenSize`); a medição numérica está na entrada do
+  resize do bloom acima. Suíte `tools/tests/web_profile`: 98 testes OK nesta branch.
+- Documentos atualizados: plano (status, divisão e handoff da rodada 2), roadmap e esta entrada. Nova divisão:
+  Claude integra e recompila depois do OK do usuário; Codex faz T3 (fechar R3), T4 (guard do R1) e T5 (ferramenta de
+  medição p50/p95).
+
 ## 2026-09-20 - Web: lacuna do M1 (BL_Shader com stage "?") ja estava fechada
 
 - Reexecutado o teste de `criar_m1c.py` + `shader_quebrado.py` contra o `build-web` atual (Edge headless isolado,

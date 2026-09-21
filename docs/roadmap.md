@@ -29,6 +29,11 @@ Aberto:
   shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
   "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
+- **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
+  constraints Python) e R3 (aborts de áudio sem exceções) prontos em branches do Codex, **ainda não integrados**;
+  R3 não foi compilado e tem lacuna (nulo desreferenciado em `AUD_Sound_getSpecs` etc.). M4 recomendado adiar até
+  medir p50/p95 em celular físico. Divisão vigente e pendências em
+  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como
