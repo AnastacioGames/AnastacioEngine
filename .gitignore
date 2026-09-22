@@ -2,6 +2,7 @@ build/
 build_core/
 build-web/
 build-android/
+build-cycles/
 build-linux/
 build-linux-editor/
 install/
@@ -11,9 +12,12 @@ tools/RangeArmor-master/
 projects-teste/**/*.range
 projects-teste/**/*.range1
 projects-teste/**/*.rasec
+projects-teste/**/*.blend1
 projects-teste/__pycache__/
 projects-teste/scripts/__pycache__/
 projects-teste/benchmarks/
+projects-teste/teste-save-web/
+projects-teste/web/
 .vscode/
 logs/archive/
 build_log*.txt
