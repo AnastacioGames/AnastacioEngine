@@ -37,6 +37,13 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Arquitetura](architecture.md): fluxo do runtime e mapa dos módulos.
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.
+- [Mapa de código de `KX_GameObject.cpp`](code-map-kx-gameobject.md): onde fica cada domínio do arquivo,
+  para navegar sem ler as 5.979 linhas.
+- [Mapa de código dos outros arquivos grandes do gameengine](code-map-gameengine.md): `KX_Scene`,
+  `KX_PythonInit`, `CcdPhysicsEnvironment`, `CcdPhysicsController` e `BL_BlenderDataConversion`.
+- [Índices de código por área](local-knowledge/index-physics.md): arquivo, linhas e classes de cada área
+  (`rendering`, `physics`, `logic-scripting`, `scenegraph-converter`, `dna-blend`), gerados por
+  `python tools/build_code_index.py`.
 - [Notas de build](build-notes.md): ambiente Windows, alvos e validação.
 - [Build no Linux](linux-build.md): presets do runtime/editor, dependências, empacotamento e validações em
   Linux nativo.

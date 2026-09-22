@@ -190,7 +190,7 @@ Os cinco itens abaixo foram corrigidos/verificados um por commit, cada um
 com build limpo de `RangeEngine`+`RangeRuntime` e validação aplicável
 (smoke test, ciclo Play→Stop→Play, ou revisão de código quando o
 comportamento já estava correto). Detalhe completo no
-[changelog](changelog.md#2026-09-05--ketsji-plano-1a-contador-csm) de cada
+[changelog](changelog/08_2026-09-06_a_2026-09-02.md#2026-09-05--ketsji-plano-1a-contador-csm) de cada
 data.
 
 1. **Contador de estabilização do CSM** — estado por instância de
@@ -231,7 +231,7 @@ cena); (2) achados restantes em `PostRenderScene()` (`//printf` morto) e
 `UpdateSleepTime()` (comentário de código morto, TODO de baixa qualidade,
 comentários redundantes) removidos. Smoke test `ketsji_csm_smoke.py`
 aprovado. Detalhe no
-[changelog](changelog.md#2026-09-05--ketsji-plano-1b-higiene-conservadora-do-arquivo).
+[changelog](changelog/08_2026-09-06_a_2026-09-02.md#2026-09-05--ketsji-plano-1b-higiene-conservadora-do-arquivo).
 
 ### Plano 2 — Instrumentação granular e baseline — ENCERRADO (decisão do usuário)
 
@@ -269,7 +269,7 @@ de baseline em ms/percentis — pendências adiadas, não canceladas; retomado
 parcialmente no mesmo dia para os itens de luzes/draw calls/lógica acima
 antes de avançar para o Plano 3. Detalhe de cada unidade no changelog, a
 partir de
-[2026-09-06](changelog.md#2026-09-06--ketsji-plano-2-categoria-de-profiling-para-o-collision-depth-pass).
+[2026-09-06](changelog/08_2026-09-06_a_2026-09-02.md#2026-09-06--ketsji-plano-2-categoria-de-profiling-para-o-collision-depth-pass).
 
 ### Plano 3 — Testes e infraestrutura de segurança — ENCERRADO (decisão do usuário)
 
@@ -310,7 +310,7 @@ auditoria sem código) **confirmação em jogo real pelo usuário**:
 iniciado (exige instrumentação C++ prévia): regressão de sombras, filtros
 2D, render-to-texture, e avaliação de ASan/UBSan no toolchain. Detalhe de
 cada unidade a partir do
-[changelog](changelog.md#2026-09-06--ketsji-plano-3-relogio-controlavelfalso-para-testes-de-temporizacao).
+[changelog](changelog/08_2026-09-06_a_2026-09-02.md#2026-09-06--ketsji-plano-3-relogio-controlavelfalso-para-testes-de-temporizacao).
 
 ### Plano 4 — RAII e propriedade explícita
 
@@ -333,21 +333,21 @@ anterior em `RenderCollisionDepthBuffer` por uma guarda de escopo RAII,
 eliminando o risco de um early return futuro entre o bind e o fim da função
 deixar o offscreen errado vinculado. Build incremental limpo, sem mudança de
 comportamento nos caminhos existentes. Detalhes no
-[changelog](changelog.md#2026-09-06--ketsji-plano-4-guarda-de-escopo-para-o-offscreen-de-collision-depth).
+[changelog](changelog/09_2026-09-17_a_2026-09-06.md#2026-09-06--ketsji-plano-4-guarda-de-escopo-para-o-offscreen-de-collision-depth).
 **Segunda unidade concluída em 2026-09-06:** `RAS_ScopeExit<Fn>` (RAII genérico
 local a `RAS_2DFilter.cpp`) substitui a restauração manual de três pares
 bind/unbind em `RAS_2DFilter::Render` (offscreen custom do filtro, programa de
 shader, texturas de entrada) por guardas de escopo. Build incremental limpo,
 sem mudança de comportamento (ordem de desvínculo entre offscreen/programa
 mudou, mas os três mexem em estado GL independente). Detalhes no
-[changelog](changelog.md#2026-09-06--ketsji-plano-4-guardas-de-escopo-em-ras_2dfilterrender).
+[changelog](changelog/09_2026-09-17_a_2026-09-06.md#2026-09-06--ketsji-plano-4-guardas-de-escopo-em-ras_2dfilterrender).
 
 **Terceira unidade concluída em 2026-09-06:** `KX_TempCameraGuard` (RAII local
 a `KX_KetsjiEngine.cpp`, junto de `KX_OffScreenRestoreGuard`) substitui os dois
 `Release()` manuais das câmeras temporárias `staticCam`/`cam` em
 `RenderShadowBuffers` por guardas de escopo. Build incremental limpo, sem
 mudança de comportamento. Detalhes no
-[changelog](changelog.md#2026-09-06--ketsji-plano-4-guarda-de-camera-temporaria-em-rendershadowbuffers).
+[changelog](changelog/09_2026-09-17_a_2026-09-06.md#2026-09-06--ketsji-plano-4-guarda-de-camera-temporaria-em-rendershadowbuffers).
 
 **Quarta unidade concluída em 2026-09-06:** `KX_StaticShadowBufferGuard` e
 `KX_ShadowBufferGuard` (RAII locais a `KX_KetsjiEngine.cpp`, junto de
@@ -355,7 +355,7 @@ mudança de comportamento. Detalhes no
 (`UnbindStaticShadowBuffer`, `UnbindCascadeShadowBuffer`/`UnbindShadowBuffer`)
 em `RenderShadowBuffers` por guardas de escopo. Build incremental limpo, sem
 mudança de comportamento. Detalhes no
-[changelog](changelog.md#2026-09-06--ketsji-plano-4-guardas-de-bindunbind-de-framebuffer-em-rendershadowbuffers).
+[changelog](changelog/09_2026-09-17_a_2026-09-06.md#2026-09-06--ketsji-plano-4-guardas-de-bindunbind-de-framebuffer-em-rendershadowbuffers).
 
 Com isso, as quatro unidades planejadas para Plano 4 estão concluídas. Save/
 restore de viewport/scissor em `RAS_2DFilterOffScreen::Bind`/`Unbind` foi
@@ -375,7 +375,7 @@ item). Descartados como não-candidatos: `KX_TextureRendererManager::Render`
 (toggle simples), `RAS_2DFilterManager::RenderFilters` (bind final antes de
 retornar) e `RAS_2DFilter::Render` (já guardado desde a segunda unidade).
 Build incremental limpo, sem mudança de comportamento. Detalhes no
-[changelog](changelog.md#2026-09-06--ketsjirasterizer-plano-4-guardas-em-kx_texturerenderermanager-e-ras_rasterizer).
+[changelog](changelog/09_2026-09-17_a_2026-09-06.md#2026-09-06--ketsjirasterizer-plano-4-guardas-em-kx_texturerenderermanager-e-ras_rasterizer).
 
 Nenhum novo candidato identificado até o momento; próximo passo é decidir
 entre revisar outras áreas do motor em busca do mesmo padrão ou avançar para
@@ -968,7 +968,7 @@ inatingível em produção por ora, propositalmente. Build limpo dos dois
 executáveis aprovado (135/135, exit 0), exigido por alterar o header. Sem
 teste em jogo real: nada muda de comportamento observável enquanto a flag
 não tem caminho de ativação. Detalhes no
-[changelog](changelog.md#2026-09-07--ketsji-plano-8-introducao-do-acumulador-de-passo-fixo-atras-de-flag-desligada).
+[changelog](changelog/03_2026-09-12_a_2026-08-23.md#2026-09-07--ketsji-plano-8-introducao-do-acumulador-de-passo-fixo-atras-de-flag-desligada).
 
 **2026-09-07 — flag exposta em GameData/RNA/UI (build validado, sem teste em
 jogo ainda):** `SetUseFixedTimestep` (unidade anterior) estava implementado
