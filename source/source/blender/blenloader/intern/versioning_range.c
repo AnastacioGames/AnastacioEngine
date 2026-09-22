@@ -111,6 +111,35 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
         }
       }
 
+      /* The Range atmospheric sky modes took bits 3 and 4. Preserve the two
+       * UPBGE sky flags that occupied those bits. */
+      LISTBASE_FOREACH (World *, world, &main->world) {
+        if (world->skytype & (1 << 3)) {
+          world->skytype &= ~(1 << 3);
+          world->skytype |= WO_SKYTEX;
+        }
+        if (world->skytype & (1 << 4)) {
+          world->skytype &= ~(1 << 4);
+          world->skytype |= WO_ZENUP;
+        }
+      }
+
+      /* Range inserted Clipping and Dithering ahead of the UPBGE shadow
+       * filters. Keep the filter selected by old lamp datablocks. */
+      LISTBASE_FOREACH (Lamp *, lamp, &main->lamp) {
+        switch (lamp->shadow_filter) {
+          case 1:
+            lamp->shadow_filter = LA_SHADOW_FILTER_PCF;
+            break;
+          case 2:
+            lamp->shadow_filter = LA_SHADOW_FILTER_PCF_BAIL;
+            break;
+          case 3:
+            lamp->shadow_filter = LA_SHADOW_FILTER_PCF_JITTER;
+            break;
+        }
+      }
+
     }
   }
 
