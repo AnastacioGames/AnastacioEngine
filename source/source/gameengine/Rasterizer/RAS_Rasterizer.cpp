@@ -95,6 +95,9 @@ RAS_Rasterizer::RAS_Rasterizer()
 	m_debugDrawImpl.reset(new RAS_OpenGLDebugDraw());
 
 	m_numgllights = m_impl->GetNumLights();
+	for (unsigned int i = 0; i < GPU_SHADOW_LAMPS_COUNT; i++) {
+		m_shadowLamps[i] = nullptr;
+	}
 
 	InitOverrideShadersInterface();
 
@@ -1149,6 +1152,9 @@ void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 		for (count = 0; count < m_numgllights; count++) {
 			m_impl->DisableLight(count);
 		}
+		for (unsigned int i = 0; i < GPU_SHADOW_LAMPS_COUNT; i++) {
+			m_shadowLamps[i] = nullptr;
+		}
 
 		viewmat.PackFromAffineTransform(glviewmat);
 
@@ -1162,6 +1168,13 @@ void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 			RAS_OpenGLLight *light = (*lit);
 
 			if (light->ApplyFixedFunctionLighting(kxscene, layer, count)) {
+				/* Record the GPULamp behind gl_LightSource[count] too, same slot, so
+				 * BL_BlenderShader::UpdateLights() can bind its shadow map for the fixed-function
+				 * light loop Principled/PBR materials read (see GetShadowLamps()). Slots beyond
+				 * GPU_SHADOW_LAMPS_COUNT aren't read by that loop, so skip recording those. */
+				if (count < GPU_SHADOW_LAMPS_COUNT) {
+					m_shadowLamps[count] = light->GetGPULamp();
+				}
 				count++;
 			}
 		}

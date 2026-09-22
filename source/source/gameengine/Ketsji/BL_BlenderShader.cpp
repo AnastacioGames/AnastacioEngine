@@ -186,6 +186,7 @@ void BL_BlenderShader::UnbindProg()
 void BL_BlenderShader::UpdateLights(RAS_Rasterizer *rasty)
 {
 	GPU_material_update_lamps(m_gpuMat, rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data());
+	GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
 }
 
 void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Rasterizer *rasty)

@@ -138,14 +138,20 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
 ## Iluminação e gráficos
 
-- **Sombra ausente em materiais Principled/PBR no `BLENDER_GAME`**: o loop de luzes de cena do Principled
-  (`gpu_shader_material.glsl:3918-3941`/`:4018-4025`) lê `gl_LightSource[i]` direto, sem sampler de shadow map
-  nem chamada a `shadow_simple`/`shadow_pcf`/etc.; `node_shader_bsdf_principled.c` não faz wiring de shadow
-  nenhum. Resultado: chão/objetos com material PBR não recebem sombra projetada (confirmado visualmente pelo
-  usuário com `projects-teste/pbr-baseline/shadow_ibl_test.range`: Sun+Spot com sombra ligada, sombra visível
-  só ao desligar as opções PBR e usar material legado sem nodes). Precisa levar shadow map + matriz por lamp
-  até o loop `NUM_LIGHTS` do Principled e aplicar o fator de sombra a `light_diffuse`/`light_specular`, como o
-  caminho legado já faz. Ver changelog de 2026-09-21 ("Teste Sun+Point+IBL").
+- **Compatibilidade UPBGE 0.2.5b adiada:** ao abrir um `.blend` dessa versão, migrar somente quando
+  `upbgeversionfile != 0` e o arquivo ainda não tiver versão Range. Há duas conversões verificadas que não
+  devem ser misturadas à correção dos Mouse Logic Bricks: (1) em `World.skytype`, mover `Sky Texture` do bit
+  `1 << 3` para `WO_SKYTEX` (`1 << 5`) e `Zenith Up` do bit `1 << 4` para `WO_ZENUP` (`1 << 6`); (2) em
+  `Lamp.shadow_filter`, converter PCF `1 → 3`, PCF Bail `2 → 4` e PCF Jitter `3 → 5`, pois Range inseriu
+  Clipping e Dithering antes desses filtros. Comparação feita contra `tools/arquivo_upbge.blend` na UPBGE
+  oficial 0.2.5b e o source `tools/upbge-0.2.5b-source/`.
+- **Sombra em materiais Principled/PBR no `BLENDER_GAME` — implementado, falta validar no jogo real**: shadow
+  map simples (sem CSM/VSM) agora é amostrado dentro do loop `NUM_LIGHTS` de `node_bsdf_principled()`
+  (`unfshadowmap`/`unfshadowpersmat`/`unfshadowbias`/`unfshadowenabled` em `gpu_shader_material.glsl`,
+  bind via `GPU_material_bind_shadow_lamps()` em `gpu_material.c`, chamado por
+  `BL_BlenderShader::UpdateLights()`). Compila e linka limpo; falta confirmar visualmente com
+  `projects-teste/pbr-baseline/shadow_ibl_test.range` (regra de teste visual no jogo real do `AGENTS.md`, não
+  captura automatizada). Ver changelog de 2026-09-21 ("Sombra projetada em materiais Principled/PBR").
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
   buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
   (`BUFFER_SHADOW`) projetam sombra.
@@ -168,6 +174,9 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
   o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
+- **Sombra em Principled/PBR** (ver seção "Iluminação e gráficos" acima): confirmar no jogo real com
+  `projects-teste/pbr-baseline/shadow_ibl_test.range` que o chão/objetos com material PBR agora recebem
+  sombra projetada de Sun/Spot, comparável ao material legado.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

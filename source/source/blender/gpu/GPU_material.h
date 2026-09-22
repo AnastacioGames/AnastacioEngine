@@ -464,6 +464,15 @@ bool GPU_material_use_skinning(GPUMaterial *material);
 void GPU_material_get_skinning_attrib_locations(GPUMaterial *material, int *boneindexloc, int *boneweightloc);
 void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrices, int count);
 
+/* Shadow for the fixed-function scene-light loop (node_bsdf_principled() and friends in
+ * gpu_shader_material.glsl, gl_LightSource[i] with i < GPU_MATERIAL_NUM_SHADOW_LAMPS). Must match
+ * NUM_LIGHTS in that file -- both are a hardcoded cap on the fixed-function light loop, not a
+ * dynamic count. `lamps[i]` may be NULL for slots with no active shadow-casting lamp; entries
+ * without a shadow buffer (or using CSM/VSM, not implemented for this path) are treated as
+ * unshadowed. */
+#define GPU_MATERIAL_NUM_SHADOW_LAMPS 3
+void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
+
 #ifdef __cplusplus
 }
 #endif

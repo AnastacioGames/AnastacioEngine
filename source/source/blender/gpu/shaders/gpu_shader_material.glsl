@@ -3902,6 +3902,18 @@ vec3 rotate_vector(vec3 p, vec3 n, float theta) {
 
 #define NUM_LIGHTS 3
 
+#ifndef USE_CORE_PROFILE
+/* Per-scene-light shadow data for the fixed-function light loop above (gl_LightSource[i]).
+ * Indices line up with that same slot i -- bound manually by RAS_Rasterizer/BL_BlenderShader
+ * (GPU_material_bind_shadow_lamps), not by the GPUNodeLink material graph like the legacy
+ * (non-node) material path uses. unfshadowenabled defaults to 0 (no shadow) for any material
+ * whose shader never gets these set, so this is safe even if a given draw call doesn't bind them. */
+uniform sampler2DShadow unfshadowmap[NUM_LIGHTS];
+uniform mat4 unfshadowpersmat[NUM_LIGHTS];
+uniform vec2 unfshadowbias[NUM_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
+uniform float unfshadowenabled[NUM_LIGHTS];
+#endif
+
 /* bsdfs */
 
 void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
@@ -4088,6 +4100,17 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			clearcoat_bsdf = clearcoat * Gr * Fr * Dr * vec3(0.25) * light_specular;
 		}
 		clearcoat_bsdf *= max(CNdotL, 0.0);
+
+		/* Shadow map for this light slot, bound by GPU_material_bind_shadow_lamps() (see
+		 * unfshadowmap/unfshadowpersmat/unfshadowbias/unfshadowenabled above). Mirrors what the
+		 * legacy (non-node) material path does per-lamp via shadow_simple(). */
+		if (unfshadowenabled[i] > 0.5) {
+			float shadowfac;
+			shadow_simple(I, N, unfshadowmap[i], unfshadowpersmat[i], 0.0,
+			              unfshadowbias[i].x, unfshadowbias[i].y, 0.0, NdotL, shadowfac);
+			diffuse_and_specular_bsdf *= shadowfac;
+			clearcoat_bsdf *= shadowfac;
+		}
 
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;
 	}

@@ -22,6 +22,42 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-21 - Sombra projetada em materiais Principled/PBR no BLENDER_GAME
+
+- **Causa raiz** (diagnosticada na entrada anterior, "Teste Sun+Point+IBL" abaixo): `node_bsdf_principled()`
+  em `gpu_shader_material.glsl` soma as luzes de cena lendo `gl_LightSource[i]` (estado fixed-function do
+  OpenGL, `NUM_LIGHTS = 3`) sem nenhum sampler de shadow map — diferente do caminho legado (materiais sem
+  nodes), que usa o grafo `GPUNodeLink`/`GPU_link` per-lamp com `shadow_simple`/`GPU_dynamic_texture`.
+- **Correção**, em 4 peças:
+  1. `gpu_shader_material.glsl`: uniforms `unfshadowmap[3]` (sampler2DShadow), `unfshadowpersmat[3]` (mat4),
+     `unfshadowbias[3]` (vec2: bias/slopebias) e `unfshadowenabled[3]` (float, default 0 = sem sombra),
+     amostrados dentro do loop `NUM_LIGHTS` de `node_bsdf_principled()` via `shadow_simple()` (já existente),
+     multiplicando `diffuse_and_specular_bsdf`/`clearcoat_bsdf` pelo fator retornado quando o slot está habilitado.
+  2. `gpu_material.c`/`GPU_material.h`: `GPU_MATERIAL_NUM_SHADOW_LAMPS` (=3, deve casar com `NUM_LIGHTS` do
+     glsl) e `GPU_material_bind_shadow_lamps(GPUMaterial*, GPULamp * const lamps[3])`, seguindo o mesmo padrão
+     de uniform manual (fora do grafo de nós) já usado por `GPU_material_bind_bone_matrices`/`unfoliageparams`.
+     Só lamps com shadow buffer "simples" (sem CSM, sem VSM) recebem sombra por esse caminho — CSM/VSM ficam
+     como slot desabilitado (sem regressão: já não tinham sombra no Principled antes desta mudança). Lamps
+     usados aqui são registrados em `material->lamps`/`DYN_LAMP_PERSMAT`, igual ao que `GPU_lamp_get_data()`
+     já faz pro nó "Lamp Data", pra manter `lamp->dynpersmat` atualizado a cada frame.
+  3. `RAS_Rasterizer.h`/`.cpp`: `RAS_Rasterizer::ProcessLighting()` já monta `gl_LightSource[slot]` por luz
+     (`RAS_OpenGLLight::ApplyFixedFunctionLighting`); agora também grava o `GPULamp*` de cada luz no mesmo
+     slot em `m_shadowLamps[3]` (novo membro), exposto por `GetShadowLamps()`. `RAS_OpenGLLight::GetGPULamp()`
+     virou público (só troca de visibilidade, já existia e já era usado internamente por
+     `HasShadowBuffer()`/`GetShadowMatrix()` etc.) pra isso ser possível.
+  4. `BL_BlenderShader.cpp`: `UpdateLights()` (já chamado quando o estado de luz muda, ao lado de
+     `GPU_material_update_lamps`) agora também chama `GPU_material_bind_shadow_lamps(m_gpuMat,
+     rasty->GetShadowLamps())`.
+- **Limitação preservada, não regressão**: Point/Local lights continuam sem shadow buffer (limitação de
+  engine já documentada, `gpu_material.c` só cria buffer pra `LA_SPOT`/`LA_SUN`); CSM e VSM (Sun com
+  Cascaded/Variance Shadow Map) também não recebem sombra no Principled por ora — só o shadow map simples
+  (`shadow_simple`, o default da UI).
+- **Build**: `ge_rasterizer`, `ge_rasterizer_opengl`, `ge_ketsji` e `bf_gpu` compilam limpos (só warnings
+  pré-existentes, não relacionados); `RangeEngine`/`RangeRuntime` linkam sem erro. **Validação visual no jogo
+  real ainda pendente** (regra do `AGENTS.md`: não confiar em captura automatizada) — testar com
+  `projects-teste/pbr-baseline/shadow_ibl_test.range` (Sun+Spot, sombra ligada) e comparar com o material
+  legado (que já mostrava sombra) no mesmo chão.
+
 ## 2026-09-21 - Teste Sun+Point+IBL no BLENDER_GAME: sombra ausente em materiais Principled/PBR
 
 - **Objetivo:** validar visualmente (jogo real, não captura automatizada — ver regra do `AGENTS.md`) a combinação

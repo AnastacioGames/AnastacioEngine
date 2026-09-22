@@ -60,6 +60,7 @@ struct KX_ClientObjectInfo;
 class KX_RayCast;
 
 struct GPUShader;
+struct GPULamp;
 
 /**
  * 3D rendering device context interface. 
@@ -279,6 +280,15 @@ private:
 	bool m_lastlighting;
 	void *m_lastauxinfo;
 	unsigned int m_numgllights;
+
+	/* GPULamp of each of the first GPU_SHADOW_LAMPS_COUNT lights ProcessLighting() just applied
+	 * as gl_LightSource[slot] (nullptr for a slot with no light or no shadow buffer), same
+	 * slot order. Used by BL_BlenderShader::UpdateLights() to bind shadow maps for the
+	 * fixed-function light loop that Principled/PBR materials read (gpu_shader_material.glsl,
+	 * node_bsdf_principled()) -- keep in sync with GPU_MATERIAL_NUM_SHADOW_LAMPS
+	 * (GPU_material.h) and NUM_LIGHTS (gpu_shader_material.glsl). */
+	static const unsigned int GPU_SHADOW_LAMPS_COUNT = 3;
+	struct GPULamp *m_shadowLamps[GPU_SHADOW_LAMPS_COUNT];
 
 	DrawType m_drawingmode;
 	ShadowType m_shadowMode;
@@ -653,6 +663,11 @@ public:
 	void EnableLights();
 	void DisableLights();
 	void ProcessLighting(bool uselights, const mt::mat3x4 &trans);
+
+	/** GPULamp of the lights ProcessLighting() applied to gl_LightSource[0..GPU_SHADOW_LAMPS_COUNT-1]
+	 * in its last call, same slot order (see m_shadowLamps). */
+	struct GPULamp * const *GetShadowLamps() const { return m_shadowLamps; }
+	unsigned int GetShadowLampsCount() const { return GPU_SHADOW_LAMPS_COUNT; }
 
 	void PushMatrix();
 	void PopMatrix();

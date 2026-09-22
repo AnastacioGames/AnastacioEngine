@@ -82,9 +82,10 @@ ferramenta correspondente.
   de chÃ£o 5 m Ã  frente da cÃ¢mera ativa, mirando-a durante o runtime. Suns escolhidos manualmente em `World Sun`
   preservam seu comportamento e transformaÃ§Ã£o normais.
 - IBL (irradiância/reflexo de ambiente vindo do céu/HDRI) somado às luzes de cena já funciona no shader do
-  Principled (`059766dc`). **Gap conhecido**: materiais Principled/PBR não recebem sombra projetada no
-  `BLENDER_GAME` — o loop de luzes desse material não sampleia shadow map. Só materiais legados (sem nodes)
-  mostram sombra no chão hoje. Ver `docs/roadmap.md` ("Iluminação e gráficos").
+  Principled (`059766dc`). Sombra projetada (shadow map simples de Sun/Spot) no loop de luzes do Principled
+  foi implementada em 2026-09-21 (`GPU_material_bind_shadow_lamps`, ver `docs/changelog.md`); **falta apenas
+  a validação visual no jogo real** — CSM/VSM e Point/Local ainda não projetam sombra nesse caminho (mesma
+  limitação de engine já documentada). Ver `docs/roadmap.md` ("Iluminação e gráficos").
 
 ### Runtime e ferramentas
 

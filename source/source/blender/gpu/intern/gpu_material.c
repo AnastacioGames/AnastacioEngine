@@ -161,6 +161,15 @@ struct GPUMaterial {
 
 	bool use_foliage;
 
+	/* Shadow data for the fixed-function scene-light loop read by node_bsdf_principled() et al
+	 * (gl_LightSource[i], i < NUM_LIGHTS==3 in gpu_shader_material.glsl) -- resolved once here,
+	 * bound per-frame by GPU_material_bind_shadow_lamps() from BL_BlenderShader::UpdateLights().
+	 * -1 (unused location) for any material whose shader doesn't reference these uniforms. */
+	int shadowmaploc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowpersmatloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowbiasloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+
 	ListBase lamps;
 	bool bound;
 
@@ -443,7 +452,19 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		if (material->use_foliage) {
 			material->infoliageparamsloc = GPU_shader_get_uniform(shader, "unfoliageparams");
 		}
-		
+
+		for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++) {
+			char name[32];
+			BLI_snprintf(name, sizeof(name), "unfshadowmap[%d]", i);
+			material->shadowmaploc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowpersmat[%d]", i);
+			material->shadowpersmatloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowbias[%d]", i);
+			material->shadowbiasloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowenabled[%d]", i);
+			material->shadowenabledloc[i] = GPU_shader_get_uniform(shader, name);
+		}
+
 		return 1;
 	}
 	else {
@@ -566,6 +587,7 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 		GPU_shader_uniform_vector(shader, material->bonematloc, 16, count, matrices);
 	}
 }
+
 
 void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float viewinv[4][4])
 {
@@ -4317,6 +4339,57 @@ int GPU_lamp_shadow_layer(GPULamp *lamp)
 		return lamp->lay;
 	else
 		return -1;
+}
+
+/* Binds shadow map + matrix for up to GPU_MATERIAL_NUM_SHADOW_LAMPS lamps into the
+ * unfshadowmap/unfshadowpersmat/unfshadowbias/unfshadowenabled uniform arrays that
+ * node_bsdf_principled() (gpu_shader_material.glsl) samples inside its fixed-function
+ * gl_LightSource[i] loop. `lamps[i]` must be the same lamp (or NULL) that fed gl_LightSource[i]
+ * for this draw call -- see RAS_Rasterizer::ProcessLighting() / BL_BlenderShader::UpdateLights().
+ * Only the plain depth-map shadow path (shadow_simple in glsl) is supported here: VSM and CSM
+ * lamps are left unshadowed for this loop (slot disabled) rather than sampled incorrectly, same
+ * as the existing "Point/Local lights never shadow" limitation already documented in the
+ * roadmap -- narrowing this further is future work, not a regression. */
+void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS])
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader) {
+		return;
+	}
+
+	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS;
+
+	for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++) {
+		GPULamp *lamp = lamps[i];
+		bool has_shadow = lamp && GPU_lamp_has_shadow_buffer(lamp) &&
+		                   !GPU_lamp_has_cascaded_shadow(lamp) &&
+		                   lamp->la->shadowmap_type != LA_SHADMAP_VARIANCE;
+
+		if (has_shadow) {
+			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
+			 * same registration GPU_lamp_get_data() does for the Lamp Data node path. */
+			material->dynproperty |= DYN_LAMP_PERSMAT;
+			add_user_list(&material->lamps, lamp);
+			add_user_list(&lamp->materials, material->ma);
+
+			if (material->shadowmaploc[i] != -1) {
+				GPU_texture_bind(lamp->depthtex, texunit + i);
+				GPU_shader_uniform_texture(shader, material->shadowmaploc[i], lamp->depthtex);
+			}
+			if (material->shadowpersmatloc[i] != -1) {
+				GPU_shader_uniform_vector(shader, material->shadowpersmatloc[i], 16, 1, (float *)lamp->dynpersmat);
+			}
+			if (material->shadowbiasloc[i] != -1) {
+				float bias[2] = {lamp->bias, lamp->slopebias};
+				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
+			}
+		}
+
+		if (material->shadowenabledloc[i] != -1) {
+			float enabled = has_shadow ? 1.0f : 0.0f;
+			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
+		}
+	}
 }
 
 GPUNodeLink *GPU_lamp_get_data(

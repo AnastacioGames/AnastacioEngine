@@ -37,11 +37,14 @@ class RAS_OpenGLLight : public RAS_ILightObject
 
 	RAS_Rasterizer *m_rasterizer;
 
-	GPULamp *GetGPULamp();
-
 public:
 	RAS_OpenGLLight(RAS_Rasterizer *ras);
 	~RAS_OpenGLLight();
+
+	/* Public so RAS_Rasterizer::ProcessLighting() can record it alongside the same slot it
+	 * feeds into gl_LightSource[slot] via ApplyFixedFunctionLighting() below, for
+	 * GPU_material_bind_shadow_lamps() (see RAS_Rasterizer::GetShadowLamps()). */
+	GPULamp *GetGPULamp();
 
 	bool ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer, int slot);
 
