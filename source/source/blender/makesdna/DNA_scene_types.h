@@ -1054,6 +1054,9 @@ enum {
  * fixed-timestep accumulator in NextFrame() instead of the legacy single-Update-per-frame
  * path. Off by default so old files keep the legacy behavior. */
 #define GAME_USE_FIXED_TIMESTEP				(1 << 26)
+/* Opt in to the "new shading nodes" path (BSDF/Principled nodes) in the game engine without
+ * needing an engine that carries RE_USE_SHADING_NODES (only Cycles had it). Off by default. */
+#define GAME_USE_SHADING_NODES				(1 << 27)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
 #define GAME_DEBUG_DISABLE	0

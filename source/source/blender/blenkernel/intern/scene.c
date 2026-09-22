@@ -2409,7 +2409,10 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 bool BKE_scene_use_new_shading_nodes(const Scene *scene)
 {
 	const RenderEngineType *type = RE_engines_find(scene->r.engine);
-	return (type && type->flag & RE_USE_SHADING_NODES);
+	if (type && type->flag & RE_USE_SHADING_NODES)
+		return true;
+	/* Game engine opt-in: BSDF/Principled nodes without a Cycles-like engine. */
+	return (STREQ(scene->r.engine, RE_engine_id_BLENDER_GAME) && (scene->gm.flag & GAME_USE_SHADING_NODES));
 }
 
 bool BKE_scene_use_shading_nodes_custom(Scene *scene)
@@ -2422,7 +2425,8 @@ bool BKE_scene_use_world_space_shading(Scene *scene)
 {
 	const RenderEngineType *type = RE_engines_find(scene->r.engine);
 	return ((scene->r.mode & R_USE_WS_SHADING) ||
-	        (type && (type->flag & RE_USE_SHADING_NODES)));
+	        (type && (type->flag & RE_USE_SHADING_NODES)) ||
+	        (STREQ(scene->r.engine, RE_engine_id_BLENDER_GAME) && (scene->gm.flag & GAME_USE_SHADING_NODES)));
 }
 
 bool BKE_scene_use_spherical_stereo(Scene *scene)
