@@ -1,5 +1,35 @@
 # Build no Linux
 
+## TL;DR — comece por aqui
+
+Nao tente compilar Blender/UPBGE 2.79 "cru" a partir do codigo original: em distros Linux recentes
+(GCC/glibc novos demais pra um codigo de 2014-2015) isso trava com erros de toolchain. Este repo ja tem
+um preset Linux com todos os fixes de compatibilidade aplicados (FFmpeg, OpenColorIO, RPATH do Python
+etc.) — use ele em vez de tentar compilar do zero.
+
+**Importante**: esses scripts e presets so existem na branch `linux-sync`, nao na `main` nem nos
+releases publicados. Confirme que esta nela antes de tudo:
+
+```bash
+git clone https://github.com/AnastacioGames/AnastacioEngine.git
+cd AnastacioEngine
+git checkout linux-sync
+```
+
+Depois, um unico comando cobre dependencias (via apt), Python 3.11 isolado, configuracao e build:
+
+```bash
+bash tools/linux/quickstart-editor.sh      # editor completo (RangeEngine)
+bash tools/linux/quickstart.sh             # so o player/runtime (RangeRuntime), pra rodar um .range
+```
+
+Executaveis ficam em `build-linux-editor/bin/RangeEngine` e `build-linux/bin/RangeRuntime`. **Nao e
+necessario** baixar `lib/linux_x64` via svn — isso e so para o build Windows (`lib/win64_vc15`); o preset
+Linux usa as bibliotecas da propria distro instaladas via apt.
+
+Se travar em algum passo, rode `bash tools/linux/preflight.sh` para checar o ambiente, e guarde a saida
+completa do erro (nao so a ultima linha) antes de pedir ajuda.
+
 ## PENDENTE NA MAQUINA LINUX (handoff de 2026-09-21) - LEIA PRIMEIRO
 
 Relatado por Kitsuy (tester Linux) sobre o pacote 0.4.0.
