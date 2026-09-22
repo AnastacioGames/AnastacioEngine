@@ -2,6 +2,10 @@
 
 ## TL;DR — comece por aqui
 
+**Se voce baixou o release 0.4.1 e so tem o editor (sem `RangeRuntime`)**: e um bug de empacotamento
+conhecido (o `.tar.xz` saiu com um preset so). Ate sair uma release corrigida, compile a partir do
+codigo-fonte pelos passos abaixo — voce vai ter os dois executaveis.
+
 Nao tente compilar Blender/UPBGE 2.79 "cru" a partir do codigo original: em distros Linux recentes
 (GCC/glibc novos demais pra um codigo de 2014-2015) isso trava com erros de toolchain. Este repo ja tem
 um preset Linux com todos os fixes de compatibilidade aplicados (FFmpeg, OpenColorIO, RPATH do Python
@@ -373,16 +377,30 @@ ser preservados para corrigir o primeiro erro real, em vez de adivinhar no Windo
 
 ## Empacotamento futuro
 
-Depois de validar o runtime, gere o arquivo distribuivel com:
+**Importante — pacote completo precisa dos DOIS presets.** `linux-runtime` (WITH_PLAYER=ON,
+WITH_BLENDER=OFF) so gera `RangeRuntime`; `linux-editor` (WITH_BLENDER=ON, WITH_PLAYER=OFF) so gera
+`RangeEngine`. Empacotar so um dos dois `bin/` produz um `.tar.xz` faltando o outro executavel — foi
+o que aconteceu no release 0.4.1 (Kitsuy reportou "no RangeRuntime, just the menu": o pacote saiu so
+de `build-linux-editor/bin`). Compile e instale os dois antes de empacotar:
 
 ```bash
-bash tools/linux/package-runtime.sh <versao>
+cmake --preset linux-runtime -S source && cmake --build build-linux --target RangeRuntime -j"$(nproc)" && cmake --install build-linux
+cmake --preset linux-editor -S source && cmake --build build-linux-editor --target RangeEngine -j"$(nproc)" && cmake --install build-linux-editor
+```
+
+Depois de validar os dois runtimes, gere o arquivo distribuivel unico com ambos (`BIN_DIR` e o
+principal, `EXTRA_BIN_DIR` completa o que faltar sem sobrescrever nada):
+
+```bash
+BIN_DIR=build-linux/bin EXTRA_BIN_DIR=build-linux-editor/bin bash tools/linux/package-runtime.sh <versao>
 ```
 
 Ele cria `build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz`, o arquivo
-`.tar.xz.sha256` e inclui `COPYING`. O script recusa empacotar se `RangeRuntime` ainda nao tiver sido
-instalado em `build-linux/bin/`.
+`.tar.xz.sha256` e inclui `COPYING`. O script recusa empacotar se nenhum dos dois binarios tiver sido
+instalado, e agora avisa (sem falhar) se o pacote final sair sem `RangeRuntime` ou sem `RangeEngine` —
+confira que o aviso NAO aparece antes de publicar.
 
-Distribua esse arquivo, seu checksum e o codigo-fonte correspondente.
-O pacote 0.3.0 ja passou por esse criterio em maquina limpa; para novas versoes, repetir a validacao do pacote
-extraido antes de anunciar a release.
+Distribua esse arquivo, seu checksum e o codigo-fonte correspondente. Antes de anunciar a release,
+extraia o `.tar.xz` num diretorio limpo e confirme que **os dois** `./RangeEngine` e `./RangeRuntime`
+existem e abrem — o pacote 0.3.0 e o 0.4.1 (so RangeEngine) ja mostraram que pular essa checagem deixa
+bug passar.
