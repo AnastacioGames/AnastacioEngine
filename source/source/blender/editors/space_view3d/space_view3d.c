@@ -681,6 +681,18 @@ static bool view3d_ob_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent
 	return 0;
 }
 
+static bool view3d_obj_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
+{
+	return ED_operator_scene_editable(C) && drag->type == WM_DRAG_PATH &&
+	       BLI_path_extension_check(drag->path, ".obj") && BLI_is_file(drag->path);
+}
+
+static void view3d_obj_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	drop->opcontext = WM_OP_EXEC_DEFAULT;
+	RNA_string_set(drop->ptr, "filepath", drag->path);
+}
+
 static bool view3d_group_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent *UNUSED(event))
 {
 	if (drag->type == WM_DRAG_ID) {
@@ -791,6 +803,7 @@ static void view3d_dropboxes(void)
 {
 	ListBase *lb = WM_dropboxmap_find("View3D", SPACE_VIEW3D, RGN_TYPE_WINDOW);
 
+	WM_dropbox_add(lb, "VIEW3D_OT_import_obj_drop", view3d_obj_drop_poll, view3d_obj_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_add_named", view3d_ob_drop_poll, view3d_ob_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_drop_named_material", view3d_mat_drop_poll, view3d_id_drop_copy);
 	WM_dropbox_add(lb, "MESH_OT_drop_named_image", view3d_ima_mesh_drop_poll, view3d_id_path_drop_copy);
