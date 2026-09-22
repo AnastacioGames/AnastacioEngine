@@ -86,6 +86,32 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
   // main->rangesubversionfile);
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 0, 0)) {
     printf("Upbge/bge file is now updated for Range Game Engine.\n");
+
+    if (main->upbgeversionfile != 0) {
+      /* UPBGE 0.2.5b stored the wheel and movement mouse events as 5, 6 and 8.
+       * Range added the thumb and extra buttons in those positions, so migrate the
+       * old values before the file is shown or converted to game sensors. */
+      LISTBASE_FOREACH (Object *, object, &main->object) {
+        LISTBASE_FOREACH (bSensor *, sensor, &object->sensors) {
+          if (sensor->type == SENS_MOUSE) {
+            bMouseSensor *mouse_sensor = (bMouseSensor *)sensor->data;
+
+            switch (mouse_sensor->type) {
+              case 5:
+                mouse_sensor->type = BL_SENS_MOUSE_WHEEL_UP;
+                break;
+              case 6:
+                mouse_sensor->type = BL_SENS_MOUSE_WHEEL_DOWN;
+                break;
+              case 8:
+                mouse_sensor->type = BL_SENS_MOUSE_MOVEMENT;
+                break;
+            }
+          }
+        }
+      }
+
+    }
   }
 
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 2, 0)) {
