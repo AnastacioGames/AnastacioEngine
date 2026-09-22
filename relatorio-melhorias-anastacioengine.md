@@ -81,9 +81,15 @@ ferramenta correspondente.
 - `Scene > Automatic Sun` cria um Sun e o atribui ao `World Sun`; somente esse Sun marcado orbita a referÃªncia
   de chÃ£o 5 m Ã  frente da cÃ¢mera ativa, mirando-a durante o runtime. Suns escolhidos manualmente em `World Sun`
   preservam seu comportamento e transformaÃ§Ã£o normais.
+- IBL (irradiância/reflexo de ambiente vindo do céu/HDRI) somado às luzes de cena já funciona no shader do
+  Principled (`059766dc`). **Gap conhecido**: materiais Principled/PBR não recebem sombra projetada no
+  `BLENDER_GAME` — o loop de luzes desse material não sampleia shadow map. Só materiais legados (sem nodes)
+  mostram sombra no chão hoje. Ver `docs/roadmap.md` ("Iluminação e gráficos").
 
 ### Runtime e ferramentas
 
+- Arrastar um arquivo `.obj` para a janela da Vista 3D importa o modelo diretamente na cena, sem abrir
+  o seletor de arquivos. O addon OBJ incluído é ativado automaticamente na primeira importação, se necessário.
 - Compatibilidade de scripts BGE/UPBGE: `import bge` e seus submódulos (`bge.logic`, `bge.events`,
   `bge.types`, `bge.constraints`, `bge.render`, `bge.application`, `bge.imgui` e `bge.texture`) são aliases
   dos mesmos objetos de `Range`. Jogos legados podem rodar sem renomear esses imports; scripts novos devem
@@ -184,8 +190,14 @@ ferramenta correspondente.
 
 ### Interface do Outliner
 
-- `Outliner > View > Show Alternating Rows` liga/desliga as faixas alternadas. Desligado por padrão, usa fundo sólido na cor do tema. Escolha por Outliner salva no projeto; destaques de seleção preservados.
+- `Outliner > View > Show Alternating Rows` liga/desliga as faixas alternadas. Desligado por padrão, usa fundo
+  sólido na cor do tema. Escolha por Outliner salva no projeto; destaques de seleção preservados.
 
 ### Interface da 3D View
 
-- Uma única barra flutuante, 20 px acima do canto inferior esquerdo da 3D View, traz `Play`, `Standalone` e Debug/Console, os modos de sombreamento e sua seta de opções, os controles de viewport (o ícone de câmera para atualização contínua, Only Render e painel de overlay), o bloqueio de câmera/camadas e o seletor de camadas, e os controles de transformação (manipulador, eixos, orientação e pivô). Ao entrar em Edit Mode, acrescenta Auto Merge, Occlude Geometry e visualização da malha; ao sair, esses controles desaparecem. Os controles correspondentes foram removidos do cabeçalho.
+- Uma única barra flutuante, 20 px acima do canto inferior esquerdo da 3D View, traz `Play`, `Standalone` e
+  Debug/Console, os modos de sombreamento e sua seta de opções, os controles de viewport (o ícone de câmera
+  para atualização contínua, Only Render e painel de overlay), o bloqueio de câmera/camadas e o seletor de
+  camadas, e os controles de transformação (manipulador, eixos, orientação e pivô). Ao entrar em Edit Mode,
+  acrescenta Auto Merge, Occlude Geometry e visualização da malha; ao sair, esses controles desaparecem. Os
+  controles correspondentes foram removidos do cabeçalho.

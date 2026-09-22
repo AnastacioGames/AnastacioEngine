@@ -36,7 +36,14 @@ Aberto:
   "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
-  constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido** no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`; `codex/r3-audio-fix-new` superada). Aberto: bug geral de `aud` com `METH_NOARGS` (`cache()`, `reverse()`, `handle.pause()/stop()` dão `function signature mismatch`), aguardando autorização. Diagnosticos de shader trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js` (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto. Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado adiar até
+  constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido**
+  no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`;
+  `codex/r3-audio-fix-new` superada). Aberto: bug geral de `aud` com `METH_NOARGS` (`cache()`, `reverse()`,
+  `handle.pause()/stop()` dão `function signature mismatch`), aguardando autorização. Diagnosticos de shader
+  trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
+  (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto.
+  Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado
+  adiar até
   medir p50/p95 em celular físico. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
@@ -68,7 +75,11 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver
 [linux-build.md](linux-build.md). Pendente:
 
-- **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor) — **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado por padrao para exercitar o caminho de codigo, ver `linux-build.md`/`changelog.md`). A `linux-sync` foi testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). Falta empacotar e publicar 0.4.1.
+- **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor) —
+  **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de
+  `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado
+  por padrao para exercitar o caminho de codigo, ver `linux-build.md`/`changelog.md`). A `linux-sync` foi
+  testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). Falta empacotar e publicar 0.4.1.
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
@@ -127,6 +138,20 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
 ## Iluminação e gráficos
 
+- **Sombra ausente em materiais Principled/PBR no `BLENDER_GAME`**: o loop de luzes de cena do Principled
+  (`gpu_shader_material.glsl:3918-3941`/`:4018-4025`) lê `gl_LightSource[i]` direto, sem sampler de shadow map
+  nem chamada a `shadow_simple`/`shadow_pcf`/etc.; `node_shader_bsdf_principled.c` não faz wiring de shadow
+  nenhum. Resultado: chão/objetos com material PBR não recebem sombra projetada (confirmado visualmente pelo
+  usuário com `projects-teste/pbr-baseline/shadow_ibl_test.range`: Sun+Spot com sombra ligada, sombra visível
+  só ao desligar as opções PBR e usar material legado sem nodes). Precisa levar shadow map + matriz por lamp
+  até o loop `NUM_LIGHTS` do Principled e aplicar o fator de sombra a `light_diffuse`/`light_specular`, como o
+  caminho legado já faz. Ver changelog de 2026-09-21 ("Teste Sun+Point+IBL").
+- Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
+  buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
+  (`BUFFER_SHADOW`) projetam sombra.
+- **Light probes** (reflection probes/irradiance volumes): não existem; o IBL atual (`059766dc`) é global, um
+  único céu/HDRI pra cena toda, sem componente local por objeto. Avaliar só depois de resolver a sombra do
+  Principled acima.
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
@@ -140,6 +165,8 @@ Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Pla
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
 menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
 
+- **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
+  o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
