@@ -316,6 +316,10 @@ void GPU_material_vertex_attributes(GPUMaterial *material,
 	struct GPUVertexAttribs *attrib);
 
 bool GPU_material_do_color_management(GPUMaterial *mat);
+/* World environment (sky/atmosphere/HDRI) links for the new shading nodes (Principled).
+ * `view`/`vn` are the view-space position and normal links. Returns false when there is no world. */
+bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn, GPUNodeLink *rough,
+                            GPUNodeLink **r_mirror, GPUNodeLink **r_diffuse);
 bool GPU_material_use_new_shading_nodes(GPUMaterial *mat);
 bool GPU_material_use_world_space_shading(GPUMaterial *mat);
 

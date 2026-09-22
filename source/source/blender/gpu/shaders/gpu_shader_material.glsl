@@ -3971,11 +3971,16 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, out vec4 resu
 
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
-	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I, out vec4 result)
+	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
+	vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
 {
 	/* ambient light */
-	// TODO: set ambient light to an appropriate value
-	vec3 L = mix(0.1, 0.03, metallic) * mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
+	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
+	vec3 L = mix(0.1, 0.03, metallic) * diffuse_albedo;
+	if (env_on > 0.5) {
+		/* world environment (sky/HDRI) as diffuse irradiance; specular is added after the lights */
+		L = env_diffuse.rgb * diffuse_albedo * (1.0 - metallic);
+	}
 
 	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
 
@@ -4087,6 +4092,16 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;
 	}
 #endif
+
+	if (env_on > 0.5) {
+		/* environment specular: reflected sky/HDRI with roughness-aware Schlick fresnel (Lagarde) */
+		float Cdlum_e = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b;
+		vec3 Ctint_e = Cdlum_e > 0.0 ? base_color.rgb / Cdlum_e : vec3(1.0);
+		vec3 Cspec0_e = mix(specular * 0.08 * mix(vec3(1.0), Ctint_e, specular_tint), base_color.rgb, metallic);
+		float NdotV_e = clamp(dot(N, V), 0.0, 1.0);
+		vec3 F_e = Cspec0_e + (max(vec3(1.0 - roughness), Cspec0_e) - Cspec0_e) * pow(1.0 - NdotV_e, 5.0);
+		L += env_mirror.rgb * F_e;
+	}
 
 	result = vec4(L, 1.0);
 }

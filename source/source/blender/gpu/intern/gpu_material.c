@@ -3471,6 +3471,89 @@ GPUMaterial *GPU_material_world(struct Scene *scene, struct World *wo)
 }
 
 
+bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn, GPUNodeLink *rough,
+                            GPUNodeLink **r_mirror, GPUNodeLink **r_diffuse)
+{
+	/* Mirrors the environment block of the legacy material builder, but is used only by the
+	 * new shading nodes; the legacy path is left untouched. */
+	World *world = mat->scene ? mat->scene->world : NULL;
+	Material *ma = mat->ma;
+	if (!world || !ma)
+		return false;
+
+	float ior = 1.0f;
+	GPUNodeLink *wv, *wn, *wr, *mirror, *diffibl, *transmit;
+	GPU_link(mat, "shade_world_vectors", view, vn,
+	         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&ior), &wv, &wn, &wr);
+
+	MTex *mtex = world->mtex[0];
+	bool use_tex = (world->aocolor == WO_AOSKYTEX) && mtex && mtex->tex && mtex->tex->ima;
+
+	if (use_tex) {
+		Tex *tex = mtex->tex;
+		float turbid = ma->roughness;
+		if (tex->type == TEX_IMAGE) {
+			if (mtex->texco == TEXCO_ANGMAP) {
+				GPU_link(mat, "env_angular_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
+				         wv, wn, wr, &mirror, &diffibl, &transmit);
+			}
+			else {
+				GPU_link(mat, "env_equirect_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
+				         wv, wn, wr, &mirror, &diffibl, &transmit);
+			}
+		}
+		else if (tex->type == TEX_ENVMAP) {
+			GPU_link(mat, "env_cube_tex", rough, GPU_uniform(&turbid), GPU_cube_map(tex->ima, &tex->iuser, false),
+			         wv, wn, wr, &mirror, &diffibl, &transmit);
+		}
+		else {
+			use_tex = false;
+		}
+		if (use_tex && GPU_material_do_color_management(mat)) {
+			GPU_link(mat, "srgb_to_linearrgb", mirror, &mirror);
+			GPU_link(mat, "srgb_to_linearrgb", diffibl, &diffibl);
+		}
+	}
+
+	if (!use_tex) {
+		GPUNodeLink *hor, *zen = NULL, *nad = NULL, *sunDir, *sunCol, *sunEnergy, *sunSize;
+		hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
+		if (!(world->skytype & WO_SKYATMOSPHERIC)) {
+			zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
+			nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
+		}
+
+		if (mat->scene->world_sun) {
+			Lamp *sun = mat->scene->world_sun->data;
+			GPU_link(mat, "set_rgb", GPU_dynamic_uniform(&mat->scene->world_sun->obmat[2], GPU_DYNAMIC_WORLD_SUN_DIRECTION, NULL), &sunDir);
+			GPU_link(mat, "set_rgb", GPU_dynamic_uniform(&sun->r, GPU_DYNAMIC_WORLD_SUN_COLOR, NULL), &sunCol);
+			GPU_link(mat, "set_rgb", GPU_dynamic_uniform(&sun->energy, GPU_DYNAMIC_WORLD_SUN_ENERGY, NULL), &sunEnergy);
+			GPU_link(mat, "set_value", GPU_dynamic_uniform(&world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
+		}
+		else {
+			float sdir[3] = {0.0f, 0.0f, 1.0f}; sunDir = GPU_uniform(sdir);
+			float scol[3] = {0.0f, 0.0f, 0.0f}; sunCol = GPU_uniform(scol);
+			float sunEng = 20.0f; sunEnergy = GPU_uniform(&sunEng);
+			float sunsi = 0.0f; sunSize = GPU_uniform(&sunsi);
+		}
+
+		if (world->skytype & WO_SKYATMOSPHERIC) {
+			float env_sky = (ma->mode2 & MA_USEFULLSKY) ? 1.0f : 2.0f;
+			GPU_link(mat, "env_sky_atmospheric", wv, wn, wr, sunDir, rough, hor,
+			         sunEnergy, sunSize, sunCol, GPU_uniform(&env_sky), &mirror, &diffibl, &transmit);
+		}
+		else {
+			GPU_link(mat, "env_sky", hor, zen, nad, GPU_uniform(&world->ground),
+			         rough, GPU_uniform(&world->turbidity), sunDir, sunCol, sunEnergy, sunSize,
+			         wv, wn, wr, &mirror, &diffibl, &transmit);
+		}
+	}
+
+	*r_mirror = mirror;
+	*r_diffuse = diffibl;
+	return true;
+}
+
 GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_opensubdiv, bool is_instancing, bool is_skinning)
 {
 	GPUMaterial *mat;

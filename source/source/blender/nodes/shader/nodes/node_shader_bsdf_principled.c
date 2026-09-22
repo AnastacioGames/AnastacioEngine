@@ -70,7 +70,32 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	else
 		GPU_link(mat, "direction_transform_m4v3", in[18].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[18].link);
 
-	return GPU_stack_link(mat, "node_bsdf_principled", in, out, GPU_material_builtin(mat, GPU_VIEW_POSITION));
+	/* World environment lighting (IBL from sky/HDRI). Only in the new-shading game path; otherwise
+	 * the shader keeps its constant ambient (env_on = 0).
+	 * NOTE: `view` (below) is reused as the "I" parameter of the final GPU_stack_link call, so the
+	 * world-env computation below must use its OWN fresh builtin links (env_view/env_vn) instead of
+	 * `view`/`in[17].link` directly -- builtin links are single-use (freed by GPU_link once consumed),
+	 * and feeding the same link object into two GPU_link/GPU_stack_link calls double-frees it. */
+	static float env_on = 1.0f, env_off = 0.0f;
+	GPUNodeLink *view = GPU_material_builtin(mat, GPU_VIEW_POSITION);
+	GPUNodeLink *env_mirror, *env_diffuse;
+	GPUNodeLink *rough = in[7].link ? in[7].link : GPU_uniform(in[7].vec);
+	GPUNodeLink *env_flag;
+	/* shade_world_vectors expects a normalized (perspective-aware) view direction, like
+	 * shi->view in the legacy path (built via "shade_view"), not the raw view-space position. */
+	GPUNodeLink *env_view;
+	GPU_link(mat, "shade_view", GPU_material_builtin(mat, GPU_VIEW_POSITION), &env_view);
+	GPUNodeLink *env_vn = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
+	if (GPU_material_world_env(mat, env_view, env_vn, rough, &env_mirror, &env_diffuse)) {
+		env_flag = GPU_uniform(&env_on);
+	}
+	else {
+		GPU_link(mat, "set_rgba_zero", &env_mirror);
+		env_diffuse = env_mirror;
+		env_flag = GPU_uniform(&env_off);
+	}
+
+	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag);
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)
