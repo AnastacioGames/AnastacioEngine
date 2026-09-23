@@ -22,6 +22,17 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: botão de tela cheia na página do jogo
+
+- Usuário confirmou que o First Person roda no celular pelo GitHub Pages e pediu tela cheia.
+- `index.html` gerado por `package-web.py`: botão "Tela cheia"/"Sair da tela cheia" no canto superior esquerdo,
+  visível depois de "Jogar". Coloca a página inteira em tela cheia (overlay `?perf=1`/`?debug=1` continuam
+  visíveis), escala o canvas por CSS mantendo a proporção (resolução de desenho inalterada, sem custo extra) e,
+  no Android, tenta travar em paisagem. Oculto sem Fullscreen API (iPhone só tem para `<video>`).
+- Validação no Edge headless com viewport de celular (800x360, DPR 2): botão oculto antes de jogar, entra e sai
+  da tela cheia por clique, frames continuam contando, nenhum erro/exceção. Publicado no `gh-pages` (0.1.1).
+  Pendente: conferir no celular do usuário.
+
 ## 2026-09-23 - Web: nome do jogo com espaço ajustado no export; build de teste no GitHub Pages
 
 - `tools/web/package-web.py`: nome do `.range` com espaço/acento/caractere inválido deixa de ser recusado ("nome do
