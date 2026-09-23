@@ -27,7 +27,7 @@ Aberto:
 - **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
-  audaspace; não abortam mais). Aberto: sondar `cache()`, `reverse()`, `pause()`/`stop()` com som válido e medir o
+  audaspace; não abortam mais). `cache()`, `reverse()`, `pause()`/`stop()` com som válido conferidos em 2026-09-23. Aberto: medir o
   custo de desempenho em celular (M3). Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
   (sonda R3 `[r3] TODOS`); a branch `integracao` foi removida por estar contida nela.
 - **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
@@ -38,8 +38,8 @@ Aberto:
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
   constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido**
   no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`;
-  `codex/r3-audio-fix-new` superada). Aberto: bug geral de `aud` com `METH_NOARGS` (`cache()`, `reverse()`,
-  `handle.pause()/stop()` dão `function signature mismatch`), aguardando autorização. Diagnosticos de shader
+  `codex/r3-audio-fix-new` superada). Bug de `aud` com `METH_NOARGS` corrigido em `ea2cfd04` (18 métodos) e
+  validado no Edge headless em 2026-09-23 (`cache()`, `reverse()`, `handle.pause()/stop()` sem mismatch). Diagnosticos de shader
   trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
   (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto.
   Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado
@@ -153,8 +153,8 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
   nodes em uma cena maior. `node_bsdf_diffuse`/`node_bsdf_glossy` ainda tratam toda luz como direcional e sem
   sombra.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
-  2026-09-23); roda sem erro no Edge headless. Falta aceite visual do usuário no navegador com GPU real e
-  reconferir o desktop.
+  2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
+  das esferas corretos). Falta só reconferir o desktop.
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
   buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
   (`BUFFER_SHADOW`) projetam sombra.

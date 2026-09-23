@@ -22,6 +22,15 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: `aud` METH_NOARGS validado no navegador
+
+- A correção de aridade de `ea2cfd04` (18 métodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle`/
+  `PyDynamicMusic`/`PyPlaybackManager`) foi conferida com o runtime `build-web-release` de 2026-09-23:
+  `claude_aud_noargs_probe.py` empacotada e rodada por `claude_r3_run.cjs` no Edge headless. `cache()`,
+  `reverse()`, `handle.pause()` e `handle.stop()` com som válido terminam sem `function signature mismatch`
+  (`[r3] TODOS`).
+- Aceite visual do Principled/PBR Web (luzes de cena e sombra) dado pelo usuário no navegador com GPU real.
+
 ## 2026-09-23 - Web: luzes de cena e sombra do Principled/PBR no perfil CORE (WebGL2)
 
 - **Problema**: o `web-runtime` compila com `WITH_GL_PROFILE_CORE_RANGERUNTIME` (`USE_CORE_PROFILE` nos shaders).
