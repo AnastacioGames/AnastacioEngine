@@ -24,17 +24,14 @@ Aberto:
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat
   no eixo 9) e save (IDBFS) testados e aceitos pelo usuário em 2026-09-20 ([roteiro](web-sdl2-gamepad-test.md)).
-- **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
-  estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
   audaspace; não abortam mais). `cache()`, `reverse()`, `pause()`/`stop()` com som válido conferidos em 2026-09-23. Custo em celular
   medido (M3, 2026-09-23): desprezível. Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
   (sonda R3 `[r3] TODOS`); a branch `integracao` foi removida por estar contida nela.
-- **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
-  `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
-  shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
-  "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
-  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
+- **Extração de erros de shader/Python no pré-voo (M1, encerrado)**: eventos estruturados do runtime
+  (`Module.onDiagnostic`, relatório v2) para shader (estágio, material real, compile/link) e Python (tipo, texto,
+  traceback, controller/componente/callback), testados no navegador; a heurística sobre o texto fica só como fallback.
+  "Importar pré-voo Web" segue para JSON manual. Detalhes em [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
   constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido**
   no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`;
