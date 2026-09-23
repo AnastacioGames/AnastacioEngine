@@ -44,7 +44,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   no Android, tenta travar em paisagem. Oculto sem Fullscreen API (iPhone só tem para `<video>`).
 - Validação no Edge headless com viewport de celular (800x360, DPR 2): botão oculto antes de jogar, entra e sai
   da tela cheia por clique, frames continuam contando, nenhum erro/exceção. Publicado no `gh-pages` (0.1.1).
-  Usuário confirmou no celular.
+  No celular do usuário o botão só girou a imagem para paisagem, sem tela cheia de fato (limite do
+  navegador); usuário aceitou assim.
 
 ## 2026-09-23 - Web: nome do jogo com espaço ajustado no export; build de teste no GitHub Pages
 
