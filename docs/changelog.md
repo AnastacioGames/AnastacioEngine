@@ -29,6 +29,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   `claude_aud_noargs_probe.py` empacotada e rodada por `claude_r3_run.cjs` no Edge headless. `cache()`,
   `reverse()`, `handle.pause()` e `handle.stop()` com som válido terminam sem `function signature mismatch`
   (`[r3] TODOS`).
+- **Regressões repetidas depois da mudança de áudio** (runtime `build-web-release` de 2026-09-23, Edge headless
+  isolado): áudio `web-audio` (`verify-capabilities.cjs audio`) 8/8 OK (AudioContext rodando, pico 0,35); módulo
+  `aud` (`create_web_aud_module_scene.py`) até `[aud] aud OK`; bloom + resize (`claude_m3_resize.*`) com offscreens
+  canvas/2, /4, /8 em 640x360, 1024x600, 400x300 e 960x540 e `glError=0x0` em todas as fases; resolução dinâmica
+  sem timer com aviso único; R1 `CONSTRAINT_ABI_TEST: PASS` no Web e guard estático `PASS (31 methods)`.
 - Aceite visual do Principled/PBR Web (luzes de cena e sombra) dado pelo usuário no navegador com GPU real.
 
 ## 2026-09-23 - Web: luzes de cena e sombra do Principled/PBR no perfil CORE (WebGL2)

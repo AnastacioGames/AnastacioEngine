@@ -42,7 +42,7 @@ Aberto:
   validado no Edge headless em 2026-09-23 (`cache()`, `reverse()`, `handle.pause()/stop()` sem mismatch). Diagnosticos de shader
   trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
   (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto.
-  Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado
+  Regressões de áudio/bloom/resolução dinâmica/R1 repetidas após a mudança de áudio: todas OK (2026-09-23). M4 recomendado
   adiar até
   medir p50/p95 em celular físico. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
