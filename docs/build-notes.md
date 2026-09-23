@@ -7,14 +7,22 @@ do workspace estão em [`../AGENTS.md`](../AGENTS.md) e prevalecem sobre notas h
 
 A pasta `lib/` (bibliotecas pré-compiladas de terceiros — Python, OpenEXR, FFmpeg etc.) **não fica no Git**
 (está no `.gitignore`, é grande demais para o repositório) e precisa ser baixada à parte via SVN antes de
-configurar o CMake:
+configurar o CMake.
+
+**Importante**: baixar a `trunk` sem fixar revisão traz o estado atual do repositório do Blender, que hoje
+mistura bibliotecas modernas (ex: `openxr_sdk`, `imath`, `level-zero`, usadas pelo Blender atual) com pastas
+`_Old` (as versões antigas que este fork, baseado em Blender 2.79/UPBGE 0.2.5b, realmente usa). Essas pastas
+`_Old` podem ser removidas do repositório no futuro, quebrando o build. Por isso, fixe a revisão conhecida
+como compatível com este projeto:
 
 ```bat
-svn checkout https://svn.blender.org/svnroot/bf-blender/trunk/lib/win64_vc15 lib/win64_vc15
+svn checkout -r 62326 https://svn.blender.org/svnroot/bf-blender/trunk/lib/win64_vc15 lib/win64_vc15
 ```
 
 Rode esse comando na raiz do projeto (`D:\AnastacioEngine`), criando `lib/win64_vc15/`. Sem essa pasta, a
-configuração do CMake falha por não encontrar as dependências.
+configuração do CMake falha por não encontrar as dependências. (Revisão `62326` conferida em
+2026-09-23 a partir do checkout local que efetivamente builda este projeto — `svn info` na pasta `lib/win64_vc15`
+confirma a revisão a qualquer momento.)
 
 Para build Linux, a pasta equivalente **não** é necessária — o preset Linux usa as bibliotecas da própria
 distro via apt (ver [`docs/linux-build.md`](linux-build.md)).
