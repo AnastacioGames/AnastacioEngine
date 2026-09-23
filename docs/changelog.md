@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-23 a 2026-09-20 | 31 | 50 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-23 a 2026-09-20 | 32 | 50 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
 | [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
@@ -144,6 +144,24 @@ encontradas (todas confirmadas por diagnóstico em runtime, não só leitura de 
   chão visíveis (usuário: "parece bom, sombra um pouco fraca, deve ser regulagem" — o chão satura com 4 luzes
   somando energia 5,6). Ainda sem comparação lado a lado com material legado.
 - **Ainda sem sombra no Principled**: Point/Local, CSM e VSM (limite de engine, inalterado).
+
+## 2026-09-22 — Pacote Linux 0.4.1 corrigido (faltava RangeRuntime)
+
+- O release `v0.4.1` publicado antes continha só o `RangeEngine` (editor) no `.tar.xz` Linux; `RangeRuntime`
+  (player) ficava de fora por um bug no `tools/linux/package-runtime.sh` que não combinava os `bin/` dos dois
+  presets (`linux-runtime` e `linux-editor`) quando chamado sem `EXTRA_BIN_DIR`.
+- Script corrigido para aceitar `BIN_DIR` (preset principal) + `EXTRA_BIN_DIR` (o outro preset) e mesclar os
+  binários no pacote final, com aviso explícito se algum dos dois (`RangeRuntime`/`RangeEngine`) ainda faltar.
+- `RangeRuntime` e `RangeEngine` recompilados (presets `linux-runtime` e `linux-editor`), reinstalados via
+  `cmake --install` (RPATH `$ORIGIN/lib`, `libpython3.11.so.1.0` copiado) e reempacotados juntos:
+  `AnastacioEngine-0.4.1-linux-x86_64.tar.xz` (81 874 220 bytes, antes 67 447 540 bytes só com o editor).
+- Asset do GitHub Release `v0.4.1` atualizado com `gh release upload --clobber` (tar.xz + sha256); assets
+  Windows não foram tocados.
+- Teste funcional real (não só `--help`) numa sessão gráfica X local: `RangeEngine` roda 12s sem nenhuma
+  linha de erro/aviso; `RangeRuntime` carrega `ShellShader.range` (amostra do repo), detecta GPU/OpenGL
+  (Mesa Intel RPL-P, OpenGL 4.6, Mesa 25.2.8) e renderiza sem erros. `ldd` não acusa dependência faltando em
+  nenhum dos dois binários. Teste feito na própria máquina de build; portabilidade em máquina Linux limpa
+  ainda não foi verificada diretamente.
 
 ## 2026-09-21 - Sombra projetada em materiais Principled/PBR no BLENDER_GAME
 

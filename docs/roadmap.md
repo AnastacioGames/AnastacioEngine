@@ -85,7 +85,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de
   `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado
   por padrao para exercitar o caminho de codigo, ver `linux-build.md`/`changelog.md`). A `linux-sync` foi
-  testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). Falta empacotar e publicar 0.4.1.
+  testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). **Pacote 0.4.1 publicado e corrigido em
+  2026-09-22**: release anterior só continha `RangeEngine` (bug em `tools/linux/package-runtime.sh`, faltava
+  `RangeRuntime`); script corrigido, os dois presets recompilados/reempacotados juntos e o asset do GitHub
+  Release `v0.4.1` atualizado via `gh release upload --clobber`. Testado localmente com sessão gráfica real:
+  `RangeEngine` abre sem erros e `RangeRuntime` carrega um `.range` de exemplo, detecta GPU/OpenGL (Mesa Intel
+  RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build; portabilidade em máquina
+  limpa ainda não verificada diretamente (apenas por RPATH `$ORIGIN` + `ldd` sem dependências faltando).
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
