@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>First Person - AnastacioEngine</title>
+<title>First Person</title>
 <link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; height: 100%; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
@@ -28,7 +28,7 @@
 <div id="stage">
   <canvas id="canvas" tabindex="0" width="960" height="540" oncontextmenu="event.preventDefault()"></canvas>
   <div id="overlay">
-    <h2 id="title">First Person - AnastacioEngine</h2>
+    <h2 id="title">First Person</h2>
     <progress id="progress" max="100" value="0"></progress>
     <div id="status">Carregando...</div>
     <button id="play" disabled>Jogar</button>
@@ -41,8 +41,8 @@
 <script>
 (function () {
   var GAME = "First_Person.range";
-  var EXTRAS = [];
-  var VERSION = "0.1.2";
+  var EXTRAS = ["Anastacio_Music.mp3"];
+  var VERSION = "0.1.3";
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
   if (debug) document.body.classList.add("debug");
