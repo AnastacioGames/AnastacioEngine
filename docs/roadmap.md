@@ -41,7 +41,8 @@ Aberto:
   `codex/r3-audio-fix-new` superada). Bug de `aud` com `METH_NOARGS` corrigido em `ea2cfd04` (18 métodos) e
   validado no Edge headless em 2026-09-23 (`cache()`, `reverse()`, `handle.pause()/stop()` sem mismatch). Diagnosticos de shader
   trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
-  (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto.
+  (`?perf=1`, overlay, `perf-run.cjs`) integrado; `package-web.py --perf` inclui a sonda. Build de teste para celular publicado em
+  <https://anastaciogames.github.io/AnastacioEngine/?perf=1> (branch `gh-pages`, First Person) em 2026-09-23.
   Regressões de áudio/bloom/resolução dinâmica/R1 repetidas após a mudança de áudio: todas OK (2026-09-23). M4 recomendado
   adiar até
   medir p50/p95 em celular físico. Divisão vigente e pendências em

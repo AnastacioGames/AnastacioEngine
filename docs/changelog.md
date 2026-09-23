@@ -22,6 +22,20 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: nome do jogo com espaço ajustado no export; build de teste no GitHub Pages
+
+- `tools/web/package-web.py`: nome do `.range` com espaço/acento/caractere inválido deixa de ser recusado ("nome do
+  arquivo do jogo invalido para o FS virtual", achado em `melhores graficos .range`). `safe_name()` tira acentos e
+  troca o resto por `_` (`Meu Jogo Ação.range` → `Meu_Jogo_Acao.range`; só não ASCII → `game.range`); o nome
+  padrão do pacote segue a mesma regra. Vale também para o export do editor, que chama o empacotador. Extras
+  (`--extra`) continuam recusados com nome inválido, porque scripts os importam pelo nome.
+- Validação: pacotes gerados com `Meu Jogo Ação.range` e `日本 jogo.range`, `index.html`/`manifest.json` apontam
+  para o nome ajustado e `perf-run.cjs` recebeu frames no Edge headless.
+- Build de teste para celular: First Person (`tools/ADD na engine anastacioEngine/First_Person.range`, renomeado
+  pelo usuário) empacotado com `--perf` e publicado na branch órfã `gh-pages` (GitHub Pages:
+  <https://anastaciogames.github.io/AnastacioEngine/?perf=1>). Link público testado no Edge headless: carrega,
+  WebGL2/Core, sem erro. Medição p50/p95 em celular físico pendente com o usuário.
+
 ## 2026-09-23 - Web: `aud` METH_NOARGS validado no navegador
 
 - A correção de aridade de `ea2cfd04` (18 métodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle`/

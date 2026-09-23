@@ -24,6 +24,7 @@ import json
 import re
 import shutil
 import sys
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -433,6 +434,17 @@ Este pacote e estatico: basta servir a pasta por HTTP(S). Nao abra `index.html` 
 """
 
 
+def safe_name(name):
+    """Nome aceito pelo FS virtual: tira acentos e troca espaco/caractere invalido por '_'."""
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    stem, dot, ext = re.sub(r"[^A-Za-z0-9._-]", "_", ascii_name).rpartition(".")
+    if not dot:
+        stem, ext = ext, ""
+    if not stem.strip("._"):
+        stem = "game"  # nome so com caracteres nao ASCII
+    return stem + dot + ext
+
+
 def extra_rel(path, root):
     """Caminho do extra no FS virtual: relativo a `root` se estiver dentro dele, senao o nome."""
     if root:
@@ -462,12 +474,15 @@ def main():
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
     args = ap.parse_args()
 
-    name = args.name or args.game.stem
+    game_name = safe_name(args.game.name)
+    if game_name != args.game.name:
+        print(f"Nome do jogo ajustado para o FS virtual: {game_name}")
+    name = args.name or safe_name(args.game.stem)
     if not NAME_RE.match(name):
         die("--name so pode ter letras, numeros, ponto, sublinhado ou hifen")
     if not NAME_RE.match(args.version):
         die("--version so pode ter letras, numeros, ponto, sublinhado ou hifen")
-    if not NAME_RE.match(args.game.name):
+    if not NAME_RE.match(game_name) or game_name.startswith("."):
         die(f"nome do arquivo do jogo invalido para o FS virtual: {args.game.name}")
     for x in args.extra:
         if not x.is_file():
@@ -475,7 +490,7 @@ def main():
         rel = extra_rel(x, args.extra_root)
         if not all(NAME_RE.match(part) and part not in (".", "..") for part in rel.split("/")):
             die(f"nome de arquivo extra invalido: {rel}")
-    names = [args.game.name] + [extra_rel(x, args.extra_root) for x in args.extra]
+    names = [game_name] + [extra_rel(x, args.extra_root) for x in args.extra]
     if len(set(names)) != len(names):
         die("nomes duplicados entre jogo e extras (colidiriam no FS virtual)")
 
@@ -493,7 +508,7 @@ def main():
         shutil.copy2(args.runtime_dir / n, tmp / n)
     if args.perf:
         shutil.copy2(Path(__file__).with_name(PERF_FILE), tmp / PERF_FILE)
-    shutil.copy2(args.game, tmp / "game" / args.game.name)
+    shutil.copy2(args.game, tmp / "game" / game_name)
     for x in args.extra:
         dst = tmp / "game" / extra_rel(x, args.extra_root)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -502,7 +517,7 @@ def main():
     title = args.title or name
     html = (INDEX_TEMPLATE
             .replace("__TITLE__", title.replace("<", "&lt;").replace(">", "&gt;"))
-            .replace("__GAME__", args.game.name)
+            .replace("__GAME__", game_name)
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
@@ -523,7 +538,7 @@ def main():
         "title": title,
         "version": args.version,
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        "entry_game": f"game/{args.game.name}",
+        "entry_game": f"game/{game_name}",
         "requirements": {"webgl": 2, "threads": False, "cross_origin_isolation": False},
         "runtime": {n: files[n] for n in RUNTIME_FILES},
         "files": files,
