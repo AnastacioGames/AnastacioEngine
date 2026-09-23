@@ -19,6 +19,9 @@
   #log { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 35%; overflow: auto; margin: 0;
          background: rgba(0,0,0,.8); color: #9f9; font: 11px monospace; padding: 6px; white-space: pre-wrap; }
   body.debug #log { display: block; }
+  #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
+        background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
+  #fs[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -32,13 +35,14 @@
     <div id="error" hidden></div>
   </div>
 </div>
+<button id="fs" hidden>Tela cheia</button>
 <pre id="log"></pre>
 <script src="frame-time-perf.js"></script>
 <script>
 (function () {
   var GAME = "First_Person.range";
   var EXTRAS = [];
-  var VERSION = "0.1.0";
+  var VERSION = "0.1.1";
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
   if (debug) document.body.classList.add("debug");
@@ -78,8 +82,45 @@
     if (started || !ready) return;
     started = true;
     el("overlay").hidden = true;
+    el("fs").hidden = !fsSupported;
     el("canvas").focus();
   }
+
+  // Tela cheia: a pagina inteira (overlay de perf/log continuam visiveis). O canvas mantem a resolucao
+  // de desenho e so e escalado por CSS, preservando a proporcao (o mapeamento de toque/mouse segue certo).
+  // iPhone nao tem Fullscreen API para elementos fora de <video>: o botao fica oculto la.
+  var root = document.documentElement;
+  var fsSupported = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function fitCanvas() {
+    var c = el("canvas");
+    if (!isFullscreen()) { c.style.width = c.style.height = ""; return; }
+    var k = Math.min(window.innerWidth / c.width, window.innerHeight / c.height);
+    c.style.width = Math.floor(c.width * k) + "px";
+    c.style.height = Math.floor(c.height * k) + "px";
+  }
+  function toggleFullscreen() {
+    if (isFullscreen()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    var req = root.requestFullscreen ? root.requestFullscreen() : root.webkitRequestFullscreen();
+    Promise.resolve(req).then(function () {
+      var c = el("canvas");
+      // Android/Chrome so permite travar a orientacao em tela cheia; falha em silencio nos demais.
+      if (c.width > c.height && screen.orientation && screen.orientation.lock)
+        return screen.orientation.lock("landscape");
+    }).catch(function () {});
+  }
+  function onFullscreenChange() {
+    el("fs").textContent = isFullscreen() ? "Sair da tela cheia" : "Tela cheia";
+    fitCanvas();
+    el("canvas").focus();
+  }
+  el("fs").addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+  window.addEventListener("resize", fitCanvas);
 
   // Alguns avisos da emulacao GL saem direto por console.error (antes do printErr).
   var _consoleError = console.error.bind(console);
