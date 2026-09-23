@@ -22,6 +22,36 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Sombra em Principled/PBR: correções que faltavam para funcionar no jogo real
+
+A entrada de 2026-09-21 compilava mas não sombreava nada no jogo (validado no `shadow_ibl_test.range`). Causas
+encontradas (todas confirmadas por diagnóstico em runtime, não só leitura de código):
+
+- **Bind fora de hora**: `GPU_material_bind_shadow_lamps()` rodava em `KX_BlenderMaterial::Prepare()`, antes de
+  `BindProg()`, então o `glUniform*` ia para o programa errado. Agora é `BL_BlenderShader::BindShadowLamps()`,
+  chamado por objeto em `KX_BlenderMaterial::ActivateMeshUser()` depois de `Update()`.
+- **`ProcessLighting()` nunca era chamado para materiais com nodes** (só o caminho `m_shader` chamava), então
+  `m_shadowLamps` ficava vazio. Agora `ActivateMeshUser()` chama `ProcessLighting(true, ...)` também para
+  `m_blenderShader`. Efeito colateral a observar: todo material com nodes passa a receber o estado de luz
+  fixed-function por objeto.
+- **Vazamento**: `GPU_material_bind_shadow_lamps()` chamava `add_user_list()` (sem dedupe) por objeto e por frame;
+  agora registra lamp/material uma vez.
+- **Point/Spot tratados como direcionais** em `node_bsdf_principled()`: agora `position.w == 1` usa
+  direção `luz - fragmento`, atenuação `constant/linear/quadratic` e cone do Spot (`spotCutoff`,
+  `spotExponent`). Diffuse/Glossy BSDF (`node_bsdf_diffuse`/`node_bsdf_glossy`) **não** foram tocados.
+- **`GL_SPOT_CUTOFF` em radianos**: `RAS_OpenGLLight::ApplyFixedFunctionLighting()` passava `m_spotsize / 2`
+  (radianos) onde o GL espera graus [0, 90]; agora converte. Sem isso o cone valia ~0,4° e o Spot não iluminava.
+- **Loop limitado a 3 luzes**: numa cena com 4 luzes o Sun (slot 3) nunca entrava. `NUM_LIGHTS` passou a 8
+  (slots desligados são pulados) e `NUM_SHADOW_LIGHTS = 3` mantém o limite de shadow maps.
+- **Luz desligada mantinha a cor antiga**: `RAS_OpenGLRasterizer::DisableLight()` agora zera `diffuse`/`specular`
+  do slot, já que o shader não olha `GL_LIGHTi`.
+- **Sampler de sombra sem textura**: slots sem sombra apontam `unfshadowmap[i]` para a própria unit em vez da
+  unit 0 (evita `sampler2DShadow` e `sampler2D` na mesma unit).
+- **Validação**: `RangeRuntime` com `projects-teste/pbr-baseline/shadow_ibl_test.range`, sombras do Spot no
+  chão visíveis (usuário: "parece bom, sombra um pouco fraca, deve ser regulagem" — o chão satura com 4 luzes
+  somando energia 5,6). Ainda sem comparação lado a lado com material legado.
+- **Ainda sem sombra no Principled**: Point/Local, CSM e VSM (limite de engine, inalterado).
+
 ## 2026-09-21 - Sombra projetada em materiais Principled/PBR no BLENDER_GAME
 
 - **Causa raiz** (diagnosticada na entrada anterior, "Teste Sun+Point+IBL" abaixo): `node_bsdf_principled()`

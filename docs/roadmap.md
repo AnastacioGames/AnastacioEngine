@@ -145,13 +145,13 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
   `Lamp.shadow_filter`, converter PCF `1 → 3`, PCF Bail `2 → 4` e PCF Jitter `3 → 5`, pois Range inseriu
   Clipping e Dithering antes desses filtros. Comparação feita contra `tools/arquivo_upbge.blend` na UPBGE
   oficial 0.2.5b e o source `tools/upbge-0.2.5b-source/`.
-- **Sombra em materiais Principled/PBR no `BLENDER_GAME` — implementado, falta validar no jogo real**: shadow
-  map simples (sem CSM/VSM) agora é amostrado dentro do loop `NUM_LIGHTS` de `node_bsdf_principled()`
-  (`unfshadowmap`/`unfshadowpersmat`/`unfshadowbias`/`unfshadowenabled` em `gpu_shader_material.glsl`,
-  bind via `GPU_material_bind_shadow_lamps()` em `gpu_material.c`, chamado por
-  `BL_BlenderShader::UpdateLights()`). Compila e linka limpo; falta confirmar visualmente com
-  `projects-teste/pbr-baseline/shadow_ibl_test.range` (regra de teste visual no jogo real do `AGENTS.md`, não
-  captura automatizada). Ver changelog de 2026-09-21 ("Sombra projetada em materiais Principled/PBR").
+- **Sombra em materiais Principled/PBR no `BLENDER_GAME` — funcionando** (validado em 2026-09-23 no
+  `projects-teste/pbr-baseline/shadow_ibl_test.range`): shadow map simples (sem CSM/VSM) nos 3 primeiros slots
+  de luz, com Point/Spot corretos (direção, atenuação, cone) e loop de até 8 luzes. Ver changelog de 2026-09-23.
+  Pendente, opcional: comparar lado a lado com material legado sob as mesmas luzes (o chão satura com energia
+  somada 5,6 e a sombra fica fraca) e ver o efeito de `ProcessLighting(true)` agora rodar para todo material com
+  nodes em uma cena maior. `node_bsdf_diffuse`/`node_bsdf_glossy` ainda tratam toda luz como direcional e sem
+  sombra.
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
   buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
   (`BUFFER_SHADOW`) projetam sombra.
@@ -174,9 +174,6 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
   o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
-- **Sombra em Principled/PBR** (ver seção "Iluminação e gráficos" acima): confirmar no jogo real com
-  `projects-teste/pbr-baseline/shadow_ibl_test.range` que o chão/objetos com material PBR agora recebem
-  sombra projetada de Sun/Spot, comparável ao material legado.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 
