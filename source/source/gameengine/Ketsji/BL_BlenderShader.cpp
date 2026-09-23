@@ -194,6 +194,8 @@ void BL_BlenderShader::BindShadowLamps(RAS_Rasterizer *rasty)
 	 * so it can't live in UpdateLights() which runs from Prepare() before BindProg(). */
 	if (GPU_material_bound(m_gpuMat)) {
 		GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
+		/* CORE (Web) has no gl_LightSource: upload the same per-slot light values as uniforms. */
+		GPU_material_bind_scene_lights(m_gpuMat, rasty->GetSceneLights());
 	}
 }
 

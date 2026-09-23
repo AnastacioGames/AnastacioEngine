@@ -127,6 +127,14 @@ void gpu_extensions_init(void)
 	/* ^-- maybe a bit extreme? */
 
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &GG.maxtextures);
+#ifdef __EMSCRIPTEN__
+	/* LEGACY_GL_EMULATION tracks only min(MAX_TEXTURE_IMAGE_UNITS, 28) units; glEnable() with a
+	 * higher active unit throws in its hook (e.g. the Principled shadow maps bound at the top
+	 * units, GPU_material_bind_shadow_lamps, on a WebGL reporting 32). */
+	if (GG.maxtextures > 28) {
+		GG.maxtextures = 28;
+	}
+#endif
 
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &GG.maxtexsize);
 	glGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, &GG.maxcubemapsize);

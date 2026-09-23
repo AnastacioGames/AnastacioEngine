@@ -473,6 +473,27 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 #define GPU_MATERIAL_NUM_SHADOW_LAMPS 3
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 
+/* One slot of that same scene-light loop, with the values the fixed-function glLight* calls
+ * would store in gl_LightSource[slot] (eye-space position/direction, as GL transforms them by
+ * the modelview at call time). Under USE_CORE_PROFILE (Web/WebGL2) gl_LightSource doesn't
+ * exist, so these are uploaded as the unflightsource[] uniform array instead. A slot with zero
+ * diffuse and specular is skipped by the shader. Must match NUM_LIGHTS in the glsl. */
+#define GPU_MATERIAL_NUM_SCENE_LIGHTS 8
+typedef struct GPUSceneLight {
+	float position[4];
+	float diffuse[4];
+	float specular[4];
+	float halfvector[4];
+	float spotdirection[3];
+	float spotexponent;
+	float spotcutoff;
+	float spotcoscutoff;
+	float constantatt;
+	float linearatt;
+	float quadraticatt;
+} GPUSceneLight;
+void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
+
 #ifdef __cplusplus
 }
 #endif

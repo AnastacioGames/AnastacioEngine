@@ -3907,8 +3907,29 @@ vec3 rotate_vector(vec3 p, vec3 n, float theta) {
 #define NUM_LIGHTS 8
 #define NUM_SHADOW_LIGHTS 3
 
-#ifndef USE_CORE_PROFILE
-/* Per-scene-light shadow data for the fixed-function light loop above (gl_LightSource[i]).
+#ifdef USE_CORE_PROFILE
+/* Core/GLES3 (Web) has no gl_LightSource: RAS_OpenGLLight computes the same per-slot values
+ * (eye space) and GPU_material_bind_scene_lights() uploads them here, same field names. */
+struct SceneLightSource {
+	vec4 position;
+	vec4 diffuse;
+	vec4 specular;
+	vec4 halfVector;
+	vec3 spotDirection;
+	float spotExponent;
+	float spotCutoff;
+	float spotCosCutoff;
+	float constantAttenuation;
+	float linearAttenuation;
+	float quadraticAttenuation;
+};
+uniform SceneLightSource unflightsource[NUM_LIGHTS];
+#define SCENE_LIGHT(i) unflightsource[i]
+#else
+#define SCENE_LIGHT(i) gl_LightSource[i]
+#endif
+
+/* Per-scene-light shadow data for the light loop in node_bsdf_principled() (SCENE_LIGHT(i)).
  * Indices line up with that same slot i -- bound manually by RAS_Rasterizer/BL_BlenderShader
  * (GPU_material_bind_shadow_lamps), not by the GPUNodeLink material graph like the legacy
  * (non-node) material path uses. unfshadowenabled defaults to 0 (no shadow) for any material
@@ -3917,7 +3938,26 @@ uniform sampler2DShadow unfshadowmap[NUM_SHADOW_LIGHTS];
 uniform mat4 unfshadowpersmat[NUM_SHADOW_LIGHTS];
 uniform vec2 unfshadowbias[NUM_SHADOW_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
 uniform float unfshadowenabled[NUM_SHADOW_LIGHTS];
-#endif
+
+/* Shadow factor of scene-light slot i. GLSL ES 3.00 only allows constant indices into sampler
+ * arrays, so the loop index can't reach unfshadowmap[] directly. */
+float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
+{
+	float shadowfac = 1.0;
+	if (i == 0 && unfshadowenabled[0] > 0.5) {
+		shadow_simple(rco, vn, unfshadowmap[0], unfshadowpersmat[0], 0.0,
+		              unfshadowbias[0].x, unfshadowbias[0].y, 0.0, inp, shadowfac);
+	}
+	else if (i == 1 && unfshadowenabled[1] > 0.5) {
+		shadow_simple(rco, vn, unfshadowmap[1], unfshadowpersmat[1], 0.0,
+		              unfshadowbias[1].x, unfshadowbias[1].y, 0.0, inp, shadowfac);
+	}
+	else if (i == 2 && unfshadowenabled[2] > 0.5) {
+		shadow_simple(rco, vn, unfshadowmap[2], unfshadowpersmat[2], 0.0,
+		              unfshadowbias[2].x, unfshadowbias[2].y, 0.0, inp, shadowfac);
+	}
+	return shadowfac;
+}
 
 /* bsdfs */
 
@@ -3927,19 +3967,13 @@ void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 	vec3 L = vec3(0.2);
 
 	/* directional lights */
-#ifndef USE_CORE_PROFILE
-	/* gl_LightSource[] has no core-profile equivalent; nothing populates a GLSL
-	 * light-array uniform under CORE (RAS_OpenGLLight's fixed-function glLight calls
-	 * are already a no-op there too), so this falls back to ambient-only under CORE.
-	 * Porting real per-lamp lighting to these BSDF nodes is out of scope for now. */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		vec3 light_position = gl_LightSource[i].position.xyz;
-		vec3 light_diffuse = gl_LightSource[i].diffuse.rgb;
+		vec3 light_position = SCENE_LIGHT(i).position.xyz;
+		vec3 light_diffuse = SCENE_LIGHT(i).diffuse.rgb;
 
 		float bsdf = max(dot(N, light_position), 0.0);
 		L += light_diffuse * bsdf;
 	}
-#endif
 
 	result = vec4(L * color.rgb, 1.0);
 }
@@ -3950,13 +3984,11 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, out vec4 result)
 	vec3 L = vec3(0.2);
 
 	/* directional lights */
-#ifndef USE_CORE_PROFILE
-	/* see node_bsdf_diffuse() above -- same ambient-only fallback under CORE. */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		vec3 light_position = gl_LightSource[i].position.xyz;
-		vec3 H = gl_LightSource[i].halfVector.xyz;
-		vec3 light_diffuse = gl_LightSource[i].diffuse.rgb;
-		vec3 light_specular = gl_LightSource[i].specular.rgb;
+		vec3 light_position = SCENE_LIGHT(i).position.xyz;
+		vec3 H = SCENE_LIGHT(i).halfVector.xyz;
+		vec3 light_diffuse = SCENE_LIGHT(i).diffuse.rgb;
+		vec3 light_specular = SCENE_LIGHT(i).specular.rgb;
 
 		/* we mix in some diffuse so low roughness still shows up */
 		float r2 = roughness * roughness;
@@ -3964,7 +3996,6 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, out vec4 result)
 		bsdf += 0.5 * max(dot(N, light_position), 0.0);
 		L += light_specular * bsdf;
 	}
-#endif
 
 	result = vec4(L * color.rgb, 1.0);
 }
@@ -4030,17 +4061,15 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	float F0_norm = 1.0 / (1.0 - F0);
 
 	/* directional lights */
-#ifndef USE_CORE_PROFILE
-	/* see node_bsdf_diffuse() above -- same ambient-only fallback under CORE. */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		if (gl_LightSource[i].diffuse.rgb == vec3(0.0) && gl_LightSource[i].specular.rgb == vec3(0.0)) {
+		if (SCENE_LIGHT(i).diffuse.rgb == vec3(0.0) && SCENE_LIGHT(i).specular.rgb == vec3(0.0)) {
 			continue; /* disabled slot */
 		}
 
 		/* position.w == 0: directional (Sun), position.xyz is already the direction to the light.
 		 * w == 1: Point/Spot, position.xyz is the light position in view space, and I is the
 		 * fragment's view-space position, so the direction is (light - fragment). */
-		vec4 light_position_world = gl_LightSource[i].position;
+		vec4 light_position_world = SCENE_LIGHT(i).position;
 		vec3 light_position;
 		float light_atten = 1.0;
 		if (light_position_world.w == 0.0) {
@@ -4050,20 +4079,20 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			vec3 light_vec = light_position_world.xyz - I;
 			float light_dist = length(light_vec);
 			light_position = light_vec / max(light_dist, 0.0001);
-			light_atten = 1.0 / (gl_LightSource[i].constantAttenuation +
-			                     gl_LightSource[i].linearAttenuation * light_dist +
-			                     gl_LightSource[i].quadraticAttenuation * light_dist * light_dist);
-			if (gl_LightSource[i].spotCutoff < 179.0) {
-				float spotcos = dot(-light_position, normalize(gl_LightSource[i].spotDirection));
-				light_atten *= (spotcos < gl_LightSource[i].spotCosCutoff) ?
-				               0.0 : pow(spotcos, gl_LightSource[i].spotExponent);
+			light_atten = 1.0 / (SCENE_LIGHT(i).constantAttenuation +
+			                     SCENE_LIGHT(i).linearAttenuation * light_dist +
+			                     SCENE_LIGHT(i).quadraticAttenuation * light_dist * light_dist);
+			if (SCENE_LIGHT(i).spotCutoff < 179.0) {
+				float spotcos = dot(-light_position, normalize(SCENE_LIGHT(i).spotDirection));
+				light_atten *= (spotcos < SCENE_LIGHT(i).spotCosCutoff) ?
+				               0.0 : pow(spotcos, SCENE_LIGHT(i).spotExponent);
 			}
 		}
 
 		vec3 H = normalize(light_position + V);
 
-		vec3 light_diffuse = gl_LightSource[i].diffuse.rgb;
-		vec3 light_specular = gl_LightSource[i].specular.rgb;
+		vec3 light_diffuse = SCENE_LIGHT(i).diffuse.rgb;
+		vec3 light_specular = SCENE_LIGHT(i).specular.rgb;
 
 		float NdotL = dot(N, light_position);
 		float NdotV = dot(N, V);
@@ -4137,18 +4166,13 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		 * unfshadowmap/unfshadowpersmat/unfshadowbias/unfshadowenabled above). Mirrors what the
 		 * legacy (non-node) material path does per-lamp via shadow_simple(). */
 		if (i < NUM_SHADOW_LIGHTS) {
-			if (unfshadowenabled[i] > 0.5) {
-				float shadowfac;
-				shadow_simple(I, N, unfshadowmap[i], unfshadowpersmat[i], 0.0,
-				              unfshadowbias[i].x, unfshadowbias[i].y, 0.0, NdotL, shadowfac);
-				diffuse_and_specular_bsdf *= shadowfac;
-				clearcoat_bsdf *= shadowfac;
-			}
+			float shadowfac = scene_light_shadow(i, I, N, NdotL);
+			diffuse_and_specular_bsdf *= shadowfac;
+			clearcoat_bsdf *= shadowfac;
 		}
 
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;
 	}
-#endif
 
 	if (env_on > 0.5) {
 		/* environment specular: reflected sky/HDRI with roughness-aware Schlick fresnel (Lagarde) */

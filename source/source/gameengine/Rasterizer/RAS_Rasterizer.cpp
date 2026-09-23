@@ -98,6 +98,7 @@ RAS_Rasterizer::RAS_Rasterizer()
 	for (unsigned int i = 0; i < GPU_SHADOW_LAMPS_COUNT; i++) {
 		m_shadowLamps[i] = nullptr;
 	}
+	m_sceneLights.reset(new GPUSceneLight[GPU_MATERIAL_NUM_SCENE_LIGHTS]());
 
 	InitOverrideShadersInterface();
 
@@ -1155,6 +1156,9 @@ void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 		for (unsigned int i = 0; i < GPU_SHADOW_LAMPS_COUNT; i++) {
 			m_shadowLamps[i] = nullptr;
 		}
+		for (unsigned int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
+			m_sceneLights[i] = GPUSceneLight();
+		}
 
 		viewmat.PackFromAffineTransform(glviewmat);
 
@@ -1166,8 +1170,8 @@ void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 		LoadMatrix(glviewmat);
 		for (lit = m_lights.begin(), count = 0; !(lit == m_lights.end()) && count < m_numgllights; ++lit) {
 			RAS_OpenGLLight *light = (*lit);
-
-			if (light->ApplyFixedFunctionLighting(kxscene, layer, count)) {
+			/* m_numgllights <= GPU_MATERIAL_NUM_SCENE_LIGHTS (GetNumLights() caps it at 8). */
+			if (light->ApplyFixedFunctionLighting(kxscene, layer, count, glviewmat, &m_sceneLights[count])) {
 				/* Record the GPULamp behind gl_LightSource[count] too, same slot, so
 				 * BL_BlenderShader::UpdateLights() can bind its shadow map for the fixed-function
 				 * light loop Principled/PBR materials read (see GetShadowLamps()). Slots beyond

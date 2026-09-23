@@ -152,6 +152,9 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
   somada 5,6 e a sombra fica fraca) e ver o efeito de `ProcessLighting(true)` agora rodar para todo material com
   nodes em uma cena maior. `node_bsdf_diffuse`/`node_bsdf_glossy` ainda tratam toda luz como direcional e sem
   sombra.
+- **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
+  2026-09-23); roda sem erro no Edge headless. Falta aceite visual do usuário no navegador com GPU real e
+  reconferir o desktop.
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
   buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
   (`BUFFER_SHADOW`) projetam sombra.

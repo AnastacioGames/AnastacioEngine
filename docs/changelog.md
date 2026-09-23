@@ -22,6 +22,32 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: luzes de cena e sombra do Principled/PBR no perfil CORE (WebGL2)
+
+- **Problema**: o `web-runtime` compila com `WITH_GL_PROFILE_CORE_RANGERUNTIME` (`USE_CORE_PROFILE` nos shaders).
+  O loop de luzes de `node_bsdf_principled()`/`node_bsdf_diffuse()`/`node_bsdf_glossy()` e a sombra do Principled
+  estavam em `#ifndef USE_CORE_PROFILE` (`gl_LightSource` não existe em GLES3, e `RAS_OpenGLLight` não chama
+  `glLight*` em CORE): no navegador esses materiais só recebiam ambiente/IBL, sem Sun/Point/Spot nem sombra.
+- **Correção**:
+  - `RAS_OpenGLLight::ApplyFixedFunctionLighting()` preenche também um `GPUSceneLight` (`GPU_material.h`) com os
+    mesmos valores do `glLight*`, em espaço de visão (posição/direção multiplicadas pela view, `halfVector`
+    derivado para o Sun, `spotCosCutoff`). `RAS_Rasterizer` guarda os 8 slots (`GetSceneLights()`), porque
+    uniform é estado do programa e `ProcessLighting()` não recalcula quando a camada de luz se repete.
+  - `GPU_material_bind_scene_lights()` envia `unflightsource[i].*` por objeto, junto do bind de sombra em
+    `BL_BlenderShader::BindShadowLamps()`; no COMPAT as localizações são -1 e nada é enviado.
+  - GLSL: em CORE, `uniform SceneLightSource unflightsource[8]` com os campos de `gl_LightSource`; os três BSDFs
+    leem `SCENE_LIGHT(i)` (em COMPAT continua `gl_LightSource[i]`). A amostragem de sombra passou para
+    `scene_light_shadow()`, com índices constantes em `unfshadowmap[]` (GLSL ES 3.00 proíbe indexar array de
+    samplers com a variável do loop).
+  - `gpu_extensions.c`: no Emscripten `GPU_max_textures()` fica limitado a 28, o máximo de units que o
+    `LEGACY_GL_EMULATION` rastreia. Com WebGL informando 32 (SwiftShader), o bind da sombra em
+    `max - 3 + i` fazia `glEnable` estourar em `hook_enable` (`enabled_tex2D` de undefined) ao carregar a cena.
+- **Validação**: `build` nativo (`RangeRuntime`/`RangeEngine`) e `build-web-release` compilaram com código 0.
+  `shadow_ibl_test.range` empacotado e rodado no Edge headless (SwiftShader): sem exceção, sem erro de shader no
+  pré-voo, `glError=0`; a captura mostra os brilhos das várias luzes, o cone do Spot e as sombras no chão.
+  **Pendente**: aceite visual do usuário no navegador com GPU real e conferência do desktop (o GLSL do caminho
+  COMPAT mudou: macro `SCENE_LIGHT` e helper de sombra).
+
 ## 2026-09-23 - Sombra em Principled/PBR: correções que faltavam para funcionar no jogo real
 
 A entrada de 2026-09-21 compilava mas não sombreava nada no jogo (validado no `shadow_ibl_test.range`). Causas
