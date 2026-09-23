@@ -1,0 +1,12 @@
+{
+  "windows": {
+    "main_menu": {
+      "options_width": 720,
+      "options_height": 650
+    },
+    "pause_menu": {
+      "options_width": 720,
+      "options_height": 650
+    }
+  }
+}

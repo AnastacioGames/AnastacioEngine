@@ -43,13 +43,15 @@ O modo **RanGE GPU Skinning** move a deformação do esqueleto para a GPU. Para
 usá-lo, selecione esse modo no painel da Armature e habilite **GPU Skinning**
 nas opções do material que será usado pelo objeto.
 ### Exportação para Web (em desenvolvimento)
-O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a exportação para o navegador **ainda não está finalizada** e não deve ser usada em projetos de produção.
+O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a exportação para o navegador **ainda não está finalizada** e não deve ser usada em projetos de produção. O estado atual está em [docs/roadmap.md](docs/roadmap.md).
+
 ## Status de plataformas
 | Plataforma | Estado |
 |---|---|
 | Windows x64 | Suportada nesta release. |
 | Linux x86_64 | Suportada nativamente (fora do WSL) a partir da 0.3.0. |
 | 32-bit | Não suportado. |
+
 ## Estrutura da distribuição
 - `RangeEngine`/`RangeEngine.exe`: editor para criar e configurar projetos.
 - `RangeRuntime`/`RangeRuntime.exe`: player standalone para arquivos `.range`.
@@ -58,6 +60,20 @@ O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a ex
 ## Sobre
 
 AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b / Blender 2.79, e concentra seu desenvolvimento em performance, renderização, ferramentas de runtime e fluxo de produção para jogos.
+
+## Desenvolvimento (código-fonte)
+
+Este repositório também guarda o código-fonte completo da engine.
+
+- [Índice da documentação](docs/README.md)
+- [Roadmap atual](docs/roadmap.md)
+- [Arquitetura](docs/architecture.md)
+- [Build no Windows](docs/build-notes.md)
+- [Build no Linux](docs/linux-build.md)
+- [Histórico técnico](docs/changelog.md)
+- [Licença](docs/licenca.md)
+
+Para agentes de código, as regras operacionais estão em [AGENTS.md](AGENTS.md).
 
 ## Links
 
