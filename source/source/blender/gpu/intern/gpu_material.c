@@ -4369,8 +4369,13 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
 			 * same registration GPU_lamp_get_data() does for the Lamp Data node path. */
 			material->dynproperty |= DYN_LAMP_PERSMAT;
-			add_user_list(&material->lamps, lamp);
-			add_user_list(&lamp->materials, material->ma);
+			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once. */
+			if (!BLI_findptr(&material->lamps, lamp, offsetof(LinkData, data))) {
+				add_user_list(&material->lamps, lamp);
+			}
+			if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
+				add_user_list(&lamp->materials, material->ma);
+			}
 
 			if (material->shadowmaploc[i] != -1) {
 				GPU_texture_bind(lamp->depthtex, texunit + i);
@@ -4383,6 +4388,13 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				float bias[2] = {lamp->bias, lamp->slopebias};
 				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
 			}
+		}
+
+		else if (material->shadowmaploc[i] != -1) {
+			/* Unset sampler2DShadow uniforms default to unit 0, which may hold a plain sampler2D
+			 * texture: two sampler types on one unit is GL_INVALID_OPERATION at draw time. Point
+			 * the unused slot at its own (unbound) unit instead. */
+			GPU_shader_uniform_int(shader, material->shadowmaploc[i], texunit + i);
 		}
 
 		if (material->shadowenabledloc[i] != -1) {

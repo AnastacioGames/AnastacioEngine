@@ -28,6 +28,7 @@
 #include "GPU_glew.h"
 
 #include <stdio.h>
+#include <algorithm>
 
 
 #include "RAS_OpenGLLight.h"
@@ -123,7 +124,9 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 			//vec[2] = -base->object->obmat[2][2];
 #ifdef WITH_GL_PROFILE_COMPAT
 			glLightfv((GLenum)(GL_LIGHT0 + slot), GL_SPOT_DIRECTION, vec);
-			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_CUTOFF, m_spotsize / 2.0f);
+			/* m_spotsize is in radians (Lamp.spot_size); GL_SPOT_CUTOFF is the half-angle in degrees,
+			 * valid range [0, 90] (or 180 = no cone). */
+			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_CUTOFF, std::min(m_spotsize * (0.5f * 180.0f / 3.14159265f), 90.0f));
 			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_EXPONENT, 128.0f * m_spotblend);
 #endif
 		}

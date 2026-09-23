@@ -3900,7 +3900,12 @@ vec3 rotate_vector(vec3 p, vec3 n, float theta) {
 
 /*********** NEW SHADER NODES ***************/
 
-#define NUM_LIGHTS 3
+/* Loop over every fixed-function slot RAS_Rasterizer::ProcessLighting() can fill (GL's 8 lights;
+ * disabled slots are zeroed in RAS_OpenGLRasterizer::DisableLight). Only the first
+ * NUM_SHADOW_LIGHTS get a shadow map -- keep that in sync with GPU_MATERIAL_NUM_SHADOW_LAMPS
+ * (GPU_material.h) and RAS_Rasterizer::GPU_SHADOW_LAMPS_COUNT. */
+#define NUM_LIGHTS 8
+#define NUM_SHADOW_LIGHTS 3
 
 #ifndef USE_CORE_PROFILE
 /* Per-scene-light shadow data for the fixed-function light loop above (gl_LightSource[i]).
@@ -3908,10 +3913,10 @@ vec3 rotate_vector(vec3 p, vec3 n, float theta) {
  * (GPU_material_bind_shadow_lamps), not by the GPUNodeLink material graph like the legacy
  * (non-node) material path uses. unfshadowenabled defaults to 0 (no shadow) for any material
  * whose shader never gets these set, so this is safe even if a given draw call doesn't bind them. */
-uniform sampler2DShadow unfshadowmap[NUM_LIGHTS];
-uniform mat4 unfshadowpersmat[NUM_LIGHTS];
-uniform vec2 unfshadowbias[NUM_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
-uniform float unfshadowenabled[NUM_LIGHTS];
+uniform sampler2DShadow unfshadowmap[NUM_SHADOW_LIGHTS];
+uniform mat4 unfshadowpersmat[NUM_SHADOW_LIGHTS];
+uniform vec2 unfshadowbias[NUM_SHADOW_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
+uniform float unfshadowenabled[NUM_SHADOW_LIGHTS];
 #endif
 
 /* bsdfs */
@@ -4028,8 +4033,32 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 #ifndef USE_CORE_PROFILE
 	/* see node_bsdf_diffuse() above -- same ambient-only fallback under CORE. */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		vec3 light_position_world = gl_LightSource[i].position.xyz;
-		vec3 light_position = normalize(light_position_world);
+		if (gl_LightSource[i].diffuse.rgb == vec3(0.0) && gl_LightSource[i].specular.rgb == vec3(0.0)) {
+			continue; /* disabled slot */
+		}
+
+		/* position.w == 0: directional (Sun), position.xyz is already the direction to the light.
+		 * w == 1: Point/Spot, position.xyz is the light position in view space, and I is the
+		 * fragment's view-space position, so the direction is (light - fragment). */
+		vec4 light_position_world = gl_LightSource[i].position;
+		vec3 light_position;
+		float light_atten = 1.0;
+		if (light_position_world.w == 0.0) {
+			light_position = normalize(light_position_world.xyz);
+		}
+		else {
+			vec3 light_vec = light_position_world.xyz - I;
+			float light_dist = length(light_vec);
+			light_position = light_vec / max(light_dist, 0.0001);
+			light_atten = 1.0 / (gl_LightSource[i].constantAttenuation +
+			                     gl_LightSource[i].linearAttenuation * light_dist +
+			                     gl_LightSource[i].quadraticAttenuation * light_dist * light_dist);
+			if (gl_LightSource[i].spotCutoff < 179.0) {
+				float spotcos = dot(-light_position, normalize(gl_LightSource[i].spotDirection));
+				light_atten *= (spotcos < gl_LightSource[i].spotCosCutoff) ?
+				               0.0 : pow(spotcos, gl_LightSource[i].spotExponent);
+			}
+		}
 
 		vec3 H = normalize(light_position + V);
 
@@ -4101,15 +4130,20 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		}
 		clearcoat_bsdf *= max(CNdotL, 0.0);
 
+		diffuse_and_specular_bsdf *= light_atten;
+		clearcoat_bsdf *= light_atten;
+
 		/* Shadow map for this light slot, bound by GPU_material_bind_shadow_lamps() (see
 		 * unfshadowmap/unfshadowpersmat/unfshadowbias/unfshadowenabled above). Mirrors what the
 		 * legacy (non-node) material path does per-lamp via shadow_simple(). */
-		if (unfshadowenabled[i] > 0.5) {
-			float shadowfac;
-			shadow_simple(I, N, unfshadowmap[i], unfshadowpersmat[i], 0.0,
-			              unfshadowbias[i].x, unfshadowbias[i].y, 0.0, NdotL, shadowfac);
-			diffuse_and_specular_bsdf *= shadowfac;
-			clearcoat_bsdf *= shadowfac;
+		if (i < NUM_SHADOW_LIGHTS) {
+			if (unfshadowenabled[i] > 0.5) {
+				float shadowfac;
+				shadow_simple(I, N, unfshadowmap[i], unfshadowpersmat[i], 0.0,
+				              unfshadowbias[i].x, unfshadowbias[i].y, 0.0, NdotL, shadowfac);
+				diffuse_and_specular_bsdf *= shadowfac;
+				clearcoat_bsdf *= shadowfac;
+			}
 		}
 
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;

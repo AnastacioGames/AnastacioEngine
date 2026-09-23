@@ -186,7 +186,15 @@ void BL_BlenderShader::UnbindProg()
 void BL_BlenderShader::UpdateLights(RAS_Rasterizer *rasty)
 {
 	GPU_material_update_lamps(m_gpuMat, rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data());
-	GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
+}
+
+void BL_BlenderShader::BindShadowLamps(RAS_Rasterizer *rasty)
+{
+	/* Needs the program bound (glUniform*) and the per-object light set from ProcessLighting(),
+	 * so it can't live in UpdateLights() which runs from Prepare() before BindProg(). */
+	if (GPU_material_bound(m_gpuMat)) {
+		GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
+	}
 }
 
 void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Rasterizer *rasty)
