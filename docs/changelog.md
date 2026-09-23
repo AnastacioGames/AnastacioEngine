@@ -22,6 +22,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: mouse com cursor oculto deixa de girar a câmera sem parar
+
+- Usuário relatou mouse "muito sensível" no First Person (GitHub Pages). Causa: no port SDL2/Emscripten o
+  `WarpMouse` não funciona, então `reCenter()` não recentralizava e `deltaPosition` repetia o deslocamento a cada
+  frame (câmera girando como joystick). Não era sensibilidade do jogo.
+- `GHOST_SystemSDL.cpp` (só `__EMSCRIPTEN__`): com cursor oculto, cursor virtual acumulado de `xrel/yrel`;
+  `setCursorPosition` move o cursor virtual. Clique de mouse real pede pointer lock no `#canvas`.
+  `GHOST_WindowSDL.cpp`: mostrar cursor sai do pointer lock; ocultar pede. `package-web.py`: rejeição de pointer
+  lock não vira erro na página.
+- Validação no Edge headless (sonda `mprobe`): movimento de 80 px gera um único delta, com e sem pointer lock;
+  toque/arrasto gera delta proporcional, sem salto no toque novo; cursor visível inalterado. Publicado no
+  `gh-pages` (0.1.2). Pendente: conferir no celular/PC do usuário.
+
 ## 2026-09-23 - Web: botão de tela cheia na página do jogo
 
 - Usuário confirmou que o First Person roda no celular pelo GitHub Pages e pediu tela cheia.

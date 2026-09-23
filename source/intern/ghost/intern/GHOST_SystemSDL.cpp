@@ -32,6 +32,27 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
+
+/* Web: the browser cannot warp the cursor (SDL's Emscripten_WarpMouse is unsupported), so
+ * mouse.reCenter() did nothing and deltaPosition returned the cursor's distance from the center
+ * on every frame: a mouse-look camera kept spinning while the cursor was off-center. While the
+ * game hides the cursor (mouse-look), GHOST reports a virtual cursor driven by the relative motion
+ * (pointer lock, plain mouse move or touch drag) and setCursorPosition() warps that virtual cursor.
+ * With a visible cursor (menus) the real absolute position is used, as before. */
+static bool web_virtual_cursor = false;
+static int web_cursor_x = 0;
+static int web_cursor_y = 0;
+/* Last position reported to the engine; a warp to the same spot sends no event (like a native warp). */
+static int web_reported_x = -1;
+static int web_reported_y = -1;
+
+static void web_clamp_cursor(SDL_Window *sdl_win)
+{
+	int w, h;
+	SDL_GetWindowSize(sdl_win, &w, &h);
+	web_cursor_x = (web_cursor_x < 0) ? 0 : (web_cursor_x > w - 1) ? w - 1 : web_cursor_x;
+	web_cursor_y = (web_cursor_y < 0) ? 0 : (web_cursor_y > h - 1) ? h - 1 : web_cursor_y;
+}
 #endif
 
 GHOST_SystemSDL::GHOST_SystemSDL()
@@ -344,6 +365,29 @@ GHOST_SystemSDL::processEvent(SDL_Event *sdl_event)
 			GHOST_TInt32 x_root = sdl_sub_evt.x + x_win;
 			GHOST_TInt32 y_root = sdl_sub_evt.y + y_win;
 
+#ifdef __EMSCRIPTEN__
+			if (!window->getCursorVisibility()) {
+				if (web_virtual_cursor) {
+					/* xrel is 0 on the event that places a new touch, so a new finger does not jump. */
+					web_cursor_x += sdl_sub_evt.xrel;
+					web_cursor_y += sdl_sub_evt.yrel;
+				}
+				else {
+					web_cursor_x = sdl_sub_evt.x;
+					web_cursor_y = sdl_sub_evt.y;
+					web_virtual_cursor = true;
+				}
+				web_clamp_cursor(sdl_win);
+				x_root = web_cursor_x + x_win;
+				y_root = web_cursor_y + y_win;
+				web_reported_x = web_cursor_x;
+				web_reported_y = web_cursor_y;
+			}
+			else {
+				web_virtual_cursor = false;
+			}
+#endif
+
 #if 0
 			if (window->getCursorGrabMode() != GHOST_kGrabDisable && window->getCursorGrabMode() != GHOST_kGrabNormal)
 			{
@@ -397,6 +441,19 @@ GHOST_SystemSDL::processEvent(SDL_Event *sdl_event)
 
 			GHOST_WindowSDL *window = findGhostWindow(SDL_GetWindowFromID_fallback(sdl_sub_evt.windowID));
 			assert(window != NULL);
+
+#ifdef __EMSCRIPTEN__
+			/* Mouse-look: (re)lock the pointer on a real mouse click, e.g. after Esc released it.
+			 * Deferred: the browser only grants it inside a user input handler. */
+			if (type == GHOST_kEventButtonDown && sdl_sub_evt.which != SDL_TOUCH_MOUSEID &&
+			    !window->getCursorVisibility())
+			{
+				EmscriptenPointerlockChangeEvent lock;
+				if (emscripten_get_pointerlock_status(&lock) == EMSCRIPTEN_RESULT_SUCCESS && !lock.isActive) {
+					emscripten_request_pointerlock("#canvas", 1);
+				}
+			}
+#endif
 
 			/* process rest of normal mouse buttons */
 			if (sdl_sub_evt.button == SDL_BUTTON_LEFT)
@@ -524,6 +581,33 @@ GHOST_SystemSDL::setCursorPosition(GHOST_TInt32 x,
 {
 	int x_win, y_win;
 	SDL_Window *win = SDL_GetMouseFocus();
+#ifdef __EMSCRIPTEN__
+	/* Touch or a cursor outside the canvas leave no mouse focus; the Web build has one window. */
+	GHOST_WindowSDL *window = static_cast<GHOST_WindowSDL *>(m_windowManager->getActiveWindow());
+	if (!window && !m_windowManager->getWindows().empty()) {
+		window = static_cast<GHOST_WindowSDL *>(m_windowManager->getWindows().front());
+	}
+	if (window && !window->getCursorVisibility()) {
+		win = window->getSDLWindow();
+		SDL_GetWindowPosition(win, &x_win, &y_win);
+		web_cursor_x = x - x_win;
+		web_cursor_y = y - y_win;
+		web_virtual_cursor = true;
+		web_clamp_cursor(win);
+		/* A native warp produces a motion event only when the position changes; emulate that so the
+		 * engine sees the new position without an event per reCenter() while the mouse is still. */
+		if (web_cursor_x != web_reported_x || web_cursor_y != web_reported_y) {
+			web_reported_x = web_cursor_x;
+			web_reported_y = web_cursor_y;
+			pushEvent(new GHOST_EventCursor(getMilliSeconds(), GHOST_kEventCursorMove, window,
+			                                web_cursor_x + x_win, web_cursor_y + y_win));
+		}
+		return GHOST_kSuccess;
+	}
+	if (!win) {
+		return GHOST_kFailure;
+	}
+#endif
 	SDL_GetWindowPosition(win, &x_win, &y_win);
 
 	SDL_WarpMouseInWindow(win, x - x_win, y - y_win);

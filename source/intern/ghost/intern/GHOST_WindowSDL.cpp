@@ -26,6 +26,10 @@
 
 #include <assert.h>
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten/html5.h>
+#endif
+
 GHOST_WindowSDL::GHOST_WindowSDL(GHOST_SystemSDL *system,
                                  const STR_String& title,
                                  GHOST_TInt32 left,
@@ -555,6 +559,17 @@ GHOST_TSuccess
 GHOST_WindowSDL::setWindowCursorVisibility(bool visible)
 {
 	SDL_ShowCursor(visible);
+#ifdef __EMSCRIPTEN__
+	/* Hidden cursor means mouse-look: lock the pointer so it cannot leave the canvas and motion is
+	 * unbounded (GHOST_SystemSDL keeps a virtual cursor). The browser grants the lock only during a
+	 * user input event, so the request is deferred to the next click/key; touch devices ignore it. */
+	if (visible) {
+		emscripten_exit_pointerlock();
+	}
+	else {
+		emscripten_request_pointerlock("#canvas", 1);
+	}
+#endif
 	return GHOST_kSuccess;
 }
 
