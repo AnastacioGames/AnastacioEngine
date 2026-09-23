@@ -3,6 +3,22 @@
 O projeto usa CMake + Ninja e gera a instalação atual em `build/bin/`. As regras anti-loop e de preservação
 do workspace estão em [`../AGENTS.md`](../AGENTS.md) e prevalecem sobre notas históricas do changelog.
 
+## Dependência externa: pasta `lib/`
+
+A pasta `lib/` (bibliotecas pré-compiladas de terceiros — Python, OpenEXR, FFmpeg etc.) **não fica no Git**
+(está no `.gitignore`, é grande demais para o repositório) e precisa ser baixada à parte via SVN antes de
+configurar o CMake:
+
+```bat
+svn checkout https://svn.blender.org/svnroot/bf-blender/trunk/lib/win64_vc15 lib/win64_vc15
+```
+
+Rode esse comando na raiz do projeto (`D:\AnastacioEngine`), criando `lib/win64_vc15/`. Sem essa pasta, a
+configuração do CMake falha por não encontrar as dependências.
+
+Para build Linux, a pasta equivalente **não** é necessária — o preset Linux usa as bibliotecas da própria
+distro via apt (ver [`docs/linux-build.md`](linux-build.md)).
+
 ## Ambiente obrigatório
 
 Uma chamada direta de `ninja` em PowerShell ou `cmd` comum não herda `INCLUDE` e `LIB` do MSVC. Para
