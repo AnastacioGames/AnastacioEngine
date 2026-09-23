@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "first-person",
+  "title": "First Person - AnastacioEngine",
+  "version": "0.1.0",
+  "created_utc": "2026-09-23T21:34:54+00:00",
+  "entry_game": "game/First_Person.range",
+  "requirements": {
+    "webgl": 2,
+    "threads": false,
+    "cross_origin_isolation": false
+  },
+  "runtime": {
+    "RangeRuntime.js": {
+      "bytes": 940590,
+      "sha256": "568640ca97a61d88238a96ec350cad5041667794a3c325ac366083da6ad6b2e5"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21623302,
+      "sha256": "d7aa00737a0142b451f5de43885c5812ffa179d8cfdaa29d1bb71d53cd782036"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    }
+  },
+  "files": {
+    "frame-time-perf.js": {
+      "bytes": 1936,
+      "sha256": "6d8018ee5152564fa3206226f4c56a73e21579631aa07f7963560a50051e2b91"
+    },
+    "game/First_Person.range": {
+      "bytes": 1196208,
+      "sha256": "8ad56022596e3ae0109f6727bdfe61e6909cd115151a5463f36ca7517e131d07"
+    },
+    "HOSTING.md": {
+      "bytes": 1822,
+      "sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b"
+    },
+    "index.html": {
+      "bytes": 13650,
+      "sha256": "85499321d5ac40322e8e1ebc2f4a66a40f90a3b7752f3829962f1aa22fccfdbf"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    },
+    "RangeRuntime.js": {
+      "bytes": 940590,
+      "sha256": "568640ca97a61d88238a96ec350cad5041667794a3c325ac366083da6ad6b2e5"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21623302,
+      "sha256": "d7aa00737a0142b451f5de43885c5812ffa179d8cfdaa29d1bb71d53cd782036"
+    },
+    "serve.py": {
+      "bytes": 965,
+      "sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92"
+    }
+  },
+  "warnings": []
+}
