@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "First_Person",
+  "title": "First Person",
+  "version": "0.1.4",
+  "created_utc": "2026-09-23T23:18:49+00:00",
+  "entry_game": "game/First_Person.range",
+  "requirements": {
+    "webgl": 2,
+    "threads": false,
+    "cross_origin_isolation": false
+  },
+  "runtime": {
+    "RangeRuntime.js": {
+      "bytes": 940847,
+      "sha256": "3ca3a1ae5cbb1d0920546bcba93ac18fb40857984b3a725e976b43838fb08415"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21624135,
+      "sha256": "9b7bc92d31ac8f8cfdfe0d25238c9a2ebfb8a823e3de26e973f18968c9557263"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    }
+  },
+  "files": {
+    "frame-time-perf.js": {
+      "bytes": 1936,
+      "sha256": "6d8018ee5152564fa3206226f4c56a73e21579631aa07f7963560a50051e2b91"
+    },
+    "game/First_Person.range": {
+      "bytes": 1377976,
+      "sha256": "aca42ab4ba2301dc7315232a491550f44339e6bf8f277c14e5ccd441378b9c06"
+    },
+    "HOSTING.md": {
+      "bytes": 1822,
+      "sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b"
+    },
+    "index.html": {
+      "bytes": 16035,
+      "sha256": "1bb4951401c2d3fbbf5e361d123be01a1cd7bbf99a24ed89a21da07c499e02b9"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    },
+    "RangeRuntime.js": {
+      "bytes": 940847,
+      "sha256": "3ca3a1ae5cbb1d0920546bcba93ac18fb40857984b3a725e976b43838fb08415"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21624135,
+      "sha256": "9b7bc92d31ac8f8cfdfe0d25238c9a2ebfb8a823e3de26e973f18968c9557263"
+    },
+    "serve.py": {
+      "bytes": 965,
+      "sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92"
+    }
+  },
+  "warnings": []
+}

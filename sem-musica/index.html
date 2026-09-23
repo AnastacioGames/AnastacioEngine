@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First Person</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+  #stage { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  canvas { max-width: 100%; max-height: 100%; background: #000; outline: none; }
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
+             align-items: center; justify-content: center; background: rgba(0,0,0,.85); text-align: center; padding: 16px; }
+  #overlay[hidden] { display: none; }
+  button { font-size: 18px; padding: 12px 32px; border: 0; border-radius: 6px; background: #e8862a; color: #111; cursor: pointer; }
+  button:disabled { background: #555; color: #999; cursor: default; }
+  progress { width: min(360px, 80vw); }
+  #error { color: #ff8a80; white-space: pre-wrap; max-width: 90vw; }
+  #log { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 35%; overflow: auto; margin: 0;
+         background: rgba(0,0,0,.8); color: #9f9; font: 11px monospace; padding: 6px; white-space: pre-wrap; }
+  body.debug #log { display: block; }
+  #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
+        background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
+  #fs[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas" tabindex="0" width="960" height="540" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="overlay">
+    <h2 id="title">First Person</h2>
+    <progress id="progress" max="100" value="0"></progress>
+    <div id="status">Carregando...</div>
+    <button id="play" disabled>Jogar</button>
+    <div id="error" hidden></div>
+  </div>
+</div>
+<button id="fs" hidden>Tela cheia</button>
+<pre id="log"></pre>
+<script src="frame-time-perf.js"></script>
+<script>
+(function () {
+  var GAME = "First_Person.range";
+  var EXTRAS = [];
+  var VERSION = "0.1.4";
+  var el = function (id) { return document.getElementById(id); };
+  var debug = /[?&]debug=1/.test(location.search);
+  if (debug) document.body.classList.add("debug");
+  function log(s) { if (debug) el("log").textContent += s + "\n"; }
+
+  var failed = false;
+  function fail(msg) {
+    if (failed) return;
+    failed = true;
+    if (pf) pf.failure = String(msg);
+    el("progress").hidden = true;
+    el("play").hidden = true;
+    el("status").textContent = "Nao foi possivel iniciar o jogo.";
+    var e = el("error");
+    e.hidden = false;
+    e.textContent = msg + "\n\nRecarregue a pagina para tentar novamente. Use ?debug=1 para ver o log.";
+    el("overlay").hidden = false;
+  }
+
+  function fetchInto(url, fsName) {
+    return fetch(url + "?v=" + encodeURIComponent(VERSION)).then(function (r) {
+      if (!r.ok) throw new Error(url + ": HTTP " + r.status);
+      return r.arrayBuffer();
+    }).then(function (buf) {
+      var parts = fsName.split("/"), dir = "/";
+      for (var i = 0; i < parts.length - 1; i++) {
+        try { Module.FS_createPath(dir, parts[i], true, true); } catch (e) {}
+        dir += parts[i] + "/";
+      }
+      Module.FS_createDataFile(dir, parts[parts.length - 1], new Uint8Array(buf), true, false);
+      log("[fs] /" + fsName + " (" + buf.byteLength + " bytes)");
+    });
+  }
+
+  var ready = false, started = false;
+  function tryStart() {
+    if (started || !ready) return;
+    started = true;
+    el("overlay").hidden = true;
+    el("fs").hidden = !fsSupported;
+    el("canvas").focus();
+  }
+
+  // Tela cheia: a pagina inteira (overlay de perf/log continuam visiveis). O canvas mantem a resolucao
+  // de desenho e so e escalado por CSS, preservando a proporcao (o mapeamento de toque/mouse segue certo).
+  // iPhone nao tem Fullscreen API para elementos fora de <video>: o botao fica oculto la.
+  var root = document.documentElement;
+  var fsSupported = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function fitCanvas() {
+    var c = el("canvas");
+    if (!isFullscreen()) { c.style.width = c.style.height = ""; return; }
+    var k = Math.min(window.innerWidth / c.width, window.innerHeight / c.height);
+    c.style.width = Math.floor(c.width * k) + "px";
+    c.style.height = Math.floor(c.height * k) + "px";
+  }
+  function toggleFullscreen() {
+    if (isFullscreen()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    var req = root.requestFullscreen ? root.requestFullscreen() : root.webkitRequestFullscreen();
+    Promise.resolve(req).then(function () {
+      var c = el("canvas");
+      // Android/Chrome so permite travar a orientacao em tela cheia; falha em silencio nos demais.
+      if (c.width > c.height && screen.orientation && screen.orientation.lock)
+        return screen.orientation.lock("landscape");
+    }).catch(function () {});
+  }
+  function onFullscreenChange() {
+    el("fs").textContent = isFullscreen() ? "Sair da tela cheia" : "Tela cheia";
+    fitCanvas();
+    el("canvas").focus();
+  }
+  el("fs").addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+  window.addEventListener("resize", fitCanvas);
+
+  // Alguns avisos da emulacao GL saem direto por console.error (antes do printErr).
+  var _consoleError = console.error.bind(console);
+  console.error = function () {
+    var t = arguments.length ? String(arguments[0]) : "";
+    if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn.apply(console, arguments);
+    else _consoleError.apply(null, arguments);
+  };
+
+  window.Module = {
+    canvas: el("canvas"),
+    arguments: [GAME],
+    print: function (t) { log("[out] " + t); console.log(t); },
+    printErr: function (t) {
+      log("[err] " + t);
+      // Avisos conhecidos e inofensivos da emulacao GL legada do emscripten.
+      if (/using emscripten GL (immediate mode )?emulation/.test(t)) console.warn(t); else console.error(t);
+    },
+    onAbort: function (w) {
+      if (pf) pf.runtimeAborted = String(w);
+      fail("O runtime foi interrompido: " + w);
+    },
+    setStatus: function (t) {
+      if (failed) return;
+      var m = /(.+) \((\d+(?:\.\d+)?)\/(\d+)\)/.exec(t);
+      if (m) { el("progress").value = 100 * m[2] / m[3]; el("status").textContent = "Baixando dados do jogo..."; }
+      else if (t) el("status").textContent = t;
+    },
+    preRun: [function () {
+      Module.addRunDependency("game-files");
+      var jobs = [fetchInto("game/" + GAME, GAME)];
+      EXTRAS.forEach(function (n) { jobs.push(fetchInto("game/" + n, n)); });
+      Promise.all(jobs).then(function () {
+        Module.removeRunDependency("game-files");
+      }).catch(function (e) { fail("Falha ao baixar arquivos do jogo: " + e.message); });
+    }],
+    onRuntimeInitialized: function () {
+      if (pf) pf.runtimeInitialized = true;
+      log("[event] runtime inicializado");
+      markReady();
+    }
+  };
+
+  window.addEventListener("error", function (ev) { fail("Erro: " + ev.message); });
+  window.addEventListener("unhandledrejection", function (ev) {
+    var msg = ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason);
+    // Pedido de pointer lock recusado (Esc recente, iframe, navegador sem suporte): o jogo segue sem trava.
+    if (/pointer ?lock|exited the lock/i.test(msg)) { ev.preventDefault(); console.warn("[web] pointer lock recusado: " + msg); return; }
+    fail("Erro: " + msg);
+  });
+
+  // O jogo so comeca a ser mostrado apos um clique: libera foco de teclado e permite audio (politica de autoplay).
+  var script = document.createElement("script");
+  script.src = "RangeRuntime.js?v=" + encodeURIComponent(VERSION);
+  script.onerror = function () { fail("RangeRuntime.js nao foi encontrado no servidor."); };
+  // Liberar o botao so quando o runtime terminou de inicializar (onRuntimeInitialized): com rede lenta o
+  // script carrega antes do .data/.wasm e o botao ficava ativo cedo demais (achado no GitHub Pages).
+  function markReady() {
+    if (failed || ready) return;
+    ready = true;
+    el("progress").hidden = true;
+    el("status").textContent = "Pronto.";
+    el("play").disabled = false;
+  }
+  el("play").addEventListener("click", tryStart);
+
+  // Pre-voo: eventos estruturados do runtime tem precedencia; o parser de console
+  // permanece apenas para binarios antigos e caminhos que ainda nao emitem eventos.
+  var preflight = /[?&]preflight=1/.test(location.search);
+  var pf = { shaders: [], python: [], diagnostics: [], contextLost: false, runtimeInitialized: false,
+             runtimeAborted: "", failure: "" };
+  var pfOpenShader = null, pfPyOpen = false, pfSeen = {}, pfStructuredShader = false;
+  var pfStructuredPyKinds = {};
+  function pfAddPy(rec) {
+    // O mesmo erro se repete a cada frame do controller; um registro por causa basta.
+    // Heuristica de console nao duplica um erro que ja chegou como evento estruturado.
+    if (!rec.structured && pfStructuredPyKinds[rec.kind]) return;
+    var key = rec.kind + "|" + (rec.module || "") + "|" + (rec.file || "") + "|" + (rec.origin || "") + "|" + rec.text;
+    if (!pfSeen[key]) { pfSeen[key] = true; pf.python.push(rec); }
+  }
+  function pfAddShader(rec) {
+    var key = rec.operation + "|" + rec.stage + "|" + (rec.material || "") + "|" + rec.log;
+    if (!pfSeen[key]) { pfSeen[key] = true; pf.shaders.push(rec); }
+  }
+  function pfDiagnostic(rec) {
+    if (!rec || rec.version !== 1 || typeof rec.category !== "string") return;
+    pf.diagnostics.push(rec);
+    if (rec.category === "shader" && rec.severity === "error") {
+      pfStructuredShader = true;
+      pfAddShader({ material: rec.origin || "", stage: rec.stage || "", operation: rec.operation || "",
+                    log: rec.log || "", structured: true });
+    }
+    else if (rec.category === "python" && rec.severity === "error") {
+      var kind = rec.exception_type || "Exception";
+      pfStructuredPyKinds[kind] = true;
+      var mod = "";
+      var mm = /(?:ModuleNotFoundError|ImportError).*?['"]([\w.]+)['"]/.exec(rec.message || "");
+      if (mm) mod = mm[1];
+      pfAddPy({ kind: kind, module: mod, file: "", text: rec.message || "", origin: rec.origin || "",
+                context: rec.context || "", traceback: rec.traceback || "", structured: true });
+    }
+  }
+  function pfLine(t) {
+    t = t.replace(/\x1b\[[0-9;]*m/g, "");
+    // O log do compilador GLSL chega em linhas soltas depois do cabecalho; outra linha fecha.
+    if (pfOpenShader) {
+      if (/^\s*(ERROR|WARNING):/.test(t)) { pfOpenShader.log += "\n" + t; return; }
+      pfOpenShader = null;
+    }
+    var m = /(ModuleNotFoundError|ImportError)\b.*?['"]([\w.]+)['"]/.exec(t);
+    if (m) { pfAddPy({ kind: m[1], module: m[2], file: "", text: t }); return; }
+    m = /FileNotFoundError.*?['"]([^'"]+)['"]/.exec(t);
+    if (m) { pfAddPy({ kind: "FileNotFoundError", file: m[1], text: t }); return; }
+    if (/Traceback \(most recent/.test(t) || /Python\W*.*script error/i.test(t)) { pfPyOpen = true; return; }
+    if (pfPyOpen) {
+      m = /^([\w.]*(Error|Exception))\b/.exec(t);
+      if (m) { pfPyOpen = false; pfAddPy({ kind: m[1], text: t, file: "" }); return; }
+    }
+    if (!pfStructuredShader && /shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
+      var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t,
+                  structured: false };
+      pfAddShader(rec);
+      pfOpenShader = rec;
+    }
+  }
+  function pfProbeGL() {
+    try {
+      var c = document.createElement("canvas");
+      var gl = c.getContext("webgl2");
+      if (gl) return { version: 2, missing_extensions: [] };
+      return { version: c.getContext("webgl") ? 1 : 0, missing_extensions: [],
+               error: "WebGL 2 indisponivel" };
+    } catch (e) { return { version: 0, missing_extensions: [], error: String(e) }; }
+  }
+  function hex(buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+  }
+  function pfFiles() {
+    return fetch("manifest.json?v=" + encodeURIComponent(VERSION), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (man) {
+        if (!man || typeof man.files !== "object") throw new Error("manifesto sem lista de arquivos");
+        return man;
+      }).catch(function (e) {
+        return { files: {}, preflight_manifest_error: String(e) };
+      })
+      .then(function (man) {
+        if (man.preflight_manifest_error) {
+          return [{ name: "manifest.json", status: null, mime: "", error: man.preflight_manifest_error }];
+        }
+        var names = Object.keys(man.files || {}).filter(function (n) {
+          return n !== "manifest.json" && n !== "SHA256SUMS.txt";
+        });
+        return Promise.all(names.map(function (n) {
+          var rec = { name: n, status: null, mime: "", error: "", expected_sha256: man.files[n].sha256 };
+          return fetch(n + "?v=" + encodeURIComponent(VERSION), { cache: "no-store" }).then(function (r) {
+            rec.status = r.status;
+            rec.mime = (r.headers.get("content-type") || "").split(";")[0];
+            return r.arrayBuffer();
+          }).then(function (buf) {
+            if (window.crypto && crypto.subtle) return crypto.subtle.digest("SHA-256", buf).then(function (d) { rec.sha256 = hex(d); });
+          }).catch(function (e) { rec.error = String(e); }).then(function () { return rec; });
+        }));
+      });
+  }
+  function pfBuild(files) {
+    return { schema: "range-web-preflight", schema_version: 2,
+             cross_origin_isolated: !!window.crossOriginIsolated,
+             webgl: pfProbeGL(), files: files, context_lost: pf.contextLost,
+             runtime_initialized: pf.runtimeInitialized, runtime_aborted: pf.runtimeAborted,
+             runtime_failure: pf.failure,
+             diagnostics: pf.diagnostics, shader_errors: pf.shaders, python_errors: pf.python };
+  }
+  if (preflight) {
+    document.body.classList.add("debug");
+    var _print = Module.print, _printErr = Module.printErr;
+    Module.print = function (t) { pfLine(String(t)); _print(t); };
+    Module.printErr = function (t) { pfLine(String(t)); _printErr(t); };
+    Module.onDiagnostic = pfDiagnostic;
+    el("canvas").addEventListener("webglcontextlost", function () { pf.contextLost = true; }, false);
+    var pfFilesCache = null;
+    window.rangePreflight = function () {
+      var p = pfFilesCache ? Promise.resolve(pfFilesCache) : pfFiles().then(function (f) { return (pfFilesCache = f); });
+      return p.then(pfBuild);
+    };
+    var box = document.createElement("pre");
+    box.id = "preflight";
+    box.style.cssText = "position:fixed;top:0;right:0;max-width:45%;max-height:60%;overflow:auto;margin:0;" +
+                        "background:rgba(0,0,0,.85);color:#8cf;font:11px monospace;padding:6px;z-index:9";
+    document.body.appendChild(box);
+    var pfRefresh = function () {
+      window.rangePreflight().then(function (r) { box.textContent = JSON.stringify(r, null, 2); });
+    };
+    setInterval(pfRefresh, 2000);
+    pfRefresh();
+    // &post=1: o editor (range_web/preflight_run.py) espera o relatorio em POST /__preflight.
+    if (/[?&]post=1/.test(location.search)) {
+      var pfDelay = Number((/[?&]delay=(\d+)/.exec(location.search) || [0, 12])[1]) * 1000;
+      setTimeout(function () {
+        window.rangePreflight().then(function (r) {
+          return fetch("__preflight", { method: "POST", body: JSON.stringify(r) });
+        });
+      }, pfDelay);
+    }
+  }
+
+  document.body.appendChild(script);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "name": "First_Person",
+  "title": "First Person",
+  "version": "0.1.4",
+  "created_utc": "2026-09-23T23:18:48+00:00",
+  "entry_game": "game/First_Person.range",
+  "requirements": {
+    "webgl": 2,
+    "threads": false,
+    "cross_origin_isolation": false
+  },
+  "runtime": {
+    "RangeRuntime.js": {
+      "bytes": 940847,
+      "sha256": "3ca3a1ae5cbb1d0920546bcba93ac18fb40857984b3a725e976b43838fb08415"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21624135,
+      "sha256": "9b7bc92d31ac8f8cfdfe0d25238c9a2ebfb8a823e3de26e973f18968c9557263"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    }
+  },
+  "files": {
+    "frame-time-perf.js": {
+      "bytes": 1936,
+      "sha256": "6d8018ee5152564fa3206226f4c56a73e21579631aa07f7963560a50051e2b91"
+    },
+    "game/Anastacio_Music.mp3": {
+      "bytes": 2713428,
+      "sha256": "f585d1062439f82bde0ea218bd8f5adfdb4f2531b9e8e5739ffe41bbf01cb355"
+    },
+    "game/First_Person.range": {
+      "bytes": 1380068,
+      "sha256": "ac25028188cedf2e9c91fca91c60785f4efb5a5969fee7f152f99ca14bb52b56"
+    },
+    "HOSTING.md": {
+      "bytes": 1822,
+      "sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b"
+    },
+    "index.html": {
+      "bytes": 16056,
+      "sha256": "0fdea6af20cbaa5398f77098211fdbf5a8bb86ca43739cdde86665d51eb991e2"
+    },
+    "RangeRuntime.data": {
+      "bytes": 26898029,
+      "sha256": "e5e5e308904c4eea926cba89a530da308ec9f438bc4eb4a75972103e2080f070"
+    },
+    "RangeRuntime.js": {
+      "bytes": 940847,
+      "sha256": "3ca3a1ae5cbb1d0920546bcba93ac18fb40857984b3a725e976b43838fb08415"
+    },
+    "RangeRuntime.wasm": {
+      "bytes": 21624135,
+      "sha256": "9b7bc92d31ac8f8cfdfe0d25238c9a2ebfb8a823e3de26e973f18968c9557263"
+    },
+    "serve.py": {
+      "bytes": 965,
+      "sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92"
+    }
+  },
+  "warnings": []
+}
