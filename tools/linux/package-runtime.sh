@@ -23,6 +23,7 @@ esac
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 runtime_dir="${BIN_DIR:-$repo_root/build-linux/bin}"   # BIN_DIR=build-linux-editor/bin para o editor
+extra_dir="${EXTRA_BIN_DIR:-}"                          # o outro dir (editor OU runtime) para empacotar os dois juntos
 dist_dir="$repo_root/build-linux/dist"
 package_name="AnastacioEngine-${version}-linux-x86_64"
 staging_dir="$dist_dir/$package_name"
@@ -30,6 +31,11 @@ archive="$dist_dir/$package_name.tar.xz"
 
 if [ ! -x "$runtime_dir/RangeRuntime" ] && [ ! -x "$runtime_dir/RangeEngine" ]; then
   printf 'RangeRuntime/RangeEngine nao encontrado em %s. Execute cmake --install primeiro.\n' "$runtime_dir" >&2
+  exit 1
+fi
+
+if [ -n "$extra_dir" ] && [ ! -x "$extra_dir/RangeRuntime" ] && [ ! -x "$extra_dir/RangeEngine" ]; then
+  printf 'EXTRA_BIN_DIR=%s nao tem RangeRuntime nem RangeEngine. Confira o cmake --install desse preset.\n' "$extra_dir" >&2
   exit 1
 fi
 
@@ -41,7 +47,20 @@ fi
 rm -rf "$staging_dir"
 mkdir -p "$staging_dir"
 cp -a "$runtime_dir/." "$staging_dir/"
+if [ -n "$extra_dir" ]; then
+  # -n (no-clobber): so adiciona o que falta (o outro executavel e seus arquivos exclusivos),
+  # sem sobrescrever nada que ja veio do runtime_dir principal.
+  cp -an "$extra_dir/." "$staging_dir/"
+fi
 cp "$repo_root/source/COPYING" "$staging_dir/COPYING"
+
+missing=""
+[ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"
+[ -x "$staging_dir/RangeEngine" ] || missing="${missing:+$missing e }RangeEngine"
+if [ -n "$missing" ]; then
+  printf 'AVISO: pacote sem %s. Para publicar um release completo, compile os dois presets\n' "$missing" >&2
+  printf '(linux-runtime e linux-editor) e passe BIN_DIR + EXTRA_BIN_DIR apontando pra cada bin/.\n' >&2
+fi
 
 # Torna o pacote portatil: embute o Python 3.11 isolado em python311/ e troca o RUNPATH absoluto
 # (/opt/anastacio-python311/lib) por $ORIGIN/python311/lib. Sem isso o binario so abre na maquina de build
