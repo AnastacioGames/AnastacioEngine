@@ -27,8 +27,8 @@ Aberto:
 - **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
   estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
-  audaspace; não abortam mais). `cache()`, `reverse()`, `pause()`/`stop()` com som válido conferidos em 2026-09-23. Aberto: medir o
-  custo de desempenho em celular (M3). Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
+  audaspace; não abortam mais). `cache()`, `reverse()`, `pause()`/`stop()` com som válido conferidos em 2026-09-23. Custo em celular
+  medido (M3, 2026-09-23): desprezível. Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
   (sonda R3 `[r3] TODOS`); a branch `integracao` foi removida por estar contida nela.
 - **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
   `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
@@ -43,9 +43,17 @@ Aberto:
   trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
   (`?perf=1`, overlay, `perf-run.cjs`) integrado; `package-web.py --perf` inclui a sonda. Build de teste para celular publicado em
   <https://anastaciogames.github.io/AnastacioEngine/?perf=1> (branch `gh-pages`, First Person) em 2026-09-23.
-  Regressões de áudio/bloom/resolução dinâmica/R1 repetidas após a mudança de áudio: todas OK (2026-09-23). M4 recomendado
-  adiar até
-  medir p50/p95 em celular físico. Divisão vigente e pendências em
+  Regressões de áudio/bloom/resolução dinâmica/R1 repetidas após a mudança de áudio: todas OK (2026-09-23). Medição em celular
+  físico (2026-09-23, OPPO Reno14 5G, Dimensity 8350, 12 GB, `?perf=1`): p50 22 ms, p95 55 ms, dpr 3, canvas
+  640x480; lentidões periódicas que se recuperam sozinhas. Média aceitável; o M4 deve atacar os picos (p95:
+  GC/Python/áudio/compilação de shader), não a resolução. Rodada 0.1.3 (mesmo aparelho, MP3 em loop via `aud`
+  + sombra reconfigurada pelo usuário): música toca; p50 33 ms, p95 44 ms. A versão tinha `fps` 60→30 e
+  sombra do Sun 2048→512 (clip 90→33,7, frustum 40→13): o p50 é o teto de 30 fps, não custo. A/B a 60 fps com
+  a mesma sombra (0.1.4, `/musica/` e `/sem-musica/`): com música p50 22/p95 33 ms, sem música p50 22/p95 44 ms;
+  o áudio MP3 não custa desempenho mensurável (diferença do p95 é variação entre rodadas). M3 do áudio fechado. **M4 adiado** (2026-09-23): o jogo medido não usa filtros 2D e os picos do p95 são
+  esporádicos, não custo fixo de passe; reabrir só se um jogo com filtros medir mal no celular.
+  Desktop (Chrome, `/musica/`, DPR 2): p50 18,1/p95 18,5 ms, sem picos; os picos são do celular. Console: aviso de
+  `ScriptProcessorNode` obsoleto (áudio SDL; migrar para AudioWorklet no futuro) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
@@ -65,8 +73,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 - Auditoria: `RangeEngine -b --python tools/tests/web_profile/i18n_audit.py -- <idioma> [saida.txt]` lista textos sem
   tradução. Restam lacunas do catálogo do Blender 2.79 (pt_BR ~455, es ~511, ru ~1 124) e os textos de `layout.label(text=...)`
   em Python/C fora do RNA (scan estático ainda por fazer). O russo (e o es) de `translations_ui.py` precisa de revisão nativa.
-- Traduzir as mensagens das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`, `manifest.py`, `collect.py`,
-  `preflight.py`), ainda em português, e os demais textos em português da Range fora do painel Web.
+- Mensagens das regras Web traduzidas (2026-09-23, `translations_rules.py`; es/ru pedem revisão nativa). Falta
+  traduzir os demais textos em português da Range fora do painel Web.
 - Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
   `libboost-all-dev`), rodar `engine_i18n.py` e conferir o seletor na janela; confirmar que o pacote leva `locale/*/LC_MESSAGES/blender.mo`.
 - Roteiros manuais citam os botões pelo nome em português; em inglês são Validate Web, Export Web, Open in browser.

@@ -48,6 +48,17 @@ check(pgettext_iface("Export from a development tree with tools/web/package-web.
 from range_web import results
 check(results.Report().summary() == "Nenhuma incompatibilidade detectada", "results.summary traduz em pt_BR")
 
+# Mensagens das regras: o valor fica em ingles (JSON) e tr() traduz molde e argumentos na exibicao.
+from range_web import preflight, rules_files
+from range_web.i18n import tr
+shader = preflight.check_preflight({"schema": preflight.PREFLIGHT_SCHEMA, "schema_version": 2,
+                                    "shader_errors": [{"stage": "vertex"}]})[0]
+check(shader.message == "Shader did not compile (stage vertex).", "mensagem da regra guardada em ingles")
+check(tr(shader.message) == "Shader não compilou (estágio vertex).", "tr traduz mensagem de regra em pt_BR")
+dest = rules_files.check_destinations([("", "a.png")])[0]
+check(tr(dest.message) == "Destino inválido '': caminho vazio.", "tr traduz argumento que tambem e mensagem")
+check(tr(dest.fix) == "Normalizar o destino dentro da raiz do pacote.", "tr traduz a dica de correcao")
+
 system.language = 'en_US'
 check(results.Report().summary() == "No incompatibility detected", "results.summary volta ao ingles em en_US")
 

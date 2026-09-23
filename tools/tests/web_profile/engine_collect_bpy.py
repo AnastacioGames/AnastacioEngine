@@ -73,7 +73,7 @@ try:
 
     missing = by_rule.get("WEB-PKG-003", [])
     check(any(f.location.get("source") == "nao_existe" for f in missing), "modulo ausente reportado")
-    check(any("sem Text definido" in f.message for f in missing), "controller sem Text reportado")
+    check(any("without Text set" in f.message for f in missing), "controller sem Text reportado")
     check(not any(f.location.get("source") == "door" for f in missing), "door.py resolvido no projeto")
     proc = by_rule.get("WEB-PY-002", [])
     check(len(proc) == 1 and proc[0].location["source"].endswith("helper.py"),

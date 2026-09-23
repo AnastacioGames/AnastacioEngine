@@ -22,6 +22,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Web: mensagens das regras traduzidas (English, Português, Español, Русский)
+
+- As mensagens e dicas de correção das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`,
+  `manifest.py`, `collect.py`, `collect_bpy.py`, `preflight.py`, `export.py`) passam a ser escritas em inglês,
+  como o resto do painel. Os detalhes internos de manifesto inválido também, mas sem tradução (só quem monta runtime vê).
+- `i18n.Msg` guarda o texto em inglês (JSON e testes) junto do molde e dos argumentos; `i18n.tr` traduz na exibição
+  (o catálogo casa o molde, não o texto já formatado). Argumentos que também são `Msg` são traduzidos; nomes de
+  arquivo, não. O painel e o aviso de export bloqueado usam `tr`.
+- Catálogo novo `translations_rules.py` (112 moldes, pt_BR/es/ru) somado aos catálogos do perfil Web. O russo
+  e o espanhol precisam de revisão nativa, como os de `translations_ui.py`.
+- Validação: 99 testes unitários de `tools/tests/web_profile`; no editor, `engine_i18n.py` (com checagens novas de
+  `tr`), `engine_web_ui.py`, `engine_collect_bpy.py`, `engine_web_export.py` e `engine_web_cli.py`, todos aprovados.
+
 ## 2026-09-23 - Web: mouse com cursor oculto deixa de girar a câmera sem parar
 
 - Usuário relatou mouse "muito sensível" no First Person (GitHub Pages). Causa: no port SDL2/Emscripten o

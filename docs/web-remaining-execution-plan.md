@@ -285,7 +285,7 @@ Estado: `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`. M0-
 1. (Feito) integração e regressões. Ao receber T3/T4 do Codex, integrar de novo, recompilar e repetir as mesmas verificações mais `claude_r3_probe`.
 2. (Feito) nome de material em `shader_errors` e teste de falha de link; falta teste de material de nós. T4 integrado. T5 parcial: `frame-time-perf.js` integrado, sem ligação ao `index.html` e sem script CDP. T3 aberto (`codex/r3-audio-fix-new` incompleto).
 3. SSAO na Web: aguarda a comparação do usuário.
-4. Registrar a decisão do M4 assim que houver a tabela p50/p95.
+4. (Feito 2026-09-23) M4 adiado: celular físico (OPPO Reno14 5G) mediu p50 22 ms sem filtros 2D na cena; picos do p95 são esporádicos. Ver roadmap.
 
 **Codex (não toca nos arquivos acima; branch nova a partir do HEAD desta branch, commit com trailer do Codex, changelog com evidência executada):**
 - **T3 (fechar R3):** (a) checar o nulo em todos os chamadores de `createReader()` listados no status de R3 e nos construtores de leitores de efeito, ou garantir que nunca recebam nulo no Web; (b) converter as validações de RIFF/WAV/Vorbis/MP3 que ainda usam `AUD_THROW` para retorno de erro no Emscripten; (c) **compilar e executar** no build Web da sua própria worktree e provar com pacote real (a sonda `claude_r3_probe.py` já reproduz o segfault; deve terminar com `[r3] TODOS`): arquivo inexistente, arquivo corrompido, formato não suportado, e o mesmo encadeado com efeito (`volume`, `limit`, `pitch`) e com `.write`/`.specs`/`.length`, sem abort. Sem T3 executado, R3 não pode ser marcado como resolvido.

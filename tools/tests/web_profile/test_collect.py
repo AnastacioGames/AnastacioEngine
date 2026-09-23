@@ -67,7 +67,7 @@ class ResolveTests(unittest.TestCase):
     def test_missing_text_and_empty_text(self):
         findings, _ = collect.resolve(snap([ref(KIND_TEXT, "gone.py"), ref(KIND_TEXT, "")]))
         self.assertEqual(ids(findings), ["WEB-PKG-003", "WEB-PKG-003"])
-        self.assertIn("sem Text definido", findings[1].message)
+        self.assertIn("without Text set", findings[1].message)
 
     def test_transitive_missing_import_is_py001_not_duplicated(self):
         files = {"a": "import b\n", "b": "import nao_existe\n"}

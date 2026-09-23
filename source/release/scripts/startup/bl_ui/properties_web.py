@@ -212,6 +212,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
 
     @staticmethod
     def _draw_report(layout):
+        from range_web.i18n import tr
         # Só lê o resultado guardado; a coleta roda no operador, nunca aqui.
         report = _last_report
         if report is None:
@@ -223,7 +224,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
             box = layout.box()
             row = box.row()
             # Mensagens do runtime trazem quebras de linha; o label as desenharia como quadrados.
-            lines = "%s  %s" % (finding.rule_id, finding.message)
+            lines = "%s  %s" % (finding.rule_id, tr(finding.message))
             head, *rest = lines.splitlines() or [""]
             row.label(text=head, icon=_SEVERITY_ICONS[finding.severity])
             loc = finding.location
@@ -232,7 +233,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
             if loc.get("chain"):
                 box.label(text=loc["chain"])
             if finding.fix:
-                rest += finding.fix.splitlines()
+                rest += tr(finding.fix).splitlines()
             for line in rest:
                 if line.strip():
                     box.label(text=line)
@@ -270,6 +271,7 @@ class SCENE_OT_range_web_export(Operator):
         import sys
         import tempfile
         from range_web import export
+        from range_web.i18n import tr
 
         web = context.scene.range_web
         # Em modo background is_dirty nunca zera (não há janela para reiniciá-lo).
@@ -310,7 +312,7 @@ class SCENE_OT_range_web_export(Operator):
         try:
             export.export_package(_last_report, dest, build)
         except export.ExportBlocked as exc:
-            self.report({'WARNING'}, _("%s Fix and validate again.") % exc)
+            self.report({'WARNING'}, _("%s Fix and validate again.") % tr(exc.args[0]))
             return {'CANCELLED'}
         except Exception as exc:
             self.report({'WARNING'}, _("Export failed; the previous one was preserved: %s") % exc)

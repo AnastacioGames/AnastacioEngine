@@ -78,7 +78,7 @@ class ManifestTest(unittest.TestCase):
         d = self.good(); del d["capabilities"]
         self.assertTrue(mf.validate_manifest(d))
         d = self.good(); d["capabilities"]["save"] = {"state": "validated"}
-        self.assertIn("sem evidence", mf.validate_manifest(d)[0])
+        self.assertIn("without evidence", mf.validate_manifest(d)[0])
         d = self.good(); d["capabilities"]["x"] = {"state": "on"}
         self.assertTrue(mf.validate_manifest(d))
         d = self.good(); d["python"]["pyc_magic"] = "zz"

@@ -107,7 +107,7 @@ class PreflightTests(unittest.TestCase):
             {"kind": "ValueError", "text": "linha1\nlinha2 \"aspas\" ção", "origin": "Sphere", "context": "controller",
              "traceback": "Traceback...", "structured": True}]))
         self.assertEqual(ids(found), ["WEB-PY-009", "WEB-PY-009"])
-        self.assertIn("controller em Cube", found[0].message)
+        self.assertIn("controller in Cube", found[0].message)
         self.assertEqual(found[1].location["source"], "Sphere")
         self.assertEqual(found[0].fix, "Traceback...")
 

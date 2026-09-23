@@ -9,9 +9,10 @@ import bpy
 
 from . import collect
 from . import rules_files
+from .i18n import Msg
 from .results import Report
 
-ASSET_IMAGE = "Imagem"
+ASSET_IMAGE = Msg("Image")
 ASSET_SOUND = "Som"
 ASSET_FONT = "Fonte"
 ASSET_LIBRARY = "Biblioteca"
@@ -111,7 +112,7 @@ def collect_assets():
         if img.users == 0:
             continue
         assets.append((ASSET_IMAGE, _abs(img.filepath), {"datablock": "Image:" + img.name,
-                                                          "chain": "Imagem > " + img.name}))
+                                                          "chain": "Image > " + img.name}))
     for snd in bpy.data.sounds:
         if snd.packed_file or not snd.filepath or snd.users == 0:
             continue

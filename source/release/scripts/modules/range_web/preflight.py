@@ -15,6 +15,7 @@
 
 import json
 
+from .i18n import Msg
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 
 PREFLIGHT_SCHEMA = "range-web-preflight"
@@ -35,8 +36,8 @@ def load_preflight(path, runtime_manifest=None):
         with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, ValueError) as exc:
-        return [_err("WEB-DEPLOY-002", "Não foi possível ler o relatório de pré-voo: %s" % exc,
-                     fix="Gerar o relatório com PREFLIGHT_OUT=arquivo.json no verify-package.cjs.",
+        return [_err("WEB-DEPLOY-002", Msg("Could not read the preflight report: %s", exc),
+                     fix="Generate the report with PREFLIGHT_OUT=file.json in verify-package.cjs.",
                      location={"source": str(path)})]
     return check_preflight(data, runtime_manifest)
 
@@ -44,10 +45,10 @@ def load_preflight(path, runtime_manifest=None):
 def check_preflight(data, runtime_manifest=None):
     """Findings de um relatorio de pre-voo. `runtime_manifest` (opcional) diz se o build exige threads."""
     if not isinstance(data, dict) or data.get("schema") != PREFLIGHT_SCHEMA:
-        return [_err("WEB-DEPLOY-002", "Relatório de pré-voo ausente ou com schema desconhecido.",
-                     fix="Rodar o Testar Web com a página de pré-voo do pacote.")]
+        return [_err("WEB-DEPLOY-002", "Preflight report missing or with an unknown schema.",
+                     fix="Run the Web test with the preflight page of the package.")]
     if data.get("schema_version") not in _SUPPORTED_SCHEMA_VERSIONS:
-        return [_err("WEB-DEPLOY-002", "Versão do relatório de pré-voo incompatível: %r." % data.get("schema_version"))]
+        return [_err("WEB-DEPLOY-002", Msg("Incompatible preflight report version: %r.", data.get("schema_version")))]
 
     findings = []
     findings += _check_isolation(data, runtime_manifest)
@@ -65,9 +66,9 @@ def _check_isolation(data, runtime_manifest):
     if threads in (None, "disabled") or data.get("cross_origin_isolated") is not False:
         return []
     return [_err("WEB-DEPLOY-001",
-                 "Build com threads exige isolamento de origem, mas a página não está isolada.",
-                 fix="Servir com Cross-Origin-Opener-Policy: same-origin e "
-                     "Cross-Origin-Embedder-Policy: require-corp. O binário serial é outro build.",
+                 "A threaded build requires origin isolation, but the page is not isolated.",
+                 fix="Serve with Cross-Origin-Opener-Policy: same-origin and "
+                     "Cross-Origin-Embedder-Policy: require-corp. The serial binary is a different build.",
                  capability="threads")]
 
 
@@ -77,11 +78,11 @@ def _check_webgl(data):
         return []
     out = []
     if gl.get("version", 0) < 2:
-        out.append(_err("WEB-GFX-001", "WebGL indisponível no navegador%s." % (
+        out.append(_err("WEB-GFX-001", Msg("WebGL unavailable in the browser%s.",
             ": " + gl["error"] if gl.get("error") else ""),
-            fix="Usar um navegador com WebGL 2 e aceleração de hardware.", capability="webgl"))
+            fix="Use a browser with WebGL 2 and hardware acceleration.", capability="webgl"))
     for ext in gl.get("missing_extensions", ()):
-        out.append(_err("WEB-GFX-001", "Extensão WebGL obrigatória ausente: %s." % ext, capability="webgl"))
+        out.append(_err("WEB-GFX-001", Msg("Required WebGL extension missing: %s.", ext), capability="webgl"))
     return out
 
 
@@ -92,45 +93,45 @@ def _check_files(data):
         loc = {"source": name}
         status = f.get("status")
         if status is None or status >= 400:
-            why = f.get("error") or ("HTTP %s" % status if status else "sem resposta")
-            out.append(_err("WEB-DEPLOY-002", "%s não carregou: %s." % (name, why),
-                            fix="Conferir a URL e se o arquivo foi publicado junto do pacote.", location=loc))
+            why = f.get("error") or ("HTTP %s" % status if status else Msg("no response"))
+            out.append(_err("WEB-DEPLOY-002", Msg("%s did not load: %s.", name, why),
+                            fix="Check the URL and whether the file was published with the package.", location=loc))
             continue
         if name.endswith(".wasm") and f.get("mime") != _WASM_MIME:
-            out.append(_err("WEB-DEPLOY-002", "%s servido como %r; esperado %s." % (name, f.get("mime"), _WASM_MIME),
-                            fix="Configurar o MIME application/wasm no servidor.", location=loc))
+            out.append(_err("WEB-DEPLOY-002", Msg("%s served as %r; expected %s.", name, f.get("mime"), _WASM_MIME),
+                            fix="Configure the application/wasm MIME type on the server.", location=loc))
         exp, got = f.get("expected_sha256"), f.get("sha256")
         if exp and got and exp != got:
-            out.append(_err("WEB-DEPLOY-002", "%s diverge do manifesto (cache de versões misturadas?)." % name,
-                            fix="Limpar o cache e republicar todos os arquivos do pacote juntos.", location=loc))
+            out.append(_err("WEB-DEPLOY-002", Msg("%s differs from the manifest (mixed cached versions?).", name),
+                            fix="Clear the cache and republish all package files together.", location=loc))
     return out
 
 
 def _check_runtime(data):
     if data.get("runtime_aborted"):
-        return [_err("WEB-DEPLOY-002", "Runtime abortou durante o pré-voo: %s." % data["runtime_aborted"],
-                     fix="Consultar o log do runtime e corrigir o erro antes de publicar.")]
+        return [_err("WEB-DEPLOY-002", Msg("Runtime aborted during preflight: %s.", data["runtime_aborted"]),
+                     fix="Check the runtime log and fix the error before publishing.")]
     if data.get("runtime_failure"):
-        return [_err("WEB-DEPLOY-002", "Runtime falhou durante o pré-voo: %s." % data["runtime_failure"],
-                     fix="Consultar o log do runtime e conferir os arquivos do pacote.")]
+        return [_err("WEB-DEPLOY-002", Msg("Runtime failed during preflight: %s.", data["runtime_failure"]),
+                     fix="Check the runtime log and the package files.")]
     if data.get("runtime_initialized") is False:
-        return [_err("WEB-DEPLOY-002", "Runtime não concluiu a inicialização durante o pré-voo.",
-                     fix="Aumentar o tempo de pré-voo ou corrigir a falha de carregamento do runtime.")]
+        return [_err("WEB-DEPLOY-002", "Runtime did not finish initializing during preflight.",
+                     fix="Increase the preflight time or fix the runtime loading failure.")]
     return []
 
 
 def _check_context(data):
     if not data.get("context_lost"):
         return []
-    return [_err("WEB-DEPLOY-003", "Contexto WebGL perdido durante a execução.",
-                 fix="Recarregar a página; o jogo deve pausar ou avisar em vez de continuar sem render.")]
+    return [_err("WEB-DEPLOY-003", "WebGL context lost during execution.",
+                 fix="Reload the page; the game should pause or warn instead of running without rendering.")]
 
 
 def _check_shaders(data):
     out = []
     for s in data.get("shader_errors", ()):
         where = ", material %s" % s["material"] if s.get("material") else ""
-        out.append(_err("WEB-GFX-002", "Shader não compilou (estágio %s%s)." % (s.get("stage", "?"), where),
+        out.append(_err("WEB-GFX-002", Msg("Shader did not compile (stage %s%s).", s.get("stage", "?"), where),
                         fix=s.get("log", ""), location={"source": s.get("material", "")}))
     return out
 
@@ -146,13 +147,13 @@ def _check_python(data):
         seen.add(key)
         kind = e.get("kind", "")
         if kind in ("ImportError", "ModuleNotFoundError"):
-            out.append(_err("WEB-PY-001", "Import falhou no runtime: %s." % (e.get("module") or e.get("text", "?")),
-                            fix="Incluir o módulo no pacote ou removê-lo.", location={"source": e.get("file", "")}))
+            out.append(_err("WEB-PY-001", Msg("Import failed at runtime: %s.", e.get("module") or e.get("text", "?")),
+                            fix="Include the module in the package or remove it.", location={"source": e.get("file", "")}))
         elif kind == "FileNotFoundError":
-            out.append(_err("WEB-PKG-003", "Arquivo não encontrado no runtime: %s." % (e.get("file") or e.get("text", "?")),
-                            fix="Incluir o arquivo no pacote.", location={"source": e.get("file", "")}))
+            out.append(_err("WEB-PKG-003", Msg("File not found at runtime: %s.", e.get("file") or e.get("text", "?")),
+                            fix="Include the file in the package.", location={"source": e.get("file", "")}))
         else:
-            where = " (%s%s)" % (e.get("context", ""), " em %s" % e["origin"] if e.get("origin") else "")                 if e.get("context") or e.get("origin") else ""
-            out.append(_err("WEB-PY-009", "%s no runtime%s: %s" % (kind or "Erro", where, e.get("text", "")),
+            where = Msg(" (%s%s)", e.get("context", ""), Msg(" in %s", e["origin"]) if e.get("origin") else "")                 if e.get("context") or e.get("origin") else ""
+            out.append(_err("WEB-PY-009", Msg("%s at runtime%s: %s", kind or Msg("Error"), where, e.get("text", "")),
                             fix=e.get("traceback", ""), location={"source": e.get("origin") or e.get("file", "")}))
     return out

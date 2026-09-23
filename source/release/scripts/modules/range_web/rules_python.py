@@ -12,6 +12,7 @@
 import ast
 
 from . import rules_files
+from .i18n import Msg
 from .results import (
     EVIDENCE_CONFIRMED, EVIDENCE_POTENTIAL, SEVERITY_ERROR, SEVERITY_WARNING, Finding,
 )
@@ -58,15 +59,15 @@ def analyze_source(source, filename, required=True, available_modules=None):
     except SyntaxError as e:
         result.findings.append(Finding(
             "WEB-PY-008", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-            "Erro de sintaxe: %s" % (e.msg,),
-            fix="Corrigir a sintaxe (o runtime usa a gramática do Python do manifesto).",
+            Msg("Syntax error: %s", e.msg),
+            fix="Fix the syntax (the runtime uses the grammar of the manifest's Python).",
             location={"source": filename, "line": e.lineno}))
         return result
     except (ValueError, RecursionError) as e:
         result.findings.append(Finding(
             "WEB-PY-008", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-            "Script não pôde ser analisado: %s" % (e,),
-            fix="Verificar codificação e conteúdo do arquivo.",
+            Msg("Script could not be analyzed: %s", e),
+            fix="Check the encoding and content of the file.",
             location={"source": filename}))
         return result
     _Analyzer(result, filename, required, available_modules).visit(tree)
@@ -78,8 +79,8 @@ def check_python_main_loop(text_name, adapter_validated=False):
     if not text_name or adapter_validated:
         return []
     return [Finding("WEB-PY-005", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-                    "Main loop Python personalizado (%s) sem adaptador Web validado." % text_name,
-                    fix="Usar controllers/components executados por frame.",
+                    Msg("Custom Python main loop (%s) without a validated Web adapter.", text_name),
+                    fix="Use controllers/components run every frame.",
                     location={"source": text_name})]
 
 
@@ -268,8 +269,8 @@ class _Analyzer(ast.NodeVisitor):
         infinite = isinstance(node.test, ast.Constant) and bool(node.test.value)
         if infinite and not _has_exit(node.body):
             self._emit("WEB-PY-006", node,
-                       "Loop sem saída aparente; pode travar o navegador.",
-                       "Executar por frame (controller/component) em vez de um laço bloqueante.",
+                       "Loop with no apparent exit; it may freeze the browser.",
+                       "Run it per frame (controller/component) instead of a blocking loop.",
                        hard=False)
         self.generic_visit(node)
 
@@ -299,14 +300,14 @@ class _Analyzer(ast.NodeVisitor):
         if self.import_guard:
             return  # import opcional protegido por try/except ImportError
         if top in EDITOR_MODULES:
-            self._emit("WEB-PY-007", node, "Import de %s (API exclusiva do editor)." % top,
-                       "Separar a ferramenta de autoria da lógica do jogo.")
+            self._emit("WEB-PY-007", node, Msg("Import of %s (editor-only API).", top),
+                       "Separate the authoring tool from the game logic.")
         elif top == "bge" and (self.available is None or top not in self.available):
-            self._emit("WEB-PY-001", node, "Import não resolvido: %s (o motor expõe a API como Range)." % name,
-                       "Trocar `import bge` por `import Range` (bge.logic -> Range.logic, bge.types -> Range.types).")
+            self._emit("WEB-PY-001", node, Msg("Unresolved import: %s (the engine exposes the API as Range).", name),
+                       "Replace `import bge` with `import Range` (bge.logic -> Range.logic, bge.types -> Range.types).")
         elif self.available is not None and top not in self.available:
-            self._emit("WEB-PY-001", node, "Import não resolvido: %s." % name,
-                       "Incluir o módulo no pacote ou usar um módulo presente no runtime.")
+            self._emit("WEB-PY-001", node, Msg("Unresolved import: %s.", name),
+                       "Include the module in the package or use a module present in the runtime.")
 
     # -- chamadas ---------------------------------------------------------
     def visit_Call(self, node):
@@ -317,21 +318,21 @@ class _Analyzer(ast.NodeVisitor):
 
     def _check_call(self, name, node):
         if name in _OS_PROCESS or name.startswith(_OS_PROCESS_PREFIXES):
-            self._emit("WEB-PY-002", node, "Execução de processo: %s." % name,
-                       "Remover do caminho Web ou mover para um serviço externo.")
+            self._emit("WEB-PY-002", node, Msg("Process execution: %s.", name),
+                       "Remove it from the Web path or move it to an external service.")
         elif name in _DLL_CALLS:
-            self._emit("WEB-PY-003", node, "Carregamento de biblioteca nativa: %s." % name,
-                       "Não há DLL/SO do host no navegador; usar módulo Wasm do runtime.")
+            self._emit("WEB-PY-003", node, Msg("Native library loading: %s.", name),
+                       "There is no host DLL/SO in the browser; use a Wasm module of the runtime.")
         elif name in _THREAD_CALLS:
-            self._emit("WEB-PY-004", node, "Criação de thread/processo: %s." % name,
-                       "Distribuir o trabalho por frames ou por adaptador validado.")
+            self._emit("WEB-PY-004", node, Msg("Thread/process creation: %s.", name),
+                       "Spread the work across frames or use a validated adapter.")
         elif name in _BLOCKING_CALLS:
-            self._emit("WEB-PY-006", node, "Chamada bloqueante em script: %s." % name,
-                       "Evitar espera no frame; medir no navegador.", hard=False)
+            self._emit("WEB-PY-006", node, Msg("Blocking call in script: %s.", name),
+                       "Avoid waiting inside the frame; measure it in the browser.", hard=False)
         elif name in _EVAL_CALLS:
             self.result.has_dynamic = True
-            self._emit("WEB-PY-009", node, "%s: análise estática cobre só parte do código." % name,
-                       "Validar esse caminho no navegador.", hard=False)
+            self._emit("WEB-PY-009", node, Msg("%s: static analysis covers only part of the code.", name),
+                       "Validate this path in the browser.", hard=False)
         elif name in _PATH_CALLS or name.endswith(_PATH_CALL_SUFFIXES):
             self._check_host_path(name, node)
         elif name in _IMPORT_CALLS:
@@ -340,10 +341,10 @@ class _Analyzer(ast.NodeVisitor):
                 self._check_import(arg.value, node)
             else:
                 self.result.has_dynamic = True
-                self._emit("WEB-PY-009", node, "Import dinâmico: análise estática parcial.",
-                           "Declarar o módulo explicitamente e validar no navegador.", hard=False)
-                self._emit("WEB-PKG-007", node, "Módulo formado dinamicamente não é descoberto.",
-                           "Declarar o conjunto adicional de módulos no pacote.", hard=False)
+                self._emit("WEB-PY-009", node, "Dynamic import: partial static analysis.",
+                           "Declare the module explicitly and validate it in the browser.", hard=False)
+                self._emit("WEB-PKG-007", node, "A dynamically built module is not discovered.",
+                           "Declare the additional set of modules in the package.", hard=False)
 
 
     def _check_host_path(self, name, node):
@@ -352,8 +353,8 @@ class _Analyzer(ast.NodeVisitor):
         if not (isinstance(arg, ast.Constant) and isinstance(arg.value, str)):
             return
         if rules_files.looks_like_host_path(arg.value):
-            self._emit("WEB-PKG-004", node, "Caminho do host usado no runtime: %s (%s)." % (arg.value, name),
-                       "Remapear para o FS virtual (caminho relativo ao jogo).")
+            self._emit("WEB-PKG-004", node, Msg("Host path used at runtime: %s (%s).", arg.value, name),
+                       "Remap to the virtual FS (path relative to the game).")
 
 
 def _has_exit(body):
