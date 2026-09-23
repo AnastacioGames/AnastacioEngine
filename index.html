@@ -42,7 +42,7 @@
 (function () {
   var GAME = "First_Person.range";
   var EXTRAS = [];
-  var VERSION = "0.1.1";
+  var VERSION = "0.1.2";
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
   if (debug) document.body.classList.add("debug");
@@ -166,7 +166,10 @@
 
   window.addEventListener("error", function (ev) { fail("Erro: " + ev.message); });
   window.addEventListener("unhandledrejection", function (ev) {
-    fail("Erro: " + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason));
+    var msg = ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason);
+    // Pedido de pointer lock recusado (Esc recente, iframe, navegador sem suporte): o jogo segue sem trava.
+    if (/pointer ?lock|exited the lock/i.test(msg)) { ev.preventDefault(); console.warn("[web] pointer lock recusado: " + msg); return; }
+    fail("Erro: " + msg);
   });
 
   // O jogo so comeca a ser mostrado apos um clique: libera foco de teclado e permite audio (politica de autoplay).
