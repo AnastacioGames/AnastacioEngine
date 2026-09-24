@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 35 | 55 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 35 | 57 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
 | [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
@@ -33,6 +33,15 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Orientação: o giro de 180° em paisagem funciona com o `sensorLandscape` atual. Em pé a imagem não vira retrato,
   e o jogo continua só em paisagem por decisão do usuário. Um `OrientationEventListener` próprio foi testado e
   descartado: não era necessário.
+- First Person no APK: o WebView do Android não tem pointer lock e rejeita o pedido do runtime (cursor oculto)
+  com `UnknownError: If you see this error we have a bug...`, que a página mostrava como erro fatal. O
+  `index.html` de `package-web.py` troca `Element.prototype.requestPointerLock` por um no-op só dentro do APK
+  (marca `RangeWebView/`); no navegador nada muda. Jogo roda, áudio `running`, usuário confirmou.
+- `AndroidManifest.xml`: `launchMode="singleTask"`. Tocar no ícone com o jogo aberto por `adb shell am start`
+  criava uma segunda Activity por cima, com dois jogos rodando.
+- Medida por CDP, jogo parado, 1200 frames: APK 50,3 e 59,9 fps médios em duas rodadas (p50 16,7 ms); Chrome do
+  aparelho com o mesmo pacote 37,5 fps (p50 33,3 ms, uma rodada). Números preliminares
+  ([android-manual-tests.md](android-manual-tests.md)).
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
 

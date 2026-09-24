@@ -24,7 +24,7 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 
 ## Diagnóstico (build debug)
 
-- Parâmetros do harness: `adb shell am start -n com.anastaciogames.rangewebview/.MainActivity --es query "debug=1&perf=1"`.
+- Parâmetros do harness: `adb shell am start -S -n com.anastaciogames.rangewebview/.MainActivity --es query "debug=1&perf=1"`.
 - Console JS no logcat: `adb logcat -s RangeWeb`.
 - DevTools: `chrome://inspect` no PC, com o aparelho ligado por USB.
 
@@ -34,4 +34,7 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 - Sem permissão `INTERNET`: arquivo ausente no pacote responde 404; links externos abrem no navegador.
 - O user agent do WebView ganha `RangeWebView/1`; o `index.html` do pacote usa isso para esconder o botão "Tela cheia".
 - Girar ou redimensionar não recria a Activity (`configChanges`), para não recarregar o jogo.
+- `launchMode="singleTask"`: tocar no ícone com o jogo aberto não cria uma segunda cópia. Por isso, para mudar a
+  `query` de um jogo já aberto, use `am start -S` (reinicia o app).
+- O WebView não tem pointer lock; o `index.html` do pacote transforma o pedido em no-op dentro do APK.
 - Ainda não há protocolo de pausa com o runtime nem controles por toque (próxima rodada).

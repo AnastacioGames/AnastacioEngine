@@ -179,6 +179,11 @@ __PERF_SCRIPT__
   var root = document.documentElement;
   var inAndroidApp = /\\bRangeWebView\\//.test(navigator.userAgent);
   var fsSupported = !inAndroidApp && !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  // O WebView do Android nao tem pointer lock: o pedido do runtime (cursor oculto) rejeita com "UnknownError ...
+  // report this bug to chromium" e a pagina mostrava erro. No APK o pedido vira no-op; toque/arrasto seguem pelo
+  // cursor virtual do runtime, como sem pointer lock no navegador.
+  if (inAndroidApp && window.Element && Element.prototype.requestPointerLock)
+    Element.prototype.requestPointerLock = function () { return Promise.resolve(); };
   function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
   function fitCanvas() {
     var c = el("canvas");

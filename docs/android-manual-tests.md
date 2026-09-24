@@ -30,9 +30,23 @@ Aprovado:
   (retrato) a imagem não gira: é o esperado. Decisão do usuário: o jogo fica só em paisagem.
   Com o aparelho quase deitado (como se joga a cena `motion`) o Android não detecta o giro, como em qualquer app.
 
+- 2026-09-24: First Person (com `Anastacio_Music.mp3`, `--perf`, runtime release) no APK. Primeira carga mostrava
+  "Erro: If you see this error we have a bug. Please report this bug to chromium.": o WebView não tem pointer
+  lock e rejeita o pedido do runtime com `UnknownError` (confirmado por CDP chamando `requestPointerLock()`).
+  Corrigido no `index.html` (pedido vira no-op no APK). Depois disso: jogo roda, `AudioContext` `running`, sem
+  erro; usuário confirmou "está funcionando".
+- Frame time com o jogo parado, 1200 frames medidos por CDP (canvas 640x480, DPR 3,5):
+  APK 1ª medida p50 16,7 ms / p95 33,4 ms / 50,3 fps médio (19% dos frames acima de 20 ms);
+  APK 2ª medida p50 16,7 / p95 16,7 / 59,9 fps. Chrome 154 do mesmo aparelho, mesmo pacote servido do PC por
+  `adb reverse`: p50 33,3 / p95 33,4 / 37,5 fps (uma medida; a segunda falhou por conexão). Variação grande entre
+  medidas: ainda não dá para dizer que o APK é mais rápido.
+- Tocar no ícone com o jogo aberto por `adb shell am start` abria uma segunda instância da Activity por cima (dois
+  jogos rodando). Corrigido com `launchMode="singleTask"`.
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
-- `?perf=1` com o jogo real (First Person), áudio, save/IDBFS e comparação com o Chrome do mesmo aparelho.
+- Música audível e controles por toque no First Person (confirmar com o usuário); save/IDBFS com um jogo que salve.
+- Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
