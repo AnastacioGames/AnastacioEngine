@@ -43,7 +43,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   aparelho com o mesmo pacote 37,5 fps (p50 33,3 ms, uma rodada). Números preliminares
   ([android-manual-tests.md](android-manual-tests.md)).
 - Música ausente no APK não era do WebView: o `First_Person.range` local é uma versão antiga sem o script da
-  música. Com o `.range` publicado em `gh-pages` a saída de áudio mede pico 0,65 (antes 0).
+  música. Com o `.range` publicado em `gh-pages` a saída de áudio mede pico 0,65 (antes 0); usuário ouviu.
+- Save no APK: `web-save.range` grava (`SAVED`), o app é encerrado por `am force-stop` e a sessão seguinte lê
+  (`LOADED`). O IndexedDB do WebView persiste entre execuções.
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
 

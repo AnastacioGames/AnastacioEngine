@@ -47,10 +47,13 @@ Aprovado:
   (`musica/game/First_Person.range`, que chama `aud.Sound(...//Anastacio_Music.mp3)`): log `[music] tocando
   status=True` e pico 0,65 na saída do `ScriptProcessorNode` (antes 0). Usuário confirmou que ouve a música.
 
+- 2026-09-24: save/IDBFS no APK com `web-save.range` (`tools/create_web_save_scene.py`, runtime release):
+  sessão 1 `[web-save] SAVED`; `am force-stop` (processo encerrado) e sessão 2 `[web-save] LOADED`. O IndexedDB
+  do WebView persiste entre execuções do app. Depois o APK voltou a ter o First Person.
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
-- Save/IDBFS com um jogo que salve.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
