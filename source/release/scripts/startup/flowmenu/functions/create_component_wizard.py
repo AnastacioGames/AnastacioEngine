@@ -49,7 +49,7 @@ class FLOWMENU_OT_create_advanced_component(Operator):
 		s_class = scene.flowmenu_wizard_class
 
 		if not s_module.isidentifier() or not s_class.isidentifier():
-			self.report({'ERROR'}, "File and class names must be valid Python identifiers.")
+			self.report({'ERROR'}, tip_("File and class names must be valid Python identifiers."))
 			return {'CANCELLED'}
 
 		# --- TEMPLATE COMPLETO COM VARIÁVEIS PRONTAS ---
@@ -119,19 +119,19 @@ class {}(Range.types.KX_PythonComponent):
 			if not os.path.exists(scripts_dir):
 				os.makedirs(scripts_dir)
 		except OSError as e:
-			self.report({'ERROR'}, "Could not create scripts directory: " + str(e))
+			self.report({'ERROR'}, tip_("Could not create scripts directory: %s") % e)
 			return {'CANCELLED'}
 
 		filepath = os.path.join(scripts_dir, "{}.py".format(s_module))
 		if os.path.exists(filepath):
-			self.report({'ERROR'}, "Component file already exists: " + filepath)
+			self.report({'ERROR'}, tip_("Component file already exists: %s") % filepath)
 			return {'CANCELLED'}
 
 		try:
 			with open(filepath, "w", encoding="utf-8") as f:
 				f.write(final_code)
 		except Exception as e:
-			self.report({'ERROR'}, "Save Error: " + str(e))
+			self.report({'ERROR'}, tip_("Save error: %s") % e)
 			return {'CANCELLED'}
 
 		# --- 3. REGISTRAR E ADICIONAR ---
@@ -145,7 +145,7 @@ class {}(Range.types.KX_PythonComponent):
 
 			result = bpy.ops.logic.python_component_register(component_name=full_name)
 			if 'FINISHED' not in result:
-				self.report({'ERROR'}, "Could not register component: " + full_name)
+				self.report({'ERROR'}, tip_("Could not register component: %s") % full_name)
 				return {'CANCELLED'}
 
 			bpy.ops.wm.flowmenu_component_list_refresh()
@@ -154,7 +154,7 @@ class {}(Range.types.KX_PythonComponent):
 			self.report({'INFO'}, tip_("Component registered: %s") % full_name)
 
 		except Exception as e:
-			self.report({'ERROR'}, "Could not register component: " + str(e))
+			self.report({'ERROR'}, tip_("Could not register component: %s") % e)
 			return {'CANCELLED'}
 
 		return {'FINISHED'}

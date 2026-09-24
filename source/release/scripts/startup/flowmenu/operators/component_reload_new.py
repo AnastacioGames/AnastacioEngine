@@ -1,5 +1,6 @@
 import bpy
 from bpy.types import Operator
+from bpy.app.translations import pgettext_tip as tip_
 import importlib
 import sys
 
@@ -79,7 +80,7 @@ class FLOWMENU_OT_python_component_reload_new(Operator):
 
         # Proteção: Garante que há um objeto e configurações de jogo
         if not context.object or not hasattr(context.object, "game"):
-            self.report({'WARNING'}, "No active game object selected.")
+            self.report({'WARNING'}, tip_("No active game object selected."))
             return {"CANCELLED"}
 
         game = context.object.game
@@ -98,14 +99,14 @@ class FLOWMENU_OT_python_component_reload_new(Operator):
                 # Remove e registra novamente com retry para tolerar reload parcial de imports.
                 ok, err = _reload_component_with_retry(component_active, get_component, attempts=3)
                 if ok:
-                    self.report({'INFO'}, "Reloaded: {}".format(get_component))
+                    self.report({'INFO'}, tip_("Reloaded: %s") % get_component)
                 else:
-                    self.report({'ERROR'}, "Reload failed: {} | {}".format(get_component, err))
+                    self.report({'ERROR'}, tip_("Reload failed: %s | %s") % (get_component, err))
             else:
-                self.report({'WARNING'}, "Invalid component selection.")
+                self.report({'WARNING'}, tip_("Invalid component selection."))
 
         except Exception as e:
-            self.report({'ERROR'}, "Error reloading component: {}".format(e))
+            self.report({'ERROR'}, tip_("Error reloading component: %s") % e)
             print("[Reload Error] {}".format(e))
 
         return {"FINISHED"}
@@ -163,11 +164,11 @@ class FLOWMENU_OT_reload_all_components(Operator):
 
             # Restaura o objeto ativo original
             context.scene.objects.active = act
-            self.report({"INFO"}, "Reloaded {} components. Check console for details.".format(count))
+            self.report({"INFO"}, tip_("Reloaded %s components. Check the console for details.") % count)
 
         except Exception as e:
             print("CRITICAL RELOAD ERROR: {}".format(e))
-            self.report({"ERROR"}, "Critical Error: {}".format(e))
+            self.report({"ERROR"}, tip_("Critical error: %s") % e)
 
         return {"FINISHED"}
 

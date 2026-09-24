@@ -3,6 +3,7 @@ import importlib
 import os
 import sys
 from bpy.types import Operator, Panel
+from bpy.app.translations import pgettext_tip as tip_
 
 # ==============================================================================
 # CRIAÇÃO/REGISTRO DO COMPONENT DE CONDUÇÃO DO VEHICLE
@@ -284,7 +285,7 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
 
         blend_dir = set_scripts_dir()
         if not blend_dir:
-            self.report({'ERROR'}, "Save the .blend file before adding the component.")
+            self.report({'ERROR'}, tip_("Save the .blend file before adding the component."))
             return {'CANCELLED'}
 
         scripts_dir = os.path.join(blend_dir, "scripts")
@@ -297,7 +298,7 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
                 with open(filepath, "w", encoding="utf-8") as fp:
                     fp.write(VEHICLE_COMPONENT_TEMPLATE)
         except OSError as exc:
-            self.report({'ERROR'}, "Could not create component file: {}".format(exc))
+            self.report({'ERROR'}, tip_("Could not create component file: %s") % exc)
             return {'CANCELLED'}
 
         ob = context.active_object
@@ -305,7 +306,7 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
         already_added = any("{}.{}".format(comp.module, comp.name) == full_name
                              for comp in ob.game.components)
         if already_added:
-            self.report({'INFO'}, "Vehicle component already added to this object.")
+            self.report({'INFO'}, tip_("Vehicle component already added to this object."))
             return {'FINISHED'}
 
         if scripts_dir not in sys.path:
@@ -328,10 +329,10 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
                 new_comp.module = VEHICLE_COMPONENT_MODULE
                 new_comp.name = VEHICLE_COMPONENT_CLASS
             except Exception as exc:
-                self.report({'ERROR'}, "Could not add component: {}".format(exc))
+                self.report({'ERROR'}, tip_("Could not add component: %s") % exc)
                 return {'CANCELLED'}
 
-        self.report({'INFO'}, "Vehicle component added.")
+        self.report({'INFO'}, tip_("Vehicle component added."))
         return {'FINISHED'}
 
 

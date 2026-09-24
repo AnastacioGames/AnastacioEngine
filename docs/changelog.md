@@ -27,7 +27,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 ## 2026-09-24 - Operadores da Range com texto-fonte em inglês e tradução
 
 - Mensagens e dicas que estavam escritas em português no código passaram ao inglês, como no painel Web, e o
-  português original virou tradução (pt/es/ru no bloco `MESSAGES` de `range_web/translations_labels.py`, 16 textos):
+  português original virou tradução (pt/es/ru no bloco `MESSAGES` de `range_web/translations_labels.py`):
   `flowmenu/operators/open_external_editor.py` (dica, item "System Default", três mensagens),
   `flowmenu/functions/create_component_wizard.py` (três mensagens), `flowmenu/custom_pt_physics.py` (dica do Set Drive
   Type e itens FWD/RWD/AWD) e `bl_ui/properties_particle.py` (três mensagens do Import Debug Values). As mensagens
@@ -36,6 +36,12 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   mesmo de antes.
 - Conferido no motor: os quatro operadores registram com a dica em inglês e `pgettext_tip` devolve pt/es/ru.
   `engine_i18n.py`, `engine_web_ui.py` e os 124 testes puros seguem OK. Não conferido na janela real.
+- Na mesma rodada, as 32 mensagens `self.report` que já estavam em inglês no flowmenu (`custom_pt_properties.py`,
+  `component_reload_new.py`, `create_component.py`, `register_component.py`, `create_component_wizard.py`) e no
+  painel de veículo passaram por `tip_()`, com moldes `%s` no lugar de concatenação/`format`; traduções pt/es/ru no
+  mesmo bloco `MESSAGES` (48 textos no total, `%s` conferido entre as línguas). No motor, o operador de criar
+  componente mostrou "Erro: Selecione um objeto com Game Physics!" em pt e o russo em ru. `bugfix_regression/run_all.py`
+  também passa.
 - Fica de fora: o addon opcional `addon_editor_shot_tool.py` (UI em português) e o código gerado para o jogo
   (template do `VehiclePlayerComponent`, que imprime no console do jogo).
 

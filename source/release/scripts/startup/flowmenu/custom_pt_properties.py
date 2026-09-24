@@ -1,6 +1,7 @@
 import bpy
 from bpy.types import Panel, Operator, UIList, PropertyGroup
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
+from bpy.app.translations import pgettext_tip as tip_
 
 # Cache para a lista de ícones (evita recriar a lista toda vez e deixar a UI lenta)
 _icon_enum_items = None
@@ -39,7 +40,7 @@ class OBJECT_OT_game_header_add(Operator):
     def execute(self, context):
         ob = context.active_object
         if not ob or not getattr(ob, "game", None):
-            self.report({'WARNING'}, "Active object has no 'game'.")
+            self.report({'WARNING'}, tip_("Active object has no 'game'."))
             return {'CANCELLED'}
 
         gp = ob.game.properties
@@ -48,7 +49,7 @@ class OBJECT_OT_game_header_add(Operator):
             name = "C_Header/{}/{}".format(self.title, icon)
             bpy.ops.object.game_property_new(name=name, type='BOOL')
         except Exception as e:
-            self.report({'ERROR'}, "Failed to create property: {}".format(e))
+            self.report({'ERROR'}, tip_("Failed to create property: %s") % e)
             return {'CANCELLED'}
 
         try:
@@ -259,11 +260,11 @@ class FLOWMENU_OT_component_list_add(Operator):
                         
                     bpy.ops.logic.python_component_register(component_name=nm)
                 else:
-                    self.report({'ERROR'}, "Component path not found.")
+                    self.report({'ERROR'}, tip_("Component path not found."))
             except Exception as e:
-                self.report({'ERROR'}, "Script Error: Check console for missing imports or syntax errors.")
+                self.report({'ERROR'}, tip_("Script error: check the console for missing imports or syntax errors."))
                 print("[Component Manager] Failed to register: {}".format(e))
         else:
-            self.report({'WARNING'}, "No component selected or list is empty.")
+            self.report({'WARNING'}, tip_("No component selected or list is empty."))
             
         return {"FINISHED"}

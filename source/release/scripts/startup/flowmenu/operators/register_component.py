@@ -1,5 +1,6 @@
 import bpy
 from bpy.types import Operator
+from bpy.app.translations import pgettext_tip as tip_
 import importlib
 import sys
 
@@ -95,7 +96,7 @@ class FLOWMENU_OT_register_component(Operator):
         register_component = _resolve_component(module_components, class_select)
         if register_component is None:
             self.report({"ERROR"},
-                        "Component list is stale or ambiguous; refresh the module/class list and choose again.")
+                        tip_("Component list is stale or ambiguous; refresh the module/class list and choose again."))
             return {"CANCELLED"}
 
         list_name_components = [f"{component.module}.{component.name}" for component in game.components]
@@ -103,11 +104,11 @@ class FLOWMENU_OT_register_component(Operator):
         if register_component not in list_name_components:
             ok, err = _register_component_with_retry(register_component, attempts=3)
             if ok:
-                self.report({"INFO"}, "Component '" + str(register_component).split(".")[1] + "' added!")
+                self.report({"INFO"}, tip_("Component '%s' added!") % str(register_component).split(".")[1])
                 return {"FINISHED"}
 
-            self.report({"ERROR"}, f"Failed to add component '{register_component}': {err}")
+            self.report({"ERROR"}, tip_("Failed to add component '%s': %s") % (register_component, err))
             return {"CANCELLED"}
 
-        self.report({"INFO"}, "Component '" + str(register_component).split(".")[1] + "' is already added.")
+        self.report({"INFO"}, tip_("Component '%s' is already added.") % str(register_component).split(".")[1])
         return {"FINISHED"}
