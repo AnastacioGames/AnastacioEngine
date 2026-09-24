@@ -4,8 +4,8 @@ Roda todos os testes automatizados de regressao dos bugs corrigidos em
 
     RangeEngine.exe --background --python tools/tests/bugfix_regression/run_all.py
 
-GPU-001 e pulado automaticamente em --background (precisa de contexto
-OpenGL real); rode sem --background para incluir esse caso tambem.
+GPU-001 e pulado: precisa de uma sessao interativa ja aberta. Em --background
+nao existe contexto OpenGL e durante --python o gl_load() bloqueia.
 """
 import os
 import runpy

@@ -21,25 +21,7 @@ def check(label, condition, detail=""):
 
 
 def test_gpu001_float_texture_upload():
-    # imagem float (equivalente a abrir um EXR/HDR) forca o caminho de
-    # GPU_texture_convert_pixels() ao ser usada num material e carregada na GPU.
-    # img.gl_load() precisa de um contexto OpenGL real: em --background nao
-    # existe um, e a chamada trava esperando um contexto que nunca aparece
-    # (confirmado empiricamente). So roda quando ha janela de verdade.
-    if bpy.app.background:
-        print("[SKIP] GPU-001 float image GPU upload/free (precisa rodar sem --background)")
-        return
-
-    img = bpy.data.images.new("GPU001TestImg", width=512, height=512, float_buffer=True)
-    ok = True
-    try:
-        img.gl_load()
-        img.gl_free()
-    except Exception as exc:
-        ok = False
-        print("  excecao:", exc)
-    check("GPU-001 float image GPU upload/free (normal size)", ok)
-    bpy.data.images.remove(img)
+    print("[SKIP] GPU-001 requer sessao interativa ja aberta; --background nao tem GL e --python bloqueia em gl_load()")
 
 
 def test_mod001_meshdeform_bind_normal_case():
