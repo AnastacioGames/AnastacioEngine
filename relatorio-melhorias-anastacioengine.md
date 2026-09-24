@@ -178,6 +178,10 @@ ferramenta correspondente.
   JSON guarda só caminho e alias; a senha vem de `RANGE_ANDROID_KEYSTORE_PASSWORD` ou de um campo de sessão do
   painel e chega ao Gradle pelo ambiente. Perder a chave obriga a publicar como outro app; um APK debug instalado
   não é atualizado por um release (chaves diferentes).
+- Controles na tela (A1): desenho e captura de toque na página (HTML/Pointer Events); a engine recebe o estado por
+  `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico) ou como teclas. Estende o input existente
+  (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
+  Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

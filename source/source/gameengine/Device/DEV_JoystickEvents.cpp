@@ -34,6 +34,38 @@
 
 #include "CM_Message.h"
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+
+/* Module.rangePad is written by the page's on-screen controls (package-web.py): active, axes[6] in -1..1 (triggers
+ * 0..1, SDL GameController order) and buttons as a bitmask in SDL_GameControllerButton order. Returns 0 while the
+ * page shows no pad. */
+EM_JS(int, dev_virtualpad_web_read, (int *axes, int count, unsigned int *buttons), {
+	var p = (typeof Module !== 'undefined') ? Module.rangePad : null;
+	var base = axes >> 2;
+	for (var i = 0; i < count; i++) HEAP32[base + i] = 0;
+	HEAP32[buttons >> 2] = 0;
+	if (!p || !p.active) return 0;
+	for (var i = 0; i < count; i++) {
+		var v = p.axes ? +p.axes[i] : 0;
+		if (!isFinite(v)) v = 0;
+		v = Math.max(-1, Math.min(1, v));
+		HEAP32[base + i] = Math.round(v * (v < 0 ? 32768 : 32767));
+	}
+	HEAP32[buttons >> 2] = p.buttons | 0;
+	return 1;
+});
+#endif
+
+void DEV_Joystick::ReadVirtualPad()
+{
+#ifdef __EMSCRIPTEN__
+	s_padActive = dev_virtualpad_web_read(s_padAxis, JOYAXIS_MAX, &s_padButtons) != 0;
+#else
+	s_padActive = false;
+#endif
+}
+
 #ifdef WITH_SDL
 void DEV_Joystick::OnAxisEvent(SDL_Event *sdl_event)
 {
@@ -65,12 +97,13 @@ void DEV_Joystick::OnNothing(SDL_Event *sdl_event)
  * so any change since the previous frame raises the flags even if the event itself was lost. */
 void DEV_Joystick::SyncLiveState()
 {
-	if (!m_private->m_gamecontroller || SDL_GameControllerGetAxis == (void *)0 || SDL_GameControllerGetButton == (void *)0) {
+	if (!m_private->m_gamecontroller && !HasVirtualPad()) {
 		return;
 	}
 
+	/* Merged state (physical + on-screen pad), so the virtual pad also triggers the sensors. */
 	for (int i = 0; i < JOYAXIS_MAX && i < SDL_CONTROLLER_AXIS_MAX; i++) {
-		const int value = SDL_GameControllerGetAxis(m_private->m_gamecontroller, (SDL_GameControllerAxis)i);
+		const int value = GetAxisPosition(i);
 		if (value != m_live_axis[i]) {
 			m_live_axis[i] = value;
 			m_istrig_axis = 1;
@@ -78,7 +111,7 @@ void DEV_Joystick::SyncLiveState()
 	}
 
 	for (int i = 0; i < 32 && i < SDL_CONTROLLER_BUTTON_MAX; i++) {
-		const bool down = SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)i) != 0;
+		const bool down = aButtonPressIsPositive(i);
 		if (down != m_live_button[i]) {
 			m_live_button[i] = down;
 			m_istrig_button = 1;
@@ -138,7 +171,19 @@ bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 			case SDL_JOYDEVICEADDED:
 			{
 				if (sdl_event.jdevice.which < JOYINDEX_MAX) {
-					if (!DEV_Joystick::m_instance[sdl_event.jdevice.which]) {
+					DEV_Joystick *existing = DEV_Joystick::m_instance[sdl_event.jdevice.which];
+					if (existing && existing->IsVirtualOnly()) {
+						/* A physical controller arrives where the on-screen pad was alone: open it in the same
+						 * instance, both keep working merged. */
+						if (!existing->CreateJoystickDevice()) {
+							/* Not a game controller: CreateJoystickDevice() zeroed the ranges, the pad still needs them. */
+							existing->m_axismax = SDL_CONTROLLER_AXIS_MAX;
+							existing->m_buttonmax = SDL_CONTROLLER_BUTTON_MAX;
+						}
+						addrem[sdl_event.jdevice.which] = 1;
+						remap = true;
+					}
+					else if (!existing) {
 						DEV_Joystick::m_instance[sdl_event.jdevice.which] = new DEV_Joystick(sdl_event.jdevice.which);
 						DEV_Joystick::m_instance[sdl_event.jdevice.which]->CreateJoystickDevice();
 						addrem[sdl_event.jdevice.which] = 1;
@@ -206,6 +251,22 @@ bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 				break;
 			}
 		}
+	}
+
+	/* On-screen pad: index 0 exists while the page shows it, even with no physical controller. */
+	DEV_Joystick::ReadVirtualPad();
+	DEV_Joystick *first = DEV_Joystick::m_instance[0];
+	if (s_padActive && !first) {
+		first = DEV_Joystick::m_instance[0] = new DEV_Joystick(0);
+		first->m_axismax = SDL_CONTROLLER_AXIS_MAX;
+		first->m_buttonmax = SDL_CONTROLLER_BUTTON_MAX;
+		addrem[0] = 1;
+		remap = true;
+	}
+	else if (!s_padActive && first && first->IsVirtualOnly()) {
+		first->ReleaseInstance(0);
+		addrem[0] = 2;
+		remap = true;
 	}
 
 	for (int i = 0; i < JOYINDEX_MAX; i++) {

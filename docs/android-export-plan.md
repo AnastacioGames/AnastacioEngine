@@ -62,6 +62,8 @@ A0b é um template pequeno feito diretamente com Gradle, sem exportador genéric
 
 ### A1 mínimo — direcional e botões
 
+**Decisão 2026-09-24:** overlay HTML (Pointer Events) alimentando um pad virtual lido pela engine por `EM_JS`, com alvo gamepad (índice 0, analógico) ou tecla (origem separada do teclado físico), estendendo o Range Input System em vez de criar sistema paralelo. SDL virtual joystick não está habilitado na porta Emscripten. Plano e etapas T0–T4 em [android-touch-controls-plan.md](android-touch-controls-plan.md).
+
 O harness captura Pointer Events e mantém estado por `pointerId`, com captura do ponteiro, coordenadas normalizadas ao canvas e tratamento de `pointercancel`, perda de foco e pausa. Aplicar `touch-action: none` à área do jogo e respeitar recortes/barras do sistema. Dois dedos precisam manter movimento + ação simultaneamente sem clique duplicado do SDL.
 
 Começar com controles digitais mapeados a teclas existentes. Fazer uma prova curta de injeção na cadeia JS → SDL/GHOST → lógica do jogo. Se eventos sintéticos não chegarem corretamente, usar uma pequena ponte explícita JS→wasm; **não assumir que “sem C++” é um requisito** nem alterar globais privados do SDL/Emscripten. Preservar o estado do teclado físico: soltar um toque não pode soltar uma tecla ainda mantida por outra fonte.

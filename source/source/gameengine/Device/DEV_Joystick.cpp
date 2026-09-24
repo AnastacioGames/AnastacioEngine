@@ -112,6 +112,10 @@ DEV_Joystick::~DEV_Joystick()
 
 DEV_Joystick *DEV_Joystick::m_instance[JOYINDEX_MAX];
 
+bool DEV_Joystick::s_padActive = false;
+int DEV_Joystick::s_padAxis[JOYAXIS_MAX] = {0};
+unsigned int DEV_Joystick::s_padButtons = 0;
+
 
 void DEV_Joystick::Init()
 {
@@ -251,7 +255,7 @@ bool DEV_Joystick::aAnyButtonPressIsPositive(void)
 	/* this is needed for the "all events" option
 	 * so we know if there are no buttons pressed */
 	for (int i = 0; i < m_buttonmax; i++) {
-		if (SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)i)) {
+		if (aButtonPressIsPositive(i)) {
 			return true;
 		}
 	}
@@ -259,15 +263,31 @@ bool DEV_Joystick::aAnyButtonPressIsPositive(void)
 	return false;
 }
 
-bool DEV_Joystick::aButtonPressIsPositive(int button)
+bool DEV_Joystick::IsVirtualOnly() const
 {
 #ifdef WITH_SDL
-	if ((SDL_CHECK(SDL_GameControllerGetButton) &&
-	     SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)button))) {
+	return m_joyindex == 0 && !m_private->m_gamecontroller;
+#else
+	return false;
+#endif
+}
+
+bool DEV_Joystick::PhysicalButton(int button)
+{
+#ifdef WITH_SDL
+	return m_private->m_gamecontroller && SDL_CHECK(SDL_GameControllerGetButton) &&
+	       SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)button);
+#else
+	return false;
+#endif
+}
+
+bool DEV_Joystick::aButtonPressIsPositive(int button)
+{
+	if (PhysicalButton(button)) {
 		return true;
 	}
-#endif
-	return false;
+	return HasVirtualPad() && button >= 0 && button < 32 && (s_padButtons & (1u << button));
 }
 
 
@@ -281,9 +301,15 @@ bool DEV_Joystick::aButtonPressIsPositive(int button)
  * reaching OnAxisEvent). SDL_GameControllerGetAxis() reads the controller's
  * internal state directly, the same way the button methods already do,
  * bypassing the event queue race entirely. */
-int DEV_Joystick::GetAxisPosition(int index)
+int DEV_Joystick::PhysicalAxis(int index)
 {
+	if (index < 0 || index >= JOYAXIS_MAX) {
+		return 0;
+	}
 #ifdef WITH_SDL
+	if (!m_private->m_gamecontroller) {
+		return 0;
+	}
 	if (SDL_CHECK(SDL_GameControllerGetAxis)) {
 		return SDL_GameControllerGetAxis(m_private->m_gamecontroller, (SDL_GameControllerAxis)index);
 	}
@@ -291,15 +317,21 @@ int DEV_Joystick::GetAxisPosition(int index)
 	return m_axis_array[index];
 }
 
+/* Physical controller and on-screen pad share index 0: the input pushed furthest wins, so either one moves the
+ * player and neither cancels the other. */
+int DEV_Joystick::GetAxisPosition(int index)
+{
+	const int physical = PhysicalAxis(index);
+	if (!HasVirtualPad() || index < 0 || index >= JOYAXIS_MAX) {
+		return physical;
+	}
+	const int pad = s_padAxis[index];
+	return (std::abs(pad) > std::abs(physical)) ? pad : physical;
+}
+
 bool DEV_Joystick::aButtonReleaseIsPositive(int button)
 {
-#ifdef WITH_SDL
-	if (!(SDL_CHECK(SDL_GameControllerGetButton) &&
-	      SDL_GameControllerGetButton(m_private->m_gamecontroller, (SDL_GameControllerButton)button))) {
-		return true;
-	}
-#endif
-	return false;
+	return !aButtonPressIsPositive(button);
 }
 
 bool DEV_Joystick::CreateJoystickDevice(void)
@@ -425,6 +457,9 @@ void DEV_Joystick::DestroyJoystickDevice(void)
 
 int DEV_Joystick::Connected(void)
 {
+	if (HasVirtualPad()) {
+		return 1;
+	}
 #ifdef WITH_SDL
 	if (m_isinit &&
 	    (SDL_CHECK(SDL_GameControllerGetAttached) &&
@@ -475,7 +510,11 @@ int DEV_Joystick::pAxisTest(int axisnum)
 const std::string DEV_Joystick::GetName()
 {
 #ifdef WITH_SDL
-	return (SDL_CHECK(SDL_GameControllerName)) ? SDL_GameControllerName(m_private->m_gamecontroller) : "";
+	if (!m_private->m_gamecontroller) {
+		return IsVirtualOnly() ? "Range Virtual Pad" : "";
+	}
+	const char *name = (SDL_CHECK(SDL_GameControllerName)) ? SDL_GameControllerName(m_private->m_gamecontroller) : nullptr;
+	return name ? name : "";
 #else /* WITH_SDL */
 	return "";
 #endif /* WITH_SDL */

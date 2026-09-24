@@ -280,6 +280,11 @@ __PERF_SCRIPT__
     });
   }
 
+  // Controle na tela -> gamepad 0 do runtime (DEV_JoystickEvents.cpp le Module.rangePad a cada quadro).
+  // axes na ordem do SDL GameController (LX, LY, RX, RY, gatilho E, gatilho D; -1..1, gatilhos 0..1);
+  // buttons e mascara de bits na ordem de SDL_GameControllerButton (A=1, B=2, X=4, Y=8, ...).
+  var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0 };
+
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
@@ -298,6 +303,7 @@ __PERF_SCRIPT__
     canvas: el("canvas"),
     arguments: [GAME],
     rangeMotion: motion,
+    rangePad: pad,
     print: function (t) { log("[out] " + t); console.log(t); },
     printErr: function (t) {
       log("[err] " + t);

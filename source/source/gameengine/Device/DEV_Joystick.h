@@ -76,6 +76,21 @@ class DEV_Joystick
 	/** live SDL state seen on the previous frame, see SyncLiveState() */
 	int m_live_axis[JOYAXIS_MAX];
 	bool m_live_button[32];
+
+	/** On-screen pad drawn by the Web page (Module.rangePad), read once per frame by HandleEvents().
+	 * It is merged into joystick index 0: with no physical controller there, index 0 is the virtual pad alone. */
+	static bool s_padActive;
+	static int s_padAxis[JOYAXIS_MAX];
+	static unsigned int s_padButtons;
+	static void ReadVirtualPad();
+	bool HasVirtualPad() const
+	{
+		return m_joyindex == 0 && s_padActive;
+	}
+	/** Index 0 created only for the virtual pad (no SDL controller behind it). */
+	bool IsVirtualOnly() const;
+	int PhysicalAxis(int index);
+	bool PhysicalButton(int button);
 	
 	/**
 	 * Precision or range of the axes
