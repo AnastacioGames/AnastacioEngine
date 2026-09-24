@@ -62,7 +62,7 @@ def _run_validation(context):
     stdlib = info.python_modules()
     if stdlib is None:
         stdlib = set(sys.stdlib_module_names) | set(sys.builtin_module_names) | _ENGINE_API_MODULES
-    report = collect_bpy.collect_report(stdlib=stdlib)
+    report = collect_bpy.collect_report(stdlib=stdlib, touch_layout=context.scene.range_web.touch_layout.lower())
     report.extend(info.findings)
     return report, info
 
@@ -165,6 +165,31 @@ class RangeWebSettings(PropertyGroup):
         subtype='DIR_PATH',
         default="//web/",
     )
+    # Controle na tela (A1): vale para o Web e para o APK, que embute este pacote.
+    touch_layout: bpy.props.EnumProperty(
+        name="Touch controls",
+        description="On-screen controls shown on touch screens (phones, tablets and the Android app)",
+        items=(
+            ('NONE', "None", "No on-screen controls; taps reach the game as mouse clicks"),
+            ('STICK', "Stick + 2 buttons", "Left stick and A/B buttons, as gamepad 0"),
+            ('DPAD', "D-pad + 4 buttons", "D-pad and A/B/X/Y buttons, as gamepad 0"),
+            ('TWIN', "Two sticks", "Left and right sticks, as gamepad 0"),
+            ('WASD', "Stick as WASD + Space", "For games that read the keyboard: the stick presses W/A/S/D "
+                                               "and the button presses Space"),
+            ('ARROWS', "D-pad as arrows + Space/Enter", "For games that read the keyboard: the d-pad presses "
+                                                         "the arrow keys and the buttons press Space and Enter"),
+        ),
+        default='STICK',
+    )
+    touch_stick: bpy.props.EnumProperty(
+        name="Stick mode",
+        description="Where the on-screen stick appears",
+        items=(
+            ('DYNAMIC', "Where the finger touches", "The stick appears under the finger, anywhere on its half of the screen"),
+            ('FIXED', "In the corner", "The stick stays in the corner"),
+        ),
+        default='DYNAMIC',
+    )
 
 
 class SCENE_PT_range_web(SceneButtonsPanel, Panel):
@@ -184,6 +209,13 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         col.prop(web, "output_directory")
         col.prop(web, "auto_preflight")
         col.prop(web, "open_after_export")
+
+        box = layout.box()
+        box.prop(web, "touch_layout")
+        row = box.row()
+        row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD'}
+        row.prop(web, "touch_stick", expand=True)
+        box.label(text="Shown only on touch screens; test on a PC with ?touch=1 in the address.", icon='INFO')
 
         layout.separator()
         layout.operator("scene.range_web_validate", icon='FILE_REFRESH')
@@ -301,6 +333,7 @@ class SCENE_OT_range_web_export(Operator):
                 cmd = [python, packager, "--game", game_copy, "--name", name,
                        "--runtime-dir", info.directory, "--out-dir", scratch]
                 cmd += ["--extra-root", collect_bpy.project_root()]
+                cmd += ["--touch-layout", web.touch_layout.lower(), "--touch-stick", web.touch_stick.lower()]
                 for extra in extras:
                     cmd += ["--extra", extra]
                 result = subprocess.run(cmd, capture_output=True, text=True)

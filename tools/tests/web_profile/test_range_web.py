@@ -16,11 +16,12 @@ sys.path.insert(0, os.path.join(ROOT, "source", "release", "scripts", "modules")
 
 from range_web import (  # noqa: E402
     EVIDENCE_CONFIRMED, EVIDENCE_POTENTIAL, EVIDENCE_UNVALIDATED,
-    SEVERITY_ERROR, SEVERITY_WARNING, Finding, Report,
+    SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARNING, Finding, Report,
 )
 from range_web import manifest as mf  # noqa: E402
 from range_web import rules_files as rf  # noqa: E402
 from range_web import rules_python as rp  # noqa: E402
+from range_web import touch  # noqa: E402
 
 STDLIB = {"sys", "os", "math", "time", "random", "json"}
 
@@ -318,6 +319,93 @@ class PythonTest(unittest.TestCase):
         self.assertEqual(rp.check_python_main_loop(""), [])
         self.assertEqual(ids(rp.check_python_main_loop("loop.py")), ["WEB-PY-005"])
         self.assertEqual(rp.check_python_main_loop("loop.py", adapter_validated=True), [])
+
+
+def _kb(name, key):
+    return ("Cena", "Player", name, "KEYBOARD", {"key": key, "all_keys": False})
+
+
+def _joy(name, **info):
+    return ("Cena", "Player", name, "JOYSTICK", info)
+
+
+def _binding(kind, part, **values):
+    return {"PERIPHERALTYPE": {"TYPE": kind, "INDEX": "0", "SENSITIVITY": 1.0},
+            part: {k: str(v) for k, v in values.items()}}
+
+
+def _map(**actions):
+    return {"Player": {name: {"Type": "VALUE", "ControlType": "VECTOR2D", "Bindings": binds, "Processors": {}}
+                       for name, binds in actions.items()}}
+
+
+class TouchTest(unittest.TestCase):
+    """WEB-INPUT-001: entrada que o controle na tela (A1) nao aperta."""
+
+    WASD = _binding("KEYBOARD", "COMPOSITEPADS", UP=45, DOWN=41, LEFT=23, RIGHT=26)
+    STICK = _binding("JOYSTICK", "COMPOSITEPADS", UP=101, DOWN=101, LEFT=100, RIGHT=100)
+
+    def test_layout_keys_match_template(self):
+        # As teclas de cada layout do template (package-web.py) sao as que touch.reach declara.
+        import re
+        with open(os.path.join(ROOT, "tools", "web", "package-web.py"), encoding="utf-8") as f:
+            src = f.read()
+        names = re.search(r'var KEY_NAMES = \((.*?)\)\.split', src, re.S).group(1)
+        names = "".join(re.findall(r'"([^"]*)"', names)).split(" ")
+        for layout in ("wasd", "arrows"):
+            body = re.search(r"\n    %s: \[(.*?)\](?:,\n    [a-z]|\n  \})" % layout, src, re.S).group(1)
+            codes = {7 + names.index(k[:-3]) for k in re.findall(r'"([A-Z]+KEY)"', body)}
+            self.assertEqual(codes, set(touch.reach(layout)[0]) - {touch.MOUSE_LEFT, touch.MOUSE_X,
+                                                                  touch.MOUSE_Y}, layout)
+        for layout in touch.LAYOUTS[1:4]:
+            self.assertIn("\n    %s: [" % layout, src)
+
+    def test_keyboard_sensor(self):
+        self.assertEqual(touch.check_touch("wasd", [_kb("up", "W"), _kb("jump", "SPACE")], {}), [])
+        found = touch.check_touch("stick", [_kb("up", "W")], {})
+        self.assertEqual(ids(found), ["WEB-INPUT-001"])
+        self.assertEqual(found[0].severity, SEVERITY_WARNING)
+        self.assertEqual(found[0].location["object"], "Player")
+        self.assertIn("'stick'", found[0].message)
+        self.assertEqual(ids(touch.check_touch("wasd", [_kb("run", "LEFT_SHIFT")], {})), ["WEB-INPUT-001"])
+        # Sensor sem tecla ou com "todas as teclas" nao vira aviso.
+        self.assertEqual(touch.check_touch("stick", [_kb("any", "NONE")], {}), [])
+
+    def test_joystick_sensor(self):
+        a = _joy("a", event_type="BUTTONS", button="BUTTON_A")
+        x = _joy("x", event_type="BUTTONS", button="BUTTON_X")
+        move = _joy("move", event_type="STICK_DIRECTIONS", stick="LEFT_STICK")
+        look = _joy("look", event_type="STICK_AXIS", axis="RIGHT_STICK_VERTICAL")
+        self.assertEqual(touch.check_touch("stick", [a, move], {}), [])
+        self.assertEqual(ids(touch.check_touch("stick", [x, look], {})), ["WEB-INPUT-001"] * 2)
+        self.assertEqual(touch.check_touch("dpad", [x], {}), [])
+        self.assertEqual(touch.check_touch("twin", [look], {}), [])
+        self.assertEqual(ids(touch.check_touch("wasd", [a], {})), ["WEB-INPUT-001"])
+        self.assertEqual(touch.check_touch("dpad", [_joy("any", all_events=True)], {}), [])
+
+    def test_input_system_maps(self):
+        maps = _map(Move={"kb": self.WASD, "pad": self.STICK})
+        self.assertEqual(touch.check_touch("wasd", [], maps), [])
+        self.assertEqual(touch.check_touch("stick", [], maps), [])
+        found = touch.check_touch("arrows", [], maps)
+        self.assertEqual(ids(found), ["WEB-INPUT-001"])
+        self.assertEqual(found[0].location["chain"], "Player > Move")
+        # So teclado: o stick (gamepad) nao alcanca.
+        self.assertEqual(ids(touch.check_touch("stick", [], _map(Move={"kb": self.WASD}))), ["WEB-INPUT-001"])
+        # Clique e movimento do mouse chegam pelo toque fora dos controles; botao direito nao.
+        click = _binding("MOUSE", "BINDING", BUTTON=touch.MOUSE_LEFT)
+        right = _binding("MOUSE", "BINDING", BUTTON=118)
+        self.assertEqual(touch.check_touch("stick", [], _map(Fire={"m": click})), [])
+        self.assertEqual(ids(touch.check_touch("stick", [], _map(Aim={"m": right}))), ["WEB-INPUT-001"])
+        # Binding malformado nao derruba a regra.
+        self.assertEqual(ids(touch.check_touch("stick", [], _map(Bad={"x": {"BINDING": {"BUTTON": "a"}}}))),
+                         ["WEB-INPUT-001"])
+
+    def test_none_layout_single_info(self):
+        found = touch.check_touch("none", [_kb("up", "W"), _kb("down", "S")], _map(Move={"kb": self.WASD}))
+        self.assertEqual(ids(found), ["WEB-INPUT-001"])
+        self.assertEqual(found[0].severity, SEVERITY_INFO)
+        self.assertEqual(touch.check_touch("none", [], {}), [])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,29 @@
+{
+    "Pular": {
+        "Type": "BUTTON",
+        "ControlType": "VECTOR1D",
+        "Processors": {},
+        "Bindings": {
+            "teclado": {
+                "PERIPHERALTYPE": {
+                    "TYPE": "KEYBOARD",
+                    "INDEX": "0",
+                    "SENSITIVITY": 1.0
+                },
+                "BINDING": {
+                    "BUTTON": "8"
+                }
+            },
+            "controle": {
+                "PERIPHERALTYPE": {
+                    "TYPE": "JOYSTICK",
+                    "INDEX": "0",
+                    "SENSITIVITY": 1.0
+                },
+                "BINDING": {
+                    "BUTTON": "1"
+                }
+            }
+        }
+    }
+}

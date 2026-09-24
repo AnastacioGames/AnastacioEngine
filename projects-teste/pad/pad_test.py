@@ -13,8 +13,13 @@ def main(cont):
     joy = logic.joysticks[0]
     button_a = cont.sensors["BotaoA"]
 
+    maps = logic.inputSystem.inputMaps
     if own["frames"] == 0:
         print("[pad] codes W=%d SPACE=%d UPARROW=%d" % (events.WKEY, events.SPACEKEY, events.UPARROWKEY))
+        print("[pad] maps %s" % sorted(maps))
+    jump = maps.get("Pad", {}).get("Pular")
+    if jump is not None and jump.activated:
+        print("[pad] map Pular down")
     for name in KEYS:
         ev = logic.keyboard.inputs[getattr(events, name)]
         if ev.activated:

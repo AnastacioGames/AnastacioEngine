@@ -154,22 +154,64 @@ def snapshot_hash(snapshot, assets, file_hashes):
     return h.hexdigest()
 
 
+def input_map_files(root=None):
+    """Mapas do Input System: o motor le <pasta do .range>/KeyMapping/*.json (KX_InputSystem)."""
+    folder = os.path.join(root if root is not None else project_root(), "KeyMapping")
+    if not os.path.isdir(folder):
+        return []
+    return sorted(os.path.join(folder, n) for n in os.listdir(folder)
+                  if n.endswith(".json") and os.path.isfile(os.path.join(folder, n)))
+
+
+def load_input_maps(root=None):
+    """{nome do mapa: dados}; JSON ilegivel fica de fora (o motor tambem o ignora)."""
+    import json
+    maps = {}
+    for path in input_map_files(root):
+        try:
+            with open(path, encoding="utf-8") as f:
+                maps[os.path.splitext(os.path.basename(path))[0]] = json.load(f)
+        except (OSError, ValueError):
+            continue
+    return maps
+
+
+def collect_input_sensors(scenes):
+    """[(cena, objeto, sensor, tipo, dados)] dos sensores Keyboard e Joystick, para touch.check_touch."""
+    out = []
+    for scene_name, ob in _scene_objects(scenes):
+        for s in ob.game.sensors:
+            if s.type == 'KEYBOARD':
+                info = {"key": s.key, "all_keys": s.use_all_keys}
+            elif s.type == 'JOYSTICK':
+                info = {"event_type": s.event_type, "button": s.button_number, "stick": s.axis_number,
+                        "axis": s.single_axis_number, "all_events": s.use_all_events}
+            else:
+                continue
+            out.append((scene_name, ob.name, s.name, s.type, info))
+    return out
+
+
 def collect_extra_files(scenes=None, stdlib=None):
     """Arquivos do projeto para o `--extra` do empacotador: modulos .py alcancados pelos
-    controllers e assets externos, desde que estejam dentro da pasta do projeto (o caminho
-    relativo e mantido via --extra-root). Fora dela nao ha caminho estavel no pacote."""
+    controllers, assets externos e os mapas KeyMapping/*.json do Input System, desde que estejam
+    dentro da pasta do projeto (o caminho relativo e mantido via --extra-root). Fora dela nao ha
+    caminho estavel no pacote."""
     scenes = list(scenes if scenes is not None else bpy.data.scenes)
     snapshot, assets, seen = build_snapshot(scenes, stdlib=stdlib)
     collect.resolve(snapshot)
     root = project_root()
     prefix = root + os.sep
     paths = set(seen) | {p for _kind, p, _origin in assets if os.path.isfile(p)}
+    if root:
+        paths |= set(input_map_files(root))
     return sorted(p for p in paths if p.startswith(prefix))
 
 
-def collect_report(scenes=None, stdlib=None):
+def collect_report(scenes=None, stdlib=None, touch_layout=None):
     """Coleta e resolve. `scenes` None = todas as cenas do arquivo. Retorna Report (sem regras
-    de renderizacao/midia, que pertencem a marcos posteriores)."""
+    de renderizacao/midia, que pertencem a marcos posteriores). Com `touch_layout`, inclui o aviso
+    de entrada que o controle na tela nao aperta (WEB-INPUT-001)."""
     scenes = list(scenes if scenes is not None else bpy.data.scenes)
     snapshot, assets, file_hashes = build_snapshot(scenes, stdlib=stdlib)
     # Referencia do runtime a um Text/modulo so e "necessaria" se o objeto existe no pacote;
@@ -180,6 +222,10 @@ def collect_report(scenes=None, stdlib=None):
     # Asset fora da pasta do projeto (ou symlink que escapa) nao entra no pacote: PKG-005.
     report.extend(collect.check_assets(assets, os.path.isfile, roots=(project_root(),)))
     report.extend(_check_package_files(project_root(), assets, file_hashes))
+    if touch_layout is not None:
+        from . import touch
+        report.extend(touch.check_touch(touch_layout, collect_input_sensors(scenes),
+                                        load_input_maps() if project_root() else {}))
     return report
 
 

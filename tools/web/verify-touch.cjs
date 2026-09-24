@@ -70,6 +70,8 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   let line = await lastPad(0);
   // Com controle fisico ligado o nome e o dele ("Standard Gamepad"): o pad virtual junta no mesmo indice 0.
   check('pad ativo vira joysticks[0]', /connected=True/.test(line), line || '(nenhuma linha [pad])');
+  const maps = ((await logText()).match(/\[pad\] maps [^\n]*/) || ['(sem linha maps)'])[0];
+  check('KeyMapping/Pad.json carregado pelo Input System', /\[pad\] maps \['Pad'\]/.test(maps), maps);
 
   // 2. Dois dedos: stick arrastado ate a borda direita e botao A apertado ao mesmo tempo.
   const [bx, by, br] = await center('#touch .zone.left .base');
@@ -88,6 +90,7 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   const log2 = (await logText()).slice(mark);
   check('engine ve stick e A juntos', /axes=\[1\.0, 0\.0,/.test(line) && /buttons=\[0\]/.test(line), line || '-');
   check('sensor Joystick A down', /\[pad\] sensor A down/.test(log2), '-');
+  check('Input System: acao Pular pelo botao A (binding JOYSTICK)', /\[pad\] map Pular down/.test(log2), '-');
 
   // 3. Soltar so o botao: o stick continua; depois soltar o stick: tudo volta a zero.
   await touch('touchEnd', [[ax, ay, 2]]);  // no CDP o touchEnd lista os pontos que sobem
@@ -138,6 +141,7 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   await sleep(500);
   log6 = (await logText()).slice(mark);
   check('jogo ve W e espaco apertados', /\[pad\] key W down/.test(log6) && /\[pad\] key SPACE down/.test(log6), '-');
+  check('Input System: acao Pular pelo espaco (binding KEYBOARD)', /\[pad\] map Pular down/.test(log6), '-');
   await touch('touchEnd', []);
   await sleep(500);
   log6 = (await logText()).slice(mark);

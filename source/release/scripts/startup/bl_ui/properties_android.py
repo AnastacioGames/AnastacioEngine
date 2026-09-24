@@ -246,6 +246,8 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
             box.label(text="Keep the key and the password with a backup: updates need the same key.",
                       icon='INFO')
         col.prop(settings, "output_directory")
+        # Mesma propriedade do painel Web: o APK embute o pacote Web com o controle na tela dele.
+        col.prop(context.scene.range_web, "touch_layout")
 
         box = layout.box()
         box.label(text="Tools (only if not found automatically):")

@@ -401,6 +401,36 @@ _TABLE = {
     "Error": ("Erro", "Error", "Ошибка"),
     "%s at runtime%s: %s": ("%s no runtime%s: %s", "%s en el runtime%s: %s", "%s во время выполнения%s: %s"),
 
+    # touch.py
+    "Input action %s has no binding the touch layout '%s' presses.": (
+        "A ação de entrada %s não tem binding que o controle na tela '%s' aperte.",
+        "La acción de entrada %s no tiene binding que el control táctil '%s' pulse.",
+        "У действия ввода %s нет привязки, которую нажимает сенсорная раскладка '%s'."),
+    "Choose a touch layout that presses these inputs, or add a mapping the layout reaches.": (
+        "Escolha um controle na tela que aperte essas entradas ou adicione um mapeamento que ele alcance.",
+        "Elija un control táctil que pulse estas entradas o añada un mapeo que alcance.",
+        "Выберите сенсорную раскладку, которая нажимает эти входы, или добавьте доступную ей привязку."),
+    "Keyboard sensor %s (key %s)": (
+        "Sensor Keyboard %s (tecla %s)",
+        "Sensor Keyboard %s (tecla %s)",
+        "Сенсор Keyboard %s (клавиша %s)"),
+    "Joystick sensor %s": (
+        "Sensor Joystick %s",
+        "Sensor Joystick %s",
+        "Сенсор Joystick %s"),
+    "%s is not pressed by the touch layout '%s'.": (
+        "%s não é apertado pelo controle na tela '%s'.",
+        "%s no es pulsado por el control táctil '%s'.",
+        "%s не нажимается сенсорной раскладкой '%s'."),
+    "Touch controls are off: on phones and tablets only taps reach the game.": (
+        "Controle na tela desligado: em celulares e tablets só toques chegam ao jogo.",
+        "Controles táctiles desactivados: en móviles y tabletas solo los toques llegan al juego.",
+        "Сенсорное управление выключено: на телефонах и планшетах в игру приходят только касания."),
+    "Choose a touch layout in Web (Range) > Touch controls.": (
+        "Escolha um layout em Web (Range) > Controle na tela.",
+        "Elija un diseño en Web (Range) > Controles táctiles.",
+        "Выберите раскладку в Web (Range) > Сенсорное управление."),
+
     # export.py
     "%d Web error(s) block the export.": (
         "%d erro(s) Web bloqueiam o export.",

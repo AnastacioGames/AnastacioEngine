@@ -934,6 +934,7 @@ def main():
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "entry_game": f"game/{game_name}",
         "requirements": {"webgl": 2, "threads": False, "cross_origin_isolation": False},
+        "touch_controls": {"layout": args.touch_layout, "stick": args.touch_stick},
         "runtime": {n: files[n] for n in RUNTIME_FILES},
         "files": files,
         "warnings": warnings,

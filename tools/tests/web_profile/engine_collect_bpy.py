@@ -94,6 +94,29 @@ try:
     assets = [("Som", os.path.join(tmp, n), {}) for n in ("musica.rasec", "ok.ogg")]
     got = sorted(f.rule_id for f in collect_bpy._check_package_files(tmp, assets, {}))
     check(got == ["WEB-PKG-009"], "asset .rasec no pacote e PKG-009 (%s)" % got)
+
+    # Controle na tela (WEB-INPUT-001): sensor Keyboard e mapa do Input System que o layout nao aperta.
+    import json
+    os.mkdir(os.path.join(tmp, "KeyMapping"))
+    keymap = os.path.join(tmp, "KeyMapping", "Jogador.json")
+    wasd = {"PERIPHERALTYPE": {"TYPE": "KEYBOARD", "INDEX": "0", "SENSITIVITY": 1.0},
+            "COMPOSITEPADS": {"UP": "45", "DOWN": "41", "LEFT": "23", "RIGHT": "26"}}
+    with open(keymap, "w", encoding="utf-8") as f:
+        json.dump({"Mover": {"Type": "VALUE", "ControlType": "VECTOR2D", "Bindings": {"wasd": wasd},
+                             "Processors": {}}}, f)
+    bpy.ops.logic.sensor_add(type='KEYBOARD', name="Pular", object="Porta")
+    ob.game.sensors["Pular"].key = 'SPACE'
+    check(keymap in collect_bpy.collect_extra_files(stdlib=STDLIB), "KeyMapping/*.json vai para o pacote")
+    touch = [f for f in collect_bpy.collect_report(stdlib=STDLIB, touch_layout="stick").findings
+             if f.rule_id == "WEB-INPUT-001"]
+    chains = sorted(f.location.get("chain", "") for f in touch)
+    check(len(touch) == 2 and "Jogador > Mover" in chains and any(c.endswith("Porta > Pular") for c in chains),
+          "stick nao alcanca teclado: sensor e acao avisados (%s)" % chains)
+    touch = [f for f in collect_bpy.collect_report(stdlib=STDLIB, touch_layout="wasd").findings
+             if f.rule_id == "WEB-INPUT-001"]
+    check(touch == [], "wasd alcanca W/A/S/D e espaco (%s)" % touch)
+    check(not [f for f in collect_bpy.collect_report(stdlib=STDLIB).findings if f.rule_id == "WEB-INPUT-001"],
+          "sem layout informado a regra nao roda")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

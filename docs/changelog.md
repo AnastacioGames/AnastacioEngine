@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 16 | 29 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 17 | 32 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,29 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Controle na tela: layout no painel Web e aviso de entrada sem toque (A1, etapa T3)
+
+- Properties > Scene > Web (Range) ganhou **Controle na tela** (nenhum, stick + 2 botões, d-pad + 4 botões, dois
+  sticks, stick como WASD + espaço, d-pad como setas + espaço/Enter) e **Modo do stick** (onde o dedo toca ou no
+  canto). O Exportar Web passa `--touch-layout/--touch-stick` ao empacotador, que grava `touch_controls` no
+  `manifest.json`. O painel Android mostra o mesmo campo: o APK embute o pacote Web, então a config não foi para o
+  `android-export.json` (decisão registrada no plano).
+- Nova regra WEB-INPUT-001 (`range_web/touch.py`, aviso, evidência potencial): sensor Keyboard com tecla que o
+  layout não aperta, sensor Joystick com botão/stick que o layout não tem, ação do Input System sem nenhum binding
+  alcançado (todas as entradas do binding precisam estar no layout; clique esquerdo e movimento do mouse contam,
+  porque o toque fora dos controles vira mouse). Com controle desligado, um só aviso informativo. Não vê
+  `logic.keyboard` lido em Python.
+- Correção: os mapas do Input System (`KeyMapping/*.json`, lidos pelo motor ao lado do `.range`) não entravam no
+  pacote Web; o export do editor agora os inclui. `make_pad_project.py` gera `KeyMapping/Pad.json` com a ação
+  "Pular" (espaço ou botão A) e `verify-touch.cjs` confere as duas vias no navegador (19/19). Isso também fecha a
+  pendência da T0 de conferir um binding `JOYSTICK` com o pad virtual.
+- Traduções pt/es/ru do painel e das mensagens. "Stick", "Dynamic" e "Fixed" viraram "Stick mode", "Where the
+  finger touches" e "In the corner": o catálogo do Blender traduz os primeiros ("Bastão", "Фикс") e vence o nosso.
+- Testes: `test_range_web.py` +5 (teclas dos layouts conferidas contra o template, sensores, mapas, layout
+  desligado), 124 puros OK; `engine_collect_bpy.py` (JSON no pacote, aviso com stick e sem aviso com wasd) e
+  `engine_web_export.py` (layout do painel no manifest e na página) sem falhas; `engine_i18n`, `engine_web_ui` e
+  `engine_android_export` sem falhas. Não testado: celular.
 
 ## 2026-09-24 - Controle na tela: alvo tecla para jogos que leem teclado (A1, etapa T2)
 

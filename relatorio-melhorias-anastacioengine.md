@@ -182,6 +182,8 @@ ferramenta correspondente.
   `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico) ou como teclas. Estende o input existente
   (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
   O overlay só aparece em tela de toque (`pointer: coarse`) ou com `?touch=1`; layout padrão stick + A/B.
+  O layout é configuração do export Web (Properties > Scene > Web (Range) > Controle na tela, gravado no `.range`);
+  o APK embute esse pacote e herda o layout, sem campo próprio no `android-export.json`.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.

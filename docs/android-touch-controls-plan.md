@@ -98,7 +98,7 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
 
 ## Etapas
 
-1. **T0, prova da ponte (curta), feita em 2026-09-24:** `verify-pad.cjs` 7/7 no Edge headless; com controle USB real, físico e virtual juntos (maior eixo vence, botões somados) e o físico segue sozinho ao desligar o pad (ver changelog). Falta conferir um mapa `JOYSTICK` do Input System e o celular.
+1. **T0, prova da ponte (curta), feita em 2026-09-24:** `verify-pad.cjs` 7/7 no Edge headless; com controle USB real, físico e virtual juntos (maior eixo vence, botões somados) e o físico segue sozinho ao desligar o pad (ver changelog). Mapa `JOYSTICK` do Input System conferido na T3. Falta o celular.
    - `Module.rangePad` com eixos e botões fixos no JS.
    - Leitura por `EM_JS` em `DEV_Joystick` (`DEV_JoystickEvents.cpp`: fonte virtual no `SyncLiveState`, junta no índice 0; se não houver gamepad físico, cria a instância virtual).
    - Critério: no navegador do PC, o valor aparece em `logic.joysticks[0]` e num mapa `JOYSTICK` do Input System.
@@ -117,7 +117,14 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - Teclas seguradas pelo toque lidas no mesmo poll.
    - Em `DEV_EventConsumer.cpp`, o estado do teclado físico e o do toque ficam separados, e a tecla só muda quando o estado combinado muda.
    - Remover o `printf("[web-input] ...")` que sobrou na linha 67.
-4. **T3, configuração e editor:**
+4. **T3, configuração e editor, feita em 2026-09-24.** Decisão: o layout fica na config do export Web (propriedade
+   da cena `range_web.touch_layout`/`touch_stick`, no `.range`), não no `android-export.json`; o APK embute o pacote
+   Web e herda o layout (o painel Android mostra o mesmo campo). O pacote registra o layout em
+   `manifest.json` (`touch_controls`). Aviso WEB-INPUT-001 (`range_web/touch.py`) para sensor Keyboard/Joystick e ação
+   do Input System que o layout não aperta; sem controle na tela, um só aviso informativo. Os mapas
+   `KeyMapping/*.json` não iam no pacote Web (o Input System ficava vazio no navegador); agora vão, e
+   `verify-touch.cjs` confere uma ação com binding JOYSTICK (botão A do toque) e KEYBOARD (espaço do `wasd`), 19/19.
+   Leitura de `logic.keyboard` em Python não é detectada pelo aviso.
    - Seção `touchControls` na config do export Web, que o Android herda. Hoje o plano diz `android-export.json`; o overlay serve aos dois, então a decisão será registrada no plano.
    - Seletor de layout no painel.
    - Aviso de ação sem mapeamento móvel (plano, linha 130).

@@ -5,10 +5,12 @@
 Um cubo andando pelo plano com o stick esquerdo de logic.joysticks[0] (vermelho sem gamepad, verde com) ou
 com WASD/setas. O botao A, lido por um sensor Joystick (logic brick), ou o espaco fazem o cubo pular. A cada 30
 quadros o estado vai para o console ("[pad] ..."), e cada tecla apertada/solta sai como "[pad] key W down"; no
-navegador, abrir com ?debug=1. tools/web/verify-pad.cjs confere a cadeia Module.rangePad -> DEV_Joystick ->
+navegador, abrir com ?debug=1. O mapa KeyMapping/Pad.json do Input System tem a acao "Pular" (espaco ou botao A do
+gamepad 0); cada ativacao sai como "[pad] map Pular down". tools/web/verify-pad.cjs confere a cadeia Module.rangePad -> DEV_Joystick ->
 Python e sensor sem controle fisico; tools/web/verify-touch.cjs, o overlay (gamepad e teclas).
 """
 
+import json
 import os
 
 import bpy
@@ -32,8 +34,13 @@ def main(cont):
     joy = logic.joysticks[0]
     button_a = cont.sensors["BotaoA"]
 
+    maps = logic.inputSystem.inputMaps
     if own["frames"] == 0:
         print("[pad] codes W=%d SPACE=%d UPARROW=%d" % (events.WKEY, events.SPACEKEY, events.UPARROWKEY))
+        print("[pad] maps %s" % sorted(maps))
+    jump = maps.get("Pad", {}).get("Pular")
+    if jump is not None and jump.activated:
+        print("[pad] map Pular down")
     for name in KEYS:
         ev = logic.keyboard.inputs[getattr(events, name)]
         if ev.activated:
@@ -113,6 +120,16 @@ ctrl = cube.game.controllers["Pad"]
 ctrl.text = text
 always.link(ctrl)
 button_a.link(ctrl)
+
+# Input System: o motor le <pasta do .range>/KeyMapping/*.json; o export Web leva a pasta junto.
+# Codigos: SPACEKEY = 8 (SCA_EnumInputs), botao A = 1 (KX_PythonJoystick::JOYSTICK_EnumInputs).
+os.makedirs(os.path.join(DEST, "KeyMapping"), exist_ok=True)
+with open(os.path.join(DEST, "KeyMapping", "Pad.json"), "w", encoding="utf-8") as f:
+    json.dump({"Pular": {"Type": "BUTTON", "ControlType": "VECTOR1D", "Processors": {}, "Bindings": {
+        "teclado": {"PERIPHERALTYPE": {"TYPE": "KEYBOARD", "INDEX": "0", "SENSITIVITY": 1.0},
+                    "BINDING": {"BUTTON": "8"}},
+        "controle": {"PERIPHERALTYPE": {"TYPE": "JOYSTICK", "INDEX": "0", "SENSITIVITY": 1.0},
+                     "BINDING": {"BUTTON": "1"}}}}}, f, indent=4)
 
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(DEST, "pad.range"))
 print("Cena de teste em", os.path.join(DEST, "pad.range"))

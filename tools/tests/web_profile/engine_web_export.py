@@ -5,6 +5,7 @@
 Sai com codigo != 0 se alguma verificacao falhar.
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -34,6 +35,19 @@ bpy.ops.wm.save_as_mainfile(filepath=os.path.join(tmp, "jogo.blend"))
 check(bpy.ops.scene.range_web_export() == {'FINISHED'}, "arquivo limpo exporta")
 check(os.path.isfile(os.path.join(dest, "index.html")), "index.html gerado")
 check(os.path.isfile(os.path.join(dest, "manifest.json")), "manifest.json gerado")
+with open(os.path.join(dest, "manifest.json"), encoding="utf-8") as f:
+    touch = json.load(f).get("touch_controls")
+check(touch == {"layout": "stick", "stick": "dynamic"}, "controle na tela padrao no manifest (%s)" % touch)
+scene.range_web.touch_layout = 'WASD'
+scene.range_web.touch_stick = 'FIXED'
+bpy.ops.wm.save_mainfile()
+check(bpy.ops.scene.range_web_export() == {'FINISHED'}, "exporta com controle na tela WASD")
+with open(os.path.join(dest, "manifest.json"), encoding="utf-8") as f:
+    touch = json.load(f).get("touch_controls")
+with open(os.path.join(dest, "index.html"), encoding="utf-8") as f:
+    page = f.read()
+check(touch == {"layout": "wasd", "stick": "fixed"} and '{"layout": "wasd", "stick": "fixed"}' in page,
+      "layout do painel chega ao manifest e a pagina (%s)" % touch)
 check(os.listdir(tmp).count("web") == 1 and not [n for n in os.listdir(tmp) if "export" in n],
       "sem temporarios sobrando")
 

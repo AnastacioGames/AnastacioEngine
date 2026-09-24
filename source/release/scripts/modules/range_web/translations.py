@@ -82,6 +82,27 @@ _PT_BR = {
     "%d error(s), %d warning(s)": "%d erro(s), %d aviso(s)",
     "No incompatibility detected (%d warning(s))": "Nenhuma incompatibilidade detectada (%d aviso(s))",
     "No incompatibility detected": "Nenhuma incompatibilidade detectada",
+    # Controle na tela (A1)
+    "Touch controls": "Controle na tela",
+    "On-screen controls shown on touch screens (phones, tablets and the Android app)": "Controles desenhados na tela em telas de toque (celulares, tablets e o app Android)",
+    "No on-screen controls; taps reach the game as mouse clicks": "Sem controles na tela; toques chegam ao jogo como cliques do mouse",
+    "Stick + 2 buttons": "Stick + 2 botões",
+    "Left stick and A/B buttons, as gamepad 0": "Stick esquerdo e botões A/B, como gamepad 0",
+    "D-pad + 4 buttons": "D-pad + 4 botões",
+    "D-pad and A/B/X/Y buttons, as gamepad 0": "D-pad e botões A/B/X/Y, como gamepad 0",
+    "Two sticks": "Dois sticks",
+    "Left and right sticks, as gamepad 0": "Sticks esquerdo e direito, como gamepad 0",
+    "Stick as WASD + Space": "Stick como WASD + Espaço",
+    "For games that read the keyboard: the stick presses W/A/S/D and the button presses Space": "Para jogos que leem o teclado: o stick aperta W/A/S/D e o botão aperta Espaço",
+    "D-pad as arrows + Space/Enter": "D-pad como setas + Espaço/Enter",
+    "For games that read the keyboard: the d-pad presses the arrow keys and the buttons press Space and Enter": "Para jogos que leem o teclado: o d-pad aperta as setas e os botões apertam Espaço e Enter",
+    "Stick mode": "Modo do stick",
+    "Where the on-screen stick appears": "Onde o stick da tela aparece",
+    "Where the finger touches": "Onde o dedo toca",
+    "The stick appears under the finger, anywhere on its half of the screen": "O stick nasce embaixo do dedo, em qualquer ponto da metade dele na tela",
+    "In the corner": "No canto",
+    "The stick stays in the corner": "O stick fica no canto",
+    "Shown only on touch screens; test on a PC with ?touch=1 in the address.": "Só aparece em telas de toque; no PC, teste com ?touch=1 no endereço.",
 }
 
 # Nomes de operadores Python usam o contexto "Operator"; o resto usa o padrão "*".

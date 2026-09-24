@@ -53,7 +53,11 @@ sensor Joystick, Input System), somado a um controle físico. `?touch=1` mostra 
 `?touch=0` esconde; `?touchlayout=` e `?touchstick=dynamic|fixed` trocam o layout só nessa visita.
 Layouts `stick`, `dpad` e `twin` viram o gamepad 0; `wasd` (stick = W/A/S/D, botão = espaço) e `arrows` (d-pad = setas,
 espaço e Enter) apertam teclas, para jogos que leem teclado — somadas às do teclado físico sem uma soltar a outra.
-O padrão do pacote vem de `package-web.py --touch-layout` (`none` desliga) e `--touch-stick`.
+O layout do pacote é escolhido no editor em Properties > Scene > Web (Range) > **Controle na tela** (o export Android
+usa o mesmo, porque embute este pacote) ou, na linha de comando, por `package-web.py --touch-layout` (`none` desliga)
+e `--touch-stick`; fica registrado em `manifest.json` (`touch_controls`). O Validar Web avisa (WEB-INPUT-001) sensor
+Keyboard/Joystick ou ação do Input System que o layout escolhido não aperta; teclado lido direto em Python não é
+detectado. Os mapas do Input System (`KeyMapping/*.json` ao lado do `.range`) vão no pacote pelo export do editor.
 
 Verificação automatizada (só logs/estado, **não** julga o visual): com um Chrome aberto com
 `--remote-debugging-port=9333`, rode `node tools/web/verify-package.cjs http://127.0.0.1:8080/ 9333`.
@@ -63,7 +67,8 @@ Se `node` não estiver no PATH, use o do emsdk (ex.: `D:/emsdk/node/24.19.0_64bi
 e confere que o arquivo voltou do IndexedDB (usa `Module.FS`, exposto pelo pre-js). Cobre a camada IDBFS.
 `node tools/web/verify-touch.cjs <url> 9333` testa o controle na tela com dois dedos emulados (stick + botão A juntos,
 soltura ao perder o foco, toque fora dos controles) e o layout `wasd` (W e espaço no jogo, W do teclado físico mantido
-quando o toque solta); `verify-pad.cjs` testa só a ponte `Module.rangePad`, sem controle
+quando o toque solta) e uma ação do `KeyMapping/Pad.json` pelo toque (empacote com
+`--extra projects-teste/pad/KeyMapping/Pad.json --extra-root projects-teste/pad`); `verify-pad.cjs` testa só a ponte `Module.rangePad`, sem controle
 físico ligado. Os dois esperam a cena de `tools/tests/web_profile/make_pad_project.py`.
 `node tools/web/verify-save.cjs <url> 9333` testa `saveGlobalDict`/`loadGlobalDict` de ponta a ponta num pacote gerado de
 `tools/create_web_save_scene.py` (`RangeEngine -b --python ...`): grava numa sessão, recarrega e confere a leitura. Não use `--virtual-time-budget` com
