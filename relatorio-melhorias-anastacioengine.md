@@ -179,7 +179,8 @@ ferramenta correspondente.
   painel e chega ao Gradle pelo ambiente. Perder a chave obriga a publicar como outro app; um APK debug instalado
   não é atualizado por um release (chaves diferentes).
 - Controles na tela (A1): desenho e captura de toque na página (HTML/Pointer Events); a engine recebe o estado por
-  `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico) ou como teclas. Estende o input existente
+  `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico), como teclas/botões do mouse ou como
+  movimento do mouse (stick de olhar move o cursor virtual do GHOST, igual a arrastar o dedo). Estende o input existente
   (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
   O overlay só aparece em tela de toque (`pointer: coarse`) ou com `?touch=1`; layout padrão stick + A/B.
   O layout é configuração do export Web (Properties > Scene > Web (Range) > Controle na tela, gravado no `.range`);

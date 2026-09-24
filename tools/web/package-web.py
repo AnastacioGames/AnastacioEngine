@@ -312,8 +312,10 @@ __PERF_SCRIPT__
   // Controle na tela -> gamepad 0 do runtime (DEV_JoystickEvents.cpp le Module.rangePad a cada quadro).
   // axes na ordem do SDL GameController (LX, LY, RX, RY, gatilho E, gatilho D; -1..1, gatilhos 0..1);
   // buttons e mascara de bits na ordem de SDL_GameControllerButton (A=1, B=2, X=4, Y=8, ...).
-  // keys: teclas seguradas pelo toque, em codigos de bge.events (DEV_InputDevice.cpp as junta as do teclado fisico).
-  var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0, keys: [] };
+  // keys: teclas e botoes do mouse segurados pelo toque, em codigos de bge.events (DEV_InputDevice.cpp os junta aos
+  // fisicos). look: quanto o stick de olhar girou desde o ultimo quadro, em fracoes da janela; GHOST_SystemSDL.cpp o
+  // consome e move o cursor virtual como um arrastar de dedo (jogos com mouse-look giram sem mudanca).
+  var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0, keys: [], look: [0, 0] };
 
   // Overlay do controle na tela: cada controle segue um dedo (pointerId), entao mover e apertar ao mesmo tempo
   // funciona. Toques fora dos controles seguem para o canvas (arrastar para olhar continua). Aparece em tela de
@@ -334,7 +336,12 @@ __PERF_SCRIPT__
            { type: "button", key: "SPACEKEY", label: "\\u2423", at: [0, 0] }],
     arrows: [{ type: "dpad", keys: ["UPARROWKEY", "DOWNARROWKEY", "LEFTARROWKEY", "RIGHTARROWKEY"] },
              { type: "button", key: "SPACEKEY", label: "\\u2423", at: [-0.75, 0.55] },
-             { type: "button", key: "RETKEY", label: "\\u23ce", at: [0.75, -0.55] }]
+             { type: "button", key: "RETKEY", label: "\\u23ce", at: [0.75, -0.55] }],
+    // Primeira pessoa com teclado e mouse: stick direito move o mouse (olhar em volta); pulo e clique acima dele.
+    fps: [{ type: "stick", side: "left", keys: ["WKEY", "SKEY", "AKEY", "DKEY"] },
+          { type: "stick", side: "right", look: 1.5 },
+          { type: "button", key: "SPACEKEY", label: "\\u2423", at: [0.3, -2] },
+          { type: "button", key: "LEFTMOUSE", label: "\\u25ce", at: [-2, -1.4] }]
   };
   // Ordem de SCA_IInputDevice::SCA_EnumInputs a partir de RETKEY (= 7), a mesma de bge.events. So as teclas
   // que fazem sentido num controle na tela; verify-touch.cjs confere W, SPACE e UPARROW com o bge.events.
@@ -342,7 +349,11 @@ __PERF_SCRIPT__
     "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z CAPSLOCK LEFTCTRL LEFTALT RIGHTALT RIGHTCTRL RIGHTSHIFT " +
     "LEFTSHIFT ESC TAB LINEFEED BACKSPACE DEL SEMICOLON QUOTE ACCENTGRAVE SLASH BACKSLASH EQUAL LEFTBRACKET " +
     "RIGHTBRACKET LEFTARROW DOWNARROW RIGHTARROW UPARROW").split(" ");
+  // Botoes do mouse (SCA_EnumInputs, os de bge.events), para jogos que atiram no clique.
+  var MOUSE_CODES = { LEFTMOUSE: 116, MIDDLEMOUSE: 117, RIGHTMOUSE: 118 };
   function keyCode(name) {
+    var mouse = MOUSE_CODES[String(name).toUpperCase()];
+    if (mouse) return mouse;
     var i = KEY_NAMES.indexOf(String(name).toUpperCase().replace(/KEY$/, ""));
     if (i < 0) { log("[touch] tecla desconhecida: " + name); return 0; }
     return 7 + i;
@@ -418,12 +429,14 @@ __PERF_SCRIPT__
     };
   }
   // Stick fixo: o centro e a posicao de repouso. Dinamico: a base vai para onde o dedo tocou dentro da zona.
+  // Alvos: axes (gamepad 0), keys (quatro teclas) ou look (mouse; o numero e o giro em janelas por segundo).
   function makeStick(c, dynamic) {
     var zone = node("div", "zone " + c.side), base = node("div", "base"), knob = node("div", "knob");
     base.appendChild(knob);
     zone.appendChild(base);
     var codes = c.keys ? c.keys.map(keyCode) : null;
-    var ctl = { node: zone, axes: codes ? null : c.axes, value: [0, 0], bits: 0, held: [] }, cx = 0, cy = 0, r = 1;
+    var ctl = { node: zone, axes: codes || c.look ? null : c.axes, look: +c.look || 0, value: [0, 0], bits: 0,
+                held: [] }, cx = 0, cy = 0, r = 1;
     function aim(e) {
       var dx = e.clientX - cx, dy = e.clientY - cy, len = Math.sqrt(dx * dx + dy * dy);
       if (len > r) { dx *= r / len; dy *= r / len; }
@@ -524,8 +537,23 @@ __PERF_SCRIPT__
     });
     el("touch").hidden = false;
     pad.active = true;
+    if (touchControls.some(function (c) { return c.look; })) requestAnimationFrame(lookFrame);
     log("[touch] controle na tela: " + (Array.isArray(chosen) ? "personalizado" : chosen) +
         (dynamic ? " (stick dinamico)" : ""));
+  }
+  // Stick de olhar: acumula o giro a cada quadro da pagina; o runtime zera pad.look ao consumir. Curva quadratica:
+  // pouco desvio mira fino, desvio todo gira rapido.
+  var lookAt = 0;
+  function lookFrame(now) {
+    var dt = lookAt ? Math.min(0.1, (now - lookAt) / 1000) : 0;
+    lookAt = now;
+    touchControls.forEach(function (c) {
+      if (!c.look) return;
+      pad.look[0] += c.value[0] * Math.abs(c.value[0]) * c.look * dt;
+      pad.look[1] += c.value[1] * Math.abs(c.value[1]) * c.look * dt;
+    });
+    if (pad.active) requestAnimationFrame(lookFrame);
+    else lookAt = 0;
   }
   // Soltar tudo quando a pagina perde o foco ou some: sem isso um dedo "preso" seguia andando ao voltar.
   function releaseTouch() {
@@ -542,6 +570,31 @@ __PERF_SCRIPT__
   window.addEventListener("pagehide", releaseTouch);
   window.addEventListener("orientationchange", releaseTouch);
   document.addEventListener("visibilitychange", function () { if (document.hidden) releaseTouch(); });
+
+  // Audio: com a pagina escondida (app em segundo plano, outra aba) o jogo para, mas o Web Audio do SDL seguia
+  // tocando a musica. Suspende o contexto ao esconder e retoma ao voltar (so o que esta pagina suspendeu).
+  var audioHeld = false;
+  function syncAudio() {
+    var sdl = window.Module && Module.SDL2, ctx = sdl && sdl.audioContext;
+    if (!ctx) return;
+    if (!ctx.rangeWatched) {
+      ctx.rangeWatched = true;
+      // O SDL chama resume() sozinho enquanto espera o primeiro gesto; escondido, volta a suspender.
+      ctx.addEventListener("statechange", function () { if (document.hidden && audioHeld) syncAudio(); });
+    }
+    if (document.hidden) {
+      if (ctx.state === "running") {
+        audioHeld = true;
+        ctx.suspend();
+        log("[event] audio suspenso (pagina escondida)");
+      }
+    } else if (audioHeld) {
+      audioHeld = false;
+      ctx.resume();
+      log("[event] audio retomado");
+    }
+  }
+  document.addEventListener("visibilitychange", syncAudio);
 
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -860,9 +913,11 @@ def main():
     ap.add_argument("--perf", action="store_true",
                     help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
-    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin", "wasd", "arrows"], default="stick",
+    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin", "wasd", "arrows", "fps"],
+                    default="stick",
                     help="controle na tela em aparelhos de toque: stick/dpad/twin viram gamepad 0; wasd/arrows "
-                         "apertam teclas (padrao: stick + botoes A/B)")
+                         "apertam teclas; fps = WASD, stick direito move o mouse, pulo e clique "
+                         "(padrao: stick + botoes A/B)")
     ap.add_argument("--touch-stick", choices=["dynamic", "fixed"], default="dynamic",
                     help="stick dinamico (nasce onde o dedo toca) ou fixo")
     args = ap.parse_args()

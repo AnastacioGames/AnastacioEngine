@@ -352,11 +352,15 @@ class TouchTest(unittest.TestCase):
             src = f.read()
         names = re.search(r'var KEY_NAMES = \((.*?)\)\.split', src, re.S).group(1)
         names = "".join(re.findall(r'"([^"]*)"', names)).split(" ")
-        for layout in ("wasd", "arrows"):
-            body = re.search(r"\n    %s: \[(.*?)\](?:,\n    [a-z]|\n  \})" % layout, src, re.S).group(1)
+        mouse = {"LEFTMOUSE": touch.MOUSE_LEFT}
+        self.assertIn("LEFTMOUSE: %d," % touch.MOUSE_LEFT, src)
+        for layout in ("wasd", "arrows", "fps"):
+            body = re.search(r"\n    %s: \[(.*?)\](?:,\n    (?://|[a-z])|\n  \})" % layout, src, re.S).group(1)
             codes = {7 + names.index(k[:-3]) for k in re.findall(r'"([A-Z]+KEY)"', body)}
-            self.assertEqual(codes, set(touch.reach(layout)[0]) - {touch.MOUSE_LEFT, touch.MOUSE_X,
-                                                                  touch.MOUSE_Y}, layout)
+            codes |= {mouse[k] for k in re.findall(r'"([A-Z]+MOUSE)"', body)}
+            # O clique do mouse o toque alcanca sempre; so o fps o tem num botao.
+            always = {touch.MOUSE_X, touch.MOUSE_Y} | ({touch.MOUSE_LEFT} if layout != "fps" else set())
+            self.assertEqual(codes, set(touch.reach(layout)[0]) - always, layout)
         for layout in touch.LAYOUTS[1:4]:
             self.assertIn("\n    %s: [" % layout, src)
 

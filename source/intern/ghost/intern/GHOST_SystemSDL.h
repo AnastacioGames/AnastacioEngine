@@ -120,6 +120,12 @@ private:
 	void
 	processEvent(SDL_Event *sdl_event);
 
+#ifdef __EMSCRIPTEN__
+	/// Moves the virtual cursor by the on-screen look stick (Module.rangePad.look); true if it moved.
+	bool
+	processWebLook();
+#endif
+
 	/// The vector of windows that need to be updated.
 	std::vector<GHOST_WindowSDL *> m_dirty_windows;
 };

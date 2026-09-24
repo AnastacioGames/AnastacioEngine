@@ -178,6 +178,9 @@ class RangeWebSettings(PropertyGroup):
                                                "and the button presses Space"),
             ('ARROWS', "D-pad as arrows + Space/Enter", "For games that read the keyboard: the d-pad presses "
                                                          "the arrow keys and the buttons press Space and Enter"),
+            ('FPS', "First person (WASD + look)", "For first-person games that read the keyboard and mouse: the "
+                                                  "left stick presses W/A/S/D, the right stick moves the mouse to "
+                                                  "look around and the buttons press Space and the left mouse button"),
         ),
         default='STICK',
     )
@@ -213,7 +216,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         box = layout.box()
         box.prop(web, "touch_layout")
         row = box.row()
-        row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD'}
+        row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD', 'FPS'}
         row.prop(web, "touch_stick", expand=True)
         box.label(text="Shown only on touch screens; test on a PC with ?touch=1 in the address.", icon='INFO')
 

@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 23 | 39 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 24 | 40 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,27 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Controle na tela: layout `fps` (stick de olhar e clique) e áudio pausado em segundo plano
+
+- Relato do usuário no First Person 0.1.6: em segundo plano o jogo pausa e volta de onde estava, mas a música
+  continuava. Causa: o Web Audio do SDL (`Module.SDL2.audioContext`) segue tocando com a página escondida. A página
+  agora suspende o contexto no `visibilitychange` e retoma ao voltar (só o que ela mesma suspendeu; se o SDL chamar
+  `resume()` com a página escondida, suspende de novo). Verificado no `verify-capabilities.cjs audio` (novo item:
+  `suspended` escondida, `running` ao voltar).
+- Pedido do usuário: segundo direcional à direita para olhar e botão de tiro. Novo alvo **`look`** no stick: a
+  página acumula o giro em `Module.rangePad.look` (frações da janela, curva quadrática, 1,5 janela/s) e
+  `GHOST_SystemSDL::processWebLook()` o consome a cada quadro, movendo o cursor virtual do Web como um arrastar de
+  dedo (só com o cursor escondido). Botões do mouse no alvo tecla: `DEV_InputDevice::PollVirtualKeys` aceita
+  `LEFTMOUSE`..`BUTTON7MOUSE` além das teclas, com origem separada do mouse físico (`ConvertButtonEvent` registra o
+  estado físico).
+- Layout **`fps`**: stick esquerdo W/A/S/D, stick direito olhar, botões espaço e clique esquerdo. No painel Web
+  ("Primeira pessoa (WASD + olhar)", pt/es/ru), em `--touch-layout` e no `range_web/touch.py` (WEB-INPUT-001).
+- Cena de teste `make_pad_project.py`: cursor escondido com `reCenter()`, logs `[pad] mouse LEFT down/up` e
+  `[pad] look dx= dy=`. `verify-touch.cjs` ganhou a seção do `fps`: 30/30 no Edge headless. 124 testes puros OK;
+  builds `build-web-release` e nativo (`RangeRuntime`, `RangeEngine`) com código 0.
+- APK debug do First Person 0.1.7 (versionCode 3, `--touch-layout fps`) instalado no Find X3 Pro e aprovado pelo
+  usuário (pausa da música, stick de olhar e botão de tiro).
 
 ## 2026-09-24 - Controle na tela aprovado no First Person (A1 concluído)
 

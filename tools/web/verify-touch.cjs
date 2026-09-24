@@ -220,6 +220,42 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   log7 = (await logText()).slice(mark);
   check('W solta quando o teclado solta', /\[pad\] key W up/.test(log7), '-');
 
+  // 8. Layout fps: stick direito move o mouse (olhar) e o botao de tiro aperta o botao esquerdo do mouse.
+  if (!await open('&touchlayout=fps')) { process.exitCode = 1; return; }
+  let log8 = await logText();
+  check('codigo LEFTMOUSE igual ao do bge.events', /\[pad\] codes .*LEFTMOUSE=116/.test(log8),
+        (log8.match(/\[pad\] codes[^\n]*/) || ['(sem linha codes)'])[0]);
+  const [lx, ly, lr] = await center('#touch .zone.right .base');
+  mark = (await logText()).length;
+  await touch('touchStart', [[lx, ly, 14]]);
+  await touch('touchMove', [[lx + lr * 1.2, ly, 14]]);
+  await sleep(1500);
+  p = await padState();
+  await touch('touchEnd', []);
+  await sleep(1200);
+  log8 = (await logText()).slice(mark);
+  const looks = [...log8.matchAll(/\[pad\] look dx=(-?[\d.]+) dy=(-?[\d.]+)/g)].map(m => [+m[1], +m[2]]);
+  const sum = looks.reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]);
+  // 1,5 janela/s por 1,5 s com o stick todo para a direita: o jogo ve ~2 janelas na horizontal e quase nada na vertical.
+  check('stick de olhar gira o mouse na horizontal', Math.abs(sum[0]) > 1 && Math.abs(sum[1]) < 0.1 * Math.abs(sum[0]),
+        `soma dx=${sum[0].toFixed(3)} dy=${sum[1].toFixed(3)} (${looks.length} linhas)`);
+  check('runtime consome o giro (pad.look zera)', Math.abs(p.look[0]) < 0.2 && p.keys.length === 0 && p.buttons === 0,
+        JSON.stringify(p));
+  mark = (await logText()).length;
+  await sleep(1000);
+  check('stick solto nao gira mais', !/\[pad\] look/.test((await logText()).slice(mark)), '-');
+  const [fx, fy] = await evalJs(`(function(){var r=document.querySelectorAll('#touch .btn')[1].getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];})()`);
+  mark = (await logText()).length;
+  await touch('touchStart', [[fx, fy, 15]]);
+  await sleep(300);
+  p = await padState();
+  await touch('touchEnd', []);
+  await sleep(500);
+  log8 = (await logText()).slice(mark);
+  check('botao de tiro = botao esquerdo do mouse', JSON.stringify(p.keys) === '[116]' &&
+        /\[pad\] mouse LEFT down/.test(log8) && /\[pad\] mouse LEFT up/.test(log8), JSON.stringify(p.keys));
+
   if (errors.length) console.log('--- excecoes JS ---\n' + errors.join('\n'));
   process.exitCode = results.every(Boolean) && !errors.length ? 0 : 1;
   console.log(process.exitCode === 0 ? 'TOUCH: PASS' : 'TOUCH: FAIL');

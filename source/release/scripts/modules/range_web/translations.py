@@ -96,6 +96,8 @@ _PT_BR = {
     "For games that read the keyboard: the stick presses W/A/S/D and the button presses Space": "Para jogos que leem o teclado: o stick aperta W/A/S/D e o botão aperta Espaço",
     "D-pad as arrows + Space/Enter": "D-pad como setas + Espaço/Enter",
     "For games that read the keyboard: the d-pad presses the arrow keys and the buttons press Space and Enter": "Para jogos que leem o teclado: o d-pad aperta as setas e os botões apertam Espaço e Enter",
+    "First person (WASD + look)": "Primeira pessoa (WASD + olhar)",
+    "For first-person games that read the keyboard and mouse: the left stick presses W/A/S/D, the right stick moves the mouse to look around and the buttons press Space and the left mouse button": "Para jogos em primeira pessoa que leem teclado e mouse: o stick esquerdo aperta W/A/S/D, o direito move o mouse para olhar em volta e os botões apertam Espaço e o botão esquerdo do mouse",
     "Stick mode": "Modo do stick",
     "Where the on-screen stick appears": "Onde o stick da tela aparece",
     "Where the finger touches": "Onde o dedo toca",

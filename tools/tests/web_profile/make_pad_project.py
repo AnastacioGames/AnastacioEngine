@@ -6,7 +6,9 @@ Um cubo andando pelo plano com o stick esquerdo de logic.joysticks[0] (vermelho 
 com WASD/setas. O botao A, lido por um sensor Joystick (logic brick), ou o espaco fazem o cubo pular. A cada 30
 quadros o estado vai para o console ("[pad] ..."), e cada tecla apertada/solta sai como "[pad] key W down"; no
 navegador, abrir com ?debug=1. O mapa KeyMapping/Pad.json do Input System tem a acao "Pular" (espaco ou botao A do
-gamepad 0); cada ativacao sai como "[pad] map Pular down". tools/web/verify-pad.cjs confere a cadeia Module.rangePad -> DEV_Joystick ->
+gamepad 0); cada ativacao sai como "[pad] map Pular down". Com o cursor escondido (mouse-look, reCenter a cada
+quadro), o botao esquerdo sai como "[pad] mouse LEFT down/up" e o giro acumulado do mouse como "[pad] look dx=... dy=...".
+tools/web/verify-pad.cjs confere a cadeia Module.rangePad -> DEV_Joystick ->
 Python e sensor sem controle fisico; tools/web/verify-touch.cjs, o overlay (gamepad e teclas).
 """
 
@@ -35,9 +37,22 @@ def main(cont):
     button_a = cont.sensors["BotaoA"]
 
     maps = logic.inputSystem.inputMaps
+    mouse = logic.mouse
     if own["frames"] == 0:
-        print("[pad] codes W=%d SPACE=%d UPARROW=%d" % (events.WKEY, events.SPACEKEY, events.UPARROWKEY))
+        print("[pad] codes W=%d SPACE=%d UPARROW=%d LEFTMOUSE=%d"
+              % (events.WKEY, events.SPACEKEY, events.UPARROWKEY, events.LEFTMOUSE))
         print("[pad] maps %s" % sorted(maps))
+        mouse.visible = False
+    else:
+        dx, dy = mouse.deltaPosition
+        own["look_x"] += dx
+        own["look_y"] += dy
+    mouse.reCenter()
+    left = mouse.inputs[events.LEFTMOUSE]
+    if left.activated:
+        print("[pad] mouse LEFT down")
+    if left.released:
+        print("[pad] mouse LEFT up")
     jump = maps.get("Pad", {}).get("Pular")
     if jump is not None and jump.activated:
         print("[pad] map Pular down")
@@ -68,6 +83,9 @@ def main(cont):
 
     own["frames"] += 1
     if own["frames"] % 30 == 0:
+        if own["look_x"] or own["look_y"]:
+            print("[pad] look dx=%.3f dy=%.3f" % (own["look_x"], own["look_y"]))
+            own["look_x"] = own["look_y"] = 0.0
         if joy:
             print("[pad] connected=True name=%s axes=%s buttons=%s"
                   % (joy.name, [round(v, 2) for v in joy.axisValues], sorted(joy.activeButtons)))
@@ -107,6 +125,8 @@ with open(os.path.join(DEST, "pad_test.py"), "w", encoding="utf-8") as f:
 
 scene.objects.active = cube
 bpy.ops.object.game_property_new(type='INT', name="frames")
+bpy.ops.object.game_property_new(type='FLOAT', name="look_x")
+bpy.ops.object.game_property_new(type='FLOAT', name="look_y")
 bpy.ops.logic.sensor_add(type='ALWAYS', name="Sempre", object=cube.name)
 bpy.ops.logic.sensor_add(type='JOYSTICK', name="BotaoA", object=cube.name)
 bpy.ops.logic.controller_add(type='PYTHON', name="Pad", object=cube.name)

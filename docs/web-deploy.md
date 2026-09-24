@@ -53,6 +53,9 @@ sensor Joystick, Input System), somado a um controle físico. `?touch=1` mostra 
 `?touch=0` esconde; `?touchlayout=` e `?touchstick=dynamic|fixed` trocam o layout só nessa visita.
 Layouts `stick`, `dpad` e `twin` viram o gamepad 0; `wasd` (stick = W/A/S/D, botão = espaço) e `arrows` (d-pad = setas,
 espaço e Enter) apertam teclas, para jogos que leem teclado — somadas às do teclado físico sem uma soltar a outra.
+`fps` é para primeira pessoa com teclado e mouse: stick esquerdo = W/A/S/D, stick direito move o mouse (olhar em volta,
+só com o cursor escondido, como no mouse-look), botões = espaço e botão esquerdo do mouse.
+Com a página escondida (app em segundo plano, outra aba) o áudio é suspenso e volta ao reabrir.
 O layout do pacote é escolhido no editor em Properties > Scene > Web (Range) > **Controle na tela** (o export Android
 usa o mesmo, porque embute este pacote) ou, na linha de comando, por `package-web.py --touch-layout` (`none` desliga)
 e `--touch-stick`; fica registrado em `manifest.json` (`touch_controls`). O Validar Web avisa (WEB-INPUT-001) sensor

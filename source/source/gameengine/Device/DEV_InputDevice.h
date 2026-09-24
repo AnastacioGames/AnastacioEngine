@@ -39,7 +39,7 @@ protected:
 	std::map<int, SCA_EnumInputs> m_reverseButtonTranslateTable;
 	std::map<int, SCA_EnumInputs> m_reverseWindowTranslateTable;
 
-	/** Teclas seguradas pelo teclado fisico e pelo controle na tela (Web), em separado: soltar o toque nao solta
+	/** Teclas e botoes do mouse segurados pelo teclado/mouse fisico e pelo controle na tela (Web), em separado: soltar o toque nao solta
 	 * a tecla que o teclado ainda segura, e vice-versa. O evento so muda quando o estado combinado muda. */
 	bool m_physicalKeys[MAX_KEYS];
 	bool m_virtualKeys[MAX_KEYS];
@@ -54,7 +54,7 @@ public:
 	void ConvertMoveEvent(int x, int y);
 	void ConvertWheelEvent(int z);
 	void ConvertEvent(SCA_IInputDevice::SCA_EnumInputs type, int val, unsigned int unicode);
-	/// Le as teclas seguradas pelo controle na tela (Module.rangePad.keys); so age no build Web.
+	/// Le as teclas e botoes do mouse segurados pelo controle na tela (Module.rangePad.keys); so age no build Web.
 	void PollVirtualKeys();
 };
 

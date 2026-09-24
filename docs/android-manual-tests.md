@@ -92,6 +92,12 @@ Aprovado:
   teclas) e o botão Espaço; o jogo, que só lê teclado, anda e pula sem mudança. O log de toque só sai com
   depuração ligada, então a aprovação é visual. O app segue instalado, junto com o "Pad teste".
 
+- 2026-09-24: relato do usuário no 0.1.6: ao ir para segundo plano o jogo pausa e volta de onde estava (mesmo
+  depois de muito tempo), mas a música continuava tocando. Corrigido na página (áudio suspenso com a página
+  escondida). Pedido no mesmo relato: segundo direcional à direita para olhar e botão de tiro. APK 0.1.7
+  (versionCode 3) com `--touch-layout fps` instalado no Find X3 Pro e aprovado pelo usuário: música para em
+  segundo plano e volta ao reabrir, stick direito gira a câmera e o botão de tiro atira o disco.
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.

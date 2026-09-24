@@ -33,8 +33,8 @@
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>
 
-/* Codigos SCA_EnumInputs (os de bge.events) das teclas seguradas pelo controle na tela, escritos pela pagina em
- * Module.rangePad.keys (tools/web/package-web.py). Retorna quantos couberam em keys. */
+/* Codigos SCA_EnumInputs (os de bge.events) das teclas e botoes do mouse segurados pelo controle na tela, escritos
+ * pela pagina em Module.rangePad.keys (tools/web/package-web.py). Retorna quantos couberam em keys. */
 EM_JS(int, dev_virtualkeys_web_read, (int *keys, int max), {
 	var p = (typeof Module !== 'undefined') ? Module.rangePad : null;
 	if (!p || !p.active || !p.keys) return 0;
@@ -204,18 +204,24 @@ void DEV_InputDevice::ConvertKeyEvent(int incode, int val, unsigned int unicode)
 void DEV_InputDevice::PollVirtualKeys()
 {
 #ifdef __EMSCRIPTEN__
+	// Faixas aceitas: teclas e botoes do mouse (o toque nao gera movimento nem roda do mouse por aqui).
+	const int ranges[2][2] = {{BEGINKEY, BEGINMOUSE}, {BEGINMOUSEBUTTONS, ENDMOUSEBUTTONS}};
 	int keys[32];
 	const int count = dev_virtualkeys_web_read(keys, 32);
 	bool held[MAX_KEYS] = {false};
 	for (int i = 0; i < count; ++i) {
-		if (keys[i] > BEGINKEY && keys[i] < BEGINMOUSE) {
-			held[keys[i]] = true;
+		for (const int *r : ranges) {
+			if (keys[i] > r[0] && keys[i] < r[1]) {
+				held[keys[i]] = true;
+			}
 		}
 	}
-	for (int k = BEGINKEY + 1; k < BEGINMOUSE; ++k) {
-		if (held[k] != m_virtualKeys[k]) {
-			m_virtualKeys[k] = held[k];
-			ConvertEvent((SCA_EnumInputs)k, (held[k] || m_physicalKeys[k]) ? 1 : 0, 0);
+	for (const int *r : ranges) {
+		for (int k = r[0] + 1; k < r[1]; ++k) {
+			if (held[k] != m_virtualKeys[k]) {
+				m_virtualKeys[k] = held[k];
+				ConvertEvent((SCA_EnumInputs)k, (held[k] || m_physicalKeys[k]) ? 1 : 0, 0);
+			}
 		}
 	}
 #endif
@@ -223,7 +229,9 @@ void DEV_InputDevice::PollVirtualKeys()
 
 void DEV_InputDevice::ConvertButtonEvent(int incode, int val)
 {
-	ConvertEvent(m_reverseButtonTranslateTable[incode], val, 0);
+	const SCA_EnumInputs type = m_reverseButtonTranslateTable[incode];
+	m_physicalKeys[type] = (val > 0);
+	ConvertEvent(type, m_virtualKeys[type] ? 1 : val, 0);
 }
 
 void DEV_InputDevice::ConvertWindowEvent(int incode)

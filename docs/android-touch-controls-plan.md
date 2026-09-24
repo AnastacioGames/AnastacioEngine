@@ -86,13 +86,16 @@ Por que o overlay fica em HTML, e não desenhado pela engine nem nativo em Kotli
 
 Cada controle tem um **alvo**, como o "control path" do Unity:
 - **`pad:`**, por exemplo `pad:leftStick` ou `pad:a`. Analógico de verdade, pelo mesmo caminho do gamepad físico. Jogos que leem gamepad ou Input System funcionam sem mudar nada.
-- **`key:`**, por exemplo `key:W` ou `key:SPACE`. É a compatibilidade com jogos que leem teclado, como o First Person com WASD. No modo tecla, o stick vira 4 teclas digitais por limiar. A origem fica separada: soltar o toque não solta a tecla que o teclado físico ainda segura. Esse é o risco apontado no plano, linha 67.
+- **`key:`**, por exemplo `key:W` ou `key:SPACE`. É a compatibilidade com jogos que leem teclado, como o First Person com WASD. No modo tecla, o stick vira 4 teclas digitais por limiar. A origem fica separada: soltar o toque não solta a tecla que o teclado físico ainda segura. Esse é o risco apontado no plano, linha 67. Botões do mouse (`LEFTMOUSE`, `MIDDLEMOUSE`, `RIGHTMOUSE`) também valem como tecla, para jogos que atiram no clique.
+- **`look`** (T5, 2026-09-24): o stick move o mouse. A página acumula o giro em `Module.rangePad.look` (frações da janela; curva quadrática, 1,5 janela/s no máximo) e o `GHOST_SystemSDL.cpp` o consome a cada quadro, movendo o cursor virtual como um arrastar de dedo. Só age com o cursor escondido (mouse-look); jogos com `deltaPosition` + `reCenter()` giram sem mudança.
 
 Os layouts prontos são o "brinde":
 - nenhum;
 - stick + 2 botões;
 - d-pad + 4 botões;
-- dois sticks.
+- dois sticks;
+- `wasd` e `arrows` (alvo tecla);
+- `fps`: stick esquerdo W/A/S/D, stick direito olhar (mouse), botões espaço e clique esquerdo.
 
 Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor. Posição, tamanho, deadzone e o modo do stick (fixo ou dinâmico) são ajustáveis.
 
@@ -155,6 +158,13 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    4. Trocar Controle na tela para "Stick como WASD + Espaço", gerar de novo e conferir `[pad] key W down/up` e
       `[pad] map Pular down` pelo botão.
    5. Jogo real: First Person com o layout WASD (andar + olhar arrastando fora dos controles ao mesmo tempo).
+
+6. **T5, primeira pessoa (2026-09-24, pedido do usuário depois do teste do First Person):** layout `fps` com dois
+   sticks e dois botões. Alvo `look` (acima) e botões do mouse no alvo tecla (`DEV_InputDevice.cpp` junta os do toque
+   aos do mouse físico, com origem separada, como as teclas). Verificado no navegador: `verify-touch.cjs` 30/30 (giro
+   horizontal chega ao jogo e para ao soltar; botão de tiro = `LEFTMOUSE` down/up). No mesmo dia, pausa do áudio
+   com a página escondida (`verify-capabilities.cjs audio`: suspenso ao esconder, retomado ao voltar), porque no APK
+   o jogo parava em segundo plano e a música continuava. Aprovado no Find X3 Pro (First Person 0.1.7).
 
 Teclado: não desenhar teclado QWERTY na tela. Texto (nome, chat) usa o teclado do sistema Android, que vem de graça,
 quando a engine pedir "abrir teclado"; entra só se algum jogo precisar.

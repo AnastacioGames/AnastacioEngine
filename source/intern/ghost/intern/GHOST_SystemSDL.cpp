@@ -31,6 +31,7 @@
 #include "GHOST_EventWheel.h"
 
 #ifdef __EMSCRIPTEN__
+#include <emscripten.h>
 #include <emscripten/html5.h>
 
 /* Web: the browser cannot warp the cursor (SDL's Emscripten_WarpMouse is unsupported), so
@@ -58,6 +59,25 @@ static void web_clamp_cursor(SDL_Window *sdl_win)
 	web_cursor_x = (web_cursor_x < 0) ? 0 : (web_cursor_x > w - 1) ? w - 1 : web_cursor_x;
 	web_cursor_y = (web_cursor_y < 0) ? 0 : (web_cursor_y > h - 1) ? h - 1 : web_cursor_y;
 }
+
+/* On-screen look stick (tools/web/package-web.py): the page accumulates in Module.rangePad.look how far the view
+ * should turn, in fractions of the window size, and the runtime takes it here each frame. It moves the virtual
+ * cursor like a finger drag, so a mouse-look game (deltaPosition + reCenter) turns without any change. */
+EM_JS(int, ghost_web_take_look, (float *out), {
+	var p = (typeof Module !== 'undefined') ? Module.rangePad : null;
+	if (!p || !p.active || !p.look) return 0;
+	var x = +p.look[0] || 0, y = +p.look[1] || 0;
+	p.look[0] = 0;
+	p.look[1] = 0;
+	if (!x && !y) return 0;
+	HEAPF32[out >> 2] = x;
+	HEAPF32[(out >> 2) + 1] = y;
+	return 1;
+});
+
+/* Sub-pixel remainder of the look stick, so a slow turn is not lost to rounding. */
+static float web_look_rest_x = 0.0f;
+static float web_look_rest_y = 0.0f;
 #endif
 
 GHOST_SystemSDL::GHOST_SystemSDL()
@@ -709,6 +729,12 @@ GHOST_SystemSDL::processEvents(bool waitForEvent)
 			anyProcessed = true;
 		}
 
+#ifdef __EMSCRIPTEN__
+		if (processWebLook()) {
+			anyProcessed = true;
+		}
+#endif
+
 		if (generateWindowExposeEvents()) {
 			anyProcessed = true;
 		}
@@ -717,6 +743,51 @@ GHOST_SystemSDL::processEvents(bool waitForEvent)
 	return anyProcessed;
 }
 
+
+#ifdef __EMSCRIPTEN__
+bool
+GHOST_SystemSDL::processWebLook()
+{
+	float look[2];
+	if (!ghost_web_take_look(look)) {
+		return false;
+	}
+	GHOST_WindowSDL *window = static_cast<GHOST_WindowSDL *>(m_windowManager->getActiveWindow());
+	if (!window && !m_windowManager->getWindows().empty()) {
+		window = static_cast<GHOST_WindowSDL *>(m_windowManager->getWindows().front());
+	}
+	/* Only in mouse-look (hidden cursor); with a visible cursor (menus) the stick does nothing. */
+	if (!window || window->getCursorVisibility()) {
+		web_look_rest_x = web_look_rest_y = 0.0f;
+		return false;
+	}
+	SDL_Window *sdl_win = window->getSDLWindow();
+	int w, h, x_win, y_win;
+	SDL_GetWindowSize(sdl_win, &w, &h);
+	SDL_GetWindowPosition(sdl_win, &x_win, &y_win);
+	web_look_rest_x += look[0] * w;
+	web_look_rest_y += look[1] * h;
+	const int dx = (int)web_look_rest_x, dy = (int)web_look_rest_y;
+	web_look_rest_x -= dx;
+	web_look_rest_y -= dy;
+	if (!web_virtual_cursor) {
+		web_cursor_x = w / 2;
+		web_cursor_y = h / 2;
+		web_virtual_cursor = true;
+	}
+	web_cursor_x += dx;
+	web_cursor_y += dy;
+	web_clamp_cursor(sdl_win);
+	if (web_cursor_x == web_reported_x && web_cursor_y == web_reported_y) {
+		return false;
+	}
+	web_reported_x = web_cursor_x;
+	web_reported_y = web_cursor_y;
+	pushEvent(new GHOST_EventCursor(getMilliSeconds(), GHOST_kEventCursorMove, window,
+	                                web_cursor_x + x_win, web_cursor_y + y_win));
+	return true;
+}
+#endif
 
 GHOST_WindowSDL *
 GHOST_SystemSDL::findGhostWindow(SDL_Window *sdl_win)

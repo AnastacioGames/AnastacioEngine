@@ -104,6 +104,18 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
       expect('AudioContext em execucao', a.state === 'running');
       expect('mixer avancou (frames)', a.frames > 0);
       expect('saida com amplitude (tom audivel)', a.peak > 0.05);
+      // App em segundo plano / outra aba: a pagina suspende o audio ao esconder e retoma ao voltar.
+      const visibility = hidden => evalJs(`Object.defineProperty(document, 'hidden', { configurable: true,
+        get: () => ${hidden} }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden;`);
+      await visibility(true);
+      await sleep(1000);
+      const away = await evalJs(`__aud.last.state`);
+      await visibility(false);
+      await sleep(1000);
+      const back = await evalJs(`__aud.last.state`);
+      console.log('audio escondido/visivel:', away, back);
+      expect('pagina escondida suspende o audio', away === 'suspended');
+      expect('pagina visivel retoma o audio', back === 'running');
       logs.filter(l => /\[aud\]|audio|Audaspace|aud:/i.test(l)).slice(0, 15).forEach(l => console.log('  ' + l.slice(0, 200)));
     } else if (mode === 'render') {
       await sleep(8000);

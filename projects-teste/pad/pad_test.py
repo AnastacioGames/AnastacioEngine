@@ -14,9 +14,22 @@ def main(cont):
     button_a = cont.sensors["BotaoA"]
 
     maps = logic.inputSystem.inputMaps
+    mouse = logic.mouse
     if own["frames"] == 0:
-        print("[pad] codes W=%d SPACE=%d UPARROW=%d" % (events.WKEY, events.SPACEKEY, events.UPARROWKEY))
+        print("[pad] codes W=%d SPACE=%d UPARROW=%d LEFTMOUSE=%d"
+              % (events.WKEY, events.SPACEKEY, events.UPARROWKEY, events.LEFTMOUSE))
         print("[pad] maps %s" % sorted(maps))
+        mouse.visible = False
+    else:
+        dx, dy = mouse.deltaPosition
+        own["look_x"] += dx
+        own["look_y"] += dy
+    mouse.reCenter()
+    left = mouse.inputs[events.LEFTMOUSE]
+    if left.activated:
+        print("[pad] mouse LEFT down")
+    if left.released:
+        print("[pad] mouse LEFT up")
     jump = maps.get("Pad", {}).get("Pular")
     if jump is not None and jump.activated:
         print("[pad] map Pular down")
@@ -47,6 +60,9 @@ def main(cont):
 
     own["frames"] += 1
     if own["frames"] % 30 == 0:
+        if own["look_x"] or own["look_y"]:
+            print("[pad] look dx=%.3f dy=%.3f" % (own["look_x"], own["look_y"]))
+            own["look_x"] = own["look_y"] = 0.0
         if joy:
             print("[pad] connected=True name=%s axes=%s buttons=%s"
                   % (joy.name, [round(v, 2) for v in joy.axisValues], sorted(joy.activeButtons)))

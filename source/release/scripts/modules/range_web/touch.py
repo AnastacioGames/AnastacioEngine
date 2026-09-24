@@ -7,7 +7,7 @@
 from .i18n import Msg
 from .results import EVIDENCE_POTENTIAL, SEVERITY_INFO, SEVERITY_WARNING, Finding
 
-LAYOUTS = ("none", "stick", "dpad", "twin", "wasd", "arrows")
+LAYOUTS = ("none", "stick", "dpad", "twin", "wasd", "arrows", "fps")
 STICK_MODES = ("dynamic", "fixed")
 DEFAULT_LAYOUT = "stick"
 DEFAULT_STICK = "dynamic"
@@ -41,6 +41,8 @@ _REACH = {
     "twin": ((), (JOY_LEFTX, JOY_LEFTY, JOY_RIGHTX, JOY_RIGHTY)),
     "wasd": ((KEY_W, KEY_S, KEY_A, KEY_D, KEY_SPACE), ()),
     "arrows": ((KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_RET), ()),
+    # O stick direito move o mouse (MOUSE_X/Y) e um botao aperta o esquerdo, que o toque ja alcanca sempre.
+    "fps": ((KEY_W, KEY_S, KEY_A, KEY_D, KEY_SPACE, MOUSE_LEFT), ()),
 }
 
 RULE_ID = "WEB-INPUT-001"
