@@ -34,7 +34,7 @@ Aprovado:
   "Erro: If you see this error we have a bug. Please report this bug to chromium.": o WebView não tem pointer
   lock e rejeita o pedido do runtime com `UnknownError` (confirmado por CDP chamando `requestPointerLock()`).
   Corrigido no `index.html` (pedido vira no-op no APK). Depois disso: jogo roda, `AudioContext` `running`, sem
-  erro; usuário confirmou "está funcionando".
+  erro; usuário confirmou "está funcionando" e controle por toque "bom".
 - Frame time com o jogo parado, 1200 frames medidos por CDP (canvas 640x480, DPR 3,5):
   APK 1ª medida p50 16,7 ms / p95 33,4 ms / 50,3 fps médio (19% dos frames acima de 20 ms);
   APK 2ª medida p50 16,7 / p95 16,7 / 59,9 fps. Chrome 154 do mesmo aparelho, mesmo pacote servido do PC por
@@ -46,7 +46,7 @@ Aprovado:
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
-- Música audível e controles por toque no First Person (confirmar com o usuário); save/IDBFS com um jogo que salve.
+- Música audível no First Person (confirmar com o usuário); save/IDBFS com um jogo que salve.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
