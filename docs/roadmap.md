@@ -164,6 +164,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
   no Windows, duplo clique).
+  Registro/remoção (`-r`/`-u`) e comandos do Registro validados em 2026-09-24; falta somente validar o duplo clique no Explorer.
 - **Export presets (RangeArmor)**: falta o teste manual (projeto novo e antigo) do [plano](export-presets-plan.md).
   `company_name`, `icon_path` e toggles desktop já são gravados por `wm.py`, com extensão do schema
   registrada no plano; a pendência é de validação manual, não de implementação desses campos.

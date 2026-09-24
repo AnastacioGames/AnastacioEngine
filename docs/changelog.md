@@ -24,6 +24,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - Associações `.blend` e `.range` no Windows
+
+- `RangeEngine.exe -R`/`-r` registra `.blend` para o editor e `.range` para o `RangeRuntime`; `-U`/`-u` remove somente os valores e ProgIDs da Range Engine. O registro tenta `HKLM` e recua para `HKCU` sem elevação.
+- Validado sem abrir janela: `RangeEngine -r` e `-u` criaram/removeram no `HKCU` os ProgIDs, comandos e ícones esperados, e as associações anteriores foram restauradas. Falta o teste visual de duplo clique no Explorer.
+
 ## 2026-09-24 - Export Android: AAB para a Google Play
 
 - `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda

@@ -51,6 +51,7 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Checklist de bugs silenciosos](checklist-varredura-bugs-silenciosos.md): roteiro reutilizável de auditoria.
 - [Atlas de ícones](icon-atlas-notes.md): formato e carregamento do atlas externo.
 - [Distribuição 0.1](distribution-0.1.md): estrutura do pacote portátil.
+- [Associações de arquivos no Windows](windows-file-associations.md): registro e remoção de `.blend` e `.range`.
 - [Licença](licenca.md): resumo e localização do texto legal.
 
 ## Histórico
