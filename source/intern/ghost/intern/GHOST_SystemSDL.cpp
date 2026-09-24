@@ -46,6 +46,11 @@ static int web_cursor_y = 0;
 static int web_reported_x = -1;
 static int web_reported_y = -1;
 
+/* Window size the virtual cursor refers to. When the canvas is resized (phone rotated), the cursor keeps
+ * its relative position: left at the old center, mouse-look saw a jump and the camera turned. */
+static int web_win_w = 0;
+static int web_win_h = 0;
+
 static void web_clamp_cursor(SDL_Window *sdl_win)
 {
 	int w, h;
@@ -118,6 +123,9 @@ GHOST_SystemSDL::createWindow(const STR_String& title,
 		}
 
 		if (window->getValid()) {
+#ifdef __EMSCRIPTEN__
+			SDL_GetWindowSize(window->getSDLWindow(), &web_win_w, &web_win_h);
+#endif
 			m_windowManager->addWindow(window);
 			pushEvent(new GHOST_Event(getMilliSeconds(), GHOST_kEventWindowSize, window));
 		}
@@ -331,6 +339,26 @@ GHOST_SystemSDL::processEvent(SDL_Event *sdl_event)
 					break;
 				case SDL_WINDOWEVENT_RESIZED:
 					g_event = new GHOST_Event(getMilliSeconds(), GHOST_kEventWindowSize, window);
+#ifdef __EMSCRIPTEN__
+					if (window && web_virtual_cursor && web_win_w > 0 && web_win_h > 0 &&
+					    sdl_sub_evt.data1 > 0 && sdl_sub_evt.data2 > 0)
+					{
+						SDL_Window *sdl_win = window->getSDLWindow();
+						web_cursor_x = web_cursor_x * sdl_sub_evt.data1 / web_win_w;
+						web_cursor_y = web_cursor_y * sdl_sub_evt.data2 / web_win_h;
+						web_clamp_cursor(sdl_win);
+						if (web_cursor_x != web_reported_x || web_cursor_y != web_reported_y) {
+							int x_win, y_win;
+							SDL_GetWindowPosition(sdl_win, &x_win, &y_win);
+							web_reported_x = web_cursor_x;
+							web_reported_y = web_cursor_y;
+							pushEvent(new GHOST_EventCursor(getMilliSeconds(), GHOST_kEventCursorMove, window,
+							                                web_cursor_x + x_win, web_cursor_y + y_win));
+						}
+					}
+					web_win_w = sdl_sub_evt.data1;
+					web_win_h = sdl_sub_evt.data2;
+#endif
 					break;
 				case SDL_WINDOWEVENT_MOVED:
 					g_event = new GHOST_Event(getMilliSeconds(), GHOST_kEventWindowMove, window);

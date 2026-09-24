@@ -30,7 +30,8 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 
 ## Comportamento
 
-- Paisagem (`sensorLandscape`), tela cheia imersiva, tela sempre acesa com o app em primeiro plano.
+- Gira em paisagem e retrato (`fullUser`, respeita o bloqueio de rotação do sistema); o canvas se ajusta à tela
+  mantendo a proporção do jogo. Tela cheia imersiva, tela sempre acesa com o app em primeiro plano.
 - Sem permissão `INTERNET`: arquivo ausente no pacote responde 404; links externos abrem no navegador.
 - O user agent do WebView ganha `RangeWebView/1`; o `index.html` do pacote usa isso para esconder o botão "Tela cheia".
 - Girar ou redimensionar não recria a Activity (`configChanges`), para não recarregar o jogo.

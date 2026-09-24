@@ -8,7 +8,9 @@
         android:label="@string/app_name"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
 
-        <!-- configChanges: girar ou redimensionar nao recria a Activity (recriar recarregaria o jogo).
+        <!-- fullUser: gira pelo sensor em paisagem e retrato (as quatro direcoes), respeitando o bloqueio de
+             rotacao do sistema, como o Chrome.
+             configChanges: girar ou redimensionar nao recria a Activity (recriar recarregaria o jogo).
              singleTask: tocar no icone com o jogo aberto (ex.: aberto por "adb shell am start") traz a mesma
              instancia, em vez de rodar uma segunda copia do jogo por cima. -->
         <activity
@@ -16,7 +18,7 @@
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
             android:exported="true"
-            android:screenOrientation="sensorLandscape">
+            android:screenOrientation="fullUser">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -23,6 +23,18 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - APK e Web: rotação em paisagem e retrato
+
+- APK: `screenOrientation` passa de `sensorLandscape` para `fullUser` (as quatro direções, respeitando o bloqueio
+  de rotação do sistema). No APK o `index.html` sempre ajusta o canvas à tela.
+- `package-web.py`: `fitCanvas` usa uma proporção fixa do jogo, adotada quando o runtime cria a janela com a
+  resolução do `.range` (MutationObserver em `width/height`). Antes media por `canvas.width/height`, que o SDL
+  troca pelo tamanho CSS a cada resize: a imagem abria achatada em pé (960x540 x 640x480) e se deformava a cada giro.
+  Vale também para a tela cheia no navegador.
+- `GHOST_SystemSDL.cpp` (Web): no resize da janela o cursor virtual do mouse-look é reescalado para a nova
+  janela. Ficava no centro antigo e a câmera do First Person virava um pouco a cada giro.
+- Aprovado pelo usuário no Find X3 Pro com o First Person ("ficou muito bom").
+
 ## 2026-09-24 - APK: botão "Tela cheia" escondido dentro do app
 
 - `MainActivity` acrescenta `RangeWebView/1` ao user agent do WebView. O `index.html` de `package-web.py` procura

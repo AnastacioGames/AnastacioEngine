@@ -185,12 +185,25 @@ __PERF_SCRIPT__
   if (inAndroidApp && window.Element && Element.prototype.requestPointerLock)
     Element.prototype.requestPointerLock = function () { return Promise.resolve(); };
   function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  // Proporcao do jogo. O runtime cria a janela com a resolucao do .range (pode diferir de __WIDTH__x__HEIGHT__), e
+  // depois o SDL (janela redimensionavel) troca canvas.width/height pelo tamanho CSS a cada resize. Medir a proporcao
+  // por eles a cada vez deformava a imagem ao girar (achatada ou cortada). Aqui so vale uma troca de tamanho com
+  // proporcao diferente da do CSS atual, ou seja, pedida pelo jogo e nao pelo SDL acompanhando o CSS.
+  var canvasAspect = el("canvas").width / el("canvas").height;
+  if (window.MutationObserver) new MutationObserver(function () {
+    var c = el("canvas"), a = c.width / c.height, r = c.getBoundingClientRect();
+    if (!(a > 0) || Math.abs(a / canvasAspect - 1) < 0.01) return;
+    if (c.style.width && r.height > 0 && Math.abs(a / (r.width / r.height) - 1) < 0.01) return;
+    canvasAspect = a;
+    fitCanvas();
+  }).observe(el("canvas"), { attributes: true, attributeFilter: ["width", "height"] });
   function fitCanvas() {
     var c = el("canvas");
-    if (!isFullscreen()) { c.style.width = c.style.height = ""; return; }
-    var k = Math.min(window.innerWidth / c.width, window.innerHeight / c.height);
-    c.style.width = Math.floor(c.width * k) + "px";
-    c.style.height = Math.floor(c.height * k) + "px";
+    // No APK a pagina ja ocupa a tela toda: o canvas sempre se ajusta a ela, em paisagem ou retrato.
+    if (!isFullscreen() && !inAndroidApp) { c.style.width = c.style.height = ""; return; }
+    var w = Math.min(window.innerWidth, window.innerHeight * canvasAspect);
+    c.style.width = Math.floor(w) + "px";
+    c.style.height = Math.floor(w / canvasAspect) + "px";
   }
   function toggleFullscreen() {
     if (isFullscreen()) {
@@ -271,6 +284,7 @@ __PERF_SCRIPT__
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
   window.addEventListener("resize", fitCanvas);
+  if (inAndroidApp) fitCanvas();
 
   // Alguns avisos da emulacao GL saem direto por console.error (antes do printErr).
   var _consoleError = console.error.bind(console);

@@ -51,6 +51,13 @@ Aprovado:
   sessão 1 `[web-save] SAVED`; `am force-stop` (processo encerrado) e sessão 2 `[web-save] LOADED`. O IndexedDB
   do WebView persiste entre execuções do app. Depois o APK voltou a ter o First Person.
 
+- 2026-09-24: rotação liberada em paisagem e retrato (`fullUser`, respeita o bloqueio de rotação do sistema),
+  revertendo a decisão "só paisagem". Três problemas corrigidos, aprovados pelo usuário ("ficou muito bom"):
+  imagem achatada ao abrir em pé (a página usava a proporção padrão 960x540 e o First Person roda em 640x480);
+  proporção que se deformava a cada giro (o SDL troca `canvas.width/height` pelo tamanho CSS e o `index.html`
+  media a proporção por eles); câmera que virava um pouco a cada giro (o cursor virtual do mouse-look ficava no
+  centro antigo; agora é reescalado no resize em `GHOST_SystemSDL.cpp`).
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
