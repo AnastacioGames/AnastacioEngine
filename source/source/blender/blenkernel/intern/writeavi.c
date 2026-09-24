@@ -24,6 +24,7 @@
  */
 
 
+#include <stdio.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -195,10 +196,15 @@ static int start_avi(void *context_v, Scene *UNUSED(scene), RenderData *rd, int 
 		return 0;
 	}
 
-	AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_WIDTH, &x);
-	AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_HEIGHT, &y);
-	AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_QUALITY, &quality);
-	AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_FRAMERATE, &framerate);
+	if (AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_WIDTH, &x) != AVI_ERROR_NONE ||
+	    AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_HEIGHT, &y) != AVI_ERROR_NONE ||
+	    AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_QUALITY, &quality) != AVI_ERROR_NONE ||
+	    AVI_set_compress_option(avi, AVI_OPTION_TYPE_MAIN, 0, AVI_OPTION_FRAMERATE, &framerate) != AVI_ERROR_NONE)
+	{
+		BKE_report(reports, RPT_ERROR, "Cannot configure AVI movie file");
+		AVI_close_compress(avi);
+		return 0;
+	}
 
 	avi->interlace = 0;
 	avi->odd_fields = 0;
@@ -210,7 +216,7 @@ static int start_avi(void *context_v, Scene *UNUSED(scene), RenderData *rd, int 
 }
 
 static int append_avi(void *context_v, RenderData *UNUSED(rd), int start_frame, int frame, int *pixels,
-                      int rectx, int recty, const char *UNUSED(suffix), ReportList *UNUSED(reports))
+                      int rectx, int recty, const char *UNUSED(suffix), ReportList *reports)
 {
 	unsigned int *rt1, *rt2, *rectot;
 	int x, y;
@@ -240,7 +246,10 @@ static int append_avi(void *context_v, RenderData *UNUSED(rd), int start_frame, 
 		}
 	}
 
-	AVI_write_frame(avi, (frame - start_frame), AVI_FORMAT_RGB32, rectot, rectx * recty * 4);
+	if (AVI_write_frame(avi, (frame - start_frame), AVI_FORMAT_RGB32, rectot, rectx * recty * 4) != AVI_ERROR_NONE) {
+		BKE_report(reports, RPT_ERROR, "Cannot write AVI movie frame");
+		return 0;
+	}
 //	printf("added frame %3d (frame %3d in avi): ", frame, frame-start_frame);
 
 	return 1;
@@ -252,7 +261,9 @@ static void end_avi(void *context_v)
 
 	if (avi == NULL) return;
 
-	AVI_close_compress(avi);
+	if (AVI_close_compress(avi) != AVI_ERROR_NONE) {
+		fprintf(stderr, "Cannot finalize AVI movie file\n");
+	}
 }
 
 static void *context_create_avi(void)

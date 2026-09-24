@@ -38,6 +38,7 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 {
 	int i;
 	int useconds;
+	bool write_ok = true;
 
 	(void)stream; /* unused */
 
@@ -57,8 +58,8 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 							movie->streams[i].sh.SuggestedBufferSize = movie->header->SuggestedBufferSize;
 							movie->streams[i].sh.right = *((int *) opt_data);
 							((AviBitmapInfoHeader *) movie->streams[i].sf)->SizeImage = movie->header->SuggestedBufferSize;
-							fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET);
-							awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
+							write_ok &= (fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET) == 0);
+							write_ok &= awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
 						}
 					}
 
@@ -74,8 +75,8 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 							movie->streams[i].sh.SuggestedBufferSize = movie->header->SuggestedBufferSize;
 							movie->streams[i].sh.bottom = *((int *) opt_data);
 							((AviBitmapInfoHeader *) movie->streams[i].sf)->SizeImage = movie->header->SuggestedBufferSize;
-							fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET);
-							awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
+							write_ok &= (fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET) == 0);
+							write_ok &= awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
 						}
 					}
 
@@ -85,8 +86,8 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 					for (i = 0; i < movie->header->Streams; i++) {
 						if (avi_get_format_type(movie->streams[i].format) == FCC("vids")) {
 							movie->streams[i].sh.Quality = (*((int *) opt_data)) * 100;
-							fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET);
-							awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
+							write_ok &= (fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET) == 0);
+							write_ok &= awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
 						}
 					}
 					break;
@@ -99,15 +100,15 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 					for (i = 0; i < movie->header->Streams; i++) {
 						if (avi_get_format_type(movie->streams[i].format) == FCC("vids")) {
 							movie->streams[i].sh.Scale = movie->header->MicroSecPerFrame;
-							fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET);
-							awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
+							write_ok &= (fseek(movie->fp, movie->offset_table[1 + i * 2 + 1], SEEK_SET) == 0);
+							write_ok &= awrite(movie, movie->streams[i].sf, 1, movie->streams[i].sf_size, movie->fp, AVI_BITMAPH);
 						}
 					}
 					break;
 			}
 
-			fseek(movie->fp, movie->offset_table[0], SEEK_SET);
-			awrite(movie, movie->header, 1, sizeof(AviMainHeader), movie->fp, AVI_MAINH);
+			write_ok &= (fseek(movie->fp, movie->offset_table[0], SEEK_SET) == 0);
+			write_ok &= awrite(movie, movie->header, 1, sizeof(AviMainHeader), movie->fp, AVI_MAINH);
 
 			break;
 		case AVI_OPTION_TYPE_STRH:
@@ -118,5 +119,5 @@ AviError AVI_set_compress_option(AviMovie *movie, int option_type, int stream, A
 			return AVI_ERROR_OPTION;
 	}
 
-	return AVI_ERROR_NONE;
+	return write_ok ? AVI_ERROR_NONE : AVI_ERROR_WRITING;
 }
