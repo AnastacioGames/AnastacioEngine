@@ -42,6 +42,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Medida por CDP, jogo parado, 1200 frames: APK 50,3 e 59,9 fps médios em duas rodadas (p50 16,7 ms); Chrome do
   aparelho com o mesmo pacote 37,5 fps (p50 33,3 ms, uma rodada). Números preliminares
   ([android-manual-tests.md](android-manual-tests.md)).
+- Música ausente no APK não era do WebView: o `First_Person.range` local é uma versão antiga sem o script da
+  música. Com o `.range` publicado em `gh-pages` a saída de áudio mede pico 0,65 (antes 0).
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
 
