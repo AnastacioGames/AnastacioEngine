@@ -122,6 +122,56 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   await touch('touchEnd', []);
   check('toque fora dos controles nao aciona o pad', p.buttons === 0 && p.axes.every(v => v === 0), JSON.stringify(p));
 
+  // 5b. Checklist do celular (plano A1): dois botoes juntos, arrastar para fora, toque cancelado e pagina escondida.
+  const [bbx, bby] = await evalJs(`(function(){var r=document.querySelectorAll('#touch .btn')[1].getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];})()`);
+  mark = (await logText()).length;
+  await touch('touchStart', [[ax, ay, 5]]);
+  await touch('touchStart', [[ax, ay, 5], [bbx, bby, 6]]);
+  await sleep(300);
+  p = await padState();
+  check('dois botoes juntos (A e B)', p.buttons === 3, `buttons=${p.buttons}`);
+  await sleep(1200);
+  line = await lastPad(mark);
+  check('engine ve A e B juntos', /buttons=\[0, 1\]/.test(line), line || '-');
+  await touch('touchEnd', []);
+  await sleep(200);
+  // Dedo do stick arrastado ate em cima do botao A: continua sendo o stick (pointer capture) e nao aperta A.
+  await touch('touchStart', [[bx, by, 7]]);
+  await touch('touchMove', [[bx + br, by, 7]]);
+  await touch('touchMove', [[ax, ay, 7]]);
+  await sleep(200);
+  p = await padState();
+  check('arrastar para fora do stick: segue no stick e nao aperta A',
+        p.buttons === 0 && Math.hypot(p.axes[0], p.axes[1]) > 0.99, JSON.stringify(p));
+  await touch('touchEnd', []);
+  await sleep(200);
+  p = await padState();
+  check('soltar fora do controle zera o stick', p.axes.every(v => v === 0), JSON.stringify(p));
+  // Toque cancelado pelo sistema (gesto do Android, notificacao por cima).
+  await touch('touchStart', [[bx, by, 8]]);
+  await touch('touchMove', [[bx, by - br, 8]]);
+  await touch('touchStart', [[bx, by - br, 8], [ax, ay, 9]]);
+  await sleep(200);
+  const held = await padState();
+  await touch('touchCancel', []);
+  await sleep(200);
+  p = await padState();
+  check('touchcancel solta stick e botao', held.buttons === 1 && held.axes[1] < -0.9 &&
+        p.buttons === 0 && p.axes.every(v => v === 0), `${JSON.stringify(held)} -> ${JSON.stringify(p)}`);
+  // Troca de app: a pagina fica escondida com o dedo ainda no controle.
+  await touch('touchStart', [[bx, by, 10]]);
+  await touch('touchMove', [[bx + br, by, 10]]);
+  await sleep(200);
+  const moving = await padState();
+  await evalJs(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange')); delete document.hidden;`);
+  await sleep(200);
+  p = await padState();
+  check('pagina escondida (troca de app) solta o stick', moving.axes[0] > 0.9 && p.axes.every(v => v === 0),
+        `${JSON.stringify(moving.axes.slice(0, 2))} -> ${JSON.stringify(p.axes.slice(0, 2))}`);
+  await touch('touchEnd', []);
+
   // 6. Alvo tecla (layout wasd): o stick vira W/A/S/D e o botao, espaco, pelo teclado do jogo.
   if (!await open('&touchlayout=wasd')) { process.exitCode = 1; return; }
   let log6 = await logText();

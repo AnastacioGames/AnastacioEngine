@@ -79,6 +79,9 @@ Aprovado:
 
 Pendente (não confirmado nesta rodada):
 
+- Controle na tela (A1): roteiro no aparelho com a cena `pad` em
+  [android-touch-controls-plan.md](android-touch-controls-plan.md) (T4).
+
 - Home/retorno com o processo recriado pelo sistema.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).

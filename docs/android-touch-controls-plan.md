@@ -129,11 +129,31 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - Seletor de layout no painel.
    - Aviso de ação sem mapeamento móvel (plano, linha 130).
    - Traduções pt/es/ru.
-5. **T4, testes e documentação:**
-   - Em `verify-capabilities.cjs`, um modo multitoque com dois pontos simultâneos via CDP `Input.dispatchTouchEvent`.
-   - Uma cena de teste (`tools/create_web_touch_scene.py`, no molde do `create_web_save_scene.py`) que registra eixos e botões no logcat `RangeWeb`.
-   - No celular, os critérios da linha 71 do plano: mover + agir ao mesmo tempo, dois botões juntos, arrastar para fora do controle, cancelar o toque e trocar de app sem input preso.
-   - Atualizar `docs/android-export-plan.md` §4, `docs/roadmap.md`, o relatório e o changelog.
+5. **T4, testes e documentação: parte automática feita em 2026-09-24; falta o celular.** Mudanças do plano
+   original: a cena de teste é a do pad (`tools/tests/web_profile/make_pad_project.py`, `projects-teste/pad`), que já
+   imprime eixos, botões, teclas e a ação do Input System (`[pad] ...`, que no APK sai no logcat `RangeWeb`), em
+   vez de um `create_web_touch_scene.py` repetido; o multitoque fica em `verify-touch.cjs` (já usa dois dedos pelo
+   CDP), não em um modo novo do `verify-capabilities.cjs`. `verify-touch.cjs` passou a conferir também a checklist
+   abaixo no navegador: dois botões juntos (A+B, engine vê `buttons=[0, 1]`), dedo do stick arrastado até em cima
+   do botão A (segue no stick, A não aperta, soltar zera), `touchcancel` com stick e botão apertados, e página
+   escondida (`visibilitychange`, como na troca de app) com o stick apertado. 25/25.
+
+   **Roteiro no celular (pendente):**
+   1. Gerar a cena: `build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
+   2. Abrir `projects-teste/pad/pad.range` no editor. Em Android (Range), usar um applicationId de teste (ex.:
+      `com.anastaciogames.pad`), gerar o APK debug e instalar com "Instalar no celular". Log:
+      `adb logcat -s RangeWeb`, com o app aberto com `?debug=1` (`--es query "debug=1"`).
+   3. Com o layout padrão (stick + 2 botões), conferir:
+      - mover + agir: segurar o stick e apertar A; o cubo anda e pula, e o log mostra `axes=[...]` com `buttons=[0]`;
+      - dois botões juntos: A e B, log `buttons=[0, 1]`;
+      - arrastar para fora: levar o dedo do stick até o outro lado da tela; o cubo continua andando, B não é
+        apertado, e ao soltar para;
+      - toque cancelado: puxar a barra de notificações com o dedo no stick; ao voltar, o cubo está parado;
+      - troca de app: Home com o dedo no stick e no botão; ao voltar, nada fica preso;
+      - toque fora dos controles não aperta botão.
+   4. Trocar Controle na tela para "Stick como WASD + Espaço", gerar de novo e conferir `[pad] key W down/up` e
+      `[pad] map Pular down` pelo botão.
+   5. Jogo real: First Person com o layout WASD (andar + olhar arrastando fora dos controles ao mesmo tempo).
 
 Teclado: não desenhar teclado QWERTY na tela. Texto (nome, chat) usa o teclado do sistema Android, que vem de graça,
 quando a engine pedir "abrir teclado"; entra só se algum jogo precisar.

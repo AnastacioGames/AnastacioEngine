@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 17 | 32 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 18 | 33 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Controle na tela: checklist do celular conferida no navegador (A1, etapa T4, parte automática)
+
+- `tools/web/verify-touch.cjs` passou de 19 para 25 conferências, cobrindo no Edge headless os critérios do plano
+  que antes só estavam na lista do celular: dois botões juntos (A+B, engine vê `buttons=[0, 1]`), dedo do stick
+  arrastado até em cima do botão A (continua no stick e não aperta A), soltar fora do controle, `touchcancel` com
+  stick e botão apertados, e página escondida (`visibilitychange`, troca de app) com o stick apertado. Tudo solta
+  sem entrada presa.
+- Mudança do plano: a cena de teste da T4 é a do pad (`make_pad_project.py`), que já registra eixos, botões,
+  teclas e a ação do Input System, e sai no logcat `RangeWeb` no APK; o multitoque fica no `verify-touch.cjs`,
+  sem modo novo no `verify-capabilities.cjs`.
+- Roteiro do aparelho escrito no plano (T4) e anotado como pendente em `android-manual-tests.md`. Não testado:
+  celular.
 
 ## 2026-09-24 - Controle na tela: layout no painel Web e aviso de entrada sem toque (A1, etapa T3)
 

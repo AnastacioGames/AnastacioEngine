@@ -66,7 +66,8 @@ Se `node` não estiver no PATH, use o do emsdk (ex.: `D:/emsdk/node/24.19.0_64bi
 `node tools/web/verify-persistence.cjs <url> 9333` testa a persistência: grava um token em `/saves`, faz `syncfs`, recarrega
 e confere que o arquivo voltou do IndexedDB (usa `Module.FS`, exposto pelo pre-js). Cobre a camada IDBFS.
 `node tools/web/verify-touch.cjs <url> 9333` testa o controle na tela com dois dedos emulados (stick + botão A juntos,
-soltura ao perder o foco, toque fora dos controles) e o layout `wasd` (W e espaço no jogo, W do teclado físico mantido
+dois botões juntos, dedo arrastado para fora do stick, soltura em `touchcancel`, ao perder o foco e com a página
+escondida, toque fora dos controles) e o layout `wasd` (W e espaço no jogo, W do teclado físico mantido
 quando o toque solta) e uma ação do `KeyMapping/Pad.json` pelo toque (empacote com
 `--extra projects-teste/pad/KeyMapping/Pad.json --extra-root projects-teste/pad`); `verify-pad.cjs` testa só a ponte `Module.rangePad`, sem controle
 físico ligado. Os dois esperam a cena de `tools/tests/web_profile/make_pad_project.py`.
