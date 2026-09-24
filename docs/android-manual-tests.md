@@ -74,9 +74,8 @@ Aprovado:
   `[web-save] LOADED`. O save sobrevive à atualização release sobre release (o First Person não salva nada). Título da tela inicial aparece como
   "pkg" (nome do pacote Web de teste, não o `appName`).
 
-- 2026-09-24: apps de teste ainda instalados no Find X3 Pro (desinstalação pelo agente bloqueada pela permissão
-  do adb): `com.anastaciogames.testerelease`, `com.anastaciogames.rangewebview` (template) e
-  `com.anastaciogames.firstperson` ("teste1_fabio"). Remover pelo celular ou com `adb uninstall <id>`.
+- 2026-09-24: apps de teste desinstalados do Find X3 Pro a pedido do usuário: `com.anastaciogames.testerelease`,
+  `com.anastaciogames.rangewebview` (template) e `com.anastaciogames.firstperson` ("teste1_fabio").
 
 Pendente (não confirmado nesta rodada):
 
