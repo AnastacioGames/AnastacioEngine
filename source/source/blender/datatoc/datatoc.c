@@ -48,8 +48,9 @@ int main(int argc, char **argv)
 	long size;
 	int i;
 	int argv_len;
+	int write_error;
 
-	if (argc < 2) {
+	if (argc != 3) {
 		printf("Usage: datatoc <data_file_from> <data_file_to>\n");
 		exit(1);
 	}
@@ -67,7 +68,11 @@ int main(int argc, char **argv)
 		fclose(fpin);
 		exit(1);
 	}
-	fseek(fpin, 0L,  SEEK_SET);
+	if (fseek(fpin, 0L, SEEK_SET) != 0) {
+		printf("Unable to rewind input <%s>\n", argv[1]);
+		fclose(fpin);
+		exit(1);
+	}
 
 	if (argv[1][0] == '.') argv[1]++;
 
@@ -94,6 +99,8 @@ int main(int argc, char **argv)
 	fprintf(fpout, "int datatoc_%s_size = %d;\n", argv[1], (int)size);
 	fprintf(fpout, "char datatoc_%s[] = {\n", argv[1]);
 	while (size--) {
+		int byte;
+
 		/* if we want to open in an editor
 		 * this is nicer to avoid very long lines */
 #ifdef VERBOSE
@@ -102,8 +109,17 @@ int main(int argc, char **argv)
 		}
 #endif
 
-		/* fprintf (fpout, "\\x%02x", getc(fpin)); */
-		fprintf(fpout, "%3d,", getc(fpin));
+		byte = getc(fpin);
+		if (byte == EOF) {
+			fprintf(stderr, "Unexpected end of input <%s>\n", argv[1]);
+			fclose(fpin);
+			fclose(fpout);
+			remove(argv[2]);
+			return 1;
+		}
+
+		/* fprintf (fpout, "\\x%02x", byte); */
+		fprintf(fpout, "%3d,", byte);
 	}
 
 	/* trailing NULL terminator, this isnt needed in some cases and
@@ -112,6 +128,14 @@ int main(int argc, char **argv)
 	fprintf(fpout, "0\n};\n\n");
 
 	fclose(fpin);
-	fclose(fpout);
+	write_error = ferror(fpout);
+	if (fclose(fpout) != 0) {
+		write_error = 1;
+	}
+	if (write_error) {
+		fprintf(stderr, "Unable to write output <%s>\n", argv[2]);
+		remove(argv[2]);
+		return 1;
+	}
 	return 0;
 }

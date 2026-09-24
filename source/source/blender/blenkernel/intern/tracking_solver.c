@@ -24,6 +24,7 @@
  */
 
 #include <limits.h>
+#include <stdint.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -144,6 +145,7 @@ static bool reconstruct_retrieve_libmv_tracks(MovieReconstructContext *context, 
 	bool ok = true;
 	bool origin_set = false;
 	int sfra = context->sfra, efra = context->efra;
+	int64_t frame_count;
 	float imat[4][4];
 
 	if (context->is_camera) {
@@ -192,11 +194,20 @@ static bool reconstruct_retrieve_libmv_tracks(MovieReconstructContext *context, 
 		return ok;
 	}
 
-	reconstructed = MEM_callocN(((size_t)(efra - sfra) + 1) * sizeof(MovieReconstructedCamera),
-	                            "temp reconstructed camera");
+	frame_count = (int64_t)efra - (int64_t)sfra + 1;
+	if (frame_count > INT_MAX / (int64_t)sizeof(MovieReconstructedCamera)) {
+		return false;
+	}
 
-	for (a = sfra; a <= efra; a++) {
+	reconstructed = MEM_callocN((size_t)frame_count * sizeof(MovieReconstructedCamera),
+	                            "temp reconstructed camera");
+	if (reconstructed == NULL) {
+		return false;
+	}
+
+	for (size_t frame_index = 0; frame_index < (size_t)frame_count; frame_index++) {
 		double matd[4][4];
+		a = sfra + (int)frame_index;
 
 		if (libmv_reprojectionCameraForImage(libmv_reconstruction, a, matd)) {
 			int i, j;
