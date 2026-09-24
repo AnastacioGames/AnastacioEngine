@@ -3,20 +3,19 @@
 //
 // Uso: node tools/web/verify-touch.cjs http://127.0.0.1:8792/ [porta-cdp=9333]
 // Requer Chrome/Edge aberto com --remote-debugging-port=<porta-cdp> (ver docs/web-deploy.md). Abre com ?touch=1
-// (o navegador do PC nao e pointer: coarse) e o layout padrao do pacote (stick + A/B).
+// (o navegador do PC nao e pointer: coarse): primeiro o layout padrao do pacote (stick + A/B, alvo gamepad),
+// depois ?touchlayout=wasd (alvo tecla, junto com o teclado fisico emulado pelo CDP).
 const url = process.argv[2];
 const port = process.argv[3] || '9333';
 if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.exit(2); }
 
 (async () => {
-  const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise(r => (ws.onopen = r));
+  let target = null, ws = null;
   let id = 0; const pending = new Map(); const errors = [];
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.id) { pending.get(m.id)?.(m.error ? { error: m.error } : m.result); pending.delete(m.id); }
-    else if (m.method === 'Runtime.exceptionThrown') errors.push(JSON.stringify(m.params.exceptionDetails.text));
+  const closeTab = async () => {
+    if (!target) return;
+    await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`);
+    await new Promise(r => { ws.onclose = r; ws.close(); });
   };
   const call = (method, params = {}) => new Promise(r => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
   const evalJs = async expr => (await call('Runtime.evaluate', { expression: expr, returnByValue: true })).result?.value;
@@ -34,25 +33,35 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   const results = [];
   const check = (name, ok, detail) => { results.push(ok); console.log(`${ok ? 'OK  ' : 'FALHA'} ${name}: ${detail}`); };
 
-  await call('Runtime.enable'); await call('Page.enable');
-  await call('Network.enable'); await call('Network.setCacheDisabled', { cacheDisabled: true });
-  await call('Emulation.setDeviceMetricsOverride', { width: 960, height: 540, deviceScaleFactor: 1, mobile: false });
-  await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  await call('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'debug=1&touch=1' });
-
-  let state = 'loading';
-  for (let i = 0; i < 60 && state === 'loading'; i++) {
-    await sleep(500);
-    state = await evalJs(`(function(){var b=document.getElementById('play'),e=document.getElementById('error');
-      if(e&&!e.hidden)return 'error';return b&&!b.disabled?'ready':'loading';})()`);
-  }
-  if (state !== 'ready') {
-    console.log('pagina nao ficou pronta:', state, await evalJs(`document.getElementById('error').textContent`));
-    process.exitCode = 1;
-    return;
-  }
-  await evalJs(`document.getElementById('play').click()`);
-  await sleep(2500);
+  // Cada layout numa aba nova: recarregar na mesma aba deixava o toque do CDP sem chegar a pagina (Edge headless).
+  const open = async query => {
+    await closeTab();
+    target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
+    ws = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise(r => (ws.onopen = r));
+    ws.onmessage = e => {
+      const m = JSON.parse(e.data);
+      if (m.id) { pending.get(m.id)?.(m.error ? { error: m.error } : m.result); pending.delete(m.id); }
+      else if (m.method === 'Runtime.exceptionThrown') errors.push(JSON.stringify(m.params.exceptionDetails.text));
+    };
+    await call('Runtime.enable'); await call('Page.enable');
+    await call('Network.enable'); await call('Network.setCacheDisabled', { cacheDisabled: true });
+    await call('Emulation.setDeviceMetricsOverride', { width: 960, height: 540, deviceScaleFactor: 1, mobile: false });
+    await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+    await call('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'debug=1&touch=1' + query });
+    let state = 'loading';
+    for (let i = 0; i < 60 && state === 'loading'; i++) {
+      await sleep(500);
+      state = await evalJs(`(function(){var b=document.getElementById('play'),e=document.getElementById('error');
+        if(e&&!e.hidden)return 'error';return b&&!b.disabled?'ready':'loading';})()`);
+    }
+    if (state !== 'ready')
+      console.log('pagina nao ficou pronta:', state, await evalJs(`document.getElementById('error').textContent`));
+    else await evalJs(`document.getElementById('play').click()`);
+    await sleep(2500);
+    return state === 'ready';
+  };
+  if (!await open('')) { process.exitCode = 1; return; }
 
   // 1. Overlay visivel com o layout padrao e pad ativo.
   const shown = await evalJs(`(function(){var t=document.getElementById('touch');
@@ -110,10 +119,56 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   await touch('touchEnd', []);
   check('toque fora dos controles nao aciona o pad', p.buttons === 0 && p.axes.every(v => v === 0), JSON.stringify(p));
 
+  // 6. Alvo tecla (layout wasd): o stick vira W/A/S/D e o botao, espaco, pelo teclado do jogo.
+  if (!await open('&touchlayout=wasd')) { process.exitCode = 1; return; }
+  let log6 = await logText();
+  // Codigos da tabela da pagina (W=45, SPACE=8, UPARROW=72) iguais aos do bge.events.
+  check('codigos de tecla iguais aos do bge.events', /\[pad\] codes W=45 SPACE=8 UPARROW=72/.test(log6),
+        (log6.match(/\[pad\] codes[^\n]*/) || ['(sem linha codes)'])[0]);
+  const [kx, ky, kr] = await center('#touch .zone.left .base');
+  const [sx, sy] = await center('#touch .btn');
+  mark = (await logText()).length;
+  await touch('touchStart', [[kx, ky, 11]]);
+  await touch('touchMove', [[kx, ky - kr * 1.2, 11]]);
+  await touch('touchStart', [[kx, ky - kr * 1.2, 11], [sx, sy, 12]]);
+  await sleep(300);
+  p = await padState();
+  check('stick para cima + botao = W e espaco', JSON.stringify(p.keys) === '[45,8]' && p.axes.every(v => v === 0) &&
+        p.buttons === 0, JSON.stringify(p));
+  await sleep(500);
+  log6 = (await logText()).slice(mark);
+  check('jogo ve W e espaco apertados', /\[pad\] key W down/.test(log6) && /\[pad\] key SPACE down/.test(log6), '-');
+  await touch('touchEnd', []);
+  await sleep(500);
+  log6 = (await logText()).slice(mark);
+  check('soltar o toque solta W e espaco', /\[pad\] key W up/.test(log6) && /\[pad\] key SPACE up/.test(log6), '-');
+
+  // 7. Origem separada: W segurado no teclado fisico nao solta quando o toque solta.
+  const key = (type, code, vk) => call('Input.dispatchKeyEvent',
+    { type, key: code.slice(-1).toLowerCase(), code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+  await evalJs(`document.getElementById('canvas').focus()`);
+  mark = (await logText()).length;
+  await key('keyDown', 'KeyW', 87);
+  await sleep(300);
+  await touch('touchStart', [[kx, ky, 13]]);
+  await touch('touchMove', [[kx, ky - kr * 1.2, 13]]);
+  await sleep(300);
+  const during = await padState();
+  await touch('touchEnd', []);
+  await sleep(500);
+  let log7 = (await logText()).slice(mark);
+  const downs = (log7.match(/\[pad\] key W down/g) || []).length;
+  check('teclado segura W: toque sobe e W continua',
+        JSON.stringify(during.keys) === '[45]' && downs === 1 && !/\[pad\] key W up/.test(log7),
+        `toque keys=${JSON.stringify(during.keys)}, W down=${downs}, W up=${/key W up/.test(log7)}`);
+  await key('keyUp', 'KeyW', 87);
+  await sleep(500);
+  log7 = (await logText()).slice(mark);
+  check('W solta quando o teclado solta', /\[pad\] key W up/.test(log7), '-');
+
   if (errors.length) console.log('--- excecoes JS ---\n' + errors.join('\n'));
-  await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`);
   process.exitCode = results.every(Boolean) && !errors.length ? 0 : 1;
   console.log(process.exitCode === 0 ? 'TOUCH: PASS' : 'TOUCH: FAIL');
   // Sem process.exit(): no Node 24 no Windows ele dispara um assert do libuv com o WebSocket aberto.
-  await new Promise(r => { ws.onclose = r; ws.close(); });
+  await closeTab();
 })();

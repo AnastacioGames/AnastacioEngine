@@ -141,7 +141,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - AAB/Play seguem a ordem do plano. Controles por toque (A1): caminho em
   [android-touch-controls-plan.md](android-touch-controls-plan.md); T0 (ponte `Module.rangePad` → gamepad 0)
   verificada no navegador; T1 (overlay na página: stick, d-pad e botões, multitoque) verificada no navegador
-  com toque emulado. Próximo: T2, alvo tecla (jogos que leem teclado), e teste no celular.
+  com toque emulado; T2 (alvo tecla: layouts `wasd` e `arrows`, origem separada do teclado físico) verificada
+  no navegador e aceita pelo usuário no Edge do PC. Próximo: T3, configuração no painel do export, e teste no celular.
 
 ### Outros
 

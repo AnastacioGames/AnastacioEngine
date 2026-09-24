@@ -312,7 +312,8 @@ __PERF_SCRIPT__
   // Controle na tela -> gamepad 0 do runtime (DEV_JoystickEvents.cpp le Module.rangePad a cada quadro).
   // axes na ordem do SDL GameController (LX, LY, RX, RY, gatilho E, gatilho D; -1..1, gatilhos 0..1);
   // buttons e mascara de bits na ordem de SDL_GameControllerButton (A=1, B=2, X=4, Y=8, ...).
-  var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0 };
+  // keys: teclas seguradas pelo toque, em codigos de bge.events (DEV_InputDevice.cpp as junta as do teclado fisico).
+  var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0, keys: [] };
 
   // Overlay do controle na tela: cada controle segue um dedo (pointerId), entao mover e apertar ao mesmo tempo
   // funciona. Toques fora dos controles seguem para o canvas (arrastar para olhar continua). Aparece em tela de
@@ -327,9 +328,35 @@ __PERF_SCRIPT__
     dpad: [{ type: "dpad" },
            { type: "button", bit: 0, label: "A", at: [0, 1] }, { type: "button", bit: 1, label: "B", at: [1, 0] },
            { type: "button", bit: 2, label: "X", at: [-1, 0] }, { type: "button", bit: 3, label: "Y", at: [0, -1] }],
-    twin: [{ type: "stick", side: "left", axes: [0, 1] }, { type: "stick", side: "right", axes: [2, 3] }]
+    twin: [{ type: "stick", side: "left", axes: [0, 1] }, { type: "stick", side: "right", axes: [2, 3] }],
+    // Alvo tecla (jogos que leem teclado): keys = [cima, baixo, esquerda, direita]; key = tecla do botao.
+    wasd: [{ type: "stick", side: "left", keys: ["WKEY", "SKEY", "AKEY", "DKEY"] },
+           { type: "button", key: "SPACEKEY", label: "\\u2423", at: [0, 0] }],
+    arrows: [{ type: "dpad", keys: ["UPARROWKEY", "DOWNARROWKEY", "LEFTARROWKEY", "RIGHTARROWKEY"] },
+             { type: "button", key: "SPACEKEY", label: "\\u2423", at: [-0.75, 0.55] },
+             { type: "button", key: "RETKEY", label: "\\u23ce", at: [0.75, -0.55] }]
   };
-  var touchControls = [], touchLogAt = 0, touchLogButtons = 0;
+  // Ordem de SCA_IInputDevice::SCA_EnumInputs a partir de RETKEY (= 7), a mesma de bge.events. So as teclas
+  // que fazem sentido num controle na tela; verify-touch.cjs confere W, SPACE e UPARROW com o bge.events.
+  var KEY_NAMES = ("RET SPACE PADASTER COMMA MINUS PERIOD ZERO ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE " +
+    "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z CAPSLOCK LEFTCTRL LEFTALT RIGHTALT RIGHTCTRL RIGHTSHIFT " +
+    "LEFTSHIFT ESC TAB LINEFEED BACKSPACE DEL SEMICOLON QUOTE ACCENTGRAVE SLASH BACKSLASH EQUAL LEFTBRACKET " +
+    "RIGHTBRACKET LEFTARROW DOWNARROW RIGHTARROW UPARROW").split(" ");
+  function keyCode(name) {
+    var i = KEY_NAMES.indexOf(String(name).toUpperCase().replace(/KEY$/, ""));
+    if (i < 0) { log("[touch] tecla desconhecida: " + name); return 0; }
+    return 7 + i;
+  }
+  // Direcao digital de um stick/d-pad no alvo tecla: codes = [cima, baixo, esquerda, direita].
+  function heldKeys(codes, up, down, left, right) {
+    var held = [];
+    if (up) held.push(codes[0]);
+    if (down) held.push(codes[1]);
+    if (left) held.push(codes[2]);
+    if (right) held.push(codes[3]);
+    return held;
+  }
+  var touchControls = [], touchLogAt = 0, touchLogButtons = "";
   function touchParam(name) {
     var m = new RegExp("[?&]" + name + "=(\\\\w+)").exec(location.search);
     return m ? m[1] : null;
@@ -341,18 +368,21 @@ __PERF_SCRIPT__
     return n;
   }
   function updatePad() {
-    var axes = [0, 0, 0, 0, 0, 0], bits = 0;
+    var axes = [0, 0, 0, 0, 0, 0], bits = 0, keys = [];
     touchControls.forEach(function (c) {
       if (c.axes) { axes[c.axes[0]] = c.value[0]; axes[c.axes[1]] = c.value[1]; }
       bits |= c.bits;
+      keys = keys.concat(c.held);
     });
     pad.axes = axes;
     pad.buttons = bits;
+    pad.keys = keys;
     var now = performance.now();
-    if (debug && (bits !== touchLogButtons || now - touchLogAt > 250)) {
+    if (debug && (bits + ":" + keys !== touchLogButtons || now - touchLogAt > 250)) {
       touchLogAt = now;
-      touchLogButtons = bits;
-      log("[touch] axes " + axes.map(function (v) { return v.toFixed(2); }).join(" ") + " | buttons " + bits);
+      touchLogButtons = bits + ":" + keys;
+      log("[touch] axes " + axes.map(function (v) { return v.toFixed(2); }).join(" ") + " | buttons " + bits +
+          " | keys " + keys.join(","));
     }
   }
   // Um dedo por controle, preso a ele por pointer capture: arrastar para fora nao solta nem pega outro controle.
@@ -392,7 +422,8 @@ __PERF_SCRIPT__
     var zone = node("div", "zone " + c.side), base = node("div", "base"), knob = node("div", "knob");
     base.appendChild(knob);
     zone.appendChild(base);
-    var ctl = { node: zone, axes: c.axes, value: [0, 0], bits: 0 }, cx = 0, cy = 0, r = 1;
+    var codes = c.keys ? c.keys.map(keyCode) : null;
+    var ctl = { node: zone, axes: codes ? null : c.axes, value: [0, 0], bits: 0, held: [] }, cx = 0, cy = 0, r = 1;
     function aim(e) {
       var dx = e.clientX - cx, dy = e.clientY - cy, len = Math.sqrt(dx * dx + dy * dy);
       if (len > r) { dx *= r / len; dy *= r / len; }
@@ -400,9 +431,12 @@ __PERF_SCRIPT__
       var n = Math.min(1, len / r);
       var k = n <= STICK_DEADZONE ? 0 : (n - STICK_DEADZONE) / (1 - STICK_DEADZONE) / n;
       ctl.value = [dx / r * k, dy / r * k];
+      // Alvo tecla: cada eixo vira tecla depois de meio curso (diagonal aperta as duas).
+      if (codes) ctl.held = heldKeys(codes, ctl.value[1] < -0.5, ctl.value[1] > 0.5, ctl.value[0] < -0.5, ctl.value[0] > 0.5);
     }
     ctl.reset = function () {
       ctl.value = [0, 0];
+      ctl.held = [];
       knob.style.transform = "";
       base.removeAttribute("style");
       zone.classList.remove("on");
@@ -429,7 +463,7 @@ __PERF_SCRIPT__
     return ctl;
   }
   // D-pad de 8 direcoes pelo angulo do dedo em relacao ao centro (diagonal aperta os dois botoes).
-  function makeDpad() {
+  function makeDpad(c) {
     var box = node("div", "dpad"), arms = {};
     [["up", DPAD_UP, 0.8, 0], ["down", DPAD_DOWN, 0.8, 1.6], ["left", DPAD_LEFT, 0, 0.8], ["right", DPAD_RIGHT, 1.6, 0.8]]
       .forEach(function (a) {
@@ -439,7 +473,8 @@ __PERF_SCRIPT__
         box.appendChild(i);
         arms[a[1]] = i;
       });
-    var ctl = { node: box, value: null, bits: 0 };
+    var codes = c.keys ? c.keys.map(keyCode) : null;
+    var ctl = { node: box, value: null, bits: 0, held: [] };
     function aim(e) {
       var b = box.getBoundingClientRect(), r = b.width / 2;
       var dx = (e.clientX - b.left - r) / r, dy = (e.clientY - b.top - r) / r, len = Math.sqrt(dx * dx + dy * dy);
@@ -452,7 +487,8 @@ __PERF_SCRIPT__
         if (dx < -0.38) bits |= DPAD_LEFT;
         if (dx > 0.38) bits |= DPAD_RIGHT;
       }
-      ctl.bits = bits;
+      ctl.bits = codes ? 0 : bits;
+      ctl.held = codes ? heldKeys(codes, bits & DPAD_UP, bits & DPAD_DOWN, bits & DPAD_LEFT, bits & DPAD_RIGHT) : [];
       for (var k in arms) arms[k].classList.toggle("on", !!(bits & k));
     }
     ctl.reset = function () { aim({ clientX: NaN, clientY: NaN }); };
@@ -461,27 +497,35 @@ __PERF_SCRIPT__
   }
   // Botoes em volta de um centro no canto inferior direito; "at" em unidades de --u (x para a direita, y para baixo).
   function makeButton(c) {
-    var b = node("div", "btn", c.label), ctl = { node: b, value: null, bits: 0 };
+    var code = c.key ? keyCode(c.key) : 0;
+    var b = node("div", "btn", c.label || String(c.key || "").replace(/KEY$/, ""));
+    var ctl = { node: b, value: null, bits: 0, held: [] };
     b.style.right = "calc(var(--sr) + var(--u) * " + (1.35 - c.at[0]) + ")";
     b.style.bottom = "calc(var(--sb) + var(--u) * " + (1.35 - c.at[1]) + ")";
-    ctl.reset = function () { ctl.bits = 0; b.classList.remove("on"); };
-    bindPointer(b, ctl, function () { ctl.bits = 1 << c.bit; b.classList.add("on"); }, function () {});
+    ctl.reset = function () { ctl.bits = 0; ctl.held = []; b.classList.remove("on"); };
+    bindPointer(b, ctl, function () {
+      if (code) ctl.held = [code]; else ctl.bits = 1 << c.bit;
+      b.classList.add("on");
+    }, function () {});
     return ctl;
   }
   function startTouch() {
     var show = touchParam("touch");
-    var layout = touchLayouts[touchParam("touchlayout") || TOUCH.layout];
+    // TOUCH.layout: nome de um layout pronto ou a lista de controles (config do projeto, T3).
+    var chosen = touchParam("touchlayout") || TOUCH.layout;
+    var layout = Array.isArray(chosen) ? chosen : touchLayouts[chosen];
     var coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
     if (!layout || show === "0" || (show !== "1" && !coarse) || touchControls.length) return;
     var dynamic = (touchParam("touchstick") || TOUCH.stick) !== "fixed";
     layout.forEach(function (c) {
-      var ctl = c.type === "stick" ? makeStick(c, dynamic) : c.type === "dpad" ? makeDpad() : makeButton(c);
+      var ctl = c.type === "stick" ? makeStick(c, dynamic) : c.type === "dpad" ? makeDpad(c) : makeButton(c);
       touchControls.push(ctl);
       el("touch").appendChild(ctl.node);
     });
     el("touch").hidden = false;
     pad.active = true;
-    log("[touch] controle na tela: " + (touchParam("touchlayout") || TOUCH.layout) + (dynamic ? " (stick dinamico)" : ""));
+    log("[touch] controle na tela: " + (Array.isArray(chosen) ? "personalizado" : chosen) +
+        (dynamic ? " (stick dinamico)" : ""));
   }
   // Soltar tudo quando a pagina perde o foco ou some: sem isso um dedo "preso" seguia andando ao voltar.
   function releaseTouch() {
@@ -816,8 +860,9 @@ def main():
     ap.add_argument("--perf", action="store_true",
                     help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
-    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin"], default="stick",
-                    help="controle na tela em aparelhos de toque (padrao: stick + botoes A/B)")
+    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin", "wasd", "arrows"], default="stick",
+                    help="controle na tela em aparelhos de toque: stick/dpad/twin viram gamepad 0; wasd/arrows "
+                         "apertam teclas (padrao: stick + botoes A/B)")
     ap.add_argument("--touch-stick", choices=["dynamic", "fixed"], default="dynamic",
                     help="stick dinamico (nasce onde o dedo toca) ou fixo")
     args = ap.parse_args()

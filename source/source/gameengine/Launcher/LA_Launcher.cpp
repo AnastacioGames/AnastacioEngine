@@ -522,6 +522,8 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 
 	m_system->processEvents(false);
 	m_system->dispatchEvents();
+	// Teclas do controle na tela (Web) entram depois das do teclado, no mesmo ponto do quadro.
+	m_inputDevice->PollVirtualKeys();
 
 	SCA_IInputDevice::SCA_EnumInputs exitKey = m_ketsjiEngine->GetExitKey();
 	if (m_inputDevice->GetInput(exitKey).Find(SCA_InputEvent::ACTIVE) &&

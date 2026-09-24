@@ -50,7 +50,9 @@ Abra http://localhost:8080/, espere o botão **Jogar** e clique (dá foco ao can
 
 Controle na tela: aparece sozinho em tela de toque (`pointer: coarse`) e vira o gamepad 0 do jogo (`logic.joysticks[0]`,
 sensor Joystick, Input System), somado a um controle físico. `?touch=1` mostra no PC (clique e arraste com o mouse),
-`?touch=0` esconde; `?touchlayout=stick|dpad|twin` e `?touchstick=dynamic|fixed` trocam o layout só nessa visita.
+`?touch=0` esconde; `?touchlayout=` e `?touchstick=dynamic|fixed` trocam o layout só nessa visita.
+Layouts `stick`, `dpad` e `twin` viram o gamepad 0; `wasd` (stick = W/A/S/D, botão = espaço) e `arrows` (d-pad = setas,
+espaço e Enter) apertam teclas, para jogos que leem teclado — somadas às do teclado físico sem uma soltar a outra.
 O padrão do pacote vem de `package-web.py --touch-layout` (`none` desliga) e `--touch-stick`.
 
 Verificação automatizada (só logs/estado, **não** julga o visual): com um Chrome aberto com
@@ -60,7 +62,8 @@ Se `node` não estiver no PATH, use o do emsdk (ex.: `D:/emsdk/node/24.19.0_64bi
 `node tools/web/verify-persistence.cjs <url> 9333` testa a persistência: grava um token em `/saves`, faz `syncfs`, recarrega
 e confere que o arquivo voltou do IndexedDB (usa `Module.FS`, exposto pelo pre-js). Cobre a camada IDBFS.
 `node tools/web/verify-touch.cjs <url> 9333` testa o controle na tela com dois dedos emulados (stick + botão A juntos,
-soltura ao perder o foco, toque fora dos controles); `verify-pad.cjs` testa só a ponte `Module.rangePad`, sem controle
+soltura ao perder o foco, toque fora dos controles) e o layout `wasd` (W e espaço no jogo, W do teclado físico mantido
+quando o toque solta); `verify-pad.cjs` testa só a ponte `Module.rangePad`, sem controle
 físico ligado. Os dois esperam a cena de `tools/tests/web_profile/make_pad_project.py`.
 `node tools/web/verify-save.cjs <url> 9333` testa `saveGlobalDict`/`loadGlobalDict` de ponta a ponta num pacote gerado de
 `tools/create_web_save_scene.py` (`RangeEngine -b --python ...`): grava numa sessão, recarrega e confere a leitura. Não use `--virtual-time-budget` com

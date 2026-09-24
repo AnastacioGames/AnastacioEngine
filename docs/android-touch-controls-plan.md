@@ -109,7 +109,11 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - Pointer capture, `touch-action: none` e respeito ao entalhe da tela.
    - Soltar tudo ao perder o foco.
    - Aparece só em `pointer: coarse` ou com `?touch=1`.
-3. **T2, alvo tecla:**
+3. **T2, alvo tecla, feita em 2026-09-24:** `verify-touch.cjs` 16/16 (gamepad e teclas, com teclado físico emulado
+   pelo CDP). A página manda códigos de `bge.events` em `Module.rangePad.keys`; `DEV_InputDevice` guarda teclado físico
+   e toque em separado e é lido por `LA_Launcher::EngineNextFrame` logo depois dos eventos do sistema (o
+   `DEV_EventConsumer` só recebe eventos, então o poll ficou no laço do quadro). Layouts `wasd` e `arrows`.
+   Aceita pelo usuário no Edge do PC (mouse simulando o dedo, junto com o teclado físico).
    - Teclas seguradas pelo toque lidas no mesmo poll.
    - Em `DEV_EventConsumer.cpp`, o estado do teclado físico e o do toque ficam separados, e a tecla só muda quando o estado combinado muda.
    - Remover o `printf("[web-input] ...")` que sobrou na linha 67.

@@ -30,8 +30,30 @@
 
 #include <iostream>
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+
+/* Codigos SCA_EnumInputs (os de bge.events) das teclas seguradas pelo controle na tela, escritos pela pagina em
+ * Module.rangePad.keys (tools/web/package-web.py). Retorna quantos couberam em keys. */
+EM_JS(int, dev_virtualkeys_web_read, (int *keys, int max), {
+	var p = (typeof Module !== 'undefined') ? Module.rangePad : null;
+	if (!p || !p.active || !p.keys) return 0;
+	var n = 0;
+	for (var i = 0; i < p.keys.length && n < max; i++) {
+		var k = p.keys[i] | 0;
+		if (k > 0) HEAP32[(keys >> 2) + n++] = k;
+	}
+	return n;
+});
+#endif
+
 DEV_InputDevice::DEV_InputDevice()
 {
+	for (int i = 0; i < MAX_KEYS; ++i) {
+		m_physicalKeys[i] = false;
+		m_virtualKeys[i] = false;
+	}
+
 	m_reverseKeyTranslateTable[GHOST_kKeyA] = AKEY;
 	m_reverseKeyTranslateTable[GHOST_kKeyB] = BKEY;
 	m_reverseKeyTranslateTable[GHOST_kKeyC] = CKEY;
@@ -174,7 +196,29 @@ DEV_InputDevice::~DEV_InputDevice()
 
 void DEV_InputDevice::ConvertKeyEvent(int incode, int val, unsigned int unicode)
 {
-	ConvertEvent(m_reverseKeyTranslateTable[incode], val, unicode);
+	const SCA_EnumInputs type = m_reverseKeyTranslateTable[incode];
+	m_physicalKeys[type] = (val > 0);
+	ConvertEvent(type, m_virtualKeys[type] ? 1 : val, unicode);
+}
+
+void DEV_InputDevice::PollVirtualKeys()
+{
+#ifdef __EMSCRIPTEN__
+	int keys[32];
+	const int count = dev_virtualkeys_web_read(keys, 32);
+	bool held[MAX_KEYS] = {false};
+	for (int i = 0; i < count; ++i) {
+		if (keys[i] > BEGINKEY && keys[i] < BEGINMOUSE) {
+			held[keys[i]] = true;
+		}
+	}
+	for (int k = BEGINKEY + 1; k < BEGINMOUSE; ++k) {
+		if (held[k] != m_virtualKeys[k]) {
+			m_virtualKeys[k] = held[k];
+			ConvertEvent((SCA_EnumInputs)k, (held[k] || m_physicalKeys[k]) ? 1 : 0, 0);
+		}
+	}
+#endif
 }
 
 void DEV_InputDevice::ConvertButtonEvent(int incode, int val)

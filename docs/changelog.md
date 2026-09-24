@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 15 | 27 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 16 | 29 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,27 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Controle na tela: alvo tecla para jogos que leem teclado (A1, etapa T2)
+
+- O controle na tela também aperta teclas. Na página, stick e d-pad aceitam `keys` (cima, baixo, esquerda, direita;
+  o stick vira tecla depois de meio curso, diagonal aperta duas) e o botão aceita `key`, com os nomes de
+  `bge.events` (`WKEY`, `SPACEKEY`, …). O controle com alvo tecla não mexe no gamepad. Novos layouts: `wasd`
+  (stick = W/A/S/D, botão = espaço) e `arrows` (d-pad = setas, espaço e Enter).
+- `Module.rangePad.keys` leva os códigos de `bge.events` (tabela na página na ordem de `SCA_EnumInputs`, conferida
+  contra o `bge.events` no teste). `DEV_InputDevice::PollVirtualKeys` lê por `EM_JS` a cada quadro, chamado em
+  `LA_Launcher::EngineNextFrame` logo depois dos eventos do sistema. Teclado físico e toque ficam em estados
+  separados e o evento só muda com o estado combinado: soltar o toque não solta W que o teclado segura, e vice-versa.
+  No build nativo o poll não faz nada. Chega ao sensor Keyboard, a `logic.keyboard` e aos bindings `KEYBOARD` do
+  Input System (mesma tabela de entradas).
+- Removido o `printf("[web-input] ...")` de depuração que sobrou em `DEV_EventConsumer::HandleKeyEvent`.
+- `TOUCH.layout` aceita também a lista de controles (para a config do projeto na T3).
+- `verify-touch.cjs` 16/16 no Edge headless: as 10 de gamepad e, no `wasd`, códigos W=45/SPACE=8/UPARROW=72 iguais
+  aos do `bge.events`, stick para cima + botão dão `keys [45,8]` sem eixo nem botão de gamepad, o jogo vê W e espaço
+  apertados e soltos, W segurado no teclado (CDP) continua quando o toque solta e sobe quando o teclado solta. Cada
+  layout abre numa aba nova: recarregar na mesma aba deixava o toque do CDP sem chegar à página. D-pad do `arrows`
+  conferido à parte (diagonal = ↑ e →). Build Web e nativo sem erro. Aceite do usuário no Edge do PC (`wasd` com
+  mouse e teclado físico). Não testado: celular, First Person com `wasd`.
 
 ## 2026-09-24 - Controle na tela: overlay com stick, d-pad e botões (A1, etapa T1)
 
