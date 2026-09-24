@@ -177,7 +177,8 @@ ferramenta correspondente.
   assinado: a chave (PKCS12, criada pelo keytool do JDK) fica fora de repositórios git e nunca é sobrescrita; o
   JSON guarda só caminho e alias; a senha vem de `RANGE_ANDROID_KEYSTORE_PASSWORD` ou de um campo de sessão do
   painel e chega ao Gradle pelo ambiente. Perder a chave obriga a publicar como outro app; um APK debug instalado
-  não é atualizado por um release (chaves diferentes).
+  não é atualizado por um release (chaves diferentes). O release pode gerar também o AAB da Google Play (opção
+  `aab`), assinado com a mesma chave; o APK continua saindo para instalar no aparelho.
 - Controles na tela (A1): desenho e captura de toque na página (HTML/Pointer Events); a engine recebe o estado por
   `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico), como teclas/botões do mouse ou como
   movimento do mouse (stick de olhar move o cursor virtual do GHOST, igual a arrastar o dedo). Estende o input existente

@@ -125,7 +125,9 @@ sobre release preservando o save.
 - APK debug para desenvolvimento via ADB. Distribuição a jogadores usa APK release e chave estável; segredo fora do JSON, logs e repositório. Testar atualização sem desinstalar usando a mesma identidade/assinatura.
 - Copiar assets brutos inicialmente e deixar a compressão do APK ser medida. Comparar compressão padrão e `noCompress` somente se tamanho/carga justificarem. `.wasm`/`.data` não são gzip por definição e remover compressão não reduz RAM do jogo.
 - Saída: APK, hashes e relatório com versão do template, hashes do runtime/conteúdo, toolchain e capacidades Android testadas. Não alterar o manifesto Web para fingir que a validação desktop vale para Android.
-- AAB é etapa posterior. O limite deve ser verificado pelo tamanho de download calculado por bundletool/Play Console. Em 2026-09-20, a página específica de limites informa **500 MB para o módulo base**, enquanto guias gerais ainda citam 200 MB; usar a [tabela da Play Console](https://support.google.com/googleplay/android-developer/answer/9859372?hl=en), reconferida ao publicar. PAD exige resolver caminhos, disponibilidade dos assets e primeira abertura offline; não é só um flag de empacotamento.
+- AAB feito em 2026-09-24: opção do release (painel "Also build AAB (Google Play)", `package-android.py --aab`, chave `aab` do
+  `android-export.json`); `bundleRelease` no mesmo Gradle, assinatura igual à do APK conferida pelo keytool, AAB no relatório.
+  Verificado pelo `bundletool` (splits instalados e jogo rodando no Find X3 Pro). Falta envio a uma faixa de teste da Play Console. O limite deve ser verificado pelo tamanho de download calculado por bundletool/Play Console. Em 2026-09-20, a página específica de limites informa **500 MB para o módulo base**, enquanto guias gerais ainda citam 200 MB; usar a [tabela da Play Console](https://support.google.com/googleplay/android-developer/answer/9859372?hl=en), reconferida ao publicar. PAD exige resolver caminhos, disponibilidade dos assets e primeira abertura offline; não é só um flag de empacotamento.
 
 ### A4 — editor
 

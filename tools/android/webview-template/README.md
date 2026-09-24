@@ -30,7 +30,7 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 4. Instalar no aparelho com depuração USB: `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
 
 Release assinado: `range_web/android.py` passa `RANGE_ANDROID_KEYSTORE`, `RANGE_ANDROID_KEY_ALIAS` e
-`RANGE_ANDROID_KEYSTORE_PASSWORD` pelo ambiente para `assembleRelease`; sem `RANGE_ANDROID_KEYSTORE` o release
+`RANGE_ANDROID_KEYSTORE_PASSWORD` pelo ambiente para `assembleRelease` (e `bundleRelease`, com a opção AAB); sem `RANGE_ANDROID_KEYSTORE` o release
 sai sem assinatura. Nenhuma chave ou senha fica neste diretório.
 
 ## Diagnóstico (build debug)
