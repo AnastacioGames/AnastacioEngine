@@ -39,6 +39,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Fechadas quatro lacunas remanescentes em commits pequenos: falhas de I/O/finalização AVI, liberação de `AnimOverride`, limites da reconstrução de tracking e I/O parcial de `datatoc`.
 - `RangeEngine` e `RangeRuntime` passaram no build isolado; a regressão ANIM/MOD/RND, uma exportação AVI RAW e a conversão real por `datatoc` passaram. GPU-001 requer teste manual em uma janela interativa já aberta; o smoke automatizado agora o registra como `SKIP` explícito.
 
+## 2026-09-24 - Associações `.blend` e `.range` no Windows
+
+- `RangeEngine.exe -R`/`-r` registra `.blend` para o editor e `.range` para o `RangeRuntime`; `-U`/`-u` remove somente os valores e ProgIDs da Range Engine. O registro tenta `HKLM` e recua para `HKCU` sem elevação.
+- Validado sem abrir janela: `RangeEngine -r` e `-u` criaram/removeram no `HKCU` os ProgIDs, comandos e ícones esperados, e as associações anteriores foram restauradas. Falta o teste visual de duplo clique no Explorer.
+
 ## 2026-09-24 - Export Android: AAB para a Google Play
 
 - `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda

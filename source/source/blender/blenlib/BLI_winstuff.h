@@ -118,7 +118,8 @@ DIR *opendir(const char *path);
 struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
-void RegisterBlendExtension(void);
+void BLI_windows_register_file_extensions(void);
+void BLI_windows_unregister_file_extensions(void);
 void get_default_root(char *root);
 int check_file_chars(char *filename);
 const char *dirname(char *path);

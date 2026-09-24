@@ -59,114 +59,163 @@ int BLI_getInstallationDir(char *str)
 	return 1;
 }
 
-static void RegisterBlendExtension_Fail(HKEY root)
+static void file_extensions_fail(HKEY root)
 {
 	printf("failed\n");
 	if (root)
 		RegCloseKey(root);
 	if (!G.background)
-		MessageBox(0, "Could not register file extension.", "Blender error", MB_OK | MB_ICONERROR);
+		MessageBox(0, "Could not register Range file associations.", "Range Engine error", MB_OK | MB_ICONERROR);
 	TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void RegisterBlendExtension(void)
+static bool registry_set_default(HKEY root, const char *key_name, const char *value)
 {
 	LONG lresult;
-	HKEY hkey = 0;
-	HKEY root = 0;
-	BOOL usr_mode = false;
+	HKEY hkey;
 	DWORD dwd = 0;
-	char buffer[256];
 
-	char BlPath[MAX_PATH];
-	char InstallDir[FILE_MAXDIR];
-	char SysDir[FILE_MAXDIR];
-	const char *ThumbHandlerDLL;
-	char RegCmd[MAX_PATH * 2];
-	char MBox[256];
-	char *blender_app;
-#ifndef _WIN64
-	BOOL IsWOW64;
-#endif
+	lresult = RegCreateKeyEx(root, key_name, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hkey, &dwd);
+	if (lresult != ERROR_SUCCESS)
+		return false;
 
-	printf("Registering file extension...");
-	GetModuleFileName(0, BlPath, MAX_PATH);
+	lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (const BYTE *)value, (DWORD)strlen(value) + 1);
+	RegCloseKey(hkey);
+	return lresult == ERROR_SUCCESS;
+}
 
-	/* Replace the actual app name with the wrapper. */
-	blender_app = strstr(BlPath, "blender-app.exe");
-	if (blender_app != NULL) {
-		strcpy(blender_app, "blender.exe");
+static bool register_file_association(HKEY root,
+	                                  const char *extension,
+	                                  const char *prog_id,
+	                                  const char *description,
+	                                  const char *executable,
+	                                  const int icon_index)
+{
+	char command_key[MAX_PATH];
+	char icon_key[MAX_PATH];
+	char command[MAX_PATH * 2 + 8];
+	char icon[MAX_PATH + 8];
+
+	if (BLI_snprintf(command_key, sizeof(command_key), "%s\\shell\\open\\command", prog_id) >= (int)sizeof(command_key) ||
+	    BLI_snprintf(icon_key, sizeof(icon_key), "%s\\DefaultIcon", prog_id) >= (int)sizeof(icon_key) ||
+	    BLI_snprintf(command, sizeof(command), "\"%s\" \"%%1\"", executable) >= (int)sizeof(command) ||
+	    BLI_snprintf(icon, sizeof(icon), "\"%s\", %d", executable, icon_index) >= (int)sizeof(icon)) {
+		return false;
 	}
 
-	/* root is HKLM by default */
-	lresult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Classes", 0, KEY_ALL_ACCESS, &root);
+	return registry_set_default(root, prog_id, description) &&
+	       registry_set_default(root, command_key, command) &&
+	       registry_set_default(root, icon_key, icon) &&
+	       registry_set_default(root, extension, prog_id);
+}
+
+static bool path_set_filename(char *path, const char *filename)
+{
+	char *separator = strrchr(path, '\\');
+	if (separator == NULL || (size_t)(separator - path + 1) + strlen(filename) + 1 > MAX_PATH) {
+		return false;
+	}
+
+	BLI_strncpy(separator + 1, filename, MAX_PATH - (size_t)(separator - path + 1));
+	return true;
+}
+
+void BLI_windows_register_file_extensions(void)
+{
+	LONG lresult;
+	HKEY root = NULL;
+	BOOL user_mode = false;
+	DWORD engine_path_length;
+	char engine_path[MAX_PATH];
+	char runtime_path[MAX_PATH];
+	char message[256];
+
+	printf("Registering Range file associations...");
+	engine_path_length = GetModuleFileName(NULL, engine_path, sizeof(engine_path));
+	if (engine_path_length == 0 || engine_path_length >= sizeof(engine_path)) {
+		file_extensions_fail(NULL);
+	}
+	BLI_strncpy(runtime_path, engine_path, sizeof(runtime_path));
+	if (!path_set_filename(runtime_path, "RangeRuntime.exe")) {
+		file_extensions_fail(NULL);
+	}
+
+	/* Prefer a machine-wide association; use the current user's classes when not elevated. */
+	lresult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Classes", 0, KEY_WRITE, &root);
 	if (lresult != ERROR_SUCCESS) {
-		/* try HKCU on failure */
-		usr_mode = true;
-		lresult = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Classes", 0, KEY_ALL_ACCESS, &root);
-		if (lresult != ERROR_SUCCESS)
-			RegisterBlendExtension_Fail(0);
+		user_mode = true;
+		lresult = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Classes", 0, KEY_WRITE, &root);
+		if (lresult != ERROR_SUCCESS) {
+			file_extensions_fail(NULL);
+		}
 	}
 
-	lresult = RegCreateKeyEx(root, "blendfile", 0,
-	                         NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwd);
-	if (lresult == ERROR_SUCCESS) {
-		strcpy(buffer, "Blender File");
-		lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (BYTE *)buffer, strlen(buffer) + 1);
-		RegCloseKey(hkey);
+	if (!register_file_association(root, ".blend", "RangeEngine.BlendFile", "Range Engine Blend File", engine_path, 1) ||
+	    !register_file_association(root, ".range", "RangeEngine.RangeFile", "Range Engine Game", runtime_path, 0)) {
+		file_extensions_fail(root);
 	}
-	if (lresult != ERROR_SUCCESS)
-		RegisterBlendExtension_Fail(root);
-
-	lresult = RegCreateKeyEx(root, "blendfile\\shell\\open\\command", 0,
-	                         NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwd);
-	if (lresult == ERROR_SUCCESS) {
-		sprintf(buffer, "\"%s\" \"%%1\"", BlPath);
-		lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (BYTE *)buffer, strlen(buffer) + 1);
-		RegCloseKey(hkey);
-	}
-	if (lresult != ERROR_SUCCESS)
-		RegisterBlendExtension_Fail(root);
-
-	lresult = RegCreateKeyEx(root, "blendfile\\DefaultIcon", 0,
-	                         NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwd);
-	if (lresult == ERROR_SUCCESS) {
-		sprintf(buffer, "\"%s\", 1", BlPath);
-		lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (BYTE *)buffer, strlen(buffer) + 1);
-		RegCloseKey(hkey);
-	}
-	if (lresult != ERROR_SUCCESS)
-		RegisterBlendExtension_Fail(root);
-
-	lresult = RegCreateKeyEx(root, ".blend", 0,
-	                         NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwd);
-	if (lresult == ERROR_SUCCESS) {
-		strcpy(buffer, "blendfile");
-		lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (BYTE *)buffer, strlen(buffer) + 1);
-		RegCloseKey(hkey);
-	}
-	if (lresult != ERROR_SUCCESS)
-		RegisterBlendExtension_Fail(root);
-
-	BLI_getInstallationDir(InstallDir);
-	GetSystemDirectory(SysDir, FILE_MAXDIR);
-#ifdef _WIN64
-	ThumbHandlerDLL = "BlendThumb64.dll";
-#else
-	IsWow64Process(GetCurrentProcess(), &IsWOW64);
-	if (IsWOW64 == true)
-		ThumbHandlerDLL = "BlendThumb64.dll";
-	else
-		ThumbHandlerDLL = "BlendThumb.dll";
-#endif
-	snprintf(RegCmd, MAX_PATH * 2, "%s\\regsvr32 /s \"%s\\%s\"", SysDir, InstallDir, ThumbHandlerDLL);
-	system(RegCmd);
 
 	RegCloseKey(root);
-	printf("success (%s)\n", usr_mode ? "user" : "system");
+	printf("success (%s)\n", user_mode ? "user" : "system");
 	if (!G.background) {
-		sprintf(MBox, "File extension registered for %s.", usr_mode ? "the current user. To register for all users, run as an administrator" : "all users");
-		MessageBox(0, MBox, "Blender", MB_OK | MB_ICONINFORMATION);
+		BLI_snprintf(message, sizeof(message), "Range file associations registered for %s.",
+		             user_mode ? "the current user. Run as administrator to register for all users" : "all users");
+		MessageBox(NULL, message, "Range Engine", MB_OK | MB_ICONINFORMATION);
+	}
+	TerminateProcess(GetCurrentProcess(), 0);
+}
+
+static void unregister_file_association(HKEY root, const char *extension, const char *prog_id)
+{
+	HKEY hkey;
+	DWORD type;
+	DWORD size = 64;
+	char value[64];
+	char command_key[MAX_PATH];
+	char open_key[MAX_PATH];
+	char shell_key[MAX_PATH];
+	char icon_key[MAX_PATH];
+
+	if (RegOpenKeyEx(root, extension, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &hkey) == ERROR_SUCCESS) {
+		if (RegQueryValueEx(hkey, NULL, NULL, &type, (BYTE *)value, &size) == ERROR_SUCCESS &&
+		    type == REG_SZ && strcmp(value, prog_id) == 0) {
+			RegDeleteValue(hkey, NULL);
+		}
+		RegCloseKey(hkey);
+		RegDeleteKey(root, extension); /* only succeeds if the key is now empty */
+	}
+
+	BLI_snprintf(command_key, sizeof(command_key), "%s\\shell\\open\\command", prog_id);
+	BLI_snprintf(open_key, sizeof(open_key), "%s\\shell\\open", prog_id);
+	BLI_snprintf(shell_key, sizeof(shell_key), "%s\\shell", prog_id);
+	BLI_snprintf(icon_key, sizeof(icon_key), "%s\\DefaultIcon", prog_id);
+	RegDeleteKey(root, command_key);
+	RegDeleteKey(root, open_key);
+	RegDeleteKey(root, shell_key);
+	RegDeleteKey(root, icon_key);
+	RegDeleteKey(root, prog_id);
+}
+
+void BLI_windows_unregister_file_extensions(void)
+{
+	HKEY root;
+
+	printf("Removing Range file associations...");
+	/* Try both stores: an elevated registration lives in HKLM, a regular one in HKCU. */
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Classes", 0, KEY_WRITE, &root) == ERROR_SUCCESS) {
+		unregister_file_association(root, ".blend", "RangeEngine.BlendFile");
+		unregister_file_association(root, ".range", "RangeEngine.RangeFile");
+		RegCloseKey(root);
+	}
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Classes", 0, KEY_WRITE, &root) == ERROR_SUCCESS) {
+		unregister_file_association(root, ".blend", "RangeEngine.BlendFile");
+		unregister_file_association(root, ".range", "RangeEngine.RangeFile");
+		RegCloseKey(root);
+	}
+
+	printf("success\n");
+	if (!G.background) {
+		MessageBox(NULL, "Range file associations removed.", "Range Engine", MB_OK | MB_ICONINFORMATION);
 	}
 	TerminateProcess(GetCurrentProcess(), 0);
 }
