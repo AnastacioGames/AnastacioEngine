@@ -74,13 +74,21 @@ Aprovado:
   `[web-save] LOADED`. O save sobrevive à atualização release sobre release (o First Person não salva nada). Título da tela inicial aparece como
   "pkg" (nome do pacote Web de teste, não o `appName`).
 
+- 2026-09-24: controle na tela (A1, T4) no Find X3 Pro, aprovado pelo usuário ("funciona, perfeito"). APK debug
+  `com.anastaciogames.pad` ("Pad teste") da cena `pad` (`make_pad_project.py`, runtime release), gerado por
+  `tools/web/package-android.py --install`. Layout padrão (stick dinâmico + A/B): o logcat `RangeWeb` mostra o
+  stick analógico chegando a ±1 e em diagonais (`axes=[0.84, 0.24, ...]`), stick e B juntos
+  (`axes=[-0.99, 0.11, ...] buttons=[1]`), A 5 vezes no sensor Joystick e na ação `Pular` do Input System, com
+  soltura em todas; usuário fez arrastar para fora, barra de notificações e Home sem entrada presa. Layout `wasd`
+  (reaberto com `--es query "touchlayout=wasd"`, sem reinstalar): W/A/S/D e espaço com um `up` para cada `down`
+  (W 4, A 6, S 7, D 6, espaço 4) e `map Pular down` pelo espaço. O app segue instalado.
+
 - 2026-09-24: apps de teste desinstalados do Find X3 Pro a pedido do usuário: `com.anastaciogames.testerelease`,
   `com.anastaciogames.rangewebview` (template) e `com.anastaciogames.firstperson` ("teste1_fabio").
 
 Pendente (não confirmado nesta rodada):
 
-- Controle na tela (A1): roteiro no aparelho com a cena `pad` em
-  [android-touch-controls-plan.md](android-touch-controls-plan.md) (T4).
+- Controle na tela (A1): First Person com o layout `wasd` no aparelho (item 5 do roteiro da T4).
 
 - Home/retorno com o processo recriado pelo sistema.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).

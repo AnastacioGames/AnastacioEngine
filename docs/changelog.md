@@ -24,7 +24,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
-## 2026-09-24 - Controle na tela: checklist do celular conferida no navegador (A1, etapa T4, parte automática)
+## 2026-09-24 - Controle na tela: checklist do celular no navegador e no Find X3 Pro (A1, etapa T4)
 
 - `tools/web/verify-touch.cjs` passou de 19 para 25 conferências, cobrindo no Edge headless os critérios do plano
   que antes só estavam na lista do celular: dois botões juntos (A+B, engine vê `buttons=[0, 1]`), dedo do stick
@@ -34,8 +34,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Mudança do plano: a cena de teste da T4 é a do pad (`make_pad_project.py`), que já registra eixos, botões,
   teclas e a ação do Input System, e sai no logcat `RangeWeb` no APK; o multitoque fica no `verify-touch.cjs`,
   sem modo novo no `verify-capabilities.cjs`.
-- Roteiro do aparelho escrito no plano (T4) e anotado como pendente em `android-manual-tests.md`. Não testado:
-  celular.
+- Roteiro do aparelho escrito no plano (T4). Itens 1 a 4 aprovados no Find X3 Pro pelo usuário: APK
+  `com.anastaciogames.pad` da cena `pad`, layouts stick e `wasd`, logcat sem entrada presa (detalhes em
+  `android-manual-tests.md`). Falta o First Person com `wasd` no aparelho.
 
 ## 2026-09-24 - Controle na tela: layout no painel Web e aviso de entrada sem toque (A1, etapa T3)
 

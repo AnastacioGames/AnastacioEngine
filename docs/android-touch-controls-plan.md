@@ -129,7 +129,8 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - Seletor de layout no painel.
    - Aviso de ação sem mapeamento móvel (plano, linha 130).
    - Traduções pt/es/ru.
-5. **T4, testes e documentação: parte automática feita em 2026-09-24; falta o celular.** Mudanças do plano
+5. **T4, testes e documentação, feita em 2026-09-24:** itens 1 a 4 do roteiro aprovados no Find X3 Pro (ver
+   [android-manual-tests.md](android-manual-tests.md)); falta o item 5 (First Person). Mudanças do plano
    original: a cena de teste é a do pad (`tools/tests/web_profile/make_pad_project.py`, `projects-teste/pad`), que já
    imprime eixos, botões, teclas e a ação do Input System (`[pad] ...`, que no APK sai no logcat `RangeWeb`), em
    vez de um `create_web_touch_scene.py` repetido; o multitoque fica em `verify-touch.cjs` (já usa dois dedos pelo
@@ -138,7 +139,7 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    do botão A (segue no stick, A não aperta, soltar zera), `touchcancel` com stick e botão apertados, e página
    escondida (`visibilitychange`, como na troca de app) com o stick apertado. 25/25.
 
-   **Roteiro no celular (pendente):**
+   **Roteiro no celular:**
    1. Gerar a cena: `build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
    2. Abrir `projects-teste/pad/pad.range` no editor. Em Android (Range), usar um applicationId de teste (ex.:
       `com.anastaciogames.pad`), gerar o APK debug e instalar com "Instalar no celular". Log:
