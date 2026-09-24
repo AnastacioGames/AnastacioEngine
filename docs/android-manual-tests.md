@@ -23,12 +23,13 @@ Aprovado:
 - WebGL 2 (`OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))`), Python e cena rodando em paisagem.
 - `bge.logic.motion` no WebView: `available=True`, gravidade ≈ (0.1, 0.2, 9.8) com o aparelho deitado;
   inclinação e `calibrate()` pelo toque aprovados pelo usuário ("funciona").
+- 2026-09-24: APK reinstalado com a marca `RangeWebView/1` (runtime release): botão "Tela cheia" não aparece;
+  Home e retorno (via `adb shell input keyevent KEYCODE_HOME` e relançamento) voltam com a cena rodando, sem
+  recarregar e sem erro no logcat.
 
 Pendente (não confirmado nesta rodada):
 
-- Home e retorno (sem recarregar; o processo não foi recriado durante a sessão), giro de 180° em paisagem.
+- Giro de 180° em paisagem; Home/retorno com o processo recriado pelo sistema.
 - `?perf=1` com o jogo real (First Person), áudio, save/IDBFS e comparação com o Chrome do mesmo aparelho.
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
-- Esconder o botão "Tela cheia" do harness dentro do APK (a Activity já é imersiva). Implementado em 2026-09-24
-  (marca `RangeWebView/1` no user agent) e verificado só no navegador; falta confirmar no aparelho.
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.

@@ -28,8 +28,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - `MainActivity` acrescenta `RangeWebView/1` ao user agent do WebView. O `index.html` de `package-web.py` procura
   essa marca e não mostra o botão "Tela cheia" dentro do APK, que já abre imersivo. No navegador nada muda.
 - Verificado no Edge headless com o user agent sobrescrito pelo CDP (botão visível sem a marca, oculto com ela).
-  APK debug recompilado com o pacote `motion` e o runtime release (`build-web-release/bin`); falta instalar e
-  conferir no aparelho.
+  APK debug recompilado com o pacote `motion` e o runtime release (`build-web-release/bin`), instalado no
+  Find X3 Pro: botão ausente e Home/retorno com a cena seguindo sem recarregar.
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
 
