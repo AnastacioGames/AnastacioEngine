@@ -44,6 +44,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - `RangeEngine.exe -R`/`-r` registra `.blend` para o editor e `.range` para o `RangeRuntime`; `-U`/`-u` remove somente os valores e ProgIDs da Range Engine. O registro tenta `HKLM` e recua para `HKCU` sem elevação.
 - Validado sem abrir janela: `RangeEngine -r` e `-u` criaram/removeram no `HKCU` os ProgIDs, comandos e ícones esperados, e as associações anteriores foram restauradas. Falta o teste visual de duplo clique no Explorer.
 
+## 2026-09-24 - Lacunas do catálogo pt_BR e espanhol
+
+- Novo `range_web/translations_catalog.py`: 436 entradas pt_BR e 493 es já traduzidas nos `.po` do Blender 2.79, mas ausentes do MO instalado, passam a complementar os dicionários do editor. O russo não recebeu tradução em massa.
+- Auditoria com a árvore-fonte carregada: pt_BR 1 279 → 1 030 e es 1 336 → 1 089. A diferença remanescente inclui identificadores RNA, ícones e textos técnicos/iguais ao inglês; `engine_i18n.py` passou para pt_BR, es e ru_RU em modo background.
+
 ## 2026-09-24 - Export Android: AAB para a Google Play
 
 - `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda
