@@ -125,9 +125,12 @@ Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md).
 por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
 - **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
-  verificados com sensores emulados (`tools/web/verify-motion.cjs`). Falta o aceite no celular real
-  (`projects-teste/motion/motion.range`, gerada por `make_motion_project.py`) e conferir `orientation`.
-- **APK WebView mínimo (A0b)**: próximo passo. Máquina sem Android SDK/JDK/adb; o usuário está instalando o Android Studio (2026-09-23).
+  verificados com sensores emulados (`tools/web/verify-motion.cjs`) e aprovados no aparelho real dentro do APK
+  (inclinação e `calibrate()`). Falta conferir `orientation`, taxa/latência e o Chrome do mesmo aparelho.
+- **APK WebView mínimo (A0b)**: template em `tools/android/webview-template/` rodando a cena `motion` no
+  OPPO Find X3 Pro (2026-09-23): carga offline, WebGL 2, Python e sensores ok
+  ([android-manual-tests.md](android-manual-tests.md)). Próximo: Home/retorno, `?perf=1` e áudio/save com o jogo
+  real (First Person), comparação com o Chrome do aparelho, esconder o botão "Tela cheia" no APK.
 - AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros

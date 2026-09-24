@@ -23,6 +23,18 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - APK WebView mínimo (A0b) rodando no aparelho
+
+- Novo template `tools/android/webview-template/` (Kotlin, uma Activity, AGP 9.4.1 com Kotlin embutido, Gradle
+  9.7.1 pelo wrapper com `distributionSha256Sum`, compileSdk 37/targetSdk 36/minSdk 24, `androidx.webkit` 1.17.1,
+  `androidx.core` 1.19.1). `WebViewAssetLoader` serve `assets/www/` em `https://appassets.androidplatform.net`;
+  arquivo ausente responde 404 explícito e o app não pede `INTERNET`. Links externos abrem no navegador.
+- Paisagem (`sensorLandscape`), imersivo, tela acesa, `configChanges` para girar sem recarregar o jogo. Console JS
+  vai para o logcat (`RangeWeb`); depuração remota e o extra `query` (ex.: `debug=1`) só no build debug.
+- Testado no OPPO Find X3 Pro (Android 13, WebView 150) com a cena `motion`: carga offline, WebGL 2, Python e
+  `bge.logic.motion` com sensores reais; inclinação e `calibrate()` aprovados pelo usuário. Pendências em
+  `docs/android-manual-tests.md` (novo).
+
 ## 2026-09-23 - Sensores de movimento: `bge.logic.motion` (giroscópio, acelerômetro, inclinação)
 
 - Por decisão do usuário, os sensores vieram antes do APK Android: testáveis já no celular pelo navegador, e o APK
