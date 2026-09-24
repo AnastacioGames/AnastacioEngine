@@ -108,8 +108,13 @@ Pthreads não entram no plano atual. COOP/COEP isoladamente não comprovam supor
 
 **Estado 2026-09-24:** feito junto com A4 por decisão do usuário. A lógica está em
 `source/release/scripts/modules/range_web/android.py`; `tools/web/package-android.py` (terminal) e o painel
-"Android (Range)" (`bl_ui/properties_android.py`) só a chamam. APK debug funcionando; release assinado e o teste de
-atualização preservando o save ficam para a rodada seguinte.
+"Android (Range)" (`bl_ui/properties_android.py`) só a chamam. APK debug aceito no aparelho. Release assinado feito
+no mesmo dia: chave PKCS12 criada pelo keytool do JDK ("Criar chave" no painel ou `--create-keystore`), recusada
+dentro de repositório git e nunca sobrescrita; caminho e alias no `android-export.json`, senha só pela variável
+`RANGE_ANDROID_KEYSTORE_PASSWORD` ou pelo campo de sessão do painel (não vai para o `.blend`, JSON, log nem
+relatório); o Gradle recebe tudo pelo ambiente. Senha e alias conferidos pelo keytool antes do Gradle; o APK sai
+verificado pelo `apksigner` e o relatório guarda o SHA-256 do certificado. Falta no aparelho: atualização release
+sobre release preservando o save.
 
 `tools/web/package-android.py` consome a pasta produzida por `package-web.py`, verifica hashes e manifestos, copia recursos de execução para o template e aplica `android-export.json`. Não reimplementa coleta de assets ou validação Web.
 

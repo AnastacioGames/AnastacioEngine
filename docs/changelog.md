@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 36 | 57 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 37 | 57 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
 | [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
@@ -22,6 +22,24 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Export Android: release assinado
+
+- Build type Release liberado. Chave PKCS12 (RSA 4096, ~27 anos) criada pelo keytool do JDK: botão "Criar chave"
+  no painel (padrão `~/RangeAndroidKeys/<applicationId>.jks`) ou `package-android.py --create-keystore`. Recusa
+  caminho dentro de repositório git e nunca sobrescreve uma chave existente.
+- `android-export.json` ganha `keystore` e `keyAlias`; a senha nunca é gravada. Vem de
+  `RANGE_ANDROID_KEYSTORE_PASSWORD` (terminal, ou pedida por `getpass`) ou do campo "Senha da chave"
+  (`WindowManager.range_android_password`, `SKIP_SAVE`, fora do `.blend`). O template lê chave, alias e senha
+  do ambiente (`signingConfigs` só existe com `RANGE_ANDROID_KEYSTORE`), então nada fica no projeto temporário.
+- Antes do Gradle, `keytool -list` confere senha e alias (erros claros em vez da exceção do Gradle). Depois,
+  `apksigner verify --print-certs`; o relatório ganha `signing` com o SHA-256 do certificado.
+- Catálogos es/ru do Android completados: `engine_i18n.py` falhava em "es/ru cobrem as mesmas chaves do pt_BR"
+  desde o commit do A3/A4.
+- Verificado: `test_android.py` (20 testes, com criação real de chave, senha errada, alias inexistente e recusa
+  dentro do git), `engine_android_export.py` e `engine_i18n.py` sem falhas; release do First Person pelo terminal
+  com chave temporária (APK assinado, senha ausente de `gradle.log`, JSON e relatório); debug continua igual.
+  Pendente: instalar release e atualizar por cima no aparelho mantendo o save.
 
 ## 2026-09-24 - Export Android pelo editor e pelo terminal (A3/A4, APK debug)
 

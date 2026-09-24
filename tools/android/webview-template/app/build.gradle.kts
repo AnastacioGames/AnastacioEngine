@@ -16,9 +16,26 @@ android {
         versionName = "0.1.0"
     }
 
+    // Chave do release pelo ambiente (range_web/android.py): a senha nao fica em arquivo do projeto.
+    val keystore = System.getenv("RANGE_ANDROID_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) {
+            create("range") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("RANGE_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RANGE_ANDROID_KEY_ALIAS")
+                // PKCS12 (keytool padrao) usa a mesma senha para o arquivo e a chave.
+                keyPassword = System.getenv("RANGE_ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (keystore != null) {
+                signingConfig = signingConfigs.getByName("range")
+            }
         }
     }
 

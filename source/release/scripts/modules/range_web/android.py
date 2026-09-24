@@ -42,7 +42,14 @@ DEFAULTS = {
     "icon": "",
     "orientation": "auto",
     "buildType": "debug",
+    # Release: caminho da chave e alias. A senha nunca entra aqui (vem do ambiente ou do painel, so na sessao).
+    "keystore": "",
+    "keyAlias": "",
 }
+
+# Senha da chave para o terminal e para o Gradle (o template le as variaveis RANGE_ANDROID_*).
+PASSWORD_ENV = "RANGE_ANDROID_KEYSTORE_PASSWORD"
+MIN_PASSWORD = 6  # minimo do keytool
 
 # Arquivos do pacote Web que so servem para hospedagem e ficam fora do APK.
 _WEB_ONLY = {"serve.py", "HOSTING.md"}
@@ -78,9 +85,10 @@ def load_config(path):
         raise AndroidError(Msg("Invalid %s: expected a JSON object.", path))
     config = dict(DEFAULTS)
     config.update(data)
-    icon = config.get("icon")
-    if icon and not os.path.isabs(icon):
-        config["icon"] = os.path.join(os.path.dirname(os.path.abspath(path)), icon)
+    for key in ("icon", "keystore"):
+        value = config.get(key)
+        if value and not os.path.isabs(value):
+            config[key] = os.path.join(os.path.dirname(os.path.abspath(path)), value)
     return config
 
 
@@ -112,7 +120,7 @@ def config_problems(config):
     if config.get("buildType") not in BUILD_TYPES:
         problems.append(Msg("Invalid build type: %s.", config.get("buildType")))
     elif config["buildType"] == "release":
-        problems.append(Msg("Signed release build is not available yet; use debug."))
+        problems.extend(keystore_problems(config))
     icon = config.get("icon") or ""
     if icon:
         try:
@@ -124,6 +132,44 @@ def config_problems(config):
             if not is_png:
                 problems.append(Msg("The icon must be a PNG image: %s", icon))
     return problems
+
+
+def inside_git(path):
+    """Raiz do repositorio git que contem `path`, ou None."""
+    here = os.path.dirname(os.path.abspath(path))
+    while True:
+        if os.path.exists(os.path.join(here, ".git")):
+            return here
+        parent = os.path.dirname(here)
+        if parent == here:
+            return None
+        here = parent
+
+
+def keystore_problems(config, must_exist=True):
+    """O que impede usar a chave do release (vazia = ok). must_exist=False ao criar a chave."""
+    problems = []
+    keystore = config.get("keystore") or ""
+    if not keystore:
+        problems.append(Msg("Release needs a signing key: choose the key file or create one."))
+    else:
+        repo = inside_git(keystore)
+        if repo:
+            problems.append(Msg("The signing key must stay outside git repositories (%s is inside %s). "
+                                "Keep it in a private folder with a backup.", keystore, repo))
+        elif must_exist and not os.path.isfile(keystore):
+            problems.append(Msg("Signing key not found: %s", keystore))
+    if not (config.get("keyAlias") or "").strip():
+        problems.append(Msg("Fill in the key alias."))
+    return problems
+
+
+def password_problem(password):
+    if not password:
+        return Msg("Type the signing key password (or set %s).", PASSWORD_ENV)
+    if len(password) < MIN_PASSWORD:
+        return Msg("The key password needs at least %d characters.", MIN_PASSWORD)
+    return None
 
 
 # --- JDK e Android SDK ---
@@ -138,6 +184,20 @@ class Toolchain:
     @property
     def adb(self):
         return os.path.join(self.sdk_dir, "platform-tools", "adb" + _EXE)
+
+    @property
+    def keytool(self):
+        return os.path.join(self.java_home, "bin", "keytool" + _EXE)
+
+    @property
+    def apksigner(self):
+        """apksigner do build-tools mais novo, ou None."""
+        name = "apksigner.bat" if os.name == "nt" else "apksigner"
+        found = glob.glob(os.path.join(self.sdk_dir, "build-tools", "*", name))
+
+        def version(path):
+            return [int(x) if x.isdigit() else 0 for x in os.path.basename(os.path.dirname(path)).split(".")]
+        return max(found, key=version) if found else None
 
     def env(self):
         env = dict(os.environ)
@@ -355,7 +415,7 @@ def _gradle_failure(log_path):
     return " ".join(tail)
 
 
-def run_gradle(project, toolchain, build_type, log_path, log=print):
+def run_gradle(project, toolchain, build_type, log_path, log=print, extra_env=None):
     task = "assembleDebug" if build_type == "debug" else "assembleRelease"
     wrapper = os.path.join(project, "gradlew.bat" if os.name == "nt" else "gradlew")
     if os.name != "nt":
@@ -364,7 +424,9 @@ def run_gradle(project, toolchain, build_type, log_path, log=print):
     log("Gradle: %s (log em %s)" % (task, log_path))
     with open(log_path, "w", encoding="utf-8", errors="replace") as out:
         creation = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        result = subprocess.run(cmd, cwd=project, env=toolchain.env(), stdout=out, stderr=subprocess.STDOUT,
+        env = toolchain.env()
+        env.update(extra_env or {})
+        result = subprocess.run(cmd, cwd=project, env=env, stdout=out, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, creationflags=creation)
     if result.returncode != 0:
         raise AndroidError(Msg("Gradle failed (see %s): %s", log_path, _gradle_failure(log_path)))
@@ -372,6 +434,66 @@ def run_gradle(project, toolchain, build_type, log_path, log=print):
     if not os.path.isfile(apk):
         raise AndroidError(Msg("Gradle finished but the APK was not found at %s.", apk))
     return apk
+
+
+def _run(cmd, timeout=120, **kw):
+    creation = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    return subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout,
+                          stdin=subprocess.DEVNULL, creationflags=creation, **kw)
+
+
+def create_keystore(path, alias, password, name, toolchain=None, log=print):
+    """Cria a chave do release com o keytool do JDK (PKCS12, RSA 4096, ~27 anos). Nunca sobrescreve."""
+    problems = keystore_problems({"keystore": path, "keyAlias": alias}, must_exist=False)
+    problem = password_problem(password)
+    if problem:
+        problems.append(problem)
+    if problems:
+        raise AndroidError(problems[0])
+    if os.path.exists(path):
+        raise AndroidError(Msg("%s already exists; a signing key is never overwritten.", path))
+    toolchain = toolchain or find_toolchain()
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    common = re.sub(r'[,+"\\<>;=#]', " ", name or "").strip() or "Range"
+    # A senha vai pelo ambiente (:env), nao pela linha de comando visivel a outros processos.
+    env = dict(os.environ, RANGE_KEYTOOL_PASS=password)
+    result = _run([toolchain.keytool, "-genkeypair", "-keystore", path, "-storetype", "PKCS12",
+                   "-alias", alias, "-keyalg", "RSA", "-keysize", "4096", "-validity", "10000",
+                   "-dname", "CN=" + common,
+                   "-storepass:env", "RANGE_KEYTOOL_PASS", "-keypass:env", "RANGE_KEYTOOL_PASS"], env=env)
+    if result.returncode != 0 or not os.path.isfile(path):
+        output = (result.stdout + result.stderr).strip()
+        raise AndroidError(Msg("keytool failed: %s", output.splitlines()[-1] if output else result.returncode))
+    log("Chave criada em %s (alias %s). Guarde uma copia de seguranca e a senha." % (path, alias))
+    return path
+
+
+def check_keystore(path, alias, password, toolchain):
+    """Abre a chave com o keytool antes do Gradle, para dar erro claro de senha ou alias."""
+    env = dict(os.environ, RANGE_KEYTOOL_PASS=password)
+    result = _run([toolchain.keytool, "-list", "-keystore", path, "-alias", alias,
+                   "-storepass:env", "RANGE_KEYTOOL_PASS"], env=env)
+    if result.returncode == 0:
+        return
+    output = (result.stdout + result.stderr).lower()
+    if "password" in output:
+        raise AndroidError(Msg("Wrong password for the signing key %s.", path))
+    if "alias" in output or "does not exist" in output:
+        raise AndroidError(Msg("The signing key %s has no alias %s.", path, alias))
+    raise AndroidError(Msg("keytool failed: %s", output.strip().splitlines()[-1] if output.strip() else
+                           result.returncode))
+
+
+def signing_certificate(apk, toolchain):
+    """SHA-256 do certificado que assinou o APK (apksigner verify), ou "" se nao der para ler."""
+    if not toolchain.apksigner:
+        return ""
+    try:
+        result = _run([toolchain.apksigner, "verify", "--print-certs", apk], env=toolchain.env())
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    m = re.search(r"certificate SHA-256 digest: ([0-9a-f]+)", result.stdout)
+    return m.group(1) if result.returncode == 0 and m else ""
 
 
 def _java_version(toolchain):
@@ -405,19 +527,33 @@ def _apk_name(config):
     return "%s-%s-%s.apk" % (stem, version, config["buildType"])
 
 
-def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=print):
+def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=print, password=None):
     """Gera o APK a partir do pacote Web em `package_dir`. Devolve o caminho do APK copiado para `out_dir`.
+
+    Release: `password` (ou a variavel RANGE_ANDROID_KEYSTORE_PASSWORD) abre a chave de config["keystore"].
 
     Grava em `out_dir`: o APK, android-export.json (a configuracao usada), android-report.json e gradle.log.
     """
     problems = config_problems(config)
     if problems:
         raise AndroidError(problems[0])
+    release = config["buildType"] == "release"
+    signing_env = {}
+    if release:
+        password = password or os.environ.get(PASSWORD_ENV, "")
+        problem = password_problem(password)
+        if problem:
+            raise AndroidError(problem)
+        signing_env = {"RANGE_ANDROID_KEYSTORE": os.path.abspath(config["keystore"]),
+                       "RANGE_ANDROID_KEY_ALIAS": config["keyAlias"].strip(), PASSWORD_ENV: password}
     template = template or template_dir()
     if template is None:
         raise AndroidError(Msg("Android template not found (tools/android/webview-template). "
                                "Export from a development tree."))
     toolchain = toolchain or find_toolchain()
+    if release:
+        check_keystore(signing_env["RANGE_ANDROID_KEYSTORE"], signing_env["RANGE_ANDROID_KEY_ALIAS"], password,
+                       toolchain)
     log("JDK: %s (%s)" % (toolchain.java_home, toolchain.java_source))
     log("Android SDK: %s (%s)" % (toolchain.sdk_dir, toolchain.sdk_source))
     manifest = verify_web_package(package_dir)
@@ -435,9 +571,13 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
     prepare_project(template, package_dir, config, work)
     log("Projeto Android montado em %s" % work)
 
-    built = run_gradle(work, toolchain, config["buildType"], os.path.join(out_dir, GRADLE_LOG_NAME), log)
+    built = run_gradle(work, toolchain, config["buildType"], os.path.join(out_dir, GRADLE_LOG_NAME), log,
+                       extra_env=signing_env)
     apk = os.path.join(out_dir, _apk_name(config))
     shutil.copyfile(built, apk)
+    certificate = signing_certificate(apk, toolchain)
+    if release and not certificate:
+        raise AndroidError(Msg("The release APK is not signed (apksigner could not verify %s).", apk))
 
     report = {
         "schema": "range-android-report",
@@ -465,6 +605,11 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
                                 glob.glob(os.path.join(toolchain.sdk_dir, "platforms", "android-*"))),
             "build_tools": sorted(os.path.basename(p) for p in
                                   glob.glob(os.path.join(toolchain.sdk_dir, "build-tools", "*"))),
+        },
+        "signing": {
+            "keystore": os.path.abspath(config["keystore"]) if release else "",
+            "keyAlias": config["keyAlias"].strip() if release else "",
+            "certificate_sha256": certificate,
         },
         "project_dir": work,
     }

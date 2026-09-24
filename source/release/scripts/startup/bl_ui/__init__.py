@@ -264,6 +264,13 @@ def register():
 
     from . import properties_android
     Scene.range_android = PointerProperty(type=properties_android.RangeAndroidSettings)
+    # Senha da chave do release: no WindowManager para nunca ir para o .blend.
+    WindowManager.range_android_password = StringProperty(
+        name="Key password",
+        description="Password of the signing key; kept only while the editor is open, never saved in the file",
+        subtype='PASSWORD',
+        options={'SKIP_SAVE'},
+    )
     ########### End Range Web Profile ###########
 
 
@@ -272,6 +279,7 @@ def unregister():
 
     if hasattr(Scene, "range_android"):
         del Scene.range_android
+        del bpy.types.WindowManager.range_android_password
 
     if hasattr(Scene, "range_web"):
         from range_web import translations as range_web_translations

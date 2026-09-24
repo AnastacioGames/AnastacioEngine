@@ -50,8 +50,31 @@ class ConfigTests(unittest.TestCase):
         for bad in (0, -1, "3", True, 2100000001):
             self.assertTrue(android.config_problems(config(versionCode=bad)), bad)
 
-    def test_release_blocked_for_now(self):
+    def test_release_needs_key_outside_git(self):
         self.assertTrue(android.config_problems(config(buildType="release")))
+        with tempfile.TemporaryDirectory() as tmp:
+            key = os.path.join(tmp, "jogo.jks")
+            touch(key, b"key")
+            self.assertEqual(android.config_problems(config(buildType="release", keystore=key, keyAlias="upload")), [])
+            self.assertTrue(android.config_problems(config(buildType="release", keystore=key, keyAlias="")))
+            os.makedirs(os.path.join(tmp, ".git"))
+            problems = android.config_problems(config(buildType="release", keystore=key, keyAlias="upload"))
+            self.assertIn("outside git", str(problems[0]))
+        missing = os.path.join(tempfile.gettempdir(), "range-nao-existe.jks")
+        self.assertTrue(android.config_problems(config(buildType="release", keystore=missing, keyAlias="upload")))
+
+    def test_password(self):
+        self.assertIsNotNone(android.password_problem(""))
+        self.assertIsNotNone(android.password_problem("12345"))
+        self.assertIsNone(android.password_problem("123456"))
+
+    def test_password_never_saved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, android.CONFIG_NAME)
+            android.save_config(config(keystore="k.jks", keyAlias="upload", password="segredo"), path)
+            with open(path, encoding="utf-8") as f:
+                self.assertNotIn("segredo", f.read())
+            self.assertEqual(android.load_config(path)["keystore"], os.path.join(tmp, "k.jks"))
 
     def test_icon_must_be_png(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -120,6 +143,45 @@ class ToolchainTests(unittest.TestCase):
         with self.assertRaises(android.AndroidError) as ctx:
             self.find({"JAVA_HOME": self.jdk("j"), "ANDROID_HOME": self.sdk("s", platform=False)})
         self.assertIn("platform %d" % android.COMPILE_SDK, str(ctx.exception))
+
+
+def _real_toolchain():
+    try:
+        return android.find_toolchain()
+    except android.AndroidError:
+        return None
+
+
+@unittest.skipIf(_real_toolchain() is None, "JDK/Android SDK ausentes")
+class KeystoreTests(unittest.TestCase):
+    def test_create_and_never_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = os.path.join(tmp, "chaves", "jogo.jks")
+            android.create_keystore(key, "upload", "senha-teste", "Jogo", _real_toolchain(), log=lambda _l: None)
+            self.assertTrue(os.path.isfile(key))
+            with open(key, "rb") as f:
+                before = f.read()
+            with self.assertRaisesRegex(android.AndroidError, "never overwritten"):
+                android.create_keystore(key, "upload", "senha-teste", "Jogo", _real_toolchain())
+            with open(key, "rb") as f:
+                self.assertEqual(f.read(), before)
+
+    def test_check_password_and_alias(self):
+        tc = _real_toolchain()
+        with tempfile.TemporaryDirectory() as tmp:
+            key = os.path.join(tmp, "jogo.jks")
+            android.create_keystore(key, "upload", "senha-teste", "Jogo", tc, log=lambda _l: None)
+            android.check_keystore(key, "upload", "senha-teste", tc)
+            with self.assertRaisesRegex(android.AndroidError, "Wrong password"):
+                android.check_keystore(key, "upload", "senha-errada", tc)
+            with self.assertRaisesRegex(android.AndroidError, "no alias"):
+                android.check_keystore(key, "outro", "senha-teste", tc)
+
+    def test_refuses_inside_git(self):
+        with self.assertRaisesRegex(android.AndroidError, "outside git"):
+            android.create_keystore(os.path.join(ROOT, "tmp-nao-criar.jks"), "upload", "senha-teste", "Jogo",
+                                    _real_toolchain())
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "tmp-nao-criar.jks")))
 
 
 class WebPackageTests(unittest.TestCase):

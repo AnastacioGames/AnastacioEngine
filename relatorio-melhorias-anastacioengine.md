@@ -174,7 +174,10 @@ ferramenta correspondente.
   copia `tools/android/webview-template` para uma pasta temporária e roda o Gradle. JDK e Android SDK não vêm com a
   engine: procura em `JAVA_HOME`/`ANDROID_HOME`, depois no Android Studio instalado, depois nas pastas do painel, e
   sem eles mostra erro sem instalar nada. `applicationId` é a identidade do app (mudar perde o save). Release
-  assinado ainda bloqueado; a chave ficará fora do `android-export.json` e do git.
+  assinado: a chave (PKCS12, criada pelo keytool do JDK) fica fora de repositórios git e nunca é sobrescrita; o
+  JSON guarda só caminho e alias; a senha vem de `RANGE_ANDROID_KEYSTORE_PASSWORD` ou de um campo de sessão do
+  painel e chega ao Gradle pelo ambiente. Perder a chave obriga a publicar como outro app; um APK debug instalado
+  não é atualizado por um release (chaves diferentes).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados
