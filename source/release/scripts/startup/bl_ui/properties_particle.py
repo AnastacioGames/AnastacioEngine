@@ -24,6 +24,7 @@ import bpy
 from bpy.types import Panel, Menu, Operator
 from rna_prop_ui import PropertyPanel
 from bpy.app.translations import pgettext_iface as iface_
+from bpy.app.translations import pgettext_tip as tip_
 
 from .properties_physics_common import (
     point_cache_ui,
@@ -1712,13 +1713,13 @@ class PARTICLE_OT_import_gpu_debug_values(Operator):
     def execute(self, context):
         path = _gpu_debug_sidecar_path()
         if not path or not os.path.exists(path):
-            self.report({'INFO'}, "Nenhum gpu_particles_debug.json encontrado ao lado do .blend")
+            self.report({'INFO'}, tip_("No gpu_particles_debug.json found next to the .blend"))
             return {'CANCELLED'}
 
         applied = _apply_gpu_debug_values(path)
         os.replace(path, path[:-len(".json")] + ".applied.json")
-        self.report({'INFO'}, "Valores de debug aplicados: %s" % ", ".join(applied) if applied else
-                     "Nenhum objeto do JSON corresponde a objetos desta cena")
+        self.report({'INFO'}, tip_("Debug values applied: %s") % ", ".join(applied) if applied else
+                    tip_("No object in the JSON matches an object of this scene"))
         return {'FINISHED'}
 
 

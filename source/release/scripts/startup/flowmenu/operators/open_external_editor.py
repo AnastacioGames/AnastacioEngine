@@ -3,19 +3,20 @@ import os
 import sys
 import subprocess
 from bpy.types import Operator
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import EnumProperty, IntProperty
 
 
 class FLOWMENU_OT_open_external_editor(Operator):
     bl_label = "Open AS"
     bl_idname = "wm.flowmenu_open_external_editor"
-    bl_description = "Abre a pasta do projeto ou o script do componente selecionado"
+    bl_description = "Opens the project folder or the script of the selected component"
 
     # Se index >= 0, abre o script daquele componente. Se -1, abre a pasta do projeto.
     index: IntProperty(default=-1)
 
     editors_enum: EnumProperty(name="Editor", items=[
-        ("default", "Sistema Padrão", "Abre com o programa padrão do sistema"),
+        ("default", "System Default", "Opens with the default program of the system"),
         ("code", "VSCode", "Visual Studio Code"),],
                                default="default")
 
@@ -61,7 +62,7 @@ class FLOWMENU_OT_open_external_editor(Operator):
             subprocess.Popen([editor, path], shell=True)
             return True
         except Exception as e:
-            self.report({'ERROR'}, "Erro ao chamar editor '{}': {}".format(editor, e))
+            self.report({'ERROR'}, tip_("Could not run the editor '%s': %s") % (editor, e))
             return False
 
     def open_specific_script(self, context):
@@ -80,7 +81,7 @@ class FLOWMENU_OT_open_external_editor(Operator):
         # Onde o .blend está salvo
         base_path = bpy.path.abspath("//")
         if not base_path:
-            self.report({'ERROR'}, "Salve o arquivo .blend antes de abrir scripts!")
+            self.report({'ERROR'}, tip_("Save the .blend file before opening scripts!"))
             return {'CANCELLED'}
 
         # Tenta construir o caminho do arquivo
@@ -97,7 +98,7 @@ class FLOWMENU_OT_open_external_editor(Operator):
 
         # Verificação final
         if not os.path.exists(filepath):
-            self.report({'WARNING'}, "Arquivo não encontrado em: {}".format(filepath))
+            self.report({'WARNING'}, tip_("File not found at: %s") % filepath)
             # Tenta abrir a pasta para ajudar o usuário a achar
             self.get_editor_command(base_path)
             return {'CANCELLED'}

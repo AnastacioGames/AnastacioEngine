@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 20 | 35 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 21 | 36 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,21 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Operadores da Range com texto-fonte em inglês e tradução
+
+- Mensagens e dicas que estavam escritas em português no código passaram ao inglês, como no painel Web, e o
+  português original virou tradução (pt/es/ru no bloco `MESSAGES` de `range_web/translations_labels.py`, 16 textos):
+  `flowmenu/operators/open_external_editor.py` (dica, item "System Default", três mensagens),
+  `flowmenu/functions/create_component_wizard.py` (três mensagens), `flowmenu/custom_pt_physics.py` (dica do Set Drive
+  Type e itens FWD/RWD/AWD) e `bl_ui/properties_particle.py` (três mensagens do Import Debug Values). As mensagens
+  de `self.report` passam por `pgettext_tip`, porque o `report` não traduz sozinho.
+- Com a tradução desligada (padrão de fábrica), o editor mostra esses textos em inglês; com pt ligado, o texto é o
+  mesmo de antes.
+- Conferido no motor: os quatro operadores registram com a dica em inglês e `pgettext_tip` devolve pt/es/ru.
+  `engine_i18n.py`, `engine_web_ui.py` e os 124 testes puros seguem OK. Não conferido na janela real.
+- Fica de fora: o addon opcional `addon_editor_shot_tool.py` (UI em português) e o código gerado para o jogo
+  (template do `VehiclePlayerComponent`, que imprime no console do jogo).
 
 ## 2026-09-24 - Tradução dos textos de interface em C fora do RNA (scan estático)
 

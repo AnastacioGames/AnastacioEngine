@@ -1186,6 +1186,52 @@ EXTRA = (
     ("Y Flip", "Espelhar Y", "Reflejar Y", "Отразить по Y"),
 )
 
-PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA}
-ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA}
-RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA}
+# Mensagens e dicas dos operadores da Range (flowmenu, veiculo, particulas) que estavam escritas em portugues no
+# codigo; o codigo passou ao ingles e o portugues original vem daqui.
+MESSAGES = (
+    ("Select an object with Game Physics!", "Selecione um objeto com Game Physics!",
+     "¡Selecciona un objeto con Game Physics!", "Выберите объект с Game Physics!"),
+    ("Save the .blend file first!", "Salve o arquivo .blend primeiro!", "¡Guarda primero el archivo .blend!",
+     "Сначала сохраните файл .blend!"),
+    ("Component registered: %s", "Componente registrado: %s", "Componente registrado: %s", "Компонент зарегистрирован: %s"),
+    ("Opens the project folder or the script of the selected component",
+     "Abre a pasta do projeto ou o script do componente selecionado",
+     "Abre la carpeta del proyecto o el script del componente seleccionado",
+     "Открывает папку проекта или скрипт выбранного компонента"),
+    ("System Default", "Padrão do sistema", "Predeterminado del sistema", "Системный по умолчанию"),
+    ("Opens with the default program of the system", "Abre com o programa padrão do sistema",
+     "Abre con el programa predeterminado del sistema", "Открывает программой по умолчанию в системе"),
+    ("Could not run the editor '%s': %s", "Erro ao chamar o editor '%s': %s", "No se pudo ejecutar el editor '%s': %s",
+     "Не удалось запустить редактор '%s': %s"),
+    ("Save the .blend file before opening scripts!", "Salve o arquivo .blend antes de abrir scripts!",
+     "¡Guarda el archivo .blend antes de abrir scripts!", "Сохраните файл .blend перед открытием скриптов!"),
+    ("File not found at: %s", "Arquivo não encontrado em: %s", "Archivo no encontrado en: %s", "Файл не найден: %s"),
+    ("Turns 'Drive' on or off on the right wheels by their Y position relative to the chassis (Y+ = front, "
+     "Y- = rear, following the project convention). Bulk editing shortcut; creates no new data, only sets "
+     "has_drive per wheel",
+     "Liga/desliga 'Drive' nas rodas certas por posição Y relativa ao chassi (Y+ = dianteira, Y- = traseira, "
+     "seguindo a convenção do projeto). Atalho de edição em massa; não cria nenhum dado novo, só marca has_drive "
+     "por roda",
+     "Activa o desactiva 'Drive' en las ruedas correctas según su posición Y relativa al chasis (Y+ = delantera, "
+     "Y- = trasera, según la convención del proyecto). Atajo de edición en masa; no crea datos nuevos, solo marca "
+     "has_drive en cada rueda",
+     "Включает или выключает 'Drive' на нужных колёсах по их позиции Y относительно шасси (Y+ = перед, "
+     "Y- = зад, по соглашению проекта). Быстрая массовая правка; не создаёт новых данных, только задаёт "
+     "has_drive для каждого колеса"),
+    ("Only the front wheels (positive Y) get traction", "Só as rodas dianteiras (Y positivo) recebem tração",
+     "Solo las ruedas delanteras (Y positivo) reciben tracción", "Тягу получают только передние колёса (Y положительный)"),
+    ("Only the rear wheels (negative Y) get traction", "Só as rodas traseiras (Y negativo) recebem tração",
+     "Solo las ruedas traseras (Y negativo) reciben tracción", "Тягу получают только задние колёса (Y отрицательный)"),
+    ("All wheels get traction", "Todas as rodas recebem tração", "Todas las ruedas reciben tracción",
+     "Тягу получают все колёса"),
+    ("No gpu_particles_debug.json found next to the .blend", "Nenhum gpu_particles_debug.json encontrado ao lado do .blend",
+     "No se encontró gpu_particles_debug.json junto al .blend", "Рядом с .blend не найден gpu_particles_debug.json"),
+    ("Debug values applied: %s", "Valores de debug aplicados: %s", "Valores de depuración aplicados: %s",
+     "Применены отладочные значения: %s"),
+    ("No object in the JSON matches an object of this scene", "Nenhum objeto do JSON corresponde a objetos desta cena",
+     "Ningún objeto del JSON corresponde a un objeto de esta escena", "Ни один объект из JSON не совпадает с объектами этой сцены"),
+)
+
+PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES}
+ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES}
+RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES}

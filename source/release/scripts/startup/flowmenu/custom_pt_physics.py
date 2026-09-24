@@ -232,18 +232,17 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
 class OBJECT_OT_vehicle_set_drive_type(Operator):
     bl_idname = "object.vehicle_set_drive_type"
     bl_label = "Set Drive Type"
-    bl_description = ("Liga/desliga 'Drive' nas rodas certas por posição Y relativa ao "
-                       "chassi (Y+ = dianteira, Y- = traseira, seguindo a convenção do "
-                       "projeto). Atalho de edição em massa; não cria nenhum dado novo, "
-                       "só marca has_drive por roda")
+    bl_description = ("Turns 'Drive' on or off on the right wheels by their Y position relative to the "
+                      "chassis (Y+ = front, Y- = rear, following the project convention). Bulk editing "
+                      "shortcut; creates no new data, only sets has_drive per wheel")
     bl_options = {'UNDO'}
 
     drive_type: bpy.props.EnumProperty(
         name="Drive Type",
         items=[
-            ('FWD', "FWD", "Só as rodas dianteiras (Y positivo) recebem tração"),
-            ('RWD', "RWD", "Só as rodas traseiras (Y negativo) recebem tração"),
-            ('AWD', "AWD", "Todas as rodas recebem tração"),
+            ('FWD', "FWD", "Only the front wheels (positive Y) get traction"),
+            ('RWD', "RWD", "Only the rear wheels (negative Y) get traction"),
+            ('AWD', "AWD", "All wheels get traction"),
         ],
     )
 

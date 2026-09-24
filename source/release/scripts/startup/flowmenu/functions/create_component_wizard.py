@@ -3,6 +3,7 @@ import os
 import sys
 import importlib
 from bpy.types import Operator, PropertyGroup
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import StringProperty, EnumProperty, CollectionProperty, IntProperty, BoolProperty
 
 
@@ -36,12 +37,12 @@ class FLOWMENU_OT_create_advanced_component(Operator):
 		ob = context.active_object
 
 		if not ob or not hasattr(ob, "game"):
-			self.report({'ERROR'}, "Selecione um objeto com Game Physics!")
+			self.report({'ERROR'}, tip_("Select an object with Game Physics!"))
 			return {'CANCELLED'}
 
 		root_path = get_scripts_path_internal()
 		if not root_path:
-			self.report({'ERROR'}, "Salve o arquivo .blend primeiro!")
+			self.report({'ERROR'}, tip_("Save the .blend file first!"))
 			return {'CANCELLED'}
 
 		s_module = scene.flowmenu_wizard_module
@@ -150,7 +151,7 @@ class {}(Range.types.KX_PythonComponent):
 			bpy.ops.wm.flowmenu_component_list_refresh()
 
 			scene.flowmenu_show_wizard = False
-			self.report({'INFO'}, "Sucesso! " + full_name)
+			self.report({'INFO'}, tip_("Component registered: %s") % full_name)
 
 		except Exception as e:
 			self.report({'ERROR'}, "Could not register component: " + str(e))

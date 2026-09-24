@@ -73,8 +73,11 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   (2026-09-24; restam só nomes próprios, códigos e palavras iguais nas duas línguas). Textos em C fora do RNA
   (`IFACE_`/`TIP_`/`N_`): scan em `i18n_scan_c.py` e traduções em `translations_c.py` (2026-09-24; em pt/es restam
   códigos e nomes; no ru, 90 lacunas do catálogo russo do Blender). O russo (e o es) de `translations_ui.py`, `translations_labels.py` e `translations_c.py` precisa de revisão nativa.
-- Mensagens das regras Web traduzidas (2026-09-23, `translations_rules.py`; es/ru pedem revisão nativa). Falta
-  traduzir os demais textos em português da Range fora do painel Web.
+- Mensagens das regras Web traduzidas (2026-09-23, `translations_rules.py`; es/ru pedem revisão nativa). Textos em
+  português dos operadores da Range (flowmenu: editor externo e assistente de componente; veículo; partículas)
+  passaram ao inglês com tradução (2026-09-24, bloco `MESSAGES` de `translations_labels.py`). Falta: o addon opcional
+  `addon_editor_shot_tool.py` (UI toda em português; tem cópia em `tools/ProjetoCutscene`) e envolver em `tip_()` as
+  mensagens de `self.report` que já estão em inglês no flowmenu (hoje não se traduzem).
 - Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
   `libboost-all-dev`), rodar `engine_i18n.py` e conferir o seletor na janela; confirmar que o pacote leva `locale/*/LC_MESSAGES/blender.mo`.
 - Roteiros manuais citam os botões pelo nome em português; em inglês são Validate Web, Export Web, Open in browser.
