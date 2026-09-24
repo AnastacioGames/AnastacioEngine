@@ -143,6 +143,7 @@ set(SRC
 	KX_PythonKeyboard.cpp
 	KX_PythonJoystick.cpp
 	KX_PythonMain.cpp
+	KX_PythonMotion.cpp
 	KX_PythonMouse.cpp
 	KX_RenderPipeline.cpp
 	KX_RadarSensor.cpp
@@ -251,6 +252,7 @@ set(SRC
 	KX_PythonKeyboard.h
 	KX_PythonJoystick.h
 	KX_PythonMain.h
+	KX_PythonMotion.h
 	KX_PythonMouse.h
 	KX_RenderPipeline.h
 	KX_RadarSensor.h

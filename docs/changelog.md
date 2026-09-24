@@ -23,6 +23,27 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-23 - Sensores de movimento: `bge.logic.motion` (giroscópio, acelerômetro, inclinação)
+
+- Por decisão do usuário, os sensores vieram antes do APK Android: testáveis já no celular pelo navegador, e o APK
+  (WebView) herda sem mudança. Não há biblioteca externa: `DeviceMotionEvent`/`DeviceOrientationEvent` são padrão.
+- Nova classe `KX_PythonMotion` (`Ketsji/KX_PythonMotion.{h,cpp}`, no padrão de `KX_PythonMouse`), registrada como
+  `bge.logic.motion`: `available`, `gyroscope` (rad/s), `accelerometer` e `gravity` (m/s², apontando para cima como
+  no W3C), `orientation` (alpha/beta/gamma do navegador), `tilt` (x, y de -1 a 1: para onde uma bola rolaria na
+  tela) e `calibrate()`. No Web lê `Module.rangeMotion` por `EM_JS`; nas outras plataformas `available = False` e
+  zeros. Documentada em `bge.types.KX_PythonMotion.rst`.
+- Página do `package-web.py`: ouve os dois eventos, gira os eixos para os da tela (`screen.orientation.angle`),
+  calcula a gravidade (ou passa-baixa, sem aceleração linear), pede permissão no clique em Jogar (só iOS exige) e,
+  com `?debug=1`, loga os valores uma vez por segundo. `available` cai depois de 1 s sem leitura.
+- Achado: Chrome/WebView preenchem `rotationRate` como alpha=x, beta=y, gamma=z, não na ordem do texto do W3C.
+  O mapeamento segue o Chrome; iOS usa a ordem da especificação (não testado).
+- Cena de teste gerada por `tools/tests/web_profile/make_motion_project.py` (`projects-teste/motion/motion.range`):
+  tabuleiro que inclina, bola que rola, verde/vermelho para sensor ligado/desligado, toque calibra.
+- Validação: `RangeRuntime` nativo (MSVC) e runtime Web release compilados; sonda nativa com todos os atributos
+  (`available=False`, `Vector` zerado, `calibrate()` = `False`); `tools/web/verify-motion.cjs` com sensores emulados
+  pelo CDP no Edge headless: `MOTION: PASS` (retrato, paisagem a 90°, giro nos três eixos, calibração pelo toque).
+  `orientation` não foi emulada. 99 testes de `tools/tests/web_profile` OK. Falta o teste no celular real.
+
 ## 2026-09-23 - Web: mensagens das regras traduzidas (English, Português, Español, Русский)
 
 - As mensagens e dicas de correção das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`,

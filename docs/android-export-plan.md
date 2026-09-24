@@ -74,6 +74,7 @@ Critérios: mover + ação, dois botões juntos, arrastar para fora, cancelar to
 
 - Provar primeiro um eixo com faixa e deadzone conhecidas chegando à lógica do jogo. Avaliar API pública de joystick virtual do SDL na versão efetivamente usada ou um adaptador de entrada do engine; testar antes de escolher. Não sobrescrever `navigator.getGamepads()` como arquitetura de produção.
 - `DeviceOrientationEvent`/`DeviceMotionEvent` são candidatos a inclinação/movimento; medir eventos reais, valores nulos, taxa, latência e transformação de eixos. Generic Sensor API e `navigator.vibrate` são opcionais, com detecção e fallback.
+  **Atualização 2026-09-23:** antecipado por decisão do usuário. `bge.logic.motion` (giroscópio, acelerômetro, gravidade, `tilt`, `calibrate()`) já existe no runtime Web, com eixos da tela e verificação por sensores emulados (`tools/web/verify-motion.cjs`); ver changelog. Falta medir taxa/latência e o aceite no aparelho real.
 - Se uma API Web faltar, avaliar adaptador Android pequeno (`SensorManager`/vibração) com mensagens limitadas à origem local. Isso não exige portar o engine inteiro para NDK.
 - Só então estabilizar API Python (`touches`, aceleração, orientação etc.), reutilizando a infraestrutura de input existente. Não exigir de saída novo `SCA_IInputDevice`, DNA ou Logic Bricks.
 - Calibrar posição neutra, filtrar ruído, reinicializar ao retomar e funcionar sem sensores. O gesto do botão Jogar continua necessário para áudio quando exigido pelo provedor.

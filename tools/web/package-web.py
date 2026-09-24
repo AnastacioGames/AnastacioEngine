@@ -166,6 +166,7 @@ __PERF_SCRIPT__
   function tryStart() {
     if (started || !ready) return;
     started = true;
+    requestMotionPermission();
     el("overlay").hidden = true;
     el("fs").hidden = !fsSupported;
     el("canvas").focus();
@@ -202,6 +203,63 @@ __PERF_SCRIPT__
     fitCanvas();
     el("canvas").focus();
   }
+  // Sensores de movimento -> bge.logic.motion (KX_PythonMotion.cpp le Module.rangeMotion).
+  // Os eixos do aparelho (x direita, y topo, z para fora da tela em retrato) sao girados para os da tela
+  // atual, para "inclinar a direita" continuar sendo +x em paisagem. Gravidade no sentido do W3C: aponta
+  // para cima (aparelho deitado de face para cima da z ~ +9.8).
+  var motion = { t: 0, gyro: [0, 0, 0], accel: [0, 0, 0], gravity: [0, 0, 0], orient: [0, 0, 0] };
+  var motionLogAt = 0;
+  var iosMotion = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function screenAngle() {
+    var a = screen.orientation && typeof screen.orientation.angle === "number" ? screen.orientation.angle
+          : (typeof window.orientation === "number" ? window.orientation : 0);
+    return a * Math.PI / 180;
+  }
+  function toScreen(x, y, z) {
+    var a = screenAngle(), c = Math.cos(a), s = Math.sin(a);
+    return [x * c - y * s, x * s + y * c, z];
+  }
+  function onDeviceMotion(e) {
+    var g = e.accelerationIncludingGravity, r = e.rotationRate, lin = e.acceleration;
+    if (!g || g.x === null) return;
+    var accel = toScreen(g.x, g.y, g.z);
+    var grav;
+    if (lin && lin.x !== null) grav = toScreen(g.x - lin.x, g.y - lin.y, g.z - lin.z);
+    else {
+      // Sem aceleracao linear separada: passa-baixa sobre a leitura com gravidade.
+      grav = motion.t ? motion.gravity : accel.slice();
+      for (var i = 0; i < 3; i++) grav[i] += 0.1 * (accel[i] - grav[i]);
+    }
+    var d = Math.PI / 180;
+    // rotationRate em graus/s. Chrome/WebView preenchem alpha=x, beta=y, gamma=z (conferido com sensor
+    // emulado, verify-motion.cjs); Safari segue a especificacao (alpha=z, beta=x, gamma=y), nao testado.
+    var ra = r && r.alpha !== null ? [(r.alpha || 0) * d, (r.beta || 0) * d, (r.gamma || 0) * d] : null;
+    motion.gyro = !ra ? [0, 0, 0] : iosMotion ? toScreen(ra[1], ra[2], ra[0]) : toScreen(ra[0], ra[1], ra[2]);
+    motion.accel = accel;
+    motion.gravity = grav;
+    motion.t = performance.now();
+    if (debug && motion.t - motionLogAt > 1000) {
+      motionLogAt = motion.t;
+      log("[motion] accel " + accel.map(function (v) { return v.toFixed(2); }).join(" ") +
+          " | gyro " + motion.gyro.map(function (v) { return v.toFixed(2); }).join(" ") +
+          " | orient " + motion.orient.map(function (v) { return v.toFixed(0); }).join(" "));
+    }
+  }
+  function onDeviceOrientation(e) {
+    if (e.alpha === null && e.beta === null) return;
+    motion.orient = [e.alpha || 0, e.beta || 0, e.gamma || 0];
+  }
+  window.addEventListener("devicemotion", onDeviceMotion);
+  window.addEventListener("deviceorientation", onDeviceOrientation);
+  // iOS so entrega os eventos depois de permissao pedida num gesto do usuario (o clique em Jogar).
+  function requestMotionPermission() {
+    [window.DeviceMotionEvent, window.DeviceOrientationEvent].forEach(function (E) {
+      if (E && typeof E.requestPermission === "function")
+        E.requestPermission().catch(function (e) { console.warn("[web] sensores recusados: " + e); });
+    });
+  }
+
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
@@ -218,6 +276,7 @@ __PERF_SCRIPT__
   window.Module = {
     canvas: el("canvas"),
     arguments: [GAME],
+    rangeMotion: motion,
     print: function (t) { log("[out] " + t); console.log(t); },
     printErr: function (t) {
       log("[err] " + t);

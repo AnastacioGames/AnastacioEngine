@@ -126,6 +126,10 @@ Variables
 
    The current mouse wrapped in an :class:`~bge.types.SCA_PythonMouse` object.
 
+.. data:: motion
+
+   Device motion sensors (gyroscope, accelerometer, tilt) wrapped in a :class:`~bge.types.KX_PythonMotion` object.
+
 .. data:: joysticks
 
    A list of attached :class:`~bge.types.SCA_PythonJoystick`.

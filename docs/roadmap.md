@@ -121,9 +121,14 @@ fechada.
 Android v1: rota proposta de APK com WebView embutindo o pacote Web, ainda sem execução Android comprovada.
 Próximo passo: referência no Chrome Android e APK mínimo no mesmo aparelho físico com o jogo real;
 validar carga, desempenho, toque simultâneo, save e ciclo de vida antes do exportador/editor.
-Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). Sensores/API Python e AAB
-vêm depois do núcleo jogável, salvo requisito do jogo. NDK congelado, reaberto somente por limitação medida;
-bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
+Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
+por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
+
+- **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
+  verificados com sensores emulados (`tools/web/verify-motion.cjs`). Falta o aceite no celular real
+  (`projects-teste/motion/motion.range`, gerada por `make_motion_project.py`) e conferir `orientation`.
+- **APK WebView mínimo (A0b)**: próximo passo. Máquina sem Android SDK/JDK/adb; o usuário está instalando o Android Studio (2026-09-23).
+- AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros
 
