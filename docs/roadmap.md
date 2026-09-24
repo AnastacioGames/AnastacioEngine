@@ -123,10 +123,9 @@ fechada.
 
 ### Android / iOS
 
-Android v1: rota proposta de APK com WebView embutindo o pacote Web, ainda sem execução Android comprovada.
-Próximo passo: referência no Chrome Android e APK mínimo no mesmo aparelho físico com o jogo real;
-validar carga, desempenho, toque simultâneo, save e ciclo de vida antes do exportador/editor.
-Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
+Android v1 concluído (2026-09-24): APK/AAB com WebView embutindo o pacote Web, validado em aparelho físico
+(carga, desempenho, toque, save, ciclo de vida) e exportado pelo editor. Publicação na Play Console adiada
+para o futuro por decisão do usuário. Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
 por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
 - **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
@@ -148,7 +147,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   "Instalar no celular". Release assinado implementado (chave fora do JSON e do git, verificado pelo `apksigner`).
   Release instalado e atualizado por cima no aparelho (v1→v2, mesma chave). Save preservado na atualização (cena `web-save`).
 - AAB (2026-09-24): opção no release do painel e `package-android.py --aab`; AAB instalado pelo `bundletool`
-  no Find X3 Pro e jogo rodando. Falta publicar numa faixa de teste da Play Console (conta do usuário).
+  no Find X3 Pro e jogo rodando. Publicar numa faixa de teste da Play Console (conta do usuário) fica para o futuro.
 - Controles por toque (A1): caminho em
   [android-touch-controls-plan.md](android-touch-controls-plan.md); T0 (ponte `Module.rangePad` → gamepad 0)
   verificada no navegador; T1 (overlay na página: stick, d-pad e botões, multitoque) verificada no navegador
