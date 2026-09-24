@@ -170,6 +170,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Auditoria de `source/blender`**: confirmar ou descartar os candidatos de
   [`relatorio-varredura-bugs-silenciosos.md`](relatorio-varredura-bugs-silenciosos.md), com reprodução,
   correção isolada e teste.
+  Reauditoria concluída em 2026-09-24: os 26 itens têm correção ou descarte registrado; a única validação
+  ainda manual é GPU-001, que requer uma sessão interativa já aberta para testar `gl_load()`.
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 

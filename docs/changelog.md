@@ -24,6 +24,12 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - Reauditoria de bugs silenciosos
+
+- Concluída a releitura dos 26 candidatos de `source/blender`: PHYS-001/002, GPU-002, PY-002, BLN-002 e BLN-004 foram descartados; a suspeita de cabeçalho AVI inválido após o primeiro frame também foi descartada.
+- Fechadas quatro lacunas remanescentes em commits pequenos: falhas de I/O/finalização AVI, liberação de `AnimOverride`, limites da reconstrução de tracking e I/O parcial de `datatoc`.
+- `RangeEngine` e `RangeRuntime` passaram no build isolado; a regressão ANIM/MOD/RND, uma exportação AVI RAW e a conversão real por `datatoc` passaram. GPU-001 requer teste manual em uma janela interativa já aberta; o smoke automatizado agora o registra como `SKIP` explícito.
+
 ## 2026-09-24 - Export Android: AAB para a Google Play
 
 - `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda
