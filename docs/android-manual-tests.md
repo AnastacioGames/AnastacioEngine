@@ -128,10 +128,25 @@ Aprovado:
   sem subir. Neste aparelho, o Chrome não fica atrás como no Find X3 Pro; a diferença lá pode vir do DPR 3,5 ou da
   tela de 120 Hz, ainda não investigado.
 
+- 2026-09-24: no Tab S6 Lite, com o First Person no APK: o `RangeRuntime.wasm` chega como `application/wasm` e
+  `WebAssembly.instantiateStreaming` existe. Home, `am kill` com o app em segundo plano e reabrir: o sistema
+  recria o processo, o jogo carrega de novo até "Pronto./Jogar" sem erro no log. O estado da partida não volta.
+
+- 2026-09-24: cena padrão do `RangeEngine.exe` (`source/release/datafiles/startup.blend`, com filtros) como
+  cena mais pesada, pacote `Cena_Padrao` (runtime release), APK debug `com.anastaciogames.cenapadrao`.
+  Tab S6 Lite, jogo parado, 3 rodadas cada, mediana:
+
+  | Caso | fps | frame típico | Memória (PSS) | Carga até "Jogar" |
+  |---|---|---|---|---|
+  | APK parado | 11,5 | 83 ms | 319 MB (app + renderer) | 3,2 s (1ª 3,8 s) |
+  | Chrome parado | 12,2 | 83 ms | 439 MB (Chrome inteiro) | 2,6 s (1ª 3,8 s) |
+
+  Empate de novo, os dois no limite da GPU: todos os frames acima de 34 ms (83 a 100 ms, cinco vsyncs). O canvas é
+  1280x720 (3x os pixels do First Person) e os filtros rodam por pixel. Bateria em 29 °C, sem subir.
+
 Pendente (não confirmado nesta rodada):
 
-- Home/retorno com o processo recriado pelo sistema.
 - Sessão longa (10+ min) para ver aquecimento e queda de fps; perda de ~10–15% dos frames de 60 Hz no APK
-  ainda sem causa investigada.
-- MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
+  ainda sem causa investigada. A primeira tentativa com o First Person andando foi cancelada: a câmera fica
+  olhando para o vazio e não representa carga de jogo.
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
