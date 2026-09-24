@@ -45,12 +45,12 @@ Aprovado:
 - Música: sem som no primeiro pacote porque o `First_Person.range` local (`tools/ADD na engine anastacioEngine/`,
   15/09) é anterior ao script da música. Reempacotado com o `.range` publicado em `gh-pages`
   (`musica/game/First_Person.range`, que chama `aud.Sound(...//Anastacio_Music.mp3)`): log `[music] tocando
-  status=True` e pico 0,65 na saída do `ScriptProcessorNode` (antes 0). Falta o usuário confirmar que ouviu.
+  status=True` e pico 0,65 na saída do `ScriptProcessorNode` (antes 0). Usuário confirmou que ouve a música.
 
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
-- Confirmar a música de ouvido no APK; save/IDBFS com um jogo que salve.
+- Save/IDBFS com um jogo que salve.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.

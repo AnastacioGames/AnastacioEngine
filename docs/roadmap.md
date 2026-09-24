@@ -131,8 +131,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   OPPO Find X3 Pro (2026-09-23): carga offline, WebGL 2, Python e sensores ok
   ([android-manual-tests.md](android-manual-tests.md)). Em 2026-09-24: botão "Tela cheia" escondido, Home/retorno e
   giro de 180° confirmados no aparelho (só paisagem, por decisão). First Person roda no APK
-  (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque aprovado. Próximo: confirmar
-  música, save/IDBFS, comparação com o Chrome do aparelho com mais medidas.
+  (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque e música aprovados. Próximo:
+  save/IDBFS, comparação com o Chrome do aparelho com mais medidas.
 - AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros
