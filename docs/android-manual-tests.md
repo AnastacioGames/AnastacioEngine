@@ -26,10 +26,13 @@ Aprovado:
 - 2026-09-24: APK reinstalado com a marca `RangeWebView/1` (runtime release): botão "Tela cheia" não aparece;
   Home e retorno (via `adb shell input keyevent KEYCODE_HOME` e relançamento) voltam com a cena rodando, sem
   recarregar e sem erro no logcat.
+- 2026-09-24: giro de 180° com `sensorLandscape` chega a `ROTATION_270` (visto por `dumpsys window`). Em pé
+  (retrato) a imagem não gira: é o esperado. Decisão do usuário: o jogo fica só em paisagem.
+  Com o aparelho quase deitado (como se joga a cena `motion`) o Android não detecta o giro, como em qualquer app.
 
 Pendente (não confirmado nesta rodada):
 
-- Giro de 180° em paisagem; Home/retorno com o processo recriado pelo sistema.
+- Home/retorno com o processo recriado pelo sistema.
 - `?perf=1` com o jogo real (First Person), áudio, save/IDBFS e comparação com o Chrome do mesmo aparelho.
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.

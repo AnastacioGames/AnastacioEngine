@@ -30,6 +30,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Verificado no Edge headless com o user agent sobrescrito pelo CDP (botão visível sem a marca, oculto com ela).
   APK debug recompilado com o pacote `motion` e o runtime release (`build-web-release/bin`), instalado no
   Find X3 Pro: botão ausente e Home/retorno com a cena seguindo sem recarregar.
+- Orientação: o giro de 180° em paisagem funciona com o `sensorLandscape` atual. Em pé a imagem não vira retrato,
+  e o jogo continua só em paisagem por decisão do usuário. Um `OrientationEventListener` próprio foi testado e
+  descartado: não era necessário.
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
 
