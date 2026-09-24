@@ -131,7 +131,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 - **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
   verificados com sensores emulados (`tools/web/verify-motion.cjs`) e aprovados no aparelho real dentro do APK
-  (inclinação e `calibrate()`). Falta conferir `orientation`, taxa/latência e o Chrome do mesmo aparelho.
+  (inclinação e `calibrate()`). `orientation`, taxa (~30 Hz) e latência (1–2 frames) conferidas no APK e no Chrome
+  do mesmo aparelho em 2026-09-24.
 - **APK WebView mínimo (A0b)**: template em `tools/android/webview-template/` rodando a cena `motion` no
   OPPO Find X3 Pro (2026-09-23): carga offline, WebGL 2, Python e sensores ok
   ([android-manual-tests.md](android-manual-tests.md)). Em 2026-09-24: botão "Tela cheia" escondido, Home/retorno e
@@ -139,7 +140,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque, música e save (IDBFS após fechar o
   app) aprovados. Comparação com o Chrome do aparelho medida (`tools/android/measure-device.py`, 3 rodadas por caso):
   APK 52–56 fps contra 36–45 no Chrome, sem frame acima de 34 ms. Sessão longa (10 min, cena padrão com filtros,
-  Galaxy Tab S6 Lite) sem queda de fps nem vazamento (2026-09-24). Falta investigar frames perdidos a 60 Hz no Find X3 Pro.
+  Galaxy Tab S6 Lite) sem queda de fps nem vazamento (2026-09-24). Frames perdidos a 60 Hz no Find X3 Pro: custo de CPU
+  do runtime (~20 ms por frame), não do WebView.
 - **Export Android (A3/A4)**: módulo `range_web/android.py`, painel "Android (Range)" no editor e
   `tools/web/package-android.py` geram o APK debug a partir do pacote Web (2026-09-24, verificado no build e no editor
   em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com

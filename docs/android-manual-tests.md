@@ -150,7 +150,22 @@ Aprovado:
   memória visível. A primeira tentativa, com o First Person andando, foi cancelada: a câmera fica olhando para o
   vazio e não representa carga de jogo.
 
+- 2026-09-24: causa dos frames de 60 Hz perdidos no Find X3 Pro (APK do First Person, parado). A tela está em
+  120 Hz (LTPO), mas o WebView entrega o rAF a 60 Hz: os intervalos são só 16,7 ms (~72%) e 33,3 ms (~28%),
+  46–49 fps. O tempo gasto dentro do callback de rAF (o frame do runtime no main thread) é p50 20 ms, p90 25 ms,
+  p99 28 ms, acima dos 16,7 ms de um vsync, com canvas de 640x480. Não é vsync, WebView nem GPU: é custo de
+  CPU do runtime por frame (lógica/Python/física/envio GL). Melhorar exige otimizar o frame do runtime (M4).
+- 2026-09-24: sensores no Find X3 Pro, First Person, APK contra Chrome do mesmo aparelho, 20 s cada:
+
+  | Alvo | `devicemotion` | Intervalo p50/p95 | Idade da leitura no frame p50/p95 |
+  |---|---|---|---|
+  | APK | 28,4 Hz | 33,5 / 53,9 ms | 25 / 50 ms |
+  | Chrome | 30,8 Hz | 33,4 / 44,2 ms | 18 / 35 ms |
+
+  `orientation` chega nos dois (alpha/beta/gamma iguais ao evento `deviceorientation`, ex. 90/4/-1 com o
+  aparelho deitado). A taxa é a mesma (~30 Hz, limite do navegador); a idade maior no APK acompanha o frame mais
+  lento, não o sensor. Latência total até o Python fica em 1–2 frames.
+
 Pendente (não confirmado nesta rodada):
 
-- Perda de ~10–15% dos frames de 60 Hz no APK do Find X3 Pro ainda sem causa investigada.
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
