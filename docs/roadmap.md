@@ -138,7 +138,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   giro de 180° confirmados no aparelho; rotação em paisagem e retrato aprovada (proporção e câmera estáveis ao girar). First Person roda no APK
   (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque, música e save (IDBFS após fechar o
   app) aprovados. Comparação com o Chrome do aparelho medida (`tools/android/measure-device.py`, 3 rodadas por caso):
-  APK 52–56 fps contra 36–45 no Chrome, sem frame acima de 34 ms. Falta sessão longa (aquecimento).
+  APK 52–56 fps contra 36–45 no Chrome, sem frame acima de 34 ms. Sessão longa (10 min, cena padrão com filtros,
+  Galaxy Tab S6 Lite) sem queda de fps nem vazamento (2026-09-24). Falta investigar frames perdidos a 60 Hz no Find X3 Pro.
 - **Export Android (A3/A4)**: módulo `range_web/android.py`, painel "Android (Range)" no editor e
   `tools/web/package-android.py` geram o APK debug a partir do pacote Web (2026-09-24, verificado no build e no editor
   em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com
