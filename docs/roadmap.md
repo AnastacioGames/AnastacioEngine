@@ -137,7 +137,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `tools/web/package-android.py` geram o APK debug a partir do pacote Web (2026-09-24, verificado no build e no editor
   em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com
   "Instalar no celular". Release assinado implementado (chave fora do JSON e do git, verificado pelo `apksigner`).
-  Próximo: aceite no aparelho do release (chave fora do JSON e do git) e atualização por cima mantendo o save.
+  Release instalado e atualizado por cima no aparelho (v1→v2, mesma chave). Save preservado na atualização (cena `web-save`).
 - AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros

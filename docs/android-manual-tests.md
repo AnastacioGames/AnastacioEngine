@@ -65,6 +65,18 @@ Aprovado:
   O teste `engine_android_export.py` instalou sem querer o app de teste "jogo" (`com.anastaciogames.testepainel`)
   com o celular ligado; desinstalado, e o teste só instala com `RANGE_ANDROID_TEST_INSTALL=1`.
 
+- 2026-09-24: release assinado no Find X3 Pro (feito pelo agente via adb, chave de teste temporária, app separado
+  `com.anastaciogames.testerelease` para não tocar no debug instalado). v1 (versionCode 1) instalada, abriu até
+  "Pronto./Jogar" e entrou no jogo; v2 (versionCode 2, versionName 1.1, mesma chave) instalada por cima com
+  `install -r`: `Success`, `firstInstallTime` mantido (atualização, não reinstalação, dados do app preservados) e o
+  jogo abre de novo. Senha ausente de APK, JSON, relatório e `gradle.log`. Save na atualização: `web-save`
+  como release v3 (sessão 1 `[web-save] SAVED`), v4 instalada por cima com a mesma chave e aberta de novo:
+  `[web-save] LOADED`. O save sobrevive à atualização release sobre release (o First Person não salva nada). Título da tela inicial aparece como
+  "pkg" (nome do pacote Web de teste, não o `appName`).
+
+- 2026-09-24: apps de teste desinstalados do Find X3 Pro a pedido do usuário: `com.anastaciogames.testerelease`,
+  `com.anastaciogames.rangewebview` (template) e `com.anastaciogames.firstperson` ("teste1_fabio").
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.

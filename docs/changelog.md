@@ -39,7 +39,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Verificado: `test_android.py` (20 testes, com criação real de chave, senha errada, alias inexistente e recusa
   dentro do git), `engine_android_export.py` e `engine_i18n.py` sem falhas; release do First Person pelo terminal
   com chave temporária (APK assinado, senha ausente de `gradle.log`, JSON e relatório); debug continua igual.
-  Pendente: instalar release e atualizar por cima no aparelho mantendo o save.
+  No aparelho (app de teste separado): release v1 instalado e v2 atualizado por cima com a mesma chave,
+  `firstInstallTime` mantido; com a cena `web-save`, v3 `SAVED` e v4 por cima `LOADED` (save preservado).
 
 ## 2026-09-24 - Export Android pelo editor e pelo terminal (A3/A4, APK debug)
 
