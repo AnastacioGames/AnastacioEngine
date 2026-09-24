@@ -117,9 +117,10 @@ do editor (2026-09-20). Ver changelog, seção "World Status".
 
 ### Vehicle System / Vehicle Lab
 
-Executar o [plano 2](vehicle-system-plan-2.md) por marcos: Fase B (Steering & Brakes, incl. volante visual),
-Fase C (Powertrain: drive type, torque/RPM, marchas), Fase A (Chassis: Center of Mass offset). Fase D está
-fechada.
+[Plano 2](vehicle-system-plan-2.md): Fases B (direção em graus, direção sensível à velocidade, freio de mão,
+volante visual), C (`has_drive`, torque/RPM, gearbox automático/manual) e A (`vehicle_com_offset` via compound
+shape) já estão no código desde o snapshot 28775369. Falta validar cada uma no jogo real (usuário). Fase D
+está fechada. O componente do demo `Vehicle` foi sincronizado com a versão com gearbox em 2026-09-24.
 
 ### Android / iOS
 

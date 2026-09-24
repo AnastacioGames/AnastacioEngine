@@ -9,7 +9,9 @@ steering/drive por roda); este componente só lê esse veículo já pronto
 Controles padrão: W acelera, S dá ré, A/D esterçam, Espaço freia, Shift
 esquerdo é o freio de mão. Se ``game.vehicle_steering_wheel`` estiver
 preenchido no painel Vehicle, o objeto referenciado gira no seu eixo Y
-local para acompanhar o esterço atual.
+local para acompanhar o esterço atual. Se houver marchas cadastradas em
+``game.vehicle_gears``, o câmbio (automático por RPM, ou manual com E/Q)
+seleciona a marcha atual e sua relação multiplica a força de motor.
 """
 
 import math
@@ -33,6 +35,10 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         ("Steering Sign", 1.0),
         ("Engine Sign", 1.0),
         ("Steering Wheel Multiplier", 4.0),
+        ("Upshift RPM", 5500.0),
+        ("Downshift RPM", 2000.0),
+        ("Shift Up Key", "EKEY"),
+        ("Shift Down Key", "QKEY"),
     ])
 
     # Speed-sensitive steering: linear falloff from full angle at 0 km/h down
@@ -42,14 +48,24 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
     MIN_STEERING_FACTOR = 0.3
 
     # Torque-based engine force (only used when game.vehicle_max_torque > 0,
-    # set in the Physics > Vehicle panel). No gearbox yet, so RPM is simulated
-    # directly from wheel angular speed (as if final drive ratio == 1:1);
-    # torque falls off linearly from full at 0 RPM to 30% at max RPM (arcade
-    # feel, no clutch/curve). TORQUE_TO_FORCE_SCALE converts torque (Nm-ish)
-    # into the same arbitrary force units applyEngineForce already uses.
+    # set in the Physics > Vehicle panel). RPM is simulated from wheel angular
+    # speed, multiplied by the current gear ratio (game.vehicle_gears) if any
+    # gears are defined, else treated as final drive ratio == 1:1. Torque
+    # falls off linearly from full at 0 RPM to 30% at max RPM (arcade feel,
+    # no clutch/curve). TORQUE_TO_FORCE_SCALE converts torque (Nm-ish) into
+    # the same arbitrary force units applyEngineForce already uses.
     MIN_TORQUE_FACTOR_AT_MAX_RPM = 0.3
     TORQUE_TO_FORCE_SCALE = 10.0
     FALLBACK_MAX_RPM = 6000.0
+
+    # Deve casar com OB_GEARBOX_* em DNA_object_types.h.
+    GEARBOX_AUTOMATIC = 0
+    GEARBOX_MANUAL = 1
+
+    # Câmbio automático só alterna entre marcha à ré e a 1ª marcha à frente
+    # abaixo desta velocidade, pra não trocar de sentido em movimento (imita
+    # a trava de um câmbio real).
+    REVERSE_ENGAGE_SPEED_KMH = 5.0
 
     def start(self, args):
         self._args = args
@@ -84,6 +100,14 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         # voltar ao centro.
         self._current_steer_value = 0.0
 
+        self._gear_ratios = list(self.object.getVehicleGearRatios())
+        self._gearbox_type = self.object.getVehicleGearboxType()
+        self._current_gear_index = self._first_forward_gear_index() or 0
+        self._shift_up_key = getattr(Range.events, str(self._args["Shift Up Key"]))
+        self._shift_down_key = getattr(Range.events, str(self._args["Shift Down Key"]))
+        self._prev_shift_up_held = False
+        self._prev_shift_down_held = False
+
         print("VehiclePlayer: pronto (%d rodas, %d de direção, %d motrizes). "
               "W acelera, S ré, A/D esterçam, Espaço freia, Shift é freio de mão." %
               (self._num_wheels, len(self._steering_wheels), len(self._drive_wheels)))
@@ -93,6 +117,7 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
             return
         try:
             throttle, steering, brake, handbrake = self._read_input()
+            self._update_gear_selection(throttle)
             engine_force = self._compute_engine_force(throttle)
             target_steer_value = self._compute_steer_value(steering)
             steer_value = self._smooth_steer_value(target_steer_value)
@@ -123,6 +148,12 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
             return engine_sign * float(self._args["Reverse Force"]) * throttle
 
         torque = max_torque * self._torque_factor_at_current_rpm()
+        if self._gear_ratios:
+            gear_ratio = self._gear_ratios[self._current_gear_index]
+            # Direção vem do sinal da marcha selecionada (positiva = à frente,
+            # negativa = ré), não do throttle: assim a troca de marcha (auto
+            # ou manual) é a única responsável por decidir o sentido.
+            return engine_sign * torque * gear_ratio * self.TORQUE_TO_FORCE_SCALE * abs(throttle)
         return engine_sign * torque * self.TORQUE_TO_FORCE_SCALE * throttle
 
     def _torque_factor_at_current_rpm(self):
@@ -130,8 +161,14 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         if max_rpm <= 0.0:
             max_rpm = self.FALLBACK_MAX_RPM
 
-        rpm_fraction = min(self._simulated_rpm() / max_rpm, 1.0)
+        rpm_fraction = min(self._current_engine_rpm() / max_rpm, 1.0)
         return 1.0 - rpm_fraction * (1.0 - self.MIN_TORQUE_FACTOR_AT_MAX_RPM)
+
+    def _current_engine_rpm(self):
+        wheel_rpm = self._simulated_rpm()
+        if self._gear_ratios:
+            return wheel_rpm * abs(self._gear_ratios[self._current_gear_index])
+        return wheel_rpm
 
     def _simulated_rpm(self):
         # Sem gearbox ainda: assume relação final 1:1 (RPM do motor == RPM da
@@ -147,6 +184,63 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         speed_m_s = abs(self._vehicle.getCurrentSpeedKmh()) / 3.6
         wheel_angular_speed = speed_m_s / radius  # rad/s
         return wheel_angular_speed * 60.0 / (2.0 * math.pi)
+
+    def _first_forward_gear_index(self):
+        for i, ratio in enumerate(self._gear_ratios):
+            if ratio > 0.0:
+                return i
+        return None
+
+    def _reverse_gear_index(self):
+        for i, ratio in enumerate(self._gear_ratios):
+            if ratio < 0.0:
+                return i
+        return None
+
+    def _update_gear_selection(self, throttle):
+        if not self._gear_ratios:
+            return
+        if self._gearbox_type == self.GEARBOX_MANUAL:
+            self._read_manual_shift_input()
+        else:
+            self._auto_select_gear(throttle)
+
+    def _read_manual_shift_input(self):
+        up_held = self._held(self._shift_up_key)
+        down_held = self._held(self._shift_down_key)
+        if up_held and not self._prev_shift_up_held:
+            self._current_gear_index = min(self._current_gear_index + 1, len(self._gear_ratios) - 1)
+        if down_held and not self._prev_shift_down_held:
+            self._current_gear_index = max(self._current_gear_index - 1, 0)
+        self._prev_shift_up_held = up_held
+        self._prev_shift_down_held = down_held
+
+    def _auto_select_gear(self, throttle):
+        reverse_index = self._reverse_gear_index()
+        forward_index = self._first_forward_gear_index()
+        speed_kmh = abs(self._vehicle.getCurrentSpeedKmh())
+        if speed_kmh < self.REVERSE_ENGAGE_SPEED_KMH:
+            if throttle < 0.0 and reverse_index is not None:
+                self._current_gear_index = reverse_index
+            elif throttle > 0.0 and forward_index is not None:
+                self._current_gear_index = forward_index
+
+        if reverse_index is not None and self._current_gear_index == reverse_index:
+            return
+        if forward_index is None:
+            return
+
+        engine_rpm = self._current_engine_rpm()
+        upshift_rpm = float(self._args["Upshift RPM"])
+        downshift_rpm = float(self._args["Downshift RPM"])
+        next_index = self._current_gear_index + 1
+        prev_index = self._current_gear_index - 1
+        if (engine_rpm > upshift_rpm and next_index < len(self._gear_ratios)
+                and self._gear_ratios[next_index] > 0.0):
+            self._current_gear_index = next_index
+        elif (engine_rpm < downshift_rpm and prev_index >= forward_index
+                and self._gear_ratios[prev_index] > 0.0):
+            self._current_gear_index = prev_index
 
     def _compute_steer_value(self, steering):
         max_angle_rad = math.radians(float(self._args["Max Steering Angle (deg)"]))
