@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 21 | 36 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 22 | 38 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,17 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Addon Cutscene Shot Tool em inglês com tradução
+
+- `addons/addon_editor_shot_tool.py` (`1.0.1` → `1.0.2`): rótulos, dicas, títulos dos grupos, nomes dos campos e
+  mensagens passaram do português ao inglês; o português original virou tradução pt/es/ru (38 textos no bloco
+  `MESSAGES` de `range_web/translations_labels.py`). Mensagens via `tip_()` com `%s`; a contagem do painel usa
+  `iface_()` com `translate=False`. "Effects" e "Shake" não têm tradução no catálogo do Blender e entraram na tabela.
+- A cópia em `tools/ProjetoCutscene/scripts/addon_shot_tool.py` (projeto de exemplo, versão 1.0.0) não mudou.
+- Conferido no motor: o addon liga, "New Camera Shot" cria `CamShot_01` com 13 propriedades e a mensagem sai no
+  idioma escolhido; rótulos traduzidos em pt/es/ru. `engine_i18n.py`, `engine_web_ui.py`, os 124 testes puros e
+  `bugfix_regression/run_all.py` passam. Não conferido na janela real.
 
 ## 2026-09-24 - Operadores da Range com texto-fonte em inglês e tradução
 

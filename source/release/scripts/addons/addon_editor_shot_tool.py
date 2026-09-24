@@ -27,14 +27,16 @@ componente na cena, ajuste aqui também para manter os dois em sincronia.
 bl_info = {
     "name": "Cutscene Shot Tool",
     "author": "Anastacio Games",
-    "version": (1, 0, 1),
+    "version": (1, 0, 2),
     "blender": (2, 79, 0),
     "location": "View3D > Sidebar (N) > Cutscene  |  Properties > Object Data > Empty to Cutscene",
-    "description": "Cria e edita os Empties de tomada de câmera lidos pelo CutsceneCameraManager",
+    "description": "Creates and edits the camera shot Empties read by the CutsceneCameraManager",
     "category": "Object",
 }
 
 import bpy
+from bpy.app.translations import pgettext_iface as iface_
+from bpy.app.translations import pgettext_tip as tip_
 
 # Nome, tipo (Blender Game Property), valor default.
 # 'order' é tratado à parte (auto-incrementado), por isso não está aqui.
@@ -106,8 +108,8 @@ def apply_schema(obj, schema, overwrite=False):
 
 class CUTSCENE_OT_add_shot_empty(bpy.types.Operator):
     bl_idname = "cutscene.add_shot_empty"
-    bl_label = "Criar Nova Tomada"
-    bl_description = "Cria um Empty no cursor 3D com todas as propriedades de tomada já configuradas"
+    bl_label = "New Camera Shot"
+    bl_description = "Creates an Empty at the 3D cursor with all shot properties already set up"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -123,20 +125,20 @@ class CUTSCENE_OT_add_shot_empty(bpy.types.Operator):
         add_or_get_prop(empty, "order", 'INT').value = order
         apply_schema(empty, SHOT_PROPERTY_SCHEMA, overwrite=True)
 
-        self.report({'INFO'}, f"'{empty.name}' criado com order={order} e {len(SHOT_PROPERTY_SCHEMA) + 1} propriedades.")
+        self.report({'INFO'}, tip_("'%s' created with order=%s and %s properties.") % (empty.name, order, len(SHOT_PROPERTY_SCHEMA) + 1))
         return {'FINISHED'}
 
 
 class CUTSCENE_OT_sync_shot_properties(bpy.types.Operator):
     bl_idname = "cutscene.sync_shot_properties"
-    bl_label = "Sincronizar Propriedades"
-    bl_description = "Adiciona nos Empties/Câmeras selecionados as propriedades de tomada que estiverem faltando (não sobrescreve valores existentes)"
+    bl_label = "Sync Shot Properties"
+    bl_description = "Adds the missing shot properties to the selected Empties/Cameras (existing values are kept)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         targets = [o for o in context.selected_objects if o.type in SHOT_OBJECT_TYPES]
         if not targets:
-            self.report({'WARNING'}, "Selecione ao menos um Empty ou Câmera.")
+            self.report({'WARNING'}, tip_("Select at least one Empty or Camera."))
             return {'CANCELLED'}
 
         touched = 0
@@ -147,14 +149,14 @@ class CUTSCENE_OT_sync_shot_properties(bpy.types.Operator):
             if added:
                 touched += 1
 
-        self.report({'INFO'}, f"{touched}/{len(targets)} Empties atualizados.")
+        self.report({'INFO'}, tip_("%s/%s objects updated.") % (touched, len(targets)))
         return {'FINISHED'}
 
 
 class CUTSCENE_OT_delete_shot(bpy.types.Operator):
     bl_idname = "cutscene.delete_shot"
-    bl_label = "Remover Tomada"
-    bl_description = "Apaga o Empty/Câmera desta tomada da cena"
+    bl_label = "Delete Camera Shot"
+    bl_description = "Deletes the Empty/Camera of this shot from the scene"
     bl_options = {'REGISTER', 'UNDO'}
 
     obj_name: bpy.props.StringProperty()
@@ -162,7 +164,7 @@ class CUTSCENE_OT_delete_shot(bpy.types.Operator):
     def execute(self, context):
         obj = context.scene.objects.get(self.obj_name)
         if not obj:
-            self.report({'WARNING'}, f"Objeto '{self.obj_name}' não encontrado.")
+            self.report({'WARNING'}, tip_("Object '%s' not found.") % self.obj_name)
             return {'CANCELLED'}
 
         name = obj.name
@@ -171,14 +173,14 @@ class CUTSCENE_OT_delete_shot(bpy.types.Operator):
         context.scene.objects.active = obj
         bpy.ops.object.delete()
 
-        self.report({'INFO'}, f"'{name}' removido.")
+        self.report({'INFO'}, tip_("'%s' deleted.") % name)
         return {'FINISHED'}
 
 
 class CUTSCENE_OT_strip_shot_properties(bpy.types.Operator):
     bl_idname = "cutscene.strip_shot_properties"
-    bl_label = "Remover Propriedades de Tomada"
-    bl_description = "Remove as propriedades de tomada deste objeto (ele deixa de ser uma Tomada de Cutscene, mas não é apagado)"
+    bl_label = "Remove Shot Properties"
+    bl_description = "Removes the shot properties from this object (it stops being a cutscene shot but is not deleted)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -194,14 +196,14 @@ class CUTSCENE_OT_strip_shot_properties(bpy.types.Operator):
                 obj.game.properties.active_index = idx if hasattr(obj.game.properties, "active_index") else 0
                 bpy.ops.object.game_property_remove(index=list(obj.game.properties).index(p))
 
-        self.report({'INFO'}, f"Propriedades de tomada removidas de '{obj.name}'.")
+        self.report({'INFO'}, tip_("Shot properties removed from '%s'.") % obj.name)
         return {'FINISHED'}
 
 
 class CUTSCENE_OT_renumber_shots(bpy.types.Operator):
     bl_idname = "cutscene.renumber_shots"
-    bl_label = "Renumerar Ordem"
-    bl_description = "Renumera sequencialmente (1, 2, 3...) todas as tomadas da cena, respeitando a ordem atual"
+    bl_label = "Renumber Shots"
+    bl_description = "Renumbers all shots of the scene in sequence (1, 2, 3...), keeping the current order"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -214,12 +216,12 @@ class CUTSCENE_OT_renumber_shots(bpy.types.Operator):
                     p.value = idx
                     break
 
-        self.report({'INFO'}, f"{len(shots)} tomadas renumeradas.")
+        self.report({'INFO'}, tip_("%s shots renumbered.") % len(shots))
         return {'FINISHED'}
 
 
 class CUTSCENE_PT_shot_tool(bpy.types.Panel):
-    bl_label = "Cutscene - Tomadas de Câmera"
+    bl_label = "Cutscene - Camera Shots"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Cutscene"
@@ -228,7 +230,7 @@ class CUTSCENE_PT_shot_tool(bpy.types.Panel):
         layout = self.layout
         shots = [o for o in context.scene.objects if is_shot_empty(o)]
 
-        layout.label(text=f"{len(shots)} tomada(s) detectada(s) na cena")
+        layout.label(text=iface_("%s shot(s) found in the scene") % len(shots), translate=False)
         layout.operator("cutscene.add_shot_empty", icon='EMPTY_DATA')
         layout.operator("cutscene.sync_shot_properties", icon='FILE_REFRESH')
         layout.operator("cutscene.renumber_shots", icon='LINENUMBERS_ON')
@@ -243,25 +245,25 @@ class CUTSCENE_PT_shot_tool(bpy.types.Panel):
 
 
 FIELD_LABELS = {
-    "target": "Alvo (Look At)",
-    "duration": "Duração (s)",
-    "transition": "Transição",
+    "target": "Look At Target",
+    "duration": "Duration (s)",
+    "transition": "Transition",
     "fov": "FOV",
-    "transition_speed": "Velocidade da Transição",
-    "pan_target": "Alvo do Pan",
-    "follow": "Seguir (Chase-Cam)",
-    "shake": "Tremor (Shake)",
-    "noise": "Balanço Orgânico (Noise)",
-    "slowmo_scale": "Escala Slow-Motion",
-    "filter_on": "Ativar Filtro",
-    "filter_off": "Desativar Filtro",
+    "transition_speed": "Transition Speed",
+    "pan_target": "Pan Target",
+    "follow": "Follow (Chase Cam)",
+    "shake": "Shake",
+    "noise": "Noise Sway",
+    "slowmo_scale": "Slow Motion Scale",
+    "filter_on": "Filter On",
+    "filter_off": "Filter Off",
 }
 
 FIELD_GROUPS = (
-    ("Enquadramento", ("duration", "transition", "fov", "transition_speed")),
-    ("Foco de Câmera", ("target", "pan_target", "follow")),
-    ("Efeitos", ("shake", "noise", "slowmo_scale")),
-    ("Filtros de Pós-Processamento", ("filter_on", "filter_off")),
+    ("Framing", ("duration", "transition", "fov", "transition_speed")),
+    ("Camera Focus", ("target", "pan_target", "follow")),
+    ("Effects", ("shake", "noise", "slowmo_scale")),
+    ("Post-Processing Filters", ("filter_on", "filter_off")),
 )
 
 
@@ -276,7 +278,7 @@ def draw_labeled_prop(layout, prop, label):
 
 class CUTSCENE_PT_empty_shot_data(bpy.types.Panel):
     """Painel próprio (com seta de recolher) em Properties > Object Data, ao lado de 'Empty'/'Camera'."""
-    bl_label = "Empty/Câmera to Cutscene"
+    bl_label = "Empty/Camera to Cutscene"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "data"
@@ -291,14 +293,14 @@ class CUTSCENE_PT_empty_shot_data(bpy.types.Panel):
 
         order = get_shot_order(ob)
         if order is None:
-            layout.label(text="Este objeto ainda não é uma Tomada de Cutscene.", icon='INFO')
-            layout.operator("cutscene.sync_shot_properties", text="Transformar em Tomada de Câmera", icon='CAMERA_DATA')
+            layout.label(text="This object is not a cutscene shot yet.", icon='INFO')
+            layout.operator("cutscene.sync_shot_properties", text="Make Camera Shot", icon='CAMERA_DATA')
             return
 
         props_by_name = {p.name: p for p in ob.game.properties}
 
         row = layout.row()
-        row.label(text="Ordem da Tomada", icon='CAMERA_DATA')
+        row.label(text="Shot Order", icon='CAMERA_DATA')
         for alias in ORDER_PROP_ALIASES:
             if alias in props_by_name:
                 row.prop(props_by_name[alias], "value", text="")
@@ -315,8 +317,8 @@ class CUTSCENE_PT_empty_shot_data(bpy.types.Panel):
                 draw_labeled_prop(col, prop, FIELD_LABELS.get(name, name))
 
         layout.separator()
-        layout.operator("cutscene.sync_shot_properties", text="Adicionar Propriedades Faltantes", icon='FILE_REFRESH')
-        layout.operator("cutscene.strip_shot_properties", text="Remover Propriedades de Tomada", icon='X')
+        layout.operator("cutscene.sync_shot_properties", text="Add Missing Properties", icon='FILE_REFRESH')
+        layout.operator("cutscene.strip_shot_properties", text="Remove Shot Properties", icon='X')
 
 
 CLASSES = (
