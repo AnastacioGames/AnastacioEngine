@@ -45,6 +45,8 @@ DEFAULTS = {
     # Release: caminho da chave e alias. A senha nunca entra aqui (vem do ambiente ou do painel, so na sessao).
     "keystore": "",
     "keyAlias": "",
+    # Release: gera tambem o .aab (formato da Google Play), assinado com a mesma chave. Ignorado no debug.
+    "aab": False,
 }
 
 # Senha da chave para o terminal e para o Gradle (o template le as variaveis RANGE_ANDROID_*).
@@ -415,13 +417,16 @@ def _gradle_failure(log_path):
     return " ".join(tail)
 
 
-def run_gradle(project, toolchain, build_type, log_path, log=print, extra_env=None):
-    task = "assembleDebug" if build_type == "debug" else "assembleRelease"
+def run_gradle(project, toolchain, build_type, log_path, log=print, extra_env=None, bundle=False):
+    """Roda o Gradle e devolve (apk, aab); aab e None sem `bundle`."""
+    tasks = ["assembleDebug" if build_type == "debug" else "assembleRelease"]
+    if bundle:
+        tasks.append("bundleDebug" if build_type == "debug" else "bundleRelease")
     wrapper = os.path.join(project, "gradlew.bat" if os.name == "nt" else "gradlew")
     if os.name != "nt":
         os.chmod(wrapper, 0o755)
-    cmd = [wrapper, task, "--console=plain", "--stacktrace"]
-    log("Gradle: %s (log em %s)" % (task, log_path))
+    cmd = [wrapper, *tasks, "--console=plain", "--stacktrace"]
+    log("Gradle: %s (log em %s)" % (" ".join(tasks), log_path))
     with open(log_path, "w", encoding="utf-8", errors="replace") as out:
         creation = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         env = toolchain.env()
@@ -433,7 +438,12 @@ def run_gradle(project, toolchain, build_type, log_path, log=print, extra_env=No
     apk = os.path.join(project, "app", "build", "outputs", "apk", build_type, "app-%s.apk" % build_type)
     if not os.path.isfile(apk):
         raise AndroidError(Msg("Gradle finished but the APK was not found at %s.", apk))
-    return apk
+    if not bundle:
+        return apk, None
+    aab = os.path.join(project, "app", "build", "outputs", "bundle", build_type, "app-%s.aab" % build_type)
+    if not os.path.isfile(aab):
+        raise AndroidError(Msg("Gradle finished but the AAB was not found at %s.", aab))
+    return apk, aab
 
 
 def _run(cmd, timeout=120, **kw):
@@ -496,6 +506,18 @@ def signing_certificate(apk, toolchain):
     return m.group(1) if result.returncode == 0 and m else ""
 
 
+def bundle_certificate(aab, toolchain):
+    """SHA-256 do certificado que assinou o AAB (assinatura JAR, lida pelo keytool), ou ""."""
+    try:
+        # Saida em ingles: o keytool em pt_BR quebra no -printcert (MissingFormatArgumentException).
+        result = _run([toolchain.keytool, "-J-Duser.language=en", "-printcert", "-jarfile", aab],
+                      env=toolchain.env())
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    m = re.search(r"SHA256:\s*([0-9A-Fa-f:]+)", result.stdout)
+    return m.group(1).replace(":", "").lower() if result.returncode == 0 and m else ""
+
+
 def _java_version(toolchain):
     try:
         out = subprocess.run([os.path.join(toolchain.java_home, "bin", "java" + _EXE), "-version"],
@@ -521,10 +543,10 @@ def _template_versions(template):
     return versions
 
 
-def _apk_name(config):
+def _apk_name(config, ext="apk"):
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", config["appName"].strip()).strip("_") or "app"
     version = re.sub(r"[^A-Za-z0-9._-]+", "_", config["versionName"].strip())
-    return "%s-%s-%s.apk" % (stem, version, config["buildType"])
+    return "%s-%s-%s.%s" % (stem, version, config["buildType"], ext)
 
 
 def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=print, password=None):
@@ -532,7 +554,7 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
 
     Release: `password` (ou a variavel RANGE_ANDROID_KEYSTORE_PASSWORD) abre a chave de config["keystore"].
 
-    Grava em `out_dir`: o APK, android-export.json (a configuracao usada), android-report.json e gradle.log.
+    Grava em `out_dir`: o APK (e o AAB, no release com config["aab"]), android-export.json (a configuracao usada), android-report.json e gradle.log.
     """
     problems = config_problems(config)
     if problems:
@@ -571,19 +593,33 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
     prepare_project(template, package_dir, config, work)
     log("Projeto Android montado em %s" % work)
 
-    built = run_gradle(work, toolchain, config["buildType"], os.path.join(out_dir, GRADLE_LOG_NAME), log,
-                       extra_env=signing_env)
+    bundle = release and bool(config.get("aab"))
+    built, built_aab = run_gradle(work, toolchain, config["buildType"], os.path.join(out_dir, GRADLE_LOG_NAME),
+                                  log, extra_env=signing_env, bundle=bundle)
     apk = os.path.join(out_dir, _apk_name(config))
     shutil.copyfile(built, apk)
     certificate = signing_certificate(apk, toolchain)
     if release and not certificate:
         raise AndroidError(Msg("The release APK is not signed (apksigner could not verify %s).", apk))
+    aab = None
+    if bundle:
+        aab = os.path.join(out_dir, _apk_name(config, "aab"))
+        shutil.copyfile(built_aab, aab)
+        if bundle_certificate(aab, toolchain) != certificate:
+            raise AndroidError(Msg("The AAB is not signed with the same key as the APK (%s).", aab))
+    else:
+        # Um .aab de geracao anterior no destino nao pode passar por atual.
+        stale = os.path.join(out_dir, _apk_name(config, "aab"))
+        if os.path.isfile(stale):
+            os.remove(stale)
 
     report = {
         "schema": "range-android-report",
         "schema_version": SCHEMA_VERSION,
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "apk": {"file": os.path.basename(apk), "bytes": os.path.getsize(apk), "sha256": _sha256(apk)},
+        "aab": {"file": os.path.basename(aab), "bytes": os.path.getsize(aab), "sha256": _sha256(aab)}
+        if aab else None,
         "config": {key: config.get(key) for key in DEFAULTS},
         "web_package": {
             "dir": os.path.abspath(package_dir),
@@ -617,6 +653,8 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
         json.dump(report, f, indent=2, ensure_ascii=False)
         f.write("\n")
     log("APK: %s (%.1f MiB)" % (apk, report["apk"]["bytes"] / (1 << 20)))
+    if aab:
+        log("AAB: %s (%.1f MiB)" % (aab, report["aab"]["bytes"] / (1 << 20)))
     return apk
 
 

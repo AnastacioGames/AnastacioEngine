@@ -60,6 +60,7 @@ def _config(context):
         "buildType": settings.build_type.lower(),
         "keystore": bpy.path.abspath(settings.keystore) if settings.keystore else "",
         "keyAlias": settings.key_alias.strip(),
+        "aab": settings.aab,
     })
     return config
 
@@ -199,9 +200,15 @@ class RangeAndroidSettings(PropertyGroup):
         description="Name of the key inside the key file",
         default="upload",
     )
+    aab: bpy.props.BoolProperty(
+        name="Also build AAB (Google Play)",
+        description="Also generates the .aab bundle signed with the same key, the format Google Play requires; "
+                    "the APK is still built for installing on your phone",
+        default=False,
+    )
     output_directory: bpy.props.StringProperty(
         name="Destination",
-        description="Folder of the APK, android-export.json, report and Gradle log",
+        description="Folder of the APK (and AAB), android-export.json, report and Gradle log",
         subtype='DIR_PATH',
         default="//android/",
     )
@@ -242,6 +249,7 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
             box.prop(settings, "keystore")
             box.prop(settings, "key_alias")
             box.prop(context.window_manager, "range_android_password")
+            box.prop(settings, "aab")
             box.operator("scene.range_android_create_key", icon='KEY_HLT')
             box.label(text="Keep the key and the password with a backup: updates need the same key.",
                       icon='INFO')

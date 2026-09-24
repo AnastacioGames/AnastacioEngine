@@ -14,6 +14,7 @@ build-android/<nome do pacote Web>): o APK, android-export.json usado, android-r
 Release assinado (a chave fica fora do git; a senha vem de RANGE_ANDROID_KEYSTORE_PASSWORD ou e pedida):
   python tools/web/package-android.py --create-keystore %USERPROFILE%/RangeAndroidKeys/jogo.jks --name Jogo
   python tools/web/package-android.py --web ... --config android-export.json --build-type release       --keystore %USERPROFILE%/RangeAndroidKeys/jogo.jks
+Com --aab o release gera tambem o .aab para a Google Play (o APK continua saindo, para instalar no aparelho).
 """
 
 import argparse
@@ -51,6 +52,8 @@ def main():
     ap.add_argument("--build-type", choices=android.BUILD_TYPES)
     ap.add_argument("--keystore", help="chave do release (sobrepoe a do --config)")
     ap.add_argument("--key-alias", help="alias da chave (sobrepoe o do --config; padrao upload)")
+    ap.add_argument("--aab", action="store_true", default=None,
+                    help="release: gera tambem o .aab da Google Play, com a mesma chave")
     ap.add_argument("--create-keystore", metavar="ARQUIVO", help="cria a chave do release e sai")
     ap.add_argument("--out-dir", type=Path)
     ap.add_argument("--jdk", default="", help="pasta do JDK, se nao houver JAVA_HOME nem Android Studio")
@@ -66,7 +69,7 @@ def main():
                  "buildType": args.build_type,
                  "icon": os.path.abspath(args.icon) if args.icon else None,
                  "keystore": os.path.abspath(args.keystore) if args.keystore else None,
-                 "keyAlias": args.key_alias}
+                 "keyAlias": args.key_alias, "aab": args.aab}
     config.update({k: v for k, v in overrides.items() if v is not None})
     config["keyAlias"] = config.get("keyAlias") or "upload"
 

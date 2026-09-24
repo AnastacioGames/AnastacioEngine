@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 24 | 40 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 25 | 41 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Export Android: AAB para a Google Play
+
+- `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda
+  `assembleRelease bundleRelease`; o `.aab` sai ao lado do APK e entra no `android-report.json`. A assinatura do AAB é
+  conferida pelo `keytool -printcert -jarfile` e tem de ser a mesma do APK; um `.aab` antigo no destino é apagado quando
+  a opção está desligada. O keytool em pt_BR quebra no `-printcert` (`MissingFormatArgumentException`), por isso roda com
+  `-J-Duser.language=en`.
+- Painel "Android (Range)": caixa "Also build AAB (Google Play)" no release; `package-android.py --aab`. Traduções
+  pt/es/ru em `translations_android.py`.
+- Verificado: First Person em release com chave de teste, APK 51,8 MiB e AAB 21,9 MiB com o mesmo certificado.
+  `bundletool build-apks --connected-device` (1.18.3) gerou os splits do Find X3 Pro (download ~22 MB, `.wasm`/`.data`
+  sem compressão no master); `install-apks` instalou e o jogo abriu e renderizou com o controle na tela.
 
 ## 2026-09-24 - Controle na tela: layout `fps` (stick de olhar e clique) e áudio pausado em segundo plano
 

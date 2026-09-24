@@ -30,7 +30,7 @@ PT_BR = {
     "Build type": "Tipo de build",
     "For testing on your phone; allows remote inspection (chrome://inspect)":
         "Para testar no seu celular; permite inspeção remota (chrome://inspect)",
-    "Folder of the APK, android-export.json, report and Gradle log":
+    "Folder of the APK (and AAB), android-export.json, report and Gradle log":
         "Pasta do APK, do android-export.json, do relatório e do log do Gradle",
     "JDK folder; only used if JAVA_HOME and Android Studio are not found":
         "Pasta do JDK; só é usada se JAVA_HOME e o Android Studio não forem encontrados",
@@ -153,6 +153,14 @@ PT_BR = {
     "The signing key %s has no alias %s.": "A chave de assinatura %s não tem o alias %s.",
     "The release APK is not signed (apksigner could not verify %s).":
         "O APK release não está assinado (o apksigner não conseguiu verificar %s).",
+    "Also build AAB (Google Play)":
+        "Gerar também o AAB (Google Play)",
+    "Also generates the .aab bundle signed with the same key, the format Google Play requires; the APK is still built for installing on your phone":
+        "Gera também o pacote .aab assinado com a mesma chave, o formato que a Google Play exige; o APK continua sendo gerado para instalar no seu celular",
+    "Gradle finished but the AAB was not found at %s.":
+        "O Gradle terminou, mas o AAB não foi encontrado em %s.",
+    "The AAB is not signed with the same key as the APK (%s).":
+        "O AAB não está assinado com a mesma chave do APK (%s).",
 }
 
 ES = {
@@ -183,7 +191,7 @@ ES = {
     "Build type": "Tipo de build",
     "For testing on your phone; allows remote inspection (chrome://inspect)":
         "Para probar en tu móvil; permite inspección remota (chrome://inspect)",
-    "Folder of the APK, android-export.json, report and Gradle log":
+    "Folder of the APK (and AAB), android-export.json, report and Gradle log":
         "Carpeta del APK, android-export.json, informe y log de Gradle",
     "JDK folder; only used if JAVA_HOME and Android Studio are not found":
         "Carpeta del JDK; solo se usa si no se encuentran JAVA_HOME ni Android Studio",
@@ -299,6 +307,14 @@ ES = {
     "The signing key %s has no alias %s.": "La clave de firma %s no tiene el alias %s.",
     "The release APK is not signed (apksigner could not verify %s).":
         "El APK release no está firmado (apksigner no pudo verificar %s).",
+    "Also build AAB (Google Play)":
+        "Generar también el AAB (Google Play)",
+    "Also generates the .aab bundle signed with the same key, the format Google Play requires; the APK is still built for installing on your phone":
+        "Genera también el paquete .aab firmado con la misma clave, el formato que exige Google Play; el APK se sigue generando para instalar en tu teléfono",
+    "Gradle finished but the AAB was not found at %s.":
+        "Gradle terminó, pero no se encontró el AAB en %s.",
+    "The AAB is not signed with the same key as the APK (%s).":
+        "El AAB no está firmado con la misma clave que el APK (%s).",
 }
 
 RU = {
@@ -345,7 +361,7 @@ RU = {
     "Portrait only": "Только портретная",
     "For testing on your phone; allows remote inspection (chrome://inspect)":
         "Для проверки на своём телефоне; разрешает удалённую отладку (chrome://inspect)",
-    "Folder of the APK, android-export.json, report and Gradle log":
+    "Folder of the APK (and AAB), android-export.json, report and Gradle log":
         "Папка для APK, android-export.json, отчёта и журнала Gradle",
     "JDK folder; only used if JAVA_HOME and Android Studio are not found":
         "Папка JDK; используется, только если не найдены JAVA_HOME и Android Studio",
@@ -445,4 +461,12 @@ RU = {
     "The signing key %s has no alias %s.": "В ключе подписи %s нет псевдонима %s.",
     "The release APK is not signed (apksigner could not verify %s).":
         "APK релиза не подписан (apksigner не смог проверить %s).",
+    "Also build AAB (Google Play)":
+        "Также собрать AAB (Google Play)",
+    "Also generates the .aab bundle signed with the same key, the format Google Play requires; the APK is still built for installing on your phone":
+        "Также создаёт пакет .aab, подписанный тем же ключом, — формат, который требует Google Play; APK по-прежнему собирается для установки на телефон",
+    "Gradle finished but the AAB was not found at %s.":
+        "Gradle завершился, но AAB не найден в %s.",
+    "The AAB is not signed with the same key as the APK (%s).":
+        "AAB подписан не тем же ключом, что и APK (%s).",
 }

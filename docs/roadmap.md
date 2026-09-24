@@ -147,7 +147,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com
   "Instalar no celular". Release assinado implementado (chave fora do JSON e do git, verificado pelo `apksigner`).
   Release instalado e atualizado por cima no aparelho (v1→v2, mesma chave). Save preservado na atualização (cena `web-save`).
-- AAB/Play seguem a ordem do plano. Controles por toque (A1): caminho em
+- AAB (2026-09-24): opção no release do painel e `package-android.py --aab`; AAB instalado pelo `bundletool`
+  no Find X3 Pro e jogo rodando. Falta publicar numa faixa de teste da Play Console (conta do usuário).
+- Controles por toque (A1): caminho em
   [android-touch-controls-plan.md](android-touch-controls-plan.md); T0 (ponte `Module.rangePad` → gamepad 0)
   verificada no navegador; T1 (overlay na página: stick, d-pad e botões, multitoque) verificada no navegador
   com toque emulado; T2 (alvo tecla: layouts `wasd` e `arrows`, origem separada do teclado físico) verificada
