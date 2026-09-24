@@ -24,6 +24,14 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - Veículo: telemetria de marcha/RPM no HUD e no Vehicle Lab
+
+- `vehicle_player_component.py` (projeto de teste, demo `Vehicle` e template do flowmenu): seções Motor, Freios,
+  Direção, Câmbio, Controles e Telemetria; teclas configuráveis de troca (E/Q por padrão) e RPM de subida/descida do
+  automático. "Publish Telemetry" grava `vehicle_gearbox`, `vehicle_gear`, `vehicle_rpm` e `vehicle_speed_kmh` no chassi;
+  "Show HUD" mostra essas propriedades no debug. No manual a troca vale a qualquer velocidade.
+- `KX_VehicleDebugUI.cpp`: aba Overview do Vehicle Lab mostra câmbio, marcha e RPM lidos dessas propriedades (ou dica
+  para ligar a telemetria). Compilado; validação no jogo pendente com o usuário.
 ## 2026-09-24 - Export Android: AAB para a Google Play
 
 - `range_web/android.py`: opção `aab` do `android-export.json` (só no release). O mesmo Gradle roda

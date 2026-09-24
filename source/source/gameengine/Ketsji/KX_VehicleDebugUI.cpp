@@ -161,6 +161,27 @@ void KX_VehicleDebugUI::RenderOverviewTab(PHY_IVehicle *vehicle)
     }
   }
   ImGui::Text("Wheels in contact: %d / %d", contactCount, vehicle->GetNumWheels());
+
+  /* Gearbox state lives in Python (vehicle_player_component); it is only
+   * visible here when the component publishes it as game properties. */
+  ImGui::Separator();
+  PHY_IPhysicsController *controller = vehicle->GetChassisController();
+  KX_ClientObjectInfo *info = controller ? static_cast<KX_ClientObjectInfo *>(controller->GetNewClientInfo()) : nullptr;
+  KX_GameObject *chassis = info ? info->m_gameobject : nullptr;
+  EXP_Value *gear = chassis ? chassis->GetProperty("vehicle_gear") : nullptr;
+  if (!gear) {
+    ImGui::TextDisabled("Gear/RPM: enable \"Publish Telemetry\" or \"Show HUD\" in the vehicle component.");
+    return;
+  }
+  EXP_Value *gearbox = chassis->GetProperty("vehicle_gearbox");
+  EXP_Value *rpm = chassis->GetProperty("vehicle_rpm");
+  if (gearbox) {
+    ImGui::Text("Gearbox: %s", gearbox->GetText().c_str());
+  }
+  ImGui::Text("Gear: %s", gear->GetText().c_str());
+  if (rpm) {
+    ImGui::Text("Engine RPM: %s", rpm->GetText().c_str());
+  }
 }
 
 void KX_VehicleDebugUI::RenderSuspensionTab(PHY_IVehicle *vehicle)
