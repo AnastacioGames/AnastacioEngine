@@ -29,5 +29,6 @@ Pendente (não confirmado nesta rodada):
 - Home e retorno (sem recarregar; o processo não foi recriado durante a sessão), giro de 180° em paisagem.
 - `?perf=1` com o jogo real (First Person), áudio, save/IDBFS e comparação com o Chrome do mesmo aparelho.
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
-- Esconder o botão "Tela cheia" do harness dentro do APK (a Activity já é imersiva).
+- Esconder o botão "Tela cheia" do harness dentro do APK (a Activity já é imersiva). Implementado em 2026-09-24
+  (marca `RangeWebView/1` no user agent) e verificado só no navegador; falta confirmar no aparelho.
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.

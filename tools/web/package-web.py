@@ -174,9 +174,11 @@ __PERF_SCRIPT__
 
   // Tela cheia: a pagina inteira (overlay de perf/log continuam visiveis). O canvas mantem a resolucao
   // de desenho e so e escalado por CSS, preservando a proporcao (o mapeamento de toque/mouse segue certo).
-  // iPhone nao tem Fullscreen API para elementos fora de <video>: o botao fica oculto la.
+  // iPhone nao tem Fullscreen API para elementos fora de <video>: o botao fica oculto la. No APK Android
+  // (MainActivity acrescenta "RangeWebView/" ao user agent) a Activity ja e imersiva: botao oculto tambem.
   var root = document.documentElement;
-  var fsSupported = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  var inAndroidApp = /\\bRangeWebView\\//.test(navigator.userAgent);
+  var fsSupported = !inAndroidApp && !!(root.requestFullscreen || root.webkitRequestFullscreen);
   function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
   function fitCanvas() {
     var c = el("canvas");

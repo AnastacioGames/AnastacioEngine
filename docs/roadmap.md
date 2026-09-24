@@ -130,7 +130,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **APK WebView mínimo (A0b)**: template em `tools/android/webview-template/` rodando a cena `motion` no
   OPPO Find X3 Pro (2026-09-23): carga offline, WebGL 2, Python e sensores ok
   ([android-manual-tests.md](android-manual-tests.md)). Próximo: Home/retorno, `?perf=1` e áudio/save com o jogo
-  real (First Person), comparação com o Chrome do aparelho, esconder o botão "Tela cheia" no APK.
+  real (First Person), comparação com o Chrome do aparelho. Botão "Tela cheia" já escondido no APK (2026-09-24),
+  falta confirmar no aparelho.
 - AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros

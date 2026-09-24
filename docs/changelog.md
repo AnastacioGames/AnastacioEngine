@@ -23,6 +23,16 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - APK: botão "Tela cheia" escondido dentro do app
+
+- `MainActivity` acrescenta `RangeWebView/1` ao user agent do WebView. O `index.html` de `package-web.py` procura
+  essa marca e não mostra o botão "Tela cheia" dentro do APK, que já abre imersivo. No navegador nada muda.
+- Verificado no Edge headless com o user agent sobrescrito pelo CDP (botão visível sem a marca, oculto com ela).
+  APK debug recompilado com o pacote `motion` e o runtime release (`build-web-release/bin`); falta instalar e
+  conferir no aparelho.
+- Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
+  `--runtime-dir build-web-release/bin`.
+
 ## 2026-09-23 - APK WebView mínimo (A0b) rodando no aparelho
 
 - Novo template `tools/android/webview-template/` (Kotlin, uma Activity, AGP 9.4.1 com Kotlin embutido, Gradle

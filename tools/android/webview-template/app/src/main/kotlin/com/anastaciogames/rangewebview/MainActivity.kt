@@ -56,6 +56,8 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = false
             allowFileAccess = false
             allowContentAccess = false
+            // Marca para o harness de package-web.py (ex.: esconder o botao "Tela cheia", a Activity ja e imersiva).
+            userAgentString = "$userAgentString $UA_MARKER"
         }
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -128,5 +130,6 @@ class MainActivity : Activity() {
         const val APP_HOST = "appassets.androidplatform.net"
         const val START_URL = "https://$APP_HOST/assets/www/index.html"
         const val LOG_TAG = "RangeWeb"
+        const val UA_MARKER = "RangeWebView/1"
     }
 }

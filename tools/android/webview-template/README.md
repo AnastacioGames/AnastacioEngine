@@ -8,7 +8,8 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 
 ## Gerar e instalar
 
-1. Gerar o pacote Web: `python tools/web/package-web.py --game <jogo>.range --name <nome> --version <versao>`.
+1. Gerar o pacote Web: `python tools/web/package-web.py --game <jogo>.range --name <nome> --version <versao>
+   --runtime-dir build-web-release/bin` (sem `--runtime-dir` ele usa `build-web/bin`, que pode ser um build de depuração).
 2. Copiar o conteúdo de `build-web/dist/<nome>/` (sem `serve.py` e `HOSTING.md`) para `app/src/main/assets/www/`
    (pasta ignorada pelo git).
 3. Compilar (PowerShell, nesta pasta):
@@ -31,5 +32,6 @@ Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gr
 
 - Paisagem (`sensorLandscape`), tela cheia imersiva, tela sempre acesa com o app em primeiro plano.
 - Sem permissão `INTERNET`: arquivo ausente no pacote responde 404; links externos abrem no navegador.
+- O user agent do WebView ganha `RangeWebView/1`; o `index.html` do pacote usa isso para esconder o botão "Tela cheia".
 - Girar ou redimensionar não recria a Activity (`configChanges`), para não recarregar o jogo.
 - Ainda não há protocolo de pausa com o runtime nem controles por toque (próxima rodada).
