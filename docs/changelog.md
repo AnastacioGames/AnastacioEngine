@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 19 | 34 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 20 | 35 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,21 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Tradução dos textos de interface em C fora do RNA (scan estático)
+
+- Novo `tools/tests/web_profile/i18n_scan_c.py` (roda no motor): lê os `.c/.cc/.cpp` de `source/source` (fora
+  `makesrna`, já coberto pelo `i18n_audit.py`) e lista os literais de `IFACE_`, `TIP_`, `N_`, `CTX_IFACE_` e `CTX_N_`
+  (junta literais adjacentes; resolve `BLT_I18NCONTEXT_*`) que o `pgettext` não traduz. 1 300 textos distintos; antes,
+  131 sem tradução em pt_BR, 128 em es e 221 em ru_RU.
+- Novo `range_web/translations_c.py` (pt_BR/es/ru, 78 textos), registrado junto do `translations_labels.py`
+  (tradução existente vence): diálogo de fechar sem salvar e títulos das janelas da Range (`wm_window.c`), editor de
+  drivers, logic bricks (Animation sensor, Skip dt), sockets de nós novos (Principled Hair/Volume, sprites), outliner.
+- Depois: pt_BR 73, es 70 e ru_RU 163. Em pt/es restam só códigos (X:, RGB, Hex, Ctrl), nomes (Python, Range
+  Engine), portas lógicas (And, Or, Xor) e palavras iguais nas duas línguas. Os 90 a mais do ru são lacunas do
+  catálogo russo do Blender 2.79 (dicas de modal, Principled BSDF, mensagens de biblioteca), não textos da Range.
+- `engine_i18n.py` confere um texto em C em pt/es/ru; `engine_web_ui.py` e os 124 testes puros seguem OK.
+  Não conferido na janela real.
 
 ## 2026-09-24 - Tradução dos textos fixos dos layouts Python (scan estático)
 

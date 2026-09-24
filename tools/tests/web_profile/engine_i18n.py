@@ -45,6 +45,8 @@ check(pgettext_iface("Export from a development tree with tools/web/package-web.
       "mensagem do export traduzida")
 # Texto fixo de layout Python (layout.label(text=...), translations_labels.py).
 check(pgettext_iface("Game Settings:") == "Configurações do jogo:", "rotulo fixo de layout traduzido (Game Settings:)")
+# Texto de interface em C fora do RNA (IFACE_ em wm_window.c, translations_c.py).
+check(pgettext_iface("Discard Changes") == "Descartar alterações", "texto em C traduzido (Discard Changes)")
 
 # Modulos puros usam o mesmo caminho de traducao.
 from range_web import results
@@ -78,6 +80,7 @@ for lang, obj, web in (('es', "Objeto", "Validar Web"), ('ru_RU', "Объект"
           "%s: dica da Range (translations_ui) traduzida" % lang)
     check(pgettext_iface("Build Navigation Mesh") != "Build Navigation Mesh",
           "%s: rotulo fixo de layout (translations_labels) traduzido" % lang)
+    check(pgettext_iface("Save & Quit") != "Save & Quit", "%s: texto em C (translations_c) traduzido" % lang)
 
 # Sem o interruptor de traducao de interface, nada muda mesmo em pt_BR.
 system.language = 'pt_BR'
