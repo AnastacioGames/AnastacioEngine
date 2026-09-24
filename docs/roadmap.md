@@ -140,7 +140,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Release instalado e atualizado por cima no aparelho (v1→v2, mesma chave). Save preservado na atualização (cena `web-save`).
 - AAB/Play seguem a ordem do plano. Controles por toque (A1): caminho em
   [android-touch-controls-plan.md](android-touch-controls-plan.md); T0 (ponte `Module.rangePad` → gamepad 0)
-  verificada no navegador. Próximo: T1, overlay na página.
+  verificada no navegador; T1 (overlay na página: stick, d-pad e botões, multitoque) verificada no navegador
+  com toque emulado. Próximo: T2, alvo tecla (jogos que leem teclado), e teste no celular.
 
 ### Outros
 

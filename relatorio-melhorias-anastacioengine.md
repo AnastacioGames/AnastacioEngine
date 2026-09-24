@@ -181,6 +181,7 @@ ferramenta correspondente.
 - Controles na tela (A1): desenho e captura de toque na página (HTML/Pointer Events); a engine recebe o estado por
   `Module.rangePad` e o entrega como gamepad 0 (somado ao controle físico) ou como teclas. Estende o input existente
   (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
+  O overlay só aparece em tela de toque (`pointer: coarse`) ou com `?touch=1`; layout padrão stick + A/B.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.

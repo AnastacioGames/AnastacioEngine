@@ -87,7 +87,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>__TITLE__</title>
 <link rel="icon" href="data:,">
 <style>
@@ -107,6 +107,32 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
         background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
   #fs[hidden] { display: none; }
+  #touch { position: fixed; inset: 0; z-index: 20; pointer-events: none; --u: clamp(46px, 12vmin, 80px);
+           --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px);
+           --sb: env(safe-area-inset-bottom, 0px);
+           user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #touch[hidden] { display: none; }
+  #touch .zone, #touch .btn, #touch .dpad { position: absolute; pointer-events: auto; touch-action: none; }
+  #touch .zone { bottom: 0; width: 45%; height: 70%; }
+  #touch .zone.left { left: 0; }
+  #touch .zone.right { right: 0; }
+  #touch .base { position: absolute; box-sizing: border-box; width: calc(var(--u) * 2); height: calc(var(--u) * 2);
+                 bottom: calc(var(--sb) + var(--u) * .8); border-radius: 50%;
+                 background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.4); }
+  #touch .left .base { left: calc(var(--sl) + var(--u) * .8); }
+  #touch .right .base { right: calc(var(--sr) + var(--u) * .8); }
+  #touch .knob { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * .9); height: calc(var(--u) * .9);
+                 margin: calc(var(--u) * -.45) 0 0 calc(var(--u) * -.45); border-radius: 50%;
+                 background: rgba(255,255,255,.45); }
+  #touch .btn { box-sizing: border-box; width: calc(var(--u) * 1.1); height: calc(var(--u) * 1.1); border-radius: 50%;
+                display: flex; align-items: center; justify-content: center; font: bold 20px system-ui, sans-serif;
+                color: rgba(255,255,255,.85); background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.4); }
+  #touch .dpad { box-sizing: border-box; width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4);
+                 left: calc(var(--sl) + var(--u) * .7); bottom: calc(var(--sb) + var(--u) * .7);
+                 border-radius: 50%; background: rgba(255,255,255,.06); }
+  #touch .dpad i { position: absolute; width: calc(var(--u) * .8); height: calc(var(--u) * .8); border-radius: 6px;
+                   background: rgba(255,255,255,.25); }
+  #touch .zone.on .knob, #touch .btn.on, #touch .dpad i.on { background: rgba(232,134,42,.7); }
 </style>
 </head>
 <body>
@@ -121,6 +147,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 <button id="fs" hidden>Tela cheia</button>
+<div id="touch" hidden></div>
 <pre id="log"></pre>
 __PERF_SCRIPT__
 <script>
@@ -145,6 +172,7 @@ __PERF_SCRIPT__
     e.hidden = false;
     e.textContent = msg + "\\n\\nRecarregue a pagina para tentar novamente. Use ?debug=1 para ver o log.";
     el("overlay").hidden = false;
+    stopTouch();
   }
 
   function fetchInto(url, fsName) {
@@ -169,6 +197,7 @@ __PERF_SCRIPT__
     requestMotionPermission();
     el("overlay").hidden = true;
     el("fs").hidden = !fsSupported;
+    startTouch();
     el("canvas").focus();
   }
 
@@ -284,6 +313,191 @@ __PERF_SCRIPT__
   // axes na ordem do SDL GameController (LX, LY, RX, RY, gatilho E, gatilho D; -1..1, gatilhos 0..1);
   // buttons e mascara de bits na ordem de SDL_GameControllerButton (A=1, B=2, X=4, Y=8, ...).
   var pad = { active: false, axes: [0, 0, 0, 0, 0, 0], buttons: 0 };
+
+  // Overlay do controle na tela: cada controle segue um dedo (pointerId), entao mover e apertar ao mesmo tempo
+  // funciona. Toques fora dos controles seguem para o canvas (arrastar para olhar continua). Aparece em tela de
+  // toque (pointer: coarse) ou com ?touch=1; ?touch=0 esconde; ?touchlayout= e ?touchstick= trocam a config.
+  var TOUCH = __TOUCH__;
+  var DPAD_UP = 1 << 11, DPAD_DOWN = 1 << 12, DPAD_LEFT = 1 << 13, DPAD_RIGHT = 1 << 14;
+  var STICK_DEADZONE = 0.1;
+  var touchLayouts = {
+    stick: [{ type: "stick", side: "left", axes: [0, 1] },
+            { type: "button", bit: 0, label: "A", at: [-0.75, 0.55] },
+            { type: "button", bit: 1, label: "B", at: [0.75, -0.55] }],
+    dpad: [{ type: "dpad" },
+           { type: "button", bit: 0, label: "A", at: [0, 1] }, { type: "button", bit: 1, label: "B", at: [1, 0] },
+           { type: "button", bit: 2, label: "X", at: [-1, 0] }, { type: "button", bit: 3, label: "Y", at: [0, -1] }],
+    twin: [{ type: "stick", side: "left", axes: [0, 1] }, { type: "stick", side: "right", axes: [2, 3] }]
+  };
+  var touchControls = [], touchLogAt = 0, touchLogButtons = 0;
+  function touchParam(name) {
+    var m = new RegExp("[?&]" + name + "=(\\\\w+)").exec(location.search);
+    return m ? m[1] : null;
+  }
+  function node(tag, cls, text) {
+    var n = document.createElement(tag);
+    n.className = cls;
+    if (text) n.textContent = text;
+    return n;
+  }
+  function updatePad() {
+    var axes = [0, 0, 0, 0, 0, 0], bits = 0;
+    touchControls.forEach(function (c) {
+      if (c.axes) { axes[c.axes[0]] = c.value[0]; axes[c.axes[1]] = c.value[1]; }
+      bits |= c.bits;
+    });
+    pad.axes = axes;
+    pad.buttons = bits;
+    var now = performance.now();
+    if (debug && (bits !== touchLogButtons || now - touchLogAt > 250)) {
+      touchLogAt = now;
+      touchLogButtons = bits;
+      log("[touch] axes " + axes.map(function (v) { return v.toFixed(2); }).join(" ") + " | buttons " + bits);
+    }
+  }
+  // Um dedo por controle, preso a ele por pointer capture: arrastar para fora nao solta nem pega outro controle.
+  function bindPointer(target, ctl, down, move) {
+    var id = null;
+    function end(e) {
+      if (e.pointerId !== id) return;
+      id = null;
+      ctl.reset();
+      updatePad();
+    }
+    target.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      if (id !== null) return;
+      id = e.pointerId;
+      try { target.setPointerCapture(id); } catch (x) {}
+      down(e);
+      updatePad();
+    });
+    target.addEventListener("pointermove", function (e) {
+      if (e.pointerId !== id) return;
+      move(e);
+      updatePad();
+    });
+    target.addEventListener("pointerup", end);
+    target.addEventListener("pointercancel", end);
+    target.addEventListener("lostpointercapture", end);
+    ctl.release = function () {
+      var was = id;
+      id = null;
+      if (was !== null) try { target.releasePointerCapture(was); } catch (x) {}
+      ctl.reset();
+    };
+  }
+  // Stick fixo: o centro e a posicao de repouso. Dinamico: a base vai para onde o dedo tocou dentro da zona.
+  function makeStick(c, dynamic) {
+    var zone = node("div", "zone " + c.side), base = node("div", "base"), knob = node("div", "knob");
+    base.appendChild(knob);
+    zone.appendChild(base);
+    var ctl = { node: zone, axes: c.axes, value: [0, 0], bits: 0 }, cx = 0, cy = 0, r = 1;
+    function aim(e) {
+      var dx = e.clientX - cx, dy = e.clientY - cy, len = Math.sqrt(dx * dx + dy * dy);
+      if (len > r) { dx *= r / len; dy *= r / len; }
+      knob.style.transform = "translate(" + dx + "px," + dy + "px)";
+      var n = Math.min(1, len / r);
+      var k = n <= STICK_DEADZONE ? 0 : (n - STICK_DEADZONE) / (1 - STICK_DEADZONE) / n;
+      ctl.value = [dx / r * k, dy / r * k];
+    }
+    ctl.reset = function () {
+      ctl.value = [0, 0];
+      knob.style.transform = "";
+      base.removeAttribute("style");
+      zone.classList.remove("on");
+    };
+    bindPointer(zone, ctl, function (e) {
+      var b = base.getBoundingClientRect();
+      r = b.width / 2;
+      if (dynamic) {
+        var z = zone.getBoundingClientRect();
+        var x = Math.max(r, Math.min(z.width - r, e.clientX - z.left));
+        var y = Math.max(r, Math.min(z.height - r, e.clientY - z.top));
+        base.style.left = x - r + "px";
+        base.style.top = y - r + "px";
+        base.style.right = base.style.bottom = "auto";
+        cx = z.left + x;
+        cy = z.top + y;
+      } else {
+        cx = b.left + r;
+        cy = b.top + r;
+      }
+      zone.classList.add("on");
+      aim(e);
+    }, aim);
+    return ctl;
+  }
+  // D-pad de 8 direcoes pelo angulo do dedo em relacao ao centro (diagonal aperta os dois botoes).
+  function makeDpad() {
+    var box = node("div", "dpad"), arms = {};
+    [["up", DPAD_UP, 0.8, 0], ["down", DPAD_DOWN, 0.8, 1.6], ["left", DPAD_LEFT, 0, 0.8], ["right", DPAD_RIGHT, 1.6, 0.8]]
+      .forEach(function (a) {
+        var i = node("i", "");
+        i.style.left = "calc(var(--u) * " + a[2] + ")";
+        i.style.top = "calc(var(--u) * " + a[3] + ")";
+        box.appendChild(i);
+        arms[a[1]] = i;
+      });
+    var ctl = { node: box, value: null, bits: 0 };
+    function aim(e) {
+      var b = box.getBoundingClientRect(), r = b.width / 2;
+      var dx = (e.clientX - b.left - r) / r, dy = (e.clientY - b.top - r) / r, len = Math.sqrt(dx * dx + dy * dy);
+      var bits = 0;
+      if (len > 0.2) {
+        dx /= len;
+        dy /= len;
+        if (dy < -0.38) bits |= DPAD_UP;
+        if (dy > 0.38) bits |= DPAD_DOWN;
+        if (dx < -0.38) bits |= DPAD_LEFT;
+        if (dx > 0.38) bits |= DPAD_RIGHT;
+      }
+      ctl.bits = bits;
+      for (var k in arms) arms[k].classList.toggle("on", !!(bits & k));
+    }
+    ctl.reset = function () { aim({ clientX: NaN, clientY: NaN }); };
+    bindPointer(box, ctl, aim, aim);
+    return ctl;
+  }
+  // Botoes em volta de um centro no canto inferior direito; "at" em unidades de --u (x para a direita, y para baixo).
+  function makeButton(c) {
+    var b = node("div", "btn", c.label), ctl = { node: b, value: null, bits: 0 };
+    b.style.right = "calc(var(--sr) + var(--u) * " + (1.35 - c.at[0]) + ")";
+    b.style.bottom = "calc(var(--sb) + var(--u) * " + (1.35 - c.at[1]) + ")";
+    ctl.reset = function () { ctl.bits = 0; b.classList.remove("on"); };
+    bindPointer(b, ctl, function () { ctl.bits = 1 << c.bit; b.classList.add("on"); }, function () {});
+    return ctl;
+  }
+  function startTouch() {
+    var show = touchParam("touch");
+    var layout = touchLayouts[touchParam("touchlayout") || TOUCH.layout];
+    var coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    if (!layout || show === "0" || (show !== "1" && !coarse) || touchControls.length) return;
+    var dynamic = (touchParam("touchstick") || TOUCH.stick) !== "fixed";
+    layout.forEach(function (c) {
+      var ctl = c.type === "stick" ? makeStick(c, dynamic) : c.type === "dpad" ? makeDpad() : makeButton(c);
+      touchControls.push(ctl);
+      el("touch").appendChild(ctl.node);
+    });
+    el("touch").hidden = false;
+    pad.active = true;
+    log("[touch] controle na tela: " + (touchParam("touchlayout") || TOUCH.layout) + (dynamic ? " (stick dinamico)" : ""));
+  }
+  // Soltar tudo quando a pagina perde o foco ou some: sem isso um dedo "preso" seguia andando ao voltar.
+  function releaseTouch() {
+    if (!touchControls.length) return;
+    touchControls.forEach(function (c) { c.release(); });
+    updatePad();
+  }
+  function stopTouch() {
+    releaseTouch();
+    pad.active = false;
+    el("touch").hidden = true;
+  }
+  window.addEventListener("blur", releaseTouch);
+  window.addEventListener("pagehide", releaseTouch);
+  window.addEventListener("orientationchange", releaseTouch);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) releaseTouch(); });
 
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -602,6 +816,10 @@ def main():
     ap.add_argument("--perf", action="store_true",
                     help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
+    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin"], default="stick",
+                    help="controle na tela em aparelhos de toque (padrao: stick + botoes A/B)")
+    ap.add_argument("--touch-stick", choices=["dynamic", "fixed"], default="dynamic",
+                    help="stick dinamico (nasce onde o dedo toca) ou fixo")
     args = ap.parse_args()
 
     game_name = safe_name(args.game.name)
@@ -651,6 +869,7 @@ def main():
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
+            .replace("__TOUCH__", json.dumps({"layout": args.touch_layout, "stick": args.touch_stick}))
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))
     (tmp / "index.html").write_text(html, encoding="utf-8", newline="\n")

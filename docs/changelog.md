@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 14 | 24 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 15 | 27 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,28 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Controle na tela: overlay com stick, d-pad e botões (A1, etapa T1)
+
+- `package-web.py` desenha o controle na página (HTML/CSS, sem custo na cena) e escreve `Module.rangePad`, que a T0
+  já entrega como gamepad 0. Cada controle segue um dedo (`pointerId` + pointer capture): mover e apertar ao mesmo
+  tempo funciona, e arrastar para fora do controle não solta nem aciona outro. Toques fora dos controles seguem para
+  o canvas (arrastar para olhar continua). Tudo solta em `blur`, `visibilitychange`, `pagehide`, giro da tela e
+  `pointercancel`.
+- Layouts: `stick` (stick esquerdo + A/B, padrão), `dpad` (d-pad de 8 direções nos botões DPAD do SDL + A/B/X/Y),
+  `twin` (dois sticks, eixos 0-1 e 2-3). Stick dinâmico (nasce onde o dedo toca, na zona inferior da metade da
+  tela) ou fixo; zona morta radial de 10 %. Tamanho por `vmin` e margens por `env(safe-area-inset-*)`
+  (`viewport-fit=cover`).
+- Aparece só em `pointer: coarse` (celular, WebView do APK) ou com `?touch=1`; `?touch=0`, `?touchlayout=` e
+  `?touchstick=` para testar. Padrão do pacote por `--touch-layout` (`none` desliga) e `--touch-stick`; o editor ainda
+  usa o padrão (seletor na T3). Com `?debug=1` o log mostra `[touch] axes ... | buttons ...`.
+- `tools/web/verify-touch.cjs`: 10/10 no Edge headless com toque emulado pelo CDP — stick até a borda dá LX 1,
+  botão A junto, engine vê os dois (`axes=[1.0, 0.0, …] buttons=[0]`) e o sensor A dispara; soltar só o A mantém o
+  stick; soltar tudo zera; diagonal solta ao perder o foco; toque fora dos controles não mexe no pad. D-pad
+  conferido à parte (diagonal cima-direita aperta UP+RIGHT, baixo só DOWN, soltar zera).
+- Com o controle USB ligado no PC, `verify-pad.cjs` falha nas 3 checagens que esperam "sem gamepad" (o índice 0 é o
+  físico); anotado no cabeçalho dele. Conferido pelo usuário no Edge do PC com `?touch=1`, usando o mouse como
+  dedo: funciona. Não testado: celular (toque real, entalhe, WebView do APK).
 
 ## 2026-09-24 - Controle na tela: ponte do gamepad virtual (A1, etapa T0)
 

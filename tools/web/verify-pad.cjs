@@ -4,7 +4,8 @@
 //
 // Uso: node tools/web/verify-pad.cjs http://127.0.0.1:8792/ [porta-cdp=9333]
 // Requer Chrome/Edge aberto com --remote-debugging-port=<porta-cdp> (ver docs/web-deploy.md).
-// Escreve Module.rangePad direto (sem overlay): prova a ponte JS -> wasm, nao o toque.
+// Escreve Module.rangePad direto (sem overlay): prova a ponte JS -> wasm, nao o toque (ver verify-touch.cjs).
+// Rodar sem controle fisico ligado: com ele, joysticks[0] existe e o nome e o do controle.
 const url = process.argv[2];
 const port = process.argv[3] || '9333';
 if (!url) { console.error('uso: verify-pad.cjs <url> [porta-cdp]'); process.exit(2); }

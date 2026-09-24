@@ -102,7 +102,9 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - `Module.rangePad` com eixos e botões fixos no JS.
    - Leitura por `EM_JS` em `DEV_Joystick` (`DEV_JoystickEvents.cpp`: fonte virtual no `SyncLiveState`, junta no índice 0; se não houver gamepad físico, cria a instância virtual).
    - Critério: no navegador do PC, o valor aparece em `logic.joysticks[0]` e num mapa `JOYSTICK` do Input System.
-2. **T1, overlay:**
+2. **T1, overlay, feita em 2026-09-24:** `verify-touch.cjs` 10/10 no Edge headless com toque emulado (dois dedos
+   pelo CDP); d-pad na diagonal conferido. Layouts `stick`, `dpad` e `twin` já no template, escolhidos por
+   `package-web.py --touch-layout/--touch-stick` (a T3 liga isso ao painel). Falta o celular.
    - Módulo JS no template de `tools/web/package-web.py`, com stick fixo e dinâmico, d-pad e botões.
    - Pointer capture, `touch-action: none` e respeito ao entalhe da tela.
    - Soltar tudo ao perder o foco.
