@@ -43,6 +43,8 @@ check(pgettext_tip("Stops the local server of the Web package") == "Para o servi
 check(pgettext_iface("Preflight after export") == "Pré-voo após exportar", "acentos preservados na string")
 check(pgettext_iface("Export from a development tree with tools/web/package-web.py.").startswith("Exporte a partir"),
       "mensagem do export traduzida")
+# Texto fixo de layout Python (layout.label(text=...), translations_labels.py).
+check(pgettext_iface("Game Settings:") == "Configurações do jogo:", "rotulo fixo de layout traduzido (Game Settings:)")
 
 # Modulos puros usam o mesmo caminho de traducao.
 from range_web import results
@@ -74,6 +76,8 @@ for lang, obj, web in (('es', "Objeto", "Validar Web"), ('ru_RU', "Объект"
     check(pgettext_iface("Vortex Height") != "Vortex Height", "%s: rotulo da Range (translations_ui) traduzido" % lang)
     check(pgettext_tip("Distance to begin suspend physics of this object") != "Distance to begin suspend physics of this object",
           "%s: dica da Range (translations_ui) traduzida" % lang)
+    check(pgettext_iface("Build Navigation Mesh") != "Build Navigation Mesh",
+          "%s: rotulo fixo de layout (translations_labels) traduzido" % lang)
 
 # Sem o interruptor de traducao de interface, nada muda mesmo em pt_BR.
 system.language = 'pt_BR'

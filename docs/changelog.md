@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 18 | 33 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 19 | 34 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,22 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Tradução dos textos fixos dos layouts Python (scan estático)
+
+- Novo `tools/tests/web_profile/i18n_scan_labels.py` (roda no motor): lê com `ast` os `.py` de
+  `release/scripts/startup` e lista os textos literais passados a `label`, `operator`, `prop`, `menu` etc.
+  (`text=` ou `label("...")`, respeitando `text_ctxt` e `translate=False`) que `pgettext_iface` não traduz. Cobre o que
+  o `i18n_audit.py` (só RNA) não via. 2 378 textos distintos; antes, 895 sem tradução em pt_BR e 898 em es (ru não medido antes).
+- Novo `range_web/translations_labels.py` (pt_BR/es/ru, 997 textos), registrado depois dos outros dicionários
+  (`setdefault`: tradução já existente vence). Cobre sobretudo os painéis do game engine (Game, Física, Mundo,
+  Input System, cutscene, componentes, menus da Range) e menus do Blender que o catálogo 2.79 não traduz. Textos
+  que o catálogo traduz num idioma e não em outro ficam nas três línguas, para as tabelas manterem as mesmas chaves.
+- Depois: pt_BR 72, es 74 e ru 30 sem tradução no scan, todos nomes próprios (Range Engine - Discord), códigos
+  (X/Y/Z, FXAA, ORM, AWD/FWD/RWD) ou palavras iguais nas duas línguas (Sensor, Material). A auditoria RNA também
+  cai um pouco (pt_BR 1 286 → 1 279, ru 1 958 → 1 940).
+- `engine_i18n.py` confere um rótulo fixo em pt/es/ru; `engine_web_ui.py` e os 124 testes puros seguem OK.
+  es/ru pedem revisão nativa. Não conferido na janela real do editor. Textos em C fora do RNA seguem sem scan.
 
 ## 2026-09-24 - Controle na tela: checklist do celular no navegador e no Find X3 Pro (A1, etapa T4)
 

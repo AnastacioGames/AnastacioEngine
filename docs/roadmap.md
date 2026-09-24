@@ -68,8 +68,10 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   **Interface**; ver fonte, acentos e o menu (Default, English, Português, Español, Русский; cirílico depende da fonte Roboto). Decidir se o padrão de fábrica deve vir
   com a tradução ligada (hoje segue o 2.79: desligada).
 - Auditoria: `RangeEngine -b --python tools/tests/web_profile/i18n_audit.py -- <idioma> [saida.txt]` lista textos sem
-  tradução. Restam lacunas do catálogo do Blender 2.79 (pt_BR ~455, es ~511, ru ~1 124) e os textos de `layout.label(text=...)`
-  em Python/C fora do RNA (scan estático ainda por fazer). O russo (e o es) de `translations_ui.py` precisa de revisão nativa.
+  tradução. Restam lacunas do catálogo do Blender 2.79 (pt_BR ~455, es ~511, ru ~1 124). Textos fixos dos layouts Python
+  (`layout.label(text=...)` etc.): scan estático em `i18n_scan_labels.py` e traduções em `translations_labels.py`
+  (2026-09-24; restam só nomes próprios, códigos e palavras iguais nas duas línguas). Falta o scan dos textos em C
+  fora do RNA. O russo (e o es) de `translations_ui.py` e `translations_labels.py` precisa de revisão nativa.
 - Mensagens das regras Web traduzidas (2026-09-23, `translations_rules.py`; es/ru pedem revisão nativa). Falta
   traduzir os demais textos em português da Range fora do painel Web.
 - Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
