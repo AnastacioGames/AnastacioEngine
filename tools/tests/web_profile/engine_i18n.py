@@ -66,14 +66,22 @@ check(tr(dest.fix) == "Normalizar o destino dentro da raiz do pacote.", "tr trad
 system.language = 'en_US'
 check(results.Report().summary() == "No incompatibility detected", "results.summary volta ao ingles em en_US")
 
-# Espanhol e russo (cirilico): catalogo do Blender + dicionario range_web, e as duas tabelas cobrem as mesmas chaves.
-from range_web import translations
-check(set(translations._ES) == set(translations._PT_BR) == set(translations._RU), "es/ru cobrem as mesmas chaves do pt_BR")
+# Espanhol e russo (cirilico): o complemento do .po cobre somente pt_BR/es;
+# russo continua aguardando revisão nativa, sem preencher lacunas em massa.
+from range_web import translations, translations_catalog
+system.language = 'pt_BR'
+check(pgettext_iface("Clear Useless Actions") == "Limpar ações inúteis",
+      "pt_BR: complemento do catalogo do Blender traduz operador ausente do MO")
+check(bool(translations_catalog.PT_BR) and bool(translations_catalog.ES),
+      "complementos pt_BR/es carregados sem ampliar o catalogo russo")
 for lang, obj, web in (('es', "Objeto", "Validar Web"), ('ru_RU', "Объект", "Проверить Web")):
     system.language = lang
     check(bpy.app.translations.locale == lang, "idioma %s ativo" % lang)
     check(pgettext_iface("Object") == obj, "%s: catalogo do Blender traduz Object" % lang)
     check(pgettext_iface("Validate Web") == web, "%s: dicionario range_web traduz o rotulo" % lang)
+    if lang == 'es':
+        check(pgettext_iface("Clear Useless Actions") == "Eliminar acciones inútiles",
+              "es: complemento do catalogo do Blender traduz operador ausente do MO")
     # Texto de UI da Range/UPBGE fora do catalogo do Blender (translations_ui.py), rotulo e dica.
     check(pgettext_iface("Vortex Height") != "Vortex Height", "%s: rotulo da Range (translations_ui) traduzido" % lang)
     check(pgettext_tip("Distance to begin suspend physics of this object") != "Distance to begin suspend physics of this object",
