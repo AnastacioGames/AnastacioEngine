@@ -2,7 +2,7 @@
 > Game engine para criação de jogos 3D, baseada na Range Engine 1.6 Rev1 e na linhagem UPBGE / Blender 2.79.
 > [!IMPORTANT]
 > **Para baixar a engine, use os links da seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
-> O botão verde **Code → Download ZIP** do GitHub baixa somente uma cópia do repositório (README e imagens); ele **não** contém os executáveis da AnastacioEngine.
+> O botão verde **Code → Download ZIP** do GitHub baixa o código-fonte do repositório; ele **não** contém os executáveis prontos da AnastacioEngine.
 
 ![Splash Screen da AnastacioEngine 0.4.1](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.4.1/splash.png)
 
@@ -50,6 +50,8 @@ O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a ex
 |---|---|
 | Windows x64 | Suportada nesta release. |
 | Linux x86_64 | Suportada nativamente (fora do WSL) a partir da 0.3.0. |
+| Web (navegador) | Em desenvolvimento; ainda não usar em produção. |
+| Android | Experimental: APK de teste rodando o runtime Web em um aparelho; sem download nem exportação pelo editor. |
 | 32-bit | Não suportado. |
 
 ## Estrutura da distribuição
