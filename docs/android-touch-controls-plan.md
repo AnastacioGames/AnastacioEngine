@@ -130,7 +130,7 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    - Aviso de ação sem mapeamento móvel (plano, linha 130).
    - Traduções pt/es/ru.
 5. **T4, testes e documentação, feita em 2026-09-24:** itens 1 a 4 do roteiro aprovados no Find X3 Pro (ver
-   [android-manual-tests.md](android-manual-tests.md)); falta o item 5 (First Person). Mudanças do plano
+   [android-manual-tests.md](android-manual-tests.md)); item 5 (First Person com `wasd`) aprovado no mesmo dia. Mudanças do plano
    original: a cena de teste é a do pad (`tools/tests/web_profile/make_pad_project.py`, `projects-teste/pad`), que já
    imprime eixos, botões, teclas e a ação do Input System (`[pad] ...`, que no APK sai no logcat `RangeWeb`), em
    vez de um `create_web_touch_scene.py` repetido; o multitoque fica em `verify-touch.cjs` (já usa dois dedos pelo

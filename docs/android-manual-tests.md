@@ -86,9 +86,13 @@ Aprovado:
 - 2026-09-24: apps de teste desinstalados do Find X3 Pro a pedido do usuário: `com.anastaciogames.testerelease`,
   `com.anastaciogames.rangewebview` (template) e `com.anastaciogames.firstperson` ("teste1_fabio").
 
-Pendente (não confirmado nesta rodada):
+- 2026-09-24: controle na tela (A1, item 5 da T4) no jogo real, aprovado pelo usuário ("funciona bem"). APK debug
+  `com.anastaciogames.firstperson` 0.1.6 (versionCode 2), mesmo `.range` e música do teste anterior, empacotado
+  com o runtime release e `--touch-layout wasd`. O layout mostra um direcional que aperta W/A/S/D (diagonal = duas
+  teclas) e o botão Espaço; o jogo, que só lê teclado, anda e pula sem mudança. O log de toque só sai com
+  depuração ligada, então a aprovação é visual. O app segue instalado, junto com o "Pad teste".
 
-- Controle na tela (A1): First Person com o layout `wasd` no aparelho (item 5 do roteiro da T4).
+Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
 - Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).

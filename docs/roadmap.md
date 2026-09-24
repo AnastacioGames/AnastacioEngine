@@ -150,7 +150,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   no navegador e aceita pelo usuário no Edge do PC; T3 (layout no painel Web, herdado pelo Android; aviso
   WEB-INPUT-001; mapas `KeyMapping/*.json` do Input System passam a ir no pacote) verificada; T4 com a
   checklist conferida no navegador (`verify-touch.cjs` 25/25) e aprovada no Find X3 Pro (cena `pad`, layouts
-  stick e `wasd`). Falta: First Person com o layout `wasd` no aparelho.
+  stick e `wasd`) e no First Person com o layout `wasd` (2026-09-24). A1 concluído.
 
 ### Outros
 
