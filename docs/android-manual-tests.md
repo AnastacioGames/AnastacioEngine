@@ -98,9 +98,40 @@ Aprovado:
   (versionCode 3) com `--touch-layout fps` instalado no Find X3 Pro e aprovado pelo usuário: música para em
   segundo plano e volta ao reabrir, stick direito gira a câmera e o botão de tiro atira o disco.
 
+- 2026-09-24: comparação APK x Chrome no Find X3 Pro com medida automática
+  ([tools/android/measure-device.py](../tools/android/measure-device.py): reabre o jogo, clica "Jogar" por CDP, 5 s
+  de aquecimento e 20 s medidos; `--walk` segura W e alterna A/D). First Person, APK 0.1.7 debug (WebView 153) e
+  mesmo pacote no Chrome 154 por `adb reverse`; 3 rodadas por caso, mediana:
+
+  | Caso | fps | frames > 20 ms | Memória (PSS) | Carga até "Jogar" |
+  |---|---|---|---|---|
+  | APK parado | 52,4 | 14% | 441 MB (app + renderer) | 2,2 s |
+  | APK andando | 56,3 | 6% | 446 MB | 2,2 s |
+  | Chrome parado | 36,4 | 65% | 610 MB (Chrome inteiro) | 2,0 s |
+  | Chrome andando | 44,9 | 34% | 626 MB | 2,0 s |
+
+  Nenhum frame acima de 34 ms nos dois (máximo 50 ms uma vez no Chrome): os frames lentos são de 33 ms, ou seja,
+  frames de 60 Hz perdidos, e não travadas. O APK foi melhor que o Chrome em todas as rodadas; com 3 rodadas cada
+  e resultados estáveis, a diferença agora é consistente. Heap JS ~45 MB nos dois; a bateria ficou entre 37 e 38 °C,
+  sem subir durante a medida. A memória do Chrome inclui o navegador, então não é comparável diretamente.
+
+- 2026-09-24: mesma comparação num aparelho mais fraco: Galaxy Tab S6 Lite (SM-P613, Snapdragon 720G), Android 14,
+  tela 1200x2000 (DPR 1,5), WebView e Chrome 153. First Person 0.1.7 debug, jogo parado, 3 rodadas cada, mediana:
+
+  | Caso | fps | frames > 20 ms | Memória (PSS) | Carga até "Jogar" |
+  |---|---|---|---|---|
+  | APK parado | 57,3 | 5% | 379 MB (app + renderer) | 4,2 s (1ª 5,7 s) |
+  | Chrome parado | 57,4 | 4% | 432 MB (Chrome inteiro) | 3,4 s (1ª 6,2 s) |
+
+  Empate: os dois ficam perto de 60 fps, com um frame de 50 ms em uma rodada de cada. O canvas é 640x480 nos dois;
+  a área menor no Chrome (barra de endereço) só muda a escala na tela, não o custo de desenhar. Bateria em 28 °C,
+  sem subir. Neste aparelho, o Chrome não fica atrás como no Find X3 Pro; a diferença lá pode vir do DPR 3,5 ou da
+  tela de 120 Hz, ainda não investigado.
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.
-- Repetir a comparação APK x Chrome com mais medidas e jogando (não só parado).
+- Sessão longa (10+ min) para ver aquecimento e queda de fps; perda de ~10–15% dos frames de 60 Hz no APK
+  ainda sem causa investigada.
 - MIME `application/wasm` pelo `WebViewAssetLoader` (sem aviso de fallback no log, mas não medido).
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.

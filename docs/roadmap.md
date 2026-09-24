@@ -137,7 +137,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   ([android-manual-tests.md](android-manual-tests.md)). Em 2026-09-24: botão "Tela cheia" escondido, Home/retorno e
   giro de 180° confirmados no aparelho; rotação em paisagem e retrato aprovada (proporção e câmera estáveis ao girar). First Person roda no APK
   (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque, música e save (IDBFS após fechar o
-  app) aprovados. Próximo: comparação com o Chrome do aparelho com mais medidas.
+  app) aprovados. Comparação com o Chrome do aparelho medida (`tools/android/measure-device.py`, 3 rodadas por caso):
+  APK 52–56 fps contra 36–45 no Chrome, sem frame acima de 34 ms. Falta sessão longa (aquecimento).
 - **Export Android (A3/A4)**: módulo `range_web/android.py`, painel "Android (Range)" no editor e
   `tools/web/package-android.py` geram o APK debug a partir do pacote Web (2026-09-24, verificado no build e no editor
   em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com
