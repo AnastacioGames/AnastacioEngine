@@ -144,9 +144,13 @@ Aprovado:
   Empate de novo, os dois no limite da GPU: todos os frames acima de 34 ms (83 a 100 ms, cinco vsyncs). O canvas é
   1280x720 (3x os pixels do First Person) e os filtros rodam por pixel. Bateria em 29 °C, sem subir.
 
+- 2026-09-24: sessão longa no Tab S6 Lite, cena padrão no APK, jogo parado, 10 min com leitura por minuto:
+  11,53 a 11,58 fps em todos os minutos, p50 83,5 ms sem mudar, bateria de 29,4 para 29,9 °C (nível 89% do
+  início ao fim), PSS 325 MB no fim (319 MB nas medidas curtas). Sem queda de fps, aquecimento ou vazamento de
+  memória visível. A primeira tentativa, com o First Person andando, foi cancelada: a câmera fica olhando para o
+  vazio e não representa carga de jogo.
+
 Pendente (não confirmado nesta rodada):
 
-- Sessão longa (10+ min) para ver aquecimento e queda de fps; perda de ~10–15% dos frames de 60 Hz no APK
-  ainda sem causa investigada. A primeira tentativa com o First Person andando foi cancelada: a câmera fica
-  olhando para o vazio e não representa carga de jogo.
+- Perda de ~10–15% dos frames de 60 Hz no APK do Find X3 Pro ainda sem causa investigada.
 - O aceite anterior no Chrome foi no OPPO Reno14; este teste usou o Find X3 Pro.
