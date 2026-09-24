@@ -243,7 +243,10 @@ void BKE_animdata_free(ID *id, const bool do_id_user)
 			free_fcurves(&adt->drivers);
 
 			/* free overrides */
-			/* TODO... */
+			for (AnimOverride *aor = adt->overrides.first; aor; aor = aor->next) {
+				MEM_SAFE_FREE(aor->rna_path);
+			}
+			BLI_freelistN(&adt->overrides);
 
 			/* free animdata now */
 			MEM_freeN(adt);
