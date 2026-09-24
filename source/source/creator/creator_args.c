@@ -1169,17 +1169,35 @@ static int arg_handle_start_with_console(int UNUSED(argc), const char **UNUSED(a
 }
 
 static const char arg_handle_register_extension_doc[] =
-"\n\tRegister blend-file extension, then exit (Windows only)."
+"\n\tRegister .blend and .range file associations, then exit (Windows only)."
 ;
 static const char arg_handle_register_extension_doc_silent[] =
-"\n\tSilently register blend-file extension, then exit (Windows only)."
+"\n\tSilently register .blend and .range file associations, then exit (Windows only)."
 ;
 static int arg_handle_register_extension(int UNUSED(argc), const char **UNUSED(argv), void *data)
 {
 #ifdef WIN32
 	if (data)
 		G.background = 1;
-	RegisterBlendExtension();
+	BLI_windows_register_file_extensions();
+#else
+	(void)data; /* unused */
+#endif
+	return 0;
+}
+
+static const char arg_handle_unregister_extension_doc[] =
+"\n\tRemove .blend and .range file associations registered by Range Engine, then exit (Windows only)."
+;
+static const char arg_handle_unregister_extension_doc_silent[] =
+"\n\tSilently remove .blend and .range file associations registered by Range Engine, then exit (Windows only)."
+;
+static int arg_handle_unregister_extension(int UNUSED(argc), const char **UNUSED(argv), void *data)
+{
+#ifdef WIN32
+	if (data)
+		G.background = 1;
+	BLI_windows_unregister_file_extensions();
 #else
 	(void)data; /* unused */
 #endif
@@ -2101,6 +2119,8 @@ void main_args_setup(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 2, "-con", "--start-console", CB(arg_handle_start_with_console), NULL);
 	BLI_argsAdd(ba, 2, "-R", NULL, CB(arg_handle_register_extension), NULL);
 	BLI_argsAdd(ba, 2, "-r", NULL, CB_EX(arg_handle_register_extension, silent), ba);
+	BLI_argsAdd(ba, 2, "-U", NULL, CB(arg_handle_unregister_extension), NULL);
+	BLI_argsAdd(ba, 2, "-u", NULL, CB_EX(arg_handle_unregister_extension, silent), ba);
 	BLI_argsAdd(ba, 2, NULL, "--no-native-pixels", CB(arg_handle_native_pixels_set), ba);
 
 	/* third pass: disabling things and forcing settings */
