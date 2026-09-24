@@ -5,6 +5,7 @@
 # Limites: imports relativos nao sao seguidos (o analisador
 # registra so o modulo nomeado); import dinamico vira WEB-PKG-007/WEB-PY-009 (aviso).
 
+from .i18n import Msg
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 from . import rules_files
 from . import rules_python
@@ -66,10 +67,10 @@ def _module_of(target):
 
 
 def _missing(ref, what, name):
-    message = ("%s não foi encontrado: %s." % (what, name) if name
-               else "Referência sem %s definido." % what)
+    message = (Msg("%s was not found: %s.", what, name) if name
+               else Msg("Reference without %s set.", what))
     return Finding("WEB-PKG-003", SEVERITY_ERROR, EVIDENCE_CONFIRMED, message,
-                   fix="Incluir o arquivo no projeto ou corrigir a referência do controller/component.",
+                   fix="Include the file in the project or fix the controller/component reference.",
                    location=ref.location(source=name))
 
 
@@ -104,7 +105,7 @@ def resolve(snapshot):
             name = ref.target if ref.is_module else _module_of(ref.target)
             key = ("module", name)
             found = _lookup(snapshot, name)
-            what = "Módulo"
+            what = Msg("Module")
         if key in visited:
             continue  # ciclo ou alcancado por outro caminho: analisado uma vez
         if found is None:
@@ -147,8 +148,8 @@ def check_assets(assets, exists, roots=()):
     for kind, path, origin in assets:
         if not exists(path):
             findings.append(Finding("WEB-PKG-003", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-                                    "%s não encontrado: %s." % (kind, path),
-                                    fix="Incluir/substituir o asset ou corrigir a referência.",
+                                    Msg("%s not found: %s.", kind, path),
+                                    fix="Include/replace the asset or fix the reference.",
                                     location=dict(origin, source=path)))
         elif roots:
             findings.extend(rules_files.check_within_roots(path, roots, source=origin.get("chain") or path))

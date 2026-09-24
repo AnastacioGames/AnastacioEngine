@@ -162,13 +162,20 @@ struct GPUMaterial {
 	bool use_foliage;
 
 	/* Shadow data for the fixed-function scene-light loop read by node_bsdf_principled() et al
-	 * (gl_LightSource[i], i < NUM_LIGHTS==3 in gpu_shader_material.glsl) -- resolved once here,
+	 * (SCENE_LIGHT(i), i < NUM_SHADOW_LIGHTS in gpu_shader_material.glsl) -- resolved once here,
 	 * bound per-frame by GPU_material_bind_shadow_lamps() from BL_BlenderShader::UpdateLights().
 	 * -1 (unused location) for any material whose shader doesn't reference these uniforms. */
 	int shadowmaploc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowpersmatloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowbiasloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+
+	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
+	struct {
+		int position, diffuse, specular, halfvector, spotdirection, spotexponent;
+		int spotcutoff, spotcoscutoff, constantatt, linearatt, quadraticatt;
+	} scenelightloc[GPU_MATERIAL_NUM_SCENE_LIGHTS];
+	bool use_scene_lights;
 
 	ListBase lamps;
 	bool bound;
@@ -463,6 +470,32 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->shadowbiasloc[i] = GPU_shader_get_uniform(shader, name);
 			BLI_snprintf(name, sizeof(name), "unfshadowenabled[%d]", i);
 			material->shadowenabledloc[i] = GPU_shader_get_uniform(shader, name);
+		}
+
+		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
+			char name[64];
+#define SCENE_LIGHT_LOC(field, glslname) \
+			BLI_snprintf(name, sizeof(name), "unflightsource[%d]." glslname, i); \
+			material->scenelightloc[i].field = GPU_shader_get_uniform(shader, name)
+			SCENE_LIGHT_LOC(position, "position");
+			SCENE_LIGHT_LOC(diffuse, "diffuse");
+			SCENE_LIGHT_LOC(specular, "specular");
+			SCENE_LIGHT_LOC(halfvector, "halfVector");
+			SCENE_LIGHT_LOC(spotdirection, "spotDirection");
+			SCENE_LIGHT_LOC(spotexponent, "spotExponent");
+			SCENE_LIGHT_LOC(spotcutoff, "spotCutoff");
+			SCENE_LIGHT_LOC(spotcoscutoff, "spotCosCutoff");
+			SCENE_LIGHT_LOC(constantatt, "constantAttenuation");
+			SCENE_LIGHT_LOC(linearatt, "linearAttenuation");
+			SCENE_LIGHT_LOC(quadraticatt, "quadraticAttenuation");
+#undef SCENE_LIGHT_LOC
+			/* Any field may be optimized out (e.g. Glossy never uses the diffuse color). */
+			const int *locs = (const int *)&material->scenelightloc[i];
+			for (int j = 0; j < sizeof(material->scenelightloc[i]) / sizeof(int); j++) {
+				if (locs[j] != -1) {
+					material->use_scene_lights = true;
+				}
+			}
 		}
 
 		return 1;
@@ -4369,8 +4402,13 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
 			 * same registration GPU_lamp_get_data() does for the Lamp Data node path. */
 			material->dynproperty |= DYN_LAMP_PERSMAT;
-			add_user_list(&material->lamps, lamp);
-			add_user_list(&lamp->materials, material->ma);
+			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once. */
+			if (!BLI_findptr(&material->lamps, lamp, offsetof(LinkData, data))) {
+				add_user_list(&material->lamps, lamp);
+			}
+			if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
+				add_user_list(&lamp->materials, material->ma);
+			}
 
 			if (material->shadowmaploc[i] != -1) {
 				GPU_texture_bind(lamp->depthtex, texunit + i);
@@ -4385,10 +4423,45 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			}
 		}
 
+		else if (material->shadowmaploc[i] != -1) {
+			/* Unset sampler2DShadow uniforms default to unit 0, which may hold a plain sampler2D
+			 * texture: two sampler types on one unit is GL_INVALID_OPERATION at draw time. Point
+			 * the unused slot at its own (unbound) unit instead. */
+			GPU_shader_uniform_int(shader, material->shadowmaploc[i], texunit + i);
+		}
+
 		if (material->shadowenabledloc[i] != -1) {
 			float enabled = has_shadow ? 1.0f : 0.0f;
 			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
 		}
+	}
+}
+
+/* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into
+ * unflightsource[] (CORE profile replacement for gl_LightSource[], see GPUSceneLight). Must run
+ * per object with the program bound: uniforms are per-program state, and ProcessLighting()
+ * skips recomputing when the light layer didn't change between objects. No-op under COMPAT,
+ * where the shader doesn't declare unflightsource and every location is -1. */
+void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS])
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || !material->use_scene_lights) {
+		return;
+	}
+
+	for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
+		const GPUSceneLight *light = &lights[i];
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].position, 4, 1, light->position);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].diffuse, 4, 1, light->diffuse);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].specular, 4, 1, light->specular);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].halfvector, 4, 1, light->halfvector);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotdirection, 3, 1, light->spotdirection);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotexponent, 1, 1, &light->spotexponent);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcutoff, 1, 1, &light->spotcutoff);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcoscutoff, 1, 1, &light->spotcoscutoff);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].constantatt, 1, 1, &light->constantatt);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].linearatt, 1, 1, &light->linearatt);
+		GPU_shader_uniform_vector(shader, material->scenelightloc[i].quadraticatt, 1, 1, &light->quadraticatt);
 	}
 }
 

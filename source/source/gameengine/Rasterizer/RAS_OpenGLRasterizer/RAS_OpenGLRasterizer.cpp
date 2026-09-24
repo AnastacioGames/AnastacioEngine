@@ -243,6 +243,13 @@ void RAS_OpenGLRasterizer::EnableLight(unsigned short count)
 void RAS_OpenGLRasterizer::DisableLight(unsigned short count)
 {
 	glDisable((GLenum)(GL_LIGHT0 + count));
+#ifdef WITH_GL_PROFILE_COMPAT
+	/* Node materials (Principled) loop over every gl_LightSource[i] slot without checking
+	 * GL_LIGHTi, so a disabled slot must not keep the previous light's color. */
+	const float black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+	glLightfv((GLenum)(GL_LIGHT0 + count), GL_DIFFUSE, black);
+	glLightfv((GLenum)(GL_LIGHT0 + count), GL_SPECULAR, black);
+#endif
 }
 
 void RAS_OpenGLRasterizer::SetDepthFunc(RAS_Rasterizer::DepthFunc func)

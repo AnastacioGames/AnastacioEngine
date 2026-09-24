@@ -45,6 +45,7 @@
 
 #include "KX_PythonJoystick.h"
 #include "KX_PythonKeyboard.h"
+#include "KX_PythonMotion.h"
 #include "KX_PythonMouse.h"
 #include "KX_InputSystem.h"
 #include "KX_InputTable.h"
@@ -237,6 +238,7 @@ PyMODINIT_FUNC initGameTypesPythonBinding(void)
 		PyType_Ready_Attr(dict, EXP_Value, init_getset);
 		PyType_Ready_Attr(dict, KX_PythonJoystick, init_getset);
 		PyType_Ready_Attr(dict, KX_PythonKeyboard, init_getset);
+		PyType_Ready_Attr(dict, KX_PythonMotion, init_getset);
 		PyType_Ready_Attr(dict, KX_PythonMouse, init_getset);
 		PyType_Ready_Attr(dict, KX_InputSystem, init_getset);
 		PyType_Ready_Attr(dict, KX_InputTable, init_getset);

@@ -4,6 +4,7 @@
 import os
 
 from . import manifest as mf
+from .i18n import Msg
 from .results import EVIDENCE_CONFIRMED, SEVERITY_ERROR, Finding
 
 
@@ -40,13 +41,13 @@ def find_runtime(runtime_id, candidate_dirs):
         if data["runtime_id"] != runtime_id:
             findings = [Finding(
                 "WEB-PKG-001", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-                "Runtime instalado é %r, mas o projeto pede %r." % (data["runtime_id"], runtime_id),
-                fix="Ajustar o campo Runtime ou instalar o runtime pedido.", location={"source": path})]
+                Msg("Installed runtime is %r, but the project asks for %r.", data["runtime_id"], runtime_id),
+                fix="Adjust the Runtime field or install the requested runtime.", location={"source": path})]
         else:
             findings = mf.verify_artifacts(data, directory)
         return RuntimeInfo(data, directory, findings)
-    searched = "; ".join(candidate_dirs) or "nenhum diretório configurado"
+    searched = "; ".join(candidate_dirs) or Msg("no directory configured")
     return RuntimeInfo(None, None, [Finding(
         "WEB-PKG-001", SEVERITY_ERROR, EVIDENCE_CONFIRMED,
-        "Manifesto do runtime ausente (procurado em: %s)." % searched,
-        fix="Instalar um runtime Web compatível com manifesto válido; não reutilizar binário desktop.")])
+        Msg("Runtime manifest missing (searched in: %s).", searched),
+        fix="Install a compatible Web runtime with a valid manifest; do not reuse a desktop binary.")])

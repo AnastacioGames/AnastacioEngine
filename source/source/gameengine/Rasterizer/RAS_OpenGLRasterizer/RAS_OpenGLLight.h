@@ -30,6 +30,7 @@
 class RAS_Rasterizer;
 class KX_Scene;
 struct GPULamp;
+struct GPUSceneLight;
 struct Image;
 
 class RAS_OpenGLLight : public RAS_ILightObject
@@ -46,7 +47,10 @@ public:
 	 * GPU_material_bind_shadow_lamps() (see RAS_Rasterizer::GetShadowLamps()). */
 	GPULamp *GetGPULamp();
 
-	bool ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer, int slot);
+	/* Sets GL_LIGHT<slot> (COMPAT) and always fills `r_light` with the same values in eye space
+	 * (`viewmat` is the column-major view matrix), for the CORE-profile unflightsource[] uniforms. */
+	bool ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer, int slot, const float viewmat[16],
+	                                GPUSceneLight *r_light);
 
 	RAS_OpenGLLight *Clone()
 	{

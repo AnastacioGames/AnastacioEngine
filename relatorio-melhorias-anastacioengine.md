@@ -86,6 +86,10 @@ ferramenta correspondente.
   foi implementada em 2026-09-21 (`GPU_material_bind_shadow_lamps`, ver `docs/changelog.md`); **falta apenas
   a validação visual no jogo real** — CSM/VSM e Point/Local ainda não projetam sombra nesse caminho (mesma
   limitação de engine já documentada). Ver `docs/roadmap.md` ("Iluminação e gráficos").
+- No Web (perfil CORE), as luzes de cena do Principled/Diffuse/Glossy chegam por `unflightsource[]`
+  (`GPUSceneLight`, calculado em `RAS_OpenGLLight` junto do `glLight*`), não por `gl_LightSource`. Mudança no
+  formato de luz deve atualizar os dois caminhos. No Emscripten, `GPU_max_textures()` é limitado a 28 pela
+  emulação GL legada.
 
 ### Runtime e ferramentas
 

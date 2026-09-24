@@ -100,6 +100,7 @@ extern "C" {
 #include "KX_ParentActuator.h"
 #include "KX_PythonJoystick.h"
 #include "KX_PythonKeyboard.h"
+#include "KX_PythonMotion.h"
 #include "KX_PythonMouse.h"
 #include "KX_RadarSensor.h"
 #include "KX_RaySensor.h"
@@ -175,6 +176,7 @@ extern "C" {
 
 static std::unique_ptr<KX_PythonKeyboard> gp_PythonKeyboard;
 static std::unique_ptr<KX_PythonMouse> gp_PythonMouse;
+static std::unique_ptr<KX_PythonMotion> gp_PythonMotion;
 static std::unique_ptr<KX_PythonJoystick> gp_PythonJoysticks[JOYINDEX_MAX];
 static std::unique_ptr<KX_InputSystem> gp_InputSystem;
 
@@ -1790,6 +1792,10 @@ PyMODINIT_FUNC initGameLogicPythonBinding()
 	PyDict_SetItemString(d, "mouse", gp_PythonMouse->GetProxy());
 	KX_GetActiveEngine()->SetPythonMouse(pythonMouse);
 
+	BLI_assert(!gp_PythonMotion);
+	gp_PythonMotion.reset(new KX_PythonMotion());
+	PyDict_SetItemString(d, "motion", gp_PythonMotion->GetProxy());
+
 	PyObject *joylist = PyList_New(JOYINDEX_MAX);
 	for (unsigned short i = 0; i < JOYINDEX_MAX; ++i) {
 		PyList_SET_ITEM(joylist, i, Py_None);
@@ -2640,6 +2646,7 @@ void exitGamePython()
 	// Clean up the Python mouse and keyboard.
 	gp_PythonKeyboard.reset(nullptr);
 	gp_PythonMouse.reset(nullptr);
+	gp_PythonMotion.reset(nullptr);
 	gp_InputSystem.reset(nullptr);
 	for (unsigned short i = 0; i < JOYINDEX_MAX; ++i) {
 		gp_PythonJoysticks[i].reset(nullptr);

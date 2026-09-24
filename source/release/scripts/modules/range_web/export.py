@@ -4,12 +4,12 @@
 import os
 import shutil
 
-from .i18n import _
+from .i18n import Msg, _
 
 
 class ExportBlocked(Exception):
     def __init__(self, findings):
-        super().__init__("%d erro(s) Web bloqueiam o export." % len(findings))
+        super().__init__(Msg("%d Web error(s) block the export.", len(findings)))
         self.findings = findings
 
 

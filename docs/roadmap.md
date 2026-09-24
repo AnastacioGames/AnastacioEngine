@@ -24,27 +24,33 @@ Aberto:
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat
   no eixo 9) e save (IDBFS) testados e aceitos pelo usuário em 2026-09-20 ([roteiro](web-sdl2-gamepad-test.md)).
-- **Extração de erros de shader/Python no pré-voo** é heurística sobre o texto do runtime (não informa
-  estágio/material do shader); "Importar pré-voo Web" segue para JSON manual.
 - **Erros de áudio no Web (R3)**: arquivo inexistente/corrompido em `aud` agora vira exceção Python (`-fexceptions` no
-  audaspace; não abortam mais). Aberto: sondar `cache()`, `reverse()`, `pause()`/`stop()` com som válido e medir o
-  custo de desempenho em celular (M3). Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
+  audaspace; não abortam mais). `cache()`, `reverse()`, `pause()`/`stop()` com som válido conferidos em 2026-09-23. Custo em celular
+  medido (M3, 2026-09-23): desprezível. Ver changelog de 2026-09-21. Rebuild Web limpo da `linux-sync` reverificado
   (sonda R3 `[r3] TODOS`); a branch `integracao` foi removida por estar contida nela.
-- **Extração de erros de shader/Python no pré-voo**: checkpoint de shader comum implementado em
-  `8251b0dc` (evento estruturado WebGL com operação/estágio/origem/log e relatório v2); Python,
-  shaders especiais/filtros e teste em navegador continuam pendentes. A heurística permanece como fallback;
-  "Importar pré-voo Web" segue para JSON manual. Roteiro e handoff em
-  [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
+- **Extração de erros de shader/Python no pré-voo (M1, encerrado)**: eventos estruturados do runtime
+  (`Module.onDiagnostic`, relatório v2) para shader (estágio, material real, compile/link) e Python (tipo, texto,
+  traceback, controller/componente/callback), testados no navegador; a heurística sobre o texto fica só como fallback.
+  "Importar pré-voo Web" segue para JSON manual. Detalhes em [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
   constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido**
   no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`;
-  `codex/r3-audio-fix-new` superada). Aberto: bug geral de `aud` com `METH_NOARGS` (`cache()`, `reverse()`,
-  `handle.pause()/stop()` dão `function signature mismatch`), aguardando autorização. Diagnosticos de shader
+  `codex/r3-audio-fix-new` superada). Bug de `aud` com `METH_NOARGS` corrigido em `ea2cfd04` (18 métodos) e
+  validado no Edge headless em 2026-09-23 (`cache()`, `reverse()`, `handle.pause()/stop()` sem mismatch). Diagnosticos de shader
   trazem o nome real do material e cobrem falha de link (node-material não injetável). `frame-time-perf.js`
-  (`?perf=1`, overlay, `perf-run.cjs`) integrado, mas o gancho `--perf` em `package-web.py` está só proposto.
-  Regressões de áudio/bloom/resolução dinâmica/R1 ainda não repetidas após a mudança de áudio. M4 recomendado
-  adiar até
-  medir p50/p95 em celular físico. Divisão vigente e pendências em
+  (`?perf=1`, overlay, `perf-run.cjs`) integrado; `package-web.py --perf` inclui a sonda. Build de teste para celular publicado em
+  <https://anastaciogames.github.io/AnastacioEngine/?perf=1> (branch `gh-pages`, First Person) em 2026-09-23.
+  Regressões de áudio/bloom/resolução dinâmica/R1 repetidas após a mudança de áudio: todas OK (2026-09-23). Medição em celular
+  físico (2026-09-23, OPPO Reno14 5G, Dimensity 8350, 12 GB, `?perf=1`): p50 22 ms, p95 55 ms, dpr 3, canvas
+  640x480; lentidões periódicas que se recuperam sozinhas. Média aceitável; o M4 deve atacar os picos (p95:
+  GC/Python/áudio/compilação de shader), não a resolução. Rodada 0.1.3 (mesmo aparelho, MP3 em loop via `aud`
+  + sombra reconfigurada pelo usuário): música toca; p50 33 ms, p95 44 ms. A versão tinha `fps` 60→30 e
+  sombra do Sun 2048→512 (clip 90→33,7, frustum 40→13): o p50 é o teto de 30 fps, não custo. A/B a 60 fps com
+  a mesma sombra (0.1.4, `/musica/` e `/sem-musica/`): com música p50 22/p95 33 ms, sem música p50 22/p95 44 ms;
+  o áudio MP3 não custa desempenho mensurável (diferença do p95 é variação entre rodadas). M3 do áudio fechado. **M4 adiado** (2026-09-23): o jogo medido não usa filtros 2D e os picos do p95 são
+  esporádicos, não custo fixo de passe; reabrir só se um jogo com filtros medir mal no celular.
+  Desktop (Chrome, `/musica/`, DPR 2): p50 18,1/p95 18,5 ms, sem picos; os picos são do celular. Console: aviso de
+  `ScriptProcessorNode` obsoleto (áudio SDL; migrar para AudioWorklet no futuro) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
@@ -64,8 +70,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 - Auditoria: `RangeEngine -b --python tools/tests/web_profile/i18n_audit.py -- <idioma> [saida.txt]` lista textos sem
   tradução. Restam lacunas do catálogo do Blender 2.79 (pt_BR ~455, es ~511, ru ~1 124) e os textos de `layout.label(text=...)`
   em Python/C fora do RNA (scan estático ainda por fazer). O russo (e o es) de `translations_ui.py` precisa de revisão nativa.
-- Traduzir as mensagens das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`, `manifest.py`, `collect.py`,
-  `preflight.py`), ainda em português, e os demais textos em português da Range fora do painel Web.
+- Mensagens das regras Web traduzidas (2026-09-23, `translations_rules.py`; es/ru pedem revisão nativa). Falta
+  traduzir os demais textos em português da Range fora do painel Web.
 - Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
   `libboost-all-dev`), rodar `engine_i18n.py` e conferir o seletor na janela; confirmar que o pacote leva `locale/*/LC_MESSAGES/blender.mo`.
 - Roteiros manuais citam os botões pelo nome em português; em inglês são Validate Web, Export Web, Open in browser.
@@ -79,7 +85,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de
   `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado
   por padrao para exercitar o caminho de codigo, ver `linux-build.md`/`changelog.md`). A `linux-sync` foi
-  testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). Falta empacotar e publicar 0.4.1.
+  testada no Linux pelo usuario em 2026-09-21 ("tudo ok"). **Pacote 0.4.1 publicado e corrigido em
+  2026-09-22**: release anterior só continha `RangeEngine` (bug em `tools/linux/package-runtime.sh`, faltava
+  `RangeRuntime`); script corrigido, os dois presets recompilados/reempacotados juntos e o asset do GitHub
+  Release `v0.4.1` atualizado via `gh release upload --clobber`. Testado localmente com sessão gráfica real:
+  `RangeEngine` abre sem erros e `RangeRuntime` carrega um `.range` de exemplo, detecta GPU/OpenGL (Mesa Intel
+  RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build; portabilidade em máquina
+  limpa ainda não verificada diretamente (apenas por RPATH `$ORIGIN` + `ldd` sem dependências faltando).
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
@@ -109,9 +121,18 @@ fechada.
 Android v1: rota proposta de APK com WebView embutindo o pacote Web, ainda sem execução Android comprovada.
 Próximo passo: referência no Chrome Android e APK mínimo no mesmo aparelho físico com o jogo real;
 validar carga, desempenho, toque simultâneo, save e ciclo de vida antes do exportador/editor.
-Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). Sensores/API Python e AAB
-vêm depois do núcleo jogável, salvo requisito do jogo. NDK congelado, reaberto somente por limitação medida;
-bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
+Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
+por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
+
+- **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
+  verificados com sensores emulados (`tools/web/verify-motion.cjs`) e aprovados no aparelho real dentro do APK
+  (inclinação e `calibrate()`). Falta conferir `orientation`, taxa/latência e o Chrome do mesmo aparelho.
+- **APK WebView mínimo (A0b)**: template em `tools/android/webview-template/` rodando a cena `motion` no
+  OPPO Find X3 Pro (2026-09-23): carga offline, WebGL 2, Python e sensores ok
+  ([android-manual-tests.md](android-manual-tests.md)). Próximo: Home/retorno, `?perf=1` e áudio/save com o jogo
+  real (First Person), comparação com o Chrome do aparelho. Botão "Tela cheia" já escondido no APK (2026-09-24),
+  falta confirmar no aparelho.
+- AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros
 
@@ -145,13 +166,16 @@ bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
   `Lamp.shadow_filter`, converter PCF `1 → 3`, PCF Bail `2 → 4` e PCF Jitter `3 → 5`, pois Range inseriu
   Clipping e Dithering antes desses filtros. Comparação feita contra `tools/arquivo_upbge.blend` na UPBGE
   oficial 0.2.5b e o source `tools/upbge-0.2.5b-source/`.
-- **Sombra em materiais Principled/PBR no `BLENDER_GAME` — implementado, falta validar no jogo real**: shadow
-  map simples (sem CSM/VSM) agora é amostrado dentro do loop `NUM_LIGHTS` de `node_bsdf_principled()`
-  (`unfshadowmap`/`unfshadowpersmat`/`unfshadowbias`/`unfshadowenabled` em `gpu_shader_material.glsl`,
-  bind via `GPU_material_bind_shadow_lamps()` em `gpu_material.c`, chamado por
-  `BL_BlenderShader::UpdateLights()`). Compila e linka limpo; falta confirmar visualmente com
-  `projects-teste/pbr-baseline/shadow_ibl_test.range` (regra de teste visual no jogo real do `AGENTS.md`, não
-  captura automatizada). Ver changelog de 2026-09-21 ("Sombra projetada em materiais Principled/PBR").
+- **Sombra em materiais Principled/PBR no `BLENDER_GAME` — funcionando** (validado em 2026-09-23 no
+  `projects-teste/pbr-baseline/shadow_ibl_test.range`): shadow map simples (sem CSM/VSM) nos 3 primeiros slots
+  de luz, com Point/Spot corretos (direção, atenuação, cone) e loop de até 8 luzes. Ver changelog de 2026-09-23.
+  Pendente, opcional: comparar lado a lado com material legado sob as mesmas luzes (o chão satura com energia
+  somada 5,6 e a sombra fica fraca) e ver o efeito de `ProcessLighting(true)` agora rodar para todo material com
+  nodes em uma cena maior. `node_bsdf_diffuse`/`node_bsdf_glossy` ainda tratam toda luz como direcional e sem
+  sombra.
+- **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
+  2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
+  das esferas corretos). Falta só reconferir o desktop.
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
   buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
   (`BUFFER_SHADOW`) projetam sombra.
@@ -174,9 +198,6 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
   o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
-- **Sombra em Principled/PBR** (ver seção "Iluminação e gráficos" acima): confirmar no jogo real com
-  `projects-teste/pbr-baseline/shadow_ibl_test.range` que o chão/objetos com material PBR agora recebem
-  sombra projetada de Sun/Spot, comparável ao material legado.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

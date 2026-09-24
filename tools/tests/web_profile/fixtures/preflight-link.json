@@ -1,0 +1,11 @@
+{
+  "schema": "range-web-preflight",
+  "schema_version": 2,
+  "shader_errors": [{
+    "material": "MatQuebradoLink",
+    "stage": "",
+    "operation": "link",
+    "log": "ERROR: 0: program link failed",
+    "structured": true
+  }]
+}

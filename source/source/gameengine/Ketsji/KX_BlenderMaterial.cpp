@@ -378,6 +378,13 @@ void KX_BlenderMaterial::ActivateMeshUser(RAS_MeshUser *meshUser, RAS_Rasterizer
 	else if (m_blenderShader) {
 		m_blenderShader->Update(meshUser, m_passIndex, rasty);
 
+		if (m_blenderShader->Ok()) {
+			/* Node materials never went through ProcessLighting(), so gl_LightSource[] and the
+			 * per-slot GPULamps (RAS_Rasterizer::GetShadowLamps()) were never set for this object. */
+			rasty->ProcessLighting(true, camtrans);
+			m_blenderShader->BindShadowLamps(rasty);
+		}
+
 		/* we do blend modes here, because they can change per object
 		 * with the same material due to obcolor/obalpha */
 		int alphablend = m_blenderShader->GetAlphaBlend();

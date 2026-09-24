@@ -81,6 +81,7 @@ public:
 	RAS_InstancingBuffer::Attrib GetInstancingAttribs() const;
 
 	void UpdateLights(RAS_Rasterizer *rasty);
+	void BindShadowLamps(RAS_Rasterizer *rasty);
 	void Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Rasterizer *rasty);
 	/** Re-upload just the object-matrix-dependent uniforms with an explicit matrix, bypassing
 	 * meshUser->GetMatrix(). Used to apply RAS_Rasterizer::GetTransform()'s halo/billboard

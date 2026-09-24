@@ -24,6 +24,7 @@ import json
 import re
 import shutil
 import sys
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -103,6 +104,9 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #log { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 35%; overflow: auto; margin: 0;
          background: rgba(0,0,0,.8); color: #9f9; font: 11px monospace; padding: 6px; white-space: pre-wrap; }
   body.debug #log { display: block; }
+  #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
+        background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
+  #fs[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -116,6 +120,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     <div id="error" hidden></div>
   </div>
 </div>
+<button id="fs" hidden>Tela cheia</button>
 <pre id="log"></pre>
 __PERF_SCRIPT__
 <script>
@@ -161,9 +166,106 @@ __PERF_SCRIPT__
   function tryStart() {
     if (started || !ready) return;
     started = true;
+    requestMotionPermission();
     el("overlay").hidden = true;
+    el("fs").hidden = !fsSupported;
     el("canvas").focus();
   }
+
+  // Tela cheia: a pagina inteira (overlay de perf/log continuam visiveis). O canvas mantem a resolucao
+  // de desenho e so e escalado por CSS, preservando a proporcao (o mapeamento de toque/mouse segue certo).
+  // iPhone nao tem Fullscreen API para elementos fora de <video>: o botao fica oculto la. No APK Android
+  // (MainActivity acrescenta "RangeWebView/" ao user agent) a Activity ja e imersiva: botao oculto tambem.
+  var root = document.documentElement;
+  var inAndroidApp = /\\bRangeWebView\\//.test(navigator.userAgent);
+  var fsSupported = !inAndroidApp && !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function fitCanvas() {
+    var c = el("canvas");
+    if (!isFullscreen()) { c.style.width = c.style.height = ""; return; }
+    var k = Math.min(window.innerWidth / c.width, window.innerHeight / c.height);
+    c.style.width = Math.floor(c.width * k) + "px";
+    c.style.height = Math.floor(c.height * k) + "px";
+  }
+  function toggleFullscreen() {
+    if (isFullscreen()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    var req = root.requestFullscreen ? root.requestFullscreen() : root.webkitRequestFullscreen();
+    Promise.resolve(req).then(function () {
+      var c = el("canvas");
+      // Android/Chrome so permite travar a orientacao em tela cheia; falha em silencio nos demais.
+      if (c.width > c.height && screen.orientation && screen.orientation.lock)
+        return screen.orientation.lock("landscape");
+    }).catch(function () {});
+  }
+  function onFullscreenChange() {
+    el("fs").textContent = isFullscreen() ? "Sair da tela cheia" : "Tela cheia";
+    fitCanvas();
+    el("canvas").focus();
+  }
+  // Sensores de movimento -> bge.logic.motion (KX_PythonMotion.cpp le Module.rangeMotion).
+  // Os eixos do aparelho (x direita, y topo, z para fora da tela em retrato) sao girados para os da tela
+  // atual, para "inclinar a direita" continuar sendo +x em paisagem. Gravidade no sentido do W3C: aponta
+  // para cima (aparelho deitado de face para cima da z ~ +9.8).
+  var motion = { t: 0, gyro: [0, 0, 0], accel: [0, 0, 0], gravity: [0, 0, 0], orient: [0, 0, 0] };
+  var motionLogAt = 0;
+  var iosMotion = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function screenAngle() {
+    var a = screen.orientation && typeof screen.orientation.angle === "number" ? screen.orientation.angle
+          : (typeof window.orientation === "number" ? window.orientation : 0);
+    return a * Math.PI / 180;
+  }
+  function toScreen(x, y, z) {
+    var a = screenAngle(), c = Math.cos(a), s = Math.sin(a);
+    return [x * c - y * s, x * s + y * c, z];
+  }
+  function onDeviceMotion(e) {
+    var g = e.accelerationIncludingGravity, r = e.rotationRate, lin = e.acceleration;
+    if (!g || g.x === null) return;
+    var accel = toScreen(g.x, g.y, g.z);
+    var grav;
+    if (lin && lin.x !== null) grav = toScreen(g.x - lin.x, g.y - lin.y, g.z - lin.z);
+    else {
+      // Sem aceleracao linear separada: passa-baixa sobre a leitura com gravidade.
+      grav = motion.t ? motion.gravity : accel.slice();
+      for (var i = 0; i < 3; i++) grav[i] += 0.1 * (accel[i] - grav[i]);
+    }
+    var d = Math.PI / 180;
+    // rotationRate em graus/s. Chrome/WebView preenchem alpha=x, beta=y, gamma=z (conferido com sensor
+    // emulado, verify-motion.cjs); Safari segue a especificacao (alpha=z, beta=x, gamma=y), nao testado.
+    var ra = r && r.alpha !== null ? [(r.alpha || 0) * d, (r.beta || 0) * d, (r.gamma || 0) * d] : null;
+    motion.gyro = !ra ? [0, 0, 0] : iosMotion ? toScreen(ra[1], ra[2], ra[0]) : toScreen(ra[0], ra[1], ra[2]);
+    motion.accel = accel;
+    motion.gravity = grav;
+    motion.t = performance.now();
+    if (debug && motion.t - motionLogAt > 1000) {
+      motionLogAt = motion.t;
+      log("[motion] accel " + accel.map(function (v) { return v.toFixed(2); }).join(" ") +
+          " | gyro " + motion.gyro.map(function (v) { return v.toFixed(2); }).join(" ") +
+          " | orient " + motion.orient.map(function (v) { return v.toFixed(0); }).join(" "));
+    }
+  }
+  function onDeviceOrientation(e) {
+    if (e.alpha === null && e.beta === null) return;
+    motion.orient = [e.alpha || 0, e.beta || 0, e.gamma || 0];
+  }
+  window.addEventListener("devicemotion", onDeviceMotion);
+  window.addEventListener("deviceorientation", onDeviceOrientation);
+  // iOS so entrega os eventos depois de permissao pedida num gesto do usuario (o clique em Jogar).
+  function requestMotionPermission() {
+    [window.DeviceMotionEvent, window.DeviceOrientationEvent].forEach(function (E) {
+      if (E && typeof E.requestPermission === "function")
+        E.requestPermission().catch(function (e) { console.warn("[web] sensores recusados: " + e); });
+    });
+  }
+
+  el("fs").addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+  window.addEventListener("resize", fitCanvas);
 
   // Alguns avisos da emulacao GL saem direto por console.error (antes do printErr).
   var _consoleError = console.error.bind(console);
@@ -176,6 +278,7 @@ __PERF_SCRIPT__
   window.Module = {
     canvas: el("canvas"),
     arguments: [GAME],
+    rangeMotion: motion,
     print: function (t) { log("[out] " + t); console.log(t); },
     printErr: function (t) {
       log("[err] " + t);
@@ -209,7 +312,10 @@ __PERF_SCRIPT__
 
   window.addEventListener("error", function (ev) { fail("Erro: " + ev.message); });
   window.addEventListener("unhandledrejection", function (ev) {
-    fail("Erro: " + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason));
+    var msg = ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason);
+    // Pedido de pointer lock recusado (Esc recente, iframe, navegador sem suporte): o jogo segue sem trava.
+    if (/pointer ?lock|exited the lock/i.test(msg)) { ev.preventDefault(); console.warn("[web] pointer lock recusado: " + msg); return; }
+    fail("Erro: " + msg);
   });
 
   // O jogo so comeca a ser mostrado apos um clique: libera foco de teclado e permite audio (politica de autoplay).
@@ -433,6 +539,17 @@ Este pacote e estatico: basta servir a pasta por HTTP(S). Nao abra `index.html` 
 """
 
 
+def safe_name(name):
+    """Nome aceito pelo FS virtual: tira acentos e troca espaco/caractere invalido por '_'."""
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    stem, dot, ext = re.sub(r"[^A-Za-z0-9._-]", "_", ascii_name).rpartition(".")
+    if not dot:
+        stem, ext = ext, ""
+    if not stem.strip("._"):
+        stem = "game"  # nome so com caracteres nao ASCII
+    return stem + dot + ext
+
+
 def extra_rel(path, root):
     """Caminho do extra no FS virtual: relativo a `root` se estiver dentro dele, senao o nome."""
     if root:
@@ -462,12 +579,15 @@ def main():
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
     args = ap.parse_args()
 
-    name = args.name or args.game.stem
+    game_name = safe_name(args.game.name)
+    if game_name != args.game.name:
+        print(f"Nome do jogo ajustado para o FS virtual: {game_name}")
+    name = args.name or safe_name(args.game.stem)
     if not NAME_RE.match(name):
         die("--name so pode ter letras, numeros, ponto, sublinhado ou hifen")
     if not NAME_RE.match(args.version):
         die("--version so pode ter letras, numeros, ponto, sublinhado ou hifen")
-    if not NAME_RE.match(args.game.name):
+    if not NAME_RE.match(game_name) or game_name.startswith("."):
         die(f"nome do arquivo do jogo invalido para o FS virtual: {args.game.name}")
     for x in args.extra:
         if not x.is_file():
@@ -475,7 +595,7 @@ def main():
         rel = extra_rel(x, args.extra_root)
         if not all(NAME_RE.match(part) and part not in (".", "..") for part in rel.split("/")):
             die(f"nome de arquivo extra invalido: {rel}")
-    names = [args.game.name] + [extra_rel(x, args.extra_root) for x in args.extra]
+    names = [game_name] + [extra_rel(x, args.extra_root) for x in args.extra]
     if len(set(names)) != len(names):
         die("nomes duplicados entre jogo e extras (colidiriam no FS virtual)")
 
@@ -493,7 +613,7 @@ def main():
         shutil.copy2(args.runtime_dir / n, tmp / n)
     if args.perf:
         shutil.copy2(Path(__file__).with_name(PERF_FILE), tmp / PERF_FILE)
-    shutil.copy2(args.game, tmp / "game" / args.game.name)
+    shutil.copy2(args.game, tmp / "game" / game_name)
     for x in args.extra:
         dst = tmp / "game" / extra_rel(x, args.extra_root)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -502,7 +622,7 @@ def main():
     title = args.title or name
     html = (INDEX_TEMPLATE
             .replace("__TITLE__", title.replace("<", "&lt;").replace(">", "&gt;"))
-            .replace("__GAME__", args.game.name)
+            .replace("__GAME__", game_name)
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
@@ -523,7 +643,7 @@ def main():
         "title": title,
         "version": args.version,
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        "entry_game": f"game/{args.game.name}",
+        "entry_game": f"game/{game_name}",
         "requirements": {"webgl": 2, "threads": False, "cross_origin_isolation": False},
         "runtime": {n: files[n] for n in RUNTIME_FILES},
         "files": files,

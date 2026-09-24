@@ -21,6 +21,10 @@ use `--runtime-dir build-web-release/bin`) ou, para depuração, pelo preset `we
 python tools/web/package-web.py --game caminho/jogo.range --name meu-jogo --version 0.1.0 --zip
 ```
 
+- A página tem botão "Tela cheia" (aparece depois de "Jogar"; no Android tenta travar em paisagem; oculto no
+  iPhone, que não tem Fullscreen API para páginas).
+- Nome do `.range` com espaço, acento ou caractere inválido é ajustado sozinho para o FS virtual (`Meu Jogo Ação.range`
+  → `Meu_Jogo_Acao.range`; nome só com caracteres não ASCII vira `game.range`). O arquivo original não é alterado.
 - `--extra arquivo.py` (repetível) coloca módulos ao lado do `.range` no FS virtual `/` (mesmo diretório
   do jogo, que entra no `sys.path`). Dependências dinâmicas não são descobertas: declare-as.
 - Saída em `build-web/dist/<name>/` (troca o pacote anterior só depois de o novo estar completo) e, com `--zip`,

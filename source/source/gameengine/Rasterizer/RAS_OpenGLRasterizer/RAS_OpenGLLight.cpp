@@ -28,6 +28,8 @@
 #include "GPU_glew.h"
 
 #include <stdio.h>
+#include <algorithm>
+#include <cmath>
 
 
 #include "RAS_OpenGLLight.h"
@@ -42,6 +44,8 @@
 #include "DNA_scene_types.h"
 
 #include "GPU_material.h"
+
+#include "BLI_math_vector.h"
 
 RAS_OpenGLLight::RAS_OpenGLLight(RAS_Rasterizer *ras)
 	:m_rasterizer(ras)
@@ -62,7 +66,17 @@ RAS_OpenGLLight::~RAS_OpenGLLight()
 	}
 }
 
-bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer, int slot)
+/* What glLightfv does to GL_POSITION/GL_SPOT_DIRECTION: multiply by the current modelview. */
+static void light_to_eye_space(const float viewmat[16], const float vec[4], float r_eye[4])
+{
+	for (int row = 0; row < 4; row++) {
+		r_eye[row] = viewmat[row] * vec[0] + viewmat[4 + row] * vec[1] + viewmat[8 + row] * vec[2] +
+		             viewmat[12 + row] * vec[3];
+	}
+}
+
+bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer, int slot, const float viewmat[16],
+                                                 GPUSceneLight *r_light)
 {
 	KX_Scene *lightscene = (KX_Scene *)m_scene;
 	KX_LightObject *kxlight = (KX_LightObject *)m_light;
@@ -102,6 +116,11 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 #ifdef WITH_GL_PROFILE_COMPAT
 		glLightfv((GLenum)(GL_LIGHT0 + slot), GL_POSITION, vec);
 #endif
+		light_to_eye_space(viewmat, vec, r_light->position);
+		/* GL's derived halfVector for a directional light with a non-local viewer. */
+		float half[3] = {r_light->position[0], r_light->position[1], r_light->position[2] + 1.0f};
+		normalize_v3(half);
+		copy_v3_v3(r_light->halfvector, half);
 	}
 	else {
 		//vec[3] = 1.0;
@@ -113,6 +132,10 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 		//attennuation still is acceptable
 		glLightf((GLenum)(GL_LIGHT0 + slot), GL_QUADRATIC_ATTENUATION, m_att2 / (m_distance * m_distance));
 #endif
+		light_to_eye_space(viewmat, vec, r_light->position);
+		r_light->constantatt = 1.0f;
+		r_light->linearatt = m_att1 / m_distance;
+		r_light->quadraticatt = m_att2 / (m_distance * m_distance);
 
 		if (m_type == RAS_ILightObject::LIGHT_SPOT) {
 			vec[0] = -worldmatrix(0, 2);
@@ -123,14 +146,25 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 			//vec[2] = -base->object->obmat[2][2];
 #ifdef WITH_GL_PROFILE_COMPAT
 			glLightfv((GLenum)(GL_LIGHT0 + slot), GL_SPOT_DIRECTION, vec);
-			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_CUTOFF, m_spotsize / 2.0f);
+			/* m_spotsize is in radians (Lamp.spot_size); GL_SPOT_CUTOFF is the half-angle in degrees,
+			 * valid range [0, 90] (or 180 = no cone). */
+			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_CUTOFF, std::min(m_spotsize * (0.5f * 180.0f / 3.14159265f), 90.0f));
 			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_EXPONENT, 128.0f * m_spotblend);
 #endif
+			vec[3] = 0.0f;
+			float eyedir[4];
+			light_to_eye_space(viewmat, vec, eyedir);
+			copy_v3_v3(r_light->spotdirection, eyedir);
+			r_light->spotcutoff = std::min(m_spotsize * (0.5f * 180.0f / 3.14159265f), 90.0f);
+			r_light->spotcoscutoff = cosf(r_light->spotcutoff * (3.14159265f / 180.0f));
+			r_light->spotexponent = 128.0f * m_spotblend;
 		}
 		else {
 #ifdef WITH_GL_PROFILE_COMPAT
 			glLightf((GLenum)(GL_LIGHT0 + slot), GL_SPOT_CUTOFF, 180.0f);
 #endif
+			r_light->spotcutoff = 180.0f;
+			r_light->spotcoscutoff = -1.0f;
 		}
 	}
 
@@ -147,6 +181,7 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 #ifdef WITH_GL_PROFILE_COMPAT
 	glLightfv((GLenum)(GL_LIGHT0 + slot), GL_DIFFUSE, vec);
 #endif
+	copy_v4_v4(r_light->diffuse, vec);
 	if (m_nospecular) {
 		vec[0] = vec[1] = vec[2] = vec[3] = 0.0f;
 	}
@@ -161,6 +196,7 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 	glLightfv((GLenum)(GL_LIGHT0 + slot), GL_SPECULAR, vec);
 	glEnable((GLenum)(GL_LIGHT0 + slot));
 #endif
+	copy_v4_v4(r_light->specular, vec);
 
 	return true;
 }

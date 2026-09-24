@@ -2,6 +2,14 @@
 
 Preparado em 2026-09-20 para execução pelo Claude, a partir da análise somente leitura do runtime Web. Este documento é um roteiro, não comprovação de implementação. As constatações estáticas devem ser reconferidas contra a revisão efetivamente trabalhada.
 
+## Estado atual (2026-09-23)
+
+- M0-M3, R1, R3 (áudio) e T5 (`perf-run.cjs`/`frame-time-perf.js`) concluídos e integrados na `linux-sync`.
+- M3 medido em celular físico e desktop: áudio com custo desprezível; picos do p95 só no celular. **M4 adiado.**
+- Mensagens das regras Web traduzidas (en/pt/es/ru) em 2026-09-23; es/ru pedem revisão nativa.
+- Em aberto: comparar o SSAO na Web com o desktop (usuário); migrar o áudio SDL de `ScriptProcessorNode`
+  (obsoleto) para AudioWorklet; push/PR só com pedido do usuário. As seções abaixo são histórico.
+
 ## Estado de execução (2026-09-20)
 
 - **M0 implementado, validação de navegador pendente** no commit `1c9d1562`: o manifesto passou a declarar `bge` e `aud` condicionado a `WITH_AUDASPACE`; o pré-voo exige WebGL 2 e reprova abort, falha e inicialização incompleta; o empacotador registra essas condições. A suite `tools/tests/web_profile` passou com 83 testes. Falta exportar/executar um pacote Web real.
@@ -285,7 +293,7 @@ Estado: `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`. M0-
 1. (Feito) integração e regressões. Ao receber T3/T4 do Codex, integrar de novo, recompilar e repetir as mesmas verificações mais `claude_r3_probe`.
 2. (Feito) nome de material em `shader_errors` e teste de falha de link; falta teste de material de nós. T4 integrado. T5 parcial: `frame-time-perf.js` integrado, sem ligação ao `index.html` e sem script CDP. T3 aberto (`codex/r3-audio-fix-new` incompleto).
 3. SSAO na Web: aguarda a comparação do usuário.
-4. Registrar a decisão do M4 assim que houver a tabela p50/p95.
+4. (Feito 2026-09-23) M4 adiado: celular físico (OPPO Reno14 5G) mediu p50 22 ms sem filtros 2D na cena; picos do p95 são esporádicos. Ver roadmap.
 
 **Codex (não toca nos arquivos acima; branch nova a partir do HEAD desta branch, commit com trailer do Codex, changelog com evidência executada):**
 - **T3 (fechar R3):** (a) checar o nulo em todos os chamadores de `createReader()` listados no status de R3 e nos construtores de leitores de efeito, ou garantir que nunca recebam nulo no Web; (b) converter as validações de RIFF/WAV/Vorbis/MP3 que ainda usam `AUD_THROW` para retorno de erro no Emscripten; (c) **compilar e executar** no build Web da sua própria worktree e provar com pacote real (a sonda `claude_r3_probe.py` já reproduz o segfault; deve terminar com `[r3] TODOS`): arquivo inexistente, arquivo corrompido, formato não suportado, e o mesmo encadeado com efeito (`volume`, `limit`, `pitch`) e com `.write`/`.specs`/`.length`, sem abort. Sem T3 executado, R3 não pode ser marcado como resolvido.

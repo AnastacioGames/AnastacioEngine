@@ -11,7 +11,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-21 a 2026-09-20 | 34 | 50 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 35 | 55 KB |
+| [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
 | [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
 | [03_2026-09-12_a_2026-08-23.md](changelog/03_2026-09-12_a_2026-08-23.md) | 2026-09-12 a 2026-08-23 | 49 | 90 KB |
@@ -21,6 +22,189 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - APK: botão "Tela cheia" escondido dentro do app
+
+- `MainActivity` acrescenta `RangeWebView/1` ao user agent do WebView. O `index.html` de `package-web.py` procura
+  essa marca e não mostra o botão "Tela cheia" dentro do APK, que já abre imersivo. No navegador nada muda.
+- Verificado no Edge headless com o user agent sobrescrito pelo CDP (botão visível sem a marca, oculto com ela).
+  APK debug recompilado com o pacote `motion` e o runtime release (`build-web-release/bin`); falta instalar e
+  conferir no aparelho.
+- Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
+  `--runtime-dir build-web-release/bin`.
+
+## 2026-09-23 - APK WebView mínimo (A0b) rodando no aparelho
+
+- Novo template `tools/android/webview-template/` (Kotlin, uma Activity, AGP 9.4.1 com Kotlin embutido, Gradle
+  9.7.1 pelo wrapper com `distributionSha256Sum`, compileSdk 37/targetSdk 36/minSdk 24, `androidx.webkit` 1.17.1,
+  `androidx.core` 1.19.1). `WebViewAssetLoader` serve `assets/www/` em `https://appassets.androidplatform.net`;
+  arquivo ausente responde 404 explícito e o app não pede `INTERNET`. Links externos abrem no navegador.
+- Paisagem (`sensorLandscape`), imersivo, tela acesa, `configChanges` para girar sem recarregar o jogo. Console JS
+  vai para o logcat (`RangeWeb`); depuração remota e o extra `query` (ex.: `debug=1`) só no build debug.
+- Testado no OPPO Find X3 Pro (Android 13, WebView 150) com a cena `motion`: carga offline, WebGL 2, Python e
+  `bge.logic.motion` com sensores reais; inclinação e `calibrate()` aprovados pelo usuário. Pendências em
+  `docs/android-manual-tests.md` (novo).
+
+## 2026-09-23 - Sensores de movimento: `bge.logic.motion` (giroscópio, acelerômetro, inclinação)
+
+- Por decisão do usuário, os sensores vieram antes do APK Android: testáveis já no celular pelo navegador, e o APK
+  (WebView) herda sem mudança. Não há biblioteca externa: `DeviceMotionEvent`/`DeviceOrientationEvent` são padrão.
+- Nova classe `KX_PythonMotion` (`Ketsji/KX_PythonMotion.{h,cpp}`, no padrão de `KX_PythonMouse`), registrada como
+  `bge.logic.motion`: `available`, `gyroscope` (rad/s), `accelerometer` e `gravity` (m/s², apontando para cima como
+  no W3C), `orientation` (alpha/beta/gamma do navegador), `tilt` (x, y de -1 a 1: para onde uma bola rolaria na
+  tela) e `calibrate()`. No Web lê `Module.rangeMotion` por `EM_JS`; nas outras plataformas `available = False` e
+  zeros. Documentada em `bge.types.KX_PythonMotion.rst`.
+- Página do `package-web.py`: ouve os dois eventos, gira os eixos para os da tela (`screen.orientation.angle`),
+  calcula a gravidade (ou passa-baixa, sem aceleração linear), pede permissão no clique em Jogar (só iOS exige) e,
+  com `?debug=1`, loga os valores uma vez por segundo. `available` cai depois de 1 s sem leitura.
+- Achado: Chrome/WebView preenchem `rotationRate` como alpha=x, beta=y, gamma=z, não na ordem do texto do W3C.
+  O mapeamento segue o Chrome; iOS usa a ordem da especificação (não testado).
+- Cena de teste gerada por `tools/tests/web_profile/make_motion_project.py` (`projects-teste/motion/motion.range`):
+  tabuleiro que inclina, bola que rola, verde/vermelho para sensor ligado/desligado, toque calibra.
+- Validação: `RangeRuntime` nativo (MSVC) e runtime Web release compilados; sonda nativa com todos os atributos
+  (`available=False`, `Vector` zerado, `calibrate()` = `False`); `tools/web/verify-motion.cjs` com sensores emulados
+  pelo CDP no Edge headless: `MOTION: PASS` (retrato, paisagem a 90°, giro nos três eixos, calibração pelo toque).
+  `orientation` não foi emulada. 99 testes de `tools/tests/web_profile` OK. Falta o teste no celular real.
+
+## 2026-09-23 - Web: mensagens das regras traduzidas (English, Português, Español, Русский)
+
+- As mensagens e dicas de correção das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`,
+  `manifest.py`, `collect.py`, `collect_bpy.py`, `preflight.py`, `export.py`) passam a ser escritas em inglês,
+  como o resto do painel. Os detalhes internos de manifesto inválido também, mas sem tradução (só quem monta runtime vê).
+- `i18n.Msg` guarda o texto em inglês (JSON e testes) junto do molde e dos argumentos; `i18n.tr` traduz na exibição
+  (o catálogo casa o molde, não o texto já formatado). Argumentos que também são `Msg` são traduzidos; nomes de
+  arquivo, não. O painel e o aviso de export bloqueado usam `tr`.
+- Catálogo novo `translations_rules.py` (112 moldes, pt_BR/es/ru) somado aos catálogos do perfil Web. O russo
+  e o espanhol precisam de revisão nativa, como os de `translations_ui.py`.
+- Validação: 99 testes unitários de `tools/tests/web_profile`; no editor, `engine_i18n.py` (com checagens novas de
+  `tr`), `engine_web_ui.py`, `engine_collect_bpy.py`, `engine_web_export.py` e `engine_web_cli.py`, todos aprovados.
+
+## 2026-09-23 - Web: mouse com cursor oculto deixa de girar a câmera sem parar
+
+- Usuário relatou mouse "muito sensível" no First Person (GitHub Pages). Causa: no port SDL2/Emscripten o
+  `WarpMouse` não funciona, então `reCenter()` não recentralizava e `deltaPosition` repetia o deslocamento a cada
+  frame (câmera girando como joystick). Não era sensibilidade do jogo.
+- `GHOST_SystemSDL.cpp` (só `__EMSCRIPTEN__`): com cursor oculto, cursor virtual acumulado de `xrel/yrel`;
+  `setCursorPosition` move o cursor virtual. Clique de mouse real pede pointer lock no `#canvas`.
+  `GHOST_WindowSDL.cpp`: mostrar cursor sai do pointer lock; ocultar pede. `package-web.py`: rejeição de pointer
+  lock não vira erro na página.
+- Validação no Edge headless (sonda `mprobe`): movimento de 80 px gera um único delta, com e sem pointer lock;
+  toque/arrasto gera delta proporcional, sem salto no toque novo; cursor visível inalterado. Publicado no
+  `gh-pages` (0.1.2). Usuário confirmou no teste real: sensibilidade do mouse e jogo OK.
+
+## 2026-09-23 - Web: botão de tela cheia na página do jogo
+
+- Usuário confirmou que o First Person roda no celular pelo GitHub Pages e pediu tela cheia.
+- `index.html` gerado por `package-web.py`: botão "Tela cheia"/"Sair da tela cheia" no canto superior esquerdo,
+  visível depois de "Jogar". Coloca a página inteira em tela cheia (overlay `?perf=1`/`?debug=1` continuam
+  visíveis), escala o canvas por CSS mantendo a proporção (resolução de desenho inalterada, sem custo extra) e,
+  no Android, tenta travar em paisagem. Oculto sem Fullscreen API (iPhone só tem para `<video>`).
+- Validação no Edge headless com viewport de celular (800x360, DPR 2): botão oculto antes de jogar, entra e sai
+  da tela cheia por clique, frames continuam contando, nenhum erro/exceção. Publicado no `gh-pages` (0.1.1).
+  No celular do usuário o botão só girou a imagem para paisagem, sem tela cheia de fato (limite do
+  navegador); usuário aceitou assim.
+
+## 2026-09-23 - Web: nome do jogo com espaço ajustado no export; build de teste no GitHub Pages
+
+- `tools/web/package-web.py`: nome do `.range` com espaço/acento/caractere inválido deixa de ser recusado ("nome do
+  arquivo do jogo invalido para o FS virtual", achado em `melhores graficos .range`). `safe_name()` tira acentos e
+  troca o resto por `_` (`Meu Jogo Ação.range` → `Meu_Jogo_Acao.range`; só não ASCII → `game.range`); o nome
+  padrão do pacote segue a mesma regra. Vale também para o export do editor, que chama o empacotador. Extras
+  (`--extra`) continuam recusados com nome inválido, porque scripts os importam pelo nome.
+- Validação: pacotes gerados com `Meu Jogo Ação.range` e `日本 jogo.range`, `index.html`/`manifest.json` apontam
+  para o nome ajustado e `perf-run.cjs` recebeu frames no Edge headless.
+- Build de teste para celular: First Person (`tools/ADD na engine anastacioEngine/First_Person.range`, renomeado
+  pelo usuário) empacotado com `--perf` e publicado na branch órfã `gh-pages` (GitHub Pages:
+  <https://anastaciogames.github.io/AnastacioEngine/?perf=1>). Link público testado no Edge headless: carrega,
+  WebGL2/Core, sem erro. Medição p50/p95 em celular físico pendente com o usuário.
+
+## 2026-09-23 - Web: `aud` METH_NOARGS validado no navegador
+
+- A correção de aridade de `ea2cfd04` (18 métodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle`/
+  `PyDynamicMusic`/`PyPlaybackManager`) foi conferida com o runtime `build-web-release` de 2026-09-23:
+  `claude_aud_noargs_probe.py` empacotada e rodada por `claude_r3_run.cjs` no Edge headless. `cache()`,
+  `reverse()`, `handle.pause()` e `handle.stop()` com som válido terminam sem `function signature mismatch`
+  (`[r3] TODOS`).
+- **Regressões repetidas depois da mudança de áudio** (runtime `build-web-release` de 2026-09-23, Edge headless
+  isolado): áudio `web-audio` (`verify-capabilities.cjs audio`) 8/8 OK (AudioContext rodando, pico 0,35); módulo
+  `aud` (`create_web_aud_module_scene.py`) até `[aud] aud OK`; bloom + resize (`claude_m3_resize.*`) com offscreens
+  canvas/2, /4, /8 em 640x360, 1024x600, 400x300 e 960x540 e `glError=0x0` em todas as fases; resolução dinâmica
+  sem timer com aviso único; R1 `CONSTRAINT_ABI_TEST: PASS` no Web e guard estático `PASS (31 methods)`.
+- Aceite visual do Principled/PBR Web (luzes de cena e sombra) dado pelo usuário no navegador com GPU real.
+
+## 2026-09-23 - Web: luzes de cena e sombra do Principled/PBR no perfil CORE (WebGL2)
+
+- **Problema**: o `web-runtime` compila com `WITH_GL_PROFILE_CORE_RANGERUNTIME` (`USE_CORE_PROFILE` nos shaders).
+  O loop de luzes de `node_bsdf_principled()`/`node_bsdf_diffuse()`/`node_bsdf_glossy()` e a sombra do Principled
+  estavam em `#ifndef USE_CORE_PROFILE` (`gl_LightSource` não existe em GLES3, e `RAS_OpenGLLight` não chama
+  `glLight*` em CORE): no navegador esses materiais só recebiam ambiente/IBL, sem Sun/Point/Spot nem sombra.
+- **Correção**:
+  - `RAS_OpenGLLight::ApplyFixedFunctionLighting()` preenche também um `GPUSceneLight` (`GPU_material.h`) com os
+    mesmos valores do `glLight*`, em espaço de visão (posição/direção multiplicadas pela view, `halfVector`
+    derivado para o Sun, `spotCosCutoff`). `RAS_Rasterizer` guarda os 8 slots (`GetSceneLights()`), porque
+    uniform é estado do programa e `ProcessLighting()` não recalcula quando a camada de luz se repete.
+  - `GPU_material_bind_scene_lights()` envia `unflightsource[i].*` por objeto, junto do bind de sombra em
+    `BL_BlenderShader::BindShadowLamps()`; no COMPAT as localizações são -1 e nada é enviado.
+  - GLSL: em CORE, `uniform SceneLightSource unflightsource[8]` com os campos de `gl_LightSource`; os três BSDFs
+    leem `SCENE_LIGHT(i)` (em COMPAT continua `gl_LightSource[i]`). A amostragem de sombra passou para
+    `scene_light_shadow()`, com índices constantes em `unfshadowmap[]` (GLSL ES 3.00 proíbe indexar array de
+    samplers com a variável do loop).
+  - `gpu_extensions.c`: no Emscripten `GPU_max_textures()` fica limitado a 28, o máximo de units que o
+    `LEGACY_GL_EMULATION` rastreia. Com WebGL informando 32 (SwiftShader), o bind da sombra em
+    `max - 3 + i` fazia `glEnable` estourar em `hook_enable` (`enabled_tex2D` de undefined) ao carregar a cena.
+- **Validação**: `build` nativo (`RangeRuntime`/`RangeEngine`) e `build-web-release` compilaram com código 0.
+  `shadow_ibl_test.range` empacotado e rodado no Edge headless (SwiftShader): sem exceção, sem erro de shader no
+  pré-voo, `glError=0`; a captura mostra os brilhos das várias luzes, o cone do Spot e as sombras no chão.
+  **Pendente**: aceite visual do usuário no navegador com GPU real e conferência do desktop (o GLSL do caminho
+  COMPAT mudou: macro `SCENE_LIGHT` e helper de sombra).
+
+## 2026-09-23 - Sombra em Principled/PBR: correções que faltavam para funcionar no jogo real
+
+A entrada de 2026-09-21 compilava mas não sombreava nada no jogo (validado no `shadow_ibl_test.range`). Causas
+encontradas (todas confirmadas por diagnóstico em runtime, não só leitura de código):
+
+- **Bind fora de hora**: `GPU_material_bind_shadow_lamps()` rodava em `KX_BlenderMaterial::Prepare()`, antes de
+  `BindProg()`, então o `glUniform*` ia para o programa errado. Agora é `BL_BlenderShader::BindShadowLamps()`,
+  chamado por objeto em `KX_BlenderMaterial::ActivateMeshUser()` depois de `Update()`.
+- **`ProcessLighting()` nunca era chamado para materiais com nodes** (só o caminho `m_shader` chamava), então
+  `m_shadowLamps` ficava vazio. Agora `ActivateMeshUser()` chama `ProcessLighting(true, ...)` também para
+  `m_blenderShader`. Efeito colateral a observar: todo material com nodes passa a receber o estado de luz
+  fixed-function por objeto.
+- **Vazamento**: `GPU_material_bind_shadow_lamps()` chamava `add_user_list()` (sem dedupe) por objeto e por frame;
+  agora registra lamp/material uma vez.
+- **Point/Spot tratados como direcionais** em `node_bsdf_principled()`: agora `position.w == 1` usa
+  direção `luz - fragmento`, atenuação `constant/linear/quadratic` e cone do Spot (`spotCutoff`,
+  `spotExponent`). Diffuse/Glossy BSDF (`node_bsdf_diffuse`/`node_bsdf_glossy`) **não** foram tocados.
+- **`GL_SPOT_CUTOFF` em radianos**: `RAS_OpenGLLight::ApplyFixedFunctionLighting()` passava `m_spotsize / 2`
+  (radianos) onde o GL espera graus [0, 90]; agora converte. Sem isso o cone valia ~0,4° e o Spot não iluminava.
+- **Loop limitado a 3 luzes**: numa cena com 4 luzes o Sun (slot 3) nunca entrava. `NUM_LIGHTS` passou a 8
+  (slots desligados são pulados) e `NUM_SHADOW_LIGHTS = 3` mantém o limite de shadow maps.
+- **Luz desligada mantinha a cor antiga**: `RAS_OpenGLRasterizer::DisableLight()` agora zera `diffuse`/`specular`
+  do slot, já que o shader não olha `GL_LIGHTi`.
+- **Sampler de sombra sem textura**: slots sem sombra apontam `unfshadowmap[i]` para a própria unit em vez da
+  unit 0 (evita `sampler2DShadow` e `sampler2D` na mesma unit).
+- **Validação**: `RangeRuntime` com `projects-teste/pbr-baseline/shadow_ibl_test.range`, sombras do Spot no
+  chão visíveis (usuário: "parece bom, sombra um pouco fraca, deve ser regulagem" — o chão satura com 4 luzes
+  somando energia 5,6). Ainda sem comparação lado a lado com material legado.
+- **Ainda sem sombra no Principled**: Point/Local, CSM e VSM (limite de engine, inalterado).
+
+## 2026-09-22 — Pacote Linux 0.4.1 corrigido (faltava RangeRuntime)
+
+- O release `v0.4.1` publicado antes continha só o `RangeEngine` (editor) no `.tar.xz` Linux; `RangeRuntime`
+  (player) ficava de fora por um bug no `tools/linux/package-runtime.sh` que não combinava os `bin/` dos dois
+  presets (`linux-runtime` e `linux-editor`) quando chamado sem `EXTRA_BIN_DIR`.
+- Script corrigido para aceitar `BIN_DIR` (preset principal) + `EXTRA_BIN_DIR` (o outro preset) e mesclar os
+  binários no pacote final, com aviso explícito se algum dos dois (`RangeRuntime`/`RangeEngine`) ainda faltar.
+- `RangeRuntime` e `RangeEngine` recompilados (presets `linux-runtime` e `linux-editor`), reinstalados via
+  `cmake --install` (RPATH `$ORIGIN/lib`, `libpython3.11.so.1.0` copiado) e reempacotados juntos:
+  `AnastacioEngine-0.4.1-linux-x86_64.tar.xz` (81 874 220 bytes, antes 67 447 540 bytes só com o editor).
+- Asset do GitHub Release `v0.4.1` atualizado com `gh release upload --clobber` (tar.xz + sha256); assets
+  Windows não foram tocados.
+- Teste funcional real (não só `--help`) numa sessão gráfica X local: `RangeEngine` roda 12s sem nenhuma
+  linha de erro/aviso; `RangeRuntime` carrega `ShellShader.range` (amostra do repo), detecta GPU/OpenGL
+  (Mesa Intel RPL-P, OpenGL 4.6, Mesa 25.2.8) e renderiza sem erros. `ldd` não acusa dependência faltando em
+  nenhum dos dois binários. Teste feito na própria máquina de build; portabilidade em máquina Linux limpa
+  ainda não foi verificada diretamente.
 
 ## 2026-09-21 - Sombra projetada em materiais Principled/PBR no BLENDER_GAME
 
@@ -331,217 +515,3 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   `dynamic resolution needs a GPU timer query ... render scale is not adjusted`, confirmando o caminho sem subida.
   O runtime fornecido ainda nao tinha o trace `offScreenSize`, portanto nao houve medicao numerica dos sete
   offscreens nem afirmacao de `glError=0`; a instrumentacao reservada em `RAS_2DFilter.cpp` continua necessaria.
-
-## 2026-09-20 - Web: M3, correcoes de base dos filtros 2D (indice, resize do bloom, timer de GPU)
-
-- **Colisao de indice**: `reservedPassIndex` era 17 e `FILTERPASS_LENSFLARE` tambem, entao o filtro customizado de
-  indice 0 caia no slot do Lens Flare. Agora `reservedPassIndex = FILTERPASS_LENSFLARE + 1`. Teste no runtime Web
-  (`m3_filtros.py` + `criar_m3.py`, Edge isolado, Lens Flare ligado): antes (`build-web-release`, anterior ao fix)
-  `addFilter(0)` falhava com "found existing filter in index (0)", `removeFilter(-1)` era aceito e
-  `removeFilter(0)` apagava o Lens Flare; depois (`build-web`) os quatro checks passam. `removeFilter` com indice
-  negativo agora levanta `ValueError` (o `unsigned` dava wrap para 16, o filtro Clouds).
-- **Resize do bloom**: os 7 offscreens do bloom eram criados uma vez com o tamanho do canvas / `lod`. Agora usam a
-  flag interna `RAS_CANVAS_DIVISOR` (`RAS_2DFilterOffScreen::Update` recalcula e recria), e um callback
-  (`KX_2DFilterManager::RefreshBloomTextures`) reaplica os bind codes nos filtros que amostram essas texturas
-  (`KX_2DFilter::UpdateTextureBindCode`). **Verificado em runtime Web** (`claude_m3_resize.py`/`claude_m3_criar.py`/
-  `claude_m3_resize.cjs`, Edge headless isolado, debug `RAS_2DFILTER_DEBUG` com o novo campo `offScreenSize`): bloom ligado
-  via `changeBloomValues` e `render.setWindowSize` 1280x720 -> 640x360 -> 1024x600 -> 400x300 -> 960x540; os offscreens do
-  bloom seguem canvas/2, /4 e /8 em cada tamanho (ex. 1024x600 -> 512x300, 256x150, 128x75) e `glError=0x0` em todas as
-  ~860 linhas de debug. Igual em `build-web` e `build-web-release`. Nao comparado com o build anterior ao fix (nao se sabe
-  se o bug antigo era reproduzivel neste cenario).
-- **Timer de GPU**: na Web o query `TIME` nao tem objeto GL, `Available()` dava true e o resultado era 0, o que subia
-  a resolucao dinamica ate o maximo. `RAS_Query::IsSupported()` novo; `UpdateDynamicResolution` nao ajusta a escala
-  sem timer (avisa uma vez) e descarta amostras <= 0. Testado no mesmo pacote (resolucao dinamica ligada, alvo 60 fps, 50-100%): o aviso "dynamic resolution needs a GPU timer"
-  sai uma unica vez e os offscreens ficam no tamanho cheio. Limite: a escala nasce em 100% (o maximo), entao o defeito antigo
-  (subir a escala com resultado 0) nao e observavel neste cenario; o teste confirma o caminho novo, nao a regressao.
-- Builds: nativo (143/143) e `build-web` (139/139) com codigo 0. `build-web-release` reconstruido depois (163/163, codigo 0) e o teste de resize repetido nele com o mesmo resultado.
-- **Nao feito**: selecao do ultimo filtro/blit final (o fluxo ja esta correto, so custa um blit; e otimizacao para o M4),
-  medicoes em desktop e celular fisico, tabela de p50/p95 e decisao sobre o M4.
-
-## 2026-09-20 - Web: M2, DNA `unsigned char` e checagem de range da RNA reativada no Emscripten
-
-- Cinco campos DNA passam de `char` para `unsigned char` (`ImageUser.fie_ima`, `Material.seed1`/`seed2`,
-  `ToolSettings.skgen_subdivision_number`, `ThemeSpace.handle_vertex_size`), e `USE_RNA_RANGE_CHECK` volta a valer
-  no Emscripten (`rna_internal.h`). Commits `9d008486` e `dfae0be0`. O hardmax 200/255 da RNA contradizia o tipo `char` do campo (com sinal, valores acima de 127 não cabem);
-  o comportamento anterior não foi reproduzido em runtime.
-- **SDNA preservado**: o `makesdna` descarta `unsigned`, então o `dna.c` e os offsets gerados são idênticos
-  antes (`ed6c1f8f`) e depois. Nativo: `dna.c` 418262 B e offsets 23236 B; wasm32: 414162 B e 22585 B. Os dois
-  "depois" batem com o `dna.c` dos diretórios de build.
-- **Checagem ativa no Web**: compilando `rna_image.c`/`rna_material.c`/`rna_scene.c`/`rna_userdef.c` com os
-  headers anteriores ao M2 a checagem dá 7 erros (imagem 1, material 2, cena 1, tema 3 = as 7 propriedades do
-  inventário); com o HEAD, 0 erros. O compilador nativo MSVC não define `__STDC_VERSION__ >= 201112L`, então lá a
-  checagem nunca rodou nem roda; a cobertura dela é só do Emscripten. Builds completos após os commits: nativo,
-  `build-web` e `build-web-release` terminaram com código 0.
-- **Roundtrip nativo** (`RangeEngine.exe -b --python`, salvar `.range` e reabrir): `halo.seed` e `halo.flare_seed`
-  em 0/1/127/128/255, `fields_per_frame` em 1/2/127/128/200, `etch_subdivision_number` em 1/2/127/128/200/255,
-  todos voltaram iguais. `handle_vertex_size` em 0/128/255 nos temas Graph/Image/Clip sobreviveu a salvar e recarregar
-  o `userpref.blend`; os temas padrão trazem 5. `userpref.blend` reais do usuário (2.79 do RangeEngine, 2.67 e 2.68)
-  carregam sem erro.
-- **Animação**: com o material ligado a um objeto, `halo.seed` 200->255 e `flare_seed` 3->250 animam corretamente,
-  também depois de salvar e reabrir. Material sem objeto não é reavaliado após o load, igual a `size` e `hardness`
-  (não é do M2).
-- **Fora da faixa via RNA**: o setter faz clamp e não levanta erro. `seed` 256 vira 255 e -1 vira 0;
-  `fields_per_frame` 0 vira 1 e 201 vira 200; `etch_subdivision_number` 0 vira 1 e 256 vira 255;
-  `handle_vertex_size` 256 vira 255 e -1 vira 0.
-- Treze `.blend`/`.range` do repositório carregam sem erro e com seeds, `fields_per_frame` e subdivisão dentro da
-  faixa. Exceção: `preview.blend` traz `etch_subdivision_number` 0, valor já gravado no arquivo (byte 0 é igual
-  em `char` e `unsigned char`), fora da faixa 1-255 da RNA.
-- **Consumidores revisados**: nenhum depende do sinal. `resources.c::UI_ThemeGetColorPtr` já usava
-  `unsigned char *`, e o `hashvectf + ma->seed2` de `rendercore.c` deixa de indexar negativo para seed > 127.
-  O cast `(char)tex->fie_ima` em `versioning_legacy.c:2471` é inofensivo (o legado grava 2) e foi mantido.
-- **Não coberto**: um build nativo com a checagem ativa não existe (o MSVC não a executa); os `.blend` legados só
-  provam carregamento e valores, não o comportamento anterior ao M2 com valores acima de 127. O
-  `build-web-release` tem 49 passos pendentes por `GPU_shader.h` (alterado no M1, não no M2), então deve ser
-  reconstruído antes de qualquer publicação.
-
-## 2026-09-20 - Web/R1: ABI dos callbacks Python de constraints
-
-- Inventário executado de `physicsconstraints_methods`: 31 registros (30 `METH_VARARGS`, um
-  `METH_VARARGS | METH_KEYWORDS`, nenhum `METH_NOARGS`). Vinte e oito callbacks `METH_VARARGS`
-  tinham a assinatura de três parâmetros; `gPyCreateVehicle` e `gPyExportBulletFile` já tinham
-  dois, e `gPyCreateConstraint` já estava correto com três e `METH_KEYWORDS`.
-- Em `KX_PyConstraintBinding.cpp`, removido o parâmetro `kwds` das 28 funções `METH_VARARGS`.
-  As flags não mudaram: setters continuam posicionais e `createConstraint` conserva a API de
-  keywords existente.
-- Novo `tools/tests/constraint_abi_test.py`: guarda estática das 31 assinaturas/flags e cena
-  Python que cobre argumentos válidos e inválidos dos setters, rejeição de keyword em
-  `setGravity` e aridades inválidas das demais APIs expostas.
-- Antes da correção, a cena passou no `RangeRuntime` nativo em Windows x64: a incompatibilidade
-  ABI não se reproduziu nessa plataforma. Após a correção, o mesmo teste passou nativamente.
-- Executados com sucesso: `cmake --build --preset web-runtime` (1817 etapas),
-  `package-web.py` para a cena de regressão e execução Web em Chrome headless/WebGL2 via CDP;
-  o log da cena correta registrou `CONSTRAINT_ABI_TEST: PASS`. O pacote usou runtime de
-  depuração (`SAFE_HEAP`/`ASSERTIONS`), somente para validação.
-
-## 2026-09-20 - Web: testes de runtime do M1 (diagnósticos Python e shader)
-
-- Três jogos com falha injetada foram empacotados com `package-web.py --runtime-dir build-web/bin`, servidos e
-  executados no Edge via `verify-package.cjs` com `PREFLIGHT_OUT`. `check_preflight` emitiu apenas o achado
-  esperado em cada um: exceção Python -> `WEB-PY-009`, import inexistente -> `WEB-PY-001`, GLSL inválido em
-  Filter2D (`mode = CUSTOMFILTER`) -> `WEB-GFX-002`, todos ERROR.
-- Segunda rodada (mesmo método): `SyntaxError` no controller -> `WEB-PY-009`; mensagem com aspas, quebra de linha,
-  Unicode (acentos e japonês) e 3000 caracteres chegou íntegra ao relatório (3028 caracteres, sem truncar);
-  o mesmo erro em 3 objetos gerou 3 eventos distintos.
-- Terceira rodada: exceção em `start()` de componente Python (`KX_PythonComponent`) e em callback `pre_draw`
-  geraram evento `python` com `exception_type` RuntimeError e traceback -> `WEB-PY-009` ERROR (o callback repete
-  o evento a cada frame).
-- Importação de relatório por arquivo (`load_preflight`, sem bpy): versão 1 e 2 são lidas (`WEB-PY-009` com
-  `python_errors`); versão 3, ausente ou não numérica degrada para um único `WEB-DEPLOY-002`. Os 30 testes
-  `test_preflight*` passam.
-- Importação pela UI do editor (roteiro `projects-teste/teste-editor-web/ROTEIRO-M1.md`, passos A.1 a A.6, feitos pelo
-  usuário): versão 1 e 2 mostram `WEB-PY-009`; versão 3 mostra um único `WEB-DEPLOY-002`; importar `pf-ok.json`
-  limpa os resultados do pré-voo anterior. Resultado importado não tem **Locate** (o `origin` é só texto).
-  Um build antigo (só versão 1) rejeitava a versão 2: abrir o `RangeEngine.exe` da worktree.
-- Painel Web: mensagem e traceback com quebras de linha apareciam como quadrados; agora uma linha por label
-  (`properties_web.py`). Ainda não conferido visualmente.
-- Execução sem pré-voo testada pelo usuário no navegador: export com "Preflight after export" desligado, página
-  aberta sem `?preflight=1`, jogo renderizou e o console mostrou só avisos habituais (emulação GL, ScriptProcessorNode),
-  sem erro. Achado: nome de arquivo com espaço (`melhores graficos .range`) é recusado no export
-  ("nome do arquivo do jogo invalido para o FS virtual"); o editor só reporta isso na falha do empacotador.
-- Bug achado pelo usuário: component em `scripts/` (módulo `scripts.cinematic_lighting_component`) virava
-  WEB-PKG-003 "Módulo não foi encontrado: scripts". O coletor tratava `comp.module` como "modulo.funcao" e cortava o
-  último segmento; corrigido com `is_module=True` em `collect_bpy.py`, com teste em `test_collect.py`. Ainda não
-  reconferido no editor.
-- Falha de vertex de `BL_Shader` testada em runtime (`criar_m1c.py` + `shader_quebrado.py`, headless): o log chega ao relatório e vira `WEB-GFX-002`, mas pelo fallback de texto do console: `stage` "?" e `material` vazio, porque o `GPUShader: compile error:` não passa por `Module.onDiagnostic`. Lacuna aberta: emitir diagnóstico estruturado (estágio e material) no caminho `GPUShader`/`BL_Shader`. Link e materiais de nós não testados.
-- O runtime usado era build de depuração (SAFE_HEAP/ASSERTIONS); serve para o teste, não para publicar.
-
-## 2026-09-20 - Web: estado do M0 e checkpoint de diagnóstico estruturado de shader
-
-- M0 no commit `1c9d1562`: `make-runtime-manifest.py` declara o alias `bge` e `aud` conforme
-  `WITH_AUDASPACE`; o pré-voo requer WebGL 2 e torna abort, falha e inicialização incompleta estados
-  explícitos. `package-web.py` deixa de ocultar erro de leitura do manifesto. A suite Web Profile passou com
-  83 testes; falta exportar e executar pacote Web real.
-- Checkpoint parcial de M1 no commit `8251b0dc`: `gpu_shader.c` chama `Module.onDiagnostic` em falha de
-  compilação/link WebGL, com operação, estágio, origem e log. `GPU_generate_pass` preserva o nome de
-  material/world para essa origem. O coletor do pacote exporta relatório v2 e usa a heurística antiga só como
-  fallback; o leitor aceita v1 e v2. Testes de `test_preflight` (11), `py_compile` e `git diff --check` passaram.
-- Não concluído: captura segura de exceções Python, shaders especiais/filtros e validação em navegador.
-  A tentativa de build não vale como validação porque `build-android` da worktree apontava para a árvore
-  principal; o próximo agente deve configurar build Web limpo da própria worktree.
-
-## 2026-09-20 - Web: gamepad — sensores de joystick avaliam pelo estado vivo do SDL
-
-- Sintoma (teste do patch do SDL2 no navegador): o D-pad exigia vários toques e, quando respondia, o cubo ficava
-  girando sem parar. O monitor `navigator.getGamepads()` injetado numa cópia do pacote mostrou que o navegador
-  entregava tudo certo (mapeamento "Standard Gamepad", eixo 0 em rampa e voltando a 0, `timestamp` avançando),
-  então o patch do SDL2 não era a causa.
-- Causa raiz: `SCA_JoystickSensor` só avalia quando `DEV_Joystick::IsTrigAxis()`/`IsTrigButton()` estão ligados, e
-  essas flags só subiam ao consumir um evento SDL em `HandleEvents`. No Web o `SDL_PollEvent` do GHOST drena esses
-  eventos antes (mesma raiz da fila compartilhada das entradas de 2026-09-14): evento de apertar perdido = vários
-  toques; evento de soltar perdido = sensor nunca vê a soltura. A correção de 14/09 só trocou a leitura do valor
-  (`SDL_GameControllerGetAxis`), o gate por evento ficou.
-- Fix (`DEV_JoystickEvents.cpp`, `DEV_Joystick.h/.cpp`): `SyncLiveState()` compara eixos e botões vivos do SDL com
-  o quadro anterior ao fim de `HandleEvents` e liga as flags mesmo sem evento. Semântica nativa inalterada.
-- Confirmado pelo usuário com controle físico no navegador (runtime `build-web-release` religado). Regressão geral
-  (render, sombras, teclado, console sem erro vermelho), World Status no editor, export Web e idioma também
-  aceitos. Save (IDBFS) validado com o pacote `projects-teste/teste-save-web` (SAVED, recarregar, LOADED),
-  automático (`verify-save.cjs`) e manual pelo usuário.
-- Segundo controle ("USB Joystick", vendor 0079 produto 0006) chega ao navegador com `mapping=""`,
-  12 botões, 10 eixos e D-pad como hat no eixo 9 (repouso 3.29). O SDL pode não mapear o hat sem uma entrada no
-  banco de controles. Testado pelo usuário: o D-pad desse controle funciona igual, nenhum mapeamento necessário.
-
-## 2026-09-20 - Web: patch do SDL2 (gamepad) versionado
-
-- Novo `tools/web/patch-sdl2-gamepad.py`: aplica no cache do emsdk (SDL 2.32.10,
-  `src/joystick/emscripten/SDL_sysjoystick.c`) a remoção do gate `gamepadState.timestamp != item->timestamp`.
-  Idempotente (marcador no fonte), preserva o EOL, `--check` informa o estado, apaga `libSDL2*.a` para forçar a
-  recompilação da porta. Só a correção entra; os `printf [web-input]` de diagnóstico da época não foram mantidos.
-- Testado num emsdk falso a partir do arquivo original do zip da porta (diff de 5 linhas). No emsdk real:
-  arquivo restaurado do zip, patch aplicado e `embuilder build sdl2` recompilou `libSDL2.a` sem erro.
-- Ligado ao build: `source/build_files/cmake/platform/platform_web.cmake` roda o script a cada configure (avisa
-  se falhar). `RangeRuntime` (preset `web-runtime-release`) relinkado com a porta recompilada sem erro; o cache de
-  `build-web-release` e `build-web` estavam com `WITH_INTERNATIONAL=ON` (divergia do preset) e foram realinhados para OFF.
-- Não verificado: gamepad físico no navegador com o novo `RangeRuntime`.
-
-## 2026-09-20 - Idioma: English + Português (i18n do editor)
-
-- O editor passa a compilar com `WITH_INTERNATIONAL`: o submódulo `locale` do Blender 2.79 não existia e o
-  CMake desligava a opção sozinho (o alvo `msgfmt` sumia do Ninja). Vendorizado só o necessário em
-  `source/release/datafiles/locale` (`po/pt_BR.po`, `po/pt.po` e um `languages` reduzido a Default/English/pt_BR/pt_PT;
-  origem e commit em `locale/README.md`, branch `blender-v2.79-release` de `blender/blender-translations`). O
-  menu de idioma lista só o que existe.
-- Correções que o i18n ligado expôs: `interface_style.c` ainda usava `datatoc_bfont_ttf`/`bmonofont` (fontes trocadas
-  por Roboto neste fork) → agora `roboto_medium`/`roboto_mono_medium`; o `install()` gravava o catálogo como
-  `RangeEngine.mo` mas o código carrega o domínio `blender` (`TEXT_DOMAIN_NAME`) → `RENAME blender.mo`;
-  `blenderplayer/.../stubs.c` duplicava `BPY_app_translations_py_pgettext` (guardado com `#ifndef WITH_BLENDER`, como
-  os demais).
-- Presets: `WITH_INTERNATIONAL` explícito (`ON` em `linux-editor`; `OFF` em `linux-runtime`, `android-runtime` e
-  `web-runtime`, que não têm editor e evitam exigir Boost).
-- Painel Web: textos em inglês (idioma-fonte); pt_BR em `range_web/translations.py`, registrado em `bl_ui.register()`.
-  Módulos puros usam `range_web/i18n.py` (`_()` traduz no editor, devolve o texto fora dele). `_open_in_browser` agora
-  devolve `(ok, mensagem)` em vez de o operador testar o começo do texto.
-- Espanhol (`es`) e russo (`ru_RU`) adicionados ao menu: `po/es.po`, `po/ru.po` (mesmo commit) e `range_web/translations_es_ru.py`; coberto por `engine_i18n.py`.
-- Textos de UI da Range/UPBGE fora do catálogo do Blender (1 459 rótulos e dicas de RNA) traduzidos em pt_BR/es/ru_RU em `range_web/translations_ui.py`; auditoria por `tools/tests/web_profile/i18n_audit.py` (pt_BR: 2 698 → 1 281 sem tradução, o resto é ícone, identificador ou nome igual nos dois idiomas; ru tem mais lacunas no catálogo do Blender).
-- Testes: 78 unitários OK (asserções de texto atualizadas); `engine_i18n.py` novo (13 verificações: catálogo do Blender,
-  dicionário `range_web`, dica, formato `%s`, acentos, desligar tradução); os 5 `engine_*` existentes passam.
-- Padrão do Blender 2.79 mantido: tradução vem desligada (Preferências > System > **International Fonts**, depois
-  **Language** e **Interface**).
-- Não verificado: desenho na janela real (fonte Droid Sans, acentos, menu de idioma) e o Linux.
-- Fora desta entrega: mensagens das regras (`rules_*.py`, `runtime.py`, `manifest.py`, `collect.py`, `preflight.py`) ainda em
-  português; o export.py/results só traduzem o que já era texto de interface.
-
-## 2026-09-20 - Web: "Abrir no navegador" com um clique
-
-- Novo botão **Abrir no navegador** (servidor local em thread daemon, porta livre, `range_web/local_server.py`),
-  **Parar servidor**, linha de estado e opção **Abrir após exportar**. Botões de servir e de pré-voo usam `poll`
-  e mostram o motivo no painel quando o ambiente não está pronto (sem pacote, pacote desatualizado, sem
-  Chrome/Edge). `serve.py` do pacote aceita porta 0. Testes: `test_local_server.py` (78 unitários OK) e
-  `engine_web_serve.py`. O pré-voo mantém seu servidor próprio, de propósito.
-
-## 2026-09-20 - Web: fluxo do editor aceito pelo usuário
-
-- Teste manual no editor concluído (Validar, Exportar Web, Testar pacote no navegador, Importar pré-voo, bloqueio
-  por erro e Localizar): passou. Marco E fechado; o item saiu do roadmap.
-
-## 2026-09-20 - docs: celular confirmado e roteiro do teste no editor
-
-- Deploy no GitHub Pages confirmado pelo usuário também no celular. Roadmap e `web-deploy.md` atualizados; o item
-  "Deploy real" saiu dos abertos. Roteiro do teste manual do fluxo no editor em
-  `projects-teste/teste-editor-web/LEIA-ME.md` (com `editor-web-teste.range`).
-
-## 2026-09-20 - docs: roadmap reconciliado com o git log
-
-- `docs/roadmap.md` reescrito só com pendências reais (de 526 para cerca de 140 linhas). A narrativa histórica
-  do bloco Web (bloqueios de shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) já estava
-  nas entradas de 2026-09-12 a 2026-09-18 deste changelog e foi removida do roadmap. Marco D e pré-voo saíram
-  da lista de abertos; o item FFmpeg do editor Linux continua aberto (só o wrapper audaspace foi ajustado). Aceites manuais do usuário no mesmo dia (cutscene Play/Stop/Play e standalone, sombras, migração de `maxphystep`, Sol/Lens Flare, resolução dinâmica, splash/About, Outliner, barra da 3D View, Particles, gamepad ImGui, sensores/actuators de física) removidos das pendências.

@@ -56,6 +56,7 @@ class RAS_DebugDraw;
 class RAS_InstancingBuffer;
 class RAS_ILightObject;
 class RAS_ISync;
+struct GPUSceneLight;
 struct KX_ClientObjectInfo;
 class KX_RayCast;
 
@@ -289,6 +290,11 @@ private:
 	 * (GPU_material.h) and NUM_LIGHTS (gpu_shader_material.glsl). */
 	static const unsigned int GPU_SHADOW_LAMPS_COUNT = 3;
 	struct GPULamp *m_shadowLamps[GPU_SHADOW_LAMPS_COUNT];
+
+	/* Same slots as values (GPU_MATERIAL_NUM_SCENE_LIGHTS entries, unused ones zeroed), kept here
+	 * because under CORE they're per-program uniforms that must be re-uploaded per object, while
+	 * ProcessLighting() only recomputes them when the light layer changes. */
+	std::unique_ptr<GPUSceneLight[]> m_sceneLights;
 
 	DrawType m_drawingmode;
 	ShadowType m_shadowMode;
@@ -668,6 +674,8 @@ public:
 	 * in its last call, same slot order (see m_shadowLamps). */
 	struct GPULamp * const *GetShadowLamps() const { return m_shadowLamps; }
 	unsigned int GetShadowLampsCount() const { return GPU_SHADOW_LAMPS_COUNT; }
+	/** Light values ProcessLighting() applied in its last call, for GPU_material_bind_scene_lights(). */
+	const GPUSceneLight *GetSceneLights() const { return m_sceneLights.get(); }
 
 	void PushMatrix();
 	void PopMatrix();
