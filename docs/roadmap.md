@@ -133,6 +133,10 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   giro de 180° confirmados no aparelho; rotação em paisagem e retrato aprovada (proporção e câmera estáveis ao girar). First Person roda no APK
   (pointer lock do WebView neutralizado; ~60 fps parado, medidas variando). Controle por toque, música e save (IDBFS após fechar o
   app) aprovados. Próximo: comparação com o Chrome do aparelho com mais medidas.
+- **Export Android (A3/A4)**: módulo `range_web/android.py`, painel "Android (Range)" no editor e
+  `tools/web/package-android.py` geram o APK debug a partir do pacote Web (2026-09-24, verificado no build e no editor
+  em modo background). Aceito em 2026-09-24: APK do First Person gerado pelo painel e instalado no Find X3 Pro com
+  "Instalar no celular". Próximo: release assinado (chave fora do JSON e do git) e atualização por cima mantendo o save.
 - AAB/Play e controles por toque (A1) seguem a ordem do plano.
 
 ### Outros

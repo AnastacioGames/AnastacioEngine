@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 35 | 57 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-20 | 36 | 57 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
 | [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
@@ -22,6 +22,32 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Export Android pelo editor e pelo terminal (A3/A4, APK debug)
+
+- Novo `range_web/android.py` (sem bpy): confere o pacote do export Web por `SHA256SUMS.txt`, copia
+  `tools/android/webview-template` para `%TEMP%/range-android-build/` (sem `build/`, `.gradle/` nem o `www/` de teste),
+  põe o jogo em `assets/www` (sem `serve.py`/`HOSTING.md`), aplica `applicationId`, nome, `versionName`/`versionCode`,
+  ícone PNG (`mipmap-xxxhdpi`) e orientação (`fullUser`/`sensorLandscape`/`sensorPortrait`) e roda `assembleDebug`.
+  Saída: APK, `android-export.json` usado, `android-report.json` (hashes, template, JDK/SDK) e `gradle.log`.
+  O namespace Kotlin continua `com.anastaciogames.rangewebview`; só o `applicationId` muda.
+- JDK/SDK: `JAVA_HOME`/`ANDROID_HOME`, depois Android Studio (registro do Windows e `%LOCALAPPDATA%\Android\Sdk`),
+  depois as pastas do painel. Sem JDK, SDK, platform 37 ou build-tools: erro com o que instalar; nada é instalado.
+- `adb`: instala por cima com `install -r` e abre o jogo; erros claros para aparelho ausente, não autorizado,
+  assinatura diferente (não desinstala, para não apagar o save) e versão mais nova no aparelho.
+- Painel "Android (Range)" (`bl_ui/properties_android.py`, `Scene.range_android`), abaixo do painel Web: campos,
+  "Gerar APK" (exporta o Web antes se o pacote estiver ausente ou mais velho que o `.range`) e "Instalar no celular".
+  Gradle e adb rodam numa thread com operador modal; em modo background, direto. Traduções em
+  `range_web/translations_android.py`.
+- `tools/web/package-android.py`: mesma lógica pelo terminal (`--web`, `--config` ou `--app-id/--name`, `--install`).
+- Release assinado ainda bloqueado com mensagem ("use debug").
+- Verificado: `test_android.py` (15 testes), `engine_android_export.py` no editor em background (APK gerado de uma cena
+  vazia, sem celular "Instalar" cancela com mensagem) e APK do First Person pelo terminal (`aapt`: id
+  `com.anastaciogames.firstperson`, nome e versão certos). Primeiro `assembleDebug` em ~8 s com o cache do Gradle.
+- Aceite: APK do First Person gerado pelo painel e instalado no Find X3 Pro com "Instalar no celular"; aprovado
+  pelo usuário. Correções do aceite: "Gerar APK" salva o arquivo modificado antes de exportar (antes recusava e o
+  aviso sumia no topo) e o painel mostra o último erro/resultado abaixo dos botões. `engine_android_export.py` só
+  chama "Instalar" com `RANGE_ANDROID_TEST_INSTALL=1` (tinha instalado o app de teste no celular ligado).
 
 ## 2026-09-24 - APK e Web: rotação em paisagem e retrato
 

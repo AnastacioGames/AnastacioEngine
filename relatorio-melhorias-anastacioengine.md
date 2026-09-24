@@ -169,6 +169,12 @@ ferramenta correspondente.
   Sensores podem usar adaptador Android pequeno quando necessário. NDK fica congelado até limitação medida
   que justifique reabertura (bloqueios conhecidos: `malloc_stats` na Bionic, `GL/glu.h`, sem GHOST Android).
   Plano em [`docs/android-export-plan.md`](docs/android-export-plan.md).
+- Export Android: a lógica fica em `range_web/android.py`; o painel "Android (Range)" e
+  `tools/web/package-android.py` só a chamam. Ele consome o pacote do export Web (conferido por `SHA256SUMS.txt`),
+  copia `tools/android/webview-template` para uma pasta temporária e roda o Gradle. JDK e Android SDK não vêm com a
+  engine: procura em `JAVA_HOME`/`ANDROID_HOME`, depois no Android Studio instalado, depois nas pastas do painel, e
+  sem eles mostra erro sem instalar nada. `applicationId` é a identidade do app (mudar perde o save). Release
+  assinado ainda bloqueado; a chave ficará fora do `android-export.json` e do git.
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

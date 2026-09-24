@@ -61,6 +61,7 @@ _modules = [
     "properties_scene",
     "properties_cutscene",
     "properties_web",
+    "properties_android",
     "properties_texture",
     "properties_world",
     "space_clip",
@@ -260,11 +261,17 @@ def register():
 
     Scene.range_web = PointerProperty(type=properties_web.RangeWebSettings)
     range_web_translations.register()
+
+    from . import properties_android
+    Scene.range_android = PointerProperty(type=properties_android.RangeAndroidSettings)
     ########### End Range Web Profile ###########
 
 
 def unregister():
     from bpy.types import Scene
+
+    if hasattr(Scene, "range_android"):
+        del Scene.range_android
 
     if hasattr(Scene, "range_web"):
         from range_web import translations as range_web_translations

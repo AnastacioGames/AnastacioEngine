@@ -106,6 +106,11 @@ Pthreads não entram no plano atual. COOP/COEP isoladamente não comprovam supor
 
 ### A3 — CLI antes do editor
 
+**Estado 2026-09-24:** feito junto com A4 por decisão do usuário. A lógica está em
+`source/release/scripts/modules/range_web/android.py`; `tools/web/package-android.py` (terminal) e o painel
+"Android (Range)" (`bl_ui/properties_android.py`) só a chamam. APK debug funcionando; release assinado e o teste de
+atualização preservando o save ficam para a rodada seguinte.
+
 `tools/web/package-android.py` consome a pasta produzida por `package-web.py`, verifica hashes e manifestos, copia recursos de execução para o template e aplica `android-export.json`. Não reimplementa coleta de assets ou validação Web.
 
 - Metadados: `applicationId` estável, `versionCode` inteiro crescente, `versionName`, nome, ícone, orientação e perfil de qualidade. Separar identidade do app do nome da cena para não perder saves ao renomeá-la.

@@ -2,7 +2,14 @@
 
 APK mínimo que roda o pacote Web (`tools/web/package-web.py`) dentro de um WebView, servido por
 `https://appassets.androidplatform.net/assets/www/index.html` (`WebViewAssetLoader`). É a prova A0b de
-[docs/android-export-plan.md](../../../docs/android-export-plan.md); o exportador `package-android.py` (A3) vem depois.
+[docs/android-export-plan.md](../../../docs/android-export-plan.md).
+
+O caminho normal agora é o painel "Android (Range)" do editor ou `tools/web/package-android.py`, que copiam este
+template para uma pasta temporária, aplicam `android-export.json` (applicationId, nome, versão, ícone, orientação)
+e rodam o Gradle. Ao mudar o template, mantenha os trechos que `range_web/android.py` substitui (`applicationId`,
+`versionCode`, `versionName`, `app_name`, `screenOrientation`, `android:label`); os testes em
+`tools/tests/web_profile/test_android.py` avisam se sumirem. Os passos abaixo continuam valendo para testar o
+template à mão.
 
 Toolchain: Android Studio (JDK = `jbr` dele, SDK com platform 37), AGP 9.4.1, Gradle 9.7.1 pelo wrapper.
 

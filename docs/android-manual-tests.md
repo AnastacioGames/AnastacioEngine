@@ -58,6 +58,13 @@ Aprovado:
   media a proporção por eles); câmera que virava um pouco a cada giro (o cursor virtual do mouse-look ficava no
   centro antigo; agora é reescalado no resize em `GHOST_SystemSDL.cpp`).
 
+- 2026-09-24: A3/A4 aceito. APK debug do First Person (`com.anastaciogames.firstperson`, nome "teste1_fabio")
+  gerado pelo painel "Android (Range)" e instalado com "Instalar no celular"; usuário confirmou que funciona.
+  Primeiro clique em "Gerar APK" não fazia nada: o arquivo ficava modificado após preencher os campos e o aviso só
+  aparecia no topo. Agora o painel salva o arquivo sozinho e mostra erros/resultado abaixo dos botões.
+  O teste `engine_android_export.py` instalou sem querer o app de teste "jogo" (`com.anastaciogames.testepainel`)
+  com o celular ligado; desinstalado, e o teste só instala com `RANGE_ANDROID_TEST_INSTALL=1`.
+
 Pendente (não confirmado nesta rodada):
 
 - Home/retorno com o processo recriado pelo sistema.

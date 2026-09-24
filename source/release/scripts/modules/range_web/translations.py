@@ -87,13 +87,17 @@ _PT_BR = {
 # Nomes de operadores Python usam o contexto "Operator"; o resto usa o padrão "*".
 _CONTEXTS = ("*", "Operator")
 
-from . import translations_rules, translations_ui
+from . import translations_android, translations_rules, translations_ui
 from .translations_es_ru import ES as _ES, RU as _RU
 
 # Textos de UI da Range/UPBGE fora do catálogo do Blender (gerados; ver translations_ui.py).
 _PT_BR.update(translations_ui.PT_BR)
 _ES.update(translations_ui.ES)
 _RU.update(translations_ui.RU)
+# Painel e mensagens do export Android.
+_PT_BR.update(translations_android.PT_BR)
+_ES.update(translations_android.ES)
+_RU.update(translations_android.RU)
 # Mensagens das regras Web (resultados do painel).
 _PT_BR.update(translations_rules.PT_BR)
 _ES.update(translations_rules.ES)
