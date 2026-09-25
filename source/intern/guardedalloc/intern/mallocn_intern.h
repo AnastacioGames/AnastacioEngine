@@ -42,7 +42,10 @@
 
 #if defined(__linux__) || (defined(__FreeBSD_kernel__) && !defined(__FreeBSD__)) || defined(__GLIBC__)
 #  include <malloc.h>
-#  define HAVE_MALLOC_STATS
+/* Android (bionic) defines __linux__ but has no malloc_stats(). */
+#  ifndef __ANDROID__
+#    define HAVE_MALLOC_STATS
+#  endif
 #elif defined(__FreeBSD__)
 #  include <malloc_np.h>
 #elif defined(__APPLE__)

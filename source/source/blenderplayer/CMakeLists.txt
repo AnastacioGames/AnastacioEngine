@@ -346,6 +346,11 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS bf_alembic)
 	endif()
 
+	# bf_python registers the _cycles module (CCL_python_module_init).
+	if(WITH_CYCLES)
+		list(APPEND BLENDER_SORTED_LIBS bf_intern_cycles)
+	endif()
+
 	foreach(SORTLIB ${BLENDER_SORTED_LIBS})
 		set(REMLIB ${SORTLIB})
 		if(TARGET ${SORTLIB})

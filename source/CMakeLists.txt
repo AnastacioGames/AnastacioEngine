@@ -527,7 +527,8 @@ mark_as_advanced(
 	WITH_GL_PROFILE_ES20
 )
 
-if(WITH_GL_PROFILE_COMPAT)
+# Android has no GLU (GL/glu.h), even with the compat profile enabled.
+if(WITH_GL_PROFILE_COMPAT AND NOT ANDROID)
 	set(WITH_GLU ON)
 else()
 	set(WITH_GLU OFF)

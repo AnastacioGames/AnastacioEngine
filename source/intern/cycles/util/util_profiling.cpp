@@ -18,6 +18,8 @@
 #include "util/util_profiling.h"
 #include "util/util_set.h"
 
+#include <chrono>
+
 CCL_NAMESPACE_BEGIN
 
 Profiler::Profiler()

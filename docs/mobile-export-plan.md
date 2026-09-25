@@ -2,6 +2,7 @@
 
 > **Atualização 2026-09-20:** este documento é o levantamento da rota **nativa** (trilha B), agora congelada.
 > O caminho vigente do Android é o APK com WebView sobre o pacote Web: ver [android-export-plan.md](android-export-plan.md).
+> O diretório `build-android/` pertence a esta rota congelada ("Android Nativo (NDK)"; ver [build-dirs.md](build-dirs.md)).
 
 ## Objetivo
 
