@@ -83,7 +83,15 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
         # --- Lens ---
         box = layout.box()
         box.label(text="Lens:", icon="CAMERA_DATA")
-        box.row().prop(cam, "type", expand=True)
+        if engine == 'BLENDER_GAME':
+            # The game only has perspective and orthographic projections.
+            row = box.row()
+            row.prop_enum(cam, "type", 'PERSP')
+            row.prop_enum(cam, "type", 'ORTHO')
+            if cam.type == 'PANO':
+                box.label(text="Panoramic is not supported in the game, it renders as Orthographic", icon='ERROR')
+        else:
+            box.row().prop(cam, "type", expand=True)
 
         split = box.split()
 
@@ -144,10 +152,12 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
         box = layout.box()
         box.label(text="Sensor:", icon="CAMERA_DATA")
 
-        row = box.row(align=True)
-        row.menu("CAMERA_MT_presets", text=bpy.types.CAMERA_MT_presets.bl_label)
-        row.operator("camera.preset_add", text="", icon='ZOOMIN')
-        row.operator("camera.preset_add", text="", icon='ZOOMOUT').remove_active = True
+        # Real-camera presets only matter for rendering; Size and Fit still drive the game FOV.
+        if engine != 'BLENDER_GAME':
+            row = box.row(align=True)
+            row.menu("CAMERA_MT_presets", text=bpy.types.CAMERA_MT_presets.bl_label)
+            row.operator("camera.preset_add", text="", icon='ZOOMIN')
+            row.operator("camera.preset_add", text="", icon='ZOOMOUT').remove_active = True
 
         split = box.split()
 
@@ -164,6 +174,15 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
 
         col = split.column(align=True)
         col.prop(cam, "sensor_fit", text="")
+
+        # --- Stereo ---
+        # The Depth of Field panel is hidden in the game, but its distance is the stereo focal length.
+        if engine == 'BLENDER_GAME' and context.scene.game_settings.stereo == 'STEREO':
+            box = layout.box()
+            box.label(text="Stereo:", icon="CAMERA_STEREO")
+            box.prop(cam, "dof_distance", text="Focal Distance")
+            if cam.dof_distance == 0.0:
+                box.label(text="0 = automatic (30 × Eye Separation)", icon='INFO')
 
 
 class DATA_PT_camera_dof(CameraButtonsPanel, Panel):

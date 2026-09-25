@@ -11,6 +11,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 ## 2026-09-25 - Custom Viewport da câmera
 
+- Camera Presets (lista de câmeras reais) escondidos no Range Engine; Size e Fit do sensor continuam visíveis porque definem o FOV no jogo (`RAS_FramingManager::ComputeFrustum`).
+- Range Engine: o tipo da câmera mostra só Perspective/Orthographic (o conversor trata qualquer tipo que não seja `CAM_PERSP` como ortográfico) e avisa se a câmera já estiver em Panoramic. Com Stereo ligado no jogo, o painel Camera mostra "Focal Distance" (`dof_distance`, usado por `RAS_Rasterizer::GetFrustumMatrix`; 0 = 30 × Eye Separation), que tinha ficado inacessível ao esconder o Depth of Field. Display e Safe Areas continuam: não afetam o jogo, mas ajudam a enquadrar a câmera no editor.
 - O viewport em pixels era calculado uma única vez na conversão, a partir do tamanho visível do canvas. Com isso, ficava errado depois de redimensionar a janela, com a escala de resolução dinâmica (o render usa `GetRenderWidth`) e no estéreo. Agora `KX_Camera` guarda os ratios (`RAS_CameraData::m_viewportRatios`), e `UpdateViewport()` resolve o retângulo a cada frame, contra a área de render daquele frame e olho, invalidando a projeção só quando ele muda. `setViewport()` do Python continua em pixels fixos.
 - Os ratios são carregados mesmo com o viewport desligado, então `useViewport = True` pelo Python usa os valores do editor em vez de um retângulo 0x0.
 - Ratios iguais (largura ou altura zero) passam a ser tratados como inválidos, igual aos invertidos.

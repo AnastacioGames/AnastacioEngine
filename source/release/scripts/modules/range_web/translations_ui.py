@@ -2,6 +2,7 @@
 # Chave = texto em ingles do codigo. Gerado a partir de tools/tests/web_profile/i18n_audit.py; edite a mao.
 
 PT_BR = {
+    "0 = automatic (30 × Eye Separation)": "0 = automático (30 × Eye Separation)",
     "1024x1024 px": "1024x1024 px",
     "12 views, 30° apart": "12 vistas, a cada 30°",
     "128x128 px": "128x128 px",
@@ -439,6 +440,7 @@ PT_BR = {
     "Fixed pointer type, empty if variable type": "Tipo de ponteiro fixo; vazio se o tipo for variável",
     "Flip U Offset": "Deslocamento do giro em U",
     "Flip V Offset": "Deslocamento do giro em V",
+    "Focal Distance": "Distância focal",
     "Fog / Mist": "Neblina / névoa",
     "Fog / Mist Enabled": "Neblina / névoa ativada",
     "Fog / Mist Property": "Propriedade de neblina / névoa",
@@ -810,6 +812,7 @@ PT_BR = {
     "PCF Early Bail": "PCF Early Bail",
     "PCF Jitter": "PCF Jitter",
     "PCF Penumbra": "PCF Penumbra",
+    "Panoramic is not supported in the game, it renders as Orthographic": "Panorâmica não é suportada no jogo, é renderizada como Ortográfica",
     "Parallax": "Parallax",
     "Parallax Bump Scale": "Escala do parallax bump",
     "Parallax Component": "Componente de parallax",
@@ -1196,6 +1199,7 @@ PT_BR = {
     "Steering Wheel": "Volante",
     "Step Max": "Passo máximo",
     "Step size used by number buttons, for floats 1/100th of the step size": "Tamanho do passo dos botões numéricos; para floats, 1/100 do passo",
+    "Stereo:": "Estéreo:",
     "Stick Axis": "Eixo do analógico",
     "Stick Direction": "Direção do analógico",
     "Stick Directions": "Direções do analógico",
@@ -1508,6 +1512,7 @@ PT_BR = {
 }
 
 ES = {
+    "0 = automatic (30 × Eye Separation)": "0 = automático (30 × Eye Separation)",
     "1024x1024 px": "1024x1024 px",
     "12 views, 30° apart": "12 vistas, cada 30°",
     "128x128 px": "128x128 px",
@@ -1945,6 +1950,7 @@ ES = {
     "Fixed pointer type, empty if variable type": "Tipo de puntero fijo; vacío si el tipo es variable",
     "Flip U Offset": "Desplazamiento del volteo en U",
     "Flip V Offset": "Desplazamiento del volteo en V",
+    "Focal Distance": "Distancia focal",
     "Fog / Mist": "Niebla / bruma",
     "Fog / Mist Enabled": "Niebla / bruma activada",
     "Fog / Mist Property": "Propiedad de niebla / bruma",
@@ -2316,6 +2322,7 @@ ES = {
     "PCF Early Bail": "PCF Early Bail",
     "PCF Jitter": "PCF Jitter",
     "PCF Penumbra": "PCF Penumbra",
+    "Panoramic is not supported in the game, it renders as Orthographic": "Panorámica no es compatible con el juego, se renderiza como Ortográfica",
     "Parallax": "Parallax",
     "Parallax Bump Scale": "Escala del parallax bump",
     "Parallax Component": "Componente de parallax",
@@ -2702,6 +2709,7 @@ ES = {
     "Steering Wheel": "Volante",
     "Step Max": "Paso máximo",
     "Step size used by number buttons, for floats 1/100th of the step size": "Tamaño del paso de los botones numéricos; para floats, 1/100 del paso",
+    "Stereo:": "Estéreo:",
     "Stick Axis": "Eje del stick",
     "Stick Direction": "Dirección del stick",
     "Stick Directions": "Direcciones del stick",
@@ -3014,6 +3022,7 @@ ES = {
 }
 
 RU = {
+    "0 = automatic (30 × Eye Separation)": "0 = автоматически (30 × Eye Separation)",
     "1024x1024 px": "1024x1024 px",
     "12 views, 30° apart": "12 видов через 30°",
     "128x128 px": "128x128 px",
@@ -3451,6 +3460,7 @@ RU = {
     "Fixed pointer type, empty if variable type": "Фиксированный тип указателя; пусто, если тип переменный",
     "Flip U Offset": "Смещение отражения по U",
     "Flip V Offset": "Смещение отражения по V",
+    "Focal Distance": "Фокусное расстояние",
     "Fog / Mist": "Туман / дымка",
     "Fog / Mist Enabled": "Туман / дымка включены",
     "Fog / Mist Property": "Свойство тумана / дымки",
@@ -3822,6 +3832,7 @@ RU = {
     "PCF Early Bail": "PCF Early Bail",
     "PCF Jitter": "PCF Jitter",
     "PCF Penumbra": "PCF Penumbra",
+    "Panoramic is not supported in the game, it renders as Orthographic": "Панорамная камера не поддерживается в игре, рендерится как ортографическая",
     "Parallax": "Parallax",
     "Parallax Bump Scale": "Масштаб parallax bump",
     "Parallax Component": "Компонент parallax",
@@ -4208,6 +4219,7 @@ RU = {
     "Steering Wheel": "Руль",
     "Step Max": "Макс. шаг",
     "Step size used by number buttons, for floats 1/100th of the step size": "Шаг числовых кнопок; для float — 1/100 шага",
+    "Stereo:": "Стерео:",
     "Stick Axis": "Ось стика",
     "Stick Direction": "Направление стика",
     "Stick Directions": "Направления стика",
