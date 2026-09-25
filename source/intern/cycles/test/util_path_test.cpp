@@ -398,4 +398,75 @@ TEST(util_path_is_relative, relative_unixdir_on_windows)
 }
 #endif  /* _WIN32 */
 
+/* ******** Tests for path_write_binary() and path_read_binary() ******** */
+
+static string binary_test_dir()
+{
+	const char *dir = getenv("TEMP");
+	if(dir == NULL) {
+		dir = getenv("TMPDIR");
+	}
+	return path_join((dir != NULL)? dir: ".", "cycles_util_path_test");
+}
+
+TEST(util_path_binary, write_read_roundtrip)
+{
+	const string path = path_join(binary_test_dir(), "roundtrip.bin");
+	vector<uint8_t> written;
+	for(int i = 0; i < 1000; i++) {
+		written.push_back((uint8_t)(i * 7));
+	}
+
+	EXPECT_TRUE(path_write_binary(path, written));
+
+	vector<uint8_t> read;
+	EXPECT_TRUE(path_read_binary(path, read));
+	EXPECT_EQ(read, written);
+
+	path_remove(path);
+}
+
+TEST(util_path_binary, write_to_directory_fails)
+{
+	/* The target can't be opened as a file, so the write must report failure. */
+	const string dir = binary_test_dir();
+	path_create_directories(path_join(dir, "dummy"));
+	ASSERT_TRUE(path_is_directory(dir));
+
+	vector<uint8_t> data(16, 42);
+	EXPECT_FALSE(path_write_binary(dir, data));
+}
+
+TEST(util_path_binary, read_missing_clears_vector)
+{
+	const string path = path_join(binary_test_dir(), "does_not_exist.bin");
+	path_remove(path);
+
+	vector<uint8_t> data(16, 42);
+	EXPECT_FALSE(path_read_binary(path, data));
+	EXPECT_TRUE(data.empty());
+}
+
+TEST(util_path_binary, read_empty_clears_vector)
+{
+	const string path = path_join(binary_test_dir(), "empty.bin");
+	EXPECT_TRUE(path_write_binary(path, vector<uint8_t>()));
+	EXPECT_EQ(path_file_size(path), (size_t)0);
+
+	vector<uint8_t> data(16, 42);
+	EXPECT_FALSE(path_read_binary(path, data));
+	EXPECT_TRUE(data.empty());
+
+	path_remove(path);
+}
+
+TEST(util_path_binary, file_size_of_missing_is_sentinel)
+{
+	/* path_read_binary() relies on this sentinel to avoid resizing to SIZE_MAX. */
+	const string path = path_join(binary_test_dir(), "does_not_exist.bin");
+	path_remove(path);
+
+	EXPECT_EQ(path_file_size(path), (size_t)-1);
+}
+
 CCL_NAMESPACE_END

@@ -1,7 +1,7 @@
 # Relatório de varredura — Cycles
 
 Data: 2026-09-25
-Estado: CYC-001 a CYC-010 corrigidos e validados por compilação. Permanecem apenas validações funcionais direcionadas e a cobertura das variantes desativadas.
+Estado: CYC-001 a CYC-011 corrigidos e validados por compilação. Permanecem apenas validações funcionais direcionadas e a cobertura das variantes desativadas.
 
 ## Escopo e método
 
@@ -25,6 +25,7 @@ Estado: CYC-001 a CYC-010 corrigidos e validados por compilação. Permanecem ap
 | CYC-008 | Corrigido | `source/intern/cycles/device/device_cuda.cpp:561` | `CUDADevice::load_kernels()` reaproveitava `result` para o módulo de filtro: se o cubin de render falhasse e o de filtro carregasse, retornava `true` e chamava `reserve_local_memory()` com `cuModule = 0`. Ali `cuModuleGetFunction()` falhava e o código seguia com `CUfunction` e `num_threads_per_block` não inicializados até `cuLaunchKernel()`. Agora cada módulo tem seu resultado, a carga só tem sucesso com os dois, e `reserve_local_memory()` retorna antes de configurar/lançar o kernel se a busca da função ou o cálculo de ocupação falhar. |
 | CYC-009 | Corrigido | `source/intern/cycles/device/device_cuda.cpp:972` | Mesmo padrão de CYC-007 no CUDA: `mem_copy_from()` calculava `elem * y * w` e `elem * w * h` em `int`. Com buffer de 2 GiB ou mais (ex.: 8192 × 8192 com 8 floats por pixel), o valor negativo virava `size_t` enorme; `cuMemcpyDtoH()` falhava e a render era perdida, ou o `memset` do ramo só-host escrevia fora do buffer. As multiplicações agora começam em `size_t`. |
 | CYC-010 | Corrigido | `source/intern/cycles/device/opencl/opencl_util.cpp:395` | A serialização do comando Python de compilação externa usava strings brutas e um suposto escape de apóstrofo que não continha barra invertida em C++. Nomes de dispositivo ou caminhos com apóstrofo quebravam `--python-expr`. Agora usa literal Python comum e escapa barras, apóstrofos e quebras de linha. |
+| CYC-011 | Corrigido | `source/intern/cycles/util/util_ies.cpp:83` | `IESTextParser` construía um `vector<char>` sem terminador, porém chamava `strstr`/`strtod` e acessava `data[0]` como string C. Um IES sem quebra de linha final podia ler além do fim. Agora o buffer recebe `\\0` antes do parse. |
 
 ### Validação funcional ainda recomendada
 
@@ -65,10 +66,9 @@ Estado: CYC-001 a CYC-010 corrigidos e validados por compilação. Permanecem ap
 - CYC-002: limites revisados contra as expansões de `process_type_b()`/`process_type_c()`; `util_ies.cpp` recompilado e `lib/cycles_util.lib` relinkada com sucesso no ambiente MSVC.
 - CYC-005: `light.cpp` recompilado e `lib/cycles_render.lib` relinkada com sucesso no ambiente MSVC.
 - CYC-003/CYC-004: `buffers.cpp`, `tile.cpp`, `blender_session.cpp` e `util_path.cpp` compilados no MSVC. A revisão posterior confirmou os quatro objetos atualizados (`ninja: no work to do`); não houve render de 65.536², pois exigiria memória inviável.
-- CYC-006: `opencl_util.cpp` recompilado no MSVC. O build ativo tem `WITH_CYCLES_DEVICE_OPENCL=OFF`, portanto o objeto validou a integração, mas não a execução do ramo OpenCL.
-- CYC-007: `opencl_split.cpp` recompilado no MSVC. Como OpenCL está desabilitado no build ativo, ainda falta compilar e executar o ramo `WITH_OPENCL` em configuração própria.
+- CYC-006/CYC-007/CYC-010: build isolado `build_opencl_validate/` configurado com `WITH_CYCLES_DEVICE_OPENCL=ON`; `device_opencl.cpp`, `opencl_util.cpp` e `opencl_split.cpp` foram compilados com `-DWITH_OPENCL`. A RX 6800M e a Radeon integrada expõem OpenCL 2.1 e são aceitas pelo backend. O link do alvo completo parou nos objetos CPU SSE/AVX por `Permission denied`, fora do backend OpenCL; por isso as chamadas Python, a cópia maior que 2 GiB e a compilação externa com caracteres especiais permanecem testes funcionais pendentes.
 - CYC-008/CYC-009: build separado `build_cuda/` (cache copiado de `build/` com `WITH_CYCLES_DEVICE_CUDA=ON`, `WITH_CUDA_DYNLOAD=ON`, `WITH_CYCLES_CUDA_BINARIES=OFF`), sem tocar no `build/` compartilhado. `ninja cycles_device extern_cuew` compilou `device_cuda.cpp` com `-DWITH_CUDA -DWITH_CUDA_DYNLOAD` (via cuew, sem toolkit NVIDIA) sem avisos e linkou `lib/cycles_device.lib`. Não houve execução: não há GPU/toolkit CUDA configurado nesta máquina e os kernels `.cu` não foram compilados.
-- CYC-010: `opencl_util.cpp` recompilado no MSVC. O build ativo não entra no ramo `WITH_OPENCL`; a execução da chamada Python serializada requer configuração OpenCL própria.
+- CYC-011: `util_ies.cpp` recompilado e `cycles_util_ies_test` executado com 13/13 casos, inclusive IES válido sem quebra de linha final.
 - Kernels `.cu` (`kernel.cu`, `kernel_split.cu`, `filter.cu`): assinaturas conferidas contra os argumentos que `device_cuda.cpp` passa em cada `cuLaunchKernel()`; contagem, ordem e tipos batem.
 - `ninja bf_intern_cycles`, no ambiente MSVC configurado: sucesso (`ninja: no work to do`).
 - Binário instalado `build/bin/RangeEngine.exe`: addon Cycles já estava habilitado pelas preferências locais. A tentativa de registrá-lo novamente falhou corretamente com `register_class(... already registered ...)`; não é falha de inicialização.

@@ -86,6 +86,7 @@ public:
 	IESTextParser(ustring str)
 	 : text(str.begin(), str.end())
 	{
+		text.push_back('\0');
 		std::replace(text.begin(), text.end(), ',', ' ');
 		data = strstr(&text[0], "\nTILT=");
 	}

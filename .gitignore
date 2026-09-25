@@ -1,6 +1,9 @@
 build/
 build_core/
 build_cuda/
+build_gtest/
+build_opencl/
+build_opencl_validate/
 build-web/
 build-android/
 build-cycles/
