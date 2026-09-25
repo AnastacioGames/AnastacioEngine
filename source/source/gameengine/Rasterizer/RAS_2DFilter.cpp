@@ -32,6 +32,8 @@
 
 #include "GPU_glew.h"
 
+#include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
+
 #include <functional>
 #include <memory>
 
@@ -118,7 +120,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
-	"ge_LensFlareSunPos" // GE_LENSFLARE_SUNPOS_UNIFORM
+	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
+	"ge_FxaaParams" // GE_FXAA_PARAMETERS_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -479,6 +482,19 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 
 	/* BuildIn Uniforms */
+	if (m_predefinedUniforms[GE_FXAA_PARAMETERS_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.fxaa_edge_threshold, m_buildInFilters.fxaa_edge_threshold_min,
+		                   m_buildInFilters.fxaa_subpix, (float)m_buildInFilters.fxaa_search_steps};
+		// Filters created from Python or a 2D filter actuator have no scene values; use the defaults.
+		if (m_buildInFilters.fxaa_search_steps <= 0) {
+			params[0] = SCENE_FX_FXAA_EDGE_THRESHOLD;
+			params[1] = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+			params[2] = SCENE_FX_FXAA_SUBPIX;
+			params[3] = SCENE_FX_FXAA_SEARCH_STEPS;
+		}
+		SetUniformfv(m_predefinedUniforms[GE_FXAA_PARAMETERS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+
 	if (m_predefinedUniforms[GE_BLOOM_PARAMETERS_UNIFORM] != -1) {
 		float params[4] = {m_buildInFilters.bloom_intensity, m_buildInFilters.bloom_threshold,
 						   (float)canvas->GetWidth(), (float)canvas->GetHeight()};

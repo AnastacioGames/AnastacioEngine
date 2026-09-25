@@ -6,10 +6,14 @@ Replaces the previous 4-corner luma-only pass with proper edge detection,
 orientation, and directional edge-length search for sharper diagonals.
 */
 
-#define FXAA_EDGE_THRESHOLD_MIN 0.0312
-#define FXAA_EDGE_THRESHOLD 0.125
-#define FXAA_SUBPIX_TRIM_SCALE 1.0
-#define FXAA_SEARCH_STEPS 10
+// x: edge threshold, y: edge threshold min, z: subpixel, w: search steps
+uniform vec4 ge_FxaaParams;
+
+#define FXAA_EDGE_THRESHOLD ge_FxaaParams.x
+#define FXAA_EDGE_THRESHOLD_MIN ge_FxaaParams.y
+#define FXAA_SUBPIX_TRIM_SCALE ge_FxaaParams.z
+// Loops need a constant bound, so search up to the cap and stop at the chosen count.
+#define FXAA_SEARCH_STEPS_MAX 32
 
 uniform sampler2D bgl_RenderedTexture;
 uniform float bgl_RenderedTextureWidth;
@@ -119,7 +123,8 @@ vec4 AAPostFX(sampler2D tex, vec2 rcpRes, vec2 uv)
 	if (!reached2) { uv2 += offset; }
 
 	if (!reachedBoth) {
-		for (int i = 2; i < FXAA_SEARCH_STEPS; i++) {
+		for (int i = 2; i < FXAA_SEARCH_STEPS_MAX; i++) {
+			if (float(i) >= ge_FxaaParams.w) { break; }
 			if (!reached1) {
 				lumaEnd1 = rgb2luma(TEXTURE_LOD(tex, uv1, 0.0).rgb) - lumaLocalAverage;
 			}

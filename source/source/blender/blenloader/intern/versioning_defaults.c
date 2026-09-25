@@ -35,6 +35,7 @@
 #include "DNA_userdef_types.h"
 #include "DNA_world_types.h"
 
+#include "BKE_addon.h"
 #include "BKE_brush.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -185,6 +186,10 @@ void BLO_update_defaults_userpref_blend(void)
   U.uiflag2 &= ~USER_KEEP_SESSION;
   U.flag |= USER_AUTOSAVE;
   U.flag &= ~USER_TXT_TABSTOSPACES_DISABLE;
+
+  /* Add-ons */
+  BKE_addon_ensure(&U.addons, "development_icon_get"); /* Development: Icon Viewer */
+  BKE_addon_ensure(&U.addons, "game_scene_statistics"); /* Game Engine: Game Engine Scene Statistics */
 }
 
 /**

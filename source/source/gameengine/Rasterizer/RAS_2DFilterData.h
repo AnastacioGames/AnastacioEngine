@@ -31,6 +31,10 @@ class EXP_Value;
 typedef struct BuildInFilters {
 	/* Fxaa */
 	bool useFxaa;
+	float fxaa_edge_threshold;
+	float fxaa_edge_threshold_min;
+	float fxaa_subpix;
+	int fxaa_search_steps;
 
 	/* Bloom */
 	bool useBloom;

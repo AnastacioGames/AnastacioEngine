@@ -91,6 +91,7 @@ typedef struct {
 typedef struct {
   int color_uniform;
   int viewport_size_uniform;
+  int fxaa_params_uniform;
 } GPUFXAAShaderInterface;
 
 typedef struct {
@@ -1219,12 +1220,23 @@ bool GPU_fx_do_composite_pass(
 		if (fxaa_shader) {
 			GPUFXAAShaderInterface *interface = GPU_shader_get_interface(fxaa_shader);
 			float viewport_size[2] = {fx->viewsize_w, fx->viewsize_h};
+			float fxaa_params[4] = {scenefx.fxaa_edge_threshold, scenefx.fxaa_edge_threshold_min,
+			                        scenefx.fxaa_subpix, (float)scenefx.fxaa_search_steps};
+
+			/* A scene that never got the settings has zeros; use the defaults. */
+			if (scenefx.fxaa_search_steps <= 0) {
+				fxaa_params[0] = SCENE_FX_FXAA_EDGE_THRESHOLD;
+				fxaa_params[1] = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+				fxaa_params[2] = SCENE_FX_FXAA_SUBPIX;
+				fxaa_params[3] = SCENE_FX_FXAA_SEARCH_STEPS;
+			}
 
 			GPU_shader_bind(fxaa_shader);
 
 			GPU_texture_bind(src, numslots++);
 			GPU_shader_uniform_texture(fxaa_shader, interface->color_uniform, src);
 			GPU_shader_uniform_vector(fxaa_shader, interface->viewport_size_uniform, 2, 1, viewport_size);
+			GPU_shader_uniform_vector(fxaa_shader, interface->fxaa_params_uniform, 4, 1, fxaa_params);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2071,6 +2083,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 
 			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
 			interface->viewport_size_uniform = GPU_shader_get_uniform(shader, "viewport_size");
+			interface->fxaa_params_uniform = GPU_shader_get_uniform(shader, "fxaa_params");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

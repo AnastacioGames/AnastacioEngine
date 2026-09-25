@@ -4817,7 +4817,7 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "active_attachment_index", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "activeAttachment");
-	RNA_def_property_range(prop, 0, 7);
+	RNA_def_property_range(prop, 0, GAME_ATTACHMENT_COUNT - 1);
 	RNA_def_property_ui_text(prop, "Active Attachment Index", "Index of active attachment slot");
 
 	prop = RNA_def_property(srna, "exit_key", PROP_ENUM, PROP_NONE);
@@ -5634,6 +5634,43 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "render_editor_fxaa", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "editor_render_flag", SCENE_FX_FLAG_FXAA);
 	RNA_def_property_ui_text(prop, "Render FXAA", "Render FXAA in Viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_fxaa", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "expand_flag", SCENE_FX_FLAG_FXAA);
+	RNA_def_property_ui_text(prop, "Expanded", "Set sensor expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "fxaa_edge_threshold", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "fxaa_edge_threshold");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_range(prop, 0.063f, 0.333f, 1, 3);
+	RNA_def_property_ui_text(prop, "Edge Threshold",
+	                         "Minimum local contrast, relative to the brightest pixel, needed to smooth an edge. "
+	                         "Lower values smooth more edges but cost more");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "fxaa_edge_threshold_min", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "fxaa_edge_threshold_min");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 0.1f, 1, 4);
+	RNA_def_property_ui_text(prop, "Edge Threshold Min",
+	                         "Contrast below which dark areas are left untouched");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "fxaa_subpix", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "fxaa_subpix");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Subpixel",
+	                         "Amount of subpixel aliasing removal. Lower values keep the image sharper");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "fxaa_search_steps", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "fxaa_search_steps");
+	RNA_def_property_range(prop, 2, SCENE_FX_FXAA_SEARCH_STEPS_MAX);
+	RNA_def_property_ui_text(prop, "Search Steps",
+	                         "How far along an edge to search. More steps smooth long edges better but cost more");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 

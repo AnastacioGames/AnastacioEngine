@@ -884,7 +884,21 @@ typedef struct SCENEFXSettings {
 	char ssr_lod;
 
 	char pad[3];
+
+	/* FXAA has no settings struct of its own, its values live here. */
+	float fxaa_edge_threshold;
+	float fxaa_edge_threshold_min;
+	float fxaa_subpix;
+	int fxaa_search_steps;
 } SCENEFXSettings;
+
+/* FXAA defaults, the values the shaders used before they became settings. */
+#define SCENE_FX_FXAA_EDGE_THRESHOLD      0.125f
+#define SCENE_FX_FXAA_EDGE_THRESHOLD_MIN  0.0312f
+#define SCENE_FX_FXAA_SUBPIX              1.0f
+#define SCENE_FX_FXAA_SEARCH_STEPS        10
+/* The shaders need a constant loop bound, so the step count is capped. */
+#define SCENE_FX_FXAA_SEARCH_STEPS_MAX    32
 
 /* shaderfx enables */
 typedef enum eSCENEFXFlags {

@@ -522,4 +522,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       wo->moon_brightness = 0.25f;
     }
   }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "float", "fxaa_edge_threshold")) {
+    /* FXAA values became settings; keep the look the shaders had before. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->scenefx_settings.fxaa_edge_threshold = SCENE_FX_FXAA_EDGE_THRESHOLD;
+      scene->scenefx_settings.fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+      scene->scenefx_settings.fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
+      scene->scenefx_settings.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+    }
+  }
 }

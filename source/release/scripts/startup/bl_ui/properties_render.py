@@ -54,31 +54,9 @@ class RenderButtonsPanel:
         scene = context.scene
         return scene and (scene.render.engine in cls.COMPAT_ENGINES)
 
-class RENDER_PT_render(RenderButtonsPanel, Panel):
-    bl_label = "Render"
-    bl_options = {"HIDE_HEADER"}
-    COMPAT_ENGINES = {"BLENDER_RENDER", "BLENDER_GAME", "CYCLES"}
 
-    def draw(self, context):
-        layout = self.layout
-
-        rd = context.scene.render
-        
-        if rd.has_multiple_engines:
-            layout.prop(rd, "engine", text="Engine", icon="SCRIPTWIN")
-
-        if context.scene.render.engine != "BLENDER_GAME":
-            row = layout.row(align=True)
-            row.operator("render.render", text="Render", icon='RENDER_STILL')
-            row.operator("render.render", text="Animation", icon='RENDER_ANIMATION').animation = True
-            row.operator("sound.mixdown", text="Audio", icon='PLAY_AUDIO')
-
-            split = layout.split(factor=0.33)
-
-            split.label(text="Display:")
-            row = split.row(align=True)
-            row.prop(rd, "display_mode", text="")
-            row.prop(rd, "use_lock_interface", icon_only=True)
+# RENDER_PT_render (engine selector) lives in properties_render_engine.py so it
+# registers before the game panels and is drawn at the top of the Render tab.
 
 
 class RENDER_PT_dimensions(RenderButtonsPanel, Panel):
@@ -518,6 +496,12 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
         if (scenefx_settings.use_ssr and scenefx_settings.use_lightscatter and scenefx_settings.use_tonemap and scenefx_settings.use_ssao and scenefx_settings.use_bloom and scenefx_settings.use_fxaa):
             layout.operator("wm.quit_blender", text="Make GTA 6", icon='MATCAP_16')
 
+        # The baker is Blender Render's, also when the Range Engine is selected.
+        if not rd.use_bake_to_vertex_color or rd.use_bake_multires:
+            layout.label(text="Needs a UV map and an image set in the UV/Image Editor", icon='INFO')
+        if rd.engine == 'BLENDER_GAME':
+            layout.label(text="Uses Blender Render shading, may differ from the game", icon='INFO')
+
         layout.prop(rd, "bake_type")
 
         multires_bake = False
@@ -578,7 +562,6 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
 
 
 classes = (
-    RENDER_PT_render,
     RENDER_MT_presets,
     RENDER_MT_ffmpeg_presets,
     RENDER_MT_framerate_presets,
