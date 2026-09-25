@@ -254,31 +254,38 @@ class INFO_MT_game(Menu):
 
         gs = context.scene.game_settings
 
-        layout.operator("view3d.game_start", icon="PLAY")
-
-        layout.separator(factor=1)
-
+        layout.label(text="Overlays")
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
-        layout.prop(gs, "use_deprecation_warnings")
+        layout.prop(gs, "show_debug_properties")
+
         layout.separator(factor=1)
+        layout.label(text="Debug")
         layout.prop(gs, "show_debug_mode", text="Debug Mode")
-        layout.prop(gs, "use_auto_start")
+        layout.prop(gs, "show_console")
+        layout.prop(gs, "use_python_console", text="Python Console")
+        layout.prop(gs, "use_deprecation_warnings")
+
+        layout.separator(factor=1)
+        layout.label(text="Visualization")
+        layout.prop(gs, "show_physics_visualization", text="Physics")
+        sub = layout.column()
+        sub.active = gs.obstacle_simulation != 'NONE'
+        sub.prop(gs, "show_obstacle_simulation", text="Obstacle Simulation")
         layout.menu("INFO_MT_game_show_debug")
+
+        layout.separator(factor=1)
+        layout.prop(gs, "use_auto_start")
 
 
 class INFO_MT_game_show_debug(Menu):
-    bl_label = "Show Debug"
+    bl_label = "Bounds and Frustums"
 
     def draw(self, context):
         layout = self.layout
 
         gs = context.scene.game_settings
 
-        layout.prop(gs, "show_debug_properties")
-        layout.prop(gs, "show_physics_visualization")
-
-        layout.separator(factor=1)
         layout.prop_menu_enum(gs, "show_bounding_box")
         layout.prop_menu_enum(gs, "show_armatures")
         layout.prop_menu_enum(gs, "show_camera_frustum")
