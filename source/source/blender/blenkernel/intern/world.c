@@ -91,7 +91,34 @@ void BKE_world_status_props_ensure(World *wrld)
 		{"cloud_type",           GPROP_INT,   0.0f, 0},
 		{"player_under_cover",   GPROP_BOOL, 0.0f, 0},
 	};
+	/* Earlier Portuguese names, still stored in the embedded startup.blend. */
+	const char *wo_status_legacy[][2] = {
+		{"chuva_ligada",        "rain_enabled"},
+		{"chuva_densidade",     "rain_intensity"},
+		{"nuvens_ligadas",      "clouds_enabled"},
+		{"neblina_ligada",      "mist_enabled"},
+		{"neblina_densidade",   "mist_density"},
+		{"horario_sol",         "sun_hour"},
+		{"tipo_nuvem",          "cloud_type"},
+		{"player_area_coberta", "player_under_cover"},
+	};
 	int i;
+
+	/* Rename a legacy property (keeping its value), or drop it when the new name already exists. */
+	for (i = 0; i < ARRAY_SIZE(wo_status_legacy); i++) {
+		bProperty *legacy = BLI_findstring(&wrld->prop, wo_status_legacy[i][0], offsetof(bProperty, name));
+		if (!legacy) {
+			continue;
+		}
+
+		if (BLI_findstring(&wrld->prop, wo_status_legacy[i][1], offsetof(bProperty, name))) {
+			BLI_remlink(&wrld->prop, legacy);
+			BKE_bproperty_free(legacy);
+		}
+		else {
+			BLI_strncpy(legacy->name, wo_status_legacy[i][1], sizeof(legacy->name));
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(wo_status); i++) {
 		bProperty *prop;
