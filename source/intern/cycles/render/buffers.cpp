@@ -144,7 +144,7 @@ void RenderBuffers::reset(BufferParams& params_)
 	params = params_;
 
 	/* re-allocate buffer */
-	buffer.alloc(params.width*params.height*params.get_passes_size());
+	buffer.alloc((size_t)params.width*params.height*params.get_passes_size());
 	buffer.zero_to_device();
 }
 
@@ -158,7 +158,7 @@ bool RenderBuffers::copy_from_device()
 	if(!buffer.device_pointer)
 		return false;
 
-	buffer.copy_from_device(0, params.width * params.get_passes_size(), params.height);
+	buffer.copy_from_device(0, (size_t)params.width * params.get_passes_size(), params.height);
 
 	return true;
 }
@@ -196,17 +196,17 @@ bool RenderBuffers::get_denoising_pass_rect(int type, float exposure, int sample
 	}
 
 	int pass_stride = params.get_passes_size();
-	int size = params.width*params.height;
+	size_t size = (size_t)params.width*params.height;
 
 	float *in = buffer.data() + offset;
 
 	if(components == 1) {
-		for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+		for(size_t i = 0; i < size; i++, in += pass_stride, pixels++) {
 			pixels[0] = in[0]*scale;
 		}
 	}
 	else if(components == 3) {
-		for(int i = 0; i < size; i++, in += pass_stride, pixels += 3) {
+		for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 3) {
 			pixels[0] = in[0]*scale;
 			pixels[1] = in[1]*scale;
 			pixels[2] = in[2]*scale;
@@ -217,7 +217,7 @@ bool RenderBuffers::get_denoising_pass_rect(int type, float exposure, int sample
 		assert(params.passes[0].type == PASS_COMBINED);
 		float *in_combined = buffer.data();
 
-		for(int i = 0; i < size; i++, in += pass_stride, in_combined += pass_stride, pixels += 4) {
+		for(size_t i = 0; i < size; i++, in += pass_stride, in_combined += pass_stride, pixels += 4) {
 			pixels[0] = in[0]*scale;
 			pixels[1] = in[1]*scale;
 			pixels[2] = in[2]*scale;
@@ -261,12 +261,12 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 		float scale = (pass.filter)? 1.0f/(float)sample: 1.0f;
 		float scale_exposure = (pass.exposure)? scale*exposure: scale;
 
-		int size = params.width*params.height;
+		size_t size = (size_t)params.width*params.height;
 
 		if(components == 1 && type == PASS_RENDER_TIME) {
 			/* Render time is not stored by kernel, but measured per tile. */
-			float val = (float) (1000.0 * render_time/(params.width * params.height * sample));
-			for(int i = 0; i < size; i++, pixels++) {
+			float val = (float) (1000.0 * render_time/((double)params.width * params.height * sample));
+			for(size_t i = 0; i < size; i++, pixels++) {
 				pixels[0] = val;
 			}
 		}
@@ -275,13 +275,13 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 
 			/* Scalar */
 			if(type == PASS_DEPTH) {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels++) {
 					float f = *in;
 					pixels[0] = (f == 0.0f)? 1e10f: f*scale_exposure;
 				}
 			}
 			else if(type == PASS_MIST) {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels++) {
 					float f = *in;
 					pixels[0] = saturate(f*scale_exposure);
 				}
@@ -292,14 +292,14 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 			        type == PASS_BVH_INTERSECTIONS ||
 			        type == PASS_RAY_BOUNCES)
 			{
-				for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels++) {
 					float f = *in;
 					pixels[0] = f*scale;
 				}
 			}
 #endif
 			else {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels++) {
 					float f = *in;
 					pixels[0] = f*scale_exposure;
 				}
@@ -310,7 +310,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 
 			/* RGBA */
 			if(type == PASS_SHADOW) {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels += 3) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 3) {
 					float4 f = make_float4(in[0], in[1], in[2], in[3]);
 					float invw = (f.w > 0.0f)? 1.0f/f.w: 1.0f;
 
@@ -331,7 +331,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 
 				float *in_divide = buffer.data() + pass_offset;
 
-				for(int i = 0; i < size; i++, in += pass_stride, in_divide += pass_stride, pixels += 3) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, in_divide += pass_stride, pixels += 3) {
 					float3 f = make_float3(in[0], in[1], in[2]);
 					float3 f_divide = make_float3(in_divide[0], in_divide[1], in_divide[2]);
 
@@ -344,7 +344,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 			}
 			else {
 				/* RGB/vector */
-				for(int i = 0; i < size; i++, in += pass_stride, pixels += 3) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 3) {
 					float3 f = make_float3(in[0], in[1], in[2]);
 
 					pixels[0] = f.x*scale_exposure;
@@ -358,7 +358,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 
 			/* RGBA */
 			if(type == PASS_SHADOW) {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 4) {
 					float4 f = make_float4(in[0], in[1], in[2], in[3]);
 					float invw = (f.w > 0.0f)? 1.0f/f.w: 1.0f;
 
@@ -380,7 +380,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 
 				float *in_weight = buffer.data() + pass_offset;
 
-				for(int i = 0; i < size; i++, in += pass_stride, in_weight += pass_stride, pixels += 4) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, in_weight += pass_stride, pixels += 4) {
 					float4 f = make_float4(in[0], in[1], in[2], in[3]);
 					float w = in_weight[0];
 					float invw = (w > 0.0f)? 1.0f/w: 0.0f;
@@ -392,7 +392,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 				}
 			}
 			else if(type == PASS_CRYPTOMATTE) {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 4) {
 					float4 f = make_float4(in[0], in[1], in[2], in[3]);
 					/* x and z contain integer IDs, don't rescale them.
 					   y and w contain matte weights, they get scaled. */
@@ -403,7 +403,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 				}
 			}
 			else {
-				for(int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
+				for(size_t i = 0; i < size; i++, in += pass_stride, pixels += 4) {
 					float4 f = make_float4(in[0], in[1], in[2], in[3]);
 
 					pixels[0] = f.x*scale_exposure;

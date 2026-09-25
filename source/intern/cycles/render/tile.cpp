@@ -130,7 +130,7 @@ static int get_divider(int w, int h, int start_resolution)
 {
 	int divider = 1;
 	if(start_resolution != INT_MAX) {
-		while(w*h > start_resolution*start_resolution) {
+		while((int64_t)w*h > (int64_t)start_resolution*start_resolution) {
 			w = max(1, w/2);
 			h = max(1, h/2);
 
@@ -172,7 +172,7 @@ void TileManager::set_samples(int num_samples_)
 		while(divider > pixel_size) {
 			int image_w = max(1, params.width/divider);
 			int image_h = max(1, params.height/divider);
-			pixel_samples += image_w * image_h;
+			pixel_samples += (uint64_t)image_w * image_h;
 			divider >>= 1;
 		}
 
@@ -180,7 +180,7 @@ void TileManager::set_samples(int num_samples_)
 		int image_h = max(1, params.height/divider);
 		state.total_pixel_samples = pixel_samples + (uint64_t)get_num_effective_samples() * image_w*image_h;
 		if(schedule_denoising) {
-			state.total_pixel_samples += params.width*params.height;
+			state.total_pixel_samples += (uint64_t)params.width*params.height;
 		}
 	}
 }

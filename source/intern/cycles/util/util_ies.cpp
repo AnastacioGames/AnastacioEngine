@@ -21,6 +21,13 @@
 
 CCL_NAMESPACE_BEGIN
 
+/* IES profiles are normally small. Keep enough room for dense profiles while
+ * preventing malformed input from turning a textual count into an excessive
+ * allocation. The processing below can mirror the horizontal distribution up
+ * to four times, so the parsed intensity grid is kept well below INT_MAX. */
+static const long IES_MAX_ANGLES = 4096;
+static const long IES_MAX_INTENSITY_VALUES = 1024 * 1024;
+
 // NOTE: For some reason gcc-7.2 does not instantiate this versio of allocator
 // gere (used in IESTextParser). Works fine for gcc-6, gcc-7.3 and gcc-8.
 //
@@ -129,9 +136,12 @@ bool IESFile::parse(ustring ies)
 	if(strncmp(parser.data, "\nTILT=INCLUDE", 13) == 0) {
 		parser.data += 13;
 		parser.get_double(); /* Lamp to Luminaire geometry */
-		int num_tilt = parser.get_long(); /* Amount of tilt angles and factors */
+		long num_tilt = parser.get_long(); /* Amount of tilt angles and factors */
+		if(num_tilt < 0 || num_tilt > IES_MAX_ANGLES) {
+			return false;
+		}
 		/* Skip over angles and factors. */
-		for(int i = 0; i < 2*num_tilt; i++) {
+		for(long i = 0; i < 2*num_tilt; i++) {
 			parser.get_double();
 		}
 	}
@@ -148,9 +158,15 @@ bool IESFile::parse(ustring ies)
 	parser.get_long(); /* Number of lamps */
 	parser.get_double(); /* Lumens per lamp */
 	double factor = parser.get_double(); /* Candela multiplier */
-	int v_angles_num = parser.get_long(); /* Number of vertical angles */
-	int h_angles_num = parser.get_long(); /* Number of horizontal angles */
+	long v_angles_num = parser.get_long(); /* Number of vertical angles */
+	long h_angles_num = parser.get_long(); /* Number of horizontal angles */
 	type = (IESType) parser.get_long(); /* Photometric type */
+
+	if(v_angles_num <= 0 || h_angles_num <= 0 ||
+	   v_angles_num > IES_MAX_ANGLES || h_angles_num > IES_MAX_ANGLES ||
+	   v_angles_num > IES_MAX_INTENSITY_VALUES/h_angles_num) {
+		return false;
+	}
 
 	/* TODO(lukas): Test whether the current type B processing can also deal with type A files.
 	 * In theory the only difference should be orientation which we ignore anyways, but with IES you never know...

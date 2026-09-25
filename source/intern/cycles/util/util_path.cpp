@@ -697,12 +697,11 @@ bool path_write_binary(const string& path, const vector<uint8_t>& binary)
 	if(!f)
 		return false;
 
-	if(binary.size() > 0)
-		fwrite(&binary[0], sizeof(uint8_t), binary.size(), f);
+	const bool write_success = binary.empty() ||
+	                           fwrite(&binary[0], sizeof(uint8_t), binary.size(), f) == binary.size();
+	const bool close_success = fclose(f) == 0;
 
-	fclose(f);
-
-	return true;
+	return write_success && close_success;
 }
 
 bool path_write_text(const string& path, string& text)
@@ -723,15 +722,20 @@ bool path_read_binary(const string& path, vector<uint8_t>& binary)
 		return false;
 	}
 
-	binary.resize(path_file_size(path));
-
-	if(binary.size() == 0) {
+	/* path_file_size() returns (size_t)-1 when stat fails, e.g. the file was
+	 * removed after fopen(); don't try to allocate that. */
+	const size_t size = path_file_size(path);
+	if(size == 0 || size == (size_t)-1) {
 		fclose(f);
+		binary.resize(0);
 		return false;
 	}
 
+	binary.resize(size);
+
 	if(fread(&binary[0], sizeof(uint8_t), binary.size(), f) != binary.size()) {
 		fclose(f);
+		binary.resize(0);
 		return false;
 	}
 

@@ -719,7 +719,7 @@ void BlenderSession::do_write_update_render_result(BL::RenderResult& b_rr,
 
 	float exposure = scene->film->exposure;
 
-	vector<float> pixels(rtile.w*rtile.h*4);
+	vector<float> pixels((size_t)rtile.w*rtile.h*4);
 
 	/* Adjust absolute sample number to the range. */
 	int sample = rtile.sample;

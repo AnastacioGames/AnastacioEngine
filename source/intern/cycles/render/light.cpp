@@ -991,7 +991,7 @@ void LightManager::device_update_ies(DeviceScene *dscene)
 	}
 
 	/* Shrink the slot table by removing empty slots at the end. */
-	int slot_end;
+	size_t slot_end;
 	for(slot_end = ies_slots.size(); slot_end; slot_end--) {
 		if(ies_slots[slot_end-1]->users > 0) {
 			/* If the preceding slot has users, we found the new end of the table. */
@@ -1005,18 +1005,37 @@ void LightManager::device_update_ies(DeviceScene *dscene)
 	ies_slots.resize(slot_end);
 
 	if(ies_slots.size() > 0) {
-		int packed_size = 0;
+		const size_t max_ies_data_size = (size_t)INT_MAX;
+		const size_t num_slots = ies_slots.size();
+		if(num_slots > max_ies_data_size) {
+			VLOG(1) << "Too many IES profiles, ignoring IES update.";
+			return;
+		}
+
+		size_t packed_size = 0;
 		foreach(IESSlot *slot, ies_slots) {
-			packed_size += slot->ies.packed_size();
+			const int size = slot->ies.packed_size();
+			if(size < 0 || (size_t)size > max_ies_data_size - num_slots - packed_size) {
+				/* Offsets are stored as int bit patterns in the kernel data. Avoid
+				 * truncating them by uploading an explicitly invalid offset table. */
+				VLOG(1) << "IES profile data is too large, ignoring IES profiles.";
+				float *data = dscene->ies_lights.alloc(num_slots);
+				for(size_t i = 0; i < num_slots; i++) {
+					data[i] = __int_as_float(-1);
+				}
+				dscene->ies_lights.copy_to_device();
+				return;
+			}
+			packed_size += size;
 		}
 
 		/* ies_lights starts with an offset table that contains the offset of every slot,
 		 * or -1 if the slot is invalid.
 		 * Following that table, the packed valid IES lights are stored. */
-		float *data = dscene->ies_lights.alloc(ies_slots.size() + packed_size);
+		float *data = dscene->ies_lights.alloc(num_slots + packed_size);
 
-		int offset = ies_slots.size();
-		for(int i = 0; i < ies_slots.size(); i++) {
+		int offset = (int)num_slots;
+		for(size_t i = 0; i < num_slots; i++) {
 			int size = ies_slots[i]->ies.packed_size();
 			if(size > 0) {
 				data[i] = __int_as_float(offset);
