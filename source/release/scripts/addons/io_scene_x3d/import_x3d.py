@@ -1266,7 +1266,7 @@ def gzipOpen(path):
 
     if data is None:
         try:
-            filehandle = open(path, 'rU', encoding='utf-8', errors='surrogateescape')
+            filehandle = open(path, 'r', encoding='utf-8', errors='surrogateescape')
             data = filehandle.read()
             filehandle.close()
         except:

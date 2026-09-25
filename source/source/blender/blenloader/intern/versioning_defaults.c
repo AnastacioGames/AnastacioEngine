@@ -190,6 +190,18 @@ void BLO_update_defaults_userpref_blend(void)
   /* Add-ons */
   BKE_addon_ensure(&U.addons, "development_icon_get"); /* Development: Icon Viewer */
   BKE_addon_ensure(&U.addons, "game_scene_statistics"); /* Game Engine: Game Engine Scene Statistics */
+
+  /* Import-Export */
+  BKE_addon_ensure(&U.addons, "io_scene_fbx");
+  BKE_addon_ensure(&U.addons, "io_scene_obj");
+  BKE_addon_ensure(&U.addons, "io_scene_x3d");
+  BKE_addon_ensure(&U.addons, "io_curve_svg");
+  BKE_addon_ensure(&U.addons, "io_import_images_as_planes");
+  BKE_addon_ensure(&U.addons, "io_anim_nuke_chan");
+  BKE_addon_ensure(&U.addons, "io_export_after_effects");
+  BKE_addon_ensure(&U.addons, "io_mesh_uv_layout");
+  BKE_addon_ensure(&U.addons, "io_sequencer_edl");
+  BKE_addon_ensure(&U.addons, "io_blend_utils");
 }
 
 /**
