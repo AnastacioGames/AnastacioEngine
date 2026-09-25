@@ -105,7 +105,7 @@ class USERPREF_PT_navigation(Panel):
 
         draw_group("User Preferences:",
                    ('INTERFACE', 'EDITING', 'INPUT', 'ADDONS', 'THEMES'),
-                   'PREFERENCES')
+                   'SETTINGS')
         draw_group("Game Engine:", ('INPUTSYSTEM',), 'GAME')
         draw_group("System:", ('SYSTEM_GENERAL', 'SYSTEM_FILES'), 'SETTINGS')
 
@@ -792,11 +792,11 @@ class USERPREF_PT_theme(Panel):
         layout = self.layout
 
         theme = context.user_preferences.themes[0]
-        layout = layout.box()
 
         split_themes = layout.split(factor=0.2)
 
-        sub = split_themes.column()
+        # Only the presets and the area list sit inside the outer box
+        sub = split_themes.box()
 
         sub.label(text="Presets:")
         subrow = sub.row(align=True)
@@ -807,11 +807,6 @@ class USERPREF_PT_theme(Panel):
         sub.separator(factor=1)
 
         sub.prop(theme, "theme_area", expand=True)
-
-        split = layout.split(factor=0.4)
-
-        layout.separator(factor=1)
-        layout.separator(factor=1)
 
         split = split_themes.split()
 
@@ -1392,13 +1387,15 @@ class USERPREF_PT_addons(Panel):
 
         split = layout.split(factor=0.2)
         col = split.column()
-        col.prop(wm, "addon_search", text="", icon='VIEWZOOM')
 
-        col.label(text="Supported Level")
-        col.prop(wm, "addon_support", expand=True)
+        box = col.box()
+        box.prop(wm, "addon_search", text="", icon='VIEWZOOM')
+        box.label(text="Supported Level")
+        box.column(align=True).prop(wm, "addon_support", expand=True)
 
-        col.label(text="Categories")
-        col.prop(wm, "addon_filter", expand=True)
+        box = col.box()
+        box.label(text="Categories")
+        box.column(align=True).prop(wm, "addon_filter", expand=True)
 
         col = split.column()
 

@@ -1835,7 +1835,8 @@ void uiItemEnumR_string_prop(
 	}
 
 	for (a = 0; item[a].identifier; a++) {
-		if (item[a].value == ivalue) {
+		/* Skip headings: they can share the value of a real item (e.g. value 0). */
+		if (item[a].identifier[0] && item[a].value == ivalue) {
 			const char *item_name = name ? name : CTX_IFACE_(RNA_property_translation_context(prop), item[a].name);
 			const int flag = item_name[0] ? 0 : UI_ITEM_R_ICON_ONLY;
 
