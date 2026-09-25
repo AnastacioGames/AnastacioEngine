@@ -123,6 +123,88 @@ void util_image_downscale_pixels(const vector<T>& input_pixels,
 	}
 }
 
+/* Maps an output pixel center to the two nearest input pixels along one axis
+ * and the weight of the second one. */
+inline void util_image_upscale_axis(const size_t output_coord,
+                                    const size_t input_size,
+                                    const float inv_scale_factor,
+                                    size_t *i0,
+                                    size_t *i1,
+                                    float *t)
+{
+	float coord = ((float)output_coord + 0.5f) * inv_scale_factor - 0.5f;
+	coord = min(max(coord, 0.0f), (float)(input_size - 1));
+	*i0 = min((size_t)coord, input_size - 1);
+	*i1 = min(*i0 + 1, input_size - 1);
+	*t = coord - (float)(*i0);
+}
+
+template<typename T>
+void util_image_upscale_pixels(const vector<T>& input_pixels,
+                               const size_t input_width,
+                               const size_t input_height,
+                               const size_t input_depth,
+                               const size_t components,
+                               const size_t output_width,
+                               const size_t output_height,
+                               const size_t output_depth,
+                               vector<T> *output_pixels)
+{
+	assert(components <= 4);
+	if(input_width == 0 || input_height == 0 || input_depth == 0) {
+		std::fill(output_pixels->begin(), output_pixels->end(), T(0.0f));
+		return;
+	}
+	/* Per axis factors, so truncated output sizes and axes that are kept at
+	 * their input size still cover the whole input. */
+	const float inv_scale_x = (float)input_width / (float)output_width,
+	            inv_scale_y = (float)input_height / (float)output_height,
+	            inv_scale_z = (float)input_depth / (float)output_depth;
+	for(size_t z = 0; z < output_depth; ++z) {
+		size_t z0, z1;
+		float tz;
+		util_image_upscale_axis(z, input_depth, inv_scale_z, &z0, &z1, &tz);
+		for(size_t y = 0; y < output_height; ++y) {
+			size_t y0, y1;
+			float ty;
+			util_image_upscale_axis(y, input_height, inv_scale_y, &y0, &y1, &ty);
+			for(size_t x = 0; x < output_width; ++x) {
+				size_t x0, x1;
+				float tx;
+				util_image_upscale_axis(x, input_width, inv_scale_x, &x0, &x1, &tx);
+				const size_t corner_x[2] = {x0, x1},
+				             corner_y[2] = {y0, y1},
+				             corner_z[2] = {z0, z1};
+				const float weight_x[2] = {1.0f - tx, tx},
+				            weight_y[2] = {1.0f - ty, ty},
+				            weight_z[2] = {1.0f - tz, tz};
+				float accum[4] = {0};
+				for(int dz = 0; dz < 2; ++dz) {
+					for(int dy = 0; dy < 2; ++dy) {
+						for(int dx = 0; dx < 2; ++dx) {
+							const float weight = weight_x[dx] * weight_y[dy] * weight_z[dz];
+							const T *pixel = util_image_read(input_pixels,
+							                                 input_width, input_height, input_depth,
+							                                 components,
+							                                 corner_x[dx], corner_y[dy], corner_z[dz]);
+							for(size_t k = 0; k < components; ++k) {
+								accum[k] += weight * util_image_cast_to_float(pixel[k]);
+							}
+						}
+					}
+				}
+				const size_t output_index =
+				        (z * output_width * output_height +
+				         y * output_width + x) * components;
+				T *result = &output_pixels->at(output_index);
+				for(size_t k = 0; k < components; ++k) {
+					result[k] = util_image_cast_from_float<T>(accum[k]);
+				}
+			}
+		}
+	}
+}
+
 }  /* namespace */
 
 template<typename T>
@@ -152,6 +234,11 @@ void util_image_resize_pixels(const vector<T>& input_pixels,
 	*output_width = max((size_t)((float)input_width * scale_factor), (size_t)1);
 	*output_height = max((size_t)((float)input_height * scale_factor), (size_t)1);
 	*output_depth = max((size_t)((float)input_depth * scale_factor), (size_t)1);
+	/* 2D images are stored with a depth of 1; upscaling must not turn them
+	 * into volumes. */
+	if(input_depth == 1) {
+		*output_depth = 1;
+	}
 	/* Prepare pixel storage for the result. */
 	const size_t num_output_pixels = ((*output_width) *
 	                                  (*output_height) *
@@ -166,7 +253,11 @@ void util_image_resize_pixels(const vector<T>& input_pixels,
 		                            *output_width, *output_height, *output_depth,
 		                            output_pixels);
 	} else {
-		/* TODO(sergey): Needs implementation. */
+		util_image_upscale_pixels(input_pixels,
+		                          input_width, input_height, input_depth,
+		                          components,
+		                          *output_width, *output_height, *output_depth,
+		                          output_pixels);
 	}
 }
 

@@ -1,7 +1,7 @@
 # Relatório de varredura — Cycles
 
 Data: 2026-09-25
-Estado: CYC-001 a CYC-011 corrigidos e validados por compilação. Permanecem apenas validações funcionais direcionadas e a cobertura das variantes desativadas.
+Estado: CYC-001 a CYC-012 corrigidos e validados por compilação. Permanecem apenas validações funcionais direcionadas e a cobertura das variantes desativadas.
 
 ## Escopo e método
 
@@ -26,6 +26,7 @@ Estado: CYC-001 a CYC-011 corrigidos e validados por compilação. Permanecem ap
 | CYC-009 | Corrigido | `source/intern/cycles/device/device_cuda.cpp:972` | Mesmo padrão de CYC-007 no CUDA: `mem_copy_from()` calculava `elem * y * w` e `elem * w * h` em `int`. Com buffer de 2 GiB ou mais (ex.: 8192 × 8192 com 8 floats por pixel), o valor negativo virava `size_t` enorme; `cuMemcpyDtoH()` falhava e a render era perdida, ou o `memset` do ramo só-host escrevia fora do buffer. As multiplicações agora começam em `size_t`. |
 | CYC-010 | Corrigido | `source/intern/cycles/device/opencl/opencl_util.cpp:395` | A serialização do comando Python de compilação externa usava strings brutas e um suposto escape de apóstrofo que não continha barra invertida em C++. Nomes de dispositivo ou caminhos com apóstrofo quebravam `--python-expr`. Agora usa literal Python comum e escapa barras, apóstrofos e quebras de linha. |
 | CYC-011 | Corrigido | `source/intern/cycles/util/util_ies.cpp:83` | `IESTextParser` construía um `vector<char>` sem terminador, porém chamava `strstr`/`strtod` e acessava `data[0]` como string C. Um IES sem quebra de linha final podia ler além do fim. Agora o buffer recebe `\\0` antes do parse. |
+| CYC-012 | Corrigido | `source/intern/cycles/util/util_image_impl.h:126` | O ramo de upscale de `util_image_resize_pixels()` alocava a saída e a deixava sem preencher; em 2D também podia converter profundidade 1 em volume. Agora interpola linearmente por eixo, limita nas bordas, preserva componentes/tipo e mantém profundidade 1 para imagens 2D. |
 
 ### Validação funcional ainda recomendada
 
@@ -44,7 +45,6 @@ Estado: CYC-001 a CYC-011 corrigidos e validados por compilação. Permanecem ap
 
 | Local | Observação | Avaliação |
 | --- | --- | --- |
-| `util/util_image_impl.h:129-170` | A função pública de resize aloca a saída para `scale_factor > 1`, mas o ramo de upscale só tem `TODO` e deixa os pixels sem preencher. O único chamador atual (`render/image.cpp:668`) inicia em 1 e só reduz a escala, portanto esse ramo não é alcançado no fluxo atual. | Corrigir antes de reutilizar a API para upscale; não há regressão ativa demonstrada. |
 | `render/mesh_subdivision.cpp:562` | A subdivisão de `ATTR_ELEMENT_VERTEX_MOTION` está explicitamente sem implementação. | Lacuna funcional para motion blur + subdivisão, dependente do caminho de cena; requer teste de render específico antes de priorizar. |
 | `render/mesh_subdivision.cpp:260` | Interpolação FVar de atributos de canto está marcada como pendente. | Lacuna conhecida de atributos/subdivisão, não evidência de corrupção nesta varredura. |
 | `device/device_network.cpp`, `device/device_network.h` | **Device de rede não suportado e inseguro.** Três defeitos confirmados por leitura: (1) não compila com `WITH_CYCLES_NETWORK=ON`: `device_network.cpp:533` tem `(void*)? ...` (erro de sintaxe) e `:502` atribui `device_ptr` (inteiro) a `void*`; (2) se o cliente cai sem enviar `stop`, `DeviceServer::listen()` (`:333`) e `task_release_tile()` (`:718`) não consultam `have_error()` e ficam em laço a 100% de CPU, sem aceitar nova conexão; (3) quando `RPCReceive` falha no cabeçalho/dados, `archive` fica nulo, mas os chamadores seguem com `rcv.read()` (ex.: `NetworkDevice::load_kernels`, `:195`) e desreferenciam nulo. Além disso, o protocolo não tem autenticação, aceita cabeçalho de até 4 GiB e valida ponteiros vindos do par só com `assert`: qualquer host da rede local que conecte na porta 5120 derruba o servidor. | Manter `WITH_CYCLES_NETWORK=OFF` e não oferecer a usuários. Correções pontuais dos três defeitos não resolvem a segurança do protocolo; reativar exige redesenho (autenticação, limites e validação de mensagens). O Cycles upstream removeu esse device em versões posteriores. |
