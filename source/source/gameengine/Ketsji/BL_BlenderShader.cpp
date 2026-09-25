@@ -172,10 +172,13 @@ void BL_BlenderShader::ReloadMaterial()
 
 void BL_BlenderShader::BindProg(RAS_Rasterizer *rasty)
 {
+	// Set before binding: instanced foliage uploads its wind distance during the bind.
+	// Without an active camera there is no reference, so the distance limit is skipped.
+	GPU_material_set_foliage_reference_position(m_gpuMat, m_scene->GetActiveCamera() ?
+	                                            m_scene->GetOptimizationReferencePosition().Data() : nullptr);
 	GPU_material_bind(m_gpuMat, m_blenderScene->lay, rasty->GetTime(), 1,
 					  rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data(), nullptr, false,
 					  rasty->GetProjectionMatrix().Data());
-	GPU_material_set_foliage_reference_position(m_gpuMat, m_scene->GetOptimizationReferencePosition().Data());
 }
 
 void BL_BlenderShader::UnbindProg()

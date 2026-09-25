@@ -241,6 +241,8 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
 - **Game Settings, FXAA e LOD (2026-09-25)**: conferir no jogo real os painéis novos das abas Render e Scene,
   os ajustes de FXAA e o LOD com Billboard/Invisible.
+- **Foliage no Web (2026-09-25)**: conferir num build Web que um material com Foliage Shader compila
+  (troca `grass == 1` → `grass > 0.5` no vertex shader) e que o vento anima. No desktop foi aceito pelo usuário.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

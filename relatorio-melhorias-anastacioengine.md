@@ -151,7 +151,8 @@ ferramenta correspondente.
   Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
   will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity
   Culling and Foliage/Grass material wind consume it; outside the chosen `Wind Distance`, the vertex shader skips
-  procedural wind.
+  procedural wind. Non-instanced objects are tested on the CPU per object; instanced foliage is tested in the
+  shader per instance (`unfoliagecamera`). Wind is applied in mesh space before instancing/skinning.
 
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
   framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são

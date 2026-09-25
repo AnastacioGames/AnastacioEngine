@@ -523,6 +523,13 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "foliage_distance")) {
+    /* Files from before Foliage Optimization get the same wind distance as new materials. */
+    LISTBASE_FOREACH (Material *, ma, &main->mat) {
+      ma->foliage_distance = 50.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "float", "fxaa_edge_threshold")) {
     /* FXAA values became settings; keep the look the shaders had before. */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {

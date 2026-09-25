@@ -155,6 +155,7 @@ struct GPUMaterial {
 	bool use_skinning;
 
 	int infoliageparamsloc;
+	int infoliagecameraloc;
 	float foliagecamera[3];
 	bool foliagecamera_set;
 	float foliagetime;
@@ -458,6 +459,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 
 		if (material->use_foliage) {
 			material->infoliageparamsloc = GPU_shader_get_uniform(shader, "unfoliageparams");
+			material->infoliagecameraloc = material->use_instancing ?
+			        GPU_shader_get_uniform(shader, "unfoliagecamera") : -1;
 		}
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++) {
@@ -663,6 +666,17 @@ void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float
 
 }
 
+/* Keep in sync with FOLIAGE_PERIOD in gpu_shader_vertex.glsl. */
+#define FOLIAGE_TIME_PERIOD 256.0
+
+/* Distance optimization needs a reference (active camera) and a usable radius; a zero
+ * distance from files saved before the option existed means "not configured". */
+static bool foliage_optimization_active(const GPUMaterial *material)
+{
+	const Material *ma = material->ma;
+	return ma->foliage_optimization && material->foliagecamera_set && ma->foliage_distance > 0.0f;
+}
+
 void GPU_material_bind(
         GPUMaterial *material, int viewlay, double time, int mipmap,
         float viewmat[4][4], float viewinv[4][4], float camerafactors[4], bool scenelock,
@@ -768,7 +782,23 @@ void GPU_material_bind(
 			GPU_shader_uniform_vector(shader, material->timeloc, 1, 1, &ftime);
 		}
 		if (material->use_foliage && material->ma) {
-			material->foliagetime = (float)(time * material->ma->foliage_turbulence);
+			Material *ma = material->ma;
+			/* Wrapped so the shader hash keeps its precision in long sessions; the noise
+			 * lattice repeats with the same period, so the wrap is seamless. */
+			material->foliagetime = (float)fmod(time * ma->foliage_turbulence, FOLIAGE_TIME_PERIOD);
+
+			/* Instanced draws never reach GPU_material_bind_uniforms(): upload the full
+			 * strength here and let the shader apply the wind distance per instance. */
+			if (material->use_instancing) {
+				float params[3] = {ma->foliage_strength, material->foliagetime, ma->foliage_grass};
+				float camera[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+				if (foliage_optimization_active(material)) {
+					copy_v3_v3(camera, material->foliagecamera);
+					camera[3] = ma->foliage_distance;
+				}
+				GPU_shader_uniform_vector(shader, material->infoliageparamsloc, 3, 1, params);
+				GPU_shader_uniform_vector(shader, material->infoliagecameraloc, 4, 1, camera);
+			}
 		}
 
 		GPU_pass_update_uniforms(material->pass);
@@ -795,7 +825,7 @@ void GPU_material_bind_uniforms(
 		if (material->use_foliage && material->ma) {
 			Material *ma = material->ma;
 			float strength = ma->foliage_strength;
-			if (ma->foliage_optimization && material->foliagecamera_set) {
+			if (foliage_optimization_active(material)) {
 				const float dx = obmat[3][0] - material->foliagecamera[0];
 				const float dy = obmat[3][1] - material->foliagecamera[1];
 				const float dz = obmat[3][2] - material->foliagecamera[2];
@@ -897,10 +927,13 @@ bool GPU_material_bound(GPUMaterial *material)
 void GPU_material_set_foliage_reference_position(GPUMaterial *material, const float position[3])
 {
 	if (material && material->use_foliage) {
-		material->foliagecamera[0] = position[0];
-		material->foliagecamera[1] = position[1];
-		material->foliagecamera[2] = position[2];
-		material->foliagecamera_set = true;
+		if (position) {
+			copy_v3_v3(material->foliagecamera, position);
+			material->foliagecamera_set = true;
+		}
+		else {
+			material->foliagecamera_set = false;
+		}
 	}
 }
 

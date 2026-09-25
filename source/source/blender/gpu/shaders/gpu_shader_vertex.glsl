@@ -68,9 +68,18 @@ varying float gl_ClipDistance[6];
 #endif
 
 #ifdef USE_FOLIAGE
-uniform vec3 unfoliageparams; // strength, time * turbulence, is_grass
+uniform vec3 unfoliageparams; // strength, wrapped time * turbulence, is_grass
+#ifdef USE_INSTANCING
+uniform vec4 unfoliagecamera; // world reference position, wind distance (<= 0: no limit)
+#endif
+
+/* The noise lattice repeats with this period, so the CPU can wrap the time by the same
+ * amount without a visible jump and the hash never sees large, imprecise inputs.
+ * Keep in sync with FOLIAGE_TIME_PERIOD in gpu_material.c. */
+#define FOLIAGE_PERIOD 256.0
 
 float foliage_random(in vec2 st) {
+    st = mod(st, FOLIAGE_PERIOD);
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
@@ -88,19 +97,20 @@ float foliage_noise(in vec2 st) {
     return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
-void foliage_wind(in vec4 position, in float time, in float strength, in float grass, out vec4 transpos)
+void foliage_wind(in vec4 position, in vec2 phase, in float time, in float strength, in float grass, out vec4 transpos)
 {
-    transpos = position;
+	transpos = position;
 
 	/* A zero strength is sent for foliage objects outside their material's
 	 * optimization radius. Return before evaluating the procedural noise. */
 	if (strength == 0.0)
 		return;
 
-	if (grass == 1 && transpos.z < 0.1)
+	/* Float compare: GLSL ES has no implicit int to float conversion. */
+	if (grass > 0.5 && transpos.z < 0.1)
 		return;
 
-	float wind = foliage_noise(transpos.xy + time * 1.0);
+	float wind = foliage_noise(transpos.xy + phase + time);
 	transpos.xy += vec2(wind * strength, -wind * strength);
 }
 #endif
@@ -201,6 +211,26 @@ void main()
 #endif
 #endif
 
+#ifdef USE_FOLIAGE
+	/* Wind runs in mesh space, before instancing and skinning, so the grass anchor (z < 0.1)
+	 * and the displacement axes belong to the mesh itself. */
+	{
+		float foliage_strength = unfoliageparams[0];
+		vec2 foliage_phase = vec2(0.0);
+#ifdef USE_INSTANCING
+		/* All instances share one draw call: give each its own noise phase and apply the
+		 * wind distance per instance (the CPU can only test the whole batch). */
+		foliage_phase = ininstposition.xy;
+		if (unfoliagecamera.w > 0.0) {
+			vec3 foliage_delta = ininstposition - unfoliagecamera.xyz;
+			if (dot(foliage_delta, foliage_delta) > unfoliagecamera.w * unfoliagecamera.w)
+				foliage_strength = 0.0;
+		}
+#endif
+		foliage_wind(position, foliage_phase, unfoliageparams[1], foliage_strength, unfoliageparams[2], position);
+	}
+#endif
+
 #ifdef USE_INSTANCING
 	mat4 instmat = mat4(vec4(ininstmatrix[0], ininstposition.x),
 						vec4(ininstmatrix[1], ininstposition.y),
@@ -229,10 +259,6 @@ void main()
 
 	position = skinMat * position;
 	normal = mat3(skinMat) * normal;
-#endif
-
-#ifdef USE_FOLIAGE
-	foliage_wind(position, unfoliageparams[1], unfoliageparams[0], unfoliageparams[2], position);
 #endif
 
 	VERTEX = position.xyz;
