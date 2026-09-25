@@ -100,7 +100,8 @@ class USERPREF_PT_navigation(Panel):
             group.scale_y = 1.12
             group.label(text=title, icon=icon)
             for section in sections:
-                group.prop_enum(userpref, "active_section", section, icon=icon)
+                # Only the group header carries the icon; items stay text-only.
+                group.prop_enum(userpref, "active_section", section, icon='NONE')
 
         draw_group("User Preferences:",
                    ('INTERFACE', 'EDITING', 'INPUT', 'ADDONS', 'THEMES'),
@@ -193,122 +194,103 @@ class USERPREF_PT_interface(Panel):
 
         row = layout.row()
 
-        # Use boxed groups so each part reads as an independent settings panel.
+        # Each group of settings is drawn as its own boxed panel.
+        # Column 1: display
         col = row.column()
-        col = col.box()
-        col.label(text="Display:")
-        col.prop(view, "ui_scale", text="Scale")
-        col.prop(view, "ui_line_width", text="Line Width")
-        col.prop(view, "header_size", text="Header Size")
-        col.prop(view, "show_tooltips")
-        col.prop(view, "show_tooltips_python")
-        col.prop(view, "show_developer_ui")
-        col.prop(view, "show_object_info", text="Object Info")
-        col.prop(view, "show_large_cursors")
-        col.prop(view, "show_view_name", text="View Name")
-        col.prop(view, "show_playback_fps", text="Playback FPS")
-        col.prop(view, "use_global_scene")
-        col.prop(view, "object_origin_size")
 
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
+        box = col.box()
+        box.label(text="Display:")
+        box.prop(view, "ui_scale", text="Scale")
+        box.prop(view, "ui_line_width", text="Line Width")
+        box.prop(view, "header_size", text="Header Size")
+        box.prop(view, "object_origin_size")
 
-        col.prop(view, "show_mini_axis", text="Display Mini Axis")
-        sub = col.column()
+        box = col.box()
+        box.prop(view, "show_tooltips")
+        box.prop(view, "show_tooltips_python")
+        box.prop(view, "show_developer_ui")
+        box.prop(view, "show_object_info", text="Object Info")
+        box.prop(view, "show_large_cursors")
+        box.prop(view, "show_view_name", text="View Name")
+        box.prop(view, "show_playback_fps", text="Playback FPS")
+        box.prop(view, "use_global_scene")
+
+        box = col.box()
+        box.prop(view, "show_mini_axis", text="Display Mini Axis")
+        sub = box.column(align=True)
         sub.active = view.show_mini_axis
         sub.prop(view, "mini_axis_size", text="Size")
         sub.prop(view, "mini_axis_brightness", text="Brightness")
 
-        col.separator(factor=1)
+        box = col.box()
+        box.label(text="Warnings")
+        box.prop(view, "use_quit_dialog")
 
-        col.label("Warnings")
-        col.prop(view, "use_quit_dialog")
+        # Column 2: viewports
+        col = row.column()
 
-        row.separator(factor=1)
-        row.separator(factor=1)
+        box = col.box()
+        box.label(text="View Manipulation:")
+        box.prop(view, "use_mouse_depth_cursor")
+        box.prop(view, "use_cursor_lock_adjust")
+        box.prop(view, "use_mouse_depth_navigate")
+        box.prop(view, "use_zoom_to_mouse")
+        box.prop(view, "use_rotate_around_active")
+        box.prop(view, "use_global_pivot")
+        box.prop(view, "use_camera_lock_parent")
 
-        view_panel = row.column()
-        col = view_panel.box()
-        col.label(text="View Manipulation:")
-        col.prop(view, "use_mouse_depth_cursor")
-        col.prop(view, "use_cursor_lock_adjust")
-        col.prop(view, "use_mouse_depth_navigate")
-        col.prop(view, "use_zoom_to_mouse")
-        col.prop(view, "use_rotate_around_active")
-        col.prop(view, "use_global_pivot")
-        col.prop(view, "use_camera_lock_parent")
+        box = col.box()
+        box.prop(view, "use_auto_perspective")
+        sub = box.column(align=True)
+        sub.prop(view, "smooth_view")
+        sub.prop(view, "rotation_angle")
 
-        col.separator(factor=1)
-
-        col.prop(view, "use_auto_perspective")
-        col.prop(view, "smooth_view")
-        col.prop(view, "rotation_angle")
-
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        # Keep the viewport timing/grid controls in their own sub-panel.
-        col = view_panel.box()
-        col.label(text="2D Viewports:")
-        col.prop(view, "view2d_grid_spacing_min", text="Minimum Grid Spacing")
-        col.prop(view, "timecode_style")
-        col.prop(view, "view_frame_type")
+        box = col.box()
+        box.label(text="2D Viewports:")
+        box.prop(view, "view2d_grid_spacing_min", text="Minimum Grid Spacing")
+        box.prop(view, "timecode_style")
+        box.prop(view, "view_frame_type")
         if view.view_frame_type == 'SECONDS':
-            col.prop(view, "view_frame_seconds")
+            box.prop(view, "view_frame_seconds")
         elif view.view_frame_type == 'KEYFRAMES':
-            col.prop(view, "view_frame_keyframes")
+            box.prop(view, "view_frame_keyframes")
 
-        row.separator(factor=1)
-        row.separator(factor=1)
+        # Column 3: manipulator and menus
+        col = row.column()
 
-        manip_panel = row.column()
-        col = manip_panel.box()
-        # Toolbox doesn't exist yet
-        # col.label(text="Toolbox:")
-        #col.prop(view, "show_column_layout")
-        #col.label(text="Open Toolbox Delay:")
-        #col.prop(view, "open_left_mouse_delay", text="Hold LMB")
-        #col.prop(view, "open_right_mouse_delay", text="Hold RMB")
-        col.prop(view, "show_manipulator")
-        sub = col.column()
+        box = col.box()
+        box.prop(view, "show_manipulator")
+        sub = box.column(align=True)
         sub.active = view.show_manipulator
         sub.prop(view, "manipulator_size", text="Size")
         sub.prop(view, "manipulator_handle_size", text="Handle Size")
         sub.prop(view, "manipulator_hotspot", text="Hotspot")
 
-        col.separator(factor=1)
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        # Menus and pie-menu timing are independent groups of controls.
-        col = manip_panel.box()
-        col.label(text="Menus:")
-        col.prop(view, "use_mouse_over_open")
-        sub = col.column()
+        box = col.box()
+        box.label(text="Menus:")
+        box.prop(view, "use_mouse_over_open")
+        sub = box.column(align=True)
         sub.active = view.use_mouse_over_open
-
         sub.prop(view, "open_toplevel_delay", text="Top Level")
         sub.prop(view, "open_sublevel_delay", text="Sub Level")
 
-        col.separator(factor=1)
-        col = manip_panel.box()
-        col.label(text="Pie Menus:")
-        sub = col.column(align=True)
+        box = col.box()
+        box.label(text="Pie Menus:")
+        sub = box.column(align=True)
         sub.prop(view, "pie_animation_timeout")
         sub.prop(view, "pie_initial_timeout")
         sub.prop(view, "pie_menu_radius")
         sub.prop(view, "pie_menu_threshold")
         sub.prop(view, "pie_menu_confirm")
-        col.separator(factor=1)
 
-        col.prop(view, "show_splash")
-        col.separator(factor=1)
+        box = col.box()
+        box.prop(view, "show_splash")
 
-        col.label(text="App Template:")
-        col.label(text="Options intended for use with app-templates only.")
-        col.prop(view, "show_layout_ui")
-        col.prop(view, "show_view3d_cursor")
+        box = col.box()
+        box.label(text="App Template:")
+        box.label(text="Options intended for use with app-templates only.")
+        box.prop(view, "show_layout_ui")
+        box.prop(view, "show_view3d_cursor")
 
 
 class USERPREF_PT_edit(Panel):
@@ -648,8 +630,9 @@ class USERPREF_PT_theme(Panel):
             else:
                 label = data.rna_type.name
 
-            col.label(label)
-            row = col.row()
+            box = col.box()
+            box.label(label)
+            row = box.row()
             subsplit = row.split(factor=0.95)
 
             padding1 = subsplit.split(factor=0.15)
@@ -726,8 +709,6 @@ class USERPREF_PT_theme(Panel):
         subsub.prop(widget_style, "shadetop")
         subsub.prop(widget_style, "shadedown")
 
-        layout.separator(factor=1)
-
     @staticmethod
     def _ui_font_style(layout, font_style):
 
@@ -753,6 +734,8 @@ class USERPREF_PT_theme(Panel):
     @staticmethod
     def _theme_interface_options(col, ui):
         ui_state = ui.wcol_state
+        outer = col
+        col = outer.box()
         col.label(text="State:")
         row = col.row()
         split = row.split(factor=0.5)
@@ -769,7 +752,7 @@ class USERPREF_PT_theme(Panel):
         right.prop(ui_state, "inner_changed")
         right.prop(ui_state, "inner_changed_sel")
 
-        col.separator(factor=1)
+        col = outer.box()
         col.label(text="Styles:")
         row = col.row()
         split = row.split(factor=0.5)
@@ -779,7 +762,7 @@ class USERPREF_PT_theme(Panel):
         left.prop(ui, "icon_alpha")
         right.prop(ui, "widget_emboss")
 
-        col.separator(factor=1)
+        col = outer.box()
         col.label(text="Axis Colors:")
         row = col.row()
         split = row.split(factor=0.5)
@@ -788,7 +771,7 @@ class USERPREF_PT_theme(Panel):
         left.prop(ui, "axis_y")
         left.prop(ui, "axis_z")
 
-        col.separator(factor=1)
+        col = outer.box()
         col.label(text="Icon Colors:")
         row = col.row()
         split = row.split(factor=0.5)
@@ -799,7 +782,6 @@ class USERPREF_PT_theme(Panel):
         left.prop(ui, "icon_object_data")
         right.prop(ui, "icon_modifier")
         right.prop(ui, "icon_shading")
-        col.separator(factor=1)
 
     @classmethod
     def poll(cls, context):
@@ -839,65 +821,84 @@ class USERPREF_PT_theme(Panel):
 
             self._theme_interface_options(col, ui)
 
-            col.label(text="Regular:")
-            self._theme_widget_style(col, ui.wcol_regular)
+            box = col.box()
+            box.label(text="Regular:")
+            self._theme_widget_style(box, ui.wcol_regular)
 
-            col.label(text="Tool:")
-            self._theme_widget_style(col, ui.wcol_tool)
+            box = col.box()
+            box.label(text="Tool:")
+            self._theme_widget_style(box, ui.wcol_tool)
 
-            col.label(text="Radio Buttons:")
-            self._theme_widget_style(col, ui.wcol_radio)
+            box = col.box()
+            box.label(text="Radio Buttons:")
+            self._theme_widget_style(box, ui.wcol_radio)
 
-            col.label(text="Text:")
-            self._theme_widget_style(col, ui.wcol_text)
+            box = col.box()
+            box.label(text="Text:")
+            self._theme_widget_style(box, ui.wcol_text)
 
-            col.label(text="Option:")
-            self._theme_widget_style(col, ui.wcol_option)
+            box = col.box()
+            box.label(text="Option:")
+            self._theme_widget_style(box, ui.wcol_option)
 
-            col.label(text="Toggle:")
-            self._theme_widget_style(col, ui.wcol_toggle)
+            box = col.box()
+            box.label(text="Toggle:")
+            self._theme_widget_style(box, ui.wcol_toggle)
 
-            col.label(text="Number Field:")
-            self._theme_widget_style(col, ui.wcol_num)
+            box = col.box()
+            box.label(text="Number Field:")
+            self._theme_widget_style(box, ui.wcol_num)
 
-            col.label(text="Value Slider:")
-            self._theme_widget_style(col, ui.wcol_numslider)
+            box = col.box()
+            box.label(text="Value Slider:")
+            self._theme_widget_style(box, ui.wcol_numslider)
 
-            col.label(text="Box:")
-            self._theme_widget_style(col, ui.wcol_box)
+            box = col.box()
+            box.label(text="Box:")
+            self._theme_widget_style(box, ui.wcol_box)
 
-            col.label(text="Menu:")
-            self._theme_widget_style(col, ui.wcol_menu)
+            box = col.box()
+            box.label(text="Menu:")
+            self._theme_widget_style(box, ui.wcol_menu)
 
-            col.label(text="Pie Menu:")
-            self._theme_widget_style(col, ui.wcol_pie_menu)
+            box = col.box()
+            box.label(text="Pie Menu:")
+            self._theme_widget_style(box, ui.wcol_pie_menu)
 
-            col.label(text="Pulldown:")
-            self._theme_widget_style(col, ui.wcol_pulldown)
+            box = col.box()
+            box.label(text="Pulldown:")
+            self._theme_widget_style(box, ui.wcol_pulldown)
 
-            col.label(text="Menu Back:")
-            self._theme_widget_style(col, ui.wcol_menu_back)
+            box = col.box()
+            box.label(text="Menu Back:")
+            self._theme_widget_style(box, ui.wcol_menu_back)
 
-            col.label(text="Tooltip:")
-            self._theme_widget_style(col, ui.wcol_tooltip)
+            box = col.box()
+            box.label(text="Tooltip:")
+            self._theme_widget_style(box, ui.wcol_tooltip)
 
-            col.label(text="Menu Item:")
-            self._theme_widget_style(col, ui.wcol_menu_item)
+            box = col.box()
+            box.label(text="Menu Item:")
+            self._theme_widget_style(box, ui.wcol_menu_item)
 
-            col.label(text="Scroll Bar:")
-            self._theme_widget_style(col, ui.wcol_scroll)
+            box = col.box()
+            box.label(text="Scroll Bar:")
+            self._theme_widget_style(box, ui.wcol_scroll)
 
-            col.label(text="Progress Bar:")
-            self._theme_widget_style(col, ui.wcol_progress)
+            box = col.box()
+            box.label(text="Progress Bar:")
+            self._theme_widget_style(box, ui.wcol_progress)
 
-            col.label(text="List Item:")
-            self._theme_widget_style(col, ui.wcol_list_item)
+            box = col.box()
+            box.label(text="List Item:")
+            self._theme_widget_style(box, ui.wcol_list_item)
 
         elif theme.theme_area == 'GLOBAL_THEME':
             col = split.column()
 
-            col.label(text="Copy Global Theme To:")
-            copy_split = col.split(factor=0.5)
+            box = col.box()
+            box.label(text="Copy Global Theme To:")
+            copy_split = box.split(factor=0.5)
             copy_left = copy_split.column()
             copy_right = copy_split.column()
 
@@ -920,26 +921,23 @@ class USERPREF_PT_theme(Panel):
             copy_right.prop(theme, "global_copy_console")
             copy_right.prop(theme, "global_copy_clip_editor")
 
-            col.separator(factor=1)
             col.label(text="Shared Theme Space Settings:")
             self._theme_generic(col, theme.global_theme, 'GLOBAL_THEME')
 
-            col.separator(factor=1)
-            col.label(text="All Widget Colors:")
-            self._theme_widget_style(col, theme.global_ui.wcol_regular)
+            box = col.box()
+            box.label(text="All Widget Colors:")
+            self._theme_widget_style(box, theme.global_ui.wcol_regular)
 
             col.label(text="Widget State Colors:")
             self._theme_generic(col, theme.global_ui.wcol_state, 'GLOBAL_THEME')
-
-            col.separator()
-            col.separator()
         elif theme.theme_area == 'BONE_COLOR_SETS':
             col = split.column()
 
             for i, ui in enumerate(theme.bone_color_sets, 1):
-                col.label(iface_(f"Color Set {i:d}"), translate=False)
+                box = col.box()
+                box.label(iface_(f"Color Set {i:d}"), translate=False)
 
-                row = col.row()
+                row = box.row()
 
                 subsplit = row.split(factor=0.95)
 
@@ -961,18 +959,17 @@ class USERPREF_PT_theme(Panel):
 
             style = context.user_preferences.ui_styles[0]
 
-            col.label(text="Panel Title:")
-            self._ui_font_style(col, style.panel_title)
+            box = col.box()
+            box.label(text="Panel Title:")
+            self._ui_font_style(box, style.panel_title)
 
-            col.separator(factor=1)
+            box = col.box()
+            box.label(text="Widget:")
+            self._ui_font_style(box, style.widget)
 
-            col.label(text="Widget:")
-            self._ui_font_style(col, style.widget)
-
-            col.separator(factor=1)
-
-            col.label(text="Widget Label:")
-            self._ui_font_style(col, style.widget_label)
+            box = col.box()
+            box.label(text="Widget Label:")
+            self._ui_font_style(box, style.widget_label)
         else:
             self._theme_generic(split, getattr(theme, theme.theme_area.lower()), theme.theme_area)
 
@@ -1169,109 +1166,87 @@ class USERPREF_PT_input(Panel):
     def draw_input_prefs(inputs, layout):
         import sys
 
-        # Keep the input preferences visually independent from the keymap.
-        layout = layout.box()
+        # Each group of input settings gets its own boxed panel.
+        col = layout.column()
 
-        # General settings
-        row = layout.row()
-        col = row.column()
-
-        sub = col.column()
-        sub.label(text="Presets:")
-        subrow = sub.row(align=True)
-
+        box = col.box()
+        box.label(text="Presets:")
+        subrow = box.row(align=True)
         subrow.menu("USERPREF_MT_interaction_presets", text=bpy.types.USERPREF_MT_interaction_presets.bl_label)
         subrow.operator("wm.interaction_preset_add", text="", icon='ZOOMIN')
         subrow.operator("wm.interaction_preset_add", text="", icon='ZOOMOUT').remove_active = True
-        sub.separator(factor=1)
 
-        sub.label(text="Mouse:")
-        sub1 = sub.column()
-        sub1.active = (inputs.select_mouse == 'RIGHT')
-        sub1.prop(inputs, "use_mouse_emulate_3_button")
-        sub.prop(inputs, "use_mouse_continuous")
+        box = col.box()
+        box.label(text="Mouse:")
+        sub = box.column()
+        sub.active = (inputs.select_mouse == 'RIGHT')
+        sub.prop(inputs, "use_mouse_emulate_3_button")
+        box.prop(inputs, "use_mouse_continuous")
+        sub = box.column(align=True)
         sub.prop(inputs, "drag_threshold")
         sub.prop(inputs, "tweak_threshold")
 
-        sub.label(text="Select With:")
-        sub.row().prop(inputs, "select_mouse", expand=True)
+        box = col.box()
+        box.label(text="Select With:")
+        box.row().prop(inputs, "select_mouse", expand=True)
 
-        sub = col.column()
-        sub.label(text="Double Click:")
-        sub.prop(inputs, "mouse_double_click_time", text="Speed")
+        box = col.box()
+        box.label(text="Double Click:")
+        box.prop(inputs, "mouse_double_click_time", text="Speed")
+        box.prop(inputs, "use_emulate_numpad")
 
-        sub.separator(factor=1)
+        box = col.box()
+        box.label(text="Orbit Style:")
+        box.row().prop(inputs, "view_rotate_method", expand=True)
 
-        sub.prop(inputs, "use_emulate_numpad")
-
-        sub.separator(factor=1)
-
-        sub.label(text="Orbit Style:")
-        sub.row().prop(inputs, "view_rotate_method", expand=True)
-
-        sub.separator(factor=1)
-
-        sub.label(text="Zoom Style:")
-        sub.row().prop(inputs, "view_zoom_method", text="")
+        box = col.box()
+        box.label(text="Zoom Style:")
+        box.row().prop(inputs, "view_zoom_method", text="")
         if inputs.view_zoom_method in {'DOLLY', 'CONTINUE'}:
-            sub.row().prop(inputs, "view_zoom_axis", expand=True)
-            sub.prop(inputs, "invert_mouse_zoom", text="Invert Mouse Zoom Direction")
-
-        #sub.prop(inputs, "use_mouse_mmb_paste")
-
-        # col.separator(factor=1)
-
-        sub = col.column()
-        sub.prop(inputs, "invert_zoom_wheel", text="Invert Wheel Zoom Direction")
-        #sub.prop(view, "wheel_scroll_lines", text="Scroll Lines")
-
+            box.row().prop(inputs, "view_zoom_axis", expand=True)
+            box.prop(inputs, "invert_mouse_zoom", text="Invert Mouse Zoom Direction")
+        box.prop(inputs, "invert_zoom_wheel", text="Invert Wheel Zoom Direction")
         if sys.platform == "darwin":
-            sub = col.column()
-            sub.prop(inputs, "use_trackpad_natural", text="Natural Trackpad Direction")
+            box.prop(inputs, "use_trackpad_natural", text="Natural Trackpad Direction")
 
-        col.separator(factor=1)
-        sub = col.column()
-        sub.label(text="View Navigation:")
-        sub.row().prop(inputs, "navigation_mode", expand=True)
-
-        sub.label(text="Walk Navigation:")
+        box = col.box()
+        box.label(text="View Navigation:")
+        box.row().prop(inputs, "navigation_mode", expand=True)
 
         walk = inputs.walk_navigation
 
-        sub.prop(walk, "use_mouse_reverse")
+        box = col.box()
+        box.label(text="Walk Navigation:")
+        box.prop(walk, "use_mouse_reverse")
+        sub = box.column(align=True)
         sub.prop(walk, "mouse_speed")
         sub.prop(walk, "teleport_time")
-
-        sub = col.column(align=True)
+        sub = box.column(align=True)
         sub.prop(walk, "walk_speed")
         sub.prop(walk, "walk_speed_factor")
 
-        sub.separator(factor=1)
-        sub.prop(walk, "use_gravity")
-        sub = col.column(align=True)
+        box = col.box()
+        box.prop(walk, "use_gravity")
+        sub = box.column(align=True)
         sub.active = walk.use_gravity
         sub.prop(walk, "view_height")
         sub.prop(walk, "jump_height")
 
         if inputs.use_ndof:
-            col.separator(factor=1)
-            col.label(text="NDOF Device:")
-            sub = col.column(align=True)
+            box = col.box()
+            box.label(text="NDOF Device:")
+            sub = box.column(align=True)
             sub.prop(inputs, "ndof_sensitivity", text="Pan Sensitivity")
             sub.prop(inputs, "ndof_orbit_sensitivity", text="Orbit Sensitivity")
             sub.prop(inputs, "ndof_deadzone", text="Deadzone")
 
-            sub.separator(factor=1)
-            col.label(text="Navigation Style:")
-            sub = col.column(align=True)
-            sub.row().prop(inputs, "ndof_view_navigate_method", expand=True)
+            box = col.box()
+            box.label(text="Navigation Style:")
+            box.row().prop(inputs, "ndof_view_navigate_method", expand=True)
 
-            sub.separator(factor=1)
-            col.label(text="Rotation Style:")
-            sub = col.column(align=True)
-            sub.row().prop(inputs, "ndof_view_rotate_method", expand=True)
-
-        row.separator(factor=1)
+            box = col.box()
+            box.label(text="Rotation Style:")
+            box.row().prop(inputs, "ndof_view_rotate_method", expand=True)
 
     def draw(self, context):
         from rna_keymap_ui import draw_keymaps
