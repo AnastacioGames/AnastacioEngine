@@ -1,5 +1,6 @@
 build/
 build_core/
+build_cuda/
 build-web/
 build-android/
 build-cycles/
