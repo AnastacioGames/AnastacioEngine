@@ -169,6 +169,10 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
 Teclado: não desenhar teclado QWERTY na tela. Texto (nome, chat) usa o teclado do sistema Android, que vem de graça,
 quando a engine pedir "abrir teclado"; entra só se algum jogo precisar.
 
+Exemplo para quem está começando (2026-09-25): o template de componente `03_jogador_celular.py`
+(Text Editor > Templates > Components) anda e pula lendo teclado e gamepad 0, então já funciona com os layouts
+`stick` e `dpad` sem nenhum código de toque.
+
 Depois, fora deste escopo:
 - `logic.touches` (dedos crus via `SDL_FINGER*`);
 - vibração;
