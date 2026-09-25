@@ -38,19 +38,31 @@
 class KX_GameObject;
 
 /* Profile tips. */
-const std::string profileTips[12] = {
-    "Time spent on physics calculations.",
-    "Time spent on logic is time that is spent on logic bricks and Python code.",
-    "Time spent on animation calculations.",
-    "Time spent on camera culling.",
-    "Time spent on parent update.",
-    "Time spent actually rendering the game.",
-    "Time spent rendering the shadows.",
-    "Time spent on culling shadows.",
-    "Time spent on activity culling.",
-    "Time spent profiling and system devices.",
-    "Time spent waiting on the GPU.",
-    "Time spent sleep cool down timing the logic rate"};
+/* Must match KX_KetsjiEngine::m_profileLabels order (tc_* enum). */
+const std::string profileTips[] = {
+    "Time spent on physics calculations.",                                         // tc_physics
+    "Time spent on logic bricks and Python code.",                                 // tc_logic
+    "Time spent on animation calculations.",                                       // tc_animations
+    "Time spent deforming meshes (skinning / armature deform).",                   // tc_animations_deform
+    "Time spent on camera culling and LOD update.",                                // tc_network
+    "Time spent on parent update (legacy, always 0).",                             // tc_scenegraph
+    "Time spent actually rendering the game.",                                     // tc_rasterizer
+    "Time spent rendering the shadows.",                                           // tc_shadows
+    "Time spent on culling shadows.",                                              // tc_shadowculling
+    "Time spent on the GPU particle screen-space collision depth pass.",           // tc_collisiondepth
+    "Time spent rendering texture renderers (planar / mirror probes).",            // tc_texturerenderers
+    "Time spent updating GPU particle emitters.",                                  // tc_particles
+    "Time spent updating actuators.",                                              // tc_actuators
+    "Time spent polling input devices and processing UI input.",                   // tc_input
+    "Time spent on parent update after logic.",                                    // tc_scenegraph_logic
+    "Time spent on parent update after actuators.",                                // tc_scenegraph_actuators
+    "Time spent on parent update after physics.",                                  // tc_scenegraph_physics
+    "Time spent on light culling and light updates.",                              // tc_lightupdate
+    "Time spent on post-render and 2D filters.",                                   // tc_filters2d
+    "Time spent on activity culling and system devices.",                          // tc_services
+    "Time not attributed to any other category.",                                  // tc_overhead
+    "Time spent waiting on the GPU.",                                              // tc_latency
+    "Time spent sleeping to cap the logic rate."};                                 // tc_outside
 
 /* RenderQueries tips. */
 const std::string profileQueryTips[3] = {

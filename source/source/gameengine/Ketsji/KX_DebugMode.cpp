@@ -324,6 +324,8 @@ void KX_DebugMode::RenderDebugProperties()
         ImGui::TableSetColumnIndex(0);
         ImGui::TextColored(color, "%s", KX_GetActiveEngine()->m_profileLabels[j].c_str());
         if (ImGui::IsItemHovered()) {
+          static_assert(sizeof(profileTips) / sizeof(profileTips[0]) == KX_KetsjiEngine::tc_numCategories,
+                        "profileTips must have one entry per profile category");
           ImGui::SetTooltip("%s", profileTips[j].c_str());
         }
 

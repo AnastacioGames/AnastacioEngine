@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 26 | 41 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 27 | 42 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,16 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-24 - Debug: crash ao passar o mouse na tabela de Profile
+
+- Sintoma: com "Framerate and Profile" ativo, passar o mouse sobre as linhas da tabela de profile fechava a engine
+  (crash em `ImGui::SetTooltip` chamado por `KX_DebugMode::RenderDebugProperties`).
+- Causa: `profileTips` (`KX_DebugMode.h`) tinha 12 entradas, mas a tabela percorre `tc_numCategories` (23)
+  categorias; o hover nas linhas 13+ lia fora do array. As 12 dicas também estavam fora de ordem em relação às categorias.
+- Correção: `profileTips` reescrito com uma dica por categoria, na ordem do enum `tc_*`, e um `static_assert` em
+  `KX_DebugMode.cpp` que quebra a compilação se alguém adicionar categoria sem dica.
+- Vale para todos os alvos (desktop, Android, web), pois compartilham o mesmo `source`.
 
 ## 2026-09-24 - Veículo: motor em Nm, pedais, joystick, moto e gamepad só no ImGui de gameplay
 
