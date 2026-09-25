@@ -442,35 +442,35 @@ def _draw_binding_properties(layout, wm):
     table = json.loads(wm["input_table_dict"])[wm.input_table_selected_name] if wm.get("input_table_dict") else {}
 
     split = layout.split(factor=0.5)
-    split.label(text="Return Type:", icon="NODETREE")
+    split.label(text="Return Type:")
     split.prop(wm, "binding_type_enum", text="")
     col = layout.column()
     if wm.binding_type_enum == "VALUE":
         row = col.row()
-        row.label(text="Control Type", icon="ANIM")
+        row.label(text="Control Type")
         row.prop(wm, "binding_control_type_enum", text="")
 
     col.separator()
     row = col.row()
-    row.label(text="Bindings:", icon="OUTLINER_OB_LATTICE")
+    row.label(text="Bindings:")
     add = row.operator("wm.input_binding_save", text="", icon='ZOOMIN', emboss=False)
     add.input_map_name = wm.input_map_selected
     add.input_table_name = wm.input_table_selected_name
     bindings = table.get("Bindings", {})
     if not bindings:
-        col.label(text="No binding yet: click + to add a key or a gamepad button", icon="INFO")
+        col.label(text="No binding yet: click + to add a key or a gamepad button")
     for bind, binds in bindings.items():
         _draw_binding(col, wm, bind, binds)
 
     col.separator()
     row = col.row()
-    row.label(text="Processors:", icon="SCRIPTWIN")
+    row.label(text="Processors:")
     add = row.operator("wm.input_add_processor", text="", icon='ZOOMIN', emboss=False)
     add.input_map_name = wm.input_map_selected
     add.input_table_name = wm.input_table_selected_name
     processors = table.get("Processors", {})
     if not processors:
-        col.label(text="Nothing", icon="INFO")
+        col.label(text="Nothing")
     for process in processors:
         _draw_processor(col, wm, process)
 
@@ -494,19 +494,20 @@ def _draw_tables(layout, wm):
 
     for index, item in enumerate(wm.input_table_list):
         is_open = table_open and index == wm.input_table_index
-        box = layout.box()
-        toggle, sub = _header(box, "wm.input_ui_expand", item.name, is_open)
+        # Botao largo como o "Physics" das Game Settings; os botoes da acao ficam colados a direita.
+        row = layout.row(align=True)
+        toggle = row.operator("wm.input_ui_expand", text=item.name, icon="TRIA_DOWN" if is_open else "TRIA_RIGHT")
         toggle.kind = 'TABLE'
         toggle.index = index
-        rename = sub.operator("wm.input_table_rename", text="", icon="GREASEPENCIL", emboss=False)
+        rename = row.operator("wm.input_table_rename", text="", icon="GREASEPENCIL")
         rename.input_map_name = wm.input_map_selected
         rename.input_table_name = item.name
         if is_open:
-            sub.operator("wm.input_map_table", text="", icon='COPYDOWN', emboss=False)
-            remove = sub.operator("wm.input_table_remove", text="", icon='ZOOMOUT', emboss=False)
+            row.operator("wm.input_map_table", text="", icon='COPYDOWN')
+            remove = row.operator("wm.input_table_remove", text="", icon='ZOOMOUT')
             remove.input_map_name = wm.input_map_selected
             remove.remove_active = item.name
-            _draw_binding_properties(box, wm)
+            _draw_binding_properties(layout.box(), wm)
 
 
 class INPUT_OT_expand(Operator):
