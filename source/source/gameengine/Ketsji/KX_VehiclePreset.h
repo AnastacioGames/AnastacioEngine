@@ -70,7 +70,23 @@ struct KX_VehiclePreset {
   short rayCastMask = 1;
 
   std::vector<KX_VehiclePresetWheel> wheels;
+
+  /* Optional "engine" block (game-logic data kept on the chassis
+   * KX_GameObject, not in PHY_IVehicle). Presets without it still load and
+   * leave the engine untouched; hasEngine says whether it was present. */
+  bool hasEngine = false;
+  float maxTorque = 0.0f; /* Nm at the crankshaft. */
+  float maxRPM = 0.0f;
+  int gearboxType = 0; /* OB_GEARBOX_*: 0 automatic, 1 manual. */
+  std::vector<float> gearRatios;
 };
+
+/* Engine block <-> chassis game object (vehicle_max_torque/rpm, gearbox_type,
+ * vehicle_gears copied at conversion). Kept apart from Capture/Apply because
+ * those only see PHY_IVehicle. */
+class KX_GameObject;
+void KX_CaptureVehicleEngine(const KX_GameObject *chassis, KX_VehiclePreset *preset);
+void KX_ApplyVehicleEngine(KX_GameObject *chassis, const KX_VehiclePreset &preset);
 
 /* Parses and fully validates `jsonText` as a vehicle_preset_v1 document.
  * Returns false and fills *error (never empty) on any structural problem:

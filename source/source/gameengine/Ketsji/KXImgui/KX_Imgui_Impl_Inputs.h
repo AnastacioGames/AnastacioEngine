@@ -13,6 +13,11 @@ IMGUI_IMPL_API bool     KX_ImGui_Impl_Inputs_InitForOpenGL(SCA_IInputDevice* m_i
 
 IMGUI_IMPL_API void     KX_ImGui_Impl_Inputs_Shutdown();
 IMGUI_IMPL_API void     KX_ImGui_Impl_Inputs_NewFrame();
+// Marks the window being drawn (id = ImGuiWindow::ID) as a gameplay menu for this
+// frame. Only those windows (and popups/children opened from them) receive gamepad
+// navigation; engine debug windows (Debug Mode, Vehicle/Particle Lab, console) never
+// do, so the controller keeps driving the game while a debug panel is focused.
+IMGUI_IMPL_API void     KX_ImGui_Impl_Inputs_MarkGameplayWindow(unsigned int windowId);
 //IMGUI_IMPL_API bool     ImGui_ImplSDL2_ProcessEvent(const SDL_Event* event);
 IMGUI_IMPL_API void     KX_ImGui_Impl_Inputs_ProcessEvent();
 

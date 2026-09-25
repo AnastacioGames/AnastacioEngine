@@ -32,6 +32,8 @@
 
 #include "implot.h"  // pulls in imgui.h
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
+#include "KX_Imgui_Impl_Inputs.h"
 
 #include "KX_KetsjiEngine.h"
 #include "KX_Globals.h"
@@ -55,6 +57,8 @@ static PyObject *gPyImgui_Begin(PyObject *, PyObject *args, PyObject *kwds)
 
 	bool open = true;
 	bool isOpen = ImGui::Begin(name, closable ? &open : nullptr);
+	// Python-drawn windows are game menus: the only ones gamepad navigation reaches.
+	KX_ImGui_Impl_Inputs_MarkGameplayWindow(ImGui::GetCurrentWindow()->ID);
 	bool wantClose = closable && !open;
 
 	PyObject *result = PyTuple_New(2);

@@ -35,6 +35,7 @@
 
 #include "BLI_blenlib.h"
 #include "cJSON.h"
+#include "KX_GameObject.h"
 #include "PHY_IVehicle.h"
 
 namespace {
@@ -50,6 +51,7 @@ const float kStructuralComparisonEpsilon = 1e-5f;
  * that panel). Guards against a corrupt/hostile file claiming millions of
  * wheels. */
 const int kMaxWheels = 32;
+const int kMaxGears = 16;
 
 bool IsFiniteVec3(const mt::vec3 &v)
 {
@@ -305,6 +307,40 @@ bool KX_ParseVehiclePreset(const std::string &jsonText, KX_VehiclePreset *out, s
     }
   }
 
+  const cJSON *engine = ok ? cJSON_GetObjectItemCaseSensitive(root, "engine") : nullptr;
+  if (ok && engine) {
+    if (!cJSON_IsObject(engine)) {
+      localError = "field \"engine\" must be an object";
+      ok = false;
+    }
+    else if (!GetFloat(engine, "maxTorque", &preset.maxTorque, &localError) ||
+             !GetFloat(engine, "maxRPM", &preset.maxRPM, &localError) ||
+             !GetIntInRange(engine, "gearboxType", 0, 1, &preset.gearboxType, &localError)) {
+      localError = "engine: " + localError;
+      ok = false;
+    }
+    else if (preset.maxTorque < 0.0f || preset.maxRPM < 0.0f) {
+      localError = "engine: maxTorque/maxRPM must be >= 0";
+      ok = false;
+    }
+    const cJSON *gears = ok ? cJSON_GetObjectItemCaseSensitive(engine, "gearRatios") : nullptr;
+    if (ok && (!cJSON_IsArray(gears) || cJSON_GetArraySize(gears) > kMaxGears)) {
+      localError = "engine: \"gearRatios\" must be an array of at most " + std::to_string(kMaxGears) + " numbers";
+      ok = false;
+    }
+    for (int i = 0; ok && i < cJSON_GetArraySize(gears); i++) {
+      const cJSON *item = cJSON_GetArrayItem(gears, i);
+      if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) || item->valuedouble == 0.0) {
+        localError = "engine: gearRatios[" + std::to_string(i) + "] must be a finite non-zero number";
+        ok = false;
+      }
+      else {
+        preset.gearRatios.push_back((float)item->valuedouble);
+      }
+    }
+    preset.hasEngine = ok;
+  }
+
   cJSON_Delete(root);
 
   if (!ok) {
@@ -347,6 +383,19 @@ std::string KX_SerializeVehiclePreset(const KX_VehiclePreset &preset)
     cJSON_AddItemToArray(wheelsArr, w);
   }
   cJSON_AddItemToObject(root, "wheels", wheelsArr);
+
+  if (preset.hasEngine) {
+    cJSON *engine = cJSON_CreateObject();
+    cJSON_AddNumberToObject(engine, "maxTorque", preset.maxTorque);
+    cJSON_AddNumberToObject(engine, "maxRPM", preset.maxRPM);
+    cJSON_AddNumberToObject(engine, "gearboxType", preset.gearboxType);
+    cJSON *gears = cJSON_CreateArray();
+    for (float ratio : preset.gearRatios) {
+      cJSON_AddItemToArray(gears, cJSON_CreateNumber(ratio));
+    }
+    cJSON_AddItemToObject(engine, "gearRatios", gears);
+    cJSON_AddItemToObject(root, "engine", engine);
+  }
 
   char *outStr = cJSON_Print(root);
   std::string result(outStr);
@@ -534,4 +583,30 @@ bool KX_ApplyVehiclePreset(PHY_IVehicle *vehicle, const KX_VehiclePreset &preset
   }
 
   return true;
+}
+
+void KX_CaptureVehicleEngine(const KX_GameObject *chassis, KX_VehiclePreset *preset)
+{
+  if (!chassis || !preset) {
+    return;
+  }
+  preset->hasEngine = true;
+  preset->maxTorque = chassis->GetVehicleMaxTorque();
+  preset->maxRPM = chassis->GetVehicleMaxRPM();
+  preset->gearboxType = chassis->GetVehicleGearboxType();
+  preset->gearRatios = chassis->GetVehicleGearRatios();
+  if (preset->gearRatios.size() > (size_t)kMaxGears) {
+    preset->gearRatios.resize(kMaxGears);
+  }
+}
+
+void KX_ApplyVehicleEngine(KX_GameObject *chassis, const KX_VehiclePreset &preset)
+{
+  if (!chassis || !preset.hasEngine) {
+    return;
+  }
+  chassis->SetVehicleMaxTorque(preset.maxTorque);
+  chassis->SetVehicleMaxRPM(preset.maxRPM);
+  chassis->SetVehicleGearboxType((short)preset.gearboxType);
+  chassis->SetVehicleGearRatios(preset.gearRatios);
 }

@@ -29,6 +29,7 @@
 
 #include "KX_VehicleDebugUI.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cctype>
 #include <fstream>
@@ -58,6 +59,13 @@ KX_VehicleDebugUI::KX_VehicleDebugUI()
 
 KX_VehicleDebugUI::~KX_VehicleDebugUI()
 {
+}
+
+static KX_GameObject *GetChassisObject(PHY_IVehicle *vehicle)
+{
+  PHY_IPhysicsController *controller = vehicle ? vehicle->GetChassisController() : nullptr;
+  KX_ClientObjectInfo *info = controller ? static_cast<KX_ClientObjectInfo *>(controller->GetNewClientInfo()) : nullptr;
+  return info ? info->m_gameobject : nullptr;
 }
 
 std::string KX_VehicleDebugUI::GetPresetPath(PHY_IVehicle *vehicle) const
@@ -90,6 +98,7 @@ void KX_VehicleDebugUI::AutoLoadPresets()
     KX_VehiclePreset preset;
     std::string error;
     if (KX_LoadVehiclePreset(path, &preset, &error) && KX_ApplyVehiclePreset(vehicle, preset, &error)) {
+      KX_ApplyVehicleEngine(GetChassisObject(vehicle), preset);
       m_presetStatus = "Auto-loaded: " + path;
       printf("Vehicle Lab: %s\n", m_presetStatus.c_str());
     } else {
@@ -170,7 +179,7 @@ void KX_VehicleDebugUI::RenderOverviewTab(PHY_IVehicle *vehicle)
   KX_GameObject *chassis = info ? info->m_gameobject : nullptr;
   EXP_Value *gear = chassis ? chassis->GetProperty("vehicle_gear") : nullptr;
   if (!gear) {
-    ImGui::TextDisabled("Gear/RPM: enable \"Publish Telemetry\" or \"Show HUD\" in the vehicle component.");
+    ImGui::TextDisabled("Gear/RPM: add the vehicle player component to the chassis.");
     return;
   }
   EXP_Value *gearbox = chassis->GetProperty("vehicle_gearbox");
@@ -372,6 +381,63 @@ void KX_VehicleDebugUI::RenderEditTab(PHY_IVehicle *vehicle)
   }
 }
 
+void KX_VehicleDebugUI::RenderEngineTab(PHY_IVehicle *vehicle)
+{
+  KX_GameObject *chassis = GetChassisObject(vehicle);
+  if (!chassis) {
+    ImGui::TextDisabled("No chassis game object.");
+    return;
+  }
+  ImGui::TextDisabled(
+      "Engine data read by the vehicle component every frame (not by the physics engine). "
+      "Changes apply live, are saved with the preset and do not change the .range file.");
+  ImGui::Separator();
+
+  float torque = chassis->GetVehicleMaxTorque();
+  if (ImGui::DragFloat("Max torque (Nm)", &torque, 1.0f, 0.0f, 2000.0f, "%.0f") && std::isfinite(torque)) {
+    chassis->SetVehicleMaxTorque(std::max(torque, 0.0f));
+  }
+  float rpm = chassis->GetVehicleMaxRPM();
+  if (ImGui::DragFloat("Max RPM", &rpm, 10.0f, 0.0f, 20000.0f, "%.0f") && std::isfinite(rpm)) {
+    chassis->SetVehicleMaxRPM(std::max(rpm, 0.0f));
+  }
+  int gearbox = chassis->GetVehicleGearboxType();
+  const char *gearboxNames[] = {"Automatic", "Manual"};
+  if (ImGui::Combo("Gearbox", &gearbox, gearboxNames, 2)) {
+    chassis->SetVehicleGearboxType((short)gearbox);
+  }
+
+  ImGui::Separator();
+  ImGui::TextDisabled("Gear ratios: negative = reverse. 1st gear has the largest ratio.");
+  std::vector<float> ratios = chassis->GetVehicleGearRatios();
+  bool changed = false;
+  int removeIndex = -1;
+  for (int i = 0; i < (int)ratios.size(); i++) {
+    ImGui::PushID(i);
+    std::string label = ratios[i] < 0.0f ? "Reverse" : ("Gear " + std::to_string(i + 1));
+    if (ImGui::DragFloat(label.c_str(), &ratios[i], 0.01f, -20.0f, 20.0f, "%.2f") && std::isfinite(ratios[i]) &&
+        ratios[i] != 0.0f) {
+      changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("X")) {
+      removeIndex = i;
+    }
+    ImGui::PopID();
+  }
+  if (removeIndex >= 0) {
+    ratios.erase(ratios.begin() + removeIndex);
+    changed = true;
+  }
+  if (ratios.size() < 16 && ImGui::Button("Add gear")) {
+    ratios.push_back(ratios.empty() ? 3.5f : std::max(ratios.back() * 0.75f, 0.5f));
+    changed = true;
+  }
+  if (changed) {
+    chassis->SetVehicleGearRatios(ratios);
+  }
+}
+
 void KX_VehicleDebugUI::RenderStructuralTab(PHY_IVehicle *vehicle)
 {
   ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.25f, 1.0f), "LOCKED: structural fields require rebuildPreset().");
@@ -399,14 +465,19 @@ void KX_VehicleDebugUI::RenderPresetsTab(PHY_IVehicle *vehicle)
     BLI_dir_create_recursive(directory);
     KX_VehiclePreset preset;
     std::string error;
-    if (KX_CaptureVehiclePreset(vehicle, &preset, &error) && KX_SaveVehiclePresetAtomic(path, preset, &error)) m_presetStatus = "Saved: " + path;
+    bool captured = KX_CaptureVehiclePreset(vehicle, &preset, &error);
+    if (captured) KX_CaptureVehicleEngine(GetChassisObject(vehicle), &preset);
+    if (captured && KX_SaveVehiclePresetAtomic(path, preset, &error)) m_presetStatus = "Saved: " + path;
     else m_presetStatus = "Save failed: " + error;
   }
   ImGui::SameLine();
   if (ImGui::Button("Load preset")) {
     KX_VehiclePreset preset;
     std::string error;
-    if (KX_LoadVehiclePreset(path, &preset, &error) && KX_ApplyVehiclePreset(vehicle, preset, &error)) m_presetStatus = "Loaded: " + path;
+    if (KX_LoadVehiclePreset(path, &preset, &error) && KX_ApplyVehiclePreset(vehicle, preset, &error)) {
+      KX_ApplyVehicleEngine(GetChassisObject(vehicle), preset);
+      m_presetStatus = "Loaded: " + path;
+    }
     else m_presetStatus = "Load refused: " + error;
   }
   ImGui::TextDisabled("Auto-load runs once when this vehicle appears. Incompatible structural files are refused without changing the car.");
@@ -560,6 +631,10 @@ void KX_VehicleDebugUI::Render(bool *open)
     }
     if (ImGui::BeginTabItem("Edit")) {
       RenderEditTab(vehicle);
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Engine")) {
+      RenderEngineTab(vehicle);
       ImGui::EndTabItem();
     }
     if (ImGui::BeginTabItem("Structure (locked)")) {

@@ -3707,9 +3707,9 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0.0f, 1000.0f, 10, 1);
 	RNA_def_property_float_default(prop, 320.0f);
 	RNA_def_property_ui_text(prop, "Max Torque",
-	                          "Arcade-feel max engine torque; 0 uses game logic's built-in default. "
-	                          "Consumed by game logic (not the physics engine) to scale applied engine "
-	                          "force");
+	                          "Max engine torque in Nm at the crankshaft (e.g. ~175 for a 1.8 engine); 0 uses "
+	                          "game logic's legacy fixed force. Consumed by game logic (not the physics "
+	                          "engine): wheel force = torque x gear x final drive / wheel radius");
 	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
 	prop = RNA_def_property(srna, "vehicle_max_rpm", PROP_FLOAT, PROP_NONE);

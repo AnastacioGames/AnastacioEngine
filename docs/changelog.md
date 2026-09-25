@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 25 | 41 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 26 | 41 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -24,12 +24,28 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
 
+## 2026-09-24 - Veículo: motor em Nm, pedais, joystick, moto e gamepad só no ImGui de gameplay
+
+- `vehicle_player_component.py` (projeto de teste, demo `Vehicle` e template do flowmenu, mantidos idênticos):
+  torque em Nm; neutro (N) e ré (R) no câmbio; pedais acelerador/ré/freio com ré virtual; "Invert Direction";
+  telemetria sempre publicada; "Throttle Time (s)" (rampa de pedal no teclado) e "Engine Inertia" (RPM sobe/desce
+  com inércia, mais lento em neutro).
+- Joystick no mesmo componente (seção Joystick): analógico esquerdo = direção, RT/LT = acelerar/ré, B = freio,
+  X = freio de mão, LB/RB = marchas, A = empinar; índice e zona morta configuráveis.
+- Seção Moto: checkbox "Motorcycle" com equilíbrio PD em torno do eixo à frente (inclina para dentro da curva conforme
+  a velocidade), "Max Wheelie (deg)" (trava de empinar, padrão 45°) e "Wheelie Key" (Shift esquerdo) / botão A com
+  "Wheelie Force" e "Wheelie Min Speed". Na moto a tecla de empinar tem prioridade sobre o freio de mão se coincidirem.
+- `KX_Imgui_Impl_Inputs.cpp`/`KX_PythonImgui.cpp`: o gamepad só navega janelas ImGui criadas pelo Python
+  (`imgui.begin`, gameplay); menus de debug nativos recebem os botões como soltos.
+- `KX_VehiclePreset` ganhou bloco opcional `engine` (torque, RPM, câmbio, relações); `KX_VehicleDebugUI` ganhou aba
+  Engine. Build de `RangeEngine`/`RangeRuntime` ok; validado no jogo pelo usuário.
+
 ## 2026-09-24 - Veículo: telemetria de marcha/RPM no HUD e no Vehicle Lab
 
 - `vehicle_player_component.py` (projeto de teste, demo `Vehicle` e template do flowmenu): seções Motor, Freios,
   Direção, Câmbio, Controles e Telemetria; teclas configuráveis de troca (E/Q por padrão) e RPM de subida/descida do
   automático. "Publish Telemetry" grava `vehicle_gearbox`, `vehicle_gear`, `vehicle_rpm` e `vehicle_speed_kmh` no chassi;
-  "Show HUD" mostra essas propriedades no debug. No manual a troca vale a qualquer velocidade.
+  "Show HUD" mostra essas propriedades no debug (depois removido: a telemetria passou a ser sempre publicada). No manual a troca vale a qualquer velocidade.
 - `KX_VehicleDebugUI.cpp`: aba Overview do Vehicle Lab mostra câmbio, marcha e RPM lidos dessas propriedades (ou dica
   para ligar a telemetria). Compilado; validação no jogo pendente com o usuário.
 

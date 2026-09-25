@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "KX_Imgui_Impl_Inputs.h"
 
 // RangeEngine Implementation
@@ -414,6 +415,39 @@ static void ImGui_ImplSDL2_UpdateMouseData()
  * physical device index is safe -- SDL keeps them in sync -- and keeps this backend
  * self-contained, matching how it already talks to SDL directly for mouse cursors/clipboard
  * above. Standard mapping, ported from Dear ImGui's own imgui_impl_sdl2.cpp backend. */
+/* Gameplay windows marked while drawing the previous frame (filled by
+ * KX_ImGui_Impl_Inputs_MarkGameplayWindow, swapped at each NewFrame). */
+static ImVector<ImGuiID> s_gameplayWindowsDrawing;
+static ImVector<ImGuiID> s_gameplayWindows;
+
+void KX_ImGui_Impl_Inputs_MarkGameplayWindow(unsigned int windowId)
+{
+    if (!s_gameplayWindowsDrawing.contains(windowId)) {
+        s_gameplayWindowsDrawing.push_back(windowId);
+    }
+}
+
+/* Gamepad drives ImGui only when navigation is on a gameplay menu (or on a popup/child
+ * whose parent chain reaches one). With nothing focused it is allowed only if a
+ * gameplay menu is on screen, so the controller can enter the game menu but never
+ * lands on an engine debug window. */
+static bool ImGui_ImplSDL2_GamepadTargetsGameplay()
+{
+    if (s_gameplayWindows.empty()) {
+        return false;
+    }
+    ImGuiContext *ctx = ImGui::GetCurrentContext();
+    if (ctx->NavWindow == nullptr) {
+        return true;
+    }
+    for (ImGuiWindow *w = ctx->NavWindow; w != nullptr; w = w->ParentWindow) {
+        if (s_gameplayWindows.contains(w->ID)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void ImGui_ImplSDL2_UpdateGamepads()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -443,13 +477,17 @@ static void ImGui_ImplSDL2_UpdateGamepads()
     }
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
 
+    // Outside gameplay menus every gamepad key is reported released (not just
+    // skipped), so nothing stays held when focus moves to a debug window.
+    const bool gate = ImGui_ImplSDL2_GamepadTargetsGameplay();
+
 #define IM_SAT(V) (V < 0.0f ? 0.0f : V > 1.0f ? 1.0f : V)
 #define MAP_BUTTON(KEY_NO, BUTTON_NO) \
-    { io.AddKeyEvent(KEY_NO, SDL_GameControllerGetButton(bd->GameController, BUTTON_NO) != 0); }
+    { io.AddKeyEvent(KEY_NO, gate && SDL_GameControllerGetButton(bd->GameController, BUTTON_NO) != 0); }
 #define MAP_ANALOG(KEY_NO, AXIS_NO, V0, V1) \
     { \
         float vn = (float)(SDL_GameControllerGetAxis(bd->GameController, AXIS_NO) - V0) / (float)(V1 - V0); \
-        vn = IM_SAT(vn); \
+        vn = gate ? IM_SAT(vn) : 0.0f; \
         io.AddKeyAnalogEvent(KEY_NO, vn > 0.1f, vn); \
     }
     const int thumb_dead_zone = 8000;  // suggested by SDL_gamecontroller.h
@@ -538,5 +576,7 @@ void KX_ImGui_Impl_Inputs_NewFrame()
     ImGui_ImplSDL2_UpdateMouseCursor();
 
     // Update game controllers (if enabled and available)
+    s_gameplayWindows.swap(s_gameplayWindowsDrawing);
+    s_gameplayWindowsDrawing.resize(0);
     ImGui_ImplSDL2_UpdateGamepads();
 }

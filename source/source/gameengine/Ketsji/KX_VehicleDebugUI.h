@@ -93,6 +93,7 @@ class KX_VehicleDebugUI
   void RenderDebugDrawTab();
   void RenderTelemetryTab(PHY_IVehicle *vehicle);
   void RenderEditTab(PHY_IVehicle *vehicle);
+  void RenderEngineTab(PHY_IVehicle *vehicle);
   void RenderStructuralTab(PHY_IVehicle *vehicle);
   void RenderPresetsTab(PHY_IVehicle *vehicle);
   std::string GetPresetPath(PHY_IVehicle *vehicle) const;
