@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Material: painel Options do modo jogo
+
+Só interface e textos, sem mudar como o jogo desenha nem o que o `.blend` guarda:
+
+- Escondidos no modo jogo, porque o motor não lê: `Invert Z Depth` (`MA_ZINV`, só `zbuf.c`) e `Light Group Exclusive` (`MA_GROUP_NOLAY`, só `convertblender.c`). Continuam no painel do render antigo.
+- Light Group/Local ficavam cinza em todo material que não fosse Halo: o `sub.active` do Point Size pegava a coluna inteira. Agora "Halo Options" só aparece em material Halo.
+- Z Offset não fica mais cinza sem Z Transparency: o jogo aplica o offset em qualquer material (`KX_BlenderMaterial`, `SetPolygonOffset`).
+- Aviso quando Geometry Instancing e GPU Skinning estão ligados juntos (`BL_BlenderShader::UseInstancing` desliga o instancing nesse caso).
+- Tooltips no RNA de `offset_z`, `pass_index` (chega ao shader pelo nó Object Info) e `use_full_sky` (só com céu Atmospheric e sem textura de ambiente), com traduções PT-BR/ES/RU.
+
 ## 2026-09-25 - Material: painel Transparency do modo jogo
 
 Só interface e textos, sem mudar como o jogo desenha nem o que o `.blend` guarda. O painel agora mostra o que o motor faz de fato (`KX_BlenderMaterial`, `RAS_BucketManager`, `gpu_material.c`):

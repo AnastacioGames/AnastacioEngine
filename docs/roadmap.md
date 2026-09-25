@@ -249,6 +249,8 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Painel Transparency do modo jogo (2026-09-25)**: conferir no editor o layout novo e os dois avisos
   (Mask/Raytrace + Opaque; Depth Transparency sem efeito). Em aberto, sem decisão: a pré-passada de
   profundidade de Clip/Alpha to Coverage em `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
+- **Painel Options do modo jogo (2026-09-25)**: conferir no editor o painel sem Invert Z/Exclusive, Light Group
+  ativo fora de Halo, Z Offset sempre ativo e o aviso de Instancing + GPU Skinning.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

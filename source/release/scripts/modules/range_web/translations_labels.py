@@ -460,6 +460,8 @@ TABLE = (
     ("Insert Key", "Inserir chave", "Insertar clave", "Вставить ключ"),
     ("Insert Keyframe...", "Inserir quadro-chave...", "Insertar fotograma clave...", "Вставить ключевой кадр..."),
     ("Inset Faces", "Inserir faces internas", "Insertar caras", "Вставить грани"),
+    ("Instancing is ignored with GPU Skinning", "Instancing é ignorado com GPU Skinning",
+     "Instancing se ignora con GPU Skinning", "Instancing игнорируется при GPU Skinning"),
     ("Interactive Mirror", "Espelho interativo", "Espejo interactivo", "Интерактивное отражение"),
     ("Interface", "Interface", "Interfaz", "Интерфейс"),
     ("Interior Faces", "Faces internas", "Caras interiores", "Внутренние грани"),

@@ -881,11 +881,11 @@ class MATERIAL_PT_game_options(MaterialButtonsPanel, Panel):
         box = split.box()
         box.label(text="Render:", icon="RENDER_STILL")
         col = box.column()
+        # Invert Z Depth and Light Group Exclusive are not shown: only the
+        # offline renderer reads them (zbuf.c, convertblender.c).
         if simple_material(base_mat):
-            col.prop(mat, "invert_z")
-            sub = col.row()
-            sub.prop(mat, "offset_z")
-            sub.active = mat.use_transparency and mat.transparency_method == 'Z_TRANSPARENCY'
+            # The game engine applies Z Offset to every material, not only Z transparency.
+            col.prop(mat, "offset_z")
         sub = col.column(align=True)
 
         sub.separator(factor=1.4)
@@ -894,12 +894,13 @@ class MATERIAL_PT_game_options(MaterialButtonsPanel, Panel):
         sub.prop(mat, "light_group", text="")
         row = sub.row(align=True)
         row.active = bool(mat.light_group)
-        row.prop(mat, "use_light_group_exclusive", text="Exclusive")
         row.prop(mat, "use_light_group_local", text="Local")
 
-        sub.active = (mat.type == "HALO")
-        sub.label(text="Halo Options:")
-        sub.prop(mat, "point_size", text="Point Size")
+        if mat.type == 'HALO':
+            sub = col.column(align=True)
+            sub.separator(factor=1.4)
+            sub.label(text="Halo Options:")
+            sub.prop(mat, "point_size", text="Point Size")
 
         box = split.box()
         box.label(text="Object:", icon="OBJECT_DATA")
@@ -911,6 +912,9 @@ class MATERIAL_PT_game_options(MaterialButtonsPanel, Panel):
         col.prop(mat, "use_object_color")
         col.prop(mat, "use_instancing")
         col.prop(mat, "use_gpu_skinning")
+        if mat.use_instancing and mat.use_gpu_skinning:
+            # BL_BlenderShader::UseInstancing() turns instancing off when skinning is on.
+            col.label(text="Instancing is ignored with GPU Skinning", icon='ERROR')
         col.prop(mat, "pass_index")
 
 class MATERIAL_PT_shadow(MaterialButtonsPanel, Panel):

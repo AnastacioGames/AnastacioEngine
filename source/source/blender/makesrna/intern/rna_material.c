@@ -2106,7 +2106,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "pass_index", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "index");
-	RNA_def_property_ui_text(prop, "Pass Index", "Index number for the \"Material Index\" render pass");
+	RNA_def_property_ui_text(prop, "Pass Index", "Index number for the \"Material Index\" render pass (game engine: read in shaders through the Object Info node)");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Material_update");
 
 	/* flags */
@@ -2159,7 +2159,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "offset_z", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "zoffs");
-	RNA_def_property_ui_text(prop, "Z Offset", "Give faces an artificial offset in the Z buffer for Z transparency");
+	RNA_def_property_ui_text(prop, "Z Offset", "Give faces an artificial offset in the Z buffer (render: Z transparency only; game engine: any material, e.g. decals or avoiding z-fighting)");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
 	prop = RNA_def_property(srna, "use_sky", PROP_BOOLEAN, PROP_NONE);
@@ -2218,7 +2218,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_full_sky", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode2", MA_USEFULLSKY);
-	RNA_def_property_ui_text(prop, "Use Full Sky", "Render the sky with sun");
+	RNA_def_property_ui_text(prop, "Use Full Sky", "Include the sun in the sky reflected by this material (only with the Atmospheric sky type and no world environment texture)");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
 	prop = RNA_def_property(srna, "use_transparent_shadows", PROP_BOOLEAN, PROP_NONE);
