@@ -1,0 +1,21 @@
+{
+    "htrhtrh": {
+        "Type": "BUTTON",
+        "ControlType": "VECTOR1D",
+        "Bindings": {},
+        "Processors": {
+            "INVERTVALUES": {
+                "X": 0
+            },
+            "LERPVALUES": {
+                "X": 0.0
+            }
+        }
+    },
+    "jjj": {
+        "Type": "BUTTON",
+        "ControlType": "VECTOR1D",
+        "Bindings": {},
+        "Processors": {}
+    }
+}
