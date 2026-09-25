@@ -67,17 +67,18 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
         box = layout.box()
         box.label(text="Colors:", icon="COLOR")
         split = box.split()
-        col = split.column()
-        col.prop(world, "horizon_color", text="Horizon")
-        col.prop(world, "ambient_color", text="Ambient")
+        split.column().prop(world, "horizon_color", text="Horizon")
+        split.column().prop(world, "ambient_color", text="Ambient")
 
-        col = split.column()
         if world.use_sky_atmospheric:
-            col.prop(world, "zenith_color", text="Extinction")
-            col.prop(world, "nadir_color", text="Inscattering")
+            split.column().prop(world, "zenith_color", text="Extinction")
+            split.column().prop(world, "nadir_color", text="Inscattering")
         else:
+            col = split.column()
             col.active = world.use_sky_blend
             col.prop(world, "zenith_color", text="Zenith")
+            col = split.column()
+            col.active = world.use_sky_blend
             col.prop(world, "nadir_color", text="Nadir")
 
         # Sun
@@ -102,7 +103,7 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
         row.prop(world, "use_sky_stars", text="Stars")
         row.prop(world, "use_sky_moon", text="Moon")
 
-        row = box.row(align=True)
+        row = box.row()
         row.active = world.use_sky_moon
         row.prop(world, "moon_size", text="Moon Size")
         row.prop(world, "moon_brightness", text="Brightness")
