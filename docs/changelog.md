@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 39 | 53 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 40 | 55 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,22 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-25 - Template de componente "03 Jogador Celular" (teclado, gamepad e controle na tela)
+
+- Novo `release/scripts/templates_components/03_jogador_celular.py`, em Text Editor > Templates > Components.
+  É o exemplo recomendado para quem não programa: anexa ao jogador e ajusta `Speed`, `Jump Speed`,
+  `Move Relative To Object` e `Stick Deadzone` no painel. Anda com WASD/setas, stick esquerdo ou d-pad do gamepad 0
+  e pula com Espaço ou botão A; o controle na tela (layouts `stick` e `dpad`) chega como gamepad 0, então o mesmo
+  código serve ao PC, ao controle USB e ao celular. O comentário do topo é o passo a passo e explica que em
+  `activeButtons` o botão A é 0 (no Input System é 1).
+- Chão por `collisionCallbacks` (contato abaixo do centro com normal quase vertical), não por velocidade vertical
+  perto de zero: depois de cair, a física deixa ~0,18→0,02 de velocidade por ~10 quadros e o pulo era ignorado.
+  Objeto sem física anda, e o console avisa que ele não pula (sem traceback).
+- Teste no `RangeRuntime.exe` (Windows) com cena gerada por script e input simulado no componente: componente
+  carregado do `.range`, 3,33 m em 40 quadros com `Speed` 5, pulo 1 quadro após tocar o chão (0,49→1,29 m em
+  10 quadros), sem pulo duplo no ar. Teclado, gamepad e toque reais não foram apertados nesse teste. Linux não
+  testado; o template é só Python e usa a numeração SDL dos botões, igual nas duas plataformas.
 
 ## 2026-09-25 - Export Game: painéis RangeArmor, Web e Android divididos em caixas
 
