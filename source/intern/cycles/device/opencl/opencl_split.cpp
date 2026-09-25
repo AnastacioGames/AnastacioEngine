@@ -997,8 +997,9 @@ void OpenCLDevice::mem_copy_to(device_memory& mem)
 
 void OpenCLDevice::mem_copy_from(device_memory& mem, int y, int w, int h, int elem)
 {
-	size_t offset = elem*y*w;
-	size_t size = elem*w*h;
+	/* Promote before multiplying: render buffers can exceed the range of int. */
+	size_t offset = (size_t)elem * y * w;
+	size_t size = (size_t)elem * w * h;
 	assert(size != 0);
 	opencl_assert(clEnqueueReadBuffer(cqCommandQueue,
 	                                  CL_MEM_PTR(mem.device_pointer),

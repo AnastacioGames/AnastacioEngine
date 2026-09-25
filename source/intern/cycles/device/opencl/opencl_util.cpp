@@ -16,6 +16,9 @@
 
 #ifdef WITH_OPENCL
 
+#include <climits>
+#include <cstdlib>
+
 #include "device/opencl/opencl.h"
 #include "device/device_intern.h"
 
@@ -392,8 +395,13 @@ bool OpenCLDevice::OpenCLProgram::compile_kernel(const string *debug_src)
 
 static void escape_python_string(string& str)
 {
-	/* Escape string to be passed as a Python raw string with '' quotes'. */
-	string_replace(str, "'", "\'");
+	/* Escape a regular Python string literal delimited by single quotes. Raw
+	 * strings are not suitable here: a trailing backslash and a quote in a
+	 * device name or a cache path would make the generated expression invalid. */
+	string_replace(str, "\\", "\\\\");
+	string_replace(str, "'", "\\'");
+	string_replace(str, "\r", "\\r");
+	string_replace(str, "\n", "\\n");
 }
 
 bool OpenCLDevice::OpenCLProgram::compile_separate(const string& clbin)
@@ -418,7 +426,7 @@ bool OpenCLDevice::OpenCLProgram::compile_separate(const string& clbin)
 
 	args.push_back(
 		string_printf(
-			"import _cycles; _cycles.opencl_compile(r'%d', r'%s', r'%s', r'%s', r'%s', r'%s')",
+			"import _cycles; _cycles.opencl_compile('%d', '%s', '%s', '%s', '%s', '%s')",
 			device_platform_id,
 			device_name.c_str(),
 			platform_name.c_str(),
@@ -443,7 +451,22 @@ bool OpenCLDevice::OpenCLProgram::compile_separate(const string& clbin)
  * module compile kernels. Parameters must match function above. */
 bool device_opencl_compile_kernel(const vector<string>& parameters)
 {
-	int device_platform_id = std::stoi(parameters[0]);
+	/* This entry point is exposed through _cycles.opencl_compile(). Do not let
+	 * malformed Python arguments escape as an out-of-range access or exception
+	 * in the background compiler process. */
+	if(parameters.size() != 6) {
+		return false;
+	}
+
+	char *end = NULL;
+	const long parsed_device_platform_id = strtol(parameters[0].c_str(), &end, 10);
+	if(end == parameters[0].c_str() || *end != '\0' || parsed_device_platform_id < 0 ||
+	   parsed_device_platform_id > INT_MAX)
+	{
+		return false;
+	}
+
+	const int device_platform_id = (int)parsed_device_platform_id;
 	const string& device_name = parameters[1];
 	const string& platform_name = parameters[2];
 	const string& build_options = parameters[3];

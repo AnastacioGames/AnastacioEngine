@@ -558,7 +558,7 @@ public:
 		CUDAContextScope scope(this);
 
 		string cubin_data;
-		CUresult result;
+		CUresult result, filter_result;
 
 		if(path_read_text(cubin, cubin_data))
 			result = cuModuleLoadData(&cuModule, cubin_data.c_str());
@@ -569,18 +569,21 @@ public:
 			cuda_error_message(string_printf("Failed loading CUDA kernel %s.", cubin.c_str()));
 
 		if(path_read_text(filter_cubin, cubin_data))
-			result = cuModuleLoadData(&cuFilterModule, cubin_data.c_str());
+			filter_result = cuModuleLoadData(&cuFilterModule, cubin_data.c_str());
 		else
-			result = CUDA_ERROR_FILE_NOT_FOUND;
+			filter_result = CUDA_ERROR_FILE_NOT_FOUND;
 
-		if(cuda_error_(result, "cuModuleLoad"))
+		if(cuda_error_(filter_result, "cuModuleLoad"))
 			cuda_error_message(string_printf("Failed loading CUDA kernel %s.", filter_cubin.c_str()));
 
-		if(result == CUDA_SUCCESS) {
-			reserve_local_memory(requested_features);
-		}
+		/* Both modules are required; don't let a successful filter load hide a
+		 * failed render kernel load. */
+		if(result != CUDA_SUCCESS || filter_result != CUDA_SUCCESS)
+			return false;
 
-		return (result == CUDA_SUCCESS);
+		reserve_local_memory(requested_features);
+
+		return true;
 	}
 
 	void reserve_local_memory(const DeviceRequestedFeatures& requested_features)
@@ -609,10 +612,18 @@ public:
 			cuda_assert(cuModuleGetFunction(&cuPathTrace, cuModule, "kernel_cuda_path_trace"));
 		}
 
+		if(have_error()) {
+			return;
+		}
+
 		cuda_assert(cuFuncSetCacheConfig(cuPathTrace, CU_FUNC_CACHE_PREFER_L1));
 
 		int min_blocks, num_threads_per_block;
 		cuda_assert(cuOccupancyMaxPotentialBlockSize(&min_blocks, &num_threads_per_block, cuPathTrace, NULL, 0, 0));
+
+		if(have_error()) {
+			return;
+		}
 
 		/* Launch kernel, using just 1 block appears sufficient to reserve
 		 * memory for all multiprocessors. It would be good to do this in
@@ -957,8 +968,9 @@ public:
 		}
 		else {
 			CUDAContextScope scope(this);
-			size_t offset = elem*y*w;
-			size_t size = elem*w*h;
+			/* Promote before multiplying: buffers of 2 GiB or more overflow int. */
+			size_t offset = (size_t)elem*y*w;
+			size_t size = (size_t)elem*w*h;
 
 			if(mem.host_pointer && mem.device_pointer) {
 				cuda_assert(cuMemcpyDtoH((uchar*)mem.host_pointer + offset,
