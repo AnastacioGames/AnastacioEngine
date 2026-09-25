@@ -376,7 +376,14 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->use_skinning,
 			material->use_foliage,
 			GPU_material_use_new_shading_nodes(material));
+	}
 
+	/* The user sources were only needed to generate the pass. */
+	const bool has_user_vertcode = (vertcode != NULL);
+	MEM_SAFE_FREE(fragcode);
+	MEM_SAFE_FREE(vertcode);
+
+	if (used) {
 		if (!material->pass)
 			return 0;
 
@@ -428,7 +435,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->obautobumpscaleloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_AUTO_BUMPSCALE));
 		if (material->builtins & GPU_CAMERA_TEXCO_FACTORS)
 			material->cameratexcofacloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_CAMERA_TEXCO_FACTORS));
-		if (material->builtins & GPU_TIME || vertcode)
+		if (material->builtins & GPU_TIME || has_user_vertcode)
 			material->timeloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_TIME));
 		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS)
 			material->partscalarpropsloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_SCALAR_PROPS));

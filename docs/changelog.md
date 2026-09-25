@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Material: Shader Sources (Vertex/Fragment GLSL)
+
+- `library_query.c`: `Material.vertcode`/`fragcode` (os Texts de `script_vert`/`script_frag`) não eram percorridos por `BKE_library_foreach_ID_link`, e `ID_MA` não declarava uso de `ID_TXT`. Apagar o Text usado como shader deixava o material com um ponteiro para memória liberada, e a próxima compilação chamava `txt_to_buf()` nele. Agora os dois ponteiros são registrados com `IDWALK_CB_NOP`, a mesma convenção do RNA, que não conta usuários de Text. Teste em background: remover o Text zera `script_vert` no material e na cópia, `users` fica estável na cópia/remoção e save/reload está correto.
+- Vazamentos: os buffers de `txt_to_buf()` eram liberados dentro do codegen, e não eram liberados quando o material não tinha saída (`used == false`) nem no vertex de material do tipo World. Agora `gpu_material_construct_end` libera os dois depois de `GPU_generate_pass`, e `code_generate_fragment`/`vertex` recebem `const char *`.
+- Painel Shading: "Vertex:/Fragment:" eram alinhados aos campos por `separator(factor=3.2)`, o que desalinhava com outra escala de UI. Agora é uma linha por par (`split`) com `template_ID` (botões New/Open, que já atribuem o Text ao campo). A seção não fica mais cinza com Shadeless, porque o GLSL do usuário é aplicado antes do ramo Shadeless em `GPU_shaderesult_set`.
+- Pendente: editar o texto do shader não recompila o material; é preciso reatribuir o Text.
+
 ## 2026-09-25 - Custom Viewport da câmera
 
 - Camera Presets (lista de câmeras reais) escondidos no Range Engine; Size e Fit do sensor continuam visíveis porque definem o FOV no jogo (`RAS_FramingManager::ComputeFrustum`).

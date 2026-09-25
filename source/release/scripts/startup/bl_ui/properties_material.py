@@ -397,7 +397,6 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
             sub.prop(mat, "specular_metallic_bsdf", text="Metallic")
             sub.prop(mat, "alpha", text="Opacity")
             sub.prop(mat, "specular_ior", text="IOR")
-            subleft = sub
             col = split.column()
             sub = col.column()
             sub.active = not mat.use_shadeless
@@ -407,16 +406,15 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
             sub.prop(mat, "ambient")
             sub.prop(mat, "specular_slope", text="Slope")
             col.prop(mat, "roughness", text="Turbidity")
-            
-            subleft.label(text="Shader Sources:")
-            subleft.label(text="Vertex:")
-            subleft.label(text="Fragment:")
-            
-            col.separator(factor=3.2)
-            
-            col.prop(mat, "script_vert", text="")
-            col.prop(mat, "script_frag", text="")
-            
+
+            # One row per label/field pair keeps them aligned at any UI scale.
+            # The user GLSL is compiled even when Shadeless, so it is never greyed out.
+            col = box.column()
+            col.label(text="Shader Sources:")
+            for label, attr in (("Vertex:", "script_vert"), ("Fragment:", "script_frag")):
+                row = col.split()
+                row.label(text=label)
+                row.template_ID(mat, attr, new="text.new", open="text.open")
 
 
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):

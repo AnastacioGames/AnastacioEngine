@@ -736,7 +736,7 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 	}
 }
 
-static char *code_generate_fragment(ListBase *nodes, char *usercode, const GPUMatType type, GPUNodeLink *outputs[8])
+static char *code_generate_fragment(ListBase *nodes, const char *usercode, const GPUMatType type, GPUNodeLink *outputs[8])
 {
 	DynStr *ds = BLI_dynstr_new();
 	char *code;
@@ -818,8 +818,6 @@ static char *code_generate_fragment(ListBase *nodes, char *usercode, const GPUMa
 	if (usercode) {
 		BLI_dynstr_append(ds, "\n");
 		BLI_dynstr_append(ds, usercode);
-
-		MEM_freeN(usercode);
 	}
 
 	/* create shader */
@@ -833,7 +831,7 @@ static char *code_generate_fragment(ListBase *nodes, char *usercode, const GPUMa
 	return code;
 }
 
-static char *code_generate_vertex(ListBase *nodes, char *usercode, const GPUMatType type, bool use_instancing)
+static char *code_generate_vertex(ListBase *nodes, const char *usercode, const GPUMatType type, bool use_instancing)
 {
 	DynStr *ds = BLI_dynstr_new();
 	GPUNode *node;
@@ -960,8 +958,6 @@ static char *code_generate_vertex(ListBase *nodes, char *usercode, const GPUMatT
 			"#define VERTEX_ID varvertexid\n\n"
 		);
 		BLI_dynstr_append(ds, usercode);
-
-		MEM_freeN(usercode);
 	}
 
 	code = BLI_dynstr_get_cstring(ds);

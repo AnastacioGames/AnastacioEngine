@@ -703,6 +703,9 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 					library_foreach_ID_as_subdata_link((ID **)&material->nodetree, callback, user_data, flag, &data);
 				}
 				CALLBACK_INVOKE(material->group, IDWALK_CB_USER);
+				/* User GLSL sources (Shading panel > Shader Sources); Text is not refcounted by RNA. */
+				CALLBACK_INVOKE(material->vertcode, IDWALK_CB_NOP);
+				CALLBACK_INVOKE(material->fragcode, IDWALK_CB_NOP);
 				if (material->texpaintslot != NULL) {
 					CALLBACK_INVOKE(material->texpaintslot->ima, IDWALK_CB_NOP);
 				}
@@ -1090,7 +1093,7 @@ bool BKE_library_id_can_use_idtype(ID *id_owner, const short id_type_used)
 		case ID_MB:
 			return ELEM(id_type_used, ID_MA);
 		case ID_MA:
-			return (ELEM(id_type_used, ID_TE, ID_GR));
+			return (ELEM(id_type_used, ID_TE, ID_GR, ID_TXT));
 		case ID_TE:
 			return (ELEM(id_type_used, ID_IM, ID_OB));
 		case ID_LT:
