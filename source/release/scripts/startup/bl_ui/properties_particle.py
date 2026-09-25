@@ -433,6 +433,21 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             if gp.use_color_curve and gp.color_curve:
                 box.template_curve_mapping(gp, "color_curve", brush=False)
 
+        # ---- Custom Shader ----
+        row = main_box.row(align=True)
+        row.prop(ob, "show_expanded_gpu_shader", text="Custom Shader (GLSL)",
+                 icon='TRIA_DOWN' if ob.show_expanded_gpu_shader else 'TRIA_RIGHT', emboss=True)
+
+        if ob.show_expanded_gpu_shader:
+            box = main_box.box()
+            box.prop(gp, "use_fragment_shader")
+            col = box.column()
+            col.enabled = gp.use_fragment_shader
+            col.label(text="Fragment shader .glsl file (replaces the default sprite look, hot-reloaded):")
+            col.prop(gp, "fragment_shader_path", text="")
+            col.label(text="Must define void main() writing fragColor.", icon="INFO")
+            col.label(text="Available: v_uv, v_lifeFrac, v_alpha, u_color, u_endColor, u_texture, u_useTexture, u_time")
+
         # ---- Mix GPU Particle System ----
         row = main_box.row(align=True)
         row.prop(ob, "show_expanded_gpu_mix", text="Mix GPU Particle System",
@@ -486,6 +501,7 @@ bpy.types.Object.show_expanded_gpu_motion = bpy.props.BoolProperty(name="Expande
 bpy.types.Object.show_expanded_gpu_appearance = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Object.show_expanded_gpu_curves = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Object.show_expanded_gpu_mix = bpy.props.BoolProperty(name="Expanded", default=False)
+bpy.types.Object.show_expanded_gpu_shader = bpy.props.BoolProperty(name="Expanded", default=False)
 
 
 class PARTICLE_PT_emission(ParticleButtonsPanel, Panel):
