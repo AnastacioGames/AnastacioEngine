@@ -565,11 +565,14 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
         layout = layout.column()
         layout.active = (sss.use) and (not mat.use_shadeless)
 
-        row = layout.row().split()
-        sub = row.row(align=True).split(align=True, factor=0.75)
-        sub.menu("MATERIAL_MT_sss_presets", text=bpy.types.MATERIAL_MT_sss_presets.bl_label)
-        sub.operator("material.sss_preset_add", text="", icon='ZOOMIN')
-        sub.operator("material.sss_preset_add", text="", icon='ZOOMOUT').remove_active = True
+        # Presets are tuned for the offline renderer (path length in mm, SSS color);
+        # the game only reads Scale and Radius, so they are not shown there.
+        if context.scene.render.engine != 'BLENDER_GAME':
+            row = layout.row().split()
+            sub = row.row(align=True).split(align=True, factor=0.75)
+            sub.menu("MATERIAL_MT_sss_presets", text=bpy.types.MATERIAL_MT_sss_presets.bl_label)
+            sub.operator("material.sss_preset_add", text="", icon='ZOOMIN')
+            sub.operator("material.sss_preset_add", text="", icon='ZOOMOUT').remove_active = True
 
         box = layout.box()
         box.label(text="Scattering:", icon="STRANDS")
@@ -594,7 +597,7 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
         else:
             col = split.column()
             col.prop(sss, "scale")
-            col.prop(sss, "radius", text="RGB Radius", expand=True)
+            col.prop(sss, "game_radius", text="RGB Radius", expand=True)
 
 
 class MATERIAL_PT_halo(MaterialButtonsPanel, Panel):

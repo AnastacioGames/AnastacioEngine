@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Material: Subsurface Scattering no modo jogo
+
+- O SSS do GLSL (`set_sss`) lê só Enabled, Scale e RGB Radius; a tonalidade vem da cor Diffuse.
+- Painel no modo jogo: presets escondidos (calibrados para o render e mudam o Color, que o jogo ignora);
+  RGB Radius exibido pela nova propriedade RNA `game_radius` (mesmo campo `sss_radius`, sem unidade "m").
+- Shader: Scale <= 0 é tratado como 0.001, evitando divisão por zero no `pow` (pixels pretos/NaN).
+- Lâmpadas com Diffuse desligado não somam mais SSS (antes somavam). Única mudança visual possível em cenas antigas.
+- Removida a função morta `set_sss2` do GLSL. Dica do `game_radius` traduzida (pt_BR/es/ru).
+- Teste: `.blend` com SSS, Scale 0, lâmpada Point e Sun sem Diffuse roda no RangeRuntime sem erro de shader.
+
 ## 2026-09-25 - Material: painel Options do modo jogo
 
 Só interface e textos, sem mudar como o jogo desenha nem o que o `.blend` guarda:

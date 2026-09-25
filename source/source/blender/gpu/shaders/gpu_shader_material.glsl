@@ -691,36 +691,12 @@ void curves_rgb(float fac, vec4 col, sampler2D curvemap, out vec4 outcol)
 	outcol.a = col.a;
 }
 
-void set_sss2(float brightness, float visifac, vec3 lightcol,
-			float scale, vec3 radius,
-		vec3 col, float i, vec3 view, vec3 lv, vec3 normal, vec4 diff, out vec4 outcol) 
-{
-	scale = min(scale, 1.0);
-
-	radius *= 0.1;
-	float lnotn = dot(-normal, lv);
-
-	i += max(lnotn, 0.0);
-	vec3 lambertian = smoothstep(-radius, radius + 0.5, vec3(dot(normal, lv) * 0.5 * i)) * (1.0 - scale);
-    vec3 indirect    = max(dot( -view, lv + normal * radius), 0.0) * radius * scale;
-	radius *= scale;
-	vec3 translucent = max(lnotn + radius, 0.0) * radius;
-
-	vec3 lrgb = (lambertian + translucent + indirect) * col;
-	lrgb *= lightcol * brightness * visifac;
-	lrgb /= 1.0 + radius;
-
-	diff.rgb = diff.rgb * (1.0 - min(lrgb, 1.0));
-
-	outcol = vec4(lrgb + diff.rgb, 1.0);
-}
-
 void set_sss(float brightness, float visifac, vec3 lightcol, float scale, vec3 radius, float typi,
 		vec3 col, float i, vec3 view, vec3 lv, vec3 normal, vec4 diff, out vec4 outcol) 
 {
+	/* Scale <= 0 would divide by zero in pow() below (NaN/black pixels). */
+	scale = max(scale, 0.001);
 	float ndl = dot(normal, lv);
-	float pndl = clamp( ndl, 0.0, 1.0),
-	      nndl = clamp(-ndl, 0.0, 1.0);
 
 	vec3 res = 0.2 * exp(-3.0 * abs(ndl) / (radius + 0.001));
 

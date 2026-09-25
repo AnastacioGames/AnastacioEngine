@@ -1696,7 +1696,8 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	else
 		GPU_link(mat, "set_value", GPU_uniform(&one), &shadfac);
 
-	if (ma->sss_flag) {
+	/* Subsurface scattering is diffuse light: lamps with Diffuse off do not add it. */
+	if (ma->sss_flag && !(lamp->mode & LA_NO_DIFF)) {
 		float lamptype = (lamp->type == LA_SUN) ? 0.0f : 1.0f;
 		GPU_link(mat, "set_sss", energy, visifac, col,
 			GPU_uniform(&ma->sss_scale), GPU_uniform((float *)&ma->sss_radius),

@@ -1670,6 +1670,16 @@ static void rna_def_material_sss(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Radius", "Mean red/green/blue scattering path length");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
+	/* Same data as "radius", without length units: in the game engine it is a unitless factor. */
+	prop = RNA_def_property(srna, "game_radius", PROP_FLOAT, PROP_COLOR);
+	RNA_def_property_float_sdna(prop, NULL, "sss_radius");
+	RNA_def_property_range(prop, 0.001, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.001, 10000, 1, 3);
+	RNA_def_property_ui_text(prop, "Radius",
+	                         "Red/green/blue scattering strength and spread (game engine, unitless; "
+	                         "the tint comes from the Diffuse color)");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
 	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "sss_col");
 	RNA_def_property_ui_text(prop, "Color", "Scattering color");

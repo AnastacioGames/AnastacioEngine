@@ -251,6 +251,8 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   profundidade de Clip/Alpha to Coverage em `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
 - **Painel Options do modo jogo (2026-09-25)**: conferir no editor o painel sem Invert Z/Exclusive, Light Group
   ativo fora de Halo, Z Offset sempre ativo e o aviso de Instancing + GPU Skinning.
+- **Painel Subsurface Scattering do modo jogo (2026-09-25)**: conferir no editor que os presets somem, o RGB
+  Radius aparece sem "m" e que o efeito some ao desligar Diffuse na lâmpada.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 
