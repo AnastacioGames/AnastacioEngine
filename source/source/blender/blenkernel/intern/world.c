@@ -82,14 +82,14 @@ void BKE_world_free(World *wrld)
 void BKE_world_status_props_ensure(World *wrld)
 {
 	struct { const char *name; int type; float fval; int ival; } wo_status[] = {
-		{"chuva_ligada",       GPROP_BOOL,  0.0f, 0},
-		{"chuva_densidade",    GPROP_FLOAT, wrld->rain_intensity, 0},
-		{"nuvens_ligadas",     GPROP_BOOL,  0.0f, 0},
-		{"neblina_ligada",     GPROP_BOOL,  0.0f, 0},
-		{"neblina_densidade",  GPROP_FLOAT, wrld->mistdensity, 0},
-		{"horario_sol",        GPROP_FLOAT, 12.0f, 0},
-		{"tipo_nuvem",         GPROP_INT,   0.0f, 0},
-		{"player_area_coberta", GPROP_BOOL, 0.0f, 0},
+		{"rain_enabled",         GPROP_BOOL,  0.0f, 0},
+		{"rain_intensity",       GPROP_FLOAT, wrld->rain_intensity, 0},
+		{"clouds_enabled",       GPROP_BOOL,  0.0f, 0},
+		{"mist_enabled",         GPROP_BOOL,  0.0f, 0},
+		{"mist_density",         GPROP_FLOAT, wrld->mistdensity, 0},
+		{"sun_hour",             GPROP_FLOAT, 12.0f, 0},
+		{"cloud_type",           GPROP_INT,   0.0f, 0},
+		{"player_under_cover",   GPROP_BOOL, 0.0f, 0},
 	};
 	int i;
 

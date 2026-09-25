@@ -266,9 +266,9 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 	 * state at scene conversion time (authored World Property values are only
 	 * used as defaults/fallback if the user removed one of these keys). */
 	struct { const char *name; bool bval; } wo_status_bools[] = {
-		{"chuva_ligada",   (blenderworld->weather_flag & WO_WEATHER_RAIN) != 0},
-		{"nuvens_ligadas", (blenderworld->weather_flag & WO_WEATHER_CLOUDS) != 0},
-		{"neblina_ligada", (blenderworld->mode & WO_MIST) != 0},
+		{"rain_enabled",   (blenderworld->weather_flag & WO_WEATHER_RAIN) != 0},
+		{"clouds_enabled", (blenderworld->weather_flag & WO_WEATHER_CLOUDS) != 0},
+		{"mist_enabled",   (blenderworld->mode & WO_MIST) != 0},
 	};
 	for (const auto &status : wo_status_bools) {
 		if (worldinfo->GetProperty(status.name)) {
@@ -279,8 +279,8 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 	}
 
 	struct { const char *name; float fval; } wo_status_floats[] = {
-		{"chuva_densidade",   blenderworld->rain_intensity},
-		{"neblina_densidade", blenderworld->mistdensity},
+		{"rain_intensity", blenderworld->rain_intensity},
+		{"mist_density",   blenderworld->mistdensity},
 	};
 	for (const auto &status : wo_status_floats) {
 		if (worldinfo->GetProperty(status.name)) {
