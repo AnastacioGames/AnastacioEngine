@@ -63,6 +63,7 @@ _modules = [
     "properties_cutscene",
     "properties_web",
     "properties_android",
+    "properties_input",
     "properties_texture",
     "properties_world",
     "space_clip",
@@ -265,6 +266,12 @@ def register():
 
     from . import properties_android
     Scene.range_android = PointerProperty(type=properties_android.RangeAndroidSettings)
+
+    # Aba Input: carrega as ligacoes da acao aberta fora do desenho (o desenho nao registra propriedades).
+    from . import properties_input
+    if properties_input.input_sync_handler not in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.append(properties_input.input_sync_handler)
+
     # Senha da chave do release: no WindowManager para nunca ir para o .blend.
     WindowManager.range_android_password = StringProperty(
         name="Key password",
@@ -289,6 +296,11 @@ def unregister():
 
     if hasattr(Scene, "rangearmor_export"):
         del Scene.rangearmor_export
+
+    from . import properties_input
+    if properties_input.input_sync_handler in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.remove(properties_input.input_sync_handler)
+
 
     from bpy.utils import unregister_class
     for mod in reversed(_modules_loaded):

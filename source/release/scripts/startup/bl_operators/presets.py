@@ -487,7 +487,7 @@ class AddPresetInteraction(AddPresetBase, Operator):
 def update_userprefs():
     for window in bpy.context.window_manager.windows:
         for area in window.screen.areas:
-            if area.type == 'USER_PREFERENCES':
+            if area.type in {'USER_PREFERENCES', 'PROPERTIES'}:
                 area.tag_redraw()
 
 class AddInputMap(AddPresetBase, Operator):
@@ -506,6 +506,7 @@ class AddInputMap(AddPresetBase, Operator):
         input_map_data = {}
         
         wm.input_map_index = -1 # Force Input Map Update
+        wm["input_ui_select_map"] = "{}.json".format(self.name) # the Input tab opens the new map
         update_userprefs() # so the interface updates immediately after adding the new input
         
         if bpy.data.is_saved:
@@ -574,6 +575,7 @@ class AddInputTable(AddPresetBase, Operator):
         filepath = os.path.join(path, self.input_map_name)
         
         wm.input_table_index = -1 # Force Input Table Update
+        wm["input_ui_select_table"] = self.name # the Input tab opens the new action
         update_userprefs()
         
         with open(filepath, 'r+') as file: 

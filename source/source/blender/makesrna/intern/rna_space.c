@@ -192,6 +192,7 @@ static const EnumPropertyItem buttons_context_items[] = {
 	{BCONTEXT_WORLD, "WORLD", ICON_WORLD, "World", "World"},
 	{BCONTEXT_CUTSCENE, "CUTSCENE", ICON_SEQUENCE, "Cutscene", "Cutscene"},
 	{BCONTEXT_EXPORT, "EXPORT", ICON_EXPORT, "Export Game", "Export the game for Windows, Linux, Web and Android"},
+	{BCONTEXT_INPUT, "INPUT", ICON_GAME, "Input", "Game input maps: actions bound to keyboard, mouse, gamepad and touch controls"},
 	{BCONTEXT_OBJECT, "OBJECT", ICON_OBJECT_DATA, "Object", "Object"},
 	{BCONTEXT_CONSTRAINT, "CONSTRAINT", ICON_CONSTRAINT, "Constraints", "Object constraints"},
 	{BCONTEXT_MODIFIER, "MODIFIER", ICON_MODIFIER, "Modifiers", "Object modifiers"},
@@ -1065,6 +1066,9 @@ static const EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSE
 	}
 	if (sbuts->pathflag & (1 << BCONTEXT_EXPORT)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_EXPORT);
+	}
+	if (sbuts->pathflag & (1 << BCONTEXT_INPUT)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_INPUT);
 	}
 
 	if (totitem) {

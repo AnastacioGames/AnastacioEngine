@@ -125,7 +125,7 @@ TABLE = (
     ("Billboard:", "Billboard:", "Billboard:", "Билборд:"),
     ("Bind", "Vincular", "Vincular", "Привязать"),
     ("Binding Properties:", "Propriedades do binding:", "Propiedades del binding:", "Свойства привязки:"),
-    ("Bindings:", "Bindings:", "Bindings:", "Привязки:"),
+    ("Bindings:", "Ligações:", "Asignaciones:", "Привязки:"),
     ("Bit Depth (bits per pixel):", "Profundidade de cor (bits por pixel):", "Profundidad de color (bits por píxel):",
      "Глубина цвета (бит на пиксель):"),
     ("Blend Mode:", "Modo de mistura:", "Modo de mezcla:", "Режим смешивания:"),
@@ -1543,6 +1543,51 @@ EXPORT_PANELS = (
     ("Build and Install:", "Gerar e instalar:", "Generar e instalar:", "Сборка и установка:"),
 )
 
-PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}
-ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}
-RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}
+# Aba Input das Propriedades (Input System: mapas, acoes e ligacoes).
+INPUT_PANELS = (
+    ("Input Maps", "Mapas de controle", "Mapas de control", "Карты управления"),
+    ("Maps are saved in KeyMapping/ next to the .range", "Os mapas ficam em KeyMapping/ ao lado do .range",
+     "Los mapas se guardan en KeyMapping/ junto al .range", "Карты хранятся в KeyMapping/ рядом с .range"),
+    ("The maps are saved in the KeyMapping folder next to the .range",
+     "Os mapas ficam na pasta KeyMapping ao lado do .range",
+     "Los mapas se guardan en la carpeta KeyMapping junto al .range",
+     "Карты хранятся в папке KeyMapping рядом с .range"),
+    ("No input map yet: click + to create one", "Nenhum mapa ainda: clique em + para criar",
+     "Aún no hay mapas: haga clic en + para crear uno", "Карт пока нет: нажмите +, чтобы создать"),
+    ("Actions (Input Tables):", "Ações (Input Tables):", "Acciones (Input Tables):", "Действия (Input Tables):"),
+    ("No action yet: click + to add one (e.g. Jump, Move)",
+     "Nenhuma ação ainda: clique em + para adicionar (ex.: Pular, Andar)",
+     "Aún no hay acciones: haga clic en + para añadir una (p. ej. Saltar, Andar)",
+     "Действий пока нет: нажмите +, чтобы добавить (например, Прыжок, Ходьба)"),
+    ("No binding yet: click + to add a key or a gamepad button",
+     "Nenhuma ligação ainda: clique em + para adicionar uma tecla ou botão do controle",
+     "Aún no hay asignaciones: haga clic en + para añadir una tecla o un botón del mando",
+     "Привязок пока нет: нажмите +, чтобы добавить клавишу или кнопку геймпада"),
+    ("Loading...", "Carregando...", "Cargando...", "Загрузка..."),
+    ("On-screen Controls (Web/Android)", "Controle na tela (Web/Android)", "Controles en pantalla (Web/Android)",
+     "Экранное управление (Web/Android)"),
+    ("The on-screen controls are joystick 0: bind actions to Joystick, index 0",
+     "O controle na tela é o joystick 0: ligue as ações a Joystick, índice 0",
+     "Los controles en pantalla son el joystick 0: asigne las acciones a Joystick, índice 0",
+     "Экранное управление — это джойстик 0: привязывайте действия к Joystick, индекс 0"),
+    ("Every action with bindings can be pressed on the touch screen",
+     "Toda ação com ligações pode ser apertada na tela de toque",
+     "Todas las acciones con asignaciones se pueden pulsar en la pantalla táctil",
+     "Все действия с привязками можно нажать на сенсорном экране"),
+    ("Actions the touch layout does not press (WEB-INPUT-001):",
+     "Ações que o controle na tela não aperta (WEB-INPUT-001):",
+     "Acciones que los controles en pantalla no pulsan (WEB-INPUT-001):",
+     "Действия, которые экранное управление не нажимает (WEB-INPUT-001):"),
+    ("The Input System moved to the Properties editor, Input tab",
+     "O Input System mudou para o editor de Propriedades, aba Input",
+     "El Input System pasó al editor de Propiedades, pestaña Input",
+     "Input System перенесена в редактор свойств, вкладка Input"),
+    ("Each map opens to show its actions, and each action its bindings",
+     "Cada mapa abre para mostrar as ações, e cada ação as suas ligações",
+     "Cada mapa se abre para mostrar sus acciones, y cada acción sus asignaciones",
+     "Каждая карта раскрывается и показывает действия, а каждое действие — свои привязки"),
+)
+
+PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS}
+ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS}
+RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS}
