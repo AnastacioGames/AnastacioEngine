@@ -64,54 +64,53 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
         row.prop(world, "use_sky_real", text="Real", toggle=True)
 
         # Colors
-        main_box.prop(world, "flow_expand_colors", text="Colors", emboss=True)
-        if world.flow_expand_colors:
-            split = main_box.split()
-            col = split.column()
-            col.prop(world, "horizon_color", text="Horizon")
-            col.prop(world, "ambient_color", text="Ambient")
+        box = layout.box()
+        box.label(text="Colors:", icon="COLOR")
+        split = box.split()
+        col = split.column()
+        col.prop(world, "horizon_color", text="Horizon")
+        col.prop(world, "ambient_color", text="Ambient")
 
-            col = split.column()
-            if world.use_sky_atmospheric:
-                col.prop(world, "zenith_color", text="Extinction")
-                col.prop(world, "nadir_color", text="Inscattering")
-            else:
-                col.active = world.use_sky_blend
-                col.prop(world, "zenith_color", text="Zenith")
-                col.prop(world, "nadir_color", text="Nadir")
+        col = split.column()
+        if world.use_sky_atmospheric:
+            col.prop(world, "zenith_color", text="Extinction")
+            col.prop(world, "nadir_color", text="Inscattering")
+        else:
+            col.active = world.use_sky_blend
+            col.prop(world, "zenith_color", text="Zenith")
+            col.prop(world, "nadir_color", text="Nadir")
 
         # Sun
-        main_box.prop(world, "flow_expand_sun", text="Sun", emboss=True)
-        if world.flow_expand_sun:
-            col = main_box.column(align=True)
-            # The assignment belongs to Scene (the runtime reads Scene.world_sun),
-            # but it is presented with the World sky controls deliberately.
-            col.prop(scene, "world_sun_set", text="Object")
-            col.prop(scene, "use_auto_world_sun", text="Automatic")
-            hour_row = col.row()
-            hour_row.active = scene.use_auto_world_sun
-            hour_row.prop(scene, "auto_world_sun_hour", text="Hour")
-            col.prop(world, "sun_size", text="Size")
+        box = layout.box()
+        box.label(text="Sun:", icon="LAMP_SUN")
+        col = box.column(align=True)
+        # The assignment belongs to Scene (the runtime reads Scene.world_sun),
+        # but it is presented with the World sky controls deliberately.
+        col.prop(scene, "world_sun_set", text="Object")
+        col.prop(scene, "use_auto_world_sun", text="Automatic")
+        row = box.row(align=True)
+        sub = row.row(align=True)
+        sub.active = scene.use_auto_world_sun
+        sub.prop(scene, "auto_world_sun_hour", text="Hour")
+        row.prop(world, "sun_size", text="Size")
 
         # Sky Objects
-        main_box.prop(world, "flow_expand_sky", text="Sky Objects", emboss=True)
-        if world.flow_expand_sky:
-            split = main_box.split()
-            col = split.column()
-            col.prop(world, "use_sky_atmospheric", text="Atmospheric")
-            col.prop(world, "use_sky_stars", text="Stars")
+        box = layout.box()
+        box.label(text="Sky Objects:", icon="SOLO_ON")
+        row = box.row()
+        row.prop(world, "use_sky_atmospheric", text="Atmospheric")
+        row.prop(world, "use_sky_stars", text="Stars")
+        row.prop(world, "use_sky_moon", text="Moon")
 
-            col = split.column()
-            col.prop(world, "use_sky_moon", text="Moon")
-            moon_col = col.column()
-            moon_col.active = world.use_sky_moon
-            moon_col.prop(world, "moon_size", text="Size")
-            moon_col.prop(world, "moon_brightness", text="Brightness")
+        row = box.row(align=True)
+        row.active = world.use_sky_moon
+        row.prop(world, "moon_size", text="Moon Size")
+        row.prop(world, "moon_brightness", text="Brightness")
 
-            if not world.use_sky_atmospheric:
-                row = main_box.row()
-                row.prop(world, "sky_turbidity", text="Turbidity")
-                row.prop(world, "ground_color", text="Ground")
+        if not world.use_sky_atmospheric:
+            row = box.row()
+            row.prop(world, "sky_turbidity", text="Turbidity")
+            row.prop(world, "ground_color", text="Ground")
 
 
 # ==============================================================================
@@ -132,24 +131,22 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
         light = context.world.light_settings
         world = context.world
 
-        main_box = layout.box()
-        main_box.label(text="Environment Effects:", icon="LAMP_SUN")
-
-        row = main_box.row(align=True)
-        row.prop(world, "flow_expand_env_light", text="Environment Lighting", emboss=True)
+        box = layout.box()
+        row = box.row()
+        row.label(text="Environment Lighting:", icon="LAMP_SUN")
         row.prop(light, "use_environment_light", text="")
 
-        if world.flow_expand_env_light:
-            col = main_box.column(align=True)
-            col.active = light.use_environment_light
-            col.prop(light, "environment_energy", text="Energy")
-            col.prop(light, "environment_color", text="Color")
+        row = box.row(align=True)
+        row.active = light.use_environment_light
+        row.prop(light, "environment_energy", text="Energy")
+        row.prop(light, "environment_color", text="")
 
-        main_box.prop(world, "flow_expand_exposure", text="Camera Exposure", emboss=True)
-        if world.flow_expand_exposure:
-            col = main_box.column(align=True)
-            col.prop(world, "exposure")
-            col.prop(world, "color_range", text="Color Range")
+        box = layout.box()
+        box.label(text="Camera Exposure:", icon="CAMERA_DATA")
+
+        row = box.row(align=True)
+        row.prop(world, "exposure")
+        row.prop(world, "color_range", text="Color Range")
 
 
 # ==============================================================================
@@ -170,34 +167,34 @@ class CUSTOM_PT_game_mist(CustomWorldButtonsPanel, Panel):
         world = context.world
         mist = world.mist_settings
 
-        main_box = layout.box()
-        main_box.label(text="Fog Effects:", icon="IMAGE_ZDEPTH")
-
-        row = main_box.row(align=True)
-        row.prop(world, "flow_expand_mist", text="Mist", emboss=True)
+        box = layout.box()
+        row = box.row()
+        row.label(text="Mist:", icon="IMAGE_ZDEPTH")
         row.prop(mist, "use_mist", text="")
 
-        if world.flow_expand_mist:
-            col = main_box.column(align=True)
-            col.active = mist.use_mist
-            col.prop(mist, "mist_blend_type", text="")
-            col.prop(mist, "falloff")
-            col.prop(mist, "intensity", text="Minimum Intensity", slider=True)
+        col = box.column(align=True)
+        col.active = mist.use_mist
+        row = col.row(align=True)
+        row.prop(mist, "mist_blend_type", text="")
+        row.prop(mist, "falloff", text="")
+        col.prop(mist, "intensity", text="Minimum Intensity", slider=True)
 
-        main_box.prop(world, "flow_expand_mist_distance", text="Distance", emboss=True)
-        if world.flow_expand_mist_distance:
-            col = main_box.column(align=True)
-            col.active = mist.use_mist
-            col.prop(mist, "start")
-            col.prop(mist, "depth")
+        box = layout.box()
+        box.active = mist.use_mist
+        box.label(text="Distance:", icon="ARROW_LEFTRIGHT")
+
+        row = box.row(align=True)
+        row.prop(mist, "start")
+        row.prop(mist, "depth")
 
         if mist.falloff == 'HEIGHT':
-            main_box.prop(world, "flow_expand_mist_height", text="Height Fog", emboss=True)
-            if world.flow_expand_mist_height:
-                col = main_box.column(align=True)
-                col.active = mist.use_mist
-                col.prop(mist, "height_fog")
-                col.prop(mist, "density_fog")
+            box = layout.box()
+            box.active = mist.use_mist
+            box.label(text="Height Fog:", icon="MOD_OCEAN")
+
+            row = box.row(align=True)
+            row.prop(mist, "height_fog")
+            row.prop(mist, "density_fog")
 
 
 # ==============================================================================

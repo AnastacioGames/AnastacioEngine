@@ -153,8 +153,10 @@ TABLE = (
     ("Calculate To Frame", "Calcular até o quadro", "Calcular hasta el fotograma", "Вычислить до кадра"),
     ("Calculate...", "Calcular...", "Calcular...", "Вычислить..."),
     ("Camera Exposure", "Exposição da câmera", "Exposición de la cámara", "Экспозиция камеры"),
+    ("Camera Exposure:", "Exposição da câmera:", "Exposición de la cámara:", "Экспозиция камеры:"),
     ("Camera Lens Angle", "Ângulo da lente da câmera", "Ángulo de la lente de la cámara", "Угол объектива камеры"),
     ("Camera Lens Scale", "Escala da lente da câmera", "Escala de la lente de la cámara", "Масштаб объектива камеры"),
+    ("Colors:", "Cores:", "Colores:", "Цвета:"),
     ("Camera:", "Câmera:", "Cámara:", "Камера:"),
     ("Cascaded Shadow Mapping", "Sombras em cascata (CSM)", "Sombras en cascada (CSM)", "Каскадные тени (CSM)"),
     ("Center Cursor and View All", "Centralizar cursor e ver tudo", "Centrar cursor y ver todo",
@@ -294,6 +296,7 @@ TABLE = (
     ("Disconnect All", "Desconectar tudo", "Desconectar todo", "Разъединить всё"),
     ("Discontinuity (Euler) Filter", "Filtro de descontinuidade (Euler)", "Filtro de discontinuidad (Euler)",
      "Фильтр разрывов (Эйлер)"),
+    ("Distance:", "Distância:", "Distancia:", "Расстояние:"),
     ("Distance Factor", "Fator de distância", "Factor de distancia", "Коэффициент расстояния"),
     ("Documentation", "Documentação", "Documentación", "Документация"),
     ("Doppler", "Doppler", "Doppler", "Доплер"),
@@ -421,6 +424,7 @@ TABLE = (
     ("Hardness:", "Dureza:", "Dureza:", "Жёсткость:"),
     ("Header Error", "Erro no cabeçalho", "Error en el encabezado", "Ошибка заголовка"),
     ("Height Fog", "Névoa por altura", "Niebla por altura", "Высотный туман"),
+    ("Height Fog:", "Névoa por altura:", "Niebla por altura:", "Высотный туман:"),
     ("Hide Active Layer", "Ocultar camada ativa", "Ocultar capa activa", "Скрыть активный слой"),
     ("Hide Bounding Box", "Ocultar caixa delimitadora", "Ocultar caja delimitadora", "Скрыть ограничивающий бокс"),
     ("Hide Masked", "Ocultar mascarados", "Ocultar enmascarados", "Скрыть замаскированное"),
@@ -804,6 +808,7 @@ TABLE = (
     ("Sculpt Overlay Color:", "Cor da sobreposição de escultura:", "Color de la superposición de escultura:",
      "Цвет наложения скульптинга:"),
     ("Search ...", "Buscar ...", "Buscar ...", "Поиск ..."),
+    ("See Text Object", "Ver objeto de texto", "Ver objeto de texto", "См. текстовый объект"),
     ("Second emitter, drawn together with the one above", "Segundo emissor, desenhado junto com o de cima",
      "Segundo emisor, dibujado junto con el de arriba", "Второй излучатель, рисуется вместе с верхним"),
     ("Select All by Layer", "Selecionar tudo por camada", "Seleccionar todo por capa", "Выделить всё по слою"),
@@ -872,6 +877,7 @@ TABLE = (
     ("Simplify:", "Simplificar:", "Simplificar:", "Упрощение:"),
     ("Single Bone", "Osso único", "Hueso único", "Одна кость"),
     ("Size over Lifetime:", "Tamanho ao longo da vida:", "Tamaño a lo largo de la vida:", "Размер за время жизни:"),
+    ("Sky Objects:", "Objetos do céu:", "Objetos del cielo:", "Небесные объекты:"),
     ("Sky Render:", "Render do céu:", "Render del cielo:", "Рендер неба:"),
     ("Sky:", "Céu:", "Cielo:", "Небо:"),
     ("Sleep", "Dormir", "Dormir", "Сон"),
@@ -924,6 +930,7 @@ TABLE = (
     ("Strips to the Right", "Faixas à direita", "Tiras a la derecha", "Полосы справа"),
     ("Subdivide", "Subdividir", "Subdividir", "Подразделить"),
     ("Subdivide Smooth", "Subdividir suave", "Subdividir suave", "Подразделить со сглаживанием"),
+    ("Sun:", "Sol:", "Sol:", "Солнце:"),
     ("Superscript 1", "Sobrescrito 1", "Superíndice 1", "Верхний индекс 1"),
     ("Superscript 2", "Sobrescrito 2", "Superíndice 2", "Верхний индекс 2"),
     ("Superscript 3", "Sobrescrito 3", "Superíndice 3", "Верхний индекс 3"),
@@ -1498,10 +1505,7 @@ MESSAGES = (
 
 # Caixas e dicas dos paineis da aba Export Game (RangeArmor, Web, Android).
 EXPORT_PANELS = (
-    ("Desktop builds; Web and Android have their own panels below",
-     "Builds para desktop; Web e Android têm painéis próprios abaixo",
-     "Builds de escritorio; Web y Android tienen sus propios paneles abajo",
-     "Сборки для ПК; у Web и Android свои панели ниже"),
+    ("Desktop builds", "Builds para desktop", "Builds de escritorio", "Сборки для ПК"),
     ("Empty fields keep the RangeArmor Panel defaults",
      "Campos vazios mantêm o padrão do RangeArmor Panel",
      "Los campos vacíos mantienen los valores de RangeArmor Panel",
@@ -1587,6 +1591,7 @@ INPUT_PANELS = (
      "Cada mapa se abre para mostrar sus acciones, y cada acción sus asignaciones",
      "Каждая карта раскрывается и показывает действия, а каждое действие — свои привязки"),
 )
+
 
 PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS}
 ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS}

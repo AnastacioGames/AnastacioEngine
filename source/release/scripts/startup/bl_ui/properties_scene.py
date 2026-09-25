@@ -657,7 +657,7 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         row = box.row(align=True)
         row.prop(export, "export_windows64", toggle=True)
         row.prop(export, "export_linux64", toggle=True)
-        box.label(text="Desktop builds; Web and Android have their own panels below", icon='INFO')
+        box.label(text="Desktop builds", icon='INFO')
 
         box = layout.box()
         box.label(text="Package Info:", icon="FILE_TEXT")

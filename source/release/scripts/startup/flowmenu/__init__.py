@@ -160,15 +160,6 @@ def register():
     bpy.types.Scene.flowmenu_component_list = bpy.props.CollectionProperty(type=FLOWMENU_ListItem)
     bpy.types.Scene.flowmenu_component_list_active = bpy.props.IntProperty(default=0)
 
-    # --- ESTADO DE EXPANSÃO DO PAINEL WORLD ---
-    bpy.types.World.flow_expand_colors = bpy.props.BoolProperty(name="Colors", default=False)
-    bpy.types.World.flow_expand_sun = bpy.props.BoolProperty(name="Sun", default=False)
-    bpy.types.World.flow_expand_sky = bpy.props.BoolProperty(name="Sky Objects", default=False)
-    bpy.types.World.flow_expand_env_light = bpy.props.BoolProperty(default=False)
-    bpy.types.World.flow_expand_exposure = bpy.props.BoolProperty(default=False)
-    bpy.types.World.flow_expand_mist = bpy.props.BoolProperty(default=False)
-    bpy.types.World.flow_expand_mist_distance = bpy.props.BoolProperty(default=False)
-    bpy.types.World.flow_expand_mist_height = bpy.props.BoolProperty(default=False)
 
     # Keymaps
     wm = bpy.context.window_manager
@@ -194,14 +185,6 @@ def unregister():
     del bpy.types.Scene.flowmenu_wizard_class
     del bpy.types.Scene.flowmenu_component_list
     del bpy.types.Scene.flowmenu_component_list_active
-    del bpy.types.World.flow_expand_colors
-    del bpy.types.World.flow_expand_sun
-    del bpy.types.World.flow_expand_sky
-    del bpy.types.World.flow_expand_env_light
-    del bpy.types.World.flow_expand_exposure
-    del bpy.types.World.flow_expand_mist
-    del bpy.types.World.flow_expand_mist_distance
-    del bpy.types.World.flow_expand_mist_height
 
     # 1. DESREGISTRA AS CLASSES DO NOSSO ADD-ON
     for cls in reversed(classes):

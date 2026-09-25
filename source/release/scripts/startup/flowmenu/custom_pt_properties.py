@@ -94,14 +94,7 @@ class CUSTOM_PT_game_properties(Panel):
         icon = parts[2] if len(parts) > 2 else default_icon
         return title, icon
 
-    def _draw_prop_row(self, parent, prop, index):
-        box = parent.box()
-        row = box.row(align=True)
-        row.prop(prop, "name", text="")
-        row.prop(prop, "type", text="")
-        row.prop(prop, "value", text="")
-        row.prop(prop, "show_debug", text="", toggle=True, icon='INFO')
-
+    def _draw_order_buttons(self, row, index):
         sub = row.row(align=True)
         mv = sub.operator("object.game_property_move", text="", icon='TRIA_UP')
         mv.index = index
@@ -109,8 +102,65 @@ class CUSTOM_PT_game_properties(Panel):
         mv = sub.operator("object.game_property_move", text="", icon='TRIA_DOWN')
         mv.index = index
         mv.direction = 'DOWN'
+        row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = index
 
-        sub.operator("object.game_property_remove", text="", icon='X').index = index
+    def _draw_prop_row(self, parent, prop, index):
+        # Mesmo layout da barra lateral do Logic Bricks (space_logic.py)
+        row = parent.box().row()
+        row.prop(prop, "name", text="")
+        row.prop(prop, "type", text="")
+        row.prop(prop, "value", text="")
+        row.prop(prop, "show_debug", text="", toggle=True, icon='INFO')
+        self._draw_order_buttons(row, index)
+
+    def _draw_header_row(self, box, prop, index):
+        row = box.row(align=True)
+        is_open = bool(prop.value)
+        row.prop(prop, "value", text="", emboss=False,
+                 icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT')
+        title, icon = self._split_tag(prop.name, "HEADER", "FULLSCREEN")
+        row.label(text=title, icon=icon)
+        self._draw_order_buttons(row, index)
+        return is_open
+
+    def _draw_text_props(self, layout, game):
+        # Propriedades "Text" e "Text-Res" de objetos de texto,
+        # igual à barra lateral do Logic Bricks (space_logic.py)
+        prop_index = game.properties.find("Text")
+        prop_index_res = game.properties.find("Text-Res")
+
+        if prop_index == -1:
+            props = layout.operator("object.game_property_new", text="Add Text Game Property", icon='PLUS')
+            props.name = "Text"
+            props.type = 'STRING'
+            return
+
+        layout.operator("object.game_property_remove", text="Remove Text Game Property", icon='X').index = prop_index
+
+        box = layout.box()
+        row = box.row()
+        sub = row.row()
+        sub.enabled = False
+        prop = game.properties[prop_index]
+        sub.prop(prop, "name", text="", icon='FONT_DATA')
+        row.prop(prop, "type", text="")
+        row.label(text="See Text Object")
+
+        sub = row.row(align=True)
+        if prop_index_res == -1:
+            props = sub.operator("object.game_property_new", text="", icon='PLUS')
+            props.name = "Text-Res"
+            props.type = 'FLOAT'
+            return
+
+        sub.operator("object.game_property_remove", text="", icon='X').index = prop_index_res
+        row = box.row()
+        sub = row.row()
+        sub.enabled = False
+        prop = game.properties[prop_index_res]
+        sub.prop(prop, "name", text="", icon='FONT_DATA')
+        row.prop(prop, "value", text="Resolution")
+        row.label(text="Text Resolution(0-50)")
 
     def draw(self, context):
         layout = self.layout
@@ -118,62 +168,46 @@ class CUSTOM_PT_game_properties(Panel):
         game = ob.game
         is_font = (ob.type == 'FONT')
 
-        box = layout.box()
-        row = box.row(align=True)
-        row.operator("object.game_header_add", text="Add Header", icon='PLUS')
+        if is_font:
+            self._draw_text_props(layout, game)
+
+        row = layout.row(align=True)
         op = row.operator("object.game_property_new", text="Add Game Property", icon='PLUS')
         op.name = ""
+        row.operator("object.game_header_add", text="Add Header", icon='PLUS')
 
-        if is_font: pass
+        props_list = [
+            (i, p) for i, p in enumerate(game.properties)
+            if not (is_font and p.name in {"Text", "Text-Res"})
+        ]
+        if not props_list:
+            return
 
-        props_list = list(game.properties)
-        has_any_header = any(self._is_header(p.name) for p in props_list)
+        has_any_header = any(self._is_header(p.name) for _, p in props_list)
 
         if not has_any_header:
-            for i, prop in enumerate(props_list):
-                if is_font and prop.name in {"Text", "Text-Res"}: continue
+            for i, prop in props_list:
                 self._draw_prop_row(layout, prop, i)
             return
 
-        current_box = None
         current_col = None
         group_open = True
 
-        i = 0
-        while i < len(props_list):
-            prop = props_list[i]
-            if is_font and prop.name in {"Text", "Text-Res"}:
-                i += 1
-                continue
-
+        for i, prop in props_list:
             if self._is_header(prop.name):
-                current_box = layout.box()
-                header_row = current_box.row(align=True)
-                title, icon = self._split_tag(prop.name, "HEADER", "FULLSCREEN")
-                header_row.prop(prop, "value", text=title, toggle=True, icon=icon)
-
-                sub = header_row.row(align=True)
-                mv = sub.operator("object.game_property_move", text="", icon='TRIA_UP')
-                mv.index = i; mv.direction = 'UP'
-                mv = sub.operator("object.game_property_move", text="", icon='TRIA_DOWN')
-                mv.index = i; mv.direction = 'DOWN'
-                header_row.operator("object.game_property_remove", text="", icon='X').index = i
-
-                current_col = current_box.column(align=True)
-                group_open = bool(prop.value)
-                i += 1
+                box = layout.box()
+                group_open = self._draw_header_row(box, prop, i)
+                current_col = box.column() if group_open else None
                 continue
 
             if current_col is None:
-                current_box = layout.box()
-                ungrouped_header = current_box.row()
-                ungrouped_header.label(text="Ungrouped Properties", icon="LINENUMBERS_ON")
-                current_col = current_box.column(align=True)
-                group_open = True
+                if not group_open:
+                    continue
+                box = layout.box()
+                box.label(text="Ungrouped Properties", icon="LINENUMBERS_ON")
+                current_col = box.column()
 
-            if group_open:
-                self._draw_prop_row(current_col, prop, i)
-            i += 1
+            self._draw_prop_row(current_col, prop, i)
 
 # ==============================================================================
 # PAINEL CUSTOMIZADO: EXISTING COMPONENTS (Portado do Component Helper)
