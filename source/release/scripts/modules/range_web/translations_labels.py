@@ -1186,6 +1186,120 @@ EXTRA = (
     ("Y Flip", "Espelhar Y", "Reflejar Y", "Отразить по Y"),
 )
 
+# Paineis de Render do Range Engine (System, Display, Attachments, Animations, FXAA) e dicas do Bake.
+RENDER_PANELS = (
+    # Bake
+    ("Needs a UV map and an image set in the UV/Image Editor",
+     "Precisa de um mapa UV e de uma imagem definida no Editor UV/Imagem",
+     "Necesita un mapa UV y una imagen asignada en el Editor UV/Imagen",
+     "Нужны UV-развёртка и изображение, заданное в редакторе UV/изображений"),
+    ("Uses Blender Render shading, may differ from the game",
+     "Usa o sombreamento do Blender Render, pode ficar diferente do jogo",
+     "Usa el sombreado de Blender Render, puede diferir del juego",
+     "Использует затенение Blender Render, может отличаться от игры"),
+    # System
+    ("Custom Mouse Cursor", "Cursor do mouse personalizado", "Cursor del ratón personalizado", "Свой курсор мыши"),
+    ("Cursor Size:", "Tamanho do cursor:", "Tamaño del cursor:", "Размер курсора:"),
+    ("Cursor Offset X:", "Deslocamento X do cursor:", "Desplazamiento X del cursor:", "Смещение курсора по X:"),
+    ("Cursor Offset Y:", "Deslocamento Y do cursor:", "Desplazamiento Y del cursor:", "Смещение курсора по Y:"),
+    # Display
+    ("Vsync:", "Vsync:", "Vsync:", "Вертикальная синхронизация:"),
+    ("HDR:", "HDR:", "HDR:", "HDR:"),
+    ("Dynamic Resolution:", "Resolução dinâmica:", "Resolución dinámica:", "Динамическое разрешение:"),
+    ("Scales the render to hold the FPS.", "Ajusta a escala do render para manter o FPS.",
+     "Ajusta la escala del render para mantener los FPS.", "Масштабирует рендер, чтобы удерживать FPS."),
+    ("Minimum Scale:", "Escala mínima:", "Escala mínima:", "Минимальный масштаб:"),
+    ("Maximum Scale:", "Escala máxima:", "Escala máxima:", "Максимальный масштаб:"),
+    ("Scale Step:", "Passo da escala:", "Paso de escala:", "Шаг масштаба:"),
+    # Attachments
+    ("Render Attachments:", "Anexos de render:", "Adjuntos de render:", "Вложения рендера:"),
+    ("Extra outputs read by 2D filters as bgl_DataTextures[n]",
+     "Saídas extras lidas pelos filtros 2D como bgl_DataTextures[n]",
+     "Salidas extra leídas por los filtros 2D como bgl_DataTextures[n]",
+     "Дополнительные выходы, читаемые 2D-фильтрами как bgl_DataTextures[n]"),
+    ("Slot %d", "Slot %d", "Ranura %d", "Слот %d"),
+    ("Slot %d is empty, press + to create an attachment", "O slot %d está vazio, clique em + para criar um anexo",
+     "La ranura %d está vacía, pulsa + para crear un adjunto", "Слот %d пуст, нажмите +, чтобы создать вложение"),
+    ("Precision:", "Precisão:", "Precisión:", "Точность:"),
+    ("HDR", "HDR", "HDR", "HDR"),
+    ("2D filter access: bgl_DataTextures[%d]", "Acesso no filtro 2D: bgl_DataTextures[%d]",
+     "Acceso en el filtro 2D: bgl_DataTextures[%d]", "Доступ в 2D-фильтре: bgl_DataTextures[%d]"),
+    ("Empty slots before this one, material outputs will not match.",
+     "Há slots vazios antes deste, as saídas do material não vão coincidir.",
+     "Hay ranuras vacías antes de esta, las salidas del material no coincidirán.",
+     "Перед этим слотом есть пустые, выходы материала не совпадут."),
+    ("Fill the slots in order, starting at Slot 0.", "Preencha os slots em ordem, a partir do Slot 0.",
+     "Rellena las ranuras en orden, empezando por la ranura 0.", "Заполняйте слоты по порядку, начиная со слота 0."),
+    ("SSR uses Slot 0 as G-Buffer (Gbuff0, Half)", "O SSR usa o Slot 0 como G-Buffer (Gbuff0, Half)",
+     "SSR usa la ranura 0 como G-Buffer (Gbuff0, Half)", "SSR использует слот 0 как G-буфер (Gbuff0, Half)"),
+    # Animations
+    ("Logic Rate:", "Taxa de lógica:", "Tasa de lógica:", "Частота логики:"),
+    ("Ticks", "Ticks", "Ticks", "Тики"),
+    ("Actions update at the animation rate only (faster, less smooth)",
+     "As ações atualizam só na taxa da animação (mais leve, menos suave)",
+     "Las acciones se actualizan solo a la tasa de la animación (más ligero, menos suave)",
+     "Действия обновляются только с частотой анимации (быстрее, менее плавно)"),
+    ("Actions update every frame (smoother playback)", "As ações atualizam a cada quadro (reprodução mais suave)",
+     "Las acciones se actualizan en cada fotograma (reproducción más suave)",
+     "Действия обновляются каждый кадр (более плавное воспроизведение)"),
+    # FXAA
+    ("FXAA", "FXAA", "FXAA", "FXAA"),
+    ("Render FXAA", "Renderizar FXAA", "Renderizar FXAA", "Рендерить FXAA"),
+    ("Use FXAA on viewport", "Usar FXAA na viewport", "Usar FXAA en la vista", "Использовать FXAA во вьюпорте"),
+    ("Render FXAA in Viewport", "Renderizar FXAA na viewport", "Renderizar FXAA en la vista",
+     "Рендерить FXAA во вьюпорте"),
+    ("Edge Threshold Min", "Limiar mínimo de borda", "Umbral mínimo de bordes", "Мин. порог обводки"),
+    ("Subpixel", "Subpixel", "Subpíxel", "Субпиксель"),
+    ("Search Steps", "Passos de busca", "Pasos de búsqueda", "Шаги поиска"),
+    ("Minimum local contrast, relative to the brightest pixel, needed to smooth an edge. "
+     "Lower values smooth more edges but cost more",
+     "Contraste local mínimo, relativo ao pixel mais claro, para suavizar uma borda. "
+     "Valores menores suavizam mais bordas, mas custam mais",
+     "Contraste local mínimo, relativo al píxel más brillante, necesario para suavizar un borde. "
+     "Valores menores suavizan más bordes, pero cuestan más",
+     "Минимальный локальный контраст относительно самого яркого пикселя, нужный для сглаживания края. "
+     "Меньшие значения сглаживают больше краёв, но дороже"),
+    ("Contrast below which dark areas are left untouched",
+     "Contraste abaixo do qual as áreas escuras não são alteradas",
+     "Contraste por debajo del cual las zonas oscuras no se tocan",
+     "Контраст, ниже которого тёмные области не изменяются"),
+    ("Amount of subpixel aliasing removal. Lower values keep the image sharper",
+     "Quantidade de remoção de serrilhado subpixel. Valores menores mantêm a imagem mais nítida",
+     "Cantidad de eliminación de dientes de sierra subpíxel. Valores menores mantienen la imagen más nítida",
+     "Степень устранения субпиксельного алиасинга. Меньшие значения сохраняют изображение чётче"),
+    ("How far along an edge to search. More steps smooth long edges better but cost more",
+     "Até onde buscar ao longo de uma borda. Mais passos suavizam melhor bordas longas, mas custam mais",
+     "Hasta dónde buscar a lo largo de un borde. Más pasos suavizan mejor los bordes largos, pero cuestan más",
+     "Как далеко искать вдоль края. Больше шагов лучше сглаживают длинные края, но дороже"),
+    # Game Settings (Scene)
+    ("Physics Engine:", "Motor de física:", "Motor de física:", "Физический движок:"),
+    ("Physics Engine", "Motor de física", "Motor de física", "Физический движок"),
+    ("Solver", "Solucionador", "Solucionador", "Решатель"),
+    ("Game Rate:", "Ritmo do jogo:", "Ritmo del juego:", "Частота игры:"),
+    ("Per Frame:", "Por quadro:", "Por fotograma:", "За кадр:"),
+    ("Physics Substeps", "Subpassos da física", "Subpasos de física", "Подшаги физики"),
+    ("Max Logic Frames", "Máx. quadros de lógica", "Máx. fotogramas de lógica", "Макс. логических кадров"),
+    ("Deactivation (Sleeping Objects):", "Desativação (objetos em repouso):", "Desactivación (objetos en reposo):",
+     "Деактивация (спящие объекты):"),
+    ("Render:", "Renderização:", "Renderizado:", "Рендер:"),
+    ("Used by the Steering actuator to avoid obstacles", "Usado pelo atuador Steering para desviar de obstáculos",
+     "Usado por el actuador Steering para esquivar obstáculos", "Используется актуатором Steering для обхода препятствий"),
+    ("Simulation", "Simulação", "Simulación", "Симуляция"),
+    ("Level Height", "Altura de nível", "Altura de nivel", "Высота уровня"),
+    ("Show Debug Visualization", "Mostrar visualização de depuração", "Mostrar visualización de depuración",
+     "Показать отладочную визуализацию"),
+    ("Level of Detail", "Nível de detalhe", "Nivel de detalle", "Уровень детализации"),
+    ("The levels are set per object, in the Object tab", "Os níveis são definidos por objeto, na aba Object",
+     "Los niveles se definen por objeto, en la pestaña Object", "Уровни задаются для каждого объекта на вкладке Object"),
+    ("Enable Python Console", "Ativar console Python", "Activar consola Python", "Включить консоль Python"),
+    ("Hold all keys during the game to open it in the system console",
+     "Segure todas as teclas durante o jogo para abri-lo no console do sistema",
+     "Mantén todas las teclas durante el juego para abrirla en la consola del sistema",
+     "Удерживайте все клавиши во время игры, чтобы открыть её в системной консоли"),
+    ("Keys:", "Teclas:", "Teclas:", "Клавиши:"),
+    ("Navigation Mesh", "Malha de navegação", "Malla de navegación", "Навигационная сетка"),
+)
+
 # Mensagens e dicas dos operadores da Range (flowmenu, veiculo, particulas) que estavam escritas em portugues no
 # codigo; o codigo passou ao ingles e o portugues original vem daqui.
 MESSAGES = (
@@ -1362,6 +1476,6 @@ MESSAGES = (
      "Добавить недостающие свойства"),
 )
 
-PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES}
-ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES}
-RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES}
+PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}
+ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}
+RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}

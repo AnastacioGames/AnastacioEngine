@@ -213,6 +213,10 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	BuildInFilters filters = {
 		(scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_FXAA) ? true : false,
 	};
+	filters.fxaa_edge_threshold = settings.fxaa_edge_threshold;
+	filters.fxaa_edge_threshold_min = settings.fxaa_edge_threshold_min;
+	filters.fxaa_subpix = settings.fxaa_subpix;
+	filters.fxaa_search_steps = settings.fxaa_search_steps;
 
 	if (settings.bloom) {
 		filters.useBloom = (scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_BLOOM) ? true : false;
@@ -1525,6 +1529,20 @@ void KX_Scene::SetCameraOnTop(KX_Camera *cam)
 	m_cameralist->Add(cam);
 }
 
+/* Drop the objects sitting on an invisible LoD level, as PhysicsCullingCallback does for
+ * DBVT culling; without this an invisible level only hid the object with DBVT culling on. */
+static void CullInvisibleLods(std::vector<KX_GameObject *>& objects, KX_Camera *cam)
+{
+	objects.erase(std::remove_if(objects.begin(), objects.end(), [cam](KX_GameObject *gameobj) {
+		if (gameobj->GetVisibleLOD()) {
+			return false;
+		}
+		gameobj->UpdateVisibleLOD(cam);
+		gameobj->GetCullingNode().SetCulled(true);
+		return true;
+	}), objects.end());
+}
+
 void KX_Scene::PhysicsCullingCallback(KX_ClientObjectInfo *objectInfo, void *cullingInfo)
 {
 	CullingInfo *info = static_cast<CullingInfo *>(cullingInfo);
@@ -1557,6 +1575,7 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, RA
 			objects.push_back(gameobj);
 		}
 		if (!is_shadowbuf) {
+			CullInvisibleLods(objects, cam);
 			m_lastCullingTotalObjects = m_renderlist->GetCount();
 			m_lastCullingTestedObjects = (int)objects.size();
 			m_lastCullingVisibleObjects = (int)objects.size();
@@ -1598,6 +1617,9 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		KX_CullingHandler handler(m_renderlist, frustum, layer);
 		objects = handler.Process();
 		testedCount = handler.GetLastTestedCount();
+		if (!is_shadowbuf) {
+			CullInvisibleLods(objects, cam);
+		}
 	}
 	else {
 		// Bullet's DBVT culling tests the whole render list through its own tree

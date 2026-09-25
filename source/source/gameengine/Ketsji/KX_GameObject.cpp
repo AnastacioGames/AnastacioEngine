@@ -127,6 +127,8 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_currentLodLevel(0),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
+	m_lodBillboardActive(false),
+	m_lodBillboardOrientation(mt::mat3::Identity()),
 	m_currentAtlasCell(-1),
 	m_convertInfo(nullptr),
 	m_objectColor(mt::one4),
@@ -174,6 +176,8 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_currentLodLevel(0),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
+	m_lodBillboardActive(other.m_lodBillboardActive),
+	m_lodBillboardOrientation(other.m_lodBillboardOrientation),
 	m_currentAtlasCell(-1),
 	m_convertInfo(other.m_convertInfo),
 	m_objectColor(other.m_objectColor),
@@ -1338,7 +1342,16 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 			m_currentAtlasCell = -1;
 		}
 
+		if (!(lodLevel.GetFlag() & KX_LodLevel::USE_BILLBOARD) && m_lodBillboardActive) {
+			this->NodeSetLocalOrientation(m_lodBillboardOrientation);
+			m_lodBillboardActive = false;
+		}
+
 		if (lodLevel.GetFlag() & KX_LodLevel::USE_BILLBOARD) {
+			if (!m_lodBillboardActive) {
+				m_lodBillboardOrientation = this->NodeGetLocalOrientation();
+				m_lodBillboardActive = true;
+			}
 			// Cylindrical billboard: rotate only around Z so the local +Y (forward)
 			// axis faces the camera, keeping the object upright (tree/foliage impostor).
 			// Assumes the object has no parent rotation, as is typical for trees.

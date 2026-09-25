@@ -133,6 +133,10 @@ protected:
 	/// Set before ReplaceMesh() when the incoming LOD level needs a private, per-instance
 	/// display array for multi-angle impostor UV selection (see KX_LodLevel::USE_ATLAS).
 	bool								m_wantsImpostorAtlasDeformer;
+	/// True while a billboard LoD level drives the orientation; the original one is kept in
+	/// m_lodBillboardOrientation and restored when a non billboard level is reached.
+	bool								m_lodBillboardActive;
+	mt::mat3							m_lodBillboardOrientation;
 	/// Currently selected atlas cell index for the impostor billboard, -1 if none yet applied.
 	int									m_currentAtlasCell;
 	/// Info about blender object convert from.

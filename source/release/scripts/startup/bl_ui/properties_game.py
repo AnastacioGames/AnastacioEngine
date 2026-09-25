@@ -24,6 +24,7 @@ from array import array
 from bpy.types import Panel, Menu, UIList, Operator, AnimationEventTrigger
 from bpy.props import IntProperty, StringProperty, EnumProperty
 from mathutils import Vector
+from bpy.app.translations import pgettext_iface as iface_
 
 class GameButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -664,26 +665,8 @@ class RENDER_MT_game_refresh_rate(Menu):
 
 
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):
-    bl_label = "Embedded Player"
-    COMPAT_ENGINES = {'BLENDER_GAME'}
-
-    def draw(self, context):
-        layout = self.layout
-
-        rd = context.scene.render
-
-        box = layout.box()
-        box.label(text="Embedded Player:", icon="VIEW3D")
-        row = box.row()
-        row.operator("view3d.game_start", text="Start")
-        row = box.row()
-        row.label(text="Resolution:", icon="SCENE")
-        row = box.row(align=True)
-        row.menu("RENDER_MT_game_res_embedded", text="{} x {}".format(rd.resolution_x, rd.resolution_y))
-
-
-class RENDER_PT_game_player(RenderButtonsPanel, Panel):
-    bl_label = "Standalone Player"
+    # Embedded and Standalone players side by side, one column each.
+    bl_label = "Player"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     def draw(self, context):
@@ -691,9 +674,31 @@ class RENDER_PT_game_player(RenderButtonsPanel, Panel):
         layout = self.layout
         not_osx = sys.platform != "darwin"
 
+        rd = context.scene.render
         gs = context.scene.game_settings
 
-        box = layout.box()
+        # Borderless hides Fullscreen and Desktop; Desktop only shows with Fullscreen.
+        show_fullscreen = not gs.borderless_window
+        show_desktop = not_osx and show_fullscreen and gs.show_fullscreen
+        option_rows = 1 + show_fullscreen + show_desktop
+
+        split = layout.split(factor=0.5)
+
+        box = split.box()
+        box.label(text="Embedded Player:", icon="VIEW3D")
+        row = box.row()
+        row.operator("view3d.game_start", text="Start")
+        row = box.row()
+        row.label(text="Resolution:", icon="SCENE")
+        row = box.row(align=True)
+        row.menu("RENDER_MT_game_res_embedded", text="{} x {}".format(rd.resolution_x, rd.resolution_y))
+        # Blank rows so both boxes keep the same height. They sit in a column,
+        # like the checkboxes, so the row spacing matches.
+        col = box.column()
+        for _ in range(option_rows):
+            col.label(text="")
+
+        box = split.box()
         box.label(text="Standalone Player:", icon="WORLD")
         row = box.row()
         row.operator("wm.blenderplayer_start", text="Start")
@@ -702,18 +707,13 @@ class RENDER_PT_game_player(RenderButtonsPanel, Panel):
         row = box.row(align=True)
         row.active = not_osx or not gs.show_fullscreen
         row.menu("RENDER_MT_game_res_player", text="{} x {}".format(gs.resolution_x, gs.resolution_y))
-        row = box.row(align=True)
-        col = row.column()
-        col.active = not gs.borderless_window
-        col.prop(gs, "show_fullscreen")
-
-        col = row.column()
+        col = box.column()
+        if show_fullscreen:
+            col.prop(gs, "show_fullscreen")
         col.prop(gs, "borderless_window")
-
-        if not_osx:
-            col = row.column()
-            col.active = gs.show_fullscreen and not gs.borderless_window
+        if show_desktop:
             col.prop(gs, "use_desktop")
+
 
 class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
     bl_label = "Shading"
@@ -821,9 +821,18 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             subcol.prop(ssr_settings, "max_distance")
             
         row = layout.row(align=True)
-        row.label("FXAA")
+        row.prop(scenefx_settings, "show_expanded_fxaa", text="FXAA", emboss=True)
         row.prop(scenefx_settings, "render_editor_fxaa", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         row.prop(scenefx_settings, "use_fxaa", text="")
+
+        # FXAA values live on scenefx_settings itself, so there is no settings pointer to check.
+        if scenefx_settings.show_expanded_fxaa:
+            subcol = layout.column(align=True)
+            subcol.active = scenefx_settings.use_fxaa
+            subcol.prop(scenefx_settings, "fxaa_edge_threshold")
+            subcol.prop(scenefx_settings, "fxaa_edge_threshold_min")
+            subcol.prop(scenefx_settings, "fxaa_subpix")
+            subcol.prop(scenefx_settings, "fxaa_search_steps")
 
 
 class RENDER_PT_game_system(RenderButtonsPanel, Panel):
@@ -838,106 +847,121 @@ class RENDER_PT_game_system(RenderButtonsPanel, Panel):
         # Outer group containing the System subpanels.
         system_group = layout.box()
 
-        box = system_group.box()
+        # System and Game Exit Key side by side; both have a title plus two rows.
+        split = system_group.split(factor=0.5)
+
+        box = split.box()
         box.label(text="System:", icon="SETTINGS")
-        split = box.split(factor=0.4)
-        split.prop(gs, "use_frame_rate")
-        split.prop(gs, "use_deprecation_warnings")
-
-        box = system_group.box()
-        box.label(text="Game Exit Key:", icon="BLENDER")
-        row = box.row()
-        col = row.column()
-        col.active = not gs.ignore_exit_key
-        col.prop(gs, "exit_key", text="", event=True)
-
         col = box.column()
-        col.use_property_split = True
-        col.use_property_decorate = False
+        col.prop(gs, "use_frame_rate")
+        col.prop(gs, "use_deprecation_warnings")
 
-        if (gs.ignore_exit_key):
-            warn_box = col.box()
-            warn_box.label("It will not be possible to close the game by exit key, exitGame() event only!", icon="ERROR")
+        box = split.box()
+        box.label(text="Game Exit Key:", icon="QUIT")
+        col = box.column()
+        sub = col.column()
+        sub.active = not gs.ignore_exit_key
+        sub.prop(gs, "exit_key", text="", event=True)
         col.prop(gs, "ignore_exit_key")
+
+        # Full width, the message is too long for half a column.
+        if gs.ignore_exit_key:
+            warn_box = system_group.box()
+            warn_box.label("It will not be possible to close the game by exit key, exitGame() event only!", icon="ERROR")
 
         cursor_box = system_group.box()
         cursor_box.label(text="Mouse Cursor:", icon="RESTRICT_SELECT_OFF")
-        col = cursor_box.column()
-        col.prop(gs, "show_mouse", text="Mouse Cursor")
-        col.label(text="Custom Mouse Cursor:", icon="RESTRICT_SELECT_OFF")
-        col.prop(gs, "cursor_filepath", text="")
-        col.prop(gs, "cursor_size")
-        row = cursor_box.row()
-        row.prop(gs, "cursor_offset_x")
-        row.prop(gs, "cursor_offset_y")
-        row.prop(gs, "cursor_mipmap")
+        cursor_box.prop(gs, "show_mouse", text="Mouse Cursor")
 
-        framing_box = system_group.box()
-        framing_box.label(text="Framing:", icon="IMAGE_COL")
-        col = framing_box.column()
-        col.row().prop(gs, "frame_type", expand=True)
-        col.prop(gs, "frame_color", text="")
+        expanded = context.scene.show_expanded_game_cursor
+        row = cursor_box.row(align=True)
+        row.prop(context.scene, "show_expanded_game_cursor", text="Custom Mouse Cursor",
+                 icon='TRIA_DOWN' if expanded else 'TRIA_RIGHT', emboss=True)
 
+        if expanded:
+            col = cursor_box.column()
+            col.active = gs.show_mouse
+            row = col.row()
+            row.prop(gs, "cursor_filepath", text="")
+            row.prop(gs, "cursor_mipmap")
 
-class RENDER_PT_game_dynamic_resolution(RenderButtonsPanel, Panel):
-    bl_label = "Dynamic Resolution"
-    bl_order = -100
-    COMPAT_ENGINES = {'BLENDER_GAME'}
+            row = col.row()
+            for prop, label in (("cursor_offset_x", "Cursor Offset X:"),
+                                ("cursor_offset_y", "Cursor Offset Y:"),
+                                ("cursor_size", "Cursor Size:")):
+                sub = row.column(align=True)
+                sub.label(text=label)
+                sub.prop(gs, prop, text="")
 
-    def draw(self, context):
-        layout = self.layout
-        gs = context.scene.game_settings
-
-        box = layout.box()
-        box.label(text="Dynamic Resolution", icon="SCENE")
-        box.label(text="Adjust the internal render scale to maintain the target frame rate.")
-        box.prop(gs, "use_dynamic_resolution", text="Enable Dynamic Resolution")
-
-        settings = box.column(align=True)
-        settings.active = gs.use_dynamic_resolution
-        settings.label(text="Target FPS:")
-        settings.menu("RENDER_MT_game_target_fps", text=str(gs.dynamic_resolution_target_fps))
-        settings.prop(gs, "dynamic_resolution_min_scale")
-        settings.prop(gs, "dynamic_resolution_max_scale")
-        settings.prop(gs, "dynamic_resolution_step")
 
 class RENDER_UL_attachments(UIList):
+    # The 7 slots are fixed; an empty slot has no item, so it is drawn as a dimmed placeholder.
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         if item is not None:
-            layout.prop(item, "name", text="", emboss=False, icon="TEXTURE")
-            layout.label(text=str(index))
+            row = layout.row()
+            row.label(text=iface_("Slot %d") % index, translate=False, icon="TEXTURE")
+            row.prop(item, "name", text="", emboss=False)
+            row.label(text=item.bl_rna.properties["type"].enum_items[item.type].name)
         else:
-            layout.label(text="", icon="TEXTURE")
+            row = layout.row()
+            row.enabled = False
+            row.label(text=iface_("Slot %d") % index, translate=False, icon="DOT")
+            row.label(text="Empty")
+
 
 class RENDER_PT_game_attachments(RenderButtonsPanel, Panel):
+    # Extra color outputs written by materials, read back by 2D filters as bgl_DataTextures[n].
     bl_label = "Attachments"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     def draw(self, context):
         layout = self.layout
 
-        gs = context.scene.game_settings
+        scene = context.scene
+        gs = scene.game_settings
+        slots = list(gs.attachment_slots)
 
         box = layout.box()
-        box.label(text="Attachments:", icon="TEXTURE")
+        box.label(text="Render Attachments:", icon="TEXTURE")
+        box.label(text="Extra outputs read by 2D filters as bgl_DataTextures[n]", icon="INFO")
+
         row = box.row()
-
-        row.template_list("RENDER_UL_attachments", "", gs, "attachment_slots", gs, "active_attachment_index", rows=2)
-
+        row.template_list("RENDER_UL_attachments", "", gs, "attachment_slots", gs, "active_attachment_index", rows=3)
         col = row.column(align=True)
         col.operator("scene.render_attachment_new", icon='ZOOMIN', text="")
         col.operator("scene.render_attachment_remove", icon='ZOOMOUT', text="")
 
+        index = gs.active_attachment_index
         attachment = gs.active_attachment
 
-        if attachment is not None:
-            row = box.row()
-            row.prop(attachment, "type")
-            row.prop(attachment, "hdr")
+        if attachment is None:
+            box.label(text=iface_("Slot %d is empty, press + to create an attachment") % index, translate=False)
+            return
 
-            if attachment.type == "CUSTOM":
-                row = box.row()
-                row.prop(attachment, "size")
+        # The engine skips empty slots when it builds the framebuffer, so the data texture
+        # index is the count of used slots before this one.
+        data_index = sum(1 for a in slots[:index] if a is not None)
+
+        sub = box.box()
+        sub.prop(attachment, "name")
+        split = sub.split(factor=0.5)
+        col = split.column()
+        col.label(text="Type:")
+        col.prop(attachment, "type", text="")
+        col = split.column()
+        col.label(text="Precision:")
+        col.row().prop(attachment, "hdr", expand=True)
+        if attachment.type == "CUSTOM":
+            sub.prop(attachment, "size", text="Channels")
+        sub.label(text=iface_("2D filter access: bgl_DataTextures[%d]") % data_index, translate=False)
+
+        if data_index != index:
+            warn = box.box()
+            warn.label(text="Empty slots before this one, material outputs will not match.", icon="ERROR")
+            warn.label(text="Fill the slots in order, starting at Slot 0.")
+
+        if index == 0 and scene.scenefx_settings.use_ssr:
+            box.label(text="SSR uses Slot 0 as G-Buffer (Gbuff0, Half)", icon="LOCKED")
 
 
 class RENDER_PT_game_animations(RenderButtonsPanel, Panel):
@@ -947,16 +971,31 @@ class RENDER_PT_game_animations(RenderButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
 
-        gs = context.scene.game_settings
+        scene = context.scene
+        gs = scene.game_settings
 
         box = layout.box()
         box.label(text="Animations:", icon="ACTION")
-        box.label(text="Animation Frame Rate:")
-        box.menu("RENDER_MT_game_animation_fps", text=str(context.scene.render.fps))
-        box.prop(gs, "use_restrict_animation_updates")
+
+        split = box.split(factor=0.5)
+        col = split.column()
+        col.label(text="Animation Frame Rate:")
+        col.menu("RENDER_MT_game_animation_fps", text="%g fps" % (scene.render.fps / scene.render.fps_base))
+        col = split.column()
+        col.label(text="Logic Rate:")
+        col.prop(gs, "fps", text="Ticks")
+
+        col = box.column()
+        col.prop(gs, "use_restrict_animation_updates")
+        if gs.use_restrict_animation_updates:
+            col.label(text="Actions update at the animation rate only (faster, less smooth)", icon="INFO")
+        else:
+            col.label(text="Actions update every frame (smoother playback)", icon="INFO")
 
 
 class RENDER_PT_game_display(RenderButtonsPanel, Panel):
+    # Dynamic Resolution and Display side by side, one column each.
+    # Field names sit on their own label above the field, so fields show only the value.
     bl_label = "Display"
     COMPAT_ENGINES = {"BLENDER_GAME"}
 
@@ -966,19 +1005,45 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
         gs = context.scene.game_settings
 
         display_group = layout.box()
+        split = display_group.split(factor=0.5)
 
-        box = display_group.box()
+        # Both columns have a title plus ten rows, so the boxes keep the same height.
+        box = split.box()
+        box.label(text="Dynamic Resolution:", icon="SCENE")
+        col = box.column(align=True)
+        col.label(text="Scales the render to hold the FPS.")
+        col.prop(gs, "use_dynamic_resolution", text="Enable")
+        settings = col.column(align=True)
+        settings.active = gs.use_dynamic_resolution
+        settings.label(text="Target FPS:")
+        settings.menu("RENDER_MT_game_target_fps", text=str(gs.dynamic_resolution_target_fps))
+        settings.label(text="Minimum Scale:")
+        settings.prop(gs, "dynamic_resolution_min_scale", text="")
+        settings.label(text="Maximum Scale:")
+        settings.prop(gs, "dynamic_resolution_max_scale", text="")
+        settings.label(text="Scale Step:")
+        settings.prop(gs, "dynamic_resolution_step", text="")
+
+        box = split.box()
         box.label(text="Display:", icon="RENDER_STILL")
-        col = box.column()
-        col.prop(gs, "vsync", icon="RENDER_STILL")
-        col.prop(gs, "samples", icon="RENDER_STILL")
-        col.prop(gs, "hdr", icon="RENDER_STILL")
+        col = box.column(align=True)
+        col.label(text="Vsync:")
+        col.prop(gs, "vsync", text="", icon="RENDER_STILL")
+        col.label(text="AA Samples:")
+        col.prop(gs, "samples", text="", icon="RENDER_STILL")
+        col.label(text="HDR:")
+        col.prop(gs, "hdr", text="", icon="RENDER_STILL")
+        col.label(text="Bit Depth (bits per pixel):")
+        col.menu("RENDER_MT_game_bit_depth", text=str(gs.depth))
+        col.label(text="Fullscreen Refresh Rate (Hz):")
+        col.menu("RENDER_MT_game_refresh_rate", text=str(gs.frequency))
 
-        quality = box.column(align=True)
-        quality.label(text="Bit Depth (bits per pixel):")
-        quality.menu("RENDER_MT_game_bit_depth", text=str(gs.depth))
-        quality.label(text="Fullscreen Refresh Rate (Hz):")
-        quality.menu("RENDER_MT_game_refresh_rate", text=str(gs.frequency))
+        # How the image fits the window when the aspect ratio differs.
+        framing_box = display_group.box()
+        framing_box.label(text="Framing:", icon="IMAGE_COL")
+        col = framing_box.column()
+        col.row().prop(gs, "frame_type", expand=True)
+        col.prop(gs, "frame_color", text="")
 
         stereo_box = display_group.box()
         stereo_box.label(text="Stereo:", icon="CAMERA_STEREO")
@@ -1018,32 +1083,32 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
 
         if scene.show_expanded_game_physics:
             box = main_box.box()
-            box.label(text="Engine:", icon="PHYSICS")
-            box.prop(gs, "physics_engine", text="Engine")
+            box.label(text="Physics Engine:", icon="PHYSICS")
+            box.prop(gs, "physics_engine", text="Physics Engine")
             if gs.physics_engine != 'NONE':
-                box.prop(gs, "physics_solver", icon="PHYSICS")
+                box.prop(gs, "physics_solver", text="Solver", icon="PHYSICS")
                 box.prop(gs, "physics_gravity", text="Gravity")
 
+            box = main_box.box()
+            box.label(text="Steps & Timing:", icon="TIME")
+            split = box.split()
+
+            col = split.column()
+            col.label(text="Game Rate:")
+            col.prop(gs, "fps", text="FPS")
+            col.prop(gs, "time_scale")
+
+            col = split.column()
+            col.label(text="Per Frame:")
+            if gs.physics_engine != 'NONE':
+                col.prop(gs, "physics_step_sub", text="Physics Substeps")
+            col.prop(gs, "sleep_timer", text="Max Logic Frames")
+
+            box.prop(gs, "use_fixed_timestep")
+
+            if gs.physics_engine != 'NONE':
                 box = main_box.box()
-                box.label(text="Steps & Timing:", icon="TIME")
-                split = box.split()
-
-                col = split.column()
-                col.label(text="Physics Steps:")
-                sub = col.column(align=True)
-                sub.prop(gs, "physics_step_sub", text="Substeps")
-
-                col = split.column()
-                col.label(text="Sleep Timer")
-                col.prop(gs, "sleep_timer", text="Sleep")
-
-                row = box.row()
-                row.prop(gs, "fps", text="FPS")
-                row.prop(gs, "time_scale")
-                box.prop(gs, "use_fixed_timestep")
-
-                box = main_box.box()
-                box.label(text="Deactivation:", icon="SNAP_FACE")
+                box.label(text="Deactivation (Sleeping Objects):", icon="SNAP_FACE")
                 col = box.column()
                 sub = col.row(align=True)
                 sub.prop(gs, "deactivation_linear_threshold", text="Linear Threshold")
@@ -1056,7 +1121,7 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 split = box.split()
 
                 col = split.column()
-                col.label(text="Culling:")
+                col.label(text="Render:")
                 col.prop(gs, "shadows_on_off", text="Shadow Culling")
                 col.prop(gs, "use_occlusion_culling", text="Occlusion Culling")
                 sub = col.column()
@@ -1067,19 +1132,6 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 col.label(text="Object Activity:")
                 col.prop(gs, "use_activity_culling")
 
-            else:
-                box = main_box.box()
-                box.label(text="Steps:", icon="TIME")
-                split = box.split()
-
-                col = split.column()
-                col.label(text="Physics Steps:")
-                col.prop(gs, "fps", text="FPS")
-
-                col = split.column()
-                col.label(text="Logic Steps:")
-                col.prop(gs, "logic_step_max", text="Max")
-
         # ---- Obstacle Simulation ----
         row = main_box.row(align=True)
         row.prop(scene, "show_expanded_game_obstacles", text="Obstacle Simulation",
@@ -1087,71 +1139,20 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
 
         if scene.show_expanded_game_obstacles:
             box = main_box.box()
-            box.prop(gs, "obstacle_simulation", text="Type")
+            box.label(text="Used by the Steering actuator to avoid obstacles", icon='INFO')
+            box.prop(gs, "obstacle_simulation", text="Simulation")
             if gs.obstacle_simulation != 'NONE':
-                box.prop(gs, "level_height")
-                box.prop(gs, "show_obstacle_simulation")
-
-        # ---- Navigation Mesh ----
-        row = main_box.row(align=True)
-        row.prop(scene, "show_expanded_game_navmesh", text="Navigation Mesh",
-                 icon='TRIA_DOWN' if scene.show_expanded_game_navmesh else 'TRIA_RIGHT', emboss=True)
-
-        if scene.show_expanded_game_navmesh:
-            rd = gs.recast_data
-            col = main_box.column()
-            col.operator("mesh.navmesh_make", text="Build Navigation Mesh")
-
-            box = main_box.box()
-            box.label(text="Rasterization:", icon="MESH_GRID")
-            row = box.row()
-            row.prop(rd, "cell_size")
-            row.prop(rd, "cell_height")
-
-            box = main_box.box()
-            box.label(text="Agent:", icon="POSE_HLT")
-            split = box.split()
-
-            col = split.column()
-            col.prop(rd, "agent_height", text="Height")
-            col.prop(rd, "agent_radius", text="Radius")
-
-            col = split.column()
-            col.prop(rd, "slope_max")
-            col.prop(rd, "climb_max")
-
-            box = main_box.box()
-            box.label(text="Region:", icon="MOD_MESHDEFORM")
-            row = box.row()
-            row.prop(rd, "region_min_size")
-            if rd.partitioning != 'LAYERS':
-                row.prop(rd, "region_merge_size")
-
-            box.prop(rd, "partitioning")
-
-            box = main_box.box()
-            box.label(text="Polygonization:", icon="MESH_DATA")
-            split = box.split()
-
-            col = split.column()
-            col.prop(rd, "edge_max_len")
-            col.prop(rd, "edge_max_error")
-
-            split.prop(rd, "verts_per_poly")
-
-            box = main_box.box()
-            box.label(text="Detail Mesh:", icon="MOD_TRIANGULATE")
-            row = box.row()
-            row.prop(rd, "sample_dist")
-            row.prop(rd, "sample_max_error")
+                box.prop(gs, "level_height", text="Level Height")
+                box.prop(gs, "show_obstacle_simulation", text="Show Debug Visualization")
 
         # ---- LOD Hysteresis ----
         row = main_box.row(align=True)
-        row.prop(scene, "show_expanded_game_lod", text="Level of Detail - LOD",
+        row.prop(scene, "show_expanded_game_lod", text="Level of Detail",
                  icon='TRIA_DOWN' if scene.show_expanded_game_lod else 'TRIA_RIGHT', emboss=True)
 
         if scene.show_expanded_game_lod:
             box = main_box.box()
+            box.label(text="The levels are set per object, in the Object tab", icon='INFO')
             row = box.row()
             row.prop(gs, "use_scene_hysteresis", text="Hysteresis")
             row = box.row()
@@ -1162,13 +1163,15 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
         row = main_box.row(align=True)
         row.prop(scene, "show_expanded_game_console", text="Python Console",
                  icon='TRIA_DOWN' if scene.show_expanded_game_console else 'TRIA_RIGHT', emboss=True)
-        row.prop(gs, "use_python_console", text="")
 
         if scene.show_expanded_game_console:
             box = main_box.box()
-            row = box.row(align=True)
-            row.active = gs.use_python_console
-            row.label("Keys:")
+            box.prop(gs, "use_python_console", text="Enable Python Console")
+            col = box.column()
+            col.active = gs.use_python_console
+            col.label(text="Hold all keys during the game to open it in the system console", icon='INFO')
+            row = col.row(align=True)
+            row.label(text="Keys:")
             row.prop(gs, "python_console_key1", text="", event=True)
             row.prop(gs, "python_console_key2", text="", event=True)
             row.prop(gs, "python_console_key3", text="", event=True)
@@ -1191,9 +1194,68 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             box.prop(scene, "audio3d_update")
 
 
+class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):
+    bl_label = "Navigation Mesh"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+        rd = context.scene.game_settings.recast_data
+
+        layout.operator("mesh.navmesh_make", text="Build Navigation Mesh")
+
+        box = layout.box()
+        box.label(text="Rasterization:", icon="MESH_GRID")
+        row = box.row()
+        row.prop(rd, "cell_size")
+        row.prop(rd, "cell_height")
+
+        box = layout.box()
+        box.label(text="Agent:", icon="POSE_HLT")
+        split = box.split()
+
+        col = split.column()
+        col.prop(rd, "agent_height", text="Height")
+        col.prop(rd, "agent_radius", text="Radius")
+
+        col = split.column()
+        col.prop(rd, "slope_max")
+        col.prop(rd, "climb_max")
+
+        box = layout.box()
+        box.label(text="Region:", icon="MOD_MESHDEFORM")
+        row = box.row()
+        row.prop(rd, "region_min_size")
+        if rd.partitioning != 'LAYERS':
+            row.prop(rd, "region_merge_size")
+
+        box.prop(rd, "partitioning")
+
+        box = layout.box()
+        box.label(text="Polygonization:", icon="MESH_DATA")
+        split = box.split()
+
+        col = split.column()
+        col.prop(rd, "edge_max_len")
+        col.prop(rd, "edge_max_error")
+
+        split.prop(rd, "verts_per_poly")
+
+        box = layout.box()
+        box.label(text="Detail Mesh:", icon="MOD_TRIANGULATE")
+        row = box.row()
+        row.prop(rd, "sample_dist")
+        row.prop(rd, "sample_max_error")
+
+
 bpy.types.Scene.show_expanded_game_physics = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Scene.show_expanded_game_obstacles = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Scene.show_expanded_game_navmesh = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Scene.show_expanded_game_lod = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Scene.show_expanded_game_console = bpy.props.BoolProperty(name="Expanded", default=False)
 bpy.types.Scene.show_expanded_game_audio = bpy.props.BoolProperty(name="Expanded", default=False)
@@ -1626,8 +1688,12 @@ class OBJECT_OT_bake_lod_impostor(Operator):
         cell_resolution = int(scene.lod_impostor_bake_resolution)
 
         if multi_angle:
+            # The game splits the full turn into cols * rows cells, so the grid must hold
+            # exactly angle_count cells (8 views -> 4x2, not 3x3 with an empty cell).
             cols = math.ceil(math.sqrt(angle_count))
-            rows = math.ceil(angle_count / cols)
+            while angle_count % cols:
+                cols += 1
+            rows = angle_count // cols
         else:
             cols, rows = 1, 1
 
@@ -1983,16 +2049,15 @@ classes = (
     RENDER_MT_game_bit_depth,
     RENDER_MT_game_refresh_rate,
     RENDER_PT_embedded,
-    RENDER_PT_game_player,
+    RENDER_PT_game_display,
     RENDER_PT_game_shading,
     RENDER_PT_game_post_process_shaders,
     RENDER_PT_game_system,
-    RENDER_PT_game_dynamic_resolution,
     RENDER_PT_game_attachments,
     RENDER_PT_game_animations,
-    RENDER_PT_game_display,
 	RENDER_UL_attachments,
     SCENE_PT_game_physics,
+    SCENE_PT_game_navmesh,
     WORLD_PT_game_context_world,
     WORLD_PT_game_world,
     WORLD_PT_game_environment_lighting,
@@ -2007,6 +2072,8 @@ classes = (
     OBJECT_PT_levels_of_detail,
     OBJECT_PT_animation_events, 
 )
+
+bpy.types.Scene.show_expanded_game_cursor = bpy.props.BoolProperty(name="Expanded", default=False)
 
 if __name__ == "__main__":  # only for live edit.
     from bpy.utils import register_class
