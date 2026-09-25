@@ -1010,29 +1010,47 @@ class MATERIAL_PT_transp_game(MaterialButtonsPanel, Panel):
         layout = self.layout
         base_mat = context.material
         mat = active_node_mat(base_mat)
+        game = base_mat.game_settings  # the converter reads these from the base material
+        simple = simple_material(base_mat)
 
-        if simple_material(base_mat):
+        # Mirrors KX_BlenderMaterial: Alpha Blend picks the render pass; Z Transparency only
+        # turns an Opaque material into (unsorted) Alpha Blend, Mask/Raytrace never do.
+        use_transp = base_mat.use_transparency
+        method = base_mat.transparency_method
+        blend = game.alpha_blend
+        if use_transp and method == 'Z_TRANSPARENCY' and blend == 'OPAQUE':
+            blend = 'ALPHA'
+        blended = blend in {'ADD', 'ALPHA', 'ALPHA_SORT'}
+
+        if simple:
             layout.prop(base_mat, "use_transparency", text="Enabled")
-        layout = layout.column()
-        layout.active = mat.use_transparency
-
-        box = layout.box()
-        box.label(text="Depth Transparency:", icon="IMAGE_RGB_ALPHA")
-        split = box.split()
-        col = split.column()
-        col.active = mat.use_depth_transparency
-        col.prop(mat, "depth_transp_factor", text="Depth Factor")
-        col = split.column()
-        col.prop(mat, "use_depth_transparency")
 
         box = layout.box()
         box.label(text="Alpha:", icon="IMAGE_ALPHA")
-        if simple_material(base_mat):
-            row = box.row()
-            row.prop(mat, "transparency_method", expand=True)
+        col = box.column()
+        col.prop(game, "alpha_blend", text="Blend")
+        if simple:
+            row = col.row()
+            row.active = use_transp
+            row.prop(base_mat, "transparency_method", expand=True)
+            if use_transp and method != 'Z_TRANSPARENCY' and game.alpha_blend == 'OPAQUE':
+                col.label(text="Opaque blends without sorting: use Z Transparency", icon='ERROR')
 
-        box.prop(mat, "alpha")
-        box.prop(mat, "specular_alpha", text="Specular")
+        # Alpha still reaches the shader with Enabled off when Blend is not Opaque.
+        col = box.column()
+        col.active = use_transp or game.alpha_blend != 'OPAQUE'
+        col.prop(mat, "alpha")
+        row = col.row()
+        row.active = use_transp and method != 'MASK' and not mat.use_shadeless
+        row.prop(mat, "specular_alpha", text="Specular")
+
+        box = layout.box()
+        box.prop(mat, "use_depth_transparency")
+        col = box.column()
+        col.active = mat.use_depth_transparency and use_transp and blended
+        col.prop(mat, "depth_transp_factor", text="Fade Distance")
+        if mat.use_depth_transparency and not (use_transp and blended):
+            box.label(text="No effect: needs Enabled and a blending mode", icon='ERROR')
 
 
 class VolumeButtonsPanel:

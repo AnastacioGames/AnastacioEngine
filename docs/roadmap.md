@@ -246,6 +246,9 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Shader Sources do material (2026-09-25)**: conferir no jogo real um material com Vertex/Fragment GLSL
   próprio (a posse dos buffers do código do usuário mudou para `gpu_material.c`) e o layout novo do painel
   Shading. Em aberto: editar o Text não recompila o material.
+- **Painel Transparency do modo jogo (2026-09-25)**: conferir no editor o layout novo e os dois avisos
+  (Mask/Raytrace + Opaque; Depth Transparency sem efeito). Em aberto, sem decisão: a pré-passada de
+  profundidade de Clip/Alpha to Coverage em `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

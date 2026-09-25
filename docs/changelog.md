@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Material: painel Transparency do modo jogo
+
+Só interface e textos, sem mudar como o jogo desenha nem o que o `.blend` guarda. O painel agora mostra o que o motor faz de fato (`KX_BlenderMaterial`, `RAS_BucketManager`, `gpu_material.c`):
+
+- `Alpha Blend` (Game Settings) aparece no topo, como "Blend". É ele que escolhe a passada de render (sólida ou alpha, com ou sem ordenação). Z Transparency só transforma um Opaque em Alpha Blend sem ordenação; Mask/Raytrace não. Com Enabled + Mask/Raytrace + Opaque o material é misturado na passada sólida, sem ordenar e gravando profundidade. O painel avisa essa combinação.
+- Alpha fica ativo também com Enabled desligado quando Blend não é Opaque (o alpha chega ao shader nesse caso). Specular só fica ativo com Z/Raytrace e sem Shadeless, que é quando `alpha_spec_correction` é aplicado.
+- Depth Transparency: checkbox primeiro e o fator renomeado para "Fade Distance" (é uma distância em unidades da cena), ativo só com Enabled e um modo com mistura (Alpha, Add, Sort). Fora disso, avisa que não tem efeito. Com Enabled desligado e Blend ligado, o motor ainda copia a textura de profundidade todo frame sem usar.
+- Tooltips de `use_depth_transparency`/`depth_transp_factor` corrigidos no RNA, com traduções PT-BR/ES/RU.
+- Não mexido, anotado: a pré-passada de profundidade para Clip/Alpha to Coverage (`ALPHA_DEPTH_CUTOUT_BUCKET`) nunca roda, porque esses materiais não passam em `IsAlpha()` e vão para o bucket sólido.
+
 ## 2026-09-25 - Material: Shader Sources (Vertex/Fragment GLSL)
 
 - `library_query.c`: `Material.vertcode`/`fragcode` (os Texts de `script_vert`/`script_frag`) não eram percorridos por `BKE_library_foreach_ID_link`, e `ID_MA` não declarava uso de `ID_TXT`. Apagar o Text usado como shader deixava o material com um ponteiro para memória liberada, e a próxima compilação chamava `txt_to_buf()` nele. Agora os dois ponteiros são registrados com `IDWALK_CB_NOP`, a mesma convenção do RNA, que não conta usuários de Text. Teste em background: remover o Text zera `script_vert` no material e na cópia, `users` fica estável na cópia/remoção e save/reload está correto.
