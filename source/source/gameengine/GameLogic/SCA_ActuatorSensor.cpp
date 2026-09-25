@@ -53,7 +53,7 @@ SCA_ActuatorSensor::SCA_ActuatorSensor(SCA_EventManager *eventmgr,
 void SCA_ActuatorSensor::Init()
 {
 	m_lastresult = m_invert ? true : false;
-	m_midresult = m_lastresult;
+	m_midresult = false;
 	m_reset = true;
 }
 
@@ -94,12 +94,15 @@ SCA_ActuatorSensor::~SCA_ActuatorSensor()
 bool SCA_ActuatorSensor::Evaluate()
 {
 	if (m_actuator) {
-		bool result = m_actuator->IsActive();
+		/* m_midresult keeps the activation seen by Update() in the previous frame: one-shot
+		 * actuators (Property, Message, Add Object...) are already inactive here and the
+		 * sensor would only report the negative edge. */
+		bool result = m_actuator->IsActive() || m_midresult;
 		bool reset = m_reset && m_level;
 
 		m_reset = false;
-		if (m_lastresult != result || m_midresult != result) {
-			m_lastresult = m_midresult = result;
+		if (m_lastresult != result) {
+			m_lastresult = result;
 			return true;
 		}
 		return (reset) ? true : false;
