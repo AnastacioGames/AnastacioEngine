@@ -214,6 +214,16 @@ public:
 	 * Sets this camera's viewport.
 	 */
 	void SetViewport(int left, int bottom, int right, int top);
+
+	/**
+	 * Sets this camera's viewport as ratios of the render area, resolved every frame by UpdateViewport().
+	 */
+	void SetViewportRatios(float left, float bottom, float right, float top);
+
+	/**
+	 * Resolves the viewport ratios against the current render area and returns the viewport.
+	 */
+	const RAS_Rect& UpdateViewport(const RAS_Rect& displayArea);
 	
 	/**
 	 * Gets this camera's viewport status.bool

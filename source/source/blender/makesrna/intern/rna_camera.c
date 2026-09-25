@@ -200,19 +200,23 @@ static void rna_def_game_camera_viewport_data(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "left_ratio", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "leftratio");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Left Ratio", "Set camera viewport left to a ratio of the entire viewport width");
 
 	prop = RNA_def_property(srna, "right_ratio", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "rightratio");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_float_default(prop, 1.0f);
 	RNA_def_property_ui_text(prop, "Right Ratio", "Set camera viewport right to a ratio of the entire viewport width");
 
 	prop = RNA_def_property(srna, "bottom_ratio", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "bottomratio");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Bottom Ratio", "Set camera viewport bottom to a ratio of the entire viewport height");
 
 	prop = RNA_def_property(srna, "top_ratio", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "topratio");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_float_default(prop, 1.0f);
 	RNA_def_property_ui_text(prop, "Top Ratio", "Set camera viewport top to a ratio of the entire viewport height");
 }
@@ -423,7 +427,8 @@ void RNA_def_camera(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_viewport", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag", GAME_CAM_VIEWPORT);
-	RNA_def_property_ui_text(prop, "Show Frustum", "Show a visualization of frustum in Game Engine");
+	RNA_def_property_ui_text(prop, "Use Custom Viewport",
+	                         "Render this camera into its own region of the window, even when it is not the active camera");
 	RNA_def_property_update(prop, NC_CAMERA, NULL);
 
 	prop = RNA_def_property(srna, "use_object_activity_culling", PROP_BOOLEAN, PROP_NONE);

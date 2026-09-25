@@ -1052,7 +1052,7 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 	return gamelight;
 }
 
-static KX_Camera *BL_GameCameraFromBlenderCamera(Object *ob, KX_Scene *kxscene, RAS_ICanvas *canvas, float camZoom)
+static KX_Camera *BL_GameCameraFromBlenderCamera(Object *ob, KX_Scene *kxscene, float camZoom)
 {
 	Camera *ca = static_cast<Camera *>(ob->data);
 	RAS_CameraData camdata(ca->lens, ca->ortho_scale, ca->sensor_x, ca->sensor_y, ca->sensor_fit, ca->shiftx, ca->shifty, ca->clipsta, ca->clipend, ca->type == CAM_PERSP, ca->YF_dofdist, camZoom);
@@ -1061,17 +1061,17 @@ static KX_Camera *BL_GameCameraFromBlenderCamera(Object *ob, KX_Scene *kxscene, 
 	gamecamera = new KX_Camera(kxscene, KX_Scene::m_callbacks, camdata);
 	gamecamera->SetName(ca->id.name + 2);
 
+	/* Ratios are always kept, so enabling useViewport from Python uses the editor's values.
+	 * The pixel viewport is resolved each frame against the render area (KX_Camera::UpdateViewport). */
+	const GameCameraViewportSettings& settings = ca->gameviewport;
+	gamecamera->SetViewportRatios(settings.leftratio, settings.bottomratio, settings.rightratio, settings.topratio);
+
 	if (ca->gameflag & GAME_CAM_VIEWPORT) {
-		const GameCameraViewportSettings& settings = ca->gameviewport;
-		if (settings.leftratio > settings.rightratio || settings.bottomratio > settings.topratio) {
+		if (settings.leftratio >= settings.rightratio || settings.bottomratio >= settings.topratio) {
 			CM_Warning("\"" << gamecamera->GetName() << "\" uses invalid custom viewport ratios, disabling custom viewport.");
 		}
 		else {
 			gamecamera->EnableViewport(true);
-			const int maxx = canvas->GetMaxX();
-			const int maxy = canvas->GetMaxY();
-			gamecamera->SetViewport(maxx * settings.leftratio, maxy * settings.bottomratio,
-			                        maxx * settings.rightratio, maxy * settings.topratio);
 		}
 	}
 
@@ -1220,7 +1220,7 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 
 		case OB_CAMERA:
 		{
-			KX_Camera *gamecamera = BL_GameCameraFromBlenderCamera(ob, kxscene, canvas, camZoom);
+			KX_Camera *gamecamera = BL_GameCameraFromBlenderCamera(ob, kxscene, camZoom);
 			gameobj = gamecamera;
 
 			kxscene->GetCameraList()->Add(CM_AddRef(gamecamera));

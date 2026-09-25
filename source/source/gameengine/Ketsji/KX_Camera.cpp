@@ -382,6 +382,40 @@ void KX_Camera::SetViewport(int left, int bottom, int right, int top)
 {
 	InvalidateProjectionMatrix();
 	m_camdata.m_viewport = RAS_Rect(left, right, bottom, top);
+	// Explicit pixels from Python replace the ratios set in the editor.
+	m_camdata.m_useViewportRatios = false;
+}
+
+void KX_Camera::SetViewportRatios(float left, float bottom, float right, float top)
+{
+	InvalidateProjectionMatrix();
+	m_camdata.m_useViewportRatios = true;
+	m_camdata.m_viewportRatios[0] = left;
+	m_camdata.m_viewportRatios[1] = bottom;
+	m_camdata.m_viewportRatios[2] = right;
+	m_camdata.m_viewportRatios[3] = top;
+}
+
+const RAS_Rect& KX_Camera::UpdateViewport(const RAS_Rect& displayArea)
+{
+	if (m_camdata.m_useViewportRatios) {
+		/* Resolved against the render area of this frame so the viewport follows window resizes,
+		 * the dynamic render scale and the per-eye area of stereo modes. */
+		const float *ratios = m_camdata.m_viewportRatios;
+		const int maxx = displayArea.GetMaxX();
+		const int maxy = displayArea.GetMaxY();
+		const RAS_Rect viewport(displayArea.GetLeft() + (int)(maxx * ratios[0]), displayArea.GetLeft() + (int)(maxx * ratios[2]),
+		                        displayArea.GetBottom() + (int)(maxy * ratios[1]), displayArea.GetBottom() + (int)(maxy * ratios[3]));
+		const RAS_Rect& current = m_camdata.m_viewport;
+		if (viewport.GetLeft() != current.GetLeft() || viewport.GetRight() != current.GetRight() ||
+		    viewport.GetBottom() != current.GetBottom() || viewport.GetTop() != current.GetTop())
+		{
+			m_camdata.m_viewport = viewport;
+			InvalidateProjectionMatrix();
+		}
+	}
+
+	return m_camdata.m_viewport;
 }
 
 bool KX_Camera::UseViewport() const

@@ -48,6 +48,9 @@ struct RAS_CameraData
 	bool m_perspective;
 	bool m_useViewport;
 	RAS_Rect m_viewport;
+	/// When set, m_viewport is recomputed from m_viewportRatios (left, bottom, right, top) against the render area.
+	bool m_useViewportRatios = false;
+	float m_viewportRatios[4] = {0.0f, 0.0f, 1.0f, 1.0f};
 	float m_focallength;
 	float m_zoom;
 

@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Custom Viewport da câmera
+
+- O viewport em pixels era calculado uma única vez na conversão, a partir do tamanho visível do canvas. Com isso, ficava errado depois de redimensionar a janela, com a escala de resolução dinâmica (o render usa `GetRenderWidth`) e no estéreo. Agora `KX_Camera` guarda os ratios (`RAS_CameraData::m_viewportRatios`), e `UpdateViewport()` resolve o retângulo a cada frame, contra a área de render daquele frame e olho, invalidando a projeção só quando ele muda. `setViewport()` do Python continua em pixels fixos.
+- Os ratios são carregados mesmo com o viewport desligado, então `useViewport = True` pelo Python usa os valores do editor em vez de um retângulo 0x0.
+- Ratios iguais (largura ou altura zero) passam a ser tratados como inválidos, igual aos invertidos.
+- RNA: `use_viewport` tinha nome e tooltip copiados de "Show Frustum"; os ratios agora ficam limitados a 0..1. O painel avisa quando Left/Bottom não é menor que Right/Top.
+- Painel Custom Viewport redesenhado: caixa de presets (Full Screen, Picture-in-Picture, metades Left/Right/Top/Bottom e os 4 quadrantes) pelo novo operador `camera.game_viewport_preset` (`bl_operators/camera.py`); ratios em pares Horizontal (Left/Right) e Vertical (Bottom/Top); linha "Result" com o tamanho em pixels na resolução do jogo, com o mesmo arredondamento do motor. Traduções em PT-BR, ES e RU.
+
+## 2026-09-25 - Aba Camera em painéis nativos
+
+- `properties_data_camera.py`: as seções deixaram de ser botões de expansão dentro de um único painel e viraram painéis com a seta nativa. Camera (aberto) reúne Lens, Shift & Clipping e Sensor; Depth of Field, Display, Safe Areas, Culling & LOD (Game: LOD, Culling, Shadow Cascade Cache e Optimization Reference), Custom Viewport (Game) e Stereoscopy (Render com multiview) começam fechados.
+- Safe Areas e Custom Viewport passaram o checkbox para dentro ("Enabled"). As propriedades `show_expanded_cam_*` deixaram de ser definidas; arquivos que as tenham guardam só IDProperties sem uso.
+- Traduções de "Lens:" e "Culling & LOD" em PT-BR, ES e RU. Registro conferido em `RangeEngine --background`.
+- Depth of Field, Display e Safe Areas com o conteúdo em caixas com título. Depth of Field fica escondido no Range Engine (`BLENDER_GAME`): é só prévia do compositor do viewport (o High Quality pesa o editor) e o jogo não aplica o efeito; o runtime lê só `YF_dofdist` como distância focal do estéreo.
+
 ## 2026-09-25 - Painéis: Foliage próprio, checkbox dentro do conteúdo, Vehicle dividido
 
 - `properties_material.py`: as opções de Foliage saíram de Game Settings para o painel `MATERIAL_PT_game_foliage` ("Foliage Shader", fechado por padrão), com o checkbox `use_foliage` no cabeçalho e duas caixas: Wind (Grass, Strength, Turbulence) e Optimization (Stop Beyond Distance, Wind Distance). As propriedades RNA não mudaram.

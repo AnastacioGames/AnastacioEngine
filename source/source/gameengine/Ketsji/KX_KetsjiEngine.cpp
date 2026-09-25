@@ -816,7 +816,7 @@ void KX_KetsjiEngine::GetSceneViewport(KX_Scene *scene, KX_Camera *cam, const RA
 	// so that we are using the latest camera position.
 
 	if (cam->UseViewport()) {
-		area = cam->GetViewport();
+		area = cam->UpdateViewport(displayArea);
 	}
 	else {
 		area = displayArea;

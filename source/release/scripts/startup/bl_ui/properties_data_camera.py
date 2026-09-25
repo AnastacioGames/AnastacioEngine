@@ -78,27 +78,46 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
         layout = self.layout
 
         cam = context.camera
-        scene = context.scene
-        render = scene.render
-        engine = render.engine
-
-        main_box = layout.box()
-        main_box.label(text="Camera:", icon="CAMERA_DATA")
+        engine = context.scene.render.engine
 
         # --- Lens ---
-        row = main_box.row(align=True)
-        row.prop(cam, "show_expanded_cam_lens", text="Lens",
-                 icon='TRIA_DOWN' if cam.show_expanded_cam_lens else 'TRIA_RIGHT', emboss=True)
+        box = layout.box()
+        box.label(text="Lens:", icon="CAMERA_DATA")
+        box.row().prop(cam, "type", expand=True)
 
-        if cam.show_expanded_cam_lens:
-            box = main_box.box()
-            box.label(text="Type:", icon="CAMERA_DATA")
-            box.row().prop(cam, "type", expand=True)
+        split = box.split()
 
-            split = box.split()
+        col = split.column()
+        if cam.type == 'PERSP':
+            row = col.row()
+            if cam.lens_unit == 'MILLIMETERS':
+                row.prop(cam, "lens")
+            elif cam.lens_unit == 'FOV':
+                row.prop(cam, "angle")
+            row.prop(cam, "lens_unit", text="")
 
-            col = split.column()
-            if cam.type == 'PERSP':
+        elif cam.type == 'ORTHO':
+            col.prop(cam, "ortho_scale")
+
+        elif cam.type == 'PANO':
+            if engine == 'CYCLES':
+                ccam = cam.cycles
+                col.prop(ccam, "panorama_type", text="Type")
+                if ccam.panorama_type == 'FISHEYE_EQUIDISTANT':
+                    col.prop(ccam, "fisheye_fov")
+                elif ccam.panorama_type == 'FISHEYE_EQUISOLID':
+                    row = box.row()
+                    row.prop(ccam, "fisheye_lens", text="Lens")
+                    row.prop(ccam, "fisheye_fov")
+                elif ccam.panorama_type == 'EQUIRECTANGULAR':
+                    row = box.row()
+                    sub = row.column(align=True)
+                    sub.prop(ccam, "latitude_min")
+                    sub.prop(ccam, "latitude_max")
+                    sub = row.column(align=True)
+                    sub.prop(ccam, "longitude_min")
+                    sub.prop(ccam, "longitude_max")
+            elif engine == 'BLENDER_RENDER':
                 row = col.row()
                 if cam.lens_unit == 'MILLIMETERS':
                     row.prop(cam, "lens")
@@ -106,272 +125,282 @@ class DATA_PT_camera(CameraButtonsPanel, Panel):
                     row.prop(cam, "angle")
                 row.prop(cam, "lens_unit", text="")
 
-            elif cam.type == 'ORTHO':
-                col.prop(cam, "ortho_scale")
+        # --- Shift & Clipping ---
+        box = layout.box()
+        box.label(text="Shift & Clipping:", icon="SETTINGS")
+        split = box.split()
 
-            elif cam.type == 'PANO':
-                if engine == 'CYCLES':
-                    ccam = cam.cycles
-                    col.prop(ccam, "panorama_type", text="Type")
-                    if ccam.panorama_type == 'FISHEYE_EQUIDISTANT':
-                        col.prop(ccam, "fisheye_fov")
-                    elif ccam.panorama_type == 'FISHEYE_EQUISOLID':
-                        row = box.row()
-                        row.prop(ccam, "fisheye_lens", text="Lens")
-                        row.prop(ccam, "fisheye_fov")
-                    elif ccam.panorama_type == 'EQUIRECTANGULAR':
-                        row = box.row()
-                        sub = row.column(align=True)
-                        sub.prop(ccam, "latitude_min")
-                        sub.prop(ccam, "latitude_max")
-                        sub = row.column(align=True)
-                        sub.prop(ccam, "longitude_min")
-                        sub.prop(ccam, "longitude_max")
-                elif engine == 'BLENDER_RENDER':
-                    row = col.row()
-                    if cam.lens_unit == 'MILLIMETERS':
-                        row.prop(cam, "lens")
-                    elif cam.lens_unit == 'FOV':
-                        row.prop(cam, "angle")
-                    row.prop(cam, "lens_unit", text="")
+        col = split.column(align=True)
+        col.label(text="Shift:")
+        col.prop(cam, "shift_x", text="X")
+        col.prop(cam, "shift_y", text="Y")
 
-            box = main_box.box()
-            box.label(text="Shift & Clipping:", icon="SETTINGS")
-            split = box.split()
-
-            col = split.column(align=True)
-            col.label(text="Shift:")
-            col.prop(cam, "shift_x", text="X")
-            col.prop(cam, "shift_y", text="Y")
-
-            col = split.column(align=True)
-            col.label(text="Clipping:")
-            col.prop(cam, "clip_start", text="Start")
-            col.prop(cam, "clip_end", text="End")
+        col = split.column(align=True)
+        col.label(text="Clipping:")
+        col.prop(cam, "clip_start", text="Start")
+        col.prop(cam, "clip_end", text="End")
 
         # --- Sensor ---
-        row = main_box.row(align=True)
-        row.prop(cam, "show_expanded_cam_sensor", text="Sensor",
-                 icon='TRIA_DOWN' if cam.show_expanded_cam_sensor else 'TRIA_RIGHT', emboss=True)
+        box = layout.box()
+        box.label(text="Sensor:", icon="CAMERA_DATA")
 
-        if cam.show_expanded_cam_sensor:
-            box = main_box.box()
+        row = box.row(align=True)
+        row.menu("CAMERA_MT_presets", text=bpy.types.CAMERA_MT_presets.bl_label)
+        row.operator("camera.preset_add", text="", icon='ZOOMIN')
+        row.operator("camera.preset_add", text="", icon='ZOOMOUT').remove_active = True
 
-            row = box.row(align=True)
-            row.menu("CAMERA_MT_presets", text=bpy.types.CAMERA_MT_presets.bl_label)
-            row.operator("camera.preset_add", text="", icon='ZOOMIN')
-            row.operator("camera.preset_add", text="", icon='ZOOMOUT').remove_active = True
+        split = box.split()
 
-            box.label(text="Sensor:", icon="CAMERA_DATA")
+        col = split.column(align=True)
+        if cam.sensor_fit == 'AUTO':
+            col.prop(cam, "sensor_width", text="Size")
+        else:
+            sub = col.column(align=True)
+            sub.active = cam.sensor_fit == 'HORIZONTAL'
+            sub.prop(cam, "sensor_width", text="Width")
+            sub = col.column(align=True)
+            sub.active = cam.sensor_fit == 'VERTICAL'
+            sub.prop(cam, "sensor_height", text="Height")
 
-            split = box.split()
+        col = split.column(align=True)
+        col.prop(cam, "sensor_fit", text="")
 
-            col = split.column(align=True)
-            if cam.sensor_fit == 'AUTO':
-                col.prop(cam, "sensor_width", text="Size")
-            else:
-                sub = col.column(align=True)
-                sub.active = cam.sensor_fit == 'HORIZONTAL'
-                sub.prop(cam, "sensor_width", text="Width")
-                sub = col.column(align=True)
-                sub.active = cam.sensor_fit == 'VERTICAL'
-                sub.prop(cam, "sensor_height", text="Height")
 
-            col = split.column(align=True)
-            col.prop(cam, "sensor_fit", text="")
+class DATA_PT_camera_dof(CameraButtonsPanel, Panel):
+    bl_label = "Depth of Field"
+    bl_options = {'DEFAULT_CLOSED'}
+    # Viewport-only effect: the game engine never applies it, so it's hidden there.
+    COMPAT_ENGINES = {'BLENDER_RENDER'}
 
-        # --- Depth of Field ---
-        row = main_box.row(align=True)
-        row.prop(cam, "show_expanded_cam_dof", text="Depth of Field",
-                 icon='TRIA_DOWN' if cam.show_expanded_cam_dof else 'TRIA_RIGHT', emboss=True)
+    def draw(self, context):
+        layout = self.layout
 
-        if cam.show_expanded_cam_dof:
-            dof_options = cam.gpu_dof
+        cam = context.camera
+        dof_options = cam.gpu_dof
 
-            box = main_box.box()
-            box.label(text="Depth of Field:", icon="CAMERA_DATA")
-            split = box.split()
+        box = layout.box()
+        box.label(text="Focus:", icon="CAMERA_DATA")
+        box.prop(cam, "dof_object", text="")
+        sub = box.column()
+        sub.active = (cam.dof_object is None)
+        sub.prop(cam, "dof_distance", text="Distance")
 
-            col = split.column()
-            col.label(text="Focus:")
-            col.prop(cam, "dof_object", text="")
-            sub = col.column()
-            sub.active = (cam.dof_object is None)
-            sub.prop(cam, "dof_distance", text="Distance")
+        hq_support = dof_options.is_hq_supported
+        box = layout.box()
+        box.label(text="Viewport:", icon="RESTRICT_VIEW_OFF")
+        col = box.column(align=True)
+        sub = col.column()
+        sub.active = hq_support
+        sub.prop(dof_options, "use_high_quality")
+        col.prop(dof_options, "fstop")
+        if dof_options.use_high_quality and hq_support:
+            col.prop(dof_options, "blades")
 
-            hq_support = dof_options.is_hq_supported
-            col = split.column(align=True)
-            col.label("Viewport:")
-            sub = col.column()
-            sub.active = hq_support
-            sub.prop(dof_options, "use_high_quality")
-            col.prop(dof_options, "fstop")
-            if dof_options.use_high_quality and hq_support:
-                col.prop(dof_options, "blades")
 
-        # --- Display ---
-        row = main_box.row(align=True)
-        row.prop(cam, "show_expanded_cam_display", text="Display",
-                 icon='TRIA_DOWN' if cam.show_expanded_cam_display else 'TRIA_RIGHT', emboss=True)
+class DATA_PT_camera_display(CameraButtonsPanel, Panel):
+    bl_label = "Display"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
-        if cam.show_expanded_cam_display:
-            box = main_box.box()
-            box.label(text="Display:", icon="RESTRICT_VIEW_OFF")
-            split = box.split()
+    def draw(self, context):
+        layout = self.layout
 
-            col = split.column()
-            col.prop(cam, "show_limits", text="Limits")
-            col.prop(cam, "show_mist", text="Mist")
+        cam = context.camera
 
-            col.prop(cam, "show_sensor", text="Sensor")
-            col.prop(cam, "show_name", text="Name")
+        box = layout.box()
+        box.label(text="Display:", icon="RESTRICT_VIEW_OFF")
+        split = box.split()
 
-            col = split.column()
-            col.prop_menu_enum(cam, "show_guide")
+        col = split.column()
+        col.prop(cam, "show_limits", text="Limits")
+        col.prop(cam, "show_mist", text="Mist")
+        col.prop(cam, "show_sensor", text="Sensor")
+        col.prop(cam, "show_name", text="Name")
+
+        col = split.column()
+        col.prop_menu_enum(cam, "show_guide")
+        col.separator(factor=1)
+        col.prop(cam, "draw_size", text="Size")
+        col.separator(factor=1)
+        col.prop(cam, "show_passepartout", text="Passepartout")
+        sub = col.column()
+        sub.active = cam.show_passepartout
+        sub.prop(cam, "passepartout_alpha", text="Alpha", slider=True)
+
+
+class DATA_PT_camera_safe_areas(CameraButtonsPanel, Panel):
+    bl_label = "Safe Areas"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+
+        layout.prop(cam, "show_safe_areas", text="Enabled")
+
+        box = layout.box()
+        box.label(text="Safe Areas:", icon="RESTRICT_VIEW_OFF")
+        draw_display_safe_settings(box, context.scene.safe_areas, cam)
+
+
+class DATA_PT_camera_game_culling(CameraButtonsPanel, Panel):
+    bl_label = "Culling & LOD"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+        scene = context.scene
+
+        box = layout.box()
+        box.label(text="Levels of Detail:", icon="MOD_SUBSURF")
+        box.prop(cam, "lod_factor", text="Distance Factor")
+
+        box = layout.box()
+        box.label(text="Culling:", icon="GHOST_ENABLED")
+        split = box.split()
+
+        col = split.column()
+        col.label(text="Frustum Culling:")
+        col.prop(cam, "show_frustum")
+        col.prop(cam, "show_culling_box")
+        col.prop(cam, "override_culling")
+
+        col = split.column()
+        col.label(text="Object Activity:")
+        col.prop(cam, "use_object_activity_culling")
+
+        box = layout.box()
+        box.label(text="Shadow Cascade Cache:", icon="TIME")
+        box.prop(cam, "csm_cache_max_stale_frames", text="Tolerance", slider=True)
+
+        box = layout.box()
+        box.label(text="Optimization Reference:", icon="CAMERA_DATA")
+        if context.object == scene.camera:
+            box.label(text="This active camera supplies the runtime distance reference.")
+        else:
+            box.label(text="The active Scene camera supplies the runtime distance reference.")
+        box.label(text="Foliage and Grass use it when Foliage Optimization is enabled.")
+
+
+class DATA_PT_camera_game_viewport(CameraButtonsPanel, Panel):
+    bl_label = "Custom Viewport"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+        viewport = cam.viewport
+
+        layout.prop(cam, "use_viewport", text="Enabled")
+
+        layout = layout.column()
+        layout.active = cam.use_viewport
+
+        box = layout.box()
+        box.label(text="Presets:", icon="SCREEN_BACK")
+        self.draw_presets(box.column(align=True), (
+            (('FULL', "Full Screen"), ('PICTURE_IN_PICTURE', "Picture-in-Picture")),
+            (('LEFT', "Left"), ('RIGHT', "Right"), ('TOP', "Top"), ('BOTTOM', "Bottom")),
+            (('TOP_LEFT', "Top Left"), ('TOP_RIGHT', "Top Right")),
+            (('BOTTOM_LEFT', "Bottom Left"), ('BOTTOM_RIGHT', "Bottom Right")),
+        ))
+
+        box = layout.box()
+        box.label(text="Viewport Ratios:", icon="SETTINGS")
+        split = box.split(factor=0.3)
+        split.label(text="Horizontal:")
+        row = split.row(align=True)
+        row.prop(viewport, "left_ratio", text="Left")
+        row.prop(viewport, "right_ratio", text="Right")
+
+        split = box.split(factor=0.3)
+        split.label(text="Vertical:")
+        row = split.row(align=True)
+        row.prop(viewport, "bottom_ratio", text="Bottom")
+        row.prop(viewport, "top_ratio", text="Top")
+
+        # Same check as the converter, which disables the viewport at game start.
+        if viewport.left_ratio >= viewport.right_ratio or viewport.bottom_ratio >= viewport.top_ratio:
+            box.label(text="Left/Bottom must be lower than Right/Top", icon='ERROR')
+        else:
+            # Same rounding as KX_Camera::UpdateViewport, against the game resolution.
+            gs = context.scene.game_settings
+            maxx = gs.resolution_x - 1
+            maxy = gs.resolution_y - 1
+            width = int(maxx * viewport.right_ratio) - int(maxx * viewport.left_ratio) + 1
+            height = int(maxy * viewport.top_ratio) - int(maxy * viewport.bottom_ratio) + 1
+            row = box.row()
+            row.label(text="Result:")
+            row.label(text="%d × %d px  (%d × %d)" % (width, height, gs.resolution_x, gs.resolution_y),
+                      translate=False)
+
+    @staticmethod
+    def draw_presets(col, rows):
+        for items in rows:
+            row = col.row(align=True)
+            for preset, text in items:
+                row.operator("camera.game_viewport_preset", text=text).preset = preset
+
+
+class DATA_PT_camera_stereoscopy(CameraButtonsPanel, Panel):
+    bl_label = "Stereoscopy"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER'}
+
+    @classmethod
+    def poll(cls, context):
+        render = context.scene.render
+        return (CameraButtonsPanel.poll.__func__(cls, context) and
+                render.use_multiview and render.views_format == 'STEREO_3D')
+
+    def draw(self, context):
+        layout = self.layout
+
+        render = context.scene.render
+        cam = context.camera
+        st = cam.stereo
+
+        is_spherical_stereo = cam.type != 'ORTHO' and render.use_spherical_stereo
+        use_spherical_stereo = is_spherical_stereo and st.use_spherical_stereo
+
+        box = layout.box()
+        box.label(text="Convergence:", icon="CAMERA_STEREO")
+        col = box.column()
+        col.row().prop(st, "convergence_mode", expand=True)
+
+        sub = col.column()
+        sub.active = st.convergence_mode != 'PARALLEL'
+        sub.prop(st, "convergence_distance")
+
+        col.prop(st, "interocular_distance")
+
+        if is_spherical_stereo:
+            box = layout.box()
+            box.label(text="Spherical Stereo:", icon="WORLD")
+            col = box.column()
             col.separator(factor=1)
-            col.prop(cam, "draw_size", text="Size")
-            col.separator(factor=1)
-            col.prop(cam, "show_passepartout", text="Passepartout")
-            sub = col.column()
-            sub.active = cam.show_passepartout
-            sub.prop(cam, "passepartout_alpha", text="Alpha", slider=True)
+            row = col.row()
+            row.prop(st, "use_spherical_stereo")
+            sub = row.row()
+            sub.active = st.use_spherical_stereo
+            sub.prop(st, "use_pole_merge")
+            row = col.row(align=True)
+            row.active = st.use_pole_merge
+            row.prop(st, "pole_merge_angle_from")
+            row.prop(st, "pole_merge_angle_to")
 
-        # --- Safe Areas ---
-        row = main_box.row(align=True)
-        row.prop(cam, "show_expanded_cam_safe_areas", text="Safe Areas",
-                 icon='TRIA_DOWN' if cam.show_expanded_cam_safe_areas else 'TRIA_RIGHT', emboss=True)
-        row.prop(cam, "show_safe_areas", text="")
-
-        if cam.show_expanded_cam_safe_areas:
-            safe_data = scene.safe_areas
-
-            box = main_box.box()
-            box.label(text="Safe Areas:", icon="RESTRICT_VIEW_OFF")
-            draw_display_safe_settings(box, safe_data, cam)
-
-        # --- Levels of Detail (game only) ---
-        if engine == 'BLENDER_GAME':
-            row = main_box.row(align=True)
-            row.prop(cam, "show_expanded_cam_lod", text="Levels of Detail",
-                     icon='TRIA_DOWN' if cam.show_expanded_cam_lod else 'TRIA_RIGHT', emboss=True)
-
-            if cam.show_expanded_cam_lod:
-                box = main_box.box()
-                box.label(text="Levels of Detail:", icon="MOD_SUBSURF")
-                col = box.column()
-                col.prop(cam, "lod_factor", text="Distance Factor")
-
-            box = main_box.box()
-            box.label(text="Optimization Reference:", icon="CAMERA_DATA")
-            if context.object == scene.camera:
-                box.label(text="This active camera supplies the runtime distance reference.")
-            else:
-                box.label(text="The active Scene camera supplies the runtime distance reference.")
-            box.label(text="Foliage and Grass use it when Foliage Optimization is enabled.")
-
-        # --- Culling (game only) ---
-        if engine == 'BLENDER_GAME':
-            row = main_box.row(align=True)
-            row.prop(cam, "show_expanded_cam_culling", text="Culling",
-                     icon='TRIA_DOWN' if cam.show_expanded_cam_culling else 'TRIA_RIGHT', emboss=True)
-
-            if cam.show_expanded_cam_culling:
-                box = main_box.box()
-                box.label(text="Culling:", icon="GHOST_ENABLED")
-                split = box.split()
-
-                col = split.column()
-                col.label(text="Frustum Culling:")
-                col.prop(cam, "show_frustum")
-                col.prop(cam, "show_culling_box")
-                col.prop(cam, "override_culling")
-
-                col = split.column()
-                col.label(text="Object Activity:")
-                col.prop(cam, "use_object_activity_culling")
-
-                box = main_box.box()
-                box.label(text="Shadow Cascade Cache:", icon="TIME")
-                box.prop(cam, "csm_cache_max_stale_frames", text="Tolerance", slider=True)
-
-        # --- Custom Viewport (game only) ---
-        if engine == 'BLENDER_GAME':
-            row = main_box.row(align=True)
-            row.prop(cam, "show_expanded_cam_viewport", text="Custom Viewport",
-                     icon='TRIA_DOWN' if cam.show_expanded_cam_viewport else 'TRIA_RIGHT', emboss=True)
-            row.prop(cam, "use_viewport", text="")
-
-            if cam.show_expanded_cam_viewport:
-                viewport = cam.viewport
-
-                box = main_box.box()
-                box.label(text="Viewport Ratios:", icon="SETTINGS")
-                split = box.split()
-                split.active = cam.use_viewport
-
-                col = split.column()
-                col.prop(viewport, "left_ratio")
-                col.prop(viewport, "right_ratio")
-
-                col = split.column()
-                col.prop(viewport, "bottom_ratio")
-                col.prop(viewport, "top_ratio")
-
-        # --- Stereoscopy (render only, multiview stereo3d) ---
-        if (engine == 'BLENDER_RENDER' and render.use_multiview and
-                render.views_format == 'STEREO_3D'):
-            row = main_box.row(align=True)
-            row.prop(cam, "show_expanded_cam_stereoscopy", text="Stereoscopy",
-                     icon='TRIA_DOWN' if cam.show_expanded_cam_stereoscopy else 'TRIA_RIGHT', emboss=True)
-
-            if cam.show_expanded_cam_stereoscopy:
-                st = cam.stereo
-
-                is_spherical_stereo = cam.type != 'ORTHO' and render.use_spherical_stereo
-                use_spherical_stereo = is_spherical_stereo and st.use_spherical_stereo
-
-                box = main_box.box()
-                box.label(text="Convergence:", icon="CAMERA_STEREO")
-                col = box.column()
-                col.row().prop(st, "convergence_mode", expand=True)
-
-                sub = col.column()
-                sub.active = st.convergence_mode != 'PARALLEL'
-                sub.prop(st, "convergence_distance")
-
-                col.prop(st, "interocular_distance")
-
-                if is_spherical_stereo:
-                    box = main_box.box()
-                    box.label(text="Spherical Stereo:", icon="WORLD")
-                    col = box.column()
-                    col.separator(factor=1)
-                    row = col.row()
-                    row.prop(st, "use_spherical_stereo")
-                    sub = row.row()
-                    sub.active = st.use_spherical_stereo
-                    sub.prop(st, "use_pole_merge")
-                    row = col.row(align=True)
-                    row.active = st.use_pole_merge
-                    row.prop(st, "pole_merge_angle_from")
-                    row.prop(st, "pole_merge_angle_to")
-
-                box = main_box.box()
-                box.label(text="Pivot:", icon="ROTATE")
-                row = box.row()
-                row.active = not use_spherical_stereo
-                row.prop(st, "pivot", expand=True)
-
-
-bpy.types.Camera.show_expanded_cam_lens = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_sensor = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_dof = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_display = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_safe_areas = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_lod = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_culling = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_viewport = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Camera.show_expanded_cam_stereoscopy = bpy.props.BoolProperty(name="Expanded", default=False)
+        box = layout.box()
+        box.label(text="Pivot:", icon="ROTATE")
+        row = box.row()
+        row.active = not use_spherical_stereo
+        row.prop(st, "pivot", expand=True)
 
 
 class DATA_PT_custom_props_camera(CameraButtonsPanel, PropertyPanel, Panel):
@@ -412,6 +441,12 @@ classes = (
     SAFE_AREAS_MT_presets,
     DATA_PT_context_camera,
     DATA_PT_camera,
+    DATA_PT_camera_dof,
+    DATA_PT_camera_display,
+    DATA_PT_camera_safe_areas,
+    DATA_PT_camera_game_culling,
+    DATA_PT_camera_game_viewport,
+    DATA_PT_camera_stereoscopy,
     # DATA_PT_custom_props_camera,  # disabled: Custom Properties panel unused
 )
 
