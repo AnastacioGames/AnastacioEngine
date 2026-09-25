@@ -477,6 +477,13 @@ def register():
     bpy.utils.register_class(RagdollSpawnerOperator)
     bpy.utils.register_class(RagdollPanel)
 
+    # Panels are placed in registration order: re-register "Create Obstacle" so it stays
+    # the last panel of the Physics tab.
+    obstacle_panel = getattr(bpy.types, "PHYSICS_PT_game_obstacle_create", None)
+    if obstacle_panel is not None:
+        bpy.utils.unregister_class(obstacle_panel)
+        bpy.utils.register_class(obstacle_panel)
+
 
 def unregister():
     bpy.utils.unregister_class(RagdollSpawnerOperator)

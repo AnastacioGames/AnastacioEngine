@@ -44,6 +44,10 @@ from .custom_pt_physics import (
     CUSTOM_PT_game_physics,
     CUSTOM_PT_game_collision_bounds,
     PHYSICS_PT_game_vehicle,
+    PHYSICS_PT_game_vehicle_engine,
+    PHYSICS_PT_game_vehicle_wheels,
+    PHYSICS_PT_game_vehicle_gearbox,
+    PHYSICS_PT_game_vehicle_component,
     OBJECT_OT_vehicle_add_player_component,
     OBJECT_OT_vehicle_set_drive_type
 )
@@ -91,6 +95,10 @@ classes = [
     CUSTOM_PT_game_physics,
     CUSTOM_PT_game_collision_bounds,
     PHYSICS_PT_game_vehicle,
+    PHYSICS_PT_game_vehicle_engine,
+    PHYSICS_PT_game_vehicle_wheels,
+    PHYSICS_PT_game_vehicle_gearbox,
+    PHYSICS_PT_game_vehicle_component,
     OBJECT_OT_vehicle_add_player_component,
     OBJECT_OT_vehicle_set_drive_type,
     # --- NOSSAS NOVAS CLASSES DO WORLD ---
@@ -142,6 +150,16 @@ def register():
     for cls in classes:
         try:
             bpy.utils.register_class(cls)
+        except Exception as e:
+            print("[FlowMenu Error]: " + str(e))
+
+    # 2.1 "CREATE OBSTACLE" POR ÚLTIMO NA ABA PHYSICS: painéis entram na ordem de registro,
+    # então ele é re-registrado depois dos painéis de física acima (o addon de Ragdoll faz o mesmo).
+    obstacle_panel = getattr(bpy.types, "PHYSICS_PT_game_obstacle_create", None)
+    if obstacle_panel is not None:
+        try:
+            bpy.utils.unregister_class(obstacle_panel)
+            bpy.utils.register_class(obstacle_panel)
         except Exception as e:
             print("[FlowMenu Error]: " + str(e))
 

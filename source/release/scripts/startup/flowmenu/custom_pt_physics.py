@@ -1124,13 +1124,12 @@ class CUSTOM_PT_game_collision_bounds(CustomPhysicsButtonsPanel, Panel):
         rd = context.scene.render
         return (rd.engine in cls.COMPAT_ENGINES) and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'CHARACTER', 'SOFT_BODY'})
 
-    def draw_header(self, context):
-        self.layout.prop(context.active_object.game, "use_collision_bounds", text="")
-
     def draw(self, context):
         layout = self.layout
         game = context.active_object.game
-        
+
+        layout.prop(game, "use_collision_bounds", text="Enabled")
+
         main_box = layout.box()
         main_box.active = game.use_collision_bounds
         
@@ -1159,11 +1158,10 @@ class CUSTOM_PT_game_collision_bounds(CustomPhysicsButtonsPanel, Panel):
         col.prop(game, "collision_mask")
 
 
-class PHYSICS_PT_game_vehicle(Panel):
+class VehicleButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "vehicle"
-    bl_label = "Vehicle"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -1172,11 +1170,23 @@ class PHYSICS_PT_game_vehicle(Panel):
         rd = context.scene.render
         return ob and ob.game and (rd.engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        game = context.active_object.game
 
-        if game.physics_type in {'RIGID_BODY', 'DYNAMIC'}:
-            self.layout.prop(game, "is_vehicle", text="")
+class VehicleSubPanel(VehicleButtonsPanel):
+    """Vehicle settings panels: only for objects that can be a vehicle, greyed out until
+    the "Enabled" checkbox of the Vehicle panel is on."""
+
+    @classmethod
+    def poll(cls, context):
+        return VehicleButtonsPanel.poll.__func__(cls, context) and             context.active_object.game.physics_type in {'RIGID_BODY', 'DYNAMIC'}
+
+    def draw(self, context):
+        ob = context.active_object
+        self.layout.active = ob.game.is_vehicle
+        self.draw_content(self.layout, ob)
+
+
+class PHYSICS_PT_game_vehicle(VehicleButtonsPanel, Panel):
+    bl_label = "Vehicle"
 
     def draw(self, context):
         layout = self.layout
@@ -1185,27 +1195,43 @@ class PHYSICS_PT_game_vehicle(Panel):
         game = ob.game
 
         if game.physics_type not in {'RIGID_BODY', 'DYNAMIC'}:
-            layout.label(text="Only Rigid Body/Dynamic objects can be a Vehicle.")
+            layout.label(text="Only Rigid Body/Dynamic objects can be a Vehicle.", icon='INFO')
             return
 
-        col = layout.column()
-        col.active = game.is_vehicle
+        layout.prop(game, "is_vehicle", text="Enabled")
+        layout = layout.column()
+        layout.active = game.is_vehicle
 
-        col.prop(ob, "vehicle_steering_wheel", text="Steering Wheel")
-        col.row(align=True).prop(ob, "vehicle_com_offset", text="Center of Mass Offset")
+        box = layout.box()
+        box.label(text="Chassis:", icon='AUTO')
+        box.prop(ob, "vehicle_steering_wheel", text="Steering Wheel")
+        box.row(align=True).prop(ob, "vehicle_com_offset", text="Center of Mass Offset")
 
-        row = col.row(align=True)
-        row.label(text="Drive Type:")
+
+class PHYSICS_PT_game_vehicle_engine(VehicleSubPanel, Panel):
+    bl_label = "Engine"
+
+    def draw_content(self, layout, ob):
+        box = layout.box()
+        box.label(text="Drive Type:", icon='DRIVER')
+        row = box.row(align=True)
         row.operator("object.vehicle_set_drive_type", text="FWD").drive_type = 'FWD'
         row.operator("object.vehicle_set_drive_type", text="RWD").drive_type = 'RWD'
         row.operator("object.vehicle_set_drive_type", text="AWD").drive_type = 'AWD'
 
-        row = col.row(align=True)
+        box = layout.box()
+        box.label(text="Power:", icon='SETTINGS')
+        row = box.row(align=True)
         row.prop(ob, "vehicle_max_torque", text="Max Torque")
         row.prop(ob, "vehicle_max_rpm", text="Max RPM")
 
+
+class PHYSICS_PT_game_vehicle_wheels(VehicleSubPanel, Panel):
+    bl_label = "Wheels"
+
+    def draw_content(self, layout, ob):
         for i, wheel in enumerate(ob.vehicle_wheels):
-            box = col.box()
+            box = layout.box()
             row = box.row(align=True)
             row.prop(wheel, "show_expanded", text="", emboss=False)
             row.prop(wheel, "object", text="Wheel %d" % (i + 1))
@@ -1232,20 +1258,30 @@ class PHYSICS_PT_game_vehicle(Panel):
                 col_susp.prop(wheel, "max_suspension_travel", text="Max Travel")
                 col_susp.prop(wheel, "max_suspension_force", text="Max Force")
 
-        row = col.row(align=True)
-        row.operator("object.vehicle_wheel_add", text="Add Wheel", icon='ZOOMIN')
+        layout.operator("object.vehicle_wheel_add", text="Add Wheel", icon='ZOOMIN')
 
-        col.separator()
-        col.prop(ob, "gearbox_type", text="Gearbox")
 
-        for i, gear in enumerate(ob.vehicle_gears):
-            row = col.row(align=True)
-            label = "Reverse" if gear.ratio < 0.0 else "Gear %d" % (i + 1)
-            row.prop(gear, "ratio", text=label)
-            row.operator("object.vehicle_gear_remove", text="", icon='PANEL_CLOSE').index = i
+class PHYSICS_PT_game_vehicle_gearbox(VehicleSubPanel, Panel):
+    bl_label = "Gearbox"
 
-        row = col.row(align=True)
-        row.operator("object.vehicle_gear_add", text="Add Gear", icon='ZOOMIN')
+    def draw_content(self, layout, ob):
+        layout.prop(ob, "gearbox_type", text="Type")
 
-        row = col.row(align=True)
-        row.operator("object.vehicle_add_player_component", text="Add Vehicle Component", icon='PLUGIN')
+        if len(ob.vehicle_gears):
+            box = layout.box()
+            box.label(text="Gears:", icon='LINENUMBERS_ON')
+            col = box.column(align=True)
+            for i, gear in enumerate(ob.vehicle_gears):
+                row = col.row(align=True)
+                label = "Reverse" if gear.ratio < 0.0 else "Gear %d" % (i + 1)
+                row.prop(gear, "ratio", text=label)
+                row.operator("object.vehicle_gear_remove", text="", icon='PANEL_CLOSE').index = i
+
+        layout.operator("object.vehicle_gear_add", text="Add Gear", icon='ZOOMIN')
+
+
+class PHYSICS_PT_game_vehicle_component(VehicleSubPanel, Panel):
+    bl_label = "Player Component"
+
+    def draw_content(self, layout, ob):
+        layout.operator("object.vehicle_add_player_component", text="Add Vehicle Component", icon='PLUGIN')

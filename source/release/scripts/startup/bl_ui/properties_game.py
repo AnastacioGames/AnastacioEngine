@@ -472,15 +472,14 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
         return (rd.engine in cls.COMPAT_ENGINES) \
             and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'CHARACTER', 'SOFT_BODY'})
 
-    def draw_header(self, context):
-        game = context.active_object.game
-
-        self.layout.prop(game, "use_collision_bounds", text="")
-
     def draw(self, context):
         layout = self.layout
 
         game = context.active_object.game
+        layout.prop(game, "use_collision_bounds", text="Enabled")
+        layout = layout.column()
+        layout.active = game.use_collision_bounds
+
         split = layout.split()
         split.active = game.use_collision_bounds
 
@@ -505,6 +504,9 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
 
 
 class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
+    # New id so files that saved the old panel position also show it last; add-ons that
+    # add physics panels re-register it after theirs (see easy_ragdoll_RangeEngine.py).
+    bl_idname = "PHYSICS_PT_game_obstacle_create"
     bl_label = "Create Obstacle"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -515,16 +517,13 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
         return (rd.engine in cls.COMPAT_ENGINES) \
             and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY', 'CHARACTER', 'NO_COLLISION'})
 
-    def draw_header(self, context):
-        game = context.active_object.game
-
-        self.layout.prop(game, "use_obstacle_create", text="")
-
     def draw(self, context):
         layout = self.layout
 
         game = context.active_object.game
 
+        layout.prop(game, "use_obstacle_create", text="Enabled")
+        layout = layout.column()
         layout.active = game.use_obstacle_create
 
         row = layout.row()

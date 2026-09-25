@@ -429,18 +429,15 @@ class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):
         engine = context.scene.render.engine
         return check_material(mat) and (mat.type in {'SURFACE', 'WIRE'}) and (engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        mat = context.material
-
-        if simple_material(mat):
-            self.layout.prop(mat, "use_transparency", text="")
-
     def draw(self, context):
         layout = self.layout
 
         base_mat = context.material
         mat = active_node_mat(context.material)
         rayt = mat.raytrace_transparency
+
+        if simple_material(base_mat):
+            layout.prop(base_mat, "use_transparency", text="Enabled")
 
         box = layout.box()
         box.label(text="Alpha:", icon="IMAGE_RGB_ALPHA")
@@ -499,17 +496,14 @@ class MATERIAL_PT_mirror(MaterialButtonsPanel, Panel):
         engine = context.scene.render.engine
         return check_material(mat) and (mat.type in {'SURFACE', 'WIRE'}) and (engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        raym = active_node_mat(context.material).raytrace_mirror
-
-        self.layout.prop(raym, "use", text="")
-
     def draw(self, context):
         layout = self.layout
 
         mat = active_node_mat(context.material)
         raym = mat.raytrace_mirror
 
+        layout.prop(raym, "use", text="Enabled")
+        layout = layout.column()
         layout.active = raym.use
 
         box = layout.box()
@@ -561,19 +555,16 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
         engine = context.scene.render.engine
         return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        mat = active_node_mat(context.material)
-        sss = mat.subsurface_scattering
-
-        self.layout.active = (not mat.use_shadeless)
-        self.layout.prop(sss, "use", text="")
-
     def draw(self, context):
         layout = self.layout
 
         mat = active_node_mat(context.material)
         sss = mat.subsurface_scattering
 
+        row = layout.row()
+        row.active = (not mat.use_shadeless)
+        row.prop(sss, "use", text="Enabled")
+        layout = layout.column()
         layout.active = (sss.use) and (not mat.use_shadeless)
 
         row = layout.row().split()
@@ -674,17 +665,14 @@ class MATERIAL_PT_flare(MaterialButtonsPanel, Panel):
         engine = context.scene.render.engine
         return mat and (mat.type == 'HALO') and (engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        halo = context.material.halo
-
-        self.layout.prop(halo, "use_flare_mode", text="")
-
     def draw(self, context):
         layout = self.layout
 
         mat = context.material  # don't use node material
         halo = mat.halo
 
+        layout.prop(halo, "use_flare_mode", text="Enabled")
+        layout = layout.column()
         layout.active = halo.use_flare_mode
 
         box = layout.box()
@@ -727,19 +715,6 @@ class MATERIAL_PT_game_settings(MaterialButtonsPanel, Panel):
         col.label(text="Alpha Blend:")
         col.prop(game, "alpha_blend", text="")
 
-        row = col.row()
-        row.active = mat.use_foliage
-        row.prop(mat, "use_foliage")
-        row.prop(mat, "foliage_grass")
-        col = col.column()
-        col.active = mat.use_foliage
-        col.prop(mat, "foliage_strength")
-        col.prop(mat, "foliage_turbulence")
-        col.prop(mat, "use_foliage_optimization")
-        distance_row = col.row()
-        distance_row.active = mat.use_foliage_optimization
-        distance_row.prop(mat, "foliage_distance")
-
         box = split.box()
         box.label(text="Constant Values:", icon="SETTINGS")
         col = box.column()
@@ -749,6 +724,40 @@ class MATERIAL_PT_game_settings(MaterialButtonsPanel, Panel):
         col.prop(mat, "use_constant_texture_uv")
         col.prop(mat, "use_constant_world")
         col.prop(mat, "use_constant_mist")
+
+
+class MATERIAL_PT_game_foliage(MaterialButtonsPanel, Panel):
+    bl_label = "Foliage Shader"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.material and (context.scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+        mat = context.material
+
+        layout.prop(mat, "use_foliage", text="Enabled")
+        layout = layout.column()
+        layout.active = mat.use_foliage
+
+        box = layout.box()
+        box.label(text="Wind:", icon="FORCE_WIND")
+        col = box.column()
+        col.prop(mat, "foliage_grass")
+        col.prop(mat, "foliage_strength", text="Strength")
+        col.prop(mat, "foliage_turbulence", text="Turbulence")
+
+        box = layout.box()
+        box.label(text="Optimization:", icon="CAMERA_DATA")
+        col = box.column()
+        col.prop(mat, "use_foliage_optimization", text="Stop Beyond Distance")
+        row = col.row()
+        row.active = mat.use_foliage_optimization
+        row.prop(mat, "foliage_distance")
+
 
 class MATERIAL_PT_strand(MaterialButtonsPanel, Panel):
     bl_label = "Strand"
@@ -999,17 +1008,14 @@ class MATERIAL_PT_transp_game(MaterialButtonsPanel, Panel):
         engine = context.scene.render.engine
         return check_material(mat) and (engine in cls.COMPAT_ENGINES)
 
-    def draw_header(self, context):
-        mat = context.material
-
-        if simple_material(mat):
-            self.layout.prop(mat, "use_transparency", text="")
-
     def draw(self, context):
         layout = self.layout
         base_mat = context.material
         mat = active_node_mat(base_mat)
 
+        if simple_material(base_mat):
+            layout.prop(base_mat, "use_transparency", text="Enabled")
+        layout = layout.column()
         layout.active = mat.use_transparency
 
         box = layout.box()
@@ -1224,6 +1230,7 @@ classes = (
     MATERIAL_PT_halo,
     MATERIAL_PT_flare,
     MATERIAL_PT_game_settings,
+    MATERIAL_PT_game_foliage,
     MATERIAL_PT_strand,
     MATERIAL_PT_options,
     MATERIAL_PT_game_options,
