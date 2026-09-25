@@ -84,7 +84,8 @@ BL_Action::BL_Action(KX_GameObject *gameobj)
 	m_appliedToObject(true),
 	m_requestIpo(false),
 	m_calc_localtime(true),
-	m_prevUpdate(-1.0f)
+	m_prevUpdate(-1.0f),
+	m_eventsIncludeCurrentFrame(false)
 {
 }
 
@@ -238,6 +239,7 @@ bool BL_Action::Play(const std::string& name,
 	m_requestIpo = false;
 
 	m_prevUpdate = -1.0f;
+	m_eventsIncludeCurrentFrame = true;
 
 	return true;
 }
@@ -366,6 +368,13 @@ void BL_Action::Update(float curtime, bool applyToObject)
 	}
 	m_prevUpdate = curtime;
 
+	// Frame reached by the previous update, used to find the crossed animation event triggers.
+	// setActionFrame changes m_localframe directly, so a jump never fires the triggers skipped over.
+	const float eventFromFrame = m_localframe;
+	// End frame reached before a loop/ping-pong wrap around, if any.
+	bool eventWrapped = false;
+	float eventWrapFrame = 0.0f;
+
 	KX_Scene *scene = m_obj->GetScene();
 	curtime -= (float)scene->GetSuspendedDelta();
 
@@ -393,6 +402,9 @@ void BL_Action::Update(float curtime, bool applyToObject)
 			}
 			case ACT_MODE_LOOP:
 			{
+				eventWrapped = true;
+				eventWrapFrame = m_endframe;
+
 				// Put the time back to the beginning
 				m_localframe = m_startframe;
 				m_starttime = curtime;
@@ -400,6 +412,9 @@ void BL_Action::Update(float curtime, bool applyToObject)
 			}
 			case ACT_MODE_PING_PONG:
 			{
+				eventWrapped = true;
+				eventWrapFrame = m_endframe;
+
 				m_localframe = m_endframe;
 				m_starttime = curtime;
 
@@ -413,6 +428,18 @@ void BL_Action::Update(float curtime, bool applyToObject)
 	}
 
 	BLI_assert(m_localframe >= minFrame && m_localframe <= maxFrame);
+
+	/* Animation Events: also for culled objects, which only manage the action time below. */
+	if (eventWrapped) {
+		// Finish the previous pass up to its end frame, then restart. A loop starts again at its
+		// start frame (fire it), a ping-pong restarts at the end frame just processed (don't).
+		ProcessAnimationEvents(eventFromFrame, eventWrapFrame, m_eventsIncludeCurrentFrame);
+		ProcessAnimationEvents(m_localframe, m_localframe, m_playmode == ACT_MODE_LOOP);
+	}
+	else {
+		ProcessAnimationEvents(eventFromFrame, m_localframe, m_eventsIncludeCurrentFrame);
+	}
+	m_eventsIncludeCurrentFrame = false;
 
 	m_appliedToObject = applyToObject;
 	// In case of culled armatures (doesn't requesting to transform the object) we only manages time.
@@ -501,37 +528,33 @@ void BL_Action::Update(float curtime, bool applyToObject)
 	if (m_done) {
 		ClearControllerList();
 	}
+}
 
-	/* Animation Events */
-	KX_AnimationEventManager *animationEvent_Manager = m_obj->GetAnimationEventManager();
-	if (animationEvent_Manager) {
-		/* Reset the list of already triggered triggers when the animation starts again, 
-		/* this way avoids the trigger being called more than once intentionally. */
-		if (m_localframe == m_startframe) {
-			animationEvent_Manager->ResetTriggers(); 
+void BL_Action::ProcessAnimationEvents(float fromFrame, float toFrame, bool includeFrom)
+{
+	KX_AnimationEventManager *manager = m_obj->GetAnimationEventManager();
+	if (!manager || !m_actionData) {
+		return;
+	}
+
+	const std::string actionName = m_actionData->GetName();
+	const float minFrame = std::min(fromFrame, toFrame);
+	const float maxFrame = std::max(fromFrame, toFrame);
+
+	for (KX_AnimationEvent *event : manager->GetEvents()) {
+		if (event->GetActionName() != actionName) {
+			continue;
 		}
 
-		/* Process Animation Events */
-		for (KX_AnimationEvent *event : *animationEvent_Manager->GetEvents()) {
-			if (event->GetActionName() != m_actionData->GetName()) {
+		// A trigger fires once when the playback crosses its frame, in either direction.
+		for (unsigned int i = 0, size = event->GetTriggerCount(); i < size; ++i) {
+			const float frame = (float)event->GetTrigger(i);
+			if (frame < minFrame || frame > maxFrame || (frame == fromFrame && !includeFrom)) {
 				continue;
 			}
 
-			for (int i = 0; i < event->GetTriggerCount(); i++) {
-				int frametrigger = event->GetTrigger(i);
-				std::vector<int> *alreadyTriggered = event->GetAlreadyTriggereds();
-
-				// Make sure the m_localframe is within a 4 frames range, this helps to ensure that the event will be called.
-				bool passOffset = m_localframe > (frametrigger - 2) && (frametrigger + 2) > m_localframe;
-
-				if (passOffset && std::find(alreadyTriggered->begin(), alreadyTriggered->end(), frametrigger) == alreadyTriggered->end()) {
-					event->GetAlreadyTriggereds()->push_back(frametrigger);
-					event->SetLastTriggerIndex(i);
-
-					// Add to list to be processed later ...
-					animationEvent_Manager->GetEventsToCall()->push_back(std::make_pair(event, event->GetCustomArg(i)));
-				}
-			}
+			event->Fire(i);
+			manager->AddEventToCall(event, i);
 		}
 	}
 }

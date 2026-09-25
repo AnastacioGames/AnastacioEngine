@@ -880,8 +880,11 @@ public:
 	void UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lodfactor);
 
 	void SetAnimationEventManager(KX_AnimationEventManager *AnimationEventManager);
-	/// Get current animatoin event manager.
+	/// Get current animation event manager.
 	KX_AnimationEventManager *GetAnimationEventManager() const;
+
+	/// Replicate the logic bricks, then point the Animation Event sensors to the events of this object.
+	virtual void ReParentLogic();
 
 	/** Update the activity culling of the object.
 	 * \param distance Squared nearest distance to the cameras of this object.

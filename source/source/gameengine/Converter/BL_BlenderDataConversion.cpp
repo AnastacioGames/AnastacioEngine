@@ -1330,6 +1330,8 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 		KX_AnimationEventManager *AnimationEventManager = BL_AnimationEventManagerFromBlenderObject(ob);
 		if (AnimationEventManager) {
 			gameobj->SetAnimationEventManager(AnimationEventManager);
+			// SetAnimationEventManager holds its own reference.
+			AnimationEventManager->Release();
 		}
 
 		// Fase I.2: per-object GPU particle emitter, opt-in via Object.use_gpu_particles.

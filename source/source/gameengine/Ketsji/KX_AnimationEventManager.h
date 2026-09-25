@@ -39,32 +39,32 @@ class KX_AnimationEventManager : public EXP_Value
 {
 	Py_Header
 
-private:
-	std::vector<KX_AnimationEvent*> *m_events;
-	/// is used to call the events in KX_Scene->UpdateAnimations, it is safe to do the python calls there.
-	std::vector<std::pair<KX_AnimationEvent*, const char*>> *m_events_toCall;
+public:
+	/// An event trigger reached during the animation update, with its custom argument.
+	using EventCall = std::pair<KX_AnimationEvent *, const char *>;
 
-	int m_refcount;
+private:
+	std::vector<KX_AnimationEvent *> m_events;
+	/** Filled by BL_Action::Update in the animation worker thread of this object,
+	 * consumed by KX_Scene::UpdateAnimations on the main thread after all workers finished. */
+	std::vector<EventCall> m_eventsToCall;
 
 public:
 	KX_AnimationEventManager(Object *ob);
-	KX_AnimationEventManager(std::vector<KX_AnimationEvent*> *other_events);
+	KX_AnimationEventManager(const KX_AnimationEventManager& other);
 	virtual ~KX_AnimationEventManager();
 
 	virtual std::string GetName();
 
 	/// Return number of events
 	unsigned int GetEventCount() const;
-	
-	std::vector<KX_AnimationEvent*> *GetEvents() const;
-	KX_AnimationEvent *GetEvent(int index);
 
-	/// get the events iterate through KX_Scene->UpdateAnimations, then clean up the vector.
-	std::vector<std::pair<KX_AnimationEvent*, const char*>> *GetEventsToCall();
-	void ClearEventsToCall();
+	const std::vector<KX_AnimationEvent *>& GetEvents() const;
+	KX_AnimationEvent *GetEvent(int index) const;
 
-	/// Reset all triggers
-	void ResetTriggers();
+	void AddEventToCall(KX_AnimationEvent *event, int triggerIndex);
+	/// Move the pending calls into calls and clear the pending list.
+	void TakeEventsToCall(std::vector<EventCall>& calls);
 
 #ifdef WITH_PYTHON
 

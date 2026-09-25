@@ -29,50 +29,55 @@
 
 #include "EXP_Value.h"
 
+#include <string>
+#include <utility>
+#include <vector>
+
 class KX_AnimationEvent : public EXP_Value
 {
 	Py_Header
-protected:
-	std::string			m_name;
 
 private:
-	const char *m_actionName;
-	/* bAnimationEventTriggers has converted here now, std::pair<frame_trigger, custom_argument_call> */
-	std::vector<std::pair<int, const char*>> *m_triggers;
-	std::vector<int> *m_alreadyTriggered;
+	/// Empty when the event has no action assigned.
+	std::string m_actionName;
+	/// Converted AnimationEventTrigger list: <trigger frame, custom argument>.
+	std::vector<std::pair<int, std::string>> m_triggers;
+	/// Python function to call, as "module.function". Empty when not set.
+	std::string m_pythonEvent;
 
-	const char *m_pythonEvent;
-
-	/// For logic bricks
+	/// For logic bricks: last fired trigger and how many times each trigger fired.
 	int m_lastTriggerIndex;
+	std::vector<unsigned int> m_triggerFireCounts;
+	unsigned int m_fireCount;
 
 #ifdef WITH_PYTHON
+	/// Strong reference to the resolved Python function, nullptr when unset or not found.
 	PyObject *m_pyEventFunction;
 #endif // WITH_PYTHON
 
 public:
-	KX_AnimationEvent(const char *actionName, std::vector<std::pair<int, const char*>> *triggers, std::vector<int> *alreadyTriggered, const char *pythonEvent);
+	KX_AnimationEvent(const std::string& actionName, const std::vector<std::pair<int, std::string>>& triggers,
+	                  const std::string& pythonEvent);
+	KX_AnimationEvent(const KX_AnimationEvent& other);
 	virtual ~KX_AnimationEvent();
 
 	virtual std::string GetName();
 
 	unsigned int GetTriggerCount() const;
-	virtual int GetTrigger(int index) const;
-	virtual const char *GetCustomArg(int index) const;
+	int GetTrigger(int index) const;
+	const char *GetCustomArg(int index) const;
 
-	virtual std::string GetActionName();
-	virtual std::vector<std::pair<int, const char*>> *GetTriggers();
+	const std::string& GetActionName() const;
+	const std::string& GetPythonEventName() const;
 
-	virtual std::vector<int> *GetAlreadyTriggereds();
-	virtual void SetAlreadyTriggereds(std::vector<int> *alreadyTriggered);
-	virtual const char *GetPythonEventName();
-
-	/// For logic bricks
-	virtual const int GetLastTriggerIndex();
-	virtual void SetLastTriggerIndex(const int triggerIndex);
+	/// Record that a trigger was reached, for the logic bricks.
+	void Fire(int triggerIndex);
+	int GetLastTriggerIndex() const;
+	/// Times the trigger fired, or all triggers together when triggerIndex is -1.
+	unsigned int GetFireCount(int triggerIndex) const;
 
 #ifdef WITH_PYTHON
-	PyObject *GetPyEventFunction();
+	PyObject *GetPyEventFunction() const;
 
 	static PyObject *pyattr_get_triggers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 

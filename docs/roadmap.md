@@ -116,7 +116,14 @@ Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ve
 
 Causa raiz achada e corrigida em 2026-09-20 (o World do `startup.blend` não passava por `BKE_world_init`); as oito
 propriedades aparecem em `scene.world.properties` num File > New. Painel Global Properties aceito pelo usuário na janela
-do editor (2026-09-20). Ver changelog, seção "World Status".
+do editor (2026-09-20). Nomes passados para inglês em 2026-09-25 (`horario_sol` virou `sun_hour`); falta o usuário
+conferir o File > New na janela do editor. Ver changelog, seções "World Status".
+
+### Animation Events
+
+Revisados em 2026-09-25 (crashes, threads, sensor, painel; ver changelog). Testes headless do editor e do runtime
+passaram. Falta o usuário validar o painel na janela do editor e um jogo real com Animation Events (callback Python
+e sensor Animation Event).
 
 ### Vehicle System / Vehicle Lab
 

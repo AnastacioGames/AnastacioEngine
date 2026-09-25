@@ -65,6 +65,7 @@
 #include "KX_PyMath.h"
 #include "SCA_IActuator.h"
 #include "SCA_ISensor.h"
+#include "SCA_AnimationEventSensor.h"
 #include "SCA_IController.h"
 #include "KX_NetworkMessageScene.h" //Needed for sendMessage()
 #include "KX_ObstacleSimulation.h"
@@ -213,6 +214,11 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 		m_lodManager->AddRef();
 	}
 
+	// Each replica gets its own events, so trigger state and sensors stay per object.
+	if (other.m_animationEventManager) {
+		m_animationEventManager = new KX_AnimationEventManager(*other.m_animationEventManager);
+	}
+
 #ifdef WITH_PYTHON
 	if (m_attr_dict) {
 		m_attr_dict = PyDict_Copy(m_attr_dict);
@@ -226,10 +232,6 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 		for (KX_PythonComponent *component : m_components) {
 			component->SetGameObject(this);
 		}
-	}
-
-	if (other.m_animationEventManager) {
-		m_animationEventManager = new KX_AnimationEventManager(other.m_animationEventManager->GetEvents());
 	}
 #endif  // WITH_PYTHON
 }
@@ -1415,6 +1417,20 @@ void KX_GameObject::SetAnimationEventManager(KX_AnimationEventManager *Animation
 KX_AnimationEventManager *KX_GameObject::GetAnimationEventManager() const
 {
 	return m_animationEventManager;
+}
+
+void KX_GameObject::ReParentLogic()
+{
+	SCA_IObject::ReParentLogic();
+
+	// The replicated sensors still point to the events of the original object.
+	for (SCA_ISensor *sensor : GetSensors()) {
+		SCA_AnimationEventSensor *eventSensor = dynamic_cast<SCA_AnimationEventSensor *>(sensor);
+		if (eventSensor) {
+			eventSensor->SetEvent(m_animationEventManager ?
+			                      m_animationEventManager->GetEvent(eventSensor->GetEventIndex()) : nullptr);
+		}
+	}
 }
 
 void KX_GameObject::UpdateActivity(float distance)
@@ -4349,7 +4365,11 @@ PyObject *KX_GameObject::pyattr_get_animationEventsManager(EXP_PyObjectPlus *sel
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 
-	return (self->m_animationEventManager) ? self->m_animationEventManager->GetProxy() : Py_None;
+	if (!self->m_animationEventManager) {
+		Py_RETURN_NONE;
+	}
+
+	return self->m_animationEventManager->GetProxy();
 }
 
 PyObject *KX_GameObject::pyattr_get_particles(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

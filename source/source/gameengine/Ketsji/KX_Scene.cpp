@@ -2051,61 +2051,62 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 		}
 	}
 
-	// Animation Events: Process triggers captured in executed actions
 	for (KX_GameObject *gameobj : m_animatedlist) {
-		if (!gameobj->IsActionsSuspended()) {
-			if (gameobj->GetDoAnimations()) {
-				BLI_task_pool_push(m_animationPool, UpdateAnimPoseTask, gameobj, false, TASK_PRIORITY_LOW);
-
-				KX_AnimationEventManager *eventManager = gameobj->GetAnimationEventManager();
-				if (eventManager) {
-					
-					std::vector<std::pair<KX_AnimationEvent*, const char*>> *eventsPtr = eventManager->GetEventsToCall();
-
-					if (!eventsPtr->empty()) {
-						for (const auto event : *eventsPtr) {
-							// We make sure it's thread safe. So we can make the call safely.
-							PyGILState_STATE gilstate = PyGILState_Ensure();
-
-							PyObject *args = PyTuple_New(2);
-							PyObject *custom_arg = PyUnicode_FromString(event.second);
-							PyTuple_SET_ITEM(args, 0, gameobj->GetProxy());
-							PyTuple_SET_ITEM(args, 1, custom_arg);
-
-							PyObject *function = event.first->GetPyEventFunction();
-
-							if (PyCallable_Check(function)) {
-								// Run Function
-								PyObject *ret = PyObject_Call(function, args, nullptr);
-
-								if (!ret) {
-									EXP_ReportPythonDiagnostic("scene.animation.event", gameobj->GetName().c_str());
-									PyErr_Print();
-									PyErr_Clear();
-								}
-								else {
-									Py_DECREF(args);
-									Py_DECREF(ret);
-								}
-							}
-							else {
-								EXP_ReportPythonDiagnostic("scene.animation.event.callable", gameobj->GetName().c_str());
-								PyErr_Print();
-								PyErr_Clear();
-								Py_DECREF(args);
-							}
-
-							// Release the GIL
-							PyGILState_Release(gilstate);
-						}
-						eventsPtr->clear();
-					}
-				}
-			}
+		if (!gameobj->IsActionsSuspended() && gameobj->GetDoAnimations()) {
+			BLI_task_pool_push(m_animationPool, UpdateAnimPoseTask, gameobj, false, TASK_PRIORITY_LOW);
 		}
 	}
 
 	BLI_task_pool_work_and_wait(m_animationPool);
+
+	// Animation Events: the animation tasks above queue the reached triggers per object, so the
+	// Python functions are called only now, on the main thread, once every task finished.
+	// Collected first, the callbacks may change the animated objects list.
+	std::vector<std::pair<KX_GameObject *, KX_AnimationEventManager::EventCall>> eventCalls;
+	std::vector<KX_AnimationEventManager::EventCall> objectCalls;
+	for (KX_GameObject *gameobj : m_animatedlist) {
+		KX_AnimationEventManager *eventManager = gameobj->GetAnimationEventManager();
+		if (!eventManager) {
+			continue;
+		}
+
+		objectCalls.clear();
+		eventManager->TakeEventsToCall(objectCalls);
+		for (const KX_AnimationEventManager::EventCall& call : objectCalls) {
+			eventCalls.emplace_back(gameobj, call);
+		}
+	}
+
+#ifdef WITH_PYTHON
+	if (!eventCalls.empty()) {
+		PyGILState_STATE gilstate = PyGILState_Ensure();
+
+		for (const std::pair<KX_GameObject *, KX_AnimationEventManager::EventCall>& item : eventCalls) {
+			KX_GameObject *gameobj = item.first;
+			PyObject *function = item.second.first->GetPyEventFunction();
+			// Events used only by an Animation Event sensor have no Python function.
+			if (!function) {
+				continue;
+			}
+
+			// "N" steals the new proxy reference.
+			PyObject *args = Py_BuildValue("(Ns)", gameobj->GetProxy(), item.second.second);
+			PyObject *ret = args ? PyObject_Call(function, args, nullptr) : nullptr;
+			Py_XDECREF(args);
+
+			if (ret) {
+				Py_DECREF(ret);
+			}
+			else {
+				EXP_ReportPythonDiagnostic("scene.animation.event", gameobj->GetName().c_str());
+				PyErr_Print();
+				PyErr_Clear();
+			}
+		}
+
+		PyGILState_Release(gilstate);
+	}
+#endif  // WITH_PYTHON
 
 	return true;
 }

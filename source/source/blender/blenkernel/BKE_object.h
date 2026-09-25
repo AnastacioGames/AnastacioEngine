@@ -105,10 +105,10 @@ bool BKE_object_vehicle_gear_remove(struct Object *ob, int index);
 /* Animation Events */
 void BKE_object_animation_event_add(struct Object *ob);
 bool BKE_object_animation_event_remove(struct Object* ob, int event);
-/* Animation Events Triggers */ 
-void BKE_object_animation_event_trigger_add(struct Object *ob, int index);
+/* Animation Events Triggers */
+bool BKE_object_animation_event_trigger_add(struct Object *ob, struct Scene *scene, int index);
 bool BKE_object_animation_event_trigger_remove(struct Object *ob, int eventIndex, int index);
-bool BKE_object_animation_event_trigger_pick(struct Object *ob, int eventIndex, int index);
+bool BKE_object_animation_event_trigger_pick(struct Object *ob, struct Scene *scene, int eventIndex, int index);
 
 void BKE_object_copy_data(struct Main *bmain, struct Object *ob_dst, const struct Object *ob_src, const int flag);
 struct Object *BKE_object_copy(struct Main *bmain, const struct Object *ob);

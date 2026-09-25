@@ -83,6 +83,12 @@ private:
 	// The last update time to avoid double animation update.
 	float m_prevUpdate;
 
+	/// Animation Events: a trigger exactly on the current frame fires in the next update (set by Play).
+	bool m_eventsIncludeCurrentFrame;
+
+	/// Queue the animation event triggers of this action crossed between two frames.
+	void ProcessAnimationEvents(float fromFrame, float toFrame, bool includeFrom);
+
 	void ClearControllerList();
 	void AddController(SG_Controller *cont);
 	void InitIPO();

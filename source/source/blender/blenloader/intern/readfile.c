@@ -5178,7 +5178,7 @@ static void lib_link_object(FileData *fd, Main *main)
 			{
 				AnimationEvent *event;
 				for (event = ob->animevents.first; event; event = event->next) {
-					event->action = newlibadr(fd, ob->id.lib, event->action);
+					event->action = newlibadr_us(fd, ob->id.lib, event->action);
 				}
 			}
 		}
@@ -9928,6 +9928,13 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 	}
 
 	expand_doit(fd, mainvar, ob->vehicle_steering_wheel);
+
+	{
+		AnimationEvent *event;
+		for (event = ob->animevents.first; event; event = event->next) {
+			expand_doit(fd, mainvar, event->action);
+		}
+	}
 }
 
 static void expand_scene(FileData *fd, Main *mainvar, Scene *sce)

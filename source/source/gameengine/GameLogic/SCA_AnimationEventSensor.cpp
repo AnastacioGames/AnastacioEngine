@@ -59,12 +59,14 @@ SCA_AnimationEventSensor::SCA_AnimationEventSensor(class SCA_EventManager *event
 
 void SCA_AnimationEventSensor::Init()
 {
-	m_lastresult = m_invert ? true : false;
+	m_lastresult = false;
+	m_reset = true;
 
 	if (m_event) {
-		m_lastTrigger = m_event->GetTrigger(m_event->GetLastTriggerIndex());
+		m_lastFireCount = m_event->GetFireCount(m_triggerAll ? -1 : m_triggerIndex);
 	}
 	else {
+		m_lastFireCount = 0;
 		CM_LogicBrickWarning(this, "sensor " << m_name << " does not have a valid event index!");
 	}
 }
@@ -104,33 +106,40 @@ SCA_AnimationEventSensor::~SCA_AnimationEventSensor()
 
 bool SCA_AnimationEventSensor::Evaluate()
 {
-	if (m_event != nullptr) {
-		int currenttrigger = m_event->GetTrigger(m_event->GetLastTriggerIndex());
-		bool result = m_triggerAll ? (currenttrigger != m_lastTrigger) : (currenttrigger == m_event->GetTrigger(m_triggerIndex)); // last triggered
-		bool reset = m_reset && m_level;
-
-		if (m_invert) {
-			result = !result;
-		}
-
-		m_reset = false;
-		if (m_invert ? result : m_lastresult != result) {
-			m_lastresult = result;
-			m_lastTrigger = currenttrigger;
-			if (!m_triggerAll && !m_invert) {
-				m_event->SetLastTriggerIndex(-1);
-			}
-
-			return true;
-		}
-		return (reset) ? true : false;
+	if (!m_event) {
+		return false;
 	}
-	return false;
+
+	// Positive for one logic frame each time the watched trigger (or any trigger) fired since the
+	// last evaluation, so repeated fires of the same trigger in a loop are all reported.
+	const unsigned int fireCount = m_event->GetFireCount(m_triggerAll ? -1 : m_triggerIndex);
+	const bool result = (fireCount != m_lastFireCount);
+	m_lastFireCount = fireCount;
+
+	const bool reset = m_reset && m_level;
+	m_reset = false;
+
+	if (result != m_lastresult) {
+		m_lastresult = result;
+		return true;
+	}
+	return reset;
 }
 
 void SCA_AnimationEventSensor::Update()
 {
 	// Nothing
+}
+
+int SCA_AnimationEventSensor::GetEventIndex() const
+{
+	return m_eventIndex;
+}
+
+void SCA_AnimationEventSensor::SetEvent(KX_AnimationEvent *event)
+{
+	m_event = event;
+	m_lastFireCount = (m_event) ? m_event->GetFireCount(m_triggerAll ? -1 : m_triggerIndex) : 0;
 }
 
 #ifdef WITH_PYTHON

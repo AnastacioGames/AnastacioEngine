@@ -32,83 +32,52 @@
 #include "EXP_ListWrapper.h"
 
 #include "BL_BlenderDataConversion.h"
+#include "DNA_action_types.h"
 #include "DNA_object_types.h"
 #include "BLI_listbase.h"
 
 KX_AnimationEventManager::KX_AnimationEventManager(Object *ob)
-	:m_refcount(1)
 {
-	this->m_events = new std::vector<KX_AnimationEvent*>();
-	this->m_events_toCall = new std::vector<std::pair<KX_AnimationEvent*, const char*>>();
-
-	/* XXX Converter XXX */
-	AnimationEvent *base = (AnimationEvent*)ob->animevents.first;
-	for (AnimationEvent *event = (AnimationEvent *)ob->animevents.first; event; event = event->next) {
-		if (event == base) continue;
-
-		char *pythonEvent = new char[64];
-		if (strlen(event->eventcall) != 0) {
-			strcpy(pythonEvent, event->eventcall);
-		}
-		else {
-			pythonEvent = nullptr;
+	/* Index 0 of ob->animevents (and of each event->triggers) is a hidden base element
+	 * created by the editor, user data starts at index 1. */
+	AnimationEvent *base = (AnimationEvent *)ob->animevents.first;
+	for (AnimationEvent *event = base; event; event = event->next) {
+		if (event == base) {
+			continue;
 		}
 
-		char *actionName = new char[64];
-		// Check if have an action.
-		if (event->action) {
-			strcpy(actionName, event->action->id.name + 2);
-		}
-		else {
-			// we need to keep the animation event empty and not remove it, to avoid problems with the animation event sensor, so dummy the name.
-			actionName = "nullptr";
-		}
+		// Events without an action are kept so the sensor event indices stay valid.
+		const std::string actionName = (event->action) ? event->action->id.name + 2 : "";
 
-		AnimationEventTrigger *trigger;
-
-		std::vector<std::pair<int, const char*>> *triggers = new std::vector<std::pair<int, const char*>>();
-		std::vector<int> *alreadyTriggered = new std::vector<int>();
-		bool first = true;
-		for (trigger = (AnimationEventTrigger*)event->triggers.first; trigger; trigger = trigger->next) {
-			if (first) {
-				first = false;
+		std::vector<std::pair<int, std::string>> triggers;
+		AnimationEventTrigger *baseTrigger = (AnimationEventTrigger *)event->triggers.first;
+		for (AnimationEventTrigger *trigger = baseTrigger; trigger; trigger = trigger->next) {
+			if (trigger == baseTrigger) {
 				continue;
 			}
-
-			char *custom_arg = new char[64];
-			strcpy(custom_arg, trigger->custom_arg);
-
-			triggers->push_back(std::make_pair(trigger->frame, custom_arg));
+			triggers.emplace_back(trigger->frame, trigger->custom_arg);
 		}
 
-		this->m_events->emplace_back(new KX_AnimationEvent(actionName, triggers, alreadyTriggered, pythonEvent));
+		m_events.push_back(new KX_AnimationEvent(actionName, triggers, event->eventcall));
 	}
 }
 
-KX_AnimationEventManager::KX_AnimationEventManager(std::vector<KX_AnimationEvent*> *other_events)
-	:m_refcount(1)
+KX_AnimationEventManager::KX_AnimationEventManager(const KX_AnimationEventManager& other)
+	:EXP_Value(other)
 {
-	std::vector<KX_AnimationEvent*> *events = new std::vector<KX_AnimationEvent*>();
+	// Don't share the Python proxy of the original manager.
+	ProcessReplica();
 
-	// Copy KX_AnimationEvents from other.
-	for (KX_AnimationEvent *event : *other_events) {
-		KX_AnimationEvent *event_new = new KX_AnimationEvent(*event);
-		event_new->SetAlreadyTriggereds(new std::vector<int>());
-		events->push_back(event_new);
+	for (KX_AnimationEvent *event : other.m_events) {
+		m_events.push_back(new KX_AnimationEvent(*event));
 	}
-
-	m_events = events;
-	m_events_toCall = new std::vector<std::pair<KX_AnimationEvent*, const char*>>();
 }
 
 KX_AnimationEventManager::~KX_AnimationEventManager()
 {
-	for (KX_AnimationEvent *event : *m_events) {
-		delete event;
+	for (KX_AnimationEvent *event : m_events) {
+		event->Release();
 	}
-
-	delete m_events;
-	delete m_events_toCall;
 }
 
 std::string KX_AnimationEventManager::GetName()
@@ -118,38 +87,31 @@ std::string KX_AnimationEventManager::GetName()
 
 unsigned int KX_AnimationEventManager::GetEventCount() const
 {
-	return m_events->size();
+	return m_events.size();
 }
 
-std::vector<KX_AnimationEvent*> *KX_AnimationEventManager::GetEvents() const
+const std::vector<KX_AnimationEvent *>& KX_AnimationEventManager::GetEvents() const
 {
 	return m_events;
 }
 
-KX_AnimationEvent *KX_AnimationEventManager::GetEvent(int index)
+KX_AnimationEvent *KX_AnimationEventManager::GetEvent(int index) const
 {
-	if (this && (index >= 0 && index < m_events->size())) {
-		return m_events->at(index);
+	if (index >= 0 && index < (int)m_events.size()) {
+		return m_events[index];
 	}
 	return nullptr;
 }
 
-std::vector<std::pair<KX_AnimationEvent*, const char*>> *KX_AnimationEventManager::GetEventsToCall()
+void KX_AnimationEventManager::AddEventToCall(KX_AnimationEvent *event, int triggerIndex)
 {
-	return m_events_toCall;
+	m_eventsToCall.emplace_back(event, event->GetCustomArg(triggerIndex));
 }
 
-void KX_AnimationEventManager::ClearEventsToCall()
+void KX_AnimationEventManager::TakeEventsToCall(std::vector<EventCall>& calls)
 {
-	m_events_toCall->clear();
-}
-
-
-void KX_AnimationEventManager::ResetTriggers() {
-	for (unsigned int i = 0; i < m_events->size(); i++) {
-		KX_AnimationEvent *event = (*m_events)[i];
-		event->GetAlreadyTriggereds()->clear();
-	}
+	calls.insert(calls.end(), m_eventsToCall.begin(), m_eventsToCall.end());
+	m_eventsToCall.clear();
 }
 
 #ifdef WITH_PYTHON
@@ -187,12 +149,12 @@ PyAttributeDef KX_AnimationEventManager::Attributes[] = {
 
 unsigned int KX_AnimationEventManager::py_get_events_size()
 {
-	return m_events->size();
+	return m_events.size();
 }
 
 PyObject *KX_AnimationEventManager::py_get_events_item(unsigned int index)
 {
-	return (*m_events)[index]->GetProxy();
+	return m_events[index]->GetProxy();
 }
 
 PyObject *KX_AnimationEventManager::pyattr_get_events(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

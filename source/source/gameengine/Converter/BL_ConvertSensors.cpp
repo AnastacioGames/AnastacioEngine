@@ -487,7 +487,8 @@ void BL_ConvertSensors(struct Object *blenderobject,
 						int triggerIndex = blenderaessensor->trigger_index - 1;
 						bool triggerAll = blenderaessensor->trigger_all;
 
-						KX_AnimationEvent *event = gameobj->GetAnimationEventManager()->GetEvent(eventIndex);
+						KX_AnimationEventManager *eventManager = gameobj->GetAnimationEventManager();
+						KX_AnimationEvent *event = (eventManager) ? eventManager->GetEvent(eventIndex) : nullptr;
 						gamesensor = new SCA_AnimationEventSensor(eventmgr, gameobj, eventIndex, triggerIndex, triggerAll, event);
 					}
 					break;

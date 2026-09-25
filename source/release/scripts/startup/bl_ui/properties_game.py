@@ -1977,67 +1977,76 @@ class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'}
+        return context.object is not None and context.scene.render.engine in cls.COMPAT_ENGINES
 
     def draw(self, context):
         layout = self.layout
         ob = context.object
-        gs = context.scene.game_settings
 
         col = layout.column()
-        
+
+        # Index 0 of anim_events (and of each event.triggers) is a hidden base element.
+        last = len(ob.anim_events) - 1
         for i, event in enumerate(ob.anim_events):
-            if i == 0: continue
+            if i == 0:
+                continue
+
             box = col.box()
             row = box.row()
             row.prop(event, "show_expanded", text="", emboss=True)
-            
-            if (event.anim): textHeader = "{EventIndex} - Animation Event: {ActionName}".format(EventIndex=i, ActionName=event.anim.name)
-            else: textHeader = "{EventIndex} - Empty Animation Event".format(EventIndex=i)
-            row.label(text=textHeader, icon="RECOVER_LAST")
-            
-            row = row.row(align=True)
-            row.operator("object.animation_event_move_up", text="", icon='DOTSUP').index = i
-            row.operator("object.animation_event_move_down", text="", icon='DOTSDOWN').index = i
-            row.operator("object.animation_event_remove", text="", icon='PANEL_CLOSE').index = i
-            
-            if (not event.show_expanded):         
-                continue
-            
-            row = box.split(factor=0.2)
-            row.label(text="Action:")
-            row.prop(event, "anim", text="")
-            
-            # Triggers
-            row = box.split(factor=1)
-            row.operator("object.animation_event_trigger_add", text="Add Trigger", icon='ZOOMIN').index = i
-            row = box.row()
-            if len(event.triggers) == 0: row.label(text="No Triggers! Please add an frame trigger", icon="PANEL_CLOSE")
-            else: row.label(text="Triggers", icon="ANIM")
-            for it, eventTrigger in enumerate(event.triggers):
-                if it == 0: continue
-                #row = box.split(factor=1)
-                row = box.row()
-                row.prop(eventTrigger, "frame", text="Frame")
-                row.prop(eventTrigger, "custom_arg", text="")
-                
-                buttonPick = row.operator("object.animation_event_trigger_pick", text="", icon="EYEDROPPER")
-                buttonPick.index = it
-                buttonPick.eventIndex = i
 
-                button = row.operator("object.animation_event_trigger_remove", text="", icon="PANEL_CLOSE")
-                button.index = it
-                button.eventIndex = i
-               
+            if event.anim:
+                header = "{} - {}".format(i, event.anim.name)
+            else:
+                header = "{} - No Action".format(i)
+            row.label(text=header, icon="RECOVER_LAST", translate=False)
+
+            sub = row.row(align=True)
+            up = sub.row(align=True)
+            up.enabled = i > 1
+            up.operator("object.animation_event_move_up", text="", icon='DOTSUP').index = i
+            down = sub.row(align=True)
+            down.enabled = i < last
+            down.operator("object.animation_event_move_down", text="", icon='DOTSDOWN').index = i
+            sub.operator("object.animation_event_remove", text="", icon='PANEL_CLOSE').index = i
+
+            if not event.show_expanded:
+                continue
+
+            split = box.split(factor=0.25)
+            split.label(text="Action:")
+            split.prop(event, "anim", text="")
+
+            split = box.split(factor=0.25)
+            split.label(text="Python Event:")
+            split.prop(event, "eventcall", text="", icon="FILE_SCRIPT")
+
+            # Triggers
             row = box.row()
-            row = row.separator(factor=1)
-            row = box.row()
-            row.label(text="Python Event:", icon="FILE_SCRIPT")
-            row.prop(event, "eventcall", text="")
+            row.label(text="Triggers", icon="ANIM")
+            row.operator("object.animation_event_trigger_add", text="Add Trigger", icon='ZOOMIN').index = i
+
+            if len(event.triggers) < 2:
+                box.label(text="No triggers. Add a frame trigger", icon="INFO")
+
+            for it, trigger in enumerate(event.triggers):
+                if it == 0:
+                    continue
+
+                row = box.row(align=True)
+                row.prop(trigger, "frame", text="Frame")
+                row.prop(trigger, "custom_arg", text="")
+
+                props = row.operator("object.animation_event_trigger_pick", text="", icon="EYEDROPPER")
+                props.eventIndex = i
+                props.index = it
+
+                props = row.operator("object.animation_event_trigger_remove", text="", icon="PANEL_CLOSE")
+                props.eventIndex = i
+                props.index = it
 
         row = col.row(align=True)
-        row.operator("object.animation_event_add", text="Add", icon='ZOOMIN')
+        row.operator("object.animation_event_add", text="Add Animation Event", icon='ZOOMIN')
 
 classes = (
     GAME_PT_game_components,

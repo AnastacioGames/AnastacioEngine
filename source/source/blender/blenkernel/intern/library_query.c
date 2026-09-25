@@ -593,6 +593,10 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 					}
 				}
 
+				for (AnimationEvent *event = object->animevents.first; event; event = event->next) {
+					CALLBACK_INVOKE(event->action, IDWALK_CB_USER);
+				}
+
 				modifiers_foreachIDLink(object, library_foreach_modifiersForeachIDLink, &data);
 				BKE_constraints_id_loop(&object->constraints, library_foreach_constraintObjectLooper, &data);
 

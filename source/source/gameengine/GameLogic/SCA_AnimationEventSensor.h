@@ -39,7 +39,8 @@ class SCA_AnimationEventSensor : public SCA_ISensor
 {
 	Py_Header
 	bool		m_lastresult;
-	int			m_lastTrigger;
+	/// Fire count of the watched trigger(s) seen by the last evaluation.
+	unsigned int	m_lastFireCount;
 
 	int			m_eventIndex;
 	int			m_triggerIndex;
@@ -61,6 +62,11 @@ public:
 	virtual bool	IsPositiveTrigger();
 	virtual void	ReParent(SCA_IObject* parent);
 	void Update();
+
+	/// Index of the watched event in the object events (0 is the first user event).
+	int GetEventIndex() const;
+	/// Watch another event, used when the owner object is replicated.
+	void SetEvent(KX_AnimationEvent *event);
 
 #ifdef WITH_PYTHON
 

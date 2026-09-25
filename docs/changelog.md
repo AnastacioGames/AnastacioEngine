@@ -11,7 +11,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 41 | 58 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-24 | 34 | 47 KB |
+| [12_2026-09-23_a_2026-09-23.md](changelog/12_2026-09-23_a_2026-09-23.md) | 2026-09-23 a 2026-09-23 | 9 | 13 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +24,44 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-25 - Animation Events revisados (crashes, threads, sensor, painel)
+
+- Revisão do sistema herdado da Range. **Editor**: o evento agora conta como usuário da Action (`id_us_plus`/`min`
+  em `object.c`, `newlibadr_us` no `readfile.c`, `IDWALK_CB_USER` no `library_query.c`, `expand_doit` no append).
+  Antes, apagar a Action deixava ponteiro solto (crash ao desenhar o painel) e uma Action usada só pelo evento
+  sumia ao salvar. Operadores (`object_animation_event.c`) validam índices e cancelam em vez de crashar, usam a cena
+  ativa (antes `G.main->scene.first`), mandam notifier; ▲ no primeiro evento não troca mais com o elemento-base
+  escondido (índice 0), que fazia o evento sumir. Remover evento libera os triggers.
+- **Runtime**: `BL_Action::Update` roda nas threads do pool de animação e o `KX_Scene::UpdateAnimations` lia/limpava
+  a mesma fila de eventos na thread principal ao mesmo tempo. Agora os callbacks rodam depois de
+  `BLI_task_pool_work_and_wait`, no mesmo frame. Trigger dispara quando a reprodução cruza o frame (antes: janela
+  de ±2 frames + lista "já disparados" por valor de frame, que engolia dois triggers no mesmo frame e zerava todas
+  as Actions do objeto); trata loop, ping-pong, sentido reverso e objetos culled; `setActionFrame` não dispara o que
+  pulou. `KX_AnimationEvent` guarda dados por valor (acabou vazamento de `new char[64]`/vetores), mantém referência
+  própria da função Python e não compartilha proxy com a cópia; evento sem Python Event não gera erro no log;
+  `animationEventManager` sem manager retorna `None` com refcount certo; manager não vazava mais uma referência na
+  conversão.
+- **Sensor Animation Event**: sensor de objeto criado por AddObject apontava para o evento do original (nunca
+  disparava) — `KX_GameObject::ReParentLogic` religa. Detecção por contador de disparos (antes comparava o último
+  frame e perdia disparos seguidos; com um trigger em loop disparava só uma vez). Conversão não chama mais
+  `GetEvent` em manager nulo (`this &&`, UB no clang de Web/Android).
+- **Painel**: Action e Python Event em cima, linha Triggers com Add Trigger, aviso com ícone de informação, ▲/▼
+  desativados nas pontas, disponível também em Empty/Camera/Lamp.
+- **Validação**: compilou (`RangeEngine` + `RangeRuntime`, sem mudança de DNA). Teste headless de 27 checagens dos
+  operadores/contagem de usuários/salvar-recarregar passou. Teste no runtime com Action em loop 1-20, triggers em
+  1, 10, 10 e 20, callback Python e sensor, num objeto e numa cópia por AddObject: cada trigger disparou 12-13
+  vezes nos dois objetos e o sensor pulsou 24/25 vezes. Não verificado: o painel na janela do editor.
+
+## 2026-09-25 - World Status com nomes em inglês
+
+- As 8 World Properties automáticas viraram `rain_enabled`, `rain_intensity`, `clouds_enabled`, `mist_enabled`,
+  `mist_density`, `sun_hour`, `cloud_type`, `player_under_cover` (`world.c`, `BL_ConvertProperties.cpp`).
+  `horario_sol` virou `sun_hour`, que o runtime já lê para o World Sun automático.
+- O `startup.blend` embutido guardava os nomes em português, e o File > New mostrava os dois conjuntos.
+  `BKE_world_status_props_ensure` agora renomeia o nome antigo (mantendo o valor) ou o remove quando o novo já
+  existe. `.blend` do usuário não são alterados. `RangeEngine -b --factory-startup` lista só as 8 em inglês.
+- Painel World: Colors em 4 colunas; Moon Size e Brightness separados.
 
 ## 2026-09-25 - Aba Input nas Propriedades (Input System saiu das Preferências)
 
@@ -497,158 +536,3 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   (`LOADED`). O IndexedDB do WebView persiste entre execuções.
 - Cuidado ao reempacotar para o APK: `build-web/bin` pode estar com runtime de depuração (SAFE_HEAP); usar
   `--runtime-dir build-web-release/bin`.
-
-## 2026-09-23 - APK WebView mínimo (A0b) rodando no aparelho
-
-- Novo template `tools/android/webview-template/` (Kotlin, uma Activity, AGP 9.4.1 com Kotlin embutido, Gradle
-  9.7.1 pelo wrapper com `distributionSha256Sum`, compileSdk 37/targetSdk 36/minSdk 24, `androidx.webkit` 1.17.1,
-  `androidx.core` 1.19.1). `WebViewAssetLoader` serve `assets/www/` em `https://appassets.androidplatform.net`;
-  arquivo ausente responde 404 explícito e o app não pede `INTERNET`. Links externos abrem no navegador.
-- Paisagem (`sensorLandscape`), imersivo, tela acesa, `configChanges` para girar sem recarregar o jogo. Console JS
-  vai para o logcat (`RangeWeb`); depuração remota e o extra `query` (ex.: `debug=1`) só no build debug.
-- Testado no OPPO Find X3 Pro (Android 13, WebView 150) com a cena `motion`: carga offline, WebGL 2, Python e
-  `bge.logic.motion` com sensores reais; inclinação e `calibrate()` aprovados pelo usuário. Pendências em
-  `docs/android-manual-tests.md` (novo).
-
-## 2026-09-23 - Sensores de movimento: `bge.logic.motion` (giroscópio, acelerômetro, inclinação)
-
-- Por decisão do usuário, os sensores vieram antes do APK Android: testáveis já no celular pelo navegador, e o APK
-  (WebView) herda sem mudança. Não há biblioteca externa: `DeviceMotionEvent`/`DeviceOrientationEvent` são padrão.
-- Nova classe `KX_PythonMotion` (`Ketsji/KX_PythonMotion.{h,cpp}`, no padrão de `KX_PythonMouse`), registrada como
-  `bge.logic.motion`: `available`, `gyroscope` (rad/s), `accelerometer` e `gravity` (m/s², apontando para cima como
-  no W3C), `orientation` (alpha/beta/gamma do navegador), `tilt` (x, y de -1 a 1: para onde uma bola rolaria na
-  tela) e `calibrate()`. No Web lê `Module.rangeMotion` por `EM_JS`; nas outras plataformas `available = False` e
-  zeros. Documentada em `bge.types.KX_PythonMotion.rst`.
-- Página do `package-web.py`: ouve os dois eventos, gira os eixos para os da tela (`screen.orientation.angle`),
-  calcula a gravidade (ou passa-baixa, sem aceleração linear), pede permissão no clique em Jogar (só iOS exige) e,
-  com `?debug=1`, loga os valores uma vez por segundo. `available` cai depois de 1 s sem leitura.
-- Achado: Chrome/WebView preenchem `rotationRate` como alpha=x, beta=y, gamma=z, não na ordem do texto do W3C.
-  O mapeamento segue o Chrome; iOS usa a ordem da especificação (não testado).
-- Cena de teste gerada por `tools/tests/web_profile/make_motion_project.py` (`projects-teste/motion/motion.range`):
-  tabuleiro que inclina, bola que rola, verde/vermelho para sensor ligado/desligado, toque calibra.
-- Validação: `RangeRuntime` nativo (MSVC) e runtime Web release compilados; sonda nativa com todos os atributos
-  (`available=False`, `Vector` zerado, `calibrate()` = `False`); `tools/web/verify-motion.cjs` com sensores emulados
-  pelo CDP no Edge headless: `MOTION: PASS` (retrato, paisagem a 90°, giro nos três eixos, calibração pelo toque).
-  `orientation` não foi emulada. 99 testes de `tools/tests/web_profile` OK. Falta o teste no celular real.
-
-## 2026-09-23 - Web: mensagens das regras traduzidas (English, Português, Español, Русский)
-
-- As mensagens e dicas de correção das regras Web (`rules_files.py`, `rules_python.py`, `runtime.py`,
-  `manifest.py`, `collect.py`, `collect_bpy.py`, `preflight.py`, `export.py`) passam a ser escritas em inglês,
-  como o resto do painel. Os detalhes internos de manifesto inválido também, mas sem tradução (só quem monta runtime vê).
-- `i18n.Msg` guarda o texto em inglês (JSON e testes) junto do molde e dos argumentos; `i18n.tr` traduz na exibição
-  (o catálogo casa o molde, não o texto já formatado). Argumentos que também são `Msg` são traduzidos; nomes de
-  arquivo, não. O painel e o aviso de export bloqueado usam `tr`.
-- Catálogo novo `translations_rules.py` (112 moldes, pt_BR/es/ru) somado aos catálogos do perfil Web. O russo
-  e o espanhol precisam de revisão nativa, como os de `translations_ui.py`.
-- Validação: 99 testes unitários de `tools/tests/web_profile`; no editor, `engine_i18n.py` (com checagens novas de
-  `tr`), `engine_web_ui.py`, `engine_collect_bpy.py`, `engine_web_export.py` e `engine_web_cli.py`, todos aprovados.
-
-## 2026-09-23 - Web: mouse com cursor oculto deixa de girar a câmera sem parar
-
-- Usuário relatou mouse "muito sensível" no First Person (GitHub Pages). Causa: no port SDL2/Emscripten o
-  `WarpMouse` não funciona, então `reCenter()` não recentralizava e `deltaPosition` repetia o deslocamento a cada
-  frame (câmera girando como joystick). Não era sensibilidade do jogo.
-- `GHOST_SystemSDL.cpp` (só `__EMSCRIPTEN__`): com cursor oculto, cursor virtual acumulado de `xrel/yrel`;
-  `setCursorPosition` move o cursor virtual. Clique de mouse real pede pointer lock no `#canvas`.
-  `GHOST_WindowSDL.cpp`: mostrar cursor sai do pointer lock; ocultar pede. `package-web.py`: rejeição de pointer
-  lock não vira erro na página.
-- Validação no Edge headless (sonda `mprobe`): movimento de 80 px gera um único delta, com e sem pointer lock;
-  toque/arrasto gera delta proporcional, sem salto no toque novo; cursor visível inalterado. Publicado no
-  `gh-pages` (0.1.2). Usuário confirmou no teste real: sensibilidade do mouse e jogo OK.
-
-## 2026-09-23 - Web: botão de tela cheia na página do jogo
-
-- Usuário confirmou que o First Person roda no celular pelo GitHub Pages e pediu tela cheia.
-- `index.html` gerado por `package-web.py`: botão "Tela cheia"/"Sair da tela cheia" no canto superior esquerdo,
-  visível depois de "Jogar". Coloca a página inteira em tela cheia (overlay `?perf=1`/`?debug=1` continuam
-  visíveis), escala o canvas por CSS mantendo a proporção (resolução de desenho inalterada, sem custo extra) e,
-  no Android, tenta travar em paisagem. Oculto sem Fullscreen API (iPhone só tem para `<video>`).
-- Validação no Edge headless com viewport de celular (800x360, DPR 2): botão oculto antes de jogar, entra e sai
-  da tela cheia por clique, frames continuam contando, nenhum erro/exceção. Publicado no `gh-pages` (0.1.1).
-  No celular do usuário o botão só girou a imagem para paisagem, sem tela cheia de fato (limite do
-  navegador); usuário aceitou assim.
-
-## 2026-09-23 - Web: nome do jogo com espaço ajustado no export; build de teste no GitHub Pages
-
-- `tools/web/package-web.py`: nome do `.range` com espaço/acento/caractere inválido deixa de ser recusado ("nome do
-  arquivo do jogo invalido para o FS virtual", achado em `melhores graficos .range`). `safe_name()` tira acentos e
-  troca o resto por `_` (`Meu Jogo Ação.range` → `Meu_Jogo_Acao.range`; só não ASCII → `game.range`); o nome
-  padrão do pacote segue a mesma regra. Vale também para o export do editor, que chama o empacotador. Extras
-  (`--extra`) continuam recusados com nome inválido, porque scripts os importam pelo nome.
-- Validação: pacotes gerados com `Meu Jogo Ação.range` e `日本 jogo.range`, `index.html`/`manifest.json` apontam
-  para o nome ajustado e `perf-run.cjs` recebeu frames no Edge headless.
-- Build de teste para celular: First Person (`tools/ADD na engine anastacioEngine/First_Person.range`, renomeado
-  pelo usuário) empacotado com `--perf` e publicado na branch órfã `gh-pages` (GitHub Pages:
-  <https://anastaciogames.github.io/AnastacioEngine/?perf=1>). Link público testado no Edge headless: carrega,
-  WebGL2/Core, sem erro. Medição p50/p95 em celular físico pendente com o usuário.
-
-## 2026-09-23 - Web: `aud` METH_NOARGS validado no navegador
-
-- A correção de aridade de `ea2cfd04` (18 métodos `METH_NOARGS` de `PySound`/`PyDevice`/`PyHandle`/
-  `PyDynamicMusic`/`PyPlaybackManager`) foi conferida com o runtime `build-web-release` de 2026-09-23:
-  `claude_aud_noargs_probe.py` empacotada e rodada por `claude_r3_run.cjs` no Edge headless. `cache()`,
-  `reverse()`, `handle.pause()` e `handle.stop()` com som válido terminam sem `function signature mismatch`
-  (`[r3] TODOS`).
-- **Regressões repetidas depois da mudança de áudio** (runtime `build-web-release` de 2026-09-23, Edge headless
-  isolado): áudio `web-audio` (`verify-capabilities.cjs audio`) 8/8 OK (AudioContext rodando, pico 0,35); módulo
-  `aud` (`create_web_aud_module_scene.py`) até `[aud] aud OK`; bloom + resize (`claude_m3_resize.*`) com offscreens
-  canvas/2, /4, /8 em 640x360, 1024x600, 400x300 e 960x540 e `glError=0x0` em todas as fases; resolução dinâmica
-  sem timer com aviso único; R1 `CONSTRAINT_ABI_TEST: PASS` no Web e guard estático `PASS (31 methods)`.
-- Aceite visual do Principled/PBR Web (luzes de cena e sombra) dado pelo usuário no navegador com GPU real.
-
-## 2026-09-23 - Web: luzes de cena e sombra do Principled/PBR no perfil CORE (WebGL2)
-
-- **Problema**: o `web-runtime` compila com `WITH_GL_PROFILE_CORE_RANGERUNTIME` (`USE_CORE_PROFILE` nos shaders).
-  O loop de luzes de `node_bsdf_principled()`/`node_bsdf_diffuse()`/`node_bsdf_glossy()` e a sombra do Principled
-  estavam em `#ifndef USE_CORE_PROFILE` (`gl_LightSource` não existe em GLES3, e `RAS_OpenGLLight` não chama
-  `glLight*` em CORE): no navegador esses materiais só recebiam ambiente/IBL, sem Sun/Point/Spot nem sombra.
-- **Correção**:
-  - `RAS_OpenGLLight::ApplyFixedFunctionLighting()` preenche também um `GPUSceneLight` (`GPU_material.h`) com os
-    mesmos valores do `glLight*`, em espaço de visão (posição/direção multiplicadas pela view, `halfVector`
-    derivado para o Sun, `spotCosCutoff`). `RAS_Rasterizer` guarda os 8 slots (`GetSceneLights()`), porque
-    uniform é estado do programa e `ProcessLighting()` não recalcula quando a camada de luz se repete.
-  - `GPU_material_bind_scene_lights()` envia `unflightsource[i].*` por objeto, junto do bind de sombra em
-    `BL_BlenderShader::BindShadowLamps()`; no COMPAT as localizações são -1 e nada é enviado.
-  - GLSL: em CORE, `uniform SceneLightSource unflightsource[8]` com os campos de `gl_LightSource`; os três BSDFs
-    leem `SCENE_LIGHT(i)` (em COMPAT continua `gl_LightSource[i]`). A amostragem de sombra passou para
-    `scene_light_shadow()`, com índices constantes em `unfshadowmap[]` (GLSL ES 3.00 proíbe indexar array de
-    samplers com a variável do loop).
-  - `gpu_extensions.c`: no Emscripten `GPU_max_textures()` fica limitado a 28, o máximo de units que o
-    `LEGACY_GL_EMULATION` rastreia. Com WebGL informando 32 (SwiftShader), o bind da sombra em
-    `max - 3 + i` fazia `glEnable` estourar em `hook_enable` (`enabled_tex2D` de undefined) ao carregar a cena.
-- **Validação**: `build` nativo (`RangeRuntime`/`RangeEngine`) e `build-web-release` compilaram com código 0.
-  `shadow_ibl_test.range` empacotado e rodado no Edge headless (SwiftShader): sem exceção, sem erro de shader no
-  pré-voo, `glError=0`; a captura mostra os brilhos das várias luzes, o cone do Spot e as sombras no chão.
-  **Pendente**: aceite visual do usuário no navegador com GPU real e conferência do desktop (o GLSL do caminho
-  COMPAT mudou: macro `SCENE_LIGHT` e helper de sombra).
-
-## 2026-09-23 - Sombra em Principled/PBR: correções que faltavam para funcionar no jogo real
-
-A entrada de 2026-09-21 compilava mas não sombreava nada no jogo (validado no `shadow_ibl_test.range`). Causas
-encontradas (todas confirmadas por diagnóstico em runtime, não só leitura de código):
-
-- **Bind fora de hora**: `GPU_material_bind_shadow_lamps()` rodava em `KX_BlenderMaterial::Prepare()`, antes de
-  `BindProg()`, então o `glUniform*` ia para o programa errado. Agora é `BL_BlenderShader::BindShadowLamps()`,
-  chamado por objeto em `KX_BlenderMaterial::ActivateMeshUser()` depois de `Update()`.
-- **`ProcessLighting()` nunca era chamado para materiais com nodes** (só o caminho `m_shader` chamava), então
-  `m_shadowLamps` ficava vazio. Agora `ActivateMeshUser()` chama `ProcessLighting(true, ...)` também para
-  `m_blenderShader`. Efeito colateral a observar: todo material com nodes passa a receber o estado de luz
-  fixed-function por objeto.
-- **Vazamento**: `GPU_material_bind_shadow_lamps()` chamava `add_user_list()` (sem dedupe) por objeto e por frame;
-  agora registra lamp/material uma vez.
-- **Point/Spot tratados como direcionais** em `node_bsdf_principled()`: agora `position.w == 1` usa
-  direção `luz - fragmento`, atenuação `constant/linear/quadratic` e cone do Spot (`spotCutoff`,
-  `spotExponent`). Diffuse/Glossy BSDF (`node_bsdf_diffuse`/`node_bsdf_glossy`) **não** foram tocados.
-- **`GL_SPOT_CUTOFF` em radianos**: `RAS_OpenGLLight::ApplyFixedFunctionLighting()` passava `m_spotsize / 2`
-  (radianos) onde o GL espera graus [0, 90]; agora converte. Sem isso o cone valia ~0,4° e o Spot não iluminava.
-- **Loop limitado a 3 luzes**: numa cena com 4 luzes o Sun (slot 3) nunca entrava. `NUM_LIGHTS` passou a 8
-  (slots desligados são pulados) e `NUM_SHADOW_LIGHTS = 3` mantém o limite de shadow maps.
-- **Luz desligada mantinha a cor antiga**: `RAS_OpenGLRasterizer::DisableLight()` agora zera `diffuse`/`specular`
-  do slot, já que o shader não olha `GL_LIGHTi`.
-- **Sampler de sombra sem textura**: slots sem sombra apontam `unfshadowmap[i]` para a própria unit em vez da
-  unit 0 (evita `sampler2DShadow` e `sampler2D` na mesma unit).
-- **Validação**: `RangeRuntime` com `projects-teste/pbr-baseline/shadow_ibl_test.range`, sombras do Spot no
-  chão visíveis (usuário: "parece bom, sombra um pouco fraca, deve ser regulagem" — o chão satura com 4 luzes
-  somando energia 5,6). Ainda sem comparação lado a lado com material legado.
-- **Ainda sem sombra no Principled**: Point/Local, CSM e VSM (limite de engine, inalterado).

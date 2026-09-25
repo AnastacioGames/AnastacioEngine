@@ -928,15 +928,16 @@ void BKE_object_animation_event_add(Object *ob)
 	bAction *defaultAction = (ob->adt) ? ob->adt->action : NULL;
 	if (defaultAction) {
 		animEvent->action = defaultAction;
+		id_us_plus(&defaultAction->id);
 	}
-	
-	
-	/* If the AnimationEvent list is empty, initialize it with the base animevent */
+
+	/* Index 0 is a hidden base element: the UI, the logic sensor and the game engine
+	 * all skip it, so user events start at index 1. */
 	if (!last) {
 		AnimationEvent *base = MEM_callocN(sizeof(AnimationEvent), "Base Animation Event");
 		BLI_addtail(&ob->animevents, base);
 	}
-	animEvent->flag = true;
+	animEvent->flag = ANIMEVENT_SHOW;
 	BLI_addtail(&ob->animevents, animEvent);
 }
 
@@ -944,18 +945,27 @@ bool BKE_object_animation_event_remove(Object *ob, int index)
 {
 	AnimationEvent *rem;
 
-	if (index < 1 || index > BLI_listbase_count(&ob->animevents) - 1)
+	if (index < 1) {
 		return false;
+	}
 
 	rem = BLI_findlink(&ob->animevents, index);
+	if (!rem) {
+		return false;
+	}
 
 	BLI_remlink(&ob->animevents, rem);
+	if (rem->action) {
+		id_us_min(&rem->action->id);
+	}
+	BLI_freelistN(&rem->triggers);
 	MEM_freeN(rem);
 
-	/* If there are no user defined animations, remove the base animation as well */
+	/* If there are no user defined events, remove the base event as well */
 	if (BLI_listbase_is_single(&ob->animevents)) {
 		AnimationEvent *base = ob->animevents.first;
 		BLI_remlink(&ob->animevents, base);
+		BLI_freelistN(&base->triggers);
 		MEM_freeN(base);
 	}
 
@@ -963,61 +973,84 @@ bool BKE_object_animation_event_remove(Object *ob, int index)
 }
 
 /* Animation Event Trigger */
-void BKE_object_animation_event_trigger_add(Object *ob, int index)
+bool BKE_object_animation_event_trigger_add(Object *ob, Scene *scene, int index)
 {
-	AnimationEvent *rem;
-	rem = BLI_findlink(&ob->animevents, index);
+	AnimationEvent *event;
+	AnimationEventTrigger *trigger;
 
-	AnimationEventTrigger *trigger = MEM_callocN(sizeof(AnimationEventTrigger), "Animation Event Trigger");
-	AnimationEventTrigger *last = rem->triggers.last;
-
-	/* By default, set the timeline keyframe */
-	Scene* scene = G.main->scene.first;
-	trigger->frame = (int)ceil(CFRA);
-
-	/* If the AnimationEvent list is empty, initialize it with the base animevent */
-	if (!last) {
-		AnimationEvent *base = MEM_callocN(sizeof(AnimationEvent), "Base Animation Event");
-		BLI_addtail(&rem->triggers, base);
+	if (index < 1) {
+		return false;
 	}
 
-	BLI_addtail(&rem->triggers, trigger);
+	event = BLI_findlink(&ob->animevents, index);
+	if (!event) {
+		return false;
+	}
 
+	/* Index 0 is a hidden base trigger, same as for the events list */
+	if (BLI_listbase_is_empty(&event->triggers)) {
+		AnimationEventTrigger *base = MEM_callocN(sizeof(AnimationEventTrigger), "Base Animation Event Trigger");
+		BLI_addtail(&event->triggers, base);
+	}
+
+	/* By default, use the current timeline frame */
+	trigger = MEM_callocN(sizeof(AnimationEventTrigger), "Animation Event Trigger");
+	trigger->frame = scene ? (int)ceil(CFRA) : 0;
+	BLI_addtail(&event->triggers, trigger);
+
+	return true;
 }
 
 bool BKE_object_animation_event_trigger_remove(Object *ob, int eventIndex, int index)
 {
-	AnimationEvent *rem;
-	AnimationEventTrigger *remT;
+	AnimationEvent *event;
+	AnimationEventTrigger *trigger;
 
-	rem = BLI_findlink(&ob->animevents, eventIndex);
-	remT = BLI_findlink(&rem->triggers, index);
-
-	if (remT) {
-		BLI_remlink(&rem->triggers, remT);
-		MEM_freeN(remT);
+	if (eventIndex < 1 || index < 1) {
+		return false;
 	}
 
-	/* If there are no user defined animations, remove the base animation as well */
-	if (BLI_listbase_is_single(&rem->triggers)) {
-		AnimationEvent *base = rem->triggers.first;
-		BLI_remlink(&rem->triggers, base);
-		MEM_freeN(base);
+	event = BLI_findlink(&ob->animevents, eventIndex);
+	if (!event) {
+		return false;
+	}
+
+	trigger = BLI_findlink(&event->triggers, index);
+	if (!trigger) {
+		return false;
+	}
+
+	BLI_remlink(&event->triggers, trigger);
+	MEM_freeN(trigger);
+
+	/* If there are no user defined triggers, remove the base trigger as well */
+	if (BLI_listbase_is_single(&event->triggers)) {
+		BLI_freelistN(&event->triggers);
 	}
 
 	return true;
 }
 
-bool BKE_object_animation_event_trigger_pick(Object *ob, int eventIndex, int index)
+bool BKE_object_animation_event_trigger_pick(Object *ob, Scene *scene, int eventIndex, int index)
 {
-	AnimationEvent *rem;
-	AnimationEventTrigger *remT;
+	AnimationEvent *event;
+	AnimationEventTrigger *trigger;
 
-	rem = BLI_findlink(&ob->animevents, eventIndex);
-	remT = BLI_findlink(&rem->triggers, index);
+	if (!scene || eventIndex < 1 || index < 1) {
+		return false;
+	}
 
-	Scene *scene = G.main->scene.first;
-	remT->frame = (int)ceil(CFRA);
+	event = BLI_findlink(&ob->animevents, eventIndex);
+	if (!event) {
+		return false;
+	}
+
+	trigger = BLI_findlink(&event->triggers, index);
+	if (!trigger) {
+		return false;
+	}
+
+	trigger->frame = (int)ceil(CFRA);
 
 	return true;
 }

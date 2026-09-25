@@ -116,8 +116,13 @@ ferramenta correspondente.
 - Menu in-game em ImGui com suporte por mouse, teclado e bindings de gamepad.
 - Debug Mode expõe bounding boxes, frusta de câmera/sombra e render queries.
 - Console ImGui espelha o log da engine no Play e no standalone.
-- World Properties podem ser compartilhadas pelo `World` no runtime. A criação automática das propriedades
-  de World Status continua pendente e está no roadmap.
+- World Properties podem ser compartilhadas pelo `World` no runtime. Todo World novo nasce com as 8
+  propriedades de World Status (`rain_enabled`, `rain_intensity`, `clouds_enabled`, `mist_enabled`,
+  `mist_density`, `sun_hour`, `cloud_type`, `player_under_cover`); as de chuva, nuvens e neblina espelham o
+  estado real do World ao iniciar o jogo.
+- Animation Events (aba Game do objeto): triggers por frame de uma Action chamam uma função Python
+  (`modulo.funcao(obj, argumento)`) e/ou o sensor Animation Event. Disparam quando a reprodução cruza o frame
+  (loop, ping-pong, reverso), com callbacks na thread principal depois da atualização das animações.
 - Runtime Properties tipadas ampliam Property Sensors/Actuators; detalhes e pendências estão em
   [`docs/logic-bricks-modernization.md`](docs/logic-bricks-modernization.md).
 - Atlas externo de ícones configurável em `User Preferences > Files > Icons`, com fallback embutido.

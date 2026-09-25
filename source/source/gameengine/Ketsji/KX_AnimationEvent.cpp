@@ -28,58 +28,91 @@
 #include "EXP_Value.h"
 #include "EXP_PythonCallBack.h"
 
-KX_AnimationEvent::KX_AnimationEvent(const char *actionName, std::vector<std::pair<int, const char*>> *triggers, std::vector<int> *alreadyTriggered, const char *pythonEvent)
+KX_AnimationEvent::KX_AnimationEvent(const std::string& actionName, const std::vector<std::pair<int, std::string>>& triggers,
+                                     const std::string& pythonEvent)
 	:EXP_Value(),
 	m_actionName(actionName),
 	m_triggers(triggers),
-	m_alreadyTriggered(alreadyTriggered),
 	m_pythonEvent(pythonEvent),
 	m_lastTriggerIndex(-1),
+	m_triggerFireCounts(triggers.size(), 0),
+	m_fireCount(0)
+#ifdef WITH_PYTHON
+	,
 	m_pyEventFunction(nullptr)
+#endif  // WITH_PYTHON
 {
-	/* Get the Python function and store it in m_pyEventFunction, 
-	/* so we can call it as many times as we want, but with less performance cost. */
-	PyObject *module = nullptr, *function = nullptr;
-
-	if (pythonEvent != nullptr) {
-
-		std::string mod_path = GetPythonEventName(); /* just for storage, use C style string access */
-		std::string function_string;
-
-		// Resolve module path, same in SCA_PythonController
-		const int pos = mod_path.rfind('.');
-		if (pos != std::string::npos) {
-			function_string = mod_path.substr(pos + 1);
-			mod_path = mod_path.substr(0, pos);
-		}
-
-		module = PyImport_ImportModule(mod_path.c_str());
-		if (!module) {
-			EXP_ReportPythonDiagnostic("animation.event.import", mod_path.c_str());
-			PyErr_Print();
-			PyErr_Clear();
-
-			return;
-		}
-		function = PyObject_GetAttrString(module, function_string.c_str());
-		if (!function) {
-			EXP_ReportPythonDiagnostic("animation.event.function", function_string.c_str());
-			PyErr_Print();
-			PyErr_Clear();
-			Py_DECREF(module);
-
-			return;
-		}
-
-		m_pyEventFunction = function;
-
-		Py_DECREF(module);
-		Py_DECREF(function);
+#ifdef WITH_PYTHON
+	/* Resolve the Python function once and keep a reference to it,
+	 * so it can be called many times with less performance cost. */
+	if (m_pythonEvent.empty()) {
+		return;
 	}
+
+	std::string mod_path = m_pythonEvent;
+	std::string function_string;
+
+	// Resolve module path, same in SCA_PythonController
+	const size_t pos = mod_path.rfind('.');
+	if (pos != std::string::npos) {
+		function_string = mod_path.substr(pos + 1);
+		mod_path = mod_path.substr(0, pos);
+	}
+
+	PyObject *module = PyImport_ImportModule(mod_path.c_str());
+	if (!module) {
+		EXP_ReportPythonDiagnostic("animation.event.import", mod_path.c_str());
+		PyErr_Print();
+		PyErr_Clear();
+		return;
+	}
+
+	PyObject *function = PyObject_GetAttrString(module, function_string.c_str());
+	Py_DECREF(module);
+	if (!function) {
+		EXP_ReportPythonDiagnostic("animation.event.function", function_string.c_str());
+		PyErr_Print();
+		PyErr_Clear();
+		return;
+	}
+
+	if (!PyCallable_Check(function)) {
+		EXP_ReportPythonDiagnostic("animation.event.callable", m_pythonEvent.c_str());
+		Py_DECREF(function);
+		return;
+	}
+
+	// Keep the new reference from PyObject_GetAttrString, released in the destructor.
+	m_pyEventFunction = function;
+#endif  // WITH_PYTHON
+}
+
+KX_AnimationEvent::KX_AnimationEvent(const KX_AnimationEvent& other)
+	:EXP_Value(other),
+	m_actionName(other.m_actionName),
+	m_triggers(other.m_triggers),
+	m_pythonEvent(other.m_pythonEvent),
+	m_lastTriggerIndex(-1),
+	m_triggerFireCounts(other.m_triggers.size(), 0),
+	m_fireCount(0)
+#ifdef WITH_PYTHON
+	,
+	m_pyEventFunction(other.m_pyEventFunction)
+#endif  // WITH_PYTHON
+{
+	// Don't share the Python proxy of the original event.
+	ProcessReplica();
+
+#ifdef WITH_PYTHON
+	Py_XINCREF(m_pyEventFunction);
+#endif  // WITH_PYTHON
 }
 
 KX_AnimationEvent::~KX_AnimationEvent()
 {
+#ifdef WITH_PYTHON
+	Py_XDECREF(m_pyEventFunction);
+#endif  // WITH_PYTHON
 }
 
 std::string KX_AnimationEvent::GetName()
@@ -89,60 +122,66 @@ std::string KX_AnimationEvent::GetName()
 
 unsigned int KX_AnimationEvent::GetTriggerCount() const
 {
-	return m_triggers->size();
+	return m_triggers.size();
 }
 
 int KX_AnimationEvent::GetTrigger(int index) const
 {
-	if (index >= 0 && index < GetTriggerCount()) {
-		return (*m_triggers)[index].first;
+	if (index >= 0 && index < (int)m_triggers.size()) {
+		return m_triggers[index].first;
 	}
 	return -1;
 }
 
 const char *KX_AnimationEvent::GetCustomArg(int index) const
 {
-	return (*m_triggers)[index].second;
+	if (index >= 0 && index < (int)m_triggers.size()) {
+		return m_triggers[index].second.c_str();
+	}
+	return "";
 }
 
-std::string KX_AnimationEvent::GetActionName()
+const std::string& KX_AnimationEvent::GetActionName() const
 {
 	return m_actionName;
 }
 
-std::vector<std::pair<int, const char*>> *KX_AnimationEvent::GetTriggers()
-{
-	return m_triggers;
-}
-
-std::vector<int> *KX_AnimationEvent::GetAlreadyTriggereds()
-{
-	return m_alreadyTriggered;
-}
-
-void KX_AnimationEvent::SetAlreadyTriggereds(std::vector<int> *alreadyTriggered)
-{
-	m_alreadyTriggered = alreadyTriggered;
-}
-
-const char *KX_AnimationEvent::GetPythonEventName()
+const std::string& KX_AnimationEvent::GetPythonEventName() const
 {
 	return m_pythonEvent;
 }
 
-const int KX_AnimationEvent::GetLastTriggerIndex()
+void KX_AnimationEvent::Fire(int triggerIndex)
+{
+	if (triggerIndex < 0 || triggerIndex >= (int)m_triggerFireCounts.size()) {
+		return;
+	}
+
+	m_lastTriggerIndex = triggerIndex;
+	++m_triggerFireCounts[triggerIndex];
+	++m_fireCount;
+}
+
+int KX_AnimationEvent::GetLastTriggerIndex() const
 {
 	return m_lastTriggerIndex;
 }
 
-void KX_AnimationEvent::SetLastTriggerIndex(const int triggerIndex)
+unsigned int KX_AnimationEvent::GetFireCount(int triggerIndex) const
 {
-	m_lastTriggerIndex = triggerIndex;
+	if (triggerIndex == -1) {
+		return m_fireCount;
+	}
+	if (triggerIndex >= 0 && triggerIndex < (int)m_triggerFireCounts.size()) {
+		return m_triggerFireCounts[triggerIndex];
+	}
+	return 0;
 }
 
 #ifdef WITH_PYTHON
 
-PyObject *KX_AnimationEvent::GetPyEventFunction() {
+PyObject *KX_AnimationEvent::GetPyEventFunction() const
+{
 	return m_pyEventFunction;
 }
 
@@ -181,13 +220,13 @@ PyObject *KX_AnimationEvent::pyattr_get_triggers(EXP_PyObjectPlus *self_v, const
 {
 	KX_AnimationEvent *self = static_cast<KX_AnimationEvent *>(self_v);
 
-	int size = self->GetTriggerCount();
-
+	const unsigned int size = self->GetTriggerCount();
 	PyObject *list = PyList_New(size);
-	
-	for (int i = 0; i < self->m_triggers->size(); i++)
-		PyList_SetItem(list, i, PyLong_FromLong(self->GetTrigger(i)));
-	
+
+	for (unsigned int i = 0; i < size; i++) {
+		PyList_SET_ITEM(list, i, PyLong_FromLong(self->GetTrigger(i)));
+	}
+
 	return list;
 }
 #endif //WITH_PYTHON
