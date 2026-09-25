@@ -130,7 +130,7 @@ ferramenta correspondente.
   automaticamente a partir desses dados — não é mais só um marcador de design. `KX_GameObject::getVehicle()`
   expõe o veículo já pronto para Python. O painel Vehicle também tem um botão para criar/anexar o
   `vehicle_player_component.py` de controle jogável direto no objeto.
-- "Export Game (1 Click)" (`Scene > Export (RangeArmor)`) empacota o jogo direto do Blender sem
+- "Export Game (1 Click)" (`Export Game > Export (RangeArmor)`) empacota o jogo direto do Blender sem
   precisar abrir o RangeArmor Panel manualmente antes: scaffold do projeto (`config.json`,
   `Launcher.exe`, ícones, runtime), geração do `.rasec` protegido e chamada do `build_release.py`
   são todos automáticos, com barra de progresso/cursor de espera durante o processo. O template de
@@ -184,7 +184,7 @@ ferramenta correspondente.
   movimento do mouse (stick de olhar move o cursor virtual do GHOST, igual a arrastar o dedo). Estende o input existente
   (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
   O overlay só aparece em tela de toque (`pointer: coarse`) ou com `?touch=1`; layout padrão stick + A/B.
-  O layout é configuração do export Web (Properties > Scene > Web (Range) > Controle na tela, gravado no `.range`);
+  O layout é configuração do export Web (Properties > Export Game > Web (Range) > Controle na tela, gravado no `.range`);
   o APK embute esse pacote e herda o layout, sem campo próprio no `android-export.json`.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de

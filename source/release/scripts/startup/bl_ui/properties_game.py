@@ -1187,11 +1187,15 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             col = box.column()
             col.prop(scene, "audio_distance_model", text="Distance Model")
             col = box.column(align=True)
-            col.prop(scene, "audio_doppler_speed", text="Speed")
-            col.prop(scene, "audio_doppler_factor", text="Doppler")
+            col.prop(scene, "audio_doppler_speed", text="Speed of Sound (m/s)")
+            col.prop(scene, "audio_doppler_factor", text="Doppler Factor")
+            # LA_Launcher applies these once, from the scene the game starts with.
+            box.label(text="Read from the start scene when the game begins", icon='INFO')
 
             box.label("3D Audio:")
-            box.prop(scene, "audio3d_update")
+            # KX_Scene updates the speakers once the frame counter reaches this value, so 0 is every frame.
+            box.prop(scene, "audio3d_update", text="Speaker Update Skip (frames)")
+            box.label(text="Speaker objects only; frames skipped between updates, 0 = every frame", icon='INFO')
 
 
 class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):

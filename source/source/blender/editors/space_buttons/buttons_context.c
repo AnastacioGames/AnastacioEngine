@@ -579,6 +579,7 @@ static int buttons_context_path(const bContext *C, ButsContextPath *path, int ma
 		case BCONTEXT_SCENE:
 		case BCONTEXT_RENDER:
 		case BCONTEXT_CUTSCENE:
+		case BCONTEXT_EXPORT:
 			found = buttons_context_path_scene(path);
 			break;
 		case BCONTEXT_RENDER_LAYER:

@@ -191,6 +191,7 @@ static const EnumPropertyItem buttons_context_items[] = {
 	{BCONTEXT_SCENE, "SCENE", ICON_SCENE_DATA, "Scene", "Scene"},
 	{BCONTEXT_WORLD, "WORLD", ICON_WORLD, "World", "World"},
 	{BCONTEXT_CUTSCENE, "CUTSCENE", ICON_SEQUENCE, "Cutscene", "Cutscene"},
+	{BCONTEXT_EXPORT, "EXPORT", ICON_EXPORT, "Export Game", "Export the game for Windows, Linux, Web and Android"},
 	{BCONTEXT_OBJECT, "OBJECT", ICON_OBJECT_DATA, "Object", "Object"},
 	{BCONTEXT_CONSTRAINT, "CONSTRAINT", ICON_CONSTRAINT, "Constraints", "Object constraints"},
 	{BCONTEXT_MODIFIER, "MODIFIER", ICON_MODIFIER, "Modifiers", "Object modifiers"},
@@ -1061,6 +1062,9 @@ static const EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSE
 	}
 	if (sbuts->pathflag & (1 << BCONTEXT_CUTSCENE)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_CUTSCENE);
+	}
+	if (sbuts->pathflag & (1 << BCONTEXT_EXPORT)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_EXPORT);
 	}
 
 	if (totitem) {

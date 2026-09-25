@@ -139,7 +139,7 @@ class RangeWebSettings(PropertyGroup):
         default=False,
     )
     runtime_id: bpy.props.StringProperty(
-        name="Runtime",
+        name="Web runtime",
         description="Web runtime used in the package; availability is checked on export",
         default=WEB_RUNTIME_ID,
     )
@@ -197,6 +197,7 @@ class RangeWebSettings(PropertyGroup):
 
 class SCENE_PT_range_web(SceneButtonsPanel, Panel):
     bl_label = "Web (Range)"
+    bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -204,46 +205,55 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         layout = self.layout
         web = context.scene.range_web
 
-        layout.prop(web, "check_compatibility")
-
-        col = layout.column()
-        col.prop(web, "runtime_id")
-        col.prop(web, "entry_scene")
-        col.prop(web, "output_directory")
-        col.prop(web, "auto_preflight")
-        col.prop(web, "open_after_export")
+        box = layout.box()
+        box.label(text="Package:", icon="PACKAGE")
+        box.prop(web, "runtime_id")
+        box.prop(web, "entry_scene")
+        box.prop(web, "output_directory")
+        box.label(text="Empty entry scene uses the current scene", icon='INFO')
 
         box = layout.box()
+        box.label(text="Touch Controls:", icon="HAND")
         box.prop(web, "touch_layout")
         row = box.row()
         row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD', 'FPS'}
         row.prop(web, "touch_stick", expand=True)
         box.label(text="Shown only on touch screens; test on a PC with ?touch=1 in the address.", icon='INFO')
 
-        layout.separator()
-        layout.operator("scene.range_web_validate", icon='FILE_REFRESH')
-        self._draw_report(layout)
+        box = layout.box()
+        box.label(text="Validation:", icon="VIEWZOOM")
+        box.prop(web, "check_compatibility")
+        box.operator("scene.range_web_validate", icon='FILE_REFRESH')
+        self._draw_report(box)
 
-        layout.separator()
-        layout.operator("scene.range_web_export", icon='EXPORT')
-        layout.label(text="Desktop preview (P key) is not a Web test.")
+        box = layout.box()
+        box.label(text="Export:", icon="EXPORT")
+        row = box.row()
+        row.prop(web, "auto_preflight")
+        row.prop(web, "open_after_export")
+        box.operator("scene.range_web_export", icon='EXPORT')
+        box.label(text="Validates again before exporting; errors block the export", icon='INFO')
+
+        box = layout.box()
+        box.label(text="Browser Test:", icon="WORLD")
         from range_web import local_server
         # Botões só liberam com o ambiente pronto; o motivo aparece em vez de um clique mudo.
         why = _serve_blocked_reason(context)
-        row = layout.row()
+        row = box.row()
         row.enabled = why is None
         row.operator("scene.range_web_serve", icon='URL')
         why_pre = _preflight_blocked_reason(context)
-        row = layout.row()
+        row = box.row()
         row.enabled = why_pre is None
         row.operator("scene.range_web_preflight", icon='PLAY')
         for reason in {why, why_pre} - {None}:
-            layout.label(text=reason, icon='INFO')
+            box.label(text=reason, icon='INFO')
         served = local_server.url()
         if served:
-            layout.label(text=_("Serving at %s") % served, icon='WORLD')
-            layout.operator("scene.range_web_stop_server", icon='PAUSE')
-        layout.operator("scene.range_web_import_preflight", icon='FILE_FOLDER')
+            box.label(text=_("Serving at %s") % served, icon='WORLD')
+            box.operator("scene.range_web_stop_server", icon='PAUSE')
+        box.operator("scene.range_web_import_preflight", icon='FILE_FOLDER')
+        box.label(text="Desktop preview (P key) is not a Web test.", icon='INFO')
 
     @staticmethod
     def _draw_report(layout):

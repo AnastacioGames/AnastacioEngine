@@ -35,7 +35,7 @@ class PROPERTIES_HT_header(Header):
         top_row = layout.row(align=True)
         top_row.scale_x = 1.3
         top_row.scale_y = 1.3
-        top_context = ('RENDER', 'RENDER_LAYER', 'SCENE', 'WORLD', 'CUTSCENE')
+        top_context = ('RENDER', 'RENDER_LAYER', 'SCENE', 'WORLD', 'CUTSCENE', 'EXPORT')
         valid_flag = view.context_valid_flag
         for item in view.bl_rna.properties["context"].enum_items:
             if item.identifier in top_context and (valid_flag & (1 << item.value)):
@@ -57,7 +57,7 @@ class PROPERTIES_PT_navigation_bar(Panel):
 
         col = layout.column(align=True)
 
-        top_context = ('RENDER', 'RENDER_LAYER', 'SCENE', 'WORLD', 'CUTSCENE')
+        top_context = ('RENDER', 'RENDER_LAYER', 'SCENE', 'WORLD', 'CUTSCENE', 'EXPORT')
         valid_flag = view.context_valid_flag
 
         for item in view.bl_rna.properties["context"].enum_items:

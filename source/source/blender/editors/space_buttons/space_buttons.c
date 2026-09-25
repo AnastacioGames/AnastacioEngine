@@ -161,6 +161,9 @@ static void buttons_main_region_draw(const bContext *C, ARegion *ar)
 	case BCONTEXT_CUTSCENE:
 		contexts[0] = "cutscene";
 		break;
+	case BCONTEXT_EXPORT:
+		contexts[0] = "export";
+		break;
 	case BCONTEXT_OBJECT:
 		contexts[0] = "object";
 		break;

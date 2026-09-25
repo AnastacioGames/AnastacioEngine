@@ -39,7 +39,7 @@
    doversion (mesmo padrão já usado pelo Input System em `bl_ui/__init__.py`). Campos:
    `export_windows64`, `export_linux64`, `product_name`, `product_version`, `company_name`,
    `icon_path`. **Implementado.**
-2. **Painel** `SCENE_PT_rangearmor_export` em `Properties > Scene`, com os campos acima e um
+2. **Painel** `SCENE_PT_rangearmor_export` em `Properties > Export Game` (antes `Properties > Scene`), com os campos acima e um
    botão que chama `wm.export_with_rangearmor`. **Implementado.**
 3. **`WM_OT_export_with_rangearmor`** agora, antes de abrir o executável, lê
    `launcher/config.json` do projeto atual (deduzido a partir de `bpy.data.filepath`,
@@ -69,7 +69,7 @@
 
 ## Atualização 2026-09-12: botão "Export Game (1 Click)"
 
-Adicionado `wm.one_click_export_rangearmor` no mesmo painel `Scene > Export (RangeArmor)`, que
+Adicionado `wm.one_click_export_rangearmor` no mesmo painel `Export Game > Export (RangeArmor)`, que
 chama `release/scripts/build_release.py --target All --compress` diretamente (mesmo script que o
 botão "Export All" do RangeArmor Panel usa via `OS.execute`), sem precisar abrir o executável do
 painel nem copiar arquivos manualmente depois — o resultado já sai compactado em

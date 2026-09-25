@@ -185,6 +185,7 @@ typedef enum eSpaceButtons_Context {
 	BCONTEXT_VEHICLE = 15,
 	/* Keep appended so existing serialized context values remain stable. */
 	BCONTEXT_CUTSCENE = 16,
+	BCONTEXT_EXPORT = 17,
 
 	/* always as last... */
 	BCONTEXT_TOT

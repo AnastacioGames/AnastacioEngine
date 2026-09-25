@@ -34,7 +34,7 @@ python tools/web/package-web.py --game caminho/jogo.range --name meu-jogo --vers
 
 ## Testar localmente
 
-**No editor (recomendado):** em Properties > Scene > Web (Range), **Abrir no navegador** sobe um servidor local numa
+**No editor (recomendado):** em Properties > Export Game > Web (Range), **Abrir no navegador** sobe um servidor local numa
 porta livre e abre o jogo no navegador padrão (clique em **Jogar**). O botão só fica ativo com o pacote exportado e
 atualizado em relação ao `.range` salvo; caso contrário o painel mostra o motivo. **Parar servidor** encerra
 (o servidor também morre com o editor). A opção **Abrir após exportar** faz isso ao fim do Exportar Web.
@@ -56,7 +56,7 @@ espaço e Enter) apertam teclas, para jogos que leem teclado — somadas às do 
 `fps` é para primeira pessoa com teclado e mouse: stick esquerdo = W/A/S/D, stick direito move o mouse (olhar em volta,
 só com o cursor escondido, como no mouse-look), botões = espaço e botão esquerdo do mouse.
 Com a página escondida (app em segundo plano, outra aba) o áudio é suspenso e volta ao reabrir.
-O layout do pacote é escolhido no editor em Properties > Scene > Web (Range) > **Controle na tela** (o export Android
+O layout do pacote é escolhido no editor em Properties > Export Game > Web (Range) > **Controle na tela** (o export Android
 usa o mesmo, porque embute este pacote) ou, na linha de comando, por `package-web.py --touch-layout` (`none` desliga)
 e `--touch-stick`; fica registrado em `manifest.json` (`touch_controls`). O Validar Web avisa (WEB-INPUT-001) sensor
 Keyboard/Joystick ou ação do Input System que o layout escolhido não aperta; teclado lido direto em Python não é

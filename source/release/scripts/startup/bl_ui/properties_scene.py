@@ -239,7 +239,7 @@ class SCENE_PT_unit(SceneButtonsPanel, Panel):
         box = panel.box()
         box.label(text="Units:", icon="UI")
         split = box.split(factor=0.35)
-        split.label("Length:")
+        split.label("Unit System:")
         split.prop(unit, "system", text="")
         split = box.split(factor=0.35)
         split.label("Angle:")
@@ -253,6 +253,13 @@ class SCENE_PT_unit(SceneButtonsPanel, Panel):
         split = col.split(factor=0.35)
         split.row()
         split.prop(unit, "use_separate")
+
+        # Units only change how the editor shows values; the game engine never reads them.
+        if context.scene.render.engine == 'BLENDER_GAME':
+            if unit.system != 'NONE' and unit.scale_length != 1.0:
+                box.label(text="The game ignores Unit Scale, physics always uses 1 unit = 1 m", icon='ERROR')
+            else:
+                box.label(text="Editor display only, the game always uses 1 unit = 1 m", icon='INFO')
 
 
 class SceneKeyingSetsPanel:
@@ -637,6 +644,7 @@ class RangeArmorExportSettings(bpy.types.PropertyGroup):
 
 class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
     bl_label = "Export (RangeArmor)"
+    bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     def draw(self, context):
@@ -649,16 +657,21 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         row = box.row(align=True)
         row.prop(export, "export_windows64", toggle=True)
         row.prop(export, "export_linux64", toggle=True)
+        box.label(text="Desktop builds; Web and Android have their own panels below", icon='INFO')
 
         box = layout.box()
-        box.label(text="Package Info:", icon="INFO")
+        box.label(text="Package Info:", icon="FILE_TEXT")
         box.prop(export, "product_name")
         box.prop(export, "product_version")
         box.prop(export, "company_name")
         box.prop(export, "icon_path")
+        box.label(text="Empty fields keep the RangeArmor Panel defaults", icon='INFO')
 
-        layout.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
-        layout.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
+        box = layout.box()
+        box.label(text="Export:", icon="RENDER_ANIMATION")
+        box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
+        box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
+        box.label(text="The file must be saved in the project's data/ folder", icon='INFO')
 
 
 classes = (

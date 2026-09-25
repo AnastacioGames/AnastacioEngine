@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 32 | 52 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 39 | 53 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,39 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-25 - Export Game: painéis RangeArmor, Web e Android divididos em caixas
+
+- `SCENE_PT_rangearmor_export`: caixas Platforms / Package Info / Export, com dicas (Web e Android têm painéis
+  próprios; campos vazios mantêm o padrão do RangeArmor Panel; o `.blend` precisa estar em `<projeto>/data/`).
+- `properties_web.py`: caixas Package / Touch Controls / Validation / Export / Browser Test. O relatório da validação
+  fica dentro da caixa Validation; "Pré-voo" e "Abrir após exportar" lado a lado.
+- `properties_android.py`: caixas App / Build / Release Signing (só com tipo Release) / Tools / Build and Install.
+  Versão e código da versão em linhas separadas (o label "Versão do app" ficava cortado).
+- Traduções que as capturas revelaram erradas: o tipo de build aparecia como "Liberar" (`.mo` do Blender traduzindo
+  "Release") e o runtime Web como "Em execução" (chave genérica "Runtime"). Os itens do enum viraram
+  "Debug (testing)" / "Release (players)" e a propriedade `runtime_id` virou "Web runtime", sem mudar identificadores.
+  "Product Name" e "Company Name" ganharam tradução. Tudo em `EXPORT_PANELS` de `translations_labels.py`.
+- Teste: capturas dos três painéis em pt_BR, es e ru_RU sem traceback; `engine_i18n.py` 36 ok.
+
+## 2026-09-25 - Aba Export Game no editor de Propriedades
+
+- Nova aba `BCONTEXT_EXPORT = 17` (ícone EXPORT) logo depois de Cutscene, no grupo de cima do cabeçalho
+  (`DNA_space_types.h`, `rna_space.c`, `buttons_context.c` usa o caminho de cena, `space_buttons.c` desenha o
+  contexto `"export"`, `space_properties.py` inclui `'EXPORT'` em `top_context`).
+- Os painéis Export (RangeArmor), Web (Range) e Android (Range) saíram da aba Scene e passaram a usar
+  `bl_context = "export"`. Traduções da aba em `translations_ui.py`.
+- Docs com o caminho antigo (`Properties > Scene > Web (Range)`) atualizados.
+
+## 2026-09-25 - Game Settings > Audio e Scene > Units: labels e dicas
+
+- Audio: "Speed of Sound (m/s)" e "Doppler Factor" no lugar de "Speed"/"Doppler", com dica de que o `LA_Launcher`
+  lê esses valores da cena inicial. `audio3d_update` virou "Speaker Update Skip (frames)", com dica de que vale só
+  para objetos Speaker e 0 = todo quadro.
+- Units: o label do sistema de unidades dizia "Length:" e virou "Unit System:". No Game Engine aparece a dica de que
+  as unidades só mudam a exibição no editor (o jogo sempre usa 1 unidade = 1 m) e um aviso quando há Unit Scale
+  diferente de 1.
+- Traduções pt_BR/es/ru em `translations_labels.py`.
 
 ## 2026-09-25 - Build: Ninja não rastreia headers (MSVC em português) e crash ao dar play
 

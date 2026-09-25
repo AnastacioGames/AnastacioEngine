@@ -12,7 +12,7 @@ configure, `RangeRuntime` Web relinkado (`build-web-release`) e caches Web com `
 ## 1. Exportar e abrir
 
 1. No editor, abra um projeto de teste (o mesmo dos pacotes 8201–8211, se possível).
-2. Properties > Scene > **Web (Range)**: **Validar Web**, depois **Exportar Web**, depois **Abrir no navegador**.
+2. Properties > Export Game > **Web (Range)**: **Validar Web**, depois **Exportar Web**, depois **Abrir no navegador**.
 3. Esperado: o pré-voo não aponta erro novo e o jogo abre no navegador.
 
 ## 2. Regressão geral no navegador

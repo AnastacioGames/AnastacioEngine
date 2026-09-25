@@ -14,7 +14,7 @@ e `ruim.blend` (módulo inexistente).
 
 ## A. Painel no editor (RangeEngine.exe com janela)
 
-1. Abra `build/web-manual/bom.blend`. Propriedades > Cena > painel **Web (Range)**.
+1. Abra `build/web-manual/bom.blend`. Propriedades > aba Export Game > painel **Web (Range)**.
 2. Clique **Validar Web**. Esperado: resumo sem erros ("Nenhuma incompatibilidade").
 3. Clique **Exportar Web**. Esperado: mensagem "Pacote Web gerado em ...", pasta `build/web-manual/web/`
    com `game/meu_mod.py` e `game/pkg/util.py`.

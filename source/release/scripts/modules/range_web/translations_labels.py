@@ -1298,6 +1298,26 @@ RENDER_PANELS = (
      "Удерживайте все клавиши во время игры, чтобы открыть её в системной консоли"),
     ("Keys:", "Teclas:", "Teclas:", "Клавиши:"),
     ("Navigation Mesh", "Malha de navegação", "Malla de navegación", "Навигационная сетка"),
+    # Audio (Game Settings) e Units (Scene)
+    ("Speed of Sound (m/s)", "Velocidade do som (m/s)", "Velocidad del sonido (m/s)", "Скорость звука (м/с)"),
+    ("Doppler Factor", "Fator Doppler", "Factor Doppler", "Коэффициент Доплера"),
+    ("Read from the start scene when the game begins", "Lido da cena inicial quando o jogo começa",
+     "Se lee de la escena inicial cuando empieza el juego", "Берётся из стартовой сцены при запуске игры"),
+    ("Speaker Update Skip (frames)", "Quadros pulados entre atualizações", "Fotogramas omitidos entre actualizaciones",
+     "Пропуск кадров между обновлениями"),
+    ("Speaker objects only; frames skipped between updates, 0 = every frame",
+     "Só objetos Speaker; quadros pulados entre atualizações, 0 = todo quadro",
+     "Solo objetos Speaker; fotogramas omitidos entre actualizaciones, 0 = cada fotograma",
+     "Только объекты Speaker; пропуск кадров между обновлениями, 0 = каждый кадр"),
+    ("Unit System:", "Sistema de unidades:", "Sistema de unidades:", "Система единиц:"),
+    ("The game ignores Unit Scale, physics always uses 1 unit = 1 m",
+     "O jogo ignora a escala das unidades, a física sempre usa 1 unidade = 1 m",
+     "El juego ignora la escala de unidades, la física siempre usa 1 unidad = 1 m",
+     "Игра игнорирует масштаб единиц, физика всегда использует 1 единица = 1 м"),
+    ("Editor display only, the game always uses 1 unit = 1 m",
+     "Só muda a exibição no editor, o jogo sempre usa 1 unidade = 1 m",
+     "Solo cambia la visualización en el editor, el juego siempre usa 1 unidad = 1 m",
+     "Только отображение в редакторе, игра всегда использует 1 единица = 1 м"),
 )
 
 # Mensagens e dicas dos operadores da Range (flowmenu, veiculo, particulas) que estavam escritas em portugues no
@@ -1476,6 +1496,53 @@ MESSAGES = (
      "Добавить недостающие свойства"),
 )
 
-PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}
-ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}
-RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS}
+# Caixas e dicas dos paineis da aba Export Game (RangeArmor, Web, Android).
+EXPORT_PANELS = (
+    ("Desktop builds; Web and Android have their own panels below",
+     "Builds para desktop; Web e Android têm painéis próprios abaixo",
+     "Builds de escritorio; Web y Android tienen sus propios paneles abajo",
+     "Сборки для ПК; у Web и Android свои панели ниже"),
+    ("Empty fields keep the RangeArmor Panel defaults",
+     "Campos vazios mantêm o padrão do RangeArmor Panel",
+     "Los campos vacíos mantienen los valores de RangeArmor Panel",
+     "Пустые поля сохраняют значения RangeArmor Panel"),
+    ("Export:", "Exportar:", "Exportar:", "Экспорт:"),
+    ("The file must be saved in the project's data/ folder",
+     "O arquivo precisa estar salvo na pasta data/ do projeto",
+     "El archivo debe estar guardado en la carpeta data/ del proyecto",
+     "Файл должен быть сохранён в папке data/ проекта"),
+    ("Package:", "Pacote:", "Paquete:", "Пакет:"),
+    ("Empty entry scene uses the current scene",
+     "Cena inicial vazia usa a cena atual",
+     "Una escena inicial vacía usa la escena actual",
+     "Пустая начальная сцена означает текущую сцену"),
+    ("Touch Controls:", "Controles de toque:", "Controles táctiles:", "Сенсорное управление:"),
+    ("Validation:", "Validação:", "Validación:", "Проверка:"),
+    ("Validates again before exporting; errors block the export",
+     "Valida de novo antes de exportar; erros bloqueiam a exportação",
+     "Valida de nuevo antes de exportar; los errores bloquean la exportación",
+     "Перед экспортом проверка повторяется; ошибки блокируют экспорт"),
+    ("Browser Test:", "Teste no navegador:", "Prueba en el navegador:", "Тест в браузере:"),
+    ("App:", "Aplicativo:", "Aplicación:", "Приложение:"),
+    ("Do not change the App ID after publishing",
+     "Não mude o ID do app depois de publicar",
+     "No cambie el ID de la app después de publicar",
+     "Не меняйте ID приложения после публикации"),
+    ("Build:", "Build:", "Build:", "Сборка:"),
+    ("Debug (testing)", "Debug (teste)", "Debug (pruebas)", "Debug (тест)"),
+    ("Release (players)", "Release (jogadores)", "Release (jugadores)", "Release (для игроков)"),
+    ("Web runtime", "Runtime Web", "Runtime Web", "Среда Web"),
+    ("Product Name", "Nome do produto", "Nombre del producto", "Название продукта"),
+    ("Company Name", "Nome da empresa", "Nombre de la empresa", "Название компании"),
+    ("Release Signing:", "Assinatura do Release:", "Firma del Release:", "Подпись Release:"),
+    ("Tools:", "Ferramentas:", "Herramientas:", "Инструменты:"),
+    ("Only if not found automatically (Android Studio)",
+     "Só se não forem achadas sozinhas (Android Studio)",
+     "Solo si no se encuentran solas (Android Studio)",
+     "Только если не найдены автоматически (Android Studio)"),
+    ("Build and Install:", "Gerar e instalar:", "Generar e instalar:", "Сборка и установка:"),
+)
+
+PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}
+ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}
+RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS}

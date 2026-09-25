@@ -183,8 +183,8 @@ class RangeAndroidSettings(PropertyGroup):
     build_type: bpy.props.EnumProperty(
         name="Build type",
         items=(
-            ('DEBUG', "Debug", "For testing on your phone; allows remote inspection (chrome://inspect)"),
-            ('RELEASE', "Release", "Signed with your key, for distribution to players"),
+            ('DEBUG', "Debug (testing)", "For testing on your phone; allows remote inspection (chrome://inspect)"),
+            ('RELEASE', "Release (players)", "Signed with your key, for distribution to players"),
         ),
         default='DEBUG',
     )
@@ -228,6 +228,7 @@ class RangeAndroidSettings(PropertyGroup):
 
 class SCENE_PT_range_android(SceneButtonsPanel, Panel):
     bl_label = "Android (Range)"
+    bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -235,17 +236,26 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
         layout = self.layout
         settings = context.scene.range_android
 
-        col = layout.column()
-        col.prop(settings, "application_id")
-        col.prop(settings, "app_name")
-        row = col.row(align=True)
-        row.prop(settings, "version_name")
-        row.prop(settings, "version_code")
-        col.prop(settings, "icon")
-        col.prop(settings, "orientation")
-        col.prop(settings, "build_type")
+        box = layout.box()
+        box.label(text="App:", icon="FILE_IMAGE")
+        box.prop(settings, "application_id")
+        box.prop(settings, "app_name")
+        box.prop(settings, "version_name")
+        box.prop(settings, "version_code")
+        box.prop(settings, "icon")
+        box.prop(settings, "orientation")
+        box.label(text="Do not change the App ID after publishing", icon='INFO')
+
+        box = layout.box()
+        box.label(text="Build:", icon="MOD_BUILD")
+        box.prop(settings, "build_type")
+        box.prop(settings, "output_directory")
+        # Mesma propriedade do painel Web: o APK embute o pacote Web com o controle na tela dele.
+        box.prop(context.scene.range_web, "touch_layout")
+
         if settings.build_type == 'RELEASE':
-            box = col.box()
+            box = layout.box()
+            box.label(text="Release Signing:", icon="KEY_HLT")
             box.prop(settings, "keystore")
             box.prop(settings, "key_alias")
             box.prop(context.window_manager, "range_android_password")
@@ -253,37 +263,36 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
             box.operator("scene.range_android_create_key", icon='KEY_HLT')
             box.label(text="Keep the key and the password with a backup: updates need the same key.",
                       icon='INFO')
-        col.prop(settings, "output_directory")
-        # Mesma propriedade do painel Web: o APK embute o pacote Web com o controle na tela dele.
-        col.prop(context.scene.range_web, "touch_layout")
 
         box = layout.box()
-        box.label(text="Tools (only if not found automatically):")
+        box.label(text="Tools:", icon="SETTINGS")
         box.prop(settings, "jdk_directory")
         box.prop(settings, "sdk_directory")
+        box.label(text="Only if not found automatically (Android Studio)", icon='INFO')
 
-        layout.separator()
-        layout.label(text="Uses the package from the Web panel; exports it again if it is outdated.")
+        box = layout.box()
+        box.label(text="Build and Install:", icon="EXPORT")
         busy = _job is not None
-        row = layout.row()
+        row = box.row()
         row.enabled = not busy
         row.operator("scene.range_android_build", icon='EXPORT')
         # Instalar so libera com um APK gerado no destino; o motivo aparece em vez de um clique mudo.
         last = _last_build(context)
-        row = layout.row()
+        row = box.row()
         row.enabled = not busy and last is not None
         row.operator("scene.range_android_install", icon='PLAY')
         if busy:
-            layout.label(text=_(_job.label) + "...", icon='TIME')
+            box.label(text=_(_job.label) + "...", icon='TIME')
             if _job.lines:
-                layout.label(text=_job.lines[-1])
+                box.label(text=_job.lines[-1])
         elif _last_message is not None:
             icon, text = _last_message
             for line in _wrap(text):
-                layout.label(text=line, icon=icon)
+                box.label(text=line, icon=icon)
                 icon = 'NONE'
         elif last is None:
-            layout.label(text="No APK in the destination yet.", icon='INFO')
+            box.label(text="No APK in the destination yet.", icon='INFO')
+        box.label(text="Uses the package from the Web panel; exports it again if it is outdated.", icon='INFO')
 
 
 class SCENE_OT_range_android_build(_JobOperator, Operator):
