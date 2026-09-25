@@ -2,6 +2,7 @@
 
 O projeto usa CMake + Ninja e gera a instalação atual em `build/bin/`. As regras anti-loop e de preservação
 do workspace estão em [`../AGENTS.md`](../AGENTS.md) e prevalecem sobre notas históricas do changelog.
+O que cada diretório `build*` é (e qual Android é o oficial) está em [`build-dirs.md`](build-dirs.md).
 
 ## Dependência externa: pasta `lib/`
 
@@ -71,6 +72,8 @@ pode manter `dna.c` ou `dna_type_offsets.h` obsoletos e causar corrupção de he
 Se uma mudança em outro header provocar crash desproporcional ao diff após build incremental, faça um clean
 rebuild antes de investigar o crash como defeito funcional. Não repita a mesma tentativa de build mais de
 duas vezes sem mudar a causa identificada.
+
+No `build/` atual o Ninja não rastreia nenhum header: o `msvc_deps_prefix` em `build/CMakeFiles/rules.ninja` (`Observação: incluindo arquivo:`) não bate com a codificação da saída do MSVC em português. Depois de editar um `.h`, apague os `.obj` de quem o inclui (ou faça clean rebuild). Correção definitiva pendente: reconfigurar com `VSLANG=1033`. Detalhes em [`../AGENTS.md`](../AGENTS.md).
 
 ## Validação mínima
 

@@ -176,6 +176,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   correção isolada e teste.
   Reauditoria concluída em 2026-09-24: os 26 itens têm correção ou descarte registrado; a única validação
   ainda manual é GPU-001, que requer uma sessão interativa já aberta para testar `gl_load()`.
+- **Build sem rastreio de headers**: o Ninja do `build/` não registra dependências de `.h` (prefixo do MSVC em
+  português, ver `AGENTS.md`). Reconfigurar com `VSLANG=1033` e fazer um clean rebuild completo.
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 
@@ -230,6 +232,8 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
 - **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
   o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
+- **Game Settings, FXAA e LOD (2026-09-25)**: conferir no jogo real os painéis novos das abas Render e Scene,
+  os ajustes de FXAA e o LOD com Billboard/Invisible.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

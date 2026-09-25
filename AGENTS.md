@@ -1,5 +1,7 @@
 # Instruções para agentes de código (Codex e outros) neste repo
 
+> **Nomes dos builds:** veja [docs/build-dirs.md](docs/build-dirs.md). "Android" = APK WebView sobre `build-web-release`. O `build-android/` é o experimento NDK **congelado**: falhas nele não indicam Android quebrado.
+
 ## Regra anti-loop: não repita a mesma tentativa que falhou
 
 Antes de rodar QUALQUER comando de build/compilação, confira mentalmente este checklist — a maioria dos
@@ -51,6 +53,7 @@ O build incremental do Ninja aqui às vezes não rastreia corretamente dependên
   (`0xc0000374`) ao carregar arquivo, ou timing/comportamento não-determinístico, que parece não ter relação
   com a mudança.
 - Mesmo headers "normais" (não-DNA) já causaram `EXCEPTION_ACCESS_VIOLATION` no load da cena após rebuild incremental.
+- **Causa identificada (2026-09-25):** em `build/CMakeFiles/rules.ninja` o `msvc_deps_prefix` é `Observação: incluindo arquivo:` (MSVC em português). A frase sai do compilador em outra codificação e não bate com o prefixo, então o Ninja **não registra nenhuma dependência de header**: mudar um `.h` só recompila os `.cpp` que você também editou. Ex.: um membro novo em `KX_GameObject.h` deixou `KX_ShadowRenderer.obj` com o layout antigo e o play fechava a engine. Contorno: apagar os `.obj` da área afetada (ex.: `build/source/gameengine/**/*.obj`) ou `ninja -t clean`. Correção definitiva (pendente): reconfigurar o `build/` com `VSLANG=1033` (MSVC em inglês).
 
 **Regra**: depois de editar QUALQUER header (`.h`), se aparecer um crash estranho/desproporcional ao diff após
 build incremental, não gaste tempo debugando como se fosse bug de código — vá direto para:

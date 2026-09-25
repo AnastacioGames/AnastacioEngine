@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-09-24 a 2026-09-23 | 27 | 42 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-09-25 a 2026-09-23 | 32 | 52 KB |
 | [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
 | [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
 | [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
@@ -23,6 +23,70 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
 | [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
 | [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
+
+## 2026-09-25 - Build: Ninja não rastreia headers (MSVC em português) e crash ao dar play
+
+- Sintoma: depois de adicionar membros em `KX_GameObject.h` (billboard do LOD), dar play no editor e no RangeRuntime
+  fechava a engine (`EXCEPTION_ACCESS_VIOLATION` em `KX_ShadowRenderer::Render`).
+- Causa: `msvc_deps_prefix` em `build/CMakeFiles/rules.ninja` é `Observação: incluindo arquivo:`; a saída do MSVC chega
+  em outra codificação, o prefixo não bate e o Ninja não registra nenhuma dependência de header. Só os `.cpp` editados
+  foram recompilados; `KX_ShadowRenderer.obj` ficou com o layout antigo do `KX_GameObject`.
+- Contorno aplicado: apagados os 307 `.obj` de `build/source/gameengine/**` e recompilado (329/329). Engine abre sem
+  crash, cena com Sun e sombra roda 120 quadros no RangeRuntime, teste de LOD passa.
+- Regra registrada em `AGENTS.md` e `docs/build-notes.md`. Correção definitiva pendente: reconfigurar com `VSLANG=1033`.
+  Mudanças antigas em headers da parte C podem ter deixado `.obj` desatualizados; um clean rebuild resolve.
+
+## 2026-09-25 - LOD: billboard restaura a rotação e nível Invisible sem Occlusion Culling
+
+- `KX_GameObject::UpdateLod`: o nível com Billboard girava o objeto para a câmera e nunca devolvia a rotação ao voltar
+  para um nível sem billboard. Novos membros `m_lodBillboardActive`/`m_lodBillboardOrientation` guardam a orientação
+  ao entrar no billboard e a restauram ao sair.
+- `KX_Scene::CalculateVisibleMeshes`: o nível "Invisible Mesh" só escondia o objeto com Occlusion Culling (DBVT)
+  ligado. Nova `CullInvisibleLods` aplicada nos caminhos sem frustum culling e sem DBVT (não em shadow buffer).
+- `OBJECT_OT_bake_lod_impostor`: grade do atlas agora usa colunas que dividem o número de ângulos (8 ângulos = 4x2,
+  antes 3x3 com célula vazia).
+- Teste no RangeRuntime (Occlusion Culling desligado): near/billboard/near/invisible/back com nível, `culled` e rotação
+  corretos em cada etapa.
+
+## 2026-09-25 - Game Settings (aba Scene): labels, Navigation Mesh separada e Python Console
+
+- `properties_game.py`, `SCENE_PT_game_physics`: "Physics Engine" e "Solver" no lugar de "Engine"; boxes
+  "Steps & Timing" (Game Rate / Per Frame, sempre visível), "Deactivation (Sleeping Objects)" e "Culling"
+  (Render / Object Activity). Corrigido o ramo com física "None", que usava a propriedade inexistente `logic_step_max`.
+- Obstacle Simulation com dica "Used by the Steering actuator to avoid obstacles" e labels "Simulation",
+  "Level Height", "Show Debug Visualization" (é o RVO do atuador Steering, independente da navmesh).
+- Navigation Mesh virou o painel próprio `SCENE_PT_game_navmesh` (fechado por padrão); removido
+  `Scene.show_expanded_game_navmesh`.
+- "Level of Detail - LOD" virou "Level of Detail", com dica de que os níveis ficam na aba Object.
+- Python Console: checkbox "Enable Python Console" movido para dentro do box, junto das teclas e de uma dica
+  (segurar as teclas durante o jogo abre o console do sistema; o jogo pausa enquanto ele está aberto).
+- Traduções pt_BR/es/ru dos novos textos em `translations_labels.py` (`RENDER_PANELS`).
+
+## 2026-09-25 - Aba Render: painéis reorganizados, FXAA configurável e addons padrão
+
+- Seletor de engine (`RENDER_PT_render`) movido para `properties_render_engine.py`, registrado antes de
+  `properties_game` para ficar no topo da aba Render.
+- Player: Embedded e Standalone lado a lado num painel "Player". System e Game Exit Key lado a lado; cursor
+  customizado recolhível. Dynamic Resolution foi para dentro do painel Display, ao lado das opções de tela.
+- Attachments: slots vazios aparecem como "Empty", mostra o índice `bgl_DataTextures[n]` real, avisa quando há slots
+  vazios antes (os índices dos materiais deixam de bater) e quando o SSR usa o Slot 0. `active_attachment_index`
+  usa `GAME_ATTACHMENT_COUNT`.
+- Animations: frame rate da animação e taxa de lógica lado a lado, com dica do "Restrict Animation Updates".
+- Bake: dicas de que precisa de UV e imagem, e de que usa o shading do Blender Render. Easter egg "Make GTA 6" mantido.
+- FXAA: `SCENEFXSettings` ganhou `fxaa_edge_threshold`, `fxaa_edge_threshold_min`, `fxaa_subpix` e
+  `fxaa_search_steps` (padrões = valores antigos fixos no shader; versioning em `versioning_range.c`). Os shaders do
+  viewport (`gpu_shader_fx_fxaa_frag.glsl`) e do jogo (`RAS_Fxaa2DFilter.glsl`, uniform `ge_FxaaParams`) leem esses
+  valores; filtros criados por Python/atuador usam os padrões. Painel FXAA expansível em Post-Processing.
+- Userpref padrão liga os addons Icon Viewer e Game Engine Scene Statistics (vale para userpref novo; um
+  `userpref.blend` salvo mantém a escolha do usuário).
+
+## 2026-09-25 - Build: correções para Android NDK e Cycles no player
+
+- `source/CMakeLists.txt`: sem GLU no Android mesmo com perfil compat. `mallocn_intern.h`: sem `malloc_stats()` no
+  bionic. `util_profiling.cpp`: `#include <chrono>`. `blenderplayer/CMakeLists.txt`: liga `bf_intern_cycles` quando
+  `WITH_CYCLES` (o `bf_python` registra o módulo `_cycles`).
+- `docs/build-dirs.md`: nomes oficiais dos diretórios `build*` (o Android oficial é o APK WebView; `build-android/`
+  é o experimento NDK congelado). Referenciado em `AGENTS.md`, `build-notes.md` e `mobile-export-plan.md`.
 
 ## 2026-09-24 - Debug: crash ao passar o mouse na tabela de Profile
 
