@@ -266,10 +266,15 @@ padrao ja usado para outros datafiles opcionais nesse mesmo arquivo.
 
 - **Ligados**: `WITH_COMPOSITOR`, `WITH_OPENIMAGEIO` (import/export de imagem parada em nodes de
   material/textura e no editor de imagem).
-- **Desligados**: `WITH_CYCLES`, `WITH_ALEMBIC`, `WITH_OPENVDB` (nao usados pelo RangeEngine, mesmo no
+- **Desligados**: `WITH_ALEMBIC`, `WITH_OPENVDB` (nao usados pelo RangeEngine, mesmo no
   Windows), `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` (API antiga incompativel com as versoes do Ubuntu
   24.04 — ver itens 2 e 3 acima; portar fica para uma rodada futura dedicada, nao bloqueia o editor abrir
   e rodar).
+- **Cycles**: ligado desde 2026-09-26, so CPU (ver "Editor com Cycles" abaixo).
+- **Player**: `WITH_PLAYER=ON` desde 2026-09-26; o `RangeRuntime` sai ao lado do `RangeEngine`, que o botao
+  Standalone procura na mesma pasta. No link do player, todas as libs registradas vao dentro do
+  `--start-group` (`source/blenderplayer/CMakeLists.txt`), porque as libs do editor entram como dependencias
+  transitivas depois do grupo.
 
 Atalho automatico (mesmo padrao do runtime, mas instala tambem as libs de FFmpeg/OIIO/OCIO — usadas so na
 etapa de configuracao/preflight; as flags acima decidem o que de fato entra no binario):
@@ -429,22 +434,26 @@ for t in $(find build-linux-gtest -name "cycles_*_test" -type f -executable); do
 No OpenEXR 3.x as bibliotecas `Half` e `IlmImf` viraram `Imath` e `OpenEXR`; o `FindOpenEXR` antigo nao as
 acha sozinho, por isso os dois `-D...LIBRARY` acima.
 
-## Editor com Cycles (sandbox `build-linux-cycles/`)
+## Editor com Cycles
 
-Validado em 2026-09-26: `RangeEngine` com `WITH_CYCLES=ON` (so CPU; sem OSL, Embree, CUDA e OpenCL) compila,
-e o Cycles renderiza cenas de verdade. Mesmos pacotes da secao anterior. O `build-linux-editor/` continua sem
-Cycles; esta e a sandbox Linux, equivalente ao `build-cycles/` do Windows.
+Desde 2026-09-26 o preset `linux-editor` tem `WITH_CYCLES=ON` (so CPU; sem OSL, Embree, CUDA e OpenCL), e o
+`build-linux-editor/` e o unico editor Linux: nao ha mais sandbox separada. Mesmos pacotes da secao anterior.
 
 ```bash
 cd source
-cmake --preset linux-editor -B ../build-linux-cycles -DWITH_CYCLES=ON -DWITH_CYCLES_OSL=OFF \
-  -DWITH_CYCLES_EMBREE=OFF -DWITH_CYCLES_DEVICE_CUDA=OFF -DWITH_CYCLES_DEVICE_OPENCL=OFF
-ninja -C ../build-linux-cycles install
-cd ../build-linux-cycles/bin
+cmake --preset linux-editor
+ninja -C ../build-linux-editor install
+cd ../build-linux-editor/bin
 ./RangeEngine -b --factory-startup --python ../../tools/linux/cycles-smoke-render.py -- /tmp/cycles.png 128
 ```
+
+Num `build-linux-editor/` configurado antes do Cycles, o cache guarda a deteccao antiga do OpenEXR (versao
+2.0, sem Imath) e a compilacao falha em `ImathBox.h`. Apague as entradas `OPENEXR_*`/`IMATH_*` do
+`CMakeCache.txt` e configure de novo; a deteccao nova acha o OpenEXR 3.1.
 
 Com 1 amostra a imagem sai com ruido; com 128, limpa, com sombra e o vermelho da esfera refletido no chao
 (~0,7 s em 16 threads). O link do `RangeEngine` exigiu declarar `extern_glog`/`extern_gflags` como
 dependencia de `cycles_util` (`intern/cycles/util/CMakeLists.txt`): o `ld` do Linux resolve bibliotecas
-estaticas na ordem, e sem isso faltavam os simbolos `google::*` de `util_logging.cpp`.
+estaticas na ordem, e sem isso faltavam os simbolos `google::*` de `util_logging.cpp`. O menu de engine so
+lista "Cycles Render" com o add-on `cycles` ligado; um build com Cycles liga o add-on ao carregar as
+preferencias (`editors/interface/resources.c`), porque um build sem Cycles o remove.

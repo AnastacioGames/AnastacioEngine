@@ -957,7 +957,9 @@ int ANIM_scene_get_keyingset_index(struct Scene *scene, struct KeyingSet *ks) RE
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ANIM_id_update) */
 void ANIM_id_update(struct Scene *scene, struct ID *id) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (builtin_keyingsets) */
 struct ListBase builtin_keyingsets;
+#endif
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ANIM_keyingset_info_register) */
 void ANIM_keyingset_info_register(struct KeyingSetInfo *ksi) RET_NONE
 #endif

@@ -375,8 +375,10 @@ endif()
 	# forward references unresolved under GNU ld's single-pass archive
 	# scanning. --start-group/--end-group makes ld re-scan the group until
 	# everything resolves, regardless of order.
+	# With WITH_BLENDER the editor libraries come in as transitive deps after
+	# the group, so every registered library goes in the group too.
 	if(UNIX AND NOT APPLE)
-		target_link_libraries(RangeRuntime -Wl,--start-group ${BLENDER_SORTED_LIBS} -Wl,--end-group)
+		target_link_libraries(RangeRuntime -Wl,--start-group ${BLENDER_SORTED_LIBS} ${BLENDER_LINK_LIBS} -Wl,--end-group)
 	else()
 		target_link_libraries(RangeRuntime ${BLENDER_SORTED_LIBS})
 	endif()
