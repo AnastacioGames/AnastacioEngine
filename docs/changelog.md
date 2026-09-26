@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Linux: i18n validado no editor
+
+- `build-linux-editor/` com `WITH_INTERNATIONAL=ON`: `engine_i18n.py` 36 ok (pt_BR, es, ru_RU; catalogo do
+  Blender e dicionarios da Range). Os `blender.mo` saem em `bin/2.79/datafiles/locale/`, e o
+  `package-runtime.sh` copia o `bin` inteiro. Pela janela, o usuario trocou o idioma para pt_BR e conferiu
+  menus e acentos.
+- Roadmap: removido o item "validar a janela real do `RangeEngine`"; o editor ja vinha sendo usado com janela
+  no Linux (Cycles, Standalone, preferencias).
+
 ## 2026-09-26 - Cycles: Embree 4 e OpenCL no editor Linux
 
 - Embree: o Ubuntu 24.04 so tem o Embree 4, e o Cycles era escrito para o 3. `FindEmbree.cmake` acha

@@ -80,8 +80,9 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   português dos operadores da Range (flowmenu: editor externo e assistente de componente; veículo; partículas)
   passaram ao inglês com tradução (2026-09-24, bloco `MESSAGES` de `translations_labels.py`), inclusive o addon opcional
   `addon_editor_shot_tool.py` (a cópia antiga em `tools/ProjetoCutscene` ficou como estava). As mensagens `self.report` do flowmenu e do veículo já passam por `tip_()`.
-- Linux: recompilar o preset `linux-editor` (agora com `WITH_INTERNATIONAL=ON`, exige `libboost-locale`, já em
-  `libboost-all-dev`), rodar `engine_i18n.py` e conferir o seletor na janela; confirmar que o pacote leva `locale/*/LC_MESSAGES/blender.mo`.
+- Linux: `linux-editor` recompilado com `WITH_INTERNATIONAL=ON` e `engine_i18n.py` com 36 ok (2026-09-26); os
+  `blender.mo` (pt_BR, pt, es, ru) saem em `bin/2.79/datafiles/locale/` e o `package-runtime.sh` copia o `bin`
+  inteiro. Seletor de idioma conferido na janela pelo usuario (2026-09-26).
 - Roteiros manuais citam os botões pelo nome em português; em inglês são Validate Web, Export Web, Open in browser.
 
 ### Linux x86_64
@@ -100,8 +101,6 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   `RangeEngine` abre sem erros e `RangeRuntime` carrega um `.range` de exemplo, detecta GPU/OpenGL (Mesa Intel
   RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build; portabilidade em máquina
   limpa ainda não verificada diretamente (apenas por RPATH `$ORIGIN` + `ldd` sem dependências faltando).
-- Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
-  testado em `--background`.
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
   Falta: CUDA na versao Windows e OpenCL numa GPU AMD. OSL fica desligado (sem pacote no Ubuntu
