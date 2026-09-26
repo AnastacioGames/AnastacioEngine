@@ -19,6 +19,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - `kernel_sm_120.cubin` nao e dependencia do `RangeEngine`: compilar `cycles_kernel_cuda` antes.
 - Teste: `RangeEngine -b` renderiza a cena padrao na RTX 5060 com os kernels pre-compilados (512 amostras,
   7,1 s).
+- Usuario confirmou render com GPU (CUDA) pela interface do editor.
 
 ## 2026-09-26 - Linux: pacote testado em maquina limpa
 
