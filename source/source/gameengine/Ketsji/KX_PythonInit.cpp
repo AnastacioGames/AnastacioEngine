@@ -3188,6 +3188,20 @@ void loadGamePythonConfig(char *saveName, char *extName)
 
 	FILE *fp = fopen(marshal_path.c_str(), "rb");
 
+#ifndef __EMSCRIPTEN__
+	/* No Range save yet: read the one a UPBGE/BGE build of the same game left,
+	 * "game.bgeconf" next to the .blend. The next save goes to the Range path. */
+	if (!fp && !saveName && !extName) {
+		const size_t extlen = std::string(".save").size();
+		std::string legacy_path = marshal_path.substr(0, marshal_path.size() - extlen) + ".bgeconf";
+		fp = fopen(legacy_path.c_str(), "rb");
+		if (fp) {
+			CM_Warning("loading UPBGE save '" << legacy_path << "'");
+			marshal_path = legacy_path;
+		}
+	}
+#endif
+
 	if (fp) {
 		// obtain file size:
 		fseek(fp, 0, SEEK_END);
@@ -3259,26 +3273,17 @@ std::string pathGamePythonConfig(char *saveName, char *extName)
 	return path;
 #else
 	std::string path = KX_GetOrigPath();
-	int len = path.size();
 
-	/* replace extension */
-	if (BLI_path_extension_check(path.c_str(), ".range")) {
-		// remove .range extension.
-		path = path.substr(0, len - 6);
-		len = path.size();
-
-		// remove filename and add saveName.
-		if (saveName) {
-			path = path.substr(0, len - sizeof(BLI_path_basename(G.main->name)) - 6);
-  			path += saveName;
-		}
+	/* Remove the extension. A legacy UPBGE game started from its .blend saves
+	 * next to it as "game.save" too, not "game.blend.save". */
+	if (BLI_path_extension_check(path.c_str(), ".range") || BLI_path_extension_check(path.c_str(), ".blend")) {
+		path = path.substr(0, path.size() - 6);
 	}
-	else {
-		// remove filename and add saveName.
-		if (saveName) {
-			path = path.substr(0, len - sizeof(G.main->name));
-			path += saveName;
-		}
+
+	// Replace the file name with saveName, keeping the folder.
+	if (saveName) {
+		const size_t dirlen = BLI_path_basename(path.c_str()) - path.c_str();
+		path = path.substr(0, dirlen) + saveName;
 	}
 
 	// add Extension.

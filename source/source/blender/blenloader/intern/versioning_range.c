@@ -299,7 +299,8 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
         // Set default sensor color.
         if (U.themes.first) {
           bTheme *btheme = U.themes.first;
-          copy_v4_v4_uchar(sens->color, btheme->tui.wcol_box.inner);
+          /* bSensor.color has 3 bytes and ends the struct, copying 4 overflows it. */
+          copy_v3_v3_char(sens->color, (const char *)btheme->tui.wcol_box.inner);
         }
       }
     }

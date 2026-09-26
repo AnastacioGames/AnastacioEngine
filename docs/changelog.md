@@ -20,6 +20,16 @@ Pastas no modo Current Scene do Outliner, parecidas com as coleções do Blender
 - **Stub:** `WM_menu_name_call` acrescentado a `blenderplayer/bad_level_call_stubs/stubs.c`; sem ele o `RangeRuntime` não linkava.
 - **Teste:** build limpo de `RangeEngine` e `RangeRuntime` ok; `tools/arquivo_upbge.blend` abre com o `Base` novo. Falta teste no editor.
 
+## 2026-09-25 - Compatibilidade UPBGE: logic bricks revisados; corrige estouro na cor do sensor
+
+Comparado `tools/upbge-0.2.5b-source` com a Range (DNA, RNA e `BL_Convert*` de sensores, controladores e atuadores; API Python de `GameLogic`).
+
+- **Corrigido:** `blo_do_versions_range()` copiava 4 bytes (`copy_v4_v4_uchar`) para `bSensor.color[3]`, o último campo da struct (200 bytes): 1 byte escrito fora do bloco em todo sensor de arquivo UPBGE aberto. Agora `copy_v3_v3_char`.
+- **Já compatível, sem ação:** fora o Mouse Sensor (migrado em `32f66eef`), a Range só acrescentou valores de enum e flags (2D Filter 14-19, `ACT_OBJECT_NORMAL_SET`, `ACT_EDOB_CHANGE_COLOR`, `ACT_EDOB_ADD_FROM_PROP`/`_PROP_GLOBAL`, `SENS_ANIMATIONEVENT`, `SENS_DELTATIME`/`SENS_SHOW_DESCR`); campos novos lidos como zero mantêm o comportamento antigo (Delay `repeat_times`/`use_delta`, `use_dt`, `debug` de Near/Radar/Ray, runtime do Property Sensor/Actuator, `saveloc`/`extension_name`). Atributos Python de `SCA_PythonKeyboard/Mouse/Joystick` continuam existindo em `Ketsji/KX_Python*`.
+- **Teclas:** `wm_event_types.h` do UPBGE 0.2.5b é idêntico ao da Range; Keyboard Sensors antigos não precisam de migração. (`Ketsji` e `windowmanager` do UPBGE v0.2.5b copiados do GitHub para `tools/upbge-0.2.5b-source`, que é ignorado pelo git.)
+- **Save/Load globalDict (Game Actuator e `logic.save/loadGlobalDict`):** o UPBGE gravava `jogo.bgeconf`, a Range grava `jogo.save`. `pathGamePythonConfig` agora tira `.blend` como já tirava `.range` (antes: `jogo.blend.save`), e `loadGamePythonConfig` lê `jogo.bgeconf` quando não há `.save` e não há nome/extensão próprios; o próximo save vai para o `.save`. Corrigido também o nome de save próprio (`saveloc`), que cortava o caminho com `sizeof` de ponteiro/array em vez do tamanho do nome do arquivo.
+- **Teste:** `RangeEngine -b tools/arquivo_upbge.blend`: 8 Mouse Sensors com tipos corretos (wheel up/down, movement), cor aplicada, sem aviso de memória. `RangeRuntime` com `.blend` + `.bgeconf` (marshal) e `loadGlobalDict()`: `globalDict` carregado.
+
 ## 2026-09-25 - startup.blend de fábrica atualizado
 
 - `source/release/datafiles/startup.blend` substituído pelo `startup.blend` salvo por Fabio pela UI (`%APPDATA%\RangeEngine\Blender\2.79\config\startup.blend`). O anterior ficou em `startup.blend1`.
