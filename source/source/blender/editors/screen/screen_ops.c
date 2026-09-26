@@ -2684,6 +2684,8 @@ static int screen_set_exec(bContext *C, wmOperator *op)
 
 static void SCREEN_OT_screen_set(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	ot->name = "Set Screen";
 	ot->description = "Switch to an available screen";
 	ot->idname = "SCREEN_OT_screen_set";
@@ -2692,8 +2694,12 @@ static void SCREEN_OT_screen_set(wmOperatorType *ot)
 	ot->poll = ED_operator_screenactive;
 
 	/* rna */
-	RNA_def_string(ot->srna, "screen_name", NULL, MAX_ID_NAME - 2, "Screen", "Screen to activate");
-	RNA_def_int(ot->srna, "delta", 0, INT_MIN, INT_MAX, "Delta", "", INT_MIN, INT_MAX);
+	/* SKIP_SAVE: a tab click stores screen_name, and without this flag the Ctrl+Arrow
+	 * keymap items would reload it and jump to that named screen instead of cycling. */
+	prop = RNA_def_string(ot->srna, "screen_name", NULL, MAX_ID_NAME - 2, "Screen", "Screen to activate");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_int(ot->srna, "delta", 0, INT_MIN, INT_MAX, "Delta", "", INT_MIN, INT_MAX);
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */

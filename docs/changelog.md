@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Screens: Ctrl+Seta parava de navegar depois de apagar uma screen
+
+- **Sintoma:** ao apagar uma screen (ex.: "Game Play") e criar outra pelo **+**, Ctrl+→/← deixava de trocar de screen, sem erro.
+- **Causa:** as abas de screen (`uiTemplateScreenTabs`) chamam `SCREEN_OT_screen_set` com `screen_name`. Essa propriedade era guardada como "last properties" e os itens de keymap Ctrl+→/← a recarregavam. Com `screen_name` preenchido, o operador vai para a screen com esse nome e ignora `delta`. Enquanto a screen existia, isso parecia navegação normal. Depois de apagada, o nome não achava nada e o operador era cancelado.
+- **Correção:** `screen_name` e `delta` agora têm `PROP_SKIP_SAVE` em `screen_ops.c`.
+- A remoção da screen estava correta: o `screen delete 0000000000000000` no log `wm.event` aparece só porque a referência do notifier é zerada quando o ID é liberado.
+- **Teste:** RangeEngine com `--log "wm.*"`. Depois de apagar a screen, criar outra e clicar numa aba, Ctrl+→ gera `screen_set(delta=1)` e troca de screen (confirmado pelo usuário).
+
 ## 2026-09-25 - Asset Browser (modo Assets do File Browser, arrastar para a Vista 3D)
 
 Feito como no Blender: o File Browser ganhou um modo de navegação (`SpaceFile.browse_mode`, DNA novo), sem editor novo.
