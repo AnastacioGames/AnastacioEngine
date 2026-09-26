@@ -31,6 +31,14 @@ set(LIB
 
 )
 
+# glog/gflags ficam depois das libs do Cycles na linha de link (o ld do Linux exige a ordem).
+if(WITH_CYCLES_LOGGING)
+	list(APPEND LIB
+		${GLOG_LIBRARIES}
+		${GFLAGS_LIBRARIES}
+	)
+endif()
+
 if(WITH_CYCLES_STANDALONE)
 	if (WITH_CYCLES_STANDALONE_GUI)
 		list(APPEND SRC

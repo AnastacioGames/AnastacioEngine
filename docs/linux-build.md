@@ -428,3 +428,23 @@ for t in $(find build-linux-gtest -name "cycles_*_test" -type f -executable); do
 
 No OpenEXR 3.x as bibliotecas `Half` e `IlmImf` viraram `Imath` e `OpenEXR`; o `FindOpenEXR` antigo nao as
 acha sozinho, por isso os dois `-D...LIBRARY` acima.
+
+## Editor com Cycles (sandbox `build-linux-cycles/`)
+
+Validado em 2026-09-26: `RangeEngine` com `WITH_CYCLES=ON` (so CPU; sem OSL, Embree, CUDA e OpenCL) compila,
+e o Cycles renderiza cenas de verdade. Mesmos pacotes da secao anterior. O `build-linux-editor/` continua sem
+Cycles; esta e a sandbox Linux, equivalente ao `build-cycles/` do Windows.
+
+```bash
+cd source
+cmake --preset linux-editor -B ../build-linux-cycles -DWITH_CYCLES=ON -DWITH_CYCLES_OSL=OFF \
+  -DWITH_CYCLES_EMBREE=OFF -DWITH_CYCLES_DEVICE_CUDA=OFF -DWITH_CYCLES_DEVICE_OPENCL=OFF
+ninja -C ../build-linux-cycles install
+cd ../build-linux-cycles/bin
+./RangeEngine -b --factory-startup --python ../../tools/linux/cycles-smoke-render.py -- /tmp/cycles.png 128
+```
+
+Com 1 amostra a imagem sai com ruido; com 128, limpa, com sombra e o vermelho da esfera refletido no chao
+(~0,7 s em 16 threads). O link do `RangeEngine` exigiu declarar `extern_glog`/`extern_gflags` como
+dependencia de `cycles_util` (`intern/cycles/util/CMakeLists.txt`): o `ld` do Linux resolve bibliotecas
+estaticas na ordem, e sem isso faltavam os simbolos `google::*` de `util_logging.cpp`.

@@ -10,6 +10,8 @@ build-cycles/
 build-linux/
 build-linux-editor/
 build-linux-gtest/
+build-linux-cycles/
+build-linux-cycles.*.log
 install/
 .vs/
 lib/

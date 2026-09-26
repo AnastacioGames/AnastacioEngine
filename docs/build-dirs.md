@@ -11,6 +11,7 @@ diga qual dos itens abaixo é. Assim um caminho não é confundido com outro.
 | **Android Web (APK WebView)** | *(sem build C++ próprio)* | **ativo, é o Android oficial** | APK Kotlin com WebView carregando o pacote Web. Recompilar o C++ do Android = recompilar `build-web-release`. Ver [android-export-plan.md](android-export-plan.md) e [android-manual-tests.md](android-manual-tests.md). |
 | **Android Nativo (NDK), congelado** | `build-android/` | **congelado, não é o Android oficial** | Experimento antigo de compilar a engine com o NDK. Falha com centenas de dependências ausentes, e isso é esperado. Não use como sinal de "Android quebrado". Critérios para reabrir: [android-export-plan.md](android-export-plan.md), seção 9. |
 | **Sandbox do Cycles** | `build-cycles/` | teste | Cópia do build principal com `WITH_CYCLES=ON`, usada para testar o Cycles sem arriscar o `build/`. |
+| **Sandbox do Cycles (Linux)** | `build-linux-cycles/` | teste | Preset `linux-editor` com `WITH_CYCLES=ON` (só CPU). Ver [linux-build.md](linux-build.md). |
 
 ## Expressões e o que significam
 
