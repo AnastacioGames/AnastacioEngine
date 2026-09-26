@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - Outliner: coleções só para organizar (sem Group, sem mudar parent)
+
+Pastas no modo Current Scene do Outliner, parecidas com as coleções do Blender 2.8, mas **só organizacionais**: não mudam parent, camadas, Groups nem nada no jogo.
+
+- **Dados:** `SceneCollection` (nome, `uid`, subcoleções) em `Scene.collections`. `Base.collection_uid` diz a pasta de cada objeto (0 = raiz). Usa uid e não ponteiro, então cópia de cena, apagar objeto e undo não precisam de remapeamento. Arquivos antigos abrem com tudo na raiz. Funções em `scene.c` (`BKE_scene_collection_*`), leitura/escrita em `readfile.c`/`writefile.c`.
+- **Árvore:** elemento `TSE_SCENE_COLLECTION` (id = cena, nr = uid, para o aberto/fechado persistir). Os objetos raiz entram na pasta depois de `outliner_make_hierarchy`, ou seja, **filho sempre aparece sob o pai**, e a coleção só vale para objetos sem pai. Ao mover um objeto, os descendentes recebem a mesma coleção.
+- **Botões olho/seleção/render** da pasta aplicam a todos os objetos mostrados dentro (filhos e subcoleções inclusos).
+- **Operadores:** `outliner.collection_new` (dentro da pasta selecionada), `collection_delete` (objetos e subpastas sobem para o pai), `collection_objects_select`, `collection_move_objects` (menu; também em "Move to Collection" no menu de contexto do objeto). Arrastar objeto para pasta ou para a área vazia (raiz), arrastar o ícone da pasta para dentro de outra ou para a raiz. Duplo clique renomeia (nome único na cena). Menu **Collection** e botão de nova pasta no cabeçalho do Outliner.
+- **Stub:** `WM_menu_name_call` acrescentado a `blenderplayer/bad_level_call_stubs/stubs.c`; sem ele o `RangeRuntime` não linkava.
+- **Teste:** build limpo de `RangeEngine` e `RangeRuntime` ok; `tools/arquivo_upbge.blend` abre com o `Base` novo. Falta teste no editor.
+
 ## 2026-09-25 - startup.blend de fábrica atualizado
 
 - `source/release/datafiles/startup.blend` substituído pelo `startup.blend` salvo por Fabio pela UI (`%APPDATA%\RangeEngine\Blender\2.79\config\startup.blend`). O anterior ficou em `startup.blend1`.

@@ -35,6 +35,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 #include "BLI_path_util.h"
+#include "BLI_linklist.h"
 #include "BLI_mempool.h"
 #include "BLI_stack.h"
 #include "BLI_string.h"
@@ -53,6 +54,7 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_material.h"
+#include "BKE_object.h"
 #include "BKE_group.h"
 
 #include "../blenloader/BLO_readfile.h"
@@ -2434,4 +2436,411 @@ void OUTLINER_OT_group_link(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_string(ot->srna, "object", "Object", MAX_ID_NAME, "Object", "Target Object");
+}
+
+/* ******************** Outliner Collections ********************** */
+/* Folders that only organize objects in the Outliner (see SceneCollection). */
+
+static bool outliner_collection_poll(bContext *C)
+{
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	Scene *scene = CTX_data_scene(C);
+
+	return (ED_operator_outliner_active(C) && soops->outlinevis == SO_CUR_SCENE &&
+	        scene && !ID_IS_LINKED(scene));
+}
+
+static TreeElement *outliner_selected_collection_te(ListBase *lb)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_COLLECTION && (tselem->flag & TSE_SELECTED) && te->directdata) {
+			return te;
+		}
+		TreeElement *found = outliner_selected_collection_te(&te->subtree);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static void outliner_selected_collection_uids(ListBase *lb, LinkNode **r_uids)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_COLLECTION && (tselem->flag & TSE_SELECTED)) {
+			BLI_linklist_prepend(r_uids, POINTER_FROM_INT(te->index));
+		}
+		outliner_selected_collection_uids(&te->subtree, r_uids);
+	}
+}
+
+/* Sets the collection of base and of every descendant of its object, so children
+ * keep the folder of their parent if they are unparented later. Returns true when
+ * the object has a parent, meaning it stays shown under that parent. */
+static bool outliner_base_collection_set(Scene *scene, Base *base, int uid)
+{
+	base->collection_uid = uid;
+	for (Base *base_iter = scene->base.first; base_iter; base_iter = base_iter->next) {
+		if (base_iter != base && BKE_object_is_child_recursive(base->object, base_iter->object)) {
+			base_iter->collection_uid = uid;
+		}
+	}
+	return base->object->parent != NULL;
+}
+
+static void outliner_collection_notify(bContext *C, Scene *scene)
+{
+	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
+}
+
+/* New Collection ------------------------------------------------- */
+
+static int outliner_collection_new_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	SceneCollection *parent = NULL;
+
+	if (RNA_boolean_get(op->ptr, "nested")) {
+		TreeElement *te = outliner_selected_collection_te(&soops->tree);
+		if (te) {
+			parent = te->directdata;
+			TREESTORE(te)->flag &= ~TSE_CLOSED;
+		}
+	}
+
+	BKE_scene_collection_add(scene, parent, NULL);
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_new(wmOperatorType *ot)
+{
+	ot->name = "New Collection";
+	ot->idname = "OUTLINER_OT_collection_new";
+	ot->description = "Add a collection to organize objects in the Outliner (does not change parenting)";
+
+	ot->exec = outliner_collection_new_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "nested", true, "Nested", "Add it inside the selected collection");
+}
+
+/* Delete Collection ---------------------------------------------- */
+
+static int outliner_collection_delete_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	LinkNode *uids = NULL;
+	bool changed = false;
+
+	outliner_selected_collection_uids(&soops->tree, &uids);
+	for (LinkNode *link = uids; link; link = link->next) {
+		SceneCollection *sc = BKE_scene_collection_find(scene, POINTER_AS_INT(link->link));
+		if (sc) {
+			BKE_scene_collection_remove(scene, sc);
+			changed = true;
+		}
+	}
+	BLI_linklist_free(uids, NULL);
+
+	if (!changed) {
+		return OPERATOR_CANCELLED;
+	}
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_delete(wmOperatorType *ot)
+{
+	ot->name = "Delete Collection";
+	ot->idname = "OUTLINER_OT_collection_delete";
+	ot->description = "Delete the selected collections, their objects and sub-collections move to the parent";
+
+	ot->exec = outliner_collection_delete_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/* Select Objects -------------------------------------------------- */
+
+static void outliner_collection_select_fn(TreeElement *te, Object *ob, void *userdata)
+{
+	Scene *scene = userdata;
+	Base *base = te->directdata ? te->directdata : BKE_scene_base_find(scene, ob);
+
+	if (base && (ob->restrictflag & (OB_RESTRICT_VIEW | OB_RESTRICT_SELECT)) == 0) {
+		ED_base_object_select(base, BA_SELECT);
+	}
+}
+
+static void outliner_collection_select_recursive(ListBase *lb, Scene *scene, bool *r_found)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_COLLECTION && (tselem->flag & TSE_SELECTED)) {
+			outliner_scene_collection_foreach_object(&te->subtree, outliner_collection_select_fn, scene);
+			*r_found = true;
+		}
+		else {
+			outliner_collection_select_recursive(&te->subtree, scene, r_found);
+		}
+	}
+}
+
+static int outliner_collection_objects_select_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	bool found = false;
+
+	if (!RNA_boolean_get(op->ptr, "extend")) {
+		BKE_scene_base_deselect_all(scene);
+	}
+	outliner_collection_select_recursive(&soops->tree, scene, &found);
+
+	WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+	return found ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+void OUTLINER_OT_collection_objects_select(wmOperatorType *ot)
+{
+	ot->name = "Select Objects";
+	ot->idname = "OUTLINER_OT_collection_objects_select";
+	ot->description = "Select the objects of the selected collections";
+
+	ot->exec = outliner_collection_objects_select_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "extend", false, "Extend", "Keep the current selection");
+}
+
+/* Move Objects to Collection -------------------------------------- */
+
+#define COLLECTION_MOVE_ROOT 0
+#define COLLECTION_MOVE_NEW -1
+
+static void collection_move_items_add(EnumPropertyItem **items, int *totitem, ListBase *lb)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		EnumPropertyItem item = {sc->uid, sc->name, ICON_FILE_FOLDER, sc->name, ""};
+		RNA_enum_item_add(items, totitem, &item);
+		collection_move_items_add(items, totitem, &sc->children);
+	}
+}
+
+static const EnumPropertyItem *collection_move_itemf(
+        bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	EnumPropertyItem *items = NULL;
+	int totitem = 0;
+	Scene *scene = C ? CTX_data_scene(C) : NULL;
+	EnumPropertyItem item_root = {COLLECTION_MOVE_ROOT, "SCENE_ROOT", ICON_SCENE_DATA, "Scene Root", ""};
+	EnumPropertyItem item_new = {COLLECTION_MOVE_NEW, "NEW", ICON_ZOOMIN, "New Collection", ""};
+
+	RNA_enum_item_add(&items, &totitem, &item_root);
+	if (scene) {
+		collection_move_items_add(&items, &totitem, &scene->collections);
+	}
+	RNA_enum_item_add_separator(&items, &totitem);
+	RNA_enum_item_add(&items, &totitem, &item_new);
+	RNA_enum_item_end(&items, &totitem);
+
+	*r_free = true;
+	return items;
+}
+
+static void outliner_selected_object_bases(ListBase *lb, Scene *scene, LinkNode **r_bases)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == 0 && te->idcode == ID_OB && (tselem->flag & TSE_SELECTED)) {
+			Base *base = BKE_scene_base_find(scene, (Object *)tselem->id);
+			if (base && BLI_linklist_index(*r_bases, base) == -1) {
+				BLI_linklist_prepend(r_bases, base);
+			}
+		}
+		outliner_selected_object_bases(&te->subtree, scene, r_bases);
+	}
+}
+
+static int outliner_collection_move_objects_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	int uid = RNA_enum_get(op->ptr, "collection");
+	LinkNode *bases = NULL;
+	int parented = 0;
+
+	/* In the Outliner use its selection, elsewhere the selected objects. */
+	if (soops) {
+		outliner_selected_object_bases(&soops->tree, scene, &bases);
+	}
+	else {
+		CTX_DATA_BEGIN (C, Base *, base, selected_bases)
+		{
+			BLI_linklist_prepend(&bases, base);
+		}
+		CTX_DATA_END;
+	}
+
+	if (bases == NULL) {
+		BKE_report(op->reports, RPT_WARNING, "No objects selected");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (uid == COLLECTION_MOVE_NEW) {
+		uid = BKE_scene_collection_add(scene, NULL, NULL)->uid;
+	}
+	else if (uid != COLLECTION_MOVE_ROOT && BKE_scene_collection_find(scene, uid) == NULL) {
+		BLI_linklist_free(bases, NULL);
+		return OPERATOR_CANCELLED;
+	}
+
+	for (LinkNode *link = bases; link; link = link->next) {
+		if (outliner_base_collection_set(scene, link->link, uid)) {
+			parented++;
+		}
+	}
+	BLI_linklist_free(bases, NULL);
+
+	if (parented) {
+		BKE_reportf(op->reports, RPT_INFO,
+		            "%d parented object(s) stay shown under their parent", parented);
+	}
+
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+static bool outliner_collection_move_objects_poll(bContext *C)
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+
+	if (scene == NULL || ID_IS_LINKED(scene)) {
+		return false;
+	}
+	return (soops == NULL || soops->outlinevis == SO_CUR_SCENE);
+}
+
+void OUTLINER_OT_collection_move_objects(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Move to Collection";
+	ot->idname = "OUTLINER_OT_collection_move_objects";
+	ot->description = "Move the selected objects to a collection in the Outliner (does not change parenting)";
+
+	ot->invoke = WM_menu_invoke;
+	ot->exec = outliner_collection_move_objects_exec;
+	ot->poll = outliner_collection_move_objects_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	prop = RNA_def_enum(ot->srna, "collection", DummyRNA_NULL_items, COLLECTION_MOVE_ROOT, "Collection", "");
+	RNA_def_enum_funcs(prop, collection_move_itemf);
+	RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
+	ot->prop = prop;
+}
+
+/* Drag and drop ---------------------------------------------------- */
+
+static int collection_object_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Main *bmain = CTX_data_main(C);
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	ARegion *ar = CTX_wm_region(C);
+	char ob_name[MAX_ID_NAME - 2];
+	float fmval[2];
+	int uid = 0;
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te && TREESTORE(te)->type == TSE_SCENE_COLLECTION) {
+		uid = te->index;
+	}
+
+	RNA_string_get(op->ptr, "object", ob_name);
+	Object *ob = (Object *)BKE_libblock_find_name(bmain, ID_OB, ob_name);
+	Base *base = ob ? BKE_scene_base_find(scene, ob) : NULL;
+	if (base == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
+	if (outliner_base_collection_set(scene, base, uid)) {
+		BKE_reportf(op->reports, RPT_INFO, "'%s' stays shown under its parent '%s'",
+		            ob->id.name + 2, ob->parent->id.name + 2);
+	}
+
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_object_drop(wmOperatorType *ot)
+{
+	ot->name = "Drop Object to Collection";
+	ot->idname = "OUTLINER_OT_collection_object_drop";
+	ot->description = "Drag object to a collection (or to the scene root) in the Outliner";
+
+	ot->invoke = collection_object_drop_invoke;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+	RNA_def_string(ot->srna, "object", "Object", MAX_ID_NAME, "Object", "Target Object");
+}
+
+static int collection_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Scene *scene = CTX_data_scene(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	ARegion *ar = CTX_wm_region(C);
+	char name[MAX_NAME];
+	float fmval[2];
+	SceneCollection *parent = NULL;
+
+	RNA_string_get(op->ptr, "collection", name);
+	SceneCollection *sc = BKE_scene_collection_find_name(scene, name);
+	if (sc == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te && TREESTORE(te)->type == TSE_SCENE_COLLECTION) {
+		parent = te->directdata;
+	}
+
+	if (!BKE_scene_collection_move(scene, sc, parent)) {
+		BKE_report(op->reports, RPT_WARNING, "Cannot move a collection inside itself");
+		return OPERATOR_CANCELLED;
+	}
+
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_drop(wmOperatorType *ot)
+{
+	ot->name = "Drop Collection";
+	ot->idname = "OUTLINER_OT_collection_drop";
+	ot->description = "Drag a collection into another collection (or to the scene root) in the Outliner";
+
+	ot->invoke = collection_drop_invoke;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+	RNA_def_string(ot->srna, "collection", "Collection", MAX_NAME, "Collection", "Dragged collection");
 }

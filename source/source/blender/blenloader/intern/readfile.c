@@ -6181,6 +6181,14 @@ static void direct_link_view_settings(FileData *fd, ColorManagedViewSettings *vi
 		direct_link_curvemapping(fd, view_settings->curve_mapping);
 }
 
+static void direct_link_scene_collections(FileData *fd, ListBase *lb)
+{
+	link_list(fd, lb);
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		direct_link_scene_collections(fd, &sc->children);
+	}
+}
+
 static void direct_link_scene(FileData *fd, Scene *sce)
 {
 	Editing *ed;
@@ -6203,6 +6211,7 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	id_us_ensure_real(&sce->id);
 
 	link_list(fd, &(sce->base));
+	direct_link_scene_collections(fd, &sce->collections);
 
 	sce->adt = newdataadr(fd, sce->adt);
 	direct_link_animdata(fd, sce->adt);

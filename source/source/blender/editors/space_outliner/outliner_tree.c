@@ -59,6 +59,7 @@
 #include "BKE_main.h"
 #include "BKE_library.h"
 #include "BKE_modifier.h"
+#include "BKE_scene.h"
 #include "BKE_sequencer.h"
 #include "BKE_idcode.h"
 #include "BKE_outliner_treehash.h"
@@ -1039,6 +1040,12 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		te->name = gpl->info;
 		te->directdata = gpl;
 	}
+	else if (type == TSE_SCENE_COLLECTION) {
+		SceneCollection *sc = BKE_scene_collection_find((Scene *)id, index);
+
+		te->name = sc ? sc->name : IFACE_("Collection");
+		te->directdata = sc;
+	}
 	else if (type == TSE_SEQUENCE) {
 		Sequence *seq = (Sequence *) idv;
 		Sequence *p;
@@ -1395,6 +1402,75 @@ static void outliner_add_orphaned_datablocks(Main *mainvar, SpaceOops *soops)
 /* Hierarchy --------------------------------------------- */
 
 /* make sure elements are correctly nested */
+/* Outliner collections --------------------------------------------- */
+
+static void outliner_add_scene_collections(SpaceOops *soops, ListBase *lb, Scene *scene,
+                                           TreeElement *parent, ListBase *collections)
+{
+	for (SceneCollection *sc = collections->first; sc; sc = sc->next) {
+		TreeElement *te = outliner_add_element(soops, lb, scene, parent, TSE_SCENE_COLLECTION, sc->uid);
+		outliner_add_scene_collections(soops, &te->subtree, scene, te, &sc->children);
+	}
+}
+
+/* Calls fn for every object shown inside a collection folder: its root objects,
+ * their children and the objects of nested collections. */
+void outliner_scene_collection_foreach_object(ListBase *lb, OutlinerSceneCollectionObjectFn fn, void *userdata)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == 0 && te->idcode == ID_OB) {
+			fn(te, (Object *)tselem->id, userdata);
+			outliner_scene_collection_foreach_object(&te->subtree, fn, userdata);
+		}
+		else if (tselem->type == TSE_SCENE_COLLECTION) {
+			outliner_scene_collection_foreach_object(&te->subtree, fn, userdata);
+		}
+	}
+}
+
+TreeElement *outliner_find_scene_collection_te(ListBase *lb, int uid)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type != TSE_SCENE_COLLECTION) {
+			continue;
+		}
+		if (te->index == uid) {
+			return te;
+		}
+		TreeElement *found = outliner_find_scene_collection_te(&te->subtree, uid);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+/* Moves root objects (after the parent hierarchy is built) into their collection folder.
+ * Children always stay under their parent, whatever collection they have. */
+static void outliner_move_objects_to_collections(ListBase *lb)
+{
+	TreeElement *te, *ten;
+
+	for (te = lb->first; te; te = ten) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		ten = te->next;
+
+		if (tselem->type == 0 && te->idcode == ID_OB && te->directdata) {
+			Base *base = te->directdata;
+			if (base->collection_uid != 0) {
+				TreeElement *te_coll = outliner_find_scene_collection_te(lb, base->collection_uid);
+				if (te_coll) {
+					BLI_remlink(lb, te);
+					BLI_addtail(&te_coll->subtree, te);
+					te->parent = te_coll;
+				}
+			}
+		}
+	}
+}
+
 static void outliner_make_hierarchy(ListBase *lb)
 {
 	TreeElement *te, *ten, *tep;
@@ -1870,6 +1946,8 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 		{
 			TreeElement *world_te = outliner_add_scene_contents(soops, &soops->tree, scene, NULL);
 
+			outliner_add_scene_collections(soops, &soops->tree, scene, NULL, &scene->collections);
+
 			for (base = scene->base.first; base; base = base->next) {
 				if (world_te && base->object == scene->world_sun) {
 					ten = outliner_add_element(soops, &world_te->subtree, base->object, world_te, 0, 0);
@@ -1881,6 +1959,7 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 			}
 		}
 		outliner_make_hierarchy(&soops->tree);
+		outliner_move_objects_to_collections(&soops->tree);
 	}
 	else if (soops->outlinevis == SO_VISIBLE) {
 		for (base = scene->base.first; base; base = base->next) {

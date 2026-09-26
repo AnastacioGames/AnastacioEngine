@@ -916,6 +916,7 @@ enum {
 	OL_OP_TOGSEL,
 	OL_OP_TOGREN,
 	OL_OP_RENAME,
+	OL_OP_MOVE_TO_COLLECTION,
 };
 
 static const EnumPropertyItem prop_object_op_types[] = {
@@ -930,6 +931,8 @@ static const EnumPropertyItem prop_object_op_types[] = {
 	{OL_OP_TOGSEL, "TOGSEL", 0, "Toggle Selectable", ""},
 	{OL_OP_TOGREN, "TOGREN", 0, "Toggle Renderable", ""},
 	{OL_OP_RENAME, "RENAME", 0, "Rename", ""},
+	{OL_OP_MOVE_TO_COLLECTION, "MOVE_TO_COLLECTION", 0, "Move to Collection",
+	 "Move to a collection in the Outliner (does not change parenting)"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -1021,6 +1024,11 @@ static int outliner_object_operation_exec(bContext *C, wmOperator *op)
 	else if (event == OL_OP_RENAME) {
 		outliner_do_object_operation(C, op->reports, scene, soops, &soops->tree, item_rename_cb);
 		str = "Rename Object";
+	}
+	else if (event == OL_OP_MOVE_TO_COLLECTION) {
+		/* opens its own menu and pushes its own undo step */
+		WM_operator_name_call(C, "OUTLINER_OT_collection_move_objects", WM_OP_INVOKE_REGION_WIN, NULL);
+		return OPERATOR_FINISHED;
 	}
 	else {
 		BLI_assert(0);
@@ -1990,6 +1998,9 @@ static int do_outliner_operation_event(bContext *C, ARegion *ar, SpaceOops *soop
 				}
 				else if (datalevel == TSE_ID_BASE) {
 					/* do nothing... there are no ops needed here yet */
+				}
+				else if (datalevel == TSE_SCENE_COLLECTION) {
+					WM_menu_name_call(C, "OUTLINER_MT_collection", WM_OP_INVOKE_REGION_WIN);
 				}
 				else if (datalevel == TSE_CONSTRAINT) {
 					WM_operator_name_call(C, "OUTLINER_OT_constraint_operation", WM_OP_INVOKE_REGION_WIN, NULL);

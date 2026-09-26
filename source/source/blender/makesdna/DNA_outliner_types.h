@@ -88,6 +88,7 @@ typedef struct TreeStore {
 #define TSE_KEYMAP_ITEM     35  /* NO ID */
 #define TSE_ID_BASE         36  /* NO ID */
 #define TSE_GP_LAYER        37  /* NO ID */
+#define TSE_SCENE_COLLECTION 38  /* id is the Scene, nr is SceneCollection.uid */
 
 
 /* Check whether given TreeStoreElem should have a real ID in its ->id member. */

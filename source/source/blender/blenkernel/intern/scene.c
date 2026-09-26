@@ -341,6 +341,7 @@ void BKE_scene_copy_data(Main *bmain, Scene *sce_dst, const Scene *sce_src, cons
 	sce_dst->fps_info = NULL;
 
 	BLI_duplicatelist(&(sce_dst->base), &(sce_src->base));
+	BKE_scene_collections_copy(&sce_dst->collections, &sce_src->collections);
 	for (Base *base_dst = sce_dst->base.first, *base_src = sce_src->base.first;
 	     base_dst;
 	     base_dst = base_dst->next, base_src = base_src->next)
@@ -576,6 +577,7 @@ void BKE_scene_free(Scene *sce)
 
 	sce->basact = NULL;
 	BLI_freelistN(&sce->base);
+	BKE_scene_collections_free(&sce->collections);
 	BKE_sequencer_editing_free(sce, false);
 
 	BKE_keyingsets_free(&sce->keyingsets);
@@ -1405,6 +1407,190 @@ void BKE_scene_base_select(Scene *sce, Base *selbase)
 	selbase->object->flag = selbase->flag;
 
 	sce->basact = selbase;
+}
+
+/* -------------------------------------------------------------------- */
+/* Outliner collections: folders that only organize objects in the Outliner. */
+
+static SceneCollection *scene_collection_find_uid(ListBase *lb, int uid)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		if (sc->uid == uid) {
+			return sc;
+		}
+		SceneCollection *found = scene_collection_find_uid(&sc->children, uid);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static SceneCollection *scene_collection_find_name(ListBase *lb, const char *name, const SceneCollection *skip)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		if (sc != skip && STREQ(sc->name, name)) {
+			return sc;
+		}
+		SceneCollection *found = scene_collection_find_name(&sc->children, name, skip);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static int scene_collection_uid_max(const ListBase *lb)
+{
+	int uid_max = 0;
+	for (const SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		uid_max = max_ii(uid_max, sc->uid);
+		uid_max = max_ii(uid_max, scene_collection_uid_max(&sc->children));
+	}
+	return uid_max;
+}
+
+typedef struct SceneCollectionNameCheck {
+	Scene *sce;
+	SceneCollection *sc;
+} SceneCollectionNameCheck;
+
+static bool scene_collection_name_exists(void *arg, const char *name)
+{
+	SceneCollectionNameCheck *check = arg;
+	return scene_collection_find_name(&check->sce->collections, name, check->sc) != NULL;
+}
+
+static void scene_collection_unique_name(Scene *sce, SceneCollection *sc)
+{
+	SceneCollectionNameCheck check = {sce, sc};
+	BLI_uniquename_cb(scene_collection_name_exists, &check, DATA_("Collection"), '.', sc->name, sizeof(sc->name));
+}
+
+SceneCollection *BKE_scene_collection_find(Scene *sce, int uid)
+{
+	if (uid == 0) {
+		return NULL;
+	}
+	return scene_collection_find_uid(&sce->collections, uid);
+}
+
+static SceneCollection *scene_collection_parent_find_recursive(SceneCollection *parent, SceneCollection *sc)
+{
+	for (SceneCollection *child = parent->children.first; child; child = child->next) {
+		if (child == sc) {
+			return parent;
+		}
+		SceneCollection *found = scene_collection_parent_find_recursive(child, sc);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+SceneCollection *BKE_scene_collection_find_name(Scene *sce, const char *name)
+{
+	return scene_collection_find_name(&sce->collections, name, NULL);
+}
+
+/* Returns NULL when sc is at the scene root. */
+SceneCollection *BKE_scene_collection_parent_find(Scene *sce, SceneCollection *sc)
+{
+	for (SceneCollection *root = sce->collections.first; root; root = root->next) {
+		if (root == sc) {
+			return NULL;
+		}
+		SceneCollection *found = scene_collection_parent_find_recursive(root, sc);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+/* True when sc is ancestor itself or is nested somewhere inside it. */
+bool BKE_scene_collection_is_inside(SceneCollection *sc, SceneCollection *ancestor)
+{
+	if (sc == ancestor) {
+		return true;
+	}
+	for (SceneCollection *child = ancestor->children.first; child; child = child->next) {
+		if (BKE_scene_collection_is_inside(sc, child)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+SceneCollection *BKE_scene_collection_add(Scene *sce, SceneCollection *parent, const char *name)
+{
+	SceneCollection *sc = MEM_callocN(sizeof(*sc), __func__);
+	sc->uid = scene_collection_uid_max(&sce->collections) + 1;
+	BLI_strncpy(sc->name, name ? name : DATA_("Collection"), sizeof(sc->name));
+	scene_collection_unique_name(sce, sc);
+	BLI_addtail(parent ? &parent->children : &sce->collections, sc);
+	return sc;
+}
+
+void BKE_scene_collection_rename(Scene *sce, SceneCollection *sc, const char *name)
+{
+	BLI_strncpy(sc->name, name, sizeof(sc->name));
+	scene_collection_unique_name(sce, sc);
+}
+
+/* Objects and sub-collections of a removed collection move up to its parent. */
+void BKE_scene_collection_remove(Scene *sce, SceneCollection *sc)
+{
+	SceneCollection *parent = BKE_scene_collection_parent_find(sce, sc);
+	ListBase *lb = parent ? &parent->children : &sce->collections;
+	const int parent_uid = parent ? parent->uid : 0;
+
+	for (Base *base = sce->base.first; base; base = base->next) {
+		if (base->collection_uid == sc->uid) {
+			base->collection_uid = parent_uid;
+		}
+	}
+
+	while (sc->children.first) {
+		SceneCollection *child = sc->children.first;
+		BLI_remlink(&sc->children, child);
+		BLI_insertlinkbefore(lb, sc, child);
+	}
+
+	BLI_remlink(lb, sc);
+	MEM_freeN(sc);
+}
+
+/* Moves sc inside parent (NULL = scene root). Fails when parent is inside sc. */
+bool BKE_scene_collection_move(Scene *sce, SceneCollection *sc, SceneCollection *parent)
+{
+	if (parent && BKE_scene_collection_is_inside(parent, sc)) {
+		return false;
+	}
+	SceneCollection *old_parent = BKE_scene_collection_parent_find(sce, sc);
+	BLI_remlink(old_parent ? &old_parent->children : &sce->collections, sc);
+	BLI_addtail(parent ? &parent->children : &sce->collections, sc);
+	return true;
+}
+
+void BKE_scene_collections_copy(ListBase *dst, const ListBase *src)
+{
+	BLI_duplicatelist(dst, src);
+	for (SceneCollection *sc_dst = dst->first, *sc_src = src->first;
+	     sc_dst;
+	     sc_dst = sc_dst->next, sc_src = sc_src->next)
+	{
+		BKE_scene_collections_copy(&sc_dst->children, &sc_src->children);
+	}
+}
+
+void BKE_scene_collections_free(ListBase *lb)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		BKE_scene_collections_free(&sc->children);
+	}
+	BLI_freelistN(lb);
 }
 
 /* checks for cycle, returns 1 if it's all OK */

@@ -68,7 +68,19 @@ typedef struct Base {
 	int flag;
 	short sx, sy;
 	struct Object *object;
+	int collection_uid;		/* SceneCollection.uid shown in the Outliner, 0 = scene root */
+	int pad;
 } Base;
+
+/* SceneCollection - folder used only to organize objects in the Outliner.
+ * It does not change parenting, layers or anything in the game engine. */
+typedef struct SceneCollection {
+	struct SceneCollection *next, *prev;
+	ListBase children;		/* SceneCollection */
+	char name[64];			/* MAX_NAME */
+	int uid;				/* unique inside the scene, never 0 */
+	int flag;
+} SceneCollection;
 
 /* ************************************************************* */
 /* Output Format Data */
@@ -1848,6 +1860,7 @@ typedef struct Scene {
 	ListBase base;
 	struct Base *basact;		/* active base */
 	struct Object *obedit;		/* name replaces old G.obedit */
+	ListBase collections;		/* SceneCollection, Outliner organization only */
 
 	float cursor[3];			/* 3d cursor location */
 	char _pad[4];

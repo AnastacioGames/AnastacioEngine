@@ -70,6 +70,18 @@ void         BKE_scene_base_unlink(struct Scene *sce, struct Base *base);
 void         BKE_scene_base_deselect_all(struct Scene *sce);
 void         BKE_scene_base_select(struct Scene *sce, struct Base *selbase);
 
+/* Outliner collections (organization only, see SceneCollection) */
+struct SceneCollection *BKE_scene_collection_add(struct Scene *sce, struct SceneCollection *parent, const char *name);
+struct SceneCollection *BKE_scene_collection_find(struct Scene *sce, int uid);
+struct SceneCollection *BKE_scene_collection_find_name(struct Scene *sce, const char *name);
+struct SceneCollection *BKE_scene_collection_parent_find(struct Scene *sce, struct SceneCollection *sc);
+bool BKE_scene_collection_is_inside(struct SceneCollection *sc, struct SceneCollection *ancestor);
+void BKE_scene_collection_remove(struct Scene *sce, struct SceneCollection *sc);
+bool BKE_scene_collection_move(struct Scene *sce, struct SceneCollection *sc, struct SceneCollection *parent);
+void BKE_scene_collection_rename(struct Scene *sce, struct SceneCollection *sc, const char *name);
+void BKE_scene_collections_copy(struct ListBase *dst, const struct ListBase *src);
+void BKE_scene_collections_free(struct ListBase *lb);
+
 /* Scene base iteration function.
  * Define struct here, so no need to bother with alloc/free it.
  */

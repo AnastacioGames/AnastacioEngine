@@ -81,6 +81,13 @@ void outliner_operatortypes(void)
 	WM_operatortype_append(OUTLINER_OT_scene_drop);
 	WM_operatortype_append(OUTLINER_OT_material_drop);
 	WM_operatortype_append(OUTLINER_OT_group_link);
+
+	WM_operatortype_append(OUTLINER_OT_collection_new);
+	WM_operatortype_append(OUTLINER_OT_collection_delete);
+	WM_operatortype_append(OUTLINER_OT_collection_objects_select);
+	WM_operatortype_append(OUTLINER_OT_collection_move_objects);
+	WM_operatortype_append(OUTLINER_OT_collection_object_drop);
+	WM_operatortype_append(OUTLINER_OT_collection_drop);
 }
 
 void outliner_keymap(wmKeyConfig *keyconf)

@@ -62,6 +62,8 @@ class OUTLINER_HT_header(Header):
                 row.label(text="No Keying Set Active")
         elif space.display_mode == 'ORPHAN_DATA':
             layout.operator("outliner.orphans_purge")
+        elif space.display_mode == 'CURRENT_SCENE':
+            layout.operator("outliner.collection_new", text="", icon='NEWFOLDER').nested = True
 
 
 class OUTLINER_MT_editor_menus(Menu):
@@ -80,6 +82,8 @@ class OUTLINER_MT_editor_menus(Menu):
 
         if space.display_mode == 'DATABLOCKS':
             layout.menu("OUTLINER_MT_edit_datablocks")
+        elif space.display_mode == 'CURRENT_SCENE':
+            layout.menu("OUTLINER_MT_collection")
 
 
 class OUTLINER_MT_view(Menu):
@@ -137,6 +141,22 @@ class OUTLINER_MT_edit_datablocks(Menu):
         layout.operator("outliner.drivers_delete_selected")
 
 
+class OUTLINER_MT_collection(Menu):
+    bl_label = "Collection"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator("outliner.collection_new", text="New Collection", icon='NEWFOLDER').nested = True
+        layout.operator("outliner.collection_new", text="New Collection at Root").nested = False
+        layout.operator("outliner.collection_delete", text="Delete Collection")
+
+        layout.separator(factor=1)
+
+        layout.operator("outliner.collection_objects_select", text="Select Objects")
+        layout.operator_menu_enum("outliner.collection_move_objects", "collection", text="Move Objects to Collection")
+
+
 class OUTLINER_MT_scene_add(Menu):
     bl_label = "Add Scene"
 
@@ -156,6 +176,7 @@ classes = (
     OUTLINER_MT_view,
     OUTLINER_MT_search,
     OUTLINER_MT_edit_datablocks,
+    OUTLINER_MT_collection,
     OUTLINER_MT_scene_add,
 )
 

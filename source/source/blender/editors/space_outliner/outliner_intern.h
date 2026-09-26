@@ -140,6 +140,10 @@ struct ID *outliner_search_back(SpaceOops *soops, TreeElement *te, short idcode)
 
 void outliner_build_tree(struct Main *mainvar, struct Scene *scene, struct SpaceOops *soops);
 
+typedef void (*OutlinerSceneCollectionObjectFn)(TreeElement *te, struct Object *ob, void *userdata);
+void outliner_scene_collection_foreach_object(ListBase *lb, OutlinerSceneCollectionObjectFn fn, void *userdata);
+TreeElement *outliner_find_scene_collection_te(ListBase *lb, int uid);
+
 /* outliner_draw.c ---------------------------------------------- */
 
 void draw_outliner(const struct bContext *C);
@@ -253,6 +257,13 @@ void OUTLINER_OT_parent_clear(struct wmOperatorType *ot);
 void OUTLINER_OT_scene_drop(struct wmOperatorType *ot);
 void OUTLINER_OT_material_drop(struct wmOperatorType *ot);
 void OUTLINER_OT_group_link(struct wmOperatorType *ot);
+
+void OUTLINER_OT_collection_new(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_delete(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_objects_select(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_move_objects(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_object_drop(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_drop(struct wmOperatorType *ot);
 
 /* outliner_tools.c ---------------------------------------------- */
 

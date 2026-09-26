@@ -2628,6 +2628,14 @@ static void write_paint(WriteData *wd, Paint *p)
 	}
 }
 
+static void write_scene_collections(WriteData *wd, ListBase *lb)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		writestruct(wd, DATA, SceneCollection, 1, sc);
+		write_scene_collections(wd, &sc->children);
+	}
+}
+
 static void write_scene(WriteData *wd, Scene *sce)
 {
 	/* write LibData */
@@ -2643,6 +2651,7 @@ static void write_scene(WriteData *wd, Scene *sce)
 	for (Base *base = sce->base.first; base; base = base->next) {
 		writestruct(wd, DATA, Base, 1, base);
 	}
+	write_scene_collections(wd, &sce->collections);
 
 	ToolSettings *tos = sce->toolsettings;
 	writestruct(wd, DATA, ToolSettings, 1, tos);

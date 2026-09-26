@@ -221,6 +221,10 @@ ferramenta correspondente.
 
 - `Outliner > View > Show Alternating Rows` liga/desliga as faixas alternadas. Desligado por padrão, usa fundo
   sólido na cor do tema. Escolha por Outliner salva no projeto; destaques de seleção preservados.
+- Coleções (modo Current Scene) são pastas **só de organização**: não mudam parent, camadas, Groups nem o jogo.
+  Um objeto está numa coleção por `Base.collection_uid`; filho sempre aparece sob o pai (a coleção vale para
+  objetos raiz). Olho/seleção/render da pasta aplicam a todos os objetos dentro. Menu Collection, arrastar e
+  "Move to Collection" no menu de contexto.
 
 ### Interface da 3D View
 

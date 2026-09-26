@@ -603,6 +603,7 @@ wmKeyMapItem *WM_keymap_verify_item(
         int val, int modifier, int keymodifier) RET_NULL
 int			WM_menu_invoke			(struct bContext *C, struct wmOperator *op, const struct wmEvent *event) RET_ZERO
 int			WM_menu_invoke_ex(struct bContext *C, struct wmOperator *op, int opcontext) RET_ZERO
+void		WM_menu_name_call(struct bContext *C, const char *menu_name, short context) RET_NONE
 bool                WM_menutype_poll(struct bContext *C, struct MenuType *mt) RET_ZERO
 void		WM_modalkeymap_assign(struct wmKeyMap *km, const char *opname) RET_NONE
 wmKeyMapItem *WM_modalkeymap_find_propvalue(wmKeyMap *km, const int propvalue) RET_NULL

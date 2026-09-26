@@ -439,6 +439,90 @@ static void restrictbutton_gr_restrict_render(bContext *C, void *poin, void *poi
 	WM_event_add_notifier(C, NC_GROUP, NULL);
 }
 
+/* Outliner collections: the toggles act on every object shown inside the folder,
+ * including child objects and nested collections. */
+typedef struct SceneCollectionRestrict {
+	Scene *scene;
+	int flag;
+	bool any_object;
+	bool all_restricted;
+} SceneCollectionRestrict;
+
+static void scene_collection_restrict_check_fn(TreeElement *UNUSED(te), Object *ob, void *userdata)
+{
+	SceneCollectionRestrict *data = userdata;
+	data->any_object = true;
+	if ((ob->restrictflag & data->flag) == 0) {
+		data->all_restricted = false;
+	}
+}
+
+static bool scene_collection_restrict_flag(TreeElement *te, int flag)
+{
+	SceneCollectionRestrict data = {NULL, flag, false, true};
+	outliner_scene_collection_foreach_object(&te->subtree, scene_collection_restrict_check_fn, &data);
+	return data.any_object && data.all_restricted;
+}
+
+static void scene_collection_restrict_clear_fn(TreeElement *UNUSED(te), Object *ob, void *userdata)
+{
+	SceneCollectionRestrict *data = userdata;
+	if (!ID_IS_LINKED(ob)) {
+		ob->restrictflag &= ~data->flag;
+	}
+}
+
+static void scene_collection_restrict_set_fn(TreeElement *te, Object *ob, void *userdata)
+{
+	SceneCollectionRestrict *data = userdata;
+	if (ID_IS_LINKED(ob) || data->scene->obedit == ob) {
+		return;
+	}
+	ob->restrictflag |= data->flag;
+	if (ELEM(data->flag, OB_RESTRICT_SELECT, OB_RESTRICT_VIEW) && (ob->flag & SELECT)) {
+		Base *base = te->directdata ? te->directdata : BKE_scene_base_find(data->scene, ob);
+		if (base) {
+			ED_base_object_select(base, BA_DESELECT);
+		}
+	}
+}
+
+static void restrictbutton_scene_collection_flag(bContext *C, Scene *scene, TreeStoreElem *tselem, int flag)
+{
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	TreeElement *te = soops ? outliner_find_tree_element(&soops->tree, tselem) : NULL;
+	if (te == NULL) {
+		return;
+	}
+
+	SceneCollectionRestrict data = {scene, flag, false, true};
+	if (scene_collection_restrict_flag(te, flag)) {
+		outliner_scene_collection_foreach_object(&te->subtree, scene_collection_restrict_clear_fn, &data);
+	}
+	else {
+		outliner_scene_collection_foreach_object(&te->subtree, scene_collection_restrict_set_fn, &data);
+	}
+}
+
+static void restrictbutton_scene_collection_view(bContext *C, void *poin, void *poin2)
+{
+	restrictbutton_scene_collection_flag(C, poin, poin2, OB_RESTRICT_VIEW);
+	WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, poin);
+	DAG_id_type_tag(CTX_data_main(C), ID_OB);
+}
+
+static void restrictbutton_scene_collection_select(bContext *C, void *poin, void *poin2)
+{
+	restrictbutton_scene_collection_flag(C, poin, poin2, OB_RESTRICT_SELECT);
+	WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, poin);
+}
+
+static void restrictbutton_scene_collection_render(bContext *C, void *poin, void *poin2)
+{
+	restrictbutton_scene_collection_flag(C, poin, poin2, OB_RESTRICT_RENDER);
+	WM_event_add_notifier(C, NC_SCENE | ND_OB_RENDER, poin);
+}
+
 static void restrictbutton_id_user_toggle(bContext *UNUSED(C), void *poin, void *UNUSED(poin2))
 {
 	ID *id = (ID *)poin;
@@ -584,6 +668,16 @@ static void namebutton_cb(bContext *C, void *tsep, char *oldname)
 				}
 				case TSE_R_LAYER:
 					break;
+				case TSE_SCENE_COLLECTION:
+				{
+					SceneCollection *sc = te->directdata;
+
+					if (sc) {
+						BKE_scene_collection_rename((Scene *)tselem->id, sc, sc->name);
+					}
+					WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+					break;
+				}
 			}
 		}
 		tselem->flag &= ~TSE_TEXTBUT;
@@ -672,6 +766,34 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow renderability"));
 				UI_but_func_set(bt, restrictbutton_gr_restrict_render, scene, gr);
 				UI_but_flag_enable(bt, but_flag);
+
+				UI_block_emboss_set(block, UI_EMBOSS);
+			}
+			else if (tselem->type == TSE_SCENE_COLLECTION) {
+				bool restrict_bool;
+
+				UI_block_emboss_set(block, UI_EMBOSS_NONE);
+
+				restrict_bool = scene_collection_restrict_flag(te, OB_RESTRICT_VIEW);
+				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF,
+				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX), te->ys, UI_UNIT_X, UI_UNIT_Y,
+				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow visibility of all objects in this collection"));
+				UI_but_func_set(bt, restrictbutton_scene_collection_view, scene, tselem);
+				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+
+				restrict_bool = scene_collection_restrict_flag(te, OB_RESTRICT_SELECT);
+				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_SELECT_ON : ICON_RESTRICT_SELECT_OFF,
+				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_SELECTX), te->ys, UI_UNIT_X, UI_UNIT_Y,
+				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow selection of all objects in this collection"));
+				UI_but_func_set(bt, restrictbutton_scene_collection_select, scene, tselem);
+				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+
+				restrict_bool = scene_collection_restrict_flag(te, OB_RESTRICT_RENDER);
+				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_RENDER_ON : ICON_RESTRICT_RENDER_OFF,
+				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_RENDERX), te->ys, UI_UNIT_X, UI_UNIT_Y,
+				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow rendering of all objects in this collection"));
+				UI_but_func_set(bt, restrictbutton_scene_collection_render, scene, tselem);
+				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 
 				UI_block_emboss_set(block, UI_EMBOSS);
 			}
@@ -1200,6 +1322,21 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 				UI_icon_draw(x, y, ICON_RENDERLAYERS); break;
 			case TSE_R_LAYER:
 				UI_icon_draw(x, y, ICON_RENDERLAYERS); break;
+			case TSE_SCENE_COLLECTION:
+			{
+				SceneCollection *sc = te->directdata;
+
+				if (sc == NULL || arg.x >= arg.xmax) {
+					UI_icon_draw(x, y, ICON_FILE_FOLDER);
+				}
+				else {
+					/* Dragging the folder icon moves the collection (see outliner_collection_drop). */
+					uiBut *but = uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_FILE_FOLDER, arg.xb, arg.yb,
+					                          UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 1.0, arg.alpha, "");
+					UI_but_drag_set_name(but, sc->name);
+				}
+				break;
+			}
 			case TSE_LINKED_LAMP:
 				UI_icon_draw(x, y, ICON_LAMP_DATA); break;
 			case TSE_LINKED_MAT:
