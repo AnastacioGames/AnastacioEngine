@@ -44,7 +44,7 @@ macro(BLENDER_SRC_GTEST_EX NAME SRC EXTRA_LIBS DO_ADD_TEST)
 		endif()
 		
 		if(UNIX AND NOT APPLE)
-			target_link_libraries(${TARGET_NAME} bf_intern_libc_compat)
+			target_link_libraries(${NAME}_test bf_intern_libc_compat)
 		endif()
 		set_target_properties(${NAME}_test PROPERTIES
 		                      RUNTIME_OUTPUT_DIRECTORY         "${TESTS_OUTPUT_DIR}"

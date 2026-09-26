@@ -9,6 +9,7 @@ build-android/
 build-cycles/
 build-linux/
 build-linux-editor/
+build-linux-gtest/
 install/
 .vs/
 lib/

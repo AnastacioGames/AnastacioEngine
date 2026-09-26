@@ -404,3 +404,27 @@ Distribua esse arquivo, seu checksum e o codigo-fonte correspondente. Antes de a
 extraia o `.tar.xz` num diretorio limpo e confirme que **os dois** `./RangeEngine` e `./RangeRuntime`
 existem e abrem — o pacote 0.3.0 e o 0.4.1 (so RangeEngine) ja mostraram que pular essa checagem deixa
 bug passar.
+
+## Testes do Cycles (GTest) no Linux
+
+Validado em 2026-09-26 (Ubuntu, OpenEXR 3.1): 10 binarios, 177/177 testes passando. Use um diretorio proprio
+(`build-linux-gtest/`), sem mexer em `build-linux*`. Pacotes extras alem dos da secao de dependencias:
+
+```bash
+sudo apt install libopenexr-dev libpugixml-dev libtiff-dev
+```
+
+Configure a partir do cache do `build-linux-editor` (ou do preset `linux-editor`) com:
+
+```bash
+L=/usr/lib/x86_64-linux-gnu
+cmake -S source -B build-linux-gtest -G Ninja -DWITH_CYCLES=ON -DWITH_GTESTS=ON \
+  -DWITH_CYCLES_OSL=OFF -DWITH_CYCLES_EMBREE=OFF -DWITH_CYCLES_DEVICE_CUDA=OFF -DWITH_CYCLES_DEVICE_OPENCL=OFF \
+  -DOPENEXR_HALF_LIBRARY=$L/libImath.so -DOPENEXR_ILMIMF_LIBRARY=$L/libOpenEXR.so
+T=$(ninja -C build-linux-gtest -t targets all | grep -oE "^cycles_[a-z_]+_test" | sort -u)
+ninja -C build-linux-gtest $T
+for t in $(find build-linux-gtest -name "cycles_*_test" -type f -executable); do $t; done
+```
+
+No OpenEXR 3.x as bibliotecas `Half` e `IlmImf` viraram `Imath` e `OpenEXR`; o `FindOpenEXR` antigo nao as
+acha sozinho, por isso os dois `-D...LIBRARY` acima.
