@@ -512,6 +512,7 @@ void file_draw_list(const bContext *C, ARegion *ar)
 	bool is_icon;
 	short align;
 	bool do_drag;
+	const bool is_asset_browser = ED_fileselect_is_asset_browser(sfile);
 	int column_space = 0.6f * UI_UNIT_X;
 	const bool small_size = SMALL_SIZE_CHECK(params->thumbnail_size);
 	const bool update_stat_strings = small_size != SMALL_SIZE_CHECK(layout->curr_size);
@@ -602,6 +603,10 @@ void file_draw_list(const bContext *C, ARegion *ar)
 
 		/* don't drag parent or refresh items */
 		do_drag = !(FILENAME_IS_CURRPAR(file->relpath));
+		if (is_asset_browser) {
+			/* Only data-blocks: a dragged .blend or folder would be opened by the window drop-boxes. */
+			do_drag = do_drag && (file->typeflag & FILE_TYPE_BLENDERLIB) && !(file->typeflag & FILE_TYPE_DIR);
+		}
 
 		if (FILE_IMGDISPLAY == params->display) {
 			const int icon = filelist_geticon(files, i, false);

@@ -342,6 +342,10 @@ class INFO_MT_window(Menu):
 
         layout.separator(factor=1)
 
+        layout.operator("screen.asset_browser_show", text="Asset Browser", icon='ASSET_MANAGER')
+
+        layout.separator(factor=1)
+
         layout.operator("screen.screenshot", icon="CAMERA_DATA")
 
         if sys.platform[:3] == "win":

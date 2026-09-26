@@ -27,6 +27,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
 
 #include "BLI_blenlib.h"
@@ -48,6 +49,7 @@
 #include "WM_types.h"
 #include "wm_subwindow.h"
 
+#include "ED_fileselect.h"
 #include "ED_screen.h"
 #include "ED_screen_types.h"
 #include "ED_space_api.h"
@@ -1827,12 +1829,17 @@ typedef struct {
 	const int space_type;
 	const char *label;
 	const int icon;
+	/* Sub-mode of the space type (SpaceFile.browse_mode for SPACE_FILE). */
+	const int subtype;
 } EditorTypeItem;
+
+#define EDITOR_TYPE_VALUE(space_type, subtype) ((space_type) | ((subtype) << 8))
 
 static const EditorTypeItem general_editors[] = {
 	{SPACE_VIEW3D, "3D View", ICON_VIEW3D},
 	{SPACE_IMAGE, "UV/Image Editor", ICON_IMAGE_COL},
 	{SPACE_NODE, "Node Editor", ICON_NODETREE},
+	{SPACE_FILE, "Asset Browser", ICON_ASSET_MANAGER, FILE_BROWSE_MODE_ASSETS},
 	{0, NULL, 0}
 };
 
@@ -1865,11 +1872,21 @@ static const EditorTypeItem more_editors[] = {
 static void ui_area_type_set_cb(bContext *C, void *arg1, void *arg2)
 {
 	ScrArea *sa = (ScrArea *)arg1;
-	const int space_type = POINTER_AS_INT(arg2);
+	const int value = POINTER_AS_INT(arg2);
+	const int space_type = value & 0xff;
+	const int subtype = value >> 8;
 
 	if (sa->spacetype != space_type) {
 		sa->butspacetype = space_type;
 		ED_area_newspace(C, sa, space_type, true);
+	}
+
+	/* File Browser and Asset Browser share SPACE_FILE, switching between them only changes its mode. */
+	if (sa->spacetype == SPACE_FILE) {
+		SpaceFile *sfile = sa->spacedata.first;
+		if (sfile && sfile->browse_mode != subtype) {
+			ED_fileselect_set_browse_mode(C, sa, subtype);
+		}
 	}
 }
 
@@ -1891,7 +1908,7 @@ static void ui_area_type_menu_item(uiLayout *layout, ScrArea *sa, const EditorTy
 	                              0.0f,
 	                              0.0f,
 	                              TIP_("Change editor type"));
-	UI_but_func_set(but, ui_area_type_set_cb, sa, POINTER_FROM_INT(item->space_type));
+	UI_but_func_set(but, ui_area_type_set_cb, sa, POINTER_FROM_INT(EDITOR_TYPE_VALUE(item->space_type, item->subtype)));
 }
 
 static void ui_area_type_menu_column(uiLayout *layout, ScrArea *sa, const char *title, const EditorTypeItem *items)
@@ -1922,8 +1939,15 @@ static void ui_area_type_menu_main(bContext *C, uiLayout *layout, void *arg1)
 	uiItemMenuF(uiLayoutColumn(row, false), "More Editors", ICON_RIGHTARROW, ui_area_type_menu_more, sa);
 }
 
-static int ui_area_type_icon(const int space_type)
+static int ui_area_type_icon(const ScrArea *sa)
 {
+	const int space_type = sa->spacetype;
+	int subtype = 0;
+
+	if (space_type == SPACE_FILE && ED_fileselect_is_asset_browser(sa->spacedata.first)) {
+		subtype = FILE_BROWSE_MODE_ASSETS;
+	}
+
 	const EditorTypeItem *editor_groups[] = {
 		general_editors,
 		animation_editors,
@@ -1934,7 +1958,7 @@ static int ui_area_type_icon(const int space_type)
 
 	for (int group = 0; editor_groups[group] != NULL; group++) {
 		for (int i = 0; editor_groups[group][i].label != NULL; i++) {
-			if (editor_groups[group][i].space_type == space_type) {
+			if (editor_groups[group][i].space_type == space_type && editor_groups[group][i].subtype == subtype) {
 				return editor_groups[group][i].icon;
 			}
 		}
@@ -1954,7 +1978,7 @@ int ED_area_header_switchbutton(const bContext *C, uiBlock *block, int yco)
 	uiDefIconMenuBut(block,
 	                 ui_area_type_menu_main,
 	                 sa,
-	                 ui_area_type_icon(sa->spacetype),
+	                 ui_area_type_icon(sa),
 	                 xco,
 	                 yco,
 	                 1.6 * U.widget_unit,

@@ -74,6 +74,7 @@ struct ImBuf       *filelist_geticon_image(struct FileList *filelist, const int 
 int                 filelist_geticon(struct FileList *filelist, const int index, const bool is_main);
 
 struct FileList    *filelist_new(short type);
+short               filelist_type_get(const struct FileList *filelist);
 void                filelist_clear(struct FileList *filelist);
 void                filelist_clear_ex(struct FileList *filelist, const bool do_cache, const bool do_selection);
 void                filelist_free(struct FileList *filelist);

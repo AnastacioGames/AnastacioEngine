@@ -693,6 +693,19 @@ static void view3d_obj_drop_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_string_set(drop->ptr, "filepath", drag->path);
 }
 
+/* Object, Group or Material dragged from inside a .blend in the File Browser. */
+static bool view3d_asset_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
+{
+	return drag->type == WM_DRAG_PATH && ED_operator_objectmode(C) &&
+	       view3d_asset_drop_path_parse(drag->path, NULL, NULL, NULL);
+}
+
+static void view3d_asset_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	drop->opcontext = WM_OP_EXEC_DEFAULT;
+	RNA_string_set(drop->ptr, "filepath", drag->path);
+}
+
 static bool view3d_group_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent *UNUSED(event))
 {
 	if (drag->type == WM_DRAG_ID) {
@@ -803,6 +816,7 @@ static void view3d_dropboxes(void)
 {
 	ListBase *lb = WM_dropboxmap_find("View3D", SPACE_VIEW3D, RGN_TYPE_WINDOW);
 
+	WM_dropbox_add(lb, "VIEW3D_OT_asset_drop", view3d_asset_drop_poll, view3d_asset_drop_copy);
 	WM_dropbox_add(lb, "VIEW3D_OT_import_obj_drop", view3d_obj_drop_poll, view3d_obj_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_add_named", view3d_ob_drop_poll, view3d_ob_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_drop_named_material", view3d_mat_drop_poll, view3d_id_drop_copy);

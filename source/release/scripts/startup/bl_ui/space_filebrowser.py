@@ -33,6 +33,10 @@ class FILEBROWSER_HT_header(Header):
         if st.active_operator is None:
             layout.template_header()
 
+        if st.browse_mode == 'ASSETS':
+            self.draw_asset_browser(context)
+            return
+
         layout.menu("FILEBROWSER_MT_view")
 
         row = layout.row(align=True)
@@ -88,6 +92,35 @@ class FILEBROWSER_HT_header(Header):
             row.separator()
             row.prop(params, "filter_search", text="", icon='VIEWZOOM')
 
+    def draw_asset_browser(self, context):
+        layout = self.layout
+        st = context.space_data
+        params = st.params
+
+        layout.menu("FILEBROWSER_MT_asset_view")
+
+        row = layout.row(align=True)
+        row.operator("file.parent", text="", icon='FILE_PARENT')
+        row.operator("file.refresh", text="", icon='FILE_REFRESH')
+
+        if params:
+            layout.prop(params, "display_type", expand=True, text="")
+            row = layout.row(align=True)
+            row.prop(params, "use_link", text="Link" if params.use_link else "Append",
+                     icon='LINK_BLEND' if params.use_link else 'APPEND_BLEND', toggle=True)
+
+        layout.separator_spacer()
+
+        layout.template_running_jobs()
+
+        if params:
+            row = layout.row(align=True)
+            row.prop_enum(params, "filter_id", 'OBJECT', text="")
+            row.prop_enum(params, "filter_id", 'GROUP', text="")
+            row.prop_enum(params, "filter_id", 'MATERIAL', text="")
+            row.separator()
+            row.prop(params, "filter_search", text="", icon='VIEWZOOM')
+
 
 class FILEBROWSER_UL_dir(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
@@ -102,6 +135,8 @@ class FILEBROWSER_UL_dir(UIList):
             icon = 'BOOKMARKS'
         if active_propname == "recent_folders_active":
             icon = 'FILE_FOLDER'
+        if active_propname == "asset_libraries_active":
+            icon = 'ASSET_MANAGER'
 
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
@@ -123,6 +158,10 @@ class FILEBROWSER_PT_bookmarks_volumes(Panel):
     bl_category = "Bookmarks"
     bl_label = "Volumes"
 
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.browse_mode == 'FILES'
+
     def draw(self, context):
         layout = self.layout
         space = context.space_data
@@ -141,7 +180,7 @@ class FILEBROWSER_PT_bookmarks_system(Panel):
 
     @classmethod
     def poll(cls, context):
-        return not context.user_preferences.filepaths.hide_system_bookmarks
+        return context.space_data.browse_mode == 'FILES' and not context.user_preferences.filepaths.hide_system_bookmarks
 
     def draw(self, context):
         layout = self.layout
@@ -170,6 +209,10 @@ class FILEBROWSER_PT_bookmarks_favorites(Panel):
     bl_region_type = 'TOOLS'
     bl_category = "Bookmarks"
     bl_label = "Favorites"
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.browse_mode == 'FILES'
 
     def draw(self, context):
         layout = self.layout
@@ -204,7 +247,7 @@ class FILEBROWSER_PT_bookmarks_recents(Panel):
 
     @classmethod
     def poll(cls, context):
-        return not context.user_preferences.filepaths.hide_recent_locations
+        return context.space_data.browse_mode == 'FILES' and not context.user_preferences.filepaths.hide_recent_locations
 
     def draw(self, context):
         layout = self.layout
@@ -228,7 +271,8 @@ class FILEBROWSER_PT_advanced_filter(Panel):
     @classmethod
     def poll(cls, context):
         # only useful in append/link (library) context currently...
-        return context.space_data.params.use_library_browsing
+        space = context.space_data
+        return space.browse_mode == 'FILES' and space.params.use_library_browsing
 
     def draw(self, context):
         layout = self.layout
@@ -241,6 +285,69 @@ class FILEBROWSER_PT_advanced_filter(Panel):
                 layout.separator()
                 col = layout.column()
                 col.prop(params, "filter_id")
+
+
+class FILEBROWSER_PT_asset_libraries(Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOLS'
+    bl_category = "Assets"
+    bl_label = "Asset Libraries"
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.browse_mode == 'ASSETS'
+
+    def draw(self, context):
+        layout = self.layout
+        space = context.space_data
+
+        row = layout.row()
+        if space.asset_libraries:
+            row.template_list("FILEBROWSER_UL_dir", "asset_libraries", space, "asset_libraries",
+                              space, "asset_libraries_active", item_dyntip_propname="path",
+                              rows=2, maxrows=10)
+        else:
+            row.label(text="No library yet: browse to a folder and add it")
+
+        col = row.column(align=True)
+        col.operator("file.asset_library_add", icon='ZOOMIN', text="")
+        col.operator("file.asset_library_remove", icon='ZOOMOUT', text="")
+
+        layout.separator()
+        layout.operator("file.asset_previews_generate", text="Generate Previews", icon='IMAGE_COL')
+
+
+class FILEBROWSER_PT_asset_directory(Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOLS'
+    bl_category = "Assets"
+    bl_label = "Folder"
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.browse_mode == 'ASSETS' and context.space_data.params
+
+    def draw(self, context):
+        layout = self.layout
+        params = context.space_data.params
+        layout.prop(params, "directory", text="")
+        layout.operator("file.bookmark_add", text="Bookmark Folder", icon='BOOKMARKS')
+
+
+class FILEBROWSER_MT_asset_view(Menu):
+    bl_label = "View"
+
+    def draw(self, context):
+        layout = self.layout
+        params = context.space_data.params
+
+        if params:
+            layout.prop_menu_enum(params, "display_size")
+            layout.prop_menu_enum(params, "sort_method")
+
+        layout.separator()
+
+        layout.menu("INFO_MT_area")
 
 
 class FILEBROWSER_MT_view(Menu):
@@ -268,6 +375,9 @@ classes = (
     FILEBROWSER_PT_bookmarks_favorites,
     FILEBROWSER_PT_bookmarks_recents,
     FILEBROWSER_PT_advanced_filter,
+    FILEBROWSER_PT_asset_libraries,
+    FILEBROWSER_PT_asset_directory,
+    FILEBROWSER_MT_asset_view,
     FILEBROWSER_MT_view,
 )
 

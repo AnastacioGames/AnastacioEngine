@@ -900,6 +900,12 @@ char *ED_fsmenu_entry_get_name(struct FSMenuEntry *fsentry) RET_NULL
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_fsmenu_entry_set_name) */
 void ED_fsmenu_entry_set_name(struct FSMenuEntry *fsentry, const char *name) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_fileselect_set_browse_mode) */
+void ED_fileselect_set_browse_mode(struct bContext *C, struct ScrArea *sa, const int mode) RET_NONE
+#endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_fileselect_asset_library_active_index) */
+int ED_fileselect_asset_library_active_index(const char *dir) RET_ZERO
+#endif
 
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (PE_get_current) */
 struct PTCacheEdit *PE_get_current(struct Main *bmain, struct Scene *scene, struct Object *ob) RET_NULL

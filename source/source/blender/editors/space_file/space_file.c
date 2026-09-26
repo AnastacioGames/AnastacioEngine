@@ -212,6 +212,22 @@ static void file_refresh(const bContext *C, ScrArea *sa)
 	if (!sfile->folders_prev) {
 		sfile->folders_prev = folderlist_new();
 	}
+
+	ED_fileselect_browse_mode_params_ensure(sfile);
+	if (sfile->files) {
+		/* The list reader is fixed at creation, recreate the list when the browse mode (or a file
+		 * dialog reusing this space) changed the kind of listing. */
+		const short list_type = filelist_type_get(sfile->files);
+		if ((list_type == FILE_LOADLIB) != (params->type == FILE_LOADLIB) ||
+		    (list_type == FILE_MAIN) != (params->type == FILE_MAIN))
+		{
+			filelist_readjob_stop(wm, sa ? sa : CTX_wm_area(C));
+			filelist_freelib(sfile->files);
+			filelist_free(sfile->files);
+			MEM_freeN(sfile->files);
+			sfile->files = NULL;
+		}
+	}
 	if (!sfile->files) {
 		sfile->files = filelist_new(params->type);
 		params->highlight_file = -1; /* added this so it opens nicer (ton) */
@@ -276,6 +292,31 @@ static void file_refresh(const bContext *C, ScrArea *sa)
 
 	if (sfile->layout) {
 		sfile->layout->dirty = true;
+	}
+
+	/* The Asset Browser has no file name / execute buttons nor operator properties, but a file dialog
+	 * opened in its area (the operator wins over the browse mode) needs them. */
+	if (sa) {
+		const bool hide = ED_fileselect_is_asset_browser(sfile);
+		bool changed = false;
+		ARegion *ar;
+
+		for (ar = sa->regionbase.first; ar; ar = ar->next) {
+			if (ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOL_PROPS)) {
+				if (hide && !(ar->flag & RGN_FLAG_HIDDEN)) {
+					ar->flag |= RGN_FLAG_HIDDEN;
+					changed = true;
+				}
+				else if (!hide && sfile->op && (ar->flag & RGN_FLAG_HIDDEN)) {
+					ar->flag &= ~RGN_FLAG_HIDDEN;
+					changed = true;
+				}
+			}
+		}
+		if (changed) {
+			ED_area_initialize(wm, CTX_wm_window(C), sa);
+			ED_area_tag_redraw(sa);
+		}
 	}
 
 	/* Might be called with NULL sa, see file_main_region_draw() below. */
@@ -437,6 +478,9 @@ static void file_operatortypes(void)
 	WM_operatortype_append(FILE_OT_directory_new);
 	WM_operatortype_append(FILE_OT_delete);
 	WM_operatortype_append(FILE_OT_rename);
+	WM_operatortype_append(FILE_OT_asset_library_add);
+	WM_operatortype_append(FILE_OT_asset_library_remove);
+	WM_operatortype_append(FILE_OT_asset_add);
 	WM_operatortype_append(FILE_OT_smoothscroll);
 	WM_operatortype_append(FILE_OT_filepath_drop);
 }
@@ -472,6 +516,8 @@ static void file_keymap(struct wmKeyConfig *keyconf)
 	keymap = WM_keymap_ensure(keyconf, "File Browser Main", SPACE_FILE, 0);
 	kmi = WM_keymap_add_item(keymap, "FILE_OT_execute", LEFTMOUSE, KM_DBL_CLICK, 0, 0);
 	RNA_boolean_set(kmi->ptr, "need_active", true);
+	/* Asset Browser: double-click adds the asset at the 3D cursor. */
+	WM_keymap_add_item(keymap, "FILE_OT_asset_add", LEFTMOUSE, KM_DBL_CLICK, 0, 0);
 
 	WM_keymap_add_item(keymap, "FILE_OT_refresh", PADPERIOD, KM_PRESS, 0, 0);
 
@@ -674,7 +720,8 @@ static bool filepath_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(
 {
 	if (drag->type == WM_DRAG_PATH) {
 		SpaceFile *sfile = CTX_wm_space_file(C);
-		if (sfile) {
+		/* Asset Browser items are dragged out of it, dropping them back means nothing. */
+		if (sfile && !ED_fileselect_is_asset_browser(sfile)) {
 			return 1;
 		}
 	}

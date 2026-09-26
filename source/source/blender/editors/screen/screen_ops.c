@@ -45,6 +45,7 @@
 #include "DNA_mask_types.h"
 #include "DNA_node_types.h"
 #include "DNA_userdef_types.h"
+#include "DNA_space_types.h"
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
@@ -66,6 +67,7 @@
 #include "ED_anim_api.h"
 #include "ED_armature.h"
 #include "ED_clip.h"
+#include "ED_fileselect.h"
 #include "ED_image.h"
 #include "ED_keyframes_draw.h"
 #include "ED_object.h"
@@ -4230,6 +4232,45 @@ static void SCREEN_OT_settings_show(struct wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Show Asset Browser Operator
+ * \{ */
+
+static int asset_browser_show_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	int sizex = 900 * UI_DPI_FAC;
+	int sizey = 600 * UI_DPI_FAC;
+
+	/* changes context! */
+	wmWindow *win = WM_window_open_temp(C, event->x, event->y, sizex, sizey, WM_WINDOW_ASSETS);
+
+	if (win != NULL) {
+		ScrArea *sa = win->screen->areabase.first;
+		if (sa && sa->spacetype == SPACE_FILE) {
+			ED_fileselect_set_browse_mode(C, sa, FILE_BROWSE_MODE_ASSETS);
+		}
+		return OPERATOR_FINISHED;
+	}
+	else {
+		BKE_report(op->reports, RPT_ERROR, "Failed to open window!");
+		return OPERATOR_CANCELLED;
+	}
+}
+
+static void SCREEN_OT_asset_browser_show(struct wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Show Asset Browser";
+	ot->description = "Show the Asset Browser in a separate window";
+	ot->idname = "SCREEN_OT_asset_browser_show";
+
+	/* api callbacks */
+	ot->invoke = asset_browser_show_invoke;
+	ot->poll = ED_operator_screenactive;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Show Drivers Editor Operator
  * \{ */
 
@@ -4717,6 +4758,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_screenshot);
 	WM_operatortype_append(SCREEN_OT_settings_show);
 	WM_operatortype_append(SCREEN_OT_drivers_editor_show);
+	WM_operatortype_append(SCREEN_OT_asset_browser_show);
 	WM_operatortype_append(SCREEN_OT_region_blend);
 	WM_operatortype_append(SCREEN_OT_space_context_cycle);
 

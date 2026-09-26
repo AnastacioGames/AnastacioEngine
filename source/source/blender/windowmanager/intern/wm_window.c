@@ -873,6 +873,9 @@ wmWindow *WM_window_open_temp(bContext *C, int x, int y, int sizex, int sizey, i
 	else if (type == WM_WINDOW_DRIVERS) {
 		ED_area_newspace(C, sa, SPACE_IPO, false);
 	}
+	else if (type == WM_WINDOW_ASSETS) {
+		ED_area_newspace(C, sa, SPACE_FILE, false);
+	}
 	else {
 		ED_area_newspace(C, sa, SPACE_USERPREF, false);
 	}
@@ -934,7 +937,9 @@ wmWindow *WM_window_open_temp(bContext *C, int x, int y, int sizex, int sizey, i
 		}
 	}
 
-	if (sa->spacetype == SPACE_IMAGE)
+	if (type == WM_WINDOW_ASSETS)
+		title = IFACE_("Range Asset Browser");
+	else if (sa->spacetype == SPACE_IMAGE)
 		title = IFACE_("Blender Render");
 	else if (ELEM(sa->spacetype, SPACE_OUTLINER, SPACE_USERPREF))
 		title = IFACE_("Range Settings");

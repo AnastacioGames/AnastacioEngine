@@ -64,6 +64,7 @@ typedef struct FSMenu {
 	FSMenuEntry *fsmenu_system_bookmarks;
 	FSMenuEntry *fsmenu_bookmarks;
 	FSMenuEntry *fsmenu_recent;
+	FSMenuEntry *fsmenu_asset_libraries;
 } FSMenu;
 
 static FSMenu *g_fsmenu = NULL;
@@ -93,6 +94,9 @@ struct FSMenuEntry *ED_fsmenu_get_category(struct FSMenu *fsmenu, FSMenuCategory
 		case FS_CATEGORY_RECENT:
 			fsm_head = fsmenu->fsmenu_recent;
 			break;
+		case FS_CATEGORY_ASSET_LIBRARIES:
+			fsm_head = fsmenu->fsmenu_asset_libraries;
+			break;
 	}
 	return fsm_head;
 }
@@ -111,6 +115,9 @@ void ED_fsmenu_set_category(struct FSMenu *fsmenu, FSMenuCategory category, FSMe
 			break;
 		case FS_CATEGORY_RECENT:
 			fsmenu->fsmenu_recent = fsm_head;
+			break;
+		case FS_CATEGORY_ASSET_LIBRARIES:
+			fsmenu->fsmenu_asset_libraries = fsm_head;
 			break;
 	}
 }
@@ -394,6 +401,16 @@ void fsmenu_write_file(struct FSMenu *fsmenu, const char *filename)
 			fprintf(fp, "%s\n", fsm_iter->path);
 		}
 	}
+	fprintf(fp, "[AssetLibraries]\n");
+	for (fsm_iter = ED_fsmenu_get_category(fsmenu, FS_CATEGORY_ASSET_LIBRARIES); fsm_iter; fsm_iter = fsm_iter->next) {
+		if (fsm_iter->path && fsm_iter->save) {
+			fsmenu_entry_generate_name(fsm_iter, fsm_name, sizeof(fsm_name));
+			if (fsm_iter->name[0] && !STREQ(fsm_iter->name, fsm_name)) {
+				fprintf(fp, "!%s\n", fsm_iter->name);
+			}
+			fprintf(fp, "%s\n", fsm_iter->path);
+		}
+	}
 	fclose(fp);
 }
 
@@ -415,6 +432,9 @@ void fsmenu_read_bookmarks(struct FSMenu *fsmenu, const char *filename)
 		}
 		else if (STREQLEN(line, "[Recent]", 8)) {
 			category = FS_CATEGORY_RECENT;
+		}
+		else if (STREQLEN(line, "[AssetLibraries]", 16)) {
+			category = FS_CATEGORY_ASSET_LIBRARIES;
 		}
 		else if (line[0] == '!') {
 			int len = strlen(line);
@@ -695,7 +715,8 @@ void fsmenu_refresh_system_category(struct FSMenu *fsmenu)
 
 void fsmenu_refresh_bookmarks_status(struct FSMenu *fsmenu)
 {
-	int categories[] = {FS_CATEGORY_SYSTEM, FS_CATEGORY_SYSTEM_BOOKMARKS, FS_CATEGORY_BOOKMARKS, FS_CATEGORY_RECENT};
+	int categories[] = {FS_CATEGORY_SYSTEM, FS_CATEGORY_SYSTEM_BOOKMARKS, FS_CATEGORY_BOOKMARKS, FS_CATEGORY_RECENT,
+	                    FS_CATEGORY_ASSET_LIBRARIES};
 	int i;
 
 	for (i = sizeof(categories) / sizeof(*categories); i--; ) {
@@ -713,6 +734,7 @@ void fsmenu_free(void)
 		fsmenu_free_category(g_fsmenu, FS_CATEGORY_SYSTEM_BOOKMARKS);
 		fsmenu_free_category(g_fsmenu, FS_CATEGORY_BOOKMARKS);
 		fsmenu_free_category(g_fsmenu, FS_CATEGORY_RECENT);
+		fsmenu_free_category(g_fsmenu, FS_CATEGORY_ASSET_LIBRARIES);
 		MEM_freeN(g_fsmenu);
 	}
 

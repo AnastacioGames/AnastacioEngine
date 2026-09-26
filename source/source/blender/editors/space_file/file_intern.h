@@ -85,6 +85,9 @@ void FILE_OT_bookmark_toggle(struct wmOperatorType *ot);
 void FILE_OT_filenum(struct wmOperatorType *ot);
 void FILE_OT_delete(struct wmOperatorType *ot);
 void FILE_OT_rename(struct wmOperatorType *ot);
+void FILE_OT_asset_library_add(struct wmOperatorType *ot);
+void FILE_OT_asset_library_remove(struct wmOperatorType *ot);
+void FILE_OT_asset_add(struct wmOperatorType *ot);
 void FILE_OT_smoothscroll(struct wmOperatorType *ot);
 void FILE_OT_filepath_drop(struct wmOperatorType *ot);
 

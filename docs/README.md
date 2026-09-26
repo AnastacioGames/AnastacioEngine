@@ -21,6 +21,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
   ainda pendentes dessa frente.
 - [Plano do Vehicle System](vehicle-system-plan-2.md): evolução faseada da ponte Bullet, debug de veículo
   e ferramenta Vehicle Lab em ImGui.
+- [Asset Browser](asset-browser.md): modo Assets do File Browser, bibliotecas, arrastar para a Vista 3D,
+  janela flutuante e miniaturas.
 - [Preset físico de veículo v1](vehicle-preset-v1.md): contrato do arquivo, save/load e rebuild explícito.
 - [Roteiro de teste de veículo](vehicle-test-guide.md): cena padrão, automação por componente e validação manual.
 - [Relatório de bugs silenciosos](relatorio-varredura-bugs-silenciosos.md): candidatos da auditoria estática

@@ -308,6 +308,9 @@ typedef struct FileList {
 	short max_recursion;
 	short recursion_level;
 
+	/* FileSelectParams.type this list was created for (fixes the reader callbacks below). */
+	short type;
+
 	struct BlendHandle *libfiledata;
 
 	/* Set given path as root directory, if last bool is true may change given string in place to a valid value.
@@ -1297,6 +1300,7 @@ FileList *filelist_new(short type)
 
 	p->selection_state = BLI_ghash_new(BLI_ghashutil_uinthash_v4_p, BLI_ghashutil_uinthash_v4_cmp, __func__);
 
+	p->type = type;
 	switch (type) {
 		case FILE_MAIN:
 			p->checkdirf = filelist_checkdir_main;
@@ -1315,6 +1319,11 @@ FileList *filelist_new(short type)
 			break;
 	}
 	return p;
+}
+
+short filelist_type_get(const struct FileList *filelist)
+{
+	return filelist->type;
 }
 
 void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const bool do_selection)

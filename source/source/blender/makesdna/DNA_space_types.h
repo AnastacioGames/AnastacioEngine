@@ -681,7 +681,8 @@ typedef struct SpaceFile {
 	char _pad0[6];
 	/* End 'SpaceLink' header. */
 
-	char _pad1[4];
+	char browse_mode; /* eFileBrowse_Mode */
+	char _pad1[3];
 	int scroll_offset;
 
 	struct FileSelectParams *params; /* config and input for file select */
@@ -706,6 +707,12 @@ typedef struct SpaceFile {
 	short recentnr, bookmarknr;
 	short systemnr, system_bookmarknr;
 } SpaceFile;
+
+/* SpaceFile.browse_mode (File space type sub-mode, like the Asset Browser of Blender 2.9x) */
+typedef enum eFileBrowse_Mode {
+	FILE_BROWSE_MODE_FILES = 0,
+	FILE_BROWSE_MODE_ASSETS = 1,
+} eFileBrowse_Mode;
 
 /* FSMenuEntry's without paths indicate separators */
 typedef struct FSMenuEntry {

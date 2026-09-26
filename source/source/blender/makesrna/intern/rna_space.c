@@ -1904,6 +1904,60 @@ static void rna_FileBrowser_FSMenuRecent_active_range(PointerRNA *ptr, int *min,
 	rna_FileBrowser_FSMenu_active_range(ptr, min, max, softmin, softmax, FS_CATEGORY_RECENT);
 }
 
+static void rna_FileBrowser_FSMenuAssetLibrary_data_begin(CollectionPropertyIterator *iter, PointerRNA *UNUSED(ptr))
+{
+	rna_FileBrowser_FSMenu_begin(iter, FS_CATEGORY_ASSET_LIBRARIES);
+}
+
+static int rna_FileBrowser_FSMenuAssetLibrary_data_length(PointerRNA *UNUSED(ptr))
+{
+	struct FSMenu *fsmenu = ED_fsmenu_get();
+
+	return ED_fsmenu_get_nentries(fsmenu, FS_CATEGORY_ASSET_LIBRARIES);
+}
+
+/* No DNA index for asset libraries: the active one is the library holding the current folder. */
+static int rna_FileBrowser_FSMenuAssetLibrary_active_get(PointerRNA *ptr)
+{
+	SpaceFile *sf = ptr->data;
+
+	return sf->params ? ED_fileselect_asset_library_active_index(sf->params->dir) : -1;
+}
+
+static void rna_FileBrowser_FSMenuAssetLibrary_active_set(PointerRNA *ptr, int value)
+{
+	SpaceFile *sf = ptr->data;
+	FSMenuEntry *fsm = ED_fsmenu_get_entry(ED_fsmenu_get(), FS_CATEGORY_ASSET_LIBRARIES, value);
+
+	if (fsm && fsm->path && sf->params) {
+		BLI_strncpy(sf->params->dir, fsm->path, sizeof(sf->params->dir));
+	}
+}
+
+static void rna_FileBrowser_FSMenuAssetLibrary_active_range(
+        PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
+{
+	rna_FileBrowser_FSMenu_active_range(ptr, min, max, softmin, softmax, FS_CATEGORY_ASSET_LIBRARIES);
+}
+
+static void rna_SpaceFileBrowser_browse_mode_update(bContext *C, PointerRNA *ptr)
+{
+	SpaceFile *sf = ptr->data;
+	ScrArea *sa = rna_area_from_space(ptr);
+
+	if (sa) {
+		ED_fileselect_set_browse_mode(C, sa, sf->browse_mode);
+	}
+}
+
+static int rna_SpaceFileBrowser_browse_mode_editable(PointerRNA *ptr, const char **UNUSED(r_info))
+{
+	SpaceFile *sf = ptr->data;
+
+	/* A file dialog can not become an Asset Browser. */
+	return (sf->op == NULL) ? PROP_EDITABLE : 0;
+}
+
 #else
 
 static const EnumPropertyItem dt_uv_items[] = {
@@ -4046,6 +4100,12 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 	RNA_def_property_ui_icon(prop, ICON_FILE_FOLDER, 0);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 
+	prop = RNA_def_property(srna, "use_link", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", FILE_LINK);
+	RNA_def_property_ui_text(prop, "Link",
+	                         "Asset Browser: link the assets instead of appending them (Ctrl while dropping also links)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
 	prop = RNA_def_property(srna, "use_filter_blendid", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "filter", FILE_TYPE_BLENDERLIB);
 	RNA_def_property_ui_text(prop, "Filter Blender IDs", "Show .blend files items (objects, materials, etc.)");
@@ -4129,6 +4189,13 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 
+	static const EnumPropertyItem file_browse_mode_items[] = {
+		{FILE_BROWSE_MODE_FILES, "FILES", ICON_FILESEL, "File Browser", "Browse files and folders"},
+		{FILE_BROWSE_MODE_ASSETS, "ASSETS", ICON_ASSET_MANAGER, "Asset Browser",
+		 "Browse the Objects, Groups and Materials of the asset libraries, drag them into the 3D View"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	srna = RNA_def_struct(brna, "SpaceFileBrowser", "Space");
 	RNA_def_struct_sdna(srna, "SpaceFile");
 	RNA_def_struct_ui_text(srna, "Space File Browser", "File browser space data");
@@ -4205,6 +4272,30 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 	RNA_def_property_int_sdna(prop, NULL, "recentnr");
 	RNA_def_property_int_funcs(prop, "rna_FileBrowser_FSMenuRecent_active_get",
 	                           "rna_FileBrowser_FSMenuRecent_active_set", "rna_FileBrowser_FSMenuRecent_active_range");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, "rna_FileBrowser_FSMenu_active_update");
+
+	/* Asset Browser */
+	prop = RNA_def_property(srna, "browse_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "browse_mode");
+	RNA_def_property_enum_items(prop, file_browse_mode_items);
+	RNA_def_property_editable_func(prop, "rna_SpaceFileBrowser_browse_mode_editable");
+	RNA_def_property_ui_text(prop, "Browse Mode", "Browse files, or the assets of the asset libraries");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, "rna_SpaceFileBrowser_browse_mode_update");
+
+	prop = RNA_def_collection(srna, "asset_libraries", "FileBrowserFSMenuEntry", "Asset Libraries",
+	                          "Folders whose .blend files are browsed by the Asset Browser");
+	RNA_def_property_collection_funcs(prop, "rna_FileBrowser_FSMenuAssetLibrary_data_begin", "rna_FileBrowser_FSMenu_next",
+	                                  "rna_FileBrowser_FSMenu_end", "rna_FileBrowser_FSMenu_get",
+	                                  "rna_FileBrowser_FSMenuAssetLibrary_data_length", NULL, NULL, NULL);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop = RNA_def_property(srna, "asset_libraries_active", PROP_INT, PROP_NONE);
+	RNA_def_property_int_funcs(prop, "rna_FileBrowser_FSMenuAssetLibrary_active_get",
+	                           "rna_FileBrowser_FSMenuAssetLibrary_active_set",
+	                           "rna_FileBrowser_FSMenuAssetLibrary_active_range");
+	RNA_def_property_ui_text(prop, "Active Asset Library", "Index of the asset library being browsed (-1 if none)");
 	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, "rna_FileBrowser_FSMenu_active_update");
 }

@@ -253,6 +253,10 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   ativo fora de Halo, Z Offset sempre ativo e o aviso de Instancing + GPU Skinning.
 - **Painel Subsurface Scattering do modo jogo (2026-09-25)**: conferir no editor que os presets somem, o RGB
   Radius aparece sem "m" e que o efeito some ao desligar Diffuse na lâmpada.
+- **Asset Browser (2026-09-25)**: conferir na janela real o gesto de arrastar um asset (objeto, grupo, material)
+  do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
+  miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
+  execução automatizada, mas nenhum gesto com o mouse foi testado.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

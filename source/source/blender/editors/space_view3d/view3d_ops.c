@@ -25,7 +25,10 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "MEM_guardedalloc.h"
 
+
+#include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_group_types.h"
 #include "DNA_scene_types.h"
@@ -34,13 +37,23 @@
 #include "DNA_view3d_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_ghash.h"
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
+
+#include "BLO_readfile.h"
 
 #include "BKE_appdir.h"
 #include "BKE_blender_copybuffer.h"
 #include "BKE_context.h"
+#include "BKE_depsgraph.h"
+#include "BKE_group.h"
+#include "BKE_idcode.h"
+#include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_report.h"
+#include "BKE_scene.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -48,6 +61,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 
@@ -194,11 +208,301 @@ static void VIEW3D_OT_import_obj_drop(wmOperatorType *ot)
 	RNA_def_string_file_path(ot->srna, "filepath", NULL, FILE_MAX, "File Path", "OBJ file to import");
 }
 
+/* ************************** asset drop ***************************** */
+
+/* Parse a path dragged from the File Browser pointing inside a .blend
+ * ("lib.blend/Object/Cube"). Only data-blocks the 3D View can place are
+ * accepted. Cheap text test first: drop polls run on every mouse move. */
+bool view3d_asset_drop_path_parse(const char *path, char *r_libpath, short *r_idcode, char *r_name)
+{
+	char dir[FILE_MAX_LIBEXTRA];
+	char *group, *name;
+	short idcode;
+
+	if (path == NULL || BLI_strcasestr(path, ".blend") == NULL) {
+		return false;
+	}
+	if (!BLO_library_path_explode(path, dir, &group, &name) || group == NULL || name == NULL) {
+		return false;
+	}
+
+	idcode = BKE_idcode_from_name(group);
+	if (!ELEM(idcode, ID_OB, ID_GR, ID_MA)) {
+		return false;
+	}
+
+	if (r_libpath) {
+		BLI_strncpy(r_libpath, dir, FILE_MAX_LIBEXTRA);
+	}
+	if (r_idcode) {
+		*r_idcode = idcode;
+	}
+	if (r_name) {
+		BLI_strncpy(r_name, name, MAX_ID_NAME - 2);
+	}
+	return true;
+}
+
+static GSet *asset_drop_id_set(ListBase *lb)
+{
+	GSet *set = BLI_gset_ptr_new(__func__);
+	ID *id;
+
+	for (id = lb->first; id; id = id->next) {
+		BLI_gset_add(set, id);
+	}
+	return set;
+}
+
+/* Find the data-block brought by the append/link. Appending renames on
+ * conflict (Cube -> Cube.001), so prefer a new ID; linking an ID that is
+ * already linked returns the existing one from the same library. */
+static ID *asset_drop_find_id(ListBase *lb, GSet *existing, const char *libpath, const char *name, bool link)
+{
+	const size_t name_len = strlen(name);
+	ID *id;
+
+	for (id = lb->first; id; id = id->next) {
+		if (!BLI_gset_haskey(existing, id) && STREQLEN(id->name + 2, name, name_len) &&
+		    ELEM(id->name[2 + name_len], '\0', '.'))
+		{
+			return id;
+		}
+	}
+	if (link) {
+		for (id = lb->first; id; id = id->next) {
+			if (id->lib && STREQ(id->name + 2, name) && BLI_path_cmp(id->lib->filepath, libpath) == 0) {
+				return id;
+			}
+		}
+	}
+	return NULL;
+}
+
+/* The Append/Link toggle of an open Asset Browser (any window). */
+static bool asset_drop_browser_wants_link(bContext *C)
+{
+	wmWindowManager *wm = CTX_wm_manager(C);
+	wmWindow *win;
+	ScrArea *sa;
+
+	for (win = wm->windows.first; win; win = win->next) {
+		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
+			if (sa->spacetype == SPACE_FILE) {
+				SpaceFile *sfile = sa->spacedata.first;
+				if (sfile->op == NULL && sfile->browse_mode == FILE_BROWSE_MODE_ASSETS &&
+				    sfile->params && (sfile->params->flag & FILE_LINK))
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
+{
+	Main *bmain = CTX_data_main(C);
+	Scene *scene = CTX_data_scene(C);
+	wmWindow *win = CTX_wm_window(C);
+	ARegion *ar = CTX_wm_region(C);
+	const wmEvent *event = win ? win->eventstate : NULL;
+	wmOperatorType *append_ot;
+	PropertyRNA *prop;
+	PointerRNA props;
+	char path[FILE_MAX_LIBEXTRA], libpath[FILE_MAX_LIBEXTRA], name[MAX_ID_NAME - 2];
+	char directory[FILE_MAX_LIBEXTRA];
+	int mval[2] = {0, 0};
+	Base *target = NULL;
+	ListBase *lb;
+	GSet *existing;
+	ID *id;
+	short idcode;
+	bool link, has_mouse;
+	int result;
+
+	RNA_string_get(op->ptr, "filepath", path);
+	if (!view3d_asset_drop_path_parse(path, libpath, &idcode, name)) {
+		BKE_reportf(op->reports, RPT_ERROR, "'%s' is not an object, group or material inside a .blend", path);
+		return OPERATOR_CANCELLED;
+	}
+	if (BLI_path_cmp(BKE_main_blendfile_path(bmain), libpath) == 0) {
+		BKE_report(op->reports, RPT_ERROR, "Cannot drop assets from the file being edited");
+		return OPERATOR_CANCELLED;
+	}
+
+	/* Ctrl while dropping (or the Link toggle of the Asset Browser) links instead of appending. */
+	prop = RNA_struct_find_property(op->ptr, "link");
+	if (RNA_property_is_set(op->ptr, prop)) {
+		link = RNA_property_boolean_get(op->ptr, prop);
+	}
+	else {
+		link = (event && event->ctrl);
+		/* The browser toggle is a preference: objects, which can not be linked, are still appended. */
+		if (!link && idcode != ID_OB) {
+			link = asset_drop_browser_wants_link(C);
+		}
+	}
+	if (link && idcode == ID_OB) {
+		/* A linked object cannot be moved to the drop point. */
+		BKE_report(op->reports, RPT_ERROR, "Objects can only be appended; link a Group instead");
+		return OPERATOR_CANCELLED;
+	}
+
+	/* Called from a script or another editor there is no drop point:
+	 * objects go to the 3D cursor. */
+	has_mouse = event && ar && ar->regiontype == RGN_TYPE_WINDOW && CTX_wm_region_view3d(C);
+	if (has_mouse) {
+		mval[0] = event->x - ar->winrct.xmin;
+		mval[1] = event->y - ar->winrct.ymin;
+	}
+
+	if (idcode == ID_MA) {
+		/* Check the target before bringing anything into the file. */
+		/* Without drop point (double-click in the Asset Browser, scripts): the active object. */
+		target = has_mouse ? ED_view3d_give_base_under_cursor(C, mval) : BASACT;
+		if (target && !OB_TYPE_SUPPORT_MATERIAL(target->object->type)) {
+			target = NULL;
+		}
+		if (target == NULL) {
+			BKE_report(op->reports, RPT_ERROR, "Drop the material on an object");
+			return OPERATOR_CANCELLED;
+		}
+	}
+
+	append_ot = WM_operatortype_find(link ? "WM_OT_link" : "WM_OT_append", false);
+	if (append_ot == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
+	lb = which_libbase(bmain, idcode);
+	existing = asset_drop_id_set(lb);
+
+	BLI_join_dirfile(directory, sizeof(directory), libpath, BKE_idcode_to_name(idcode));
+	BLI_add_slash(directory);
+
+	WM_operator_properties_create_ptr(&props, append_ot);
+	RNA_string_set(&props, "directory", directory);
+	RNA_string_set(&props, "filename", name);
+	RNA_boolean_set(&props, "autoselect", idcode != ID_MA);
+	RNA_boolean_set(&props, "active_layer", true);
+	RNA_boolean_set(&props, "instance_groups", idcode == ID_GR);
+	result = WM_operator_name_call_ptr(C, append_ot, WM_OP_EXEC_DEFAULT, &props);
+	WM_operator_properties_free(&props);
+
+	id = (result & OPERATOR_FINISHED) ? asset_drop_find_id(lb, existing, libpath, name, link) : NULL;
+	BLI_gset_free(existing, NULL);
+
+	if (id == NULL) {
+		BKE_reportf(op->reports, RPT_ERROR, "Could not load '%s' from '%s'", name, libpath);
+		return OPERATOR_CANCELLED;
+	}
+
+	if (idcode == ID_MA) {
+		assign_material(bmain, target->object, (Material *)id, 1, BKE_MAT_ASSIGN_USERPREF);
+		DAG_id_tag_update(&target->object->id, OB_RECALC_OB);
+		WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, target->object);
+		WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, id);
+	}
+	else {
+		/* Append/link selected exactly what arrived: for a Group that is the
+		 * instancing Empty (made active, at the 3D cursor), for an Object the
+		 * object plus parents/children brought with it. Move the hierarchy
+		 * roots so the dropped item lands under the mouse. */
+		Object *ref = (Object *)id;
+		float loc[3], offset[3];
+		Base *base, *base_next;
+
+		if (idcode == ID_GR) {
+			Group *group = (Group *)id;
+			Object *inst = NULL;
+
+			for (base = scene->base.first; base; base = base_next) {
+				base_next = base->next;
+				if ((base->flag & SELECT) == 0) {
+					continue;
+				}
+				if (base->object->dup_group == group) {
+					inst = base->object;
+				}
+				else if (BKE_group_object_exists(group, base->object)) {
+					/* Appending also gives bases to the group's objects (T27437);
+					 * keep only the instance, like the modern Asset Browser. The
+					 * object must survive: the group still uses it. */
+					Object *ob = base->object;
+					BKE_scene_base_unlink(scene, base);
+					MEM_freeN(base);
+					id_us_min(&ob->id);
+					id_us_ensure_real(&ob->id);
+					DAG_id_type_tag(bmain, ID_OB);
+				}
+			}
+			if (inst == NULL) {
+				BKE_report(op->reports, RPT_ERROR, "Group was loaded but no instance was created");
+				return OPERATOR_CANCELLED;
+			}
+			ref = inst;
+		}
+
+		while (ref->parent) {
+			ref = ref->parent;
+		}
+
+		ED_object_location_from_view(C, loc);
+		if (has_mouse) {
+			ED_view3d_cursor3d_position(C, mval, loc);
+		}
+		sub_v3_v3v3(offset, loc, ref->loc);
+
+		for (base = scene->base.first; base; base = base->next) {
+			Object *ob = base->object;
+			if ((base->flag & SELECT) && ob->id.lib == NULL &&
+			    (ob->parent == NULL || (ob->parent->flag & SELECT) == 0))
+			{
+				add_v3_v3(ob->loc, offset);
+				DAG_id_tag_update(&ob->id, OB_RECALC_OB);
+			}
+		}
+
+		DAG_relations_tag_update(bmain);
+		base = BKE_scene_base_find(scene, (idcode == ID_GR) ? ref : (Object *)id);
+		if (base) {
+			ED_base_object_activate(C, base);
+		}
+		WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
+		WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM, scene);
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+static void VIEW3D_OT_asset_drop(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Drop Asset";
+	ot->idname = "VIEW3D_OT_asset_drop";
+	ot->description = "Append (or link with Ctrl) an object, group or material dragged from a .blend "
+	                  "and place it where it was dropped";
+	ot->exec = view3d_asset_drop_exec;
+	ot->poll = ED_operator_objectmode;
+
+	ot->flag = OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+	prop = RNA_def_string(ot->srna, "filepath", NULL, FILE_MAX_LIBEXTRA, "File Path",
+	                      "Data-block inside a .blend (lib.blend/Object/Name)");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "link", false, "Link", "Link instead of appending (default: Ctrl held)");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
 /* ************************** registration **********************************/
 
 void view3d_operatortypes(void)
 {
 	WM_operatortype_append(VIEW3D_OT_import_obj_drop);
+	WM_operatortype_append(VIEW3D_OT_asset_drop);
 	WM_operatortype_append(VIEW3D_OT_rotate);
 	WM_operatortype_append(VIEW3D_OT_move);
 	WM_operatortype_append(VIEW3D_OT_zoom);

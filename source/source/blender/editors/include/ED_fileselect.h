@@ -79,6 +79,12 @@ short ED_fileselect_set_params(struct SpaceFile *sfile);
 
 void ED_fileselect_reset_params(struct SpaceFile *sfile);
 
+/* Asset Browser: SpaceFile in FILE_BROWSE_MODE_ASSETS. */
+bool ED_fileselect_is_asset_browser(const struct SpaceFile *sfile);
+void ED_fileselect_browse_mode_params_ensure(struct SpaceFile *sfile);
+void ED_fileselect_set_browse_mode(struct bContext *C, struct ScrArea *sa, const int mode);
+int ED_fileselect_asset_library_active_index(const char *dir);
+
 
 void ED_fileselect_init_layout(struct SpaceFile *sfile, struct ARegion *ar);
 
@@ -110,7 +116,9 @@ typedef enum FSMenuCategory {
 	FS_CATEGORY_SYSTEM,
 	FS_CATEGORY_SYSTEM_BOOKMARKS,
 	FS_CATEGORY_BOOKMARKS,
-	FS_CATEGORY_RECENT
+	FS_CATEGORY_RECENT,
+	/* Folders scanned by the Asset Browser (SpaceFile.browse_mode == FILE_BROWSE_MODE_ASSETS). */
+	FS_CATEGORY_ASSET_LIBRARIES
 } FSMenuCategory;
 
 typedef enum FSMenuInsert {

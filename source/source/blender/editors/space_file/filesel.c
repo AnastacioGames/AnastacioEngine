@@ -60,6 +60,7 @@
 
 
 #include "ED_fileselect.h"
+#include "ED_screen.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -303,6 +304,167 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 
 	return 1;
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Asset Browser mode
+ *
+ * The Asset Browser is the File Browser (SPACE_FILE) running without operator in
+ * FILE_BROWSE_MODE_ASSETS, like Blender 2.9x does it: it lists the contents of the
+ * .blend files of an asset library folder (Objects, Groups and Materials only) and
+ * its items are dragged into the 3D View (see VIEW3D_OT_asset_drop).
+ * \{ */
+
+#define FILE_ASSET_FILTER_ID (FILTER_ID_OB | FILTER_ID_GR | FILTER_ID_MA)
+
+bool ED_fileselect_is_asset_browser(const SpaceFile *sfile)
+{
+	return (sfile && (sfile->op == NULL) && (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS));
+}
+
+/* First asset library folder that exists on disk. */
+static bool fileselect_asset_library_default(char *r_dir, const size_t maxlen)
+{
+	FSMenuEntry *fsm;
+
+	for (fsm = ED_fsmenu_get_category(ED_fsmenu_get(), FS_CATEGORY_ASSET_LIBRARIES); fsm; fsm = fsm->next) {
+		if (fsm->path && BLI_is_dir(fsm->path)) {
+			BLI_strncpy(r_dir, fsm->path, maxlen);
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Keep the parameters a browse mode relies on. Cheap enough to run on every refresh, so spaces read
+ * from files and parameters changed from Python can not break the Asset Browser (or leave a normal
+ * File Browser with the library reader of an old Asset Browser).
+ */
+void ED_fileselect_browse_mode_params_ensure(SpaceFile *sfile)
+{
+	FileSelectParams *params = sfile->params;
+
+	if (params == NULL || sfile->op) {
+		/* File dialogs define their own parameters. */
+		return;
+	}
+
+	if (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS) {
+		params->type = FILE_LOADLIB;
+		params->flag |= FILE_FILTER | FILE_HIDE_DOT;
+		params->flag &= ~FILE_DIRSEL_ONLY;
+		params->filter = FILE_TYPE_FOLDER | FILE_TYPE_BLENDER | FILE_TYPE_BLENDERLIB;
+		params->filter_id &= FILE_ASSET_FILTER_ID;
+		if (params->filter_id == 0) {
+			params->filter_id = FILE_ASSET_FILTER_ID;
+		}
+		params->filter_glob[0] = '\0';
+		params->title[0] = '\0';
+	}
+	else if (params->type == FILE_LOADLIB) {
+		/* Plain File Browser left with the parameters of the Asset Browser. */
+		params->type = FILE_UNIX;
+		params->flag &= ~(FILE_FILTER | FILE_LINK);
+		params->filter = 0;
+		params->recursion_level = 0;
+	}
+}
+
+/* Asset library holding  dir (longest matching folder), -1 when outside of all of them. */
+int ED_fileselect_asset_library_active_index(const char *dir)
+{
+	FSMenuEntry *fsm;
+	size_t best_len = 0;
+	int i, best = -1;
+
+	for (fsm = ED_fsmenu_get_category(ED_fsmenu_get(), FS_CATEGORY_ASSET_LIBRARIES), i = 0; fsm; fsm = fsm->next, i++) {
+		if (fsm->path) {
+			const size_t len = strlen(fsm->path);
+			if (len > best_len && BLI_path_ncmp(dir, fsm->path, len) == 0) {
+				best = i;
+				best_len = len;
+			}
+		}
+	}
+	return best;
+}
+
+void ED_fileselect_set_browse_mode(bContext *C, ScrArea *sa, const int mode)
+{
+	wmWindowManager *wm = CTX_wm_manager(C);
+	wmWindow *win = CTX_wm_window(C);
+	SpaceFile *sfile;
+	FileSelectParams *params;
+	ARegion *ar;
+
+	if (sa == NULL || sa->spacetype != SPACE_FILE) {
+		return;
+	}
+	sfile = sa->spacedata.first;
+	if (sfile->op) {
+		/* Never turn an open file dialog into an Asset Browser. */
+		return;
+	}
+
+	sfile->browse_mode = (char)mode;
+	params = ED_fileselect_get_params(sfile);
+
+	if (mode == FILE_BROWSE_MODE_ASSETS) {
+		char dir[FILE_MAX_LIBEXTRA];
+
+		params->display = FILE_IMGDISPLAY;
+		params->sort = FILE_SORT_ALPHA;
+		/* Flat view: list the contents of every .blend file of the library folder. */
+		params->recursion_level = 1;
+		params->filter_id = FILE_ASSET_FILTER_ID;
+		params->filter_search[0] = '\0';
+		if (fileselect_asset_library_default(dir, sizeof(dir))) {
+			BLI_strncpy(params->dir, dir, sizeof(params->dir));
+		}
+	}
+	else {
+		params->display = FILE_SHORTDISPLAY;
+		params->recursion_level = 0;
+		params->filter_search[0] = '\0';
+	}
+	params->file[0] = '\0';
+	params->active_file = -1;
+	params->highlight_file = -1;
+	ED_fileselect_browse_mode_params_ensure(sfile);
+
+	/* The reader of a file list is fixed when it is created: start a new list. */
+	if (sfile->previews_timer) {
+		WM_event_remove_timer_notifier(wm, win, sfile->previews_timer);
+		sfile->previews_timer = NULL;
+	}
+	if (sfile->files) {
+		filelist_readjob_stop(wm, sa);
+		filelist_freelib(sfile->files);
+		filelist_free(sfile->files);
+		MEM_freeN(sfile->files);
+		sfile->files = NULL;
+	}
+	/* The Asset Browser has no file name / execute buttons nor operator properties. */
+	for (ar = sa->regionbase.first; ar; ar = ar->next) {
+		if (ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOL_PROPS)) {
+			if (mode == FILE_BROWSE_MODE_ASSETS) {
+				ar->flag |= RGN_FLAG_HIDDEN;
+			}
+			else {
+				ar->flag &= ~RGN_FLAG_HIDDEN;
+			}
+		}
+	}
+
+	if (win) {
+		ED_area_initialize(wm, win, sa);
+	}
+	ED_area_tag_refresh(sa);
+	ED_area_tag_redraw(sa);
+	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+}
+
+/** \} */
 
 void ED_fileselect_reset_params(SpaceFile *sfile)
 {

@@ -1824,6 +1824,12 @@ int file_directory_new_exec(bContext *C, wmOperator *op)
 }
 
 
+/* File management operators do not belong to the Asset Browser (it only reads its libraries). */
+static bool file_not_asset_browser_poll(bContext *C)
+{
+	return ED_operator_file_active(C) && !ED_fileselect_is_asset_browser(CTX_wm_space_file(C));
+}
+
 void FILE_OT_directory_new(struct wmOperatorType *ot)
 {
 	PropertyRNA *prop;
@@ -1836,7 +1842,7 @@ void FILE_OT_directory_new(struct wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = WM_operator_confirm;
 	ot->exec = file_directory_new_exec;
-	ot->poll = ED_operator_file_active; /* <- important, handler is on window level */
+	ot->poll = file_not_asset_browser_poll; /* <- important, handler is on window level */
 
 	prop = RNA_def_string_dir_path(ot->srna, "directory", NULL, FILE_MAX, "Directory", "Name of new directory");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
@@ -2207,7 +2213,7 @@ static int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
 
 static bool file_rename_poll(bContext *C)
 {
-	bool poll = ED_operator_file_active(C);
+	bool poll = file_not_asset_browser_poll(C);
 	SpaceFile *sfile = CTX_wm_space_file(C);
 
 	if (sfile && sfile->params) {
@@ -2253,7 +2259,7 @@ void FILE_OT_rename(struct wmOperatorType *ot)
 
 static bool file_delete_poll(bContext *C)
 {
-	bool poll = ED_operator_file_active(C);
+	bool poll = file_not_asset_browser_poll(C);
 	SpaceFile *sfile = CTX_wm_space_file(C);
 
 	if (sfile && sfile->params) {
@@ -2328,6 +2334,177 @@ void FILE_OT_delete(struct wmOperatorType *ot)
 	ot->exec = file_delete_exec;
 	ot->poll = file_delete_poll; /* <- important, handler is on window level */
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Asset Browser operators
+ * \{ */
+
+static bool file_asset_browser_poll(bContext *C)
+{
+	return ED_operator_file_active(C) && ED_fileselect_is_asset_browser(CTX_wm_space_file(C));
+}
+
+static void file_asset_libraries_write(void)
+{
+	char name[FILE_MAX];
+
+	BLI_make_file_string("/", name, BKE_appdir_folder_id_create(BLENDER_USER_CONFIG, NULL), BLENDER_BOOKMARK_FILE);
+	fsmenu_write_file(ED_fsmenu_get(), name);
+}
+
+static int file_asset_library_add_exec(bContext *C, wmOperator *op)
+{
+	ScrArea *sa = CTX_wm_area(C);
+	SpaceFile *sfile = CTX_wm_space_file(C);
+	char dir[FILE_MAX_LIBEXTRA], libpath[FILE_MAX_LIBEXTRA];
+	char *group, *name;
+
+	if (RNA_struct_property_is_set(op->ptr, "directory")) {
+		RNA_string_get(op->ptr, "directory", dir);
+	}
+	else if (sfile && sfile->params) {
+		BLI_strncpy(dir, sfile->params->dir, sizeof(dir));
+	}
+	else {
+		dir[0] = '\0';
+	}
+
+	/* Browsing inside a .blend file: the library is the folder holding it. */
+	if (BLO_library_path_explode(dir, libpath, &group, &name)) {
+		BLI_split_dir_part(libpath, dir, sizeof(dir));
+	}
+	BLI_path_abs(dir, BKE_main_blendfile_path(CTX_data_main(C)));
+	BLI_add_slash(dir);
+
+	if (!BLI_is_dir(dir)) {
+		BKE_reportf(op->reports, RPT_ERROR, "Asset library folder not found: '%s'", dir);
+		return OPERATOR_CANCELLED;
+	}
+
+	fsmenu_insert_entry(ED_fsmenu_get(), FS_CATEGORY_ASSET_LIBRARIES, dir, NULL, FS_INSERT_SAVE);
+	file_asset_libraries_write();
+
+	/* Show the new library right away. */
+	if (sfile && sfile->params && ED_fileselect_is_asset_browser(sfile)) {
+		BLI_strncpy(sfile->params->dir, dir, sizeof(sfile->params->dir));
+		/* Without a file list yet, the next refresh reads the new folder anyway. */
+		if (sfile->files) {
+			ED_file_change_dir(C);
+		}
+	}
+
+	if (sa) {
+		ED_area_tag_refresh(sa);
+		ED_area_tag_redraw(sa);
+	}
+	return OPERATOR_FINISHED;
+}
+
+void FILE_OT_asset_library_add(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	/* identifiers */
+	ot->name = "Add Asset Library";
+	ot->description = "Use the current folder (or the given one) as an asset library of the Asset Browser";
+	ot->idname = "FILE_OT_asset_library_add";
+
+	/* api callbacks */
+	ot->exec = file_asset_library_add_exec;
+	ot->poll = ED_operator_file_active;
+
+	/* properties */
+	prop = RNA_def_string_dir_path(ot->srna, "directory", NULL, FILE_MAX, "Directory", "Folder of the asset library");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
+static int file_asset_library_remove_exec(bContext *C, wmOperator *op)
+{
+	ScrArea *sa = CTX_wm_area(C);
+	SpaceFile *sfile = CTX_wm_space_file(C);
+	struct FSMenu *fsmenu = ED_fsmenu_get();
+	const int nentries = ED_fsmenu_get_nentries(fsmenu, FS_CATEGORY_ASSET_LIBRARIES);
+	int index = RNA_int_get(op->ptr, "index");
+
+	if (index < 0 && sfile && sfile->params) {
+		index = ED_fileselect_asset_library_active_index(sfile->params->dir);
+	}
+	if (index < 0 || index >= nentries) {
+		return OPERATOR_CANCELLED;
+	}
+
+	fsmenu_remove_entry(fsmenu, FS_CATEGORY_ASSET_LIBRARIES, index);
+	file_asset_libraries_write();
+
+	if (sa) {
+		ED_area_tag_refresh(sa);
+		ED_area_tag_redraw(sa);
+	}
+	return OPERATOR_FINISHED;
+}
+
+void FILE_OT_asset_library_remove(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	/* identifiers */
+	ot->name = "Remove Asset Library";
+	ot->description = "Remove an asset library from the Asset Browser (the folder is not touched)";
+	ot->idname = "FILE_OT_asset_library_remove";
+
+	/* api callbacks */
+	ot->exec = file_asset_library_remove_exec;
+	ot->poll = ED_operator_file_active;
+
+	/* properties */
+	prop = RNA_def_int(ot->srna, "index", -1, -1, 20000, "Index", "Library to remove, -1 for the active one", -1, 20000);
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
+/* Double-click on an asset: same as dropping it in the 3D View, at the 3D cursor. */
+static int file_asset_add_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceFile *sfile = CTX_wm_space_file(C);
+	FileSelectParams *params = ED_fileselect_get_params(sfile);
+	wmOperatorType *ot = WM_operatortype_find("VIEW3D_OT_asset_drop", true);
+	const int numfiles = filelist_files_ensure(sfile->files);
+	FileDirEntry *file;
+	char path[FILE_MAX_LIBEXTRA];
+	PointerRNA ptr;
+	int ret;
+
+	if (ot == NULL || params->active_file < 0 || params->active_file >= numfiles) {
+		return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
+	}
+	file = filelist_file(sfile->files, params->active_file);
+	if (file == NULL || !(file->typeflag & FILE_TYPE_BLENDERLIB) || (file->typeflag & FILE_TYPE_DIR)) {
+		return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
+	}
+
+	BLI_join_dirfile(path, sizeof(path), filelist_dir(sfile->files), file->relpath);
+
+	WM_operator_properties_create_ptr(&ptr, ot);
+	RNA_string_set(&ptr, "filepath", path);
+	RNA_boolean_set(&ptr, "link", (params->flag & FILE_LINK) != 0);
+	ret = WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, &ptr);
+	WM_operator_properties_free(&ptr);
+
+	return ret;
+}
+
+void FILE_OT_asset_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Asset";
+	ot->description = "Append (or link) the active asset into the scene, at the 3D cursor";
+	ot->idname = "FILE_OT_asset_add";
+
+	/* api callbacks */
+	ot->exec = file_asset_add_exec;
+	ot->poll = file_asset_browser_poll;
+}
+
+/** \} */
 
 
 void ED_operatormacros_file(void)

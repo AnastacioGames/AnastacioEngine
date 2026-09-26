@@ -302,7 +302,61 @@ class WM_OT_blend_strings_utf8_validate(Operator):
         return {'FINISHED'}
 
 
+class FILE_OT_asset_previews_generate(Operator):
+    """Generate previews for the assets of every .blend file of the current asset library folder"""
+    bl_idname = "file.asset_previews_generate"
+    bl_label = "Generate Asset Previews"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return (space and space.type == 'FILE_BROWSER' and
+                space.browse_mode == 'ASSETS' and space.params)
+
+    @staticmethod
+    def library_folder(directory):
+        import os
+        # Browsing inside a .blend file: the library is the folder holding it.
+        path = os.path.normpath(bpy.path.abspath(directory))
+        while path and not os.path.isdir(path):
+            parent = os.path.dirname(path)
+            if parent == path:
+                return ""
+            path = parent
+        return path
+
+    def execute(self, context):
+        import os
+        space = context.space_data
+        folder = self.library_folder(space.params.directory)
+        if not folder:
+            self.report({'ERROR'}, "Asset library folder not found")
+            return {'CANCELLED'}
+
+        current = os.path.normcase(os.path.normpath(bpy.data.filepath)) if bpy.data.filepath else ""
+        files = [{"name": fn} for fn in sorted(os.listdir(folder))
+                 if fn.lower().endswith(".blend") and
+                 os.path.normcase(os.path.join(folder, fn)) != current]
+        if not files:
+            self.report({'WARNING'}, "No .blend file in '%s'" % folder)
+            return {'CANCELLED'}
+
+        ret = bpy.ops.wm.previews_batch_generate(
+            'EXEC_DEFAULT', files=files, directory=folder + os.sep,
+            use_scenes=False, use_backups=False,
+        )
+        if 'FINISHED' not in ret:
+            return {'CANCELLED'}
+
+        if bpy.ops.file.refresh.poll():
+            bpy.ops.file.refresh()
+        self.report({'INFO'}, "Previews generated for %d file(s)" % len(files))
+        return {'FINISHED'}
+
+
 classes = (
+    FILE_OT_asset_previews_generate,
     WM_OT_previews_batch_clear,
     WM_OT_previews_batch_generate,
     WM_OT_blend_strings_utf8_validate,
