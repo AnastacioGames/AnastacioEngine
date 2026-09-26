@@ -302,7 +302,14 @@ static void file_refresh(const bContext *C, ScrArea *sa)
 		ARegion *ar;
 
 		for (ar = sa->regionbase.first; ar; ar = ar->next) {
-			if (ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOL_PROPS)) {
+			if (ar->regiontype == RGN_TYPE_UI) {
+				/* Path bar: the Asset Browser uses it to type or paste a folder. */
+				if ((hide || sfile->op) && (ar->flag & RGN_FLAG_HIDDEN)) {
+					ar->flag &= ~RGN_FLAG_HIDDEN;
+					changed = true;
+				}
+			}
+			else if (ar->regiontype == RGN_TYPE_TOOL_PROPS) {
 				if (hide && !(ar->flag & RGN_FLAG_HIDDEN)) {
 					ar->flag |= RGN_FLAG_HIDDEN;
 					changed = true;

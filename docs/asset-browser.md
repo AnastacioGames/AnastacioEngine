@@ -11,6 +11,7 @@ em arquivos `.blend` de uma pasta de biblioteca.
 - Menu de tipo de editor de qualquer área > **Asset Browser**.
 - **Window > Asset Browser** abre uma janela flutuante. Ela usa a mesma janela temporária das Preferências e do Drivers.
 - Em Python: `space.browse_mode = 'ASSETS'` num File Browser sem diálogo aberto.
+- Para trocar de pasta, use a barra de caminho acima dos arquivos (digitar ou colar) ou dê duplo clique nas pastas. O botão de navegar pasta não é usado: um File Browser não abre um segundo seletor de arquivos.
 
 ### Bibliotecas
 

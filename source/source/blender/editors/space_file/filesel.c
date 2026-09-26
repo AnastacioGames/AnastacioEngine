@@ -444,9 +444,9 @@ void ED_fileselect_set_browse_mode(bContext *C, ScrArea *sa, const int mode)
 		MEM_freeN(sfile->files);
 		sfile->files = NULL;
 	}
-	/* The Asset Browser has no file name / execute buttons nor operator properties. */
+	/* The Asset Browser has no operator properties (the UI region keeps the path bar). */
 	for (ar = sa->regionbase.first; ar; ar = ar->next) {
-		if (ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOL_PROPS)) {
+		if (ar->regiontype == RGN_TYPE_TOOL_PROPS) {
 			if (mode == FILE_BROWSE_MODE_ASSETS) {
 				ar->flag |= RGN_FLAG_HIDDEN;
 			}

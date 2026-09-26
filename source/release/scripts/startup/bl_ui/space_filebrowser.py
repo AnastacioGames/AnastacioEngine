@@ -330,7 +330,9 @@ class FILEBROWSER_PT_asset_directory(Panel):
     def draw(self, context):
         layout = self.layout
         params = context.space_data.params
-        layout.prop(params, "directory", text="")
+        # The path bar above the files edits the folder; a browse button here would open
+        # a second file selector, which is not allowed inside a File Browser.
+        layout.label(text=params.directory, icon='FILE_FOLDER')
         layout.operator("file.bookmark_add", text="Bookmark Folder", icon='BOOKMARKS')
 
 
