@@ -25,7 +25,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Preset `linux-editor`: `WITH_CYCLES_EMBREE=ON` e `WITH_CYCLES_DEVICE_OPENCL=ON`; `quickstart-editor.sh`
   instala `libembree-dev`. OSL continua desligado: sem pacote no Ubuntu 24.04 e esta versao espera OSL 1.9.
 - Teste: cubo com 300 fios de cabelo e uma copia linkada, CPU, 32 amostras, Embree ligado e desligado: as
-  duas imagens batem (diferenca media 0,03/255, so ruido de amostragem).
+  duas imagens batem (diferenca media 0,03/255, so ruido de amostragem). Depois de instalar o `libembree-dev`
+  do sistema, o usuario testou pela interface: Embree (Render > Performance > Use Embree) e CUDA (primeiro
+  render recompilou o kernel sm_120) funcionando.
 
 ## 2026-09-26 - Cycles: CUDA na RTX 5060 (sm_120) com CUDA 13
 
