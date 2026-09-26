@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-25 - startup.blend de fábrica atualizado
+
+- `source/release/datafiles/startup.blend` substituído pelo `startup.blend` salvo por Fabio pela UI (`%APPDATA%\RangeEngine\Blender\2.79\config\startup.blend`). O anterior ficou em `startup.blend1`.
+- Screens: Asset Browser, Game Dev, Game Play, Script (antes só Game Dev e Game Play). Texto embutido `03_jogador_celular.py` no lugar de `02_component_properties.py`. Objetos e imagens empacotadas iguais aos de antes.
+- **Teste:** `RangeEngine -b --factory-startup` lista as 4 screens e o texto novo. `RangeEngine` e `RangeRuntime` compilam.
+
 ## 2026-09-25 - Screens: Ctrl+Seta parava de navegar depois de apagar uma screen
 
 - **Sintoma:** ao apagar uma screen (ex.: "Game Play") e criar outra pelo **+**, Ctrl+→/← deixava de trocar de screen, sem erro.
