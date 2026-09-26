@@ -411,6 +411,43 @@ extraia o `.tar.xz` num diretorio limpo e confirme que **os dois** `./RangeEngin
 existem e abrem — o pacote 0.3.0 e o 0.4.1 (so RangeEngine) ja mostraram que pular essa checagem deixa
 bug passar.
 
+### Teste em maquina limpa (container, 2026-09-26)
+
+Sem Docker/Podman e sem sudo, da para testar num Ubuntu 24.04 minimo com `unshare` (namespace de
+usuario) e o `ubuntu-base` oficial:
+
+```bash
+wget https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz
+mkdir root && unshare -r tar -xzf ubuntu-base-24.04.3-base-amd64.tar.gz -C root   # erros de chown sao normais
+tar -xJf build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz -C root/opt
+cp /etc/resolv.conf root/etc/
+unshare -rm --fork bash -c 'mount --rbind /proc root/proc && mount --rbind /dev root/dev && chroot root bash'
+```
+
+Monte o `/proc`: sem ele o carregador nao resolve `$ORIGIN` e o erro de `libpython` e falso. Dentro do
+container, `apt-get -o APT::Sandbox::User=root ...` instala pacotes (o dpkg reclama de `chown`, mas os
+arquivos ficam no lugar).
+
+Resultado:
+
+- **Defeito encontrado e corrigido**: o pacote colocava a stdlib do Python em `python311/lib`, mas o
+  executavel procura em `2.79/python/lib/python3.11`. Fora da maquina de build (sem
+  `/opt/anastacio-python311`) o editor e o runtime morriam com `No module named 'encodings'`. O pacote
+  0.4.1 publicado tem esse layout. `package-runtime.sh` agora copia para `<versao>/python`, confere
+  `encodings/__init__.py` e tira as ferramentas de build (`datatoc`, `makesdna`, `makesrna`, `msgfmt`,
+  `imgui.ini`).
+- Com a correcao, `RangeEngine -b` roda o `tools/linux/cycles-smoke-render.py` (Cycles CPU, PNG gerado) e o
+  `RangeRuntime` acha o Python embutido. Janela e GPU nao foram testadas no container.
+- O pacote nao embute as bibliotecas do sistema. Num Ubuntu 24.04 minimo faltam estas; qualquer desktop ja
+  tem as de X11/GL, e o resto sai dos pacotes de runtime (sem `-dev`):
+
+```bash
+sudo apt install libboost-locale1.83.0 libembree4-4 libfftw3-single3 libfftw3-double3 libfreetype6 \
+  libglew2.2 libgl1 libglu1-mesa libgomp1 libopenexr-3-1-30 libjpeg8 libopenal1 libopenimageio2.4t64 \
+  libpng16-16t64 libsdl2-2.0-0 libsndfile1 libtiff6 libx11-6 libxfixes3 libxinerama1 libxi6 \
+  libxrender1 libxxf86vm1
+```
+
 ## Testes do Cycles (GTest) no Linux
 
 Validado em 2026-09-26 (Ubuntu, OpenEXR 3.1): 10 binarios, 177/177 testes passando. Use um diretorio proprio

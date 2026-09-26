@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Linux: pacote testado em maquina limpa
+
+- Teste num container Ubuntu 24.04 minimo (`ubuntu-base` + `unshare`, sem Docker nem sudo); roteiro em
+  `docs/linux-build.md`.
+- Defeito: `package-runtime.sh` punha a stdlib em `python311/lib`, mas o executavel procura em
+  `<versao>/python`. Sem `/opt/anastacio-python311` o Python falhava com `No module named 'encodings'`,
+  e isso afeta o 0.4.1 publicado. O script agora copia para `2.79/python`, garante o libpython em `lib/`,
+  confere a stdlib e tira `datatoc`, `makesdna`, `makesrna`, `msgfmt` e `imgui.ini` do pacote.
+- Depois da correcao: `RangeEngine -b` renderiza a cena de teste com Cycles e o `RangeRuntime` acha o
+  Python embutido. As bibliotecas do sistema continuam fora do pacote; a lista de pacotes de runtime esta
+  em `linux-build.md`.
+
 ## 2026-09-26 - Linux: i18n validado no editor
 
 - `build-linux-editor/` com `WITH_INTERNATIONAL=ON`: `engine_i18n.py` 36 ok (pt_BR, es, ru_RU; catalogo do

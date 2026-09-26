@@ -99,8 +99,10 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   `RangeRuntime`); script corrigido, os dois presets recompilados/reempacotados juntos e o asset do GitHub
   Release `v0.4.1` atualizado via `gh release upload --clobber`. Testado localmente com sessão gráfica real:
   `RangeEngine` abre sem erros e `RangeRuntime` carrega um `.range` de exemplo, detecta GPU/OpenGL (Mesa Intel
-  RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build; portabilidade em máquina
-  limpa ainda não verificada diretamente (apenas por RPATH `$ORIGIN` + `ldd` sem dependências faltando).
+  RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build. **Máquina limpa testada em
+  2026-09-26** (container Ubuntu 24.04 mínimo): o 0.4.1 não acha a stdlib do Python fora da máquina de build;
+  `package-runtime.sh` corrigido e o editor renderiza com Cycles no container. Falta: publicar um release
+  corrigido (0.4.2) e testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
   Falta: CUDA na versao Windows e OpenCL numa GPU AMD. OSL fica desligado (sem pacote no Ubuntu

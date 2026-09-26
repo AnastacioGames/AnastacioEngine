@@ -53,6 +53,9 @@ if [ -n "$extra_dir" ]; then
   cp -an "$extra_dir/." "$staging_dir/"
 fi
 cp "$repo_root/source/COPYING" "$staging_dir/COPYING"
+# Ferramentas de build (geradores de codigo) e estado local do ImGui nao vao para o usuario.
+rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna" "$staging_dir/makesrna" \
+  "$staging_dir/msgfmt" "$staging_dir/imgui.ini" "$staging_dir/\\imgui.ini"
 
 missing=""
 [ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"
@@ -62,23 +65,32 @@ if [ -n "$missing" ]; then
   printf '(linux-runtime e linux-editor) e passe BIN_DIR + EXTRA_BIN_DIR apontando pra cada bin/.\n' >&2
 fi
 
-# Torna o pacote portatil: embute o Python 3.11 isolado em python311/ e troca o RUNPATH absoluto
-# (/opt/anastacio-python311/lib) por $ORIGIN/python311/lib. Sem isso o binario so abre na maquina de build
+# Torna o pacote portatil: embute o Python 3.11 isolado em <versao>/python e troca o RUNPATH absoluto
+# (/opt/anastacio-python311/lib) por $ORIGIN/lib. Sem isso o binario so abre na maquina de build
 # ("libpython3.11.so.1.0: cannot open shared object file").
 python_root="${PYTHON_ROOT_DIR:-/opt/anastacio-python311}"
 if [ ! -e "$python_root/lib/libpython3.11.so.1.0" ]; then
   printf 'Python isolado nao encontrado em %s (rode tools/linux/install-python311.sh).\n' "$python_root" >&2
   exit 1
 fi
-mkdir -p "$staging_dir/python311"
-cp -a "$python_root/lib" "$staging_dir/python311/lib"
-find "$staging_dir/python311" -type d \( -name test -o -name tests -o -name __pycache__ \) -prune -exec rm -rf {} +
+# O executavel procura a stdlib em <versao>/python (ex.: 2.79/python/lib/python3.11); fora dali o
+# Python so acha "encodings" se /opt/anastacio-python311 existir, ou seja, so na maquina de build.
+version_dir="$(find "$staging_dir" -mindepth 1 -maxdepth 1 -type d -name '[0-9].[0-9]*' | head -n1)"
+if [ -z "$version_dir" ]; then
+  printf 'Pasta de versao (ex.: 2.79) ausente em %s.\n' "$staging_dir" >&2
+  exit 1
+fi
+bundle_python="$version_dir/python"
+rm -rf "$bundle_python"
+mkdir -p "$bundle_python"
+cp -a "$python_root/lib" "$bundle_python/lib"
+find "$bundle_python" -type d \( -name test -o -name tests -o -name __pycache__ \) -prune -exec rm -rf {} +
 
 # Patch direto na string do ELF (sem depender de patchelf/chrpath); a nova string e menor e o resto vira NUL.
 python3 - "$staging_dir" "$python_root/lib" <<'PY'
 import os, sys
 root, old = sys.argv[1], sys.argv[2].encode()
-new = b"$ORIGIN/python311/lib"
+new = b"$ORIGIN/lib"
 assert len(new) <= len(old), "RUNPATH novo maior que o antigo"
 patched = 0
 for dirpath, _, files in os.walk(root):
@@ -102,8 +114,14 @@ for dirpath, _, files in os.walk(root):
 # so age em builds antigos com o RUNPATH absoluto, por isso patched == 0 e aceitavel.
 PY
 
-# Confere que o libpython vai junto: em lib/ (RUNPATH $ORIGIN/lib do CMake) ou em python311/lib.
-if [ ! -e "$staging_dir/lib/libpython3.11.so.1.0" ] && [ ! -e "$staging_dir/python311/lib/libpython3.11.so.1.0" ]; then
+# Confere que libpython (lib/, RUNPATH $ORIGIN/lib do CMake) e a stdlib vao juntos.
+mkdir -p "$staging_dir/lib"
+[ -e "$staging_dir/lib/libpython3.11.so.1.0" ] || cp -L "$python_root/lib/libpython3.11.so.1.0" "$staging_dir/lib/"
+if [ ! -e "$bundle_python/lib/python3.11/encodings/__init__.py" ]; then
+  printf 'stdlib do Python ausente em %s.\n' "$bundle_python" >&2
+  exit 1
+fi
+if [ ! -e "$staging_dir/lib/libpython3.11.so.1.0" ]; then
   printf 'libpython3.11.so.1.0 ausente do pacote.
 ' >&2
   exit 1
