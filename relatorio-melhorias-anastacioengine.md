@@ -221,10 +221,14 @@ ferramenta correspondente.
 
 - `Outliner > View > Show Alternating Rows` liga/desliga as faixas alternadas. Desligado por padrão, usa fundo
   sólido na cor do tema. Escolha por Outliner salva no projeto; destaques de seleção preservados.
-- Coleções (modo Current Scene) são pastas **só de organização**: não mudam parent, camadas, Groups nem o jogo.
-  Um objeto está numa coleção por `Base.collection_uid`; filho sempre aparece sob o pai (a coleção vale para
-  objetos raiz). Olho/seleção/render da pasta aplicam a todos os objetos dentro. Menu Collection, arrastar e
-  "Move to Collection" no menu de contexto.
+- Coleções (modo Current Scene) são pastas de organização sobre o sistema de layers (não é a reescrita do
+  Blender 2.8): não mudam parent nem Groups. Um objeto está numa coleção por `Base.collection_uid`; filho sempre
+  aparece sob o pai (a coleção vale para objetos raiz). Olho/seleção/render da pasta aplicam a todos os objetos
+  dentro. Menu Collection, arrastar e "Move to Collection" no menu de contexto.
+- Única ligação com o jogo: a caixa "In game" da pasta. Desmarcada, os objetos vão para o layer 20 e começam
+  inativos (fonte do Add Object); o layer anterior fica em `Base.collection_lay` e volta ao marcar. Com alguma
+  pasta fora do jogo, o layer 20 inteiro fica reservado e inativo no conversor. "Create Group from Collection"
+  cria um Group com os objetos da pasta.
 
 ### Interface da 3D View
 

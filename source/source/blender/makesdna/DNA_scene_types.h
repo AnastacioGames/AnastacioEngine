@@ -69,11 +69,12 @@ typedef struct Base {
 	short sx, sy;
 	struct Object *object;
 	int collection_uid;		/* SceneCollection.uid shown in the Outliner, 0 = scene root */
-	int pad;
+	int collection_lay;		/* layers before a "not in game" collection moved it, 0 = not moved */
 } Base;
 
-/* SceneCollection - folder used only to organize objects in the Outliner.
- * It does not change parenting, layers or anything in the game engine. */
+/* SceneCollection - folder used to organize objects in the Outliner.
+ * It does not change parenting. Only SCECOL_GAME_EXCLUDE reaches the game engine,
+ * by moving the objects to SCECOL_GAME_LAYER (see BKE_scene_collections_game_sync). */
 typedef struct SceneCollection {
 	struct SceneCollection *next, *prev;
 	ListBase children;		/* SceneCollection */
@@ -81,6 +82,12 @@ typedef struct SceneCollection {
 	int uid;				/* unique inside the scene, never 0 */
 	int flag;
 } SceneCollection;
+
+/* SceneCollection.flag */
+#define SCECOL_GAME_EXCLUDE	(1 << 0)	/* objects start inactive in the game (for Add Object) */
+
+/* Layer 20: objects of "not in game" collections, never active when the game starts. */
+#define SCECOL_GAME_LAYER	(1 << 19)
 
 /* ************************************************************* */
 /* Output Format Data */

@@ -36,6 +36,10 @@ class OUTLINER_HT_header(Header):
 
         OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
 
+        # Like Blender 2.8: "New Collection" button next to the menus.
+        if space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
+            layout.operator("outliner.collection_new", text="", icon='NEWFOLDER').nested = True
+
         layout.prop(space, "display_mode", text="")
 
         filepath = bpy.data.filepath
@@ -62,11 +66,6 @@ class OUTLINER_HT_header(Header):
                 row.label(text="No Keying Set Active")
         elif space.display_mode == 'ORPHAN_DATA':
             layout.operator("outliner.orphans_purge")
-
-        # Like Blender 2.8: "New Collection" button at the right end of the header.
-        if space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
-            layout.separator_spacer()
-            layout.operator("outliner.collection_new", text="", icon='NEWFOLDER').nested = True
 
 
 class OUTLINER_MT_editor_menus(Menu):
@@ -158,6 +157,11 @@ class OUTLINER_MT_collection(Menu):
 
         layout.operator("outliner.collection_objects_select", text="Select Objects")
         layout.operator_menu_enum("outliner.collection_move_objects", "collection", text="Move Objects to Collection")
+
+        layout.separator(factor=1)
+
+        layout.operator("outliner.collection_game_exclude", text="Toggle Not in Game", icon='CHECKBOX_DEHLT')
+        layout.operator("outliner.collection_to_group", text="Create Group from Collection", icon='GROUP')
 
 
 class OUTLINER_MT_scene_add(Menu):

@@ -88,6 +88,8 @@ void outliner_operatortypes(void)
 	WM_operatortype_append(OUTLINER_OT_collection_move_objects);
 	WM_operatortype_append(OUTLINER_OT_collection_object_drop);
 	WM_operatortype_append(OUTLINER_OT_collection_drop);
+	WM_operatortype_append(OUTLINER_OT_collection_game_exclude);
+	WM_operatortype_append(OUTLINER_OT_collection_to_group);
 }
 
 void outliner_keymap(wmKeyConfig *keyconf)

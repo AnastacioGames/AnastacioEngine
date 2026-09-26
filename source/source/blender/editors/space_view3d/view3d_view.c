@@ -1439,6 +1439,15 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	 * the window manager until after this operator exits */
 	WM_redraw_windows(C);
 
+	/* objects parented after their folder was marked "not in game" follow it now */
+	bool collections_changed = false;
+	for (Scene *sce = bmain->scene.first; sce; sce = sce->id.next) {
+		collections_changed |= BKE_scene_collections_game_sync(sce);
+	}
+	if (collections_changed) {
+		DAG_relations_tag_update(bmain);
+	}
+
 	BLI_callback_exec(bmain, &startscene->id, BLI_CB_EVT_GAME_PRE);
 
 	rv3d = CTX_wm_region_view3d(C);

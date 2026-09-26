@@ -523,6 +523,13 @@ static void restrictbutton_scene_collection_render(bContext *C, void *poin, void
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_RENDER, poin);
 }
 
+static void restrictbutton_scene_collection_game(bContext *C, void *poin, void *poin2)
+{
+	Scene *scene = poin;
+	SceneCollection *sc = poin2;
+	outliner_collection_game_exclude_set(C, scene, sc, (sc->flag & SCECOL_GAME_EXCLUDE) == 0);
+}
+
 static void restrictbutton_id_user_toggle(bContext *UNUSED(C), void *poin, void *UNUSED(poin2))
 {
 	ID *id = (ID *)poin;
@@ -794,6 +801,22 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow rendering of all objects in this collection"));
 				UI_but_func_set(bt, restrictbutton_scene_collection_render, (Scene *)tselem->id, tselem);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+
+				/* like the Blender 2.8 exclude checkbox, left of the eye */
+				SceneCollection *sc = te->directdata;
+				if (sc) {
+					const bool in_game = (sc->flag & SCECOL_GAME_EXCLUDE) == 0;
+					bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, in_game ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT,
+					                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+					                  NULL, 0, 0, 0, 0,
+					                  TIP_("In game: unchecked, the objects start inactive (layer 20), "
+					                       "ready for the Add Object actuator"));
+					UI_but_func_set(bt, restrictbutton_scene_collection_game, (Scene *)tselem->id, sc);
+					UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+					if (ID_IS_LINKED(tselem->id)) {
+						UI_but_flag_enable(bt, UI_BUT_DISABLED);
+					}
+				}
 
 				UI_block_emboss_set(block, UI_EMBOSS);
 			}

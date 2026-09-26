@@ -53,6 +53,7 @@
 #include "BKE_outliner_treehash.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
 #include "BKE_group.h"
@@ -2496,8 +2497,26 @@ static bool outliner_base_collection_set(Scene *scene, Base *base, int uid)
 	return base->object->parent != NULL;
 }
 
+/* Objects that entered or left a "not in game" collection change layer. */
+void outliner_collection_game_sync(bContext *C)
+{
+	Main *bmain = CTX_data_main(C);
+	bool changed = false;
+
+	for (Scene *sce = bmain->scene.first; sce; sce = sce->id.next) {
+		if (BKE_scene_collections_game_sync(sce)) {
+			WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, sce);
+			changed = true;
+		}
+	}
+	if (changed) {
+		DAG_relations_tag_update(bmain);
+	}
+}
+
 static void outliner_collection_notify(bContext *C, Scene *scene)
 {
+	outliner_collection_game_sync(C);
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
 }
@@ -2867,4 +2886,120 @@ void OUTLINER_OT_collection_drop(wmOperatorType *ot)
 
 	RNA_def_string(ot->srna, "collection", "Collection", MAX_NAME, "Collection", "Dragged collection");
 	RNA_def_string(ot->srna, "scene", NULL, MAX_ID_NAME - 2, "Scene", "Scene of the dragged collection");
+}
+
+/* Not in Game ------------------------------------------------------ */
+
+/* Objects of a "not in game" collection move to layer 20 and start inactive in the
+ * game, ready for the Add Object actuator. Layer 20 is shown so they stay visible. */
+void outliner_collection_game_exclude_set(bContext *C, Scene *scene, SceneCollection *sc, bool exclude)
+{
+	if (exclude) {
+		sc->flag |= SCECOL_GAME_EXCLUDE;
+		if ((scene->lay & SCECOL_GAME_LAYER) == 0) {
+			scene->lay |= SCECOL_GAME_LAYER;
+			BKE_screen_view3d_main_sync(&CTX_data_main(C)->screen, scene);
+			WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+		}
+	}
+	else {
+		sc->flag &= ~SCECOL_GAME_EXCLUDE;
+	}
+	outliner_collection_notify(C, scene);
+}
+
+static int outliner_collection_game_exclude_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	LinkNode *tes = NULL;
+	int exclude = -1;
+
+	outliner_selected_collection_tes(&soops->tree, &tes);
+	for (LinkNode *link = tes; link; link = link->next) {
+		TreeElement *te = link->link;
+		Scene *te_scene = outliner_collection_te_scene(te);
+		SceneCollection *sc = ID_IS_LINKED(te_scene) ? NULL : BKE_scene_collection_find(te_scene, te->index);
+		if (sc == NULL) {
+			continue;
+		}
+		/* the first folder decides, so a mixed selection ends up all the same */
+		if (exclude == -1) {
+			exclude = (sc->flag & SCECOL_GAME_EXCLUDE) == 0;
+		}
+		outliner_collection_game_exclude_set(C, te_scene, sc, exclude);
+	}
+	BLI_linklist_free(tes, NULL);
+
+	return (exclude == -1) ? OPERATOR_CANCELLED : OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_game_exclude(wmOperatorType *ot)
+{
+	ot->name = "Toggle Not in Game";
+	ot->idname = "OUTLINER_OT_collection_game_exclude";
+	ot->description = "Objects of the selected collections start inactive in the game (layer 20), "
+	                  "ready to be spawned with the Add Object actuator";
+
+	ot->exec = outliner_collection_game_exclude_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/* Collection to Group ---------------------------------------------- */
+
+typedef struct CollectionToGroupData {
+	Group *group;
+	Scene *scene;
+} CollectionToGroupData;
+
+static void outliner_collection_to_group_fn(TreeElement *te, Object *ob, void *userdata)
+{
+	CollectionToGroupData *data = userdata;
+	Base *base = te->directdata ? te->directdata : BKE_scene_base_find(data->scene, ob);
+	BKE_group_object_add(data->group, ob, data->scene, base);
+}
+
+static int outliner_collection_to_group_exec(bContext *C, wmOperator *op)
+{
+	Main *bmain = CTX_data_main(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	LinkNode *tes = NULL;
+	int tot = 0;
+
+	outliner_selected_collection_tes(&soops->tree, &tes);
+	for (LinkNode *link = tes; link; link = link->next) {
+		TreeElement *te = link->link;
+		SceneCollection *sc = te->directdata;
+		if (sc == NULL) {
+			continue;
+		}
+		CollectionToGroupData data = {BKE_group_add(bmain, sc->name), outliner_collection_te_scene(te)};
+		outliner_scene_collection_foreach_object(&te->subtree, outliner_collection_to_group_fn, &data);
+		tot++;
+	}
+	BLI_linklist_free(tes, NULL);
+
+	if (tot == 0) {
+		BKE_report(op->reports, RPT_WARNING, "No collection selected");
+		return OPERATOR_CANCELLED;
+	}
+
+	BKE_reportf(op->reports, RPT_INFO, "%d group(s) created", tot);
+	DAG_relations_tag_update(bmain);
+	WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_to_group(wmOperatorType *ot)
+{
+	ot->name = "Create Group from Collection";
+	ot->idname = "OUTLINER_OT_collection_to_group";
+	ot->description = "Create a group with the objects of each selected collection "
+	                  "(for group instances and the Add Object actuator)";
+
+	ot->exec = outliner_collection_to_group_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }

@@ -81,6 +81,9 @@ bool BKE_scene_collection_move(struct Scene *sce, struct SceneCollection *sc, st
 void BKE_scene_collection_rename(struct Scene *sce, struct SceneCollection *sc, const char *name);
 void BKE_scene_collections_copy(struct ListBase *dst, const struct ListBase *src);
 void BKE_scene_collections_free(struct ListBase *lb);
+bool BKE_scene_collection_game_excluded(struct Scene *sce, struct SceneCollection *sc);
+bool BKE_scene_collections_game_exclude_any(const struct Scene *sce);
+bool BKE_scene_collections_game_sync(struct Scene *sce);
 
 /* Scene base iteration function.
  * Define struct here, so no need to bother with alloc/free it.

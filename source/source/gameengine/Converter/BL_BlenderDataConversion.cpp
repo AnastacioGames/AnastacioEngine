@@ -1750,6 +1750,11 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	kxscene->SetObstacleSimulation(obstacleSimulation);
 
 	int activeLayerBitInfo = blenderscene->lay;
+	/* Outliner collections marked "not in game" keep their objects on this layer,
+	 * they start inactive even when the layer is shown in the editor. */
+	if (BKE_scene_collections_game_exclude_any(blenderscene)) {
+		activeLayerBitInfo &= ~SCECOL_GAME_LAYER;
+	}
 
 	std::vector<BL_ParentChildLink> vec_parent_child;
 

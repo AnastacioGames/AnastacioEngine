@@ -257,8 +257,6 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
   miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
   execução automatizada, mas nenhum gesto com o mouse foi testado.
-- **Coleções do Outliner (2026-09-25)**: conferir no editor criar/renomear/apagar pasta, arrastar objeto e
-  pasta, "Move to Collection", botões olho/seleção/render da pasta, e salvar/reabrir o `.range` com as pastas.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

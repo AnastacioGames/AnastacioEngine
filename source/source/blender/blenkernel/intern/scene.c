@@ -1593,6 +1593,89 @@ void BKE_scene_collections_free(ListBase *lb)
 	BLI_freelistN(lb);
 }
 
+/* True when sc or one of its parent collections is marked "not in game". */
+bool BKE_scene_collection_game_excluded(Scene *sce, SceneCollection *sc)
+{
+	for (; sc; sc = BKE_scene_collection_parent_find(sce, sc)) {
+		if (sc->flag & SCECOL_GAME_EXCLUDE) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool scene_collections_game_exclude_any(const ListBase *lb)
+{
+	for (const SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		if ((sc->flag & SCECOL_GAME_EXCLUDE) || scene_collections_game_exclude_any(&sc->children)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool BKE_scene_collections_game_exclude_any(const Scene *sce)
+{
+	return scene_collections_game_exclude_any(&sce->collections);
+}
+
+/* Children are shown (and added in game) with their parent, so the folder of the
+ * top parent decides. */
+static bool scene_base_game_excluded(Scene *sce, Base *base)
+{
+	Object *root = base->object;
+	while (root->parent) {
+		root = root->parent;
+	}
+	Base *root_base = (root == base->object) ? base : BKE_scene_base_find(sce, root);
+	if (root_base == NULL) {
+		root_base = base;
+	}
+	return BKE_scene_collection_game_excluded(sce, BKE_scene_collection_find(sce, root_base->collection_uid));
+}
+
+/* Moves the objects of "not in game" collections to SCECOL_GAME_LAYER and gives the
+ * others back the layers they had before. Returns true when a layer changed. */
+bool BKE_scene_collections_game_sync(Scene *sce)
+{
+	const unsigned int view_layers = (1u << 20) - 1;
+	bool changed = false;
+
+	if (ID_IS_LINKED(sce)) {
+		return false;
+	}
+
+	for (Base *base = sce->base.first; base; base = base->next) {
+		Object *ob = base->object;
+		unsigned int lay = (unsigned int)base->lay;
+
+		if (ID_IS_LINKED(ob)) {
+			continue;
+		}
+
+		if (scene_base_game_excluded(sce, base)) {
+			if ((lay & view_layers) == SCECOL_GAME_LAYER) {
+				continue;
+			}
+			if (base->collection_lay == 0) {
+				base->collection_lay = (lay & view_layers) ? (int)(lay & view_layers) : 1;
+			}
+			lay = (lay & ~view_layers) | SCECOL_GAME_LAYER;
+		}
+		else if (base->collection_lay != 0) {
+			lay = (lay & ~view_layers) | ((unsigned int)base->collection_lay & view_layers);
+			base->collection_lay = 0;
+		}
+		else {
+			continue;
+		}
+
+		base->lay = ob->lay = (int)lay;
+		changed = true;
+	}
+	return changed;
+}
+
 /* checks for cycle, returns 1 if it's all OK */
 bool BKE_scene_validate_setscene(Main *bmain, Scene *sce)
 {

@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Themes > Global Theme: UI atualiza numa etapa só
+
+`rna_userdef.c`: marcar "User Interface" em Copy Global Theme To fazia `tui = tglobal_ui`, mas no `tglobal_ui` só o `wcol_regular` tinha a cor global; os outros widgets (`wcol_tool`, `wcol_num`, `wcol_option`...) ficavam com a cópia antiga. O resto só atualizava ao mexer num valor de "All Widget Colors" (Roundness, Shade...), que espalhava o `wcol_regular` por todos os widgets. Os "Widget State Colors" globais nunca propagavam sozinhos. Agora os dois caminhos (e o `wcol_state`) usam `rna_theme_global_ui_apply`, que espalha o `wcol_regular` por todos os widgets do `tglobal_ui` e copia para o `tui`. Teste: build ok; script em modo batch: com a caixa desmarcada, muda cor, Roundness e state color globais; ao marcar, `wcol_num`/`wcol_option` e `wcol_state` já saem iguais ao global, e mudar uma state color depois também propaga. Falta conferir o visual no editor.
+
+## 2026-09-26 - Text Editor: barra lateral em painéis
+
+`space_text.py`: a sidebar (N) virou os painéis View (Line Numbers / Word Wrap / Syntax Highlight como ícones numa linha, Highlight Line), subpainel Margin (fechado, `bl_parent_id`), Editor (Font Size, Tab Width, Tabs as Spaces, Live Edit) e Find & Replace (campos com conta-gotas ao lado, opções numa linha). Nenhuma opção removida. O cabeçalho continua forçando as três opções de View ligadas a cada redesenho (comportamento antigo). Teste: registro dos painéis em modo batch e conferido pelo usuário no editor.
+
+## 2026-09-26 - Outliner: pasta "fora do jogo" (layer 20) e Group a partir da coleção
+
+Primeira ligação das coleções com o jogo, sobre o sistema de layers (não é a reescrita do Blender 2.8, que trocaria layers, Groups e o conversor do BGE).
+
+- **Caixa "In game"** à esquerda do olho em cada pasta (como o exclude do 2.8), também em Collection > Toggle Not in Game (`outliner.collection_game_exclude`). Desmarcada (`SCECOL_GAME_EXCLUDE`), os objetos da pasta, das subpastas e os filhos deles vão para o layer 20 (`SCECOL_GAME_LAYER`) e começam **inativos** no jogo, prontos para o Add Object. O layer anterior fica em `Base.collection_lay` (era `pad`) e volta quando a caixa é marcada de novo ou o objeto sai da pasta.
+- **Layer 20 visível no editor:** ao desmarcar, o layer 20 é ligado na cena para os objetos não sumirem. O conversor (`BL_BlenderDataConversion.cpp`) tira o layer 20 dos layers ativos sempre que a cena tem alguma pasta fora do jogo, então o que for posto nele à mão também começa inativo nesse caso.
+- **Sincronia:** `BKE_scene_collections_game_sync` roda em toda operação de pasta (mover, arrastar, apagar) e no início do jogo pelo editor (pega objetos que ganharam pai depois).
+- **Create Group from Collection** (`outliner.collection_to_group`): cria um Group com o nome da pasta e os objetos mostrados nela, para instância de grupo.
+- **Cabeçalho:** o botão de nova coleção passou para o lado do menu Collection.
+- **Teste:** build ok. Script no editor: Cube na pasta, desmarca → layer 20 e layer 20 da cena ligado; marca → volta ao layer 1; Group "Collection" com o Cube; salvar e reabrir mantém o layer 20. Conferido pelo usuário no editor.
+
 ## 2026-09-25 - Outliner: coleções só para organizar (sem Group, sem mudar parent)
 
 Pastas no modo Current Scene do Outliner, parecidas com as coleções do Blender 2.8, mas **só organizacionais**: não mudam parent, camadas, Groups nem nada no jogo.

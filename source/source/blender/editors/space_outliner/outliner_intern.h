@@ -33,6 +33,7 @@ struct EditBone;
 struct ID;
 struct Object;
 struct Scene;
+struct SceneCollection;
 struct TreeStoreElem;
 struct bContext;
 struct bPoseChannel;
@@ -143,6 +144,9 @@ void outliner_build_tree(struct Main *mainvar, struct Scene *scene, struct Space
 typedef void (*OutlinerSceneCollectionObjectFn)(TreeElement *te, struct Object *ob, void *userdata);
 void outliner_scene_collection_foreach_object(ListBase *lb, OutlinerSceneCollectionObjectFn fn, void *userdata);
 TreeElement *outliner_find_scene_collection_te(ListBase *lb, int uid);
+void outliner_collection_game_sync(struct bContext *C);
+void outliner_collection_game_exclude_set(struct bContext *C, struct Scene *scene,
+                                          struct SceneCollection *sc, bool exclude);
 
 /* outliner_draw.c ---------------------------------------------- */
 
@@ -264,6 +268,8 @@ void OUTLINER_OT_collection_objects_select(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_move_objects(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_object_drop(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_drop(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_game_exclude(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_to_group(struct wmOperatorType *ot);
 
 /* outliner_tools.c ---------------------------------------------- */
 
