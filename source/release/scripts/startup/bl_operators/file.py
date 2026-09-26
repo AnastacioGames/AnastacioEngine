@@ -389,7 +389,43 @@ class FILE_OT_asset_library_browse(Operator):
         return bpy.ops.file.asset_library_add(directory=self.directory)
 
 
+class WM_OT_asset_texts_import(Operator):
+    """Copy the scripts (Texts) of the file an asset came from; names already in this file are kept"""
+    bl_idname = "wm.asset_texts_import"
+    bl_label = "Copy Scripts"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    filepath: StringProperty(
+        subtype='FILE_PATH',
+        options={'HIDDEN', 'SKIP_SAVE'},
+    )
+
+    def _names(self):
+        # Opening the library without assigning to data_to only reads the names.
+        with bpy.data.libraries.load(self.filepath) as (data_from, data_to):
+            names = list(data_from.texts)
+        missing = [n for n in names if n not in bpy.data.texts]
+        existing = [n for n in names if n in bpy.data.texts]
+        return missing, existing
+
+    def execute(self, context):
+        try:
+            missing, existing = self._names()
+        except OSError:
+            return {'CANCELLED'}
+        if not missing:
+            return {'CANCELLED'}
+        for name in missing:
+            bpy.ops.wm.import_libload_text(filepath=self.filepath, text=name)
+        msg = "Copied scripts: " + ", ".join(missing)
+        if existing:
+            msg += " (already in the project: " + ", ".join(existing) + ")"
+        self.report({'INFO'}, msg)
+        return {'FINISHED'}
+
+
 classes = (
+    WM_OT_asset_texts_import,
     FILE_OT_asset_library_browse,
     FILE_OT_asset_previews_generate,
     WM_OT_previews_batch_clear,

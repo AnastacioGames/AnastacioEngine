@@ -21,6 +21,12 @@ import bpy
 from bpy.types import Header, Panel, Menu, UIList
 
 
+def _is_asset_browser(space):
+    # A file selector opened from the Asset Browser reuses its area, so it is a
+    # regular file selector (drives, bookmarks...) while an operator is active.
+    return space.browse_mode == 'ASSETS' and space.active_operator is None
+
+
 class FILEBROWSER_HT_header(Header):
     bl_space_type = 'FILE_BROWSER'
 
@@ -33,7 +39,7 @@ class FILEBROWSER_HT_header(Header):
         if st.active_operator is None:
             layout.template_header()
 
-        if st.browse_mode == 'ASSETS':
+        if _is_asset_browser(st):
             self.draw_asset_browser(context)
             return
 
@@ -159,7 +165,7 @@ class FILEBROWSER_PT_bookmarks_volumes(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'FILES'
+        return not _is_asset_browser(context.space_data)
 
     def draw(self, context):
         layout = self.layout
@@ -179,7 +185,7 @@ class FILEBROWSER_PT_bookmarks_system(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'FILES' and not context.user_preferences.filepaths.hide_system_bookmarks
+        return not _is_asset_browser(context.space_data) and not context.user_preferences.filepaths.hide_system_bookmarks
 
     def draw(self, context):
         layout = self.layout
@@ -211,7 +217,7 @@ class FILEBROWSER_PT_bookmarks_favorites(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'FILES'
+        return not _is_asset_browser(context.space_data)
 
     def draw(self, context):
         layout = self.layout
@@ -246,7 +252,7 @@ class FILEBROWSER_PT_bookmarks_recents(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'FILES' and not context.user_preferences.filepaths.hide_recent_locations
+        return not _is_asset_browser(context.space_data) and not context.user_preferences.filepaths.hide_recent_locations
 
     def draw(self, context):
         layout = self.layout
@@ -271,7 +277,7 @@ class FILEBROWSER_PT_advanced_filter(Panel):
     def poll(cls, context):
         # only useful in append/link (library) context currently...
         space = context.space_data
-        return space.browse_mode == 'FILES' and space.params.use_library_browsing
+        return not _is_asset_browser(space) and space.params.use_library_browsing
 
     def draw(self, context):
         layout = self.layout
@@ -294,7 +300,7 @@ class FILEBROWSER_PT_asset_libraries(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'ASSETS'
+        return _is_asset_browser(context.space_data)
 
     def draw(self, context):
         layout = self.layout
@@ -326,7 +332,7 @@ class FILEBROWSER_PT_asset_directory(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.browse_mode == 'ASSETS' and context.space_data.params
+        return _is_asset_browser(context.space_data) and context.space_data.params
 
     def draw(self, context):
         layout = self.layout

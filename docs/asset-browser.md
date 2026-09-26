@@ -32,6 +32,7 @@ em arquivos `.blend` de uma pasta de biblioteca.
   - vale para Groups e Materials;
   - Objects são sempre append (o 2.79 não instancia objeto linkado);
   - Ctrl ao soltar força link.
+- Ao soltar, os scripts (Texts) do arquivo de origem são copiados para o projeto automaticamente; um nome que já existe no projeto não é copiado nem sobrescrito.
 - Não é possível arrastar assets do próprio arquivo aberto.
 
 ### Miniaturas

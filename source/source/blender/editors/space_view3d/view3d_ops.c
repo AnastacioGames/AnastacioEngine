@@ -219,7 +219,7 @@ bool view3d_asset_drop_path_parse(const char *path, char *r_libpath, short *r_id
 	char *group, *name;
 	short idcode;
 
-	if (path == NULL || BLI_strcasestr(path, ".blend") == NULL) {
+	if (path == NULL || (BLI_strcasestr(path, ".blend") == NULL && BLI_strcasestr(path, ".range") == NULL)) {
 		return false;
 	}
 	if (!BLO_library_path_explode(path, dir, &group, &name) || group == NULL || name == NULL) {
@@ -324,7 +324,7 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 
 	RNA_string_get(op->ptr, "filepath", path);
 	if (!view3d_asset_drop_path_parse(path, libpath, &idcode, name)) {
-		BKE_reportf(op->reports, RPT_ERROR, "'%s' is not an object, group or material inside a .blend", path);
+		BKE_reportf(op->reports, RPT_ERROR, "'%s' is not an object, group or material inside a .blend or .range", path);
 		return OPERATOR_CANCELLED;
 	}
 	if (BLI_path_cmp(BKE_main_blendfile_path(bmain), libpath) == 0) {
@@ -474,6 +474,17 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 		WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM, scene);
 	}
 
+	/* Scripts (Texts) of the source file are not brought along: copy the missing ones, keeping existing names. */
+	{
+		wmOperatorType *texts_ot = WM_operatortype_find("WM_OT_asset_texts_import", true);
+		if (texts_ot) {
+			WM_operator_properties_create_ptr(&props, texts_ot);
+			RNA_string_set(&props, "filepath", libpath);
+			WM_operator_name_call_ptr(C, texts_ot, WM_OP_EXEC_DEFAULT, &props);
+			WM_operator_properties_free(&props);
+		}
+	}
+
 	return OPERATOR_FINISHED;
 }
 
@@ -491,7 +502,7 @@ static void VIEW3D_OT_asset_drop(wmOperatorType *ot)
 	ot->flag = OPTYPE_UNDO | OPTYPE_INTERNAL;
 
 	prop = RNA_def_string(ot->srna, "filepath", NULL, FILE_MAX_LIBEXTRA, "File Path",
-	                      "Data-block inside a .blend (lib.blend/Object/Name)");
+	                      "Data-block inside a .blend or .range (lib.blend/Object/Name)");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 	prop = RNA_def_boolean(ot->srna, "link", false, "Link", "Link instead of appending (default: Ctrl held)");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
