@@ -394,6 +394,8 @@ if(WITH_CYCLES_CUDA_BINARIES)
 			-I ${CMAKE_CURRENT_SOURCE_DIR}/..
 			-I ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cuda
 			--use_fast_math
+			# nvcc 13 defaults to C++20, where the MSVC 14.5x STL static-asserts on removed features.
+			-std=c++17
 			-o ${CMAKE_CURRENT_BINARY_DIR}/${cuda_cubin})
 
 		if(${experimental})

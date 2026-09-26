@@ -9,6 +9,14 @@
       "binaryDir": "${sourceDir}/../build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "WITH_CYCLES": "ON",
+        "WITH_CYCLES_OSL": "OFF",
+        "WITH_CYCLES_EMBREE": "ON",
+        "WITH_CYCLES_DEVICE_CUDA": "ON",
+        "WITH_CUDA_DYNLOAD": "ON",
+        "WITH_CYCLES_CUDA_BINARIES": "ON",
+        "CYCLES_CUDA_BINARIES_ARCH": "sm_120",
+        "WITH_CYCLES_DEVICE_OPENCL": "ON",
         "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe",
         "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
         "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
