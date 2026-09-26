@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Windows: Cycles com CUDA no build principal
+
+- Preset `v142-ninja` liga Cycles com Embree, CUDA (binarios `sm_120`) e OpenCL no `build/`.
+- CUDA 13.0 nao aceita o MSVC 14.51 do VS 18; instalado o CUDA 13.4 em `D:` (o instalador so deixa escolher
+  a unidade sem versao anterior instalada). Cache reapontado com `cmake -U "CUDA_*" -DCUDA_TOOLKIT_ROOT_DIR=...`.
+- O nvcc 13 usa C++20 por padrao e a STL do MSVC 14.5x da static_assert (`aligned_storage`, `result_of`);
+  `-std=c++17` adicionado aos flags do kernel.
+- `kernel_sm_120.cubin` nao e dependencia do `RangeEngine`: compilar `cycles_kernel_cuda` antes.
+- Teste: `RangeEngine -b` renderiza a cena padrao na RTX 5060 com os kernels pre-compilados (512 amostras,
+  7,1 s).
+
 ## 2026-09-26 - Linux: pacote testado em maquina limpa
 
 - Teste num container Ubuntu 24.04 minimo (`ubuntu-base` + `unshare`, sem Docker nem sudo); roteiro em
