@@ -121,6 +121,35 @@ static void rna_userdef_version_get(PointerRNA *ptr, int *value)
 	value[2] = userdef->subversionfile;
 }
 
+/* Spread "All Widget Colors" over every widget slot of the global UI, then copy it to the
+ * User Interface theme. Toggling the checkbox and editing a widget value must give the same result. */
+static void rna_theme_global_ui_apply(bTheme *btheme)
+{
+	ThemeUI *global_ui = &btheme->tglobal_ui;
+	const uiWidgetColors widget = global_ui->wcol_regular;
+
+	global_ui->wcol_tool = widget;
+	global_ui->wcol_text = widget;
+	global_ui->wcol_radio = widget;
+	global_ui->wcol_option = widget;
+	global_ui->wcol_toggle = widget;
+	global_ui->wcol_num = widget;
+	global_ui->wcol_numslider = widget;
+	global_ui->wcol_tab = widget;
+	global_ui->wcol_menu = widget;
+	global_ui->wcol_pulldown = widget;
+	global_ui->wcol_menu_back = widget;
+	global_ui->wcol_menu_item = widget;
+	global_ui->wcol_tooltip = widget;
+	global_ui->wcol_box = widget;
+	global_ui->wcol_scroll = widget;
+	global_ui->wcol_progress = widget;
+	global_ui->wcol_list_item = widget;
+	global_ui->wcol_pie_menu = widget;
+
+	btheme->tui = *global_ui;
+}
+
 static void rna_userdef_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	if (ptr->type == &RNA_Theme || ptr->type == &RNA_ThemeGlobal || ptr->type == &RNA_ThemeGlobalUI) {
@@ -160,33 +189,15 @@ static void rna_userdef_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Pointe
 
 		if ((ptr->type == &RNA_Theme || ptr->type == &RNA_ThemeGlobalUI) &&
 		    (btheme->global_theme_spaces & (1 << 0))) {
-			btheme->tui = btheme->tglobal_ui;
+			rna_theme_global_ui_apply(btheme);
 		}
 	}
-	else if (ptr->type == &RNA_ThemeWidgetColors) {
+	else if (ptr->type == &RNA_ThemeWidgetColors || ptr->type == &RNA_ThemeWidgetStateColors) {
 		bTheme *btheme = UI_GetTheme();
-		uiWidgetColors *global_widget = &btheme->tglobal_ui.wcol_regular;
 
-		if (ptr->data == global_widget && (btheme->global_theme_spaces & (1 << 0))) {
-			btheme->tui.wcol_regular = *global_widget;
-			btheme->tui.wcol_tool = *global_widget;
-			btheme->tui.wcol_text = *global_widget;
-			btheme->tui.wcol_radio = *global_widget;
-			btheme->tui.wcol_option = *global_widget;
-			btheme->tui.wcol_toggle = *global_widget;
-			btheme->tui.wcol_num = *global_widget;
-			btheme->tui.wcol_numslider = *global_widget;
-			btheme->tui.wcol_tab = *global_widget;
-			btheme->tui.wcol_menu = *global_widget;
-			btheme->tui.wcol_pulldown = *global_widget;
-			btheme->tui.wcol_menu_back = *global_widget;
-			btheme->tui.wcol_menu_item = *global_widget;
-			btheme->tui.wcol_tooltip = *global_widget;
-			btheme->tui.wcol_box = *global_widget;
-			btheme->tui.wcol_scroll = *global_widget;
-			btheme->tui.wcol_progress = *global_widget;
-			btheme->tui.wcol_list_item = *global_widget;
-			btheme->tui.wcol_pie_menu = *global_widget;
+		if ((ptr->data == &btheme->tglobal_ui.wcol_regular || ptr->data == &btheme->tglobal_ui.wcol_state) &&
+		    (btheme->global_theme_spaces & (1 << 0))) {
+			rna_theme_global_ui_apply(btheme);
 		}
 	}
 	WM_main_add_notifier(NC_WINDOW, NULL);
