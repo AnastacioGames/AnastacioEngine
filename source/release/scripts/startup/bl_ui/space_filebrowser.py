@@ -109,17 +109,16 @@ class FILEBROWSER_HT_header(Header):
             row.prop(params, "use_link", text="Link" if params.use_link else "Append",
                      icon='LINK_BLEND' if params.use_link else 'APPEND_BLEND', toggle=True)
 
-        layout.separator_spacer()
-
-        layout.template_running_jobs()
-
-        if params:
             row = layout.row(align=True)
             row.prop_enum(params, "filter_id", 'OBJECT', text="")
             row.prop_enum(params, "filter_id", 'GROUP', text="")
             row.prop_enum(params, "filter_id", 'MATERIAL', text="")
             row.separator()
             row.prop(params, "filter_search", text="", icon='VIEWZOOM')
+
+        layout.separator_spacer()
+
+        layout.template_running_jobs()
 
 
 class FILEBROWSER_UL_dir(UIList):
@@ -307,11 +306,13 @@ class FILEBROWSER_PT_asset_libraries(Panel):
                               space, "asset_libraries_active", item_dyntip_propname="path",
                               rows=2, maxrows=10)
         else:
-            row.label(text="No library yet: browse to a folder and add it")
+            row.label(text="No library yet: add a folder")
 
         col = row.column(align=True)
         col.operator("file.asset_library_add", icon='ZOOMIN', text="")
         col.operator("file.asset_library_remove", icon='ZOOMOUT', text="")
+
+        layout.operator("file.asset_library_browse", text="Add Library Folder...", icon='FILE_FOLDER')
 
         layout.separator()
         layout.operator("file.asset_previews_generate", text="Generate Previews", icon='IMAGE_COL')

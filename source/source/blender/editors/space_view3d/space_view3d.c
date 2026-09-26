@@ -1421,6 +1421,11 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 	wmWindow *win;
 	bool want_timer = false;
 
+	/* The timer is freed with the window manager it belongs to. */
+	if (g_realtime_viewport_timer && BLI_findindex(&wm->timers, g_realtime_viewport_timer) == -1) {
+		g_realtime_viewport_timer = NULL;
+	}
+
 	for (win = wm->windows.first; win && !want_timer; win = win->next) {
 		ScrArea *sa;
 		if (!win->screen)

@@ -66,37 +66,6 @@
 
 #include "wm.h"
 
-#define SPLASH_ENTRY_DURATION 1.20
-#define SPLASH_ENTRY_OFFSET 22
-
-static wmTimer *g_splash_fade_timer = NULL;
-static int g_splash_entry_offset = 0;
-
-static int wm_block_splash_entry_event(
-    const bContext *C, uiBlock *block, const wmEvent *event)
-{
-  if (event->type != TIMER || event->customdata != g_splash_fade_timer) {
-    return false;
-  }
-
-  const float progress = MIN2(
-      (float)(g_splash_fade_timer->duration / SPLASH_ENTRY_DURATION), 1.0f);
-  /* Smoothstep avoids the abrupt start and stop of a linear movement. */
-  const float eased = progress * progress * (3.0f - 2.0f * progress);
-  const int target_offset = (int)roundf(-SPLASH_ENTRY_OFFSET * (1.0f - eased));
-  UI_block_translate(block, 0, target_offset - g_splash_entry_offset);
-  g_splash_entry_offset = target_offset;
-
-  ED_region_tag_redraw(CTX_wm_menu(C));
-
-  if (progress == 1.0f) {
-    WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), g_splash_fade_timer);
-    g_splash_fade_timer = NULL;
-  }
-
-  return true;
-}
-
 static void wm_block_close(bContext *C, void *arg_block, void *UNUSED(arg))
 {
   wmWindow *win = CTX_wm_window(C);
@@ -297,7 +266,6 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *region, void *UNUSE
 
   UI_but_func_set(but, wm_block_close, block, NULL);
   UI_block_func_set(block, wm_block_splash_refreshmenu, block, NULL);
-	UI_block_event_func_set(block, wm_block_splash_entry_event);
 
   char version_buf[256] = "\0";
   get_version_string_splash_screen(version_buf, sizeof(version_buf));
@@ -320,21 +288,12 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *region, void *UNUSE
   }
 
   UI_block_bounds_set_centered(block, 0);
-  if (g_splash_fade_timer) {
-    UI_block_translate(block, 0, g_splash_entry_offset);
-  }
 
   return block;
 }
 
 static int wm_splash_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *UNUSED(event))
 {
-	if (g_splash_fade_timer) {
-		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), g_splash_fade_timer);
-	}
-	g_splash_fade_timer = WM_event_add_timer(
-		CTX_wm_manager(C), CTX_wm_window(C), TIMER, 1.0 / 60.0);
-	g_splash_entry_offset = -SPLASH_ENTRY_OFFSET;
 	UI_popup_block_invoke(C, wm_block_create_splash, NULL, NULL);
 
 	return OPERATOR_FINISHED;

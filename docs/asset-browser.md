@@ -15,7 +15,9 @@ em arquivos `.blend` de uma pasta de biblioteca.
 
 ### Bibliotecas
 
-- Na aba **Assets**, no painel **Asset Libraries**, navegue até uma pasta e clique em **+**. A pasta vira uma biblioteca e é aberta.
+- Na aba **Assets**, no painel **Asset Libraries**, clique em **Add Library Folder...** e escolha a pasta no seletor.
+  O seletor ocupa a própria área (maximizada) e, ao confirmar, ela volta ao modo Assets já na nova biblioteca.
+- Ou navegue até uma pasta e clique em **+**. A pasta vira uma biblioteca e é aberta.
 - Se você estiver dentro de um `.blend`, a biblioteca registrada é a pasta que contém esse arquivo.
 - **−** remove a biblioteca ativa. A pasta em disco não é tocada.
 - As bibliotecas ficam salvas na seção `[AssetLibraries]` do `bookmarks.txt` do usuário, junto com os favoritos.
@@ -58,7 +60,7 @@ O botão **Generate Previews**, no painel Asset Libraries, gera as miniaturas de
 | Entrada no menu de tipo de editor (subtipo) | `editors/screen/area.c` |
 | Janela flutuante (`SCREEN_OT_asset_browser_show`, `WM_WINDOW_ASSETS`) | `editors/screen/screen_ops.c`, `windowmanager/intern/wm_window.c` |
 | RNA: `browse_mode`, `asset_libraries(_active)`, `params.use_link` | `makesrna/intern/rna_space.c` |
-| Header, painéis e `file.asset_previews_generate` | `bl_ui/space_filebrowser.py`, `bl_operators/file.py` |
+| Header, painéis, `file.asset_library_browse` e `file.asset_previews_generate` | `bl_ui/space_filebrowser.py`, `bl_operators/file.py` |
 
 Regras do modo Assets. `ED_fileselect_browse_mode_params_ensure` as reaplica a cada refresh:
 

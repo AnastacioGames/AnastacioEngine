@@ -355,7 +355,42 @@ class FILE_OT_asset_previews_generate(Operator):
         return {'FINISHED'}
 
 
+class FILE_OT_asset_library_browse(Operator):
+    """Choose a folder in a file selector and add it as an asset library"""
+    bl_idname = "file.asset_library_browse"
+    bl_label = "Add Library Folder"
+    bl_options = {'REGISTER'}
+
+    directory: StringProperty(
+        maxlen=1024,
+        subtype='DIR_PATH',
+        options={'HIDDEN', 'SKIP_SAVE'},
+    )
+    filter_folder: BoolProperty(
+        default=True,
+        options={'HIDDEN', 'SKIP_SAVE'},
+    )
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return (space and space.type == 'FILE_BROWSER' and
+                space.browse_mode == 'ASSETS' and space.active_operator is None)
+
+    def invoke(self, context, event):
+        # The selector takes over this File Browser area (maximized) and gives it
+        # back in Assets mode when it closes.
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        if not self.directory:
+            return {'CANCELLED'}
+        return bpy.ops.file.asset_library_add(directory=self.directory)
+
+
 classes = (
+    FILE_OT_asset_library_browse,
     FILE_OT_asset_previews_generate,
     WM_OT_previews_batch_clear,
     WM_OT_previews_batch_generate,

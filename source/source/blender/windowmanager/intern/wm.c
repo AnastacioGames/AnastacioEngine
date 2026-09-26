@@ -341,6 +341,11 @@ void wm_close_and_free(bContext *C, wmWindowManager *wm)
 		wm_window_free(C, wm, win);
 	}
 
+	/* Timers without a window (e.g. the realtime viewport one) are not freed with the windows. */
+	while (wm->timers.first) {
+		WM_event_remove_timer(wm, NULL, wm->timers.first);
+	}
+
 	while ((op = BLI_pophead(&wm->operators))) {
 		WM_operator_free(op);
 	}
