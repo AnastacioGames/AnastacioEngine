@@ -32,7 +32,11 @@
 
 #include <pmmintrin.h>
 #include <xmmintrin.h>
-#include <embree3/rtcore_geometry.h>
+#ifdef WITH_EMBREE4
+#  include <embree4/rtcore_geometry.h>
+#else
+#  include <embree3/rtcore_geometry.h>
+#endif
 
 #include "bvh/bvh_embree.h"
 
@@ -715,19 +719,30 @@ void BVHEmbree::update_curve_vertex_buffer(RTCGeometry geom_id, const Mesh* mesh
 		}
 	}
 #  if RTC_VERSION >= 30900
-  if (!use_curves) {
-    unsigned char *flags = (unsigned char *)rtcSetNewGeometryBuffer(geom_id,
-                                                                    RTC_BUFFER_TYPE_FLAGS,
-                                                                    0,
-                                                                    RTC_FORMAT_UCHAR,
-                                                                    sizeof(unsigned char),
-                                                                    num_keys_embree);
-    flags[0] = RTC_CURVE_FLAG_NEIGHBOR_RIGHT;
-    ::memset(flags + 1,
-             RTC_CURVE_FLAG_NEIGHBOR_RIGHT | RTC_CURVE_FLAG_NEIGHBOR_RIGHT,
-             num_keys_embree - 2);
-    flags[num_keys_embree - 1] = RTC_CURVE_FLAG_NEIGHBOR_LEFT;
-  }
+	/* Curvas lineares (Embree 3.9+): um flag por segmento dizendo se ha segmento
+	 * vizinho a esquerda/direita na mesma curva, para unir as juntas. */
+	if(!use_curves) {
+		size_t num_segments = 0;
+		for(size_t j = 0; j < num_curves; ++j) {
+			num_segments += mesh->get_curve(j).num_segments();
+		}
+		unsigned char *flags = (unsigned char*)rtcSetNewGeometryBuffer(geom_id, RTC_BUFFER_TYPE_FLAGS, 0,
+		                                                               RTC_FORMAT_UCHAR, sizeof(unsigned char),
+		                                                               num_segments);
+		for(size_t j = 0; j < num_curves; ++j) {
+			const int n = mesh->get_curve(j).num_segments();
+			for(int k = 0; k < n; ++k) {
+				unsigned char f = 0;
+				if(k > 0) {
+					f |= RTC_CURVE_FLAG_NEIGHBOR_LEFT;
+				}
+				if(k < n - 1) {
+					f |= RTC_CURVE_FLAG_NEIGHBOR_RIGHT;
+				}
+				*flags++ = f;
+			}
+		}
+	}
 #  endif
 }
 

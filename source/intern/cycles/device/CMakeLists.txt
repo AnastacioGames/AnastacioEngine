@@ -80,6 +80,11 @@ if(WITH_CYCLES_NETWORK)
 endif()
 if(WITH_CYCLES_DEVICE_OPENCL)
 	add_definitions(-DWITH_OPENCL)
+	# device_opencl.cpp chama clew; sem isso o RangeRuntime nao resolve os
+	# simbolos (o ld do Linux le os .a numa passada so).
+	list(APPEND LIB
+		extern_clew
+	)
 endif()
 if(WITH_CYCLES_DEVICE_CUDA)
 	add_definitions(-DWITH_CUDA)

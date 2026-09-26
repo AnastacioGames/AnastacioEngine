@@ -270,7 +270,8 @@ padrao ja usado para outros datafiles opcionais nesse mesmo arquivo.
   Windows), `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` (API antiga incompativel com as versoes do Ubuntu
   24.04 — ver itens 2 e 3 acima; portar fica para uma rodada futura dedicada, nao bloqueia o editor abrir
   e rodar).
-- **Cycles**: ligado desde 2026-09-26, so CPU (ver "Editor com Cycles" abaixo).
+- **Cycles**: ligado desde 2026-09-26, CPU com Embree, CUDA e OpenCL; OSL desligado (ver "Editor com Cycles"
+  abaixo).
 - **Player**: `WITH_PLAYER=ON` desde 2026-09-26; o `RangeRuntime` sai ao lado do `RangeEngine`, que o botao
   Standalone procura na mesma pasta. No link do player, todas as libs registradas vao dentro do
   `--start-group` (`source/blenderplayer/CMakeLists.txt`), porque as libs do editor entram como dependencias
@@ -436,8 +437,19 @@ acha sozinho, por isso os dois `-D...LIBRARY` acima.
 
 ## Editor com Cycles
 
-Desde 2026-09-26 o preset `linux-editor` tem `WITH_CYCLES=ON` com CUDA (sem OSL, Embree e OpenCL), e o
-`build-linux-editor/` e o unico editor Linux: nao ha mais sandbox separada. Mesmos pacotes da secao anterior.
+Desde 2026-09-26 o preset `linux-editor` tem `WITH_CYCLES=ON` com Embree, CUDA e OpenCL (sem OSL), e o
+`build-linux-editor/` e o unico editor Linux: nao ha mais sandbox separada. Mesmos pacotes da secao anterior,
+mais `sudo apt install libembree-dev` (o `quickstart-editor.sh` ja instala).
+
+Embree: o Ubuntu 24.04 so tem o Embree 4 (`libembree-dev` 4.3); o Cycles aceita 3 e 4 (`WITH_EMBREE4` e
+definido quando o CMake acha `embree4/rtcore.h`). No Windows segue o Embree 3 estatico das libs pre-compiladas.
+Liga em Render > Performance > "Use Embree" (so afeta a CPU).
+
+OpenCL: compilado (`clew` carrega a `libOpenCL` em runtime), mas este Cycles so aceita GPUs AMD em OpenCL; placas
+NVIDIA aparecem so em CUDA, como no Blender oficial da epoca.
+
+OSL: desligado. Nao ha pacote do OpenShadingLanguage no Ubuntu 24.04, e esta versao do Cycles espera OSL 1.9,
+que so compila com LLVM antigo (3.x a 6); ligar exigiria compilar OSL e LLVM a parte.
 
 CUDA (GPU NVIDIA): o kernel e compilado na primeira vez que se renderiza na GPU (uns 4 minutos; depois fica em
 `~/.cache/cycles/kernels/`). Precisa do `nvcc` em `/usr/local/cuda/bin` ou no PATH, na versao que conhece a placa

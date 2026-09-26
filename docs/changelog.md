@@ -9,6 +9,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Cycles: Embree 4 e OpenCL no editor Linux
+
+- Embree: o Ubuntu 24.04 so tem o Embree 4, e o Cycles era escrito para o 3. `FindEmbree.cmake` acha
+  `embree4/rtcore.h` e a `libembree4` compartilhada; `intern/cycles/CMakeLists.txt` define `WITH_EMBREE4`
+  (sem `EMBREE_STATIC_LIB`). No codigo, headers `embree4/`, `RTCRayQueryContext` no lugar de
+  `RTCIntersectContext`, e `kernel_embree_intersect1`/`kernel_embree_occluded1` (`kernel/bvh/bvh_embree.h`)
+  passam o contexto por `RTCIntersectArguments`/`RTCOccludedArguments`. O Embree 3 do Windows segue igual.
+- `bvh_embree.cpp`: o bloco `RTC_VERSION >= 30900` (flags de vizinho das curvas lineares) usava uma variavel
+  inexistente e tratava todo o cabelo como uma curva so; nunca tinha compilado. Reescrito com um flag por
+  segmento, curva a curva.
+- OpenCL: `cycles_device` nao linkava o `extern_clew`, e o `RangeRuntime` falhava com `clewInit` indefinido;
+  agora linka quando `WITH_CYCLES_DEVICE_OPENCL`. Este Cycles so aceita OpenCL em GPUs AMD
+  (`OpenCLInfo::device_supported`), entao a RTX 5060 nao aparece em OpenCL; nao foi testado em AMD.
+- Preset `linux-editor`: `WITH_CYCLES_EMBREE=ON` e `WITH_CYCLES_DEVICE_OPENCL=ON`; `quickstart-editor.sh`
+  instala `libembree-dev`. OSL continua desligado: sem pacote no Ubuntu 24.04 e esta versao espera OSL 1.9.
+- Teste: cubo com 300 fios de cabelo e uma copia linkada, CPU, 32 amostras, Embree ligado e desligado: as
+  duas imagens batem (diferenca media 0,03/255, so ruido de amostragem).
+
 ## 2026-09-26 - Cycles: CUDA na RTX 5060 (sm_120) com CUDA 13
 
 - `kernel_config.h`: o kernel CUDA so conhecia arquiteturas ate 7.x e parava com "Unknown or unsupported CUDA

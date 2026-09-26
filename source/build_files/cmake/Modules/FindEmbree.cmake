@@ -39,6 +39,7 @@ SET(_embree_SEARCH_DIRS
 FIND_PATH(EMBREE_INCLUDE_DIR
   NAMES
     embree3/rtcore.h
+    embree4/rtcore.h
   HINTS
     ${_embree_SEARCH_DIRS}
   PATH_SUFFIXES
@@ -46,17 +47,27 @@ FIND_PATH(EMBREE_INCLUDE_DIR
 )
 
 
-SET(_embree_FIND_COMPONENTS
-  embree_avx
-  embree_avx2
-  embree_sse42
-  embree3
-  lexers
-  math
-  simd
-  sys
-  tasking
-)
+# Embree 4 (Ubuntu 24.04+) vem como uma biblioteca compartilhada so;
+# o Embree 3 estatico das libs pre-compiladas vem em varios pedacos.
+IF(EXISTS "${EMBREE_INCLUDE_DIR}/embree4/rtcore.h")
+  SET(EMBREE_MAJOR_VERSION 4)
+  SET(_embree_FIND_COMPONENTS
+    embree4
+  )
+ELSE()
+  SET(EMBREE_MAJOR_VERSION 3)
+  SET(_embree_FIND_COMPONENTS
+    embree_avx
+    embree_avx2
+    embree_sse42
+    embree3
+    lexers
+    math
+    simd
+    sys
+    tasking
+  )
+ENDIF()
 
 SET(_embree_LIBRARIES)
 FOREACH(COMPONENT ${_embree_FIND_COMPONENTS})

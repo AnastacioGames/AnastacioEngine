@@ -14,8 +14,13 @@
  * limitations under the License.
  */
 
-#include <embree3/rtcore_ray.h>
-#include <embree3/rtcore_scene.h>
+#ifdef WITH_EMBREE4
+#  include <embree4/rtcore_ray.h>
+#  include <embree4/rtcore_scene.h>
+#else
+#  include <embree3/rtcore_ray.h>
+#  include <embree3/rtcore_scene.h>
+#endif
 
 #include "kernel/kernel_compat_cpu.h"
 #include "kernel/split/kernel_split_data_types.h"
@@ -59,17 +64,52 @@ struct CCLIntersectContext  {
 	}
 };
 
+/* O filtro do Embree recebe o ponteiro de "context" e converte de volta para
+ * IntersectContext, entao "context" precisa ser o primeiro membro. */
 class IntersectContext
 {
 public:
 	IntersectContext(CCLIntersectContext* ctx)
 	{
+#ifdef WITH_EMBREE4
+		rtcInitRayQueryContext(&context);
+#else
 		rtcInitIntersectContext(&context);
+#endif
 		userRayExt = ctx;
 	}
+#ifdef WITH_EMBREE4
+	RTCRayQueryContext context;
+#else
 	RTCIntersectContext context;
+#endif
 	CCLIntersectContext* userRayExt;
 };
+
+/* Embree 4 passa o contexto dentro de uma struct de argumentos. */
+ccl_device_inline void kernel_embree_intersect1(RTCScene scene, IntersectContext& rtc_ctx, RTCRayHit& ray_hit)
+{
+#ifdef WITH_EMBREE4
+	RTCIntersectArguments args;
+	rtcInitIntersectArguments(&args);
+	args.context = &rtc_ctx.context;
+	rtcIntersect1(scene, &ray_hit, &args);
+#else
+	rtcIntersect1(scene, &rtc_ctx.context, &ray_hit);
+#endif
+}
+
+ccl_device_inline void kernel_embree_occluded1(RTCScene scene, IntersectContext& rtc_ctx, RTCRay& ray)
+{
+#ifdef WITH_EMBREE4
+	RTCOccludedArguments args;
+	rtcInitOccludedArguments(&args);
+	args.context = &rtc_ctx.context;
+	rtcOccluded1(scene, &ray, &args);
+#else
+	rtcOccluded1(scene, &rtc_ctx.context, &ray);
+#endif
+}
 
 ccl_device_inline void kernel_embree_setup_ray(const Ray& ray, RTCRay& rtc_ray, const uint visibility)
 {

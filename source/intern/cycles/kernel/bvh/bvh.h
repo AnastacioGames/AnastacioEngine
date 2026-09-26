@@ -198,7 +198,7 @@ ccl_device_intersect bool scene_intersect(KernelGlobals *kg,
 		IntersectContext rtc_ctx(&ctx);
 		RTCRayHit ray_hit;
 		kernel_embree_setup_rayhit(ray, ray_hit, visibility);
-		rtcIntersect1(kernel_data.bvh.scene, &rtc_ctx.context, &ray_hit);
+		kernel_embree_intersect1(kernel_data.bvh.scene, rtc_ctx, ray_hit);
 		if(ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID && ray_hit.hit.primID != RTC_INVALID_GEOMETRY_ID) {
 			kernel_embree_convert_hit(kg, &ray_hit.ray, &ray_hit.hit, isect);
 			return true;
@@ -298,7 +298,7 @@ ccl_device_intersect bool scene_intersect_local(KernelGlobals *kg,
 			}
 			RTCScene scene = (RTCScene)rtcGetGeometryUserData(geom);
 			if(scene) {
-				rtcOccluded1(scene, &rtc_ctx.context, &rtc_ray);
+				kernel_embree_occluded1(scene, rtc_ctx, rtc_ray);
 			}
 		}
 
@@ -347,7 +347,7 @@ ccl_device_intersect bool scene_intersect_shadow_all(KernelGlobals *kg,
 		IntersectContext rtc_ctx(&ctx);
 		RTCRay rtc_ray;
 		kernel_embree_setup_ray(*ray, rtc_ray, PATH_RAY_SHADOW);
-		rtcOccluded1(kernel_data.bvh.scene, &rtc_ctx.context, &rtc_ray);
+		kernel_embree_occluded1(kernel_data.bvh.scene, rtc_ctx, rtc_ray);
 
 		if(ctx.num_hits > max_hits) {
 			return true;
@@ -462,7 +462,7 @@ ccl_device_intersect uint scene_intersect_volume_all(KernelGlobals *kg,
 		IntersectContext rtc_ctx(&ctx);
 		RTCRay rtc_ray;
 		kernel_embree_setup_ray(*ray, rtc_ray, visibility);
-		rtcOccluded1(kernel_data.bvh.scene, &rtc_ctx.context, &rtc_ray);
+		kernel_embree_occluded1(kernel_data.bvh.scene, rtc_ctx, rtc_ray);
 		return rtc_ray.tfar == -INFINITY;
 	}
 #  endif

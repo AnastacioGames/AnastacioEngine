@@ -39,7 +39,7 @@ if command -v apt >/dev/null 2>&1; then
     libsdl2-dev libopenal-dev libsndfile1-dev \
     libfreetype6-dev libpng-dev libjpeg-dev zlib1g-dev libtbb-dev \
     libboost-all-dev libfftw3-dev \
-    libopenimageio-dev libopencolorio-dev \
+    libopenimageio-dev libopencolorio-dev libembree-dev \
     libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
     libswscale-dev libswresample-dev \
     libtheora-dev libvorbis-dev libogg-dev libvpx-dev libx264-dev

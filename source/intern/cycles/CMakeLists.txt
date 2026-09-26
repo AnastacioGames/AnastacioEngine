@@ -219,7 +219,21 @@ endif()
 
 if(WITH_CYCLES_EMBREE)
 	add_definitions(-DWITH_EMBREE)
-	add_definitions(-DEMBREE_STATIC_LIB)
+	# Embree 4 (biblioteca do sistema no Linux) muda headers e a API de
+	# consulta de raios; o Embree 3 estatico segue nas libs do Windows.
+	set(_cycles_embree4 OFF)
+	foreach(_dir ${EMBREE_INCLUDE_DIRS})
+		if(EXISTS "${_dir}/embree4/rtcore.h")
+			set(_cycles_embree4 ON)
+		endif()
+	endforeach()
+	if(_cycles_embree4)
+		add_definitions(-DWITH_EMBREE4)
+	else()
+		add_definitions(-DEMBREE_STATIC_LIB)
+	endif()
+	unset(_cycles_embree4)
+	unset(_dir)
 	include_directories(
 		SYSTEM
 		${EMBREE_INCLUDE_DIRS}
