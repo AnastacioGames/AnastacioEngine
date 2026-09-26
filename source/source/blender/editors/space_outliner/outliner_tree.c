@@ -1926,6 +1926,8 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 			{
 				TreeElement *world_te = outliner_add_element(soops, &te->subtree, sce->world, te, 0, 0);
 
+				outliner_add_scene_collections(soops, &te->subtree, sce, te, &sce->collections);
+
 				for (base = sce->base.first; base; base = base->next) {
 					if (world_te && base->object == sce->world_sun) {
 						ten = outliner_add_element(soops, &world_te->subtree, base->object, world_te, 0, 0);
@@ -1937,6 +1939,7 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 				}
 			}
 			outliner_make_hierarchy(&te->subtree);
+			outliner_move_objects_to_collections(&te->subtree);
 			/* clear id.newid, to prevent objects be inserted in wrong scenes (parent in other scene) */
 			for (base = sce->base.first; base; base = base->next) base->object->id.newid = NULL;
 		}

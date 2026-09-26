@@ -62,7 +62,10 @@ class OUTLINER_HT_header(Header):
                 row.label(text="No Keying Set Active")
         elif space.display_mode == 'ORPHAN_DATA':
             layout.operator("outliner.orphans_purge")
-        elif space.display_mode == 'CURRENT_SCENE':
+
+        # Like Blender 2.8: "New Collection" button at the right end of the header.
+        if space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
+            layout.separator_spacer()
             layout.operator("outliner.collection_new", text="", icon='NEWFOLDER').nested = True
 
 
@@ -82,7 +85,7 @@ class OUTLINER_MT_editor_menus(Menu):
 
         if space.display_mode == 'DATABLOCKS':
             layout.menu("OUTLINER_MT_edit_datablocks")
-        elif space.display_mode == 'CURRENT_SCENE':
+        elif space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
             layout.menu("OUTLINER_MT_collection")
 
 

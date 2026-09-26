@@ -778,21 +778,21 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF,
 				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX), te->ys, UI_UNIT_X, UI_UNIT_Y,
 				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow visibility of all objects in this collection"));
-				UI_but_func_set(bt, restrictbutton_scene_collection_view, scene, tselem);
+				UI_but_func_set(bt, restrictbutton_scene_collection_view, (Scene *)tselem->id, tselem);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 
 				restrict_bool = scene_collection_restrict_flag(te, OB_RESTRICT_SELECT);
 				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_SELECT_ON : ICON_RESTRICT_SELECT_OFF,
 				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_SELECTX), te->ys, UI_UNIT_X, UI_UNIT_Y,
 				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow selection of all objects in this collection"));
-				UI_but_func_set(bt, restrictbutton_scene_collection_select, scene, tselem);
+				UI_but_func_set(bt, restrictbutton_scene_collection_select, (Scene *)tselem->id, tselem);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 
 				restrict_bool = scene_collection_restrict_flag(te, OB_RESTRICT_RENDER);
 				bt = uiDefIconBut(block, UI_BTYPE_ICON_TOGGLE, 0, restrict_bool ? ICON_RESTRICT_RENDER_ON : ICON_RESTRICT_RENDER_OFF,
 				                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_RENDERX), te->ys, UI_UNIT_X, UI_UNIT_Y,
 				                  NULL, 0, 0, 0, 0, TIP_("Restrict/Allow rendering of all objects in this collection"));
-				UI_but_func_set(bt, restrictbutton_scene_collection_render, scene, tselem);
+				UI_but_func_set(bt, restrictbutton_scene_collection_render, (Scene *)tselem->id, tselem);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 
 				UI_block_emboss_set(block, UI_EMBOSS);

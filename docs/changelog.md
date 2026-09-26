@@ -19,6 +19,7 @@ Pastas no modo Current Scene do Outliner, parecidas com as coleções do Blender
 - **Operadores:** `outliner.collection_new` (dentro da pasta selecionada), `collection_delete` (objetos e subpastas sobem para o pai), `collection_objects_select`, `collection_move_objects` (menu; também em "Move to Collection" no menu de contexto do objeto). Arrastar objeto para pasta ou para a área vazia (raiz), arrastar o ícone da pasta para dentro de outra ou para a raiz. Duplo clique renomeia (nome único na cena). Menu **Collection** e botão de nova pasta no cabeçalho do Outliner.
 - **Stub:** `WM_menu_name_call` acrescentado a `blenderplayer/bad_level_call_stubs/stubs.c`; sem ele o `RangeRuntime` não linkava.
 - **Teste:** build limpo de `RangeEngine` e `RangeRuntime` ok; `tools/arquivo_upbge.blend` abre com o `Base` novo. Falta teste no editor.
+- **Também em All Scenes** (modo padrão do `startup.blend`; antes as pastas só existiam em Current Scene e nada aparecia): pastas dentro de cada cena, operadores e arrastar usam a cena da pasta (o drop de pasta leva o nome da cena na propriedade `scene`). Botão de nova coleção no canto direito do cabeçalho, como no Blender 2.8. Teste: build ok; `outliner.collection_new` em All Scenes no `startup.blend` (batch) cria a pasta.
 
 ## 2026-09-25 - Compatibilidade UPBGE: logic bricks revisados; corrige estouro na cor do sensor
 

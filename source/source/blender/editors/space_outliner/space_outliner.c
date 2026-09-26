@@ -32,6 +32,8 @@
 #include "BLI_mempool.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_screen.h"
 #include "BKE_scene.h"
 #include "BKE_outliner_treehash.h"
@@ -256,11 +258,21 @@ static bool outliner_collection_object_drop_poll(bContext *C, wmDrag *drag, cons
 	Scene *scene = CTX_data_scene(C);
 	float fmval[2];
 
-	if (soops->outlinevis != SO_CUR_SCENE || drag->type != WM_DRAG_ID || ID_IS_LINKED(scene)) {
+	if (!ELEM(soops->outlinevis, SO_CUR_SCENE, SO_ALL_SCENES) || drag->type != WM_DRAG_ID) {
 		return false;
 	}
 	ID *id = drag->poin;
 	if (GS(id->name) != ID_OB) {
+		return false;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te && TREESTORE(te)->type == TSE_SCENE_COLLECTION) {
+		/* in "All Scenes" the folder can belong to another scene */
+		scene = (Scene *)TREESTORE(te)->id;
+	}
+	if (ID_IS_LINKED(scene)) {
 		return false;
 	}
 	Base *base = BKE_scene_base_find(scene, (Object *)id);
@@ -268,8 +280,6 @@ static bool outliner_collection_object_drop_poll(bContext *C, wmDrag *drag, cons
 		return false;
 	}
 
-	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
-	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
 	if (te) {
 		return (TREESTORE(te)->type == TSE_SCENE_COLLECTION && te->index != base->collection_uid);
 	}
@@ -298,18 +308,31 @@ static SceneCollection *outliner_collection_from_drag(ListBase *lb, const void *
 	return NULL;
 }
 
+/* The scene owning the dragged collection ("All Scenes" shows the folders of every scene). */
+static Scene *outliner_collection_drag_scene(Main *bmain, const void *poin, SceneCollection **r_sc)
+{
+	for (Scene *scene = bmain->scene.first; scene; scene = scene->id.next) {
+		SceneCollection *sc = outliner_collection_from_drag(&scene->collections, poin);
+		if (sc) {
+			*r_sc = sc;
+			return scene;
+		}
+	}
+	return NULL;
+}
+
 static bool outliner_collection_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
-	Scene *scene = CTX_data_scene(C);
+	SceneCollection *sc = NULL;
 	float fmval[2];
 
-	if (soops->outlinevis != SO_CUR_SCENE || drag->type != WM_DRAG_NAME || ID_IS_LINKED(scene)) {
+	if (!ELEM(soops->outlinevis, SO_CUR_SCENE, SO_ALL_SCENES) || drag->type != WM_DRAG_NAME) {
 		return false;
 	}
-	SceneCollection *sc = outliner_collection_from_drag(&scene->collections, drag->poin);
-	if (sc == NULL) {
+	Scene *scene = outliner_collection_drag_scene(CTX_data_main(C), drag->poin, &sc);
+	if (scene == NULL || ID_IS_LINKED(scene)) {
 		return false;
 	}
 
@@ -317,17 +340,21 @@ static bool outliner_collection_drop_poll(bContext *C, wmDrag *drag, const wmEve
 	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
 	if (te) {
 		SceneCollection *target = (TREESTORE(te)->type == TSE_SCENE_COLLECTION) ? te->directdata : NULL;
-		return (target && !BKE_scene_collection_is_inside(target, sc) &&
+		return (target && (Scene *)TREESTORE(te)->id == scene && !BKE_scene_collection_is_inside(target, sc) &&
 		        BKE_scene_collection_parent_find(scene, sc) != target);
 	}
-	/* empty area: move to the scene root */
-	return BKE_scene_collection_parent_find(scene, sc) != NULL;
+	/* empty area: move to the scene root, only for the active scene */
+	return scene == CTX_data_scene(C) && BKE_scene_collection_parent_find(scene, sc) != NULL;
 }
 
 static void outliner_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
 	/* poll already matched drag->poin with a live SceneCollection.name */
+	SceneCollection *sc;
+	Scene *scene = outliner_collection_drag_scene(G_MAIN, drag->poin, &sc);
+
 	RNA_string_set(drop->ptr, "collection", drag->poin);
+	RNA_string_set(drop->ptr, "scene", scene ? scene->id.name + 2 : "");
 }
 
 /* region dropbox definition */

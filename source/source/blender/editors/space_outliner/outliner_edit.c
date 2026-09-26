@@ -2446,8 +2446,14 @@ static bool outliner_collection_poll(bContext *C)
 	SpaceOops *soops = CTX_wm_space_outliner(C);
 	Scene *scene = CTX_data_scene(C);
 
-	return (ED_operator_outliner_active(C) && soops->outlinevis == SO_CUR_SCENE &&
+	return (ED_operator_outliner_active(C) && ELEM(soops->outlinevis, SO_CUR_SCENE, SO_ALL_SCENES) &&
 	        scene && !ID_IS_LINKED(scene));
+}
+
+/* In "All Scenes" each scene has its own folders, the element id is its scene. */
+static Scene *outliner_collection_te_scene(TreeElement *te)
+{
+	return (Scene *)TREESTORE(te)->id;
 }
 
 static TreeElement *outliner_selected_collection_te(ListBase *lb)
@@ -2465,14 +2471,14 @@ static TreeElement *outliner_selected_collection_te(ListBase *lb)
 	return NULL;
 }
 
-static void outliner_selected_collection_uids(ListBase *lb, LinkNode **r_uids)
+static void outliner_selected_collection_tes(ListBase *lb, LinkNode **r_tes)
 {
 	for (TreeElement *te = lb->first; te; te = te->next) {
 		TreeStoreElem *tselem = TREESTORE(te);
 		if (tselem->type == TSE_SCENE_COLLECTION && (tselem->flag & TSE_SELECTED)) {
-			BLI_linklist_prepend(r_uids, POINTER_FROM_INT(te->index));
+			BLI_linklist_prepend(r_tes, te);
 		}
-		outliner_selected_collection_uids(&te->subtree, r_uids);
+		outliner_selected_collection_tes(&te->subtree, r_tes);
 	}
 }
 
@@ -2508,6 +2514,7 @@ static int outliner_collection_new_exec(bContext *C, wmOperator *op)
 		TreeElement *te = outliner_selected_collection_te(&soops->tree);
 		if (te) {
 			parent = te->directdata;
+			scene = outliner_collection_te_scene(te);
 			TREESTORE(te)->flag &= ~TSE_CLOSED;
 		}
 	}
@@ -2537,18 +2544,21 @@ static int outliner_collection_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
-	LinkNode *uids = NULL;
+	LinkNode *tes = NULL;
 	bool changed = false;
 
-	outliner_selected_collection_uids(&soops->tree, &uids);
-	for (LinkNode *link = uids; link; link = link->next) {
-		SceneCollection *sc = BKE_scene_collection_find(scene, POINTER_AS_INT(link->link));
+	/* the tree is only rebuilt after this, so its elements stay valid */
+	outliner_selected_collection_tes(&soops->tree, &tes);
+	for (LinkNode *link = tes; link; link = link->next) {
+		TreeElement *te = link->link;
+		Scene *te_scene = outliner_collection_te_scene(te);
+		SceneCollection *sc = ID_IS_LINKED(te_scene) ? NULL : BKE_scene_collection_find(te_scene, te->index);
 		if (sc) {
-			BKE_scene_collection_remove(scene, sc);
+			BKE_scene_collection_remove(te_scene, sc);
 			changed = true;
 		}
 	}
-	BLI_linklist_free(uids, NULL);
+	BLI_linklist_free(tes, NULL);
 
 	if (!changed) {
 		return OPERATOR_CANCELLED;
@@ -2586,8 +2596,11 @@ static void outliner_collection_select_recursive(ListBase *lb, Scene *scene, boo
 	for (TreeElement *te = lb->first; te; te = te->next) {
 		TreeStoreElem *tselem = TREESTORE(te);
 		if (tselem->type == TSE_SCENE_COLLECTION && (tselem->flag & TSE_SELECTED)) {
-			outliner_scene_collection_foreach_object(&te->subtree, outliner_collection_select_fn, scene);
-			*r_found = true;
+			/* only the active scene's objects can be selected in the viewport */
+			if (outliner_collection_te_scene(te) == scene) {
+				outliner_scene_collection_foreach_object(&te->subtree, outliner_collection_select_fn, scene);
+				*r_found = true;
+			}
 		}
 		else {
 			outliner_collection_select_recursive(&te->subtree, scene, r_found);
@@ -2730,7 +2743,7 @@ static bool outliner_collection_move_objects_poll(bContext *C)
 	if (scene == NULL || ID_IS_LINKED(scene)) {
 		return false;
 	}
-	return (soops == NULL || soops->outlinevis == SO_CUR_SCENE);
+	return (soops == NULL || ELEM(soops->outlinevis, SO_CUR_SCENE, SO_ALL_SCENES));
 }
 
 void OUTLINER_OT_collection_move_objects(wmOperatorType *ot)
@@ -2769,6 +2782,7 @@ static int collection_object_drop_invoke(bContext *C, wmOperator *op, const wmEv
 	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
 	if (te && TREESTORE(te)->type == TSE_SCENE_COLLECTION) {
 		uid = te->index;
+		scene = outliner_collection_te_scene(te);
 	}
 
 	RNA_string_get(op->ptr, "object", ob_name);
@@ -2810,6 +2824,15 @@ static int collection_drop_invoke(bContext *C, wmOperator *op, const wmEvent *ev
 	float fmval[2];
 	SceneCollection *parent = NULL;
 
+	/* "All Scenes" shows the folders of every scene, the drop box says which one. */
+	RNA_string_get(op->ptr, "scene", name);
+	if (name[0]) {
+		scene = (Scene *)BKE_libblock_find_name(CTX_data_main(C), ID_SCE, name);
+		if (scene == NULL || ID_IS_LINKED(scene)) {
+			return OPERATOR_CANCELLED;
+		}
+	}
+
 	RNA_string_get(op->ptr, "collection", name);
 	SceneCollection *sc = BKE_scene_collection_find_name(scene, name);
 	if (sc == NULL) {
@@ -2843,4 +2866,5 @@ void OUTLINER_OT_collection_drop(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 
 	RNA_def_string(ot->srna, "collection", "Collection", MAX_NAME, "Collection", "Dragged collection");
+	RNA_def_string(ot->srna, "scene", NULL, MAX_ID_NAME - 2, "Scene", "Scene of the dragged collection");
 }
