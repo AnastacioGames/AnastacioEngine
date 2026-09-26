@@ -135,41 +135,84 @@ class TEXT_MT_editor_menus(Menu):
         layout.menu("TEXT_MT_templates")
 
 
-class TEXT_PT_properties(Panel):
+# Sidebar (N panel), organized in the Blender 2.8 style.
+
+class TEXT_PT_view(Panel):
     bl_space_type = 'TEXT_EDITOR'
     bl_region_type = 'UI'
-    bl_label = "Properties"
+    bl_category = "Text"
+    bl_label = "View"
 
     def draw(self, context):
         layout = self.layout
 
         st = context.space_data
 
-        flow = layout.column_flow()
-        flow.prop(st, "show_line_numbers")
-        flow.prop(st, "show_word_wrap")
-        flow.prop(st, "show_syntax_highlight")
-        flow.prop(st, "show_line_highlight")
-        flow.prop(st, "use_live_edit")
+        # These properties carry an RNA icon, so they are drawn as compact
+        # icon toggles in one row instead of full-width buttons.
+        row = layout.row(align=True)
+        row.prop(st, "show_line_numbers", text="")
+        row.prop(st, "show_word_wrap", text="")
+        row.prop(st, "show_syntax_highlight", text="")
 
-        flow = layout.column_flow()
-        flow.prop(st, "font_size")
-        flow.prop(st, "tab_width")
+        layout.prop(st, "show_line_highlight")
 
-        text = st.text
-        if text:
-            flow.prop(text, "use_tabs_as_spaces")
 
-        flow.prop(st, "show_margin")
-        col = flow.column()
+class TEXT_PT_view_margin(Panel):
+    bl_space_type = 'TEXT_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Text"
+    bl_label = "Margin"
+    bl_parent_id = "TEXT_PT_view"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        st = context.space_data
+        self.layout.prop(st, "show_margin", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        st = context.space_data
+
+        col = layout.column()
         col.active = st.show_margin
-        col.prop(st, "margin_column")
+        col.prop(st, "margin_column", text="Column")
+
+
+class TEXT_PT_properties(Panel):
+    bl_space_type = 'TEXT_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Text"
+    bl_label = "Editor"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        st = context.space_data
+        text = st.text
+
+        col = layout.column(align=True)
+        col.prop(st, "font_size")
+        col.prop(st, "tab_width")
+
+        # Checkboxes read better without the split label column.
+        col = layout.column()
+        col.use_property_split = False
+        if text:
+            col.prop(text, "use_tabs_as_spaces")
+        col.prop(st, "use_live_edit")
 
 
 class TEXT_PT_find(Panel):
     bl_space_type = 'TEXT_EDITOR'
     bl_region_type = 'UI'
-    bl_label = "Find"
+    bl_category = "Text"
+    bl_label = "Find & Replace"
 
     def draw(self, context):
         layout = self.layout
@@ -179,22 +222,26 @@ class TEXT_PT_find(Panel):
         # find
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.prop(st, "find_text", text="")
-        row.operator("text.find_set_selected", text="", icon='TEXT')
+        row.prop(st, "find_text", text="", icon='VIEWZOOM')
+        row.operator("text.find_set_selected", text="", icon='EYEDROPPER')
         col.operator("text.find")
+
+        layout.separator()
 
         # replace
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.prop(st, "replace_text", text="")
-        row.operator("text.replace_set_selected", text="", icon='TEXT')
+        row.prop(st, "replace_text", text="", icon='ARROW_LEFTRIGHT')
+        row.operator("text.replace_set_selected", text="", icon='EYEDROPPER')
         col.operator("text.replace")
 
+        layout.separator()
+
         # settings
-        layout.prop(st, "use_match_case")
         row = layout.row(align=True)
-        row.prop(st, "use_find_wrap", text="Wrap")
-        row.prop(st, "use_find_all", text="All")
+        row.prop(st, "use_match_case", text="Case", toggle=True)
+        row.prop(st, "use_find_wrap", text="Wrap", toggle=True)
+        row.prop(st, "use_find_all", text="All", toggle=True)
 
 
 class TEXT_MT_view(Menu):
@@ -377,6 +424,8 @@ classes = (
     TEXT_HT_header,
     TEXT_MT_edit,
     TEXT_MT_editor_menus,
+    TEXT_PT_view,
+    TEXT_PT_view_margin,
     TEXT_PT_properties,
     TEXT_PT_find,
     TEXT_MT_view,
