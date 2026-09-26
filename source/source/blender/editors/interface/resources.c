@@ -1691,8 +1691,11 @@ void init_userdef_do_versions(void)
 			(U.flag & USER_CUSTOM_RANGE) ? (&U.coba_weight) : NULL,
 			UI_GetTheme()->tv3d.vertex_unreferenced);
 
-	/* Not versioning, just avoid errors. */
+	/* Not versioning, just avoid errors. With Cycles built in, keep its add-on on so the
+	 * engine selector lists it even with prefs saved by a build without Cycles. */
 #ifndef WITH_CYCLES
 	BKE_addon_remove_safe(&U.addons, "cycles");
+#else
+	BKE_addon_ensure(&U.addons, "cycles");
 #endif
 }
