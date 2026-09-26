@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Cycles: CUDA na RTX 5060 (sm_120) com CUDA 13
+
+- `kernel_config.h`: o kernel CUDA so conhecia arquiteturas ate 7.x e parava com "Unknown or unsupported CUDA
+  architecture". Nova faixa 8.x a 12.x (Ampere a Blackwell) com os limites do 7.x e 16 blocos por SM.
+- `util_math.h`: o CUDA 13 removeu o `saturate()` que o nvcc trazia pronto; agora e definido com `__saturatef`
+  quando `__CUDACC_VER_MAJOR__ >= 13` (CUDA mais antigo segue usando o dele).
+- Preset `linux-editor`: `WITH_CYCLES_DEVICE_CUDA=ON` e `WITH_CUDA_DYNLOAD=ON`. Sem dynload o CMake do player
+  quebrava (`target_link_libraries(${target} ...)` com variavel indefinida; corrigido para `RangeRuntime`).
+- Teste: render `-b` na GPU com CUDA 13.0: primeira compilacao do kernel ~4 min, depois o render sai em < 1 s
+  e a imagem confere. As duas correcoes do kernel valem tambem para o Windows com CUDA 13 e placas 8.x+.
+
 ## 2026-09-26 - Cycles: um editor Linux so, com Cycles
 
 O preset `linux-editor` passa a ter `WITH_CYCLES=ON` (so CPU; OSL, Embree, CUDA e OpenCL desligados) e a sandbox `build-linux-cycles/` deixa de existir. O menu de engine nao listava "Cycles Render": ele depende do add-on `cycles`, que o build sem Cycles remove das preferencias (`resources.c`), e nada o religava. Agora um build com Cycles faz `BKE_addon_ensure(&U.addons, "cycles")` no mesmo ponto. O `build-linux-editor/` antigo guardava no cache a deteccao do OpenEXR 2.0 e falhava em `ImathBox.h`; apagar as entradas `OPENEXR_*`/`IMATH_*` do cache resolveu. Teste: build ok; em `-b` com as preferencias do usuario o add-on carrega e `scene.cycles` existe; `cycles-smoke-render.py` a 64 amostras renderiza certo. Pela interface, o usuario renderizou com F12 e com a viewport em Rendered.

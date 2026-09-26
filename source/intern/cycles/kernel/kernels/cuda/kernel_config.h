@@ -81,6 +81,19 @@
 #  define CUDA_KERNEL_MAX_REGISTERS 64
 #  define CUDA_KERNEL_BRANCHED_MAX_REGISTERS 72
 
+/* 8.x a 12.x (Ampere, Ada, Hopper, Blackwell): mesmos limites de registradores
+ * do 7.x; 16 blocos por SM e o menor valor entre essas arquiteturas. */
+#elif __CUDA_ARCH__ <= 1299
+#  define CUDA_MULTIPRESSOR_MAX_REGISTERS 65536
+#  define CUDA_MULTIPROCESSOR_MAX_BLOCKS 16
+#  define CUDA_BLOCK_MAX_THREADS 1024
+#  define CUDA_THREAD_MAX_REGISTERS 255
+
+/* tunable parameters */
+#  define CUDA_THREADS_BLOCK_WIDTH 16
+#  define CUDA_KERNEL_MAX_REGISTERS 64
+#  define CUDA_KERNEL_BRANCHED_MAX_REGISTERS 72
+
 
 /* unknown architecture */
 #else

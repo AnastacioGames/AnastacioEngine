@@ -102,8 +102,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   limpa ainda não verificada diretamente (apenas por RPATH `$ORIGIN` + `ldd` sem dependências faltando).
 - Validar a janela real do `RangeEngine` numa sessão gráfica (GHOST/X11, ícones, i18n, addons Python); só foi
   testado em `--background`.
-- **Cycles no editor Linux**: ligado no preset `linux-editor` (so CPU) e testado pela interface (2026-09-26).
-  Falta: CUDA na NVIDIA desta maquina.
+- **Cycles no editor Linux**: ligado no preset `linux-editor`, CPU testada pela interface e CUDA (RTX 5060,
+  sm_120, CUDA 13.0) testada em render `-b` (2026-09-26). Falta: CUDA pela interface e na versao Windows.
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
   do editor para OpenColorIO 2.x/FFmpeg 5+ (desligados no preset `linux-editor`; só o wrapper `audaspace` do
   FFmpeg foi ajustado).

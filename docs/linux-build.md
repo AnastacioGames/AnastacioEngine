@@ -436,8 +436,14 @@ acha sozinho, por isso os dois `-D...LIBRARY` acima.
 
 ## Editor com Cycles
 
-Desde 2026-09-26 o preset `linux-editor` tem `WITH_CYCLES=ON` (so CPU; sem OSL, Embree, CUDA e OpenCL), e o
+Desde 2026-09-26 o preset `linux-editor` tem `WITH_CYCLES=ON` com CUDA (sem OSL, Embree e OpenCL), e o
 `build-linux-editor/` e o unico editor Linux: nao ha mais sandbox separada. Mesmos pacotes da secao anterior.
+
+CUDA (GPU NVIDIA): o kernel e compilado na primeira vez que se renderiza na GPU (uns 4 minutos; depois fica em
+`~/.cache/cycles/kernels/`). Precisa do `nvcc` em `/usr/local/cuda/bin` ou no PATH, na versao que conhece a placa
+(RTX 50xx / sm_120: CUDA 12.8+, pelo repositorio da NVIDIA; o `nvidia-cuda-toolkit` do Ubuntu 24.04 e 12.0 e nao
+serve). Instale `cuda-toolkit-13-0`, nao o pacote `cuda`, que troca o driver. A libcuda e carregada em runtime
+(`WITH_CUDA_DYNLOAD=ON`), entao o editor abre em maquinas sem NVIDIA.
 
 ```bash
 cd source

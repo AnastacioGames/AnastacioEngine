@@ -282,12 +282,18 @@ ccl_device_inline float mix(float a, float b, float t)
 }
 #endif  /* __KERNEL_OPENCL__ */
 
-#ifndef __KERNEL_CUDA__
+/* O CUDA ate 12.x traz saturate() pronto; o CUDA 13 removeu. */
+#if !defined(__KERNEL_CUDA__)
 ccl_device_inline float saturate(float a)
 {
 	return clamp(a, 0.0f, 1.0f);
 }
-#endif  /* __KERNEL_CUDA__ */
+#elif __CUDACC_VER_MAJOR__ >= 13
+ccl_device_inline float saturate(float a)
+{
+	return __saturatef(a);
+}
+#endif
 
 ccl_device_inline int float_to_int(float f)
 {
