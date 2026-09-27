@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Release 0.4.3: pacote Windows (splash novo)
+
+- So Windows; o Linux segue na 0.4.2. Muda o splash (embutido no `RangeEngine.exe` via `datatoc`) e os addons
+  `ant_landscape`/`io_export_after_effects` (`is <numero>` -> `==`).
+- Montado na maquina AMD, sem CUDA Toolkit: `build/bin` daqui nao tem cubins. Os 8 cubins
+  (`kernel_`/`filter_sm_75/86/89/120`) vieram do zip 0.4.2, com o codigo dos kernels sem mudanca desde entao.
+  A lista de arquivos do zip 0.4.2 serviu de referencia: 4.657 arquivos, os mesmos.
+- **`blender.crt.manifest` desta maquina estava errado:** o CMake o regenerou em 12/09 com hashes de DLLs
+  `api-ms-win-*` de outro SDK, mas as DLLs da `build/bin/blender.crt/` sao de abril (40 de 49 hashes nao
+  batiam, e faltavam 5 DLLs no manifesto). O pacote usa o manifesto da 0.4.2, cujos 54 hashes batem com as
+  DLLs. Conferir isso antes de empacotar em qualquer maquina.
+- Validado extraindo o zip: `RangeEngine -b` sai com 0, Cycles lista CPU e OpenCL (RX 6800M), `RangeRuntime`
+  roda um `.range`. A extracao falhou num caminho muito longo (pasta temporaria funda, arquivo `.cl` do Cycles
+  com nome grande); em caminho curto extrai tudo. A nota do release recomenda caminho curto.
+
 ## 2026-09-26 - Docs: checagem automatica e guia para contribuir
 
 - `tools/check_docs.py`: confere links locais, referencias `arquivo:linha` (arquivo existe e tem a linha) e os
