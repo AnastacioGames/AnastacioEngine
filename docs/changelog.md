@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-27 - Release 0.4.2: pacote Windows
+
+- `AnastacioEngine-0.4.2-windows-x64.zip` (159 MB) e `.sha256` anexados a `v0.4.2`, que ate entao so tinha o
+  pacote Linux. Feito na maquina NVIDIA (CUDA 13.4): cubins sm_75/86/89/120 dentro de
+  `2.79/scripts/addons/cycles/lib/`; Embree e OpenCL ligados.
+- Montado conforme `distribution-0.1.md`: `blender.crt/` + so `ucrtbase.dll` solto, sem `.pdb`/`.lib`/`.map`
+  de build, `datatoc`/`makes*`, logs, `demos/`, `rangearmor/` e `imgui.ini`. RangeArmor sem versao nova.
+- Copia extraida numa pasta limpa: render Cycles em `-b` com CUDA (RTX 5060 Laptop) OK; `RangeRuntime.exe`
+  abre um `.blend` de jogo e roda sem crash.
+- Pegadinha: com o notebook fora da tomada a RTX 5060 some (Cycles lista so a CPU e `nvidia-smi` falha com
+  "insufficient permissions"). Ligar a fonte antes de testar CUDA.
+
 ## 2026-09-26 - Windows: Cycles OpenCL testado na AMD
 
 - Maquina AMD (RX 6800M + Radeon integrada do Ryzen 9 5900HX), preset `v142-ninja` sem CUDA Toolkit: o

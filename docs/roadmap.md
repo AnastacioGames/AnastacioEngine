@@ -10,27 +10,6 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ## Prioridade atual
 
-### Release Windows 0.4.2 (fazer na maquina NVIDIA)
-
-A tag/release `v0.4.2` ja existe no GitHub, so com o pacote Linux. Falta anexar o zip do Windows. Tem que
-ser feito na maquina NVIDIA (RTX 5060, CUDA 13.4 em `D:`): a maquina AMD nao tem CUDA Toolkit, e sem ele o
-configure desliga os cubins sozinho. Os cubins **nao vao para o git** (sao saida de build); vao dentro do zip,
-o usuario final nao baixa nada a parte.
-
-1. `git pull`; confirmar no `build/CMakeCache.txt` que `WITH_CYCLES_CUDA_BINARIES=ON` e que o configure nao
-   imprime "CUDA compiler not found".
-2. `ninja cycles_kernel_cuda RangeEngine RangeRuntime` (pelo vcvars64, ver AGENTS.md).
-3. Conferir em `build/bin/2.79/scripts/addons/cycles/lib/` os `kernel_sm_{75,86,89,120}.cubin` e
-   `filter_sm_*.cubin`, todos com data nova.
-4. Montar `AnastacioEngine-0.4.2-windows-x64.zip` seguindo [distribution-0.1.md](distribution-0.1.md): pasta
-   `blender.crt/` obrigatoria, sem DLLs do VC++ soltos (so `ucrtbase.dll`), sem `.pdb`/`.lib`/ferramentas
-   internas. RangeArmor como asset separado, se houver versao nova.
-5. Extrair o zip numa pasta limpa e abrir `RangeEngine.exe` e `RangeRuntime.exe` dali; renderizar com CUDA.
-6. `gh release upload v0.4.2 <zip> <zip>.sha256` (a v0.4.2 usa um `.sha256` por arquivo, como o do Linux,
-   nao `SHA256SUMS.txt`) e acrescentar ao texto da release o que o Windows traz: Cycles com Embree, CUDA (RTX 20/30/40/50)
-   e OpenCL (AMD), validados em 2026-09-26.
-7. Registrar no changelog e tirar esta secao do roadmap.
-
 ### Web (WebGL/WebAssembly)
 
 Estado: o runtime Web roda no navegador com render (luz GLSL, normal map `.dds`, sombras, filtros 2D), teclado,
@@ -122,8 +101,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   `RangeEngine` abre sem erros e `RangeRuntime` carrega um `.range` de exemplo, detecta GPU/OpenGL (Mesa Intel
   RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build. **Máquina limpa testada em
   2026-09-26** (container Ubuntu 24.04 mínimo): o 0.4.1 não acha a stdlib do Python fora da máquina de build;
-  `package-runtime.sh` corrigido e o editor renderiza com Cycles no container. Falta: publicar um release
-  corrigido (0.4.2) e testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
+  `package-runtime.sh` corrigido e o editor renderiza com Cycles no container. Corrigido publicado
+  na `v0.4.2`. Falta testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
   CUDA no Windows (CUDA 13.4, sm_120) testado pela interface, render e bake (2026-09-26).
