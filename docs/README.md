@@ -3,6 +3,20 @@
 Este índice separa estado atual, procedimentos e histórico. Documentação herdada de dependências em
 `source/extern/` e documentação de ferramentas importadas em `tools/` não fazem parte deste conjunto.
 
+## Entender a engine (comece aqui)
+
+Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
+
+1. [Arquitetura](architecture.md): mapa do repositório, loop do jogo (desktop e Web), módulos do runtime,
+   caminho do editor até o jogo, Cycles.
+2. [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): o que a engine já tem e decisões vigentes.
+3. [Guia de manutenção](maintenance-guide.md): que arquivos mexer em cada tipo de mudança.
+4. [Diretórios de build](build-dirs.md), [build no Windows](build-notes.md) e [no Linux](linux-build.md).
+5. Para achar código: [mapa dos arquivos grandes](code-map-gameengine.md), [mapa do `KX_GameObject.cpp`](code-map-kx-gameobject.md)
+   e os índices gerados do código em `local-knowledge/index-*.md` (`python tools/build_code_index.py` atualiza).
+   Os resumos `local-knowledge/<area>.md` foram gerados por IA local e podem ter erros.
+6. Regras de trabalho e build para agentes: [AGENTS.md](../AGENTS.md).
+
 ## Estado atual
 
 - [Perfil Web e validação de exportação](web-profile-validation-plan.md): autoria na Range Engine com compatibilidade Web,
@@ -24,7 +38,6 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Asset Browser](asset-browser.md): modo Assets do File Browser, bibliotecas, arrastar para a Vista 3D,
   janela flutuante e miniaturas.
 - [Preset físico de veículo v1](vehicle-preset-v1.md): contrato do arquivo, save/load e rebuild explícito.
-- [Roteiro de teste de veículo](vehicle-test-guide.md): cena padrão, automação por componente e validação manual.
 - [Relatório de bugs silenciosos](relatorio-varredura-bugs-silenciosos.md): candidatos da auditoria estática
   de `source/source/blender`.
 - [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
@@ -40,7 +53,7 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.
 - [Mapa de código de `KX_GameObject.cpp`](code-map-kx-gameobject.md): onde fica cada domínio do arquivo,
-  para navegar sem ler as 5.979 linhas.
+  para navegar sem ler as ~6 mil linhas.
 - [Mapa de código dos outros arquivos grandes do gameengine](code-map-gameengine.md): `KX_Scene`,
   `KX_PythonInit`, `CcdPhysicsEnvironment`, `CcdPhysicsController` e `BL_BlenderDataConversion`.
 - [Índices de código por área](local-knowledge/index-physics.md): arquivo, linhas e classes de cada área

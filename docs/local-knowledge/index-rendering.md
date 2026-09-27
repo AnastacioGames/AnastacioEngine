@@ -7,10 +7,10 @@
 
 | arquivo | linhas | classes |
 |---|---:|---|
-| RAS_2DFilter.cpp | 584 | `RAS_2DFilter` |
-| RAS_2DFilter.h | 140 | `RAS_2DFilter` |
+| RAS_2DFilter.cpp | 600 | `RAS_2DFilter` |
+| RAS_2DFilter.h | 141 | `RAS_2DFilter` |
 | RAS_2DFilterData.cpp | 35 |  |
-| RAS_2DFilterData.h | 129 | `RAS_2DFilterData` |
+| RAS_2DFilterData.h | 133 | `RAS_2DFilterData` |
 | RAS_2DFilterManager.cpp | 378 | `RAS_2DFilterManager` |
 | RAS_2DFilterManager.h | 141 | `RAS_2DFilterManager` |
 | RAS_2DFilterOffScreen.cpp | 215 | `RAS_2DFilterOffScreen` |
@@ -29,7 +29,7 @@
 | RAS_BoundingBoxManager.h | 72 | `RAS_BoundingBoxManager` |
 | RAS_BucketManager.cpp | 491 | `RAS_BucketManager`, `SortedMeshSlot`, `backtofront`, `fronttoback` |
 | RAS_BucketManager.h | 136 | `RAS_BucketManager`, `SortedMeshSlot`, `backtofront`, `fronttoback`, `TextData` |
-| RAS_CameraData.h | 76 | `RAS_CameraData` |
+| RAS_CameraData.h | 79 | `RAS_CameraData` |
 | RAS_DebugDraw.cpp | 137 | `RAS_DebugDraw`, `Shape`, `Line`, `Aabb`, `Frustum`, `Text2d` |
 | RAS_DebugDraw.h | 145 | `RAS_DebugDraw`, `Shape`, `Line`, `Aabb`, `Frustum`, `Text2d` |
 | RAS_Deformer.cpp | 76 | `RAS_Deformer` |
@@ -69,8 +69,8 @@
 | RAS_ParticleShaderCache.h | 142 | `RAS_ParticleShaderCache` |
 | RAS_Query.cpp | 77 | `RAS_Query` |
 | RAS_Query.h | 76 | `RAS_Query` |
-| RAS_Rasterizer.cpp | 1499 | `RAS_Rasterizer` |
-| RAS_Rasterizer.h | 706 | `RAS_Rasterizer`, `RayCastTranform`, `OverrideShaderDrawFrameBufferInterface`, `OverrideShaderStereoStippleInterface`, `OverrideShaderStereoAnaglyph`, `OverrideShaderShadowInterface` |
+| RAS_Rasterizer.cpp **grande** | 1516 | `RAS_Rasterizer` |
+| RAS_Rasterizer.h | 729 | `RAS_Rasterizer`, `RayCastTranform`, `OverrideShaderDrawFrameBufferInterface`, `OverrideShaderStereoStippleInterface`, `OverrideShaderStereoAnaglyph`, `OverrideShaderShadowInterface` |
 | RAS_Rect.h | 124 | `RAS_Rect` |
 | RAS_Shader.cpp | 596 | `RAS_Shader`, `RAS_Uniform`, `UniformInfo` |
 | RAS_Shader.h | 218 | `RAS_Shader`, `RAS_Uniform`, `RAS_DefUniform`, `UniformInfo` |
@@ -103,11 +103,11 @@
 | RAS_GLExtensionManager.h | 43 |  |
 | RAS_OpenGLDebugDraw.cpp | 434 | `RAS_OpenGLDebugDraw` |
 | RAS_OpenGLDebugDraw.h | 95 | `RAS_OpenGLDebugDraw` |
-| RAS_OpenGLLight.cpp | 486 | `RAS_OpenGLLight` |
-| RAS_OpenGLLight.h | 76 | `RAS_OpenGLLight` |
+| RAS_OpenGLLight.cpp | 522 | `RAS_OpenGLLight` |
+| RAS_OpenGLLight.h | 83 | `RAS_OpenGLLight` |
 | RAS_OpenGLQuery.cpp | 118 | `RAS_OpenGLQuery` |
 | RAS_OpenGLQuery.h | 56 | `RAS_OpenGLQuery` |
-| RAS_OpenGLRasterizer.cpp | 699 | `RAS_OpenGLRasterizer`, `ScreenPlane` |
+| RAS_OpenGLRasterizer.cpp | 706 | `RAS_OpenGLRasterizer`, `ScreenPlane` |
 | RAS_OpenGLRasterizer.h | 146 | `RAS_OpenGLRasterizer`, `ScreenPlane` |
 | RAS_OpenGLSync.cpp | 82 | `RAS_OpenGLSync` |
 | RAS_OpenGLSync.h | 50 | `RAS_OpenGLSync` |
@@ -129,7 +129,7 @@
 | GPU_framebuffer.h | 105 |  |
 | GPU_glew.h | 29 |  |
 | GPU_init_exit.h | 38 |  |
-| GPU_material.h | 467 | `GPUParticleInfo` |
+| GPU_material.h | 502 | `GPUParticleInfo` |
 | GPU_select.h | 54 |  |
 | GPU_shader.h | 158 |  |
 | GPU_texture.h | 125 |  |
@@ -141,15 +141,15 @@
 |---|---:|---|
 | gpu_basic_shader.c | 777 |  |
 | gpu_buffers.c **grande** | 2119 |  |
-| gpu_codegen.c **grande** | 1954 |  |
+| gpu_codegen.c **grande** | 1950 |  |
 | gpu_codegen.h | 192 | `GPUNode`, `GPUNodeLink`, `GPUPass` |
-| gpu_compositing.c **grande** | 2125 |  |
+| gpu_compositing.c **grande** | 2138 |  |
 | gpu_debug.c | 807 |  |
 | gpu_draw.c **grande** | 2479 |  |
-| gpu_extensions.c | 383 |  |
+| gpu_extensions.c | 391 |  |
 | gpu_framebuffer.c | 1070 |  |
 | gpu_init_exit.c | 67 |  |
-| gpu_material.c **grande** | 4625 |  |
+| gpu_material.c **grande** | 4895 |  |
 | gpu_private.h | 32 |  |
 | gpu_select.c | 228 |  |
 | gpu_select_pick.c | 742 |  |

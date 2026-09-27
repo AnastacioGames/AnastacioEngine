@@ -2,6 +2,8 @@
 
 > Gerado por `tools/build_local_knowledge.sh` via modelo local (Ollama).
 > Resumo raso para orientacao inicial - para decisoes reais, leia o arquivo completo.
+> **Atencao:** texto gerado por IA local em 2026-09-15, sem revisao linha a linha; pode ter erros e nao cobre
+> arquivos novos. Para a estrutura atual, use `docs/architecture.md` e os `index-*.md` (gerados do codigo).
 
 ## source/source/gameengine/Rasterizer/Node/RAS_BaseNode.h
 
@@ -13,7 +15,7 @@ Este arquivo implementa a classe `RAS_DownwardNode`, que é uma estrutura de nó
 
 ## source/source/gameengine/Rasterizer/Node/RAS_DummyNode.h
 
-Este arquivo define uma classe `RAS_DummyNode` usada em um game engine C++ baseado no UPBGE (Unreal Python Blender Game Engine) ou Blender 2.79. A classe implementa um nó dummy, provavelmente usado como uma estrutura básica para outros nós ou para representar um lugar reservado no sistema de nós da engine. Ela contém estruturas internas `RAS_DummyNodeData` e `RAS_DummyNodeTuple` para armazenar dados e tuplas associadas ao nó. A classe também tem um método `Print` para exibir informações sobre o nó, possivelmente para fins de depuração. Esses nós dummy podem interagir com outros sistemas de renderização, física, lógica de jogo e gerenciamento de cena, servindo como uma base para a construção de nós mais complexos e funcionalidades específicas no engine.
+Este arquivo define uma classe `RAS_DummyNode` usada em um game engine C++ baseado no UPBGE (Uchronia Project Blender Game Engine) ou Blender 2.79. A classe implementa um nó dummy, provavelmente usado como uma estrutura básica para outros nós ou para representar um lugar reservado no sistema de nós da engine. Ela contém estruturas internas `RAS_DummyNodeData` e `RAS_DummyNodeTuple` para armazenar dados e tuplas associadas ao nó. A classe também tem um método `Print` para exibir informações sobre o nó, possivelmente para fins de depuração. Esses nós dummy podem interagir com outros sistemas de renderização, física, lógica de jogo e gerenciamento de cena, servindo como uma base para a construção de nós mais complexos e funcionalidades específicas no engine.
 
 ## source/source/gameengine/Rasterizer/Node/RAS_RenderNode.h
 
@@ -29,7 +31,7 @@ Este arquivo implementa classes para iterar sobre nós em uma estrutura de árvo
 
 ## source/source/gameengine/Rasterizer/RAS_2DFilter.cpp
 
-Este arquivo implementa um sistema de filtros 2D dentro de um motor de jogos C++ baseado no UPBGE (Unreal Engine Python Binding for Games Engine) / Blender 2.79. O `RAS_2DFilter` permite aplicar efeitos visuais 2D como bloom, tonemapping, efeitos atmosféricos e outros efeitos de pós-processamento na cena renderizada. Ele interage com vários outros sistemas, incluindo:
+Este arquivo implementa um sistema de filtros 2D dentro de um motor de jogos C++ baseado no UPBGE (Uchronia Project Blender Game Engine) / Blender 2.79. O `RAS_2DFilter` permite aplicar efeitos visuais 2D como bloom, tonemapping, efeitos atmosféricos e outros efeitos de pós-processamento na cena renderizada. Ele interage com vários outros sistemas, incluindo:
 
 1. `RAS_2DFilterManager` - Gerenciador de filtros.
 2. `RAS_Rasterizer` - Sistema de rasterização.
@@ -46,7 +48,7 @@ Este arquivo C++ define a classe `RAS_2DFilter`, que é parte de um motor de jog
 
 ## source/source/gameengine/Rasterizer/RAS_2DFilterData.cpp
 
-Este arquivo implementa uma classe chamada `RAS_2DFilterData` que é provavelmente usada em um motor de jogo baseado no UPBGE (Unreal Engine Blender Game Engine) ou em um fork do Blender 2.79, escrito em C++. Essa classe é responsável por armazenar dados relacionados a filtros 2D aplicados a objetos no jogo. Os dados incluem um ponteiro para o objeto de jogo (`gameObject`), um booleano que indica se o filtro deve usar mipmaps (`mipmap`), um índice de modo de filtro (`filterMode`), e um índice de passo de filtro (`filterPassIndex`). Essa classe provavelmente interage com outros sistemas de renderização e efeitos visuais dentro do motor de jogo, aplicando e controlando filtros 2D para objetos renderizados na cena.
+Este arquivo implementa uma classe chamada `RAS_2DFilterData` que é provavelmente usada em um motor de jogo baseado no UPBGE (Uchronia Project Blender Game Engine) ou em um fork do Blender 2.79, escrito em C++. Essa classe é responsável por armazenar dados relacionados a filtros 2D aplicados a objetos no jogo. Os dados incluem um ponteiro para o objeto de jogo (`gameObject`), um booleano que indica se o filtro deve usar mipmaps (`mipmap`), um índice de modo de filtro (`filterMode`), e um índice de passo de filtro (`filterPassIndex`). Essa classe provavelmente interage com outros sistemas de renderização e efeitos visuais dentro do motor de jogo, aplicando e controlando filtros 2D para objetos renderizados na cena.
 
 ## source/source/gameengine/Rasterizer/RAS_2DFilterData.h
 

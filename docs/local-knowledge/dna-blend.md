@@ -2,6 +2,8 @@
 
 > Gerado por `tools/build_local_knowledge.sh` via modelo local (Ollama).
 > Resumo raso para orientacao inicial - para decisoes reais, leia o arquivo completo.
+> **Atencao:** texto gerado por IA local em 2026-09-15, sem revisao linha a linha; pode ter erros e nao cobre
+> arquivos novos. Para a estrutura atual, use `docs/architecture.md` e os `index-*.md` (gerados do codigo).
 
 ## source/source/blender/makesdna/DNA_ID.h
 
@@ -65,7 +67,7 @@ Este arquivo, `DNA_cloth_types.h`, define estruturas de dados para simulação d
 
 ## source/source/blender/makesdna/DNA_color_types.h
 
-Este arquivo de cabeçalho (`DNA_color_types.h`) do Blender 2.79, dentro de um fork do UPBGE (Unreal Engine for Blender Game Engine), define estruturas e tipos relacionados ao mapeamento e gerenciamento de cores. Implementa funcionalidades para mapeamento de curvas (CurveMapping), histogramas, escopos de onda e configurações de gerenciamento de cores.
+Este arquivo de cabeçalho (`DNA_color_types.h`) do Blender 2.79, dentro de um fork do UPBGE (Uchronia Project Blender Game Engine), define estruturas e tipos relacionados ao mapeamento e gerenciamento de cores. Implementa funcionalidades para mapeamento de curvas (CurveMapping), histogramas, escopos de onda e configurações de gerenciamento de cores.
 
 Ele provavelmente interage com outros sistemas relacionados à renderização, texturização e exibição de imagens dentro do motor de jogos. Isso inclui sistemas de gerenciamento de texturas, pipelines de renderização, e ferramentas de visualização e edição de cores.
 
@@ -107,7 +109,7 @@ Este sistema provavelmente interage com outros sistemas relacionados a malhas e 
 
 ## source/source/blender/makesdna/DNA_defs.h
 
-Este arquivo, `DNA_defs.h`, é parte de um sistema de definições genéricas para cabeçalhos DNA em um motor de jogo C++ baseado no UPBGE (Unreal Engine for Blender Game Engine). Ele define constantes, macros e tipos de dados fundamentais que outros componentes do motor de jogo usam para representar e manipular dados de estruturas de dados (DNA) internas.
+Este arquivo, `DNA_defs.h`, é parte de um sistema de definições genéricas para cabeçalhos DNA em um motor de jogo C++ baseado no UPBGE (Uchronia Project Blender Game Engine). Ele define constantes, macros e tipos de dados fundamentais que outros componentes do motor de jogo usam para representar e manipular dados de estruturas de dados (DNA) internas.
 
 Alguns pontos-chave:
 

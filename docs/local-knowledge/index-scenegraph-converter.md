@@ -42,7 +42,7 @@
 | BL_ArmatureConstraint.h | 114 | `BL_ArmatureConstraint` |
 | BL_ArmatureObject.cpp | 623 | `BL_ArmatureObject` |
 | BL_ArmatureObject.h | 133 | `BL_ArmatureObject` |
-| BL_BlenderDataConversion.cpp **grande** | 2436 |  |
+| BL_BlenderDataConversion.cpp **grande** | 2443 |  |
 | BL_BlenderDataConversion.h | 81 | `BL_MeshMaterial` |
 | BL_ConvertActuators.cpp | 1367 |  |
 | BL_ConvertActuators.h | 45 |  |
@@ -52,7 +52,7 @@
 | BL_ConvertObjectInfo.h | 22 | `BL_ConvertObjectInfo` |
 | BL_ConvertProperties.cpp | 293 |  |
 | BL_ConvertProperties.h | 44 |  |
-| BL_ConvertSensors.cpp | 767 |  |
+| BL_ConvertSensors.cpp | 768 |  |
 | BL_ConvertSensors.h | 45 |  |
 | BL_Converter.cpp | 936 | `BL_Converter`, `SceneSlot` |
 | BL_Converter.h | 227 | `BL_Converter`, `SceneSlot`, `ThreadInfo` |
@@ -77,12 +77,12 @@
 
 | arquivo | linhas | classes |
 |---|---:|---|
-| BL_Action.cpp | 545 | `BL_Action` |
-| BL_Action.h | 161 | `BL_Action` |
+| BL_Action.cpp | 568 | `BL_Action` |
+| BL_Action.h | 167 | `BL_Action` |
 | BL_ActionManager.cpp | 191 | `BL_ActionManager` |
 | BL_ActionManager.h | 137 | `BL_ActionManager` |
-| BL_BlenderShader.cpp | 272 | `BL_BlenderShader` |
-| BL_BlenderShader.h | 102 | `BL_BlenderShader` |
+| BL_BlenderShader.cpp | 286 | `BL_BlenderShader` |
+| BL_BlenderShader.h | 103 | `BL_BlenderShader` |
 | BL_Shader.cpp | 962 | `BL_Shader` |
 | BL_Shader.h | 107 | `BL_Shader` |
 | BL_Texture.cpp | 758 | `BL_Texture` |
@@ -95,22 +95,22 @@
 | KX_2DFilterOffScreen.h | 56 | `KX_2DFilterOffScreen` |
 | KX_AddObjectActuator.cpp | 319 | `KX_AddObjectActuator` |
 | KX_AddObjectActuator.h | 131 | `KX_AddObjectActuator` |
-| KX_AnimationEvent.cpp | 193 | `KX_AnimationEvent` |
-| KX_AnimationEvent.h | 82 | `KX_AnimationEvent` |
-| KX_AnimationEventManager.cpp | 202 | `KX_AnimationEventManager` |
+| KX_AnimationEvent.cpp | 232 | `KX_AnimationEvent` |
+| KX_AnimationEvent.h | 87 | `KX_AnimationEvent` |
+| KX_AnimationEventManager.cpp | 164 | `KX_AnimationEventManager` |
 | KX_AnimationEventManager.h | 79 | `KX_AnimationEventManager` |
 | KX_ArmatureSensor.cpp | 220 | `KX_ArmatureSensor` |
 | KX_ArmatureSensor.h | 90 | `KX_ArmatureSensor` |
 | KX_BatchGroup.cpp | 327 | `KX_BatchGroup` |
 | KX_BatchGroup.h | 81 | `KX_BatchGroup` |
-| KX_BlenderMaterial.cpp | 1024 | `KX_BlenderMaterial` |
+| KX_BlenderMaterial.cpp | 1031 | `KX_BlenderMaterial` |
 | KX_BlenderMaterial.h | 141 | `KX_BlenderMaterial` |
 | KX_BoneParentNodeRelationship.cpp | 105 | `KX_BoneParentRelation` |
 | KX_BoneParentNodeRelationship.h | 65 | `KX_BoneParentRelation` |
 | KX_BoundingBox.cpp | 410 | `KX_BoundingBox` |
 | KX_BoundingBox.h | 90 | `KX_BoundingBox` |
-| KX_Camera.cpp | 1091 | `KX_Camera`, `View` |
-| KX_Camera.h | 284 | `KX_Camera`, `View` |
+| KX_Camera.cpp | 1125 | `KX_Camera`, `View` |
+| KX_Camera.h | 294 | `KX_Camera`, `View` |
 | KX_CameraActuator.cpp | 389 | `KX_CameraActuator` |
 | KX_CameraActuator.h | 128 | `KX_CameraActuator` |
 | KX_CameraIpoSGController.cpp | 63 | `KX_CameraIpoSGController` |
@@ -138,8 +138,8 @@
 | KX_CullingHandler.h | 44 | `KX_CullingHandler` |
 | KX_CutsceneManager.cpp | 164 | `KX_CutsceneManager` |
 | KX_CutsceneManager.h | 121 | `KX_CutsceneManager`, `Event`, `Sequence`, `SpawnedObjects` |
-| KX_DebugMode.cpp | 1138 | `KX_DebugMode` |
-| KX_DebugMode.h | 236 | `ScrollingBuffer`, `KX_DebugMode` |
+| KX_DebugMode.cpp | 1140 | `KX_DebugMode` |
+| KX_DebugMode.h | 248 | `ScrollingBuffer`, `KX_DebugMode` |
 | KX_DebugRenderer.cpp | 125 | `KX_DebugRenderer` |
 | KX_DebugRenderer.h | 61 | `KX_DebugRenderer` |
 | KX_DynamicActuator.cpp | 184 | `KX_DynamicActuator` |
@@ -152,8 +152,8 @@
 | KX_FontObject.h | 133 | `KX_FontObject` |
 | KX_GameActuator.cpp | 220 | `KX_GameActuator` |
 | KX_GameActuator.h | 95 | `KX_GameActuator` |
-| KX_GameObject.cpp **grande** | 5979 | `KX_GameObject`, `ActivityCullingInfo`, `RayCastData` |
-| KX_GameObject.h | 1304 | `KX_GameObject`, `ActivityCullingInfo`, `DebugProfilingData`, `RayCastData` |
+| KX_GameObject.cpp **grande** | 6012 | `KX_GameObject`, `ActivityCullingInfo`, `RayCastData` |
+| KX_GameObject.h | 1311 | `KX_GameObject`, `ActivityCullingInfo`, `DebugProfilingData`, `RayCastData` |
 | KX_Globals.cpp | 94 |  |
 | KX_Globals.h | 50 |  |
 | KX_ImpostorAtlasDeformer.cpp | 90 | `KX_ImpostorAtlasDeformer` |
@@ -222,9 +222,9 @@
 | KX_PythonComponent.h | 74 | `KX_PythonComponent` |
 | KX_PythonComponentManager.cpp | 59 | `KX_PythonComponentManager` |
 | KX_PythonComponentManager.h | 25 | `KX_PythonComponentManager` |
-| KX_PythonInit.cpp **grande** | 3284 |  |
+| KX_PythonInit.cpp **grande** | 3296 |  |
 | KX_PythonInit.h | 87 | `PyNextFrameState` |
-| KX_PythonInitTypes.cpp | 344 |  |
+| KX_PythonInitTypes.cpp | 346 |  |
 | KX_PythonInitTypes.h | 40 |  |
 | KX_PythonJoystick.cpp | 315 | `KX_PythonJoystick` |
 | KX_PythonJoystick.h | 116 | `KX_PythonJoystick` |
@@ -232,6 +232,8 @@
 | KX_PythonKeyboard.h | 51 | `KX_PythonKeyboard` |
 | KX_PythonMain.cpp | 60 |  |
 | KX_PythonMain.h | 43 |  |
+| KX_PythonMotion.cpp | 210 | `KX_PythonMotion` |
+| KX_PythonMotion.h | 76 | `KX_PythonMotion` |
 | KX_PythonMouse.cpp | 363 | `KX_PythonMouse` |
 | KX_PythonMouse.h | 74 | `KX_PythonMouse` |
 | KX_RadarSensor.cpp | 230 | `KX_RadarSensor` |
@@ -246,7 +248,7 @@
 | KX_ReplaceMeshActuator.h | 89 | `KX_ReplaceMeshActuator` |
 | KX_RuntimePropertyRegistry.cpp | 92 | `KX_RuntimePropertyRegistry` |
 | KX_RuntimePropertyRegistry.h | 57 | `KX_RuntimePropertyDescriptor`, `KX_RuntimePropertyValue`, `KX_RuntimePropertyRegistry` |
-| KX_Scene.cpp **grande** | 3767 | `KX_Scene` |
+| KX_Scene.cpp **grande** | 3790 | `KX_Scene` |
 | KX_Scene.h | 678 | `KX_Scene`, `AnimationPoolData`, `CullingInfo` |
 | KX_SceneActuator.cpp | 274 | `KX_SceneActuator` |
 | KX_SceneActuator.h | 104 | `KX_SceneActuator` |
@@ -278,10 +280,10 @@
 | KX_TimeLogger.h | 106 | `KX_TimeLogger` |
 | KX_TrackToActuator.cpp | 478 | `KX_TrackToActuator` |
 | KX_TrackToActuator.h | 108 | `KX_TrackToActuator` |
-| KX_VehicleDebugUI.cpp | 556 | `KX_VehicleDebugUI` |
-| KX_VehicleDebugUI.h | 111 | `KX_VehicleDebugUI`, `TelemetrySample`, `PendingEdit` |
-| KX_VehiclePreset.cpp | 537 |  |
-| KX_VehiclePreset.h | 130 | `KX_VehiclePresetWheel`, `KX_VehiclePreset` |
+| KX_VehicleDebugUI.cpp | 652 | `KX_VehicleDebugUI` |
+| KX_VehicleDebugUI.h | 112 | `KX_VehicleDebugUI`, `TelemetrySample`, `PendingEdit` |
+| KX_VehiclePreset.cpp | 612 |  |
+| KX_VehiclePreset.h | 146 | `KX_VehiclePresetWheel`, `KX_VehiclePreset` |
 | KX_VehicleWrapper.cpp | 770 | `KX_VehicleWrapper` |
 | KX_VehicleWrapper.h | 77 | `KX_VehicleWrapper` |
 | KX_VertexProxy.cpp | 614 | `KX_VertexProxy` |
@@ -299,9 +301,9 @@
 |---|---:|---|
 | KX_Imgui.cpp | 457 | `KX_Imgui` |
 | KX_Imgui.h | 88 | `KX_Imgui` |
-| KX_Imgui_Impl_Inputs.cpp | 542 |  |
-| KX_Imgui_Impl_Inputs.h | 21 |  |
-| KX_PythonImgui.cpp | 677 |  |
+| KX_Imgui_Impl_Inputs.cpp | 582 |  |
+| KX_Imgui_Impl_Inputs.h | 26 |  |
+| KX_PythonImgui.cpp | 681 |  |
 | KX_PythonImgui.h | 40 |  |
 
 ## source/source/gameengine/Ketsji/KXNetwork

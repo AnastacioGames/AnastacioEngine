@@ -2,10 +2,12 @@
 
 > Gerado por `tools/build_local_knowledge.sh` via modelo local (Ollama).
 > Resumo raso para orientacao inicial - para decisoes reais, leia o arquivo completo.
+> **Atencao:** texto gerado por IA local em 2026-09-15, sem revisao linha a linha; pode ter erros e nao cobre
+> arquivos novos. Para a estrutura atual, use `docs/architecture.md` e os `index-*.md` (gerados do codigo).
 
 ## source/source/gameengine/GameLogic/SCA_AnimationEventSensor.h
 
-Este arquivo define a classe SCA_AnimationEventSensor, que é um sensor no engine de jogos C++ baseado no UPBGE (Unreal Python Blender Game Engine), um fork do Blender 2.79. O sensor é responsável por detectar eventos de animação específicos e é usado no sistema de lógica do jogo. Ele herda da classe SCA_ISensor e implementa métodos para inicialização, avaliação e replicação. O sensor interage com outros sistemas, como o gerenciador de eventos e objetos do jogo, para detectar e responder a eventos de animação. Ele também pode interagir com atuadores (actuators) por meio da interface Python, permitindo que ele controle outros aspectos do jogo em resposta aos eventos de animação.
+Este arquivo define a classe SCA_AnimationEventSensor, que é um sensor no engine de jogos C++ baseado no UPBGE (Uchronia Project Blender Game Engine), um fork do Blender 2.79. O sensor é responsável por detectar eventos de animação específicos e é usado no sistema de lógica do jogo. Ele herda da classe SCA_ISensor e implementa métodos para inicialização, avaliação e replicação. O sensor interage com outros sistemas, como o gerenciador de eventos e objetos do jogo, para detectar e responder a eventos de animação. Ele também pode interagir com atuadores (actuators) por meio da interface Python, permitindo que ele controle outros aspectos do jogo em resposta aos eventos de animação.
 
 ## source/source/gameengine/GameLogic/SCA_2DFilterActuator.cpp
 
@@ -97,7 +99,7 @@ Este arquivo define a classe `SCA_ExpressionController` que é uma implementaç�
 
 ## source/source/gameengine/GameLogic/SCA_AlwaysSensor.cpp
 
-Este arquivo implementa um sensor sempre ativo (`SCA_AlwaysSensor`) para um motor de jogo C++, que é um fork do UPBGE (Unreal Engine Blender Game Engine) baseado no Blender 2.79. Esse sensor é projetado para sempre retornar verdadeiro, o que significa que ele sempre acionará os atuadores associados a ele.
+Este arquivo implementa um sensor sempre ativo (`SCA_AlwaysSensor`) para um motor de jogo C++, que é um fork do UPBGE (Uchronia Project Blender Game Engine) baseado no Blender 2.79. Esse sensor é projetado para sempre retornar verdadeiro, o que significa que ele sempre acionará os atuadores associados a ele.
 
 Este sensor interage principalmente com o `SCA_LogicManager`, que é responsável por gerenciar o fluxo lógico do jogo, e o `SCA_EventManager`, que lida com os eventos dentro do jogo. O sensor também interage com a classe `SCA_IObject`, que representa um objeto no jogo, e com as classes de valor (`EXP_Value`), que são usadas para replicar o sensor.
 
@@ -105,7 +107,7 @@ O sensor é inicializado com um valor verdadeiro e, em cada avaliação, ele ret
 
 ## source/source/gameengine/GameLogic/SCA_IActuator.cpp
 
-Este arquivo implementa a classe `SCA_IActuator`, que é uma parte fundamental de um motor de jogo C++ baseado no UPBGE (Unreal Physics Blender Game Engine) / Blender 2.79. Essa classe atua como uma base para atuadores lógicos em um jogo, responsáveis por causar efeitos concretos no ambiente do jogo, como mover objetos, tocar sons ou iniciar animações.
+Este arquivo implementa a classe `SCA_IActuator`, que é uma parte fundamental de um motor de jogo C++ baseado no UPBGE (Uchronia Project Blender Game Engine) / Blender 2.79. Essa classe atua como uma base para atuadores lógicos em um jogo, responsáveis por causar efeitos concretos no ambiente do jogo, como mover objetos, tocar sons ou iniciar animações.
 
 A classe `SCA_IActuator` interage com outros sistemas como controladores lógicos (`SCA_IController`) e objetos de jogo (`SCA_IObject`). Ela gerencia eventos positivos e negativos que acionam seus métodos de atualização (`Update`), e também lida com a replicação de objetos, ativando e desativando atuadores conforme necessário. Através dos métodos de ligação e desligação de controladores, ela também coordena a interação entre atuadores e controladores, garantindo que a lógica do jogo seja executada corretamente e eficientemente.
 
@@ -143,7 +145,7 @@ Em resumo, o `SCA_IController` é uma classe central que coordena a interação 
 
 ## source/source/gameengine/GameLogic/SCA_AnimationEventSensor.h
 
-Este arquivo define uma classe C++ chamada `SCA_AnimationEventSensor`, que é um tipo de sensor dentro de um motor de jogo baseado no UPBGE (Unreal Python Blender Game Engine), um fork do Blender 2.79. O sensor é usado para detectar eventos de animação, especificamente quando um evento de animação ocorre.
+Este arquivo define uma classe C++ chamada `SCA_AnimationEventSensor`, que é um tipo de sensor dentro de um motor de jogo baseado no UPBGE (Uchronia Project Blender Game Engine), um fork do Blender 2.79. O sensor é usado para detectar eventos de animação, especificamente quando um evento de animação ocorre.
 
 A classe herda de `SCA_ISensor`, que é uma classe base para sensores no motor de jogo. O sensor armazena informações sobre o índice do evento de animação a ser detectado (`m_eventIndex`), o índice do gatilho (`m_triggerIndex`), e se deve responder a todos os gatilhos (`m_triggerAll`). Ele também mantém um ponteiro para um objeto `KX_AnimationEvent`, que representa o evento de animação específico.
 
@@ -151,7 +153,7 @@ Este sensor interage com outros sistemas do motor de jogo, como o sistema de eve
 
 ## source/source/gameengine/GameLogic/SCA_IController.h
 
-Este arquivo define a classe `SCA_IController`, que representa um controlador lógico em um motor de jogo C++ baseado no UPBGE (Unreal Python Blender Game Engine). O controlador é uma parte crucial do sistema de lógica do jogo, interagindo com sensores (`SCA_ISensor`) e atuadores (`SCA_IActuator`).
+Este arquivo define a classe `SCA_IController`, que representa um controlador lógico em um motor de jogo C++ baseado no UPBGE (Uchronia Project Blender Game Engine). O controlador é uma parte crucial do sistema de lógica do jogo, interagindo com sensores (`SCA_ISensor`) e atuadores (`SCA_IActuator`).
 
 Um controlador pode estar ligado a múltiplos sensores e atuadores. Quando um sensor é ativado, ele pode disparar o controlador, que então pode ativar seus atuadores associados. A classe `SCA_IController` fornece métodos para ligar e desligar sensores e atuadores, bem como para manipular o estado do controlador.
 
@@ -163,7 +165,7 @@ Este arquivo implementa um gerenciador de eventos para sensores "sempre" em um g
 
 ## source/source/gameengine/GameLogic/SCA_IInputDevice.cpp
 
-Este arquivo implementa uma classe `SCA_IInputDevice` para o mecanismo de jogo UPBGE (Unreal Engine Blender Game Engine), que é um fork do Blender 2.79. A classe é responsável pelo gerenciamento de entrada do usuário, especificamente para eventos de teclado e mouse. Ela inclui uma tabela de mapeamento de teclas para caracteres, permitindo a conversão entre códigos de tecla e caracteres correspondentes, considerando o uso do Shift. O dispositivo de entrada também controla eventos de mouse, como movimento e rotação da roda do mouse, e pode ser configurado para "agarrar" eventos de saída do jogo. Essa classe interage com outros sistemas do jogo, como o loop principal de atualização do jogo, para detectar e processar entradas do usuário em tempo real.
+Este arquivo implementa uma classe `SCA_IInputDevice` para o mecanismo de jogo UPBGE (Uchronia Project Blender Game Engine), que é um fork do Blender 2.79. A classe é responsável pelo gerenciamento de entrada do usuário, especificamente para eventos de teclado e mouse. Ela inclui uma tabela de mapeamento de teclas para caracteres, permitindo a conversão entre códigos de tecla e caracteres correspondentes, considerando o uso do Shift. O dispositivo de entrada também controla eventos de mouse, como movimento e rotação da roda do mouse, e pode ser configurado para "agarrar" eventos de saída do jogo. Essa classe interage com outros sistemas do jogo, como o loop principal de atualização do jogo, para detectar e processar entradas do usuário em tempo real.
 
 ## source/source/gameengine/GameLogic/SCA_BasicEventManager.h
 
@@ -191,7 +193,7 @@ Este arquivo implementa um controlador de expressão para um motor de jogo C++ (
 
 ## source/source/gameengine/GameLogic/SCA_ExpressionController.h
 
-O arquivo `KX_EXPRESSIONController.h` implementa um controlador de expressão dentro de um motor de jogos C++ (fork do UPBGE/Blender 2.79). Esse controlador permite a execução de expressões lógicas personalizadas, que podem ser usadas para controlar o comportamento dos objetos no jogo. Ele interage com outros sistemas, como o gerenciador lógico (`SCA_LogicManager`), para responder a eventos e atualizar o estado dos objetos. O controlador também utiliza uma classe `EXP_Expression` para armazenar e avaliar as expressões, e pode interagir com outros controladores e identificadores no jogo.
+O arquivo `SCA_ExpressionController.h` implementa um controlador de expressão dentro de um motor de jogos C++ (fork do UPBGE/Blender 2.79). Esse controlador permite a execução de expressões lógicas personalizadas, que podem ser usadas para controlar o comportamento dos objetos no jogo. Ele interage com outros sistemas, como o gerenciador lógico (`SCA_LogicManager`), para responder a eventos e atualizar o estado dos objetos. O controlador também utiliza uma classe `EXP_Expression` para armazenar e avaliar as expressões, e pode interagir com outros controladores e identificadores no jogo.
 
 ## source/source/gameengine/GameLogic/SCA_IActuator.cpp
 

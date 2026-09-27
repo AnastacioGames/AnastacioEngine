@@ -13,12 +13,12 @@
 | SCA_ANDController.h | 51 | `SCA_ANDController` |
 | SCA_ActuatorEventManager.cpp | 64 | `SCA_ActuatorEventManager` |
 | SCA_ActuatorEventManager.h | 46 | `SCA_ActuatorEventManager` |
-| SCA_ActuatorSensor.cpp | 169 | `SCA_ActuatorSensor` |
+| SCA_ActuatorSensor.cpp | 172 | `SCA_ActuatorSensor` |
 | SCA_ActuatorSensor.h | 70 | `SCA_ActuatorSensor` |
 | SCA_AlwaysSensor.cpp | 139 | `SCA_AlwaysSensor` |
 | SCA_AlwaysSensor.h | 53 | `SCA_AlwaysSensor` |
-| SCA_AnimationEventSensor.cpp | 175 | `SCA_AnimationEventSensor` |
-| SCA_AnimationEventSensor.h | 76 | `SCA_AnimationEventSensor` |
+| SCA_AnimationEventSensor.cpp | 184 | `SCA_AnimationEventSensor` |
+| SCA_AnimationEventSensor.h | 82 | `SCA_AnimationEventSensor` |
 | SCA_BasicEventManager.cpp | 56 | `SCA_BasicEventManager` |
 | SCA_BasicEventManager.h | 49 | `SCA_BasicEventManager` |
 | SCA_DelaySensor.cpp | 202 | `SCA_DelaySensor` |

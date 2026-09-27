@@ -111,6 +111,13 @@ antes de investigar um crash "esquisito" que não bate com a mudança feita.
   `Mesh*` compartilhado entre Objects — dado por-objeto que dependa da ordem de vertex groups (ex.: índices
   de bone) quebra se dois Objects compartilharem a mesma malha com vertex groups em ordem diferente. Vale
   como alerta para qualquer dado novo por-objeto que for pendurado na conversão de mesh compartilhada.
+- **Função do editor chamada pelo código do jogo**: o `RangeRuntime` não linka o editor, então ela precisa
+  de um stub em `source/source/blenderplayer/bad_level_call_stubs/stubs.c`, senão o player não linka
+  (casos: `WM_menu_name_call`, `builtin_keyingsets`).
+- **GLSL do jogo também roda na Web (GLSL ES 3.00)**: sem comparação `float == int` e sem recursos só do
+  desktop; o runtime Web compila os mesmos shaders de `source/source/blender/gpu/shaders/`.
+- **Texto novo na interface** (label, tooltip, mensagem de operador) precisa de tradução pt_BR, es e ru nos
+  catálogos de `source/release/scripts/modules/range_web/translations_*.py`.
 
 ---
 

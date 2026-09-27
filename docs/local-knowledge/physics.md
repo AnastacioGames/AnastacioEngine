@@ -2,6 +2,8 @@
 
 > Gerado por `tools/build_local_knowledge.sh` via modelo local (Ollama).
 > Resumo raso para orientacao inicial - para decisoes reais, leia o arquivo completo.
+> **Atencao:** texto gerado por IA local em 2026-09-15, sem revisao linha a linha; pode ter erros e nao cobre
+> arquivos novos. Para a estrutura atual, use `docs/architecture.md` e os `index-*.md` (gerados do codigo).
 
 ## source/source/gameengine/Physics/Bullet/CcdConstraint.cpp
 
@@ -23,7 +25,7 @@ Este arquivo implementa uma classe `CcdGraphicController` que é uma extensão d
 
 ## source/source/gameengine/Physics/Bullet/CcdMathUtils.h
 
-Este arquivo é uma biblioteca de utilidades matemáticas para converter tipos de dados entre diferentes sistemas de matemática utilizados em um motor de jogos C++, especificamente para um fork do UPBGE (Unreal Physics Blender Game Engine) baseado no Blender 2.79. Implementa funções inline que permitem a conversão entre vetores 3D, vetores 4D, matrizes 3x3 e quaterniões entre as bibliotecas MathFu e Bullet Physics. Essas conversões são essenciais para interoperabilidade entre diferentes componentes do motor de jogos, garantindo que dados sejam corretamente interpretados e manipulados por sistemas de física, renderização e outros módulos que dependam de representações matemáticas consistentes.
+Este arquivo é uma biblioteca de utilidades matemáticas para converter tipos de dados entre diferentes sistemas de matemática utilizados em um motor de jogos C++, especificamente para um fork do UPBGE (Uchronia Project Blender Game Engine) baseado no Blender 2.79. Implementa funções inline que permitem a conversão entre vetores 3D, vetores 4D, matrizes 3x3 e quaterniões entre as bibliotecas MathFu e Bullet Physics. Essas conversões são essenciais para interoperabilidade entre diferentes componentes do motor de jogos, garantindo que dados sejam corretamente interpretados e manipulados por sistemas de física, renderização e outros módulos que dependam de representações matemáticas consistentes.
 
 ## source/source/gameengine/Physics/Bullet/CcdPhysicsController.cpp
 

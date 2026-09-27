@@ -52,20 +52,20 @@
 | DNA_object_fluidsim_types.h | 185 |  |
 | DNA_object_force_types.h | 471 |  |
 | DNA_object_types.h | 956 |  |
-| DNA_outliner_types.h | 101 |  |
+| DNA_outliner_types.h | 102 |  |
 | DNA_packedFile_types.h | 51 |  |
 | DNA_particle_types.h | 616 |  |
 | DNA_property_types.h | 57 |  |
 | DNA_python_component_types.h | 68 |  |
 | DNA_rigidbody_types.h | 313 |  |
-| DNA_scene_types.h **grande** | 2522 |  |
+| DNA_scene_types.h **grande** | 2559 |  |
 | DNA_screen_types.h | 441 |  |
 | DNA_sdna_types.h | 76 |  |
 | DNA_sensor_types.h | 417 |  |
 | DNA_sequence_types.h | 592 |  |
 | DNA_smoke_types.h | 289 |  |
 | DNA_sound_types.h | 130 |  |
-| DNA_space_types.h | 1496 |  |
+| DNA_space_types.h **grande** | 1505 |  |
 | DNA_speaker_types.h | 75 |  |
 | DNA_text_types.h | 72 |  |
 | DNA_texture_types.h | 702 |  |
@@ -101,16 +101,16 @@
 |---|---:|---|
 | blend_validate.c | 145 |  |
 | readblenentry.c | 482 |  |
-| readfile.c **grande** | 11015 |  |
+| readfile.c **grande** | 11031 |  |
 | readfile.h | 172 |  |
 | runtime.c | 141 |  |
 | undofile.c | 186 |  |
 | versioning_250.c **grande** | 2748 |  |
 | versioning_260.c **grande** | 2727 |  |
 | versioning_270.c **grande** | 1879 |  |
-| versioning_defaults.c | 423 |  |
+| versioning_defaults.c | 440 |  |
 | versioning_legacy.c **grande** | 3530 |  |
-| versioning_range.c | 470 |  |
+| versioning_range.c | 543 |  |
 | versioning_upbge.c | 354 |  |
 | versioning_userdef.c | 1297 |  |
-| writefile.c **grande** | 4324 |  |
+| writefile.c **grande** | 4333 |  |

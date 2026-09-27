@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Docs: arquitetura atualizada para o estado atual
+
+- `architecture.md`: mapa do repositório, loop Web (`emscripten_set_main_loop_arg`), caminho editor → `.blend`
+  → conversor, export Web/Android em `range_web`, Cycles, `m_debugRenderer` e linha do `main()` corrigida.
+- `code-map-*.md`: números de linha e tamanhos reconferidos com o código; índices `local-knowledge/index-*.md`
+  regerados. Resumos de IA local marcados como não revisados (tinham "UPBGE = Unreal ...").
+- `maintenance-guide.md`: stubs do player, GLSL ES da Web e traduções de texto novo. `docs/README.md` com
+  ordem de leitura e sem o link para o inexistente `vehicle-test-guide.md`.
+
 ## 2026-09-27 - Release 0.4.2: pacote Windows
 
 - `AnastacioEngine-0.4.2-windows-x64.zip` (159 MB) e `.sha256` anexados a `v0.4.2`, que ate entao so tinha o

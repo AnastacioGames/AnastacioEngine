@@ -12,6 +12,25 @@ O núcleo do runtime de jogo está em `source/source/gameengine/`, separado da p
 (`source/source/blender/`, `source/source/creator/`). O nome "Ketsji" que aparece em vários lugares é o
 codinome histórico do BGE (Blender Game Engine).
 
+## Mapa do repositório
+
+A raiz do CMake é `source/` (presets em `source/CMakePresets.json`). Dentro dela:
+
+| Caminho | O que é |
+|---|---|
+| `source/source/gameengine/` | Runtime do jogo (Ketsji): loop, cena, objetos, lógica, física, render. Detalhado abaixo. |
+| `source/source/blender/` | Editor herdado do Blender 2.79: `makesdna` (structs gravadas no `.blend`), `makesrna` (propriedades expostas à UI/Python), `blenkernel` (dados), `blenloader` (ler/gravar `.blend` e versioning), `editors` (operadores e desenho da UI), `gpu` (shaders GLSL do material no jogo), `python` (`bpy`), `windowmanager`. |
+| `source/source/creator/` | `main()` do editor (`RangeEngine`). |
+| `source/source/blenderplayer/` | Alvo do player (`RangeRuntime`) e os stubs que substituem funções do editor. |
+| `source/intern/` | Bibliotecas internas: `cycles` (render offline), `ghost` (janela/input), `audaspace` (áudio), `guardedalloc` etc. |
+| `source/extern/` | Terceiros (Bullet, ImGui, Recast, clew/cuew…). |
+| `source/release/scripts/` | Python do editor: `startup/bl_ui` (painéis), `startup/bl_operators`, `startup/flowmenu` (painéis de física da Range), `modules/range_web` (export Web/Android, pré-voo e traduções), `addons`, `templates_components`. |
+| `source/release/datafiles/` | `startup.blend` de fábrica, ícones, locale. |
+| `tools/` | Scripts de apoio: `web/` (empacotar e verificar o pacote Web), `android/` (template do APK WebView), `linux/`, `build_code_index.py` (índices em `docs/local-knowledge/`). |
+| `docs/` | Documentação; índice em `docs/README.md`. |
+
+Diretórios de build (`build/`, `build-web-release/` etc.) e o que cada um significa: [build-dirs.md](build-dirs.md).
+
 ## Fluxo de execução
 
 ```
@@ -42,11 +61,18 @@ main() [GPG_Ghost.cpp, standalone]        BL_KetsjiEmbedStart.cpp [embedded no B
 ```
 
 Dois pontos de entrada de `main()`:
-- **Standalone**: `GamePlayer/GPG_Ghost.cpp:817` (`int main(...)`) → constrói `GPG_Canvas` + `LA_PlayerLauncher`.
+- **Standalone** (`RangeRuntime`): `GamePlayer/GPG_Ghost.cpp:842` (`int main(...)`) → constrói `GPG_Canvas` + `LA_PlayerLauncher`.
 - **Embutido no Blender** (botão Play do editor): `BlenderRoutines/BL_KetsjiEmbedStart.cpp`, chamado a partir do
   `main()` do próprio Blender em `source/creator/` (fora de `gameengine/`).
 
 Ambos convergem em `LA_Launcher`, que por sua vez dirige `KX_KetsjiEngine`.
+
+**Web (Emscripten):** o mesmo `GPG_Ghost.cpp` compila para WebAssembly (presets `web-runtime` e
+`web-runtime-release`). O navegador não aceita um `while` bloqueante, então `LA_Launcher.cpp` registra
+`EngineNextFrame()` com `emscripten_set_main_loop_arg` e o navegador chama um frame por vez. Os trechos
+específicos da Web ficam em `#ifdef __EMSCRIPTEN__` (input, joystick, ImGui, Python, filtros 2D e o rasterizer
+OpenGL, que roda em WebGL2). O **Android** oficial é um APK com WebView que carrega esse pacote Web; não há
+build C++ próprio (ver [build-dirs.md](build-dirs.md)).
 
 ## Ordem do frame (`KX_KetsjiEngine::NextFrame()`)
 
@@ -107,7 +133,8 @@ Dois grupos, com ciclos de vida opostos:
 - **Possuídos internamente**: `std::unique_ptr<KX_ShadowRenderer> m_shadowRenderer`,
   `std::unique_ptr<KX_RenderPipeline> m_renderPipeline`,
   `std::unique_ptr<KX_SimulationPipeline> m_simulationPipeline`,
-  `std::unique_ptr<KX_SceneScheduler> m_sceneScheduler` (extraídos nos Planos 5-7) e
+  `std::unique_ptr<KX_SceneScheduler> m_sceneScheduler` (extraídos nos Planos 5-7),
+  `std::unique_ptr<KX_DebugRenderer> m_debugRenderer` e
   `CustomMouseCursor *m_CustomMouseCursor` (ponteiro cru, mas com dono explícito: criado/substituído só
   via `SetCustomMouseCursor`, liberado por `FreeCustomMouseCursor` no destrutor — ver Plano 1A, item 5).
   Esses vivem e morrem com a instância de `KX_KetsjiEngine`.
@@ -136,10 +163,40 @@ Dois grupos, com ciclos de vida opostos:
 | **BlenderRoutines** | Ponte entre o "Play" embutido no editor Blender e o Ketsji. | `BL_KetsjiEmbedStart.cpp`, `KX_BlenderCanvas.h/.cpp` | Ketsji, Rasterizer, Blender core |
 | **VideoTexture** | Add-on de captura de vídeo/render-to-texture exposto ao Python (`bge.texture`). | `Texture.h/.cpp`, `VideoFFmpeg.h/.cpp`, `ImageRender.h/.cpp`, `VideoDeckLink.h/.cpp` | Ketsji, Rasterizer, FFmpeg/DeckLink (3rd party) |
 
+## Do editor para o jogo
+
+O jogo não lê o editor diretamente; tudo passa pelo `.blend`:
+
+```
+UI Python (release/scripts/startup/bl_ui, flowmenu)
+   -> propriedades RNA (makesrna/intern/rna_*.c)
+   -> structs DNA gravadas no .blend (makesdna/DNA_*_types.h; versioning em blenloader/intern/versioning_range.c)
+   -> Converter (BL_BlenderDataConversion.cpp e BL_Convert*.cpp) no início do jogo
+   -> objetos de runtime (KX_GameObject, SCA_* logic bricks, controllers de física, materiais GLSL)
+```
+
+Por isso uma opção nova de jogo costuma tocar DNA, RNA, UI Python, versioning e conversor. A lista de
+arquivos por tipo de mudança está em [maintenance-guide.md](maintenance-guide.md). Coisas só do editor (Asset
+Browser, pastas do Outliner, temas, painéis) vivem em `source/source/blender/editors/` e nos scripts Python, e
+não passam pelo conversor, com uma exceção: pastas marcadas "fora do jogo" põem os objetos no layer 20, que o
+conversor trata como inativo.
+
+**Export Web/Android** é todo em Python (`release/scripts/modules/range_web/`): coleta os dados da cena, roda
+o pré-voo (regras de compatibilidade de Python, shaders e arquivos), monta o pacote com o runtime Web e, para
+Android, gera APK/AAB. Os painéis ficam em `bl_ui/properties_web.py` e `properties_android.py`.
+
+## Cycles
+
+Render offline do editor (F12, viewport em Rendered e bake), em `source/intern/cycles/`, com o add-on Python em
+`intern/cycles/blender/addon/` (instalado como `scripts/addons/cycles`). Não faz parte do runtime do jogo. Dispositivos: CPU (com Embree),
+CUDA (NVIDIA, cubins pré-compilados sm_75/86/89/120 no pacote Windows) e OpenCL (só GPUs AMD, kernel
+compilado na primeira vez). Estado e pendências: [relatorio-varredura-cycles.md](relatorio-varredura-cycles.md).
+
 ## Pontos de integração Python / ImGui
 
 - **Python**: `Ketsji/KX_PythonInit.h/.cpp` — `initGamePython(Main*, PyObject*)`, `initPlayerPython(int argc, char**argv)`.
   Registro adicional de tipos em `KX_PythonInitTypes.cpp` e em `GameLogic/SCA_PythonController.cpp`.
+  `bge.logic.motion` (giroscópio, acelerômetro, inclinação no celular) fica em `Ketsji/KX_PythonMotion.cpp`.
 - **ImGui**: `Ketsji/KXImgui/KX_Imgui.h/.cpp` — classe `KX_Imgui`, `Init(DEV_InputDevice*)`;
   bindings Python em `KX_PythonImgui.h/.cpp`; input em `KX_Imgui_Impl_Inputs.cpp`.
   O histórico do menu ImGui está nas entradas de 2026-08-25 de `docs/changelog.md`.

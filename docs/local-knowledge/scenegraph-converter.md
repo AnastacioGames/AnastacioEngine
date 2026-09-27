@@ -2,6 +2,8 @@
 
 > Gerado por `tools/build_local_knowledge.sh` via modelo local (Ollama).
 > Resumo raso para orientacao inicial - para decisoes reais, leia o arquivo completo.
+> **Atencao:** texto gerado por IA local em 2026-09-15, sem revisao linha a linha; pode ter erros e nao cobre
+> arquivos novos. Para a estrutura atual, use `docs/architecture.md` e os `index-*.md` (gerados do codigo).
 
 ## source/source/gameengine/SceneGraph/SG_Interpolator.h
 
@@ -210,7 +212,7 @@ Esta estrutura provavelmente interage com outros sistemas do motor de jogo que r
 
 ## source/source/gameengine/SceneGraph/SG_ScalarInterpolator.h
 
-Este arquivo define uma classe abstrata chamada `SG_ScalarInterpolator` em um motor de jogo C++ baseado no UPBGE (Unreal Python Blender Game Engine) ou Blender 2.79. A classe serve como uma interface para interpoladores escalares, que são responsáveis por calcular valores de ponto flutuante com base no tempo atual. Isso é particularmente útil para animações suaves de propriedades numéricas ao longo do tempo. Outros sistemas do motor provavelmente interagem com essa classe para obter valores interpolados, permitindo a criação de animações suaves e controladas em objetos, câmeras, luzes e outros elementos do jogo.
+Este arquivo define uma classe abstrata chamada `SG_ScalarInterpolator` em um motor de jogo C++ baseado no UPBGE (Uchronia Project Blender Game Engine) ou Blender 2.79. A classe serve como uma interface para interpoladores escalares, que são responsáveis por calcular valores de ponto flutuante com base no tempo atual. Isso é particularmente útil para animações suaves de propriedades numéricas ao longo do tempo. Outros sistemas do motor provavelmente interagem com essa classe para obter valores interpolados, permitindo a criação de animações suaves e controladas em objetos, câmeras, luzes e outros elementos do jogo.
 
 ## source/source/gameengine/Converter/BL_ActionActuator.cpp
 
@@ -248,11 +250,11 @@ O `BL_ArmatureActuator` interage principalmente com outros sistemas do motor de 
 
 ## source/source/gameengine/Converter/BL_ArmatureActuator.h
 
-Este arquivo implementa uma classe `BL_ArmatureActuator` que é uma ação (actuator) dentro de um motor de jogos C++ baseado no UPBGE (Unreal Player Blender Game Engine) ou no Blender 2.79. A classe se concentra na interação com as constraints de armadura (bones) em uma cena 3D, permitindo que ações no jogo ativem, desativem ou modifiquem constraints específicas de uma pose. Isso é útil para controlar animações detalhadas e interativas de personagens 3D.
+Este arquivo implementa uma classe `BL_ArmatureActuator` que é uma ação (actuator) dentro de um motor de jogos C++ baseado no UPBGE (Uchronia Project Blender Game Engine) ou no Blender 2.79. A classe se concentra na interação com as constraints de armadura (bones) em uma cena 3D, permitindo que ações no jogo ativem, desativem ou modifiquem constraints específicas de uma pose. Isso é útil para controlar animações detalhadas e interativas de personagens 3D.
 
 O actuator provavelmente interage com outros sistemas como o `SCA_IActuator` (base de todas as ações no motor), `BL_ArmatureConstraint` (representando as constraints de armadura), e `KX_GameObject` (representando objetos do jogo). Ele também usa funções de processamento de réplicas para manter a consistência entre diferentes estados do jogo e funções de atualização para reagir a mudanças na cena ao longo do tempo.
 
 ## source/source/gameengine/Converter/BL_ArmatureChannel.cpp
 
-Este arquivo implementa a classe BL_ArmatureChannel, que é responsável pela representação e manipulação de canais de armação (bones) dentro de um motor de jogo baseado em C++, derivado do UPBGE (Unreal Python Blender Game Engine) ou Blender 2.79. A classe fornece acesso a várias propriedades e métodos relacionados aos canais de armação, como localização, escala, rotação e informações de IK (Inverse Kinematics). Ela interage com outros sistemas do motor, como BL_ArmatureObject (para representar o objeto de armação em si) e BL_ArmatureConstraint (para aplicar restrições à armação). A implementação também inclui suporte a Python, permitindo que os canais de armação sejam expostos e manipulados através de scripts Python no jogo.
+Este arquivo implementa a classe BL_ArmatureChannel, que é responsável pela representação e manipulação de canais de armação (bones) dentro de um motor de jogo baseado em C++, derivado do UPBGE (Uchronia Project Blender Game Engine) ou Blender 2.79. A classe fornece acesso a várias propriedades e métodos relacionados aos canais de armação, como localização, escala, rotação e informações de IK (Inverse Kinematics). Ela interage com outros sistemas do motor, como BL_ArmatureObject (para representar o objeto de armação em si) e BL_ArmatureConstraint (para aplicar restrições à armação). A implementação também inclui suporte a Python, permitindo que os canais de armação sejam expostos e manipulados através de scripts Python no jogo.
 
