@@ -9,21 +9,23 @@
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.4.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.3)** (Windows; o Linux segue na 0.4.2)
+Versão atual: **[AnastacioEngine 0.4.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.3)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
 | [Windows x64 (0.4.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.4.2)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-linux-x86_64.tar.xz) | Editor e runtime nativos. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-linux-x86_64.tar.xz.sha256) |
+| [Linux x86_64 (0.4.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-linux-x86_64.tar.xz) | Editor e runtime nativos. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-linux-x86_64.tar.xz.sha256) |
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
 Para rodar um jogo exportado, use `RangeRuntime`. No Linux, as bibliotecas de sistema necessárias estão nas
-[notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2).
+[notas do release 0.4.2](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2) (continuam valendo na 0.4.3).
 
-## Novidades da 0.4.3 (Windows)
+## Novidades da 0.4.3
 
-Splash novo com os ícones das plataformas e addons sem avisos do Python 3.11. O resto é igual à 0.4.2.
+Splash novo com os ícones das plataformas, addons sem avisos do Python 3.11 e correção do loop de tempo
+(Fixed Timestep fora da interface, v-sync sem atraso falso). No Linux, o splash agora abre centralizado.
+O resto é igual à 0.4.2.
 
 ## Novidades da 0.4.2
 
