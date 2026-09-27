@@ -25,7 +25,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   - Logs sem erro em todos os casos.
 - Zip `AnastacioEngine-0.4.3-windows-x64.zip` refeito a partir do anterior trocando só `RangeEngine.exe`,
   `RangeRuntime.exe` e `2.79/scripts/startup/bl_ui/properties_game.py` (os mesmos 4.657 arquivos, mesmo
-  `blender.crt.manifest` da 0.4.2 e mesmos cubins). Validado extraindo em `D:	043`: `RangeEngine -b` sai com 0,
+  `blender.crt.manifest` da 0.4.2 e mesmos cubins). Validado extraindo em `D:\t043`: `RangeEngine -b` sai com 0,
   Cycles lista CPU e OpenCL, `RangeRuntime` roda os casos acima. Tag `v0.4.3` movida para este commit.
 - Falta o teste no jogo real (roadmap).
 
