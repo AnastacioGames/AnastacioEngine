@@ -9,6 +9,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-27 - Release 0.4.3: pacote Linux
+
+- Linux alcança a 0.4.3: `RangeEngine` e `RangeRuntime` recompilados com o fix do loop de tempo (Fixed Timestep
+  fora da interface, `FrameOver()` com v-sync) e o splash novo (reembutido via `datatoc`).
+- Pacote `AnastacioEngine-0.4.3-linux-x86_64.tar.xz` (editor + runtime) gerado por `package-runtime.sh`.
+  Validado extraindo numa pasta temporária: `RangeEngine -b` com ambiente limpo acha o Python 3.11.9 embutido.
+- Testes do pacote extraído (Intel RPL-P, Mesa 25.2, monitor 144 Hz, X11), comparando com o pacote 0.4.2. Cena
+  com script que mede o intervalo entre frames e conta passos de lógica por frame (`scene.pre_draw`), 8 s,
+  640x360:
+  - tic 60 e 144, v-sync ligado/desligado: 60,0/144,1 fps e 1,000 passo por frame nos dois, exceto tic 144 com
+    v-sync na 0.4.2 (1 frame com 2 passos e pico de 13,8 ms); na 0.4.3, 0 frames irregulares, pico de 7,3 ms.
+  - tic 60 com picos de 30 ms a cada 20 frames: sem v-sync os dois dão 60 fps; com v-sync a 0.4.3 dá 57,6 fps
+    (não recupera o atraso, efeito esperado do fix) e a 0.4.2, 60 fps.
+  - Sem erros nos logs. Uma cena demo (`Chuva com nuvens.range`) roda sem erro. O `RangeRuntime` ignora
+    SIGTERM (só sai com SIGKILL), igual na 0.4.2: não é regressão.
+  - Editor com janela: splash novo aparece (a imagem nova está no binário, a antiga não).
+- Splash fora do centro no Linux: ele é criado com o tamanho de janela salvo no startup (2494x1371 aqui) e o
+  gerenciador de janelas redimensiona depois (1854x1131). O listener de resize dos popups centralizados
+  marcava a região, mas o refresh não rodava porque `can_refresh` ficava `false`. Corrigido em
+  `ui_popup_block_create` (`interface_region_popup.c`): popups `UI_BLOCK_BOUNDS_POPUP_CENTER` agora podem ser
+  reconstruídos. Conferido com printf temporário: o splash é recentralizado para 1854x1131. O zip Windows
+  0.4.3 não foi recompilado com este fix.
+- Pendente: o texto de versão do splash está fixo em "AnastacioEngine 0.4.0 Release Candidate"
+  (`get_version_string_splash_screen`), em todas as plataformas.
+
 ## 2026-09-27 - Loop de tempo: teste automático e zip 0.4.3 atualizado
 
 - Teste automático no `RangeRuntime`: cena simples com um script que mede o intervalo entre frames e conta

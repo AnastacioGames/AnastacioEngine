@@ -723,6 +723,9 @@ uiPopupBlockHandle *ui_popup_block_create(bContext *C,
 	/* keep centered on window resizing */
 	if (block->bounds_type == UI_BLOCK_BOUNDS_POPUP_CENTER) {
 		type.listener = ui_block_region_popup_window_listener;
+		/* The listener only tags the region, the block is rebuilt (and re-centered) on refresh.
+		 * Needed on Linux where the window manager resizes the window after the splash opens. */
+		handle->can_refresh = true;
 	}
 
 	return handle;
