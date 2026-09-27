@@ -83,7 +83,7 @@ para jogos.
 
 ## Desenvolvimento (código-fonte)
 
-- [Índice da documentação](docs/README.md) · [Roadmap](docs/roadmap.md) · [Histórico técnico](docs/changelog.md)
+- [Diagramas da arquitetura](docs/diagramas-arquitetura.md) · [Índice da documentação](docs/README.md) · [Roadmap](docs/roadmap.md) · [Histórico técnico](docs/changelog.md)
 - [Build no Windows](docs/build-notes.md) · [Build no Linux](docs/linux-build.md) · [Arquitetura](docs/architecture.md)
 - [Licença](docs/licenca.md) · [Relatório de melhorias](relatorio-melhorias-anastacioengine.md)
 

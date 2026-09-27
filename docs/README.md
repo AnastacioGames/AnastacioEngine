@@ -7,6 +7,8 @@ Este índice separa estado atual, procedimentos e histórico. Documentação her
 
 Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
+0. [Diagramas da arquitetura](diagramas-arquitetura.md): a mesma visão desenhada (repositório, módulos,
+   entradas, frame, editor → jogo, plataformas). Bom primeiro contato.
 1. [Arquitetura](architecture.md): mapa do repositório, loop do jogo (desktop e Web), módulos do runtime,
    caminho do editor até o jogo, Cycles.
 2. [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): o que a engine já tem e decisões vigentes.
