@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Cycles: cubins CUDA para RTX 20/30/40/50
+
+- Preset `v142-ninja`: `CYCLES_CUDA_BINARIES_ARCH=sm_75;sm_86;sm_89;sm_120` (sm_75 e o minimo do CUDA 13).
+  Cada arch leva ~12 min e ~9 MB (sm_120 ~28 MB). So sm_120 testado em hardware real (RTX 5060).
+- Removidos de `build/bin/.../cycles/lib` cubins antigos de 2023 (sm_30 a sm_70), sobras de outro build.
+
 ## 2026-09-26 - Windows: Cycles com CUDA no build principal
 
 - Preset `v142-ninja` liga Cycles com Embree, CUDA (binarios `sm_120`) e OpenCL no `build/`.
