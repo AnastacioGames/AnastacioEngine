@@ -78,5 +78,5 @@ Estado: CYC-001 a CYC-012 corrigidos e validados por compilação. Permanecem ap
 ## Próximas prioridades sugeridas
 
 1. ~~Cobrir CUDA/OpenCL em build separado~~ e ~~portar CUDA para sm_80+/CUDA 12+~~: feitos no editor Linux (CUDA 13 validado na RTX 5060; OpenCL compilado, aceita só GPUs AMD). OSL segue inviável (exige OSL 1.9 com LLVM antigo). A rede fica fora: não suportada/insegura (ver observações).
-2. ~~Testar CUDA e OpenCL no Windows~~: CUDA 13.4 na RTX 5060 e OpenCL na RX 6800M, render e bake de AO iguais à CPU (26/09/2026, ver `changelog.md`). Falta OpenCL no Linux (máquina AMD).
+2. ~~Testar CUDA e OpenCL no Windows~~: CUDA 13.4 na RTX 5060 e OpenCL na RX 6800M, render e bake de AO iguais à CPU (26/09/2026, ver `changelog.md`). Falta OpenCL no Linux: pendente, sem máquina Linux com GPU AMD (o WSL não serve).
 3. Adicionar corpus automatizado para entradas IES e corridas de I/O, se a infraestrutura de testes de Cycles for ativada neste fork.
