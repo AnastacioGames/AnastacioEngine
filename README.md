@@ -1,83 +1,90 @@
 # AnastacioEngine
 > Game engine para criação de jogos 3D, baseada na Range Engine 1.6 Rev1 e na linhagem UPBGE / Blender 2.79.
-> [!IMPORTANT]
-> **Para baixar a engine, use os links da seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
-> O botão verde **Code → Download ZIP** do GitHub baixa o código-fonte do repositório; ele **não** contém os executáveis prontos da AnastacioEngine.
 
-![Splash Screen da AnastacioEngine 0.4.1](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.4.1/splash.png)
+> [!IMPORTANT]
+> **Para baixar a engine, use a seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
+> O botão verde **Code → Download ZIP** baixa só o código-fonte, sem os executáveis.
+
+![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.4.1/splash.png)
 
 ## Download
 
-A versão atual é **[AnastacioEngine 0.4.1](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.1)** para Windows x64 e Linux x86_64. O RangeArmor continua na [0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.0).
+Versão atual: **[AnastacioEngine 0.4.2](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2)**
 
 | Pacote | Conteúdo |
 |---|---|
-| [AnastacioEngine Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.1/AnastacioEngine-0.4.1-windows-x64.zip) | Editor, runtime e dependências necessárias para criar e executar projetos no Windows. **Versão 0.4.1**. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.1/AnastacioEngine-0.4.1-windows-x64.zip.sha256) |
-| [AnastacioEngine Linux x86_64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.1/AnastacioEngine-0.4.1-linux-x86_64.tar.xz) | Editor e runtime nativos para Linux x86_64 (validado fora do WSL). **Versão 0.4.1**. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.1/AnastacioEngine-0.4.1-linux-x86_64.tar.xz.sha256) |
-| [RangeArmor (painel Windows, exporta para Windows e Linux)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos (painel, launcher e scripts de exportação). O painel roda apenas no Windows, mas exporta e empacota jogos para Windows **e** Linux x86_64. |
-| [SHA-256 (0.4.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) | Hashes para verificar a integridade dos downloads. |
+| [Windows x64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-windows-x64.zip.sha256) |
+| [Linux x86_64](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-linux-x86_64.tar.xz) | Editor e runtime nativos. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.2/AnastacioEngine-0.4.2-linux-x86_64.tar.xz.sha256) |
+| [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
-Extraia o pacote da sua plataforma em uma pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine`
-(Linux). Para executar um jogo exportado, use `RangeRuntime`/`RangeRuntime.exe`. A partir da 0.3.0, a
-RangeArmor é distribuída como arquivo separado — baixe-a à parte se quiser criar/empacotar projetos.
+**Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
+Para rodar um jogo exportado, use `RangeRuntime`. No Linux, as bibliotecas de sistema necessárias estão nas
+[notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2).
 
-## Versão 0.4.1
+## Novidades da 0.4.2
 
-Esta é a distribuição pronta da AnastacioEngine para Windows x64 e, agora, Linux x86_64 nativo. Escolha o
-pacote desejado na seção **Download**, extraia-o em uma pasta própria e execute `RangeEngine`.
+### Destaque: render Cycles na placa de vídeo
+- **NVIDIA (CUDA):** placas RTX 20, 30, 40 e 50 já vêm suportadas no pacote do Windows, sem instalar o CUDA Toolkit.
+- **AMD (OpenCL):** render e bake na GPU AMD, testados numa RX 6800M.
+- **Embree:** render na CPU mais rápido, no Windows e no Linux.
+- Bake de iluminação na GPU dá o mesmo resultado que na CPU.
 
-- O pacote da engine contém o editor, o runtime e as dependências necessárias para cada plataforma.
-- A **RangeArmor** agora é um pacote à parte, com as ferramentas para criar e empacotar projetos.
-- Use `RangeRuntime`/`RangeRuntime.exe` para executar um jogo exportado (`.range`).
-- Consulte `SHA256SUMS.txt` caso queira verificar a integridade do download.
+### Correções importantes
+- **Linux:** o pacote 0.4.1 não abria fora da máquina de build (`No module named 'encodings'`). Corrigido e
+  testado num Ubuntu 24.04 limpo. **Quem baixou o 0.4.1 deve atualizar.**
+- **Arquivos UPBGE:** abrir um projeto UPBGE com sensores escrevia fora da memória; corrigido. Save/Load do
+  `globalDict` agora também lê os arquivos `.bgeconf` do UPBGE.
+- **Material com shader GLSL próprio:** apagar o texto do shader deixava o material apontando para memória
+  liberada (crash). Corrigido, junto com vazamentos de memória.
+- **Subsurface Scattering:** Scale 0 gerava pixels pretos; corrigido.
+- **Custom Viewport da câmera:** ficava errado ao redimensionar a janela ou usar resolução dinâmica; agora
+  se ajusta a cada frame.
+- **Foliage (vento):** grama instanciada não balançava e a base das plantas se mexia; corrigido. O vento
+  também não perde precisão em sessões longas.
+- **Screens:** Ctrl+Seta deixava de trocar de screen depois de apagar uma; corrigido.
+- **Theme:** Copy Global Theme agora atualiza toda a interface de uma vez.
+- Diversas correções de segurança e estabilidade no Cycles (leitura de arquivos, luzes IES, buffers grandes).
+
+### Novidades e aprimoramentos
+- **Asset Browser:** novo modo do File Browser para navegar por bibliotecas de `.blend` e arrastar objetos,
+  grupos e materiais direto para a Vista 3D.
+- **Outliner com coleções:** pastas para organizar a cena. Uma pasta pode ficar "fora do jogo" (objetos
+  começam inativos, prontos para o Add Object) e virar um Group com um clique.
+- **Painéis reorganizados:** abas Camera, Material, Render, Physics, Vehicle, Game Settings e Text Editor em
+  painéis nativos, com opções que o jogo não usa escondidas e avisos quando uma combinação não tem efeito.
+- **Custom Viewport:** presets prontos (tela cheia, picture-in-picture, tela dividida, quadrantes) e prévia do
+  tamanho em pixels.
+- **Aba Input** nas Propriedades e **aba Export Game** (RangeArmor, Web e Android) no editor.
+- **Veículos:** motor em Nm, pedais, joystick, moto e telemetria de marcha/RPM no HUD e no Vehicle Lab.
+- **Idiomas:** interface em English, Português, Español e Русский.
+- **Windows:** arquivos `.blend` e `.range` associados à engine.
 
 ## Ferramentas para criar jogos
-### World, clima e iluminação
-Configure clima diretamente na cena e ajuste o sistema de sombras CSM pelo editor.
-### Veículos e simulação
-Transforme um Rigid Body em veículo, configure as rodas e ajuste a física em tempo real pelo Vehicle Lab.
-### RangeArmor
-Crie projetos, mantenha os arquivos organizados e prepare distribuições com o RangeArmor Panel.
-### GPU Skinning
-O modo **RanGE GPU Skinning** move a deformação do esqueleto para a GPU. Para
-usá-lo, selecione esse modo no painel da Armature e habilite **GPU Skinning**
-nas opções do material que será usado pelo objeto.
-### Exportação para Web (em desenvolvimento)
-O perfil Web (Range) e o botão **Exportar Web** já existem no editor, mas a exportação para o navegador **ainda não está finalizada** e não deve ser usada em projetos de produção. O estado atual está em [docs/roadmap.md](docs/roadmap.md).
+- **World, clima e iluminação:** clima direto na cena e sombras CSM ajustáveis pelo editor.
+- **Veículos:** transforme um Rigid Body em veículo e ajuste a física em tempo real pelo Vehicle Lab.
+- **GPU Skinning:** escolha **RanGE GPU Skinning** no painel da Armature e ligue **GPU Skinning** no material.
+- **RangeArmor:** crie projetos e prepare distribuições pelo RangeArmor Panel.
+- **Render Cycles:** CPU, NVIDIA (CUDA) e AMD (OpenCL).
 
-## Status de plataformas
+## Plataformas
 | Plataforma | Estado |
 |---|---|
-| Windows x64 | Suportada nesta release. |
-| Linux x86_64 | Suportada nativamente (fora do WSL) a partir da 0.3.0. |
-| Web (navegador) | Em desenvolvimento; ainda não usar em produção. |
-| Android | Experimental: APK de teste rodando o runtime Web em um aparelho; sem download nem exportação pelo editor. |
+| Windows x64 | Suportada. |
+| Linux x86_64 | Suportada (nativo). |
+| Web (navegador) | Em testes; ainda não usar em produção. Detalhes no [roadmap](docs/roadmap.md). |
+| Android | Experimental: APK/AAB gerado pelo editor a partir do pacote Web. |
 | 32-bit | Não suportado. |
-
-## Estrutura da distribuição
-- `RangeEngine`/`RangeEngine.exe`: editor para criar e configurar projetos.
-- `RangeRuntime`/`RangeRuntime.exe`: player standalone para arquivos `.range`.
-- `RangeArmor`: painel, launcher e scripts de empacotamento; distribuído como pacote separado a partir da 0.3.0.
 
 ## Sobre
 
-AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b / Blender 2.79, e concentra seu desenvolvimento em performance, renderização, ferramentas de runtime e fluxo de produção para jogos.
+AnastacioEngine é um projeto da Anastacio Games. A engine parte da Range Engine 1.6 Rev1, derivada da
+UPBGE 0.2.5b / Blender 2.79, e foca em performance, renderização, ferramentas de runtime e fluxo de produção
+para jogos.
 
 ## Desenvolvimento (código-fonte)
 
-Este repositório também guarda o código-fonte completo da engine.
-
-- [Índice da documentação](docs/README.md)
-- [Roadmap atual](docs/roadmap.md)
-- [Arquitetura](docs/architecture.md)
-- [Build no Windows](docs/build-notes.md)
-- [Build no Linux](docs/linux-build.md)
-- [Histórico técnico](docs/changelog.md)
-- [Licença](docs/licenca.md)
+- [Índice da documentação](docs/README.md) · [Roadmap](docs/roadmap.md) · [Histórico técnico](docs/changelog.md)
+- [Build no Windows](docs/build-notes.md) · [Build no Linux](docs/linux-build.md) · [Arquitetura](docs/architecture.md)
+- [Licença](docs/licenca.md) · [Relatório de melhorias](relatorio-melhorias-anastacioengine.md)
 
 Para agentes de código, as regras operacionais estão em [AGENTS.md](AGENTS.md).
-
-## Links
-
-- [Releases e downloads](https://github.com/AnastacioGames/AnastacioEngine/releases)
-- [Relatório de melhorias](relatorio-melhorias-anastacioengine.md)
