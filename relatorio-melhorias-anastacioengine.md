@@ -193,6 +193,10 @@ ferramenta correspondente.
   O layout é configuração do export Web (Properties > Export Game > Web (Range) > Controle na tela, gravado no `.range`);
   o APK embute esse pacote e herda o layout, sem campo próprio no `android-export.json`.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
+- Loop de tempo: 1 `Update()` de simulação por frame, com o catch-up por sleep herdado (`UpdateSleepTime()`/
+  `FrameOver()`). A física de taxa fixa depende disso. O acumulador de passo fixo do Plano 8 está desligado
+  (`LA_Launcher` passa sempre `false`; o bit no DNA é ignorado e a opção saiu da UI). Com v-sync ligado,
+  `FrameOver()` zera `m_overframetime`, porque a espera do `SwapBuffers()` não é atraso do jogo.
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados

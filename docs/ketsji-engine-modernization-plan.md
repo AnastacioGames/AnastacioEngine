@@ -1073,6 +1073,14 @@ prática.
 auditado e validado em jogo real; sem pendência bloqueante. Retomar apenas se
 o caso `timescale=0` se mostrar relevante na prática.
 
+**2026-09-26 — acumulador desligado (revisão do Kitsuy):** a física de taxa
+fixa só aguenta 1 `Update()` por frame, e o acumulador rodava até
+`m_maxLogicFrame`. Além disso, o sleep antigo continuava ditando o ritmo, os
+passos extras não avançavam o tempo lógico e o `JUSTACTIVATED` disparava duas
+vezes. A opção saiu da UI e `LA_Launcher` passa sempre `false`; o bit
+`GAME_USE_FIXED_TIMESTEP` continua no DNA e é ignorado. O código do acumulador
+em `NextFrame()` fica inerte. Ver changelog de 2026-09-26.
+
 ### Plano 9 — Otimizações orientadas por perfil
 
 **Objetivo:** implementar somente ganhos sustentados pelos baselines.

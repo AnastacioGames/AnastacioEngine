@@ -884,6 +884,12 @@ void KX_KetsjiEngine::ClockTiming()
 void KX_KetsjiEngine::FrameOver()
 {
 	m_previousRealTime = m_clockTime;
+	// With v-sync, SwapBuffers() blocks until the next refresh, so that wait lands in
+	// m_deltatime and would be counted as drift; the display already paces the frame.
+	if (m_canvas && m_canvas->GetSwapControl() != RAS_ICanvas::VSYNC_OFF) {
+		m_overframetime = 0.0;
+		return;
+	}
 	if (m_overframetime < 0.0) {
 		if (m_timestep < (m_deltatime - m_overframetime)) {
 			m_overframetime = (m_timestep - m_deltaTime + m_overframetime + 6e-6);

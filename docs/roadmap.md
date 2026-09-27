@@ -198,6 +198,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   ainda manual é GPU-001, que requer uma sessão interativa já aberta para testar `gl_load()`.
 - **Build sem rastreio de headers**: o Ninja do `build/` não registra dependências de `.h` (prefixo do MSVC em
   português, ver `AGENTS.md`). Reconfigurar com `VSLANG=1033` e fazer um clean rebuild completo.
+- **Loop de tempo (perguntas ao Kitsuy, 2026-09-26)**: (1) em `KX_KetsjiEngine::FrameOver()`, o ramo de
+  `m_overframetime < 0` usa `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real): erro de
+  digitação herdado ou intencional? Não mudar sem a resposta. (2) `m_timeUnderRate` é `long`: com Max Logic
+  Frames = 5 a 60 Hz a conta dá ~0,02 e vira `sleep_for(0ms)`, o loop gira sem dormir. É intencional?
+- **`setTimeScale()` no Python**: aceita 0 e valores negativos, enquanto a RNA tem mínimo 0,001. Decidir se valida.
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 
@@ -270,6 +275,9 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
   miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
   execução automatizada, mas nenhum gesto com o mouse foi testado.
+- **Loop de tempo (2026-09-26)**: conferir no jogo real que o checkbox Fixed Timestep sumiu (Physics → Steps &
+  Timing), que um arquivo antigo com a opção ligada roda igual ao modo normal, e com v-sync ligado e desligado
+  (60 Hz e 144 Hz se houver) que o FPS não trava em 30, não engasga, não perde tecla e o veículo não muda.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 

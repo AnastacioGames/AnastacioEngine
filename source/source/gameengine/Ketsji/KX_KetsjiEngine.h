@@ -261,8 +261,9 @@ private:
 	/// maximum number of consecutive logic frame
 	int m_maxLogicFrame;
 
-	/// Plano 8: fixed-timestep accumulator, off by default so behavior is unchanged
-	/// until a caller opts in. See docs/ketsji-engine-modernization-plan.md, Plano 8.
+	/// Plano 8: fixed-timestep accumulator. Disabled since 2026-09-26: LA_Launcher always
+	/// passes false (the fixed-rate physics needs one step per frame), so the path below is
+	/// inert. See docs/ketsji-engine-modernization-plan.md, Plano 8.
 	/// When false, NextFrame() keeps the legacy single Update() call per frame with
 	/// catch-up handled by sleeping in UpdateSleepTime(), exactly as before this flag
 	/// existed. When true, NextFrame() accumulates real elapsed time (scaled by

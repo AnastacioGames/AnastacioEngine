@@ -1103,8 +1103,6 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 col.prop(gs, "physics_step_sub", text="Physics Substeps")
             col.prop(gs, "sleep_timer", text="Max Logic Frames")
 
-            box.prop(gs, "use_fixed_timestep")
-
             if gs.physics_engine != 'NONE':
                 box = main_box.box()
                 box.label(text="Deactivation (Sleeping Objects):", icon="SNAP_FACE")

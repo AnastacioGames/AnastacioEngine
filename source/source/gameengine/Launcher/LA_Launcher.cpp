@@ -284,7 +284,9 @@ void LA_Launcher::InitEngine()
 	                                     gm.dynamicResolutionMaxScale,
 	                                     gm.dynamicResolutionStep);
 	m_ketsjiEngine->SetTimeScale(gm.timeScale);
-	m_ketsjiEngine->SetUseFixedTimestep((gm.flag & GAME_USE_FIXED_TIMESTEP) != 0);
+	// GAME_USE_FIXED_TIMESTEP stays in old files but is ignored: the fixed-rate physics
+	// needs exactly one simulation step per frame, which the accumulator did not keep.
+	m_ketsjiEngine->SetUseFixedTimestep(false);
 
 	// Set the global settings (carried over if restart/load new files).
 	m_ketsjiEngine->SetGlobalSettings(m_globalSettings);

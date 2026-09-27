@@ -5098,10 +5098,8 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_fixed_timestep", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_USE_FIXED_TIMESTEP);
 	RNA_def_property_ui_text(prop, "Fixed Timestep Accumulator",
-	                         "Run the game logic in fixed-size steps accumulated from real elapsed "
-	                         "time (capped at Sleep Timer steps per frame), instead of exactly one "
-	                         "logic update per displayed frame. Off by default for compatibility "
-	                         "with existing files");
+	                         "Deprecated: ignored by the engine, which always runs one logic "
+	                         "update per displayed frame. Kept so old files and scripts still load");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 

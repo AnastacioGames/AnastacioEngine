@@ -9,6 +9,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Loop de tempo: Fixed Timestep desligado e fix de v-sync (revisão do Kitsuy)
+
+- **Fixed Timestep (Plano 8) desligado.** No modo fixo o `NextFrame()` rodava `m_simulationPipeline->Update()`
+  até `m_maxLogicFrame` vezes por frame, mas a física de taxa fixa só aguenta 1 passo (causa provável do crash
+  nesse modo). A investigação achou mais problemas no mesmo modo: o sleep antigo continuava ditando o ritmo, então
+  os passos alternavam entre 0 e 2 (engasgo); num frame com 0 passos o `ClearInputs()` apagava a tecla; nos passos
+  extras `m_logicTime`/`m_frameTime`/`m_animationsTime` não avançavam (só `FrameTiming()` avança, 1x por frame)
+  enquanto a física andava 2x; o `JUSTACTIVATED` disparava duas vezes. Mudança: o checkbox saiu de
+  `properties_game.py`, `LA_Launcher.cpp` passa sempre `SetUseFixedTimestep(false)` e a descrição RNA virou
+  "Deprecated". O bit `GAME_USE_FIXED_TIMESTEP` fica no DNA: arquivos antigos abrem iguais e rodam no modo normal.
+  O código do acumulador fica inerte; só o comentário do `.h` mudou (sem mudança de layout).
+- **V-sync em `FrameOver()`.** Com v-sync, o tempo em que `SwapBuffers()` fica bloqueado entrava em `m_deltatime`
+  e acumulava em `m_overframetime` como se fosse atraso. Agora, com `GetSwapControl() != VSYNC_OFF`,
+  `m_overframetime` é zerado. Sem v-sync a lógica antiga fica igual, inclusive o `m_deltaTime` do ramo negativo,
+  que aguarda resposta do Kitsuy (roadmap).
+- **Comentário errado corrigido** em `KX_RenderPipeline.cpp` (e anotado na entrada antiga do changelog):
+  `m_frameTime` não passa pelo acumulador, então chuva/nuvens/flare não ficam mais lentos com o Time Scale.
+- `KX_SimulationPipeline.cpp` não mudou. Todo o código é compartilhado; vale para Windows, Linux e Web.
+- Build incremental de `RangeEngine` e `RangeRuntime` sem erro. Falta o teste no jogo real (roadmap).
+
 ## 2026-09-26 - Release 0.4.3: pacote Windows (splash novo)
 
 - So Windows; o Linux segue na 0.4.2. Muda o splash (embutido no `RangeEngine.exe` via `datatoc`) e os addons

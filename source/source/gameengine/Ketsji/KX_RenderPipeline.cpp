@@ -614,11 +614,9 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 
 	// Animate the native World weather filters (Rain/Clouds/Lens Flare) -- their shaders
 	// scroll/flicker using a time uniform that nothing was updating after Fase 5 wired the
-	// filters on, so they rendered as a frozen frame. Driven off the engine's simulation
-	// time (advances one m_timestep per logic frame, and logic frames are gated by
-	// Time Scale via m_simAccumulator) rather than the real-time clock, so Time Scale
-	// slows the weather shaders along with everything else instead of leaving them at
-	// real-world speed while the rest of the game is in slow motion.
+	// filters on, so they rendered as a frozen frame. Driven off the engine's frame time,
+	// which advances one unscaled m_timestep per frame (FrameTiming()), so the weather
+	// shaders keep their speed under Time Scale; they do not slow down in slow motion.
 	if (filterManager) {
 		const float time = (float)m_engine->GetFrameTime();
 

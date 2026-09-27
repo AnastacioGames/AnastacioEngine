@@ -84,7 +84,7 @@ código morto"):
 NextFrame()
   -> input / ImGui / joystick
   -> simulação: m_simulationPipeline->Update()
-       (direto, ou via loop do acumulador de passo fixo quando use_fixed_timestep está ligada)
+       (uma chamada por frame; o acumulador de passo fixo está desligado desde 2026-09-26)
   -> processamento de libs/cenas agendadas (lib load/free, troca de cena)
   -> retorna m_doRender
 
