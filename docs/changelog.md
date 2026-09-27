@@ -9,6 +9,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-27 - Loop de tempo: teste automático e zip 0.4.3 atualizado
+
+- Teste automático no `RangeRuntime`: cena simples com um script que mede o intervalo entre frames e conta
+  passos de lógica por frame desenhado (`scene.pre_draw`), 8 s por caso, janela 640x360, monitor de 165 Hz (AMD
+  RX 6800M). Comparado com o zip anterior da 0.4.3 (antes do fix):
+  - tic rate 60, com e sem limite de FPS, flag antiga ligada e desligada, v-sync ligado e desligado: os dois dão
+    60,0 fps, 1 passo por frame e nenhum engasgo. O motor sempre marca o ritmo pelo tic rate (sleep), então
+    60 Hz num monitor de 165 Hz não mostra o bug do v-sync.
+  - tic rate 165 (igual ao monitor) com a flag antiga ligada: o antigo teve 1 a 3 frames de 12 ms sem passo de
+    lógica (0,998 passo/frame); o novo teve 0 engasgos e 1,000 passo/frame.
+  - tic rate 60 com picos de 30 ms a cada 20 frames: sem v-sync os dois ficam iguais (60 fps, recuperam o
+    atraso). Com v-sync o novo não recupera mais (57,7 fps médios, cada pico perde ~13 ms), que é o efeito
+    esperado do fix do Kitsuy; o antigo recuperava, mas teve um travão de 111 ms num dos casos.
+  - Logs sem erro em todos os casos.
+- Zip `AnastacioEngine-0.4.3-windows-x64.zip` refeito a partir do anterior trocando só `RangeEngine.exe`,
+  `RangeRuntime.exe` e `2.79/scripts/startup/bl_ui/properties_game.py` (os mesmos 4.657 arquivos, mesmo
+  `blender.crt.manifest` da 0.4.2 e mesmos cubins). Validado extraindo em `D:	043`: `RangeEngine -b` sai com 0,
+  Cycles lista CPU e OpenCL, `RangeRuntime` roda os casos acima. Tag `v0.4.3` movida para este commit.
+- Falta o teste no jogo real (roadmap).
+
 ## 2026-09-26 - Loop de tempo: Fixed Timestep desligado e fix de v-sync (revisão do Kitsuy)
 
 - **Fixed Timestep (Plano 8) desligado.** No modo fixo o `NextFrame()` rodava `m_simulationPipeline->Update()`

@@ -275,9 +275,10 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
   miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
   execução automatizada, mas nenhum gesto com o mouse foi testado.
-- **Loop de tempo (2026-09-26)**: conferir no jogo real que o checkbox Fixed Timestep sumiu (Physics → Steps &
-  Timing), que um arquivo antigo com a opção ligada roda igual ao modo normal, e com v-sync ligado e desligado
-  (60 Hz e 144 Hz se houver) que o FPS não trava em 30, não engasga, não perde tecla e o veículo não muda.
+- **Loop de tempo (2026-09-26)**: o teste automático (cena simples, monitor 165 Hz) já passou; ver changelog de
+  2026-09-27. Falta conferir no jogo real, num monitor de 60 Hz se houver, com v-sync ligado e desligado, que o FPS
+  não trava em 30, não perde tecla e o veículo não muda. Com v-sync e picos de carga o jogo não recupera mais o
+  tempo perdido (57,7 fps médios no teste); ver se isso incomoda no jogo real.
 - **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
   separadas num relatório de benchmark.
 
