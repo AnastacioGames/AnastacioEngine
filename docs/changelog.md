@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Windows: Cycles OpenCL testado na AMD
+
+- Maquina AMD (RX 6800M + Radeon integrada do Ryzen 9 5900HX), preset `v142-ninja` sem CUDA Toolkit: o
+  configure desliga os cubins sozinho e o CUDA fica so por dynload.
+- O RX 6800M aparece duas vezes na lista (mesmo PCI `03:00.0`, a segunda com `_ID_2`): cada GPU tem seu
+  driver AMD (32.0.21045 e 31.0.21923), cada um registra um `amdocl64.dll` e os dois enxergam o 6800M.
+  Marcar so uma entrada.
+- Usuario confirmou render com GPU (OpenCL) pela interface.
+- Render em `-b` (cena padrao, 128 amostras, 50%): 1a vez 24,5 s (compila ~9 kernels split), depois 7,7 s;
+  CPU 1,4 s com os tiles padrao.
+- Bake de AO (chao sob cubo) com OpenCL: mesmos valores da CPU (min/max/media); 0,79 s contra 0,26 s depois
+  de compilar o kernel `bake` (28 s na 1a vez). O bake imprime `Split kernel error: failed to load
+  kernel_path_init`, sem efeito no resultado.
+
 ## 2026-09-26 - Cycles: cubins CUDA para RTX 20/30/40/50
 
 - Preset `v142-ninja`: `CYCLES_CUDA_BINARIES_ARCH=sm_75;sm_86;sm_89;sm_120` (sm_75 e o minimo do CUDA 13).

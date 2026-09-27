@@ -483,7 +483,8 @@ definido quando o CMake acha `embree4/rtcore.h`). No Windows segue o Embree 3 es
 Liga em Render > Performance > "Use Embree" (so afeta a CPU).
 
 OpenCL: compilado (`clew` carrega a `libOpenCL` em runtime), mas este Cycles so aceita GPUs AMD em OpenCL; placas
-NVIDIA aparecem so em CUDA, como no Blender oficial da epoca.
+NVIDIA aparecem so em CUDA, como no Blender oficial da epoca. Validado no Windows na RX 6800M (2026-09-26);
+no Linux ainda nao foi testado em GPU AMD.
 
 OSL: desligado. Nao ha pacote do OpenShadingLanguage no Ubuntu 24.04, e esta versao do Cycles espera OSL 1.9,
 que so compila com LLVM antigo (3.x a 6); ligar exigiria compilar OSL e LLVM a parte.

@@ -106,7 +106,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
   CUDA no Windows (CUDA 13.4, sm_120) testado pela interface, render e bake (2026-09-26).
-  Falta (na maquina AMD): testar OpenCL no Windows e no Linux. Roteiro: Preferences > System > Cycles
+  OpenCL no Windows (RX 6800M) testado pela interface e em `-b`, render e bake (2026-09-26).
+  Falta (na maquina AMD): testar OpenCL no Linux. Roteiro: Preferences > System > Cycles
   Compute Device = OpenCL, marcar a GPU AMD; Render Device = GPU Compute; renderizar a cena padrao e fazer
   bake de AO (chao sob cubo) comparando com a CPU. O primeiro uso compila o kernel OpenCL e pode demorar
   varios minutos. Cubins CUDA para sm_75/sm_86/sm_89/sm_120 (RTX 20/30/40/50) no release desde 2026-09-26;
