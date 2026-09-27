@@ -111,15 +111,17 @@ O Android é um APK com WebView que carrega o pacote Web, então entra pelo cami
 ## 4. Um frame do jogo
 
 ```mermaid
-flowchart TB
-    subgraph NF["KX_KetsjiEngine::NextFrame()"]
+flowchart LR
+    subgraph NF["1 · KX_KetsjiEngine::NextFrame()"]
+        direction TB
         N1["ImGui e eventos de joystick"]
         N2["Simulação: KX_SimulationPipeline::Update()<br/>1 vez, ou N passos com passo fixo"]
         N3["Limpa input e mensagens"]
         N4["Carrega/libera libs e troca cenas<br/>(KX_SceneScheduler)"]
         N1 --> N2 --> N3 --> N4
     end
-    subgraph SIM["Simulação, para cada cena"]
+    subgraph SIM["2 · Simulação, para cada cena"]
+        direction TB
         S1["Atividade dos objetos"]
         S2["Animações e deformação"]
         S3["Cutscene"]
@@ -129,7 +131,8 @@ flowchart TB
         S7["Atualiza hierarquia (UpdateParents)"]
         S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
     end
-    subgraph RD["KX_RenderPipeline::Render()"]
+    subgraph RD["3 · KX_RenderPipeline::Render()"]
+        direction TB
         R1["BeginFrame"]
         R2["Sombras (KX_ShadowRenderer)"]
         R3["Render-to-texture"]
@@ -138,8 +141,8 @@ flowchart TB
         R6["EndFrame: ImGui, debug, troca de buffers"]
         R1 --> R2 --> R3 --> R4 --> R5 --> R6
     end
-    N2 -.-> SIM
-    NF -->|"m_doRender"| RD
+    NF -.->|"passo 2 chama"| SIM
+    SIM -->|"depois do NextFrame,<br/>se m_doRender"| RD
 ```
 
 **Legenda.** `NextFrame()` sempre roda a simulação; o render só acontece quando `m_doRender` é verdadeiro
