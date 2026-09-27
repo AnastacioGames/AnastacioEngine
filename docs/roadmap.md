@@ -105,7 +105,12 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   corrigido (0.4.2) e testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
-  CUDA no Windows (CUDA 13.4, sm_120) testado pela interface (2026-09-26). Falta: OpenCL numa GPU AMD. OSL fica desligado (sem pacote no Ubuntu
+  CUDA no Windows (CUDA 13.4, sm_120) testado pela interface, render e bake (2026-09-26).
+  Falta (na maquina AMD): testar OpenCL no Windows e no Linux. Roteiro: Preferences > System > Cycles
+  Compute Device = OpenCL, marcar a GPU AMD; Render Device = GPU Compute; renderizar a cena padrao e fazer
+  bake de AO (chao sob cubo) comparando com a CPU. O primeiro uso compila o kernel OpenCL e pode demorar
+  varios minutos. Decisao aberta: compilar cubins tambem para sm_75/sm_86/sm_89 (RTX 20/30/40); hoje so
+  sm_120, e outras NVIDIA ficam sem GPU no Cycles do release. OSL fica desligado (sem pacote no Ubuntu
   24.04; exige OSL 1.9 com LLVM antigo).
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
   do editor para OpenColorIO 2.x/FFmpeg 5+ (desligados no preset `linux-editor`; só o wrapper `audaspace` do

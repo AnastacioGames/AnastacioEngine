@@ -20,6 +20,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Teste: `RangeEngine -b` renderiza a cena padrao na RTX 5060 com os kernels pre-compilados (512 amostras,
   7,1 s).
 - Usuario confirmou render com GPU (CUDA) pela interface do editor.
+- Bake de AO (chao sob cubo) com CUDA: mesmos valores da CPU (min/max/media), 0,86 s contra 1,80 s.
+- Addons `ant_landscape` e `io_export_after_effects`: `is <numero>` trocado por `==` (SyntaxWarning no Python 3.11).
 
 ## 2026-09-26 - Linux: pacote testado em maquina limpa
 
