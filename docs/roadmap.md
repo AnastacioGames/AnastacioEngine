@@ -102,7 +102,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   RPL-P, OpenGL 4.6) e renderiza sem erros. Teste feito na própria máquina de build. **Máquina limpa testada em
   2026-09-26** (container Ubuntu 24.04 mínimo): o 0.4.1 não acha a stdlib do Python fora da máquina de build;
   `package-runtime.sh` corrigido e o editor renderiza com Cycles no container. Release `v0.4.2` corrigido
-  publicado em 2026-09-26 (editor + runtime). Falta: testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
+  publicado em 2026-09-26 (editor + runtime); `v0.4.3` Linux publicado em 2026-09-27. Falta: testar a janela num desktop limpo. Lista de pacotes de runtime em `linux-build.md`.
 - **Cycles no editor Linux**: ligado no preset `linux-editor` com Embree 4, CUDA e OpenCL; CPU testada pela
   interface (com e sem Embree) e CUDA (RTX 5060, sm_120, CUDA 13.0) testada pela interface (2026-09-26).
   CUDA no Windows (CUDA 13.4, sm_120) testado pela interface, render e bake (2026-09-26).
