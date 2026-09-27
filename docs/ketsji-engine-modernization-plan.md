@@ -18,7 +18,7 @@ mudança: cada plano precisa ser compilado, testado e medido isoladamente.
   autorizada, iniciada ou concluída.
 - O `docs/roadmap.md` continua sendo a fonte do trabalho atualmente aberto.
 - Em 2026-09-06, os Planos 6-9 foram refinados com terminologia e requisitos de
-  [`render-simulation-separation-report.md`](render-simulation-separation-report.md)
+  um relatório externo, `render-simulation-separation-report.md`, que não foi versionado
   (parecer técnico cruzado com `KX_KetsjiEngine`/`KX_Scene`, sem alterar o
   código nem autorizar novas fases).
 - Cada achado do Plano 1A deve ser reconfirmado imediatamente antes da correção,

@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-26 - Docs: checagem automatica e guia para contribuir
+
+- `tools/check_docs.py`: confere links locais, referencias `arquivo:linha` (arquivo existe e tem a linha) e os
+  mapas de codigo (metodo ainda perto da linha citada, tamanho do arquivo). Sai com 1 em erro; `--fix` grava
+  linhas, tamanhos e o `HEAD` conferido nos mapas. Na primeira rodada achou 1 link quebrado
+  (`ketsji-engine-modernization-plan.md` apontava para um relatorio externo nunca versionado) e 5 tamanhos
+  com 1 linha a mais (o script antigo contava a linha vazia final).
+- `CONTRIBUTING.md` e `.github/ISSUE_TEMPLATE/bug_report.yml`: o modelo de bug pede versao, sistema, placa de
+  video/driver e dispositivo do Cycles.
+
 ## 2026-09-26 - Docs: arquitetura atualizada para o estado atual
 
 - `architecture.md`: mapa do repositório, loop Web (`emscripten_set_main_loop_arg`), caminho editor → `.blend`

@@ -35,7 +35,8 @@ na inicialização do aplicativo devido à configuração lado a lado incorreta"
 Windows, mesmo com os DLLs presentes no diretório. `ucrtbase.dll` fica fora da pasta `blender.crt/`, solto
 junto do `.exe` (não pode entrar no manifesto — ver comentário em `platform_win32_bundle_crt.cmake`).
 Antes de publicar, valide em uma máquina sem o Visual Studio ou em uma instalação limpa, extraindo o ZIP
-de fato (não apenas rodando a partir de `build/bin/`).
+de fato (não apenas rodando a partir de `build/bin/`). Rode também `python tools/check_docs.py` (e `--fix` se
+os mapas de código envelheceram), para a documentação do release bater com o código.
 
 No GitHub, mantenha o código-fonte no repositório e anexe o ZIP à Release como
 `AnastacioEngine-0.1-windows-x64.zip`. O diretório de build permanece ignorado pelo Git.

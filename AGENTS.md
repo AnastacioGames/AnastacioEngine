@@ -80,7 +80,7 @@ antes de começar:
   está em `docs/changelog/`. Não leia o histórico inteiro: use
   `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`. Novas entradas vão no topo de
   `docs/changelog.md`.
-- `docs/code-map-*.md` — mapas de navegação dos arquivos grandes do gameengine (onde fica cada domínio), para não ler o arquivo inteiro.
+- `docs/code-map-*.md` — mapas de navegação dos arquivos grandes do gameengine (onde fica cada domínio), para não ler o arquivo inteiro. Depois de mudar código ou docs, `python tools/check_docs.py` diz se algum link, referência `arquivo:linha` ou linha dos mapas envelheceu (`--fix` corrige os mapas).
 
 Antes de propor "vamos implementar X", confira o roadmap e o relatório; consulte no changelog apenas o
 histórico relevante. Depois de implementar, atualize o estado vigente e acrescente o registro histórico sem

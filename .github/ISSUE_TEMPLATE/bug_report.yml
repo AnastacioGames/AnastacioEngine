@@ -1,0 +1,105 @@
+name: Relatório de bug
+description: Algo não funciona como deveria na engine, no player ou no export.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar. Quanto mais dados, mais rápido dá para reproduzir.
+        You can also write in English, Español or Русский.
+
+  - type: input
+    id: versao
+    attributes:
+      label: Versão da engine
+      description: Aparece no splash (Help > Splash Screen). Se compilou do código, informe o commit.
+      placeholder: "0.4.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux (informe a distro abaixo)
+        - Web (informe o navegador abaixo)
+        - Android
+    validations:
+      required: true
+
+  - type: input
+    id: sistema_detalhe
+    attributes:
+      label: Distro, navegador ou aparelho
+      description: Só se escolheu Linux, Web ou Android.
+      placeholder: "Ubuntu 24.04 / Chrome 140 / Galaxy S21"
+
+  - type: input
+    id: gpu
+    attributes:
+      label: Placa de vídeo e versão do driver
+      description: No Windows, veja no Gerenciador de Dispositivos ou no app da NVIDIA/AMD. Notebook com duas placas? Informe as duas.
+      placeholder: "NVIDIA RTX 3060, driver 580.88 / AMD RX 6800M + Radeon integrada, Adrenalin 25.9.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: onde
+    attributes:
+      label: Onde acontece
+      multiple: true
+      options:
+        - Editor (RangeEngine)
+        - Jogo rodando no editor (Play)
+        - Player (RangeRuntime / jogo exportado)
+        - Render Cycles
+        - Export Web ou Android
+        - Não sei
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cycles
+    attributes:
+      label: Dispositivo do Cycles
+      description: Só se o problema for no render ou bake do Cycles (User Preferences > System > Cycles Compute Device).
+      options:
+        - Não uso Cycles neste problema
+        - CPU
+        - CUDA (NVIDIA)
+        - OpenCL (AMD)
+
+  - type: textarea
+    id: descricao
+    attributes:
+      label: O que aconteceu
+      description: E o que você esperava que acontecesse.
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Abrir o arquivo anexado
+        2. Apertar P
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Mensagens do console
+      description: No Windows, Window > Toggle System Console mostra o console. No Linux, rode pelo terminal. Cole as linhas de erro.
+      render: shell
+
+  - type: textarea
+    id: anexos
+    attributes:
+      label: Arquivo e imagens
+      description: Um .blend pequeno que reproduza o problema ajuda muito (compacte em .zip para anexar). Prints também.
