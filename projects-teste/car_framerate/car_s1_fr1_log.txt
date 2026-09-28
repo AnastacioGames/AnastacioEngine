@@ -1,0 +1,8 @@
+frame 0 pos (0.0, 0.0, 1.2) speed 0.00
+frame 60 pos (0.0, 0.0, 0.79) speed 0.16
+frame 120 pos (0.0, 2.93, 0.79) speed 6.03
+frame 180 pos (0.0, 11.86, 0.79) speed 11.91
+frame 240 pos (0.0, 26.56, 0.79) speed 17.56
+frame 300 pos (0.0, 46.79, 0.79) speed 22.99
+frame 360 pos (0.0, 72.34, 0.79) speed 28.19
+RESULT maxErr=0.0000 avgErr=0.0000 dist=72.34
