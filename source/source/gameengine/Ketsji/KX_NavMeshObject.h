@@ -62,6 +62,10 @@ protected:
 		mt::vec3 pos;
 	};
 	std::map<KX_GameObject *, NavObstacle> m_obstacleRefs;
+	/// Incremented when the navmesh is rebuilt or its tiles finish changing, so paths can be redone.
+	unsigned int m_version;
+	/// Obstacle requests were issued and the tiles aren't rebuilt yet.
+	bool m_tilesDirty;
 
 	void FreeNavMesh();
 	bool IsDynamicRequested();
@@ -93,6 +97,7 @@ public:
 	bool BuildNavMesh();
 	bool IsDynamic() const;
 	dtTileCache *GetTileCache() const;
+	unsigned int GetVersion() const;
 	/// Carves the obstacle objects into the dynamic navmesh and rebuilds the touched tiles.
 	void UpdateObstacles(const std::vector<KX_GameObject *>& obstacles);
 	dtNavMesh *GetNavMesh() const;

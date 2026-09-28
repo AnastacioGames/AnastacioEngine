@@ -63,6 +63,7 @@ KX_SteeringActuator::KX_SteeringActuator(SCA_IObject *gameobj, int mode, KX_Game
 	m_pathUpdatePeriod(pathUpdatePeriod),
 	m_lockzvel(lockzvel),
 	m_wayPointIdx(-1),
+	m_navmeshVersion(0),
 	m_steerVec(mt::zero3)
 {
 	m_navmesh = static_cast<KX_NavMeshObject *>(navmesh);
@@ -220,9 +221,11 @@ bool KX_SteeringActuator::Update(double curtime)
 
 				static const float WAYPOINT_RADIUS(0.25f);
 
-				if (m_pathUpdateTime < 0 || (m_pathUpdatePeriod >= 0 &&
-				                             curtime - m_pathUpdateTime > ((double)m_pathUpdatePeriod / 1000.0))) {
+				if (m_pathUpdateTime < 0 || m_navmesh->GetVersion() != m_navmeshVersion ||
+				    (m_pathUpdatePeriod >= 0 && curtime - m_pathUpdateTime > ((double)m_pathUpdatePeriod / 1000.0)))
+				{
 					m_pathUpdateTime = curtime;
+					m_navmeshVersion = m_navmesh->GetVersion();
 					m_path = m_navmesh->FindPath(mypos, targpos, MAX_PATH_LENGTH);
 					m_wayPointIdx = m_path.size() > 1 ? 1 : -1;
 				}

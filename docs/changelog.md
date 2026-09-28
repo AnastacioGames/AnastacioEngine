@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Navmesh dinâmica: Steering refaz o caminho quando a navmesh muda (passo 6)
+
+- `KX_NavMeshObject` tem um contador de versão: sobe ao reconstruir a navmesh e quando `dtTileCache::update`
+  termina de refazer os tiles depois de pedidos de obstáculo. `KX_SteeringActuator` (path following) refaz
+  `FindPath` quando a versão difere da do caminho atual, além do período de atualização.
+- Teste: agente com update period -1 indo de (-8,0) a (8,0); cilindro raio 3 aparece em (5,0) no frame 6.
+  Dinâmica: caminho passa de 17.86 (5 pontos) para 18.71 (7 pontos). Estática: fica em 17.34.
+
 ## 2026-09-28 - Navmesh dinâmica: obstáculos em runtime (passos 4-5)
 
 - Objetos com "Create Obstacle" abrem buracos nas navmeshes com `dynamic_navmesh`: cilindro com o raio do

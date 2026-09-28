@@ -64,6 +64,8 @@ class KX_SteeringActuator : public SCA_IActuator, public mt::SimdClassAllocator
 	double m_pathUpdateTime;
 	bool m_lockzvel;
 	int m_wayPointIdx;
+	/// Navmesh version the current path was found on, a changed dynamic navmesh redoes the path.
+	unsigned int m_navmeshVersion;
 	mt::mat3 m_parentlocalmat;
 	mt::vec3 m_steerVec;
 

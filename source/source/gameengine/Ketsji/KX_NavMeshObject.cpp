@@ -110,7 +110,9 @@ KX_NavMeshObject::KX_NavMeshObject(void *sgReplicationInfo, SG_Callbacks callbac
 	m_tileCache(nullptr),
 	m_tileAlloc(nullptr),
 	m_tileComp(nullptr),
-	m_tileMeshProc(nullptr)
+	m_tileMeshProc(nullptr),
+	m_version(0),
+	m_tilesDirty(false)
 {
 }
 
@@ -368,6 +370,8 @@ void KX_NavMeshObject::FreeNavMesh()
 	m_tileComp = nullptr;
 	m_tileMeshProc = nullptr;
 	m_obstacleRefs.clear();
+	m_tilesDirty = false;
+	++m_version;
 	m_dynamic = false;
 }
 
@@ -728,6 +732,7 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 		    dtStatusSucceed(m_tileCache->removeObstacle(it->second.ref)))
 		{
 			it = m_obstacleRefs.erase(it);
+			m_tilesDirty = true;
 		}
 		else {
 			++it;
@@ -750,6 +755,7 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 				continue;
 			}
 			m_obstacleRefs.erase(it);
+			m_tilesDirty = true;
 		}
 
 		// Cylinder from the bottom to the top of the object bounds.
@@ -768,10 +774,21 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 		dtObstacleRef ref;
 		if (dtStatusSucceed(m_tileCache->addObstacle(lpos, radius, height, &ref))) {
 			m_obstacleRefs[gameobj] = {ref, pos};
+			m_tilesDirty = true;
 		}
 	}
 
-	m_tileCache->update(0.0f, m_navMesh);
+	bool upToDate = false;
+	m_tileCache->update(0.0f, m_navMesh, &upToDate);
+	if (m_tilesDirty && upToDate) {
+		m_tilesDirty = false;
+		++m_version;
+	}
+}
+
+unsigned int KX_NavMeshObject::GetVersion() const
+{
+	return m_version;
 }
 
 bool KX_NavMeshObject::IsDynamic() const
