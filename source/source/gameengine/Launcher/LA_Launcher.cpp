@@ -230,7 +230,11 @@ void LA_Launcher::InitEngine()
 
 	m_canvas->SetSwapControl(swapControlTable[gm.vsync]);
 
-	m_canvas->SetSamples(m_samples);
+	// m_samples foi lido da cena antes do minimo acima (0 com "AA Samples: Off"). Com 0, o
+	// proximo UpdateOffScreens() (resize, setWindowSize/setFullScreen, escala dinamica) refaria
+	// o framebuffer sem MSAA, mas os materiais ja compilaram sem o dither: folhagem "Alpha Blend
+	// Hashed" vira silhueta solida (alpha test em U.glalphaclip ~0.004).
+	m_canvas->SetSamples((m_samples > 1) ? m_samples : AAsamples);
 
 	// Create the inputdevices.
 	m_inputDevice = new DEV_InputDevice();

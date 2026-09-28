@@ -1027,7 +1027,7 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 		m_dynamicsWorld->stepSimulationRun();
 		CallbackTriggers();
 	}
-	m_dynamicsWorld->synchronizeMotionStates();
+	SynchronizeActiveMotionStates();
 	m_dynamicsWorld->clearForces();
 	ProcessFhSprings();
 
@@ -1047,6 +1047,23 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 	//}
 
 	//return true;
+}
+
+/* Replaces btDiscreteDynamicsWorld::synchronizeMotionStates() for ProceedDeltaTime. The modified
+ * stepSimulation() stores m_localTime = steps * substep (no remainder), so Bullet's motion state
+ * interpolation extrapolated the drawn transform (steps - 1) substeps ahead of the body whenever
+ * physics substeps > 1, while vehicle wheels (SyncWheels) use the real body transform: the wheels
+ * drifted off the chassis proportionally to speed unless "Use Frame Rate" was on. Publish the
+ * current body transform instead, for the same bodies Bullet would (active, dynamic, with state). */
+void CcdPhysicsEnvironment::SynchronizeActiveMotionStates()
+{
+	const btCollisionObjectArray& objects = m_dynamicsWorld->getCollisionObjectArray();
+	for (int i = 0; i < objects.size(); i++) {
+		btRigidBody *body = btRigidBody::upcast(objects[i]);
+		if (body && body->getMotionState() && !body->isStaticOrKinematicObject() && body->isActive()) {
+			body->getMotionState()->setWorldTransform(body->getWorldTransform());
+		}
+	}
 }
 
 void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval)

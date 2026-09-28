@@ -117,6 +117,7 @@ protected:
 	float m_contactBreakingThreshold;
 	//changed 3-20-2025
 	void ProcessFhSprings();
+	void SynchronizeActiveMotionStates();
 
 public:
 	CcdPhysicsEnvironment(PHY_SolverType solverType, bool useDbvtCulling);

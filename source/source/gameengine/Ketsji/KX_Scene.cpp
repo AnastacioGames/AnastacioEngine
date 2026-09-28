@@ -1996,7 +1996,13 @@ void KX_Scene::UpdateAnimPoseTask(TaskPool *pool, void *taskdata, int UNUSED(thr
 	KX_GameObject *gameobj = (KX_GameObject *)taskdata;
 
 	const bool needs_update = anim_needs_update(gameobj);
-	data->scene->m_animNeedsUpdateCache[gameobj] = needs_update;
+	// Never insert from a worker thread (operator[] could rehash while other tasks write): the entry
+	// was created on the main thread in UpdateAnimations(). A missing entry is a bug, not a new key.
+	std::unordered_map<KX_GameObject *, bool>::iterator it = data->scene->m_animNeedsUpdateCache.find(gameobj);
+	BLI_assert(it != data->scene->m_animNeedsUpdateCache.end());
+	if (it != data->scene->m_animNeedsUpdateCache.end()) {
+		it->second = needs_update;
+	}
 
 	// If the object is a culled armature, then we manage only the animation time and end of its animations.
 	gameobj->UpdateActionManager(curtime, needs_update);
@@ -2053,17 +2059,26 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 
 	// Pre-populate the needs_update cache on the main thread before dispatching: pass 1 (below) only
 	// ever assigns to existing keys from multiple threads, never inserts, so no rehash can race.
+	// GetDoAnimations() is NOT a pure getter: with setHalfAnimations() it toggles m_bDoAnimations on
+	// every call. It must be evaluated exactly once per object per update, and the same result used both
+	// to create the cache entry and to dispatch the task. Calling it twice (once per loop) returned false
+	// then true for half-animated objects, so their tasks inserted into the unordered_map from worker
+	// threads, racing a rehash; the corrupted map then fed garbage/duplicate objects to the deform pass
+	// (concurrent ApplyPose -> BKE_pose_where_is -> iksolver on the same pose: crash).
 	m_animNeedsUpdateCache.clear();
+	std::vector<KX_GameObject *> poseTasks;
+	poseTasks.reserve(m_animatedlist.size());
 	for (KX_GameObject *gameobj : m_animatedlist) {
 		if (!gameobj->IsActionsSuspended() && gameobj->GetDoAnimations()) {
-			m_animNeedsUpdateCache[gameobj] = false;
+			// emplace() ignores duplicates, so one object never gets two concurrent pose tasks.
+			if (m_animNeedsUpdateCache.emplace(gameobj, false).second) {
+				poseTasks.push_back(gameobj);
+			}
 		}
 	}
 
-	for (KX_GameObject *gameobj : m_animatedlist) {
-		if (!gameobj->IsActionsSuspended() && gameobj->GetDoAnimations()) {
-			BLI_task_pool_push(m_animationPool, UpdateAnimPoseTask, gameobj, false, TASK_PRIORITY_LOW);
-		}
+	for (KX_GameObject *gameobj : poseTasks) {
+		BLI_task_pool_push(m_animationPool, UpdateAnimPoseTask, gameobj, false, TASK_PRIORITY_LOW);
 	}
 
 	BLI_task_pool_work_and_wait(m_animationPool);

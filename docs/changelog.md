@@ -9,6 +9,49 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Bugs do Discord (Kitsuy): crash com setHalfAnimations, folhagem branca/preta e rodas do carro
+
+- **Crash no skinning CPU/IK com `setHalfAnimations(1)`** (backtrace Linux em `ApplyPose` → `iksolver`).
+  `KX_GameObject::GetDoAnimations()` alterna `m_bDoAnimations` a cada chamada quando half animations está
+  ligado, e `KX_Scene::UpdateAnimations` chamava duas vezes por objeto: a primeira não criava a entrada em
+  `m_animNeedsUpdateCache`, a segunda disparava a `UpdateAnimPoseTask` mesmo assim, e a task inseria no
+  `unordered_map` a partir das threads do pool (rehash concorrente, mapa corrompido, deform com objeto
+  inválido/duplicado). Agora uma chamada por objeto decide cache e task; a task só atualiza entrada existente.
+  Efeito colateral: `setHalfAnimations(1)` passa a de fato animar em quadros alternados (antes a dupla
+  alternância anulava o efeito).
+- Validado com `projects-teste/halfanim_crash` (gerador `gen_halfanim_crash.py`: 150 rigs com IK, skinning CPU,
+  spawnados nos 5 primeiros quadros com half animations): código antigo sai com código 11 no quadro 0 em
+  todas as execuções; corrigido roda 600 quadros sem crash (3/3) e as malhas deformam na tela.
+- **Folhagem "Alpha Blend Hashed" branca/preta dependendo do arquivo aberto primeiro** (menu → nível).
+  Launcher e conversor forçam `gm.aasamples >= 4`, então esses materiais compilam sem o dither, mas o canvas
+  podia ficar sem MSAA: `LA_Launcher` passava o `m_samples` lido antes do mínimo (0) para `SetSamples`, e
+  `Range.render.setAntiAliasing(0)` (o menu ImGui do template aplica 0 por padrão) derrubava o MSAA para os
+  níveis carregados depois. Sem MSAA, o alpha-to-coverage some e sobra o alpha test em ~0.004.
+  - `LA_Launcher::InitEngine` usa o mínimo calculado quando `m_samples <= 1`.
+  - `setAntiAliasing(level <= 1)` vira 4 (**mudança de API**: AA "desligado" não desliga mais o MSAA).
+  - `StartKetsjiShell` restaura o `gm.aasamples` de cada cena ao sair do jogo embutido, para o viewport não
+    recompilar os materiais sem dither e o valor forçado não ir para o `.blend`.
+  - Validado na tela com `projects-teste/foliage_aa` (planos Hashed com alpha em degradê): sem a correção,
+    `setAntiAliasing(0)` no próprio nível deixa as folhas como blocos brancos sólidos (aa=0); com a correção
+    aparece o degradê (aa=4). O menu chamando `setAntiAliasing(0)` antes de `startGame` **não** reproduz: o
+    nível abre com o motor reiniciado e aa=4. O caso do Kitsuy deve ser o AA 0 aplicado no mesmo motor (script
+    de opções no nível ou LibLoad); sem o arquivo dele, não confirmado. O granulado preto no terreno pode ser
+    a sombra com dither, que depende do mesmo MSAA (hipótese).
+- **Carro só funcionava com "Use Frame Rate"** (física). A flag só escolhe entre `ProceedDeltaTimeCar` (ligada)
+  e `ProceedDeltaTime` (desligada). O `stepSimulation` modificado do Bullet guarda `m_localTime = passos *
+  substep`, então o `synchronizeMotionStates` do Bullet desenhava cada corpo `(passos - 1)` substeps à frente
+  da física quando `physics_step_sub > 1`, enquanto as rodas (`SyncWheels`) usam o transform real: rodas
+  descoladas do chassi proporcional à velocidade (0,31 m a 28 m/s com 3 substeps). `ProceedDeltaTime` agora
+  publica o transform atual dos corpos ativos (`SynchronizeActiveMotionStates`); com 1 substep nada muda.
+- No modo "Use Frame Rate", `CcdPhysicsController::SynchronizeMotionStates` escrevia o transform do centro de
+  massa direto no objeto e ignorava o `vehicle_com_offset`: chassi desenhado deslocado pelo offset. Agora passa
+  pelo `BlenderBulletMotionState`, que compensa.
+- Teste `projects-teste/car_framerate` (carro de 4 rodas, 300 quadros acelerando; mede o offset local das rodas
+  no chassi desenhado): antes, 3 substeps sem Use Frame Rate dava erro máx. 0,31 m e offset 0,5 m dava 0,50 m
+  com Use Frame Rate; agora 0,0000 nos 6 casos, com trajetórias iguais nos dois modos.
+- Os substeps da cena só são aplicados quando ela tem World (`BL_BlenderDataConversion`, herdado do UPBGE).
+- `projects-teste/kitsuy_check.sh` gera e roda os três testes (crash, carro, folhagem) para validar no Linux.
+
 ## 2026-09-28 - Lâmpadas: correções de bugs (Hemi, Spot 180°, falloff quadrático)
 
 - Hemi não cria mais buffer de sombra: ele não tinha projeção (`gpu_lamp_calc_winmat` ignora Hemi) e custava uma

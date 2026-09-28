@@ -38,6 +38,9 @@
 #include "KX_PythonInit.h"
 #include "KX_Globals.h"
 
+#include <utility>
+#include <vector>
+
 #include "GHOST_ISystem.h"
 
 #include "LA_BlenderLauncher.h"
@@ -117,6 +120,14 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 	GlobalSettings gs, gsBackup;
 	gs.glslflag = startscene->gm.flag;
 	gsBackup.glslflag = startscene->gm.flag;
+
+	/* LA_Launcher e BL_Converter forcam gm.aasamples >= 4 nas cenas que o jogo converte. Sem
+	 * restaurar, o viewport recompila os materiais "Alpha Blend Hashed" sem o dither e, sem MSAA,
+	 * a folhagem aparece como silhueta branca/preta depois do play (e o valor iria para o .blend). */
+	std::vector<std::pair<Scene *, short> > aasamplesBackup;
+	for (Scene *sce = (Scene *)maggie1->scene.first; sce; sce = (Scene *)sce->id.next) {
+		aasamplesBackup.emplace_back(sce, sce->gm.aasamples);
+	}
 
 	do {
 		// if we got an exitcode 3 (KX_ExitInfo::START_OTHER_GAME) load a different file
@@ -237,6 +248,9 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 
 	// Restore GLSL settings
 	startscene->gm.flag = gsBackup.glslflag;
+	for (const std::pair<Scene *, short>& backup : aasamplesBackup) {
+		backup.first->gm.aasamples = backup.second;
+	}
 	GPU_materials_free(G.main);
 
 	// Restore cursor.

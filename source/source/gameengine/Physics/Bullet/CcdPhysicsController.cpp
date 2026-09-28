@@ -829,6 +829,14 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 
 	if (body && !body->isStaticObject()) {
 		const btTransform& xform = body->getCenterOfMassTransform();
+		if (m_bulletMotionState) {
+			// Goes through BlenderBulletMotionState so the vehicle_com_offset compensation applies;
+			// writing the COM transform directly drew the chassis shifted by the offset.
+			m_bulletMotionState->setWorldTransform(xform);
+			const mt::vec3& scale = m_MotionState->GetWorldScaling();
+			GetCollisionShape()->setLocalScaling(ToBullet(scale));
+			return true;
+		}
 		const btMatrix3x3& worldOri = xform.getBasis();
 		const btVector3& worldPos = xform.getOrigin();
 		m_MotionState->SetWorldOrientation(ToMt(worldOri));
