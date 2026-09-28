@@ -49,6 +49,7 @@ base class --- :class:`KX_GameObject`
    .. method:: draw(mode)
 
       Draws a debug mesh for the navigation mesh.
+      On a dynamic navigation mesh, the obstacle cylinders are drawn in yellow.
 
       :arg mode: the drawing mode (one of :ref:`these constants <navmesh-draw-mode>`)
       :arg mode: integer

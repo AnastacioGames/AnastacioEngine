@@ -836,6 +836,37 @@ void KX_NavMeshObject::DrawNavMesh(NavMeshRenderMode renderMode) const
 	const mt::vec4 color(0.0f, 0.0f, 0.0f, 1.0f);
 	const dtNavMesh *navMesh = m_navMesh;
 
+	// Obstacle cylinders carving the dynamic navmesh, the carved hole also includes the agent radius.
+	if (m_tileCache) {
+		const mt::vec4 obstacleColor(1.0f, 0.8f, 0.0f, 1.0f);
+		const int segments = 16;
+		for (const std::pair<KX_GameObject * const, NavObstacle>& item : m_obstacleRefs) {
+			const dtTileCacheObstacle *ob = m_tileCache->getObstacleByRef(item.second.ref);
+			if (!ob || ob->type != DT_OBSTACLE_CYLINDER) {
+				continue;
+			}
+			const dtObstacleCylinder& cyl = ob->cylinder;
+			mt::vec3 prevBottom, prevTop;
+			for (int i = 0; i <= segments; ++i) {
+				const float angle = 2.0f * (float)M_PI * i / segments;
+				float lpos[3] = {cyl.pos[0] + cyl.radius * cosf(angle), cyl.pos[1], cyl.pos[2] + cyl.radius * sinf(angle)};
+				flipAxes(lpos);
+				const mt::vec3 bottom = TransformToWorldCoords(mt::vec3(lpos));
+				lpos[2] += cyl.height;
+				const mt::vec3 top = TransformToWorldCoords(mt::vec3(lpos));
+				if (i > 0) {
+					KX_RasterizerDrawDebugLine(prevBottom, bottom, obstacleColor);
+					KX_RasterizerDrawDebugLine(prevTop, top, obstacleColor);
+				}
+				if (i % (segments / 4) == 0) {
+					KX_RasterizerDrawDebugLine(bottom, top, obstacleColor);
+				}
+				prevBottom = bottom;
+				prevTop = top;
+			}
+		}
+	}
+
 	switch (renderMode) {
 		case RM_POLYS:
 		case RM_WALLS:

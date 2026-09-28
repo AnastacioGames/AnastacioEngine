@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Navmesh dinâmica: debug visual dos obstáculos
+
+- `KX_NavMeshObject::DrawNavMesh` (`nav.draw(mode)`) desenha em amarelo o cilindro de cada obstáculo da
+  navmesh dinâmica (círculos na base e no topo, 4 arestas verticais), lido do `dtTileCache`. O buraco na
+  navmesh é maior que o cilindro porque soma o raio do agente.
+
 ## 2026-09-28 - Navmesh dinâmica: API Python (passo 7)
 
 - `KX_NavMeshObject.dynamic` (navmesh em tiles ativa) e `.version` (sobe quando a navmesh muda), só leitura.
