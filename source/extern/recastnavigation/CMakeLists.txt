@@ -28,6 +28,7 @@ remove_cc_flag_unsigned_char()
 set(INC
 	Recast/Include
 	Detour/Include
+	DetourTileCache/Include
 )
 
 set(INC_SYS
@@ -56,6 +57,13 @@ set(SRC
 	Detour/Include/DetourNavMeshQuery.h
 	Detour/Include/DetourNode.h
 	Detour/Include/DetourStatus.h
+
+	DetourTileCache/Source/DetourTileCache.cpp
+	DetourTileCache/Source/DetourTileCacheBuilder.cpp
+
+	DetourTileCache/Include/DetourTileCache.h
+	DetourTileCache/Include/DetourTileCacheBuilder.h
+	DetourTileCache/Include/DetourTileCacheCompressorNone.h
 
 	Recast/Source/Recast.cpp
 	Recast/Source/RecastAlloc.cpp

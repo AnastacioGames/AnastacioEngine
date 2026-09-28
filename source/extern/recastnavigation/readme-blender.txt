@@ -16,4 +16,9 @@ dtStatNavMeshBuilder) to the current dtNavMesh/dtNavMeshQuery API. See
 docs/roadmap.md and docs/changelog.md for the port of recast-capi, KX_NavMeshObject
 and KX_SteeringActuator to the new API.
 
+2026-09-28: Added DetourTileCache/ (DetourTileCache and DetourTileCacheBuilder, unchanged)
+from upstream commit 9f4ce64458dfae86e1239c525ddc219c4e9e06f1, for the dynamic navmesh
+(obstacles). DetourTileCache/Include/DetourTileCacheCompressorNone.h is a Range addition:
+a passthrough compressor, so no fastlz dependency is needed.
+
 ~rdb
