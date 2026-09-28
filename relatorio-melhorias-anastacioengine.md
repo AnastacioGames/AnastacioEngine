@@ -63,8 +63,9 @@ ferramenta correspondente.
 ### Iluminação e renderização
 
 - O caminho usado pelo `RangeRuntime` foi migrado para OpenGL core profile, mantendo o editor em
-  compatibility profile. Os no-ops aceitos no core são motion blur legado, clipping de espelho/água e
-  texto de debug baseado em `BLF_draw`.
+  compatibility profile. Os no-ops aceitos no core são motion blur legado e texto de debug baseado
+  em `BLF_draw`. O corte de espelho/água (`KX_PlanarMap`) usa projeção oblíqua e funciona em compat, core e
+  WebGL2. A textura Realtime Planar precisa de uma imagem associada, senão não renderiza.
 - CSM para luzes Sun usa três cascatas ajustadas ao frustum e considera os bounds dos casters no recorte Z.
   O bug de sombra estática ausente no ângulo inicial foi corrigido e confirmado visualmente.
 - Novas Lamps já nascem com o preset de sombras para Sun: mapa Simple com filtro PCF, 1024 px na cascata

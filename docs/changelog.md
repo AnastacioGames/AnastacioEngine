@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Espelho/água: corte do plano com projeção oblíqua
+
+- `KX_PlanarMap::BeginRenderFace` troca o `glClipPlane` (no-op no core e no WebGL2) por projeção oblíqua
+  (Lengyel): o near plane vira o plano do espelho/água, sem mudar shader e sem `discard` (preserva early-z).
+  `EndRenderFace` restaura a projeção e o modo MODELVIEW.
+- A textura Environment Map Realtime Planar só funciona com uma imagem associada (`BL_Texture` cria o
+  `m_gpuTex` a partir dela).
+- Validado na tela pelo usuário no `RangeRuntime` Windows e no build Web (cena `projects-teste/planar`):
+  espelho mostra só o que está acima do plano, água só o que está abaixo.
+
 ## 2026-09-28 - Navmesh dinâmica: debug visual dos obstáculos
 
 - `KX_NavMeshObject::DrawNavMesh` (`nav.draw(mode)`) desenha em amarelo o cilindro de cada obstáculo da

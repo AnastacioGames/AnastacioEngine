@@ -144,10 +144,30 @@ void KX_PlanarMap::BeginRenderFace(RAS_Rasterizer *rasty)
 
 	if (m_type == REFLECTION) {
 		rasty->SetInvertFrontFace(true);
-		rasty->EnableClipPlane(0, m_clipPlane);
 	}
-	else {
-		rasty->EnableClipPlane(0, -m_clipPlane);
+
+	/* Clip what is behind the mirror/water with an oblique near plane (Lengyel, "Oblique
+	 * View Frustum Depth Projection and Clipping") instead of glClipPlane: core profile and
+	 * WebGL2 have no fixed-function clip planes, and a per-fragment discard in every
+	 * material would disable early depth test. SetupCamera() already guarantees the
+	 * render camera is on the negative side of the plane. */
+	const mt::vec4 worldPlane = (m_type == REFLECTION) ? m_clipPlane : -m_clipPlane;
+	const mt::vec4 plane = rasty->GetViewInvMatrix().Transpose() * worldPlane;
+
+	m_savedProjection = rasty->GetProjectionMatrix();
+	mt::mat4 projection = m_savedProjection;
+
+	const mt::vec4 corner(plane.x < 0.0f ? -1.0f : 1.0f, plane.y < 0.0f ? -1.0f : 1.0f, 1.0f, 1.0f);
+	const mt::vec4 q = projection.Inverse() * corner;
+	const float dot = mt::vec4::DotProduct(plane, q);
+	if (dot != 0.0f) {
+		const mt::vec4 c = plane * (2.0f / dot);
+		for (unsigned short i = 0; i < 4; ++i) {
+			projection(2, i) = c[i] - projection(3, i);
+		}
+		rasty->SetProjectionMatrix(projection);
+		// SetProjectionMatrix() leaves the projection stack current; the view is already loaded.
+		rasty->SetMatrixMode(RAS_Rasterizer::RAS_MODELVIEW);
 	}
 }
 
@@ -156,7 +176,8 @@ void KX_PlanarMap::EndRenderFace(RAS_Rasterizer *rasty)
 	if (m_type == REFLECTION) {
 		rasty->SetInvertFrontFace(false);
 	}
-	rasty->DisableClipPlane(0);
+	rasty->SetProjectionMatrix(m_savedProjection);
+	rasty->SetMatrixMode(RAS_Rasterizer::RAS_MODELVIEW);
 
 	KX_TextureRenderer::EndRenderFace(rasty);
 }

@@ -40,6 +40,8 @@ private:
 	mt::vec3 m_normal;
 	/// Clip plane equation values.
 	mt::vec4 m_clipPlane;
+	/// Projection active before BeginRenderFace() replaced it by the oblique one.
+	mt::mat4 m_savedProjection;
 
 	std::unordered_map<KX_Camera *, mt::mat4> m_projections;
 

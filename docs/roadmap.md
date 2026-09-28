@@ -275,8 +275,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
-- Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado, clipping de
-  espelho/água e texto de debug via `BLF_draw`.
+- Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado e texto de
+  debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).
 
 ## Validações manuais pendentes
 
