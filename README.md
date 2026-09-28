@@ -23,9 +23,8 @@ Para rodar um jogo exportado, use `RangeRuntime`. No Linux, as bibliotecas de si
 
 ## Novidades da 0.4.3
 
-Splash novo com os ícones das plataformas, addons sem avisos do Python 3.11 e correção do loop de tempo
-(Fixed Timestep fora da interface, v-sync sem atraso falso). No Linux, o splash agora abre centralizado.
-O resto é igual à 0.4.2.
+Addons sem avisos do Python 3.11 e correção do loop de tempo (Fixed Timestep fora da interface, v-sync sem
+atraso falso). O resto é igual à 0.4.2.
 
 ## Novidades da 0.4.2
 
