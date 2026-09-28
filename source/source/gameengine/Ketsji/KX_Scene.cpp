@@ -1609,7 +1609,10 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		const int *viewport = KX_GetActiveEngine()->GetCanvas()->GetViewPort();
 		CullingInfo info(layer, objects, cam, is_shadowbuf);
 
-		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, m_dbvtOcclusionRes, viewport, matrix);
+		/* Occlusion culling only for the main camera: in shadow passes it cost ~14ms
+		 * (one software raster per light/cascade) and the camera's occluders don't apply to lights. */
+		const int occlusionRes = is_shadowbuf ? 0 : m_dbvtOcclusionRes;
+		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, occlusionRes, viewport, matrix);
 	}
 
 	int testedCount;

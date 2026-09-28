@@ -209,7 +209,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"
   era GPU/fill-rate). Proposta: não usar occlusion nas passadas de sombra (`is_shadowbuf`) em
-  `KX_Scene::CalculateVisibleMeshes`; câmera principal mantém. Aguardando aprovação + teste visual.
+  `KX_Scene::CalculateVisibleMeshes`; câmera principal mantém. Aplicada e compilada em 2026-09-28; falta o teste visual/FPS do usuário.
 - Avaliar folhagem e LOD na cena real; impostor e bake de atlas já existem, o resto pode ser trabalho de asset.
 - Navmesh dinâmica: hoje o navmesh é gerado uma vez (`mesh.navmesh_make`). Plano (2026-09-28), passos
   pequenos, cada um compilável e confirmado antes do próximo:
@@ -218,7 +218,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   2. Membros novos em `KX_NavMeshObject` (tile cache, alocador, compressor, `m_dynamic`), sem mudar
      comportamento.
   3. `BuildNavMeshTiled()` opt-in (property `dynamic_navmesh`), reconstruindo a partir dos polígonos do próprio
-     navmesh com parâmetros de `gm.recastData`; caminho estático intacto, sem DNA nova.
+     navmesh com parâmetros de `gm.recastData`; caminho estático intacto, sem DNA nova. Avisos ao usuário:
+     no painel (Python, `layout.label(icon='ERROR')`) quando `dynamic_navmesh` existe mas não é booleana,
+     quando o modo dinâmico está ligado sem navmesh gerada, e quando há obstáculo sem navmesh dinâmica na cena;
+     no console, ao iniciar o jogo, se o build dinâmico falhar e cair para o estático. Tooltip avisa que os
+     caminhos podem diferir levemente do estático.
   4. Obstáculos: objetos com `OB_HASOBSTACLE` (raio `obstacleRad`, altura da bbox); remover+adicionar ao mover;
      limpar ao destruir.
   5. `dtTileCache::update` por frame em `KX_Scene::LogicEndFrame`.
