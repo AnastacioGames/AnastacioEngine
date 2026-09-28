@@ -810,8 +810,11 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	SG_Node *replicanode = newobj->GetNode();
 
 	// Add the object in the obstacle simulation if needed.
-	if (m_obstacleSimulation && gameobj->GetBlenderObject()->gameflag & OB_HASOBSTACLE) {
-		m_obstacleSimulation->AddObstacleForObj(newobj);
+	if (gameobj->GetBlenderObject()->gameflag & OB_HASOBSTACLE) {
+		if (m_obstacleSimulation) {
+			m_obstacleSimulation->AddObstacleForObj(newobj);
+		}
+		AddNavMeshObstacle(newobj);
 	}
 	// Reconstruct nav mesh.
 	if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_NAVMESH) {
@@ -1394,6 +1397,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	if (m_obstacleSimulation) {
 		m_obstacleSimulation->DestroyObstacleForObj(gameobj);
 	}
+	m_navObstacles.erase(std::remove(m_navObstacles.begin(), m_navObstacles.end(), gameobj), m_navObstacles.end());
+	m_dynamicNavMeshes.erase(std::remove(m_dynamicNavMeshes.begin(), m_dynamicNavMeshes.end(), gameobj),
+	                         m_dynamicNavMeshes.end());
 
 	m_componentManager.UnregisterObject(gameobj);
 
@@ -2155,6 +2161,10 @@ void KX_Scene::LogicEndFrame()
 	//prepare obstacle simulation for new frame
 	if (m_obstacleSimulation) {
 		m_obstacleSimulation->UpdateObstacles();
+	}
+
+	for (KX_NavMeshObject *navmesh : m_dynamicNavMeshes) {
+		navmesh->UpdateObstacles(m_navObstacles);
 	}
 
 	for (KX_FontObject *font : m_fontlist) {
@@ -3030,6 +3040,20 @@ KX_CutsceneManager *KX_Scene::GetCutsceneManager()
 const KX_CutsceneManager *KX_Scene::GetCutsceneManager() const
 {
 	return m_cutsceneManager.get();
+}
+
+void KX_Scene::AddNavMeshObstacle(KX_GameObject *gameobj)
+{
+	if (std::find(m_navObstacles.begin(), m_navObstacles.end(), gameobj) == m_navObstacles.end()) {
+		m_navObstacles.push_back(gameobj);
+	}
+}
+
+void KX_Scene::AddDynamicNavMesh(KX_NavMeshObject *navmesh)
+{
+	if (std::find(m_dynamicNavMeshes.begin(), m_dynamicNavMeshes.end(), navmesh) == m_dynamicNavMeshes.end()) {
+		m_dynamicNavMeshes.push_back(navmesh);
+	}
 }
 
 void KX_Scene::SetObstacleSimulation(KX_ObstacleSimulation *obstacleSimulation)

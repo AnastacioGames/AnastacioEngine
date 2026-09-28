@@ -69,6 +69,7 @@ class KX_NetworkMessageScene;
 class KX_NetworkMessageManager;
 class KX_2DFilterManager;
 class KX_ObstacleSimulation;
+class KX_NavMeshObject;
 class KX_WorldInfo;
 class KX_Camera;
 class KX_FontObject;
@@ -337,6 +338,9 @@ private:
 	KX_2DFilterManager *m_filterManager;
 
 	KX_ObstacleSimulation *m_obstacleSimulation;
+	/// Objects with "Create Obstacle" and the navmeshes they carve (dynamic navmeshes only).
+	std::vector<KX_GameObject *> m_navObstacles;
+	std::vector<KX_NavMeshObject *> m_dynamicNavMeshes;
 	std::unique_ptr<KX_CutsceneManager> m_cutsceneManager;
 	/** Events crossed by the Cutscene clock, retained until the native action
 	 * dispatcher consumes them. Keeping this queue on the owning scene prevents
@@ -604,6 +608,8 @@ public:
 
 	KX_ObstacleSimulation *GetObstacleSimulation();
 	void SetObstacleSimulation(KX_ObstacleSimulation *obstacleSimulation);
+	void AddNavMeshObstacle(KX_GameObject *gameobj);
+	void AddDynamicNavMesh(KX_NavMeshObject *navmesh);
 
 	void SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneManager);
 	void StopCutscene();

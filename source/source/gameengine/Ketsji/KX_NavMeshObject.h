@@ -32,6 +32,8 @@
 #include "DetourNavMeshQuery.h"
 #include "KX_GameObject.h"
 
+#include <map>
+
 class dtTileCache;
 struct dtTileCacheAlloc;
 struct dtTileCacheCompressor;
@@ -52,6 +54,14 @@ protected:
 	dtTileCacheAlloc *m_tileAlloc;
 	dtTileCacheCompressor *m_tileComp;
 	dtTileCacheMeshProcess *m_tileMeshProc;
+
+	/// Tile cache obstacle of each obstacle object and the world position it was carved at.
+	struct NavObstacle
+	{
+		unsigned int ref;
+		mt::vec3 pos;
+	};
+	std::map<KX_GameObject *, NavObstacle> m_obstacleRefs;
 
 	void FreeNavMesh();
 	bool IsDynamicRequested();
@@ -83,6 +93,8 @@ public:
 	bool BuildNavMesh();
 	bool IsDynamic() const;
 	dtTileCache *GetTileCache() const;
+	/// Carves the obstacle objects into the dynamic navmesh and rebuilds the touched tiles.
+	void UpdateObstacles(const std::vector<KX_GameObject *>& obstacles);
 	dtNavMesh *GetNavMesh() const;
 	dtNavMeshQuery *GetNavMeshQuery() const;
 

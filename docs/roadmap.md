@@ -229,6 +229,12 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   4. Obstáculos: objetos com `OB_HASOBSTACLE` (raio `obstacleRad`, altura da bbox); remover+adicionar ao mover;
      limpar ao destruir.
   5. `dtTileCache::update` por frame em `KX_Scene::LogicEndFrame`.
+  Passos 4-5 feitos em 2026-09-28: `KX_Scene` guarda os objetos com "Create Obstacle" (mesmo sem Obstacle
+  Simulation) e as navmeshes dinâmicas; `LogicEndFrame` chama `KX_NavMeshObject::UpdateObstacles` (cilindro
+  com raio `obstacleRad` e altura da bbox; remove+adiciona ao mover mais de 0.1; remove ao destruir). Painel
+  Create Obstacle avisa quando não há navmesh dinâmica na cena. Teste: cilindro no caminho aumenta a rota
+  (17.89 → 18.75) e ela volta ao original quando o obstáculo sai. Segmentos de borda da Obstacle Simulation
+  continuam os do build inicial.
   6. `KX_SteeringActuator` refaz `findPath` quando o navmesh mudar (contador de versão).
   7. Python (`dynamic`, `rebuild()`, `addObstacle`/`removeObstacle`) + docs. DetourCrowd fica para depois.
   Riscos: perda de precisão nas bordas, atraso de alguns frames, ponteiros de objetos destruídos.

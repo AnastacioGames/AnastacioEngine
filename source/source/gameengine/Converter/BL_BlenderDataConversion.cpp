@@ -2284,6 +2284,13 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		}
 	}
 
+	// Obstacles carving dynamic navmeshes, independent of the obstacle simulation.
+	for (KX_GameObject *gameobj : objectlist) {
+		if (gameobj->GetBlenderObject()->gameflag & OB_HASOBSTACLE) {
+			kxscene->AddNavMeshObstacle(gameobj);
+		}
+	}
+
 	// Process navigation mesh objects.
 	for (KX_GameObject *gameobj : objectlist) {
 		Object *blenderobject = gameobj->GetBlenderObject();

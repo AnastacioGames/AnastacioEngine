@@ -367,6 +367,7 @@ void KX_NavMeshObject::FreeNavMesh()
 	m_tileAlloc = nullptr;
 	m_tileComp = nullptr;
 	m_tileMeshProc = nullptr;
+	m_obstacleRefs.clear();
 	m_dynamic = false;
 }
 
@@ -536,6 +537,7 @@ bool KX_NavMeshObject::BuildNavMeshTiled()
 	}
 
 	m_dynamic = true;
+	GetScene()->AddDynamicNavMesh(this);
 	return true;
 }
 
@@ -711,6 +713,65 @@ bool KX_NavMeshObject::BuildNavMesh()
   }
 
 	return true;
+}
+
+void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obstacles)
+{
+	if (!m_tileCache) {
+		return;
+	}
+
+	/* The tile cache takes a limited number of requests per update, a failed request is retried
+	 * on the next frame. */
+	for (std::map<KX_GameObject *, NavObstacle>::iterator it = m_obstacleRefs.begin(); it != m_obstacleRefs.end(); ) {
+		if (std::find(obstacles.begin(), obstacles.end(), it->first) == obstacles.end() &&
+		    dtStatusSucceed(m_tileCache->removeObstacle(it->second.ref)))
+		{
+			it = m_obstacleRefs.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+
+	const mt::vec3 navScale = NodeGetWorldScaling();
+	for (KX_GameObject *gameobj : obstacles) {
+		if (gameobj == this) {
+			continue;
+		}
+
+		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
+		std::map<KX_GameObject *, NavObstacle>::iterator it = m_obstacleRefs.find(gameobj);
+		if (it != m_obstacleRefs.end()) {
+			// Small moves don't justify rebuilding the tiles.
+			if ((it->second.pos - pos).LengthSquared() < 0.01f ||
+			    dtStatusFailed(m_tileCache->removeObstacle(it->second.ref)))
+			{
+				continue;
+			}
+			m_obstacleRefs.erase(it);
+		}
+
+		// Cylinder from the bottom to the top of the object bounds.
+		mt::vec3 aabbMin, aabbMax;
+		gameobj->GetBoundsAabb(aabbMin, aabbMax);
+		const mt::vec3 scale = gameobj->NodeGetWorldScaling();
+		const float bottom = pos.z + std::min(aabbMin.z * scale.z, 0.0f);
+		const float top = pos.z + std::max(aabbMax.z * scale.z, 0.0f);
+
+		mt::vec3 local = TransformToLocalCoords(mt::vec3(pos.x, pos.y, bottom));
+		flipAxes(local);
+		const float lpos[3] = {local.x, local.y, local.z};
+		const float radius = gameobj->GetBlenderObject()->obstacleRad / std::max(navScale.x, 1e-6f);
+		const float height = std::max(top - bottom, 0.01f) / std::max(navScale.z, 1e-6f);
+
+		dtObstacleRef ref;
+		if (dtStatusSucceed(m_tileCache->addObstacle(lpos, radius, height, &ref))) {
+			m_obstacleRefs[gameobj] = {ref, pos};
+		}
+	}
+
+	m_tileCache->update(0.0f, m_navMesh);
 }
 
 bool KX_NavMeshObject::IsDynamic() const

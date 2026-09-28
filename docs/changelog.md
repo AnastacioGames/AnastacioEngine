@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Navmesh dinâmica: obstáculos em runtime (passos 4-5)
+
+- Objetos com "Create Obstacle" abrem buracos nas navmeshes com `dynamic_navmesh`: cilindro com o raio do
+  obstáculo e a altura da bbox, em coordenadas locais da navmesh. Mover mais de 0.1 refaz o obstáculo; destruir
+  o objeto remove. Independe da Obstacle Simulation da cena.
+- `KX_Scene::LogicEndFrame` sincroniza os obstáculos e chama `dtTileCache::update`; pedidos recusados (fila
+  cheia) são repetidos no frame seguinte.
+- Painel Create Obstacle: aviso quando a cena não tem navmesh dinâmica.
+- Teste: cilindro raio 3 no caminho horizontal leva a rota de 17.89 para 18.75; ao tirar o obstáculo volta a
+  17.89. Navmesh estática com obstáculo não muda. O Steering actuator ainda não refaz o caminho (passo 6).
+
 ## 2026-09-28 - Navmesh dinâmica: build em tiles opt-in (passos 2-3)
 
 - Property de jogo booleana `dynamic_navmesh` no objeto navmesh: `KX_NavMeshObject::BuildNavMeshTiled()`

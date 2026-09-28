@@ -542,6 +542,14 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
         row.prop(game, "obstacle_radius", text="Radius")
         row.label()
 
+        if game.use_obstacle_create:
+            def is_dynamic_navmesh(ob):
+                prop = ob.game.properties.get("dynamic_navmesh")
+                return ob.game.physics_type == 'NAVMESH' and prop is not None and prop.type == 'BOOL' and prop.value
+
+            if not any(is_dynamic_navmesh(ob) for ob in context.scene.objects):
+                layout.label(text="No dynamic navmesh in the scene: the navmesh won't be carved", icon='ERROR')
+
 
 class RenderButtonsPanel:
     bl_space_type = 'PROPERTIES'
