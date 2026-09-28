@@ -126,23 +126,7 @@ static void get_version_string(char *ver, const int max_length)
 
 static void get_version_string_splash_screen(char *ver, const int max_length)
 {
-  bool previewVer = RANGE_MINSUBVERSION < 100;
-  bool isPostRelease = RANGE_MINSUBVERSION > 100;
-
-  if (!isPostRelease) {
-	  if (previewVer) {
-		BLI_snprintf(ver, max_length, "AnastacioEngine 0.4.0 Preview %d", RANGE_MINSUBVERSION);
-	  }
-	  else {
-		BLI_snprintf(ver, max_length, "AnastacioEngine 0.4.0 Release");
-	  }
-  }
-  else {
-    // A and B Releases.
-    BLI_snprintf(ver,
-                 max_length,
-                 "AnastacioEngine 0.4.0 Release Candidate");
-  }
+  BLI_snprintf(ver, max_length, "AnastacioEngine " ANASTACIO_VERSION_STRING);
 }
 
 static void wm_block_splash_image_roundcorners_add(ImBuf *ibuf)

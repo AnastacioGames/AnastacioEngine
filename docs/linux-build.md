@@ -449,6 +449,12 @@ sudo apt install libboost-locale1.83.0 libembree4-4 libfftw3-single3 libfftw3-do
   libxrender1 libxxf86vm1
 ```
 
+Janela no container (2026-09-28, pacote de teste 0.4.4, Intel Mesa): com so os pacotes acima mais
+`libgl1-mesa-dri mesa-utils`, o `ldd` nao acusa nenhuma biblioteca faltando em `RangeEngine` e `RangeRuntime`.
+Para abrir janela, monte `/tmp/.X11-unix`, copie o `.Xauthority` e exporte `DISPLAY`. O runtime rodou as
+cenas do Kitsuy (600 quadros com `setHalfAnimations`; folhagem com AA 4) e saiu com codigo 0. O editor abriu
+e desenhou a interface inteira. Os unicos avisos foram de ALSA (sem placa de som no container) e gvfs.
+
 ## Testes do Cycles (GTest) no Linux
 
 Validado em 2026-09-26 (Ubuntu, OpenEXR 3.1): 10 binarios, 177/177 testes passando. Use um diretorio proprio

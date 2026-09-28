@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Versão do splash e do About; janela testada em Ubuntu limpo
+
+- O splash mostrava "AnastacioEngine 0.4.0 Release Candidate" (texto fixo, derivado de
+  `RANGE_MINSUBVERSION` = 113) e o About mostrava "0.4.1". Agora os dois mostram 0.4.4. O splash usa
+  `ANASTACIO_VERSION_STRING` em `BKE_blender_version.h`, e o About (`wm.py`) tem o mesmo número. Em cada
+  release, atualize esses dois lugares. Conferido com screenshot do editor no Linux.
+- Pacote de teste 0.4.4 num Ubuntu 24.04 limpo (container `unshare`, Intel Mesa): não falta nenhuma
+  biblioteca; runtime e editor abrem janela e as cenas do Kitsuy passam. Detalhes em `linux-build.md`.
+
 ## 2026-09-28 - Linux: bugs do Kitsuy validados (Intel, NVIDIA e sem GPU); crash GLX com vsync adaptativo
 
 `bash projects-teste/kitsuy_check.sh` rodado no Linux (X na Intel Raptor Lake, `prime-select on-demand`):
@@ -197,8 +206,8 @@ caso, sem derrubar o processo.
   `ui_popup_block_create` (`interface_region_popup.c`): popups `UI_BLOCK_BOUNDS_POPUP_CENTER` agora podem ser
   reconstruídos. Conferido com printf temporário: o splash é recentralizado para 1854x1131. O zip Windows
   0.4.3 não foi recompilado com este fix.
-- Pendente: o texto de versão do splash está fixo em "AnastacioEngine 0.4.0 Release Candidate"
-  (`get_version_string_splash_screen`), em todas as plataformas.
+- O texto de versão do splash estava fixo em "AnastacioEngine 0.4.0 Release Candidate". Isso foi resolvido
+  em 2026-09-28 (ver a entrada do topo).
 
 ## 2026-09-27 - Loop de tempo: teste automático e zip 0.4.3 atualizado
 
