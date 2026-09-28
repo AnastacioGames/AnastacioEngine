@@ -57,6 +57,7 @@ extern "C" {
 #include "DetourTileCacheCompressorNone.h"
 #include "EXP_BoolValue.h"
 #include "KX_ObstacleSimulation.h"
+#include "KX_Scene.h"
 
 #include "CM_Message.h"
 
@@ -719,7 +720,7 @@ bool KX_NavMeshObject::BuildNavMesh()
 	return true;
 }
 
-void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obstacles)
+void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_NavMeshObstacle>& obstacles)
 {
 	if (!m_tileCache) {
 		return;
@@ -728,7 +729,9 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 	/* The tile cache takes a limited number of requests per update, a failed request is retried
 	 * on the next frame. */
 	for (std::map<KX_GameObject *, NavObstacle>::iterator it = m_obstacleRefs.begin(); it != m_obstacleRefs.end(); ) {
-		if (std::find(obstacles.begin(), obstacles.end(), it->first) == obstacles.end() &&
+		KX_GameObject *gameobj = it->first;
+		if (std::none_of(obstacles.begin(), obstacles.end(),
+		                 [gameobj](const KX_NavMeshObstacle& obstacle) { return obstacle.object == gameobj; }) &&
 		    dtStatusSucceed(m_tileCache->removeObstacle(it->second.ref)))
 		{
 			it = m_obstacleRefs.erase(it);
@@ -740,16 +743,34 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 	}
 
 	const mt::vec3 navScale = NodeGetWorldScaling();
-	for (KX_GameObject *gameobj : obstacles) {
+	for (const KX_NavMeshObstacle& obstacle : obstacles) {
+		KX_GameObject *gameobj = obstacle.object;
 		if (gameobj == this) {
 			continue;
 		}
 
+		// Cylinder from the bottom to the top of the object bounds.
 		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
+		mt::vec3 aabbMin, aabbMax;
+		gameobj->GetBoundsAabb(aabbMin, aabbMax);
+		const mt::vec3 scale = gameobj->NodeGetWorldScaling();
+
+		/* Radius given by script, else the "Create Obstacle" radius, else the half size of the
+		 * object bounds. */
+		float worldRadius = obstacle.radius;
+		if (worldRadius <= 0.0f) {
+			worldRadius = gameobj->GetBlenderObject() ? gameobj->GetBlenderObject()->obstacleRad : 0.0f;
+		}
+		if (worldRadius <= 0.0f) {
+			worldRadius = std::max((aabbMax.x - aabbMin.x) * std::fabs(scale.x),
+			                       (aabbMax.y - aabbMin.y) * std::fabs(scale.y)) * 0.5f;
+		}
+		const float radius = std::max(worldRadius, 0.01f) / std::max(navScale.x, 1e-6f);
+
 		std::map<KX_GameObject *, NavObstacle>::iterator it = m_obstacleRefs.find(gameobj);
 		if (it != m_obstacleRefs.end()) {
 			// Small moves don't justify rebuilding the tiles.
-			if ((it->second.pos - pos).LengthSquared() < 0.01f ||
+			if (((it->second.pos - pos).LengthSquared() < 0.01f && it->second.radius == radius) ||
 			    dtStatusFailed(m_tileCache->removeObstacle(it->second.ref)))
 			{
 				continue;
@@ -758,22 +779,17 @@ void KX_NavMeshObject::UpdateObstacles(const std::vector<KX_GameObject *>& obsta
 			m_tilesDirty = true;
 		}
 
-		// Cylinder from the bottom to the top of the object bounds.
-		mt::vec3 aabbMin, aabbMax;
-		gameobj->GetBoundsAabb(aabbMin, aabbMax);
-		const mt::vec3 scale = gameobj->NodeGetWorldScaling();
 		const float bottom = pos.z + std::min(aabbMin.z * scale.z, 0.0f);
 		const float top = pos.z + std::max(aabbMax.z * scale.z, 0.0f);
 
 		mt::vec3 local = TransformToLocalCoords(mt::vec3(pos.x, pos.y, bottom));
 		flipAxes(local);
 		const float lpos[3] = {local.x, local.y, local.z};
-		const float radius = gameobj->GetBlenderObject()->obstacleRad / std::max(navScale.x, 1e-6f);
 		const float height = std::max(top - bottom, 0.01f) / std::max(navScale.z, 1e-6f);
 
 		dtObstacleRef ref;
 		if (dtStatusSucceed(m_tileCache->addObstacle(lpos, radius, height, &ref))) {
-			m_obstacleRefs[gameobj] = {ref, pos};
+			m_obstacleRefs[gameobj] = {ref, pos, radius};
 			m_tilesDirty = true;
 		}
 	}
@@ -1007,6 +1023,8 @@ PyTypeObject KX_NavMeshObject::Type = {
 };
 
 PyAttributeDef KX_NavMeshObject::Attributes[] = {
+	EXP_PYATTRIBUTE_RO_FUNCTION("dynamic", KX_NavMeshObject, pyattr_get_dynamic),
+	EXP_PYATTRIBUTE_RO_FUNCTION("version", KX_NavMeshObject, pyattr_get_version),
 	EXP_PYATTRIBUTE_NULL // Sentinel.
 };
 
@@ -1015,6 +1033,8 @@ PyMethodDef KX_NavMeshObject::Methods[] = {
 	EXP_PYMETHODTABLE(KX_NavMeshObject, raycast),
 	EXP_PYMETHODTABLE(KX_NavMeshObject, draw),
 	EXP_PYMETHODTABLE(KX_NavMeshObject, rebuild),
+	EXP_PYMETHODTABLE(KX_NavMeshObject, addObstacle),
+	EXP_PYMETHODTABLE_O(KX_NavMeshObject, removeObstacle),
 	{nullptr, nullptr} // Sentinel.
 };
 
@@ -1075,6 +1095,55 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_NavMeshObject, rebuild,
 {
 	BuildNavMesh();
 	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_NavMeshObject, addObstacle,
+                    "addObstacle(object, radius=0.0): carve the object into the dynamic navmeshes of the scene\n"
+                    "radius: world radius, 0.0 uses the object obstacle radius or its bounds\n")
+{
+	PyObject *pyobj;
+	float radius = 0.0f;
+	if (!PyArg_ParseTuple(args, "O|f:addObstacle", &pyobj, &radius)) {
+		return nullptr;
+	}
+	KX_GameObject *gameobj;
+	if (!ConvertPythonToGameObject(GetScene()->GetLogicManager(), pyobj, &gameobj, false,
+	                               "navmesh.addObstacle(object, radius): KX_NavMeshObject"))
+	{
+		return nullptr;
+	}
+	if (gameobj->GetScene() != GetScene()) {
+		PyErr_SetString(PyExc_ValueError, "navmesh.addObstacle(object, radius): KX_NavMeshObject, "
+		                "the object must be in the navmesh scene");
+		return nullptr;
+	}
+	GetScene()->AddNavMeshObstacle(gameobj, radius);
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_O(KX_NavMeshObject, removeObstacle,
+                      "removeObstacle(object): stop carving the object into the dynamic navmeshes of the scene\n")
+{
+	KX_GameObject *gameobj;
+	if (!ConvertPythonToGameObject(GetScene()->GetLogicManager(), value, &gameobj, false,
+	                               "navmesh.removeObstacle(object): KX_NavMeshObject"))
+	{
+		return nullptr;
+	}
+	GetScene()->RemoveNavMeshObstacle(gameobj);
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_NavMeshObject::pyattr_get_dynamic(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_NavMeshObject *self = static_cast<KX_NavMeshObject *>(self_v);
+	return PyBool_FromLong(self->IsDynamic());
+}
+
+PyObject *KX_NavMeshObject::pyattr_get_version(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_NavMeshObject *self = static_cast<KX_NavMeshObject *>(self_v);
+	return PyLong_FromUnsignedLong(self->GetVersion());
 }
 
 #endif  // WITH_PYTHON

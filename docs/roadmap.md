@@ -239,6 +239,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Passo 6 feito em 2026-09-28: `KX_NavMeshObject::GetVersion()` sobe quando a navmesh é reconstruída ou
   quando os tiles terminam de mudar; o Steering refaz o caminho se a versão mudou, mesmo com update period -1.
   7. Python (`dynamic`, `rebuild()`, `addObstacle`/`removeObstacle`) + docs. DetourCrowd fica para depois.
+  Passo 7 feito em 2026-09-28: `KX_NavMeshObject.dynamic` e `.version` (só leitura),
+  `addObstacle(object, radius=0.0)` e `removeObstacle(object)`; raio automático usa o "Create Obstacle" ou
+  metade da bbox. Falta teste visual do usuário (painel, console, agente contornando obstáculo em movimento).
   Riscos: perda de precisão nas bordas, atraso de alguns frames, ponteiros de objetos destruídos.
 
 ## Iluminação e gráficos

@@ -1397,7 +1397,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	if (m_obstacleSimulation) {
 		m_obstacleSimulation->DestroyObstacleForObj(gameobj);
 	}
-	m_navObstacles.erase(std::remove(m_navObstacles.begin(), m_navObstacles.end(), gameobj), m_navObstacles.end());
+	RemoveNavMeshObstacle(gameobj);
 	m_dynamicNavMeshes.erase(std::remove(m_dynamicNavMeshes.begin(), m_dynamicNavMeshes.end(), gameobj),
 	                         m_dynamicNavMeshes.end());
 
@@ -3042,11 +3042,22 @@ const KX_CutsceneManager *KX_Scene::GetCutsceneManager() const
 	return m_cutsceneManager.get();
 }
 
-void KX_Scene::AddNavMeshObstacle(KX_GameObject *gameobj)
+void KX_Scene::AddNavMeshObstacle(KX_GameObject *gameobj, float radius)
 {
-	if (std::find(m_navObstacles.begin(), m_navObstacles.end(), gameobj) == m_navObstacles.end()) {
-		m_navObstacles.push_back(gameobj);
+	for (KX_NavMeshObstacle& obstacle : m_navObstacles) {
+		if (obstacle.object == gameobj) {
+			obstacle.radius = radius;
+			return;
+		}
 	}
+	m_navObstacles.push_back({gameobj, radius});
+}
+
+void KX_Scene::RemoveNavMeshObstacle(KX_GameObject *gameobj)
+{
+	m_navObstacles.erase(std::remove_if(m_navObstacles.begin(), m_navObstacles.end(),
+	                                    [gameobj](const KX_NavMeshObstacle& obstacle) { return obstacle.object == gameobj; }),
+	                     m_navObstacles.end());
 }
 
 void KX_Scene::AddDynamicNavMesh(KX_NavMeshObject *navmesh)

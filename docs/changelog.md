@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Navmesh dinâmica: API Python (passo 7)
+
+- `KX_NavMeshObject.dynamic` (navmesh em tiles ativa) e `.version` (sobe quando a navmesh muda), só leitura.
+- `addObstacle(object, radius=0.0)` / `removeObstacle(object)`: qualquer objeto da cena passa a recortar (ou
+  deixa de recortar) todas as navmeshes dinâmicas da cena. Raio 0 usa o raio do "Create Obstacle" ou metade
+  da maior dimensão XY da bbox; mudar o raio refaz o obstáculo. `KX_Scene` guarda o raio por obstáculo.
+- Teste: cubo sem "Create Obstacle" em (6,0); com raio 3 o caminho vai de 17.89 para 18.75, e continua
+  recortado depois de `rebuild()`. Na navmesh estática as chamadas não mudam nada.
+
 ## 2026-09-28 - Navmesh dinâmica: Steering refaz o caminho quando a navmesh muda (passo 6)
 
 - `KX_NavMeshObject` tem um contador de versão: sobe ao reconstruir a navmesh e quando `dtTileCache::update`

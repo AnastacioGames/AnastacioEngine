@@ -38,6 +38,7 @@ class dtTileCache;
 struct dtTileCacheAlloc;
 struct dtTileCacheCompressor;
 struct dtTileCacheMeshProcess;
+struct KX_NavMeshObstacle;
 
 class KX_NavMeshObject : public KX_GameObject
 {
@@ -60,6 +61,7 @@ protected:
 	{
 		unsigned int ref;
 		mt::vec3 pos;
+		float radius;
 	};
 	std::map<KX_GameObject *, NavObstacle> m_obstacleRefs;
 	/// Incremented when the navmesh is rebuilt or its tiles finish changing, so paths can be redone.
@@ -99,7 +101,7 @@ public:
 	dtTileCache *GetTileCache() const;
 	unsigned int GetVersion() const;
 	/// Carves the obstacle objects into the dynamic navmesh and rebuilds the touched tiles.
-	void UpdateObstacles(const std::vector<KX_GameObject *>& obstacles);
+	void UpdateObstacles(const std::vector<KX_NavMeshObstacle>& obstacles);
 	dtNavMesh *GetNavMesh() const;
 	dtNavMeshQuery *GetNavMeshQuery() const;
 
@@ -118,6 +120,11 @@ public:
 	EXP_PYMETHOD_DOC(KX_NavMeshObject, raycast);
 	EXP_PYMETHOD_DOC(KX_NavMeshObject, draw);
 	EXP_PYMETHOD_DOC_NOARGS(KX_NavMeshObject, rebuild);
+	EXP_PYMETHOD_DOC(KX_NavMeshObject, addObstacle);
+	EXP_PYMETHOD_DOC_O(KX_NavMeshObject, removeObstacle);
+
+	static PyObject *pyattr_get_dynamic(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_version(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 #endif  // WITH_PYTHON
 };

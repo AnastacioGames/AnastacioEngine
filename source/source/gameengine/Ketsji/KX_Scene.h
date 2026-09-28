@@ -92,7 +92,14 @@ class RAS_2DFilterManager;
 struct Scene;
 struct TaskPool;
 
-class KX_Scene : public EXP_Value, public SCA_IScene
+/// Object carving the dynamic navmeshes of the scene, radius <= 0 means automatic.
+struct KX_NavMeshObstacle
+{
+	KX_GameObject *object;
+	float radius;
+};
+
+class KX_Scene: public EXP_Value, public SCA_IScene
 {
 public:
 	enum DrawingCallbackType {
@@ -339,7 +346,7 @@ private:
 
 	KX_ObstacleSimulation *m_obstacleSimulation;
 	/// Objects with "Create Obstacle" and the navmeshes they carve (dynamic navmeshes only).
-	std::vector<KX_GameObject *> m_navObstacles;
+	std::vector<KX_NavMeshObstacle> m_navObstacles;
 	std::vector<KX_NavMeshObject *> m_dynamicNavMeshes;
 	std::unique_ptr<KX_CutsceneManager> m_cutsceneManager;
 	/** Events crossed by the Cutscene clock, retained until the native action
@@ -608,7 +615,9 @@ public:
 
 	KX_ObstacleSimulation *GetObstacleSimulation();
 	void SetObstacleSimulation(KX_ObstacleSimulation *obstacleSimulation);
-	void AddNavMeshObstacle(KX_GameObject *gameobj);
+	/// Adds the obstacle or updates its radius.
+	void AddNavMeshObstacle(KX_GameObject *gameobj, float radius = 0.0f);
+	void RemoveNavMeshObstacle(KX_GameObject *gameobj);
 	void AddDynamicNavMesh(KX_NavMeshObject *navmesh);
 
 	void SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneManager);
