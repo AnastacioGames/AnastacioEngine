@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Recast/Detour: cópia vendorizada já está em dia com o upstream
+
+- Upstream baixado em `tools/recastnavigation-upstream` (commit `9f4ce64`, 2026-02-27; pasta ignorada no git).
+- Comparação com `source/extern/recastnavigation`: todos os fontes de `Recast/` e `Detour/` são iguais ao
+  upstream, exceto patches locais — `buildMeshAdjacency()` não-static (usado pela `recast-capi`), retorno de
+  erro em vez de "Data can be corrupted" ao passar de 0xffff vértices/polígonos, checagens de alocação nula em
+  `rcBuildContours`/`dtCreateNavMeshData` e guarda de `m_tiles` nulo em `dtNavMesh`.
+- O item do roadmap ("cópia antiga do Blender 2.79") estava errado e saiu. Continua em aberto só a navmesh
+  dinâmica, que precisaria vendorizar `DetourTileCache` (disponível no upstream baixado).
+
 ## 2026-09-28 - Python: `setTimeScale()` valida o valor
 
 - `bge.logic.setTimeScale()` agora levanta `ValueError` para negativo, NaN e infinito, que corrompiam o

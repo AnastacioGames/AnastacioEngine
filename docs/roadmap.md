@@ -208,10 +208,6 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - Investigar o custo residual de `MainRender` na cena de benchmark (GPU Skinning já descartado por A/B; nova
   hipótese começa por medição).
 - Avaliar folhagem e LOD na cena real; impostor e bake de atlas já existem, o resto pode ser trabalho de asset.
-- Atualizar a cópia antiga (Blender 2.79) em `source/extern/recastnavigation` a partir do upstream
-  (a API de integração já usa `dtNavMesh`/`dtNavMeshQuery`), com a varredura de bugs silenciosos.
-  Bloqueado: `tools/recastnavigation-main` só tem `build/` e `RecastDemo/`, sem os fontes; baixar o
-  upstream de novo antes de planejar. A cópia atual não tem `DetourCrowd` nem `DetourTileCache`.
 - Navmesh dinâmica: hoje o navmesh é gerado uma vez (`mesh.navmesh_make`). Reagir a objetos móveis exige
   `DetourTileCache` e obstáculos temporários; escopo novo, não iniciado.
 
