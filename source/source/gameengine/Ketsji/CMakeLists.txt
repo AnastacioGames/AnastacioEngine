@@ -64,6 +64,7 @@ set(INC_SYS
 	../../../intern/mathfu
 	../../../extern/recastnavigation/Recast/Include
 	../../../extern/recastnavigation/Detour/Include
+	../../../extern/recastnavigation/DetourTileCache/Include
 	../../../extern/imgui/include/backend
 	../../../extern/imgui/include
 	../../../extern/implot/include

@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Navmesh dinâmica: build em tiles opt-in (passos 2-3)
+
+- Property de jogo booleana `dynamic_navmesh` no objeto navmesh: `KX_NavMeshObject::BuildNavMeshTiled()`
+  reconstrói a navmesh em tiles (48 células) com `DetourTileCache`, a partir dos triângulos do próprio navmesh e
+  de `gm.recastData`. Sem erosão, filtro de inclinação nem de bordas: a superfície já foi gerada erodida.
+- Sem a property, o caminho estático é o mesmo de antes; sem DNA nova. Property não booleana ou falha no build
+  dinâmico: aviso no console e fallback para o estático.
+- Painel Physics (NAVMESH): aviso se `dynamic_navmesh` não é booleana, se o mesh está vazio, e nota de que os
+  caminhos podem diferir levemente do estático.
+- Teste (plano 20x20 + caixa): estático, dinâmico e property INT; caminhos dinâmicos contornam a caixa, com
+  comprimento até ~0.6 diferente do estático; property INT cai no estático. Obstáculos em runtime ainda não.
+
 ## 2026-09-28 - Recast/Detour: cópia vendorizada já está em dia com o upstream
 
 - Upstream baixado em `tools/recastnavigation-upstream` (commit `9f4ce64`, 2026-02-27; pasta ignorada no git).

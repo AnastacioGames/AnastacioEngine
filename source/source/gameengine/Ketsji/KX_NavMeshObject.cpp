@@ -52,6 +52,10 @@ extern "C" {
 #include "Recast.h"
 #include "DetourCommon.h"
 #include "DetourNavMeshBuilder.h"
+#include "DetourTileCache.h"
+#include "DetourTileCacheBuilder.h"
+#include "DetourTileCacheCompressorNone.h"
+#include "EXP_BoolValue.h"
 #include "KX_ObstacleSimulation.h"
 
 #include "CM_Message.h"
@@ -101,18 +105,18 @@ inline void flipAxes(float vec[3])
 KX_NavMeshObject::KX_NavMeshObject(void *sgReplicationInfo, SG_Callbacks callbacks)
 	:KX_GameObject(sgReplicationInfo, callbacks),
 	m_navMesh(nullptr),
-	m_navQuery(nullptr)
+	m_navQuery(nullptr),
+	m_dynamic(false),
+	m_tileCache(nullptr),
+	m_tileAlloc(nullptr),
+	m_tileComp(nullptr),
+	m_tileMeshProc(nullptr)
 {
 }
 
 KX_NavMeshObject::~KX_NavMeshObject()
 {
-	if (m_navQuery) {
-		dtFreeNavMeshQuery(m_navQuery);
-	}
-	if (m_navMesh) {
-		dtFreeNavMesh(m_navMesh);
-	}
+	FreeNavMesh();
 }
 
 EXP_Value *KX_NavMeshObject::GetReplica()
@@ -127,6 +131,11 @@ void KX_NavMeshObject::ProcessReplica()
 	KX_GameObject::ProcessReplica();
 	m_navMesh = nullptr;
 	m_navQuery = nullptr;
+	m_dynamic = false;
+	m_tileCache = nullptr;
+	m_tileAlloc = nullptr;
+	m_tileComp = nullptr;
+	m_tileMeshProc = nullptr;
 }
 
 int KX_NavMeshObject::GetGameObjectType() const
@@ -303,6 +312,233 @@ bool KX_NavMeshObject::BuildVertIndArrays(float *&vertices, int& nverts,
 }
 
 
+namespace {
+
+/* Polys get the flag the default query filter needs (see the static build); areas stay 0, as in
+ * the static navmesh. */
+struct NavMeshTileMeshProcess : public dtTileCacheMeshProcess
+{
+	virtual void process(dtNavMeshCreateParams *params, unsigned char *polyAreas, unsigned short *polyFlags)
+	{
+		for (int i = 0; i < params->polyCount; ++i) {
+			polyFlags[i] = (polyAreas[i] == DT_TILECACHE_NULL_AREA) ? 0 : 1;
+			polyAreas[i] = 0;
+		}
+	}
+};
+
+const int NAVMESH_TILE_SIZE = 48;
+const int NAVMESH_LAYERS_PER_TILE = 4;
+const int NAVMESH_MAX_OBSTACLES = 128;
+
+} // namespace
+
+bool KX_NavMeshObject::IsDynamicRequested()
+{
+	EXP_Value *prop = GetProperty("dynamic_navmesh");
+	if (!prop) {
+		return false;
+	}
+	if (!dynamic_cast<EXP_BoolValue *>(prop)) {
+		CM_Warning("navmesh \"" << m_name << "\": property \"dynamic_navmesh\" must be a Boolean, "
+		           "using the static navmesh");
+		return false;
+	}
+	return prop->GetNumber() != 0.0;
+}
+
+void KX_NavMeshObject::FreeNavMesh()
+{
+	if (m_navQuery) {
+		dtFreeNavMeshQuery(m_navQuery);
+		m_navQuery = nullptr;
+	}
+	if (m_tileCache) {
+		dtFreeTileCache(m_tileCache);
+		m_tileCache = nullptr;
+	}
+	if (m_navMesh) {
+		dtFreeNavMesh(m_navMesh);
+		m_navMesh = nullptr;
+	}
+	delete m_tileAlloc;
+	delete m_tileComp;
+	delete m_tileMeshProc;
+	m_tileAlloc = nullptr;
+	m_tileComp = nullptr;
+	m_tileMeshProc = nullptr;
+	m_dynamic = false;
+}
+
+/* Rebuilds the navmesh from the navmesh object's own triangles (already the walkable surface
+ * generated in the editor) as a tiled mesh backed by a DetourTileCache. The surface was already
+ * eroded by the agent radius when generated, so it isn't eroded again here. */
+bool KX_NavMeshObject::BuildNavMeshTiled()
+{
+	KX_Mesh *meshobj = m_meshes.front();
+
+	std::vector<float> verts;
+	std::vector<int> tris;
+	for (RAS_MeshMaterial *meshmat : meshobj->GetMeshMaterialList()) {
+		RAS_DisplayArray *array = meshmat->GetDisplayArray();
+		const int base = verts.size() / 3;
+		for (unsigned int j = 0, numvert = array->GetVertexCount(); j < numvert; ++j) {
+			float pos[3];
+			copy_v3_v3(pos, array->GetPosition(j).data);
+			flipAxes(pos);
+			verts.insert(verts.end(), pos, pos + 3);
+		}
+		for (unsigned int j = 0, numtris = array->GetTriangleIndexCount(); j < numtris; ++j) {
+			tris.push_back(base + array->GetTriangleIndex(j));
+		}
+	}
+
+	const int nverts = verts.size() / 3;
+	const int ntris = tris.size() / 3;
+	if (nverts == 0 || ntris == 0) {
+		return false;
+	}
+
+	const RecastData &recastData = GetScene()->GetBlenderScene()->gm.recastData;
+
+	rcConfig cfg;
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.cs = recastData.cellsize;
+	cfg.ch = recastData.cellheight;
+	if (cfg.cs <= 0.0f || cfg.ch <= 0.0f) {
+		return false;
+	}
+	cfg.walkableSlopeAngle = recastData.agentmaxslope;
+	cfg.walkableHeight = (int)ceilf(recastData.agentheight / cfg.ch);
+	cfg.walkableClimb = (int)floorf(recastData.agentmaxclimb / cfg.ch);
+	cfg.walkableRadius = 0;
+	cfg.maxEdgeLen = (int)(recastData.edgemaxlen / cfg.cs);
+	cfg.maxSimplificationError = recastData.edgemaxerror;
+	cfg.maxVertsPerPoly = std::max(3, std::min(recastData.vertsperpoly, (int)DT_VERTS_PER_POLYGON));
+	cfg.tileSize = NAVMESH_TILE_SIZE;
+	cfg.borderSize = 3;
+	cfg.width = cfg.tileSize + cfg.borderSize * 2;
+	cfg.height = cfg.tileSize + cfg.borderSize * 2;
+	calcMeshBounds(verts.data(), nverts, cfg.bmin, cfg.bmax);
+	/* Room above and below the surface for the heightfield and later obstacles. */
+	cfg.bmin[1] -= recastData.agentheight;
+	cfg.bmax[1] += recastData.agentheight;
+
+	int gw = 0, gh = 0;
+	rcCalcGridSize(cfg.bmin, cfg.bmax, cfg.cs, &gw, &gh);
+	const int tw = (gw + cfg.tileSize - 1) / cfg.tileSize;
+	const int th = (gh + cfg.tileSize - 1) / cfg.tileSize;
+	const int maxLayers = tw * th * NAVMESH_LAYERS_PER_TILE;
+	const int tileBits = (int)dtIlog2(dtNextPow2(maxLayers));
+	if (tileBits > 14) {
+		/* Too many tiles to leave enough bits for polygons per tile. */
+		return false;
+	}
+
+	dtTileCacheParams tcparams;
+	memset(&tcparams, 0, sizeof(tcparams));
+	rcVcopy(tcparams.orig, cfg.bmin);
+	tcparams.cs = cfg.cs;
+	tcparams.ch = cfg.ch;
+	tcparams.width = cfg.tileSize;
+	tcparams.height = cfg.tileSize;
+	tcparams.walkableHeight = recastData.agentheight;
+	tcparams.walkableRadius = recastData.agentradius;
+	tcparams.walkableClimb = recastData.agentmaxclimb;
+	tcparams.maxSimplificationError = recastData.edgemaxerror;
+	tcparams.maxTiles = maxLayers;
+	tcparams.maxObstacles = NAVMESH_MAX_OBSTACLES;
+
+	m_tileAlloc = new dtTileCacheAlloc();
+	m_tileComp = new dtTileCacheCompressorNone();
+	m_tileMeshProc = new NavMeshTileMeshProcess();
+	m_tileCache = dtAllocTileCache();
+	if (!m_tileCache || dtStatusFailed(m_tileCache->init(&tcparams, m_tileAlloc, m_tileComp, m_tileMeshProc))) {
+		return false;
+	}
+
+	dtNavMeshParams nmparams;
+	memset(&nmparams, 0, sizeof(nmparams));
+	rcVcopy(nmparams.orig, cfg.bmin);
+	nmparams.tileWidth = cfg.tileSize * cfg.cs;
+	nmparams.tileHeight = cfg.tileSize * cfg.cs;
+	nmparams.maxTiles = 1 << tileBits;
+	nmparams.maxPolys = 1 << (22 - tileBits);
+	m_navMesh = dtAllocNavMesh();
+	if (!m_navMesh || dtStatusFailed(m_navMesh->init(&nmparams))) {
+		return false;
+	}
+
+	std::vector<unsigned char> areas(ntris, RC_WALKABLE_AREA);
+	rcContext ctx(false);
+	for (int ty = 0; ty < th; ++ty) {
+		for (int tx = 0; tx < tw; ++tx) {
+			rcConfig tcfg = cfg;
+			tcfg.bmin[0] = cfg.bmin[0] + (tx * cfg.tileSize - cfg.borderSize) * cfg.cs;
+			tcfg.bmin[2] = cfg.bmin[2] + (ty * cfg.tileSize - cfg.borderSize) * cfg.cs;
+			tcfg.bmax[0] = cfg.bmin[0] + ((tx + 1) * cfg.tileSize + cfg.borderSize) * cfg.cs;
+			tcfg.bmax[2] = cfg.bmin[2] + ((ty + 1) * cfg.tileSize + cfg.borderSize) * cfg.cs;
+
+			rcHeightfield *solid = rcAllocHeightfield();
+			rcCompactHeightfield *chf = rcAllocCompactHeightfield();
+			rcHeightfieldLayerSet *lset = rcAllocHeightfieldLayerSet();
+			/* Every navmesh triangle is walkable by construction: no slope or ledge filtering, a
+			 * thin navmesh surface would lose its border cells to the ledge filter. */
+			bool ok = solid && chf && lset &&
+			          rcCreateHeightfield(&ctx, *solid, tcfg.width, tcfg.height, tcfg.bmin, tcfg.bmax, tcfg.cs, tcfg.ch) &&
+			          rcRasterizeTriangles(&ctx, verts.data(), nverts, tris.data(), areas.data(), ntris, *solid,
+			                               tcfg.walkableClimb) &&
+			          rcBuildCompactHeightfield(&ctx, tcfg.walkableHeight, tcfg.walkableClimb, *solid, *chf) &&
+			          rcBuildHeightfieldLayers(&ctx, *chf, tcfg.borderSize, tcfg.walkableHeight, *lset);
+
+			for (int i = 0; ok && i < std::min(lset->nlayers, NAVMESH_LAYERS_PER_TILE); ++i) {
+				const rcHeightfieldLayer *layer = &lset->layers[i];
+				dtTileCacheLayerHeader header;
+				header.magic = DT_TILECACHE_MAGIC;
+				header.version = DT_TILECACHE_VERSION;
+				header.tx = tx;
+				header.ty = ty;
+				header.tlayer = i;
+				dtVcopy(header.bmin, layer->bmin);
+				dtVcopy(header.bmax, layer->bmax);
+				header.width = (unsigned char)layer->width;
+				header.height = (unsigned char)layer->height;
+				header.minx = (unsigned char)layer->minx;
+				header.maxx = (unsigned char)layer->maxx;
+				header.miny = (unsigned char)layer->miny;
+				header.maxy = (unsigned char)layer->maxy;
+				header.hmin = (unsigned short)layer->hmin;
+				header.hmax = (unsigned short)layer->hmax;
+
+				unsigned char *data = nullptr;
+				int dataSize = 0;
+				if (dtStatusFailed(dtBuildTileCacheLayer(m_tileComp, &header, layer->heights, layer->areas,
+				                                         layer->cons, &data, &dataSize)) ||
+				    dtStatusFailed(m_tileCache->addTile(data, dataSize, DT_COMPRESSEDTILE_FREE_DATA, nullptr)))
+				{
+					dtFree(data);
+					ok = false;
+				}
+			}
+
+			rcFreeHeightField(solid);
+			rcFreeCompactHeightfield(chf);
+			rcFreeHeightfieldLayerSet(lset);
+			if (!ok || dtStatusFailed(m_tileCache->buildNavMeshTilesAt(tx, ty, m_navMesh))) {
+				return false;
+			}
+		}
+	}
+
+	m_navQuery = dtAllocNavMeshQuery();
+	if (!m_navQuery || dtStatusFailed(m_navQuery->init(m_navMesh, MAX_NODES))) {
+		return false;
+	}
+
+	m_dynamic = true;
+	return true;
+}
+
 bool KX_NavMeshObject::BuildNavMesh()
 {
   KX_ObstacleSimulation *obssimulation = GetScene()->GetObstacleSimulation();
@@ -311,18 +547,22 @@ bool KX_NavMeshObject::BuildNavMesh()
     obssimulation->DestroyObstacleForObj(this);
   }
 
-	if (m_navQuery) {
-		dtFreeNavMeshQuery(m_navQuery);
-		m_navQuery = nullptr;
-	}
-	if (m_navMesh) {
-		dtFreeNavMesh(m_navMesh);
-		m_navMesh = nullptr;
-	}
+	FreeNavMesh();
 
 	if (m_meshes.empty()) {
 		CM_Error("can't find mesh for navmesh object: " << m_name);
 		return false;
+	}
+
+	if (IsDynamicRequested()) {
+		if (BuildNavMeshTiled()) {
+			if (obssimulation) {
+				obssimulation->AddObstaclesForNavMesh(this);
+			}
+			return true;
+		}
+		CM_Warning("navmesh \"" << m_name << "\": dynamic navmesh build failed, using the static navmesh");
+		FreeNavMesh();
 	}
 
 	float *vertices = nullptr, *dvertices = nullptr;
@@ -471,6 +711,16 @@ bool KX_NavMeshObject::BuildNavMesh()
   }
 
 	return true;
+}
+
+bool KX_NavMeshObject::IsDynamic() const
+{
+	return m_dynamic;
+}
+
+dtTileCache *KX_NavMeshObject::GetTileCache() const
+{
+	return m_tileCache;
 }
 
 dtNavMesh *KX_NavMeshObject::GetNavMesh() const

@@ -224,6 +224,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
      quando o modo dinâmico está ligado sem navmesh gerada, e quando há obstáculo sem navmesh dinâmica na cena;
      no console, ao iniciar o jogo, se o build dinâmico falhar e cair para o estático. Tooltip avisa que os
      caminhos podem diferir levemente do estático.
+  Passos 1-3 feitos em 2026-09-28 (aviso de "obstáculo sem navmesh dinâmica" fica para o passo 4). Cena de
+  teste (plano + caixa): caminhos dinâmicos contornam a caixa e diferem do estático em até ~0.6 de comprimento.
   4. Obstáculos: objetos com `OB_HASOBSTACLE` (raio `obstacleRad`, altura da bbox); remover+adicionar ao mover;
      limpar ao destruir.
   5. `dtTileCache::update` por frame em `KX_Scene::LogicEndFrame`.

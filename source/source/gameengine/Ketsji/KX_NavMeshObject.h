@@ -32,6 +32,11 @@
 #include "DetourNavMeshQuery.h"
 #include "KX_GameObject.h"
 
+class dtTileCache;
+struct dtTileCacheAlloc;
+struct dtTileCacheCompressor;
+struct dtTileCacheMeshProcess;
+
 class KX_NavMeshObject : public KX_GameObject
 {
 	Py_Header
@@ -39,6 +44,18 @@ class KX_NavMeshObject : public KX_GameObject
 protected:
 	dtNavMesh *m_navMesh;
 	dtNavMeshQuery *m_navQuery;
+
+	/* Dynamic navmesh (opt-in by the Boolean game property "dynamic_navmesh"): the navmesh is
+	 * rebuilt in tiles through a DetourTileCache so obstacles can carve it at runtime. */
+	bool m_dynamic;
+	dtTileCache *m_tileCache;
+	dtTileCacheAlloc *m_tileAlloc;
+	dtTileCacheCompressor *m_tileComp;
+	dtTileCacheMeshProcess *m_tileMeshProc;
+
+	void FreeNavMesh();
+	bool IsDynamicRequested();
+	bool BuildNavMeshTiled();
 
 	bool BuildVertIndArrays(float *&vertices, int& nverts,
 	                        unsigned short * &polys, int& npolys, unsigned short *&dmeshes,
@@ -64,6 +81,8 @@ public:
 	virtual int GetGameObjectType() const;
 
 	bool BuildNavMesh();
+	bool IsDynamic() const;
+	dtTileCache *GetTileCache() const;
 	dtNavMesh *GetNavMesh() const;
 	dtNavMeshQuery *GetNavMeshQuery() const;
 
