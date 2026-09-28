@@ -1593,7 +1593,10 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 	m_boundingBoxManager->Update(false);
 
 	bool dbvt_culling = false;
-	if (m_dbvtCulling) {
+	/* DBVT (and its occlusion) only for the main camera: in shadow passes it cost ~14ms (one
+	 * software raster per light/cascade). DBVT without occlusion hid the skinned characters,
+	 * so shadows use the plain frustum handler, as with occlusion off in the scene. */
+	if (m_dbvtCulling && !is_shadowbuf) {
 		for (KX_GameObject *gameobj : m_renderlist) {
 			/* Reset KX_GameObject m_culled to true before doing culling
 			 * since DBVT culling will only set it to false.
@@ -1609,10 +1612,7 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		const int *viewport = KX_GetActiveEngine()->GetCanvas()->GetViewPort();
 		CullingInfo info(layer, objects, cam, is_shadowbuf);
 
-		/* Occlusion culling only for the main camera: in shadow passes it cost ~14ms
-		 * (one software raster per light/cascade) and the camera's occluders don't apply to lights. */
-		const int occlusionRes = is_shadowbuf ? 0 : m_dbvtOcclusionRes;
-		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, occlusionRes, viewport, matrix);
+		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, m_dbvtOcclusionRes, viewport, matrix);
 	}
 
 	int testedCount;
