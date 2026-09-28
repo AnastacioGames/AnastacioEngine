@@ -1098,6 +1098,17 @@ class CUSTOM_PT_game_physics(CustomPhysicsButtonsPanel, Panel):
             col.operator("mesh.navmesh_reset")
             col.operator("mesh.navmesh_clear")
 
+            # Dynamic navmesh is opt-in through the "dynamic_navmesh" game property.
+            prop = game.properties.get("dynamic_navmesh")
+            if prop is not None:
+                if prop.type != 'BOOL':
+                    box.label(text="\"dynamic_navmesh\" must be a Boolean property", icon='ERROR')
+                elif prop.value:
+                    if ob.type != 'MESH' or not ob.data.polygons:
+                        box.label(text="Dynamic navmesh: build the navigation mesh first", icon='ERROR')
+                    else:
+                        box.label(text="Dynamic navmesh: paths may differ slightly from static", icon='INFO')
+
         if physics_type in {"STATIC", "DYNAMIC", "RIGID_BODY"}:
             ff_box = layout.box()
             ff_box.label(text="Force Field:", icon="FORCE_FORCE")

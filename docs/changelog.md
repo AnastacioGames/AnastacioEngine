@@ -14,6 +14,10 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - `KX_NavMeshObject::DrawNavMesh` (`nav.draw(mode)`) desenha em amarelo o cilindro de cada obstáculo da
   navmesh dinâmica (círculos na base e no topo, 4 arestas verticais), lido do `dtTileCache`. O buraco na
   navmesh é maior que o cilindro porque soma o raio do agente.
+- Os avisos de `dynamic_navmesh` do painel Physics (NAVMESH) também foram para o painel customizado
+  `flowmenu/custom_pt_physics.py`, que é o que aparece no editor; antes só estavam em `bl_ui/properties_game.py`.
+- Validado na tela: cilindro amarelo, agente com Steering contornando obstáculo que se move, aviso no painel e
+  no console com `dynamic_navmesh` não booleana.
 
 ## 2026-09-28 - Navmesh dinâmica: API Python (passo 7)
 
