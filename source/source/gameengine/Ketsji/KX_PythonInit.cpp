@@ -71,6 +71,7 @@ extern "C" {
 #endif
 
 #include "KX_PythonInit.h"
+#include <cmath>
 
 // directory header for py function getBlendFileList
 #ifndef WIN32
@@ -594,6 +595,12 @@ static PyObject *gPySetTimeScale(PyObject *, PyObject *args)
 	double time_scale;
 
 	if (!PyArg_ParseTuple(args, "d:setTimeScale", &time_scale)) {
+		return nullptr;
+	}
+
+	/* 0 is accepted as "pause"; negative, NaN and inf would corrupt the time accumulator. */
+	if (!(time_scale >= 0.0) || !std::isfinite(time_scale)) {
+		PyErr_SetString(PyExc_ValueError, "setTimeScale(scale): scale must be a finite value >= 0");
 		return nullptr;
 	}
 

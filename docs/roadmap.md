@@ -200,7 +200,6 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `m_overframetime < 0` usa `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real): erro de
   digitação herdado ou intencional? Não mudar sem a resposta. (2) `m_timeUnderRate` é `long`: com Max Logic
   Frames = 5 a 60 Hz a conta dá ~0,02 e vira `sleep_for(0ms)`, o loop gira sem dormir. É intencional?
-- **`setTimeScale()` no Python**: aceita 0 e valores negativos, enquanto a RNA tem mínimo 0,001. Decidir se valida.
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 

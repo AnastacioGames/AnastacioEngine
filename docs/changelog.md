@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Python: `setTimeScale()` valida o valor
+
+- `bge.logic.setTimeScale()` agora levanta `ValueError` para negativo, NaN e infinito, que corrompiam o
+  acumulador de tempo (`KX_KetsjiEngine`). 0 continua aceito como "pausa", para não quebrar scripts; a RNA
+  segue com mínimo 0,001 na interface.
+- Verificado no `RangeRuntime`: 0 e 2 aceitos; -1, nan e inf rejeitados.
+
 ## 2026-09-28 - Build: Ninja volta a rastrear headers (VSLANG=1033)
 
 - Causa: `msvc_deps_prefix` em português (`Observação: incluindo arquivo:`) não batia com a saída do `cl`, e o
