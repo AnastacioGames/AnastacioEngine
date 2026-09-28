@@ -17,7 +17,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Os avisos de `dynamic_navmesh` do painel Physics (NAVMESH) também foram para o painel customizado
   `flowmenu/custom_pt_physics.py`, que é o que aparece no editor; antes só estavam em `bl_ui/properties_game.py`.
 - Validado na tela: cilindro amarelo, agente com Steering contornando obstáculo que se move, aviso no painel e
-  no console com `dynamic_navmesh` não booleana.
+  no console com `dynamic_navmesh` não booleana; sem a propriedade o painel não mostra nada, e com Boolean
+  marcada mostra o aviso INFO.
 
 ## 2026-09-28 - Navmesh dinâmica: API Python (passo 7)
 
