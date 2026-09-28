@@ -205,11 +205,26 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
-- Investigar o custo residual de `MainRender` na cena de benchmark (GPU Skinning já descartado por A/B; nova
-  hipótese começa por medição).
+- Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
+  14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
+  na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"
+  era GPU/fill-rate). Proposta: não usar occlusion nas passadas de sombra (`is_shadowbuf`) em
+  `KX_Scene::CalculateVisibleMeshes`; câmera principal mantém. Aguardando aprovação + teste visual.
 - Avaliar folhagem e LOD na cena real; impostor e bake de atlas já existem, o resto pode ser trabalho de asset.
-- Navmesh dinâmica: hoje o navmesh é gerado uma vez (`mesh.navmesh_make`). Reagir a objetos móveis exige
-  `DetourTileCache` e obstáculos temporários; escopo novo, não iniciado.
+- Navmesh dinâmica: hoje o navmesh é gerado uma vez (`mesh.navmesh_make`). Plano (2026-09-28), passos
+  pequenos, cada um compilável e confirmado antes do próximo:
+  1. Vendorizar `DetourTileCache/` de `tools/recastnavigation-upstream` + compressor passthrough (CMake,
+     `readme-blender.txt`).
+  2. Membros novos em `KX_NavMeshObject` (tile cache, alocador, compressor, `m_dynamic`), sem mudar
+     comportamento.
+  3. `BuildNavMeshTiled()` opt-in (property `dynamic_navmesh`), reconstruindo a partir dos polígonos do próprio
+     navmesh com parâmetros de `gm.recastData`; caminho estático intacto, sem DNA nova.
+  4. Obstáculos: objetos com `OB_HASOBSTACLE` (raio `obstacleRad`, altura da bbox); remover+adicionar ao mover;
+     limpar ao destruir.
+  5. `dtTileCache::update` por frame em `KX_Scene::LogicEndFrame`.
+  6. `KX_SteeringActuator` refaz `findPath` quando o navmesh mudar (contador de versão).
+  7. Python (`dynamic`, `rebuild()`, `addObstacle`/`removeObstacle`) + docs. DetourCrowd fica para depois.
+  Riscos: perda de precisão nas bordas, atraso de alguns frames, ponteiros de objetos destruídos.
 
 ## Iluminação e gráficos
 
