@@ -36,7 +36,7 @@ manualmente antes de chamar o Ninja.
 
 **Como compilar corretamente**: rode o `vcvars64.bat` e o `ninja` na MESMA chamada de processo (variáveis de um `.bat` não sobrevivem entre chamadas de shell separadas):
 ```
-cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && cd /d D:\AnastacioEngine\build && ninja <target> 2>&1'
+cmd /c 'set VSLANG=1033&& "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && cd /d D:\AnastacioEngine\build && ninja <target> 2>&1'
 ```
 - A linha `'vswhere.exe' não é reconhecido...` que aparece no começo da saída é ruído inofensivo do próprio `vcvars64.bat`, não é erro.
 - Alvos úteis para checagens rápidas (não os produtos completos): `ge_rasterizer`, `ge_rasterizer_opengl`,
@@ -53,7 +53,7 @@ O build incremental do Ninja aqui às vezes não rastreia corretamente dependên
   (`0xc0000374`) ao carregar arquivo, ou timing/comportamento não-determinístico, que parece não ter relação
   com a mudança.
 - Mesmo headers "normais" (não-DNA) já causaram `EXCEPTION_ACCESS_VIOLATION` no load da cena após rebuild incremental.
-- **Causa identificada (2026-09-25):** em `build/CMakeFiles/rules.ninja` o `msvc_deps_prefix` é `Observação: incluindo arquivo:` (MSVC em português). A frase sai do compilador em outra codificação e não bate com o prefixo, então o Ninja **não registra nenhuma dependência de header**: mudar um `.h` só recompila os `.cpp` que você também editou. Ex.: um membro novo em `KX_GameObject.h` deixou `KX_ShadowRenderer.obj` com o layout antigo e o play fechava a engine. Contorno: apagar os `.obj` da área afetada (ex.: `build/source/gameengine/**/*.obj`) ou `ninja -t clean`. Correção definitiva (pendente): reconfigurar o `build/` com `VSLANG=1033` (MSVC em inglês). Em 2026-09-28 o `VSLANG=1033` não teve efeito: o MSVC 14.51 só tem a pasta de recursos `1046` em `bin/Hostx64/x64`. Antes, é preciso instalar o pacote de idioma inglês pelo Visual Studio Installer (decisão do usuário).
+- **Causa identificada (2026-09-25):** em `build/CMakeFiles/rules.ninja` o `msvc_deps_prefix` é `Observação: incluindo arquivo:` (MSVC em português). A frase sai do compilador em outra codificação e não bate com o prefixo, então o Ninja **não registra nenhuma dependência de header**: mudar um `.h` só recompila os `.cpp` que você também editou. Ex.: um membro novo em `KX_GameObject.h` deixou `KX_ShadowRenderer.obj` com o layout antigo e o play fechava a engine. Contorno: apagar os `.obj` da área afetada (ex.: `build/source/gameengine/**/*.obj`) ou `ninja -t clean`. **Corrigido em 2026-09-28:** pacote de idioma inglês instalado no Visual Studio e `build/` reconfigurado com `VSLANG=1033` (prefixo agora `Note: including file:`). **Todo build precisa do `set VSLANG=1033&&`** do comando abaixo; sem ele o `cl` volta a responder em português e o Ninja para de registrar dependências de novo.
 
 **Regra**: depois de editar QUALQUER header (`.h`), se aparecer um crash estranho/desproporcional ao diff após
 build incremental, não gaste tempo debugando como se fosse bug de código — vá direto para:

@@ -196,9 +196,6 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   correção isolada e teste.
   Reauditoria concluída em 2026-09-24: os 26 itens têm correção ou descarte registrado; a única validação
   ainda manual é GPU-001, que requer uma sessão interativa já aberta para testar `gl_load()`.
-- **Build sem rastreio de headers**: o Ninja do `build/` não registra dependências de `.h` (prefixo do MSVC em
-  português, ver `AGENTS.md`). Reconfigurar com `VSLANG=1033` e fazer um clean rebuild completo. Bloqueado
-  (2026-09-28): sem o pacote de idioma inglês do Visual Studio, o `cl` ignora o `VSLANG=1033`.
 - **Loop de tempo (perguntas ao Kitsuy, 2026-09-26)**: (1) em `KX_KetsjiEngine::FrameOver()`, o ramo de
   `m_overframetime < 0` usa `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real): erro de
   digitação herdado ou intencional? Não mudar sem a resposta. (2) `m_timeUnderRate` é `long`: com Max Logic

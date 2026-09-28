@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Build: Ninja volta a rastrear headers (VSLANG=1033)
+
+- Causa: `msvc_deps_prefix` em português (`Observação: incluindo arquivo:`) não batia com a saída do `cl`, e o
+  Ninja não registrava nenhuma dependência de `.h`.
+- Pacote de idioma inglês instalado no Visual Studio; `build/` reconfigurado com `VSLANG=1033` (prefixo agora
+  `Note: including file:`) e rebuild completo de C/C++ via `ninja install` (3078 passos, sem erro; cubins CUDA
+  preservados renomeando só o `.ninja_deps`).
+- Verificado: `ninja -t deps` lista 228 headers para `KX_ShadowRenderer.cpp.obj`; tocar `KX_GameObject.h`
+  gera 96 passos no `ninja -n RangeRuntime`, incluindo esse objeto. `RangeEngine` e `RangeRuntime` (com
+  `ValidationProject.range`) abrem.
+- Comando de build do `AGENTS.md` e do skill `build-anastacio` agora começa com `set VSLANG=1033&&`.
+
 ## 2026-09-27 - Release 0.4.3: pacote Linux
 
 - Linux alcança a 0.4.3: `RangeEngine` e `RangeRuntime` recompilados com o fix do loop de tempo (Fixed Timestep

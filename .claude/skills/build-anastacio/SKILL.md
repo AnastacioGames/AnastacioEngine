@@ -12,7 +12,7 @@ A fonte canônica das regras é [AGENTS.md](../../../AGENTS.md) — leia lá ant
 Um shell puro (PowerShell, git-bash, cmd) NÃO compila este repo — falta o ambiente do MSVC. Rode `vcvars64.bat` e `ninja` na MESMA chamada:
 
 ```
-cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && cd /d D:\AnastacioEngine\build && ninja <target> 2>&1'
+cmd /c 'set VSLANG=1033&& "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && cd /d D:\AnastacioEngine\build && ninja <target> 2>&1'
 ```
 
 Alvos úteis para checagem rápida: `ge_rasterizer`, `ge_rasterizer_opengl`, `ge_rasterizer_shaders` (rebuild depois de editar `.glsl`).
