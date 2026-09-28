@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Lâmpadas: correções de bugs (Hemi, Spot 180°, falloff quadrático)
+
+- Hemi não cria mais buffer de sombra: ele não tinha projeção (`gpu_lamp_calc_winmat` ignora Hemi) e custava uma
+  passada de sombra por quadro. A cor de baixo (Shadow Color) agora é definida fora do bloco de sombra e não é
+  trocada por branco (`GPU_lamp_from_blender`).
+- `shade_hemi_spec`: `ang / up` (0/0 com `up == 0`) trocado por `sign(up)`.
+- Spot de 180°: a sombra dividia por zero em `tan(90°)`; o ângulo da projeção da sombra fica limitado a 170°
+  (o cone de luz continua igual). Mais que isso a resolução do mapa despenca.
+- Conversão da lâmpada zerava `att2` sem `LA_QUAD` (flag que a UI 2.79 não mostra); agora usa `la->att2`,
+  igual ao shader do viewport.
+- Validado na tela pelo usuário comparando runtime antes/depois (`projects-teste/lamps`): Hemi com a mesma cor
+  de baixo, Spot 180° com sombra. Ganho de FPS da Hemi não medido (cena leve).
+- Pendente da varredura: NaN nos falloffs em casos-limite, early-out para lâmpada culled, matrizes de lâmpada
+  recalculadas por material (`GPU_material_update_lamps`), `shadowColor` só leitura em runtime.
+
 ## 2026-09-28 - Espelho/água: corte do plano com projeção oblíqua
 
 - `KX_PlanarMap::BeginRenderFace` troca o `glClipPlane` (no-op no core e no WebGL2) por projeção oblíqua

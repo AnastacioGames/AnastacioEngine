@@ -993,7 +993,8 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 	RAS_ILightObject *lightobj = rasterizer->CreateLight();
 
 	lightobj->m_att1 = la->att1;
-	lightobj->m_att2 = (la->mode & LA_QUAD) ? la->att2 : 0.0f;
+	// Same as the GLSL lamp (gpu_lamp_from_blender): LA_QUAD is a legacy flag the 2.79 UI no longer shows.
+	lightobj->m_att2 = la->att2;
 	lightobj->m_coeff_const = la->coeff_const;
 	lightobj->m_coeff_lin = la->coeff_lin;
 	lightobj->m_coeff_quad = la->coeff_quad;

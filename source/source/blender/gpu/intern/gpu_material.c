@@ -3771,7 +3771,8 @@ static void gpu_lamp_calc_winmat(GPULamp *lamp)
 		orthographic_m4(lamp->winmat, -wsize, wsize, -wsize, wsize, lamp->d, lamp->clipend);
 	}
 	else if (lamp->type == LA_SPOT) {
-		angle = saacos(lamp->spotsi);
+		/* A 180 degree spot has a 90 degree half angle: tan() is infinite there, clamp to 170 degrees. */
+		angle = min_ff(saacos(lamp->spotsi), (float)M_PI * 85.0f / 180.0f);
 		temp = 0.5f * lamp->size * cosf(angle) / sinf(angle);
 		pixsize = lamp->d / temp;
 		wsize = pixsize * 0.5f * lamp->size;
@@ -4090,17 +4091,19 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	la = ob->data;
 	gpu_lamp_from_blender(scene, ob, par, la, lamp);
 
+	/* Also the Hemi ground color (shade_hemi_diffuse/spec), which needs no shadow buffer. */
+	lamp->shadow_color[0] = la->shdwr;
+	lamp->shadow_color[1] = la->shdwg;
+	lamp->shadow_color[2] = la->shdwb;
+
+	/* Hemi has no shadow projection (gpu_lamp_calc_winmat), so no shadow buffer for it. */
 	if ((la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
-	    (la->type == LA_SUN && (la->mode & LA_SHAD_RAY)) || la->type == LA_HEMI)
+	    (la->type == LA_SUN && (la->mode & LA_SHAD_RAY)))
 	{
 		if (!gpu_lamp_create_shadow_buffer(lamp)) {
 			gpu_lamp_shadow_free(lamp);
 			return lamp;
 		}
-
-		lamp->shadow_color[0] = la->shdwr;
-		lamp->shadow_color[1] = la->shdwg;
-		lamp->shadow_color[2] = la->shdwb;
 
 		if (la->type == LA_SUN && la->shadow_cascade_count != 0) {
 			lamp->cascade[0] = gpu_lamp_create_cascade(lamp, la, 0);
@@ -4120,7 +4123,8 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 			}
 		}
 	}
-	else {
+	else if (la->type != LA_HEMI) {
+		/* No shadow: white keeps the shadow mix neutral. Hemi keeps its ground color. */
 		lamp->shadow_color[0] = 1.0;
 		lamp->shadow_color[1] = 1.0;
 		lamp->shadow_color[2] = 1.0;

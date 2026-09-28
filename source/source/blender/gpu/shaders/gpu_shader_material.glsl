@@ -2744,7 +2744,7 @@ void shade_hemi_spec(vec3 upcol, vec3 downcol, vec3 vn, vec3 lv, vec3 vp,
 
 	t = visifac * min(pow(ang * 0.5 + 0.5, max(hard, 1.0)) * hard, M_PI * 2.0);
 
-	up = (1.0 - pow(1.0 - ang, hard)) * (ang / up);
+	up = (1.0 - pow(1.0 - ang, hard)) * sign(up); /* ang / up is 0/0 when up == 0 */
 	outcol = vec4(energy * mix(downcol, upcol, up * 0.5 + 0.5), 1.0);
 }
 
