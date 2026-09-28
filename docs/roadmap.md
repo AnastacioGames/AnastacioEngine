@@ -210,7 +210,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"
   era GPU/fill-rate). Proposta: não usar occlusion nas passadas de sombra (`is_shadowbuf`) em
   `KX_Scene::CalculateVisibleMeshes`; câmera principal mantém. Aplicada em 2026-09-28: sombras não usam DBVT (usar DBVT sem occlusion
-  sumia com os personagens com skinning); 60 FPS, `ShadowCulling` 0.4ms, `Skinning` normal. Falta o teste visual do usuário.
+  sumia com os personagens com skinning); 60 FPS, `ShadowCulling` 0.4ms, `Skinning` normal. Teste visual do usuário OK em 2026-09-28 (sombras dos personagens, sem sumir nem piscar).
 - Avaliar folhagem e LOD na cena real; impostor e bake de atlas já existem, o resto pode ser trabalho de asset.
 - Navmesh dinâmica: hoje o navmesh é gerado uma vez (`mesh.navmesh_make`). Plano (2026-09-28), passos
   pequenos, cada um compilável e confirmado antes do próximo:
