@@ -352,6 +352,24 @@ GHOST_TSuccess GHOST_ContextGLX::releaseNativeHandles()
 GHOST_TSuccess GHOST_ContextGLX::setSwapInterval(int interval)
 {
 	if (GLXEW_EXT_swap_control) {
+		// Intervalo negativo (vsync adaptativo) exige GLX_EXT_swap_control_tear. Sem ela (ex.:
+		// llvmpipe), o Mesa responde BadValue e o handler padrao do Xlib encerra o processo.
+		// GLXEW_EXT_swap_control_tear le a string do cliente, que anuncia a extensao mesmo quando
+		// a tela nao a suporta; o Mesa valida pela lista da tela, entao consulta essa.
+		if (interval < 0) {
+			const char *exts = ::glXQueryExtensionsString(m_display, DefaultScreen(m_display));
+			bool tear = false;
+			for (const char *p = exts; p && (p = strstr(p, "GLX_EXT_swap_control_tear")); p++) {
+				const char end = p[strlen("GLX_EXT_swap_control_tear")];
+				if ((p == exts || p[-1] == ' ') && (end == ' ' || end == '\0')) {
+					tear = true;
+					break;
+				}
+			}
+			if (!tear) {
+				interval = -interval;
+			}
+		}
 		::glXSwapIntervalEXT(m_display, m_window, interval);
 
 		return GHOST_kSuccess;

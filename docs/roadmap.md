@@ -90,10 +90,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver
 [linux-build.md](linux-build.md). Pendente:
 
-- **Bugs do Kitsuy (2026-09-28)**: crash de `setHalfAnimations`, rodas sem "Use Frame Rate" e folhagem Hashed
-  corrigidos e validados no Windows (ver changelog). Falta rodar `bash projects-teste/kitsuy_check.sh` no Linux,
-  com a GPU integrada e com `DRI_PRIME=1`/offload NVIDIA, para conferir se o driver da integrada rebaixa o MSAA
-  (`aa=0` no log da folhagem) — hipótese para o menu que só funcionou na dedicada. Depois, mandar o build ao Kitsuy.
+- **Bugs do Kitsuy (2026-09-28)**: corrigidos e validados no Windows e no Linux (Intel integrada,
+  NVIDIA via offload e llvmpipe sem GPU; ver changelog). Falta mandar o build ao Kitsuy.
 
 - **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor) —
   **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de

@@ -9,6 +9,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Linux: bugs do Kitsuy validados (Intel, NVIDIA e sem GPU); crash GLX com vsync adaptativo
+
+`bash projects-teste/kitsuy_check.sh` rodado no Linux (X na Intel Raptor Lake, `prime-select on-demand`):
+setHalfAnimations `OK frames=600`, carro `maxErr=0.0000` nas 6 variações, folhagem `aa=4` com degradê nos PNGs. Mesmo resultado com offload NVIDIA (RTX 5060 Laptop,
+`__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia`; processo confirmado no `nvidia-smi`).
+O `aa=0` da integrada, suspeito do menu que só funcionava na dedicada, não se reproduziu aqui.
+
+Sem GPU (`LIBGL_ALWAYS_SOFTWARE=1`, llvmpipe) o `RangeRuntime` morria na hora com `X Error BadValue`
+(GLX, valor `0xffffffff`) em `GHOST_ContextGLX::setSwapInterval(-1)`: vsync adaptativo exige
+`GLX_EXT_swap_control_tear`. `GLXEW_EXT_swap_control_tear` lê a string do cliente (anuncia a extensão),
+mas o Mesa valida pela lista da tela, que no llvmpipe não a tem. Fix: com intervalo negativo, consulta
+`glXQueryExtensionsString` da tela e, sem a extensão, cai para vsync normal. Depois do fix, o mesmo
+script passa inteiro em llvmpipe. Armaduras (`halfanim_crash`) validadas visualmente pelo usuário na bateria:
+Intel 600 ticks em ~11 s (velocidade real; a cena é frenética de propósito, 150 rigs com loop de 20 frames),
+llvmpipe ~73 s (~8 fps, câmera lenta: o BGE desacelera a lógica quando o render não acompanha). Esperado para
+rasterização em CPU, não é regressão. O WGL só retorna falha nesse
+caso, sem derrubar o processo.
+
 ## 2026-09-28 - Bugs do Discord (Kitsuy): crash com setHalfAnimations, folhagem branca/preta e rodas do carro
 
 - **Crash no skinning CPU/IK com `setHalfAnimations(1)`** (backtrace Linux em `ApplyPose` → `iksolver`).
