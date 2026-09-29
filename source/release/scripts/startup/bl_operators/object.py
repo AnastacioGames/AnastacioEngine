@@ -1237,6 +1237,16 @@ class DestructionFragmentsGenerate(Operator):
             game.collision_mask = ob.game.collision_mask
             group.objects.link(piece)
 
+        # Os pedacos vao para um collection do Outliner com o nome do grupo, dentro do collection do objeto.
+        collection = scene.collections.find(group_name)
+        if collection is None:
+            collection = scene.collections.new(group_name, scene.object_bases[ob.name].collection)
+        # Layer 20 e a dos collections fora do jogo: marcado assim, o Outliner mostra o estado certo.
+        # Em outro layer ficaria fora do jogo mas seria movido para o 20, entao so marca no 20.
+        collection.use_game = layer != 19
+        for piece in pieces:
+            scene.object_bases[piece.name].collection = collection
+
         # Liga a Destruction (preenche os padroes na primeira vez) e aponta para o grupo.
         ob.game.use_destruction = True
         ob.game.destruction.fragments = group
@@ -1245,7 +1255,8 @@ class DestructionFragmentsGenerate(Operator):
             self.report({'WARNING'}, "%d pieces on layer %d, which is visible: they will also appear in the game"
                         % (len(pieces), self.layer))
         else:
-            self.report({'INFO'}, "%d pieces on layer %d, group %s" % (len(pieces), self.layer, group.name))
+            self.report({'INFO'}, "%d pieces on layer %d, group and collection %s"
+                        % (len(pieces), self.layer, group.name))
         return {'FINISHED'}
 
 

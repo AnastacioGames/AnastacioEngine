@@ -9,6 +9,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Generate Fragments põe os pedaços num collection do Outliner
+
+- Os collections do Outliner (`SceneCollection`) ganharam RNA:
+  - `scene.collections` (nível de cima), com `new(name, parent=None)`, `remove(collection)` e `find(name)`, que
+    busca em qualquer profundidade;
+  - `SceneCollection.name`, `uid`, `use_game` (o "not in game" do Outliner, que move os objetos para a
+    layer 20) e `children`;
+  - `ObjectBase.collection`, que funciona só pelo `scene.object_bases`, porque o collection é da base na cena.
+  Mudar `use_game` ou o collection de uma base roda `BKE_scene_collections_game_sync`, como o Outliner faz.
+- O operador Generate Fragments põe os pedaços no collection `<nome>_fragments`, dentro do collection do
+  objeto. Gerar de novo reaproveita o collection. Com os pedaços na layer 20, o collection fica marcado
+  como fora do jogo. Conferido no editor headless: collection dentro do pai, reaproveitado, 6 pedaços, layer 20; com a layer 3, fica no jogo.
+- Painel Explosive: `layout.split(percentage=...)` virou `factor=` (o UILayout do fork não aceita mais
+  `percentage`); o painel dava TypeError ao ser desenhado com um Effect.
+- Painéis Destruction e Explosive reorganizados no padrão do painel Physics: seções com título e ícone
+  (Fragments, Break, Debris; Blast, Trigger, Effect) em duas colunas.
+
 ## 2026-09-29 - Ponteiros de jogo no `library_query.c` e import do `aud` sem crash
 
 - `BKE_library_foreach_ID_link` (`library_query.c`) não listava `vehicle_steering_wheel`, `collision_bound`,

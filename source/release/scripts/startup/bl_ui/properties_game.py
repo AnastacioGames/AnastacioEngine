@@ -571,22 +571,28 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
         layout = layout.column()
         layout.active = game.use_destruction
 
-        row = layout.row(align=True)
-        row.prop(ds, "fragments")
+        col = layout.column()
+        col.label(text="Fragments:", icon='GROUP')
+        row = col.row(align=True)
+        row.prop(ds, "fragments", text="")
         row.operator("object.destruction_fragments_generate", text="Generate Fragments...", icon='MOD_EXPLODE')
+        if game.use_destruction:
+            self.draw_fragments_check(col, context.scene, ob, ds.fragments)
+
+        layout.separator()
 
         split = layout.split()
         col = split.column()
+        col.label(text="Break:", icon='MOD_EXPLODE')
         col.prop(ds, "break_impulse")
         col.prop(ds, "use_break_on_collision")
+
         col = split.column()
-        col.prop(ds, "burst_speed")
+        col.label(text="Debris:", icon='MOD_PHYSICS')
+        sub = col.column(align=True)
+        sub.prop(ds, "burst_speed")
+        sub.prop(ds, "debris_lifetime", text="Lifetime")
         col.prop(ds, "use_inherit_velocity")
-
-        layout.prop(ds, "debris_lifetime")
-
-        if game.use_destruction:
-            self.draw_fragments_check(layout, context.scene, ob, ds.fragments)
 
     @staticmethod
     def draw_fragments_check(layout, scene, ob, group):
@@ -625,32 +631,33 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
 
         split = layout.split()
         col = split.column()
-        col.prop(es, "radius")
-        col.prop(es, "force")
-        col = split.column()
-        col.prop(es, "up_bias")
+        col.label(text="Blast:", icon='FORCE_FORCE')
+        sub = col.column(align=True)
+        sub.prop(es, "radius")
+        sub.prop(es, "force")
+        sub.prop(es, "up_bias", slider=True)
         col.prop(es, "use_occlusion")
 
-        layout.separator()
-        layout.prop(es, "fuse")
-
-        split = layout.split()
         col = split.column()
+        col.label(text="Trigger:", icon='TIME')
+        col.prop(es, "fuse")
         col.prop(es, "use_explode_on_impact")
         col.prop(es, "use_chain_reaction")
-        col = split.column()
-        col.active = es.use_explode_on_impact or es.use_chain_reaction
-        col.prop(es, "impact_impulse")
+        sub = col.column()
+        sub.active = es.use_explode_on_impact or es.use_chain_reaction
+        sub.prop(es, "impact_impulse")
 
         layout.separator()
-        split = layout.split(percentage=0.65)
-        split.prop(es, "effect")
+
+        col = layout.column()
+        col.label(text="Effect:", icon='PARTICLES')
+        split = col.split(factor=0.65)
+        split.prop(es, "effect", text="")
         sub = split.row()
         sub.active = es.effect is not None
         sub.prop(es, "effect_life", text="Life")
-
         if game.use_explosive and es.effect is not None and es.effect.is_visible(context.scene):
-            layout.label(text="Move the Effect object to an inactive layer", icon='ERROR')
+            col.label(text="Move the Effect object to an inactive layer", icon='ERROR')
 
 
 class RenderButtonsPanel:

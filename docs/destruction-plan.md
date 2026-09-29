@@ -67,6 +67,8 @@ Debris Lifetime: 10.0 s (0 = permanente)     [x] Chain Reaction
     pedaços, e a mesma semente dá os mesmos pedaços;
   - põe os pedaços do grupo `<nome>_fragments` na layer escolhida, com `dupli_offset` 0, para o runtime usar
     `obj.world * piece.world`;
+  - põe os pedaços também num collection do Outliner com o mesmo nome, criado dentro do collection do objeto e
+    reaproveitado quando os pedaços são gerados de novo. Na layer 20 ele fica marcado como fora do jogo;
   - dá aos pedaços Rigid Body e Convex Hull, a massa do objeto dividida pelo volume de cada um e o collision
     group e mask do objeto;
   - liga a Destruction e preenche `Fragments`;

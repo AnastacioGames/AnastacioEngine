@@ -693,6 +693,43 @@ static void rna_Object_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 	WM_main_add_notifier(NC_SCENE | ND_LAYER_CONTENT, scene);
 }
 
+/* The Scene of a base reached through scene.object_bases, NULL otherwise. */
+static Scene *rna_Base_scene(PointerRNA *ptr)
+{
+	ID *id = ptr->id.data;
+	return (id && GS(id->name) == ID_SCE) ? (Scene *)id : NULL;
+}
+
+static PointerRNA rna_Base_collection_get(PointerRNA *ptr)
+{
+	Scene *scene = rna_Base_scene(ptr);
+	Base *base = (Base *)ptr->data;
+	SceneCollection *sc = scene ? BKE_scene_collection_find(scene, base->collection_uid) : NULL;
+	return rna_pointer_inherit_refine(ptr, &RNA_SceneCollection, sc);
+}
+
+static void rna_Base_collection_set(PointerRNA *ptr, PointerRNA value)
+{
+	Scene *scene = rna_Base_scene(ptr);
+	Base *base = (Base *)ptr->data;
+	SceneCollection *sc = (SceneCollection *)value.data;
+
+	if (scene == NULL || (sc && BKE_scene_collection_find(scene, sc->uid) != sc)) {
+		return;
+	}
+	base->collection_uid = sc ? sc->uid : 0;
+}
+
+static void rna_Base_collection_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	Scene *scene = rna_Base_scene(ptr);
+	if (scene && BKE_scene_collections_game_sync(scene)) {
+		DAG_relations_tag_update(bmain);
+		WM_main_add_notifier(NC_SCENE | ND_LAYER_CONTENT, scene);
+	}
+	WM_main_add_notifier(NC_SCENE | ND_OB_ACTIVE, scene);
+}
+
 static void rna_Base_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Base *base = (Base *)ptr->data;
@@ -4309,6 +4346,15 @@ static void rna_def_object_base(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BA_SELECT);
 	RNA_def_property_ui_text(prop, "Select", "Object base selection state");
 	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Base_select_update");
+
+	prop = RNA_def_property(srna, "collection", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "SceneCollection");
+	RNA_def_property_pointer_funcs(prop, "rna_Base_collection_get", "rna_Base_collection_set", NULL, NULL);
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Collection",
+	                         "Outliner collection of the object in this scene (None for the top level), "
+	                         "only through scene.object_bases");
+	RNA_def_property_update(prop, 0, "rna_Base_collection_update");
 
 	RNA_api_object_base(srna);
 }

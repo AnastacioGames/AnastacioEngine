@@ -698,6 +698,53 @@ static void rna_Scene_object_unlink(Scene *scene, Main *bmain, ReportList *repor
 	WM_main_add_notifier(NC_SCENE | ND_OB_ACTIVE, scene);
 }
 
+/* Outliner collections: a collection of "not in game" moves its objects to layer 20. */
+static void rna_scene_collections_changed(Main *bmain, Scene *scene)
+{
+	if (BKE_scene_collections_game_sync(scene)) {
+		DAG_relations_tag_update(bmain);
+		WM_main_add_notifier(NC_SCENE | ND_LAYER_CONTENT, scene);
+	}
+	WM_main_add_notifier(NC_SCENE | ND_OB_ACTIVE, scene);
+}
+
+static void rna_SceneCollection_name_set(PointerRNA *ptr, const char *value)
+{
+	BKE_scene_collection_rename((Scene *)ptr->id.data, (SceneCollection *)ptr->data, value);
+}
+
+static void rna_SceneCollection_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	rna_scene_collections_changed(bmain, (Scene *)ptr->id.data);
+}
+
+static SceneCollection *rna_Scene_collections_new(Scene *scene, Main *bmain, ReportList *reports,
+                                                  const char *name, SceneCollection *parent)
+{
+	if (parent && BKE_scene_collection_find(scene, parent->uid) != parent) {
+		BKE_reportf(reports, RPT_ERROR, "Collection '%s' is not in scene '%s'", parent->name, scene->id.name + 2);
+		return NULL;
+	}
+	SceneCollection *sc = BKE_scene_collection_add(scene, parent, name);
+	rna_scene_collections_changed(bmain, scene);
+	return sc;
+}
+
+static void rna_Scene_collections_remove(Scene *scene, Main *bmain, ReportList *reports, SceneCollection *sc)
+{
+	if (BKE_scene_collection_find(scene, sc->uid) != sc) {
+		BKE_reportf(reports, RPT_ERROR, "Collection '%s' is not in scene '%s'", sc->name, scene->id.name + 2);
+		return;
+	}
+	BKE_scene_collection_remove(scene, sc);
+	rna_scene_collections_changed(bmain, scene);
+}
+
+static SceneCollection *rna_Scene_collections_find(Scene *scene, const char *name)
+{
+	return BKE_scene_collection_find_name(scene, name);
+}
+
 static void rna_Scene_skgen_etch_template_set(PointerRNA *ptr, PointerRNA value)
 {
 	ToolSettings *ts = (ToolSettings *)ptr->data;
@@ -7332,6 +7379,75 @@ static void rna_def_scene_objects(BlenderRNA *brna, PropertyRNA *cprop)
 }
 
 
+/* scene.collections */
+static void rna_def_scene_collection(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "SceneCollection", NULL);
+	RNA_def_struct_sdna(srna, "SceneCollection");
+	RNA_def_struct_ui_text(srna, "Scene Collection",
+	                       "Outliner folder that organizes objects, without changing their parenting");
+	RNA_def_struct_ui_icon(srna, ICON_FILE_FOLDER);
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_SceneCollection_name_set");
+	RNA_def_property_ui_text(prop, "Name", "Collection name, unique inside the scene");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_SCENE | ND_OB_ACTIVE, NULL);
+
+	prop = RNA_def_property(srna, "uid", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "UID", "Identifier of the collection inside the scene");
+
+	prop = RNA_def_property(srna, "use_game", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SCECOL_GAME_EXCLUDE);
+	RNA_def_property_ui_text(prop, "In Game",
+	                         "Objects start active in the game; when off they move to layer 20 and start "
+	                         "inactive, ready for Add Object");
+	RNA_def_property_update(prop, 0, "rna_SceneCollection_update");
+
+	prop = RNA_def_property(srna, "children", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "children", NULL);
+	RNA_def_property_struct_type(prop, "SceneCollection");
+	RNA_def_property_ui_text(prop, "Children", "Collections inside this one");
+}
+
+static void rna_def_scene_collections(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "SceneCollections");
+	srna = RNA_def_struct(brna, "SceneCollections", NULL);
+	RNA_def_struct_sdna(srna, "Scene");
+	RNA_def_struct_ui_text(srna, "Scene Collections", "Top level Outliner collections of the scene");
+
+	func = RNA_def_function(srna, "new", "rna_Scene_collections_new");
+	RNA_def_function_ui_description(func, "Add a collection, the name is made unique inside the scene");
+	RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
+	RNA_def_string(func, "name", "Collection", MAX_NAME, "Name", "");
+	parm = RNA_def_pointer(func, "parent", "SceneCollection", "Parent",
+	                       "Collection to add it into, None for the top level");
+	parm = RNA_def_pointer(func, "collection", "SceneCollection", "", "The new collection");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_Scene_collections_remove");
+	RNA_def_function_ui_description(func, "Remove a collection, its objects and collections move to its parent");
+	RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
+	parm = RNA_def_pointer(func, "collection", "SceneCollection", "", "Collection to remove");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+
+	func = RNA_def_function(srna, "find", "rna_Scene_collections_find");
+	RNA_def_function_ui_description(func, "Find a collection by name at any depth");
+	parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_pointer(func, "collection", "SceneCollection", "", "The collection, or None");
+	RNA_def_function_return(func, parm);
+}
+
 /* scene.bases.* */
 static void rna_def_scene_bases(BlenderRNA *brna, PropertyRNA *cprop)
 {
@@ -7822,6 +7938,12 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_collection_funcs(prop, NULL, NULL, NULL, "rna_Scene_objects_get", NULL, NULL, NULL, NULL);
 	rna_def_scene_objects(brna, prop);
 
+	prop = RNA_def_property(srna, "collections", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "collections", NULL);
+	RNA_def_property_struct_type(prop, "SceneCollection");
+	RNA_def_property_ui_text(prop, "Collections", "Top level Outliner collections, see ObjectBase.collection");
+	rna_def_scene_collections(brna, prop);
+
 	/* Layers */
 	prop = RNA_def_property(srna, "layers", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	/* this seems to be too much trouble with depsgraph updates/etc. currently (20110420) */
@@ -8207,6 +8329,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	rna_def_unit_settings(brna);
 	rna_def_scene_image_format_data(brna);
 	rna_def_scene_game_data(brna);
+	rna_def_scene_collection(brna);
 	rna_def_scene_shaders_fx(brna);
 	rna_def_transform_orientation(brna);
 	rna_def_selected_uv_element(brna);

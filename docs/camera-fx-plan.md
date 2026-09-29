@@ -11,9 +11,9 @@ A proposta é levar tudo isso para dentro da engine:
 Decisões do usuário: uma câmera ativa (sem tela dividida), configurações na câmera, olho de gato com as 3 opções selecionáveis.
 
 ## O que já existe e será reaproveitado
-- `Camera` DNA ([DNA_camera_types.h](source/blender/makesdna/DNA_camera_types.h)) já tem `dof_ob` (objeto de foco) e `gpu_dof` (`focus_distance`, `fstop`, `num_blades`). Esses campos serão reaproveitados para foco e abertura, e os campos novos vão em uma struct ao final.
-- Padrão de filtro nativo reservado: `FILTERPASS_*` e `reservedPassIndex` em [RAS_2DFilterManager.h](source/gameengine/Rasterizer/RAS_2DFilterManager.h), `Ensure*Filters` em [KX_2DFilterManager.cpp](source/gameengine/Ketsji/KX_2DFilterManager.cpp) (modelo: `EnsureLensFlareFilters`), uniforms em `RAS_2DFilter.cpp` via `BuildInFilters` e atualização por frame em `KX_RenderPipeline::PostRenderScene` (como já é feito com `flare_time`/`flare_sun_x`).
-- Tremor: `KX_Camera::SetShakeShift` e `KX_Scene::UpdateEarthquake` ([KX_Scene.cpp:627](source/gameengine/Ketsji/KX_Scene.cpp#L627)).
+- `Camera` DNA ([DNA_camera_types.h](../source/source/blender/makesdna/DNA_camera_types.h)) já tem `dof_ob` (objeto de foco) e `gpu_dof` (`focus_distance`, `fstop`, `num_blades`). Esses campos serão reaproveitados para foco e abertura, e os campos novos vão em uma struct ao final.
+- Padrão de filtro nativo reservado: `FILTERPASS_*` e `reservedPassIndex` em [RAS_2DFilterManager.h](../source/source/gameengine/Rasterizer/RAS_2DFilterManager.h), `Ensure*Filters` em [KX_2DFilterManager.cpp](../source/source/gameengine/Ketsji/KX_2DFilterManager.cpp) (modelo: `EnsureLensFlareFilters`), uniforms em `RAS_2DFilter.cpp` via `BuildInFilters` e atualização por frame em `KX_RenderPipeline::PostRenderScene` (como já é feito com `flare_time`/`flare_sun_x`).
+- Tremor: `KX_Camera::SetShakeShift` e `KX_Scene::UpdateEarthquake` ([KX_Scene.cpp:627](../source/source/gameengine/Ketsji/KX_Scene.cpp#L627)).
 - Shaders GLSL embutidos via `datatoc` em `Rasterizer/RAS_OpenGLFilters/` (CMakeLists).
 - Algoritmos de referência: os shaders do jogo (bokeh com anéis, blur radial em buffer de meia resolução, blur direcional com 24 amostras e peso `pow`).
 
@@ -69,10 +69,10 @@ Para ser rápido, os efeitos são agrupados por custo, e cada grupo só é compi
 
 ### 4. Dados, RNA e UI
 - DNA: `struct CameraGameFX` ao final de `Camera` (flags de efeito, parâmetros, foco, tremor). Defaults em `versioning_range.c`, que é o padrão usado pelo `csmCacheMaxStaleFrames`.
-- RNA: [rna_camera.c](source/blender/makesrna/intern/rna_camera.c).
-- UI: [properties_data_camera.py](../release/scripts/startup/bl_ui/properties_data_camera.py), só `BLENDER_GAME`, com os painéis "Focus", "Camera Effects" (um subpainel ou caixa por efeito, cada um com checkbox no cabeçalho) e "Camera Shake".
+- RNA: [rna_camera.c](../source/source/blender/makesrna/intern/rna_camera.c).
+- UI: [properties_data_camera.py](../source/release/scripts/startup/bl_ui/properties_data_camera.py), só `BLENDER_GAME`, com os painéis "Focus", "Camera Effects" (um subpainel ou caixa por efeito, cada um com checkbox no cabeçalho) e "Camera Shake".
 - Python: toggles `cam.fx.dof`, `cam.fx.speedBlur`… ou atributos planos `cam.useDof` etc. (seguir o estilo dos atributos existentes de `KX_Camera`) e `cam.speedBlurOverride`.
-- Conversão: ler DNA → `KX_Camera` em [BL_BlenderDataConversion.cpp:1065](source/gameengine/Converter/BL_BlenderDataConversion.cpp#L1065).
+- Conversão: ler DNA → `KX_Camera` em [BL_BlenderDataConversion.cpp:1065](../source/source/gameengine/Converter/BL_BlenderDataConversion.cpp#L1065).
 
 ## Fases (cada uma compila e é testada antes da próxima)
 1. **Foco**: DNA, RNA, painel Focus, `UpdateFocus` e API Python. Sem efeito visual, dá para validar só pelo Python (`focusPosition`).
