@@ -24,7 +24,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Painel Explosive: `layout.split(percentage=...)` virou `factor=` (o UILayout do fork não aceita mais
   `percentage`); o painel dava TypeError ao ser desenhado com um Effect.
 - Painéis Destruction e Explosive reorganizados no padrão do painel Physics: seções com título e ícone
-  (Fragments, Break, Debris; Blast, Trigger, Effect) em duas colunas.
+  (Fragments, Break, Debris; Blast, Trigger, Effect), cada seção numa caixa (`layout.box()`), como o
+  painel Physics do flowmenu (`flowmenu/custom_pt_physics.py`).
 
 ## 2026-09-29 - Ponteiros de jogo no `library_query.c` e import do `aud` sem crash
 

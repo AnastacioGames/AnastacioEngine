@@ -571,7 +571,7 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
         layout = layout.column()
         layout.active = game.use_destruction
 
-        col = layout.column()
+        col = layout.box()
         col.label(text="Fragments:", icon='GROUP')
         row = col.row(align=True)
         row.prop(ds, "fragments", text="")
@@ -579,9 +579,7 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
         if game.use_destruction:
             self.draw_fragments_check(col, context.scene, ob, ds.fragments)
 
-        layout.separator()
-
-        split = layout.split()
+        split = layout.box().split()
         col = split.column()
         col.label(text="Break:", icon='MOD_EXPLODE')
         col.prop(ds, "break_impulse")
@@ -629,7 +627,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         layout = layout.column()
         layout.active = game.use_explosive
 
-        split = layout.split()
+        split = layout.box().split()
         col = split.column()
         col.label(text="Blast:", icon='FORCE_FORCE')
         sub = col.column(align=True)
@@ -647,9 +645,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         sub.active = es.use_explode_on_impact or es.use_chain_reaction
         sub.prop(es, "impact_impulse")
 
-        layout.separator()
-
-        col = layout.column()
+        col = layout.box()
         col.label(text="Effect:", icon='PARTICLES')
         split = col.split(factor=0.65)
         split.prop(es, "effect", text="")
