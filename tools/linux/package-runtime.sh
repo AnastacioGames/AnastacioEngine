@@ -133,8 +133,10 @@ fi
 # Empacota em lib/ as .so da distro (diretas e indiretas) de que os executaveis e os modulos do Python
 # dependem; sem isso o pacote so abre com os mesmos nomes de pacote do Ubuntu 24.04 (Fumangy, 2026-09-29).
 # Ficam no sistema: glibc, libstdc++/libgcc_s, GL/driver, X11/xcb/Wayland, audio e servicos do desktop.
+# libva, libvdpau e libOpenCL vao junto (sao carregadores genericos; o driver fica no sistema): faltavam em Ubuntu 22.04/26.04,
+# Debian 12 e Fedora limpos. libgbm fica: e do Mesa e todo desktop com video tem.
 # A glibc nao pode ir junto: o pacote continua exigindo a glibc da maquina de build (ver docs/linux-build.md).
-system_libs='^(ld-linux.*|lib(c|m|dl|pthread|rt|resolv|util|anl|nsl|mvec)|libstdc\+\+|libgcc_s|libGL|libGLX.*|libGLdispatch|libEGL|libOpenGL|libglapi|libgbm|libdrm.*|libX11|libX11-xcb|libxcb.*|libxshmfence|libwayland-.*|libxkbcommon.*|libvdpau|libva.*|libOpenCL|libcuda|libnvidia.*|libasound|libjack|libpulse.*|libfontconfig|libexpat|libdbus-1|libsystemd|libudev|libcom_err|libgpg-error)\.so'
+system_libs='^(ld-linux.*|lib(c|m|dl|pthread|rt|resolv|util|anl|nsl|mvec)|libstdc\+\+|libgcc_s|libGL|libGLX.*|libGLdispatch|libEGL|libOpenGL|libglapi|libgbm|libdrm.*|libX11|libX11-xcb|libxcb.*|libxshmfence|libwayland-.*|libxkbcommon.*|libcuda|libnvidia.*|libasound|libjack|libpulse.*|libfontconfig|libexpat|libdbus-1|libsystemd|libudev|libcom_err|libgpg-error)\.so'
 ldd_targets=()
 while IFS= read -r -d '' f; do
   head -c4 "$f" | grep -q 'ELF' && ldd_targets+=("$f")

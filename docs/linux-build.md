@@ -478,7 +478,8 @@ O script instala as dependencias pelo apt, o CMake pelo pip (>=3.28, o do 22.04 
 isolado, compila os dois presets e gera `build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz`. No 22.04
 a Embree so vem como `libembree3.so` (sem as bibliotecas por componente); `FindEmbree.cmake` aceita isso. Para
 conferir o pacote: `objdump -T` dos binarios sem simbolo acima de `GLIBC_2.35` e `ldd ./RangeEngine | grep "not found"`
-vazio. O pacote tambem traz `range-engine.png`, `RangeEngine.desktop` e `install-desktop.sh` (icone no menu e na
+vazio. `libva`, `libvdpau` e `libOpenCL` vao em `lib/` (sem elas o pacote nao abria em Ubuntu 22.04/26.04, Debian 12
+e Fedora limpos); `libgbm`, ALSA/Pulse e Wayland ficam no sistema, como em qualquer desktop. O pacote tambem traz `range-engine.png`, `RangeEngine.desktop` e `install-desktop.sh` (icone no menu e na
 dock; a janela X11 ja define o icone sozinha via `_NET_WM_ICON`).
 
 ## Testes do Cycles (GTest) no Linux

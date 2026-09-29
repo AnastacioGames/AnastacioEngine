@@ -20,6 +20,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - O `cmake --install` do preset editor tambem instala o `RangeRuntime`: compilar os dois alvos em `build-linux-editor`.
 - Icone: `GHOST_WindowX11.cpp` define `_NET_WM_ICON` (48x48, do `winrange.ico`); o pacote leva `range-engine.png`,
   `RangeEngine.desktop` (`StartupWMClass=Range Engine`) e `install-desktop.sh`. Conferido com `xprop` no pacote.
+- Teste em containers limpos (Ubuntu 22.04, Debian 12, Ubuntu 26.04, Fedora): alem das bibliotecas de desktop
+  (ALSA/Pulse, Wayland, xkbcommon, gbm), faltavam `libva*`, `libvdpau` e `libOpenCL`, puxadas pelo FFmpeg da
+  OIIO. Como sao carregadores genericos (o driver fica no sistema), agora vao em `lib/`.
 - Roadmap: bug do menu do player Linux (Kitsuy) cancelado pelo usuario.
 
 ## 2026-09-29 - Linux: pacote com as bibliotecas da distro, build do zero conferido
