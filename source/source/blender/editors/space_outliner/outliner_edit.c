@@ -2811,9 +2811,26 @@ static int collection_object_drop_invoke(bContext *C, wmOperator *op, const wmEv
 		return OPERATOR_CANCELLED;
 	}
 
-	if (outliner_base_collection_set(scene, base, uid)) {
-		BKE_reportf(op->reports, RPT_INFO, "'%s' stays shown under its parent '%s'",
-		            ob->id.name + 2, ob->parent->id.name + 2);
+	/* Dragging one of the selected objects moves the whole Outliner selection. */
+	LinkNode *bases = NULL;
+	outliner_selected_object_bases(&soops->tree, scene, &bases);
+	if (BLI_linklist_index(bases, base) == -1) {
+		BLI_linklist_free(bases, NULL);
+		bases = NULL;
+		BLI_linklist_prepend(&bases, base);
+	}
+
+	int parented = 0;
+	for (LinkNode *link = bases; link; link = link->next) {
+		if (outliner_base_collection_set(scene, link->link, uid)) {
+			parented++;
+		}
+	}
+	BLI_linklist_free(bases, NULL);
+
+	if (parented) {
+		BKE_reportf(op->reports, RPT_INFO,
+		            "%d parented object(s) stay shown under their parent", parented);
 	}
 
 	outliner_collection_notify(C, scene);
