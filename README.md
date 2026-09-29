@@ -9,11 +9,11 @@
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.4.5](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.5)** (Linux) · **[0.4.4](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.4)** (Windows)
+Versão atual: **[AnastacioEngine 0.4.5](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.5)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.4.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.4/AnastacioEngine-0.4.4-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.4/AnastacioEngine-0.4.4-windows-x64.zip.sha256) |
+| [Windows x64 (0.4.5)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-windows-x64.zip.sha256) |
 | [Linux x86_64 (0.4.5)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-linux-x86_64.tar.xz.sha256) |
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
@@ -22,13 +22,14 @@ Para rodar um jogo exportado, use `RangeRuntime`. No Linux não é preciso insta
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
 
-## Novidades da 0.4.5 (só Linux)
+## Novidades da 0.4.5
 
 - **Abre em mais distros:** o pacote agora é compilado no Ubuntu 22.04 (exige glibc 2.35) e leva as bibliotecas
   junto. Corrige `libOpenImageIO.so.2.4: cannot open shared object file` no Ubuntu 26.04 e o erro de glibc em
   distros mais antigas que o Ubuntu 24.04. Testado em Ubuntu 22.04, Debian 12, Ubuntu 26.04 e Fedora limpos.
 - **Ícone da Range** na janela e atalho `.desktop` para o menu de aplicativos.
-- A engine é a mesma da 0.4.4; o Windows continua na 0.4.4.
+- **Windows 0.4.5:** mesma engine da 0.4.4, publicada para igualar a numeração. O número da versão no splash e
+  no About passa a ser 0.4.5.
 - Se ainda der erro, rode `ldd ./RangeEngine | grep "not found"` e mande a saída numa
   [issue](https://github.com/AnastacioGames/AnastacioEngine/issues).
 

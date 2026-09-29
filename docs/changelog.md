@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Release 0.4.5: pacote Windows
+
+- Numero da versao 0.4.4 -> 0.4.5 em `ANASTACIO_VERSION_STRING` (splash) e no About (`wm.py`). O pacote Linux
+  0.4.5 ja publicado foi compilado antes desta troca e mostra 0.4.4 no splash e no About.
+- `AnastacioEngine-0.4.5-windows-x64.zip` (+ `.sha256`) montado a partir do zip 0.4.4 publicado (4.657 arquivos,
+  mesmo `blender.crt.manifest`, conferido por SHA-1 contra os DLLs), trocando so `RangeEngine.exe`,
+  `RangeRuntime.exe` e `wm.py` (unicos arquivos diferentes do `build/bin`). O `blender.crt.manifest` do
+  `build/bin` nao bate com os DLLs de `blender.crt/`; nao usar. Zip com `zipfile` do Python, sem `\` nos nomes.
+- Antes de empacotar: regressao, ABI de `Range.constraints` (estatico e runtime) e teste de constraints de bone
+  passando. Validado extraindo em `D:\t045`: `RangeEngine --version` e `-b` saem com 0 e o About le 0.4.5;
+  `RangeRuntime` abre `benchmark.range` e `ImGui_example.range` e segue rodando; sem eventos SideBySide.
+
 ## 2026-09-29 - Constraints de bone: teste de correcao e custo do IK
 
 - `tools/tests/bone_constraint_test.py`: compara a `pose_matrix` de cada bone no jogo com a avaliacao do
