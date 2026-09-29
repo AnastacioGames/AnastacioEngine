@@ -201,7 +201,7 @@ CcdPhysicsController::CcdPhysicsController(const CcdConstructionInfo& ci)
 {
 	m_newClientInfo = 0;
 	m_registerCount = 0;
-	m_softBodyTransformInitialized = false;
+	m_softbodyStartTrans.setIdentity();
 	m_parentRoot = nullptr;
 	// copy pointers locally to allow smart release
 	m_MotionState = ci.m_MotionState;
@@ -368,8 +368,15 @@ bool CcdPhysicsController::CreateSoftbody()
 		{
 			int nvertices = convexHull->getNumPoints();
 			const btVector3 *vertices = convexHull->getPoints();
+			// getPoints() is unscaled: apply the object scale like the triangle mesh path does.
+			const btVector3& localScaling = convexHull->getLocalScaling();
+			btAlignedObjectArray<btVector3> scaledVertices;
+			scaledVertices.resize(nvertices);
+			for (int i = 0; i < nvertices; ++i) {
+				scaledVertices[i] = vertices[i] * localScaling;
+			}
 
-			HullDesc hdsc(QF_TRIANGLES, nvertices, vertices);
+			HullDesc hdsc(QF_TRIANGLES, nvertices, &scaledVertices[0]);
 			HullResult hres;
 			HullLibrary hlib;
 			hdsc.mMaxVertices = nvertices;
@@ -441,6 +448,9 @@ bool CcdPhysicsController::CreateSoftbody()
 
 				psb = btSoftBodyHelpers::CreateFromTriMesh(worldInfo, (const btScalar *)vertexBase, (const int *)indexbase, numtris, false);
 			}
+		}
+		if (!psb) {
+			return false;
 		}
 		// store face tag so that we can find our original face when doing ray casting
 		btSoftBody::Face *ft;
@@ -525,25 +535,39 @@ bool CcdPhysicsController::CreateSoftbody()
 
 	psb->setCollisionFlags(0);
 
+	// The nodes were built from scaled vertices: compare them with scaled positions.
+	const btVector3 localScaling = m_cci.m_collisionShape->getLocalScaling();
+	const btSoftBody::tNodeArray& nodes = psb->m_nodes;
 	const unsigned int numVertices = m_shapeInfo->m_vertexRemap.size();
 	m_softBodyIndices.resize(numVertices);
 	for (unsigned int i = 0; i < numVertices; ++i) {
 		const unsigned int index = m_shapeInfo->m_vertexRemap[i];
 		if (index == -1) {
-			m_softBodyIndices[i] = 0;
+			// Vertex without collision (material with physics disabled): no node, see KX_SoftBodyDeformer.
+			m_softBodyIndices[i] = -1;
 			continue;
 		}
 		const float *co = &m_shapeInfo->m_vertexArray[index * 3];
-		m_softBodyIndices[i] = Ccd_FindClosestNode(psb, btVector3(co[0], co[1], co[2]));
+		const btVector3 pos = btVector3(co[0], co[1], co[2]) * localScaling;
+		// Without welding the triangle mesh nodes keep the m_vertexArray order: use the index directly
+		// and only search the closest node when it doesn't match (convex hull).
+		if (index < (unsigned int)nodes.size() && (nodes[index].m_x - pos).length2() <= SIMD_EPSILON) {
+			m_softBodyIndices[i] = index;
+			continue;
+		}
+		const int node = Ccd_FindClosestNode(psb, pos);
+		m_softBodyIndices[i] = (node >= 0) ? (unsigned int)node : -1;
 	}
 
+	// Nodes are in object space: move them to the object transform, which becomes the soft body frame.
 	btTransform startTrans;
 	m_bulletMotionState->getWorldTransform(startTrans);
 
 	m_MotionState->SetWorldPosition(ToMt(startTrans.getOrigin()));
-	m_MotionState->SetWorldOrientation(mt::mat3::Identity());
+	m_MotionState->SetWorldOrientation(ToMt(startTrans.getBasis()));
 
 	psb->transform(startTrans);
+	m_softbodyStartTrans = startTrans;
 
 	m_object->setCollisionFlags(m_object->getCollisionFlags() | m_cci.m_collisionFlags);
 	if (m_cci.m_do_anisotropic) {
@@ -705,24 +729,27 @@ bool CcdPhysicsController::ReplaceControllerShape(btCollisionShape *newShape)
 
 	btSoftBody *softBody = GetSoftBody();
 	if (softBody) {
+		// The new Bullet shape has no scaling, the soft body is built from the scaled vertices.
+		newShape->setLocalScaling(m_cci.m_scaling);
+
+		// Soft body must be recreated: build the new one first so the old one stays valid on failure.
+		if (!CreateSoftbody()) {
+			CM_Warning("soft body can't be rebuilt from the new shape (needs a triangle mesh or convex hull), keeping the old one");
+			return true;
+		}
+
 		btSoftRigidDynamicsWorld *world = m_cci.m_physicsEnv->GetDynamicsWorld();
-		// remove the old softBody
-		world->removeSoftBody(softBody);
-
-		// soft body must be recreated
-		delete m_object;
-		m_object = nullptr;
-		// force complete reinitialization
-		m_softBodyTransformInitialized = false;
-
-		CreateSoftbody();
-		BLI_assert(m_object);
+		const bool inWorld = !IsPhysicsSuspended();
+		if (inWorld) {
+			world->removeSoftBody(softBody);
+		}
+		delete softBody;
 
 		btSoftBody *newSoftBody = GetSoftBody();
-		// set the user
 		newSoftBody->setUserPointer(this);
-		// add the new softbody
-		world->addSoftBody(newSoftBody);
+		if (inWorld) {
+			world->addSoftBody(newSoftBody, GetCollisionFilterGroup(), GetCollisionFilterMask());
+		}
 	}
 
 	if (m_characterController) {
@@ -807,20 +834,19 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 
 	btSoftBody *sb = GetSoftBody();
 	if (sb) {
+		// Keep m_softbodyStartTrans equal to the reported transform, it's the base of SetPosition/SetOrientation.
 		if (sb->m_pose.m_bframe) {
-			btVector3 worldPos = sb->m_pose.m_com;
-			btQuaternion worldquat;
-			btMatrix3x3 trs = sb->m_pose.m_rot * sb->m_pose.m_scl;
-			trs.getRotation(worldquat);
-			m_MotionState->SetWorldPosition(ToMt(worldPos));
-			m_MotionState->SetWorldOrientation(ToMt(worldquat));
+			// m_rot is the pure rotation of the polar decomposition (m_scl holds the deformation).
+			m_softbodyStartTrans.setBasis(sb->m_pose.m_rot);
+			m_softbodyStartTrans.setOrigin(sb->m_pose.m_com);
+			m_MotionState->SetWorldOrientation(ToMt(sb->m_pose.m_rot));
 		}
 		else {
 			btVector3 aabbMin, aabbMax;
 			sb->getAabb(aabbMin, aabbMax);
-			btVector3 worldPos  = (aabbMax + aabbMin) * 0.5f;
-			m_MotionState->SetWorldPosition(ToMt(worldPos));
+			m_softbodyStartTrans.setOrigin((aabbMax + aabbMin) * 0.5f);
 		}
+		m_MotionState->SetWorldPosition(ToMt(m_softbodyStartTrans.getOrigin()));
 		m_MotionState->CalculateWorldTransformations();
 		return true;
 	}
@@ -867,7 +893,6 @@ void CcdPhysicsController::WriteDynamicsToMotionState()
 void CcdPhysicsController::PostProcessReplica(class PHY_IMotionState *motionstate, class PHY_IPhysicsController *parentctrl)
 {
 	SetParentRoot((CcdPhysicsController *)parentctrl);
-	m_softBodyTransformInitialized = false;
 	m_MotionState = motionstate;
 	m_registerCount = 0;
 	m_collisionShape = nullptr;
@@ -895,6 +920,10 @@ void CcdPhysicsController::PostProcessReplica(class PHY_IMotionState *motionstat
 			}
 		}
 	}
+	// The copied construction info still points to the original's shape: the soft body must be
+	// built from the replica's own shape (the original can be freed before this replica).
+	m_cci.m_collisionShape = m_collisionShape;
+	m_savedSoftNodeMasses.clear();
 
 	// load some characterists that are not
 	btRigidBody *oldbody = GetRigidBody();
@@ -950,6 +979,7 @@ void CcdPhysicsController::SetCenterOfMassTransform(btTransform& xform)
 	else {
 		//either collision object or soft body?
 		if (GetSoftBody()) {
+			SetSoftBodyTransform(xform);
 		}
 		else {
 			if (m_object->isStaticOrKinematicObject()) {
@@ -961,6 +991,32 @@ void CcdPhysicsController::SetCenterOfMassTransform(btTransform& xform)
 			m_object->setWorldTransform(xform);
 		}
 	}
+}
+
+void CcdPhysicsController::SetSoftBodyTransform(const btTransform& xform)
+{
+	btSoftBody *softBody = GetSoftBody();
+	if (!softBody) {
+		return;
+	}
+
+	// The nodes are in world space: move them rigidly from the current frame to the new one.
+	const btTransform delta = xform * m_softbodyStartTrans.inverse();
+	btQuaternion rot;
+	delta.getBasis().getRotation(rot);
+	if (delta.getOrigin().fuzzyZero() && btFabs(rot.getW()) >= btScalar(1.0f - SIMD_EPSILON)) {
+		return;
+	}
+
+	softBody->transform(delta);
+	// transform() stores the delta, keep the absolute frame (used to place constraint pivots).
+	softBody->m_initialWorldTransform = xform;
+	m_softbodyStartTrans = xform;
+}
+
+const btTransform& CcdPhysicsController::GetEditTransform()
+{
+	return GetSoftBody() ? m_softbodyStartTrans : m_object->getWorldTransform();
 }
 
 // kinematic methods
@@ -977,7 +1033,7 @@ void CcdPhysicsController::RelativeTranslate(const mt::vec3& dlocin, bool local)
 		}
 
 		btVector3 dloc = ToBullet(dlocin);
-		btTransform xform = m_object->getWorldTransform();
+		btTransform xform = GetEditTransform();
 
 		if (local) {
 			dloc = xform.getBasis() * dloc;
@@ -1004,7 +1060,7 @@ void CcdPhysicsController::RelativeRotate(const mt::mat3& rotval, bool local)
 		btMatrix3x3 currentOrn;
 		GetWorldOrientation(currentOrn);
 
-		btTransform xform = m_object->getWorldTransform();
+		btTransform xform = GetEditTransform();
 
 		xform.setBasis(xform.getBasis() * (local ?
 		                                   drotmat : (currentOrn.inverse() * drotmat * currentOrn)));
@@ -1037,17 +1093,9 @@ void CcdPhysicsController::SetWorldOrientation(const btMatrix3x3& orn)
 		if (m_object->isStaticObject() && !m_cci.m_bSensor) {
 			m_object->setCollisionFlags(m_object->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
 		}
-		btTransform xform  = m_object->getWorldTransform();
+		btTransform xform = GetEditTransform();
 		xform.setBasis(orn);
 		SetCenterOfMassTransform(xform);
-
-		//only once!
-		if (!m_softBodyTransformInitialized && GetSoftBody()) {
-			m_softbodyStartTrans.setBasis(orn);
-			xform.setOrigin(m_softbodyStartTrans.getOrigin());
-			GetSoftBody()->transform(xform);
-			m_softBodyTransformInitialized = true;
-		}
 	}
 }
 
@@ -1063,12 +1111,9 @@ void CcdPhysicsController::SetPosition(const mt::vec3& pos)
 			return;
 		}
 
-		btTransform xform  = m_object->getWorldTransform();
+		btTransform xform = GetEditTransform();
 		xform.setOrigin(ToBullet(pos));
 		SetCenterOfMassTransform(xform);
-		if (!m_softBodyTransformInitialized) {
-			m_softbodyStartTrans.setOrigin(xform.getOrigin());
-		}
 	}
 }
 
@@ -1111,8 +1156,71 @@ void CcdPhysicsController::RestorePhysics()
 	m_cci.m_physicsEnv->AddCcdPhysicsController(this);
 }
 
+/// Mass weighted center and linear velocity of the soft body nodes (pinned nodes are ignored).
+static void SoftBodyLinearState(const btSoftBody *softBody, btVector3& com, btVector3& linVel)
+{
+	btScalar totalMass = 0.0f;
+	com.setZero();
+	linVel.setZero();
+	for (int i = 0, size = softBody->m_nodes.size(); i < size; ++i) {
+		const btSoftBody::Node& node = softBody->m_nodes[i];
+		if (node.m_im > 0.0f) {
+			const btScalar mass = 1.0f / node.m_im;
+			com += node.m_x * mass;
+			linVel += node.m_v * mass;
+			totalMass += mass;
+		}
+	}
+	if (totalMass > 0.0f) {
+		com /= totalMass;
+		linVel /= totalMass;
+	}
+}
+
+/// Angular velocity of the soft body nodes around com: I^-1 * L.
+static btVector3 SoftBodyAngularVelocity(const btSoftBody *softBody, const btVector3& com, const btVector3& linVel)
+{
+	btVector3 momentum(0.0f, 0.0f, 0.0f);
+	btMatrix3x3 inertia(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	for (int i = 0, size = softBody->m_nodes.size(); i < size; ++i) {
+		const btSoftBody::Node& node = softBody->m_nodes[i];
+		if (node.m_im > 0.0f) {
+			const btScalar mass = 1.0f / node.m_im;
+			const btVector3 r = node.m_x - com;
+			momentum += r.cross(node.m_v - linVel) * mass;
+			const btScalar r2 = r.length2();
+			for (int row = 0; row < 3; ++row) {
+				for (int col = 0; col < 3; ++col) {
+					inertia[row][col] += mass * ((row == col ? r2 : 0.0f) - r[row] * r[col]);
+				}
+			}
+		}
+	}
+	if (btFuzzyZero(inertia.determinant())) {
+		return btVector3(0.0f, 0.0f, 0.0f);
+	}
+	return inertia.inverse() * momentum;
+}
+
 void CcdPhysicsController::SuspendDynamics(bool ghost)
 {
+	btSoftBody *softBody = GetSoftBody();
+	if (softBody) {
+		// A soft body has no static mode: freeze it by pinning every node (zero mass).
+		if (!m_suspended && !IsPhysicsSuspended()) {
+			const int numNodes = softBody->m_nodes.size();
+			m_savedSoftNodeMasses.resize(numNodes);
+			for (int i = 0; i < numNodes; ++i) {
+				m_savedSoftNodeMasses[i] = softBody->getMass(i);
+				softBody->setMass(i, 0.0f);
+				softBody->m_nodes[i].m_v.setZero();
+			}
+			// m_bDyna stays set: the soft body is still synchronized from its nodes.
+			m_suspended = true;
+		}
+		return;
+	}
+
 	btRigidBody *body = GetRigidBody();
 	if (body && !m_suspended && !m_cci.m_bSensor && !IsPhysicsSuspended()) {
 		btBroadphaseProxy *handle = body->getBroadphaseHandle();
@@ -1136,6 +1244,21 @@ void CcdPhysicsController::SuspendDynamics(bool ghost)
 
 void CcdPhysicsController::RestoreDynamics()
 {
+	btSoftBody *softBody = GetSoftBody();
+	if (softBody) {
+		if (m_suspended && !IsPhysicsSuspended()) {
+			if (m_savedSoftNodeMasses.size() == softBody->m_nodes.size()) {
+				for (int i = 0, size = m_savedSoftNodeMasses.size(); i < size; ++i) {
+					softBody->setMass(i, m_savedSoftNodeMasses[i]);
+				}
+			}
+			m_savedSoftNodeMasses.clear();
+			softBody->activate(true);
+			m_suspended = false;
+		}
+		return;
+	}
+
 	btRigidBody *body = GetRigidBody();
 	if (body && m_suspended && !IsPhysicsSuspended()) {
 		// before make sure any position change that was done in this logic frame are accounted for
@@ -1179,6 +1302,10 @@ void CcdPhysicsController::SetScaling(const mt::vec3& scale)
 
 void CcdPhysicsController::SetTransform()
 {
+	// The soft body is placed by its nodes, not by a world transform.
+	if (GetSoftBody()) {
+		return;
+	}
 	const mt::vec3 pos = m_MotionState->GetWorldPosition();
 	const mt::mat3 rot = m_MotionState->GetWorldOrientation();
 	ForceWorldTransform(ToBullet(rot), ToBullet(pos));
@@ -1208,6 +1335,16 @@ float CcdPhysicsController::GetMass()
 
 void CcdPhysicsController::SetMass(float newmass)
 {
+	btSoftBody *softBody = GetSoftBody();
+	if (softBody) {
+		// setTotalMass() scales the node masses, pinned nodes stay pinned.
+		if (!m_suspended && newmass > 0.0f && softBody->getTotalMass() > 0.0f) {
+			softBody->setTotalMass(newmass);
+			m_cci.m_mass = newmass;
+		}
+		return;
+	}
+
 	btRigidBody *body = GetRigidBody();
 	if (body && !m_suspended && !IsPhysicsSuspended() && (!mt::FuzzyZero(newmass) && !mt::FuzzyZero(GetMass()))) {
 		btBroadphaseProxy *handle = body->getBroadphaseHandle();
@@ -1222,8 +1359,10 @@ void CcdPhysicsController::SetMass(float newmass)
 
 float CcdPhysicsController::GetFriction()
 {
-	if (GetSoftBody()) {
-		std::cout << "friction is only available for rigid bodies and dynamic objects" << std::endl;
+	btSoftBody *softBody = GetSoftBody();
+	if (softBody) {
+		// Soft body dynamic friction coefficient [0,1].
+		return softBody->m_cfg.kDF;
 	}
 
 	if (GetRigidBody()) {
@@ -1234,6 +1373,12 @@ float CcdPhysicsController::GetFriction()
 
 void CcdPhysicsController::SetFriction(float newfriction)
 {
+	btSoftBody *softBody = GetSoftBody();
+	if (softBody) {
+		softBody->m_cfg.kDF = btClamped(btScalar(newfriction), btScalar(0.0f), btScalar(1.0f));
+		return;
+	}
+
 	btRigidBody* body = GetRigidBody();
 	if (body && !m_suspended && !IsPhysicsSuspended() &&
 		newfriction > 0.0) {
@@ -1300,7 +1445,7 @@ void CcdPhysicsController::ApplyForce(const mt::vec3& forcein, bool local)
 			}
 			return;
 		}
-		btTransform xform = m_object->getWorldTransform();
+		const btTransform& xform = GetEditTransform();
 
 		if (local) {
 			force = xform.getBasis() * force;
@@ -1337,13 +1482,25 @@ void CcdPhysicsController::SetAngularVelocity(const mt::vec3& ang_vel, bool loca
 			}
 			return;
 		}
-		btTransform xform = m_object->getWorldTransform();
+		const btTransform& xform = GetEditTransform();
 		if (local) {
 			angvel = xform.getBasis() * angvel;
 		}
 		btRigidBody *body = GetRigidBody();
 		if (body) {
 			body->setAngularVelocity(angvel);
+		}
+		btSoftBody *soft = GetSoftBody();
+		if (soft) {
+			// Keep the linear velocity, replace the rotation around the center of mass.
+			btVector3 com, linVel;
+			SoftBodyLinearState(soft, com, linVel);
+			for (int i = 0, size = soft->m_nodes.size(); i < size; ++i) {
+				btSoftBody::Node& node = soft->m_nodes[i];
+				if (node.m_im > 0.0f) {
+					node.m_v = linVel + angvel.cross(node.m_x - com);
+				}
+			}
 		}
 	}
 }
@@ -1540,7 +1697,7 @@ void CcdPhysicsController::SetSoftAngStiff(float angstiff)
 		btSoftBody::Material* material = softBody->m_materials[0];
 
 		if (material) {
-			material->m_kVST = angstiff;
+			material->m_kAST = angstiff;
 			softBody->m_bUpdateRtCst = true; // Update constraints
 		}
 	}
@@ -1557,7 +1714,7 @@ void CcdPhysicsController::SetSoftVolume(float volume)
 		btSoftBody::Material* material = softBody->m_materials[0];
 
 		if (material) {
-			material->m_kAST = volume;
+			material->m_kVST = volume;
 			softBody->m_bUpdateRtCst = true; // Update constraints
 		}
 	}
@@ -1577,7 +1734,6 @@ void CcdPhysicsController::SetSoftVsRigidHardness(float hardness)
 		return;
 
 	softBody->m_cfg.kSRHR_CL = hardness;
-	softBody->m_bUpdateRtCst = true; // Update constraints
 }
 
 void CcdPhysicsController::SetSoftVsKineticHardness(float hardness)
@@ -1587,7 +1743,6 @@ void CcdPhysicsController::SetSoftVsKineticHardness(float hardness)
 		return;
 
 	softBody->m_cfg.kSKHR_CL = hardness;
-	softBody->m_bUpdateRtCst = true; // Update constraints
 }
 
 
@@ -1599,7 +1754,6 @@ void CcdPhysicsController::SetSoftVsSoftHardness(float hardness) {
         return;
 
     softBody->m_cfg.kSSHR_CL = hardness;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetSoftVsRigidImpulseSplitCluster(float split) {
@@ -1608,7 +1762,6 @@ void CcdPhysicsController::SetSoftVsRigidImpulseSplitCluster(float split) {
         return;
 
     softBody->m_cfg.kSR_SPLT_CL = split;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetSoftVsKineticImpulseSplitCluster(float split) {
@@ -1617,7 +1770,6 @@ void CcdPhysicsController::SetSoftVsKineticImpulseSplitCluster(float split) {
         return;
 
     softBody->m_cfg.kSK_SPLT_CL = split;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetSoftVsSoftImpulseSplitCluster(float split) {
@@ -1626,7 +1778,6 @@ void CcdPhysicsController::SetSoftVsSoftImpulseSplitCluster(float split) {
         return;
 
     softBody->m_cfg.kSS_SPLT_CL = split;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetVelocitiesCorrectionFactor(float factor) {
@@ -1635,7 +1786,6 @@ void CcdPhysicsController::SetVelocitiesCorrectionFactor(float factor) {
         return;
 
     softBody->m_cfg.kVCF = factor;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetDampingCoefficient(float coefficient) {
@@ -1644,7 +1794,6 @@ void CcdPhysicsController::SetDampingCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kDP = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetDragCoefficient(float coefficient) {
@@ -1653,7 +1802,6 @@ void CcdPhysicsController::SetDragCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kDG = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetLiftCoefficient(float coefficient) {
@@ -1662,7 +1810,6 @@ void CcdPhysicsController::SetLiftCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kLF = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetPressureCoefficient(float coefficient) {
@@ -1671,7 +1818,6 @@ void CcdPhysicsController::SetPressureCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kPR = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetVolumeConversationCoefficient(float coefficient) {
@@ -1680,7 +1826,6 @@ void CcdPhysicsController::SetVolumeConversationCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kVC = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetDynamicFrictionCoefficient(float coefficient) {
@@ -1689,7 +1834,6 @@ void CcdPhysicsController::SetDynamicFrictionCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kDF = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetPoseMatchingCoefficient(float coefficient) {
@@ -1698,7 +1842,6 @@ void CcdPhysicsController::SetPoseMatchingCoefficient(float coefficient) {
         return;
 
     softBody->m_cfg.kMT = coefficient;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetRigidContactsHardness(float hardness) {
@@ -1707,7 +1850,6 @@ void CcdPhysicsController::SetRigidContactsHardness(float hardness) {
         return;
 
     softBody->m_cfg.kCHR = hardness;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetKineticContactsHardness(float hardness) {
@@ -1716,7 +1858,6 @@ void CcdPhysicsController::SetKineticContactsHardness(float hardness) {
         return;
 
     softBody->m_cfg.kKHR = hardness;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetSoftContactsHardness(float hardness) {
@@ -1725,7 +1866,6 @@ void CcdPhysicsController::SetSoftContactsHardness(float hardness) {
         return;
 
     softBody->m_cfg.kSHR = hardness;
-    softBody->m_bUpdateRtCst = true;
 }
 
 
@@ -1740,7 +1880,6 @@ void CcdPhysicsController::SetAnchorsHardness(float val) {
         return;
 
     softBody->m_cfg.kAHR = val;
-    softBody->m_bUpdateRtCst = true;
 }
 
 void CcdPhysicsController::SetVelocitySolverIterations(int iterations) {
@@ -1803,6 +1942,12 @@ mt::vec3 CcdPhysicsController::GetLinearVelocity()
 		const btVector3& linvel = body->getLinearVelocity();
 		return ToMt(linvel);
 	}
+	btSoftBody *soft = GetSoftBody();
+	if (soft) {
+		btVector3 com, linVel;
+		SoftBodyLinearState(soft, com, linVel);
+		return ToMt(linVel);
+	}
 
 	return mt::zero3;
 }
@@ -1814,6 +1959,12 @@ mt::vec3 CcdPhysicsController::GetAngularVelocity()
 		const btVector3& angvel = body->getAngularVelocity();
 		return ToMt(angvel);
 	}
+	btSoftBody *soft = GetSoftBody();
+	if (soft) {
+		btVector3 com, linVel;
+		SoftBodyLinearState(soft, com, linVel);
+		return ToMt(SoftBodyAngularVelocity(soft, com, linVel));
+	}
 
 	return mt::zero3;
 }
@@ -1824,6 +1975,14 @@ mt::vec3 CcdPhysicsController::GetVelocity(const mt::vec3 &posin)
 	if (body) {
 		btVector3 linvel = body->getVelocityInLocalPoint(ToBullet(posin));
 		return ToMt(linvel);
+	}
+	btSoftBody *soft = GetSoftBody();
+	if (soft) {
+		// posin is relative to the center of mass, like getVelocityInLocalPoint().
+		btVector3 com, linVel;
+		SoftBodyLinearState(soft, com, linVel);
+		const btVector3 angVel = SoftBodyAngularVelocity(soft, com, linVel);
+		return ToMt(linVel + angVel.cross(ToBullet(posin)));
 	}
 
 	return mt::zero3;

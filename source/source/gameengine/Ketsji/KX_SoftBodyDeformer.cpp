@@ -82,47 +82,65 @@ void KX_SoftBodyDeformer::Apply(RAS_DisplayArray *array)
 	// update the vertex in m_transverts
 	Update();
 
+	// Update vertex data from the original mesh first, the soft body positions are written over it.
+	RAS_DisplayArray *origArray = nullptr;
+	for (DisplayArraySlot& slot : m_slots) {
+		if (slot.m_displayArray == array) {
+			const short modifiedFlag = slot.m_arrayUpdateClient.GetInvalidAndClear();
+			if (modifiedFlag != RAS_DisplayArray::NONE_MODIFIED) {
+				array->UpdateFrom(slot.m_origDisplayArray, modifiedFlag);
+			}
+			origArray = slot.m_origDisplayArray;
+			break;
+		}
+	}
+
 	btSoftBody::tNodeArray&   nodes(softBody->m_nodes);
+	const unsigned int numNodes = nodes.size();
 	const std::vector<unsigned int>& indices = ctrl->GetSoftBodyIndices();
+
+	const bool autoUpdate = m_gameobj->GetAutoUpdateBounds();
 
 	// AABB Box : min/max.
 	mt::vec3 aabbMin(FLT_MAX);
 	mt::vec3 aabbMax(-FLT_MAX);
 
-	if (m_needUpdateAabb) {
+	// Reset only when this deformer computes the bounds, a predefined bound must stay untouched.
+	if (m_needUpdateAabb && autoUpdate) {
 		m_boundingBox->SetAabb(aabbMin, aabbMax);
 		m_needUpdateAabb = false;
 	}
 
-	const mt::mat3x4 invtrans = m_gameobj->NodeGetWorldTransform().Inverse();
-	const bool autoUpdate = m_gameobj->GetAutoUpdateBounds();
+	const mt::mat3x4 trans = m_gameobj->NodeGetWorldTransform();
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::mat3& rot = m_gameobj->NodeGetWorldOrientation();
 
 	for (unsigned int i = 0, size = array->GetVertexCount(); i < size; ++i) {
 		const RAS_VertexInfo& vinfo = array->GetVertexInfo(i);
+		const unsigned int origIndex = vinfo.GetOrigIndex();
+		const unsigned int index = (origIndex < indices.size()) ? indices[origIndex] : -1;
 
-		const unsigned int index = indices[vinfo.GetOrigIndex()];
-		const mt::vec3 pos = ToMt(nodes[index].m_x);
-
+		mt::vec3 pos;
+		if (index < numNodes) {
+			pos = ToMt(nodes[index].m_x);
+			array->SetNormal(i, ToMt(nodes[index].m_n));
+		}
+		else if (origArray) {
+			/* Vertex without soft body node (material with physics disabled):
+			 * follow the object transform, the vertices are drawn in world space. */
+			pos = trans * mt::vec3(origArray->GetPosition(i));
+			array->SetNormal(i, rot * mt::vec3(origArray->GetNormal(i)));
+		}
+		else {
+			continue;
+		}
 		array->SetPosition(i, pos);
-		array->SetNormal(i, ToMt(nodes[index].m_n));
 
 		if (autoUpdate) {
 			// Extract object transform from the vertex position.
-			const mt::vec3 ptWorld = invtrans * pos;
-			aabbMin = mt::vec3::Min(aabbMin, ptWorld);
-			aabbMax = mt::vec3::Max(aabbMax, ptWorld);
-		}
-	}
-
-	for (DisplayArraySlot& slot : m_slots) {
-		if (slot.m_displayArray == array) {
-			const short modifiedFlag = slot.m_arrayUpdateClient.GetInvalidAndClear();
-			if (modifiedFlag != RAS_DisplayArray::NONE_MODIFIED) {
-				/// Update vertex data from the original mesh.
-				array->UpdateFrom(slot.m_origDisplayArray, modifiedFlag);
-			}
-
-			break;
+			const mt::vec3 ptLocal = invtrans * pos;
+			aabbMin = mt::vec3::Min(aabbMin, ptLocal);
+			aabbMax = mt::vec3::Max(aabbMax, ptLocal);
 		}
 	}
 

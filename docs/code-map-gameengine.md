@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-09-29 (`HEAD` `29b5984d`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-09-29 (`HEAD` `1b6b5e1e`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -111,29 +111,29 @@ mais óbvio a viver em outro arquivo se um dia dividirem esse `.cpp`.
 
 ---
 
-## `Physics/Bullet/CcdPhysicsController.cpp` (2.601 linhas)
+## `Physics/Bullet/CcdPhysicsController.cpp` (2.760 linhas)
 
-Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdPhysicsController.h` (976 linhas).
+Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdPhysicsController.h` (983 linhas).
 
 | Domínio | Conteúdo (linha inicial) |
 |---|---|
 | Personagem | `CcdCharacter` 60–187 (pulo, caminhada, velocidade de queda, inclinação máxima) |
-| Ciclo de vida | construtor 199, `PostProcessReplica` 867, `SetPhysicsEnvironment` 923, `GetReplica` 2033, `GetReplicaForSensors` 2040 |
+| Ciclo de vida | construtor 199, `PostProcessReplica` 893, `SetPhysicsEnvironment` 952, `GetReplica` 2192, `GetReplicaForSensors` 2199 |
 | Constraints (referências) | `add/remove/getCcdConstraintRef` 236–254 |
-| Motion state e transformação | `GetTransformFromMotionState` 259, `SetCenterOfMassOffset` 308, `SimulationTick` 767, `SynchronizeMotionStates` 804, `Write*ToDynamics/MotionState` 849–855, `SetTransform`, posição/orientação/escala 936–1185, `DefaultMotionState` 2143–2189 |
-| Criação de corpos | `CreateSoftbody` 351 (~200 linhas), `CreateCharacterController` 555, `CreateRigidbody` 582 |
-| Shapes | `DeleteBulletShape` 654, `DeleteControllerShape` 670, `ReplaceControllerShape` 691, `ReinstancePhysicsShape` 2091, `ReplacePhysicsShape` 2116, `CreateBulletShape` 2410 (~160 linhas), `AddShape` 2570, `UpdateMesh` 2222 (~170 linhas), `FindMesh` 2189 |
-| Compound | `AddCompoundChild` 1902, `RemoveCompoundChild` 1979 |
-| Suspensão | `SuspendPhysics`/`RestorePhysics` 1109–1114, `SuspendDynamics`/`RestoreDynamics` 1137–1160, `IsPhysicsSuspended` 2076 |
+| Motion state e transformação | `GetTransformFromMotionState` 259, `SetCenterOfMassOffset` 308, `SimulationTick` 794, `SynchronizeMotionStates` 831, `Write*ToDynamics/MotionState` 849–855, `SetTransform`, posição/orientação/escala 936–1185, `DefaultMotionState` 2302–2348 |
+| Criação de corpos | `CreateSoftbody` 351 (~200 linhas), `CreateCharacterController` 579, `CreateRigidbody` 606 |
+| Shapes | `DeleteBulletShape` 654, `DeleteControllerShape` 694, `ReplaceControllerShape` 715, `ReinstancePhysicsShape` 2250, `ReplacePhysicsShape` 2275, `CreateBulletShape` 2569 (~160 linhas), `AddShape` 2729, `UpdateMesh` 2381 (~170 linhas), `FindMesh` 2348 |
+| Compound | `AddCompoundChild` 2061, `RemoveCompoundChild` 2138 |
+| Suspensão | `SuspendPhysics`/`RestorePhysics` 1154–1159, `SuspendDynamics`/`RestoreDynamics` 1245–1268, `IsPhysicsSuspended` 2235 |
 | Massa, atrito, forças, velocidades | 1185–1421 e 1791–1840 |
-| Colisão | group/mask 1425–1440, `SetActive` 1429, `RefreshCollisions` 1084 |
+| Colisão | group/mask 1425–1440, `SetActive` 1586, `RefreshCollisions` 1129 |
 | Damping e CCD | 1445–1495 |
 | **Soft body (parâmetros)** | `SetSoft*` e coeficientes 1506–1776 (~270 linhas de setters quase idênticos) |
-| Sleeping | `UpdateDeactivation` 1881, `WantsSleeping` 1889 |
+| Sleeping | `UpdateDeactivation` 2040, `WantsSleeping` 2048 |
 
 ---
 
-## `Converter/BL_BlenderDataConversion.cpp` (2.457 linhas)
+## `Converter/BL_BlenderDataConversion.cpp` (2.463 linhas)
 
 Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConversion.h` (81 linhas).
 

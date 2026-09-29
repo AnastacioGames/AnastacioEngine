@@ -9,6 +9,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Soft body no jogo: mapeamento com escala, transformação, velocidade, suspend e deformer
+
+- Mapeamento vértice → nó (`CcdPhysicsController::CreateSoftbody`): a posição do vértice agora é comparada já
+  escalada; com escala não uniforme a malha renderizada encolhia (extensão local 0,67 em vez de 2) e, com escala
+  uniforme, cantos e arestas pegavam nós errados. Convex hull passa a usar os pontos escalados (antes o corpo tinha
+  o tamanho sem escala). Retorno nulo de `CreateFromTriMesh`/hull agora é tratado.
+- Transformação: `SetSoftBodyTransform` aplica o delta entre a transformação atual e a nova aos nós, então
+  `worldPosition`/`worldOrientation`/`applyMovement`/`applyRotation` funcionam depois do primeiro quadro (antes só
+  valiam uma vez). O estado de movimento reporta a rotação da pose (shape matching) ou a base inicial, não mais identidade.
+- Velocidade: `getLinearVelocity`/`getAngularVelocity`/`setAngularVelocity` e `getVelocity(pos)` passam a funcionar
+  em soft body (média ponderada por massa dos nós; angular por I⁻¹L).
+- `suspendDynamics`/`restoreDynamics`: zera e restaura as massas dos nós (antes o corpo continuava caindo e o
+  `restore` podia derrubar o runtime com ponteiro nulo em `SetTransform`).
+- `mass`/`friction` em Python: `setTotalMass` e `kDF` (antes `mass` era ignorado e `friction` imprimia no stdout).
+  Corrigida a troca entre `SetSoftAngStiff` e `SetSoftVolume`; setters de `m_cfg` não pedem mais recálculo de
+  constantes a cada chamada.
+- `ReplaceControllerShape`: cria o novo soft body antes de apagar o antigo, respeita física suspensa e mantém o
+  filtro de colisão; `addSoftBody` recebe grupo/máscara também na criação e na atualização do controlador.
+- `KX_SoftBodyDeformer::Apply`: índice checado contra o tamanho (vértices sem nó, ex. material sem física, seguem o
+  objeto em vez de ler fora do vetor); AABB só é zerada quando vai ser recalculada.
+- Conversão: soft body tem prioridade sobre modificador/shape key/armature (antes um Subsurf ou vertex group fazia a
+  malha ficar parada enquanto a física andava); é emitido aviso no console quando isso acontece.
+- Teste: `tools/tests/soft_body_test.py` (16 checagens). Código antigo: 11 falhas; com a correção: 16/16.
+- Fica para depois: pular o upload da malha quando o corpo está parado — soft body do Bullet 2.x não dorme.
+
 ## 2026-09-29 - Reverb Area nativa (substitui o componente RanGE-SoundReverb)
 
 - Origem: `tools/soundReverb.range` (Blender 2.79 da Range 1.6) trazia o componente Python `Range_SoundReverb`,

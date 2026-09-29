@@ -731,7 +731,7 @@ void CcdPhysicsEnvironment::AddCcdPhysicsController(CcdPhysicsController *ctrl)
 	else {
 		if (ctrl->GetSoftBody()) {
 			btSoftBody *softBody = ctrl->GetSoftBody();
-			m_dynamicsWorld->addSoftBody(softBody);
+			m_dynamicsWorld->addSoftBody(softBody, ctrl->GetCollisionFilterGroup(), ctrl->GetCollisionFilterMask());
 		}
 		else {
 			if (obj->getCollisionShape()) {
@@ -899,7 +899,7 @@ void CcdPhysicsEnvironment::UpdateCcdPhysicsController(CcdPhysicsController *ctr
 			m_dynamicsWorld->addRigidBody(body, newCollisionGroup, newCollisionMask);
 		}
 		else if (softBody) {
-			m_dynamicsWorld->addSoftBody(softBody);
+			m_dynamicsWorld->addSoftBody(softBody, newCollisionGroup, newCollisionMask);
 		}
 		else {
 			m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);

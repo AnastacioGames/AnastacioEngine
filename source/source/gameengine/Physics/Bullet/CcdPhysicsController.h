@@ -592,9 +592,11 @@ protected:
 	/// needed when updating the controller
 	friend class CcdPhysicsEnvironment;
 
-	//some book keeping for replication
-	bool m_softBodyTransformInitialized;
+	/// Current rigid frame of the soft body (its nodes live in world space). Set on creation,
+	/// refreshed by SynchronizeMotionStates and used to move the nodes on SetPosition/SetOrientation.
 	btTransform m_softbodyStartTrans;
+	/// Node masses saved by SuspendDynamics() on a soft body, restored by RestoreDynamics().
+	btAlignedObjectArray<btScalar> m_savedSoftNodeMasses;
 
 	/// Soft body indices for all original vertices.
 	std::vector<unsigned int> m_softBodyIndices;
@@ -694,6 +696,7 @@ public:
 		return m_object->getCollisionShape();
 	}
 
+	/// Soft body node of each original vertex, -1 (max unsigned) when the vertex has no node.
 	const std::vector<unsigned int>& GetSoftBodyIndices() const;
 	////////////////////////////////////
 	// PHY_IPhysicsController interface
@@ -902,6 +905,10 @@ public:
 	void UpdateDeactivation(float timeStep);
 
 	void SetCenterOfMassTransform(btTransform& xform);
+	/// Move the soft body nodes rigidly from m_softbodyStartTrans to xform.
+	void SetSoftBodyTransform(const btTransform& xform);
+	/// Transform used as base for position/orientation changes (soft body frame or object transform).
+	const btTransform& GetEditTransform();
 
 	static btTransform GetTransformFromMotionState(PHY_IMotionState *motionState);
 

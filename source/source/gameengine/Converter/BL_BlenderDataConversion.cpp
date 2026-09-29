@@ -789,6 +789,17 @@ RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj)
 	}
 
 	RAS_Deformer *deformer = nullptr;
+#ifdef WITH_BULLET
+	/* The soft body moves every vertex from the physics nodes: it must win over the other deformers,
+	 * otherwise the mesh stays still while the physics simulates. */
+	if (bHasSoftBody) {
+		if (bHasModifier || bHasShapeKey || bHasArmature) {
+			CM_Warning("object \"" << (blenderobj->id.name + 2) << "\": soft body ignores modifiers, shape keys and armature in game");
+		}
+		deformer = new KX_SoftBodyDeformer(meshobj, object);
+	}
+	else
+#endif
 	if (bHasModifier) {
 		if (isParentArmature) {
 			BL_ModifierDeformer *modifierDeformer = new BL_ModifierDeformer(object, blenderScene, meshblendobj, blenderobj,
@@ -818,11 +829,6 @@ RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj)
 	else if (bHasDvert) {
 		deformer = new BL_MeshDeformer(object, meshblendobj, meshobj);
 	}
-#ifdef WITH_BULLET
-	else if (bHasSoftBody) {
-		deformer = new KX_SoftBodyDeformer(meshobj, object);
-	}
-#endif
 
 	if (deformer) {
 		deformer->InitializeDisplayArrays();
