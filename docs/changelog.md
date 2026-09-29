@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Release 0.4.4: pacote Windows
+
+- `AnastacioEngine-0.4.4-windows-x64.zip` (+ `.sha256`) anexado à release `v0.4.4`, que já tinha o Linux. A tag
+  continua em `63e9b2e3` (build Linux); o Windows inclui também as correções de previews do Asset Browser
+  feitas depois (anotado nas notas do release). README aponta para os dois pacotes 0.4.4.
+- Montado como a 0.4.3: a partir do zip 0.4.3 publicado (mesmo `blender.crt.manifest` e cubins, 4.657 arquivos),
+  trocando `RangeEngine.exe`, `RangeRuntime.exe` e os 6 scripts mudados desde `v0.4.3`. A pasta de staging da
+  0.4.3 tinha 4.796 arquivos, diferente do zip; não usar como base.
+- Validado extraindo em `D:\t044`: `RangeEngine -b` sai com 0 e carrega a opção Auto; `RangeRuntime` abre
+  `benchmark.range` e segue rodando.
+
 ## 2026-09-28 - Asset Browser: previews de .range, grupos vazios e console no Windows
 
 - **`.range`:** "Generate Previews" e o Auto só procuravam `.blend`; bibliotecas salvas como `.range` ficavam sem nenhuma miniatura (achado no teste do usuário no Windows, biblioteca "Carros Velhos").
