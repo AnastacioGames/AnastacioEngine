@@ -4,8 +4,12 @@
 
 **Se voce baixou o release 0.4.1**: ele tem bugs de empacotamento (so um executavel na primeira
 versao; e o Python embutido no caminho errado, que da `No module named 'encodings'` fora da maquina
-de build). Use o release **0.4.2 ou mais recente** (atual: **0.4.4**), que traz o editor e o `RangeRuntime` e foi
-testado numa maquina limpa.
+de build). Use o release **0.4.5 ou mais recente**, que traz o editor e o `RangeRuntime`.
+
+**Se voce baixou o release 0.4.4 ou anterior** e aparece `libOpenImageIO.so.2.4: cannot open shared object file`
+(Ubuntu 26.04 e outras distros) ou erro de `GLIBC_2.38`: a 0.4.5 corrige os dois. Ela e compilada no Ubuntu 22.04
+(glibc 2.35) e leva as bibliotecas em `lib/`; foi testada em Ubuntu 22.04, Debian 12, Ubuntu 26.04 e Fedora limpos.
+Detalhes em "Bibliotecas empacotadas" e "glibc", mais abaixo.
 
 Nao tente compilar Blender/UPBGE 2.79 "cru" a partir do codigo original: em distros Linux recentes
 (GCC/glibc novos demais pra um codigo de 2014-2015) isso trava com erros de toolchain. Este repo ja tem
@@ -442,7 +446,7 @@ Resultado:
   `imgui.ini`).
 - Com a correcao, `RangeEngine -b` roda o `tools/linux/cycles-smoke-render.py` (Cycles CPU, PNG gerado) e o
   `RangeRuntime` acha o Python embutido. Janela e GPU nao foram testadas no container.
-- O pacote nao embute as bibliotecas do sistema. Num Ubuntu 24.04 minimo faltam estas; qualquer desktop ja
+- Ate a 0.4.4 o pacote nao embutia as bibliotecas do sistema (desde a 0.4.5 embute; ver abaixo). Num Ubuntu 24.04 minimo faltavam estas; qualquer desktop ja
   tem as de X11/GL, e o resto sai dos pacotes de runtime (sem `-dev`):
 
 ```bash
