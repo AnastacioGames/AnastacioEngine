@@ -458,6 +458,18 @@ Para abrir janela, monte `/tmp/.X11-unix`, copie o `.Xauthority` e exporte `DISP
 cenas do Kitsuy (600 quadros com `setHalfAnimations`; folhagem com AA 4) e saiu com codigo 0. O editor abriu
 e desenhou a interface inteira. Os unicos avisos foram de ALSA (sem placa de som no container) e gvfs.
 
+**Bibliotecas empacotadas (2026-09-29, depois da 0.4.4):** `package-runtime.sh` agora copia para `lib/` as `.so`
+da distro de que os executaveis e os modulos do Python dependem (265 no build do editor) e troca o `RUNPATH` dos
+executaveis por `RPATH` (`$ORIGIN/lib` passa a valer para as dependencias indiretas). O `apt install` acima deixa
+de ser necessario. Ficam no sistema: glibc, `libstdc++`/`libgcc_s`, GL/driver, X11/xcb/Wayland, ALSA/Pulse,
+fontconfig, dbus/systemd/udev. Pacote: 197 MB (antes 85 MB), 736 MB extraido; quase tudo vem da OpenImageIO do
+Ubuntu (GDAL, OpenVDB, FFmpeg), que o Cycles exige.
+
+**Limite que continua:** o pacote exige **glibc 2.38** e **GLIBCXX_3.4.32** (os da maquina de build, Ubuntu 24.04).
+Roda em Ubuntu 24.04+, Mint 22, Debian 13, Fedora 39+ e Arch; **nao** em Ubuntu 22.04 (2.35) nem Debian 12
+(2.36). Para esses, o pacote precisa ser compilado numa base com glibc antiga. Para conferir numa maquina:
+`ldd --version` e `ldd ./RangeEngine | grep "not found"`.
+
 ## Testes do Cycles (GTest) no Linux
 
 Validado em 2026-09-26 (Ubuntu, OpenEXR 3.1): 10 binarios, 177/177 testes passando. Use um diretorio proprio

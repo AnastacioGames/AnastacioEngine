@@ -127,6 +127,65 @@ if [ ! -e "$staging_dir/lib/libpython3.11.so.1.0" ]; then
   exit 1
 fi
 
+# Empacota em lib/ as .so da distro (diretas e indiretas) de que os executaveis e os modulos do Python
+# dependem; sem isso o pacote so abre com os mesmos nomes de pacote do Ubuntu 24.04 (Fumangy, 2026-09-29).
+# Ficam no sistema: glibc, libstdc++/libgcc_s, GL/driver, X11/xcb/Wayland, audio e servicos do desktop.
+# A glibc nao pode ir junto: o pacote continua exigindo a glibc da maquina de build (ver docs/linux-build.md).
+system_libs='^(ld-linux.*|lib(c|m|dl|pthread|rt|resolv|util|anl|nsl|mvec)|libstdc\+\+|libgcc_s|libGL|libGLX.*|libGLdispatch|libEGL|libOpenGL|libglapi|libgbm|libdrm.*|libX11|libX11-xcb|libxcb.*|libxshmfence|libwayland-.*|libxkbcommon.*|libvdpau|libva.*|libOpenCL|libcuda|libnvidia.*|libasound|libjack|libpulse.*|libfontconfig|libexpat|libdbus-1|libsystemd|libudev|libcom_err|libgpg-error)\.so'
+ldd_targets=()
+while IFS= read -r -d '' f; do
+  head -c4 "$f" | grep -q 'ELF' && ldd_targets+=("$f")
+done < <(find "$staging_dir" -type f \( -name 'Range*' -o -name '*.so' -o -name '*.so.*' \) -print0)
+bundled=0
+while read -r soname path; do
+  printf '%s\n' "$soname" | grep -Eq "$system_libs" && continue
+  case "$path" in "$staging_dir"/*) continue ;; esac
+  [ -e "$staging_dir/lib/$soname" ] && continue
+  cp -L "$path" "$staging_dir/lib/$soname"
+  bundled=$((bundled + 1))
+done < <(ldd "${ldd_targets[@]}" 2>/dev/null | awk '$2 == "=>" && $3 ~ /^\// {print $1, $3}' | sort -u -k1,1)
+printf 'Bibliotecas da distro empacotadas em lib/: %s\n' "$bundled"
+if ldd "${ldd_targets[@]}" 2>/dev/null | grep -q 'not found'; then
+  printf 'Dependencia nao encontrada na maquina de build:\n' >&2
+  ldd "${ldd_targets[@]}" 2>/dev/null | grep 'not found' | sort -u >&2
+  exit 1
+fi
+
+# DT_RUNPATH so vale para as dependencias diretas; as .so empacotadas nao acham umas as outras em lib/.
+# DT_RPATH do executavel vale para a arvore toda, entao troca a tag (0x1d -> 0x0f) nos dois executaveis.
+python3 - "$staging_dir" <<'PY'
+import os, struct, sys
+root = sys.argv[1]
+for name in ("RangeEngine", "RangeRuntime"):
+    path = os.path.join(root, name)
+    if not os.path.isfile(path):
+        continue
+    with open(path, "r+b") as f:
+        data = bytearray(f.read())
+        assert data[:4] == b"\x7fELF" and data[4] == 2, name + ": esperado ELF 64 bits"
+        phoff, = struct.unpack_from("<Q", data, 0x20)
+        phentsize, phnum = struct.unpack_from("<HH", data, 0x36)
+        changed = False
+        for i in range(phnum):
+            p = phoff + i * phentsize
+            p_type, = struct.unpack_from("<I", data, p)
+            if p_type != 2:  # PT_DYNAMIC
+                continue
+            off, = struct.unpack_from("<Q", data, p + 8)
+            size, = struct.unpack_from("<Q", data, p + 32)
+            for e in range(off, off + size, 16):
+                tag, = struct.unpack_from("<q", data, e)
+                if tag == 0:
+                    break
+                if tag == 0x1d:
+                    struct.pack_into("<q", data, e, 0x0f)
+                    changed = True
+        if changed:
+            f.seek(0)
+            f.write(data)
+            print("RUNPATH -> RPATH:", name)
+PY
+
 mkdir -p "$dist_dir"
 rm -f "$archive" "$archive.sha256"
 tar -C "$dist_dir" -cJf "$archive" "$package_name"

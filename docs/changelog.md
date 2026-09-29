@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Linux: pacote com as bibliotecas da distro, build do zero conferido
+
+- **Retorno do Discord (Fumangy):** o pacote 0.4.4 "pede dependencias". Extraido sem `apt install`, ele usava
+  as `.so` do sistema com nomes do Ubuntu 24.04 (OpenImageIO 2.4, OpenEXR 3.1, boost_locale 1.83 etc.) e exige
+  `GLIBC_2.38`/`GLIBCXX_3.4.32` (`__isoc23_strtol`, `__isoc23_sscanf`, `fmod`).
+- `tools/linux/package-runtime.sh` agora copia para `lib/` as dependencias diretas e indiretas (265 `.so`),
+  menos glibc, libstdc++, GL/driver, X11/xcb/Wayland, audio e servicos do desktop, e troca `DT_RUNPATH` por
+  `DT_RPATH` nos dois executaveis (sem isso as `.so` empacotadas nao acham umas as outras). Pacote de teste:
+  197 MB (0.4.4: 85 MB).
+- Teste do pacote extraido: `ldd` e `LD_DEBUG=libs` so carregam de fora de `lib/` as bibliotecas do sistema;
+  `ssl`, `sqlite3`, `lzma` e numpy do Python sobem; editor abre com interface (screenshot); runtime abre demo.
+- Nao resolvido: glibc 2.38 continua exigida (Ubuntu 22.04 e Debian 12 fora). Precisa de build numa base
+  antiga; esta maquina nao tem Docker/Podman.
+- **Build do zero:** clone limpo da `main` + `cmake --preset linux-editor -S source` compilou RangeEngine e
+  RangeRuntime (2858/2858). A doc mandava usar a branch `linux-sync`, 106 commits atras; doc corrigida e branch
+  apagada.
+- Achado de passagem: o `RangeRuntime` trata `SIGTERM` mas nao encerra (igual no build e no pacote); `timeout`
+  nao fecha o player.
+
 ## 2026-09-28 - Release 0.4.4: pacote Windows
 
 - `AnastacioEngine-0.4.4-windows-x64.zip` (+ `.sha256`) anexado à release `v0.4.4`, que já tinha o Linux. A tag

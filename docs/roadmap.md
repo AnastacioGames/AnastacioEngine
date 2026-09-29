@@ -109,6 +109,9 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     Debian 12 (2.36) nao rodam nem com as `.so` empacotadas. Para cobrir essas distros, compilar o pacote numa
     base antiga (container Ubuntu 22.04/Debian 12) e empacotar as `.so` que nao sao GL/X11/glibc; para o
     editor, avaliar tirar a OIIO do pacote Linux.
+    **Feito 2026-09-29:** `package-runtime.sh` empacota as `.so` (ver changelog); falta publicar e o build em
+    base com glibc antiga (instalar Docker ou Podman: pede sudo).
+  - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
   - **Menu do player Linux (Kitsuy):** bug depende de qual arquivo e aberto primeiro pelo menu (abrindo o level
     direto funciona); melhorou apos a atualizacao de 2026-09-28, mas continua. Em maquina hibrida so funcionou
     forcando a GPU dedicada; testar com iGPU e com `prime-run`/`DRI_PRIME=1`. Pedir passo a passo a ele.
