@@ -21,7 +21,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   (Generic/Underwater/Cavern/Hall/Forest/Custom), Shape (Sphere/Box, sincroniza `empty_draw_type`), Size
   (`empty_draw_size`), Full Effect Zone, Priority e Filter; painel "Advanced" com os 12 parâmetros EFX e ganhos do
   filtro. Escolher um Behavior copia os valores (tabela da Range); editar qualquer valor troca para Custom.
-  `Add > Reverb Area` (`object.reverb_area_add`) cria o Empty já configurado.
+  `Add > Reverb Area` (`object.reverb_area_add`) cria o Empty já configurado (padrão Box, desenho Cube).
 - Runtime: `KX_Scene::UpdateReverbAreas` (mesma cadência do update de áudio 3D) leva a câmera ativa ao espaço
   local de cada área dividido por `empty_drawsize * escala` (rotação e escala não uniforme; esfera vira elipsoide),
   fade linear entre `inner_factor` e a borda, vence a maior influência e a prioridade desempata.

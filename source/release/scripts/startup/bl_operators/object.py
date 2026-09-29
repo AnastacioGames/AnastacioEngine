@@ -1047,7 +1047,7 @@ class ReverbAreaAdd(Operator):
             ('SPHERE', "Sphere", "Spherical area"),
             ('BOX', "Box", "Box area"),
         ),
-        default='SPHERE',
+        default='BOX',
     )
     size: FloatProperty(
         name="Size",
