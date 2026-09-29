@@ -14,7 +14,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Build num container `ubuntu:22.04` com Podman (`tools/linux/container-build-22.04.sh`): o maior simbolo exigido
   cai de `GLIBC_2.38` para `GLIBC_2.35` (Ubuntu 22.04 e Debian 12 passam a rodar). 257 `.so` em `lib/`, incluindo
   `libOpenImageIO.so.2.2`; o pacote antigo falhava no Ubuntu 26.04 do Fumangy com `libOpenImageIO.so.2.4`.
-  Pacote: 135 MB.
+  Pacote: 234 MB. Publicado como release v0.4.5 (so Linux; Windows continua na 0.4.4).
 - `FindEmbree.cmake`: so acrescenta a biblioteca de um componente se ela existir (o 22.04 so tem `libembree3.so`;
   sem isso faltava `rtcIntersect1` no link).
 - O `cmake --install` do preset editor tambem instala o `RangeRuntime`: compilar os dois alvos em `build-linux-editor`.

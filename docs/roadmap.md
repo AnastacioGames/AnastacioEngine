@@ -110,7 +110,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     base antiga (container Ubuntu 22.04/Debian 12) e empacotar as `.so` que nao sao GL/X11/glibc; para o
     editor, avaliar tirar a OIIO do pacote Linux.
     **Feito 2026-09-29:** `package-runtime.sh` empacota as `.so` e o pacote passou a ser compilado num container
-    Ubuntu 22.04 (`tools/linux/container-build-22.04.sh`, glibc 2.35). Falta publicar na v0.4.4 e o Fumangy
+    Ubuntu 22.04 (`tools/linux/container-build-22.04.sh`, glibc 2.35). Publicado na v0.4.5; falta o Fumangy
     confirmar no Ubuntu 26.04 (o pacote antigo falhava com `libOpenImageIO.so.2.4`).
   - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
