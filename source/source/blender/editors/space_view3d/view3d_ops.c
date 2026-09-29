@@ -301,6 +301,50 @@ static bool asset_drop_browser_wants_link(bContext *C)
 	return false;
 }
 
+/* The 2.79 way to link an object: a linked object keeps the location of its
+ * library and cannot be moved, so wrap it in a local Group and instance that
+ * at the drop point. The objects the link brought (the object and whatever
+ * came selected with it) leave the scene and live only in the Group. */
+static Object *asset_drop_link_object_instance(bContext *C, Main *bmain, Scene *scene, Object *linked)
+{
+	const float rot[3] = {0.0f, 0.0f, 0.0f};
+	Group *group;
+	Base *base, *base_next;
+	Object *inst;
+
+	/* Reuse the Group made by a previous drop of the same object. */
+	for (group = bmain->group.first; group; group = group->id.next) {
+		GroupObject *go = group->gobject.first;
+		if (group->id.lib == NULL && go && go->ob == linked) {
+			break;
+		}
+	}
+	if (group == NULL) {
+		group = BKE_group_add(bmain, linked->id.name + 2);
+		copy_v3_v3(group->dupli_ofs, linked->loc);
+		BKE_group_object_add(group, linked, scene, NULL);
+	}
+
+	for (base = scene->base.first; base; base = base_next) {
+		base_next = base->next;
+		if ((base->flag & SELECT) && base->object->id.lib) {
+			Object *ob = base->object;
+			BKE_group_object_add(group, ob, scene, base);
+			BKE_scene_base_unlink(scene, base);
+			MEM_freeN(base);
+			id_us_min(&ob->id);
+			id_us_ensure_real(&ob->id);
+		}
+	}
+	DAG_id_type_tag(bmain, ID_OB);
+
+	inst = ED_object_add_type(C, OB_EMPTY, group->id.name + 2, scene->cursor, rot, false, scene->layact);
+	inst->dup_group = group;
+	inst->transflag |= OB_DUPLIGROUP;
+	id_us_plus(&group->id);
+	return inst;
+}
+
 static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
@@ -338,16 +382,7 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 		link = RNA_property_boolean_get(op->ptr, prop);
 	}
 	else {
-		link = (event && event->ctrl);
-		/* The browser toggle is a preference: objects, which can not be linked, are still appended. */
-		if (!link && idcode != ID_OB) {
-			link = asset_drop_browser_wants_link(C);
-		}
-	}
-	if (link && idcode == ID_OB) {
-		/* A linked object cannot be moved to the drop point. */
-		BKE_report(op->reports, RPT_ERROR, "Objects can only be appended; link a Group instead");
-		return OPERATOR_CANCELLED;
+		link = (event && event->ctrl) || asset_drop_browser_wants_link(C);
 	}
 
 	/* Called from a script or another editor there is no drop point:
@@ -377,6 +412,17 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 	}
 
 	lb = which_libbase(bmain, idcode);
+	if (!link) {
+		/* Appending data already linked from the same library gives back the
+		 * linked data-block (2.79 behavior): nothing would be appended. */
+		for (id = lb->first; id; id = id->next) {
+			if (id->lib && STREQ(id->name + 2, name) && BLI_path_cmp(id->lib->filepath, libpath) == 0) {
+				BKE_reportf(op->reports, RPT_ERROR, "'%s' is already linked in this file: link it again or "
+				            "remove the linked copies before appending", name);
+				return OPERATOR_CANCELLED;
+			}
+		}
+	}
 	existing = asset_drop_id_set(lb);
 
 	BLI_join_dirfile(directory, sizeof(directory), libpath, BKE_idcode_to_name(idcode));
@@ -397,6 +443,11 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 	if (id == NULL) {
 		BKE_reportf(op->reports, RPT_ERROR, "Could not load '%s' from '%s'", name, libpath);
 		return OPERATOR_CANCELLED;
+	}
+
+	if (idcode == ID_OB && link) {
+		/* From here on the instancing Empty is the dropped object. */
+		id = &asset_drop_link_object_instance(C, bmain, scene, (Object *)id)->id;
 	}
 
 	if (idcode == ID_MA) {
@@ -495,7 +546,7 @@ static void VIEW3D_OT_asset_drop(wmOperatorType *ot)
 	ot->name = "Drop Asset";
 	ot->idname = "VIEW3D_OT_asset_drop";
 	ot->description = "Append (or link with Ctrl) an object, group or material dragged from a .blend "
-	                  "and place it where it was dropped";
+	                  "and place it where it was dropped; a linked object comes as a Group instance";
 	ot->exec = view3d_asset_drop_exec;
 	ot->poll = ED_operator_objectmode;
 

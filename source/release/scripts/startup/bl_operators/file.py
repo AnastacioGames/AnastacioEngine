@@ -348,11 +348,230 @@ class FILE_OT_asset_previews_generate(Operator):
         )
         if 'FINISHED' not in ret:
             return {'CANCELLED'}
+        for f in files:
+            _AssetPreviewsAuto.mark_done(os.path.join(folder, f["name"]))
 
         if bpy.ops.file.refresh.poll():
             bpy.ops.file.refresh()
         self.report({'INFO'}, "Previews generated for %d file(s)" % len(files))
         return {'FINISHED'}
+
+
+class _AssetPreviewsAuto:
+    """Generates the previews of the asset libraries in the background.
+
+    Every open Asset Browser is checked a few times per second of UI activity.
+    A .blend never generated, or changed after the last generation, gets a
+    background process (the same script as wm.previews_batch_generate), one
+    file at a time. The modification time after the generation (the script
+    saves the file) is kept in asset_previews.json in the user config folder,
+    together with the on/off toggle, so it survives restarts.
+    """
+
+    INTERVAL = 2.0
+    _data = None
+    _proc = None
+    _proc_file = ""
+    _queue = []
+    _last = 0.0
+
+    @classmethod
+    def _json_path(cls):
+        import os
+        folder = bpy.utils.user_resource('CONFIG', create=True)
+        return os.path.join(folder, "asset_previews.json")
+
+    @classmethod
+    def data(cls):
+        if cls._data is None:
+            import json
+            try:
+                with open(cls._json_path(), encoding="utf-8") as fh:
+                    cls._data = json.load(fh)
+            except (OSError, ValueError):
+                cls._data = {}
+            cls._data.setdefault("auto", True)
+            cls._data.setdefault("files", {})
+        return cls._data
+
+    @classmethod
+    def save(cls):
+        import json
+        try:
+            with open(cls._json_path(), "w", encoding="utf-8") as fh:
+                json.dump(cls.data(), fh, indent=1)
+        except OSError:
+            pass
+
+    @classmethod
+    def enabled(cls):
+        return bool(cls.data()["auto"])
+
+    @classmethod
+    def set_enabled(cls, value):
+        cls.data()["auto"] = bool(value)
+        cls.save()
+
+    @staticmethod
+    def _key(path):
+        import os
+        return os.path.normcase(os.path.abspath(path))
+
+    @classmethod
+    def mark_done(cls, path):
+        import os
+        try:
+            cls.data()["files"][cls._key(path)] = os.path.getmtime(path)
+        except OSError:
+            return
+        cls.save()
+
+    @classmethod
+    def _stale(cls, folder):
+        import os
+        current = cls._key(bpy.data.filepath) if bpy.data.filepath else ""
+        done = cls.data()["files"]
+        try:
+            names = sorted(os.listdir(folder))
+        except OSError:
+            return []
+        stale = []
+        for fn in names:
+            if not fn.lower().endswith(".blend"):
+                continue
+            path = os.path.join(folder, fn)
+            key = cls._key(path)
+            if key == current or path in cls._queue or path == cls._proc_file:
+                continue
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if done.get(key) != mtime:
+                stale.append(path)
+        return stale
+
+    @classmethod
+    def _start(cls, path):
+        import os
+        import subprocess
+        from bl_previews_utils import bl_previews_render as preview_render
+        cmd = [
+            bpy.app.binary_path, "--background", "--factory-startup", "-noaudio",
+            path, "--python",
+            os.path.join(os.path.dirname(preview_render.__file__), "bl_previews_render.py"),
+            "--", "--no_scenes", "--no_backups",
+        ]
+        try:
+            cls._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            cls._proc_file = path
+        except OSError:
+            cls._proc = None
+            cls._proc_file = ""
+
+    @classmethod
+    def _refresh_browsers(cls):
+        wm = bpy.context.window_manager
+        for win in wm.windows:
+            for area in win.screen.areas:
+                if area.type != 'FILE_BROWSER':
+                    continue
+                space = area.spaces.active
+                if not _is_asset_browser_space(space):
+                    continue
+                region = next((r for r in area.regions if r.type == 'WINDOW'), None)
+                if region is None:
+                    continue
+                override = {"window": win, "screen": win.screen, "area": area, "region": region}
+                try:
+                    bpy.ops.file.refresh(override)
+                except RuntimeError:
+                    pass
+                area.tag_redraw()
+
+    @classmethod
+    def tick(cls):
+        import time
+        if cls._proc is not None:
+            if cls._proc.poll() is None:
+                return
+            if cls._proc.returncode == 0:
+                cls.mark_done(cls._proc_file)
+            else:
+                # Do not retry a broken file until it changes again.
+                cls.mark_done(cls._proc_file)
+                print("Asset previews: generation failed for %r" % cls._proc_file)
+            cls._proc = None
+            cls._proc_file = ""
+            if not cls._queue:
+                cls._refresh_browsers()
+        if cls._queue:
+            cls._start(cls._queue.pop(0))
+            return
+
+        now = time.monotonic()
+        if now - cls._last < cls.INTERVAL:
+            return
+        cls._last = now
+        if not cls.enabled():
+            return
+        wm = bpy.context.window_manager
+        if wm is None:
+            return
+        folders = set()
+        for win in wm.windows:
+            for area in win.screen.areas:
+                if area.type == 'FILE_BROWSER':
+                    space = area.spaces.active
+                    if _is_asset_browser_space(space) and space.params:
+                        folder = FILE_OT_asset_previews_generate.library_folder(space.params.directory)
+                        if folder:
+                            folders.add(folder)
+        for folder in sorted(folders):
+            cls._queue.extend(cls._stale(folder))
+        if cls._queue:
+            cls._start(cls._queue.pop(0))
+
+
+def _is_asset_browser_space(space):
+    return (space is not None and getattr(space, "browse_mode", None) == 'ASSETS' and
+            space.active_operator is None)
+
+
+@bpy.app.handlers.persistent
+def _asset_previews_auto_handler(scene):
+    if bpy.app.background:
+        return
+    try:
+        _AssetPreviewsAuto.tick()
+    except Exception as ex:
+        print("Asset previews:", ex)
+
+
+def _asset_previews_auto_register():
+    handlers = bpy.app.handlers.scene_update_post
+    for fn in list(handlers):
+        if getattr(fn, "__name__", "") == _asset_previews_auto_handler.__name__:
+            handlers.remove(fn)
+    handlers.append(_asset_previews_auto_handler)
+
+
+def _asset_previews_auto_get(self):
+    return _AssetPreviewsAuto.enabled()
+
+
+def _asset_previews_auto_set(self, value):
+    _AssetPreviewsAuto.set_enabled(value)
+
+
+bpy.types.WindowManager.asset_previews_auto = bpy.props.BoolProperty(
+    name="Auto Previews",
+    description="Generate the previews of new or changed .blend files of the asset "
+                "library in the background",
+    get=_asset_previews_auto_get,
+    set=_asset_previews_auto_set,
+)
+_asset_previews_auto_register()
 
 
 class FILE_OT_asset_library_browse(Operator):

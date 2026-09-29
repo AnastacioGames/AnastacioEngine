@@ -321,7 +321,9 @@ class FILEBROWSER_PT_asset_libraries(Panel):
         layout.operator("file.asset_library_browse", text="Add Library Folder...", icon='FILE_FOLDER')
 
         layout.separator()
-        layout.operator("file.asset_previews_generate", text="Generate Previews", icon='IMAGE_COL')
+        row = layout.row(align=True)
+        row.operator("file.asset_previews_generate", text="Generate Previews", icon='IMAGE_COL')
+        row.prop(context.window_manager, "asset_previews_auto", text="Auto")
 
 
 class FILEBROWSER_PT_asset_directory(Panel):

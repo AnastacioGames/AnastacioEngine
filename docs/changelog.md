@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Asset Browser: Link de objeto e previews automáticas
+
+- **Link de objeto:** com o botão Link (ou Ctrl), um objeto arrastado agora vem ligado dentro de um grupo local com o nome dele, instanciado no ponto do drop (o jeito do 2.79: objeto ligado direto não pode ser movido). O `dupli_offset` do grupo é a posição original, e drops seguintes do mesmo objeto reaproveitam o grupo. Antes, objetos sempre entravam como append (achado no teste visual do usuário).
+- **Append depois de Link:** o 2.79 devolve o dado já ligado em vez de copiar; o drop agora cancela com uma mensagem clara em vez de "Could not load".
+- **Previews automáticas:** opção "Auto" ao lado de "Generate Previews" (ligada por padrão). Um handler verifica a cada 2 s de atividade da UI os `.blend` das bibliotecas abertas no Asset Browser e gera em segundo plano (um processo por vez, o mesmo script do `wm.previews_batch_generate`) os nunca gerados ou modificados depois da última geração; a lista é atualizada ao final. Estado e datas ficam em `asset_previews.json`, na pasta de configuração do usuário.
+- **Testes** (`-b`): link de objeto (2 drops, 1 grupo), grupo e material ligados, append após link com o erro novo, arquivo salvo e reaberto; geração automática com previews 128×128 e a fila vazia depois.
+- Código comum às plataformas; no Windows só falta recompilar e conferir.
+
 ## 2026-09-28 - Versão do splash e do About; janela testada em Ubuntu limpo
 
 - O splash mostrava "AnastacioEngine 0.4.0 Release Candidate" (texto fixo, derivado de
