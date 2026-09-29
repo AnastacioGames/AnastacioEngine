@@ -48,6 +48,8 @@ extern char datatoc_RAS_Fxaa2DFilter_glsl[];
 extern char datatoc_RAS_Rain2DFilter_glsl[];
 extern char datatoc_RAS_Clouds2DFilter_glsl[];
 extern char datatoc_RAS_LensFlare2DFilter_glsl[];
+extern char datatoc_RAS_CameraDof2DFilter_glsl[];
+extern char datatoc_RAS_CameraLens2DFilter_glsl[];
 extern char datatoc_RAS_Tonemaps2DFilter_glsl[];
 extern char datatoc_RAS_SSAO2DFilter_glsl[];
 extern char datatoc_RAS_Blur2DFilter_glsl[];
@@ -121,7 +123,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
 	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
-	"ge_FxaaParams" // GE_FXAA_PARAMETERS_UNIFORM
+	"ge_FxaaParams", // GE_FXAA_PARAMETERS_UNIFORM
+	"ge_CameraFX[0]" // GE_CAMERAFX_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -272,6 +275,8 @@ RAS_OffScreen *RAS_2DFilter::Render(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, 
 		    frag == datatoc_RAS_Rain2DFilter_glsl ? "RAIN" :
 		    frag == datatoc_RAS_Clouds2DFilter_glsl ? "CLOUDS" :
 		    frag == datatoc_RAS_LensFlare2DFilter_glsl ? "LENSFLARE" :
+		    frag == datatoc_RAS_CameraDof2DFilter_glsl ? "CAMERA_DOF" :
+		    frag == datatoc_RAS_CameraLens2DFilter_glsl ? "CAMERA_LENS" :
 		    frag == datatoc_RAS_Tonemaps2DFilter_glsl ? "TONEMAPS" :
 		    frag == datatoc_RAS_SSAO2DFilter_glsl ? "SSAO" :
 		    frag == datatoc_RAS_Blur2DFilter_glsl ? "BLUR" :
@@ -321,6 +326,8 @@ bool RAS_2DFilter::LinkProgram()
 	                        fragment == datatoc_RAS_Rain2DFilter_glsl ||
 	                        fragment == datatoc_RAS_Clouds2DFilter_glsl ||
 	                        fragment == datatoc_RAS_LensFlare2DFilter_glsl ||
+	                        fragment == datatoc_RAS_CameraDof2DFilter_glsl ||
+	                        fragment == datatoc_RAS_CameraLens2DFilter_glsl ||
 	                        fragment == datatoc_RAS_Tonemaps2DFilter_glsl ||
 	                        fragment == datatoc_RAS_SSAO2DFilter_glsl ||
 	                        fragment == datatoc_RAS_Blur2DFilter_glsl ||
@@ -567,6 +574,11 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	if (m_predefinedUniforms[GE_LENSFLARE_SUNPOS_UNIFORM] != -1) {
 		float params[2] = {m_buildInFilters.flare_sun_x, m_buildInFilters.flare_sun_y};
 		SetUniformfv(m_predefinedUniforms[GE_LENSFLARE_SUNPOS_UNIFORM], RAS_Uniform::UNI_FLOAT2, params, sizeof(float) * 2, 1);
+	}
+
+	if (m_predefinedUniforms[GE_CAMERAFX_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_CAMERAFX_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.camera_fx,
+		             sizeof(float) * 24, 6);
 	}
 
 	/* GameObject Uniforms */

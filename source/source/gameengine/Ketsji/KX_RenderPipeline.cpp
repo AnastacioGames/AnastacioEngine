@@ -578,6 +578,10 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 
 	// Calculate sun screen position for the Light Scattering and Lens Flare filters.
 	KX_2DFilterManager *filterManager = scene->Get2DFilterManager();
+	if (filterManager) {
+		// Camera FX (focus DOF, speed/directional blur, cat eye lens) of the active camera.
+		filterManager->UpdateCameraFX(scene->GetActiveCamera());
+	}
 	RAS_2DFilter *flareFilter = filterManager ? filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true) : nullptr;
 
 	float sunPos[2] = {0.5f, 0.0f};

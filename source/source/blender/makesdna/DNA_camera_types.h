@@ -58,6 +58,43 @@ typedef struct GameCameraViewportSettings {
 	float topratio;
 } GameCameraViewportSettings;
 
+/* Game engine camera: focus sensor, focus tracking, Camera FX filters and shake.
+ * Manual focus distance, f-stop and blade count come from gpu_dof, the focus object from dof_ob. */
+typedef struct CameraGameFX {
+	short focus_mode;     /* CAM_FOCUS_* */
+	short track_mode;     /* CAM_TRACK_* */
+	short flag;           /* CAM_GFX_* */
+	short dof_quality;    /* 0 low, 1 medium, 2 high */
+	char focus_prop[64];  /* CAM_FOCUS_PROPERTY: objects whose property is true */
+	float focus_smooth;   /* seconds to reach a new focus distance */
+	float focus_range;    /* sharp band around the focus distance, meters */
+	float focus_screen[2]; /* CAM_FOCUS_AUTO: screen point of the ray, 0..1 top-down */
+
+	float track_speed;    /* seconds (time constant) */
+	float track_limit;    /* max angle from the base orientation, radians; 0 = no limit */
+	float track_deadzone; /* screen fraction around the aim point with no rotation */
+	float track_screen_offset[2]; /* where the target is framed, -0.5..0.5 */
+	float drone_amplitude;
+	float drone_frequency;
+	float track_bank;     /* drone bank strength */
+
+	float dof_blur;       /* max blur radius, pixels */
+	float speedblur_strength;
+	float speedblur_max_speed; /* m/s that gives full strength */
+	float dirblur_strength;
+	float dirblur_max;
+	float cateye_strength;
+	float chroma_strength;
+	float vignette_strength;
+	float vignette_radius;
+	float fisheye_strength;
+
+	float shake_amplitude;
+	float shake_frequency;
+	float shake_decay;    /* trauma lost per second */
+	float pad;
+} CameraGameFX;
+
 typedef struct Camera {
 	ID id;
 	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */
@@ -95,6 +132,9 @@ typedef struct Camera {
 
 	/* Stereo settings */
 	struct CameraStereoSettings stereo;
+
+	/* Game engine focus, tracking, filters and shake */
+	struct CameraGameFX gamefx;
 } Camera;
 
 /* **************** CAMERA ********************* */
@@ -142,6 +182,35 @@ enum {
 	GAME_CAM_VIEWPORT					= (1 << 3),
 	/* Draw the camera's culling volume in the editor viewport. */
 	GAME_CAM_SHOW_CULLING_BOX			= (1 << 4),
+};
+
+/* gamefx.focus_mode */
+enum {
+	CAM_FOCUS_MANUAL   = 0,
+	CAM_FOCUS_OBJECT   = 1,
+	CAM_FOCUS_PROPERTY = 2,
+	CAM_FOCUS_AUTO     = 3,
+};
+
+/* gamefx.track_mode */
+enum {
+	CAM_TRACK_OFF     = 0,
+	CAM_TRACK_LOOK_AT = 1,
+	CAM_TRACK_DRONE   = 2,
+};
+
+/* gamefx.flag */
+enum {
+	CAM_GFX_DOF             = (1 << 0),
+	CAM_GFX_SPEEDBLUR       = (1 << 1),
+	CAM_GFX_DIRBLUR         = (1 << 2),
+	CAM_GFX_CATEYE_BOKEH    = (1 << 3),
+	CAM_GFX_CHROMA          = (1 << 4),
+	CAM_GFX_VIGNETTE        = (1 << 5),
+	CAM_GFX_CHROMA_SPEED    = (1 << 6),
+	CAM_GFX_SHAKE_ROLL      = (1 << 7),
+	CAM_GFX_TRACK_UPLOCK    = (1 << 8),
+	CAM_GFX_BLUR_PROTECT    = (1 << 9),
 };
 
 /* Sensor fit */

@@ -53,11 +53,14 @@ public:
 		FILTERPASS_TONEMAP      = 14,
 		FILTERPASS_RAIN         = 15,
 		FILTERPASS_CLOUDS       = 16,
-		FILTERPASS_LENSFLARE    = 17
+		FILTERPASS_LENSFLARE    = 17,
+		/* Camera FX (KX_Camera game_fx), only present while their effects are on */
+		FILTERPASS_CAMERA_DOF   = 18,
+		FILTERPASS_CAMERA_LENS  = 19
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
-	const int reservedPassIndex = FILTERPASS_LENSFLARE + 1;
+	const int reservedPassIndex = FILTERPASS_CAMERA_LENS + 1;
 
 	enum FILTER_MODE {
 		FILTER_ENABLED = -2,
@@ -105,6 +108,8 @@ public:
 
 	/// Removes the filters at a given pass index.
 	void RemoveFilterPass(unsigned int passIndex);
+	/// Removes a built-in filter at a reserved pass index (FILTERPASS_*).
+	void RemoveReservedFilterPass(unsigned int passIndex);
 
 	/// Get the existing filter for the given pass index.
 	RAS_2DFilter *GetFilterPass(unsigned int passIndex, bool use_reserved);

@@ -647,7 +647,7 @@ void KX_Scene::UpdateEarthquake(double curtime)
 		}
 		if (m_earthquakeCameraShaking) {
 			for (KX_Camera *camera : *GetCameraList()) {
-				camera->SetShakeShift(0.0f, 0.0f);
+				camera->SetEarthquakeShift(0.0f, 0.0f);
 			}
 			m_earthquakeCameraShaking = false;
 		}
@@ -697,12 +697,12 @@ void KX_Scene::UpdateEarthquake(double curtime)
 		const float amp = kLevelCamera[level] * cameraAmount;
 		const float sx = horizontal ? 1.0f : 0.3f;
 		const float sy = vertical ? 1.0f : 0.3f;
-		camera->SetShakeShift(amp * sx * waveX * 0.6f, amp * sy * waveZ * 0.6f);
+		camera->SetEarthquakeShift(amp * sx * waveX * 0.6f, amp * sy * waveZ * 0.6f);
 		m_earthquakeCameraShaking = true;
 	}
 	else if (m_earthquakeCameraShaking) {
 		for (KX_Camera *cam : *GetCameraList()) {
-			cam->SetShakeShift(0.0f, 0.0f);
+			cam->SetEarthquakeShift(0.0f, 0.0f);
 		}
 		m_earthquakeCameraShaking = false;
 	}
@@ -1423,6 +1423,10 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	gameobj->RemoveMeshes();
 
 	m_rendererManager->InvalidateViewpoint(gameobj);
+
+	for (KX_Camera *camera : *m_cameralist) {
+		camera->UnlinkObject(gameobj);
+	}
 
 	bool ret = true;
 	if (m_lightlist->RemoveValue(gameobj)) {

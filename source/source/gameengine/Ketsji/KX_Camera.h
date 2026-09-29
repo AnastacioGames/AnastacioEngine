@@ -60,6 +60,87 @@ protected:
 	float m_shakeShiftX = 0.0f;
 	float m_shakeShiftY = 0.0f;
 
+public:
+	/// Game focus, tracking, Camera FX and shake settings (Camera.gamefx + gpu_dof in DNA).
+	struct GameFX
+	{
+		short focusMode = 0;
+		short trackMode = 0;
+		short flag = 0;
+		short dofQuality = 1;
+		std::string focusProp;
+		float focusDistance = 10.0f;
+		float fstop = 128.0f;
+		int numBlades = 0;
+		float focusSmooth = 0.2f;
+		float focusRange = 2.0f;
+		float focusScreen[2] = {0.5f, 0.5f};
+		float trackSpeed = 0.25f;
+		float trackLimit = 0.0f;
+		float trackDeadzone = 0.0f;
+		float trackScreenOffset[2] = {0.0f, 0.0f};
+		float droneAmplitude = 1.0f;
+		float droneFrequency = 1.0f;
+		float trackBank = 0.3f;
+		float dofBlur = 6.0f;
+		float speedBlurStrength = 0.5f;
+		float speedBlurMaxSpeed = 40.0f;
+		float dirBlurStrength = 0.5f;
+		float dirBlurMax = 0.05f;
+		float catEyeStrength = 0.5f;
+		float chromaStrength = 0.5f;
+		float vignetteStrength = 0.4f;
+		float vignetteRadius = 0.75f;
+		float fisheyeStrength = 0.0f;
+		float shakeAmplitude = 0.02f;
+		float shakeFrequency = 15.0f;
+		float shakeDecay = 1.5f;
+	};
+
+protected:
+	GameFX m_gameFX;
+
+	/// Focus object of CAM_FOCUS_OBJECT (DOF Object or cam.focusObject).
+	KX_GameObject *m_focusObject = nullptr;
+	/// Object the focus resolved to this frame (OBJECT/PROPERTY/AUTO), may be null.
+	KX_GameObject *m_focusTarget = nullptr;
+	/// Cached CAM_FOCUS_PROPERTY target and the time of the last scene scan.
+	KX_GameObject *m_focusPropTarget = nullptr;
+	std::string m_focusPropScanned;
+	double m_focusScanTime = -1.0;
+	bool m_focusValid = false;
+	bool m_focusInitialized = false;
+	mt::vec3 m_focusPosition = mt::zero3;
+	float m_focusDistance = 10.0f;
+	mt::vec2 m_focusScreen = mt::vec2(0.5f, 0.5f);
+	double m_fxLastTime = -1.0;
+
+	/// Tracking offset over the base (object) orientation, local yaw/pitch/roll.
+	float m_trackYaw = 0.0f;
+	float m_trackPitch = 0.0f;
+	float m_trackRoll = 0.0f;
+	float m_trackYawRate = 0.0f;
+	bool m_trackActive = false;
+	mt::mat3 m_trackRotation = mt::mat3::Identity();
+	mt::vec3 m_trackOffset = mt::zero3;
+	float m_droneTime = 0.0f;
+
+	/// Motion of the rendered camera, used by Speed/Directional Blur.
+	bool m_motionInitialized = false;
+	mt::vec3 m_prevRenderPos = mt::zero3;
+	mt::vec3 m_prevRenderForward = mt::zero3;
+	float m_speed = 0.0f;
+	float m_speedOverride = -1.0f;
+	mt::vec2 m_turn = mt::zero2;
+
+	/// Shake sources summed into the lens shift: World earthquake + cam.shake() trauma.
+	float m_quakeShiftX = 0.0f;
+	float m_quakeShiftY = 0.0f;
+	float m_trauma = 0.0f;
+	float m_traumaRate = 0.0f; // 0 = use shakeDecay
+	float m_traumaTime = 0.0f;
+	float m_shakeRoll = 0.0f;
+
 	/// Setting for a view: left or right eye or default (left eye).
 	struct View
 	{
@@ -104,6 +185,12 @@ protected:
 
 	void ExtractFrustum(RAS_Rasterizer::StereoEye eye);
 
+	KX_GameObject *FindPropertyFocus(bool rescan, double curtime);
+	void UpdateFocus(float dt, double curtime);
+	void UpdateTracking(float dt);
+	void UpdateShake(float dt);
+	void UpdateMotion(float dt);
+
 public:
 
 	enum { INSIDE, INTERSECT, OUTSIDE };
@@ -145,6 +232,28 @@ public:
 	/** Transient lens-shift offset (earthquake camera shake). Added to shift_x/shift_y
 	 *  when the projection is built, so the authored shift stays untouched. */
 	void				SetShakeShift(float x, float y);
+	/// Earthquake part of the shake; summed with the cam.shake() part.
+	void				SetEarthquakeShift(float x, float y);
+
+	GameFX& GetGameFX();
+	void SetFocusObject(KX_GameObject *object);
+	KX_GameObject *GetFocusObject() const;
+	/// Clears any reference to a removed object.
+	void UnlinkObject(KX_GameObject *object);
+	/// Focus sensor, tracking and shake, once per frame for the active camera.
+	void UpdateGameFX(double curtime);
+	/// Adds shake trauma (0..1), decays at shake_decay per second.
+	void AddShake(float trauma, float duration);
+
+	const mt::vec3& GetFocusPosition() const;
+	float GetFocusDistance() const;
+	const mt::vec2& GetFocusScreenPosition() const;
+	bool IsFocusValid() const;
+	float GetCameraSpeed() const;
+	const mt::vec2& GetCameraTurn() const;
+	/// Orientation that is rendered (base orientation plus tracking and shake roll).
+	mt::mat3 GetRenderOrientation() const;
+	mt::vec3 GetRenderPosition() const;
 	
 	/** Gets the modelview matrix that is used by the rasterizer. 
 	 *  \warning If the Camera is a dynamic object then this method may return garbage.  Use GetWorldToCamera() instead.
@@ -285,6 +394,15 @@ public:
 	static PyObject*	pyattr_get_camera_to_world(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_world_to_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	
+	EXP_PYMETHOD_DOC_VARARGS(KX_Camera, shake);
+
+	static PyObject*	pyattr_get_focus_object(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_focus_object(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject*	pyattr_get_focus_target(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_focus_position(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_focus_screen_position(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_track_orientation(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+
 	static PyObject*	pyattr_get_INSIDE(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_OUTSIDE(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_INTERSECT(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

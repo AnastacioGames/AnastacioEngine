@@ -32,6 +32,8 @@
 #include "KX_2DFilterOffScreen.h"
 #include "EXP_PyObjectPlus.h"
 
+class KX_Camera;
+
 class KX_2DFilterManager : public RAS_2DFilterManager, public EXP_PyObjectPlus
 {
 	Py_Header
@@ -60,6 +62,10 @@ public:
 	void EnsureCloudsFilters(BuildInFilters filters);
 	void EnsureLensFlareFilters(BuildInFilters filters);
 	bool SetBuiltinFilterEnabled(FILTER_MODE mode, bool enabled) override;
+
+	/** Camera FX of the active camera: adds/removes the DOF and Lens passes when the set of enabled
+	 * effects changes (so everything off costs no pass) and uploads this frame's values. */
+	void UpdateCameraFX(KX_Camera *camera);
 
 private:
 	RAS_ICanvas *m_canvas;

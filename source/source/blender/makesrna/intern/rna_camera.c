@@ -221,6 +221,148 @@ static void rna_def_game_camera_viewport_data(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Top Ratio", "Set camera viewport top to a ratio of the entire viewport height");
 }
 
+#define GFX_FLOAT(_id, _member, _min, _max, _smin, _smax, _name, _desc) \
+	prop = RNA_def_property(srna, _id, PROP_FLOAT, PROP_NONE); \
+	RNA_def_property_float_sdna(prop, NULL, _member); \
+	RNA_def_property_range(prop, _min, _max); \
+	RNA_def_property_ui_range(prop, _smin, _smax, 1, 3); \
+	RNA_def_property_ui_text(prop, _name, _desc); \
+	RNA_def_property_update(prop, NC_CAMERA, NULL)
+
+#define GFX_FLAG(_id, _flag, _name, _desc) \
+	prop = RNA_def_property(srna, _id, PROP_BOOLEAN, PROP_NONE); \
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", _flag); \
+	RNA_def_property_ui_text(prop, _name, _desc); \
+	RNA_def_property_update(prop, NC_CAMERA, NULL)
+
+static void rna_def_camera_game_fx(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem focus_mode_items[] = {
+		{CAM_FOCUS_MANUAL, "MANUAL", 0, "Manual", "Focus at a fixed distance"},
+		{CAM_FOCUS_OBJECT, "OBJECT", 0, "Object", "Focus on the DOF Object"},
+		{CAM_FOCUS_PROPERTY, "PROPERTY", 0, "Property",
+		 "Focus on the nearest object whose property is true (or non-zero)"},
+		{CAM_FOCUS_AUTO, "AUTO", 0, "Auto", "Focus on whatever is under the aim point of the screen"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem track_mode_items[] = {
+		{CAM_TRACK_OFF, "OFF", 0, "Off", "The camera does not turn by itself"},
+		{CAM_TRACK_LOOK_AT, "LOOK_AT", 0, "Look At", "The camera turns on its own axis to follow the focus"},
+		{CAM_TRACK_DRONE, "DRONE", 0, "Drone", "Look At with smooth target changes, hover and banking"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem dof_quality_items[] = {
+		{0, "LOW", 0, "Low", "Fewer samples, fastest"},
+		{1, "MEDIUM", 0, "Medium", ""},
+		{2, "HIGH", 0, "High", "More samples, smoother bokeh"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "CameraGameFXData", NULL);
+	RNA_def_struct_sdna(srna, "CameraGameFX");
+	RNA_def_struct_nested(brna, srna, "Camera");
+	RNA_def_struct_ui_text(srna, "Camera Game FX", "Game engine focus, tracking, effects and shake");
+
+	/* Focus */
+	prop = RNA_def_property(srna, "focus_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "focus_mode");
+	RNA_def_property_enum_items(prop, focus_mode_items);
+	RNA_def_property_ui_text(prop, "Focus", "How the camera finds its focus");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+
+	prop = RNA_def_property(srna, "focus_property", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "focus_prop");
+	RNA_def_property_ui_text(prop, "Focus Property", "Game property that marks the focus target when true");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+
+	GFX_FLOAT("focus_smooth", "focus_smooth", 0.0f, 10.0f, 0.0f, 2.0f, "Focus Smooth",
+	          "Seconds the focus takes to reach a new distance");
+	GFX_FLOAT("focus_range", "focus_range", 0.0f, 10000.0f, 0.0f, 50.0f, "Focus Range",
+	          "Depth around the focus distance that stays sharp, in meters");
+
+	prop = RNA_def_property(srna, "focus_screen", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "focus_screen");
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Aim Point", "Screen point (0..1, top-down) used by Auto focus");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+
+	/* Tracking */
+	prop = RNA_def_property(srna, "track_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "track_mode");
+	RNA_def_property_enum_items(prop, track_mode_items);
+	RNA_def_property_ui_text(prop, "Tracking", "Turn the camera on its own axis to follow the focus");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+
+	GFX_FLOAT("track_speed", "track_speed", 0.0f, 10.0f, 0.0f, 2.0f, "Track Smooth",
+	          "Seconds the camera takes to turn toward the focus (0 = instant)");
+	prop = RNA_def_property(srna, "track_limit", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_float_sdna(prop, NULL, "track_limit");
+	RNA_def_property_range(prop, 0.0f, M_PI);
+	RNA_def_property_ui_text(prop, "Angle Limit", "Max turn away from the base orientation (0 = no limit)");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+	GFX_FLOAT("track_deadzone", "track_deadzone", 0.0f, 0.5f, 0.0f, 0.5f, "Dead Zone",
+	          "Screen fraction around the aim point where the camera does not turn");
+
+	prop = RNA_def_property(srna, "track_screen_offset", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "track_screen_offset");
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_range(prop, -0.5f, 0.5f);
+	RNA_def_property_ui_text(prop, "Framing Offset", "Where the target sits on screen (0,0 = center)");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+
+	GFX_FLAG("use_track_up_lock", CAM_GFX_TRACK_UPLOCK, "Keep Horizon", "Never roll while tracking");
+	GFX_FLOAT("drone_amplitude", "drone_amplitude", 0.0f, 20.0f, 0.0f, 5.0f, "Hover Amplitude",
+	          "Drone hover strength (1 = the Rolima Racer drone)");
+	GFX_FLOAT("drone_frequency", "drone_frequency", 0.0f, 20.0f, 0.0f, 5.0f, "Hover Speed", "Drone hover speed");
+	GFX_FLOAT("track_bank", "track_bank", 0.0f, 5.0f, 0.0f, 2.0f, "Bank", "Drone roll into the turn");
+
+	/* Effects */
+	GFX_FLAG("use_dof", CAM_GFX_DOF, "Depth of Field", "Bokeh blur outside the focus range");
+	prop = RNA_def_property(srna, "dof_quality", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "dof_quality");
+	RNA_def_property_enum_items(prop, dof_quality_items);
+	RNA_def_property_ui_text(prop, "Quality", "Bokeh sample count");
+	RNA_def_property_update(prop, NC_CAMERA, NULL);
+	GFX_FLOAT("dof_blur", "dof_blur", 0.0f, 32.0f, 0.0f, 16.0f, "Blur Size", "Max bokeh radius in pixels");
+
+	GFX_FLAG("use_speed_blur", CAM_GFX_SPEEDBLUR, "Speed Blur", "Radial blur centered on the focus, grows with speed");
+	GFX_FLOAT("speed_blur_strength", "speedblur_strength", 0.0f, 2.0f, 0.0f, 1.0f, "Strength", "");
+	GFX_FLOAT("speed_blur_max_speed", "speedblur_max_speed", 0.1f, 1000.0f, 1.0f, 200.0f, "Full Speed",
+	          "Camera speed (m/s) that gives the full blur");
+
+	GFX_FLAG("use_directional_blur", CAM_GFX_DIRBLUR, "Directional Blur", "Blur along the camera turn");
+	GFX_FLOAT("directional_blur_strength", "dirblur_strength", 0.0f, 2.0f, 0.0f, 1.0f, "Strength", "");
+	GFX_FLOAT("directional_blur_max", "dirblur_max", 0.0f, 0.2f, 0.0f, 0.1f, "Max", "Max blur length (screen fraction)");
+
+	GFX_FLAG("use_blur_protect", CAM_GFX_BLUR_PROTECT, "Protect Focus",
+	         "Keep the focus range sharp under Speed and Directional Blur");
+
+	GFX_FLAG("use_cat_eye", CAM_GFX_CATEYE_BOKEH, "Cat Eye Bokeh", "Bokeh squeezes toward the frame edges");
+	GFX_FLOAT("cat_eye_strength", "cateye_strength", 0.0f, 1.0f, 0.0f, 1.0f, "Cat Eye", "");
+	GFX_FLAG("use_chromatic", CAM_GFX_CHROMA, "Chromatic Aberration", "Color fringes toward the frame edges");
+	GFX_FLOAT("chromatic_strength", "chroma_strength", 0.0f, 5.0f, 0.0f, 2.0f, "Strength", "");
+	GFX_FLAG("use_chromatic_speed", CAM_GFX_CHROMA_SPEED, "Grow With Speed", "Stronger aberration at speed");
+	GFX_FLAG("use_vignette", CAM_GFX_VIGNETTE, "Vignette / Fisheye", "Darkened corners and barrel lens");
+	GFX_FLOAT("vignette_strength", "vignette_strength", 0.0f, 1.0f, 0.0f, 1.0f, "Vignette", "");
+	GFX_FLOAT("vignette_radius", "vignette_radius", 0.0f, 2.0f, 0.0f, 1.5f, "Radius", "");
+	GFX_FLOAT("fisheye_strength", "fisheye_strength", -1.0f, 1.0f, -0.5f, 0.5f, "Fisheye",
+	          "Barrel (positive) or pincushion (negative) distortion");
+
+	/* Shake */
+	GFX_FLOAT("shake_amplitude", "shake_amplitude", 0.0f, 0.5f, 0.0f, 0.1f, "Shake Amplitude",
+	          "Max lens shift of cam.shake() at full trauma");
+	GFX_FLOAT("shake_frequency", "shake_frequency", 0.0f, 60.0f, 0.0f, 30.0f, "Shake Frequency", "");
+	GFX_FLOAT("shake_decay", "shake_decay", 0.0f, 20.0f, 0.0f, 5.0f, "Shake Decay", "Trauma lost per second");
+	GFX_FLAG("use_shake_roll", CAM_GFX_SHAKE_ROLL, "Shake Roll", "Also roll the camera a little while shaking");
+}
+
+#undef GFX_FLOAT
+#undef GFX_FLAG
+
 void RNA_def_camera(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -409,6 +551,12 @@ void RNA_def_camera(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "gameviewport");
 	RNA_def_property_struct_type(prop, "GameCameraViewportData");
 
+	prop = RNA_def_property(srna, "game_fx", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "gamefx");
+	RNA_def_property_struct_type(prop, "CameraGameFXData");
+	RNA_def_property_ui_text(prop, "Game FX", "Game engine focus, tracking, effects and shake");
+
 	/* flag */
 	prop = RNA_def_property(srna, "override_culling", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag", GAME_CAM_OVERRIDE_CULLING);
@@ -500,6 +648,7 @@ void RNA_def_camera(BlenderRNA *brna)
 
 	/* Game Data */
 	rna_def_game_camera_viewport_data(brna);
+	rna_def_camera_game_fx(brna);
 
 	/* Camera API */
 	RNA_api_camera(srna);

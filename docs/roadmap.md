@@ -197,9 +197,10 @@ pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Expl
 
 ### Câmera: foco, rastreio e Camera FX
 
-[Plano](camera-fx-plan.md) salvo em 2026-09-29; começa **depois de fechar a Destruição**. Sensor de foco na
-câmera (objeto, propriedade true, automático ou manual), rastreio do foco (Look At / Drone), módulo único de
-efeitos (DOF Bokeh, Speed Blur, Directional Blur, olho de gato em 3 estilos) e tremor somado ao terremoto.
+Implementado em 2026-09-29 (fases 1 a 5 do [plano](camera-fx-plan.md)); referência em [camera-fx.md](camera-fx.md).
+Validado no `RangeRuntime` com `tools/create_camera_fx_scene.py` (foco por propriedade, Drone, shake, fallback
+após remover o alvo, efeitos desligados em jogo). Pendente: conferência visual dos filtros e custo medido
+(`tc_filters2d`) no Rolima Racer; troca dos scripts do jogo fica para quando o usuário decidir.
 
 ### Android / iOS
 

@@ -25,6 +25,7 @@
 #include "KX_SimulationPipeline.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
+#include "KX_Camera.h"
 #include "KX_Globals.h"
 #include "EXP_ListValue.h"
 #include "PHY_IPhysicsEnvironment.h"
@@ -136,6 +137,12 @@ void KX_SimulationPipeline::Update()
 
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph_physics);
 			scene->UpdateParents();
+
+			// Focus sensor, focus tracking and shake of the active camera, on final transforms.
+			KX_Camera *activeCamera = scene->GetActiveCamera();
+			if (activeCamera) {
+				activeCamera->UpdateGameFX(m_engine->GetFrameTime());
+			}
 
 			// Fase I.2: step every object's GPU particle emitter once per frame (not once
 			// per camera -- see RenderCamera). Placed last, after UpdateParents(), so each

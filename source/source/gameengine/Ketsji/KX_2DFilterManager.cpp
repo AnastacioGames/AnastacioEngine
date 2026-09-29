@@ -29,6 +29,12 @@
 
 #include "CM_Message.h"
 
+#include "KX_Camera.h"
+#include "DNA_camera_types.h"
+
+#include <algorithm>
+#include <cmath>
+
 extern "C" {
 	extern char datatoc_RAS_Bloom2DFilter_buf_glsl[];
 	extern char datatoc_RAS_Bloom2DFilter_bufH_glsl[];
@@ -44,6 +50,8 @@ extern "C" {
 	extern char datatoc_RAS_Rain2DFilter_glsl[];
 	extern char datatoc_RAS_Clouds2DFilter_glsl[];
 	extern char datatoc_RAS_LensFlare2DFilter_glsl[];
+	extern char datatoc_RAS_CameraDof2DFilter_glsl[];
+	extern char datatoc_RAS_CameraLens2DFilter_glsl[];
 }
 
 KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filters) :
@@ -348,6 +356,103 @@ void KX_2DFilterManager::EnsureLensFlareFilters(BuildInFilters filters)
 	flareData.shaderText = datatoc_RAS_LensFlare2DFilter_glsl;
 
 	AddFilter(flareData, true);
+}
+
+void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
+{
+	bool useDof = false;
+	bool useLens = false;
+	float fx[24] = {0.0f};
+
+	if (camera) {
+		const KX_Camera::GameFX& gfx = camera->GetGameFX();
+		const float speed = camera->GetCameraSpeed();
+		const float speedFactor = std::min(speed / std::max(gfx.speedBlurMaxSpeed, 0.1f), 1.0f);
+		const mt::vec2& screen = camera->GetFocusScreenPosition();
+		const mt::vec2& turn = camera->GetCameraTurn();
+
+		useDof = (gfx.flag & CAM_GFX_DOF) && gfx.dofBlur > 0.0f;
+		const bool speedBlur = (gfx.flag & CAM_GFX_SPEEDBLUR) && gfx.speedBlurStrength > 0.0f;
+		const bool dirBlur = (gfx.flag & CAM_GFX_DIRBLUR) && gfx.dirBlurStrength > 0.0f;
+		const bool chroma = (gfx.flag & CAM_GFX_CHROMA) && gfx.chromaStrength > 0.0f;
+		const bool vignette = (gfx.flag & CAM_GFX_VIGNETTE) &&
+		                      (gfx.vignetteStrength > 0.0f || gfx.fisheyeStrength != 0.0f);
+		useLens = speedBlur || dirBlur || chroma || vignette;
+
+		static const float rings[3] = {2.0f, 3.0f, 5.0f};
+		const RAS_CameraData *data = camera->GetCameraData();
+
+		fx[0] = camera->GetFocusDistance();
+		fx[1] = gfx.focusRange;
+		fx[2] = data->m_clipstart;
+		fx[3] = data->m_clipend;
+		fx[4] = gfx.dofBlur;
+		fx[5] = rings[std::min(std::max((int)gfx.dofQuality, 0), 2)];
+		fx[6] = (gfx.flag & CAM_GFX_CATEYE_BOKEH) ? gfx.catEyeStrength : 0.0f;
+		fx[7] = data->m_perspective ? 1.0f : 0.0f;
+		fx[8] = speedBlur ? gfx.speedBlurStrength * speedFactor : 0.0f;
+		fx[9] = screen.x;
+		fx[10] = 1.0f - screen.y;
+		fx[11] = (gfx.flag & CAM_GFX_BLUR_PROTECT) ? 1.0f : 0.0f;
+		if (dirBlur) {
+			mt::vec2 dir = turn * gfx.dirBlurStrength * 4.0f;
+			const float len = dir.Length();
+			if (len > gfx.dirBlurMax && len > 0.0f) {
+				dir *= gfx.dirBlurMax / len;
+			}
+			fx[12] = dir.x;
+			fx[13] = dir.y;
+		}
+		float chromaAmount = chroma ? gfx.chromaStrength : 0.0f;
+		if (chroma && (gfx.flag & CAM_GFX_CHROMA_SPEED)) {
+			chromaAmount *= 0.25f + speedFactor;
+		}
+		fx[16] = chromaAmount;
+		fx[17] = vignette ? gfx.vignetteStrength : 0.0f;
+		fx[18] = gfx.vignetteRadius;
+		fx[19] = vignette ? gfx.fisheyeStrength : 0.0f;
+		fx[20] = (float)gfx.numBlades;
+	}
+
+	RAS_2DFilter *dof = GetFilterPass(FILTERPASS_CAMERA_DOF, true);
+	if (useDof && !dof) {
+		RAS_2DFilterData data;
+		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+		data.filterPassIndex = FILTERPASS_CAMERA_DOF;
+		data.gameObject = nullptr;
+		data.mipmap = false;
+		data.propertyNames = {};
+		data.buildInFilters = {};
+		data.shaderText = datatoc_RAS_CameraDof2DFilter_glsl;
+		dof = AddFilter(data, true);
+	}
+	else if (!useDof && dof) {
+		RemoveReservedFilterPass(FILTERPASS_CAMERA_DOF);
+		dof = nullptr;
+	}
+
+	RAS_2DFilter *lens = GetFilterPass(FILTERPASS_CAMERA_LENS, true);
+	if (useLens && !lens) {
+		RAS_2DFilterData data;
+		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+		data.filterPassIndex = FILTERPASS_CAMERA_LENS;
+		data.gameObject = nullptr;
+		data.mipmap = false;
+		data.propertyNames = {};
+		data.buildInFilters = {};
+		data.shaderText = datatoc_RAS_CameraLens2DFilter_glsl;
+		lens = AddFilter(data, true);
+	}
+	else if (!useLens && lens) {
+		RemoveReservedFilterPass(FILTERPASS_CAMERA_LENS);
+		lens = nullptr;
+	}
+
+	for (RAS_2DFilter *filter : {dof, lens}) {
+		if (filter) {
+			std::copy(fx, fx + 24, filter->GetBuildInFilters()->camera_fx);
+		}
+	}
 }
 
 KX_2DFilter *KX_2DFilterManager::BloomPass(BuildInFilters filters, int time, int index, float lod, int w, int h)

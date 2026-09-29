@@ -9,6 +9,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Câmera do jogo: foco, rastreio, Camera FX e tremor
+
+- DNA `CameraGameFX gamefx` no fim de `Camera` (defaults em `BKE_camera_gamefx_init`, versioning em
+  `versioning_range.c`); RNA `Camera.game_fx`; painéis "Focus & Tracking", "Camera Effects" e "Camera Shake"
+  (só Range Game). Tudo desligado por padrão.
+- `KX_Camera::UpdateGameFX` roda para a câmera ativa em `KX_SimulationPipeline`, depois do scenegraph: foco
+  (Manual/Object/Property/Auto), rastreio Look At/Drone como offset em `GetRenderOrientation`/`GetRenderPosition`
+  (`worldOrientation` não muda), velocidade da câmera e tremor por trauma. O terremoto do World agora chama
+  `SetEarthquakeShift` e soma com o `shake()`.
+- Filtros reservados `FILTERPASS_CAMERA_DOF` (18) e `FILTERPASS_CAMERA_LENS` (19), shaders
+  `RAS_CameraDof2DFilter.glsl` e `RAS_CameraLens2DFilter.glsl`, uniform `ge_CameraFX[6]`;
+  `reservedPassIndex` passou para 20. Os passes só existem com um efeito ligado
+  (`RAS_2DFilterManager::RemoveReservedFilterPass`).
+- API Python e migração do Rolima Racer em `docs/camera-fx.md`. O atributo `fstop` do plano não foi exposto.
+- Teste: `tools/create_camera_fx_scene.py` no `RangeRuntime`: alvo por propriedade seguido (tela ~0,55/0,59 com
+  offset -0,1), trauma 0,53 → 0 em 1,5 s, alvo removido → `focusValid=False` e foco manual, efeitos desligados
+  sem erro de shader.
+
 ## 2026-09-29 - Generate Fragments põe os pedaços num collection do Outliner
 
 - Os collections do Outliner (`SceneCollection`) ganharam RNA:

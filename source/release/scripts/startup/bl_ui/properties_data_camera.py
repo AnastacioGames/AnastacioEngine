@@ -306,6 +306,127 @@ class DATA_PT_camera_game_culling(CameraButtonsPanel, Panel):
         box.label(text="Foliage and Grass use it when Foliage Optimization is enabled.")
 
 
+class DATA_PT_camera_game_focus(CameraButtonsPanel, Panel):
+    bl_label = "Focus & Tracking"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+        fx = cam.game_fx
+
+        box = layout.box()
+        box.label(text="Focus:", icon="CAMERA_DATA")
+        box.prop(fx, "focus_mode", expand=True)
+        if fx.focus_mode == 'MANUAL':
+            box.prop(cam.gpu_dof, "focus_distance", text="Distance")
+        elif fx.focus_mode == 'OBJECT':
+            box.prop(cam, "dof_object", text="Object")
+        elif fx.focus_mode == 'PROPERTY':
+            box.prop(fx, "focus_property", text="Property")
+        else:
+            box.prop(fx, "focus_screen")
+        row = box.row(align=True)
+        row.prop(fx, "focus_range", text="Range")
+        row.prop(fx, "focus_smooth", text="Smooth")
+
+        box = layout.box()
+        box.label(text="Tracking:", icon="CONSTRAINT")
+        box.prop(fx, "track_mode", expand=True)
+        if fx.track_mode != 'OFF':
+            if fx.focus_mode not in {'OBJECT', 'PROPERTY'}:
+                box.label(text="Tracking follows Object or Property focus only.", icon="INFO")
+            col = box.column(align=True)
+            col.prop(fx, "track_speed")
+            col.prop(fx, "track_limit")
+            col.prop(fx, "track_deadzone")
+            box.prop(fx, "track_screen_offset")
+            box.prop(fx, "use_track_up_lock")
+            if fx.track_mode == 'DRONE':
+                col = box.column(align=True)
+                col.prop(fx, "drone_amplitude")
+                col.prop(fx, "drone_frequency")
+                col.prop(fx, "track_bank")
+
+
+class DATA_PT_camera_game_effects(CameraButtonsPanel, Panel):
+    bl_label = "Camera Effects"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+        fx = cam.game_fx
+
+        box = layout.box()
+        box.prop(fx, "use_dof")
+        if fx.use_dof:
+            row = box.row()
+            row.prop(fx, "dof_quality", expand=True)
+            col = box.column(align=True)
+            col.prop(fx, "dof_blur")
+            col.prop(cam.gpu_dof, "blades")
+
+        box = layout.box()
+        box.prop(fx, "use_speed_blur")
+        if fx.use_speed_blur:
+            col = box.column(align=True)
+            col.prop(fx, "speed_blur_strength")
+            col.prop(fx, "speed_blur_max_speed")
+
+        box = layout.box()
+        box.prop(fx, "use_directional_blur")
+        if fx.use_directional_blur:
+            col = box.column(align=True)
+            col.prop(fx, "directional_blur_strength")
+            col.prop(fx, "directional_blur_max")
+
+        if fx.use_speed_blur or fx.use_directional_blur:
+            layout.prop(fx, "use_blur_protect")
+
+        box = layout.box()
+        box.label(text="Cat Eye Lens:", icon="RESTRICT_VIEW_OFF")
+        row = box.row()
+        row.prop(fx, "use_cat_eye", text="Bokeh", toggle=True)
+        row.prop(fx, "use_chromatic", text="Aberration", toggle=True)
+        row.prop(fx, "use_vignette", text="Vignette / Fisheye", toggle=True)
+        if fx.use_cat_eye:
+            sub = box.row()
+            sub.active = fx.use_dof
+            sub.prop(fx, "cat_eye_strength")
+        if fx.use_chromatic:
+            row = box.row(align=True)
+            row.prop(fx, "chromatic_strength")
+            row.prop(fx, "use_chromatic_speed", text="Speed")
+        if fx.use_vignette:
+            col = box.column(align=True)
+            col.prop(fx, "vignette_strength")
+            col.prop(fx, "vignette_radius")
+            col.prop(fx, "fisheye_strength")
+
+
+class DATA_PT_camera_game_shake(CameraButtonsPanel, Panel):
+    bl_label = "Camera Shake"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        fx = context.camera.game_fx
+
+        col = layout.column(align=True)
+        col.prop(fx, "shake_amplitude", text="Amplitude")
+        col.prop(fx, "shake_frequency", text="Frequency")
+        col.prop(fx, "shake_decay", text="Decay")
+        layout.prop(fx, "use_shake_roll")
+        layout.label(text="Triggered by camera.shake(); adds to the World earthquake.", icon="INFO")
+
+
 class DATA_PT_camera_game_viewport(CameraButtonsPanel, Panel):
     bl_label = "Custom Viewport"
     bl_options = {'DEFAULT_CLOSED'}
@@ -464,6 +585,9 @@ classes = (
     DATA_PT_camera_display,
     DATA_PT_camera_safe_areas,
     DATA_PT_camera_game_culling,
+    DATA_PT_camera_game_focus,
+    DATA_PT_camera_game_effects,
+    DATA_PT_camera_game_shake,
     DATA_PT_camera_game_viewport,
     DATA_PT_camera_stereoscopy,
     # DATA_PT_custom_props_camera,  # disabled: Custom Properties panel unused

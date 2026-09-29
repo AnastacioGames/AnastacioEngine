@@ -54,6 +54,7 @@
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
 
+#include "BKE_camera.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_property.h"
@@ -545,6 +546,13 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     /* Native destruction: old files get the same debris limit as new scenes. */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {
       scene->gm.max_debris = 150;
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "Camera", "CameraGameFX", "gamefx")) {
+    /* Camera focus/FX: old cameras get the defaults, with every effect off. */
+    LISTBASE_FOREACH (Camera *, camera, &main->camera) {
+      BKE_camera_gamefx_init(&camera->gamefx);
     }
   }
 }

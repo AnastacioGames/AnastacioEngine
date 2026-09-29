@@ -221,6 +221,15 @@ void RAS_2DFilterManager::RemoveFilterPass(unsigned int passIndex)
 	}
 }
 
+void RAS_2DFilterManager::RemoveReservedFilterPass(unsigned int passIndex)
+{
+	RAS_PassTo2DFilter::iterator it = m_filters.find(passIndex);
+	if (it != m_filters.end()) {
+		delete it->second;
+		m_filters.erase(it);
+	}
+}
+
 RAS_2DFilter *RAS_2DFilterManager::GetFilterPass(unsigned int passIndex, bool use_reserved)
 {
 	unsigned int index = use_reserved ? passIndex : passIndex + reservedPassIndex;

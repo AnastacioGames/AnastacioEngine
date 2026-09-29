@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "DNA_camera_types.h"
 #include "DNA_lamp_types.h"
@@ -50,6 +51,39 @@
 
 /****************************** Camera Datablock *****************************/
 
+void BKE_camera_gamefx_init(CameraGameFX *fx)
+{
+	/* Everything off by default: focus is only computed, nothing is drawn or moved. */
+	memset(fx, 0, sizeof(*fx));
+	fx->focus_mode = CAM_FOCUS_MANUAL;
+	fx->track_mode = CAM_TRACK_OFF;
+	fx->flag = CAM_GFX_TRACK_UPLOCK | CAM_GFX_BLUR_PROTECT;
+	fx->dof_quality = 1;
+	fx->focus_smooth = 0.2f;
+	fx->focus_range = 2.0f;
+	fx->focus_screen[0] = 0.5f;
+	fx->focus_screen[1] = 0.5f;
+	fx->track_speed = 0.25f;
+	fx->track_limit = 0.0f;
+	fx->track_deadzone = 0.0f;
+	fx->drone_amplitude = 1.0f;
+	fx->drone_frequency = 1.0f;
+	fx->track_bank = 0.3f;
+	fx->dof_blur = 6.0f;
+	fx->speedblur_strength = 0.5f;
+	fx->speedblur_max_speed = 40.0f;
+	fx->dirblur_strength = 0.5f;
+	fx->dirblur_max = 0.05f;
+	fx->cateye_strength = 0.5f;
+	fx->chroma_strength = 0.5f;
+	fx->vignette_strength = 0.4f;
+	fx->vignette_radius = 0.75f;
+	fx->fisheye_strength = 0.0f;
+	fx->shake_amplitude = 0.02f;
+	fx->shake_frequency = 15.0f;
+	fx->shake_decay = 1.5f;
+}
+
 void BKE_camera_init(Camera *cam)
 {
 	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(cam, id));
@@ -68,6 +102,7 @@ void BKE_camera_init(Camera *cam)
 	cam->csmCacheMaxStaleFrames = 1;
 
 	GPU_fx_compositor_init_dof_settings(&cam->gpu_dof);
+	BKE_camera_gamefx_init(&cam->gamefx);
 
 	/* stereoscopy 3d */
 	cam->stereo.interocular_distance = 0.065f;

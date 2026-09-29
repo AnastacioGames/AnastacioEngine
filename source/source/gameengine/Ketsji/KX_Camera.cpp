@@ -39,6 +39,12 @@
 
 #include "RAS_ICanvas.h"
 
+#include "DNA_camera_types.h"
+
+#include <cfloat>
+#include <cmath>
+#include <algorithm>
+
 #include "GPU_glew.h"
 
 #include <BLI_math_rotation.h>
@@ -94,7 +100,27 @@ mt::mat3x4 KX_Camera::GetWorldToCamera() const
 
 mt::mat3x4 KX_Camera::GetCameraToWorld() const
 {
-	return mt::mat3x4(NodeGetWorldOrientation(), NodeGetWorldPosition());
+	return mt::mat3x4(GetRenderOrientation(), GetRenderPosition());
+}
+
+mt::mat3 KX_Camera::GetRenderOrientation() const
+{
+	if (!m_trackActive && m_shakeRoll == 0.0f) {
+		return NodeGetWorldOrientation();
+	}
+	mt::mat3 ori = NodeGetWorldOrientation() * m_trackRotation;
+	if (m_shakeRoll != 0.0f) {
+		ori = ori * mt::mat3::RotationZ(m_shakeRoll);
+	}
+	return ori;
+}
+
+mt::vec3 KX_Camera::GetRenderPosition() const
+{
+	if (!m_trackActive) {
+		return NodeGetWorldPosition();
+	}
+	return NodeGetWorldPosition() + m_trackOffset;
 }
 
 /**
@@ -160,6 +186,408 @@ void KX_Camera::SetShakeShift(float x, float y)
 	m_shakeShiftX = x;
 	m_shakeShiftY = y;
 	InvalidateProjectionMatrix();
+}
+
+void KX_Camera::SetEarthquakeShift(float x, float y)
+{
+	m_quakeShiftX = x;
+	m_quakeShiftY = y;
+	if (m_trauma <= 0.0f) {
+		SetShakeShift(x, y);
+	}
+	// Otherwise UpdateShake() sums both sources this frame.
+}
+
+KX_Camera::GameFX& KX_Camera::GetGameFX()
+{
+	return m_gameFX;
+}
+
+void KX_Camera::SetFocusObject(KX_GameObject *object)
+{
+	m_focusObject = object;
+}
+
+KX_GameObject *KX_Camera::GetFocusObject() const
+{
+	return m_focusObject;
+}
+
+void KX_Camera::UnlinkObject(KX_GameObject *object)
+{
+	if (m_focusObject == object) {
+		m_focusObject = nullptr;
+	}
+	if (m_focusTarget == object) {
+		m_focusTarget = nullptr;
+	}
+	if (m_focusPropTarget == object) {
+		m_focusPropTarget = nullptr;
+		// Look for another marked object right away.
+		m_focusScanTime = -1.0;
+	}
+}
+
+void KX_Camera::AddShake(float trauma, float duration)
+{
+	m_trauma = std::min(1.0f, std::max(0.0f, m_trauma + trauma));
+	m_traumaRate = (duration > 0.0f) ? m_trauma / duration : 0.0f;
+}
+
+const mt::vec3& KX_Camera::GetFocusPosition() const
+{
+	return m_focusPosition;
+}
+
+float KX_Camera::GetFocusDistance() const
+{
+	return m_focusDistance;
+}
+
+const mt::vec2& KX_Camera::GetFocusScreenPosition() const
+{
+	return m_focusScreen;
+}
+
+bool KX_Camera::IsFocusValid() const
+{
+	return m_focusValid;
+}
+
+float KX_Camera::GetCameraSpeed() const
+{
+	return (m_speedOverride >= 0.0f) ? m_speedOverride : m_speed;
+}
+
+const mt::vec2& KX_Camera::GetCameraTurn() const
+{
+	return m_turn;
+}
+
+static bool camera_property_is_true(KX_GameObject *object, const std::string& prop)
+{
+	EXP_Value *value = object->GetProperty(prop);
+	return value && value->GetNumber() != 0.0;
+}
+
+KX_GameObject *KX_Camera::FindPropertyFocus(bool rescan, double curtime)
+{
+	const std::string& prop = m_gameFX.focusProp;
+	if (prop.empty()) {
+		m_focusPropTarget = nullptr;
+		return nullptr;
+	}
+
+	// The cached target stays while its property is still true; a full scene scan runs
+	// only every half second (to pick up new objects) or when the target went away.
+	const bool cachedValid = m_focusPropTarget && camera_property_is_true(m_focusPropTarget, prop);
+	if (cachedValid && !rescan && m_focusPropScanned == prop && curtime - m_focusScanTime < 0.5) {
+		return m_focusPropTarget;
+	}
+	if (!cachedValid || rescan || m_focusPropScanned != prop || curtime - m_focusScanTime >= 0.5) {
+		m_focusScanTime = curtime;
+		m_focusPropScanned = prop;
+		const mt::vec3 campos = NodeGetWorldPosition();
+		KX_GameObject *best = nullptr;
+		float bestDist = FLT_MAX;
+		for (KX_GameObject *object : *GetScene()->GetObjectList()) {
+			if (object == this || !camera_property_is_true(object, prop)) {
+				continue;
+			}
+			const float dist = (object->NodeGetWorldPosition() - campos).LengthSquared();
+			if (dist < bestDist) {
+				bestDist = dist;
+				best = object;
+			}
+		}
+		m_focusPropTarget = best;
+	}
+	return m_focusPropTarget;
+}
+
+void KX_Camera::UpdateFocus(float dt, double curtime)
+{
+	m_focusTarget = nullptr;
+	m_focusValid = false;
+
+	switch (m_gameFX.focusMode) {
+		case CAM_FOCUS_OBJECT:
+		{
+			if (m_focusObject) {
+				m_focusTarget = m_focusObject;
+			}
+			break;
+		}
+		case CAM_FOCUS_PROPERTY:
+		{
+			m_focusTarget = FindPropertyFocus(false, curtime);
+			break;
+		}
+		case CAM_FOCUS_AUTO:
+		{
+			// Physics ray through the aim point: no depth buffer read, no GPU stall.
+			const mt::mat3 ori = GetRenderOrientation();
+			const mt::vec3 from = GetRenderPosition();
+			float x = m_gameFX.focusScreen[0] * 2.0f - 1.0f;
+			float y = (1.0f - m_gameFX.focusScreen[1]) * 2.0f - 1.0f;
+			mt::vec3 dir;
+			if (m_camdata.m_perspective) {
+				const float tanX = 0.5f * m_camdata.m_sensor_x / std::max(m_camdata.m_lens, 0.001f);
+				RAS_ICanvas *canvas = KX_GetActiveEngine()->GetCanvas();
+				const float aspect = (canvas && canvas->GetHeight() > 0) ?
+				                     (float)canvas->GetWidth() / (float)canvas->GetHeight() : 16.0f / 9.0f;
+				dir = ori * mt::vec3(x * tanX, y * tanX / aspect, -1.0f);
+			}
+			else {
+				dir = ori * mt::vec3(0.0f, 0.0f, -1.0f);
+			}
+			const mt::vec3 to = from + dir.SafeNormalized(mt::axisX3) * m_camdata.m_clipend;
+
+			PHY_IPhysicsEnvironment *pe = GetScene()->GetPhysicsEnvironment();
+			PHY_IPhysicsController *spc = m_physicsController.get();
+			KX_GameObject *parent = GetParent();
+			if (!spc && parent) {
+				spc = parent->GetPhysicsController();
+			}
+			RayCastData rayData("", false, (1u << OB_MAX_COL_MASKS) - 1);
+			KX_RayCast::Callback<KX_Camera, RayCastData> callback(this, spc, &rayData);
+			if (pe && KX_RayCast::RayTest(pe, from, to, callback) && callback.m_hitFound) {
+				m_focusTarget = rayData.m_hitObject;
+				m_focusPosition = callback.m_hitPoint;
+				m_focusValid = true;
+			}
+			break;
+		}
+		default:
+			break;
+	}
+
+	if (m_focusTarget && m_gameFX.focusMode != CAM_FOCUS_AUTO) {
+		m_focusPosition = m_focusTarget->NodeGetWorldPosition();
+		m_focusValid = true;
+	}
+	(void)dt;
+}
+
+void KX_Camera::UpdateTracking(float dt)
+{
+	const short mode = m_gameFX.trackMode;
+	const bool drone = (mode == CAM_TRACK_DRONE);
+	// Only a real target (object or property) is followed; Auto/Manual focus would chase itself.
+	const bool follow = (mode != CAM_TRACK_OFF) && m_focusValid && m_focusTarget &&
+	                    m_gameFX.focusMode != CAM_FOCUS_AUTO;
+
+	const float blend = (m_gameFX.trackSpeed > 0.0f) ? 1.0f - std::exp(-dt / m_gameFX.trackSpeed) : 1.0f;
+
+	float targetYaw = 0.0f;
+	float targetPitch = 0.0f;
+
+	const mt::mat3 base = NodeGetWorldOrientation();
+	const mt::vec3 basePos = NodeGetWorldPosition();
+
+	// Drone hover (same shape as Rolima Racer's update_drone_movement), in world space.
+	mt::vec3 hover = mt::zero3;
+	if (drone) {
+		m_droneTime += dt * m_gameFX.droneFrequency;
+		hover = mt::vec3(0.0f,
+		                 std::cos(m_droneTime * 1.5f) * 0.015f,
+		                 std::sin(m_droneTime * 2.5f) * 0.03f) * m_gameFX.droneAmplitude;
+	}
+
+	if (follow) {
+		const mt::vec3 local = base.Transpose() * (m_focusPosition - (basePos + hover));
+		const float horiz = std::sqrt(local.x * local.x + local.z * local.z);
+		if (horiz > 1e-5f || std::fabs(local.y) > 1e-5f) {
+			targetYaw = std::atan2(local.x, -local.z);
+			targetPitch = std::atan2(local.y, horiz);
+		}
+		else {
+			targetYaw = m_trackYaw;
+			targetPitch = m_trackPitch;
+		}
+
+		// Framing offset and dead zone are screen fractions, turned into angles with the FOV.
+		const float fovX = 2.0f * std::atan(0.5f * m_camdata.m_sensor_x / std::max(m_camdata.m_lens, 0.001f));
+		RAS_ICanvas *canvas = KX_GetActiveEngine()->GetCanvas();
+		const float aspect = (canvas && canvas->GetHeight() > 0) ?
+		                     (float)canvas->GetWidth() / (float)canvas->GetHeight() : 16.0f / 9.0f;
+		const float fovY = fovX / aspect;
+		targetYaw -= m_gameFX.trackScreenOffset[0] * fovX;
+		targetPitch -= m_gameFX.trackScreenOffset[1] * fovY;
+
+		const float dead = m_gameFX.trackDeadzone;
+		if (dead > 0.0f) {
+			const float dy = targetYaw - m_trackYaw;
+			const float dp = targetPitch - m_trackPitch;
+			const float zoneX = dead * fovX;
+			const float zoneY = dead * fovY;
+			// Only turn by what exceeds the dead zone, so the camera comes to rest at its edge.
+			targetYaw = (std::fabs(dy) <= zoneX) ? m_trackYaw : targetYaw - std::copysign(zoneX, dy);
+			targetPitch = (std::fabs(dp) <= zoneY) ? m_trackPitch : targetPitch - std::copysign(zoneY, dp);
+		}
+
+		const float limit = m_gameFX.trackLimit;
+		if (limit > 0.0f) {
+			const float mag = std::sqrt(targetYaw * targetYaw + targetPitch * targetPitch);
+			if (mag > limit) {
+				targetYaw *= limit / mag;
+				targetPitch *= limit / mag;
+			}
+		}
+	}
+
+	// Smoothing on the angles also gives the drone's soft change of target for free.
+	const float prevYaw = m_trackYaw;
+	m_trackYaw += (targetYaw - m_trackYaw) * blend;
+	m_trackPitch += (targetPitch - m_trackPitch) * blend;
+
+	float targetRoll = 0.0f;
+	if (drone && dt > 0.0f) {
+		const float rate = (m_trackYaw - prevYaw) / dt;
+		m_trackYawRate += (rate - m_trackYawRate) * std::min(1.0f, dt * 8.0f);
+		targetRoll = std::max(-0.35f, std::min(0.35f, -m_trackYawRate * m_gameFX.trackBank * 0.25f));
+	}
+	else {
+		m_trackYawRate = 0.0f;
+	}
+	m_trackRoll += (targetRoll - m_trackRoll) * blend;
+
+	const bool nearZero = std::fabs(m_trackYaw) < 1e-5f && std::fabs(m_trackPitch) < 1e-5f &&
+	                      std::fabs(m_trackRoll) < 1e-5f && !drone;
+	if (mode == CAM_TRACK_OFF && nearZero) {
+		m_trackActive = false;
+		m_trackRotation = mt::mat3::Identity();
+		m_trackOffset = mt::zero3;
+		return;
+	}
+
+	mt::mat3 rot = mt::mat3::RotationY(-m_trackYaw) * mt::mat3::RotationX(m_trackPitch);
+	if (m_gameFX.flag & CAM_GFX_TRACK_UPLOCK) {
+		// Keep the horizon: rebuild the frame around the world up axis.
+		const mt::vec3 forward = base * rot * mt::vec3(0.0f, 0.0f, -1.0f);
+		const mt::vec3 zAxis = -forward;
+		mt::vec3 xAxis = mt::vec3::CrossProduct(mt::axisZ3, zAxis);
+		if (xAxis.LengthSquared() > 1e-6f) {
+			xAxis.Normalize();
+			const mt::vec3 yAxis = mt::vec3::CrossProduct(zAxis, xAxis);
+			rot = base.Transpose() * mt::mat3(xAxis, yAxis, zAxis);
+		}
+	}
+	if (m_trackRoll != 0.0f) {
+		rot = rot * mt::mat3::RotationZ(m_trackRoll);
+	}
+
+	m_trackRotation = rot;
+	m_trackOffset = hover;
+	m_trackActive = true;
+}
+
+void KX_Camera::UpdateShake(float dt)
+{
+	float x = m_quakeShiftX;
+	float y = m_quakeShiftY;
+	float roll = 0.0f;
+
+	if (m_trauma > 0.0f) {
+		const float rate = (m_traumaRate > 0.0f) ? m_traumaRate : m_gameFX.shakeDecay;
+		m_trauma = std::max(0.0f, m_trauma - rate * dt);
+		m_traumaTime += dt * m_gameFX.shakeFrequency;
+		const float t = m_traumaTime;
+		const float amount = m_trauma * m_trauma * m_gameFX.shakeAmplitude;
+		// Summed sines at unrelated rates read as noise without a noise table.
+		x += amount * (std::sin(t * 1.00f) + 0.5f * std::sin(t * 2.31f + 1.3f)) / 1.5f;
+		y += amount * (std::sin(t * 1.17f + 0.7f) + 0.5f * std::sin(t * 2.73f + 2.1f)) / 1.5f;
+		if (m_gameFX.flag & CAM_GFX_SHAKE_ROLL) {
+			roll = amount * 2.0f * std::sin(t * 0.83f + 0.4f);
+		}
+		if (m_trauma <= 0.0f) {
+			m_traumaRate = 0.0f;
+		}
+	}
+
+	m_shakeRoll = roll;
+	SetShakeShift(x, y);
+}
+
+void KX_Camera::UpdateMotion(float dt)
+{
+	const mt::mat3 ori = GetRenderOrientation();
+	const mt::vec3 pos = GetRenderPosition();
+	const mt::vec3 forward = ori * mt::vec3(0.0f, 0.0f, -1.0f);
+
+	if (!m_motionInitialized || dt <= 0.0f) {
+		m_prevRenderPos = pos;
+		m_prevRenderForward = forward;
+		m_motionInitialized = true;
+		return;
+	}
+
+	const float speed = (pos - m_prevRenderPos).Length() / dt;
+	const float k = std::min(1.0f, dt * 10.0f);
+	m_speed += (speed - m_speed) * k;
+
+	// Turn of this frame as a screen fraction (what Directional Blur smears over).
+	const mt::vec3 delta = forward - m_prevRenderForward;
+	const float tanX = 0.5f * m_camdata.m_sensor_x / std::max(m_camdata.m_lens, 0.001f);
+	const mt::vec2 turn(mt::vec3::DotProduct(delta, ori.GetColumn(0)) / (2.0f * tanX),
+	                    mt::vec3::DotProduct(delta, ori.GetColumn(1)) / (2.0f * tanX));
+	m_turn += (turn - m_turn) * k;
+
+	m_prevRenderPos = pos;
+	m_prevRenderForward = forward;
+}
+
+void KX_Camera::UpdateGameFX(double curtime)
+{
+	float dt = (m_fxLastTime < 0.0) ? 0.0f : (float)(curtime - m_fxLastTime);
+	m_fxLastTime = curtime;
+	dt = std::max(0.0f, std::min(dt, 0.25f));
+
+	UpdateFocus(dt, curtime);
+	UpdateTracking(dt);
+
+	// Distance along the rendered view axis (what the DOF compares against linear depth).
+	const mt::mat3 ori = GetRenderOrientation();
+	const mt::vec3 pos = GetRenderPosition();
+	const mt::vec3 forward = ori * mt::vec3(0.0f, 0.0f, -1.0f);
+	float target;
+	if (m_focusValid) {
+		target = mt::vec3::DotProduct(m_focusPosition - pos, forward);
+	}
+	else if (m_gameFX.focusMode == CAM_FOCUS_AUTO && m_focusInitialized) {
+		target = m_focusDistance;
+	}
+	else {
+		target = m_gameFX.focusDistance;
+	}
+	target = std::max(target, m_camdata.m_clipstart);
+
+	if (!m_focusInitialized || m_gameFX.focusSmooth <= 0.0f) {
+		m_focusDistance = target;
+		m_focusInitialized = true;
+	}
+	else {
+		m_focusDistance += (target - m_focusDistance) * (1.0f - std::exp(-dt / m_gameFX.focusSmooth));
+	}
+	if (!m_focusValid) {
+		m_focusPosition = pos + forward * m_focusDistance;
+	}
+
+	// Screen position (0..1, top-down like getScreenPosition).
+	const mt::vec3 view = ori.Transpose() * (m_focusPosition - pos);
+	if (view.z < -1e-4f) {
+		const mt::mat4& proj = GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE);
+		const mt::vec4 clip = proj * mt::vec4(view.x, view.y, view.z, 1.0f);
+		if (clip.w != 0.0f) {
+			m_focusScreen = mt::vec2(clip.x / clip.w * 0.5f + 0.5f, 1.0f - (clip.y / clip.w * 0.5f + 0.5f));
+		}
+	}
+	else {
+		m_focusScreen = mt::vec2(0.5f, 0.5f);
+	}
+
+	UpdateShake(dt);
+	UpdateMotion(dt);
 }
 
 void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterizer::StereoMode stereoMode,
@@ -528,6 +956,7 @@ PyMethodDef KX_Camera::Methods[] = {
 	EXP_PYMETHODTABLE_O(KX_Camera, getScreenPosition),
 	EXP_PYMETHODTABLE_VARARGS(KX_Camera, getScreenVect),
 	EXP_PYMETHODTABLE_VARARGS(KX_Camera, getScreenRay),
+	EXP_PYMETHODTABLE_VARARGS(KX_Camera, shake),
 	{nullptr, nullptr} //Sentinel
 };
 
@@ -556,6 +985,56 @@ PyAttributeDef KX_Camera::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("world_to_camera",  KX_Camera,  pyattr_get_world_to_camera),
 
 	/* Grrr, functions for constants? */
+	EXP_PYATTRIBUTE_SHORT_RW("focusMode", 0, 3, true, KX_Camera, m_gameFX.focusMode),
+	EXP_PYATTRIBUTE_RW_FUNCTION("focusObject", KX_Camera, pyattr_get_focus_object, pyattr_set_focus_object),
+	EXP_PYATTRIBUTE_STRING_RW("focusProperty", 0, 63, false, KX_Camera, m_gameFX.focusProp),
+	EXP_PYATTRIBUTE_RO_FUNCTION("focusTarget", KX_Camera, pyattr_get_focus_target),
+	EXP_PYATTRIBUTE_RO_FUNCTION("focusPosition", KX_Camera, pyattr_get_focus_position),
+	EXP_PYATTRIBUTE_FLOAT_RO("focusDistance", KX_Camera, m_focusDistance),
+	EXP_PYATTRIBUTE_RO_FUNCTION("focusScreenPosition", KX_Camera, pyattr_get_focus_screen_position),
+	EXP_PYATTRIBUTE_BOOL_RO("focusValid", KX_Camera, m_focusValid),
+	EXP_PYATTRIBUTE_FLOAT_RW("focusManualDistance", 0.0f, FLT_MAX, KX_Camera, m_gameFX.focusDistance),
+	EXP_PYATTRIBUTE_FLOAT_RW("focusRange", 0.0f, FLT_MAX, KX_Camera, m_gameFX.focusRange),
+	EXP_PYATTRIBUTE_FLOAT_RW("focusSmooth", 0.0f, 10.0f, KX_Camera, m_gameFX.focusSmooth),
+
+	EXP_PYATTRIBUTE_SHORT_RW("trackMode", 0, 2, true, KX_Camera, m_gameFX.trackMode),
+	EXP_PYATTRIBUTE_FLOAT_RW("trackSpeed", 0.0f, 10.0f, KX_Camera, m_gameFX.trackSpeed),
+	EXP_PYATTRIBUTE_FLOAT_RW("trackLimit", 0.0f, 3.1416f, KX_Camera, m_gameFX.trackLimit),
+	EXP_PYATTRIBUTE_FLOAT_RW("trackDeadzone", 0.0f, 0.5f, KX_Camera, m_gameFX.trackDeadzone),
+	EXP_PYATTRIBUTE_FLOAT_ARRAY_RW("trackScreenOffset", -0.5f, 0.5f, KX_Camera, m_gameFX.trackScreenOffset, 2),
+	EXP_PYATTRIBUTE_FLOAT_RW("droneAmplitude", 0.0f, 20.0f, KX_Camera, m_gameFX.droneAmplitude),
+	EXP_PYATTRIBUTE_FLOAT_RW("droneFrequency", 0.0f, 20.0f, KX_Camera, m_gameFX.droneFrequency),
+	EXP_PYATTRIBUTE_FLOAT_RW("trackBank", 0.0f, 5.0f, KX_Camera, m_gameFX.trackBank),
+	EXP_PYATTRIBUTE_RO_FUNCTION("trackOrientation", KX_Camera, pyattr_get_track_orientation),
+
+	EXP_PYATTRIBUTE_FLAG_RW("useDof", KX_Camera, m_gameFX.flag, CAM_GFX_DOF),
+	EXP_PYATTRIBUTE_FLAG_RW("useSpeedBlur", KX_Camera, m_gameFX.flag, CAM_GFX_SPEEDBLUR),
+	EXP_PYATTRIBUTE_FLAG_RW("useDirectionalBlur", KX_Camera, m_gameFX.flag, CAM_GFX_DIRBLUR),
+	EXP_PYATTRIBUTE_FLAG_RW("useBlurProtect", KX_Camera, m_gameFX.flag, CAM_GFX_BLUR_PROTECT),
+	EXP_PYATTRIBUTE_FLAG_RW("useCatEye", KX_Camera, m_gameFX.flag, CAM_GFX_CATEYE_BOKEH),
+	EXP_PYATTRIBUTE_FLAG_RW("useChromatic", KX_Camera, m_gameFX.flag, CAM_GFX_CHROMA),
+	EXP_PYATTRIBUTE_FLAG_RW("useChromaticSpeed", KX_Camera, m_gameFX.flag, CAM_GFX_CHROMA_SPEED),
+	EXP_PYATTRIBUTE_FLAG_RW("useVignette", KX_Camera, m_gameFX.flag, CAM_GFX_VIGNETTE),
+	EXP_PYATTRIBUTE_FLAG_RW("useShakeRoll", KX_Camera, m_gameFX.flag, CAM_GFX_SHAKE_ROLL),
+	EXP_PYATTRIBUTE_FLAG_RW("useTrackUpLock", KX_Camera, m_gameFX.flag, CAM_GFX_TRACK_UPLOCK),
+	EXP_PYATTRIBUTE_SHORT_RW("dofQuality", 0, 2, true, KX_Camera, m_gameFX.dofQuality),
+	EXP_PYATTRIBUTE_FLOAT_RW("dofBlur", 0.0f, 32.0f, KX_Camera, m_gameFX.dofBlur),
+	EXP_PYATTRIBUTE_FLOAT_RW("speedBlurStrength", 0.0f, 2.0f, KX_Camera, m_gameFX.speedBlurStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("speedBlurMaxSpeed", 0.1f, 1000.0f, KX_Camera, m_gameFX.speedBlurMaxSpeed),
+	EXP_PYATTRIBUTE_FLOAT_RW("speedOverride", -1.0f, FLT_MAX, KX_Camera, m_speedOverride),
+	EXP_PYATTRIBUTE_FLOAT_RO("cameraSpeed", KX_Camera, m_speed),
+	EXP_PYATTRIBUTE_FLOAT_RW("directionalBlurStrength", 0.0f, 2.0f, KX_Camera, m_gameFX.dirBlurStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("directionalBlurMax", 0.0f, 0.2f, KX_Camera, m_gameFX.dirBlurMax),
+	EXP_PYATTRIBUTE_FLOAT_RW("catEyeStrength", 0.0f, 1.0f, KX_Camera, m_gameFX.catEyeStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("chromaticStrength", 0.0f, 5.0f, KX_Camera, m_gameFX.chromaStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("vignetteStrength", 0.0f, 1.0f, KX_Camera, m_gameFX.vignetteStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("vignetteRadius", 0.0f, 2.0f, KX_Camera, m_gameFX.vignetteRadius),
+	EXP_PYATTRIBUTE_FLOAT_RW("fisheyeStrength", -1.0f, 1.0f, KX_Camera, m_gameFX.fisheyeStrength),
+	EXP_PYATTRIBUTE_FLOAT_RW("shakeAmplitude", 0.0f, 0.5f, KX_Camera, m_gameFX.shakeAmplitude),
+	EXP_PYATTRIBUTE_FLOAT_RW("shakeFrequency", 0.0f, 60.0f, KX_Camera, m_gameFX.shakeFrequency),
+	EXP_PYATTRIBUTE_FLOAT_RW("shakeDecay", 0.0f, 20.0f, KX_Camera, m_gameFX.shakeDecay),
+	EXP_PYATTRIBUTE_FLOAT_RO("shakeTrauma", KX_Camera, m_trauma),
+
 	EXP_PYATTRIBUTE_RO_FUNCTION("INSIDE",   KX_Camera, pyattr_get_INSIDE),
 	EXP_PYATTRIBUTE_RO_FUNCTION("OUTSIDE",  KX_Camera, pyattr_get_OUTSIDE),
 	EXP_PYATTRIBUTE_RO_FUNCTION("INTERSECT",    KX_Camera, pyattr_get_INTERSECT),
@@ -721,6 +1200,20 @@ EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, setViewport,
 	}
 
 	SetViewport(left, bottom, right, top);
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, shake,
+                            "shake(trauma, duration=0.0)\n"
+                            "Adds camera shake (0..1), summed with the World earthquake.\n"
+                            "With a duration the shake fades out over that time, else at shakeDecay per second.\n")
+{
+	float trauma, duration = 0.0f;
+	if (!PyArg_ParseTuple(args, "f|f:shake", &trauma, &duration)) {
+		return nullptr;
+	}
+
+	AddShake(trauma, duration);
 	Py_RETURN_NONE;
 }
 
@@ -972,6 +1465,54 @@ PyObject *KX_Camera::pyattr_get_world_to_camera(EXP_PyObjectPlus *self_v, const 
 	return PyObjectFrom(mt::mat4::FromAffineTransform(self->GetWorldToCamera()));
 }
 
+
+PyObject *KX_Camera::pyattr_get_focus_object(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	KX_GameObject *object = self->GetFocusObject();
+	if (!object) {
+		Py_RETURN_NONE;
+	}
+	return object->GetProxy();
+}
+
+int KX_Camera::pyattr_set_focus_object(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	KX_GameObject *object;
+	if (!ConvertPythonToGameObject(self->GetScene()->GetLogicManager(), value, &object, true, "camera.focusObject = obj: KX_Camera")) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->SetFocusObject(object);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_Camera::pyattr_get_focus_target(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	if (!self->m_focusTarget) {
+		Py_RETURN_NONE;
+	}
+	return self->m_focusTarget->GetProxy();
+}
+
+PyObject *KX_Camera::pyattr_get_focus_position(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	return PyObjectFrom(self->GetFocusPosition());
+}
+
+PyObject *KX_Camera::pyattr_get_focus_screen_position(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	return PyObjectFrom(self->GetFocusScreenPosition());
+}
+
+PyObject *KX_Camera::pyattr_get_track_orientation(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	return PyObjectFrom(self->GetRenderOrientation());
+}
 
 PyObject *KX_Camera::pyattr_get_INSIDE(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {

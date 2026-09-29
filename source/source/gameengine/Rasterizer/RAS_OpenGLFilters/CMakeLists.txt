@@ -57,5 +57,7 @@ data_to_c_simple(RAS_VertexShader2DFilter.glsl SRC)
 data_to_c_simple(RAS_Rain2DFilter.glsl SRC)
 data_to_c_simple(RAS_Clouds2DFilter.glsl SRC)
 data_to_c_simple(RAS_LensFlare2DFilter.glsl SRC)
+data_to_c_simple(RAS_CameraDof2DFilter.glsl SRC)
+data_to_c_simple(RAS_CameraLens2DFilter.glsl SRC)
 
 blender_add_lib(ge_rasterizer_shaders "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

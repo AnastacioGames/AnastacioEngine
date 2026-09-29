@@ -1088,6 +1088,45 @@ static KX_Camera *BL_GameCameraFromBlenderCamera(Object *ob, KX_Scene *kxscene, 
 
 	gamecamera->SetActivityCulling(ca->gameflag & GAME_CAM_OBJECT_ACTIVITY_CULLING);
 
+	// Focus sensor, tracking, Camera FX and shake (the DOF Object is linked after conversion).
+	{
+		const CameraGameFX& src = ca->gamefx;
+		KX_Camera::GameFX& fx = gamecamera->GetGameFX();
+		fx.focusMode = src.focus_mode;
+		fx.trackMode = src.track_mode;
+		fx.flag = src.flag;
+		fx.dofQuality = src.dof_quality;
+		fx.focusProp = src.focus_prop;
+		fx.focusDistance = ca->gpu_dof.focus_distance;
+		fx.fstop = ca->gpu_dof.fstop;
+		fx.numBlades = ca->gpu_dof.num_blades;
+		fx.focusSmooth = src.focus_smooth;
+		fx.focusRange = src.focus_range;
+		fx.focusScreen[0] = src.focus_screen[0];
+		fx.focusScreen[1] = src.focus_screen[1];
+		fx.trackSpeed = src.track_speed;
+		fx.trackLimit = src.track_limit;
+		fx.trackDeadzone = src.track_deadzone;
+		fx.trackScreenOffset[0] = src.track_screen_offset[0];
+		fx.trackScreenOffset[1] = src.track_screen_offset[1];
+		fx.droneAmplitude = src.drone_amplitude;
+		fx.droneFrequency = src.drone_frequency;
+		fx.trackBank = src.track_bank;
+		fx.dofBlur = src.dof_blur;
+		fx.speedBlurStrength = src.speedblur_strength;
+		fx.speedBlurMaxSpeed = src.speedblur_max_speed;
+		fx.dirBlurStrength = src.dirblur_strength;
+		fx.dirBlurMax = src.dirblur_max;
+		fx.catEyeStrength = src.cateye_strength;
+		fx.chromaStrength = src.chroma_strength;
+		fx.vignetteStrength = src.vignette_strength;
+		fx.vignetteRadius = src.vignette_radius;
+		fx.fisheyeStrength = src.fisheye_strength;
+		fx.shakeAmplitude = src.shake_amplitude;
+		fx.shakeFrequency = src.shake_frequency;
+		fx.shakeDecay = src.shake_decay;
+	}
+
 	if (ca->gameflag & GAME_CAM_OVERRIDE_CULLING) {
 		if (kxscene->GetOverrideCullingCamera()) {
 			CM_Warning("\"" << gamecamera->GetName() << "\" sets for culling override whereas \""
@@ -1864,6 +1903,17 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		KX_Camera *gamecamera = static_cast<KX_Camera *>(converter.FindGameObject(blenderscene->camera));
 		if (gamecamera) {
 			kxscene->SetActiveCamera(gamecamera);
+		}
+	}
+
+	// Camera focus objects (DOF Object) now that every object exists.
+	for (KX_Camera *gamecamera : *kxscene->GetCameraList()) {
+		Object *blenderobject = gamecamera->GetBlenderObject();
+		if (blenderobject && blenderobject->type == OB_CAMERA) {
+			Object *dofob = static_cast<Camera *>(blenderobject->data)->dof_ob;
+			if (dofob) {
+				gamecamera->SetFocusObject(converter.FindGameObject(dofob));
+			}
 		}
 	}
 
