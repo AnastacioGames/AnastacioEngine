@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Constraints de bone: teste de correcao e custo do IK
+
+- `tools/tests/bone_constraint_test.py`: compara a `pose_matrix` de cada bone no jogo com a avaliacao do
+  editor (60 quadros, alvo mudando posicao/rotacao/escala). Resultado no Windows: erro 0 em Copy Location,
+  Copy Rotation, Copy Scale, Copy Transforms, Track To, Damped Track, Locked Track, Stretch To, Floor,
+  Transformation, Limit Distance, Limit Rotation e IK. Child Of (fora da lista de
+  `BL_ArmatureObject::LoadConstraints`) nao acompanha o alvo, como esperado. Clamp To nao testado (precisa de curva).
+- O jogo usa o proprio `BKE_pose_where_is`; a lista em `LoadConstraints` so decide quais alvos externos sao
+  sincronizados com objetos do jogo (1o e 2o alvo) e ficam expostos ao Python. Constraints de objeto: so
+  Rigid Body Joint e convertido.
+- Pegadinhas conferidas: sem action tocando nem Armature Actuator em Run, a pose so acompanha o alvo com
+  `armature.update()` a cada tick; e a pose so e recalculada se alguma malha filha da armature estiver visivel
+  (`anim_needs_update`), entao ler bones fora da camera devolve valor antigo.
+- Custo do IK (modo `--make-perf-scene`, 20 rigs com cadeia IK de 10 bones, na tomada): categoria Skinning
+  2,0 ms/quadro com Standard e 2,6 ms com iTaSC (~0,1 ms por rig), 60 fps nos dois.
+
 ## 2026-09-29 - Linux: pacote compilado no Ubuntu 22.04, icone da Range
 
 - Build num container `ubuntu:22.04` com Podman (`tools/linux/container-build-22.04.sh`): o maior simbolo exigido
