@@ -81,7 +81,10 @@ FOREACH(COMPONENT ${_embree_FIND_COMPONENTS})
     PATH_SUFFIXES
       lib64 lib
     )
-  LIST(APPEND _embree_LIBRARIES "${EMBREE_${UPPERCOMPONENT}_LIBRARY}")
+  # Pacotes de distro (ex.: libembree-dev do Ubuntu 22.04) so trazem libembree3.so; ignora os componentes ausentes.
+  IF(EMBREE_${UPPERCOMPONENT}_LIBRARY)
+    LIST(APPEND _embree_LIBRARIES "${EMBREE_${UPPERCOMPONENT}_LIBRARY}")
+  ENDIF()
 ENDFOREACH()
 
 
