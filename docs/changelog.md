@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Asset Browser: previews de .range, grupos vazios e console no Windows
+
+- **`.range`:** "Generate Previews" e o Auto só procuravam `.blend`; bibliotecas salvas como `.range` ficavam sem nenhuma miniatura (achado no teste do usuário no Windows, biblioteca "Carros Velhos").
+- **Grupos vazios:** em `bl_previews_render.py` um grupo sem objetos deixava a câmera de preview em NaN, e o grupo seguinte saía em branco. Grupos vazios agora são pulados.
+- **Windows:** o processo de geração em segundo plano usa `CREATE_NO_WINDOW` (antes abria um console por arquivo).
+- Continuam sem miniatura, sem ser bug do script: câmeras e lâmpadas; objeto com Object Color de alpha 0; material com nó Material apontando para ele mesmo (o gerador de ícones do core não desenha).
+- Teste (`-b`, cópia do arquivo do usuário): materiais, objetos e grupos com preview, incluindo o grupo que vinha depois dos vazios.
+
 ## 2026-09-28 - Runtime: Show Framerate e Debug Properties vindos da cena
 
 - O runtime separado (`LA_Launcher.cpp`) só lia essas opções por `-g`; as marcadas na cena eram ignoradas, e só funcionavam dentro do editor, que as copia antes de rodar (`game_set_commmandline_options`). Agora o padrão é a flag da cena para Framerate/Profile, Debug Properties, Render Queries e Ignore Exit Key; `-g` continua tendo prioridade.

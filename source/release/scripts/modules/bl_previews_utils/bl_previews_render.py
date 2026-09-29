@@ -404,6 +404,9 @@ def do_previews(do_objects, do_groups, do_scenes, do_data_intern):
                 continue
             # Here too, we do want to keep linked objects members of local group...
             objects = tuple((ob.name, ob.library.filepath if ob.library else None) for ob in grp.objects)
+            if not objects:
+                # An empty bbox leaves the shared camera at NaN, and the next group renders blank.
+                continue
 
             render_engine = objects_render_engine_guess(objects)
             render_context = render_contexts.get(render_engine, None)

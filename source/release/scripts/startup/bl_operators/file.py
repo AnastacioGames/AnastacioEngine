@@ -336,7 +336,7 @@ class FILE_OT_asset_previews_generate(Operator):
 
         current = os.path.normcase(os.path.normpath(bpy.data.filepath)) if bpy.data.filepath else ""
         files = [{"name": fn} for fn in sorted(os.listdir(folder))
-                 if fn.lower().endswith(".blend") and
+                 if fn.lower().endswith((".blend", ".range")) and
                  os.path.normcase(os.path.join(folder, fn)) != current]
         if not files:
             self.report({'WARNING'}, "No .blend file in '%s'" % folder)
@@ -437,7 +437,7 @@ class _AssetPreviewsAuto:
             return []
         stale = []
         for fn in names:
-            if not fn.lower().endswith(".blend"):
+            if not fn.lower().endswith((".blend", ".range")):
                 continue
             path = os.path.join(folder, fn)
             key = cls._key(path)
@@ -462,8 +462,11 @@ class _AssetPreviewsAuto:
             os.path.join(os.path.dirname(preview_render.__file__), "bl_previews_render.py"),
             "--", "--no_scenes", "--no_backups",
         ]
+        # On Windows the child would open a console window for every file.
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
-            cls._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            cls._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                         creationflags=flags)
             cls._proc_file = path
         except OSError:
             cls._proc = None
