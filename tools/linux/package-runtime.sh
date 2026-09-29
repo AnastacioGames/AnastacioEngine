@@ -53,6 +53,9 @@ if [ -n "$extra_dir" ]; then
   cp -an "$extra_dir/." "$staging_dir/"
 fi
 cp "$repo_root/source/COPYING" "$staging_dir/COPYING"
+# Icone e atalho do menu/dock (o executavel so define o icone da janela no X11).
+cp "$repo_root/source/release/linux/range-engine.png" "$repo_root/source/release/linux/RangeEngine.desktop" \
+  "$repo_root/source/release/linux/install-desktop.sh" "$staging_dir/"
 # Ferramentas de build (geradores de codigo) e estado local do ImGui nao vao para o usuario.
 rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna" "$staging_dir/makesrna" \
   "$staging_dir/msgfmt" "$staging_dir/imgui.ini" "$staging_dir/\\imgui.ini"
