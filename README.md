@@ -9,17 +9,24 @@
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.4.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.3)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.4.4](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.4)** (Linux; o Windows segue na 0.4.3 até o pacote 0.4.4 sair)
 
 | Pacote | Conteúdo |
 |---|---|
 | [Windows x64 (0.4.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.4.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-linux-x86_64.tar.xz) | Editor e runtime nativos. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.3/AnastacioEngine-0.4.3-linux-x86_64.tar.xz.sha256) |
+| [Linux x86_64 (0.4.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.4/AnastacioEngine-0.4.4-linux-x86_64.tar.xz) | Editor e runtime nativos. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.4/AnastacioEngine-0.4.4-linux-x86_64.tar.xz.sha256) |
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
 Para rodar um jogo exportado, use `RangeRuntime`. No Linux, as bibliotecas de sistema necessárias estão nas
-[notas do release 0.4.2](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2) (continuam valendo na 0.4.3).
+[notas do release 0.4.2](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.2) (continuam valendo na 0.4.4).
+
+## Novidades da 0.4.4
+
+Correções dos bugs reportados pelo Kitsuy (crash com `setHalfAnimations`, folhagem Hashed sem MSAA, rodas do
+carro, runtime sem GPU), navmesh dinâmica, Link de objeto e previews automáticas no Asset Browser, espelho e água
+com corte oblíquo e correções de lâmpadas e sombras. **Mudança de API:** `setAntiAliasing(0)` e `(1)` usam 4
+amostras. Detalhes nas [notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.4).
 
 ## Novidades da 0.4.3
 

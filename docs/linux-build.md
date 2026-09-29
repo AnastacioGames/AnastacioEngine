@@ -4,7 +4,7 @@
 
 **Se voce baixou o release 0.4.1**: ele tem bugs de empacotamento (so um executavel na primeira
 versao; e o Python embutido no caminho errado, que da `No module named 'encodings'` fora da maquina
-de build). Use o release **0.4.2 ou mais recente** (atual: **0.4.3**), que traz o editor e o `RangeRuntime` e foi
+de build). Use o release **0.4.2 ou mais recente** (atual: **0.4.4**), que traz o editor e o `RangeRuntime` e foi
 testado numa maquina limpa.
 
 Nao tente compilar Blender/UPBGE 2.79 "cru" a partir do codigo original: em distros Linux recentes
