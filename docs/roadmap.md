@@ -308,8 +308,6 @@ menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e
   do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
   miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
   execução automatizada, mas nenhum gesto com o mouse foi testado.
-- **Asset Browser no Windows (2026-09-28)**: recompilado e previews automáticas conferidas (incluindo `.range`).
-  Falta conferir lá o Link de objeto via grupo.
 - **Loop de tempo (2026-09-26)**: o teste automático (cena simples, monitor 165 Hz) já passou; ver changelog de
   2026-09-27. Falta conferir no jogo real, num monitor de 60 Hz se houver, com v-sync ligado e desligado, que o FPS
   não trava em 30, não perde tecla e o veículo não muda. Com v-sync e picos de carga o jogo não recupera mais o
