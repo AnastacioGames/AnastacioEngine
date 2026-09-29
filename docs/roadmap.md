@@ -109,12 +109,11 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     Debian 12 (2.36) nao rodam nem com as `.so` empacotadas. Para cobrir essas distros, compilar o pacote numa
     base antiga (container Ubuntu 22.04/Debian 12) e empacotar as `.so` que nao sao GL/X11/glibc; para o
     editor, avaliar tirar a OIIO do pacote Linux.
-    **Feito 2026-09-29:** `package-runtime.sh` empacota as `.so` (ver changelog); falta publicar e o build em
-    base com glibc antiga (instalar Docker ou Podman: pede sudo).
+    **Feito 2026-09-29:** `package-runtime.sh` empacota as `.so` e o pacote passou a ser compilado num container
+    Ubuntu 22.04 (`tools/linux/container-build-22.04.sh`, glibc 2.35). Falta publicar na v0.4.4 e o Fumangy
+    confirmar no Ubuntu 26.04 (o pacote antigo falhava com `libOpenImageIO.so.2.4`).
   - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
-  - **Menu do player Linux (Kitsuy):** bug depende de qual arquivo e aberto primeiro pelo menu (abrindo o level
-    direto funciona); melhorou apos a atualizacao de 2026-09-28, mas continua. Em maquina hibrida so funcionou
-    forcando a GPU dedicada; testar com iGPU e com `prime-run`/`DRI_PRIME=1`. Pedir passo a passo a ele.
+  - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
     `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
     **2026-09-29:** clone limpo da `main` + `cmake --preset linux-editor -S source` configurou e compilou

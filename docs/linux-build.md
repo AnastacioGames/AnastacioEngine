@@ -465,10 +465,21 @@ de ser necessario. Ficam no sistema: glibc, `libstdc++`/`libgcc_s`, GL/driver, X
 fontconfig, dbus/systemd/udev. Pacote: 197 MB (antes 85 MB), 736 MB extraido; quase tudo vem da OpenImageIO do
 Ubuntu (GDAL, OpenVDB, FFmpeg), que o Cycles exige.
 
-**Limite que continua:** o pacote exige **glibc 2.38** e **GLIBCXX_3.4.32** (os da maquina de build, Ubuntu 24.04).
-Roda em Ubuntu 24.04+, Mint 22, Debian 13, Fedora 39+ e Arch; **nao** em Ubuntu 22.04 (2.35) nem Debian 12
-(2.36). Para esses, o pacote precisa ser compilado numa base com glibc antiga. Para conferir numa maquina:
-`ldd --version` e `ldd ./RangeEngine | grep "not found"`.
+**glibc (2026-09-29):** compilado no Ubuntu 24.04, o pacote exigia glibc 2.38. Agora ele e compilado num
+container `ubuntu:22.04` com Podman, e o maior simbolo exigido e `GLIBC_2.35`: roda em Ubuntu 22.04+, Debian 12+,
+Mint 21+, Fedora e Arch recentes. Num clone separado (os `build-linux*/` do container nao servem para o host):
+
+```bash
+podman run --rm -v $PWD:/work:Z -v $PWD/tools/linux/container-build-22.04.sh:/build.sh:Z \
+  docker.io/library/ubuntu:22.04 /build.sh
+```
+
+O script instala as dependencias pelo apt, o CMake pelo pip (>=3.28, o do 22.04 e antigo) e o Python 3.11
+isolado, compila os dois presets e gera `build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz`. No 22.04
+a Embree so vem como `libembree3.so` (sem as bibliotecas por componente); `FindEmbree.cmake` aceita isso. Para
+conferir o pacote: `objdump -T` dos binarios sem simbolo acima de `GLIBC_2.35` e `ldd ./RangeEngine | grep "not found"`
+vazio. O pacote tambem traz `range-engine.png`, `RangeEngine.desktop` e `install-desktop.sh` (icone no menu e na
+dock; a janela X11 ja define o icone sozinha via `_NET_WM_ICON`).
 
 ## Testes do Cycles (GTest) no Linux
 

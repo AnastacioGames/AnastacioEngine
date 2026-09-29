@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Linux: pacote compilado no Ubuntu 22.04, icone da Range
+
+- Build num container `ubuntu:22.04` com Podman (`tools/linux/container-build-22.04.sh`): o maior simbolo exigido
+  cai de `GLIBC_2.38` para `GLIBC_2.35` (Ubuntu 22.04 e Debian 12 passam a rodar). 257 `.so` em `lib/`, incluindo
+  `libOpenImageIO.so.2.2`; o pacote antigo falhava no Ubuntu 26.04 do Fumangy com `libOpenImageIO.so.2.4`.
+  Pacote: 135 MB.
+- `FindEmbree.cmake`: so acrescenta a biblioteca de um componente se ela existir (o 22.04 so tem `libembree3.so`;
+  sem isso faltava `rtcIntersect1` no link).
+- O `cmake --install` do preset editor tambem instala o `RangeRuntime`: compilar os dois alvos em `build-linux-editor`.
+- Icone: `GHOST_WindowX11.cpp` define `_NET_WM_ICON` (48x48, do `winrange.ico`); o pacote leva `range-engine.png`,
+  `RangeEngine.desktop` (`StartupWMClass=Range Engine`) e `install-desktop.sh`. Conferido com `xprop` no pacote.
+- Roadmap: bug do menu do player Linux (Kitsuy) cancelado pelo usuario.
+
 ## 2026-09-29 - Linux: pacote com as bibliotecas da distro, build do zero conferido
 
 - **Retorno do Discord (Fumangy):** o pacote 0.4.4 "pede dependencias". Extraido sem `apt install`, ele usava
