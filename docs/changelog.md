@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-28 - Runtime: Show Framerate e Debug Properties vindos da cena
+
+- O runtime separado (`LA_Launcher.cpp`) só lia essas opções por `-g`; as marcadas na cena eram ignoradas, e só funcionavam dentro do editor, que as copia antes de rodar (`game_set_commmandline_options`). Agora o padrão é a flag da cena para Framerate/Profile, Debug Properties, Render Queries e Ignore Exit Key; `-g` continua tendo prioridade.
+- Debug Mode (ligado por padrão em toda cena) e Console continuam só por `-g`, para jogos exportados não abrirem com a barra de debug.
+- Achado no teste do loop de tempo (a cena teve que ligar o painel por `render.showFramerate`). Teste: cena só com as flags → painel e propriedades aparecem, sem a barra de debug (screenshot).
+
 ## 2026-09-28 - Asset Browser: Link de objeto e previews automáticas
 
 - **Link de objeto:** com o botão Link (ou Ctrl), um objeto arrastado agora vem ligado dentro de um grupo local com o nome dele, instanciado no ponto do drop (o jeito do 2.79: objeto ligado direto não pode ser movido). O `dupli_offset` do grupo é a posição original, e drops seguintes do mesmo objeto reaproveitam o grupo. Antes, objetos sempre entravam como append (achado no teste visual do usuário).

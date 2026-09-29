@@ -142,19 +142,22 @@ void LA_Launcher::InitEngine()
 	SYS_SystemHandle syshandle = SYS_GetSystem();
 
 	const GameData& gm = m_startScene->gm;
-	bool properties = (SYS_GetCommandLineInt(syshandle, "show_properties", 0) != 0);
-	bool profile = (SYS_GetCommandLineInt(syshandle, "show_profile", 0) != 0);
+	// The editor writes these from the scene before starting; the standalone runtime only
+	// gets -g options, so fall back to the scene flags (as the editor does). Debug mode
+	// (on by default in every scene) and the console stay opt-in for exported games.
+	bool properties = (SYS_GetCommandLineInt(syshandle, "show_properties", (gm.flag & GAME_SHOW_DEBUG_PROPS)) != 0);
+	bool profile = (SYS_GetCommandLineInt(syshandle, "show_profile", (gm.flag & GAME_SHOW_FRAMERATE)) != 0);
 	bool debugMode = (SYS_GetCommandLineInt(syshandle, "show_debug_mode", 0) != 0);
 	bool showConsole = (SYS_GetCommandLineInt(syshandle, "show_console", 0) != 0);
-	bool ignoreExitKey = (SYS_GetCommandLineInt(syshandle, "ignore_exit_key", 0) != 0);
+	bool ignoreExitKey = (SYS_GetCommandLineInt(syshandle, "ignore_exit_key", (gm.flag & GAME_PLAYER_IGNORE_EXIT_KEY)) != 0);
 
 	bool showPhysics = (gm.flag & GAME_SHOW_PHYSICS);
 	SYS_WriteCommandLineInt(syshandle, "show_physics", showPhysics);
 
 	// WARNING: Fixed time is the opposite of fixed framerate.
 	bool fixed_framerate = (SYS_GetCommandLineInt(syshandle, "fixedtime", (gm.flag & GAME_ENABLE_ALL_FRAMES)) == 0);
-	bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", 0) != 0);
-	bool renderQueries = (SYS_GetCommandLineInt(syshandle, "show_render_queries", 0) != 0);
+	bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", (gm.flag & GAME_SHOW_FRAMERATE)) != 0);
+	bool renderQueries = (SYS_GetCommandLineInt(syshandle, "show_render_queries", (gm.flag & GAME_SHOW_RENDER_QUERIES)) != 0);
 	short showBoundingBox = SYS_GetCommandLineInt(syshandle, "show_bounding_box", gm.showBoundingBox);
 	short showArmatures = SYS_GetCommandLineInt(syshandle, "show_armatures", gm.showArmatures);
 	short showCameraFrustum = SYS_GetCommandLineInt(syshandle, "show_camera_frustum", gm.showCameraFrustum);
