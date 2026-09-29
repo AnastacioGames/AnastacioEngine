@@ -106,7 +106,7 @@ Publicado em `v0.4.0` como `AnastacioEngine-0.4.0-linux-x64.tar.gz`. Como o pres
 dois — mesma estrutura usada na `0.3.0`:
 
 ```bash
-git fetch origin && git checkout linux-sync && git pull
+git checkout main && git pull
 cmake --preset linux-editor -S source && cmake --build build-linux-editor --target RangeEngine -j"$(nproc)" && cmake --install build-linux-editor
 cmake --preset linux-runtime -S source && cmake --build build-linux --target RangeRuntime -j"$(nproc)" && cmake --install build-linux
 

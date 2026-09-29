@@ -12,14 +12,17 @@ Nao tente compilar Blender/UPBGE 2.79 "cru" a partir do codigo original: em dist
 um preset Linux com todos os fixes de compatibilidade aplicados (FFmpeg, OpenColorIO, RPATH do Python
 etc.) — use ele em vez de tentar compilar do zero.
 
-**Importante**: esses scripts e presets so existem na branch `linux-sync`, nao na `main` nem nos
-releases publicados. Confirme que esta nela antes de tudo:
+Os scripts (`tools/linux/`) e os presets (`source/CMakePresets.json`) estao na `main`. A branch `linux-sync`
+esta parada desde 2026-09-25 e muito atras da `main`: nao use. Clone limpo:
 
 ```bash
 git clone https://github.com/AnastacioGames/AnastacioEngine.git
 cd AnastacioEngine
-git checkout linux-sync
 ```
+
+Rode o `cmake` sempre com `-S source` (o `CMakePresets.json` fica em `source/`, nao na raiz). Se um build antigo
+foi configurado de outra pasta `source` (ex.: RGE 1.6.13), apague `build-linux*/` antes: o `CMakeCache.txt`
+guarda o caminho do codigo antigo.
 
 Depois, um unico comando cobre dependencias (via apt), Python 3.11 isolado, configuracao e build:
 
@@ -109,7 +112,7 @@ causa (ponteiro invalido, `strinfo`/RNA nulo, etc.), nao so o default. Registrar
 
 ### 3. Ao terminar
 
-Atualizar `docs/changelog.md` e `docs/roadmap.md` (secao Linux) e commitar com push para a branch `linux-sync`.
+Atualizar `docs/changelog.md` e `docs/roadmap.md` (secao Linux) e commitar com push para a `main`.
 
 ## Estado em 15 de setembro de 2026 — validacao em Linux nativo (Ubuntu 24.04, GPU NVIDIA real)
 

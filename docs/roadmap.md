@@ -100,11 +100,24 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     `libembree4` e exclusiva dele). Pedir distro/versao e `ldd ./RangeEngine | grep "not found"`. Solucao
     proposta: empacotar as `.so` em `lib/` (RUNPATH `$ORIGIN/lib`, ja usado pelo Python), deixando so
     GL/X11/driver no sistema; validar em Ubuntu 22.04, Debian 12 e Fedora limpos.
+    **Diagnostico 2026-09-29 (pacote 0.4.4 extraido, sem apt):** na maquina de build `ldd | grep "not found"`
+    sai vazio (ja tem tudo). Dependencias diretas fora de `lib/`: Runtime = GL/GLU/GLEW, X11 (Xi, Xinerama,
+    Xxf86vm, Xfixes, Xrender), SDL2, OpenAL, sndfile, freetype, png, jpeg-turbo8, tiff6, fftw3, gomp, z,
+    stdc++; o editor soma OpenImageIO 2.4, OpenEXR 3.1, boost_locale 1.83 e embree4. A OIIO puxa ~250 `.so`
+    transitivas (GDAL, OpenCV, FFmpeg). **Bloqueio maior:** os binarios exigem `GLIBC_2.38` (`__isoc23_strtol`,
+    `__isoc23_sscanf`, `fmod`) e `GLIBCXX_3.4.32`; a glibc nao pode ir em `lib/`, entao Ubuntu 22.04 (2.35) e
+    Debian 12 (2.36) nao rodam nem com as `.so` empacotadas. Para cobrir essas distros, compilar o pacote numa
+    base antiga (container Ubuntu 22.04/Debian 12) e empacotar as `.so` que nao sao GL/X11/glibc; para o
+    editor, avaliar tirar a OIIO do pacote Linux.
   - **Menu do player Linux (Kitsuy):** bug depende de qual arquivo e aberto primeiro pelo menu (abrindo o level
     direto funciona); melhorou apos a atualizacao de 2026-09-28, mas continua. Em maquina hibrida so funcionou
     forcando a GPU dedicada; testar com iGPU e com `prime-run`/`DRI_PRIME=1`. Pedir passo a passo a ele.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
     `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
+    **2026-09-29:** clone limpo da `main` + `cmake --preset linux-editor -S source` configurou e compilou
+    RangeEngine e RangeRuntime (2858/2858, sem erro) em Ubuntu 24.04; player abriu demo. Causa provavel: a doc
+    mandava usar a branch `linux-sync` (106 commits atras); doc corrigida e branch apagada. Falta o Kitsuy
+    confirmar com clone novo.
   - **`setHalfAnimations(1)`:** Kitsuy confirmou sem crash no Linux e no Windows; reconferir no build proprio.
   - **Zip Windows 0.4.4 com `\` nos caminhos** (extraido no Linux sai sem pastas): refeito em 2026-09-29 com `/`
     (Python `zipfile`), extraido e identico ao staging. Falta abrir os `.exe` da copia extraida e subir o asset
