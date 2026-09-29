@@ -35,6 +35,7 @@
 
 #include "KX_PhysicsEngineEnums.h"
 #include "KX_CutsceneManager.h"
+#include "KX_DestructionManager.h"
 #include "KX_TextureRendererManager.h" // For KX_TextureRendererManager::RendererCategory.
 #include "KX_PythonComponentManager.h"
 #include "KX_KetsjiEngine.h" // For KX_DebugOption.
@@ -228,6 +229,9 @@ private:
 	SCA_TimeEventManager *m_timemgr;
 
 	KX_PythonComponentManager m_componentManager;
+
+	/// Native destruction (Object.gameflag2 & OB_DESTRUCTIBLE).
+	KX_DestructionManager m_destructionManager;
 
 	/// Physics engine abstraction.
 	PHY_IPhysicsEnvironment *m_physicsEnvironment;
@@ -456,6 +460,7 @@ public:
 	SCA_LogicManager *GetLogicManager() const;
 	SCA_TimeEventManager *GetTimeEventManager() const;
 	KX_PythonComponentManager& GetPythonComponentManager();
+	KX_DestructionManager& GetDestructionManager();
 
 	/// Return the currently active camera.
 	KX_Camera *GetActiveCamera();
@@ -663,6 +668,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, play_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, stop_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, restart_cutscene);
+	EXP_PYMETHOD_DOC(KX_Scene, explode);
 	EXP_PYMETHOD_DOC(KX_Scene, get);
 	EXP_PYMETHOD_DOC(KX_Scene, drawObstacleSimulation);
 
@@ -685,6 +691,8 @@ public:
 	static int pyattr_set_drawing_callback(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_remove_callback(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_remove_callback(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_max_debris(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_max_debris(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_gravity(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_gravity(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 

@@ -232,6 +232,68 @@ static void rna_GameObjectSettings_is_vehicle_set(PointerRNA *ptr, bool value)
 	}
 }
 
+/* Native destruction: the struct is zeroed on objects created before it existed (and on new ones),
+ * so the first enable seeds the defaults. Values validated by the Python prototype. */
+static void rna_GameObjectSettings_use_destruction_set(PointerRNA *ptr, bool value)
+{
+	Object *ob = ptr->data;
+	RangeDestructionSettings *ds = &ob->destruction;
+
+	if (value) {
+		ob->gameflag2 |= OB_DESTRUCTIBLE;
+		if (ds->break_impulse == 0.0f) {
+			ds->break_impulse = 10.0f;
+			ds->burst_speed = 2.0f;
+			ds->debris_lifetime = 10.0f;
+			ds->flags = DESTRUCTION_BREAK_ON_COLLISION | DESTRUCTION_INHERIT_VELOCITY;
+		}
+	}
+	else {
+		ob->gameflag2 &= ~OB_DESTRUCTIBLE;
+	}
+}
+
+static void rna_GameObjectSettings_use_explosive_set(PointerRNA *ptr, bool value)
+{
+	Object *ob = ptr->data;
+	RangeExplosiveSettings *es = &ob->explosive;
+
+	if (value) {
+		ob->gameflag2 |= OB_EXPLOSIVE;
+		if (es->radius == 0.0f) {
+			es->radius = 5.0f;
+			es->force = 30.0f;
+			es->up_bias = 0.3f;
+			es->fuse = 0.0f;
+			es->impact_impulse = 12.0f;
+			es->effect_life = 0.25f;
+			es->flags = EXPLOSIVE_OCCLUSION | EXPLOSIVE_ON_IMPACT | EXPLOSIVE_CHAIN_REACTION;
+		}
+	}
+	else {
+		ob->gameflag2 &= ~OB_EXPLOSIVE;
+	}
+}
+
+/* Group e Object nao tem STRUCT_ID_REFCOUNT: conta o usuario aqui, como em dupli_group */
+static void rna_RangeDestructionSettings_fragments_set(PointerRNA *ptr, PointerRNA value)
+{
+	RangeDestructionSettings *ds = ptr->data;
+
+	id_us_min((ID *)ds->fragments);
+	ds->fragments = value.data;
+	id_us_plus((ID *)ds->fragments);
+}
+
+static void rna_RangeExplosiveSettings_effect_set(PointerRNA *ptr, PointerRNA value)
+{
+	RangeExplosiveSettings *es = ptr->data;
+
+	id_us_min((ID *)es->effect);
+	es->effect = value.data;
+	id_us_plus((ID *)es->effect);
+}
+
 static void rna_Object_internal_update_draw(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	DAG_id_tag_update(ptr->id.data, OB_RECALC_OB);
@@ -2317,6 +2379,148 @@ static void rna_def_object_reverb_area(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
 }
 
+static void rna_def_object_destruction(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "RangeDestructionSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeDestructionSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Destruction Settings",
+	                       "Replaces the object in game by its pre-fractured fragments on a strong hit");
+
+	prop = RNA_def_property(srna, "fragments", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "fragments");
+	RNA_def_property_struct_type(prop, "Group");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_RangeDestructionSettings_fragments_set", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Fragments",
+	                         "Group with the pieces, fractured around the origin and kept in an inactive layer. "
+	                         "Empty: the object just disappears when it breaks");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "break_impulse", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "break_impulse");
+	RNA_def_property_range(prop, 0.001f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 1000.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Break Impulse",
+	                         "Impact strength (summed contact impulse, N*s) that breaks the object. "
+	                         "Explosions compare their impulse at the object against it too");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_break_on_collision", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", DESTRUCTION_BREAK_ON_COLLISION);
+	RNA_def_property_ui_text(prop, "Break on Collision",
+	                         "Break on strong collisions. Off: only explosions and Python (shatter()) break it");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "burst_speed", PROP_FLOAT, PROP_VELOCITY);
+	RNA_def_property_float_sdna(prop, NULL, "burst_speed");
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 50.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Burst Speed", "Speed the fragments fly apart from the impact point");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_inherit_velocity", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", DESTRUCTION_INHERIT_VELOCITY);
+	RNA_def_property_ui_text(prop, "Inherit Velocity", "Fragments keep the velocity the object had when it broke");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "debris_lifetime", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "debris_lifetime");
+	RNA_def_property_range(prop, 0.0f, 3600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 120.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Debris Lifetime",
+	                         "Seconds before the fragments disappear (0 = permanent, still limited by the "
+	                         "scene's Max Debris)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+}
+
+static void rna_def_object_explosive(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "RangeExplosiveSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeExplosiveSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Explosive Settings",
+	                       "Radial impulse that pushes objects, breaks destructibles and detonates explosives");
+
+	prop = RNA_def_property(srna, "radius", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "radius");
+	RNA_def_property_range(prop, 0.01f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 50.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Radius", "Distance the explosion reaches");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "force", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "force");
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 500.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Force",
+	                         "Impulse (N*s) at the center of the explosion, falling linearly to 0 at the radius");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "up_bias", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "up_bias");
+	RNA_def_property_range(prop, 0.0f, 5.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 1.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Up Bias", "Extra upward push, so objects fly up instead of sliding on the floor");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_occlusion", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_OCCLUSION);
+	RNA_def_property_ui_text(prop, "Occlusion", "Static geometry (walls, floor) between the blast and an object shields it");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "fuse", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "fuse");
+	RNA_def_property_range(prop, 0.0f, 3600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 30.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Fuse",
+	                         "Seconds after the object enters the game until it explodes, e.g. a grenade "
+	                         "added with Add Object (0 = no fuse)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_explode_on_impact", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_ON_IMPACT);
+	RNA_def_property_ui_text(prop, "Explode on Impact", "Explode on collisions stronger than Impact Impulse");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "impact_impulse", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "impact_impulse");
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 1000.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Impact Impulse",
+	                         "Hit strength (summed contact impulse, N*s) that detonates it, by collision or "
+	                         "by another explosion");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_chain_reaction", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_CHAIN_REACTION);
+	RNA_def_property_ui_text(prop, "Chain Reaction",
+	                         "Other explosions stronger than Impact Impulse here detonate it (next frame)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "effect", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "effect");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_RangeExplosiveSettings_effect_set", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Effect",
+	                         "Object (in an inactive layer) added at the blast, e.g. fire/smoke or a sound");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "effect_life", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "effect_life");
+	RNA_def_property_range(prop, 0.0f, 3600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 30.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Effect Life", "Seconds the effect object lives (0 = until removed by its own logic)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+}
+
 static void rna_def_object_game_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2416,6 +2620,33 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	                          "wheel objects. Native marker only, physical setup still happens through the "
 	                          "vehicle wrapper/preset at runtime");
 	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	/* Native destruction / explosive, see RangeDestructionSettings and RangeExplosiveSettings. */
+	prop = RNA_def_property(srna, "use_destruction", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_DESTRUCTIBLE);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_GameObjectSettings_use_destruction_set");
+	RNA_def_property_ui_text(prop, "Destruction",
+	                         "Break into the pre-fractured Fragments group on a strong hit or explosion");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "destruction", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "destruction");
+	RNA_def_property_struct_type(prop, "RangeDestructionSettings");
+	RNA_def_property_ui_text(prop, "Destruction Settings", "");
+
+	prop = RNA_def_property(srna, "use_explosive", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_EXPLOSIVE);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_GameObjectSettings_use_explosive_set");
+	RNA_def_property_ui_text(prop, "Explosive",
+	                         "Explode (fuse, impact, chain reaction or Python) with a radial impulse");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "explosive", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "explosive");
+	RNA_def_property_struct_type(prop, "RangeExplosiveSettings");
+	RNA_def_property_ui_text(prop, "Explosive Settings", "");
 
 	prop = RNA_def_property(srna, "mass", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.01, 1000000.0);
@@ -2713,6 +2944,8 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	rna_def_game_object_activity_culling(brna);
 	rna_def_object_gpu_particles(brna);
 	rna_def_object_reverb_area(brna);
+	rna_def_object_destruction(brna);
+	rna_def_object_explosive(brna);
 }
 
 static void rna_def_object_constraints(BlenderRNA *brna, PropertyRNA *cprop)

@@ -35,6 +35,7 @@
 #include "PHY_DynamicTypes.h"
 
 #include <array>
+#include <vector>
 
 class PHY_IConstraint;
 class PHY_IVehicle;
@@ -249,6 +250,8 @@ public:
 	virtual PHY_ICharacter *GetCharacterController(class KX_GameObject *ob) = 0;
 
 	virtual PHY_IPhysicsController *RayTest(PHY_IRayCastFilterCallback &filterCallback, float fromX, float fromY, float fromZ, float toX, float toY, float toZ) = 0;
+	/// Controllers whose bounding box touches the sphere (sensors excluded), appended to result.
+	virtual void SphereQuery(const mt::vec3& center, float radius, std::vector<PHY_IPhysicsController *>& result) = 0;
 
 	// culling based on physical broad phase
 	// the plane number must be set as follow: near, far, left, right, top, botton

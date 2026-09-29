@@ -102,6 +102,7 @@ set(SRC
 	KX_ConsoleWindow.cpp
 	KX_CullingHandler.cpp
 	KX_CutsceneManager.cpp
+	KX_DestructionManager.cpp
 	KX_DebugMode.cpp
 	KX_EmptyObject.cpp
 	KX_FontObject.cpp
@@ -209,6 +210,7 @@ set(SRC
 	KX_CubeMap.h
 	KX_CullingHandler.h
 	KX_CutsceneManager.h
+	KX_DestructionManager.h
 	KX_DebugMode.h
 	KX_EmptyObject.h
 	KX_FontObject.h

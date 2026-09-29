@@ -166,6 +166,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
                    KX_NetworkMessageManager *messageManager) :
 	m_keyboardmgr(nullptr),
 	m_mousemgr(nullptr),
+	m_destructionManager(this),
 	m_physicsEnvironment(0),
 	m_sceneName(sceneName),
 	m_worldSun(nullptr),
@@ -326,6 +327,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_animationPool = BLI_task_pool_create(KX_GetActiveEngine()->GetTaskScheduler(), &m_animationPoolData);
 
 	m_audio3d_update = scene->audio.audio3d_update;
+	m_destructionManager.SetMaxDebris(scene->gm.max_debris);
 #ifdef WITH_PYTHON
 	m_attrDict = nullptr;
 	m_removeCallbacks = nullptr;
@@ -515,6 +517,11 @@ SCA_TimeEventManager *KX_Scene::GetTimeEventManager() const
 KX_PythonComponentManager& KX_Scene::GetPythonComponentManager()
 {
 	return m_componentManager;
+}
+
+KX_DestructionManager& KX_Scene::GetDestructionManager()
+{
+	return m_destructionManager;
 }
 
 void KX_Scene::SetFramingType(const RAS_FrameSettings& frameSettings)
@@ -909,6 +916,11 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 		if (parent) {
 			newctrl->SuspendDynamics();
 		}
+	}
+
+	// Needs the replicated physics controller for the collision callbacks.
+	if (newblenderobj && (newblenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
+		m_destructionManager.RegisterObject(newobj);
 	}
 
 	return newobj;
@@ -1406,6 +1418,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	                         m_dynamicNavMeshes.end());
 
 	m_componentManager.UnregisterObject(gameobj);
+	m_destructionManager.UnregisterObject(gameobj);
 
 	gameobj->RemoveMeshes();
 
@@ -2177,6 +2190,9 @@ void KX_Scene::LogicEndFrame()
 {
 	m_logicmgr->EndFrame();
 
+	// Breaks queued by this frame's collisions; the broken objects are removed just below.
+	m_destructionManager.Update(KX_GetActiveEngine()->GetFrameStep());
+
 	RemoveEuthanasyObjects();
 
 	//prepare obstacle simulation for new frame
@@ -2631,6 +2647,7 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 	m_boundingBoxManager->Merge(other->GetBoundingBoxManager());
 	m_rendererManager->Merge(other->GetTextureRendererManager());
 	m_componentManager.Merge(other->GetPythonComponentManager());
+	m_destructionManager.Merge(other->GetDestructionManager());
 
 	bool occlusion = false;
 	for (KX_GameObject *gameobj : *other->GetObjectList()) {
@@ -3247,6 +3264,7 @@ PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE(KX_Scene, stop_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, restart_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, drawObstacleSimulation),
+	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, explode),
 
 	// Sict style access.
 	EXP_PYMETHODTABLE(KX_Scene, get),
@@ -3589,6 +3607,28 @@ int KX_Scene::pyattr_set_remove_callback(EXP_PyObjectPlus *self_v, const EXP_PYA
 	return PY_SET_ATTR_SUCCESS;
 }
 
+PyObject *KX_Scene::pyattr_get_max_debris(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Scene *self = static_cast<KX_Scene *>(self_v);
+	return PyLong_FromLong(self->m_destructionManager.GetMaxDebris());
+}
+
+int KX_Scene::pyattr_set_max_debris(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_Scene *self = static_cast<KX_Scene *>(self_v);
+	const long maxDebris = PyLong_AsLong(value);
+	if (maxDebris == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "scene.maxDebris = int: KX_Scene, expected an int");
+		return PY_SET_ATTR_FAIL;
+	}
+	if (maxDebris < 0 || maxDebris > 100000) {
+		PyErr_SetString(PyExc_ValueError, "scene.maxDebris = int: KX_Scene, expected 0 (no limit) to 100000");
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_destructionManager.SetMaxDebris(maxDebris);
+	return PY_SET_ATTR_SUCCESS;
+}
+
 PyObject *KX_Scene::pyattr_get_gravity(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_Scene *self = static_cast<KX_Scene *>(self_v);
@@ -3628,6 +3668,7 @@ PyAttributeDef KX_Scene::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("pre_draw_setup", KX_Scene, pyattr_get_drawing_callback, pyattr_set_drawing_callback),
 	EXP_PYATTRIBUTE_RW_FUNCTION("onRemove", KX_Scene, pyattr_get_remove_callback, pyattr_set_remove_callback),
 	EXP_PYATTRIBUTE_RW_FUNCTION("gravity", KX_Scene, pyattr_get_gravity, pyattr_set_gravity),
+	EXP_PYATTRIBUTE_RW_FUNCTION("maxDebris", KX_Scene, pyattr_get_max_debris, pyattr_set_max_debris),
 	EXP_PYATTRIBUTE_BOOL_RO("suspended", KX_Scene, m_suspend),
 	EXP_PYATTRIBUTE_BOOL_RO("activityCulling", KX_Scene, m_activityCulling),
 	EXP_PYATTRIBUTE_BOOL_RO("dbvt_culling", KX_Scene, m_dbvtCulling),
@@ -3858,6 +3899,71 @@ EXP_PYMETHODDEF_DOC(KX_Scene, drawObstacleSimulation,
 	}
 
 	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, explode,
+                    "explode(position, radius=5.0, force=20.0, upBias=0.3, occlusion=True, mask=0xFFFF, ignore=None)\n"
+                    "Radial impulse force * (1 - distance / radius) on the dynamic objects around position.\n"
+                    "Destructibles hit above their breakImpulse break, explosives above their Impact Impulse\n"
+                    "detonate next frame. With occlusion, static geometry in the way shields an object.\n"
+                    "mask filters the collision groups, ignore is an object or a list of objects left out.\n"
+                    "Returns the list of objects reached.\n")
+{
+	PyObject *pyposition;
+	float radius = 5.0f;
+	float force = 20.0f;
+	float upBias = 0.3f;
+	int occlusion = 1;
+	int mask = 0xFFFF;
+	PyObject *pyignore = Py_None;
+
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "O|fffpiO:explode",
+	                                   {"position", "radius", "force", "upBias", "occlusion", "mask", "ignore", 0},
+	                                   &pyposition, &radius, &force, &upBias, &occlusion, &mask, &pyignore)) {
+		return nullptr;
+	}
+
+	mt::vec3 position;
+	if (!PyVecTo(pyposition, position)) {
+		return nullptr;
+	}
+
+	if (mask < 0 || mask > 0xFFFF) {
+		PyErr_SetString(PyExc_ValueError, "scene.explode(): KX_Scene, mask must be between 0 and 65535");
+		return nullptr;
+	}
+
+	std::vector<KX_GameObject *> ignore;
+	if (pyignore != Py_None) {
+		KX_GameObject *gameobj;
+		// A name is a sequence too.
+		if (!PyObject_TypeCheck(pyignore, &KX_GameObject::Type) && !PyUnicode_Check(pyignore) && PySequence_Check(pyignore)) {
+			for (Py_ssize_t i = 0, size = PySequence_Size(pyignore); i < size; ++i) {
+				PyObject *item = PySequence_GetItem(pyignore, i);
+				const bool ok = ConvertPythonToGameObject(m_logicmgr, item, &gameobj, false, "scene.explode(): KX_Scene, ignore: ");
+				Py_DECREF(item);
+				if (!ok) {
+					return nullptr;
+				}
+				ignore.push_back(gameobj);
+			}
+		}
+		else if (ConvertPythonToGameObject(m_logicmgr, pyignore, &gameobj, false, "scene.explode(): KX_Scene, ignore: ")) {
+			ignore.push_back(gameobj);
+		}
+		else {
+			return nullptr;
+		}
+	}
+
+	const std::vector<KX_GameObject *> reached = m_destructionManager.Explode(position, radius, force, upBias, occlusion,
+	                                                                          (unsigned short)mask, ignore);
+
+	PyObject *list = PyList_New(reached.size());
+	for (unsigned int i = 0, size = reached.size(); i < size; ++i) {
+		PyList_SET_ITEM(list, i, reached[i]->GetProxy());
+	}
+	return list;
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, get, "")

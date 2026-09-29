@@ -575,11 +575,82 @@ base class --- :class:`SCA_IObject`
 
       :type: :class:`KX_LodManager`
 
+   .. attribute:: isDestructible
+
+      True if Physics > Destruction is enabled on this object, also for objects on an inactive layer (read-only).
+
+      :type: boolean
+
+   .. attribute:: isExplosive
+
+      True if Physics > Explosive is enabled on this object, also for objects on an inactive layer (read-only).
+
+      :type: boolean
+
+   .. attribute:: breakImpulse
+
+      The impulse that breaks this destructible object, from a collision or from :meth:`KX_Scene.explode`.
+      Starts with the panel's Break Impulse; changing it affects only this instance.
+      Reads 0.0 on objects that are not destructible, and setting it on them raises AttributeError.
+
+      :type: float
+
+   .. attribute:: fuse
+
+      Seconds left before this explosive object detonates. The fuse counts from the moment the object enters
+      the game (scene start or :meth:`KX_Scene.addObject`). 0.0 means no fuse; setting a value lights it.
+      Setting it on an object that is not explosive raises AttributeError.
+
+      :type: float
+
+   .. attribute:: onBreak
+
+      A list of functions called when this object breaks, with the arguments `(object, fragments)`.
+      They run right after the fragments enter the scene, before any explosion pushes them.
+      Callbacks set on an object of an inactive layer are copied to every object added from it.
+
+      :type: list of functions and/or methods
+
+      .. code-block:: python
+
+         def on_break(obj, fragments):
+             print('%s broke into %d pieces' % (obj.name, len(fragments)))
+
+         controller.owner.onBreak.append(on_break)
+
+   .. attribute:: onExplode
+
+      A list of functions called when this object explodes, with the arguments `(object, position)`.
+      On an object that is both destructible and explosive, they run after :attr:`onBreak`.
+      Callbacks set on an object of an inactive layer are copied to every object added from it.
+
+      :type: list of functions and/or methods
+
    .. method:: endObject()
 
       Delete this object, can be used in place of the EndObject Actuator.
 
       The actual removal of the object from the scene is delayed.
+
+   .. method:: shatter(origin=None, burst=None)
+
+      Break this destructible object now, replacing it by the pieces of its Fragments group.
+      On an object that is also explosive, it detonates as well.
+
+      :arg origin: The point the pieces fly away from, the object's position by default.
+      :type origin: 3D Vector
+      :arg burst: The speed given to the pieces away from origin, the panel's Burst Speed by default.
+      :type burst: float
+      :return: The new pieces, an empty list if the object is not destructible or has already broken.
+      :rtype: list of :class:`KX_GameObject`
+
+   .. method:: detonate()
+
+      Make this explosive object explode now: a blast like :meth:`KX_Scene.explode` with the panel's settings,
+      the Effect object, and the removal of the object. A destructible explosive breaks as well.
+
+      :return: False if the object is not explosive or has already exploded.
+      :rtype: boolean
 
    .. method:: replaceMesh(mesh, useDisplayMesh=True, usePhysicsMesh=False)
 

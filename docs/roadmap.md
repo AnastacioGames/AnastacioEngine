@@ -188,6 +188,19 @@ volante visual), C (`has_drive`, torque/RPM, gearbox automático/manual) e A (`v
 shape) já estão no código desde o snapshot 28775369. Falta validar cada uma no jogo real (usuário). Fase D
 está fechada. O componente do demo `Vehicle` foi sincronizado com a versão com gearbox em 2026-09-24.
 
+### Destruição e explosões
+
+[Plano](destruction-plan.md) aprovado em 2026-09-29; F0 (DNA, RNA e painéis), F1 (Generate Fragments), F2 (quebra por colisão e `shatter()` no runtime), F3 (`scene.explode()`, pavio, impacto, cadeia, Effect e `detonate()`), F4 (Max Debris, `onBreak`/`onExplode`, impulso por massa nos pedaços) e F5 (demo em `source/release/demos/Destruction/`, API no `.rst`) prontas; falta o usuário jogar a demo e ajustar a sensação: objetos
+pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Explosive na aba Physics e
+`scene.explode()`, em fases F0–F5. Protótipo Python validado por teste automático no runtime
+0.4.5 (fora do git, em `tools/ADD na engine anastacioEngine/`).
+
+### Câmera: foco, rastreio e Camera FX
+
+[Plano](camera-fx-plan.md) salvo em 2026-09-29; começa **depois de fechar a Destruição**. Sensor de foco na
+câmera (objeto, propriedade true, automático ou manual), rastreio do foco (Look At / Drone), módulo único de
+efeitos (DOF Bokeh, Speed Blur, Directional Blur, olho de gato em 3 estilos) e tremor somado ao terremoto.
+
 ### Android / iOS
 
 Android v1 concluído (2026-09-24): APK/AAB com WebView embutindo o pacote Web, validado em aparelho físico

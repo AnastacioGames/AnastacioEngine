@@ -160,6 +160,37 @@ base class --- :class:`EXP_PyObjectPlus`
 
       :type: Vector((gx, gy, gz))
 
+   .. attribute:: maxDebris
+
+      The number of fragments of broken objects kept alive in the scene; past it the oldest are removed.
+      Starts with Scene > Game Physics > Max Debris. 0 means no limit. Lowering it removes the extra pieces at once.
+
+      :type: integer in [0, 100000]
+
+   .. method:: explode(position, radius=5.0, force=20.0, upBias=0.3, occlusion=True, mask=0xFFFF, ignore=None)
+
+      Radial impulse on the dynamic objects around position, falling to zero at radius
+      (`force * (1 - distance / radius)`). Destructible objects hit above their :attr:`KX_GameObject.breakImpulse`
+      break and their pieces are pushed, sharing the impulse by mass. Explosive objects hit above their Impact
+      Impulse (with Chain Reaction on) detonate on the next frame.
+
+      :arg position: The center of the blast.
+      :type position: 3D Vector
+      :arg radius: The distance the blast reaches.
+      :type radius: float
+      :arg force: The impulse at the center.
+      :type force: float
+      :arg upBias: How much the push is tilted upwards, 0.0 is straight away from the center.
+      :type upBias: float
+      :arg occlusion: If True, static geometry between the center and an object shields it.
+      :type occlusion: boolean
+      :arg mask: The collision groups reached.
+      :type mask: bitfield
+      :arg ignore: An object or a list of objects left out.
+      :type ignore: :class:`KX_GameObject` or list
+      :return: The objects reached (not the new pieces).
+      :rtype: list of :class:`KX_GameObject`
+
    .. method:: addObject(object, reference, time=0.0)
 
       Adds an object to the scene like the Add Object Actuator would.

@@ -2623,7 +2623,12 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	// Accessing a SoundActuator's sound results in a crash if aud is not initialized.
 	{
 		PyObject *mod = PyImport_ImportModuleLevel("aud", nullptr, nullptr, nullptr, 0);
-		Py_DECREF(mod);
+		if (mod) {
+			Py_DECREF(mod);
+		}
+		else {
+			PyErr_Print();
+		}
 	}
 #endif
 
@@ -2634,7 +2639,12 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	 * before initialization. the new aud must use something it shouldn't use at that moment i think. */
 	for (unsigned short i = 0; bge_internal_modules[i].name; ++i) {
 		PyObject *mod = PyImport_ImportModuleLevel(bge_internal_modules[i].name, nullptr, nullptr, nullptr, 0);
-		Py_DECREF(mod);
+		if (mod) {
+			Py_DECREF(mod);
+		}
+		else {
+			PyErr_Print();
+		}
 	}
 
 	// Init Range

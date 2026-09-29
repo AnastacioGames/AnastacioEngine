@@ -540,4 +540,11 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       scene->scenefx_settings.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
     }
   }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "GameData", "short", "max_debris")) {
+    /* Native destruction: old files get the same debris limit as new scenes. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->gm.max_debris = 150;
+    }
+  }
 }

@@ -551,6 +551,108 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
                 layout.label(text="No dynamic navmesh in the scene: the navmesh won't be carved", icon='ERROR')
 
 
+class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
+    bl_label = "Destruction"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY'})
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        game = ob.game
+        ds = game.destruction
+
+        layout.prop(game, "use_destruction", text="Enabled")
+        layout = layout.column()
+        layout.active = game.use_destruction
+
+        row = layout.row(align=True)
+        row.prop(ds, "fragments")
+        row.operator("object.destruction_fragments_generate", text="Generate Fragments...", icon='MOD_EXPLODE')
+
+        split = layout.split()
+        col = split.column()
+        col.prop(ds, "break_impulse")
+        col.prop(ds, "use_break_on_collision")
+        col = split.column()
+        col.prop(ds, "burst_speed")
+        col.prop(ds, "use_inherit_velocity")
+
+        layout.prop(ds, "debris_lifetime")
+
+        if game.use_destruction:
+            self.draw_fragments_check(layout, context.scene, ob, ds.fragments)
+
+    @staticmethod
+    def draw_fragments_check(layout, scene, ob, group):
+        if group is None:
+            layout.label(text="No Fragments: the object just disappears when it breaks", icon='INFO')
+            return
+        if ob.name in group.objects:
+            layout.label(text="The object itself is in its Fragments group", icon='ERROR')
+        pieces = [piece for piece in group.objects if piece != ob]
+        if not pieces:
+            layout.label(text="The Fragments group is empty", icon='ERROR')
+        elif any(piece.name not in scene.objects for piece in pieces):
+            layout.label(text="Some fragments are not in this scene: they won't be created", icon='ERROR')
+        elif any(piece.is_visible(scene) for piece in pieces):
+            layout.label(text="Move the fragments to an inactive layer", icon='ERROR')
+
+
+class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
+    bl_label = "Explosive"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY', 'NO_COLLISION'})
+
+    def draw(self, context):
+        layout = self.layout
+        game = context.active_object.game
+        es = game.explosive
+
+        layout.prop(game, "use_explosive", text="Enabled")
+        layout = layout.column()
+        layout.active = game.use_explosive
+
+        split = layout.split()
+        col = split.column()
+        col.prop(es, "radius")
+        col.prop(es, "force")
+        col = split.column()
+        col.prop(es, "up_bias")
+        col.prop(es, "use_occlusion")
+
+        layout.separator()
+        layout.prop(es, "fuse")
+
+        split = layout.split()
+        col = split.column()
+        col.prop(es, "use_explode_on_impact")
+        col.prop(es, "use_chain_reaction")
+        col = split.column()
+        col.active = es.use_explode_on_impact or es.use_chain_reaction
+        col.prop(es, "impact_impulse")
+
+        layout.separator()
+        split = layout.split(percentage=0.65)
+        split.prop(es, "effect")
+        sub = split.row()
+        sub.active = es.effect is not None
+        sub.prop(es, "effect_life", text="Life")
+
+        if game.use_explosive and es.effect is not None and es.effect.is_visible(context.scene):
+            layout.label(text="Move the Effect object to an inactive layer", icon='ERROR')
+
+
 class RenderButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -1132,6 +1234,10 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 sub.prop(gs, "deactivation_angular_threshold", text="Angular Threshold")
                 sub = col.row()
                 sub.prop(gs, "deactivation_time", text="Time")
+
+                box = main_box.box()
+                box.label(text="Destruction:", icon="MOD_EXPLODE")
+                box.prop(gs, "max_debris")
 
                 box = main_box.box()
                 box.label(text="Culling:", icon="RESTRICT_RENDER_OFF")
@@ -2071,6 +2177,8 @@ classes = (
     PHYSICS_PT_game_physics,
     PHYSICS_PT_game_collision_bounds,
     PHYSICS_PT_game_obstacles,
+    PHYSICS_PT_game_destruction,
+    PHYSICS_PT_game_explosive,
     RENDER_OT_set_game_resolution,
     RENDER_MT_game_res_embedded,
     RENDER_MT_game_res_player,

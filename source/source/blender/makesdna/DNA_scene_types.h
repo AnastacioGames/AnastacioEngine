@@ -1006,7 +1006,10 @@ typedef struct GameData {
 	short showShadowFrustum;
 
 	/* Scene LoD */
-	short lodflag, pad2;
+	short lodflag;
+	/* Native destruction: max fragments alive at once, oldest removed first. Replaces the unused
+	 * pad2 slot; 0 (old files) is treated as the default (150) by the game engine. */
+	short max_debris;
 	int scehysteresis;
 	/* Render attachments */
 	RenderAttachment *attachments[7];

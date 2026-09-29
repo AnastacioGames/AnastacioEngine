@@ -936,6 +936,7 @@ void BKE_scene_init(Scene *sce)
 
 	sce->gm.lodflag = SCE_LOD_USE_HYST;
 	sce->gm.scehysteresis = 10;
+	sce->gm.max_debris = 150;
 
 	sce->gm.exitkey = 218; // Blender key code for ESC
 

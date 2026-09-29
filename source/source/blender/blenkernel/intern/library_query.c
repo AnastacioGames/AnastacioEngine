@@ -562,6 +562,14 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 
 				CALLBACK_INVOKE(object->gpd, IDWALK_CB_USER);
 				CALLBACK_INVOKE(object->dup_group, IDWALK_CB_USER);
+				/* Native destruction / explosive (refcounted by RNA). */
+				CALLBACK_INVOKE(object->destruction.fragments, IDWALK_CB_USER);
+				CALLBACK_INVOKE(object->explosive.effect, IDWALK_CB_USER);
+				/* Game pointers not refcounted by RNA: listed so deleting the target clears them. */
+				CALLBACK_INVOKE(object->vehicle_steering_wheel, IDWALK_CB_NOP);
+				CALLBACK_INVOKE(object->collision_bound, IDWALK_CB_NOP);
+				CALLBACK_INVOKE(object->gpu_particles.collision_ground_object, IDWALK_CB_NOP);
+				CALLBACK_INVOKE(object->gamePredefinedBound, IDWALK_CB_NOP);
 
 				if (object->pd) {
 					CALLBACK_INVOKE(object->pd->tex, IDWALK_CB_USER);

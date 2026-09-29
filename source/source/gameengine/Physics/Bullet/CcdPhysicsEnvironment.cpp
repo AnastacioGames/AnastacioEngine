@@ -2275,6 +2275,50 @@ struct OcclusionBuffer {
 	}
 };
 
+struct SphereQueryCallback : public btBroadphaseAabbCallback {
+	btVector3 m_center;
+	btScalar m_radius2;
+	std::vector<PHY_IPhysicsController *>& m_result;
+
+	SphereQueryCallback(const btVector3& center, btScalar radius, std::vector<PHY_IPhysicsController *>& result)
+		:m_center(center),
+		m_radius2(radius * radius),
+		m_result(result)
+	{
+	}
+
+	virtual bool process(const btBroadphaseProxy *proxy)
+	{
+		if (proxy->m_collisionFilterGroup & CcdConstructionInfo::SensorFilter) {
+			return true;
+		}
+
+		// Distance from the center to the closest point of the box.
+		const btVector3 closest(
+			btClamped(m_center.x(), proxy->m_aabbMin.x(), proxy->m_aabbMax.x()),
+			btClamped(m_center.y(), proxy->m_aabbMin.y(), proxy->m_aabbMax.y()),
+			btClamped(m_center.z(), proxy->m_aabbMin.z(), proxy->m_aabbMax.z()));
+		if (closest.distance2(m_center) > m_radius2) {
+			return true;
+		}
+
+		btCollisionObject *object = static_cast<btCollisionObject *>(proxy->m_clientObject);
+		CcdPhysicsController *ctrl = object ? static_cast<CcdPhysicsController *>(object->getUserPointer()) : nullptr;
+		if (ctrl) {
+			m_result.push_back(ctrl);
+		}
+		return true;
+	}
+};
+
+void CcdPhysicsEnvironment::SphereQuery(const mt::vec3& center, float radius, std::vector<PHY_IPhysicsController *>& result)
+{
+	const btVector3 btCenter = ToBullet(center);
+	const btVector3 extent(radius, radius, radius);
+	SphereQueryCallback callback(btCenter, radius, result);
+	m_dynamicsWorld->getBroadphase()->aabbTest(btCenter - extent, btCenter + extent, callback);
+}
+
 
 struct  DbvtCullingCallback : btDbvt::ICollide {
 	PHY_CullingCallback m_clientCallback;

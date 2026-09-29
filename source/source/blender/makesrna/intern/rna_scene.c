@@ -5001,6 +5001,16 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "threshold will deactivate (0.0 means no deactivation)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "max_debris", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "max_debris");
+	RNA_def_property_range(prop, 1, 10000);
+	RNA_def_property_ui_range(prop, 10, 1000, 10, 0);
+	RNA_def_property_int_default(prop, 150);
+	RNA_def_property_ui_text(prop, "Max Debris",
+	                         "Most fragments of destroyed objects alive at once; the oldest disappear first "
+	                         "(keep it low for Web and Android)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	/* mode */
 	prop = RNA_def_property(srna, "use_occlusion_culling", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", WO_DBVT_CULLING);

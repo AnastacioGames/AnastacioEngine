@@ -252,6 +252,9 @@ public:
 	//
 	PyObject*							m_attr_dict;
 	PyObject*							m_collisionCallbacks;
+	/// onBreak and onExplode (KX_DestructionManager), copied by replication.
+	PyObject*							m_breakCallbacks;
+	PyObject*							m_explodeCallbacks;
 #endif
 
 	virtual void	/* This function should be virtual - derived classed override it */
@@ -1030,6 +1033,10 @@ public:
 	void RegisterCollisionCallbacks();
 	void UnregisterCollisionCallbacks();
 	void RunCollisionCallbacks(KX_GameObject *collider, KX_CollisionContactPointList& contactPointList);
+	/// The object just broke into fragments (still in the scene, removed at the end of the frame).
+	void RunBreakCallbacks(const std::vector<KX_GameObject *>& fragments);
+	/// The object just exploded at position.
+	void RunExplodeCallbacks(const mt::vec3& position);
 	/**
 	 * Stop making progress
 	 */
@@ -1157,6 +1164,8 @@ public:
 	EXP_PYMETHOD_NOARGS(KX_GameObject,GetPropertyNames);
 	EXP_PYMETHOD(KX_GameObject,ReplaceMesh);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,EndObject);
+	EXP_PYMETHOD(KX_GameObject, Shatter);
+	EXP_PYMETHOD_NOARGS(KX_GameObject, Detonate);
 	EXP_PYMETHOD_DOC(KX_GameObject,rayCastTo);
 	EXP_PYMETHOD_DOC(KX_GameObject,rayCast);
 	EXP_PYMETHOD_DOC_O(KX_GameObject,getDistanceTo);
@@ -1194,6 +1203,14 @@ public:
 	static PyObject*	pyattr_get_friction(EXP_PyObjectPlus* self_v, const EXP_PYATTRIBUTE_DEF* attrdef);
 	static int			pyattr_set_friction(EXP_PyObjectPlus* self_v, const EXP_PYATTRIBUTE_DEF* attrdef, PyObject* value);
 	static PyObject*	pyattr_get_is_suspend_dynamics(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_is_destructible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_is_explosive(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_destruction_callbacks(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_destruction_callbacks(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject*	pyattr_get_break_impulse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_break_impulse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject*	pyattr_get_fuse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_fuse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_lin_vel_min(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_lin_vel_min(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_lin_vel_max(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

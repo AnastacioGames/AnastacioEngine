@@ -2169,6 +2169,14 @@ static int game_physics_copy_exec(bContext *C, wmOperator *UNUSED(op))
 
 			ob_iter->col_group = ob->col_group;
 			ob_iter->col_mask = ob->col_mask;
+
+			/* Native destruction / explosive settings (their ID pointers are refcounted). */
+			id_us_min((ID *)ob_iter->destruction.fragments);
+			id_us_min((ID *)ob_iter->explosive.effect);
+			ob_iter->destruction = ob->destruction;
+			ob_iter->explosive = ob->explosive;
+			id_us_plus((ID *)ob_iter->destruction.fragments);
+			id_us_plus((ID *)ob_iter->explosive.effect);
 		}
 	}
 	CTX_DATA_END;

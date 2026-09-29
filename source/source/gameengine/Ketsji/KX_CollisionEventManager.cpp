@@ -36,6 +36,9 @@
 #include "KX_CollisionContactPoints.h"
 #include "PHY_IPhysicsEnvironment.h"
 #include "PHY_IPhysicsController.h"
+#include "KX_Scene.h"
+
+#include "DNA_object_types.h"
 
 KX_CollisionEventManager::KX_CollisionEventManager(SCA_LogicManager *logicmgr, PHY_IPhysicsEnvironment *physEnv)
 	:SCA_EventManager(logicmgr, TOUCH_EVENTMGR),
@@ -212,6 +215,14 @@ void KX_CollisionEventManager::NextFrame()
 		KX_CollisionContactPointList contactPointList1 = KX_CollisionContactPointList(colldata, !collision.isFirst);
 		kxObj1->RunCollisionCallbacks(kxObj2, contactPointList0);
 		kxObj2->RunCollisionCallbacks(kxObj1, contactPointList1);
+
+		// Native destruction: queue a break or a detonation when the impact is strong enough.
+		if (kxObj1->GetBlenderObject() && (kxObj1->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
+			kxObj1->GetScene()->GetDestructionManager().NotifyCollision(kxObj1, colldata, collision.isFirst);
+		}
+		if (kxObj2->GetBlenderObject() && (kxObj2->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
+			kxObj2->GetScene()->GetDestructionManager().NotifyCollision(kxObj2, colldata, !collision.isFirst);
+		}
 	}
 
 	for (SCA_ISensor *sensor : m_sensors) {

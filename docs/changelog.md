@@ -9,6 +9,44 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Ponteiros de jogo no `library_query.c` e import do `aud` sem crash
+
+- `BKE_library_foreach_ID_link` (`library_query.c`) não listava `vehicle_steering_wheel`, `collision_bound`,
+  `gpu_particles.collision_ground_object` e `gamePredefinedBound`. Apagar o objeto ou a malha apontada deixava
+  o ponteiro pendurado. Agora entram com `IDWALK_CB_NOP` (o RNA não conta usuário neles) e viram None ao apagar
+  o alvo. Conferido no editor headless.
+- `initGamePython` (`KX_PythonInit.cpp`) chamava `Py_DECREF(NULL)` se o import do `aud` ou de um módulo interno
+  falhasse. Agora imprime o erro Python e segue.
+
+## 2026-09-29 - Destruição e explosões nativas (painéis Destruction e Explosive, `KX_DestructionManager`)
+
+- Origem: protótipo Python (`destruction.py` + `First_Person_destruction.range`, fora do git). Plano e
+  aprendizados de cada fase em `docs/destruction-plan.md`.
+- DNA: `RangeDestructionSettings` (grupo de pedaços, Break Impulse, Burst Speed, Debris Lifetime, flags) e
+  `RangeExplosiveSettings` (Effect, Radius, Force, Up Bias, Fuse, Impact Impulse, Effect Life, flags) no fim do
+  `Object`; `OB_DESTRUCTIBLE`/`OB_EXPLOSIVE` (`gameflag2`, bits 14 e 15); `GameData.max_debris` (padrão 150).
+  Ponteiros `fragments` e `effect` em `lib_link`, `expand` e `library_query`; Copy Game Physics copia os dois.
+  Arquivos antigos abrem com tudo desligado; o primeiro enable semeia os padrões.
+- Editor: painéis Destruction e Explosive na aba Physics (Static, Dynamic e Rigid Body) e Max Debris na física
+  da cena. Botão Generate Fragments... (`object.destruction_fragments_generate`, Cell Fracture): cria o grupo
+  `<objeto>_fragments` com os pedaços em Rigid Body e Convex Hull, massa repartida por volume, material interno e
+  layer escolhida.
+- Runtime (`KX_DestructionManager`, um por cena): quebra por colisão com o `appliedImpulse` do contato, fora do
+  callback de física; pedaços replicados direto do grupo (sem Dupli Group), com velocidade herdada e burst;
+  explosão por `SphereQuery` (novo em `PHY_IPhysicsEnvironment`, Bullet via `aabbTest`) com queda linear,
+  oclusão só por geometria estática e impulso dos pedaços repartido por massa; explosivo com pavio contado desde a
+  entrada no jogo, impacto, reação em cadeia (um elo por frame) e Effect; destrutível e explosivo ao mesmo tempo
+  quebra e explode uma vez só. Detritos com tempo de vida e fila FIFO de Max Debris.
+- API Python: `shatter()`, `detonate()`, `isDestructible`, `isExplosive`, `breakImpulse`, `fuse`, `onBreak`,
+  `onExplode` no `KX_GameObject`; `explode()` e `maxDebris` no `KX_Scene`. Documentada nos `.rst` de
+  `source/doc/python_api/rst/bge_types/`. As listas de callbacks são copiadas para cada objeto do `addObject`.
+- Demo `source/release/demos/Destruction/`: a First Person com caixas, parede, barris em cadeia, granada (G) e
+  explosão na mira (E), tudo pelos painéis; o componente da demo só cuida das teclas e do tremor de câmera.
+- Testes automáticos no `RangeRuntime` (F2 a F5, log em arquivo): todos PASS. A cena da F4 também passa no build
+  Web (Chrome). A sensação no jogo ainda depende do usuário jogar a demo.
+- Fica para depois: logic brick de explosão, variações de fratura sorteadas, fade-out dos detritos e corte em
+  tempo real.
+
 ## 2026-09-29 - Soft body no jogo: mapeamento com escala, transformação, velocidade, suspend e deformer
 
 - Mapeamento vértice → nó (`CcdPhysicsController::CreateSoftbody`): a posição do vértice agora é comparada já

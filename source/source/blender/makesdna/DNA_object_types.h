@@ -40,6 +40,7 @@ struct AnimData;
 struct BoundBox;
 struct DerivedMesh;
 struct FluidsimSettings;
+struct Group;
 struct Ipo;
 struct Material;
 struct Object;
@@ -303,6 +304,46 @@ enum {
 	REVERB_AREA_FILTER_LOWPASS  = 1,
 	REVERB_AREA_FILTER_HIGHPASS = 2,
 	REVERB_AREA_FILTER_BANDPASS = 3,
+};
+
+/* Native pre-fractured destruction (opt-in via gameflag2 & OB_DESTRUCTIBLE). On a strong enough
+ * impact (or explosion) the object is replaced in game by the objects of the 'fragments' group,
+ * which were fractured around the origin (see "Generate Fragments..."). break_impulse == 0 means
+ * not initialized yet (old files): rna_object.c fills the defaults on first enable. */
+typedef struct RangeDestructionSettings {
+	struct Group *fragments;
+	float break_impulse;   /* summed contact appliedImpulse that breaks the object */
+	float burst_speed;     /* outward speed (m/s) added to every fragment */
+	float debris_lifetime; /* seconds before fragments disappear, 0 = permanent */
+	int flags;             /* DESTRUCTION_* */
+} RangeDestructionSettings;
+
+/* RangeDestructionSettings.flags */
+enum {
+	DESTRUCTION_BREAK_ON_COLLISION = 1 << 0,
+	DESTRUCTION_INHERIT_VELOCITY   = 1 << 1,
+};
+
+/* Native explosive (opt-in via gameflag2 & OB_EXPLOSIVE): radial impulse with linear falloff,
+ * breaks destructibles and detonates other explosives in range. radius == 0 means not initialized
+ * yet (old files): rna_object.c fills the defaults on first enable. */
+typedef struct RangeExplosiveSettings {
+	struct Object *effect; /* optional object (inactive layer) spawned at the blast */
+	float radius;
+	float force;           /* impulse at the center, falls to 0 at the radius */
+	float up_bias;         /* extra upward component of the push direction */
+	float fuse;            /* seconds after entering the game, 0 = no fuse */
+	float impact_impulse;  /* summed contact appliedImpulse that detonates (impact / chain) */
+	float effect_life;     /* seconds the effect object lives */
+	int flags;             /* EXPLOSIVE_* */
+	int pad;
+} RangeExplosiveSettings;
+
+/* RangeExplosiveSettings.flags */
+enum {
+	EXPLOSIVE_OCCLUSION      = 1 << 0,
+	EXPLOSIVE_ON_IMPACT      = 1 << 1,
+	EXPLOSIVE_CHAIN_REACTION = 1 << 2,
 };
 
 enum {
@@ -595,6 +636,10 @@ typedef struct Object {
 	struct RangeGPUParticleSettings gpu_particles_mix;
 	/* Native reverb area, opt-in via gameflag2 & OB_REVERB_AREA (Empty objects). */
 	struct RangeReverbAreaSettings reverb_area;
+	/* Native destruction, opt-in via gameflag2 & OB_DESTRUCTIBLE. */
+	struct RangeDestructionSettings destruction;
+	/* Native explosive, opt-in via gameflag2 & OB_EXPLOSIVE. */
+	struct RangeExplosiveSettings explosive;
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -913,6 +958,11 @@ enum {
 	/* Marks this Empty as a reverb area: ob->reverb_area holds shape, preset and params,
 	 * applied by KX_Scene to 3D speakers while the listener is inside it. */
 	OB_REVERB_AREA                   = 1 << 13,
+
+	/* ob->destruction: replaced in game by its pre-fractured fragments group on a strong hit. */
+	OB_DESTRUCTIBLE                  = 1 << 14,
+	/* ob->explosive: detonates (fuse, impact, chain reaction or Python) with a radial impulse. */
+	OB_EXPLOSIVE                     = 1 << 15,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };

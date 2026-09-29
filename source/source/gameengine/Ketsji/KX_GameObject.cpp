@@ -157,7 +157,9 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_collisionGroundObject(nullptr)
 #ifdef WITH_PYTHON
 	, m_attr_dict(nullptr),
-	m_collisionCallbacks(nullptr)
+	m_collisionCallbacks(nullptr),
+	m_breakCallbacks(nullptr),
+	m_explodeCallbacks(nullptr)
 #endif
 {
 	// define the relationship between this node and it's parent.
@@ -207,7 +209,9 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_collisionGroundObject(nullptr)
 #ifdef WITH_PYTHON
 	, m_attr_dict(other.m_attr_dict),
-	m_collisionCallbacks(other.m_collisionCallbacks)
+	m_collisionCallbacks(other.m_collisionCallbacks),
+	m_breakCallbacks(nullptr),
+	m_explodeCallbacks(nullptr)
 #endif  // WITH_PYTHON
 {
 	if (m_lodManager) {
@@ -225,6 +229,14 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	}
 
 	Py_XINCREF(m_collisionCallbacks);
+
+	// Own lists: a callback added to one replica doesn't reach its siblings.
+	if (other.m_breakCallbacks) {
+		m_breakCallbacks = PyList_GetSlice(other.m_breakCallbacks, 0, PY_SSIZE_T_MAX);
+	}
+	if (other.m_explodeCallbacks) {
+		m_explodeCallbacks = PyList_GetSlice(other.m_explodeCallbacks, 0, PY_SSIZE_T_MAX);
+	}
 
 	if (other.m_components) {
 		m_components = static_cast<EXP_ListValue<KX_PythonComponent> *>(other.m_components->GetReplica());
@@ -250,6 +262,8 @@ KX_GameObject::~KX_GameObject()
 		UnregisterCollisionCallbacks();
 		Py_CLEAR(m_collisionCallbacks);
 	}
+	Py_CLEAR(m_breakCallbacks);
+	Py_CLEAR(m_explodeCallbacks);
 
 	if (m_components) {
 		m_components->Release();
@@ -2249,6 +2263,43 @@ void KX_GameObject::RunCollisionCallbacks(KX_GameObject *collider, KX_CollisionC
 #endif
 }
 
+void KX_GameObject::RunBreakCallbacks(const std::vector<KX_GameObject *>& fragments)
+{
+#ifdef WITH_PYTHON
+	if (!m_breakCallbacks || PyList_GET_SIZE(m_breakCallbacks) == 0) {
+		return;
+	}
+
+	PyObject *pyfragments = PyList_New(fragments.size());
+	for (unsigned int i = 0, size = fragments.size(); i < size; ++i) {
+		PyList_SET_ITEM(pyfragments, i, fragments[i]->GetProxy());
+	}
+
+	PyObject *args[] = {GetProxy(), pyfragments};
+	EXP_RunPythonCallBackList(m_breakCallbacks, args, 0, ARRAY_SIZE(args));
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(args); ++i) {
+		Py_DECREF(args[i]);
+	}
+#endif
+}
+
+void KX_GameObject::RunExplodeCallbacks(const mt::vec3& position)
+{
+#ifdef WITH_PYTHON
+	if (!m_explodeCallbacks || PyList_GET_SIZE(m_explodeCallbacks) == 0) {
+		return;
+	}
+
+	PyObject *args[] = {GetProxy(), PyObjectFrom(position)};
+	EXP_RunPythonCallBackList(m_explodeCallbacks, args, 0, ARRAY_SIZE(args));
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(args); ++i) {
+		Py_DECREF(args[i]);
+	}
+#endif
+}
+
 template <bool recursive>
 static void walk_children(const SG_Node *node, std::vector<KX_GameObject *>& list)
 {
@@ -2756,6 +2807,8 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{"getPropertyNames", (PyCFunction)KX_GameObject::sPyGetPropertyNames, METH_NOARGS},
 	{"replaceMesh", (PyCFunction)KX_GameObject::sPyReplaceMesh, METH_VARARGS | METH_KEYWORDS},
 	{"endObject", (PyCFunction)KX_GameObject::sPyEndObject, METH_NOARGS},
+	{"shatter", (PyCFunction)KX_GameObject::sPyShatter, METH_VARARGS | METH_KEYWORDS},
+	{"detonate", (PyCFunction)KX_GameObject::sPyDetonate, METH_NOARGS},
 	{"reinstancePhysicsMesh", (PyCFunction)KX_GameObject::sPyReinstancePhysicsMesh, METH_VARARGS | METH_KEYWORDS},
 	{"replacePhysicsShape", (PyCFunction)KX_GameObject::sPyReplacePhysicsShape, METH_O},
 
@@ -2797,6 +2850,12 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("mass",     KX_GameObject, pyattr_get_mass,     pyattr_set_mass),
 	EXP_PYATTRIBUTE_RW_FUNCTION("friction", KX_GameObject, pyattr_get_friction, pyattr_set_friction),
 	EXP_PYATTRIBUTE_RO_FUNCTION("isSuspendDynamics",        KX_GameObject, pyattr_get_is_suspend_dynamics),
+	EXP_PYATTRIBUTE_RO_FUNCTION("isDestructible", KX_GameObject, pyattr_get_is_destructible),
+	EXP_PYATTRIBUTE_RO_FUNCTION("isExplosive", KX_GameObject, pyattr_get_is_explosive),
+	EXP_PYATTRIBUTE_RW_FUNCTION("onBreak", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
+	EXP_PYATTRIBUTE_RW_FUNCTION("onExplode", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
+	EXP_PYATTRIBUTE_RW_FUNCTION("breakImpulse", KX_GameObject, pyattr_get_break_impulse, pyattr_set_break_impulse),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fuse", KX_GameObject, pyattr_get_fuse, pyattr_set_fuse),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",       KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMax",       KX_GameObject, pyattr_get_lin_vel_max, pyattr_set_lin_vel_max),
 	EXP_PYATTRIBUTE_RW_FUNCTION("angularVelocityMin", KX_GameObject, pyattr_get_ang_vel_min, pyattr_set_ang_vel_min),
@@ -2884,6 +2943,49 @@ PyObject *KX_GameObject::PyEndObject()
 	GetScene()->DelayedRemoveObject(this);
 
 	Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PyShatter(PyObject *args, PyObject *kwds)
+{
+	PyObject *pyorigin = Py_None;
+	PyObject *pyburst = Py_None;
+
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "|OO:shatter", {"origin", "burst", 0}, &pyorigin, &pyburst)) {
+		return nullptr;
+	}
+
+	mt::vec3 origin;
+	const mt::vec3 *originptr = nullptr;
+	if (pyorigin != Py_None) {
+		if (!PyVecTo(pyorigin, origin)) {
+			return nullptr;
+		}
+		originptr = &origin;
+	}
+
+	float burst;
+	const float *burstptr = nullptr;
+	if (pyburst != Py_None) {
+		burst = PyFloat_AsDouble(pyburst);
+		if (burst == -1.0f && PyErr_Occurred()) {
+			PyErr_SetString(PyExc_TypeError, "gameOb.shatter(origin, burst): KX_GameObject, burst must be a float or None");
+			return nullptr;
+		}
+		burstptr = &burst;
+	}
+
+	const std::vector<KX_GameObject *> pieces = GetScene()->GetDestructionManager().Shatter(this, originptr, burstptr);
+
+	PyObject *list = PyList_New(pieces.size());
+	for (unsigned int i = 0, size = pieces.size(); i < size; ++i) {
+		PyList_SET_ITEM(list, i, pieces[i]->GetProxy());
+	}
+	return list;
+}
+
+PyObject *KX_GameObject::PyDetonate()
+{
+	return PyBool_FromLong(GetScene()->GetDestructionManager().Detonate(this));
 }
 
 PyObject *KX_GameObject::PyReinstancePhysicsMesh(PyObject *args, PyObject *kwds)
@@ -3397,6 +3499,87 @@ PyObject *KX_GameObject::pyattr_get_is_suspend_dynamics(EXP_PyObjectPlus *self_v
 	PYTHON_CHECK_PHYSICS_CONTROLLER(self, attrdef->m_name.c_str(), nullptr);
 
 	return PyBool_FromLong(self->IsDynamicsSuspended());
+}
+
+PyObject *KX_GameObject::pyattr_get_is_destructible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	return PyBool_FromLong(self->GetScene()->GetDestructionManager().IsDestructible(self));
+}
+
+PyObject *KX_GameObject::pyattr_get_is_explosive(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	return PyBool_FromLong(self->GetScene()->GetDestructionManager().IsExplosive(self));
+}
+
+PyObject *KX_GameObject::pyattr_get_break_impulse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	return PyFloat_FromDouble(self->GetScene()->GetDestructionManager().GetBreakImpulse(self));
+}
+
+int KX_GameObject::pyattr_set_break_impulse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const float impulse = PyFloat_AsDouble(value);
+	if (impulse == -1.0f && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "gameOb.breakImpulse = float: KX_GameObject, expected a float");
+		return PY_SET_ATTR_FAIL;
+	}
+	if (!self->GetScene()->GetDestructionManager().SetBreakImpulse(self, impulse)) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.breakImpulse = float: KX_GameObject, \"%s\" is not destructible",
+		             self->GetName().c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_destruction_callbacks(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks : self->m_explodeCallbacks;
+	if (!list) {
+		list = PyList_New(0);
+	}
+	Py_INCREF(list);
+	return list;
+}
+
+int KX_GameObject::pyattr_set_destruction_callbacks(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	if (!PyList_CheckExact(value)) {
+		PyErr_Format(PyExc_ValueError, "gameOb.%s = list: KX_GameObject, expected a list", attrdef->m_name.c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks : self->m_explodeCallbacks;
+	Py_INCREF(value);
+	Py_XDECREF(list);
+	list = value;
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_fuse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	return PyFloat_FromDouble(self->GetScene()->GetDestructionManager().GetFuse(self));
+}
+
+int KX_GameObject::pyattr_set_fuse(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const float seconds = PyFloat_AsDouble(value);
+	if (seconds == -1.0f && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "gameOb.fuse = float: KX_GameObject, expected a float");
+		return PY_SET_ATTR_FAIL;
+	}
+	if (!self->GetScene()->GetDestructionManager().SetFuse(self, seconds)) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.fuse = float: KX_GameObject, \"%s\" is not explosive",
+		             self->GetName().c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	return PY_SET_ATTR_SUCCESS;
 }
 
 PyObject *KX_GameObject::pyattr_get_lin_vel_min(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

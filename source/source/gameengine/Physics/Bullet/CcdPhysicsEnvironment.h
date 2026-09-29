@@ -228,6 +228,7 @@ public:
 	btTypedConstraint *GetConstraintById(int constraintId);
 
 	virtual PHY_IPhysicsController *RayTest(PHY_IRayCastFilterCallback &filterCallback, float fromX, float fromY, float fromZ, float toX, float toY, float toZ);
+	virtual void SphereQuery(const mt::vec3& center, float radius, std::vector<PHY_IPhysicsController *>& result);
 	virtual bool CullingTest(PHY_CullingCallback callback, void *userData, const std::array<mt::vec4, 6>& planes,
 							 int occlusionRes, const int *viewport, const mt::mat4& matrix);
 

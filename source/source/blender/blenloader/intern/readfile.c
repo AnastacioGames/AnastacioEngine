@@ -5175,6 +5175,9 @@ static void lib_link_object(FileData *fd, Main *main)
 				}
 			}
 			ob->vehicle_steering_wheel = newlibadr(fd, ob->id.lib, ob->vehicle_steering_wheel);
+			/* Native destruction / explosive: refcounted by RNA like dup_group. */
+			ob->destruction.fragments = newlibadr_us(fd, ob->id.lib, ob->destruction.fragments);
+			ob->explosive.effect = newlibadr_us(fd, ob->id.lib, ob->explosive.effect);
 			{
 				AnimationEvent *event;
 				for (event = ob->animevents.first; event; event = event->next) {
@@ -9937,6 +9940,8 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 	}
 
 	expand_doit(fd, mainvar, ob->vehicle_steering_wheel);
+	expand_doit(fd, mainvar, ob->destruction.fragments);
+	expand_doit(fd, mainvar, ob->explosive.effect);
 
 	{
 		AnimationEvent *event;

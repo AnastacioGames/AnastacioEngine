@@ -1069,8 +1069,189 @@ class ReverbAreaAdd(Operator):
         return {'FINISHED'}
 
 
+class DestructionFragmentsGenerate(Operator):
+    """Cut the active mesh into pieces (Cell Fracture) and use them as its Destruction fragments"""
+    bl_idname = "object.destruction_fragments_generate"
+    bl_label = "Generate Fragments"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    count: IntProperty(
+        name="Pieces",
+        description="Number of pieces to cut the object into",
+        min=2, max=200, soft_max=50,
+        default=10,
+    )
+    seed: IntProperty(
+        name="Seed",
+        description="Random seed for the cut points",
+        min=0,
+        default=0,
+    )
+    interior_material: StringProperty(
+        name="Interior Material",
+        description="Material of the cut faces (empty: same as the surface)",
+    )
+    layer: IntProperty(
+        name="Layer",
+        description="Layer that receives the pieces (use a layer that is not visible in the game)",
+        min=1, max=20,
+        default=20,
+    )
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and ob.type == 'MESH' and ob.mode == 'OBJECT'
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "count")
+        layout.prop(self, "seed")
+        layout.prop_search(self, "interior_material", bpy.data, "materials")
+        layout.prop(self, "layer")
+
+    @staticmethod
+    def _clear_group(group):
+        for piece in list(group.objects):
+            if piece.users_group != (group,):
+                # Usado em outro grupo tambem: so tira deste.
+                group.objects.unlink(piece)
+                continue
+            mesh = piece.data
+            bpy.data.objects.remove(piece, do_unlink=True)
+            if mesh is not None and mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
+
+    @staticmethod
+    def _points_inside(src, count, rng):
+        """Random cut points inside the mesh (falls back to the bounding box for open meshes)."""
+        from mathutils import Vector
+        lo = Vector(tuple(min(v[i] for v in src.bound_box) for i in range(3)))
+        hi = Vector(tuple(max(v[i] for v in src.bound_box) for i in range(3)))
+        # Pontos colados na borda geram lascas finas: sorteia so em 90% da caixa.
+        center, half = (lo + hi) * 0.5, (hi - lo) * 0.45
+
+        def sample():
+            return center + Vector(tuple(rng.uniform(-half[i], half[i]) for i in range(3)))
+
+        points = []
+        for _ in range(count * 50):
+            co = sample()
+            found, location, normal, _index = src.closest_point_on_mesh(co)
+            if found and (co - location).dot(normal) < 0.0:
+                points.append(co)
+                if len(points) == count:
+                    return points
+        return points + [sample() for _ in range(count - len(points))]
+
+    def execute(self, context):
+        import random
+        import bmesh
+        from object_fracture_cell import fracture_cell_setup as fcs
+
+        scene = context.scene
+        ob = context.active_object
+        layer = self.layer - 1
+        interior = bpy.data.materials.get(self.interior_material) if self.interior_material else None
+
+        # Os pedacos ficam no espaco local do objeto (dupli_offset 0): o runtime usa obj.world * piece.world.
+        mesh = ob.to_mesh(scene, True, 'PREVIEW')
+        if not mesh.polygons:
+            bpy.data.meshes.remove(mesh)
+            self.report({'ERROR'}, "The object has no faces to cut")
+            return {'CANCELLED'}
+        material_index = 0
+        if interior is not None:
+            if not mesh.materials:
+                mesh.materials.append(None)
+            mesh.materials.append(interior)
+            material_index = len(mesh.materials) - 1
+
+        src = bpy.data.objects.new(ob.name + "_fracture_src", mesh)
+        scene.objects.link(src)
+        scene.update()
+
+        rng = random.Random(self.seed)
+        # O Cell Fracture usa o random global (ruido dos vertices).
+        random.seed(self.seed)
+        pts_mesh = bpy.data.meshes.new(ob.name + "_fracture_pts")
+        pts_mesh.from_pydata(self._points_inside(src, self.count, rng), [], [])
+        pts = bpy.data.objects.new(pts_mesh.name, pts_mesh)
+        scene.objects.link(pts)
+        pts.parent = src
+        scene.update()
+
+        pieces = fcs.cell_fracture_objects(scene, src, source={'VERT_CHILD'}, source_limit=0, source_noise=0.0,
+                                           use_smooth_faces=False, use_data_match=True, margin=0.002,
+                                           material_index=material_index)
+        pieces = fcs.cell_fracture_boolean(scene, src, pieces, use_island_split=False, use_interior_hide=False,
+                                           use_debug_bool=False, use_debug_redraw=False, level=0)
+        if pieces:
+            bpy.ops.object.origin_set({"selected_editable_objects": pieces}, type='ORIGIN_GEOMETRY',
+                                      center='MEDIAN')
+
+        for tmp in (pts, src):
+            data = tmp.data
+            scene.objects.unlink(tmp)
+            bpy.data.objects.remove(tmp)
+            bpy.data.meshes.remove(data)
+
+        if not pieces:
+            self.report({'ERROR'}, "Cell Fracture made no pieces")
+            return {'CANCELLED'}
+
+        volumes = []
+        for piece in pieces:
+            bm = bmesh.new()
+            bm.from_mesh(piece.data)
+            # As normais que saem do Boolean nem sempre sao coerentes: sem isso o volume sai errado.
+            bmesh.ops.triangulate(bm, faces=bm.faces)
+            bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+            volumes.append(max(bm.calc_volume(signed=False), 1e-6))
+            bm.free()
+        total = sum(volumes)
+
+        group_name = ob.name + "_fragments"
+        group = bpy.data.groups.get(group_name)
+        if group is None:
+            group = bpy.data.groups.new(group_name)
+        else:
+            self._clear_group(group)
+        group.dupli_offset = (0.0, 0.0, 0.0)
+
+        layers = [i == layer for i in range(20)]
+        for i, (piece, volume) in enumerate(zip(pieces, volumes)):
+            piece.name = "%s_frag.%02d" % (ob.name, i)
+            piece.data.name = piece.name
+            piece.layers = layers
+            piece.select = False
+            game = piece.game
+            game.physics_type = 'RIGID_BODY'
+            game.use_collision_bounds = True
+            game.collision_bounds_type = 'CONVEX_HULL'
+            game.mass = max(ob.game.mass * volume / total, 0.01)
+            game.collision_group = ob.game.collision_group
+            game.collision_mask = ob.game.collision_mask
+            group.objects.link(piece)
+
+        # Liga a Destruction (preenche os padroes na primeira vez) e aponta para o grupo.
+        ob.game.use_destruction = True
+        ob.game.destruction.fragments = group
+
+        if scene.layers[layer]:
+            self.report({'WARNING'}, "%d pieces on layer %d, which is visible: they will also appear in the game"
+                        % (len(pieces), self.layer))
+        else:
+            self.report({'INFO'}, "%d pieces on layer %d, group %s" % (len(pieces), self.layer, group.name))
+        return {'FINISHED'}
+
+
 classes = (
     ClearAllRestrictRender,
+    DestructionFragmentsGenerate,
     DupliOffsetFromCursor,
     IsolateTypeRender,
     JoinUVs,
