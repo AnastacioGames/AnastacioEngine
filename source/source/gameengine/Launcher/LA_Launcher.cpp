@@ -218,7 +218,7 @@ void LA_Launcher::InitEngine()
 	// sem pedido explicito. Forcamos um minimo aqui para sempre passar pelo caminho de
 	// alpha-to-coverage real, independente do valor configurado na cena e da GPU/driver.
 	if (m_startScene->gm.aasamples <= 1) {
-		m_startScene->gm.aasamples = 4;
+		m_startScene->gm.aasamples = 2;
 	}
 
 	// Create the canvas, rasterizer and rendertools.

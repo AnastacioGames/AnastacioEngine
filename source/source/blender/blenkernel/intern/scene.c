@@ -888,7 +888,7 @@ void BKE_scene_init(Scene *sce)
 	sce->scenefx_settings.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
 
 	/* game data */
-	sce->gm.aasamples = 4;
+	sce->gm.aasamples = 2;
 	sce->gm.stereoflag = STEREO_NOSTEREO;
 	sce->gm.stereomode = STEREO_ANAGLYPH;
 	sce->gm.eyeseparation = 0.10;

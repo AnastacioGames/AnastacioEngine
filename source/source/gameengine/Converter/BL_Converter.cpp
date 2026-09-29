@@ -245,7 +245,7 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	// LibLoad/AddScene, ja que cada uma tem seu proprio Scene->gm.aasamples independente),
 	// para sempre passar pelo caminho de alpha-to-coverage real.
 	if (blenderscene->gm.aasamples <= 1) {
-		blenderscene->gm.aasamples = 4;
+		blenderscene->gm.aasamples = 2;
 	}
 
 	PHY_IPhysicsEnvironment *phy_env = nullptr;

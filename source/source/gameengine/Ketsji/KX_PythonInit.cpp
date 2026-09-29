@@ -1456,10 +1456,10 @@ static PyObject *gPySetAntiAliasing(PyObject *, PyObject *args)
 	}
 
 	/* Materiais "Alpha Blend Hashed" compilam sem dither porque o launcher e o conversor forcam
-	 * gm.aasamples >= 4 (LA_Launcher.cpp, BL_Converter.cpp). Sem MSAA no framebuffer eles perdem
+	 * gm.aasamples >= 2 (LA_Launcher.cpp, BL_Converter.cpp). Sem MSAA no framebuffer eles perdem
 	 * o alpha-to-coverage e viram silhuetas solidas; por isso "desligado" vira o mesmo minimo. */
 	if (level <= 1) {
-		level = 4;
+		level = 2;
 	}
 
 	RAS_ICanvas *canvas = KX_GetActiveEngine()->GetCanvas();

@@ -303,6 +303,8 @@ void BLO_update_defaults_startup_blend(Main *bmain)
 
     scene->gm.lodflag |= SCE_LOD_USE_HYST;
     scene->gm.scehysteresis = 10;
+    /* MSAA minimo que o jogo aceita (alpha-to-coverage da folhagem Hashed); ver LA_Launcher.cpp. */
+    scene->gm.aasamples = 2;
 
     scene->r.ffcodecdata.audio_mixrate = 48000;
   }

@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - MSAA mínimo do jogo passa de 4x para 2x
+
+- O piso forçado para a folhagem "Alpha Blend Hashed" (ver entrada da 0.4.4) era 4x, então "AA Samples: Off" e
+  `setAntiAliasing(0)` custavam 4x em PC fraco. Alpha-to-coverage só precisa de 2 amostras (N amostras dão
+  N+1 níveis de transparência: 2x = 3 níveis, 4x = 5), então o piso vira 2x em `LA_Launcher::InitEngine`,
+  `BL_Converter::ConvertScene` e `setAntiAliasing(level <= 1)`. Quem quer folhagem mais suave escolhe 4x/8x.
+- Padrão de cenas novas: `gm.aasamples = 2` em `scene.c` e em `BLO_update_defaults_startup_blend` (File > New
+  vinha com 4x do startup.blend). Arquivos já salvos mantêm o valor deles.
+- Validado com `projects-teste/foliage_aa`: `level_aa0.range` (nível chama `setAntiAliasing(0)`) loga aa=2 e
+  mostra o degradê em 3 faixas, sem virar bloco sólido (`shot2x_level_aa0.png`).
+
 ## 2026-09-29 - Release 0.4.5: pacote Windows
 
 - Numero da versao 0.4.4 -> 0.4.5 em `ANASTACIO_VERSION_STRING` (splash) e no About (`wm.py`). O pacote Linux

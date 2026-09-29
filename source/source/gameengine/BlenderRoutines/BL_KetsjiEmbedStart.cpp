@@ -121,7 +121,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 	gs.glslflag = startscene->gm.flag;
 	gsBackup.glslflag = startscene->gm.flag;
 
-	/* LA_Launcher e BL_Converter forcam gm.aasamples >= 4 nas cenas que o jogo converte. Sem
+	/* LA_Launcher e BL_Converter forcam gm.aasamples >= 2 nas cenas que o jogo converte. Sem
 	 * restaurar, o viewport recompila os materiais "Alpha Blend Hashed" sem o dither e, sem MSAA,
 	 * a folhagem aparece como silhueta branca/preta depois do play (e o valor iria para o .blend). */
 	std::vector<std::pair<Scene *, short> > aasamplesBackup;
