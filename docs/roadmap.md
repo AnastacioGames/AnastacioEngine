@@ -52,6 +52,9 @@ Aberto:
   Desktop (Chrome, `/musica/`, DPR 2): p50 18,1/p95 18,5 ms, sem picos; os picos são do celular. Console: aviso de
   `ScriptProcessorNode` obsoleto (áudio SDL; migrar para AudioWorklet no futuro) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
+- **Reverb Area (2026-09-29)**: validar ouvindo no jogo real (entrar/sair de uma área com um speaker 3D
+  tocando) e no Web, onde o OpenAL de compatibilidade (`web-no-openal/efx.h`) pode não ter EFX. Sem desenho
+  da zona de efeito total no viewport (só a borda externa, pelo Empty).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
 - **Filtros 2D**: refinamento visual e custo de múltiplos passes ficam para etapa posterior; tratar como

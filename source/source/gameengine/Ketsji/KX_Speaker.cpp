@@ -35,6 +35,10 @@
 
 #include "KX_Speaker.h"
 
+#include "DNA_object_types.h"
+
+#include <cmath>
+
 #ifdef WITH_AUDASPACE
 typedef float sample_t;
 #  include <python/PyAPI.h>
@@ -81,6 +85,8 @@ KX_Speaker::KX_Speaker(void *sgReplicationInfo,
   m_playback = nullptr;
 #endif  // WITH_AUDASPACE
   m_playback_catkey = 0;
+  m_areaReverb = false;
+  m_areaReverbSource = nullptr;
   m_type = type;
   m_isplaying = false;
 
@@ -207,6 +213,17 @@ EXP_Value *KX_Speaker::GetReplica()
 void KX_Speaker::ProcessReplica()
 {
   KX_GameObject::ProcessReplica();
+
+  // The reverb area effect belongs to the original's handle; the scene re-applies it to this
+  // replica on its next update. Left as is, play() would start the replica with an effect
+  // the scene no longer knows it owns, and it would never be removed.
+  if (m_areaReverb) {
+    m_settings.active_effect_type = 0;
+    m_settings.active_filter_type = 0;
+    m_areaReverb = false;
+    m_areaReverbSource = nullptr;
+  }
+
 #ifdef WITH_AUDASPACE
   m_handle = nullptr;
   m_sound = m_sound ? AUD_Sound_copy(m_sound) : nullptr;
@@ -293,6 +310,103 @@ void KX_Speaker::UpdateEffect()
       AUD_EFFECT_setFilterGainLF(m_handle, m_settings.filter_gainlf);
       AUD_EFFECT_setFilterGainHF(m_handle, m_settings.filter_gainhf);
   }
+#endif  // WITH_AUDASPACE
+}
+
+void KX_Speaker::ApplyAreaReverb(const RangeReverbAreaSettings *area, float influence)
+{
+#ifdef WITH_AUDASPACE
+  // 2D speakers are usually music/UI: they are not "in" the room.
+  if (!m_is3d) {
+    return;
+  }
+  // An effect set from Python (SetEffect) owns this speaker.
+  if (!m_areaReverb && m_settings.active_effect_type != 0) {
+    return;
+  }
+
+  if (!area || influence <= 0.0f) {
+    if (m_areaReverb) {
+      if (m_handle && AUD_EFFECT_hasEffect(m_handle)) {
+        AUD_EFFECT_removeEffect(m_handle);
+      }
+      m_settings.active_effect_type = 0;
+      m_settings.active_filter_type = 0;
+      m_areaReverb = false;
+      m_areaReverbSource = nullptr;
+    }
+    return;
+  }
+
+  const int filterType = area->use_filter ? area->filter_type : 0;
+  const bool sourceChanged = (area != m_areaReverbSource);
+
+  // Effect gains fade with the influence; the filter fades from "no filtering" (1.0) at the
+  // outer edge to the area's gains in the full effect zone.
+  const float reverbGain = area->gain * influence;
+  const float filterGain = 1.0f - influence * (1.0f - area->filter_gain);
+  const float filterGainLF = 1.0f - influence * (1.0f - area->filter_gain_lf);
+  const float filterGainHF = 1.0f - influence * (1.0f - area->filter_gain_hf);
+
+  const bool gainsChanged = sourceChanged ||
+                            fabsf(reverbGain - m_settings.reverb_gain) > 1e-3f ||
+                            fabsf(filterGain - m_settings.filter_gain) > 1e-3f ||
+                            fabsf(filterGainLF - m_settings.filter_gainlf) > 1e-3f ||
+                            fabsf(filterGainHF - m_settings.filter_gainhf) > 1e-3f;
+
+  m_settings.reverb_density = area->density;
+  m_settings.reverb_diffusion = area->diffusion;
+  m_settings.reverb_gain = reverbGain;
+  m_settings.reverb_gain_hf = area->gain_hf;
+  m_settings.reverb_decay_time = area->decay_time;
+  m_settings.reverb_decay_hf_ratio = area->decay_hf_ratio;
+  m_settings.reverb_reflections_gain = area->reflections_gain;
+  m_settings.reverb_reflections_delay = area->reflections_delay;
+  m_settings.reverb_late_reverb_gain = area->late_reverb_gain;
+  m_settings.reverb_late_reverb_delay = area->late_reverb_delay;
+  m_settings.reverb_air_absorption_gain_hf = area->air_absorption_gain_hf;
+  m_settings.reverb_room_rolloff_factor = area->room_rolloff_factor;
+  m_settings.reverb_decay_limit_hf = area->decay_limit_hf;
+  m_settings.filter_gain = filterGain;
+  m_settings.filter_gainlf = filterGainLF;
+  m_settings.filter_gainhf = filterGainHF;
+
+  // Without a handle (not playing yet) play() applies active_effect_type from m_settings.
+  const bool needsSet = !m_areaReverb || m_settings.active_filter_type != filterType ||
+                        (m_handle && !AUD_EFFECT_hasEffect(m_handle));
+
+  m_settings.active_effect_type = 1;  // aud::AUDIO_EFFECT_REVERB
+  m_settings.active_filter_type = filterType;
+  m_areaReverb = true;
+  m_areaReverbSource = area;
+
+  // Not playing: play() applies active_effect_type from m_settings when it (re)starts.
+  if (!m_handle || AUD_Handle_getStatus(m_handle) != AUD_STATUS_PLAYING) {
+    return;
+  }
+
+  if (needsSet) {
+    if (AUD_EFFECT_hasEffect(m_handle)) {
+      AUD_EFFECT_removeEffect(m_handle);
+    }
+    AUD_EFFECT_setEffect(m_handle, m_settings.active_effect_type, filterType);
+    UpdateEffect();
+  }
+  else if (sourceChanged) {
+    UpdateEffect();
+  }
+  else if (gainsChanged) {
+    // Same area, only the fade moved: skip the 13 static reverb params.
+    AUD_EFFECT_setReverbGain(m_handle, reverbGain);
+    if (filterType) {
+      AUD_EFFECT_setFilterGain(m_handle, filterGain);
+      AUD_EFFECT_setFilterGainLF(m_handle, filterGainLF);
+      AUD_EFFECT_setFilterGainHF(m_handle, filterGainHF);
+    }
+  }
+#else
+  (void)area;
+  (void)influence;
 #endif  // WITH_AUDASPACE
 }
 
@@ -571,6 +685,9 @@ EXP_PYMETHODDEF_DOC(KX_Speaker, SetEffect, "SetEffect(effectType): Add Sound Eff
 
     m_settings.active_effect_type = type;
     m_settings.active_filter_type = filterType;
+    // From now on the script owns the effect; reverb areas leave this speaker alone.
+    m_areaReverb = false;
+    m_areaReverbSource = nullptr;
 
 #ifdef WITH_AUDASPACE
     if (!m_handle) {
@@ -602,6 +719,8 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_Speaker,
     }
     m_settings.active_effect_type = 0; // null
     m_settings.active_filter_type = 0; // null
+    m_areaReverb = false;
+    m_areaReverbSource = nullptr;
 #endif  // WITH_AUDASPACE
 
     Py_RETURN_NONE;

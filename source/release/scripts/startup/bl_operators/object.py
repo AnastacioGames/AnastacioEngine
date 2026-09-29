@@ -1024,6 +1024,51 @@ class LodGenerate(Operator):
         return {'FINISHED'}
 
 
+class ReverbAreaAdd(Operator):
+    """Add an Empty that applies reverb to 3D speakers while the active camera is inside it"""
+    bl_idname = "object.reverb_area_add"
+    bl_label = "Add Reverb Area"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    preset: EnumProperty(
+        name="Behavior",
+        items=(
+            ('GENERIC', "Generic", "Neutral room reverb"),
+            ('UNDERWATER', "Underwater", "Muffled, dense sound with most highs removed"),
+            ('CAVERN', "Cavern", "Long, strong echoes of a cave"),
+            ('HALL', "Hall", "Long decay of a large hall"),
+            ('FOREST', "Forest", "Short, open reverb with the lows thinned out"),
+        ),
+        default='GENERIC',
+    )
+    shape: EnumProperty(
+        name="Shape",
+        items=(
+            ('SPHERE', "Sphere", "Spherical area"),
+            ('BOX', "Box", "Box area"),
+        ),
+        default='SPHERE',
+    )
+    size: FloatProperty(
+        name="Size",
+        description="Half size of the area (Empty display size)",
+        min=0.01, soft_max=100.0,
+        default=5.0,
+        unit='LENGTH',
+    )
+
+    def execute(self, context):
+        bpy.ops.object.empty_add(type='CUBE' if self.shape == 'BOX' else 'SPHERE')
+        ob = context.active_object
+        ob.name = "ReverbArea"
+        ob.empty_draw_size = self.size
+        # Seeds the settings (Generic) the first time the flag is turned on.
+        ob.use_reverb_area = True
+        ob.reverb_area.shape = self.shape
+        ob.reverb_area.preset = self.preset
+        return {'FINISHED'}
+
+
 classes = (
     ClearAllRestrictRender,
     DupliOffsetFromCursor,
@@ -1033,6 +1078,7 @@ classes = (
     LodClearAll,
     LodGenerate,
     MakeDupliFace,
+    ReverbAreaAdd,
     SelectCamera,
     SelectHierarchy,
     SelectPattern,

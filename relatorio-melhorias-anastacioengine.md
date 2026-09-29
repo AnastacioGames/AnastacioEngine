@@ -114,6 +114,10 @@ ferramenta correspondente.
   (`dtNavMesh`/`dtNavMeshQuery`), substituindo a antiga `dtStatNavMesh`; walkable
   Height/Radius/Climb do bake respeitam a configuração da cena. Navmesh dinâmica (rebake em
   runtime) não existe e está no roadmap.
+- Reverb Area nativa: `Add > Reverb Area` cria um Empty (esfera ou caixa) com comportamento escolhido
+  (Generic, Underwater, Cavern, Hall, Forest ou Custom). Enquanto a câmera ativa está dentro, o reverb/filtro
+  OpenAL entra com fade em todos os speakers 3D da cena; speakers 2D e efeitos ligados por script (`SetEffect`)
+  não são tocados. Substitui o componente Python `Range_SoundReverb`. Teste: `tools/tests/reverb_area_test.py`.
 - Menu in-game em ImGui com suporte por mouse, teclado e bindings de gamepad.
 - Debug Mode expõe bounding boxes, frusta de câmera/sombra e render queries.
 - Console ImGui espelha o log da engine no Play e no standalone.

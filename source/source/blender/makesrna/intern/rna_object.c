@@ -388,6 +388,109 @@ static void rna_GPUParticleSettings_particle_look_update(Main *bmain, Scene *sce
 	rna_Object_internal_update(bmain, scene, ptr);
 }
 
+/* Reverb area presets, ported from the RanGE-SoundReverb 1.6 Python component (OpenAL EFX
+ * reverb values plus the filter it overlaid). Picking one copies its values into the settings;
+ * the runtime (KX_Scene) only ever reads the resolved values. */
+static void rna_reverb_area_apply_preset(RangeReverbAreaSettings *ra, int preset)
+{
+	/* density, diffusion, gain, gain_hf, decay_time, decay_hf_ratio, reflections_gain,
+	 * reflections_delay, late_reverb_gain, late_reverb_delay, air_absorption_gain_hf,
+	 * room_rolloff_factor, decay_limit_hf, filter_type, filter_gain, filter_gain_lf, filter_gain_hf */
+	static const struct {
+		float density, diffusion, gain, gain_hf, decay_time, decay_hf_ratio;
+		float refl_gain, refl_delay, late_gain, late_delay, air_abs_hf, room_rolloff;
+		int decay_limit_hf, filter_type;
+		float filter_gain, filter_gain_lf, filter_gain_hf;
+	} presets[] = {
+		[REVERB_AREA_PRESET_GENERIC] = {1.0f, 1.0f, 0.32f, 0.89f, 1.49f, 0.83f, 0.05f, 0.007f, 1.26f, 0.011f, 0.994f, 0.0f, 1,
+		                                REVERB_AREA_FILTER_LOWPASS, 1.0f, 1.0f, 0.8f},
+		[REVERB_AREA_PRESET_UNDERWATER] = {0.3f, 0.5f, 0.26f, 0.05f, 0.8f, 0.1f, 0.01f, 0.002f, 0.25f, 0.01f, 0.3f, 1.0f, 0,
+		                                   REVERB_AREA_FILTER_LOWPASS, 0.5f, 1.0f, 0.1f},
+		[REVERB_AREA_PRESET_CAVERN] = {1.0f, 1.0f, 0.5f, 0.7f, 2.31f, 0.59f, 0.25f, 0.01f, 1.26f, 0.022f, 0.994f, 0.0f, 1,
+		                               REVERB_AREA_FILTER_BANDPASS, 1.0f, 0.8f, 0.8f},
+		[REVERB_AREA_PRESET_HALL] = {1.0f, 1.0f, 0.316f, 0.708f, 3.92f, 0.7f, 0.05f, 0.02f, 1.23f, 0.03f, 0.994f, 0.0f, 1,
+		                             REVERB_AREA_FILTER_LOWPASS, 0.9f, 1.0f, 0.7f},
+		[REVERB_AREA_PRESET_FOREST] = {1.0f, 1.0f, 0.3f, 0.5f, 1.49f, 0.54f, 0.05f, 0.01f, 1.26f, 0.03f, 0.994f, 0.0f, 1,
+		                               REVERB_AREA_FILTER_HIGHPASS, 0.7f, 0.4f, 1.0f},
+	};
+
+	if (preset <= REVERB_AREA_PRESET_CUSTOM || preset > REVERB_AREA_PRESET_FOREST) {
+		/* Custom: keep whatever the user set. */
+		return;
+	}
+
+	ra->density = presets[preset].density;
+	ra->diffusion = presets[preset].diffusion;
+	ra->gain = presets[preset].gain;
+	ra->gain_hf = presets[preset].gain_hf;
+	ra->decay_time = presets[preset].decay_time;
+	ra->decay_hf_ratio = presets[preset].decay_hf_ratio;
+	ra->reflections_gain = presets[preset].refl_gain;
+	ra->reflections_delay = presets[preset].refl_delay;
+	ra->late_reverb_gain = presets[preset].late_gain;
+	ra->late_reverb_delay = presets[preset].late_delay;
+	ra->air_absorption_gain_hf = presets[preset].air_abs_hf;
+	ra->room_rolloff_factor = presets[preset].room_rolloff;
+	ra->decay_limit_hf = presets[preset].decay_limit_hf;
+	ra->filter_type = presets[preset].filter_type;
+	ra->filter_gain = presets[preset].filter_gain;
+	ra->filter_gain_lf = presets[preset].filter_gain_lf;
+	ra->filter_gain_hf = presets[preset].filter_gain_hf;
+}
+
+/* Keeps the Empty's viewport display matching the area shape, so what is drawn is the area. */
+static void rna_reverb_area_sync_empty_draw(Object *ob)
+{
+	if (ob->type == OB_EMPTY) {
+		ob->empty_drawtype = (ob->reverb_area.shape == REVERB_AREA_SHAPE_BOX) ? OB_CUBE : OB_EMPTY_SPHERE;
+	}
+}
+
+static void rna_Object_use_reverb_area_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	RangeReverbAreaSettings *ra = &ob->reverb_area;
+
+	if (!(ob->gameflag2 & OB_REVERB_AREA)) {
+		return;
+	}
+
+	/* First enable (new object or file saved before reverb areas existed): the struct is zeroed,
+	 * so seed the Generic behavior and take the shape from how the Empty is already drawn. */
+	if (ra->inner_factor == 0.0f) {
+		ra->shape = (ob->empty_drawtype == OB_CUBE) ? REVERB_AREA_SHAPE_BOX : REVERB_AREA_SHAPE_SPHERE;
+		ra->preset = REVERB_AREA_PRESET_GENERIC;
+		ra->use_filter = 1;
+		ra->inner_factor = 0.8f;
+		ra->priority = 0;
+		rna_reverb_area_apply_preset(ra, REVERB_AREA_PRESET_GENERIC);
+	}
+
+	rna_reverb_area_sync_empty_draw(ob);
+	rna_Object_internal_update(bmain, scene, ptr);
+}
+
+static void rna_ReverbAreaSettings_preset_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	RangeReverbAreaSettings *ra = (RangeReverbAreaSettings *)ptr->data;
+	rna_reverb_area_apply_preset(ra, ra->preset);
+	rna_Object_internal_update(bmain, scene, ptr);
+}
+
+/* Any hand-edited reverb/filter value means the area no longer matches its preset. */
+static void rna_ReverbAreaSettings_param_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	RangeReverbAreaSettings *ra = (RangeReverbAreaSettings *)ptr->data;
+	ra->preset = REVERB_AREA_PRESET_CUSTOM;
+	rna_Object_internal_update(bmain, scene, ptr);
+}
+
+static void rna_ReverbAreaSettings_shape_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	rna_reverb_area_sync_empty_draw((Object *)ptr->id.data);
+	rna_Object_internal_update(bmain, scene, ptr);
+}
+
 static void rna_Object_hide_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
 	DAG_id_type_tag(bmain, ID_OB);
@@ -2112,6 +2215,108 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, "rna_GPUParticleSettings_particle_look_update");
 }
 
+/* One hand-tunable reverb/filter value: editing it switches the area preset to Custom. */
+static void rna_def_reverb_area_param(StructRNA *srna, const char *identifier, float min, float max,
+                                      const char *name, const char *description)
+{
+	PropertyRNA *prop = RNA_def_property(srna, identifier, PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, min, max);
+	RNA_def_property_ui_range(prop, min, max, 1, 3);
+	RNA_def_property_ui_text(prop, name, description);
+	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
+}
+
+static void rna_def_object_reverb_area(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem shape_items[] = {
+		{REVERB_AREA_SHAPE_SPHERE, "SPHERE", 0, "Sphere", "Spherical area, radius = Empty size x X scale"},
+		{REVERB_AREA_SHAPE_BOX, "BOX", 0, "Box", "Box area, follows the Empty's size, scale and rotation"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static const EnumPropertyItem preset_items[] = {
+		{REVERB_AREA_PRESET_GENERIC, "GENERIC", 0, "Generic", "Neutral room reverb"},
+		{REVERB_AREA_PRESET_UNDERWATER, "UNDERWATER", 0, "Underwater", "Muffled, dense sound with most highs removed"},
+		{REVERB_AREA_PRESET_CAVERN, "CAVERN", 0, "Cavern", "Long, strong echoes of a cave"},
+		{REVERB_AREA_PRESET_HALL, "HALL", 0, "Hall", "Long decay of a large hall"},
+		{REVERB_AREA_PRESET_FOREST, "FOREST", 0, "Forest", "Short, open reverb with the lows thinned out"},
+		{REVERB_AREA_PRESET_CUSTOM, "CUSTOM", 0, "Custom", "Values set by hand below"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static const EnumPropertyItem filter_items[] = {
+		{REVERB_AREA_FILTER_LOWPASS, "LOWPASS", 0, "Low Pass", "Cut high frequencies (muffled)"},
+		{REVERB_AREA_FILTER_HIGHPASS, "HIGHPASS", 0, "High Pass", "Cut low frequencies (thin)"},
+		{REVERB_AREA_FILTER_BANDPASS, "BANDPASS", 0, "Band Pass", "Cut both ends"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "RangeReverbAreaSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeReverbAreaSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Reverb Area Settings",
+	                       "Reverb applied to 3D speakers while the active camera is inside this area");
+
+	prop = RNA_def_property(srna, "shape", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "shape");
+	RNA_def_property_enum_items(prop, shape_items);
+	RNA_def_property_ui_text(prop, "Shape", "Shape of the area (also sets how the Empty is drawn)");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_ReverbAreaSettings_shape_update");
+
+	prop = RNA_def_property(srna, "preset", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "preset");
+	RNA_def_property_enum_items(prop, preset_items);
+	RNA_def_property_ui_text(prop, "Behavior", "Sound behavior inside the area. Picking one fills the values below; editing any of them switches to Custom");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_preset_update");
+
+	prop = RNA_def_property(srna, "inner_factor", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "inner_factor");
+	RNA_def_property_range(prop, 0.4f, 0.99f);
+	RNA_def_property_ui_text(prop, "Full Effect Zone", "Fraction of the area size where the effect is at full strength; it fades out between here and the edge");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "priority", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "priority");
+	RNA_def_property_range(prop, -100, 100);
+	RNA_def_property_ui_text(prop, "Priority", "When areas overlap and both are at full strength, the higher priority wins (e.g. a room inside a cave)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_filter", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_filter", 1);
+	RNA_def_property_ui_text(prop, "Filter", "Also filter the direct sound (EQ) while inside the area");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "filter_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "filter_type");
+	RNA_def_property_enum_items(prop, filter_items);
+	RNA_def_property_ui_text(prop, "Filter Type", "");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
+
+	rna_def_reverb_area_param(srna, "density", 0.0f, 1.0f, "Density", "Modal density of the late reverb (lower = more colored)");
+	rna_def_reverb_area_param(srna, "diffusion", 0.0f, 1.0f, "Diffusion", "Echo density of the late reverb");
+	rna_def_reverb_area_param(srna, "gain", 0.0f, 1.0f, "Gain", "Overall reverb level at full strength");
+	rna_def_reverb_area_param(srna, "gain_hf", 0.0f, 1.0f, "Gain HF", "Reverb attenuation of high frequencies");
+	rna_def_reverb_area_param(srna, "decay_time", 0.1f, 20.0f, "Decay Time", "Seconds the reverb takes to fade (60 dB)");
+	rna_def_reverb_area_param(srna, "decay_hf_ratio", 0.1f, 2.0f, "Decay HF Ratio", "High frequency decay time relative to Decay Time");
+	rna_def_reverb_area_param(srna, "reflections_gain", 0.0f, 3.16f, "Reflections Gain", "Level of the early reflections");
+	rna_def_reverb_area_param(srna, "reflections_delay", 0.0f, 0.3f, "Reflections Delay", "Seconds until the first reflection");
+	rna_def_reverb_area_param(srna, "late_reverb_gain", 0.0f, 10.0f, "Late Reverb Gain", "Level of the late reverb tail");
+	rna_def_reverb_area_param(srna, "late_reverb_delay", 0.0f, 0.1f, "Late Reverb Delay", "Seconds between the first reflection and the late reverb");
+	rna_def_reverb_area_param(srna, "air_absorption_gain_hf", 0.892f, 1.0f, "Air Absorption HF", "High frequency loss through air per meter");
+	rna_def_reverb_area_param(srna, "room_rolloff_factor", 0.0f, 10.0f, "Room Rolloff", "Distance attenuation of the reverb");
+	rna_def_reverb_area_param(srna, "filter_gain", 0.0f, 1.0f, "Filter Gain", "Direct sound level at full strength");
+	rna_def_reverb_area_param(srna, "filter_gain_lf", 0.0f, 1.0f, "Filter Gain LF", "Low frequency level at full strength (Band Pass/High Pass)");
+	rna_def_reverb_area_param(srna, "filter_gain_hf", 0.0f, 1.0f, "Filter Gain HF", "High frequency level at full strength (Band Pass/Low Pass)");
+
+	prop = RNA_def_property(srna, "decay_limit_hf", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "decay_limit_hf", 1);
+	RNA_def_property_ui_text(prop, "Decay HF Limit", "Limit high frequency decay by air absorption");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
+}
+
 static void rna_def_object_game_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2507,6 +2712,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 
 	rna_def_game_object_activity_culling(brna);
 	rna_def_object_gpu_particles(brna);
+	rna_def_object_reverb_area(brna);
 }
 
 static void rna_def_object_constraints(BlenderRNA *brna, PropertyRNA *cprop)
@@ -3348,6 +3554,18 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "gpu_particles_mix");
 	RNA_def_property_struct_type(prop, "RangeGPUParticleSettings");
+
+	/* Native reverb area (Empty objects), see RangeReverbAreaSettings. */
+	prop = RNA_def_property(srna, "use_reverb_area", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_REVERB_AREA);
+	RNA_def_property_ui_text(prop, "Reverb Area", "Apply reverb to 3D speakers while the active camera is inside this Empty");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_use_reverb_area_update");
+
+	prop = RNA_def_property(srna, "reverb_area", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "reverb_area");
+	RNA_def_property_struct_type(prop, "RangeReverbAreaSettings");
+	RNA_def_property_ui_text(prop, "Reverb Area Settings", "");
 	RNA_def_property_ui_text(prop, "Mix GPU Particle Settings", "");
 
 	/* vertex groups */

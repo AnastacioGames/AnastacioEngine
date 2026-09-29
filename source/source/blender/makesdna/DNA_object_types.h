@@ -249,6 +249,62 @@ typedef struct RangeGPUParticleSettings {
 	char pad4[4];
 } RangeGPUParticleSettings;
 
+/* Native reverb area (opt-in on an Empty via gameflag2 & OB_REVERB_AREA). While the active camera
+ * (the audio listener) is inside the area, KX_Scene applies this reverb/filter to every playing
+ * 3D speaker, fading it in between the outer bounds (empty_drawsize * scale) and the inner bounds
+ * (outer * inner_factor). Replaces the old RanGE-SoundReverb Python component. The params below
+ * always hold the resolved values: picking a preset copies its values in (rna_object.c), editing
+ * any of them switches the preset to REVERB_AREA_PRESET_CUSTOM. */
+typedef struct RangeReverbAreaSettings {
+	short shape;        /* REVERB_AREA_SHAPE_* */
+	short preset;       /* REVERB_AREA_PRESET_* */
+	short use_filter;
+	short filter_type;  /* REVERB_AREA_FILTER_*, same values as aud::SoundFilterType */
+	float inner_factor; /* 0.4..0.99, 0 = not initialized yet (old files) */
+	int priority;       /* wins over lower priorities when both have full influence */
+
+	float density;
+	float diffusion;
+	float gain;
+	float gain_hf;
+	float decay_time;
+	float decay_hf_ratio;
+	float reflections_gain;
+	float reflections_delay;
+	float late_reverb_gain;
+	float late_reverb_delay;
+	float air_absorption_gain_hf;
+	float room_rolloff_factor;
+	int decay_limit_hf;
+
+	float filter_gain;
+	float filter_gain_lf;
+	float filter_gain_hf;
+} RangeReverbAreaSettings;
+
+/* RangeReverbAreaSettings.shape */
+enum {
+	REVERB_AREA_SHAPE_SPHERE = 0,
+	REVERB_AREA_SHAPE_BOX    = 1,
+};
+
+/* RangeReverbAreaSettings.preset */
+enum {
+	REVERB_AREA_PRESET_CUSTOM     = 0,
+	REVERB_AREA_PRESET_GENERIC    = 1,
+	REVERB_AREA_PRESET_UNDERWATER = 2,
+	REVERB_AREA_PRESET_CAVERN     = 3,
+	REVERB_AREA_PRESET_HALL       = 4,
+	REVERB_AREA_PRESET_FOREST     = 5,
+};
+
+/* RangeReverbAreaSettings.filter_type */
+enum {
+	REVERB_AREA_FILTER_LOWPASS  = 1,
+	REVERB_AREA_FILTER_HIGHPASS = 2,
+	REVERB_AREA_FILTER_BANDPASS = 3,
+};
+
 enum {
 	GPU_PARTICLE_LOOK_DEFAULT = 0,
 	GPU_PARTICLE_LOOK_SMOKE = 1,
@@ -537,6 +593,8 @@ typedef struct Object {
 	/* Fase Q: second GPU particle emitter, opt-in via gameflag2 & OB_GPU_PARTICLES_MIX, drawn
 	 * together with gpu_particles above (see "Mix GPU Particle System" panel). */
 	struct RangeGPUParticleSettings gpu_particles_mix;
+	/* Native reverb area, opt-in via gameflag2 & OB_REVERB_AREA (Empty objects). */
+	struct RangeReverbAreaSettings reverb_area;
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -851,6 +909,10 @@ enum {
 	 * drawn together with the primary one instead of replacing it -- lets two looks (e.g. Fire
 	 * + Smoke) mix on one emitter object. */
 	OB_GPU_PARTICLES_MIX             = 1 << 12,
+
+	/* Marks this Empty as a reverb area: ob->reverb_area holds shape, preset and params,
+	 * applied by KX_Scene to 3D speakers while the listener is inside it. */
+	OB_REVERB_AREA                   = 1 << 13,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };

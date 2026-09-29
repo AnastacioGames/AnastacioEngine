@@ -9,6 +9,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-29 - Reverb Area nativa (substitui o componente RanGE-SoundReverb)
+
+- Origem: `tools/soundReverb.range` (Blender 2.79 da Range 1.6) trazia o componente Python `Range_SoundReverb`,
+  que exigia um componente em cada speaker e propriedades de texto digitadas à mão (`ReverbArea`, `RA_*`, `FA_*`).
+  Problemas dele: reverb calculado pela posição do speaker (não do ouvinte), rescan da cena por speaker
+  (`reverbAreas` vs `_reverbAreas`), remoção durante iteração, cubo sem rotação, esfera só com escala X, `exec()`.
+- DNA: `RangeReverbAreaSettings` inline no fim do `Object` (`reverb_area`, sem ponteiros) + `OB_REVERB_AREA`
+  (`gameflag2`, bit 13). Arquivos antigos: struct zerada; ligar a flag semeia o preset Generic (`inner_factor == 0`).
+- RNA/UI (`rna_object.c`, `properties_data_empty.py`): painel "Reverb Area" no Empty com Behavior
+  (Generic/Underwater/Cavern/Hall/Forest/Custom), Shape (Sphere/Box, sincroniza `empty_draw_type`), Size
+  (`empty_draw_size`), Full Effect Zone, Priority e Filter; painel "Advanced" com os 12 parâmetros EFX e ganhos do
+  filtro. Escolher um Behavior copia os valores (tabela da Range); editar qualquer valor troca para Custom.
+  `Add > Reverb Area` (`object.reverb_area_add`) cria o Empty já configurado.
+- Runtime: `KX_Scene::UpdateReverbAreas` (mesma cadência do update de áudio 3D) leva a câmera ativa ao espaço
+  local de cada área dividido por `empty_drawsize * escala` (rotação e escala não uniforme; esfera vira elipsoide),
+  fade linear entre `inner_factor` e a borda, vence a maior influência e a prioridade desempata.
+  `KX_Speaker::ApplyAreaReverb` aplica só em speakers 3D, não toca em speaker cujo efeito veio de `SetEffect`
+  (script), manda os 13 parâmetros só quando a área dominante muda e, por quadro, só ganho/filtro quando mudam.
+  Áreas registradas na conversão, em `AddReplicaObject` e no `MergeScene`; removidas com o objeto.
+- Teste `tools/tests/reverb_area_test.py`: 10 checagens de editor e 9 posições de câmera no `RangeRuntime`
+  (fora, centro, faixa de fade, área aninhada por prioridade, caixa rotacionada com escala 2x1x1, saída
+  removendo o efeito, speaker 2D e speaker de script intocados): todos PASS. O teste confere o estado mandado
+  ao OpenAL, não o som; audição no jogo real pendente.
+
 ## 2026-09-29 - MSAA mínimo do jogo passa de 4x para 2x
 
 - O piso forçado para a folhagem "Alpha Blend Hashed" (ver entrada da 0.4.4) era 4x, então "AA Samples: Off" e

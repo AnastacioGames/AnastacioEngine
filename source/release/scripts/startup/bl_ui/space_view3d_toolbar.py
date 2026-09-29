@@ -194,6 +194,7 @@ class VIEW3D_PT_tools_add_object(View3DPanel, Panel):
         layout.operator("object.add", text="Lattice", icon='OUTLINER_OB_LATTICE').type = 'LATTICE'
         layout.operator("object.empty_add", text="Empty", icon='OUTLINER_OB_EMPTY').type = 'PLAIN_AXES'
         layout.operator("object.speaker_add", text="Speaker", icon='OUTLINER_OB_SPEAKER')
+        layout.operator("object.reverb_area_add", text="Reverb Area", icon='SOUND')
         layout.operator("object.camera_add", text="Camera", icon='OUTLINER_OB_CAMERA')
 
     def draw(self, context):

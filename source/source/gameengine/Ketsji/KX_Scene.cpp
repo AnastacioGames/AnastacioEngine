@@ -207,6 +207,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_cameralist = new EXP_ListValue<KX_Camera>();
 	m_fontlist = new EXP_ListValue<KX_FontObject>();
 	m_speakerlist = new EXP_ListValue<KX_Speaker>();
+	m_reverbAreasActive = false;
 	m_renderlist = new EXP_ListValue<KX_GameObject>();
 
 	SCENEFXSettings settings = scene->scenefx_settings;
@@ -877,6 +878,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	if (newblenderobj && (newblenderobj->gameflag2 & OB_GPU_PARTICLE_COLLIDER)) {
 		AddGpuParticleColliderObject(newobj);
 	}
+	if (newblenderobj && newblenderobj->type == OB_EMPTY && (newblenderobj->gameflag2 & OB_REVERB_AREA)) {
+		AddReverbAreaObject(newobj);
+	}
 
 	// Logic cannot be replicated, until the whole hierarchy is replicated.
 	m_logicHierarchicalGameObjects.push_back(newobj);
@@ -1440,6 +1444,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	CM_ListRemoveIfFound(m_tempObjectList, gameobj);
 	CM_ListRemoveIfFound(m_gpuParticleObjects, gameobj);
 	CM_ListRemoveIfFound(m_gpuParticleColliderObjects, gameobj);
+	CM_ListRemoveIfFound(m_reverbAreaObjects, gameobj);
 	if (CM_ListRemoveIfFound(m_staticShadowCasterObjects, gameobj)) {
 		m_staticShadowCasterListDirty = true;
 	}
@@ -2160,6 +2165,7 @@ void KX_Scene::LogicUpdateFrame(double curtime)
 				speaker->Update();
 			}
 		}
+		UpdateReverbAreas();
 		m_audio3d_frames = 0;
 	}
   else {
@@ -2301,6 +2307,92 @@ void KX_Scene::RemoveGpuParticleColliderObject(KX_GameObject *gameobj)
 const std::vector<KX_GameObject *> &KX_Scene::GetGpuParticleColliderObjects() const
 {
 	return m_gpuParticleColliderObjects;
+}
+
+void KX_Scene::AddReverbAreaObject(KX_GameObject *gameobj)
+{
+	if (std::find(m_reverbAreaObjects.begin(), m_reverbAreaObjects.end(), gameobj) == m_reverbAreaObjects.end()) {
+		m_reverbAreaObjects.push_back(gameobj);
+	}
+}
+
+void KX_Scene::RemoveReverbAreaObject(KX_GameObject *gameobj)
+{
+	CM_ListRemoveIfFound(m_reverbAreaObjects, gameobj);
+}
+
+/* Influence (0..1) of a reverb area at a world position. The position is taken into the Empty's
+ * local space and divided by its half size (empty_drawsize * scale), so the outer bounds are 1
+ * on every axis whatever the rotation or non-uniform scale: a sphere becomes an ellipsoid and a
+ * box follows its rotation. Full effect up to inner_factor, linear fade out to the edge. */
+static float reverb_area_influence(KX_GameObject *areaobj, const RangeReverbAreaSettings &ra, const mt::vec3 &listener)
+{
+	const Object *blenderobj = areaobj->GetBlenderObject();
+	const float drawsize = blenderobj->empty_drawsize;
+	const mt::vec3 &scale = areaobj->NodeGetWorldScaling();
+
+	const mt::vec3 local = areaobj->NodeGetWorldOrientation().Transpose() * (listener - areaobj->NodeGetWorldPosition());
+	float u[3];
+	for (unsigned short i = 0; i < 3; ++i) {
+		const float halfsize = std::fabs(scale[i] * drawsize);
+		if (halfsize < 1e-6f) {
+			return 0.0f;
+		}
+		u[i] = local[i] / halfsize;
+	}
+
+	const float dist = (ra.shape == REVERB_AREA_SHAPE_BOX) ?
+		std::max(std::fabs(u[0]), std::max(std::fabs(u[1]), std::fabs(u[2]))) :
+		std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+
+	/* inner_factor 0 = struct never initialized in the editor (flag set from Python): use the
+	 * editor default. */
+	const float inner = (ra.inner_factor > 0.0f) ? CLAMPIS(ra.inner_factor, 0.4f, 0.99f) : 0.8f;
+	return CLAMPIS((1.0f - dist) / (1.0f - inner), 0.0f, 1.0f);
+}
+
+void KX_Scene::UpdateReverbAreas()
+{
+	if (m_reverbAreaObjects.empty() && !m_reverbAreasActive) {
+		return;
+	}
+
+	const RangeReverbAreaSettings *best = nullptr;
+	float bestInfluence = 0.0f;
+	int bestPriority = 0;
+
+	KX_Camera *listener = GetActiveCamera();
+	if (listener) {
+		const mt::vec3 &listenerPos = listener->NodeGetWorldPosition();
+		for (KX_GameObject *areaobj : m_reverbAreaObjects) {
+			// Areas on inactive layers are templates for addObject, not placed in the level.
+			if ((areaobj->GetLayer() & GetBlenderScene()->lay) == 0) {
+				continue;
+			}
+			const RangeReverbAreaSettings &ra = areaobj->GetBlenderObject()->reverb_area;
+			const float influence = reverb_area_influence(areaobj, ra, listenerPos);
+			if (influence <= 0.0f) {
+				continue;
+			}
+			// The strongest area wins; priority only breaks ties (e.g. a room nested in a cave,
+			// both at full strength), so walking into a fade band never cuts the reverb down.
+			const bool stronger = influence > bestInfluence + 1e-4f;
+			const bool tieWins = std::fabs(influence - bestInfluence) <= 1e-4f && ra.priority > bestPriority;
+			if (!best || stronger || tieWins) {
+				best = &ra;
+				bestInfluence = influence;
+				bestPriority = ra.priority;
+			}
+		}
+	}
+
+	for (KX_Speaker *speaker : m_speakerlist) {
+		if ((speaker->GetLayer() & GetBlenderScene()->lay) != 0) {
+			speaker->ApplyAreaReverb(best, bestInfluence);
+		}
+	}
+
+	m_reverbAreasActive = !m_reverbAreaObjects.empty();
 }
 
 void KX_Scene::AddStaticShadowCasterObject(KX_GameObject *gameobj)
@@ -2610,6 +2702,9 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 	m_gpuParticleColliderObjects.insert(m_gpuParticleColliderObjects.end(), other->m_gpuParticleColliderObjects.begin(), other->m_gpuParticleColliderObjects.end());
 	other->m_gpuParticleColliderObjects.clear();
+
+	m_reverbAreaObjects.insert(m_reverbAreaObjects.end(), other->m_reverbAreaObjects.begin(), other->m_reverbAreaObjects.end());
+	other->m_reverbAreaObjects.clear();
 
 	if (!other->m_staticShadowCasterObjects.empty()) {
 		m_staticShadowCasterObjects.insert(m_staticShadowCasterObjects.end(), other->m_staticShadowCasterObjects.begin(), other->m_staticShadowCasterObjects.end());

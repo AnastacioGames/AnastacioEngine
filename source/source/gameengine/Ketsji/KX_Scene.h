@@ -158,6 +158,13 @@ private:
 	/// pass (RAS_COLLISION_DEPTH) -- independent of any material's Depth Transparency flag.
 	std::vector<KX_GameObject *> m_gpuParticleColliderObjects;
 
+	/// Empties flagged use_reverb_area (Object.gameflag2 & OB_REVERB_AREA), cached the same way
+	/// as m_gpuParticleObjects. See UpdateReverbAreas().
+	std::vector<KX_GameObject *> m_reverbAreaObjects;
+	/// True while the last UpdateReverbAreas() had areas, so speakers get their area reverb
+	/// removed once after the last area is gone.
+	bool m_reverbAreasActive;
+
 	/// Sun/CSM static shadow cache: objects auto-classified as static (body_type STATIC or
 	/// NO_COLLISION, unless use_force_dynamic_shadow is set) go here. Rendered into the
 	/// cached static shadow buffer, only re-rendered when this list changes or an explicit
@@ -556,6 +563,13 @@ public:
 	void AddGpuParticleColliderObject(KX_GameObject *gameobj);
 	void RemoveGpuParticleColliderObject(KX_GameObject *gameobj);
 	const std::vector<KX_GameObject *> &GetGpuParticleColliderObjects() const;
+
+	/// Native reverb areas: registered from scene conversion, object duplication and removed
+	/// with the object. UpdateReverbAreas() finds the area with the most influence at the
+	/// active camera (the listener) and applies it to every 3D speaker of this scene.
+	void AddReverbAreaObject(KX_GameObject *gameobj);
+	void RemoveReverbAreaObject(KX_GameObject *gameobj);
+	void UpdateReverbAreas();
 
 	/// Sun/CSM static shadow cache lists. Add/Remove set m_staticShadowCasterListDirty on the
 	/// static list so Sun lights know to invalidate their cached static shadow buffer.

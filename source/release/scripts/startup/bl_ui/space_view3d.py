@@ -1370,6 +1370,7 @@ class INFO_MT_add(Menu):
         layout.separator(factor=1)
 
         layout.operator("object.speaker_add", text="Speaker", icon='OUTLINER_OB_SPEAKER')
+        layout.operator_menu_enum("object.reverb_area_add", "preset", text="Reverb Area", icon='SOUND')
         layout.separator(factor=1)
 
         if INFO_MT_camera_add.is_extended():

@@ -1355,6 +1355,12 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 			kxscene->AddGpuParticleColliderObject(gameobj);
 		}
 
+		// Native reverb area: an Empty flagged use_reverb_area, applied to 3D speakers by
+		// KX_Scene::UpdateReverbAreas while the active camera is inside it.
+		if (ob->type == OB_EMPTY && (ob->gameflag2 & OB_REVERB_AREA)) {
+			kxscene->AddReverbAreaObject(gameobj);
+		}
+
 		// Sun/CSM static shadow cache: auto-classify by Physics Type. Static/No Collision
 		// objects are assumed not to move at runtime and go in the cached static list, unless
 		// use_force_dynamic_shadow overrides that (e.g. a scripted moving platform with Static

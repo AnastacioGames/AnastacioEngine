@@ -103,6 +103,11 @@ protected:
 #endif  // WITH_AUDASPACE
   int m_playback_catkey;
 
+  /* Reverb area state (see ApplyAreaReverb): the effect currently on this speaker was set by
+   * the scene's reverb areas, not by a script, and came from this area's settings. */
+  bool m_areaReverb;
+  const struct RangeReverbAreaSettings *m_areaReverbSource;
+
   void startInitPlay();
   void play();
 
@@ -133,6 +138,12 @@ protected:
 
   void Update();
   void UpdateEffect();
+
+  /** Applies the listener's dominant reverb area to this speaker (3D speakers only).
+   * \param area The area settings, nullptr when the listener is in no area.
+   * \param influence 0..1 fade of the area at the listener position.
+   * A speaker whose effect was set by a script (SetEffect) is left untouched. */
+  void ApplyAreaReverb(const struct RangeReverbAreaSettings *area, float influence);
 
   virtual EXP_Value *GetReplica();
   virtual void ProcessReplica();
