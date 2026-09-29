@@ -93,6 +93,28 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 - **Bugs do Kitsuy (2026-09-28)**: corrigidos e validados no Windows e no Linux (Intel integrada,
   NVIDIA via offload e llvmpipe sem GPU; ver changelog). Falta mandar o build ao Kitsuy.
 
+- **Retorno do Discord (2026-09-29), testar tudo na maquina Linux:**
+  - **Dependencias do pacote (Fumangy):** "instalei, mas pede dependencias". O pacote usa as `.so` do sistema
+    e o `apt install` da release/`linux-build.md` so vale no Ubuntu 24.04 (nomes com versao: `boost-locale1.83.0`,
+    `openexr-3-1-30`, `openimageio2.4t64`, sufixo `t64`). Todas sao exigidas mesmo sem usar o Cycles (so
+    `libembree4` e exclusiva dele). Pedir distro/versao e `ldd ./RangeEngine | grep "not found"`. Solucao
+    proposta: empacotar as `.so` em `lib/` (RUNPATH `$ORIGIN/lib`, ja usado pelo Python), deixando so
+    GL/X11/driver no sistema; validar em Ubuntu 22.04, Debian 12 e Fedora limpos.
+  - **Menu do player Linux (Kitsuy):** bug depende de qual arquivo e aberto primeiro pelo menu (abrindo o level
+    direto funciona); melhorou apos a atualizacao de 2026-09-28, mas continua. Em maquina hibrida so funcionou
+    forcando a GPU dedicada; testar com iGPU e com `prime-run`/`DRI_PRIME=1`. Pedir passo a passo a ele.
+  - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
+    `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
+  - **`setHalfAnimations(1)`:** Kitsuy confirmou sem crash no Linux e no Windows; reconferir no build proprio.
+  - **Zip Windows 0.4.4 com `\` nos caminhos** (extraido no Linux sai sem pastas): refeito em 2026-09-29 com `/`
+    (Python `zipfile`), extraido e identico ao staging. Falta abrir os `.exe` da copia extraida e subir o asset
+    (`gh release upload --clobber`). Nao usar `Compress-Archive` do PowerShell 5.1.
+- **API float/int/bool do Kitsuy** (`KX_GameObject` com `m_float1..9`, `m_int1..9`, `m_bool1..9`, enviada em
+  2026-09-29): nao integrada. Nomes genericos e limite fixo; perguntar o caso de uso e, se valer, propor
+  propriedades tipadas com nome ou um vetor `own.data`.
+- **Nao sao bugs (Kitsuy):** carro precisa do modo de frame rate fixo (duas atualizacoes de fisica a mais para
+  as rodas); iluminacao estranha era o ajuste de environment lighting do jogo dele.
+
 - **Pacote 0.4.0 quebrado no Linux** (`libpython3.11.so.1.0` nao encontrado; tooltip crasha o editor) —
   **ambos corrigidos e validados em Linux nativo 2026-09-21** (RUNPATH `$ORIGIN/lib`, e use-after-free de
   `ARegion` em `wm_tooltip.c` corrigido + testado em sessao grafica real; "Python Tooltips" agora vem marcado

@@ -77,6 +77,10 @@ A criação dos ZIPs deve preservar o build original. Primeiro monte as pastas d
 `RangeArmor Panel.exe` e `release/launcher/Launcher.exe` existem. Depois compacte para `build/dist/`
 e gere os hashes. Antes do upload, execute os binários a partir de uma cópia extraída do ZIP.
 
+Não use `Compress-Archive` do PowerShell 5.1: ele grava os caminhos com `\`, e no Linux o ZIP extrai tudo
+sem pastas (zip da 0.4.4, relatado pelo Kitsuy em 2026-09-29). Use o `zipfile` do Python gravando os nomes
+com `/`, e confira que nenhuma entrada de `namelist()` contém `\`.
+
 Quando disponível, o atlas legado da UPBGE deve ficar em:
 
 ```text
