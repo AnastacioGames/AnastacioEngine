@@ -176,6 +176,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.aura") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_AURA; else world->weather_flag &= ~WO_WEATHER_RAIN_AURA;
 	}
+	else if (std::strcmp(identifier, "weather.aura_style") == 0) world->rain_aura_style = (value >= 0.5f) ? WO_RAIN_AURA_ANIMATED : WO_RAIN_AURA_STATIC;
 	else if (std::strcmp(identifier, "weather.aura_size") == 0) world->rain_aura_size = value;
 	else if (std::strcmp(identifier, "weather.aura_rate") == 0) world->rain_aura_rate = value;
 	else if (std::strcmp(identifier, "weather.aura_intensity") == 0) world->rain_aura_intensity = value;

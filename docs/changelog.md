@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Aura da chuva: estilo Animated
+
+- World › Rain › Aura ganhou `rain_aura_style` (Static / Animated), no antigo `rain_lightning_pad`
+  (arquivos antigos abrem como Static). Python: `world.setWeather("aura_style", 1)`.
+- Animated (`KX_RainAura`): a gota nasce no contorno e voa 0,04–0,12 × escala em 0,25–0,55 s, com uma
+  gravidade leve que curva o caminho, um fade-in rápido e um fade-out longo. Os spawns caem para 12% para
+  manter a densidade parecida. Continua em 1 VBO e 1 draw.
+- 3D View (`view3d_rain.c`): mesmo voo sem guardar estado. Cada slot repete um ciclo pelo relógio e sorteia
+  de novo a cada ciclo.
+- O protótipo Python original não estava versionado; os parâmetros foram refeitos a partir da descrição no roadmap.
+
 ## 2026-09-30 - Correções nos Logic Bricks
 
 - `rna_sensor.c`: `rna_PropertySensor_evaluation_type_itemf` lia o `bSensor` como `bPropertySensor`; o

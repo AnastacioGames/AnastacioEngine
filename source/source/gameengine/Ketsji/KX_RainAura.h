@@ -27,8 +27,9 @@
  * World > Rain > Aura: manga-style still strokes of water that pop in and out on the upper
  * part of the silhouette (seen from the active camera) of every object carrying the aura
  * game property. Sharp mesh edges are read once per mesh; each frame the silhouette is found
- * in object space, strokes live 15-50 ms, and every live stroke goes into one dynamic vertex
- * buffer drawn with a single call.
+ * in object space, and every live stroke goes into one dynamic vertex buffer drawn with a
+ * single call. Static style: strokes stand still and live 15-50 ms. Animated style: each drop
+ * leaves the outline and travels a longer, slightly falling path for 0.25-0.55 s, fading out.
  */
 
 #ifndef __KX_RAINAURA_H__
@@ -69,9 +70,12 @@ private:
 		float scale;
 	};
 	struct Stroke {
-		mt::vec3 corner[4];
-		float brightness;
-		double death;
+		/// Tail of the stroke; the head is base + dir * length.
+		mt::vec3 base, dir;
+		/// World velocity (animated style only, zero when static).
+		mt::vec3 velocity;
+		float width, length, brightness, fall;
+		double birth, death;
 	};
 
 	void RefreshTargets(KX_Scene *scene, const std::string& prop);
@@ -87,6 +91,7 @@ private:
 	std::vector<float> m_vertices;
 	std::string m_prop;
 	double m_lastTime;
+	bool m_animated;
 	double m_nextScan;
 	float m_carry;
 	float m_intensity;

@@ -265,6 +265,10 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub = col.column()
             sub.active = weather.use_rain_aura
             sub.prop(weather, "rain_aura_property", text="Property")
+            info = sub.column(align=True)
+            info.label(text="Objects need a Bool game property", icon='INFO')
+            info.label(text="\"%s\" set to True" % (weather.rain_aura_property or "..."))
+            sub.prop(weather, "rain_aura_style", text="Style")
             sub.prop(weather, "rain_aura_size")
             sub.prop(weather, "rain_aura_rate")
             sub.prop(weather, "rain_aura_intensity")

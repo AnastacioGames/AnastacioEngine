@@ -358,12 +358,6 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
-- **Aura da chuva, estilo animado (adiado, pedido do usuário em 2026-09-30)**: além do estilo atual (riscos
-  parados de 15–50 ms, mangá), oferecer um segundo estilo em que a gota **anda** um caminho maior saindo do
-  contorno. O protótipo em Python (antes do pedido de deixar os riscos bem curtos) foi aprovado visualmente.
-  Ideia: `rain_aura_style` (Static / Animated) no World › Rain › Aura; em `KX_RainAura` o estilo Animated dá a
-  cada risco velocidade ao longo de `z` e vida maior, avançando a base a cada frame (mesmo VBO, 1 draw); no
-  viewport (`view3d_rain.c`) usar a fase pelo tempo, já que ele não guarda estado.
 - Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado e texto de
   debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).
 

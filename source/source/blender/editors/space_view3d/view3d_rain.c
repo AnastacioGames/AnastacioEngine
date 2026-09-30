@@ -65,6 +65,10 @@
 #define AURA_AVERAGE_LIFE 0.0325f
 #define AURA_REFERENCE_DISTANCE 3.0f
 #define AURA_MAX_STROKES 4096
+#define AURA_ANIMATED_RATE_SCALE 0.12f
+#define AURA_ANIMATED_GRAVITY 0.35f
+/* Mean life of an animated drop (0.25 to 0.55 s). */
+#define AURA_ANIMATED_LIFE 0.4f
 
 static const char *bolt_vert =
 	"out vec2 v_uv;\n"
@@ -272,8 +276,10 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 	}
 
 	/* The strokes alive at any moment in game: spawn rate times their mean life. */
-	const int count = min_ii((int)(total * AURA_STROKES_PER_METER * world->rain_aura_rate * AURA_AVERAGE_LIFE),
-	                         AURA_MAX_STROKES);
+	const bool animated = (world->rain_aura_style == WO_RAIN_AURA_ANIMATED);
+	const float alive = animated ? AURA_ANIMATED_RATE_SCALE * AURA_ANIMATED_LIFE : AURA_AVERAGE_LIFE;
+	const int count = min_ii((int)(total * AURA_STROKES_PER_METER * world->rain_aura_rate * alive), AURA_MAX_STROKES);
+	const double now = PIL_check_seconds_timer();
 	float *cumulative = MEM_mallocN(sizeof(float) * num, __func__);
 	float sum = 0.0f;
 	for (int i = 0; i < num; i++) {
@@ -287,6 +293,17 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 
 	glBegin(GL_QUADS);
 	for (int c = 0; c < count; c++) {
+		/* Animated: no state between redraws, so each slot c replays a drop cycle by the clock and
+		 * reseeds per cycle, keeping the same drop (edge, direction) for its whole flight. */
+		float age = 0.0f, life = 1.0f;
+		if (animated) {
+			BLI_rng_seed(rng, (unsigned int)c * 2654435761u);
+			life = 0.25f + 0.3f * BLI_rng_get_float(rng);
+			const double cycle = now / life + BLI_rng_get_float(rng);
+			const double gen = floor(cycle);
+			age = (float)(cycle - gen) * life;
+			BLI_rng_seed(rng, ((unsigned int)c * 2654435761u) ^ ((unsigned int)(gen) * 40503u + 0x9E3779B9u));
+		}
 		/* Pick an edge by its length on screen. */
 		const float r = BLI_rng_get_float(rng) * sum;
 		int lo = 0, hi = num - 1;
@@ -312,11 +329,31 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 
 		const float scale = size * edge->scale;
 		const float width = (0.0006f + 0.0012f * BLI_rng_get_float(rng)) * scale;
-		const float length = ((BLI_rng_get_float(rng) < 0.5f) ?
-		                      (0.002f + 0.003f * BLI_rng_get_float(rng)) :
-		                      (0.006f + 0.01f * BLI_rng_get_float(rng))) * scale;
-		interp_v3_v3v3(base, edge->a, edge->b, BLI_rng_get_float(rng));
-		madd_v3_v3fl(base, z, (0.001f + 0.011f * BLI_rng_get_float(rng)) * scale);
+		float length, fade = 1.0f;
+		if (animated) {
+			/* Same flight as KX_RainAura: out along z, bent down by a light gravity. */
+			const float path = (0.04f + 0.08f * BLI_rng_get_float(rng)) * scale;
+			length = (0.006f + 0.008f * BLI_rng_get_float(rng)) * scale;
+			interp_v3_v3v3(base, edge->a, edge->b, BLI_rng_get_float(rng));
+			madd_v3_v3fl(base, z, 0.002f * BLI_rng_get_float(rng) * scale);
+			const float speed = path / life;
+			const float fall = AURA_ANIMATED_GRAVITY * scale;
+			float vel[3];
+			mul_v3_v3fl(vel, z, speed);
+			madd_v3_v3fl(base, z, speed * age);
+			base[2] -= 0.5f * fall * age * age;
+			vel[2] -= fall * age;
+			normalize_v3_v3(z, vel);
+			const float t = age / life;
+			fade = min_ff(1.0f, t * 8.0f) * max_ff(0.0f, 1.0f - t);
+		}
+		else {
+			length = ((BLI_rng_get_float(rng) < 0.5f) ?
+			          (0.002f + 0.003f * BLI_rng_get_float(rng)) :
+			          (0.006f + 0.01f * BLI_rng_get_float(rng))) * scale;
+			interp_v3_v3v3(base, edge->a, edge->b, BLI_rng_get_float(rng));
+			madd_v3_v3fl(base, z, (0.001f + 0.011f * BLI_rng_get_float(rng)) * scale);
+		}
 
 		sub_v3_v3v3(y, cam_pos, base);
 		madd_v3_v3fl(y, z, -dot_v3v3(y, z));
@@ -326,7 +363,7 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 		cross_v3_v3v3(x, y, z);
 		mul_v3_fl(x, width * 0.5f);
 
-		const float b = (0.6f + 0.4f * BLI_rng_get_float(rng)) * intensity;
+		const float b = (0.6f + 0.4f * BLI_rng_get_float(rng)) * intensity * fade;
 		glColor3f(0.85f * b, 0.9f * b, 1.0f * b);
 		glVertex3f(base[0] - x[0], base[1] - x[1], base[2] - x[2]);
 		glVertex3f(base[0] + x[0], base[1] + x[1], base[2] + x[2]);

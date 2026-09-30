@@ -53,6 +53,10 @@ static const float kStrokesPerMeter = 900.0f;
 static const float kMaxCarry = 120.0f;
 /// The stroke sizes were tuned with the camera this far from the objects.
 static const float kReferenceDistance = 3.0f;
+/// Animated style: fewer spawns, since each drop lives ~12x longer.
+static const float kAnimatedRateScale = 0.12f;
+/// Animated style: downward pull (per unit of stroke scale) that bends the path.
+static const float kAnimatedGravity = 0.35f;
 /// How often the list of objects with the aura property is rebuilt (added objects).
 static const double kScanInterval = 0.5;
 
@@ -79,6 +83,7 @@ static const char *kFragmentSource =
 
 KX_RainAura::KX_RainAura()
 	:m_lastTime(-1.0),
+	m_animated(false),
 	m_nextScan(0.0),
 	m_carry(0.0f),
 	m_intensity(1.0f),
@@ -202,23 +207,30 @@ void KX_RainAura::Update(KX_Scene *scene, KX_Camera *camera, const World *world,
 	const double dt = (m_lastTime < 0.0) ? 0.0 : std::min(time - m_lastTime, 0.1);
 	m_lastTime = time;
 
-	// Expire first, so a disabled aura empties within 50 ms.
-	for (unsigned int i = 0; i < m_strokes.size();) {
-		if (time >= m_strokes[i].death) {
-			m_strokes[i] = m_strokes.back();
-			m_strokes.pop_back();
-		}
-		else {
-			++i;
-		}
-	}
-
 	const bool active = camera && world && (world->weather_flag & WO_WEATHER_RAIN) &&
 	                    (world->weather_flag & WO_WEATHER_RAIN_AURA);
+
+	// Expire first, so a disabled aura empties at once; animated drops move along their path.
+	for (unsigned int i = 0; i < m_strokes.size();) {
+		Stroke& stroke = m_strokes[i];
+		if (!active || time >= stroke.death) {
+			stroke = m_strokes.back();
+			m_strokes.pop_back();
+			continue;
+		}
+		if (stroke.velocity.LengthSquared() > 0.0f) {
+			stroke.velocity.z -= stroke.fall * (float)dt;
+			stroke.base += stroke.velocity * (float)dt;
+			stroke.dir = stroke.velocity.Normalized();
+		}
+		++i;
+	}
+
 	if (!active) {
 		m_carry = 0.0f;
 		return;
 	}
+	m_animated = (world->rain_aura_style == WO_RAIN_AURA_ANIMATED);
 
 	const std::string prop = world->rain_aura_prop;
 	if (prop != m_prop || time >= m_nextScan) {
@@ -284,7 +296,8 @@ void KX_RainAura::Update(KX_Scene *scene, KX_Camera *camera, const World *world,
 		}
 	}
 
-	m_carry = std::min(m_carry + total * kStrokesPerMeter * rate * (float)dt, kMaxCarry);
+	const float rateScale = m_animated ? kAnimatedRateScale : 1.0f;
+	m_carry = std::min(m_carry + total * kStrokesPerMeter * rate * rateScale * (float)dt, kMaxCarry);
 	while (m_carry >= 1.0f && !m_silhouette.empty() && m_strokes.size() < kMaxStrokes) {
 		m_carry -= 1.0f;
 		const unsigned int index = std::min<unsigned int>(
@@ -298,25 +311,31 @@ void KX_RainAura::Update(KX_Scene *scene, KX_Camera *camera, const World *world,
 		const mt::vec3 side = mt::cross(sil.view, sil.out);
 		const mt::vec3 z = (sil.out * std::cos(ang) + side * std::sin(ang)).Normalized();
 
-		// Manga style: a still stroke a little outside the outline, no trajectory.
 		const float scale = size * sil.scale;
-		const float width = (0.0006f + 0.0012f * Random()) * scale;
-		const float length = ((Random() < 0.5f) ? (0.002f + 0.003f * Random()) : (0.006f + 0.01f * Random())) * scale;
-		const mt::vec3 base = sil.a + (sil.b - sil.a) * Random() + z * ((0.001f + 0.011f * Random()) * scale);
-
-		mt::vec3 y = camPos - base;
-		y -= z * mt::dot(y, z);
-		y = (y.Length() > 1e-6f) ? y.Normalized() : sil.view;
-		const mt::vec3 x = mt::cross(y, z) * (width * 0.5f);
-
 		Stroke stroke;
-		stroke.corner[0] = base - x;
-		stroke.corner[1] = base + x;
-		stroke.corner[2] = base + x + z * length;
-		stroke.corner[3] = base - x + z * length;
+		stroke.dir = z;
+		stroke.width = (0.0006f + 0.0012f * Random()) * scale;
 		stroke.brightness = 0.6f + 0.4f * Random();
-		// Lives 1 to 3 frames, then pops up somewhere else.
-		stroke.death = time + 0.015 + 0.035 * Random();
+		stroke.birth = time;
+		if (m_animated) {
+			// A drop born on the outline that flies out over a longer, slightly falling path.
+			const float life = 0.25f + 0.3f * Random();
+			const float path = (0.04f + 0.08f * Random()) * scale;
+			stroke.length = (0.006f + 0.008f * Random()) * scale;
+			stroke.base = sil.a + (sil.b - sil.a) * Random() + z * (0.002f * Random() * scale);
+			stroke.velocity = z * (path / life);
+			stroke.fall = kAnimatedGravity * scale;
+			stroke.death = time + life;
+		}
+		else {
+			// Manga style: a still stroke a little outside the outline, no trajectory.
+			stroke.length = ((Random() < 0.5f) ? (0.002f + 0.003f * Random()) : (0.006f + 0.01f * Random())) * scale;
+			stroke.base = sil.a + (sil.b - sil.a) * Random() + z * ((0.001f + 0.011f * Random()) * scale);
+			stroke.velocity = mt::zero3;
+			stroke.fall = 0.0f;
+			// Lives 1 to 3 frames, then pops up somewhere else.
+			stroke.death = time + 0.015 + 0.035 * Random();
+		}
 		m_strokes.push_back(stroke);
 	}
 }
@@ -411,14 +430,32 @@ void KX_RainAura::Draw(const mt::mat4& view, const mt::mat4& projection)
 		return;
 	}
 
+	// Billboard each stroke around its direction, facing the camera.
+	const mt::vec3 camPos = view.Inverse().TranslationVector3D();
 	m_vertices.resize(m_strokes.size() * 16);
 	float *v = m_vertices.data();
 	for (const Stroke& stroke : m_strokes) {
+		const mt::vec3& z = stroke.dir;
+		mt::vec3 y = camPos - stroke.base;
+		y -= z * mt::dot(y, z);
+		if (y.Length() < 1e-6f) {
+			y = mt::cross(z, mt::axisX3);
+		}
+		const mt::vec3 x = mt::cross(y.Normalized(), z) * (stroke.width * 0.5f);
+		const mt::vec3 head = stroke.base + z * stroke.length;
+		const mt::vec3 corner[4] = {stroke.base - x, stroke.base + x, head + x, head - x};
+
+		float bright = stroke.brightness;
+		if (stroke.velocity.LengthSquared() > 0.0f) {
+			// Quick fade in, long fade out over the path.
+			const float t = (float)((m_lastTime - stroke.birth) / (stroke.death - stroke.birth));
+			bright *= std::min(1.0f, t * 8.0f) * std::max(0.0f, 1.0f - t);
+		}
 		for (unsigned int i = 0; i < 4; ++i) {
-			*v++ = stroke.corner[i].x;
-			*v++ = stroke.corner[i].y;
-			*v++ = stroke.corner[i].z;
-			*v++ = stroke.brightness;
+			*v++ = corner[i].x;
+			*v++ = corner[i].y;
+			*v++ = corner[i].z;
+			*v++ = bright;
 		}
 	}
 

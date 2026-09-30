@@ -642,6 +642,17 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Aura Property", "Game property (True) that marks the objects receiving the aura");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	static const EnumPropertyItem rain_aura_style_items[] = {
+		{WO_RAIN_AURA_STATIC, "STATIC", 0, "Static", "Still manga strokes that pop in and out"},
+		{WO_RAIN_AURA_ANIMATED, "ANIMATED", 0, "Animated", "Drops that leave the outline and travel a longer path"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "rain_aura_style", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "rain_aura_style");
+	RNA_def_property_enum_items(prop, rain_aura_style_items);
+	RNA_def_property_ui_text(prop, "Aura Style", "How the aura strokes move");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "rain_aura_size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.3f, 5.0f);
 	RNA_def_property_ui_range(prop, 0.3f, 5.0f, 1, 2);
