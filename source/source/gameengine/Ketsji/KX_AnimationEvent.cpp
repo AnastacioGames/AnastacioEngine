@@ -208,6 +208,7 @@ PyTypeObject KX_AnimationEvent::Type = {
 };
 
 PyMethodDef KX_AnimationEvent::Methods[] = {
+	EXP_PYMETHODTABLE_VARARGS(KX_AnimationEvent, getFireCount),
 	{nullptr, nullptr} // Sentinel
 };
 
@@ -215,6 +216,17 @@ PyAttributeDef KX_AnimationEvent::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("triggers", KX_AnimationEvent, pyattr_get_triggers),
 	EXP_PYATTRIBUTE_NULL  // Sentinel
 };
+
+EXP_PYMETHODDEF_DOC_VARARGS(KX_AnimationEvent, getFireCount,
+                            "getFireCount(index=-1)\n"
+                            "Times the trigger fired (all triggers together with -1).\n")
+{
+	int index = -1;
+	if (!PyArg_ParseTuple(args, "|i:getFireCount", &index)) {
+		return nullptr;
+	}
+	return PyLong_FromUnsignedLong(GetFireCount(index));
+}
 
 PyObject *KX_AnimationEvent::pyattr_get_triggers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {

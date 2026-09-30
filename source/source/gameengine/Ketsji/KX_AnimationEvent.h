@@ -79,6 +79,8 @@ public:
 #ifdef WITH_PYTHON
 	PyObject *GetPyEventFunction() const;
 
+	EXP_PYMETHOD_DOC_VARARGS(KX_AnimationEvent, getFireCount);
+
 	static PyObject *pyattr_get_triggers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 #endif // WITH_PYTHON

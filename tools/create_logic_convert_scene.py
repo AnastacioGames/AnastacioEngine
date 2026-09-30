@@ -225,6 +225,53 @@ a_cam.damping = 0.5
 a_cam.axis = 'POS_X'
 link([cam.game.sensors["Follow"]], cam.game.controllers["Follow"], [a_cam])
 
+# Movement +X (Player anda 0.1 por frame no estado 2), Random constante, Joystick sem controle.
+scene.objects.active = player
+for name in ("moved", "rv", "joy"):
+    bpy.ops.object.game_property_new(type='INT', name=name)
+s_mov = brick("sensor", 'MOVEMENT', "MovedX")
+s_mov.axis = 'XAXIS'
+s_mov.threshold = 0.05
+c_mov = brick("controller", 'LOGIC_AND', "MovedX", 2)
+a_mov = brick("actuator", 'PROPERTY', "Moved")
+a_mov.mode = 'ADD'
+a_mov.property = "moved"
+a_mov.value = "1"
+link([s_mov], c_mov, [a_mov])
+c_rv = brick("controller", 'LOGIC_AND', "Rv", 1)
+a_rv = brick("actuator", 'RANDOM', "Rv")
+a_rv.distribution = 'INT_CONSTANT'
+a_rv.property = "rv"
+a_rv.int_value = 5
+a_mvis = brick("actuator", 'MOUSE', "ShowMouse")
+a_mvis.mode = 'VISIBILITY'
+a_mvis.visible = True
+link([s_start], c_rv, [a_rv, a_mvis])
+s_joy = brick("sensor", 'JOYSTICK', "PadA")
+s_joy.event_type = 'BUTTONS'
+c_joy = brick("controller", 'LOGIC_AND', "PadA", 1)
+a_joy = brick("actuator", 'PROPERTY', "Joy")
+a_joy.mode = 'ADD'
+a_joy.property = "joy"
+a_joy.value = "1"
+link([s_joy], c_joy, [a_joy])
+
+# Kid: vira filho da Wall (Parent) e roda um Mouse Look com sensibilidade 0 (nao gira).
+kid = bpy.data.objects.new("Kid", None)
+scene.objects.link(kid)
+scene.objects.active = kid
+bpy.ops.logic.sensor_add(type='ALWAYS', name="KidGo", object=kid.name)
+bpy.ops.logic.controller_add(type='LOGIC_AND', name="KidGo", object=kid.name)
+bpy.ops.logic.actuator_add(type='PARENT', name="ToWall", object=kid.name)
+kid.game.actuators["ToWall"].object = wall
+bpy.ops.logic.actuator_add(type='MOUSE', name="Look", object=kid.name)
+a_look = kid.game.actuators["Look"]
+a_look.mode = 'LOOK'
+a_look.sensitivity_x = 0.0
+a_look.sensitivity_y = 0.0
+link([kid.game.sensors["KidGo"]], kid.game.controllers["KidGo"], [kid.game.actuators["ToWall"], a_look])
+scene.objects.active = player
+
 # Checker: script comum (nao convertido) que imprime o resultado e sai.
 checker = bpy.data.objects.new("Checker", None)
 scene.objects.link(checker)
@@ -238,9 +285,9 @@ text.from_string(
     "if own['frames'] == 60:\n"
     "    p = logic.getCurrentScene().objects['Player']\n"
     "    bullets = len([o for o in own.scene.objects if o.name == 'Bullet'])\n"
-    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f' % (\n"
+    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f moved=%d rv=%d joy=%d kid=%s mvis=%s' % (\n"
     "        p['score'], p['ticks'], p['alive'], p.state, p.worldPosition.x, p.worldPosition.y,\n"
-    "        p['pulses'], bullets, p['saw'], p['sawmat'], own.scene.objects['Box']['boxn'], own.scene.objects['Box'].worldPosition.z, p['msgs'], *own.scene.objects['Cam'].worldPosition)\n"
+    "        p['pulses'], bullets, p['saw'], p['sawmat'], own.scene.objects['Box']['boxn'], own.scene.objects['Box'].worldPosition.z, p['msgs'], *own.scene.objects['Cam'].worldPosition, p['moved'], p['rv'], p['joy'], own.scene.objects['Kid'].parent, logic.mouse.visible)\n"
     "    print(line, flush=True)\n"
     "    with open(logic.expandPath('//' + own.scene.name + '_check.txt'), 'w') as f:\n"
     "        f.write(line + '\\n')\n"
@@ -252,7 +299,7 @@ checker.game.controllers["Check"].text = text
 checker.game.sensors["Frame"].link(checker.game.controllers["Check"])
 
 if convert:
-    for target in (player, cam):
+    for target in (player, cam, kid):
         scene.objects.active = target
         print("CONVERT", target.name, bpy.ops.logic.convert_to_component(mode=mode))
     print(bpy.data.texts["player_logic.py"].as_string())

@@ -39,6 +39,20 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   `Debug`); ícone por tipo de sensor (Collision `MOD_PHYSICS`, Delay `TIME`, Message `FILE_TEXT` etc.) e
   `FILE_TEXT` também no actuator Message.
 - Sensores/actuators soltos (sem controller) do objeto convertido também são desativados.
+- Novos tradutores: sensor Movement (posição do frame anterior, como `KX_MovementSensor`), sensor Joystick
+  (botões, direções do stick, eixo único e gatilhos via `logic.joysticks`), actuator Parent (set/remove),
+  Random (todas as distribuições; sequência do `random` do Python) e Mouse (Visibility e Look, porta de
+  `KX_MouseActuator`). Teste ganhou `moved rv joy kid mvis` na linha CHECK, iguais nos quatro modos.
+- Últimos tradutores: actuator Constraint (Loc, Distância, Orientação e Force Field, porta de
+  `KX_ConstraintActuator` com damping, Time e Persistent), Steering (Seek, Flee e Path Following via
+  `findPath`, com facing; sem simulação de obstáculos nem Normal Up, que ficam como brick), sensor Actuator
+  (actuator ativo no frame anterior; se o actuator lido não for convertido, o controller fica como brick) e
+  Animation Event. Helpers desses tipos só entram no código gerado quando usados.
+- `KX_AnimationEvent.getFireCount(index=-1)` (C++): quantas vezes o gatilho disparou (-1 = todos), usado pelo
+  Animation Event convertido.
+- Teste à parte (bricks × convertido): os cinco Constraints deram posição/orientação iguais, Animation Event
+  igual (3 disparos em 60 frames); Steering 1 frame atrás, o mesmo atraso que um contador Always + Property Add
+  convertido já mostra (59 × 58).
 - `sca.c`: cor padrão de sensor novo passa a ser cinza 0.17 (43/255), em vez da cor de box do tema.
 - Sound também nos modos Play Stop, Loop Stop e Loop End: o componente detecta o pulso negativo do controller
   (`_fall`) e para o som ou encerra o loop no fim da volta, como `KX_SoundActuator`. A cena de teste ganhou um

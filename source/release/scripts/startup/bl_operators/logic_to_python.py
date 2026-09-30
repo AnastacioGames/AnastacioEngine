@@ -24,6 +24,7 @@
 
 import ast
 import re
+from collections import OrderedDict
 
 import bpy
 from bpy.types import Operator
@@ -148,7 +149,23 @@ _SENSOR_ICONS = {
     'COLLISION': 'MOD_PHYSICS', 'DELAY': 'TIME', 'MESSAGE': 'FILE_TEXT',
     'MOUSE': 'RESTRICT_SELECT_OFF', 'NEAR': 'META_PLANE', 'PROPERTY': 'UI',
     'RADAR': 'OUTLINER_OB_FORCE_FIELD', 'RANDOM': 'RNDCURVE', 'RAY': 'IPO_LINEAR',
+    'ACTUATOR': 'LOGIC', 'ANIMATIONEVENT': 'ACTION',
 }
+
+# Joystick (SDL GameController): eixos 0/1 stick esquerdo, 2/3 direito, 4/5 gatilhos.
+_JOY_BUTTONS = ['BUTTON_A', 'BUTTON_B', 'BUTTON_X', 'BUTTON_Y', 'BUTTON_BACK', 'BUTTON_GUIDE',
+                'BUTTON_START', 'BUTTON_STICK_LEFT', 'BUTTON_STICK_RIGHT', 'BUTTON_SHOULDER_LEFT',
+                'BUTTON_SHOULDER_RIGHT', 'BUTTON_DPAD_UP', 'BUTTON_DPAD_DOWN', 'BUTTON_DPAD_LEFT',
+                'BUTTON_DPAD_RIGHT']
+_JOY_SINGLE = {'LEFT_STICK_HORIZONTAL': 0, 'LEFT_STICK_VERTICAL': 1,
+               'RIGHT_STICK_HORIZONTAL': 2, 'RIGHT_STICK_VERTICAL': 3}
+_DIR_AXES = {'DIRPX': (0, False), 'DIRPY': (1, False), 'DIRPZ': (2, False),
+             'DIRNX': (0, True), 'DIRNY': (1, True), 'DIRNZ': (2, True)}
+_DYNAMIC = {'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY'}
+_ACT_STATE = [None]  # expressao "actuator ativo" do tradutor atual (None = padrao)
+_FIRE = "%FIRE%"  # trocado pela variavel de pulso do controller na saida
+_MOVE_AXES = {'XAXIS': (0, 1), 'YAXIS': (1, 1), 'ZAXIS': (2, 1),
+              'NEGXAXIS': (0, -1), 'NEGYAXIS': (1, -1), 'NEGZAXIS': (2, -1), 'ALLAXIS': (-1, 0)}
 
 
 def _arg(name, value, kind=None):
@@ -287,6 +304,20 @@ def _sensor_expr(ob, sens, key=None):
     elif t == 'RANDOM':
         # Mesma cadencia (um sorteio a cada tick_skip + 1 frames), sequencia do random do Python.
         expr = "self._random(%r, %s, %d)" % (key, A("Seed", sens.seed), sens.tick_skip)
+    elif t == 'MOVEMENT':
+        axis, sign = _MOVE_AXES[sens.axis]
+        expr = "self._moved(%r, %s, %d, %d, %s)" % (key, sens.use_local, axis, sign,
+                                                    A("Threshold", sens.threshold))
+    elif t == 'JOYSTICK':
+        expr = _joystick_expr(sens, A)
+    elif t == 'ACTUATOR':
+        # Actuator ativo no frame anterior (actuators rodam depois dos sensores).
+        if not sens.actuator:
+            raise Unsupported("sensor actuator sem actuator")
+        expr = "self._act_on.get(%r, False)" % sens.actuator
+    elif t == 'ANIMATIONEVENT':
+        trigger = -1 if sens.trigger_all else sens.trigger_index - 1
+        expr = "self._anim_event(%r, %d, %d)" % (key, sens.event_index - 1, trigger)
     elif t == 'MESSAGE':
         # Mensagens enviadas no frame anterior para este objeto (ou sem destino), como o sensor.
         expr = "bool(logic.getMessages(ob.name, %s))" % A("Subject", sens.subject)
@@ -296,6 +327,31 @@ def _sensor_expr(ob, sens, key=None):
         expr = "not (%s)" % expr
     # Liga/desliga do sensor pelos args (desligado = sensor falso).
     return "%s and (%s)" % (A("Enabled", True), expr)
+
+
+def _joystick_expr(sens, A):
+    # Mesmo teste de SCA_JoystickSensor: positivo enquanto a condicao vale (threshold em -32768..32767).
+    idx = A("Index", sens.joystick_index)
+    thr = "%s / 32768.0" % A("Threshold", sens.axis_threshold)
+    ev = sens.event_type
+    if ev == 'BUTTONS':
+        buttons = "self._joy(%s)[1]" % idx
+        if sens.use_all_events:
+            return "bool(%s)" % buttons
+        return "%d in %s" % (_JOY_BUTTONS.index(sens.button_number), buttons)
+    axes = "self._joy(%s)[0]" % idx
+    if ev == 'STICK_DIRECTIONS':
+        base = 0 if sens.axis_number == 'LEFT_STICK' else 2
+        if sens.use_all_events:
+            return "max(abs(%s[%d]), abs(%s[%d])) > %s" % (axes, base, axes, base + 1, thr)
+        i, cmp = {'RIGHTAXIS': (0, "> "), 'LEFTAXIS': (0, "< -"),
+                  'DOWNAXIS': (1, "> "), 'UPAXIS': (1, "< -")}[sens.axis_direction]
+        return "%s[%d] %s%s" % (axes, base + i, cmp, thr)
+    if ev == 'STICK_AXIS':
+        i = _JOY_SINGLE[sens.single_axis_number]
+    else:
+        i = 4 if sens.axis_trigger_number == 'LEFT_SHOULDER_TRIGGER' else 5
+    return "abs(%s[%d]) > %s" % (axes, i, thr)
 
 
 # ---------------------------------------------------------------------------
@@ -464,7 +520,150 @@ def _actuator_code(ob, act):
         return ["ob.setVisible(%s, %s)" % (_act_arg("Visible", act.use_visible), act.apply_to_children),
                 "ob.setOcclusion(%s, %s)" % (_act_arg("Occlusion", act.use_occlusion),
                                              act.apply_to_children)], False
+    if t == 'PARENT':
+        if act.mode == 'REMOVEPARENT':
+            return ["ob.removeParent()"], False
+        if act.object is None:
+            raise Unsupported("parent sem objeto")
+        return ["_p = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
+                "if _p is not None:",
+                "    ob.setParent(_p, %s, %s)" % (_act_arg("Compound", act.use_compound),
+                                                  _act_arg("Ghost", act.use_ghost))], False
+    if t == 'RANDOM':
+        return _random_act_code(act), False
+    if t == 'MOUSE':
+        if act.mode == 'VISIBILITY':
+            return ["logic.mouse.visible = %s" % _act_arg("Visible", act.visible)], False
+        axes = {'OBJECT_AXIS_X': 0, 'OBJECT_AXIS_Y': 1, 'OBJECT_AXIS_Z': 2}
+        cfg = []
+        for c in "xy":
+            C = c.upper()
+            cfg.append("(%s, %s, %s, %s, %d, %s, %s, %s)" % (
+                _act_arg("Use " + C, getattr(act, "use_axis_" + c)),
+                _act_arg("Reset " + C, getattr(act, "reset_" + c)),
+                _act_arg("Local " + C, getattr(act, "local_" + c)),
+                _act_arg("Threshold " + C, getattr(act, "threshold_" + c)),
+                axes[getattr(act, "object_axis_" + c)],
+                _act_arg("Sensitivity " + C, getattr(act, "sensitivity_" + c)),
+                _act_arg("Min " + C, getattr(act, "min_" + c)),
+                _act_arg("Max " + C, getattr(act, "max_" + c))))
+        # Continuo com o controller positivo; o pulso negativo refaz o salto inicial.
+        return (["self._mouse_look(%r, (%s))" % (act.name, ", ".join(cfg))], True,
+                ["self._ticks.pop(%r, None)" % ("mlk:" + act.name)])
+    if t == 'CONSTRAINT':
+        return _constraint_code(ob, act)
+    if t == 'STEERING':
+        return _steering_code(ob, act)
     raise Unsupported("actuator %s" % t)
+
+
+def _constraint_code(ob, act):
+    # KX_ConstraintActuator: continuo ate falhar (raio sem acerto) ou esgotar Time frames.
+    A = _act_arg
+    m = act.mode
+    if m == 'LOC':
+        if act.limit == 'NONE':
+            raise Unsupported("constraint loc sem eixo")
+        call = "self._cst_loc(%d, %s, %s, %s)" % ({'LOCX': 0, 'LOCY': 1, 'LOCZ': 2}[act.limit],
+                                                A("Min", act.limit_min), A("Max", act.limit_max),
+                                                A("Damping", act.damping))
+    elif m == 'ORI':
+        if act.direction_axis_pos == 'NONE':
+            raise Unsupported("constraint orientacao sem eixo")
+        if not _nonzero(act.rotation_max):
+            raise Unsupported("constraint orientacao sem direcao de referencia")
+        call = "self._cst_ori(%d, %s, %s, %s, %s)" % (_DIR_AXES[act.direction_axis_pos][0],
+                                                    A("Reference", act.rotation_max),
+                                                    A("Min Angle", act.angle_min), A("Max Angle", act.angle_max),
+                                                    A("Damping", act.damping))
+    elif m in {'DIST', 'FH'}:
+        mode = act.direction if m == 'DIST' else act.direction_axis
+        if mode == 'NONE':
+            raise Unsupported("constraint %s sem eixo" % m.lower())
+        axis, neg = _DIR_AXES[mode]
+        mat = act.use_material_detect
+        prop = A("Material", act.material) if mat else A("Property", act.property)
+        dyn = ob.game.physics_type in _DYNAMIC
+        if m == 'DIST':
+            call = "self._cst_dist(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % (
+                axis, neg, A("Local", act.use_local), A("Normal", act.use_normal),
+                A("Force Distance", act.use_force_distance), A("Persistent", act.use_persistent),
+                mat, prop, A("Distance", act.distance), A("Range", act.range), A("Damping", act.damping),
+                A("Rot Damping", act.damping_rotation), dyn)
+        else:
+            if not dyn:
+                raise Unsupported("constraint fh em objeto nao dinamico")
+            call = "self._cst_fh(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %r)" % (
+                axis, neg, A("Height", act.fh_height), A("Force", act.fh_force), A("Fh Damping", act.fh_damping),
+                A("Rot Fh Damping", act.rotation_max[1]), A("Normal", act.use_fh_normal),
+                A("Rot Fh", act.use_fh_paralel_axis), A("Persistent", act.use_persistent), mat, prop,
+                ob.game.radius)
+    else:
+        raise Unsupported("constraint %s" % m)
+    key = "cst:" + act.name
+    _ACT_STATE[0] = "%r in self._ticks" % key
+    return (["self._cst(%r, %s, %s, lambda: %s)" % (key, _FIRE, A("Time", act.time), call)], True,
+            ["self._ticks.pop(%r, None)" % key])
+
+
+def _steering_code(ob, act):
+    # KX_SteeringActuator sem simulacao de obstaculos (nao exposta em Python).
+    A = _act_arg
+    if act.target is None:
+        raise Unsupported("steering sem alvo")
+    if act.normal_up:
+        raise Unsupported("steering com normal up")
+    if ob.game.use_obstacle_create and any(sc.game_settings.obstacle_simulation != 'NONE'
+                                           for sc in ob.users_scene):
+        raise Unsupported("steering com simulacao de obstaculos")
+    mode = ['SEEK', 'FLEE', 'PATHFOLLOWING'].index(act.mode)
+    navmesh = act.navmesh.name if act.navmesh and act.navmesh.game.physics_type == 'NAVMESH' else None
+    if mode == 2 and navmesh is None:
+        raise Unsupported("steering path following sem navmesh")
+    facing = ['X', 'Y', 'Z', 'NEG_X', 'NEG_Y', 'NEG_Z'].index(act.facing_axis) + 1 if act.facing else 0
+    key = "str:" + act.name
+    _ACT_STATE[0] = "%r in self._ticks" % key
+    call = "self._steer(%r, %s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s)" % (
+        key, _FIRE, mode, A("Target", act.target.name), A("Navmesh", navmesh) if navmesh else None,
+        A("Distance", act.distance), A("Velocity", act.velocity), A("Update Period", act.update_period),
+        A("Self Terminated", act.self_terminated), facing, ob.game.physics_type in _DYNAMIC,
+        A("Lock Z Velocity", act.lock_z_velocity), A("Visualize", act.show_visualization))
+    return [call], True, ["self._ticks.pop(%r, None)" % key]
+
+
+def _random_act_code(act):
+    # Mesmas distribuicoes de SCA_RandomActuator, com o gerador do Python (sequencia diferente).
+    if not act.property:
+        raise Unsupported("random sem propriedade")
+    d = act.distribution
+    A = _act_arg
+    gen = "self._rng(%r, %s)" % (act.name, A("Seed", act.seed))
+    if d == 'BOOL_CONSTANT':
+        val = A("Value", act.use_always_true)
+    elif d == 'BOOL_UNIFORM':
+        val = "%s.random() < 0.5" % gen
+    elif d == 'BOOL_BERNOUILLI':
+        val = "%s.random() < %s" % (gen, A("Chance", act.chance))
+    elif d == 'INT_CONSTANT':
+        val = A("Value", act.int_value)
+    elif d == 'INT_UNIFORM':
+        val = "%s.randint(%s, %s)" % (gen, A("Min", act.int_min), A("Max", act.int_max))
+    elif d == 'INT_POISSON':
+        val = "self._poisson(%s, %s)" % (gen, A("Mean", act.int_mean))
+    elif d == 'FLOAT_CONSTANT':
+        val = A("Value", act.float_value)
+    elif d == 'FLOAT_UNIFORM':
+        val = "%s.uniform(%s, %s)" % (gen, A("Min", act.float_min), A("Max", act.float_max))
+    elif d == 'FLOAT_NORMAL':
+        # Seed 0 devolve a media, como na engine.
+        mean = A("Mean", act.float_mean)
+        val = "(%s.gauss(%s, %s) if %s else %s)" % (gen, mean, A("Deviation", act.standard_derivation),
+                                                   A("Seed", act.seed), mean)
+    elif d == 'FLOAT_NEGATIVE_EXPONENTIAL':
+        val = "%s * -math.log(1.0 - %s.random())" % (A("Half Life", act.half_life_time), gen)
+    else:
+        raise Unsupported("random %s" % d)
+    return ["ob[%s] = %s" % (A("Property", act.property), val)]
 
 
 _DYNAMICS = {
@@ -594,6 +793,7 @@ _HEADER = '''\
 from Range import logic, events, types
 from mathutils import Matrix, Vector
 from collections import OrderedDict
+import math
 import random
 
 
@@ -606,7 +806,8 @@ class %(classname)s(%(base)s):
         self._dbg = {}
         self._ticks = {}
         self._hits = []
-%(start_extra)s
+        self._act_on = {}
+%(start_extra)s%(extra)s
     def _rise(self, key, value):
         """Pulso positivo: True so no frame em que value passa a True."""
         prev = self._prev.get(key, False)
@@ -689,6 +890,83 @@ class %(classname)s(%(base)s):
         self._ticks[key] = (gen, n, value)
         return value
 
+    def _moved(self, key, local, axis, sign, threshold):
+        """Movement sensor: compara com a posicao do frame anterior (KX_MovementSensor)."""
+        ob = self.object
+        if local:
+            pos = ob.localOrientation.inverted() * ob.localPosition
+        else:
+            pos = ob.worldPosition.copy()
+        key = "mov:" + key
+        prev = self._prev.get(key, pos)
+        self._prev[key] = pos
+        d = pos - prev
+        if axis < 0:
+            return any(abs(v) > threshold for v in d)
+        return d[axis] * sign > threshold
+
+    def _joy(self, index):
+        """(eixos -1..1, botoes apertados) do joystick; sem joystick, tudo solto."""
+        js = logic.joysticks[index] if 0 <= index < len(logic.joysticks) else None
+        if js is None:
+            return [0.0] * 6, []
+        return list(js.axisValues) + [0.0] * 6, js.activeButtons
+
+    def _rng(self, key, seed):
+        key = "rng:" + key
+        gen = self._ticks.get(key)
+        if gen is None:
+            gen = self._ticks[key] = random.Random(seed)
+        return gen
+
+    @staticmethod
+    def _poisson(gen, mean):
+        a = max(math.exp(-mean), 1e-38)
+        b, n = gen.random(), 0
+        while b >= a:
+            b *= gen.random()
+            n += 1
+        return n
+
+    def _mouse_look(self, key, axes):
+        """Mouse actuator Look (KX_MouseActuator): gira o objeto e recentraliza o cursor."""
+        from Range import render
+        ob = self.object
+        pos = list(logic.mouse.position)
+        center = [0.5, 0.5]
+        for i, size in enumerate((render.getWindowWidth(), render.getWindowHeight())):
+            if size %% 2 == 0 and size > 1:
+                center[i] = float((size - 1) // 2) / (size - 1)
+        key = "mlk:" + key
+        st = self._ticks.get(key)
+        if st is None:
+            # Primeiro frame: so posiciona o cursor (evita o salto inicial).
+            old = [center[i] if axes[i][1] else pos[i] for i in range(2)]
+            self._ticks[key] = {"old": old, "angle": [0.0, 0.0]}
+            logic.mouse.position = tuple(old)
+            return
+        setpos = [0.0, 0.0]
+        for i, (use, reset, local, thr, obaxis, sens, lo, hi) in enumerate(axes):
+            if not use:
+                setpos[i] = center[i]
+                continue
+            setpos[i] = center[i] if reset else pos[i]
+            move = -(pos[i] - (center[i] if reset else st["old"][i]))
+            if abs(move) > thr / 10.0:
+                move *= sens
+                ang = st["angle"][i]
+                if lo != 0.0 and ang + move <= lo:
+                    move = lo - ang
+                if hi != 0.0 and ang + move >= hi:
+                    move = hi - ang
+                st["angle"][i] = ang + move
+                rot = [0.0, 0.0, 0.0]
+                rot[obaxis] = move
+                ob.applyRotation(rot, local)
+        if st["old"] != pos:
+            logic.mouse.position = tuple(setpos)
+        st["old"] = pos
+
     def _follow(self, target, height, dmin, dmax, damping, axis, neg):
         """Mesma conta de KX_CameraActuator: fica atras do alvo e olha para ele."""
         ob = self.object
@@ -756,6 +1034,248 @@ class %(classname)s(%(base)s):
 '''
 
 
+_EXTRA = OrderedDict()
+_EXTRA["_anim_event"] = '''
+    def _anim_event(self, key, index, trigger):
+        """Animation Event sensor: positivo no frame em que o gatilho disparou (-1 = qualquer)."""
+        mgr = self.object.animationEventManager
+        evs = mgr.events if mgr is not None else []
+        if not 0 <= index < len(evs):
+            return False
+        n = evs[index].getFireCount(trigger)
+        key = "aev:" + key
+        fired = key in self._prev and self._prev[key] != n
+        self._prev[key] = n
+        return fired
+'''
+_EXTRA["_cst"] = '''
+    def _cst(self, key, fire, time, apply):
+        """Constraint actuator: roda ate apply() falhar ou passar de time frames (0 = sem limite)."""
+        if fire and key not in self._ticks:
+            self._ticks[key] = 0
+        n = self._ticks.get(key)
+        if n is None:
+            return
+        ok = apply()
+        if ok and time > 0:
+            n += 1
+            ok = n < time
+        if ok:
+            self._ticks[key] = n
+        else:
+            self._ticks.pop(key, None)
+
+    def _cst_loc(self, axis, lo, hi, damp):
+        ob = self.object
+        pos = ob.localPosition.copy()
+        new = pos.copy()
+        new[axis] = lo if new[axis] < lo else (hi if new[axis] > hi else new[axis])
+        if damp:
+            f = damp / (1.0 + damp)
+            new = f * pos + (1.0 - f) * new
+        ob.localPosition = new
+        return True
+
+    def _cst_ori(self, axis, ref, amin, amax, damp):
+        ob = self.object
+        ref = Vector(ref).normalized()
+        cmin, cmax = math.cos(amin), math.cos(amax)
+        f = damp / (1.0 + damp) if damp else 0.0
+        direction = ob.worldOrientation.col[axis].copy()
+        eps = 1.1920929e-07
+        if cmax < 1.0 - eps or cmin < 1.0 - eps:
+            c = direction.dot(ref)
+            if cmax - eps <= c <= cmin + eps:
+                return True
+            z = ref.cross(direction)
+            if z.length_squared < 1e-12:
+                z = ref.cross(Vector((1.0, 0.0, 0.0)) if direction[0] < 0.9999 else Vector((0.0, 1.0, 0.0)))
+            y = z.cross(ref).normalized()
+            if c > cmin:
+                ref = cmin * ref + math.sin(amin) * y
+            else:
+                ref = cmax * ref + math.sin(amax) * y
+        ob.alignAxisToVect(f * direction + (1.0 - f) * ref, axis, 1.0)
+        return True
+
+    def _cst_ray(self, to, prop, material):
+        """Primeiro objeto no raio; precisa ter a propriedade/material (sem x-ray)."""
+        ob = self.object
+        hit, point, normal = ob.rayCast(to, ob.worldPosition, 0, "" if material else prop, 1, 0, 0)
+        if hit is not None and material and prop and not self._has_mat(hit, prop):
+            hit = None
+        return hit, point, normal
+
+    def _cst_dist(self, axis, neg, local, use_normal, use_dist, persistent, material, prop,
+                  dmin, dmax, damp, rotdamp, dyn):
+        ob = self.object
+        pos = ob.worldPosition.copy()
+        normal = ob.worldOrientation.col[axis].normalized() * (-1.0 if neg else 1.0)
+        if local:
+            direction = normal.copy()
+        else:
+            direction = Vector((0.0, 0.0, 0.0))
+            direction[axis] = -1.0 if neg else 1.0
+        f = damp / (1.0 + damp) if damp else 0.0
+        hit, point, hitnormal = self._cst_ray(pos + dmax * direction, prop, material)
+        if hit is None:
+            return persistent
+        if not (use_normal or use_dist):
+            return True
+        if use_normal:
+            rf = rotdamp / (1.0 + rotdamp) if rotdamp else f
+            nn = rf * normal - (1.0 - rf) * Vector(hitnormal)
+            ob.alignAxisToVect(-nn if neg else nn, axis, 1.0)
+            if local:
+                direction = nn.normalized()
+        point = Vector(point)
+        if use_dist:
+            dist = f * (pos - point).length + (1.0 - f) * dmin if damp else dmin
+            if dyn:
+                # Cancela a velocidade na direcao do raio, ja que a posicao e fixada nela.
+                vel = ob.worldLinearVelocity
+                fall = vel.dot(direction)
+                if abs(fall) > 1e-6:
+                    ob.worldLinearVelocity = vel - fall * direction
+        else:
+            dist = (pos - point).length
+        ob.worldPosition = point - dist * direction
+        return True
+
+    def _cst_fh(self, axis, neg, height, force, damp, rotdamp, use_normal, use_rot, persistent,
+                material, prop, radius):
+        ob = self.object
+        pos = ob.worldPosition.copy()
+        sign = -1.0 if neg else 1.0
+        normal = -sign * ob.worldOrientation.col[axis].normalized()
+        direction = Vector((0.0, 0.0, 0.0))
+        direction[axis] = sign
+        hit, point, hitnormal = self._cst_ray(pos + (height + radius) * direction, prop, material)
+        if hit is None:
+            return persistent
+        point, hitnormal = Vector(point), Vector(hitnormal)
+        dist = (point - pos).length - radius
+        vel = ob.worldLinearVelocity
+        rel = vel - hit.getVelocity(point - hit.worldPosition)
+        spring = (1.0 - dist / height) * force
+        push = spring + direction.dot(rel) * damp
+        vel = vel - push * direction
+        if use_normal:
+            vel += push * (hitnormal - hitnormal.dot(direction) * direction)
+        ob.worldLinearVelocity = vel
+        if use_rot:
+            ang = ob.worldAngularVelocity
+            flat = ang - ang.dot(hitnormal) * hitnormal
+            rd = damp if abs(rotdamp) < 1e-6 else rotdamp
+            ob.worldAngularVelocity = ang + (normal.cross(hitnormal) * force - flat * rd)
+        return True
+'''
+_EXTRA["_steer"] = '''
+    def _steer(self, key, fire, mode, target, navmesh, dist, speed, period, self_term, facing, dyn,
+               lock_z, show):
+        """Steering actuator (KX_SteeringActuator): 0 seek, 1 flee, 2 path following."""
+        now = logic.getFrameTime()
+        st = self._ticks.get(key)
+        if st is None:
+            # Ativacao: so marca o tempo; o movimento comeca no proximo frame.
+            if fire:
+                parent = self.object.parent
+                self._ticks[key] = {"t": now, "pt": -1.0, "path": [], "wp": -1,
+                                    "plm": parent.localOrientation.copy() if parent else None}
+            return
+        delta = now - st["t"]
+        st["t"] = now
+        if not delta:
+            return
+        ob = self.object
+        tgt = ob.scene.objects.get(target)
+        if tgt is None:
+            self._ticks.pop(key, None)
+            return
+        pos = ob.worldPosition.copy()
+        to = tgt.worldPosition - pos
+        steer = None
+        done = True
+        if mode == 0 and to.xy.length_squared > dist * dist:
+            done, steer = False, to.normalized()
+        elif mode == 1 and to.xy.length_squared < dist * dist:
+            done, steer = False, -to.normalized()
+        elif mode == 2:
+            nm = ob.scene.objects.get(navmesh)
+            if nm is not None and to.length_squared > dist * dist:
+                done = False
+                if st["pt"] < 0 or (period >= 0 and now - st["pt"] > period / 1000.0):
+                    st["pt"] = now
+                    st["path"] = [Vector(p) for p in nm.findPath(pos, tgt.worldPosition)]
+                    st["wp"] = 1 if len(st["path"]) > 1 else -1
+                path, wp = st["path"], st["wp"]
+                if wp > 0:
+                    point = path[wp]
+                    if (point - pos).length_squared < 0.25 * 0.25:
+                        wp += 1
+                        if wp >= len(path):
+                            wp, done = -1, True
+                        else:
+                            point = path[wp]
+                    st["wp"] = wp
+                    steer = point - pos
+                    if show:
+                        from Range import render
+                        for a, b in zip(path, path[1:]):
+                            render.drawLine(a, b, (1.0, 0.0, 0.0))
+        if steer is not None:
+            if dyn or mode == 2:
+                steer.z = 0.0
+            if steer.length > 1e-6:
+                steer.normalize()
+            vel = speed * steer
+            if facing:
+                self._steer_face(st, facing, vel)
+            if dyn:
+                vel.z = 0.0 if lock_z else ob.worldLinearVelocity.z
+                ob.worldLinearVelocity = vel
+            else:
+                ob.applyMovement(delta * vel, False)
+        if done and self_term:
+            self._ticks.pop(key, None)
+
+    def _steer_face(self, st, facing, vel):
+        """Aponta o eixo escolhido (1 X, 2 Y, 3 Z, 4-6 negativos) na direcao do movimento."""
+        if vel.length < 1e-6:
+            return
+        safe = lambda v: v.normalized() if v.length > 1e-6 else Vector((1.0, 0.0, 0.0))
+        d = vel.normalized()
+        up = Vector((0.0, 0.0, 1.0))
+        if facing == 1:
+            left = d
+            d = -safe(left.cross(up))
+        elif facing == 2:
+            left = safe(d.cross(up))
+        elif facing == 3:
+            left, up = up, d
+            d = left
+            left = safe(d.cross(up))
+        elif facing == 4:
+            left = -d
+            d = -safe(left.cross(up))
+        elif facing == 5:
+            left = safe(-d.cross(up))
+            d = -d
+        else:
+            left, up = up, -d
+            d = left
+            left = safe(d.cross(up))
+        mat = Matrix((left, d, up)).transposed()
+        ob = self.object
+        if ob.parent is not None:
+            pos = ob.localPosition.copy()
+            ob.localOrientation = st["plm"] * ob.parent.worldOrientation.inverted() * mat
+            ob.localPosition = pos
+        else:
+            ob.localOrientation = mat
+'''
+
+
 _RUNNER = '''
 
 # Modo controller: um sensor Always (pulso continuo) liga um controller Python
@@ -807,9 +1327,11 @@ def _args_start():
     return "".join(lines)
 
 
-def convert_object(ob, classname, component=True):
+def convert_object(ob, classname, component=True, _skip=frozenset()):
     """Retorna (codigo, controllers convertidos, lista de pendencias)."""
     converted = []
+    act_refs = {}  # controller -> actuators lidos por sensores Actuator
+    watched = {s.actuator for s in ob.game.sensors if s.type == 'ACTUATOR'}
     todos = []
     sensor_exprs = {}  # nome da variavel -> (expressao, nome original); cada sensor avaliado uma vez
     sensor_masks = {}
@@ -831,6 +1353,9 @@ def convert_object(ob, classname, component=True):
         return [sub(line) for line in lines_or_expr]
 
     for cont in ob.game.controllers:
+        if cont.name in _skip:
+            todos.append("%s: sensor Actuator le um actuator nao convertido" % cont.name)
+            continue
         try:
             sensors = [(o, s) for o in bpy.data.objects for s in o.game.sensors
                        if _owns(s.controllers, cont)]
@@ -841,11 +1366,13 @@ def convert_object(ob, classname, component=True):
                 if owner == ob:
                     var, key = _ident(s.name, "s"), s.name
                     expr = _sensor_expr(ob, s)
+                    if s.type == 'ACTUATOR':
+                        act_refs.setdefault(cont.name, []).append(s.actuator)
                 else:
                     var, key = _ident(owner.name + "_" + s.name, "s"), owner.name + "/" + s.name
                     expr = _sensor_expr(owner, s, key)
                     # Helpers que usam self.object so valem para o proprio objeto.
-                    if re.search(r"hits|self\._(near|radar)\b", expr):
+                    if re.search(r"hits|self\._(near|radar|act_on|anim_event)\b", expr):
                         raise Unsupported("sensor %s de %s ligado" % (s.type, owner.name))
                     expr = on(owner, expr)
                     expr = "%s is not None and (%s)" % (foreign[owner.name], expr)
@@ -865,11 +1392,13 @@ def convert_object(ob, classname, component=True):
                 _GROUP[0] = "Actuator " + _ACT_LABEL[0]
                 if a.type == 'MESSAGE':
                     _GROUP_ICON[_GROUP[0]] = 'FILE_TEXT'
+                _ACT_STATE[0] = None
                 code = _actuator_code(owner, a)
+                code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0],)
                 if owner != ob:
                     if any(re.search(r"self\.(?!_a\[)", line) for part in code[:1] + code[2:3] for line in part):
                         raise Unsupported("actuator %s de %s ligado" % (a.type, owner.name))
-                    code = (on(owner, code[0]), code[1]) + tuple(on(owner, c) for c in code[2:])
+                    code = (on(owner, code[0]), code[1], on(owner, code[2]), code[3])
                 actuators.append((a, owner, code))
         except Unsupported as ex:
             todos.append("%s: %s" % (cont.name, ex))
@@ -880,13 +1409,17 @@ def convert_object(ob, classname, component=True):
         plans.append((cont, cont_expr, pulse, actuators))
         converted.append(cont)
 
+    # Sensor Actuator so funciona se o actuator lido tambem foi convertido.
+    done_acts = {act.name for _c, _e, _p, acts in plans for act, owner, _code in acts if owner == ob}
+    bad = {c for c, refs in act_refs.items() if any(r not in done_acts for r in refs)}
+    if bad - _skip:
+        return convert_object(ob, classname, component, _skip | bad)
+
     # Mesma ordem da engine: sensores, depois controllers, depois actuators.
     # Assim nenhum sensor enxerga uma mudanca feita por actuator no mesmo frame.
     uses_hits = any("hits" in expr for expr, _orig in sensor_exprs.values())
     start_extra = "        self.object.collisionCallbacks.append(self._on_hit)\n" if uses_hits else ""
-    out = [_HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra,
-                      "base": "types.KX_PythonComponent" if component else "object",
-                      "args": _args_source(), "args_start": _args_start()}]
+    out = []
     for name, var in sorted(foreign.items()):
         # Bricks ligados de outro objeto: some se o objeto for removido.
         out.append("        %s = scene.objects.get(%r)" % (var, name))
@@ -902,7 +1435,8 @@ def convert_object(ob, classname, component=True):
     out.append("\n        # Controllers (so rodam no estado deles)")
     for cont, cont_expr, pulse, actuators in plans:
         cname = _ident(cont.name, "c")
-        one_shot = not all(code[1] for _act, _owner, code in actuators)
+        one_shot = not all(code[1] and not any(_FIRE in line for line in code[0])
+                           for _act, _owner, code in actuators)
         fire = "self._rise(%r, %s)" % (cont.name, cname)
         if pulse:
             fire = "%s or (%s and (%s))" % (fire, cname, " or ".join(pulse))
@@ -910,7 +1444,7 @@ def convert_object(ob, classname, component=True):
         out.append("        %s = bool(state & %d) and (%s)" % (cname, 1 << (cont.states - 1), cont_expr))
         if one_shot:
             out.append("        %s_fire = %s" % (cname, fire))
-        if any(code[2:] and code[2] for _act, _owner, code in actuators):
+        if any(code[2] for _act, _owner, code in actuators):
             out.append("        %s_off = self._fall(%r, %s)" % (cname, cont.name, cname))
 
     out.append("\n        if self._debug_on:")
@@ -922,6 +1456,8 @@ def convert_object(ob, classname, component=True):
         out.append("            pass")
 
     out.append("\n        # Actuators")
+    if watched:
+        out.append("        self._act_on = {}")
     for cont, _expr, _pulse, actuators in plans:
         cname = _ident(cont.name, "c")
         for act, owner, code in actuators:
@@ -930,13 +1466,17 @@ def convert_object(ob, classname, component=True):
             if owner != ob:
                 cond += " and %s is not None" % foreign[owner.name]
             out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
-            out += ["            " + line for line in lines]
-            if code[2:] and code[2]:
+            out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
+            if code[2]:
                 off = cname + "_off"
                 if owner != ob:
                     off += " and %s is not None" % foreign[owner.name]
                 out.append("        if %s:  # pulso negativo de '%s'" % (off, act.name))
                 out += ["            " + line for line in code[2]]
+            if owner == ob and act.name in watched:
+                # Estado lido pelos sensores Actuator no proximo frame.
+                out.append("        if %s:" % (code[3] or cond))
+                out.append("            self._act_on[%r] = True" % act.name)
 
     for todo in todos:
         out.append("        # TODO: controller %s (nao convertido, brick continua ativo)" % todo)
@@ -946,7 +1486,13 @@ def convert_object(ob, classname, component=True):
         for cont in converted:
             mask |= 1 << (cont.states - 1)
         out.append(_RUNNER % {"classname": classname, "mask": mask})
-    return "\n".join(out) + "\n", converted, todos
+    body = "\n".join(out)
+    extra = "".join(text for name, text in _EXTRA.items() if "self.%s(" % name in body)
+    header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra,
+                        "base": "types.KX_PythonComponent" if component else "object",
+                        "args": _args_source(), "args_start": _args_start(),
+                        "extra": extra}
+    return header + "\n" + body + "\n", converted, todos
 
 
 def _class_name(obname):
