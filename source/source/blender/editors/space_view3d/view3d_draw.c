@@ -482,6 +482,8 @@ static const char *floor_vert =
 
 static const char *floor_frag =
 	"in vec3 v_pos;\n"
+	"uniform mat4 u_persinv;\n"
+	"uniform vec4 u_viewport;\n"
 	"uniform vec3 u_camera;\n"
 	"uniform float u_scale;\n"
 	"uniform float u_subdiv;\n"
@@ -500,9 +502,19 @@ static const char *floor_frag =
 	"	return 1.0 - clamp(abs(c) / max(fw, 1e-8) - 0.5, 0.0, 1.0);\n"
 	"}\n"
 	"void main() {\n"
-	"	vec2 p = v_pos.xy;\n"
+	/* Rebuild the point on Z=0 from the pixel's ray instead of using the interpolated
+	 * v_pos: across the huge quad that interpolation loses precision and the lines
+	 * come out broken at some angles. */
+	"	vec2 ndc = (gl_FragCoord.xy - u_viewport.xy) / u_viewport.zw * 2.0 - 1.0;\n"
+	"	vec4 ra = u_persinv * vec4(ndc, -1.0, 1.0);\n"
+	"	vec4 rb = u_persinv * vec4(ndc, 1.0, 1.0);\n"
+	"	vec3 pa = ra.xyz / ra.w;\n"
+	"	vec3 pb = rb.xyz / rb.w;\n"
+	"	float dz = pb.z - pa.z;\n"
+	"	vec3 wp = (abs(dz) > 1e-12) ? mix(pa, pb, -pa.z / dz) : v_pos;\n"
+	"	vec2 p = wp.xy;\n"
 	"	vec2 fw = fwidth(p);\n"
-	"	vec3 view = v_pos - u_camera;\n"
+	"	vec3 view = vec3(p, 0.0) - u_camera;\n"
 	"	float dist = length(view);\n"
 	"	float fade = 1.0 - smoothstep(0.0, u_fadeDist, dist - u_fadeDist * 0.25);\n"
 	"	fade *= smoothstep(0.0, 0.2, abs(view.z) / max(dist, 1e-8));\n"
@@ -572,6 +584,18 @@ static bool drawfloor_shader(RegionView3D *rv3d, View3D *v3d, float grid_scale,
 	coly[3] = show_y ? 1.0f : 0.0f;
 
 	GPU_shader_bind(floor_shader);
+	{
+		int vp[4];
+		float viewport[4];
+		glGetIntegerv(GL_VIEWPORT, vp);
+		viewport[0] = (float)vp[0];
+		viewport[1] = (float)vp[1];
+		viewport[2] = (float)max_ii(vp[2], 1);
+		viewport[3] = (float)max_ii(vp[3], 1);
+		GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_persinv"), 16, 1,
+		                          (float *)rv3d->persinv);
+		GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_viewport"), 4, 1, viewport);
+	}
 	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_camera"), 3, 1, cam);
 	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_scale"), grid_scale);
 	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_subdiv"),
