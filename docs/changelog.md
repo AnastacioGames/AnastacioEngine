@@ -9,6 +9,35 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Collision Bounds: Oriented Box novo; Box centrado na geometria, Capsule e Convex Hull corrigidos
+
+- `CcdPhysicsEnvironment.cpp`: Box, Cylinder, Cone e Capsule usavam a extensão da bounding box, mas ficavam
+  centrados na origem do objeto (`bounds_center` era calculado e ignorado). Agora, se a origem não está no centro
+  da geometria, a forma vai dentro de um compound deslocado. O centro de massa continua na origem. Character fica de
+  fora, porque precisa de forma convexa simples.
+- Capsule: a altura passada ao Bullet agora exclui as calotas (`2*(ext_z - raio)`). Antes, a cápsula ficava `2*raio`
+  mais alta que a malha.
+- `CcdPhysicsController.cpp`: Convex Hull passa pelo `btConvexHullComputer` e guarda só os vértices do casco. A forma
+  é a mesma, mas com menos pontos por consulta.
+- Novo tipo **Oriented Box** (`OB_BOUND_ORIENTED_BOX = 9`, só malhas, não aparece para Character/Soft Body):
+  `BKE_mesh_calc_obb` (`mesh.c`) acha a menor caixa rotacionada partindo dos eixos locais e dos eixos principais
+  (PCA), com refino por pequenas rotações. Nunca sai maior que o Box. No jogo vira um `btBoxShape` rotacionado dentro
+  de um compound. Usa os vértices da malha original (sem modificadores). Com escala não uniforme a caixa rotacionada
+  não acompanha a escala exatamente.
+- Viewport (`drawobject.c`): desenha o Oriented Box, e os bounds de jogo agora aparecem centrados na geometria, igual
+  à física (Character continua desenhado na origem).
+- Centro de massa: em corpos dinâmicos (Dynamic/Rigid Body) com forma primitiva deslocada, o centro de massa vai
+  para o centro da forma, via `SetCenterOfMassOffset` (mesma compensação do `vehicle_com_offset`). Antes o corpo
+  girava em volta da origem, que podia estar fora da malha. Não vale para Character, compound e veículo com offset.
+- `PostProcessReplica`: cópias (Add Object) perdiam o offset do centro de massa (inclusive o do veículo). Agora o
+  offset é lido do motion state original e reaplicado.
+- Collider Object (`collision_bound`): Triangle Mesh e Convex Hull chamavam `UpdateMesh(gameobj, nullptr)` e usavam a
+  malha do próprio objeto; só funcionava por acaso quando o objeto colisor também tinha física Triangle Mesh (a forma
+  era compartilhada pelo `FindMesh`). Agora a malha do colisor é usada. Se o colisor não existe ou não tem malha, o
+  objeto usa a própria malha e avisa no console (antes ficava sem física). O campo só vale para Triangle Mesh e
+  Convex Hull, e aparece na UI para os dois.
+- Muda a colisão de arquivos antigos que têm a origem fora do centro da malha.
+
 ## 2026-09-30 - World Weather: ripples viram normal (onda com refração)
 
 - `RAS_Rain2DFilter.glsl` e `gpu_shader_fx_rain_frag.glsl`: o ripple deixou de somar brilho (`rainRipples3D`) e

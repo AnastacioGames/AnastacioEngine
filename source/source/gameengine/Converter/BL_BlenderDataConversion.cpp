@@ -2150,20 +2150,28 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			int layerMask = (groupobj.find(blenderobject) == groupobj.end()) ? activeLayerBitInfo : 0;
 
 			/* Custom Mesh Process. */
+			// Only Triangle Mesh and Convex Hull use the "Collider Object" mesh.
+			const bool useColliderObject = blenderobject->collision_bound &&
+				(blenderobject->gameflag & OB_BOUNDS) &&
+				ELEM(blenderobject->collision_boundtype, OB_BOUND_TRIANGLE_MESH, OB_BOUND_CONVEX_HULL);
 			// This object depends on another object, we will do physics on it later.
-			if (blenderobject->collision_bound && !processCustomMesh) {
+			if (useColliderObject && !processCustomMesh) {
 				continue;
 			}
 			// We create the physics information of these objects now because they depend on other objects (other objects it's already calculated in last loop).
-			else if (blenderobject->collision_bound) {
+			else if (useColliderObject) {
 				KX_GameObject *gameobjmesh = converter.FindGameObject(blenderobject->collision_bound);
+				const std::vector<KX_Mesh *> *colliderMeshes = gameobjmesh ? &gameobjmesh->GetMeshList() : nullptr;
 
-				if (!gameobjmesh) continue;
-
-				const std::vector<KX_Mesh *>& meshes = gameobjmesh->GetMeshList();
-				KX_Mesh *meshobj = (meshes.empty()) ? nullptr : meshes.front();
-
-				BL_CreatePhysicsObjectNew(gameobj, blenderobject, meshobj, kxscene, layerMask, converter, false);
+				if (colliderMeshes && !colliderMeshes->empty()) {
+					BL_CreatePhysicsObjectNew(gameobj, blenderobject, colliderMeshes->front(), kxscene, layerMask, converter, false);
+					continue;
+				}
+				// Collider object missing or without mesh: fall back to our own mesh.
+				CM_Warning("object \"" << gameobj->GetName() << "\": Collider Object has no mesh, using the object's own mesh");
+				const std::vector<KX_Mesh *>& ownMeshes = gameobj->GetMeshList();
+				BL_CreatePhysicsObjectNew(gameobj, blenderobject, ownMeshes.empty() ? nullptr : ownMeshes.front(),
+				                          kxscene, layerMask, converter, false);
 				continue;
 			}
 

@@ -33,6 +33,7 @@
 #include "BLI_memarena.h"
 #include "BLI_edgehash.h"
 #include "BLI_string.h"
+#include "BLI_math_solvers.h"
 
 #include "BKE_animsys.h"
 #include "BKE_main.h"
@@ -726,6 +727,124 @@ BoundBox *BKE_mesh_boundbox_get(Object *ob)
 	}
 
 	return me->bb;
+}
+
+/* Box volume of the vertices projected on the given orthonormal axes (rows). */
+static float mesh_obb_volume(const MVert *mvert, const int totvert, const float axes[3][3],
+                             float r_min[3], float r_max[3])
+{
+	INIT_MINMAX(r_min, r_max);
+	for (int i = 0; i < totvert; i++) {
+		const float d[3] = {
+		    dot_v3v3(axes[0], mvert[i].co),
+		    dot_v3v3(axes[1], mvert[i].co),
+		    dot_v3v3(axes[2], mvert[i].co)};
+		minmax_v3v3_v3(r_min, r_max, d);
+	}
+	return (r_max[0] - r_min[0]) * (r_max[1] - r_min[1]) * (r_max[2] - r_min[2]);
+}
+
+/* Rotate the axes around each of them, keeping the angle that gives the smallest box. */
+static float mesh_obb_refine(const MVert *mvert, const int totvert, float axes[3][3])
+{
+	float bmin[3], bmax[3];
+	float best = mesh_obb_volume(mvert, totvert, axes, bmin, bmax);
+	const float steps[2][2] = {{DEG2RADF(3.0f), 15.0f}, {DEG2RADF(0.5f), 6.0f}};
+
+	for (int s = 0; s < 2; s++) {
+		for (int k = 0; k < 3; k++) {
+			float base[3][3], best_axes[3][3];
+			copy_m3_m3(base, axes);
+			copy_m3_m3(best_axes, axes);
+			const int n = (int)steps[s][1];
+			for (int j = -n; j <= n; j++) {
+				if (j == 0) {
+					continue;
+				}
+				float rot[3][3], test[3][3];
+				axis_angle_normalized_to_mat3(rot, base[k], steps[s][0] * (float)j);
+				for (int a = 0; a < 3; a++) {
+					mul_v3_m3v3(test[a], rot, base[a]);
+				}
+				const float vol = mesh_obb_volume(mvert, totvert, test, bmin, bmax);
+				if (vol < best) {
+					best = vol;
+					copy_m3_m3(best_axes, test);
+				}
+			}
+			copy_m3_m3(axes, best_axes);
+		}
+	}
+	return best;
+}
+
+/**
+ * Oriented bounding box of the mesh vertices, in object space.
+ * Starts from both the local axes and the principal axes (PCA) and refines
+ * each by small rotations, keeping the smallest box. Never larger than the AABB.
+ * \return r_axes: box axes as rows, r_center: box center, r_half: half extents.
+ */
+bool BKE_mesh_calc_obb(const Mesh *me, float r_axes[3][3], float r_center[3], float r_half[3])
+{
+	const MVert *mvert = me->mvert;
+	const int totvert = me->totvert;
+
+	if (mvert == NULL || totvert == 0) {
+		return false;
+	}
+
+	float mean[3] = {0.0f, 0.0f, 0.0f};
+	for (int i = 0; i < totvert; i++) {
+		add_v3_v3(mean, mvert[i].co);
+	}
+	mul_v3_fl(mean, 1.0f / (float)totvert);
+
+	float cov[3][3] = {{0.0f}};
+	for (int i = 0; i < totvert; i++) {
+		float d[3];
+		sub_v3_v3v3(d, mvert[i].co, mean);
+		for (int a = 0; a < 3; a++) {
+			for (int b = a; b < 3; b++) {
+				cov[a][b] += d[a] * d[b];
+			}
+		}
+	}
+	cov[1][0] = cov[0][1];
+	cov[2][0] = cov[0][2];
+	cov[2][1] = cov[1][2];
+
+	float axes[3][3];
+	unit_m3(axes);
+	float best = mesh_obb_refine(mvert, totvert, axes);
+
+	float eigen_values[3], pca[3][3];
+	if (BLI_eigen_solve_selfadjoint_m3((const float (*)[3])cov, eigen_values, pca)) {
+		normalize_v3(pca[0]);
+		cross_v3_v3v3(pca[2], pca[0], pca[1]);
+		normalize_v3(pca[2]);
+		cross_v3_v3v3(pca[1], pca[2], pca[0]);
+		if (is_finite_v3(pca[0]) && is_finite_v3(pca[1]) && is_finite_v3(pca[2])) {
+			const float vol = mesh_obb_refine(mvert, totvert, pca);
+			if (vol < best * 0.999f) {
+				best = vol;
+				copy_m3_m3(axes, pca);
+			}
+		}
+	}
+
+	float bmin[3], bmax[3], mid[3];
+	mesh_obb_volume(mvert, totvert, axes, bmin, bmax);
+	mid_v3_v3v3(mid, bmin, bmax);
+	sub_v3_v3v3(r_half, bmax, bmin);
+	mul_v3_fl(r_half, 0.5f);
+
+	/* Center back to object space: axes are rows, so center = axes^T * mid. */
+	zero_v3(r_center);
+	for (int a = 0; a < 3; a++) {
+		madd_v3_v3fl(r_center, axes[a], mid[a]);
+	}
+	copy_m3_m3(r_axes, axes);
+	return true;
 }
 
 void BKE_mesh_texspace_get(Mesh *me, float r_loc[3], float r_rot[3], float r_size[3])

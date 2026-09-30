@@ -497,7 +497,7 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
 
         col = split.column()
         col.prop(game, "collision_bounds_type", text="Bounds")
-        if (game.collision_bounds_type == "TRIANGLE_MESH"):
+        if game.collision_bounds_type in {'TRIANGLE_MESH', 'CONVEX_HULL'}:
             col.prop(game, "collision_bound")
 
         row = col.row()

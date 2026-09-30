@@ -60,6 +60,7 @@
 extern "C" {
 	#include "BLI_utildefines.h"
 	#include "BKE_object.h"
+	#include "BKE_mesh.h"
 }
 
 #define CCD_CONSTRAINT_DISABLE_LINKED_COLLISION 0x80
@@ -3407,6 +3408,16 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		}
 	}
 
+	// "Collider Object": the converter passes that object's mesh instead of our own.
+	// UpdateMesh must use it too, otherwise it silently falls back to our own mesh.
+	RAS_Mesh *colliderMesh = nullptr;
+	if (blenderobject->collision_bound && meshobj) {
+		const std::vector<KX_Mesh *>& ownMeshes = gameobj->GetMeshList();
+		if (ownMeshes.empty() || ownMeshes.front() != meshobj) {
+			colliderMesh = meshobj;
+		}
+	}
+
 	// Get bounds information
 	float bounds_center[3], bounds_extends[3];
 	BoundBox *bb = BKE_object_boundbox_get(blenderobject);
@@ -3422,6 +3433,29 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		bounds_center[0] = 0.5f * (bb->vec[0][0] + bb->vec[4][0]);
 		bounds_center[1] = 0.5f * (bb->vec[0][1] + bb->vec[2][1]);
 		bounds_center[2] = 0.5f * (bb->vec[0][2] + bb->vec[1][2]);
+	}
+
+	// Placement of primitive shapes inside the object: geometry center, plus
+	// rotation for the oriented box.
+	btTransform boundsTrans(btMatrix3x3::getIdentity(),
+	                        btVector3(bounds_center[0], bounds_center[1], bounds_center[2]));
+
+	if (bounds == OB_BOUND_ORIENTED_BOX) {
+		float axes[3][3], center[3], half[3];
+		if (blenderobject->type == OB_MESH && !isbulletchar &&
+		    BKE_mesh_calc_obb((Mesh *)blenderobject->data, axes, center, half))
+		{
+			// axes are the box axes (rows); the child basis needs them as columns.
+			const btMatrix3x3 basis(axes[0][0], axes[0][1], axes[0][2],
+			                        axes[1][0], axes[1][1], axes[1][2],
+			                        axes[2][0], axes[2][1], axes[2][2]);
+			boundsTrans.setBasis(basis.transpose());
+			boundsTrans.setOrigin(btVector3(center[0], center[1], center[2]));
+			bounds_extends[0] = half[0];
+			bounds_extends[1] = half[1];
+			bounds_extends[2] = half[2];
+		}
+		bounds = OB_BOUND_BOX;
 	}
 
 	switch (bounds) {
@@ -3468,7 +3502,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		case OB_BOUND_CONVEX_HULL:
 		{
 			// Convex shapes can be shared, check first if we already have a shape on that mesh.
-			CcdShapeConstructionInfo *sharedShapeInfo = CcdShapeConstructionInfo::FindMesh(meshobj, gameobj->GetDeformer(), PHY_SHAPE_POLYTOPE);
+			CcdShapeConstructionInfo *sharedShapeInfo = CcdShapeConstructionInfo::FindMesh(meshobj, colliderMesh ? nullptr : gameobj->GetDeformer(), PHY_SHAPE_POLYTOPE);
 			if (sharedShapeInfo) {
 				shapeInfo->Release();
 				shapeInfo = sharedShapeInfo;
@@ -3476,8 +3510,8 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			}
 			else {
 				shapeInfo->m_shapeType = PHY_SHAPE_POLYTOPE;
-				// Update from deformer or mesh.
-				shapeInfo->UpdateMesh(gameobj, nullptr);
+				// Update from the collider object mesh, or from deformer or mesh.
+				shapeInfo->UpdateMesh(gameobj, colliderMesh);
 			}
 
 			bm = shapeInfo->CreateBulletShape(ci.m_margin);
@@ -3486,7 +3520,8 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		case OB_BOUND_CAPSULE:
 		{
 			shapeInfo->m_radius = std::max(bounds_extends[0], bounds_extends[1]);
-			shapeInfo->m_height = 2.0f * bounds_extends[2];
+			// Bullet's capsule height excludes the two hemispherical caps.
+			shapeInfo->m_height = 2.0f * (bounds_extends[2] - shapeInfo->m_radius);
 			if (shapeInfo->m_height < 0.0f) {
 				shapeInfo->m_height = 0.0f;
 			}
@@ -3497,7 +3532,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		case OB_BOUND_TRIANGLE_MESH:
 		{
 			// Mesh shapes can be shared, check first if we already have a shape on that mesh.
-			CcdShapeConstructionInfo *sharedShapeInfo = CcdShapeConstructionInfo::FindMesh(meshobj, gameobj->GetDeformer(), PHY_SHAPE_MESH);
+			CcdShapeConstructionInfo *sharedShapeInfo = CcdShapeConstructionInfo::FindMesh(meshobj, colliderMesh ? nullptr : gameobj->GetDeformer(), PHY_SHAPE_MESH);
 			if (sharedShapeInfo) {
 				//printf("Found Shared Collision Mesh by Object '%s', mesh name: '%s' \n", gameobj->GetName().c_str(), meshobj->GetName().c_str());
 				shapeInfo->Release();
@@ -3506,8 +3541,8 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			}
 			else {
 				shapeInfo->m_shapeType = PHY_SHAPE_MESH;
-				// Update from deformer or mesh.
-				shapeInfo->UpdateMesh(gameobj, nullptr);
+				// Update from the collider object mesh, or from deformer or mesh.
+				shapeInfo->UpdateMesh(gameobj, colliderMesh);
 			}
 
 			// Soft bodies can benefit from welding, don't do it on non-soft bodies
@@ -3535,6 +3570,43 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		delete motionstate;
 		shapeInfo->Release();
 		return;
+	}
+
+	// Primitive bounds are built from the mesh bounding box, but Bullet shapes
+	// are centered on the object origin. When the origin is not at the
+	// geometry center, shift the shape inside a compound so it covers the mesh.
+	// The center of mass stays at the object origin. Characters need a convex
+	// (non-compound) shape, so they keep the old behavior.
+	// The oriented box also rotates the shape inside that compound.
+	const bool boundsRotated = !(boundsTrans.getBasis() == btMatrix3x3::getIdentity());
+	const bool usesVehicleComOffset = (blenderobject->gameflag2 & OB_VEHICLE) != 0 &&
+	                                  (blenderobject->vehicle_com_offset[0] != 0.0f ||
+	                                   blenderobject->vehicle_com_offset[1] != 0.0f ||
+	                                   blenderobject->vehicle_com_offset[2] != 0.0f);
+	// Dynamic bodies turn around the center of mass, so it must be the shape
+	// center, not the object origin (which can even be outside the mesh).
+	// The shape then sits at the compound origin and the motion state shifts
+	// the body by the geometry center (see SetCenterOfMassOffset below).
+	btVector3 boundsComOffset(0.0f, 0.0f, 0.0f);
+	if (ELEM(bounds, OB_BOUND_BOX, OB_BOUND_CYLINDER, OB_BOUND_CONE, OB_BOUND_CAPSULE) &&
+	    !isbulletchar && (boundsRotated || boundsTrans.getOrigin().length2() > 1.0e-10f))
+	{
+		CcdShapeConstructionInfo *offsetShapeInfo = new CcdShapeConstructionInfo();
+		offsetShapeInfo->m_shapeType = PHY_SHAPE_COMPOUND;
+		offsetShapeInfo->AddShape(shapeInfo);
+
+		if (isbulletdyna && !isCompoundChild && !hasCompoundChildren && !usesVehicleComOffset) {
+			boundsComOffset = boundsTrans.getOrigin();
+			boundsTrans.setOrigin(btVector3(0.0f, 0.0f, 0.0f));
+		}
+		shapeInfo->m_childTrans = boundsTrans;
+
+		btCompoundShape *offsetCompoundShape = new btCompoundShape();
+		offsetCompoundShape->addChildShape(shapeInfo->m_childTrans, bm);
+
+		bm = offsetCompoundShape;
+		shapeInfo->Release();
+		shapeInfo = offsetShapeInfo;
 	}
 
 	// Vehicle chassis Center of Mass offset: wrap the plain chassis shape in
@@ -3708,6 +3780,13 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		physicscontroller->SetCenterOfMassOffset(mt::vec3(blenderobject->vehicle_com_offset[0],
 		                                                    blenderobject->vehicle_com_offset[1],
 		                                                    blenderobject->vehicle_com_offset[2]));
+	}
+
+	else if (!boundsComOffset.fuzzyZero()) {
+		// The offset is in object space, so it follows the object scale.
+		physicscontroller->SetCenterOfMassOffset(mt::vec3(boundsComOffset[0] * scaling[0],
+		                                                    boundsComOffset[1] * scaling[1],
+		                                                    boundsComOffset[2] * scaling[2]));
 	}
 
 	physicscontroller->SetNewClientInfo(&gameobj->GetClientInfo());

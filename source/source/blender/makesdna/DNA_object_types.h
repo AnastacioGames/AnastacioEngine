@@ -831,6 +831,7 @@ enum {
 /*	OB_BOUND_DYN_MESH      = 6, */ /*UNUSED*/
 	OB_BOUND_CAPSULE       = 7,
 	OB_BOUND_EMPTY         = 8,
+	OB_BOUND_ORIENTED_BOX  = 9, /* game engine only: smallest rotated box */
 };
 
 /* lod flags */

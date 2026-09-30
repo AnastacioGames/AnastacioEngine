@@ -109,6 +109,8 @@ static const EnumPropertyItem dupli_items[] = {
 
 static const EnumPropertyItem collision_bounds_items[] = {
 	{OB_BOUND_BOX, "BOX", ICON_MESH_CUBE, "Box", ""},
+	{OB_BOUND_ORIENTED_BOX, "ORIENTED_BOX", ICON_MESH_CUBE, "Oriented Box",
+	 "Smallest rotated box around the mesh vertices"},
 	{OB_BOUND_SPHERE, "SPHERE", ICON_MESH_UVSPHERE, "Sphere", ""},
 	{OB_BOUND_CYLINDER, "CYLINDER", ICON_MESH_CYLINDER, "Cylinder", ""},
 	{OB_BOUND_CONE, "CONE", ICON_MESH_CONE, "Cone", ""},
@@ -887,6 +889,9 @@ static const EnumPropertyItem *rna_Object_collision_bounds_itemf(bContext *UNUSE
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_CYLINDER);
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_SPHERE);
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_BOX);
+		if (ob->type == OB_MESH && ob->body_type != OB_BODY_TYPE_CHARACTER) {
+			RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_ORIENTED_BOX);
+		}
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_CAPSULE);
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_EMPTY);
 	}

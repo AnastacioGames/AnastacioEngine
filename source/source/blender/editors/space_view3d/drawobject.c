@@ -7395,7 +7395,29 @@ static void draw_bounding_volume(Object *ob, char type)
 	if (bb == NULL)
 		return;
 
-	if (ob->gameflag & OB_BOUNDS) { /* bounds need to be drawn around origin for game engine */
+	if (type == OB_BOUND_ORIENTED_BOX) {
+		float axes[3][3], center[3], half[3], vec[8][3];
+		if (ob->type != OB_MESH || !BKE_mesh_calc_obb(ob->data, axes, center, half)) {
+			draw_box(bb->vec, false);
+			return;
+		}
+		for (int i = 0; i < 8; i++) {
+			/* Same corner order as BoundBox. */
+			const float sx = (i < 4) ? -1.0f : 1.0f;
+			const float sy = ELEM(i, 2, 3, 6, 7) ? 1.0f : -1.0f;
+			const float sz = ELEM(i, 1, 2, 5, 6) ? 1.0f : -1.0f;
+			copy_v3_v3(vec[i], center);
+			madd_v3_v3fl(vec[i], axes[0], sx * half[0]);
+			madd_v3_v3fl(vec[i], axes[1], sy * half[1]);
+			madd_v3_v3fl(vec[i], axes[2], sz * half[2]);
+		}
+		draw_box(vec, false);
+		return;
+	}
+
+	/* The game engine centers primitive bounds on the geometry, except for
+	 * characters, which keep them around the object origin. */
+	if ((ob->gameflag & OB_BOUNDS) && ob->body_type == OB_BODY_TYPE_CHARACTER) {
 
 		if (type == OB_BOUND_BOX) {
 			float vec[8][3], size[3];

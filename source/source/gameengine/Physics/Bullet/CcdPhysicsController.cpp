@@ -42,6 +42,7 @@
 #include "BulletSoftBody/btSoftBodyInternals.h"
 #include "BulletSoftBody/btSoftBodyHelpers.h"
 #include "LinearMath/btConvexHull.h"
+#include "LinearMath/btConvexHullComputer.h"
 #include "BulletCollision/Gimpact/btGImpactShape.h"
 
 #include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
@@ -286,6 +287,11 @@ public:
 	void SetComOffset(const btVector3& offset)
 	{
 		m_comOffset = offset;
+	}
+
+	const btVector3& GetComOffset() const
+	{
+		return m_comOffset;
 	}
 
 	void getWorldTransform(btTransform& worldTrans) const
@@ -927,8 +933,14 @@ void CcdPhysicsController::PostProcessReplica(class PHY_IMotionState *motionstat
 
 	// load some characterists that are not
 	btRigidBody *oldbody = GetRigidBody();
+	// m_bulletMotionState still belongs to the original: keep its center of mass offset.
+	const btVector3 comOffset = m_bulletMotionState ?
+		static_cast<BlenderBulletMotionState *>(m_bulletMotionState)->GetComOffset() : btVector3(0.0f, 0.0f, 0.0f);
 	m_object = nullptr;
 	CreateRigidbody();
+	if (!comOffset.fuzzyZero()) {
+		SetCenterOfMassOffset(ToMt(comOffset));
+	}
 	btRigidBody *body = GetRigidBody();
 	if (body) {
 		if (m_cci.m_mass) {
@@ -2614,8 +2626,19 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 				break;
 			}
 
-			collisionShape = new btConvexHullShape(&m_vertexArray[0], m_vertexArray.size() / 3, 3 * sizeof(btScalar));
-			collisionShape->setMargin(margin);
+			// Keep only the points that lie on the hull: exact same shape, but
+			// support queries no longer iterate over every interior vertex.
+			btConvexHullComputer hullComputer;
+			hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), m_vertexArray.size() / 3, 0.0f, 0.0f);
+			btConvexHullShape *hullShape;
+			if (hullComputer.vertices.size() >= 4) {
+				hullShape = new btConvexHullShape(&hullComputer.vertices[0].getX(), hullComputer.vertices.size(), sizeof(btVector3));
+			}
+			else {
+				hullShape = new btConvexHullShape(&m_vertexArray[0], m_vertexArray.size() / 3, 3 * sizeof(btScalar));
+			}
+			hullShape->setMargin(margin);
+			collisionShape = hullShape;
 			break;
 		}
 		case PHY_SHAPE_MESH:
