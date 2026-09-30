@@ -115,6 +115,7 @@ typedef struct {
   int rain_params4_uniform;
   int rain_lightning_uniform;
   int rain_streak_width_uniform;
+  int rain_ripple_normal_uniform;
 } GPURAINShaderInterface;
 
 typedef struct {
@@ -1352,6 +1353,7 @@ bool GPU_fx_do_composite_pass(
 			    (world->weather_flag & WO_WEATHER_RAIN_SPLASH) ? 1.0f : 0.0f,
 			    world->rain_splash_size, world->rain_splash_rate, world->rain_splash_intensity};
 			float rain_streak_width = (world->rain_streak_width > 0.0f) ? world->rain_streak_width : 1.0f;
+			float rain_ripple_normal = (world->rain_ripple_normal > 0.0f) ? world->rain_ripple_normal : 1.0f;
 			float rain_lightning[4] = {0.0f, 0.0f, 0.5f, 0.5f};
 			unsigned int lightning_seed;
 			if ((world->weather_flag & WO_WEATHER_RAIN_LIGHTNING) &&
@@ -1403,6 +1405,7 @@ bool GPU_fx_do_composite_pass(
 			GPU_shader_uniform_vector(rain_shader, interface->rain_params4_uniform, 4, 1, rain_params4);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_lightning_uniform, 4, 1, rain_lightning);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_streak_width_uniform, 1, 1, &rain_streak_width);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_ripple_normal_uniform, 1, 1, &rain_ripple_normal);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2159,6 +2162,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_params4_uniform = GPU_shader_get_uniform(shader, "rain_params4");
 			interface->rain_lightning_uniform = GPU_shader_get_uniform(shader, "rain_lightning");
 			interface->rain_streak_width_uniform = GPU_shader_get_uniform(shader, "rain_streak_width");
+			interface->rain_ripple_normal_uniform = GPU_shader_get_uniform(shader, "rain_ripple_normal");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

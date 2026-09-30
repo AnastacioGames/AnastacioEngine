@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - World Weather: ripples viram normal (onda com refração)
+
+- `RAS_Rain2DFilter.glsl` e `gpu_shader_fx_rain_frag.glsl`: o ripple deixou de somar brilho (`rainRipples3D`) e
+  passou a ser uma altura (`rainRippleHeight`, seno amortecido em anel) cuja inclinação gera uma normal Z-up. Essa
+  normal distorce o que está sob a água (refração) e dá especular e fresnel. Continua sem UV: usa o XY do mundo
+  reconstruído da profundidade.
+- Novo campo `World.rain_ripple_normal` (reusa `rain_weather_pad`; 0 em arquivo antigo = 1.0), RNA
+  `weather_settings.rain_ripple_normal`, painel World > Ripples, uniform `ge_RainRippleNormal` / `rain_ripple_normal`,
+  `setWeather("weather.ripple_normal", v)`. Intensidade e normal do ripple agora são relidas a cada frame.
+- Protótipo em Python: `tools/ripple_normal_test.py`.
+
 ## 2026-09-30 - Cutscene: evento Camera Path; Motion Paths escondido na Game Engine
 
 - Novo evento de cutscene `CAMERA_PATH` (`CUTSCENE_EVENT_CAMERA_PATH = 17`): move um objeto (normalmente a câmera)

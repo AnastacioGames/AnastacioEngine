@@ -645,6 +645,8 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 			if (const World *world = scene->GetBlenderScene()->world) {
 				rainParams->useRainSplash = (world->weather_flag & WO_WEATHER_RAIN_SPLASH) != 0;
 				rainParams->rain_streak_width = world->rain_streak_width;
+				rainParams->rain_ripple = world->rain_ripple;
+				rainParams->rain_ripple_normal = world->rain_ripple_normal;
 				rainParams->rain_splash_size = world->rain_splash_size;
 				rainParams->rain_splash_rate = world->rain_splash_rate;
 				rainParams->rain_splash_intensity = world->rain_splash_intensity;

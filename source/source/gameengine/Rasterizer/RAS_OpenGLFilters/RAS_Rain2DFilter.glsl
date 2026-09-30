@@ -20,6 +20,7 @@ uniform vec4 ge_RainParams3; // density, ripple radius, minimum upward normal, s
 uniform vec4 ge_RainParams4; // use splash, splash size, splash rate, splash intensity
 uniform vec4 ge_RainLightning; // flash, bolt, bolt screen position
 uniform float ge_RainStreakWidth; // Classic streak width, 1 = 2 px at 1080p
+uniform float ge_RainRippleNormal; // ripple normal strength, 1 = default
 uniform vec3 ge_RainColor;
 uniform float ge_RainStyle; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
 
@@ -86,36 +87,26 @@ vec3 rainCellHash(vec3 position)
 		* 43758.5453);
 }
 
-float rainRipples3D(vec3 coord, float time)
+/* Ripple water height: each cell drops once per cycle; the wave is a damped sine
+ * inside an expanding ring (crest + trough), so its gradient reads as a bump normal. */
+float rainRippleHeight(vec2 p, float time)
 {
-	vec3 i = floor(coord);
-	vec3 f = fract(coord);
-	float rippleEffect = 0.0;
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	float h = 0.0;
 
-	for (int z = -1; z <= 1; z++) {
-		for (int y = -1; y <= 1; y++) {
-			for (int x = -1; x <= 1; x++) {
-				vec3 neighbor = vec3(float(x), float(y), float(z));
-				vec3 randomVector = rainCellHash(i + neighbor);
-				vec3 difference = neighbor - f + randomVector;
-
-				float dist = length(difference);
-				float dropTime = fract(time * 2.0 + randomVector.x);
-
-				float distToRing1 = abs(dist - dropTime);
-				float distToRing2 = abs(dist - dropTime + 0.12);
-
-				float ring1 = smoothstep(0.09, 0.0, distToRing1);
-				float ring2 = smoothstep(0.09, 0.0, distToRing2);
-
-				float fade = 1.0 - smoothstep(0.3, 0.95, dropTime);
-				float totalRing = (ring1 + ring2 * 0.4) * fade;
-
-				rippleEffect = max(rippleEffect, totalRing);
-			}
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 n = vec2(float(x), float(y));
+			vec3 r = rainCellHash(vec3(i + n, 0.0));
+			float dist = length(n - f + r.xy);
+			float t = fract(time * 0.8 + r.z);
+			float x0 = dist - t * 1.1;
+			float wave = sin(x0 * 55.0) * exp(-x0 * x0 * 180.0);
+			h += wave * (1.0 - t) * (1.0 - t);
 		}
 	}
-	return rippleEffect;
+	return h;
 }
 
 vec3 getWorldPositionFromDepth(vec2 uv, float depthValue)
@@ -442,8 +433,29 @@ void main()
 			/* Blender/Range uses Z as the world-up axis. Testing Y here rejects
 			 * horizontal floors and lets some vertical faces through. */
 			if (length(worldPos - camPos) <= rippleRadius && normal.z >= rippleMinUp) {
-				float rippleNoise = rainRipples3D(worldPos * 6.0, time);
-				finalColor += vec3(rippleNoise * rippleIntensity * 0.15);
+				/* Height -> gradient -> perturbed Z-up normal, like a material normal map
+				 * projected from above in world XY (no mesh UV needed). */
+				vec2 p = worldPos.xy * 6.0;
+				const float e = 0.02;
+				float h = rainRippleHeight(p, time);
+				vec2 grad = vec2(rainRippleHeight(p + vec2(e, 0.0), time) - h,
+				                 rainRippleHeight(p + vec2(0.0, e), time) - h) / e;
+				vec3 N = normalize(vec3(-grad * 0.075 * ge_RainRippleNormal, 1.0));
+				float fadeOut = 1.0 - smoothstep(rippleRadius * 0.7, rippleRadius, length(worldPos - camPos));
+				float amount = rippleIntensity * 2.5 * fadeOut;
+
+				/* Refraction: shift what is under the water by the normal slope. */
+				vec3 refr = texture(bgl_RenderedTexture, texcoord + N.xy * 0.012 * amount).rgb;
+				float refrLuma = dot(refr, vec3(0.299, 0.587, 0.114));
+				finalColor += mix(refr, vec3(refrLuma) * 0.85, darken) - overcast;
+
+				/* Highlight + fresnel from the bent normal, only where there is a wave. */
+				vec3 V = normalize(camPos - worldPos);
+				vec3 H = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
+				float spec = pow(max(dot(N, H), 0.0), 120.0);
+				float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+				float slope = clamp((1.0 - N.z) * 40.0, 0.0, 1.0);
+				finalColor += vec3(spec * 0.8 + fres * 0.25) * slope * amount * 0.4;
 			}
 		}
 	}

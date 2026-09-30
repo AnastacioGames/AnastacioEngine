@@ -278,6 +278,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_ripple = world->rain_ripple;
 			filters.rain_ripple_distance = world->rain_ripple_distance;
 			filters.rain_ripple_min_up = world->rain_ripple_min_up;
+			filters.rain_ripple_normal = world->rain_ripple_normal;
 			filters.rain_color[0] = world->rain_color[0];
 			filters.rain_color[1] = world->rain_color[1];
 			filters.rain_color[2] = world->rain_color[2];

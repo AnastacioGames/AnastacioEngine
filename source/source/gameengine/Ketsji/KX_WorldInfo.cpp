@@ -159,6 +159,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.rain_wind") == 0) world->rain_wind = value;
 	else if (std::strcmp(identifier, "weather.rain_darken") == 0) world->rain_darken = value;
 	else if (std::strcmp(identifier, "weather.ripple_intensity") == 0) world->rain_ripple = value;
+	else if (std::strcmp(identifier, "weather.ripple_normal") == 0) world->rain_ripple_normal = value;
 	else if (std::strcmp(identifier, "weather.rain") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN; else world->weather_flag &= ~WO_WEATHER_RAIN;
 	}

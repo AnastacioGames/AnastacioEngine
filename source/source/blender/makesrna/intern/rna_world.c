@@ -591,6 +591,12 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Ripple Upward Surface", "Minimum upward-facing normal for ripples; 0.5 accepts slopes up to 60 degrees and rejects vertical sides");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "rain_ripple_normal", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.01f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Ripple Normal", "Strength of the ripple normal: surface bending, refraction and highlights of the waves");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "rain_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "rain_color");
 	RNA_def_property_array(prop, 3);

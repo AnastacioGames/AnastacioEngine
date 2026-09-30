@@ -119,7 +119,7 @@ base class --- :class:`EXP_PyObjectPlus`
       Changes a World weather setting at runtime (the "weather." prefix is optional).
       Booleans: ``rain``, ``ripples``, ``splash``, ``aura``, ``lightning``, ``clouds``, ``lens_flare``, ``mist``.
       Floats: ``rain_intensity``, ``rain_density``, ``rain_speed``, ``rain_wind``, ``rain_darken``,
-      ``rain_streak_width``, ``ripple_intensity``, ``splash_size``, ``splash_rate``, ``splash_intensity``,
+      ``rain_streak_width``, ``ripple_intensity``, ``ripple_normal``, ``splash_size``, ``splash_rate``, ``splash_intensity``,
       ``splash_distance``, ``aura_size``, ``aura_rate``, ``aura_intensity``, ``aura_distance``,
       ``lightning_rate``, ``lightning_intensity``, ``lightning_distance``, ``lightning_width``,
       ``cloud_coverage``, ``cloud_scale``, ``cloud_speed``, ``flare_scale``, ``flare_intensity``, ``mist_*``.

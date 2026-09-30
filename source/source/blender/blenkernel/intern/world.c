@@ -192,6 +192,7 @@ void BKE_world_init(World *wrld)
 	wrld->rain_ripple = 0.4f;
 	wrld->rain_ripple_distance = 20.0f;
 	wrld->rain_ripple_min_up = 0.5f;
+	wrld->rain_ripple_normal = 1.0f;
 	wrld->rain_color[0] = 0.8f;
 	wrld->rain_color[1] = 0.8f;
 	wrld->rain_color[2] = 0.8f;

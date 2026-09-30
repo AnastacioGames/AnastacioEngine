@@ -121,6 +121,7 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainStyle", // GE_RAIN_STYLE_UNIFORM
 	"ge_RainParams4", // GE_RAIN_PARAMS4_UNIFORM
 	"ge_RainStreakWidth", // GE_RAIN_STREAK_WIDTH_UNIFORM
+	"ge_RainRippleNormal", // GE_RAIN_RIPPLE_NORMAL_UNIFORM
 	"ge_RainLightning", // GE_RAIN_LIGHTNING_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
@@ -562,6 +563,11 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		/* 0 = file saved before the field existed: keep the original width. */
 		float width = m_buildInFilters.rain_streak_width > 0.0f ? m_buildInFilters.rain_streak_width : 1.0f;
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_STREAK_WIDTH_UNIFORM], RAS_Uniform::UNI_FLOAT, &width, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_RIPPLE_NORMAL_UNIFORM] != -1) {
+		/* 0 = file saved before the field existed: default strength. */
+		float strength = m_buildInFilters.rain_ripple_normal > 0.0f ? m_buildInFilters.rain_ripple_normal : 1.0f;
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_RIPPLE_NORMAL_UNIFORM], RAS_Uniform::UNI_FLOAT, &strength, sizeof(float), 1);
 	}
 	if (m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_lightning, sizeof(float) * 4, 1);

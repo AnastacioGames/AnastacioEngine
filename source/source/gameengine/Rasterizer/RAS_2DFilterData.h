@@ -84,6 +84,7 @@ typedef struct BuildInFilters {
 	float rain_ripple;
 	float rain_ripple_distance;
 	float rain_ripple_min_up;
+	float rain_ripple_normal;
 	float rain_color[3];
 	float rain_streak_width;
 	float rain_splash_size;

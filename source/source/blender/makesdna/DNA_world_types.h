@@ -136,7 +136,7 @@ typedef struct World {
 
 	float rain_intensity, rain_density, rain_speed, rain_wind, rain_darken, rain_ripple;
 	float rain_ripple_distance, rain_ripple_min_up;
-	float rain_weather_pad;
+	float rain_ripple_normal; /* forca da normal das ondas (era rain_weather_pad; 0 = arquivo antigo = 1.0) */
 	float rain_color[3];
 	/* respingo nas superficies de cima e aura de riscos na silhueta, ver WO_WEATHER_RAIN_SPLASH/AURA */
 	float rain_splash_size, rain_splash_rate, rain_splash_intensity, rain_splash_distance;

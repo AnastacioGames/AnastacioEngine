@@ -246,6 +246,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub = col.column()
             sub.active = weather.use_rain_ripple
             sub.prop(weather, "rain_ripple_intensity")
+            sub.prop(weather, "rain_ripple_normal")
             sub.prop(weather, "rain_ripple_distance")
             sub.prop(weather, "rain_ripple_min_up")
 
