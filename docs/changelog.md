@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Versão 0.4.6
+
+`ANASTACIO_VERSION_STRING` (`BKE_blender_version.h`) e o About (`wm.py`) passam para 0.4.6. Release Linux
+com a chuva do World, MP3 no `aud` e colormanagement (OpenColorIO 1.1.1).
+
 ## 2026-09-30 - Linux: MP3 no aud/Sound actuator (libsndfile 1.2.2 no pacote)
 
 - Kitsuy: jogo abre com tela preta no player Linux 0.4.5 e funciona no Windows; causa apontada por ele: som do
