@@ -9,6 +9,32 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Linux: MP3 no aud/Sound actuator (libsndfile 1.2.2 no pacote)
+
+- Kitsuy: jogo abre com tela preta no player Linux 0.4.5 e funciona no Windows; causa apontada por ele: som do
+  `aud`. Reproduzido com o pacote publicado: `.mp3` falha com "The file couldn't be read with any installed file
+  reader", `.ogg` toca. No Linux o FFmpeg fica desligado (`WITH_CODEC_FFMPEG=OFF`) e o Audaspace le tudo pela
+  libsndfile; o pacote levava a do Ubuntu 22.04 (1.0.31), que so le MP3 a partir da 1.1.0. No Windows o FFmpeg le.
+- `tools/linux/container-build-22.04.sh` compila a libsndfile 1.2.2 (`ENABLE_MPEG=ON`, mpg123/lame/FLAC/Opus do
+  apt) em `/usr/local`, que o `ld.so.cache` resolve antes da do sistema; `package-runtime.sh` empacota essa.
+  No fim o script confere a string `libsndfile-1.2.2` na `lib/libsndfile.so.1` do tarball. Versao padrao: 0.4.6.
+- Pacote 0.4.6 validado: `RangeEngine -b` toca `.mp3` e `.ogg` pelo `aud`; codecs carregados de `lib/`
+  (`LD_DEBUG=libs`); maior simbolo `GLIBC_2.35`; demo `Example_ImgGui` no `RangeRuntime` tocou a musica de
+  fundo (ouvido na maquina Linux). Falta publicar e o Kitsuy confirmar com o jogo dele.
+
+## 2026-09-30 - Linux: colormanagement no pacote (OpenColorIO 1.1.1)
+
+- Kitsuy: o pacote Linux nao tinha `2.79/datafiles/colormanagement`; o player rodava em "Color management: using
+  fallback mode" (so Linear/sRGB, sem os colorspaces do `config.ocio`; o BGE nao usa Filmic/Looks, a diferenca
+  aparece em texturas float EXR/HDR e colorspaces de imagem). A pasta so e instalada com `WITH_OPENCOLORIO`.
+- O apt do Ubuntu 22.04 ja traz a OCIO 1.1.1 (`libopencolorio-dev`), a API 1.x de `intern/opencolorio`; os
+  presets `linux-runtime` e `linux-editor` passam a ligar `WITH_OPENCOLORIO`. O container confere no fim que o
+  tarball tem `lib/libOpenColorIO.so.1` e `colormanagement/config.ocio`. Host 24.04+ (so OCIO 2.x): `-DWITH_OPENCOLORIO=OFF`.
+- A checagem da libsndfile no script (`ldconfig -p | grep | grep -q`) derrubava o build com SIGPIPE (141) sob
+  `pipefail`; agora le o cache de um arquivo.
+- Pacote 0.4.6 validado: sem a linha de "fallback mode"; cena `tools/create_rain_splash_scene.py` rodou 25 s no
+  `RangeRuntime` sem erro; `libOpenColorIO.so.1` exige no maximo `GLIBC_2.33`.
+
 ## 2026-09-30 - Chuva do World: respingo, aura, raio e riscos finos
 
 - World › Rain ganhou dois efeitos, desligados por padrão (versioning 1.6.114):

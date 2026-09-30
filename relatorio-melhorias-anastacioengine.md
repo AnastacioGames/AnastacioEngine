@@ -218,6 +218,12 @@ ferramenta correspondente.
   o `makesdna` descarta `unsigned`, então SDNA, tamanhos e offsets não mudam (comparados antes/depois). Não alargar
   o tipo nem reduzir o hardmax para satisfazer o compilador. O MSVC nativo não define `__STDC_VERSION__` C11 e
   portanto nunca executa a checagem. Evidência em [`docs/changelog.md`](docs/changelog.md) (2026-09-20).
+- Pacote Linux: o FFmpeg fica desligado (`WITH_CODEC_FFMPEG=OFF`) e o `aud` lê áudio pela libsndfile. O
+  container 22.04 compila e empacota a libsndfile 1.2.2 com MPEG (a 1.0.31 do apt não lê MP3); não voltar para a
+  do sistema. `WITH_OPENCOLORIO` fica ligado nos presets Linux com a OCIO 1.1.1 do apt do 22.04 (a API 1.x que
+  `intern/opencolorio` usa); o pacote leva `libOpenColorIO.so.1` e `datafiles/colormanagement`. Compilar fora do
+  container (24.04+, só OCIO 2.x) exige `-DWITH_OPENCOLORIO=OFF` até o port para 2.x. Evidência em
+  [`docs/changelog.md`](docs/changelog.md) (2026-09-30).
 
 ## Fontes relacionadas
 

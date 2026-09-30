@@ -115,6 +115,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     **Feito 2026-09-29:** `package-runtime.sh` empacota as `.so` e o pacote passou a ser compilado num container
     Ubuntu 22.04 (`tools/linux/container-build-22.04.sh`, glibc 2.35). Publicado na v0.4.5; falta o Fumangy
     confirmar no Ubuntu 26.04 (o pacote antigo falhava com `libOpenImageIO.so.2.4`).
+  - **Som no player Linux (Kitsuy):** jogo com tela preta no 0.4.5 Linux; causa: `aud` nao lia `.mp3` (libsndfile
+    1.0.31 do 22.04 sem MPEG, FFmpeg desligado no Linux). **Feito 2026-09-30:** container compila e empacota a
+    libsndfile 1.2.2 com MP3; pacote 0.4.6 toca `.mp3`/`.ogg`. Falta publicar a 0.4.6 e o Kitsuy confirmar.
+  - **`colormanagement` no pacote Linux (Kitsuy, 2026-09-30):** falta `2.79/datafiles/colormanagement`; so e
+    instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
+    2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,
+    pacote 0.4.6 leva `libOpenColorIO.so.1` e a pasta, sem "fallback mode". Falta o Kitsuy confirmar.
   - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
@@ -159,8 +166,9 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   so sm_120 testado em hardware real. OSL fica desligado (sem pacote no Ubuntu
   24.04; exige OSL 1.9 com LLVM antigo).
 - Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
-  do editor para OpenColorIO 2.x/FFmpeg 5+ (desligados no preset `linux-editor`; só o wrapper `audaspace` do
-  FFmpeg foi ajustado).
+  do editor para OpenColorIO 2.x/FFmpeg 5+. Só necessário fora do container 22.04 (Ubuntu 24.04+ só tem OCIO
+  2.x): o container usa a OCIO 1.1.1 do apt desde 2026-09-30. FFmpeg segue desligado; só o wrapper `audaspace`
+  do FFmpeg foi ajustado.
 
 ### Cutscene nativo
 

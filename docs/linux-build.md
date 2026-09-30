@@ -217,8 +217,8 @@ para explicar a evolucao do port.
 
 ## Escopo inicial
 
-O preset `linux-runtime` compila somente o player, com OpenGL/X11, Python, SDL e OpenAL. FFmpeg, OpenImageIO,
-OpenColorIO, Cycles, compositor e outros recursos ficam desligados nesta primeira etapa (o player nao precisa
+O preset `linux-runtime` compila somente o player, com OpenGL/X11, Python, SDL e OpenAL (e OpenColorIO 1.x desde
+2026-09-30, ver o container 22.04 abaixo). FFmpeg, OpenImageIO, Cycles, compositor e outros recursos ficam desligados nesta primeira etapa (o player nao precisa
 deles). Isso preserva o Windows e reduz o primeiro problema de portabilidade a um alvo verificavel.
 
 ## Editor (RangeEngine) — preset `linux-editor`, validado em Linux real em 15 de setembro de 2026
@@ -482,7 +482,12 @@ O script instala as dependencias pelo apt, o CMake pelo pip (>=3.28, o do 22.04 
 isolado, compila os dois presets e gera `build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz`. No 22.04
 a Embree so vem como `libembree3.so` (sem as bibliotecas por componente); `FindEmbree.cmake` aceita isso. Para
 conferir o pacote: `objdump -T` dos binarios sem simbolo acima de `GLIBC_2.35` e `ldd ./RangeEngine | grep "not found"`
-vazio. `libva`, `libvdpau` e `libOpenCL` vao em `lib/` (sem elas o pacote nao abria em Ubuntu 22.04/26.04, Debian 12
+vazio. **Audio (2026-09-30):** o FFmpeg fica desligado no Linux e o `aud` le tudo pela libsndfile; a do 22.04
+(1.0.31) nao le MP3, entao o script compila a 1.2.2 com MPEG em `/usr/local` e confere que o tarball leva essa.
+OpenColorIO (2026-09-30): o container usa a OCIO 1.1.1 do apt (`libopencolorio-dev`, API 1.x) e os presets
+Linux ligam `WITH_OPENCOLORIO`; o pacote leva `lib/libOpenColorIO.so.1` e `2.79/datafiles/colormanagement`, que o
+script confere no fim. Num host 24.04+ (so OCIO 2.x) configure com `-DWITH_OPENCOLORIO=OFF`.
+`libva`, `libvdpau` e `libOpenCL` vao em `lib/` (sem elas o pacote nao abria em Ubuntu 22.04/26.04, Debian 12
 e Fedora limpos); `libgbm`, ALSA/Pulse e Wayland ficam no sistema, como em qualquer desktop. O pacote tambem traz `range-engine.png`, `RangeEngine.desktop` e `install-desktop.sh` (icone no menu e na
 dock; a janela X11 ja define o icone sozinha via `_NET_WM_ICON`).
 
