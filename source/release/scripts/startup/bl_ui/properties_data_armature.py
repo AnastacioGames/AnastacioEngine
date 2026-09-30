@@ -320,7 +320,7 @@ class DATA_PT_motion_paths(MotionPathButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         # XXX: include pose-mode check?
-        return (context.object) and (context.armature)
+        return context.scene.render.engine != 'BLENDER_GAME' and (context.object) and (context.armature)
 
     def draw(self, context):
         # layout = self.layout

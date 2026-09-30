@@ -39,59 +39,52 @@ class MotionPathButtonsPanel:
         # Display Range
         layout.row().prop(mps, "type", expand=True)
 
-        split = layout.split()
-
-        col = split.column()
-        col.label(text="Display Range:")
-        sub = col.column(align=True)
+        box = layout.box()
+        box.label(text="Display Range:", icon='TIME')
+        sub = box.column(align=True)
         if mps.type == 'CURRENT_FRAME':
             sub.prop(mps, "frame_before", text="Before")
             sub.prop(mps, "frame_after", text="After")
         elif mps.type == 'RANGE':
             sub.prop(mps, "frame_start", text="Start")
             sub.prop(mps, "frame_end", text="End")
-
         sub.prop(mps, "frame_step", text="Step")
 
-        col = split.column()
-        if bones:
-            col.label(text="Cache for Bone:")
-        else:
-            col.label(text="Cache:")
-
+        # Cache
+        box = layout.box()
+        box.label(text="Cache for Bone:" if bones else "Cache:", icon='ANIM_DATA')
         if mpath:
-            sub = col.column(align=True)
+            sub = box.column(align=True)
             sub.enabled = False
             sub.prop(mpath, "frame_start", text="From")
             sub.prop(mpath, "frame_end", text="To")
 
-            sub = col.row(align=True)
+            row = box.row(align=True)
             if bones:
-                sub.operator("pose.paths_update", text="Update Paths", icon='BONE_DATA')
-                sub.operator("pose.paths_clear", text="", icon='X')
+                row.operator("pose.paths_update", text="Update Paths", icon='BONE_DATA')
+                row.operator("pose.paths_clear", text="", icon='X')
             else:
-                sub.operator("object.paths_update", text="Update Paths", icon='OBJECT_DATA')
-                sub.operator("object.paths_clear", text="", icon='X')
+                row.operator("object.paths_update", text="Update Paths", icon='OBJECT_DATA')
+                row.operator("object.paths_clear", text="", icon='X')
         else:
-            sub = col.column(align=True)
-            sub.label(text="Nothing to show yet...", icon='ERROR')
+            box.label(text="Nothing to show yet...", icon='ERROR')
             if bones:
-                sub.operator("pose.paths_calculate", text="Calculate...", icon='BONE_DATA')
+                box.operator("pose.paths_calculate", text="Calculate...", icon='BONE_DATA')
             else:
-                sub.operator("object.paths_calculate", text="Calculate...", icon='OBJECT_DATA')
+                box.operator("object.paths_calculate", text="Calculate...", icon='OBJECT_DATA')
 
         # Display Settings
-        split = layout.split()
+        box = layout.box()
+        box.label(text="Show:", icon='RESTRICT_VIEW_OFF')
+        split = box.split()
 
         col = split.column()
-        col.label(text="Show:")
         col.prop(mps, "show_frame_numbers", text="Frame Numbers")
         if mpath is not None:
             col.prop(mpath, "lines", text="Lines")
             col.prop(mpath, "line_thickness", text="Thickness")
 
         col = split.column()
-        col.label("")
         col.prop(mps, "show_keyframe_highlight", text="Keyframes")
         sub = col.column()
         sub.enabled = mps.show_keyframe_highlight
@@ -101,7 +94,7 @@ class MotionPathButtonsPanel:
 
         # Customize path
         if mpath is not None:
-            row = layout.row(align=True)
+            row = box.row(align=True)
             row.prop(mpath, "use_custom_color", text="", toggle=True, icon='COLOR')
             sub = row.row(align=True)
             sub.enabled = mpath.use_custom_color

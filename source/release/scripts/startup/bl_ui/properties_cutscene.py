@@ -241,7 +241,31 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             box.prop(event, "trigger_name")
 
         elif event.type == 'WAIT_CAMERA_END':
-            layout.box().label("Waits until the current camera shot finishes. No parameters.")
+            layout.box().label("Waits until the current camera shot or camera path finishes. No parameters.")
+
+        elif event.type == 'CAMERA_PATH':
+            box = layout.box()
+            box.label("Camera Path", icon='CURVE_PATH')
+
+            obj = box.row()
+            obj.alert = event.path_object is None
+            obj.prop(event, "path_object")
+
+            curve = box.row()
+            curve.alert = event.path_curve is None or event.path_curve.type != 'CURVE'
+            curve.prop(event, "path_curve")
+
+            box.prop(event, "path_duration")
+            box.prop(event, "path_look_at")
+            follow = box.row()
+            follow.active = event.path_look_at is None
+            follow.prop(event, "path_follow")
+            box.prop(event, "path_set_camera")
+
+            if event.path_object is None or event.path_curve is None:
+                box.label("Object and Curve are required.", icon='ERROR')
+            elif event.path_curve.type != 'CURVE':
+                box.label("Curve must be a Curve object (Bezier, Poly or NURBS).", icon='ERROR')
 
 
 classes = (

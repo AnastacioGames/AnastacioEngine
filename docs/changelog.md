@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Cutscene: evento Camera Path; Motion Paths escondido na Game Engine
+
+- Novo evento de cutscene `CAMERA_PATH` (`CUTSCENE_EVENT_CAMERA_PATH = 17`): move um objeto (normalmente a câmera)
+  por uma curva com velocidade constante. Reusa slots do `CutsceneEvent`: `template_object` = objeto,
+  `spawn_point` = curva, `dependent_object` = Look At opcional, `param_float` = duração, `param_bool` = seguir a
+  direção, `param_int` = tornar câmera ativa. RNA: `path_object`, `path_curve`, `path_look_at`, `path_duration`,
+  `path_follow`, `path_set_camera`.
+- A conversão amostra a primeira spline (Bezier/Poly/NURBS) em espaço local da curva (`BL_SampleCutscenePath`);
+  o runtime (`KX_Scene::UpdateCutscenePaths`) aplica a transformação atual da curva, orienta com -Z à frente e
+  +Z do mundo como up, e libera `WAIT_CAMERA_END` quando o último caminho termina.
+- Painéis Motion Paths (Object e Armature) escondidos quando a engine é `BLENDER_GAME`; Viewport Display e Motion
+  Paths passaram a usar caixas com rótulo, no padrão dos outros painéis de Object.
+- Compilou; `RangeRuntime` linkou. `RangeEngine` não relinkou porque o editor estava aberto. Sem teste no jogo.
+
 ## 2026-09-30 - Barra lateral N com abas e visual arredondado
 
 - Painéis da barra N da 3D View ganharam categorias: `Item` (Transform, Vertex Weights, Properties) e `View`

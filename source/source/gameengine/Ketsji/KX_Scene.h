@@ -370,6 +370,15 @@ private:
 	 * dispatcher consumes them. Keeping this queue on the owning scene prevents
 	 * a frame update from silently losing an authored event. */
 	KX_CutsceneManager::DispatchedEvents m_pendingCutsceneEvents;
+	/** Camera Path events currently moving an object, with the cutscene time they started. */
+	struct CutscenePathPlayback
+	{
+		const KX_CutsceneManager::Event *m_event;
+		double m_startTime;
+	};
+	std::vector<CutscenePathPlayback> m_cutscenePaths;
+	/** Place Camera Path objects for the current cutscene time and drop the finished ones. */
+	void UpdateCutscenePaths(double time);
 
 	AnimationPoolData m_animationPoolData;
 	TaskPool *m_animationPool;

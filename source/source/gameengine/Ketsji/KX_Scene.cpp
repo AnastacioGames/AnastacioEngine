@@ -2833,6 +2833,7 @@ void KX_Scene::SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneMa
 	}
 	m_cutsceneManager = std::move(cutsceneManager);
 	m_pendingCutsceneEvents.clear();
+	m_cutscenePaths.clear();
 }
 
 void KX_Scene::StopCutscene()
@@ -2842,6 +2843,7 @@ void KX_Scene::StopCutscene()
 		m_cutsceneManager->Stop();
 	}
 	m_pendingCutsceneEvents.clear();
+	m_cutscenePaths.clear();
 }
 
 bool KX_Scene::RestartCutscene()
@@ -2851,6 +2853,7 @@ bool KX_Scene::RestartCutscene()
 	}
 	ClearCutsceneSpawnedObjects();
 	m_pendingCutsceneEvents.clear();
+	m_cutscenePaths.clear();
 	return m_cutsceneManager->Restart();
 }
 
@@ -2863,6 +2866,93 @@ void KX_Scene::UpdateCutscene(double time)
 	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Update(time);
 	m_pendingCutsceneEvents.insert(
 		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
+
+	if (!m_cutscenePaths.empty()) {
+		UpdateCutscenePaths(m_cutsceneManager->GetTime());
+		if (m_cutscenePaths.empty() &&
+		    m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_CAMERA_END) {
+			m_cutsceneManager->ClearWait();
+		}
+	}
+}
+
+/* Position along a polyline at a fraction of its total length (constant speed). */
+static void EvaluateCutscenePath(const std::vector<mt::vec3> &points, float fraction,
+                                 mt::vec3 &position, mt::vec3 &direction)
+{
+	float total = 0.0f;
+	for (std::size_t i = 1; i < points.size(); ++i) {
+		total += (points[i] - points[i - 1]).Length();
+	}
+
+	float remaining = total * fraction;
+	for (std::size_t i = 1; i < points.size(); ++i) {
+		const mt::vec3 segment = points[i] - points[i - 1];
+		const float length = segment.Length();
+		if (length <= 0.0f) {
+			continue;
+		}
+		if (remaining <= length || i == points.size() - 1) {
+			const float t = std::min(remaining / length, 1.0f);
+			position = points[i - 1] + segment * t;
+			direction = segment / length;
+			return;
+		}
+		remaining -= length;
+	}
+	position = points.back();
+	direction = mt::zero3;
+}
+
+void KX_Scene::UpdateCutscenePaths(double time)
+{
+	for (auto it = m_cutscenePaths.begin(); it != m_cutscenePaths.end();) {
+		const KX_CutsceneManager::Event *event = it->m_event;
+		KX_GameObject *object = event->m_templateObject;
+		KX_GameObject *curve = event->m_spawnPoint;
+		if (!m_objectlist->SearchValue(object) || !m_objectlist->SearchValue(curve)) {
+			it = m_cutscenePaths.erase(it);
+			continue;
+		}
+
+		const float duration = event->m_paramFloat;
+		const float fraction = (duration > 0.0f) ?
+			std::min(float((time - it->m_startTime) / duration), 1.0f) : 1.0f;
+
+		mt::vec3 localPosition, localDirection;
+		EvaluateCutscenePath(event->m_pathPoints, fraction, localPosition, localDirection);
+
+		const mt::mat3x4 curveTransform = curve->NodeGetWorldTransform();
+		const mt::vec3 position = curveTransform * localPosition;
+		object->NodeSetWorldPosition(position);
+
+		/* Cameras look down -Z; keep the horizon level with world +Z as up. */
+		mt::vec3 forward = mt::zero3;
+		KX_GameObject *target = event->m_dependentObject;
+		if (target && m_objectlist->SearchValue(target)) {
+			forward = target->NodeGetWorldPosition() - position;
+		}
+		else if (event->m_paramBool) {
+			forward = curve->NodeGetWorldOrientation() * localDirection;
+		}
+		if (forward.LengthSquared() > 1e-8f) {
+			const mt::vec3 zAxis = -forward.Normalized();
+			mt::vec3 xAxis = mt::cross(mt::axisZ3, zAxis);
+			if (xAxis.LengthSquared() > 1e-6f) {
+				xAxis.Normalize();
+				const mt::vec3 yAxis = mt::cross(zAxis, xAxis);
+				object->NodeSetGlobalOrientation(mt::mat3(xAxis, yAxis, zAxis));
+			}
+		}
+		object->NodeUpdate();
+
+		if (fraction >= 1.0f) {
+			it = m_cutscenePaths.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
 }
 
 KX_CutsceneManager::DispatchedEvents KX_Scene::TakePendingCutsceneEvents()
@@ -3191,6 +3281,29 @@ void KX_Scene::DispatchCutsceneEvents()
 		case CUTSCENE_EVENT_WAIT_CAMERA_END:
 			if (m_cutsceneManager) {
 				m_cutsceneManager->StartWaitCameraEnd();
+			}
+			break;
+
+		case CUTSCENE_EVENT_CAMERA_PATH:
+			if (!event->m_templateObject || !event->m_spawnPoint || event->m_pathPoints.size() < 2) {
+				CM_Error("Cutscene Camera Path event '" << event->m_name
+				         << "' requires an Object and a Curve with at least two points");
+				continue;
+			}
+			{
+				/* A new path on the same object replaces the one it was following. */
+				for (auto it = m_cutscenePaths.begin(); it != m_cutscenePaths.end(); ++it) {
+					if (it->m_event->m_templateObject == event->m_templateObject) {
+						m_cutscenePaths.erase(it);
+						break;
+					}
+				}
+				m_cutscenePaths.push_back({event, m_cutsceneManager->GetTime()});
+
+				if (event->m_paramInt && event->m_templateObject->GetGameObjectType() == SCA_IObject::OBJ_CAMERA) {
+					SetActiveCamera(static_cast<KX_Camera *>(event->m_templateObject));
+				}
+				UpdateCutscenePaths(m_cutsceneManager->GetTime());
 			}
 			break;
 

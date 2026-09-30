@@ -250,8 +250,10 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.use_property_split = True
-        flow = layout.grid_flow(row_major=True, num_columns=0, even_columns=True, even_rows=False, align=False)
+        box = layout.box()
+        box.label(text="Display:", icon='RESTRICT_VIEW_OFF')
+        box.use_property_split = True
+        flow = box.grid_flow(row_major=True, num_columns=0, even_columns=True, even_rows=False, align=False)
 
         obj = context.object
         obj_type = obj.type
@@ -357,7 +359,7 @@ class OBJECT_PT_motion_paths(MotionPathButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return (context.object)
+        return context.scene.render.engine != 'BLENDER_GAME' and (context.object)
 
     def draw(self, context):
         # layout = self.layout

@@ -175,6 +175,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 Fases 0–2 e 4–5 implementadas; validação manual (Play → Stop → Play e standalone) aceita em 2026-09-20.
 Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ver
 [plano](cutscene-native-integration-plan.md) e [roteiro](cutscene-native-example.md).
+Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testar no jogo. Wait Trigger ainda não
+é liberado por nada no código, e o export/import só cobre Spawn Object.
 
 ### World Status
 

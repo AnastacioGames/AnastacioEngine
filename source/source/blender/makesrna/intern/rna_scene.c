@@ -7635,6 +7635,7 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 		{CUTSCENE_EVENT_WAIT_TIME, "WAIT_TIME", ICON_TIME, "Wait Time", "Pause the timeline for a duration"},
 		{CUTSCENE_EVENT_WAIT_TRIGGER, "WAIT_TRIGGER", ICON_TIME, "Wait Trigger", "Pause the timeline until a named trigger fires"},
 		{CUTSCENE_EVENT_WAIT_CAMERA_END, "WAIT_CAMERA_END", ICON_TIME, "Wait Camera End", "Pause the timeline until the current camera shot finishes"},
+		{CUTSCENE_EVENT_CAMERA_PATH, "CAMERA_PATH", ICON_CURVE_PATH, "Camera Path", "Move an object (usually a camera) along a curve"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -7723,6 +7724,44 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Object");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Target", "Object the player camera should look at");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	/* Camera Path */
+	prop = RNA_def_property(srna, "path_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "template_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Object", "Object moved along the path, usually a camera");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "path_curve", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "spawn_point");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Curve", "Curve object that defines the path");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "path_look_at", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "dependent_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Look At", "Optional object the moving object keeps looking at");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "path_duration", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "param_float");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_text(prop, "Duration", "Seconds to travel the whole path");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "path_follow", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "param_bool", 1);
+	RNA_def_property_ui_text(prop, "Follow Path", "Turn the object to face the direction of travel (ignored with Look At)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "path_set_camera", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "param_int", 1);
+	RNA_def_property_ui_text(prop, "Make Active Camera", "Make the object the active scene camera while it moves");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	/* Player */

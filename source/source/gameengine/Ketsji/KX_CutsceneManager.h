@@ -24,6 +24,8 @@
 #include <string>
 #include <vector>
 
+#include "mathfu.h"
+
 class KX_GameObject;
 
 class KX_CutsceneManager
@@ -51,6 +53,9 @@ public:
 		std::string m_textEs;
 		std::string m_textRu;
 		std::string m_audioPath;
+
+		/* Camera Path: points sampled from the curve, in the curve's local space. */
+		std::vector<mt::vec3> m_pathPoints;
 	};
 
 	struct Sequence

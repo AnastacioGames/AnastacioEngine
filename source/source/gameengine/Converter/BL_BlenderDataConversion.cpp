@@ -143,6 +143,7 @@ extern "C" {
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
+#include "DNA_curve_types.h"
 #include "DNA_controller_types.h"
 #include "DNA_group_types.h"
 #include "DNA_image_types.h"
@@ -169,6 +170,9 @@ extern "C" {
 #include "BKE_main.h"
 #include "BKE_global.h"
 #include "BKE_object.h"
+extern "C" {
+#include "BKE_curve.h"
+}
 #include "BKE_python_component.h"
 #include "BKE_key.h"
 #include "BKE_mesh.h"
@@ -1645,6 +1649,61 @@ static void bl_ConvertBlenderObject_Single(BL_SceneConverter& converter,
 	}
 }
 
+/// Sample the first spline of a curve object into points in the curve's local space.
+static std::vector<mt::vec3> BL_SampleCutscenePath(Object *ob)
+{
+	std::vector<mt::vec3> points;
+	if (!ob || ob->type != OB_CURVE || !ob->data) {
+		return points;
+	}
+
+	Nurb *nu = (Nurb *)BKE_curve_nurbs_get((Curve *)ob->data)->first;
+	if (!nu || nu->pntsu < 1) {
+		return points;
+	}
+
+	const bool cyclic = (nu->flagu & CU_NURB_CYCLIC) != 0;
+	const int resolu = max_ii(nu->resolu, 1);
+
+	if (nu->type == CU_BEZIER && nu->bezt) {
+		std::vector<float> seg((resolu + 1) * 3);
+		const int segments = SEGMENTSU(nu);
+		points.push_back(mt::vec3(nu->bezt[0].vec[1]));
+		for (int i = 0; i < segments; ++i) {
+			const BezTriple *a = &nu->bezt[i];
+			const BezTriple *b = &nu->bezt[(i + 1) % nu->pntsu];
+			for (int j = 0; j < 3; ++j) {
+				BKE_curve_forward_diff_bezier(a->vec[1][j], a->vec[2][j], b->vec[0][j], b->vec[1][j],
+				                              seg.data() + j, resolu, 3 * sizeof(float));
+			}
+			for (int k = 1; k <= resolu; ++k) {
+				points.push_back(mt::vec3(&seg[k * 3]));
+			}
+		}
+	}
+	else if (nu->type == CU_POLY && nu->bp) {
+		for (int i = 0; i < nu->pntsu; ++i) {
+			points.push_back(mt::vec3(nu->bp[i].vec));
+		}
+		if (cyclic) {
+			points.push_back(points.front());
+		}
+	}
+	else if (nu->type == CU_NURBS && nu->bp && BKE_nurb_check_valid_u(nu)) {
+		const int len = resolu * SEGMENTSU(nu);
+		std::vector<float> data(len * 3, 0.0f);
+		BKE_nurb_makeCurve(nu, data.data(), nullptr, nullptr, nullptr, resolu, 3 * sizeof(float));
+		for (int k = 0; k < len; ++k) {
+			points.push_back(mt::vec3(&data[k * 3]));
+		}
+		if (cyclic && !points.empty()) {
+			points.push_back(points.front());
+		}
+	}
+
+	return points;
+}
+
 static void BL_ConvertCutscene(KX_Scene *kxscene, Scene *blenderscene, const BL_SceneConverter& converter)
 {
 	const CutsceneSettings *settings = blenderscene->cutscene_settings;
@@ -1675,6 +1734,9 @@ static void BL_ConvertCutscene(KX_Scene *kxscene, Scene *blenderscene, const BL_
 			event.m_textEs = blenderEvent->text_es;
 			event.m_textRu = blenderEvent->text_ru;
 			event.m_audioPath = blenderEvent->audio_path;
+			if (blenderEvent->type == CUTSCENE_EVENT_CAMERA_PATH) {
+				event.m_pathPoints = BL_SampleCutscenePath(blenderEvent->spawn_point);
+			}
 			sequence.m_events.push_back(event);
 		}
 
