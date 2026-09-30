@@ -1397,6 +1397,7 @@ static void draw_controller_header(uiLayout *layout, PointerRNA *ptr, int xco, i
 	sub = uiLayoutRow(row, false);
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemR(sub, ptr, "show_expanded", UI_ITEM_R_NO_BG, "", ICON_NONE);
+	uiItemL(sub, "", ICON_LOGIC);
 	if (RNA_boolean_get(ptr, "show_expanded")) {
 		uiItemR(sub, ptr, "type", 0, "", ICON_NONE);
 		uiItemR(sub, ptr, "name", 0, "", ICON_NONE);
@@ -1501,6 +1502,7 @@ static void draw_actuator_header(uiLayout *layout, PointerRNA *ptr, PointerRNA *
 	sub = uiLayoutRow(row, false);
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemR(sub, ptr, "show_expanded", UI_ITEM_R_NO_BG, "", ICON_NONE);
+	uiItemL(sub, "", ICON_LOGIC);
 	if (RNA_boolean_get(ptr, "show_expanded")) {
 		uiItemR(sub, ptr, "type", 0, "", ICON_NONE);
 		uiItemR(sub, ptr, "name", 0, "", ICON_NONE);
