@@ -34,6 +34,9 @@
 #include <cstring>
 #include "KX_LightObject.h"
 #include "KX_PyMath.h"
+#include "KX_Globals.h"
+#include "KX_KetsjiEngine.h"
+#include "KX_Scene.h"
 #include "RAS_Rasterizer.h"
 #include "GPU_material.h"
 
@@ -162,6 +165,28 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.ripples") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_RIPPLE; else world->weather_flag &= ~WO_WEATHER_RAIN_RIPPLE;
 	}
+	else if (std::strcmp(identifier, "weather.rain_streak_width") == 0) world->rain_streak_width = value;
+	else if (std::strcmp(identifier, "weather.splash") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_SPLASH; else world->weather_flag &= ~WO_WEATHER_RAIN_SPLASH;
+	}
+	else if (std::strcmp(identifier, "weather.splash_size") == 0) world->rain_splash_size = value;
+	else if (std::strcmp(identifier, "weather.splash_rate") == 0) world->rain_splash_rate = value;
+	else if (std::strcmp(identifier, "weather.splash_intensity") == 0) world->rain_splash_intensity = value;
+	else if (std::strcmp(identifier, "weather.splash_distance") == 0) world->rain_splash_distance = value;
+	else if (std::strcmp(identifier, "weather.aura") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_AURA; else world->weather_flag &= ~WO_WEATHER_RAIN_AURA;
+	}
+	else if (std::strcmp(identifier, "weather.aura_size") == 0) world->rain_aura_size = value;
+	else if (std::strcmp(identifier, "weather.aura_rate") == 0) world->rain_aura_rate = value;
+	else if (std::strcmp(identifier, "weather.aura_intensity") == 0) world->rain_aura_intensity = value;
+	else if (std::strcmp(identifier, "weather.aura_distance") == 0) world->rain_aura_distance = value;
+	else if (std::strcmp(identifier, "weather.lightning") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_LIGHTNING; else world->weather_flag &= ~WO_WEATHER_RAIN_LIGHTNING;
+	}
+	else if (std::strcmp(identifier, "weather.lightning_rate") == 0) world->rain_lightning_rate = value;
+	else if (std::strcmp(identifier, "weather.lightning_intensity") == 0) world->rain_lightning_intensity = value;
+	else if (std::strcmp(identifier, "weather.lightning_distance") == 0) world->rain_lightning_distance = value;
+	else if (std::strcmp(identifier, "weather.lightning_width") == 0) world->rain_lightning_width = value;
 	else if (std::strcmp(identifier, "weather.clouds") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_CLOUDS; else world->weather_flag &= ~WO_WEATHER_CLOUDS;
 	}
@@ -527,8 +552,48 @@ PyTypeObject KX_WorldInfo::Type = {
 };
 
 PyMethodDef KX_WorldInfo::Methods[] = {
+	{"setWeather", (PyCFunction)KX_WorldInfo::sPysetWeather, METH_VARARGS, "setWeather(name, value): change a World weather setting at runtime"},
+	{"strikeLightning", (PyCFunction)KX_WorldInfo::sPystrikeLightning, METH_VARARGS, "strikeLightning(bolt=True): a lightning strike now (rain must be on)"},
 	{nullptr, nullptr} /* Sentinel */
 };
+
+PyObject *KX_WorldInfo::PysetWeather(PyObject *args)
+{
+	const char *name;
+	PyObject *value;
+	if (!PyArg_ParseTuple(args, "sO:setWeather", &name, &value)) {
+		return nullptr;
+	}
+	const bool isBool = PyBool_Check(value);
+	const float number = isBool ? (value == Py_True ? 1.0f : 0.0f) : (float)PyFloat_AsDouble(value);
+	if (!isBool && PyErr_Occurred()) {
+		return nullptr;
+	}
+	std::string identifier = name;
+	if (identifier.compare(0, 8, "weather.") != 0) {
+		identifier = "weather." + identifier;
+	}
+	if (!SetWeatherRuntimeProperty(identifier.c_str(), number, value == Py_True, isBool)) {
+		PyErr_Format(PyExc_ValueError, "world.setWeather(): unknown setting \"%s\"", name);
+		return nullptr;
+	}
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_WorldInfo::PystrikeLightning(PyObject *args)
+{
+	int bolt = 1;
+	if (!PyArg_ParseTuple(args, "|p:strikeLightning", &bolt)) {
+		return nullptr;
+	}
+	// Every running scene that uses this World (overlay scenes may share it).
+	for (KX_Scene *scene : *KX_GetActiveEngine()->CurrentScenes()) {
+		if (scene->GetBlenderScene() == m_scene) {
+			scene->StrikeLightning(bolt != 0);
+		}
+	}
+	Py_RETURN_NONE;
+}
 
 PyAttributeDef KX_WorldInfo::Attributes[] = {
 	EXP_PYATTRIBUTE_BOOL_RW("mistEnable", KX_WorldInfo, m_hasmist),

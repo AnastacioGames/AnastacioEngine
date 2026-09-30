@@ -34,6 +34,10 @@
 #include "RAS_ICanvas.h"
 #include "RAS_OffScreen.h"
 #include "RAS_FramingManager.h"
+#include "DNA_scene_types.h"
+#include "DNA_world_types.h"
+#include "KX_RainAura.h"
+#include "KX_RainLightning.h"
 #include "RAS_ParticleBuffer.h" // Per-object GPU particle emitters, see KX_GameObject::GetParticleBuffer.
 #include "GPU_texture.h"
 
@@ -546,6 +550,15 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		}
 	}
 
+	// World > Rain > Aura: every live stroke of the scene in one draw call.
+	if (KX_RainAura *rainAura = scene->GetRainAura()) {
+		rainAura->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
+	}
+	// World > Rain > Lightning: the bolt ribbons, one draw call (the flash is in the rain filter).
+	if (KX_RainLightning *rainLightning = scene->GetRainLightning()) {
+		rainLightning->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
+	}
+
 	// Plano 9, unidade 2: DebugDrawWorld() desce até btDiscreteDynamicsWorld::debugDrawWorld(),
 	// que varre todos os corpos/constraints do mundo físico mesmo quando nenhum modo de debug
 	// está ligado. GetDebugMode() == 0 é o caso comum (fora do editor de física), então só
@@ -625,7 +638,24 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		const float time = (float)m_engine->GetFrameTime();
 
 		if (RAS_2DFilter *rain = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_RAIN, true)) {
-			rain->GetBuildInFilters()->rain_time = time;
+			BuildInFilters *rainParams = rain->GetBuildInFilters();
+			rainParams->rain_time = time;
+			// Splash / streak width can be changed at runtime (world.setWeather), so read them
+			// back from the World every frame -- a handful of floats, no recompile.
+			if (const World *world = scene->GetBlenderScene()->world) {
+				rainParams->useRainSplash = (world->weather_flag & WO_WEATHER_RAIN_SPLASH) != 0;
+				rainParams->rain_streak_width = world->rain_streak_width;
+				rainParams->rain_splash_size = world->rain_splash_size;
+				rainParams->rain_splash_rate = world->rain_splash_rate;
+				rainParams->rain_splash_intensity = world->rain_splash_intensity;
+				rainParams->rain_splash_distance = world->rain_splash_distance;
+			}
+			// Lightning flash: flash, bolt brightness and where the bolt is on screen.
+			const mt::vec4 lightning = scene->GetRainLightning() ?
+				scene->GetRainLightning()->GetFilterParams(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix()) : mt::zero4;
+			for (int i = 0; i < 4; ++i) {
+				rainParams->rain_lightning[i] = lightning[i];
+			}
 		}
 		if (RAS_2DFilter *clouds = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true)) {
 			clouds->GetBuildInFilters()->cloud_time = time;

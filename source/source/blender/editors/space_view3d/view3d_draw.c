@@ -3202,6 +3202,9 @@ static void view3d_draw_objects(
 	/* transp and X-ray afterdraw stuff */
 	if (v3d->afterdraw_transp.first)     view3d_draw_transp(bmain, scene, ar, v3d);
 
+	/* World > Rain aura and lightning bolt, before X-ray clears the depth */
+	view3d_draw_rain_effects(scene, v3d, rv3d);
+
 	/* always do that here to cleanup depth buffers if none needed */
 	if (fx) {
 		do_composite_xray = v3d->zbuf && (v3d->afterdraw_xray.first || v3d->afterdraw_xraytransp.first);

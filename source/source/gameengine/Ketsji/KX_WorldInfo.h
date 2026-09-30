@@ -118,6 +118,10 @@ public:
 	PyObject *m_attr_dict;
 	static PyMappingMethods Mapping;
 
+	/* setWeather("rain_splash_size", 1.5): same names as the Property actuator ("weather." optional) */
+	EXP_PYMETHOD_VARARGS(KX_WorldInfo, setWeather);
+	EXP_PYMETHOD_VARARGS(KX_WorldInfo, strikeLightning);
+
 	/* attributes */
 	static PyObject *pyattr_get_mist_typeconst(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_mist_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

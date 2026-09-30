@@ -195,6 +195,20 @@ void BKE_world_init(World *wrld)
 	wrld->rain_color[0] = 0.8f;
 	wrld->rain_color[1] = 0.8f;
 	wrld->rain_color[2] = 0.8f;
+	wrld->rain_streak_width = 0.35f;
+	wrld->rain_splash_size = 1.0f;
+	wrld->rain_splash_rate = 0.9f;
+	wrld->rain_splash_intensity = 1.0f;
+	wrld->rain_splash_distance = 25.0f;
+	wrld->rain_aura_size = 1.0f;
+	wrld->rain_aura_rate = 0.6f;
+	wrld->rain_aura_intensity = 1.0f;
+	wrld->rain_aura_distance = 30.0f;
+	BLI_strncpy(wrld->rain_aura_prop, "aura_chuva", sizeof(wrld->rain_aura_prop));
+	wrld->rain_lightning_rate = 7.0f;
+	wrld->rain_lightning_intensity = 1.0f;
+	wrld->rain_lightning_distance = 80.0f;
+	wrld->rain_lightning_width = 1.0f;
 
 	wrld->cloud_coverage = 0.5f;
 	wrld->cloud_scale = 1.0f;

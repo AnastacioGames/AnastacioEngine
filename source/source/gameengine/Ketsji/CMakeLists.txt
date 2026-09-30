@@ -162,6 +162,8 @@ set(SRC
 	KX_BoneParentNodeRelationship.cpp
 	KX_NodeRelationships.cpp
 	KX_Scene.cpp
+	KX_RainAura.cpp
+	KX_RainLightning.cpp
 	KX_SceneActuator.cpp
 	KX_ShadowRenderer.cpp
 	KX_SoftBodyDeformer.cpp
@@ -272,6 +274,8 @@ set(SRC
 	KX_BoneParentNodeRelationship.h
 	KX_NodeRelationships.h
 	KX_Scene.h
+	KX_RainAura.h
+	KX_RainLightning.h
 	KX_SceneActuator.h
 	KX_ShadowRenderer.h
 	KX_SoftBodyDeformer.h

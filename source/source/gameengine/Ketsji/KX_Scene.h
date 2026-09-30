@@ -73,6 +73,8 @@ class KX_ObstacleSimulation;
 class KX_NavMeshObject;
 class KX_WorldInfo;
 class KX_Camera;
+class KX_RainAura;
+class KX_RainLightning;
 class KX_FontObject;
 class KX_Speaker;
 class KX_GameObject;
@@ -153,6 +155,10 @@ private:
 	/// cached so UpdateGpuParticleEmitters/RenderCamera don't need to scan every object
 	/// every frame. Not exposed to Python -- mirrors the m_animatedlist pattern.
 	std::vector<KX_GameObject *> m_gpuParticleObjects;
+
+	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
+	std::unique_ptr<KX_RainAura> m_rainAura;
+	std::unique_ptr<KX_RainLightning> m_rainLightning;
 
 	/// Objects flagged use_gpu_particle_collider (Object.gameflag2 & OB_GPU_PARTICLE_COLLIDER),
 	/// cached the same way as m_gpuParticleObjects. Drives the Screen-Space collision depth
@@ -557,6 +563,14 @@ public:
 	/// once per frame from KX_KetsjiEngine::NextFrame, after UpdateParents() so emitters read
 	/// a fresh world transform -- not per camera, see GetGpuParticleObjects() for the draw side.
 	void UpdateGpuParticleEmitters(float deltaTime);
+	/// World > Rain > Aura: silhouette strokes, once per frame after the final transforms.
+	void UpdateRainAura(double time);
+	KX_RainAura *GetRainAura() const;
+	/// World > Rain > Lightning: created on the first strike or when the option is on.
+	void UpdateRainLightning(double time);
+	KX_RainLightning *GetRainLightning() const;
+	/// world.strikeLightning(): a strike on the next frame.
+	void StrikeLightning(bool bolt);
 	/// Registers/unregisters an object with GetParticleBuffer() != nullptr for per-frame
 	/// update/draw. Called from scene conversion, object duplication and object removal.
 	void AddGpuParticleObject(KX_GameObject *gameobj);

@@ -195,6 +195,7 @@ set(SRC
 	intern/undo_system.c
 	intern/unit.c
 	intern/world.c
+	intern/rain_lightning.c
 	intern/writeavi.c
 	intern/writeframeserver.c
 
@@ -305,6 +306,7 @@ set(SRC
 	BKE_undo_system.h
 	BKE_unit.h
 	BKE_world.h
+	BKE_rain_lightning.h
 	BKE_writeavi.h
 	BKE_writeframeserver.h
 

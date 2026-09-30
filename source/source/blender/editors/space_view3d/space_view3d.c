@@ -1438,7 +1438,9 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 		 * would look frozen mid-motion instead of animating. */
 		World *world = win->screen->scene ? win->screen->scene->world : NULL;
 		if (world &&
-		    ((world->weather_flag & WO_WEATHER_RAIN && world->rain_speed != 0.0f) ||
+		    ((world->weather_flag & WO_WEATHER_RAIN &&
+		      (world->rain_speed != 0.0f ||
+		       world->weather_flag & (WO_WEATHER_RAIN_SPLASH | WO_WEATHER_RAIN_AURA | WO_WEATHER_RAIN_LIGHTNING))) ||
 		     (world->weather_flag & WO_WEATHER_CLOUDS && world->cloud_speed != 0.0f)))
 		{
 			want_timer = true;

@@ -119,6 +119,9 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainParams3", // GE_RAIN_PARAMS3_UNIFORM
 	"ge_RainColor", // GE_RAIN_COLOR_UNIFORM
 	"ge_RainStyle", // GE_RAIN_STYLE_UNIFORM
+	"ge_RainParams4", // GE_RAIN_PARAMS4_UNIFORM
+	"ge_RainStreakWidth", // GE_RAIN_STREAK_WIDTH_UNIFORM
+	"ge_RainLightning", // GE_RAIN_LIGHTNING_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
@@ -547,8 +550,21 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_RAIN_PARAMS3_UNIFORM] != -1) {
 		float params[4] = {m_buildInFilters.rain_density, m_buildInFilters.rain_ripple_distance,
-						   m_buildInFilters.rain_ripple_min_up, 0.0f};
+						   m_buildInFilters.rain_ripple_min_up, m_buildInFilters.rain_splash_distance};
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_PARAMS3_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_PARAMS4_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.useRainSplash ? 1.0f : 0.0f, m_buildInFilters.rain_splash_size,
+						   m_buildInFilters.rain_splash_rate, m_buildInFilters.rain_splash_intensity};
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_PARAMS4_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_STREAK_WIDTH_UNIFORM] != -1) {
+		/* 0 = file saved before the field existed: keep the original width. */
+		float width = m_buildInFilters.rain_streak_width > 0.0f ? m_buildInFilters.rain_streak_width : 1.0f;
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_STREAK_WIDTH_UNIFORM], RAS_Uniform::UNI_FLOAT, &width, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_lightning, sizeof(float) * 4, 1);
 	}
 	if (m_predefinedUniforms[GE_RAIN_COLOR_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.rain_color, sizeof(float) * 3, 1);

@@ -149,6 +149,8 @@ void KX_SimulationPipeline::Update()
 			// emitter reads its owning object's freshest world transform.
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_particles);
 			scene->UpdateGpuParticleEmitters(m_engine->GetPhysicsTime());
+			scene->UpdateRainAura(m_engine->GetFrameTime());
+			scene->UpdateRainLightning(m_engine->GetFrameTime());
 		}
 	}
 }

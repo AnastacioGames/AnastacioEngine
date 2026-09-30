@@ -113,3 +113,31 @@ base class --- :class:`EXP_PyObjectPlus`
       SkyTexture:  returns 2
 
       :type: int (read only)
+
+   .. method:: setWeather(name, value)
+
+      Changes a World weather setting at runtime (the "weather." prefix is optional).
+      Booleans: ``rain``, ``ripples``, ``splash``, ``aura``, ``lightning``, ``clouds``, ``lens_flare``, ``mist``.
+      Floats: ``rain_intensity``, ``rain_density``, ``rain_speed``, ``rain_wind``, ``rain_darken``,
+      ``rain_streak_width``, ``ripple_intensity``, ``splash_size``, ``splash_rate``, ``splash_intensity``,
+      ``splash_distance``, ``aura_size``, ``aura_rate``, ``aura_intensity``, ``aura_distance``,
+      ``lightning_rate``, ``lightning_intensity``, ``lightning_distance``, ``lightning_width``,
+      ``cloud_coverage``, ``cloud_scale``, ``cloud_speed``, ``flare_scale``, ``flare_intensity``, ``mist_*``.
+
+      .. code-block:: python
+
+         scene.world.setWeather("aura", True)
+         scene.world.setWeather("splash_size", 1.5)
+
+      :arg name: setting name
+      :type name: string
+      :arg value: new value
+      :type value: bool or float
+      :raises ValueError: unknown setting name
+
+   .. method:: strikeLightning(bolt=True)
+
+      Strikes a lightning now (World > Rain must be on; automatic lightning can stay off).
+
+      :arg bolt: show a bolt; False gives only a far flash behind the clouds
+      :type bolt: bool

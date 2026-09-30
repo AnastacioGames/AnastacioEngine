@@ -73,6 +73,7 @@ typedef struct BuildInFilters {
 	bool useRain;
 	bool useRainDroplets;
 	bool useRainRipple;
+	bool useRainSplash;
 	int rain_style;
 	float rain_time;
 	float rain_intensity;
@@ -84,6 +85,13 @@ typedef struct BuildInFilters {
 	float rain_ripple_distance;
 	float rain_ripple_min_up;
 	float rain_color[3];
+	float rain_streak_width;
+	float rain_splash_size;
+	float rain_splash_rate;
+	float rain_splash_intensity;
+	float rain_splash_distance;
+	/* Lightning: flash, bolt brightness, bolt screen position (refreshed every frame) */
+	float rain_lightning[4];
 
 	/* Clouds (native World weather) */
 	bool useClouds;

@@ -39,6 +39,8 @@
 #include <cmath>
 
 #include "KX_Scene.h"
+#include "KX_RainAura.h"
+#include "KX_RainLightning.h"
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
 #include "KX_Globals.h"
@@ -279,6 +281,12 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_color[0] = world->rain_color[0];
 			filters.rain_color[1] = world->rain_color[1];
 			filters.rain_color[2] = world->rain_color[2];
+			filters.useRainSplash = (world->weather_flag & WO_WEATHER_RAIN_SPLASH) ? true : false;
+			filters.rain_streak_width = world->rain_streak_width;
+			filters.rain_splash_size = world->rain_splash_size;
+			filters.rain_splash_rate = world->rain_splash_rate;
+			filters.rain_splash_intensity = world->rain_splash_intensity;
+			filters.rain_splash_distance = world->rain_splash_distance;
 		}
 
 		if (world->weather_flag & WO_WEATHER_CLOUDS) {
@@ -1461,6 +1469,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	CM_ListRemoveIfFound(m_tempObjectList, gameobj);
 	CM_ListRemoveIfFound(m_gpuParticleObjects, gameobj);
 	CM_ListRemoveIfFound(m_gpuParticleColliderObjects, gameobj);
+	if (m_rainAura) {
+		m_rainAura->RemoveObject(gameobj);
+	}
 	CM_ListRemoveIfFound(m_reverbAreaObjects, gameobj);
 	if (CM_ListRemoveIfFound(m_staticShadowCasterObjects, gameobj)) {
 		m_staticShadowCasterListDirty = true;
@@ -2277,6 +2288,49 @@ void KX_Scene::SetLodHysteresisValue(int hysteresisvalue)
 int KX_Scene::GetLodHysteresisValue() const
 {
 	return m_lodHysteresisValue;
+}
+
+void KX_Scene::UpdateRainAura(double time)
+{
+	const World *world = m_blenderScene ? m_blenderScene->world : nullptr;
+	const bool enabled = world && (world->weather_flag & WO_WEATHER_RAIN) && (world->weather_flag & WO_WEATHER_RAIN_AURA);
+	if (!m_rainAura) {
+		if (!enabled) {
+			return;
+		}
+		m_rainAura.reset(new KX_RainAura());
+	}
+	m_rainAura->Update(this, GetActiveCamera(), world, time);
+}
+
+KX_RainAura *KX_Scene::GetRainAura() const
+{
+	return m_rainAura.get();
+}
+
+void KX_Scene::UpdateRainLightning(double time)
+{
+	const World *world = m_blenderScene ? m_blenderScene->world : nullptr;
+	if (!m_rainLightning) {
+		if (!world || !(world->weather_flag & WO_WEATHER_RAIN) || !(world->weather_flag & WO_WEATHER_RAIN_LIGHTNING)) {
+			return;
+		}
+		m_rainLightning.reset(new KX_RainLightning());
+	}
+	m_rainLightning->Update(GetActiveCamera(), world, time);
+}
+
+KX_RainLightning *KX_Scene::GetRainLightning() const
+{
+	return m_rainLightning.get();
+}
+
+void KX_Scene::StrikeLightning(bool bolt)
+{
+	if (!m_rainLightning) {
+		m_rainLightning.reset(new KX_RainLightning());
+	}
+	m_rainLightning->Strike(bolt);
 }
 
 void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)

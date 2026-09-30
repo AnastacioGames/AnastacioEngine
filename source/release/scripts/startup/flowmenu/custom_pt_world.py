@@ -232,6 +232,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             if weather.rain_style == 'CLASSIC':
                 col.prop(weather, "rain_density")
                 col.prop(weather, "rain_wind", text="Wind")
+                col.prop(weather, "rain_streak_width")
             col.prop(weather, "rain_darken", slider=True)
             col.prop(weather, "rain_color", text="Rain Color")
 
@@ -247,6 +248,37 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.prop(weather, "rain_ripple_intensity")
             sub.prop(weather, "rain_ripple_distance")
             sub.prop(weather, "rain_ripple_min_up")
+
+            row = col.row()
+            row.prop(weather, "use_rain_splash", text="")
+            row.label(text="Splash")
+            sub = col.column()
+            sub.active = weather.use_rain_splash
+            sub.prop(weather, "rain_splash_size")
+            sub.prop(weather, "rain_splash_rate")
+            sub.prop(weather, "rain_splash_intensity")
+            sub.prop(weather, "rain_splash_distance")
+
+            row = col.row()
+            row.prop(weather, "use_rain_aura", text="")
+            row.label(text="Aura")
+            sub = col.column()
+            sub.active = weather.use_rain_aura
+            sub.prop(weather, "rain_aura_property", text="Property")
+            sub.prop(weather, "rain_aura_size")
+            sub.prop(weather, "rain_aura_rate")
+            sub.prop(weather, "rain_aura_intensity")
+            sub.prop(weather, "rain_aura_distance")
+
+            row = col.row()
+            row.prop(weather, "use_rain_lightning", text="")
+            row.label(text="Lightning")
+            sub = col.column()
+            sub.active = weather.use_rain_lightning
+            sub.prop(weather, "rain_lightning_rate", text="Per Minute")
+            sub.prop(weather, "rain_lightning_intensity", text="Intensity")
+            sub.prop(weather, "rain_lightning_distance", text="Distance")
+            sub.prop(weather, "rain_lightning_width", text="Width")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)

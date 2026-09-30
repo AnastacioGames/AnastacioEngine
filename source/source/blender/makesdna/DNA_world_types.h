@@ -138,6 +138,13 @@ typedef struct World {
 	float rain_ripple_distance, rain_ripple_min_up;
 	float rain_weather_pad;
 	float rain_color[3];
+	/* respingo nas superficies de cima e aura de riscos na silhueta, ver WO_WEATHER_RAIN_SPLASH/AURA */
+	float rain_splash_size, rain_splash_rate, rain_splash_intensity, rain_splash_distance;
+	float rain_aura_size, rain_aura_rate, rain_aura_intensity, rain_aura_distance;
+	float rain_streak_width; /* largura dos riscos da chuva Classic (1 = original) */
+	float rain_lightning_rate; /* raios por minuto no modo automatico, ver WO_WEATHER_RAIN_LIGHTNING */
+	char  rain_aura_prop[64]; /* propriedade de jogo que marca os objetos com aura */
+	float rain_lightning_intensity, rain_lightning_distance, rain_lightning_width, rain_lightning_pad;
 
 	float cloud_coverage, cloud_scale, cloud_speed;
 	float cloud_color[3];
@@ -185,6 +192,9 @@ typedef struct World {
 #define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
 #define WO_WEATHER_RAIN_RIPPLE     (1 << 4)
 #define WO_WEATHER_EARTHQUAKE      (1 << 5)
+#define WO_WEATHER_RAIN_SPLASH     (1 << 6)
+#define WO_WEATHER_RAIN_AURA       (1 << 7)
+#define WO_WEATHER_RAIN_LIGHTNING  (1 << 8)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

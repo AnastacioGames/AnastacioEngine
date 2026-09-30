@@ -9,6 +9,29 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Chuva do World: respingo, aura, raio e riscos finos
+
+- World › Rain ganhou dois efeitos, desligados por padrão (versioning 1.6.114):
+  - **Splash**: gotas que sobem ao bater nas superfícies voltadas para cima, com borda. Roda dentro do passe
+    de chuva já existente (`rainSplash()` em `RAS_Rain2DFilter.glsl`, `ge_RainParams4`), sem passe a mais.
+  - **Aura**: riscos parados de 15–50 ms, em leque, no contorno de cima da silhueta dos objetos com a
+    propriedade `rain_aura_property` (padrão `aura_chuva`). `KX_RainAura` guarda as arestas vivas por malha,
+    acha a silhueta em espaço local e desenha todos os riscos com um `glDrawElements` (VBO dinâmico, máx. 4096).
+  - **Aura** com tamanho constante na tela: os riscos (em mm) escalam com distância/3 m; antes só apareciam
+    a ~3 m da câmera.
+  - **Lightning**: raios automáticos (`rain_lightning_rate` por minuto) ou por Python, 2–4 descargas com
+    decaimento. Lógica compartilhada em `BKE_rain_lightning` (agenda, pulsos, raio com ramos por midpoint
+    displacement). `KX_RainLightning` desenha uma fita contínua virada para a câmera com perfil gaussiano e
+    pontas redondas (sem bordas duras), numa chamada; o clarão entra no filtro de chuva (`ge_RainLightning`).
+- Chuva Classic refeita: linhas anti-aliased de largura em pixels (3 camadas, gota até ~15% da tela), no
+  lugar do ruído esticado que gerava riscos grossos perto da câmera. `rain_streak_width` 1,0 = 2 px em 1080p.
+- 3D View: o compositor recebe `rain_params4`, `rain_lightning` e `rain_streak_width` (respingo, riscos finos
+  e clarão iguais ao jogo); `view3d_rain.c` desenha aura e raio; o timer do viewport roda com esses efeitos.
+- Python: `KX_WorldInfo.setWeather(name, value)`, com os nomes do Property actuator mais `splash*`, `aura*`,
+  `lightning*` e `rain_streak_width`; `KX_WorldInfo.strikeLightning(bolt=True)`. Splash, aura e largura são relidos do World a cada frame.
+- Teste: `tools/create_rain_splash_scene.py` (versão Python do protótipo removida) no `RangeRuntime`: 60 FPS,
+  sem erro de GLSL/Python, aura e respingo conferidos em screenshot.
+
 ## 2026-09-29 - Câmera do jogo: foco, rastreio, Camera FX e tremor
 
 - DNA `CameraGameFX gamefx` no fim de `Camera` (defaults em `BKE_camera_gamefx_init`, versioning em

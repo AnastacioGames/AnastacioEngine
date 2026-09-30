@@ -46,6 +46,8 @@
 
 #include "PIL_time.h"
 
+#include "BKE_rain_lightning.h"
+
 static const float fullscreencos[4][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, 1.0f}};
 static const float fullscreenuvs[4][2] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}};
 
@@ -110,6 +112,9 @@ typedef struct {
   int rain_params3_uniform;
   int rain_color_uniform;
   int rain_style_uniform;
+  int rain_params4_uniform;
+  int rain_lightning_uniform;
+  int rain_streak_width_uniform;
 } GPURAINShaderInterface;
 
 typedef struct {
@@ -1342,7 +1347,41 @@ bool GPU_fx_do_composite_pass(
 			    world->rain_ripple, (float)fmod(PIL_check_seconds_timer(), 10000.0),
 			    (world->weather_flag & WO_WEATHER_RAIN_DROPLETS) ? 1.0f : 0.0f,
 			    (world->weather_flag & WO_WEATHER_RAIN_RIPPLE) ? 1.0f : 0.0f};
-			float rain_params3[4] = {world->rain_density, world->rain_ripple_distance, world->rain_ripple_min_up, 0.0f};
+			float rain_params3[4] = {world->rain_density, world->rain_ripple_distance, world->rain_ripple_min_up, world->rain_splash_distance};
+			float rain_params4[4] = {
+			    (world->weather_flag & WO_WEATHER_RAIN_SPLASH) ? 1.0f : 0.0f,
+			    world->rain_splash_size, world->rain_splash_rate, world->rain_splash_intensity};
+			float rain_streak_width = (world->rain_streak_width > 0.0f) ? world->rain_streak_width : 1.0f;
+			float rain_lightning[4] = {0.0f, 0.0f, 0.5f, 0.5f};
+			unsigned int lightning_seed;
+			if ((world->weather_flag & WO_WEATHER_RAIN_LIGHTNING) &&
+			    BKE_rain_lightning_eval(world->rain_lightning_rate, world->rain_lightning_intensity,
+			                            PIL_check_seconds_timer(), &rain_lightning[0], &rain_lightning[1],
+			                            &lightning_seed) &&
+			    rain_lightning[1] > 0.0f)
+			{
+				/* Bolt center on screen, for the halo in the sky (same bolt as view3d_rain.c). */
+				RainLightningBolt bolt;
+				float viewinv[4][4], persmat[4][4], co[4];
+				const float clip_end = is_persp ? projmat[3][2] / (projmat[2][2] + 1.0f) : 0.0f;
+				invert_m4_m4(viewinv, viewmat);
+				BKE_rain_lightning_view_bolt(lightning_seed, viewinv, clip_end, world->rain_lightning_distance,
+				                             world->rain_lightning_width, &bolt);
+				mul_m4_m4m4(persmat, projmat, viewmat);
+				copy_v3_v3(co, bolt.center);
+				co[3] = 1.0f;
+				mul_m4_v4(persmat, co);
+				if (co[3] > 0.0f) {
+					rain_lightning[2] = co[0] / co[3] * 0.5f + 0.5f;
+					rain_lightning[3] = co[1] / co[3] * 0.5f + 0.5f;
+				}
+				else {
+					rain_lightning[1] = 0.0f;
+				}
+			}
+			else {
+				rain_lightning[1] = 0.0f;
+			}
 			float rain_style = (world->rain_style == WO_RAIN_STYLE_VOLUMETRIC) ? 1.0f : 0.0f;
 
 			GPURAINShaderInterface *interface = GPU_shader_get_interface(rain_shader);
@@ -1361,6 +1400,9 @@ bool GPU_fx_do_composite_pass(
 			GPU_shader_uniform_vector(rain_shader, interface->rain_params3_uniform, 4, 1, rain_params3);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_color_uniform, 3, 1, world->rain_color);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_style_uniform, 1, 1, &rain_style);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_params4_uniform, 4, 1, rain_params4);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_lightning_uniform, 4, 1, rain_lightning);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_streak_width_uniform, 1, 1, &rain_streak_width);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2114,6 +2156,9 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_params3_uniform = GPU_shader_get_uniform(shader, "rain_params3");
 			interface->rain_color_uniform = GPU_shader_get_uniform(shader, "rain_color");
 			interface->rain_style_uniform = GPU_shader_get_uniform(shader, "rain_style");
+			interface->rain_params4_uniform = GPU_shader_get_uniform(shader, "rain_params4");
+			interface->rain_lightning_uniform = GPU_shader_get_uniform(shader, "rain_lightning");
+			interface->rain_streak_width_uniform = GPU_shader_get_uniform(shader, "rain_streak_width");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

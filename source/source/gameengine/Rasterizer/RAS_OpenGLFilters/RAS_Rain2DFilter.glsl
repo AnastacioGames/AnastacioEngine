@@ -16,38 +16,61 @@ uniform mat4 unfinvprojmat;
 
 uniform vec4 ge_RainParams1; // intensity, speed, wind, darken
 uniform vec4 ge_RainParams2; // ripple intensity, time, use droplets, use ripple
-uniform vec4 ge_RainParams3; // density, ripple radius, minimum upward normal, unused
+uniform vec4 ge_RainParams3; // density, ripple radius, minimum upward normal, splash distance
+uniform vec4 ge_RainParams4; // use splash, splash size, splash rate, splash intensity
+uniform vec4 ge_RainLightning; // flash, bolt, bolt screen position
+uniform float ge_RainStreakWidth; // Classic streak width, 1 = 2 px at 1080p
 uniform vec3 ge_RainColor;
 uniform float ge_RainStyle; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
 
 vec2 texcoord;
 
-/* Streaks: screen-space value-noise layers (base: RainFX.py rainLayer/hash/valueNoise). */
-float rainHash(vec2 p)
+/* Classic streaks: thin anti-aliased lines measured in pixels, so they stay fine at any
+ * resolution. Each column of cells scrolls down at its own speed and every cell holds at
+ * most one drop with a short fading tail, so no streak ever spans the whole screen. */
+float rainLineHash(vec2 p)
 {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-float rainValueNoise(vec2 p)
-{
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	float a = rainHash(i);
-	float b = rainHash(i + vec2(1.0, 0.0));
-	float c = rainHash(i + vec2(0.0, 1.0));
-	float d = rainHash(i + vec2(1.0, 1.0));
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-}
-
-float rainLayer(vec2 uv, float scale, float speed, float sharpness, float wind, float time)
+float rainLines(vec2 uv, vec2 res, float cellsX, float cellsY, float speed, float widthPx, float wind, float time, float seed)
 {
 	vec2 p = uv;
 	p.x += p.y * wind * 0.4;
-	p *= vec2(scale * 0.6, scale * 0.06);
-	p.y += time * speed;
-	float n = rainValueNoise(p);
-	return pow(clamp(n, 0.0, 1.0), sharpness);
+	float col = floor(p.x * cellsX);
+	float hc = rainLineHash(vec2(col, seed));
+	/* Wrapped scroll: rows are random, so the wrap is invisible and fract() keeps its precision. */
+	float y = p.y * cellsY + mod(time * speed * cellsY * (0.8 + 0.4 * hc), 4096.0) + hc * 37.0;
+	float row = floor(y);
+	float f = fract(y);
+	float h1 = rainLineHash(vec2(col + seed, row));
+	float h2 = rainLineHash(vec2(row, col - seed));
+	float h3 = rainLineHash(vec2(col + row, seed * 1.7));
+	if (h3 < 0.3) {
+		return 0.0;
+	}
+	float len = 0.2 + 0.45 * h2;
+	if (f > len) {
+		return 0.0;
+	}
+	float dx = abs(fract(p.x * cellsX) - (0.15 + 0.7 * h1)) * res.x / cellsX;
+	/* Coverage of a line narrower than one pixel is its width. */
+	float w = max(widthPx, 1.0);
+	float line = clamp(0.5 * w + 0.5 - dx, 0.0, 1.0) * min(widthPx, 1.0);
+	/* Head at the bottom, tail fading upward. */
+	float tail = smoothstep(0.0, 0.03, f) * (1.0 - f / len);
+	return line * tail * (0.5 + 0.5 * h3);
+}
+
+/* Three layers for depth: a few slightly wider, faster drops up close and many finer,
+ * slower ones behind. widthScale 1 = 2 px at 1080p. */
+float rainClassicStreaks(vec2 uv, vec2 res, float density, float speed, float wind, float widthScale, float time)
+{
+	float px = widthScale * 2.0 * res.y / 1080.0;
+	float s = rainLines(uv, res, 45.0 * density, 5.0, speed * 1.6, px * 1.6, wind, time, 3.1) * 0.9;
+	s += rainLines(uv, res, 90.0 * density, 8.0, speed * 1.2, px, wind * 0.8, time, 7.7) * 0.7;
+	s += rainLines(uv, res, 160.0 * density, 13.0, speed * 0.9, px * 0.7, wind * 0.7, time, 12.9) * 0.5;
+	return s;
 }
 
 /* Puddle ripples: world-space cellular rings sampled from reconstructed depth
@@ -149,6 +172,203 @@ float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float t
 	return rain;
 }
 
+/* Splash: drops bouncing up where the rain hits upward-facing surfaces, edges included.
+ * For each pixel, look a few pixels below for a surface cell (the drops rise above it),
+ * then draw a crown + drops in a parabola for the 2x2 nearest cells of a world-space grid. */
+#define SPLASH_SEARCH_STEPS 10
+#define SPLASH_DROPS 8
+#define SPLASH_MIN_UP 0.7
+#define SPLASH_GRAVITY 9.8
+
+float splashCell;
+float splashRate;
+float splashHeight;
+float splashRadius;
+float splashDrop;
+float splashTime;
+vec2 splashRes;
+
+vec3 splashHash(vec3 p)
+{
+	return fract(sin(vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+	                      dot(p, vec3(269.5, 183.3, 246.1)),
+	                      dot(p, vec3(113.5, 271.9, 124.6)))) * 43758.5453);
+}
+
+float splashDepthAt(vec2 uv)
+{
+	return texture(bgl_DepthTexture, uv).x;
+}
+
+vec3 splashViewPos(vec2 uv, float d)
+{
+	vec4 v = unfinvprojmat * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+	return v.xyz / v.w;
+}
+
+vec3 splashWorldPos(vec2 uv, float d)
+{
+	return (unfinvviewmat * vec4(splashViewPos(uv, d), 1.0)).xyz;
+}
+
+/* xy = screen uv, z = distance along the view axis. */
+vec3 splashProject(vec3 w)
+{
+	vec4 c = unfprojmat * (unfviewmat * vec4(w, 1.0));
+	return vec3(c.xy / c.w * 0.5 + 0.5, c.w);
+}
+
+/* Neighbour on the side that stays on the same surface (avoids the silhouette). */
+vec3 splashNeighbour(vec2 uv, vec2 dir, vec3 wp)
+{
+	vec3 a = splashWorldPos(uv + dir, splashDepthAt(uv + dir));
+	vec3 b = splashWorldPos(uv - dir, splashDepthAt(uv - dir));
+	return distance(a, wp) < distance(b, wp) ? a - wp : wp - b;
+}
+
+float splashOne(vec3 cell, float surfZ, vec2 uv, float sceneZ)
+{
+	vec3 h = splashHash(cell);
+	float V = sqrt(2.0 * SPLASH_GRAVITY * splashHeight);
+	float life = 2.2 * V / SPLASH_GRAVITY;
+	float age = fract(splashTime * splashRate + h.x) / splashRate;
+	if (age > life) {
+		return 0.0;
+	}
+
+	vec3 C = vec3((cell.xy + 0.2 + 0.6 * h.yz) * splashCell, surfZ);
+	vec3 s0 = splashProject(C);
+	if (s0.z <= 0.0) {
+		return 0.0;
+	}
+	/* Only on the real surface: near an edge the center may fall in the air. */
+	vec2 cuv = s0.xy;
+	if (any(lessThan(cuv, vec2(0.0))) || any(greaterThan(cuv, vec2(1.0)))) {
+		return 0.0;
+	}
+	float cd = splashDepthAt(cuv);
+	if (cd >= 0.9999 || distance(splashWorldPos(cuv, cd), C) > 0.02 + 0.004 * s0.z) {
+		return 0.0;
+	}
+	/* Hidden behind something closer. */
+	if (sceneZ < s0.z - 0.08) {
+		return 0.0;
+	}
+
+	/* World axes on screen (pixels per meter); the splash is tiny, so affine is enough. */
+	const float e = 0.05;
+	vec2 ax = (splashProject(C + vec3(e, 0.0, 0.0)).xy - s0.xy) / e * splashRes;
+	vec2 ay = (splashProject(C + vec3(0.0, e, 0.0)).xy - s0.xy) / e * splashRes;
+	vec2 az = (splashProject(C + vec3(0.0, 0.0, e)).xy - s0.xy) / e * splashRes;
+	vec2 p = (uv - s0.xy) * splashRes;
+	float ppm = length(az);
+	float u = age / life;
+	float a = 0.0;
+
+	/* Crown: thin wall of water that opens and rises right after the impact. */
+	if (u < 0.45) {
+		float det = ax.x * ay.y - ax.y * ay.x;
+		if (abs(det) > 1e-3) {
+			mat2 inv = mat2(ay.y, -ax.y, -ay.x, ax.x) / det;
+			float k = u / 0.45;
+			float rc = splashRadius * (0.15 + 0.55 * k);
+			float hc = splashHeight * 0.45 * sin(3.1416 * k);
+			float w = max(splashDrop * 0.6, 1.2 / ppm);
+			for (int j = 0; j < 4; ++j) {
+				float z = hc * float(j) / 3.0;
+				vec2 local = inv * (p - az * z);
+				float ring = 1.0 - smoothstep(0.0, w, abs(length(local) - rc));
+				a = max(a, ring * (0.9 - 0.4 * float(j) / 3.0) * (1.0 - k * 0.5));
+			}
+		}
+	}
+
+	/* Drops thrown up and out, falling back with gravity. */
+	for (int n = 0; n < SPLASH_DROPS; ++n) {
+		float fn = float(n);
+		float r1 = fract(h.x * 37.13 + fn * 0.618);
+		float r2 = fract(h.y * 91.71 + fn * 0.371);
+		float ang = 6.2832 * (fn / float(SPLASH_DROPS) + 0.12 * r1 + h.z);
+		float vs = V * (0.55 + 0.45 * r2);
+		float z = vs * age - 0.5 * SPLASH_GRAVITY * age * age;
+		if (z < 0.0) {
+			continue;
+		}
+		float rr = splashRadius * (0.3 + 0.9 * u) * (0.7 + 0.6 * r1);
+		vec2 sp = ax * cos(ang) * rr + ay * sin(ang) * rr + az * z;
+		float rad = max(splashDrop * (1.0 - 0.4 * u) * (0.6 + 0.8 * r2) * ppm, 0.8);
+		float d = length(p - sp);
+		a = max(a, 1.0 - smoothstep(rad * 0.4, rad + 0.75, d));
+	}
+	return a;
+}
+
+/* Returns the splash coverage (0..1) for this pixel. */
+float rainSplash(vec2 uv, float size, float rate, float maxDist, float time)
+{
+	splashRes = vec2(textureSize(bgl_DepthTexture, 0));
+	vec2 texel = 1.0 / splashRes;
+	splashCell = 0.1 * max(size, 1.0);
+	splashRate = rate;
+	splashHeight = 0.035 * size;
+	splashRadius = 0.03 * size;
+	splashDrop = 0.0035 * size;
+	splashTime = time;
+	/* Pixels per meter at 0.8 m from the camera: the search must cover the tallest splash. */
+	float ppm = unfprojmat[1][1] * splashRes.y * 0.5 / 0.8;
+	float searchPx = min((splashHeight * 1.1 + splashDrop) * ppm, 72.0);
+
+	float d0 = splashDepthAt(uv);
+	float sceneZ = d0 >= 0.9999 ? 1e9 : -splashViewPos(uv, d0).z;
+	vec3 camPos = unfinvviewmat[3].xyz;
+
+	float acc = 0.0;
+	vec3 lastBase = vec3(1e9);
+	for (int k = 0; k < SPLASH_SEARCH_STEPS; ++k) {
+		vec2 suv = uv - vec2(0.0, float(k) * searchPx / float(SPLASH_SEARCH_STEPS - 1) * texel.y);
+		if (suv.y < 0.0) {
+			break;
+		}
+		float ds = splashDepthAt(suv);
+		if (ds >= 0.9999) {
+			continue;
+		}
+		vec3 wp = splashWorldPos(suv, ds);
+		if (distance(wp, camPos) > maxDist) {
+			continue;
+		}
+		vec3 n = normalize(cross(splashNeighbour(suv, vec2(texel.x, 0.0), wp), splashNeighbour(suv, vec2(0.0, texel.y), wp)));
+		if (dot(n, camPos - wp) < 0.0) {
+			n = -n;
+		}
+		if (n.z < SPLASH_MIN_UP) {
+			continue;
+		}
+		/* The two nearest cells on each axis, so a crown is not cut at a cell border. */
+		vec3 b = vec3(floor(wp.xy / splashCell - 0.5), floor(wp.z / 0.25));
+		if (all(equal(b, lastBase))) {
+			continue;
+		}
+		lastBase = b;
+		for (int i = 0; i < 2; ++i) {
+			for (int j = 0; j < 2; ++j) {
+				acc = max(acc, splashOne(b + vec3(float(i), float(j), 0.0), wp.z, uv, sceneZ));
+			}
+		}
+	}
+	return acc;
+}
+
+/* Lightning flash: the whole scene gets brighter and colder, the sky much more, and the
+ * sky around the bolt even more. x = flash, y = bolt brightness, zw = bolt on screen (uv). */
+vec3 rainLightning(vec3 col, vec2 uv, float depth, vec2 res, vec4 lightning)
+{
+	float sky = step(0.9999, depth);
+	float halo = lightning.y * exp(-length((uv - lightning.zw) * vec2(res.x / res.y, 1.0)) * 5.0);
+	vec3 tint = vec3(0.75, 0.82, 1.0);
+	return col * (1.0 + lightning.x * 1.2) + tint * (lightning.x * (0.04 + 0.3 * sky) + halo * 0.35 * sky);
+}
+
 void main()
 {
 #ifdef USE_CORE_PROFILE
@@ -174,7 +394,7 @@ void main()
 	float rippleRadius = ge_RainParams3.y;
 	float rippleMinUp = ge_RainParams3.z;
 
-	if (intensity <= 0.001) {
+	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001) {
 		gl_FragColor = direct;
 		return;
 	}
@@ -200,16 +420,7 @@ void main()
 			streaks = rainVolumetricStreaks(camPos, viewDir, sceneDepth, time * speed);
 		}
 		else {
-			/* Classic: two screen-space layers for a sense of parallax -- a few thick,
-			 * fast, sharply-defined streaks up close, and many thin, slower, softer
-			 * ones further back. */
-			/* The former 12/30 power masks retained only exceptionally bright noise
-			 * samples, so Classic could look entirely dry at ordinary resolutions.
-			 * These narrower, lower-power layers keep individual streaks visible. */
-			streaks = rainLayer(texcoord, 15.0 * density, speed * 1.3, 6.0, wind, time) * 0.75;
-
-			streaks += rainLayer(texcoord + vec2(3.7, 1.3), 55.0 * density, speed * 0.6, 12.0, wind * 0.7, time) * 0.50;
-			streaks += rainLayer(texcoord + vec2(9.1, 5.2), 80.0 * density, speed * 0.5, 14.0, wind * 0.7, time) * 0.35;
+			streaks = rainClassicStreaks(texcoord, vec2(textureSize(bgl_RenderedTexture, 0)), density, speed, wind, ge_RainStreakWidth, time);
 		}
 
 		finalColor += ge_RainColor * streaks * intensity;
@@ -235,6 +446,21 @@ void main()
 				finalColor += vec3(rippleNoise * rippleIntensity * 0.15);
 			}
 		}
+	}
+
+	if (ge_RainParams4.x > 0.5 && ge_RainParams4.w > 0.001) {
+		float splash = rainSplash(texcoord, ge_RainParams4.y, ge_RainParams4.z, ge_RainParams3.w, time) * ge_RainParams4.w * 0.85;
+		if (splash > 0.0) {
+			/* Water: slightly refracts what is behind it and catches the sky light. */
+			vec2 texel = 1.0 / vec2(textureSize(bgl_DepthTexture, 0));
+			vec3 behind = texture(bgl_RenderedTexture, texcoord + vec2(0.0, 2.0) * texel).rgb;
+			vec3 water = behind * 0.55 + vec3(0.78, 0.85, 0.95) * 0.6;
+			finalColor = mix(finalColor, water, clamp(splash, 0.0, 1.0));
+		}
+	}
+
+	if (ge_RainLightning.x > 0.001) {
+		finalColor = rainLightning(finalColor, texcoord, texture(bgl_DepthTexture, texcoord).x, vec2(textureSize(bgl_RenderedTexture, 0)), ge_RainLightning);
 	}
 
 	gl_FragColor = vec4(finalColor, direct.a);

@@ -597,6 +597,104 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Rain Color", "Color tint of the rain streaks");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "rain_streak_width", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Streak Width", "Width of the Classic rain streaks in pixels (1.0 = 2 px at 1080p, lower is thinner)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_splash", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_SPLASH);
+	RNA_def_property_ui_text(prop, "Splash", "Drops bouncing up when the rain hits upward-facing surfaces and edges");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_splash_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.3f, 6.0f);
+	RNA_def_property_ui_range(prop, 0.3f, 6.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Splash Size", "Size of the splash drops");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_splash_rate", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 6.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 6.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Splash Rate", "Splashes per surface cell per second");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_splash_intensity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Splash Intensity", "Brightness of the splash drops");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_splash_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 100.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Splash Distance", "Maximum distance from the active camera where splashes are drawn");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_aura", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_AURA);
+	RNA_def_property_ui_text(prop, "Aura", "Manga-style short spray strokes on the upper silhouette of marked objects");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_aura_property", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "rain_aura_prop");
+	RNA_def_property_ui_text(prop, "Aura Property", "Game property (True) that marks the objects receiving the aura");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_aura_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.3f, 5.0f);
+	RNA_def_property_ui_range(prop, 0.3f, 5.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Aura Size", "Size of the aura strokes");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_aura_rate", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 3.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 3.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Aura Amount", "Amount of aura strokes");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_aura_intensity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Aura Intensity", "Brightness of the aura strokes");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_aura_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 100.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Aura Distance", "Maximum distance from the active camera for objects with aura");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_lightning", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_LIGHTNING);
+	RNA_def_property_ui_text(prop, "Lightning", "Branching lightning bolts far in front of the camera with a flickering flash");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_lightning_rate", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 60.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 30.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Lightning Rate", "Automatic strikes per minute (0 = only from Python, world.strikeLightning())");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_lightning_intensity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Lightning Intensity", "Brightness of the flash and of the bolt");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_lightning_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 5.0f, 2000.0f);
+	RNA_def_property_ui_range(prop, 20.0f, 300.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Lightning Distance", "Average distance of the bolts from the camera (their height follows it)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_lightning_width", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 5.0f);
+	RNA_def_property_ui_range(prop, 0.2f, 3.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Bolt Width", "Thickness of the bolt and of its glow");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	/* clouds */
 	prop = RNA_def_property(srna, "use_clouds", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_CLOUDS);

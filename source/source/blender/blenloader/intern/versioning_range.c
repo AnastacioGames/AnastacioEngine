@@ -525,6 +525,32 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 114)) {
+    /* Respingo/aura de chuva desligados por padrao; largura 1 mantem a chuva Classic antiga. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_streak_width = 1.0f;
+      wo->rain_splash_size = 1.0f;
+      wo->rain_splash_rate = 0.9f;
+      wo->rain_splash_intensity = 1.0f;
+      wo->rain_splash_distance = 25.0f;
+      wo->rain_aura_size = 1.0f;
+      wo->rain_aura_rate = 0.6f;
+      wo->rain_aura_intensity = 1.0f;
+      wo->rain_aura_distance = 30.0f;
+      BLI_strncpy(wo->rain_aura_prop, "aura_chuva", sizeof(wo->rain_aura_prop));
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_lightning_intensity")) {
+    /* Raios da chuva desligados por padrao (WO_WEATHER_RAIN_LIGHTNING nunca estava ligado). */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_lightning_rate = 7.0f;
+      wo->rain_lightning_intensity = 1.0f;
+      wo->rain_lightning_distance = 80.0f;
+      wo->rain_lightning_width = 1.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "foliage_distance")) {
     /* Files from before Foliage Optimization get the same wind distance as new materials. */
     LISTBASE_FOREACH (Material *, ma, &main->mat) {
