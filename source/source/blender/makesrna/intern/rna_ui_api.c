@@ -51,6 +51,8 @@ const EnumPropertyItem rna_enum_icon_items[] = {
 
 #ifdef RNA_RUNTIME
 
+#include "BLI_math_color.h"
+
 const char *rna_translate_ui_text(
         const char *text, const char *text_ctxt, StructRNA *type, PropertyRNA *prop, bool translate)
 {
@@ -252,6 +254,13 @@ static void rna_uiItemL(
 	}
 
 	uiItemL(layout, name, icon);
+}
+
+static void rna_uiLayoutBoxColorSet(uiLayout *layout, float color[3])
+{
+	unsigned char col[3];
+	rgb_float_to_uchar(col, color);
+	uiLayoutBoxSetCustomColor(layout, col);
 }
 
 static void rna_uiItemM(
@@ -528,6 +537,11 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_function_return(func, parm);
 	RNA_def_function_ui_description(func, "Sublayout (items placed in this sublayout are placed "
 	                                "under each other in a column and are surrounded by a box)");
+
+	func = RNA_def_function(srna, "box_color_set", "rna_uiLayoutBoxColorSet");
+	RNA_def_function_ui_description(func, "Set a custom background color on a box layout (ignored on other layouts)");
+	parm = RNA_def_float_color(func, "color", 3, NULL, 0.0f, 1.0f, "Color", "", 0.0f, 1.0f);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
 	/* split layout */
 	func = RNA_def_function(srna, "split", "uiLayoutSplit");

@@ -34,6 +34,8 @@ from .custom_pt_components import (
 )
 from .custom_pt_properties import (
     OBJECT_OT_game_header_add, 
+    FLOWMENU_HeaderColor,
+    OBJECT_OT_game_header_color_add,
     CUSTOM_PT_game_properties,
     FLOWMENU_ListItem,
     FLOWMENU_UL_ComponentList,
@@ -82,6 +84,8 @@ classes = [
     create_component_wizard.FLOWMENU_OT_create_advanced_component,
 
     # --- NOSSAS NOVAS CLASSES DE PAINEL ---
+    FLOWMENU_HeaderColor,
+    OBJECT_OT_game_header_color_add,
     OBJECT_OT_game_header_add,
     CUSTOM_PT_game_components,
     CUSTOM_PT_game_existing_components,
@@ -177,6 +181,7 @@ def register():
     bpy.types.Scene.flowmenu_wizard_class = bpy.props.StringProperty(name="Class Name", default="NewComponent")
     bpy.types.Scene.flowmenu_component_list = bpy.props.CollectionProperty(type=FLOWMENU_ListItem)
     bpy.types.Scene.flowmenu_component_list_active = bpy.props.IntProperty(default=0)
+    bpy.types.Object.game_header_colors = bpy.props.CollectionProperty(type=FLOWMENU_HeaderColor)
 
 
     # Keymaps
@@ -203,6 +208,7 @@ def unregister():
     del bpy.types.Scene.flowmenu_wizard_class
     del bpy.types.Scene.flowmenu_component_list
     del bpy.types.Scene.flowmenu_component_list_active
+    del bpy.types.Object.game_header_colors
 
     # 1. DESREGISTRA AS CLASSES DO NOSSO ADD-ON
     for cls in reversed(classes):

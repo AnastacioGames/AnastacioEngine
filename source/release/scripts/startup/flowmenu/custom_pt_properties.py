@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import Panel, Operator, UIList, PropertyGroup
-from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty, FloatVectorProperty
 from bpy.app.translations import pgettext_tip as tip_
 
 # Cache para a lista de ícones (evita recriar a lista toda vez e deixar a UI lenta)
@@ -17,6 +17,47 @@ def get_icon_enum_items(self, context):
                 # Colocar o nome do ícone no 2º parâmetro permite buscar digitando
                 _icon_enum_items.append((icon, icon, "", icon, i))
     return _icon_enum_items
+
+# ==============================================================================
+# COR DOS CABEÇALHOS (mesma ideia da cor dos Logic Bricks)
+# ==============================================================================
+# Cinza padrão da caixa, igual ao default dos sensores (43/255).
+HEADER_DEFAULT_COLOR = (0.17, 0.17, 0.17)
+# Função escondida: mude para True para mostrar o quadrado de cor nos cabeçalhos.
+SHOW_HEADER_COLOR = False
+
+class FLOWMENU_HeaderColor(PropertyGroup):
+    # name = nome completo da Game Property do cabeçalho (único no objeto)
+    color: FloatVectorProperty(name="Color", subtype='COLOR_GAMMA', size=3,
+                                min=0.0, max=1.0, default=HEADER_DEFAULT_COLOR,
+                                description="Custom color for this header")
+
+def find_header_color(ob, key):
+    colors = getattr(ob, "game_header_colors", None)
+    if colors is None:
+        return None
+    return colors.get(key)
+
+def set_box_color(box, color):
+    # box_color_set existe só em builds com o suporte em C
+    if color is not None and hasattr(box, "box_color_set"):
+        box.box_color_set(color)
+
+class OBJECT_OT_game_header_color_add(Operator):
+    bl_idname = "object.game_header_color_add"
+    bl_label = "Header Color"
+    bl_description = "Enable a custom color for this header"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    key: StringProperty()
+
+    def execute(self, context):
+        ob = context.active_object
+        if not ob or find_header_color(ob, self.key) is not None:
+            return {'CANCELLED'}
+        item = ob.game_header_colors.add()
+        item.name = self.key
+        return {'FINISHED'}
 
 # ==============================================================================
 # OPERATOR: ADD HEADER 
@@ -104,9 +145,11 @@ class CUSTOM_PT_game_properties(Panel):
         mv.direction = 'DOWN'
         row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = index
 
-    def _draw_prop_row(self, parent, prop, index):
+    def _draw_prop_row(self, parent, prop, index, color=None):
         # Mesmo layout da barra lateral do Logic Bricks (space_logic.py)
-        row = parent.box().row()
+        box = parent.box()
+        set_box_color(box, color)
+        row = box.row()
         row.prop(prop, "name", text="")
         row.prop(prop, "type", text="")
         row.prop(prop, "value", text="")
@@ -120,8 +163,24 @@ class CUSTOM_PT_game_properties(Panel):
                  icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT')
         title, icon = self._split_tag(prop.name, "HEADER", "FULLSCREEN")
         row.label(text=title, icon=icon)
+
+        # Quadrado de cor pequeno, como no cabeçalho dos Logic Bricks
+        color = None
+        if not SHOW_HEADER_COLOR:
+            self._draw_order_buttons(row, index)
+            return is_open, color
+        hc = find_header_color(prop.id_data, prop.name)
+        sub = row.row(align=True)
+        sub.ui_units_x = 1.0
+        if hc is not None:
+            color = hc.color
+            sub.prop(hc, "color", text="")
+            set_box_color(box, color)
+        else:
+            sub.operator("object.game_header_color_add", text="", icon='COLOR',
+                         emboss=False).key = prop.name
         self._draw_order_buttons(row, index)
-        return is_open
+        return is_open, color
 
     def _draw_text_props(self, layout, game):
         # Propriedades "Text" e "Text-Res" de objetos de texto,
@@ -192,11 +251,12 @@ class CUSTOM_PT_game_properties(Panel):
 
         current_col = None
         group_open = True
+        group_color = None
 
         for i, prop in props_list:
             if self._is_header(prop.name):
                 box = layout.box()
-                group_open = self._draw_header_row(box, prop, i)
+                group_open, group_color = self._draw_header_row(box, prop, i)
                 current_col = box.column() if group_open else None
                 continue
 
@@ -207,7 +267,7 @@ class CUSTOM_PT_game_properties(Panel):
                 box.label(text="Ungrouped Properties", icon="LINENUMBERS_ON")
                 current_col = box.column()
 
-            self._draw_prop_row(current_col, prop, i)
+            self._draw_prop_row(current_col, prop, i, group_color)
 
 # ==============================================================================
 # PAINEL CUSTOMIZADO: EXISTING COMPONENTS (Portado do Component Helper)

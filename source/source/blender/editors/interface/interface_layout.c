@@ -3936,6 +3936,10 @@ void uiLayoutBoxSetCustomColor(uiLayout *layout, const unsigned char col[3])
 {
 	uiLayoutItemBx *item = (uiLayoutItemBx*)layout;
 
+	/* Only box layouts carry a roundbox button. */
+	if (layout->item.type != ITEM_LAYOUT_BOX || item->roundbox == NULL)
+		return;
+
 	copy_v3_v3_uchar(item->roundbox->col, col);
 	item->roundbox->col[3] = 255; // alpha value
 }
