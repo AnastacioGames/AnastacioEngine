@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 
 #include "BLT_translation.h"
 
@@ -219,7 +220,9 @@ static StructRNA *rna_Panel_register(
 		return NULL;
 	}
 
-	if ((dummypt.category[0] == '\0') && (dummypt.region_type == RGN_TYPE_TOOLS)) {
+	if ((dummypt.category[0] == '\0') && ((dummypt.region_type == RGN_TYPE_TOOLS) ||
+	     (dummypt.space_type == SPACE_VIEW3D && dummypt.region_type == RGN_TYPE_UI)))
+	{
 		/* Use a fallback, otherwise an empty value will draw the panel in every category. */
 		strcpy(dummypt.category, PNL_CATEGORY_FALLBACK);
 	}

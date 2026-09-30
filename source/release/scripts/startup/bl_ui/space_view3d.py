@@ -3434,6 +3434,7 @@ class VIEW3D_MT_edit_gpencil_interpolate(Menu):
 class VIEW3D_PT_grease_pencil(GreasePencilDataPanel, Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
 
     # NOTE: this is just a wrapper around the generic GP Panel
 
@@ -3441,6 +3442,7 @@ class VIEW3D_PT_grease_pencil(GreasePencilDataPanel, Panel):
 class VIEW3D_PT_grease_pencil_palettecolor(GreasePencilPaletteColorPanel, Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
 
     # NOTE: this is just a wrapper around the generic GP Panel
 
@@ -3448,6 +3450,7 @@ class VIEW3D_PT_grease_pencil_palettecolor(GreasePencilPaletteColorPanel, Panel)
 class VIEW3D_PT_view3d_properties(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "View"
 
     def draw(self, context):
@@ -3491,6 +3494,7 @@ class VIEW3D_PT_view3d_properties(Panel):
 class VIEW3D_PT_view3d_cursor(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "3D Cursor"
 
     def draw(self, context):
@@ -3502,6 +3506,7 @@ class VIEW3D_PT_view3d_cursor(Panel):
 class VIEW3D_PT_view3d_stereo(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "Stereoscopy"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -3539,6 +3544,7 @@ class VIEW3D_PT_view3d_stereo(Panel):
 class VIEW3D_PT_background_image(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "Background Images"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -4021,6 +4027,7 @@ class VIEW3D_PT_transform_orientations(Panel):
 class VIEW3D_PT_quad_view(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "Quad View"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -4046,6 +4053,7 @@ class VIEW3D_PT_quad_view(Panel):
 class VIEW3D_PT_etch_a_ton(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "View"
     bl_label = "Skeleton Sketching"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -4103,6 +4111,7 @@ class VIEW3D_PT_etch_a_ton(Panel):
 class VIEW3D_PT_context_properties(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_category = "Item"
     bl_label = "Properties"
     bl_options = {'DEFAULT_CLOSED'}
 

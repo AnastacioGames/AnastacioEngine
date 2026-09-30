@@ -505,6 +505,8 @@ static void ui_draw_x_icon(float x, float y)
 }
 
 #define PNL_ICON    UI_UNIT_X  /* could be UI_UNIT_Y too */
+#define PNL_ROUND_RADIUS (4.0f * UI_DPI_FAC)  /* rounded panel corners */
+#define PNL_GAP     round_fl_to_int(4.0f * UI_DPI_FAC)  /* space between panels */
 
 static void ui_draw_panel_scalewidget(const rcti *rect)
 {
@@ -650,11 +652,10 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 
 		if (UI_GetThemeValue(TH_PANEL_SHOW_HEADER)) {
 			/* draw with background color */
+			/* rounded header, like Blender 2.8+ */
 			UI_ThemeColor4(TH_PANEL_HEADER);
-			glRectf(minx, headrect.ymin + 1, maxx, y);
-
-			fdrawline(minx, y, maxx, y);
-			fdrawline(minx, y, maxx, y);
+			UI_draw_roundbox_corner_set(is_closed_y ? UI_CNR_ALL : (UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT));
+			UI_draw_roundbox(minx, headrect.ymin + 1, maxx, y, PNL_ROUND_RADIUS / block->aspect);
 		}
 		else if (!(panel->runtime_flag & PNL_FIRST)) {
 			/* draw embossed separator */
@@ -739,7 +740,8 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 		else if (UI_GetThemeValue(TH_PANEL_SHOW_BACK)) {
 			glEnable(GL_BLEND);
 			UI_ThemeColor4(TH_PANEL_BACK);
-			glRecti(rect->xmin, rect->ymin, rect->xmax, rect->ymax);
+			UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_LEFT | UI_CNR_BOTTOM_RIGHT);
+			UI_draw_roundbox(rect->xmin, rect->ymin, rect->xmax, rect->ymax + 1, PNL_ROUND_RADIUS / block->aspect);
 		}
 
 		if (panel->control & UI_PNL_SCALE)
@@ -958,7 +960,7 @@ static bool uiAlignPanelStep(ScrArea *sa, ARegion *ar, const float fac, const bo
 	ps->pa->ofsy = -get_panel_size_y(ps->pa);
 
 	if (has_category_tabs) {
-		if (align == BUT_VERTICAL) {
+		if (align == BUT_VERTICAL && ar->alignment != RGN_ALIGN_RIGHT) {
 			ps->pa->ofsx += UI_PANEL_CATEGORY_MARGIN_WIDTH;
 		}
 	}
@@ -968,7 +970,7 @@ static bool uiAlignPanelStep(ScrArea *sa, ARegion *ar, const float fac, const bo
 
 		if (align == BUT_VERTICAL) {
 			psnext->pa->ofsx = ps->pa->ofsx;
-			psnext->pa->ofsy = get_panel_real_ofsy(ps->pa) - get_panel_size_y(psnext->pa);
+			psnext->pa->ofsy = get_panel_real_ofsy(ps->pa) - get_panel_size_y(psnext->pa) - PNL_GAP;
 		}
 		else {
 			psnext->pa->ofsx = get_panel_real_ofsx(ps->pa);
@@ -1721,7 +1723,7 @@ static void ui_panel_category_draw_tab(
 
 
 /**
- * Draw vertical tabs on the left side of the region,
+ * Draw vertical tabs on the outer side of the region,
  * one tab per category.
  */
 void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
@@ -1744,8 +1746,12 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 	const int tab_v_pad_text = round_fl_to_int((2 + ((px * 3) * dpi_fac)) * zoom);
 	/* padding between tabs */
 	const int tab_v_pad = round_fl_to_int((4 + (2 * px * dpi_fac)) * zoom);
-	const float tab_curve_radius = ((px * 3) * dpi_fac) * zoom;
-	const int roundboxtype = UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT;
+	const float tab_curve_radius = ((px * 4) * dpi_fac) * zoom;
+	/* tabs sit on the outer edge: right side for right-aligned regions (N sidebar) */
+	const bool is_right = (ar->alignment == RGN_ALIGN_RIGHT);
+	const int strip_xmin = is_right ? (ar->winx - category_tabs_width) : v2d->mask.xmin;
+	const int strip_xmax = strip_xmin + category_tabs_width;
+	const int roundboxtype = is_right ? (UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT) : (UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT);
 	bool is_alpha;
 	bool do_scaletabs = false;
 #ifdef USE_FLAT_INACTIVE
@@ -1753,8 +1759,8 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 #endif
 	float scaletabs = 1.0f;
 	/* same for all tabs */
-	const int rct_xmin = v2d->mask.xmin + 3;  /* intentionally dont scale by 'px' */
-	const int rct_xmax = v2d->mask.xmin + category_tabs_width;
+	const int rct_xmin = is_right ? strip_xmin : strip_xmin + 3;  /* intentionally dont scale by 'px' */
+	const int rct_xmax = is_right ? strip_xmax - 3 : strip_xmax;
 	const int text_v_ofs = (rct_xmax - rct_xmin) * 0.3f;
 
 	int y_ofs = tab_v_pad;
@@ -1771,9 +1777,6 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 
 	/* Secondary theme colors */
 	uchar theme_col_tab_outline[3];
-	uchar theme_col_tab_divider[3];  /* line that divides tabs from the main region */
-	uchar theme_col_tab_highlight[3];
-	uchar theme_col_tab_highlight_inactive[3];
 
 
 
@@ -1786,9 +1789,6 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 	UI_GetThemeColor3ubv(TH_TAB_INACTIVE, theme_col_tab_inactive);
 	UI_GetThemeColor3ubv(TH_TAB_OUTLINE, theme_col_tab_outline);
 
-	interp_v3_v3v3_uchar(theme_col_tab_divider, theme_col_back, theme_col_tab_outline, 0.3f);
-	interp_v3_v3v3_uchar(theme_col_tab_highlight, theme_col_back, theme_col_text_hi, 0.2f);
-	interp_v3_v3v3_uchar(theme_col_tab_highlight_inactive, theme_col_tab_inactive, theme_col_text_hi, 0.12f);
 
 	is_alpha = (ar->overlap && (theme_col_back[3] != 255));
 
@@ -1802,9 +1802,6 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 	ui_fontscale(&fstyle_points, aspect / (U.pixelsize * 1.1f));
 	BLF_size(fontid, fstyle_points, U.dpi);
 
-	BLF_enable(fontid, BLF_SHADOW);
-	BLF_shadow(fontid, 3, (const float[4]){1.0f, 1.0f, 1.0f, 0.25f});
-	BLF_shadow_offset(fontid, -1, -1);
 
 	BLI_assert(UI_panel_category_is_visible(ar));
 
@@ -1850,7 +1847,7 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		glColor3ubv(theme_col_tab_bg);
 	}
 
-	glRecti(v2d->mask.xmin, v2d->mask.ymin, v2d->mask.xmin + category_tabs_width, v2d->mask.ymax);
+	glRecti(strip_xmin, v2d->mask.ymin, strip_xmax, v2d->mask.ymax);
 
 	if (is_alpha) {
 		glDisable(GL_BLEND);
@@ -1862,47 +1859,23 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		const char *category_id_draw = IFACE_(category_id);
 		int category_width = BLI_rcti_size_y(rct) - (tab_v_pad_text * 2);
 		size_t category_draw_len = BLF_DRAW_STR_DUMMY_MAX;
-		// int category_width = BLF_width(fontid, category_id_draw, BLF_DRAW_STR_DUMMY_MAX);
 
 		const bool is_active = STREQ(category_id, category_id_active);
 
 #ifdef DEBUG
 		if (STREQ(category_id, PNL_CATEGORY_FALLBACK)) {
-			printf("WARNING: Panel has no 'bl_category', script needs updating!\n");
+			printf("WARNING: Panel has no 'bl_category', script needs updating!
+");
 		}
 #endif
 
 		glEnable(GL_BLEND);
 
-#ifdef USE_FLAT_INACTIVE
-		if (is_active)
-#endif
-		{
-			glColor3ubv(is_active ? theme_col_tab_active : theme_col_tab_inactive);
-			ui_panel_category_draw_tab(
-			        GL_POLYGON, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
-			        tab_curve_radius - px, roundboxtype, true, true, NULL);
-
-			/* tab outline */
-			glColor3ubv(theme_col_tab_outline);
-			ui_panel_category_draw_tab(
-			        GL_LINE_STRIP, rct->xmin - px, rct->ymin - px, rct->xmax - px, rct->ymax + px,
-			        tab_curve_radius, roundboxtype, true, true, NULL);
-			/* tab highlight (3d look) */
-			glColor3ubv(is_active ? theme_col_tab_highlight : theme_col_tab_highlight_inactive);
-			ui_panel_category_draw_tab(
-			        GL_LINE_STRIP, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
-			        tab_curve_radius, roundboxtype, true, false,
-			        is_active ? theme_col_back : theme_col_tab_inactive);
-		}
-
-		/* tab blackline */
-		if (!is_active) {
-			glColor3ubv(theme_col_tab_divider);
-			glRecti(v2d->mask.xmin + category_tabs_width - px,
-			        rct->ymin - tab_v_pad,
-			        v2d->mask.xmin + category_tabs_width,
-			        rct->ymax + tab_v_pad);
+		/* flat rounded tab, like Blender 2.8+: only the active one is filled */
+		if (is_active) {
+			glColor3ubv(theme_col_tab_active);
+			UI_draw_roundbox_corner_set(roundboxtype);
+			UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, tab_curve_radius);
 		}
 
 		if (do_scaletabs) {
@@ -1914,53 +1887,24 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		BLF_position(fontid, rct->xmax - text_v_ofs, rct->ymin + tab_v_pad_text, 0.0f);
 
 		/* tab titles */
-
-		/* draw white shadow to give text more depth */
-		glColor3ubv(theme_col_text);
-
-		/* main tab title */
+		glColor3ubv(is_active ? theme_col_text_hi : theme_col_text);
 		BLF_draw(fontid, category_id_draw, category_draw_len);
 
 		glDisable(GL_BLEND);
 
-		/* tab blackline remaining (last tab) */
-		if (pc_dyn->prev == NULL) {
-			glColor3ubv(theme_col_tab_divider);
-			glRecti(v2d->mask.xmin + category_tabs_width - px,
-			        rct->ymax + px,
-			        v2d->mask.xmin + category_tabs_width,
-			        v2d->mask.ymax);
-		}
-		if (pc_dyn->next == NULL) {
-			glColor3ubv(theme_col_tab_divider);
-			glRecti(v2d->mask.xmin + category_tabs_width - px,
-			        0,
-			        v2d->mask.xmin + category_tabs_width,
-			        rct->ymin);
-		}
-
-#ifdef USE_FLAT_INACTIVE
-		/* draw line between inactive tabs */
-		if (is_active == false && is_active_prev == false && pc_dyn->prev) {
-			glColor3ubv(theme_col_tab_divider);
-			glRecti(v2d->mask.xmin + (category_tabs_width / 5),
-			        rct->ymax + px,
-			        (v2d->mask.xmin + category_tabs_width) - (category_tabs_width / 5),
-			        rct->ymax + (px * 3));
-		}
-
-		is_active_prev = is_active;
-#endif
-
 		/* not essential, but allows events to be handled right up until the region edge [#38171] */
-		pc_dyn->rect.xmin = v2d->mask.xmin;
+		if (is_right) {
+			pc_dyn->rect.xmax = ar->winx;
+		}
+		else {
+			pc_dyn->rect.xmin = v2d->mask.xmin;
+		}
 	}
 
 	glDisable(GL_LINE_SMOOTH);
 
 	BLF_disable(fontid, BLF_ROTATION);
 
-	BLF_disable(fontid, BLF_SHADOW);
 
 	if (fstyle->kerning == 1) {
 		BLF_disable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
@@ -1972,7 +1916,9 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 static int ui_handle_panel_category_cycling(const wmEvent *event, ARegion *ar, const uiBut *active_but)
 {
 	const bool is_mousewheel = ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE);
-	const bool inside_tabregion = (event->mval[0] < ((PanelCategoryDyn *)ar->panels_category.first)->rect.xmax);
+	const rcti *tab_rect = &((PanelCategoryDyn *)ar->panels_category.first)->rect;
+	const bool inside_tabregion = (ar->alignment == RGN_ALIGN_RIGHT) ?
+	        (event->mval[0] > tab_rect->xmin) : (event->mval[0] < tab_rect->xmax);
 
 	/* if mouse is inside non-tab region, ctrl key is required */
 	if (is_mousewheel && !event->ctrl && !inside_tabregion)

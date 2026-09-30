@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Barra lateral N com abas e visual arredondado
+
+- Painéis da barra N da 3D View ganharam categorias: `Item` (Transform, Vertex Weights, Properties) e `View`
+  (View, 3D Cursor, Grease Pencil, Background Images, Quad View, etc.). `rna_ui.c` aplica a categoria `Misc`
+  também a painéis Python da região UI da 3D View sem `bl_category`.
+- Abas de categoria ficam na borda direita em regiões alinhadas à direita (T continua à esquerda); estilo
+  plano com a aba ativa preenchida e arredondada, sem contorno em relevo nem sombra no texto.
+- Painéis com cabeçalho e fundo de cantos arredondados e 4 px de espaço entre eles (vale para todo o editor).
+
 ## 2026-09-30 - Grade da 3D View no estilo Blender 5 e botões flutuantes
 
 - `drawfloor` (vista de usuário/perspectiva) desenha o chão com shader GLSL (`drawfloor_shader` em
