@@ -371,6 +371,27 @@ static PyObject *gPySendMessage(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(gPyGetMessages_doc,
+             "getMessages(to, [subject])\n"
+             "returns the (subject, body) messages a Message sensor on the object named 'to' sees this frame"
+             );
+static PyObject *gPyGetMessages(PyObject *, PyObject *args)
+{
+	char *to;
+	char *subject = (char *)"";
+	if (!PyArg_ParseTuple(args, "s|s:getMessages", &to, &subject)) {
+		return nullptr;
+	}
+
+	const std::vector<KX_NetworkMessageManager::Message> messages =
+		KX_GetActiveScene()->GetNetworkMessageScene()->FindMessages(to, subject);
+	PyObject *list = PyList_New(messages.size());
+	for (unsigned int i = 0; i < messages.size(); ++i) {
+		PyList_SET_ITEM(list, i, Py_BuildValue("(ss)", messages[i].subject.c_str(), messages[i].body.c_str()));
+	}
+	return list;
+}
+
 // this gets a pointer to an array filled with floats
 static PyObject *gPyGetSpectrum(PyObject *, PyObject *Py_UNUSED(ignored))
 {
@@ -1011,6 +1032,7 @@ static struct PyMethodDef game_methods[] = {
 	{"saveGlobalDict", (PyCFunction)gPySaveGlobalDict, METH_VARARGS, (const char *)gPySaveGlobalDict_doc},
 	{"loadGlobalDict", (PyCFunction)gPyLoadGlobalDict, METH_VARARGS, (const char *)gPyLoadGlobalDict_doc},
 	{"sendMessage", (PyCFunction)gPySendMessage, METH_VARARGS, (const char *)gPySendMessage_doc},
+	{"getMessages", (PyCFunction)gPyGetMessages, METH_VARARGS, (const char *)gPyGetMessages_doc},
 	{"getCurrentController", (PyCFunction)SCA_PythonController::sPyGetCurrentController, METH_NOARGS, SCA_PythonController::sPyGetCurrentController__doc__},
 	{"getCurrentScene", (PyCFunction)gPyGetCurrentScene, METH_NOARGS, gPyGetCurrentScene_doc},
 	{"getInactiveSceneNames", (PyCFunction)gPyGetInactiveSceneNames, METH_NOARGS, (const char *)gPyGetInactiveSceneNames_doc},

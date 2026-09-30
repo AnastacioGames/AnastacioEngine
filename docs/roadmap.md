@@ -210,6 +210,24 @@ Validado no `RangeRuntime` com `tools/create_camera_fx_scene.py` (foco por propr
 após remover o alvo, efeitos desligados em jogo). Pendente: conferência visual dos filtros e custo medido
 (`tc_filters2d`) no Rolima Racer; troca dos scripts do jogo fica para quando o usuário decidir.
 
+### Logic Bricks → Python Component
+
+Fase 1 pronta em 2026-09-30: botão **To Python** no header do Logic Editor (`logic.convert_to_component`,
+`bl_operators/logic_to_python.py`) gera `<objeto>_logic.py` com um `KX_PythonComponent`, registra no objeto e
+desativa só os bricks convertidos. Suporta Always, Keyboard, Mouse (botões, roda, movimento), Property sensor;
+And/Or/Nand/Nor/Xor/Xnor; Motion simples, Property (Assign/Add/Toggle/Copy), State, Message; estados e pulsos.
+Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e com componente). Próximas fases:
+- F2 (parcial, 2026-09-30): feitos Collision (propriedade), Near, Radar, Ray (propriedade), Delay (frames),
+  Mouse Over, controller Expression, actuators Edit Object (Add/End/Replace Mesh/Dynamics), Scene, Game,
+  Visibility; depois Random (mesma cadência, sequência do `random` do Python), Track To (alvo fixo, sem pai) e
+  Sound (Play/Loop Stop/End, via `aud`; ping-pong fica como brick) e Camera actuator. Controller
+  Python fica como brick (já é código). Collision/Ray por material convertidos (Ray por material com x-ray fica como brick). Links entre objetos convertidos (sensor/actuator de outro objeto via `scene.objects.get`; Collision/Near/Radar e actuators com helper do próprio objeto ficam como brick). Message sensor convertido
+  via `logic.getMessages` (nova API).
+- F3 (2026-09-30): campo Mode no operador: Python Component (padrão), Always + Python (Module) e
+  Always + Python (Script). Os dois últimos criam `LC_always` (pulso contínuo) e um controller `LC_state_<n>`
+  por estado usado; o código é o mesmo, com `main(cont)` no fim. Mesmo CHECK nos três modos.
+- Pendente: usuário testar no editor com um objeto real lotado de bricks.
+
 ### Android / iOS
 
 Android v1 concluído (2026-09-24): APK/AAB com WebView embutindo o pacote Web, validado em aparelho físico
@@ -340,6 +358,12 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
+- **Aura da chuva, estilo animado (adiado, pedido do usuário em 2026-09-30)**: além do estilo atual (riscos
+  parados de 15–50 ms, mangá), oferecer um segundo estilo em que a gota **anda** um caminho maior saindo do
+  contorno. O protótipo em Python (antes do pedido de deixar os riscos bem curtos) foi aprovado visualmente.
+  Ideia: `rain_aura_style` (Static / Animated) no World › Rain › Aura; em `KX_RainAura` o estilo Animated dá a
+  cada risco velocidade ao longo de `z` e vida maior, avançando a base a cada frame (mesmo VBO, 1 draw); no
+  viewport (`view3d_rain.c`) usar a fase pelo tempo, já que ele não guarda estado.
 - Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado e texto de
   debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).
 

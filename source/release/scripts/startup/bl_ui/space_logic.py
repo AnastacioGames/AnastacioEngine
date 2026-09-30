@@ -113,6 +113,9 @@ class LOGIC_HT_header(Header):
 
         LOGIC_MT_editor_menus.draw_collapsible(context, layout)
 
+        layout.separator()
+        layout.operator("logic.convert_to_component", text="Convert to Python", icon='SCRIPT')
+
 
 class LOGIC_MT_editor_menus(Menu):
     bl_idname = "LOGIC_MT_editor_menus"
@@ -134,6 +137,10 @@ class LOGIC_MT_view(Menu):
         layout = self.layout
 
         layout.operator("logic.properties", icon='MENU_PANEL')
+
+        layout.separator()
+
+        layout.operator("logic.convert_to_component", icon='SCRIPT')
 
         layout.separator()
 

@@ -65,17 +65,26 @@ void KX_NetworkMessageSensor::Init()
 
 KX_NetworkMessageSensor::~KX_NetworkMessageSensor()
 {
+	if (m_BodyList) {
+		m_BodyList->Release();
+	}
+	if (m_SubjectList) {
+		m_SubjectList->Release();
+	}
 }
 
 EXP_Value *KX_NetworkMessageSensor::GetReplica()
 {
 	// This is the standard sensor implementation of GetReplica
 	// There may be more network message sensor specific stuff to do here.
-	EXP_Value *replica = new KX_NetworkMessageSensor(*this);
+	KX_NetworkMessageSensor *replica = new KX_NetworkMessageSensor(*this);
 
 	if (replica == nullptr) {
 		return nullptr;
 	}
+	// The message lists belong to the original, the replica must build its own.
+	replica->m_BodyList = nullptr;
+	replica->m_SubjectList = nullptr;
 	replica->ProcessReplica();
 
 	return replica;

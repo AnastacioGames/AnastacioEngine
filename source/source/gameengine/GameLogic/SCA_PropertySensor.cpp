@@ -238,20 +238,19 @@ bool SCA_PropertySensor::CheckPropertyCondition()
 		{
 			EXP_Value *orgprop = GetParent()->FindIdentifier(m_checkpropname);
 			if (!orgprop->IsError()) {
-				float min;
-				float max;
-				float val;
-				CM_StringTo(m_checkpropval, min);
-				CM_StringTo(m_checkpropmaxval, max);
+				float min = 0.0f;
+				float max = 0.0f;
+				float val = 0.0f;
+				bool valid = CM_StringTo(m_checkpropval, min) && CM_StringTo(m_checkpropmaxval, max);
 
 				if (orgprop->GetValueType() == VALUE_STRING_TYPE) {
-					CM_StringTo(orgprop->GetText(), val);
+					valid = valid && CM_StringTo(orgprop->GetText(), val);
 				}
 				else {
 					val = orgprop->GetNumber();
 				}
 
-				result = (min <= val) && (val <= max);
+				result = valid && (min <= val) && (val <= max);
 			}
 			orgprop->Release();
 
@@ -280,18 +279,21 @@ bool SCA_PropertySensor::CheckPropertyCondition()
 		{
 			EXP_Value *orgprop = GetParent()->FindIdentifier(m_checkpropname);
 			if (!orgprop->IsError()) {
-				float ref;
-				CM_StringTo(m_checkpropval, ref);
-				float val;
+				float ref = 0.0f;
+				bool valid = CM_StringTo(m_checkpropval, ref);
+				float val = 0.0f;
 
 				if (orgprop->GetValueType() == VALUE_STRING_TYPE) {
-					CM_StringTo(orgprop->GetText(), val);
+					valid = valid && CM_StringTo(orgprop->GetText(), val);
 				}
 				else {
 					val = orgprop->GetNumber();
 				}
 
-				if (reverse) {
+				if (!valid) {
+					result = false;
+				}
+				else if (reverse) {
 					result = val < ref;
 				}
 				else {

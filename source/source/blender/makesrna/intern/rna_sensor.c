@@ -98,7 +98,8 @@ static const EnumPropertyItem runtime_property_vector_evaluation_items[] = {
 static const EnumPropertyItem *rna_PropertySensor_evaluation_type_itemf(
 		bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
 {
-	bPropertySensor *sensor = (bPropertySensor *)ptr->data;
+	/* ptr->data e o bSensor; os dados do Property sensor ficam em bSensor.data. */
+	bPropertySensor *sensor = ((bSensor *)ptr->data)->data;
 	*r_free = false;
 	if (!(sensor->runtime_enabled & 1)) {
 		return property_sensor_evaluation_items;

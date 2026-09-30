@@ -106,13 +106,8 @@ void init_sensor(bSensor *sens)
 	sens->data= NULL;
 	sens->pulse = 0;
 
-	// Set default sensor color.
-	if (U.themes.first) {
-		bTheme *btheme = U.themes.first;
-		sens->color[0] = btheme->tui.wcol_box.inner[0];
-		sens->color[1] = btheme->tui.wcol_box.inner[1];
-		sens->color[2] = btheme->tui.wcol_box.inner[2];
-	}
+	// Default sensor color: 0.17 gray (43/255).
+	sens->color[0] = sens->color[1] = sens->color[2] = 43;
 
 	switch (sens->type) {
 	case SENS_ALWAYS:

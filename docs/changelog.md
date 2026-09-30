@@ -9,6 +9,73 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Correções nos Logic Bricks
+
+- `rna_sensor.c`: `rna_PropertySensor_evaluation_type_itemf` lia o `bSensor` como `bPropertySensor`; o
+  `runtime_enabled` lido era lixo e o enum às vezes só oferecia Equal/Not Equal (Greater Than, Interval etc.
+  falhavam pelo editor e por script). Era a causa do "exit 11" intermitente do teste do conversor (o `.range`
+  não chegava a ser salvo).
+- `SCA_PropertySensor`: Interval e Less/Greater Than usavam `float` não inicializado quando o valor não era
+  número (campo vazio/texto); agora inicia em 0 e conversão falha dá resultado falso.
+- `KX_NetworkMessageSensor`: destrutor não liberava as listas de body/subject (vazamento) e a réplica
+  (Add Object) compartilhava os ponteiros das listas, com release duplo no próximo frame; réplica zera as listas.
+
+## 2026-09-30 - Logic Bricks → Python Component (fase 2, parcial)
+
+- Random sensor, Track To (Edit Object, alvo fixo) e Sound (Play End via `aud`) no conversor.
+- Message sensor: nova função `Range.logic.getMessages(to, subject="")` (C++, `KX_PythonInit.cpp`) devolve a
+  lista `(subject, body)` que um Message sensor do objeto `to` enxerga no frame. O conversor usa essa função e
+  dispara o controller todo frame com mensagem, como o sensor. Teste ganhou `msgs` na linha CHECK.
+- Conversor de bricks, campo Mode: além do Python Component, gera sensor Always + controller Python
+  (modo Module `<modulo>.main` ou Script `<modulo>_run.py`), um controller `LC_state_<n>` por estado.
+  Teste: `create_logic_convert_scene.py -- <saida> convert:MODULE|convert:SCRIPT`.
+- Conversor de bricks: valores dos bricks viram args do componente (`"<brick> <campo>"`): teclas
+  (`"KeyW Key": "W"`, aceita `SPACE`, `LEFTARROW`, `PAD1`), propriedades/valores, distâncias, ranges,
+  delay, subjects, vetores do Motion, objeto/tempo do Add Object, volume/pitch etc. Cada sensor ganha
+  `"<sensor> Enabled"` (liga/desliga) e o componente ganha `Debug`, que imprime mudanças de
+  sensores/controllers. Nos modos Always + Python ficam os valores padrão do texto gerado.
+  Os args saem agrupados com um `C_Header` por brick ("Sensor X", "Actuator Y"); sensor e
+  actuator de mesmo nome e campo ganham args separados. Primeiro cabeçalho "Logic" (ícone `LOGIC`, com o
+  `Debug`); ícone por tipo de sensor (Collision `MOD_PHYSICS`, Delay `TIME`, Message `FILE_TEXT` etc.) e
+  `FILE_TEXT` também no actuator Message.
+- Sensores/actuators soltos (sem controller) do objeto convertido também são desativados.
+- `sca.c`: cor padrão de sensor novo passa a ser cinza 0.17 (43/255), em vez da cor de box do tema.
+- Sound também nos modos Play Stop, Loop Stop e Loop End: o componente detecta o pulso negativo do controller
+  (`_fall`) e para o som ou encerra o loop no fim da volta, como `KX_SoundActuator`. A cena de teste ganhou um
+  Sound Loop Stop ligado ao Delay; bricks e convertido seguem com a mesma linha CHECK.
+- Links entre objetos: sensores e actuators de outro objeto ligados ao controller viram código sobre `scene.objects.get(<nome>)` (ignorado se o objeto sumir); desativação dos originais passa a olhar todos os objetos. Teste ganhou a Box (`boxn`, `boxz` na linha CHECK).
+- Collision e Ray por material: helper `_has_mat` repete `RAS_Mesh::FindMaterialName` (nome sem prefixo MA); Ray sem x-ray exige o material no primeiro objeto atingido. Teste ganhou `sawmat` na linha CHECK.
+- Camera actuator: helper `_follow` porta a conta de `KX_CameraActuator` (altura, atrás do eixo com damping,
+  distância mín./máx., -Z para o alvo). A cena de teste ganhou a câmera "Cam" seguindo o Player e a posição
+  dela entrou na linha CHECK (igual nos dois). Controller Python fica como brick, com aviso explícito.
+
+- Novos tradutores: Collision (filtro por propriedade, via `collisionCallbacks`), Near (com histerese do reset),
+  Radar (cone pelo eixo local), Ray (`rayCast` com x-ray e máscara), Delay (mesma contagem de
+  `SCA_DelaySensor`, em frames), Mouse Over/Over Any (`getScreenRay` da câmera ativa); controller Expression
+  (AND/OR/NOT, `=`, `<>`, nomes de sensor ou game property); actuators Edit Object (Add Object com
+  velocidade, End Object, Replace Mesh, Dynamics), Scene, Game (Quit/Restart/Start) e Visibility.
+- Cada sensor só é avaliado quando algum controller dele está no estado ativo, como na engine (conta certo
+  para Delay/Near/Property Changed).
+- Teste ampliado (Delay + Expression + Add Object no estado 3, Ray na Wall): bricks e convertido deram a mesma
+  linha `CHECK score=10 ticks=32 alive=True state=4 x=3.20 y=0.00 pulses=3 bullets=3 saw=1` (Player na origem
+  para o Ray acertar a Wall).
+
+## 2026-09-30 - Logic Bricks → Python Component (fase 1)
+
+- Botão **Convert to Python** no header do Logic Editor (e em View): `logic.convert_to_component` em
+  `bl_operators/logic_to_python.py`. Gera o texto `<objeto>_logic.py` com uma classe `KX_PythonComponent`,
+  registra via `logic.python_component_register` e desativa (não apaga) os bricks convertidos; sensor/actuator
+  só é desativado se todos os controllers ligados a ele foram convertidos.
+- `update()` segue a ordem da engine: sensores (uma vez cada), controllers, actuators, com o estado lido no
+  começo do frame. Sem isso o componente ficava um frame adiantado (sensor lendo propriedade alterada por
+  actuator no mesmo frame).
+- Brick sem tradutor, ou controller ligado a sensor/actuator de outro objeto: controller fica ativo e vira TODO
+  no código e no relatório. Teclas: identificador do RNA (`LEFT_ARROW`, `NUMPAD_1`) mapeado para `events.*KEY`.
+- Teste: `tools/create_logic_convert_scene.py` no `RangeRuntime`, com bricks e convertido: mesma linha
+  `score=10 ticks=32 alive=True state=4 x=-6.00`. No demo Destruction os 10 controllers ficam como pendentes
+  (Python, Sound, Collision) sem erro. Obs.: o enum `evaluation_type` do Property sensor depende do tipo da
+  propriedade; defina `property` antes.
+
 ## 2026-09-30 - Release 0.4.6 (Windows e Linux)
 
 - `ANASTACIO_VERSION_STRING` 0.4.6; README com downloads e novidades da 0.4.6 (câmera FX, chuva, destruição,

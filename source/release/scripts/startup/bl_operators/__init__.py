@@ -34,6 +34,7 @@ _modules = [
     "console",
     "file",
     "image",
+    "logic_to_python",
     "mask",
     "mesh",
     "node",
