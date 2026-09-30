@@ -9,10 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
-## 2026-09-30 - Versão 0.4.6
+## 2026-09-30 - Release 0.4.6 (Windows e Linux)
 
-`ANASTACIO_VERSION_STRING` (`BKE_blender_version.h`) e o About (`wm.py`) passam para 0.4.6. Release Linux
-com a chuva do World, MP3 no `aud` e colormanagement (OpenColorIO 1.1.1).
+- `ANASTACIO_VERSION_STRING` 0.4.6; README com downloads e novidades da 0.4.6 (câmera FX, chuva, destruição,
+  Reverb Area, soft body, Outliner, MSAA 2x). Pacote Windows montado sobre o staging da 0.4.5 com os binários e
+  scripts novos de `build/bin/`, zipado com `zipfile` (caminhos com `/`). Linux 0.4.6 sai à parte na mesma release.
+  O About (`wm.py`) também mostra 0.4.6.
 
 ## 2026-09-30 - Linux: MP3 no aud/Sound actuator (libsndfile 1.2.2 no pacote)
 

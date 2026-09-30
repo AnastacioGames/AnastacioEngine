@@ -9,18 +9,31 @@
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.4.5](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.5)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.4.6](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.6)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.4.5)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.4.5)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.5/AnastacioEngine-0.4.5-linux-x86_64.tar.xz.sha256) |
+| [Windows x64 (0.4.6)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-windows-x64.zip.sha256) |
+| [Linux x86_64 (0.4.6)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-linux-x86_64.tar.xz.sha256) |
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
 Para rodar um jogo exportado, use `RangeRuntime`. No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.4.6
+
+- **Câmera do jogo:** foco, rastreio de alvo, Camera FX (profundidade de campo, speed blur, blur direcional,
+  olho de gato) e tremor de câmera, nos painéis da câmera (só Range Game).
+- **Chuva do World:** respingo nas superfícies, aura nos objetos, raios com clarão e riscos finos; iguais no jogo
+  e na 3D View. Controle por Python com `setWeather()` e `strikeLightning()`.
+- **Destruição e explosões nativas:** painéis Destruction/Explosive, Generate Fragments (pedaços num collection)
+  e API Python.
+- **Reverb Area:** Empty com reverb OpenAL por área (esfera ou caixa), com presets e transição pela câmera.
+- **Soft body no jogo:** escala, transformação, velocidade, suspend e deformer corrigidos.
+- **Outliner:** arrastar um objeto selecionado para uma coleção move toda a seleção.
+- MSAA mínimo do jogo passa de 4x para 2x (cenas novas vêm com 2x).
 
 ## Novidades da 0.4.5
 
