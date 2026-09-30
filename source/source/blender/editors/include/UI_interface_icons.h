@@ -77,6 +77,7 @@ void UI_icon_draw_aspect(float x, float y, int icon_id, float aspect, float alph
 void UI_icon_draw_aspect_color(float x, float y, int icon_id, float aspect, const float rgb[3], const char mono_color[4]);
 void UI_icon_draw_size(float x, float y, int size, int icon_id, float alpha);
 void UI_icons_free(void);
+void UI_icons_reload_internal(void);
 void UI_icons_free_drawinfo(void *drawinfo);
 
 struct ListBase *UI_iconfile_list(void);

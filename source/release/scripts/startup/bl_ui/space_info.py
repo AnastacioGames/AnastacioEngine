@@ -115,7 +115,7 @@ class INFO_MT_file(Menu):
 
         layout.operator_context = 'INVOKE_AREA'
         layout.operator("wm.read_homefile", text="New File", icon='NEW')
-        layout.operator("wm.create_project", text="Create Project", icon='FILE_FOLDER')
+        layout.operator("wm.create_project", text="Create Project", icon='NEWFOLDER')
         layout.operator("wm.open_mainfile", text="Open Project", icon='FILE_FOLDER')
         layout.menu("INFO_MT_file_open_recent", text="Open Recent Project", icon='OPEN_RECENT')
         layout.operator("wm.revert_mainfile", icon='FILE_REFRESH')
@@ -172,7 +172,7 @@ class INFO_MT_file(Menu):
         layout.separator(factor=1)
 
         layout.menu("INFO_MT_file_external_data", icon='EXTERNAL_DATA')
-        layout.operator("wm.blend_strings_utf8_validate", text="Validade .range strings", icon='FILE_BLEND')
+        layout.operator("wm.blend_strings_utf8_validate", text="Validade .range strings", icon='TEXT')
 
         layout.separator(factor=1)
 

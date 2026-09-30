@@ -470,7 +470,137 @@ float ED_view3d_grid_scale(Scene *scene, View3D *v3d, const char **grid_unit)
 	return v3d->grid * ED_scene_grid_scale(scene, grid_unit);
 }
 
-static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool write_depth)
+/* Infinite floor in the style of Blender 2.8+: a camera-centered plane on Z=0 whose
+ * lines are drawn per pixel with anti-aliasing, subdivision levels that blend
+ * with the zoom, a distance fade and the X/Y axes in color. */
+static const char *floor_vert =
+	"out vec3 v_pos;\n"
+	"void main() {\n"
+	"	v_pos = gl_Vertex.xyz;\n"
+	"	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+	"}\n";
+
+static const char *floor_frag =
+	"in vec3 v_pos;\n"
+	"uniform vec3 u_camera;\n"
+	"uniform float u_scale;\n"
+	"uniform float u_subdiv;\n"
+	"uniform float u_fadeDist;\n"
+	"uniform float u_showFloor;\n"
+	"uniform vec4 u_colGrid;\n"
+	"uniform vec4 u_colEmph;\n"
+	"uniform vec4 u_colX;\n"
+	"uniform vec4 u_colY;\n"
+	"float grid_line(vec2 p, vec2 fw, float size) {\n"
+	"	vec2 q = p / size;\n"
+	"	vec2 d = abs(fract(q - 0.5) - 0.5) / max(fw / size, vec2(1e-8));\n"
+	"	return 1.0 - clamp(min(d.x, d.y) - 0.25, 0.0, 1.0);\n"
+	"}\n"
+	"float axis_line(float c, float fw) {\n"
+	"	return 1.0 - clamp(abs(c) / max(fw, 1e-8) - 0.5, 0.0, 1.0);\n"
+	"}\n"
+	"void main() {\n"
+	"	vec2 p = v_pos.xy;\n"
+	"	vec2 fw = fwidth(p);\n"
+	"	vec3 view = v_pos - u_camera;\n"
+	"	float dist = length(view);\n"
+	"	float fade = 1.0 - smoothstep(0.0, u_fadeDist, dist - u_fadeDist * 0.25);\n"
+	"	fade *= smoothstep(0.0, 0.2, abs(view.z) / max(dist, 1e-8));\n"
+	/* Level whose cells are at least ~10 px wide, with the fraction used to fade it in. */
+	"	float px = max(fw.x, fw.y) * 10.0;\n"
+	"	float lod = max(log(px / u_scale) / log(u_subdiv), 0.0);\n"
+	"	float level = floor(lod);\n"
+	"	float blend = fract(lod);\n"
+	"	float s0 = u_scale * pow(u_subdiv, level);\n"
+	"	float s1 = s0 * u_subdiv;\n"
+	"	float s2 = s1 * u_subdiv;\n"
+	"	vec4 col = vec4(0.0);\n"
+	"	if (u_showFloor > 0.5) {\n"
+	"		float g0 = grid_line(p, fw, s0) * (1.0 - blend);\n"
+	"		float g1 = grid_line(p, fw, s1);\n"
+	"		float g2 = grid_line(p, fw, s2);\n"
+	"		col = vec4(u_colGrid.rgb, max(g0, g1) * u_colGrid.a);\n"
+	"		col = mix(col, u_colEmph, g2);\n"
+	"	}\n"
+	"	float ax = axis_line(p.y, fw.y) * u_colX.a;\n"
+	"	float ay = axis_line(p.x, fw.x) * u_colY.a;\n"
+	"	col = mix(col, vec4(u_colX.rgb, 1.0), ax);\n"
+	"	col = mix(col, vec4(u_colY.rgb, 1.0), ay);\n"
+	"	col.a *= fade;\n"
+	"	if (col.a < 0.002) discard;\n"
+	"	gl_FragColor = col;\n"
+	"}\n";
+
+static GPUShader *floor_shader = NULL;
+static bool floor_shader_failed = false;
+
+/* Returns false when the shader is unavailable, so the caller falls back to the line grid. */
+static bool drawfloor_shader(RegionView3D *rv3d, View3D *v3d, float grid_scale,
+                             const unsigned char col_grid[3], const unsigned char col_emph[3])
+{
+	const bool show_floor = (v3d->gridflag & V3D_SHOW_FLOOR) != 0;
+	const bool show_x = (v3d->gridflag & V3D_SHOW_X) != 0;
+	const bool show_y = (v3d->gridflag & V3D_SHOW_Y) != 0;
+
+	if (!floor_shader && !floor_shader_failed) {
+		floor_shader = GPU_shader_create(floor_vert, floor_frag, NULL, NULL, NULL, 0, 0, 0);
+		floor_shader_failed = (floor_shader == NULL);
+	}
+	if (!floor_shader) {
+		return false;
+	}
+	if (!show_floor && !show_x && !show_y) {
+		return true;
+	}
+
+	const float *cam = rv3d->viewinv[3];
+	/* Half of the clip range, like the fade distance of the Blender 2.8 grid. */
+	const float extent = max_ff(v3d->far, 1.0f);
+	const float fade_dist = rv3d->is_persp ? extent * 0.5f : extent;
+	float col[4], colx[4], coly[4], cole[4];
+	unsigned char tcol[3];
+
+	rgb_uchar_to_float(col, col_grid);
+	col[3] = 0.5f;
+	rgb_uchar_to_float(cole, col_emph);
+	cole[3] = 0.8f;
+	UI_make_axis_color(col_grid, tcol, 'X');
+	rgb_uchar_to_float(colx, tcol);
+	colx[3] = show_x ? 1.0f : 0.0f;
+	UI_make_axis_color(col_grid, tcol, 'Y');
+	rgb_uchar_to_float(coly, tcol);
+	coly[3] = show_y ? 1.0f : 0.0f;
+
+	GPU_shader_bind(floor_shader);
+	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_camera"), 3, 1, cam);
+	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_scale"), grid_scale);
+	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_subdiv"),
+	                         (float)max_ii(v3d->gridsubdiv, 2));
+	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_fadeDist"), fade_dist);
+	GPU_shader_uniform_float(floor_shader, GPU_shader_get_uniform(floor_shader, "u_showFloor"),
+	                         show_floor ? 1.0f : 0.0f);
+	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_colGrid"), 4, 1, col);
+	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_colEmph"), 4, 1, cole);
+	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_colX"), 4, 1, colx);
+	GPU_shader_uniform_vector(floor_shader, GPU_shader_get_uniform(floor_shader, "u_colY"), 4, 1, coly);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(GL_FALSE);
+
+	glBegin(GL_QUADS);
+	glVertex3f(cam[0] - extent, cam[1] - extent, 0.0f);
+	glVertex3f(cam[0] + extent, cam[1] - extent, 0.0f);
+	glVertex3f(cam[0] + extent, cam[1] + extent, 0.0f);
+	glVertex3f(cam[0] - extent, cam[1] + extent, 0.0f);
+	glEnd();
+
+	GPU_shader_unbind();
+	glDisable(GL_BLEND);
+	return true;
+}
+
+static void drawfloor(Scene *scene, RegionView3D *rv3d, View3D *v3d, const char **grid_unit, bool write_depth)
 {
 	float grid, grid_scale;
 	unsigned char col_grid[3];
@@ -489,8 +619,23 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 
 	glLineWidth(1.0f);
 
+	int axis_flags = V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_Z;
+	bool use_shader;
+	{
+		unsigned char col_bg[3], col_emph[3];
+		UI_GetThemeColor3ubv(TH_BACK, col_bg);
+		UI_GetColorPtrShade3ubv(col_grid, col_emph,
+		                        (((col_grid[0] + col_grid[1] + col_grid[2]) + 30) >
+		                         (col_bg[0] + col_bg[1] + col_bg[2])) ? 20 : -10);
+		use_shader = drawfloor_shader(rv3d, v3d, grid_scale, col_grid, col_emph);
+		if (use_shader) {
+			/* The shader draws the floor and the X/Y axes; only Z stays a line. */
+			axis_flags = V3D_SHOW_Z;
+		}
+	}
+
 	/* draw the Y axis and/or grid lines */
-	if (v3d->gridflag & V3D_SHOW_FLOOR) {
+	if (!use_shader && (v3d->gridflag & V3D_SHOW_FLOOR)) {
 		const int sublines = v3d->gridsubdiv;
 		float vert[4][3] = {{0.0f}};
 		unsigned char col_bg[3];
@@ -533,12 +678,12 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 
 	/* draw the Z axis line */
 	/* check for the 'show Z axis' preference */
-	if (v3d->gridflag & (V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_Z)) {
+	if (v3d->gridflag & axis_flags) {
 		glLineWidth(3.0f);
 		glBegin(GL_LINES);
 		int axis;
 		for (axis = 0; axis < 3; axis++) {
-			if (v3d->gridflag & (V3D_SHOW_X << axis)) {
+			if (v3d->gridflag & axis_flags & (V3D_SHOW_X << axis)) {
 				float vert[3];
 				unsigned char tcol[3];
 
@@ -3108,7 +3253,7 @@ static void view3d_draw_objects(
 			glLoadMatrixf(rv3d->viewmat);
 		}
 		else if (!draw_grids_after) {
-			drawfloor(scene, v3d, grid_unit, true);
+			drawfloor(scene, rv3d, v3d, grid_unit, true);
 		}
 	}
 
@@ -3186,7 +3331,7 @@ static void view3d_draw_objects(
 
 	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
 	if (draw_grids_after) {
-		drawfloor(scene, v3d, grid_unit, false);
+		drawfloor(scene, rv3d, v3d, grid_unit, false);
 	}
 
 	/* must be before xray draw which clears the depth buffer */
@@ -4342,8 +4487,14 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	uiLayout *row;
 	const Object *ob = CTX_data_active_object(C);
 	const bool edit_mode = (ob != NULL) && ((ob->mode & OB_MODE_EDIT) != 0);
-	int x = UI_UNIT_X / 2;
-	int y = (UI_UNIT_Y / 2) + 20;
+	rcti rect;
+	int x, y;
+
+	/* Start at the visible part of the region, so the side panels (T/N)
+	 * with region overlap don't cover the buttons. */
+	ED_region_visible_rect(ar, &rect);
+	x = rect.xmin + UI_UNIT_X / 2;
+	y = rect.ymin + (UI_UNIT_Y / 2) + 20;
 
 	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
 	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);

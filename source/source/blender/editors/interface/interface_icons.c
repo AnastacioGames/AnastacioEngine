@@ -502,9 +502,23 @@ static void init_matcap_icons(void)
 
 }
 
+/* True when the loaded atlas has full color icons (UPBGE style), drawn without theme tinting. */
+static bool icon_atlas_is_color = false;
+
+static const char *icon_atlas_directory(void)
+{
+	if (U.icondir[0])
+		return U.icondir;
+	if (U.icon_style == USER_ICON_STYLE_UPBGE)
+		return BKE_appdir_folder_id(BLENDER_DATAFILES, "icons_upbge");
+	if (U.icon_style == USER_ICON_STYLE_BLENDER5)
+		return BKE_appdir_folder_id(BLENDER_DATAFILES, "icons_blender5");
+	return BKE_appdir_folder_id(BLENDER_DATAFILES, "icons");
+}
+
 static ImBuf *load_external_icon_atlas(const char *filename, const int min_width, const int min_height)
 {
-	const char *icondir = U.icondir[0] ? U.icondir : BKE_appdir_folder_id(BLENDER_DATAFILES, "icons");
+	const char *icondir = icon_atlas_directory();
 	char iconfilestr[FILE_MAX];
 	ImBuf *bbuf;
 
@@ -526,11 +540,18 @@ static ImBuf *load_external_icon_atlas(const char *filename, const int min_width
 	return bbuf;
 }
 
-static void init_internal_icons(void)
+static int icon_atlas_draw_type(const IconType *icontype)
 {
-//	bTheme *btheme = UI_GetTheme();
+	if (icon_atlas_is_color && icontype->type == ICON_TYPE_MONO_TEXTURE)
+		return ICON_TYPE_TEXTURE;
+	return icontype->type;
+}
+
+/* Loads the atlas (external or built-in) and uploads it as GL texture.
+ * Returns the 32px buffer (caller frees) for the non-texture fallback. */
+static ImBuf *load_icon_atlas_texture(void)
+{
 	ImBuf *b16buf = NULL, *b32buf = NULL;
-	int x, y, icontype;
 
 	/* The atlas is external so UI icons can be replaced after compilation. */
 	b16buf = load_external_icon_atlas("blender_icons16.png", 602, 640);
@@ -543,6 +564,8 @@ static void init_internal_icons(void)
 		b16buf = NULL;
 		b32buf = NULL;
 	}
+
+	icon_atlas_is_color = (b16buf != NULL && U.icon_style == USER_ICON_STYLE_UPBGE);
 
 	if (b16buf == NULL)
 		b16buf = IMB_ibImageFromMemory((const uchar *)datatoc_blender_icons16_png,
@@ -601,6 +624,15 @@ static void init_internal_icons(void)
 		}
 	}
 
+	IMB_freeImBuf(b16buf);
+	return b32buf;
+}
+
+static void init_internal_icons(void)
+{
+	ImBuf *b32buf = load_icon_atlas_texture();
+	int x, y, icontype;
+
 	if (icongltex.id)
 		icontype = ICON_TYPE_TEXTURE;
 	else
@@ -618,7 +650,7 @@ static void init_internal_icons(void)
 				def_internal_icon(b32buf, BIFICONID_FIRST + y * ICON_GRID_COLS + x,
 				                  x * (ICON_GRID_W + ICON_GRID_MARGIN) + ICON_GRID_MARGIN,
 				                  y * (ICON_GRID_H + ICON_GRID_MARGIN) + ICON_GRID_MARGIN, ICON_GRID_W,
-				                  icontype.type, icontype.theme_color);
+				                  icon_atlas_draw_type(&icontype), icontype.theme_color);
 			}
 		}
 	}
@@ -652,11 +684,43 @@ static void init_internal_icons(void)
 	def_internal_vicon(ICON_COLORSET_19_VEC, vicon_colorset_draw_19);
 	def_internal_vicon(ICON_COLORSET_20_VEC, vicon_colorset_draw_20);
 
-	IMB_freeImBuf(b16buf);
 	IMB_freeImBuf(b32buf);
 
 }
+
+/* Reloads the atlas after the icon style or directory changes, keeping the registered icons. */
+static void reload_internal_icons(void)
+{
+	ImBuf *b32buf = load_icon_atlas_texture();
+	int i;
+
+	IMB_freeImBuf(b32buf);
+
+	for (i = 0; i < ICON_GRID_ROWS * ICON_GRID_COLS; i++) {
+		const IconType *icontype = &icontypes[i];
+		Icon *icon;
+		DrawInfo *di;
+
+		if (!ELEM(icontype->type, ICON_TYPE_TEXTURE, ICON_TYPE_MONO_TEXTURE))
+			continue;
+
+		icon = BKE_icon_get(BIFICONID_FIRST + i);
+		di = icon ? icon->drawinfo : NULL;
+		if (di && ELEM(di->type, ICON_TYPE_TEXTURE, ICON_TYPE_MONO_TEXTURE))
+			di->type = icon_atlas_draw_type(icontype);
+	}
+}
 #endif  /* WITH_HEADLESS */
+
+void UI_icons_reload_internal(void)
+{
+#ifndef WITH_HEADLESS
+	/* No icons or GL context in background mode. */
+	if (G.background)
+		return;
+	reload_internal_icons();
+#endif
+}
 
 static void init_iconfile_list(struct ListBase *list)
 {

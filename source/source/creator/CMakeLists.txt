@@ -501,6 +501,14 @@ if(WITH_OPENCOLORIO)
 	)
 endif()
 
+# Icon style atlases (User Preferences > Interface > Icons)
+install(
+	DIRECTORY
+		${CMAKE_SOURCE_DIR}/release/datafiles/icons_upbge
+		${CMAKE_SOURCE_DIR}/release/datafiles/icons_blender5
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
 # game controller data base
 if(WITH_GAMEENGINE AND WITH_SDL)
 	install(

@@ -459,7 +459,7 @@ typedef struct UserDef {
 	int savetime;
 	char tempdir[768];	/* FILE_MAXDIR length */
 	char fontdir[768];
-	char icondir[768];	/* Root directory containing icon atlas style subdirectories */
+	char icondir[768];	/* Directory with a custom icon atlas, overrides icon_style */
 	char renderdir[1024]; /* FILE_MAX length */
 	/* EXR cache path */
 	char render_cachedir[768];  /* 768 = FILE_MAXDIR */
@@ -502,7 +502,8 @@ typedef struct UserDef {
 
 	int scrollback;     /* console scrollback limit */
 	char node_margin;   /* node insert offset (aka auto-offset) margin, but might be useful for later stuff as well */
-	char pad2[9];
+	char icon_style;    /* eUserpref_IconStyle */
+	char pad2[8];
 	short transopts;    /* eUserpref_Translation_Flags */
 	short menuthreshold1, menuthreshold2;
 
@@ -786,6 +787,13 @@ typedef enum eAutokey_Flag {
 	AUTOKEY_FLAG_NOWARNING		= (1 << 7),
 	ANIMRECORD_FLAG_WITHNLA		= (1 << 10),
 } eAutokey_Flag;
+
+/* UserDef.icon_style */
+typedef enum eUserpref_IconStyle {
+	USER_ICON_STYLE_RANGE = 0,
+	USER_ICON_STYLE_UPBGE = 1,
+	USER_ICON_STYLE_BLENDER5 = 2,
+} eUserpref_IconStyle;
 
 /* UserDef.transopts */
 typedef enum eUserpref_Translation_Flags {

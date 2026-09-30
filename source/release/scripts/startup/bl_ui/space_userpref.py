@@ -202,6 +202,7 @@ class USERPREF_PT_interface(Panel):
         box.label(text="Display:")
         box.prop(view, "ui_scale", text="Scale")
         box.prop(view, "ui_line_width", text="Line Width")
+        box.prop(view, "icon_style", text="Icons")
         box.prop(view, "header_size", text="Header Size")
         box.prop(view, "object_origin_size")
 

@@ -9,6 +9,33 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - Grade da 3D View no estilo Blender 5 e botões flutuantes
+
+- `drawfloor` (vista de usuário/perspectiva) desenha o chão com shader GLSL (`drawfloor_shader` em
+  `view3d_draw.c`): linhas suavizadas por `fwidth`, subdivisão por LOD com transição suave, linha de ênfase,
+  fade por distância e ângulo rasante, eixos X/Y infinitos. Eixo Z e grade ortográfica seguem as linhas antigas;
+  se o shader falhar, volta ao desenho antigo.
+- Botões flutuantes da 3D View começam no retângulo visível da região (`ED_region_visible_rect`), então não
+  ficam mais cobertos pelo painel T/N com region overlap (relato do Fumangy no Discord).
+
+## 2026-09-30 - Estilo de ícones: Blender 5
+
+- Terceira opção em `Interface > Icons`: ícones do Blender 5.0 (SVG rasterizado para o atlas, 484 de 492 por
+  nome/apelido). Atlas em `release/datafiles/icons_blender5/`, gerado por
+  `tools/blender5_icons/build_blender5_icon_atlas.py`.
+- Correção: SVGs com canvas diferente de 1600×1600 saíam esticados (grandes). Agora rasteriza em escala fixa
+  (1600 unidades = 16 px) e centraliza na célula, como o Blender.
+
+## 2026-09-30 - Estilo de ícones: Range ou UPBGE
+
+- `User Preferences > Interface > Icons` escolhe entre os ícones da Range (monocromáticos, tingidos pelo tema)
+  e os ícones coloridos da UPBGE 0.2.5b. A troca recarrega o atlas na hora, sem reiniciar.
+- `U.icon_style` usa um byte do antigo `pad2[9]` do `UserDef` (tamanho do struct inalterado; userprefs
+  antigos abrem como Range).
+- Atlas em `release/datafiles/icons_upbge/`, gerados por `tools/upbge_icons/build_upbge_icon_atlas.py`
+  (remapeamento por nome da ordem 2.79 para a ordem da Range). Detalhes em `docs/icon-atlas-notes.md`.
+- `Files > Icons` continua sobrepondo o estilo; agora também recarrega ao mudar.
+
 ## 2026-09-30 - Aura da chuva: estilo Animated
 
 - World › Rain › Aura ganhou `rain_aura_style` (Static / Animated), no antigo `rain_lightning_pad`

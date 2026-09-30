@@ -130,7 +130,8 @@ ferramenta correspondente.
   (loop, ping-pong, reverso), com callbacks na thread principal depois da atualização das animações.
 - Runtime Properties tipadas ampliam Property Sensors/Actuators; detalhes e pendências estão em
   [`docs/logic-bricks-modernization.md`](docs/logic-bricks-modernization.md).
-- Atlas externo de ícones configurável em `User Preferences > Files > Icons`, com fallback embutido.
+- Estilo de ícones Range ou UPBGE em `User Preferences > Interface > Icons`; atlas externo em
+  `User Preferences > Files > Icons` sobrepõe o estilo, com fallback embutido.
 - `Create Project`, disponível no splash e em `File`, abre o navegador de pastas e cria uma estrutura pronta
   para o fluxo RangeArmor: `data/` com o `.range`, a cópia protegida `.rasec`, scripts e assets; pastas
   independentes de engine, launcher, ícones e builds em `release/`. Pastas existentes nunca são sobrescritas.

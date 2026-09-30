@@ -103,6 +103,7 @@ static const EnumPropertyItem rna_enum_language_default_items[] = {
 #include "MEM_CacheLimiterC-Api.h"
 
 #include "UI_interface.h"
+#include "UI_interface_icons.h"
 
 #ifdef WITH_OPENSUBDIV
 #  include "opensubdiv_capi.h"
@@ -272,6 +273,12 @@ static void rna_userdef_load_ui_update(Main *UNUSED(bmain), Scene *UNUSED(scene)
 	UserDef *userdef = (UserDef *)ptr->data;
 	if (userdef->flag & USER_FILENOUI) G.fileflags |= G_FILE_NO_UI;
 	else G.fileflags &= ~G_FILE_NO_UI;
+}
+
+static void rna_userdef_icons_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	UI_icons_reload_internal();
+	rna_userdef_update(bmain, scene, ptr);
 }
 
 static void rna_userdef_mipmap_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -3558,6 +3565,13 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static const EnumPropertyItem icon_styles[] = {
+		{USER_ICON_STYLE_RANGE, "RANGE", 0, "Range", "Monochrome Range icons, tinted by the theme"},
+		{USER_ICON_STYLE_UPBGE, "UPBGE", 0, "UPBGE", "Classic colored UPBGE 0.2.5 icons"},
+		{USER_ICON_STYLE_BLENDER5, "BLENDER5", 0, "Blender 5", "Monochrome Blender 5.0 icons, tinted by the theme"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	PropertyRNA *prop;
 	StructRNA *srna;
 
@@ -3568,6 +3582,13 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "View & Controls", "Preferences related to viewing data");
 
 	/* View  */
+	prop = RNA_def_property(srna, "icon_style", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "icon_style");
+	RNA_def_property_enum_items(prop, icon_styles);
+	RNA_def_property_ui_text(prop, "Icon Style",
+	                         "Icon set used by the interface (a custom Icons Directory overrides it)");
+	RNA_def_property_update(prop, 0, "rna_userdef_icons_update");
+
 	prop = RNA_def_property(srna, "ui_scale", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_ui_text(prop, "UI Scale", "Changes the size of the fonts and buttons in the interface");
 	RNA_def_property_range(prop, 0.25f, 4.0f);
@@ -4798,7 +4819,9 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "icon_directory", PROP_STRING, PROP_DIRPATH);
 	RNA_def_property_string_sdna(prop, NULL, "icondir");
 	RNA_def_property_ui_text(prop, "Icons Directory",
-	                         "Directory containing blender_icons16.png and blender_icons32.png");
+	                         "Directory containing blender_icons16.png and blender_icons32.png "
+	                         "(overrides the icon style)");
+	RNA_def_property_update(prop, 0, "rna_userdef_icons_update");
 
 	prop = RNA_def_property(srna, "texture_directory", PROP_STRING, PROP_DIRPATH);
 	RNA_def_property_string_sdna(prop, NULL, "textudir");
