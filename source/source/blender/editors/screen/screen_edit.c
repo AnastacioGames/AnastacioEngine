@@ -1322,6 +1322,12 @@ bool ED_screen_delete(bContext *C, bScreen *sc)
 		return false;
 	}
 
+	/* A screen not shown in any window can be freed without switching. */
+	if (!ed_screen_used(wm, sc)) {
+		BKE_libblock_free(bmain, sc);
+		return true;
+	}
+
 	/* screen can only be in use by one window at a time, so as
 	 * long as we are able to find a screen that is unused, we
 	 * can safely assume ours is not in use anywhere an delete it */

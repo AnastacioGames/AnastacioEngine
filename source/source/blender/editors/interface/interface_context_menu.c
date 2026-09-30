@@ -273,6 +273,8 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 		if (screen_name[0]) {
 			uiItemStringO(layout, IFACE_("Rename..."), ICON_NONE,
 			              "SCREEN_OT_screen_rename", "screen_name", screen_name);
+			uiItemStringO(layout, IFACE_("Delete"), ICON_X,
+			              "SCREEN_OT_delete", "screen_name", screen_name);
 			uiItemS(layout);
 		}
 	}

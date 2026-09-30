@@ -503,7 +503,8 @@ typedef struct UserDef {
 	int scrollback;     /* console scrollback limit */
 	char node_margin;   /* node insert offset (aka auto-offset) margin, but might be useful for later stuff as well */
 	char icon_style;    /* eUserpref_IconStyle */
-	char pad2[8];
+	char screen_selector; /* eUserpref_ScreenSelector */
+	char pad2[7];
 	short transopts;    /* eUserpref_Translation_Flags */
 	short menuthreshold1, menuthreshold2;
 
@@ -794,6 +795,12 @@ typedef enum eUserpref_IconStyle {
 	USER_ICON_STYLE_UPBGE = 1,
 	USER_ICON_STYLE_BLENDER5 = 2,
 } eUserpref_IconStyle;
+
+/* UserDef.screen_selector */
+typedef enum eUserpref_ScreenSelector {
+	USER_SCREEN_SELECTOR_TABS = 0,
+	USER_SCREEN_SELECTOR_CLASSIC = 1,
+} eUserpref_ScreenSelector;
 
 /* UserDef.transopts */
 typedef enum eUserpref_Translation_Flags {

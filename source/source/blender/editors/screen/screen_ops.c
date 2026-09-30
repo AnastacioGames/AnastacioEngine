@@ -4378,9 +4378,20 @@ static void SCREEN_OT_new(wmOperatorType *ot)
 /** \name Delete Screen Operator
  * \{ */
 
-static int screen_delete_exec(bContext *C, wmOperator *UNUSED(op))
+static int screen_delete_exec(bContext *C, wmOperator *op)
 {
 	bScreen *sc = CTX_wm_screen(C);
+	char screen_name[MAX_ID_NAME - 2];
+
+	/* Optional target, used by the right-click menu of the screen tabs. */
+	RNA_string_get(op->ptr, "screen_name", screen_name);
+	if (screen_name[0]) {
+		sc = (bScreen *)BKE_libblock_find_name(CTX_data_main(C), ID_SCR, screen_name);
+		if (sc == NULL) {
+			BKE_reportf(op->reports, RPT_ERROR, "Screen '%s' not found", screen_name);
+			return OPERATOR_CANCELLED;
+		}
+	}
 
 	WM_event_add_notifier(C, NC_SCREEN | ND_SCREENDELETE, sc);
 
@@ -4396,6 +4407,10 @@ static void SCREEN_OT_delete(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = screen_delete_exec;
+
+	PropertyRNA *prop = RNA_def_string(ot->srna, "screen_name", NULL, MAX_ID_NAME - 2, "Screen",
+	                                   "Screen to delete (empty: active screen)");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */

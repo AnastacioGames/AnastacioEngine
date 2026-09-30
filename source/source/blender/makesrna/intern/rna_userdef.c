@@ -3572,6 +3572,12 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static const EnumPropertyItem screen_selectors[] = {
+		{USER_SCREEN_SELECTOR_TABS, "TABS", 0, "Tabs", "Screens as tabs in the Info header"},
+		{USER_SCREEN_SELECTOR_CLASSIC, "CLASSIC", 0, "Classic", "Screen dropdown with add and delete buttons"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	PropertyRNA *prop;
 	StructRNA *srna;
 
@@ -3588,6 +3594,12 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Icon Style",
 	                         "Icon set used by the interface (a custom Icons Directory overrides it)");
 	RNA_def_property_update(prop, 0, "rna_userdef_icons_update");
+
+	prop = RNA_def_property(srna, "screen_selector", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "screen_selector");
+	RNA_def_property_enum_items(prop, screen_selectors);
+	RNA_def_property_ui_text(prop, "Screen Selector", "How screens are shown in the Info header");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
 	prop = RNA_def_property(srna, "ui_scale", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_ui_text(prop, "UI Scale", "Changes the size of the fonts and buttons in the interface");

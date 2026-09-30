@@ -39,9 +39,12 @@ class INFO_HT_header(Header):
             layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
         else:
             row = layout.row(align=True)
-            row.template_screen_tabs()
-            row.operator("screen.new", text="", icon='ZOOMIN')
-            row.operator("screen.delete", text="", icon='X')
+            if context.user_preferences.view.screen_selector == 'CLASSIC':
+                layout.template_ID(window, "screen", new="screen.new", unlink="screen.delete")
+            else:
+                row.template_screen_tabs()
+                row.operator("screen.new", text="", icon='ZOOMIN')
+                # Delete via right-click on a tab (context menu).
             # Scene add/copy/delete moved into the Outliner header, next to
             # the "Scenes" root (see OUTLINER_MT_scene_add in
             # space_outliner.py). Deleting a scene is done via right-click
