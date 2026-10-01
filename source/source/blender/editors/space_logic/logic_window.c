@@ -361,6 +361,8 @@ static const char *sensor_name(int type)
 		return N_("Message");
 	case SENS_JOYSTICK:
 		return N_("Joystick");
+	case SENS_VR_HEAD:
+		return N_("VR Head");
 	}
 	return N_("Unknown");
 }
@@ -1330,6 +1332,18 @@ static void draw_sensor_movement(uiLayout *layout, PointerRNA *ptr)
 	uiItemR(row, ptr, "threshold", 0, NULL, ICON_NONE);
 }
 
+static void draw_sensor_vr_head(uiLayout *layout, PointerRNA *ptr)
+{
+	uiLayout *row;
+	const int mode = RNA_enum_get(ptr, "mode");
+	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+	row = uiLayoutRow(layout, false);
+	uiItemR(row, ptr, "angle", 0, NULL, ICON_NONE);
+	if (mode == SENS_VRHEAD_NOD || mode == SENS_VRHEAD_SHAKE) {
+		uiItemR(row, ptr, "time", 0, NULL, ICON_NONE);
+	}
+}
+
 static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	uiLayout *box;
@@ -1390,6 +1404,9 @@ static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case SENS_RAY:
 			draw_sensor_ray(box, ptr, C);
+			break;
+		case SENS_VR_HEAD:
+			draw_sensor_vr_head(box, ptr);
 			break;
 	}
 }

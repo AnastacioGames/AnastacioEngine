@@ -1492,6 +1492,9 @@ static void write_sensors(WriteData *wd, ListBase *lb)
 			case SENS_MOVEMENT:
 				writestruct(wd, DATA, bMovementSensor, 1, sens->data);
 				break;
+			case SENS_VR_HEAD:
+				writestruct(wd, DATA, bVRHeadSensor, 1, sens->data);
+				break;
 			case SENS_ANIMATIONEVENT:
 				writestruct(wd, DATA, bAnimationEventSensor, 1, sens->data);
 				break;

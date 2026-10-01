@@ -283,6 +283,8 @@ def _sensor_expr(ob, sens, key=None):
     elif t == 'RADAR':
         expr = "self._radar(%s, %s, %s, %s / 2.0)" % (_axis(sens.axis), A("Property", sens.property),
                                                       A("Distance", sens.distance), A("Angle", sens.angle))
+    elif t == 'VR_HEAD':
+        raise Unsupported("sensor VR Head")  # TODO: converter junto com os bricks de VR
     elif t == 'RAY':
         if sens.axis == 'GAZE':
             raise Unsupported("ray com eixo VR Gaze")  # TODO: converter junto com os bricks de VR

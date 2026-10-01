@@ -126,6 +126,7 @@ set(SRC
 	KX_MouseActuator.cpp
 	KX_MouseFocusSensor.cpp
 	KX_MovementSensor.cpp
+	KX_VRHeadSensor.cpp
 	KX_NavMeshObject.cpp
 	KX_NearSensor.cpp
 	KX_ObColorIpoSGController.cpp
@@ -237,6 +238,7 @@ set(SRC
 	KX_MouseActuator.h
 	KX_MouseFocusSensor.h
 	KX_MovementSensor.h
+	KX_VRHeadSensor.h
 	KX_NavMeshObject.h
 	KX_NearSensor.h
 	KX_ObColorIpoSGController.h

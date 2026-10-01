@@ -83,6 +83,14 @@ objeto visível mais perto do centro da visão dentro do ângulo (com folga de 1
 não zerarem o tempo). A mira é um anel no ponto olhado que enche com o Gaze Time e fica verde ao disparar; Debug
 mostra o contorno do cone. Validado no celular com `vr_trigger.range` (5°, 300 ms).
 
+## Sensor VR Head: gestos de cabeça (validado no celular, 2026-10-01)
+
+Sensor novo **VR Head** (`SENS_VR_HEAD`, `bVRHeadSensor`, `KX_VRHeadSensor`), lê a cabeça da câmera ativa (pode
+ficar em qualquer objeto). Modos: **Look Up / Look Down / Tilt Left / Tilt Right** (positivo enquanto passar do
+**Angle**) e **Nod (Yes) / Shake (No)** (pulso quando a cabeça vai e volta pelo menos o Angle dentro do **Time**).
+Python: `mode`, `angle`, `time` e, só leitura, `pitch`, `yaw`, `roll` (rad). A conversão para Python recusa o sensor.
+Teste: `vr_gesture.range` (balançar "não" = tela invertida, olhar para cima 35° = desliga, "sim" 15° = pula).
+
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
 
 Implementado com shorts no padding do `GameData` (`vr_lens_strength` em %, `vr_head_smoothing` em ms; 0 = padrão 30%/40 ms, então cenas antigas não precisam de versionamento). Lido em `LA_Launcher`. Plano original:

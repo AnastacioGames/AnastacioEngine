@@ -56,6 +56,7 @@ static const EnumPropertyItem sensor_type_items[] = {
 	{SENS_MOVEMENT, "MOVEMENT", 0, "Movement", ""},
 	{SENS_RANDOM, "RANDOM", 0, "Random", ""},
 	{SENS_RAY, "RAY", 0, "Ray", ""},
+	{SENS_VR_HEAD, "VR_HEAD", 0, "VR Head", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -150,6 +151,8 @@ static StructRNA *rna_Sensor_refine(struct PointerRNA *ptr)
 			return &RNA_AnimationEventSensor;
 		case SENS_DELAY:
 			return &RNA_DelaySensor;
+		case SENS_VR_HEAD:
+			return &RNA_VRHeadSensor;
 		default:
 			return &RNA_Sensor;
 	}
@@ -222,6 +225,7 @@ const EnumPropertyItem *rna_Sensor_type_itemf(bContext *C, PointerRNA *ptr, Prop
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_RANDOM);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_RAY);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_TOUCH);
+	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_VR_HEAD);
 
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
@@ -1065,6 +1069,42 @@ static void rna_def_movement_sensor(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_vr_head_sensor(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem mode_items[] = {
+		{SENS_VRHEAD_LOOK_UP, "LOOK_UP", 0, "Look Up", "Positive while the head looks up beyond the angle"},
+		{SENS_VRHEAD_LOOK_DOWN, "LOOK_DOWN", 0, "Look Down", "Positive while the head looks down beyond the angle"},
+		{SENS_VRHEAD_TILT_LEFT, "TILT_LEFT", 0, "Tilt Left", "Positive while the head tilts left beyond the angle"},
+		{SENS_VRHEAD_TILT_RIGHT, "TILT_RIGHT", 0, "Tilt Right", "Positive while the head tilts right beyond the angle"},
+		{SENS_VRHEAD_NOD, "NOD", 0, "Nod (Yes)", "Pulse when the head nods down and up inside the time"},
+		{SENS_VRHEAD_SHAKE, "SHAKE", 0, "Shake (No)", "Pulse when the head turns left and right inside the time"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "VRHeadSensor", "Sensor");
+	RNA_def_struct_ui_text(srna, "VR Head Sensor", "Sensor to detect head gestures of the active camera (VR head tracking)");
+	RNA_def_struct_sdna_from(srna, "bVRHeadSensor", "data");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_ui_text(prop, "Gesture", "Head gesture to detect");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "angle", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_range(prop, DEG2RADF(1.0f), DEG2RADF(89.0f));
+	RNA_def_property_ui_text(prop, "Angle", "How far the head must turn");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "time", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Time", "Seconds for the whole nod/shake (down and up, or left and right)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_message_sensor(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -1224,6 +1264,7 @@ void RNA_def_sensor(BlenderRNA *brna)
 	rna_def_random_sensor(brna);
 	rna_def_ray_sensor(brna);
 	rna_def_movement_sensor(brna);
+	rna_def_vr_head_sensor(brna);
 	rna_def_message_sensor(brna);
 	rna_def_joystick_sensor(brna);
 }

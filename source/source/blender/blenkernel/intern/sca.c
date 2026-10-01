@@ -152,6 +152,13 @@ void init_sensor(bSensor *sens)
 		movs = sens->data;
 		movs->threshold = 0.01f;
 		break;
+	case SENS_VR_HEAD:
+	{
+		bVRHeadSensor *vrs = sens->data = MEM_callocN(sizeof(bVRHeadSensor), "vrheadsens");
+		vrs->angle = DEG2RADF(25.0f);
+		vrs->time = 1.0f;
+		break;
+	}
 	case SENS_ANIMATIONEVENT:
 		sens->data = MEM_callocN(sizeof(bAnimationEventSensor), "animsens");
 		aes = sens->data;

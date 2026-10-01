@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: sensor VR Head (gestos de cabeça)
+
+Novo sensor `SENS_VR_HEAD` (`bVRHeadSensor`: `mode`, `angle`, `time`; RNA `VRHeadSensor`; `KX_VRHeadSensor`). Lê a orientação de render da câmera ativa: Look Up/Down e Tilt Left/Right ficam positivos enquanto passam do ângulo; Nod (pitch) e Shake (yaw) detectam ida e volta de pelo menos o ângulo dentro de `time` e dão pulso de um tic. Python: `mode`, `angle`, `time` e só leitura `pitch`, `yaw`, `roll`. Conversão para Python recusa o sensor. Validado no celular (`vr_gesture.range`: balançar "não" inverte a tela, olhar para cima desliga, acenar "sim" pula). DNA cresceu: rebuild limpo se aparecer crash estranho.
+
 ## 2026-10-01 - VR no celular: cone e mira no Ray VR Gaze
 
 `bRaySensor` ganhou `gaze_angle` (rad, RNA `gaze_angle` 0–45°, Python `gazeAngle`) e `gaze_reticle` (RNA `use_gaze_reticle`). Com cone > 0, se o raio central erra, `KX_RaySensor` escolhe o objeto visível (filtros de propriedade/material e máscara) de menor ângulo dentro do cone e confirma linha de visada com outro raio até a origem dele; o alvo atual tem histerese de 1,5× o ângulo. A mira desenha anéis com linhas de debug no ponto olhado (2 m sem alvo), anel interno = progresso do Gaze Time, verde ao disparar. Com Debug ligado, desenha o contorno do cone. Validado no celular (`vr_trigger.range`, cone 5°, 300 ms). DNA cresceu: rebuild limpo se aparecer crash estranho.

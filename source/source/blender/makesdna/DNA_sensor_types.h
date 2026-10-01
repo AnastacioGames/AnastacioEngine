@@ -220,6 +220,22 @@ typedef struct bMovementSensor {
 	float threshold, pad;
 } bMovementSensor;
 
+typedef struct bVRHeadSensor {
+	short mode;  /* SENS_VRHEAD_* */
+	short pad;
+	float angle; /* radians: how far the head must turn */
+	float time;  /* seconds: nod/shake must happen inside this window */
+	float pad2;
+} bVRHeadSensor;
+
+/* bVRHeadSensor->mode */
+#define SENS_VRHEAD_LOOK_UP     0
+#define SENS_VRHEAD_LOOK_DOWN   1
+#define SENS_VRHEAD_TILT_LEFT   2
+#define SENS_VRHEAD_TILT_RIGHT  3
+#define SENS_VRHEAD_NOD         4 /* yes: down/up */
+#define SENS_VRHEAD_SHAKE       5 /* no: left/right */
+
 /* bMouseSensor->type: uses blender event defines */
 
 /* bMouseSensor->flag: only pulse for now */
@@ -307,6 +323,7 @@ typedef struct bMovementSensor {
 #define SENS_ARMATURE		 14
 #define SENS_MOVEMENT		 15
 #define SENS_ANIMATIONEVENT  16
+#define SENS_VR_HEAD         17
 
 /* sensor->flag */
 #define SENS_SHOW		1

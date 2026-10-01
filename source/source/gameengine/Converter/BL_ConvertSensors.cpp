@@ -77,6 +77,7 @@
 #include "SCA_RandomSensor.h"
 #include "KX_RaySensor.h"
 #include "KX_MovementSensor.h"
+#include "KX_VRHeadSensor.h"
 #include "SCA_EventManager.h"
 #include "SCA_LogicManager.h"
 #include "KX_Scene.h"
@@ -633,6 +634,15 @@ void BL_ConvertSensors(struct Object *blenderobject,
 							float threshold = blendermovsensor->threshold;
 							gamesensor = new KX_MovementSensor(eventmgr, gameobj, axis, localflag, threshold);
 						}
+					}
+					break;
+				}
+				case SENS_VR_HEAD:
+				{
+					bVRHeadSensor *bvrhead = (bVRHeadSensor *)sens->data;
+					SCA_EventManager *eventmgr = logicmgr->FindEventManager(SCA_EventManager::BASIC_EVENTMGR);
+					if (bvrhead && eventmgr) {
+						gamesensor = new KX_VRHeadSensor(eventmgr, gameobj, kxscene, bvrhead->mode, bvrhead->angle, bvrhead->time);
 					}
 					break;
 				}
