@@ -63,7 +63,8 @@ struct KX_LocalFlags {
 		ZeroLinearVelocity(false),
 		ZeroAngularVelocity(false),
 		ServoControlAngular(false),
-		VRGaze(false)
+		VRGaze(false),
+		VRTeleport(false)
 	{
 	}
 
@@ -88,6 +89,8 @@ struct KX_LocalFlags {
 	bool ServoControlAngular;
 	/// Location offset relative to the active camera's horizontal gaze (VR walking).
 	bool VRGaze;
+	/// With VRGaze: jump once to the looked-at ground point (Loc Y = max distance) instead of walking.
+	bool VRTeleport;
 };
 
 class KX_ObjectActuator : public SCA_IActuator, public mt::SimdClassAllocator
@@ -120,6 +123,8 @@ class KX_ObjectActuator : public SCA_IActuator, public mt::SimdClassAllocator
 	float m_vr_gaze_factor;
 	/// VR Gaze walking: slowing down after the trigger was released.
 	bool m_vr_gaze_braking;
+	/// VR Teleport: the jump already happened for the current trigger press.
+	bool m_vr_teleport_done;
 
 public:
 	KX_ObjectActuator(SCA_IObject *gameobj,

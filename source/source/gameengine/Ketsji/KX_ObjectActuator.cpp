@@ -41,6 +41,7 @@
 #include "KX_Globals.h"
 #include "KX_Scene.h"
 #include "KX_Camera.h"
+#include "KX_RayCast.h"
 
 #include "CM_Message.h"
 
@@ -63,6 +64,61 @@ static mt::vec3 vr_gaze_offset(KX_GameObject *parent, const mt::vec3& offset)
 	forward.Normalize();
 	const mt::vec3 right(forward.y, -forward.x, 0.0f);
 	return right * offset.x + forward * offset.y + mt::vec3(0.0f, 0.0f, offset.z);
+}
+
+/* VR teleport: casts a ray from the active camera along the gaze direction and reports the first
+ * solid hit, which becomes the landing point (the hit is on the ground/floor itself, so it is
+ * already the right height for the feet). */
+namespace {
+struct VRTeleportRayCallback {
+	bool found;
+	mt::vec3 point;
+
+	bool NeedRayCast(KX_ClientObjectInfo *UNUSED(client), void *UNUSED(data))
+	{
+		return true;
+	}
+
+	bool RayHit(KX_ClientObjectInfo *UNUSED(client), KX_RayCast *result, void *UNUSED(data))
+	{
+		found = true;
+		point = result->m_hitPoint;
+		return true;
+	}
+};
+}  // namespace
+
+static bool vr_teleport_target(KX_GameObject *parent, float maxDistance, mt::vec3& outPoint)
+{
+	KX_Camera *cam = parent->GetScene()->GetActiveCamera();
+	PHY_IPhysicsEnvironment *pe = parent->GetScene()->GetPhysicsEnvironment();
+	if (!cam || !pe || maxDistance <= 0.0f) {
+		return false;
+	}
+
+	const mt::vec3 from = cam->NodeGetWorldPosition();
+	const mt::vec3 dir = cam->GetRenderOrientation() * mt::vec3(0.0f, 0.0f, -1.0f);
+	const mt::vec3 to = from + maxDistance * dir;
+
+	VRTeleportRayCallback cb;
+	cb.found = false;
+	KX_RayCast::Callback<VRTeleportRayCallback, void> callback(&cb, parent->GetPhysicsController());
+	KX_RayCast::RayTest(pe, from, to, callback);
+	if (!cb.found) {
+		return false;
+	}
+
+	/* Keep the body's current height above the ground (its origin may be at the center, not the feet). */
+	const mt::vec3 pos = parent->NodeGetWorldPosition();
+	VRTeleportRayCallback down;
+	down.found = false;
+	KX_RayCast::Callback<VRTeleportRayCallback, void> downCallback(&down, parent->GetPhysicsController());
+	KX_RayCast::RayTest(pe, pos, pos - mt::vec3(0.0f, 0.0f, 100.0f), downCallback);
+	const float height = down.found ? std::max(pos.z - down.point.z, 0.0f) : 0.0f;
+
+	// Small lift so the body does not start inside the floor.
+	outPoint = cb.point + mt::vec3(0.0f, 0.0f, height + 0.02f);
+	return true;
 }
 
 KX_ObjectActuator::KX_ObjectActuator(SCA_IObject *gameobj,
@@ -94,7 +150,8 @@ KX_ObjectActuator::KX_ObjectActuator(SCA_IObject *gameobj,
 	m_angular_damping_active(false),
 	m_jumping(false),
 	m_vr_gaze_factor(0.0f),
-	m_vr_gaze_braking(false)
+	m_vr_gaze_braking(false),
+	m_vr_teleport_done(false)
 {
 	if (m_bitLocalFlag.ServoControl) {
 		// in servo motion, the force is local if the target velocity is local
@@ -160,6 +217,7 @@ bool KX_ObjectActuator::Update()
 	if (bNegativeEvent || m_vr_gaze_braking) {
 		m_vr_gaze_braking = false;
 		m_vr_gaze_factor = 0.0f;
+		m_vr_teleport_done = false;
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
 			character->SetWalkDirection(mt::zero3);
@@ -317,6 +375,16 @@ bool KX_ObjectActuator::Update()
 			/* Set position mode */
 			if (!m_bitLocalFlag.ZeroDLoc & m_bitLocalFlag.SetPositionMode) {
 				parent->NodeSetWorldPosition(m_dloc);
+			}
+			/* VR teleport: one jump per trigger press, Loc Y = max distance */
+			else if (!m_bitLocalFlag.ZeroDLoc && m_bitLocalFlag.VRGaze && m_bitLocalFlag.VRTeleport) {
+				if (!m_vr_teleport_done) {
+					mt::vec3 target;
+					if (vr_teleport_target(parent, m_dloc.y, target)) {
+						parent->NodeSetWorldPosition(target);
+					}
+					m_vr_teleport_done = true;
+				}
 			}
 			/* Simple movement */
 			else if (!m_bitLocalFlag.ZeroDLoc && m_bitLocalFlag.VRGaze) {

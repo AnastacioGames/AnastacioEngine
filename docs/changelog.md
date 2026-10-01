@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: teleporte no atuador Motion
+
+- Motion (modo Simple) com VR Gaze ganhou a opção **Teleport** (`ACT_DLOC_VR_TELEPORT`, `use_vr_teleport`): cada
+  toque faz um raio da câmera na direção do olhar (até Loc Y metros) e põe o corpo no ponto atingido, mantendo a
+  altura atual acima do chão; um salto por toque (`KX_ObjectActuator.cpp`).
+- Validado no celular com `vr_teleport.range`.
+
 ## 2026-10-01 - VR no celular: mira (linhas de debug) na Web/celular
 
 - `RAS_OpenGLDebugDraw::Flush` na Web desenha as linhas via `GLctx` em `EM_JS` (`ras_draw_lines_webgl`), com

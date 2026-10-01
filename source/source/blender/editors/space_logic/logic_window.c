@@ -2004,8 +2004,11 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 			row = uiLayoutRow(layout, false);
 			uiItemR(row, ptr, "use_vr_gaze", 0, NULL, ICON_NONE);
 			if (RNA_boolean_get(ptr, "use_vr_gaze")) {
-				/* Shared with the linear velocity ramp: frames to reach (and stop from) the walking speed. */
-				uiItemR(row, ptr, "damping", 0, NULL, ICON_NONE);
+				uiItemR(row, ptr, "use_vr_teleport", 0, NULL, ICON_NONE);
+				if (!RNA_boolean_get(ptr, "use_vr_teleport")) {
+					/* Shared with the linear velocity ramp: frames to reach (and stop from) the walking speed. */
+					uiItemR(row, ptr, "damping", 0, NULL, ICON_NONE);
+				}
 			}
 
 			split = uiLayoutSplit(layout, 0.9, false);

@@ -885,6 +885,13 @@ static void rna_def_object_actuator(BlenderRNA *brna)
 	                         "(Y = forward, X = right, Z = up): walk where the player looks");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_vr_teleport", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_DLOC_VR_TELEPORT);
+	RNA_def_property_ui_text(prop, "Teleport",
+	                         "With VR Gaze, jump once to the looked-at ground point instead of walking there "
+	                         "(no motion sickness); Loc Y becomes the maximum teleport distance in meters");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "use_local_rotation", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_DROT_LOCAL);
 	RNA_def_property_ui_text(prop, "L", "Rotation is defined in local coordinates");

@@ -311,6 +311,7 @@ typedef struct bActuator {
 #define ACT_ADD_CHAR_LOC		128
 #define ACT_CHAR_JUMP			256
 #define ACT_DLOC_VR_GAZE		512 /* Loc follows the head gaze (y = forward), horizontal only */
+#define ACT_DLOC_VR_TELEPORT	1024 /* with VR Gaze: jump once to the looked-at ground point (Loc Y = max distance) instead of walking */
 
 /* objectactuator->type */
 #define ACT_OBJECT_NORMAL		0
