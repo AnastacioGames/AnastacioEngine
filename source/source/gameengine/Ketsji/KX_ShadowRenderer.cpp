@@ -185,7 +185,8 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 
 	const RAS_CameraData *camdata = viewcam->GetCameraData();
 	const mt::mat4& proj = viewcam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE);
-	const mt::mat3x4 camWorldTrans = viewcam->NodeGetWorldTransform();
+	/* GetCameraToWorld() includes the head tracking orientation (VR), so the cascades follow the view. */
+	const mt::mat3x4 camWorldTrans = viewcam->GetCameraToWorld();
 	const mt::mat3x4 lightWorldInv = light->NodeGetWorldTransform().Inverse();
 
 	float minX, maxX, minY, maxY, minZ, maxZ;

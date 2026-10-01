@@ -1033,6 +1033,7 @@ PyAttributeDef KX_Camera::Attributes[] = {
 	EXP_PYATTRIBUTE_FLOAT_RW("droneFrequency", 0.0f, 20.0f, KX_Camera, m_gameFX.droneFrequency),
 	EXP_PYATTRIBUTE_FLOAT_RW("trackBank", 0.0f, 5.0f, KX_Camera, m_gameFX.trackBank),
 	EXP_PYATTRIBUTE_RO_FUNCTION("trackOrientation", KX_Camera, pyattr_get_track_orientation),
+	EXP_PYATTRIBUTE_RO_FUNCTION("gazeDirection", KX_Camera, pyattr_get_gaze_direction),
 
 	EXP_PYATTRIBUTE_FLAG_RW("useDof", KX_Camera, m_gameFX.flag, CAM_GFX_DOF),
 	EXP_PYATTRIBUTE_FLAG_RW("useSpeedBlur", KX_Camera, m_gameFX.flag, CAM_GFX_SPEEDBLUR),
@@ -1539,6 +1540,13 @@ PyObject *KX_Camera::pyattr_get_track_orientation(EXP_PyObjectPlus *self_v, cons
 {
 	KX_Camera *self = static_cast<KX_Camera *>(self_v);
 	return PyObjectFrom(self->GetRenderOrientation());
+}
+
+PyObject *KX_Camera::pyattr_get_gaze_direction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	/* World direction the player looks at, including the head tracking: use it with rayCast for gaze aiming. */
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	return PyObjectFrom(self->GetRenderOrientation() * mt::vec3(0.0f, 0.0f, -1.0f));
 }
 
 PyObject *KX_Camera::pyattr_get_INSIDE(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

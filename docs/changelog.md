@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular, peça 4: separação 0,064, gaze, setStereoMode e sombras na view da cabeça
+
+- Com `VR Head Tracking` ou `VR Lens Distortion` ligados e a separação ainda no padrão 0,10, o launcher usa 0,064 m.
+- `KX_Camera.gazeDirection`: vetor unitário (mundo) para onde a view da cabeça aponta, para raycast de olhar.
+- `bge.render.setStereoMode/getStereoMode` e constantes `STEREO_NOSTEREO/SIDEBYSIDE/ABOVEBELOW/ANAGLYPH/INTERLACED`.
+- `KX_ShadowRenderer`: as cascatas usam `GetCameraToWorld()` (view com a cabeça) em vez da transformação do objeto.
+- Validado no celular: sombra simples da Sun aparece no APK (exige GLSL Shadows ligado na cena). CSM ainda não testada no Web.
+
 ## 2026-10-01 - VR no celular, peça 3: distorção de lente e botão "Entrar em VR"
 
 - Novo flag de cena `GAME_VR_LENS_DISTORTION` (RNA `vr_lens_distortion`, painel Stereo).

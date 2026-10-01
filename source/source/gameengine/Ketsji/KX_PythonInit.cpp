@@ -1232,6 +1232,33 @@ static PyObject *gPySetEyeSeparation(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *gPySetStereoMode(PyObject *, PyObject *args)
+{
+	int mode;
+	if (!PyArg_ParseTuple(args, "i:setStereoMode", &mode)) {
+		return nullptr;
+	}
+	if (mode <= RAS_Rasterizer::RAS_STEREO_NOSTEREO - 1 || mode >= RAS_Rasterizer::RAS_STEREO_MAXSTEREO) {
+		PyErr_SetString(PyExc_ValueError, "bge.render.setStereoMode(mode): invalid mode");
+		return nullptr;
+	}
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.setStereoMode(mode), Rasterizer not available");
+		return nullptr;
+	}
+	KX_GetActiveEngine()->GetRasterizer()->SetStereoMode((RAS_Rasterizer::StereoMode)mode);
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetStereoMode(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.getStereoMode(), Rasterizer not available");
+		return nullptr;
+	}
+	return PyLong_FromLong(KX_GetActiveEngine()->GetRasterizer()->GetStereoMode());
+}
+
 static PyObject *gPyGetEyeSeparation(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
@@ -1734,6 +1761,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 	{"disableMotionBlur", (PyCFunction)gPyDisableMotionBlur, METH_NOARGS, "disable motion blur"},
 
 	{"setEyeSeparation", (PyCFunction)gPySetEyeSeparation, METH_VARARGS, "set the eye separation for stereo mode"},
+	{"setStereoMode", (PyCFunction)gPySetStereoMode, METH_VARARGS, "set the stereo mode (STEREO_* constants)"},
+	{"getStereoMode", (PyCFunction)gPyGetStereoMode, METH_NOARGS, "get the stereo mode"},
 	{"getEyeSeparation", (PyCFunction)gPyGetEyeSeparation, METH_NOARGS, "get the eye separation for stereo mode"},
 	{"setFocalLength", (PyCFunction)gPySetFocalLength, METH_VARARGS, "set the focal length for stereo mode"},
 	{"getFocalLength", (PyCFunction)gPyGetFocalLength, METH_VARARGS, "get the focal length for stereo mode"},
@@ -2792,6 +2821,11 @@ PyMODINIT_FUNC initRasterizerPythonBinding()
 	KX_MACRO_addTypesToDict(d, VSYNC_ADAPTIVE, RAS_ICanvas::VSYNC_ADAPTIVE);
 
 	/* stereoscopy */
+	KX_MACRO_addTypesToDict(d, STEREO_NOSTEREO, RAS_Rasterizer::RAS_STEREO_NOSTEREO);
+	KX_MACRO_addTypesToDict(d, STEREO_SIDEBYSIDE, RAS_Rasterizer::RAS_STEREO_SIDEBYSIDE);
+	KX_MACRO_addTypesToDict(d, STEREO_ABOVEBELOW, RAS_Rasterizer::RAS_STEREO_ABOVEBELOW);
+	KX_MACRO_addTypesToDict(d, STEREO_ANAGLYPH, RAS_Rasterizer::RAS_STEREO_ANAGLYPH);
+	KX_MACRO_addTypesToDict(d, STEREO_INTERLACED, RAS_Rasterizer::RAS_STEREO_INTERLACED);
 	KX_MACRO_addTypesToDict(d, LEFT_EYE, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
 	KX_MACRO_addTypesToDict(d, RIGHT_EYE, RAS_Rasterizer::RAS_STEREO_RIGHTEYE);
 
