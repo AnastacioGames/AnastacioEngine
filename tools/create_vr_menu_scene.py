@@ -11,8 +11,8 @@ import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 output = argv[0] if argv else "vr_menu.range"
-# 3D text is not drawn on web/Android yet (BLF still uses fixed-function GL); pass --text for desktop.
-WITH_TEXT = "--text" in argv
+# Button labels are 3D text objects; --no-text leaves only the colored planes.
+WITH_TEXT = "--no-text" not in argv
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene

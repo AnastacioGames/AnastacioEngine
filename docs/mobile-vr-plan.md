@@ -154,11 +154,12 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    ficam errados em estéreo.
    Feito (2026-10-01): opção **Self** no Ray VR Gaze (botão em qualquer objeto: usa o olhar da câmera ativa e só
    dispara ao acertar o próprio dono ou um filho). Exemplo só com bricks: `tools/create_vr_menu_scene.py` gera
-   `vr_menu.range` (3 botões planos coloridos, texto filho só com `--text`; olhar 1 s soma `cliques`; a câmera desenha a mira filtrando
+   `vr_menu.range` (3 botões planos coloridos, texto filho, `--no-text` tira; olhar 1 s soma `cliques`; a câmera desenha a mira filtrando
    `botao`). Receita: plano com física Static + texto filho No Collision; sensor Ray "VR Gaze" com Self e Gaze
    Time → AND → atuador; para esconder um menu, Visibility + Suspend Physics (invisível ainda bloqueia o raio).
-   Validado no desktop e no celular (Cardboard/APK). Limite: texto 3D não aparece na web/Android (BLF ainda
-   usa a pilha de matrizes do GL fixo; o runtime web pula o desenho em vez de abortar com "null function").
+   Validado no desktop e no celular (Cardboard/APK), com texto. Na web o BLF desenha as letras com um shader
+   próprio direto no WebGL (sem glBegin/pilha de matrizes); a matriz e a cor vêm de `BLF_draw_state`.
+   Limite: a mira (linhas de debug) não aparece no celular.
 7. **Conforto.** Vinheta ao girar/mover rápido (reduz enjoo), recentralizar pelo olhar (segurar o olhar para
    baixo por 2 s) e opção de snap-turn do corpo.
 8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com

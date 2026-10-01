@@ -69,6 +69,10 @@ void BLF_size(int fontid, int size, int dpi);
  */
 void BLF_matrix(int fontid, const float m[16]);
 
+/* View-projection matrix and color for drawing where there is no fixed-function GL
+ * (WebGL); ignored on desktop, which reads both from the GL state. */
+void BLF_draw_state(const float viewproj[16], const float color[4]);
+
 /* Draw the string using the default font, size and dpi. */
 void BLF_draw_default(float x, float y, float z, const char *str, size_t len) ATTR_NONNULL();
 void BLF_draw_default_ascii(float x, float y, float z, const char *str, size_t len) ATTR_NONNULL();

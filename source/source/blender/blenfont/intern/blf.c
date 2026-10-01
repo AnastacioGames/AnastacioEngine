@@ -502,6 +502,20 @@ void BLF_rotation_default(float angle)
 	}
 }
 
+#ifdef __EMSCRIPTEN__
+static float blf_web_viewproj[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
+#endif
+
+void BLF_draw_state(const float viewproj[16], const float color[4])
+{
+#ifdef __EMSCRIPTEN__
+	memcpy(blf_web_viewproj, viewproj, sizeof(blf_web_viewproj));
+	blf_web_color_set(color);
+#else
+	UNUSED_VARS(viewproj, color);
+#endif
+}
+
 static void blf_draw_gl__start(FontBLF *font, GLint *mode)
 {
 	/*
@@ -511,6 +525,35 @@ static void blf_draw_gl__start(FontBLF *font, GLint *mode)
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+#ifdef __EMSCRIPTEN__
+	/* Same transform as the matrix stack below, composed here for the WebGL glyph shader. */
+	{
+		float model[4][4], mvp[4][4];
+		if (font->flags & BLF_MATRIX) {
+			memcpy(model, font->m, sizeof(model));
+		}
+		else {
+			unit_m4(model);
+		}
+		translate_m4(model, font->pos[0], font->pos[1], font->pos[2]);
+		if (font->flags & BLF_ASPECT) {
+			mul_v3_fl(model[0], font->aspect[0]);
+			mul_v3_fl(model[1], font->aspect[1]);
+			mul_v3_fl(model[2], font->aspect[2]);
+		}
+		if (font->flags & BLF_ROTATION) {
+			rotate_m4(model, 'Z', font->angle);
+		}
+		mul_m4_m4m4(mvp, blf_web_viewproj, model);
+		*mode = blf_web_begin(mvp);
+		if (font->shadow || font->blur) {
+			blf_web_color_get(font->orig_col);
+		}
+		font->tex_bind_state = -1;
+		return;
+	}
+#endif
 
 #ifndef BLF_STANDALONE
 	GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
@@ -546,6 +589,13 @@ static void blf_draw_gl__start(FontBLF *font, GLint *mode)
 
 static void blf_draw_gl__end(GLint mode)
 {
+#ifdef __EMSCRIPTEN__
+	if (mode) {
+		blf_web_end();
+	}
+	glDisable(GL_BLEND);
+	return;
+#endif
 	glMatrixMode(GL_TEXTURE);
 	glPopMatrix();
 
@@ -572,6 +622,12 @@ void BLF_draw_ex(
 
 	if (font && font->glyph_cache) {
 		blf_draw_gl__start(font, &mode);
+#ifdef __EMSCRIPTEN__
+		if (!mode) {  /* glyph shader failed to build */
+			blf_draw_gl__end(mode);
+			return;
+		}
+#endif
 		if (font->flags & BLF_WORD_WRAP) {
 			blf_font_draw__wrap(font, str, len, r_info);
 		}

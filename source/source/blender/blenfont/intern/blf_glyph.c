@@ -55,6 +55,109 @@
 #include "blf_internal_types.h"
 #include "blf_internal.h"
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#  include "BLI_math_vector.h"
+#  include "GPU_shader.h"
+
+/* WebGL has no fixed-function GL (glBegin, glColor, matrix stack), so there each glyph quad
+ * is drawn with this small shader, using the matrix given to blf_web_begin(). The quad goes
+ * straight to WebGL through its own vertex array and buffer, restoring the previous bindings:
+ * Emscripten's legacy GL emulation keeps its own idea of those and would draw from the wrong
+ * arrays otherwise. */
+EM_JS(void, blf_gl_quad_webgl, (const float *verts, int pos, int uv), {
+	var g = GLctx;
+	var prevVao = g.getParameter(g.VERTEX_ARRAY_BINDING);
+	var prevBuf = g.getParameter(g.ARRAY_BUFFER_BINDING);
+	if (!Module.blfWebVao) {
+		Module.blfWebVao = g.createVertexArray();
+		Module.blfWebVbo = g.createBuffer();
+		g.bindVertexArray(Module.blfWebVao);
+		g.bindBuffer(g.ARRAY_BUFFER, Module.blfWebVbo);
+		g.enableVertexAttribArray(pos);
+		g.vertexAttribPointer(pos, 2, g.FLOAT, false, 16, 0);
+		g.enableVertexAttribArray(uv);
+		g.vertexAttribPointer(uv, 2, g.FLOAT, false, 16, 8);
+	}
+	g.bindVertexArray(Module.blfWebVao);
+	g.bindBuffer(g.ARRAY_BUFFER, Module.blfWebVbo);
+	g.bufferData(g.ARRAY_BUFFER, HEAPF32.subarray(verts >> 2, (verts >> 2) + 16), g.STREAM_DRAW);
+	g.drawArrays(g.TRIANGLE_FAN, 0, 4);
+	g.bindVertexArray(prevVao);
+	g.bindBuffer(g.ARRAY_BUFFER, prevBuf);
+});
+
+static const char blf_web_vert[] =
+	"uniform mat4 unfmvp;\n"
+	"in vec2 pos;\n"
+	"in vec2 uv;\n"
+	"out vec2 texco;\n"
+	"void main()\n"
+	"{\n"
+	"	texco = uv;\n"
+	"	gl_Position = unfmvp * vec4(pos, 0.0, 1.0);\n"
+	"}\n";
+
+/* Glyph textures are single channel (GL_R8) on web: red is the coverage. */
+static const char blf_web_frag[] =
+	"uniform sampler2D glyphs;\n"
+	"uniform vec4 unfcolor;\n"
+	"in vec2 texco;\n"
+	"out vec4 fragColor;\n"
+	"void main()\n"
+	"{\n"
+	"	fragColor = vec4(unfcolor.rgb, unfcolor.a * texture(glyphs, texco).r);\n"
+	"}\n";
+
+static GPUShader *blf_web_shader = NULL;
+static int blf_web_mvp_loc = -1;
+static int blf_web_color_loc = -1;
+static int blf_web_glyphs_loc = -1;
+static int blf_web_pos_attr = -1;
+static int blf_web_uv_attr = -1;
+static float blf_web_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+void blf_web_color_set(const float color[4])
+{
+	copy_v4_v4(blf_web_color, color);
+}
+
+void blf_web_color_get(float r_color[4])
+{
+	copy_v4_v4(r_color, blf_web_color);
+}
+
+int blf_web_begin(const float mvp[4][4])
+{
+	if (!blf_web_shader) {
+		blf_web_shader = GPU_shader_create(blf_web_vert, blf_web_frag, NULL, NULL, NULL, 0, 0, 0);
+		if (!blf_web_shader) {
+			return 0;
+		}
+		blf_web_mvp_loc = GPU_shader_get_uniform(blf_web_shader, "unfmvp");
+		blf_web_color_loc = GPU_shader_get_uniform(blf_web_shader, "unfcolor");
+		blf_web_glyphs_loc = GPU_shader_get_uniform(blf_web_shader, "glyphs");
+		blf_web_pos_attr = GPU_shader_get_attribute(blf_web_shader, "pos");
+		blf_web_uv_attr = GPU_shader_get_attribute(blf_web_shader, "uv");
+	}
+
+	GPU_shader_bind(blf_web_shader);
+	GPU_shader_uniform_vector(blf_web_shader, blf_web_mvp_loc, 16, 1, (const float *)mvp);
+	GPU_shader_uniform_int(blf_web_shader, blf_web_glyphs_loc, 0);
+	glActiveTexture(GL_TEXTURE0);
+	return 1;
+}
+
+void blf_web_end(void)
+{
+	GPU_shader_unbind();
+}
+
+/* glColor4fv in the glyph code below only sets the color of the next quads. */
+#  undef glColor4fv
+#  define glColor4fv(color) blf_web_color_set(color)
+#endif
+
 #include "BLI_strict_flags.h"
 
 GlyphCacheBLF *blf_glyph_cache_find(FontBLF *font, unsigned int size, unsigned int dpi)
@@ -180,7 +283,11 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-#ifndef BLF_STANDALONE
+#ifdef __EMSCRIPTEN__
+	/* WebGL2 has no GL_ALPHA8: single channel red texture, read as coverage by blf_web_frag. */
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, gc->p2_width, gc->p2_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+#else
+#  ifndef BLF_STANDALONE
 	/* needed since basic shader doesn't support alpha-only textures,
 	 * while we could add support this is only used in a few places
 	 * (an alternative could be to have a simple shader for BLF). */
@@ -188,9 +295,10 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 		GLint swizzle_mask[] = {GL_ONE, GL_ONE, GL_ONE, GL_ALPHA};
 		glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzle_mask);
 	}
-#endif
+#  endif
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA8, gc->p2_width, gc->p2_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL);
+#endif
 }
 
 GlyphBLF *blf_glyph_search(GlyphCacheBLF *gc, unsigned int c)
@@ -340,6 +448,16 @@ void blf_glyph_free(GlyphBLF *g)
 
 static void blf_texture_draw(float uv[2][2], float dx, float y1, float dx1, float y2)
 {
+#ifdef __EMSCRIPTEN__
+	const float verts[16] = {
+		dx, y1, uv[0][0], uv[0][1],
+		dx, y2, uv[0][0], uv[1][1],
+		dx1, y2, uv[1][0], uv[1][1],
+		dx1, y1, uv[1][0], uv[0][1],
+	};
+	GPU_shader_uniform_vector(blf_web_shader, blf_web_color_loc, 4, 1, blf_web_color);
+	blf_gl_quad_webgl(verts, blf_web_pos_attr, blf_web_uv_attr);
+#else
 	glBegin(GL_QUADS);
 	glTexCoord2f(uv[0][0], uv[0][1]);
 	glVertex2f(dx, y1);
@@ -353,6 +471,7 @@ static void blf_texture_draw(float uv[2][2], float dx, float y1, float dx1, floa
 	glTexCoord2f(uv[1][0], uv[0][1]);
 	glVertex2f(dx1, y1);
 	glEnd();
+#endif
 }
 
 static void blf_texture5_draw(const float shadow_col[4], float uv[2][2], float x1, float y1, float x2, float y2)
@@ -461,6 +580,12 @@ void blf_glyph_render(FontBLF *font, GlyphBLF *g, float x, float y)
 		}
 
 
+#ifdef __EMSCRIPTEN__
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glBindTexture(GL_TEXTURE_2D, g->tex);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, g->offset_x, g->offset_y, g->width, g->height, GL_RED, GL_UNSIGNED_BYTE, g->bitmap);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+#else
 		glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 		glPixelStorei(GL_UNPACK_LSB_FIRST, GL_FALSE);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
@@ -469,6 +594,7 @@ void blf_glyph_render(FontBLF *font, GlyphBLF *g, float x, float y)
 		glBindTexture(GL_TEXTURE_2D, g->tex);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, g->offset_x, g->offset_y, g->width, g->height, GL_ALPHA, GL_UNSIGNED_BYTE, g->bitmap);
 		glPopClientAttrib();
+#endif
 
 		g->uv[0][0] = ((float)g->offset_x) / ((float)gc->p2_width);
 		g->uv[0][1] = ((float)g->offset_y) / ((float)gc->p2_height);

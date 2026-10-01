@@ -486,11 +486,6 @@ void RAS_OpenGLRasterizer::DisableForText()
 void RAS_OpenGLRasterizer::RenderText3D(int fontid, const std::string& text, int size, int dpi,
                                         const float color[4], const float mat[16], float aspect, bool useShadow, const float shadowOffset[2], const float shadow_color[4])
 {
-#ifdef __EMSCRIPTEN__
-	/* BLF draws with the fixed-function matrix stack (glMultMatrixf etc.), which
-	 * WebGL lacks: calling it aborts with "null function". Skip 3D text on web. */
-	return;
-#endif
 	/* enable/disable flags */
 	int flags = BLF_MATRIX | BLF_ASPECT;
 
@@ -511,6 +506,9 @@ void RAS_OpenGLRasterizer::RenderText3D(int fontid, const std::string& text, int
 #ifdef WITH_GL_PROFILE_COMPAT
 	glColor4fv(color);
 #endif
+	/* WebGL has no GL matrix stack nor current color: BLF takes them from here. */
+	const mt::mat4 viewproj = m_rasterizer->GetProjectionMatrix() * m_rasterizer->GetViewMatrix();
+	BLF_draw_state((const float *)viewproj.Data(), color);
 
 	/* multiply the text matrix by the object matrix */
 	BLF_enable(fontid, flags);

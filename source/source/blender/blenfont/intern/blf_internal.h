@@ -79,6 +79,14 @@ struct GlyphBLF *blf_glyph_add(struct FontBLF *font, unsigned int index, unsigne
 void blf_glyph_free(struct GlyphBLF *g);
 void blf_glyph_render(struct FontBLF *font, struct GlyphBLF *g, float x, float y);
 
+#ifdef __EMSCRIPTEN__
+/* WebGL path for glyph drawing (no fixed-function GL there), see blf_glyph.c. */
+int blf_web_begin(const float mvp[4][4]);
+void blf_web_end(void);
+void blf_web_color_get(float r_color[4]);
+void blf_web_color_set(const float color[4]);
+#endif
+
 #ifdef WIN32
 /* blf_font_win32_compat.c */
 #  ifdef FT_FREETYPE_H
