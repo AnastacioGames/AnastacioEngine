@@ -862,6 +862,67 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 			return !(is_game && !use_new);
 	}
 
+	/* Game com PBR Shading Nodes: nos cujo GLSL e aproximado ou vazio.
+	 * Tabela completa em docs/node-material-support.md. */
+	if (is_game && use_new) {
+		switch (node->type) {
+			case SH_NODE_BSDF_GLOSSY:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: lit like Diffuse with a soft highlight, no reflection";
+				return false;
+			case SH_NODE_BSDF_GLASS:
+			case SH_NODE_BSDF_REFRACTION:
+			case SH_NODE_BSDF_TOON:
+			case SH_NODE_BSDF_TRANSLUCENT:
+			case SH_NODE_BSDF_VELVET:
+			case SH_NODE_BSDF_ANISOTROPIC:
+			case SH_NODE_SUBSURFACE_SCATTERING:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: rendered as Diffuse BSDF";
+				return false;
+			case SH_NODE_BSDF_HAIR:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: outputs the flat color, no lighting";
+				return false;
+			case SH_NODE_AMBIENT_OCCLUSION:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: AO output is always 1, color passes through";
+				return false;
+			case SH_NODE_BEVEL:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: returns the unchanged normal";
+				return false;
+			case SH_NODE_LIGHT_PATH:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: fixed values for a camera ray";
+				return false;
+			case SH_NODE_LIGHT_FALLOFF:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: all outputs return Strength";
+				return false;
+			case SH_NODE_TEX_SKY:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: outputs plain white";
+				return false;
+			case SH_NODE_BLACKBODY:
+			case SH_NODE_WAVELENGTH:
+			case SH_NODE_TANGENT:
+			case SH_NODE_WIREFRAME:
+			case SH_NODE_HAIR_INFO:
+			case SH_NODE_HOLDOUT:
+			case SH_NODE_TEX_IES:
+			case SH_NODE_TEX_POINTDENSITY:
+			case SH_NODE_SCRIPT:
+			case SH_NODE_BSDF_HAIR_PRINCIPLED:
+			case SH_NODE_VOLUME_ABSORPTION:
+			case SH_NODE_VOLUME_SCATTER:
+			case SH_NODE_VOLUME_PRINCIPLED:
+				*r_badge = "Cycles";
+				*r_tip = "Not supported in Game: no GLSL code, output is ignored or zero";
+				return true;
+		}
+	}
+
 	compat = node->typeinfo->compatibility;
 	if (compat == NODE_OLD_SHADING) {
 		*r_badge = "BI";

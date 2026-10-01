@@ -17,6 +17,10 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 `bMouseSensor.pad1` virou `hold` (ms; RNA `hold`, painel só nos eventos de botão; Python `holdTime` em segundos). `SCA_MouseSensor` acumula o tempo pressionado (período do tic rate passado pelo conversor) e só fica positivo ao atingir o Hold. Só o Mouse simples (não o Mouse Over). Conversão para Python recusa Hold > 0. Validado no celular (`vr_trigger.range`: segurar 0,8 s pula).
 
+## 2026-10-01 - Nós de material: selos de aproximação no Game (Fase 2)
+
+`node_engine_badge` (`node_draw.c`): no Game com PBR Shading Nodes, nós com GLSL aproximado ganham o selo `~Game` e um tooltip com o que o jogo faz (Glossy sem reflexo; Glass, Toon etc. viram Diffuse; AO = 1; Sky branco...). Nós sem GLSL (Blackbody, Wavelength, Wireframe, volumes...) ficam com alerta. Matriz completa em `docs/node-material-support.md`; fases seguintes no roadmap. `node_draw.c` compila; o build do `RangeEngine` estava quebrado por trabalho de VR em andamento (`rna_sensor.c`, `KX_VRHeadSensor`), então falta ver os selos no editor.
+
 ## 2026-10-01 - Nós de material: selo de motor e correções GLSL (Fase 1)
 
 Editor de nós (`node_draw.c`, `node_engine_badge`): selo "Game", "BI" ou "Cycles" no cabeçalho dos nós de um só caminho; nó incompatível com o motor ativo fica com cabeçalho avermelhado e ícone de alerta. Sprites Animation ganhou `node_type_compatibility` (antes sumia do menu). GLSL (`gpu_shader_material.glsl`): Glossy limita a roughness (roughness 0 dava NaN/preto); Diffuse e Glossy usam a cor do World (horizon, via `GPU_material_world_color`) como ambiente no lugar do `0.2` fixo e repassam `color.a`; Transparent BSDF liga o alpha blend do material. Os BSDFs que caem no Diffuse (Glass, Toon etc.) continuam com ambiente `0.2`. Validado no Game com `tools/create_node_material_test.py` (gera `node_material_test.range`; teclas 1-4 trocam a cor do World). Para a cor do World mudar em runtime o material precisa de `use_constant_world = False`. Glossy no Game ainda sem reflexo (Fase 4).
