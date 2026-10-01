@@ -593,7 +593,8 @@ void BL_ConvertSensors(struct Object *blenderobject,
 							      axis,
 							      mask,
 							      kxscene,
-							      blenderraysensor->debug != 0);
+							      blenderraysensor->debug != 0,
+							      blenderraysensor->gaze_time * 0.001f);
 
 					}
 					break;

@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: sensor Ray com eixo "VR Gaze"
+
+O sensor Ray ganhou o eixo `SENS_RAY_GAZE` (raio na direção da cabeça da câmera) e o campo `gaze_time` (ms, no antigo `pad1` de `bRaySensor`, sem mudar o tamanho do DNA). Só dispara depois de olhar o mesmo objeto pelo tempo definido. Python: `gazeTime`, `gazeProgress`. Arquivos: `DNA_sensor_types.h`, `rna_sensor.c`, `logic_window.c`, `BL_ConvertSensors.cpp`, `KX_RaySensor.*`. Compilam o editor, o runtime nativo e o Web; falta validar no celular. Pendência futura: atualizar a conversão de logic bricks para componente Python (`logic_to_python.py`) para o novo eixo/campo.
+
 ## 2026-10-01 - VR no celular: lente e suavização no painel Stereo
 
 - `GameData.vr_lens_strength` (%) e `vr_head_smoothing` (ms) nos shorts de padding (tamanho do DNA igual; 0 = padrão 30%/40 ms, sem versionamento). RNA, painel Render → Stereo e leitura em `LA_Launcher`. Python continua sobrescrevendo em runtime.

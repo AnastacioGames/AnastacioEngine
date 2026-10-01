@@ -52,6 +52,13 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 
 - Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
 
+## Gaze sem Python: sensor Ray com eixo "VR Gaze" (feito, 2026-10-01)
+
+Em vez de um sensor novo, o sensor **Ray** ganhou o eixo **VR Gaze** (`SENS_RAY_GAZE`): o raio sai da câmera na direção da
+cabeça (`gazeDirection`). Campo **Gaze Time** (ms, `bRaySensor.gaze_time`, 0 = instantâneo): só dispara depois de olhar
+o mesmo objeto por esse tempo. Python: `sensor.gazeTime` (s) e `sensor.gazeProgress` (0..1, para barras). Propriedade,
+material, X-Ray e máscara funcionam como no Ray normal. Usar na câmera ativa. Validado no celular (2026-10-01) com `vr_bricks.range`: Ray VR Gaze + Filter 2D Invert ao olhar o cubo por 1 s. Cuidado: não ligar o sensor ao mesmo controlador And da música (o And falso para o som). Próximos: VR Move, gatilho Cardboard, VR Head.
+
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
 
 Implementado com shorts no padding do `GameData` (`vr_lens_strength` em %, `vr_head_smoothing` em ms; 0 = padrão 30%/40 ms, então cenas antigas não precisam de versionamento). Lido em `LA_Launcher`. Plano original:
@@ -99,6 +106,10 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    VR já visível, tela sempre ligada).
 
 Itens 1, 2 e 4 dão o maior ganho: um jogo simples (olhar, andar, clicar) fica possível só com logic bricks.
+
+**Pendência futura (anotada 2026-10-01):** quando os bricks de VR existirem, atualizar a conversão de logic
+bricks para componente Python para cobrir os novos sensores/atuadores (VR Gaze, VR Move, gatilho Cardboard).
+Não fazer agora.
 
 ## Teste da peça 1 (celular)
 

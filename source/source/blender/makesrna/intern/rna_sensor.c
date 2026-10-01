@@ -932,6 +932,7 @@ static void rna_def_ray_sensor(BlenderRNA *brna)
 		{SENS_RAY_NEG_X_AXIS, "NEGXAXIS", 0, "-X axis", ""},
 		{SENS_RAY_NEG_Y_AXIS, "NEGYAXIS", 0, "-Y axis", ""},
 		{SENS_RAY_NEG_Z_AXIS, "NEGZAXIS", 0, "-Z axis", ""},
+		{SENS_RAY_GAZE, "GAZE", 0, "VR Gaze", "Follow the VR head view of the camera (use on the active camera)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -987,6 +988,12 @@ static void rna_def_ray_sensor(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "axisflag");
 	RNA_def_property_enum_items(prop, axis_items);
 	RNA_def_property_ui_text(prop, "Axis", "Along which axis the ray is cast");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "gaze_time", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "gaze_time");
+	RNA_def_property_range(prop, 0, 30000);
+	RNA_def_property_ui_text(prop, "Gaze Time", "Milliseconds the gaze must stay on the same object before the sensor fires (0 = instant)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "mask", PROP_BOOLEAN, PROP_LAYER_MEMBER);

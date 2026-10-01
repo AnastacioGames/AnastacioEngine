@@ -146,7 +146,7 @@ typedef struct bRaySensor {
 	char matname[64];
 	//struct Material *ma; // XXX remove materialName
 	short mode;
-	short pad1;
+	short gaze_time; /* ms the gaze must stay on the same object (axis SENS_RAY_GAZE), 0 = instant */
 	int axisflag;
 	int mask;
 	int debug;
@@ -249,6 +249,7 @@ typedef struct bMovementSensor {
 #define SENS_RAY_NEG_X_AXIS     3
 #define SENS_RAY_NEG_Y_AXIS     4
 #define SENS_RAY_NEG_Z_AXIS     5
+#define SENS_RAY_GAZE           6 /* VR head view direction (camera objects) */
 //#define SENS_RAY_NEGATIVE_AXIS     1
 
 /* movementSensor->axisflag */

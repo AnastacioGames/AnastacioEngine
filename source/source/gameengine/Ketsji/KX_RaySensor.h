@@ -55,6 +55,9 @@ class KX_RaySensor : public SCA_ISensor
 	int				m_mask;
 	bool			m_rayHit;
 	bool m_drawDebug;
+	float m_gazeTime;
+	float m_gazeAccum;
+	SCA_IObject *m_gazeObject;
 	mt::vec3 m_hitPosition;
 	SCA_IObject*	m_hitObject;
 	mt::vec3 m_hitNormal;
@@ -71,7 +74,8 @@ public:
 				 int axis,
 				 int mask,
 				 class KX_Scene* ketsjiScene,
-				 bool drawDebug = false);
+				 bool drawDebug = false,
+				 float gazeTime = 0.0f);
 	virtual ~KX_RaySensor();
 	virtual EXP_Value* GetReplica();
 
@@ -103,6 +107,7 @@ public:
 #ifdef WITH_PYTHON
 
 	/* Attributes */
+	static PyObject *pyattr_get_gazeprogress(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_hitobject(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	
 #endif  /* WITH_PYTHON */

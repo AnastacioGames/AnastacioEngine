@@ -44,6 +44,8 @@
 #include "KX_PyMath.h"
 #include "KX_Globals.h"
 #include "KX_Mesh.h"
+#include "KX_Camera.h"
+#include "KX_KetsjiEngine.h"
 #include "PHY_IPhysicsEnvironment.h"
 #include "PHY_IPhysicsController.h"
 #include "DNA_sensor_types.h"
@@ -59,7 +61,8 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 							   int axis,
 							   int mask,
 							   KX_Scene *ketsjiScene,
-							   bool drawDebug)
+							   bool drawDebug,
+							   float gazeTime)
 	:SCA_ISensor(gameobj, eventmgr),
 	m_propertyname(propname),
 	m_bFindMaterial(bFindMaterial),
@@ -69,6 +72,9 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 	m_axis(axis),
 	m_mask(mask),
 	m_drawDebug(drawDebug),
+	m_gazeTime(gazeTime),
+	m_gazeAccum(0.0f),
+	m_gazeObject(nullptr),
 	m_hitMaterial("")
 {
 	Init();
@@ -79,6 +85,8 @@ void KX_RaySensor::Init()
 	m_bTriggered = (m_invert) ? true : false;
 	m_rayHit = false;
 	m_hitObject = nullptr;
+	m_gazeAccum = 0.0f;
+	m_gazeObject = nullptr;
 	m_reset = true;
 }
 
@@ -234,6 +242,17 @@ bool KX_RaySensor::Evaluate()
 			todir = -mat.GetColumn(2);
 			break;
 		}
+		case SENS_RAY_GAZE: // VR head view of the camera
+		{
+			KX_Camera *cam = dynamic_cast<KX_Camera *>(obj);
+			todir = cam ? cam->GetRenderOrientation() * mt::vec3(0.0f, 0.0f, -1.0f) : -mat.GetColumn(2);
+			break;
+		}
+		default:
+		{
+			todir = mat.GetColumn(1);
+			break;
+		}
 	}
 	todir.Normalize();
 	m_rayDirection = todir;
@@ -264,6 +283,20 @@ bool KX_RaySensor::Evaluate()
 		KX_RasterizerDrawDebugLine(frompoint, topoint, rayColor);
 		if (m_rayHit) {
 			KX_RasterizerDrawDebugLine(frompoint, m_hitPosition, hitColor);
+		}
+	}
+
+	if (m_axis == SENS_RAY_GAZE) {
+		/* The gaze only counts after staying on the same object for the gaze time. */
+		if (m_rayHit && m_hitObject == m_gazeObject) {
+			m_gazeAccum += 1.0f / (float)std::max(KX_GetActiveEngine()->GetTicRate(), 1.0);
+		}
+		else {
+			m_gazeAccum = 0.0f;
+			m_gazeObject = m_rayHit ? m_hitObject : nullptr;
+		}
+		if (m_rayHit && m_gazeAccum < m_gazeTime) {
+			m_rayHit = false;
 		}
 	}
 
@@ -339,8 +372,10 @@ PyAttributeDef KX_RaySensor::Attributes[] = {
 	EXP_PYATTRIBUTE_BOOL_RW("useXRay", KX_RaySensor, m_bXRay),
 	EXP_PYATTRIBUTE_FLOAT_RW("range", 0, 10000, KX_RaySensor, m_distance),
 	EXP_PYATTRIBUTE_STRING_RW("propName", 0, MAX_PROP_NAME, false, KX_RaySensor, m_propertyname),
-	EXP_PYATTRIBUTE_INT_RW("axis", 0, 5, true, KX_RaySensor, m_axis),
+	EXP_PYATTRIBUTE_INT_RW("axis", 0, 6, true, KX_RaySensor, m_axis),
 	EXP_PYATTRIBUTE_INT_RW("mask", 1, (1 << OB_MAX_COL_MASKS) - 1, true, KX_RaySensor, m_mask),
+	EXP_PYATTRIBUTE_FLOAT_RW("gazeTime", 0, 30, KX_RaySensor, m_gazeTime),
+	EXP_PYATTRIBUTE_RO_FUNCTION("gazeProgress", KX_RaySensor, pyattr_get_gazeprogress),
 	EXP_PYATTRIBUTE_VECTOR_RO("hitPosition", KX_RaySensor, m_hitPosition, 3),
 	EXP_PYATTRIBUTE_VECTOR_RO("rayDirection", KX_RaySensor, m_rayDirection, 3),
 	EXP_PYATTRIBUTE_VECTOR_RO("hitNormal", KX_RaySensor, m_hitNormal, 3),
@@ -348,6 +383,15 @@ PyAttributeDef KX_RaySensor::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("hitObject", KX_RaySensor, pyattr_get_hitobject),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
+
+PyObject *KX_RaySensor::pyattr_get_gazeprogress(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_RaySensor *self = static_cast<KX_RaySensor *>(self_v);
+	if (!self->m_gazeObject) {
+		return PyFloat_FromDouble(0.0);
+	}
+	return PyFloat_FromDouble(self->m_gazeTime > 0.0f ? std::min(self->m_gazeAccum / self->m_gazeTime, 1.0f) : 1.0f);
+}
 
 PyObject *KX_RaySensor::pyattr_get_hitobject(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {

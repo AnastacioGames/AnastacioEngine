@@ -282,6 +282,8 @@ def _sensor_expr(ob, sens, key=None):
         expr = "self._radar(%s, %s, %s, %s / 2.0)" % (_axis(sens.axis), A("Property", sens.property),
                                                       A("Distance", sens.distance), A("Angle", sens.angle))
     elif t == 'RAY':
+        if sens.axis == 'GAZE':
+            raise Unsupported("ray com eixo VR Gaze")  # TODO: converter junto com os bricks de VR
         mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
         if sens.ray_type != 'PROPERTY' and sens.material:
             if sens.use_x_ray:
