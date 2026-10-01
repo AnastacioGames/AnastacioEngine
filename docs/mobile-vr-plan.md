@@ -152,6 +152,12 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    2D não tem paralaxe). Opção na câmera: "VR Reticle".
 6. **UI no espaço 3D.** Painéis curvos presos à cabeça ou ao mundo, com gaze nativo, já que overlays 2D
    ficam errados em estéreo.
+   Feito (2026-10-01): opção **Self** no Ray VR Gaze (botão em qualquer objeto: usa o olhar da câmera ativa e só
+   dispara ao acertar o próprio dono ou um filho). Exemplo só com bricks: `tools/create_vr_menu_scene.py` gera
+   `vr_menu.range` (3 botões planos com texto filho; olhar 1 s soma `cliques`; a câmera desenha a mira filtrando
+   `botao`). Receita: plano com física Static + texto filho No Collision; sensor Ray "VR Gaze" com Self e Gaze
+   Time → AND → atuador; para esconder um menu, Visibility + Suspend Physics (invisível ainda bloqueia o raio).
+   Validado no desktop: olhando para o botão do meio, só ele conta 1 após 1 s. Falta validar no celular.
 7. **Conforto.** Vinheta ao girar/mover rápido (reduz enjoo), recentralizar pelo olhar (segurar o olhar para
    baixo por 2 s) e opção de snap-turn do corpo.
 8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com

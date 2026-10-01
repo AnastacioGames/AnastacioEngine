@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: painel VR e botões 3D com "Self"
+
+- Painel próprio `RENDER_PT_game_vr` ("VR") com "Prepare VR Scene" e os parâmetros VR; o Stereo ficou só com modo.
+- Ray "VR Gaze": opção `use_gaze_self` (bit 4 de `bRaySensor.gaze_reticle`, sem mudar o DNA). Em objeto que não é
+  câmera, o raio sai da câmera ativa e só fica positivo ao acertar o dono ou um filho (`KX_RaySensor::IsSelf`);
+  o cone também filtra pelo dono. Botão de logic editor ao lado de "Reticle".
+- `tools/create_vr_menu_scene.py` → `vr_menu.range`: menu de 3 botões só com bricks. Validado no runtime nativo
+  (só o botão olhado conta, após 1 s). Falta validação no celular.
+
 ## 2026-10-01 - Nós de material: Glass, Refraction, reflexo do Glossy e Toon Glossy (Fase 4, parte 1)
 
 - `node_shader_gpu_world_env()` (`node_shader_util.c`) monta os links de reflexo/difuso da textura do World; o

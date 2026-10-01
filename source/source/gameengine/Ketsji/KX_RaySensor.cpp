@@ -64,7 +64,8 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 							   bool drawDebug,
 							   float gazeTime,
 							   float gazeAngle,
-							   bool gazeReticle)
+							   bool gazeReticle,
+							   bool gazeSelf)
 	:SCA_ISensor(gameobj, eventmgr),
 	m_propertyname(propname),
 	m_bFindMaterial(bFindMaterial),
@@ -78,6 +79,7 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 	m_gazeAccum(0.0f),
 	m_gazeAngle(gazeAngle),
 	m_gazeReticle(gazeReticle),
+	m_gazeSelf(gazeSelf),
 	m_gazeObject(nullptr),
 	m_hitMaterial("")
 {
@@ -200,6 +202,17 @@ bool KX_RaySensor::NeedRayCast(KX_ClientObjectInfo *client, void *UNUSED(data))
 	return true;
 }
 
+/* The owner itself or one of its children (a button made of a plane and its text). */
+bool KX_RaySensor::IsSelf(KX_GameObject *owner, KX_GameObject *gameobj)
+{
+	for (KX_GameObject *o = gameobj; o; o = o->GetParent()) {
+		if (o == owner) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool KX_RaySensor::Evaluate()
 {
 	bool result = false;
@@ -209,7 +222,16 @@ bool KX_RaySensor::Evaluate()
 	m_hitPosition = mt::zero3;
 	m_hitNormal = mt::axisX3;
 
-	KX_GameObject *obj = (KX_GameObject *)GetParent();
+	KX_GameObject *owner = (KX_GameObject *)GetParent();
+	KX_GameObject *obj = owner;
+	/* Self: a VR button looks for the gaze of the active camera and only fires when it hits the owner itself. */
+	const bool gazeSelf = (m_axis == SENS_RAY_GAZE && m_gazeSelf && !dynamic_cast<KX_Camera *>(owner));
+	if (gazeSelf) {
+		obj = m_scene->GetActiveCamera();
+		if (!obj) {
+			return false;
+		}
+	}
 	mt::vec3 frompoint = obj->NodeGetWorldPosition();
 	mt::mat3 mat = obj->NodeGetWorldOrientation();
 
@@ -299,7 +321,10 @@ bool KX_RaySensor::Evaluate()
 			if (gameobj == obj || !gameobj->GetVisible() || !(gameobj->GetCollisionGroup() & m_mask)) {
 				continue;
 			}
-			if (!m_propertyname.empty()) {
+			if (gazeSelf && !IsSelf(owner, gameobj)) {
+				continue;
+			}
+			if (!gazeSelf && !m_propertyname.empty()) {
 				bool found = false;
 				if (m_bFindMaterial) {
 					for (KX_Mesh *meshObj : gameobj->GetMeshList()) {
@@ -357,6 +382,11 @@ bool KX_RaySensor::Evaluate()
 				prev = p;
 			}
 		}
+	}
+
+	if (gazeSelf && m_rayHit && !IsSelf(owner, static_cast<KX_GameObject *>(m_hitObject))) {
+		m_rayHit = false;
+		m_hitObject = nullptr;
 	}
 
 	if (m_axis == SENS_RAY_GAZE) {

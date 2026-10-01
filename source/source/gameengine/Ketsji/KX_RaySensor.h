@@ -61,6 +61,8 @@ class KX_RaySensor : public SCA_ISensor
 	float m_gazeAngle;
 	/// Draw a reticle ring at the gaze point that fills with the gaze time.
 	bool m_gazeReticle;
+	/// Gaze of the active camera, fires only when it hits the owner or its children.
+	bool m_gazeSelf;
 	SCA_IObject *m_gazeObject;
 	mt::vec3 m_hitPosition;
 	SCA_IObject*	m_hitObject;
@@ -81,7 +83,8 @@ public:
 				 bool drawDebug = false,
 				 float gazeTime = 0.0f,
 				 float gazeAngle = 0.0f,
-				 bool gazeReticle = false);
+				 bool gazeReticle = false,
+				 bool gazeSelf = false);
 	virtual ~KX_RaySensor();
 	virtual EXP_Value* GetReplica();
 
@@ -93,6 +96,7 @@ public:
 	bool RayHit(KX_ClientObjectInfo *client, KX_RayCast *result, void *UNUSED(data));
 	/// \see KX_RayCast
 	bool NeedRayCast(KX_ClientObjectInfo *client, void *UNUSED(data));
+	static bool IsSelf(KX_GameObject *owner, KX_GameObject *gameobj);
 
 	virtual void		Replace_IScene(SCA_IScene *val) 
 	{ 	
