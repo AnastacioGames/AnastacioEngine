@@ -49,7 +49,7 @@ typedef struct bMouseSensor {
 	 */
 	short type;
 	short flag;
-	short pad1;
+	short hold;			/* ms the button must stay pressed before the sensor fires (touch long press), 0 = instant */
 	short mode;			/* flag to choose material or property */
 	char propname[64];
 	char matname[64];

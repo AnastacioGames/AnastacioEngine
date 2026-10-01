@@ -361,6 +361,8 @@ void BL_ConvertSensors(struct Object *blenderobject,
 							                                 startx, starty,
 							                                 keytype,
 							                                 gameobj);
+							((SCA_MouseSensor *)gamesensor)->SetHold(bmouse->hold * 0.001f,
+							                                         1.0f / (float)std::max(kxengine->GetTicRate(), 1.0));
 						}
 						else {
 							/* give us a focus-aware sensor */

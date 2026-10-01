@@ -66,6 +66,11 @@ class SCA_MouseSensor : public SCA_ISensor
 	 * valid y coordinate
 	 */
 	short m_y;
+
+	/// Seconds the button must stay pressed before the sensor fires (0 = instant).
+	float m_holdTime;
+	float m_holdAccum;
+	float m_ticPeriod;
 	
  public:
 	/**
@@ -95,6 +100,7 @@ class SCA_MouseSensor : public SCA_ISensor
 	virtual EXP_Value* GetReplica();
 	virtual bool Evaluate();
 	virtual void Init();
+	void SetHold(float holdTime, float ticPeriod);
 	virtual bool IsPositiveTrigger();
 	void setX(short x);
 	void setY(short y);

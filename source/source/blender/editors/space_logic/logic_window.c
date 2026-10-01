@@ -1182,6 +1182,12 @@ static void draw_sensor_mouse(uiLayout *layout, PointerRNA *ptr, bContext *C)
 		split = uiLayoutSplit(layout, 0.3, false);
 		uiItemR(split, ptr, "mask", 0, NULL, ICON_NONE);
 	}
+	else if (RNA_enum_get(ptr, "mouse_event") <= BL_SENS_MOUSE_RIGHT_BUTTON ||
+	         (RNA_enum_get(ptr, "mouse_event") >= BL_SENS_MOUSE_LEFTTHUMBMOUSE &&
+	          RNA_enum_get(ptr, "mouse_event") <= BL_SENS_MOUSE_BUTTON7))
+	{
+		uiItemR(layout, ptr, "hold", 0, NULL, ICON_NONE);
+	}
 }
 
 static void draw_sensor_near(uiLayout *layout, PointerRNA *ptr)

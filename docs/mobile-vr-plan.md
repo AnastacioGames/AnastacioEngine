@@ -69,6 +69,13 @@ A conversão logic bricks → Python recusa essa opção por enquanto. Aceleraç
 ao apertar e cair até 0 ao soltar (só no modo Simple; 0 = liga/desliga seco). Ainda sem teleporte.
 Validado no celular (2026-10-01): anda para onde olha; a inclinação não muda a velocidade (é o esperado). Aceleração com Damping 45 e Loc Y 0,05 (~3 m/s) aprovada.
 
+## Gatilho Cardboard: Hold no sensor Mouse (feito, 2026-10-01)
+
+O sensor Mouse (botões) ganhou o campo **Hold** (ms, `hold`; Python `holdTime` em segundos): o toque/botão só
+dispara depois de ficar pressionado esse tempo (toque longo). 0 = instantâneo (comportamento antigo). "Olhar +
+tocar" = And entre o Ray VR Gaze e o Mouse. Validado no celular com `vr_trigger.range` (segurar 0,8 s pula). O
+olhar ainda é um raio fino, difícil de manter no alvo: próximos são cone de tolerância no Ray VR Gaze e mira na tela.
+
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
 
 Implementado com shorts no padding do `GameData` (`vr_lens_strength` em %, `vr_head_smoothing` em ms; 0 = padrão 30%/40 ms, então cenas antigas não precisam de versionamento). Lido em `LA_Launcher`. Plano original:

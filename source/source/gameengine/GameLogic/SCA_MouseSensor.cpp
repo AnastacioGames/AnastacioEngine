@@ -54,7 +54,10 @@ SCA_MouseSensor::SCA_MouseSensor(SCA_MouseManager *eventmgr,
                                  SCA_IObject *gameobj)
 	:SCA_ISensor(gameobj, eventmgr),
 	m_x(startx),
-	m_y(starty)
+	m_y(starty),
+	m_holdTime(0.0f),
+	m_holdAccum(0.0f),
+	m_ticPeriod(1.0f / 60.0f)
 {
 	m_mousemode   = mousemode;
 	m_triggermode = true;
@@ -66,6 +69,13 @@ void SCA_MouseSensor::Init()
 {
 	m_val = (m_invert) ? 1 : 0; /* stores the latest attribute */
 	m_reset = true;
+	m_holdAccum = 0.0f;
+}
+
+void SCA_MouseSensor::SetHold(float holdTime, float ticPeriod)
+{
+	m_holdTime = holdTime;
+	m_ticPeriod = ticPeriod;
 }
 
 SCA_MouseSensor::~SCA_MouseSensor()
@@ -129,9 +139,12 @@ bool SCA_MouseSensor::Evaluate()
 
 			const SCA_InputEvent& mevent = mousedev->GetInput(convertTable[m_mousemode]);
 			if (mevent.Find(SCA_InputEvent::ACTIVE)) {
-				m_val = 1;
+				/* With a hold time the press only counts after staying down that long (long press). */
+				m_holdAccum += m_ticPeriod;
+				m_val = (m_holdAccum + 1e-4f >= m_holdTime) ? 1 : 0;
 			}
 			else {
+				m_holdAccum = 0.0f;
 				m_val = 0;
 			}
 			break;
@@ -239,6 +252,7 @@ PyMethodDef SCA_MouseSensor::Methods[] = {
 PyAttributeDef SCA_MouseSensor::Attributes[] = {
 	EXP_PYATTRIBUTE_SHORT_RW("mode", KX_MOUSESENSORMODE_NODEF, KX_MOUSESENSORMODE_MAX - 1, true, SCA_MouseSensor, m_mousemode),
 	EXP_PYATTRIBUTE_SHORT_LIST_RO("position", SCA_MouseSensor, m_x, 2),
+	EXP_PYATTRIBUTE_FLOAT_RW("holdTime", 0, 30, SCA_MouseSensor, m_holdTime),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
 

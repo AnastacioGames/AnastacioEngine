@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: Hold (toque longo) no sensor Mouse
+
+`bMouseSensor.pad1` virou `hold` (ms; RNA `hold`, painel só nos eventos de botão; Python `holdTime` em segundos). `SCA_MouseSensor` acumula o tempo pressionado (período do tic rate passado pelo conversor) e só fica positivo ao atingir o Hold. Só o Mouse simples (não o Mouse Over). Conversão para Python recusa Hold > 0. Validado no celular (`vr_trigger.range`: segurar 0,8 s pula).
+
+## 2026-10-01 - Nós de material: selo de motor e correções GLSL (Fase 1)
+
+Editor de nós (`node_draw.c`, `node_engine_badge`): selo "Game", "BI" ou "Cycles" no cabeçalho dos nós de um só caminho; nó incompatível com o motor ativo fica com cabeçalho avermelhado e ícone de alerta. Sprites Animation ganhou `node_type_compatibility` (antes sumia do menu). GLSL (`gpu_shader_material.glsl`): Glossy limita a roughness (roughness 0 dava NaN/preto); Diffuse e Glossy usam a cor do World (horizon, via `GPU_material_world_color`) como ambiente no lugar do `0.2` fixo e repassam `color.a`; Transparent BSDF liga o alpha blend do material. Os BSDFs que caem no Diffuse (Glass, Toon etc.) continuam com ambiente `0.2`. Editor compila; falta validação visual trocando de motor.
+
 ## 2026-10-01 - VR no celular: atuador Motion com "VR Gaze" (andar para onde olha)
 
 Nova flag `ACT_DLOC_VR_GAZE` (512, em `bObjectActuator.flag`, sem mudar o DNA) e RNA `use_vr_gaze`: nos modos Simple e Character o Loc é aplicado na base do olhar da câmera ativa no plano horizontal (`vr_gaze_offset` em `KX_ObjectActuator.cpp`). Arquivos: `DNA_actuator_types.h`, `rna_actuator.c`, `logic_window.c`, `BL_ConvertActuators.cpp`, `KX_ObjectActuator.*`, `logic_to_python.py` (recusa a opção). Com VR Gaze, o `damping` do Motion Simple vira rampa de aceleração e frenagem (`m_vr_gaze_factor`, `m_vr_gaze_braking`); na UI o Damping fica ao lado da opção. Editor, runtime nativo e Web compilam; andar validado no celular (`vr_move.range`), aceleração ainda não.

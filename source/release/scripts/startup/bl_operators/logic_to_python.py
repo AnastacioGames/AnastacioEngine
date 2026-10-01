@@ -234,6 +234,8 @@ def _sensor_expr(ob, sens, key=None):
             expr = " and ".join(parts)
     elif t == 'MOUSE':
         ev = sens.mouse_event
+        if ev in _MOUSE_BUTTONS and sens.hold:
+            raise Unsupported("mouse com Hold")  # TODO: converter junto com os bricks de VR
         if ev in _MOUSE_BUTTONS:
             state = "activated" if (sens.use_tap or ev.startswith("WHEEL")) else "active"
             expr = "ms[events.%s].%s" % (_MOUSE_BUTTONS[ev], state)
