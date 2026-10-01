@@ -1801,10 +1801,6 @@ class OBJECT_OT_bake_lod_impostor(Operator):
             return {'CANCELLED'}
 
         level = ob.lod_levels[self.index]
-        target = level.object
-        if target is None or target.type != 'MESH':
-            self.report({'ERROR'}, "LOD level has no billboard object to texture")
-            return {'CANCELLED'}
 
         # The high-poly mesh to photograph is the LOD owner itself (level 0),
         # not the low-poly billboard plane referenced by this level.
@@ -1831,14 +1827,17 @@ class OBJECT_OT_bake_lod_impostor(Operator):
         bbox_world = [source.matrix_world * Vector(corner) for corner in source.bound_box]
         min_co = Vector((min(v[i] for v in bbox_world) for i in range(3)))
         max_co = Vector((max(v[i] for v in bbox_world) for i in range(3)))
-        center = (min_co + max_co) * 0.5
         size = max_co - min_co
+        # The runtime billboard spins the object around its origin, so frame every shot
+        # horizontally on that vertical axis (not on the bbox center): the quad then stays
+        # centered on the origin and an off-center mesh keeps its offset inside the image
+        # instead of the quad swinging sideways at other headings.
+        pivot = source.matrix_world.translation
+        center = Vector((pivot.x, pivot.y, (min_co.z + max_co.z) * 0.5))
         # Half-extent used to frame the camera, with a margin so the silhouette isn't clipped.
-        # half_width uses the bbox's diagonal (not just size.x/size.y) so a diagonal
-        # viewing angle in multi-angle mode never crops corners that axis-aligned
-        # framing would have missed.
+        # half_width is the farthest bbox corner from the axis, so no heading crops the mesh.
         half_height = max(size.z, 1e-3) * 0.5 * 1.1
-        half_width = max((Vector((size.x, size.y, 0.0)).length), 1e-3) * 0.5 * 1.1
+        half_width = max(max(Vector((v.x - pivot.x, v.y - pivot.y)).length for v in bbox_world), 1e-3) * 1.1
         half_extent = max(half_height, half_width)
         camera_distance = max(size.y, size.x, 1.0) * 4.0 + half_extent
 
@@ -1864,7 +1863,7 @@ class OBJECT_OT_bake_lod_impostor(Operator):
         prev_filepath = scene.render.filepath
 
         blend_dir = os.path.dirname(bpy.data.filepath) if bpy.data.filepath else bpy.app.tempdir
-        out_path = os.path.join(blend_dir, "{}_impostor.png".format(target.name))
+        out_path = os.path.join(blend_dir, "{}_impostor.png".format(source.name))
         cell_paths = []
 
         try:
@@ -1885,7 +1884,13 @@ class OBJECT_OT_bake_lod_impostor(Operator):
                 # offset of (0, +d, 0) from the object). Rotating the offset
                 # counter-clockwise by `angle` keeps heading(angle) == angle,
                 # so runtime cell selection can map heading directly to index.
-                angle = (2.0 * math.pi * i) / angle_count if multi_angle else 0.0
+                if multi_angle:
+                    angle = (2.0 * math.pi * i) / angle_count
+                else:
+                    # A single shot is shown from every side, so take it from the
+                    # object's own front (Blender's Front view: local -Y, looking +Y).
+                    front = source.matrix_world.to_3x3() * Vector((0.0, -1.0, 0.0))
+                    angle = math.atan2(-front.x, front.y) if front.xy.length > 1e-6 else math.pi
                 offset = Vector((-camera_distance * math.sin(angle), camera_distance * math.cos(angle), 0.0))
                 cam_obj.location = center + offset
                 cam_obj.location.z = center.z
@@ -1893,7 +1898,7 @@ class OBJECT_OT_bake_lod_impostor(Operator):
                 cam_obj.rotation_euler = direction.to_track_quat('-Z', 'Y').to_euler()
 
                 cell_path = out_path if not multi_angle else os.path.join(
-                    blend_dir, "{}_impostor_cell{}.png".format(target.name, i))
+                    blend_dir, "{}_impostor_cell{}.png".format(source.name, i))
                 scene.render.filepath = cell_path
                 bpy.ops.render.render(write_still=True)
                 cell_paths.append(cell_path)
@@ -1919,6 +1924,10 @@ class OBJECT_OT_bake_lod_impostor(Operator):
         else:
             level.use_atlas = False
 
+        # Never texture the user's LOD mesh: its UVs, orientation and (often shared)
+        # material don't match the baked shot. Point the level at a generated quad instead.
+        target = self._build_impostor_quad(scene, source, level.object, center, half_extent)
+        level.object = target
         self._apply_impostor_texture(target, out_path)
 
         self.report({'INFO'}, "Impostor baked to {}".format(out_path))
@@ -1958,6 +1967,44 @@ class OBJECT_OT_bake_lod_impostor(Operator):
         atlas_img.filepath_raw = out_path
         atlas_img.file_format = 'PNG'
         atlas_img.save()
+
+    @staticmethod
+    def _build_impostor_quad(scene, source, previous, center, half_extent):
+        # Quad matching the frontal ortho shot: camera on +Y looking at -Y, so the face
+        # normal is +Y (what the runtime billboard turns to the camera), image right is
+        # world -X and image up is +Z. Coordinates are relative to the owner's origin and
+        # divided by its scale, since the LOD mesh is drawn with the owner's transform
+        # and the billboard replaces its rotation.
+        name = "{}_impostor".format(source.name)
+        scale = source.matrix_world.to_scale()
+        offset = center - source.matrix_world.translation
+
+        def local(dx, dz):
+            return ((offset.x + dx) / scale.x, offset.y / scale.y, (offset.z + dz) / scale.z)
+
+        e = half_extent
+        verts = [local(e, -e), local(-e, -e), local(-e, e), local(e, e)]
+        mesh = bpy.data.meshes.new(name)
+        mesh.from_pydata(verts, [], [(0, 1, 2, 3)])
+        mesh.uv_textures.new()
+        for loop_uv, uv in zip(mesh.uv_layers[0].data, ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))):
+            loop_uv.uv = uv
+        mesh.update()
+
+        quad = bpy.data.objects.get(name)
+        if quad is not None and quad.type == 'MESH':
+            old_mesh = quad.data
+            quad.data = mesh
+            if old_mesh.users == 0:
+                bpy.data.meshes.remove(old_mesh)
+        else:
+            quad = bpy.data.objects.new(name, mesh)
+            scene.objects.link(quad)
+            # Same layers as the object the level used before (usually a hidden LOD layer).
+            quad.layers = (previous or source).layers
+            quad.location = (previous or source).location
+        mesh.name = name
+        return quad
 
     @staticmethod
     def _apply_impostor_texture(target, image_path):

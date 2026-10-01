@@ -964,6 +964,8 @@ class LodGenerate(Operator):
     def execute(self, context):
         scene = context.scene
         ob = scene.objects.active
+        if ob.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
 
         lod_name = ob.name
         lod_suffix = "lod"
@@ -985,9 +987,14 @@ class LodGenerate(Operator):
 
         step = (1.0 - self.target) / (self.count - 1)
         for i in range(1, self.count):
-            scene.objects.active = ob
-            bpy.ops.object.duplicate()
-            lod = context.selected_objects[0]
+            # Copy at data level: bpy.ops.object.duplicate() fails its poll when run
+            # from the Properties editor (or in Edit Mode) and picks up any selection.
+            # Each level copies the previous one so it inherits the decimate modifier.
+            src = ob if i == 1 else lod
+            lod = src.copy()
+            if src.data is not None:
+                lod.data = src.data.copy()
+            scene.objects.link(lod)
 
             scene.objects.active = ob
             bpy.ops.object.lod_add()

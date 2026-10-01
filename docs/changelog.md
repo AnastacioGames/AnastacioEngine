@@ -9,6 +9,34 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - LOD: Bake Impostor gera o próprio quad
+
+- `Bake Impostor Texture` não texturiza mais o objeto do nível LOD. Antes ele punha a textura no material[0] desse
+  objeto (às vezes compartilhado com o original) e o atlas saía nas UVs e faces de uma malha qualquer (um cubo,
+  por exemplo), virado para o lado errado. Agora o operador cria ou atualiza `<objeto>_impostor`: um quad com a face
+  em +Y, UV 0..1 (direita da imagem = -X do mundo) e o tamanho do enquadramento ortográfico, com material próprio.
+  O nível passa a apontar para ele; o objeto e o material anteriores ficam intactos.
+- O enquadramento do bake é centrado no eixo vertical da origem do objeto, não no centro do bbox, e a largura
+  é a do canto mais distante desse eixo. O billboard gira em torno da origem: com o quad no centro do bbox, uma
+  malha fora de centro fazia o impostor sair deslocado para o lado nas outras vistas.
+- `KX_GameObject::UpdateLod`: a célula do atlas é arredondada para a vista mais próxima, em vez de truncada.
+  O truncamento chegava a mostrar a vista uma célula adiantada.
+- O billboard cilíndrico agora aplica a orientação em espaço de mundo (`NodeSetGlobalOrientation`). Com um pai
+  rotacionado (por exemplo, o empty raiz de um modelo importado), a orientação local virava o quad para o lado
+  errado, e o impostor aparecia girado ou espelhado no jogo. Testado no RangeRuntime com o pai girado 180° em Z:
+  o impostor e o modelo real ficam com a mesma inclinação.
+- Generate LODs (`object.lod_generate`): troca `bpy.ops.object.duplicate()`, cujo poll falhava ("context is
+  incorrect") fora da 3D View ou em Edit Mode, por cópia de objeto e malha via dados; sai do Edit Mode antes.
+  Testado em background partindo do Edit Mode: gera `Cubelod1` e `Cubelod2`.
+- `UpdateLod` chama `NodeUpdate()` depois de girar o billboard ou restaurar a orientação original. O LOD roda
+  antes do render, depois da passada do scene graph, então a matriz de mundo ficava um frame atrasada: ao voltar
+  para o modelo real, ele piscava um frame com a rotação do billboard.
+- Bake sem atlas (uma imagem só): a foto agora é tirada da frente do próprio objeto (-Y local, a vista Front do
+  Blender, respeitando a rotação), e não do +Y do mundo. Como a imagem única aparece de todos os lados, a foto
+  antiga ficava correta só olhando de +Y para -Y e espelhada no sentido mais comum, olhando ao longo do +Y.
+- Validado em background: nível apontando para um cubo com material compartilhado → quad com normal +Y, atlas 4x2,
+  material do original sem slot novo. Falta conferir no jogo real.
+
 ## 2026-09-30 - Collision Bounds: Oriented Box novo; Box centrado na geometria, Capsule e Convex Hull corrigidos
 
 - `CcdPhysicsEnvironment.cpp`: Box, Cylinder, Cone e Capsule usavam a extensão da bounding box, mas ficavam

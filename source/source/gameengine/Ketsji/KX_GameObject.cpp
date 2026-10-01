@@ -1360,6 +1360,9 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 
 		if (!(lodLevel.GetFlag() & KX_LodLevel::USE_BILLBOARD) && m_lodBillboardActive) {
 			this->NodeSetLocalOrientation(m_lodBillboardOrientation);
+			// LODs update right before render, after the scene graph pass: refresh the
+			// world matrix now or the real mesh draws one frame with the billboard turn.
+			this->NodeUpdate();
 			m_lodBillboardActive = false;
 		}
 
@@ -1370,7 +1373,8 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 			}
 			// Cylindrical billboard: rotate only around Z so the local +Y (forward)
 			// axis faces the camera, keeping the object upright (tree/foliage impostor).
-			// Assumes the object has no parent rotation, as is typical for trees.
+			// Set in world space: a rotated parent (e.g. an imported model's root empty)
+			// would otherwise turn the quad away from the camera and mirror the atlas.
 			mt::vec3 toCam = cam_pos - this->NodeGetWorldPosition();
 			toCam[2] = 0.0f;
 			const float lenSq = toCam.LengthSquared();
@@ -1383,7 +1387,8 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 				rot(0, 0) = ch;    rot(0, 1) = -sh;   rot(0, 2) = 0.0f;
 				rot(1, 0) = sh;    rot(1, 1) = ch;    rot(1, 2) = 0.0f;
 				rot(2, 0) = 0.0f;  rot(2, 1) = 0.0f;  rot(2, 2) = 1.0f;
-				this->NodeSetLocalOrientation(rot);
+				this->NodeSetGlobalOrientation(rot);
+				this->NodeUpdate();
 
 				if (lodLevel.GetFlag() & KX_LodLevel::USE_ATLAS) {
 					const int cols = lodLevel.GetAtlasColumns();
@@ -1394,10 +1399,9 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 						if (normalized < 0.0f) {
 							normalized += 1.0f;
 						}
-						int cellIndex = int(normalized * cellCount);
-						if (cellIndex >= cellCount) {
-							cellIndex = cellCount - 1;
-						}
+						// Cell i was baked exactly at heading i / cellCount: round to the nearest
+						// view instead of flooring, which ran up to a whole cell ahead.
+						const int cellIndex = int(normalized * cellCount + 0.5f) % cellCount;
 						if (cellIndex != m_currentAtlasCell) {
 							KX_ImpostorAtlasDeformer *atlasDeformer =
 								static_cast<KX_ImpostorAtlasDeformer *>(m_meshUser->GetDeformer());
