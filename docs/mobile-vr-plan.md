@@ -48,7 +48,7 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
   frame buffer aplicada por olho na apresentação do Side-by-Side (k fixo 0,3) e botão "Entrar em VR" na página
   (tela cheia, wake lock). Sem correção de aberração cromática; intensidade ainda não configurável.
 - [x] Peça 4 (2026-10-01): separação 0,064 no modo VR, `KX_Camera.gazeDirection`, `bge.render.setStereoMode`, cascatas
-  seguindo a view da cabeça. Sombra simples validada no celular; CSM no Web não testada. Falta: seleção por tempo (script).
+  seguindo a view da cabeça. Sombra simples validada no celular; CSM no Web não testada. Seleção por tempo: exemplo em `source/release/scripts/templates_range/vr_gaze.py` (falta validar no celular).
 
 ## Teste da peça 1 (celular)
 
