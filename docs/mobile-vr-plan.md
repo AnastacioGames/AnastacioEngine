@@ -162,13 +162,19 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    Validado no desktop e no celular (Cardboard/APK), com texto. Na web o BLF desenha as letras com um shader
    próprio direto no WebGL (sem glBegin/pilha de matrizes); a matriz e a cor vêm de `BLF_draw_state`.
    A mira (linhas de debug) também aparece no celular desde 2026-10-01.
+   Painéis curvos (2026-10-01): `--curved` no mesmo script põe os botões lado a lado num arco de 3 m em volta do
+   jogador (trechos de cilindro virados para o olho, texto girado para o centro). Validado no celular. Painel preso
+   à cabeça fica de fora: o head tracking gira só a view, então um filho da câmera não acompanha o olhar.
 7. **Conforto.** Vinheta ao girar/mover rápido (reduz enjoo), recentralizar pelo olhar (segurar o olhar para
    baixo por 2 s) e opção de snap-turn do corpo.
+   Feito (2026-10-01): vinheta pelo giro/velocidade do corpo (`vr_vignette`, %), recentralizar olhando >60° para
+   baixo por `vr_recenter_time` ms; snap-turn fica com bricks (VR Head/toque → Motion Rot Z em pulso).
 8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com
    botão "Preparar cena VR" que liga Stereo, Side-by-Side, 0,064, head tracking e lente de uma vez.
    Feito (2026-10-01): painel `RENDER_PT_game_vr` na aba Render, abaixo do Display/Stereo, com o botão no topo.
 9. **Exportação.** Preset "Cardboard" no `package-web.py`/`package-android.py` (paisagem, sem overlay, botão
    VR já visível, tela sempre ligada).
+   Feito (2026-10-01): `package-web.py --cardboard`; `package-android.py` força paisagem nesse pacote.
 
 Itens 1, 2 e 4 dão o maior ganho: um jogo simples (olhar, andar, clicar) fica possível só com logic bricks.
 

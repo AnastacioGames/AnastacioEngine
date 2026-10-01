@@ -89,6 +89,12 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
   Falta validação visual.
 
+## 2026-10-01 - VR no celular: painéis curvos no menu de exemplo
+
+- `tools/create_vr_menu_scene.py --curved`: botões em arco de 3 m (malha de cilindro com normais para o olho,
+  8 segmentos, 24° cada), texto girado para o centro. Botões continuam com Ray VR Gaze Self.
+- Validado no celular (APK Cardboard): curvatura, textos e cliques pelo olhar.
+
 ## 2026-10-01 - VR no celular: conforto e preset Cardboard
 
 - `GameData.vr_vignette` (0-100%) e `vr_recenter_time` (ms) no lugar do padding `dynamicResolutionPad2`; RNA e
