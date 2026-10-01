@@ -52,6 +52,52 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 
 - Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
 
+## Próximo: parâmetros VR no painel Stereo (planejado, 2026-10-01)
+
+Hoje a intensidade da lente e a suavização só são ajustáveis por Python (`vr_tune.py`). Plano para levá-las ao
+painel Render → Stereo, salvas na cena:
+
+1. **DNA** (`GameData` em `DNA_scene_types.h`): `float vr_lens_strength` (0..1, padrão 0,3) e
+   `float vr_head_smoothing` (segundos, 0..5, padrão 0,04). Usar o espaço de padding existente ou
+   adicionar no fim da struct; conferir alinhamento.
+2. **Versionamento**: no `versioning_*` do `.range`, preencher os padrões em cenas antigas (valor 0 não pode
+   virar "lente zero" sem querer).
+3. **RNA** (`rna_scene.c`): `game_settings.vr_lens_strength` e `vr_head_smoothing`, com range e descrição.
+4. **UI** (`properties_game.py`, painel Stereo): dois campos abaixo dos checkboxes "VR Head Tracking" e
+   "VR Lens Distortion", visíveis só com esses ligados.
+5. **Runtime**: no início da cena (GPG_Ghost / `KX_KetsjiEngine`, onde `gs.vr_*` já é lido), chamar
+   `SetVRLensStrength` e definir `m_smoothing` do `KX_PythonMotion` a partir da cena. O Python
+   (`setVRLensStrength`, `motion.smoothing`) continua valendo em tempo de execução e sobrescreve o painel.
+6. **Docs/teste**: atualizar esta página e o changelog; compilar o editor e o runtime nativo e o Web; validar
+   no celular com o `fp_vr.range`, tirando o `vr_tune.py`.
+
+## Ideias para facilitar jogos VR (sugestões, 2026-10-01)
+
+Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
+
+1. **Sensor "VR Gaze" (logic brick).** Sem Python: raio do olhar com filtro por propriedade, saída positiva ao
+   olhar (opção de tempo mínimo, 0 = instantâneo) e campo de progresso 0..1 para barras. Substitui o `vr_gaze.py`.
+   Bônus: atuador de feedback (cor/escala ao ser olhado), com restauração ao sair.
+2. **Atuador "VR Move" (andar para onde olha).** Move o corpo para a frente da `gazeDirection` (só no plano
+   horizontal, opção de voo), com velocidade e botão/gatilho. Sem enjoo: aceleração suave e opção de "teleporte"
+   (marca o ponto olhado e salta).
+3. **Sensor "VR Head" (gestos).** Positivo em: olhar para cima/baixo além de um ângulo, balançar a cabeça
+   (sim/não) e inclinar. Útil para menus e ações sem tela de toque.
+4. **Gatilho do Cardboard.** Sensor para o toque na tela (o visor não tem botão) com opção de toque longo, e
+   ligação com o gaze: "olhar + tocar" como clique.
+5. **Mira/cursor VR.** Reticle de ponto na profundidade do objeto olhado, desenhado nos dois olhos (hoje o HUD
+   2D não tem paralaxe). Opção na câmera: "VR Reticle".
+6. **UI no espaço 3D.** Painéis curvos presos à cabeça ou ao mundo, com gaze nativo, já que overlays 2D
+   ficam errados em estéreo.
+7. **Conforto.** Vinheta ao girar/mover rápido (reduz enjoo), recentralizar pelo olhar (segurar o olhar para
+   baixo por 2 s) e opção de snap-turn do corpo.
+8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com
+   botão "Preparar cena VR" que liga Stereo, Side-by-Side, 0,064, head tracking e lente de uma vez.
+9. **Exportação.** Preset "Cardboard" no `package-web.py`/`package-android.py` (paisagem, sem overlay, botão
+   VR já visível, tela sempre ligada).
+
+Itens 1, 2 e 4 dão o maior ganho: um jogo simples (olhar, andar, clicar) fica possível só com logic bricks.
+
 ## Teste da peça 1 (celular)
 
 1. Na câmera do jogo, um sensor Always com pulso (True Level Triggering) ligado a um controlador Python em
