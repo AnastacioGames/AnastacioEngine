@@ -3937,10 +3937,10 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 
 /* bsdfs */
 
-void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
+void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 ambient, out vec4 result)
 {
-	/* ambient light */
-	vec3 L = vec3(0.2);
+	/* ambient light from the World color */
+	vec3 L = ambient;
 
 	/* directional lights */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
@@ -3951,13 +3951,19 @@ void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 		L += light_diffuse * bsdf;
 	}
 
-	result = vec4(L * color.rgb, 1.0);
+	result = vec4(L * color.rgb, color.a);
 }
 
-void node_bsdf_glossy(vec4 color, float roughness, vec3 N, out vec4 result)
+void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 {
-	/* ambient light */
-	vec3 L = vec3(0.2);
+	/* used by BSDFs without their own GLSL approximation */
+	node_bsdf_diffuse_ambient(color, roughness, N, vec3(0.2), result);
+}
+
+void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 ambient, out vec4 result)
+{
+	/* ambient light from the World color */
+	vec3 L = ambient;
 
 	/* directional lights */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
@@ -3967,13 +3973,14 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, out vec4 result)
 		vec3 light_specular = SCENE_LIGHT(i).specular.rgb;
 
 		/* we mix in some diffuse so low roughness still shows up */
-		float r2 = roughness * roughness;
-		float bsdf = 0.5 * pow(max(dot(N, H), 0.0), 1.0 / r2);
+		/* clamp: roughness 0 made the exponent infinite (NaN/black) */
+		float r2 = max(roughness * roughness, 1e-4);
+		float bsdf = 0.5 * pow(max(dot(N, H), 0.0), min(1.0 / r2, 1000.0));
 		bsdf += 0.5 * max(dot(N, light_position), 0.0);
 		L += light_specular * bsdf;
 	}
 
-	result = vec4(L * color.rgb, 1.0);
+	result = vec4(L * color.rgb, color.a);
 }
 
 void node_bsdf_anisotropic(

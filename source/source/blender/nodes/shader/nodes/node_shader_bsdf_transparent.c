@@ -33,6 +33,8 @@ static bNodeSocketTemplate sh_node_bsdf_transparent_out[] = {
 
 static int node_shader_gpu_bsdf_transparent(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
+	/* the result has alpha 0, so the material needs alpha blending */
+	GPU_material_enable_alpha(mat);
 	return GPU_stack_link(mat, "node_bsdf_transparent", in, out);
 }
 

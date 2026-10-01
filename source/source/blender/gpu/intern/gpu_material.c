@@ -2786,6 +2786,12 @@ void GPU_horizon_update_color(const float color[3])
 	copy_v3_v3(GPUWorld.horicol, color);
 }
 
+/* World color (horizon) as ambient for Cycles-style BSDF nodes in GLSL */
+GPUNodeLink *GPU_material_world_color(GPUMaterial *mat)
+{
+	return GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, mat->ma);
+}
+
 void GPU_ambient_update_color(const float color[3])
 {
 	copy_v3_v3(GPUWorld.ambcol, color);

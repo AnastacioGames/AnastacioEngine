@@ -281,6 +281,7 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 
 void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned short index);
 void GPU_material_enable_alpha(GPUMaterial *material);
+struct GPUNodeLink *GPU_material_world_color(GPUMaterial *mat);
 GPUBuiltin GPU_get_material_builtins(GPUMaterial *material);
 GPUBlendMode GPU_material_alpha_blend(GPUMaterial *material, const float obcol[4]);
 

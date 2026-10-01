@@ -45,7 +45,7 @@ static int node_shader_gpu_bsdf_glossy(GPUMaterial *mat, bNode *UNUSED(node), bN
 	else
 		GPU_link(mat, "direction_transform_m4v3", in[2].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[2].link);
 
-	return GPU_stack_link(mat, "node_bsdf_glossy", in, out);
+	return GPU_stack_link(mat, "node_bsdf_glossy", in, out, GPU_material_world_color(mat));
 }
 
 /* node type definition */

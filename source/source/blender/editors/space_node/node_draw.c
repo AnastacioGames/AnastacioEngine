@@ -30,6 +30,7 @@
 #include "DNA_texture_types.h"
 #include "DNA_world_types.h"
 #include "DNA_linestyle_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
@@ -41,6 +42,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_scene.h"
 
 #include "BLF_api.h"
 
@@ -826,6 +828,56 @@ void node_draw_shadow(SpaceNode *snode, bNode *node, float radius, float alpha)
 	}
 }
 
+/* Selo de motor em nos de shader: "Game" para nos exclusivos do jogo, "BI" para
+ * nos so do Blender Render/Game legado, "Cycles" para nos so do Cycles/Game PBR.
+ * Nos que funcionam nos dois caminhos ficam sem selo. Retorna true se o motor
+ * ativo nao suporta o no. */
+static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
+                              const char **r_badge, const char **r_tip)
+{
+	Scene *scene = CTX_data_scene(C);
+	bool is_game, use_new;
+	short compat;
+
+	*r_badge = NULL;
+	*r_tip = NULL;
+
+	if (!scene || ntree->type != NTREE_SHADER || !node->typeinfo)
+		return false;
+
+	is_game = STREQ(scene->r.engine, RE_engine_id_BLENDER_GAME);
+	use_new = BKE_scene_use_new_shading_nodes(scene);
+
+	switch (node->type) {
+		case SH_NODE_SPRITES_ANIMATION:
+		case SH_NODE_OBJECT:
+		case SH_NODE_TIME:
+		case SH_NODE_PARALLAX:
+			*r_badge = "Game";
+			*r_tip = "Game Engine only node, ignored by other engines";
+			return !is_game;
+		case SH_NODE_OUTPUT_ATTACHMENT:
+			*r_badge = "Game";
+			*r_tip = "Game Engine only node (without PBR Shading Nodes)";
+			return !(is_game && !use_new);
+	}
+
+	compat = node->typeinfo->compatibility;
+	if (compat == NODE_OLD_SHADING) {
+		*r_badge = "BI";
+		*r_tip = "Blender Render and Game (without PBR Shading Nodes) only; warning icon = not supported by the active engine";
+	}
+	else if (compat == NODE_NEW_SHADING) {
+		*r_badge = "Cycles";
+		*r_tip = "Cycles and Game (with PBR Shading Nodes) only; warning icon = not supported by the active engine";
+	}
+	else {
+		return false;
+	}
+
+	return !(compat & (use_new ? NODE_NEW_SHADING : NODE_OLD_SHADING));
+}
+
 static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeTree *ntree, bNode *node, bNodeInstanceKey key)
 {
 	bNodeInstanceHash *previews = CTX_data_pointer_get(C, "node_previews").data;
@@ -837,6 +889,8 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	int color_id = node_get_colorid(node);
 	char showname[128]; /* 128 used below */
 	View2D *v2d = &ar->v2d;
+	const char *engine_badge, *engine_tip;
+	bool engine_incompatible = node_engine_badge(C, ntree, node, &engine_badge, &engine_tip);
 
 	/* XXX hack: copy values from linked ID data where displayed as sockets */
 	if (node->block)
@@ -861,7 +915,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	else
 		UI_ThemeColor(color_id);
 
-	if (node->flag & NODE_MUTED)
+	if (node->flag & NODE_MUTED || engine_incompatible)
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 
@@ -897,6 +951,18 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		but = uiDefIconBut(node->block, UI_BTYPE_BUT_TOGGLE, B_REDR, ICON_NODETREE,
 		                   iconofs, rct->ymax - NODE_DY, iconbutw, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
 		UI_but_func_set(but, node_toggle_button_cb, node, (void *)"NODE_OT_group_edit");
+		UI_block_emboss_set(node->block, UI_EMBOSS);
+	}
+
+	/* selo do motor */
+	if (engine_badge) {
+		float badgew = (engine_incompatible ? iconbutw : 0.0f) +
+		               UI_fontstyle_string_width(UI_FSTYLE_WIDGET, engine_badge) + 0.4f * U.widget_unit;
+		iconofs -= badgew;
+		UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
+		uiDefIconTextBut(node->block, UI_BTYPE_LABEL, 0, engine_incompatible ? ICON_ERROR : ICON_NONE,
+		                 engine_badge, iconofs, rct->ymax - NODE_DY, badgew, UI_UNIT_Y,
+		                 NULL, 0, 0, 0, 0, engine_tip);
 		UI_block_emboss_set(node->block, UI_EMBOSS);
 	}
 
@@ -1017,6 +1083,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	float hiddenrad = BLI_rctf_size_y(rct) / 2.0f;
 	float socket_size = NODE_SOCKSIZE;
 	int color_id = node_get_colorid(node);
+	const char *engine_badge, *engine_tip;
 	char showname[128]; /* 128 is used below */
 
 	/* shadow */
@@ -1024,7 +1091,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 
 	/* body */
 	UI_ThemeColor(color_id);
-	if (node->flag & NODE_MUTED)
+	if (node->flag & NODE_MUTED || node_engine_badge(C, ntree, node, &engine_badge, &engine_tip))
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad);
