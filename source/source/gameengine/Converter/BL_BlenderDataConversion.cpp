@@ -675,7 +675,8 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	for (unsigned int i = 0; i < numpolys; ++i) {
 		const MPoly& mpoly = mpolys[i];
 
-		const BL_MeshMaterial& mat = mats[mpoly.mat_nr];
+		// Old files can store a material index past the mesh material count; clamp like Blender does.
+		const BL_MeshMaterial& mat = mats[min_ii(mpoly.mat_nr, (int)mats.size() - 1)];
 		RAS_DisplayArray *array = mat.array;
 
 		// Mark face as flat, so vertices are split.
