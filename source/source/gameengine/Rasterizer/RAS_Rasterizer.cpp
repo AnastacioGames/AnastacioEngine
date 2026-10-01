@@ -79,6 +79,7 @@ RAS_Rasterizer::RAS_Rasterizer()
 	m_stereomode(RAS_STEREO_NOSTEREO),
 	m_vrLensK(0.0f),
 	m_vrLensStrength(0.3f),
+	m_vrVignette(0.0f),
 	m_curreye(RAS_STEREO_LEFTEYE),
 	m_eyeseparation(0.0f),
 	m_focallength(0.0f),
@@ -347,13 +348,14 @@ void RAS_Rasterizer::DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *d
 	else {
 		srcOffScreen->BindColorTexture(0, 0);
 
-		if (lensDistort && m_vrLensK > 0.0f) {
+		if (lensDistort && (m_vrLensK > 0.0f || m_vrVignette > 0.0f)) {
 			GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_VR_LENS);
 			GPU_shader_bind(shader);
 
 			OverrideShaderVRLensInterface *interface = (OverrideShaderVRLensInterface *)GPU_shader_get_interface(shader);
 			GPU_shader_uniform_int(shader, interface->colorTexLoc, 0);
 			GPU_shader_uniform_float(shader, interface->kLoc, m_vrLensK);
+			GPU_shader_uniform_float(shader, interface->vignetteLoc, m_vrVignette);
 			int vp[4];
 			GetViewport(vp);
 			GPU_shader_uniform_float(shader, interface->aspectLoc, (vp[3] > 0) ? (0.5f * vp[2]) / vp[3] : 1.0f);
@@ -1029,6 +1031,7 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
 			interface->kLoc = GPU_shader_get_uniform(shader, "lensk");
 			interface->aspectLoc = GPU_shader_get_uniform(shader, "lensaspect");
+			interface->vignetteLoc = GPU_shader_get_uniform(shader, "vignette");
 
 			GPU_shader_set_interface(shader, interface);
 		}

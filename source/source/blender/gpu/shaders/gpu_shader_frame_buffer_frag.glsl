@@ -11,6 +11,19 @@ uniform sampler2D depthtex;
 #ifdef LENS_DISTORT
 uniform float lensk;
 uniform float lensaspect;
+uniform float vignette; /* comfort vignette 0..1, closes the edges of each eye */
+
+/* Brightness kept at this point of the eye: the dark ring grows toward the center with the vignette. */
+float lens_vignette(vec2 co)
+{
+	if (vignette <= 0.0) {
+		return 1.0;
+	}
+	float cx = (co.x < 0.5) ? 0.25 : 0.75;
+	float r = length(vec2((co.x - cx) * lensaspect, co.y - 0.5) * 2.0);
+	float inner = mix(1.2, 0.25, vignette);
+	return 1.0 - smoothstep(inner, inner + 0.45, r);
+}
 
 /* Side by side: each half is one eye. Pre-distorts (barrel) so the lens pincushion cancels out.
  * Returns the source coordinate, or a negative x when it falls outside the eye's half. */
@@ -64,6 +77,7 @@ void main(void)
 #elif defined(LENS_DISTORT)
 	vec2 ls = lens_source(co);
 	fragColor = (ls.x < 0.0) ? vec4(0.0, 0.0, 0.0, 1.0) : texture(colortex, ls);
+	fragColor.rgb *= lens_vignette(co);
 #elif defined(ANAGLYPH)
 	fragColor = vec4(texture(lefteyetex, co).r, texture(righteyetex, co).gb, 1.0);
 #else
@@ -101,6 +115,7 @@ void main()
 #elif defined(LENS_DISTORT)
 	vec2 ls = lens_source(co);
 	gl_FragData[0] = (ls.x < 0.0) ? vec4(0.0, 0.0, 0.0, 1.0) : texture2D(colortex, ls);
+	gl_FragData[0].rgb *= lens_vignette(co);
 #elif defined(ANAGLYPH)
 	gl_FragData[0] = vec4(texture2D(lefteyetex, co).r, texture2D(righteyetex, co).gb, 1.0);
 #else

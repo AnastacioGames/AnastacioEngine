@@ -237,6 +237,7 @@ private:
 		int colorTexLoc;
 		int kLoc;
 		int aspectLoc;
+		int vignetteLoc;
 	};
 
 	struct OverrideShaderStereoStippleInterface
@@ -273,6 +274,7 @@ private:
 	/// Barrel distortion strength of the final side by side present (VR lenses), 0 = off.
 	float m_vrLensK;
 	float m_vrLensStrength;
+	float m_vrVignette;
 	StereoEye m_curreye;
 	float m_eyeseparation;
 	float m_focallength;
@@ -454,6 +456,8 @@ public:
 	/// Distortion strength used when the scene enables lens distortion (default 0.3).
 	void SetVRLensStrength(float k) { m_vrLensStrength = k; }
 	float GetVRLensStrength() const { return m_vrLensStrength; }
+	/// Comfort vignette (0..1) applied with the lens pass, side by side only.
+	void SetVRVignette(float v) { m_vrVignette = v; }
 
 	/**
 	 * Sets which eye buffer subsequent primitives will be rendered to.

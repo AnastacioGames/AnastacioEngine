@@ -580,6 +580,10 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
     log("Android SDK: %s (%s)" % (toolchain.sdk_dir, toolchain.sdk_source))
     manifest = verify_web_package(package_dir)
     log("Pacote Web conferido: %s %s" % (manifest.get("name"), manifest.get("version")))
+    if manifest.get("cardboard") and config["orientation"] == "auto":
+        # Pacote --cardboard: o visor so funciona deitado.
+        config = dict(config, orientation="landscape")
+        log("Pacote Cardboard: orientacao em paisagem")
 
     out_dir = os.path.abspath(out_dir)
     os.makedirs(out_dir, exist_ok=True)

@@ -65,6 +65,10 @@ private:
 	float m_smoothing;
 	mt::quat m_smoothQuat;
 	bool m_smoothValid;
+	/// Seconds looking straight down that recenter the head, 0 disables it.
+	float m_recenterTime;
+	/// Time spent looking down; negative after a recenter until the head comes back up.
+	float m_downTime;
 
 	mt::mat3 GetRawHeadOrientation(bool *valid) const;
 
@@ -78,6 +82,8 @@ public:
 	static KX_PythonMotion *GetInstance();
 	/** Default smoothing (seconds) for the current/next instance, set from the scene settings. */
 	static void SetDefaultSmoothing(float seconds);
+	/** Default look-down recenter time (seconds, 0 = off), set from the scene settings. */
+	static void SetDefaultRecenterTime(float seconds);
 
 	/// Head orientation for the engine (VR Head Tracking). The first valid reading is taken as the
 	/// forward direction, unless a script already called recenter(). False without a sensor.

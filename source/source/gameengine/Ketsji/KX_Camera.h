@@ -127,6 +127,11 @@ protected:
 	/// VR Head Tracking: sensor orientation (z up, facing +y) turned into a rotation local to the object.
 	bool m_headActive = false;
 	mt::mat3 m_headRotation = mt::mat3::Identity();
+	/// VR comfort vignette (0..1) from the body turn/move speed, head excluded.
+	float m_vrVignette = 0.0f;
+	bool m_comfortInitialized = false;
+	mt::vec3 m_comfortPrevPos = mt::zero3;
+	mt::vec3 m_comfortPrevForward = mt::zero3;
 
 	/// Motion of the rendered camera, used by Speed/Directional Blur.
 	bool m_motionInitialized = false;
@@ -246,6 +251,8 @@ public:
 	/// Focus sensor, tracking and shake, once per frame for the active camera.
 	void UpdateGameFX(double curtime);
 	void UpdateHeadTracking(float dt);
+	void UpdateVRComfort(float dt);
+	float GetVRVignette() const { return m_vrVignette; }
 	/// Stereo render copies take the head rotation of the camera they stand for.
 	void CopyHeadView(const KX_Camera *other) { m_headActive = other->m_headActive; m_headRotation = other->m_headRotation; }
 	/// Adds shake trauma (0..1), decays at shake_decay per second.

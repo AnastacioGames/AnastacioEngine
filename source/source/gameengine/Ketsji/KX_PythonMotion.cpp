@@ -72,6 +72,16 @@ void KX_PythonMotion::SetDefaultSmoothing(float seconds)
 	}
 }
 
+static float g_defaultRecenterTime = 0.0f;
+
+void KX_PythonMotion::SetDefaultRecenterTime(float seconds)
+{
+	g_defaultRecenterTime = seconds;
+	if (g_motionInstance) {
+		g_motionInstance->m_recenterTime = seconds;
+	}
+}
+
 KX_PythonMotion::KX_PythonMotion()
 	:EXP_PyObjectPlus()
 {
@@ -82,6 +92,8 @@ KX_PythonMotion::KX_PythonMotion()
 	m_smoothing = g_defaultSmoothing;
 	m_smoothQuat = mt::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	m_smoothValid = false;
+	m_recenterTime = g_defaultRecenterTime;
+	m_downTime = 0.0f;
 	g_motionInstance = this;
 }
 
@@ -164,7 +176,22 @@ bool KX_PythonMotion::GetHeadView(mt::mat3 &rot, float dt)
 		m_headYaw = kx_motion_heading(raw);
 		m_headCentered = true;
 	}
-	rot = mt::mat3::RotationZ(-m_headYaw) * raw;
+	// Comfort recenter: looking straight down (over 60 deg) for m_recenterTime takes the direction the
+	// top of the screen points to as forward. Fires once, then waits for the head to come back up.
+	if (m_recenterTime > 0.0f) {
+		const float down = -(raw * mt::vec3(0.0f, 0.0f, -1.0f)).z;
+		if (down < 0.866f) {
+			m_downTime = 0.0f;
+		}
+		else if (m_downTime >= 0.0f) {
+			m_downTime += std::max(dt, 0.0f);
+			if (m_downTime >= m_recenterTime) {
+				m_headYaw = kx_motion_heading(raw);
+				m_downTime = -1.0f;
+			}
+		}
+	}
+	rot =mt::mat3::RotationZ(-m_headYaw) * raw;
 	return true;
 }
 
@@ -212,6 +239,7 @@ PyAttributeDef KX_PythonMotion::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("headOrientation", KX_PythonMotion, pyattr_get_headOrientation),
 	EXP_PYATTRIBUTE_RO_FUNCTION("tilt", KX_PythonMotion, pyattr_get_tilt),
 	EXP_PYATTRIBUTE_FLOAT_RW("smoothing", 0.0f, 5.0f, KX_PythonMotion, m_smoothing),
+	EXP_PYATTRIBUTE_FLOAT_RW("recenterTime", 0.0f, 10.0f, KX_PythonMotion, m_recenterTime),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
 

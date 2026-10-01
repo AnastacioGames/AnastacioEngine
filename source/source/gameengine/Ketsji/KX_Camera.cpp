@@ -562,6 +562,39 @@ void KX_Camera::UpdateHeadTracking(float dt)
 	}
 }
 
+void KX_Camera::UpdateVRComfort(float dt)
+{
+	KX_Scene *scene = GetScene();
+	const float strength = (m_headActive && scene && scene->GetBlenderScene()) ?
+	                       scene->GetBlenderScene()->gm.vr_vignette / 100.0f : 0.0f;
+	if (strength <= 0.0f) {
+		m_vrVignette = 0.0f;
+		m_comfortInitialized = false;
+		return;
+	}
+
+	// Body motion only (the object, without the head): turning the head never darkens the view.
+	const mt::vec3 pos = NodeGetWorldPosition();
+	const mt::vec3 forward = NodeGetWorldOrientation() * mt::vec3(0.0f, 0.0f, -1.0f);
+	float target = 0.0f;
+	if (m_comfortInitialized && dt > 0.0f) {
+		const float dot = std::min(1.0f, std::max(-1.0f, mt::vec3::DotProduct(forward, m_comfortPrevForward)));
+		const float turnSpeed = std::acos(dot) / dt;           // rad/s
+		const float moveSpeed = (pos - m_comfortPrevPos).Length() / dt; // m/s
+		// Full vignette from 90 deg/s of turn or 4 m/s of movement.
+		target = std::min(1.0f, std::max(turnSpeed / (float)M_PI_2, moveSpeed / 4.0f));
+	}
+	m_comfortPrevPos = pos;
+	m_comfortPrevForward = forward;
+	m_comfortInitialized = true;
+
+	// Closes fast and opens slowly, so a snap turn shows as a short dimming instead of a flash.
+	const float current = m_vrVignette / strength;
+	const float tau = (target > current) ? 0.08f : 0.35f;
+	const float k = 1.0f - std::exp(-dt / tau);
+	m_vrVignette = (current + (target - current) * k) * strength;
+}
+
 void KX_Camera::UpdateGameFX(double curtime)
 {
 	float dt = (m_fxLastTime < 0.0) ? 0.0f : (float)(curtime - m_fxLastTime);
@@ -569,6 +602,7 @@ void KX_Camera::UpdateGameFX(double curtime)
 	dt = std::max(0.0f, std::min(dt, 0.25f));
 
 	UpdateHeadTracking(dt);
+	UpdateVRComfort(dt);
 
 	UpdateFocus(dt, curtime);
 	UpdateTracking(dt);

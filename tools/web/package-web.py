@@ -156,6 +156,7 @@ __PERF_SCRIPT__
   var GAME = "__GAME__";
   var EXTRAS = __EXTRAS__;
   var VERSION = "__VERSION__";
+  var CARDBOARD = __CARDBOARD__;  // --cardboard: botao VR sempre visivel, sem controle de toque
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
   if (debug) document.body.classList.add("debug");
@@ -737,7 +738,7 @@ __PERF_SCRIPT__
     el("status").textContent = "Pronto.";
     el("play").disabled = false;
     // Visor so faz sentido em aparelho de toque (ou com ?vr=1).
-    if (/[?&]vr=1/.test(location.search) || (window.matchMedia && matchMedia("(pointer: coarse)").matches)) {
+    if (CARDBOARD || /[?&]vr=1/.test(location.search) || (window.matchMedia && matchMedia("(pointer: coarse)").matches)) {
       el("vr").hidden = false;
       el("vr").disabled = false;
     }
@@ -996,7 +997,12 @@ def main():
                          "(padrao: stick + botoes A/B)")
     ap.add_argument("--touch-stick", choices=["dynamic", "fixed"], default="dynamic",
                     help="stick dinamico (nasce onde o dedo toca) ou fixo")
+    ap.add_argument("--cardboard", action="store_true",
+                    help="preset VR Cardboard: sem controle na tela (o toque vira gatilho), botao 'Entrar em VR' "
+                         "sempre visivel; o APK gerado deste pacote sai em paisagem")
     args = ap.parse_args()
+    if args.cardboard:
+        args.touch_layout = "none"
 
     game_name = safe_name(args.game.name)
     if game_name != args.game.name:
@@ -1045,6 +1051,7 @@ def main():
             .replace("__EXTRAS__", json.dumps([extra_rel(x, args.extra_root) for x in args.extra]))
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
+            .replace("__CARDBOARD__", "true" if args.cardboard else "false")
             .replace("__TOUCH__", json.dumps({"layout": args.touch_layout, "stick": args.touch_stick}))
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))
@@ -1066,6 +1073,7 @@ def main():
         "entry_game": f"game/{game_name}",
         "requirements": {"webgl": 2, "threads": False, "cross_origin_isolation": False},
         "touch_controls": {"layout": args.touch_layout, "stick": args.touch_stick},
+        "cardboard": args.cardboard,
         "runtime": {n: files[n] for n in RUNTIME_FILES},
         "files": files,
         "warnings": warnings,

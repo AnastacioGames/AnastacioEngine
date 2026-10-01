@@ -700,6 +700,10 @@ class RENDER_OT_game_vr_setup(Operator):
         gs.stereo_eye_separation = 0.064
         gs.vr_head_tracking = True
         gs.vr_lens_distortion = True
+        gs.vr_lens_strength = 30
+        gs.vr_head_smoothing = 40
+        gs.vr_vignette = 50
+        gs.vr_recenter_time = 2000
         return {'FINISHED'}
 
 
@@ -1199,6 +1203,8 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
                 stereo_box.prop(gs, "vr_lens_strength")
             if gs.vr_head_tracking:
                 stereo_box.prop(gs, "vr_head_smoothing")
+                stereo_box.prop(gs, "vr_vignette")
+                stereo_box.prop(gs, "vr_recenter_time")
 
 
 class SceneButtonsPanel:

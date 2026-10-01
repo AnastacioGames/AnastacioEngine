@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: conforto e preset Cardboard
+
+- `GameData.vr_vignette` (0-100%) e `vr_recenter_time` (ms) no lugar do padding `dynamicResolutionPad2`; RNA e
+  painel Stereo. "Prepare VR Scene" agora liga lente 30%, suavização 40 ms, vinheta 50% e recentralizar 2 s.
+- Vinheta: `KX_Camera::UpdateVRComfort` mede giro/velocidade do corpo e suaviza; `RAS_Rasterizer::SetVRVignette`
+  passa o uniform `vignette` ao shader da lente (usado também com lente 0).
+- Recentralizar: `KX_PythonMotion` zera o yaw após olhar >60° para baixo por `recenterTime`; Python `recenterTime`.
+- Snap-turn fica com bricks (VR Head/toque → Motion Rot Z em pulso).
+- `package-web.py --cardboard` (sem overlay, botão VR visível) e `android.py` força paisagem nesse pacote.
+- Validado: builds nativo e Web ok; APK Cardboard instalado e aberto no celular.
+
 ## 2026-10-01 - Nós de material: Diffuse, Glossy e Toon no loop de luzes do Principled (Fase 3)
 
 - `gpu_shader_material.glsl`: `scene_light_dir()` (direção, atenuação, cone de Spot) e `scene_light_visibility()`

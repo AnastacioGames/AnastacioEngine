@@ -1025,7 +1025,10 @@ typedef struct GameData {
 	/* VR: lens strength in percent (0 = default 30), head smoothing in ms (0 = default 40). */
 	short vr_lens_strength;
 	short vr_head_smoothing;
-	int dynamicResolutionPad2;
+	/* VR comfort: vignette strength in percent while the body turns/moves (0 = off), time in ms looking
+	 * down to recenter the head (0 = off). */
+	short vr_vignette;
+	short vr_recenter_time;
 	char cursorimage_path[1024]; /* FILE_MAX */
 	int cursor_size;
 	int cursor_offset_x, cursor_offset_y;

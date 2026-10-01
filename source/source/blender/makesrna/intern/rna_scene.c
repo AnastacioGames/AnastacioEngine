@@ -4959,6 +4959,20 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Head Smoothing", "Head tracking smoothing in milliseconds (0 = default, 40; 1 is almost off)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "vr_vignette", PROP_INT, PROP_PERCENTAGE);
+	RNA_def_property_int_sdna(prop, NULL, "vr_vignette");
+	RNA_def_property_range(prop, 0, 100);
+	RNA_def_property_ui_text(prop, "Comfort Vignette",
+	                         "Darken the view edges while the body turns or moves, to reduce motion sickness (0 = off)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "vr_recenter_time", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "vr_recenter_time");
+	RNA_def_property_range(prop, 0, 10000);
+	RNA_def_property_ui_text(prop, "Recenter Time",
+	                         "Milliseconds looking straight down to recenter the view forward (0 = off)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "vr_head_tracking", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_VR_HEAD_TRACKING);
 	RNA_def_property_ui_text(prop, "VR Head Tracking",

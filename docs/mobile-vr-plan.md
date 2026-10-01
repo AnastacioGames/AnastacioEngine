@@ -115,7 +115,24 @@ painel Render → Stereo, salvas na cena:
 ## Botão "Prepare VR Scene" (feito, 2026-10-01)
 
 Operador `render.game_vr_setup` no painel Stereo: liga Stereo, Side-by-Side, separação 0,064, VR Head Tracking e
-VR Lens Distortion de uma vez (lente e suavização ficam no padrão). Testado no editor em modo headless; falta validar na UI.
+VR Lens Distortion de uma vez. Também define lente 30%, suavização 40 ms, vinheta 50% e recentralizar 2000 ms.
+Validado na UI.
+
+## Conforto: vinheta, recentralizar e snap-turn (feito, 2026-10-01)
+
+- **Comfort Vignette** (`vr_vignette`, 0-100%, 0 = desligado): escurece as bordas de cada olho quando o corpo
+  gira ou anda (alvo `max(giro/90°/s, vel/4 m/s)`, fecha em ~0,08 s e abre em ~0,35 s). Girar só a cabeça não
+  escurece. Aplicado no shader da lente (`vignette` em `gpu_shader_frame_buffer_frag.glsl`), só em Side-by-Side.
+- **Recenter Time** (`vr_recenter_time`, ms, 0 = desligado): olhar mais de 60° para baixo por esse tempo
+  recentraliza a frente; só repete depois de levantar a cabeça. Em Python: `motion.recenterTime` (s).
+- **Snap-turn**: sem opção nova; com bricks, VR Head (Tilt) ou toque → Motion Rot Z 30° em pulso.
+- Campos em `GameData` (reusam o padding `dynamicResolutionPad2`, sem versionamento).
+
+## Preset Cardboard na exportação (feito, 2026-10-01)
+
+`package-web.py --cardboard`: sem controle na tela, botão "Entrar em VR" sempre visível e `"cardboard": true`
+no manifest. `package-android.py` usa paisagem quando o manifest é Cardboard e a orientação está em `auto`
+(a tela já fica sempre ligada no APK). Validado no celular (instala e abre em paisagem).
 
 ## Ideias para facilitar jogos VR (sugestões, 2026-10-01)
 

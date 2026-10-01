@@ -198,6 +198,7 @@ void LA_Launcher::InitEngine()
 		const GameData &vrgm = m_startScene->gm;
 		m_rasterizer->SetVRLensStrength(vrgm.vr_lens_strength > 0 ? vrgm.vr_lens_strength / 100.0f : 0.3f);
 		KX_PythonMotion::SetDefaultSmoothing(vrgm.vr_head_smoothing > 0 ? vrgm.vr_head_smoothing / 1000.0f : 0.04f);
+		KX_PythonMotion::SetDefaultRecenterTime(vrgm.vr_recenter_time / 1000.0f);
 	}
 	m_rasterizer->SetDrawingMode(GetRasterizerDrawMode());
 

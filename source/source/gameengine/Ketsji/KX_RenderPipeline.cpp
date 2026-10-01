@@ -227,6 +227,11 @@ void KX_RenderPipeline::Render()
 		const bool vrLens = (renderData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_SIDEBYSIDE) &&
 		                    (firstscene->GetBlenderScene()->gm.flag & GAME_VR_LENS_DISTORTION);
 		rasterizer->SetVRLensDistortion(vrLens ? rasterizer->GetVRLensStrength() : 0.0f);
+		{
+			KX_Camera *cam = firstscene->GetActiveCamera();
+			const bool sideBySide = (renderData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_SIDEBYSIDE);
+			rasterizer->SetVRVignette((sideBySide && cam) ? cam->GetVRVignette() : 0.0f);
+		}
 
 		// Compositing per eye off screens to screen.
 		if (renderData.m_renderPerEye) {
