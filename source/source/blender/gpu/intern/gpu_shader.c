@@ -123,6 +123,7 @@ static struct GPUShadersGlobal {
 		GPUShader *black;
 		GPUShader *black_instancing;
 		GPUShader *draw_frame_buffer;
+		GPUShader *vr_lens;
 		GPUShader *stereo_stipple;
 		GPUShader *stereo_anaglyph;
 		GPUShader *frustum_line;
@@ -1006,6 +1007,13 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 					NULL, NULL, NULL, 0, 0, 0);
 			retval = GG.shaders.draw_frame_buffer;
 			break;
+		case GPU_SHADER_VR_LENS:
+			if (!GG.shaders.vr_lens)
+				GG.shaders.vr_lens = GPU_shader_create(
+					datatoc_gpu_shader_frame_buffer_vert_glsl, datatoc_gpu_shader_frame_buffer_frag_glsl,
+					NULL, NULL, "#define LENS_DISTORT;\n", 0, 0, 0);
+			retval = GG.shaders.vr_lens;
+			break;
 		case GPU_SHADER_STEREO_STIPPLE:
 			if (!GG.shaders.stereo_stipple)
 				GG.shaders.stereo_stipple = GPU_shader_create(
@@ -1217,6 +1225,11 @@ void GPU_shader_free_builtin_shaders(void)
 	if (GG.shaders.draw_frame_buffer) {
 		GPU_shader_free(GG.shaders.draw_frame_buffer);
 		GG.shaders.draw_frame_buffer = NULL;
+	}
+
+	if (GG.shaders.vr_lens) {
+		GPU_shader_free(GG.shaders.vr_lens);
+		GG.shaders.vr_lens = NULL;
 	}
 
 	if (GG.shaders.stereo_stipple) {

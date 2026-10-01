@@ -232,6 +232,13 @@ private:
 		int colorTexLoc;
 	};
 
+	struct OverrideShaderVRLensInterface
+	{
+		int colorTexLoc;
+		int kLoc;
+		int aspectLoc;
+	};
+
 	struct OverrideShaderStereoStippleInterface
 	{
 		int leftEyeTexLoc;
@@ -263,6 +270,8 @@ private:
 	bool m_camnegscale;
 
 	StereoMode m_stereomode;
+	/// Barrel distortion strength of the final side by side present (VR lenses), 0 = off.
+	float m_vrLensK;
 	StereoEye m_curreye;
 	float m_eyeseparation;
 	float m_focallength;
@@ -410,7 +419,7 @@ public:
 	 * \param srcindex The input off screen index.
 	 * \param dstindex The output off screen index.
 	 */
-	void DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *dstOffScreen);
+	void DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *dstOffScreen, bool lensDistort = false);
 
 	/** Draw off screen at the given index to screen.
 	 * \param canvas The canvas containing the screen viewport.
@@ -438,6 +447,9 @@ public:
 	void SetStereoMode(const StereoMode stereomode);
 
 	StereoMode GetStereoMode();
+
+	/// Strength of the per-eye lens distortion applied when presenting side by side, 0 disables it.
+	void SetVRLensDistortion(float k);
 
 	/**
 	 * Sets which eye buffer subsequent primitives will be rendered to.

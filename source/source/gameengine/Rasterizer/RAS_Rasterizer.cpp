@@ -77,6 +77,7 @@ RAS_Rasterizer::RAS_Rasterizer()
 	m_camortho(false),
 	m_camnegscale(false),
 	m_stereomode(RAS_STEREO_NOSTEREO),
+	m_vrLensK(0.0f),
 	m_curreye(RAS_STEREO_LEFTEYE),
 	m_eyeseparation(0.0f),
 	m_focallength(0.0f),
@@ -336,7 +337,7 @@ void RAS_Rasterizer::DrawOverlayPlane()
 	m_impl->DrawOverlayPlane();
 }
 
-void RAS_Rasterizer::DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *dstOffScreen)
+void RAS_Rasterizer::DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *dstOffScreen, bool lensDistort)
 {
 	if (srcOffScreen->GetSamples() > 0) {
 		srcOffScreen->Blit(dstOffScreen, true);
@@ -345,11 +346,24 @@ void RAS_Rasterizer::DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *d
 	else {
 		srcOffScreen->BindColorTexture(0, 0);
 
-		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_DRAW_FRAME_BUFFER);
-		GPU_shader_bind(shader);
+		if (lensDistort && m_vrLensK > 0.0f) {
+			GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_VR_LENS);
+			GPU_shader_bind(shader);
 
-		OverrideShaderDrawFrameBufferInterface *interface = (OverrideShaderDrawFrameBufferInterface *)GPU_shader_get_interface(shader);
-		GPU_shader_uniform_int(shader, interface->colorTexLoc, 0);
+			OverrideShaderVRLensInterface *interface = (OverrideShaderVRLensInterface *)GPU_shader_get_interface(shader);
+			GPU_shader_uniform_int(shader, interface->colorTexLoc, 0);
+			GPU_shader_uniform_float(shader, interface->kLoc, m_vrLensK);
+			int vp[4];
+			GetViewport(vp);
+			GPU_shader_uniform_float(shader, interface->aspectLoc, (vp[3] > 0) ? (0.5f * vp[2]) / vp[3] : 1.0f);
+		}
+		else {
+			GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_DRAW_FRAME_BUFFER);
+			GPU_shader_bind(shader);
+
+			OverrideShaderDrawFrameBufferInterface *interface = (OverrideShaderDrawFrameBufferInterface *)GPU_shader_get_interface(shader);
+			GPU_shader_uniform_int(shader, interface->colorTexLoc, 0);
+		}
 
 		DrawOverlayPlane();
 
@@ -373,7 +387,7 @@ void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen
 	SetDepthFunc(RAS_ALWAYS);
 
 	RAS_OffScreen::RestoreScreen();
-	DrawOffScreen(offScreen, nullptr);
+	DrawOffScreen(offScreen, nullptr, true);
 	SetDepthFunc(RAS_LEQUAL);
 }
 
@@ -545,6 +559,11 @@ RAS_Rect RAS_Rasterizer::GetRenderArea(RAS_ICanvas *canvas, StereoMode stereoMod
 void RAS_Rasterizer::SetStereoMode(const StereoMode stereomode)
 {
 	m_stereomode = stereomode;
+}
+
+void RAS_Rasterizer::SetVRLensDistortion(float k)
+{
+	m_vrLensK = k;
 }
 
 RAS_Rasterizer::StereoMode RAS_Rasterizer::GetStereoMode()
@@ -995,6 +1014,20 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 			OverrideShaderDrawFrameBufferInterface *interface = (OverrideShaderDrawFrameBufferInterface *)MEM_mallocN(sizeof(OverrideShaderDrawFrameBufferInterface), "OverrideShaderDrawFrameBufferInterface");
 
 			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
+
+			GPU_shader_set_interface(shader, interface);
+		}
+	}
+
+	// Lens distortion shader (VR side by side).
+	{
+		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_VR_LENS);
+		if (shader && !GPU_shader_get_interface(shader)) {
+			OverrideShaderVRLensInterface *interface = (OverrideShaderVRLensInterface *)MEM_mallocN(sizeof(OverrideShaderVRLensInterface), "OverrideShaderVRLensInterface");
+
+			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
+			interface->kLoc = GPU_shader_get_uniform(shader, "lensk");
+			interface->aspectLoc = GPU_shader_get_uniform(shader, "lensaspect");
 
 			GPU_shader_set_interface(shader, interface);
 		}

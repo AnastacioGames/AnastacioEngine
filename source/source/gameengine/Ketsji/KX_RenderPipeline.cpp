@@ -223,6 +223,11 @@ void KX_RenderPipeline::Render()
 
 		canvas->SetViewPort(0, 0, width, height);
 
+		/* VR lens distortion: only for side by side, where both eyes share the final off screen. */
+		const bool vrLens = (renderData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_SIDEBYSIDE) &&
+		                    (firstscene->GetBlenderScene()->gm.flag & GAME_VR_LENS_DISTORTION);
+		rasterizer->SetVRLensDistortion(vrLens ? 0.3f : 0.0f);
+
 		// Compositing per eye off screens to screen.
 		if (renderData.m_renderPerEye) {
 			RAS_OffScreen *leftofs = canvas->GetOffScreen(renderData.m_frameDataList[0].m_ofsType);

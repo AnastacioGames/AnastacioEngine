@@ -143,6 +143,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     <progress id="progress" max="100" value="0"></progress>
     <div id="status">Carregando...</div>
     <button id="play" disabled>Jogar</button>
+    <button id="vr" disabled hidden>Entrar em VR</button>
     <div id="error" hidden></div>
   </div>
 </div>
@@ -191,6 +192,22 @@ __PERF_SCRIPT__
   }
 
   var ready = false, started = false;
+  // "Entrar em VR": o mesmo que Jogar, mais tela cheia, paisagem travada e tela sempre acesa. A cena precisa ter
+  // Stereo Side-by-Side (e, para a cabeca seguir o celular, "VR Head Tracking"); o runtime centraliza a direcao
+  // "para frente" na primeira leitura do sensor.
+  var wakeLock = null;
+  function enterVR() {
+    if (started || !ready) return;
+    tryStart();
+    if (fsSupported && !isFullscreen()) toggleFullscreen();
+    else if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function () {});
+    if (navigator.wakeLock && navigator.wakeLock.request)
+      navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (started && wakeLock && document.visibilityState === "visible" && navigator.wakeLock)
+      navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }).catch(function () {});
+  });
   function tryStart() {
     if (started || !ready) return;
     started = true;
@@ -719,8 +736,14 @@ __PERF_SCRIPT__
     el("progress").hidden = true;
     el("status").textContent = "Pronto.";
     el("play").disabled = false;
+    // Visor so faz sentido em aparelho de toque (ou com ?vr=1).
+    if (/[?&]vr=1/.test(location.search) || (window.matchMedia && matchMedia("(pointer: coarse)").matches)) {
+      el("vr").hidden = false;
+      el("vr").disabled = false;
+    }
   }
   el("play").addEventListener("click", tryStart);
+  el("vr").addEventListener("click", enterVR);
 
   // Pre-voo: eventos estruturados do runtime tem precedencia; o parser de console
   // permanece apenas para binarios antigos e caminhos que ainda nao emitem eventos.

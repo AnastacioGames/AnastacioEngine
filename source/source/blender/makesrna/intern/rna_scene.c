@@ -4939,6 +4939,12 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "Set the distance between the eyes - the camera focal distance/30 should be fine");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "vr_lens_distortion", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_VR_LENS_DISTORTION);
+	RNA_def_property_ui_text(prop, "VR Lens Distortion",
+	                         "Barrel distortion per eye in Side-by-Side, to cancel the Cardboard lens pincushion");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "vr_head_tracking", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_VR_HEAD_TRACKING);
 	RNA_def_property_ui_text(prop, "VR Head Tracking",

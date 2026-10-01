@@ -44,7 +44,9 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 - [x] Peça 2 (2026-10-01): opção "VR Head Tracking" (flag da cena `GAME_VR_HEAD_TRACKING`, painel Stereo). A
   câmera ativa aplica `N·Rx(-90°)·H` na view (N = orientação do objeto, H = `headOrientation`); o primeiro valor
   do sensor vira o "frente" (auto-recenter). Validada no celular. Suavização e helper de gaze ficaram para depois.
-- [ ] Peça 3
+- [x] Peça 3 (2026-10-01): flag `GAME_VR_LENS_DISTORTION` (painel Stereo), variante `LENS_DISTORT` do shader de
+  frame buffer aplicada por olho na apresentação do Side-by-Side (k fixo 0,3) e botão "Entrar em VR" na página
+  (tela cheia, wake lock). Sem correção de aberração cromática; intensidade ainda não configurável.
 - [ ] Peça 4
 
 ## Teste da peça 1 (celular)

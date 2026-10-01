@@ -127,6 +127,8 @@ typedef enum GPUBuiltinShader {
 	 * RAS_OpenGLDebugDraw). Instanced quad expanded in the vertex shader using camera
 	 * right/up vectors, radial falloff computed in the fragment shader. */
 	GPU_SHADER_LIGHT_GLOW           = 15,
+	/* Frame buffer draw with per-eye barrel distortion for side by side VR (Cardboard lenses). */
+	GPU_SHADER_VR_LENS              = 16,
 } GPUBuiltinShader;
 
 GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader);

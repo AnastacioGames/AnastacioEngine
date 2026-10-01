@@ -1095,6 +1095,7 @@ enum {
 #define GAME_USE_SHADING_NODES				(1 << 27)
 /* The active camera's view follows the device head pose (bge.logic.motion.headOrientation). */
 #define GAME_VR_HEAD_TRACKING				(1 << 28)
+#define GAME_VR_LENS_DISTORTION				(1 << 29)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
 #define GAME_DEBUG_DISABLE	0

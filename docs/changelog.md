@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular, peça 3: distorção de lente e botão "Entrar em VR"
+
+- Novo flag de cena `GAME_VR_LENS_DISTORTION` (RNA `vr_lens_distortion`, painel Stereo).
+- `GPU_SHADER_VR_LENS`: variante `LENS_DISTORT` do shader de frame buffer; pré-distorção em barril por olho,
+  aplicada em `RAS_Rasterizer::DrawOffScreen` na apresentação final do Side-by-Side (`KX_RenderPipeline` define k = 0,3).
+- `package-web.py`: botão "Entrar em VR" (inicia o jogo, tela cheia e wake lock), visível com `?vr=1` ou ponteiro coarse.
+
 ## 2026-10-01 - VR no celular, peça 2: opção "VR Head Tracking"
 
 - Novo flag de cena `GAME_VR_HEAD_TRACKING` (RNA `vr_head_tracking`, painel Stereo > "VR Head Tracking").
