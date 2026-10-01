@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: conversão dos bricks VR para Python
+
+- `logic_to_python.py` deixou de recusar Ray com eixo VR Gaze, VR Head, Mouse com Hold e Motion com VR Gaze/Teleport.
+  Helpers gerados: `_gaze` (cone, tempo, Self, mira e destaque), `_vr_head`, `_hold`, `_vr_walk`/`_vr_offset` e
+  `_vr_teleport`. Actuators que precisam rodar todo frame (frear depois de soltar, teleporte 1x por toque) saem
+  fora do `if controller`, recebendo o estado do controller.
+- Validado em background com `vr_menu`, `vr_gesture` e `vr_teleport`; o `vr_menu` convertido dá o mesmo clique
+  da versão com bricks.
+
 ## 2026-10-01 - VR no celular: destaque do objeto olhado (Highlight)
 
 - Ray com eixo VR Gaze ganhou a opção **Highlight** (bit 8 de `gaze_reticle`, `use_gaze_highlight`, sem mudança de

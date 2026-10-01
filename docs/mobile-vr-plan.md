@@ -65,7 +65,7 @@ Em vez de um atuador novo, o Motion (modos Simple e Character) ganhou a opção 
 `use_vr_gaze`): o campo **Loc** passa a valer na direção do olhar da câmera ativa projetada no chão (Y = frente,
 X = direita, Z = cima do mundo); o "L" fica ignorado. Olhando reto para cima/baixo, usa a frente do próprio objeto.
 Uso: no corpo do jogador, Motion Simple com Loc Y = 0,05 e VR Gaze, ligado ao gatilho (toque) ou a um Always.
-A conversão logic bricks → Python recusa essa opção por enquanto. Aceleração suave: com VR Gaze, o **Damping** (frames, ao lado da opção) faz a velocidade subir de 0 até o Loc
+A conversão logic bricks → Python cobre andar e Teleport (helpers `_vr_walk`/`_vr_teleport`). Aceleração suave: com VR Gaze, o **Damping** (frames, ao lado da opção) faz a velocidade subir de 0 até o Loc
 ao apertar e cair até 0 ao soltar (só no modo Simple; 0 = liga/desliga seco).
 **Teleport** (`ACT_DLOC_VR_TELEPORT`, `use_vr_teleport`, só modo Simple): com VR Gaze, cada toque salta uma vez para o ponto do chão olhado; Loc Y = alcance máximo (m), mantém a altura do corpo acima do chão. Validado no celular (2026-10-01) com `vr_teleport.range`.
 Validado no celular (2026-10-01): anda para onde olha; a inclinação não muda a velocidade (é o esperado). Aceleração com Damping 45 e Loc Y 0,05 (~3 m/s) aprovada.
@@ -89,7 +89,7 @@ mostra o contorno do cone. Validado no celular com `vr_trigger.range` (5°, 300 
 Sensor novo **VR Head** (`SENS_VR_HEAD`, `bVRHeadSensor`, `KX_VRHeadSensor`), lê a cabeça da câmera ativa (pode
 ficar em qualquer objeto). Modos: **Look Up / Look Down / Tilt Left / Tilt Right** (positivo enquanto passar do
 **Angle**) e **Nod (Yes) / Shake (No)** (pulso quando a cabeça vai e volta pelo menos o Angle dentro do **Time**).
-Python: `mode`, `angle`, `time` e, só leitura, `pitch`, `yaw`, `roll` (rad). A conversão para Python recusa o sensor.
+Python: `mode`, `angle`, `time` e, só leitura, `pitch`, `yaw`, `roll` (rad). A conversão para Python cobre o sensor (helper `_vr_head`).
 Teste: `vr_gesture.range` (balançar "não" = tela invertida, olhar para cima 35° = desliga, "sim" 15° = pula).
 
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
@@ -172,9 +172,9 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
 
 Itens 1, 2 e 4 dão o maior ganho: um jogo simples (olhar, andar, clicar) fica possível só com logic bricks.
 
-**Pendência futura (anotada 2026-10-01):** quando os bricks de VR existirem, atualizar a conversão de logic
-bricks para componente Python para cobrir os novos sensores/atuadores (VR Gaze, VR Move, gatilho Cardboard).
-Não fazer agora.
+**Conversão para Python (feito, 2026-10-01):** `logic_to_python.py` converte Ray VR Gaze (cone, Gaze Time, Self,
+Reticle via `render.drawLine`, Highlight), VR Head, Mouse com Hold e Motion com VR Gaze/Teleport. Validado no
+`vr_menu` convertido: mesmo clique da versão com bricks.
 
 ## Teste da peça 1 (celular)
 

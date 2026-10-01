@@ -164,6 +164,8 @@ _DIR_AXES = {'DIRPX': (0, False), 'DIRPY': (1, False), 'DIRPZ': (2, False),
 _DYNAMIC = {'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY'}
 _ACT_STATE = [None]  # expressao "actuator ativo" do tradutor atual (None = padrao)
 _FIRE = "%FIRE%"  # trocado pela variavel de pulso do controller na saida
+_ON = "%ON%"  # trocado pela variavel do controller (actuator que roda todo frame)
+_ACT_ALWAYS = [False]  # actuator roda todo frame, fora do "if controller" (usa _ON)
 _MOVE_AXES = {'XAXIS': (0, 1), 'YAXIS': (1, 1), 'ZAXIS': (2, 1),
               'NEGXAXIS': (0, -1), 'NEGYAXIS': (1, -1), 'NEGZAXIS': (2, -1), 'ALLAXIS': (-1, 0)}
 
@@ -235,8 +237,10 @@ def _sensor_expr(ob, sens, key=None):
     elif t == 'MOUSE':
         ev = sens.mouse_event
         if ev in _MOUSE_BUTTONS and sens.hold:
-            raise Unsupported("mouse com Hold")  # TODO: converter junto com os bricks de VR
-        if ev in _MOUSE_BUTTONS:
+            # Long press: positivo depois de Hold ms com o botao (ou toque) segurado.
+            expr = "self._hold(%r, ms[events.%s].active, %s)" % (key, _MOUSE_BUTTONS[ev],
+                                                                 A("Hold", sens.hold / 1000.0))
+        elif ev in _MOUSE_BUTTONS:
             state = "activated" if (sens.use_tap or ev.startswith("WHEEL")) else "active"
             expr = "ms[events.%s].%s" % (_MOUSE_BUTTONS[ev], state)
         elif ev == 'MOVEMENT':
@@ -284,10 +288,19 @@ def _sensor_expr(ob, sens, key=None):
         expr = "self._radar(%s, %s, %s, %s / 2.0)" % (_axis(sens.axis), A("Property", sens.property),
                                                       A("Distance", sens.distance), A("Angle", sens.angle))
     elif t == 'VR_HEAD':
-        raise Unsupported("sensor VR Head")  # TODO: converter junto com os bricks de VR
+        expr = "self._vr_head(%r, %r, %s, %s)" % (key, sens.mode, A("Angle", sens.angle), A("Time", sens.time))
+    elif t == 'RAY' and sens.axis == 'GAZE':
+        mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
+        mat = sens.ray_type != 'PROPERTY' and bool(sens.material)
+        if mat and sens.use_x_ray:
+            raise Unsupported("ray por material com x-ray")
+        prop = A("Material", sens.material) if mat else (
+            A("Property", sens.property) if sens.ray_type == 'PROPERTY' else "''")
+        expr = "self._gaze(%r, %s, %s, %s, %s, %d, %s, %s, %s, %s, %s)" % (
+            key, A("Self", sens.use_gaze_self), prop, mat, sens.use_x_ray, mask, A("Range", sens.range),
+            A("Gaze Time", sens.gaze_time / 1000.0), A("Gaze Angle", sens.gaze_angle),
+            A("Reticle", sens.use_gaze_reticle), A("Highlight", sens.use_gaze_highlight))
     elif t == 'RAY':
-        if sens.axis == 'GAZE':
-            raise Unsupported("ray com eixo VR Gaze")  # TODO: converter junto com os bricks de VR
         mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
         if sens.ray_type != 'PROPERTY' and sens.material:
             if sens.use_x_ray:
@@ -436,10 +449,17 @@ def _actuator_code(ob, act):
     if t == 'MOTION':
         if act.mode != 'OBJECT_NORMAL':
             raise Unsupported("motion %s" % act.mode)
-        if act.use_vr_gaze:
-            raise Unsupported("motion VR Gaze")
         lines = []
-        if _nonzero(act.offset_location):
+        vr = []
+        if act.use_vr_gaze and _nonzero(act.offset_location):
+            # Roda todo frame (_ON = controller): acelera/freia pelo Damping, teleporte 1x por toque.
+            if act.use_vr_teleport:
+                vr.append("if self._rise(%r, %s):" % ("tp:" + act.name, _ON))
+                vr.append("    self._vr_teleport(%s)" % _act_arg("Teleport Distance", act.offset_location[1]))
+            else:
+                vr.append("self._vr_walk(%r, %s, %s, %s)" % (act.name, _ON, _act_arg("Loc", act.offset_location),
+                                                           _act_arg("Damping", act.damping)))
+        elif _nonzero(act.offset_location):
             lines.append("ob.applyMovement(%s, %s)" % (_act_arg("Loc", act.offset_location),
                                                        act.use_local_location))
         if _nonzero(act.offset_rotation):
@@ -460,6 +480,9 @@ def _actuator_code(ob, act):
         if _nonzero(act.angular_velocity):
             lines.append("ob.setAngularVelocity(%s, %s)" % (_act_arg("Angular Velocity", act.angular_velocity),
                                                             act.use_local_angular_velocity))
+        if vr:
+            _ACT_ALWAYS[0] = True
+            return vr + (["if %s:" % _ON] + ["    " + line for line in lines] if lines else []), True
         return lines or ["pass"], True
     if t == 'PROPERTY':
         if act.actuator_mode != 'NONE' or act.use_world_property:
@@ -1284,6 +1307,207 @@ _EXTRA["_steer"] = '''
 '''
 
 
+_EXTRA["_hold"] = '''
+    def _hold(self, key, active, time):
+        """Mouse com Hold: positivo depois de time segundos com o botao segurado (long press)."""
+        key = "hold:" + key
+        t = self._prev.get(key, 0.0) + 1.0 / max(logic.getLogicTicRate(), 1.0) if active else 0.0
+        self._prev[key] = t
+        return active and t + 1e-4 >= time
+'''
+_EXTRA["_vr_head"] = '''
+    def _vr_head(self, key, mode, angle, time):
+        """Sensor VR Head (KX_VRHeadSensor): pitch/roll da cabeca e gestos de sim/nao em zigue-zague."""
+        cam = self.object.scene.active_camera
+        if cam is None:
+            return False
+        rot = cam.trackOrientation
+        fwd = rot * Vector((0.0, 0.0, -1.0))
+        right = rot * Vector((1.0, 0.0, 0.0))
+        pitch = math.asin(max(-1.0, min(1.0, fwd.z)))
+        roll = math.asin(max(-1.0, min(1.0, right.z)))
+        yaw = math.atan2(fwd.y, fwd.x)
+        heads = self.__dict__.setdefault("_vrh", {})
+        st = heads.get(key)
+        if st is None:
+            st = heads[key] = {"yaw": yaw, "anchor": yaw if mode == 'SHAKE' else pitch,
+                               "dir": 0, "ext": 0.0, "swings": 0, "t": 0.0}
+        else:
+            # Yaw sem salto ao cruzar +-180 graus.
+            delta = yaw - math.atan2(math.sin(st["yaw"]), math.cos(st["yaw"]))
+            if delta > math.pi:
+                delta -= 2.0 * math.pi
+            elif delta < -math.pi:
+                delta += 2.0 * math.pi
+            st["yaw"] += delta
+        if mode == 'LOOK_UP':
+            return pitch >= angle
+        if mode == 'LOOK_DOWN':
+            return pitch <= -angle
+        if mode == 'TILT_LEFT':
+            return roll >= angle
+        if mode == 'TILT_RIGHT':
+            return roll <= -angle
+        # Nod/Shake: sai do repouso pelo angulo e volta pelo angulo dentro do tempo.
+        value = st["yaw"] if mode == 'SHAKE' else pitch
+        st["t"] += 1.0 / max(logic.getLogicTicRate(), 1.0)
+        if st["dir"] == 0:
+            d = value - st["anchor"]
+            if abs(d) >= angle:
+                st.update(dir=1 if d > 0 else -1, ext=value, swings=1, t=0.0)
+            elif st["t"] > time:
+                st.update(anchor=value, t=0.0)
+            return False
+        if (value - st["ext"]) * st["dir"] > 0:
+            st["ext"] = value
+        elif abs(value - st["ext"]) >= angle:
+            st.update(swings=st["swings"] + 1, dir=-st["dir"], ext=value)
+        done = st["swings"] >= 2
+        if done or st["t"] > time:
+            st.update(anchor=value, dir=0, swings=0, t=0.0)
+        return done
+'''
+_EXTRA["_gaze"] = '''
+    def _gaze(self, key, self_only, prop, mat, xray, mask, rng, time, cone, reticle, highlight):
+        """Ray com eixo VR Gaze (KX_RaySensor): olhar da camera, cone, tempo de olhar, mira e destaque."""
+        ob = self.object
+        # Self: botao VR, usa o olhar da camera ativa e so vale acertando o dono (ou filhos).
+        self_only = self_only and not isinstance(ob, types.KX_Camera)
+        src = ob.scene.active_camera if self_only else ob
+        if src is None:
+            return False
+        frm = src.worldPosition.copy()
+        d = (src.gazeDirection if isinstance(src, types.KX_Camera) else -src.worldOrientation.col[2]).normalized()
+        # Sem fisica propria (camera presa no corpo), o raio ignora o pai, como o sensor.
+        caster = src.parent if src.getPhysicsId() == 0 and src.parent is not None else src
+        st = self.__dict__.setdefault("_gz", {}).setdefault(key, [None, 0.0, None, None])
+        gazed = st[0] if st[0] is not None and not st[0].invalid else None
+
+        def cast(to):
+            hit, point = caster.rayCast(to, frm, rng, "" if mat else prop, 0, xray, 0, mask)[:2]
+            if mat and not self._has_mat(hit, prop):
+                return None, None
+            return hit, point
+
+        hit, point = cast(frm + d * rng)
+        if hit is None and cone > 0:
+            # Cone: alvo visivel mais perto do centro da vista; o ja olhado ganha cone 1.5x.
+            best, best_angle = None, cone
+            for o in ob.scene.objects:
+                if o is src or not o.visible or not (o.collisionGroup & mask):
+                    continue
+                if self_only and not self._is_self(o):
+                    continue
+                if not self_only and prop and not (self._has_mat(o, prop) if mat else prop in o):
+                    continue
+                to = o.worldPosition - frm
+                if not 1e-4 <= to.length <= rng:
+                    continue
+                a = d.angle(to)
+                if a <= (cone * 1.5 if o is gazed else cone) and (best is None or a < best_angle):
+                    best, best_angle = o, a
+            if best is not None:
+                # Linha de visada: o raio ate o alvo precisa acerta-lo primeiro.
+                hit, point = cast(frm + (best.worldPosition - frm).normalized() * rng)
+                if hit is not best:
+                    hit, point = None, None
+        if self_only and hit is not None and not self._is_self(hit):
+            hit, point = None, None
+        # So conta depois de time segundos no mesmo objeto.
+        if hit is not None and hit is gazed:
+            st[1] += 1.0 / max(logic.getLogicTicRate(), 1.0)
+        else:
+            st[0], st[1] = hit, 0.0
+        if highlight:
+            self._highlight(st, None if hit is None else (ob if self_only else hit))
+        if reticle:
+            self._reticle(frm, d, rng, point, 0.0 if hit is None else (min(st[1] / time, 1.0) if time > 0 else 1.0))
+        return hit is not None and st[1] >= time
+
+    def _is_self(self, o):
+        while o is not None:
+            if o is self.object:
+                return True
+            o = o.parent
+        return False
+
+    @staticmethod
+    def _highlight(st, o):
+        """Escala o objeto olhado x1.1 e devolve a escala do anterior."""
+        if o is st[2]:
+            return
+        if st[2] is not None and not st[2].invalid:
+            st[2].localScale = st[3]
+        st[2] = o
+        if o is not None:
+            st[3] = o.localScale.copy()
+            o.localScale = st[3] * 1.1
+
+    @staticmethod
+    def _reticle(frm, d, rng, point, progress):
+        """Anel virado para o olho no ponto olhado (2 m a frente sem acerto), enche com o tempo."""
+        from Range import render
+        if point is None:
+            point = frm + d * min(2.0, rng)
+        dist = max((point - frm).length, 0.05)
+        center = frm + d * (dist * 0.98)
+        u = d.cross(Vector((0.0, 0.0, 1.0)) if abs(d.z) < 0.99 else Vector((1.0, 0.0, 0.0))).normalized()
+        v = u.cross(d)
+        color = (0.2, 1.0, 0.3) if progress >= 1.0 else (1.0, 1.0, 1.0)
+        for r in (dist * 0.009, dist * 0.009 * progress):
+            if r <= 0:
+                continue
+            pts = [center + (u * math.cos(a) + v * math.sin(a)) * r
+                   for a in (i * 2.0 * math.pi / 20 for i in range(21))]
+            for p0, p1 in zip(pts, pts[1:]):
+                render.drawLine(p0, p1, color)
+'''
+_EXTRA["_vr_walk"] = '''
+    def _vr_walk(self, key, on, loc, damping):
+        """Motion com VR Gaze: anda para onde a cabeca olha, acelerando/freando em damping frames."""
+        key = "walk:" + key
+        f = self._prev.get(key, 0.0)
+        if on:
+            f = min(f + 1.0 / damping, 1.0) if damping > 0 else 1.0
+        else:
+            f = max(f - 1.0 / damping, 0.0) if damping > 0 else 0.0
+        self._prev[key] = f
+        if f > 0:
+            self.object.applyMovement(self._vr_offset(Vector(loc) * (60.0 * f * logic.deltaTime())), False)
+
+    def _vr_offset(self, v):
+        """x = direita, y = frente do olhar projetado no chao, z = cima do mundo."""
+        ob = self.object
+        fwd = ob.worldOrientation.col[1].copy()
+        cam = ob.scene.active_camera
+        if cam is not None:
+            g = cam.gazeDirection
+            if g.x * g.x + g.y * g.y > 1e-4:
+                fwd = g.copy()
+        fwd.z = 0.0
+        if fwd.length < 1e-6:
+            return Vector((0.0, 0.0, v.z))
+        fwd.normalize()
+        return Vector((fwd.y, -fwd.x, 0.0)) * v.x + fwd * v.y + Vector((0.0, 0.0, v.z))
+'''
+_EXTRA["_vr_teleport"] = '''
+    def _vr_teleport(self, dist):
+        """Motion com Teleport: pula para o ponto do chao olhado (ate dist), mantendo a altura do corpo."""
+        ob = self.object
+        cam = ob.scene.active_camera
+        if cam is None or dist <= 0:
+            return
+        frm = cam.worldPosition.copy()
+        hit, point = ob.rayCast(frm + cam.gazeDirection * dist, frm, dist)[:2]
+        if hit is None:
+            return
+        pos = ob.worldPosition.copy()
+        down, ground = ob.rayCast(pos - Vector((0.0, 0.0, 100.0)), pos, 100.0)[:2]
+        height = max(pos.z - ground.z, 0.0) if down is not None else 0.0
+        ob.worldPosition = point + Vector((0.0, 0.0, height + 0.02))
+'''
+
+
 _RUNNER = '''
 
 # Modo controller: um sensor Always (pulso continuo) liga um controller Python
@@ -1401,12 +1625,13 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 if a.type == 'MESSAGE':
                     _GROUP_ICON[_GROUP[0]] = 'FILE_TEXT'
                 _ACT_STATE[0] = None
+                _ACT_ALWAYS[0] = False
                 code = _actuator_code(owner, a)
-                code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0],)
+                code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0], _ACT_ALWAYS[0])
                 if owner != ob:
                     if any(re.search(r"self\.(?!_a\[)", line) for part in code[:1] + code[2:3] for line in part):
                         raise Unsupported("actuator %s de %s ligado" % (a.type, owner.name))
-                    code = (on(owner, code[0]), code[1], on(owner, code[2]), code[3])
+                    code = (on(owner, code[0]), code[1], on(owner, code[2])) + code[3:]
                 actuators.append((a, owner, code))
         except Unsupported as ex:
             todos.append("%s: %s" % (cont.name, ex))
@@ -1473,8 +1698,12 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             cond = cname if continuous else cname + "_fire"
             if owner != ob:
                 cond += " and %s is not None" % foreign[owner.name]
-            out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
-            out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
+            if code[4]:
+                out.append("        # actuator '%s' <- controller '%s' (todo frame)" % (act.name, cont.name))
+                out += ["        " + line.replace(_ON, cond) for line in lines]
+            else:
+                out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
+                out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
             if code[2]:
                 off = cname + "_off"
                 if owner != ob:
