@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: botão "Prepare VR Scene"
+
+- Operador `render.game_vr_setup` (`properties_game.py`, painel Stereo): Stereo + Side-by-Side + separação 0,064 +
+  head tracking + lente num clique. Testado em `-b` no editor.
+
 ## 2026-10-01 - VR no celular: sensor VR Head (gestos de cabeça)
 
 Novo sensor `SENS_VR_HEAD` (`bVRHeadSensor`: `mode`, `angle`, `time`; RNA `VRHeadSensor`; `KX_VRHeadSensor`). Lê a orientação de render da câmera ativa: Look Up/Down e Tilt Left/Right ficam positivos enquanto passam do ângulo; Nod (pitch) e Shake (yaw) detectam ida e volta de pelo menos o ângulo dentro de `time` e dão pulso de um tic. Python: `mode`, `angle`, `time` e só leitura `pitch`, `yaw`, `roll`. Conversão para Python recusa o sensor. Validado no celular (`vr_gesture.range`: balançar "não" inverte a tela, olhar para cima desliga, acenar "sim" pula). DNA cresceu: rebuild limpo se aparecer crash estranho.

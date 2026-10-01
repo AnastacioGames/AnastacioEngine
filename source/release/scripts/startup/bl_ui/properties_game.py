@@ -686,6 +686,23 @@ class RENDER_OT_set_game_resolution(Operator):
         return {'FINISHED'}
 
 
+class RENDER_OT_game_vr_setup(Operator):
+    """Set the scene up for mobile VR (Cardboard): side-by-side stereo, """ \
+        """head tracking and lens distortion"""
+    bl_idname = "render.game_vr_setup"
+    bl_label = "Prepare VR Scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        gs = context.scene.game_settings
+        gs.stereo = 'STEREO'
+        gs.stereo_mode = 'SIDEBYSIDE'
+        gs.stereo_eye_separation = 0.064
+        gs.vr_head_tracking = True
+        gs.vr_lens_distortion = True
+        return {'FINISHED'}
+
+
 class RENDER_MT_game_res_embedded(Menu):
     bl_label = "Resolution Presets"
     bl_idname = "RENDER_MT_game_res_embedded"
@@ -1172,6 +1189,7 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
         stereo_box = display_group.box()
         stereo_box.label(text="Stereo:", icon="CAMERA_STEREO")
         stereo_box.row().prop(gs, "stereo", expand=True)
+        stereo_box.operator("render.game_vr_setup", icon="CAMERA_STEREO")
         if gs.stereo == 'STEREO':
             stereo_box.prop(gs, "stereo_mode")
             stereo_box.prop(gs, "stereo_eye_separation")
@@ -2236,6 +2254,7 @@ classes = (
     PHYSICS_PT_game_destruction,
     PHYSICS_PT_game_explosive,
     RENDER_OT_set_game_resolution,
+    RENDER_OT_game_vr_setup,
     RENDER_MT_game_res_embedded,
     RENDER_MT_game_res_player,
     RENDER_MT_game_target_fps,

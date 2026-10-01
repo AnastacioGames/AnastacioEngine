@@ -112,6 +112,11 @@ painel Render → Stereo, salvas na cena:
 6. **Docs/teste**: atualizar esta página e o changelog; compilar o editor e o runtime nativo e o Web; validar
    no celular com o `fp_vr.range`, tirando o `vr_tune.py`.
 
+## Botão "Prepare VR Scene" (feito, 2026-10-01)
+
+Operador `render.game_vr_setup` no painel Stereo: liga Stereo, Side-by-Side, separação 0,064, VR Head Tracking e
+VR Lens Distortion de uma vez (lente e suavização ficam no padrão). Testado no editor em modo headless; falta validar na UI.
+
 ## Ideias para facilitar jogos VR (sugestões, 2026-10-01)
 
 Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
