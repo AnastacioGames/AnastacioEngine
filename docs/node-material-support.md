@@ -23,9 +23,11 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 
 | Nó | O que o Game faz |
 |---|---|
-| Glossy BSDF | brilho GGX das luzes da cena e cor do World como ambiente; sem reflexo |
-| Toon BSDF | faixas de luz do Toon difuso do Cycles; a opção Component Glossy é ignorada |
-| Glass, Refraction, Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
+| Glossy BSDF | brilho GGX das luzes da cena; reflete a textura do World (desfocada pela Roughness) ou, sem ela, a cor do World |
+| Toon BSDF | faixas de luz do Toon do Cycles, Component Diffuse e Glossy; cor do World como ambiente |
+| Glass BSDF | fresnel entre o reflexo do World e o World desfocado como luz transmitida, com brilho das luzes; não refrata a cena |
+| Refraction BSDF | World desfocado como luz transmitida; não refrata a cena |
+| Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
 | Hair BSDF | cor chapada, sem luz |
 | Ambient Occlusion | AO sempre 1; a cor passa direto |
 | Bevel | devolve a normal sem mudança |
@@ -56,5 +58,4 @@ Output Attachment só no Game legado.
 
 ## Pendências
 
-Ver o plano em `docs/roadmap.md` (nós de material): aproximações melhores para Glass,
-Toon Glossy, AO, Blackbody e Sky (Fase 4).
+Ver o plano em `docs/roadmap.md` (nós de material): AO, Blackbody/Wavelength e Sky (resto da Fase 4).

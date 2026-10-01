@@ -307,3 +307,25 @@ void node_shader_gpu_tex_mapping(GPUMaterial *mat, bNode *node, GPUNodeStack *in
 			GPU_link(mat, "texco_norm", in[0].link, &in[0].link);
 	}
 }
+
+/* World environment (sky/HDRI) for BSDF nodes in the new-shading Game path: reflection and diffuse
+ * irradiance plus a 0/1 flag. Builtin links are single-use, so this takes its own view/normal links;
+ * callers must not pass theirs. Without a world texture both colors are zero and the flag is 0. */
+void node_shader_gpu_world_env(GPUMaterial *mat, GPUNodeLink *rough,
+                               GPUNodeLink **r_mirror, GPUNodeLink **r_diffuse, GPUNodeLink **r_flag)
+{
+	static float env_on = 1.0f, env_off = 0.0f;
+	GPUNodeLink *env_view;
+	/* shade_world_vectors expects a normalized (perspective-aware) view direction (shade_view),
+	 * not the raw view-space position. */
+	GPU_link(mat, "shade_view", GPU_material_builtin(mat, GPU_VIEW_POSITION), &env_view);
+	GPUNodeLink *env_vn = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
+	if (GPU_material_world_env(mat, env_view, env_vn, rough, r_mirror, r_diffuse)) {
+		*r_flag = GPU_uniform(&env_on);
+	}
+	else {
+		GPU_link(mat, "set_rgba_zero", r_mirror);
+		*r_diffuse = *r_mirror;
+		*r_flag = GPU_uniform(&env_off);
+	}
+}

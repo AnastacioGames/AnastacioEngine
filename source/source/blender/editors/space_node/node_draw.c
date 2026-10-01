@@ -868,14 +868,20 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 		switch (node->type) {
 			case SH_NODE_BSDF_GLOSSY:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: GGX highlight from scene lights, World color as ambient, no reflection";
+				*r_tip = "Approximated in Game: GGX highlight from scene lights, reflects the World texture (or World color)";
 				return false;
 			case SH_NODE_BSDF_TOON:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: diffuse toon bands from scene lights; Component Glossy is ignored";
+				*r_tip = "Approximated in Game: toon bands from scene lights, World color as ambient";
 				return false;
 			case SH_NODE_BSDF_GLASS:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: fresnel mix of World reflection and blurred World as transmission, no real refraction";
+				return false;
 			case SH_NODE_BSDF_REFRACTION:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: blurred World as transmitted light, no real refraction";
+				return false;
 			case SH_NODE_BSDF_TRANSLUCENT:
 			case SH_NODE_BSDF_VELVET:
 			case SH_NODE_BSDF_ANISOTROPIC:

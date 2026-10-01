@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Nós de material: Glass, Refraction, reflexo do Glossy e Toon Glossy (Fase 4, parte 1)
+
+- `node_shader_gpu_world_env()` (`node_shader_util.c`) monta os links de reflexo/difuso da textura do World; o
+  Principled passou a usá-lo e Glossy, Glass e Refraction também.
+- Glossy reflete a textura do World desfocada pela Roughness (sem textura, a cor do World).
+- Glass: `fresnel_dielectric_cos` (IOR invertido na face de trás) mistura reflexo + brilho GGX das luzes com o
+  World desfocado como luz transmitida. Refraction: só a parte transmitida. Não há refração real da cena.
+- Toon: Component Glossy mede a faixa em torno do reflexo da visão e usa o especular da luz (uniform `glossy`).
+- Selos e `docs/node-material-support.md` atualizados.
+- Validado: build ok; `node_material_test.range` e cenas de teste com e sem textura no World rodam sem
+  `GPUShader: compile error` em `%TEMP%ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
+  Falta validação visual.
+
 ## 2026-10-01 - VR no celular: conforto e preset Cardboard
 
 - `GameData.vr_vignette` (0-100%) e `vr_recenter_time` (ms) no lugar do padding `dynamicResolutionPad2`; RNA e

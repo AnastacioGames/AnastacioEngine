@@ -34,15 +34,18 @@ static bNodeSocketTemplate sh_node_bsdf_toon_out[] = {
 	{	-1, 0, ""	}
 };
 
-static int node_shader_gpu_bsdf_toon(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+static int node_shader_gpu_bsdf_toon(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
+	float glossy = (node->custom1 == SHD_TOON_GLOSSY) ? 1.0f : 0.0f;
+
 	if (!in[3].link)
 		in[3].link = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
 	else
 		GPU_link(mat, "direction_transform_m4v3", in[3].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[3].link);
 
 	return GPU_stack_link(mat, "node_bsdf_toon", in, out,
-	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat));
+	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat),
+	                      GPU_uniform(&glossy));
 }
 
 /* node type definition */

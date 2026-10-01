@@ -45,8 +45,11 @@ static int node_shader_gpu_bsdf_glossy(GPUMaterial *mat, bNode *UNUSED(node), bN
 	else
 		GPU_link(mat, "direction_transform_m4v3", in[2].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[2].link);
 
-	return GPU_stack_link(mat, "node_bsdf_glossy", in, out,
-	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat));
+	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
+	node_shader_gpu_world_env(mat, in[1].link ? in[1].link : GPU_uniform(in[1].vec), &env_mirror, &env_diffuse, &env_flag);
+
+	return GPU_stack_link(mat, "node_bsdf_glossy", in, out, GPU_material_builtin(mat, GPU_VIEW_POSITION),
+	                      GPU_material_world_color(mat), env_mirror, env_diffuse, env_flag);
 }
 
 /* node type definition */

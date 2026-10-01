@@ -4010,10 +4010,11 @@ void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 	result = vec4(L * color.rgb, color.a);
 }
 
-void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient, out vec4 result)
+void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
+                      vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
 {
-	/* ambient light from the World color */
-	vec3 L = ambient;
+	/* reflected World environment (roughness-blurred), or the World color as ambient without one */
+	vec3 L = (env_on > 0.5) ? env_mirror.rgb : ambient;
 
 	vec3 V = scene_view_vector(I);
 	float NdotV = max(dot(N, V), 1e-4);
@@ -4046,12 +4047,49 @@ void node_bsdf_anisotropic(
 	node_bsdf_diffuse(color, 0.0, N, result);
 }
 
-void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, out vec4 result)
+/* Light transmitted through glass/refraction: World environment when there is one, else the
+ * World color. There is no screen copy to refract, so with Alpha Blend the scene behind shows
+ * through the alpha instead (untinted). */
+vec3 glass_transmitted(vec3 ambient, vec4 env_diffuse, float env_on)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	return (env_on > 0.5) ? env_diffuse.rgb : ambient;
 }
 
-void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 ambient, out vec4 result)
+void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,
+                     vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
+{
+	vec3 V = scene_view_vector(I);
+	float NdotV = dot(N, V);
+	/* back faces: from inside the glass the relative IOR flips */
+	float eta = max((NdotV < 0.0) ? 1.0 / max(ior, 1e-4) : ior, 1e-4);
+	float F = fresnel_dielectric_cos(abs(NdotV), eta);
+
+	/* reflection: World environment (or color as a dim stand-in) plus GGX highlights of scene lights */
+	vec3 R = (env_on > 0.5) ? env_mirror.rgb : ambient;
+	float a = max(sqr(roughness), 0.001);
+	float roughg = sqr(roughness * 0.5 + 0.5);
+	float NdotVc = max(abs(NdotV), 1e-4);
+	vec3 Ns = (NdotV < 0.0) ? -N : N;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = dot(Ns, l);
+		if (NdotL <= 0.0) {
+			continue;
+		}
+		vec3 H = normalize(l + V);
+		float bsdf = GTR2(max(dot(Ns, H), 0.0), a) * smithG_GGX(NdotL, roughg) * smithG_GGX(NdotVc, roughg);
+		R += SCENE_LIGHT(i).specular.rgb * bsdf * NdotL * scene_light_visibility(i, I, Ns, NdotL, atten);
+	}
+
+	vec3 T = glass_transmitted(ambient, env_diffuse, env_on) * color.rgb;
+	result = vec4(F * R * color.rgb + (1.0 - F) * T, F);
+}
+
+void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 ambient, float glossy, out vec4 result)
 {
 	/* ambient light from the World color */
 	vec3 L = ambient;
@@ -4060,6 +4098,10 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 
 	float max_angle = clamp(size, 0.0, 1.0) * M_PI * 0.5;
 	float smooth_angle = clamp(tsmooth, 0.0, 1.0) * M_PI * 0.5;
 
+	/* Glossy component: the band is measured around the mirrored view direction, as in Cycles */
+	vec3 V = scene_view_vector(I);
+	vec3 R = reflect(-V, N);
+
 	for (int i = 0; i < NUM_LIGHTS; i++) {
 		vec3 l;
 		float atten;
@@ -4067,10 +4109,19 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 
 			continue;
 		}
 		float NdotL = dot(N, l);
-		float angle = acos(clamp(NdotL, -1.0, 1.0));
+		float cosa = (glossy > 0.5) ? dot(R, l) : NdotL;
+		float angle = acos(clamp(cosa, -1.0, 1.0));
 		float band = (angle < max_angle) ? 1.0 :
 		             (angle < max_angle + smooth_angle) ? 1.0 - (angle - max_angle) / smooth_angle : 0.0;
-		L += SCENE_LIGHT(i).diffuse.rgb * band * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+		if (glossy > 0.5) {
+			if (NdotL <= 0.0) {
+				continue;
+			}
+			L += SCENE_LIGHT(i).specular.rgb * band * scene_light_visibility(i, I, N, NdotL, atten);
+		}
+		else {
+			L += SCENE_LIGHT(i).diffuse.rgb * band * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+		}
 	}
 
 	result = vec4(L * color.rgb, color.a);
@@ -4256,9 +4307,11 @@ void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv
 	result = color;
 }
 
-void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, out vec4 result)
+void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,
+                          vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	/* only the transmitted part (no fresnel in Cycles' Refraction BSDF); alpha 0 like Transparent */
+	result = vec4(glass_transmitted(ambient, env_diffuse, env_on) * color.rgb, 0.0);
 }
 
 void node_ambient_occlusion(vec4 color, float distance, vec3 normal, out vec4 result_color, out float result_ao)
