@@ -545,7 +545,7 @@ void KX_Camera::UpdateMotion(float dt)
 	m_prevRenderForward = forward;
 }
 
-void KX_Camera::UpdateHeadTracking()
+void KX_Camera::UpdateHeadTracking(float dt)
 {
 	m_headActive = false;
 	KX_Scene *scene = GetScene();
@@ -554,7 +554,7 @@ void KX_Camera::UpdateHeadTracking()
 	}
 	KX_PythonMotion *motion = KX_PythonMotion::GetInstance();
 	mt::mat3 head;
-	if (motion && motion->GetHeadView(head)) {
+	if (motion && motion->GetHeadView(head, dt)) {
 		// The object keeps the body direction: its level orientation (looking along +y, z up) is
 		// Rx(90) from the camera's own axes, so the head turns the view from there.
 		m_headRotation = mt::mat3::RotationX(-(float)M_PI_2) * head;
@@ -564,11 +564,11 @@ void KX_Camera::UpdateHeadTracking()
 
 void KX_Camera::UpdateGameFX(double curtime)
 {
-	UpdateHeadTracking();
-
 	float dt = (m_fxLastTime < 0.0) ? 0.0f : (float)(curtime - m_fxLastTime);
 	m_fxLastTime = curtime;
 	dt = std::max(0.0f, std::min(dt, 0.25f));
+
+	UpdateHeadTracking(dt);
 
 	UpdateFocus(dt, curtime);
 	UpdateTracking(dt);

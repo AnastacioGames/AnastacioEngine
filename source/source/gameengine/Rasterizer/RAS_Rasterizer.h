@@ -272,6 +272,7 @@ private:
 	StereoMode m_stereomode;
 	/// Barrel distortion strength of the final side by side present (VR lenses), 0 = off.
 	float m_vrLensK;
+	float m_vrLensStrength;
 	StereoEye m_curreye;
 	float m_eyeseparation;
 	float m_focallength;
@@ -450,6 +451,9 @@ public:
 
 	/// Strength of the per-eye lens distortion applied when presenting side by side, 0 disables it.
 	void SetVRLensDistortion(float k);
+	/// Distortion strength used when the scene enables lens distortion (default 0.3).
+	void SetVRLensStrength(float k) { m_vrLensStrength = k; }
+	float GetVRLensStrength() const { return m_vrLensStrength; }
 
 	/**
 	 * Sets which eye buffer subsequent primitives will be rendered to.

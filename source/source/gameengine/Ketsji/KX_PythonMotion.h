@@ -61,6 +61,10 @@ private:
 	float m_headYaw;
 	/// True once recenter() ran (by a script or by GetHeadView()).
 	bool m_headCentered;
+	/// Time constant (seconds) of the low pass on the head view, 0 disables it. Smooths sensor jitter.
+	float m_smoothing;
+	mt::quat m_smoothQuat;
+	bool m_smoothValid;
 
 	mt::mat3 GetRawHeadOrientation(bool *valid) const;
 
@@ -75,7 +79,7 @@ public:
 
 	/// Head orientation for the engine (VR Head Tracking). The first valid reading is taken as the
 	/// forward direction, unless a script already called recenter(). False without a sensor.
-	bool GetHeadView(mt::mat3 &rot);
+	bool GetHeadView(mt::mat3 &rot, float dt);
 
 #ifdef WITH_PYTHON
 	EXP_PYMETHOD_NOARGS(KX_PythonMotion, Calibrate);

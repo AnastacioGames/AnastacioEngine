@@ -78,6 +78,7 @@ RAS_Rasterizer::RAS_Rasterizer()
 	m_camnegscale(false),
 	m_stereomode(RAS_STEREO_NOSTEREO),
 	m_vrLensK(0.0f),
+	m_vrLensStrength(0.3f),
 	m_curreye(RAS_STEREO_LEFTEYE),
 	m_eyeseparation(0.0f),
 	m_focallength(0.0f),

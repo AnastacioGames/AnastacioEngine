@@ -71,6 +71,7 @@ extern "C" {
 #endif
 
 #include "KX_PythonInit.h"
+#include <algorithm>
 #include <cmath>
 
 // directory header for py function getBlendFileList
@@ -1250,6 +1251,29 @@ static PyObject *gPySetStereoMode(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *gPySetVRLensStrength(PyObject *, PyObject *args)
+{
+	float k;
+	if (!PyArg_ParseTuple(args, "f:setVRLensStrength", &k)) {
+		return nullptr;
+	}
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.setVRLensStrength(k), Rasterizer not available");
+		return nullptr;
+	}
+	KX_GetActiveEngine()->GetRasterizer()->SetVRLensStrength(std::min(std::max(k, 0.0f), 1.0f));
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetVRLensStrength(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.getVRLensStrength(), Rasterizer not available");
+		return nullptr;
+	}
+	return PyFloat_FromDouble(KX_GetActiveEngine()->GetRasterizer()->GetVRLensStrength());
+}
+
 static PyObject *gPyGetStereoMode(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
@@ -1762,6 +1786,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 
 	{"setEyeSeparation", (PyCFunction)gPySetEyeSeparation, METH_VARARGS, "set the eye separation for stereo mode"},
 	{"setStereoMode", (PyCFunction)gPySetStereoMode, METH_VARARGS, "set the stereo mode (STEREO_* constants)"},
+	{"setVRLensStrength", (PyCFunction)gPySetVRLensStrength, METH_VARARGS, "set the VR lens distortion strength (0..1, default 0.3)"},
+	{"getVRLensStrength", (PyCFunction)gPyGetVRLensStrength, METH_NOARGS, "get the VR lens distortion strength"},
 	{"getStereoMode", (PyCFunction)gPyGetStereoMode, METH_NOARGS, "get the stereo mode"},
 	{"getEyeSeparation", (PyCFunction)gPyGetEyeSeparation, METH_NOARGS, "get the eye separation for stereo mode"},
 	{"setFocalLength", (PyCFunction)gPySetFocalLength, METH_VARARGS, "set the focal length for stereo mode"},

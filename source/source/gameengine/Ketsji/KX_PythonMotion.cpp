@@ -70,6 +70,9 @@ KX_PythonMotion::KX_PythonMotion()
 	m_neutral[0] = m_neutral[1] = 0.0f;
 	m_headYaw = 0.0f;
 	m_headCentered = false;
+	m_smoothing = 0.04f;
+	m_smoothQuat = mt::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	m_smoothValid = false;
 	g_motionInstance = this;
 }
 
@@ -116,13 +119,37 @@ static float kx_motion_heading(const mt::mat3 &rot)
 	return std::atan2(-dir.x, dir.y);
 }
 
-bool KX_PythonMotion::GetHeadView(mt::mat3 &rot)
+bool KX_PythonMotion::GetHeadView(mt::mat3 &rot, float dt)
 {
 	Refresh();
 	bool valid;
-	const mt::mat3 raw = GetRawHeadOrientation(&valid);
+	mt::mat3 raw = GetRawHeadOrientation(&valid);
 	if (!valid) {
+		m_smoothValid = false;
 		return false;
+	}
+	if (m_smoothing > 0.0f) {
+		mt::quat target(m_data[HEAD_QUAT], m_data[HEAD_QUAT + 1], m_data[HEAD_QUAT + 2], m_data[HEAD_QUAT + 3]);
+		target.Normalize();
+		if (!m_smoothValid) {
+			m_smoothQuat = target;
+			m_smoothValid = true;
+		}
+		else {
+			// Normalized lerp toward the sensor, on the shortest side.
+			const float dot = m_smoothQuat.scalar() * target.scalar() +
+			                  mt::vec3::DotProduct(m_smoothQuat.vector(), target.vector());
+			const float k = 1.0f - std::exp(-std::max(dt, 0.0f) / m_smoothing);
+			const float sign = (dot < 0.0f) ? -1.0f : 1.0f;
+			mt::quat q(m_smoothQuat.scalar() + (sign * target.scalar() - m_smoothQuat.scalar()) * k,
+			           m_smoothQuat.vector() + (sign * target.vector() - m_smoothQuat.vector()) * k);
+			q.Normalize();
+			m_smoothQuat = q;
+		}
+		raw = m_smoothQuat.ToMatrix();
+	}
+	else {
+		m_smoothValid = false;
 	}
 	if (!m_headCentered) {
 		m_headYaw = kx_motion_heading(raw);
@@ -175,6 +202,7 @@ PyAttributeDef KX_PythonMotion::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("orientation", KX_PythonMotion, pyattr_get_orientation),
 	EXP_PYATTRIBUTE_RO_FUNCTION("headOrientation", KX_PythonMotion, pyattr_get_headOrientation),
 	EXP_PYATTRIBUTE_RO_FUNCTION("tilt", KX_PythonMotion, pyattr_get_tilt),
+	EXP_PYATTRIBUTE_FLOAT_RW("smoothing", 0.0f, 5.0f, KX_PythonMotion, m_smoothing),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
 

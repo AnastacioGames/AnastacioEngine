@@ -50,6 +50,8 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 - [x] Peça 4 (2026-10-01): separação 0,064 no modo VR, `KX_Camera.gazeDirection`, `bge.render.setStereoMode`, cascatas
   seguindo a view da cabeça. Sombra simples validada no celular; CSM no celular descartada (no celular vale uma sombra só, pequena). Seleção por tempo: exemplo em `source/release/scripts/templates_range/vr_gaze.py` (validado no celular com o First_Person). Correção: as câmeras de cada olho do estéreo recebem a rotação da cabeça (`CopyHeadView`).
 
+- Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
+
 ## Teste da peça 1 (celular)
 
 1. Na câmera do jogo, um sensor Always com pulso (True Level Triggering) ligado a um controlador Python em
