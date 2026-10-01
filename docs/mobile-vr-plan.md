@@ -40,7 +40,7 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 
 - [x] Peça 1 (2026-09-30): código pronto, `RangeRuntime` nativo e `build-web-release` compilam; quaternion
   conferido no Node (retrato em pé olhando para o norte → frente +y; virado a oeste → frente -x).
-  **Falta validar no celular** com o teste abaixo.
+  Validada no celular junto com a Peça 2 (a orientação da cabeça segue o aparelho).
 - [x] Peça 2 (2026-10-01): opção "VR Head Tracking" (flag da cena `GAME_VR_HEAD_TRACKING`, painel Stereo). A
   câmera ativa aplica `N·Rx(-90°)·H` na view (N = orientação do objeto, H = `headOrientation`); o primeiro valor
   do sensor vira o "frente" (auto-recenter). Validada no celular. Suavização e helper de gaze ficaram para depois.

@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: texto 3D na Web/celular
+
+- Na Web, a emulação legada de GL do Emscripten bagunçava VAO/VBO ao desenhar glifos. O BLF ganhou um caminho
+  próprio (`blf_web_begin/end` em `blf_glyph.c`): shader e quad desenhados direto via `GLctx` em `EM_JS`.
+- `BLF_draw_state` e `RAS_OpenGLRasterizer::RenderText3D` passam viewproj e cor ao BLF.
+- `tools/create_vr_menu_scene.py` volta a gerar os botões com texto por padrão.
+- Validado no celular: o menu VR mostra as letras e os botões funcionam.
+
 ## 2026-10-01 - VR no celular: painel VR e botões 3D com "Self"
 
 - Painel próprio `RENDER_PT_game_vr` ("VR") com "Prepare VR Scene" e os parâmetros VR; o Stereo ficou só com modo.
@@ -16,7 +24,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   câmera, o raio sai da câmera ativa e só fica positivo ao acertar o dono ou um filho (`KX_RaySensor::IsSelf`);
   o cone também filtra pelo dono. Botão de logic editor ao lado de "Reticle".
 - `tools/create_vr_menu_scene.py` → `vr_menu.range`: menu de 3 botões só com bricks. Validado no runtime nativo
-  (só o botão olhado conta, após 1 s). Falta validação no celular.
+  (só o botão olhado conta, após 1 s). Validado depois no celular.
 
 ## 2026-10-01 - Nós de material: Glass, Refraction, reflexo do Glossy e Toon Glossy (Fase 4, parte 1)
 
@@ -28,7 +36,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Toon: Component Glossy mede a faixa em torno do reflexo da visão e usa o especular da luz (uniform `glossy`).
 - Selos e `docs/node-material-support.md` atualizados.
 - Validado: build ok; `node_material_test.range` e cenas de teste com e sem textura no World rodam sem
-  `GPUShader: compile error` em `%TEMP%ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
+  `GPUShader: compile error` em `%TEMP%
+ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
   Falta validação visual.
 
 ## 2026-10-01 - VR no celular: conforto e preset Cardboard
