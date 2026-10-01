@@ -238,6 +238,7 @@ private:
 		int kLoc;
 		int aspectLoc;
 		int vignetteLoc;
+		int chromaLoc;
 	};
 
 	struct OverrideShaderStereoStippleInterface
@@ -275,6 +276,8 @@ private:
 	float m_vrLensK;
 	float m_vrLensStrength;
 	float m_vrVignette;
+	/// Chromatic aberration correction of the lens pass (red/blue scale offset), 0 = off.
+	float m_vrChroma;
 	StereoEye m_curreye;
 	float m_eyeseparation;
 	float m_focallength;
@@ -458,6 +461,9 @@ public:
 	float GetVRLensStrength() const { return m_vrLensStrength; }
 	/// Comfort vignette (0..1) applied with the lens pass, side by side only.
 	void SetVRVignette(float v) { m_vrVignette = v; }
+	/// Chromatic aberration correction of the lens pass (default 0.01, 0 disables it).
+	void SetVRChromaticAberration(float c) { m_vrChroma = c; }
+	float GetVRChromaticAberration() const { return m_vrChroma; }
 
 	/**
 	 * Sets which eye buffer subsequent primitives will be rendered to.

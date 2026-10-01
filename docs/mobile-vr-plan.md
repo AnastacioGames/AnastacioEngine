@@ -46,11 +46,11 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
   do sensor vira o "frente" (auto-recenter). Validada no celular. Suavização e helper de gaze ficaram para depois.
 - [x] Peça 3 (2026-10-01): flag `GAME_VR_LENS_DISTORTION` (painel Stereo), variante `LENS_DISTORT` do shader de
   frame buffer aplicada por olho na apresentação do Side-by-Side (k fixo 0,3) e botão "Entrar em VR" na página
-  (tela cheia, wake lock). Sem correção de aberração cromática; intensidade ainda não configurável.
+  (tela cheia, wake lock). Aberração cromática corrigida desde 2026-10-01 (ver Ajustes); intensidade ainda não configurável.
 - [x] Peça 4 (2026-10-01): separação 0,064 no modo VR, `KX_Camera.gazeDirection`, `bge.render.setStereoMode`, cascatas
   seguindo a view da cabeça. Sombra simples validada no celular; CSM no celular descartada (no celular vale uma sombra só, pequena). Seleção por tempo: exemplo em `source/release/scripts/templates_range/vr_gaze.py` (validado no celular com o First_Person). Correção: as câmeras de cada olho do estéreo recebem a rotação da cabeça (`CopyHeadView`).
 
-- Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
+- Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. Aberração cromática (2026-10-01): o passe da lente amostra o vermelho com raio ×(1−c) e o azul com ×(1+c), c = `bge.render.setVRChromaticAberration(c)` (0 a 0,1, padrão 0,01, 0 desliga; só atua com a distorção ligada). Compilado e rodando no desktop; falta validar no celular. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
 
 ## Gaze sem Python: sensor Ray com eixo "VR Gaze" (feito, 2026-10-01)
 

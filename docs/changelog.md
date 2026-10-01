@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: correção de aberração cromática na lente
+
+- `gpu_shader_frame_buffer_frag.glsl` (`LENS_DISTORT`): `lens_color` amostra o canal vermelho com o raio distorcido
+  ×(1−c) e o azul com ×(1+c), compensando as franjas coloridas da lente do Cardboard. Uniform `lensca`.
+- `RAS_Rasterizer`: `m_vrChroma` (padrão 0,01), enviado só quando a distorção está ligada.
+- Python: `bge.render.setVRChromaticAberration(c)` / `getVRChromaticAberration()` (0 a 0,1).
+- RangeRuntime compilado; `vr_lens.range` rodou sem erro de shader. Falta validação visual no celular e build web.
+
 ## 2026-10-01 - VR no celular: conversão dos bricks VR para Python
 
 - `logic_to_python.py` deixou de recusar Ray com eixo VR Gaze, VR Head, Mouse com Hold e Motion com VR Gaze/Teleport.
@@ -77,7 +85,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Toon: Component Glossy mede a faixa em torno do reflexo da visão e usa o especular da luz (uniform `glossy`).
 - Selos e `docs/node-material-support.md` atualizados.
 - Validado: build ok; `node_material_test.range` e cenas de teste com e sem textura no World rodam sem
-  `GPUShader: compile error` em `%TEMP%ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
+  `GPUShader: compile error` em `%TEMP%
+ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
   Falta validação visual.
 
 ## 2026-10-01 - VR no celular: conforto e preset Cardboard

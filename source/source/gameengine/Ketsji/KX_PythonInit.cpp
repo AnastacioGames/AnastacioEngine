@@ -1274,6 +1274,29 @@ static PyObject *gPyGetVRLensStrength(PyObject *, PyObject *Py_UNUSED(ignored))
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetRasterizer()->GetVRLensStrength());
 }
 
+static PyObject *gPySetVRChromaticAberration(PyObject *, PyObject *args)
+{
+	float c;
+	if (!PyArg_ParseTuple(args, "f:setVRChromaticAberration", &c)) {
+		return nullptr;
+	}
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.setVRChromaticAberration(c), Rasterizer not available");
+		return nullptr;
+	}
+	KX_GetActiveEngine()->GetRasterizer()->SetVRChromaticAberration(std::min(std::max(c, 0.0f), 0.1f));
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetVRChromaticAberration(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	if (!KX_GetActiveEngine()->GetRasterizer()) {
+		PyErr_SetString(PyExc_RuntimeError, "bge.render.getVRChromaticAberration(), Rasterizer not available");
+		return nullptr;
+	}
+	return PyFloat_FromDouble(KX_GetActiveEngine()->GetRasterizer()->GetVRChromaticAberration());
+}
+
 static PyObject *gPyGetStereoMode(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	if (!KX_GetActiveEngine()->GetRasterizer()) {
@@ -1788,6 +1811,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 	{"setStereoMode", (PyCFunction)gPySetStereoMode, METH_VARARGS, "set the stereo mode (STEREO_* constants)"},
 	{"setVRLensStrength", (PyCFunction)gPySetVRLensStrength, METH_VARARGS, "set the VR lens distortion strength (0..1, default 0.3)"},
 	{"getVRLensStrength", (PyCFunction)gPyGetVRLensStrength, METH_NOARGS, "get the VR lens distortion strength"},
+	{"setVRChromaticAberration", (PyCFunction)gPySetVRChromaticAberration, METH_VARARGS, "set the VR lens chromatic aberration correction (0..0.1, default 0.01)"},
+	{"getVRChromaticAberration", (PyCFunction)gPyGetVRChromaticAberration, METH_NOARGS, "get the VR lens chromatic aberration correction"},
 	{"getStereoMode", (PyCFunction)gPyGetStereoMode, METH_NOARGS, "get the stereo mode"},
 	{"getEyeSeparation", (PyCFunction)gPyGetEyeSeparation, METH_NOARGS, "get the eye separation for stereo mode"},
 	{"setFocalLength", (PyCFunction)gPySetFocalLength, METH_VARARGS, "set the focal length for stereo mode"},
