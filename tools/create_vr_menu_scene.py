@@ -11,6 +11,8 @@ import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 output = argv[0] if argv else "vr_menu.range"
+# 3D text is not drawn on web/Android yet (BLF still uses fixed-function GL); pass --text for desktop.
+WITH_TEXT = "--text" in argv
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -71,14 +73,15 @@ for i, (label, color) in enumerate((("Jogar", (0.2, 0.8, 0.3)), ("Opcoes", (0.2,
     bpy.ops.object.game_property_new(type='INT', name="cliques")
     button.game.properties["cliques"].show_debug = True
 
-    bpy.ops.object.text_add(location=(-0.25, 2.98, z - 0.07), rotation=(math.pi / 2, 0, 0))
-    text = bpy.context.object
-    text.name = "Texto" + label
-    text.data.body = label
-    text.scale = (0.18, 0.18, 0.18)
-    text.game.physics_type = 'NO_COLLISION'
-    text.parent = button
-    text.matrix_parent_inverse = button.matrix_world.inverted()
+    if WITH_TEXT:
+        bpy.ops.object.text_add(location=(-0.25, 2.98, z - 0.07), rotation=(math.pi / 2, 0, 0))
+        text = bpy.context.object
+        text.name = "Texto" + label
+        text.data.body = label
+        text.scale = (0.18, 0.18, 0.18)
+        text.game.physics_type = 'NO_COLLISION'
+        text.parent = button
+        text.matrix_parent_inverse = button.matrix_world.inverted()
 
     gaze = add(button, "sensor", 'RAY', axis='GAZE', range=20, gaze_time=1000, use_gaze_self=True)
     cont = add(button, "controller", 'LOGIC_AND')
