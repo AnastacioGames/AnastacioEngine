@@ -39,8 +39,31 @@
 #include "PHY_ICharacter.h"
 #include "PHY_IPhysicsEnvironment.h"
 #include "KX_Globals.h"
+#include "KX_Scene.h"
+#include "KX_Camera.h"
 
 #include "CM_Message.h"
+
+/* VR walking: x = right, y = forward along the head gaze projected on the ground, z = world up.
+ * Looking straight up/down falls back to the object's own forward axis. */
+static mt::vec3 vr_gaze_offset(KX_GameObject *parent, const mt::vec3& offset)
+{
+	mt::vec3 forward = parent->NodeGetWorldOrientation() * mt::vec3(0.0f, 1.0f, 0.0f);
+	KX_Camera *cam = parent->GetScene()->GetActiveCamera();
+	if (cam) {
+		const mt::vec3 gaze = cam->GetRenderOrientation() * mt::vec3(0.0f, 0.0f, -1.0f);
+		if (gaze.x * gaze.x + gaze.y * gaze.y > 1e-4f) {
+			forward = gaze;
+		}
+	}
+	forward.z = 0.0f;
+	if (mt::FuzzyZero(forward)) {
+		return mt::vec3(0.0f, 0.0f, offset.z);
+	}
+	forward.Normalize();
+	const mt::vec3 right(forward.y, -forward.x, 0.0f);
+	return right * offset.x + forward * offset.y + mt::vec3(0.0f, 0.0f, offset.z);
+}
 
 KX_ObjectActuator::KX_ObjectActuator(SCA_IObject *gameobj,
                                      KX_GameObject *refobj,
@@ -69,7 +92,9 @@ KX_ObjectActuator::KX_ObjectActuator(SCA_IObject *gameobj,
 	m_reference(refobj),
 	m_linear_damping_active(false),
 	m_angular_damping_active(false),
-	m_jumping(false)
+	m_jumping(false),
+	m_vr_gaze_factor(0.0f),
+	m_vr_gaze_braking(false)
 {
 	if (m_bitLocalFlag.ServoControl) {
 		// in servo motion, the force is local if the target velocity is local
@@ -114,12 +139,27 @@ void KX_ObjectActuator::UpdateFuzzyFlags()
 bool KX_ObjectActuator::Update()
 {
 	bool bNegativeEvent = IsNegativeEvent();
+	if (IsPositiveEvent()) {
+		m_vr_gaze_braking = false;
+	}
 	RemoveAllEvents();
 
 	KX_GameObject *parent = static_cast<KX_GameObject *>(GetParent());
 	PHY_ICharacter *character = parent->GetScene()->GetPhysicsEnvironment()->GetCharacterController(parent);
 
-	if (bNegativeEvent) {
+	if ((bNegativeEvent || m_vr_gaze_braking) && m_bitLocalFlag.VRGaze && !m_bitLocalFlag.CharacterMotion &&
+	    m_damping > 0 && m_vr_gaze_factor > 0.0f && parent && !m_bitLocalFlag.ZeroDLoc &&
+	    !m_bitLocalFlag.SetPositionMode)
+	{
+		// VR Gaze walking: slow down over the damping frames instead of stopping at once.
+		m_vr_gaze_factor = std::max(m_vr_gaze_factor - 1.0f / m_damping, 0.0f);
+		parent->ApplyMovement(vr_gaze_offset(parent, (m_dloc * (60.f * m_vr_gaze_factor)) * KX_GetActiveEngine()->GetEngineDeltaTime()), false);
+		m_vr_gaze_braking = (m_vr_gaze_factor > 0.0f);
+		return m_vr_gaze_braking;
+	}
+	if (bNegativeEvent || m_vr_gaze_braking) {
+		m_vr_gaze_braking = false;
+		m_vr_gaze_factor = 0.0f;
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
 			character->SetWalkDirection(mt::zero3);
@@ -229,7 +269,10 @@ bool KX_ObjectActuator::Update()
 		else if (m_bitLocalFlag.CharacterMotion) {
 			mt::vec3 dir = (m_dloc * 60.f) * KX_GetActiveEngine()->GetEngineDeltaTime();
 
-			if (m_bitLocalFlag.DLoc) {
+			if (m_bitLocalFlag.VRGaze) {
+				dir = vr_gaze_offset(parent, dir);
+			}
+			else if (m_bitLocalFlag.DLoc) {
 				mt::mat3 basis = parent->GetPhysicsController()->GetOrientation();
 				dir = basis * dir;
 			}
@@ -276,6 +319,11 @@ bool KX_ObjectActuator::Update()
 				parent->NodeSetWorldPosition(m_dloc);
 			}
 			/* Simple movement */
+			else if (!m_bitLocalFlag.ZeroDLoc && m_bitLocalFlag.VRGaze) {
+				// Accelerate over the damping frames (0 = full speed at once).
+				m_vr_gaze_factor = (m_damping > 0) ? std::min(m_vr_gaze_factor + 1.0f / m_damping, 1.0f) : 1.0f;
+				parent->ApplyMovement(vr_gaze_offset(parent, (m_dloc * (60.f * m_vr_gaze_factor)) * KX_GetActiveEngine()->GetEngineDeltaTime()), false);
+			}
 			else if (!m_bitLocalFlag.ZeroDLoc) {
 				parent->ApplyMovement((m_dloc * 60.f) * KX_GetActiveEngine()->GetEngineDeltaTime(), (m_bitLocalFlag.DLoc) != 0);
 			}

@@ -310,6 +310,7 @@ typedef struct bActuator {
 #define ACT_ADD_LIN_VEL			64
 #define ACT_ADD_CHAR_LOC		128
 #define ACT_CHAR_JUMP			256
+#define ACT_DLOC_VR_GAZE		512 /* Loc follows the head gaze (y = forward), horizontal only */
 
 /* objectactuator->type */
 #define ACT_OBJECT_NORMAL		0

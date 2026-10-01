@@ -878,6 +878,13 @@ static void rna_def_object_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "L", "Location is defined in local coordinates");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_vr_gaze", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_DLOC_VR_GAZE);
+	RNA_def_property_ui_text(prop, "VR Gaze",
+	                         "Location follows the active camera's gaze on the ground plane "
+	                         "(Y = forward, X = right, Z = up): walk where the player looks");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "use_local_rotation", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_DROT_LOCAL);
 	RNA_def_property_ui_text(prop, "L", "Rotation is defined in local coordinates");

@@ -192,6 +192,7 @@ void BL_ConvertActuators(const char *maggiename,
 				bitLocalFlag.AddOrSetLinV = bool((obact->flag & ACT_ADD_LIN_VEL) != 0);
 				bitLocalFlag.AddOrSetCharLoc = bool((obact->flag & ACT_ADD_CHAR_LOC) != 0);
 				bitLocalFlag.ServoControlAngular = (obact->servotype == ACT_SERVO_ANGULAR);
+				bitLocalFlag.VRGaze = bool((obact->flag & ACT_DLOC_VR_GAZE) != 0);
 				if (obact->reference && bitLocalFlag.ServoControl) {
 					obref = converter.FindGameObject(obact->reference);
 				}

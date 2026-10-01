@@ -432,6 +432,8 @@ def _actuator_code(ob, act):
     if t == 'MOTION':
         if act.mode != 'OBJECT_NORMAL':
             raise Unsupported("motion %s" % act.mode)
+        if act.use_vr_gaze:
+            raise Unsupported("motion VR Gaze")
         lines = []
         if _nonzero(act.offset_location):
             lines.append("ob.applyMovement(%s, %s)" % (_act_arg("Loc", act.offset_location),

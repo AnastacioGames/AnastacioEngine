@@ -59,6 +59,16 @@ cabeça (`gazeDirection`). Campo **Gaze Time** (ms, `bRaySensor.gaze_time`, 0 = 
 o mesmo objeto por esse tempo. Python: `sensor.gazeTime` (s) e `sensor.gazeProgress` (0..1, para barras). Propriedade,
 material, X-Ray e máscara funcionam como no Ray normal. Usar na câmera ativa. Validado no celular (2026-10-01) com `vr_bricks.range`: Ray VR Gaze + Filter 2D Invert ao olhar o cubo por 1 s. Cuidado: não ligar o sensor ao mesmo controlador And da música (o And falso para o som). Próximos: VR Move, gatilho Cardboard, VR Head.
 
+## VR Move: opção "VR Gaze" no atuador Motion (feito, 2026-10-01)
+
+Em vez de um atuador novo, o Motion (modos Simple e Character) ganhou a opção **VR Gaze** (`ACT_DLOC_VR_GAZE`,
+`use_vr_gaze`): o campo **Loc** passa a valer na direção do olhar da câmera ativa projetada no chão (Y = frente,
+X = direita, Z = cima do mundo); o "L" fica ignorado. Olhando reto para cima/baixo, usa a frente do próprio objeto.
+Uso: no corpo do jogador, Motion Simple com Loc Y = 0,05 e VR Gaze, ligado ao gatilho (toque) ou a um Always.
+A conversão logic bricks → Python recusa essa opção por enquanto. Aceleração suave: com VR Gaze, o **Damping** (frames, ao lado da opção) faz a velocidade subir de 0 até o Loc
+ao apertar e cair até 0 ao soltar (só no modo Simple; 0 = liga/desliga seco). Ainda sem teleporte.
+Validado no celular (2026-10-01): anda para onde olha; a inclinação não muda a velocidade (é o esperado). Aceleração com Damping 45 e Loc Y 0,05 (~3 m/s) aprovada.
+
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
 
 Implementado com shorts no padding do `GameData` (`vr_lens_strength` em %, `vr_head_smoothing` em ms; 0 = padrão 30%/40 ms, então cenas antigas não precisam de versionamento). Lido em `LA_Launcher`. Plano original:

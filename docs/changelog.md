@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: atuador Motion com "VR Gaze" (andar para onde olha)
+
+Nova flag `ACT_DLOC_VR_GAZE` (512, em `bObjectActuator.flag`, sem mudar o DNA) e RNA `use_vr_gaze`: nos modos Simple e Character o Loc é aplicado na base do olhar da câmera ativa no plano horizontal (`vr_gaze_offset` em `KX_ObjectActuator.cpp`). Arquivos: `DNA_actuator_types.h`, `rna_actuator.c`, `logic_window.c`, `BL_ConvertActuators.cpp`, `KX_ObjectActuator.*`, `logic_to_python.py` (recusa a opção). Com VR Gaze, o `damping` do Motion Simple vira rampa de aceleração e frenagem (`m_vr_gaze_factor`, `m_vr_gaze_braking`); na UI o Damping fica ao lado da opção. Editor, runtime nativo e Web compilam; andar validado no celular (`vr_move.range`), aceleração ainda não.
+
 ## 2026-10-01 - VR no celular: sensor Ray com eixo "VR Gaze"
 
 O sensor Ray ganhou o eixo `SENS_RAY_GAZE` (raio na direção da cabeça da câmera) e o campo `gaze_time` (ms, no antigo `pad1` de `bRaySensor`, sem mudar o tamanho do DNA). Só dispara depois de olhar o mesmo objeto pelo tempo definido. Python: `gazeTime`, `gazeProgress`. Arquivos: `DNA_sensor_types.h`, `rna_sensor.c`, `logic_window.c`, `BL_ConvertSensors.cpp`, `KX_RaySensor.*`. Compilam o editor, o runtime nativo e o Web; falta validar no celular. Pendência futura: atualizar a conversão de logic bricks para componente Python (`logic_to_python.py`) para o novo eixo/campo.

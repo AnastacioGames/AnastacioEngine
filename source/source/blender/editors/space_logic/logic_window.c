@@ -1971,7 +1971,15 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);
 			uiItemR(row, ptr, "offset_location", 0, NULL, ICON_NONE);
-			uiItemR(split, ptr, "use_local_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+			sub = uiLayoutRow(split, false);
+			uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_vr_gaze") == false);
+			uiItemR(sub, ptr, "use_local_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+			row = uiLayoutRow(layout, false);
+			uiItemR(row, ptr, "use_vr_gaze", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_vr_gaze")) {
+				/* Shared with the linear velocity ramp: frames to reach (and stop from) the walking speed. */
+				uiItemR(row, ptr, "damping", 0, NULL, ICON_NONE);
+			}
 
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);
@@ -2002,7 +2010,9 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 				uiItemR(row, ptr, "angular_velocity", 0, NULL, ICON_NONE);
 				uiItemR(split, ptr, "use_local_angular_velocity", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 
-				uiItemR(layout, ptr, "damping", 0, NULL, ICON_NONE);
+				if (!RNA_boolean_get(ptr, "use_vr_gaze")) {
+					uiItemR(layout, ptr, "damping", 0, NULL, ICON_NONE);
+				}
 			}
 			break;
 		case ACT_OBJECT_SERVO:
@@ -2057,8 +2067,11 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 			row = uiLayoutRow(split, false);
 			uiItemR(row, ptr, "offset_location", 0, NULL, ICON_NONE);
 			row = uiLayoutRow(split, true);
-			uiItemR(row, ptr, "use_local_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+			sub = uiLayoutRow(row, true);
+			uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_vr_gaze") == false);
+			uiItemR(sub, ptr, "use_local_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 			uiItemR(row, ptr, "use_add_character_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+			uiItemR(layout, ptr, "use_vr_gaze", 0, NULL, ICON_NONE);
 
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);

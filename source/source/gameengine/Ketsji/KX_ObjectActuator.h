@@ -61,7 +61,9 @@ struct KX_LocalFlags {
 		ZeroDRot(false),
 		ZeroDLoc(false),
 		ZeroLinearVelocity(false),
-		ZeroAngularVelocity(false)
+		ZeroAngularVelocity(false),
+		ServoControlAngular(false),
+		VRGaze(false)
 	{
 	}
 
@@ -84,6 +86,8 @@ struct KX_LocalFlags {
 	bool ZeroLinearVelocity;
 	bool ZeroAngularVelocity;
 	bool ServoControlAngular;
+	/// Location offset relative to the active camera's horizontal gaze (VR walking).
+	bool VRGaze;
 };
 
 class KX_ObjectActuator : public SCA_IActuator, public mt::SimdClassAllocator
@@ -112,6 +116,10 @@ class KX_ObjectActuator : public SCA_IActuator, public mt::SimdClassAllocator
 	bool m_linear_damping_active;
 	bool m_angular_damping_active;
 	bool m_jumping;
+	/// VR Gaze walking: 0..1 ramp toward the Loc speed over the damping frames.
+	float m_vr_gaze_factor;
+	/// VR Gaze walking: slowing down after the trigger was released.
+	bool m_vr_gaze_braking;
 
 public:
 	KX_ObjectActuator(SCA_IObject *gameobj,
