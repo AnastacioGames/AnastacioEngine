@@ -110,6 +110,7 @@ void paste_matcopybuf(struct Main *bmain, struct Material *ma);
 
 /* handle backward compatibility for tface/materials called from doversion */
 int do_version_tface(struct Main *main);
+void BKE_material_tface_split_disputed(struct Main *bmain);
 
 #ifdef __cplusplus
 }

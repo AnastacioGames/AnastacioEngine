@@ -690,6 +690,12 @@ void BL_ConvertSensors(struct Object *blenderobject,
 								joysticktype  = SCA_JoystickSensor::KX_JOYSENSORMODE_SHOULDER_TRIGGER;
 								break;
 							}
+							case SENS_JOY_HAT:
+							{
+								/* Blender 2.4x hat sensors: the hat direction is no longer stored, use axis or buttons. */
+								CM_Warning("joystick sensor \"" << sens->name << "\" uses the unsupported Hat mode and will never trigger");
+								break;
+							}
 							default:
 							{
 								CM_Error("bad case statement");

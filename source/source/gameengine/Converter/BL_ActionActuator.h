@@ -120,6 +120,8 @@ enum {
 	ACT_FLAG_ACTIVE		= 1<<1,
 	ACT_FLAG_CONTINUE	= 1<<2,
 	ACT_FLAG_PLAY_END	= 1<<3,
+	/// A looping action could not start (layer busy with a higher priority action), retry each frame.
+	ACT_FLAG_PENDING	= 1<<4,
 };
 
 #endif

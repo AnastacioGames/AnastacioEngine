@@ -635,13 +635,7 @@ static PyObject *gPyGetDeltaTime(PyObject*, PyObject *Py_UNUSED(ignored))
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetEngineDeltaTime());
 }
 
-static PyObject *gPyGetBlendFileList(PyObject*, PyObject *args)
-{
-	EXP_ShowDeprecationWarning("getBlendFileList", "getRangeFileList");
-	Py_RETURN_NONE;
-}
-
-static PyObject *gPyGetRangeFileListImpl(PyObject *, PyObject *args, bool is_rasec)
+static PyObject *gPyGetRangeFileListImpl(PyObject *, PyObject *args, const char *ext)
 {
 	char cpath[FILE_MAX];
 	char *searchpath = nullptr;
@@ -672,7 +666,7 @@ static PyObject *gPyGetRangeFileListImpl(PyObject *, PyObject *args, bool is_ras
 	}
 
 	while ((dirp = readdir(dp)) != nullptr) {
-		if (BLI_path_extension_check(dirp->d_name, is_rasec ? ".rasec" : ".range")) {
+		if (BLI_path_extension_check(dirp->d_name, ext)) {
 			value = PyC_UnicodeFromByte(dirp->d_name);
 			PyList_Append(list, value);
 			Py_DECREF(value);
@@ -685,12 +679,18 @@ static PyObject *gPyGetRangeFileListImpl(PyObject *, PyObject *args, bool is_ras
 
 static PyObject *gPyGetRasecFileList(PyObject *object, PyObject *args)
 {
-  return gPyGetRangeFileListImpl(object, args, true);
+  return gPyGetRangeFileListImpl(object, args, ".rasec");
 }
 
 static PyObject *gPyGetRangeFileList(PyObject *object, PyObject *args)
 {
-	return gPyGetRangeFileListImpl(object, args, false);
+	return gPyGetRangeFileListImpl(object, args, ".range");
+}
+
+/* Kept for Blender 2.4x games, which list their own .blend files. */
+static PyObject *gPyGetBlendFileList(PyObject *object, PyObject *args)
+{
+	return gPyGetRangeFileListImpl(object, args, ".blend");
 }
 
 PyDoc_STRVAR(gPyAddScene_doc,

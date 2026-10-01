@@ -142,7 +142,8 @@ void blo_do_versions_upbge(FileData *fd, Library *lib, Main *main)
         if (ob->type == OB_MESH) {
           Mesh *me = blo_do_versions_newlibadr(fd, lib, ob->data);
           bool converted = false;
-          for (unsigned short i = 0; i < me->totcol; ++i) {
+          /* The mesh or its material array can be missing (e.g. linked from a library). */
+          for (unsigned short i = 0; me && me->mat && i < me->totcol; ++i) {
             Material *ma = blo_do_versions_newlibadr(fd, lib, me->mat[i]);
             if (ma) {
               ob->friction = ma->friction;

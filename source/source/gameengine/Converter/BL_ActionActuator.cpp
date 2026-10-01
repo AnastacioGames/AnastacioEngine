@@ -144,8 +144,11 @@ bool BL_ActionActuator::Update(double curtime)
 
 	// Handle events
 	const bool negativeEvent = m_negevent;
-	const bool positiveEvent = m_posevent;
+	/* Like Blender 2.4x, a looping actuator held by a positive pulse keeps trying to start
+	 * while a higher priority action occupies the layer. */
+	const bool positiveEvent = m_posevent || ((m_flag & ACT_FLAG_PENDING) && !negativeEvent);
 	RemoveAllEvents();
+	m_flag &= ~ACT_FLAG_PENDING;
 
 	if (m_flag & ACT_FLAG_ACTIVE) {
 		// "Active" actions need to keep updating their current frame
@@ -196,10 +199,15 @@ bool BL_ActionActuator::Update(double curtime)
 				}
 				break;
 			case ACT_ACTION_LOOP_STOP:
-				if (!(m_flag & ACT_FLAG_ACTIVE) && Play(obj, start, end, playtype)) {
-					m_flag |= ACT_FLAG_ACTIVE;
-					if (useContinue) {
-						obj->SetActionFrame(m_layer, m_localtime);
+				if (!(m_flag & ACT_FLAG_ACTIVE)) {
+					if (Play(obj, start, end, playtype)) {
+						m_flag |= ACT_FLAG_ACTIVE;
+						if (useContinue) {
+							obj->SetActionFrame(m_layer, m_localtime);
+						}
+					}
+					else {
+						m_flag |= ACT_FLAG_PENDING;
 					}
 				}
 				break;
@@ -286,7 +294,7 @@ bool BL_ActionActuator::Update(double curtime)
 		}
 	}
 
-	return m_flag & ACT_FLAG_ACTIVE;
+	return m_flag & (ACT_FLAG_ACTIVE | ACT_FLAG_PENDING);
 }
 
 void BL_ActionActuator::DecLink()
@@ -296,7 +304,11 @@ void BL_ActionActuator::DecLink()
 	   and it should stop its action. */
 	if (m_links == 0) {
 		KX_GameObject *obj = (KX_GameObject *)GetParent();
-		obj->StopAction(m_layer);
+		/* Only stop our own action: on a state change another actuator of the new
+		 * state may already be playing on this layer. */
+		if (obj->GetCurrentActionName(m_layer) == m_actionName) {
+			obj->StopAction(m_layer);
+		}
 	}
 }
 

@@ -2026,6 +2026,8 @@ static void convert_tfacematerial(Main *bmain, Material *ma)
 	char idname[MAX_ID_NAME];
 
 	for (me = bmain->mesh.first; me; me = me->id.next) {
+		if (ID_IS_LINKED(me)) continue;
+
 		/* check if this mesh uses this material */
 		for (a = 0; a < me->totcol; a++)
 			if (me->mat[a] == ma) break;
@@ -2040,7 +2042,7 @@ static void convert_tfacematerial(Main *bmain, Material *ma)
 
 		/* loop over all the faces and stop at the ones that use the material*/
 		for (a = 0, mf = me->mface; a < me->totface; a++, mf++) {
-			if (me->mat[mf->mat_nr] != ma) continue;
+			if (mf->mat_nr < 0 || mf->mat_nr >= me->totcol || me->mat[mf->mat_nr] != ma) continue;
 
 			/* texface data for this face */
 			tf = ((MTFace *)cdl->data) + a;
@@ -2252,12 +2254,13 @@ int do_version_tface(Main *main)
 
 		/* disputed material */
 		if (ma->game.flag == MAT_BGE_DISPUTED) {
-			ma->game.flag = 0;
 			if (fileload) {
-				printf("Warning: material \"%s\" skipped.\n", ma->id.name + 2);
-				nowarning = 0;
+				/* Range: keep it marked; BKE_material_tface_split_disputed()
+				 * splits it per TexFace flag set after linking (materials can't
+				 * be copied yet here) instead of skipping it. */
 			}
 			else {
+				ma->game.flag = 0;
 				convert_tfacematerial(main, ma);
 			}
 			continue;
@@ -2305,4 +2308,84 @@ int do_version_tface(Main *main)
 	}
 
 	return nowarning;
+}
+
+/* Range: split materials that do_version_tface() marked as disputed (one
+ * material used by faces with different 2.49 TexFace flags) into one copy per
+ * flag set, like the removed 2.5x "Convert TexFace" operator. Runs after
+ * linking, on polygons (mfaces are already converted to mpolys). */
+void BKE_material_tface_split_disputed(Main *bmain)
+{
+	Material *ma, *mat_new;
+	Mesh *me;
+	MPoly *mp;
+	MTexPoly *tp;
+	MTFace tf;
+	Material **disputed;
+	int totdisputed = 0, i, a, flag;
+	short mat_nr;
+	char idname[MAX_ID_NAME];
+
+	for (ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->game.flag == MAT_BGE_DISPUTED) totdisputed++;
+	}
+	if (totdisputed == 0) return;
+
+	disputed = MEM_mallocN(sizeof(*disputed) * totdisputed, __func__);
+	totdisputed = 0;
+	for (ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->game.flag == MAT_BGE_DISPUTED) {
+			ma->game.flag = 0;
+			disputed[totdisputed++] = ma;
+		}
+	}
+
+	for (i = 0; i < totdisputed; i++) {
+		ma = disputed[i];
+		for (me = bmain->mesh.first; me; me = me->id.next) {
+			if (ID_IS_LINKED(me)) continue;
+
+			for (a = 0; a < me->totcol; a++)
+				if (me->mat[a] == ma) break;
+			if (a == me->totcol) continue;
+
+			tp = CustomData_get_layer(&me->pdata, CD_MTEXPOLY);
+			if (!tp) continue;
+
+			memset(&tf, 0, sizeof(tf));
+			for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++) {
+				if (mp->mat_nr < 0 || mp->mat_nr >= me->totcol || me->mat[mp->mat_nr] != ma) continue;
+
+				tf.mode = tp[a].mode;
+				tf.transp = tp[a].transp;
+				tf.tpage = tp[a].tpage;
+				flag = encode_tfaceflag(&tf, 1);
+				calculate_tface_materialname(ma->id.name, idname, flag);
+
+				if ((mat_new = BLI_findstring(&bmain->mat, idname + 2, offsetof(ID, name) + 2))) {
+					mat_nr = mesh_getmaterialnumber(me, mat_new);
+					if (mat_nr == -1) mat_nr = mesh_addmaterial(bmain, me, mat_new);
+				}
+				else {
+					mat_new = BKE_material_copy(bmain, ma);
+					if (!mat_new) continue;
+					BLI_strncpy(mat_new->id.name, idname, sizeof(mat_new->id.name));
+					id_us_min((ID *)mat_new);
+					mat_nr = mesh_addmaterial(bmain, me, mat_new);
+					decode_tfaceflag(mat_new, flag, 1);
+				}
+				set_facetexture_flags(mat_new, tf.tpage);
+				mp->mat_nr = mat_nr;
+			}
+
+			for (a = 0; a < me->totcol; ) {
+				if (me->mat[a] == ma) BKE_material_pop_id(bmain, &me->id, a, true);
+				else a++;
+			}
+			/* legacy tessfaces still hold the old indices */
+			BKE_mesh_tessface_clear(me);
+		}
+	}
+
+	MEM_freeN(disputed);
 }

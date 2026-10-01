@@ -15,6 +15,18 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   VAO/buffer próprios e restauração dos bindings, contornando a emulação legada de GL do Emscripten.
 - Validado no celular: o anel da mira do Ray VR Gaze aparece no `vr_menu`.
 
+## 2026-10-01 - Porte do YoFrankie (Blender 2.49): correções de compatibilidade
+
+- `logic.getBlendFileList` voltou a listar os `.blend` (`KX_PythonInit.cpp`).
+- Sensor de joystick em modo Hat: aviso claro em vez de "bad case statement"; nunca dispara (`BL_ConvertSensors.cpp`).
+- Action actuator em LOOPSTOP: retry pendente e `DecLink` só para a própria action (`BL_ActionActuator.*`).
+- `mat_nr` fora do intervalo é limitado ao número de materiais (`BL_BlenderDataConversion.cpp`).
+- Materiais TexFace 2.4x com flags mistas por face: `BKE_material_tface_split_disputed` divide o material em
+  `<nome>.TF.<flags>` após o linking (`material.c`, `readfile.c`); acaba o aviso "material skipped".
+- `versioning_upbge.c`: checagem de nulo na conversão de atrito (crash ao abrir arquivos antigos).
+- Validado: as 14 fases do YoFrankie abrem 8 s sem crash e sem "skipped". Falta validação visual e de jogabilidade.
+- Relatório completo: `PORTE_ANASTACIO.md` no repositório do jogo.
+
 ## 2026-10-01 - VR no celular: texto 3D na Web/celular
 
 - Na Web, a emulação legada de GL do Emscripten bagunçava VAO/VBO ao desenhar glifos. O BLF ganhou um caminho

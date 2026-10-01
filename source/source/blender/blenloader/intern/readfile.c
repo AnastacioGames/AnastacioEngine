@@ -8778,6 +8778,15 @@ static void do_versions_after_linking(Main *main)
 //	       main->curlib ? "LIB" : "MAIN", main->versionfile, main->subversionfile);
 
 	do_versions_after_linking_270(main);
+
+	/* Range: split 2.49 materials shared by faces with different TexFace flags */
+	if (main->versionfile < 259 || (main->versionfile == 259 && main->subversionfile < 3)) {
+		/* image alpha lookup resolves paths against G_MAIN (see convert_tface_mt) */
+		Main *gmain = G_MAIN;
+		G_MAIN = main;
+		BKE_material_tface_split_disputed(main);
+		G_MAIN = gmain;
+	}
 }
 
 static void lib_link_all(FileData *fd, Main *main)
