@@ -65,7 +65,8 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 							   float gazeTime,
 							   float gazeAngle,
 							   bool gazeReticle,
-							   bool gazeSelf)
+							   bool gazeSelf,
+							   bool gazeHighlight)
 	:SCA_ISensor(gameobj, eventmgr),
 	m_propertyname(propname),
 	m_bFindMaterial(bFindMaterial),
@@ -81,6 +82,8 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 	m_gazeReticle(gazeReticle),
 	m_gazeSelf(gazeSelf),
 	m_gazeObject(nullptr),
+	m_gazeHighlight(gazeHighlight),
+	m_highlightObject(nullptr),
 	m_hitMaterial("")
 {
 	Init();
@@ -94,11 +97,40 @@ void KX_RaySensor::Init()
 	m_gazeAccum = 0.0f;
 	m_gazeObject = nullptr;
 	m_reset = true;
+	SetHighlight(nullptr);
 }
 
 KX_RaySensor::~KX_RaySensor()
 {
-	/* Nothing to be done here. */
+	SetHighlight(nullptr);
+}
+
+void KX_RaySensor::SetHighlight(KX_GameObject *gameobj)
+{
+	if (gameobj == m_highlightObject) {
+		return;
+	}
+	if (m_highlightObject) {
+		m_highlightObject->NodeSetLocalScale(m_highlightScale);
+		m_highlightObject->NodeUpdate();
+		m_highlightObject->UnregisterSensor(this);
+	}
+	m_highlightObject = gameobj;
+	if (gameobj) {
+		m_highlightScale = gameobj->NodeGetLocalScaling();
+		gameobj->NodeSetLocalScale(m_highlightScale * 1.1f);
+		gameobj->NodeUpdate();
+		gameobj->RegisterSensor(this);
+	}
+}
+
+bool KX_RaySensor::UnlinkObject(SCA_IObject *clientobj)
+{
+	if (clientobj == m_highlightObject) {
+		m_highlightObject = nullptr;
+		return true;
+	}
+	return false;
 }
 
 
@@ -106,6 +138,7 @@ KX_RaySensor::~KX_RaySensor()
 EXP_Value *KX_RaySensor::GetReplica()
 {
 	KX_RaySensor *replica = new KX_RaySensor(*this);
+	replica->m_highlightObject = nullptr;
 	replica->ProcessReplica();
 	replica->Init();
 
@@ -397,6 +430,9 @@ bool KX_RaySensor::Evaluate()
 		else {
 			m_gazeAccum = 0.0f;
 			m_gazeObject = m_rayHit ? m_hitObject : nullptr;
+		}
+		if (m_gazeHighlight) {
+			SetHighlight(!m_rayHit ? nullptr : (gazeSelf ? owner : static_cast<KX_GameObject *>(m_hitObject)));
 		}
 		if (m_gazeReticle) {
 			/* Ring facing the eye at the gaze point (2 m ahead when nothing is hit), about 1 degree wide;

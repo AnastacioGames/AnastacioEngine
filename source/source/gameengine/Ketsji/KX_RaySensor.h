@@ -40,6 +40,7 @@
 #include "BLI_utildefines.h"
 
 struct KX_ClientObjectInfo;
+class KX_GameObject;
 class KX_RayCast;
 
 class KX_RaySensor : public SCA_ISensor
@@ -63,6 +64,10 @@ class KX_RaySensor : public SCA_ISensor
 	bool m_gazeReticle;
 	/// Gaze of the active camera, fires only when it hits the owner or its children.
 	bool m_gazeSelf;
+	/// Scale up the looked-at object (the owner with Self) while gazed, restored when the gaze leaves.
+	bool m_gazeHighlight;
+	KX_GameObject *m_highlightObject;
+	mt::vec3 m_highlightScale;
 	SCA_IObject *m_gazeObject;
 	mt::vec3 m_hitPosition;
 	SCA_IObject*	m_hitObject;
@@ -84,13 +89,16 @@ public:
 				 float gazeTime = 0.0f,
 				 float gazeAngle = 0.0f,
 				 bool gazeReticle = false,
-				 bool gazeSelf = false);
+				 bool gazeSelf = false,
+				 bool gazeHighlight = false);
 	virtual ~KX_RaySensor();
 	virtual EXP_Value* GetReplica();
 
 	virtual bool Evaluate();
 	virtual bool IsPositiveTrigger();
 	virtual void Init();
+	virtual bool UnlinkObject(SCA_IObject *clientobj);
+	void SetHighlight(KX_GameObject *gameobj);
 
 	/// \see KX_RayCast
 	bool RayHit(KX_ClientObjectInfo *client, KX_RayCast *result, void *UNUSED(data));

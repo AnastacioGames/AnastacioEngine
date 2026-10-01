@@ -1022,6 +1022,11 @@ static void rna_def_ray_sensor(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Self", "Use the gaze of the active camera and fire only when it hits this object or its children (VR buttons)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_gaze_highlight", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gaze_reticle", 8);
+	RNA_def_property_ui_text(prop, "Highlight", "Scale the looked-at object (the owner with Self) up by 10% while gazed, restored when the gaze leaves");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "mask", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "mask", 1);
 	RNA_def_property_array(prop, OB_MAX_COL_MASKS);

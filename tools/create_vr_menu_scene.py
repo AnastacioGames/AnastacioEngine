@@ -83,7 +83,8 @@ for i, (label, color) in enumerate((("Jogar", (0.2, 0.8, 0.3)), ("Opcoes", (0.2,
         text.parent = button
         text.matrix_parent_inverse = button.matrix_world.inverted()
 
-    gaze = add(button, "sensor", 'RAY', axis='GAZE', range=20, gaze_time=1000, use_gaze_self=True)
+    gaze = add(button, "sensor", 'RAY', axis='GAZE', range=20, gaze_time=1000, use_gaze_self=True,
+                use_gaze_highlight=True)
     cont = add(button, "controller", 'LOGIC_AND')
     act = add(button, "actuator", 'PROPERTY', mode='ADD', property="cliques", value="1")
     gaze.link(cont)

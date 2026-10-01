@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: destaque do objeto olhado (Highlight)
+
+- Ray com eixo VR Gaze ganhou a opção **Highlight** (bit 8 de `gaze_reticle`, `use_gaze_highlight`, sem mudança de
+  DNA): o objeto olhado (ou o dono, com Self) cresce ×1,1 e volta à escala original ao sair; objeto apagado é
+  esquecido via `RegisterSensor`/`UnlinkObject` (`KX_RaySensor.cpp`).
+- `tools/create_vr_menu_scene.py` liga o Highlight nos botões do `vr_menu`.
+
 ## 2026-10-01 - VR no celular: teleporte no atuador Motion
 
 - Motion (modo Simple) com VR Gaze ganhou a opção **Teleport** (`ACT_DLOC_VR_TELEPORT`, `use_vr_teleport`): cada

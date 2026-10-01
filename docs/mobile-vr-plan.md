@@ -141,7 +141,8 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
 
 1. **Sensor "VR Gaze" (logic brick).** Sem Python: raio do olhar com filtro por propriedade, saída positiva ao
    olhar (opção de tempo mínimo, 0 = instantâneo) e campo de progresso 0..1 para barras. Substitui o `vr_gaze.py`.
-   Bônus: atuador de feedback (cor/escala ao ser olhado), com restauração ao sair.
+   Bônus: feedback ao ser olhado — feito como opção **Highlight** no Ray VR Gaze (escala ×1,1 enquanto olhado,
+   restaura ao sair; 2026-10-01).
 2. **Atuador "VR Move" (andar para onde olha).** Move o corpo para a frente da `gazeDirection` (só no plano
    horizontal, opção de voo), com velocidade e botão/gatilho. Sem enjoo: aceleração suave e opção de "teleporte"
    (marca o ponto olhado e salta).

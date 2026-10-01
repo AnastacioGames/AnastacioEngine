@@ -600,7 +600,8 @@ void BL_ConvertSensors(struct Object *blenderobject,
 							      blenderraysensor->gaze_time * 0.001f,
 							      blenderraysensor->gaze_angle,
 							      (blenderraysensor->gaze_reticle & 1) != 0,
-							      (blenderraysensor->gaze_reticle & 4) != 0);
+							      (blenderraysensor->gaze_reticle & 4) != 0,
+							      (blenderraysensor->gaze_reticle & 8) != 0);
 
 					}
 					break;

@@ -1318,6 +1318,7 @@ static void draw_sensor_ray(uiLayout *layout, PointerRNA *ptr, bContext *C)
 		uiItemR(row, ptr, "gaze_angle", 0, NULL, ICON_NONE);
 		uiItemR(row, ptr, "use_gaze_reticle", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 		uiItemR(row, ptr, "use_gaze_self", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+		uiItemR(row, ptr, "use_gaze_highlight", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 	}
 	split = uiLayoutSplit(layout, 0.3, false);
 	uiItemR(split, ptr, "mask", 0, NULL, ICON_NONE);
