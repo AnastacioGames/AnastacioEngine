@@ -76,6 +76,8 @@ public:
 
 	/// The instance behind bge.logic.motion, null before the Python module exists.
 	static KX_PythonMotion *GetInstance();
+	/** Default smoothing (seconds) for the current/next instance, set from the scene settings. */
+	static void SetDefaultSmoothing(float seconds);
 
 	/// Head orientation for the engine (VR Head Tracking). The first valid reading is taken as the
 	/// forward direction, unless a script already called recenter(). False without a sensor.

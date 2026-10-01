@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: lente e suavização no painel Stereo
+
+- `GameData.vr_lens_strength` (%) e `vr_head_smoothing` (ms) nos shorts de padding (tamanho do DNA igual; 0 = padrão 30%/40 ms, sem versionamento). RNA, painel Render → Stereo e leitura em `LA_Launcher`. Python continua sobrescrevendo em runtime.
+- Runtime nativo, editor e Web compilam; falta validar no celular.
+
 ## 2026-10-01 - VR no celular, peça 4: separação 0,064, gaze, setStereoMode e sombras na view da cabeça
 
 - Com `VR Head Tracking` ou `VR Lens Distortion` ligados e a separação ainda no padrão 0,10, o launcher usa 0,064 m.

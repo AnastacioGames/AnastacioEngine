@@ -1022,8 +1022,9 @@ typedef struct GameData {
 	short dynamicResolutionMinScale;
 	short dynamicResolutionMaxScale;
 	short dynamicResolutionStep;
-	short pad;
-	short dynamicResolutionPad;
+	/* VR: lens strength in percent (0 = default 30), head smoothing in ms (0 = default 40). */
+	short vr_lens_strength;
+	short vr_head_smoothing;
 	int dynamicResolutionPad2;
 	char cursorimage_path[1024]; /* FILE_MAX */
 	int cursor_size;

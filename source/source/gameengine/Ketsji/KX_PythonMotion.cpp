@@ -62,6 +62,15 @@ EM_JS(void, kx_motion_web_read, (float *out, int size), {
 /* ------------------------------------------------------------------------- */
 
 static KX_PythonMotion *g_motionInstance = nullptr;
+static float g_defaultSmoothing = 0.04f;
+
+void KX_PythonMotion::SetDefaultSmoothing(float seconds)
+{
+	g_defaultSmoothing = seconds;
+	if (g_motionInstance) {
+		g_motionInstance->m_smoothing = seconds;
+	}
+}
 
 KX_PythonMotion::KX_PythonMotion()
 	:EXP_PyObjectPlus()
@@ -70,7 +79,7 @@ KX_PythonMotion::KX_PythonMotion()
 	m_neutral[0] = m_neutral[1] = 0.0f;
 	m_headYaw = 0.0f;
 	m_headCentered = false;
-	m_smoothing = 0.04f;
+	m_smoothing = g_defaultSmoothing;
 	m_smoothQuat = mt::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	m_smoothValid = false;
 	g_motionInstance = this;

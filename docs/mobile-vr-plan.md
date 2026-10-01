@@ -52,7 +52,9 @@ hardware para validar (o SDK já está em `lib/win64_vc15/openxr_sdk`, fora do b
 
 - Ajustes (2026-10-01): `bge.render.setVRLensStrength(k)` (0 a 1, padrão 0,3) e `bge.logic.motion.smoothing` (segundos, padrão 0,04, 0 desliga; filtro só na view da cabeça). Exemplo: `templates_range/vr_tune.py`. O overlay de perfil só entra com `--perf` no `package-web.py`; o APK final sai sem ele.
 
-## Próximo: parâmetros VR no painel Stereo (planejado, 2026-10-01)
+## Parâmetros VR no painel Stereo (feito, 2026-10-01)
+
+Implementado com shorts no padding do `GameData` (`vr_lens_strength` em %, `vr_head_smoothing` em ms; 0 = padrão 30%/40 ms, então cenas antigas não precisam de versionamento). Lido em `LA_Launcher`. Plano original:
 
 Hoje a intensidade da lente e a suavização só são ajustáveis por Python (`vr_tune.py`). Plano para levá-las ao
 painel Render → Stereo, salvas na cena:

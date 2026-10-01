@@ -1177,6 +1177,10 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
             stereo_box.prop(gs, "stereo_eye_separation")
             stereo_box.prop(gs, "vr_head_tracking")
             stereo_box.prop(gs, "vr_lens_distortion")
+            if gs.vr_lens_distortion:
+                stereo_box.prop(gs, "vr_lens_strength")
+            if gs.vr_head_tracking:
+                stereo_box.prop(gs, "vr_head_smoothing")
 
 
 class SceneButtonsPanel:

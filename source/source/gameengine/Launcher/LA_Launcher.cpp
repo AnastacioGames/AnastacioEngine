@@ -39,6 +39,7 @@
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_PythonInit.h"
+#include "KX_PythonMotion.h"
 #include "KX_PythonMain.h"
 #include "KX_PyConstraintBinding.h"
 
@@ -193,6 +194,11 @@ void LA_Launcher::InitEngine()
 		eyeSeparation = 0.064f;
 	}
 	m_rasterizer->SetEyeSeparation(eyeSeparation);
+	{
+		const GameData &vrgm = m_startScene->gm;
+		m_rasterizer->SetVRLensStrength(vrgm.vr_lens_strength > 0 ? vrgm.vr_lens_strength / 100.0f : 0.3f);
+		KX_PythonMotion::SetDefaultSmoothing(vrgm.vr_head_smoothing > 0 ? vrgm.vr_head_smoothing / 1000.0f : 0.04f);
+	}
 	m_rasterizer->SetDrawingMode(GetRasterizerDrawMode());
 
 	// Copy current anisotropic level to restore it at the game end.
