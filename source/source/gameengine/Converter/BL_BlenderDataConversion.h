@@ -33,6 +33,7 @@
 #define __BL_BLENDERDATACONVERSION_H__
 
 #include "RAS_Mesh.h"
+#include "KX_Mesh.h"
 #include "KX_PhysicsEngineEnums.h"
 #include "SCA_IInputDevice.h"
 
@@ -60,7 +61,8 @@ struct BL_MeshMaterial {
 
 KX_Mesh *BL_ConvertMesh(Mesh *mesh, Object *lightobj, KX_Scene *scene, BL_SceneConverter& converter);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
-                                  const RAS_Mesh::LayersInfo& layersInfo);
+                                  const RAS_Mesh::LayersInfo& layersInfo,
+                                  std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr);
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj);
 

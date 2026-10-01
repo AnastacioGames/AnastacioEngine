@@ -51,6 +51,7 @@
 #include <vector>
 #include <algorithm>
 #include <memory>
+#include <map>
 
 
 #include "mathfu.h"
@@ -192,6 +193,7 @@ extern "C" {
 #  include "BKE_DerivedMesh.h"
 #  include "BKE_material.h" // Needed for give_current_material.
 #  include "BKE_image.h"
+#  include "BKE_bmfont.h"
 #  include "IMB_imbuf_types.h"
 #  include "BKE_displist.h"
 
@@ -474,6 +476,41 @@ static RAS_MaterialBucket *BL_ConvertMaterial(Material *ma, KX_Scene *scene, BL_
 	return bucket;
 }
 
+/// True when the mesh has 2.4x TexFace "Text" faces (bitmap font).
+static bool BL_MeshHasBitmapText(const Mesh *me)
+{
+	if (!me->mtpoly) {
+		return false;
+	}
+	for (int i = 0; i < me->totpoly; ++i) {
+		if ((me->mtpoly[i].mode & TF_BMFONT) && me->mtpoly[i].tpage) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/// Glyph table of a 2.4x bitmap font image, nullptr when the image is not a bitmap font.
+static std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > BL_BitmapFontGlyphs(Image *ima)
+{
+	std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > glyphs;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, nullptr, nullptr);
+	if (ibuf) {
+		if (!(ibuf->userflags & IB_BITMAPFONT)) {
+			detectBitmapFont(ibuf);
+		}
+		if (ibuf->userflags & IB_BITMAPFONT) {
+			glyphs.reset(new std::vector<KX_Mesh::BitmapGlyph>(256));
+			for (unsigned short c = 0; c < 256; ++c) {
+				KX_Mesh::BitmapGlyph& g = (*glyphs)[c];
+				matrixGlyph(ibuf, c, &g.centerx, &g.centery, &g.sizex, &g.sizey, &g.transx, &g.transy, &g.movex, &g.movey, &g.advance);
+			}
+		}
+	}
+	BKE_image_release_ibuf(ima, ibuf, nullptr);
+	return glyphs;
+}
+
 /* blenderobj can be nullptr, make sure its checked for */
 KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneConverter& converter)
 {
@@ -485,7 +522,9 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 
 	// Without checking names, we get some reuse we don't want that can cause
 	// problems with material LoDs.
-	if (blenderobj && ((meshobj = converter.FindGameMesh(me)) != nullptr)) {
+	// Bitmap text is generated per object from its "Text" property, never share it.
+	const bool bitmapText = BL_MeshHasBitmapText(me);
+	if (blenderobj && !bitmapText && ((meshobj = converter.FindGameMesh(me)) != nullptr)) {
 		const std::string bge_name = meshobj->GetName();
 		const std::string blender_name = ((ID *)blenderobj->data)->name + 2;
 		if (bge_name == blender_name) {
@@ -562,7 +601,9 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 		mats[i] = {meshmat->GetDisplayArray(), bucket, mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire()};
 	}
 
-	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo);
+	std::vector<KX_Mesh::BitmapTextFace> bitmapTextFaces;
+	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo, bitmapText ? &bitmapTextFaces : nullptr);
+	meshobj->SetBitmapTextFaces(bitmapTextFaces);
 
 	meshobj->EndConversion(scene->GetBoundingBoxManager());
 
@@ -627,8 +668,11 @@ static void BL_ComputeVertexBoneData(const MDeformVert& dv, unsigned short defba
 }
 
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
-                                  const RAS_Mesh::LayersInfo& layersInfo)
+                                  const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces)
 {
+	const MTexPoly *mtpolys = bitmapTextFaces ? (MTexPoly *)CustomData_get_layer(&dm->polyData, CD_MTEXPOLY) : nullptr;
+	std::map<Image *, std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > > fontGlyphs;
+
 	const bool bMayHaveBoneData = (blenderobj && me->dvert && blenderobj->defbase.first &&
 	                                BL_ModifierDeformer::HasArmatureDeformer(blenderobj));
 	const unsigned short defbaseTot = bMayHaveBoneData ? BLI_listbase_count(&blenderobj->defbase) : 0;
@@ -684,6 +728,57 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 
 		const unsigned int lpstart = mpoly.loopstart;
 		const unsigned int totlp = mpoly.totloop;
+
+		// 2.4x bitmap text face: reserve one quad per character, placed by KX_Mesh::UpdateBitmapText().
+		if (mtpolys && (mtpolys[i].mode & TF_BMFONT) && mtpolys[i].tpage && mat.visible && !mat.wire &&
+		    (totlp == 3 || totlp == 4))
+		{
+			Image *ima = mtpolys[i].tpage;
+			if (fontGlyphs.find(ima) == fontGlyphs.end()) {
+				fontGlyphs[ima] = BL_BitmapFontGlyphs(ima);
+			}
+			const std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> >& glyphs = fontGlyphs[ima];
+
+			if (glyphs) {
+				KX_Mesh::BitmapTextFace face;
+				face.array = array;
+				face.firstVertex = array->GetVertexCount();
+				face.numVerts = totlp;
+				face.glyphs = glyphs;
+
+				static const float dummyTangent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+				const mt::vec4_packed boneZero(mt::zero4);
+				for (unsigned int slot = 0; slot < KX_Mesh::BitmapTextMaxChars; ++slot) {
+					for (unsigned int j = 0; j < totlp; ++j) {
+						const unsigned int loop = lpstart + j;
+						const unsigned int vertid = mloops[loop].v;
+						mt::vec2_packed uvs[RAS_Texture::MaxUnits];
+						unsigned int rgba[RAS_Texture::MaxUnits];
+						BL_GetUvRgba(layersInfo, uvLayers, colorLayers, loop, uvs, rgba);
+						if (slot == 0) {
+							face.co[j] = mt::vec3(mverts[vertid].co);
+							face.uv[j] = mt::vec2(uvs[layersInfo.activeUv].x, uvs[layersInfo.activeUv].y);
+						}
+						array->AddVertex(mt::vec3_packed(mverts[vertid].co), mt::vec3_packed(normals[loop]),
+						                 mt::vec4_packed(tangent ? tangent[loop] : dummyTangent), uvs, rgba, vertid, true,
+						                 boneZero, boneZero);
+					}
+					const unsigned int first = face.firstVertex + slot * totlp;
+					const unsigned int tris[2][3] = {{0, 1, 2}, {0, 2, 3}};
+					for (unsigned short t = 0; t < totlp - 2; ++t) {
+						for (unsigned short k = 0; k < 3; ++k) {
+							array->AddPrimitiveIndex(first + tris[t][k]);
+							// Only the face itself is used for physics and ray casts.
+							if (slot == 0) {
+								array->AddTriangleIndex(first + tris[t][k]);
+							}
+						}
+					}
+				}
+				bitmapTextFaces->push_back(face);
+				continue;
+			}
+		}
 		for (unsigned int j = lpstart; j < lpstart + totlp; ++j) {
 			const MLoop& mloop = mloops[j];
 			const unsigned int vertid = mloop.v;

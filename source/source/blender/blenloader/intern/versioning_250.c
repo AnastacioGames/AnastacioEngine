@@ -1947,7 +1947,11 @@ void blo_do_versions_250(FileData *fd, Library *lib, Main *bmain)
 						amd = (ArmatureModifierData *)modifier_new(eModifierType_Armature);
 						amd->object = ob->parent;
 						BLI_addtail((ListBase *)&ob->modifiers, amd);
-						amd->deformflag = arm->deformflag;
+						/* A linked armature is not read yet here (flags are zero),
+						 * so keep the modifier defaults instead of disabling deform. */
+						if (arm && arm->deformflag) {
+							amd->deformflag = arm->deformflag;
+						}
 						ob->partype = PAROBJECT;
 					}
 					else if (parent->type == OB_LATTICE && ob->partype == PARSKEL) {

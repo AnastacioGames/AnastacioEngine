@@ -2003,6 +2003,14 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 				has_mesh = true;
 				//has_non_mesh = true;
 			}
+
+			/* A skinned child's culling box follows the last applied pose, so skipping the pose
+			 * while it is culled can keep it culled forever (an action that moves the mesh into
+			 * view from off-screen never shows up). Blender 2.4x always updated armatures. */
+			if (child->GetDeformer()) {
+				needs_update = true;
+				break;
+			}
 			//else {
 			//	has_mesh = true;
 			//}

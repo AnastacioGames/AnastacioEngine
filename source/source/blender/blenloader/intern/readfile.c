@@ -81,6 +81,7 @@
 #include "DNA_python_component_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_text_types.h"
+#include "DNA_texture_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_sensor_types.h"
@@ -8786,6 +8787,27 @@ static void do_versions_after_linking(Main *main)
 		G_MAIN = main;
 		BKE_material_tface_split_disputed(main);
 		G_MAIN = gmain;
+	}
+
+	/* Range: 2.4x "Darken" alpha mapping was min(tex * dvar, alpha); the newer mix formula
+	 * keeps an opaque material opaque. With alpha 1 and a single alpha slot, "Mix" over
+	 * alpha 0 gives the same result. */
+	if (main->versionfile < 250) {
+		for (Material *ma = main->mat.first; ma; ma = ma->id.next) {
+			MTex *dark = NULL;
+			int totalpha = 0;
+			for (int a = 0; a < MAX_MTEX; a++) {
+				MTex *mtex = ma->mtex[a];
+				if (mtex && mtex->tex && (mtex->mapto & MAP_ALPHA)) {
+					totalpha++;
+					if (mtex->blendtype == MTEX_DARK) dark = mtex;
+				}
+			}
+			if (dark && totalpha == 1 && ma->alpha == 1.0f) {
+				dark->blendtype = MTEX_BLEND;
+				ma->alpha = 0.0f;
+			}
+		}
 	}
 }
 

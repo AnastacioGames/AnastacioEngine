@@ -57,6 +57,9 @@
 #include "BLI_compiler_compat.h" // For MSVC __func__
 
 #include "MEM_guardedalloc.h"
+#include "BLI_string_utf8.h"
+
+#include <algorithm>
 
 extern "C" {
 #  include "mathutils_bvhtree.h"
@@ -64,19 +67,22 @@ extern "C" {
 
 KX_Mesh::KX_Mesh(KX_Scene *scene, Mesh *mesh, const RAS_Mesh::LayersInfo& layersInfo)
 	:RAS_Mesh(mesh, layersInfo),
-	m_scene(scene)
+	m_scene(scene),
+	m_bitmapTextValid(false)
 {
 }
 
 KX_Mesh::KX_Mesh(KX_Scene *scene, const std::string& name, const RAS_Mesh::LayersInfo& layersInfo)
 	:RAS_Mesh(name, layersInfo),
-	m_scene(scene)
+	m_scene(scene),
+	m_bitmapTextValid(false)
 {
 }
 
 KX_Mesh::KX_Mesh(const KX_Mesh& other)
 	:RAS_Mesh(other),
-	m_scene(other.m_scene)
+	m_scene(other.m_scene),
+	m_bitmapTextValid(false)
 {
 }
 
@@ -87,6 +93,89 @@ KX_Mesh::~KX_Mesh()
 KX_Scene *KX_Mesh::GetScene() const
 {
 	return m_scene;
+}
+
+void KX_Mesh::SetBitmapTextFaces(const std::vector<BitmapTextFace>& faces)
+{
+	m_bitmapTextFaces = faces;
+	m_bitmapTextValid = false;
+}
+
+bool KX_Mesh::HasBitmapText() const
+{
+	return !m_bitmapTextFaces.empty();
+}
+
+void KX_Mesh::UpdateBitmapText(const std::string& text)
+{
+	if (m_bitmapTextValid && text == m_bitmapText) {
+		return;
+	}
+	m_bitmapText = text;
+	m_bitmapTextValid = true;
+
+	// Same layout as the 2.4x GPU_render_text().
+	for (const BitmapTextFace& face : m_bitmapTextFaces) {
+		RAS_DisplayArray *array = face.array;
+		const std::vector<BitmapGlyph>& glyphs = *face.glyphs;
+		const unsigned short uvSize = array->GetFormat().uvSize;
+		const mt::vec3 *v = face.co;
+
+		float line_height;
+		if (face.numVerts == 4) {
+			// 2.4x took v4 z here, keep it for identical line spacing.
+			line_height = std::max({v[0][1], v[1][1], v[2][1], v[3][2]}) - std::min({v[0][1], v[1][1], v[2][1], v[3][2]});
+		}
+		else {
+			line_height = std::max({v[0][1], v[1][1], v[2][1]}) - std::min({v[0][1], v[1][1], v[2][1]});
+		}
+		line_height *= 1.2f;
+
+		const float advance_tab = glyphs[' '].advance * 4.0f;
+		float penx = 0.0f;
+		float peny = 0.0f;
+		unsigned int slot = 0;
+
+		for (size_t index = 0; index < text.size() && slot < BitmapTextMaxChars; ) {
+			unsigned int character = BLI_str_utf8_as_unicode_and_size_safe(text.c_str() + index, &index);
+
+			if (character == '\n') {
+				penx = 0.0f;
+				peny -= line_height;
+				continue;
+			}
+			else if (character == '\t') {
+				penx += advance_tab;
+				continue;
+			}
+			else if (character > 255) {
+				character = '?';
+			}
+
+			const BitmapGlyph& g = glyphs[character];
+			const unsigned int first = face.firstVertex + slot * face.numVerts;
+			for (unsigned short j = 0; j < face.numVerts; ++j) {
+				array->SetPosition(first + j, mt::vec3(g.sizex * v[j][0] + g.movex + penx, g.sizey * v[j][1] + g.movey + peny, v[j][2]));
+				const mt::vec2 uv((face.uv[j][0] - g.centerx) * g.sizex + g.transx, (face.uv[j][1] - g.centery) * g.sizey + g.transy);
+				for (unsigned short layer = 0; layer < uvSize; ++layer) {
+					array->SetUv(first + j, layer, uv);
+				}
+			}
+
+			penx += g.advance;
+			++slot;
+		}
+
+		// Collapse the unused glyph slots.
+		for (; slot < BitmapTextMaxChars; ++slot) {
+			const unsigned int first = face.firstVertex + slot * face.numVerts;
+			for (unsigned short j = 0; j < face.numVerts; ++j) {
+				array->SetPosition(first + j, v[0]);
+			}
+		}
+
+		array->NotifyUpdate(RAS_DisplayArray::POSITION_MODIFIED | RAS_DisplayArray::UVS_MODIFIED);
+	}
 }
 
 

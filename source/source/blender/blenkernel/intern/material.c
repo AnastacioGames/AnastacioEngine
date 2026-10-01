@@ -2367,6 +2367,8 @@ void BKE_material_tface_split_disputed(Main *bmain)
 					if (mat_nr == -1) mat_nr = mesh_addmaterial(bmain, me, mat_new);
 				}
 				else {
+					/* runs before lib_verify_nodetree(): node typeinfo is not set yet */
+					if (ma->nodetree) ntreeSetTypes(NULL, ma->nodetree);
 					mat_new = BKE_material_copy(bmain, ma);
 					if (!mat_new) continue;
 					BLI_strncpy(mat_new->id.name, idname, sizeof(mat_new->id.name));

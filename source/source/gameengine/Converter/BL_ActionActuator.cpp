@@ -178,6 +178,10 @@ bool BL_ActionActuator::Update(double curtime)
 
 	// If a different action is playing, we've been overruled and are no longer active
 	if (obj->GetCurrentActionName(m_layer) != m_actionName && !obj->IsActionDone(m_layer)) {
+		/* Like Blender 2.4x, a held looping actuator resumes once the overriding action ends. */
+		if ((m_flag & ACT_FLAG_ACTIVE) && m_playtype == ACT_ACTION_LOOP_STOP && !negativeEvent && m_links > 0) {
+			m_flag |= ACT_FLAG_PENDING;
+		}
 		m_flag &= ~ACT_FLAG_ACTIVE;
 	}
 
@@ -303,6 +307,7 @@ void BL_ActionActuator::DecLink()
 	/* In this case no controllers use this action actuator,
 	   and it should stop its action. */
 	if (m_links == 0) {
+		m_flag &= ~ACT_FLAG_PENDING;
 		KX_GameObject *obj = (KX_GameObject *)GetParent();
 		/* Only stop our own action: on a state change another actuator of the new
 		 * state may already be playing on this layer. */

@@ -1255,6 +1255,14 @@ void KX_GameObject::UpdateBuckets()
 		m_sgNode->ClearDirty(SG_Node::DIRTY_RENDER);
 	}
 
+	for (KX_Mesh *mesh : m_meshes) {
+		if (mesh->HasBitmapText()) {
+			// 2.4x bitmap text shows the "Text" property.
+			EXP_Value *prop = GetProperty("Text");
+			mesh->UpdateBitmapText(prop ? prop->GetText() : std::string());
+		}
+	}
+
 	m_meshUser->SetPassIndex(m_passIndex);
 	m_meshUser->SetLayer(m_layer);
 	m_meshUser->SetColor(m_objectColor);

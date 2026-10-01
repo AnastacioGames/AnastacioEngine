@@ -9,6 +9,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Porte YoFrankie 2.49: texto bitmap, alpha Darken, armaduras
+
+- Texto bitmap 2.4x (TexFace `TF_BMFONT` + propriedade `Text`): a conversão reserva 256 cópias da face por
+  caractere (`BL_BlenderDataConversion.cpp`) e `KX_Mesh::UpdateBitmapText` refaz posição/UV a cada mudança de
+  texto, com o layout do `GPU_render_text` do 2.79 e a tabela de glifos de `bmfont.c`. Malhas com texto bitmap
+  não usam o cache de malhas (cada objeto tem a sua).
+- Alpha 2.4x com textura em Darken (`min(tex, alpha)`) virava opaco no GLSL novo: `do_versions_after_linking`
+  troca para Mix com alpha 0 em arquivos < 2.50 (`readfile.c`). Cópia de material com node tree corrigida
+  (`material.c`).
+- Action actuator LOOPSTOP sobreposto por outra action volta a tocar quando ela termina, como no 2.4x
+  (idle do Frankie travava após virar) (`BL_ActionActuator.cpp`).
+- Parent tipo Armature de arquivo 2.4x com armadura linkada: o modificador criado vinha com deformação desligada
+  (flags da armadura ainda não lidas); agora mantém o padrão (`versioning_250.c`).
+- Armadura com malha deformada sempre atualiza a pose, mesmo com a malha fora da câmera: a caixa de culling segue
+  a última pose, e uma action que traz a malha de fora da tela nunca aparecia (`KX_Scene.cpp`).
+- Validado só na RangeRuntime (intro do start_menu, texto das teclas, animação de virar).
+
 ## 2026-10-01 - VR no celular: correção de aberração cromática na lente
 
 - `gpu_shader_frame_buffer_frag.glsl` (`LENS_DISTORT`): `lens_color` amostra o canal vermelho com o raio distorcido
