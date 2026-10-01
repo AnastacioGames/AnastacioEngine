@@ -1193,19 +1193,35 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
         stereo_box = display_group.box()
         stereo_box.label(text="Stereo:", icon="CAMERA_STEREO")
         stereo_box.row().prop(gs, "stereo", expand=True)
-        stereo_box.operator("render.game_vr_setup", icon="CAMERA_STEREO")
         if gs.stereo == 'STEREO':
             stereo_box.prop(gs, "stereo_mode")
-            stereo_box.prop(gs, "stereo_eye_separation")
-            stereo_box.prop(gs, "vr_head_tracking")
-            stereo_box.prop(gs, "vr_lens_distortion")
-            if gs.vr_lens_distortion:
-                stereo_box.prop(gs, "vr_lens_strength")
-            if gs.vr_head_tracking:
-                stereo_box.prop(gs, "vr_head_smoothing")
-                stereo_box.prop(gs, "vr_vignette")
-                stereo_box.prop(gs, "vr_recenter_time")
 
+
+class RENDER_PT_game_vr(RenderButtonsPanel, Panel):
+    # Mobile VR settings in one place: the setup button first, then the
+    # head tracking, lens and comfort fields (used with Stereo = Stereo).
+    bl_label = "VR"
+    COMPAT_ENGINES = {"BLENDER_GAME"}
+
+    def draw(self, context):
+        layout = self.layout
+
+        gs = context.scene.game_settings
+
+        layout.operator("render.game_vr_setup", icon="CAMERA_STEREO")
+
+        vr_box = layout.box()
+        vr_box.active = (gs.stereo == 'STEREO')
+        col = vr_box.column()
+        col.prop(gs, "stereo_eye_separation")
+        col.prop(gs, "vr_head_tracking")
+        col.prop(gs, "vr_lens_distortion")
+        if gs.vr_lens_distortion:
+            col.prop(gs, "vr_lens_strength")
+        if gs.vr_head_tracking:
+            col.prop(gs, "vr_head_smoothing")
+            col.prop(gs, "vr_vignette")
+            col.prop(gs, "vr_recenter_time")
 
 class SceneButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -2269,6 +2285,7 @@ classes = (
     RENDER_MT_game_refresh_rate,
     RENDER_PT_embedded,
     RENDER_PT_game_display,
+    RENDER_PT_game_vr,
     RENDER_PT_game_shading,
     RENDER_PT_game_post_process_shaders,
     RENDER_PT_game_system,

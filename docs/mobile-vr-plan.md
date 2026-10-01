@@ -156,6 +156,7 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    baixo por 2 s) e opção de snap-turn do corpo.
 8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com
    botão "Preparar cena VR" que liga Stereo, Side-by-Side, 0,064, head tracking e lente de uma vez.
+   Feito (2026-10-01): painel `RENDER_PT_game_vr` na aba Render, abaixo do Display/Stereo, com o botão no topo.
 9. **Exportação.** Preset "Cardboard" no `package-web.py`/`package-android.py` (paisagem, sem overlay, botão
    VR já visível, tela sempre ligada).
 
