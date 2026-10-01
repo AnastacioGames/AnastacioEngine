@@ -325,6 +325,7 @@ KX_CameraRenderData KX_RenderPipeline::GetCameraRenderData(KX_Scene *scene, KX_C
 		rendercam->NodeSetGlobalOrientation(camera->NodeGetWorldOrientation());
 		rendercam->NodeSetWorldPosition(camera->NodeGetWorldPosition());
 		rendercam->NodeSetWorldScale(camera->NodeGetWorldScaling());
+		rendercam->CopyHeadView(camera);
 		rendercam->NodeUpdate();
 	}
 	// Else use the native camera.

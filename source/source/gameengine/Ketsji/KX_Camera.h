@@ -246,6 +246,8 @@ public:
 	/// Focus sensor, tracking and shake, once per frame for the active camera.
 	void UpdateGameFX(double curtime);
 	void UpdateHeadTracking();
+	/// Stereo render copies take the head rotation of the camera they stand for.
+	void CopyHeadView(const KX_Camera *other) { m_headActive = other->m_headActive; m_headRotation = other->m_headRotation; }
 	/// Adds shake trauma (0..1), decays at shake_decay per second.
 	void AddShake(float trauma, float duration);
 
