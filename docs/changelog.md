@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Nós de material: Diffuse, Glossy e Toon no loop de luzes do Principled (Fase 3)
+
+- `gpu_shader_material.glsl`: `scene_light_dir()` (direção, atenuação, cone de Spot) e `scene_light_visibility()`
+  (sombra das 3 primeiras luzes) saíram do Principled e agora servem também a `node_bsdf_diffuse_ambient`,
+  `node_bsdf_glossy` e `node_bsdf_toon`. Antes, Diffuse e Glossy tratavam toda luz como Sun e não tinham sombra.
+- Glossy: brilho GGX + Smith (mesma base do especular do Principled, fresnel branco) no lugar do Blinn misturado
+  com difuso. Toon: faixas do Toon difuso do Cycles (`size`, `smooth`) e World como ambiente; Component Glossy
+  ignorado. `node_bsdf_diffuse` (fallback de Glass etc.) segue sem posição do fragmento.
+- Nós C passam `GPU_VIEW_POSITION`. Selos do Glossy e do Toon com textos novos.
+- Validado: build ok e `node_material_test.range` (e cópia com Toon) rodam no player sem erro de GLSL.
+  Falta validação visual.
+
 ## 2026-10-01 - VR no celular: botão "Prepare VR Scene"
 
 - Operador `render.game_vr_setup` (`properties_game.py`, painel Stereo): Stereo + Side-by-Side + separação 0,064 +

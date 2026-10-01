@@ -23,8 +23,9 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 
 | Nó | O que o Game faz |
 |---|---|
-| Glossy BSDF | Diffuse com brilho suave; sem reflexo |
-| Glass, Refraction, Toon, Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
+| Glossy BSDF | brilho GGX das luzes da cena e cor do World como ambiente; sem reflexo |
+| Toon BSDF | faixas de luz do Toon difuso do Cycles; a opção Component Glossy é ignorada |
+| Glass, Refraction, Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
 | Hair BSDF | cor chapada, sem luz |
 | Ambient Occlusion | AO sempre 1; a cor passa direto |
 | Bevel | devolve a normal sem mudança |
@@ -40,6 +41,9 @@ Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, 
 
 ## Nós completos no Game PBR
 
+Principled, Diffuse, Glossy e Toon usam as mesmas luzes: Sun, Point e Spot com atenuação e cone,
+até 8 luzes, sombra nas 3 primeiras.
+
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
@@ -52,5 +56,5 @@ Output Attachment só no Game legado.
 
 ## Pendências
 
-Ver o plano em `docs/roadmap.md` (nós de material): iluminação unificada (Fase 3)
-e aproximações melhores para Glass, Toon, AO, Blackbody e Sky (Fase 4).
+Ver o plano em `docs/roadmap.md` (nós de material): aproximações melhores para Glass,
+Toon Glossy, AO, Blackbody e Sky (Fase 4).

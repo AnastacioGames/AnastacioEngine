@@ -3935,20 +3935,66 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 	return shadowfac;
 }
 
+/* Direction to scene-light slot i and its attenuation (distance + spot cone), shared by every BSDF
+ * with a light loop. I is the fragment's view-space position. Returns false for a disabled slot. */
+bool scene_light_dir(int i, vec3 I, out vec3 l, out float atten)
+{
+	l = vec3(0.0, 0.0, 1.0);
+	atten = 1.0;
+	if (SCENE_LIGHT(i).diffuse.rgb == vec3(0.0) && SCENE_LIGHT(i).specular.rgb == vec3(0.0)) {
+		return false;
+	}
+
+	/* position.w == 0: directional (Sun), position.xyz is already the direction to the light.
+	 * w == 1: Point/Spot, position.xyz is the light position in view space. */
+	vec4 light_position_world = SCENE_LIGHT(i).position;
+	if (light_position_world.w == 0.0) {
+		l = normalize(light_position_world.xyz);
+	}
+	else {
+		vec3 light_vec = light_position_world.xyz - I;
+		float light_dist = length(light_vec);
+		l = light_vec / max(light_dist, 0.0001);
+		atten = 1.0 / (SCENE_LIGHT(i).constantAttenuation +
+		               SCENE_LIGHT(i).linearAttenuation * light_dist +
+		               SCENE_LIGHT(i).quadraticAttenuation * light_dist * light_dist);
+		if (SCENE_LIGHT(i).spotCutoff < 179.0) {
+			float spotcos = dot(-l, normalize(SCENE_LIGHT(i).spotDirection));
+			atten *= (spotcos < SCENE_LIGHT(i).spotCosCutoff) ? 0.0 : pow(spotcos, SCENE_LIGHT(i).spotExponent);
+		}
+	}
+	return true;
+}
+
+/* Attenuation times shadow map of slot i (see scene_light_shadow). */
+float scene_light_visibility(int i, vec3 I, vec3 N, float NdotL, float atten)
+{
+	if (i < NUM_SHADOW_LIGHTS) {
+		atten *= scene_light_shadow(i, I, N, NdotL);
+	}
+	return atten;
+}
+
+vec3 scene_view_vector(vec3 I)
+{
+	return (gl_ProjectionMatrix[3][3] == 0.0) ? -normalize(I) : vec3(0.0, 0.0, 1.0);
+}
+
 /* bsdfs */
 
-void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 ambient, out vec4 result)
+void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient, out vec4 result)
 {
 	/* ambient light from the World color */
 	vec3 L = ambient;
 
-	/* directional lights */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		vec3 light_position = SCENE_LIGHT(i).position.xyz;
-		vec3 light_diffuse = SCENE_LIGHT(i).diffuse.rgb;
-
-		float bsdf = max(dot(N, light_position), 0.0);
-		L += light_diffuse * bsdf;
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = max(dot(N, l), 0.0);
+		L += SCENE_LIGHT(i).diffuse.rgb * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
 	}
 
 	result = vec4(L * color.rgb, color.a);
@@ -3956,28 +4002,38 @@ void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 ambient
 
 void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 {
-	/* used by BSDFs without their own GLSL approximation */
-	node_bsdf_diffuse_ambient(color, roughness, N, vec3(0.2), result);
+	/* used by BSDFs without their own GLSL approximation (no fragment position: lights as Sun) */
+	vec3 L = vec3(0.2);
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		L += SCENE_LIGHT(i).diffuse.rgb * max(dot(N, SCENE_LIGHT(i).position.xyz), 0.0);
+	}
+	result = vec4(L * color.rgb, color.a);
 }
 
-void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 ambient, out vec4 result)
+void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient, out vec4 result)
 {
 	/* ambient light from the World color */
 	vec3 L = ambient;
 
-	/* directional lights */
-	for (int i = 0; i < NUM_LIGHTS; i++) {
-		vec3 light_position = SCENE_LIGHT(i).position.xyz;
-		vec3 H = SCENE_LIGHT(i).halfVector.xyz;
-		vec3 light_diffuse = SCENE_LIGHT(i).diffuse.rgb;
-		vec3 light_specular = SCENE_LIGHT(i).specular.rgb;
+	vec3 V = scene_view_vector(I);
+	float NdotV = max(dot(N, V), 1e-4);
+	float a = max(sqr(roughness), 0.001);
+	float roughg = sqr(roughness * 0.5 + 0.5);
 
-		/* we mix in some diffuse so low roughness still shows up */
-		/* clamp: roughness 0 made the exponent infinite (NaN/black) */
-		float r2 = max(roughness * roughness, 1e-4);
-		float bsdf = 0.5 * pow(max(dot(N, H), 0.0), min(1.0 / r2, 1000.0));
-		bsdf += 0.5 * max(dot(N, light_position), 0.0);
-		L += light_specular * bsdf;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = dot(N, l);
+		if (NdotL <= 0.0) {
+			continue;
+		}
+		/* GGX like the Principled specular, white fresnel (Cycles' Glossy has none) */
+		vec3 H = normalize(l + V);
+		float bsdf = GTR2(max(dot(N, H), 0.0), a) * smithG_GGX(NdotL, roughg) * smithG_GGX(NdotV, roughg);
+		L += SCENE_LIGHT(i).specular.rgb * bsdf * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
 	}
 
 	result = vec4(L * color.rgb, color.a);
@@ -3995,9 +4051,29 @@ void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, out vec4 re
 	node_bsdf_diffuse(color, 0.0, N, result);
 }
 
-void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, out vec4 result)
+void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 ambient, out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	/* ambient light from the World color */
+	vec3 L = ambient;
+
+	/* same banding as Cycles' diffuse toon: full light inside size, linear falloff over smooth */
+	float max_angle = clamp(size, 0.0, 1.0) * M_PI * 0.5;
+	float smooth_angle = clamp(tsmooth, 0.0, 1.0) * M_PI * 0.5;
+
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = dot(N, l);
+		float angle = acos(clamp(NdotL, -1.0, 1.0));
+		float band = (angle < max_angle) ? 1.0 :
+		             (angle < max_angle + smooth_angle) ? 1.0 - (angle - max_angle) / smooth_angle : 0.0;
+		L += SCENE_LIGHT(i).diffuse.rgb * band * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+	}
+
+	result = vec4(L * color.rgb, color.a);
 }
 
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
@@ -4045,31 +4121,10 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 
 	/* directional lights */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
-		if (SCENE_LIGHT(i).diffuse.rgb == vec3(0.0) && SCENE_LIGHT(i).specular.rgb == vec3(0.0)) {
-			continue; /* disabled slot */
-		}
-
-		/* position.w == 0: directional (Sun), position.xyz is already the direction to the light.
-		 * w == 1: Point/Spot, position.xyz is the light position in view space, and I is the
-		 * fragment's view-space position, so the direction is (light - fragment). */
-		vec4 light_position_world = SCENE_LIGHT(i).position;
 		vec3 light_position;
-		float light_atten = 1.0;
-		if (light_position_world.w == 0.0) {
-			light_position = normalize(light_position_world.xyz);
-		}
-		else {
-			vec3 light_vec = light_position_world.xyz - I;
-			float light_dist = length(light_vec);
-			light_position = light_vec / max(light_dist, 0.0001);
-			light_atten = 1.0 / (SCENE_LIGHT(i).constantAttenuation +
-			                     SCENE_LIGHT(i).linearAttenuation * light_dist +
-			                     SCENE_LIGHT(i).quadraticAttenuation * light_dist * light_dist);
-			if (SCENE_LIGHT(i).spotCutoff < 179.0) {
-				float spotcos = dot(-light_position, normalize(SCENE_LIGHT(i).spotDirection));
-				light_atten *= (spotcos < SCENE_LIGHT(i).spotCosCutoff) ?
-				               0.0 : pow(spotcos, SCENE_LIGHT(i).spotExponent);
-			}
+		float light_atten;
+		if (!scene_light_dir(i, I, light_position, light_atten)) {
+			continue; /* disabled slot */
 		}
 
 		vec3 H = normalize(light_position + V);

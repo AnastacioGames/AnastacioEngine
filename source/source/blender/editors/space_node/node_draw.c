@@ -868,11 +868,14 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 		switch (node->type) {
 			case SH_NODE_BSDF_GLOSSY:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: lit like Diffuse with a soft highlight, no reflection";
+				*r_tip = "Approximated in Game: GGX highlight from scene lights, World color as ambient, no reflection";
+				return false;
+			case SH_NODE_BSDF_TOON:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: diffuse toon bands from scene lights; Component Glossy is ignored";
 				return false;
 			case SH_NODE_BSDF_GLASS:
 			case SH_NODE_BSDF_REFRACTION:
-			case SH_NODE_BSDF_TOON:
 			case SH_NODE_BSDF_TRANSLUCENT:
 			case SH_NODE_BSDF_VELVET:
 			case SH_NODE_BSDF_ANISOTROPIC:

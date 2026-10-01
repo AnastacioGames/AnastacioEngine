@@ -350,12 +350,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   de luz, com Point/Spot corretos (direção, atenuação, cone) e loop de até 8 luzes. Ver changelog de 2026-09-23.
   Pendente, opcional: comparar lado a lado com material legado sob as mesmas luzes (o chão satura com energia
   somada 5,6 e a sombra fica fraca) e ver o efeito de `ProcessLighting(true)` agora rodar para todo material com
-  nodes em uma cena maior. `node_bsdf_diffuse`/`node_bsdf_glossy` ainda tratam toda luz como direcional e sem
-  sombra.
+  nodes em uma cena maior. Diffuse/Glossy/Toon usam o mesmo loop desde a Fase 3 (abaixo).
 - **Nós de material Game × Cycles × BI** (matriz em [node-material-support.md](node-material-support.md)):
-  Fases 1 (correções GLSL, World como ambiente) e 2 (selos `~Game`/alerta no editor) feitas em 2026-10-01.
-  Abertas: Fase 3, Diffuse/Glossy/Toon no mesmo loop de luzes do Principled (fecha o item acima); Fase 4,
-  Glass/Refraction com fresnel + IBL, Toon real, AO via SSAO, Blackbody/Wavelength, Sky (Preetham), reflexo no
+  Fases 1 (correções GLSL, World como ambiente), 2 (selos `~Game`/alerta no editor) e 3 (Diffuse/Glossy/Toon no
+  loop de luzes do Principled) feitas em 2026-10-01; Fase 3 falta validação visual. Abertas: Fase 4,
+  Glass/Refraction com fresnel + IBL, componente Glossy do Toon, AO via SSAO, Blackbody/Wavelength, Sky (Preetham), reflexo no
   Glossy; Fase 5, Filmic e exposição no pós-processo; Fase 6, decidir o futuro do BI (`exec` do Mapping).
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
