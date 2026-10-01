@@ -1175,6 +1175,7 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
         if gs.stereo == 'STEREO':
             stereo_box.prop(gs, "stereo_mode")
             stereo_box.prop(gs, "stereo_eye_separation")
+            stereo_box.prop(gs, "vr_head_tracking")
 
 
 class SceneButtonsPanel:

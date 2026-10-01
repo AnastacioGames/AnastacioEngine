@@ -4939,6 +4939,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "Set the distance between the eyes - the camera focal distance/30 should be fine");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "vr_head_tracking", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_VR_HEAD_TRACKING);
+	RNA_def_property_ui_text(prop, "VR Head Tracking",
+	                         "The active camera's view follows the device orientation (phone in a Cardboard viewer); "
+	                         "the camera object keeps the body direction");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	/* physics */
 	prop = RNA_def_property(srna, "physics_engine", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "physicsEngine");

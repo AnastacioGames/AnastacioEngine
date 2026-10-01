@@ -124,6 +124,9 @@ protected:
 	mt::mat3 m_trackRotation = mt::mat3::Identity();
 	mt::vec3 m_trackOffset = mt::zero3;
 	float m_droneTime = 0.0f;
+	/// VR Head Tracking: sensor orientation (z up, facing +y) turned into a rotation local to the object.
+	bool m_headActive = false;
+	mt::mat3 m_headRotation = mt::mat3::Identity();
 
 	/// Motion of the rendered camera, used by Speed/Directional Blur.
 	bool m_motionInitialized = false;
@@ -242,6 +245,7 @@ public:
 	void UnlinkObject(KX_GameObject *object);
 	/// Focus sensor, tracking and shake, once per frame for the active camera.
 	void UpdateGameFX(double curtime);
+	void UpdateHeadTracking();
 	/// Adds shake trauma (0..1), decays at shake_decay per second.
 	void AddShake(float trauma, float duration);
 

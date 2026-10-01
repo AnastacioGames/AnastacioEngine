@@ -59,6 +59,8 @@ private:
 	float m_neutral[2];
 	/// Yaw (radians, around world z) removed from headOrientation by recenter().
 	float m_headYaw;
+	/// True once recenter() ran (by a script or by GetHeadView()).
+	bool m_headCentered;
 
 	mt::mat3 GetRawHeadOrientation(bool *valid) const;
 
@@ -67,6 +69,13 @@ private:
 public:
 	KX_PythonMotion();
 	virtual ~KX_PythonMotion();
+
+	/// The instance behind bge.logic.motion, null before the Python module exists.
+	static KX_PythonMotion *GetInstance();
+
+	/// Head orientation for the engine (VR Head Tracking). The first valid reading is taken as the
+	/// forward direction, unless a script already called recenter(). False without a sensor.
+	bool GetHeadView(mt::mat3 &rot);
 
 #ifdef WITH_PYTHON
 	EXP_PYMETHOD_NOARGS(KX_PythonMotion, Calibrate);

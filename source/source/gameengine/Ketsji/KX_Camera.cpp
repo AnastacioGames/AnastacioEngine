@@ -35,11 +35,13 @@
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_PyMath.h"
+#include "KX_PythonMotion.h"
 #include "KX_RayCast.h"
 
 #include "RAS_ICanvas.h"
 
 #include "DNA_camera_types.h"
+#include "DNA_scene_types.h"
 
 #include <cfloat>
 #include <cmath>
@@ -105,10 +107,16 @@ mt::mat3x4 KX_Camera::GetCameraToWorld() const
 
 mt::mat3 KX_Camera::GetRenderOrientation() const
 {
-	if (!m_trackActive && m_shakeRoll == 0.0f) {
+	if (!m_trackActive && m_shakeRoll == 0.0f && !m_headActive) {
 		return NodeGetWorldOrientation();
 	}
-	mt::mat3 ori = NodeGetWorldOrientation() * m_trackRotation;
+	mt::mat3 ori = NodeGetWorldOrientation();
+	if (m_headActive) {
+		ori = ori * m_headRotation;
+	}
+	if (m_trackActive) {
+		ori = ori * m_trackRotation;
+	}
 	if (m_shakeRoll != 0.0f) {
 		ori = ori * mt::mat3::RotationZ(m_shakeRoll);
 	}
@@ -537,8 +545,27 @@ void KX_Camera::UpdateMotion(float dt)
 	m_prevRenderForward = forward;
 }
 
+void KX_Camera::UpdateHeadTracking()
+{
+	m_headActive = false;
+	KX_Scene *scene = GetScene();
+	if (!scene || !scene->GetBlenderScene() || !(scene->GetBlenderScene()->gm.flag & GAME_VR_HEAD_TRACKING)) {
+		return;
+	}
+	KX_PythonMotion *motion = KX_PythonMotion::GetInstance();
+	mt::mat3 head;
+	if (motion && motion->GetHeadView(head)) {
+		// The object keeps the body direction: its level orientation (looking along +y, z up) is
+		// Rx(90) from the camera's own axes, so the head turns the view from there.
+		m_headRotation = mt::mat3::RotationX(-(float)M_PI_2) * head;
+		m_headActive = true;
+	}
+}
+
 void KX_Camera::UpdateGameFX(double curtime)
 {
+	UpdateHeadTracking();
+
 	float dt = (m_fxLastTime < 0.0) ? 0.0f : (float)(curtime - m_fxLastTime);
 	m_fxLastTime = curtime;
 	dt = std::max(0.0f, std::min(dt, 0.25f));

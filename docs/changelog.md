@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular, peça 2: opção "VR Head Tracking"
+
+- Novo flag de cena `GAME_VR_HEAD_TRACKING` (RNA `vr_head_tracking`, painel Stereo > "VR Head Tracking").
+- `KX_Camera::UpdateHeadTracking()` (chamado em `UpdateGameFX`) lê `KX_PythonMotion::GetHeadView()` e
+  `GetRenderOrientation()` aplica `ori * Rx(-90°) * cabeça` só na view: o objeto câmera (corpo/yaw) segue o jogo.
+- Primeira leitura válida vira o "frente" (auto-recenter), a menos que um script já tenha chamado `recenter()`.
+- Validado no celular (APK); frame ~16 ms com logic 0,2 ms e render principal 0,5 ms.
+
 ## 2026-10-01 - VR no celular: pose da cabeça por fusão giroscópio + gravidade
 
 - Testado no celular: o quaternion do Android/Chrome (`deviceorientation` e `AbsoluteOrientationSensor`, em

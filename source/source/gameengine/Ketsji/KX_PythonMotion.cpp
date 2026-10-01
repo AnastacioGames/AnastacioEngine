@@ -61,16 +61,28 @@ EM_JS(void, kx_motion_web_read, (float *out, int size), {
 /* Native functions                                                          */
 /* ------------------------------------------------------------------------- */
 
+static KX_PythonMotion *g_motionInstance = nullptr;
+
 KX_PythonMotion::KX_PythonMotion()
 	:EXP_PyObjectPlus()
 {
 	memset(m_data, 0, sizeof(m_data));
 	m_neutral[0] = m_neutral[1] = 0.0f;
 	m_headYaw = 0.0f;
+	m_headCentered = false;
+	g_motionInstance = this;
 }
 
 KX_PythonMotion::~KX_PythonMotion()
 {
+	if (g_motionInstance == this) {
+		g_motionInstance = nullptr;
+	}
+}
+
+KX_PythonMotion *KX_PythonMotion::GetInstance()
+{
+	return g_motionInstance;
 }
 
 void KX_PythonMotion::Refresh()
@@ -102,6 +114,22 @@ static float kx_motion_heading(const mt::mat3 &rot)
 		dir = rot * mt::vec3(0.0f, 1.0f, 0.0f) * ((dir.z > 0.0f) ? -1.0f : 1.0f);
 	}
 	return std::atan2(-dir.x, dir.y);
+}
+
+bool KX_PythonMotion::GetHeadView(mt::mat3 &rot)
+{
+	Refresh();
+	bool valid;
+	const mt::mat3 raw = GetRawHeadOrientation(&valid);
+	if (!valid) {
+		return false;
+	}
+	if (!m_headCentered) {
+		m_headYaw = kx_motion_heading(raw);
+		m_headCentered = true;
+	}
+	rot = mt::mat3::RotationZ(-m_headYaw) * raw;
+	return true;
 }
 
 #ifdef WITH_PYTHON
@@ -257,6 +285,7 @@ PyObject *KX_PythonMotion::PyRecenter()
 		Py_RETURN_FALSE;
 	}
 	m_headYaw = kx_motion_heading(rot);
+	m_headCentered = true;
 	Py_RETURN_TRUE;
 }
 
