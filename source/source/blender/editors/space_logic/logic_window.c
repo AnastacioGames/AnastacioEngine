@@ -1311,7 +1311,10 @@ static void draw_sensor_ray(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	uiItemR(row, ptr, "range", 0, NULL, ICON_NONE);
 	uiItemR(row, ptr, "use_x_ray", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 	if (RNA_enum_get(ptr, "axis") == SENS_RAY_GAZE) {
-		uiItemR(layout, ptr, "gaze_time", 0, NULL, ICON_NONE);
+		row = uiLayoutRow(layout, false);
+		uiItemR(row, ptr, "gaze_time", 0, NULL, ICON_NONE);
+		uiItemR(row, ptr, "gaze_angle", 0, NULL, ICON_NONE);
+		uiItemR(row, ptr, "use_gaze_reticle", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 	}
 	split = uiLayoutSplit(layout, 0.3, false);
 	uiItemR(split, ptr, "mask", 0, NULL, ICON_NONE);

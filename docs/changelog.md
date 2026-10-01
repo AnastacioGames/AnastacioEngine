@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: cone e mira no Ray VR Gaze
+
+`bRaySensor` ganhou `gaze_angle` (rad, RNA `gaze_angle` 0–45°, Python `gazeAngle`) e `gaze_reticle` (RNA `use_gaze_reticle`). Com cone > 0, se o raio central erra, `KX_RaySensor` escolhe o objeto visível (filtros de propriedade/material e máscara) de menor ângulo dentro do cone e confirma linha de visada com outro raio até a origem dele; o alvo atual tem histerese de 1,5× o ângulo. A mira desenha anéis com linhas de debug no ponto olhado (2 m sem alvo), anel interno = progresso do Gaze Time, verde ao disparar. Com Debug ligado, desenha o contorno do cone. Validado no celular (`vr_trigger.range`, cone 5°, 300 ms). DNA cresceu: rebuild limpo se aparecer crash estranho.
+
 ## 2026-10-01 - VR no celular: Hold (toque longo) no sensor Mouse
 
 `bMouseSensor.pad1` virou `hold` (ms; RNA `hold`, painel só nos eventos de botão; Python `holdTime` em segundos). `SCA_MouseSensor` acumula o tempo pressionado (período do tic rate passado pelo conversor) e só fica positivo ao atingir o Hold. Só o Mouse simples (não o Mouse Over). Conversão para Python recusa Hold > 0. Validado no celular (`vr_trigger.range`: segurar 0,8 s pula).

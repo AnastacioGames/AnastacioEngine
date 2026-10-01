@@ -57,6 +57,10 @@ class KX_RaySensor : public SCA_ISensor
 	bool m_drawDebug;
 	float m_gazeTime;
 	float m_gazeAccum;
+	/// Radians: gaze cone that accepts targets near the view center (0 = thin ray).
+	float m_gazeAngle;
+	/// Draw a reticle ring at the gaze point that fills with the gaze time.
+	bool m_gazeReticle;
 	SCA_IObject *m_gazeObject;
 	mt::vec3 m_hitPosition;
 	SCA_IObject*	m_hitObject;
@@ -75,7 +79,9 @@ public:
 				 int mask,
 				 class KX_Scene* ketsjiScene,
 				 bool drawDebug = false,
-				 float gazeTime = 0.0f);
+				 float gazeTime = 0.0f,
+				 float gazeAngle = 0.0f,
+				 bool gazeReticle = false);
 	virtual ~KX_RaySensor();
 	virtual EXP_Value* GetReplica();
 

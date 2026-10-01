@@ -62,7 +62,9 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 							   int mask,
 							   KX_Scene *ketsjiScene,
 							   bool drawDebug,
-							   float gazeTime)
+							   float gazeTime,
+							   float gazeAngle,
+							   bool gazeReticle)
 	:SCA_ISensor(gameobj, eventmgr),
 	m_propertyname(propname),
 	m_bFindMaterial(bFindMaterial),
@@ -74,6 +76,8 @@ KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 	m_drawDebug(drawDebug),
 	m_gazeTime(gazeTime),
 	m_gazeAccum(0.0f),
+	m_gazeAngle(gazeAngle),
+	m_gazeReticle(gazeReticle),
 	m_gazeObject(nullptr),
 	m_hitMaterial("")
 {
@@ -286,6 +290,75 @@ bool KX_RaySensor::Evaluate()
 		}
 	}
 
+	if (m_axis == SENS_RAY_GAZE && m_gazeAngle > 0.0f && !m_rayHit) {
+		/* Gaze cone: the thin ray missed, take the visible target closest to the view center inside the cone.
+		 * The object already being looked at keeps a wider cone so small head shakes don't reset the gaze time. */
+		KX_GameObject *best = nullptr;
+		float bestAngle = m_gazeAngle;
+		for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
+			if (gameobj == obj || !gameobj->GetVisible() || !(gameobj->GetCollisionGroup() & m_mask)) {
+				continue;
+			}
+			if (!m_propertyname.empty()) {
+				bool found = false;
+				if (m_bFindMaterial) {
+					for (KX_Mesh *meshObj : gameobj->GetMeshList()) {
+						if (meshObj->FindMaterialName(m_propertyname)) {
+							found = true;
+							break;
+						}
+					}
+				}
+				else {
+					found = gameobj->GetProperty(m_propertyname) != nullptr;
+				}
+				if (!found) {
+					continue;
+				}
+			}
+			const mt::vec3 to = gameobj->NodeGetWorldPosition() - frompoint;
+			const float dist = to.Length();
+			if (dist < 1e-4f || dist > m_distance) {
+				continue;
+			}
+			const float angle = std::acos(mt::Clamp(mt::dot(to / dist, todir), -1.0f, 1.0f));
+			const float limit = (gameobj == m_gazeObject) ? m_gazeAngle * 1.5f : m_gazeAngle;
+			if (angle <= limit && (!best || angle < bestAngle)) {
+				best = gameobj;
+				bestAngle = angle;
+			}
+		}
+		if (best) {
+			/* Line of sight: the ray toward the target must hit it first. */
+			const mt::vec3 to = (best->NodeGetWorldPosition() - frompoint).Normalized();
+			KX_RayCast::RayTest(physics_environment, frompoint, frompoint + m_distance * to, callback);
+			if (!(m_rayHit && m_hitObject == best)) {
+				m_rayHit = false;
+				m_hitObject = nullptr;
+			}
+		}
+		if (m_drawDebug) {
+			/* Cone outline: ring of lines at the end of the range. */
+			const mt::vec3 up = (std::fabs(todir.z) < 0.99f) ? mt::axisZ3 : mt::axisX3;
+			const mt::vec3 u = mt::cross(todir, up).Normalized();
+			const mt::vec3 v = mt::cross(u, todir);
+			const float radius = std::tan(m_gazeAngle) * m_distance;
+			const mt::vec4 coneColor = m_rayHit ? mt::vec4(0.1f, 1.0f, 0.2f, 1.0f) : mt::vec4(1.0f, 0.8f, 0.1f, 1.0f);
+			mt::vec3 prev;
+			for (int i = 0; i <= 16; ++i) {
+				const float a = (float)i * (2.0f * (float)M_PI / 16.0f);
+				const mt::vec3 p = topoint + radius * (std::cos(a) * u + std::sin(a) * v);
+				if (i > 0) {
+					KX_RasterizerDrawDebugLine(prev, p, coneColor);
+				}
+				if (i % 4 == 0) {
+					KX_RasterizerDrawDebugLine(frompoint, p, coneColor);
+				}
+				prev = p;
+			}
+		}
+	}
+
 	if (m_axis == SENS_RAY_GAZE) {
 		/* The gaze only counts after staying on the same object for the gaze time. */
 		if (m_rayHit && m_hitObject == m_gazeObject) {
@@ -294,6 +367,32 @@ bool KX_RaySensor::Evaluate()
 		else {
 			m_gazeAccum = 0.0f;
 			m_gazeObject = m_rayHit ? m_hitObject : nullptr;
+		}
+		if (m_gazeReticle) {
+			/* Ring facing the eye at the gaze point (2 m ahead when nothing is hit), about 1 degree wide;
+			 * an inner ring grows with the gaze time and everything turns green when the sensor fires. */
+			const mt::vec3 point = m_rayHit ? m_hitPosition : frompoint + std::min(2.0f, m_distance) * todir;
+			const float dist = std::max((point - frompoint).Length(), 0.05f);
+			const mt::vec3 center = frompoint + (dist * 0.98f) * todir;
+			const mt::vec3 up = (std::fabs(todir.z) < 0.99f) ? mt::axisZ3 : mt::axisX3;
+			const mt::vec3 u = mt::cross(todir, up).Normalized();
+			const mt::vec3 v = mt::cross(u, todir);
+			const float radius = dist * 0.009f;
+			const float progress = !m_rayHit ? 0.0f : (m_gazeTime > 0.0f ? std::min(m_gazeAccum / m_gazeTime, 1.0f) : 1.0f);
+			const mt::vec4 color = (progress >= 1.0f) ? mt::vec4(0.2f, 1.0f, 0.3f, 1.0f) : mt::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+			const int segments = 20;
+			for (int ring = 0; ring < 2; ++ring) {
+				const float r = (ring == 0) ? radius : radius * progress;
+				if (r <= 0.0f) {
+					continue;
+				}
+				for (int i = 0; i < segments; ++i) {
+					const float a0 = (float)i * (2.0f * (float)M_PI / segments);
+					const float a1 = (float)(i + 1) * (2.0f * (float)M_PI / segments);
+					KX_RasterizerDrawDebugLine(center + r * (std::cos(a0) * u + std::sin(a0) * v),
+					                           center + r * (std::cos(a1) * u + std::sin(a1) * v), color);
+				}
+			}
 		}
 		if (m_rayHit && m_gazeAccum < m_gazeTime) {
 			m_rayHit = false;
@@ -375,6 +474,7 @@ PyAttributeDef KX_RaySensor::Attributes[] = {
 	EXP_PYATTRIBUTE_INT_RW("axis", 0, 6, true, KX_RaySensor, m_axis),
 	EXP_PYATTRIBUTE_INT_RW("mask", 1, (1 << OB_MAX_COL_MASKS) - 1, true, KX_RaySensor, m_mask),
 	EXP_PYATTRIBUTE_FLOAT_RW("gazeTime", 0, 30, KX_RaySensor, m_gazeTime),
+	EXP_PYATTRIBUTE_FLOAT_RW("gazeAngle", 0, 1.0f, KX_RaySensor, m_gazeAngle),
 	EXP_PYATTRIBUTE_RO_FUNCTION("gazeProgress", KX_RaySensor, pyattr_get_gazeprogress),
 	EXP_PYATTRIBUTE_VECTOR_RO("hitPosition", KX_RaySensor, m_hitPosition, 3),
 	EXP_PYATTRIBUTE_VECTOR_RO("rayDirection", KX_RaySensor, m_rayDirection, 3),

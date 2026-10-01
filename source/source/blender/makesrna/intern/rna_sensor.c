@@ -1002,6 +1002,17 @@ static void rna_def_ray_sensor(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Gaze Time", "Milliseconds the gaze must stay on the same object before the sensor fires (0 = instant)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "gaze_angle", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_float_sdna(prop, NULL, "gaze_angle");
+	RNA_def_property_range(prop, 0.0f, DEG2RADF(45.0f));
+	RNA_def_property_ui_text(prop, "Gaze Angle", "Cone around the gaze: a target near the view center counts even if the thin ray misses it (0 = thin ray only)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_gaze_reticle", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gaze_reticle", 1);
+	RNA_def_property_ui_text(prop, "Reticle", "Draw a ring at the gaze point in both eyes, filling up with the gaze time");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "mask", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "mask", 1);
 	RNA_def_property_array(prop, OB_MAX_COL_MASKS);

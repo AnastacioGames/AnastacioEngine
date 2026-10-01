@@ -150,6 +150,8 @@ typedef struct bRaySensor {
 	int axisflag;
 	int mask;
 	int debug;
+	float gaze_angle; /* radians, cone around the gaze for SENS_RAY_GAZE (0 = thin ray) */
+	int gaze_reticle; /* draw the VR gaze reticle (SENS_RAY_GAZE) */
 } bRaySensor;
 
 typedef struct bArmatureSensor {

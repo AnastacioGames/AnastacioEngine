@@ -74,7 +74,14 @@ Validado no celular (2026-10-01): anda para onde olha; a inclinação não muda 
 O sensor Mouse (botões) ganhou o campo **Hold** (ms, `hold`; Python `holdTime` em segundos): o toque/botão só
 dispara depois de ficar pressionado esse tempo (toque longo). 0 = instantâneo (comportamento antigo). "Olhar +
 tocar" = And entre o Ray VR Gaze e o Mouse. Validado no celular com `vr_trigger.range` (segurar 0,8 s pula). O
-olhar ainda é um raio fino, difícil de manter no alvo: próximos são cone de tolerância no Ray VR Gaze e mira na tela.
+olhar era um raio fino, difícil de manter no alvo; resolvido abaixo.
+
+## Cone e mira no Ray VR Gaze (feito, 2026-10-01)
+
+Campos **Gaze Angle** (cone, 0–45°; Python `gazeAngle` em rad) e **Reticle** na linha do VR Gaze. Com cone, vale o
+objeto visível mais perto do centro da visão dentro do ângulo (com folga de 1,5× para o alvo atual, para tremidas
+não zerarem o tempo). A mira é um anel no ponto olhado que enche com o Gaze Time e fica verde ao disparar; Debug
+mostra o contorno do cone. Validado no celular com `vr_trigger.range` (5°, 300 ms).
 
 ## Parâmetros VR no painel Stereo (feito, 2026-10-01)
 
