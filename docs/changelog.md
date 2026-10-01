@@ -36,8 +36,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Toon: Component Glossy mede a faixa em torno do reflexo da visão e usa o especular da luz (uniform `glossy`).
 - Selos e `docs/node-material-support.md` atualizados.
 - Validado: build ok; `node_material_test.range` e cenas de teste com e sem textura no World rodam sem
-  `GPUShader: compile error` em `%TEMP%
-ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
+  `GPUShader: compile error` em `%TEMP%ange_runtime.log.txt` (checagem conferida antes com um erro proposital).
   Falta validação visual.
 
 ## 2026-10-01 - VR no celular: conforto e preset Cardboard
