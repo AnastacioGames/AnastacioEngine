@@ -1158,6 +1158,12 @@ void uiLayoutSetScaleX(struct uiLayout *layout, float scale) RET_NONE
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiLayoutSetScaleY) */
 void uiLayoutSetScaleY(struct uiLayout *layout, float scale) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (uiLayoutBoxSetCustomColor) */
+void uiLayoutBoxSetCustomColor(uiLayout *layout, const unsigned char col[3]) RET_NONE
+#endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (UI_icons_reload_internal) */
+void UI_icons_reload_internal(void) RET_NONE
+#endif
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiTemplateIconView) */
 void uiTemplateIconView(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, bool show_labels, float icon_scale) RET_NONE
 #endif

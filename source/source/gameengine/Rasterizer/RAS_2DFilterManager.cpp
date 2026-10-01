@@ -287,6 +287,16 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 			ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType()));
 		}
 
+		/* A filter reading the depth texture must not draw into the off screen owning it:
+		 * desktop GL tolerates it (depth writes are off), WebGL rejects the draw as a feedback
+		 * loop. Draw into a free filter off screen instead; the copy below reaches targetofs. */
+		if (ftargetofs == depthofs && filter->UsesDepthTexture()) {
+			ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType()));
+			if (ftargetofs == colorofs || ftargetofs == depthofs) {
+				ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(ftargetofs->GetType()));
+			}
+		}
+
 		/* Get the output off screen of the filter, could be the same as the input off screen
 		 * if no modifications were made to the targeted off screen.
 		 * This output off screen is used for the next filter as input off screen */

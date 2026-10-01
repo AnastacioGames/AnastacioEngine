@@ -4473,11 +4473,15 @@ static void GLAPIENTRY web_glPushAttrib (GLbitfield mask)
     GLboolean m = GL_TRUE;
     typeof(web_attrib_stack[0]) *e = &web_attrib_stack[web_attrib_top++];
     e->mask = mask;
-    glGetIntegerv(GL_VIEWPORT, e->viewport);
-    glGetIntegerv(GL_SCISSOR_BOX, e->scissor);
-    glGetIntegerv(GL_DEPTH_FUNC, &d);
+    /* So consulta o que a mascara pede: cada glGet* e uma ida e volta sincrona a GPU no navegador
+     * (~1 ms no WebView Android) e o PopAttrib so restaura os grupos da mascara. */
+    if (mask & GL_VIEWPORT_BIT) glGetIntegerv(GL_VIEWPORT, e->viewport);
+    if (mask & GL_SCISSOR_BIT) glGetIntegerv(GL_SCISSOR_BOX, e->scissor);
+    if (mask & GL_DEPTH_BUFFER_BIT) {
+      glGetIntegerv(GL_DEPTH_FUNC, &d);
+      glGetBooleanv(GL_DEPTH_WRITEMASK, &m);
+    }
     e->depth_func = d;
-    glGetBooleanv(GL_DEPTH_WRITEMASK, &m);
     e->depth_mask = m;
     for (i = 0; i < WEB_ATTRIB_ENABLES; i++) e->enabled[i] = glIsEnabled(web_attrib_caps[i]);
   }

@@ -49,6 +49,11 @@ EM_JS(void, kx_motion_web_read, (float *out, int size), {
 			HEAPF32[base + 1 + s * 3 + k] = isFinite(v) ? v : 0;
 		}
 	}
+	var q = m.quat;
+	if (q && size >= 18 && isFinite(q[0]) && isFinite(q[1]) && isFinite(q[2]) && isFinite(q[3])) {
+		HEAPF32[base + 13] = 1;
+		for (var j = 0; j < 4; j++) HEAPF32[base + 14 + j] = +q[j];
+	}
 });
 #endif
 
@@ -61,6 +66,7 @@ KX_PythonMotion::KX_PythonMotion()
 {
 	memset(m_data, 0, sizeof(m_data));
 	m_neutral[0] = m_neutral[1] = 0.0f;
+	m_headYaw = 0.0f;
 }
 
 KX_PythonMotion::~KX_PythonMotion()
@@ -74,6 +80,28 @@ void KX_PythonMotion::Refresh()
 #else
 	memset(m_data, 0, sizeof(m_data));
 #endif
+}
+
+mt::mat3 KX_PythonMotion::GetRawHeadOrientation(bool *valid) const
+{
+	*valid = (m_data[AVAILABLE] != 0.0f && m_data[HEAD_VALID] != 0.0f);
+	if (!*valid) {
+		return mt::mat3::Identity();
+	}
+	mt::quat q(m_data[HEAD_QUAT], m_data[HEAD_QUAT + 1], m_data[HEAD_QUAT + 2], m_data[HEAD_QUAT + 3]);
+	q.Normalize();
+	return q.ToMatrix();
+}
+
+/* Heading of the view around world z, 0 when looking along +y. Uses the up vector when looking
+ * straight up or down, where the view direction has no horizontal part. */
+static float kx_motion_heading(const mt::mat3 &rot)
+{
+	mt::vec3 dir = rot * mt::vec3(0.0f, 0.0f, -1.0f);
+	if (dir.x * dir.x + dir.y * dir.y < 1.0e-4f) {
+		dir = rot * mt::vec3(0.0f, 1.0f, 0.0f) * ((dir.z > 0.0f) ? -1.0f : 1.0f);
+	}
+	return std::atan2(-dir.x, dir.y);
 }
 
 #ifdef WITH_PYTHON
@@ -107,6 +135,7 @@ PyTypeObject KX_PythonMotion::Type = {
 
 PyMethodDef KX_PythonMotion::Methods[] = {
 	{"calibrate", (PyCFunction)KX_PythonMotion::sPyCalibrate, METH_NOARGS},
+	{"recenter", (PyCFunction)KX_PythonMotion::sPyRecenter, METH_NOARGS},
 	{nullptr, nullptr} //Sentinel
 };
 
@@ -116,6 +145,7 @@ PyAttributeDef KX_PythonMotion::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("accelerometer", KX_PythonMotion, pyattr_get_accelerometer),
 	EXP_PYATTRIBUTE_RO_FUNCTION("gravity", KX_PythonMotion, pyattr_get_gravity),
 	EXP_PYATTRIBUTE_RO_FUNCTION("orientation", KX_PythonMotion, pyattr_get_orientation),
+	EXP_PYATTRIBUTE_RO_FUNCTION("headOrientation", KX_PythonMotion, pyattr_get_headOrientation),
 	EXP_PYATTRIBUTE_RO_FUNCTION("tilt", KX_PythonMotion, pyattr_get_tilt),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
@@ -205,6 +235,29 @@ PyObject *KX_PythonMotion::PyCalibrate()
 		Py_RETURN_TRUE;
 	}
 	Py_RETURN_FALSE;
+}
+
+/* Camera orientation from the device (Blender camera axes: x right, y up, looking along -z), with the
+ * heading taken by recenter() removed: after recenter() the view faces +y. Identity when unavailable. */
+PyObject *KX_PythonMotion::pyattr_get_headOrientation(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_PythonMotion *self = static_cast<KX_PythonMotion *>(self_v);
+	self->Refresh();
+	bool valid;
+	const mt::mat3 rot = self->GetRawHeadOrientation(&valid);
+	return PyObjectFrom(valid ? mt::mat3::RotationZ(-self->m_headYaw) * rot : rot);
+}
+
+PyObject *KX_PythonMotion::PyRecenter()
+{
+	Refresh();
+	bool valid;
+	const mt::mat3 rot = GetRawHeadOrientation(&valid);
+	if (!valid) {
+		Py_RETURN_FALSE;
+	}
+	m_headYaw = kx_motion_heading(rot);
+	Py_RETURN_TRUE;
 }
 
 #endif  // WITH_PYTHON

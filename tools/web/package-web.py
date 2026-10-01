@@ -298,6 +298,19 @@ __PERF_SCRIPT__
   function onDeviceOrientation(e) {
     if (e.alpha === null && e.beta === null) return;
     motion.orient = [e.alpha || 0, e.beta || 0, e.gamma || 0];
+    // Pose da cabeca para VR (bge.logic.motion.headOrientation): W3C R = Rz(alpha)*Rx(beta)*Ry(gamma) leva o
+    // aparelho ao mundo (x leste, y norte, z cima, igual ao Blender), e os eixos do aparelho ja sao os da camera
+    // do Blender (x direita, y cima, olha para -z). Rz(-angulo da tela) segue a tela em paisagem. [w, x, y, z]
+    var d = Math.PI / 360;
+    function qmul(a, b) {
+      return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+              a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+              a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+              a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+    }
+    var al = (e.alpha || 0) * d, be = (e.beta || 0) * d, ga = (e.gamma || 0) * d, sc = -screenAngle() / 2;
+    motion.quat = qmul(qmul(qmul([Math.cos(al), 0, 0, Math.sin(al)], [Math.cos(be), Math.sin(be), 0, 0]),
+                            [Math.cos(ga), 0, Math.sin(ga), 0]), [Math.cos(sc), 0, 0, Math.sin(sc)]);
   }
   window.addEventListener("devicemotion", onDeviceMotion);
   window.addEventListener("deviceorientation", onDeviceOrientation);

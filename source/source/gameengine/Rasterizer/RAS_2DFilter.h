@@ -121,6 +121,12 @@ public:
 	bool GetMipmap() const;
 	void SetMipmap(bool mipmap);
 
+	/// True when the shader samples the depth texture (bgl_DepthTexture).
+	bool UsesDepthTexture() const
+	{
+		return m_predefinedUniforms[DEPTH_TEXTURE_UNIFORM] != -1;
+	}
+
 	RAS_2DFilterOffScreen *GetOffScreen() const;
 	void SetOffScreen(RAS_2DFilterOffScreen *offScreen);
 

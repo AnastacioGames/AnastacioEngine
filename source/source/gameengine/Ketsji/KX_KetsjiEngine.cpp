@@ -464,12 +464,13 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 	}
 
 	/* Without a GPU timer (the Web build disables it) the query "result" is a constant zero and
-	 * looks like an instant GPU, which would raise the scale forever. Keep the scale as set. */
+	 * looks like an instant GPU, which would raise the scale forever. Use the max scale as a fixed scale. */
 	if (!m_dynamicResolutionQuery.IsSupported()) {
+		m_canvas->SetRenderScale(m_dynamicResolutionMaxScale);
 		static bool warned = false;
 		if (!warned) {
 			warned = true;
-			CM_Warning("dynamic resolution needs a GPU timer query, unavailable here: the render scale is not adjusted");
+			CM_Warning("dynamic resolution needs a GPU timer query, unavailable here: using the max scale as a fixed render scale");
 		}
 		m_dynamicResolutionQueryPending = false;
 		return;

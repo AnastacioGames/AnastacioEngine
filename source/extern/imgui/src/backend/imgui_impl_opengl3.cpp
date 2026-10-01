@@ -489,6 +489,27 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data, ImVec2 KX_Viewpo
 
     ImGui_ImplOpenGL3_Data* bd = ImGui_ImplOpenGL3_GetBackendData();
 
+#ifdef __EMSCRIPTEN__
+    // RangeEngine: in a browser every glGet* is a synchronous GPU round trip (~1 ms each on
+    // Android WebView). ImGui draws last in the frame and RAS_Rasterizer::BeginFrame sets the
+    // state again, so restore the engine's known end-of-frame state instead of querying it.
+    glActiveTexture(GL_TEXTURE0);
+    GLenum last_active_texture = GL_TEXTURE0;
+    GLuint last_program = 0;
+    GLuint last_texture = 0;
+    GLuint last_array_buffer = 0;
+    GLuint last_vertex_array_object = 0;
+    GLint last_viewport[4] = { (GLint)KX_Viewport.x, (GLint)KX_Viewport.y, fb_width, fb_height };
+    GLint last_scissor_box[4] = { (GLint)KX_Viewport.x, (GLint)KX_Viewport.y, fb_width, fb_height };
+    GLenum last_blend_src_rgb = GL_SRC_ALPHA, last_blend_src_alpha = GL_SRC_ALPHA;
+    GLenum last_blend_dst_rgb = GL_ONE_MINUS_SRC_ALPHA, last_blend_dst_alpha = GL_ONE_MINUS_SRC_ALPHA;
+    GLenum last_blend_equation_rgb = GL_FUNC_ADD, last_blend_equation_alpha = GL_FUNC_ADD;
+    GLboolean last_enable_blend = GL_FALSE;
+    GLboolean last_enable_cull_face = GL_TRUE;
+    GLboolean last_enable_depth_test = GL_TRUE;
+    GLboolean last_enable_stencil_test = GL_FALSE;
+    GLboolean last_enable_scissor_test = GL_TRUE;
+#else
     // Backup GL state
     GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
     glActiveTexture(GL_TEXTURE0);
@@ -526,6 +547,8 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data, ImVec2 KX_Viewpo
     GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
 #ifdef IMGUI_IMPL_OPENGL_MAY_HAVE_PRIMITIVE_RESTART
     GLboolean last_enable_primitive_restart = (bd->GlVersion >= 310) ? glIsEnabled(GL_PRIMITIVE_RESTART) : GL_FALSE;
+#endif
+
 #endif
 
     // Setup desired GL state

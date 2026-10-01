@@ -141,6 +141,11 @@ void KX_Imgui::Render()
 	DrawCustomCursor();
 
 	ImGui::Render();
+	/* The backend backs up and restores the whole GL state around its draw. In a browser every
+	 * glGet* is a synchronous GPU round trip (~1 ms each on Android WebView), so skip empty frames. */
+	if (ImGui::GetDrawData()->TotalVtxCount == 0) {
+		return;
+	}
 	ImVec2 KX_Viewport(KX_GetActiveEngine()->GetCanvas()->GetArea().GetLeft(), KX_GetActiveEngine()->GetCanvas()->GetArea().GetBottom());
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData(), KX_Viewport);
 }

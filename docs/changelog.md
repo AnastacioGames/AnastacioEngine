@@ -9,6 +9,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-09-30 - VR no celular, peça 1: pose da cabeça em `bge.logic.motion`
+
+- Plano novo em [mobile-vr-plan.md](mobile-vr-plan.md) (VR estilo Cardboard no Web/APK; OpenXR adiado sem headset).
+- `package-web.py`: o `deviceorientation` agora gera também `Module.rangeMotion.quat`, a orientação da câmera
+  no mundo (W3C `Rz(alpha)·Rx(beta)·Ry(gamma)` seguida de `Rz(-ângulo da tela)`; os eixos do aparelho já são os
+  da câmera do Blender). Conferido no Node: retrato em pé para o norte olha para +y.
+- `KX_PythonMotion`: buffer passa de 13 para 18 floats (`HEAD_VALID`, `HEAD_QUAT`); novos `headOrientation`
+  (Matrix 3x3; identidade sem sensor) e `recenter()` (remove o rumo atual, a vista passa a olhar para +y).
+- `stubs.c` do player: stubs de `uiLayoutBoxSetCustomColor` e `UI_icons_reload_internal`, que quebravam o link do
+  `build-web-release` (o RNA passou a referenciá-las). `RangeRuntime` nativo e Web compilam; falta validar no celular.
+- Resolução dinâmica sem timer de GPU (Web): antes ficava em 100% e ignorava a escala; agora usa a escala
+  máxima como escala fixa (`KX_KetsjiEngine::UpdateDynamicResolution`). Achado no teste VR no celular, onde
+  render, filtro 2D e overhead davam picos com a cena em tela dividida.
+- Filtro 2D que lê a profundidade (`bgl_DepthTexture`) desenhava no próprio off screen dono dela: o desktop
+  tolera, o WebGL recusa o draw ("Source and destination textures of the draw are the same") a cada frame.
+  `RAS_2DFilterManager::RenderFilters` agora desvia para um off screen de filtro livre
+  (`RAS_2DFilter::UsesDepthTexture`).
+- Cenas de teste `vr_fps.range` (first person, anda com stick WASD para onde olha) e `vr_test.range` (cubos por
+  direção) na raiz, instaladas no aparelho como APK; cabeça seguindo o celular já roda no aparelho.
+- Picos de ~20 ms/frame no WebView Android: cada `glGet*` é uma ida síncrona à GPU (~1-1,7 ms). Removidos do
+  caminho por frame: `ScreenPlane::Render` não lê mais os divisores (só zera 0..1), `web_glPushAttrib` (glew-es)
+  consulta só os bits pedidos, `KX_Imgui::Render` pula frames sem vértices e o backend `imgui_impl_opengl3` no
+  Emscripten restaura o estado conhecido do fim de frame em vez de consultá-lo. Cubo e `vr_fps` (com o overlay de
+  profile) passam a 60 fps estáveis (intervalo p95 ~17,8 ms).
+
 ## 2026-09-30 - LOD: Bake Impostor gera o próprio quad
 
 - `Bake Impostor Texture` não texturiza mais o objeto do nível LOD. Antes ele punha a textura no material[0] desse

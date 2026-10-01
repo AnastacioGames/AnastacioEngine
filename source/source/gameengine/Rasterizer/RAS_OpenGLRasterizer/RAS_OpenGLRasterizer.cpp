@@ -45,7 +45,6 @@
 extern "C" {
 #  include "BLF_api.h"
 #ifdef __EMSCRIPTEN__
-extern void emscripten_glGetVertexAttribiv(GLuint index, GLenum pname, GLint *params);
 extern void emscripten_glVertexAttribDivisor(GLuint index, GLuint divisor);
 #endif
 }
@@ -181,21 +180,15 @@ inline void RAS_OpenGLRasterizer::ScreenPlane::Render()
 #ifdef __EMSCRIPTEN__
 	/* Legacy GL emulation replays vertex pointers on VAO bind, but does not
 	 * isolate attribute divisors. Instanced debug geometry can leave UVs at
-	 * divisor 1, making every screen vertex sample the texture's first corner. */
-	GLint divisors[2];
+	 * divisor 1, making every screen vertex sample the texture's first corner.
+	 * No query/restore: glGetVertexAttribiv is a synchronous GPU round trip in the browser
+	 * (~1.7 ms each on Android WebView), and every instanced draw sets its own divisors. */
 	for (GLuint i = 0; i < 2; ++i) {
-		emscripten_glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_DIVISOR, &divisors[i]);
 		emscripten_glVertexAttribDivisor(i, 0);
 	}
 #endif
 	// Draw in triangle fan mode to reduce IBO size.
 	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_BYTE, 0);
-
-#ifdef __EMSCRIPTEN__
-	for (GLuint i = 0; i < 2; ++i) {
-		emscripten_glVertexAttribDivisor(i, divisors[i]);
-	}
-#endif
 	GPU_unbind_vertex_array();
 }
 

@@ -63,6 +63,11 @@ Aberto:
   (`fie_ima`, `seed1`/`seed2`, `skgen_subdivision_number`, `handle_vertex_size`) viraram `unsigned char`, com SDNA
   idêntico. Evidência em `docs/changelog.md` (2026-09-20). O MSVC nativo não executa essa checagem.
 
+### VR no celular (Web, estilo Cardboard)
+
+Plano e estado em [mobile-vr-plan.md](mobile-vr-plan.md): pose da cabeça pelo `deviceorientation`, head tracking
+na câmera, distorção de lente no Side-by-Side e botão "Entrar em VR". OpenXR (headset) adiado até haver hardware.
+
 ### Idioma (English, Português, Español, Русский)
 
 Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 2026-09-20). Pendente:
@@ -369,8 +374,6 @@ Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Pla
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
 menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
 
-- **Drop de OBJ na Vista 3D**: confirmar na janela real que arrastar um `.obj` importa o modelo sem diálogo;
-  o operador e o importador passaram em execução automatizada, mas o gesto de arrastar ainda não foi testado.
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
 - **Game Settings, FXAA e LOD (2026-09-25)**: conferir no jogo real os painéis novos das abas Render e Scene,
   os ajustes de FXAA e o LOD com Billboard/Invisible.

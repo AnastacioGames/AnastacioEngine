@@ -28,6 +28,7 @@
 #define __KX_PythonMotion_H__
 
 #include "EXP_PyObjectPlus.h"
+#include "mathfu.h"
 
 /**
  * Device motion sensors (gyroscope, accelerometer, orientation) exposed as bge.logic.motion.
@@ -47,13 +48,19 @@ public:
 		ACCEL = 4,       // m/s^2 including gravity, 3 floats
 		GRAVITY = 7,     // m/s^2, 3 floats
 		ORIENTATION = 10, // alpha, beta, gamma in degrees, 3 floats
-		DATA_SIZE = 13
+		HEAD_VALID = 13,
+		HEAD_QUAT = 14,  // camera orientation in world (z up), w x y z; valid when [13] != 0
+		DATA_SIZE = 18
 	};
 
 private:
 	float m_data[DATA_SIZE];
 	/// Gravity direction (normalized, screen x/y) taken as neutral by calibrate().
 	float m_neutral[2];
+	/// Yaw (radians, around world z) removed from headOrientation by recenter().
+	float m_headYaw;
+
+	mt::mat3 GetRawHeadOrientation(bool *valid) const;
 
 	void Refresh();
 
@@ -63,10 +70,12 @@ public:
 
 #ifdef WITH_PYTHON
 	EXP_PYMETHOD_NOARGS(KX_PythonMotion, Calibrate);
+	EXP_PYMETHOD_NOARGS(KX_PythonMotion, Recenter);
 
 	static PyObject *pyattr_get_available(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_gyroscope(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_accelerometer(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_headOrientation(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_gravity(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_orientation(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_tilt(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
