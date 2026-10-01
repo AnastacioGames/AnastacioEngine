@@ -324,9 +324,12 @@ void BL_ActionActuator::DecLink()
 bool BL_ActionActuator::Play(KX_GameObject *obj, float start, float end, short mode)
 {
 	const short blendmode = (m_blendmode == ACT_ACTION_ADD) ? BL_Action::ACT_BLEND_ADD : BL_Action::ACT_BLEND_BLEND;
-	const bool played = obj->PlayAction(m_actionName, start, end, m_layer, m_priority, m_blendin, mode, m_layer_weight, m_ipo_flags, 1.0f, blendmode);
+	const bool useChildren = (m_ipo_flags & BL_Action::ACT_IPOFLAG_CHILD);
+	/* A 2.4x IPO actuator with "Child" may have no IPO of its own and only drive the children. */
+	const bool played = (m_actionName.empty() && useChildren) ||
+	                    obj->PlayAction(m_actionName, start, end, m_layer, m_priority, m_blendin, mode, m_layer_weight, m_ipo_flags, 1.0f, blendmode);
 
-	if (played && (m_ipo_flags & BL_Action::ACT_IPOFLAG_CHILD)) {
+	if (played && useChildren) {
 		// Like the 2.4x IPO actuator "Child" option: each child plays its own action on the same frames.
 		for (KX_GameObject *child : obj->GetChildrenRecursive()) {
 			Object *blendobj = child->GetBlenderObject();
