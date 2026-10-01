@@ -288,6 +288,7 @@ __PERF_SCRIPT__
     motion.accel = accel;
     motion.gravity = grav;
     motion.t = performance.now();
+    if (ra) fuseHead(motion.gyro, motion.gravity);
     if (debug && motion.t - motionLogAt > 1000) {
       motionLogAt = motion.t;
       log("[motion] accel " + accel.map(function (v) { return v.toFixed(2); }).join(" ") +
@@ -295,22 +296,61 @@ __PERF_SCRIPT__
           " | orient " + motion.orient.map(function (v) { return v.toFixed(0); }).join(" "));
     }
   }
+  function qmul(a, b) {
+    return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+            a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+            a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+            a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+  }
+  function screenQuat() {
+    var sc = -screenAngle() * Math.PI / 360;
+    return [Math.cos(sc), 0, 0, Math.sin(sc)];
+  }
+  // Pose da cabeca por fusao giroscopio + gravidade (filtro complementar), nos eixos da tela (= da camera).
+  // O Euler do deviceorientation e o AbsoluteOrientationSensor do Android saltam perto de olhar para cima; a
+  // integracao do giroscopio nao tem esse ponto. O yaw so vem do giroscopio (deriva devagar; recenter() corrige).
+  var fusion = null, fusionAt = 0;
+  function fuseHead(gyro, up) {
+    var now = performance.now(), n = Math.sqrt(up[0] * up[0] + up[1] * up[1] + up[2] * up[2]);
+    if (n < 1) return;
+    var u = [up[0] / n, up[1] / n, up[2] / n];
+    if (!fusion) {
+      // menor arco de u (na camera) ate o +z do mundo: so o yaw fica arbitrario
+      var w = 1 + u[2], q0 = w < 1e-6 ? [0, 1, 0, 0] : [w, u[1], -u[0], 0];
+      var l = Math.sqrt(q0[0] * q0[0] + q0[1] * q0[1] + q0[2] * q0[2] + q0[3] * q0[3]);
+      fusion = [q0[0] / l, q0[1] / l, q0[2] / l, q0[3] / l];
+      fusionAt = now;
+      motion.quat = fusion.slice();
+      return;
+    }
+    var dt = Math.min(0.1, Math.max(0, (now - fusionAt) / 1000));
+    fusionAt = now;
+    var q = fusion;
+    // "cima" do mundo visto da camera: q^-1 * (0,0,1)
+    var ex = 2 * (q[1] * q[3] - q[0] * q[2]), ey = 2 * (q[2] * q[3] + q[0] * q[1]), ez = 1 - 2 * (q[1] * q[1] + q[2] * q[2]);
+    var k = 2.0; // ganho da correcao pela gravidade (1/s)
+    var wx = gyro[0] + k * (ez * u[1] - ey * u[2]);
+    var wy = gyro[1] + k * (ex * u[2] - ez * u[0]);
+    var wz = gyro[2] + k * (ey * u[0] - ex * u[1]);
+    var ang = Math.sqrt(wx * wx + wy * wy + wz * wz) * dt, h = ang / 2;
+    var sn = ang > 1e-9 ? Math.sin(h) / (ang / dt) : 0;
+    var dq = [Math.cos(h), wx * sn, wy * sn, wz * sn];
+    q = qmul(q, dq);
+    var m = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    fusion = [q[0] / m, q[1] / m, q[2] / m, q[3] / m];
+    motion.quat = fusion.slice();
+  }
   function onDeviceOrientation(e) {
     if (e.alpha === null && e.beta === null) return;
     motion.orient = [e.alpha || 0, e.beta || 0, e.gamma || 0];
+    if (fusion) return;
     // Pose da cabeca para VR (bge.logic.motion.headOrientation): W3C R = Rz(alpha)*Rx(beta)*Ry(gamma) leva o
     // aparelho ao mundo (x leste, y norte, z cima, igual ao Blender), e os eixos do aparelho ja sao os da camera
     // do Blender (x direita, y cima, olha para -z). Rz(-angulo da tela) segue a tela em paisagem. [w, x, y, z]
     var d = Math.PI / 360;
-    function qmul(a, b) {
-      return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
-              a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
-              a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
-              a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
-    }
-    var al = (e.alpha || 0) * d, be = (e.beta || 0) * d, ga = (e.gamma || 0) * d, sc = -screenAngle() / 2;
+    var al = (e.alpha || 0) * d, be = (e.beta || 0) * d, ga = (e.gamma || 0) * d;
     motion.quat = qmul(qmul(qmul([Math.cos(al), 0, 0, Math.sin(al)], [Math.cos(be), Math.sin(be), 0, 0]),
-                            [Math.cos(ga), 0, Math.sin(ga), 0]), [Math.cos(sc), 0, 0, Math.sin(sc)]);
+                            [Math.cos(ga), 0, Math.sin(ga), 0]), screenQuat());
   }
   window.addEventListener("devicemotion", onDeviceMotion);
   window.addEventListener("deviceorientation", onDeviceOrientation);

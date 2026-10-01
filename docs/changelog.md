@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: pose da cabeça por fusão giroscópio + gravidade
+
+- Testado no celular: o quaternion do Android/Chrome (`deviceorientation` e `AbsoluteOrientationSensor`, em
+  frame `device` e `screen`) tem descontinuidade perto de 90° de pitch (fusão baseada em Euler); a vista pulava
+  para o chão ao olhar para cima.
+- `package-web.py`: filtro complementar próprio (`fuseHead`) nos eixos da tela: integra `rotationRate` e corrige
+  com o vetor gravidade (ganho 2/s). Quaternion inicial = menor arco da gravidade até +z. Sem `rotationRate`,
+  cai no caminho Euler antigo. Deriva de rumo é esperada; `recenter()` corrige.
+- Validado num simulador em Node e no aparelho: orientação correta e sem salto passando do zênite.
+
 ## 2026-09-30 - VR no celular, peça 1: pose da cabeça em `bge.logic.motion`
 
 - Plano novo em [mobile-vr-plan.md](mobile-vr-plan.md) (VR estilo Cardboard no Web/APK; OpenXR adiado sem headset).
