@@ -43,6 +43,8 @@
 #include "DNA_action_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_object_types.h"
+#include "DNA_anim_types.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -271,6 +273,7 @@ bool BL_ActionActuator::Update(double curtime)
 			case ACT_ACTION_LOOP_STOP:
 			{
 				obj->StopAction(m_layer); // Stop the action after getting the frame
+				StopChildren(obj);
 
 				// We're done
 				m_flag &= ~ACT_FLAG_ACTIVE;
@@ -313,6 +316,7 @@ void BL_ActionActuator::DecLink()
 		 * state may already be playing on this layer. */
 		if (obj->GetCurrentActionName(m_layer) == m_actionName) {
 			obj->StopAction(m_layer);
+			StopChildren(obj);
 		}
 	}
 }
@@ -320,7 +324,30 @@ void BL_ActionActuator::DecLink()
 bool BL_ActionActuator::Play(KX_GameObject *obj, float start, float end, short mode)
 {
 	const short blendmode = (m_blendmode == ACT_ACTION_ADD) ? BL_Action::ACT_BLEND_ADD : BL_Action::ACT_BLEND_BLEND;
-	return obj->PlayAction(m_actionName, start, end, m_layer, m_priority, m_blendin, mode, m_layer_weight, m_ipo_flags, 1.0f, blendmode);
+	const bool played = obj->PlayAction(m_actionName, start, end, m_layer, m_priority, m_blendin, mode, m_layer_weight, m_ipo_flags, 1.0f, blendmode);
+
+	if (played && (m_ipo_flags & BL_Action::ACT_IPOFLAG_CHILD)) {
+		// Like the 2.4x IPO actuator "Child" option: each child plays its own action on the same frames.
+		for (KX_GameObject *child : obj->GetChildrenRecursive()) {
+			Object *blendobj = child->GetBlenderObject();
+			if (blendobj && blendobj->adt && blendobj->adt->action) {
+				child->PlayAction(blendobj->adt->action->id.name + 2, start, end, m_layer, m_priority, m_blendin, mode,
+				                  m_layer_weight, m_ipo_flags & ~BL_Action::ACT_IPOFLAG_CHILD, 1.0f, blendmode);
+			}
+		}
+	}
+
+	return played;
+}
+
+void BL_ActionActuator::StopChildren(KX_GameObject *obj)
+{
+	if (!(m_ipo_flags & BL_Action::ACT_IPOFLAG_CHILD)) {
+		return;
+	}
+	for (KX_GameObject *child : obj->GetChildrenRecursive()) {
+		child->StopAction(m_layer);
+	}
 }
 
 #ifdef WITH_PYTHON

@@ -2245,6 +2245,22 @@ int do_version_tface(Main *main)
 
 	}
 
+	/* Range: a material shared by meshes with and without TexFace (2.49 drew faces
+	 * without TexFace with default face flags) must be split too, otherwise e.g. an
+	 * invisible TexFace face would hide every face of the other mesh. */
+	if (fileload) {
+		for (me = main->mesh.first; me; me = me->id.next) {
+			if (ID_IS_LINKED(me)) continue;
+			if (CustomData_get_active_layer_index(&me->fdata, CD_MTFACE) != -1) continue;
+			for (a = 0; a < me->totcol; a++) {
+				ma = me->mat[a];
+				if (ma && !ID_IS_LINKED(ma) && ma->game.flag < 0) {
+					ma->game.flag = MAT_BGE_DISPUTED;
+				}
+			}
+		}
+	}
+
 	/* 2nd part - conversion */
 	/* skip library files */
 
@@ -2335,7 +2351,8 @@ void BKE_material_tface_split_disputed(Main *bmain)
 	totdisputed = 0;
 	for (ma = bmain->mat.first; ma; ma = ma->id.next) {
 		if (ma->game.flag == MAT_BGE_DISPUTED) {
-			ma->game.flag = 0;
+			/* what meshes without TexFace keep (see do_version_tface) */
+			ma->game.flag = GEMAT_BACKCULL;
 			disputed[totdisputed++] = ma;
 		}
 	}

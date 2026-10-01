@@ -701,6 +701,11 @@ static void rna_def_action_actuator(BlenderRNA *brna)
 	                         "(dynamic objects only)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_children", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_IPOCHILD);
+	RNA_def_property_ui_text(prop, "Child", "Also play each child object's own action (Blender 2.4x IPO Child option)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "use_local", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_IPOLOCAL);
 	RNA_def_property_ui_text(prop, "L", "Let the Action act in local coordinates, used in Force and Add mode");

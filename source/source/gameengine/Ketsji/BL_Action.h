@@ -161,6 +161,7 @@ public:
 		ACT_IPOFLAG_FORCE = 1,
 		ACT_IPOFLAG_LOCAL = 2,
 		ACT_IPOFLAG_ADD = 4,
+		ACT_IPOFLAG_CHILD = 8,
 	};
 };
 

@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Porte YoFrankie 2.49: IPO "Child" e material compartilhado sem TexFace
+
+- Opção "Child" do IPO actuator 2.4x (`ACT_IPOCHILD`, RNA `use_children`): o action actuator também toca a
+  action própria de cada filho com o mesmo intervalo e camada, e para os filhos junto (`BL_ActionActuator.cpp`).
+  Animações de névoa/ondas do `fx_splash` voltam a rodar.
+- Material de arquivo 2.4x usado por malha com e sem TexFace: a malha sem TexFace fica com o material original
+  (com backface culling, sem herdar invisível/alpha das faces de outras malhas) (`material.c`). Olhos do logo
+  do menu reaparecem.
+
 ## 2026-10-01 - Porte YoFrankie 2.49: texto bitmap, alpha Darken, armaduras
 
 - Texto bitmap 2.4x (TexFace `TF_BMFONT` + propriedade `Text`): a conversão reserva 256 cópias da face por

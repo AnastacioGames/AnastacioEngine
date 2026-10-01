@@ -431,6 +431,7 @@ typedef struct bActuator {
 #define ACT_IPOFORCE        (1 << 0)
 #define ACT_IPOEND          (1 << 1)
 #define ACT_IPOLOCAL		(1 << 2)
+#define ACT_IPOCHILD		(1 << 4)  /* 2.4x "Child": also play the children's own actions */
 #define ACT_IPOADD			(1 << 5)
 
 /* property actuator->type */

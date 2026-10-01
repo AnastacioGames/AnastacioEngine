@@ -65,6 +65,7 @@ public:
 	
 	virtual void DecLink();
 
+	void StopChildren(KX_GameObject *obj);
 	bool Play(KX_GameObject *obj, float start, float end, short mode);
 
 #ifdef WITH_PYTHON
