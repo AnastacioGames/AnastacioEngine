@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - VR no celular: mira (linhas de debug) na Web/celular
+
+- `RAS_OpenGLDebugDraw::Flush` na Web desenha as linhas via `GLctx` em `EM_JS` (`ras_draw_lines_webgl`), com
+  VAO/buffer próprios e restauração dos bindings, contornando a emulação legada de GL do Emscripten.
+- Validado no celular: o anel da mira do Ray VR Gaze aparece no `vr_menu`.
+
 ## 2026-10-01 - VR no celular: texto 3D na Web/celular
 
 - Na Web, a emulação legada de GL do Emscripten bagunçava VAO/VBO ao desenhar glifos. O BLF ganhou um caminho

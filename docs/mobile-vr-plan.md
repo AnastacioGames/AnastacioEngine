@@ -159,7 +159,7 @@ Ordem sugerida, da maior para a menor facilidade para quem faz o jogo:
    Time → AND → atuador; para esconder um menu, Visibility + Suspend Physics (invisível ainda bloqueia o raio).
    Validado no desktop e no celular (Cardboard/APK), com texto. Na web o BLF desenha as letras com um shader
    próprio direto no WebGL (sem glBegin/pilha de matrizes); a matriz e a cor vêm de `BLF_draw_state`.
-   Limite: a mira (linhas de debug) não aparece no celular.
+   A mira (linhas de debug) também aparece no celular desde 2026-10-01.
 7. **Conforto.** Vinheta ao girar/mover rápido (reduz enjoo), recentralizar pelo olhar (segurar o olhar para
    baixo por 2 s) e opção de snap-turn do corpo.
 8. **Painel único "VR" no editor.** Agrupar flags, lente, suavização, separação e vinheta num painel só, com

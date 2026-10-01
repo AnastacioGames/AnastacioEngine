@@ -39,6 +39,31 @@ EM_JS(void, ras_gl_bind_buffer_webgl, (GLenum target, GLuint buffer), {
 	GLctx.bindBuffer(target, buffer ? GL.buffers[buffer] : null);
 });
 
+/* Debug lines (the VR gaze reticle uses them) go straight to WebGL through their own vertex
+ * array and buffer, restoring the previous bindings: Emscripten's legacy GL emulation keeps its
+ * own idea of those and the shared VAO path draws nothing there. Vertex = color[4] + pos[3]. */
+EM_JS(void, ras_draw_lines_webgl, (const float *data, int numverts, int pos, int color), {
+	var g = GLctx;
+	var prevVao = g.getParameter(g.VERTEX_ARRAY_BINDING);
+	var prevBuf = g.getParameter(g.ARRAY_BUFFER_BINDING);
+	if (!Module.rasLinesVao) {
+		Module.rasLinesVao = g.createVertexArray();
+		Module.rasLinesVbo = g.createBuffer();
+		g.bindVertexArray(Module.rasLinesVao);
+		g.bindBuffer(g.ARRAY_BUFFER, Module.rasLinesVbo);
+		g.enableVertexAttribArray(color);
+		g.vertexAttribPointer(color, 4, g.FLOAT, false, 28, 0);
+		g.enableVertexAttribArray(pos);
+		g.vertexAttribPointer(pos, 3, g.FLOAT, false, 28, 16);
+	}
+	g.bindVertexArray(Module.rasLinesVao);
+	g.bindBuffer(g.ARRAY_BUFFER, Module.rasLinesVbo);
+	g.bufferData(g.ARRAY_BUFFER, HEAPF32.subarray(data >> 2, (data >> 2) + numverts * 7), g.STREAM_DRAW);
+	g.drawArrays(g.LINES, 0, numverts);
+	g.bindVertexArray(prevVao);
+	g.bindBuffer(g.ARRAY_BUFFER, prevBuf);
+});
+
 extern "C" {
 extern void emscripten_glGenBuffers(GLsizei n, GLuint *buffers);
 extern void emscripten_glBufferData(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
@@ -289,6 +314,15 @@ void RAS_OpenGLDebugDraw::Flush(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_
 	const std::vector<RAS_DebugDraw::Line>& lines = debugDraw->m_lines;
 	const unsigned int numlines = lines.size();
 	if (numlines > 0) {
+#ifdef __EMSCRIPTEN__
+		GPU_shader_bind(m_colorShader);
+		if (m_colorViewProjUniform != -1) {
+			GPU_shader_uniform_vector(m_colorShader, m_colorViewProjUniform, 16, 1, (const float *)viewProjMat.Data());
+		}
+		ras_draw_lines_webgl((const float *)lines.data(), numlines * 2,
+		                     GPU_shader_get_attribute(m_colorShader, "pos"),
+		                     GPU_shader_get_attribute(m_colorShader, "color"));
+#else
 		updateVbo(m_vbos[LINES_VBO], lines);
 
 		GPU_bind_vertex_array(m_vaos[LINES_VAO]);
@@ -297,6 +331,7 @@ void RAS_OpenGLDebugDraw::Flush(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_
 			GPU_shader_uniform_vector(m_colorShader, m_colorViewProjUniform, 16, 1, (const float *)viewProjMat.Data());
 		}
 		glDrawArrays(GL_LINES, 0, numlines * 2);
+#endif
 	}
 
 	const std::vector<RAS_DebugDraw::Frustum>& frustums = debugDraw->m_frustums;
