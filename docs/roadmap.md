@@ -394,10 +394,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
 menu ImGui e Runtime Property Sensors/Actuators. Aceitas em 2026-10-02: os itens de 2026-09-25 (Game Settings,
-FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser). O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
-
-- **Profiler (Plano 2)**: opcionalmente conferir as categorias `CollisionDepth`/`TextureRenderers` como linhas
-  separadas num relatório de benchmark.
+FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser) e as
+categorias `CollisionDepth`/`TextureRenderers` do Profiler em linhas próprias. O stress de captura de vídeo e
+OpenAL foi cancelado por decisão do usuário. Nenhuma validação manual pendente.
 
 ## Fora do escopo atual
 
