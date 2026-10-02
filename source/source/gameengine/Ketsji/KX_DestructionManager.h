@@ -132,6 +132,8 @@ private:
 		/// Scrape marks: where the last one went, valid while m_scraped.
 		mt::vec3 m_lastScrape;
 		bool m_scraped;
+		/// Scrape Strip: the strip being drawn, null when the next sample starts a new one.
+		KX_GameObject *m_strip;
 	};
 
 	struct PendingScrape
@@ -153,6 +155,14 @@ private:
 		float m_impulse;
 	};
 
+	/// Decal vertex glued to a target triangle, to follow later dents.
+	struct DecalAnchor
+	{
+		/// First corner in KX_DentDeformer::GetTriangles().
+		unsigned int m_triangle;
+		float m_bary[3];
+	};
+
 	struct Decal
 	{
 		KX_GameObject *m_object;
@@ -160,6 +170,14 @@ private:
 		KX_Mesh *m_mesh;
 		/// Over the target's Max Decals, waiting for its removal.
 		bool m_removing;
+		/// Stamps: one per vertex of the mesh. Empty for strips.
+		std::vector<DecalAnchor> m_anchors;
+		/// Off the surface against z-fighting (world units).
+		float m_lift;
+		/// Strip: segments drawn, the last left/right edge (target local) and length so far (V coordinate).
+		unsigned int m_segments;
+		mt::vec3 m_edge[2];
+		float m_length;
 	};
 
 	struct PendingBreak
@@ -184,6 +202,19 @@ private:
 	/// Projects the Decal object's material on the target surface around point (mesh decal), parented
 	/// to the target. inward points into the surface.
 	void AddDecal(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& inward, const mt::vec3 *along = nullptr);
+	/// Scrape Strip: extends the strip of the object to point, or starts one.
+	void AddStripSegment(Entry *entry, const mt::vec3& point, const mt::vec3& normal, const mt::vec3& along);
+	/// Mesh of a strip starting at the edge left-right (target space), parented to the target, counted
+	/// in its Max Decals.
+	Decal *NewStrip(KX_GameObject *gameobj, const mt::vec3& left, const mt::vec3& right);
+	/// Over Max Decals: the oldest decals of gameobj go, keeping room for one more.
+	void TrimDecals(KX_GameObject *gameobj);
+	/// The Decal object of gameobj in this scene, warns once when it isn't a mesh object.
+	KX_GameObject *GetDecalTemplate(KX_GameObject *gameobj);
+	/// Adds the decal object showing mesh, parented to gameobj, in m_decals.
+	Decal *SpawnDecal(KX_GameObject *gameobj, KX_GameObject *templateobj, KX_Mesh *mesh);
+	/// Moves the decals of a dented target back on its surface.
+	void FollowDents(KX_GameObject *gameobj);
 	/// Sliding contact on an object with Scrape Marks: queues a mark every Scrape Spacing.
 	void Scrape(Entry *entry, KX_GameObject *other, const PHY_ICollData *collData, bool first);
 	/// Rebuilds the collision shape of the dented objects asking for it, once per frame.

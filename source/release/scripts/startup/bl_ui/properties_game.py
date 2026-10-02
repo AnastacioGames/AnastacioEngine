@@ -711,10 +711,20 @@ class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
         col.active = df.decal is not None
         col.prop(df, "use_scrape")
         if df.use_scrape:
+            col.row().prop(df, "scrape_style", expand=True)
             row = col.row(align=True)
             row.prop(df, "scrape_speed", text="Speed")
             row.prop(df, "scrape_spacing", text="Spacing")
-            col.label(text="Heavy: every mark is a new mesh, keep Max low", icon='ERROR')
+            if df.scrape_style == 'STAMPS':
+                col.label(text="Heavy: every mark is a new mesh, keep Max low", icon='ERROR')
+            else:
+                col.label(text="Max and Life count whole strips", icon='INFO')
+
+        mat = ob.active_material
+        if mat:
+            box = layout.box()
+            box.label(text="Damage Material:", icon='MATERIAL')
+            box.operator("node.damage_mix_add", icon='NODETREE')
 
         if game.use_deform:
             if df.use_update_physics and game.collision_bounds_type != 'TRIANGLE_MESH':

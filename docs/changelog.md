@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Deformação: faixa contínua de arrasto, Add Damage Mix e decal que acompanha amassados
+
+- **Scrape Style** (`scrape_style`, bit novo `DEFORM_SCRAPE_STRIP` em `flags`, sem campo novo no DNA): Stamps
+  (carimbos, como antes) ou **Strip**. Strip desenha uma faixa plana contínua com a largura do Size e o material do
+  Decal, um segmento por Spacing (`KX_DestructionManager::AddStripSegment`). A malha é pré-alocada com 128
+  segmentos; os vértices ainda sem uso ficam sobre a última borda (área zero) e cada amostra só move posições
+  (sem realocar). Cheia, a trilha continua numa faixa nova a partir da mesma borda. UV: U de lado a lado, V repete a
+  cada Size. Não usa a cópia privada da malha nem recorta triângulos (mais leve; melhor em chão plano). Max e Life
+  contam faixas inteiras. A normal do contato agora aponta para o objeto que desliza.
+- **Add Damage Mix** (`node.damage_mix_add`, botão no painel Deformation quando há material): põe um Mix Shader
+  entre a superfície atual e a saída, com Fac = Mask do nó Damage e um Principled metálico enferrujado.
+- **Decal acompanha amassados**: cada vértice de um carimbo guarda o triângulo de origem e as baricêntricas;
+  `FollowDents` (em `Dented` e `ResetDent`) recoloca os decals do alvo na superfície nova.
+- Refatoração: `GetDecalTemplate`, `SpawnDecal` e `TrimDecals` saem de `AddDecal`.
+- Teste: `tools/create_damage_marks_test.py`. Validado: build, execução sem avisos e teste visual do usuário.
+
 ## 2026-10-02 - Sombra suave da Point, 4 luzes com sombra, Wireframe e IES no viewport
 
 - `shadow_point` (`gpu_shader_material.glsl`): 3x3 amostras a 1 texel, cada uma comparação bilinear e presa

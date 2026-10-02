@@ -374,6 +374,7 @@ enum {
 	DEFORM_ON_COLLISION    = 1 << 0,
 	DEFORM_UPDATE_PHYSICS  = 1 << 1,
 	DEFORM_SCRAPE          = 1 << 2,
+	DEFORM_SCRAPE_STRIP    = 1 << 3,  /* scrape trail as one continuous strip instead of stamps */
 };
 
 /* RangeDeformSettings.mode */

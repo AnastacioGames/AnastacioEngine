@@ -46,6 +46,8 @@ static const float LIFESPAN_TICKS_PER_SECOND = 50.0f;
 /// Seconds between two collision dents of an object: a resting or sliding contact above the dent
 /// impulse would rebuild the mesh (and its collision shape) every frame.
 static const float DENT_COOLDOWN = 0.1f;
+/// Segments of one Scrape Strip mesh; a longer trail goes on in a new strip.
+static const unsigned int STRIP_SEGMENTS = 128;
 
 static bool is_destructible(KX_GameObject *gameobj)
 {
@@ -182,6 +184,7 @@ void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 	entry.m_dentWarned = false;
 	entry.m_lastScrape = mt::zero3;
 	entry.m_scraped = false;
+	entry.m_strip = nullptr;
 	m_entries.push_back(entry);
 
 	if (wants_collisions(gameobj)) {
@@ -224,6 +227,11 @@ void KX_DestructionManager::UnregisterObject(KX_GameObject *gameobj)
 		if (it->m_object == gameobj) {
 			m_deadDecalMeshes.push_back(it->m_mesh);
 			m_decals.erase(it);
+			for (Entry& entry : m_entries) {
+				if (entry.m_strip == gameobj) {
+					entry.m_strip = nullptr;
+				}
+			}
 			break;
 		}
 	}
@@ -356,6 +364,7 @@ void KX_DestructionManager::Dented(KX_GameObject *gameobj, const mt::vec3& point
 	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
 		m_dirtyShapes.push_back(gameobj);
 	}
+	FollowDents(gameobj);
 	gameobj->RunDentCallbacks(point, impulse);
 }
 
@@ -519,7 +528,11 @@ void KX_DestructionManager::Scrape(Entry *entry, KX_GameObject *other, const PHY
 		return;
 	}
 	const mt::vec3 point = collData->GetWorldPoint(best, first);
-	const mt::vec3 normal = collData->GetNormal(best, first).SafeNormalized(mt::axisZ3);
+	mt::vec3 normal = collData->GetNormal(best, first).SafeNormalized(mt::axisZ3);
+	// Out of this object, towards the sliding one.
+	if (other && mt::dot(normal, other->NodeGetWorldPosition() - point) < 0.0f) {
+		normal = -normal;
+	}
 
 	// Sliding speed: relative velocity of the two surfaces at the contact, across the normal.
 	mt::vec3 relative = gameobj->GetVelocity(point - gameobj->NodeGetWorldPosition());
@@ -541,6 +554,7 @@ void KX_DestructionManager::Scrape(Entry *entry, KX_GameObject *other, const PHY
 		}
 		if (distance > spacing * 8.0f) {
 			entry->m_scraped = false;
+			entry->m_strip = nullptr;
 		}
 	}
 	entry->m_lastScrape = point;
@@ -558,14 +572,8 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
                                      const mt::vec3 *along)
 {
 	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
-	KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.decal));
-	if (!templateobj || templateobj->GetMeshList().empty()) {
-		Entry *entry = FindEntry(gameobj);
-		if (entry && !entry->m_dentWarned) {
-			entry->m_dentWarned = true;
-			CM_Warning("\"" << gameobj->GetName() << "\": the Decal \"" << (settings.decal->id.name + 2)
-			           << "\" is not a mesh object in this scene.");
-		}
+	KX_GameObject *templateobj = GetDecalTemplate(gameobj);
+	if (!templateobj) {
 		return;
 	}
 	KX_DentDeformer *deformer = gameobj->GetDentDeformer(false);
@@ -621,6 +629,7 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 	const mt::vec3 tangent = (invtrans * axisU - invOrigin).SafeNormalized(mt::axisX3);
 	unsigned int index = 0;
 	std::vector<mt::vec3> polygon;
+	std::vector<DecalAnchor> anchors;
 	for (unsigned int t = 0, size = triangles.size(); t + 2 < size; t += 3) {
 		polygon.clear();
 		for (unsigned int k = 0; k < 3; ++k) {
@@ -643,8 +652,19 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 		const mt::vec3 faceNormal = (axisU * faceBox.x + axisV * faceBox.y + normal * faceBox.z).SafeNormalized(normal);
 		const mt::vec3 localNormal = (invtrans * faceNormal - invOrigin).SafeNormalized(mt::axisZ3);
 		const unsigned int first = index;
+		const mt::vec3& a = triangles[t];
+		const mt::vec3 e1 = triangles[t + 1] - a, e2 = triangles[t + 2] - a;
+		const float d11 = mt::dot(e1, e1), d12 = mt::dot(e1, e2), d22 = mt::dot(e2, e2);
+		const float denom = d11 * d22 - d12 * d12;
 		for (const mt::vec3& box : polygon) {
-			const mt::vec3 world = point + (axisU * box.x + axisV * box.y + normal * box.z) * half + faceNormal * lift;
+			const mt::vec3 surface = point + (axisU * box.x + axisV * box.y + normal * box.z) * half;
+			const mt::vec3 world = surface + faceNormal * lift;
+			// Barycentric on the source triangle, the vertex follows it when the target dents again.
+			const mt::vec3 ap = surface - a;
+			const float d1 = mt::dot(ap, e1), d2 = mt::dot(ap, e2);
+			const float bv = (denom != 0.0f) ? (d22 * d1 - d12 * d2) / denom : 0.0f;
+			const float bw = (denom != 0.0f) ? (d11 * d2 - d12 * d1) / denom : 0.0f;
+			anchors.push_back({t, {1.0f - bv - bw, bv, bw}});
 			mt::vec2_packed uvs[RAS_Texture::MaxUnits];
 			for (unsigned short u = 0; u < RAS_Texture::MaxUnits; ++u) {
 				uvs[u] = mt::vec2_packed(mt::vec2(box.x * 0.5f + 0.5f, box.y * 0.5f + 0.5f));
@@ -674,8 +694,32 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 	mesh->EndConversion(m_scene->GetBoundingBoxManager());
 	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, mesh);
 
-	// Over Max Decals: the oldest ones of this target go.
-	const int maxDecals = std::max(settings.max_decals, 1);
+	Decal *decal = SpawnDecal(gameobj, templateobj, mesh);
+	decal->m_anchors.swap(anchors);
+	decal->m_lift = lift;
+}
+
+KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)
+{
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.decal));
+	if (!templateobj || templateobj->GetMeshList().empty() ||
+	    templateobj->GetMeshList().front()->GetMeshMaterialList().empty())
+	{
+		Entry *entry = FindEntry(gameobj);
+		if (entry && !entry->m_dentWarned) {
+			entry->m_dentWarned = true;
+			CM_Warning("\"" << gameobj->GetName() << "\": the Decal \"" << (settings.decal->id.name + 2)
+			           << "\" is not a mesh object in this scene.");
+		}
+		return nullptr;
+	}
+	return templateobj;
+}
+
+void KX_DestructionManager::TrimDecals(KX_GameObject *gameobj)
+{
+	const int maxDecals = std::max(gameobj->GetBlenderObject()->deform.max_decals, 1);
 	int count = 0;
 	for (std::deque<Decal>::reverse_iterator it = m_decals.rbegin(); it != m_decals.rend(); ++it) {
 		if (it->m_target == gameobj && !it->m_removing && ++count >= maxDecals) {
@@ -683,17 +727,201 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 			m_scene->DelayedRemoveObject(it->m_object);
 		}
 	}
+}
 
+KX_DestructionManager::Decal *KX_DestructionManager::SpawnDecal(KX_GameObject *gameobj, KX_GameObject *templateobj,
+                                                                KX_Mesh *mesh)
+{
+	// Over Max Decals: the oldest ones of this target go.
+	TrimDecals(gameobj);
+
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
 	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
-	KX_GameObject *decal = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
-	decal->ReplaceMesh(mesh, true, false);
-	decal->NodeSetWorldPosition(gameobj->NodeGetWorldPosition());
-	decal->NodeSetGlobalOrientation(gameobj->NodeGetWorldOrientation());
-	decal->NodeSetWorldScale(gameobj->NodeGetWorldScaling());
-	decal->NodeUpdate();
-	decal->SetParent(gameobj, false, true);
-	m_decals.push_back({decal, gameobj, mesh, false});
-	decal->Release();
+	KX_GameObject *decalobj = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
+	decalobj->ReplaceMesh(mesh, true, false);
+	decalobj->NodeSetWorldPosition(gameobj->NodeGetWorldPosition());
+	decalobj->NodeSetGlobalOrientation(gameobj->NodeGetWorldOrientation());
+	decalobj->NodeSetWorldScale(gameobj->NodeGetWorldScaling());
+	decalobj->NodeUpdate();
+	decalobj->SetParent(gameobj, false, true);
+	decalobj->Release();
+
+	Decal decal;
+	decal.m_object = decalobj;
+	decal.m_target = gameobj;
+	decal.m_mesh = mesh;
+	decal.m_removing = false;
+	decal.m_lift = 0.0f;
+	decal.m_segments = 0;
+	decal.m_edge[0] = decal.m_edge[1] = mt::zero3;
+	decal.m_length = 0.0f;
+	m_decals.push_back(decal);
+	return &m_decals.back();
+}
+
+void KX_DestructionManager::FollowDents(KX_GameObject *gameobj)
+{
+	KX_DentDeformer *deformer = gameobj->GetDentDeformer(false);
+	if (!deformer) {
+		return;
+	}
+	std::vector<mt::vec3> triangles;
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::vec3 invOrigin = invtrans * mt::zero3;
+	for (Decal& decal : m_decals) {
+		if (decal.m_target != gameobj || decal.m_anchors.empty()) {
+			continue;
+		}
+		if (triangles.empty()) {
+			deformer->GetTriangles(triangles);
+			for (mt::vec3& corner : triangles) {
+				corner = trans * corner;
+			}
+		}
+		RAS_DisplayArray *array = decal.m_mesh->GetMeshMaterialList().front()->GetDisplayArray();
+		const unsigned int count = std::min((unsigned int)decal.m_anchors.size(), array->GetVertexCount());
+		for (unsigned int i = 0; i < count; ++i) {
+			const DecalAnchor& anchor = decal.m_anchors[i];
+			if (anchor.m_triangle + 2 >= triangles.size()) {
+				continue;
+			}
+			const mt::vec3& a = triangles[anchor.m_triangle];
+			const mt::vec3& b = triangles[anchor.m_triangle + 1];
+			const mt::vec3& c = triangles[anchor.m_triangle + 2];
+			const mt::vec3 faceNormal = mt::cross(b - a, c - a).SafeNormalized(mt::axisZ3);
+			const mt::vec3 world = a * anchor.m_bary[0] + b * anchor.m_bary[1] + c * anchor.m_bary[2] + faceNormal * decal.m_lift;
+			array->SetPosition(i, invtrans * world);
+			array->SetNormal(i, (invtrans * faceNormal - invOrigin).SafeNormalized(mt::axisZ3));
+		}
+		array->NotifyUpdate(RAS_DisplayArray::POSITION_MODIFIED | RAS_DisplayArray::NORMAL_MODIFIED);
+	}
+}
+
+KX_DestructionManager::Decal *KX_DestructionManager::NewStrip(KX_GameObject *gameobj, const mt::vec3& left,
+                                                              const mt::vec3& right)
+{
+	KX_GameObject *templateobj = GetDecalTemplate(gameobj);
+	if (!templateobj) {
+		return nullptr;
+	}
+	KX_Mesh *templateMesh = templateobj->GetMeshList().front();
+	RAS_MeshMaterial *meshmat = templateMesh->GetMeshMaterialList().front();
+
+	/* Two vertices per edge, the unused ones wait on the last edge (zero area). Positions in the
+	 * target space, like the stamps. */
+	RAS_DisplayArray *array = new RAS_DisplayArray(RAS_DisplayArray::TRIANGLES, meshmat->GetDisplayArray()->GetFormat());
+	for (unsigned int i = 0; i < (STRIP_SEGMENTS + 1) * 2; ++i) {
+		mt::vec2_packed uvs[RAS_Texture::MaxUnits];
+		for (unsigned short u = 0; u < RAS_Texture::MaxUnits; ++u) {
+			uvs[u] = mt::vec2_packed(mt::vec2((float)(i & 1), 0.0f));
+		}
+		unsigned int colors[RAS_Texture::MaxUnits];
+		std::fill(colors, colors + RAS_Texture::MaxUnits, 0xFFFFFFFF);
+		array->AddVertex(mt::vec3_packed((i & 1) ? right : left), mt::vec3_packed(mt::axisZ3),
+		                 mt::vec4_packed(mt::vec4(1.0f, 0.0f, 0.0f, 1.0f)),
+		                 uvs, colors, i, 0, mt::vec4_packed(mt::zero4), mt::vec4_packed(mt::zero4));
+	}
+	for (unsigned int k = 0; k < STRIP_SEGMENTS; ++k) {
+		const unsigned int l0 = k * 2, r0 = l0 + 1, l1 = l0 + 2, r1 = l0 + 3;
+		const unsigned int corners[6] = {l0, r0, r1, l0, r1, l1};
+		for (unsigned int v : corners) {
+			array->AddPrimitiveIndex(v);
+			array->AddTriangleIndex(v);
+		}
+	}
+
+	KX_Mesh *mesh = new KX_Mesh(m_scene, "ScrapeStrip", templateMesh->GetLayersInfo());
+	mesh->AddMaterial(meshmat->GetBucket(), meshmat->GetIndex(), array);
+	mesh->EndConversion(m_scene->GetBoundingBoxManager());
+	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, mesh);
+
+	Decal *decal = SpawnDecal(gameobj, templateobj, mesh);
+	decal->m_edge[0] = left;
+	decal->m_edge[1] = right;
+	return decal;
+}
+
+void KX_DestructionManager::AddStripSegment(Entry *entry, const mt::vec3& point, const mt::vec3& normal,
+                                            const mt::vec3& along)
+{
+	KX_GameObject *gameobj = entry->m_object;
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const float half = ((settings.decal_size > 0.0f) ? settings.decal_size : 0.5f) * 0.5f;
+	const float lift = std::max(half * 0.004f, 0.001f);
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::vec3 invOrigin = invtrans * mt::zero3;
+
+	Decal *strip = nullptr;
+	for (Decal& decal : m_decals) {
+		if (decal.m_object == entry->m_strip && !decal.m_removing) {
+			strip = &decal;
+			break;
+		}
+	}
+
+	// Across the slide; the direction from the last edge keeps the turns smooth.
+	mt::vec3 direction = along;
+	if (strip) {
+		const mt::vec3 last = trans * ((strip->m_edge[0] + strip->m_edge[1]) * 0.5f);
+		direction = (point - last).SafeNormalized(along);
+	}
+	direction -= normal * mt::dot(direction, normal);
+	const mt::vec3 side = mt::cross(normal, direction).SafeNormalized(mt::axisX3) * half;
+	const mt::vec3 center = point + normal * lift;
+	const mt::vec3 left = invtrans * (center - side);
+	const mt::vec3 right = invtrans * (center + side);
+
+	if (!strip) {
+		// First edge of a new trail.
+		strip = NewStrip(gameobj, left, right);
+		entry->m_strip = strip ? strip->m_object : nullptr;
+		return;
+	}
+	if (strip->m_segments >= STRIP_SEGMENTS) {
+		// Full: the trail goes on in a new strip from the same edge.
+		const mt::vec3 edge0 = strip->m_edge[0], edge1 = strip->m_edge[1];
+		const float length = strip->m_length;
+		strip = NewStrip(gameobj, edge0, edge1);
+		if (!strip) {
+			entry->m_strip = nullptr;
+			return;
+		}
+		strip->m_length = length;
+	}
+	entry->m_strip = strip->m_object;
+
+	RAS_DisplayArray *array = strip->m_mesh->GetMeshMaterialList().front()->GetDisplayArray();
+	strip->m_length += (center - trans * ((strip->m_edge[0] + strip->m_edge[1]) * 0.5f)).Length();
+	// The texture repeats every Size along the trail.
+	const float v = strip->m_length / (half * 2.0f);
+	const mt::vec3 localNormal = (invtrans * normal - invOrigin).SafeNormalized(mt::axisZ3);
+	const mt::vec3 tangent = (invtrans * side - invOrigin).SafeNormalized(mt::axisX3);
+	const mt::vec4 tangent4(tangent.x, tangent.y, tangent.z, 1.0f);
+	const unsigned short uvSize = array->GetFormat().uvSize;
+	if (strip->m_segments == 0) {
+		// The first edge too, now that the normal of the trail is known.
+		for (unsigned int i = 0; i < 2; ++i) {
+			array->SetNormal(i, localNormal);
+			array->SetTangent(i, tangent4);
+		}
+	}
+	++strip->m_segments;
+	// The new edge, and the unused vertices wait on it.
+	for (unsigned int i = strip->m_segments * 2, size = array->GetVertexCount(); i < size; ++i) {
+		const bool isRight = (i & 1);
+		array->SetPosition(i, isRight ? right : left);
+		array->SetNormal(i, localNormal);
+		array->SetTangent(i, tangent4);
+		for (unsigned short layer = 0; layer < uvSize; ++layer) {
+			array->SetUv(i, layer, mt::vec2(isRight ? 1.0f : 0.0f, v));
+		}
+	}
+	array->NotifyUpdate(RAS_DisplayArray::POSITION_MODIFIED | RAS_DisplayArray::NORMAL_MODIFIED |
+	                    RAS_DisplayArray::TANGENT_MODIFIED | RAS_DisplayArray::UVS_MODIFIED);
+	strip->m_edge[0] = left;
+	strip->m_edge[1] = right;
 }
 
 bool KX_DestructionManager::ResetDent(KX_GameObject *gameobj)
@@ -703,6 +931,7 @@ bool KX_DestructionManager::ResetDent(KX_GameObject *gameobj)
 		return false;
 	}
 	deformer->Reset();
+	FollowDents(gameobj);
 	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
 		m_dirtyShapes.push_back(gameobj);
 	}
@@ -1138,8 +1367,14 @@ void KX_DestructionManager::Update(float frameStep)
 		std::vector<PendingScrape> pending;
 		pending.swap(m_pendingScrapes);
 		for (const PendingScrape& scrape : pending) {
-			const Entry *entry = FindEntry(scrape.m_object);
-			if (entry && !entry->m_done && GetDentDeformer(scrape.m_object)) {
+			Entry *entry = FindEntry(scrape.m_object);
+			if (!entry || entry->m_done) {
+				continue;
+			}
+			if (scrape.m_object->GetBlenderObject()->deform.flags & DEFORM_SCRAPE_STRIP) {
+				AddStripSegment(entry, scrape.m_point, scrape.m_normal, scrape.m_along);
+			}
+			else if (GetDentDeformer(scrape.m_object)) {
 				AddDecal(scrape.m_object, scrape.m_point, -scrape.m_normal, &scrape.m_along);
 			}
 		}

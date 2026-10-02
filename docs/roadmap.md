@@ -12,11 +12,10 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ### Dano visual por impacto (Deformation)
 
-Feito: Dent, Bend em V, nó Damage (máscara por pontos de impacto), decals de impacto e marcas de arrasto. Abertos:
-- arrasto como faixa contínua de malha (marca de pneu) no lugar de carimbos espaçados, mais leve;
-- deixar o nó Damage fácil de usar (hoje exige montar Mix Shader/MixRGB à mão; ideia: botão/preset que monta
-  a mistura tinta → metal/ferrugem no material);
-- decal acompanhar amassados posteriores (baricêntricas do triângulo de origem);
+Feito: Dent, Bend em V, nó Damage (máscara por pontos de impacto), decals de impacto e marcas de arrasto.
+Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos carimbos, botão Add Damage Mix
+(tinta → metal enferrujado) e decals que acompanham amassados posteriores. Validados pelo usuário em
+`damage_marks_test.range` (`tools/create_damage_marks_test.py`).
 
 ### Web (WebGL/WebAssembly)
 

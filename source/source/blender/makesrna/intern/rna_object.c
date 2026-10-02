@@ -2728,6 +2728,18 @@ static void rna_def_object_deform(BlenderRNA *brna)
 	                         "Heavy: every mark is a new mesh and the object gets a private mesh copy");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	static const EnumPropertyItem scrape_style_items[] = {
+		{0, "STAMPS", 0, "Stamps", "A Decal mark every Spacing, projected on the surface (follows any shape, heavy)"},
+		{DEFORM_SCRAPE_STRIP, "STRIP", 0, "Strip",
+		 "One continuous flat strip along the slide, like a tire mark (light, best on flat ground)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "scrape_style", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flags");
+	RNA_def_property_enum_items(prop, scrape_style_items);
+	RNA_def_property_ui_text(prop, "Scrape Style", "How the scrape trail is drawn");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "scrape_speed", PROP_FLOAT, PROP_VELOCITY);
 	RNA_def_property_float_sdna(prop, NULL, "scrape_speed");
 	RNA_def_property_range(prop, 0.0f, 1000.0f);

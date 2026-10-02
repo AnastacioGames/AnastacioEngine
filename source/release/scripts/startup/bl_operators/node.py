@@ -298,8 +298,74 @@ class NODE_OT_tree_path_parent(Operator):
         return {'FINISHED'}
 
 
+class NODE_OT_damage_mix_add(Operator):
+    """Mix the material's surface with bare/rusty metal where the object """ \
+        """was hit (Damage node mask, game engine)"""
+    bl_idname = "node.damage_mix_add"
+    bl_label = "Add Damage Mix"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob is not None and ob.active_material is not None
+
+    def execute(self, context):
+        mat = context.object.active_material
+        mat.use_nodes = True
+        tree = mat.node_tree
+        nodes, links = tree.nodes, tree.links
+
+        output = None
+        for node in nodes:
+            if node.type == 'OUTPUT_MATERIAL' and node.is_active_output:
+                output = node
+                break
+        if output is None:
+            output = nodes.new("ShaderNodeOutputMaterial")
+            output.location = (300.0, 0.0)
+        surface = output.inputs["Surface"]
+
+        if surface.is_linked:
+            paint_socket = surface.links[0].from_socket
+            if paint_socket.node.bl_idname == "ShaderNodeMixShader" and \
+                    paint_socket.node.label == "Damage Mix":
+                self.report({'INFO'}, "The material already has a Damage Mix")
+                return {'CANCELLED'}
+        else:
+            paint = nodes.new("ShaderNodeBsdfPrincipled")
+            paint.location = output.location.x - 600.0, output.location.y
+            paint_socket = paint.outputs[0]
+
+        x, y = output.location
+        output.location = x + 200.0, y
+
+        damage = nodes.new("ShaderNodeDamage")
+        damage.location = x - 400.0, y + 300.0
+        damage.inputs["Softness"].default_value = 0.5
+
+        metal = nodes.new("ShaderNodeBsdfPrincipled")
+        metal.label = "Damaged Metal"
+        metal.location = x - 400.0, y - 250.0
+        metal.inputs["Base Color"].default_value = (0.32, 0.13, 0.05, 1.0)
+        metal.inputs["Metallic"].default_value = 1.0
+        metal.inputs["Roughness"].default_value = 0.65
+
+        mix = nodes.new("ShaderNodeMixShader")
+        mix.label = "Damage Mix"
+        mix.location = x, y
+
+        links.new(damage.outputs["Mask"], mix.inputs["Fac"])
+        links.new(paint_socket, mix.inputs[1])
+        links.new(metal.outputs[0], mix.inputs[2])
+        links.new(mix.outputs[0], surface)
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
+
+    NODE_OT_damage_mix_add,
 
     NODE_OT_add_and_link_node,
     NODE_OT_add_node,
