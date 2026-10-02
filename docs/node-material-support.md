@@ -36,15 +36,16 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
-| Hair Info | malha n�o tem fios: todas as sa�das zero, como o Cycles numa malha |
+| Hair Info | malha não tem fios: todas as saídas zero, como o Cycles numa malha |
 | IES Texture | só na árvore de nós da lâmpada (Point e Spot): o perfil (tipo C, arquivo ou Text interno) é normalizado para pico 1 e multiplicado por Strength; a Energy da lâmpada dá o brilho. Num material continua sem suporte |
+| Volume Absorption, Volume Scatter, Principled Volume | ligados na saída Volume (sem Surface): meio homogêneo dentro da caixa local do objeto (o cubo padrão; escala e rotação contam), ao longo do raio até a cena opaca atrás; absorção e espalhamento como no Cycles, luz das lâmpadas espalhada uma vez no meio do trecho (fase Henyey-Greenstein, com sombra), cor do World como ambiente, emissão e blackbody do Principled. Precisa de Blend Mode Alpha Blend (tinge a cena atrás por canal); o material não projeta sombra; atributos (density, temperature) ignorados. Com Surface ligado, só o Surface aparece |
 | Light Path | valores fixos de raio de câmera; Ray Length é a distância até a câmera |
 
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
 IES Texture (num material; na lâmpada funciona, ver acima),
-Point Density, Script, Volume Absorption, Volume Scatter, Principled Volume.
+Point Density, Script.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós
 (`material "X": nodes not supported in the game ...`), visível no console do jogo e no log.

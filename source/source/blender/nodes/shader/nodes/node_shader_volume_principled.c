@@ -54,9 +54,10 @@ static void node_shader_init_volume_principled(bNodeTree *UNUSED(ntree), bNode *
 	}
 }
 
-static int node_shader_gpu_volume_principled(GPUMaterial *UNUSED(mat), bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *UNUSED(in), GPUNodeStack *UNUSED(out))
+static int node_shader_gpu_volume_principled(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
-	return false;
+	static const int inputs[] = {0, 2, 4, 5, 6, 7, 8, 9, 10};
+	return node_shader_gpu_volume(mat, "node_volume_principled", in, inputs, ARRAY_SIZE(inputs), out);
 }
 
 /* node type definition */

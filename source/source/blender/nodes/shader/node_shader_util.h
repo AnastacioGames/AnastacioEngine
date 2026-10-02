@@ -92,6 +92,9 @@ void node_shader_gpu_tex_mapping(struct GPUMaterial *mat, struct bNode *node, st
 void node_shader_gpu_world_env(struct GPUMaterial *mat, struct GPUNodeLink *rough,
                                struct GPUNodeLink **r_mirror, struct GPUNodeLink **r_diffuse, struct GPUNodeLink **r_flag);
 struct GPUNodeLink *node_shader_gpu_scene_color(struct GPUMaterial *mat);
+struct GPUNodeLink *node_shader_gpu_scene_depth(struct GPUMaterial *mat);
+bool node_shader_gpu_volume(struct GPUMaterial *mat, const char *name, struct GPUNodeStack *in,
+                            const int *inputs, int totinput, struct GPUNodeStack *out);
 
 void ntreeExecGPUNodes(struct bNodeTreeExec *exec, struct GPUMaterial *mat, int do_outputs, short compatibility);
 

@@ -32,9 +32,10 @@ static bNodeSocketTemplate sh_node_volume_absorption_out[] = {
 	{	-1, 0, ""	}
 };
 
-static int node_shader_gpu_volume_absorption(GPUMaterial *UNUSED(mat), bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *UNUSED(in), GPUNodeStack *UNUSED(out))
+static int node_shader_gpu_volume_absorption(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
-	return false;
+	static const int inputs[] = {0, 1};
+	return node_shader_gpu_volume(mat, "node_volume_absorption", in, inputs, ARRAY_SIZE(inputs), out);
 }
 
 /* node type definition */

@@ -32,6 +32,10 @@ static int node_shader_gpu_output_material(GPUMaterial *mat, bNode *UNUSED(node)
 {
 	GPUNodeLink *outlink;
 
+	/* Game PBR: without Surface the Volume is drawn on the object's faces (see volume_shade) */
+	if (!in[0].link && in[1].link) {
+		in[0].link = in[1].link;
+	}
 	GPU_stack_link(mat, "node_output_material", in, out, &outlink);
 	GPU_material_output_link(mat, outlink, 0);
 

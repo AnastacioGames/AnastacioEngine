@@ -9,6 +9,28 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Nós de volume no Game PBR
+
+Volume Absorption, Volume Scatter e Principled Volume deixam de ser "sem suporte" e viram `~Game`.
+Ligados na saída Volume do Material Output sem Surface (`node_shader_output_material.c` passa o Volume
+como resultado), desenham nas faces do objeto um meio homogêneo:
+
+- **Espessura:** o raio de visão atravessa a caixa local `[-1, 1]^3` do objeto (o cubo padrão; escala e
+  rotação contam) e para na profundidade da cena opaca (cópia do passe sólido), então objetos dentro
+  da neblina aparecem. Com as duas faces desenhadas, conta uma vez: face da frente de fora, face de
+  trás com a câmera dentro da caixa (`volume_segment`).
+- **Luz:** Beer-Lambert por canal; espalhamento simples das luzes da cena no meio do trecho (fase
+  Henyey-Greenstein, normalizada como o difuso; com sombra naquele ponto), cor do World como ambiente;
+  emissão e blackbody (Stefan-Boltzmann como o Cycles) do Principled (`volume_shade`).
+- **Coeficientes:** os do Cycles (absorção `(1 - Color) * Density`, espalhamento `Color * Density`,
+  Principled com Absorption Color); atributos (density, temperature) ignorados.
+- **Composição:** com Blend Mode Alpha Blend a cópia da cena (a mesma do Glass) é tingida por canal;
+  sem a cópia a transmitância vira alpha média. `KX_BlenderMaterial` desliga a sombra de material só
+  com Volume, que antes projetava uma caixa sólida.
+
+Teste: `tools/create_volume_test.py` (neblina com esfera dentro, absorção laranja num cubo escalado,
+fumaça escura com blackbody 2500 K). Validado por screenshot; falta a validação visual do usuário.
+
 ## 2026-10-02 - IES Texture nas lâmpadas do Game PBR
 
 - O nó IES Texture na árvore de nós de uma lâmpada Point ou Spot molda a luz dela no jogo, em todos os BSDFs com loop de luzes (fator em `scene_light_dir`).

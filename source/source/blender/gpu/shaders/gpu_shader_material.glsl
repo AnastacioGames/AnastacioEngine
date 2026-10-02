@@ -6145,6 +6145,120 @@ void node_vector_displacement_world(vec4 vector, float midlevel, float scale, ou
 	result = (vector.xyz - vec3(midlevel)) * scale;
 }
 
+/* Volume nodes (Game PBR): homogeneous medium inside the object's local box [-1, 1]^3 (the default
+ * cube; object scale and rotation apply), along the view ray up to the opaque scene behind (depth copy
+ * of the solid pass). Both faces may be drawn: the segment is counted once, on front faces from
+ * outside and on back faces with the camera inside the box. Returns the length, mid = its middle. */
+float volume_segment(vec3 I, mat4 viewinv, mat4 obinv, sampler2D depthtex, out vec3 mid)
+{
+	vec3 dir = -scene_view_vector(I);
+	vec3 ro = (gl_ProjectionMatrix[3][3] == 0.0) ? vec3(0.0) : vec3(I.xy, 0.0);
+	mat4 m = obinv * viewinv;
+	vec3 ro_o = (m * vec4(ro, 1.0)).xyz;
+	vec3 d_o = (m * vec4(dir, 0.0)).xyz;
+	d_o = mix(d_o, vec3(1e-8), lessThan(abs(d_o), vec3(1e-8)));
+	vec3 ta = (vec3(-1.0) - ro_o) / d_o;
+	vec3 tb = (vec3(1.0) - ro_o) / d_o;
+	vec3 tmin = min(ta, tb);
+	vec3 tmax = max(ta, tb);
+	float t0 = max(max(tmin.x, tmin.y), tmin.z);
+	float t1 = min(min(tmax.x, tmax.y), tmax.z);
+	mid = I;
+	if ((t0 > 0.0) != gl_FrontFacing) {
+		return 0.0;
+	}
+	t0 = max(t0, 0.0);
+	vec2 size = vec2(textureSize(depthtex, 0));
+	if (size.x > 1.0) {
+		vec2 uv = gl_FragCoord.xy / size;
+		vec4 sp = gl_ProjectionMatrixInverse * vec4(uv * 2.0 - 1.0, texture(depthtex, uv).x * 2.0 - 1.0, 1.0);
+		t1 = min(t1, dot(sp.xyz / sp.w - ro, dir));
+	}
+	mid = ro + dir * (0.5 * (t0 + t1));
+	return max(t1 - t0, 0.0);
+}
+
+/* Beer-Lambert through the segment, with single scattering of the scene lights at its middle
+ * (Henyey-Greenstein phase, shadow at that point) plus the World color, and emission. With the
+ * scene color copy (Alpha Blend) the scene behind is tinted per channel; without it the
+ * transmittance is averaged into alpha. */
+void volume_shade(vec3 sigma_a, vec3 sigma_s, vec3 emission, float g, vec3 I, mat4 viewinv, mat4 obinv,
+                  vec3 ambient, sampler2D depthtex, sampler2D scol, out vec4 result)
+{
+	vec3 P;
+	float t = volume_segment(I, viewinv, obinv, depthtex, P);
+	vec3 sigma_t = max(sigma_a, vec3(0.0)) + max(sigma_s, vec3(0.0));
+	vec3 Tr = exp(-sigma_t * t);
+
+	vec3 Ls = ambient;
+	if (t > 0.0 && dot(sigma_s, sigma_s) > 0.0) {
+		vec3 V = scene_view_vector(P);
+		g = clamp(g, -0.99, 0.99);
+		float g2 = g * g;
+		for (int i = 0; i < NUM_LIGHTS; i++) {
+			vec3 l;
+			float atten;
+			if (!scene_light_dir(i, P, l, atten)) {
+				continue;
+			}
+			/* phase times 4 pi: isotropic = 1, as the diffuse BSDF's light */
+			float phase = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * dot(-l, V), 1e-4), 1.5);
+			Ls += SCENE_LIGHT(i).diffuse.rgb * phase * scene_light_visibility(i, P, l, 1.0, atten);
+		}
+	}
+	vec3 src = max(sigma_s, vec3(0.0)) * Ls + emission;
+	bvec3 thin = lessThan(sigma_t, vec3(1e-5));
+	vec3 L = src * mix((vec3(1.0) - Tr) / max(sigma_t, vec3(1e-5)), vec3(t), thin);
+
+	ivec2 size = textureSize(scol, 0);
+	if (size.x > 1) {
+		vec3 bg = texture(scol, gl_FragCoord.xy / vec2(size)).rgb;
+		result = vec4(bg * Tr + L, 1.0);
+		return;
+	}
+	float a = clamp(1.0 - dot(Tr, vec3(1.0 / 3.0)), 0.0, 1.0);
+	result = vec4(L / max(a, 1e-3), a);
+}
+
+void node_volume_absorption(vec4 color, float density, vec3 I, mat4 viewinv, mat4 obinv, vec3 ambient,
+                            sampler2D depthtex, sampler2D scol, out vec4 result)
+{
+	/* as Cycles: absorption (1 - color) * density, no scattering */
+	vec3 sigma_a = max(vec3(1.0) - color.rgb, vec3(0.0)) * max(density, 0.0);
+	volume_shade(sigma_a, vec3(0.0), vec3(0.0), 0.0, I, viewinv, obinv, ambient, depthtex, scol, result);
+}
+
+void node_volume_scatter(vec4 color, float density, float anisotropy, vec3 I, mat4 viewinv, mat4 obinv,
+                         vec3 ambient, sampler2D depthtex, sampler2D scol, out vec4 result)
+{
+	/* as Cycles: scattering color * density, no absorption */
+	vec3 sigma_s = max(color.rgb, vec3(0.0)) * max(density, 0.0);
+	volume_shade(vec3(0.0), sigma_s, vec3(0.0), anisotropy, I, viewinv, obinv, ambient, depthtex, scol, result);
+}
+
+void node_volume_principled(vec4 color, float density, float anisotropy, vec4 absorption_color,
+                            float emission_strength, vec4 emission_color, float blackbody_intensity,
+                            vec4 blackbody_tint, float temperature, vec3 I, mat4 viewinv, mat4 obinv,
+                            vec3 ambient, sampler2D depthtex, sampler2D scol, out vec4 result)
+{
+	/* svm_node_principled_volume of Cycles without the attributes (no smoke data in a mesh) */
+	density = max(density, 0.0);
+	vec3 sigma_s = max(color.rgb, vec3(0.0)) * density;
+	vec3 sigma_a = max(vec3(1.0) - color.rgb, vec3(0.0)) * max(vec3(1.0) - absorption_color.rgb, vec3(0.0)) * density;
+	vec3 emission = emission_color.rgb * max(emission_strength, 0.0);
+	if (blackbody_intensity > 0.0 && temperature > 1.0) {
+		vec4 bb;
+		node_blackbody(temperature, bb);
+		float lum = dot(bb.rgb, vec3(0.2126, 0.7152, 0.0722));
+		if (lum > 0.0) {
+			/* Stefan-Boltzmann, scaled as Cycles: T^4 * 5.670373e-8 * 1e-6 / pi */
+			float T2 = temperature * temperature;
+			emission += bb.rgb / lum * blackbody_tint.rgb * blackbody_intensity * T2 * T2 * (5.670373e-14 / M_PI);
+		}
+	}
+	volume_shade(sigma_a, sigma_s, emission, anisotropy, I, viewinv, obinv, ambient, depthtex, scol, result);
+}
+
 /* output */
 
 void node_output_material(vec4 surface, vec4 volume, vec3 displacement, out vec4 result)

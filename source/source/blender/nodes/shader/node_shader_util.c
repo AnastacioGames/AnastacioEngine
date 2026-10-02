@@ -339,3 +339,40 @@ GPUNodeLink *node_shader_gpu_scene_color(GPUMaterial *UNUSED(mat))
 	GPU_texture_scene_color_request();
 	return GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
 }
+
+/* Depth of the solid pass (same copy as the scene color, made for Alpha Blend materials when the
+ * color is requested), see GPU_texture_global_depth_ptr; 1x1 placeholder elsewhere. */
+GPUNodeLink *node_shader_gpu_scene_depth(GPUMaterial *UNUSED(mat))
+{
+	return GPU_dynamic_texture_ptr(GPU_texture_global_depth_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
+}
+
+/* Volume nodes (Game PBR): links the GLSL function with the listed inputs (string sockets such as
+ * the Principled Volume attributes can not go through GPU_stack_link) followed by the view position,
+ * inverse view and object matrices, World color, scene depth and scene color. */
+bool node_shader_gpu_volume(GPUMaterial *mat, const char *name, GPUNodeStack *in,
+                            const int *inputs, int totinput, GPUNodeStack *out)
+{
+	GPUNodeLink *l[16];
+	int tot = 0;
+	for (int i = 0; i < totinput; i++) {
+		GPUNodeStack *s = &in[inputs[i]];
+		l[tot++] = s->link ? s->link : GPU_uniform(s->vec);
+	}
+	l[tot++] = GPU_material_builtin(mat, GPU_VIEW_POSITION);
+	l[tot++] = GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX);
+	l[tot++] = GPU_material_builtin(mat, GPU_INVERSE_OBJECT_MATRIX);
+	l[tot++] = GPU_material_world_color(mat);
+	l[tot++] = node_shader_gpu_scene_depth(mat);
+	l[tot++] = node_shader_gpu_scene_color(mat);
+	switch (tot) {
+		case 8:
+			return GPU_link(mat, name, l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], &out[0].link);
+		case 9:
+			return GPU_link(mat, name, l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8], &out[0].link);
+		case 15:
+			return GPU_link(mat, name, l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8], l[9], l[10],
+			                l[11], l[12], l[13], l[14], &out[0].link);
+	}
+	return false;
+}

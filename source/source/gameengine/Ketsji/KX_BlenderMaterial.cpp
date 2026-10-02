@@ -38,8 +38,30 @@
 #include "GPU_draw.h"
 #include "GPU_material.h" // for GPU_BLEND_SOLID
 
+extern "C" {
+#  include "BKE_node.h"
+#  include "DNA_node_types.h"
+}
+
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
+
+/* Game PBR volume (Material Output with Volume and no Surface): the box is drawn as a medium
+ * (volume_shade), so a solid shadow would be wrong. */
+static bool material_is_volume_only(Material *mat)
+{
+	if (!mat->use_nodes || !mat->nodetree) {
+		return false;
+	}
+	for (bNode *node = (bNode *)mat->nodetree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_OUTPUT_MATERIAL && (node->flag & NODE_DO_OUTPUT)) {
+			bNodeSocket *surface = (bNodeSocket *)node->inputs.first;
+			bNodeSocket *volume = surface ? surface->next : nullptr;
+			return surface && !surface->link && volume && volume->link;
+		}
+	}
+	return false;
+}
 
 KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, KX_Scene *scene)
 	:RAS_IMaterial(name),
@@ -114,7 +136,7 @@ KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, K
 	}
 
 	m_flag |= ((mat->mode & MA_SHLESS) != 0) ? 0 : RAS_MULTILIGHT;
-	m_flag |= ((mat->mode2 & MA_CASTSHADOW) != 0) ? RAS_CASTSHADOW : 0;
+	m_flag |= ((mat->mode2 & MA_CASTSHADOW) != 0 && !material_is_volume_only(mat)) ? RAS_CASTSHADOW : 0;
 	m_flag |= ((mat->mode & MA_ONLYCAST) != 0) ? RAS_ONLYSHADOW : 0;
 
 	m_passIndex = mat->index;

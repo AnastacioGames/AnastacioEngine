@@ -942,11 +942,14 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_tip = "Not supported in Game in a material: use it in the lamp node tree";
 				return BKE_node_shader_unsupported_in_game(node, true);
 			}
-			case SH_NODE_TEX_POINTDENSITY:
-			case SH_NODE_SCRIPT:
 			case SH_NODE_VOLUME_ABSORPTION:
 			case SH_NODE_VOLUME_SCATTER:
 			case SH_NODE_VOLUME_PRINCIPLED:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: homogeneous medium in the object's local box (default cube), single scattering of scene lights; needs Blend Mode Alpha Blend; attributes ignored";
+				return false;
+			case SH_NODE_TEX_POINTDENSITY:
+			case SH_NODE_SCRIPT:
 				*r_badge = "Cycles";
 				*r_tip = "Not supported in Game: no GLSL code, output is ignored or zero";
 				/* Same rule as the warning printed by the game (BKE_node). */
