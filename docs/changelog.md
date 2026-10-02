@@ -9,6 +9,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Hair Info no Game PBR
+
+- Novo `node_hair_info`: numa malha não há fios, então todas as saídas são zero (Tangent Normal inclusive), como
+  o Cycles devolve para geometria que não é curva. Sai da lista de não suportados; selo `~Game`.
+- Cena de teste: `tools/create_hair_info_test.py` (saída no Fac de um Mix verde/vermelho; tudo verde = certo).
+- Validado: screenshot no RangeRuntime (5 esferas verdes, sem warning de nó não suportado).
+
+## 2026-10-02 - Deformação: decals de impacto (mesh decal)
+
+- Painel Deformation ganhou a caixa **Impact Decal**: objeto-modelo (`deform.decal`, numa camada inativa, com o
+  material da marca), Size, Max e Life. DNA: `RangeDeformSettings` ganhou `decal`, `decal_size`, `decal_life`,
+  `max_decals` (lib-link/expand/library_query como `explosive.effect`).
+- Em cada batida que passa do Dent Impulse (e em explosões, no ponto mais perto do centro),
+  `KX_DestructionManager::AddDecal` recorta os triângulos já amassados (`KX_DentDeformer::GetTriangles`) por uma
+  caixa projetada no ponto (Sutherland–Hodgman), só as faces viradas para a batida, UV 0..1 da projeção, rotação
+  aleatória e leve afastamento pela normal. Monta um `KX_Mesh` com o material do modelo (como `KX_MeshBuilder`),
+  replica o modelo, troca a malha e parenta ao alvo. Passou de Max, o mais velho do alvo some; Life usa lifespan.
+  A malha é liberada (`UnregisterMesh`) no Update seguinte à remoção do decal.
+- Limitação: o decal não acompanha amassados feitos depois dele.
+- Validado: build e cena `teste_decal.range` abre sem crash. Teste visual pendente.
+
 ## 2026-10-02 - Deformação: Bend em V no ponto da batida e nó Damage (máscara de dano)
 
 - Bend passa a dobrar em **V no ponto de contato**: as duas pontas ficam paradas e o ponto atingido afunda na
