@@ -290,6 +290,24 @@ static void rna_RangeDeformSettings_mode_set(PointerRNA *ptr, int value)
 	}
 }
 
+static void rna_RangeDeformSettings_decal_set(PointerRNA *ptr, PointerRNA value)
+{
+	RangeDeformSettings *ds = ptr->data;
+
+	id_us_min((ID *)ds->decal);
+	ds->decal = value.data;
+	id_us_plus((ID *)ds->decal);
+	/* Files saved before decals existed. */
+	if (ds->decal && ds->decal_size == 0.0f) {
+		ds->decal_size = 0.5f;
+		ds->max_decals = 20;
+	}
+	if (ds->decal && ds->scrape_spacing == 0.0f) {
+		ds->scrape_speed = 2.0f;
+		ds->scrape_spacing = 0.15f;
+	}
+}
+
 static void rna_GameObjectSettings_use_deform_set(PointerRNA *ptr, bool value)
 {
 	Object *ob = ptr->data;
@@ -2677,6 +2695,58 @@ static void rna_def_object_deform(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "bend_max_angle");
 	RNA_def_property_range(prop, 0.0f, M_PI);
 	RNA_def_property_ui_text(prop, "Max Bend", "Most the object bends, summing all hits");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "decal", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "decal");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_RangeDeformSettings_decal_set", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Decal",
+	                         "Mesh object (in an inactive layer) whose material is projected on the surface at each "
+	                         "hit: scratch, bullet hole, burn. UV 0..1 covers the mark");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "decal_size", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "decal_size");
+	RNA_def_property_range(prop, 0.001f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.01f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Decal Size", "Width of the mark projected at the hit");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "decal_life", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "decal_life");
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 600.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Decal Life", "Seconds a mark lives, 0 = permanent");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_scrape", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", DEFORM_SCRAPE);
+	RNA_def_property_ui_text(prop, "Scrape Marks",
+	                         "Leave a trail of Decal marks where an object slides on this one (dragging, skidding). "
+	                         "Heavy: every mark is a new mesh and the object gets a private mesh copy");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "scrape_speed", PROP_FLOAT, PROP_VELOCITY);
+	RNA_def_property_float_sdna(prop, NULL, "scrape_speed");
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 50.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Scrape Speed", "Sliding speed of a contact that starts leaving marks");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "scrape_spacing", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "scrape_spacing");
+	RNA_def_property_range(prop, 0.01f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.02f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Scrape Spacing",
+	                         "Distance slid between two marks. Smaller = continuous trail, more meshes");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "max_decals", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "max_decals");
+	RNA_def_property_range(prop, 1, 1000);
+	RNA_def_property_ui_text(prop, "Max Decals", "Most marks on the object, past it the oldest one goes");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "dent_impulse", PROP_FLOAT, PROP_NONE);

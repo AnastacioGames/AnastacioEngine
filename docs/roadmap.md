@@ -10,6 +10,14 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ## Prioridade atual
 
+### Dano visual por impacto (Deformation)
+
+Feito: Dent, Bend em V, nó Damage (máscara por pontos de impacto), decals de impacto e marcas de arrasto. Abertos:
+- arrasto como faixa contínua de malha (marca de pneu) no lugar de carimbos espaçados, mais leve;
+- deixar o nó Damage fácil de usar (hoje exige montar Mix Shader/MixRGB à mão; ideia: botão/preset que monta
+  a mistura tinta → metal/ferrugem no material);
+- decal acompanhar amassados posteriores (baricêntricas do triângulo de origem);
+
 ### Web (WebGL/WebAssembly)
 
 Estado: o runtime Web roda no navegador com render (luz GLSL, normal map `.dds`, sombras, filtros 2D), teclado,

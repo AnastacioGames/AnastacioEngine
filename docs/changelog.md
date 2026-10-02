@@ -24,6 +24,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Cena de teste: `tools/create_hair_info_test.py` (saída no Fac de um Mix verde/vermelho; tudo verde = certo).
 - Validado: screenshot no RangeRuntime (5 esferas verdes, sem warning de nó não suportado).
 
+## 2026-10-02 - Deformação: marcas de arrasto (Scrape Marks)
+
+- Caixa Impact Decal ganhou **Scrape Marks** (`DEFORM_SCRAPE`), **Speed** (`scrape_speed`) e **Spacing**
+  (`scrape_spacing`), com aviso de recurso pesado na UI e no tooltip (cada marca é uma malha nova e o objeto ganha
+  cópia privada da malha). DNA: `pad` virou `scrape_speed`, mais `scrape_spacing` e `pad`.
+- `KX_DestructionManager::Scrape`: em cada contato (callback de colisão também pedido só por Scrape), mede a
+  velocidade de deslizamento no ponto (velocidade relativa sem a componente da normal); acima de Speed, enfileira uma
+  marca a cada Spacing percorrido (salto > 8× Spacing começa outro rastro). As marcas saem no Update (fora do passo
+  de física), via `AddDecal` alinhado à direção do deslize em vez de rotação aleatória. Recebe a marca o objeto que
+  tem Scrape ligado.
+- Teste: `tools/create_scrape_test.py` (caixa empurrada uma vez desliza no chão). Validado: build e teste visual do
+  usuário.
+
 ## 2026-10-02 - Deformação: decals de impacto (mesh decal)
 
 - Painel Deformation ganhou a caixa **Impact Decal**: objeto-modelo (`deform.decal`, numa camada inativa, com o
@@ -36,7 +49,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   replica o modelo, troca a malha e parenta ao alvo. Passou de Max, o mais velho do alvo some; Life usa lifespan.
   A malha é liberada (`UnregisterMesh`) no Update seguinte à remoção do decal.
 - Limitação: o decal não acompanha amassados feitos depois dele.
-- Validado: build e cena `teste_decal.range` abre sem crash. Teste visual pendente.
+- Normal da marca vem da face mais próxima do ponto (a direção da batida pode apontar para dentro).
+- Validado: build e teste visual do usuário em `decal_test.range` (`tools/create_decal_test.py`: placa + 5 bolas).
 
 ## 2026-10-02 - Deformação: Bend em V no ponto da batida e nó Damage (máscara de dano)
 

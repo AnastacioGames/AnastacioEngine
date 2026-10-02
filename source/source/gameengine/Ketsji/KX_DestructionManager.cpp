@@ -17,10 +17,16 @@
 #include "KX_ClientObjectInfo.h"
 #include "KX_DentDeformer.h"
 #include "KX_GameObject.h"
+#include "KX_Globals.h"
+#include "KX_KetsjiEngine.h"
+#include "KX_Mesh.h"
 #include "KX_RayCast.h"
 #include "KX_Scene.h"
 
 #include "SCA_LogicManager.h"
+#include "BL_Converter.h"
+#include "RAS_DisplayArray.h"
+#include "RAS_MeshMaterial.h"
 #include "PHY_DynamicTypes.h"
 #include "PHY_IPhysicsController.h"
 #include "PHY_IPhysicsEnvironment.h"
@@ -32,6 +38,7 @@
 #include "DNA_object_types.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 /// AddReplicaObject() counts the lifespan in 1/50 s ticks (see KX_Scene::AddReplicaObject).
@@ -63,6 +70,12 @@ static bool dents_on_collision(KX_GameObject *gameobj)
 	return is_deformable(gameobj) && (gameobj->GetBlenderObject()->deform.flags & DEFORM_ON_COLLISION);
 }
 
+static bool scrapes(KX_GameObject *gameobj)
+{
+	return is_deformable(gameobj) && (gameobj->GetBlenderObject()->deform.flags & DEFORM_SCRAPE) &&
+	       gameobj->GetBlenderObject()->deform.decal;
+}
+
 static bool breaks_on_collision(KX_GameObject *gameobj)
 {
 	return is_destructible(gameobj) && (gameobj->GetBlenderObject()->destruction.flags & DESTRUCTION_BREAK_ON_COLLISION);
@@ -75,7 +88,7 @@ static bool explodes_on_impact(KX_GameObject *gameobj)
 
 static bool wants_collisions(KX_GameObject *gameobj)
 {
-	return (breaks_on_collision(gameobj) || explodes_on_impact(gameobj) || dents_on_collision(gameobj)) &&
+	return (breaks_on_collision(gameobj) || explodes_on_impact(gameobj) || dents_on_collision(gameobj) || scrapes(gameobj)) &&
 	       gameobj->GetPhysicsController() &&
 	       !gameobj->GetClientInfo().isSensor();
 }
@@ -167,6 +180,8 @@ void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 	entry.m_done = false;
 	entry.m_dentCooldown = 0.0f;
 	entry.m_dentWarned = false;
+	entry.m_lastScrape = mt::zero3;
+	entry.m_scraped = false;
 	m_entries.push_back(entry);
 
 	if (wants_collisions(gameobj)) {
@@ -190,6 +205,10 @@ void KX_DestructionManager::UnregisterObject(KX_GameObject *gameobj)
 	                               [gameobj](const PendingBreak& pending) { return pending.m_object == gameobj; }),
 	                m_pending.end());
 
+	m_pendingScrapes.erase(std::remove_if(m_pendingScrapes.begin(), m_pendingScrapes.end(),
+	                                      [gameobj](const PendingScrape& pending) { return pending.m_object == gameobj; }),
+	                       m_pendingScrapes.end());
+
 	m_pendingDents.erase(std::remove_if(m_pendingDents.begin(), m_pendingDents.end(),
 	                                    [gameobj](const PendingDent& pending) { return pending.m_object == gameobj; }),
 	                     m_pendingDents.end());
@@ -199,6 +218,20 @@ void KX_DestructionManager::UnregisterObject(KX_GameObject *gameobj)
 		touching.erase(std::remove_if(touching.begin(), touching.end(),
 		                              [gameobj](const std::pair<KX_GameObject *, long long>& touch) { return touch.first == gameobj; }),
 		               touching.end());
+	}
+
+	for (std::deque<Decal>::iterator it = m_decals.begin(); it != m_decals.end(); ++it) {
+		if (it->m_object == gameobj) {
+			m_deadDecalMeshes.push_back(it->m_mesh);
+			m_decals.erase(it);
+			break;
+		}
+	}
+	// The decals of a removed target go with it (children).
+	for (Decal& decal : m_decals) {
+		if (decal.m_target == gameobj) {
+			decal.m_target = nullptr;
+		}
 	}
 
 	const std::deque<KX_GameObject *>::iterator it = std::find(m_debris.begin(), m_debris.end(), gameobj);
@@ -217,6 +250,10 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 	Entry *entry = FindEntry(gameobj);
 	if (!entry || entry->m_done) {
 		return;
+	}
+
+	if (scrapes(gameobj)) {
+		Scrape(entry, other, collData, first);
 	}
 
 	const bool detonates = explodes_on_impact(gameobj);
@@ -362,6 +399,9 @@ bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& poin
 
 	const bool moved = bend ? deformer->AddBend(trans, point, inward, settings.bend_axis, depth, settings.bend_max_angle)
 	                        : deformer->AddDent(trans, point, inward * depth, settings.radius, settings.max_depth);
+	if (settings.decal) {
+		AddDecal(gameobj, point, inward);
+	}
 	if (!moved) {
 		return false;
 	}
@@ -395,8 +435,265 @@ void KX_DestructionManager::BlastDent(KX_GameObject *gameobj, const mt::vec3& ce
 		const mt::vec3 local = mt::vec3::Max(aabbMin, mt::vec3::Min(aabbMax, trans.Inverse() * center));
 		deformer->AddHit(trans, trans * local, settings.radius, hit_strength(impulse - settings.dent_impulse,
 		                                                                     settings.dent_impulse));
+		if (settings.decal) {
+			const mt::vec3 point = trans * local;
+			AddDecal(gameobj, point, (point - center).SafeNormalized(-mt::axisZ3));
+		}
 		Dented(gameobj, center, impulse);
 	}
+}
+
+/// Closest point to p on the triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
+static mt::vec3 closest_on_triangle(const mt::vec3& p, const mt::vec3& a, const mt::vec3& b, const mt::vec3& c)
+{
+	const mt::vec3 ab = b - a, ac = c - a, ap = p - a;
+	const float d1 = mt::dot(ab, ap), d2 = mt::dot(ac, ap);
+	if (d1 <= 0.0f && d2 <= 0.0f) {
+		return a;
+	}
+	const mt::vec3 bp = p - b;
+	const float d3 = mt::dot(ab, bp), d4 = mt::dot(ac, bp);
+	if (d3 >= 0.0f && d4 <= d3) {
+		return b;
+	}
+	const float vc = d1 * d4 - d3 * d2;
+	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+		return a + ab * (d1 / (d1 - d3));
+	}
+	const mt::vec3 cp = p - c;
+	const float d5 = mt::dot(ab, cp), d6 = mt::dot(ac, cp);
+	if (d6 >= 0.0f && d5 <= d6) {
+		return c;
+	}
+	const float vb = d5 * d2 - d1 * d6;
+	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+		return a + ac * (d2 / (d2 - d6));
+	}
+	const float va = d3 * d6 - d5 * d4;
+	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+		return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+	}
+	const float denom = 1.0f / (va + vb + vc);
+	return a + ab * (vb * denom) + ac * (vc * denom);
+}
+
+/// Clips the convex polygon (box coordinates) to the side of plane axis * sign <= 1.
+static void clip_polygon(std::vector<mt::vec3>& polygon, int axis, float sign)
+{
+	std::vector<mt::vec3> result;
+	for (unsigned int i = 0, size = polygon.size(); i < size; ++i) {
+		const mt::vec3& a = polygon[i];
+		const mt::vec3& b = polygon[(i + 1) % size];
+		const float da = 1.0f - a[axis] * sign;
+		const float db = 1.0f - b[axis] * sign;
+		if (da >= 0.0f) {
+			result.push_back(a);
+		}
+		if ((da >= 0.0f) != (db >= 0.0f)) {
+			result.push_back(a + (b - a) * (da / (da - db)));
+		}
+	}
+	polygon.swap(result);
+}
+
+void KX_DestructionManager::Scrape(Entry *entry, KX_GameObject *other, const PHY_ICollData *collData, bool first)
+{
+	KX_GameObject *gameobj = entry->m_object;
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const unsigned int num = collData->GetNumContacts();
+	if (num == 0) {
+		return;
+	}
+
+	// Deepest contact pressing on the surface.
+	unsigned int best = 0;
+	float strongest = -1.0f;
+	for (unsigned int i = 0; i < num; ++i) {
+		const float impulse = collData->GetAppliedImpulse(i, first);
+		if (impulse > strongest) {
+			strongest = impulse;
+			best = i;
+		}
+	}
+	if (strongest <= 0.0f) {
+		return;
+	}
+	const mt::vec3 point = collData->GetWorldPoint(best, first);
+	const mt::vec3 normal = collData->GetNormal(best, first).SafeNormalized(mt::axisZ3);
+
+	// Sliding speed: relative velocity of the two surfaces at the contact, across the normal.
+	mt::vec3 relative = gameobj->GetVelocity(point - gameobj->NodeGetWorldPosition());
+	if (other) {
+		relative -= other->GetVelocity(point - other->NodeGetWorldPosition());
+	}
+	relative -= normal * mt::dot(relative, normal);
+	const float speed = relative.Length();
+	const float spacing = (settings.scrape_spacing > 0.0f) ? settings.scrape_spacing : 0.15f;
+	if (speed < std::max(settings.scrape_speed, 0.01f)) {
+		return;
+	}
+
+	// One mark every spacing along the trail; a far jump starts a new trail.
+	if (entry->m_scraped) {
+		const float distance = (point - entry->m_lastScrape).Length();
+		if (distance < spacing) {
+			return;
+		}
+		if (distance > spacing * 8.0f) {
+			entry->m_scraped = false;
+		}
+	}
+	entry->m_lastScrape = point;
+	entry->m_scraped = true;
+
+	for (const PendingScrape& pending : m_pendingScrapes) {
+		if (pending.m_object == gameobj) {
+			return;
+		}
+	}
+	m_pendingScrapes.push_back({gameobj, point, normal, relative / speed});
+}
+
+void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& inward,
+                                     const mt::vec3 *along)
+{
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.decal));
+	if (!templateobj || templateobj->GetMeshList().empty()) {
+		Entry *entry = FindEntry(gameobj);
+		if (entry && !entry->m_dentWarned) {
+			entry->m_dentWarned = true;
+			CM_Warning("\"" << gameobj->GetName() << "\": the Decal \"" << (settings.decal->id.name + 2)
+			           << "\" is not a mesh object in this scene.");
+		}
+		return;
+	}
+	KX_DentDeformer *deformer = gameobj->GetDentDeformer(false);
+	KX_Mesh *templateMesh = templateobj->GetMeshList().front();
+	if (!deformer || templateMesh->GetMeshMaterialList().empty()) {
+		return;
+	}
+	RAS_MeshMaterial *meshmat = templateMesh->GetMeshMaterialList().front();
+
+	// Projection box: N out of the surface, U and V across it with a random turn.
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::vec3 invOrigin = invtrans * mt::zero3;
+	std::vector<mt::vec3> triangles;
+	deformer->GetTriangles(triangles);
+	for (mt::vec3& corner : triangles) {
+		corner = trans * corner;
+	}
+
+	/* Out of the surface: the face normal of the triangle closest to the point (the hit direction can
+	 * point either way, see DentNow), the hit direction when no triangle is found. */
+	mt::vec3 normal = -inward.SafeNormalized(-mt::axisZ3);
+	float closest = FLT_MAX;
+	for (unsigned int t = 0, size = triangles.size(); t + 2 < size; t += 3) {
+		const mt::vec3 faceNormal = mt::cross(triangles[t + 1] - triangles[t], triangles[t + 2] - triangles[t]);
+		if (faceNormal.LengthSquared() < 1e-12f) {
+			continue;
+		}
+		const float distance = (closest_on_triangle(point, triangles[t], triangles[t + 1], triangles[t + 2]) - point).LengthSquared();
+		if (distance < closest) {
+			closest = distance;
+			normal = faceNormal.Normalized();
+		}
+	}
+	const mt::vec3 helper = (std::abs(normal.z) < 0.9f) ? mt::axisZ3 : mt::axisX3;
+	const mt::vec3 side = mt::cross(helper, normal).SafeNormalized(mt::axisX3);
+	mt::vec3 axisU;
+	if (along) {
+		// Scrape: lined up with the slide.
+		axisU = (*along - normal * mt::dot(*along, normal)).SafeNormalized(side);
+	}
+	else {
+		const float turn = std::uniform_real_distribution<float>(0.0f, 6.2831853f)(m_random);
+		axisU = side * std::cos(turn) + mt::cross(normal, side) * std::sin(turn);
+	}
+	const mt::vec3 axisV = mt::cross(normal, axisU);
+	const float half = ((settings.decal_size > 0.0f) ? settings.decal_size : 0.5f) * 0.5f;
+	// Off the surface against z-fighting.
+	const float lift = std::max(half * 0.004f, 0.001f);
+
+
+	RAS_DisplayArray *array = new RAS_DisplayArray(RAS_DisplayArray::TRIANGLES, meshmat->GetDisplayArray()->GetFormat());
+	const mt::vec3 tangent = (invtrans * axisU - invOrigin).SafeNormalized(mt::axisX3);
+	unsigned int index = 0;
+	std::vector<mt::vec3> polygon;
+	for (unsigned int t = 0, size = triangles.size(); t + 2 < size; t += 3) {
+		polygon.clear();
+		for (unsigned int k = 0; k < 3; ++k) {
+			const mt::vec3 offset = triangles[t + k] - point;
+			polygon.push_back(mt::vec3(mt::dot(offset, axisU), mt::dot(offset, axisV), mt::dot(offset, normal)) / half);
+		}
+		const mt::vec3 faceBox = mt::cross(polygon[1] - polygon[0], polygon[2] - polygon[0]);
+		// Facing the hit only (the back side of a thin wall stays clean).
+		if (faceBox.z <= 0.3f * faceBox.Length()) {
+			continue;
+		}
+		for (int axis = 0; axis < 3 && polygon.size() >= 3; ++axis) {
+			clip_polygon(polygon, axis, 1.0f);
+			clip_polygon(polygon, axis, -1.0f);
+		}
+		if (polygon.size() < 3) {
+			continue;
+		}
+
+		const mt::vec3 faceNormal = (axisU * faceBox.x + axisV * faceBox.y + normal * faceBox.z).SafeNormalized(normal);
+		const mt::vec3 localNormal = (invtrans * faceNormal - invOrigin).SafeNormalized(mt::axisZ3);
+		const unsigned int first = index;
+		for (const mt::vec3& box : polygon) {
+			const mt::vec3 world = point + (axisU * box.x + axisV * box.y + normal * box.z) * half + faceNormal * lift;
+			mt::vec2_packed uvs[RAS_Texture::MaxUnits];
+			for (unsigned short u = 0; u < RAS_Texture::MaxUnits; ++u) {
+				uvs[u] = mt::vec2_packed(mt::vec2(box.x * 0.5f + 0.5f, box.y * 0.5f + 0.5f));
+			}
+			unsigned int colors[RAS_Texture::MaxUnits];
+			std::fill(colors, colors + RAS_Texture::MaxUnits, 0xFFFFFFFF);
+			array->AddVertex(mt::vec3_packed(invtrans * world), mt::vec3_packed(localNormal),
+			                 mt::vec4_packed(mt::vec4(tangent.x, tangent.y, tangent.z, 1.0f)),
+			                 uvs, colors, index, 0, mt::vec4_packed(mt::zero4), mt::vec4_packed(mt::zero4));
+			++index;
+		}
+		for (unsigned int k = 1; k + 1 < polygon.size(); ++k) {
+			const unsigned int corners[3] = {first, first + k, first + k + 1};
+			for (unsigned int v : corners) {
+				array->AddPrimitiveIndex(v);
+				array->AddTriangleIndex(v);
+			}
+		}
+	}
+	if (index == 0) {
+		delete array;
+		return;
+	}
+
+	KX_Mesh *mesh = new KX_Mesh(m_scene, "Decal", templateMesh->GetLayersInfo());
+	mesh->AddMaterial(meshmat->GetBucket(), meshmat->GetIndex(), array);
+	mesh->EndConversion(m_scene->GetBoundingBoxManager());
+	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, mesh);
+
+	// Over Max Decals: the oldest ones of this target go.
+	const int maxDecals = std::max(settings.max_decals, 1);
+	int count = 0;
+	for (std::deque<Decal>::reverse_iterator it = m_decals.rbegin(); it != m_decals.rend(); ++it) {
+		if (it->m_target == gameobj && !it->m_removing && ++count >= maxDecals) {
+			it->m_removing = true;
+			m_scene->DelayedRemoveObject(it->m_object);
+		}
+	}
+
+	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	KX_GameObject *decal = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
+	decal->ReplaceMesh(mesh, true, false);
+	decal->NodeSetWorldPosition(gameobj->NodeGetWorldPosition());
+	decal->NodeSetGlobalOrientation(gameobj->NodeGetWorldOrientation());
+	decal->NodeSetWorldScale(gameobj->NodeGetWorldScaling());
+	decal->NodeUpdate();
+	decal->SetParent(gameobj, false, true);
+	m_decals.push_back({decal, gameobj, mesh, false});
+	decal->Release();
 }
 
 bool KX_DestructionManager::ResetDent(KX_GameObject *gameobj)
@@ -777,6 +1074,14 @@ void KX_DestructionManager::SetMaxDebris(int maxDebris)
 
 void KX_DestructionManager::Update(float frameStep)
 {
+	if (!m_deadDecalMeshes.empty()) {
+		BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+		for (KX_Mesh *mesh : m_deadDecalMeshes) {
+			converter->UnregisterMesh(m_scene, mesh);
+		}
+		m_deadDecalMeshes.clear();
+	}
+
 	for (Entry& entry : m_entries) {
 		if (entry.m_dentCooldown > 0.0f) {
 			entry.m_dentCooldown -= frameStep;
@@ -826,6 +1131,17 @@ void KX_DestructionManager::Update(float frameStep)
 			}
 			entry->m_dentCooldown = DENT_COOLDOWN;
 			DentNow(dent.m_object, dent.m_point, dent.m_direction, dent.m_impulse, &dent.m_hitter);
+		}
+	}
+
+	if (!m_pendingScrapes.empty()) {
+		std::vector<PendingScrape> pending;
+		pending.swap(m_pendingScrapes);
+		for (const PendingScrape& scrape : pending) {
+			const Entry *entry = FindEntry(scrape.m_object);
+			if (entry && !entry->m_done && GetDentDeformer(scrape.m_object)) {
+				AddDecal(scrape.m_object, scrape.m_point, -scrape.m_normal, &scrape.m_along);
+			}
 		}
 	}
 

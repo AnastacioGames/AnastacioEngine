@@ -699,6 +699,23 @@ class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
         sub.active = game.collision_bounds_type == 'TRIANGLE_MESH'
         sub.prop(df, "use_update_physics")
 
+        box = layout.box()
+        box.label(text="Impact Decal:", icon='TPAINT_HLT')
+        box.prop(df, "decal", text="")
+        row = box.row(align=True)
+        row.active = df.decal is not None
+        row.prop(df, "decal_size", text="Size")
+        row.prop(df, "max_decals", text="Max")
+        row.prop(df, "decal_life", text="Life")
+        col = box.column()
+        col.active = df.decal is not None
+        col.prop(df, "use_scrape")
+        if df.use_scrape:
+            row = col.row(align=True)
+            row.prop(df, "scrape_speed", text="Speed")
+            row.prop(df, "scrape_spacing", text="Spacing")
+            col.label(text="Heavy: every mark is a new mesh, keep Max low", icon='ERROR')
+
         if game.use_deform:
             if df.use_update_physics and game.collision_bounds_type != 'TRIANGLE_MESH':
                 layout.label(text="Update Physics needs Collision Bounds: Triangle Mesh", icon='INFO')

@@ -36,6 +36,7 @@
 
 class KX_DentDeformer;
 class KX_GameObject;
+class KX_Mesh;
 class KX_Scene;
 class PHY_ICollData;
 
@@ -128,6 +129,18 @@ private:
 		/// Deformable: objects in contact and the last frame they were, to tell a hit from a contact
 		/// that goes on.
 		std::vector<std::pair<KX_GameObject *, long long> > m_touching;
+		/// Scrape marks: where the last one went, valid while m_scraped.
+		mt::vec3 m_lastScrape;
+		bool m_scraped;
+	};
+
+	struct PendingScrape
+	{
+		KX_GameObject *m_object;
+		mt::vec3 m_point;
+		mt::vec3 m_normal;
+		/// Sliding direction, the mark is stretched along it.
+		mt::vec3 m_along;
 	};
 
 	struct PendingDent
@@ -138,6 +151,15 @@ private:
 		/// Position of the hitting object.
 		mt::vec3 m_hitter;
 		float m_impulse;
+	};
+
+	struct Decal
+	{
+		KX_GameObject *m_object;
+		KX_GameObject *m_target;
+		KX_Mesh *m_mesh;
+		/// Over the target's Max Decals, waiting for its removal.
+		bool m_removing;
 	};
 
 	struct PendingBreak
@@ -159,6 +181,11 @@ private:
 	void Dented(KX_GameObject *gameobj, const mt::vec3& point, float impulse);
 	/// Explosion dent of a deformable reached by a blast.
 	void BlastDent(KX_GameObject *gameobj, const mt::vec3& center, float radius, float force);
+	/// Projects the Decal object's material on the target surface around point (mesh decal), parented
+	/// to the target. inward points into the surface.
+	void AddDecal(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& inward, const mt::vec3 *along = nullptr);
+	/// Sliding contact on an object with Scrape Marks: queues a mark every Scrape Spacing.
+	void Scrape(Entry *entry, KX_GameObject *other, const PHY_ICollData *collData, bool first);
 	/// Rebuilds the collision shape of the dented objects asking for it, once per frame.
 	void UpdatePhysicsShapes();
 
@@ -181,6 +208,12 @@ private:
 	std::vector<PendingDent> m_pendingDents;
 	/// Dented objects whose collision shape follows the mesh (DEFORM_UPDATE_PHYSICS).
 	std::vector<KX_GameObject *> m_dirtyShapes;
+	/// Scrape marks of this frame, added in Update() (no object is added inside the physics step).
+	std::vector<PendingScrape> m_pendingScrapes;
+	/// Impact decals alive, oldest first.
+	std::deque<Decal> m_decals;
+	/// Meshes of removed decals, freed in the next Update() once nothing draws them.
+	std::vector<KX_Mesh *> m_deadDecalMeshes;
 	/// Fragments alive, oldest first.
 	std::deque<KX_GameObject *> m_debris;
 	int m_maxDebris;

@@ -360,12 +360,20 @@ typedef struct RangeDeformSettings {
 	short bend_axis;       /* local long axis of a bending object: 0 X, 1 Y, 2 Z */
 	float bend_angle;      /* bend (radians) per N*s above dent_impulse */
 	float bend_max_angle;  /* most the object bends, all hits summed (radians) */
+	struct Object *decal;  /* optional mark (inactive layer, its material) projected on the hit surface */
+	float decal_size;      /* width of the projected mark, 0 = not initialized yet (old files) */
+	float decal_life;      /* seconds the mark lives, 0 = permanent */
+	int max_decals;        /* most marks on the object, past it the oldest goes */
+	float scrape_speed;    /* sliding speed (m/s) of a contact that leaves scrape marks */
+	float scrape_spacing;  /* distance between two scrape marks, 0 = not initialized yet (old files) */
+	int pad;
 } RangeDeformSettings;
 
 /* RangeDeformSettings.flags */
 enum {
 	DEFORM_ON_COLLISION    = 1 << 0,
 	DEFORM_UPDATE_PHYSICS  = 1 << 1,
+	DEFORM_SCRAPE          = 1 << 2,
 };
 
 /* RangeDeformSettings.mode */

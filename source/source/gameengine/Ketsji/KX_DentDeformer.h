@@ -83,6 +83,9 @@ eturn True when a vertex moved.
 	const float *GetHitStrengths() const;
 	int GetHitCount() const;
 
+	/// Current (dented) local positions of every triangle, three per triangle.
+	void GetTriangles(std::vector<mt::vec3>& positions);
+
 	/// Back to the rest shape, hits cleared.
 	void Reset();
 

@@ -374,6 +374,21 @@ int KX_DentDeformer::GetHitCount() const
 	return m_hitCount;
 }
 
+void KX_DentDeformer::GetTriangles(std::vector<mt::vec3>& positions)
+{
+	for (const DisplayArraySlot& slot : m_slots) {
+		RAS_DisplayArray *array = slot.m_displayArray;
+		if (array->GetPrimitiveType() != RAS_DisplayArray::TRIANGLES) {
+			continue;
+		}
+		for (unsigned int i = 0, size = array->GetPrimitiveIndexCount(); i + 2 < size; i += 3) {
+			for (unsigned int j = 0; j < 3; ++j) {
+				positions.push_back(mt::vec3(array->GetPosition(array->GetPrimitiveIndex(i + j))));
+			}
+		}
+	}
+}
+
 void KX_DentDeformer::Reset()
 {
 	if (!m_dented) {
