@@ -4741,7 +4741,7 @@ void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv
 		}
 		else {
 			/* a mesh is opaque, unlike a strand: fade the lobe out past the terminator */
-			vis = smoothstep(-0.1, 0.25, NdotL) * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+			vis = smoothstep(0.0, 0.35, NdotL) * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
 		}
 		L += SCENE_LIGHT(i).specular.rgb * M * Nphi * cosI * vis;
 	}
