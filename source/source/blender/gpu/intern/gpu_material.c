@@ -984,6 +984,38 @@ void gpu_material_add_node(GPUMaterial *material, GPUNode *node)
 
 /* Code generation */
 
+/* Fase 5 (nos de material Game x Cycles): no caminho Shading Nodes, aplica
+ * Scene > Color Management (exposure, gamma, view transform Filmic + look de
+ * contraste) aproximado antes da conversao linear -> sRGB da saida. Fora desse
+ * caminho mantem a conversao sRGB pura de sempre. Valores lidos na compilacao
+ * do shader; exposure/gamma usam ponteiros da cena. */
+static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
+{
+	/* 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
+	static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
+	ColorManagedViewSettings *vs = &scene->view_settings;
+	int idx = 0;
+
+	if (!BKE_scene_use_new_shading_nodes(scene)) {
+		GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
+		return;
+	}
+
+	if (STREQ(vs->view_transform, "Filmic")) {
+		idx = 4; /* Base Contrast (look None ou "Filmic - Base Contrast") */
+		if (strstr(vs->look, "Very Low Contrast")) idx = 1;
+		else if (strstr(vs->look, "Medium Low Contrast")) idx = 3;
+		else if (strstr(vs->look, "Low Contrast")) idx = 2;
+		else if (strstr(vs->look, "Very High Contrast")) idx = 7;
+		else if (strstr(vs->look, "Medium High Contrast")) idx = 5;
+		else if (strstr(vs->look, "High Contrast")) idx = 6;
+	}
+
+	GPU_link(mat, "game_view_transform", mat->outlinks[0],
+	         GPU_uniform(&vs->exposure), GPU_uniform(&vs->gamma),
+	         GPU_uniform(&contrast_table[idx]), &mat->outlinks[0]);
+}
+
 bool GPU_material_do_color_management(GPUMaterial *mat)
 {
 	if (!BKE_scene_check_color_management_enabled(mat->scene))
@@ -3555,7 +3587,7 @@ GPUMaterial *GPU_material_world(struct Scene *scene, struct World *wo)
 
 	if (GPU_material_do_color_management(mat)) {
 		if (mat->outlinks[0]) {
-			GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
+			gpu_material_link_display_transform(mat, scene);
 		}
 	}
 
@@ -3725,7 +3757,7 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 
 	if (GPU_material_do_color_management(mat)) {
 		if (mat->outlinks[0]) {
-			GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
+			gpu_material_link_display_transform(mat, scene);
 		}
 	}
 

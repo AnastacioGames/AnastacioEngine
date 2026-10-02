@@ -29,16 +29,16 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Refraction BSDF | World desfocado como luz transmitida; não refrata a cena |
 | Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
 | Hair BSDF | cor chapada, sem luz |
-| Ambient Occlusion | AO sempre 1; a cor passa direto |
+| Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Bevel | devolve a normal sem mudança |
 | Light Path | valores fixos de raio de câmera |
 | Light Falloff | todas as saídas devolvem Strength |
-| Sky Texture | branco |
+| Sky Texture (Hosek / Wilkie) | usa o modelo Preetham |
 
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
-Blackbody, Wavelength, Tangent, Wireframe, Hair Info, Holdout, IES Texture,
+Tangent, Wireframe, Hair Info, Holdout, IES Texture,
 Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, Principled Volume.
 
 ## Nós completos no Game PBR
@@ -49,13 +49,21 @@ até 8 luzes, sombra nas 3 primeiras.
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
-Normal Map, Bump, Fresnel, Layer Weight, nós de cor, conversão e vetor.
+Normal Map, Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),
+nós de cor, conversão e vetor.
 
 ## Nós exclusivos do jogo (`Game`)
 
 Sprites Animation, Object, Time e Parallax funcionam nos dois caminhos do Game.
 Output Attachment só no Game legado.
 
+## Cor final (Color Management)
+
+Com Shading Nodes, a saída de materiais e World aplica Scene > Color Management: exposure, gamma e view
+transform Filmic (curva aproximada; looks de contraste mudam a inclinação). Outros view transforms (Raw, Log,
+False Color) são tratados como Standard. Lido ao compilar o shader; não se combina bem com o filtro 2D de
+tonemap (dupla curva).
+
 ## Pendências
 
-Ver o plano em `docs/roadmap.md` (nós de material): AO, Blackbody/Wavelength e Sky (resto da Fase 4).
+Ver o plano em `docs/roadmap.md` (nós de material): Fases 5 e 6.

@@ -910,11 +910,15 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_tip = "Approximated in Game: all outputs return Strength";
 				return false;
 			case SH_NODE_TEX_SKY:
-				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: outputs plain white";
-				return false;
-			case SH_NODE_BLACKBODY:
-			case SH_NODE_WAVELENGTH:
+			{
+				NodeTexSky *tex = node->storage;
+				if (tex && tex->sky_model == SHD_SKY_NEW) {
+					*r_badge = "~Game";
+					*r_tip = "Approximated in Game: Hosek / Wilkie falls back to Preetham";
+					return false;
+				}
+				break;
+			}
 			case SH_NODE_TANGENT:
 			case SH_NODE_WIREFRAME:
 			case SH_NODE_HAIR_INFO:

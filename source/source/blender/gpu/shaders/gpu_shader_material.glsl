@@ -185,6 +185,33 @@ void linearrgb_to_srgb(vec4 col_from, out vec4 col_to)
 	col_to.a = col_from.a;
 }
 
+/* Game: Scene > Color Management aproximado (Fase 5). Recebe linear, devolve ja
+ * codificado para o display (substitui linearrgb_to_srgb na saida). contrast 0 =
+ * Standard; >0 = Filmic aproximado: log2 de -10 a +6.5 stops em torno de 0.18
+ * (faixa do Filmic do Blender) com curva S que leva o cinza medio a ~0.5. */
+float game_filmic_curve(float c, float contrast)
+{
+	const float s0 = 10.0 / 16.5;
+	float s = clamp((log2(max(c, 1e-10) / 0.18) + 10.0) / 16.5, 0.0, 1.0);
+	float b = contrast * (1.0 - s0) / s0;
+	if (s < s0)
+		return 0.5 * pow(s / s0, contrast);
+	return 1.0 - 0.5 * pow((1.0 - s) / (1.0 - s0), b);
+}
+
+void game_view_transform(vec4 col_from, float exposure, float gamma, float contrast, out vec4 col_to)
+{
+	vec3 c = col_from.rgb * exp2(exposure);
+	vec3 d;
+	if (contrast > 0.0)
+		d = vec3(game_filmic_curve(c.r, contrast), game_filmic_curve(c.g, contrast), game_filmic_curve(c.b, contrast));
+	else
+		d = vec3(linearrgb_to_srgb(c.r), linearrgb_to_srgb(c.g), linearrgb_to_srgb(c.b));
+	if (gamma > 0.0 && gamma != 1.0)
+		d = pow(max(d, vec3(0.0)), vec3(1.0 / gamma));
+	col_to = vec4(d, col_from.a);
+}
+
 void color_to_normal(vec3 color, out vec3 normal)
 {
 	normal.x =  2.0 * ((color.r) - 0.5);
@@ -4314,10 +4341,18 @@ void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, vec3 I
 	result = vec4(glass_transmitted(ambient, env_diffuse, env_on) * color.rgb, 0.0);
 }
 
-void node_ambient_occlusion(vec4 color, float distance, vec3 normal, out vec4 result_color, out float result_ao)
+/* Game approximation: no ray tracing, only the local concavity of the surface.
+ * The curvature comes from screen derivatives of the view normal and position;
+ * creases darken within Distance, occlusion from other objects is not computed. */
+void node_ambient_occlusion(vec4 color, float distance, vec3 normal, vec3 viewnormal, vec3 viewpos,
+                            out vec4 result_color, out float result_ao)
 {
-	result_color = color;
-	result_ao = 1.0;
+	vec3 N = normalize(viewnormal);
+	vec3 dpx = dFdx(viewpos), dpy = dFdy(viewpos);
+	float curvature = dot(dFdx(N), dpx) / max(dot(dpx, dpx), 1e-8) +
+	                  dot(dFdy(N), dpy) / max(dot(dpy, dpy), 1e-8);
+	result_ao = 1.0 - clamp(-curvature * distance * 0.25, 0.0, 1.0);
+	result_color = vec4(color.rgb * result_ao, color.a);
 }
 
 /* emission */
@@ -5146,9 +5181,147 @@ void node_tex_musgrave(vec3 co,
 	color = vec4(fac, fac, fac, 1.0);
 }
 
-void node_tex_sky(vec3 co, out vec4 color)
+/* Blackbody and Wavelength: ports of svm_math_blackbody_color and svm_node_wavelength from Cycles. */
+
+void node_blackbody(float temperature, out vec4 color)
 {
-	color = vec4(1.0);
+	float t = temperature;
+	if (t >= 12000.0) {
+		color = vec4(0.826270103, 0.994478524, 1.56626022, 1.0);
+		return;
+	}
+	if (t < 965.0) {
+		color = vec4(4.70366907, 0.0, 0.0, 1.0);
+		return;
+	}
+
+	vec3 r, g;
+	vec4 b;
+	if (t >= 6365.0) {
+		r = vec3(3.78765709e+03, 9.36026367e-06, 3.98995841e-01);
+		g = vec3(-5.00279505e+02, -4.59745390e-06, 1.09090465e+00);
+		b = vec4(6.72595954e-13, -2.73059993e-08, 4.24068546e-04, -7.52204323e-01);
+	}
+	else if (t >= 3315.0) {
+		r = vec3(4.60124770e+03, 2.89727618e-05, 1.48001316e-01);
+		g = vec3(-1.18134453e+03, -2.18913373e-05, 1.30656109e+00);
+		b = vec4(-2.22463426e-13, -1.55078698e-08, 3.81675160e-04, -7.30646033e-01);
+	}
+	else if (t >= 1902.0) {
+		r = vec3(4.66849800e+03, 2.85655028e-05, 1.29075375e-01);
+		g = vec3(-1.42546105e+03, -4.01730887e-05, 1.44002695e+00);
+		b = vec4(-2.02524603e-11, 1.79435860e-07, -2.60561875e-04, -1.41761141e-02);
+	}
+	else if (t >= 1449.0) {
+		r = vec3(4.10671449e+03, -8.61949938e-05, 6.41423749e-01);
+		g = vec3(-1.22075471e+03, 2.56245413e-05, 1.20753416e+00);
+		b = vec4(0.0);
+	}
+	else if (t >= 1167.0) {
+		r = vec3(3.37763626e+03, -4.34581697e-04, 1.64843306e+00);
+		g = vec3(-1.00402363e+03, 1.29189794e-04, 9.08181524e-01);
+		b = vec4(0.0);
+	}
+	else {
+		r = vec3(2.52432244e+03, -1.06185848e-03, 3.11067539e+00);
+		g = vec3(-7.50343014e+02, 3.15679613e-04, 4.73464526e-01);
+		b = vec4(0.0);
+	}
+
+	float t_inv = 1.0 / t;
+	color = vec4(r.x * t_inv + r.y * t + r.z,
+	             g.x * t_inv + g.y * t + g.z,
+	             ((b.x * t + b.y) * t + b.z) * t + b.w,
+	             1.0);
+}
+
+/* Linear Rec.709 primaries, the Cycles default for xyz_to_rgb. */
+vec3 node_xyz_to_rgb(vec3 xyz)
+{
+	return vec3(dot(vec3(3.240479, -1.537150, -0.498535), xyz),
+	            dot(vec3(-0.969256, 1.875991, 0.041556), xyz),
+	            dot(vec3(0.055648, -0.204043, 1.057311), xyz));
+}
+
+void node_wavelength(float wavelength, out vec4 color)
+{
+	const vec3 cie_colour_match[81] = vec3[81](
+	vec3(0.0014,0.0000,0.0065), vec3(0.0022,0.0001,0.0105), vec3(0.0042,0.0001,0.0201),
+	vec3(0.0076,0.0002,0.0362), vec3(0.0143,0.0004,0.0679), vec3(0.0232,0.0006,0.1102),
+	vec3(0.0435,0.0012,0.2074), vec3(0.0776,0.0022,0.3713), vec3(0.1344,0.0040,0.6456),
+	vec3(0.2148,0.0073,1.0391), vec3(0.2839,0.0116,1.3856), vec3(0.3285,0.0168,1.6230),
+	vec3(0.3483,0.0230,1.7471), vec3(0.3481,0.0298,1.7826), vec3(0.3362,0.0380,1.7721),
+	vec3(0.3187,0.0480,1.7441), vec3(0.2908,0.0600,1.6692), vec3(0.2511,0.0739,1.5281),
+	vec3(0.1954,0.0910,1.2876), vec3(0.1421,0.1126,1.0419), vec3(0.0956,0.1390,0.8130),
+	vec3(0.0580,0.1693,0.6162), vec3(0.0320,0.2080,0.4652), vec3(0.0147,0.2586,0.3533),
+	vec3(0.0049,0.3230,0.2720), vec3(0.0024,0.4073,0.2123), vec3(0.0093,0.5030,0.1582),
+	vec3(0.0291,0.6082,0.1117), vec3(0.0633,0.7100,0.0782), vec3(0.1096,0.7932,0.0573),
+	vec3(0.1655,0.8620,0.0422), vec3(0.2257,0.9149,0.0298), vec3(0.2904,0.9540,0.0203),
+	vec3(0.3597,0.9803,0.0134), vec3(0.4334,0.9950,0.0087), vec3(0.5121,1.0000,0.0057),
+	vec3(0.5945,0.9950,0.0039), vec3(0.6784,0.9786,0.0027), vec3(0.7621,0.9520,0.0021),
+	vec3(0.8425,0.9154,0.0018), vec3(0.9163,0.8700,0.0017), vec3(0.9786,0.8163,0.0014),
+	vec3(1.0263,0.7570,0.0011), vec3(1.0567,0.6949,0.0010), vec3(1.0622,0.6310,0.0008),
+	vec3(1.0456,0.5668,0.0006), vec3(1.0026,0.5030,0.0003), vec3(0.9384,0.4412,0.0002),
+	vec3(0.8544,0.3810,0.0002), vec3(0.7514,0.3210,0.0001), vec3(0.6424,0.2650,0.0000),
+	vec3(0.5419,0.2170,0.0000), vec3(0.4479,0.1750,0.0000), vec3(0.3608,0.1382,0.0000),
+	vec3(0.2835,0.1070,0.0000), vec3(0.2187,0.0816,0.0000), vec3(0.1649,0.0610,0.0000),
+	vec3(0.1212,0.0446,0.0000), vec3(0.0874,0.0320,0.0000), vec3(0.0636,0.0232,0.0000),
+	vec3(0.0468,0.0170,0.0000), vec3(0.0329,0.0119,0.0000), vec3(0.0227,0.0082,0.0000),
+	vec3(0.0158,0.0057,0.0000), vec3(0.0114,0.0041,0.0000), vec3(0.0081,0.0029,0.0000),
+	vec3(0.0058,0.0021,0.0000), vec3(0.0041,0.0015,0.0000), vec3(0.0029,0.0010,0.0000),
+	vec3(0.0020,0.0007,0.0000), vec3(0.0014,0.0005,0.0000), vec3(0.0010,0.0004,0.0000),
+	vec3(0.0007,0.0002,0.0000), vec3(0.0005,0.0002,0.0000), vec3(0.0003,0.0001,0.0000),
+	vec3(0.0002,0.0001,0.0000), vec3(0.0002,0.0001,0.0000), vec3(0.0001,0.0000,0.0000),
+	vec3(0.0001,0.0000,0.0000), vec3(0.0001,0.0000,0.0000), vec3(0.0000,0.0000,0.0000)
+	);
+
+	float ii = (wavelength - 380.0) * (1.0 / 5.0);
+	int i = int(ii);
+	vec3 xyz;
+
+	if (ii < 0.0 || i >= 80) {
+		xyz = vec3(0.0);
+	}
+	else {
+		xyz = mix(cie_colour_match[i], cie_colour_match[i + 1], ii - float(i));
+	}
+
+	vec3 rgb = node_xyz_to_rgb(xyz) * (1.0 / 2.52);
+	color = vec4(max(rgb, vec3(0.0)), 1.0);
+}
+
+/* Preetham sky, port of sky_radiance_old from Cycles (kernel/svm/svm_sky.h).
+ * The coefficients are computed on the CPU in node_shader_tex_sky.c. */
+float sky_perez_function(vec4 lam, float lam4, float theta, float gamma)
+{
+	float cgamma = cos(gamma);
+	return (1.0 + lam.x * exp(lam.y / cos(theta))) * (1.0 + lam.z * exp(lam.w * gamma) + lam4 * cgamma * cgamma);
+}
+
+void node_tex_sky(vec3 co, vec2 sun, vec3 radiance, vec4 config_x, vec4 config_y, vec4 config_z, vec3 config_last,
+                  out vec4 color)
+{
+	float len = length(co);
+	vec3 dir = (len > 0.0) ? co / len : vec3(0.0, 0.0, 1.0);
+
+	float theta = acos(clamp(dir.z, -1.0, 1.0));
+	float phi = atan(dir.x, dir.y);
+	float sunphi = sun.x;
+	float suntheta = sun.y;
+
+	float cospsi = sin(theta) * sin(suntheta) * cos(sunphi - phi) + cos(theta) * cos(suntheta);
+	float gamma = acos(clamp(cospsi, -1.0, 1.0));
+
+	theta = min(theta, M_PI * 0.5 - 0.001);
+
+	float x = radiance.y * sky_perez_function(config_y, config_last.y, theta, gamma);
+	float y = radiance.z * sky_perez_function(config_z, config_last.z, theta, gamma);
+	float Y = radiance.x * sky_perez_function(config_x, config_last.x, theta, gamma);
+
+	float X = (y != 0.0) ? (x / y) * Y : 0.0;
+	float Z = (y != 0.0 && Y != 0.0) ? (1.0 - x - y) / y * Y : 0.0;
+
+	color = vec4(node_xyz_to_rgb(vec3(X, Y, Z)), 1.0);
 }
 
 void node_tex_voronoi(vec3 co, float scale, float exponent, float coloring, out vec4 color, out float fac)

@@ -9,6 +9,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Game PBR: Color Management (Filmic, exposição, gamma) na saída do material
+
+- Com Scene > Game > Shading Nodes, a saída dos materiais de mesh e do World passa por
+  `game_view_transform` (`gpu_shader_material.glsl`) em vez do `linearrgb_to_srgb` puro: aplica
+  `scene->view_settings` (exposure como 2^exposure, gamma no espaço do display, view transform Filmic com o
+  contraste do look). Ligação em `gpu_material_link_display_transform` (`gpu_material.c`).
+- Filmic aproximado: log2 de -10 a +6,5 stops em torno de 0,18 e curva S que leva o cinza médio a ~0,5;
+  looks `Filmic - * Contrast` mudam a inclinação. Standard com exposure 0 e gamma 1 é idêntico ao anterior.
+- Sem custo de pós-processo: é feito no shader do material (não em 2D filter). Valores lidos ao compilar o
+  shader (mudar em runtime não atualiza). Caminho BI legado e Display Device None ficam como antes.
+- Build: compilação OK; link bloqueado porque RangeRuntime/RangeEngine estavam abertos. Falta rodar o runtime
+  e validação visual contra o Cycles.
+
+## 2026-10-01 - Nós de material no Game PBR: Blackbody, Wavelength, Sky Texture e AO
+
+- Blackbody e Wavelength ganham GLSL portado do Cycles (`svm_math_blackbody_color` e tabela CIE + XYZ→Rec.709
+  com escala 1/2,52) em `gpu_shader_material.glsl`; saem do alerta `Cycles` no editor.
+- Sky Texture deixa de ser branca: modelo Preetham com coeficientes calculados na CPU
+  (`node_shader_tex_sky.c`, porte de `sky_texture_precompute_old`) e passados como uniforms; sem Vector, usa a
+  direção do raio no World. Hosek / Wilkie usa Preetham e mantém o selo `~Game`.
+- Ambient Occlusion: aproximação por concavidade local (derivadas de tela da normal/posição), escurece cantos
+  dentro de Distance; não oclui por outros objetos.
+- Shaders compilados sem erro no RangeRuntime (Blackbody, Wavelength e Sky em materiais e World); falta
+  validação visual.
+
 ## 2026-10-01 - Porte YoFrankie 2.49: IPO "Child" e material compartilhado sem TexFace
 
 - Opção "Child" do IPO actuator 2.4x (`ACT_IPOCHILD`, RNA `use_children`): o action actuator também toca a
