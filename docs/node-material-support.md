@@ -1,4 +1,4 @@
-# Suporte dos nós de material por motor
+﻿# Suporte dos nós de material por motor
 
 Resumo do que cada nó de shader faz no Game (GLSL), no Cycles e no Blender Render (BI).
 O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
@@ -66,4 +66,4 @@ tonemap (dupla curva).
 
 ## Pendências
 
-Ver o plano em `docs/roadmap.md` (nós de material): Fases 5 e 6.
+Ver o plano em `docs/roadmap.md` (nós de material): validação visual das Fases 3 a 5. O caminho BI fica como está (decisão da Fase 6).

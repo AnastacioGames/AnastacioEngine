@@ -1,4 +1,4 @@
-# Roadmap
+﻿# Roadmap
 
 Somente itens abertos, pendentes de validação ou explicitamente adiados ficam neste arquivo. Recursos
 concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](../relatorio-melhorias-anastacioengine.md)
@@ -355,7 +355,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Fases 1 (correções GLSL, World como ambiente), 2 (selos `~Game`/alerta no editor) e 3 (Diffuse/Glossy/Toon no
   loop de luzes do Principled) feitas em 2026-10-01; Fase 4 (Glass/Refraction com fresnel + World,
   reflexo no Glossy, Toon Glossy, AO por concavidade local, Blackbody, Wavelength, Sky Preetham). Fases 3 e 4
-  faltam validação visual. Fase 5 (Filmic/exposure/gamma de Color Management aplicados na saída do material nodes, aproximado) feita em 2026-10-01, falta validação visual. Aberta: Fase 6, decidir o futuro do BI (`exec` do Mapping).
+  faltam validação visual. Fase 5 (Filmic/exposure/gamma de Color Management aplicados na saída do material nodes, aproximado) feita em 2026-10-01, falta validação visual. Fase 6 decidida em 2026-10-01: o BI fica como está (Game legado segue com os nós do BI, sem migração).
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.
