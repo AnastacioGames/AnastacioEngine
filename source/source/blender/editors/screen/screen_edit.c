@@ -1121,7 +1121,7 @@ void ED_screen_set_subwinactive(bContext *C, const wmEvent *event)
 		if (sa) {
 			/* make overlap active when mouse over */
 			for (ar = sa->regionbase.first; ar; ar = ar->next) {
-				if (BLI_rcti_isect_pt_v(&ar->winrct, &event->x)) {
+				if (ED_region_contains_xy(ar, &event->x)) {
 					scr->subwinactive = ar->swinid;
 					break;
 				}

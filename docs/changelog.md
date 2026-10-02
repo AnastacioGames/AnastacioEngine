@@ -9,6 +9,34 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Sidebars N e T flutuantes, aba Operator e nomes de states nos tooltips
+
+- Sidebars N e T da 3D View com *Region Overlap* ligado viram painéis flutuantes:
+  - o fundo só cobre os painéis abertos e as abas, com cantos arredondados; a região continua com a altura
+    toda, então a rolagem, o arrastar de painéis e o redimensionar seguem iguais;
+  - `ED_region_contains_xy` (`area.c`) faz o teste de clique: abaixo do conteúdo o evento vai para a 3D View.
+    É usado em `wm_event_system.c` e em `ED_screen_set_subwinactive`;
+  - a altura vem de `UI_panels_content_ymin` e `UI_panel_category_tabs_ymin` (`interface_panel.c`);
+  - a borda (emboss) da região não é desenhada nesse modo.
+- Painel do último operador (o mesmo do F6): a região `TOOL_PROPS` da 3D View fica sempre fechada e sem azone.
+  O painel foi registrado na sidebar N, na aba "Operator", com poll em `WM_operator_last_redo`. A aba aparece
+  depois de uma operação com opções e some quando não há nenhuma. O listener da sidebar redesenha em
+  `ND_HISTORY`.
+- States do Logic Editor: o tooltip da grade do State actuator e o do menu de máscara do controller mostram
+  "State N: nome", com o nome vindo do objeto dono do controller.
+
+## 2026-10-02 - Nós Tangent e Anisotropic BSDF no Game PBR
+
+- Tangent (`node_shader_tangent.c`, GLSL `node_tangent`/`node_tangentmap`): ganhou código GPU. Radial no eixo X/Y/Z
+  a partir das coordenadas Generated (`CD_ORCO`) ou tangente do UV Map (`CD_TANGENT`), ortogonalizada contra a
+  normal e em espaço de mundo, como no Cycles. Saiu da lista de nós sem suporte (`node.c`, selo em `node_draw.c`).
+- Anisotropic BSDF deixou de virar Diffuse: GGX anisotrópico (`GTR2_aniso`) das luzes da cena, com a divisão de
+  roughness e a rotação do Cycles; sem Tangent ligado usa a tangente radial em Z. Reflexo do World isotrópico, como
+  o Glossy. Selo `~Game` atualizado; o tooltip do Ambient Occlusion foi corrigido (dizia "AO sempre 1").
+- Wireframe continua sem suporte: precisa de coordenadas baricêntricas, que o fragment shader não tem.
+- `tools/create_node_sweep_test.py` no `RangeRuntime`: sem erro de shader, Tangent fora dos avisos. Falta a
+  validação visual do usuário.
+
 ## 2026-10-02 - Lens Flare aparecia do lado oposto ao sol
 
 - `KX_RenderPipeline.cpp` projetava na tela o `-Z` do sol, que é a direção para onde a luz vai, e não para onde o

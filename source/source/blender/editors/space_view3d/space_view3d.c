@@ -1322,6 +1322,11 @@ static void view3d_buttons_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(
 			if (wmn->action == NA_RENAME)
 				ED_region_tag_redraw(ar);
 			break;
+		case NC_WM:
+			/* last operator panel */
+			if (wmn->data == ND_HISTORY)
+				ED_region_tag_redraw(ar);
+			break;
 		case NC_GPENCIL:
 			if ((wmn->data & (ND_DATA | ND_GPENCIL_EDITMODE)) || (wmn->action == NA_EDITED))
 				ED_region_tag_redraw(ar);
@@ -1696,6 +1701,7 @@ void ED_spacetype_view3d(void)
 	BLI_addhead(&st->regiontypes, art);
 
 	view3d_buttons_register(art);
+	view3d_last_operator_sidebar_register(art);
 
 	/* regions: tool(bar) */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype view3d tools region");

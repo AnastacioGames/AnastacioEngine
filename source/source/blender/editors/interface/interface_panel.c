@@ -1151,6 +1151,38 @@ void UI_panels_end(const bContext *C, ARegion *ar, int *x, int *y)
 	ui_panels_size(sa, ar, x, y);
 }
 
+/* Lowest edge of the active panels in region pixels, used by floating overlap regions
+ * that only cover their content. Returns ar->winy when there are no panels. */
+int UI_panels_content_ymin(ARegion *ar)
+{
+	float ymin = FLT_MAX;
+
+	for (Panel *pa = ar->panels.first; pa; pa = pa->next) {
+		if (pa->runtime_flag & PNL_ACTIVE) {
+			ymin = min_ff(ymin, (float)get_panel_real_ofsy(pa));
+		}
+	}
+
+	if (ymin == FLT_MAX) {
+		return ar->winy;
+	}
+
+	float region_x, region_y;
+	UI_view2d_view_to_region_fl(&ar->v2d, 0.0f, ymin, &region_x, &region_y);
+	return max_ii(0, (int)region_y);
+}
+
+/* Lowest edge of the category tabs in region pixels (ar->winy when there are none). */
+int UI_panel_category_tabs_ymin(ARegion *ar)
+{
+	int ymin = ar->winy;
+
+	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+		ymin = min_ii(ymin, pc_dyn->rect.ymin);
+	}
+	return max_ii(0, ymin);
+}
+
 void UI_panels_draw(const bContext *C, ARegion *ar)
 {
 	uiBlock *block;
@@ -1847,7 +1879,20 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		glColor3ubv(theme_col_tab_bg);
 	}
 
-	glRecti(strip_xmin, v2d->mask.ymin, strip_xmax, v2d->mask.ymax);
+	if (ar->overlap && ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOLS)) {
+		/* floating sidebar: the strip only covers the tabs */
+		int tabs_ymin = v2d->mask.ymax;
+		for (pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+			tabs_ymin = min_ii(tabs_ymin, pc_dyn->rect.ymin);
+		}
+		glEnable(GL_BLEND);
+		UI_draw_roundbox_corner_set(roundboxtype);
+		UI_draw_roundbox(strip_xmin, max_ii(v2d->mask.ymin, tabs_ymin - tab_v_pad), strip_xmax, v2d->mask.ymax,
+		                 tab_curve_radius * 1.5f);
+	}
+	else {
+		glRecti(strip_xmin, v2d->mask.ymin, strip_xmax, v2d->mask.ymax);
+	}
 
 	if (is_alpha) {
 		glDisable(GL_BLEND);

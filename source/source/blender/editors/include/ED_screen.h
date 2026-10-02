@@ -82,6 +82,8 @@ void    ED_region_image_metadata_draw(int x, int y, struct ImBuf *ibuf, const rc
 void    ED_region_grid_draw(struct ARegion *ar, float zoomx, float zoomy);
 float	ED_region_blend_factor(struct ARegion *ar);
 void	ED_region_visible_rect(struct ARegion *ar, struct rcti *rect);
+bool	ED_region_is_floating_panels(const struct ARegion *ar);
+bool	ED_region_contains_xy(const struct ARegion *ar, const int event_xy[2]);
 
 
 /* spaces */

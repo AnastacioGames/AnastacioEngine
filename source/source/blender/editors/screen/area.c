@@ -566,7 +566,9 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 	if (sa) {
 		/* disable emboss when the area is full,
 		 * unless we need to see division between regions (quad-split for eg) */
-		if (((win->screen->state == SCREENFULL) && (ar->alignment == RGN_ALIGN_NONE)) == 0) {
+		if (((win->screen->state == SCREENFULL) && (ar->alignment == RGN_ALIGN_NONE)) == 0 &&
+		    !ED_region_is_floating_panels(ar))
+		{
 			region_draw_emboss(ar, &ar->winrct);
 		}
 	}
@@ -1188,6 +1190,10 @@ static void region_rect_recursive(wmWindow *win, ScrArea *sa, ARegion *ar, rcti 
 
 	/* clear state flags first */
 	ar->flag &= ~RGN_FLAG_TOO_SMALL;
+	/* 3D View: the last operator panel lives in the sidebar (N), its own region stays closed */
+	if (sa->spacetype == SPACE_VIEW3D && ar->regiontype == RGN_TYPE_TOOL_PROPS) {
+		ar->flag |= RGN_FLAG_HIDDEN;
+	}
 	/* user errors */
 	if (ar->next == NULL && alignment != RGN_ALIGN_QSPLIT)
 		alignment = RGN_ALIGN_NONE;
@@ -1558,7 +1564,9 @@ void ED_area_initialize(wmWindowManager *wm, wmWindow *win, ScrArea *sa)
 			UI_blocklist_free(NULL, &ar->uiblocks);
 		}
 		/* Some AZones use View2D data which is only updated in region init, so call that first! */
-		region_azones_add(screen, sa, ar, ar->alignment & ~RGN_SPLIT_PREV);
+		if (!(sa->spacetype == SPACE_VIEW3D && ar->regiontype == RGN_TYPE_TOOL_PROPS)) {
+			region_azones_add(screen, sa, ar, ar->alignment & ~RGN_SPLIT_PREV);
+		}
 	}
 }
 
@@ -2264,12 +2272,70 @@ void ED_region_panels_layout(const bContext *C, ARegion *ar)
 	ED_region_panels_layout_ex(C, ar, NULL, -1, true);
 }
 
+/* Overlapping sidebar drawn as a floating panel: background and mouse input only
+ * where its panels and tabs are, the rest shows (and passes events to) the main region. */
+bool ED_region_is_floating_panels(const ARegion *ar)
+{
+	return ar->overlap && ar->type && ar->type->paneltypes.first &&
+	       ((ar->regiontype == RGN_TYPE_UI && ar->alignment == RGN_ALIGN_RIGHT) ||
+	        (ar->regiontype == RGN_TYPE_TOOLS && ar->alignment == RGN_ALIGN_LEFT));
+}
+
+/* Event hit test for regions, aware of floating sidebars. */
+bool ED_region_contains_xy(const ARegion *ar, const int event_xy[2])
+{
+	if (!BLI_rcti_isect_pt_v(&ar->winrct, event_xy)) {
+		return false;
+	}
+	if (!ED_region_is_floating_panels(ar)) {
+		return true;
+	}
+
+	ARegion *region = (ARegion *)ar;
+	const int x = event_xy[0] - ar->winrct.xmin;
+	const int y = event_xy[1] - ar->winrct.ymin;
+	const int margin = round_fl_to_int(4.0f * UI_DPI_FAC);
+	PanelCategoryDyn *pc_dyn = region->panels_category.first;
+
+	const bool on_tabs = pc_dyn && ((ar->alignment == RGN_ALIGN_RIGHT) ? (x >= pc_dyn->rect.xmin) :
+	                                                                    (x <= pc_dyn->rect.xmax));
+	if (on_tabs) {
+		return y >= UI_panel_category_tabs_ymin(region) - margin;
+	}
+	return y >= UI_panels_content_ymin(region) - margin;
+}
+
 void ED_region_panels_draw(const bContext *C, ARegion *ar)
 {
 	View2D *v2d = &ar->v2d;
 
 	/* clear */
-	if (ar->overlap) {
+	if (ED_region_is_floating_panels(ar)) {
+		/* floating panel: background only behind the content, the viewport shows below */
+		UI_view2d_view_restore(C);
+		const int content_ymin = UI_panels_content_ymin(ar);
+		const bool is_right = (ar->alignment == RGN_ALIGN_RIGHT);
+		int xmin = 0, xmax = BLI_rcti_size_x(&ar->winrct) + 1;
+		if (ar->runtime.category) {
+			if (is_right) {
+				xmax -= round_fl_to_int(UI_PANEL_CATEGORY_MARGIN_WIDTH);
+			}
+			else {
+				xmin += round_fl_to_int(UI_PANEL_CATEGORY_MARGIN_WIDTH);
+			}
+		}
+		if (content_ymin < ar->winy) {
+			const float radius = 6.0f * UI_DPI_FAC;
+			glEnable(GL_BLEND);
+			UI_ThemeColor4(TH_BACK);
+			const int cnr_top = is_right ? UI_CNR_TOP_LEFT : UI_CNR_TOP_RIGHT;
+			const int cnr_bottom = is_right ? UI_CNR_BOTTOM_LEFT : UI_CNR_BOTTOM_RIGHT;
+			UI_draw_roundbox_corner_set(content_ymin > 0 ? cnr_bottom | cnr_top : cnr_top);
+			UI_draw_roundbox((float)xmin, (float)content_ymin, (float)xmax, (float)(ar->winy + 1), radius);
+			glDisable(GL_BLEND);
+		}
+	}
+	else if (ar->overlap) {
 		/* view should be in pixelspace */
 		UI_view2d_view_restore(C);
 		glEnable(GL_BLEND);

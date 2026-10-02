@@ -2374,7 +2374,7 @@ static ARegion *region_event_inside(bContext *C, const int xy[2])
 
 	if (screen && area)
 		for (ar = area->regionbase.first; ar; ar = ar->next)
-			if (BLI_rcti_isect_pt_v(&ar->winrct, xy))
+			if (ED_region_contains_xy(ar, xy))
 				return ar;
 	return NULL;
 }
@@ -2627,7 +2627,7 @@ void wm_event_do_handlers(bContext *C)
 
 						if ((action & WM_HANDLER_BREAK) == 0) {
 							for (ar = sa->regionbase.first; ar; ar = ar->next) {
-								if (wm_event_inside_i(event, &ar->winrct)) {
+								if (wm_event_inside_i(event, &ar->winrct) && ED_region_contains_xy(ar, &event->x)) {
 									CTX_wm_region_set(C, ar);
 
 									/* call even on non mouse events, since the */

@@ -246,6 +246,27 @@ void view3d_tool_props_register(ARegionType *art)
 	BLI_addtail(&art->paneltypes, pt);
 }
 
+static bool view3d_panel_operator_redo_poll(const bContext *C, PanelType *UNUSED(pt))
+{
+	return WM_operator_last_redo(C) != NULL;
+}
+
+/* Same panel in its own sidebar (N) tab, which only exists after a redoable operator. */
+void view3d_last_operator_sidebar_register(ARegionType *art)
+{
+	PanelType *pt;
+
+	pt = MEM_callocN(sizeof(PanelType), "spacetype view3d panel last operator sidebar");
+	strcpy(pt->idname, "VIEW3D_PT_last_operator_sidebar");
+	strcpy(pt->label, N_("Operator"));
+	strcpy(pt->category, "Operator");
+	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+	pt->draw_header = view3d_panel_operator_redo_header;
+	pt->draw = view3d_panel_operator_redo;
+	pt->poll = view3d_panel_operator_redo_poll;
+	BLI_addhead(&art->paneltypes, pt);
+}
+
 /* ********** operator to open/close toolshelf region */
 
 static int view3d_toolshelf_toggle_exec(bContext *C, wmOperator *UNUSED(op))
