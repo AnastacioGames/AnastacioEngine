@@ -7,6 +7,8 @@ Three Point lamps over a floor with a back wall, same color and Energy. From lef
 - IES "asymmetric": light only towards one side of the lamp (horizontal angle 0 = lamp -Y, towards the camera),
   the floor in front of it bright and the wall behind it dark.
 The profiles are internal Text datablocks (photometric type C).
+Pass "spot" after the output path to use Spot lamps (pointing down, 120 degree cone, soft blend) instead:
+the same three patterns must appear, clipped by the wide spot cone.
 """
 import bpy
 import math
@@ -14,6 +16,7 @@ import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 output = argv[0] if argv else "ies_test.range"
+lamp_type = 'SPOT' if len(argv) > 1 and argv[1] == "spot" else 'POINT'
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -64,8 +67,11 @@ bpy.ops.mesh.primitive_plane_add(location=(0, 4, 5), radius=10, rotation=(math.p
 bpy.context.object.data.materials.append(mat)
 
 for i, text in enumerate(texts):
-    bpy.ops.object.lamp_add(type='POINT', location=((i - 1) * 6, 0, 3))
+    bpy.ops.object.lamp_add(type=lamp_type, location=((i - 1) * 6, 0, 3))
     lamp = bpy.context.object.data
+    if lamp_type == 'SPOT':
+        lamp.spot_size = math.radians(120)
+        lamp.spot_blend = 0.3
     lamp.energy = 0.6
     lamp.distance = 8.0
     lamp.use_nodes = True
