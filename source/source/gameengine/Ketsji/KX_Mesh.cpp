@@ -84,6 +84,17 @@ KX_Mesh::KX_Mesh(const KX_Mesh& other)
 	m_scene(other.m_scene),
 	m_bitmapTextValid(false)
 {
+	// Point the bitmap text faces at the display arrays of this copy.
+	for (const BitmapTextFace& face : other.m_bitmapTextFaces) {
+		for (unsigned short i = 0, size = other.m_materials.size(); i < size; ++i) {
+			if (other.m_materials[i]->GetDisplayArray() == face.array) {
+				BitmapTextFace newface = face;
+				newface.array = m_materials[i]->GetDisplayArray();
+				m_bitmapTextFaces.push_back(newface);
+				break;
+			}
+		}
+	}
 }
 
 KX_Mesh::~KX_Mesh()
@@ -178,6 +189,18 @@ void KX_Mesh::UpdateBitmapText(const std::string& text)
 	}
 }
 
+
+KX_Mesh *KX_Mesh::Duplicate()
+{
+	KX_Mesh *dupli = new KX_Mesh(*this);
+	// Create bounding box.
+	dupli->EndConversion(m_scene->GetBoundingBoxManager());
+
+	// Transfer ownership to converter.
+	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, dupli);
+
+	return dupli;
+}
 
 void KX_Mesh::ReplaceScene(KX_Scene *scene)
 {
@@ -502,14 +525,7 @@ PyObject *KX_Mesh::PyReplaceMaterial(PyObject *args, PyObject *kwds)
 
 PyObject *KX_Mesh::PyCopy()
 {
-	KX_Mesh *dupli = new KX_Mesh(*this);
-	// Create bounding box.
-	dupli->EndConversion(m_scene->GetBoundingBoxManager());
-
-	// Transfer ownership to converter.
-	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, dupli);
-
-	return dupli->GetProxy();
+	return Duplicate()->GetProxy();
 }
 
 PyObject *KX_Mesh::PyDestruct()

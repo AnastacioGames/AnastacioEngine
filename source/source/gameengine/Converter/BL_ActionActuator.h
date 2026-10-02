@@ -66,6 +66,8 @@ public:
 	virtual void DecLink();
 
 	void StopChildren(KX_GameObject *obj);
+	/// The action playing on our layer is ours, compared by data since m_actionName may hold a library suffix.
+	bool IsOwnAction(KX_GameObject *obj);
 	bool Play(KX_GameObject *obj, float start, float end, short mode);
 
 #ifdef WITH_PYTHON

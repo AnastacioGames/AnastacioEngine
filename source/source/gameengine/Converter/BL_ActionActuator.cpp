@@ -35,6 +35,7 @@
 #include "BL_ArmatureObject.h"
 #include "BL_SkinDeformer.h"
 #include "BL_ActionManager.h"
+#include "KX_Scene.h"
 #include "BL_ActionData.h"
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
@@ -180,7 +181,7 @@ bool BL_ActionActuator::Update(double curtime)
 	}
 
 	// If a different action is playing, we've been overruled and are no longer active
-	if (obj->GetCurrentActionName(m_layer) != m_actionName && !obj->IsActionDone(m_layer)) {
+	if (!obj->IsActionDone(m_layer) && !IsOwnAction(obj)) {
 		/* Like Blender 2.4x, a held looping actuator resumes once the overriding action ends. */
 		if ((m_flag & ACT_FLAG_ACTIVE) && m_playtype == ACT_ACTION_LOOP_STOP && !negativeEvent && m_links > 0) {
 			m_flag |= ACT_FLAG_PENDING;
@@ -261,7 +262,7 @@ bool BL_ActionActuator::Update(double curtime)
 	else if ((m_flag & ACT_FLAG_ACTIVE) && negativeEvent) {
 		m_localtime = obj->GetActionFrame(m_layer);
 		const std::string curr_action = obj->GetCurrentActionName(m_layer);
-		if (!curr_action.empty() && curr_action != m_actionName) {
+		if (!curr_action.empty() && !IsOwnAction(obj)) {
 			// Someone changed the action on us, so we wont mess with it
 			// Hopefully there wont be too many problems with two actuators using
 			// the same action...
@@ -315,7 +316,7 @@ void BL_ActionActuator::DecLink()
 		KX_GameObject *obj = (KX_GameObject *)GetParent();
 		/* Only stop our own action: on a state change another actuator of the new
 		 * state may already be playing on this layer. */
-		if (obj->GetCurrentActionName(m_layer) == m_actionName) {
+		if (IsOwnAction(obj)) {
 			obj->StopAction(m_layer);
 			StopChildren(obj);
 		}
@@ -342,6 +343,17 @@ bool BL_ActionActuator::Play(KX_GameObject *obj, float start, float end, short m
 	}
 
 	return played;
+}
+
+bool BL_ActionActuator::IsOwnAction(KX_GameObject *obj)
+{
+	BL_ActionData *ours = static_cast<BL_ActionData *>(obj->GetScene()->GetLogicManager()->GetActionByName(m_actionName));
+	if (!ours) {
+		return false;
+	}
+	BL_ActionData *data = obj->GetCurrentActionData(m_layer);
+	// A finished action only keeps its name.
+	return data ? (data == ours) : (obj->GetCurrentActionName(m_layer) == ours->GetName());
 }
 
 void BL_ActionActuator::StopChildren(KX_GameObject *obj)

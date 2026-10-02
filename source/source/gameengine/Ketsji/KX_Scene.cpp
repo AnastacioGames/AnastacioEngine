@@ -1157,6 +1157,7 @@ void KX_Scene::DupliGroupRecurse(KX_GameObject *groupobj, int level)
 	for (KX_GameObject *gameobj : m_logicHierarchicalGameObjects) {
 		// This will also relink the actuator to objects within the hierarchy.
 		gameobj->Relink(m_map_gameobject_to_replica);
+		gameobj->DuplicateBitmapTextMeshes();
 		gameobj->AddMeshUser();
 		// Always make sure that the bounding box is valid.
 		gameobj->UpdateBounds(true);
@@ -1272,6 +1273,7 @@ KX_GameObject *KX_Scene::AddReplicaObject(KX_GameObject *originalobj, KX_GameObj
 	for (KX_GameObject *gameobj : m_logicHierarchicalGameObjects) {
 		// This will also relink the actuators in the hierarchy.
 		gameobj->Relink(m_map_gameobject_to_replica);
+		gameobj->DuplicateBitmapTextMeshes();
 		gameobj->AddMeshUser();
 		// Always make sure that the bounding box is valid.
 		gameobj->UpdateBounds(true);

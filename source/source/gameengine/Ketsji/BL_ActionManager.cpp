@@ -98,6 +98,13 @@ std::string BL_ActionManager::GetCurrentActionName(short layer) const
 	return action ? action->GetName() : "";
 }
 
+BL_ActionData *BL_ActionManager::GetCurrentActionData(short layer) const
+{
+	BL_Action *action = GetAction(layer);
+
+	return action ? action->GetActionData() : nullptr;
+}
+
 void BL_ActionManager::SetPlayMode(short layer, short mode)
 {
 	BL_Action *action = GetAction(layer);

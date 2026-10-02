@@ -835,6 +835,11 @@ std::string KX_GameObject::GetCurrentActionName(short layer)
 	return GetActionManager()->GetCurrentActionName(layer);
 }
 
+BL_ActionData *KX_GameObject::GetCurrentActionData(short layer)
+{
+	return GetActionManager()->GetCurrentActionData(layer);
+}
+
 void KX_GameObject::SetPlayMode(short layer, short mode)
 {
 	GetActionManager()->SetPlayMode(layer, mode);
@@ -1243,6 +1248,15 @@ void KX_GameObject::AddMeshUser()
 
 		m_meshUser->SetMatrix(mt::mat4::FromAffineTransform(NodeGetWorldTransform()));
 		m_meshUser->SetFrontFace(!IsNegativeScaling());
+	}
+}
+
+void KX_GameObject::DuplicateBitmapTextMeshes()
+{
+	for (KX_Mesh *&mesh : m_meshes) {
+		if (mesh->HasBitmapText()) {
+			mesh = mesh->Duplicate();
+		}
 	}
 }
 

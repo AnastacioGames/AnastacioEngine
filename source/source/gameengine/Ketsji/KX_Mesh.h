@@ -97,6 +97,8 @@ public:
 	bool HasBitmapText() const;
 	/// Rebuild the glyph quads of the bitmap text faces when the text changed.
 	void UpdateBitmapText(const std::string& text);
+	/// Copy of this mesh with its own display arrays, owned by the converter.
+	KX_Mesh *Duplicate();
 	void ReplaceScene(KX_Scene *scene);
 
 #ifdef WITH_PYTHON

@@ -59,6 +59,7 @@ class KX_LodManager;
 class KX_AnimationEventManager;
 class KX_PythonComponent;
 class KX_Mesh;
+class BL_ActionData;
 class RAS_MeshUser;
 class RAS_Deformer;
 class PHY_IGraphicController;
@@ -377,6 +378,7 @@ public:
 	 * Gets the currently running action on the given layer
 	 */
 	std::string GetCurrentActionName(short layer);
+	BL_ActionData *GetCurrentActionData(short layer);
 
 	/**
 	 * Sets play mode of the action on the given layer
@@ -838,6 +840,9 @@ public:
 	virtual void
 	AddMeshUser(
 	);
+
+	/// Give a replica its own copy of the meshes showing 2.4x bitmap text, the text is stored in the mesh.
+	void DuplicateBitmapTextMeshes();
 	
 	/**
 	 * Update buckets with data about the mesh after

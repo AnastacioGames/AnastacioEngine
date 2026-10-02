@@ -35,6 +35,7 @@
 #define MAX_ACTION_LAYERS 32767
 
 class BL_Action;
+class BL_ActionData;
 
 /**
  * BL_ActionManager is responsible for handling a KX_GameObject's actions.
@@ -99,6 +100,8 @@ public:
 	 * Gets the currently running action on the given layer
 	 */
 	std::string GetCurrentActionName(short layer) const;
+	/// Data of the action playing on the layer, nullptr when none or finished.
+	BL_ActionData *GetCurrentActionData(short layer) const;
 
 	/**
 	 * Sets play mode of the action on the given layer
