@@ -28,7 +28,9 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Glass BSDF | fresnel entre o reflexo do World e o World desfocado como luz transmitida, com brilho das luzes; não refrata a cena |
 | Refraction BSDF | World desfocado como luz transmitida; não refrata a cena |
 | Anisotropic BSDF | brilho GGX anisotrópico das luzes (Anisotropy, Rotation e Tangent como no Cycles; sem Tangent ligado, radial no Z do objeto); reflexo do World isotrópico, como o Glossy |
-| Translucent, Velvet, Subsurface Scattering | viram Diffuse BSDF |
+| Translucent BSDF | luz das lâmpadas por trás da superfície (Lambert em -N); não atravessa o objeto |
+| Velvet BSDF | brilho de borda em ângulo rasante (mais estreito com Sigma baixo) |
+| Subsurface Scattering | wrap lighting por canal (Radius × Scale): a luz passa do terminador; sem espalhamento real |
 | Hair BSDF | cor chapada, sem luz |
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Bevel | devolve a normal sem mudança |
@@ -39,7 +41,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
-Wireframe (precisa de baricêntricas, que o fragment shader não tem), Hair Info, Holdout, IES Texture,
+Wireframe (precisa de baricêntricas, que o fragment shader não tem), Hair Info, IES Texture,
 Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, Principled Volume.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós
@@ -51,7 +53,7 @@ Teste de regressão: `tools/create_node_sweep_test.py` (um material por tipo de 
 Principled, Diffuse, Glossy e Toon usam as mesmas luzes: Sun, Point e Spot com atenuação e cone,
 até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Shadow` da lâmpada).
 
-Principled BSDF, Diffuse BSDF, Transparent BSDF, Emission, Background, Mix/Add Shader,
+Principled BSDF, Diffuse BSDF, Transparent BSDF, Holdout (preto, alpha 0), Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
 Normal Map, Tangent (Radial e UV Map), Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),

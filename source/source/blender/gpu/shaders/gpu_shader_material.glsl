@@ -4465,9 +4465,26 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	result = vec4(L, 1.0);
 }
 
-void node_bsdf_translucent(vec4 color, vec3 N, out vec4 result)
+/* Light arriving from behind the surface (Lambert on -N), like Cycles' Translucent BSDF. */
+void node_bsdf_translucent(vec4 color, vec3 N, vec3 I, vec3 ambient, out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	vec3 L = ambient;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		/* no shadow map: the back-lit side is always in the object's own shadow */
+		L += SCENE_LIGHT(i).diffuse.rgb * max(dot(-N, l), 0.0) * atten;
+	}
+	result = vec4(L * color.rgb, color.a);
+}
+
+/* Holdout: cuts the object out of the image (black, alpha 0), like Cycles with Transparent film. */
+void node_holdout(out vec4 result)
+{
+	result = vec4(0.0);
 }
 
 void node_bsdf_transparent(vec4 color, out vec4 result)
@@ -4479,16 +4496,48 @@ void node_bsdf_transparent(vec4 color, out vec4 result)
 	result.a = 0.0;
 }
 
-void node_bsdf_velvet(vec4 color, float sigma, vec3 N, out vec4 result)
+/* Game approximation of Velvet: sheen that grows toward grazing view angles (narrower for low Sigma). */
+void node_bsdf_velvet(vec4 color, float sigma, vec3 N, vec3 I, vec3 ambient, out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	vec3 V = scene_view_vector(I);
+	float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), mix(6.0, 1.5, clamp(sigma, 0.0, 1.0)));
+	vec3 L = ambient * (0.5 + rim);
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = max(dot(N, l), 0.0);
+		float wrap = clamp(dot(N, l) * 0.5 + 0.5, 0.0, 1.0);
+		L += SCENE_LIGHT(i).diffuse.rgb * (0.5 * NdotL + rim * wrap) *
+		     scene_light_visibility(i, I, N, NdotL, atten);
+	}
+	result = vec4(L * color.rgb, color.a);
 }
 
+/* Game approximation of Subsurface Scattering: per-channel wrap lighting, wider where
+ * Radius * Scale is larger, so light bleeds past the terminator (skin, wax, leaves). */
 void node_subsurface_scattering(
         vec4 color, float scale, vec3 radius, float sharpen, float texture_blur, vec3 N,
-        out vec4 result)
+        vec3 I, vec3 ambient, out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	vec3 w = clamp(radius * scale, 0.0, 1.0) * (1.0 - 0.5 * sharpen);
+	vec3 L = ambient;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = dot(N, l);
+		vec3 wrapped = max((vec3(NdotL) + w) / (1.0 + w), 0.0);
+		/* the shadow map fades out toward the terminator, where the bleed zone is self-shadowed */
+		float shadow = scene_light_visibility(i, I, N, max(NdotL, 0.0), 1.0);
+		shadow = mix(1.0, shadow, clamp(NdotL * 4.0, 0.0, 1.0));
+		L += SCENE_LIGHT(i).diffuse.rgb * wrapped * shadow * atten;
+	}
+	result = vec4(L * color.rgb, color.a);
 }
 
 void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv, vec3 tangent, out vec4 result)

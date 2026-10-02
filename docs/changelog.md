@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Holdout, Translucent, Velvet e Subsurface Scattering no Game PBR
+
+- Holdout (`node_shader_holdout.c`, GLSL `node_holdout`): ganhou código GPU, sai preto com alpha 0. Saiu da lista de
+  nós sem suporte (`node.c`, `node_draw.c`).
+- Translucent, Velvet e Subsurface Scattering passam a usar as luzes da cena (`scene_light_dir`) e a cor do World como
+  ambiente, com selo `~Game` e tooltip próprio:
+  - Translucent: Lambert em -N, sem shadow map (o mapa dava listras de acne no lado de trás);
+  - Velvet: brilho de borda `pow(1-NdotV, mix(6,1.5,Sigma))` somado a meio Lambert;
+  - Subsurface: wrap lighting por canal (Radius × Scale, Sharpness reduz); a sombra some perto do terminador
+    para não cortar a faixa avermelhada.
+- Bevel e Wireframe ficaram como estavam: Bevel não tem derivadas úteis em malha flat; Wireframe precisa de
+  baricêntricas (geometry shader só no caminho OpenSubdiv e o enum `GPUBuiltin` não tem bit livre).
+- `tools/create_node_phases_test.py`: terceira fileira com Translucent, Subsurface, Velvet, Holdout e um Diffuse
+  de referência. Validado visualmente pelo usuário.
+
 ## 2026-10-02 - Sidebars N e T flutuantes, aba Operator e nomes de states nos tooltips
 
 - Sidebars N e T da 3D View com *Region Overlap* ligado viram painéis flutuantes:

@@ -3876,7 +3876,6 @@ bool BKE_node_shader_unsupported_in_game(const bNode *node, bool use_new)
 		switch (node->type) {
 			case SH_NODE_WIREFRAME:
 			case SH_NODE_HAIR_INFO:
-			case SH_NODE_HOLDOUT:
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:

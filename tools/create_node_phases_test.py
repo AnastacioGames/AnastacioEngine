@@ -6,6 +6,9 @@ Front row (Phase 3, scene lights), left to right:
 Back row (Phase 4), left to right:
   1 Glass   2 Refraction   3 AO (Emission by AO, cube dent)   4 Blackbody 1500 K   5 Wavelength 550 nm
   6 Glossy 0 (mirror of the World Sky Texture)
+Third row (approximations), left to right:
+  1 Translucent (lit from behind)   2 Subsurface (red bleed past the terminator)   3 Velvet (rim sheen)
+  4 Holdout (black cut-out, alpha 0)   5 Diffuse (reference for 1-3)
 Lights: Sun (shadow), red Point (shadow), blue Spot (shadow). World: Sky Texture (Preetham).
 Phase 5: Scene > Color Management is Filmic; change View Transform / Exposure / Gamma in the
 editor and press P again (read when the shader compiles).
@@ -96,7 +99,14 @@ back = [
     ("Wavelength", emission_from("ShaderNodeWavelength", "Color", Wavelength=550.0)),
     ("Mirror", bsdf("ShaderNodeBsdfGlossy", (1.0, 1.0, 1.0, 1.0), Roughness=0.0)),
 ]
-for row, (y, specs) in enumerate(((0.0, front), (3.0, back))):
+third = [
+    ("Translucent", bsdf("ShaderNodeBsdfTranslucent", (0.4, 0.9, 0.3, 1.0))),
+    ("Subsurface", bsdf("ShaderNodeSubsurfaceScattering", (0.9, 0.6, 0.5, 1.0), Scale=1.0, Radius=(1.0, 0.3, 0.15))),
+    ("Velvet", bsdf("ShaderNodeBsdfVelvet", (0.6, 0.1, 0.3, 1.0), Sigma=0.5)),
+    ("Holdout", lambda tree: tree.nodes.new("ShaderNodeHoldout")),
+    ("DiffuseRef", bsdf("ShaderNodeBsdfDiffuse", (0.9, 0.6, 0.5, 1.0))),
+]
+for row, (y, specs) in enumerate(((0.0, front), (3.0, back), (6.0, third))):
     for i, (name, build) in enumerate(specs):
         x = (i - 2.5) * 2.4
         if name == "AO":
@@ -110,7 +120,7 @@ for row, (y, specs) in enumerate(((0.0, front), (3.0, back))):
         bpy.ops.object.shade_smooth()
         obj.data.materials.append(node_material(name + "Mat", build))
 
-bpy.ops.mesh.primitive_plane_add(location=(0, 1.5, 0))
+bpy.ops.mesh.primitive_plane_add(location=(0, 3.0, 0))
 ground = bpy.context.object
 ground.scale = (15, 15, 1)
 ground.data.materials.append(node_material("GroundMat", bsdf("ShaderNodeBsdfDiffuse", (0.4, 0.4, 0.4, 1.0))))

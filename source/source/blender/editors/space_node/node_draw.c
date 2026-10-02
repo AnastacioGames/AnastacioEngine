@@ -883,10 +883,16 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_tip = "Approximated in Game: blurred World as transmitted light, no real refraction";
 				return false;
 			case SH_NODE_BSDF_TRANSLUCENT:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: scene lights from behind the surface, no light transport through the object";
+				return false;
 			case SH_NODE_BSDF_VELVET:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: grazing-angle sheen from scene lights (narrower for low Sigma)";
+				return false;
 			case SH_NODE_SUBSURFACE_SCATTERING:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: rendered as Diffuse BSDF";
+				*r_tip = "Approximated in Game: wrap lighting per channel (Radius x Scale), no real scattering";
 				return false;
 			case SH_NODE_BSDF_ANISOTROPIC:
 				*r_badge = "~Game";
@@ -924,7 +930,6 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 			}
 			case SH_NODE_WIREFRAME:
 			case SH_NODE_HAIR_INFO:
-			case SH_NODE_HOLDOUT:
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:
