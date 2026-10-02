@@ -4694,9 +4694,59 @@ void node_subsurface_scattering(
 	result = vec4(L * color.rgb, color.a);
 }
 
-void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv, vec3 tangent, out vec4 result)
+float hair_gaussian(float x, float w)
 {
-	result = color;
+	return exp(-x * x / (2.0 * w * w)) / (2.5066283 * w);
+}
+
+/* Hair BSDF on a mesh, after Cycles (kernel/closure/bsdf_hair.h): the strand runs along the tangent.
+ * Longitudinal lobe on sin(theta_i) + sin(theta_o) shifted by Offset, width RoughnessU; azimuthal lobe
+ * wide (cos(phi/2)) for Reflection, around the back (phi = pi, width RoughnessV) for Transmission. */
+void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv, vec3 tangent, vec3 N,
+                    vec3 I, float transmission, vec3 ambient, vec4 env_diffuse, float env_on, out vec4 result)
+{
+	vec3 T = tangent - N * dot(N, tangent);
+	T = (dot(T, T) > 1e-8) ? normalize(T) : normalize(cross(N, abs(N.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+	vec3 V = scene_view_vector(I);
+	float wu = max(roughnessu, 0.02);
+	float wv = max(roughnessv, 0.02);
+	/* Cycles shifts the reflection lobe by 2 * offset and transmission by -offset / 2 */
+	float shift = (transmission > 0.5) ? -0.5 * offset : 2.0 * offset;
+
+	/* the World lights the strand softly, as an ambient term */
+	vec3 L = ((env_on > 0.5) ? env_diffuse.rgb : ambient) * 0.5;
+
+	float sinO = dot(T, V);
+	vec3 Vp = V - T * sinO;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float sinI = dot(T, l);
+		float cosI = sqrt(max(1.0 - sinI * sinI, 0.0));
+		vec3 lp = l - T * sinI;
+		float cosphi = (dot(lp, lp) > 1e-8 && dot(Vp, Vp) > 1e-8) ? dot(normalize(lp), normalize(Vp)) : 1.0;
+		float phi = acos(clamp(cosphi, -1.0, 1.0));
+
+		float M = hair_gaussian(sinI + sinO - sin(shift), wu);
+		float Nphi = (transmission > 0.5) ? hair_gaussian(M_PI - phi, wv) : 0.5 * cos(0.5 * phi);
+		float NdotL = dot(N, l);
+		float vis;
+		if (transmission > 0.5) {
+			/* light through the strands from behind: on a closed mesh (as in Cycles, where the body
+			 * occludes it) it only gets through near the silhouette, where it grazes the surface */
+			vis = smoothstep(-0.6, 0.0, NdotL) * (1.0 - smoothstep(0.0, 0.5, NdotL)) * atten / max(cosI, 0.2);
+		}
+		else {
+			/* a mesh is opaque, unlike a strand: fade the lobe out past the terminator */
+			vis = smoothstep(-0.1, 0.25, NdotL) * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+		}
+		L += SCENE_LIGHT(i).specular.rgb * M * Nphi * cosI * vis;
+	}
+
+	result = vec4(L * color.rgb, color.a);
 }
 
 void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,

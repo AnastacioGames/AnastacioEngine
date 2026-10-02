@@ -31,7 +31,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Translucent BSDF | luz das lâmpadas por trás da superfície (Lambert em -N); não atravessa o objeto |
 | Velvet BSDF | brilho de borda em ângulo rasante (mais estreito com Sigma baixo) |
 | Subsurface Scattering | wrap lighting por canal (Radius × Scale): a luz passa do terminador; sem espalhamento real |
-| Hair BSDF | cor chapada, sem luz |
+| Hair BSDF | brilho das luzes ao longo do fio (Tangent; sem Tangent ligado, radial no Z do objeto, como o Anisotropic): Reflection com Offset e RoughnessU, Transmission como contraluz na silhueta; World como ambiente suave |
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |

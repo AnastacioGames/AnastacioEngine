@@ -9,6 +9,33 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Deformação: modo Bend (entortar) e getAppliedImpulse de constraints
+
+- Painel Deformation ganhou **Mode: Dent | Bend**. Bend entorta a parte do objeto além do ponto de impacto
+  (poste, placa, grade) em volta de um eixo ⟂ ao eixo comprido (`bend_axis`) e à direção do empurrão, com zona de
+  transição suave. Ângulo por N*s acima de Dent Impulse (`bend_angle`), somado até `bend_max_angle`.
+  Implementado em `KX_DentDeformer::AddBend` sobre os mesmos offsets por vértice original: UVs, costuras, normais,
+  tangentes e Update Physics funcionam igual ao Dent. Explosões entortam na direção centro → objeto; `dent()` em
+  Python segue o modo do objeto.
+- DNA: `RangeDeformSettings.pad` virou `mode`/`bend_axis`, mais `bend_angle`/`bend_max_angle` (arquivos antigos
+  recebem defaults ao ligar Bend).
+- `bge.constraints.getAppliedImpulse(id)` sempre retornava 0: `CcdPhysicsEnvironment` implementava
+  `getAppliedImpulse` (g minúsculo), que não sobrescrevia `PHY_IPhysicsEnvironment::GetAppliedImpulse`. Renomeado com
+  `override`; liga o feedback da constraint para o assert de debug do Bullet.
+- Validado: build. Validação visual do usuário pendente.
+
+## 2026-10-02 - Hair BSDF com luz (Game PBR)
+
+- `node_bsdf_hair` deixa de ser cor chapada: lobo longitudinal gaussiano em sin(θi) + sin(θo) deslocado pelo Offset
+  (2·Offset na Reflection, −Offset/2 na Transmission, como o Cycles), largura RoughnessU; lobo azimutal cos(φ/2) na
+  Reflection e gaussiano em torno de φ = π (largura RoughnessV) na Transmission. World entra como ambiente suave.
+- Numa malha fechada a Reflection some depois do terminador e a Transmission só passa perto da silhueta (contraluz),
+  porque o corpo do objeto bloquearia a luz de trás, como no Cycles.
+- Tangent desligado: radial em torno do Z do objeto, como no Anisotropic (fios horizontais, faixa de brilho vertical).
+- Cena de teste: `tools/create_hair_bsdf_test.py`.
+- Validado: build do RangeRuntime e screenshot (`RangeEngine.exe` não religado, editor aberto). Validação visual do
+  usuário pendente.
+
 ## 2026-10-02 - Sky Texture segue o World Sun e recaptura do World (Game PBR)
 
 - Com uma lâmpada Sun em Scene > World Sun, o nó Sky Texture (Preetham e Hosek / Wilkie) usa a direção dela em vez

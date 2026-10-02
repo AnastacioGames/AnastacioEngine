@@ -35,9 +35,25 @@ static bNodeSocketTemplate sh_node_bsdf_hair_out[] = {
 	{	-1, 0, ""	}
 };
 
-static int node_shader_gpu_bsdf_hair(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+static int node_shader_gpu_bsdf_hair(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
-	return GPU_stack_link(mat, "node_bsdf_hair", in, out);
+	/* Unlinked tangent: radial around the object Z axis, like the Anisotropic BSDF. */
+	if (!in[4].link) {
+		float axis = (float)SHD_TANGENT_AXIS_Z;
+		GPU_link(mat, "node_tangent", GPU_material_builtin(mat, GPU_VIEW_NORMAL), GPU_attribute(CD_ORCO, ""),
+		         GPU_uniform(&axis), GPU_material_builtin(mat, GPU_OBJECT_MATRIX),
+		         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), &in[4].link);
+	}
+	GPU_link(mat, "direction_transform_m4v3", in[4].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[4].link);
+
+	float transmission = (node->custom1 == SHD_HAIR_TRANSMISSION) ? 1.0f : 0.0f;
+	float rough = 1.0f;
+	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
+	node_shader_gpu_world_env(mat, GPU_uniform(&rough), &env_mirror, &env_diffuse, &env_flag);
+
+	return GPU_stack_link(mat, "node_bsdf_hair", in, out, GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_uniform(&transmission),
+	                      GPU_material_world_color(mat), env_diffuse, env_flag);
 }
 
 /* node type definition */
