@@ -3633,6 +3633,9 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 
 	float ior = 1.0f;
 	GPUNodeLink *wv, *wn, *wr, *mirror, *diffibl, *transmit;
+	/* rough feeds both the World lookup and the probe: a uniform link is freed on its first use, so
+	 * turn it into a node output, which can be read any number of times. */
+	GPU_link(mat, "set_value", rough, &rough);
 	GPU_link(mat, "shade_world_vectors", view, vn,
 	         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&ior), &wv, &wn, &wr);
 

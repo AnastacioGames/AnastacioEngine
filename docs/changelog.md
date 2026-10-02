@@ -35,6 +35,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Durante qualquer captura os materiais ignoram probes (sem realimentação do cubemap nele mesmo).
 - A captura guarda cores de tela; com Color Management o shader volta para linear com a curva sRGB
   (aproximado sob Filmic).
+- Correção no mesmo dia: a Roughness sem link chega como uniform, e link de uniform é liberado no primeiro
+  uso; usada pelo World e pelo probe, virava use-after-free (heap corrompido, runtime fechava ~10 s depois em
+  toda cena Game PBR). `GPU_material_world_env` agora converte com `set_value` antes de reutilizar.
 - Teste: `probe_reflection_test.range` (sala de paredes coloridas com duas esferas metálicas dentro do raio e
   uma fora, que reflete só o céu).
 
