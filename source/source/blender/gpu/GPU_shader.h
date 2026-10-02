@@ -151,6 +151,9 @@ typedef struct GPUVertexAttribs {
 	} layer[GPU_MAX_ATTRIB];
 
 	int totlayer;
+	/* Wireframe node in the viewport: GL location + 1 of the per-loop triangle corner attribute
+	 * (attbary), 0 when unused. The Game unshares vertices and uses gl_VertexID instead. */
+	int barycentric;
 } GPUVertexAttribs;
 
 #ifdef __cplusplus

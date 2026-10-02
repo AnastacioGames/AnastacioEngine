@@ -57,6 +57,10 @@ out vec3 varposition;
 out vec3 varnormal;
 out float varvertexid;
 out vec3 varbarycentric;
+/* Viewport only (unfbaryattrib = 1): triangle corner per loop from the mesh drawing, see attbary in
+ * cdDM_drawMappedFacesGLSL. The Game leaves it 0 and uses gl_VertexID % 3. */
+in vec3 attbary;
+uniform float unfbaryattrib;
 
 #if __VERSION__ < 130
   #undef in
@@ -266,6 +270,10 @@ void main()
 	varvertexid = float(gl_VertexID);
 	int corner = gl_VertexID % 3;
 	varbarycentric = vec3(corner == 0 ? 1.0 : 0.0, corner == 1 ? 1.0 : 0.0, corner == 2 ? 1.0 : 0.0);
+	if (unfbaryattrib > 0.5) {
+		/* No attribute array bound (edit mode, subsurf): no edges rather than a wrong pattern. */
+		varbarycentric = (attbary == vec3(0.0)) ? vec3(1.0) : attbary;
+	}
 
 #ifdef USE_USER_CODE
 	/* for user code */

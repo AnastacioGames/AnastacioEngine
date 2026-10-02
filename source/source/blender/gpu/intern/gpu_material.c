@@ -122,6 +122,7 @@ struct GPUMaterial {
 #endif
 	GPUVertexAttribs attribs;
 	int builtins;
+	int baryuniformloc; /* unfbaryattrib, see GPU_material_viewport_barycentric() */
 	int alpha, obcolalpha;
 	int dynproperty;
 
@@ -360,6 +361,20 @@ static void gpu_material_set_attrib_id(GPUMaterial *material)
 	}
 
 	attribs->totlayer = b;
+
+	attribs->barycentric = 0;
+	material->baryuniformloc = GPU_shader_get_uniform(shader, "unfbaryattrib");
+	if (material->builtins & GPU_BARYCENTRIC) {
+		attribs->barycentric = GPU_shader_get_attribute(shader, "attbary") + 1;
+	}
+}
+
+/* Set by the viewport while it draws objects (gpu_draw.c): meshes then feed attbary. */
+static bool gpu_viewport_barycentric = false;
+
+void GPU_material_viewport_barycentric(bool enable)
+{
+	gpu_viewport_barycentric = enable;
 }
 
 static int gpu_material_construct_end(GPUMaterial *material, const char *passname)
@@ -760,6 +775,11 @@ void GPU_material_bind(
 
 		/* note material must be bound before setting uniforms */
 		GPU_pass_bind(material->pass, time, mipmap);
+
+		if (material->baryuniformloc != -1) {
+			float use = (gpu_viewport_barycentric && material->attribs.barycentric) ? 1.0f : 0.0f;
+			GPU_shader_uniform_vector(shader, material->baryuniformloc, 1, 1, &use);
+		}
 
 #ifdef __EMSCRIPTEN__
 		/* WebGL rejects active color attachments without matching fragment outputs.

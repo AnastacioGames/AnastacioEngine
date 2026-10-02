@@ -871,9 +871,61 @@ static void cddm_draw_attrib_vertex(
 typedef struct {
 	DMVertexAttribs attribs;
 	int numdata;
+	bool barycentric; /* Wireframe node: triangle corner per loop (attbary) */
 
 	GPUAttrib datatypes[GPU_MAX_ATTRIB]; /* TODO, messing up when switching materials many times - [#21056]*/
 } GPUMaterialConv;
+
+/* Corner 0, 1 or 2 for every loop such that each triangle of a polygon has all three: a triangulated
+ * polygon is always 3-colorable (its triangles form a tree), so each triangle sharing an edge with a
+ * colored one gets the remaining corner. Feeds the Wireframe node in the viewport (attbary). */
+static unsigned char *cdDM_loop_triangle_corners(DerivedMesh *dm)
+{
+	const MLoopTri *looptri = dm->getLoopTriArray(dm);
+	const int tottri = dm->getNumLoopTri(dm);
+	const int totloop = dm->getNumLoops(dm);
+	unsigned char *corner = MEM_mallocN(sizeof(*corner) * max_ii(totloop, 1), __func__);
+	memset(corner, 0xff, sizeof(*corner) * totloop);
+
+	for (int first = 0; first < tottri; ) {
+		int last = first;
+		while (last + 1 < tottri && looptri[last + 1].poly == looptri[first].poly) {
+			last++;
+		}
+		for (int k = 0; k < 3; k++) {
+			corner[looptri[first].tri[k]] = (unsigned char)k;
+		}
+		bool changed = true;
+		while (changed) {
+			changed = false;
+			for (int t = first + 1; t <= last; t++) {
+				const unsigned int *tri = looptri[t].tri;
+				int unset = -1, sum = 0, numset = 0;
+				for (int k = 0; k < 3; k++) {
+					if (corner[tri[k]] == 0xff) {
+						unset = k;
+					}
+					else {
+						sum += corner[tri[k]];
+						numset++;
+					}
+				}
+				if (numset == 2) {
+					corner[tri[unset]] = (unsigned char)(3 - sum);
+					changed = true;
+				}
+			}
+		}
+		first = last + 1;
+	}
+	/* Loops left out (degenerate polygons) still need a valid index. */
+	for (int l = 0; l < totloop; l++) {
+		if (corner[l] == 0xff) {
+			corner[l] = 0;
+		}
+	}
+	return corner;
+}
 
 static void cdDM_drawMappedFacesGLSL(
         DerivedMesh *dm,
@@ -997,6 +1049,8 @@ static void cdDM_drawMappedFacesGLSL(
 		unsigned char *varray;
 		size_t max_element_size = 0;
 		int tot_loops = 0;
+		bool need_corners = false;
+		unsigned char *loop_corner = NULL;
 
 		GPU_vertex_setup(dm);
 		GPU_normal_setup(dm);
@@ -1056,11 +1110,24 @@ static void cdDM_drawMappedFacesGLSL(
 						numdata++;
 					}
 				}
+				if (gattribs.barycentric) {
+					matconv[a].datatypes[numdata].index = gattribs.barycentric - 1;
+					matconv[a].datatypes[numdata].info_index = -1;
+					matconv[a].datatypes[numdata].size = 3;
+					matconv[a].datatypes[numdata].type = GL_FLOAT;
+					matconv[a].barycentric = true;
+					need_corners = true;
+					numdata++;
+				}
 				if (numdata != 0) {
 					matconv[a].numdata = numdata;
 					max_element_size = max_ii(GPU_attrib_element_size(matconv[a].datatypes, numdata), max_element_size);
 				}
 			}
+		}
+
+		if (need_corners) {
+			loop_corner = cdDM_loop_triangle_corners(dm);
 		}
 
 		/* part two, generate and fill the arrays with the data */
@@ -1073,6 +1140,7 @@ static void cdDM_drawMappedFacesGLSL(
 				GPU_buffer_free(buffer);
 				MEM_freeN(mat_orig_to_new);
 				MEM_freeN(matconv);
+				MEM_SAFE_FREE(loop_corner);
 				fprintf(stderr, "Out of memory, can't draw object\n");
 				return;
 			}
@@ -1114,6 +1182,14 @@ static void cdDM_drawMappedFacesGLSL(
 							offset += sizeof(float) * 4;
 						}
 					}
+					if (matconv[i].barycentric) {
+						for (j = 0; j < mpoly->totloop; j++) {
+							float *bary = (float *)&varray[offset + j * max_element_size];
+							zero_v3(bary);
+							bary[loop_corner[mpoly->loopstart + j]] = 1.0f;
+						}
+						offset += sizeof(float) * 3;
+					}
 				}
 
 				tot_loops += mpoly->totloop;
@@ -1144,6 +1220,7 @@ static void cdDM_drawMappedFacesGLSL(
 
 		MEM_freeN(mat_orig_to_new);
 		MEM_freeN(matconv);
+		MEM_SAFE_FREE(loop_corner);
 	}
 }
 

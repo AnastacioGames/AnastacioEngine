@@ -379,7 +379,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `Cast Shadow` do Cycles (Point por atlas de cubo 3x2, 2026-10-01, validado pelo usuário); sem Shading Nodes,
   Sun e Point exigem `RAY_SHADOW` e Spot `BUFFER_SHADOW`. Sombra da Point nos materiais BI (Game, standalone e
   viewport) em 2026-10-02, validada pelo usuário. Viewport com engine Game e materiais em nós usa as lâmpadas
-  da cena e as sombras delas (como o Game) desde 2026-10-02, validado pelo usuário; IES ainda só no Game.
+  da cena e as sombras delas (como o Game) desde 2026-10-02, validado pelo usuário; IES e Wireframe no viewport,
+  sombra da Point com borda suave (3x3) e 4 luzes com sombra em 2026-10-02.
 - **Light probes**: reflection probe local feito em 2026-10-01 (propriedade `probe` num objeto, ver changelog);
   validado pelo usuário em `probe_reflection_test.range`. Luz difusa local (amostras do mesmo cubemap) e World em nós
   capturado num cubemap em 2026-10-02, validados pelo usuário. Paralaxe por esfera do raio do probe em 2026-10-02. Mistura entre probes vizinhos (e com o World na borda) em 2026-10-02. Paralaxe por caixa (Empty desenhado como Cube) em 2026-10-02, validada pelo usuário. Recaptura do World quando o sol ou as cores mudam, e Sky Texture seguindo o World Sun, em 2026-10-02, validadas pelo usuário em `sky_follow_sun_test.range`. Mistura entre probes validada em `probe_blend_test.range`.

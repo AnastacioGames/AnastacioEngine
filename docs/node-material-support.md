@@ -34,7 +34,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Hair BSDF | brilho das luzes ao longo do fio (Tangent; sem Tangent ligado, radial no Z do objeto, como o Anisotropic): Reflection com Offset e RoughnessU, Transmission como contraluz na silhueta; World como ambiente suave |
 | Principled Hair BSDF | absorção pelos modos do Cycles (Color, Melanin + Tint, Absorption); lobos R (branco, Coat apaga), TT (contraluz na silhueta) e TRT (segundo brilho colorido) mais um corpo difuso com a refletância do fio; Tangent radial no Z do objeto; entradas Random ignoradas |
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
-| Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
+| Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; no jogo e no viewport (Object Mode, sem Subdivision). A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
 | Hair Info | malha não tem fios: todas as saídas zero, como o Cycles numa malha |
 | IES Texture | só na árvore de nós da lâmpada (Point e Spot): o perfil (tipo C, arquivo ou Text interno) é normalizado para pico 1 e multiplicado por Strength; a Energy da lâmpada dá o brilho. Num material continua sem suporte |
@@ -54,7 +54,7 @@ Teste de regressão: `tools/create_node_sweep_test.py` (um material por tipo de 
 ## Nós completos no Game PBR
 
 Principled, Diffuse, Glossy e Toon usam as mesmas luzes: Sun, Point e Spot com atenuação e cone,
-até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Shadow` da lâmpada).
+até 8 luzes, sombra nas 4 primeiras (Point com sombra de cubo; segue o `Cast Shadow` da lâmpada).
 A Transmission do Principled refrata a cena atrás com Blend Mode Alpha Blend (mesma cópia da tela do Glass); em blend sólido é ignorada.
 
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Holdout (preto, alpha 0), Emission, Background, Mix/Add Shader,

@@ -1560,11 +1560,13 @@ static struct GPUMaterialState {
 	 * slot for slot (see gpu_scene_lights()). */
 	bool scene_lights;
 	GPULamp *shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]; /* only the IES fields are filled */
 } GMS = {NULL};
 
 static int gpu_scene_lights(
         Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho,
-        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
+        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS],
+        GPUSceneLight r_lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
 
 /* fixed function material, alpha handed by caller */
 static void gpu_material_to_fixed(
@@ -1710,11 +1712,13 @@ void GPU_begin_object_materials(
 	GMS.gviewinv = rv3d->viewinv;
 	GMS.gviewcamtexcofac = rv3d->viewcamtexcofac;
 
+	GPU_material_viewport_barycentric(glsl);
+
 	/* Node materials then light like the Game (RAS_Rasterizer::ProcessLighting), with shadows,
 	 * instead of the studio lights. Other engines keep their viewport look. */
 	if (glsl && new_shading_nodes && !use_matcap && STREQ(scene->r.engine, "BLENDER_GAME")) {
 		GMS.scene_lights = true;
-		gpu_scene_lights(scene, ob, GMS.glay, rv3d->viewmat, !rv3d->is_persp, GMS.shadowlamps);
+		gpu_scene_lights(scene, ob, GMS.glay, rv3d->viewmat, !rv3d->is_persp, GMS.shadowlamps, GMS.lights);
 	}
 
 	/* alpha pass setup. there's various cases to handle here:
@@ -1937,6 +1941,7 @@ int GPU_object_material_bind(int nr, void *attribs)
 			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, GMS.gob->lay, auto_bump_scale, &partile_info, object_info);
 			if (GMS.scene_lights) {
 				GPU_material_bind_shadow_lamps(gpumat, GMS.shadowlamps);
+				GPU_material_bind_scene_lights(gpumat, GMS.lights);
 			}
 			GMS.gboundmat = mat;
 
@@ -2075,6 +2080,7 @@ void GPU_end_object_materials(void)
 		GPU_default_lights();
 		GMS.scene_lights = false;
 	}
+	GPU_material_viewport_barycentric(false);
 
 	GMS.is_enabled = false;
 
@@ -2149,17 +2155,20 @@ int GPU_default_lights(void)
 
 int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho)
 {
-	return gpu_scene_lights(scene, ob, lay, viewmat, ortho, NULL);
+	return gpu_scene_lights(scene, ob, lay, viewmat, ortho, NULL, NULL);
 }
 
-/* r_shadowlamps (optional): the GPULamp of the first GPU_MATERIAL_NUM_SHADOW_LAMPS slots. */
+/* r_shadowlamps, r_lights (optional, together): the GPULamp of the first GPU_MATERIAL_NUM_SHADOW_LAMPS
+ * slots and the IES Texture of every slot, as RAS_Rasterizer::ProcessLighting() gives the Game. */
 static int gpu_scene_lights(
         Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho,
-        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS])
+        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS],
+        GPUSceneLight r_lights[GPU_MATERIAL_NUM_SCENE_LIGHTS])
 {
 	if (r_shadowlamps) {
 		for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++)
 			r_shadowlamps[i] = NULL;
+		memset(r_lights, 0, sizeof(GPUSceneLight) * GPU_MATERIAL_NUM_SCENE_LIGHTS);
 	}
 
 	/* disable all lights */
@@ -2223,8 +2232,19 @@ static int gpu_scene_lights(
 				zero_v3(light.specular);
 			if (light.type == GPU_LIGHT_SPOT)
 				light.spot_cutoff = min_ff(light.spot_cutoff, 90.0f);
+			GPULamp *gpulamp = GPU_lamp_from_blender(scene, base->object, NULL);
 			if (count < GPU_MATERIAL_NUM_SHADOW_LAMPS)
-				r_shadowlamps[count] = GPU_lamp_from_blender(scene, base->object, NULL);
+				r_shadowlamps[count] = gpulamp;
+			float strength;
+			int ies = (gpulamp && la->type != LA_SUN) ? GPU_lamp_ies_slot(gpulamp, &strength) : -1;
+			if (ies >= 0) {
+				r_lights[count].iesinfo[0] = (float)(ies + 1);
+				r_lights[count].iesinfo[1] = strength;
+				for (int axis = 0; axis < 3; axis++) {
+					mul_v3_mat3_m4v3(r_lights[count].iesaxes[axis], viewmat, base->object->obmat[axis]);
+					normalize_v3(r_lights[count].iesaxes[axis]);
+				}
+			}
 		}
 
 		GPU_basic_shader_light_set(count, &light);

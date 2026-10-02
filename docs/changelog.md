@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Sombra suave da Point, 4 luzes com sombra, Wireframe e IES no viewport
+
+- `shadow_point` (`gpu_shader_material.glsl`): 3x3 amostras a 1 texel, cada uma comparação bilinear e presa
+  dentro do tile da face. Vale para Game PBR, materiais BI e viewport.
+- Luzes com sombra no loop de luzes: 3 → 4 (`GPU_MATERIAL_NUM_SHADOW_LAMPS`, `NUM_SHADOW_LIGHTS`,
+  `RAS_Rasterizer::GPU_SHADOW_LAMPS_COUNT`). Uma unidade de textura a menos para o material (as de sombra ficam no topo).
+- Wireframe no viewport: `cdDM_drawMappedFacesGLSL` manda o canto do triângulo por loop (atributo `attbary`),
+  com 3-coloração da triangulação de cada polígono (`cdDM_loop_triangle_corners`). O vertex shader usa o
+  atributo quando `unfbaryattrib = 1` (só o viewport liga, `GPU_material_viewport_barycentric`); o Game segue
+  com `gl_VertexID % 3`. Edit Mode e Subdivision (outros DerivedMesh) ficam sem arestas.
+- IES no viewport: `gpu_scene_lights` (`gpu_draw.c`) preenche perfil e eixos por slot e chama
+  `GPU_material_bind_scene_lights`.
+- Teste: `tools/create_viewport_parity_test.py` → `viewport_parity_test.range`. Validado pelo usuário no Game
+  contra o Cycles; log com `--debug-gpu` sem erros de GL.
+
 ## 2026-10-02 - Viewport: materiais em nós com as lâmpadas da cena e sombras
 
 - Com engine Blender Game e Shading Nodes, o viewport (modo Material) acendia os materiais em nós com as luzes

@@ -286,6 +286,8 @@ void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned
 void GPU_material_enable_alpha(GPUMaterial *material);
 struct GPUNodeLink *GPU_material_world_color(GPUMaterial *mat);
 GPUBuiltin GPU_get_material_builtins(GPUMaterial *material);
+/* Viewport mesh drawing provides the Wireframe node's triangle corner as an attribute. */
+void GPU_material_viewport_barycentric(bool enable);
 GPUBlendMode GPU_material_alpha_blend(GPUMaterial *material, const float obcol[4]);
 
 /// Possibly translate builtin to instancing builtin if instancing enabled and return node.
@@ -495,7 +497,7 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
  * dynamic count. `lamps[i]` may be NULL for slots with no active shadow-casting lamp; entries
  * without a shadow buffer (or using CSM/VSM, not implemented for this path) are treated as
  * unshadowed. */
-#define GPU_MATERIAL_NUM_SHADOW_LAMPS 3
+#define GPU_MATERIAL_NUM_SHADOW_LAMPS 4
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);

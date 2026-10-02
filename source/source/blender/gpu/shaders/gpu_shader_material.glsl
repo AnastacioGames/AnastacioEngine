@@ -4030,7 +4030,7 @@ vec3 rotate_vector(vec3 p, vec3 n, float theta) {
  * NUM_SHADOW_LIGHTS get a shadow map -- keep that in sync with GPU_MATERIAL_NUM_SHADOW_LAMPS
  * (GPU_material.h) and RAS_Rasterizer::GPU_SHADOW_LAMPS_COUNT. */
 #define NUM_LIGHTS 8
-#define NUM_SHADOW_LIGHTS 3
+#define NUM_SHADOW_LIGHTS 4
 
 #ifdef USE_CORE_PROFILE
 /* Core/GLES3 (Web) has no gl_LightSource: RAS_OpenGLLight computes the same per-slot values
@@ -4100,13 +4100,23 @@ float shadow_point(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 lightmat, 
 	if (d <= n0 || d >= f0) {
 		return 1.0;
 	}
-	/* Keep the lookup inside the tile so filtering never reads a neighbour face. */
-	vec2 uv = clamp(c.xy / d * 0.5 + 0.5, vec2(point.z), vec2(1.0 - point.z));
-	uv = (uv + vec2(mod(face, 3.0), floor(face / 3.0))) / vec2(3.0, 2.0);
+	vec2 base = c.xy / d * 0.5 + 0.5;
+	vec2 tile = vec2(mod(face, 3.0), floor(face / 3.0));
 
 	d -= bias.x;
 	float depth = 0.5 * ((f0 + n0) / (f0 - n0) - 2.0 * f0 * n0 / ((f0 - n0) * d)) + 0.5;
-	return shadow2DProj(shadowmap, vec4(uv, depth, 1.0)).x;
+
+	/* Soft edge: 3x3 taps one texel apart, each a bilinear compare. Every tap stays inside the
+	 * tile so filtering never reads a neighbour face. */
+	float sum = 0.0;
+	for (int x = -1; x <= 1; x++) {
+		for (int y = -1; y <= 1; y++) {
+			vec2 uv = clamp(base + vec2(float(x), float(y)) * point.z, vec2(point.z), vec2(1.0 - point.z));
+			uv = (uv + tile) / vec2(3.0, 2.0);
+			sum += shadow2DProj(shadowmap, vec4(uv, depth, 1.0)).x;
+		}
+	}
+	return sum / 9.0;
 }
 
 /* shadow_point() for the BI material path (shade_one_light). */
@@ -4144,6 +4154,14 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 	else if (i == 2 && unfshadowenabled[2] > 0.5) {
 		shadow_simple(rco, vn, unfshadowmap[2], unfshadowpersmat[2], 0.0,
 		              unfshadowbias[2].x, unfshadowbias[2].y, 0.0, inp, shadowfac);
+	}
+	else if (i == 3 && unfshadowenabled[3] > 1.5) {
+		shadowfac = shadow_point(rco, vn, unfshadowmap[3], unfshadowpersmat[3], unfshadowbias[3],
+		                         unfshadowpoint[3], inp);
+	}
+	else if (i == 3 && unfshadowenabled[3] > 0.5) {
+		shadow_simple(rco, vn, unfshadowmap[3], unfshadowpersmat[3], 0.0,
+		              unfshadowbias[3].x, unfshadowbias[3].y, 0.0, inp, shadowfac);
 	}
 	return shadowfac;
 }

@@ -303,7 +303,7 @@ private:
 	 * fixed-function light loop that Principled/PBR materials read (gpu_shader_material.glsl,
 	 * node_bsdf_principled()) -- keep in sync with GPU_MATERIAL_NUM_SHADOW_LAMPS
 	 * (GPU_material.h) and NUM_LIGHTS (gpu_shader_material.glsl). */
-	static const unsigned int GPU_SHADOW_LAMPS_COUNT = 3;
+	static const unsigned int GPU_SHADOW_LAMPS_COUNT = 4;
 	struct GPULamp *m_shadowLamps[GPU_SHADOW_LAMPS_COUNT];
 
 	/* Same slots as values (GPU_MATERIAL_NUM_SCENE_LIGHTS entries, unused ones zeroed), kept here
