@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Porte YoFrankie 2.49: texto bitmap por réplica e Action actuator com ação linkada
+
+- Texto bitmap 2.4x fica no `KX_Mesh`, que as réplicas compartilham: placas do seletor de fases mostravam o mesmo
+  texto (ou nenhum). `KX_GameObject::DuplicateBitmapTextMeshes` dá a cada réplica uma cópia própria da malha
+  (`KX_Mesh::Duplicate`: cópia, `EndConversion` e registro no conversor). O construtor de cópia do `KX_Mesh`
+  remapeia as faces de texto para os display arrays da cópia. `KX_Mesh` em Python (`copy`) usa o mesmo caminho.
+- Action actuator: o nome guardado é a chave de busca (`nome [lib]` para ação linkada), mas a ação tocando devolve
+  só o nome. As comparações (ação sobrescrita, evento negativo e `DecLink`) falhavam e a animação de andar não
+  voltava para idle. `BL_ActionActuator::IsOwnAction` compara o `BL_ActionData` resolvido
+  (`KX_GameObject::GetCurrentActionData`).
+
 ## 2026-10-01 - Game PBR: sombra de luz Point (atlas de cubo)
 
 - Com Shading Nodes e `Cast Shadow` ligado, a Point ganha shadow map: as 6 faces do cubo (90°, clip start/end
