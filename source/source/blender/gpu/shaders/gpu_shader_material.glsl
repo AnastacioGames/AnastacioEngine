@@ -4186,7 +4186,12 @@ bool scene_light_dir(int i, vec3 I, out vec3 l, out float atten)
 		               SCENE_LIGHT(i).quadraticAttenuation * light_dist * light_dist);
 		if (SCENE_LIGHT(i).spotCutoff < 179.0) {
 			float spotcos = dot(-l, normalize(SCENE_LIGHT(i).spotDirection));
-			atten *= (spotcos < SCENE_LIGHT(i).spotCosCutoff) ? 0.0 : pow(spotcos, SCENE_LIGHT(i).spotExponent);
+			/* Cycles' spot_attenuation, not GL's pow(cos, exponent) (which shrinks a wide cone to a narrow spot).
+			 * The rasterizer sends spotExponent = 128 * Spot Blend. */
+			float spotcut = SCENE_LIGHT(i).spotCosCutoff;
+			float spotsmooth = (1.0 - spotcut) * SCENE_LIGHT(i).spotExponent / 128.0;
+			atten *= (spotcos <= spotcut) ? 0.0 :
+			         (spotsmooth > 0.0) ? smoothstep(0.0, 1.0, (spotcos - spotcut) / spotsmooth) : 1.0;
 		}
 		if (unfiesinfo[i].x > 0.0) {
 			atten *= scene_light_ies(i, -l);
