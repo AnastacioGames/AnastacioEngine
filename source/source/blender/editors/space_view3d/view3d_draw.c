@@ -541,6 +541,10 @@ static const char *floor_frag =
 	"	col.a *= fade;\n"
 	"	if (col.a < 0.002) discard;\n"
 	"	gl_FragColor = col;\n"
+	/* Depth from the rebuilt point, nudged toward the eye: the interpolated depth of the
+	 * huge quad is too imprecise and z-fights or cuts through planes at Z=0. */
+	"	vec4 dc = gl_ModelViewProjectionMatrix * vec4(mix(wp, pa, 1e-4), 1.0);\n"
+	"	gl_FragDepth = clamp((dc.z / dc.w) * 0.5 + 0.5, 0.0, 1.0);\n"
 	"}\n";
 
 static GPUShader *floor_shader = NULL;
