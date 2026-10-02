@@ -4109,6 +4109,13 @@ float shadow_point(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 lightmat, 
 	return shadow2DProj(shadowmap, vec4(uv, depth, 1.0)).x;
 }
 
+/* shadow_point() for the BI material path (shade_one_light). */
+void shadow_point_bi(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 lightmat, float bias, float slopebias,
+                     vec4 point, float inp, out float result)
+{
+	result = shadow_point(rco, vn, shadowmap, lightmat, vec2(bias, slopebias), point, inp);
+}
+
 /* Shadow factor of scene-light slot i. GLSL ES 3.00 only allows constant indices into sampler
  * arrays, so the loop index can't reach unfshadowmap[] directly. */
 float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)

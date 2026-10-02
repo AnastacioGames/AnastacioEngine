@@ -1639,7 +1639,24 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	/* this replaces if (i > 0.0) conditional until that is supported */
 	/* done in shade_visifac now, GPU_link(mat, "mtex_value_clamp_positive", i, &i); */
 
-	if ((ma->mode & MA_SHADOW) && GPU_lamp_has_shadow_buffer(lamp) && !GPU_lamp_has_point_shadow(lamp)) {
+	if ((ma->mode & MA_SHADOW) && GPU_lamp_has_point_shadow(lamp)) {
+		if (!(mat->scene->gm.flag & GAME_GLSL_NO_SHADOWS)) {
+			/* dynpersmat is view to light space for a Point (GPU_material_update_lamps). */
+			float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
+			mat->dynproperty |= DYN_LAMP_PERSMAT;
+			GPU_link(mat, "shadow_point_bi",
+			         GPU_material_builtin(mat, GPU_VIEW_POSITION),
+			         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+			         GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
+			         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+			         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias), GPU_uniform(point),
+			         inp, &shadfac);
+		}
+		else {
+			GPU_link(mat, "set_value", GPU_uniform(&one), &shadfac);
+		}
+	}
+	else if ((ma->mode & MA_SHADOW) && GPU_lamp_has_shadow_buffer(lamp)) {
 		if (!(mat->scene->gm.flag & GAME_GLSL_NO_SHADOWS)) {
 			mat->dynproperty |= DYN_LAMP_PERSMAT;
 
@@ -4258,14 +4275,13 @@ static bool gpu_lamp_create_point_shadow_buffer(GPULamp *lamp)
 	return true;
 }
 
-/* Whether a Sun/Spot (or, with Shading Nodes, a Point) gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
+/* Whether a Sun/Spot/Point gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
  * "Cast Shadow" (lamp.cycles.cast_shadow, an ID property, default on) and hides the BI shadow
  * method, so follow that instead of LA_SHAD_RAY/LA_SHAD_BUF. */
 static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
 {
 	const bool nodes = scene && BKE_scene_use_new_shading_nodes(scene);
-	/* Point shadows are only sampled by the Shading Nodes light loop (scene_light_shadow). */
-	if (!(ELEM(la->type, LA_SUN, LA_SPOT) || (nodes && la->type == LA_LOCAL))) {
+	if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
 		return false;
 	}
 	if (nodes) {
@@ -4274,7 +4290,7 @@ static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
 		return cast ? (IDP_Int(cast) != 0) : true;
 	}
 	return (la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
-	       (la->type == LA_SUN && (la->mode & LA_SHAD_RAY));
+	       (ELEM(la->type, LA_SUN, LA_LOCAL) && (la->mode & LA_SHAD_RAY));
 }
 
 GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
@@ -4360,7 +4376,7 @@ static const float gpu_point_face_rot[6][3][3] = {
 	{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
 };
 
-/* Scissor box before face 0, restored by GPU_lamp_shadow_buffer_unbind(). */
+/* Scissor box before face 0, restored by GPU_lamp_shadow_buffer_unbind(), which must follow every face. */
 static int gpu_point_saved_scissor[4];
 
 void GPU_lamp_shadow_point_face_bind(

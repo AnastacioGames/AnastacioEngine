@@ -2832,8 +2832,6 @@ static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
 
 		if (layers &&
 		    GPU_lamp_has_shadow_buffer(lamp) &&
-		    /* Point shadows are a Game-only cube atlas, not drawn by the viewport. */
-		    !GPU_lamp_has_point_shadow(lamp) &&
 		    /* keep last, may do string lookup */
 		    GPU_lamp_visible(lamp, srl, NULL))
 		{
@@ -2980,6 +2978,34 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 		v3d->lay &= GPU_lamp_shadow_layer(shadow->lamp);
 		v3d->flag2 &= ~(V3D_SOLID_TEX | V3D_SHOW_SOLID_MATCAP);
 		v3d->flag2 |= V3D_RENDER_OVERRIDE | V3D_RENDER_SHADOW;
+
+		if (GPU_lamp_has_point_shadow(shadow->lamp)) {
+			/* Point: the 6 cube faces, each into its tile of the 3x2 atlas. */
+			for (int face = 0; face < 6; face++) {
+				int viewport[4];
+				GPU_lamp_shadow_point_face_bind(shadow->lamp, face, viewmat, winmat, viewport);
+
+				ar.regiondata = &rv3d;
+				ar.regiontype = RGN_TYPE_WINDOW;
+				rv3d.persp = RV3D_CAMOB;
+				copy_m4_m4(rv3d.winmat, winmat);
+				copy_m4_m4(rv3d.viewmat, viewmat);
+				invert_m4_m4(rv3d.viewinv, rv3d.viewmat);
+				mul_m4_m4m4(rv3d.persmat, rv3d.winmat, rv3d.viewmat);
+				invert_m4_m4(rv3d.persinv, rv3d.viewinv);
+
+				ED_view3d_draw_offscreen(
+				            bmain, scene, v3d, &ar, viewport[2], viewport[3], viewmat, winmat,
+				            false, false, true,
+				            NULL, NULL, NULL, NULL);
+				GPU_lamp_shadow_buffer_unbind(shadow->lamp);
+			}
+
+			v3d->drawtype = drawtype;
+			v3d->lay = lay;
+			v3d->flag2 = flag2;
+			continue;
+		}
 
 		if (vsm) {
 			GPU_shader_bind(GPU_shader_get_builtin_shader(GPU_SHADER_VSM_STORE));

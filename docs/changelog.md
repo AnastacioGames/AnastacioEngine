@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Sombra de luz Point nos materiais BI e no viewport
+
+- Sem Shading Nodes, a Point com `Ray Shadow` ganha o mesmo atlas de cubo 3x2 da entrada de 2026-10-01
+  (`gpu_lamp_wants_shadow`). `shade_one_light` lê com `shadow_point_bi` (wrapper de `shadow_point`), com
+  `dynpersmat` em espaço da luz. Sem VSM, filtros PCF ou Only Shadow para Point.
+- Viewport do editor desenha as 6 faces (`gpu_update_lamps_shadows_world`, `view3d_draw.c`), com
+  `GPU_lamp_shadow_buffer_unbind` depois de cada face, igual ao Game: cada `GPU_lamp_shadow_point_face_bind`
+  empilha o estado de viewport. Assim a Point passa a ter sombra nos materiais BI do viewport.
+- Viewport com materiais em nós continua sem sombra de nenhuma luz (o loop de luzes só é ligado pelo Game).
+- Custo: Points com Ray Shadow em cenas BI antigas passam a fazer 6 renders de casters por frame.
+- Validado pelo usuário em `point_shadow_bi_test.range` (viewport, Game no editor e RangeRuntime).
+
 ## 2026-10-02 - Avisos de GL das texturas com `--debug-gpu`
 
 - Origem dos avisos de textura das sombras: `GPU_texture_bind`/`unbind` e `GPU_shader_uniform_texture` chamavam `glEnable`/`glDisable(target)`, que só serve ao pipeline fixo e é `GL_INVALID_OPERATION` em unidades acima de `GL_MAX_TEXTURE_COORDS` (8), onde o jogo liga shadow maps e probes. Em `point_shadow_test.range` eram milhares de erros por execução. Agora `GPU_texture_unit_fixed_function()` limita essas chamadas às unidades válidas (nenhuma no perfil core). Log com `--debug-gpu` limpo depois da correção; sem mudança visual.
