@@ -20,6 +20,9 @@
  * "Generate Fragments..." operator). An explosive detonates on its fuse, on impact, by chain reaction
  * or by KX_GameObject.detonate(): radial impulse, broken destructibles, armed explosives. An object
  * with both detonates when it breaks and breaks when it detonates.
+ *
+ * A deformable (OB_DEFORMABLE, settings in Object.deform) dents instead: hits between its dent
+ * impulse and its break impulse push the vertices around the contact point (KX_DentDeformer).
  */
 
 #ifndef __KX_DESTRUCTIONMANAGER_H__
@@ -31,6 +34,7 @@
 #include <random>
 #include <vector>
 
+class KX_DentDeformer;
 class KX_GameObject;
 class KX_Scene;
 class PHY_ICollData;
@@ -40,7 +44,7 @@ class KX_DestructionManager
 public:
 	explicit KX_DestructionManager(KX_Scene *scene);
 
-	/// Active objects flagged OB_DESTRUCTIBLE or OB_EXPLOSIVE, from scene conversion and object
+	/// Active objects flagged OB_DESTRUCTIBLE, OB_EXPLOSIVE or OB_DEFORMABLE, from scene conversion and object
 	/// replication. Requests the collision callbacks for Break on Collision / Explode on Impact and
 	/// starts the fuse.
 	void RegisterObject(KX_GameObject *gameobj);
@@ -48,8 +52,9 @@ public:
 	void UnregisterObject(KX_GameObject *gameobj);
 
 	/// Contact from KX_CollisionEventManager::NextFrame. Queues the break (or arms the explosive) when
-	/// the summed applied impulse of the contact reaches the limit; it happens in Update().
-	void NotifyCollision(KX_GameObject *gameobj, const PHY_ICollData *collData, bool first);
+	/// the summed applied impulse of the contact reaches the limit; it happens in Update(). Dents only
+	/// come from new contacts with other: resting, rolling or sliding objects don't dig a groove.
+	void NotifyCollision(KX_GameObject *gameobj, KX_GameObject *other, const PHY_ICollData *collData, bool first);
 
 	/** Break the object now: add its fragments and remove it at the end of the frame. An explosive
 	 * destructible detonates instead (its fragments get the blast).
@@ -75,6 +80,14 @@ public:
 	 */
 	std::vector<KX_GameObject *> Explode(const mt::vec3& center, float radius, float force, float upBias, bool occlusion,
 	                                     unsigned short mask, const std::vector<KX_GameObject *>& ignore);
+
+	/** Dent the object now around a world point along direction, as a hit of the given impulse
+	 * (see the Deformation panel). False when it isn't deformable, the impulse is below its dent
+	 * impulse or no vertex moved.
+	 */
+	bool Dent(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse);
+	/// Back to the rest shape. False when the object was never dented.
+	bool ResetDent(KX_GameObject *gameobj);
 
 	bool IsDestructible(KX_GameObject *gameobj) const;
 	bool IsExplosive(KX_GameObject *gameobj) const;
@@ -107,6 +120,22 @@ private:
 		long long m_armFrame;
 		/// Broken or detonated, waiting for its removal: it never breaks or explodes twice.
 		bool m_done;
+		/// Deformable: seconds before collisions can dent it again, a resting contact must not
+		/// rebuild the mesh every frame.
+		float m_dentCooldown;
+		/// The "can't dent" warning was printed, once per object.
+		bool m_dentWarned;
+		/// Deformable: objects in contact and the last frame they were, to tell a hit from a contact
+		/// that goes on.
+		std::vector<std::pair<KX_GameObject *, long long> > m_touching;
+	};
+
+	struct PendingDent
+	{
+		KX_GameObject *m_object;
+		mt::vec3 m_point;
+		mt::vec3 m_direction;
+		float m_impulse;
 	};
 
 	struct PendingBreak
@@ -118,6 +147,17 @@ private:
 	Entry *FindEntry(KX_GameObject *gameobj);
 	const Entry *FindEntry(KX_GameObject *gameobj) const;
 	void Arm(Entry *entry, long long frame);
+
+	/// Dents without the threshold checks, queues the physics shape update. True when a vertex moved.
+	bool DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse);
+	/// The dent mesh, created on the first dent; warns once when another deformer owns the mesh.
+	KX_DentDeformer *GetDentDeformer(KX_GameObject *gameobj);
+	/// After a dent: queues the physics shape update, runs onDent.
+	void Dented(KX_GameObject *gameobj, const mt::vec3& point, float impulse);
+	/// Explosion dent of a deformable reached by a blast.
+	void BlastDent(KX_GameObject *gameobj, const mt::vec3& center, float radius, float force);
+	/// Rebuilds the collision shape of the dented objects asking for it, once per frame.
+	void UpdatePhysicsShapes();
 
 	/// Adds the fragments and removes the object, no explosive handling.
 	std::vector<KX_GameObject *> ShatterNow(KX_GameObject *gameobj, const mt::vec3& origin, float burst);
@@ -134,6 +174,10 @@ private:
 	KX_Scene *m_scene;
 	std::vector<Entry> m_entries;
 	std::vector<PendingBreak> m_pending;
+	/// Strongest collision dent of each object this frame.
+	std::vector<PendingDent> m_pendingDents;
+	/// Dented objects whose collision shape follows the mesh (DEFORM_UPDATE_PHYSICS).
+	std::vector<KX_GameObject *> m_dirtyShapes;
 	/// Fragments alive, oldest first.
 	std::deque<KX_GameObject *> m_debris;
 	int m_maxDebris;

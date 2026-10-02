@@ -656,6 +656,49 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
             col.label(text="Move the Effect object to an inactive layer", icon='ERROR')
 
 
+class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
+    bl_label = "Deformation"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and ob.type == 'MESH' and context.scene.render.engine in cls.COMPAT_ENGINES
+                and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY'})
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        game = ob.game
+        df = game.deform
+
+        layout.prop(game, "use_deform", text="Enabled")
+        layout = layout.column()
+        layout.active = game.use_deform
+
+        split = layout.box().split()
+        col = split.column()
+        col.label(text="Dent:", icon='MOD_SMOOTH')
+        col.prop(df, "dent_impulse")
+        col.prop(df, "use_dent_on_collision")
+
+        col = split.column()
+        col.label(text="Shape:", icon='MOD_DISPLACE')
+        sub = col.column(align=True)
+        sub.prop(df, "radius")
+        sub.prop(df, "depth")
+        sub.prop(df, "max_depth")
+        sub = col.column()
+        sub.active = game.collision_bounds_type == 'TRIANGLE_MESH'
+        sub.prop(df, "use_update_physics")
+
+        if game.use_deform:
+            if game.use_destruction and df.dent_impulse >= game.destruction.break_impulse:
+                layout.label(text="Dent Impulse >= Break Impulse: it breaks before denting", icon='ERROR')
+            if any(mod.show_viewport for mod in ob.modifiers):
+                layout.label(text="Objects with modifiers don't dent", icon='INFO')
+
+
 class RenderButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -2275,6 +2318,7 @@ classes = (
     PHYSICS_PT_game_obstacles,
     PHYSICS_PT_game_destruction,
     PHYSICS_PT_game_explosive,
+    PHYSICS_PT_game_deform,
     RENDER_OT_set_game_resolution,
     RENDER_OT_game_vr_setup,
     RENDER_MT_game_res_embedded,

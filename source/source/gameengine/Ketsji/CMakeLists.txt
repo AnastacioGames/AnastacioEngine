@@ -110,6 +110,7 @@ set(SRC
 	KX_GameActuator.cpp
 	KX_GameObject.cpp
 	KX_Globals.cpp
+	KX_DentDeformer.cpp
 	KX_ImpostorAtlasDeformer.cpp
 	KX_InputSystem.cpp
 	KX_InputTable.cpp
@@ -222,6 +223,7 @@ set(SRC
 	KX_GameActuator.h
 	KX_GameObject.h
 	KX_Globals.h
+	KX_DentDeformer.h
 	KX_ImpostorAtlasDeformer.h
 	KX_InputSystem.h
 	KX_InputTable.h

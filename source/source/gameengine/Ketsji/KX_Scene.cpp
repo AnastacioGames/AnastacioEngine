@@ -612,9 +612,15 @@ void KX_Scene::UpdateAutoWorldSun()
 	// `sun_hour` is a World World Property, so a Property Actuator set to
 	// World Property can change the time of day without a Python script.
 	float hour = 12.0f;
+	// `sun_direction` (degrees) turns the whole orbit plane around world Z, so
+	// sunrise/sunset can happen on any heading while noon stays overhead.
+	float direction = 0.0f;
 	if (m_worldinfo) {
 		if (EXP_Value *hourProperty = m_worldinfo->GetProperty("sun_hour")) {
 			hour = static_cast<float>(hourProperty->GetNumber());
+		}
+		if (EXP_Value *directionProperty = m_worldinfo->GetProperty("sun_direction")) {
+			direction = static_cast<float>(directionProperty->GetNumber());
 		}
 	}
 	hour = std::fmod(hour, 24.0f);
@@ -627,7 +633,11 @@ void KX_Scene::UpdateAutoWorldSun()
 	// the player area at every hour.
 	static const float kHourToRadians = 0.2617993877991494f; // pi / 12
 	const float sunAngle = (hour - 12.0f) * kHourToRadians;
-	const mt::vec3 sunPosition = groundReference + mt::vec3(0.0f, -std::sin(sunAngle) * 10.0f, std::cos(sunAngle) * 10.0f);
+	const float directionAngle = direction * 0.017453292519943295f; // pi / 180
+	const float horizontal = std::sin(sunAngle) * 10.0f;
+	const mt::vec3 sunPosition = groundReference + mt::vec3(horizontal * std::sin(directionAngle),
+	                                                        -horizontal * std::cos(directionAngle),
+	                                                        std::cos(sunAngle) * 10.0f);
 	m_worldSun->NodeSetWorldPosition(sunPosition);
 	// Blender lamps illuminate along local -Z, so align local +Z away from the
 	// ground reference. This leaves local -Z pointing directly at it.
@@ -928,7 +938,7 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	}
 
 	// Needs the replicated physics controller for the collision callbacks.
-	if (newblenderobj && (newblenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
+	if (newblenderobj && (newblenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE))) {
 		m_destructionManager.RegisterObject(newobj);
 	}
 

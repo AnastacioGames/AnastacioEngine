@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Deformação por impacto (amassar a malha)
+
+- Novo painel **Deformation** na aba Physics, abaixo de Explosive (`Object.deform`, `gameflag2 & OB_DEFORMABLE`): Dent Impulse, Dent on Collision, Radius, Depth (m por N*s acima do Dent Impulse), Max Depth e Update Physics. Num objeto também destrutível, batidas abaixo do Break Impulse amassam e as mais fortes quebram.
+- `KX_DentDeformer`: cópia privada dos display arrays por instância, criada só na primeira batida (`KX_GameObject::GetDentDeformer`); objetos nunca atingidos continuam com a malha compartilhada e o instancing. Offset por vértice original (`GetOrigIndex`), então costuras de UV e arestas duras não abrem; as UVs não mudam. Normais giradas pela variação das faces vizinhas (preserva arestas duras e normais custom). Nada roda por frame.
+- `KX_DestructionManager`: no máximo um amassado por objeto por frame (o contato mais forte), cooldown de 0.1 s por objeto, nada é reenviado quando o vértice já está no Max Depth; explosões amassam o lado voltado para o centro; collision shape (Triangle Mesh/Convex Hull) reconstruído uma vez por frame com Update Physics.
+- Python: `KX_GameObject.dent(point, direction, impulse)`, `resetDent()` e `onDent` (callbacks `(object, point, impulse)`, para som e faíscas).
+- Direção do amassado orientada para o centro da bounding box (não da origem); aviso de "can't dent" uma vez por objeto; tangentes giradas com as normais (normal map correto no amassado).
+- Limitações: objetos com modificadores, armature, shape keys ou soft body não amassam; troca de LOD descarta os amassados.
+- Teste: `tools/create_dent_test.py`.
+
 ## 2026-10-02 - Paralaxe por caixa no reflection probe e probe sem World (Game PBR)
 
 - Probe cujo Empty é desenhado como Cube usa paralaxe por caixa: meia-medida = Display Size × escala do Empty, nos eixos do mundo (a rotação é ignorada). O raio refletido sai pela primeira face à frente (`unfprobebox`/`unfprobebox2`, campo `box` do `ProbeSlot`). O raio do probe continua escolhendo quais objetos o usam e a mistura.
@@ -43,6 +53,14 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Light Path: Ray Length passa a ser a distância até a câmera (antes, 1 fixo).
 - Teste: `tools/create_light_falloff_test.py`. Validado: build e execução no RangeRuntime sem erro de shader;
   validação visual pendente.
+
+## 2026-10-02 - Direção do Auto World Sun (giro em Z)
+
+- Nova World Property `sun_direction` (graus, padrão 0) e campo "Direction" no painel Sun. Ela gira o plano da
+  órbita do sol automático em torno de Z, no ponto de chão à frente da câmera: muda o lado em que o sol nasce e
+  se põe, e o meio-dia continua a pino. Antes, girar a lâmpada à mão era desfeito ao mudar a hora.
+- Mesma conta no editor (`properties_scene.py`) e no runtime (`KX_Scene.cpp`); com 0 o resultado é idêntico ao anterior.
+- Validado: build de `RangeEngine` e `RangeRuntime`. Validação visual pendente.
 
 ## 2026-10-02 - World em nós capturado num cubemap (Game PBR)
 
@@ -184,7 +202,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 - `tools/create_node_sweep_test.py`: cena com um material por tipo de nó de shader (90), Sun/Point/Spot com
   sombra, World com Sky, Filmic e reflection probe; `--autoquit` fecha após 90 quadros, `--span=lo:hi` bisecciona.
-  Rodada no `RangeRuntime`: sem crash nem erro de shader em `%TEMP%ange_runtime.log.txt`.
+  Rodada no `RangeRuntime`: sem crash nem erro de shader em `%TEMP%
+ange_runtime.log.txt`.
 - Particle Info derrubava o jogo: o jogo passa `pi = NULL` a `GPU_material_bind_uniforms` (`gpu_material.c`),
   que lia `pi->scalprops`. Sem partícula, os uniforms recebem zero.
 - `BKE_node_shader_unsupported_in_game` / `BKE_node_tree_shader_unsupported_in_game` (`node.c`): regra única de

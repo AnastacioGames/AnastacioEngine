@@ -15,6 +15,7 @@
 
 #include "KX_DestructionManager.h"
 #include "KX_ClientObjectInfo.h"
+#include "KX_DentDeformer.h"
 #include "KX_GameObject.h"
 #include "KX_RayCast.h"
 #include "KX_Scene.h"
@@ -34,6 +35,9 @@
 
 /// AddReplicaObject() counts the lifespan in 1/50 s ticks (see KX_Scene::AddReplicaObject).
 static const float LIFESPAN_TICKS_PER_SECOND = 50.0f;
+/// Seconds between two collision dents of an object: a resting or sliding contact above the dent
+/// impulse would rebuild the mesh (and its collision shape) every frame.
+static const float DENT_COOLDOWN = 0.1f;
 
 static bool is_destructible(KX_GameObject *gameobj)
 {
@@ -45,6 +49,17 @@ static bool is_explosive(KX_GameObject *gameobj)
 {
 	Object *blenderobj = gameobj->GetBlenderObject();
 	return blenderobj && (blenderobj->gameflag2 & OB_EXPLOSIVE);
+}
+
+static bool is_deformable(KX_GameObject *gameobj)
+{
+	Object *blenderobj = gameobj->GetBlenderObject();
+	return blenderobj && (blenderobj->gameflag2 & OB_DEFORMABLE);
+}
+
+static bool dents_on_collision(KX_GameObject *gameobj)
+{
+	return is_deformable(gameobj) && (gameobj->GetBlenderObject()->deform.flags & DEFORM_ON_COLLISION);
 }
 
 static bool breaks_on_collision(KX_GameObject *gameobj)
@@ -59,7 +74,8 @@ static bool explodes_on_impact(KX_GameObject *gameobj)
 
 static bool wants_collisions(KX_GameObject *gameobj)
 {
-	return (breaks_on_collision(gameobj) || explodes_on_impact(gameobj)) && gameobj->GetPhysicsController() &&
+	return (breaks_on_collision(gameobj) || explodes_on_impact(gameobj) || dents_on_collision(gameobj)) &&
+	       gameobj->GetPhysicsController() &&
 	       !gameobj->GetClientInfo().isSensor();
 }
 
@@ -131,7 +147,7 @@ void KX_DestructionManager::Arm(Entry *entry, long long frame)
 void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 {
 	Object *blenderobj = gameobj->GetBlenderObject();
-	if (!blenderobj || !(blenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE)) || FindEntry(gameobj)) {
+	if (!blenderobj || !(blenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) || FindEntry(gameobj)) {
 		return;
 	}
 
@@ -142,6 +158,8 @@ void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 	entry.m_fuse = is_explosive(gameobj) ? std::max(blenderobj->explosive.fuse, 0.0f) : 0.0f;
 	entry.m_armFrame = -1;
 	entry.m_done = false;
+	entry.m_dentCooldown = 0.0f;
+	entry.m_dentWarned = false;
 	m_entries.push_back(entry);
 
 	if (wants_collisions(gameobj)) {
@@ -165,13 +183,25 @@ void KX_DestructionManager::UnregisterObject(KX_GameObject *gameobj)
 	                               [gameobj](const PendingBreak& pending) { return pending.m_object == gameobj; }),
 	                m_pending.end());
 
+	m_pendingDents.erase(std::remove_if(m_pendingDents.begin(), m_pendingDents.end(),
+	                                    [gameobj](const PendingDent& pending) { return pending.m_object == gameobj; }),
+	                     m_pendingDents.end());
+	m_dirtyShapes.erase(std::remove(m_dirtyShapes.begin(), m_dirtyShapes.end(), gameobj), m_dirtyShapes.end());
+	for (Entry& entry : m_entries) {
+		std::vector<std::pair<KX_GameObject *, long long> >& touching = entry.m_touching;
+		touching.erase(std::remove_if(touching.begin(), touching.end(),
+		                              [gameobj](const std::pair<KX_GameObject *, long long>& touch) { return touch.first == gameobj; }),
+		               touching.end());
+	}
+
 	const std::deque<KX_GameObject *>::iterator it = std::find(m_debris.begin(), m_debris.end(), gameobj);
 	if (it != m_debris.end()) {
 		m_debris.erase(it);
 	}
 }
 
-void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, const PHY_ICollData *collData, bool first)
+void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObject *other, const PHY_ICollData *collData,
+                                            bool first)
 {
 	if (!gameobj || !collData) {
 		return;
@@ -184,7 +214,25 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, const PHY_IC
 
 	const bool detonates = explodes_on_impact(gameobj);
 	const bool breaks = breaks_on_collision(gameobj) && gameobj->GetBlenderObject()->destruction.fragments;
-	if (!detonates && !breaks) {
+	bool dents = false;
+	if (dents_on_collision(gameobj)) {
+		// A hit is a contact with an object that wasn't touching on the previous frame.
+		bool newContact = true;
+		bool found = false;
+		for (std::pair<KX_GameObject *, long long>& touch : entry->m_touching) {
+			if (touch.first == other) {
+				newContact = touch.second < m_frame - 1;
+				touch.second = m_frame;
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			entry->m_touching.emplace_back(other, m_frame);
+		}
+		dents = newContact && entry->m_dentCooldown <= 0.0f;
+	}
+	if (!detonates && !breaks && !dents) {
 		return;
 	}
 
@@ -192,12 +240,14 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, const PHY_IC
 	float total = 0.0f;
 	float strongest = -1.0f;
 	mt::vec3 origin = gameobj->NodeGetWorldPosition();
+	mt::vec3 normal = mt::zero3;
 	for (unsigned int i = 0, num = collData->GetNumContacts(); i < num; ++i) {
 		const float impulse = collData->GetAppliedImpulse(i, first);
 		total += impulse;
 		if (impulse > strongest) {
 			strongest = impulse;
 			origin = collData->GetWorldPoint(i, first);
+			normal = collData->GetNormal(i, first);
 		}
 	}
 
@@ -214,7 +264,134 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, const PHY_IC
 			}
 		}
 		m_pending.push_back({gameobj, origin});
+		return;
 	}
+
+	if (dents && total >= gameobj->GetBlenderObject()->deform.dent_impulse) {
+		// One dent per object and frame, the strongest contact.
+		for (PendingDent& pending : m_pendingDents) {
+			if (pending.m_object == gameobj) {
+				if (total > pending.m_impulse) {
+					pending = {gameobj, origin, normal, total};
+				}
+				return;
+			}
+		}
+		m_pendingDents.push_back({gameobj, origin, normal, total});
+	}
+}
+
+bool KX_DestructionManager::Dent(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse)
+{
+	const Entry *entry = gameobj ? FindEntry(gameobj) : nullptr;
+	if (!entry || entry->m_done || !is_deformable(gameobj) || impulse < gameobj->GetBlenderObject()->deform.dent_impulse) {
+		return false;
+	}
+	return DentNow(gameobj, point, direction, impulse);
+}
+
+KX_DentDeformer *KX_DestructionManager::GetDentDeformer(KX_GameObject *gameobj)
+{
+	KX_DentDeformer *deformer = gameobj->GetDentDeformer(true);
+	if (!deformer) {
+		Entry *entry = FindEntry(gameobj);
+		if (entry && !entry->m_dentWarned) {
+			entry->m_dentWarned = true;
+			CM_Warning("\"" << gameobj->GetName() << "\" is deformable but its mesh is driven by modifiers, an armature, "
+			           "shape keys or a soft body; it can't dent.");
+		}
+	}
+	return deformer;
+}
+
+void KX_DestructionManager::Dented(KX_GameObject *gameobj, const mt::vec3& point, float impulse)
+{
+	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
+		m_dirtyShapes.push_back(gameobj);
+	}
+	gameobj->RunDentCallbacks(point, impulse);
+}
+
+bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse)
+{
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const float depth = std::min((impulse - settings.dent_impulse) * settings.depth, settings.max_depth);
+	if (depth <= 0.0f) {
+		return false;
+	}
+
+	KX_DentDeformer *deformer = GetDentDeformer(gameobj);
+	if (!deformer) {
+		return false;
+	}
+
+	/* Into the object whatever the contact normal convention: towards the center of the mesh bounds,
+	 * the origin can be far from the mesh. */
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	mt::vec3 aabbMin, aabbMax;
+	deformer->GetBoundingBox()->GetAabb(aabbMin, aabbMax);
+	const mt::vec3 toCenter = trans * ((aabbMin + aabbMax) * 0.5f) - point;
+	mt::vec3 inward = direction.SafeNormalized(mt::zero3);
+	if (inward.LengthSquared() == 0.0f) {
+		inward = toCenter.SafeNormalized(-mt::axisZ3);
+	}
+	else if (mt::dot(inward, toCenter) < 0.0f) {
+		inward = -inward;
+	}
+
+	if (!deformer->AddDent(trans, point, inward * depth, settings.radius, settings.max_depth)) {
+		return false;
+	}
+
+	Dented(gameobj, point, impulse);
+	return true;
+}
+
+void KX_DestructionManager::BlastDent(KX_GameObject *gameobj, const mt::vec3& center, float radius, float force)
+{
+	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	KX_DentDeformer *deformer = GetDentDeformer(gameobj);
+	if (deformer && deformer->AddBlastDent(gameobj->NodeGetWorldTransform(), center, radius, force,
+	                                       settings.dent_impulse, settings.depth, settings.max_depth))
+	{
+		Dented(gameobj, center, impulse_at(gameobj->NodeGetWorldPosition(), center, radius, force));
+	}
+}
+
+bool KX_DestructionManager::ResetDent(KX_GameObject *gameobj)
+{
+	KX_DentDeformer *deformer = gameobj ? gameobj->GetDentDeformer(false) : nullptr;
+	if (!deformer || !deformer->IsDented()) {
+		return false;
+	}
+	deformer->Reset();
+	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
+		m_dirtyShapes.push_back(gameobj);
+	}
+	return true;
+}
+
+void KX_DestructionManager::UpdatePhysicsShapes()
+{
+	for (KX_GameObject *gameobj : m_dirtyShapes) {
+		PHY_IPhysicsController *ctrl = gameobj->GetPhysicsController();
+		// Triangle mesh and convex hull bounds only (no-op otherwise). Dupli: the shape is shared
+		// by the instances of the mesh.
+		if (!ctrl || !ctrl->ReinstancePhysicsShape(nullptr, nullptr, true)) {
+			continue;
+		}
+		// Bodies asleep on the old surface would float over the dent.
+		const Entry *entry = FindEntry(gameobj);
+		if (entry) {
+			for (const std::pair<KX_GameObject *, long long>& touch : entry->m_touching) {
+				PHY_IPhysicsController *otherctrl = touch.first->GetPhysicsController();
+				if (otherctrl) {
+					otherctrl->SetActive(true);
+				}
+			}
+		}
+	}
+	m_dirtyShapes.clear();
 }
 
 std::vector<KX_GameObject *> KX_DestructionManager::Shatter(KX_GameObject *gameobj, const mt::vec3 *origin, const float *burst)
@@ -418,7 +595,8 @@ std::vector<KX_GameObject *> KX_DestructionManager::Explode(const mt::vec3& cent
 		}
 		const bool destructible = entry && is_destructible(gameobj);
 		const bool explosive = entry && is_explosive(gameobj);
-		if (!destructible && !explosive && !gameobj->IsDynamic()) {
+		const bool deformable = entry && is_deformable(gameobj);
+		if (!destructible && !explosive && !deformable && !gameobj->IsDynamic()) {
 			continue;
 		}
 
@@ -444,6 +622,10 @@ std::vector<KX_GameObject *> KX_DestructionManager::Explode(const mt::vec3& cent
 				PushFragments(pieces, center, radius, force, upBias);
 				continue;
 			}
+		}
+
+		if (deformable && !breaks) {
+			BlastDent(gameobj, center, radius, force);
 		}
 
 		Push(gameobj, center, impulse, upBias);
@@ -555,6 +737,14 @@ void KX_DestructionManager::SetMaxDebris(int maxDebris)
 void KX_DestructionManager::Update(float frameStep)
 {
 	for (Entry& entry : m_entries) {
+		if (entry.m_dentCooldown > 0.0f) {
+			entry.m_dentCooldown -= frameStep;
+		}
+		// Contacts that ended: a new touch is a new hit.
+		const long long frame = m_frame;
+		entry.m_touching.erase(std::remove_if(entry.m_touching.begin(), entry.m_touching.end(),
+		                                      [frame](const std::pair<KX_GameObject *, long long>& touch) { return touch.second < frame - 1; }),
+		                       entry.m_touching.end());
 		if (!entry.m_done && entry.m_fuse > 0.0f) {
 			entry.m_fuse -= frameStep;
 			if (entry.m_fuse <= 0.0f) {
@@ -584,6 +774,22 @@ void KX_DestructionManager::Update(float frameStep)
 		Detonate(gameobj);
 	}
 
+	if (!m_pendingDents.empty()) {
+		std::vector<PendingDent> pending;
+		pending.swap(m_pendingDents);
+		for (const PendingDent& dent : pending) {
+			Entry *entry = FindEntry(dent.m_object);
+			// Broken or detonated meanwhile.
+			if (!entry || entry->m_done) {
+				continue;
+			}
+			entry->m_dentCooldown = DENT_COOLDOWN;
+			DentNow(dent.m_object, dent.m_point, dent.m_direction, dent.m_impulse);
+		}
+	}
+
+	UpdatePhysicsShapes();
+
 	++m_frame;
 }
 
@@ -593,6 +799,10 @@ void KX_DestructionManager::Merge(KX_DestructionManager& other)
 	m_pending.insert(m_pending.end(), other.m_pending.begin(), other.m_pending.end());
 	other.m_entries.clear();
 	other.m_pending.clear();
+	m_pendingDents.insert(m_pendingDents.end(), other.m_pendingDents.begin(), other.m_pendingDents.end());
+	other.m_pendingDents.clear();
+	m_dirtyShapes.insert(m_dirtyShapes.end(), other.m_dirtyShapes.begin(), other.m_dirtyShapes.end());
+	other.m_dirtyShapes.clear();
 	AddDebris(std::vector<KX_GameObject *>(other.m_debris.begin(), other.m_debris.end()));
 	other.m_debris.clear();
 }

@@ -1597,6 +1597,10 @@ void CcdPhysicsController::Jump()
 
 void CcdPhysicsController::SetActive(bool active)
 {
+	// Wakes a sleeping body, e.g. resting on a collision shape that changed under it (dents).
+	if (active && m_object) {
+		m_object->activate(true);
+	}
 }
 
 unsigned short CcdPhysicsController::GetCollisionGroup() const

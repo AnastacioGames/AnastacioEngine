@@ -210,6 +210,12 @@ pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Expl
 `scene.explode()`, em fases F0–F5. Protótipo Python validado por teste automático no runtime
 0.4.5 (fora do git, em `tools/ADD na engine anastacioEngine/`).
 
+### Deformação por impacto
+
+Implementada em 2026-10-02 (painel Deformation, `KX_DentDeformer`, `dent()`/`resetDent()`; ver changelog). Falta validar no
+`RangeRuntime` com `tools/create_dent_test.py` e ajustar a sensação numa cena real (lataria de carro). Possível v2: máscara de
+amassado na cor de vértice para o material misturar tinta arranhada.
+
 ### Câmera: foco, rastreio e Camera FX
 
 Implementado em 2026-09-29 (fases 1 a 5 do [plano](camera-fx-plan.md)); referência em [camera-fx.md](camera-fx.md).

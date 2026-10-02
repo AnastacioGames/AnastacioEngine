@@ -626,6 +626,15 @@ base class --- :class:`SCA_IObject`
 
       :type: list of functions and/or methods
 
+   .. attribute:: onDent
+
+      A list of functions called when this deformable object dents (collision, explosion or
+      :meth:`dent`), with the arguments `(object, point, impulse)`: world hit point (the blast center
+      for an explosion) and hit strength, e.g. to play a metal sound or spawn sparks there.
+      Callbacks set on an object of an inactive layer are copied to every object added from it.
+
+      :type: list of functions and/or methods
+
    .. method:: endObject()
 
       Delete this object, can be used in place of the EndObject Actuator.
@@ -650,6 +659,29 @@ base class --- :class:`SCA_IObject`
       the Effect object, and the removal of the object. A destructible explosive breaks as well.
 
       :return: False if the object is not explosive or has already exploded.
+      :rtype: boolean
+
+   .. method:: dent(point, direction, impulse)
+
+      Dent this deformable object (Deformation panel) as a hit of the given strength: the vertices within
+      the panel's Radius of point move along direction (into the object) by
+      (impulse - Dent Impulse) * Depth, limited by Max Depth. Only this instance changes, other objects
+      sharing the mesh keep their shape.
+
+      :arg point: hit point in world space.
+      :type point: 3D vector
+      :arg direction: hit direction in world space, flipped to point into the object.
+      :type direction: 3D vector
+      :arg impulse: hit strength (N*s), compared with Dent Impulse.
+      :type impulse: float
+      :return: False if the object is not deformable, the impulse is too weak or no vertex moved.
+      :rtype: boolean
+
+   .. method:: resetDent()
+
+      Restore the shape of a dented object.
+
+      :return: False if the object was never dented.
       :rtype: boolean
 
    .. method:: replaceMesh(mesh, useDisplayMesh=True, usePhysicsMesh=False)

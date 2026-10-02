@@ -2603,7 +2603,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 
 	// Native destruction: only active objects, replicas register in KX_Scene::AddNodeReplicaObject.
 	for (KX_GameObject *gameobj : objectlist) {
-		if (gameobj->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE)) {
+		if (gameobj->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) {
 			kxscene->GetDestructionManager().RegisterObject(gameobj);
 		}
 	}

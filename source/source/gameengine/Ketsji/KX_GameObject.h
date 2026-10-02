@@ -62,6 +62,7 @@ class KX_Mesh;
 class BL_ActionData;
 class RAS_MeshUser;
 class RAS_Deformer;
+class KX_DentDeformer;
 class PHY_IGraphicController;
 class PHY_IPhysicsEnvironment;
 class PHY_IPhysicsController;
@@ -134,6 +135,9 @@ protected:
 	/// Set before ReplaceMesh() when the incoming LOD level needs a private, per-instance
 	/// display array for multi-angle impostor UV selection (see KX_LodLevel::USE_ATLAS).
 	bool								m_wantsImpostorAtlasDeformer;
+	/// Set on the first dent (OB_DEFORMABLE): AddMeshUser() gives the instance a KX_DentDeformer.
+	/// Lazy, so objects never hit keep the shared mesh (no copy, instancing kept).
+	bool								m_wantsDentDeformer;
 	/// True while a billboard LoD level drives the orientation; the original one is kept in
 	/// m_lodBillboardOrientation and restored when a non billboard level is reached.
 	bool								m_lodBillboardActive;
@@ -253,9 +257,10 @@ public:
 	//
 	PyObject*							m_attr_dict;
 	PyObject*							m_collisionCallbacks;
-	/// onBreak and onExplode (KX_DestructionManager), copied by replication.
+	/// onBreak, onExplode and onDent (KX_DestructionManager), copied by replication.
 	PyObject*							m_breakCallbacks;
 	PyObject*							m_explodeCallbacks;
+	PyObject*							m_dentCallbacks;
 #endif
 
 	virtual void	/* This function should be virtual - derived classed override it */
@@ -553,6 +558,12 @@ public:
 	GetObjectColor();
 
 	RAS_Deformer *GetDeformer();
+
+	/** The private dent mesh of this instance (see KX_DentDeformer).
+	 * \param create Rebuild the mesh user with one when the object has none yet. Fails (nullptr)
+	 * when another deformer (armature, modifiers, shape keys, soft body) owns the mesh.
+	 */
+	KX_DentDeformer *GetDentDeformer(bool create);
 
 	/**
 	 * \return a pointer to the physics controller owned by this class.
@@ -1042,6 +1053,8 @@ public:
 	void RunBreakCallbacks(const std::vector<KX_GameObject *>& fragments);
 	/// The object just exploded at position.
 	void RunExplodeCallbacks(const mt::vec3& position);
+	/// onDent: callback(object, point, impulse), point in world space.
+	void RunDentCallbacks(const mt::vec3& point, float impulse);
 	/**
 	 * Stop making progress
 	 */
@@ -1171,6 +1184,8 @@ public:
 	EXP_PYMETHOD_NOARGS(KX_GameObject,EndObject);
 	EXP_PYMETHOD(KX_GameObject, Shatter);
 	EXP_PYMETHOD_NOARGS(KX_GameObject, Detonate);
+	EXP_PYMETHOD(KX_GameObject, Dent);
+	EXP_PYMETHOD_NOARGS(KX_GameObject, ResetDent);
 	EXP_PYMETHOD_DOC(KX_GameObject,rayCastTo);
 	EXP_PYMETHOD_DOC(KX_GameObject,rayCast);
 	EXP_PYMETHOD_DOC_O(KX_GameObject,getDistanceTo);

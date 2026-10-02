@@ -346,6 +346,25 @@ enum {
 	EXPLOSIVE_CHAIN_REACTION = 1 << 2,
 };
 
+/* Native impact deformation (opt-in via gameflag2 & OB_DEFORMABLE): a hit stronger than
+ * dent_impulse pushes the vertices around the contact point along the hit, with a smooth falloff,
+ * in a private copy of the mesh (KX_DentDeformer). radius == 0 means not initialized yet (old
+ * files): rna_object.c fills the defaults on first enable. */
+typedef struct RangeDeformSettings {
+	float dent_impulse;    /* summed contact appliedImpulse that starts denting */
+	float radius;          /* distance from the contact point reached by a dent */
+	float depth;           /* dent depth (m) per N*s above dent_impulse */
+	float max_depth;       /* most a vertex moves away from its rest position */
+	int flags;             /* DEFORM_* */
+	int pad;
+} RangeDeformSettings;
+
+/* RangeDeformSettings.flags */
+enum {
+	DEFORM_ON_COLLISION    = 1 << 0,
+	DEFORM_UPDATE_PHYSICS  = 1 << 1,
+};
+
 enum {
 	GPU_PARTICLE_LOOK_DEFAULT = 0,
 	GPU_PARTICLE_LOOK_SMOKE = 1,
@@ -640,6 +659,8 @@ typedef struct Object {
 	struct RangeDestructionSettings destruction;
 	/* Native explosive, opt-in via gameflag2 & OB_EXPLOSIVE. */
 	struct RangeExplosiveSettings explosive;
+	/* Native impact deformation, opt-in via gameflag2 & OB_DEFORMABLE. */
+	struct RangeDeformSettings deform;
 
 	/* User names for the 30 logic states (empty = unnamed). */
 	char state_names[30][32];
@@ -967,6 +988,8 @@ enum {
 	OB_DESTRUCTIBLE                  = 1 << 14,
 	/* ob->explosive: detonates (fuse, impact, chain reaction or Python) with a radial impulse. */
 	OB_EXPLOSIVE                     = 1 << 15,
+	/* ob->deform: hits dent its mesh (per instance copy) around the contact point. */
+	OB_DEFORMABLE                    = 1 << 16,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };

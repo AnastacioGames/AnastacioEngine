@@ -217,11 +217,11 @@ void KX_CollisionEventManager::NextFrame()
 		kxObj2->RunCollisionCallbacks(kxObj1, contactPointList1);
 
 		// Native destruction: queue a break or a detonation when the impact is strong enough.
-		if (kxObj1->GetBlenderObject() && (kxObj1->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
-			kxObj1->GetScene()->GetDestructionManager().NotifyCollision(kxObj1, colldata, collision.isFirst);
+		if (kxObj1->GetBlenderObject() && (kxObj1->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE))) {
+			kxObj1->GetScene()->GetDestructionManager().NotifyCollision(kxObj1, kxObj2, colldata, collision.isFirst);
 		}
-		if (kxObj2->GetBlenderObject() && (kxObj2->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE))) {
-			kxObj2->GetScene()->GetDestructionManager().NotifyCollision(kxObj2, colldata, !collision.isFirst);
+		if (kxObj2->GetBlenderObject() && (kxObj2->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE))) {
+			kxObj2->GetScene()->GetDestructionManager().NotifyCollision(kxObj2, kxObj1, colldata, !collision.isFirst);
 		}
 	}
 

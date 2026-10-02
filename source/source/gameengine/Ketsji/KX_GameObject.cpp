@@ -73,6 +73,7 @@
 #include "KX_LodLevel.h"
 #include "KX_LodManager.h"
 #include "KX_ImpostorAtlasDeformer.h"
+#include "KX_DentDeformer.h"
 #include "KX_BoundingBox.h"
 #include "SG_CullingNode.h"
 #include "KX_BatchGroup.h"
@@ -128,6 +129,7 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_currentLodLevel(0),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
+	m_wantsDentDeformer(false),
 	m_lodBillboardActive(false),
 	m_lodBillboardOrientation(mt::mat3::Identity()),
 	m_currentAtlasCell(-1),
@@ -159,7 +161,8 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	, m_attr_dict(nullptr),
 	m_collisionCallbacks(nullptr),
 	m_breakCallbacks(nullptr),
-	m_explodeCallbacks(nullptr)
+	m_explodeCallbacks(nullptr),
+	m_dentCallbacks(nullptr)
 #endif
 {
 	// define the relationship between this node and it's parent.
@@ -179,6 +182,7 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_currentLodLevel(0),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
+	m_wantsDentDeformer(false),
 	m_lodBillboardActive(other.m_lodBillboardActive),
 	m_lodBillboardOrientation(other.m_lodBillboardOrientation),
 	m_currentAtlasCell(-1),
@@ -211,7 +215,8 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	, m_attr_dict(other.m_attr_dict),
 	m_collisionCallbacks(other.m_collisionCallbacks),
 	m_breakCallbacks(nullptr),
-	m_explodeCallbacks(nullptr)
+	m_explodeCallbacks(nullptr),
+	m_dentCallbacks(nullptr)
 #endif  // WITH_PYTHON
 {
 	if (m_lodManager) {
@@ -236,6 +241,9 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	}
 	if (other.m_explodeCallbacks) {
 		m_explodeCallbacks = PyList_GetSlice(other.m_explodeCallbacks, 0, PY_SSIZE_T_MAX);
+	}
+	if (other.m_dentCallbacks) {
+		m_dentCallbacks = PyList_GetSlice(other.m_dentCallbacks, 0, PY_SSIZE_T_MAX);
 	}
 
 	if (other.m_components) {
@@ -264,6 +272,7 @@ KX_GameObject::~KX_GameObject()
 	}
 	Py_CLEAR(m_breakCallbacks);
 	Py_CLEAR(m_explodeCallbacks);
+	Py_CLEAR(m_dentCallbacks);
 
 	if (m_components) {
 		m_components->Release();
@@ -1244,11 +1253,31 @@ void KX_GameObject::AddMeshUser()
 			// affecting other instances sharing the same KX_Mesh.
 			deformer = new KX_ImpostorAtlasDeformer(m_meshes[i], GetScene()->GetBoundingBoxManager());
 		}
+		else if (!deformer && m_wantsDentDeformer) {
+			deformer = new KX_DentDeformer(m_meshes[i], GetScene()->GetBoundingBoxManager());
+		}
 		m_meshUser = m_meshes[i]->AddMeshUser(&m_clientInfo, deformer);
 
 		m_meshUser->SetMatrix(mt::mat4::FromAffineTransform(NodeGetWorldTransform()));
 		m_meshUser->SetFrontFace(!IsNegativeScaling());
 	}
+}
+
+KX_DentDeformer *KX_GameObject::GetDentDeformer(bool create)
+{
+	RAS_Deformer *deformer = GetDeformer();
+	if (deformer || !create || m_wantsDentDeformer || !m_meshUser || m_meshes.empty()) {
+		return m_wantsDentDeformer ? dynamic_cast<KX_DentDeformer *>(deformer) : nullptr;
+	}
+
+	// Same as ReplaceMesh() with the current mesh, the new mesh user owns a private copy.
+	m_wantsDentDeformer = true;
+	delete m_meshUser;
+	m_meshUser = nullptr;
+	AddMeshUser();
+	UpdateBounds(true);
+
+	return dynamic_cast<KX_DentDeformer *>(GetDeformer());
 }
 
 void KX_GameObject::DuplicateBitmapTextMeshes()
@@ -2326,6 +2355,22 @@ void KX_GameObject::RunExplodeCallbacks(const mt::vec3& position)
 #endif
 }
 
+void KX_GameObject::RunDentCallbacks(const mt::vec3& point, float impulse)
+{
+#ifdef WITH_PYTHON
+	if (!m_dentCallbacks || PyList_GET_SIZE(m_dentCallbacks) == 0) {
+		return;
+	}
+
+	PyObject *args[] = {GetProxy(), PyObjectFrom(point), PyFloat_FromDouble(impulse)};
+	EXP_RunPythonCallBackList(m_dentCallbacks, args, 0, ARRAY_SIZE(args));
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(args); ++i) {
+		Py_DECREF(args[i]);
+	}
+#endif
+}
+
 template <bool recursive>
 static void walk_children(const SG_Node *node, std::vector<KX_GameObject *>& list)
 {
@@ -2835,6 +2880,8 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{"endObject", (PyCFunction)KX_GameObject::sPyEndObject, METH_NOARGS},
 	{"shatter", (PyCFunction)KX_GameObject::sPyShatter, METH_VARARGS | METH_KEYWORDS},
 	{"detonate", (PyCFunction)KX_GameObject::sPyDetonate, METH_NOARGS},
+	{"dent", (PyCFunction)KX_GameObject::sPyDent, METH_VARARGS | METH_KEYWORDS},
+	{"resetDent", (PyCFunction)KX_GameObject::sPyResetDent, METH_NOARGS},
 	{"reinstancePhysicsMesh", (PyCFunction)KX_GameObject::sPyReinstancePhysicsMesh, METH_VARARGS | METH_KEYWORDS},
 	{"replacePhysicsShape", (PyCFunction)KX_GameObject::sPyReplacePhysicsShape, METH_O},
 
@@ -2880,6 +2927,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("isExplosive", KX_GameObject, pyattr_get_is_explosive),
 	EXP_PYATTRIBUTE_RW_FUNCTION("onBreak", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
 	EXP_PYATTRIBUTE_RW_FUNCTION("onExplode", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
+	EXP_PYATTRIBUTE_RW_FUNCTION("onDent", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
 	EXP_PYATTRIBUTE_RW_FUNCTION("breakImpulse", KX_GameObject, pyattr_get_break_impulse, pyattr_set_break_impulse),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fuse", KX_GameObject, pyattr_get_fuse, pyattr_set_fuse),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",       KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),
@@ -3012,6 +3060,31 @@ PyObject *KX_GameObject::PyShatter(PyObject *args, PyObject *kwds)
 PyObject *KX_GameObject::PyDetonate()
 {
 	return PyBool_FromLong(GetScene()->GetDestructionManager().Detonate(this));
+}
+
+PyObject *KX_GameObject::PyDent(PyObject *args, PyObject *kwds)
+{
+	PyObject *pypoint;
+	PyObject *pydirection;
+	float impulse;
+
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "OOf:dent", {"point", "direction", "impulse", 0},
+	                                   &pypoint, &pydirection, &impulse)) {
+		return nullptr;
+	}
+
+	mt::vec3 point;
+	mt::vec3 direction;
+	if (!PyVecTo(pypoint, point) || !PyVecTo(pydirection, direction)) {
+		return nullptr;
+	}
+
+	return PyBool_FromLong(GetScene()->GetDestructionManager().Dent(this, point, direction, impulse));
+}
+
+PyObject *KX_GameObject::PyResetDent()
+{
+	return PyBool_FromLong(GetScene()->GetDestructionManager().ResetDent(this));
 }
 
 PyObject *KX_GameObject::PyReinstancePhysicsMesh(PyObject *args, PyObject *kwds)
@@ -3564,7 +3637,8 @@ int KX_GameObject::pyattr_set_break_impulse(EXP_PyObjectPlus *self_v, const EXP_
 PyObject *KX_GameObject::pyattr_get_destruction_callbacks(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
-	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks : self->m_explodeCallbacks;
+	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks :
+	                  (attrdef->m_name == "onDent") ? self->m_dentCallbacks : self->m_explodeCallbacks;
 	if (!list) {
 		list = PyList_New(0);
 	}
@@ -3579,7 +3653,8 @@ int KX_GameObject::pyattr_set_destruction_callbacks(EXP_PyObjectPlus *self_v, co
 		PyErr_Format(PyExc_ValueError, "gameOb.%s = list: KX_GameObject, expected a list", attrdef->m_name.c_str());
 		return PY_SET_ATTR_FAIL;
 	}
-	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks : self->m_explodeCallbacks;
+	PyObject *&list = (attrdef->m_name == "onBreak") ? self->m_breakCallbacks :
+	                  (attrdef->m_name == "onDent") ? self->m_dentCallbacks : self->m_explodeCallbacks;
 	Py_INCREF(value);
 	Py_XDECREF(list);
 	list = value;

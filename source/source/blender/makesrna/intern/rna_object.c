@@ -277,6 +277,26 @@ static void rna_GameObjectSettings_use_explosive_set(PointerRNA *ptr, bool value
 	}
 }
 
+static void rna_GameObjectSettings_use_deform_set(PointerRNA *ptr, bool value)
+{
+	Object *ob = ptr->data;
+	RangeDeformSettings *ds = &ob->deform;
+
+	if (value) {
+		ob->gameflag2 |= OB_DEFORMABLE;
+		if (ds->radius == 0.0f) {
+			ds->dent_impulse = 3.0f;
+			ds->radius = 0.5f;
+			ds->depth = 0.01f;
+			ds->max_depth = 0.3f;
+			ds->flags = DEFORM_ON_COLLISION;
+		}
+	}
+	else {
+		ob->gameflag2 &= ~OB_DEFORMABLE;
+	}
+}
+
 /* Group e Object nao tem STRUCT_ID_REFCOUNT: conta o usuario aqui, como em dupli_group */
 static void rna_RangeDestructionSettings_fragments_set(PointerRNA *ptr, PointerRNA value)
 {
@@ -2590,6 +2610,62 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 
+static void rna_def_object_deform(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "RangeDeformSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeDeformSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Deformation Settings",
+	                       "Dents the mesh around the contact point on strong hits and explosions");
+
+	prop = RNA_def_property(srna, "dent_impulse", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "dent_impulse");
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 1000.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Dent Impulse",
+	                         "Impact strength (summed contact impulse, N*s) that starts denting the mesh. "
+	                         "On a destructible object, hits below Break Impulse dent and stronger ones break");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_dent_on_collision", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", DEFORM_ON_COLLISION);
+	RNA_def_property_ui_text(prop, "Dent on Collision",
+	                         "Dent on strong collisions. Off: only explosions and Python (dent()) dent it");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "radius", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "radius");
+	RNA_def_property_range(prop, 0.001f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.01f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Radius", "Distance from the contact point reached by a dent");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "depth", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "depth");
+	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 0.1f, 0.1, 4);
+	RNA_def_property_ui_text(prop, "Depth",
+	                         "Dent depth at the contact point (m) per N*s of impulse above Dent Impulse. "
+	                         "Lower = stiffer material");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "max_depth", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "max_depth");
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 3);
+	RNA_def_property_ui_text(prop, "Max Depth", "Most a vertex can move away from its rest position, summing all hits");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_update_physics", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", DEFORM_UPDATE_PHYSICS);
+	RNA_def_property_ui_text(prop, "Update Physics",
+	                         "Rebuild the collision shape from the dented mesh (Triangle Mesh bounds only, costly)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+}
+
 static void rna_def_game_state_name(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2739,6 +2815,19 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "explosive");
 	RNA_def_property_struct_type(prop, "RangeExplosiveSettings");
 	RNA_def_property_ui_text(prop, "Explosive Settings", "");
+
+	prop = RNA_def_property(srna, "use_deform", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_DEFORMABLE);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_GameObjectSettings_use_deform_set");
+	RNA_def_property_ui_text(prop, "Deformation",
+	                         "Dent the mesh around the contact point on strong hits and explosions");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "deform", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "deform");
+	RNA_def_property_struct_type(prop, "RangeDeformSettings");
+	RNA_def_property_ui_text(prop, "Deformation Settings", "");
 
 	prop = RNA_def_property(srna, "mass", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.01, 1000000.0);
@@ -3043,6 +3132,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	rna_def_object_gpu_particles(brna);
 	rna_def_object_reverb_area(brna);
 	rna_def_object_destruction(brna);
+	rna_def_object_deform(brna);
 	rna_def_object_explosive(brna);
 }
 
