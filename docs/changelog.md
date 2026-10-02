@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Light probes validados
+
+O usuário validou no jogo a luz difusa local e o reflexo do probe (`probe_reflection_test.range`), a mistura entre probes vizinhos e com o World (`probe_blend_test.range`) e a recaptura do World com a Sky Texture seguindo o World Sun (`sky_follow_sun_test.range`). Sem mudança de código.
+
 ## 2026-10-02 - Spot no Game PBR com a atenuação do Cycles; IES e volumes validados
 
 - **Bug:** no loop de luzes do Game PBR (`scene_light_dir`) a Spot usava o modelo do GL fixo,
