@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Viewport: materiais em nós com as lâmpadas da cena e sombras
+
+- Com engine Blender Game e Shading Nodes, o viewport (modo Material) acendia os materiais em nós com as luzes
+  de estúdio (`GPU_default_lights`) e sem sombra. Agora `GPU_begin_object_materials` (`gpu_draw.c`) põe as
+  lâmpadas da cena em `gl_LightSource` (`gpu_scene_lights`, mesmos valores de
+  `RAS_OpenGLLight::ApplyFixedFunctionLighting`: No Diffuse/No Specular, cone até 90°) e guarda o `GPULamp`
+  dos 3 primeiros slots; cada material chama `GPU_material_bind_shadow_lamps`, como o Game.
+  `GPU_end_object_materials` volta às luzes de estúdio.
+- Fora: IES Texture no viewport (uniforms de `GPU_material_bind_scene_lights` não são enviados) e viewport com
+  engine Cycles (fica como antes).
+- Log com `--debug-gpu` sem erros de GL. Validado pelo usuário em `point_shadow_test.range`.
+
 ## 2026-10-02 - Sombra de luz Point nos materiais BI e no viewport
 
 - Sem Shading Nodes, a Point com `Ray Shadow` ganha o mesmo atlas de cubo 3x2 da entrada de 2026-10-01

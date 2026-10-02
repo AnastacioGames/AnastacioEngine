@@ -1555,7 +1555,16 @@ static struct GPUMaterialState {
 	int lastmatnr, lastretval;
 	GPUBlendMode lastalphablend;
 	bool is_opensubdiv;
+
+	/* Game engine with Shading Nodes: scene lamps in gl_LightSource and their shadow maps,
+	 * slot for slot (see gpu_scene_lights()). */
+	bool scene_lights;
+	GPULamp *shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 } GMS = {NULL};
+
+static int gpu_scene_lights(
+        Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho,
+        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 
 /* fixed function material, alpha handed by caller */
 static void gpu_material_to_fixed(
@@ -1700,6 +1709,13 @@ void GPU_begin_object_materials(
 	GMS.gviewmat = rv3d->viewmat;
 	GMS.gviewinv = rv3d->viewinv;
 	GMS.gviewcamtexcofac = rv3d->viewcamtexcofac;
+
+	/* Node materials then light like the Game (RAS_Rasterizer::ProcessLighting), with shadows,
+	 * instead of the studio lights. Other engines keep their viewport look. */
+	if (glsl && new_shading_nodes && !use_matcap && STREQ(scene->r.engine, "BLENDER_GAME")) {
+		GMS.scene_lights = true;
+		gpu_scene_lights(scene, ob, GMS.glay, rv3d->viewmat, !rv3d->is_persp, GMS.shadowlamps);
+	}
 
 	/* alpha pass setup. there's various cases to handle here:
 	 * - object transparency on: only solid materials draw in the first pass,
@@ -1919,6 +1935,9 @@ int GPU_object_material_bind(int nr, void *attribs)
 
 			auto_bump_scale = GMS.gob->derivedFinal != NULL ? GMS.gob->derivedFinal->auto_bump_scale : 1.0f;
 			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, GMS.gob->lay, auto_bump_scale, &partile_info, object_info);
+			if (GMS.scene_lights) {
+				GPU_material_bind_shadow_lamps(gpumat, GMS.shadowlamps);
+			}
 			GMS.gboundmat = mat;
 
 			/* for glsl use alpha blend mode, unless it's set to solid and
@@ -2052,6 +2071,11 @@ void GPU_end_object_materials(void)
 {
 	GPU_object_material_unbind();
 
+	if (GMS.scene_lights) {
+		GPU_default_lights();
+		GMS.scene_lights = false;
+	}
+
 	GMS.is_enabled = false;
 
 	if (GMS.matbuf && GMS.matbuf != GMS.matbuf_fixed) {
@@ -2125,6 +2149,19 @@ int GPU_default_lights(void)
 
 int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho)
 {
+	return gpu_scene_lights(scene, ob, lay, viewmat, ortho, NULL);
+}
+
+/* r_shadowlamps (optional): the GPULamp of the first GPU_MATERIAL_NUM_SHADOW_LAMPS slots. */
+static int gpu_scene_lights(
+        Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho,
+        GPULamp *r_shadowlamps[GPU_MATERIAL_NUM_SHADOW_LAMPS])
+{
+	if (r_shadowlamps) {
+		for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++)
+			r_shadowlamps[i] = NULL;
+	}
+
 	/* disable all lights */
 	for (int count = 0; count < 8; count++)
 		GPU_basic_shader_light_set(count, NULL);
@@ -2176,6 +2213,18 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 			}
 			else
 				light.type = GPU_LIGHT_POINT;
+		}
+
+		if (r_shadowlamps) {
+			/* Same values as RAS_OpenGLLight::ApplyFixedFunctionLighting(). */
+			if (la->mode & LA_NO_DIFF)
+				zero_v3(light.diffuse);
+			if (la->mode & LA_NO_SPEC)
+				zero_v3(light.specular);
+			if (light.type == GPU_LIGHT_SPOT)
+				light.spot_cutoff = min_ff(light.spot_cutoff, 90.0f);
+			if (count < GPU_MATERIAL_NUM_SHADOW_LAMPS)
+				r_shadowlamps[count] = GPU_lamp_from_blender(scene, base->object, NULL);
 		}
 
 		GPU_basic_shader_light_set(count, &light);
