@@ -2656,8 +2656,38 @@ static char *ui_layer_name_tooltip_func(bContext *C, void *argN, const char *tip
 	return BLI_sprintfN("%s %d\n%s", IFACE_("Layer"), layer + 1, tip);
 }
 
+/* Logic state names shown in the tooltip of the State actuator grid. */
+typedef struct StateNameTooltipArg {
+	Object *ob;
+	int state;
+} StateNameTooltipArg;
+
+static char *ui_state_name_tooltip_func(bContext *UNUSED(C), void *argN, const char *tip)
+{
+	StateNameTooltipArg *arg = argN;
+	const char *name = sca_state_name_get(arg->ob, arg->state);
+
+	if (tip == NULL) {
+		tip = "";
+	}
+
+	if (name && name[0]) {
+		return BLI_sprintfN("%s %d: %s\n%s", IFACE_("State"), arg->state + 1, name, tip);
+	}
+	return BLI_sprintfN("%s %d\n%s", IFACE_("State"), arg->state + 1, tip);
+}
+
 static void ui_layer_name_tooltip_set(uiBut *but, PointerRNA *ptr, int layer)
 {
+	if (layer < 30 && STREQ(RNA_struct_identifier(ptr->type), "StateActuator") && ptr->id.data &&
+	    GS(((ID *)ptr->id.data)->name) == ID_OB)
+	{
+		StateNameTooltipArg *sarg = MEM_mallocN(sizeof(*sarg), __func__);
+		sarg->ob = ptr->id.data;
+		sarg->state = layer;
+		UI_but_func_tooltip_set(but, ui_state_name_tooltip_func, sarg);
+		return;
+	}
 	if (layer >= 20 || !(RNA_struct_is_a(ptr->type, &RNA_Scene) || RNA_struct_is_a(ptr->type, &RNA_SpaceView3D))) {
 		return;
 	}

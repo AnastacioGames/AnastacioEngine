@@ -805,6 +805,14 @@ static uiBlock *controller_state_mask_menu(bContext *C, ARegion *ar, void *arg_c
 	uiBlock *block;
 	uiBut *but;
 	bController *cont = arg_cont;
+	Object *ob;
+
+	/* owner of the controller, for the state names in the tooltips */
+	for (ob = CTX_data_main(C)->object.first; ob; ob = ob->id.next) {
+		if (BLI_findindex(&ob->controllers, cont) != -1) {
+			break;
+		}
+	}
 
 	short yco = 12, xco = 0, stbit, offset;
 
@@ -816,11 +824,11 @@ static uiBlock *controller_state_mask_menu(bContext *C, ARegion *ar, void *arg_c
 	for (offset=0; offset<15; offset += 5) {
 		UI_block_align_begin(block);
 		for (stbit=0; stbit<5; stbit++) {
-			but = uiDefButBitI(block, UI_BTYPE_TOGGLE, (1<<(stbit+offset)), (stbit+offset), "",	(short)(xco+12*stbit+13*offset), yco, 12, 12, (int *)&(cont->state_mask), 0, 0, 0, 0, "");
+			but = uiDefButBitI(block, UI_BTYPE_TOGGLE, (1<<(stbit+offset)), (stbit+offset), "",	(short)(xco+12*stbit+13*offset), yco, 12, 12, (int *)&(cont->state_mask), 0, 0, 0, 0, ob ? sca_state_name_get(ob, stbit+offset) : "");
 			UI_but_func_set(but, check_controller_state_mask, but, &(cont->state_mask));
 		}
 		for (stbit=0; stbit<5; stbit++) {
-			but = uiDefButBitI(block, UI_BTYPE_TOGGLE, (1<<(stbit+offset+15)), (stbit+offset+15), "",	(short)(xco+12*stbit+13*offset), yco-12, 12, 12, (int *)&(cont->state_mask), 0, 0, 0, 0, "");
+			but = uiDefButBitI(block, UI_BTYPE_TOGGLE, (1<<(stbit+offset+15)), (stbit+offset+15), "",	(short)(xco+12*stbit+13*offset), yco-12, 12, 12, (int *)&(cont->state_mask), 0, 0, 0, 0, ob ? sca_state_name_get(ob, stbit+offset+15) : "");
 			UI_but_func_set(but, check_controller_state_mask, but, &(cont->state_mask));
 		}
 	}
