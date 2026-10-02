@@ -3744,8 +3744,12 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 	else {
 		GPUNodeLink *outlink;
 		if (new_shading_nodes) {
-			/* create simple diffuse material instead of nodes */
-			outlink = gpu_material_diffuse_bsdf(mat, ma);
+			/* create simple diffuse material instead of nodes: same light loop as the Diffuse BSDF
+			 * node (scene lights with shadow maps, World color as ambient) */
+			static float roughness = 0.0f;
+			GPU_link(mat, "node_bsdf_diffuse_ambient",
+			         GPU_uniform(&ma->r), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+			         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat), &outlink);
 		}
 		else {
 			/* create blender material */

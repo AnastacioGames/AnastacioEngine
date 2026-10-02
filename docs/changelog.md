@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Game PBR: sombra em materiais sem nós
+
+- Com Shading Nodes, material sem nós usava `node_bsdf_diffuse` (ambiente fixo 0,2, luzes sem sombra): chão e
+  objetos simples nunca recebiam sombra. `GPU_material_from_blender` agora liga `node_bsdf_diffuse_ambient`, o
+  mesmo do nó Diffuse BSDF (luzes da cena com shadow map, cor do World como ambiente).
+- Lembrete: no Game a sombra do Sun ainda exige `Ray Shadow` na lâmpada (opção do BI, escondida com Cycles ativo).
+- Validado pelo usuário em `node_material_shadow_test.range`.
+
 ## 2026-10-01 - Game PBR: Color Management (Filmic, exposição, gamma) na saída do material
 
 - Com Scene > Game > Shading Nodes, a saída dos materiais de mesh e do World passa por
