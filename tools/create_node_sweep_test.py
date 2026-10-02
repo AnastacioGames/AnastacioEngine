@@ -26,7 +26,7 @@ scene.game_settings.resolution_x = 1280
 scene.game_settings.resolution_y = 720
 scene.game_settings.use_shading_nodes = True
 scene.view_settings.view_transform = 'Filmic'
-scene.view_settings.exposure = 0.3
+scene.view_settings.exposure = 0.0
 
 world = bpy.data.worlds.new("Sweep World")
 world.horizon_color = (0.4, 0.45, 0.5)
@@ -34,6 +34,7 @@ world.use_nodes = True
 wt = world.node_tree
 sky = wt.nodes.new("ShaderNodeTexSky")
 sky.sky_type = 'PREETHAM'
+sky.sun_direction = (0.3, 0.8, 0.5)  # ~30 deg up, in front of the camera: blue sky, not the pale zenith default
 wt.links.new(sky.outputs["Color"], wt.nodes["Background"].inputs["Color"])
 scene.world = world
 
@@ -99,8 +100,9 @@ probe.name = "Probe"
 bpy.ops.object.game_property_new(type='FLOAT', name="probe")
 probe.game.properties["probe"].value = 12.0
 
-bpy.ops.object.camera_add(location=(0, -16, 9), rotation=(1.15, 0, 0))
+bpy.ops.object.camera_add(location=(0, -18, 8), rotation=(1.4, 0, 0))
 cam = bpy.context.object
+cam.data.lens = 18  # wide: all 90 spheres plus the sky horizon
 scene.camera = cam
 
 if autoquit:
