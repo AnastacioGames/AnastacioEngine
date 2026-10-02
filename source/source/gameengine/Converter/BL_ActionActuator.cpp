@@ -35,6 +35,7 @@
 #include "BL_ArmatureObject.h"
 #include "BL_SkinDeformer.h"
 #include "BL_ActionManager.h"
+#include "BL_ActionData.h"
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
 #include <string>
@@ -334,7 +335,7 @@ bool BL_ActionActuator::Play(KX_GameObject *obj, float start, float end, short m
 		for (KX_GameObject *child : obj->GetChildrenRecursive()) {
 			Object *blendobj = child->GetBlenderObject();
 			if (blendobj && blendobj->adt && blendobj->adt->action) {
-				child->PlayAction(blendobj->adt->action->id.name + 2, start, end, m_layer, m_priority, m_blendin, mode,
+				child->PlayAction(BL_ActionData::LookupKey(blendobj->adt->action), start, end, m_layer, m_priority, m_blendin, mode,
 				                  m_layer_weight, m_ipo_flags & ~BL_Action::ACT_IPOFLAG_CHILD, 1.0f, blendmode);
 			}
 		}

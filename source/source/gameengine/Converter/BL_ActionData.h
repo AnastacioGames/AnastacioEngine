@@ -25,6 +25,10 @@ public:
 	std::string GetName() const;
 	bAction *GetAction() const;
 
+	/** Name under which actuators look up \a action. A linked action gets the library name
+	 * appended, so it never hides (or is hidden by) a local action with the same name. */
+	static std::string LookupKey(const bAction *action);
+
 	BL_ScalarInterpolator *GetScalarInterpolator(const std::string& rna_path, int array_index);
 };
 

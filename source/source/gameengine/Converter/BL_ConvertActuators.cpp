@@ -109,6 +109,7 @@
 #include "BL_ArmatureActuator.h"
 #include "RNA_access.h"
 #include "BL_Action.h"
+#include "BL_ActionData.h"
 /* end of blender include block */
 
 #include "BL_BlenderDataConversion.h"
@@ -234,7 +235,7 @@ void BL_ConvertActuators(const char *maggiename,
 					ipo_flags |= BL_Action::ACT_IPOFLAG_CHILD;
 				}
 
-				const std::string actionName = (actact->act) ? actact->act->id.name + 2 : "";
+				const std::string actionName = (actact->act) ? BL_ActionData::LookupKey(actact->act) : "";
 
 				BL_ActionActuator *tmpbaseact = new BL_ActionActuator(
 					gameobj,

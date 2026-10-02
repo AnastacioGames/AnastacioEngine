@@ -3,6 +3,7 @@
 extern "C" {
 #  include "DNA_action_types.h"
 #  include "DNA_anim_types.h"
+#  include "DNA_ID.h"
 #  include "BKE_fcurve.h"
 }
 
@@ -24,6 +25,15 @@ std::string BL_ActionData::GetName() const
 bAction *BL_ActionData::GetAction() const
 {
 	return m_action;
+}
+
+std::string BL_ActionData::LookupKey(const bAction *action)
+{
+	const std::string name = action->id.name + 2;
+	if (!action->id.lib) {
+		return name;
+	}
+	return name + " [" + (action->id.lib->id.name + 2) + "]";
 }
 
 BL_ScalarInterpolator *BL_ActionData::GetScalarInterpolator(const std::string& rna_path, int array_index)

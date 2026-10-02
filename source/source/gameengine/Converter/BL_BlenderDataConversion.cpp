@@ -941,7 +941,19 @@ BL_ActionData *BL_ConvertAction(bAction *action, KX_Scene *scene, BL_SceneConver
 {
 	BL_ActionData *data = new BL_ActionData(action);
 	converter.RegisterActionData(data);
-	scene->GetLogicManager()->RegisterActionName(action->id.name + 2, data);
+
+	/* Actuators look actions up by name, and 2.4x files often have a local and a linked
+	 * "CDA:ObIpo". Linked actions are also registered with their library key, which the
+	 * action actuator uses; the plain name keeps pointing at the local action. */
+	SCA_LogicManager *logicmgr = scene->GetLogicManager();
+	const std::string name = action->id.name + 2;
+	if (action->id.lib) {
+		logicmgr->RegisterActionName(BL_ActionData::LookupKey(action), data);
+	}
+	BL_ActionData *previous = static_cast<BL_ActionData *>(logicmgr->GetActionByName(name));
+	if (!(previous && action->id.lib && !previous->GetAction()->id.lib)) {
+		logicmgr->RegisterActionName(name, data);
+	}
 
 	return data;
 }
