@@ -25,6 +25,11 @@
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
 
+extern "C" {
+#  include "BKE_node.h"
+}
+#include "BKE_scene.h"
+
 #include "GPU_material.h"
 #include "GPU_shader.h"
 #include "GPU_extensions.h"
@@ -44,7 +49,28 @@
 #include "KX_TextureRendererManager.h"
 
 #include <cstring>
+#include <set>
+#include <string>
 #include <vector>
+
+/* One warning per material when its node tree uses nodes the game does not support
+ * (same rule as the alert badge of the node editor). Converted once, not per frame. */
+static void warn_unsupported_nodes(Scene *scene, Material *ma)
+{
+	static std::set<std::string> warned;
+	if (!ma || !ma->use_nodes || !ma->nodetree) {
+		return;
+	}
+	char names[512];
+	const bool use_new = BKE_scene_use_new_shading_nodes(scene);
+	if (BKE_node_tree_shader_unsupported_in_game(ma->nodetree, use_new, names, sizeof(names)) == 0) {
+		return;
+	}
+	if (warned.insert(ma->id.name + 2).second) {
+		CM_Warning("material \"" << (ma->id.name + 2) << "\": nodes not supported in the game, output ignored or zero: "
+		           << names);
+	}
+}
 
 BL_BlenderShader::BL_BlenderShader(KX_Scene *scene, struct Material *ma,
 		CM_UpdateServer<RAS_IMaterial> *materialUpdateServer)
@@ -56,6 +82,7 @@ BL_BlenderShader::BL_BlenderShader(KX_Scene *scene, struct Material *ma,
 	m_materialUpdateServer(materialUpdateServer),
 	m_skinningMismatchWarned(false)
 {
+	warn_unsupported_nodes(m_blenderScene, ma);
 	ReloadMaterial();
 }
 

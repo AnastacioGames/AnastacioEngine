@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Nós de material: varredura, crash do Particle Info e aviso de nó sem suporte
+
+- `tools/create_node_sweep_test.py`: cena com um material por tipo de nó de shader (90), Sun/Point/Spot com
+  sombra, World com Sky, Filmic e reflection probe; `--autoquit` fecha após 90 quadros, `--span=lo:hi` bisecciona.
+  Rodada no `RangeRuntime`: sem crash nem erro de shader em `%TEMP%ange_runtime.log.txt`.
+- Particle Info derrubava o jogo: o jogo passa `pi = NULL` a `GPU_material_bind_uniforms` (`gpu_material.c`),
+  que lia `pi->scalprops`. Sem partícula, os uniforms recebem zero.
+- `BKE_node_shader_unsupported_in_game` / `BKE_node_tree_shader_unsupported_in_game` (`node.c`): regra única de
+  "nó sem suporte no jogo", usada pelo selo do editor e por um `CM_Warning` por material na conversão
+  (`BL_BlenderShader`; uma vez por material, inclui node groups, ignora nós mutados). Aproximados (`~Game`) não
+  avisam. Custo só na carga.
+- Console do jogo: caixas Errors/Warnings/Messages/Debug para filtrar por nível.
+- Crash no player Windows mostra uma caixa com o caminho do log (`RANGE_NO_CRASH_DIALOG` desliga, para testes
+  automáticos).
+- Visto e não tratado: `RangeEngine -b` dá segfault ao sair depois de salvar (o arquivo sai certo).
+
 ## 2026-10-01 - Porte YoFrankie 2.49: texto bitmap por réplica e Action actuator com ação linkada
 
 - Texto bitmap 2.4x fica no `KX_Mesh`, que as réplicas compartilham: placas do seletor de fases mostravam o mesmo

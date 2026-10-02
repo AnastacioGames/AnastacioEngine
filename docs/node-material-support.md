@@ -40,6 +40,10 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 Sem código GLSL; a saída é ignorada ou zero:
 Tangent, Wireframe, Hair Info, Holdout, IES Texture,
 Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, Principled Volume.
+Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
+Ao carregar a cena, o jogo escreve um warning por material com esses nós
+(`material "X": nodes not supported in the game ...`), visível no console do jogo e no log.
+Teste de regressão: `tools/create_node_sweep_test.py` (um material por tipo de nó).
 
 ## Nós completos no Game PBR
 

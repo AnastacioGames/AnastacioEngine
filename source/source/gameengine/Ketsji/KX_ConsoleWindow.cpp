@@ -67,6 +67,14 @@ void KX_ConsoleWindow::Render()
   ImGui::SameLine();
   ImGui::SetNextItemWidth(200.0f);
   ImGui::InputText("Filter", m_filter, sizeof(m_filter));
+  ImGui::SameLine();
+  ImGui::Checkbox("Errors", &m_showLevel[(int)CM_LogLevel::ERROR_]);
+  ImGui::SameLine();
+  ImGui::Checkbox("Warnings", &m_showLevel[(int)CM_LogLevel::WARNING]);
+  ImGui::SameLine();
+  ImGui::Checkbox("Messages", &m_showLevel[(int)CM_LogLevel::MESSAGE]);
+  ImGui::SameLine();
+  ImGui::Checkbox("Debug", &m_showLevel[(int)CM_LogLevel::DEBUG]);
 
   ImGui::Separator();
 
@@ -74,6 +82,10 @@ void KX_ConsoleWindow::Render()
 
   std::vector<CM_LogLine> lines = CM_LogBuffer::Get().GetLines();
   for (const CM_LogLine& line : lines) {
+    const int level = (int)line.level;
+    if (level >= 0 && level < 4 && !m_showLevel[level]) {
+      continue;
+    }
     if (m_filter[0] != '\0' && line.text.find(m_filter) == std::string::npos) {
       continue;
     }

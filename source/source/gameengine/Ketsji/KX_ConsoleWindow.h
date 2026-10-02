@@ -33,6 +33,8 @@ class KX_ConsoleWindow
 {
  private:
   bool m_autoScroll;
+  /* Visible levels, indexed by CM_LogLevel. */
+  bool m_showLevel[4];
   char m_filter[128];
 
  public:

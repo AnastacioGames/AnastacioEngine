@@ -899,6 +899,11 @@ void GPU_material_bind_uniforms(
 		if (material->builtins & GPU_AUTO_BUMPSCALE) {
 			GPU_shader_uniform_vector(shader, material->obautobumpscaleloc, 1, 1, &autobumpscale);
 		}
+		/* The game engine has no particle duplis and passes no info: bind zeros. */
+		static GPUParticleInfo no_particle_info = {{0.0f}};
+		if (pi == NULL) {
+			pi = &no_particle_info;
+		}
 		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS) {
 			GPU_shader_uniform_vector(shader, material->partscalarpropsloc, 4, 1, pi->scalprops);
 		}

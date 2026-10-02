@@ -3849,3 +3849,87 @@ bool BKE_node_tree_iter_step(struct NodeTreeIterStore *ntreeiter,
 
 	return true;
 }
+
+/* ************** Game Engine support of shader nodes *************** */
+
+bool BKE_node_shader_unsupported_in_game(const bNode *node, bool use_new)
+{
+	short compat;
+
+	if (!node->typeinfo || node->type == NODE_GROUP || node->type == NODE_FRAME || node->type == NODE_REROUTE ||
+	    node->type == NODE_GROUP_INPUT || node->type == NODE_GROUP_OUTPUT)
+	{
+		return false;
+	}
+
+	switch (node->type) {
+		case SH_NODE_SPRITES_ANIMATION:
+		case SH_NODE_OBJECT:
+		case SH_NODE_TIME:
+		case SH_NODE_PARALLAX:
+			return false;
+		case SH_NODE_OUTPUT_ATTACHMENT:
+			return use_new;
+	}
+
+	if (use_new) {
+		switch (node->type) {
+			case SH_NODE_TANGENT:
+			case SH_NODE_WIREFRAME:
+			case SH_NODE_HAIR_INFO:
+			case SH_NODE_HOLDOUT:
+			case SH_NODE_TEX_IES:
+			case SH_NODE_TEX_POINTDENSITY:
+			case SH_NODE_SCRIPT:
+			case SH_NODE_BSDF_HAIR_PRINCIPLED:
+			case SH_NODE_VOLUME_ABSORPTION:
+			case SH_NODE_VOLUME_SCATTER:
+			case SH_NODE_VOLUME_PRINCIPLED:
+				return true;
+		}
+	}
+
+	compat = node->typeinfo->compatibility;
+	if (compat != NODE_OLD_SHADING && compat != NODE_NEW_SHADING) {
+		return false;
+	}
+	return !(compat & (use_new ? NODE_NEW_SHADING : NODE_OLD_SHADING));
+}
+
+static int node_tree_shader_unsupported_rec(bNodeTree *ntree, bool use_new, char *buf, int maxlen, int depth)
+{
+	int found = 0;
+
+	if (!ntree || depth > 16) {
+		return 0;
+	}
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->type == NODE_GROUP) {
+			found += node_tree_shader_unsupported_rec((bNodeTree *)node->id, use_new, buf, maxlen, depth + 1);
+		}
+		else if (!(node->flag & NODE_MUTED) && BKE_node_shader_unsupported_in_game(node, use_new)) {
+			const char *name = node->typeinfo->ui_name;
+			const int len = (int)strlen(buf);
+			/* List each node type once ("Tangent, Wireframe"). */
+			bool listed = false;
+			for (const char *p = strstr(buf, name); p; p = strstr(p + 1, name)) {
+				const char end = p[strlen(name)];
+				if ((p == buf || p[-1] == ' ') && (end == ',' || end == '\0')) {
+					listed = true;
+					break;
+				}
+			}
+			if (!listed) {
+				BLI_snprintf(buf + len, maxlen - len, "%s%s", len ? ", " : "", name);
+				found++;
+			}
+		}
+	}
+	return found;
+}
+
+int BKE_node_tree_shader_unsupported_in_game(bNodeTree *ntree, bool use_new, char *buf, int maxlen)
+{
+	buf[0] = '\0';
+	return node_tree_shader_unsupported_rec(ntree, use_new, buf, maxlen, 0);
+}

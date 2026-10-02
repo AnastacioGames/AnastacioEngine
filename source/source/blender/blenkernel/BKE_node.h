@@ -809,6 +809,14 @@ void            ntreeShaderEndExecTree(struct bNodeTreeExec *exec);
 bool            ntreeShaderExecTree(struct bNodeTree *ntree, struct ShadeInput *shi, struct ShadeResult *shr);
 void            ntreeShaderGetTexcoMode(struct bNodeTree *ntree, int osa, short *texco, int *mode);
 
+/* Game Engine support of a shader node. use_new: Scene > Game > Shading Nodes (PBR).
+ * True when the game ignores the node or outputs zero for it. Shared by the editor badge
+ * and the game material warning; table in docs/node-material-support.md. */
+bool            BKE_node_shader_unsupported_in_game(const struct bNode *node, bool use_new);
+/* Appends the names of unsupported nodes (also inside node groups, each name once) to buf,
+ * separated by ", ". Returns the number of names found. */
+int             BKE_node_tree_shader_unsupported_in_game(struct bNodeTree *ntree, bool use_new, char *buf, int maxlen);
+
 /* switch material render loop */
 extern void (*node_shader_lamp_loop)(struct ShadeInput *, struct ShadeResult *);
 void            set_node_shader_lamp_loop(void (*lamp_loop_func)(struct ShadeInput *, struct ShadeResult *));

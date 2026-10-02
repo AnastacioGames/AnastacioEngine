@@ -932,7 +932,8 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 			case SH_NODE_VOLUME_PRINCIPLED:
 				*r_badge = "Cycles";
 				*r_tip = "Not supported in Game: no GLSL code, output is ignored or zero";
-				return true;
+				/* Same rule as the warning printed by the game (BKE_node). */
+				return BKE_node_shader_unsupported_in_game(node, true);
 		}
 	}
 

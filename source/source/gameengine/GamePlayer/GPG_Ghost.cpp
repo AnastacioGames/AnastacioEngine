@@ -812,6 +812,19 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 
 	fflush(stderr);
 
+	/* The console is hidden, so tell the user where the log is. Set RANGE_NO_CRASH_DIALOG
+	 * to skip the dialog in automated runs. */
+	if (!getenv("RANGE_NO_CRASH_DIALOG")) {
+		char logPath[FILE_MAX];
+		char text[FILE_MAX + 128];
+		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
+		BLI_snprintf(text, sizeof(text),
+		             "RangeRuntime crashed.\n\nLog: %s\n"
+		             "Backtrace: <file>.crash.txt in the same folder.",
+		             logPath);
+		MessageBox(NULL, text, "RangeRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
+	}
+
 	/* If this is a stack overflow then we can't walk the stack, so just show
 	 * where the error happened */
 	if (EXCEPTION_STACK_OVERFLOW != ExceptionInfo->ExceptionRecord->ExceptionCode) {
