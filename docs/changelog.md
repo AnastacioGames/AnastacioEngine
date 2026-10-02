@@ -34,8 +34,9 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   roughness e a rotação do Cycles; sem Tangent ligado usa a tangente radial em Z. Reflexo do World isotrópico, como
   o Glossy. Selo `~Game` atualizado; o tooltip do Ambient Occlusion foi corrigido (dizia "AO sempre 1").
 - Wireframe continua sem suporte: precisa de coordenadas baricêntricas, que o fragment shader não tem.
-- `tools/create_node_sweep_test.py` no `RangeRuntime`: sem erro de shader, Tangent fora dos avisos. Falta a
-  validação visual do usuário.
+- `tools/create_node_sweep_test.py` no `RangeRuntime`: sem erro de shader, Tangent fora dos avisos.
+- `tools/create_node_phases_test.py`: cena das Fases 3 (luzes), 4 (Glass, Refraction, AO, Blackbody, Wavelength,
+  espelho do Sky) e 5 (Filmic), mais o Anisotropic. Validada visualmente pelo usuário, inclusive com o céu Atmospheric.
 
 ## 2026-10-02 - Lens Flare aparecia do lado oposto ao sol
 
