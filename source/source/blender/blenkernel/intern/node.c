@@ -3880,7 +3880,6 @@ bool BKE_node_shader_unsupported_in_game(const bNode *node, bool use_new)
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:
-			case SH_NODE_BSDF_HAIR_PRINCIPLED:
 			case SH_NODE_VOLUME_ABSORPTION:
 			case SH_NODE_VOLUME_SCATTER:
 			case SH_NODE_VOLUME_PRINCIPLED:

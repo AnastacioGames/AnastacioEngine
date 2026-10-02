@@ -4,7 +4,9 @@ Run with:  RangeEngine -b --python tools/create_hair_bsdf_test.py -- <output.ran
 Spheres with the Hair BSDF; with the Tangent unlinked the strands run around the object Z axis, so the
 highlight is a vertical band (across the strands) that moves with RoughnessU/Offset. From left: Reflection RoughnessU 0.1,
 Reflection RoughnessU 0.3, Reflection Offset 0.2 (band shifted), Transmission (lit by the back lamp: a glow
-on the rim). A sun lights from the front-left and a point lamp sits behind the spheres.
+on the rim). Upper row, Principled Hair BSDF: Color (brown), Melanin 0.2 (blonde), Melanin 0.6 + Redness 1 (red),
+Absorption Coefficient (0.1, 1, 1) (red tint), and Color with Coat 1 (dimmer white highlight).
+A sun lights from the front-left and a point lamp sits behind the spheres.
 """
 import bpy
 import sys
@@ -50,12 +52,39 @@ for i, m in enumerate(specs):
     bpy.ops.object.shade_smooth()
     bpy.context.object.data.materials.append(m)
 
+# upper row: Principled Hair BSDF
+def principled_hair(name, parametrization, **inputs):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    t = m.node_tree
+    t.nodes.clear()
+    out = t.nodes.new("ShaderNodeOutputMaterial")
+    n = t.nodes.new("ShaderNodeBsdfHairPrincipled")
+    n.parametrization = parametrization
+    for k, v in inputs.items():
+        n.inputs[k].default_value = v
+    t.links.new(n.outputs[0], out.inputs["Surface"])
+    return m
+
+
+principled = [
+    principled_hair("PHairColor", 'COLOR', Color=(0.4, 0.15, 0.05, 1.0)),
+    principled_hair("PHairBlonde", 'MELANIN', Melanin=0.2, **{"Melanin Redness": 0.3}),
+    principled_hair("PHairRed", 'MELANIN', Melanin=0.6, **{"Melanin Redness": 1.0}),
+    principled_hair("PHairAbsorption", 'ABSORPTION', **{"Absorption Coefficient": (0.1, 1.0, 1.0)}),
+    principled_hair("PHairCoat", 'COLOR', Color=(0.4, 0.15, 0.05, 1.0), Coat=1.0),
+]
+for i, m in enumerate(principled):
+    bpy.ops.mesh.primitive_uv_sphere_add(location=((i - 2) * 2.4, 0, 3.6), size=0.9, segments=48, ring_count=24)
+    bpy.ops.object.shade_smooth()
+    bpy.context.object.data.materials.append(m)
+
 bpy.ops.object.lamp_add(type='SUN', location=(-4, -6, 6), rotation=(0.9, 0, -0.6))
 bpy.ops.object.lamp_add(type='POINT', location=(3.9, 2.5, 1.3))
 bpy.context.object.data.energy = 6.0
 bpy.context.object.data.distance = 6.0
 
-bpy.ops.object.camera_add(location=(0, -14, 1.6), rotation=(1.53, 0, 0))
+bpy.ops.object.camera_add(location=(0, -15, 2.4), rotation=(1.53, 0, 0))
 scene.camera = bpy.context.object
 
 bpy.ops.wm.save_as_mainfile(filepath=output)

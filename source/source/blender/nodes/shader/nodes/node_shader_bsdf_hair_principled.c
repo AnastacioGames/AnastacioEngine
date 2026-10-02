@@ -108,6 +108,26 @@ static void node_shader_update_hair_principled(bNodeTree *UNUSED(ntree), bNode *
 	}
 }
 
+static int node_shader_gpu_bsdf_hair_principled(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	/* No Tangent input: strands radial around the object Z axis, like the Hair and Anisotropic BSDF. */
+	GPUNodeLink *tangent;
+	float axis = (float)SHD_TANGENT_AXIS_Z;
+	GPU_link(mat, "node_tangent", GPU_material_builtin(mat, GPU_VIEW_NORMAL), GPU_attribute(CD_ORCO, ""),
+	         GPU_uniform(&axis), GPU_material_builtin(mat, GPU_OBJECT_MATRIX),
+	         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), &tangent);
+	GPU_link(mat, "direction_transform_m4v3", tangent, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &tangent);
+
+	float parametrization = (float)node->custom1;
+	float rough = 1.0f;
+	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
+	node_shader_gpu_world_env(mat, GPU_uniform(&rough), &env_mirror, &env_diffuse, &env_flag);
+
+	return GPU_stack_link(mat, "node_bsdf_hair_principled", in, out, tangent, GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_uniform(&parametrization),
+	                      GPU_material_world_color(mat), env_diffuse, env_flag);
+}
+
 /* node type definition */
 void register_node_type_sh_bsdf_hair_principled(void)
 {
@@ -120,6 +140,7 @@ void register_node_type_sh_bsdf_hair_principled(void)
 	node_type_init(&ntype, node_shader_init_hair_principled);
 	node_type_storage(&ntype, "", NULL, NULL);
 	node_type_update(&ntype, node_shader_update_hair_principled, NULL);
+	node_type_gpu(&ntype, node_shader_gpu_bsdf_hair_principled);
 
 	nodeRegisterType(&ntype);
 }

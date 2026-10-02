@@ -876,11 +876,11 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				return false;
 			case SH_NODE_BSDF_GLASS:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: fresnel mix of World reflection and blurred World as transmission, no real refraction";
+				*r_tip = "Approximated in Game: fresnel mix of World reflection and transmission; with Blend Mode Alpha Blend refracts the scene behind (screen copy), otherwise the blurred World";
 				return false;
 			case SH_NODE_BSDF_REFRACTION:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: blurred World as transmitted light, no real refraction";
+				*r_tip = "Approximated in Game: with Blend Mode Alpha Blend refracts the scene behind (screen copy), otherwise the blurred World";
 				return false;
 			case SH_NODE_BSDF_TRANSLUCENT:
 				*r_badge = "~Game";
@@ -898,9 +898,13 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: anisotropic GGX highlight from scene lights, isotropic World reflection";
 				return false;
+			case SH_NODE_BSDF_HAIR_PRINCIPLED:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: R, TT and TRT strand lobes from scene lights (radial around object Z); Random inputs ignored";
+				return false;
 			case SH_NODE_BSDF_HAIR:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: outputs the flat color, no lighting";
+				*r_tip = "Approximated in Game: strand highlight from scene lights along the tangent (radial around object Z if unlinked), Transmission as backlight at the silhouette";
 				return false;
 			case SH_NODE_AMBIENT_OCCLUSION:
 				*r_badge = "~Game";
@@ -920,23 +924,12 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				return false;
 			case SH_NODE_LIGHT_FALLOFF:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: all outputs return Strength";
+				*r_tip = "Approximated in Game: distance to the camera, as a camera ray in Cycles";
 				return false;
-			case SH_NODE_TEX_SKY:
-			{
-				NodeTexSky *tex = node->storage;
-				if (tex && tex->sky_model == SHD_SKY_NEW) {
-					*r_badge = "~Game";
-					*r_tip = "Approximated in Game: Hosek / Wilkie falls back to Preetham";
-					return false;
-				}
-				break;
-			}
 			case SH_NODE_HAIR_INFO:
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:
-			case SH_NODE_BSDF_HAIR_PRINCIPLED:
 			case SH_NODE_VOLUME_ABSORPTION:
 			case SH_NODE_VOLUME_SCATTER:
 			case SH_NODE_VOLUME_PRINCIPLED:

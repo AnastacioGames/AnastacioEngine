@@ -32,6 +32,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Velvet BSDF | brilho de borda em ângulo rasante (mais estreito com Sigma baixo) |
 | Subsurface Scattering | wrap lighting por canal (Radius × Scale): a luz passa do terminador; sem espalhamento real |
 | Hair BSDF | brilho das luzes ao longo do fio (Tangent; sem Tangent ligado, radial no Z do objeto, como o Anisotropic): Reflection com Offset e RoughnessU, Transmission como contraluz na silhueta; World como ambiente suave |
+| Principled Hair BSDF | absorção pelos modos do Cycles (Color, Melanin + Tint, Absorption); lobos R (branco, Coat apaga), TT (contraluz na silhueta) e TRT (segundo brilho colorido) mais um corpo difuso com a refletância do fio; Tangent radial no Z do objeto; entradas Random ignoradas |
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
@@ -41,7 +42,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 
 Sem código GLSL; a saída é ignorada ou zero:
 Hair Info, IES Texture,
-Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, Principled Volume.
+Point Density, Script, Volume Absorption, Volume Scatter, Principled Volume.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós
 (`material "X": nodes not supported in the game ...`), visível no console do jogo e no log.

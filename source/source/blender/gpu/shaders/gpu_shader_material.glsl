@@ -4749,6 +4749,95 @@ void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv
 	result = vec4(L * color.rgb, color.a);
 }
 
+/* Absorption from a reflectance color, as sigma_from_reflectance in Cycles (bsdf_principled_hair). */
+float hair_reflectance_scale(float x)
+{
+	return 5.969 - 0.215 * x + 2.532 * x * x - 10.73 * pow(x, 3.0) + 5.574 * pow(x, 4.0) + 0.245 * pow(x, 5.0);
+}
+
+vec3 hair_sigma_from_reflectance(vec3 c, float azimuthal_roughness)
+{
+	vec3 l = log(max(c, vec3(1e-4))) / hair_reflectance_scale(azimuthal_roughness);
+	return l * l;
+}
+
+/* Principled Hair BSDF on a mesh: absorption from the parametrization like Cycles, then three lobes with
+ * dielectric fresnel, the strand along the tangent (radial around the object Z axis):
+ * R (white highlight), TT (colored, light from behind near the silhouette), TRT (colored second highlight). */
+void node_bsdf_hair_principled(
+        vec4 color, float melanin, float melanin_redness, vec4 tint, vec3 absorption, float roughness,
+        float radial_roughness, float coat, float ior, float offset, float random_color, float random_roughness,
+        float random, vec3 tangent, vec3 N, vec3 I, float parametrization, vec3 ambient, vec4 env_diffuse,
+        float env_on, out vec4 result)
+{
+	float rr = clamp(radial_roughness, 0.0, 1.0);
+	vec3 sigma;
+	if (parametrization < 0.5) {
+		sigma = hair_sigma_from_reflectance(color.rgb, rr);
+	}
+	else if (parametrization < 1.5) {
+		float qty = -log(max(1.0 - clamp(melanin, 0.0, 1.0), 1e-4));
+		float red = clamp(melanin_redness, 0.0, 1.0);
+		sigma = qty * (1.0 - red) * vec3(0.506, 0.841, 1.653) + qty * red * vec3(0.343, 0.733, 1.924) +
+		        hair_sigma_from_reflectance(tint.rgb, rr);
+	}
+	else {
+		sigma = max(absorption, vec3(0.0));
+	}
+	vec3 A1 = exp(-2.0 * sigma); /* one pass through the strand */
+	/* overall reflectance, the inverse of sigma_from_reflectance: the Color itself in the Color mode */
+	vec3 albedo = exp(-hair_reflectance_scale(rr) * sqrt(sigma));
+
+	vec3 T = tangent - N * dot(N, tangent);
+	T = (dot(T, T) > 1e-8) ? normalize(T) : normalize(cross(N, abs(N.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+	vec3 V = scene_view_vector(I);
+
+	/* Cycles' longitudinal roughness mapping; TT is half as wide, TRT twice */
+	float r = clamp(roughness, 0.0, 1.0);
+	float w = max(0.726 * r + 0.812 * r * r + 3.7 * pow(r, 20.0), 0.02);
+	float s = max(0.626 * rr + 1.5 * rr * rr, 0.05);
+	float f = fresnel_dielectric_cos(abs(dot(N, V)), max(ior, 1.0001));
+	/* Coat (fur) dims the white R highlight */
+	float wR = f * (1.0 - clamp(coat, 0.0, 1.0) * 0.8);
+	vec3 wTT = (1.0 - f) * (1.0 - f) * A1;
+	vec3 wTRT = (1.0 - f) * (1.0 - f) * f * A1 * A1 * 4.0;
+	/* higher orders (TRRT+), approximated as a soft diffuse body with the hair reflectance */
+	vec3 wMS = 0.8 * (1.0 - f) * albedo;
+
+	/* the World lights the strand softly with the hair's own color */
+	vec3 L = ((env_on > 0.5) ? env_diffuse.rgb : ambient) * (wTRT + wMS);
+
+	float sinO = dot(T, V);
+	vec3 Vp = V - T * sinO;
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float sinI = dot(T, l);
+		vec3 lp = l - T * sinI;
+		float cosphi = (dot(lp, lp) > 1e-8 && dot(Vp, Vp) > 1e-8) ? dot(normalize(lp), normalize(Vp)) : 1.0;
+		float phi = acos(clamp(cosphi, -1.0, 1.0));
+		float h = sinI + sinO;
+		float NdotL = dot(N, l);
+
+		float front = smoothstep(0.0, 0.35, NdotL) * scene_light_visibility(i, I, N, max(NdotL, 0.0), atten);
+		/* TT only for light really coming from behind the strand, as seen from the camera */
+		float back = smoothstep(-0.6, 0.0, NdotL) * (1.0 - smoothstep(0.0, 0.5, NdotL)) *
+		             smoothstep(0.0, 0.4, -dot(l, V)) * atten;
+
+		float wide = 0.5 * cos(0.5 * phi);
+		vec3 lobes = vec3(wR * hair_gaussian(h - sin(2.0 * offset), w) * wide) +
+		             wTRT * hair_gaussian(h + sin(4.0 * offset), 2.0 * w) * wide +
+		             wMS * max(NdotL, 0.0);
+		L += SCENE_LIGHT(i).specular.rgb * (lobes * front +
+		     wTT * hair_gaussian(h + sin(offset), 0.5 * w) * hair_gaussian(M_PI - phi, s) * back);
+	}
+
+	result = vec4(L, 1.0);
+}
+
 void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,
                           vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, out vec4 result)
 {
