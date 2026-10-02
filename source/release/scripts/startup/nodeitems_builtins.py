@@ -161,6 +161,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeExtendedMaterial"),
         NodeItem("ShaderNodeParticleInfo"),
         NodeItem("ShaderNodeObjectInfo"),
+        NodeItem("ShaderNodeDamage"),
         NodeItem("NodeGroupInput", poll=group_input_output_item_poll),
     ]),
     ShaderOldNodeCategory("SH_OUTPUT", "Output", items=[
@@ -230,6 +231,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeBevel"),
         NodeItem("ShaderNodeAmbientOcclusion"),
         NodeItem("ShaderNodeObjectInfo"),
+        NodeItem("ShaderNodeDamage"),
         NodeItem("ShaderNodeHairInfo"),
         NodeItem("ShaderNodeParticleInfo"),
         NodeItem("ShaderNodeCameraData"),

@@ -6260,3 +6260,27 @@ void user_set_world(out vec3 hor, out vec3 zen, out vec3 nad){
 	zen = ZENITH_COLOR;
 	nad = GROUND_COLOR;
 }
+
+/* Damage node: impact hits of the object (game deformation), bound per object by
+ * GPU_material_bind_damage(). xyz = local hit point, w = local radius; strength 0..1. */
+uniform vec4 unfdamagehits[16];
+uniform float unfdamagestrength[16];
+uniform int unfdamagecount;
+
+void node_damage(float softness, vec3 I, mat4 viewinvmat, mat4 obinvmat, out float mask, out float strength)
+{
+	vec3 p = (obinvmat * (viewinvmat * vec4(I, 1.0))).xyz;
+	float edge = max(softness, 0.001);
+	mask = 0.0;
+	strength = 0.0;
+	for (int i = 0; i < 16; i++) {
+		if (i >= unfdamagecount) {
+			break;
+		}
+		vec4 hit = unfdamagehits[i];
+		float t = clamp(1.0 - distance(p, hit.xyz) / max(hit.w, 0.0001), 0.0, 1.0);
+		float w = smoothstep(0.0, edge, t);
+		mask = max(mask, w);
+		strength = max(strength, w * unfdamagestrength[i]);
+	}
+}

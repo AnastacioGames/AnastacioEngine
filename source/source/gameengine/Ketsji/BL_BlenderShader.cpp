@@ -45,6 +45,8 @@ extern "C" {
 #include "RAS_IMaterial.h"
 #include "CM_Message.h"
 
+#include "KX_DentDeformer.h"
+#include "KX_GameObject.h"
 #include "KX_Scene.h"
 #include "KX_TextureRendererManager.h"
 
@@ -298,6 +300,16 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 
 	GPU_material_bind_uniforms(m_gpuMat, (float (*)[4])mat, rasty->GetViewMatrix().Data(),
 			obcol, meshUser->GetLayer(), 1.0f, nullptr, objectInfo);
+
+	// Damage node: hits of the object's dent deformer, none for the others.
+	KX_GameObject *gameobj = static_cast<KX_GameObject *>(meshUser->GetClientObject());
+	KX_DentDeformer *dent = gameobj ? gameobj->GetDentDeformer(false) : nullptr;
+	if (dent) {
+		GPU_material_bind_damage(m_gpuMat, dent->GetHits(), dent->GetHitStrengths(), dent->GetHitCount());
+	}
+	else {
+		GPU_material_bind_damage(m_gpuMat, nullptr, nullptr, 0);
+	}
 }
 
 bool BL_BlenderShader::UseInstancing() const

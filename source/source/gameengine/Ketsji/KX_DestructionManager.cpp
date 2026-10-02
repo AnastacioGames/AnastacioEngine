@@ -32,6 +32,7 @@
 #include "DNA_object_types.h"
 
 #include <algorithm>
+#include <cmath>
 
 /// AddReplicaObject() counts the lifespan in 1/50 s ticks (see KX_Scene::AddReplicaObject).
 static const float LIFESPAN_TICKS_PER_SECOND = 50.0f;
@@ -85,6 +86,12 @@ static bool contains(const std::vector<KX_GameObject *>& list, KX_GameObject *ga
 }
 
 /// Blast impulse at a point, linear falloff to 0 at the radius.
+/// Damage mark strength 0..1 from the impulse past the dent threshold.
+static float hit_strength(float excess, float threshold)
+{
+	return (excess > 0.0f) ? 1.0f - std::exp(-excess / std::max(threshold, 1.0f)) : 0.0f;
+}
+
 static float impulse_at(const mt::vec3& position, const mt::vec3& center, float radius, float force)
 {
 	const float distance = (position - center).Length();
@@ -241,6 +248,7 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 	float strongest = -1.0f;
 	mt::vec3 origin = gameobj->NodeGetWorldPosition();
 	mt::vec3 normal = mt::zero3;
+	mt::vec3 hitter = mt::zero3;
 	for (unsigned int i = 0, num = collData->GetNumContacts(); i < num; ++i) {
 		const float impulse = collData->GetAppliedImpulse(i, first);
 		total += impulse;
@@ -268,16 +276,18 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 	}
 
 	if (dents && total >= gameobj->GetBlenderObject()->deform.dent_impulse) {
+		// Seen from the hitting object, which tells the sides of a flat mesh apart (see DentNow).
+		hitter = other ? other->NodeGetWorldPosition() : origin;
 		// One dent per object and frame, the strongest contact.
 		for (PendingDent& pending : m_pendingDents) {
 			if (pending.m_object == gameobj) {
 				if (total > pending.m_impulse) {
-					pending = {gameobj, origin, normal, total};
+					pending = {gameobj, origin, normal, hitter, total};
 				}
 				return;
 			}
 		}
-		m_pendingDents.push_back({gameobj, origin, normal, total});
+		m_pendingDents.push_back({gameobj, origin, normal, hitter, total});
 	}
 }
 
@@ -312,10 +322,13 @@ void KX_DestructionManager::Dented(KX_GameObject *gameobj, const mt::vec3& point
 	gameobj->RunDentCallbacks(point, impulse);
 }
 
-bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse)
+bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse,
+                                    const mt::vec3 *hitter)
 {
 	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
-	const float depth = std::min((impulse - settings.dent_impulse) * settings.depth, settings.max_depth);
+	const bool bend = (settings.mode == DEFORM_MODE_BEND);
+	const float excess = impulse - settings.dent_impulse;
+	const float depth = bend ? excess * settings.bend_angle : std::min(excess * settings.depth, settings.max_depth);
 	if (depth <= 0.0f) {
 		return false;
 	}
@@ -325,23 +338,34 @@ bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& poin
 		return false;
 	}
 
-	/* Into the object whatever the contact normal convention: towards the center of the mesh bounds,
-	 * the origin can be far from the mesh. */
+	/* Into the object whatever the sign of the direction. Two hints: towards the center of the mesh
+	 * bounds (the origin can be far from the mesh), and away from the hitting object (collisions).
+	 * The center fails on a flat mesh (a plane: it lies on the surface), the hitter fails when it is
+	 * wide and flat itself (a cube landing on a plane: the plane origin is beside the contact), so the
+	 * clearer one decides. */
 	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
 	mt::vec3 aabbMin, aabbMax;
 	deformer->GetBoundingBox()->GetAabb(aabbMin, aabbMax);
-	const mt::vec3 toCenter = trans * ((aabbMin + aabbMax) * 0.5f) - point;
+	const mt::vec3 toCenter = (trans * ((aabbMin + aabbMax) * 0.5f) - point).SafeNormalized(mt::zero3);
+	const mt::vec3 fromHitter = hitter ? (point - *hitter).SafeNormalized(mt::zero3) : mt::zero3;
 	mt::vec3 inward = direction.SafeNormalized(mt::zero3);
 	if (inward.LengthSquared() == 0.0f) {
-		inward = toCenter.SafeNormalized(-mt::axisZ3);
+		inward = (toCenter + fromHitter).SafeNormalized(-mt::axisZ3);
 	}
-	else if (mt::dot(inward, toCenter) < 0.0f) {
-		inward = -inward;
+	else {
+		const float byCenter = mt::dot(inward, toCenter);
+		const float byHitter = mt::dot(inward, fromHitter);
+		if ((std::abs(byHitter) > std::abs(byCenter) ? byHitter : byCenter) < 0.0f) {
+			inward = -inward;
+		}
 	}
 
-	if (!deformer->AddDent(trans, point, inward * depth, settings.radius, settings.max_depth)) {
+	const bool moved = bend ? deformer->AddBend(trans, point, inward, settings.bend_axis, depth, settings.bend_max_angle)
+	                        : deformer->AddDent(trans, point, inward * depth, settings.radius, settings.max_depth);
+	if (!moved) {
 		return false;
 	}
+	deformer->AddHit(trans, point, settings.radius, hit_strength(excess, settings.dent_impulse));
 
 	Dented(gameobj, point, impulse);
 	return true;
@@ -350,11 +374,28 @@ bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& poin
 void KX_DestructionManager::BlastDent(KX_GameObject *gameobj, const mt::vec3& center, float radius, float force)
 {
 	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	if (settings.mode == DEFORM_MODE_BEND) {
+		// Bent by the blast at the point of the object closest to the center, away from it.
+		const float impulse = impulse_at(gameobj->NodeGetWorldPosition(), center, radius, force);
+		if (impulse >= settings.dent_impulse) {
+			const mt::vec3 position = gameobj->NodeGetWorldPosition();
+			DentNow(gameobj, position, position - center, impulse);
+		}
+		return;
+	}
 	KX_DentDeformer *deformer = GetDentDeformer(gameobj);
-	if (deformer && deformer->AddBlastDent(gameobj->NodeGetWorldTransform(), center, radius, force,
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	if (deformer && deformer->AddBlastDent(trans, center, radius, force,
 	                                       settings.dent_impulse, settings.depth, settings.max_depth))
 	{
-		Dented(gameobj, center, impulse_at(gameobj->NodeGetWorldPosition(), center, radius, force));
+		const float impulse = impulse_at(gameobj->NodeGetWorldPosition(), center, radius, force);
+		// Damage mark on the bounds point closest to the blast.
+		mt::vec3 aabbMin, aabbMax;
+		deformer->GetBoundingBox()->GetAabb(aabbMin, aabbMax);
+		const mt::vec3 local = mt::vec3::Max(aabbMin, mt::vec3::Min(aabbMax, trans.Inverse() * center));
+		deformer->AddHit(trans, trans * local, settings.radius, hit_strength(impulse - settings.dent_impulse,
+		                                                                     settings.dent_impulse));
+		Dented(gameobj, center, impulse);
 	}
 }
 
@@ -784,7 +825,7 @@ void KX_DestructionManager::Update(float frameStep)
 				continue;
 			}
 			entry->m_dentCooldown = DENT_COOLDOWN;
-			DentNow(dent.m_object, dent.m_point, dent.m_direction, dent.m_impulse);
+			DentNow(dent.m_object, dent.m_point, dent.m_direction, dent.m_impulse, &dent.m_hitter);
 		}
 	}
 

@@ -3585,6 +3585,7 @@ static void registerShaderNodes(void)
 	register_node_type_sh_camera();
 	register_node_type_sh_object();
 	register_node_type_sh_time();
+	register_node_type_sh_damage();
 	register_node_type_sh_lamp();
 	register_node_type_sh_gamma();
 	register_node_type_sh_brightcontrast();
@@ -3866,6 +3867,7 @@ bool BKE_node_shader_unsupported_in_game(const bNode *node, bool use_new)
 		case SH_NODE_SPRITES_ANIMATION:
 		case SH_NODE_OBJECT:
 		case SH_NODE_TIME:
+		case SH_NODE_DAMAGE:
 		case SH_NODE_PARALLAX:
 			return false;
 		case SH_NODE_OUTPUT_ATTACHMENT:

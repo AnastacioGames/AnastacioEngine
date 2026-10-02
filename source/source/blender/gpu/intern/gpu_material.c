@@ -177,6 +177,8 @@ struct GPUMaterial {
 	int probecubeloc, probeinfoloc, probeposloc;
 	int probecube2loc, probeinfo2loc, probepos2loc;
 	int probeboxloc, probebox2loc;
+	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
+	int damagehitsloc, damagestrengthloc, damagecountloc;
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {
@@ -499,6 +501,9 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probepos2loc = GPU_shader_get_uniform(shader, "unfprobepos2");
 		material->probeboxloc = GPU_shader_get_uniform(shader, "unfprobebox");
 		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
+		material->damagehitsloc = GPU_shader_get_uniform(shader, "unfdamagehits");
+		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
+		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 			char name[64];
@@ -4807,6 +4812,25 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	if (material->probebox2loc != -1) {
 		GPU_shader_uniform_vector(shader, material->probebox2loc, 4, 1, ext);
 	}
+}
+
+/* Binds the object's damage hits for the Damage node: count hits of (local xyz, radius) and strength.
+ * Must run per object with the program bound; count 0 clears the mask. */
+void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count)
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->damagecountloc == -1) {
+		return;
+	}
+	if (count > 0) {
+		if (material->damagehitsloc != -1) {
+			GPU_shader_uniform_vector(shader, material->damagehitsloc, 4, count, (const float *)hits);
+		}
+		if (material->damagestrengthloc != -1) {
+			GPU_shader_uniform_vector(shader, material->damagestrengthloc, 1, count, strength);
+		}
+	}
+	GPU_shader_uniform_int(shader, material->damagecountloc, count);
 }
 
 /* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into

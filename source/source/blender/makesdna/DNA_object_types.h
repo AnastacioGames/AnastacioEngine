@@ -356,13 +356,22 @@ typedef struct RangeDeformSettings {
 	float depth;           /* dent depth (m) per N*s above dent_impulse */
 	float max_depth;       /* most a vertex moves away from its rest position */
 	int flags;             /* DEFORM_* */
-	int pad;
+	short mode;            /* DEFORM_MODE_* */
+	short bend_axis;       /* local long axis of a bending object: 0 X, 1 Y, 2 Z */
+	float bend_angle;      /* bend (radians) per N*s above dent_impulse */
+	float bend_max_angle;  /* most the object bends, all hits summed (radians) */
 } RangeDeformSettings;
 
 /* RangeDeformSettings.flags */
 enum {
 	DEFORM_ON_COLLISION    = 1 << 0,
 	DEFORM_UPDATE_PHYSICS  = 1 << 1,
+};
+
+/* RangeDeformSettings.mode */
+enum {
+	DEFORM_MODE_DENT = 0,
+	DEFORM_MODE_BEND = 1,
 };
 
 enum {

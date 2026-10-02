@@ -214,7 +214,7 @@ public:
 
 	virtual void RemoveConstraintById(int constraintid, bool free);
 
-	virtual float getAppliedImpulse(int constraintid);
+	virtual float GetAppliedImpulse(int constraintid) override;
 
 	virtual void CallbackTriggers();
 

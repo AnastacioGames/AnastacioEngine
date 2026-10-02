@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 
 /// Smooth falloff, 1 at the center and 0 at the radius with zero slope on both ends.
 static float falloff(float distance, float radius)
@@ -77,6 +78,8 @@ static void face_sums(RAS_DisplayArray *array, std::vector<mt::vec3>& sums)
 
 KX_DentDeformer::KX_DentDeformer(RAS_Mesh *mesh, RAS_BoundingBoxManager *boundingBoxManager)
 	:RAS_Deformer(mesh),
+	m_bendAngle(0.0f),
+	m_hitCount(0),
 	m_dented(false)
 {
 	InitializeDisplayArrays();
@@ -230,12 +233,155 @@ bool KX_DentDeformer::AddBlastDent(const mt::mat3x4& trans, const mt::vec3& cent
 	return moved;
 }
 
+/// Rodrigues rotation of v around the unit axis k.
+static mt::vec3 rotate(const mt::vec3& v, const mt::vec3& k, float angle)
+{
+	const float c = std::cos(angle);
+	const float s = std::sin(angle);
+	return v * c + mt::cross(k, v) * s + k * (mt::dot(k, v) * (1.0f - c));
+}
+
+bool KX_DentDeformer::AddBend(const mt::mat3x4& trans, const mt::vec3& point, const mt::vec3& direction, int axis,
+                              float angle, float maxAngle)
+{
+	if (m_restPositions.empty() || axis < 0 || axis > 2) {
+		return false;
+	}
+	const float step = std::min(angle, maxAngle - m_bendAngle);
+	if (step <= 1e-5f) {
+		return false;
+	}
+
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::vec3 invOrigin = invtrans * mt::zero3;
+	mt::vec3 along = mt::zero3;
+	along[axis] = 1.0f;
+
+	// Push across the long axis only.
+	mt::vec3 push = invtrans * direction - invOrigin;
+	push -= along * mt::dot(push, along);
+	push = push.SafeNormalized(mt::zero3);
+	if (push.LengthSquared() == 0.0f) {
+		return false;
+	}
+	// Turning around along x push tips the long axis towards push.
+	const mt::vec3 hinge = mt::cross(along, push).SafeNormalized(mt::zero3);
+
+	const mt::vec3 pivot = invtrans * point;
+	const float pivotHeight = pivot[axis];
+	float minHeight = FLT_MAX, maxHeight = -FLT_MAX;
+	for (const mt::vec3& rest : m_restPositions) {
+		minHeight = std::min(minHeight, rest[axis]);
+		maxHeight = std::max(maxHeight, rest[axis]);
+	}
+	// Short smooth zone so the fold does not crease the mesh.
+	const float blend = std::max((maxHeight - minHeight) * 0.08f, 1e-4f);
+
+	/* V fold at the hit: both ends stay put and the hit point sinks along push.
+	 * Each side turns by the angle that keeps its end in place, the two summing to step. */
+	const float upper = std::max(maxHeight - pivotHeight, 0.0f);
+	const float lower = std::max(pivotHeight - minHeight, 0.0f);
+	float upperAngle, lowerAngle, sink;
+	if (lower < blend) {
+		// Hit at the bottom end: the rest of the bar tips over.
+		upperAngle = step;
+		lowerAngle = 0.0f;
+		sink = 0.0f;
+	}
+	else if (upper < blend) {
+		upperAngle = 0.0f;
+		lowerAngle = -step;
+		sink = 0.0f;
+	}
+	else {
+		sink = step / (1.0f / upper + 1.0f / lower);
+		upperAngle = -std::atan(sink / upper);
+		lowerAngle = std::atan(sink / lower);
+	}
+
+	bool moved = false;
+	for (unsigned int v = 0, size = m_offsets.size(); v < size; ++v) {
+		const float height = m_restPositions[v][axis] - pivotHeight;
+		const float t = std::abs(height) / blend;
+		const float weight = (t >= 1.0f) ? 1.0f : t * t * (3.0f - 2.0f * t);
+		const float turn = ((height > 0.0f) ? upperAngle : lowerAngle) * weight;
+		const mt::vec3 current = m_restPositions[v] + m_offsets[v];
+		const mt::vec3 turned = pivot + rotate(current - pivot, hinge, turn) + push * sink;
+		m_offsets[v] = turned - m_restPositions[v];
+		moved = true;
+	}
+
+	if (moved) {
+		m_bendAngle += step;
+		UpdateArrays();
+	}
+	return moved;
+}
+
+void KX_DentDeformer::AddHit(const mt::mat3x4& trans, const mt::vec3& point, float radius, float strength)
+{
+	if (radius <= 0.0f || strength <= 0.0f) {
+		return;
+	}
+	const mt::mat3x4 invtrans = trans.Inverse();
+	const mt::vec3 local = invtrans * point;
+	// Radius in local units (scaled objects).
+	const float scale = (invtrans * (point + mt::axisX3) - local).Length();
+	const float localRadius = radius * scale;
+	strength = std::min(strength, 1.0f);
+
+	for (int i = 0; i < m_hitCount; ++i) {
+		float *hit = m_hits[i];
+		const float distance = (mt::vec3(hit[0], hit[1], hit[2]) - local).Length();
+		if (distance < std::max(hit[3], localRadius) * 0.5f) {
+			hit[3] = std::max(hit[3], localRadius);
+			m_hitStrengths[i] = 1.0f - (1.0f - m_hitStrengths[i]) * (1.0f - strength);
+			return;
+		}
+	}
+
+	int slot = m_hitCount;
+	if (slot == MAX_HITS) {
+		slot = 0;
+		for (int i = 1; i < MAX_HITS; ++i) {
+			if (m_hitStrengths[i] < m_hitStrengths[slot]) {
+				slot = i;
+			}
+		}
+	}
+	else {
+		++m_hitCount;
+	}
+	m_hits[slot][0] = local.x;
+	m_hits[slot][1] = local.y;
+	m_hits[slot][2] = local.z;
+	m_hits[slot][3] = localRadius;
+	m_hitStrengths[slot] = strength;
+}
+
+const float (*KX_DentDeformer::GetHits() const)[4]
+{
+	return m_hits;
+}
+
+const float *KX_DentDeformer::GetHitStrengths() const
+{
+	return m_hitStrengths;
+}
+
+int KX_DentDeformer::GetHitCount() const
+{
+	return m_hitCount;
+}
+
 void KX_DentDeformer::Reset()
 {
 	if (!m_dented) {
 		return;
 	}
 	std::fill(m_offsets.begin(), m_offsets.end(), mt::zero3);
+	m_bendAngle = 0.0f;
+	m_hitCount = 0;
 	UpdateArrays();
 	m_dented = false;
 }

@@ -675,24 +675,32 @@ class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
         layout.prop(game, "use_deform", text="Enabled")
         layout = layout.column()
         layout.active = game.use_deform
+        layout.row().prop(df, "mode", expand=True)
 
         split = layout.box().split()
         col = split.column()
-        col.label(text="Dent:", icon='MOD_SMOOTH')
+        col.label(text="Hit:", icon='MOD_SMOOTH')
         col.prop(df, "dent_impulse")
         col.prop(df, "use_dent_on_collision")
 
         col = split.column()
         col.label(text="Shape:", icon='MOD_DISPLACE')
         sub = col.column(align=True)
-        sub.prop(df, "radius")
-        sub.prop(df, "depth")
-        sub.prop(df, "max_depth")
+        if df.mode == 'BEND':
+            sub.row().prop(df, "bend_axis", expand=True)
+            sub.prop(df, "bend_angle")
+            sub.prop(df, "bend_max_angle")
+        else:
+            sub.prop(df, "radius")
+            sub.prop(df, "depth")
+            sub.prop(df, "max_depth")
         sub = col.column()
         sub.active = game.collision_bounds_type == 'TRIANGLE_MESH'
         sub.prop(df, "use_update_physics")
 
         if game.use_deform:
+            if df.use_update_physics and game.collision_bounds_type != 'TRIANGLE_MESH':
+                layout.label(text="Update Physics needs Collision Bounds: Triangle Mesh", icon='INFO')
             if game.use_destruction and df.dent_impulse >= game.destruction.break_impulse:
                 layout.label(text="Dent Impulse >= Break Impulse: it breaks before denting", icon='ERROR')
             if any(mod.show_viewport for mod in ob.modifiers):

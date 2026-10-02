@@ -209,6 +209,7 @@ set(SRC
 	shader/nodes/node_shader_tex_wave.c
 	shader/nodes/node_shader_texture.c
 	shader/nodes/node_shader_time.c
+	shader/nodes/node_shader_damage.c
 	shader/nodes/node_shader_uvAlongStroke.c
 	shader/nodes/node_shader_uvmap.c
 	shader/nodes/node_shader_valToRgb.c

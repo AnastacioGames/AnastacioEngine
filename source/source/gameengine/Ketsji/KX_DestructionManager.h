@@ -135,6 +135,8 @@ private:
 		KX_GameObject *m_object;
 		mt::vec3 m_point;
 		mt::vec3 m_direction;
+		/// Position of the hitting object.
+		mt::vec3 m_hitter;
 		float m_impulse;
 	};
 
@@ -149,7 +151,8 @@ private:
 	void Arm(Entry *entry, long long frame);
 
 	/// Dents without the threshold checks, queues the physics shape update. True when a vertex moved.
-	bool DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse);
+	bool DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse,
+	             const mt::vec3 *hitter = nullptr);
 	/// The dent mesh, created on the first dent; warns once when another deformer owns the mesh.
 	KX_DentDeformer *GetDentDeformer(KX_GameObject *gameobj);
 	/// After a dent: queues the physics shape update, runs onDent.

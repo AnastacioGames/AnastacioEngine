@@ -3104,7 +3104,7 @@ PHY_IPhysicsController *CcdPhysicsEnvironment::CreateConeController(float conera
 	return sphereController;
 }
 
-float CcdPhysicsEnvironment::getAppliedImpulse(int constraintid)
+float CcdPhysicsEnvironment::GetAppliedImpulse(int constraintid)
 {
 	// For soft body constraints
 	if (constraintid == 0) {
@@ -3116,6 +3116,8 @@ float CcdPhysicsEnvironment::getAppliedImpulse(int constraintid)
 	for (i = 0; i < numConstraints; i++) {
 		btTypedConstraint *constraint = m_dynamicsWorld->getConstraint(i);
 		if (constraint->getUserConstraintId() == constraintid) {
+			// The solver always stores the impulse; the flag only silences Bullet's debug assert.
+			constraint->enableFeedback(true);
 			return constraint->getAppliedImpulse();
 		}
 	}

@@ -277,6 +277,19 @@ static void rna_GameObjectSettings_use_explosive_set(PointerRNA *ptr, bool value
 	}
 }
 
+static void rna_RangeDeformSettings_mode_set(PointerRNA *ptr, int value)
+{
+	RangeDeformSettings *ds = ptr->data;
+
+	ds->mode = value;
+	/* Files saved before Bend existed. */
+	if (value == DEFORM_MODE_BEND && ds->bend_max_angle == 0.0f) {
+		ds->bend_axis = 2;
+		ds->bend_angle = DEG2RADF(2.0f);
+		ds->bend_max_angle = DEG2RADF(75.0f);
+	}
+}
+
 static void rna_GameObjectSettings_use_deform_set(PointerRNA *ptr, bool value)
 {
 	Object *ob = ptr->data;
@@ -290,6 +303,11 @@ static void rna_GameObjectSettings_use_deform_set(PointerRNA *ptr, bool value)
 			ds->depth = 0.01f;
 			ds->max_depth = 0.3f;
 			ds->flags = DEFORM_ON_COLLISION;
+		}
+		if (ds->bend_max_angle == 0.0f) {
+			ds->bend_axis = 2;
+			ds->bend_angle = DEG2RADF(2.0f);
+			ds->bend_max_angle = DEG2RADF(75.0f);
 		}
 	}
 	else {
@@ -2620,6 +2638,46 @@ static void rna_def_object_deform(BlenderRNA *brna)
 	RNA_def_struct_nested(brna, srna, "Object");
 	RNA_def_struct_ui_text(srna, "Deformation Settings",
 	                       "Dents the mesh around the contact point on strong hits and explosions");
+
+	static const EnumPropertyItem mode_items[] = {
+		{DEFORM_MODE_DENT, "DENT", ICON_MOD_SHRINKWRAP, "Dent", "Push the surface in around the contact point (car body, barrel, plate)"},
+		{DEFORM_MODE_BEND, "BEND", ICON_MOD_SIMPLEDEFORM, "Bend", "Fold the whole piece into a V at the contact point (bar, pole, sign, fence post)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static const EnumPropertyItem axis_items[] = {
+		{0, "X", 0, "X", ""},
+		{1, "Y", 0, "Y", ""},
+		{2, "Z", 0, "Z", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "mode");
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_enum_funcs(prop, NULL, "rna_RangeDeformSettings_mode_set", NULL);
+	RNA_def_property_ui_text(prop, "Mode", "How a hit deforms the mesh");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "bend_axis", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "bend_axis");
+	RNA_def_property_enum_items(prop, axis_items);
+	RNA_def_property_ui_text(prop, "Bend Axis",
+	                         "Local long axis of the object. The part further along it than the hit bends, "
+	                         "the base (lowest end) stays");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "bend_angle", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_float_sdna(prop, NULL, "bend_angle");
+	RNA_def_property_range(prop, 0.0f, M_PI);
+	RNA_def_property_ui_text(prop, "Bend Angle", "Bend per N*s of impulse above Dent Impulse. Lower = stiffer");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "bend_max_angle", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_float_sdna(prop, NULL, "bend_max_angle");
+	RNA_def_property_range(prop, 0.0f, M_PI);
+	RNA_def_property_ui_text(prop, "Max Bend", "Most the object bends, summing all hits");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "dent_impulse", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "dent_impulse");

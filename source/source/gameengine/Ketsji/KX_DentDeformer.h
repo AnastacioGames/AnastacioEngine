@@ -58,7 +58,32 @@ public:
 	bool AddBlastDent(const mt::mat3x4& trans, const mt::vec3& center, float radius, float force, float threshold,
 	                  float depth, float maxDepth);
 
-	/// Back to the rest shape.
+	/** Bend the part of the mesh past a world point around it, like a hit pole or sign.
+	 * \param axis Local long axis (0 X, 1 Y, 2 Z); the vertices further along it than the point turn.
+	 * \param direction World push direction, its part along the axis is ignored.
+	 * \param angle Bend added by this hit (radians); the bend of all hits is capped at maxAngle.
+	 * 
+eturn True when a vertex moved.
+	 */
+	bool AddBend(const mt::mat3x4& trans, const mt::vec3& point, const mt::vec3& direction, int axis, float angle,
+	             float maxAngle);
+
+	/** Remember a hit for the material Damage node (mask around the point, in object space).
+	 * Hits closer than half the radius merge; past MAX_HITS the weakest one is replaced.
+	 * \param strength 0..1, summed with the hits it merges with.
+	 */
+	void AddHit(const mt::mat3x4& trans, const mt::vec3& point, float radius, float strength);
+
+	enum {
+		MAX_HITS = 16
+	};
+
+	/// Hits as (local x, y, z, radius) and strength, valid up to GetHitCount().
+	const float (*GetHits() const)[4];
+	const float *GetHitStrengths() const;
+	int GetHitCount() const;
+
+	/// Back to the rest shape, hits cleared.
 	void Reset();
 
 	bool IsDented() const;
@@ -78,6 +103,13 @@ private:
 	std::vector<std::vector<mt::vec3> > m_slotRestFaceSums;
 	/// Per slot, per display vertex: rest tangent (normal maps), rotated with the normal.
 	std::vector<std::vector<mt::vec4> > m_slotRestTangents;
+
+	/// Bend summed over all hits (radians), capped by AddBend().
+	float m_bendAngle;
+
+	float m_hits[MAX_HITS][4];
+	float m_hitStrengths[MAX_HITS];
+	int m_hitCount;
 
 	bool m_dented;
 };

@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Deformação: Bend em V no ponto da batida e nó Damage (máscara de dano)
+
+- Bend passa a dobrar em **V no ponto de contato**: as duas pontas ficam paradas e o ponto atingido afunda na
+  direção do empurrão (cada lado gira o ângulo que mantém sua ponta no lugar, somando o ângulo da batida). Batida
+  numa ponta tomba o resto, como antes. Corrige a barra atingida no meio que abaixava só a ponta de cima.
+- Ícones no seletor Mode (Dent = Shrinkwrap, Bend = Simple Deform).
+- **Máscara de dano sem cor de vértice**: cada batida/explosão que deforma grava um ponto (xyz local, raio = Radius,
+  força 0..1 = 1 − e^(−excesso/Dent Impulse)) em `KX_DentDeformer` (até 16; próximos se fundem, cheio troca o mais
+  fraco; Reset Dent limpa). `BL_BlenderShader::UpdateObjectMatrix` envia por objeto via
+  `GPU_material_bind_damage` (uniforms `unfdamagehits[16]`, `unfdamagestrength[16]`, `unfdamagecount`).
+- Nó novo **Damage** (Input, `SH_NODE_DAMAGE` 1004): entrada Softness, saídas Mask e Strength, calculadas por pixel
+  em espaço de objeto (`node_damage` no GLSL). Instâncias da mesma malha têm manchas próprias.
+- Validado: nada ainda (commit pedido antes do build; build e teste visual pendentes).
+
 ## 2026-10-02 - Deformação: modo Bend (entortar) e getAppliedImpulse de constraints
 
 - Painel Deformation ganhou **Mode: Dent | Bend**. Bend entorta a parte do objeto além do ponto de impacto
@@ -23,6 +37,17 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   `getAppliedImpulse` (g minúsculo), que não sobrescrevia `PHY_IPhysicsEnvironment::GetAppliedImpulse`. Renomeado com
   `override`; liga o feedback da constraint para o assert de debug do Bullet.
 - Validado: build. Validação visual do usuário pendente.
+
+## 2026-10-02 - Principled Hair BSDF no Game PBR
+
+- Novo `node_bsdf_hair_principled`: absorção σ como no Cycles (Color via sigma_from_reflectance, Melanin com
+  eumelanina/feomelanina + Tint, Absorption direto); lobos R, TT e TRT com fresnel dielétrico, larguras pelo mapeamento
+  de Roughness/Radial Roughness do Cycles; corpo difuso com a refletância do fio; Coat apaga o R. Random ignorado.
+- Sai da lista de não suportados; selo `~Game`. Selos atualizados de Glass, Refraction, Hair e Light Falloff; removido
+  o selo desatualizado do Sky Hosek.
+- Cena de teste: fileira de cima de `tools/create_hair_bsdf_test.py`.
+- Validado: screenshot de versão anterior; último ajuste (corpo difuso) sem build, bloqueado pelo BL_BlenderShader.cpp
+  de outra sessão. Validação visual do usuário pendente.
 
 ## 2026-10-02 - Hair BSDF com luz (Game PBR)
 
