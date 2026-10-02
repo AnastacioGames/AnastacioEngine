@@ -38,10 +38,41 @@ class CUSTOM_PT_game_context_world(CustomWorldButtonsPanel, Panel):
 
 
 # ==============================================================================
-# CORES DO MUNDO E CÉU
+# CÉU (SKY)
 # ==============================================================================
+ATMOSPHERE_EARTH = {
+    "atmosphere_intensity": 20.0,
+    "atmosphere_rayleigh_color": (5.5 / 22.4, 13.0 / 22.4, 1.0),
+    "atmosphere_rayleigh_density": 1.0,
+    "atmosphere_mie_density": 1.0,
+    "atmosphere_mie_direction": 0.758,
+    "atmosphere_altitude": 1000.0,
+}
+
+
+class WORLD_OT_atmosphere_reset(bpy.types.Operator):
+    """Set the atmospheric sky back to Earth air"""
+    bl_idname = "world.atmosphere_reset"
+    bl_label = "Reset to Earth"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.world is not None
+
+    def execute(self, context):
+        for name, value in ATMOSPHERE_EARTH.items():
+            setattr(context.world, name, value)
+        return {'FINISHED'}
+
+
+def _world_nodes_active(context):
+    world = context.world
+    return context.scene.game_settings.use_shading_nodes and world.use_nodes and world.node_tree
+
+
 class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
-    bl_label = "World"
+    bl_label = "Sky"
     bl_idname = "WORLD_PT_game_world_custom"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -54,68 +85,78 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
         layout = self.layout
         scene = context.scene
         world = context.world
+        sky = world.sky_type
 
-        main_box = layout.box()
-        main_box.label(text="World Settings:", icon="WORLD")
+        if _world_nodes_active(context):
+            layout.label(text="The World uses nodes: the node tree draws the sky", icon='INFO')
+            layout.prop(world, "use_nodes", text="Use World Nodes")
+            return
 
-        row = main_box.row(align=True)
-        row.prop(world, "use_sky_paper", text="Paper", toggle=True)
-        row.prop(world, "use_sky_blend", text="Blend", toggle=True)
-        row.prop(world, "use_sky_real", text="Real", toggle=True)
+        layout.row().prop(world, "sky_type", expand=True)
 
-        # Colors
         box = layout.box()
-        box.label(text="Colors:", icon="COLOR")
-        split = box.split()
-        split.column().prop(world, "horizon_color", text="Horizon")
-        split.column().prop(world, "ambient_color", text="Ambient")
-
-        if world.use_sky_atmospheric:
-            split.column().prop(world, "zenith_color", text="Extinction")
-            split.column().prop(world, "nadir_color", text="Inscattering")
-        else:
-            col = split.column()
-            col.active = world.use_sky_blend
-            col.prop(world, "zenith_color", text="Zenith")
-            col = split.column()
-            col.active = world.use_sky_blend
-            col.prop(world, "nadir_color", text="Nadir")
-
-        # Sun
-        box = layout.box()
-        box.label(text="Sun:", icon="LAMP_SUN")
-        col = box.column(align=True)
-        # The assignment belongs to Scene (the runtime reads Scene.world_sun),
-        # but it is presented with the World sky controls deliberately.
-        col.prop(scene, "world_sun_set", text="Object")
-        col.prop(scene, "use_auto_world_sun", text="Automatic")
-        row = box.row(align=True)
-        sub = row.row(align=True)
-        sub.active = scene.use_auto_world_sun
-        sub.prop(scene, "auto_world_sun_hour", text="Hour")
-        row.prop(world, "sun_size", text="Size")
-
-        # Sky Objects
-        box = layout.box()
-        box.label(text="Sky Objects:", icon="SOLO_ON")
-        row = box.row()
-        row.prop(world, "use_sky_atmospheric", text="Atmospheric")
-        row.prop(world, "use_sky_stars", text="Stars")
-        row.prop(world, "use_sky_moon", text="Moon")
-
-        row = box.row()
-        row.active = world.use_sky_moon
-        row.prop(world, "moon_size", text="Moon Size")
-        row.prop(world, "moon_brightness", text="Brightness")
-
-        if not world.use_sky_atmospheric:
+        if sky == 'FLAT':
+            box.prop(world, "horizon_color", text="Color")
+        elif sky == 'GRADIENT':
             row = box.row()
+            row.prop(world, "horizon_color", text="Horizon")
+            row.prop(world, "zenith_color", text="Zenith")
+            row = box.row(align=True)
+            row.prop(world, "use_sky_paper", text="Paper", toggle=True)
+            sub = row.row(align=True)
+            sub.active = world.use_sky_paper
+            sub.prop(world, "use_sky_real", text="Real", toggle=True)
+        elif sky == 'PROCEDURAL':
+            row = box.row()
+            row.prop(world, "horizon_color", text="Horizon")
+            row.prop(world, "zenith_color", text="Zenith")
+            row.prop(world, "nadir_color", text="Nadir")
+            row = box.row(align=True)
             row.prop(world, "sky_turbidity", text="Turbidity")
             row.prop(world, "ground_color", text="Ground")
+        else:
+            row = box.row()
+            row.label(text="Atmosphere:", icon='WORLD')
+            row.operator("world.atmosphere_reset", text="Earth", icon='FILE_REFRESH')
+            col = box.column(align=True)
+            col.prop(world, "atmosphere_intensity")
+            col.prop(world, "atmosphere_altitude")
+            col = box.column(align=True)
+            col.prop(world, "atmosphere_rayleigh_color")
+            col.prop(world, "atmosphere_rayleigh_density")
+            col = box.column(align=True)
+            col.prop(world, "atmosphere_mie_density")
+            col.prop(world, "atmosphere_mie_direction", slider=True)
+
+        if sky in {'PROCEDURAL', 'ATMOSPHERIC'}:
+            # The assignment belongs to Scene (the runtime reads Scene.world_sun),
+            # but it is presented with the World sky controls deliberately.
+            box = layout.box()
+            box.label(text="Sun:", icon='LAMP_SUN')
+            col = box.column(align=True)
+            col.prop(scene, "world_sun_set", text="Object")
+            col.prop(scene, "use_auto_world_sun", text="Automatic")
+            row = box.row(align=True)
+            sub = row.row(align=True)
+            sub.active = scene.use_auto_world_sun
+            sub.prop(scene, "auto_world_sun_hour", text="Hour")
+            row.prop(world, "sun_size", text="Disc Size")
+            if not scene.world_sun_set:
+                box.label(text="Without a Sun object the sky stays at noon and has no sun disc", icon='ERROR')
+
+            box = layout.box()
+            box.label(text="Night:", icon='SOLO_ON')
+            row = box.row()
+            row.prop(world, "use_sky_stars", text="Stars")
+            row.prop(world, "use_sky_moon", text="Moon")
+            row = box.row(align=True)
+            row.active = world.use_sky_moon
+            row.prop(world, "moon_size", text="Size")
+            row.prop(world, "moon_brightness", text="Brightness")
 
 
 # ==============================================================================
-# ENVIRONMENT LIGHTING (ILUMINAÇÃO GLOBAL)
+# ENVIRONMENT (AMBIENTE E EXPOSIÇÃO)
 # ==============================================================================
 class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
     bl_label = "Environment"
@@ -129,32 +170,32 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        light = context.world.light_settings
         world = context.world
+        light = world.light_settings
 
         box = layout.box()
-        row = box.row()
-        row.label(text="Environment Lighting:", icon="LAMP_SUN")
-        row.prop(light, "use_environment_light", text="")
+        box.label(text="Ambient:", icon='COLOR')
+        box.prop(world, "ambient_color", text="Color")
 
         row = box.row(align=True)
-        row.active = light.use_environment_light
-        row.prop(light, "environment_energy", text="Energy")
-        row.prop(light, "environment_color", text="")
+        row.prop(light, "use_environment_light", text="")
+        sub = row.row(align=True)
+        sub.active = light.use_environment_light
+        sub.prop(light, "environment_energy", text="Environment Light")
+        sub.prop(light, "environment_color", text="")
 
         box = layout.box()
-        box.label(text="Camera Exposure:", icon="CAMERA_DATA")
-
+        box.label(text="Exposure:", icon='CAMERA_DATA')
         row = box.row(align=True)
         row.prop(world, "exposure")
-        row.prop(world, "color_range", text="Color Range")
+        row.prop(world, "color_range", text="Range")
 
 
 # ==============================================================================
 # FOG / MIST (NEBLINA)
 # ==============================================================================
 class CUSTOM_PT_game_mist(CustomWorldButtonsPanel, Panel):
-    bl_label = "Fog / Mist"
+    bl_label = "Fog"
     bl_idname = "WORLD_PT_game_mist_custom"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -163,36 +204,35 @@ class CUSTOM_PT_game_mist(CustomWorldButtonsPanel, Panel):
         scene = context.scene
         return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
 
+    def draw_header(self, context):
+        self.layout.prop(context.world.mist_settings, "use_mist", text="")
+
     def draw(self, context):
         layout = self.layout
         world = context.world
         mist = world.mist_settings
+        layout.active = mist.use_mist
 
         box = layout.box()
-        row = box.row()
-        row.label(text="Mist:", icon="IMAGE_ZDEPTH")
-        row.prop(mist, "use_mist", text="")
-
-        col = box.column(align=True)
-        col.active = mist.use_mist
-        row = col.row(align=True)
+        if world.sky_type == 'ATMOSPHERIC':
+            # In the atmospheric sky the horizon/zenith/nadir colors are only the fog colors.
+            row = box.row()
+            row.prop(world, "horizon_color", text="Color")
+            row.prop(world, "zenith_color", text="Extinction")
+            row.prop(world, "nadir_color", text="Inscattering")
+        else:
+            box.label(text="Uses the sky horizon color", icon='INFO')
+        row = box.row(align=True)
         row.prop(mist, "mist_blend_type", text="")
         row.prop(mist, "falloff", text="")
-        col.prop(mist, "intensity", text="Minimum Intensity", slider=True)
+        box.prop(mist, "intensity", text="Minimum Intensity", slider=True)
 
         box = layout.box()
-        box.active = mist.use_mist
-        box.label(text="Distance:", icon="ARROW_LEFTRIGHT")
-
+        box.label(text="Distance:", icon='ARROW_LEFTRIGHT')
         row = box.row(align=True)
         row.prop(mist, "start")
         row.prop(mist, "depth")
-
         if mist.falloff == 'HEIGHT':
-            box = layout.box()
-            box.active = mist.use_mist
-            box.label(text="Height Fog:", icon="MOD_OCEAN")
-
             row = box.row(align=True)
             row.prop(mist, "height_fog")
             row.prop(mist, "density_fog")

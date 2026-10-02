@@ -1005,6 +1005,23 @@ void gpu_material_add_node(GPUMaterial *material, GPUNode *node)
 
 /* Code generation */
 
+/* Atmospheric sky: World parameters as two vec4 for do_sky_atmospheric. The sky keeps its
+ * own 1 - exp tonemap only when Filmic does not follow (Shading Nodes + Filmic). */
+static void gpu_world_atmosphere_links(GPUMaterial *mat, World *wo, GPUNodeLink **rlh, GPUNodeLink **atmo)
+{
+	Scene *scene = mat->scene;
+	float r[4], a[4];
+	mul_v3_v3fl(r, wo->atmo_rayleigh_col, wo->atmo_rayleigh_density * 22.4e-6f);
+	r[3] = (BKE_scene_use_new_shading_nodes(scene) && STREQ(scene->view_settings.view_transform, "Filmic")) ? 0.0f : 1.0f;
+	a[0] = wo->atmo_intensity;
+	a[1] = wo->atmo_mie_density * 21e-6f;
+	a[2] = wo->atmo_mie_g;
+	a[3] = wo->atmo_altitude;
+	/* linked here: GPU_link copies the values while r and a still exist */
+	GPU_link(mat, "set_rgba", GPU_uniform(r), rlh);
+	GPU_link(mat, "set_rgba", GPU_uniform(a), atmo);
+}
+
 /* Fase 5 (nos de material Game x Cycles): no caminho Shading Nodes, aplica
  * Scene > Color Management (exposure, gamma, view transform Filmic + look de
  * contraste) aproximado antes da conversao linear -> sRGB da saida. Fora desse
@@ -3046,7 +3063,9 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 
 						if (mat->scene->world->skytype & WO_SKYATMOSPHERIC) {
 							float env_sky = (mat->ma->mode2 & MA_USEFULLSKY) ? 1.0f : 2.0f; // 1.0f = full sky with no stars, 2.0f = only env_sky
-							GPU_link(mat, "env_sky_atmospheric", wv, wn, wr, sunDir, shi->roughness_bsdf, hor,
+							GPUNodeLink *rlh, *atmo;
+							gpu_world_atmosphere_links(mat, mat->scene->world, &rlh, &atmo);
+							GPU_link(mat, "env_sky_atmospheric", wv, wn, wr, sunDir, shi->roughness_bsdf, rlh, atmo,
 								sunEnergy, sunSize, sunCol, GPU_uniform(&env_sky), &mirror, &radiosity, &transmit);
 						}
 						else {
@@ -3543,7 +3562,9 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 
 				float env_sky = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 0.0f : 1.0f;
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
-					GPU_link(mat, "do_sky_atmospheric", shi.view, hor, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(&env_sky), blend, &shi.rgb);
+					GPUNodeLink *rlh, *atmo;
+					gpu_world_atmosphere_links(mat, wo, &rlh, &atmo);
+					GPU_link(mat, "do_sky_atmospheric", shi.view, rlh, atmo, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(&env_sky), blend, &shi.rgb);
 
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
@@ -3697,7 +3718,9 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 
 		if (world->skytype & WO_SKYATMOSPHERIC) {
 			float env_sky = (ma->mode2 & MA_USEFULLSKY) ? 1.0f : 2.0f;
-			GPU_link(mat, "env_sky_atmospheric", wv, wn, wr, sunDir, rough, hor,
+			GPUNodeLink *rlh, *atmo;
+			gpu_world_atmosphere_links(mat, world, &rlh, &atmo);
+			GPU_link(mat, "env_sky_atmospheric", wv, wn, wr, sunDir, rough, rlh, atmo,
 			         sunEnergy, sunSize, sunCol, GPU_uniform(&env_sky), &mirror, &diffibl, &transmit);
 		}
 		else {

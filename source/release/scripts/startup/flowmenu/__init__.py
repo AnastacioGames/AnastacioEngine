@@ -55,6 +55,7 @@ from .custom_pt_physics import (
 )
 from .custom_pt_world import (
     CUSTOM_PT_game_context_world,
+    WORLD_OT_atmosphere_reset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_mist,
@@ -107,6 +108,7 @@ classes = [
     OBJECT_OT_vehicle_set_drive_type,
     # --- NOSSAS NOVAS CLASSES DO WORLD ---
     CUSTOM_PT_game_context_world,
+    WORLD_OT_atmosphere_reset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_mist,

@@ -9,6 +9,38 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Céu Atmospheric: revisão do shader, parâmetros próprios e painéis Sky/Environment/Fog novos
+
+- `sky_atmosphere` (`gpu_shader_material.glsl`):
+  - os raios primário e secundário agora avançam (antes todas as amostras caíam no mesmo ponto, com a
+    densidade do ar do chão no raio inteiro; era daí que vinha o laranja forte);
+  - o raio começa na câmera e para no chão;
+  - a fase usa o ângulo real com o sol;
+  - o tamanho do sol não multiplica mais o espalhamento.
+- `rsi` calcula a interseção a partir do ponto mais próximo do centro. A forma `dot(r0,r0) - R²` perdia
+  precisão de float na escala do planeta e gerava chuvisco no horizonte.
+- `do_sky_atmospheric`: o disco do sol não divide por zero e o alpha é 1. As estrelas usavam `coord.x - starPos`
+  e agora usam `coord - starPos`. No reflexo, o termo difuso usava rough 1.318 e passou para 1.831, igual ao
+  `env_sky`.
+- Parâmetros novos no DNA do World, `atmo_*`, com defaults em `BKE_world_atmosphere_defaults`. Arquivos antigos
+  recebem os defaults em `versioning_range.c` (ar da Terra); o visual deles muda porque o laranja vinha do bug.
+  Em RNA são `atmosphere_intensity`, `_altitude`, `_rayleigh_color`, `_rayleigh_density`, `_mie_density` e
+  `_mie_direction`.
+  - O brilho do céu não depende mais da energia da lâmpada Sun.
+  - A cor do Rayleigh não vem mais do `horizon_color`, que fica só como cor da neblina.
+- O céu só aplica o próprio tonemap `1 - exp` quando o Filmic não vem depois (Shading Nodes + Filmic).
+  `gpu_world_atmosphere_links` (`gpu_material.c`) monta os dois vec4 para as três chamadas.
+- `World.sky_type` (Flat / Gradient / Procedural / Atmospheric) é um enum sobre os bits Blend/Real/Paper/Atmospheric.
+- Painéis do World no `flowmenu/custom_pt_world.py`:
+  - **Sky**: tipo de céu, opções do tipo, Sol e Noite. O botão Earth (`world.atmosphere_reset`) volta os valores
+    para a atmosfera da Terra.
+  - **Environment**: ambiente, luz de ambiente e exposição.
+  - **Fog**: no Atmospheric, mostra as cores da neblina.
+  - Traduções PT-BR/ES/RU em `translations_ui.py`.
+- Testado em cena de teste no `RangeRuntime` com o sol a 4° e a 30°: céu azul de dia, horizonte quente no pôr do
+  sol, sem chuvisco. Falta a validação no jogo real.
+- Pendente: desempenho (16×8 amostras por pixel, 3 chamadas por fragmento de material). A ideia é uma LUT por quadro.
+
 ## 2026-10-02 - Nós de material: varredura, crash do Particle Info e aviso de nó sem suporte
 
 - `tools/create_node_sweep_test.py`: cena com um material por tipo de nó de shader (90), Sun/Point/Spot com

@@ -2272,8 +2272,8 @@ float world_stars(vec3 view, vec3 sundir, float factor){
 	float pixel = 0.0005;
 	vec2 coord = pixel * floor(((view.xy / (view.z * 0.5 + 1.0)) * 0.25) / pixel);
 	vec2 starPos = vec2(rando(coord.xy + 1.0), rando(coord.yx + 3.0));
-	float stars = (smoothstep(0.02, 0.01, length(coord.x - starPos)) +
-	               smoothstep(0.02, 0.01, length(coord.x + starPos))) * view.z * view.z;
+	float stars = (smoothstep(0.02, 0.01, length(coord - starPos)) +
+	               smoothstep(0.02, 0.01, length(coord + starPos))) * view.z * view.z;
 
 	return stars * (max(0.0, dot(-sundir, vec3(0.0, 0.0, 1.0)) + 0.5) + factor);
 }
@@ -2283,8 +2283,10 @@ vec2 rsi(vec3 r0, vec3 rd, float sr) {
 	// No intersection when result.x > result.y
     // Optimized rsi, Pre-calculate the values ​​that will be reused
     float b = dot(rd, r0);
-    float c = dot(r0, r0) - (sr * sr);
-    float d = b*b - c;
+    // d = b*b - (dot(r0, r0) - sr*sr), written with the closest point to the center:
+    // at planet scale the plain form cancels in float precision and makes noise at the horizon
+    float h = length(r0 - b * rd);
+    float d = (sr - h) * (sr + h);
 
     if (d < 0.0) return vec2(1e5, -1e5); // No intersection
 
@@ -2317,25 +2319,28 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 	// Calculate the step size of the primary ray.
 	vec2 p = rsi(r0, r, rAtmos);
 	if (p.x > p.y) return vec3(0,0,0);
-	p.y = min(p.y, rsi(r0, r, rPlanet).x);
+	p.x = max(p.x, 0.0); // the camera is inside the atmosphere: start at the camera, not behind it
+	vec2 pg = rsi(r0, r, rPlanet);
+	if (pg.x <= pg.y && pg.x > 0.0) p.y = min(p.y, pg.x); // stop at the ground only when the ray hits it
 	float iStepSize = (p.y - p.x) / iSteps;
+	float iTime = p.x;
 
 	// Initialize accumulators for Rayleigh and Mie scattering.
 	vec3 totalRlh = vec3(0,0,0);
 	vec3 totalMie = vec3(0,0,0);
 
 	// Calculate the Rayleigh and Mie phases.
-	float mu = (env_sky <= 1.0) ? (dot(r, pSun) * sunSize) : 0.1;
+	float mu = (env_sky <= 1.0) ? dot(r, pSun) : 0.1;
 	float mumu = mu * mu;
 	float gg = g * g;
 
-	float pRlh = (3.0 / (32.0 * M_PI) * (1.0 + mumu)) * sunSize;
-	float pMie = (3.0 / (16.0 * M_PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg))) * sunSize;
+	float pRlh = 3.0 / (32.0 * M_PI) * (1.0 + mumu);
+	float pMie = 3.0 / (16.0 * M_PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg));
 
 	// Sample the primary ray.
 	for (int i = 0; i < int(iSteps); i++) {
 		// Calculate the primary ray sample position.
-		vec3 iPos = r0 + r * (iStepSize * 0.5);
+		vec3 iPos = r0 + r * (iTime + iStepSize * 0.5);
 
 		// Calculate the height of the sample.
 		float iHeight = length(iPos) - rPlanet;
@@ -2350,11 +2355,12 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 		// Initialize optical depth accumulators for the secondary ray.
 		float jOdRlh = 0.0;
 		float jOdMie = 0.0;
+		float jTime = 0.0;
 
 		// Sample the secondary ray.
 		for (int j = 0; j < int(jSteps); j++) {
 			// Calculate the secondary ray sample position.
-			vec3 jPos = iPos + pSun * (jStepSize * 0.5);
+			vec3 jPos = iPos + pSun * (jTime + jStepSize * 0.5);
 
 			// Calculate the height of the sample.
 			float jHeight = length(jPos) - rPlanet;
@@ -2362,6 +2368,7 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 			// Accumulate the optical depth.
 			jOdRlh += exp(-jHeight / shRlh) * jStepSize;
 			jOdMie += exp(-jHeight / shMie) * jStepSize;
+			jTime += jStepSize;
 		}
 
 		// Calculate attenuation.
@@ -2370,6 +2377,7 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 		// Accumulate scattering.
 		totalRlh += odStepRlh * attn;
 		totalMie += odStepMie * attn;
+		iTime += iStepSize;
 	}
 
 	// Calculate and return the final color.
@@ -2434,21 +2442,24 @@ void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float suns
 	outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
 }
 
-void do_sky_atmospheric(vec3 view, vec3 hor, vec3 sundir, vec3 suncolor, float energy,
+/* rlh: Rayleigh coefficients (rgb) and w = 1 for the sky's own tonemap (0 when Filmic follows);
+ * atmo: intensity, Mie coefficient, Mie direction g, viewer altitude in meters. */
+void do_sky_atmospheric(vec3 view, vec4 rlh, vec4 atmo, vec3 sundir, vec3 suncolor, float energy,
 								float sunsize, float moonEnabled, float moonSize, float moonBrightness, float env_sky, float rough, out vec4 outcol)
 {
 	view.z /= pow(rough + 1.0, 3.0);
 
-	float sun = (sunsize / 3000.0) / (dot(sundir, -view) + 1.0);
+	float sun = (sunsize / 3000.0) / max(dot(sundir, -view) + 1.0, 1e-6);
 	float Ssize = clamp((sunsize * 100.0), 0.0, 1.0); // same sunSize but the normal value is 0.01, not 1.0.
 
-	outcol.rgb = sky_atmosphere(normalize(view.xzy), vec3(0.0, 6372.0e3, 0.0), sundir.xzy, Ssize, energy, env_sky,
-					6371e3, 6471e3, hor * 1.0e-5, 21e-6, 8e3, 1.2e3, 0.758);
+	outcol.rgb = sky_atmosphere(normalize(view.xzy), vec3(0.0, 6371e3 + atmo.w, 0.0), sundir.xzy, Ssize, atmo.x, env_sky,
+					6371e3, 6471e3, rlh.rgb, atmo.y, 8e3, 1.2e3, atmo.z) * suncolor;
 
-	outcol.rgb = 1.0 - exp(-1.0 * outcol.rgb);
+	outcol.rgb = mix(outcol.rgb, 1.0 - exp(-outcol.rgb), rlh.w);
+	outcol.a = 1.0;
 					
 	// Sun, if (env_sky <= 1.0 && sunsize > 0.0)
-	float sunFactor = step(0.0, sunsize) * step(env_sky, 1.0);
+	float sunFactor = step(1e-6, sunsize) * step(env_sky, 1.0);
 	float sunEnergy = max(0.0, dot(sundir, vec3(0.0, 0.0, 1.0)));
 	float sunVisibility = smoothstep(-0.02, 0.0, view.z);
 //	outcol.rgb += sun * suncolor * energy * sunVisibility * sunFactor;
@@ -2460,7 +2471,7 @@ void do_sky_atmospheric(vec3 view, vec3 hor, vec3 sundir, vec3 suncolor, float e
 
 	// Stars, only if (env_sky == 0.0)
 	float starFactor = step(env_sky, 0.001);
-	outcol += world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor;
+	outcol.rgb += vec3(world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor);
 }
 
 void world_blend_paper_real(vec3 vec, out float blend)
@@ -2986,12 +2997,12 @@ void env_sky(vec4 hor, vec4 zen, vec4 nad, float ground, float rough, float turb
 }
 
 void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
-						vec3 hor, float energy, float sunsize, vec3 suncol, float env_sky,
+						vec4 rlh, vec4 atmo, float energy, float sunsize, vec3 suncol, float env_sky,
 						out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
-	do_sky_atmospheric(wr, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
-	do_sky_atmospheric(-wn, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.318, diffibl);
-	do_sky_atmospheric(wv, hor, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);
+	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
+	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
+	do_sky_atmospheric(wv, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);
 }
 
 void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)

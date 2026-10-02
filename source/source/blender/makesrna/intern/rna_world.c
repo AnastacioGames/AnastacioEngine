@@ -140,6 +140,25 @@ static void rna_World_use_sky_moon_set(PointerRNA *ptr, bool value)
 	((World *)ptr->data)->moon_enabled = value ? 1.0f : 0.0f;
 }
 
+/* Sky Type: one choice over the old Blend/Real/Paper/Atmospheric flag combinations. */
+static int rna_World_sky_type_get(PointerRNA *ptr)
+{
+	short t = ((World *)ptr->data)->skytype;
+	if (!(t & WO_SKYBLEND)) return 0;
+	if ((t & WO_SKYREAL) && !(t & WO_SKYPAPER)) return (t & WO_SKYATMOSPHERIC) ? 3 : 2;
+	return 1;
+}
+
+static void rna_World_sky_type_set(PointerRNA *ptr, int value)
+{
+	World *wo = ptr->data;
+	wo->skytype &= ~(WO_SKYBLEND | WO_SKYREAL | WO_SKYATMOSPHERIC);
+	if (value >= 2) wo->skytype &= ~WO_SKYPAPER;
+	if (value >= 1) wo->skytype |= WO_SKYBLEND;
+	if (value >= 2) wo->skytype |= WO_SKYREAL;
+	if (value == 3) wo->skytype |= WO_SKYATMOSPHERIC;
+}
+
 static void rna_World_use_nodes_update(bContext *C, PointerRNA *ptr)
 {
 	World *wrld = (World *)ptr->data;
@@ -935,6 +954,59 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "skytype", WO_SKYATMOSPHERIC);
 	RNA_def_property_ui_text(prop, "Atmospheric Sky", "Render background with a realistic sky");
 	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
+	static const EnumPropertyItem sky_type_items[] = {
+		{0, "FLAT", 0, "Flat", "Horizon color only"},
+		{1, "GRADIENT", 0, "Gradient", "Blend from horizon to zenith color"},
+		{2, "PROCEDURAL", 0, "Procedural", "Simple sky lit by the World Sun, with turbidity and ground"},
+		{3, "ATMOSPHERIC", 0, "Atmospheric", "Physical sky: Rayleigh and Mie scattering of the World Sun light"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "sky_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, sky_type_items);
+	RNA_def_property_enum_funcs(prop, "rna_World_sky_type_get", "rna_World_sky_type_set", NULL);
+	RNA_def_property_ui_text(prop, "Sky Type", "How the game draws the World background");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_intensity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_intensity");
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 100.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Intensity", "Brightness of the atmospheric sky; the sun lamp energy does not change it");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_rayleigh_color", PROP_FLOAT, PROP_COLOR);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_rayleigh_col");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Air Color", "Color scattered by the air (Rayleigh): blue on Earth; the sunset gets the opposite color");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_rayleigh_density", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_rayleigh_density");
+	RNA_def_property_range(prop, 0.0f, 20.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 5.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Air Density", "Amount of air (1 = Earth); more air gives a deeper blue and a redder sunset");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_mie_density", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_mie_density");
+	RNA_def_property_range(prop, 0.0f, 50.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Haze", "Dust and humidity (Mie, 1 = Earth); more haze gives a whiter sky and a bigger glow around the sun");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_mie_direction", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_mie_g");
+	RNA_def_property_range(prop, 0.0f, 0.99f);
+	RNA_def_property_ui_text(prop, "Sun Glow", "How much the haze concentrates the light around the sun");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
+	prop = RNA_def_property(srna, "atmosphere_altitude", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "atmo_altitude");
+	RNA_def_property_range(prop, 1.0f, 60000.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 20000.0f, 100, 0);
+	RNA_def_property_ui_text(prop, "Altitude", "Height of the viewer in the atmosphere, in meters; high up the sky gets darker");
+	RNA_def_property_update(prop, 0, "rna_World_update");
 
 	/* nested structs */
 	prop = RNA_def_property(srna, "light_settings", PROP_POINTER, PROP_NONE);

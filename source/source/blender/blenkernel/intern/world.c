@@ -141,6 +141,19 @@ void BKE_world_status_props_ensure(World *wrld)
 	}
 }
 
+/* Earth air: Rayleigh 5.5/13.0/22.4e-6 (as color, the blue channel is 1) and Mie 21e-6. */
+void BKE_world_atmosphere_defaults(World *wrld)
+{
+	wrld->atmo_intensity = 20.0f;
+	wrld->atmo_rayleigh_col[0] = 5.5f / 22.4f;
+	wrld->atmo_rayleigh_col[1] = 13.0f / 22.4f;
+	wrld->atmo_rayleigh_col[2] = 1.0f;
+	wrld->atmo_rayleigh_density = 1.0f;
+	wrld->atmo_mie_density = 1.0f;
+	wrld->atmo_mie_g = 0.758f;
+	wrld->atmo_altitude = 1000.0f;
+}
+
 void BKE_world_init(World *wrld)
 {
 	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(wrld, id));
@@ -165,6 +178,7 @@ void BKE_world_init(World *wrld)
 	wrld->moon_enabled = 0.0f;
 	wrld->moon_size = 0.01f;
 	wrld->moon_brightness = 0.25f;
+	BKE_world_atmosphere_defaults(wrld);
 
 	wrld->aodist = 10.0f;
 	wrld->aosamp = 5;

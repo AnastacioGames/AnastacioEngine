@@ -159,6 +159,14 @@ typedef struct World {
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
 	float flare_scale, flare_intensity;
 
+	/* Atmospheric sky (WO_SKYATMOSPHERIC): own parameters, independent of the sun lamp energy */
+	float atmo_intensity;          /* brilho do ceu */
+	float atmo_rayleigh_col[3];    /* cor do espalhamento Rayleigh (azul do ceu) */
+	float atmo_rayleigh_density;   /* 1 = ar da Terra */
+	float atmo_mie_density;        /* neblina/poeira, 1 = Terra */
+	float atmo_mie_g;              /* direcao do Mie: brilho em volta do sol */
+	float atmo_altitude;           /* altura da camera em metros */
+
 	ListBase gpumaterial;		/* runtime */
 
 	/* game engine: properties shared by all objects through the World ("World Properties") */

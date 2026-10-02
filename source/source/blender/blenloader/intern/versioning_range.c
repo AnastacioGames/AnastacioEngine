@@ -60,6 +60,7 @@
 #include "BKE_property.h"
 #include "BKE_screen.h"
 #include "BKE_scene.h"
+#include "BKE_world.h"
 
 #include "BLI_math_base.h"
 
@@ -579,6 +580,13 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     /* Camera focus/FX: old cameras get the defaults, with every effect off. */
     LISTBASE_FOREACH (Camera *, camera, &main->camera) {
       BKE_camera_gamefx_init(&camera->gamefx);
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "atmo_intensity")) {
+    /* Atmospheric sky got its own parameters; old Worlds start with Earth air. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      BKE_world_atmosphere_defaults(wo);
     }
   }
 }
