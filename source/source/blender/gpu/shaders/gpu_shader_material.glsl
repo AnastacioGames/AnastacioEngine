@@ -3001,13 +3001,47 @@ void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 	do_sky_atmospheric(wv, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);
 }
 
+/* Diffuse irradiance taps around the outward normal n: n itself plus 4 directions tilted ~50 deg,
+ * averaged from a coarse mip they approximate the cosine-convolved environment. */
+vec3 env_irradiance_dir(vec3 n, int k)
+{
+	vec3 t = normalize(abs(n.z) < 0.9 ? cross(n, vec3(0.0, 0.0, 1.0)) : cross(n, vec3(1.0, 0.0, 0.0)));
+	vec3 b = cross(n, t);
+	if (k == 0) return n;
+	if (k == 1) return normalize(n * 0.643 + t * 0.766);
+	if (k == 2) return normalize(n * 0.643 - t * 0.766);
+	if (k == 3) return normalize(n * 0.643 + b * 0.766);
+	return normalize(n * 0.643 - b * 0.766);
+}
+
+/* Split-sum environment BRDF (Karis, mobile fit): specular = F0 * x + y for the
+ * roughness-prefiltered reflection. */
+vec2 env_brdf_approx(float NdotV, float rough)
+{
+	const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+	const vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+	vec4 r = rough * c0 + c1;
+	float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+	return vec2(-1.04, 1.04) * a004 + r.zw;
+}
+
 void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
+#if __VERSION__ >= 130
+	float maxlod = log2(float(max(textureSize(wtex, 0).x, 1)));
+#else
+	float maxlod = 9.0;
+#endif
 	rough = sqrt(rough);
-	mirror = textureCubeLod(wtex, wr, rough * 9.0);
-	diffibl = textureCubeLod(wtex, -wn, 9.0);
+	mirror = textureCubeLod(wtex, wr, rough * maxlod);
+	/* wn points into the surface here (reflect() does not care, the irradiance does) */
+	float irrlod = max(maxlod - 3.0, 0.0);
+	diffibl = vec4(0.0);
+	for (int k = 0; k < 5; k++) {
+		diffibl += textureCubeLod(wtex, env_irradiance_dir(-wn, k), irrlod) * 0.2;
+	}
 	rough = rough * turbid * M_1_PI + turbid * M_1_PI;
-	transmit = textureCubeLod(wtex, wv, rough * 9.0);
+	transmit = textureCubeLod(wtex, wv, rough * maxlod);
 }
 
 /* Local reflection probe (cube map captured from a probe object in the game), bound per object by
@@ -3031,20 +3065,31 @@ void env_probe_mirror(vec4 mirror, vec3 wr, float rough, float linearize, out ve
 
 void env_equirect_tex(float rough, float turbid, sampler2D wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
-    rough = sqrt(rough);
-	mirror =   texture2DLod(wtex, uv_equirectangular(wr), rough * 9.0);
-	diffibl =  texture2DLod(wtex, uv_equirectangular(-wn), 9.0);
+	/* mip 0 is 2:1, so log2(width) - 1 is the 2x1 level; the last usable level for a mirror blur */
+	float maxlod = log2(float(max(textureSize(wtex, 0).x, 2))) - 1.0;
+	rough = sqrt(rough);
+	mirror =   texture2DLod(wtex, uv_equirectangular(wr), rough * maxlod);
+	float irrlod = max(maxlod - 3.0, 0.0);
+	diffibl = vec4(0.0);
+	for (int k = 0; k < 5; k++) {
+		diffibl += texture2DLod(wtex, uv_equirectangular(env_irradiance_dir(-wn, k)), irrlod) * 0.2;
+	}
 	rough = rough * turbid * M_1_PI + turbid * M_1_PI;
-	transmit = texture2DLod(wtex, uv_equirectangular(wv), rough * 9.0);
+	transmit = texture2DLod(wtex, uv_equirectangular(wv), rough * maxlod);
 }
 
 void env_angular_tex(float rough, float turbid, sampler2D wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
-    rough = sqrt(rough);
-	mirror = texture2DLod(wtex, uv_angular(wr), rough * 9.0);
-	diffibl = texture2DLod(wtex, uv_angular(-wn), 9.0);
+	float maxlod = log2(float(max(textureSize(wtex, 0).x, 1)));
+	rough = sqrt(rough);
+	mirror = texture2DLod(wtex, uv_angular(wr), rough * maxlod);
+	float irrlod = max(maxlod - 3.0, 0.0);
+	diffibl = vec4(0.0);
+	for (int k = 0; k < 5; k++) {
+		diffibl += texture2DLod(wtex, uv_angular(env_irradiance_dir(-wn, k)), irrlod) * 0.2;
+	}
 	rough = rough * turbid * M_1_PI + turbid * M_1_PI;
-	transmit = texture2DLod(wtex,uv_angular(wv), rough * 9.0);
+	transmit = texture2DLod(wtex, uv_angular(wv), rough * maxlod);
 }
 
 void env_apply(float amb, float refl, float f0, float metal, float opacity, float energy, float conserv,
@@ -4453,13 +4498,13 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	}
 
 	if (env_on > 0.5) {
-		/* environment specular: reflected sky/HDRI with roughness-aware Schlick fresnel (Lagarde) */
+		/* environment specular: reflected sky/HDRI times the split-sum environment BRDF */
 		float Cdlum_e = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b;
 		vec3 Ctint_e = Cdlum_e > 0.0 ? base_color.rgb / Cdlum_e : vec3(1.0);
 		vec3 Cspec0_e = mix(specular * 0.08 * mix(vec3(1.0), Ctint_e, specular_tint), base_color.rgb, metallic);
 		float NdotV_e = clamp(dot(N, V), 0.0, 1.0);
-		vec3 F_e = Cspec0_e + (max(vec3(1.0 - roughness), Cspec0_e) - Cspec0_e) * pow(1.0 - NdotV_e, 5.0);
-		L += env_mirror.rgb * F_e;
+		vec2 AB_e = env_brdf_approx(NdotV_e, roughness);
+		L += env_mirror.rgb * (Cspec0_e * AB_e.x + AB_e.y);
 	}
 
 	result = vec4(L, 1.0);

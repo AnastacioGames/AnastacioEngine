@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Luz do World (textura) mais fiel no Game PBR
+
+- Textura do World (equirect, angular, cube): o difuso passa a ser a média de 5 amostras em torno da normal num mip
+  baixo (antes, uma cor única do último mip); o mip máximo do reflexo vem do tamanho da textura (antes, 9 fixo).
+- Principled: reflexo do World multiplicado pela BRDF de ambiente split-sum (`env_brdf_approx`, Karis).
+- World montado em nós ainda reflete as cores Horizon/Zenith; próximo passo: capturar o World num cubemap.
+- Teste: `tools/create_world_ibl_test.py` (sem lâmpadas, luz só da imagem). Build e execução sem erro de shader;
+  validação visual pendente.
+
 ## 2026-10-02 - Nó Wireframe no Game PBR
 
 - Wireframe (`node_shader_wireframe.c`, GLSL `node_wireframe`): ganhou código GPU, com selo `~Game`. As arestas
