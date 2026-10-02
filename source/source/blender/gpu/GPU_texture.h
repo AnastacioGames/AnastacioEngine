@@ -77,6 +77,14 @@ GPUTexture *GPU_texture_create_jitter(int w);
 GPUTexture *GPU_texture_global_jitter_64(void);
 GPUTexture **GPU_texture_global_depth_ptr(void);
 void GPU_texture_set_global_depth(GPUTexture *depthtex);
+/* Game PBR screen-space refraction: copy of the scene color after the solid pass (mipmapped),
+ * read by Glass / Refraction in the alpha pass. NULL resets it to the 1x1 placeholder, which the
+ * shader takes as "no copy" (World fallback). A material that needs it calls request, and the
+ * game only makes the copy once one has. */
+GPUTexture **GPU_texture_global_scene_color_ptr(void);
+void GPU_texture_set_global_scene_color(GPUTexture *colortex);
+void GPU_texture_scene_color_request(void);
+int GPU_texture_scene_color_requested(void);
 /* GPU particle screen-space collision: view*projection matrix used to render the global
  * depth texture, cached alongside it (see gpu_texture.c). Returns 0 (r_viewproj untouched)
  * if no valid depth has been cached this session/since the last ResetGlobalDepthTexture. */

@@ -220,6 +220,11 @@ GPUTexture *RAS_OffScreen::GetDepthTexture()
 	return m_depthSlot.m_tex;
 }
 
+GPUTexture *RAS_OffScreen::GetColorTexture(unsigned short slot)
+{
+	return (m_samples > 0 || slot >= m_numColorSlots) ? nullptr : m_colorSlots[slot].m_tex;
+}
+
 RAS_OffScreen *RAS_OffScreen::GetLastOffScreen()
 {
 	return lastOffScreen;

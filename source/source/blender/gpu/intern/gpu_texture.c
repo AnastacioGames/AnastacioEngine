@@ -48,6 +48,8 @@ static struct GPUTextureGlobal {
 	GPUTexture *invalid_tex_3D;
 	GPUTexture *jitter_64_tex;
 	GPUTexture *depth_tex;
+	GPUTexture *scene_color_tex; /* see GPU_texture_global_scene_color_ptr */
+	int scene_color_requested;
 	/* GPU particle screen-space collision: view*projection used to render depth_tex, cached
 	 * alongside it so a 1-frame-delayed consumer (particle simulation, which runs before
 	 * this frame's render) can reproject world-space positions into that texture's screen
@@ -751,6 +753,26 @@ void GPU_texture_set_global_depth(GPUTexture *depthtex)
 	}
 }
 
+GPUTexture **GPU_texture_global_scene_color_ptr(void)
+{
+	return &GG.scene_color_tex;
+}
+
+void GPU_texture_set_global_scene_color(GPUTexture *colortex)
+{
+	GG.scene_color_tex = colortex ? colortex : GG.invalid_tex_2D;
+}
+
+void GPU_texture_scene_color_request(void)
+{
+	GG.scene_color_requested = 1;
+}
+
+int GPU_texture_scene_color_requested(void)
+{
+	return GG.scene_color_requested;
+}
+
 void GPU_texture_set_global_depth_viewproj(const float viewproj[16])
 {
 	memcpy(GG.depth_viewproj, viewproj, sizeof(GG.depth_viewproj));
@@ -814,6 +836,7 @@ void GPU_invalid_tex_init(void)
 	GG.invalid_tex_2D = GPU_texture_create_2D(1, 1, color, GPU_HDR_NONE, NULL);
 	GG.jitter_64_tex = GPU_texture_create_jitter(64);
 	GG.depth_tex = GG.invalid_tex_2D;
+	GG.scene_color_tex = GG.invalid_tex_2D;
 	GG.collider_depth_tex = GG.invalid_tex_2D;
 }
 

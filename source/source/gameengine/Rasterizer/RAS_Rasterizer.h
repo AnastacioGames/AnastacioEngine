@@ -725,6 +725,11 @@ public:
 	void UpdateGlobalDepthTexture(RAS_OffScreen *offScreen, RAS_ICanvas *canvas);
 	/// Set the global depth texture to an empty texture.
 	void ResetGlobalDepthTexture();
+	/** Point the global scene color (screen-space refraction of Glass / Refraction) at the color of
+	 * RAS_OFFSCREEN_BLIT_DEPTH, filled by UpdateGlobalDepthTexture() just before, and mipmap it. */
+	void UpdateGlobalSceneColor(RAS_ICanvas *canvas);
+	/// Back to the placeholder: materials drawn now use the World instead.
+	void ResetGlobalSceneColor();
 
 	void MotionBlur();
 

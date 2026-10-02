@@ -117,6 +117,8 @@ public:
 	unsigned short GetNumColorSlot() const;
 
 	GPUTexture *GetDepthTexture();
+	/// Color texture of a slot, nullptr for a multisample off screen.
+	GPUTexture *GetColorTexture(unsigned short slot);
 
 	static RAS_OffScreen *GetLastOffScreen();
 	static void RestoreScreen();

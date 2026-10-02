@@ -1525,6 +1525,21 @@ void RAS_Rasterizer::ResetGlobalDepthTexture()
 	GPU_texture_set_global_depth(nullptr);
 }
 
+void RAS_Rasterizer::UpdateGlobalSceneColor(RAS_ICanvas *canvas)
+{
+	GPUTexture *tex = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_BLIT_DEPTH)->GetColorTexture(0);
+	if (tex) {
+		GPU_texture_filter_mode(tex, false, true, true);
+		GPU_texture_generate_mipmap(tex);
+	}
+	GPU_texture_set_global_scene_color(tex);
+}
+
+void RAS_Rasterizer::ResetGlobalSceneColor()
+{
+	GPU_texture_set_global_scene_color(nullptr);
+}
+
 void RAS_Rasterizer::MotionBlur()
 {
 	m_impl->MotionBlur(m_motionblur, m_motionblurvalue);

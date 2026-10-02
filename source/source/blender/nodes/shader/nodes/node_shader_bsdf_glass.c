@@ -50,7 +50,8 @@ static int node_shader_gpu_bsdf_glass(GPUMaterial *mat, bNode *UNUSED(node), bNo
 	node_shader_gpu_world_env(mat, in[1].link ? in[1].link : GPU_uniform(in[1].vec), &env_mirror, &env_diffuse, &env_flag);
 
 	return GPU_stack_link(mat, "node_bsdf_glass", in, out, GPU_material_builtin(mat, GPU_VIEW_POSITION),
-	                      GPU_material_world_color(mat), env_mirror, env_diffuse, env_flag);
+	                      GPU_material_world_color(mat), env_mirror, env_diffuse, env_flag,
+	                      node_shader_gpu_scene_color(mat));
 }
 
 /* node type definition */

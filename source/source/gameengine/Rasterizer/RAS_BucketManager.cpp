@@ -43,6 +43,8 @@
 #include "RAS_IMaterial.h"
 #include "RAS_Rasterizer.h"
 
+#include "GPU_texture.h"
+
 #include "RAS_BucketManager.h"
 
 #include <algorithm>
@@ -309,10 +311,17 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 			rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
 
 			// Update depth transparency depth texture after rendering all solid materials.
-			if ((m_buckets[ALPHA_DEPTH_BUCKET].size() + m_buckets[ALPHA_DEPTH_INSTANCING_BUCKET].size()) > 0) {
+			// The same blit also copies the color, read by the screen-space refraction of
+			// Glass / Refraction (Game PBR) in the alpha pass below.
+			const bool sceneColor = GPU_texture_scene_color_requested() &&
+			                        (m_buckets[ALPHA_BUCKET].size() + m_buckets[ALPHA_INSTANCING_BUCKET].size()) > 0;
+			if (sceneColor || (m_buckets[ALPHA_DEPTH_BUCKET].size() + m_buckets[ALPHA_DEPTH_INSTANCING_BUCKET].size()) > 0) {
 				KX_KetsjiEngine *ketsji = KX_GetActiveEngine();
 				RAS_ICanvas* canvas = ketsji->GetCanvas();
 				rasty->UpdateGlobalDepthTexture(offScreen, canvas);
+				if (sceneColor) {
+					rasty->UpdateGlobalSceneColor(canvas);
+				}
 			}
 
 			// Z-prepass: write depth for alpha-cutout/clip materials (Clip, Alpha-to-Coverage)
@@ -334,6 +343,9 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 			RenderBasicBuckets(rasty, ALPHA_INSTANCING_BUCKET);
 			RenderSortedBuckets(rasty, ALPHA_BUCKET);
 
+			if (sceneColor) {
+				rasty->ResetGlobalSceneColor();
+			}
 
 			rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);
 			break;

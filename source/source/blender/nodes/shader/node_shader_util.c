@@ -28,6 +28,8 @@
 
 #include "node_exec.h"
 
+#include "GPU_texture.h"
+
 
 bool sh_node_poll_default(bNodeType *UNUSED(ntype), bNodeTree *ntree)
 {
@@ -328,4 +330,12 @@ void node_shader_gpu_world_env(GPUMaterial *mat, GPUNodeLink *rough,
 		*r_diffuse = *r_mirror;
 		*r_flag = GPU_uniform(&env_off);
 	}
+}
+
+/* Scene color copy for screen-space refraction (Glass, Refraction), see
+ * GPU_texture_global_scene_color_ptr. Asks the game to make the copy from now on. */
+GPUNodeLink *node_shader_gpu_scene_color(GPUMaterial *UNUSED(mat))
+{
+	GPU_texture_scene_color_request();
+	return GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
 }

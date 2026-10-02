@@ -4333,15 +4333,41 @@ void node_tangentmap(vec3 N, vec4 attr_tangent, mat4 viewinvmat, out vec3 T)
 }
 
 /* Light transmitted through glass/refraction: World environment when there is one, else the
- * World color. There is no screen copy to refract, so with Alpha Blend the scene behind shows
- * through the alpha instead (untinted). */
+ * World color. Used when there is no screen copy (solid blend mode, viewport, probe capture). */
 vec3 glass_transmitted(vec3 ambient, vec4 env_diffuse, float env_on)
 {
 	return (env_on > 0.5) ? env_diffuse.rgb : ambient;
 }
 
+/* Screen-space refraction: the copy of the scene made after the solid pass, read along the
+ * refracted view ray bent through a fixed thickness and projected back to the screen. The copy
+ * exists only for Alpha Blend materials in the game (drawn after the copy); elsewhere scol is the
+ * 1x1 placeholder and this returns false. Roughness picks a blurrier mip. */
+bool glass_screen_refraction(sampler2D scol, vec3 N, vec3 I, float eta, float roughness, out vec3 T)
+{
+	ivec2 size = textureSize(scol, 0);
+	if (size.x <= 1) {
+		T = vec3(0.0);
+		return false;
+	}
+	vec3 V = scene_view_vector(I);
+	vec3 Ns = (dot(N, V) < 0.0) ? -N : N;
+	vec3 r = refract(-V, Ns, 1.0 / eta);
+	if (dot(r, r) == 0.0) {
+		r = reflect(-V, Ns); /* total internal reflection */
+	}
+	const float thickness = 0.3;
+	vec4 p0 = gl_ProjectionMatrix * vec4(I, 1.0);
+	vec4 p1 = gl_ProjectionMatrix * vec4(I + (r + V) * thickness, 1.0);
+	vec2 uv = gl_FragCoord.xy / vec2(size) + (p1.xy / p1.w - p0.xy / p0.w) * 0.5;
+	uv = clamp(uv, vec2(0.0), vec2(1.0));
+	float maxlod = log2(float(max(size.x, size.y)));
+	T = textureLod(scol, uv, sqrt(clamp(roughness, 0.0, 1.0)) * maxlod * 0.6).rgb;
+	return true;
+}
+
 void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,
-                     vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
+                     vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, out vec4 result)
 {
 	vec3 V = scene_view_vector(I);
 	float NdotV = dot(N, V);
@@ -4370,7 +4396,13 @@ void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec
 		R += SCENE_LIGHT(i).specular.rgb * bsdf * NdotL * scene_light_visibility(i, I, Ns, NdotL, atten);
 	}
 
-	vec3 T = glass_transmitted(ambient, env_diffuse, env_on) * color.rgb;
+	vec3 T;
+	if (glass_screen_refraction(scol, N, I, eta, roughness, T)) {
+		/* the scene behind is already in T: opaque output, Alpha Blend just replaces */
+		result = vec4(F * R * color.rgb + (1.0 - F) * T * color.rgb, 1.0);
+		return;
+	}
+	T = glass_transmitted(ambient, env_diffuse, env_on) * color.rgb;
 	result = vec4(F * R * color.rgb + (1.0 - F) * T, F);
 }
 
@@ -4656,9 +4688,17 @@ void node_bsdf_hair(vec4 color, float offset, float roughnessu, float roughnessv
 }
 
 void node_bsdf_refraction(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec3 ambient,
-                          vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
+                          vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, out vec4 result)
 {
-	/* only the transmitted part (no fresnel in Cycles' Refraction BSDF); alpha 0 like Transparent */
+	/* only the transmitted part (no fresnel in Cycles' Refraction BSDF) */
+	vec3 V = scene_view_vector(I);
+	float eta = max((dot(N, V) < 0.0) ? 1.0 / max(ior, 1e-4) : ior, 1e-4);
+	vec3 T;
+	if (glass_screen_refraction(scol, N, I, eta, roughness, T)) {
+		result = vec4(T * color.rgb, 1.0);
+		return;
+	}
+	/* alpha 0 like Transparent: with Alpha Blend the scene shows through untinted */
 	result = vec4(glass_transmitted(ambient, env_diffuse, env_on) * color.rgb, 0.0);
 }
 
