@@ -589,6 +589,46 @@ GPUTexture *GPU_texture_create_2D(int w, int h, const float *fpixels, GPUHDRType
 
 	return tex;
 }
+/* Empty color cube map with a mip chain, for render-to-cube (light probes). Faces are filled through
+ * framebuffers and the mips regenerated with GPU_texture_generate_mipmap() after each capture. */
+GPUTexture *GPU_texture_create_cube(int size, GPUHDRType hdr, char err_out[256])
+{
+	GPUTexture *tex = MEM_callocN(sizeof(GPUTexture), "GPUTexture");
+	tex->w = tex->h = size;
+	tex->number = -1;
+	tex->refcount = 1;
+	tex->target = tex->target_base = GL_TEXTURE_CUBE_MAP;
+	tex->fb_attachment = -1;
+
+	glGenTextures(1, &tex->bindcode);
+	if (!tex->bindcode) {
+		if (err_out) {
+			BLI_snprintf(err_out, 256, "GPUTexture: cube texture create failed: %d", (int)glGetError());
+		}
+		GPU_texture_free(tex);
+		return NULL;
+	}
+
+	GLenum internalformat = (hdr == GPU_HDR_NONE) ? GL_RGBA8 : GL_RGBA16F_ARB;
+	GLenum type = (hdr == GPU_HDR_NONE) ? GL_UNSIGNED_BYTE : GL_FLOAT;
+
+	tex->number = 0;
+	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
+	for (int face = 0; face < 6; face++) {
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, internalformat, size, size, 0, GL_RGBA, type, NULL);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+	GPU_texture_unbind(tex);
+
+	return tex;
+}
+
 GPUTexture *GPU_texture_create_2D_multisample(
         int w, int h, const float *fpixels, GPUHDRType hdr, int samples, char err_out[256])
 {

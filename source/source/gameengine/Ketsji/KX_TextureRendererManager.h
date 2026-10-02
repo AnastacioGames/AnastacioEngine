@@ -33,11 +33,14 @@ class KX_GameObject;
 class KX_Camera;
 class KX_Scene;
 class KX_TextureRenderer;
+class KX_LightProbe;
 
 class RAS_Rasterizer;
 class RAS_OffScreen;
 class RAS_Texture;
 class RAS_Rect;
+
+struct GPUTexture;
 
 class KX_TextureRendererManager
 {
@@ -55,6 +58,11 @@ private:
 	KX_Camera *m_camera;
 	/// The scene we are rendering for.
 	KX_Scene *m_scene;
+
+	/// Light probes, also in m_renderers[VIEWPORT_INDEPENDENT] which owns them.
+	std::vector<KX_LightProbe *> m_probes;
+	/// True while a renderer captures: materials then skip probes (no feedback into the cube map).
+	bool m_capturing;
 
 	/// Render a texture renderer, return true if the render was proceeded.
 	bool RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
@@ -77,6 +85,14 @@ public:
 	* texture containing in the material texture passed.
 	*/
 	void AddRenderer(RendererType type, RAS_Texture *texture, KX_GameObject *viewpoint);
+
+	/// Add a local reflection probe captured from the viewpoint object.
+	void AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime);
+
+	/** Find the probe to use for an object at position: the nearest one whose radius contains it.
+	 * Returns false when none applies (the World reflection is used).
+	 */
+	bool FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.

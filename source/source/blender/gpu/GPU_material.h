@@ -480,6 +480,7 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
  * unshadowed. */
 #define GPU_MATERIAL_NUM_SHADOW_LAMPS 3
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
+void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod);
 
 /* One slot of that same scene-light loop, with the values the fixed-function glLight* calls
  * would store in gl_LightSource[slot] (eye-space position/direction, as GL transforms them by

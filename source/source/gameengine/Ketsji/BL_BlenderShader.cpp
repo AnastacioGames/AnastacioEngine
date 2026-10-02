@@ -41,6 +41,7 @@
 #include "CM_Message.h"
 
 #include "KX_Scene.h"
+#include "KX_TextureRendererManager.h"
 
 #include <cstring>
 #include <vector>
@@ -240,6 +241,14 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 			}
 		}
 	}
+
+	/* Local reflection probe around the object, or none (World reflection). */
+	GPUTexture *probeCube = nullptr;
+	float probeMaxLod = 0.0f;
+	const mt::vec3 position = meshUser->GetMatrix().TranslationVector3D();
+	const float pos[3] = {position.x, position.y, position.z};
+	m_scene->GetTextureRendererManager()->FindProbe(pos, &probeCube, &probeMaxLod);
+	GPU_material_bind_probe(m_gpuMat, probeCube, probeMaxLod);
 
 	m_alphaBlend = GPU_material_alpha_blend(m_gpuMat, meshUser->GetColor().Data());
 }

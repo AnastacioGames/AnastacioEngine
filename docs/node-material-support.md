@@ -52,6 +52,11 @@ Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Ob
 Normal Map, Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),
 nós de cor, conversão e vetor.
 
+## Reflection probe
+
+Dentro do raio de um objeto com a propriedade de jogo `probe`, Principled, Glossy e Glass refletem o
+cubemap capturado pelo probe em vez do World. Detalhes no changelog de 2026-10-01.
+
 ## Nós exclusivos do jogo (`Game`)
 
 Sprites Animation, Object, Time e Parallax funcionam nos dois caminhos do Game.

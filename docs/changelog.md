@@ -20,6 +20,24 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   voltava para idle. `BL_ActionActuator::IsOwnAction` compara o `BL_ActionData` resolvido
   (`KX_GameObject::GetCurrentActionData`).
 
+## 2026-10-01 - Game PBR: reflection probe local
+
+- Objeto com a propriedade de jogo `probe` (valor = raio de influência; ≤ 0 vira 10) vira um reflection probe:
+  `KX_LightProbe` (derivado do `KX_CubeMap`) captura um cubemap da posição do objeto, com textura própria
+  (`GPU_texture_create_cube`, half float no desktop, RGBA8 no Web) e mipmaps.
+- Propriedades opcionais: `probe_size` (pixels por face, padrão 256, 16 a 2048), `probe_clip_end` (padrão 100)
+  e `probe_realtime` (captura todo frame; sem ela, captura uma vez no início).
+- Por objeto, `BL_BlenderShader::Update` escolhe o probe mais próximo cujo raio contém a origem do objeto
+  (`KX_TextureRendererManager::FindProbe`) e liga `unfprobecube`/`unfprobeinfo` (`GPU_material_bind_probe`).
+  Sem probe, vale o reflexo do World. Sem mistura entre probes.
+- Shader: `env_probe_mirror` troca o reflexo do World (`GPU_material_world_env`) pelo cubemap do probe, com
+  mip pela Roughness. Vale para Principled, Glossy e Glass (Refraction usa só a luz transmitida). A luz difusa continua vindo do World.
+- Durante qualquer captura os materiais ignoram probes (sem realimentação do cubemap nele mesmo).
+- A captura guarda cores de tela; com Color Management o shader volta para linear com a curva sRGB
+  (aproximado sob Filmic).
+- Teste: `probe_reflection_test.range` (sala de paredes coloridas com duas esferas metálicas dentro do raio e
+  uma fora, que reflete só o céu).
+
 ## 2026-10-01 - Game PBR: sombra de luz Point (atlas de cubo)
 
 - Com Shading Nodes e `Cast Shadow` ligado, a Point ganha shadow map: as 6 faces do cubo (90°, clip start/end

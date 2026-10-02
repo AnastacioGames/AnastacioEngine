@@ -99,6 +99,7 @@ set(SRC
 	KX_ConstraintActuator.cpp
 	KX_ConstraintWrapper.cpp
 	KX_CubeMap.cpp
+	KX_LightProbe.cpp
 	KX_ConsoleWindow.cpp
 	KX_CullingHandler.cpp
 	KX_CutsceneManager.cpp
@@ -211,6 +212,7 @@ set(SRC
 	KX_ConstraintWrapper.h
 	KX_ConsoleWindow.h
 	KX_CubeMap.h
+	KX_LightProbe.h
 	KX_CullingHandler.h
 	KX_CutsceneManager.h
 	KX_DestructionManager.h

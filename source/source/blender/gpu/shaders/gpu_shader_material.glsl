@@ -3003,6 +3003,25 @@ void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn,
 	transmit = textureCubeLod(wtex, wv, rough * 9.0);
 }
 
+/* Local reflection probe (cube map captured from a probe object in the game), bound per object by
+ * GPU_material_bind_probe(): x = 1 when this object is inside a probe, y = highest mip level. */
+uniform samplerCube unfprobecube;
+uniform vec4 unfprobeinfo;
+
+void env_probe_mirror(vec4 mirror, vec3 wr, float rough, float linearize, out vec4 result)
+{
+	if (unfprobeinfo.x > 0.5) {
+		result = textureCubeLod(unfprobecube, wr, sqrt(rough) * unfprobeinfo.y);
+		/* the capture holds display colors; back to linear (approximate under Filmic) */
+		if (linearize > 0.5) {
+			srgb_to_linearrgb(result, result);
+		}
+	}
+	else {
+		result = mirror;
+	}
+}
+
 void env_equirect_tex(float rough, float turbid, sampler2D wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
     rough = sqrt(rough);

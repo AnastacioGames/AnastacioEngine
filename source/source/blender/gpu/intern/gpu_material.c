@@ -173,6 +173,9 @@ struct GPUMaterial {
 	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowpointloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 
+	/* Local reflection probe (unfprobecube/unfprobeinfo), bound per object by GPU_material_bind_probe(). */
+	int probecubeloc, probeinfoloc;
+
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {
 		int position, diffuse, specular, halfvector, spotdirection, spotexponent;
@@ -485,6 +488,9 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			BLI_snprintf(name, sizeof(name), "unfshadowpoint[%d]", i);
 			material->shadowpointloc[i] = GPU_shader_get_uniform(shader, name);
 		}
+
+		material->probecubeloc = GPU_shader_get_uniform(shader, "unfprobecube");
+		material->probeinfoloc = GPU_shader_get_uniform(shader, "unfprobeinfo");
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 			char name[64];
@@ -3693,6 +3699,11 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 		}
 	}
 
+	/* a local reflection probe, when the game binds one for the object, replaces the World reflection */
+	static float probe_linearize_on = 1.0f, probe_linearize_off = 0.0f;
+	GPU_link(mat, "env_probe_mirror", mirror, wr, rough,
+	         GPU_uniform(GPU_material_do_color_management(mat) ? &probe_linearize_on : &probe_linearize_off), &mirror);
+
 	*r_mirror = mirror;
 	*r_diffuse = diffibl;
 	return true;
@@ -4640,6 +4651,31 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
 		}
 	}
+}
+
+/* Binds the local reflection probe cube map for this object (NULL = none, the World reflection is
+ * used). Must run per object with the program bound. The probe uses its own texture unit, right below
+ * the shadow map units, so the samplerCube never shares a unit with a sampler2D. */
+void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod)
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->probeinfoloc == -1) {
+		return;
+	}
+
+	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 1;
+	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};
+
+	if (cube && material->probecubeloc != -1) {
+		GPU_texture_bind(cube, texunit);
+		GPU_shader_uniform_texture(shader, material->probecubeloc, cube);
+		info[0] = 1.0f;
+	}
+	else if (material->probecubeloc != -1) {
+		GPU_shader_uniform_int(shader, material->probecubeloc, texunit);
+	}
+
+	GPU_shader_uniform_vector(shader, material->probeinfoloc, 4, 1, info);
 }
 
 /* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into

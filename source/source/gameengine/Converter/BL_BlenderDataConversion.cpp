@@ -2660,6 +2660,30 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		}
 	}
 
+	/* Local reflection probes for Game PBR materials: objects with a "probe" game property, whose
+	 * value is the influence radius. Optional: "probe_size" (face pixels, default 256),
+	 * "probe_clip_end" (default 100) and "probe_realtime" (capture every frame, default once). */
+	for (KX_GameObject *gameobj : sumolist) {
+		EXP_Value *radiusProp = gameobj->GetProperty("probe");
+		if (!radiusProp) {
+			continue;
+		}
+
+		float radius = (float)radiusProp->GetNumber();
+		if (radius <= 0.0f) {
+			radius = 10.0f;
+		}
+		EXP_Value *sizeProp = gameobj->GetProperty("probe_size");
+		int size = sizeProp ? (int)sizeProp->GetNumber() : 256;
+		CLAMP(size, 16, 2048);
+		EXP_Value *clipProp = gameobj->GetProperty("probe_clip_end");
+		const float clipEnd = (clipProp && clipProp->GetNumber() > 0.1) ? (float)clipProp->GetNumber() : 100.0f;
+		EXP_Value *realtimeProp = gameobj->GetProperty("probe_realtime");
+		const bool realtime = realtimeProp && realtimeProp->GetNumber() != 0.0;
+
+		kxscene->GetTextureRendererManager()->AddProbe(gameobj, radius, size, clipEnd, realtime);
+	}
+
 	/* Instantiate dupli group, we will loop trough the object
 	 * that are in active layers. Note that duplicating group
 	 * has the effect of adding objects at the end of objectlist.

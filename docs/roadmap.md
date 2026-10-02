@@ -363,9 +363,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `Cast Shadow` do Cycles (Point por atlas de cubo 3x2, 2026-10-01, validado pelo usuário); sem Shading Nodes,
   Sun exige `RAY_SHADOW`, Spot `BUFFER_SHADOW` e Point não tem sombra. A Point não aparece no viewport do editor
   nem nos materiais BI.
-- **Light probes** (reflection probes/irradiance volumes): não existem; o IBL atual (`059766dc`) é global, um
-  único céu/HDRI pra cena toda, sem componente local por objeto. Avaliar só depois de resolver a sombra do
-  Principled acima.
+- **Light probes**: reflection probe local feito em 2026-10-01 (propriedade `probe` num objeto, ver changelog);
+  falta validação visual em `probe_reflection_test.range`. Em aberto: luz difusa local (irradiance, harmônicos
+  esféricos do mesmo cubemap), mistura entre probes vizinhos e correção de paralaxe por caixa.
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.

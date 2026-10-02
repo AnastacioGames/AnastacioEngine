@@ -30,6 +30,8 @@
 #include "KX_Globals.h"
 #include "KX_CubeMap.h"
 #include "KX_PlanarMap.h"
+#include "KX_LightProbe.h"
+#include "KX_GameObject.h"
 
 #include "RAS_Rasterizer.h"
 #include "RAS_OffScreen.h"
@@ -63,7 +65,8 @@ public:
 }  // namespace
 
 KX_TextureRendererManager::KX_TextureRendererManager(KX_Scene *scene)
-	:m_scene(scene)
+	:m_scene(scene),
+	m_capturing(false)
 {
 	const RAS_CameraData& camdata = RAS_CameraData();
 	m_camera = new KX_Camera(m_scene, KX_Scene::m_callbacks, camdata, true);
@@ -130,6 +133,43 @@ void KX_TextureRendererManager::AddRenderer(RendererType type, RAS_Texture *text
 	}
 
 	renderer->AddTextureUser(texture);
+}
+
+void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime)
+{
+	KX_LightProbe *probe = new KX_LightProbe(viewpoint, radius, size, clipEnd, realtime);
+	m_renderers[VIEWPORT_INDEPENDENT].push_back(probe);
+	m_probes.push_back(probe);
+}
+
+bool KX_TextureRendererManager::FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod) const
+{
+	if (m_capturing || m_probes.empty()) {
+		return false;
+	}
+
+	const mt::vec3 pos(position[0], position[1], position[2]);
+	KX_LightProbe *best = nullptr;
+	float bestDist = 0.0f;
+	for (KX_LightProbe *probe : m_probes) {
+		KX_GameObject *viewpoint = probe->GetViewpointObject();
+		if (!viewpoint || !probe->GetCubeTexture()) {
+			continue;
+		}
+		const float dist = (viewpoint->NodeGetWorldPosition() - pos).Length();
+		if (dist <= probe->GetRadius() && (!best || dist < bestDist)) {
+			best = probe;
+			bestDist = dist;
+		}
+	}
+
+	if (!best) {
+		return false;
+	}
+
+	*r_cube = best->GetCubeTexture();
+	*r_maxLod = best->GetMaxLod();
+	return true;
 }
 
 bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
@@ -224,9 +264,11 @@ void KX_TextureRendererManager::Render(RendererCategory category, RAS_Rasterizer
 
 	// Check if at least one renderer was rendered.
 	bool rendered = false;
+	m_capturing = true;
 	for (KX_TextureRenderer *renderer : renderers) {
 		rendered |= RenderRenderer(rasty, renderer, sceneCamera, viewport, area);
 	}
+	m_capturing = false;
 
 	rasty->Enable(RAS_Rasterizer::RAS_SCISSOR_TEST);
 
@@ -242,6 +284,9 @@ void KX_TextureRendererManager::Merge(KX_TextureRendererManager *other)
 		m_renderers[i].insert(m_renderers[i].end(), other->m_renderers[i].begin(), other->m_renderers[i].end());
 		other->m_renderers[i].clear();
 	}
+
+	m_probes.insert(m_probes.end(), other->m_probes.begin(), other->m_probes.end());
+	other->m_probes.clear();
 }
 
 void KX_TextureRendererManager::InvalidateRenderersProjectionMatrix()
