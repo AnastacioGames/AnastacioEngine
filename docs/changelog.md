@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Spot no Game PBR com a atenuação do Cycles; IES e volumes validados
+
+- **Bug:** no loop de luzes do Game PBR (`scene_light_dir`) a Spot usava o modelo do GL fixo,
+  `pow(cos, spotExponent)` com `spotExponent = 128 * Spot Blend` (`RAS_OpenGLLight`): com Blend 0.3 uma Spot
+  de 120° virava uma mancha de ~25°. Achado ao validar o IES numa Spot (`tools/create_ies_test.py -- <saida> spot`).
+- **Correção:** `smoothstep((cos - cosCutoff) / ((1 - cosCutoff) * Blend))`, o `spot_attenuation` do Cycles; o
+  Blend vem de `spotExponent / 128`. Só os BSDFs nodais usam esse caminho; Spots existentes ficam mais largas.
+- IES (Point e Spot) e nós de volume validados pelo usuário contra render do Cycles. Comparar com a lâmpada na
+  mesma escala de brilho: a Energy do Game não é a Strength do Cycles, e com a lâmpada forte o Absorption e o
+  Scatter parecem claros demais (o fundo e a luz é que estão claros). O Principled Volume não ilumina o entorno.
+
 ## 2026-10-02 - Nós de volume no Game PBR
 
 Volume Absorption, Volume Scatter e Principled Volume deixam de ser "sem suporte" e viram `~Game`.
