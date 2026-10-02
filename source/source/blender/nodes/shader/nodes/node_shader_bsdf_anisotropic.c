@@ -48,7 +48,20 @@ static int node_shader_gpu_bsdf_anisotropic(GPUMaterial *mat, bNode *UNUSED(node
 	else
 		GPU_link(mat, "direction_transform_m4v3", in[4].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[4].link);
 
-	return GPU_stack_link(mat, "node_bsdf_anisotropic", in, out);
+	/* Unlinked tangent: radial around the object Z axis, like Cycles. */
+	if (!in[5].link) {
+		float axis = (float)SHD_TANGENT_AXIS_Z;
+		GPU_link(mat, "node_tangent", GPU_material_builtin(mat, GPU_VIEW_NORMAL), GPU_attribute(CD_ORCO, ""),
+		         GPU_uniform(&axis), GPU_material_builtin(mat, GPU_OBJECT_MATRIX),
+		         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), &in[5].link);
+	}
+	GPU_link(mat, "direction_transform_m4v3", in[5].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[5].link);
+
+	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
+	node_shader_gpu_world_env(mat, in[1].link ? in[1].link : GPU_uniform(in[1].vec), &env_mirror, &env_diffuse, &env_flag);
+
+	return GPU_stack_link(mat, "node_bsdf_anisotropic", in, out, GPU_material_builtin(mat, GPU_VIEW_POSITION),
+	                      GPU_material_world_color(mat), env_mirror, env_diffuse, env_flag);
 }
 
 /* node type definition */

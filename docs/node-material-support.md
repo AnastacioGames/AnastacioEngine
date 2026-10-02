@@ -27,7 +27,8 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Toon BSDF | faixas de luz do Toon do Cycles, Component Diffuse e Glossy; cor do World como ambiente |
 | Glass BSDF | fresnel entre o reflexo do World e o World desfocado como luz transmitida, com brilho das luzes; não refrata a cena |
 | Refraction BSDF | World desfocado como luz transmitida; não refrata a cena |
-| Translucent, Velvet, Anisotropic, Subsurface Scattering | viram Diffuse BSDF |
+| Anisotropic BSDF | brilho GGX anisotrópico das luzes (Anisotropy, Rotation e Tangent como no Cycles; sem Tangent ligado, radial no Z do objeto); reflexo do World isotrópico, como o Glossy |
+| Translucent, Velvet, Subsurface Scattering | viram Diffuse BSDF |
 | Hair BSDF | cor chapada, sem luz |
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Bevel | devolve a normal sem mudança |
@@ -38,7 +39,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
-Tangent, Wireframe, Hair Info, Holdout, IES Texture,
+Wireframe (precisa de baricêntricas, que o fragment shader não tem), Hair Info, Holdout, IES Texture,
 Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, Principled Volume.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós
@@ -53,7 +54,7 @@ até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Sh
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
-Normal Map, Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),
+Normal Map, Tangent (Radial e UV Map), Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),
 nós de cor, conversão e vetor.
 
 ## Reflection probe
@@ -75,4 +76,4 @@ tonemap (dupla curva).
 
 ## Pendências
 
-Ver o plano em `docs/roadmap.md` (nós de material): validação visual das Fases 3 a 5. O caminho BI fica como está (decisão da Fase 6).
+Fases 3 a 5 validadas pelo usuário em 2026-10-02 (`tools/create_node_phases_test.py`). O caminho BI fica como está (decisão da Fase 6).

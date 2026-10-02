@@ -33,6 +33,24 @@ static void node_shader_init_tangent(bNodeTree *UNUSED(ntree), bNode *node)
 	node->storage = attr;
 }
 
+/* Same as Cycles: radial around an object axis (from the generated coordinates) or the UV tangent,
+ * orthogonalized against the normal, in world space. */
+static int node_shader_gpu_tangent(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	NodeShaderTangent *attr = node->storage;
+
+	if (attr->direction_type == SHD_TANGENT_UVMAP) {
+		return GPU_stack_link(mat, "node_tangentmap", in, out,
+		                      GPU_material_builtin(mat, GPU_VIEW_NORMAL), GPU_attribute(CD_TANGENT, attr->uv_map),
+		                      GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX));
+	}
+	float axis = (float)attr->axis;
+	return GPU_stack_link(mat, "node_tangent", in, out,
+	                      GPU_material_builtin(mat, GPU_VIEW_NORMAL), GPU_attribute(CD_ORCO, ""),
+	                      GPU_uniform(&axis),
+	                      GPU_material_builtin(mat, GPU_OBJECT_MATRIX), GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX));
+}
+
 /* node type definition */
 void register_node_type_sh_tangent(void)
 {
@@ -43,6 +61,7 @@ void register_node_type_sh_tangent(void)
 	node_type_socket_templates(&ntype, NULL, sh_node_tangent_out);
 	node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
 	node_type_init(&ntype, node_shader_init_tangent);
+	node_type_gpu(&ntype, node_shader_gpu_tangent);
 	node_type_storage(&ntype, "NodeShaderTangent", node_free_standard_storage, node_copy_standard_storage);
 
 	nodeRegisterType(&ntype);

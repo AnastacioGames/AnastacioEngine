@@ -4152,9 +4152,88 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
 
 void node_bsdf_anisotropic(
         vec4 color, float roughness, float anisotropy, float rotation, vec3 N, vec3 T,
+        vec3 I, vec3 ambient, vec4 env_mirror, vec4 env_diffuse, float env_on,
         out vec4 result)
 {
-	node_bsdf_diffuse(color, 0.0, N, result);
+	/* World reflection like the Glossy (isotropic), plus anisotropic GGX highlights from the scene
+	 * lights with Cycles' roughness split and tangent rotation. */
+	vec3 L = (env_on > 0.5) ? env_mirror.rgb : ambient;
+
+	vec3 X = T - N * dot(N, T);
+	X = (dot(X, X) > 1e-8) ? normalize(X) : normalize(cross(N, abs(N.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+	vec3 Y = cross(N, X);
+	if (rotation != 0.0) {
+		float ang = 2.0 * M_PI * rotation;
+		vec3 Xr = X * cos(ang) + Y * sin(ang);
+		Y = cross(N, Xr);
+		X = Xr;
+	}
+
+	float a = max(sqr(roughness), 0.001);
+	float an = clamp(anisotropy, -0.99, 0.99);
+	float ax, ay;
+	if (an < 0.0) {
+		ax = a / (1.0 + an);
+		ay = a * (1.0 + an);
+	}
+	else {
+		ax = a * (1.0 - an);
+		ay = a / (1.0 - an);
+	}
+	ax = max(ax, 0.001);
+	ay = max(ay, 0.001);
+
+	vec3 V = scene_view_vector(I);
+	float NdotV = max(dot(N, V), 1e-4);
+	float roughg = sqr(roughness * 0.5 + 0.5);
+
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = dot(N, l);
+		if (NdotL <= 0.0) {
+			continue;
+		}
+		vec3 H = normalize(l + V);
+		float bsdf = GTR2_aniso(max(dot(N, H), 0.0), dot(H, X), dot(H, Y), ax, ay) *
+		             smithG_GGX(NdotL, roughg) * smithG_GGX(NdotV, roughg);
+		L += SCENE_LIGHT(i).specular.rgb * bsdf * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
+	}
+
+	result = vec4(L * color.rgb, color.a);
+}
+
+/* Tangent node (world space), orthogonalized against the normal like Cycles. */
+vec3 tangent_orthogonalize(vec3 N, vec3 t)
+{
+	vec3 c = cross(t, N);
+	return (dot(c, c) > 1e-12) ? cross(N, normalize(c)) : vec3(0.0);
+}
+
+void node_tangent(vec3 N, vec3 orco, float axis, mat4 obmat, mat4 viewinvmat, out vec3 T)
+{
+	vec3 d = orco * 0.5; /* generated coordinates minus 0.5 */
+	vec3 t;
+	if (axis < 0.5) {
+		t = vec3(0.0, -d.z, d.y);
+	}
+	else if (axis < 1.5) {
+		t = vec3(-d.z, 0.0, d.x);
+	}
+	else {
+		t = vec3(-d.y, d.x, 0.0);
+	}
+	t = (obmat * vec4(t, 0.0)).xyz;
+	T = tangent_orthogonalize(normalize((viewinvmat * vec4(N, 0.0)).xyz), t);
+}
+
+void node_tangentmap(vec3 N, vec4 attr_tangent, mat4 viewinvmat, out vec3 T)
+{
+	vec3 nw = normalize((viewinvmat * vec4(N, 0.0)).xyz);
+	T = tangent_orthogonalize(nw, (viewinvmat * vec4(attr_tangent.xyz, 0.0)).xyz);
 }
 
 /* Light transmitted through glass/refraction: World environment when there is one, else the

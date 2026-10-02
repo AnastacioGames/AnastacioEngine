@@ -884,10 +884,13 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				return false;
 			case SH_NODE_BSDF_TRANSLUCENT:
 			case SH_NODE_BSDF_VELVET:
-			case SH_NODE_BSDF_ANISOTROPIC:
 			case SH_NODE_SUBSURFACE_SCATTERING:
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: rendered as Diffuse BSDF";
+				return false;
+			case SH_NODE_BSDF_ANISOTROPIC:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: anisotropic GGX highlight from scene lights, isotropic World reflection";
 				return false;
 			case SH_NODE_BSDF_HAIR:
 				*r_badge = "~Game";
@@ -895,7 +898,7 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				return false;
 			case SH_NODE_AMBIENT_OCCLUSION:
 				*r_badge = "~Game";
-				*r_tip = "Approximated in Game: AO output is always 1, color passes through";
+				*r_tip = "Approximated in Game: local surface concavity only, no occlusion by other objects";
 				return false;
 			case SH_NODE_BEVEL:
 				*r_badge = "~Game";
@@ -919,7 +922,6 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				}
 				break;
 			}
-			case SH_NODE_TANGENT:
 			case SH_NODE_WIREFRAME:
 			case SH_NODE_HAIR_INFO:
 			case SH_NODE_HOLDOUT:
