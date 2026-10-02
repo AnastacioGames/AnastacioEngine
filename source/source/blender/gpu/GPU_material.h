@@ -452,6 +452,19 @@ void GPU_zenith_update_color(const float color[3]);
 void GPU_update_exposure_range(float exp, float range);
 void GPU_update_envlight_energy(float energy);
 
+/* Sky Texture following the World sun lamp (Game PBR): the node keeps its coefficients in a slot read by
+ * dynamic uniforms, and GPU_sky_texture_follow_sun recomputes them when the sun turns. */
+typedef struct GPUSkyFollow {
+	const void *key;
+	void (*compute)(struct GPUSkyFollow *slot, const float sun_dir[3]);
+	float turbidity, albedo;
+	float last_dir[3];
+	float data[32];
+} GPUSkyFollow;
+
+GPUSkyFollow *GPU_sky_texture_slot(const void *key);
+void GPU_sky_texture_follow_sun(const float sun_dir[3]);
+
 struct GPUParticleInfo
 {
 	float scalprops[4];

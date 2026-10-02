@@ -309,6 +309,8 @@ void KX_WorldInfo::UpdateBackGround(RAS_Rasterizer *rasty, KX_LightObject *light
 
 			mathfu::vec3 sunDir = light->NodeGetWorldOrientation().GetColumn(2);
 			copy_v3_v3(m_scene->world_sun->obmat[2], sunDir.Data());
+			// Sky Texture nodes (Game PBR) follow the sun lamp.
+			GPU_sky_texture_follow_sun(sunDir.Data());
 
 			blenderLight->r = light->GetLightData()->m_color[0];
 			blenderLight->g = light->GetLightData()->m_color[1];

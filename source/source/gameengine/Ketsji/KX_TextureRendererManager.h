@@ -63,10 +63,15 @@ private:
 	std::vector<KX_LightProbe *> m_probes;
 	/// World captured to a cube map (no viewpoint, background only), used where no local probe applies.
 	KX_LightProbe *m_worldProbe;
+	/// World values at the last World capture; a change recaptures it.
+	float m_worldSignature[16];
 	/// True while a renderer captures: materials then skip probes (no feedback into the cube map).
 	bool m_capturing;
 
 	/// Render a texture renderer, return true if the render was proceeded.
+	/// Ask a new World capture when its colors, sun or exposure changed since the last one.
+	void CheckWorldChanged();
+
 	bool RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
 						KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
 

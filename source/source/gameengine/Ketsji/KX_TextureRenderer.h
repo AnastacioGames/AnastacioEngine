@@ -94,6 +94,11 @@ public:
 
 	// Return true when the texture renderer need to be updated.
 	bool NeedUpdate();
+	/// Render again next frame (renderers without auto update).
+	void ForceUpdate()
+	{
+		m_forceUpdate = true;
+	}
 
 	/// Setup camera position and orientation shared by all the faces, returns true when the render will be made.
 	virtual bool SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera) = 0;

@@ -86,42 +86,43 @@ static double sky_hosek_cook(const double *dataset, int stride, int index, doubl
 	return res;
 }
 
-static int node_shader_gpu_tex_sky_hosek(GPUMaterial *mat, bNode *node, GPUNodeStack *in, GPUNodeStack *out)
-{
-	NodeTexSky *tex = node->storage;
-	float dir[3], sun[2], radiance[3], config[3][9];
+/* Coefficient layout shared by both models (GPUSkyFollow.data): sun 0..1, radiance 2..4, then
+ * Preetham config_x 5..8, config_y 9..12, config_z 13..16, config_last 17..19,
+ * or Hosek / Wilkie config x 5..13, y 14..22, z 23..31. */
+#define SKY_SUN 0
+#define SKY_RADIANCE 2
+#define SKY_CONFIG 5
 
-	copy_v3_v3(dir, tex->sun_direction);
+static void sky_hosek_compute(GPUSkyFollow *slot, const float sun_dir[3])
+{
+	float dir[3];
+	float *d = slot->data;
+
+	copy_v3_v3(dir, sun_dir);
 	if (normalize_v3(dir) == 0.0f)
 		dir[2] = 1.0f;
 
 	/* Same as sky_texture_precompute_new in Cycles (render/nodes.cpp). */
 	const float theta = min_ff(acosf(CLAMPIS(dir[2], -1.0f, 1.0f)), (float)M_PI_2);
-	const double turbidity = CLAMPIS(tex->turbidity, 1.0f, 10.0f);
-	const double albedo = tex->ground_albedo;
+	const double turbidity = CLAMPIS(slot->turbidity, 1.0f, 10.0f);
+	const double albedo = slot->albedo;
 	const double elevation = M_PI_2 - theta;
 
 	for (int c = 0; c < 3; c++) {
 		for (int i = 0; i < 9; i++)
-			config[c][i] = (float)sky_hosek_cook(datasetsXYZ[c], 9, i, turbidity, albedo, elevation);
-		radiance[c] = (float)sky_hosek_cook(datasetsXYZRad[c], 1, 0, turbidity, albedo, elevation);
+			d[SKY_CONFIG + c * 9 + i] = (float)sky_hosek_cook(datasetsXYZ[c], 9, i, turbidity, albedo, elevation);
+		d[SKY_RADIANCE + c] = (float)sky_hosek_cook(datasetsXYZRad[c], 1, 0, turbidity, albedo, elevation);
 	}
-	sun[0] = atan2f(dir[0], dir[1]);
-	sun[1] = theta;
-
-	return GPU_stack_link(mat, "node_tex_sky_hosek", in, out,
-	                      GPU_uniform(sun), GPU_uniform(radiance),
-	                      GPU_uniform(config[0]), GPU_uniform(config[1]), GPU_uniform(config[2]));
+	d[SKY_SUN] = atan2f(dir[0], dir[1]);
+	d[SKY_SUN + 1] = theta;
 }
 
-static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+static void sky_preetham_compute(GPUSkyFollow *slot, const float sun_dir[3])
 {
-	NodeTexSky *tex = node->storage;
 	float dir[3], cx[5], cy[5], cz[5];
-	/* GPU_uniform copies the values when the link is consumed by GPU_stack_link below. */
-	float sun[2], radiance[3], config_x[4], config_y[4], config_z[4], config_last[3];
+	float *d = slot->data;
 
-	copy_v3_v3(dir, tex->sun_direction);
+	copy_v3_v3(dir, sun_dir);
 	if (normalize_v3(dir) == 0.0f)
 		dir[2] = 1.0f;
 
@@ -129,8 +130,9 @@ static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData 
 	const float phi = atan2f(dir[0], dir[1]);
 	const float theta2 = theta * theta;
 	const float theta3 = theta2 * theta;
-	const float T = tex->turbidity;
+	const float T = slot->turbidity;
 	const float T2 = T * T;
+	float *radiance = d + SKY_RADIANCE;
 
 	const float chi = (4.0f / 9.0f - T / 120.0f) * ((float)M_PI - 2.0f * theta);
 	radiance[0] = ((4.0453f * T - 4.9710f) * tanf(chi) - 0.2155f * T + 2.4192f) * 0.06f;
@@ -163,14 +165,35 @@ static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData 
 	radiance[1] /= sky_perez_function(cy, 0.0f, theta);
 	radiance[2] /= sky_perez_function(cz, 0.0f, theta);
 
-	sun[0] = phi;
-	sun[1] = theta;
-	copy_v4_v4(config_x, cx);
-	copy_v4_v4(config_y, cy);
-	copy_v4_v4(config_z, cz);
-	config_last[0] = cx[4];
-	config_last[1] = cy[4];
-	config_last[2] = cz[4];
+	d[SKY_SUN] = phi;
+	d[SKY_SUN + 1] = theta;
+	copy_v4_v4(d + SKY_CONFIG, cx);
+	copy_v4_v4(d + SKY_CONFIG + 4, cy);
+	copy_v4_v4(d + SKY_CONFIG + 8, cz);
+	d[SKY_CONFIG + 12] = cx[4];
+	d[SKY_CONFIG + 13] = cy[4];
+	d[SKY_CONFIG + 14] = cz[4];
+}
+
+static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	NodeTexSky *tex = node->storage;
+	const bool hosek = (tex->sky_model == SHD_SKY_NEW);
+	Scene *scene = GPU_material_scene(mat);
+	/* With a World sun lamp the sky follows it in game: coefficients live in a slot that the game
+	 * recomputes when the lamp turns (GPU_sky_texture_follow_sun), read through dynamic uniforms. */
+	Object *sun = scene ? scene->world_sun : NULL;
+	GPUSkyFollow local = {NULL};
+	GPUSkyFollow *slot = sun ? GPU_sky_texture_slot(node) : NULL;
+	const bool dynamic = (slot != NULL);
+	if (!slot)
+		slot = &local;
+
+	slot->compute = hosek ? sky_hosek_compute : sky_preetham_compute;
+	slot->turbidity = tex->turbidity;
+	slot->albedo = tex->ground_albedo;
+	copy_v3_v3(slot->last_dir, sun ? sun->obmat[2] : tex->sun_direction);
+	slot->compute(slot, slot->last_dir);
 
 	if (!in[0].link) {
 		/* Same as Cycles generated coordinates: the ray direction for the World. */
@@ -182,13 +205,16 @@ static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData 
 
 	node_shader_gpu_tex_mapping(mat, node, in, out);
 
-	if (tex->sky_model == SHD_SKY_NEW)
-		return node_shader_gpu_tex_sky_hosek(mat, node, in, out);
-
-	return GPU_stack_link(mat, "node_tex_sky", in, out,
-	                      GPU_uniform(sun), GPU_uniform(radiance),
-	                      GPU_uniform(config_x), GPU_uniform(config_y), GPU_uniform(config_z),
-	                      GPU_uniform(config_last));
+	/* GPU_uniform copies the values when the link is consumed by GPU_stack_link below. */
+#define SKY_LINK(i) (dynamic ? GPU_dynamic_uniform(slot->data + (i), GPU_DYNAMIC_WORLD_SUN_DIRECTION, NULL) :                                GPU_uniform(slot->data + (i)))
+	if (hosek) {
+		return GPU_stack_link(mat, "node_tex_sky_hosek", in, out, SKY_LINK(SKY_SUN), SKY_LINK(SKY_RADIANCE),
+		                      SKY_LINK(SKY_CONFIG), SKY_LINK(SKY_CONFIG + 9), SKY_LINK(SKY_CONFIG + 18));
+	}
+	return GPU_stack_link(mat, "node_tex_sky", in, out, SKY_LINK(SKY_SUN), SKY_LINK(SKY_RADIANCE),
+	                      SKY_LINK(SKY_CONFIG), SKY_LINK(SKY_CONFIG + 4), SKY_LINK(SKY_CONFIG + 8),
+	                      SKY_LINK(SKY_CONFIG + 12));
+#undef SKY_LINK
 }
 
 /* node type definition */

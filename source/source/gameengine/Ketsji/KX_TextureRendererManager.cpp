@@ -32,10 +32,13 @@
 #include "KX_PlanarMap.h"
 #include "KX_LightProbe.h"
 #include "KX_GameObject.h"
+#include "KX_LightObject.h"
+#include "KX_WorldInfo.h"
 
 #include "RAS_Rasterizer.h"
 #include "RAS_OffScreen.h"
 #include "RAS_Texture.h"
+#include "RAS_ILightObject.h"
 
 #include "DNA_texture_types.h"
 #include "DNA_object_types.h"
@@ -74,6 +77,7 @@ KX_TextureRendererManager::KX_TextureRendererManager(KX_Scene *scene)
 	const RAS_CameraData& camdata = RAS_CameraData();
 	m_camera = new KX_Camera(m_scene, KX_Scene::m_callbacks, camdata, true);
 	m_camera->SetName("__renderer_cam__");
+	std::fill_n(m_worldSignature, 16, -1.0f);
 }
 
 KX_TextureRendererManager::~KX_TextureRendererManager()
@@ -233,6 +237,36 @@ bool KX_TextureRendererManager::FindProbe(const float position[3], ProbeSlot r_s
 	return true;
 }
 
+void KX_TextureRendererManager::CheckWorldChanged()
+{
+	KX_WorldInfo *info = m_scene->GetWorldInfo();
+	if (!m_worldProbe || !info) {
+		return;
+	}
+
+	// Read from the World info: the Blender World only gets these values later in the frame.
+	const mt::vec4& hor = info->getHorizonColor();
+	const mt::vec4& zen = info->getZenithColor();
+	float sig[16] = {hor[0], hor[1], hor[2], zen[0], zen[1], zen[2],
+	                 info->getSunSize(), info->getExposure(), info->getRange()};
+	if (KX_LightObject *sun = m_scene->GetWorldSun()) {
+		const mt::vec3 dir = sun->NodeGetWorldOrientation().GetColumn(2);
+		const RAS_ILightObject *data = sun->GetLightData();
+		sig[9] = dir[0];
+		sig[10] = dir[1];
+		sig[11] = dir[2];
+		sig[12] = data->m_color[0];
+		sig[13] = data->m_color[1];
+		sig[14] = data->m_color[2];
+		sig[15] = data->m_energy;
+	}
+
+	if (!std::equal(sig, sig + 16, m_worldSignature)) {
+		std::copy_n(sig, 16, m_worldSignature);
+		m_worldProbe->ForceUpdate();
+	}
+}
+
 bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
                                                KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area)
 {
@@ -335,6 +369,10 @@ void KX_TextureRendererManager::Render(RendererCategory category, RAS_Rasterizer
 	const std::vector<KX_TextureRenderer *>& renderers = m_renderers[category];
 	if (renderers.empty() || rasty->GetDrawingMode() != RAS_Rasterizer::RAS_TEXTURED) {
 		return;
+	}
+
+	if (category == VIEWPORT_INDEPENDENT) {
+		CheckWorldChanged();
 	}
 
 	// Disable scissor to not bother with scissor box.

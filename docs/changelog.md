@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Sky Texture segue o World Sun e recaptura do World (Game PBR)
+
+- Com uma lâmpada Sun em Scene > World Sun, o nó Sky Texture (Preetham e Hosek / Wilkie) usa a direção dela em vez
+  da gravada no nó. Os coeficientes ficam num slot (`GPU_sky_texture_slot`, até 8 nós) lido por uniforms dinâmicos e
+  são recalculados quando o sol gira (`GPU_sky_texture_follow_sun`, chamado em `KX_WorldInfo::UpdateBackGround`).
+  Sem World Sun o céu segue a direção do nó, como antes.
+- O cubo do World capturado é refeito quando muda o sol (direção, cor, energia), as cores Horizon/Zenith, o sun size
+  ou a exposição (`KX_TextureRendererManager::CheckWorldChanged`); reflexos e luz difusa do World acompanham o céu.
+- No editor o céu usa a direção do World Sun no momento em que o material compila.
+- Cena de teste: `tools/create_sky_follow_sun_test.py` (sol baixando por Python do zênite ao horizonte).
+- Validado: build; screenshots nos quadros 90 e 400 mostram o céu e o reflexo passando de azul a pôr do sol.
+  Validação visual do usuário pendente.
+
 ## 2026-10-02 - Deformação por impacto (amassar a malha)
 
 - Novo painel **Deformation** na aba Physics, abaixo de Explosive (`Object.deform`, `gameflag2 & OB_DEFORMABLE`): Dent Impulse, Dent on Collision, Radius, Depth (m por N*s acima do Dent Impulse), Max Depth e Update Physics. Num objeto também destrutível, batidas abaixo do Break Impulse amassam e as mais fortes quebram.

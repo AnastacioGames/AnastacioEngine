@@ -56,7 +56,7 @@ A Transmission do Principled refrata a cena atrás com Blend Mode Alpha Blend (m
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Holdout (preto, alpha 0), Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
-Normal Map, Tangent (Radial e UV Map), Bump, Light Falloff (distância até a câmera, como raio de câmera no Cycles), Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham e Hosek / Wilkie),
+Normal Map, Tangent (Radial e UV Map), Bump, Light Falloff (distância até a câmera, como raio de câmera no Cycles), Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham e Hosek / Wilkie; com World Sun segue a lâmpada no jogo),
 nós de cor, conversão e vetor.
 
 ## Reflection probe

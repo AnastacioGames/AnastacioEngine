@@ -2887,6 +2887,34 @@ void GPU_update_exposure_range(float exp, float range)
 	GPUWorld.logfac = log((GPUWorld.linfac - 1.0f) / GPUWorld.linfac) / range;
 }
 
+#define GPU_SKY_FOLLOW_MAX 8
+static GPUSkyFollow gpu_sky_follow[GPU_SKY_FOLLOW_MAX];
+
+GPUSkyFollow *GPU_sky_texture_slot(const void *key)
+{
+	GPUSkyFollow *free_slot = NULL;
+	for (int i = 0; i < GPU_SKY_FOLLOW_MAX; i++) {
+		if (gpu_sky_follow[i].key == key)
+			return &gpu_sky_follow[i];
+		if (!free_slot && !gpu_sky_follow[i].key)
+			free_slot = &gpu_sky_follow[i];
+	}
+	if (free_slot)
+		free_slot->key = key;
+	return free_slot;
+}
+
+void GPU_sky_texture_follow_sun(const float sun_dir[3])
+{
+	for (int i = 0; i < GPU_SKY_FOLLOW_MAX; i++) {
+		GPUSkyFollow *slot = &gpu_sky_follow[i];
+		if (slot->key && slot->compute && !equals_v3v3(slot->last_dir, sun_dir)) {
+			copy_v3_v3(slot->last_dir, sun_dir);
+			slot->compute(slot, sun_dir);
+		}
+	}
+}
+
 void GPU_update_envlight_energy(float energy)
 {
 	GPUWorld.envlightenergy = energy;

@@ -103,6 +103,26 @@ public:
 	void setMistDistance(float d);
 	void setMistIntensity(float intensity);
 	void setExposure(float exposure);
+	float getExposure() const
+	{
+		return m_exposure;
+	}
+	float getRange() const
+	{
+		return m_range;
+	}
+	const mt::vec4& getHorizonColor() const
+	{
+		return m_horizoncolor;
+	}
+	const mt::vec4& getZenithColor() const
+	{
+		return m_zenithcolor;
+	}
+	float getSunSize() const
+	{
+		return m_sunSize;
+	}
 	void setRange(float range);
 	void setMistColor(const mt::vec3& mistcolor);
 	void setHorizonColor(const mt::vec4& horizoncolor);
