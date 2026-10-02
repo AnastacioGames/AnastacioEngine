@@ -175,6 +175,8 @@ struct GPUMaterial {
 
 	/* Local reflection probe (unfprobecube/unfprobeinfo), bound per object by GPU_material_bind_probe(). */
 	int probecubeloc, probeinfoloc, probeposloc;
+	int probecube2loc, probeinfo2loc, probepos2loc;
+	int probeboxloc, probebox2loc;
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {
@@ -492,6 +494,11 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probecubeloc = GPU_shader_get_uniform(shader, "unfprobecube");
 		material->probeinfoloc = GPU_shader_get_uniform(shader, "unfprobeinfo");
 		material->probeposloc = GPU_shader_get_uniform(shader, "unfprobepos");
+		material->probecube2loc = GPU_shader_get_uniform(shader, "unfprobecube2");
+		material->probeinfo2loc = GPU_shader_get_uniform(shader, "unfprobeinfo2");
+		material->probepos2loc = GPU_shader_get_uniform(shader, "unfprobepos2");
+		material->probeboxloc = GPU_shader_get_uniform(shader, "unfprobebox");
+		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 			char name[64];
@@ -3655,7 +3662,7 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 	 * new shading nodes; the legacy path is left untouched. */
 	World *world = mat->scene ? mat->scene->world : NULL;
 	Material *ma = mat->ma;
-	if (!world || !ma)
+	if (!ma)
 		return false;
 
 	float ior = 1.0f;
@@ -3666,8 +3673,8 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 	GPU_link(mat, "shade_world_vectors", view, vn,
 	         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&ior), &wv, &wn, &wr);
 
-	MTex *mtex = world->mtex[0];
-	bool use_tex = (world->aocolor == WO_AOSKYTEX) && mtex && mtex->tex && mtex->tex->ima;
+	MTex *mtex = world ? world->mtex[0] : NULL;
+	bool use_tex = world && (world->aocolor == WO_AOSKYTEX) && mtex && mtex->tex && mtex->tex->ima;
 
 	if (use_tex) {
 		Tex *tex = mtex->tex;
@@ -3695,7 +3702,13 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 		}
 	}
 
-	if (!use_tex) {
+	if (!world) {
+		/* no World: black environment, still replaced by a probe cube when the game binds one */
+		static float black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+		GPU_link(mat, "set_rgba", GPU_uniform(black), &mirror);
+		GPU_link(mat, "set_rgba", GPU_uniform(black), &diffibl);
+	}
+	else if (!use_tex) {
 		GPUNodeLink *hor, *zen = NULL, *nad = NULL, *sunDir, *sunCol, *sunEnergy, *sunSize;
 		hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
 		if (!(world->skytype & WO_SKYATMOSPHERIC)) {
@@ -4691,7 +4704,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 /* Binds the local reflection probe cube map for this object (NULL = none, the World reflection is
  * used). Must run per object with the program bound. The probe uses its own texture unit, right below
  * the shadow map units, so the samplerCube never shares a unit with a sampler2D. */
-void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius)
+void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3])
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
 	if (!shader || material->probeinfoloc == -1) {
@@ -4719,6 +4732,52 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 			pos[3] = radius;
 		}
 		GPU_shader_uniform_vector(shader, material->probeposloc, 4, 1, pos);
+	}
+	if (material->probeboxloc != -1) {
+		float ext[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+		if (cube && center && box) {
+			copy_v3_v3(ext, box);
+		}
+		GPU_shader_uniform_vector(shader, material->probeboxloc, 4, 1, ext);
+	}
+}
+
+/* Binds the second probe cube, blended over the first one with weight (0 = none). Call after
+ * GPU_material_bind_probe(); it uses the texture unit right below the first probe. */
+void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight)
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->probeinfo2loc == -1) {
+		return;
+	}
+
+	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 2;
+	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};
+	float pos[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	float ext[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+	if (cube && weight > 0.0f && material->probecube2loc != -1) {
+		GPU_texture_bind(cube, texunit);
+		GPU_shader_uniform_texture(shader, material->probecube2loc, cube);
+		info[0] = weight;
+		if (center) {
+			copy_v3_v3(pos, center);
+			pos[3] = radius;
+			if (box) {
+				copy_v3_v3(ext, box);
+			}
+		}
+	}
+	else if (material->probecube2loc != -1) {
+		GPU_shader_uniform_int(shader, material->probecube2loc, texunit);
+	}
+
+	GPU_shader_uniform_vector(shader, material->probeinfo2loc, 4, 1, info);
+	if (material->probepos2loc != -1) {
+		GPU_shader_uniform_vector(shader, material->probepos2loc, 4, 1, pos);
+	}
+	if (material->probebox2loc != -1) {
+		GPU_shader_uniform_vector(shader, material->probebox2loc, 4, 1, ext);
 	}
 }
 

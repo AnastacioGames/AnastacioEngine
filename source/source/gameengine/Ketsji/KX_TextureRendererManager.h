@@ -93,10 +93,21 @@ public:
 	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
 	void AddWorldProbe(int size);
 
-	/** Find the probe to use for an object at position: the nearest one whose radius contains it.
+	/// A probe cube bound to a material: radius is the parallax sphere (0 for the World capture).
+	struct ProbeSlot {
+		GPUTexture *cube = nullptr;
+		float maxLod = 0.0f;
+		float center[3] = {0.0f, 0.0f, 0.0f};
+		float radius = 0.0f;
+		/* Half extents of the parallax box (probe Empty drawn as Cube), all 0 = sphere of radius. */
+		float box[3] = {0.0f, 0.0f, 0.0f};
+	};
+
+	/** Find the probes to use for an object at position: r_slots[0] is the one that contains it best,
+	 * r_slots[1] the neighbor probe (or the captured World) blended in near its edge with r_weight2.
 	 * Falls back to the captured World. Returns false when none applies (the World reflection is used).
 	 */
-	bool FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod, float r_center[3], float *r_radius) const;
+	bool FindProbe(const float position[3], ProbeSlot r_slots[2], float *r_weight2) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.

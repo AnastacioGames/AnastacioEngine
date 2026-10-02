@@ -3051,27 +3051,56 @@ uniform samplerCube unfprobecube;
 uniform vec4 unfprobeinfo;
 /* xyz = probe center, w = probe radius (0 for the World capture: no parallax) */
 uniform vec4 unfprobepos;
+/* Second cube blended in near the edge of the first one (a neighbor probe or the World capture):
+ * unfprobeinfo2.x = its weight (0 = not bound), y = its highest mip level. */
+uniform samplerCube unfprobecube2;
+uniform vec4 unfprobeinfo2;
+uniform vec4 unfprobepos2;
+/* xyz = half extents of the parallax box around the probe center (world axes), all 0 = sphere */
+uniform vec4 unfprobebox;
+uniform vec4 unfprobebox2;
+
+void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, vec3 wpos, vec3 wn, vec3 wr, float rough, out vec4 spec, out vec4 diff)
+{
+	vec3 dir = wr;
+	if (pos.w > 0.0) {
+		/* parallax: hit the probe sphere from the shaded point and look up the direction from its center */
+		vec3 p = wpos - pos.xyz;
+		vec3 r = normalize(wr);
+		float t;
+		if (box.x > 0.0) {
+			/* box: exit distance of the ray through the nearest face ahead */
+			vec3 rs = vec3(abs(r.x) > 1e-5 ? r.x : 1e-5, abs(r.y) > 1e-5 ? r.y : 1e-5, abs(r.z) > 1e-5 ? r.z : 1e-5);
+			vec3 tf = max((box.xyz - p) / rs, (-box.xyz - p) / rs);
+			t = max(min(min(tf.x, tf.y), tf.z), 0.0);
+		}
+		else {
+			float b = dot(p, r);
+			float c = dot(p, p) - pos.w * pos.w;
+			t = -b + sqrt(max(b * b - c, 0.0));
+		}
+		/* fade the correction toward rough lobes, where the blur hides it */
+		dir = mix(p + r * t, r, clamp(rough * 2.0, 0.0, 1.0));
+	}
+	spec = textureCubeLod(cube, dir, sqrt(rough) * maxlod);
+	/* diffuse: a few taps around the normal on a low mip (same as env_cube_tex) */
+	float irrlod = max(maxlod - 3.0, 0.0);
+	diff = vec4(0.0);
+	for (int k = 0; k < 5; k++) {
+		diff += textureCubeLod(cube, env_irradiance_dir(-wn, k), irrlod) * 0.2;
+	}
+}
 
 void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, float linearize, vec3 viewpos, mat4 viewinv, out vec4 result, out vec4 result_diff)
 {
 	if (unfprobeinfo.x > 0.5) {
-		vec3 dir = wr;
-		if (unfprobepos.w > 0.0) {
-			/* parallax: hit the probe sphere from the shaded point and look up the direction from its center */
-			vec3 p = (viewinv * vec4(viewpos, 1.0)).xyz - unfprobepos.xyz;
-			vec3 r = normalize(wr);
-			float b = dot(p, r);
-			float c = dot(p, p) - unfprobepos.w * unfprobepos.w;
-			float t = -b + sqrt(max(b * b - c, 0.0));
-			/* fade the correction toward rough lobes, where the blur hides it */
-			dir = mix(p + r * t, r, clamp(rough * 2.0, 0.0, 1.0));
-		}
-		result = textureCubeLod(unfprobecube, dir, sqrt(rough) * unfprobeinfo.y);
-		/* diffuse: a few taps around the normal on a low mip (same as env_cube_tex) */
-		float irrlod = max(unfprobeinfo.y - 3.0, 0.0);
-		result_diff = vec4(0.0);
-		for (int k = 0; k < 5; k++) {
-			result_diff += textureCubeLod(unfprobecube, env_irradiance_dir(-wn, k), irrlod) * 0.2;
+		vec3 wpos = (viewinv * vec4(viewpos, 1.0)).xyz;
+		env_probe_sample(unfprobecube, unfprobepos, unfprobebox, unfprobeinfo.y, wpos, wn, wr, rough, result, result_diff);
+		if (unfprobeinfo2.x > 0.0) {
+			vec4 spec2, diff2;
+			env_probe_sample(unfprobecube2, unfprobepos2, unfprobebox2, unfprobeinfo2.y, wpos, wn, wr, rough, spec2, diff2);
+			result = mix(result, spec2, unfprobeinfo2.x);
+			result_diff = mix(result_diff, diff2, unfprobeinfo2.x);
 		}
 		/* the capture holds display colors; back to linear (approximate under Filmic) */
 		if (linearize > 0.5) {

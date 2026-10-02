@@ -61,7 +61,7 @@ nós de cor, conversão e vetor.
 ## Reflection probe
 
 Dentro do raio de um objeto com a propriedade de jogo `probe`, Principled, Glossy e Glass refletem o
-cubemap capturado pelo probe em vez do World, no reflexo e na luz difusa; o reflexo tem correção de paralaxe por uma esfera do tamanho do raio do probe (some aos poucos com Roughness alta). Com World em nós, o jogo captura o
+cubemap capturado pelo probe em vez do World, no reflexo e na luz difusa; o reflexo tem correção de paralaxe por uma esfera do tamanho do raio do probe (some aos poucos com Roughness alta); com o Empty do probe desenhado como Cube, a correção usa a caixa do Empty (Display Size × escala, eixos do mundo), melhor para salas. Funciona também em cena sem World. Entre dois probes que se sobrepõem o reflexo mistura os dois, e no quarto externo do raio mistura com o World capturado, sem troca brusca. Com World em nós, o jogo captura o
 World num cubemap no primeiro quadro e o usa fora dos probes. Detalhes no changelog de 2026-10-01 e 2026-10-02.
 
 ## Nós exclusivos do jogo (`Game`)

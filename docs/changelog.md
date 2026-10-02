@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Paralaxe por caixa no reflection probe e probe sem World (Game PBR)
+
+- Probe cujo Empty é desenhado como Cube usa paralaxe por caixa: meia-medida = Display Size × escala do Empty, nos eixos do mundo (a rotação é ignorada). O raio refletido sai pela primeira face à frente (`unfprobebox`/`unfprobebox2`, campo `box` do `ProbeSlot`). O raio do probe continua escolhendo quais objetos o usam e a mistura.
+- Sem World na cena, Principled/Glossy/Glass continuam lendo o probe (antes o ambiente inteiro caía e o espelho ficava preto); fora dos probes o ambiente é preto.
+- Teste: `tools/create_probe_box_test.py` (sala com uma cor por parede, chão xadrez e esferas espelhadas).
+
+## 2026-10-02 - Mistura entre reflection probes (Game PBR)
+
+- Cada objeto recebe até dois cubemaps: o probe que melhor o contém (nota 1 no centro, 0 no raio) e o vizinho de nota maior, com peso nota2 / (nota1 + nota2). Sem vizinho, o World capturado entra no quarto externo do raio. Na troca os pesos são zero, então o reflexo não pula.
+- Segundo cubemap em `unfprobecube2` (unidade de textura logo abaixo do primeiro), `GPU_material_bind_probe2`; `FindProbe` devolve `ProbeSlot[2]` e o peso. Reflexo e luz difusa misturam; cada cubemap usa a própria paralaxe.
+- Teste: `tools/create_probe_blend_test.py` (sala vermelha e verde, esfera espelhada indo e voltando).
+
 ## 2026-10-02 - Paralaxe no reflection probe (Game PBR)
 
 - O reflexo do probe local deixa de supor o cubemap no infinito: o raio refletido parte do ponto da superfície e bate numa esfera centrada no probe, com o raio do probe; a direção do centro até esse ponto lê o cubemap (`env_probe_mirror`, uniform `unfprobepos`).

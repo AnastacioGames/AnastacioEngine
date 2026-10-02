@@ -38,8 +38,10 @@
 #include "RAS_Texture.h"
 
 #include "DNA_texture_types.h"
+#include "DNA_object_types.h"
 
 #include "CM_Message.h"
+#include <algorithm>
 
 namespace {
 
@@ -152,47 +154,81 @@ void KX_TextureRendererManager::AddWorldProbe(int size)
 	m_renderers[VIEWPORT_INDEPENDENT].push_back(m_worldProbe);
 }
 
-bool KX_TextureRendererManager::FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod,
-                                          float r_center[3], float *r_radius) const
+static void SetProbeSlot(KX_TextureRendererManager::ProbeSlot& slot, KX_LightProbe *probe, bool parallax)
 {
+	slot.cube = probe->GetCubeTexture();
+	slot.maxLod = probe->GetMaxLod();
+	slot.radius = 0.0f;
+	slot.box[0] = slot.box[1] = slot.box[2] = 0.0f;
+	if (parallax) {
+		const mt::vec3 center = probe->GetViewpointObject()->NodeGetWorldPosition();
+		slot.center[0] = center.x;
+		slot.center[1] = center.y;
+		slot.center[2] = center.z;
+		slot.radius = probe->GetRadius();
+		/* An Empty drawn as Cube gives a box parallax (world axes): half extents = display size * scale. */
+		Object *ob = probe->GetViewpointObject()->GetBlenderObject();
+		if (ob && ob->type == OB_EMPTY && ob->empty_drawtype == OB_CUBE) {
+			const mt::vec3 scale = probe->GetViewpointObject()->NodeGetWorldScaling();
+			for (int i = 0; i < 3; i++) {
+				slot.box[i] = std::max(fabsf(scale[i]) * ob->empty_drawsize, 1e-3f);
+			}
+		}
+	}
+}
+
+bool KX_TextureRendererManager::FindProbe(const float position[3], ProbeSlot r_slots[2], float *r_weight2) const
+{
+	*r_weight2 = 0.0f;
 	if (m_capturing) {
 		return false;
 	}
 
+	// Score of a probe: 1 at its center, 0 at its radius.
 	const mt::vec3 pos(position[0], position[1], position[2]);
-	KX_LightProbe *best = nullptr;
-	float bestDist = 0.0f;
+	KX_LightProbe *best = nullptr, *second = nullptr;
+	float bestScore = 0.0f, secondScore = 0.0f;
 	for (KX_LightProbe *probe : m_probes) {
 		KX_GameObject *viewpoint = probe->GetViewpointObject();
-		if (!viewpoint || !probe->GetCubeTexture()) {
+		if (!viewpoint || !probe->GetCubeTexture() || probe->GetRadius() <= 0.0f) {
 			continue;
 		}
-		const float dist = (viewpoint->NodeGetWorldPosition() - pos).Length();
-		if (dist <= probe->GetRadius() && (!best || dist < bestDist)) {
+		const float score = 1.0f - (viewpoint->NodeGetWorldPosition() - pos).Length() / probe->GetRadius();
+		if (score <= 0.0f) {
+			continue;
+		}
+		if (!best || score > bestScore) {
+			second = best;
+			secondScore = bestScore;
 			best = probe;
-			bestDist = dist;
+			bestScore = score;
+		}
+		else if (!second || score > secondScore) {
+			second = probe;
+			secondScore = score;
 		}
 	}
 
+	KX_LightProbe *world = (m_worldProbe && m_worldProbe->GetCubeTexture()) ? m_worldProbe : nullptr;
 	if (!best) {
-		if (m_worldProbe && m_worldProbe->GetCubeTexture()) {
-			best = m_worldProbe;
-		}
-		else {
+		if (!world) {
 			return false;
 		}
+		SetProbeSlot(r_slots[0], world, false);
+		return true;
 	}
 
-	*r_cube = best->GetCubeTexture();
-	*r_maxLod = best->GetMaxLod();
-	// Parallax sphere of a local probe; the World capture is at infinity (radius 0).
-	*r_radius = 0.0f;
-	if (best != m_worldProbe) {
-		const mt::vec3 center = best->GetViewpointObject()->NodeGetWorldPosition();
-		r_center[0] = center.x;
-		r_center[1] = center.y;
-		r_center[2] = center.z;
-		*r_radius = best->GetRadius();
+	SetProbeSlot(r_slots[0], best, true);
+	/* Near the edge (outer quarter of the radius) the World capture fades in; a neighbor probe takes
+	 * over when it scores higher. Both weights are 0 at the switch, so nothing pops. */
+	const float worldScore = world ? std::max(0.25f - bestScore, 0.0f) : 0.0f;
+	if (second && secondScore >= worldScore) {
+		SetProbeSlot(r_slots[1], second, true);
+		*r_weight2 = secondScore / (bestScore + secondScore);
+	}
+	else if (worldScore > 0.0f) {
+		SetProbeSlot(r_slots[1], world, false);
+		*r_weight2 = worldScore / (bestScore + worldScore);
 	}
 	return true;
 }

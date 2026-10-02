@@ -367,7 +367,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   nem nos materiais BI.
 - **Light probes**: reflection probe local feito em 2026-10-01 (propriedade `probe` num objeto, ver changelog);
   validado pelo usuário em `probe_reflection_test.range`. Luz difusa local (amostras do mesmo cubemap) e World em nós
-  capturado num cubemap em 2026-10-02 (validação visual pendente). Paralaxe por esfera do raio do probe em 2026-10-02. Em aberto: mistura entre probes vizinhos e paralaxe por caixa.
+  capturado num cubemap em 2026-10-02 (validação visual pendente). Paralaxe por esfera do raio do probe em 2026-10-02. Mistura entre probes vizinhos (e com o World na borda) em 2026-10-02. Paralaxe por caixa (Empty desenhado como Cube) em 2026-10-02, validada pelo usuário.
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
