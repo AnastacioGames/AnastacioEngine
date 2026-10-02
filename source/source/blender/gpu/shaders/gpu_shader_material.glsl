@@ -2302,7 +2302,10 @@ float chapman_depth(float X, float h, float cosZ)
 	float c = sqrt(M_PI * 0.5 * (X + h));
 	if (cosZ >= 0.0) return c / (c * cosZ + 1.0) * exp(-h);
 	float x0 = sqrt(1.0 - cosZ * cosZ) * (X + h);
-	return 2.0 * sqrt(M_PI * 0.5 * x0) * exp(min(X - x0, 80.0)) - c / (1.0 - c * cosZ) * exp(-h);
+	/* The ray to the sun hits the planet: fully shadowed. Evaluating the formula there overflows
+	 * float precision (exp(X - x0) is huge) and draws rings around the anti-sun point. */
+	if (x0 < X) return 1e9;
+	return 2.0 * sqrt(M_PI * 0.5 * x0) * exp(X - x0) - c / (1.0 - c * cosZ) * exp(-h);
 }
 
 vec3 sky_atmosphere(vec3 r,       // normalized ray direction

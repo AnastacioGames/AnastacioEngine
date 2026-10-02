@@ -614,7 +614,9 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		if (world_sun) {
 			KX_Camera *cam = scene->GetActiveCamera();
 
-			mt::vec3 sunDir = -world_sun->NodeGetWorldOrientation().GetColumn(2);
+			// Direction toward the sun: the lamp's +Z, the same axis the sky shader draws the sun disc on
+			// (KX_WorldInfo copies it to world_sun->obmat[2]). -Z is where the light travels, away from it.
+			mt::vec3 sunDir = world_sun->NodeGetWorldOrientation().GetColumn(2);
 			mt::vec3 viewDir = cam->NodeGetWorldOrientation().Inverse() * sunDir.Normalized();
 
 			mt::vec4 screenPos = cam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE) * mt::vec4(viewDir.x, viewDir.y, viewDir.z, 1.0f);

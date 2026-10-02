@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Lens Flare aparecia do lado oposto ao sol
+
+- `KX_RenderPipeline.cpp` projetava na tela o `-Z` do sol, que é a direção para onde a luz vai, e não para onde o
+  sol está. O céu desenha o disco do sol no `+Z` (`KX_WorldInfo` copia esse eixo para `world_sun->obmat[2]`), então o
+  flare aparecia olhando para o lado contrário. Agora usa o `+Z`. A mesma posição alimenta o Light Scattering, que
+  também passa a seguir o sol.
+- Céu Atmospheric: com o sol bem abaixo do horizonte (perto de 0h), `chapman_depth` estourava a precisão de float
+  (`exp(X - x0)` enorme) e desenhava anéis em volta do ponto oposto ao sol. Quando o raio até o sol atravessa o
+  planeta, a função agora devolve sombra total sem avaliar a fórmula. Validado pelo usuário no P e no standalone.
+
 ## 2026-10-02 - Céu Atmospheric: revisão do shader, parâmetros próprios e painéis Sky/Environment/Fog novos
 
 - `sky_atmosphere` (`gpu_shader_material.glsl`):
