@@ -19,6 +19,8 @@
 
 #include "../node_shader_util.h"
 
+#include "GPU_texture.h"
+
 /* **************** OUTPUT ******************** */
 
 static bNodeSocketTemplate sh_node_bsdf_principled_in[] = {
@@ -77,7 +79,11 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
 	node_shader_gpu_world_env(mat, rough, &env_mirror, &env_diffuse, &env_flag);
 
-	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag);
+	/* screen copy for Transmission; only asked for (made each frame) when Transmission is used */
+	GPUNodeLink *scol = (in[15].link || in[15].vec[0] > 0.0f) ? node_shader_gpu_scene_color(mat) :
+	                    GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
+
+	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol);
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)

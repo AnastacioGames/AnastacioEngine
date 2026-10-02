@@ -27,7 +27,10 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - O raio refratado anda uma espessura fixa (1.0) e é projetado na tela; a Roughness escolhe o mip (desfoque).
   A saída fica opaca (a cena já está na cor). Sem cópia (blend sólido, viewport, captura de probe) usa o World, como antes.
 - Limitações: não inverte a imagem como uma lente real; o que está fora da tela ou na frente do vidro não aparece
-  na refração; vidro atrás de vidro não se vê. Principled Transmission ainda é ignorada.
+  na refração; vidro atrás de vidro não se vê.
+- Principled: Transmission (× (1 − Metallic), menos o fresnel) mistura a mesma refração, com IOR e rugosidade
+  1 − (1 − Roughness)(1 − Transmission Roughness); a cópia só é pedida quando a Transmission é usada. Sem cópia
+  (blend sólido) continua ignorada.
 - Teste: `tools/create_glass_refraction_test.py`. Validado pelo usuário.
 
 ## 2026-10-02 - Paralaxe por caixa no reflection probe e probe sem World (Game PBR)

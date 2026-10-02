@@ -4,7 +4,8 @@ Run with:  RangeEngine -b --python tools/create_glass_refraction_test.py -- <out
 A colored checker wall and floor behind a row of spheres. With Blend Mode Alpha Blend the Glass and
 Refraction nodes refract the scene behind them (lens-like, upside down through the sphere center):
 Glass at Roughness 0, 0.3 and 0.7 (blurrier), a tinted Refraction sphere, and on the far right a
-Glass with solid blend for comparison (refracts only the World, as before).
+Glass with solid blend for comparison (refracts only the World, as before). Upper row: Principled
+with Transmission 1, Transmission 1 + Transmission Roughness 0.5, and Transmission 0.5 on red.
 """
 import bpy
 import sys
@@ -55,7 +56,8 @@ def bsdf_material(name, kind, color, alpha_blend, **inputs):
     tree.nodes.clear()
     out = tree.nodes.new("ShaderNodeOutputMaterial")
     n = tree.nodes.new(kind)
-    n.inputs["Color"].default_value = color
+    if "Color" in n.inputs:
+        n.inputs["Color"].default_value = color
     for k, v in inputs.items():
         n.inputs[k].default_value = v
     tree.links.new(n.outputs[0], out.inputs["Surface"])
@@ -92,6 +94,21 @@ spheres = [
 ]
 for i, (name, mat) in enumerate(spheres):
     bpy.ops.mesh.primitive_uv_sphere_add(location=(-6 + i * 3, 0.5, 1.2), size=1.1, segments=48, ring_count=24)
+    obj = bpy.context.object
+    obj.name = name
+    bpy.ops.object.shade_smooth()
+    obj.data.materials.append(mat)
+
+# upper row: Principled with Transmission (also Alpha Blend)
+principled = [
+    ("PrincTrans1", dict(Transmission=1.0, Roughness=0.0, IOR=1.45), white),
+    ("PrincTransRough", dict(Transmission=1.0, Roughness=0.0, IOR=1.45, **{"Transmission Roughness": 0.5}), white),
+    ("PrincTransHalf", dict(Transmission=0.5, Roughness=0.2, IOR=1.45), (1.0, 0.3, 0.3, 1.0)),
+]
+for i, (name, inputs, color) in enumerate(principled):
+    mat = bsdf_material(name, "ShaderNodeBsdfPrincipled", color, True, **inputs)
+    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = color
+    bpy.ops.mesh.primitive_uv_sphere_add(location=(-3 + i * 3, 0.5, 3.4), size=0.8, segments=48, ring_count=24)
     obj = bpy.context.object
     obj.name = name
     bpy.ops.object.shade_smooth()

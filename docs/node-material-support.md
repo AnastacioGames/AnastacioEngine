@@ -51,6 +51,7 @@ Teste de regressão: `tools/create_node_sweep_test.py` (um material por tipo de 
 
 Principled, Diffuse, Glossy e Toon usam as mesmas luzes: Sun, Point e Spot com atenuação e cone,
 até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Shadow` da lâmpada).
+A Transmission do Principled refrata a cena atrás com Blend Mode Alpha Blend (mesma cópia da tela do Glass); em blend sólido é ignorada.
 
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Holdout (preto, alpha 0), Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
