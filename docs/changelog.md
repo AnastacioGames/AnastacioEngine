@@ -13,6 +13,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 O usuário validou no jogo a luz difusa local e o reflexo do probe (`probe_reflection_test.range`), a mistura entre probes vizinhos e com o World (`probe_blend_test.range`) e a recaptura do World com a Sky Texture seguindo o World Sun (`sky_follow_sun_test.range`). Sem mudança de código.
 
+Também aceitas pelo usuário as validações manuais de 2026-09-25: Game Settings, FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface do modo jogo e Asset Browser.
+
 ## 2026-10-02 - Spot no Game PBR com a atenuação do Cycles; IES e volumes validados
 
 - **Bug:** no loop de luzes do Game PBR (`scene_light_dir`) a Spot usava o modelo do GL fixo,

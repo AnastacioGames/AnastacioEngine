@@ -393,27 +393,13 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
-menu ImGui e Runtime Property Sensors/Actuators. O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
+menu ImGui e Runtime Property Sensors/Actuators. Aceitas em 2026-10-02: os itens de 2026-09-25 (Game Settings,
+FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser). O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
 
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
-- **Game Settings, FXAA e LOD (2026-09-25)**: conferir no jogo real os painéis novos das abas Render e Scene,
-  os ajustes de FXAA e o LOD com Billboard/Invisible.
-- **Foliage no Web (2026-09-25)**: conferir num build Web que um material com Foliage Shader compila
-  (troca `grass == 1` → `grass > 0.5` no vertex shader) e que o vento anima. No desktop foi aceito pelo usuário.
-- **Shader Sources do material (2026-09-25)**: conferir no jogo real um material com Vertex/Fragment GLSL
-  próprio (a posse dos buffers do código do usuário mudou para `gpu_material.c`) e o layout novo do painel
-  Shading. Em aberto: editar o Text não recompila o material.
-- **Painel Transparency do modo jogo (2026-09-25)**: conferir no editor o layout novo e os dois avisos
-  (Mask/Raytrace + Opaque; Depth Transparency sem efeito). Em aberto, sem decisão: a pré-passada de
-  profundidade de Clip/Alpha to Coverage em `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
-- **Painel Options do modo jogo (2026-09-25)**: conferir no editor o painel sem Invert Z/Exclusive, Light Group
-  ativo fora de Halo, Z Offset sempre ativo e o aviso de Instancing + GPU Skinning.
-- **Painel Subsurface Scattering do modo jogo (2026-09-25)**: conferir no editor que os presets somem, o RGB
-  Radius aparece sem "m" e que o efeito some ao desligar Diffuse na lâmpada.
-- **Asset Browser (2026-09-25)**: conferir na janela real o gesto de arrastar um asset (objeto, grupo, material)
-  do modo Assets para a Vista 3D, o duplo clique, o toggle Append/Link, a janela Window > Asset Browser e as
-  miniaturas depois de "Generate Previews". Troca de modo, bibliotecas, drop, janela e previews passaram em
-  execução automatizada, mas nenhum gesto com o mouse foi testado.
+- **Shader Sources do material**: editar o Text não recompila o material.
+- **Transparency do modo jogo**: sem decisão, a pré-passada de profundidade de Clip/Alpha to Coverage em
+  `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
 - **Loop de tempo (2026-09-26)**: o teste automático (cena simples, monitor 165 Hz) já passou; ver changelog de
   2026-09-27. Falta conferir no jogo real, num monitor de 60 Hz se houver, com v-sync ligado e desligado, que o FPS
   não trava em 30, não perde tecla e o veículo não muda. Com v-sync e picos de carga o jogo não recupera mais o
