@@ -88,6 +88,7 @@ void BKE_world_status_props_ensure(World *wrld)
 		{"mist_enabled",         GPROP_BOOL,  0.0f, 0},
 		{"mist_density",         GPROP_FLOAT, wrld->mistdensity, 0},
 		{"sun_hour",             GPROP_FLOAT, 12.0f, 0},
+		{"sun_direction",        GPROP_FLOAT, 0.0f, 0},
 		{"cloud_type",           GPROP_INT,   0.0f, 0},
 		{"player_under_cover",   GPROP_BOOL, 0.0f, 0},
 	};

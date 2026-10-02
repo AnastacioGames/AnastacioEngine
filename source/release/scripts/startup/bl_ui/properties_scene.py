@@ -38,23 +38,28 @@ from .properties_physics_common import (
 # and lets the runtime distinguish it from a manually selected World Sun.
 AUTO_WORLD_SUN_MARKER = "_range_auto_world_sun"
 AUTO_WORLD_SUN_HOUR_PROPERTY = "sun_hour"
+AUTO_WORLD_SUN_DIRECTION_PROPERTY = "sun_direction"
 AUTO_WORLD_SUN_CAMERA_INITIAL_HEIGHT = "_range_auto_world_sun_camera_initial_height"
 
 
-def _get_auto_sun_hour_property(scene):
-    """Return the World World Property reserved for the automatic sun."""
+def _get_auto_sun_property(scene, name=AUTO_WORLD_SUN_HOUR_PROPERTY):
+    """Return a World World Property reserved for the automatic sun."""
     world = scene.world
     if not world:
         return None
 
     for prop in world.properties:
-        if prop.name == AUTO_WORLD_SUN_HOUR_PROPERTY:
+        if prop.name == name:
             return prop
     return None
 
 
-def _ensure_auto_sun_hour_property(scene):
-    prop = _get_auto_sun_hour_property(scene)
+def _get_auto_sun_hour_property(scene):
+    return _get_auto_sun_property(scene, AUTO_WORLD_SUN_HOUR_PROPERTY)
+
+
+def _ensure_auto_sun_property(scene, name, default):
+    prop = _get_auto_sun_property(scene, name)
     if prop:
         return prop
 
@@ -62,11 +67,15 @@ def _ensure_auto_sun_hour_property(scene):
     # persistent Game/World Property. It is intentionally created only when
     # Automatic Sun is enabled, never merely by drawing the panel.
     if scene.world and bpy.context.scene == scene:
-        bpy.ops.world.game_property_new(type='FLOAT', name=AUTO_WORLD_SUN_HOUR_PROPERTY)
-        prop = _get_auto_sun_hour_property(scene)
+        bpy.ops.world.game_property_new(type='FLOAT', name=name)
+        prop = _get_auto_sun_property(scene, name)
         if prop:
-            prop.value = 12.0
+            prop.value = default
     return prop
+
+
+def _ensure_auto_sun_hour_property(scene):
+    return _ensure_auto_sun_property(scene, AUTO_WORLD_SUN_HOUR_PROPERTY, 12.0)
 
 
 def _auto_sun_ground_reference(scene, sun):
@@ -91,7 +100,10 @@ def _auto_sun_ground_reference(scene, sun):
 def _set_auto_sun_transform(scene, sun, hour):
     ground_reference = _auto_sun_ground_reference(scene, sun)
     angle = radians((hour - 12.0) * 15.0)
-    sun.location = ground_reference + Vector((0.0, -sin(angle) * 10.0, cos(angle) * 10.0))
+    # Direction turns the orbit plane around world Z (same math as KX_Scene).
+    direction = radians(_get_auto_world_sun_direction(scene))
+    horizontal = sin(angle) * 10.0
+    sun.location = ground_reference + Vector((horizontal * sin(direction), -horizontal * cos(direction), cos(angle) * 10.0))
     # Sun lamps emit along local -Z. Track the ground reference rather than
     # spinning locally, so light always falls across the player area.
     sun.rotation_euler = (ground_reference - sun.location).to_track_quat('-Z', 'Y').to_euler()
@@ -110,6 +122,21 @@ def _set_auto_world_sun_hour(scene, hour):
     world_sun = scene.world_sun_set
     if world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
         _set_auto_sun_transform(scene, world_sun, hour)
+
+
+def _get_auto_world_sun_direction(scene):
+    prop = _get_auto_sun_property(scene, AUTO_WORLD_SUN_DIRECTION_PROPERTY)
+    return prop.value if prop else 0.0
+
+
+def _set_auto_world_sun_direction(scene, direction):
+    prop = _ensure_auto_sun_property(scene, AUTO_WORLD_SUN_DIRECTION_PROPERTY, 0.0)
+    if prop:
+        prop.value = direction
+
+    world_sun = scene.world_sun_set
+    if world_sun and world_sun.get(AUTO_WORLD_SUN_MARKER, False):
+        _set_auto_sun_transform(scene, world_sun, _get_auto_world_sun_hour(scene))
 
 
 def _get_use_auto_world_sun(scene):
@@ -167,6 +194,17 @@ bpy.types.Scene.auto_world_sun_hour = bpy.props.FloatProperty(
     soft_max=24.0,
     get=_get_auto_world_sun_hour,
     set=_set_auto_world_sun_hour,
+)
+
+bpy.types.Scene.auto_world_sun_direction = bpy.props.FloatProperty(
+    name="Sun Direction",
+    description="Heading in degrees around Z of the automatic sun path; noon stays overhead (also stored in World World Property 'sun_direction')",
+    min=-360.0,
+    max=360.0,
+    soft_min=-180.0,
+    soft_max=180.0,
+    get=_get_auto_world_sun_direction,
+    set=_set_auto_world_sun_direction,
 )
 
 

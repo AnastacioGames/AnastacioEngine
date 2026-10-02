@@ -141,6 +141,9 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             sub.active = scene.use_auto_world_sun
             sub.prop(scene, "auto_world_sun_hour", text="Hour")
             row.prop(world, "sun_size", text="Disc Size")
+            row = box.row(align=True)
+            row.active = scene.use_auto_world_sun
+            row.prop(scene, "auto_world_sun_direction", text="Direction")
             if not scene.world_sun_set:
                 box.label(text="Without a Sun object the sky stays at noon and has no sun disc", icon='ERROR')
 
