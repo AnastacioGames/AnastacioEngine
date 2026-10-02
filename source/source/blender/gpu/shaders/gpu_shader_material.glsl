@@ -5986,6 +5986,17 @@ void node_tex_wave(
 
 /* light path */
 
+/* Hair Info on a mesh: no strands, so all outputs are zero, as Cycles returns for non-curve geometry. */
+void node_hair_info(out float is_strand, out float intercept, out float thickness, out vec3 tangent_normal,
+                    out float random)
+{
+	is_strand = 0.0;
+	intercept = 0.0;
+	thickness = 0.0;
+	tangent_normal = vec3(0.0);
+	random = 0.0;
+}
+
 void node_light_path(
 	vec3 viewpos,
 	out float is_camera_ray,

@@ -36,12 +36,13 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
+| Hair Info | malha n�o tem fios: todas as sa�das zero, como o Cycles numa malha |
 | Light Path | valores fixos de raio de câmera; Ray Length é a distância até a câmera |
 
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
-Hair Info, IES Texture,
+IES Texture,
 Point Density, Script, Volume Absorption, Volume Scatter, Principled Volume.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós

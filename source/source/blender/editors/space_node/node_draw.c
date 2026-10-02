@@ -922,11 +922,14 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: fixed values for a camera ray";
 				return false;
+			case SH_NODE_HAIR_INFO:
+				*r_badge = "~Game";
+				*r_tip = "Approximated in Game: a mesh has no strands, all outputs are zero (as Cycles on a mesh)";
+				return false;
 			case SH_NODE_LIGHT_FALLOFF:
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: distance to the camera, as a camera ray in Cycles";
 				return false;
-			case SH_NODE_HAIR_INFO:
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:
