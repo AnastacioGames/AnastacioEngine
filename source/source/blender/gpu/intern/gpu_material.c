@@ -3888,6 +3888,21 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 	return mat;
 }
 
+/* Materials whose Shader Sources use this Text compile again on the next draw. */
+bool GPU_materials_free_text(Main *bmain, struct Text *text)
+{
+	bool found = false;
+	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->vertcode == text || ma->fragcode == text) {
+			GPU_material_free(&ma->gpumaterial);
+			GPU_material_free(&ma->gpumaterialinstancing);
+			GPU_material_free(&ma->gpumaterialskinning);
+			found = true;
+		}
+	}
+	return found;
+}
+
 void GPU_materials_free(Main *bmain)
 {
 	Object *ob;

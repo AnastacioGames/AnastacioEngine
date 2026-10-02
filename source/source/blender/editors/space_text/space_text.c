@@ -31,6 +31,7 @@
 #include "BLI_blenlib.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_screen.h"
 #include "BKE_text.h"
@@ -39,6 +40,8 @@
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
+
+#include "GPU_material.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -148,6 +151,9 @@ static void text_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *wmn)
 					if (st->text) {
 						text_drawcache_tag_update(st, 1);
 						text_update_edited(st->text);
+						if (GPU_materials_free_text(G_MAIN, st->text)) {
+							WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, NULL);
+						}
 					}
 
 					ED_area_tag_redraw(sa);

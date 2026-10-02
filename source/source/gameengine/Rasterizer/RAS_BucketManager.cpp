@@ -324,22 +324,6 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 				}
 			}
 
-			// Z-prepass: write depth for alpha-cutout/clip materials (Clip, Alpha-to-Coverage)
-			// so the color pass below benefits from real hardware early-Z rejection on
-			// overlapping overdraw (e.g. stacked foliage). Reads the CUTOUT-only subset of
-			// ALPHA_DEPTH_BUCKET (see FindBucket()) -- smooth alpha-blended "Depth Transparency"
-			// materials are excluded and unaffected.
-			if ((m_buckets[ALPHA_DEPTH_CUTOUT_BUCKET].size() + m_buckets[ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET].size()) > 0) {
-				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);
-				rasty->SetColorMask(false, false, false, false);
-
-				RenderBasicBuckets(rasty, ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET);
-				RenderBasicBuckets(rasty, ALPHA_DEPTH_CUTOUT_BUCKET);
-
-				rasty->SetColorMask(true, true, true, true);
-				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
-			}
-
 			RenderBasicBuckets(rasty, ALPHA_INSTANCING_BUCKET);
 			RenderSortedBuckets(rasty, ALPHA_BUCKET);
 
@@ -366,22 +350,6 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 
 			// Don't use depth transparency because the renderer could not offer a depth texture.
 			rasty->ResetGlobalDepthTexture();
-
-			// Z-prepass: write depth for alpha-cutout/clip materials (Clip, Alpha-to-Coverage)
-			// so the color pass below benefits from real hardware early-Z rejection on
-			// overlapping overdraw (e.g. stacked foliage). Reads the CUTOUT-only subset of
-			// ALPHA_DEPTH_BUCKET (see FindBucket()) -- smooth alpha-blended "Depth Transparency"
-			// materials are excluded and unaffected.
-			if ((m_buckets[ALPHA_DEPTH_CUTOUT_BUCKET].size() + m_buckets[ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET].size()) > 0) {
-				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);
-				rasty->SetColorMask(false, false, false, false);
-
-				RenderBasicBuckets(rasty, ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET);
-				RenderBasicBuckets(rasty, ALPHA_DEPTH_CUTOUT_BUCKET);
-
-				rasty->SetColorMask(true, true, true, true);
-				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
-			}
 
 			RenderBasicBuckets(rasty, ALPHA_INSTANCING_BUCKET);
 			RenderSortedBuckets(rasty, ALPHA_BUCKET);
@@ -421,20 +389,6 @@ RAS_MaterialBucket *RAS_BucketManager::FindBucket(RAS_IMaterial *material, bool 
 			m_buckets[useinstancing ? ALPHA_INSTANCING_BUCKET : ALPHA_BUCKET].push_back(bucket);
 			if (material->IsAlphaDepth()) {
 				m_buckets[useinstancing ? ALPHA_DEPTH_INSTANCING_BUCKET : ALPHA_DEPTH_BUCKET].push_back(bucket);
-
-				/* IsAlphaDepth() (the "Depth Transparency" material checkbox, MA_DEPTH_TRANSP)
-				 * is independent of the alpha blend mode -- it can be set on a plain smooth
-				 * "Alpha Blend" material too, not just cutout ones. Only true cutout materials
-				 * (binary alpha via discard/A2C: IsAlphaShadow() == CLIP/ALPHA_TO_COVERAGE) are
-				 * safe for the Z-prepass, which writes real hardware depth for every fragment
-				 * regardless of alpha -- doing that for a smooth alpha-blended material corrupts
-				 * it (overlapping soft-alpha quads, e.g. particle smoke, get partially
-				 * depth-culled by each other's nearly-transparent regions, producing broken/
-				 * blocky fragments instead of a smoothly blended result). So the Z-prepass reads
-				 * from this narrower bucket instead of ALPHA_DEPTH_BUCKET itself. */
-				if (material->IsAlphaShadow()) {
-					m_buckets[useinstancing ? ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET : ALPHA_DEPTH_CUTOUT_BUCKET].push_back(bucket);
-				}
 			}
 		}
 		else {

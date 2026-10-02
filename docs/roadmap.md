@@ -397,9 +397,6 @@ menu ImGui e Runtime Property Sensors/Actuators. Aceitas em 2026-10-02: os itens
 FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser). O stress de captura de vídeo e OpenAL foi cancelado por decisão do usuário. Ainda abertos:
 
 - **Sombras**: registrar a origem dos avisos de textura sem nível-base vistos em `-d gpu` (desconhecida).
-- **Shader Sources do material**: editar o Text não recompila o material.
-- **Transparency do modo jogo**: sem decisão, a pré-passada de profundidade de Clip/Alpha to Coverage em
-  `RAS_BucketManager` nunca roda (o bucket fica sempre vazio).
 - **Loop de tempo (2026-09-26)**: o teste automático (cena simples, monitor 165 Hz) já passou; ver changelog de
   2026-09-27. Falta conferir no jogo real, num monitor de 60 Hz se houver, com v-sync ligado e desligado, que o FPS
   não trava em 30, não perde tecla e o veículo não muda. Com v-sync e picos de carga o jogo não recupera mais o

@@ -83,8 +83,6 @@ protected:
 		 * the broader ALPHA_DEPTH_BUCKET so the older soft-particle depth-texture trigger
 		 * (UpdateGlobalDepthTexture(), which historically fires for ANY "Depth Transparency"
 		 * material, cutout or not) keeps its original, wider behavior. */
-		ALPHA_DEPTH_CUTOUT_BUCKET,
-		ALPHA_DEPTH_CUTOUT_INSTANCING_BUCKET,
 		SOLID_SHADOW_BUCKET,
 		ALPHA_SHADOW_BUCKET,
 		SOLID_SHADOW_INSTANCING_BUCKET,

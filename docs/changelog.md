@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Shader Sources recompila ao editar o Text; pré-passada morta removida
+
+- Shader Sources: o shader do material ficava em cache e editar o Text (Vertex/Fragment) não o invalidava, nem no viewport nem ao apertar P. Agora o listener do Text Editor, em `NA_EDITED`, chama `GPU_materials_free_text()`, que descarta os GPUMaterials (normal, instancing e skinning) dos materiais que usam aquele Text e pede redesenho. Recompila a cada tecla; com código incompleto o console mostra o erro até o código voltar a ser válido. Um Text alterado só por Python não dispara a recompilação. Validado pelo usuário em `shader_sources_test.range`.
+- `RAS_BucketManager`: removida a pré-passada de profundidade de Clip/Alpha to Coverage (`ALPHA_DEPTH_CUTOUT_BUCKET` e a versão instancing). Esses materiais não passam em `IsAlpha()`, são desenhados no bucket sólido com discard e já gravam profundidade, então o bucket ficava sempre vazio. Sem mudança visual.
+
 ## 2026-10-02 - Light probes validados
 
 O usuário validou no jogo a luz difusa local e o reflexo do probe (`probe_reflection_test.range`), a mistura entre probes vizinhos e com o World (`probe_blend_test.range`) e a recaptura do World com a Sky Texture seguindo o World Sun (`sky_follow_sun_test.range`). Sem mudança de código.

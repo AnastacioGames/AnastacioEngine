@@ -48,6 +48,7 @@ struct GPUVertexAttribs;
 struct Image;
 struct Image;
 struct ImageUser;
+struct Text;
 struct Main;
 struct Material;
 struct Object;
@@ -298,6 +299,7 @@ GPUMaterial *GPU_material_matcap(struct Scene *scene, struct Material *ma, bool 
 void GPU_material_free(struct ListBase *gpumaterial);
 
 void GPU_materials_free(struct Main *bmain);
+bool GPU_materials_free_text(struct Main *bmain, struct Text *text);
 
 bool GPU_lamp_visible(GPULamp *lamp, struct SceneRenderLayer *srl, struct Material *ma);
 void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float viewinv[4][4]);
