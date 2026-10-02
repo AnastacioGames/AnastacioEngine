@@ -2294,7 +2294,18 @@ vec2 rsi(vec3 r0, vec3 rd, float sr) {
     return vec2(-b - sqrtD, -b + sqrtD);
 }
 
-vec3 sky_atmosphere(vec3 r,        // normalized ray direction
+/* Optical depth of an exponential atmosphere from relative height h (height / scale height)
+ * toward a direction with zenith cosine cosZ, in scale heights; X = planet radius / scale height.
+ * Chapman approximation (Schuler): exact straight up and at the horizon, the planet shadows below it. */
+float chapman_depth(float X, float h, float cosZ)
+{
+	float c = sqrt(M_PI * 0.5 * (X + h));
+	if (cosZ >= 0.0) return c / (c * cosZ + 1.0) * exp(-h);
+	float x0 = sqrt(1.0 - cosZ * cosZ) * (X + h);
+	return 2.0 * sqrt(M_PI * 0.5 * x0) * exp(min(X - x0, 80.0)) - c / (1.0 - c * cosZ) * exp(-h);
+}
+
+vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 					vec3 r0,       // ray origin
 					vec3 pSun,     // position of the sun
 					float sunSize, // sun size
@@ -2310,7 +2321,6 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 					)
 {
 	const float iSteps = 16.0; // Primary rays.
-	const float jSteps = 8.0; // Secondary rays.
 	
 	// Normalize the sun and view directions.
 	pSun = normalize(pSun);
@@ -2349,27 +2359,10 @@ vec3 sky_atmosphere(vec3 r,        // normalized ray direction
 		float odStepRlh = exp(-iHeight / shRlh) * iStepSize;
 		float odStepMie = exp(-iHeight / shMie) * iStepSize;
 
-		// Calculate the step size of the secondary ray.
-		float jStepSize = rsi(iPos, pSun, rAtmos).y / jSteps;
-
-		// Initialize optical depth accumulators for the secondary ray.
-		float jOdRlh = 0.0;
-		float jOdMie = 0.0;
-		float jTime = 0.0;
-
-		// Sample the secondary ray.
-		for (int j = 0; j < int(jSteps); j++) {
-			// Calculate the secondary ray sample position.
-			vec3 jPos = iPos + pSun * (jTime + jStepSize * 0.5);
-
-			// Calculate the height of the sample.
-			float jHeight = length(jPos) - rPlanet;
-
-			// Accumulate the optical depth.
-			jOdRlh += exp(-jHeight / shRlh) * jStepSize;
-			jOdMie += exp(-jHeight / shMie) * jStepSize;
-			jTime += jStepSize;
-		}
+		// Optical depth toward the sun, analytic instead of a secondary ray march.
+		float cosSun = dot(iPos, pSun) / (iHeight + rPlanet);
+		float jOdRlh = shRlh * chapman_depth(rPlanet / shRlh, iHeight / shRlh, cosSun);
+		float jOdMie = shMie * chapman_depth(rPlanet / shMie, iHeight / shMie, cosSun);
 
 		// Calculate attenuation.
 		vec3 attn = exp(-(kMie * (odStepMie + jOdMie) + kRlh * (odStepRlh + jOdRlh)));

@@ -39,7 +39,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   - Traduções PT-BR/ES/RU em `translations_ui.py`.
 - Testado em cena de teste no `RangeRuntime` com o sol a 4° e a 30°: céu azul de dia, horizonte quente no pôr do
   sol, sem chuvisco. Falta a validação no jogo real.
-- Pendente: desempenho (16×8 amostras por pixel, 3 chamadas por fragmento de material). A ideia é uma LUT por quadro.
+- Desempenho: o raio secundário (8 passos com 2 `exp` cada, dentro dos 16 passos do primário) foi trocado pela
+  profundidade óptica analítica `chapman_depth` (aproximação de Chapman de Schüler). Isso dá cerca de 8× menos
+  trabalho por pixel, e o material faz 3 chamadas por fragmento. A aproximação é exata para cima e no horizonte.
+  Diferente da versão anterior, o planeta faz sombra quando o sol está abaixo do horizonte. Com o sol a 4° a imagem
+  ficou igual à anterior. Uma LUT por quadro ficou de fora porque exigiria render-to-texture no pipeline do World.
 
 ## 2026-10-02 - Nós de material: varredura, crash do Particle Info e aviso de nó sem suporte
 
