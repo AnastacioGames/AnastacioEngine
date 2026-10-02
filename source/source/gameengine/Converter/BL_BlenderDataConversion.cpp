@@ -127,6 +127,7 @@
 
 extern "C" {
 #include "BKE_idprop.h"
+#include "BKE_node.h"
 }
 
 // This little block needed for linking to Blender...
@@ -152,6 +153,7 @@ extern "C" {
 #include "DNA_lamp_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_node_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
@@ -512,6 +514,27 @@ static std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > BL_BitmapFontGlyphs(I
 }
 
 /* blenderobj can be nullptr, make sure its checked for */
+static bool BL_NodeTreeHasWireframe(const bNodeTree *ntree, int depth)
+{
+	if (!ntree || depth > 8) {
+		return false;
+	}
+	for (const bNode *node = (const bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_WIREFRAME) {
+			return true;
+		}
+		if (node->type == NODE_GROUP && BL_NodeTreeHasWireframe((const bNodeTree *)node->id, depth + 1)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool BL_MaterialUsesWireframe(const Material *ma)
+{
+	return ma && ma->use_nodes && BL_NodeTreeHasWireframe(ma->nodetree, 0);
+}
+
 KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneConverter& converter)
 {
 	KX_Mesh *meshobj;
@@ -598,7 +621,8 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 		RAS_MeshMaterial *meshmat = meshobj->AddMaterial(bucket, i, matVertformat);
 		RAS_IMaterial *mat = meshmat->GetBucket()->GetMaterial();
 
-		mats[i] = {meshmat->GetDisplayArray(), bucket, mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire()};
+		mats[i] = {meshmat->GetDisplayArray(), bucket, mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire(),
+		           BL_MaterialUsesWireframe(ma)};
 	}
 
 	std::vector<KX_Mesh::BitmapTextFace> bitmapTextFaces;
@@ -779,6 +803,37 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 				continue;
 			}
 		}
+		const unsigned int ltstart = poly_to_tri_count(i, mpoly.loopstart);
+		const unsigned int lttot = ME_POLY_TRI_TOT(&mpoly);
+
+		// Wireframe node: no vertex sharing, so gl_VertexID % 3 is the triangle corner.
+		if (mat.barycentric && !mat.wire) {
+			for (unsigned int j = ltstart; j < (ltstart + lttot); ++j) {
+				const MLoopTri& mlooptri = mlooptris[j];
+				for (unsigned short k = 0; k < 3; ++k) {
+					const unsigned int loop = mlooptri.tri[k];
+					const unsigned int vertid = mloops[loop].v;
+					static const float dummyTangent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+					mt::vec2_packed uvs[RAS_Texture::MaxUnits];
+					unsigned int rgba[RAS_Texture::MaxUnits];
+					BL_GetUvRgba(layersInfo, uvLayers, colorLayers, loop, uvs, rgba);
+					mt::vec4_packed boneIndices(mt::zero4);
+					mt::vec4_packed boneWeights(mt::zero4);
+					if (bMayHaveBoneData && array->GetFormat().hasBoneData) {
+						BL_ComputeVertexBoneData(me->dvert[vertid], defbaseTot, boneIndices, boneWeights);
+					}
+					const unsigned int offset = array->AddVertex(mt::vec3_packed(mverts[vertid].co),
+						mt::vec3_packed(normals[loop]), mt::vec4_packed(tangent ? tangent[loop] : dummyTangent),
+						uvs, rgba, vertid, flat, boneIndices, boneWeights);
+					if (mat.visible) {
+						array->AddPrimitiveIndex(offset);
+					}
+					array->AddTriangleIndex(offset);
+				}
+			}
+			continue;
+		}
+
 		for (unsigned int j = lpstart; j < lpstart + totlp; ++j) {
 			const MLoop& mloop = mloops[j];
 			const unsigned int vertid = mloop.v;
@@ -814,9 +869,6 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 			// Add tracked vertices by the mpoly.
 			vertices[vertid] = offset;
 		}
-
-		const unsigned int ltstart = poly_to_tri_count(i, mpoly.loopstart);
-		const unsigned int lttot = ME_POLY_TRI_TOT(&mpoly);
 
 		if (mat.visible) {
 			if (mat.wire) {

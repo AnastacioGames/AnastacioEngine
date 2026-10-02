@@ -56,6 +56,7 @@ uniform float unftime;
 out vec3 varposition;
 out vec3 varnormal;
 out float varvertexid;
+out vec3 varbarycentric;
 
 #if __VERSION__ < 130
   #undef in
@@ -263,6 +264,8 @@ void main()
 
 	VERTEX = position.xyz;
 	varvertexid = float(gl_VertexID);
+	int corner = gl_VertexID % 3;
+	varbarycentric = vec3(corner == 0 ? 1.0 : 0.0, corner == 1 ? 1.0 : 0.0, corner == 2 ? 1.0 : 0.0);
 
 #ifdef USE_USER_CODE
 	/* for user code */

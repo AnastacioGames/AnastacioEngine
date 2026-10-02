@@ -906,6 +906,10 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: local surface concavity only, no occlusion by other objects";
 				return false;
+			case SH_NODE_WIREFRAME:
+				*r_badge = "~Game";
+				*r_tip = "Game only (not the viewport): triangle edges, quads show the diagonal; meshes using it lose vertex sharing";
+				return false;
 			case SH_NODE_BEVEL:
 				*r_badge = "~Game";
 				*r_tip = "Approximated in Game: returns the unchanged normal";
@@ -928,7 +932,6 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				}
 				break;
 			}
-			case SH_NODE_WIREFRAME:
 			case SH_NODE_HAIR_INFO:
 			case SH_NODE_TEX_IES:
 			case SH_NODE_TEX_POINTDENSITY:

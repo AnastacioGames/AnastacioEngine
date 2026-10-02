@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Nó Wireframe no Game PBR
+
+- Wireframe (`node_shader_wireframe.c`, GLSL `node_wireframe`): ganhou código GPU, com selo `~Game`. As arestas
+  ficam a até Size / 2 da borda do triângulo, em unidades do mundo ou em pixels (Pixel Size), com ~1 pixel de suavização.
+- Baricêntricas: builtin novo `GPU_BARYCENTRIC` (bit 31, `varbarycentric`), calculado no vertex shader por
+  `gl_VertexID % 3`.
+- Conversor (`BL_BlenderDataConversion.cpp`, `BL_ModifierDeformer.cpp`): `BL_MaterialUsesWireframe` procura o nó
+  no material (inclusive em grupos); nas malhas desse material cada triângulo ganha 3 vértices próprios, sem
+  compartilhar.
+- Limites: não funciona na viewport do editor; quads mostram a diagonal; mais memória por malha; batching e texto
+  bitmap com esse material podem quebrar o padrão.
+- `tools/create_node_phases_test.py`: 6ª esfera na terceira fileira (Wireframe 0.03, arestas amarelas). Validado
+  pelo usuário.
+
 ## 2026-10-02 - Holdout, Translucent, Velvet e Subsurface Scattering no Game PBR
 
 - Holdout (`node_shader_holdout.c`, GLSL `node_holdout`): ganhou código GPU, sai preto com alpha 0. Saiu da lista de

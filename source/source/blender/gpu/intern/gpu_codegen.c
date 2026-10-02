@@ -450,6 +450,8 @@ const char *GPU_builtin_name(GPUBuiltin builtin)
 		return "unfobjectlay";
 	else if (builtin == GPU_VERTEX_ID)
 		return "varvertexid";
+	else if (builtin == GPU_BARYCENTRIC)
+		return "varbarycentric";
 	else
 		return "";
 }

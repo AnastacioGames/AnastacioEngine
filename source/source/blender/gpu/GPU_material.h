@@ -115,7 +115,9 @@ typedef enum GPUBuiltin {
 	GPU_OBJECT_LAY                 = (1 << 27),
 	GPU_VERTEX_ID                  = (1 << 28),
 	GPU_PROJECTION_MATRIX          = (1 << 29),
-	GPU_NORMAL_MATRIX              = (1 << 30)
+	GPU_NORMAL_MATRIX              = (1 << 30),
+	/* Triangle corner from gl_VertexID % 3; only valid when the game unshares the vertices (Wireframe node). */
+	GPU_BARYCENTRIC                = (int)0x80000000
 } GPUBuiltin;
 
 typedef enum GPUOpenGLBuiltin {

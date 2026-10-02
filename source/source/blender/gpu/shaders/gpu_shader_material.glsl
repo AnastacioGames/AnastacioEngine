@@ -4487,6 +4487,20 @@ void node_holdout(out vec4 result)
 	result = vec4(0.0);
 }
 
+/* bary comes from gl_VertexID % 3 (the game gives these triangles their own vertices). Like Cycles, an
+ * edge is within Size / 2, in world units or pixels; about one pixel of smoothing against aliasing. */
+void node_wireframe(float size, float use_pixel_size, vec3 bary, vec3 co, out float fac)
+{
+	vec3 dist_px = bary / max(fwidth(bary), vec3(1e-6));
+	float edge_px = min(min(dist_px.x, dist_px.y), dist_px.z);
+	float half_px = 0.5 * size;
+	if (use_pixel_size < 0.5) {
+		float pixel_world = max(length(fwidth(co)) * 0.7071, 1e-8);
+		half_px = 0.5 * size / pixel_world;
+	}
+	fac = 1.0 - smoothstep(half_px - 0.5, half_px + 0.5, edge_px);
+}
+
 void node_bsdf_transparent(vec4 color, out vec4 result)
 {
 	/* this isn't right */

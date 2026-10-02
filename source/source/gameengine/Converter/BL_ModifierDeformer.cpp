@@ -177,7 +177,8 @@ void BL_ModifierDeformer::UpdateTransverts()
 		array->Clear();
 
 		RAS_IMaterial *mat = meshmat->GetBucket()->GetMaterial();
-		mats[i] = {array, meshmat->GetBucket(), mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire()};
+		mats[i] = {array, meshmat->GetBucket(), mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire(),
+		           BL_MaterialUsesWireframe(mat->GetBlenderMaterial())};
 	}
 
 	BL_ConvertDerivedMeshToArray(m_dm, m_bmesh, m_objMesh, mats, m_mesh->GetLayersInfo());

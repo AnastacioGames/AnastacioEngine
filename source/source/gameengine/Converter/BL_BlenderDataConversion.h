@@ -57,9 +57,12 @@ struct BL_MeshMaterial {
 	bool twoside;
 	bool collider;
 	bool wire;
+	// Material uses the Wireframe node: triangles get their own vertices (barycentric from gl_VertexID).
+	bool barycentric;
 };
 
 KX_Mesh *BL_ConvertMesh(Mesh *mesh, Object *lightobj, KX_Scene *scene, BL_SceneConverter& converter);
+bool BL_MaterialUsesWireframe(const struct Material *ma);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo,
                                   std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr);

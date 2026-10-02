@@ -8,7 +8,7 @@ Back row (Phase 4), left to right:
   6 Glossy 0 (mirror of the World Sky Texture)
 Third row (approximations), left to right:
   1 Translucent (lit from behind)   2 Subsurface (red bleed past the terminator)   3 Velvet (rim sheen)
-  4 Holdout (black cut-out, alpha 0)   5 Diffuse (reference for 1-3)
+  4 Holdout (black cut-out, alpha 0)   5 Diffuse (reference for 1-3)   6 Wireframe 0.03 (yellow edges)
 Lights: Sun (shadow), red Point (shadow), blue Spot (shadow). World: Sky Texture (Preetham).
 Phase 5: Scene > Color Management is Filmic; change View Transform / Exposure / Gamma in the
 editor and press P again (read when the shader compiles).
@@ -83,6 +83,20 @@ def emission_from(kind, socket, **props):
     return build
 
 
+def wireframe_mix(tree):
+    wire = tree.nodes.new("ShaderNodeWireframe")
+    wire.inputs["Size"].default_value = 0.03
+    base = tree.nodes.new("ShaderNodeBsdfDiffuse")
+    base.inputs["Color"].default_value = (0.2, 0.2, 0.25, 1.0)
+    edge = tree.nodes.new("ShaderNodeEmission")
+    edge.inputs["Color"].default_value = (1.0, 0.8, 0.1, 1.0)
+    mix = tree.nodes.new("ShaderNodeMixShader")
+    tree.links.new(wire.outputs["Fac"], mix.inputs["Fac"])
+    tree.links.new(base.outputs[0], mix.inputs[1])
+    tree.links.new(edge.outputs[0], mix.inputs[2])
+    return mix
+
+
 front = [
     ("Principled", bsdf("ShaderNodeBsdfPrincipled", (0.8, 0.3, 0.2, 1.0), Roughness=0.4)),
     ("Diffuse", bsdf("ShaderNodeBsdfDiffuse", (0.2, 0.7, 0.3, 1.0))),
@@ -105,6 +119,7 @@ third = [
     ("Velvet", bsdf("ShaderNodeBsdfVelvet", (0.6, 0.1, 0.3, 1.0), Sigma=0.5)),
     ("Holdout", lambda tree: tree.nodes.new("ShaderNodeHoldout")),
     ("DiffuseRef", bsdf("ShaderNodeBsdfDiffuse", (0.9, 0.6, 0.5, 1.0))),
+    ("Wireframe", wireframe_mix),
 ]
 for row, (y, specs) in enumerate(((0.0, front), (3.0, back), (6.0, third))):
     for i, (name, build) in enumerate(specs):
