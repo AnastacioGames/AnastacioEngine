@@ -2001,33 +2001,31 @@ static void ui_but_link_add(bContext *C, uiBut *from, uiBut *to)
 
 }
 
-/* Link sockets are deliberately small.  Give them a short, unambiguous catch area
- * when a link is released, without changing normal button hit testing. */
+/* Link sockets are deliberately small.  Like node sockets, snap to the nearest
+ * compatible socket within a generous radius while dragging and on release. */
+#define UI_LINK_SNAP_RADIUS 24
+
 static uiBut *ui_but_link_target_find(ARegion *ar, uiBut *but, int x, int y)
 {
 	uiBut *bt;
 	uiBut *nearest = NULL;
 	float mx = x, my = y;
-	float px = x + 8, py = y + 8;
-	float pad_x, pad_y;
+	float px = x + UI_LINK_SNAP_RADIUS * UI_DPI_FAC, py = y;
+	float radius_sq;
 	float nearest_dist_sq = FLT_MAX;
-
-	/* Preserve the original exact hit result, including its button order. */
-	for (bt = but->block->buttons.first; bt; bt = bt->next) {
-		if (ui_but_contains_point_px(ar, bt, x, y)) {
-			return bt;
-		}
-	}
 
 	ui_window_to_block_fl(ar, but->block, &mx, &my);
 	ui_window_to_block_fl(ar, but->block, &px, &py);
-	pad_x = fabsf(px - mx);
-	pad_y = fabsf(py - my);
+	radius_sq = (px - mx) * (px - mx) + (py - my) * (py - my);
 
 	for (bt = but->block->buttons.first; bt; bt = bt->next) {
 		float dx, dy, dist_sq;
 
 		if (bt == but || !ELEM(bt->type, UI_BTYPE_LINK, UI_BTYPE_INLINK)) {
+			continue;
+		}
+		/* LINK only connects to INLINK and vice-versa. */
+		if (bt->type == but->type) {
 			continue;
 		}
 
@@ -2036,18 +2034,30 @@ static uiBut *ui_but_link_target_find(ARegion *ar, uiBut *but, int x, int y)
 		dy = (my < bt->rect.ymin) ? bt->rect.ymin - my :
 		     (my > bt->rect.ymax) ? my - bt->rect.ymax : 0.0f;
 
-		if (dx > pad_x || dy > pad_y) {
-			continue;
-		}
-
 		dist_sq = dx * dx + dy * dy;
-		if (dist_sq < nearest_dist_sq) {
+		if (dist_sq <= radius_sq && dist_sq < nearest_dist_sq) {
 			nearest = bt;
 			nearest_dist_sq = dist_sq;
 		}
 	}
 
 	return nearest;
+}
+
+/* Snap the dragged link end (region coords) to the target socket center. */
+static void ui_but_link_snap(ARegion *ar, uiBut *but, const int mval[2])
+{
+	uiBut *bt = ui_but_link_target_find(ar, but, mval[0] + ar->winrct.xmin, mval[1] + ar->winrct.ymin);
+
+	if (bt) {
+		float cx = BLI_rctf_cent_x(&bt->rect), cy = BLI_rctf_cent_y(&bt->rect);
+		ui_block_to_window_fl(ar, bt->block, &cx, &cy);
+		but->linkto[0] = (short)(cx - ar->winrct.xmin);
+		but->linkto[1] = (short)(cy - ar->winrct.ymin);
+	}
+	else {
+		VECCOPY2D(but->linkto, mval);
+	}
 }
 
 
@@ -6619,7 +6629,7 @@ static int ui_do_but_LINK(
         bContext *C, uiBut *but,
         uiHandleButtonData *data, const wmEvent *event)
 {
-	VECCOPY2D(but->linkto, event->mval);
+	ui_but_link_snap(data->region, but, event->mval);
 
 	if (data->state == BUTTON_STATE_HIGHLIGHT) {
 		if (event->type == LEFTMOUSE && event->val == KM_PRESS) {
