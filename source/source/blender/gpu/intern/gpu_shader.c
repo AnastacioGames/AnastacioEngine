@@ -884,7 +884,7 @@ void GPU_shader_uniform_texture(GPUShader *UNUSED(shader), int location, GPUText
 	else
 		GPU_invalid_tex_bind(target);
 	glUniform1i(location, number);
-	glEnable(target);
+	if (GPU_texture_unit_fixed_function(number)) glEnable(target);
 	if (number != 0) glActiveTexture(GL_TEXTURE0);
 
 	GPU_ASSERT_NO_GL_ERRORS("Post Uniform Texture");

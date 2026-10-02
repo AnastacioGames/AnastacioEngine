@@ -877,6 +877,25 @@ void GPU_invalid_tex_free(void)
 }
 
 
+/* glEnable/glDisable of a texture target only matter to the fixed-function pipeline and
+ * are GL_INVALID_OPERATION on units past GL_MAX_TEXTURE_COORDS (the game binds shadow maps
+ * and probes there), so they are limited to those units. */
+bool GPU_texture_unit_fixed_function(int number)
+{
+#ifdef GL_MAX_TEXTURE_COORDS
+	static GLint max_coords = -1;
+	if (max_coords == -1) {
+		max_coords = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_COORDS, &max_coords);
+		glGetError(); /* core profile: not a valid query */
+	}
+	return number < max_coords;
+#else
+	(void)number;
+	return false;
+#endif
+}
+
 void GPU_texture_bind(GPUTexture *tex, int number)
 {
 	if (number >= GPU_max_textures()) {
@@ -902,7 +921,7 @@ void GPU_texture_bind(GPUTexture *tex, int number)
 	}
 	else
 		GPU_invalid_tex_bind(tex->target_base);
-	glEnable(tex->target_base);
+	if (GPU_texture_unit_fixed_function(number)) glEnable(tex->target_base);
 	if (number != 0) glActiveTexture(GL_TEXTURE0);
 
 	tex->number = number;
@@ -925,7 +944,7 @@ void GPU_texture_unbind(GPUTexture *tex)
 	GLenum arbnumber = (GLenum)((GLuint)GL_TEXTURE0 + tex->number);
 	if (tex->number != 0) glActiveTexture(arbnumber);
 	glBindTexture(tex->target_base, 0);
-	glDisable(tex->target_base);
+	if (GPU_texture_unit_fixed_function(tex->number)) glDisable(tex->target_base);
 	if (tex->number != 0) glActiveTexture(GL_TEXTURE0);
 
 	tex->number = -1;

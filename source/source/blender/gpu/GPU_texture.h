@@ -110,6 +110,7 @@ int GPU_texture_ref_count(GPUTexture *tex);
 void GPU_texture_bind(GPUTexture *tex, int number);
 void GPU_texture_unbind(GPUTexture *tex);
 int GPU_texture_bound_number(GPUTexture *tex);
+bool GPU_texture_unit_fixed_function(int number);
 
 void GPU_texture_filter_mode(GPUTexture *tex, bool compare, bool use_filter, bool mipmap);
 void GPU_texture_generate_mipmap(GPUTexture *tex);

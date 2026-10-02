@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Avisos de GL das texturas com `--debug-gpu`
+
+- Origem dos avisos de textura das sombras: `GPU_texture_bind`/`unbind` e `GPU_shader_uniform_texture` chamavam `glEnable`/`glDisable(target)`, que só serve ao pipeline fixo e é `GL_INVALID_OPERATION` em unidades acima de `GL_MAX_TEXTURE_COORDS` (8), onde o jogo liga shadow maps e probes. Em `point_shadow_test.range` eram milhares de erros por execução. Agora `GPU_texture_unit_fixed_function()` limita essas chamadas às unidades válidas (nenhuma no perfil core). Log com `--debug-gpu` limpo depois da correção; sem mudança visual.
+
 ## 2026-10-02 - RangeRuntime: crash ao sair quando o arquivo não carrega
 
 - `GPG_Ghost.cpp`: com um arquivo inválido (ou só `-h`, que vira nome de arquivo por ser o último argumento) o runtime imprimia a ajuda e travava ao sair. A limpeza chamava `BKE_icons_free()` sem `BKE_icons_init()` (a fila `g_icon_delete_queue` nunca foi criada) e `GPU_exit()` sem `GPU_init()`, e usava `window` antes de conferir se a janela existia. Agora as três chamadas só rodam se a parte correspondente foi iniciada. Conferido: sai com código -1, sem crash.
