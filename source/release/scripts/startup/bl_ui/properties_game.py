@@ -690,6 +690,7 @@ class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
             sub.row().prop(df, "bend_axis", expand=True)
             sub.prop(df, "bend_angle")
             sub.prop(df, "bend_max_angle")
+            sub.prop(df, "radius")
         else:
             sub.prop(df, "radius")
             sub.prop(df, "depth")
