@@ -37,6 +37,9 @@ class RAS_OpenGLLight : public RAS_ILightObject
 {
 
 	RAS_Rasterizer *m_rasterizer;
+	/* IES profile of the lamp node tree (GPU_lamp_ies_slot), resolved on first use: -2 = not yet. */
+	int m_iesslot;
+	float m_iesstrength;
 
 public:
 	RAS_OpenGLLight(RAS_Rasterizer *ras);

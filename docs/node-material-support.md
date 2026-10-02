@@ -37,12 +37,13 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
 | Hair Info | malha n�o tem fios: todas as sa�das zero, como o Cycles numa malha |
+| IES Texture | só na árvore de nós da lâmpada (Point e Spot): o perfil (tipo C, arquivo ou Text interno) é normalizado para pico 1 e multiplicado por Strength; a Energy da lâmpada dá o brilho. Num material continua sem suporte |
 | Light Path | valores fixos de raio de câmera; Ray Length é a distância até a câmera |
 
 ## Nós sem suporte no Game PBR (alerta)
 
 Sem código GLSL; a saída é ignorada ou zero:
-IES Texture,
+IES Texture (num material; na lâmpada funciona, ver acima),
 Point Density, Script, Volume Absorption, Volume Scatter, Principled Volume.
 Nós do BI num material do Game PBR (e do Cycles no Game legado) também entram aqui.
 Ao carregar a cena, o jogo escreve um warning por material com esses nós

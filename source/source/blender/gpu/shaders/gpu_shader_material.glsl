@@ -4141,6 +4141,26 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 	return shadowfac;
 }
 
+/* IES Texture node of the lamp in slot i (GPU_material_bind_scene_lights, GPU_lamp_ies_slot):
+ * x = atlas band + 1 (0 = none), y = Strength; the lamp's X, Y, Z axes in view space. One band per profile,
+ * horizontal angle along s (wraps), vertical angle along t. */
+#define IES_PROFILES 16.0
+#define IES_BAND 32.0
+uniform vec4 unfiesinfo[NUM_LIGHTS];
+uniform vec3 unfiesaxes[NUM_LIGHTS * 3];
+uniform sampler2D unfiesatlas;
+
+/* d: emission direction (light to surface) in view space; angles as svm_node_ies in Cycles. */
+float scene_light_ies(int i, vec3 d)
+{
+	vec3 v = normalize(vec3(dot(d, unfiesaxes[i * 3]), dot(d, unfiesaxes[i * 3 + 1]), dot(d, unfiesaxes[i * 3 + 2])));
+	float v_angle = acos(clamp(-v.z, -1.0, 1.0));
+	float h_angle = atan(v.x, v.y) + M_PI;
+	float band = unfiesinfo[i].x - 1.0;
+	float t = (band * IES_BAND + clamp(v_angle / M_PI * IES_BAND, 0.5, IES_BAND - 0.5)) / (IES_PROFILES * IES_BAND);
+	return unfiesinfo[i].y * textureLod(unfiesatlas, vec2(h_angle / (2.0 * M_PI), t), 0.0).r;
+}
+
 /* Direction to scene-light slot i and its attenuation (distance + spot cone), shared by every BSDF
  * with a light loop. I is the fragment's view-space position. Returns false for a disabled slot. */
 bool scene_light_dir(int i, vec3 I, out vec3 l, out float atten)
@@ -4167,6 +4187,9 @@ bool scene_light_dir(int i, vec3 I, out vec3 l, out float atten)
 		if (SCENE_LIGHT(i).spotCutoff < 179.0) {
 			float spotcos = dot(-l, normalize(SCENE_LIGHT(i).spotDirection));
 			atten *= (spotcos < SCENE_LIGHT(i).spotCosCutoff) ? 0.0 : pow(spotcos, SCENE_LIGHT(i).spotExponent);
+		}
+		if (unfiesinfo[i].x > 0.0) {
+			atten *= scene_light_ies(i, -l);
 		}
 	}
 	return true;

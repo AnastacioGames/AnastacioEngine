@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - IES Texture nas lâmpadas do Game PBR
+
+- O nó IES Texture na árvore de nós de uma lâmpada Point ou Spot molda a luz dela no jogo, em todos os BSDFs com loop de luzes (fator em `scene_light_dir`).
+- O perfil é lido em C como no Cycles (`util_ies.cpp`, sem editar o Cycles; só tipo fotométrico C), reamostrado em 64×32 (horizontal × vertical), normalizado para pico 1 e guardado numa textura atlas única de até 16 perfis (`GPU_lamp_ies_slot`, `gpu_material.c`). Strength multiplica; a Energy da lâmpada continua dando o brilho.
+- Uniforms `unfiesinfo`, `unfiesaxes` e `unfiesatlas` enviados por `GPU_material_bind_scene_lights` nos dois perfis de GL; `RAS_OpenGLLight` resolve o perfil uma vez por lâmpada e manda os eixos dela no espaço de vista.
+- Num material o nó continua sem suporte (alerta). O selo do editor mostra `~Game` quando a árvore é de uma lâmpada.
+- Teste: `tools/create_ies_test.py` (cone, lâmpada sem IES e perfil assimétrico). Validado por screenshot; falta a validação do usuário.
+
 ## 2026-10-02 - Hair Info no Game PBR
 
 - Novo `node_hair_info`: numa malha não há fios, então todas as saídas são zero (Tangent Normal inclusive), como

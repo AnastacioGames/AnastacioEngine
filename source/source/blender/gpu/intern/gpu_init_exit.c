@@ -23,6 +23,7 @@
 
 #include "BLI_sys_types.h"
 #include "GPU_init_exit.h"  /* interface */
+#include "GPU_material.h"
 
 #include "BKE_global.h"
 
@@ -60,6 +61,7 @@ void GPU_exit(void)
 	if (G.debug & G_DEBUG_GPU)
 		gpu_debug_exit();
 	gpu_codegen_exit();
+	GPU_lamp_ies_exit();
 
 	gpu_extensions_exit(); /* must come last */
 

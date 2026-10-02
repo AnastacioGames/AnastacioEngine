@@ -48,7 +48,9 @@
 #include "BLI_math_vector.h"
 
 RAS_OpenGLLight::RAS_OpenGLLight(RAS_Rasterizer *ras)
-	:m_rasterizer(ras)
+	:m_rasterizer(ras),
+	m_iesslot(-2),
+	m_iesstrength(1.0f)
 {
 }
 
@@ -134,6 +136,21 @@ bool RAS_OpenGLLight::ApplyFixedFunctionLighting(KX_Scene *kxscene, int oblayer,
 #endif
 		light_to_eye_space(viewmat, vec, r_light->position);
 		r_light->constantatt = 1.0f;
+
+		if (m_iesslot == -2) {
+			GPULamp *gpulamp = GetGPULamp();
+			m_iesslot = gpulamp ? GPU_lamp_ies_slot(gpulamp, &m_iesstrength) : -1;
+		}
+		if (m_iesslot >= 0) {
+			r_light->iesinfo[0] = (float)(m_iesslot + 1);
+			r_light->iesinfo[1] = m_iesstrength;
+			for (int axis = 0; axis < 3; axis++) {
+				float dir[4] = {worldmatrix(0, axis), worldmatrix(1, axis), worldmatrix(2, axis), 0.0f};
+				float eyedir[4];
+				light_to_eye_space(viewmat, dir, eyedir);
+				normalize_v3_v3(r_light->iesaxes[axis], eyedir);
+			}
+		}
 		r_light->linearatt = m_att1 / m_distance;
 		r_light->quadraticatt = m_att2 / (m_distance * m_distance);
 

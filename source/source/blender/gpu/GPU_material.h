@@ -517,8 +517,16 @@ typedef struct GPUSceneLight {
 	float constantatt;
 	float linearatt;
 	float quadraticatt;
+	/* IES Texture node of the lamp (both GL profiles): x = atlas band + 1 (0 = none), y = Strength;
+	 * iesaxes = the lamp's X, Y, Z axes in eye space. */
+	float iesinfo[4];
+	float iesaxes[3][3];
 } GPUSceneLight;
 void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
+
+/* IES profile of the first IES Texture node in the lamp's node tree: atlas band, or -1 when none or unreadable. */
+int GPU_lamp_ies_slot(GPULamp *lamp, float *r_strength);
+void GPU_lamp_ies_exit(void);
 
 #ifdef __cplusplus
 }

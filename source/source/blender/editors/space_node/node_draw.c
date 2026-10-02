@@ -931,6 +931,17 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 				*r_tip = "Approximated in Game: distance to the camera, as a camera ray in Cycles";
 				return false;
 			case SH_NODE_TEX_IES:
+			{
+				SpaceNode *snode = CTX_wm_space_node(C);
+				if (snode && snode->id && GS(snode->id->name) == ID_LA) {
+					*r_badge = "~Game";
+					*r_tip = "Approximated in Game: shapes the light of Point and Spot lamps (profile normalized to 1, times Strength; lamp Energy sets the brightness); photometric type C only";
+					return false;
+				}
+				*r_badge = "Cycles";
+				*r_tip = "Not supported in Game in a material: use it in the lamp node tree";
+				return BKE_node_shader_unsupported_in_game(node, true);
+			}
 			case SH_NODE_TEX_POINTDENSITY:
 			case SH_NODE_SCRIPT:
 			case SH_NODE_VOLUME_ABSORPTION:
