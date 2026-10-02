@@ -21,7 +21,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   `GPU_material_bind_damage` (uniforms `unfdamagehits[16]`, `unfdamagestrength[16]`, `unfdamagecount`).
 - Nó novo **Damage** (Input, `SH_NODE_DAMAGE` 1004): entrada Softness, saídas Mask e Strength, calculadas por pixel
   em espaço de objeto (`node_damage` no GLSL). Instâncias da mesma malha têm manchas próprias.
-- Validado: nada ainda (commit pedido antes do build; build e teste visual pendentes).
+- Validado: build RangeRuntime/RangeEngine. Teste visual do nó Damage pendente.
 
 ## 2026-10-02 - Deformação: modo Bend (entortar) e getAppliedImpulse de constraints
 
