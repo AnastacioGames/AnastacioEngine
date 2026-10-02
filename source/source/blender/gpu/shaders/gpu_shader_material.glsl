@@ -3044,22 +3044,44 @@ void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn,
 	transmit = textureCubeLod(wtex, wv, rough * maxlod);
 }
 
-/* Local reflection probe (cube map captured from a probe object in the game), bound per object by
- * GPU_material_bind_probe(): x = 1 when this object is inside a probe, y = highest mip level. */
+/* Reflection probe (cube map captured in the game), bound per object by GPU_material_bind_probe():
+ * x = 1 when a cube is bound (the local probe around the object, or else the World captured at game
+ * start), y = highest mip level. The cube replaces the World reflection and diffuse light. */
 uniform samplerCube unfprobecube;
 uniform vec4 unfprobeinfo;
+/* xyz = probe center, w = probe radius (0 for the World capture: no parallax) */
+uniform vec4 unfprobepos;
 
-void env_probe_mirror(vec4 mirror, vec3 wr, float rough, float linearize, out vec4 result)
+void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, float linearize, vec3 viewpos, mat4 viewinv, out vec4 result, out vec4 result_diff)
 {
 	if (unfprobeinfo.x > 0.5) {
-		result = textureCubeLod(unfprobecube, wr, sqrt(rough) * unfprobeinfo.y);
+		vec3 dir = wr;
+		if (unfprobepos.w > 0.0) {
+			/* parallax: hit the probe sphere from the shaded point and look up the direction from its center */
+			vec3 p = (viewinv * vec4(viewpos, 1.0)).xyz - unfprobepos.xyz;
+			vec3 r = normalize(wr);
+			float b = dot(p, r);
+			float c = dot(p, p) - unfprobepos.w * unfprobepos.w;
+			float t = -b + sqrt(max(b * b - c, 0.0));
+			/* fade the correction toward rough lobes, where the blur hides it */
+			dir = mix(p + r * t, r, clamp(rough * 2.0, 0.0, 1.0));
+		}
+		result = textureCubeLod(unfprobecube, dir, sqrt(rough) * unfprobeinfo.y);
+		/* diffuse: a few taps around the normal on a low mip (same as env_cube_tex) */
+		float irrlod = max(unfprobeinfo.y - 3.0, 0.0);
+		result_diff = vec4(0.0);
+		for (int k = 0; k < 5; k++) {
+			result_diff += textureCubeLod(unfprobecube, env_irradiance_dir(-wn, k), irrlod) * 0.2;
+		}
 		/* the capture holds display colors; back to linear (approximate under Filmic) */
 		if (linearize > 0.5) {
 			srgb_to_linearrgb(result, result);
+			srgb_to_linearrgb(result_diff, result_diff);
 		}
 	}
 	else {
 		result = mirror;
+		result_diff = diffibl;
 	}
 }
 
@@ -5594,6 +5616,41 @@ void node_tex_sky(vec3 co, vec2 sun, vec3 radiance, vec4 config_x, vec4 config_y
 	color = vec4(node_xyz_to_rgb(vec3(X, Y, Z)), 1.0);
 }
 
+/* Hosek / Wilkie, same as sky_radiance_new in Cycles (kernel/svm/svm_sky.h). The 9 coefficients of each
+ * channel come in a mat3: c[0].xyz = 0..2, c[1].xyz = 3..5, c[2].xyz = 6..8. */
+float sky_hosek_internal(mat3 c, float theta, float gamma)
+{
+	float ctheta = cos(theta);
+	float cgamma = cos(gamma);
+	float expM = exp(c[1].y * gamma);
+	float rayM = cgamma * cgamma;
+	float mieM = (1.0 + rayM) / pow(1.0 + c[2].z * c[2].z - 2.0 * c[2].z * cgamma, 1.5);
+	float zenith = sqrt(ctheta);
+
+	return (1.0 + c[0].x * exp(c[0].y / (ctheta + 0.01))) *
+	       (c[0].z + c[1].x * expM + c[1].z * rayM + c[2].x * mieM + c[2].y * zenith);
+}
+
+void node_tex_sky_hosek(vec3 co, vec2 sun, vec3 radiance, mat3 config_x, mat3 config_y, mat3 config_z,
+                        out vec4 color)
+{
+	float len = length(co);
+	vec3 dir = (len > 0.0) ? co / len : vec3(0.0, 0.0, 1.0);
+
+	float theta = acos(clamp(dir.z, -1.0, 1.0));
+	float phi = atan(dir.x, dir.y);
+	float cospsi = sin(theta) * sin(sun.y) * cos(sun.x - phi) + cos(theta) * cos(sun.y);
+	float gamma = acos(clamp(cospsi, -1.0, 1.0));
+
+	theta = min(theta, M_PI * 0.5 - 0.001);
+
+	vec3 xyz = vec3(sky_hosek_internal(config_x, theta, gamma) * radiance.x,
+	                sky_hosek_internal(config_y, theta, gamma) * radiance.y,
+	                sky_hosek_internal(config_z, theta, gamma) * radiance.z);
+
+	color = vec4(node_xyz_to_rgb(xyz) * (2.0 * M_PI / 683.0), 1.0);
+}
+
 void node_tex_voronoi(vec3 co, float scale, float exponent, float coloring, out vec4 color, out float fac)
 {
 #ifdef BIT_OPERATIONS
@@ -5710,6 +5767,7 @@ void node_tex_wave(
 /* light path */
 
 void node_light_path(
+	vec3 viewpos,
 	out float is_camera_ray,
 	out float is_shadow_ray,
 	out float is_diffuse_ray,
@@ -5731,7 +5789,7 @@ void node_light_path(
 	is_singular_ray = 0.0;
 	is_reflection_ray = 0.0;
 	is_transmission_ray = 0.0;
-	ray_length = 1.0;
+	ray_length = length(viewpos);
 	ray_depth = 1.0;
 	diffuse_depth = 1.0;
 	glossy_depth = 1.0;
@@ -5739,11 +5797,17 @@ void node_light_path(
 	transmission_depth = 1.0;
 }
 
-void node_light_falloff(float strength, float tsmooth, out float quadratic, out float linear, out float constant)
+void node_light_falloff(float strength, float tsmooth, vec3 viewpos, out float quadratic, out float linear, out float constant)
 {
+	/* Same as Cycles for a camera ray: ray length is the distance from the camera. */
+	float ray_length = length(viewpos);
+	float squared = ray_length * ray_length;
+	if (tsmooth > 0.0) {
+		strength *= squared / (tsmooth + squared);
+	}
 	quadratic = strength;
-	linear = strength;
-	constant = strength;
+	linear = strength * ray_length;
+	constant = strength * squared;
 }
 
 void node_object_info(mat4 obmat, vec3 info, out vec3 location, out float object_index, out float material_index, out float random)

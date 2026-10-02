@@ -35,9 +35,7 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 | Ambient Occlusion | concavidade local da superfície (derivadas de tela), escurece cantos dentro de Distance; não oclui por outros objetos |
 | Wireframe | arestas dos triângulos (quads mostram a diagonal), Size em unidades do mundo ou pixels; só no jogo, não na viewport. A malha com esse material perde o compartilhamento de vértices (3 por triângulo) |
 | Bevel | devolve a normal sem mudança |
-| Light Path | valores fixos de raio de câmera |
-| Light Falloff | todas as saídas devolvem Strength |
-| Sky Texture (Hosek / Wilkie) | usa o modelo Preetham |
+| Light Path | valores fixos de raio de câmera; Ray Length é a distância até a câmera |
 
 ## Nós sem suporte no Game PBR (alerta)
 
@@ -57,13 +55,14 @@ até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Sh
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Holdout (preto, alpha 0), Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),
 Image e Environment Texture, Texture Coordinate, UV Map, Attribute, Geometry, Object Info,
-Normal Map, Tangent (Radial e UV Map), Bump, Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham),
+Normal Map, Tangent (Radial e UV Map), Bump, Light Falloff (distância até a câmera, como raio de câmera no Cycles), Fresnel, Layer Weight, Blackbody, Wavelength, Sky Texture (Preetham e Hosek / Wilkie),
 nós de cor, conversão e vetor.
 
 ## Reflection probe
 
 Dentro do raio de um objeto com a propriedade de jogo `probe`, Principled, Glossy e Glass refletem o
-cubemap capturado pelo probe em vez do World. Detalhes no changelog de 2026-10-01.
+cubemap capturado pelo probe em vez do World, no reflexo e na luz difusa; o reflexo tem correção de paralaxe por uma esfera do tamanho do raio do probe (some aos poucos com Roughness alta). Com World em nós, o jogo captura o
+World num cubemap no primeiro quadro e o usa fora dos probes. Detalhes no changelog de 2026-10-01 e 2026-10-02.
 
 ## Nós exclusivos do jogo (`Game`)
 

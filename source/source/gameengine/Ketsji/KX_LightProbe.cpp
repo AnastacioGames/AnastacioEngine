@@ -28,6 +28,8 @@
 
 #include "DNA_texture_types.h"
 
+#include "KX_Camera.h"
+
 #include "CM_Message.h"
 
 #include <cmath>
@@ -104,6 +106,12 @@ bool KX_LightProbe::SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera)
 		for (Face& face : m_faces) {
 			face.AttachTexture(m_cube);
 		}
+	}
+
+	// The World capture has no viewpoint: the background depends only on the face direction.
+	if (!GetViewpointObject()) {
+		camera->NodeSetWorldPosition(mt::zero3);
+		return true;
 	}
 
 	return KX_CubeMap::SetupCamera(sceneCamera, camera);

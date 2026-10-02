@@ -366,8 +366,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Sun exige `RAY_SHADOW`, Spot `BUFFER_SHADOW` e Point não tem sombra. A Point não aparece no viewport do editor
   nem nos materiais BI.
 - **Light probes**: reflection probe local feito em 2026-10-01 (propriedade `probe` num objeto, ver changelog);
-  validado pelo usuário em `probe_reflection_test.range`. Em aberto: luz difusa local (irradiance, harmônicos
-  esféricos do mesmo cubemap), mistura entre probes vizinhos e correção de paralaxe por caixa.
+  validado pelo usuário em `probe_reflection_test.range`. Luz difusa local (amostras do mesmo cubemap) e World em nós
+  capturado num cubemap em 2026-10-02 (validação visual pendente). Paralaxe por esfera do raio do probe em 2026-10-02. Em aberto: mistura entre probes vizinhos e paralaxe por caixa.
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
   (aceite de 2026-09-20).
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.

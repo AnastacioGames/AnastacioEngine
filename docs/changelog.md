@@ -9,6 +9,41 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Paralaxe no reflection probe (Game PBR)
+
+- O reflexo do probe local deixa de supor o cubemap no infinito: o raio refletido parte do ponto da superfície e bate numa esfera centrada no probe, com o raio do probe; a direção do centro até esse ponto lê o cubemap (`env_probe_mirror`, uniform `unfprobepos`).
+- A correção diminui com a Roughness (acima de 0.5 vale só a direção), onde o desfoque esconde o erro. A luz difusa e o World capturado não mudam.
+- `KX_TextureRendererManager::FindProbe` devolve centro e raio; `GPU_material_bind_probe` recebe os dois.
+
+## 2026-10-02 - Sky Texture Hosek / Wilkie no Game PBR
+
+- O modelo Hosek / Wilkie (padrão do nó) deixa de cair no Preetham no jogo. Os 9 coeficientes por canal e a
+  radiância são calculados na CPU ao compilar o material, com os datasets do Cycles
+  (`intern/cycles/util/util_sky_model_data.h`, só incluído, sem alteração) e uma cópia das funções Cook em
+  `node_shader_tex_sky.c`; o GLSL `node_tex_sky_hosek` é o `sky_radiance_new` do Cycles.
+- Teste: `tools/create_sky_hosek_test.py`. Validado: build e execução no RangeRuntime sem erro de shader;
+  validação visual pendente.
+
+## 2026-10-02 - Light Falloff e Ray Length no Game PBR
+
+- Light Falloff deixa de devolver só Strength: usa a distância até a câmera como comprimento do raio, igual ao
+  Cycles num raio de câmera (Smooth, Quadratic = Strength, Linear × distância, Constant × distância²).
+- Light Path: Ray Length passa a ser a distância até a câmera (antes, 1 fixo).
+- Teste: `tools/create_light_falloff_test.py`. Validado: build e execução no RangeRuntime sem erro de shader;
+  validação visual pendente.
+
+## 2026-10-02 - World em nós capturado num cubemap (Game PBR)
+
+- Com Shading Nodes e World em nós, o jogo captura o fundo do World num cubemap 256 (half float, com mips) no
+  primeiro quadro (`KX_TextureRendererManager::AddWorldProbe`, sem objeto de ponto de vista, só `RenderBackground`).
+  Onde nenhum probe local alcança, Principled, Glossy e Glass refletem esse cubo em vez das cores Horizon/Zenith.
+- `env_probe_mirror` agora troca também a luz difusa (5 amostras em torno da normal num mip baixo) pelo cubo
+  ligado: o World capturado, ou o probe local dentro do raio (luz difusa local do probe, antes só reflexo).
+- Limites: captura única (mudar o World pelo Python não atualiza o cubo); com Filmic a captura já sai com a curva
+  e volta por sRGB→linear (aproximado, igual ao probe local); Glass transmitido segue a cor do World.
+- Validado: build; `node_phases_test`, `probe_reflection_test` e `world_ibl_test` rodam sem erro de shader.
+  `RangeEngine.exe` não foi religado (editor aberto). Validação visual pendente.
+
 ## 2026-10-02 - Nome visível: Anastacio Engine (fork of Range Engine)
 
 - Título da janela do editor, propriedades do `.exe` (`winblender.rc`), About, mensagens e descrições das

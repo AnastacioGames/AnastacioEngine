@@ -66,6 +66,7 @@ public:
 
 KX_TextureRendererManager::KX_TextureRendererManager(KX_Scene *scene)
 	:m_scene(scene),
+	m_worldProbe(nullptr),
 	m_capturing(false)
 {
 	const RAS_CameraData& camdata = RAS_CameraData();
@@ -142,9 +143,19 @@ void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius,
 	m_probes.push_back(probe);
 }
 
-bool KX_TextureRendererManager::FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod) const
+void KX_TextureRendererManager::AddWorldProbe(int size)
 {
-	if (m_capturing || m_probes.empty()) {
+	if (m_worldProbe) {
+		return;
+	}
+	m_worldProbe = new KX_LightProbe(nullptr, 0.0f, size, 100.0f, false);
+	m_renderers[VIEWPORT_INDEPENDENT].push_back(m_worldProbe);
+}
+
+bool KX_TextureRendererManager::FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod,
+                                          float r_center[3], float *r_radius) const
+{
+	if (m_capturing) {
 		return false;
 	}
 
@@ -164,11 +175,25 @@ bool KX_TextureRendererManager::FindProbe(const float position[3], GPUTexture **
 	}
 
 	if (!best) {
-		return false;
+		if (m_worldProbe && m_worldProbe->GetCubeTexture()) {
+			best = m_worldProbe;
+		}
+		else {
+			return false;
+		}
 	}
 
 	*r_cube = best->GetCubeTexture();
 	*r_maxLod = best->GetMaxLod();
+	// Parallax sphere of a local probe; the World capture is at infinity (radius 0).
+	*r_radius = 0.0f;
+	if (best != m_worldProbe) {
+		const mt::vec3 center = best->GetViewpointObject()->NodeGetWorldPosition();
+		r_center[0] = center.x;
+		r_center[1] = center.y;
+		r_center[2] = center.z;
+		*r_radius = best->GetRadius();
+	}
 	return true;
 }
 
@@ -176,8 +201,10 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
                                                KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area)
 {
 	KX_GameObject *viewpoint = renderer->GetViewpointObject();
+	// The World capture has no viewpoint and draws only the background.
+	const bool worldOnly = (renderer == m_worldProbe);
 	// Doesn't need (or can) update.
-	if (!renderer->NeedUpdate() || !renderer->GetEnabled() || !viewpoint) {
+	if (!renderer->NeedUpdate() || !renderer->GetEnabled() || (!viewpoint && !worldOnly)) {
 		return false;
 	}
 
@@ -186,11 +213,17 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		return false;
 	}
 
-	const bool visible = viewpoint->GetVisible();
+	if (worldOnly) {
+		m_scene->GetWorldInfo()->UpdateBackGround(rasty, m_scene->GetWorldSun());
+	}
+
+	const bool visible = viewpoint ? viewpoint->GetVisible() : false;
 	/* We hide the viewpoint object in the case backface culling is disabled -> we can't see through
 	 * the object faces if the camera is inside the gameobject.
 	 */
-	viewpoint->SetVisible(false, false);
+	if (viewpoint) {
+		viewpoint->SetVisible(false, false);
+	}
 
 	// Set camera lod distance factor from renderer value.
 	m_camera->SetLodDistanceFactor(renderer->GetLodDistanceFactor());
@@ -223,6 +256,13 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		rasty->SetViewMatrix(viewmat);
 		m_camera->SetModelviewMatrix(viewmat, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
 
+		if (worldOnly) {
+			renderer->BeginRenderFace(rasty);
+			m_scene->GetWorldInfo()->RenderBackground(rasty);
+			renderer->EndRenderFace(rasty);
+			continue;
+		}
+
 		const std::vector<KX_GameObject *> objects = m_scene->CalculateVisibleMeshes(m_camera, RAS_Rasterizer::RAS_STEREO_LEFTEYE, ~renderer->GetIgnoreLayers(), false);
 
 		/* Updating the lod per face is normally not expensive because a cube map normally show every objects
@@ -246,7 +286,9 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		renderer->EndRenderFace(rasty);
 	}
 
-	viewpoint->SetVisible(visible, false);
+	if (viewpoint) {
+		viewpoint->SetVisible(visible, false);
+	}
 
 	return true;
 }
@@ -287,6 +329,8 @@ void KX_TextureRendererManager::Merge(KX_TextureRendererManager *other)
 
 	m_probes.insert(m_probes.end(), other->m_probes.begin(), other->m_probes.end());
 	other->m_probes.clear();
+	// The merged scene's World capture stays in the renderers list (owned there) but isn't used.
+	other->m_worldProbe = nullptr;
 }
 
 void KX_TextureRendererManager::InvalidateRenderersProjectionMatrix()

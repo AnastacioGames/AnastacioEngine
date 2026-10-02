@@ -174,7 +174,7 @@ struct GPUMaterial {
 	int shadowpointloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 
 	/* Local reflection probe (unfprobecube/unfprobeinfo), bound per object by GPU_material_bind_probe(). */
-	int probecubeloc, probeinfoloc;
+	int probecubeloc, probeinfoloc, probeposloc;
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {
@@ -491,6 +491,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 
 		material->probecubeloc = GPU_shader_get_uniform(shader, "unfprobecube");
 		material->probeinfoloc = GPU_shader_get_uniform(shader, "unfprobeinfo");
+		material->probeposloc = GPU_shader_get_uniform(shader, "unfprobepos");
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 			char name[64];
@@ -3730,10 +3731,13 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 		}
 	}
 
-	/* a local reflection probe, when the game binds one for the object, replaces the World reflection */
+	/* a probe cube, when the game binds one for the object (local probe or the captured World),
+	 * replaces the World reflection and diffuse light */
 	static float probe_linearize_on = 1.0f, probe_linearize_off = 0.0f;
-	GPU_link(mat, "env_probe_mirror", mirror, wr, rough,
-	         GPU_uniform(GPU_material_do_color_management(mat) ? &probe_linearize_on : &probe_linearize_off), &mirror);
+	GPU_link(mat, "env_probe_mirror", mirror, diffibl, wn, wr, rough,
+	         GPU_uniform(GPU_material_do_color_management(mat) ? &probe_linearize_on : &probe_linearize_off),
+	         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX),
+	         &mirror, &diffibl);
 
 	*r_mirror = mirror;
 	*r_diffuse = diffibl;
@@ -4687,7 +4691,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 /* Binds the local reflection probe cube map for this object (NULL = none, the World reflection is
  * used). Must run per object with the program bound. The probe uses its own texture unit, right below
  * the shadow map units, so the samplerCube never shares a unit with a sampler2D. */
-void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod)
+void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius)
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
 	if (!shader || material->probeinfoloc == -1) {
@@ -4707,6 +4711,15 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 	}
 
 	GPU_shader_uniform_vector(shader, material->probeinfoloc, 4, 1, info);
+
+	if (material->probeposloc != -1) {
+		float pos[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+		if (cube && center) {
+			copy_v3_v3(pos, center);
+			pos[3] = radius;
+		}
+		GPU_shader_uniform_vector(shader, material->probeposloc, 4, 1, pos);
+	}
 }
 
 /* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into

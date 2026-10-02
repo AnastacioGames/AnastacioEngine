@@ -2736,6 +2736,15 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		kxscene->GetTextureRendererManager()->AddProbe(gameobj, radius, size, clipEnd, realtime);
 	}
 
+	/* A node World (Game PBR) isn't readable by the materials' reflection code, which falls back to
+	 * the Horizon/Zenith colors: capture its background to a cube map once at game start instead. */
+	Scene *bscene = kxscene->GetBlenderScene();
+	if (BKE_scene_use_new_shading_nodes(bscene) && bscene->world &&
+	    bscene->world->use_nodes && bscene->world->nodetree)
+	{
+		kxscene->GetTextureRendererManager()->AddWorldProbe(256);
+	}
+
 	/* Instantiate dupli group, we will loop trough the object
 	 * that are in active layers. Note that duplicating group
 	 * has the effect of adding objects at the end of objectlist.

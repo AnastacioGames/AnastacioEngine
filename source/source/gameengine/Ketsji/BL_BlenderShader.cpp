@@ -272,10 +272,12 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 	/* Local reflection probe around the object, or none (World reflection). */
 	GPUTexture *probeCube = nullptr;
 	float probeMaxLod = 0.0f;
+	float probeCenter[3] = {0.0f, 0.0f, 0.0f};
+	float probeRadius = 0.0f;
 	const mt::vec3 position = meshUser->GetMatrix().TranslationVector3D();
 	const float pos[3] = {position.x, position.y, position.z};
-	m_scene->GetTextureRendererManager()->FindProbe(pos, &probeCube, &probeMaxLod);
-	GPU_material_bind_probe(m_gpuMat, probeCube, probeMaxLod);
+	m_scene->GetTextureRendererManager()->FindProbe(pos, &probeCube, &probeMaxLod, probeCenter, &probeRadius);
+	GPU_material_bind_probe(m_gpuMat, probeCube, probeMaxLod, probeCenter, probeRadius);
 
 	m_alphaBlend = GPU_material_alpha_blend(m_gpuMat, meshUser->GetColor().Data());
 }

@@ -38,7 +38,7 @@ static bNodeSocketTemplate sh_node_light_falloff_out[] = {
 
 static int node_shader_gpu_light_falloff(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
-	return GPU_stack_link(mat, "node_light_falloff", in, out);
+	return GPU_stack_link(mat, "node_light_falloff", in, out, GPU_material_builtin(mat, GPU_VIEW_POSITION));
 }
 
 /* node type definition */

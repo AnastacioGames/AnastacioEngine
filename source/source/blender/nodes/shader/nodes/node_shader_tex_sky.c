@@ -19,6 +19,13 @@
 
 #include "../node_shader_util.h"
 
+/* Hosek / Wilkie datasets (BSD license, see the header), shared with Cycles. Plain C arrays. */
+#define CCL_NAMESPACE_BEGIN
+#define CCL_NAMESPACE_END
+#include "../../../../../intern/cycles/util/util_sky_model_data.h"
+#undef CCL_NAMESPACE_BEGIN
+#undef CCL_NAMESPACE_END
+
 /* **************** OUTPUT ******************** */
 
 static bNodeSocketTemplate sh_node_tex_sky_in[] = {
@@ -46,11 +53,65 @@ static void node_shader_init_tex_sky(bNodeTree *UNUSED(ntree), bNode *node)
 	node->storage = tex;
 }
 
-/* Preetham coefficients, port of sky_texture_precompute_old from Cycles (render/nodes.cpp).
- * Hosek / Wilkie also uses this model in the Game. */
+/* Preetham coefficients, port of sky_texture_precompute_old from Cycles (render/nodes.cpp). */
 static float sky_perez_function(const float lam[5], float theta, float gamma)
 {
 	return (1.0f + lam[0] * expf(lam[1] / cosf(theta))) * (1.0f + lam[2] * expf(lam[3] * gamma) + lam[4] * cosf(gamma) * cosf(gamma));
+}
+
+/* Port of ArHosekSkyModel_CookConfiguration / CookRadianceConfiguration (intern/cycles/util/util_sky_model.cpp):
+ * quintic Bezier in the solar elevation, blended over albedo and turbidity. stride is 9 (configuration) or 1. */
+static double sky_hosek_cook(const double *dataset, int stride, int index, double turbidity, double albedo, double elevation)
+{
+	const int int_turbidity = (int)turbidity;
+	const double turbidity_rem = turbidity - (double)int_turbidity;
+	const double t = pow(elevation / (M_PI / 2.0), 1.0 / 3.0);
+	const double w[6] = {
+		pow(1.0 - t, 5.0), 5.0 * pow(1.0 - t, 4.0) * t, 10.0 * pow(1.0 - t, 3.0) * t * t,
+		10.0 * pow(1.0 - t, 2.0) * t * t * t, 5.0 * (1.0 - t) * pow(t, 4.0), pow(t, 5.0)};
+	const int block = stride * 6;
+	double res = 0.0;
+
+	for (int k = 0; k < 4; k++) {
+		const int high = k >= 2;
+		const int alb = k & 1;
+		if (high && int_turbidity == 10)
+			break;
+		const double *m = dataset + block * 10 * alb + block * (int_turbidity - 1 + high) + index;
+		double v = 0.0;
+		for (int j = 0; j < 6; j++)
+			v += w[j] * m[j * stride];
+		res += (alb ? albedo : 1.0 - albedo) * (high ? turbidity_rem : 1.0 - turbidity_rem) * v;
+	}
+	return res;
+}
+
+static int node_shader_gpu_tex_sky_hosek(GPUMaterial *mat, bNode *node, GPUNodeStack *in, GPUNodeStack *out)
+{
+	NodeTexSky *tex = node->storage;
+	float dir[3], sun[2], radiance[3], config[3][9];
+
+	copy_v3_v3(dir, tex->sun_direction);
+	if (normalize_v3(dir) == 0.0f)
+		dir[2] = 1.0f;
+
+	/* Same as sky_texture_precompute_new in Cycles (render/nodes.cpp). */
+	const float theta = min_ff(acosf(CLAMPIS(dir[2], -1.0f, 1.0f)), (float)M_PI_2);
+	const double turbidity = CLAMPIS(tex->turbidity, 1.0f, 10.0f);
+	const double albedo = tex->ground_albedo;
+	const double elevation = M_PI_2 - theta;
+
+	for (int c = 0; c < 3; c++) {
+		for (int i = 0; i < 9; i++)
+			config[c][i] = (float)sky_hosek_cook(datasetsXYZ[c], 9, i, turbidity, albedo, elevation);
+		radiance[c] = (float)sky_hosek_cook(datasetsXYZRad[c], 1, 0, turbidity, albedo, elevation);
+	}
+	sun[0] = atan2f(dir[0], dir[1]);
+	sun[1] = theta;
+
+	return GPU_stack_link(mat, "node_tex_sky_hosek", in, out,
+	                      GPU_uniform(sun), GPU_uniform(radiance),
+	                      GPU_uniform(config[0]), GPU_uniform(config[1]), GPU_uniform(config[2]));
 }
 
 static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
@@ -120,6 +181,9 @@ static int node_shader_gpu_tex_sky(GPUMaterial *mat, bNode *node, bNodeExecData 
 	}
 
 	node_shader_gpu_tex_mapping(mat, node, in, out);
+
+	if (tex->sky_model == SHD_SKY_NEW)
+		return node_shader_gpu_tex_sky_hosek(mat, node, in, out);
 
 	return GPU_stack_link(mat, "node_tex_sky", in, out,
 	                      GPU_uniform(sun), GPU_uniform(radiance),

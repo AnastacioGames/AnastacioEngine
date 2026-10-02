@@ -61,6 +61,8 @@ private:
 
 	/// Light probes, also in m_renderers[VIEWPORT_INDEPENDENT] which owns them.
 	std::vector<KX_LightProbe *> m_probes;
+	/// World captured to a cube map (no viewpoint, background only), used where no local probe applies.
+	KX_LightProbe *m_worldProbe;
 	/// True while a renderer captures: materials then skip probes (no feedback into the cube map).
 	bool m_capturing;
 
@@ -88,11 +90,13 @@ public:
 
 	/// Add a local reflection probe captured from the viewpoint object.
 	void AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime);
+	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
+	void AddWorldProbe(int size);
 
 	/** Find the probe to use for an object at position: the nearest one whose radius contains it.
-	 * Returns false when none applies (the World reflection is used).
+	 * Falls back to the captured World. Returns false when none applies (the World reflection is used).
 	 */
-	bool FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod) const;
+	bool FindProbe(const float position[3], GPUTexture **r_cube, float *r_maxLod, float r_center[3], float *r_radius) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.
