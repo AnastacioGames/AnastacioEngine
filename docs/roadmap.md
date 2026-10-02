@@ -360,8 +360,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.
 - Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
-  buffer GLSL aqui (`gpu_material.c:3997` só cobre `LA_SPOT`/`LA_SUN`); só Sun (`RAY_SHADOW`) e Spot
-  (`BUFFER_SHADOW`) projetam sombra.
+  buffer GLSL aqui (`gpu_lamp_wants_shadow` em `gpu_material.c` só cobre `LA_SPOT`/`LA_SUN`). Com Shading Nodes,
+  Sun e Spot seguem o `Cast Shadow` do Cycles (2026-10-01); sem, Sun exige `RAY_SHADOW` e Spot `BUFFER_SHADOW`.
 - **Light probes** (reflection probes/irradiance volumes): não existem; o IBL atual (`059766dc`) é global, um
   único céu/HDRI pra cena toda, sem componente local por objeto. Avaliar só depois de resolver a sombra do
   Principled acima.
