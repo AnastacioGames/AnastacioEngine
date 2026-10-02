@@ -19,6 +19,17 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Limitações: objetos com modificadores, armature, shape keys ou soft body não amassam; troca de LOD descarta os amassados.
 - Teste: `tools/create_dent_test.py`.
 
+## 2026-10-02 - Refração screen-space no Glass e Refraction (Game PBR)
+
+- Com Blend Mode Alpha Blend, Glass e Refraction refratam a cena atrás: depois dos buckets sólidos o blit de
+  `RAS_OFFSCREEN_BLIT_DEPTH` (o mesmo da profundidade) copia também a cor, com mips, em
+  `GPU_texture_global_scene_color_ptr`; só é feito quando algum Glass/Refraction compilou e há bucket alpha.
+- O raio refratado anda uma espessura fixa (1.0) e é projetado na tela; a Roughness escolhe o mip (desfoque).
+  A saída fica opaca (a cena já está na cor). Sem cópia (blend sólido, viewport, captura de probe) usa o World, como antes.
+- Limitações: não inverte a imagem como uma lente real; o que está fora da tela ou na frente do vidro não aparece
+  na refração; vidro atrás de vidro não se vê. Principled Transmission ainda é ignorada.
+- Teste: `tools/create_glass_refraction_test.py`. Validado pelo usuário.
+
 ## 2026-10-02 - Paralaxe por caixa no reflection probe e probe sem World (Game PBR)
 
 - Probe cujo Empty é desenhado como Cube usa paralaxe por caixa: meia-medida = Display Size × escala do Empty, nos eixos do mundo (a rotação é ignorada). O raio refletido sai pela primeira face à frente (`unfprobebox`/`unfprobebox2`, campo `box` do `ProbeSlot`). O raio do probe continua escolhendo quais objetos o usam e a mistura.

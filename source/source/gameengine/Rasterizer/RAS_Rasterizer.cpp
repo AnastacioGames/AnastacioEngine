@@ -1529,8 +1529,11 @@ void RAS_Rasterizer::UpdateGlobalSceneColor(RAS_ICanvas *canvas)
 {
 	GPUTexture *tex = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_BLIT_DEPTH)->GetColorTexture(0);
 	if (tex) {
+		// filter_mode / generate_mipmap act on the bound texture only.
+		GPU_texture_bind(tex, 0);
 		GPU_texture_filter_mode(tex, false, true, true);
 		GPU_texture_generate_mipmap(tex);
+		GPU_texture_unbind(tex);
 	}
 	GPU_texture_set_global_scene_color(tex);
 }

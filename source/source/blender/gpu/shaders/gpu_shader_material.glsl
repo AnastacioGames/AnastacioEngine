@@ -4356,7 +4356,7 @@ bool glass_screen_refraction(sampler2D scol, vec3 N, vec3 I, float eta, float ro
 	if (dot(r, r) == 0.0) {
 		r = reflect(-V, Ns); /* total internal reflection */
 	}
-	const float thickness = 0.3;
+	const float thickness = 1.0;
 	vec4 p0 = gl_ProjectionMatrix * vec4(I, 1.0);
 	vec4 p1 = gl_ProjectionMatrix * vec4(I + (r + V) * thickness, 1.0);
 	vec2 uv = gl_FragCoord.xy / vec2(size) + (p1.xy / p1.w - p0.xy / p0.w) * 0.5;

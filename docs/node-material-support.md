@@ -25,8 +25,8 @@ O editor de nós mostra o mesmo resultado como selo no cabeçalho do nó
 |---|---|
 | Glossy BSDF | brilho GGX das luzes da cena; reflete a textura do World (desfocada pela Roughness) ou, sem ela, a cor do World |
 | Toon BSDF | faixas de luz do Toon do Cycles, Component Diffuse e Glossy; cor do World como ambiente |
-| Glass BSDF | fresnel entre o reflexo do World e o World desfocado como luz transmitida, com brilho das luzes; não refrata a cena |
-| Refraction BSDF | World desfocado como luz transmitida; não refrata a cena |
+| Glass BSDF | fresnel entre o reflexo do World e a luz transmitida, com brilho das luzes; com Blend Mode Alpha Blend refrata a cena atrás (cópia da tela, desfoque pela Roughness); em blend sólido usa o World desfocado |
+| Refraction BSDF | com Alpha Blend refrata a cena atrás (cópia da tela); em blend sólido usa o World desfocado |
 | Anisotropic BSDF | brilho GGX anisotrópico das luzes (Anisotropy, Rotation e Tangent como no Cycles; sem Tangent ligado, radial no Z do objeto); reflexo do World isotrópico, como o Glossy |
 | Translucent BSDF | luz das lâmpadas por trás da superfície (Lambert em -N); não atravessa o objeto |
 | Velvet BSDF | brilho de borda em ângulo rasante (mais estreito com Sigma baixo) |
