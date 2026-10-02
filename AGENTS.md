@@ -73,6 +73,13 @@ nela, sempre testar a partir de `build/bin/`.
 Este é um fork em C++ da Range Engine 1.6 Rev1 (derivado de UPBGE 0.2.5b / Blender 2.79), com duas frentes de
 trabalho: **Performance** e **Iluminação/Gráficos**. Use `docs/README.md` como índice e confira estas fontes
 antes de começar:
+- **Nome do projeto:** o nome visível é "Anastacio Engine (fork of Range Engine)". Textos que o usuário vê
+  (título, splash, About, instalador, docs) usam "Anastacio Engine"; coisas novas (módulos, addons, classes)
+  usam o prefixo `anastacio`/`Anastacio`. Identificadores herdados ficam como estão para não quebrar
+  compatibilidade: formato `.range`, `import Range`, `bge`, pasta de config `%APPDATA%\RangeEngine\`, ProgIDs
+  `RangeEngine.*` no registro, alvos/executáveis `RangeEngine`/`RangeRuntime` e o arquivo `RangeEngine.desktop`.
+  Não renomeie esses sem plano de migração aprovado. Links da comunidade Range Engine (site, Discord) são
+  créditos ao projeto original e ficam.
 - `docs/roadmap.md` — somente trabalho aberto e validações pendentes.
 - `relatorio-melhorias-anastacioengine.md` — capacidades existentes e decisões técnicas vigentes.
 - `docs/changelog.md` — log datado e detalhado do que foi feito em cada sessão (diagnóstico, mudanças de

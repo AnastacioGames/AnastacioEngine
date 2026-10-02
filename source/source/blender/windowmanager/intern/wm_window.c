@@ -499,13 +499,13 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
 		/* this is set to 1 if you don't have startup.blend open */
 		if (G.save_over && BKE_main_blendfile_path_from_global()[0]) {
 			char str[sizeof(((Main *)NULL)->name) + 24];
-			BLI_snprintf(str, sizeof(str), "Range Engine%s [%s%s]", wm->file_saved ? "" : "* (Unsaved)",
+			BLI_snprintf(str, sizeof(str), "Anastacio Engine%s [%s%s]", wm->file_saved ? "" : "* (Unsaved)",
 			             BKE_main_blendfile_path_from_global(),
 			             G_MAIN->recovered ? " (Recovered)" : "");
 			GHOST_SetTitle(win->ghostwin, str);
 		}
 		else
-			GHOST_SetTitle(win->ghostwin, "Range Engine");
+			GHOST_SetTitle(win->ghostwin, "Anastacio Engine");
 
 		/* Informs GHOST of unsaved changes, to set window modified visual indicator (MAC OS X)
 		 * and to give hint of unsaved changes for a user warning mechanism
@@ -714,7 +714,7 @@ void wm_window_ghostwindows_ensure(wmWindowManager *wm)
 				win->cursor = CURSOR_STD;
 			}
 
-			wm_window_ghostwindow_add(wm, "Range Engine", win);
+			wm_window_ghostwindow_add(wm, "Anastacio Engine", win);
 		}
 		/* happens after fileread */
 		if (win->eventstate == NULL)

@@ -1612,7 +1612,7 @@ int main(int argc,
 									}
 								}
 								else {
-									title = "Range Engine Standalone";
+									title = "Anastacio Engine Standalone";
 								}
 #ifdef WIN32
 								if (scr_saver_mode == SCREEN_SAVER_MODE_PREVIEW) {

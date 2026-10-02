@@ -1187,10 +1187,10 @@ static int arg_handle_register_extension(int UNUSED(argc), const char **UNUSED(a
 }
 
 static const char arg_handle_unregister_extension_doc[] =
-"\n\tRemove .blend and .range file associations registered by Range Engine, then exit (Windows only)."
+"\n\tRemove .blend and .range file associations registered by Anastacio Engine, then exit (Windows only)."
 ;
 static const char arg_handle_unregister_extension_doc_silent[] =
-"\n\tSilently remove .blend and .range file associations registered by Range Engine, then exit (Windows only)."
+"\n\tSilently remove .blend and .range file associations registered by Anastacio Engine, then exit (Windows only)."
 ;
 static int arg_handle_unregister_extension(int UNUSED(argc), const char **UNUSED(argv), void *data)
 {

@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Nome visível: Anastacio Engine (fork of Range Engine)
+
+- Título da janela do editor, propriedades do `.exe` (`winblender.rc`), About, mensagens e descrições das
+  associações de arquivo no Windows, atalho `.desktop` do Linux e título reserva do runtime passam a usar
+  "Anastacio Engine". No Linux o título inicial vira o WM_CLASS, por isso `StartupWMClass` foi atualizado junto.
+- Mantidos por compatibilidade: `RangeEngine.exe`/`RangeRuntime.exe` (o RangeArmor procura `RangeRuntime`),
+  pasta `%APPDATA%\RangeEngine\`, ProgIDs `RangeEngine.*`, `.range`, `import Range`, `bge`. Regra registrada
+  no AGENTS.md. README ganhou parágrafo explicando o fork.
+- Validado: build do editor e do runtime; `RangeEngine.exe` abre com o título "Anastacio Engine" e
+  ProductName/CompanyName/FileDescription novos. Builds Web e Android não foram recompiladas.
+
 ## 2026-10-02 - Luz do World (textura) mais fiel no Game PBR
 
 - Textura do World (equirect, angular, cube): o difuso passa a ser a média de 5 amostras em torno da normal num mip

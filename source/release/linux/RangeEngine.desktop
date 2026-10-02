@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Range Engine
+Name=Anastacio Engine
 Comment=AnastacioEngine editor
 Exec=RangeEngine %f
 Icon=range-engine
 Terminal=false
 Categories=Graphics;3DGraphics;Game;Development;
-StartupWMClass=Range Engine
+StartupWMClass=Anastacio Engine

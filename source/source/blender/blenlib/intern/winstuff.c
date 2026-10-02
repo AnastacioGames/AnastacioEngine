@@ -65,7 +65,7 @@ static void file_extensions_fail(HKEY root)
 	if (root)
 		RegCloseKey(root);
 	if (!G.background)
-		MessageBox(0, "Could not register Range file associations.", "Range Engine error", MB_OK | MB_ICONERROR);
+		MessageBox(0, "Could not register Range file associations.", "Anastacio Engine error", MB_OK | MB_ICONERROR);
 	TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -150,8 +150,8 @@ void BLI_windows_register_file_extensions(void)
 		}
 	}
 
-	if (!register_file_association(root, ".blend", "RangeEngine.BlendFile", "Range Engine Blend File", engine_path, 1) ||
-	    !register_file_association(root, ".range", "RangeEngine.RangeFile", "Range Engine Game", runtime_path, 0)) {
+	if (!register_file_association(root, ".blend", "RangeEngine.BlendFile", "Anastacio Engine Blend File", engine_path, 1) ||
+	    !register_file_association(root, ".range", "RangeEngine.RangeFile", "Anastacio Engine Game", runtime_path, 0)) {
 		file_extensions_fail(root);
 	}
 
@@ -160,7 +160,7 @@ void BLI_windows_register_file_extensions(void)
 	if (!G.background) {
 		BLI_snprintf(message, sizeof(message), "Range file associations registered for %s.",
 		             user_mode ? "the current user. Run as administrator to register for all users" : "all users");
-		MessageBox(NULL, message, "Range Engine", MB_OK | MB_ICONINFORMATION);
+		MessageBox(NULL, message, "Anastacio Engine", MB_OK | MB_ICONINFORMATION);
 	}
 	TerminateProcess(GetCurrentProcess(), 0);
 }
@@ -215,7 +215,7 @@ void BLI_windows_unregister_file_extensions(void)
 
 	printf("success\n");
 	if (!G.background) {
-		MessageBox(NULL, "Range file associations removed.", "Range Engine", MB_OK | MB_ICONINFORMATION);
+		MessageBox(NULL, "Range file associations removed.", "Anastacio Engine", MB_OK | MB_ICONINFORMATION);
 	}
 	TerminateProcess(GetCurrentProcess(), 0);
 }

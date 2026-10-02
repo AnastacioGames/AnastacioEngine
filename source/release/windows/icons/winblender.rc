@@ -25,11 +25,11 @@ BEGIN
     BEGIN
       VALUE "FileVersion", BLEN_VER_RC_STR
       VALUE "ProductVersion", BLEN_VER_RC_STR
-      VALUE "CompanyName", "RangeEngine - Legacy UPBGE Fork"
-      VALUE "FileDescription", "Range Engine"
+      VALUE "CompanyName", "Anastacio Games"
+      VALUE "FileDescription", "Anastacio Engine (fork of Range Engine)"
       VALUE "LegalCopyright", "GPLv2"
       VALUE "OriginalFilename", "RangeEngine.exe"
-      VALUE "ProductName", "Range Engine"
+      VALUE "ProductName", "Anastacio Engine"
     END
   END
   BLOCK "VarFileInfo"

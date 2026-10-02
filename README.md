@@ -1,5 +1,10 @@
-# AnastacioEngine
-> Game engine para criação de jogos 3D, baseada na Range Engine 1.6 Rev1 e na linhagem UPBGE / Blender 2.79.
+# Anastacio Engine
+> Game engine para criação de jogos 3D. Fork da Range Engine 1.6 Rev1, na linhagem UPBGE / Blender 2.79.
+
+**De Range Engine a Anastacio Engine.** O que começou como uma versão personalizada da Range Engine cresceu
+com cada atualização: renderização, física, ferramentas de editor, Linux nativo, Web e Android. Hoje boa
+parte do código foi reescrita ou revisada, e a engine segue caminho próprio como um fork. Projetos continuam
+compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mesmos.
 
 > [!IMPORTANT]
 > **Para baixar a engine, use a seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
