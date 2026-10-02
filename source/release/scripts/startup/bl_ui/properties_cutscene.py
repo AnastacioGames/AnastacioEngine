@@ -62,6 +62,7 @@ class CUTSCENE_PT_sequences(CutsceneButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.box().label("Cutscene is under development: features may change or be incomplete.", icon='ERROR')
         settings = context.scene.cutscene_settings
         sequence_index = settings.active_sequence_index
 
