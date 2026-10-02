@@ -92,6 +92,33 @@ class LOGIC_PT_properties(Panel):
             row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = i
 
 
+class LOGIC_PT_states(Panel):
+    bl_space_type = 'LOGIC_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "States"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob and ob.game
+
+    def draw(self, context):
+        layout = self.layout
+        game = context.active_object.game
+
+        col = layout.column(align=True)
+        for item in game.state_names:
+            i = item.index
+            row = col.row(align=True)
+            row.prop(game, "states_visible", index=i, text="", toggle=True,
+                     icon='LAYER_USED' if game.used_states[i] else 'BLANK1')
+            sub = row.row(align=True)
+            sub.alignment = 'RIGHT'
+            sub.label(text="%d" % (i + 1))
+            row.prop(item, "name", text="")
+            row.prop(game, "states_initial", index=i, text="", toggle=True, icon='PLAY')
+
+
 class LOGIC_MT_logicbricks_add(Menu):
     bl_label = "Add"
 
@@ -151,6 +178,7 @@ class LOGIC_MT_view(Menu):
 
 classes = (
     LOGIC_PT_properties,
+    LOGIC_PT_states,
     LOGIC_MT_logicbricks_add,
     LOGIC_HT_header,
     LOGIC_MT_editor_menus,

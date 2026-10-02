@@ -4024,6 +4024,39 @@ class VIEW3D_PT_transform_orientations(Panel):
             row.prop(orientation, "name", text="")
             row.operator("transform.delete_orientation", text="", icon='X', emboss=False)
             
+class VIEW3D_PT_layer_names(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Layers"
+    bl_label = "Layers"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        space = context.space_data
+        view = scene if space.lock_camera_and_layers else space
+
+        counts = [0] * 20
+        for ob in scene.objects:
+            for i, used in enumerate(ob.layers):
+                if used:
+                    counts[i] += 1
+
+        col = layout.column(align=True)
+        for item in scene.layer_names:
+            i = item.index
+            row = col.row(align=True)
+            row.prop(view, "layers", index=i, text="", toggle=True,
+                     icon='RESTRICT_VIEW_OFF' if view.layers[i] else 'RESTRICT_VIEW_ON')
+            sub = row.row(align=True)
+            sub.alignment = 'RIGHT'
+            sub.label(text="%d" % (i + 1))
+            row.prop(item, "name", text="")
+            sub = row.row(align=True)
+            sub.alignment = 'RIGHT'
+            sub.label(text="%d" % counts[i] if counts[i] else "-")
+
+
 class VIEW3D_PT_quad_view(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -4286,6 +4319,7 @@ classes = (
     VIEW3D_PT_snapping,
     VIEW3D_PT_meshdisplay,
     VIEW3D_PT_transform_orientations,
+    VIEW3D_PT_layer_names,
     VIEW3D_PT_quad_view,
     VIEW3D_PT_etch_a_ton,
     VIEW3D_PT_context_properties,

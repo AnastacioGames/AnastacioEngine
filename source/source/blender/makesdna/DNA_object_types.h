@@ -640,6 +640,9 @@ typedef struct Object {
 	struct RangeDestructionSettings destruction;
 	/* Native explosive, opt-in via gameflag2 & OB_EXPLOSIVE. */
 	struct RangeExplosiveSettings explosive;
+
+	/* User names for the 30 logic states (empty = unnamed). */
+	char state_names[30][32];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */

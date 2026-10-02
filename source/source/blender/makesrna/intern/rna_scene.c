@@ -787,6 +787,33 @@ static void rna_Scene_set_set(PointerRNA *ptr, PointerRNA value)
 	scene->set = set;
 }
 
+static void rna_Scene_layer_names_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	Scene *scene = (Scene *)ptr->data;
+	rna_iterator_array_begin(iter, (void *)scene->layer_names, sizeof(scene->layer_names[0]), ARRAY_SIZE(scene->layer_names), 0, NULL);
+}
+
+static int rna_SceneLayerName_index_get(PointerRNA *ptr)
+{
+	Scene *scene = (Scene *)ptr->id.data;
+	return (int)(((char *)ptr->data - (char *)scene->layer_names) / sizeof(scene->layer_names[0]));
+}
+
+static void rna_SceneLayerName_name_get(PointerRNA *ptr, char *value)
+{
+	strcpy(value, (char *)ptr->data);
+}
+
+static int rna_SceneLayerName_name_length(PointerRNA *ptr)
+{
+	return strlen((char *)ptr->data);
+}
+
+static void rna_SceneLayerName_name_set(PointerRNA *ptr, const char *value)
+{
+	BLI_strncpy_utf8((char *)ptr->data, value, sizeof(((Scene *)NULL)->layer_names[0]));
+}
+
 static void rna_Scene_layer_set(PointerRNA *ptr, const bool *values)
 {
 	Scene *scene = (Scene *)ptr->data;
@@ -7880,6 +7907,30 @@ static void rna_def_selected_uv_element(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Face Index", "");
 }
 
+static void rna_def_scene_layer_name(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "SceneLayerName", NULL);
+	RNA_def_struct_ui_text(srna, "Scene Layer Name", "User name of one scene layer");
+	RNA_def_struct_ui_icon(srna, ICON_RENDERLAYERS);
+
+	prop = RNA_def_property(srna, "index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_int_funcs(prop, "rna_SceneLayerName_index_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Index", "Layer index (0-19)");
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, "rna_SceneLayerName_name_get", "rna_SceneLayerName_name_length",
+	                              "rna_SceneLayerName_name_set");
+	RNA_def_property_string_maxlength(prop, 64);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Name", "Layer name");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_SCENE | ND_LAYER, NULL);
+}
+
 static void rna_def_display_safe_areas(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -8033,6 +8084,12 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_Scene_layer_set");
 	RNA_def_property_ui_text(prop, "Layers", "Visible layers - Shift-Click/Drag to select multiple layers");
 	RNA_def_property_update(prop, NC_SCENE | ND_LAYER, "rna_Scene_layer_update");
+
+	prop = RNA_def_property(srna, "layer_names", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_struct_type(prop, "SceneLayerName");
+	RNA_def_property_collection_funcs(prop, "rna_Scene_layer_names_begin", "rna_iterator_array_next",
+	                                  "rna_iterator_array_end", "rna_iterator_array_get", NULL, NULL, NULL, NULL);
+	RNA_def_property_ui_text(prop, "Layer Names", "User names of the 20 scene layers");
 
 	/* active layer */
 	prop = RNA_def_property(srna, "active_layer", PROP_INT, PROP_NONE);
@@ -8414,6 +8471,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	rna_def_transform_orientation(brna);
 	rna_def_selected_uv_element(brna);
 	rna_def_display_safe_areas(brna);
+	rna_def_scene_layer_name(brna);
 	RNA_define_animate_sdna(true);
 	/* *** Animated *** */
 	rna_def_scene_render_data(brna);

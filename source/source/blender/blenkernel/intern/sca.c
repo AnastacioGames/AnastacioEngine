@@ -1192,6 +1192,10 @@ const char *sca_state_name_get(Object *ob, short bit)
 	bController *cont;
 	unsigned int mask;
 
+	if (bit >= 0 && bit < 30 && ob->state_names[bit][0]) {
+		return ob->state_names[bit];
+	}
+
 	mask = (1<<bit);
 	cont = ob->controllers.first;
 	while (cont) {

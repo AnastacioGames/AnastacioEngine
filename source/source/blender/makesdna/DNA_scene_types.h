@@ -1959,6 +1959,9 @@ typedef struct Scene {
 	struct RigidBodyWorld *rigidbody_world;
 
 	struct PreviewImage *preview;
+
+	/* User names for the 20 scene layers (empty = unnamed). */
+	char layer_names[20][64];
 } Scene;
 
 /* **************** RENDERDATA ********************* */

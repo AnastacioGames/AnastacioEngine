@@ -2640,6 +2640,32 @@ static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
 	/* see view3d_header.c */
 }
 
+/* Scene layer names shown in the tooltip of the layer grid buttons. */
+static char *ui_layer_name_tooltip_func(bContext *C, void *argN, const char *tip)
+{
+	Scene *scene = CTX_data_scene(C);
+	const int layer = *(int *)argN;
+
+	if (tip == NULL) {
+		tip = "";
+	}
+
+	if (scene && scene->layer_names[layer][0]) {
+		return BLI_sprintfN("%s %d: %s\n%s", IFACE_("Layer"), layer + 1, scene->layer_names[layer], tip);
+	}
+	return BLI_sprintfN("%s %d\n%s", IFACE_("Layer"), layer + 1, tip);
+}
+
+static void ui_layer_name_tooltip_set(uiBut *but, PointerRNA *ptr, int layer)
+{
+	if (layer >= 20 || !(RNA_struct_is_a(ptr->type, &RNA_Scene) || RNA_struct_is_a(ptr->type, &RNA_SpaceView3D))) {
+		return;
+	}
+	int *arg = MEM_mallocN(sizeof(int), __func__);
+	*arg = layer;
+	UI_but_func_tooltip_set(but, ui_layer_name_tooltip_func, arg);
+}
+
 /**
  * \todo for now, grouping of layers is determined by dividing up the length of
  * the array of layer bitflags
@@ -2707,6 +2733,7 @@ void uiTemplateLayers(
 				but = uiDefAutoButR(block, ptr, prop, layer, "", icon, 0, 0, UI_UNIT_X / 2, UI_UNIT_Y / 2);
 				UI_but_func_set(but, handle_layer_buttons, but, POINTER_FROM_INT(layer));
 				but->type = UI_BTYPE_TOGGLE;
+				ui_layer_name_tooltip_set(but, ptr, layer);
 			}
 		}
 	}
@@ -2776,6 +2803,7 @@ static void ui_template_layer_layout_ex(uiLayout *layout,
 				UI_block_layout_set_current(block, uiLayoutAbsolute(layout_sub, false));
 				uiBut *but = uiDefAutoButR(block, ptr, prop, layer_index, "", icon, 0, 0, UI_UNIT_X, UI_UNIT_Y);
 				but->type = UI_BTYPE_TOGGLE;
+				ui_layer_name_tooltip_set(but, ptr, layer_index);
 
 				/* For Click Drag Toggle */
 				if (RNA_property_subtype(prop) == PROP_LAYER_MEMBER) {

@@ -1552,6 +1552,33 @@ static void rna_GameObjectSettings_state_set(PointerRNA *ptr, const bool *values
 	}
 }
 
+static void rna_GameObjectSettings_state_names_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->data;
+	rna_iterator_array_begin(iter, (void *)ob->state_names, sizeof(ob->state_names[0]), ARRAY_SIZE(ob->state_names), 0, NULL);
+}
+
+static int rna_GameStateName_index_get(PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	return (int)(((char *)ptr->data - (char *)ob->state_names) / sizeof(ob->state_names[0]));
+}
+
+static void rna_GameStateName_name_get(PointerRNA *ptr, char *value)
+{
+	strcpy(value, (char *)ptr->data);
+}
+
+static int rna_GameStateName_name_length(PointerRNA *ptr)
+{
+	return strlen((char *)ptr->data);
+}
+
+static void rna_GameStateName_name_set(PointerRNA *ptr, const char *value)
+{
+	BLI_strncpy_utf8((char *)ptr->data, value, 32);
+}
+
 static void rna_GameObjectSettings_used_state_get(PointerRNA *ptr, bool *values)
 {
 	Object *ob = (Object *)ptr->data;
@@ -2563,6 +2590,29 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 
+static void rna_def_game_state_name(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "GameStateName", NULL);
+	RNA_def_struct_ui_text(srna, "Game State Name", "User name of one logic state");
+
+	prop = RNA_def_property(srna, "index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_int_funcs(prop, "rna_GameStateName_index_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Index", "State index (0-29)");
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, "rna_GameStateName_name_get", "rna_GameStateName_name_length",
+	                              "rna_GameStateName_name_set");
+	RNA_def_property_string_maxlength(prop, 32);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Name", "State name");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_object_game_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2950,6 +3000,12 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_array(prop, OB_MAX_STATES);
 	RNA_def_property_ui_text(prop, "State", "State determining which controllers are displayed");
 	RNA_def_property_boolean_funcs(prop, "rna_GameObjectSettings_state_get", "rna_GameObjectSettings_state_set");
+
+	prop = RNA_def_property(srna, "state_names", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_struct_type(prop, "GameStateName");
+	RNA_def_property_collection_funcs(prop, "rna_GameObjectSettings_state_names_begin", "rna_iterator_array_next",
+	                                  "rna_iterator_array_end", "rna_iterator_array_get", NULL, NULL, NULL, NULL);
+	RNA_def_property_ui_text(prop, "State Names", "User names of the 30 logic states");
 
 	prop = RNA_def_property(srna, "used_states", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_array(prop, OB_MAX_STATES);
@@ -4369,6 +4425,7 @@ void RNA_def_object(BlenderRNA *brna)
 	rna_def_object(brna);
 
 	RNA_define_animate_sdna(false);
+	rna_def_game_state_name(brna);
 	rna_def_object_game_settings(brna);
 	rna_def_object_base(brna);
 	rna_def_vertex_group(brna);
