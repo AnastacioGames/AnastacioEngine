@@ -43,6 +43,7 @@
 #include "BKE_colorband.h"
 #include "BKE_colortools.h"
 #include "BKE_global.h"
+#include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
@@ -4111,6 +4112,23 @@ static GPULamp *gpu_lamp_create_cascade(GPULamp *parent, Lamp *la, int index)
 	return cascade;
 }
 
+/* Whether a Sun/Spot gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
+ * "Cast Shadow" (lamp.cycles.cast_shadow, an ID property, default on) and hides the BI shadow
+ * method, so follow that instead of LA_SHAD_RAY/LA_SHAD_BUF. */
+static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
+{
+	if (!ELEM(la->type, LA_SUN, LA_SPOT)) {
+		return false;
+	}
+	if (scene && BKE_scene_use_new_shading_nodes(scene)) {
+		IDProperty *cycles = la->id.properties ? IDP_GetPropertyFromGroup(la->id.properties, "cycles") : NULL;
+		IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ? IDP_GetPropertyFromGroup(cycles, "cast_shadow") : NULL;
+		return cast ? (IDP_Int(cast) != 0) : true;
+	}
+	return (la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
+	       (la->type == LA_SUN && (la->mode & LA_SHAD_RAY));
+}
+
 GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 {
 	Lamp *la;
@@ -4139,9 +4157,7 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	lamp->shadow_color[2] = la->shdwb;
 
 	/* Hemi has no shadow projection (gpu_lamp_calc_winmat), so no shadow buffer for it. */
-	if ((la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
-	    (la->type == LA_SUN && (la->mode & LA_SHAD_RAY)))
-	{
+	if (gpu_lamp_wants_shadow(scene, la)) {
 		if (!gpu_lamp_create_shadow_buffer(lamp)) {
 			gpu_lamp_shadow_free(lamp);
 			return lamp;

@@ -9,12 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Game PBR: sombra segue o "Cast Shadow" do Cycles
+
+- Com Shading Nodes, Sun e Spot criam shadow map conforme `lamp.cycles.cast_shadow` (padrão ligado), lido do
+  IDProperty em `gpu_lamp_wants_shadow` (`gpu_material.c`). Sem Shading Nodes, continua Ray/Buffer Shadow do BI.
+- Point continua sem sombra no Game.
+- Validado pelo usuário em `node_material_shadow_test.range` (Sun em No Shadow, com SSAO e SSR por Filter 2D).
+
 ## 2026-10-01 - Game PBR: sombra em materiais sem nós
 
 - Com Shading Nodes, material sem nós usava `node_bsdf_diffuse` (ambiente fixo 0,2, luzes sem sombra): chão e
   objetos simples nunca recebiam sombra. `GPU_material_from_blender` agora liga `node_bsdf_diffuse_ambient`, o
   mesmo do nó Diffuse BSDF (luzes da cena com shadow map, cor do World como ambiente).
-- Lembrete: no Game a sombra do Sun ainda exige `Ray Shadow` na lâmpada (opção do BI, escondida com Cycles ativo).
+- Lembrete (superado pela entrada acima): a sombra do Sun exigia `Ray Shadow` na lâmpada.
 - Validado pelo usuário em `node_material_shadow_test.range`.
 
 ## 2026-10-01 - Game PBR: Color Management (Filmic, exposição, gamma) na saída do material
