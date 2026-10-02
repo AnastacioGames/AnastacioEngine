@@ -886,6 +886,8 @@ int main(int argc,
 	GHOST_TUns32 fullScreenWidth = 0;
 	GHOST_TUns32 fullScreenHeight = 0;
 	GHOST_IWindow *window = nullptr;
+	bool gpuInitialized = false;
+	bool iconsInitialized = false;
 	int fullScreenBpp = 32;
 	int fullScreenFrequency = 60;
 	GHOST_TEmbedderWindowID parentWindow = 0;
@@ -1486,6 +1488,7 @@ int main(int argc,
 
 						//Seg Fault; icon.c gIcons == 0
 						BKE_icons_init(1);
+						iconsInitialized = true;
 
 						titlename = maggie->name;
 
@@ -1635,6 +1638,7 @@ int main(int argc,
 							}
 
 							GPU_init();
+							gpuInitialized = true;
 
 							if (SYS_GetCommandLineInt(syshandle, "nomipmap", 0)) {
 								GPU_set_mipmap(G.main, 0);
@@ -1669,7 +1673,10 @@ int main(int argc,
 				} while (ELEM(exitInfo.m_code, KX_ExitInfo::RESTART_GAME, KX_ExitInfo::START_OTHER_GAME));
 			}
 
-			GPU_exit();
+			// GPU_init() runs only once a window is open (not when the game file failed to load).
+			if (gpuInitialized) {
+				GPU_exit();
+			}
 
 #ifdef WITH_PYTHON
 			PyDict_Clear(globalDict);
@@ -1677,13 +1684,16 @@ int main(int argc,
 			exitPlayerPython();
 #endif  // WITH_PYTHON
 
-			// Seg Fault; icon.c gIcons == 0
-			BKE_icons_free();
+			// Seg Fault; icon.c gIcons == 0. The icons (and their delete queue) only exist
+			// once a game file loaded.
+			if (iconsInitialized) {
+				BKE_icons_free();
+			}
 
-			window->setCursorShape(GHOST_kStandardCursorDefault);
-			window->setCursorVisibility(true);
-
+			// No window when the game file failed to load.
 			if (window) {
+				window->setCursorShape(GHOST_kStandardCursorDefault);
+				window->setCursorVisibility(true);
 				system->disposeWindow(window);
 			}
 

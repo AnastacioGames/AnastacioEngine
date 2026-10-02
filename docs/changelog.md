@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - RangeRuntime: crash ao sair quando o arquivo não carrega
+
+- `GPG_Ghost.cpp`: com um arquivo inválido (ou só `-h`, que vira nome de arquivo por ser o último argumento) o runtime imprimia a ajuda e travava ao sair. A limpeza chamava `BKE_icons_free()` sem `BKE_icons_init()` (a fila `g_icon_delete_queue` nunca foi criada) e `GPU_exit()` sem `GPU_init()`, e usava `window` antes de conferir se a janela existia. Agora as três chamadas só rodam se a parte correspondente foi iniciada. Conferido: sai com código -1, sem crash.
+
 ## 2026-10-02 - Loop de tempo validado a 60 Hz
 
 O usuário rodou o jogo real com o monitor em 60 Hz, com v-sync ligado e desligado: comportamento igual, sem perda de tecla nem mudança no veículo, e o FPS não travou em 30. Com v-sync ficou mais suave, sem diferença de FPS. Sem mudança de código.
