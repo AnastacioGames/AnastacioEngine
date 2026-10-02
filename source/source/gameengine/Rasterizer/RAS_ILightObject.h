@@ -121,6 +121,10 @@ public:
 	virtual void UnbindCascadeShadowBuffer(short cascadeIndex) = 0;
 	virtual void SetCascadeSplits(float split0, float split1) = 0;
 
+	/* Point lamp cube shadow (Shading Nodes): 6 passes, one per face, closed with UnbindShadowBuffer(). */
+	virtual bool HasPointShadow() = 0;
+	virtual void BindPointShadowFace(RAS_ICanvas *canvas, short face, KX_Camera *cam, mt::mat3x4& camtrans) = 0;
+
 	/* Static/dynamic shadow cache split (Sun + CSM only, see GPU_lamp_shadow_static_* in
 	 * gpu_material.c for the full contract). cascadeIndex: 0=Near, 1=Medium, 2=Low. */
 	virtual bool NeedStaticShadowUpdate(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat) = 0;

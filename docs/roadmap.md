@@ -359,9 +359,10 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.
-- Lembrete de limitação de engine (não é bug, é arquitetura herdada): Point/Local lights nunca geram shadow
-  buffer GLSL aqui (`gpu_lamp_wants_shadow` em `gpu_material.c` só cobre `LA_SPOT`/`LA_SUN`). Com Shading Nodes,
-  Sun e Spot seguem o `Cast Shadow` do Cycles (2026-10-01); sem, Sun exige `RAY_SHADOW` e Spot `BUFFER_SHADOW`.
+- Sombras (`gpu_lamp_wants_shadow` em `gpu_material.c`): com Shading Nodes, Sun, Spot e Point seguem o
+  `Cast Shadow` do Cycles (Point por atlas de cubo 3x2, 2026-10-01, validado pelo usuário); sem Shading Nodes,
+  Sun exige `RAY_SHADOW`, Spot `BUFFER_SHADOW` e Point não tem sombra. A Point não aparece no viewport do editor
+  nem nos materiais BI.
 - **Light probes** (reflection probes/irradiance volumes): não existem; o IBL atual (`059766dc`) é global, um
   único céu/HDRI pra cena toda, sem componente local por objeto. Avaliar só depois de resolver a sombra do
   Principled acima.

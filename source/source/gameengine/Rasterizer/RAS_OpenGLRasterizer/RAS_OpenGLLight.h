@@ -71,6 +71,8 @@ public:
 	                             const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);
 	void UnbindCascadeShadowBuffer(short cascadeIndex);
 	void SetCascadeSplits(float split0, float split1);
+	bool HasPointShadow();
+	void BindPointShadowFace(RAS_ICanvas *canvas, short face, KX_Camera *cam, mt::mat3x4& camtrans);
 	bool NeedStaticShadowUpdate(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);
 	void BindStaticShadowBuffer(RAS_ICanvas *canvas, short cascadeIndex, KX_Camera *cam, mt::mat3x4& camtrans,
 	                            const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);

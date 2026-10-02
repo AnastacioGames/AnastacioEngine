@@ -171,6 +171,7 @@ struct GPUMaterial {
 	int shadowpersmatloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowbiasloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowpointloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {
@@ -481,6 +482,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->shadowbiasloc[i] = GPU_shader_get_uniform(shader, name);
 			BLI_snprintf(name, sizeof(name), "unfshadowenabled[%d]", i);
 			material->shadowenabledloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowpoint[%d]", i);
+			material->shadowpointloc[i] = GPU_shader_get_uniform(shader, name);
 		}
 
 		for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
@@ -662,7 +665,13 @@ void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float
 			if (!GPU_lamp_has_shadow_buffer(lamp)) {
 				GPU_lamp_update_buffer_mats(lamp);
 			}
-			mul_m4_m4m4(lamp->dynpersmat, lamp->persmat, viewinv);
+			if (GPU_lamp_has_point_shadow(lamp)) {
+				/* View space to light space: the shader picks the cube face itself. */
+				mul_m4_m4m4(lamp->dynpersmat, lamp->viewmat, viewinv);
+			}
+			else {
+				mul_m4_m4m4(lamp->dynpersmat, lamp->persmat, viewinv);
+			}
 		}
 		if (material->dynproperty & DYN_LAMP_AREAMAT) {
 			float areamat[4][4];
@@ -1581,7 +1590,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	/* this replaces if (i > 0.0) conditional until that is supported */
 	/* done in shade_visifac now, GPU_link(mat, "mtex_value_clamp_positive", i, &i); */
 
-	if ((ma->mode & MA_SHADOW) && GPU_lamp_has_shadow_buffer(lamp)) {
+	if ((ma->mode & MA_SHADOW) && GPU_lamp_has_shadow_buffer(lamp) && !GPU_lamp_has_point_shadow(lamp)) {
 		if (!(mat->scene->gm.flag & GAME_GLSL_NO_SHADOWS)) {
 			mat->dynproperty |= DYN_LAMP_PERSMAT;
 
@@ -4112,15 +4121,39 @@ static GPULamp *gpu_lamp_create_cascade(GPULamp *parent, Lamp *la, int index)
 	return cascade;
 }
 
-/* Whether a Sun/Spot gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
+/* Point lamp shadow: one depth texture holding the 6 cube faces as a 3x2 atlas of
+ * lamp->size tiles, always a plain depth map (no VSM, CSM or static cache). */
+static bool gpu_lamp_create_point_shadow_buffer(GPULamp *lamp)
+{
+	lamp->fb = GPU_framebuffer_create();
+	if (!lamp->fb) {
+		return false;
+	}
+	lamp->depthtex = GPU_texture_create_depth(lamp->size * 3, lamp->size * 2, true, NULL);
+	if (!lamp->depthtex) {
+		return false;
+	}
+	if (!GPU_framebuffer_texture_attach(lamp->fb, lamp->depthtex, 0, NULL)) {
+		return false;
+	}
+	if (!GPU_framebuffer_check_valid(lamp->fb, NULL)) {
+		return false;
+	}
+	GPU_framebuffer_restore();
+	return true;
+}
+
+/* Whether a Sun/Spot (or, with Shading Nodes, a Point) gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
  * "Cast Shadow" (lamp.cycles.cast_shadow, an ID property, default on) and hides the BI shadow
  * method, so follow that instead of LA_SHAD_RAY/LA_SHAD_BUF. */
 static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
 {
-	if (!ELEM(la->type, LA_SUN, LA_SPOT)) {
+	const bool nodes = scene && BKE_scene_use_new_shading_nodes(scene);
+	/* Point shadows are only sampled by the Shading Nodes light loop (scene_light_shadow). */
+	if (!(ELEM(la->type, LA_SUN, LA_SPOT) || (nodes && la->type == LA_LOCAL))) {
 		return false;
 	}
-	if (scene && BKE_scene_use_new_shading_nodes(scene)) {
+	if (nodes) {
 		IDProperty *cycles = la->id.properties ? IDP_GetPropertyFromGroup(la->id.properties, "cycles") : NULL;
 		IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ? IDP_GetPropertyFromGroup(cycles, "cast_shadow") : NULL;
 		return cast ? (IDP_Int(cast) != 0) : true;
@@ -4157,7 +4190,12 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	lamp->shadow_color[2] = la->shdwb;
 
 	/* Hemi has no shadow projection (gpu_lamp_calc_winmat), so no shadow buffer for it. */
-	if (gpu_lamp_wants_shadow(scene, la)) {
+	if (gpu_lamp_wants_shadow(scene, la) && la->type == LA_LOCAL) {
+		if (!gpu_lamp_create_point_shadow_buffer(lamp)) {
+			gpu_lamp_shadow_free(lamp);
+		}
+	}
+	else if (gpu_lamp_wants_shadow(scene, la)) {
 		if (!gpu_lamp_create_shadow_buffer(lamp)) {
 			gpu_lamp_shadow_free(lamp);
 			return lamp;
@@ -4189,6 +4227,61 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	}
 
 	return lamp;
+}
+
+bool GPU_lamp_has_point_shadow(GPULamp *lamp)
+{
+	return lamp->type == LA_LOCAL && lamp->depthtex != NULL;
+}
+
+/* Rows map light-local space to the camera space of each cube face (camera looks down -Z).
+ * Faces: +X, -X, +Y, -Y, +Z, -Z; keep in sync with shadow_point() in gpu_shader_material.glsl. */
+static const float gpu_point_face_rot[6][3][3] = {
+	{{0, -1, 0}, {0, 0, 1}, {-1, 0, 0}},
+	{{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},
+	{{1, 0, 0}, {0, 0, 1}, {0, -1, 0}},
+	{{-1, 0, 0}, {0, 0, 1}, {0, 1, 0}},
+	{{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}},
+	{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+};
+
+/* Scissor box before face 0, restored by GPU_lamp_shadow_buffer_unbind(). */
+static int gpu_point_saved_scissor[4];
+
+void GPU_lamp_shadow_point_face_bind(
+        GPULamp *lamp, int face, float out_viewmat[4][4], float out_winmat[4][4], int r_viewport[4])
+{
+	float facemat[4][4];
+
+	BLI_assert(face >= 0 && face < 6);
+
+	GPU_lamp_update_buffer_mats(lamp);
+
+	unit_m4(facemat);
+	for (int row = 0; row < 3; row++) {
+		for (int col = 0; col < 3; col++) {
+			facemat[col][row] = gpu_point_face_rot[face][row][col];
+		}
+	}
+	mul_m4_m4m4(out_viewmat, facemat, lamp->viewmat);
+
+	/* 90 degree square frustum; lamp->winmat keeps it for the debug frustum draw. */
+	perspective_m4(lamp->winmat, -lamp->d, lamp->d, -lamp->d, lamp->d, lamp->d, lamp->clipend);
+	copy_m4_m4(out_winmat, lamp->winmat);
+
+	r_viewport[0] = (face % 3) * lamp->size;
+	r_viewport[1] = (face / 3) * lamp->size;
+	r_viewport[2] = lamp->size;
+	r_viewport[3] = lamp->size;
+
+	if (face == 0) {
+		glGetIntegerv(GL_SCISSOR_BOX, gpu_point_saved_scissor);
+	}
+	GPU_texture_bind_as_framebuffer(lamp->depthtex);
+	glViewport(r_viewport[0], r_viewport[1], r_viewport[2], r_viewport[3]);
+	/* The scissor limits the depth clear to this face's tile. */
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(r_viewport[0], r_viewport[1], r_viewport[2], r_viewport[3]);
 }
 
 bool GPU_lamp_has_cascaded_shadow(GPULamp *lamp)
@@ -4328,7 +4421,7 @@ void GPU_lamp_shadow_buffer_bind_matrices(
 
 void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp)
 {
-	if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE) {
+	if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE && !GPU_lamp_has_point_shadow(lamp)) {
 		GPU_shader_unbind();
 		GPU_framebuffer_blur(lamp->fb, lamp->tex, lamp->blurfb, lamp->blurtex, lamp->la->bufsharp);
 	}
@@ -4336,6 +4429,10 @@ void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp)
 	GPU_framebuffer_texture_unbind(lamp->fb, lamp->tex);
 	GPU_framebuffer_restore();
 	glEnable(GL_SCISSOR_TEST);
+	if (GPU_lamp_has_point_shadow(lamp)) {
+		glScissor(gpu_point_saved_scissor[0], gpu_point_saved_scissor[1],
+		          gpu_point_saved_scissor[2], gpu_point_saved_scissor[3]);
+	}
 }
 
 int GPU_lamp_shadow_buffer_type(GPULamp *lamp)
@@ -4499,7 +4596,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 		GPULamp *lamp = lamps[i];
 		bool has_shadow = lamp && GPU_lamp_has_shadow_buffer(lamp) &&
 		                   !GPU_lamp_has_cascaded_shadow(lamp) &&
-		                   lamp->la->shadowmap_type != LA_SHADMAP_VARIANCE;
+		                   (GPU_lamp_has_point_shadow(lamp) || lamp->la->shadowmap_type != LA_SHADMAP_VARIANCE);
 
 		if (has_shadow) {
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
@@ -4524,6 +4621,10 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				float bias[2] = {lamp->bias, lamp->slopebias};
 				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
 			}
+			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
+				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
+				GPU_shader_uniform_vector(shader, material->shadowpointloc[i], 4, 1, point);
+			}
 		}
 
 		else if (material->shadowmaploc[i] != -1) {
@@ -4534,7 +4635,8 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 		}
 
 		if (material->shadowenabledloc[i] != -1) {
-			float enabled = has_shadow ? 1.0f : 0.0f;
+			/* 2 = Point lamp: unfshadowpersmat is then view to light space (see shadow_point()). */
+			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : 1.0f) : 0.0f;
 			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
 		}
 	}
@@ -4586,7 +4688,7 @@ GPUNodeLink *GPU_lamp_get_data(
 
 	shade_light_textures(mat, lamp, r_col, NULL);
 
-	if (GPU_lamp_has_shadow_buffer(lamp)) {
+	if (GPU_lamp_has_shadow_buffer(lamp) && !GPU_lamp_has_point_shadow(lamp)) {
 		GPUNodeLink *vn, *inp;
 
 		GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &vn);

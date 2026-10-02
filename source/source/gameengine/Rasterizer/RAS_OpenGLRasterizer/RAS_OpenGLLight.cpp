@@ -331,6 +331,42 @@ void RAS_OpenGLLight::UnbindShadowBuffer()
 	m_requestShadowUpdate = false;
 }
 
+bool RAS_OpenGLLight::HasPointShadow()
+{
+	GPULamp *lamp = GetGPULamp();
+	return lamp && GPU_lamp_has_point_shadow(lamp);
+}
+
+void RAS_OpenGLLight::BindPointShadowFace(RAS_ICanvas *canvas, short face, KX_Camera *cam, mt::mat3x4& camtrans)
+{
+	GPULamp *lamp = GetGPULamp();
+	float viewmat[4][4], winmat[4][4];
+	int viewport[4];
+
+	GPU_lamp_shadow_point_face_bind(lamp, face, viewmat, winmat, viewport);
+
+	m_rasterizer->SetShadowMode(RAS_Rasterizer::RAS_SHADOW_SIMPLE);
+
+	/* GPU_lamp_shadow_point_face_bind() sets the viewport to this face's tile */
+	canvas->UpdateViewPort(viewport[0], viewport[1], viewport[2], viewport[3]);
+
+	mt::mat4 modelviewmat((float *)viewmat);
+	mt::mat4 projectionmat((float *)winmat);
+
+	const mt::mat3x4 trans = mt::mat3x4((float *)viewmat);
+	camtrans = trans.Inverse();
+
+	cam->SetModelviewMatrix(modelviewmat, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
+	cam->SetProjectionMatrix(projectionmat, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
+
+	cam->NodeSetLocalPosition(camtrans.TranslationVector3D());
+	cam->NodeSetLocalOrientation(camtrans.RotationMatrix());
+	cam->NodeUpdate();
+
+	m_rasterizer->SetProjectionMatrix(projectionmat);
+	m_rasterizer->SetViewMatrix(modelviewmat);
+}
+
 bool RAS_OpenGLLight::HasCascadedShadow()
 {
 	GPULamp *lamp = GetGPULamp();

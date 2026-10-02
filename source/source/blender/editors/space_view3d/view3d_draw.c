@@ -2828,6 +2828,8 @@ static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
 
 		if (layers &&
 		    GPU_lamp_has_shadow_buffer(lamp) &&
+		    /* Point shadows are a Game-only cube atlas, not drawn by the viewport. */
+		    !GPU_lamp_has_point_shadow(lamp) &&
 		    /* keep last, may do string lookup */
 		    GPU_lamp_visible(lamp, srl, NULL))
 		{

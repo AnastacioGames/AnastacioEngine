@@ -3940,20 +3940,77 @@ uniform SceneLightSource unflightsource[NUM_LIGHTS];
 uniform sampler2DShadow unfshadowmap[NUM_SHADOW_LIGHTS];
 uniform mat4 unfshadowpersmat[NUM_SHADOW_LIGHTS];
 uniform vec2 unfshadowbias[NUM_SHADOW_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
-uniform float unfshadowenabled[NUM_SHADOW_LIGHTS];
+uniform float unfshadowenabled[NUM_SHADOW_LIGHTS]; /* 0 off, 1 Sun/Spot, 2 Point */
+uniform vec4 unfshadowpoint[NUM_SHADOW_LIGHTS]; /* Point: x = clip start, y = clip end, z = 1 / face size */
+
+/* Point lamp shadow from a 3x2 atlas of cube faces (+X -X +Y; -Y +Z -Z), lightmat = view to light
+ * space. Face axes match gpu_point_face_rot[] in gpu_material.c. */
+float shadow_point(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 lightmat, vec2 bias, vec4 point, float inp)
+{
+	if (inp <= 0.0) {
+		return 1.0;
+	}
+	vec3 p = (lightmat * vec4(rco, 1.0)).xyz;
+	vec3 n = mat3(lightmat) * vn;
+	vec3 a = abs(p);
+	float dist = max(a.x, max(a.y, a.z));
+	/* Normal offset of ~1.5 texels at this distance, plus the lamp's slope bias. */
+	p += n * (dist * 3.0 * point.z + bias.y);
+
+	vec3 c;
+	float face;
+	a = abs(p);
+	if (a.x >= a.y && a.x >= a.z) {
+		face = (p.x > 0.0) ? 0.0 : 1.0;
+		c = (p.x > 0.0) ? vec3(-p.y, p.z, -p.x) : vec3(p.y, p.z, p.x);
+	}
+	else if (a.y >= a.z) {
+		face = (p.y > 0.0) ? 2.0 : 3.0;
+		c = (p.y > 0.0) ? vec3(p.x, p.z, -p.y) : vec3(-p.x, p.z, p.y);
+	}
+	else {
+		face = (p.z > 0.0) ? 4.0 : 5.0;
+		c = (p.z > 0.0) ? vec3(-p.x, p.y, -p.z) : vec3(p.x, p.y, p.z);
+	}
+
+	float d = -c.z;
+	float n0 = point.x, f0 = point.y;
+	if (d <= n0 || d >= f0) {
+		return 1.0;
+	}
+	/* Keep the lookup inside the tile so filtering never reads a neighbour face. */
+	vec2 uv = clamp(c.xy / d * 0.5 + 0.5, vec2(point.z), vec2(1.0 - point.z));
+	uv = (uv + vec2(mod(face, 3.0), floor(face / 3.0))) / vec2(3.0, 2.0);
+
+	d -= bias.x;
+	float depth = 0.5 * ((f0 + n0) / (f0 - n0) - 2.0 * f0 * n0 / ((f0 - n0) * d)) + 0.5;
+	return shadow2DProj(shadowmap, vec4(uv, depth, 1.0)).x;
+}
 
 /* Shadow factor of scene-light slot i. GLSL ES 3.00 only allows constant indices into sampler
  * arrays, so the loop index can't reach unfshadowmap[] directly. */
 float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 {
 	float shadowfac = 1.0;
-	if (i == 0 && unfshadowenabled[0] > 0.5) {
+	if (i == 0 && unfshadowenabled[0] > 1.5) {
+		shadowfac = shadow_point(rco, vn, unfshadowmap[0], unfshadowpersmat[0], unfshadowbias[0],
+		                         unfshadowpoint[0], inp);
+	}
+	else if (i == 0 && unfshadowenabled[0] > 0.5) {
 		shadow_simple(rco, vn, unfshadowmap[0], unfshadowpersmat[0], 0.0,
 		              unfshadowbias[0].x, unfshadowbias[0].y, 0.0, inp, shadowfac);
+	}
+	else if (i == 1 && unfshadowenabled[1] > 1.5) {
+		shadowfac = shadow_point(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1],
+		                         unfshadowpoint[1], inp);
 	}
 	else if (i == 1 && unfshadowenabled[1] > 0.5) {
 		shadow_simple(rco, vn, unfshadowmap[1], unfshadowpersmat[1], 0.0,
 		              unfshadowbias[1].x, unfshadowbias[1].y, 0.0, inp, shadowfac);
+	}
+	else if (i == 2 && unfshadowenabled[2] > 1.5) {
+		shadowfac = shadow_point(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2],
+		                         unfshadowpoint[2], inp);
 	}
 	else if (i == 2 && unfshadowenabled[2] > 0.5) {
 		shadow_simple(rco, vn, unfshadowmap[2], unfshadowpersmat[2], 0.0,

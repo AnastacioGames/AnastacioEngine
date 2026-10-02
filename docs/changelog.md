@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-01 - Game PBR: sombra de luz Point (atlas de cubo)
+
+- Com Shading Nodes e `Cast Shadow` ligado, a Point ganha shadow map: as 6 faces do cubo (90°, clip start/end
+  da lâmpada, `bufsize` por face) ficam num único depth 3x2 (`gpu_lamp_create_point_shadow_buffer`). Um sampler
+  por luz, então cabe nos 3 slots de sombra do loop de luzes.
+- `KX_ShadowRenderer` faz 6 passes por Point (`RAS_OpenGLLight::BindPointShadowFace` →
+  `GPU_lamp_shadow_point_face_bind`, viewport e scissor no tile da face).
+- Shader: `unfshadowenabled = 2` marca Point; `unfshadowpersmat` vira view → espaço da luz e `shadow_point`
+  (`gpu_shader_material.glsl`) escolhe a face pelo eixo dominante. Bias: offset na normal de ~1,5 texel mais
+  Bias/Slope Bias da lâmpada. Sem VSM, CSM ou cache estático para Point.
+- Fora: viewport do editor e materiais BI (Point segue sem sombra lá).
+- Custo: 6 renders de casters por Point com sombra por frame.
+- Validado pelo usuário em `point_shadow_test.range` (sala com Point no centro).
+
 ## 2026-10-01 - Game PBR: sombra segue o "Cast Shadow" do Cycles
 
 - Com Shading Nodes, Sun e Spot criam shadow map conforme `lamp.cycles.cast_shadow` (padrão ligado), lido do

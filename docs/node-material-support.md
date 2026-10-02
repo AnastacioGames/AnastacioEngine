@@ -44,7 +44,7 @@ Point Density, Script, Principled Hair BSDF, Volume Absorption, Volume Scatter, 
 ## Nós completos no Game PBR
 
 Principled, Diffuse, Glossy e Toon usam as mesmas luzes: Sun, Point e Spot com atenuação e cone,
-até 8 luzes, sombra nas 3 primeiras.
+até 8 luzes, sombra nas 3 primeiras (Point com sombra de cubo; segue o `Cast Shadow` da lâmpada).
 
 Principled BSDF, Diffuse BSDF, Transparent BSDF, Emission, Background, Mix/Add Shader,
 texturas procedurais (Noise, Voronoi, Musgrave, Wave, Magic, Gradient, Checker, Brick),

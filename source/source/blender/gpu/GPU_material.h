@@ -415,6 +415,12 @@ void GPU_lamp_shadow_buffer_bind_matrices(
         float out_viewmat[4][4], float out_winmat[4][4]);
 void GPU_lamp_set_cascade_splits(GPULamp *lamp, float split0, float split1);
 
+/* Point lamp shadow (Shading Nodes only): the 6 cube faces live in one 3x2 depth atlas, each
+ * rendered with GPU_lamp_shadow_point_face_bind() and closed with GPU_lamp_shadow_buffer_unbind(). */
+bool GPU_lamp_has_point_shadow(GPULamp *lamp);
+void GPU_lamp_shadow_point_face_bind(
+        GPULamp *lamp, int face, float out_viewmat[4][4], float out_winmat[4][4], int r_viewport[4]);
+
 /* Static shadow cache (Sun/CSM static/dynamic split, see gpu_material.c for the full contract). */
 bool GPU_lamp_shadow_static_ensure(GPULamp *lamp);
 void GPU_lamp_shadow_static_buffer_bind(GPULamp *lamp, int *winsize);

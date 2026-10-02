@@ -451,7 +451,8 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 			// the whole cascade block (both sub-passes) would simply stop running.
 			if (light->GetVisible() && !light->GetDistanceCulled() && raslight->HasShadowBuffer() &&
 			    (useStaticSplit || raslight->NeedShadowUpdate())) {
-				const short numPasses = useCascade ? 3 : 1;
+				const bool usePoint = raslight->HasPointShadow();
+				const short numPasses = useCascade ? 3 : (usePoint ? 6 : 1);
 				++shadowUpdatedLights;
 				shadowPasses += numPasses;
 
@@ -558,6 +559,9 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 					/* binds framebuffer object, sets up camera .. */
 					if (useCascade) {
 						raslight->BindCascadeShadowBuffer(canvas, pass, cam, camtrans, cascadeView, cascadeWin);
+					}
+					else if (usePoint) {
+						raslight->BindPointShadowFace(canvas, pass, cam, camtrans);
 					}
 					else {
 						raslight->BindShadowBuffer(canvas, cam, camtrans);
