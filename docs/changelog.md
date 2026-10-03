@@ -36,6 +36,12 @@ completo e redesenhava todas as views com `NC_OBJECT|ND_DRAW`.
   resultado determinístico. Fases 4 e 5 descartadas (vertex/weight paint não desenha via PBVH; sculpt GLSL via
   PBVH mudaria o shading do viewport).
 
+## 2026-10-03 - Câmera: linhas suaves
+
+- Câmera usa os mesmos consertos de lâmpada e empty: antialias e passada transparente (depois das malhas).
+- Largura de linha por `U.pixelsize`. O volume de culling (`GAME_CAM_SHOW_CULLING_BOX`) restaura o depth mask
+  e o blend anteriores em vez de forçá-los, para não quebrar a passada transparente.
+
 ## 2026-10-03 - Empty: linhas suaves
 
 - Empties (exceto imagem) usam os mesmos consertos da lâmpada: antialias (`GL_LINE_SMOOTH` + blend) e desenho

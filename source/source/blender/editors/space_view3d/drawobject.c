@@ -2387,7 +2387,7 @@ static void drawcamera(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3
 	                         asp, shift, &drawsize, vec);
 
 	glDisable(GL_CULL_FACE);
-	glLineWidth(1);
+	glLineWidth(U.pixelsize);
 
 	/* camera frame */
 	if (!is_stereo3d_cameras) {
@@ -2434,6 +2434,9 @@ static void drawcamera(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3
 			}
 		}
 
+		/* restore the caller's state afterwards (transparent pass: blend on, no depth write) */
+		GLboolean prev_depth_mask, prev_blend = glIsEnabled(GL_BLEND);
+		glGetBooleanv(GL_DEPTH_WRITEMASK, &prev_depth_mask);
 		glEnable(GL_BLEND);
 		glDepthMask(0);
 		glColor4f(0.15f, 0.75f, 1.0f, 0.16f);
@@ -2444,8 +2447,8 @@ static void drawcamera(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3
 		drawcamera_frame(near_plane, GL_LINE_LOOP);
 		drawcamera_frame(far_plane, GL_LINE_LOOP);
 		drawcamera_volume(near_plane, far_plane, GL_LINE_LOOP);
-		glDepthMask(1);
-		glDisable(GL_BLEND);
+		glDepthMask(prev_depth_mask);
+		if (!prev_blend) glDisable(GL_BLEND);
 	}
 #endif
 
@@ -8113,7 +8116,23 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 				if (!render_override ||
 				    (rv3d->persp == RV3D_CAMOB && v3d->camera == ob)) /* special exception for active camera */
 				{
-					drawcamera(bmain, scene, v3d, rv3d, base, dflag, ob_wire_col);
+					if (!v3d->transp && !(G.f & G_PICKSEL) && !(base->flag & OB_FROMDUPLI)) {
+						/* like lamps/empties: lines after the meshes (transparent pass) */
+						ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base, dflag);
+					}
+					else {
+						const bool smooth = !(G.f & G_PICKSEL);
+						if (smooth) {
+							glEnable(GL_LINE_SMOOTH);
+							glEnable(GL_BLEND);
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						}
+						drawcamera(bmain, scene, v3d, rv3d, base, dflag, ob_wire_col);
+						if (smooth) {
+							glDisable(GL_BLEND);
+							glDisable(GL_LINE_SMOOTH);
+						}
+					}
 				}
 				break;
 			case OB_SPEAKER:
