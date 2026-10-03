@@ -302,6 +302,8 @@ void GPU_material_free(struct ListBase *gpumaterial);
 
 void GPU_materials_free(struct Main *bmain);
 bool GPU_materials_free_text(struct Main *bmain, struct Text *text);
+/* Fixed material values as uniforms (faster loading, slower drawing), see gpu_codegen.c. */
+void GPU_material_uniform_values_set(bool enable);
 
 bool GPU_lamp_visible(GPULamp *lamp, struct SceneRenderLayer *srl, struct Material *ma);
 void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float viewinv[4][4]);

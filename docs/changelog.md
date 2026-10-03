@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Fast Shader Loading no painel Render
+
+- O modo de valores como uniform (entrada abaixo) virou opção por jogo: Render > Shading > Shader Compilation >
+  Fast Shader Loading (`use_fast_shader_loading`, flag `GAME_FAST_SHADER_LOAD`, bit 5 de `GameData.flag`). O painel
+  mostra o ganho (carregamento: 800 materiais 64 s → 5 s) e a perda (até metade do FPS com muitas luzes).
+- `LA_Launcher::InitEngine` liga o modo com `GPU_material_uniform_values_set` antes de converter os materiais;
+  `ExitEngine` desliga, então o viewport segue compilando com constantes. `RANGE_SHADER_UNIFORM_VALUES=1` ainda
+  força ligado.
+- O bit 5 era `GAME_DISPLAY_LISTS` em arquivos 2.7x: `versioning_range.c` limpa o bit em arquivos anteriores a
+  1.6.115 (`RANGE_MINSUBVERSION` 114 → 115).
+- Teste: cena de `tools/create_shader_fps_test.py` com a opção ligada compilou 30 programas (770 reaproveitados,
+  shaders 1,2 s) e rodou a 29,5 fps; o arquivo antigo abriu com a opção desligada.
+
 ## 2026-10-03 - Carregamento: medição por etapa, cache e biblioteca GLSL enxuta, merge do LibLoad
 
 - Etapas 1 e 2 do plano "Cozinhar" (arquivo preparado para o jogo). `BL_LoadStats.h` e o console agora mostram

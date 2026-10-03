@@ -5340,6 +5340,16 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "Render BSDF/Principled shader nodes in the game engine (new shading nodes path)");
 	RNA_def_property_update(prop, NC_SCENE | NA_EDITED, "rna_Scene_glsl_update");
 
+	prop = RNA_def_property(srna, "use_fast_shader_loading", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_FAST_SHADER_LOAD);
+	RNA_def_property_ui_text(prop, "Fast Shader Loading",
+	                         "Materials that differ only in colors and values share one shader, so the game "
+	                         "loads much faster (800 materials: 64 s to 5 s of shader compilation). The cost is "
+	                         "drawing speed: each pixel computes the full material for every light, so heavy "
+	                         "scenes with many lights can lose up to half the FPS (60 to 31 fps with 18 lights). "
+	                         "Use it for games with many materials and few lights; leave it off when FPS matters "
+	                         "more than loading time. Only affects the game, not the viewport");
+
 	/* obstacle simulation */
 	prop = RNA_def_property(srna, "obstacle_simulation", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "obstacleSimulation");

@@ -542,6 +542,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 115)) {
+    /* Bit 5 of GameData.flag is now GAME_FAST_SHADER_LOAD; in Blender 2.7x files it was
+     * GAME_DISPLAY_LISTS and may still be set, so start every old scene with it off. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->gm.flag &= ~GAME_FAST_SHADER_LOAD;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_lightning_intensity")) {
     /* Raios da chuva desligados por padrao (WO_WEATHER_RAIN_LIGHTNING nunca estava ligado). */
     LISTBASE_FOREACH (World *, wo, &main->world) {

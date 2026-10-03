@@ -1069,6 +1069,9 @@ enum {
 #define GAME_SHOW_DEBUG_PROPS				(1 << 2)
 #define GAME_SHOW_FRAMERATE					(1 << 3)
 #define GAME_SHOW_PHYSICS					(1 << 4)
+/* Fixed material values become shader uniforms: far fewer programs to compile, slower drawing
+ * (gpu_codegen.c). Bit 5 was GAME_DISPLAY_LISTS in old files, cleared in versioning_upbge.c. */
+#define GAME_FAST_SHADER_LOAD				(1 << 5)
 #define GAME_GLSL_NO_LIGHTS					(1 << 6)
 #define GAME_GLSL_NO_SHADERS				(1 << 7)
 #define GAME_GLSL_NO_SHADOWS				(1 << 8)

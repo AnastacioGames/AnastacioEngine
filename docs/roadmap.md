@@ -19,8 +19,8 @@ usadas) também feita: compilação ~4× mais rápida, imagens idênticas. Falta
 
 Aberto:
 
-- Modo de valores como uniform (`RANGE_SHADER_UNIFORM_VALUES=1`) medido: carrega muito mais rápido, mas custa
-  ~45% do FPS em cena pesada; fica desligado. Ideia aberta: uniform só para materiais repetidos (mesma
+- Fast Shader Loading (valores como uniform) é opção no painel Render, desligada por padrão: carrega muito
+  mais rápido, mas custa ~45% do FPS em cena pesada. Ideia aberta: uniform só para materiais repetidos (mesma
   estrutura) e constante para os únicos.
 - Etapa 4: malha/tangentes/física pré-calculadas.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
@@ -41,9 +41,9 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 ### Multiplayer nativo
 
 Planejado em 2026-10-03, nada implementado. Plano completo em [`multiplayer-plan.md`](multiplayer-plan.md):
-servidor autoritativo com snapshots em C++, transporte ENet (nativo) + WebTransport/WebSocket (Web, com
-cross-play), painel Network sem código, `Range.network` em Python, predição e compensação de lag. v1 utilizável
-nas etapas 0–6.
+servidor autoritativo com snapshots em C++, painel Network sem código, `Range.network` em Python. v1
+(etapas 0–6) = multiplayer básico no Desktop via ENet; v1.1 = predição e compensação de lag; v1.2 =
+Web/Android (WebSocket, cross-play). Próximo passo: etapa 0 (contrato do protocolo + `NET_BitStream`).
 
 ### Web (WebGL/WebAssembly)
 

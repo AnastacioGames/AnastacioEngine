@@ -50,9 +50,11 @@ ferramenta correspondente.
   10 LibLoads caíram de ~13 s cada para 214 ms no total. Console mostra linhas `[Load]` por etapa.
 - Cada fragment shader de material leva só as funções da biblioteca GLSL que usa (compilação ~4× mais rápida,
   imagem idêntica); `RANGE_NO_GLSL_STRIP=1` envia a biblioteca inteira para comparação.
-- `RANGE_SHADER_UNIFORM_VALUES=1` (opcional, desligado) passa os valores fixos dos materiais como uniforms:
-  materiais de mesma estrutura compartilham o shader (esferas: 1030 → 310 ms de shaders), mas perde o constant
-  folding: em cena pesada caiu de ~60 para 31 fps. Decisão: fica desligado, não vira padrão nem opção na UI.
+- Render > Shading > Shader Compilation > **Fast Shader Loading** (`GAME_FAST_SHADER_LOAD`, desligado por padrão;
+  `RANGE_SHADER_UNIFORM_VALUES=1` força ligado) passa os valores fixos dos materiais como uniforms: materiais de
+  mesma estrutura compartilham o shader (800 esferas: 64 s → 5 s de compilação), mas perde o constant folding:
+  em cena pesada caiu de ~60 para 31 fps. Decisão: opção por jogo, com ganho e perda escritos no painel; só vale
+  para jogos com muitos materiais e poucas luzes. Vale só no jogo, nunca no viewport.
 - Streaming por distância está disponível em `projects-teste/scripts/streaming_manager.py`.
 - LOD de impostor possui billboard cilíndrico e bake automático de atlas multiângulo.
 - Partículas GPU por objeto usam transform feedback, shader cache compartilhado, sprites/texturas, curvas,

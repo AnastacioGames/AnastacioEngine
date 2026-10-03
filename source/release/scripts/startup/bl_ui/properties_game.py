@@ -971,6 +971,20 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
         col.prop(gs, "use_glsl_nodes", text="Nodes", icon="NODETREE")
         col.prop(gs, "use_glsl_extra_textures", text="Extra Textures", icon="ASSET_MANAGER")
         col.prop(gs, "use_shading_nodes", text="PBR Shading Nodes", icon="MATERIAL")
+
+        # Gains and losses stay visible: the trade only pays off in some games.
+        box = layout.box()
+        box.label(text="Shader Compilation:", icon="SCRIPT")
+        box.prop(gs, "use_fast_shader_loading")
+        col = box.column(align=True)
+        col.active = gs.use_fast_shader_loading
+        col.label(text="Gain: materials differing only in colors/values share one shader,", icon="TIME")
+        col.label(text="      so the game loads much faster (800 materials: 64 s to 5 s).")
+        col.label(text="Loss: every pixel computes the full material per light, so heavy", icon="ERROR")
+        col.label(text="      scenes can lose up to half the FPS (18 lights: 60 to 31 fps).")
+        col.label(text="Use for many materials and few lights. Game only, not the viewport.", icon="INFO")
+
+
 class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
     bl_label = "Post Processing Shaders"
     COMPAT_ENGINES = {'BLENDER_GAME'}

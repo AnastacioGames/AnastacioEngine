@@ -72,6 +72,7 @@
 
 extern "C" {
 #  include "GPU_extensions.h"
+#  include "GPU_material.h"
 
 #  include "BKE_sound.h"
 #  include "BKE_main.h"
@@ -183,6 +184,9 @@ void LA_Launcher::InitEngine()
 		}
 	}
 	m_pythonConsole.use = (gm.flag & GAME_PYTHON_CONSOLE);
+
+	// Before any material is converted: the game's shaders take fixed values as uniforms.
+	GPU_material_uniform_values_set(gm.flag & GAME_FAST_SHADER_LOAD);
 
 	m_rasterizer = new RAS_Rasterizer();
 
@@ -396,6 +400,8 @@ void LA_Launcher::ExitEngine()
 		delete m_converter;
 		m_converter = nullptr;
 	}
+	// The editor viewport keeps compiling materials with constants.
+	GPU_material_uniform_values_set(false);
 	if (m_ketsjiEngine) {
 		delete m_ketsjiEngine;
 		m_ketsjiEngine = nullptr;

@@ -192,18 +192,27 @@ static bool shader_cache_enabled(void)
 /* RANGE_SHADER_UNIFORM_VALUES=1 turns the fixed values of the material (colors, factors) into uniforms
  * instead of constants: materials with the same nodes but other values then share one program, at the
  * cost of the constant folding the compiler did on them.
- * Kept off and not offered in the UI: loading gets much faster (800 spheres: 64 s -> 5 s of shaders, 620 ->
- * 30 programs), but without the folding the GPU redoes the full material math per pixel and per light, and
- * the heavy scene of tools/create_shader_fps_test.py (18 lights) dropped from ~60 to 31 fps. Left here for
- * measurements and for a possible mode that only makes repeated materials uniform. */
+ * Off by default; a game turns it on with Render > Shader Compilation > Fast Shader Loading (GAME_FAST_SHADER_LOAD,
+ * set by the launcher through GPU_material_uniform_values_set). Loading gets much faster (800 spheres: 64 s ->
+ * 5 s of shaders, 620 -> 30 programs), but without the folding the GPU redoes the full material math per pixel
+ * and per light, and the heavy scene of tools/create_shader_fps_test.py (18 lights) dropped from ~60 to 31 fps.
+ * Worth it for games with many materials and few lights; a possible later mode only makes repeated materials
+ * uniform. */
+static bool shader_uniform_values_game = false;
+
+void GPU_material_uniform_values_set(bool enable)
+{
+	shader_uniform_values_game = enable;
+}
+
 static bool shader_uniform_values_enabled(void)
 {
-	static int enabled = -1;
-	if (enabled == -1) {
+	static int env_enabled = -1;
+	if (env_enabled == -1) {
 		const char *env = getenv("RANGE_SHADER_UNIFORM_VALUES");
-		enabled = (env && env[0] && env[0] != '0');
+		env_enabled = (env && env[0] && env[0] != '0');
 	}
-	return enabled != 0;
+	return shader_uniform_values_game || env_enabled != 0;
 }
 
 static bool codegen_input_is_uniform(const GPUInput *input)
