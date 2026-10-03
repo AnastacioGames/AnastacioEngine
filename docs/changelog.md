@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Undo: crash ao voltar muitos passos e continuar editando
+
+- `undo_system.c` (`BKE_undosys_stack_limit_steps_and_memory`): o hack `WITH_GLOBAL_UNDO_KEEP_ONE` testava
+  `us->type` em vez de `us_exclude->type`, então nunca preservava o último passo de Global Undo (memfile) ao
+  aparar a pilha; passos de edit-mode ficavam sem base e desfazer até eles travava.
+- `library_query.c`: `scene->world_sun` não era percorrido; apagar/remapear o objeto do sol deixava ponteiro
+  solto na cena.
+
 ## 2026-10-03 - Emissor de raio em Empty (onde e quando o raio cai)
 
 - Novo `RangeLightningSettings` no `Object` (`ob->lightning`, opt-in por `gameflag2 & OB_LIGHTNING`, só Empty),
