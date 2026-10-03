@@ -36,6 +36,13 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   (vidro, probe, céu Hosek, cabelo, IES, sombra de ponto, nós) e nas esferas (só o ruído de alpha já conhecido);
   `ripple_normal_test` é animada e varia entre rodadas iguais. Cenas com print injetado:
   `projects-teste/shader_cache_test/inject_shot.py`.
+- Modo opcional `RANGE_SHADER_UNIFORM_VALUES=1` (`codegen_input_is_uniform` em `gpu_codegen.c`): os valores
+  fixos do material (float a vec4) viram uniforms em vez de constantes, então materiais com os mesmos nós e
+  valores diferentes compartilham o programa; o valor é enviado a cada bind a partir de `GPUInput.vec`. Esferas:
+  shaders 1030 ms → 310 ms (160 → 41 compilados). Imagem: 97 pixels diferentes, no nível do ruído entre rodadas
+  iguais (40). Custo por quadro medido com `tools/create_shader_fps_test.py` (800 esferas, 18 luzes,
+  1920×1080, sem vsync): normal 57–60 fps, uniform 31 fps (16,7–17,5 ms → 32 ms); com 10 luzes, 60 → 50 fps.
+  A compilação nessa cena cai de 64 s para 5 s, mas o custo no quadro é alto: fica desligado e não vira padrão.
 
 ## 2026-10-03 - Undo: crash ao voltar muitos passos e continuar editando
 

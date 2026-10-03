@@ -189,6 +189,29 @@ static bool shader_cache_enabled(void)
 	return enabled != 0;
 }
 
+/* RANGE_SHADER_UNIFORM_VALUES=1 turns the fixed values of the material (colors, factors) into uniforms
+ * instead of constants: materials with the same nodes but other values then share one program, at the
+ * cost of the constant folding the compiler did on them.
+ * Kept off and not offered in the UI: loading gets much faster (800 spheres: 64 s -> 5 s of shaders, 620 ->
+ * 30 programs), but without the folding the GPU redoes the full material math per pixel and per light, and
+ * the heavy scene of tools/create_shader_fps_test.py (18 lights) dropped from ~60 to 31 fps. Left here for
+ * measurements and for a possible mode that only makes repeated materials uniform. */
+static bool shader_uniform_values_enabled(void)
+{
+	static int enabled = -1;
+	if (enabled == -1) {
+		const char *env = getenv("RANGE_SHADER_UNIFORM_VALUES");
+		enabled = (env && env[0] && env[0] != '0');
+	}
+	return enabled != 0;
+}
+
+static bool codegen_input_is_uniform(const GPUInput *input)
+{
+	return input->dynamicvec ||
+	       (shader_uniform_values_enabled() && input->type >= GPU_FLOAT && input->type <= GPU_VEC4);
+}
+
 static GPUShader *shader_cache_acquire(const char *vertexcode, const char *fragmentcode, const char *geometrycode,
                                        const char *libcode, int flags, unsigned int hash)
 {
@@ -786,7 +809,7 @@ static int codegen_print_uniforms_functions(DynStr *ds, ListBase *nodes)
 				}
 			}
 			else if (input->source == GPU_SOURCE_VEC_UNIFORM) {
-				if (input->dynamicvec) {
+				if (codegen_input_is_uniform(input)) {
 					/* only create uniforms for dynamic vectors */
 					BLI_dynstr_appendf(ds, "uniform %s unf%d;\n",
 						GPU_DATATYPE_STR[input->type], input->id);
@@ -877,7 +900,7 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 					BLI_dynstr_append(ds, GPU_builtin_name(input->builtin));
 			}
 			else if (input->source == GPU_SOURCE_VEC_UNIFORM) {
-				if (input->dynamicvec)
+				if (codegen_input_is_uniform(input))
 					BLI_dynstr_appendf(ds, "unf%d", input->id);
 				else
 					BLI_dynstr_appendf(ds, "cons%d", input->id);
@@ -1677,7 +1700,7 @@ static void gpu_nodes_extract_dynamic_inputs(GPUPass *pass, ListBase *nodes)
 				if (input->bindtex)
 					extract = 1;
 			}
-			else if (input->dynamicvec)
+			else if (input->source == GPU_SOURCE_VEC_UNIFORM && codegen_input_is_uniform(input))
 				extract = 1;
 
 			if (extract)
@@ -1751,8 +1774,9 @@ void GPU_pass_update_uniforms(GPUPass *pass)
 				GPU_shader_uniform_vector_int(shader, input->shaderloc, 1, 1, (int *)input->dynamicvec);
 			}
 			else {
+				/* Fixed values (RANGE_SHADER_UNIFORM_VALUES) are uploaded from their own copy. */
 				GPU_shader_uniform_vector(shader, input->shaderloc, input->type, 1,
-					input->dynamicvec);
+					input->dynamicvec ? input->dynamicvec : input->vec);
 			}
 		}
 	}

@@ -19,7 +19,9 @@ usadas) também feita: compilação ~4× mais rápida, imagens idênticas. Falta
 
 Aberto:
 
-- Modo opcional com valores do material como uniform, para mais reuso entre materiais de mesma estrutura.
+- Modo de valores como uniform (`RANGE_SHADER_UNIFORM_VALUES=1`) medido: carrega muito mais rápido, mas custa
+  ~45% do FPS em cena pesada; fica desligado. Ideia aberta: uniform só para materiais repetidos (mesma
+  estrutura) e constante para os únicos.
 - Etapa 4: malha/tangentes/física pré-calculadas.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
@@ -35,6 +37,13 @@ Feito: Dent, Bend em V, nó Damage (máscara por pontos de impacto), decals de i
 Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos carimbos, botão Add Damage Mix
 (tinta → metal enferrujado) e decals que acompanham amassados posteriores. Validados pelo usuário em
 `damage_marks_test.range` (`tools/create_damage_marks_test.py`).
+
+### Multiplayer nativo
+
+Planejado em 2026-10-03, nada implementado. Plano completo em [`multiplayer-plan.md`](multiplayer-plan.md):
+servidor autoritativo com snapshots em C++, transporte ENet (nativo) + WebTransport/WebSocket (Web, com
+cross-play), painel Network sem código, `Range.network` em Python, predição e compensação de lag. v1 utilizável
+nas etapas 0–6.
 
 ### Web (WebGL/WebAssembly)
 
