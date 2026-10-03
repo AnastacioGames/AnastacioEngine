@@ -9,6 +9,37 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Material rápido: receitas de nós prontas no painel do material
+
+- Painel **Quick Material** (Material rápido) no editor de Propriedades > Material, engine Game, para quem não
+  quer ligar nós à mão (`bl_operators/anastacio_material_recipes.py`, painel em `bl_ui/properties_material.py`).
+  Cada receita monta a árvore nos dois caminhos: PBR (Shading Nodes, Principled) e legado (nós do BI, nó Material
+  apontando para um material "<nome> Base", imagens pelo nó Texture com um Texture do tipo Image).
+- **Material from Texture Set** (`material.recipe_texture_set`): escolhe um arquivo do pacote e acha os irmãos
+  pelo sufixo (albedo/basecolor/diffuse/col, normal/nor/nrm, roughness/rough, gloss, metallic/metal, ao), com
+  Mapping de repetição. AO multiplica a cor; normal passa pelo Normal Map; no legado a rugosidade invertida vai no Spec.
+- **Blend Textures by Mask** (`material.recipe_mask_blend`): ideia do makcooper no Discord (vários materiais num só,
+  1 draw call). Base + 3 camadas (R, G, B) por uma máscara pintada; cria a máscara (imagem preta, Non-Color), a UV
+  se faltar, imagens de cor provisórias e um Mapping único de repetição. O painel lista as camadas com o botão de
+  abrir imagem, o **Paint the Mask** (Texture Paint com a máscara como canvas) e botões de cor do pincel por camada,
+  e avisa quando a máscara pintada ainda não foi salva. Cada camada tem um botão de pasta (`material.recipe_layer_set`): escolhe uma textura do conjunto e a
+  normal/rugosidade irmãs entram junto. A árvore é remontada com uma coluna por mapa (cor, normal, rugosidade), as 4
+  camadas misturadas pela mesma máscara; camada sem o mapa usa imagem neutra (normal plana, rugosidade 0.8). Normal
+  misturada passa por um Normal Map só; no legado a rugosidade invertida vai no Spec. Mapas que nenhuma camada tem
+  não geram nós. Imagens trocadas à mão no painel são mantidas na remontagem.
+- **Ready-made Material**: Plástico, Metal, Ouro, Borracha, Madeira, Vidro (Glass BSDF e Alpha Blend) e Brilhante
+  (Principled + Emission); no legado monta nós: nó Material com difuso/especular do preset + brilho de borda Fresnel (Geometry Normal·View) somado por MixRGB; metal/ouro com borda na própria cor, vidro mais opaco na borda, brilhante soma a cor de emissão. O preset grava `specular_metallic_bsdf`/`specular_roughness_bsdf` (Metallic/Roughness do nó Material, padrão 0.5/0.5 deixava todas as esferas iguais).
+- Botão de nós do material (ícone ao lado de Data) no Game legado: `ED_node_shader_default` agora cria um
+  **Extended Material** já ligado a uma cópia do material (`<nome> Base`, sem nós, com cor/especular atuais) e liga
+  Color e Alpha no Output. Antes vinha o nó Material vazio. As receitas usam o Extended e reaproveitam essa base.
+- Malha sem UV ganha Smart UV Project (`ensure_uv`). A UV padrão do `uv_textures.new()` punha cada face na imagem
+  inteira: pintando a máscara numa UV Sphere (512 faces) cada pincelada virava 512 e o editor travou com 6 GB.
+- Nós achados pelo nome (`AE_*`) e a receita marcada em `material["anastacio_recipe"]`. Neste fork a escala do
+  Mapping é socket (`inputs["Scale"]`), não propriedade. Textos traduzidos em `translations_labels.py` (`MATERIAL_RECIPES`).
+- Teste: `tools/create_material_recipes_test.py` (com `legacy` gera a cena do BI; a Sun recebe `RAY_SHADOW` porque o
+  legado só faz sombra de Sun assim). As duas cenas montam em `-b` e rodam no `RangeRuntime` sem erro de shader;
+  pintura da máscara numa esfera sem UV validada pelo usuário (rápida); falta conferir o resultado visual no jogo.
+
 ## 2026-10-02 - Deformação: faixa contínua de arrasto, Add Damage Mix e decal que acompanha amassados
 
 - **Scrape Style** (`scrape_style`, bit novo `DEFORM_SCRAPE_STRIP` em `flags`, sem campo novo no DNA): Stamps

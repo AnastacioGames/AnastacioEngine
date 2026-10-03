@@ -38,6 +38,7 @@
 #include "BKE_image.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_node.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -384,6 +385,18 @@ void ED_node_shader_default(const bContext *C, ID *id)
 	int output_type, shader_type;
 	float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f }, strength = 1.0f;
 
+	Material *ma_base = NULL;
+
+	/* Game legado: o nó Extended Material precisa de um material sem nós com os valores atuais. */
+	if (GS(id->name) == ID_MA && !BKE_scene_use_new_shading_nodes(scene)) {
+		Main *bmain = CTX_data_main(C);
+		char name[MAX_ID_NAME - 2];
+		ma_base = BKE_material_copy(bmain, (Material *)id);
+		ma_base->use_nodes = false;
+		BLI_snprintf(name, sizeof(name), "%s Base", id->name + 2);
+		new_id(&bmain->mat, &ma_base->id, name);
+	}
+
 	ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
 
 	switch (GS(id->name)) {
@@ -398,7 +411,7 @@ void ED_node_shader_default(const bContext *C, ID *id)
 			}
 			else {
 				output_type = SH_NODE_OUTPUT;
-				shader_type = SH_NODE_MATERIAL;
+				shader_type = SH_NODE_MATERIAL_EXT;
 			}
 
 			copy_v3_v3(color, &ma->r);
@@ -448,6 +461,12 @@ void ED_node_shader_default(const bContext *C, ID *id)
 	fromsock = in->outputs.first;
 	tosock = out->inputs.first;
 	nodeAddLink(ntree, in, fromsock, out, tosock);
+
+	if (ma_base) {
+		/* a cópia já nasce com 1 usuário, que passa a ser o nó */
+		in->id = &ma_base->id;
+		nodeAddLink(ntree, in, nodeFindSocket(in, SOCK_OUT, "Alpha"), out, nodeFindSocket(out, SOCK_IN, "Alpha"));
+	}
 
 	/* default values */
 	if (BKE_scene_use_new_shading_nodes(scene)) {

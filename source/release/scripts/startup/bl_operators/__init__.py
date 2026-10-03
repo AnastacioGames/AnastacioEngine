@@ -34,6 +34,7 @@ _modules = [
     "console",
     "file",
     "image",
+    "anastacio_material_recipes",
     "logic_to_python",
     "mask",
     "mesh",

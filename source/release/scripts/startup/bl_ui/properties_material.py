@@ -181,6 +181,68 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
                     row.label(text="No material node selected")
 
 
+class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
+    bl_label = "Quick Material"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob and ob.type == 'MESH' and (context.scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        from bl_operators.anastacio_material_recipes import (
+            LAYERS, LAYER_LABELS, MASK, MAPPING, RECIPE_KEY, find_node, get_tiling, node_image)
+
+        layout = self.layout
+        mat = context.material
+
+        col = layout.column(align=True)
+        col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
+        col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
+        col.operator_menu_enum("material.recipe_preset", "preset", text="Ready-made Material", icon='MATERIAL')
+
+        if not mat or RECIPE_KEY not in mat:
+            return
+
+        mapping = find_node(mat, MAPPING)
+        if mapping:
+            row = layout.row()
+            row.label(text="Tiling: %.2f" % get_tiling(mapping))
+            row.operator("material.recipe_tiling", text="Change", icon='FULLSCREEN_ENTER')
+
+        if mat.get(RECIPE_KEY) != "mask_blend":
+            return
+
+        box = layout.box()
+        box.label(text="Layers (paint the mask with these colors)")
+        box.label(text="Folder: pick one texture of a set (normal and roughness come along)", icon='INFO')
+        brush_colors = ('SOLO_OFF', 'COLOR_RED', 'COLOR_GREEN', 'COLOR_BLUE')
+        painting = context.object.mode == 'TEXTURE_PAINT'
+        for i, name in enumerate(LAYERS):
+            node = find_node(mat, name)
+            if node is None:
+                continue
+            row = box.row(align=True)
+            if painting:
+                row.operator("material.recipe_brush_color", text="", icon=brush_colors[i]).channel = i
+            row.label(text=LAYER_LABELS[i])
+            row.operator("material.recipe_layer_set", text="", icon='FILE_FOLDER').layer = i
+            if node.bl_idname == "ShaderNodeTexture":
+                if node.texture:
+                    row.template_ID(node.texture, "image", open="image.open")
+            else:
+                row.template_ID(node, "image", open="image.open")
+
+        mask = find_node(mat, MASK)
+        if mask:
+            row = box.row()
+            row.operator("material.recipe_paint_mask", icon='BRUSH_DATA')
+            img = node_image(mask)
+            if img and img.is_dirty:
+                box.label(text="The mask was painted: save it (Image > Save As) or pack it", icon='ERROR')
+
+
 class MATERIAL_PT_preview(MaterialButtonsPanel, Panel):
     bl_label = "Material Preview"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
@@ -1242,6 +1304,7 @@ classes = (
     MATERIAL_MT_specials,
     MATERIAL_UL_matslots,
     MATERIAL_PT_context_material,
+    MATERIAL_PT_recipes,
     MATERIAL_PT_preview,
     MATERIAL_PT_pipeline,
     MATERIAL_PT_diffuse,
