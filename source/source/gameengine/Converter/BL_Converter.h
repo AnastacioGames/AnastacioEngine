@@ -209,6 +209,8 @@ public:
 	 * \param compileShaders False leaves the material shaders to CompileSceneShaders() (asynchronous addScene).
 	 */
 	void ConvertScene(KX_Scene *scene, bool compileShaders = true);
+	/// Apply the scene's world to GPUWorld before compiling its shaders in a later frame.
+	void UseSceneWorld(KX_Scene *scene);
 	/** Compile the shaders of a scene converted without them, from material next, until the deadline (PIL
 	 * time) passes; at least one per call. True when all are compiled.
 	 */

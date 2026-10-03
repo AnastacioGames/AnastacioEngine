@@ -49,6 +49,7 @@
 #include "BL_LoadStats.h"
 #include "BL_ActionActuator.h"
 #include "KX_BlenderMaterial.h"
+#include "KX_WorldInfo.h"
 
 #include "LA_SystemCommandLine.h"
 
@@ -271,9 +272,22 @@ void BL_Converter::ConvertScene(KX_Scene *scene, bool compileShaders)
 	print_load_shaders(scene, "scene", m_sceneSlots[scene].m_materials.size(), texturesEnd - texturesStart, 0.0, PIL_check_seconds_timer() - texturesEnd);
 }
 
+/* Materials with "constant world/mist" bake the GPUWorld values into the shader at compile time. A compilation
+ * spread over frames (async addScene/LibLoad) sees GPUWorld left by the last scene rendered (the loading screen),
+ * so the destination scene's world is applied again before each step, as conversion did before compiling. */
+void BL_Converter::UseSceneWorld(KX_Scene *scene)
+{
+	KX_WorldInfo *world = scene->GetWorldInfo();
+	if (world) {
+		world->UpdateWorldSettings(m_ketsjiEngine->GetRasterizer());
+		world->UpdateBackGround(m_ketsjiEngine->GetRasterizer(), nullptr);
+	}
+}
+
 bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline)
 {
 	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
+	UseSceneWorld(scene);
 	while (next < materials.size()) {
 		materials[next++]->ReloadMaterial();
 		if (PIL_check_seconds_timer() >= deadline) {
@@ -512,6 +526,7 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 				if (merge.m_material < materials.size()) {
 					KX_BlenderMaterial *mat = materials[merge.m_material++];
 					mat->ReplaceScene(mergeScene);
+					UseSceneWorld(mergeScene);
 					mat->ReloadMaterial();
 					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
 					                   (float)merge.m_material / (float)materials.size());
@@ -568,6 +583,7 @@ void BL_Converter::StepReloads(double deadline)
 		// Backwards: the latest merged materials, compiled without the other new lights, come first.
 		UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[it->first].m_materials;
 		const float total = (float)std::max<size_t>(materials.size(), 1);
+		UseSceneWorld(it->first);
 		while (reload.m_material < materials.size() && PIL_check_seconds_timer() < deadline) {
 			materials[materials.size() - 1 - reload.m_material++]->ReloadMaterial();
 			for (KX_LibLoadStatus *status : reload.m_waiting) {

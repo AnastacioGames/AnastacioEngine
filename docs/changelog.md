@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Carregamento assíncrono: materiais compilados com o mundo da cena certa (tom ciano)
+
+- Sintoma (RolimaRacer, `addScene("Pista_1", 0, asynchronous=True)` com a tela de Loading na frente): toda a pista
+  com tom ciano (preto do quadriculado verde-azulado, grama ciano), permanente. Síncrono e assíncrono com orçamento
+  enorme (tudo num frame) ficavam corretos; `RANGE_NO_SHADER_CACHE=1` não mudava nada.
+- Causa: materiais com "constant world/mist" (`MA_CONSTANT_WORLD`/`MIST`, `GPU_select_uniform`) gravam o `GPUWorld`
+  global como constante na compilação. A conversão aplica o mundo da cena nova (`UpdateWorldSettings` /
+  `UpdateBackGround`) e o síncrono compila em seguida; no assíncrono, entre um lote e outro a cena Loading
+  renderiza e deixa o mundo dela no `GPUWorld`.
+- Correção: `BL_Converter::UseSceneWorld(scene)` reaplica o mundo da cena destino antes de cada lote em
+  `CompileSceneShaders` (addScene assíncrono), no estágio de shaders do LibLoad assíncrono e em `StepReloads`.
+- A "câmera TV / pose T / contagem que não termina" não era trava: é a contagem `Contagem_3_2_1` (~200 frames depois
+  do Loading, igual nos dois modos); o probe antigo capturava no meio dela. RolimaRacer volta com
+  `ASYNC_SCENE_LOAD = True`.
+
 ## 2026-10-03 - `addScene(..., asynchronous=True)`: shaders compilados aos poucos, tela de loading segue animando
 
 - `KX_SceneScheduler`: cena pedida com `asynchronous=True` é convertida (sem shaders, `BL_Converter::ConvertScene(scene,
