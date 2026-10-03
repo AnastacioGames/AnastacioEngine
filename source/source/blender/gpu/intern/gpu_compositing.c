@@ -126,6 +126,11 @@ typedef struct {
 } GPUCLOUDSShaderInterface;
 
 typedef struct {
+  int color_uniform;
+  int grain_params_uniform;
+} GPUGRAINShaderInterface;
+
+typedef struct {
 	int invrendertargetdim_uniform;
 	int color_uniform;
 	int dof_uniform;
@@ -502,6 +507,12 @@ bool GPU_fx_compositor_initialize_passes(
 		scenefx_flag &= ~SCENE_FX_FLAG_CLOUDS;
 	}
 
+	if (scene->scenefx_settings.use_grain && scene->scenefx_settings.grain_strength > 0.0f &&
+	    (scene->scenefx_settings.editor_render_flag & SCENE_FX_UI_GRAIN))
+	{
+		scenefx_flag |= SCENE_FX_FLAG_GRAIN;
+	}
+
 	/* The ping-pong textures are laid out according to the active pass chain.
 	 * Recreate them when a scene effect is toggled so removing the final FXAA
 	 * pass cannot reuse targets from the previous chain. */
@@ -564,6 +575,9 @@ bool GPU_fx_compositor_initialize_passes(
 		num_passes++;
 
 	if (scenefx_flag & SCENE_FX_FLAG_CLOUDS)
+		num_passes++;
+
+	if (scenefx_flag & SCENE_FX_FLAG_GRAIN)
 		num_passes++;
 
 	if (!fx->gbuffer) {
@@ -1488,6 +1502,49 @@ bool GPU_fx_do_composite_pass(
 		}
 	}
 
+	/* film grain pass, same noise as the in-game camera lens pass */
+	if (fx->sce_effects & SCENE_FX_FLAG_GRAIN) {
+		GPUShader *grain_shader;
+		grain_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_GRAIN, is_persp);
+		if (grain_shader) {
+			GPUGRAINShaderInterface *interface = GPU_shader_get_interface(grain_shader);
+			/* Seed from real time: the viewport isn't redrawn every frame, so the grain
+			 * just changes on each redraw. Kept small for float precision. */
+			float grain_params[4] = {scenefx.grain_strength,
+			                         (float)((int)(PIL_check_seconds_timer() * 60.0) % 1000) * 0.05f,
+			                         0.0f, 0.0f};
+
+			GPU_shader_bind(grain_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(grain_shader, interface->color_uniform, src);
+			GPU_shader_uniform_vector(grain_shader, interface->grain_params_uniform, 4, 1, grain_params);
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
 	/* second pass, dof */
 	if (fx->effects & GPU_FX_FLAG_DOF) {
 		const GPUDOFSettings *fx_dof = fx->settings.dof;
@@ -2177,6 +2234,17 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
 			interface->clouds_params_uniform = GPU_shader_get_uniform(shader, "clouds_params");
 			interface->clouds_color_uniform = GPU_shader_get_uniform(shader, "clouds_color");
+
+			GPU_shader_set_interface(shader, interface);
+			break;
+		}
+
+		case GPU_SHADER_FX_GRAIN:
+		{
+			GPUGRAINShaderInterface *interface = MEM_mallocN(sizeof(GPUGRAINShaderInterface), "GPUGRAINShaderInterface");
+
+			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->grain_params_uniform = GPU_shader_get_uniform(shader, "grain_params");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

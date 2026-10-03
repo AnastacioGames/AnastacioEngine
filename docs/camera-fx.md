@@ -51,7 +51,7 @@ No máximo dois passes de filtro 2D, reservados logo depois do Lens Flare:
   - Protect Focus, que deixa a faixa de foco (o carro) fora dos dois borrões;
   - aberração cromática;
   - vinheta e olho de peixe;
-  - grão de filme (Film Grain), animado e mais forte nos tons médios.
+  - grão de filme (Film Grain): desenhado neste passe, mas configurado na cena, em Render > Post Processing Shaders (`scenefx_settings.use_grain`/`grain_strength`; em jogo, `scene.filterManager.changeGrainValues(enabled, strength)`). Também aparece na viewport.
 
 Cada passe só existe enquanto um efeito dele estiver ligado. Com tudo desligado, não há nenhum passe.
 O shader compila só quando o passe aparece; ligar ou desligar outro efeito do mesmo passe não recompila nada.
@@ -86,8 +86,8 @@ World (Weather > Earthquake), sem um anular o outro.
 | `trackMode` | int 0..2 | 0 Off, 1 Look At, 2 Drone |
 | `trackSpeed`, `trackLimit`, `trackDeadzone`, `trackScreenOffset`, `droneAmplitude`, `droneFrequency`, `trackBank`, `useTrackUpLock` | | Rastreio |
 | `trackOrientation` | Matrix, RO | Orientação desenhada (base + rastreio + rolagem do tremor) |
-| `useDof`, `useSpeedBlur`, `useDirectionalBlur`, `useBlurProtect`, `useCatEye`, `useChromatic`, `useChromaticSpeed`, `useVignette`, `useGrain` | bool | Liga/desliga cada efeito |
-| `dofQuality` (0..2), `dofBlur`, `speedBlurStrength`, `speedBlurMaxSpeed`, `directionalBlurStrength`, `directionalBlurMax`, `catEyeStrength`, `chromaticStrength`, `vignetteStrength`, `vignetteRadius`, `fisheyeStrength`, `grainStrength` (0..1) | | Parâmetros |
+| `useDof`, `useSpeedBlur`, `useDirectionalBlur`, `useBlurProtect`, `useCatEye`, `useChromatic`, `useChromaticSpeed`, `useVignette` | bool | Liga/desliga cada efeito |
+| `dofQuality` (0..2), `dofBlur`, `speedBlurStrength`, `speedBlurMaxSpeed`, `directionalBlurStrength`, `directionalBlurMax`, `catEyeStrength`, `chromaticStrength`, `vignetteStrength`, `vignetteRadius`, `fisheyeStrength` | | Parâmetros |
 | `cameraSpeed` | float, RO | Velocidade da câmera desenhada (m/s, suavizada) |
 | `speedOverride` | float | ≥ 0 substitui `cameraSpeed` no Speed Blur e na aberração; -1 volta ao automático |
 | `shakeAmplitude`, `shakeFrequency`, `shakeDecay`, `useShakeRoll` | | Tremor |

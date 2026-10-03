@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Film Grain vira pós-processamento da cena
+
+- O grão saiu da câmera (`useGrain`/`grainStrength` e `CAM_GFX_GRAIN` removidos; `DNA_camera_types.h` voltou ao `pad`) e foi para `SCENEFXSettings` (`use_grain`, `grain_strength`, padrão 0.035 também por versionamento). A UI fica em Render > Post Processing Shaders, com expandir/viewport/checkbox como os outros efeitos (bit `SCENE_FX_UI_GRAIN` em `expand_flag`/`editor_render_flag`).
+- Em jogo continua no passe Lens da câmera; Python: `filterManager.changeGrainValues(enabled, strength=-1)`.
+- Viewport: novo passe `GPU_SHADER_FX_GRAIN` (`gpu_shader_fx_grain_frag.glsl`) no compositor, flag interna `SCENE_FX_FLAG_GRAIN`.
+
 ## Camera FX: grão de filme nativo e Rolima Racer migrado
 
 - Novo efeito **Film Grain** no passe Lens da câmera (`useGrain`, `grainStrength`; DNA `grain_strength` no lugar do `pad`, flag `CAM_GFX_GRAIN`). Substitui o `NoiseFilterFX.py` do jogo.

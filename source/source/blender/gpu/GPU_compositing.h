@@ -78,10 +78,12 @@ typedef enum GPUFXShaderEffect {
 	GPU_SHADER_FX_RAIN = 17,
 	/* Clouds shader */
 	GPU_SHADER_FX_CLOUDS = 18,
+	/* Film Grain shader */
+	GPU_SHADER_FX_GRAIN = 19,
 } GPUFXShaderEffect;
 
 /* keep in synch with enum above! */
-#define MAX_FX_SHADERS 19
+#define MAX_FX_SHADERS 20
 
 /* generate a new FX compositor */
 GPUFX *GPU_fx_compositor_create(void);

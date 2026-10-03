@@ -92,7 +92,6 @@ public:
 		float vignetteStrength = 0.4f;
 		float vignetteRadius = 0.75f;
 		float fisheyeStrength = 0.0f;
-		float grainStrength = 0.035f;
 		float shakeAmplitude = 0.02f;
 		float shakeFrequency = 15.0f;
 		float shakeDecay = 1.5f;

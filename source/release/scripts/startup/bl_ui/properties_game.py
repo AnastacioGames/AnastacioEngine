@@ -1081,6 +1081,16 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             subcol.prop(scenefx_settings, "fxaa_subpix")
             subcol.prop(scenefx_settings, "fxaa_search_steps")
 
+        row = layout.row(align=True)
+        row.prop(scenefx_settings, "show_expanded_grain", text="Film Grain", emboss=True)
+        row.prop(scenefx_settings, "render_editor_grain", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
+        row.prop(scenefx_settings, "use_grain", text="")
+
+        if scenefx_settings.show_expanded_grain:
+            subcol = layout.column(align=True)
+            subcol.active = scenefx_settings.use_grain
+            subcol.prop(scenefx_settings, "grain_strength", text="Strength")
+
 
 class RENDER_PT_game_system(RenderButtonsPanel, Panel):
     bl_label = "System"

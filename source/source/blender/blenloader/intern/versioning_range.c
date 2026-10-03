@@ -577,6 +577,12 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "float", "grain_strength")) {
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->scenefx_settings.grain_strength = SCENE_FX_GRAIN_STRENGTH;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "GameData", "short", "max_debris")) {
     /* Native destruction: old files get the same debris limit as new scenes. */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {

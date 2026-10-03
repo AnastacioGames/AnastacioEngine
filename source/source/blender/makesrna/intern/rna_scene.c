@@ -5812,6 +5812,29 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Search Steps",
 	                         "How far along an edge to search. More steps smooth long edges better but cost more");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_grain", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "expand_flag", SCENE_FX_UI_GRAIN);
+	RNA_def_property_ui_text(prop, "Expanded", "Set sensor expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "render_editor_grain", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "editor_render_flag", SCENE_FX_UI_GRAIN);
+	RNA_def_property_ui_text(prop, "Render Film Grain", "Render Film Grain in Viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "use_grain", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_grain", 1);
+	RNA_def_property_ui_text(prop, "Film Grain", "Animated film grain over the final image (game engine)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "grain_strength", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "grain_strength");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 0.2f, 1, 3);
+	RNA_def_property_ui_text(prop, "Grain Strength", "Amount of film grain");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_render_layer(BlenderRNA *brna)

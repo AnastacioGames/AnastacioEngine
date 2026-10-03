@@ -36,6 +36,10 @@ typedef struct BuildInFilters {
 	float fxaa_subpix;
 	int fxaa_search_steps;
 
+	/* Film Grain (camera lens pass) */
+	bool useGrain;
+	float grain_strength;
+
 	/* Bloom */
 	bool useBloom;
 	float bloom_threshold;

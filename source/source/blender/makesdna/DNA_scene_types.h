@@ -901,14 +901,18 @@ typedef struct SCENEFXSettings {
 
 	char scatter_lod;
 	char ssr_lod;
+	char use_grain; /* Film Grain, drawn in the camera lens pass */
 
-	char pad[3];
+	char pad[2];
 
 	/* FXAA has no settings struct of its own, its values live here. */
 	float fxaa_edge_threshold;
 	float fxaa_edge_threshold_min;
 	float fxaa_subpix;
 	int fxaa_search_steps;
+
+	float grain_strength;
+	float pad_grain;
 } SCENEFXSettings;
 
 /* FXAA defaults, the values the shaders used before they became settings. */
@@ -918,6 +922,10 @@ typedef struct SCENEFXSettings {
 #define SCENE_FX_FXAA_SEARCH_STEPS        10
 /* The shaders need a constant loop bound, so the step count is capped. */
 #define SCENE_FX_FXAA_SEARCH_STEPS_MAX    32
+/* Film Grain default strength. */
+#define SCENE_FX_GRAIN_STRENGTH           0.035f
+/* Film Grain bit in expand_flag/editor_render_flag (chars, so they can't hold SCENE_FX_FLAG_GRAIN). */
+#define SCENE_FX_UI_GRAIN                 (1 << 6)
 
 /* shaderfx enables */
 typedef enum eSCENEFXFlags {
@@ -934,7 +942,9 @@ typedef enum eSCENEFXFlags {
    * scene effects. */
   SCENE_FX_FLAG_LENSFLARE    = (1 << 6),
   SCENE_FX_FLAG_RAIN         = (1 << 7),
-  SCENE_FX_FLAG_CLOUDS       = (1 << 8)
+  SCENE_FX_FLAG_CLOUDS       = (1 << 8),
+  /* Viewport-only bit, derived from use_grain (Film Grain). */
+  SCENE_FX_FLAG_GRAIN        = (1 << 9)
 } eSCENEFXFlags;
 
 /* RecastData.partitioning */

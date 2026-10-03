@@ -69,6 +69,9 @@ public:
 
 private:
 	RAS_ICanvas *m_canvas;
+	/** Film Grain, a scene post-process drawn in the camera lens pass. */
+	bool m_useGrain;
+	float m_grainStrength;
 public:
 
 #ifdef WITH_PYTHON
@@ -84,6 +87,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeLightScatterValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSRValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSAOValues);
+	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeGrainValues);
 
 #endif  // WITH_PYTHON
 };

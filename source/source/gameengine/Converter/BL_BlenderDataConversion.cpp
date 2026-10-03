@@ -1414,7 +1414,6 @@ static KX_Camera *BL_GameCameraFromBlenderCamera(Object *ob, KX_Scene *kxscene, 
 		fx.vignetteStrength = src.vignette_strength;
 		fx.vignetteRadius = src.vignette_radius;
 		fx.fisheyeStrength = src.fisheye_strength;
-		fx.grainStrength = src.grain_strength;
 		fx.shakeAmplitude = src.shake_amplitude;
 		fx.shakeFrequency = src.shake_frequency;
 		fx.shakeDecay = src.shake_decay;

@@ -221,6 +221,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	filters.fxaa_edge_threshold_min = settings.fxaa_edge_threshold_min;
 	filters.fxaa_subpix = settings.fxaa_subpix;
 	filters.fxaa_search_steps = settings.fxaa_search_steps;
+	filters.useGrain = settings.use_grain != 0;
+	filters.grain_strength = settings.grain_strength;
 
 	if (settings.bloom) {
 		filters.useBloom = (scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_BLOOM) ? true : false;

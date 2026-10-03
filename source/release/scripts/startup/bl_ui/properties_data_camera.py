@@ -408,12 +408,6 @@ class DATA_PT_camera_game_effects(CameraButtonsPanel, Panel):
             col.prop(fx, "vignette_radius")
             col.prop(fx, "fisheye_strength")
 
-        row = layout.row(align=True)
-        row.prop(fx, "use_grain")
-        sub = row.row()
-        sub.active = fx.use_grain
-        sub.prop(fx, "grain_strength")
-
 
 class DATA_PT_camera_game_shake(CameraButtonsPanel, Panel):
     bl_label = "Camera Shake"

@@ -55,7 +55,8 @@ extern "C" {
 }
 
 KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filters) :
-	RAS_2DFilterManager(filters), m_canvas(canvas)
+	RAS_2DFilterManager(filters), m_canvas(canvas),
+	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength)
 {
 	/* This location doesn't seem very good to me but it works fine here, we need to generate the KX_2DFilter to have offscreen and not RAS_* */
 	/* Only for Range legacy, the code can be deprecated after Range 2.0+ */
@@ -364,6 +365,16 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 	bool useLens = false;
 	float fx[24] = {0.0f};
 
+	const bool grain = m_useGrain && m_grainStrength > 0.0f;
+	if (grain) {
+		// Grain seed; changes every frame, kept small for float precision.
+		static unsigned int grainFrame = 0;
+		grainFrame = (grainFrame + 1) % 1000;
+		fx[21] = m_grainStrength;
+		fx[22] = (float)grainFrame * 0.05f;
+		useLens = true;
+	}
+
 	if (camera) {
 		const KX_Camera::GameFX& gfx = camera->GetGameFX();
 		const float speed = camera->GetCameraSpeed();
@@ -377,8 +388,7 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		const bool chroma = (gfx.flag & CAM_GFX_CHROMA) && gfx.chromaStrength > 0.0f;
 		const bool vignette = (gfx.flag & CAM_GFX_VIGNETTE) &&
 		                      (gfx.vignetteStrength > 0.0f || gfx.fisheyeStrength != 0.0f);
-		const bool grain = (gfx.flag & CAM_GFX_GRAIN) && gfx.grainStrength > 0.0f;
-		useLens = speedBlur || dirBlur || chroma || vignette || grain;
+		useLens = useLens || speedBlur || dirBlur || chroma || vignette;
 
 		static const float rings[3] = {2.0f, 3.0f, 5.0f};
 		const RAS_CameraData *data = camera->GetCameraData();
@@ -413,13 +423,6 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		fx[18] = gfx.vignetteRadius;
 		fx[19] = vignette ? gfx.fisheyeStrength : 0.0f;
 		fx[20] = (float)gfx.numBlades;
-		if (grain) {
-			// Grain seed; changes every frame, kept small for float precision.
-			static unsigned int grainFrame = 0;
-			grainFrame = (grainFrame + 1) % 1000;
-			fx[21] = gfx.grainStrength;
-			fx[22] = (float)grainFrame * 0.05f;
-		}
 	}
 
 	RAS_2DFilter *dof = GetFilterPass(FILTERPASS_CAMERA_DOF, true);
@@ -505,6 +508,7 @@ PyMethodDef KX_2DFilterManager::Methods[] = {
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeFxaaValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeTonemapValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeBloomValues),
+	EXP_PYMETHODTABLE(KX_2DFilterManager, changeGrainValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeLightScatterValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeSSRValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeSSAOValues),
@@ -668,6 +672,23 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeTonemapValues, "changeTonemapValue
 	BuildInFilters *filterParams = Tonemap->GetBuildInFilters();
 	filterParams->tonemap_exposure = exposure;
 	filterParams->tonemap_gamma = gamma;
+
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeGrainValues, "changeGrainValues(enabled, strength)")
+{
+	int enabled;
+	float strength = -1.0f;
+
+	if (!PyArg_ParseTuple(args, "i|f:changeGrainValues", &enabled, &strength)) {
+		return nullptr;
+	}
+
+	m_useGrain = (enabled != 0);
+	if (strength >= 0.0f) {
+		m_grainStrength = std::min(strength, 1.0f);
+	}
 
 	Py_RETURN_NONE;
 }
