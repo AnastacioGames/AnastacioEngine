@@ -368,6 +368,15 @@ void BL_Converter::RemoveScene(KX_Scene *scene)
 	scene->Release();
 
 	m_sceneSlots.erase(scene);
+
+	// Its pending light reload has no scene left to recompile.
+	const auto reload = m_reloads.find(scene);
+	if (reload != m_reloads.end()) {
+		for (KX_LibLoadStatus *status : reload->second.m_waiting) {
+			status->Finish();
+		}
+		m_reloads.erase(reload);
+	}
 }
 
 void BL_Converter::ConvertCustomMouseCursor(KX_Scene *start_scene, const char *filepath)
@@ -474,15 +483,15 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 				CM_Message("[Load] async textures \"" << converter.GetScene()->GetName() << "\": "
 				           << load_ms(PIL_check_seconds_timer() - start) << "ms");
 				set_scene_progress(status, merge.m_scene, progress_textures);
-				merge.m_newLights = has_new_lights(converter);
-				merge.m_stage = merge.m_newLights ? PendingMerge::STAGE_MERGE : PendingMerge::STAGE_SHADERS;
+				merge.m_stage = PendingMerge::STAGE_SHADERS;
 				merge.m_material = 0;
 				break;
 			}
 			case PendingMerge::STAGE_SHADERS:
 			{
-				/* No new lights: compile the new materials against the destination scene before their
-				 * objects join it, one per step. Same shaders MergeScene() would build. */
+				/* Compile the new materials against the destination scene before their objects join it,
+				 * one per step. New lights recompile everything later anyway (StepReloads()), but this
+				 * way the new objects never draw without shader meanwhile. */
 				const std::vector<KX_BlenderMaterial *>& materials = converter.GetMaterials();
 				if (merge.m_material < materials.size()) {
 					KX_BlenderMaterial *mat = materials[merge.m_material++];
@@ -498,25 +507,18 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 			}
 			case PendingMerge::STAGE_MERGE:
 			{
-				MergeScene(mergeScene, converter, false);
-				merge.m_material = 0;
-				merge.m_stage = PendingMerge::STAGE_RELOAD_ALL;
-				break;
-			}
-			case PendingMerge::STAGE_RELOAD_ALL:
-			{
-				/* New lights: every shader of the destination scene loops over its lights, so all of them
-				 * recompile, one per step. Until then the old shaders stay valid, they just miss the new
-				 * lights. Backwards: the new materials, still without shader, sit at the end of the list. */
-				UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[mergeScene].m_materials;
-				if (merge.m_newLights && merge.m_material < materials.size()) {
-					materials[materials.size() - 1 - merge.m_material++]->ReloadMaterial();
-					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
-					                   (float)merge.m_material / (float)materials.size());
-					break;
+				if (has_new_lights(converter)) {
+					// Restart the scene reload: materials already redone miss these lights.
+					PendingReload& reload = m_reloads[mergeScene];
+					reload.m_material = 0;
+					if (std::find(reload.m_waiting.begin(), reload.m_waiting.end(), status) == reload.m_waiting.end()) {
+						reload.m_waiting.push_back(status);
+					}
 				}
+				MergeScene(mergeScene, converter, false);
 				++merge.m_scene;
 				merge.m_stage = PendingMerge::STAGE_TEXTURES;
+				merge.m_material = 0;
 				if (merge.m_scene < converters.size()) {
 					set_scene_progress(status, merge.m_scene, 0.0f);
 				}
@@ -532,11 +534,49 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 	return (merge.m_scene >= converters.size());
 }
 
+bool BL_Converter::IsWaitingReload(KX_LibLoadStatus *status) const
+{
+	for (const auto& item : m_reloads) {
+		const std::vector<KX_LibLoadStatus *>& waiting = item.second.m_waiting;
+		if (std::find(waiting.begin(), waiting.end(), status) != waiting.end()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void BL_Converter::StepReloads(double deadline)
+{
+	for (auto it = m_reloads.begin(); it != m_reloads.end();) {
+		PendingReload& reload = it->second;
+		// Backwards: the latest merged materials, compiled without the other new lights, come first.
+		UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[it->first].m_materials;
+		const float total = (float)std::max<size_t>(materials.size(), 1);
+		while (reload.m_material < materials.size() && PIL_check_seconds_timer() < deadline) {
+			materials[materials.size() - 1 - reload.m_material++]->ReloadMaterial();
+			for (KX_LibLoadStatus *status : reload.m_waiting) {
+				const unsigned int lastScene = (unsigned int)std::max<size_t>(status->GetSceneConverters().size(), 1) - 1;
+				set_scene_progress(status, lastScene, progress_shaders + (1.0f - progress_shaders) *
+				                   (float)reload.m_material / total);
+			}
+		}
+		if (reload.m_material < materials.size()) {
+			return;
+		}
+		CM_Message("[Load] async light reload \"" << it->first->GetName() << "\": " << materials.size()
+		           << " materials for " << reload.m_waiting.size() << " libraries");
+		for (KX_LibLoadStatus *status : reload.m_waiting) {
+			status->Finish();
+		}
+		it = m_reloads.erase(it);
+	}
+}
+
 void BL_Converter::ProcessScheduledLibraries()
 {
 	m_threadinfo.m_mutex.Lock();
 	for (KX_LibLoadStatus *libload : m_mergequeue) {
-		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0, false});
+		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0});
 	}
 	m_mergequeue.clear();
 	m_threadinfo.m_mutex.Unlock();
@@ -549,10 +589,17 @@ void BL_Converter::ProcessScheduledLibraries()
 		}
 		KX_LibLoadStatus *libload = m_merging.front().m_status;
 		m_merging.erase(m_merging.begin());
-		libload->Finish();
+		if (!IsWaitingReload(libload)) {
+			libload->Finish();
+		}
 		if (PIL_check_seconds_timer() >= deadline) {
 			break;
 		}
+	}
+
+	// Recompile for new lights only once nothing else is merging, a later library would restart it.
+	if (m_merging.empty()) {
+		StepReloads(deadline);
 	}
 
 	for (Main *maggie : m_freeQueue) {
@@ -568,16 +615,19 @@ void BL_Converter::FinalizeAsyncLoads()
 	// Merge all libraries data in the current scene, to avoid memory leak of unmerged scenes.
 	m_threadinfo.m_mutex.Lock();
 	for (KX_LibLoadStatus *libload : m_mergequeue) {
-		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0, false});
+		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0});
 	}
 	m_mergequeue.clear();
 	m_threadinfo.m_mutex.Unlock();
 
 	for (PendingMerge& merge : m_merging) {
 		StepMerge(merge, DBL_MAX);
-		merge.m_status->Finish();
+		if (!IsWaitingReload(merge.m_status)) {
+			merge.m_status->Finish();
+		}
 	}
 	m_merging.clear();
+	StepReloads(DBL_MAX);
 
 	ProcessScheduledLibraries();
 }

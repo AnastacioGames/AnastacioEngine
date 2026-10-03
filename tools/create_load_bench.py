@@ -109,8 +109,20 @@ if "load_bench" not in g:
     status = [Range.logic.LibLoad(Range.logic.expandPath("//chunk_%%02d.range" %% i), "Scene",
                                   asynchronous=ASYNC) for i in range(CHUNKS)]
     g["load_bench"] = (t0, status)
+    g["load_bench_frames"] = []
+    print("[LoadBench] LibLoad calls returned after %%.0f ms" %% ((time.perf_counter() - t0) * 1000.0))
+    g["load_bench_last"] = time.perf_counter()
 t0, status = g["load_bench"]
+now = time.perf_counter()
+frames = g["load_bench_frames"]
+frames.append(((now - g["load_bench_last"]) * 1000.0, sum(s.progress for s in status) / len(status)))
+g["load_bench_last"] = now
 if all(s.finished for s in status):
+    slow = [(i, dt, p) for i, (dt, p) in enumerate(frames) if dt > 25.0]
+    print("[LoadBench] %%d frames, worst %%.0f ms, %%d over 25 ms" %% (
+        len(frames), max(dt for dt, p in frames), len(slow)))
+    for i, dt, p in slow[:40]:
+        print("[LoadBench]   frame %%3d  %%6.1f ms  progress %%.2f" %% (i, dt, p))
     scene = Range.logic.getCurrentScene()
     print("[LoadBench] %%d chunks (%%s): %%.0f ms, %%d objects, %%d inactive" %% (
         CHUNKS, "async" if ASYNC else "sync", (time.perf_counter() - t0) * 1000.0,

@@ -109,16 +109,24 @@ private:
 		enum Stage {
 			STAGE_TEXTURES,
 			STAGE_SHADERS,
-			STAGE_MERGE,
-			STAGE_RELOAD_ALL
+			STAGE_MERGE
 		} m_stage;
-		/// Next material to compile in STAGE_SHADERS or STAGE_RELOAD_ALL.
+		/// Next material to compile in STAGE_SHADERS.
 		unsigned int m_material;
-		/// The scene brings lights: merge first, then recompile every material of the target scene.
-		bool m_newLights;
 	};
 	/// Libraries being merged, only touched by the main thread.
 	std::vector<PendingMerge> m_merging;
+
+	/** Merged lights make every material of the scene recompile. Done once after all queued libraries
+	 * merged, not once per library: 20 libraries with a lamp each recompiled the scene 20 times.
+	 */
+	struct PendingReload {
+		/// Materials already recompiled, counted from the end of the scene list.
+		unsigned int m_material;
+		/// Libraries finished once the reload ends.
+		std::vector<KX_LibLoadStatus *> m_waiting;
+	};
+	std::map<KX_Scene *, PendingReload> m_reloads;
 	/// List of libraries to free.
 	std::vector<Main *> m_freeQueue;
 
@@ -169,6 +177,10 @@ private:
 
 	/// Advance a library merge until done or the deadline (PIL time) passes, true when finished.
 	bool StepMerge(PendingMerge& merge, double deadline);
+	/// Advance the light reloads until done or the deadline passes, finishing the waiting libraries.
+	void StepReloads(double deadline);
+	/// The library is merged but still waits for its scene light reload.
+	bool IsWaitingReload(KX_LibLoadStatus *status) const;
 
 	/// Delay library merging to ProcessScheduledLibraries.
 	void AddScenesToMergeQueue(KX_LibLoadStatus *status);

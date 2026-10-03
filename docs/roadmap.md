@@ -29,7 +29,9 @@ Aberto:
   serial na GPU; DDS no `.cooked` cortaria ambos.
 - Tela de loading do LibLoad (2026-10-03): `asynchronous=True` agora tem progresso real (conversão por
   objeto, depois texturas e shaders um a um) e o merge se espalha em frames de ~8 ms. Falta o usuário testar
-  num jogo real; a abertura/link do arquivo ainda é síncrona.
+  num jogo real; a abertura/link do arquivo ainda é síncrona. Luz nova recompila a cena uma vez só depois
+  de todas as bibliotecas da fila (20 arquivos com lâmpada: 9,8 s → 5,6 s); sobra o custo de compilar ~15 ms por
+  shader com muitas luzes e um frame de ~230 ms no primeiro merge com lâmpada.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

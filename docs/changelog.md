@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - LibLoad assíncrono: recompilação por luz nova uma vez só, não por biblioteca
+
+- Antes: cada biblioteca assíncrona com lâmpada recompilava todos os materiais da cena logo depois do seu
+  merge. 20 bibliotecas com uma lâmpada cada = 20 passadas crescentes.
+- Agora (`BL_Converter::StepReloads`, `PendingReload`): toda biblioteca compila só os materiais novos antes
+  do merge (os objetos nunca aparecem sem shader); luz nova marca a cena para uma recompilação única, que só
+  começa quando nenhuma outra biblioteca está em merge e recomeça se chegar outra luz. As bibliotecas que
+  trouxeram luz ficam em `finished = False` (progresso 0,95 → 1) até ela terminar. `RemoveScene` descarta a
+  pendência; `FinalizeAsyncLoads` termina tudo.
+- `tools/create_load_bench.py` agora registra frames acima de 25 ms (`[LoadBench]`).
+- Medido (`create_load_bench.py -- <dir> 20 15 0 async`, 300 materiais): com lâmpadas 9,8 s / 583 frames →
+  5,6 s / 311 frames; sem lâmpadas 647 → 301 ms. O que sobra com lâmpadas é a passada única: ~15 ms por
+  shader com 21 luzes, um por frame; e um frame de ~230 ms no primeiro merge com lâmpada (não investigado).
+
 ## 2026-10-03 - LibLoad assíncrono: progresso real e merge espalhado em frames (tela de loading)
 
 - Antes: `LibLoad(..., asynchronous=True)` pulava de 0 para 0,9 ao fim da conversão na thread, e o merge
