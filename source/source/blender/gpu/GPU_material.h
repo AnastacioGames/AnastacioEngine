@@ -528,6 +528,10 @@ typedef struct GPUSceneLight {
 } GPUSceneLight;
 void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
 
+/* Material shader cache counters (gpu_codegen.c): programs reused, programs compiled and seconds spent
+ * compiling since the last reset. Used by the game engine "[Load]" console lines. */
+void GPU_shader_cache_stats(int *r_reused, int *r_compiled, double *r_compile_seconds, bool reset);
+
 /* IES profile of the first IES Texture node in the lamp's node tree: atlas band, or -1 when none or unreadable. */
 int GPU_lamp_ies_slot(GPULamp *lamp, float *r_strength);
 void GPU_lamp_ies_exit(void);

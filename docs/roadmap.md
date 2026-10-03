@@ -10,6 +10,25 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ## Prioridade atual
 
+### Carregamento mais rápido ("Cozinhar")
+
+Plano: arquivo `.cooked` preparado para o jogo ao lado do `.range`, com fallback para o cru. Etapas 1 (medição
+`[Load]`) e 2 (cache de shader GLSL, merge do LibLoad só com materiais novos) feitas em 2026-10-03; comparação
+visual automática sem diferenças atribuíveis ao cache. Biblioteca GLSL enxuta por shader (só as funções
+usadas) também feita: compilação ~4× mais rápida, imagens idênticas. Falta o usuário conferir jogos reais.
+
+Aberto:
+
+- Modo opcional com valores do material como uniform, para mais reuso entre materiais de mesma estrutura.
+- Etapa 4: malha/tangentes/física pré-calculadas.
+- Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
+  status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
+
+Descartado: cache de shader em disco (`glProgramBinary`, etapa 5). Testado em 2026-10-03 com 200 esferas:
+todos os binários carregaram, mas a cena ficou mais lenta (4,4 s contra 3,2 s), porque o cache do próprio
+driver NVIDIA já é mais rápido; o pedido de binário recuperável ainda desliga esse cache (1ª rodada 13 s).
+Código revertido.
+
 ### Dano visual por impacto (Deformation)
 
 Feito: Dent, Bend em V, nó Damage (máscara por pontos de impacto), decals de impacto e marcas de arrasto.

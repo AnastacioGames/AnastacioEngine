@@ -33,6 +33,9 @@
 #include "BLI_utildefines.h"
 #include "BLI_dynstr.h"
 #include "BLI_ghash.h"
+#include "BLI_math_base.h"
+
+#include "PIL_time.h"
 
 #include "GPU_extensions.h"
 #include "GPU_framebuffer.h"
@@ -45,6 +48,7 @@
 
 #include "gpu_codegen.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -55,6 +59,7 @@ extern char datatoc_gpu_shader_vertex_world_glsl[];
 extern char datatoc_gpu_shader_geometry_glsl[];
 
 static char *glsl_material_library = NULL;
+static void glsl_lib_strip_exit(void);
 
 #ifdef __EMSCRIPTEN__
 /* GLEW_VERSION_3_0 reflects a queried desktop GL version that Emscripten never
@@ -106,6 +111,180 @@ static GHash *FUNCTION_HASH = NULL;
 static char *FUNCTION_PROTOTYPES = NULL;
 static GPUShader *FUNCTION_LIB = NULL;
 #endif
+
+/* Shader cache: materials whose generated code is identical (Mat, Mat.001 differing only in dynamic
+ * uniforms, or every material recompiled when a LibLoad merges a lamp) share one compiled program.
+ * Per-material values are uploaded on each bind (GPU_pass_bind/GPU_pass_update_uniforms), so sharing
+ * the program is safe. Programs left without users stay cached (up to SHADER_CACHE_MAX_UNUSED) so a
+ * scene that is freed and opened again, or a material reloaded, finds them compiled. */
+
+typedef struct GPUShaderCacheEntry {
+	struct GPUShaderCacheEntry *next, *prev;
+	unsigned int hash;
+	int flags;
+	const char *libcode;
+	char *vertexcode, *fragmentcode, *geometrycode;
+	GPUShader *shader;
+	int users;
+	/* Removed from the cache by gpu_codegen_exit while still used: freed with its last user. */
+	bool detached;
+	unsigned int last_used;
+} GPUShaderCacheEntry;
+
+enum {
+	SHADER_CACHE_MAX_UNUSED = 256,
+};
+
+static ListBase SHADER_CACHE = {NULL, NULL};
+static ListBase SHADER_CACHE_DETACHED = {NULL, NULL};
+static unsigned int SHADER_CACHE_CLOCK = 0;
+static int SHADER_CACHE_UNUSED = 0;
+static int SHADER_CACHE_STAT_REUSED = 0;
+static int SHADER_CACHE_STAT_COMPILED = 0;
+static double SHADER_CACHE_STAT_COMPILE_TIME = 0.0;
+
+void GPU_shader_cache_stats(int *r_reused, int *r_compiled, double *r_compile_seconds, bool reset)
+{
+	*r_reused = SHADER_CACHE_STAT_REUSED;
+	*r_compiled = SHADER_CACHE_STAT_COMPILED;
+	*r_compile_seconds = SHADER_CACHE_STAT_COMPILE_TIME;
+	if (reset) {
+		SHADER_CACHE_STAT_REUSED = 0;
+		SHADER_CACHE_STAT_COMPILED = 0;
+		SHADER_CACHE_STAT_COMPILE_TIME = 0.0;
+	}
+}
+
+static bool shader_cache_str_equals(const char *a, const char *b)
+{
+	return (a == b) || (a && b && STREQ(a, b));
+}
+
+static unsigned int shader_cache_hash(const char *vertexcode, const char *fragmentcode, const char *geometrycode, int flags)
+{
+	unsigned int hash = (unsigned int)flags;
+	hash = hash * 31u + (vertexcode ? BLI_ghashutil_strhash_p(vertexcode) : 0u);
+	hash = hash * 31u + (fragmentcode ? BLI_ghashutil_strhash_p(fragmentcode) : 0u);
+	hash = hash * 31u + (geometrycode ? BLI_ghashutil_strhash_p(geometrycode) : 0u);
+	return hash;
+}
+
+static void shader_cache_entry_free(GPUShaderCacheEntry *entry)
+{
+	GPU_shader_free(entry->shader);
+	MEM_SAFE_FREE(entry->vertexcode);
+	MEM_SAFE_FREE(entry->fragmentcode);
+	MEM_SAFE_FREE(entry->geometrycode);
+	MEM_freeN(entry);
+}
+
+/* RANGE_NO_SHADER_CACHE=1 compiles every material on its own, to compare images with and without sharing. */
+static bool shader_cache_enabled(void)
+{
+	static int enabled = -1;
+	if (enabled == -1) {
+		const char *env = getenv("RANGE_NO_SHADER_CACHE");
+		enabled = !(env && env[0] && env[0] != '0');
+	}
+	return enabled != 0;
+}
+
+static GPUShader *shader_cache_acquire(const char *vertexcode, const char *fragmentcode, const char *geometrycode,
+                                       const char *libcode, int flags, unsigned int hash)
+{
+	for (GPUShaderCacheEntry *entry = SHADER_CACHE.first; entry; entry = entry->next) {
+		if (entry->hash == hash && entry->flags == flags && entry->libcode == libcode &&
+		    shader_cache_str_equals(entry->fragmentcode, fragmentcode) &&
+		    shader_cache_str_equals(entry->vertexcode, vertexcode) &&
+		    shader_cache_str_equals(entry->geometrycode, geometrycode))
+		{
+			if (entry->users == 0) {
+				SHADER_CACHE_UNUSED--;
+			}
+			entry->users++;
+			entry->last_used = ++SHADER_CACHE_CLOCK;
+			return entry->shader;
+		}
+	}
+	return NULL;
+}
+
+static void shader_cache_add(GPUShader *shader, const char *vertexcode, const char *fragmentcode,
+                             const char *geometrycode, const char *libcode, int flags, unsigned int hash)
+{
+	GPUShaderCacheEntry *entry = MEM_callocN(sizeof(GPUShaderCacheEntry), "GPUShaderCacheEntry");
+	entry->hash = hash;
+	entry->flags = flags;
+	entry->libcode = libcode;
+	entry->vertexcode = vertexcode ? BLI_strdup(vertexcode) : NULL;
+	entry->fragmentcode = fragmentcode ? BLI_strdup(fragmentcode) : NULL;
+	entry->geometrycode = geometrycode ? BLI_strdup(geometrycode) : NULL;
+	entry->shader = shader;
+	entry->users = 1;
+	entry->last_used = ++SHADER_CACHE_CLOCK;
+	BLI_addhead(&SHADER_CACHE, entry);
+}
+
+static void shader_cache_release(GPUShader *shader)
+{
+	if (!shader) {
+		return;
+	}
+
+	for (GPUShaderCacheEntry *entry = SHADER_CACHE.first; entry; entry = entry->next) {
+		if (entry->shader != shader) {
+			continue;
+		}
+		if (--entry->users > 0) {
+			return;
+		}
+		SHADER_CACHE_UNUSED++;
+		/* Over the limit: free the unused program used longest ago. */
+		if (SHADER_CACHE_UNUSED > SHADER_CACHE_MAX_UNUSED) {
+			GPUShaderCacheEntry *oldest = NULL;
+			for (GPUShaderCacheEntry *e = SHADER_CACHE.first; e; e = e->next) {
+				if (e->users == 0 && (!oldest || e->last_used < oldest->last_used)) {
+					oldest = e;
+				}
+			}
+			BLI_remlink(&SHADER_CACHE, oldest);
+			shader_cache_entry_free(oldest);
+			SHADER_CACHE_UNUSED--;
+		}
+		return;
+	}
+
+	for (GPUShaderCacheEntry *entry = SHADER_CACHE_DETACHED.first; entry; entry = entry->next) {
+		if (entry->shader == shader) {
+			if (--entry->users == 0) {
+				BLI_remlink(&SHADER_CACHE_DETACHED, entry);
+				shader_cache_entry_free(entry);
+			}
+			return;
+		}
+	}
+
+	/* Not created through the cache. */
+	GPU_shader_free(shader);
+}
+
+/* Frees every unused program; programs still used are freed with their last user. */
+static void shader_cache_exit(void)
+{
+	GPUShaderCacheEntry *next;
+	for (GPUShaderCacheEntry *entry = SHADER_CACHE.first; entry; entry = next) {
+		next = entry->next;
+		BLI_remlink(&SHADER_CACHE, entry);
+		if (entry->users == 0) {
+			shader_cache_entry_free(entry);
+		}
+		else {
+			entry->detached = true;
+			BLI_addtail(&SHADER_CACHE_DETACHED, entry);
+		}
+	}
+	SHADER_CACHE_UNUSED = 0;
+}
 
 static int gpu_str_prefix(const char *str, const char *prefix)
 {
@@ -296,8 +475,12 @@ void gpu_codegen_exit(void)
 		FUNCTION_HASH = NULL;
 	}
 
+	shader_cache_exit();
+
 	GPU_shader_free_builtin_shaders();
 	GPU_framebuffer_blur_free();
+
+	glsl_lib_strip_exit();
 
 	if (glsl_material_library) {
 		MEM_freeN(glsl_material_library);
@@ -1032,6 +1215,378 @@ static char *code_generate_geometry(ListBase *nodes, bool use_opensubdiv)
 	UNUSED_VARS(nodes, use_opensubdiv);
 #endif
 	return NULL;
+}
+
+/* GLSL library stripping: the material library (~200 KB) used to go whole into every fragment shader,
+ * so the driver parsed and compiled all of it per material. The library is split once into top-level
+ * chunks; only function definitions can be left out. Preprocessor lines, uniforms, structs and constants
+ * always stay, and functions are grouped by name so every overload of a called function is kept (the
+ * preprocessor still picks between #ifdef variants). A shader gets the functions its fragment code
+ * reaches, directly or through other library functions. RANGE_NO_GLSL_STRIP=1 sends the whole library. */
+
+typedef struct GLSLLibChunk {
+	int start, end;
+	int group; /* Function name group, -1 for chunks that are always kept. */
+} GLSLLibChunk;
+
+static GLSLLibChunk *GLSL_LIB_CHUNKS = NULL;
+static int GLSL_LIB_CHUNKS_LEN = 0;
+static GHash *GLSL_LIB_GROUPS = NULL; /* Function name -> group index + 1. */
+static int GLSL_LIB_GROUPS_LEN = 0;
+static int **GLSL_LIB_GROUP_DEPS = NULL; /* Groups called by each group. */
+static int *GLSL_LIB_GROUP_DEPS_LEN = NULL;
+static char *GLSL_LIB_ROOTS = NULL; /* Groups referenced by chunks that are always kept. */
+
+static bool glsl_lib_strip_enabled(void)
+{
+	static int enabled = -1;
+	if (enabled == -1) {
+		const char *env = getenv("RANGE_NO_GLSL_STRIP");
+		enabled = !(env && env[0] && env[0] != '0');
+	}
+	return enabled != 0;
+}
+
+static bool glsl_ident_start(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+static bool glsl_ident_char(char c)
+{
+	return glsl_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+/* True when only spaces or tabs precede text[i] on its line (preprocessor lines may be indented). */
+static bool glsl_at_line_start(const char *text, int i)
+{
+	while (i > 0 && (text[i - 1] == ' ' || text[i - 1] == '\t')) {
+		i--;
+	}
+	return i == 0 || text[i - 1] == '\n';
+}
+
+/* Skips a comment starting at text[i]; returns the index after it, or i when there is none. */
+static int glsl_skip_comment(const char *text, int i, int end)
+{
+	if (i + 1 < end && text[i] == '/' && text[i + 1] == '/') {
+		while (i < end && text[i] != '\n') {
+			i++;
+		}
+	}
+	else if (i + 1 < end && text[i] == '/' && text[i + 1] == '*') {
+		i += 2;
+		while (i + 1 < end && !(text[i] == '*' && text[i + 1] == '/')) {
+			i++;
+		}
+		i = min_ii(i + 2, end);
+	}
+	return i;
+}
+
+/* Calls fn for every identifier in text[start, end), comments and number literals skipped. */
+static void glsl_foreach_ident(const char *text, int start, int end,
+                               void (*fn)(const char *ident, int len, void *data), void *data)
+{
+	int i = start;
+	while (i < end) {
+		const int after = glsl_skip_comment(text, i, end);
+		if (after != i) {
+			i = after;
+		}
+		else if (glsl_ident_start(text[i])) {
+			const int s = i;
+			while (i < end && glsl_ident_char(text[i])) {
+				i++;
+			}
+			fn(text + s, i - s, data);
+		}
+		else if (text[i] >= '0' && text[i] <= '9') {
+			while (i < end && (glsl_ident_char(text[i]) || text[i] == '.')) {
+				i++;
+			}
+		}
+		else {
+			i++;
+		}
+	}
+}
+
+static int glsl_lib_group_lookup(const char *ident, int len)
+{
+	char name[128];
+	if (len >= (int)sizeof(name)) {
+		return -1;
+	}
+	memcpy(name, ident, len);
+	name[len] = '\0';
+	return POINTER_AS_INT(BLI_ghash_lookup(GLSL_LIB_GROUPS, name)) - 1;
+}
+
+/* Name of the function a chunk header defines ("vec3 foo(..." -> foo), or false when it is no function
+ * (struct, initializer). */
+static bool glsl_header_function_name(const char *text, int start, int end, char *r_name, int name_size)
+{
+	for (int i = start; i < end;) {
+		const int after = glsl_skip_comment(text, i, end);
+		if (after != i) {
+			i = after;
+			continue;
+		}
+		if (glsl_ident_start(text[i])) {
+			const int s = i;
+			while (i < end && glsl_ident_char(text[i])) {
+				i++;
+			}
+			if (i - s == 6 && STREQLEN(text + s, "struct", 6)) {
+				return false;
+			}
+			int j = i;
+			while (j < end && (text[j] == ' ' || text[j] == '\t' || text[j] == '\n' || text[j] == '\r')) {
+				j++;
+			}
+			if (j < end && text[j] == '(') {
+				if (i - s >= name_size) {
+					return false;
+				}
+				memcpy(r_name, text + s, i - s);
+				r_name[i - s] = '\0';
+				return true;
+			}
+			continue;
+		}
+		i++;
+	}
+	return false;
+}
+
+static void glsl_lib_add_chunk(int start, int end, int group, int *capacity)
+{
+	if (end <= start) {
+		return;
+	}
+	if (GLSL_LIB_CHUNKS_LEN == *capacity) {
+		*capacity = max_ii(*capacity * 2, 256);
+		GLSL_LIB_CHUNKS = MEM_reallocN(GLSL_LIB_CHUNKS, sizeof(GLSLLibChunk) * (*capacity));
+	}
+	GLSLLibChunk *chunk = &GLSL_LIB_CHUNKS[GLSL_LIB_CHUNKS_LEN++];
+	chunk->start = start;
+	chunk->end = end;
+	chunk->group = group;
+}
+
+static int glsl_lib_group_for_name(const char *name)
+{
+	void *value = BLI_ghash_lookup(GLSL_LIB_GROUPS, name);
+	if (value) {
+		return POINTER_AS_INT(value) - 1;
+	}
+	BLI_ghash_insert(GLSL_LIB_GROUPS, BLI_strdup(name), POINTER_FROM_INT(GLSL_LIB_GROUPS_LEN + 1));
+	return GLSL_LIB_GROUPS_LEN++;
+}
+
+typedef struct GLSLDepCollect {
+	char *seen;
+	int *list;
+	int len;
+} GLSLDepCollect;
+
+static void glsl_collect_dep(const char *ident, int len, void *data)
+{
+	GLSLDepCollect *collect = data;
+	const int group = glsl_lib_group_lookup(ident, len);
+	if (group >= 0 && !collect->seen[group]) {
+		collect->seen[group] = 1;
+		collect->list[collect->len++] = group;
+	}
+}
+
+static void glsl_lib_strip_init(const char *lib)
+{
+	const int len = (int)strlen(lib);
+	int capacity = 0;
+	int seg = 0, depth = 0, header_end = 0;
+	char name[128];
+
+	GLSL_LIB_GROUPS = BLI_ghash_str_new("glsl lib groups");
+
+	for (int i = 0; i < len;) {
+		const int after = glsl_skip_comment(lib, i, len);
+		if (after != i) {
+			i = after;
+			continue;
+		}
+		const char c = lib[i];
+		if (depth == 0 && c == '#' && glsl_at_line_start(lib, i)) {
+			/* A preprocessor line between definitions is a chunk of its own, always kept. */
+			bool blank = true;
+			for (int k = seg; k < i;) {
+				const int skip = glsl_skip_comment(lib, k, i);
+				if (skip != k) {
+					k = skip;
+				}
+				else if (ELEM(lib[k], ' ', '\t', '\n', '\r')) {
+					k++;
+				}
+				else {
+					blank = false;
+					break;
+				}
+			}
+			int e = i;
+			while (e < len && !(lib[e] == '\n' && lib[e - 1] != '\\')) {
+				e++;
+			}
+			e = min_ii(e + 1, len);
+			if (blank) {
+				glsl_lib_add_chunk(seg, e, -1, &capacity);
+				seg = e;
+			}
+			i = e;
+			continue;
+		}
+		if (c == '{') {
+			if (depth++ == 0) {
+				header_end = i;
+			}
+		}
+		else if (c == '}' && depth > 0) {
+			if (--depth == 0) {
+				int e = i + 1;
+				int k = e;
+				while (k < len && ELEM(lib[k], ' ', '\t', '\r')) {
+					k++;
+				}
+				if (k < len && lib[k] == ';') {
+					/* struct {...}; or an initializer: always kept. */
+					glsl_lib_add_chunk(seg, k + 1, -1, &capacity);
+					seg = i = k + 1;
+					continue;
+				}
+				const int group = glsl_header_function_name(lib, seg, header_end, name, sizeof(name)) ?
+				                  glsl_lib_group_for_name(name) : -1;
+				glsl_lib_add_chunk(seg, e, group, &capacity);
+				seg = e;
+			}
+		}
+		else if (c == ';' && depth == 0) {
+			glsl_lib_add_chunk(seg, i + 1, -1, &capacity);
+			seg = i + 1;
+		}
+		i++;
+	}
+	glsl_lib_add_chunk(seg, len, -1, &capacity);
+
+	/* Dependencies between function groups, and the groups that kept chunks reference. */
+	const int groups = max_ii(GLSL_LIB_GROUPS_LEN, 1);
+	GLSL_LIB_GROUP_DEPS = MEM_callocN(sizeof(int *) * groups, "glsl lib deps");
+	GLSL_LIB_GROUP_DEPS_LEN = MEM_callocN(sizeof(int) * groups, "glsl lib deps len");
+	GLSL_LIB_ROOTS = MEM_callocN(groups, "glsl lib roots");
+
+	GLSLDepCollect collect;
+	collect.seen = MEM_callocN(groups, "glsl dep seen");
+	collect.list = MEM_mallocN(sizeof(int) * groups, "glsl dep list");
+
+	for (int g = 0; g < GLSL_LIB_GROUPS_LEN; g++) {
+		memset(collect.seen, 0, groups);
+		collect.seen[g] = 1; /* No self edge. */
+		collect.len = 0;
+		for (int c = 0; c < GLSL_LIB_CHUNKS_LEN; c++) {
+			if (GLSL_LIB_CHUNKS[c].group == g) {
+				glsl_foreach_ident(lib, GLSL_LIB_CHUNKS[c].start, GLSL_LIB_CHUNKS[c].end, glsl_collect_dep, &collect);
+			}
+		}
+		if (collect.len) {
+			GLSL_LIB_GROUP_DEPS[g] = MEM_mallocN(sizeof(int) * collect.len, "glsl group deps");
+			memcpy(GLSL_LIB_GROUP_DEPS[g], collect.list, sizeof(int) * collect.len);
+			GLSL_LIB_GROUP_DEPS_LEN[g] = collect.len;
+		}
+	}
+
+	memset(collect.seen, 0, groups);
+	collect.len = 0;
+	for (int c = 0; c < GLSL_LIB_CHUNKS_LEN; c++) {
+		if (GLSL_LIB_CHUNKS[c].group == -1) {
+			glsl_foreach_ident(lib, GLSL_LIB_CHUNKS[c].start, GLSL_LIB_CHUNKS[c].end, glsl_collect_dep, &collect);
+		}
+	}
+	for (int k = 0; k < collect.len; k++) {
+		GLSL_LIB_ROOTS[collect.list[k]] = 1;
+	}
+
+	MEM_freeN(collect.seen);
+	MEM_freeN(collect.list);
+}
+
+static void glsl_lib_strip_exit(void)
+{
+	if (GLSL_LIB_GROUPS) {
+		BLI_ghash_free(GLSL_LIB_GROUPS, MEM_freeN, NULL);
+		GLSL_LIB_GROUPS = NULL;
+	}
+	if (GLSL_LIB_GROUP_DEPS) {
+		for (int g = 0; g < GLSL_LIB_GROUPS_LEN; g++) {
+			MEM_SAFE_FREE(GLSL_LIB_GROUP_DEPS[g]);
+		}
+		MEM_freeN(GLSL_LIB_GROUP_DEPS);
+		GLSL_LIB_GROUP_DEPS = NULL;
+	}
+	MEM_SAFE_FREE(GLSL_LIB_GROUP_DEPS_LEN);
+	MEM_SAFE_FREE(GLSL_LIB_ROOTS);
+	MEM_SAFE_FREE(GLSL_LIB_CHUNKS);
+	GLSL_LIB_CHUNKS_LEN = 0;
+	GLSL_LIB_GROUPS_LEN = 0;
+}
+
+/* The library reduced to what fragmentcode uses; NULL means use the whole library. */
+static char *glsl_lib_strip(const char *fragmentcode)
+{
+	if (!fragmentcode || !glsl_material_library || !glsl_lib_strip_enabled()) {
+		return NULL;
+	}
+	if (!GLSL_LIB_GROUPS) {
+		glsl_lib_strip_init(glsl_material_library);
+	}
+
+	const int groups = max_ii(GLSL_LIB_GROUPS_LEN, 1);
+	GLSLDepCollect collect;
+	collect.seen = MEM_callocN(groups, "glsl strip used");
+	collect.list = MEM_mallocN(sizeof(int) * groups, "glsl strip stack");
+	collect.len = 0;
+
+	for (int g = 0; g < GLSL_LIB_GROUPS_LEN; g++) {
+		if (GLSL_LIB_ROOTS[g]) {
+			collect.seen[g] = 1;
+			collect.list[collect.len++] = g;
+		}
+	}
+	glsl_foreach_ident(fragmentcode, 0, (int)strlen(fragmentcode), glsl_collect_dep, &collect);
+
+	/* collect.list doubles as the work stack; seen marks the groups to keep. */
+	while (collect.len) {
+		const int g = collect.list[--collect.len];
+		for (int k = 0; k < GLSL_LIB_GROUP_DEPS_LEN[g]; k++) {
+			const int dep = GLSL_LIB_GROUP_DEPS[g][k];
+			if (!collect.seen[dep]) {
+				collect.seen[dep] = 1;
+				collect.list[collect.len++] = dep;
+			}
+		}
+	}
+
+	DynStr *ds = BLI_dynstr_new();
+	for (int c = 0; c < GLSL_LIB_CHUNKS_LEN; c++) {
+		const GLSLLibChunk *chunk = &GLSL_LIB_CHUNKS[c];
+		if (chunk->group == -1 || collect.seen[chunk->group]) {
+			BLI_dynstr_nappend(ds, glsl_material_library + chunk->start, chunk->end - chunk->start);
+		}
+	}
+	char *code = BLI_dynstr_get_cstring(ds);
+	BLI_dynstr_free(ds);
+
+	MEM_freeN(collect.seen);
+	MEM_freeN(collect.list);
+	return code;
 }
 
 void GPU_code_generate_glsl_lib(void)
@@ -1894,16 +2449,33 @@ GPUPass *GPU_generate_pass(
 	if (vertcode) {
 		flags |= GPU_SHADER_FLAGS_USER_CODE;
 	}
-	shader = GPU_shader_create_ex_named(vertexcode,
-	                              fragmentcode,
-	                              geometrycode,
-	                              glsl_material_library,
-	                              NULL,
-	                              0,
-	                              0,
-	                              0,
-	                              flags,
-	                              name);
+	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
+	const bool use_cache = shader_cache_enabled();
+	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :
+	                     NULL;
+	if (shader) {
+		SHADER_CACHE_STAT_REUSED++;
+	}
+	else {
+		const double compile_start = PIL_check_seconds_timer();
+		char *libcode = glsl_lib_strip(fragmentcode);
+		shader = GPU_shader_create_ex_named(vertexcode,
+		                              fragmentcode,
+		                              geometrycode,
+		                              libcode ? libcode : glsl_material_library,
+		                              NULL,
+		                              0,
+		                              0,
+		                              0,
+		                              flags,
+		                              name);
+		MEM_SAFE_FREE(libcode);
+		SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;
+		SHADER_CACHE_STAT_COMPILED++;
+		if (shader && use_cache) {
+			shader_cache_add(shader, vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash);
+		}
+	}
 
 	/* failed? */
 	if (!shader) {
@@ -1935,7 +2507,7 @@ GPUPass *GPU_generate_pass(
 
 void GPU_pass_free(GPUPass *pass)
 {
-	GPU_shader_free(pass->shader);
+	shader_cache_release(pass->shader);
 	gpu_inputs_free(&pass->inputs);
 	if (pass->fragmentcode)
 		MEM_freeN(pass->fragmentcode);

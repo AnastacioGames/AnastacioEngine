@@ -95,6 +95,7 @@ set(SRC
 	BL_ArmatureObject.h
 	BL_BlenderDataConversion.h
 	BL_Converter.h
+	BL_LoadStats.h
 	BL_MeshDeformer.h
 	BL_ModifierDeformer.h
 	BL_Resource.h

@@ -46,6 +46,7 @@
 #include "BL_SceneConverter.h"
 #include "BL_BlenderDataConversion.h"
 #include "BL_ConvertObjectInfo.h"
+#include "BL_LoadStats.h"
 #include "BL_ActionActuator.h"
 #include "KX_BlenderMaterial.h"
 
@@ -85,6 +86,8 @@ extern "C" {
 
 #include "BLI_task.h"
 #include "CM_Message.h"
+
+#include "GPU_material.h" // GPU_shader_cache_stats
 
 #include <cstring>
 #include <memory>
@@ -216,17 +219,47 @@ KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX
 	return scene_merge->GetInactiveList()->FindValue(name);
 }
 
+/// Milliseconds, for the "[Load]" console report (see BL_LoadStats.h).
+static int load_ms(double seconds)
+{
+	return (int)(seconds * 1000.0 + 0.5);
+}
+
+/// Clears the shader cache counters before a shader stage.
+static void reset_load_shader_stats()
+{
+	int reused, compiled;
+	double compileTime;
+	GPU_shader_cache_stats(&reused, &compiled, &compileTime, true);
+}
+
+static void print_load_shaders(KX_Scene *scene, const char *stage, size_t materials, double textures, double merge,
+                               double shaders)
+{
+	int reused, compiled;
+	double compileTime;
+	GPU_shader_cache_stats(&reused, &compiled, &compileTime, true);
+	CM_Message("[Load] " << stage << " \"" << scene->GetName() << "\": textures " << load_ms(textures)
+	           << "ms, merge " << load_ms(merge) << "ms, shaders " << load_ms(shaders) << "ms ("
+	           << materials << " materials x " << scene->GetLightList()->GetCount() << " lights; compiled "
+	           << compiled << " " << load_ms(compileTime) << "ms, reused " << reused << ")");
+}
+
 void BL_Converter::ConvertScene(KX_Scene *scene)
 {
 	BL_SceneConverter converter(scene, BL_Resource::Library(m_maggie));
 	ConvertScene(converter, false, true);
+	const double texturesStart = PIL_check_seconds_timer();
 	PostConvertScene(converter);
+	const double texturesEnd = PIL_check_seconds_timer();
 	/* An Add Object actuator can convert an external object into this scene while
 	 * its regular conversion is still in progress. That merge creates the scene
 	 * slot first, so append the local conversion instead of silently discarding
 	 * it through a failed emplace(). */
 	m_sceneSlots[scene].Merge(converter);
+	reset_load_shader_stats();
 	ReloadShaders(scene);
+	print_load_shaders(scene, "scene", m_sceneSlots[scene].m_materials.size(), texturesEnd - texturesStart, 0.0, PIL_check_seconds_timer() - texturesEnd);
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
@@ -234,6 +267,10 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	KX_Scene *scene = converter.GetScene();
 	// Find out which physics engine
 	Scene *blenderscene = scene->GetBlenderScene();
+
+	BL_LoadStats& loadStats = BL_LoadStats::Get();
+	loadStats.Reset();
+	const double convertStart = PIL_check_seconds_timer();
 
 	// Materiais com blend "Alpha Blend Hashed" (GPU_BLEND_ALPHA_TO_COVERAGE) caem para um
 	// dither por shader (gpu_material.c, shade_dither) quando gm.aasamples <= 1, em vez de
@@ -296,6 +333,12 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	if (actions) {
 		BL_ConvertActions(scene, m_maggie, converter);
 	}
+
+	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(PIL_check_seconds_timer() - convertStart)
+	           << "ms, " << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
+	           << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
+	           << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, physics "
+	           << load_ms(loadStats.physics) << "ms");
 }
 
 void BL_Converter::PostConvertScene(const BL_SceneConverter& converter)
@@ -458,7 +501,9 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFileMemory(void *data, int length, cons
 
 KX_LibLoadStatus *BL_Converter::LinkBlendFilePath(const char *filepath, char *group, KX_Scene *scene_merge, char **err_str, short options)
 {
+	const double openStart = PIL_check_seconds_timer();
 	BlendHandle *blendlib = BLO_blendhandle_from_file(filepath, nullptr);
+	CM_Message("[Load] open \"" << filepath << "\": " << load_ms(PIL_check_seconds_timer() - openStart) << "ms");
 
 	// Error checking is done in LinkBlendFile
 	return LinkBlendFile(blendlib, filepath, group, scene_merge, err_str, options);
@@ -512,6 +557,8 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFile(BlendHandle *blendlib, const char 
 	ReportList reports;
 	BKE_reports_init(&reports, RPT_STORE);
 
+	const double linkStart = PIL_check_seconds_timer();
+
 	// Created only for linking, then freed.
 	Main *main_tmp = BLO_library_link_begin(main_newlib, &blendlib, path);
 	load_datablocks(main_tmp, blendlib, path, idcode);
@@ -534,6 +581,8 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFile(BlendHandle *blendlib, const char 
 	BKE_reports_clear(&reports);
 
 	BLI_strncpy(main_newlib->name, path, sizeof(main_newlib->name));
+
+	CM_Message("[Load] link \"" << path << "\" (" << group << "): " << load_ms(PIL_check_seconds_timer() - linkStart) << "ms");
 
 	// Debug data to load.
 	if (options & LIB_LOAD_VERBOSE) {
@@ -571,8 +620,8 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFile(BlendHandle *blendlib, const char 
 
 			// Merge the meshes and materials in the targeted scene.
 			MergeSceneData(scene_merge, sceneConverter);
-			// Load shaders for new created materials.
-			ReloadShaders(scene_merge);
+			// Load shaders for new created materials, a mesh library has no lamps.
+			ReloadShaders(sceneConverter);
 			break;
 		}
 		case ID_AC:
@@ -801,14 +850,36 @@ void BL_Converter::MergeSceneData(KX_Scene *to, const BL_SceneConverter& convert
 
 void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter)
 {
+	const double texturesStart = PIL_check_seconds_timer();
 	PostConvertScene(converter);
+	const double mergeStart = PIL_check_seconds_timer();
 
 	MergeSceneData(to, converter);
+
+	// Merged lamps (active or inactive) get a base in the target Blender scene and every material
+	// shader loops over those bases, so only then the existing materials must be recompiled.
+	bool newLights = false;
+	for (KX_GameObject *gameobj : converter.m_objects) {
+		if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
+			newLights = true;
+			break;
+		}
+	}
 
 	KX_Scene *from = converter.GetScene();
 	to->MergeScene(from);
 
-	ReloadShaders(to);
+	const double shadersStart = PIL_check_seconds_timer();
+	reset_load_shader_stats();
+	if (newLights) {
+		ReloadShaders(to);
+	}
+	else {
+		ReloadShaders(converter);
+	}
+	print_load_shaders(to, newLights ? "merge into" : "merge into (new materials only)",
+	                   newLights ? m_sceneSlots[to].m_materials.size() : converter.m_materials.size(),
+	                   mergeStart - texturesStart, shadersStart - mergeStart, PIL_check_seconds_timer() - shadersStart);
 
 	delete from;
 }

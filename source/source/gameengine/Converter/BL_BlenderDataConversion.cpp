@@ -114,6 +114,7 @@
 #include "BL_ConvertObjectInfo.h"
 #include "BL_ConvertProperties.h"
 #include "BL_ConvertSensors.h"
+#include "BL_LoadStats.h"
 #include "BL_MeshDeformer.h"
 #include "BL_ModifierDeformer.h"
 #include "BL_SceneConverter.h"
@@ -551,9 +552,14 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 		const std::string bge_name = meshobj->GetName();
 		const std::string blender_name = ((ID *)blenderobj->data)->name + 2;
 		if (bge_name == blender_name) {
+			++BL_LoadStats::Get().meshesReused;
 			return meshobj;
 		}
 	}
+
+	BL_LoadStats& loadStats = BL_LoadStats::Get();
+	BL_LoadTimer meshTimer(loadStats.mesh);
+	++loadStats.meshes;
 
 	if (debugNav) {
 	}
@@ -716,6 +722,9 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	float(*tangent)[4] = nullptr;
 	if (!layersInfo.uvLayers.empty()) {
 		if (CustomData_get_layer_index(&dm->loopData, CD_TANGENT) == -1) {
+			BL_LoadStats& loadStats = BL_LoadStats::Get();
+			BL_LoadTimer tangentTimer(loadStats.tangent);
+			++loadStats.tangentMeshes;
 			DM_calc_loop_tangents(dm, true, nullptr, 0);
 		}
 		tangent = (float(*)[4])dm->getLoopDataArray(dm, CD_TANGENT);
@@ -2308,6 +2317,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	}
 
 	// Create physics information.
+	const double physicsStart = PIL_check_seconds_timer();
 	for (unsigned short i = 0; i < 2; ++i) {
 		const bool processCompoundChildren = (i == 1);
 		const bool processCustomMesh = (i == 1);
@@ -2348,6 +2358,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			BL_CreatePhysicsObjectNew(gameobj, blenderobject, meshobj, kxscene, layerMask, converter, processCompoundChildren);
 		}
 	}
+	BL_LoadStats::Get().physics += PIL_check_seconds_timer() - physicsStart;
 
 	// Create and set bounding volume.
 	for (KX_GameObject *gameobj : sumolist) {

@@ -9,6 +9,34 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Carregamento: medição por etapa, cache e biblioteca GLSL enxuta, merge do LibLoad
+
+- Etapas 1 e 2 do plano "Cozinhar" (arquivo preparado para o jogo). `BL_LoadStats.h` e o console agora mostram
+  linhas `[Load]` com o tempo de cada etapa (abrir, link, conversão, merge/shaders) e quantos shaders foram
+  compilados ou reaproveitados.
+- `gpu_codegen.c`: cache de programas GLSL. Materiais cujo código gerado, flags e biblioteca são idênticos
+  compartilham o mesmo `GPUShader`; os uniforms continuam sendo enviados a cada bind. Os programas sem uso
+  ficam guardados até 256, com descarte do mais antigo, então voltar a uma cena reaproveita os shaders.
+  `RANGE_NO_SHADER_CACHE=1` desliga o cache para comparação.
+- `BL_Converter::MergeScene`: o LibLoad sem lâmpada nova compila só os materiais novos. Com lâmpada nova continua
+  recompilando tudo, porque cada shader percorre as lâmpadas da cena.
+- Benchmark (`tools/create_load_bench.py`, opções `async`/`nolamp`): shaders da cena inicial (200 materiais)
+  12,2 s → 5,1 s; 10 LibLoads sem lâmpada ~13 s cada → 214 ms no total; LibLoad com lâmpada 12–25 s → ~5 s.
+- Limite: com "constante" ligado (padrão), cor/especular entram fixos no GLSL, então só materiais de valores
+  idênticos compartilham programa. Cada compilação custa ~48 ms.
+- Validação visual: `tools/create_shader_cache_test.py` (200 esferas, vários modelos de shading, shadeless,
+  emit, alpha, ramp, textura) e `tools/compare_images.py`. Com e sem cache, as imagens diferem só em 48 pixels
+  na fileira transparente; duas rodadas sem cache já diferem em 26 pixels ali (ordenação de alpha).
+- Biblioteca GLSL enxuta (`glsl_lib_strip` em `gpu_codegen.c`): o fragment shader recebia a biblioteca de
+  materiais inteira (~195 KB) em cada compilação. Agora ela é dividida uma vez em blocos de nível superior e
+  cada shader leva só as funções que o código gerado alcança, direta ou indiretamente, com todas as sobrecargas
+  do mesmo nome. Diretivas `#` (inclusive com recuo), uniforms, structs e constantes ficam sempre.
+  `RANGE_NO_GLSL_STRIP=1` volta a enviar a biblioteca inteira. Cena de 200 esferas compilando cada material
+  sozinho: 11–14 s → 3,2 s no total. Comparação pixel a pixel com e sem corte: idêntica em 7 cenas de nós
+  (vidro, probe, céu Hosek, cabelo, IES, sombra de ponto, nós) e nas esferas (só o ruído de alpha já conhecido);
+  `ripple_normal_test` é animada e varia entre rodadas iguais. Cenas com print injetado:
+  `projects-teste/shader_cache_test/inject_shot.py`.
+
 ## 2026-10-03 - Undo: crash ao voltar muitos passos e continuar editando
 
 - `undo_system.c` (`BKE_undosys_stack_limit_steps_and_memory`): o hack `WITH_GLOBAL_UNDO_KEEP_ONE` testava

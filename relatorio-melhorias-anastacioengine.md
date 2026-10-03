@@ -45,6 +45,11 @@ ferramenta correspondente.
   Ela vale para Play e standalone, nunca para a 3D View de edição.
 - GPU Skinning move a deformação por bones para o vertex shader e está liberado para uso.
 - Z-prepass para materiais alpha-cutout reduziu o tempo de GPU do benchmark de 28,29 ms para 21,45 ms.
+- Cache de programas GLSL: materiais com código gerado idêntico compartilham o shader (e voltar a uma cena
+  reaproveita até 256 programas sem uso); o LibLoad sem lâmpada nova compila só os materiais novos. No benchmark,
+  10 LibLoads caíram de ~13 s cada para 214 ms no total. Console mostra linhas `[Load]` por etapa.
+- Cada fragment shader de material leva só as funções da biblioteca GLSL que usa (compilação ~4× mais rápida,
+  imagem idêntica); `RANGE_NO_GLSL_STRIP=1` envia a biblioteca inteira para comparação.
 - Streaming por distância está disponível em `projects-teste/scripts/streaming_manager.py`.
 - LOD de impostor possui billboard cilíndrico e bake automático de atlas multiângulo.
 - Partículas GPU por objeto usam transform feedback, shader cache compartilhado, sprites/texturas, curvas,
