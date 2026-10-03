@@ -7127,7 +7127,12 @@ static bool drawmball(
 
 	MetaBall *mb = ob->data;
 
-	if (mb->editelems) {
+	const bool overlay_only = (dflag & DRAW_OVERLAY_ONLY) != 0;
+
+	if (overlay_only) {
+		ml = mb->editelems ? mb->editelems->first : mb->elems.first;
+	}
+	else if (mb->editelems) {
 		if ((G.f & G_PICKSEL) == 0) {
 			unsigned char wire_col[4];
 			UI_GetThemeColor4ubv(TH_WIRE_EDIT, wire_col);
@@ -7152,6 +7157,21 @@ static bool drawmball(
 		return false;
 	}
 
+	/* like lamps/empties: the radius/stiffness circles go to the transparent pass (after the meshes),
+	 * the surface above stays in the normal pass */
+	if (!overlay_only && !v3d->transp && !(G.f & G_PICKSEL) && !(base->flag & OB_FROMDUPLI)) {
+		ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base,
+		                    dflag | DRAW_OVERLAY_ONLY);
+		return false;
+	}
+
+	const bool smooth = v3d->transp && !(G.f & G_PICKSEL);
+	if (smooth) {
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+
 	invert_m4_m4(imat, rv3d->viewmatob);
 	normalize_v3(imat[0]);
 	normalize_v3(imat[1]);
@@ -7162,7 +7182,7 @@ static bool drawmball(
 		}
 	}
 
-	glLineWidth(1.0f);
+	glLineWidth(U.pixelsize);
 
 	while (ml) {
 		/* draw radius */
@@ -7194,6 +7214,11 @@ static bool drawmball(
 		}
 
 		ml = ml->next;
+	}
+
+	if (smooth) {
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
 	}
 	return false;
 }
@@ -8136,11 +8161,25 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 				}
 				break;
 			case OB_SPEAKER:
-				if (!render_override) {
+				if (!render_override && !v3d->transp && !(G.f & G_PICKSEL) && !(base->flag & OB_FROMDUPLI)) {
+					/* like lamps/empties/cameras: lines after the meshes (transparent pass) */
+					ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base, dflag);
+				}
+				else if (!render_override) {
+					const bool smooth = !(G.f & G_PICKSEL);
+					if (smooth) {
+						glEnable(GL_LINE_SMOOTH);
+						glEnable(GL_BLEND);
+						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+					}
 					drawspeaker(scene, v3d, rv3d, ob, dflag);
 
 					if (is_obact) {
 						draw_gizmo_speaker(ob);
+					}
+					if (smooth) {
+						glDisable(GL_BLEND);
+						glDisable(GL_LINE_SMOOTH);
 					}
 
 					/* draw speaker 3D icon */
@@ -8204,7 +8243,19 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 			}
 
 			if (ob->pd && ob->pd->forcefield) {
+				/* smooth only in the transparent pass (deferred lamps/empties/cameras/speakers):
+				 * there no mesh is drawn after it, so the anti-aliased edges can't punch holes */
+				const bool smooth = v3d->transp && !(G.f & G_PICKSEL);
+				if (smooth) {
+					glEnable(GL_LINE_SMOOTH);
+					glEnable(GL_BLEND);
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				}
 				draw_forcefield(ob, rv3d, dflag, ob_wire_col);
+				if (smooth) {
+					glDisable(GL_BLEND);
+					glDisable(GL_LINE_SMOOTH);
+				}
 			}
 		}
 	}

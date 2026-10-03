@@ -36,6 +36,18 @@ completo e redesenhava todas as views com `NC_OBJECT|ND_DRAW`.
   resultado determinístico. Fases 4 e 5 descartadas (vertex/weight paint não desenha via PBVH; sculpt GLSL via
   PBVH mudaria o shading do viewport).
 
+## 2026-10-03 - Gizmo: ajustes do hover; speaker, force fields e metaball suaves
+
+- Hover do gizmo só roda a checagem de seleção com o mouse perto do gizmo (raio ~1.3 × `tw_size` + hotspot) e
+  só na janela com o contexto GL ativo (`wm->windrawable`), evitando custo a cada movimento e erro em 2ª janela.
+- Círculos de rotação livre (visão e trackball) passam por `manipulator_setcolor_theme`: acendem no hover e
+  ficam pretos na passada de contorno (antes eram desenhados com a cor do tema também nela).
+- Speaker: antialias e passada transparente, como lâmpada/empty/câmera.
+- Metaball: os círculos de raio e rigidez vão para a passada transparente com antialias; a superfície fica no
+  desenho normal. Nova flag `DRAW_OVERLAY_ONLY` (`view3d_intern.h`) faz a 2ª passada pular a superfície.
+- Force fields: antialias quando o objeto já é desenhado na passada transparente (empties, lâmpadas, câmeras,
+  speakers); em malhas continuam como antes.
+
 ## 2026-10-03 - Câmera: linhas suaves
 
 - Câmera usa os mesmos consertos de lâmpada e empty: antialias e passada transparente (depois das malhas).

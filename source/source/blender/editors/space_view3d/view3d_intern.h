@@ -63,6 +63,7 @@ enum {
 	DRAW_PICKING     = (1 << 0),
 	DRAW_CONSTCOLOR  = (1 << 1),
 	DRAW_SCENESET    = (1 << 2),
+	DRAW_OVERLAY_ONLY = (1 << 3),  /* deferred pass: only the overlay lines, geometry was already drawn */
 };
 
 /* draw_mesh_fancy/draw_mesh_textured draw_flags */

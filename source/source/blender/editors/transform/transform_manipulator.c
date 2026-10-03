@@ -942,6 +942,24 @@ static void manipulator_setcolor(View3D *v3d, char axis, int colcode, unsigned c
 	glColor4ubv(col);
 }
 
+/* theme colored handles (view / trackball rotation circles) */
+static void manipulator_setcolor_theme(int id)
+{
+	unsigned char col[4];
+
+	UI_GetThemeColor3ubv(TH_TRANSFORM, col);
+	col[3] = 255;
+
+	if (man_outline_pass) {
+		col[0] = col[1] = col[2] = 0;
+		col[3] = 140;
+	}
+	else if (man_hover_draw && man_hover_id == id) {
+		for (int i = 0; i < 3; i++) col[i] = (unsigned char)(col[i] + (255 - col[i]) * 0.45f);
+	}
+	glColor4ubv(col);
+}
+
 static void manipulator_axis_order(RegionView3D *rv3d, int r_axis_order[3])
 {
 	float axis_values[3];
@@ -1154,7 +1172,7 @@ static void draw_manipulator_rotate(
 	/* Screen aligned trackball rot circle */
 	if (drawflags & MAN_ROT_T) {
 		if (is_picksel) GPU_select_load_id(MAN_ROT_T);
-		else UI_ThemeColor(TH_TRANSFORM);
+		else manipulator_setcolor_theme(MAN_ROT_T);
 
 		manipulator_circle(0.2f * size);
 	}
@@ -1162,7 +1180,7 @@ static void draw_manipulator_rotate(
 	/* Screen aligned view rot circle */
 	if (drawflags & MAN_ROT_V) {
 		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
-		else UI_ThemeColor(TH_TRANSFORM);
+		else manipulator_setcolor_theme(MAN_ROT_V);
 		manipulator_circle(1.2f * size);
 
 		if (is_moving) {
@@ -1752,7 +1770,7 @@ static void draw_manipulator_rotate_cyl(
 		unit_m4(unitmat);
 
 		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
-		UI_ThemeColor(TH_TRANSFORM);
+		else manipulator_setcolor_theme(MAN_ROT_V);
 		manipulator_circle(1.2f * size);
 
 		if (is_moving) {
@@ -2147,7 +2165,20 @@ void BIF_manipulator_hover_update(wmWindow *win, ScrArea *sa, ARegion *ar)
 	{
 		const int mval[2] = {win->eventstate->x - ar->winrct.xmin, win->eventstate->y - ar->winrct.ymin};
 
-		if (mval[0] >= 0 && mval[1] >= 0 && mval[0] < ar->winx && mval[1] < ar->winy) {
+		RegionView3D *rv3d = ar->regiondata;
+		wmWindowManager *wm = G_MAIN->wm.first;
+		float center[2];
+		/* the gizmo is ~1.2 * tw_size pixels in radius (view rotation circle), plus the click hotspot */
+		const float reach = (1.3f * (float)U.tw_size + (float)U.tw_hotspot) * U.pixelsize;
+		/* the select pass draws with the current GL context: only for the window being drawn */
+		const bool is_drawable = (wm && wm->windrawable == win);
+		const bool is_near =
+		        (ED_view3d_project_float_global(ar, rv3d->twmat[3], center, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) &&
+		        (len_squared_v2v2(center, (const float[2]){(float)mval[0], (float)mval[1]}) < reach * reach);
+
+		if (is_drawable && is_near &&
+		    mval[0] >= 0 && mval[1] >= 0 && mval[0] < ar->winx && mval[1] < ar->winy)
+		{
 			wmSubWindowSet(win, ar->swinid);
 			/* same hotspot order as BIF_do_manipulator, so the highlight matches the click */
 			val = manipulator_selectbuf(scene, sa, ar, mval, 0.5f * (float)U.tw_hotspot);
