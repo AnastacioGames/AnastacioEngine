@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Linhas da lâmpada: sol e linha até o chão
+
+- `drawlamp`: no sol, a linha de direção deixou de ir até `la->dist` (cruzava a cena) e virou um traço curto,
+  de tamanho constante na tela, que esmaece na ponta; os 4 raios (antes brancos e fixos em 5 unidades) ficam
+  mais curtos, na cor da luz e também esmaecem.
+- Linha até o chão: sólida e translúcida, com um pequeno anel no ponto de contato (era um ponto de 2px).
+- Lâmpadas desenhadas com `GL_LINE_SMOOTH` + blend.
+- Lâmpadas passam a ser desenhadas na passada transparente (`afterdraw_transp`, depois das malhas, com teste
+  de profundidade e sem gravar profundidade): as bordas suavizadas não abrem mais buracos pretos nas malhas
+  desenhadas depois, e malhas na frente continuam cobrindo a lâmpada.
+
 ## 2026-10-03 - Gizmo de transformação: hover e contorno (fase 2)
 
 - Destaque ao passar o mouse: `BIF_manipulator_hover_update` (chamado pelo cursor callback da 3D view a cada

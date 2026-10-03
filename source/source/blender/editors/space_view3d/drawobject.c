@@ -1462,7 +1462,11 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 	const bool drawshadowbox = false;
 #endif
 
-	if ((drawcone || drawshadowbox) && !v3d->transp) {
+	/* lamp lines are drawn after the meshes (transparent pass: depth test, no depth write), so their
+	 * anti-aliased edges don't punch holes in meshes drawn later and meshes in front still hide them */
+	const bool draw_after_meshes = !(G.f & G_PICKSEL) && !(base->flag & OB_FROMDUPLI);
+
+	if ((drawcone || drawshadowbox || draw_after_meshes) && !v3d->transp) {
 		/* in this case we need to draw delayed */
 		ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base, dflag);
 		return;
@@ -1659,32 +1663,37 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 #endif
 	}
 	else if (la->type == LA_SUN) {
-		/* draw the line from the circle along the dist */
+		/* direction: short line from the circle, constant size on screen (like Blender 5) */
+		const float ray_len = (circrad > 0.0f) ? 40.0f * circrad : 2.0f;
+		float col_dir[4];
+
+		glGetFloatv(GL_CURRENT_COLOR, col_dir);
+		setlinestyle(0);
+		glLineWidth(1.5f * U.pixelsize);
 		glBegin(GL_LINES);
 		vec[2] = -circrad;
 		glVertex3fv(vec);
-		vec[2] = -la->dist;
+		glColor4f(col_dir[0], col_dir[1], col_dir[2], 0.0f); /* fades out at the tip */
+		vec[2] = -(circrad + ray_len);
 		glVertex3fv(vec);
 		glEnd();
 
-		glColor3fv(lampcol);
-		/* draw lines dist */
+		/* rays in the light color around the direction line */
 		const int NUM_POINTS = 4;
-		const float TWO_PI = 2.0f * M_PI; // constant to simplify the calculations
-
-		setlinestyle(0);
 		for (int i = 0; i < NUM_POINTS; i++) {
-			// calculate current point position around center
-			float angle = TWO_PI * i / NUM_POINTS;
-			float x = cos(angle) * (circrad * 2);
-			float y = sin(angle) * (circrad * 2);
+			const float angle = 2.0f * (float)M_PI * (float)i / (float)NUM_POINTS;
+			const float x = cosf(angle) * (circrad * 1.5f);
+			const float y = sinf(angle) * (circrad * 1.5f);
 
-			// draw the line from the point to the point at the point of light
 			glBegin(GL_LINES);
-			glVertex3f(vec[0] + x, vec[1] + y, -5);
-			glVertex3f(vec[0] + x, vec[1] + y, 0);
+			glColor4f(lampcol[0], lampcol[1], lampcol[2], 0.9f);
+			glVertex3f(vec[0] + x, vec[1] + y, -circrad);
+			glColor4f(lampcol[0], lampcol[1], lampcol[2], 0.0f);
+			glVertex3f(vec[0] + x, vec[1] + y, -(circrad + 0.75f * ray_len));
 			glEnd();
 		}
+		glColor4fv(col_dir);
+		glLineWidth(U.pixelsize);
 
 #ifdef WITH_GAMEENGINE
 		if (drawshadowbox) {
@@ -1774,19 +1783,30 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 
 	glEnable(GL_BLEND);
 
-	if (vec[2] > 0) vec[2] -= circrad;
-	else vec[2] += circrad;
+	/* solid, translucent line down to the ground, with a small ring where it lands */
+	{
+		float col_gnd[4];
+		glGetFloatv(GL_CURRENT_COLOR, col_gnd);
+		glColor4f(col_gnd[0], col_gnd[1], col_gnd[2], 0.55f);
 
-	glBegin(GL_LINES);
-	glVertex3fv(vec);
-	vec[2] = 0;
-	glVertex3fv(vec);
-	glEnd();
+		if (vec[2] > 0) vec[2] -= circrad;
+		else vec[2] += circrad;
 
-	glPointSize(2.0);
-	glBegin(GL_POINTS);
-	glVertex3fv(vec);
-	glEnd();
+		glBegin(GL_LINES);
+		glVertex3fv(vec);
+		vec[2] = 0;
+		glVertex3fv(vec);
+		glEnd();
+
+		const float ring = (circrad > 0.0f) ? 0.5f * circrad : 0.05f;
+		glBegin(GL_LINE_LOOP);
+		for (int a = 0; a < 24; a++) {
+			const float ang = 2.0f * (float)M_PI * (float)a / 24.0f;
+			glVertex3f(vec[0] + ring * cosf(ang), vec[1] + ring * sinf(ang), 0.0f);
+		}
+		glEnd();
+		glColor4fv(col_gnd);
+	}
 
 	glDisable(GL_BLEND);
 
@@ -8066,7 +8086,13 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 				break;
 			case OB_LAMP:
 				if (!render_override) {
+					/* smooth, blended lines for the lamp overlay */
+					glEnable(GL_LINE_SMOOTH);
+					glEnable(GL_BLEND);
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 					drawlamp(bmain, scene, v3d, rv3d, base, dt, dflag, ob_wire_col, is_obact);
+					glDisable(GL_BLEND);
+					glDisable(GL_LINE_SMOOTH);
 				}
 				break;
 			case OB_CAMERA:
