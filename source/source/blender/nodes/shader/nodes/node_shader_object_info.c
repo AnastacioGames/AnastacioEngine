@@ -49,7 +49,8 @@ void register_node_type_sh_object_info(void)
 	static bNodeType ntype;
 
 	sh_node_type_base(&ntype, SH_NODE_OBJECT_INFO, "Object Info", NODE_CLASS_INPUT, 0);
-	node_type_compatibility(&ntype, NODE_NEW_SHADING);
+	/* Also in Blender Internal materials: the game binds the object matrix and info for both. */
+	node_type_compatibility(&ntype, NODE_OLD_SHADING | NODE_NEW_SHADING);
 	node_type_socket_templates(&ntype, NULL, sh_node_object_info_out);
 	node_type_init(&ntype, NULL);
 	node_type_storage(&ntype, "", NULL, NULL);

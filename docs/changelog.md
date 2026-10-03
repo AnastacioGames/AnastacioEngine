@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Nó Object Info também em materiais Blender Internal
+
+- `node_shader_object_info.c`: compatível com `NODE_OLD_SHADING | NODE_NEW_SHADING`. Antes só Cycles; em material
+  BI o nó era pulado (saídas zero) e o runtime avisava "nodes not supported in the game: Object Info" (visto em
+  5 materiais de efeito do RolimaRacer). O jogo já enviava matriz e info do objeto (`UpdateObjectMatrix`).
+- Testado: cena BI com Location → Color, cubo em (2, 0, 1) magenta, em (−2, 0, 0) preto.
+- Medição do RolimaRacer: Pista_1 21,3 s de shaders com o cache do driver frio (1ª execução após build) e
+  0,82 s na segunda; a variação entre rodadas vem desse cache.
+
 ## 2026-10-03 - LibLoad assíncrono: orçamento por frame configurável (`setLibLoadFrameBudget`)
 
 - `Range.logic.setLibLoadFrameBudget([ms])` (`BL_Converter::SetMergeFrameBudget`): tempo por frame do merge
