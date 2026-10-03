@@ -54,9 +54,20 @@ class VIEW3D_HT_header(Header):
 
         # Object name field, placed right after the Object Mode dropdown so
         # the header reads: menus -> mode -> name -> layers -> lock icon.
-        if obj and object_mode != 'EDIT':
+        if obj:
             layout.label(text="", icon='OBJECT_DATA')
             layout.prop(obj, "name", text="")
+
+            # Edit Mode: name of the data being edited (mesh, curve...) beside it.
+            if object_mode == 'EDIT' and obj.data:
+                data_icons = {
+                    'MESH': 'MESH_DATA', 'CURVE': 'CURVE_DATA', 'SURFACE': 'SURFACE_DATA',
+                    'FONT': 'FONT_DATA', 'META': 'META_DATA', 'ARMATURE': 'ARMATURE_DATA',
+                    'LATTICE': 'LATTICE_DATA',
+                }
+                row = layout.row()
+                row.label(text="", icon=data_icons.get(obj.type, 'OBJECT_DATA'))
+                row.prop(obj.data, "name", text="")
 
             # Pose Mode: active bone name right after the armature name.
             if object_mode == 'POSE' and obj.type == 'ARMATURE':
