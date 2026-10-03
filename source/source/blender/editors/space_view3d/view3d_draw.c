@@ -777,7 +777,34 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 	}
 }
 
-/* Draw the compact navigation gizmo used by the newer Range editor.
+static void view_axis_disc(float x, float y, float radius, const uchar col[4], bool outline)
+{
+	const int segments = 32;
+
+	glColor4ubv(col);
+	glBegin(GL_TRIANGLE_FAN);
+	glVertex2f(x, y);
+	for (int i = 0; i <= segments; i++) {
+		const float ang = 2.0f * (float)M_PI * (float)i / (float)segments;
+		glVertex2f(x + cosf(ang) * radius, y + sinf(ang) * radius);
+	}
+	glEnd();
+
+	/* anti-aliased rim: smooths the polygon edge (and draws the ring of negative axes) */
+	if (!outline) {
+		glColor4ub(col[0], col[1], col[2], 255);
+	}
+	glBegin(GL_LINE_LOOP);
+	for (int i = 0; i < segments; i++) {
+		const float ang = 2.0f * (float)M_PI * (float)i / (float)segments;
+		glVertex2f(x + cosf(ang) * radius, y + sinf(ang) * radius);
+	}
+	glEnd();
+}
+
+/* Draw the compact navigation gizmo used by the newer Range editor, styled after Blender 5:
+ * a colored disc with its letter on each positive axis end, a faded ring on each negative end,
+ * and lines from the center to the positive discs, all sorted back to front.
  *
  * It deliberately stays in the legacy OpenGL overlay path: this editor still
  * uses the Blender 2.79 drawing API, so importing a modern Blender gizmo would
@@ -785,93 +812,81 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 {
 	const float k = U.rvisize * U.pixelsize;
-	const float axis_length = k * 1.05f;
-	const float cube_radius = max_ff(7.0f, k * 0.22f);
+	const float axis_length = k * 0.95f;
+	const float disc_radius = max_ff(7.0f * U.pixelsize, k * 0.24f);
 	const float startx = rect->xmax - (k * 1.15f + UI_UNIT_X);
 	const float starty = rect->ymax - (k * 1.15f + UI_UNIT_Y);
+	/* Blender 5 default theme axis colors */
 	const uchar axis_col[3][3] = {
-		{239, 66, 72}, {157, 220, 27}, {25, 174, 239}
-	};
-	const int cube_faces[6][4] = {
-		{0, 1, 3, 2}, {4, 6, 7, 5}, {0, 4, 5, 1},
-		{2, 3, 7, 6}, {0, 2, 6, 4}, {1, 5, 7, 3}
-	};
-	const int cube_edges[12][2] = {
-		{0, 1}, {1, 3}, {3, 2}, {2, 0}, {4, 5}, {5, 7},
-		{7, 6}, {6, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}
+		{255, 51, 82}, {139, 220, 0}, {40, 144, 255}
 	};
 	float axis_vec[3][3];
-	float cube[8][2];
-	int axis_order[3] = {0, 1, 2};
+	/* the six ends: index = axis * 2 + (negative ? 1 : 0) */
+	int order[6] = {0, 1, 2, 3, 4, 5};
+	float depth[6];
 
 	for (int i = 0; i < 3; i++) {
 		zero_v3(axis_vec[i]);
 		axis_vec[i][i] = 1.0f;
 		mul_qt_v3(rv3d->viewquat, axis_vec[i]);
+		depth[i * 2] = axis_vec[i][2];
+		depth[i * 2 + 1] = -axis_vec[i][2];
 	}
 
-	for (int i = 0; i < 8; i++) {
-		float corner[3] = {
-			(i & 1) ? 1.0f : -1.0f,
-			(i & 2) ? 1.0f : -1.0f,
-			(i & 4) ? 1.0f : -1.0f
-		};
-		mul_qt_v3(rv3d->viewquat, corner);
-		cube[i][0] = startx + corner[0] * cube_radius;
-		cube[i][1] = starty + corner[1] * cube_radius;
+	/* back to front (lowest view-space z first) */
+	for (int i = 1; i < 6; i++) {
+		for (int j = i; j > 0 && depth[order[j]] < depth[order[j - 1]]; j--) {
+			SWAP(int, order[j], order[j - 1]);
+		}
 	}
 
-	axis_sort_v3(rv3d->viewinv[2], axis_order);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_LINE_SMOOTH);
 
-	/* The transparent cube anchors the six axis targets without obscuring the scene. */
-	for (int face = 0; face < 6; face++) {
-		glColor4ub(123, 173, 205, 72);
-		glBegin(GL_QUADS);
-		for (int vertex = 0; vertex < 4; vertex++) {
-			const float *co = cube[cube_faces[face][vertex]];
-			glVertex2fv(co);
+	for (int n = 0; n < 6; n++) {
+		const int end = order[n];
+		const int axis = end / 2;
+		const bool negative = (end & 1) != 0;
+		const float sign = negative ? -1.0f : 1.0f;
+		const float x = startx + axis_vec[axis][0] * axis_length * sign;
+		const float y = starty + axis_vec[axis][1] * axis_length * sign;
+		/* ends pointing away from the viewer are slightly dimmer */
+		const float fade = 0.75f + 0.25f * (depth[end] * 0.5f + 0.5f);
+		uchar col[4] = {
+			(uchar)(axis_col[axis][0] * fade),
+			(uchar)(axis_col[axis][1] * fade),
+			(uchar)(axis_col[axis][2] * fade),
+			255
+		};
+
+		if (negative) {
+			uchar fill[4] = {col[0], col[1], col[2], 70};
+			glLineWidth(1.5f * U.pixelsize);
+			view_axis_disc(x, y, disc_radius * 0.85f, fill, false);
 		}
-		glEnd();
-	}
+		else {
+			const char axis_text[2] = {'X' + axis, '\0'};
 
-	glLineWidth(1.0f);
-	glColor4ub(68, 111, 139, 190);
-	glBegin(GL_LINES);
-	for (int edge = 0; edge < 12; edge++) {
-		glVertex2fv(cube[cube_edges[edge][0]]);
-		glVertex2fv(cube[cube_edges[edge][1]]);
-	}
-	glEnd();
-
-	/* Fine spokes preserve the axis relationship when the targets are spaced apart. */
-	glLineWidth(1.5f);
-	glBegin(GL_LINES);
-	for (int order = 0; order < 3; order++) {
-		const int axis = axis_order[order];
-		for (int sign = -1; sign <= 1; sign += 2) {
-			glColor4ub(axis_col[axis][0], axis_col[axis][1], axis_col[axis][2],
-			           (sign > 0) ? 210 : 90);
+			glLineWidth(2.0f * U.pixelsize);
+			glColor4ubv(col);
+			glBegin(GL_LINES);
 			glVertex2f(startx, starty);
-			glVertex2f(startx + axis_vec[axis][0] * axis_length * sign,
-			           starty + axis_vec[axis][1] * axis_length * sign);
+			glVertex2f(x, y);
+			glEnd();
+
+			glLineWidth(1.0f);
+			view_axis_disc(x, y, disc_radius, col, true);
+
+			glColor4ub(20, 20, 20, 255);
+			BLF_draw_default_ascii(x - BLF_width_default(axis_text, 1) * 0.5f,
+			                       y - 4.0f * U.pixelsize, 0.0f, axis_text, 1);
+			glEnable(GL_BLEND); /* BLF changes the OpenGL blend state. */
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 	}
-	glEnd();
 
-	/* Label the positive ends; the axis lines themselves replace the colored targets. */
-	for (int order = 0; order < 3; order++) {
-		const int axis = axis_order[order];
-		const float x = startx + axis_vec[axis][0] * axis_length;
-		const float y = starty + axis_vec[axis][1] * axis_length;
-		const char axis_text[2] = {'X' + axis, '\0'};
-
-		glColor4ub(96, 96, 96, 255);
-		BLF_draw_default_ascii(x - 3.5f, y - 4.0f, 0.0f, axis_text, 1);
-		glEnable(GL_BLEND); /* BLF changes the OpenGL blend state. */
-	}
-
+	glDisable(GL_LINE_SMOOTH);
 	glLineWidth(1.0f);
 	glDisable(GL_BLEND);
 }

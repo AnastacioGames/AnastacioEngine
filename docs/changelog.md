@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Widget de navegação da 3D View no estilo do Blender 5
+
+- `draw_view_axis` (`view3d_draw.c`): saiu o cubo translúcido. Cada eixo positivo termina numa bolinha cheia
+  na cor do eixo (cores padrão do Blender 5) com a letra dentro e linha do centro até ela; o negativo é um
+  anel translúcido. Ordenado de trás para frente, pontas afastadas um pouco mais escuras, linhas suaves e
+  escaladas por DPI. Continua só indicativo (sem clique/hover).
+- Revertida a coloração dos eixos de objeto (Display → Axis) em `drawobject.c`, que entrou por engano no
+  commit 250ae0ce.
+
 ## 2026-10-03 - Edição proporcional: distâncias com KD-tree e Random estável
 
 - `set_prop_dist` (`transform_conversions.c`): o vizinho selecionado mais próximo de cada elemento não
