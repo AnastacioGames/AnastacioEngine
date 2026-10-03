@@ -515,7 +515,7 @@ void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 	float v2[3] = {0.0, 0.0, 0.0};
 	float v3[3] = {0.0, 0.0, 0.0};
 
-	glLineWidth(1);
+	glLineWidth(U.pixelsize);
 
 	switch (drawtype) {
 
@@ -6946,13 +6946,13 @@ static void draw_empty_sphere(float size)
 
 		qobj = gluNewQuadric();
 		gluQuadricDrawStyle(qobj, GLU_SILHOUETTE);
-		gluDisk(qobj, 0.0,  1, 16, 1);
+		gluDisk(qobj, 0.0,  1, 48, 1);
 
 		glRotatef(90, 0, 1, 0);
-		gluDisk(qobj, 0.0,  1, 16, 1);
+		gluDisk(qobj, 0.0,  1, 48, 1);
 
 		glRotatef(90, 1, 0, 0);
-		gluDisk(qobj, 0.0,  1, 16, 1);
+		gluDisk(qobj, 0.0,  1, 48, 1);
 
 		gluDeleteQuadric(qobj);
 
@@ -7056,12 +7056,11 @@ static void drawcircle_size(float size)
 {
 	glBegin(GL_LINE_LOOP);
 
-	/* coordinates are: cos(degrees * 11.25) = x, sin(degrees * 11.25) = y, 0.0f = z */
-	for (short degrees = 0; degrees < CIRCLE_RESOL; degrees++) {
-		float x = cosval[degrees];
-		float y = sinval[degrees];
+	/* 64 segments: smoother than the CIRCLE_RESOL tables */
+	for (int a = 0; a < 64; a++) {
+		const float ang = 2.0f * (float)M_PI * (float)a / 64.0f;
 
-		glVertex3f(x * size, 0.0f, y * size);
+		glVertex3f(cosf(ang) * size, 0.0f, sinf(ang) * size);
 	}
 
 	glEnd();
@@ -8079,8 +8078,23 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 					if (ob->empty_drawtype == OB_EMPTY_IMAGE) {
 						draw_empty_image(ob, dflag, ob_wire_col, v3d->multiview_eye);
 					}
+					else if (!v3d->transp && !(G.f & G_PICKSEL) && !(base->flag & OB_FROMDUPLI)) {
+						/* like lamps: draw the lines after the meshes (transparent pass), so their
+						 * anti-aliased edges don't punch dark holes in meshes drawn later */
+						ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base, dflag);
+					}
 					else {
+						const bool smooth = !(G.f & G_PICKSEL);
+						if (smooth) {
+							glEnable(GL_LINE_SMOOTH);
+							glEnable(GL_BLEND);
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						}
 						drawaxes(rv3d->viewmatob, ob->empty_drawsize, ob->empty_drawtype);
+						if (smooth) {
+							glDisable(GL_BLEND);
+							glDisable(GL_LINE_SMOOTH);
+						}
 					}
 				}
 				break;
