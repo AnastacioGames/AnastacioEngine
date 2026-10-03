@@ -79,6 +79,7 @@ void BKE_camera_gamefx_init(CameraGameFX *fx)
 	fx->vignette_strength = 0.4f;
 	fx->vignette_radius = 0.75f;
 	fx->fisheye_strength = 0.0f;
+	fx->grain_strength = 0.035f;
 	fx->shake_amplitude = 0.02f;
 	fx->shake_frequency = 15.0f;
 	fx->shake_decay = 1.5f;

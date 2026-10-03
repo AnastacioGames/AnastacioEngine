@@ -50,7 +50,8 @@ No máximo dois passes de filtro 2D, reservados logo depois do Lens Flare:
   - Directional Blur na direção em que a câmera gira;
   - Protect Focus, que deixa a faixa de foco (o carro) fora dos dois borrões;
   - aberração cromática;
-  - vinheta e olho de peixe.
+  - vinheta e olho de peixe;
+  - grão de filme (Film Grain), animado e mais forte nos tons médios.
 
 Cada passe só existe enquanto um efeito dele estiver ligado. Com tudo desligado, não há nenhum passe.
 O shader compila só quando o passe aparece; ligar ou desligar outro efeito do mesmo passe não recompila nada.
@@ -85,20 +86,17 @@ World (Weather > Earthquake), sem um anular o outro.
 | `trackMode` | int 0..2 | 0 Off, 1 Look At, 2 Drone |
 | `trackSpeed`, `trackLimit`, `trackDeadzone`, `trackScreenOffset`, `droneAmplitude`, `droneFrequency`, `trackBank`, `useTrackUpLock` | | Rastreio |
 | `trackOrientation` | Matrix, RO | Orientação desenhada (base + rastreio + rolagem do tremor) |
-| `useDof`, `useSpeedBlur`, `useDirectionalBlur`, `useBlurProtect`, `useCatEye`, `useChromatic`, `useChromaticSpeed`, `useVignette` | bool | Liga/desliga cada efeito |
-| `dofQuality` (0..2), `dofBlur`, `speedBlurStrength`, `speedBlurMaxSpeed`, `directionalBlurStrength`, `directionalBlurMax`, `catEyeStrength`, `chromaticStrength`, `vignetteStrength`, `vignetteRadius`, `fisheyeStrength` | | Parâmetros |
+| `useDof`, `useSpeedBlur`, `useDirectionalBlur`, `useBlurProtect`, `useCatEye`, `useChromatic`, `useChromaticSpeed`, `useVignette`, `useGrain` | bool | Liga/desliga cada efeito |
+| `dofQuality` (0..2), `dofBlur`, `speedBlurStrength`, `speedBlurMaxSpeed`, `directionalBlurStrength`, `directionalBlurMax`, `catEyeStrength`, `chromaticStrength`, `vignetteStrength`, `vignetteRadius`, `fisheyeStrength`, `grainStrength` (0..1) | | Parâmetros |
 | `cameraSpeed` | float, RO | Velocidade da câmera desenhada (m/s, suavizada) |
 | `speedOverride` | float | ≥ 0 substitui `cameraSpeed` no Speed Blur e na aberração; -1 volta ao automático |
 | `shakeAmplitude`, `shakeFrequency`, `shakeDecay`, `useShakeRoll` | | Tremor |
 | `shakeTrauma` | float, RO | Trauma atual |
 | `shake(trauma, duration=0.0)` | método | Soma tremor |
 
-## Migração do Rolima Racer (sem mudar o jogo agora)
+## Migração do Rolima Racer (feita em 2026-10-03)
 
-- `BokehDoF.py`: trocar por `useDof` + `focusMode = 2` e `focusProperty` numa propriedade do carro do
-  jogador, no lugar da busca por `player_1_2_PC`.
-- `SpeedBlurFX.py`: `useSpeedBlur`. O centro já é o carro (ponto de foco), não o meio da tela.
-  Para usar a velocidade do carro em vez da velocidade da câmera, use `speedOverride`.
-- `DirectionalBlurFX.py`: `useDirectionalBlur`, com a direção vinda do giro da câmera.
-- `update_drone_movement` (`camera_change.py`): `trackMode = 2`.
-- Efeitos que usam `u_carDistance` (CarDustTrail, CarFireAura, CarShockAura) podem ler `cam.focusDistance`.
+O componente `scripts/camera_system/NativeCameraFX.py` do jogo substituiu `SpeedBlurFX`, `DirectionalBlurFX`,
+`BokehDoF` e `NoiseFilterFX` nos empties de câmera. Ele liga os efeitos nativos na câmera ativa a partir
+das opções do menu (`graphicsMotionBlur`, `graphicsNitroBlur`, `graphicsSlowmoDoF`, `graphicsNoiseFilter`).
+O drone (`camera_change.py`) e o tremor (`camera_shake.py`) continuam em Python.

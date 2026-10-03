@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Camera FX: grão de filme nativo e Rolima Racer migrado
+
+- Novo efeito **Film Grain** no passe Lens da câmera (`useGrain`, `grainStrength`; DNA `grain_strength` no lugar do `pad`, flag `CAM_GFX_GRAIN`). Substitui o `NoiseFilterFX.py` do jogo.
+- `KX_RenderPipeline::PostRenderScene`: a posição do sol para Lens Flare/Light Scatter não lê mais a câmera ativa quando ela é nula (crash `NodeGetWorldOrientation` visto uma vez na contagem).
+
 ## 2026-10-03 - Carregamento assíncrono: materiais compilados com o mundo da cena certa (tom ciano)
 
 - Sintoma (RolimaRacer, `addScene("Pista_1", 0, asynchronous=True)` com a tela de Loading na frente): toda a pista

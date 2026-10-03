@@ -611,8 +611,9 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 	float sunPos[2] = {0.5f, 0.0f};
 	if (scene->GetUseLightScatter() || flareFilter) {
 		KX_LightObject *world_sun = scene->GetWorldSun();
-		if (world_sun) {
-			KX_Camera *cam = scene->GetActiveCamera();
+		KX_Camera *cam = scene->GetActiveCamera();
+		// No active camera (scene still loading or camera removed): skip the sun position.
+		if (world_sun && cam) {
 
 			// Direction toward the sun: the lamp's +Z, the same axis the sky shader draws the sun disc on
 			// (KX_WorldInfo copies it to world_sun->obmat[2]). -Z is where the light travels, away from it.

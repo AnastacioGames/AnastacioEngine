@@ -17,7 +17,7 @@ uniform float bgl_RenderedTextureHeight;
 // [2] speed blur, focus x, focus y (bottom-up), protect
 // [3] turn x, turn y (screen fraction), unused, unused
 // [4] chromatic, vignette, vignette radius, fisheye
-// [5] blades, unused, unused, unused
+// [5] blades, grain strength, grain seed, unused
 uniform vec4 ge_CameraFX[6];
 
 float linearDepth(vec2 uv)
@@ -105,6 +105,16 @@ void main()
 		float d = length(v * 2.0) * 0.7071;
 		float shade = smoothstep(radius, radius - 0.5, d);
 		color *= mix(1.0, shade, vignette);
+	}
+
+	// Film grain, stronger on the mid tones.
+	float grain = ge_CameraFX[5].y;
+	if (grain > 0.0) {
+		vec2 seed = uv + vec2(ge_CameraFX[5].z * 0.05, ge_CameraFX[5].z * 0.03);
+		float n = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+		float luma = dot(color, vec3(0.299, 0.587, 0.114));
+		float lumaMask = 1.0 - pow(abs(luma - 0.5) * 2.0, 2.0);
+		color += n * grain * (0.5 + 0.5 * lumaMask);
 	}
 
 	// Outside the distorted frame.

@@ -92,7 +92,7 @@ typedef struct CameraGameFX {
 	float shake_amplitude;
 	float shake_frequency;
 	float shake_decay;    /* trauma lost per second */
-	float pad;
+	float grain_strength; /* CAM_GFX_GRAIN: animated film grain */
 } CameraGameFX;
 
 typedef struct Camera {
@@ -211,6 +211,7 @@ enum {
 	CAM_GFX_SHAKE_ROLL      = (1 << 7),
 	CAM_GFX_TRACK_UPLOCK    = (1 << 8),
 	CAM_GFX_BLUR_PROTECT    = (1 << 9),
+	CAM_GFX_GRAIN           = (1 << 10),
 };
 
 /* Sensor fit */

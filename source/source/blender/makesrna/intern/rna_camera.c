@@ -351,6 +351,8 @@ static void rna_def_camera_game_fx(BlenderRNA *brna)
 	GFX_FLOAT("vignette_radius", "vignette_radius", 0.0f, 2.0f, 0.0f, 1.5f, "Radius", "");
 	GFX_FLOAT("fisheye_strength", "fisheye_strength", -1.0f, 1.0f, -0.5f, 0.5f, "Fisheye",
 	          "Barrel (positive) or pincushion (negative) distortion");
+	GFX_FLAG("use_grain", CAM_GFX_GRAIN, "Film Grain", "Animated noise, stronger on the mid tones");
+	GFX_FLOAT("grain_strength", "grain_strength", 0.0f, 1.0f, 0.0f, 0.2f, "Grain", "");
 
 	/* Shake */
 	GFX_FLOAT("shake_amplitude", "shake_amplitude", 0.0f, 0.5f, 0.0f, 0.1f, "Shake Amplitude",

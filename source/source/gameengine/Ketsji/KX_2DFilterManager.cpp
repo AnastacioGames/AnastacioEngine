@@ -377,7 +377,8 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		const bool chroma = (gfx.flag & CAM_GFX_CHROMA) && gfx.chromaStrength > 0.0f;
 		const bool vignette = (gfx.flag & CAM_GFX_VIGNETTE) &&
 		                      (gfx.vignetteStrength > 0.0f || gfx.fisheyeStrength != 0.0f);
-		useLens = speedBlur || dirBlur || chroma || vignette;
+		const bool grain = (gfx.flag & CAM_GFX_GRAIN) && gfx.grainStrength > 0.0f;
+		useLens = speedBlur || dirBlur || chroma || vignette || grain;
 
 		static const float rings[3] = {2.0f, 3.0f, 5.0f};
 		const RAS_CameraData *data = camera->GetCameraData();
@@ -412,6 +413,13 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		fx[18] = gfx.vignetteRadius;
 		fx[19] = vignette ? gfx.fisheyeStrength : 0.0f;
 		fx[20] = (float)gfx.numBlades;
+		if (grain) {
+			// Grain seed; changes every frame, kept small for float precision.
+			static unsigned int grainFrame = 0;
+			grainFrame = (grainFrame + 1) % 1000;
+			fx[21] = gfx.grainStrength;
+			fx[22] = (float)grainFrame * 0.05f;
+		}
 	}
 
 	RAS_2DFilter *dof = GetFilterPass(FILTERPASS_CAMERA_DOF, true);
