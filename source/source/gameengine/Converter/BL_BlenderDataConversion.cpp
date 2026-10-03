@@ -175,6 +175,7 @@ extern "C" {
 #include "MEM_guardedalloc.h"
 
 #include "BKE_main.h"
+#include "BKE_image.h"
 #include "BKE_global.h"
 #include "BKE_object.h"
 extern "C" {
@@ -2790,6 +2791,53 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	logicbrick_conversionlist->Release();
 }
 
+static void BL_CollectNodeImages(bNodeTree *ntree, std::vector<Image *>& images, std::vector<bNodeTree *>& visited)
+{
+	if (!ntree || std::find(visited.begin(), visited.end(), ntree) != visited.end()) {
+		return;
+	}
+	visited.push_back(ntree);
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (!node->id) {
+			continue;
+		}
+		if (GS(node->id->name) == ID_IM) {
+			images.push_back((Image *)node->id);
+		}
+		else if (GS(node->id->name) == ID_TE && ((Tex *)node->id)->ima) {
+			images.push_back(((Tex *)node->id)->ima);
+		}
+		else if (GS(node->id->name) == ID_NT) {
+			BL_CollectNodeImages((bNodeTree *)node->id, images, visited);
+		}
+	}
+}
+
+/// Decodes the images of the materials in parallel (BKE_image_prefetch); see the texture loop below.
+static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& materials)
+{
+	if (getenv("RANGE_NO_IMAGE_PREFETCH")) {
+		return;
+	}
+	std::vector<Image *> images;
+	std::vector<bNodeTree *> visited;
+	for (KX_BlenderMaterial *kxmat : materials) {
+		Material *ma = kxmat->GetBlenderMaterial();
+		if (!ma) {
+			continue;
+		}
+		for (unsigned short i = 0; i < MAX_MTEX; ++i) {
+			if (ma->mtex[i] && ma->mtex[i]->tex && ma->mtex[i]->tex->type == TEX_IMAGE && ma->mtex[i]->tex->ima) {
+				images.push_back(ma->mtex[i]->tex->ima);
+			}
+		}
+		if (ma->use_nodes) {
+			BL_CollectNodeImages(ma->nodetree, images, visited);
+		}
+	}
+	BKE_image_prefetch(images.data(), (int)images.size());
+}
+
 void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sceneconverter)
 {
 	const std::vector<KX_GameObject *>& sumolist = sceneconverter.GetObjects();
@@ -2821,10 +2869,12 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		}
 	}
 
-	// Init textures for all materials.
+	// Init textures for all materials. Their images are decoded in parallel first, the GPU upload stays serial.
+	BL_PrefetchMaterialImages(sceneconverter.GetMaterials());
 	for (KX_BlenderMaterial *mat : sceneconverter.GetMaterials()) {
 		mat->InitTextures();
 	}
+	BKE_image_prefetch_clear();
 
 	// Look at every material texture and ask to create realtime map.
 	for (KX_GameObject *gameobj : sumolist) {

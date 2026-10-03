@@ -25,6 +25,8 @@ Aberto:
 - Etapa 4 parcial (2026-10-03, sem formato novo): normais/tangentes e BVH de física compartilhadas entre malhas
   de conteúdo igual (800 esferas: conversão 2,9 s → 0,8 s). Malhas únicas ainda calculam tudo; guardar pronto
   exigiria o `.cooked`.
+- Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
+  serial na GPU; DDS no `.cooked` cortaria ambos.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Carregamento: imagens das texturas decodificadas em paralelo
+
+- Medição (80 PNG 2048², `[Load]` + cronômetros temporários): a etapa de texturas levava 2,2 s, sendo ~1,9 s
+  de decodificação do PNG e ~0,6 s de upload. Mipmaps já eram gerados na GPU (`U.use_gpu_mipmap`).
+- A decodificação era serial porque `BKE_image_acquire_ibuf` segura o spin lock global de imagem durante a
+  leitura. Novo `BKE_image_prefetch` (`image.c`) decodifica em paralelo (`BLI_task_parallel_range`) com as
+  mesmas flags, colorspace e fonte (arquivo ou packed) de `load_image_single`, que depois só pega o buffer
+  pronto; o resto do caminho (alpha, fonte bitmap, autopack, upload) não muda. Só imagens de arquivo simples,
+  não multiview e ainda não carregadas.
+- `BL_PostConvertBlenderObjects` junta as imagens dos materiais (texture slots e nós, inclusive grupos) antes
+  de `InitTextures`; vale para a cena inicial e para o LibLoad. `RANGE_NO_IMAGE_PREFETCH=1` desliga.
+- Resultado: texturas 2,18 s → 0,69 s; captura de tela idêntica (diferença zero) com e sem.
+
 ## 2026-10-03 - Carregamento: normais/tangentes e BVH de física compartilhadas entre malhas iguais
 
 - Etapa 4 do plano "Cozinhar" sem formato novo. Cópias Shift+D são Mesh separadas com dados idênticos, então o

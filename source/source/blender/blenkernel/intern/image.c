@@ -58,6 +58,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math_vector.h"
 #include "BLI_mempool.h"
+#include "BLI_task.h"
 #include "BLI_threads.h"
 #include "BLI_timecode.h"  /* for stamp timecode format */
 #include "BLI_utildefines.h"
@@ -3475,6 +3476,98 @@ static ImBuf *image_load_movie_file(Image *ima, ImageUser *iuser, int frame)
 	return ibuf;
 }
 
+/* Images decoded ahead of time by BKE_image_prefetch(), consumed (and cleared) by load_image_single(). */
+typedef struct ImagePrefetch {
+	Image *ima;
+	ImBuf *ibuf;
+} ImagePrefetch;
+
+static ImagePrefetch *image_prefetch = NULL;
+static int image_prefetch_len = 0;
+
+static bool image_prefetch_supported(Image *ima)
+{
+	return (ima->source == IMA_SRC_FILE && ima->type == IMA_TYPE_IMAGE && !BKE_image_is_multiview(ima) &&
+	        !BKE_image_has_loaded_ibuf(ima) && !(ima->ok == 0));
+}
+
+static ImBuf *image_prefetch_take(Image *ima)
+{
+	for (int i = 0; i < image_prefetch_len; i++) {
+		if (image_prefetch[i].ima == ima) {
+			ImBuf *ibuf = image_prefetch[i].ibuf;
+			image_prefetch[i].ima = NULL;
+			image_prefetch[i].ibuf = NULL;
+			return ibuf;
+		}
+	}
+	return NULL;
+}
+
+static void image_prefetch_decode(void *__restrict userdata, const int i, const ParallelRangeTLS *__restrict UNUSED(tls))
+{
+	ImagePrefetch *item = &((ImagePrefetch *)userdata)[i];
+	Image *ima = item->ima;
+	const ImagePackedFile *imapf = ima->packedfiles.first;
+
+	/* Same flags and sources as load_image_single(), only the decoding runs here. */
+	if (imapf) {
+		if (imapf->packedfile) {
+			item->ibuf = IMB_ibImageFromMemory(
+			        (unsigned char *)imapf->packedfile->data, imapf->packedfile->size,
+			        IB_rect | IB_multilayer | imbuf_alpha_flags_for_image(ima),
+			        ima->colorspace_settings.name, "<packed data>");
+		}
+	}
+	else {
+		char filepath[FILE_MAX];
+		ImageUser iuser_t = {NULL};
+		iuser_t.framenr = ima->lastframe;
+		BKE_image_user_file_path(&iuser_t, ima, filepath);
+		item->ibuf = IMB_loadiffname(filepath, IB_rect | IB_multilayer | IB_metadata | imbuf_alpha_flags_for_image(ima),
+		                             ima->colorspace_settings.name);
+	}
+}
+
+void BKE_image_prefetch(Image **images, int count)
+{
+	BKE_image_prefetch_clear();
+
+	image_prefetch = MEM_callocN(sizeof(ImagePrefetch) * max_ii(count, 1), __func__);
+	for (int i = 0; i < count; i++) {
+		Image *ima = images[i];
+		bool duplicate = false;
+		for (int j = 0; j < image_prefetch_len; j++) {
+			duplicate |= (image_prefetch[j].ima == ima);
+		}
+		const int totpacked = BLI_listbase_count(&ima->packedfiles);
+		if (!duplicate && image_prefetch_supported(ima) && totpacked <= 1) {
+			image_prefetch[image_prefetch_len++].ima = ima;
+		}
+	}
+
+	if (image_prefetch_len > 1) {
+		ParallelRangeSettings settings;
+		BLI_parallel_range_settings_defaults(&settings);
+		settings.min_iter_per_thread = 1;
+		BLI_task_parallel_range(0, image_prefetch_len, image_prefetch, image_prefetch_decode, &settings);
+	}
+	else {
+		image_prefetch_len = 0;
+	}
+}
+
+void BKE_image_prefetch_clear(void)
+{
+	for (int i = 0; i < image_prefetch_len; i++) {
+		if (image_prefetch[i].ibuf) {
+			IMB_freeImBuf(image_prefetch[i].ibuf);
+		}
+	}
+	MEM_SAFE_FREE(image_prefetch);
+	image_prefetch_len = 0;
+}
+
 static ImBuf *load_image_single(
         Image *ima, ImageUser *iuser, int cfra,
         const int view_id,
@@ -3493,7 +3586,10 @@ static ImBuf *load_image_single(
 		flag |= imbuf_alpha_flags_for_image(ima);
 
 		imapf = BLI_findlink(&ima->packedfiles, view_id);
-		if (imapf->packedfile) {
+		if (view_id == 0 && (ibuf = image_prefetch_take(ima))) {
+			/* Decoded by BKE_image_prefetch(). */
+		}
+		else if (imapf->packedfile) {
 			ibuf = IMB_ibImageFromMemory(
 			       (unsigned char *)imapf->packedfile->data, imapf->packedfile->size, flag,
 			       ima->colorspace_settings.name, "<packed data>");
@@ -3518,7 +3614,9 @@ static ImBuf *load_image_single(
 		BKE_image_user_file_path(&iuser_t, ima, filepath);
 
 		/* read ibuf */
-		ibuf = IMB_loadiffname(filepath, flag, ima->colorspace_settings.name);
+		if (!(view_id == 0 && (ibuf = image_prefetch_take(ima)))) {
+			ibuf = IMB_loadiffname(filepath, flag, ima->colorspace_settings.name);
+		}
 	}
 
 	if (ibuf) {

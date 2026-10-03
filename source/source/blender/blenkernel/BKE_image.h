@@ -287,6 +287,9 @@ bool BKE_image_is_animated(struct Image *image);
 bool BKE_image_is_dirty(struct Image *image);
 void BKE_image_file_format_set(struct Image *image, int ftype, const struct ImbFormatOptions *options);
 bool BKE_image_has_loaded_ibuf(struct Image *image);
+/* Decode several images in parallel ahead of use; the next acquire of each one takes the decoded buffer. */
+void BKE_image_prefetch(struct Image **images, int count);
+void BKE_image_prefetch_clear(void);
 struct ImBuf *BKE_image_get_ibuf_with_name(struct Image *image, const char *name);
 struct ImBuf *BKE_image_get_first_ibuf(struct Image *image);
 #ifdef __cplusplus

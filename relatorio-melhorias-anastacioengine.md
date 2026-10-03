@@ -52,6 +52,8 @@ ferramenta correspondente.
   imagem idêntica); `RANGE_NO_GLSL_STRIP=1` envia a biblioteca inteira para comparação.
 - Malhas de conteúdo igual (cópias Shift+D, duplicatas linkadas) reaproveitam normais/tangentes na conversão e a
   BVH da física; cada objeto mantém a própria forma. `RANGE_NO_LOOPDATA_CACHE=1` desliga o cache de tangentes.
+- Imagens das texturas são decodificadas em paralelo antes do upload (`BKE_image_prefetch`, cena e LibLoad);
+  `RANGE_NO_IMAGE_PREFETCH=1` desliga.
 - Render > Shading > Shader Compilation > **Fast Shader Loading** (`GAME_FAST_SHADER_LOAD`, desligado por padrão;
   `RANGE_SHADER_UNIFORM_VALUES=1` força ligado) passa os valores fixos dos materiais como uniforms: materiais de
   mesma estrutura compartilham o shader (800 esferas: 64 s → 5 s de compilação), mas perde o constant folding:
