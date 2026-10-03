@@ -29,6 +29,7 @@
 #include "CM_Message.h"
 #include "EXP_ListValue.h"
 #include "DNA_scene_types.h"
+#include "PIL_time.h"
 
 KX_SceneScheduler::KX_SceneScheduler(KX_KetsjiEngine *engine)
 	:m_engine(engine)
@@ -91,14 +92,17 @@ void KX_SceneScheduler::DestructScene(KX_Scene *scene)
 	m_engine->GetConverter()->RemoveScene(scene);
 }
 
-void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay)
+void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
 {
 	// only add scene when it doesn't exist!
-	if (FindScene(scenename)) {
+	if (FindScene(scenename) || IsPending(scenename)) {
 		CM_Warning("scene " << scenename << " already exists, not added!");
 	}
 	else {
-		if (overlay) {
+		if (asynchronous) {
+			m_addingAsyncScenes.emplace_back(scenename, overlay);
+		}
+		else if (overlay) {
 			m_addingOverlayScenes.push_back(scenename);
 		}
 		else {
@@ -244,6 +248,74 @@ void KX_SceneScheduler::ResumeScene(const std::string& scenename)
 	}
 }
 
+bool KX_SceneScheduler::IsPending(const std::string& scenename) const
+{
+	for (const PendingScene& pending : m_pendingScenes) {
+		if (pending.m_scene->GetName() == scenename) {
+			return true;
+		}
+	}
+	for (const std::pair<std::string, bool>& item : m_addingAsyncScenes) {
+		if (item.first == scenename) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void KX_SceneScheduler::StepPendingScenes()
+{
+	for (const std::pair<std::string, bool>& item : m_addingAsyncScenes) {
+		KX_Scene *scene = CreateScene(item.first);
+		if (!scene) {
+			CM_Warning("scene " << item.first << " could not be found, not added!");
+			continue;
+		}
+		const double start = PIL_check_seconds_timer();
+		m_engine->GetConverter()->ConvertScene(scene, false);
+		m_pendingScenes.push_back({scene, item.second, 0, start, 0.0});
+	}
+	m_addingAsyncScenes.clear();
+
+	// One scene at a time, in request order, within the LibLoad frame budget.
+	if (m_pendingScenes.empty()) {
+		return;
+	}
+	BL_Converter *converter = m_engine->GetConverter();
+	PendingScene& pending = m_pendingScenes.front();
+	const double stepStart = PIL_check_seconds_timer();
+	const bool done = converter->CompileSceneShaders(pending.m_scene, pending.m_material,
+	                                                 stepStart + converter->GetMergeFrameBudget());
+	pending.m_shaderTime += PIL_check_seconds_timer() - stepStart;
+	if (!done) {
+		return;
+	}
+
+	KX_Scene *scene = pending.m_scene;
+	CM_Message("[Load] async scene \"" << scene->GetName() << "\": " << pending.m_material << " materials, shaders "
+	           << (int)(pending.m_shaderTime * 1000.0) << "ms, ready after "
+	           << (int)((PIL_check_seconds_timer() - pending.m_start) * 1000.0) << "ms");
+	if (pending.m_overlay) {
+		m_engine->GetScenes()->Add(CM_AddRef(scene));
+	}
+	else {
+		m_engine->GetScenes()->Insert(0, CM_AddRef(scene));
+	}
+	m_pendingScenes.erase(m_pendingScenes.begin());
+	PostProcessScene(scene);
+	scene->Release();
+}
+
+void KX_SceneScheduler::DestructPendingScenes()
+{
+	for (PendingScene& pending : m_pendingScenes) {
+		// Releases the creation reference, the scene never joined the list.
+		DestructScene(pending.m_scene);
+	}
+	m_pendingScenes.clear();
+	m_addingAsyncScenes.clear();
+}
+
 void KX_SceneScheduler::ProcessScheduledScenes()
 {
 	// Check whether there will be changes to the list of scenes
@@ -254,6 +326,7 @@ void KX_SceneScheduler::ProcessScheduledScenes()
 		RemoveScheduledScenes();
 		AddScheduledScenes();
 	}
+	StepPendingScenes();
 
 	if (m_engine->GetScenes()->Empty()) {
 		m_engine->RequestExit(KX_ExitInfo::NO_SCENES_LEFT);

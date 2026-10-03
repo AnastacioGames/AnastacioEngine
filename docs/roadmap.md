@@ -34,6 +34,8 @@ Aberto:
   shader com muitas luzes. `Range.logic.setLibLoadFrameBudget(30)` na tela de loading: 5,3 s → 3,6 s. Ideia aberta:
   com lâmpada, cada material novo compila duas vezes; esconder os objetos até a recompilação final cortaria ~metade.
   Compilação paralela no driver testada e descartada (despacho já custa ~4 ms por shader).
+- Cena com tela de loading (2026-10-03): `addScene(nome, 0, asynchronous=True)` compila os shaders aos poucos e só
+  então põe a cena na lista; aplicado no `BrainCore` do RolimaRacer. Falta o usuário testar no jogo.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

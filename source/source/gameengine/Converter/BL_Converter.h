@@ -205,8 +205,14 @@ public:
 	BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUseExpandFraming, float camZoom);
 	virtual ~BL_Converter();
 
-	/// Fully convert a non-libloaded scene.
-	void ConvertScene(KX_Scene *scene);
+	/** Fully convert a non-libloaded scene.
+	 * \param compileShaders False leaves the material shaders to CompileSceneShaders() (asynchronous addScene).
+	 */
+	void ConvertScene(KX_Scene *scene, bool compileShaders = true);
+	/** Compile the shaders of a scene converted without them, from material next, until the deadline (PIL
+	 * time) passes; at least one per call. True when all are compiled.
+	 */
+	bool CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline);
 
 	/** This function removes all entities stored in the converter for that scene
 	 * It should be used instead of direct delete scene

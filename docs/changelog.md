@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - `addScene(..., asynchronous=True)`: shaders compilados aos poucos, tela de loading segue animando
+
+- `KX_SceneScheduler`: cena pedida com `asynchronous=True` é convertida (sem shaders, `BL_Converter::ConvertScene(scene,
+  false)`) e fica fora de `getSceneList()` (sem lógica nem desenho) enquanto `BL_Converter::CompileSceneShaders`
+  compila materiais dentro do orçamento de `setLibLoadFrameBudget` (pelo menos um por frame). Pronta, entra na
+  lista como um `addScene` normal (overlay no fim, fundo no início). Pedido repetido com o mesmo nome é ignorado
+  como hoje; `StopEngine` libera as cenas ainda pendentes (`DestructPendingScenes`). Padrão (`False`) não muda.
+- `[Load] async scene "<nome>": N materials, shaders X ms, ready after Y ms`.
+- Teste (cena com 80 materiais e 5 lâmpadas): `addScene` volta em 0 ms, primeiro frame 127 ms (conversão), depois
+  ~55 ms por frame (um shader com 5 luzes já passa do orçamento); pronta em 4,6 s, lógica da cena só começa aí.
+- RolimaRacer: `BrainCore` (estado 3/4 do loading) usa `asynchronous=True` com orçamento 30 ms e espera a cena
+  aparecer em `getSceneList()` (limite de 120 s).
+
 ## 2026-10-03 - Nó Object Info também em materiais Blender Internal
 
 - `node_shader_object_info.c`: compatível com `NODE_OLD_SHADING | NODE_NEW_SHADING`. Antes só Cycles; em material

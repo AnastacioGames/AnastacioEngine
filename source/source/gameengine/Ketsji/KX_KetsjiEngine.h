@@ -601,7 +601,7 @@ public:
 	EXP_ListValue<KX_Scene> *CurrentScenes();
 	KX_Scene *FindScene(const std::string& scenename);
 	void AddScene(KX_Scene *scene);
-	void ConvertAndAddScene(const std::string& scenename, bool overlay);
+	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
 
 	void RemoveScene(const std::string& scenename);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);

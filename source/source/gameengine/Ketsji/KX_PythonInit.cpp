@@ -694,21 +694,27 @@ static PyObject *gPyGetBlendFileList(PyObject *object, PyObject *args)
 }
 
 PyDoc_STRVAR(gPyAddScene_doc,
-             "addScene(name, [overlay])\n"
+             "addScene(name, [overlay], asynchronous=False)\n"
              "Adds a scene to the game engine.\n"
              " name = Name of the scene\n"
-             " overlay = Overlay or underlay"
+             " overlay = Overlay or underlay\n"
+             " asynchronous = Compile its shaders a few per frame (setLibLoadFrameBudget) before the scene joins\n"
+             "   getSceneList(), so a loading screen keeps drawing; it then starts like a regular added scene."
              );
-static PyObject *gPyAddScene(PyObject *, PyObject *args)
+static PyObject *gPyAddScene(PyObject *, PyObject *args, PyObject *kwds)
 {
 	char *name;
 	int overlay = 1;
+	int asynchronous = 0;
+	static const char *kwlist[] = {"name", "overlay", "asynchronous", nullptr};
 
-	if (!PyArg_ParseTuple(args, "s|i:addScene", &name, &overlay)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ip:addScene", const_cast<char **>(kwlist), &name, &overlay,
+	                                 &asynchronous))
+	{
 		return nullptr;
 	}
 
-	KX_GetActiveEngine()->ConvertAndAddScene(name, (overlay != 0));
+	KX_GetActiveEngine()->ConvertAndAddScene(name, (overlay != 0), (asynchronous != 0));
 
 	Py_RETURN_NONE;
 }
@@ -1051,7 +1057,7 @@ static struct PyMethodDef game_methods[] = {
 	{"getCurrentScene", (PyCFunction)gPyGetCurrentScene, METH_NOARGS, gPyGetCurrentScene_doc},
 	{"getInactiveSceneNames", (PyCFunction)gPyGetInactiveSceneNames, METH_NOARGS, (const char *)gPyGetInactiveSceneNames_doc},
 	{"getSceneList", (PyCFunction)gPyGetSceneList, METH_NOARGS, (const char *)gPyGetSceneList_doc},
-	{"addScene", (PyCFunction)gPyAddScene, METH_VARARGS, (const char *)gPyAddScene_doc},
+	{"addScene", (PyCFunction)gPyAddScene, METH_VARARGS | METH_KEYWORDS, (const char *)gPyAddScene_doc},
 	{"getRandomFloat", (PyCFunction)gPyGetRandomFloat, METH_NOARGS, (const char *)gPyGetRandomFloat_doc},
 	{"setGravity", (PyCFunction)gPySetGravity, METH_O, (const char *)"set Gravitation"},
 	{"getSpectrum", (PyCFunction)gPyGetSpectrum, METH_NOARGS, (const char *)"get audio spectrum"},

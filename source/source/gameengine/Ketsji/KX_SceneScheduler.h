@@ -53,6 +53,24 @@ class KX_SceneScheduler
 	std::vector<std::string> m_addingBackgroundScenes;
 	/// Lists of scenes scheduled to be replaced at the end of the frame.
 	std::vector<std::pair<std::string, std::string> > m_replace_scenes;
+	/// Names of scenes scheduled with addScene(..., asynchronous=True), and if overlay.
+	std::vector<std::pair<std::string, bool> > m_addingAsyncScenes;
+
+	/** Scene added with addScene(..., asynchronous=True): converted, but kept out of the scene list (no
+	 * logic, no drawing) while its shaders compile a few per frame, so a loading screen keeps animating.
+	 */
+	struct PendingScene {
+		KX_Scene *m_scene;
+		bool m_overlay;
+		/// Next material to compile.
+		unsigned int m_material;
+		double m_start;
+		double m_shaderTime;
+	};
+	std::vector<PendingScene> m_pendingScenes;
+
+	void StepPendingScenes();
+	bool IsPending(const std::string& scenename) const;
 
 	void RemoveScheduledScenes();
 	void AddScheduledScenes();
@@ -72,7 +90,10 @@ public:
 	void PostProcessScene(KX_Scene *scene);
 	void DestructScene(KX_Scene *scene);
 
-	void ConvertAndAddScene(const std::string& scenename, bool overlay);
+	/// asynchronous: see PendingScene.
+	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
+	/// Free the scenes still compiling their shaders (engine stop).
+	void DestructPendingScenes();
 	void RemoveScene(const std::string& scenename);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);
 	void SuspendScene(const std::string& scenename);

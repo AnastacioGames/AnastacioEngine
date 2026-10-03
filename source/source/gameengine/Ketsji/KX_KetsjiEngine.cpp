@@ -844,6 +844,7 @@ void KX_KetsjiEngine::StopEngine()
 {
 	if (m_bInitialized) {
 		m_converter->FinalizeAsyncLoads();
+		m_sceneScheduler->DestructPendingScenes();
 
 		while (m_scenes->GetCount() > 0) {
 			KX_Scene *scene = m_scenes->GetFront();
@@ -955,9 +956,9 @@ KX_Scene *KX_KetsjiEngine::FindScene(const std::string& scenename)
 	return m_sceneScheduler->FindScene(scenename);
 }
 
-void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool overlay)
+void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
 {
-	m_sceneScheduler->ConvertAndAddScene(scenename, overlay);
+	m_sceneScheduler->ConvertAndAddScene(scenename, overlay, asynchronous);
 }
 
 void KX_KetsjiEngine::RemoveScene(const std::string& scenename)

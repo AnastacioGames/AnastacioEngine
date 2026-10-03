@@ -249,7 +249,7 @@ General functions
    :return: The current budget in milliseconds.
    :rtype: float
 
-.. function:: addScene(name, overlay=1)
+.. function:: addScene(name, overlay=1, asynchronous=False)
 
    Loads a scene into the game engine.
 
@@ -263,6 +263,9 @@ General functions
    :type name: string
    :arg overlay: Overlay or underlay (optional)
    :type overlay: integer
+   :arg asynchronous: Compile the scene shaders a few per frame (budget of :func:`setLibLoadFrameBudget`)
+      before the scene joins `getSceneList`, so a loading screen keeps drawing; its logic starts only then.
+   :type asynchronous: boolean
 
 .. function:: sendMessage(subject, body="", to="", message_from="")
 

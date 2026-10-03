@@ -251,7 +251,7 @@ static void print_load_shaders(KX_Scene *scene, const char *stage, size_t materi
 	           << compiled << " " << load_ms(compileTime) << "ms, reused " << reused << ")");
 }
 
-void BL_Converter::ConvertScene(KX_Scene *scene)
+void BL_Converter::ConvertScene(KX_Scene *scene, bool compileShaders)
 {
 	BL_SceneConverter converter(scene, BL_Resource::Library(m_maggie));
 	ConvertScene(converter, false, true);
@@ -264,8 +264,23 @@ void BL_Converter::ConvertScene(KX_Scene *scene)
 	 * it through a failed emplace(). */
 	m_sceneSlots[scene].Merge(converter);
 	reset_load_shader_stats();
+	if (!compileShaders) {
+		return;
+	}
 	ReloadShaders(scene);
 	print_load_shaders(scene, "scene", m_sceneSlots[scene].m_materials.size(), texturesEnd - texturesStart, 0.0, PIL_check_seconds_timer() - texturesEnd);
+}
+
+bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline)
+{
+	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
+	while (next < materials.size()) {
+		materials[next++]->ReloadMaterial();
+		if (PIL_check_seconds_timer() >= deadline) {
+			break;
+		}
+	}
+	return (next >= materials.size());
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
