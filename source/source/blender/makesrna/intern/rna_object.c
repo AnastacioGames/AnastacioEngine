@@ -204,6 +204,7 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 
 #include "ED_object.h"
 #include "ED_particle.h"
+#include "ED_view3d.h"
 #include "ED_curve.h"
 #include "ED_lattice.h"
 
@@ -619,6 +620,44 @@ static void rna_ReverbAreaSettings_shape_update(Main *bmain, Scene *scene, Point
 {
 	rna_reverb_area_sync_empty_draw((Object *)ptr->id.data);
 	rna_Object_internal_update(bmain, scene, ptr);
+}
+
+/* The 3D View preview needs the realtime redraw timer to animate the strikes. */
+static void rna_Object_lightning_preview_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
+{
+	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+	if (bmain->wm.first) {
+		ED_view3d_realtime_viewport_update((wmWindowManager *)bmain->wm.first);
+	}
+}
+
+static void rna_Object_use_lightning_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	RangeLightningSettings *ls = &ob->lightning;
+
+	/* First enable (new object or file saved before lightning emitters existed): zeroed struct. */
+	if ((ob->gameflag2 & OB_LIGHTNING) && ls->height == 0.0f) {
+		ls->flags = LIGHTNING_HIT_GROUND | LIGHTNING_PREVIEW;
+		ls->mode = LIGHTNING_MODE_AUTOMATIC;
+		ls->shape = LIGHTNING_SHAPE_CIRCLE;
+		ls->rate = 6.0f;
+		ls->big_chance = 0.8f;
+		ls->start_time = 0.0f;
+		ls->end_time = 0.0f;
+		ls->height = 60.0f;
+		ls->intensity = 1.0f;
+		ls->width = 1.0f;
+		ls->color[0] = 0.65f;
+		ls->color[1] = 0.72f;
+		ls->color[2] = 1.0f;
+		ls->flash_distance = 150.0f;
+		if (ob->empty_drawsize < 2.0f) {
+			ob->empty_drawsize = 10.0f;
+		}
+	}
+	rna_Object_internal_update(bmain, scene, ptr);
+	rna_Object_lightning_preview_update(bmain, scene, ptr);
 }
 
 static void rna_Object_hide_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
@@ -2439,6 +2478,116 @@ static void rna_def_reverb_area_param(StructRNA *srna, const char *identifier, f
 	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
 }
 
+static void rna_def_object_lightning(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem mode_items[] = {
+		{LIGHTNING_MODE_AUTOMATIC, "AUTOMATIC", 0, "Automatic", "Strikes on their own, at the rate below, inside the time window"},
+		{LIGHTNING_MODE_MANUAL, "MANUAL", 0, "Manual", "Strikes only when the logic asks (obj.strikeLightning() or Edit Object > Lightning Strike)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static const EnumPropertyItem shape_items[] = {
+		{LIGHTNING_SHAPE_CIRCLE, "CIRCLE", 0, "Circle", "Strikes fall inside a circle of radius = Empty size (follows its scale and rotation)"},
+		{LIGHTNING_SHAPE_BOX, "BOX", 0, "Box", "Strikes fall inside a square of half side = Empty size (follows its scale and rotation)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "RangeLightningSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeLightningSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Lightning Settings", "Where and when lightning strikes fall around this Empty");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "mode");
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "When the strikes fall");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_lightning_preview_update");
+
+	prop = RNA_def_property(srna, "shape", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "shape");
+	RNA_def_property_enum_items(prop, shape_items);
+	RNA_def_property_ui_text(prop, "Area", "Shape of the area where the strikes fall");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "rate", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "rate");
+	RNA_def_property_range(prop, 0.0f, 600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 60.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Rate", "Automatic strikes per minute");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "big_chance", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "big_chance");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Bolt Chance", "Share of automatic strikes with a visible bolt; the others are a flash only");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "start_time", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "start_time");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 3600.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Start", "Seconds of game time before the first automatic strike");
+
+	prop = RNA_def_property(srna, "end_time", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "end_time");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 3600.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "End", "Seconds of game time after which the automatic strikes stop (0 = never)");
+
+	prop = RNA_def_property(srna, "height", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "height");
+	RNA_def_property_range(prop, 1.0f, 2000.0f);
+	RNA_def_property_ui_range(prop, 5.0f, 300.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Cloud Height", "Height above the Empty where the bolts start");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "target");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_ui_text(prop, "Target", "Optional: the bolts go from the area of this Empty to this object (sideways, upward...) instead of from the cloud down to the ground");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "use_hit_ground", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", LIGHTNING_HIT_GROUND);
+	RNA_def_property_ui_text(prop, "Hit Ground", "In game, the bolt ends on the first surface below the cloud (else at the Empty's height)");
+
+	prop = RNA_def_property(srna, "use_preview", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", LIGHTNING_PREVIEW);
+	RNA_def_property_ui_text(prop, "Preview", "Show the automatic strikes in the 3D View");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_lightning_preview_update");
+
+	prop = RNA_def_property(srna, "intensity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "intensity");
+	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 3.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Intensity", "Brightness of the bolt and of the flash");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "width", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "width");
+	RNA_def_property_range(prop, 0.05f, 20.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 5.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Width", "Thickness of the bolt");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
+	RNA_def_property_float_sdna(prop, NULL, "color");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Color", "Tint of the glow around the bolt (the core stays white)");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "flash_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "flash_distance");
+	RNA_def_property_range(prop, 1.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 10.0f, 2000.0f, 100, 0);
+	RNA_def_property_ui_text(prop, "Flash Distance", "The flash on screen fades as the camera gets farther than this from the strike");
+}
+
 static void rna_def_object_reverb_area(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -3297,6 +3446,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	rna_def_game_object_activity_culling(brna);
 	rna_def_object_gpu_particles(brna);
 	rna_def_object_reverb_area(brna);
+	rna_def_object_lightning(brna);
 	rna_def_object_destruction(brna);
 	rna_def_object_deform(brna);
 	rna_def_object_explosive(brna);
@@ -4153,6 +4303,18 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "reverb_area");
 	RNA_def_property_struct_type(prop, "RangeReverbAreaSettings");
 	RNA_def_property_ui_text(prop, "Reverb Area Settings", "");
+
+	/* Lightning emitter (Empty objects), see RangeLightningSettings. */
+	prop = RNA_def_property(srna, "use_lightning", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_LIGHTNING);
+	RNA_def_property_ui_text(prop, "Lightning", "Lightning strikes fall inside the area of this Empty");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_use_lightning_update");
+
+	prop = RNA_def_property(srna, "lightning", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "lightning");
+	RNA_def_property_struct_type(prop, "RangeLightningSettings");
+	RNA_def_property_ui_text(prop, "Lightning Settings", "");
 	RNA_def_property_ui_text(prop, "Mix GPU Particle Settings", "");
 
 	/* vertex groups */

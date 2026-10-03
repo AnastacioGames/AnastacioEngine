@@ -61,6 +61,7 @@
 #include "KX_Camera.h"
 #include "KX_Speaker.h"
 #include "KX_ChangeColorActuator.h"
+#include "KX_LightningActuator.h"
 #include "KX_CameraActuator.h"
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
@@ -284,6 +285,7 @@ PyMODINIT_FUNC initGameTypesPythonBinding(void)
 		PyType_Ready_Attr(dict, KX_RaySensor, init_getset);
 		PyType_Ready_Attr(dict, KX_AddObjectActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_ChangeColorActuator, init_getset);
+		PyType_Ready_Attr(dict, KX_LightningActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_DynamicActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_EndObjectActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_ReplaceMeshActuator, init_getset);

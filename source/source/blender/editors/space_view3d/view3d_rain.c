@@ -85,51 +85,40 @@ static const char *bolt_frag =
 	"in float v_bright;\n"
 	"uniform float u_bright;\n"
 	"uniform float u_glowRatio;\n"
+	"uniform vec3 u_color;\n"
 	"void main() {\n"
 	"	float r = length(v_uv);\n"
 	"	float c = r * u_glowRatio;\n"
 	"	float core = exp(-c * c * 2.0);\n"
 	"	float glow = exp(-r * r * 6.0) * (1.0 - smoothstep(0.8, 1.0, r));\n"
-	"	vec3 col = vec3(1.0) * core + vec3(0.65, 0.72, 1.0) * glow * 0.35;\n"
+	"	vec3 col = vec3(1.0) * core + u_color * glow * 0.35;\n"
 	"	gl_FragColor = vec4(col * v_bright * u_bright, 1.0);\n"
 	"}\n";
 
 static GPUShader *bolt_shader = NULL;
 static bool bolt_shader_failed = false;
 
-static void draw_bolt(World *world, RegionView3D *rv3d)
+static bool bolt_shader_ensure(void)
 {
-	float flash, bright;
-	unsigned int seed;
-	if (!BKE_rain_lightning_eval(world->rain_lightning_rate, world->rain_lightning_intensity,
-	                             PIL_check_seconds_timer(), &flash, &bright, &seed) ||
-	    bright <= 0.001f)
-	{
-		return;
-	}
 	if (!bolt_shader && !bolt_shader_failed) {
 		bolt_shader = GPU_shader_create(bolt_vert, bolt_frag, NULL, NULL, NULL, 0, 0, 0);
 		bolt_shader_failed = (bolt_shader == NULL);
 	}
-	if (!bolt_shader) {
-		return;
-	}
+	return bolt_shader != NULL;
+}
 
-	/* Clip end from the projection, like the compositor does for the halo. */
-	const float clip_end = rv3d->is_persp ? rv3d->winmat[3][2] / (rv3d->winmat[2][2] + 1.0f) : 0.0f;
-	RainLightningBolt bolt;
-	BKE_rain_lightning_view_bolt(seed, rv3d->viewinv, clip_end,
-	                             world->rain_lightning_distance, world->rain_lightning_width, &bolt);
-	const float *cam_pos = rv3d->viewinv[3];
-
+/* One camera facing ribbon per strip, with round caps (same as KX_RainLightning). */
+static void draw_bolt_geometry(const RainLightningBolt *bolt, float bright, const float color[3], const float cam_pos[3])
+{
 	GPU_shader_bind(bolt_shader);
 	GPU_shader_uniform_float(bolt_shader, GPU_shader_get_uniform(bolt_shader, "u_bright"), bright);
 	GPU_shader_uniform_float(bolt_shader, GPU_shader_get_uniform(bolt_shader, "u_glowRatio"),
 	                         RAIN_LIGHTNING_GLOW_RATIO);
+	GPU_shader_uniform_vector(bolt_shader, GPU_shader_get_uniform(bolt_shader, "u_color"), 3, 1, color);
 
-	for (int s = 0; s < bolt.num_strips; s++) {
-		const int start = bolt.strip_start[s];
-		const int n = bolt.strip_len[s];
+	for (int s = 0; s < bolt->num_strips; s++) {
+		const int start = bolt->strip_start[s];
+		const int n = bolt->strip_len[s];
 		if (n < 2) {
 			continue;
 		}
@@ -139,19 +128,19 @@ static void draw_bolt(World *world, RegionView3D *rv3d)
 			const int i = max_ii(0, min_ii(row, n - 1));
 			float pos[3], side[3];
 			float v = 0.0f;
-			copy_v3_v3(pos, bolt.co[start + i]);
-			BKE_rain_lightning_side(&bolt, s, i, cam_pos, side);
+			copy_v3_v3(pos, bolt->co[start + i]);
+			BKE_rain_lightning_side(bolt, s, i, cam_pos, side);
 			if (row != i) {
 				float out[3];
-				sub_v3_v3v3(out, pos, bolt.co[start + ((row < 0) ? 1 : n - 2)]);
+				sub_v3_v3v3(out, pos, bolt->co[start + ((row < 0) ? 1 : n - 2)]);
 				if (normalize_v3(out) < 1e-6f) {
 					out[0] = out[1] = 0.0f;
 					out[2] = 1.0f;
 				}
-				madd_v3_v3fl(pos, out, bolt.half_width[start + i]);
+				madd_v3_v3fl(pos, out, bolt->half_width[start + i]);
 				v = 1.0f;
 			}
-			glColor3f(bolt.bright[start + i], 0.0f, 0.0f);
+			glColor3f(bolt->bright[start + i], 0.0f, 0.0f);
 			for (int k = -1; k <= 1; k += 2) {
 				glTexCoord2f((float)k, v);
 				glVertex3f(pos[0] + side[0] * k, pos[1] + side[1] * k, pos[2] + side[2] * k);
@@ -161,6 +150,69 @@ static void draw_bolt(World *world, RegionView3D *rv3d)
 	}
 
 	GPU_shader_unbind();
+}
+
+static void draw_bolt(World *world, RegionView3D *rv3d)
+{
+	static const float color[3] = {0.65f, 0.72f, 1.0f};
+	float flash, bright;
+	unsigned int seed;
+	if (!BKE_rain_lightning_eval(world->rain_lightning_rate, world->rain_lightning_intensity,
+	                             PIL_check_seconds_timer(), &flash, &bright, &seed) ||
+	    bright <= 0.001f || !bolt_shader_ensure())
+	{
+		return;
+	}
+
+	/* Clip end from the projection, like the compositor does for the halo. */
+	const float clip_end = rv3d->is_persp ? rv3d->winmat[3][2] / (rv3d->winmat[2][2] + 1.0f) : 0.0f;
+	RainLightningBolt bolt;
+	BKE_rain_lightning_view_bolt(seed, rv3d->viewinv, clip_end,
+	                             world->rain_lightning_distance, world->rain_lightning_width, &bolt);
+	draw_bolt_geometry(&bolt, bright, color, rv3d->viewinv[3]);
+}
+
+bool view3d_lightning_emitter_preview(const Object *ob)
+{
+	return ob->type == OB_EMPTY && (ob->gameflag2 & OB_LIGHTNING) &&
+	       (ob->lightning.flags & LIGHTNING_PREVIEW) && ob->lightning.mode == LIGHTNING_MODE_AUTOMATIC;
+}
+
+/* Lightning emitters: their automatic strikes on the real clock (the time window is game time,
+ * ignored here). No ground ray in the editor: the bolt ends at the Empty's height. */
+static void draw_emitter_bolts(Scene *scene, View3D *v3d, RegionView3D *rv3d)
+{
+	const double now = PIL_check_seconds_timer();
+	for (Base *base = scene->base.first; base; base = base->next) {
+		Object *ob = base->object;
+		if (!(v3d->lay & base->lay) || (ob->restrictflag & OB_RESTRICT_VIEW) || !view3d_lightning_emitter_preview(ob)) {
+			continue;
+		}
+		const RangeLightningSettings *ls = &ob->lightning;
+		double start;
+		unsigned int seed;
+		bool big;
+		if (!BKE_rain_lightning_schedule_ex(ls->rate, BKE_rain_lightning_salt(ob->id.name + 2), ls->big_chance,
+		                                    now, &start, &seed, &big) || !big)
+		{
+			continue;
+		}
+		const float flash = BKE_rain_lightning_flash(seed, big, (float)(now - start), NULL);
+		const float bright = min_ff(flash * 1.6f, 1.0f) * ls->intensity;
+		if (bright <= 0.001f || !bolt_shader_ensure()) {
+			continue;
+		}
+		float ground[3];
+		RainLightningBolt bolt;
+		BKE_rain_lightning_strike_point(seed, ob->obmat, ob->empty_drawsize, ls->shape == LIGHTNING_SHAPE_BOX, ground);
+		if (ls->target) {
+			BKE_rain_lightning_bolt_between(seed, ground, ls->target->obmat[3], ls->width, &bolt);
+		}
+		else {
+			BKE_rain_lightning_bolt_at(seed, ground, ground[2] + ls->height, ls->width, &bolt);
+		}
+		draw_bolt_geometry(&bolt, bright, ls->color, rv3d->viewinv[3]);
+	}
 }
 
 typedef struct AuraEdge {
@@ -380,9 +432,13 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 void view3d_draw_rain_effects(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 {
 	World *world = scene->world;
-	if (!world || !(world->weather_flag & WO_WEATHER_RAIN) ||
-	    !(world->weather_flag & (WO_WEATHER_RAIN_AURA | WO_WEATHER_RAIN_LIGHTNING)))
-	{
+	const bool world_fx = world && (world->weather_flag & WO_WEATHER_RAIN) &&
+	                      (world->weather_flag & (WO_WEATHER_RAIN_AURA | WO_WEATHER_RAIN_LIGHTNING));
+	bool emitters = false;
+	for (Base *base = scene->base.first; base && !emitters; base = base->next) {
+		emitters = view3d_lightning_emitter_preview(base->object);
+	}
+	if (!world_fx && !emitters) {
 		return;
 	}
 
@@ -394,11 +450,14 @@ void view3d_draw_rain_effects(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	if (world->weather_flag & WO_WEATHER_RAIN_AURA) {
+	if (world_fx && (world->weather_flag & WO_WEATHER_RAIN_AURA)) {
 		draw_aura(scene, v3d, world, rv3d);
 	}
-	if (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING) {
+	if (world_fx && (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING)) {
 		draw_bolt(world, rv3d);
+	}
+	if (emitters) {
+		draw_emitter_bolts(scene, v3d, rv3d);
 	}
 
 	glPopAttrib();

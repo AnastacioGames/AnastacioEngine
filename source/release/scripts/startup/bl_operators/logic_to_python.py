@@ -733,6 +733,9 @@ def _edit_object_code(act):
         if op == 'SETMASS':
             return ["ob.mass = %s" % _act_arg("Mass", act.mass)]
         return [_DYNAMICS[op]]
+    if m == 'LIGHTNINGSTRIKE':
+        # O dono precisa ser um Empty com Lightning ligado (senão TypeError, como o actuator recusa).
+        return ["ob.strikeLightning(%s)" % (not act.use_lightning_flash_only)]
     raise Unsupported("edit object %s" % m)
 
 

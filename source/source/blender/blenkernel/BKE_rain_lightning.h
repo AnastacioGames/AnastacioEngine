@@ -63,6 +63,13 @@ typedef struct RainLightningBolt {
  * visible bolt, otherwise it is a far flash behind the clouds.
  */
 bool BKE_rain_lightning_schedule(float rate, double time, double *r_start, unsigned int *r_seed, bool *r_big);
+/**
+ * Same as #BKE_rain_lightning_schedule for a lightning emitter: \a salt keeps two emitters out
+ * of step, \a big_chance is the share of strikes with a visible bolt.
+ */
+bool BKE_rain_lightning_schedule_ex(
+        float rate, unsigned int salt, float big_chance, double time,
+        double *r_start, unsigned int *r_seed, bool *r_big);
 
 /**
  * Flash of a strike \a t seconds after it started: 2-4 return strokes, each decaying
@@ -83,6 +90,30 @@ void BKE_rain_lightning_bolt(
  * width. The ribbon of a strip is co +- side, continuous at the joints.
  */
 void BKE_rain_lightning_side(const RainLightningBolt *bolt, int strip, int i, const float cam_pos[3], float r_side[3]);
+/* Lightning emitter: schedule salt from the object name, so editor and game agree. */
+unsigned int BKE_rain_lightning_salt(const char *name);
+
+/**
+ * Lightning emitter: where strike \a seed falls inside the area of an Empty. The area lies in
+ * the local XY plane of \a obmat, a circle of radius \a size or a square of half side \a size.
+ */
+void BKE_rain_lightning_strike_point(
+        unsigned int seed, const float obmat[4][4], float size, bool box, float r_point[3]);
+
+/**
+ * Lightning emitter: the bolt of strike \a seed from the cloud at height \a cloud_z down to
+ * \a ground. Its size follows the height, like the camera bolt follows its distance.
+ */
+void BKE_rain_lightning_bolt_at(
+        unsigned int seed, const float ground[3], float cloud_z, float width, RainLightningBolt *r_bolt);
+
+/* Lightning emitter with a Target: the bolt from  from to  to, any direction. */
+void BKE_rain_lightning_bolt_between(
+        unsigned int seed, const float from[3], const float to[3], float width, RainLightningBolt *r_bolt);
+
+/* Lightning emitter: how much of the flash reaches a camera \a distance meters away. */
+float BKE_rain_lightning_distance_fade(float distance, float flash_distance);
+
 /* Automatic strike at `time` for the 3D View: flash and bolt brightness (0 when none),
  * scaled by the intensity, plus the seed to build the bolt with. False when dark. */
 bool BKE_rain_lightning_eval(

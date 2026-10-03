@@ -1529,6 +1529,7 @@ static void rna_def_edit_object_actuator(BlenderRNA *brna)
 		{ACT_EDOB_TRACK_TO, "TRACKTO", 0, "Track to", ""},
 		{ACT_EDOB_DYNAMICS, "DYNAMICS", 0, "Dynamics", ""},
 		{ACT_EDOB_CHANGE_COLOR, "CHANGECOLOR", 0, "Change Color", ""},
+		{ACT_EDOB_LIGHTNING_STRIKE, "LIGHTNINGSTRIKE", 0, "Lightning Strike", "A strike of this lightning emitter (Empty with Lightning enabled)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1664,6 +1665,11 @@ static void rna_def_edit_object_actuator(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_replace_display_mesh", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", ACT_EDOB_REPLACE_MESH_NOGFX);
 	RNA_def_property_ui_text(prop, "Gfx", "Replace the display mesh");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_lightning_flash_only", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_EDOB_LIGHTNING_FLASH_ONLY);
+	RNA_def_property_ui_text(prop, "Flash Only", "A flash in the cloud, without a visible bolt");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "use_replace_physics_mesh", PROP_BOOLEAN, PROP_NONE);

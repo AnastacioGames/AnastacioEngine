@@ -1570,6 +1570,12 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 			kxscene->AddReverbAreaObject(gameobj);
 		}
 
+		// Lightning emitter: an Empty flagged use_lightning, strikes inside its area
+		// (KX_RainLightning, updated with World > Rain > Lightning).
+		if (ob->type == OB_EMPTY && (ob->gameflag2 & OB_LIGHTNING)) {
+			kxscene->AddLightningEmitter(gameobj);
+		}
+
 		// Sun/CSM static shadow cache: auto-classify by Physics Type. Static/No Collision
 		// objects are assumed not to move at runtime and go in the cached static list, unless
 		// use_force_dynamic_shadow overrides that (e.g. a scripted moving platform with Static

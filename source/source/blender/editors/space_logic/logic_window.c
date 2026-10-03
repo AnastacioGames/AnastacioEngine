@@ -1915,6 +1915,13 @@ static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr, bContex
 			row = uiLayoutRow(layout, true);
 			uiItemR(row, ptr, "change_col", 0, NULL, ICON_NONE);
 			break;
+		case ACT_EDOB_LIGHTNING_STRIKE:
+			if (ob->type != OB_EMPTY || !(ob->gameflag2 & OB_LIGHTNING)) {
+				uiItemL(layout, IFACE_("Needs an Empty with Object Data > Lightning enabled"), ICON_ERROR);
+				break;
+			}
+			uiItemR(layout, ptr, "use_lightning_flash_only", 0, NULL, ICON_NONE);
+			break;
 	}
 }
 

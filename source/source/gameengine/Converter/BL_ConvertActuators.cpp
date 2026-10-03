@@ -66,6 +66,7 @@
 #include "KX_ConstraintActuator.h"
 #include "KX_CameraActuator.h"
 #include "KX_ChangeColorActuator.h"
+#include "KX_LightningActuator.h"
 #include "KX_GameActuator.h"
 #include "KX_StateActuator.h"
 #include "KX_VisibilityActuator.h"
@@ -597,6 +598,11 @@ void BL_ConvertActuators(const char *maggiename,
 							editobact->use_lerp_col,
 							editobact->lerp_col);
 						baseact = tmpcolact;
+						break;
+					}
+					case ACT_EDOB_LIGHTNING_STRIKE:
+					{
+						baseact = new KX_LightningActuator(gameobj, (editobact->flag & ACT_EDOB_LIGHTNING_FLASH_ONLY) == 0);
 						break;
 					}
 				}

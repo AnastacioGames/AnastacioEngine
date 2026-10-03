@@ -54,6 +54,15 @@ class VIEW3D_HT_header(Header):
 
         # Object name field, placed right after the Object Mode dropdown so
         # the header reads: menus -> mode -> name -> layers -> lock icon.
+        # The 3D View context drops the active object when it is not on a
+        # visible layer; keep showing its name (greyed out) after a layer switch.
+        name_obj = obj or scene.objects.active
+        if name_obj and not obj:
+            row = layout.row()
+            row.active = False
+            row.label(text="", icon='OBJECT_DATA')
+            row.prop(name_obj, "name", text="")
+
         if obj:
             layout.label(text="", icon='OBJECT_DATA')
             layout.prop(obj, "name", text="")

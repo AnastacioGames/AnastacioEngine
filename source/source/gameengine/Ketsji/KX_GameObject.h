@@ -1204,6 +1204,7 @@ public:
 	EXP_PYMETHOD(KX_GameObject, ReinstancePhysicsMesh);
 	EXP_PYMETHOD_O(KX_GameObject, ReplacePhysicsShape);
 	EXP_PYMETHOD_DOC(KX_GameObject, addDebugProperty);
+	EXP_PYMETHOD_DOC(KX_GameObject, strikeLightning);
 
 	EXP_PYMETHOD_DOC(KX_GameObject, playAction);
 	EXP_PYMETHOD_DOC(KX_GameObject, stopAction);

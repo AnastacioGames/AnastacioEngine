@@ -119,6 +119,7 @@ set(SRC
 	KX_LibLoadStatus.cpp
 	KX_LightObject.cpp
 	KX_LightIpoSGController.cpp
+	KX_LightningActuator.cpp
 	KX_LodLevel.cpp
 	KX_LodManager.cpp
 	KX_MaterialIpoController.cpp
@@ -233,6 +234,7 @@ set(SRC
 	KX_LibLoadStatus.h
 	KX_LightObject.h
 	KX_LightIpoSGController.h
+	KX_LightningActuator.h
 	KX_LodLevel.h
 	KX_LodManager.h
 	KX_MaterialIpoController.h

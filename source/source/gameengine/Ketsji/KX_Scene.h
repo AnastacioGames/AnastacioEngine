@@ -580,6 +580,10 @@ public:
 	KX_RainLightning *GetRainLightning() const;
 	/// world.strikeLightning(): a strike on the next frame.
 	void StrikeLightning(bool bolt);
+	/// Empties flagged use_lightning (Object.gameflag2 & OB_LIGHTNING): strikes inside their area.
+	void AddLightningEmitter(KX_GameObject *gameobj);
+	/// obj.strikeLightning() / Edit Object > Lightning Strike: false when gameobj is not an emitter.
+	bool StrikeLightningAt(KX_GameObject *gameobj, bool bolt);
 	/// Registers/unregisters an object with GetParticleBuffer() != nullptr for per-frame
 	/// update/draw. Called from scene conversion, object duplication and object removal.
 	void AddGpuParticleObject(KX_GameObject *gameobj);

@@ -208,6 +208,7 @@ static void draw_bounding_volume(Object *ob, char type);
 
 static void drawcube_size(float size);
 static void drawcircle_size(float size);
+static void draw_lightning_area(Object *ob);
 static void draw_empty_sphere(float size);
 static void draw_empty_cone(float size);
 static void draw_box(const float vec[8][3], bool solid);
@@ -7055,6 +7056,48 @@ static void drawspiral(const float cent[3], float rad, float tmat[4][4], int sta
 
 /* draws a circle on x-z plane given the scaling of the circle, assuming that
  * all required matrices have been set (used for drawing empties) */
+/* Lightning emitter: the strike area flat on the Empty's local XY plane, plus a line up to the
+ * cloud (or to the Target). Drawn in object space, after the Empty itself. */
+static void draw_lightning_area(Object *ob)
+{
+	const RangeLightningSettings *ls = &ob->lightning;
+	const float size = ob->empty_drawsize;
+	float imat[4][4], up[3], top[3];
+
+	glBegin(GL_LINE_LOOP);
+	if (ls->shape == LIGHTNING_SHAPE_BOX) {
+		glVertex3f(-size, -size, 0.0f);
+		glVertex3f(size, -size, 0.0f);
+		glVertex3f(size, size, 0.0f);
+		glVertex3f(-size, size, 0.0f);
+	}
+	else {
+		for (int a = 0; a < 64; a++) {
+			const float ang = 2.0f * (float)M_PI * (float)a / 64.0f;
+			glVertex3f(cosf(ang) * size, sinf(ang) * size, 0.0f);
+		}
+	}
+	glEnd();
+
+	/* The cloud is straight up in world space, the target anywhere: both into object space. */
+	invert_m4_m4(imat, ob->obmat);
+	if (ls->target) {
+		copy_v3_v3(up, ls->target->obmat[3]);
+	}
+	else {
+		copy_v3_v3(up, ob->obmat[3]);
+		up[2] += ls->height;
+	}
+	mul_v3_m4v3(top, imat, up);
+
+	setlinestyle(4);
+	glBegin(GL_LINES);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3fv(top);
+	glEnd();
+	setlinestyle(0);
+}
+
 static void drawcircle_size(float size)
 {
 	glBegin(GL_LINE_LOOP);
@@ -8135,6 +8178,9 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 						}
 						drawaxes(rv3d->viewmatob, ob->empty_drawsize, ob->empty_drawtype);
+						if (ob->gameflag2 & OB_LIGHTNING) {
+							draw_lightning_area(ob);
+						}
 						if (smooth) {
 							glDisable(GL_BLEND);
 							glDisable(GL_LINE_SMOOTH);

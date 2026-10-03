@@ -1455,6 +1455,18 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 			want_timer = true;
 			break;
 		}
+		/* Lightning emitters with Preview strike on the real clock too. */
+		if (win->screen->scene) {
+			for (Base *base = win->screen->scene->base.first; base; base = base->next) {
+				if (view3d_lightning_emitter_preview(base->object)) {
+					want_timer = true;
+					break;
+				}
+			}
+			if (want_timer) {
+				break;
+			}
+		}
 
 		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
 			if (sa->spacetype == SPACE_VIEW3D) {

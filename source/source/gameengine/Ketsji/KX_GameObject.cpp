@@ -2958,6 +2958,7 @@ PyMethodDef KX_GameObject::Methods[] = {
 
 	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, sendMessage),
 	EXP_PYMETHODTABLE(KX_GameObject, addDebugProperty),
+	EXP_PYMETHODTABLE(KX_GameObject, strikeLightning),
 
 	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, playAction),
 	EXP_PYMETHODTABLE(KX_GameObject, stopAction),
@@ -6258,6 +6259,22 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, addDebugProperty,
 		scene->RemoveDebugProperty(this, name);
 	}
 
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_GameObject, strikeLightning,
+                    "strikeLightning(bolt=True)\n"
+                    "A lightning strike now inside the area of this Empty (Object Data > Lightning).\n"
+                    "bolt=False gives a flash in the cloud only.\n")
+{
+	int bolt = 1;
+	if (!PyArg_ParseTuple(args, "|p:strikeLightning", &bolt)) {
+		return nullptr;
+	}
+	if (!GetScene()->StrikeLightningAt(this, bolt != 0)) {
+		PyErr_Format(PyExc_TypeError, "gameOb.strikeLightning(): \"%s\" is not a lightning emitter (Empty with Lightning enabled)", GetName().c_str());
+		return nullptr;
+	}
 	Py_RETURN_NONE;
 }
 

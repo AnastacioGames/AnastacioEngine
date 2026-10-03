@@ -87,6 +87,53 @@ class DATA_PT_reverb_area(DataButtonsPanel, Panel):
         layout.label(text="Affects 3D speakers while the active camera is inside the area", icon='INFO')
 
 
+class DATA_PT_lightning(DataButtonsPanel, Panel):
+    bl_label = "Lightning"
+
+    def draw_header(self, context):
+        self.layout.prop(context.object, "use_lightning", text="")
+
+    def draw(self, context):
+        layout = self.layout
+
+        ob = context.object
+        ls = ob.lightning
+        layout.active = ob.use_lightning
+
+        col = layout.column()
+        col.label(text="Where:")
+        row = col.row(align=True)
+        row.prop(ls, "shape", text="")
+        row.prop(ob, "empty_draw_size", text="Size")
+        col.prop(ls, "target")
+        sub = col.column()
+        sub.active = ls.target is None
+        sub.prop(ls, "height")
+        sub.prop(ls, "use_hit_ground")
+
+        col = layout.column()
+        col.label(text="When:")
+        col.row().prop(ls, "mode", expand=True)
+        if ls.mode == 'AUTOMATIC':
+            col.prop(ls, "rate")
+            col.prop(ls, "big_chance", slider=True)
+            row = col.row(align=True)
+            row.prop(ls, "start_time")
+            row.prop(ls, "end_time")
+        else:
+            col.label(text="obj.strikeLightning() or Edit Object > Lightning Strike", icon='INFO')
+
+        col = layout.column()
+        col.label(text="Look:")
+        row = col.row(align=True)
+        row.prop(ls, "intensity")
+        row.prop(ls, "width")
+        col.prop(ls, "color")
+        col.prop(ls, "flash_distance")
+        col.prop(ls, "use_preview")
+        layout.label(text="The screen flash needs World > Rain on", icon='INFO')
+
+
 class DATA_PT_reverb_area_advanced(DataButtonsPanel, Panel):
     bl_label = "Reverb Area: Advanced"
     bl_options = {'DEFAULT_CLOSED'}
@@ -135,6 +182,7 @@ classes = (
     DATA_PT_empty,
     DATA_PT_reverb_area,
     DATA_PT_reverb_area_advanced,
+    DATA_PT_lightning,
 )
 
 if __name__ == "__main__":  # only for live edit.

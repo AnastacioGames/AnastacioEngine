@@ -83,7 +83,9 @@ static Rng rng_seed(unsigned int seed)
 	return rng;
 }
 
-bool BKE_rain_lightning_schedule(float rate, double time, double *r_start, unsigned int *r_seed, bool *r_big)
+bool BKE_rain_lightning_schedule_ex(
+        float rate, unsigned int salt, float big_chance, double time,
+        double *r_start, unsigned int *r_seed, bool *r_big)
 {
 	if (rate <= 0.0f) {
 		return false;
@@ -92,16 +94,21 @@ bool BKE_rain_lightning_schedule(float rate, double time, double *r_start, unsig
 	const double period = 60.0 / (double)rate;
 	const long long slot = (long long)floor(time / period);
 	for (long long s = slot; s >= slot - 1; s--) {
-		const unsigned int h = hash_uint((unsigned int)s * 2654435761u + 0x51ed27u);
+		const unsigned int h = hash_uint((unsigned int)s * 2654435761u + 0x51ed27u + salt * 0x9e3779b9u);
 		const double start = ((double)s + 0.8 * (double)(h >> 8) / 16777216.0) * period;
 		if (start <= time) {
 			*r_start = start;
 			*r_seed = hash_uint(h + 1u);
-			*r_big = (float)(hash_uint(h + 2u) >> 8) / 16777216.0f < BIG_CHANCE;
+			*r_big = (float)(hash_uint(h + 2u) >> 8) / 16777216.0f < big_chance;
 			return true;
 		}
 	}
 	return false;
+}
+
+bool BKE_rain_lightning_schedule(float rate, double time, double *r_start, unsigned int *r_seed, bool *r_big)
+{
+	return BKE_rain_lightning_schedule_ex(rate, 0u, BIG_CHANCE, time, r_start, r_seed, r_big);
 }
 
 float BKE_rain_lightning_flash(unsigned int seed, bool big, float t, bool *r_over)
@@ -178,6 +185,38 @@ static void add_strip(RainLightningBolt *bolt, Rng *rng, const float a[3], const
 	bolt->num_strips++;
 }
 
+/* The main channel from top to ground, then 2-5 branches leaving its upper part. */
+static void build_bolt(Rng *rng, const float top[3], const float ground[3], float k, float width,
+                       RainLightningBolt *r_bolt)
+{
+	r_bolt->num_strips = 0;
+	const float core = 0.25f * width * k;
+	add_strip(r_bolt, rng, top, ground, 9.0f * k, 6, core * RAIN_LIGHTNING_GLOW_RATIO, 1.0f, 1.0f);
+
+	/* Branches: shorter, thinner and dimmer, leaving the upper part of the main channel. */
+	const int main_len = r_bolt->strip_len[0];
+	const int branches = rng_int(rng, 2, 5);
+	for (int b = 0; b < branches; b++) {
+		const int i = rng_int(rng, main_len / 8, (int)(main_len * 0.6f));
+		const float *start = r_bolt->co[i];
+		float down[3], out[3], dir[3], end[3];
+		sub_v3_v3v3(down, r_bolt->co[min_ii(i + 4, main_len - 1)], start);
+		normalize_v3(down);
+		out[0] = rng_gauss(rng);
+		out[1] = rng_gauss(rng);
+		out[2] = 0.0f;
+		normalize_v3(out);
+		mul_v3_v3fl(dir, down, 0.6f);
+		madd_v3_v3fl(dir, out, 0.8f);
+		normalize_v3(dir);
+		copy_v3_v3(end, start);
+		madd_v3_v3fl(end, dir, rng_range(rng, 8.0f, 22.0f) * k);
+		add_strip(r_bolt, rng, start, end, 3.5f * k, 4, core * 0.55f * RAIN_LIGHTNING_GLOW_RATIO, 0.6f, 0.15f);
+	}
+
+	mid_v3_v3v3(r_bolt->center, top, ground);
+}
+
 void BKE_rain_lightning_bolt(
         unsigned int seed, const float cam_pos[3], const float cam_fwd[3], float distance, float width,
         RainLightningBolt *r_bolt)
@@ -203,32 +242,64 @@ void BKE_rain_lightning_bolt(
 	madd_v3_v3fl(top, fwd, rng_range(&rng, -10.0f, 10.0f) * k);
 	top[2] = ground[2] + rng_range(&rng, 55.0f, 75.0f) * k;
 
-	r_bolt->num_strips = 0;
-	const float core = 0.25f * width * k;
-	add_strip(r_bolt, &rng, top, ground, 9.0f * k, 6, core * RAIN_LIGHTNING_GLOW_RATIO, 1.0f, 1.0f);
+	build_bolt(&rng, top, ground, k, width, r_bolt);
+}
 
-	/* Branches: shorter, thinner and dimmer, leaving the upper part of the main channel. */
-	const int main_len = r_bolt->strip_len[0];
-	const int branches = rng_int(&rng, 2, 5);
-	for (int b = 0; b < branches; b++) {
-		const int i = rng_int(&rng, main_len / 8, (int)(main_len * 0.6f));
-		const float *start = r_bolt->co[i];
-		float down[3], out[3], dir[3], end[3];
-		sub_v3_v3v3(down, r_bolt->co[min_ii(i + 4, main_len - 1)], start);
-		normalize_v3(down);
-		out[0] = rng_gauss(&rng);
-		out[1] = rng_gauss(&rng);
-		out[2] = 0.0f;
-		normalize_v3(out);
-		mul_v3_v3fl(dir, down, 0.6f);
-		madd_v3_v3fl(dir, out, 0.8f);
-		normalize_v3(dir);
-		copy_v3_v3(end, start);
-		madd_v3_v3fl(end, dir, rng_range(&rng, 8.0f, 22.0f) * k);
-		add_strip(r_bolt, &rng, start, end, 3.5f * k, 4, core * 0.55f * RAIN_LIGHTNING_GLOW_RATIO, 0.6f, 0.15f);
+unsigned int BKE_rain_lightning_salt(const char *name)
+{
+	/* FNV-1a */
+	unsigned int h = 2166136261u;
+	for (; *name; name++) {
+		h = (h ^ (unsigned char)*name) * 16777619u;
 	}
+	return h;
+}
 
-	mid_v3_v3v3(r_bolt->center, top, ground);
+void BKE_rain_lightning_strike_point(
+        unsigned int seed, const float obmat[4][4], float size, bool box, float r_point[3])
+{
+	Rng rng = rng_seed(seed ^ 0x6c8e9cf5u);
+	float local[3] = {0.0f, 0.0f, 0.0f};
+	if (box) {
+		local[0] = rng_range(&rng, -1.0f, 1.0f) * size;
+		local[1] = rng_range(&rng, -1.0f, 1.0f) * size;
+	}
+	else {
+		/* sqrt: uniform over the disk, not packed at the center. */
+		const float r = sqrtf(rng_float(&rng)) * size;
+		const float a = rng_float(&rng) * 2.0f * (float)M_PI;
+		local[0] = cosf(a) * r;
+		local[1] = sinf(a) * r;
+	}
+	mul_v3_m4v3(r_point, obmat, local);
+}
+
+void BKE_rain_lightning_bolt_at(
+        unsigned int seed, const float ground[3], float cloud_z, float width, RainLightningBolt *r_bolt)
+{
+	Rng rng = rng_seed(seed);
+	/* The camera bolt is 55-75 m tall at k = 1. */
+	const float k = max_ff(cloud_z - ground[2], 1.0f) / 65.0f;
+	float top[3];
+	copy_v3_v3(top, ground);
+	top[0] += rng_range(&rng, -15.0f, 15.0f) * k;
+	top[1] += rng_range(&rng, -15.0f, 15.0f) * k;
+	top[2] = max_ff(cloud_z, ground[2] + 1.0f);
+	build_bolt(&rng, top, ground, k, width, r_bolt);
+}
+
+void BKE_rain_lightning_bolt_between(
+        unsigned int seed, const float from[3], const float to[3], float width, RainLightningBolt *r_bolt)
+{
+	Rng rng = rng_seed(seed);
+	const float k = max_ff(len_v3v3(from, to), 1.0f) / 65.0f;
+	build_bolt(&rng, from, to, k, width, r_bolt);
+}
+
+float BKE_rain_lightning_distance_fade(float distance, float flash_distance)
+{
+	const float d2 = flash_distance * flash_distance;
+	return d2 / (d2 + distance * distance);
 }
 
 void BKE_rain_lightning_side(const RainLightningBolt *bolt, int strip, int i, const float cam_pos[3], float r_side[3])

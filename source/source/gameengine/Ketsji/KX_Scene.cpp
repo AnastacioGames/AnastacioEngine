@@ -907,6 +907,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	if (newblenderobj && newblenderobj->type == OB_EMPTY && (newblenderobj->gameflag2 & OB_REVERB_AREA)) {
 		AddReverbAreaObject(newobj);
 	}
+	if (newblenderobj && newblenderobj->type == OB_EMPTY && (newblenderobj->gameflag2 & OB_LIGHTNING)) {
+		AddLightningEmitter(newobj);
+	}
 
 	// Logic cannot be replicated, until the whole hierarchy is replicated.
 	m_logicHierarchicalGameObjects.push_back(newobj);
@@ -1484,6 +1487,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	CM_ListRemoveIfFound(m_gpuParticleColliderObjects, gameobj);
 	if (m_rainAura) {
 		m_rainAura->RemoveObject(gameobj);
+	}
+	if (m_rainLightning) {
+		m_rainLightning->RemoveObject(gameobj);
 	}
 	CM_ListRemoveIfFound(m_reverbAreaObjects, gameobj);
 	if (CM_ListRemoveIfFound(m_staticShadowCasterObjects, gameobj)) {
@@ -2338,7 +2344,24 @@ void KX_Scene::UpdateRainLightning(double time)
 		}
 		m_rainLightning.reset(new KX_RainLightning());
 	}
-	m_rainLightning->Update(GetActiveCamera(), world, time);
+	m_rainLightning->Update(this, GetActiveCamera(), world, time);
+}
+
+void KX_Scene::AddLightningEmitter(KX_GameObject *gameobj)
+{
+	if (!m_rainLightning) {
+		m_rainLightning.reset(new KX_RainLightning());
+	}
+	m_rainLightning->AddEmitter(gameobj);
+}
+
+bool KX_Scene::StrikeLightningAt(KX_GameObject *gameobj, bool bolt)
+{
+	if (!m_rainLightning || !m_rainLightning->HasEmitter(gameobj)) {
+		return false;
+	}
+	m_rainLightning->StrikeAt(gameobj, bolt);
+	return true;
 }
 
 KX_RainLightning *KX_Scene::GetRainLightning() const
@@ -2801,6 +2824,13 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 	m_reverbAreaObjects.insert(m_reverbAreaObjects.end(), other->m_reverbAreaObjects.begin(), other->m_reverbAreaObjects.end());
 	other->m_reverbAreaObjects.clear();
+
+	if (other->m_rainLightning) {
+		if (!m_rainLightning) {
+			m_rainLightning.reset(new KX_RainLightning());
+		}
+		m_rainLightning->TakeEmitters(*other->m_rainLightning);
+	}
 
 	if (!other->m_staticShadowCasterObjects.empty()) {
 		m_staticShadowCasterObjects.insert(m_staticShadowCasterObjects.end(), other->m_staticShadowCasterObjects.begin(), other->m_staticShadowCasterObjects.end());

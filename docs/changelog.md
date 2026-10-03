@@ -9,6 +9,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Emissor de raio em Empty (onde e quando o raio cai)
+
+- Novo `RangeLightningSettings` no `Object` (`ob->lightning`, opt-in por `gameflag2 & OB_LIGHTNING`, só Empty),
+  painel Properties > Object Data > Lightning. Área círculo/quadrado de `empty_drawsize` no plano XY local
+  (segue escala/rotação/pai), altura da nuvem, Hit Ground (raycast até a primeira superfície), Target opcional
+  (o raio vai da área até o objeto, em qualquer direção), modo Automatic (raios/min, chance de bolt, janela
+  Start/End em tempo de jogo) ou Manual, intensidade, largura, cor do glow e distância de fade do flash.
+- Disparo pela lógica: `obj.strikeLightning(bolt=True)` e Edit Object > Lightning Strike (`KX_LightningActuator`,
+  flag Flash Only).
+- `KX_RainLightning` passou a cuidar de vários raios (World + emissores). Os flashes somam no filtro da chuva
+  (o clarão de tela precisa de World > Rain ligado); o halo segue o raio mais forte. O raio do World não mudou.
+- BKE (`rain_lightning.c`): `schedule_ex` com salt por nome (editor e jogo na mesma agenda), `strike_point`,
+  `bolt_at`, `bolt_between`; geometria comum em `build_bolt`. 3D View: preview dos raios automáticos
+  (`view3d_rain.c`, mantém o timer de redraw) e overlay da área + linha até a nuvem/target (`drawobject.c`).
+- Header da 3D View: o campo de nome do objeto ativo continua visível (apagado) quando o objeto não está num
+  layer visível; antes sumia ao trocar de layer. Demo `release/demos/Lightning/Lightning.range` (um exemplo por layer).
+- Convert to Python: Edit Object > Lightning Strike vira `ob.strikeLightning(True)` (ou `False` com Flash Only).
+  Traduções PT-BR/ES/RU (`translations_ui.py`) de todos os textos do emissor e do raio do World; `i18n_audit.py`
+  sem pendências de lightning nos três idiomas.
+
 ## 2026-10-03 - Weather: Live UI sem travar, nuvens e chuva na 3D View
 
 - Live UI: editar World > Weather durante o Play travava/crashava porque `ED_render_id_flush_update` liberava

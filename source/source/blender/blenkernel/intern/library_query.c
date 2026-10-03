@@ -401,6 +401,7 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 
 				CALLBACK_INVOKE(scene->camera, IDWALK_CB_NOP);
 				CALLBACK_INVOKE(scene->world, IDWALK_CB_USER);
+				CALLBACK_INVOKE(scene->world_sun, IDWALK_CB_USER);
 				CALLBACK_INVOKE(scene->set, IDWALK_CB_NOP);
 				CALLBACK_INVOKE(scene->clip, IDWALK_CB_USER);
 				if (scene->nodetree) {
@@ -565,6 +566,8 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 				/* Native destruction / explosive (refcounted by RNA). */
 				CALLBACK_INVOKE(object->destruction.fragments, IDWALK_CB_USER);
 				CALLBACK_INVOKE(object->explosive.effect, IDWALK_CB_USER);
+				/* Lightning emitter target (not refcounted, like track). */
+				CALLBACK_INVOKE(object->lightning.target, IDWALK_CB_NOP);
 				CALLBACK_INVOKE(object->deform.decal, IDWALK_CB_USER);
 				/* Game pointers not refcounted by RNA: listed so deleting the target clears them. */
 				CALLBACK_INVOKE(object->vehicle_steering_wheel, IDWALK_CB_NOP);

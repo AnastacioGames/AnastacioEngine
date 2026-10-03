@@ -477,6 +477,7 @@ typedef struct bActuator {
 #define ACT_EDOB_TRACK_TO		3
 #define ACT_EDOB_DYNAMICS		4
 #define ACT_EDOB_CHANGE_COLOR	5
+#define ACT_EDOB_LIGHTNING_STRIKE	6 /* a strike of the owner lightning emitter (Empty) */
 
 /* editObjectActuator->localflag */
 #define ACT_EDOB_LOCAL_LINV		2
@@ -506,6 +507,8 @@ typedef struct bActuator {
  * property (bEditObjectActuator->name) instead of the Object pointer. */
 #define ACT_EDOB_ADD_FROM_PROP			8
 #define ACT_EDOB_ADD_PROP_GLOBAL		16 /* property lives on the World (World Property) instead of the owner Object */
+/* editObjectActuator->flag for Lightning Strike: a flash in the cloud, no bolt */
+#define ACT_EDOB_LIGHTNING_FLASH_ONLY	32
 
 /* editObjectActuator->dyn_operation */
 #define ACT_EDOB_RESTORE_DYN	0

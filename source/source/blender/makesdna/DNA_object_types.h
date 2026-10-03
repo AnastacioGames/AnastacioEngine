@@ -385,6 +385,47 @@ enum {
 	DEFORM_MODE_BEND = 1,
 };
 
+/* Lightning emitter (opt-in on an Empty via gameflag2 & OB_LIGHTNING): strikes fall inside the
+ * area of the Empty (circle or box of empty_drawsize, following its scale and rotation), from
+ * `height` meters above it, automatically (rate per minute inside a time window) or only when the
+ * logic asks (obj.strikeLightning() / Edit Object > Lightning Strike). Independent from World >
+ * Rain > Lightning, which keeps its strikes in front of the camera. height == 0 means not
+ * initialized yet (old files): rna_object.c fills the defaults on first enable. */
+typedef struct RangeLightningSettings {
+	struct Object *target; /* optional: bolts go from the area to this object instead of cloud to ground */
+	int flags;            /* LIGHTNING_* */
+	short mode;           /* LIGHTNING_MODE_* */
+	short shape;          /* LIGHTNING_SHAPE_* */
+	float rate;           /* automatic strikes per minute */
+	float big_chance;     /* share of strikes with a visible bolt (the others are a flash only) */
+	float start_time;     /* seconds of game time before the first automatic strike */
+	float end_time;       /* seconds of game time after which it stops, 0 = never */
+	float height;         /* cloud height above the strike point (m) */
+	float intensity;
+	float width;
+	float color[3];       /* glow tint of the bolt */
+	float flash_distance; /* the flash fades with the camera distance past this (m) */
+	int pad;
+} RangeLightningSettings;
+
+/* RangeLightningSettings.flags */
+enum {
+	LIGHTNING_HIT_GROUND = 1 << 0,  /* in game, the bolt ends on the first static surface below */
+	LIGHTNING_PREVIEW    = 1 << 1,  /* strikes also shown in the 3D View */
+};
+
+/* RangeLightningSettings.mode */
+enum {
+	LIGHTNING_MODE_AUTOMATIC = 0,
+	LIGHTNING_MODE_MANUAL    = 1,
+};
+
+/* RangeLightningSettings.shape */
+enum {
+	LIGHTNING_SHAPE_CIRCLE = 0,
+	LIGHTNING_SHAPE_BOX    = 1,
+};
+
 enum {
 	GPU_PARTICLE_LOOK_DEFAULT = 0,
 	GPU_PARTICLE_LOOK_SMOKE = 1,
@@ -689,6 +730,8 @@ typedef struct Object {
 	struct RangeExplosiveSettings explosive;
 	/* Native impact deformation, opt-in via gameflag2 & OB_DEFORMABLE. */
 	struct RangeDeformSettings deform;
+	/* Lightning emitter, opt-in via gameflag2 & OB_LIGHTNING (Empty objects). */
+	struct RangeLightningSettings lightning;
 
 	/* User names for the 30 logic states (empty = unnamed). */
 	char state_names[30][32];
@@ -1018,6 +1061,8 @@ enum {
 	OB_EXPLOSIVE                     = 1 << 15,
 	/* ob->deform: hits dent its mesh (per instance copy) around the contact point. */
 	OB_DEFORMABLE                    = 1 << 16,
+	/* ob->lightning: this Empty is a lightning emitter (where and when strikes fall). */
+	OB_LIGHTNING                     = 1 << 17,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };
