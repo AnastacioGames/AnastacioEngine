@@ -48,6 +48,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_hash.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -1953,6 +1954,14 @@ const TransCenterData *transformCenter_from_type(TransInfo *t, int around)
 	return cd;
 }
 
+/* Deterministic [0..1] value from a position (used by PROP_RANDOM). */
+static float prop_random_factor(const float co[3])
+{
+	unsigned int k[3];
+	memcpy(k, co, sizeof(k));
+	return BLI_hash_int_01(BLI_hash_int_2d(BLI_hash_int_2d(k[0], k[1]), k[2]));
+}
+
 void calculatePropRatio(TransInfo *t)
 {
 	TransData *td = t->data;
@@ -2022,7 +2031,9 @@ void calculatePropRatio(TransInfo *t)
 						td->factor = sqrtf(2 * dist - dist * dist);
 						break;
 					case PROP_RANDOM:
-						td->factor = BLI_frand() * dist;
+						/* Stable per element: hash of the initial location, so the noise pattern
+						 * does not flicker while the proportional size changes. */
+						td->factor = prop_random_factor(td->iloc) * dist;
 						break;
 					case PROP_INVSQUARE:
 						td->factor = dist * (2.0f - dist);

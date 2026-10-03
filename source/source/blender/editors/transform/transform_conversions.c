@@ -52,6 +52,7 @@
 #include "BLI_string.h"
 #include "BLI_bitmap.h"
 #include "BLI_rect.h"
+#include "BLI_kdtree.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_action.h"
@@ -203,6 +204,74 @@ static void sort_trans_data(TransInfo *t)
 	}
 }
 
+#define PROP_DIST_KDTREE_MIN_SELECTED 8
+
+static void prop_dist_space_co(float r_co[3], const float co[3], float mtx[3][3], const float *proj_vec)
+{
+	mul_v3_m3v3(r_co, mtx, co);
+	if (proj_vec) {
+		float co_p[3];
+		project_v3_v3v3(co_p, r_co, proj_vec);
+		sub_v3_v3(r_co, co_p);
+	}
+}
+
+/* Same result as the brute-force loop in #set_prop_dist (distance is linear in mtx and in the
+ * view projection, so points can be transformed before the search). Returns false when not usable. */
+static bool set_prop_dist_kdtree(TransInfo *t, const bool with_dist, const bool use_island, const float *proj_vec)
+{
+	TransData *td;
+	int a, totsel = 0;
+
+	/* Selected items are at the beginning of the array. */
+	for (td = t->data; totsel < t->total && (td->flag & TD_SELECTED); totsel++, td++) {}
+
+	if (totsel < PROP_DIST_KDTREE_MIN_SELECTED || totsel == t->total) {
+		return false;
+	}
+	for (a = 1, td = t->data + 1; a < t->total; a++, td++) {
+		if (memcmp(td->mtx, t->data->mtx, sizeof(td->mtx)) != 0) {
+			return false;
+		}
+	}
+
+	float mtx[3][3];
+	copy_m3_m3(mtx, t->data->mtx);
+
+	KDTree *tree = BLI_kdtree_new(totsel);
+	for (a = 0, td = t->data; a < totsel; a++, td++) {
+		float co[3];
+		prop_dist_space_co(co, use_island ? td->iloc : td->center, mtx, proj_vec);
+		BLI_kdtree_insert(tree, a, co);
+		td->rdist = 0.0f;
+	}
+	BLI_kdtree_balance(tree);
+
+	for (td = t->data + totsel, a = totsel; a < t->total; a++, td++) {
+		KDTreeNearest nearest;
+		float co[3];
+		prop_dist_space_co(co, use_island ? td->iloc : td->center, mtx, proj_vec);
+		const int index = BLI_kdtree_find_nearest(tree, co, &nearest);
+		if (index != -1) {
+			td->rdist = nearest.dist;
+			if (use_island) {
+				TransData *td_near = &t->data[index];
+				copy_v3_v3(td->center, td_near->center);
+				copy_m3_m3(td->axismtx, td_near->axismtx);
+			}
+		}
+		else {
+			td->rdist = -1.0f;
+		}
+		if (with_dist) {
+			td->dist = td->rdist;
+		}
+	}
+
+	BLI_kdtree_free(tree);
+	return true;
+}
+
 /* distance calculated from not-selected vertex to nearest selected vertex
  * warning; this is loops inside loop, has minor N^2 issues, but by sorting list it is OK */
 static void set_prop_dist(TransInfo *t, const bool with_dist)
@@ -222,6 +291,12 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
 			normalize_v3_v3(_proj_vec, rv3d->viewinv[2]);
 			proj_vec = _proj_vec;
 		}
+	}
+
+	/* Fast path: nearest selected element via KD-tree, O(N log M) instead of O(N * M).
+	 * Valid when every element measures in the same space (shared mtx), e.g. edit-mesh. */
+	if (set_prop_dist_kdtree(t, with_dist, use_island, proj_vec)) {
+		return;
 	}
 
 	for (a = 0, tob = t->data; a < t->total; a++, tob++) {

@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Edição proporcional: distâncias com KD-tree e Random estável
+
+- `set_prop_dist` (`transform_conversions.c`): o vizinho selecionado mais próximo de cada elemento não
+  selecionado agora vem de uma KD-tree (`set_prop_dist_kdtree`), O(N log M) em vez de O(N×M). Vale para o modo
+  normal, Projected e ilhas de faces. Só é usada quando todos os elementos têm a mesma `mtx` (edit-mesh) e há
+  ao menos 8 selecionados; senão, cai no laço antigo. O início do G/R/S em malhas densas fica bem mais rápido.
+- PROP_RANDOM (`transform_generics.c`): o fator vem de um hash do `iloc` em vez de `BLI_frand`, então o
+  padrão não pisca ao mudar o raio com a roda do mouse.
+- As fórmulas dos outros modos foram conferidas com o Blender e não mudaram.
+
 ## 2026-10-03 - Sculpt e pintura mais leves no editor (fases 1 a 3)
 
 Diagnóstico: o código dos pincéis já roda em várias threads; o custo estava no que acontece a cada passo do
