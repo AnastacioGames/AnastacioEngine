@@ -54,6 +54,9 @@ ferramenta correspondente.
   BVH da física; cada objeto mantém a própria forma. `RANGE_NO_LOOPDATA_CACHE=1` desliga o cache de tangentes.
 - Imagens das texturas são decodificadas em paralelo antes do upload (`BKE_image_prefetch`, cena e LibLoad);
   `RANGE_NO_IMAGE_PREFETCH=1` desliga.
+- LibLoad assíncrono serve para tela de loading: `status.progress` sobe de verdade (conversão na thread, depois
+  texturas e shaders) e o merge na thread principal gasta ~8 ms por frame; `finished` só no fim. Pré-carregar
+  com os objetos em camada inativa e depois instanciar com `addObject`.
 - Render > Shading > Shader Compilation > **Fast Shader Loading** (`GAME_FAST_SHADER_LOAD`, desligado por padrão;
   `RANGE_SHADER_UNIFORM_VALUES=1` força ligado) passa os valores fixos dos materiais como uniforms: materiais de
   mesma estrutura compartilham o shader (800 esferas: 64 s → 5 s de compilação), mas perde o constant folding:

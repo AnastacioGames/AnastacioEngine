@@ -35,6 +35,7 @@
 #include "BL_Resource.h"
 
 #include <map>
+#include <functional>
 #include <vector>
 
 class SCA_IActuator;
@@ -82,6 +83,9 @@ private:
 	std::map<bActuator *, SCA_IActuator *> m_map_blender_to_gameactuator;
 	std::map<bController *, SCA_IController *> m_map_blender_to_gamecontroller;
 
+	/// Fraction (0..1) of the objects converted, reported while converting (async LibLoad progress).
+	std::function<void(float)> m_progressCallback;
+
 public:
 	BL_SceneConverter(KX_Scene *scene, const BL_Resource::Library& libraryId);
 	~BL_SceneConverter() = default;
@@ -114,6 +118,9 @@ public:
 
 	const std::vector<KX_GameObject *>& GetObjects() const;
 	const std::vector<KX_BlenderMaterial *>& GetMaterials() const;
+
+	void SetProgressCallback(const std::function<void(float)>& callback);
+	void ReportProgress(float fraction) const;
 };
 
 #endif  // __KX_BLENDERSCENECONVERTER_H__

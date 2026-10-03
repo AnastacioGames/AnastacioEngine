@@ -58,7 +58,8 @@ BL_SceneConverter::BL_SceneConverter(BL_SceneConverter&& other)
 	m_map_mesh_to_gamemesh(std::move(other.m_map_mesh_to_gamemesh)),
 	m_map_mesh_to_polyaterial(std::move(other.m_map_mesh_to_polyaterial)),
 	m_map_blender_to_gameactuator(std::move(other.m_map_blender_to_gameactuator)),
-	m_map_blender_to_gamecontroller(std::move(other.m_map_blender_to_gamecontroller))
+	m_map_blender_to_gamecontroller(std::move(other.m_map_blender_to_gamecontroller)),
+	m_progressCallback(std::move(other.m_progressCallback))
 {
 }
 
@@ -174,4 +175,16 @@ const std::vector<KX_GameObject *> &BL_SceneConverter::GetObjects() const
 const std::vector<KX_BlenderMaterial *> &BL_SceneConverter::GetMaterials() const
 {
 	return m_materials;
+}
+
+void BL_SceneConverter::SetProgressCallback(const std::function<void(float)>& callback)
+{
+	m_progressCallback = callback;
+}
+
+void BL_SceneConverter::ReportProgress(float fraction) const
+{
+	if (m_progressCallback) {
+		m_progressCallback(fraction);
+	}
 }

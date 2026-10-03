@@ -27,6 +27,9 @@ Aberto:
   exigiria o `.cooked`.
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
   serial na GPU; DDS no `.cooked` cortaria ambos.
+- Tela de loading do LibLoad (2026-10-03): `asynchronous=True` agora tem progresso real (conversão por
+  objeto, depois texturas e shaders um a um) e o merge se espalha em frames de ~8 ms. Falta o usuário testar
+  num jogo real; a abertura/link do arquivo ainda é síncrona.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

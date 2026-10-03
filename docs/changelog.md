@@ -9,6 +9,28 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - LibLoad assíncrono: progresso real e merge espalhado em frames (tela de loading)
+
+- Antes: `LibLoad(..., asynchronous=True)` pulava de 0 para 0,9 ao fim da conversão na thread, e o merge
+  (texturas + shaders) rodava inteiro num frame. `lib_spheres.range` (200 materiais, 4 lâmpadas): um frame de
+  ~1 s no fim.
+- Conversão na thread: `BL_SceneConverter::SetProgressCallback` relata objeto a objeto
+  (`BL_ConvertBlenderObjects`), 0 → 0,6 do `status.progress`.
+- Merge na thread principal (`BL_Converter::StepMerge`, `PendingMerge`): ~8 ms por frame, no mínimo um passo.
+  Texturas (0,7), depois shaders um material por passo (até 0,95), depois o merge da cena; `finished` só no fim.
+  Sem lâmpada nova, os materiais novos compilam contra a cena de destino antes dos objetos entrarem (mesmo
+  shader do merge síncrono). Com lâmpada nova, o merge vem antes e todos os materiais da cena recompilam um por
+  passo, de trás para frente (os novos, ainda sem shader, primeiro); até lá os shaders antigos seguem válidos,
+  só sem a luz nova. `FinalizeAsyncLoads` (fim do jogo) termina tudo de uma vez.
+- `MergeScene(to, converter, postConvert)`: com `false` não roda texturas nem recompila (o chamador faz).
+  LibLoad síncrono não muda.
+- Medido com `projects-teste/shader_cache_test/make_async_test.py` (log por frame em `async_log.txt`):
+  com lâmpadas, 1,71 s com frame de 1015 ms → 1,58 s, nenhum frame acima de 19,3 ms, 90 frames de barra;
+  sem lâmpadas, 694 ms, máximo 17 ms (uma rodada com cache do driver frio teve um frame de 464 ms: um shader
+  sozinho não divide). Síncrono igual ao anterior.
+- Limite: o `LibLoad` em si (abrir e linkar o arquivo) continua síncrono, 28 ms neste teste. `onProgress`
+  segue desativado; a tela de loading lê `status.progress` a cada frame.
+
 ## 2026-10-03 - Carregamento: imagens das texturas decodificadas em paralelo
 
 - Medição (80 PNG 2048², `[Load]` + cronômetros temporários): a etapa de texturas levava 2,2 s, sendo ~1,9 s

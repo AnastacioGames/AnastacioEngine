@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-03 (`HEAD` `ded0c6ce`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-03 (`HEAD` `bbdf0882`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -133,7 +133,7 @@ Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdP
 
 ---
 
-## `Converter/BL_BlenderDataConversion.cpp` (2.979 linhas)
+## `Converter/BL_BlenderDataConversion.cpp` (2.986 linhas)
 
 Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConversion.h` (86 linhas).
 

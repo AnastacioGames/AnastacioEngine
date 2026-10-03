@@ -98,6 +98,27 @@ private:
 
 	/// List of loaded libraries to merge.
 	std::vector<KX_LibLoadStatus *> m_mergequeue;
+
+	/** Async library being merged in the main thread, a slice per frame (textures, then the shaders of
+	 * its new materials, then the scene merge) so a loading screen keeps drawing and its progress moves.
+	 */
+	struct PendingMerge {
+		KX_LibLoadStatus *m_status;
+		/// Scene converter being merged.
+		unsigned int m_scene;
+		enum Stage {
+			STAGE_TEXTURES,
+			STAGE_SHADERS,
+			STAGE_MERGE,
+			STAGE_RELOAD_ALL
+		} m_stage;
+		/// Next material to compile in STAGE_SHADERS or STAGE_RELOAD_ALL.
+		unsigned int m_material;
+		/// The scene brings lights: merge first, then recompile every material of the target scene.
+		bool m_newLights;
+	};
+	/// Libraries being merged, only touched by the main thread.
+	std::vector<PendingMerge> m_merging;
 	/// List of libraries to free.
 	std::vector<Main *> m_freeQueue;
 
@@ -134,8 +155,10 @@ private:
 	 * - merge data
 	 * - merge scene (KX_Scene::MergeScene)
 	 * - finalize data
+	 * \param postConvert False when the caller already ran PostConvertScene() and compiled the new
+	 * materials (async merge in StepMerge()).
 	 */
-	void MergeScene(KX_Scene *to, const BL_SceneConverter& converter);
+	void MergeScene(KX_Scene *to, const BL_SceneConverter& converter, bool postConvert = true);
 
 	/** Regenerate material shader after a converting or merging a scene
 	 * depending on all the lights into the destination scene.
@@ -143,6 +166,9 @@ private:
 	void ReloadShaders(KX_Scene *scene);
 	/// Regenerate shaders of material in given scene converter, used when creating mesh.
 	void ReloadShaders(const BL_SceneConverter& converter);
+
+	/// Advance a library merge until done or the deadline (PIL time) passes, true when finished.
+	bool StepMerge(PendingMerge& merge, double deadline);
 
 	/// Delay library merging to ProcessScheduledLibraries.
 	void AddScenesToMergeQueue(KX_LibLoadStatus *status);

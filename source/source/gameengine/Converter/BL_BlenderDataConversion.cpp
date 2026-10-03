@@ -2195,7 +2195,14 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	 */
 	Scene *sce_iter;
 	Base *base;
+	// Object count for the progress report (async LibLoad loading screens).
+	int totalBases = 0;
 	for (SETLOOPER(blenderscene, sce_iter, base)) {
+		++totalBases;
+	}
+	int convertedBases = 0;
+	for (SETLOOPER(blenderscene, sce_iter, base)) {
+		converter.ReportProgress((float)convertedBases++ / (float)max_ii(totalBases, 1));
 		Object *blenderobject = base->object;
 		allblobj.insert(blenderobject);
 

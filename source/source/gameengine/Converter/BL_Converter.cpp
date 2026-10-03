@@ -89,6 +89,8 @@ extern "C" {
 
 #include "GPU_material.h" // GPU_shader_cache_stats
 
+#include <algorithm>
+#include <cfloat>
 #include <cstring>
 #include <memory>
 
@@ -429,21 +431,126 @@ std::vector<std::string> BL_Converter::GetLibraryNames() const
 	return names;
 }
 
+/// Main thread time spent per frame merging async libraries, the loading screen draws in between.
+static const double merge_frame_budget = 0.008;
+
+/// Async LibLoad progress of a scene: conversion in the thread, textures, shaders, then the merge.
+static const float progress_converted = 0.6f;
+static const float progress_textures = 0.7f;
+static const float progress_shaders = 0.95f;
+
+static void set_scene_progress(KX_LibLoadStatus *status, unsigned int scene, float fraction)
+{
+	const float count = (float)std::max<size_t>(status->GetSceneConverters().size(), 1);
+	status->SetProgress(((float)scene + fraction) / count);
+}
+
+/// Merged lamps get a base in the target Blender scene and every material shader loops over those bases.
+static bool has_new_lights(const BL_SceneConverter& converter)
+{
+	for (KX_GameObject *gameobj : converter.GetObjects()) {
+		if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
+{
+	KX_LibLoadStatus *status = merge.m_status;
+	KX_Scene *mergeScene = status->GetMergeScene();
+	std::vector<BL_SceneConverter>& converters = status->GetSceneConverters();
+
+	while (merge.m_scene < converters.size()) {
+		BL_SceneConverter& converter = converters[merge.m_scene];
+		switch (merge.m_stage) {
+			case PendingMerge::STAGE_TEXTURES:
+			{
+				const double start = PIL_check_seconds_timer();
+				PostConvertScene(converter);
+				CM_Message("[Load] async textures \"" << converter.GetScene()->GetName() << "\": "
+				           << load_ms(PIL_check_seconds_timer() - start) << "ms");
+				set_scene_progress(status, merge.m_scene, progress_textures);
+				merge.m_newLights = has_new_lights(converter);
+				merge.m_stage = merge.m_newLights ? PendingMerge::STAGE_MERGE : PendingMerge::STAGE_SHADERS;
+				merge.m_material = 0;
+				break;
+			}
+			case PendingMerge::STAGE_SHADERS:
+			{
+				/* No new lights: compile the new materials against the destination scene before their
+				 * objects join it, one per step. Same shaders MergeScene() would build. */
+				const std::vector<KX_BlenderMaterial *>& materials = converter.GetMaterials();
+				if (merge.m_material < materials.size()) {
+					KX_BlenderMaterial *mat = materials[merge.m_material++];
+					mat->ReplaceScene(mergeScene);
+					mat->ReloadMaterial();
+					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
+					                   (float)merge.m_material / (float)materials.size());
+				}
+				else {
+					merge.m_stage = PendingMerge::STAGE_MERGE;
+				}
+				break;
+			}
+			case PendingMerge::STAGE_MERGE:
+			{
+				MergeScene(mergeScene, converter, false);
+				merge.m_material = 0;
+				merge.m_stage = PendingMerge::STAGE_RELOAD_ALL;
+				break;
+			}
+			case PendingMerge::STAGE_RELOAD_ALL:
+			{
+				/* New lights: every shader of the destination scene loops over its lights, so all of them
+				 * recompile, one per step. Until then the old shaders stay valid, they just miss the new
+				 * lights. Backwards: the new materials, still without shader, sit at the end of the list. */
+				UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[mergeScene].m_materials;
+				if (merge.m_newLights && merge.m_material < materials.size()) {
+					materials[materials.size() - 1 - merge.m_material++]->ReloadMaterial();
+					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
+					                   (float)merge.m_material / (float)materials.size());
+					break;
+				}
+				++merge.m_scene;
+				merge.m_stage = PendingMerge::STAGE_TEXTURES;
+				if (merge.m_scene < converters.size()) {
+					set_scene_progress(status, merge.m_scene, 0.0f);
+				}
+				break;
+			}
+		}
+
+		if (PIL_check_seconds_timer() >= deadline) {
+			break;
+		}
+	}
+
+	return (merge.m_scene >= converters.size());
+}
+
 void BL_Converter::ProcessScheduledLibraries()
 {
 	m_threadinfo.m_mutex.Lock();
-	const std::vector<KX_LibLoadStatus *> mergeQueue = m_mergequeue;
+	for (KX_LibLoadStatus *libload : m_mergequeue) {
+		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0, false});
+	}
 	m_mergequeue.clear();
 	m_threadinfo.m_mutex.Unlock();
 
-	for (KX_LibLoadStatus *libload : mergeQueue) {
-		KX_Scene *mergeScene = libload->GetMergeScene();
-		std::vector<BL_SceneConverter>& converters = libload->GetSceneConverters();
-		for (const BL_SceneConverter& converter : converters) {
-			MergeScene(mergeScene, converter);
+	// Merge in loading order, at least one step per frame even when a step outlasts the budget.
+	const double deadline = PIL_check_seconds_timer() + merge_frame_budget;
+	while (!m_merging.empty()) {
+		if (!StepMerge(m_merging.front(), deadline)) {
+			break;
 		}
-
+		KX_LibLoadStatus *libload = m_merging.front().m_status;
+		m_merging.erase(m_merging.begin());
 		libload->Finish();
+		if (PIL_check_seconds_timer() >= deadline) {
+			break;
+		}
 	}
 
 	for (Main *maggie : m_freeQueue) {
@@ -457,6 +564,19 @@ void BL_Converter::FinalizeAsyncLoads()
 	// Finish all loading libraries.
 	BLI_task_pool_work_and_wait(m_threadinfo.m_pool);
 	// Merge all libraries data in the current scene, to avoid memory leak of unmerged scenes.
+	m_threadinfo.m_mutex.Lock();
+	for (KX_LibLoadStatus *libload : m_mergequeue) {
+		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0, false});
+	}
+	m_mergequeue.clear();
+	m_threadinfo.m_mutex.Unlock();
+
+	for (PendingMerge& merge : m_merging) {
+		StepMerge(merge, DBL_MAX);
+		merge.m_status->Finish();
+	}
+	m_merging.clear();
+
 	ProcessScheduledLibraries();
 }
 
@@ -473,9 +593,14 @@ void BL_Converter::AsyncConvertTask(TaskPool *pool, void *ptr, int UNUSED(thread
 	BL_Converter *converter = status->GetConverter();
 
 	std::vector<BL_SceneConverter>& converters = status->GetSceneConverters();
-	for (BL_SceneConverter& sceneConverter : converters) {
+	for (unsigned int i = 0; i < converters.size(); ++i) {
+		BL_SceneConverter& sceneConverter = converters[i];
+		sceneConverter.SetProgressCallback([status, i](float fraction) {
+			set_scene_progress(status, i, fraction * progress_converted);
+		});
 		converter->ConvertScene(sceneConverter, true, false);
-		status->AddProgress((1.0f / converters.size()) * 0.9f); // We'll call conversion 90% and merging 10% for now
+		sceneConverter.SetProgressCallback(nullptr);
+		set_scene_progress(status, i, progress_converted);
 	}
 
 	status->GetConverter()->AddScenesToMergeQueue(status);
@@ -849,38 +974,36 @@ void BL_Converter::MergeSceneData(KX_Scene *to, const BL_SceneConverter& convert
 	m_sceneSlots[to].Merge(converter);
 }
 
-void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter)
+void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter, bool postConvert)
 {
 	const double texturesStart = PIL_check_seconds_timer();
-	PostConvertScene(converter);
+	if (postConvert) {
+		PostConvertScene(converter);
+	}
 	const double mergeStart = PIL_check_seconds_timer();
 
 	MergeSceneData(to, converter);
 
-	// Merged lamps (active or inactive) get a base in the target Blender scene and every material
-	// shader loops over those bases, so only then the existing materials must be recompiled.
-	bool newLights = false;
-	for (KX_GameObject *gameobj : converter.m_objects) {
-		if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
-			newLights = true;
-			break;
-		}
-	}
+	// Only new lights make the existing materials recompile (see has_new_lights()).
+	const bool newLights = has_new_lights(converter);
 
 	KX_Scene *from = converter.GetScene();
 	to->MergeScene(from);
 
-	const double shadersStart = PIL_check_seconds_timer();
-	reset_load_shader_stats();
-	if (newLights) {
-		ReloadShaders(to);
+	// The async merge compiles the shaders itself, spread over frames (StepMerge()).
+	if (postConvert) {
+		const double shadersStart = PIL_check_seconds_timer();
+		reset_load_shader_stats();
+		if (newLights) {
+			ReloadShaders(to);
+		}
+		else {
+			ReloadShaders(converter);
+		}
+		print_load_shaders(to, newLights ? "merge into" : "merge into (new materials only)",
+		                   newLights ? m_sceneSlots[to].m_materials.size() : converter.m_materials.size(),
+		                   mergeStart - texturesStart, shadersStart - mergeStart, PIL_check_seconds_timer() - shadersStart);
 	}
-	else {
-		ReloadShaders(converter);
-	}
-	print_load_shaders(to, newLights ? "merge into" : "merge into (new materials only)",
-	                   newLights ? m_sceneSlots[to].m_materials.size() : converter.m_materials.size(),
-	                   mergeStart - texturesStart, shadersStart - mergeStart, PIL_check_seconds_timer() - shadersStart);
 
 	delete from;
 }
