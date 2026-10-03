@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Weather: Live UI sem travar, nuvens e chuva na 3D View
+
+- Live UI: editar World > Weather durante o Play travava/crashava porque `ED_render_id_flush_update` liberava
+  os GPUMaterials ainda em uso pelo jogo. Agora retorna cedo com `WM_game_live_ui_active()`; os previews de
+  shader/ícone (`render_preview.c`) também ficam suspensos nesse modo. O jogo lê chuva, nuvens e flare do
+  World a cada frame (`KX_RenderPipeline.cpp`) e o painel desativa os toggles que exigem recompilar.
+- `GPU_fx_compositor_initialize_passes` (`gpu_compositing.c`): `scenefx_flag` era `char`. CLOUDS (bit 8) era
+  truncado, então as nuvens nunca apareciam na viewport fora do Play; RAIN (bit 7) virava negativo e ligava
+  passes sem buffers (SSAO/SSR...), sumindo com os objetos. Agora é `int`.
+
 ## 2026-10-03 - Widget de navegação da 3D View no estilo do Blender 5
 
 - `draw_view_axis` (`view3d_draw.c`): saiu o cubo translúcido. Cada eixo positivo termina numa bolinha cheia

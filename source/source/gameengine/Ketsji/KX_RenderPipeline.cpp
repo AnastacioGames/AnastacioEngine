@@ -653,9 +653,23 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		if (RAS_2DFilter *rain = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_RAIN, true)) {
 			BuildInFilters *rainParams = rain->GetBuildInFilters();
 			rainParams->rain_time = time;
-			// Splash / streak width can be changed at runtime (world.setWeather), so read them
-			// back from the World every frame -- a handful of floats, no recompile.
+			// Every rain value is a uniform and can change at runtime (world.setWeather, or the
+			// Live UI during Play), so read them back from the World every frame -- a handful
+			// of floats, no recompile.
 			if (const World *world = scene->GetBlenderScene()->world) {
+				rainParams->useRainDroplets = (world->weather_flag & WO_WEATHER_RAIN_DROPLETS) != 0;
+				rainParams->useRainRipple = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE) != 0;
+				rainParams->rain_style = world->rain_style;
+				rainParams->rain_intensity = world->rain_intensity;
+				rainParams->rain_density = world->rain_density;
+				rainParams->rain_speed = world->rain_speed;
+				rainParams->rain_wind = world->rain_wind;
+				rainParams->rain_darken = world->rain_darken;
+				rainParams->rain_ripple_distance = world->rain_ripple_distance;
+				rainParams->rain_ripple_min_up = world->rain_ripple_min_up;
+				for (int i = 0; i < 3; ++i) {
+					rainParams->rain_color[i] = world->rain_color[i];
+				}
 				rainParams->useRainSplash = (world->weather_flag & WO_WEATHER_RAIN_SPLASH) != 0;
 				rainParams->rain_streak_width = world->rain_streak_width;
 				rainParams->rain_ripple = world->rain_ripple;
@@ -673,11 +687,24 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 			}
 		}
 		if (RAS_2DFilter *clouds = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true)) {
-			clouds->GetBuildInFilters()->cloud_time = time;
+			BuildInFilters *cloudParams = clouds->GetBuildInFilters();
+			cloudParams->cloud_time = time;
+			if (const World *world = scene->GetBlenderScene()->world) {
+				cloudParams->cloud_coverage = world->cloud_coverage;
+				cloudParams->cloud_scale = world->cloud_scale;
+				cloudParams->cloud_speed = world->cloud_speed;
+				for (int i = 0; i < 3; ++i) {
+					cloudParams->cloud_color[i] = world->cloud_color[i];
+				}
+			}
 		}
 		if (flareFilter) {
 			BuildInFilters *flareParams = flareFilter->GetBuildInFilters();
 			flareParams->flare_time = time;
+			if (const World *world = scene->GetBlenderScene()->world) {
+				flareParams->flare_scale = world->flare_scale;
+				flareParams->flare_intensity = world->flare_intensity;
+			}
 			flareParams->flare_sun_x = sunPos[0];
 			flareParams->flare_sun_y = sunPos[1];
 		}

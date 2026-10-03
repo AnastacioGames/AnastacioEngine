@@ -1203,6 +1203,11 @@ void ED_preview_icon_job(const bContext *C, void *owner, ID *id, unsigned int *r
 	wmJob *wm_job;
 	IconPreview *ip, *old_ip;
 
+	/* Ver ED_preview_shader_job: sem preview em thread durante o Play com a UI liberada. */
+	if (WM_game_live_ui_active()) {
+		return;
+	}
+
 	ED_preview_ensure_dbase();
 
 	/* suspended start means it starts after 1 timer step, see WM_jobs_timer below */
@@ -1248,6 +1253,12 @@ void ED_preview_shader_job(const bContext *C, void *owner, ID *id, ID *parent, M
 	Scene *scene = CTX_data_scene(C);
 	short id_type = GS(id->name);
 	bool use_new_shading = BKE_scene_use_new_shading_nodes(scene);
+
+	/* Play com a UI liberada: o preview renderiza numa thread enquanto o jogo usa o mesmo
+	 * contexto GL e os mesmos dados; editar o World/material travava o editor. */
+	if (WM_game_live_ui_active()) {
+		return;
+	}
 
 	/* Only texture node preview is supported with Cycles. */
 	if (use_new_shading && method == PR_NODE_RENDER && id_type != ID_TE) {

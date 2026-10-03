@@ -425,7 +425,8 @@ bool GPU_fx_compositor_initialize_passes(
 	int w = BLI_rcti_size_x(rect), h = BLI_rcti_size_y(rect);
 	char err_out[256];
 	int num_passes = 0;
-	char fx_flag, scenefx_flag;
+	char fx_flag;
+	int scenefx_flag; /* int: bits derivados do World (ex. CLOUDS = 1 << 8) nao cabem em char */
 
 	const SCENEFXSettings *scenefx_settings = &scene->scenefx_settings;
 

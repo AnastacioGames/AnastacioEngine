@@ -1,5 +1,13 @@
 import bpy
 from bpy.types import Panel
+from bpy.app.translations import pgettext_iface as iface_
+
+
+def not_live_layout(layout):
+    """Sub-layout para campos que não mudam com a UI liberada no Play (só valem no próximo Play)."""
+    sub = layout.row(align=True)
+    sub.enabled = not getattr(bpy.app, "is_game_live_ui", False)
+    return sub
 
 # ==============================================================================
 # CLASSE BASE PARA A ABA WORLD
@@ -264,7 +272,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_rain", text="Rain", emboss=True)
-        row.prop(weather, "use_rain", text="")
+        not_live_layout(row).prop(weather, "use_rain", text="")
 
         if weather.show_expanded_rain:
             col = main_box.column(align=True)
@@ -330,7 +338,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)
-        row.prop(weather, "use_clouds", text="")
+        not_live_layout(row).prop(weather, "use_clouds", text="")
 
         if weather.show_expanded_clouds:
             col = main_box.column(align=True)
@@ -342,12 +350,13 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)
-        row.prop(weather, "use_lens_flare", text="")
+        not_live_layout(row).prop(weather, "use_lens_flare", text="")
 
         if weather.show_expanded_lensflare:
             col = main_box.column(align=True)
             col.active = weather.use_lens_flare
-            col.prop_search(weather, "sun_object_name", scene, "objects", text="Sun Object")
+            not_live_layout(col).prop_search(weather, "sun_object_name", scene, "objects",
+                                            text=iface_("Sun Object") + " *")
             col.prop(weather, "flare_scale")
             col.prop(weather, "flare_intensity")
 

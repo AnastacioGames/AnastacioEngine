@@ -58,6 +58,8 @@
 #include "ED_render.h"
 #include "ED_view3d.h"
 
+#include "WM_api.h"
+
 #include "render_intern.h"  // own include
 
 extern Material defmaterial;
@@ -569,6 +571,12 @@ void ED_render_id_flush_update(Main *bmain, ID *id)
 	 * changes, in that case we don't want to do any editor updates, and making
 	 * GPU changes is not possible because OpenGL only works in the main thread */
 	if (!BLI_thread_is_main())
+		return;
+
+	/* Play com a UI liberada: o jogo ainda usa os GPUMaterial do Blender; liberá-los aqui
+	 * (world_changed libera os de todos os materiais) deixava o jogo com ponteiros soltos e
+	 * fechava ao mexer em World > Weather. O jogo lê o que muda ao vivo direto do DNA. */
+	if (WM_game_live_ui_active())
 		return;
 
 	switch (GS(id->name)) {
