@@ -775,6 +775,10 @@ static void stroke_done(struct bContext *C, struct wmOperator *op)
 			stroke->done(C, stroke);
 	}
 
+	/* 3D views skip shadow buffers and FX while a stroke runs (see
+	 * view3d_paint_stroke_active()), redraw them fully now that it ended */
+	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	if (stroke->timer) {
 		WM_event_remove_timer(
 			CTX_wm_manager(C),

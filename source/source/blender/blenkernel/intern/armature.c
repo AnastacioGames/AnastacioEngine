@@ -966,6 +966,173 @@ static void armature_bbone_defmats_cb(void *userdata, Link *iter, int index)
 	}
 }
 
+typedef struct ArmatureDeformVertsData {
+	Object *armOb;
+	bPoseChanDeform *pdef_info_array;
+	bPoseChannel **defnrToPC;
+	int *defnrToPCIndex;
+	MDeformVert *dverts, *dm_dverts;
+	DerivedMesh *dm;
+	float (*vertexCos)[3];
+	float (*defMats)[3][3];
+	float (*prevCos)[3];
+	float premat[4][4], postmat[4][4];
+	int defbase_tot, target_totvert, armature_def_nr;
+	bool use_envelope, use_quaternion, invert_vgroup, use_dverts;
+} ArmatureDeformVertsData;
+
+/* Per-vertex body of armature_deform_verts(); every vertex is independent,
+ * so this runs in parallel over the whole range. */
+static void armature_deform_vert_cb(void *__restrict userdata, const int i,
+                                    const ParallelRangeTLS *__restrict UNUSED(tls))
+{
+	ArmatureDeformVertsData *data = userdata;
+	bPoseChanDeform *pdef_info;
+	bPoseChannel *pchan;
+	MDeformVert *dvert;
+	DualQuat sumdq, *dq = NULL;
+	float *co, dco[3];
+	float sumvec[3], summat[3][3];
+	float *vec = NULL, (*smat)[3] = NULL;
+	float contrib = 0.0f;
+	float armature_weight = 1.0f; /* default to 1 if no overall def group */
+	float prevco_weight = 1.0f;   /* weight for optional cached vertexcos */
+
+	if (data->use_quaternion) {
+		memset(&sumdq, 0, sizeof(DualQuat));
+		dq = &sumdq;
+	}
+	else {
+		sumvec[0] = sumvec[1] = sumvec[2] = 0.0f;
+		vec = sumvec;
+
+		if (data->defMats) {
+			zero_m3(summat);
+			smat = summat;
+		}
+	}
+
+	if (data->use_dverts || data->armature_def_nr != -1) {
+		if (data->dm)
+			dvert = data->dm_dverts ? &data->dm_dverts[i] : NULL;
+		else if (data->dverts && i < data->target_totvert)
+			dvert = data->dverts + i;
+		else
+			dvert = NULL;
+	}
+	else
+		dvert = NULL;
+
+	if (data->armature_def_nr != -1 && dvert) {
+		armature_weight = defvert_find_weight(dvert, data->armature_def_nr);
+
+		if (data->invert_vgroup)
+			armature_weight = 1.0f - armature_weight;
+
+		/* hackish: the blending factor can be used for blending with data->prevCos too */
+		if (data->prevCos) {
+			prevco_weight = armature_weight;
+			armature_weight = 1.0f;
+		}
+	}
+
+	/* check if there's any  point in calculating for this vert */
+	if (armature_weight == 0.0f)
+		return;
+
+	/* get the coord we work on */
+	co = data->prevCos ? data->prevCos[i] : data->vertexCos[i];
+
+	/* Apply the object's matrix */
+	mul_m4_v3(data->premat, co);
+
+	if (data->use_dverts && dvert && dvert->totweight) { /* use weight groups ? */
+		MDeformWeight *dw = dvert->dw;
+		int deformed = 0;
+		unsigned int j;
+
+		for (j = dvert->totweight; j != 0; j--, dw++) {
+			const int index = dw->def_nr;
+			if (index >= 0 && index < data->defbase_tot && (pchan = data->defnrToPC[index])) {
+				float weight = dw->weight;
+				Bone *bone = pchan->bone;
+				pdef_info = data->pdef_info_array + data->defnrToPCIndex[index];
+
+				deformed = 1;
+
+				if (bone && bone->flag & BONE_MULT_VG_ENV) {
+					weight *= distfactor_to_bone(co, bone->arm_head, bone->arm_tail,
+					                             bone->rad_head, bone->rad_tail, bone->dist);
+				}
+				pchan_bone_deform(pchan, pdef_info, weight, vec, dq, smat, co, &contrib);
+			}
+		}
+		/* if there are vertexgroups but not groups with bones
+		 * (like for softbody groups) */
+		if (deformed == 0 && data->use_envelope) {
+			pdef_info = data->pdef_info_array;
+			for (pchan = data->armOb->pose->chanbase.first; pchan; pchan = pchan->next, pdef_info++) {
+				if (!(pchan->bone->flag & BONE_NO_DEFORM))
+					contrib += dist_bone_deform(pchan, pdef_info, vec, dq, smat, co);
+			}
+		}
+	}
+	else if (data->use_envelope) {
+		pdef_info = data->pdef_info_array;
+		for (pchan = data->armOb->pose->chanbase.first; pchan; pchan = pchan->next, pdef_info++) {
+			if (!(pchan->bone->flag & BONE_NO_DEFORM))
+				contrib += dist_bone_deform(pchan, pdef_info, vec, dq, smat, co);
+		}
+	}
+
+	/* actually should be EPSILON? weight values and contrib can be like 10e-39 small */
+	if (contrib > 0.0001f) {
+		if (data->use_quaternion) {
+			normalize_dq(dq, contrib);
+
+			if (armature_weight != 1.0f) {
+				copy_v3_v3(dco, co);
+				mul_v3m3_dq(dco, (data->defMats) ? summat : NULL, dq);
+				sub_v3_v3(dco, co);
+				mul_v3_fl(dco, armature_weight);
+				add_v3_v3(co, dco);
+			}
+			else
+				mul_v3m3_dq(co, (data->defMats) ? summat : NULL, dq);
+
+			smat = summat;
+		}
+		else {
+			mul_v3_fl(vec, armature_weight / contrib);
+			add_v3_v3v3(co, vec, co);
+		}
+
+		if (data->defMats) {
+			float pre[3][3], post[3][3], tmpmat[3][3];
+
+			copy_m3_m4(pre, data->premat);
+			copy_m3_m4(post, data->postmat);
+			copy_m3_m3(tmpmat, data->defMats[i]);
+
+			if (!data->use_quaternion) /* quaternion already is scale corrected */
+				mul_m3_fl(smat, armature_weight / contrib);
+
+			mul_m3_series(data->defMats[i], post, smat, pre, tmpmat);
+		}
+	}
+
+	/* always, check above code */
+	mul_m4_v3(data->postmat, co);
+
+	/* interpolate with previous modifier position using weight group */
+	if (data->prevCos) {
+		float mw = 1.0f - prevco_weight;
+		data->vertexCos[i][0] = prevco_weight * data->vertexCos[i][0] + mw * co[0];
+		data->vertexCos[i][1] = prevco_weight * data->vertexCos[i][1] + mw * co[1];
+		data->vertexCos[i][2] = prevco_weight * data->vertexCos[i][2] + mw * co[2];
+	}
+}
+
 void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm, float (*vertexCos)[3],
                            float (*defMats)[3][3], int numVerts, int deformflag,
                            float (*prevCos)[3], const char *defgrp_name)
@@ -1081,150 +1248,24 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm, float
 		}
 	}
 
-	for (i = 0; i < numVerts; i++) {
-		MDeformVert *dvert;
-		DualQuat sumdq, *dq = NULL;
-		float *co, dco[3];
-		float sumvec[3], summat[3][3];
-		float *vec = NULL, (*smat)[3] = NULL;
-		float contrib = 0.0f;
-		float armature_weight = 1.0f; /* default to 1 if no overall def group */
-		float prevco_weight = 1.0f;   /* weight for optional cached vertexcos */
+	ArmatureDeformVertsData vdata = {
+	    .armOb = armOb, .pdef_info_array = pdef_info_array,
+	    .defnrToPC = defnrToPC, .defnrToPCIndex = defnrToPCIndex,
+	    .dverts = dverts, .dm = dm,
+	    .dm_dverts = (dm && (use_dverts || armature_def_nr != -1)) ? dm->getVertDataArray(dm, CD_MDEFORMVERT) : NULL,
+	    .vertexCos = vertexCos, .defMats = defMats, .prevCos = prevCos,
+	    .defbase_tot = defbase_tot, .target_totvert = target_totvert, .armature_def_nr = armature_def_nr,
+	    .use_envelope = use_envelope, .use_quaternion = use_quaternion,
+	    .invert_vgroup = invert_vgroup, .use_dverts = use_dverts,
+	};
+	copy_m4_m4(vdata.premat, premat);
+	copy_m4_m4(vdata.postmat, postmat);
 
-		if (use_quaternion) {
-			memset(&sumdq, 0, sizeof(DualQuat));
-			dq = &sumdq;
-		}
-		else {
-			sumvec[0] = sumvec[1] = sumvec[2] = 0.0f;
-			vec = sumvec;
-
-			if (defMats) {
-				zero_m3(summat);
-				smat = summat;
-			}
-		}
-
-		if (use_dverts || armature_def_nr != -1) {
-			if (dm)
-				dvert = dm->getVertData(dm, i, CD_MDEFORMVERT);
-			else if (dverts && i < target_totvert)
-				dvert = dverts + i;
-			else
-				dvert = NULL;
-		}
-		else
-			dvert = NULL;
-
-		if (armature_def_nr != -1 && dvert) {
-			armature_weight = defvert_find_weight(dvert, armature_def_nr);
-
-			if (invert_vgroup)
-				armature_weight = 1.0f - armature_weight;
-
-			/* hackish: the blending factor can be used for blending with prevCos too */
-			if (prevCos) {
-				prevco_weight = armature_weight;
-				armature_weight = 1.0f;
-			}
-		}
-
-		/* check if there's any  point in calculating for this vert */
-		if (armature_weight == 0.0f)
-			continue;
-
-		/* get the coord we work on */
-		co = prevCos ? prevCos[i] : vertexCos[i];
-
-		/* Apply the object's matrix */
-		mul_m4_v3(premat, co);
-
-		if (use_dverts && dvert && dvert->totweight) { /* use weight groups ? */
-			MDeformWeight *dw = dvert->dw;
-			int deformed = 0;
-			unsigned int j;
-
-			for (j = dvert->totweight; j != 0; j--, dw++) {
-				const int index = dw->def_nr;
-				if (index >= 0 && index < defbase_tot && (pchan = defnrToPC[index])) {
-					float weight = dw->weight;
-					Bone *bone = pchan->bone;
-					pdef_info = pdef_info_array + defnrToPCIndex[index];
-
-					deformed = 1;
-
-					if (bone && bone->flag & BONE_MULT_VG_ENV) {
-						weight *= distfactor_to_bone(co, bone->arm_head, bone->arm_tail,
-						                             bone->rad_head, bone->rad_tail, bone->dist);
-					}
-					pchan_bone_deform(pchan, pdef_info, weight, vec, dq, smat, co, &contrib);
-				}
-			}
-			/* if there are vertexgroups but not groups with bones
-			 * (like for softbody groups) */
-			if (deformed == 0 && use_envelope) {
-				pdef_info = pdef_info_array;
-				for (pchan = armOb->pose->chanbase.first; pchan; pchan = pchan->next, pdef_info++) {
-					if (!(pchan->bone->flag & BONE_NO_DEFORM))
-						contrib += dist_bone_deform(pchan, pdef_info, vec, dq, smat, co);
-				}
-			}
-		}
-		else if (use_envelope) {
-			pdef_info = pdef_info_array;
-			for (pchan = armOb->pose->chanbase.first; pchan; pchan = pchan->next, pdef_info++) {
-				if (!(pchan->bone->flag & BONE_NO_DEFORM))
-					contrib += dist_bone_deform(pchan, pdef_info, vec, dq, smat, co);
-			}
-		}
-
-		/* actually should be EPSILON? weight values and contrib can be like 10e-39 small */
-		if (contrib > 0.0001f) {
-			if (use_quaternion) {
-				normalize_dq(dq, contrib);
-
-				if (armature_weight != 1.0f) {
-					copy_v3_v3(dco, co);
-					mul_v3m3_dq(dco, (defMats) ? summat : NULL, dq);
-					sub_v3_v3(dco, co);
-					mul_v3_fl(dco, armature_weight);
-					add_v3_v3(co, dco);
-				}
-				else
-					mul_v3m3_dq(co, (defMats) ? summat : NULL, dq);
-
-				smat = summat;
-			}
-			else {
-				mul_v3_fl(vec, armature_weight / contrib);
-				add_v3_v3v3(co, vec, co);
-			}
-
-			if (defMats) {
-				float pre[3][3], post[3][3], tmpmat[3][3];
-
-				copy_m3_m4(pre, premat);
-				copy_m3_m4(post, postmat);
-				copy_m3_m3(tmpmat, defMats[i]);
-
-				if (!use_quaternion) /* quaternion already is scale corrected */
-					mul_m3_fl(smat, armature_weight / contrib);
-
-				mul_m3_series(defMats[i], post, smat, pre, tmpmat);
-			}
-		}
-
-		/* always, check above code */
-		mul_m4_v3(postmat, co);
-
-		/* interpolate with previous modifier position using weight group */
-		if (prevCos) {
-			float mw = 1.0f - prevco_weight;
-			vertexCos[i][0] = prevco_weight * vertexCos[i][0] + mw * co[0];
-			vertexCos[i][1] = prevco_weight * vertexCos[i][1] + mw * co[1];
-			vertexCos[i][2] = prevco_weight * vertexCos[i][2] + mw * co[2];
-		}
-	}
+	ParallelRangeSettings settings;
+	BLI_parallel_range_settings_defaults(&settings);
+	settings.use_threading = (numVerts > 1024);
+	settings.min_iter_per_thread = 256;
+	BLI_task_parallel_range(0, numVerts, &vdata, armature_deform_vert_cb, &settings);
 
 	if (dualquats)
 		MEM_freeN(dualquats);

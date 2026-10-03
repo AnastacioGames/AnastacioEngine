@@ -173,6 +173,24 @@ static bool vertex_paint_use_fast_update_check(Object *ob)
 	return false;
 }
 
+/* Weight paint counterpart: valid while the evaluated mesh still references the
+ * mesh's own deform-verts (only deform modifiers, e.g. Armature, in the stack),
+ * so painting changes are visible to it without rebuilding 'derivedFinal'. */
+static bool weight_paint_use_fast_update_check(Object *ob)
+{
+	DerivedMesh *dm = ob->derivedFinal;
+	Mesh *me = BKE_mesh_from_object(ob);
+
+	if (dm && me && me->dvert && (dm->type == DM_TYPE_CDDM) &&
+	    (dm->getNumVerts(dm) == me->totvert) && (dm->getNumLoops(dm) == me->totloop))
+	{
+		return ((DM_get_vert_data_layer(dm, CD_MDEFORMVERT) == me->dvert) &&
+		        CustomData_has_layer(&dm->loopData, CD_PREVIEW_MLOOPCOL));
+	}
+
+	return false;
+}
+
 static void paint_last_stroke_update(Scene *scene, ARegion *ar, const float mval[2])
 {
 	const int mval_i[2] = {mval[0], mval[1]};
@@ -1275,6 +1293,10 @@ struct WPaintData {
 	/* original weight values for use in blur/smear */
 	float *precomputed_weight;
 	bool precomputed_weight_ready;
+
+	/* derivedFinal shares me->dvert: refresh only its weight colors per step and
+	 * re-run the modifier stack (armature deform etc.) once, at stroke end */
+	bool use_fast_update;
 };
 
 /* Initialize the stroke cache invariants from operator properties */
@@ -1515,6 +1537,8 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
 			dv->flag = 1;
 		}
 	}
+
+	wpd->use_fast_update = weight_paint_use_fast_update_check(ob);
 
 	return true;
 }
@@ -2179,31 +2203,22 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	/* also needed for "View Selected" on last stroke */
 	paint_last_stroke_update(scene, vc->ar, mval);
 
-	DAG_id_tag_update(ob->data, 0);
-	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+	if (wpd->use_fast_update && weight_paint_use_fast_update_check(ob)) {
+		/* only the weight colors changed: skip the modifier stack (armature deform of every
+		 * vertex) and the full VBO rebuild, just refresh the color buffer */
+		DerivedMesh *dm = ob->derivedFinal;
+		DM_update_weight_mcol(ob, dm, DM_weight_paint_draw_flag(ts, ob->data), NULL, 0, NULL);
+		dm->dirty |= DM_DIRTY_MCOL_UPDATE_DRAW;
+	}
+	else {
+		wpd->use_fast_update = false;
+		DAG_id_tag_update(ob->data, 0);
+	}
 	swap_m4m4(wpd->vc.rv3d->persmat, mat);
 
-	rcti r;
-	if (sculpt_get_redraw_rect(vc->ar, CTX_wm_region_view3d(C), ob, &r)) {
-		if (ss->cache) {
-			ss->cache->current_r = r;
-		}
-
-		/* previous is not set in the current cache else
-		 * the partial rect will always grow */
-		if (ss->cache) {
-			if (!BLI_rcti_is_empty(&ss->cache->previous_r))
-				BLI_rcti_union(&r, &ss->cache->previous_r);
-		}
-
-		r.xmin += vc->ar->winrct.xmin - 2;
-		r.xmax += vc->ar->winrct.xmin + 2;
-		r.ymin += vc->ar->winrct.ymin - 2;
-		r.ymax += vc->ar->winrct.ymin + 2;
-
-		ss->partial_redraw = 1;
-	}
-	ED_region_tag_redraw_partial(vc->ar, &r);
+	/* the PBVH bounds are not deformed by the armature, so a partial rect can miss the
+	 * posed mesh; redraw this region only (other views refresh when the stroke ends) */
+	ED_region_tag_redraw(vc->ar);
 }
 
 static void wpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)

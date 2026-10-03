@@ -401,7 +401,7 @@ migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3
 menu ImGui e Runtime Property Sensors/Actuators. Aceitas em 2026-10-02: os itens de 2026-09-25 (Game Settings,
 FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser) e as
 categorias `CollisionDepth`/`TextureRenderers` do Profiler em linhas próprias. O stress de captura de vídeo e
-OpenAL foi cancelado por decisão do usuário. Nenhuma validação manual pendente.
+OpenAL foi cancelado por decisão do usuário.
 
 ## Fora do escopo atual
 

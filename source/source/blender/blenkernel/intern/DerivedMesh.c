@@ -1432,6 +1432,24 @@ static void calc_weightpaint_vert_color(
 	}
 }
 
+typedef struct WeightPaintVertColorData {
+	const MDeformVert *dvert;
+	DMWeightColorInfo *dm_wcinfo;
+	unsigned char (*r_wtcol_v)[4];
+	int defbase_tot, defbase_act;
+	const bool *defbase_sel;
+	int defbase_sel_tot, draw_flag;
+} WeightPaintVertColorData;
+
+static void calc_weightpaint_vert_color_cb(void *__restrict userdata, const int i,
+                                           const ParallelRangeTLS *__restrict UNUSED(tls))
+{
+	const WeightPaintVertColorData *data = userdata;
+	calc_weightpaint_vert_color(
+	        data->r_wtcol_v[i], &data->dvert[i], data->dm_wcinfo,
+	        data->defbase_tot, data->defbase_act, data->defbase_sel, data->defbase_sel_tot, data->draw_flag);
+}
+
 static DMWeightColorInfo G_dm_wcinfo;
 
 void vDM_ColorBand_store(const ColorBand *coba, const char alert_color[4])
@@ -1493,12 +1511,16 @@ static void calc_weightpaint_vert_array(
 			}
 		}
 		else {
-			const MDeformVert *dv = DM_get_vert_data_layer(dm, CD_MDEFORMVERT);
-			for (i = numVerts; i != 0; i--, wc++, dv++) {
-				calc_weightpaint_vert_color(
-				        (unsigned char *)wc, dv, dm_wcinfo,
-				        defbase_tot, defbase_act, defbase_sel, defbase_sel_tot, draw_flag);
-			}
+			WeightPaintVertColorData data = {
+			    .dvert = DM_get_vert_data_layer(dm, CD_MDEFORMVERT), .dm_wcinfo = dm_wcinfo,
+			    .r_wtcol_v = wc, .defbase_tot = defbase_tot, .defbase_act = defbase_act,
+			    .defbase_sel = defbase_sel, .defbase_sel_tot = defbase_sel_tot, .draw_flag = draw_flag,
+			};
+			ParallelRangeSettings settings;
+			BLI_parallel_range_settings_defaults(&settings);
+			settings.use_threading = (numVerts > 4096);
+			settings.min_iter_per_thread = 1024;
+			BLI_task_parallel_range(0, numVerts, &data, calc_weightpaint_vert_color_cb, &settings);
 		}
 
 		if (defbase_sel) {
@@ -1612,6 +1634,11 @@ void DM_update_weight_mcol(
 
 		dm->dirty |= DM_DIRTY_TESS_CDLAYERS;
 	}
+}
+
+int DM_weight_paint_draw_flag(const ToolSettings *ts, const Mesh *me)
+{
+	return dm_drawflag_calc(ts, me);
 }
 
 static void DM_update_statvis_color(const Scene *scene, Object *ob, DerivedMesh *dm)

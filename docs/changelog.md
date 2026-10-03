@@ -9,6 +9,39 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Sculpt e pintura mais leves no editor (fases 1 a 3)
+
+Diagnóstico: o código dos pincéis já roda em várias threads; o custo estava no que acontece a cada passo do
+pincel. O redesenho da 3D view refazia todos os shadow maps (6 passes por luz pontual, um por cascata) e o
+compositor de FX em tela cheia. No weight paint dos bones, cada passo também refazia a pilha de modificadores
+(deformação do Armature, numa thread só), recalculava as cores de peso da malha inteira, reenviava o VBO
+completo e redesenhava todas as views com `NC_OBJECT|ND_DRAW`.
+
+- Fase 1 (`view3d_draw.c`, `paint_stroke.c`): enquanto `ups->stroke_active` estiver ligado com o objeto ativo
+  num modo de pintura (`view3d_paint_stroke_active`), a 3D view reaproveita os shadow maps do último redesenho
+  e pula o compositor de FX (sem destruí-lo). Com FX ligado, o redesenho parcial vira completo, para não
+  aparecer um retângulo sem FX sobre o último quadro composto. No fim do traço, `stroke_done` envia
+  `NC_SPACE|ND_SPACE_VIEW3D`, que traz sombras e FX de volta. O shading final não muda.
+- Fase 2 (`paint_vertex.c`, `DerivedMesh.c`): no weight paint, se o `derivedFinal` ainda referencia o
+  `me->dvert` (só modificadores de deformação, como Armature), cada passo só refaz as cores de peso
+  (`DM_update_weight_mcol` + `DM_DIRTY_MCOL_UPDATE_DRAW`); a pilha de modificadores roda uma vez, no
+  `wpaint_stroke_done`. Com modificadores construtivos (Subsurf, Mirror…), cai no caminho antigo. O passo
+  agora redesenha só a própria região, em vez de `NC_OBJECT|ND_DRAW`. Novo `DM_weight_paint_draw_flag`.
+- Fase 3 (`armature.c`, `DerivedMesh.c`): o laço por vértice de `armature_deform_verts` virou
+  `armature_deform_vert_cb` em `BLI_task_parallel_range` (acima de 1024 vértices), lendo o `CD_MDEFORMVERT`
+  do DerivedMesh como array em vez de `getVertData` por vértice; `calc_weightpaint_vert_array` calcula as
+  cores de peso em paralelo (acima de 4096 vértices). Acelera também animação e Play com Armature.
+- Build `RangeEngine` OK. Validado pelo usuário em 2026-10-03 com `projects-teste/perf_paint/perf_paint_test.range`
+  (esfera de 32.514 vértices + Armature): weight paint, pose e sculpt OK. Teste em background: deform de 8,1 ms/frame,
+  resultado determinístico. Fases 4 e 5 descartadas (vertex/weight paint não desenha via PBVH; sculpt GLSL via
+  PBVH mudaria o shading do viewport).
+
+## 2026-10-03 - Empty: linhas suaves
+
+- Empties (exceto imagem) usam os mesmos consertos da lâmpada: antialias (`GL_LINE_SMOOTH` + blend) e desenho
+  na passada transparente, depois das malhas, para não haver contorno preto sobre malhas.
+- `drawaxes` com largura escalada por `U.pixelsize`; círculo com 64 segmentos (eram 32); esfera com 48 (eram 16).
+
 ## 2026-10-03 - Linhas da lâmpada: sol e linha até o chão
 
 - `drawlamp`: no sol, a linha de direção deixou de ir até `la->dist` (cruzava a cena) e virou um traço curto,

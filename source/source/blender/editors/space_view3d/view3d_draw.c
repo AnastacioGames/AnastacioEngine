@@ -4306,6 +4306,18 @@ static void update_lods(Scene *scene, float camera_pos[3])
 }
 #endif
 
+/* A sculpt/paint stroke is running: every brush step redraws the view, so keep it
+ * light. Lamps and the camera don't move during a stroke, so the shadow buffers
+ * from the last full redraw are reused, and the FX compositor is skipped. The
+ * stroke end sends a redraw that brings both back. */
+static bool view3d_paint_stroke_active(Scene *scene)
+{
+	Object *ob = OBACT;
+
+	return (scene->toolsettings && scene->toolsettings->unified_paint_settings.stroke_active &&
+	        ob && (ob->mode & OB_MODE_ALL_PAINT));
+}
+
 static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, View3D *v3d,
                                           ARegion *ar, const char **grid_unit)
 {
@@ -4316,9 +4328,10 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 
 	/* post processing */
 	bool do_compositing = false;
+	const bool paint_stroke = view3d_paint_stroke_active(scene);
 
 	/* shadow buffers, before we setup matrices */
-	if (draw_glsl_material(scene, NULL, v3d, v3d->drawtype))
+	if (draw_glsl_material(scene, NULL, v3d, v3d->drawtype) && !paint_stroke)
 		gpu_update_lamps_shadows_world(bmain, scene, v3d, rv3d);
 
 	/* reset default OpenGL lights if needed (i.e. after preferences have been altered) */
@@ -4344,11 +4357,22 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * Lens Flare/Rain/Clouds have no scenefx_flag bit of their own (they mirror
 	 * World > Weather directly), so they need their own check here to enter the
 	 * compositor path at all when one of them is the only effect turned on. */
-	if ((v3d->fx_settings.fx_flag || scene->scenefx_settings.scenefx_flag ||
-	     (scene->world && (scene->world->weather_flag &
-	                        (WO_WEATHER_LENSFLARE | WO_WEATHER_RAIN | WO_WEATHER_CLOUDS)))) &&
-	    v3d->drawtype >= OB_SOLID)
-	{
+	const bool want_compositing =
+	        ((v3d->fx_settings.fx_flag || scene->scenefx_settings.scenefx_flag ||
+	          (scene->world && (scene->world->weather_flag &
+	                             (WO_WEATHER_LENSFLARE | WO_WEATHER_RAIN | WO_WEATHER_CLOUDS)))) &&
+	         v3d->drawtype >= OB_SOLID);
+
+	/* Without FX, a partial (scissored) stroke redraw would leave an un-composited
+	 * patch over the last composited frame: draw the whole region instead, which
+	 * stays cheap with shadows and FX skipped. */
+	if (paint_stroke && want_compositing && (ar->do_draw & RGN_DRAW_PARTIAL)) {
+		ar->drawrct = ar->winrct;
+		wmSubWindowScissorSet(win, ar->swinid, &ar->drawrct, true);
+		ar->do_draw &= ~RGN_DRAW_PARTIAL;
+	}
+
+	if (want_compositing && !paint_stroke) {
 		GPUFXSettings fx_settings;
 		BKE_screen_gpu_fx_validate(&v3d->fx_settings);
 		BKE_scene_fx_validate(scene);
@@ -4369,7 +4393,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * keeping a "zombie" GPUFX around, which forced this branch (and its GL
 	 * framebuffer/attribute bookkeeping) to re-run every single frame even
 	 * with every filter off. */
-	if (!do_compositing && rv3d->compositor) {
+	if (!do_compositing && rv3d->compositor && !paint_stroke) {
 		GPU_fx_compositor_destroy(rv3d->compositor);
 		rv3d->compositor = NULL;
 	}
@@ -4556,17 +4580,51 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
 	RNA_pointer_create(&scene->id, &RNA_ToolSettings, scene->toolsettings, &toolptr);
 
+	/* Grupo do jogo (Play, Standalone, cadeado, console) em bloco próprio: fora do
+	 * Object Mode todos ficam desabilitados juntos, como o Play (game_engine_poll).
+	 * Botão desabilitado é desenhado com alpha 0.5, então pinta um fundo opaco antes
+	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás. */
+	{
+		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
+		int end_x = x, end_y = y;
+
+		block = UI_block_begin(C, ar, "view3d_floating_game_controls", UI_EMBOSS);
+		layout = UI_block_layout(
+		        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
+		row = uiLayoutRow(layout, true);
+		uiLayoutSetEnabled(row, game_ok);
+
+		uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
+		uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
+		uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
+		        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
+		uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
+
+		UI_block_layout_resolve(block, &end_x, &end_y);
+		UI_block_end(C, block);
+
+		if (!game_ok && end_x > x) {
+			bTheme *btheme = UI_GetTheme();
+			unsigned char col[4];
+
+			copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
+			col[3] = 255;
+			glEnable(GL_BLEND);
+			glColor4ubv(col);
+			UI_draw_roundbox_corner_set(UI_CNR_ALL);
+			UI_draw_roundbox_gl_mode(GL_POLYGON, (float)x, (float)(y - UI_UNIT_Y), (float)end_x, (float)y,
+			                         0.2f * U.widget_unit);
+			glDisable(GL_BLEND);
+		}
+		UI_block_draw(C, block);
+
+		x = end_x + UI_UNIT_X / 3;
+	}
+
 	block = UI_block_begin(C, ar, "view3d_floating_controls", UI_EMBOSS);
 	layout = UI_block_layout(
 	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
 	row = uiLayoutRow(layout, true);
-
-	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
-	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
-	uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
-	        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
-	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
-	uiItemS(row);
 
 	/* Object Mode dropdown now lives only in the header; keep the shading
 	 * popover here so shading options are still one click away. */

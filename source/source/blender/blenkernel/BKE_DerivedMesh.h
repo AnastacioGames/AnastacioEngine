@@ -86,6 +86,7 @@ struct MLoopNorSpaceArray;
 struct MTFace;
 struct MVert;
 struct Mesh;
+struct ToolSettings;
 struct ModifierData;
 struct Object;
 struct PBVH;
@@ -745,6 +746,9 @@ void weight_to_rgb(float r_rgb[3], const float weight);
 void DM_update_weight_mcol(
         struct Object *ob, struct DerivedMesh *dm, int const draw_flag,
         float *weights, int num, const int *indices);
+
+/* draw_flag that DM_update_weight_mcol needs to match the weight colors built by the modifier stack */
+int DM_weight_paint_draw_flag(const struct ToolSettings *ts, const struct Mesh *me);
 
 /** convert layers requested by a GLSL material to actually available layers in
  * the DerivedMesh, with both a pointer for arrays and an offset for editmesh */
