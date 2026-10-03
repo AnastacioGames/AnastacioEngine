@@ -7,6 +7,7 @@ from rna_prop_ui import PropertyPanel
 # ==============================================================================
 class CUSTOM_PT_game_components(PropertyPanel, Panel):
     bl_label = "Component Manager"
+    bl_options = {'DEFAULT_CLOSED'}
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "game"
@@ -55,7 +56,6 @@ class CUSTOM_PT_game_existing_components(PropertyPanel, Panel):
     bl_region_type = 'WINDOW'
     bl_context = "game"
     bl_idname = "GAME_PT_game_existing_components_custom"
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

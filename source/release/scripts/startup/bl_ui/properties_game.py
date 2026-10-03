@@ -553,6 +553,7 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
 
 class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
     bl_label = "Destruction"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -610,6 +611,7 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
 
 class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
     bl_label = "Explosive"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -639,10 +641,13 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         col = split.column()
         col.label(text="Trigger:", icon='TIME')
         col.prop(es, "fuse")
-        col.prop(es, "use_explode_on_impact")
+        # Without a collision shape (Empty, No Collision) nothing ever hits the object, so impact can't trigger.
+        can_collide = context.active_object.type != 'EMPTY' and game.physics_type != 'NO_COLLISION'
+        if can_collide:
+            col.prop(es, "use_explode_on_impact")
         col.prop(es, "use_chain_reaction")
         sub = col.column()
-        sub.active = es.use_explode_on_impact or es.use_chain_reaction
+        sub.active = (can_collide and es.use_explode_on_impact) or es.use_chain_reaction
         sub.prop(es, "impact_impulse")
 
         col = layout.box()
@@ -658,6 +663,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
 
 class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
     bl_label = "Deformation"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -1848,6 +1854,7 @@ class OBJECT_MT_lod_tools(Menu):
         
 class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
     bl_label = "Game Object Tasks"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -1879,6 +1886,7 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
     bl_label = "Activity Culling"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -2271,6 +2279,7 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod

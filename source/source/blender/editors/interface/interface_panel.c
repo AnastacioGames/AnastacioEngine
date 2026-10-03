@@ -360,7 +360,19 @@ Panel *UI_panel_begin(ScrArea *sa, ARegion *ar, ListBase *lb, uiBlock *block, Pa
 	}
 
 	if (newpanel) {
-		pa->sortorder = (palast) ? palast->sortorder + 1 : 0;
+		if (palast) {
+			pa->sortorder = palast->sortorder + 1;
+		}
+		else {
+			/* No panel drawn before this one in this redraw (e.g. the panels above it were polled out):
+			 * append it after the existing ones instead of jumping to the top of the region. */
+			pa->sortorder = 0;
+			for (panext = lb->first; panext; panext = panext->next) {
+				if (panext != pa && panext->sortorder >= pa->sortorder) {
+					pa->sortorder = panext->sortorder + 1;
+				}
+			}
+		}
 
 		for (panext = lb->first; panext; panext = panext->next)
 			if (panext != pa && panext->sortorder >= pa->sortorder)

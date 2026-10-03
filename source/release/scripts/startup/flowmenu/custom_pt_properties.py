@@ -115,6 +115,7 @@ class OBJECT_OT_game_header_add(Operator):
 # ==============================================================================
 class CUSTOM_PT_game_properties(Panel):
     bl_label = "Object's Properties"
+    bl_options = {'DEFAULT_CLOSED'}
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "game"
