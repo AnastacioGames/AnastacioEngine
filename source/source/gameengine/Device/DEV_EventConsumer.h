@@ -39,6 +39,12 @@ class DEV_EventConsumer : public GHOST_IEventConsumer
 private:
 	DEV_InputDevice *m_device;
 	RAS_ICanvas *m_canvas;
+	/// UI ao vivo no jogo embutido: cliques, roda e teclas só chegam ao jogo com o cursor na tela
+	/// do jogo, o resto fica para a UI do editor. Solturas sempre passam (sem tecla presa).
+	bool m_focusGate;
+	bool m_cursorInside;
+
+	void UpdateCursorInside(int x, int y);
 
 	void HandleWindowEvent(GHOST_TEventType type);
 	void HandleKeyEvent(GHOST_TEventDataPtr data, bool down);
@@ -49,6 +55,8 @@ private:
 public:
 	DEV_EventConsumer(GHOST_ISystem *system, DEV_InputDevice *device, RAS_ICanvas *canvas);
 	virtual ~DEV_EventConsumer();
+
+	void SetFocusGate(bool gate);
 
 	/// Function called by GHOST to process all events.
 	virtual bool processEvent(GHOST_IEvent *event);

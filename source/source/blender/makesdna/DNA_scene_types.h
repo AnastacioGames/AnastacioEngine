@@ -1100,6 +1100,9 @@ enum {
 /* The active camera's view follows the device head pose (bge.logic.motion.headOrientation). */
 #define GAME_VR_HEAD_TRACKING				(1 << 28)
 #define GAME_VR_LENS_DISTORTION				(1 << 29)
+/* Jogo embutido (P): o editor continua respondendo fora da tela do jogo e valores editados nos
+ * painéis (partículas GPU, Game Properties) entram no jogo rodando. LA_BlenderLauncher. */
+#define GAME_LIVE_UI						(1 << 30)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
 #define GAME_DEBUG_DISABLE	0

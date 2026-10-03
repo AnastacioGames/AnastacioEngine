@@ -99,6 +99,8 @@ class FLOWMENU_OT_init_addon(Operator):
 		# Botões de Teste do Jogo
 		play_row = layout.row(align=True)
 		play_row.operator("view3d.game_start", text="Play (Embedded)", icon="PLAY")
+		gs = context.scene.game_settings
+		play_row.prop(gs, "use_live_ui", text="", icon='UNLOCKED' if gs.use_live_ui else 'LOCKED')
 		play_row.operator("wm.blenderplayer_start", text="Play (Standalone)", icon="GHOST_ENABLED")
 
 		# Botões Principais

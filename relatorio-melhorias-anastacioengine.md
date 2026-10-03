@@ -48,7 +48,8 @@ ferramenta correspondente.
 - Streaming por distância está disponível em `projects-teste/scripts/streaming_manager.py`.
 - LOD de impostor possui billboard cilíndrico e bake automático de atlas multiângulo.
 - Partículas GPU por objeto usam transform feedback, shader cache compartilhado, sprites/texturas, curvas,
-  presets, debug ImGui e colisão Ground Plane/Screen-Space.
+  presets, debug ImGui e colisão Ground Plane/Screen-Space. Emit From: Mesh Vertices fixa uma partícula estática
+  por vértice; o look Reflector faz refletor de pista que acende quando a câmera olha (luz falsa, sem lâmpada).
 - Fragment shader customizado por emissor (Fase P): arquivo `.glsl` externo (`object.particles.fragmentShaderPath`
   em Python, campo "Fragment Shader File" na UI), com hot-reload automático (poll de mtime a cada ~0,5s) —
   edita-se o arquivo com o jogo rodando e o efeito atualiza sozinho. Exemplos prontos em

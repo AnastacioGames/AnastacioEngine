@@ -546,7 +546,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		// invisible emitter isn't simulated this frame, so its buffer holds stale positions.
 		// Also mirrors the frustum-culling gate (Override Culling included) so particles from
 		// an emitter outside this camera's view aren't drawn.
-		if (!particleObj->GetVisible() || particleObj->GetCullingNode().GetCulled()) {
+		if (!particleObj->GetVisible() || (particleObj->GetCullingNode().GetCulled() && !particleObj->HasStaticParticles())) {
 			continue;
 		}
 		RAS_ParticleBuffer *particleBuffer = particleObj->GetParticleBuffer();

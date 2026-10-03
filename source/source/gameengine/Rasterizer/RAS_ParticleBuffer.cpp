@@ -318,6 +318,10 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	m_simTime += deltaTime;
 	PollFragShaderReload(deltaTime);
 
+	if (m_static) {
+		return;
+	}
+
 	const unsigned int writeIndex = 1 - m_readIndex;
 
 	const float emitterPos[3] = {
@@ -403,6 +407,9 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 	glUniform4fv(m_shaderCache->GetDrawEndColorLoc(), 1, m_endColor);
 	glUniform1f(m_shaderCache->GetDrawTimeLoc(), m_simTime);
 	glUniform1i(m_shaderCache->GetDrawBillboardModeLoc(), (int)m_billboardMode);
+	static const float kIdentity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+	glUniformMatrix4fv(m_shaderCache->GetDrawModelLoc(), 1, GL_FALSE, m_static ? m_model : kIdentity);
+	glUniform1i(m_shaderCache->GetDrawStaticLoc(), m_static ? 1 : 0);
 	glUniform1i(m_shaderCache->GetDrawUseTextureLoc(), m_texture != 0 ? 1 : 0);
 	if (m_texture != 0) {
 		glActiveTexture(GL_TEXTURE0);
@@ -461,7 +468,7 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 
 bool RAS_ParticleBuffer::Resize(unsigned int newCount)
 {
-	if (!m_valid || newCount == 0) {
+	if (!m_valid || newCount == 0 || m_static) {
 		return false;
 	}
 	if (newCount == m_particleCount) {
@@ -483,6 +490,35 @@ bool RAS_ParticleBuffer::Resize(unsigned int newCount)
 
 	m_particleCount = newCount;
 	m_readIndex = 0;
+	return true;
+}
+
+bool RAS_ParticleBuffer::SetStaticPositions(const std::vector<float> &localPositions)
+{
+	const unsigned int count = (unsigned int)(localPositions.size() / 3);
+	if (!m_valid || count == 0) {
+		return false;
+	}
+
+	// Same 7-float layout as BuildInitialPool; velocity unused, age 0 (the draw shader ignores
+	// age for static buffers, so they never fade or resize).
+	std::vector<float> pool(count * kFloatsPerParticle, 0.0f);
+	for (unsigned int i = 0; i < count; ++i) {
+		pool[i * kFloatsPerParticle + 0] = localPositions[i * 3 + 0];
+		pool[i * kFloatsPerParticle + 1] = localPositions[i * 3 + 1];
+		pool[i * kFloatsPerParticle + 2] = localPositions[i * 3 + 2];
+	}
+
+	const GLsizeiptr bufferSize = (GLsizeiptr)(count * kFloatsPerParticle * sizeof(float));
+	for (int i = 0; i < 2; ++i) {
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo[i]);
+		glBufferData(GL_ARRAY_BUFFER, bufferSize, pool.data(), GL_STATIC_DRAW);
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	m_particleCount = count;
+	m_readIndex = 0;
+	m_static = true;
 	return true;
 }
 

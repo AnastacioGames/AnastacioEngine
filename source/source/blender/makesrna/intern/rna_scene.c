@@ -4966,6 +4966,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "Set the distance between the eyes - the camera focal distance/30 should be fine");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "use_live_ui", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_LIVE_UI);
+	RNA_def_property_ui_text(prop, "Live UI",
+	                         "Keep the editor UI unlocked while the embedded game runs, so values edited in the "
+	                         "panels (GPU particles, game properties) apply to the running game");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "vr_lens_distortion", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_VR_LENS_DISTORTION);
 	RNA_def_property_ui_text(prop, "VR Lens Distortion",

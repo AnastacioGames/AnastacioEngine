@@ -148,6 +148,12 @@ private:
 	/// few times a second instead of every Update() call.
 	float m_fragShaderPollAccum = 0.0f;
 
+	/// GPU_PARTICLE_EMIT_VERTICES: particles are pinned at fixed local positions (SetStaticPositions)
+	/// and never simulated -- Update() skips the transform feedback pass and Draw() places them
+	/// with m_model, the owner's world transform, so they follow the object.
+	bool m_static = false;
+	float m_model[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+
 	/// Builds a staggered-age initial pool (position/velocity/age, 7 floats/particle) for
 	/// `count` particles, same layout as Create()'s inline version -- shared with Resize().
 	std::vector<float> BuildInitialPool(unsigned int count) const;
@@ -270,6 +276,13 @@ public:
 	/// layout as Create()). Returns false and leaves the buffer unchanged if newCount == 0.
 	/// No-op if newCount == m_particleCount. Must be called after Create() succeeded.
 	bool Resize(unsigned int newCount);
+
+	/// GPU_PARTICLE_EMIT_VERTICES: replaces the pool with one static particle per local-space
+	/// position (xyz triplets, e.g. mesh vertices). Resize() is refused afterwards.
+	bool SetStaticPositions(const std::vector<float> &localPositions);
+	bool IsStatic() const { return m_static; }
+	/// Owner's world transform (column-major 4x4), used only by static buffers.
+	void SetModelMatrix(const float *m) { for (int i = 0; i < 16; ++i) { m_model[i] = m[i]; } }
 
 	/// Fase E: sprite texture. glBindcode 0 clears it (back to the procedural round mask).
 	unsigned int GetTexture() const { return m_texture; }

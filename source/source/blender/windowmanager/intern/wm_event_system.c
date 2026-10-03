@@ -75,6 +75,7 @@
 #include "wm.h"
 #include "wm_window.h"
 #include "wm_event_system.h"
+#include "wm_draw.h"
 #include "wm_event_types.h"
 
 #include "RNA_enum_types.h"
@@ -513,9 +514,133 @@ static void wm_handler_ui_cancel(bContext *C)
 
 /* ********************* operators ******************* */
 
+/* ------------------------------------------------------------------ */
+/* UI ao vivo durante o jogo embutido                                  */
+
+static ARegion *g_game_live_region = NULL;
+
+/* Operadores que liberam/recarregam dados que o jogo convertido referencia, ou mexem no layout
+ * da tela onde o jogo desenha. '*' no fim casa por prefixo. */
+static const char *game_live_blocked_ops[] = {
+	"ED_OT_undo*", "ED_OT_redo", "SCREEN_OT_repeat_*", "SCREEN_OT_redo_last",
+	"WM_OT_open_mainfile", "WM_OT_read_*", "WM_OT_revert_mainfile", "WM_OT_recover_*",
+	"WM_OT_link", "WM_OT_append", "WM_OT_window_*",
+	"VIEW3D_OT_game_start",
+	"OBJECT_OT_delete", "OBJECT_OT_add*", "OBJECT_OT_*_add", "OBJECT_OT_duplicate*", "OBJECT_OT_join*",
+	"OBJECT_OT_convert", "OBJECT_OT_editmode_toggle", "OBJECT_OT_mode_set", "OBJECT_OT_*paint_toggle",
+	"MESH_OT_primitive_*", "OUTLINER_OT_*delete*", "OUTLINER_OT_*operation",
+	"SCENE_OT_new", "SCENE_OT_delete",
+	"SCREEN_OT_area_*", "SCREEN_OT_screen_*", "SCREEN_OT_back_to_previous", "SCREEN_OT_new", "SCREEN_OT_delete",
+	NULL,
+};
+
+static bool game_live_op_blocked(const char *idname)
+{
+	for (const char **pat = game_live_blocked_ops; *pat; pat++) {
+		const char *p = *pat;
+		const char *star = strchr(p, '*');
+		if (star == NULL) {
+			if (STREQ(p, idname)) {
+				return true;
+			}
+		}
+		else if (star[1] == '\0') {
+			if (STREQLEN(p, idname, (size_t)(star - p))) {
+				return true;
+			}
+		}
+		else {
+			/* prefixo*sufixo, sufixo pode conter outro '*' só no fim (ex. "*delete*") */
+			const size_t prelen = (size_t)(star - p);
+			if (STREQLEN(p, idname, prelen)) {
+				char mid[64];
+				BLI_strncpy(mid, star + 1, sizeof(mid));
+				const size_t midlen = strlen(mid);
+				const bool contains = (midlen > 0 && mid[midlen - 1] == '*');
+				if (contains) {
+					mid[midlen - 1] = '\0';
+					if (strstr(idname + prelen, mid)) {
+						return true;
+					}
+				}
+				else {
+					const size_t idlen = strlen(idname);
+					if (idlen >= prelen + midlen && STREQ(idname + idlen - midlen, mid)) {
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void WM_game_live_ui_begin(ARegion *game_region)
+{
+	g_game_live_region = game_region;
+}
+
+void WM_game_live_ui_end(void)
+{
+	g_game_live_region = NULL;
+}
+
+bool WM_game_live_ui_active(void)
+{
+	return g_game_live_region != NULL;
+}
+
+bool WM_game_live_ui_step(bContext *C)
+{
+	wmWindow *win = CTX_wm_window(C);
+	ScrArea *sa = CTX_wm_area(C);
+	ARegion *ar = CTX_wm_region(C);
+	ARegion *game_ar = g_game_live_region;
+
+	if (win == NULL || game_ar == NULL) {
+		return false;
+	}
+
+	const bool had_events = !BLI_listbase_is_empty(&win->queue);
+
+	/* Cliques, roda e teclas com o cursor sobre o jogo são do jogo. Movimento e soltura passam
+	 * (um campo sendo arrastado precisa deles), e nada é filtrado com handler modal ativo
+	 * (arrasto de valor, edição de texto, menu aberto). */
+	if (BLI_listbase_is_empty(&win->modalhandlers)) {
+		wmEvent *event, *event_next;
+		for (event = win->queue.first; event; event = event_next) {
+			event_next = event->next;
+			if (event->val == KM_RELEASE ||
+			    !(ISMOUSE_BUTTON(event->type) || ISMOUSE_WHEEL(event->type) || ISKEYBOARD(event->type)))
+			{
+				continue;
+			}
+			if (BLI_rcti_isect_pt(&game_ar->winrct, event->x, event->y)) {
+				BLI_remlink(&win->queue, event);
+				wm_event_free(event);
+			}
+		}
+	}
+
+	wm_event_do_handlers(C);
+	wm_event_do_notifiers(C);
+	wm_draw_update_game_live(C, win, game_ar);
+
+	/* O jogo continua desenhando com o contexto da sua área. */
+	CTX_wm_window_set(C, win);
+	CTX_wm_area_set(C, sa);
+	CTX_wm_region_set(C, ar);
+
+	return had_events;
+}
+
 bool WM_operator_poll(bContext *C, wmOperatorType *ot)
 {
 	wmOperatorTypeMacro *otmacro;
+
+	if (g_game_live_region && game_live_op_blocked(ot->idname)) {
+		return 0;
+	}
 
 	for (otmacro = ot->macro.first; otmacro; otmacro = otmacro->next) {
 		wmOperatorType *ot_macro = WM_operatortype_find(otmacro->idname, 0);

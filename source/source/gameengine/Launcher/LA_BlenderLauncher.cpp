@@ -29,10 +29,22 @@
 #include "KX_BlenderCanvas.h"
 
 #include "KX_PythonInit.h"
+#include "KX_KetsjiEngine.h"
+#include "KX_Scene.h"
+#include "KX_GameObject.h"
+#include "DEV_EventConsumer.h"
+
+#include "EXP_BoolValue.h"
+#include "EXP_IntValue.h"
+#include "EXP_FloatValue.h"
+#include "EXP_StringValue.h"
+
+#include <cstring>
 
 extern "C" {
 #  include "BKE_context.h"
 #  include "BKE_camera.h"
+#  include "BKE_main.h"
 
 // avoid c++ conflict with 'new'
 #  define new _new
@@ -43,6 +55,7 @@ extern "C" {
 #  include "DNA_screen_types.h"
 #  include "DNA_object_types.h"
 #  include "DNA_view3d_types.h"
+#  include "DNA_property_types.h"
 
 #  include "WM_types.h"
 #  include "WM_api.h"
@@ -50,6 +63,7 @@ extern "C" {
 #  include "wm_window.h"
 
 #  include "BLI_rect.h"
+#  include "BLI_listbase.h"
 }
 
 LA_BlenderLauncher::LA_BlenderLauncher(GHOST_ISystem *system, Main *maggie, Scene *scene, GlobalSettings *gs, RAS_Rasterizer::StereoMode stereoMode,
@@ -58,7 +72,8 @@ LA_BlenderLauncher::LA_BlenderLauncher(GHOST_ISystem *system, Main *maggie, Scen
 	m_context(context),
 	m_ar(ar),
 	m_camFrame(camframe),
-	m_drawLetterBox(false)
+	m_drawLetterBox(false),
+	m_liveUI(false)
 {
 	m_windowManager = CTX_wm_manager(m_context);
 	m_window = CTX_wm_window(m_context);
@@ -144,10 +159,26 @@ void LA_BlenderLauncher::InitEngine()
 	}
 
 	LA_Launcher::InitEngine();
+
+	// Outro .blend carregado pelo jogo (Game Actuator) não é o que o editor mostra: sem UI ao vivo.
+	m_liveUI = (m_startScene->gm.flag & GAME_LIVE_UI) && (m_maggie == CTX_data_main(m_context));
+	if (m_liveUI) {
+		for (Object *ob = (Object *)m_maggie->object.first; ob; ob = (Object *)ob->id.next) {
+			LiveSnapshotTake(ob, m_liveSnapshots[ob]);
+		}
+		m_eventConsumer->SetFocusGate(true);
+		WM_game_live_ui_begin(m_ar);
+	}
 }
 
 void LA_BlenderLauncher::ExitEngine()
 {
+	if (m_liveUI) {
+		WM_game_live_ui_end();
+		m_liveUI = false;
+		m_liveSnapshots.clear();
+	}
+
 	LA_Launcher::ExitEngine();
 
 	// Lock frame and camera enabled - restoring global values.
@@ -176,10 +207,127 @@ void LA_BlenderLauncher::RenderEngine()
 	LA_Launcher::RenderEngine();
 }
 
+void LA_BlenderLauncher::LiveSnapshotTake(Object *ob, LiveObjectSnapshot &snap)
+{
+	snap.gpuParticles = ob->gpu_particles;
+	snap.gpuParticlesMix = ob->gpu_particles_mix;
+	snap.props.clear();
+	for (bProperty *prop = (bProperty *)ob->prop.first; prop; prop = prop->next) {
+		LivePropSnapshot ps;
+		ps.name = prop->name;
+		ps.type = prop->type;
+		ps.data = prop->data;
+		if (prop->type == GPROP_STRING && prop->poin) {
+			ps.str = (const char *)prop->poin;
+		}
+		snap.props.push_back(ps);
+	}
+}
+
+static EXP_Value *live_create_property_value(bProperty *prop)
+{
+	switch (prop->type) {
+		case GPROP_BOOL:
+			return new EXP_BoolValue(prop->data != 0);
+		case GPROP_INT:
+			return new EXP_IntValue((int)prop->data);
+		case GPROP_FLOAT:
+		case GPROP_TIME:
+			return new EXP_FloatValue(*((float *)&prop->data));
+		case GPROP_STRING:
+			return new EXP_StringValue(prop->poin ? (const char *)prop->poin : "", "");
+		default:
+			return nullptr;
+	}
+}
+
+void LA_BlenderLauncher::LiveSyncFromBlender()
+{
+	// Compara o DNA de cada objeto com a cópia do último quadro; só o que o usuário mudou no
+	// painel é empurrado para o jogo (valores que a lógica do jogo alterou não são sobrescritos).
+	std::map<Object *, std::vector<KX_GameObject *> > users;
+	bool usersBuilt = false;
+	auto gameObjectsOf = [&](Object *ob) -> std::vector<KX_GameObject *> & {
+		if (!usersBuilt) {
+			for (KX_Scene *scene : *m_ketsjiEngine->CurrentScenes()) {
+				for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+					if (gameobj->GetBlenderObject()) {
+						users[gameobj->GetBlenderObject()].push_back(gameobj);
+					}
+				}
+			}
+			usersBuilt = true;
+		}
+		return users[ob];
+	};
+
+	for (Object *ob = (Object *)m_maggie->object.first; ob; ob = (Object *)ob->id.next) {
+		LiveObjectSnapshot &snap = m_liveSnapshots[ob];
+		bool changed = false;
+
+		if (memcmp(&snap.gpuParticles, &ob->gpu_particles, sizeof(RangeGPUParticleSettings)) != 0) {
+			for (KX_GameObject *gameobj : gameObjectsOf(ob)) {
+				gameobj->ApplyGPUParticlesLive(snap.gpuParticles, ob->gpu_particles, false);
+			}
+			changed = true;
+		}
+		if (memcmp(&snap.gpuParticlesMix, &ob->gpu_particles_mix, sizeof(RangeGPUParticleSettings)) != 0) {
+			for (KX_GameObject *gameobj : gameObjectsOf(ob)) {
+				gameobj->ApplyGPUParticlesLive(snap.gpuParticlesMix, ob->gpu_particles_mix, true);
+			}
+			changed = true;
+		}
+
+		for (bProperty *prop = (bProperty *)ob->prop.first; prop; prop = prop->next) {
+			const LivePropSnapshot *old = nullptr;
+			for (const LivePropSnapshot &ps : snap.props) {
+				if (ps.name == prop->name) {
+					old = &ps;
+					break;
+				}
+			}
+			const bool same = old && old->type == prop->type && old->data == prop->data &&
+			                  (prop->type != GPROP_STRING || old->str == (prop->poin ? (const char *)prop->poin : ""));
+			if (same) {
+				continue;
+			}
+			changed = true;
+			EXP_Value *value = live_create_property_value(prop);
+			if (!value) {
+				continue;
+			}
+			for (KX_GameObject *gameobj : gameObjectsOf(ob)) {
+				// No lugar: preserva registro de timer e debug da propriedade existente.
+				EXP_Value *existing = gameobj->GetProperty(prop->name);
+				if (existing) {
+					existing->SetValue(value);
+				}
+				else {
+					gameobj->SetProperty(prop->name, value);
+				}
+			}
+			value->Release();
+		}
+
+		if (changed || snap.props.size() != (size_t)BLI_listbase_count(&ob->prop)) {
+			LiveSnapshotTake(ob, snap);
+		}
+	}
+}
+
 KX_ExitInfo LA_BlenderLauncher::EngineNextFrame()
 {
-	// Free all window manager events unused.
-	wm_event_free_all(m_window);
+	if (m_liveUI) {
+		// Eventos fora da região do jogo vão para o editor; a UI é composta no back buffer
+		// antes do quadro do jogo, que desenha por cima na sua região e troca o buffer.
+		if (WM_game_live_ui_step(m_context)) {
+			LiveSyncFromBlender();
+		}
+	}
+	else {
+		// Free all window manager events unused.
+		wm_event_free_all(m_window);
+	}
 
 	return LA_Launcher::EngineNextFrame();
 }

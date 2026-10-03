@@ -40,7 +40,9 @@
 
 DEV_EventConsumer::DEV_EventConsumer(GHOST_ISystem *system, DEV_InputDevice *device, RAS_ICanvas *canvas)
 	:m_device(device),
-	m_canvas(canvas)
+	m_canvas(canvas),
+	m_focusGate(false),
+	m_cursorInside(true)
 {
 	// Setup the default mouse position.
 	int cursorx, cursory;
@@ -48,10 +50,21 @@ DEV_EventConsumer::DEV_EventConsumer(GHOST_ISystem *system, DEV_InputDevice *dev
 	int x, y;
 	m_canvas->ConvertMousePosition(cursorx, cursory, x, y, true);
 	m_device->ConvertMoveEvent(x, y);
+	UpdateCursorInside(x, y);
 }
 
 DEV_EventConsumer::~DEV_EventConsumer()
 {
+}
+
+void DEV_EventConsumer::SetFocusGate(bool gate)
+{
+	m_focusGate = gate;
+}
+
+void DEV_EventConsumer::UpdateCursorInside(int x, int y)
+{
+	m_cursorInside = (x >= 0 && y >= 0 && x < m_canvas->GetWidth() && y < m_canvas->GetHeight());
 }
 
 void DEV_EventConsumer::HandleWindowEvent(GHOST_TEventType type)
@@ -73,6 +86,7 @@ void DEV_EventConsumer::HandleCursorEvent(GHOST_TEventDataPtr data, GHOST_IWindo
 	m_canvas->ConvertMousePosition(cursorData->x, cursorData->y, x, y, false);
 
 	m_device->ConvertMoveEvent(x, y);
+	UpdateCursorInside(x, y);
 }
 
 void DEV_EventConsumer::HandleWheelEvent(GHOST_TEventDataPtr data)
@@ -92,6 +106,16 @@ void DEV_EventConsumer::HandleButtonEvent(GHOST_TEventDataPtr data, bool down)
 bool DEV_EventConsumer::processEvent(GHOST_IEvent *event)
 {
 	GHOST_TEventDataPtr eventData = ((GHOST_IEvent *)event)->getData();
+	if (m_focusGate && !m_cursorInside) {
+		switch (event->getType()) {
+			case GHOST_kEventButtonDown:
+			case GHOST_kEventWheel:
+			case GHOST_kEventKeyDown:
+				return true;
+			default:
+				break;
+		}
+	}
 	switch (event->getType()) {
 		case GHOST_kEventButtonDown:
 		{

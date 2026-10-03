@@ -269,6 +269,14 @@ void		WM_operator_stack_clear(struct wmWindowManager *wm);
 void		WM_operator_handlers_clear(wmWindowManager *wm, struct wmOperatorType *ot);
 
 bool        WM_operator_poll		(struct bContext *C, struct wmOperatorType *ot);
+
+			/* UI ao vivo durante o jogo embutido (LA_BlenderLauncher): com uma região de jogo
+			 * definida, operadores que destroem/trocam dados ou o layout ficam bloqueados e
+			 * WM_game_live_ui_step processa eventos e redesenha as outras áreas sem trocar buffer. */
+void        WM_game_live_ui_begin(struct ARegion *game_region);
+void        WM_game_live_ui_end(void);
+bool        WM_game_live_ui_active(void);
+bool        WM_game_live_ui_step(struct bContext *C); /* true se havia eventos na fila */
 bool        WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, short context);
 int         WM_operator_call_ex(struct bContext *C, struct wmOperator *op, const bool store);
 int			WM_operator_call		(struct bContext *C, struct wmOperator *op);

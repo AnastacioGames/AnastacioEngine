@@ -80,6 +80,8 @@
 #include "KX_CollisionContactPoints.h"
 #include "RAS_ParticleBuffer.h"
 #include "RAS_ParticleShaderCache.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "KX_ParticleSystem.h"
 
 #include "BKE_object.h"
@@ -729,6 +731,58 @@ void KX_GameObject::SetActionLayerWeight(short layer, float layer_weight)
 	GetActionManager()->SetActionLayerWeight(layer, layer_weight);
 }
 
+void KX_GameObject::ApplyGPUParticleParams(RAS_ParticleBuffer *buffer, const RangeGPUParticleSettings &settings)
+{
+	buffer->SetGravity(settings.gravity);
+	buffer->SetLifetime(settings.lifetime);
+	buffer->SetEmitterPos(settings.emitter_position);
+	buffer->SetEmitterRadius(settings.emitter_radius);
+	buffer->SetVelocityBase(settings.velocity);
+	buffer->SetVelocityRandomness(settings.velocity_randomness);
+	buffer->SetBillboardSize(settings.size);
+	buffer->SetColor(settings.color);
+	buffer->SetEndColor(settings.end_color);
+	buffer->SetEndSize(settings.end_size);
+	buffer->SetEmissionDirection(settings.emission_direction);
+	buffer->SetEmissionAngle(settings.emission_angle);
+	buffer->SetDebugUI(settings.use_debug_ui != 0);
+	buffer->SetBlendMode(settings.blend_mode);
+	buffer->SetBillboardMode(settings.billboard_mode);
+	buffer->SetBackfaceCulling(settings.use_backface_culling != 0);
+	buffer->SetEnabled(settings.disable_emission == 0);
+	buffer->SetCollisionMode(settings.collision_mode);
+	buffer->SetCollisionHeight(settings.collision_height);
+	buffer->SetCollisionBounce(settings.collision_bounce);
+	buffer->SetCollisionFriction(settings.collision_friction);
+	buffer->SetUseVortex(settings.use_vortex != 0);
+	buffer->SetVortexRotationSpeed(settings.vortex_rotation_speed);
+	buffer->SetVortexRadiusTop(settings.vortex_radius_top);
+	buffer->SetVortexHeight(settings.vortex_height);
+}
+
+void KX_GameObject::ApplyGPUParticlesLive(const RangeGPUParticleSettings &oldSettings, const RangeGPUParticleSettings &settings, bool mix)
+{
+	std::unique_ptr<RAS_ParticleBuffer> &bufferSlot = mix ? m_particleBufferMix : m_particleBuffer;
+	if (!bufferSlot) {
+		return;
+	}
+
+	const bool rebuild = oldSettings.particle_count != settings.particle_count ||
+	                     oldSettings.emit_from != settings.emit_from ||
+	                     oldSettings.particle_look != settings.particle_look ||
+	                     oldSettings.use_custom_frag_shader != settings.use_custom_frag_shader ||
+	                     oldSettings.use_size_curve != settings.use_size_curve ||
+	                     oldSettings.use_color_curve != settings.use_color_curve ||
+	                     strcmp(oldSettings.texture_path, settings.texture_path) != 0 ||
+	                     strcmp(oldSettings.frag_shader_path, settings.frag_shader_path) != 0;
+	if (rebuild) {
+		SetupGPUParticlesBuffer(bufferSlot, settings);
+	}
+	else {
+		ApplyGPUParticleParams(bufferSlot.get(), settings);
+	}
+}
+
 void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> &bufferSlot, const RangeGPUParticleSettings &settings)
 {
 	bufferSlot.reset(new RAS_ParticleBuffer(settings.particle_count > 0 ? settings.particle_count : 1));
@@ -738,31 +792,28 @@ void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> 
 		return;
 	}
 
-	bufferSlot->SetGravity(settings.gravity);
-	bufferSlot->SetLifetime(settings.lifetime);
-	bufferSlot->SetEmitterPos(settings.emitter_position);
-	bufferSlot->SetEmitterRadius(settings.emitter_radius);
-	bufferSlot->SetVelocityBase(settings.velocity);
-	bufferSlot->SetVelocityRandomness(settings.velocity_randomness);
-	bufferSlot->SetBillboardSize(settings.size);
-	bufferSlot->SetColor(settings.color);
-	bufferSlot->SetEndColor(settings.end_color);
-	bufferSlot->SetEndSize(settings.end_size);
-	bufferSlot->SetEmissionDirection(settings.emission_direction);
-	bufferSlot->SetEmissionAngle(settings.emission_angle);
-	bufferSlot->SetDebugUI(settings.use_debug_ui != 0);
-	bufferSlot->SetBlendMode(settings.blend_mode);
-	bufferSlot->SetBillboardMode(settings.billboard_mode);
-	bufferSlot->SetBackfaceCulling(settings.use_backface_culling != 0);
-	bufferSlot->SetEnabled(settings.disable_emission == 0);
-	bufferSlot->SetCollisionMode(settings.collision_mode);
-	bufferSlot->SetCollisionHeight(settings.collision_height);
-	bufferSlot->SetCollisionBounce(settings.collision_bounce);
-	bufferSlot->SetCollisionFriction(settings.collision_friction);
-	bufferSlot->SetUseVortex(settings.use_vortex != 0);
-	bufferSlot->SetVortexRotationSpeed(settings.vortex_rotation_speed);
-	bufferSlot->SetVortexRadiusTop(settings.vortex_radius_top);
-	bufferSlot->SetVortexHeight(settings.vortex_height);
+	ApplyGPUParticleParams(bufferSlot.get(), settings);
+
+	// One static particle per vertex of the object's own mesh (base mesh, modifiers not applied),
+	// in local space -- UpdateParticles feeds the world transform every frame.
+	if (settings.emit_from == GPU_PARTICLE_EMIT_VERTICES) {
+		Object *blenderobj = GetBlenderObject();
+		Mesh *me = (blenderobj && blenderobj->type == OB_MESH) ? (Mesh *)blenderobj->data : nullptr;
+		if (me && me->mvert && me->totvert > 0) {
+			std::vector<float> positions(me->totvert * 3);
+			for (int i = 0; i < me->totvert; ++i) {
+				positions[i * 3 + 0] = me->mvert[i].co[0];
+				positions[i * 3 + 1] = me->mvert[i].co[1];
+				positions[i * 3 + 2] = me->mvert[i].co[2];
+			}
+			bufferSlot->SetStaticPositions(positions);
+			const mt::mat4 model = mt::mat4::FromAffineTransform(NodeGetWorldTransform());
+			bufferSlot->SetModelMatrix((const float *)model.Data());
+		}
+		else {
+			CM_Warning("GPU particles on object \"" << m_name << "\": Emit From Mesh Vertices needs a mesh object with vertices, using Emitter Volume");
+		}
+	}
 
 	if (settings.use_custom_frag_shader && settings.frag_shader_path[0] != '\0') {
 		if (!bufferSlot->LoadFragShaderFromPath(settings.frag_shader_path)) {
@@ -804,6 +855,15 @@ void KX_GameObject::SetupGPUParticlesMix(const RangeGPUParticleSettings &setting
 
 void KX_GameObject::UpdateParticles(float deltaTime)
 {
+	if ((m_particleBuffer && m_particleBuffer->IsStatic()) || (m_particleBufferMix && m_particleBufferMix->IsStatic())) {
+		const mt::mat4 model = mt::mat4::FromAffineTransform(NodeGetWorldTransform());
+		if (m_particleBuffer && m_particleBuffer->IsStatic()) {
+			m_particleBuffer->SetModelMatrix((const float *)model.Data());
+		}
+		if (m_particleBufferMix && m_particleBufferMix->IsStatic()) {
+			m_particleBufferMix->SetModelMatrix((const float *)model.Data());
+		}
+	}
 	if (m_particleBuffer) {
 		const bool enabled = (GetPropertyNumber("GPU_Particles_Enabled", 1.0f) != 0.0f);
 		m_particleBuffer->SetEnabled(enabled);
@@ -827,6 +887,11 @@ RAS_ParticleBuffer *KX_GameObject::GetParticleBuffer() const
 RAS_ParticleBuffer *KX_GameObject::GetParticleBufferMix() const
 {
 	return m_particleBufferMix.get();
+}
+
+bool KX_GameObject::HasStaticParticles() const
+{
+	return (m_particleBuffer && m_particleBuffer->IsStatic()) || (m_particleBufferMix && m_particleBufferMix->IsStatic());
 }
 
 void KX_GameObject::SetActionLayerSpeed(short layer, float speed)

@@ -916,8 +916,9 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
 
         box = split.box()
         box.label(text="Embedded Player:", icon="VIEW3D")
-        row = box.row()
+        row = box.row(align=True)
         row.operator("view3d.game_start", text="Start")
+        row.prop(gs, "use_live_ui", text="", icon='UNLOCKED' if gs.use_live_ui else 'LOCKED')
         row = box.row()
         row.label(text="Resolution:", icon="SCENE")
         row = box.row(align=True)

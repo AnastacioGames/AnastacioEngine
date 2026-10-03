@@ -9,6 +9,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Refletor de pista (luz falsa) nas Partículas GPU
+
+- Novo modo **Emit From: Mesh Vertices** (`RangeGPUParticleSettings.emit_from`, antigo `pad5`; layout DNA igual):
+  uma partícula fixa por vértice da malha do próprio objeto (malha base, sem modificadores), sem simulação nem
+  idade. `RAS_ParticleBuffer::SetStaticPositions` grava as posições locais; `Update()` pula o transform feedback e
+  o draw usa `u_model` (transform de mundo atualizado em `KX_GameObject::UpdateParticles`), então acompanha o objeto.
+  `Resize()` é recusado nesse modo. Tamanho mínimo aparente pela distância evita sumir/piscar longe.
+- Novo look **Reflector** (`GPU_PARTICLE_LOOK_REFLECTOR`): olho-de-gato sem luz real. A "luz do farol" é a própria
+  câmera: cone em torno de -Z da view (12°–40°) e alcance 40–120 m. Color = brilho aceso (alfa = intensidade),
+  End Color = ponto fraco apagado. Escolher o look já liga Mesh Vertices, aditivo e valores iniciais.
+- Objeto com emissor Mesh Vertices ignora o frustum culling do objeto (`KX_GameObject::HasStaticParticles`, em
+  `KX_Scene::UpdateGpuParticleEmitters` e `KX_RenderPipeline`): malha só de vértices tem bounding box degenerada
+  e os refletores sumiam ao olhar para trás ou com a câmera baixa. A GPU recorta os sprites fora da tela.
+- Draw shader ganhou `v_viewPos` (centro em view space), disponível também para `.glsl` customizados.
+- Cena de teste `reflector_test.range` (raiz): pista em S, 152 refletores, câmera W/S/A/D. Compila e roda sem erro
+  de shader; validação visual pendente.
+
 ## 2026-10-02 - Material rápido: receitas de nós prontas no painel do material
 
 - Painel **Quick Material** (Material rápido) no editor de Propriedades > Material, engine Game, para quem não

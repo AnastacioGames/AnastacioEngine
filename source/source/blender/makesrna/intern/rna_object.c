@@ -499,6 +499,16 @@ static void rna_GPUParticleSettings_particle_look_update(Main *bmain, Scene *sce
 			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
 			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
 			break;
+		case GPU_PARTICLE_LOOK_REFLECTOR:
+			/* Static sprites on the mesh vertices; Color = lit glow, End Color = faint unlit dot. */
+			gp->use_vortex = 0;
+			gp->emit_from = GPU_PARTICLE_EMIT_VERTICES;
+			gp->size = 0.25f; gp->end_size = 0.25f;
+			gp->color[0] = 1.0f; gp->color[1] = 0.75f; gp->color[2] = 0.2f; gp->color[3] = 1.0f;
+			gp->end_color[0] = 0.4f; gp->end_color[1] = 0.3f; gp->end_color[2] = 0.1f; gp->end_color[3] = 0.15f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_CAMERA_FACING;
+			break;
 		case GPU_PARTICLE_LOOK_DEFAULT:
 		default:
 			/* No preset -- leave whatever values the emitter already had. */
@@ -2193,6 +2203,16 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 		{GPU_PARTICLE_LOOK_TORNADO, "TORNADO", 0, "Tornado", "Rotating radial dust stripes, spinning faster near the center"},
 		{GPU_PARTICLE_LOOK_WIND, "WIND", 0, "Wind", "Thin translucent horizontal streak with a subtle wobble"},
 		{GPU_PARTICLE_LOOK_AURORA, "AURORA", 0, "Aurora", "Wavy vertical light curtain, best on tall stretched sprites"},
+		{GPU_PARTICLE_LOOK_REFLECTOR, "REFLECTOR", 0, "Reflector",
+		 "Fake road reflector (cat's eye): glows in Color when the camera looks at it, End Color when unlit. "
+		 "No real light, use with Emit From: Mesh Vertices"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static const EnumPropertyItem rna_enum_gpu_particle_emit_from_items[] = {
+		{GPU_PARTICLE_EMIT_VOLUME, "VOLUME", 0, "Emitter Volume", "Particles spawn around Emitter Position and die after Lifetime"},
+		{GPU_PARTICLE_EMIT_VERTICES, "VERTICES", 0, "Mesh Vertices",
+		 "One static particle pinned on each vertex of this object's mesh (no motion, never dies)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -2273,6 +2293,12 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 180.0f);
 	RNA_def_property_ui_text(prop, "Emission Angle",
 	                          "Full cone angle in degrees around the emission direction (180 = uniform sphere)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "emit_from", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "emit_from");
+	RNA_def_property_enum_items(prop, rna_enum_gpu_particle_emit_from_items);
+	RNA_def_property_ui_text(prop, "Emit From", "Where the particles come from");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "use_vortex", PROP_BOOLEAN, PROP_NONE);

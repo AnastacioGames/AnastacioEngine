@@ -243,7 +243,9 @@ typedef struct RangeGPUParticleSettings {
 	 * the angle advances by vortex_rotation_speed (degrees/sec). Z motion still comes from the
 	 * usual gravity/velocity integration -- this only reshapes XY into a funnel. */
 	short use_vortex;
-	short pad5;
+	/* Where particles come from (GPU_PARTICLE_EMIT_*). VERTICES pins one static, never-dying
+	 * particle on each vertex of the object's own mesh (e.g. road reflectors along a track). */
+	short emit_from;
 	float vortex_rotation_speed;
 	float vortex_radius_top;
 	float vortex_height;
@@ -392,6 +394,14 @@ enum {
 	GPU_PARTICLE_LOOK_TORNADO = 5,
 	GPU_PARTICLE_LOOK_WIND = 6,
 	GPU_PARTICLE_LOOK_AURORA = 7,
+	/* Retroreflector (road cat's eye): glows when the camera/headlight looks at it. */
+	GPU_PARTICLE_LOOK_REFLECTOR = 8,
+};
+
+/* RangeGPUParticleSettings.emit_from */
+enum {
+	GPU_PARTICLE_EMIT_VOLUME = 0,
+	GPU_PARTICLE_EMIT_VERTICES = 1,
 };
 
 enum {

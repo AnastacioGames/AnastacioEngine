@@ -189,7 +189,12 @@ const char *drawVertexSource =
 	"out vec2 v_uv;\n"
 	"out float v_alpha;\n"
 	"out float v_lifeFrac;\n"
+	"out vec3 v_viewPos;\n"
 	"uniform mat4 u_view;\n"
+	// Static (GPU_PARTICLE_EMIT_VERTICES) buffers store local positions placed by u_model and
+	// never age; simulated buffers are already in world space and get an identity u_model.
+	"uniform mat4 u_model;\n"
+	"uniform bool u_static;\n"
 	"uniform mat4 u_projection;\n"
 	"uniform float u_lifetime;\n"
 	"uniform float u_size;\n"
@@ -198,12 +203,20 @@ const char *drawVertexSource =
 	"uniform bool u_useSizeCurve;\n"
 	"uniform int u_billboardMode;\n"
 	"void main() {\n"
-	"	float lifeFrac = clamp(in_particleAge / u_lifetime, 0.0, 1.0);\n"
+	"	vec3 worldPos = (u_model * vec4(in_particlePos, 1.0)).xyz;\n"
+	"	vec4 centerView = u_view * vec4(worldPos, 1.0);\n"
+	"	v_viewPos = centerView.xyz;\n"
+	"	float lifeFrac = u_static ? 0.0 : clamp(in_particleAge / u_lifetime, 0.0, 1.0);\n"
 	"	float size;\n"
 	"	if (u_useSizeCurve) {\n"
 	"		size = texture2D(u_sizeCurveTex, vec2(lifeFrac, 0.5)).r;\n"
 	"	} else {\n"
 	"		size = mix(u_size, u_endSize, lifeFrac);\n"
+	"	}\n"
+	// Static sprites (road reflectors) would shrink below a pixel far away and flicker; keep a
+	// minimum apparent size proportional to view distance.
+	"	if (u_static) {\n"
+	"		size = max(size, -centerView.z * 0.004);\n"
 	"	}\n"
 	"	if (u_billboardMode == 1) {\n"
 	"		vec3 worldRight = vec3(u_view[0][0], u_view[1][0], u_view[2][0]);\n"
@@ -211,12 +224,12 @@ const char *drawVertexSource =
 	"		vec3 rightRaw = worldRight - dot(worldRight, up) * up;\n"
 	"		vec3 right = (dot(rightRaw, rightRaw) > 0.0001) ? normalize(rightRaw) : vec3(1.0, 0.0, 0.0);\n"
 	"		vec3 offset = right * (in_corner.x * size) + up * (in_corner.y * size);\n"
-	"		gl_Position = u_projection * u_view * vec4(in_particlePos + offset, 1.0);\n"
+	"		gl_Position = u_projection * u_view * vec4(worldPos + offset, 1.0);\n"
 	"	} else if (u_billboardMode == 2) {\n"
 	"		vec3 offset = vec3(-in_corner.x * size, in_corner.y * size, 0.0);\n"
-	"		gl_Position = u_projection * u_view * vec4(in_particlePos + offset, 1.0);\n"
+	"		gl_Position = u_projection * u_view * vec4(worldPos + offset, 1.0);\n"
 	"	} else {\n"
-	"		vec4 viewPos = u_view * vec4(in_particlePos, 1.0);\n"
+	"		vec4 viewPos = centerView;\n"
 	"		viewPos.xy += in_corner * size;\n"
 	"		gl_Position = u_projection * viewPos;\n"
 	"	}\n"
@@ -225,7 +238,7 @@ const char *drawVertexSource =
 	// Fade in over the first 10% of life, fade out over the last 30% -- avoids a hard pop
 	// on respawn/death.
 	"	v_alpha = min(lifeFrac / 0.1, (1.0 - lifeFrac) / 0.3);\n"
-	"	v_alpha = clamp(v_alpha, 0.0, 1.0);\n"
+	"	v_alpha = u_static ? 1.0 : clamp(v_alpha, 0.0, 1.0);\n"
 	"}\n";
 
 // Fase P: split into a fixed preamble (varyings/uniforms every draw fragment shader needs,
@@ -239,6 +252,8 @@ const char *drawFragmentPreamble =
 	"in vec2 v_uv;\n"
 	"in float v_alpha;\n"
 	"in float v_lifeFrac;\n"
+	// Particle center in view space (camera at origin looking down -Z).
+	"in vec3 v_viewPos;\n"
 	"out vec4 fragColor;\n"
 	"uniform vec4 u_color;\n"
 	"uniform vec4 u_endColor;\n"
@@ -490,11 +505,34 @@ void main() {
 }
 )GLSL";
 
+// Retroreflector (road cat's eye / reflective tape). No real light: the "headlight" is the camera
+// itself (view -Z), which is physically close for a retroreflector since it bounces light back
+// toward its source. Lit by a cone around the view direction and a distance falloff; Color is the
+// lit glow (alpha = intensity), End Color the faint unlit dot (alpha = how visible).
+const char *lookReflectorSource = R"GLSL(
+void main() {
+	float dist = length(v_viewPos);
+	vec3 dir = v_viewPos / max(dist, 1e-4);
+	float cone = smoothstep(cos(radians(40.0)), cos(radians(12.0)), -dir.z);
+	float range = 1.0 - smoothstep(40.0, 120.0, dist);
+	float lit = cone * range;
+	float d = length(v_uv) * 2.0;
+	float core = smoothstep(0.4, 0.0, d);
+	float halo = pow(smoothstep(1.0, 0.0, d), 3.0);
+	vec3 litRgb = u_color.rgb * u_color.a * (core * 4.0 + halo * 1.5);
+	vec3 dimRgb = u_endColor.rgb * u_endColor.a * core;
+	vec3 rgb = mix(dimRgb, litRgb, lit);
+	if (max(rgb.r, max(rgb.g, rgb.b)) < 0.002) { discard; }
+	fragColor = vec4(rgb, 1.0);
+}
+)GLSL";
+
 } // namespace
 
 const char *RAS_GetBuiltinParticleLookSource(int look)
 {
 	switch (look) {
+		case GPU_PARTICLE_LOOK_REFLECTOR: return lookReflectorSource;
 		case GPU_PARTICLE_LOOK_SMOKE: return lookSmokeSource;
 		case GPU_PARTICLE_LOOK_SPARKLE: return lookSparkleSource;
 		case GPU_PARTICLE_LOOK_DISSOLVE: return lookDissolveSource;
@@ -644,6 +682,8 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_drawTextureLoc = glGetUniformLocation(m_drawProgram, "u_texture");
 	m_drawUseTextureLoc = glGetUniformLocation(m_drawProgram, "u_useTexture");
 	m_drawBillboardModeLoc = glGetUniformLocation(m_drawProgram, "u_billboardMode");
+	m_drawModelLoc = glGetUniformLocation(m_drawProgram, "u_model");
+	m_drawStaticLoc = glGetUniformLocation(m_drawProgram, "u_static");
 	m_drawEndColorLoc = glGetUniformLocation(m_drawProgram, "u_endColor");
 	m_drawEndSizeLoc = glGetUniformLocation(m_drawProgram, "u_endSize");
 	m_drawTimeLoc = glGetUniformLocation(m_drawProgram, "u_time");

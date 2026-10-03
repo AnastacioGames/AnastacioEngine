@@ -1012,6 +1012,103 @@ void wm_draw_update(bContext *C)
 	}
 }
 
+/* UI ao vivo durante o jogo embutido: redesenha as regiões marcadas (menos a do jogo) e compõe a
+ * janela inteira no back buffer, sem trocar buffer -- o jogo desenha por cima na sua região e
+ * faz a troca. Compõe todo quadro: com troca de buffer, um quadro sem composição mostraria a UI
+ * antiga no outro buffer. Só no método Triple (o padrão); nos outros a UI não é redesenhada. */
+void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
+{
+	wmWindowManager *wm = CTX_wm_manager(C);
+
+	if (wm_automatic_draw_method(win) != USER_DRAW_TRIPLE || win->drawfail ||
+	    WM_stereo3d_enabled(win, false) || win->drawdata.first == NULL)
+	{
+		return;
+	}
+
+	CTX_wm_window_set(C, win);
+	wm_window_make_drawable(wm, win);
+
+	if (win->screen->do_refresh) {
+		ED_screen_refresh(wm, win);
+	}
+
+	game_ar->do_draw = false;
+
+	GLint prev_fbo = 0, prev_program = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev_fbo);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prev_program);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(0);
+
+	/* O jogo deixa VAO/VBO/IBO e arrays genéricos ligados; o desenho da UI usa arrays do lado do
+	 * cliente e com IBO ligado o glDrawElements dos widgets lê lixo (crash no driver). */
+	GLint prev_vao = 0, prev_vbo = 0, prev_ibo = 0, prev_tex_unit = 0;
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
+	glBindVertexArray(0);
+	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prev_vbo);
+	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &prev_ibo);
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &prev_tex_unit);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	GLint max_attribs = 16;
+	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &max_attribs);
+	bool attrib_enabled[32] = {false};
+	for (int i = 0; i < max_attribs && i < 32; i++) {
+		GLint enabled = 0;
+		glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+		attrib_enabled[i] = (enabled != 0);
+		if (enabled) {
+			glDisableVertexAttribArray(i);
+		}
+	}
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glActiveTexture(GL_TEXTURE0);
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glMatrixMode(GL_TEXTURE);
+	glPushMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+
+	wm_method_draw_triple(C, win);
+
+	glMatrixMode(GL_TEXTURE);
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+	glPopAttrib();
+
+	GPU_basic_shader_bind(0);
+	for (int i = 0; i < max_attribs && i < 32; i++) {
+		if (attrib_enabled[i]) {
+			glEnableVertexAttribArray(i);
+		}
+	}
+	glPopClientAttrib();
+	glBindBuffer(GL_ARRAY_BUFFER, prev_vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prev_ibo);
+	glBindVertexArray(prev_vao);
+	glActiveTexture(prev_tex_unit);
+	glUseProgram(prev_program);
+	glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
+
+	win->screen->do_draw_gesture = false;
+	win->screen->do_draw_paintcursor = false;
+	win->screen->do_draw_drag = false;
+
+	/* A região do jogo nunca é desenhada pelo editor enquanto o jogo roda. */
+	game_ar->do_draw = false;
+}
+
 void wm_draw_data_free(wmWindow *win)
 {
 	wmDrawData *dd;

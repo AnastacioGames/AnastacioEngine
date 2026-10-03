@@ -705,6 +705,9 @@ struct wmEvent;
 void wm_cursor_position_from_ghost(struct wmWindow *win, int *x, int *y);
 void wm_draw_region_clear(struct wmWindow *win, struct ARegion *ar);
 void wm_event_free_all(struct wmWindow *win);
+void WM_game_live_ui_begin(struct ARegion *game_region);
+void WM_game_live_ui_end(void);
+bool WM_game_live_ui_step(struct bContext *C);
 void wm_get_screensize(int *r_width, int *r_height);
 void wm_subwindow_close(struct wmWindow *win, int swinid);
 void wm_subwindow_matrix_get(struct wmWindow *win, int swinid, float mat[4][4]);
@@ -726,6 +729,9 @@ void wm_window_swap_buffers(struct wmWindow *win);
 void wm_cursor_position_from_ghost(struct wmWindow *win, int *x, int *y) RET_NONE
 void wm_draw_region_clear(struct wmWindow *win, struct ARegion *ar) RET_NONE
 void wm_event_free_all(struct wmWindow *win) RET_NONE
+void WM_game_live_ui_begin(struct ARegion *game_region) RET_NONE
+void WM_game_live_ui_end(void) RET_NONE
+bool WM_game_live_ui_step(struct bContext *C) RET_ZERO
 void wm_get_screensize(int *r_width, int *r_height) RET_NONE
 void wm_subwindow_close(struct wmWindow *win, int swinid) RET_NONE
 void wm_subwindow_matrix_get(struct wmWindow *win, int swinid, float mat[4][4]) RET_NONE

@@ -26,6 +26,12 @@
 
 #include "LA_Launcher.h"
 
+#include "DNA_object_types.h"
+
+#include <map>
+#include <string>
+#include <vector>
+
 #include "RAS_Rect.h"
 
 struct Object;
@@ -54,6 +60,25 @@ protected:
 		int sceneLayer;
 		Object *camera;
 	} m_savedBlenderData;
+
+	/// UI ao vivo: o editor continua respondendo fora da região do jogo (só quando o jogo roda o
+	/// próprio .blend do editor). Valores editados no painel entram no jogo pelo LiveSync.
+	bool m_liveUI;
+	struct LivePropSnapshot {
+		std::string name;
+		short type;
+		int data;
+		std::string str;
+	};
+	struct LiveObjectSnapshot {
+		RangeGPUParticleSettings gpuParticles;
+		RangeGPUParticleSettings gpuParticlesMix;
+		std::vector<LivePropSnapshot> props;
+	};
+	std::map<Object *, LiveObjectSnapshot> m_liveSnapshots;
+
+	static void LiveSnapshotTake(Object *ob, LiveObjectSnapshot &snap);
+	void LiveSyncFromBlender();
 
 	virtual void RenderEngine();
 
