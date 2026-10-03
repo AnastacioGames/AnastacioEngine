@@ -4564,6 +4564,8 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
 	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
+	uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
+	        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
 	uiItemS(row);
 
 	/* Object Mode dropdown now lives only in the header; keep the shading

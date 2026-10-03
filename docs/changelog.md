@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - UI do editor liberada durante o Play (Live UI)
+
+- Cadeado `scene.game_settings.use_live_ui` (`GAME_LIVE_UI`, desligado por padrão) ao lado do Play na barra
+  flutuante da 3D view, do Start em Game Settings e do Play (Embedded) do flowmenu. Só no Play embutido; o
+  Standalone é outro processo e não é afetado.
+- Com o cadeado aberto, `LA_BlenderLauncher::EngineNextFrame` chama `WM_game_live_ui_step` em vez de descartar os
+  eventos: cliques/roda/teclas sobre a região do jogo continuam do jogo (nada é filtrado com handler modal ativo),
+  o resto vai para o editor. `wm_draw_update_game_live` compõe a janela (método Triple) no back buffer sem trocar
+  buffer, antes do quadro do jogo, isolando o estado GL que o jogo deixa ligado (VAO/IBO causava crash no
+  `glDrawElements` dos widgets; luz/blend/sRGB escureciam a UI). `DEV_EventConsumer::SetFocusGate`: o jogo só recebe
+  cliques e teclas com o cursor na tela dele.
+- Bloqueados durante o Play (`WM_operator_poll`): undo/redo, abrir/reverter arquivo, apagar/adicionar/duplicar
+  objeto, troca de modo, nova cena, dividir/juntar/maximizar áreas.
+- Sincronização (`LiveSyncFromBlender`): a cada evento compara o DNA com a cópia anterior e empurra só o que mudou.
+  Partículas GPU (principal e Mix) via `KX_GameObject::ApplyGPUParticlesLive` (quantidade, origem, textura, shader,
+  look e curvas recriam o emissor) e Game Properties (valor trocado no lugar). Desligado se o jogo carregar outro .blend.
+- Limitações: menu suspenso sobre a tela do jogo fica escondido; edição do formato das curvas de partícula não é
+  detectada. Validado pelo usuário no editor (partículas ao vivo, UI sem escurecer).
+
 ## 2026-10-02 - Refletor de pista (luz falsa) nas Partículas GPU
 
 - Novo modo **Emit From: Mesh Vertices** (`RangeGPUParticleSettings.emit_from`, antigo `pad5`; layout DNA igual):

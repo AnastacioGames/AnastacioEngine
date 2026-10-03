@@ -1070,8 +1070,35 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
 	glActiveTexture(GL_TEXTURE0);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	/* Estado padrão que a UI do editor assume; o jogo deixa luz, névoa, sRGB, blend etc. ligados
+	 * e a região redesenhada (ao clicar) saía escurecida. */
+	glDisable(GL_LIGHTING);
+	glDisable(GL_FOG);
+	glDisable(GL_FRAMEBUFFER_SRGB);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_ALPHA_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_COLOR_MATERIAL);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendEquation(GL_FUNC_ADD);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	GPU_basic_shader_bind(0);
+
 	glMatrixMode(GL_TEXTURE);
 	glPushMatrix();
+	glLoadIdentity();
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glMatrixMode(GL_MODELVIEW);
