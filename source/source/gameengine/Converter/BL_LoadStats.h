@@ -27,9 +27,11 @@ struct BL_LoadStats
 	double mesh = 0.0;      // BL_ConvertMesh total (includes normals and tangents).
 	double tangent = 0.0;   // MikkTSpace tangents only.
 	double physics = 0.0;   // BL_CreatePhysicsObjectNew.
+	double loopHash = 0.0;  // Content hash of meshes for the normal/tangent cache.
 	int meshes = 0;         // Meshes actually converted.
 	int meshesReused = 0;   // Requests served by an already converted mesh.
 	int tangentMeshes = 0;  // Meshes that needed tangents (have UVs).
+	int loopDataReused = 0; // Meshes whose normals/tangents came from an identical mesh.
 
 	void Reset()
 	{

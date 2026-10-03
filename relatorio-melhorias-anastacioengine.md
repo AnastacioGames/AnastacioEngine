@@ -50,6 +50,8 @@ ferramenta correspondente.
   10 LibLoads caíram de ~13 s cada para 214 ms no total. Console mostra linhas `[Load]` por etapa.
 - Cada fragment shader de material leva só as funções da biblioteca GLSL que usa (compilação ~4× mais rápida,
   imagem idêntica); `RANGE_NO_GLSL_STRIP=1` envia a biblioteca inteira para comparação.
+- Malhas de conteúdo igual (cópias Shift+D, duplicatas linkadas) reaproveitam normais/tangentes na conversão e a
+  BVH da física; cada objeto mantém a própria forma. `RANGE_NO_LOOPDATA_CACHE=1` desliga o cache de tangentes.
 - Render > Shading > Shader Compilation > **Fast Shader Loading** (`GAME_FAST_SHADER_LOAD`, desligado por padrão;
   `RANGE_SHADER_UNIFORM_VALUES=1` força ligado) passa os valores fixos dos materiais como uniforms: materiais de
   mesma estrutura compartilham o shader (800 esferas: 64 s → 5 s de compilação), mas perde o constant folding:

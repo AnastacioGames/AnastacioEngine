@@ -52,6 +52,8 @@
 #include <algorithm>
 #include <memory>
 #include <map>
+#include <unordered_map>
+#include <cstdint>
 
 
 #include "mathfu.h"
@@ -138,6 +140,7 @@ extern "C" {
 
 #include "BLI_utildefines.h"
 #include "BLI_listbase.h"
+#include "BLI_string.h"
 #include "BLI_math.h"
 #include "BLI_threads.h"
 
@@ -697,6 +700,82 @@ static void BL_ComputeVertexBoneData(const MDeformVert& dv, unsigned short defba
 	boneWeights = mt::vec4_packed(weights);
 }
 
+/** Loop normals and tangents shared by meshes with the same content (Shift+D copies are separate Mesh
+ * datablocks with identical data, so the Mesh pointer reuse in BL_ConvertMesh misses them). Only active
+ * while BL_ConvertBlenderObjects runs; deformers converting at runtime never see it. */
+struct BL_LoopDataCache
+{
+	struct Entry
+	{
+		int totloop;
+		std::vector<float> normals;   // 3 per loop.
+		std::vector<float> tangents;  // 4 per loop, empty without UVs.
+	};
+	std::unordered_map<uint64_t, Entry> entries;
+};
+
+static thread_local BL_LoopDataCache *loopDataCache = nullptr;
+
+static void hash_bytes(uint64_t& h, const void *data, size_t size)
+{
+	// FNV-1a, 64 bit.
+	const unsigned char *bytes = (const unsigned char *)data;
+	for (size_t i = 0; i < size; ++i) {
+		h = (h ^ bytes[i]) * 1099511628211ULL;
+	}
+}
+
+/// Hash of everything the loop normals and tangents depend on; 0 when the mesh can't be cached.
+static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, bool withTangents)
+{
+	if (CustomData_has_layer(&dm->loopData, CD_CUSTOMLOOPNORMAL) || CustomData_has_layer(&dm->loopData, CD_NORMAL)) {
+		return 0;
+	}
+
+	uint64_t h = 14695981039346656037ULL;
+	const int totvert = dm->getNumVerts(dm);
+	const int totedge = dm->getNumEdges(dm);
+	const int totloop = dm->getNumLoops(dm);
+	const int totpoly = dm->getNumPolys(dm);
+	const int counts[4] = {totvert, totedge, totloop, totpoly};
+	hash_bytes(h, counts, sizeof(counts));
+	const short autosmooth = (me->flag & ME_AUTOSMOOTH) ? 1 : 0;
+	hash_bytes(h, &autosmooth, sizeof(autosmooth));
+	if (autosmooth) {
+		hash_bytes(h, &me->smoothresh, sizeof(me->smoothresh));
+	}
+
+	const MVert *mverts = dm->getVertArray(dm);
+	for (int i = 0; i < totvert; ++i) {
+		hash_bytes(h, mverts[i].co, sizeof(mverts[i].co));
+	}
+	const MEdge *medges = dm->getEdgeArray(dm);
+	for (int i = 0; i < totedge; ++i) {
+		const int edge[3] = {(int)medges[i].v1, (int)medges[i].v2, medges[i].flag & ME_SHARP};
+		hash_bytes(h, edge, sizeof(edge));
+	}
+	const MLoop *mloops = dm->getLoopArray(dm);
+	for (int i = 0; i < totloop; ++i) {
+		const int loop[2] = {(int)mloops[i].v, (int)mloops[i].e};
+		hash_bytes(h, loop, sizeof(loop));
+	}
+	const MPoly *mpolys = dm->getPolyArray(dm);
+	for (int i = 0; i < totpoly; ++i) {
+		const int poly[3] = {mpolys[i].loopstart, mpolys[i].totloop, mpolys[i].flag & ME_SMOOTH};
+		hash_bytes(h, poly, sizeof(poly));
+	}
+	if (withTangents) {
+		// The first CD_TANGENT layer, the one read below, comes from the active UV layer.
+		const int uvLayer = max_ii(0, CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV));
+		const MLoopUV *uvs = (const MLoopUV *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPUV, uvLayer);
+		hash_bytes(h, &uvLayer, sizeof(uvLayer));
+		for (int i = 0; uvs && i < totloop; ++i) {
+			hash_bytes(h, uvs[i].uv, sizeof(uvs[i].uv));
+		}
+	}
+	return (h == 0) ? 1 : h;
+}
+
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces)
 {
@@ -714,20 +793,59 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	const MEdge *medges = (MEdge *)dm->getEdgeArray(dm);
 	const unsigned int numpolys = dm->getNumPolys(dm);
 
+	const bool withTangents = !layersInfo.uvLayers.empty();
+	const int totloop = dm->getNumLoops(dm);
+	BL_LoadStats& loadStats = BL_LoadStats::Get();
+	uint64_t loopHash = 0;
+	const BL_LoopDataCache::Entry *cached = nullptr;
+	if (loopDataCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
+		BL_LoadTimer hashTimer(loadStats.loopHash);
+		loopHash = BL_LoopDataHash(dm, me, withTangents);
+		const auto it = loopHash ? loopDataCache->entries.find(loopHash) : loopDataCache->entries.end();
+		if (it != loopDataCache->entries.end() && it->second.totloop == totloop &&
+		    it->second.tangents.empty() == !withTangents)
+		{
+			cached = &it->second;
+		}
+	}
+
+	if (cached) {
+		++loadStats.loopDataReused;
+		CustomData_add_layer(&dm->loopData, CD_NORMAL, CD_DUPLICATE, (void *)cached->normals.data(), totloop);
+		if (withTangents) {
+			// Copy the name: adding a layer reallocates the layer array it points into.
+			const int uvLayer = max_ii(0, CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV));
+			char uvName[MAX_CUSTOMDATA_LAYER_NAME];
+			BLI_strncpy(uvName, CustomData_get_layer_name(&dm->loopData, CD_MLOOPUV, uvLayer), sizeof(uvName));
+			// CD_TANGENT elements are 16 floats (legacy face size) while loops use the first 4: copy those only.
+			float(*tangents)[4] = (float(*)[4])CustomData_add_layer_named(&dm->loopData, CD_TANGENT, CD_CALLOC, nullptr,
+			                                                              totloop, uvName);
+			memcpy(tangents, cached->tangents.data(), sizeof(float[4]) * totloop);
+		}
+	}
+
 	if (CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1) {
 		dm->calcLoopNormals(dm, (me->flag & ME_AUTOSMOOTH), me->smoothresh);
 	}
 	const float(*normals)[3] = (float(*)[3])dm->getLoopDataArray(dm, CD_NORMAL);
 
 	float(*tangent)[4] = nullptr;
-	if (!layersInfo.uvLayers.empty()) {
+	if (withTangents) {
 		if (CustomData_get_layer_index(&dm->loopData, CD_TANGENT) == -1) {
-			BL_LoadStats& loadStats = BL_LoadStats::Get();
 			BL_LoadTimer tangentTimer(loadStats.tangent);
 			++loadStats.tangentMeshes;
 			DM_calc_loop_tangents(dm, true, nullptr, 0);
 		}
 		tangent = (float(*)[4])dm->getLoopDataArray(dm, CD_TANGENT);
+	}
+
+	if (loopHash && !cached && normals && (!withTangents || tangent)) {
+		BL_LoopDataCache::Entry& entry = loopDataCache->entries[loopHash];
+		entry.totloop = totloop;
+		entry.normals.assign(&normals[0][0], &normals[0][0] + totloop * 3);
+		if (withTangents) {
+			entry.tangents.assign(&tangent[0][0], &tangent[0][0] + totloop * 4);
+		}
 	}
 
 	// List of MLoopUV per uv layer index.
@@ -1933,6 +2051,17 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 							  float camZoom,
                               bool libloading)
 {
+	// Identical meshes share their normals and tangents while this scene converts.
+	// RANGE_NO_LOOPDATA_CACHE=1 computes every mesh on its own, to compare images.
+	BL_LoopDataCache sceneLoopDataCache;
+	struct LoopDataCacheScope {
+		LoopDataCacheScope(BL_LoopDataCache *cache)
+		{
+			const char *env = getenv("RANGE_NO_LOOPDATA_CACHE");
+			loopDataCache = (env && env[0] && env[0] != '0') ? nullptr : cache;
+		}
+		~LoopDataCacheScope() { loopDataCache = nullptr; }
+	} loopDataCacheScope(&sceneLoopDataCache);
 
 
 #define BL_CONVERTBLENDEROBJECT_SINGLE                                 \

@@ -22,7 +22,9 @@ Aberto:
 - Fast Shader Loading (valores como uniform) é opção no painel Render, desligada por padrão: carrega muito
   mais rápido, mas custa ~45% do FPS em cena pesada. Ideia aberta: uniform só para materiais repetidos (mesma
   estrutura) e constante para os únicos.
-- Etapa 4: malha/tangentes/física pré-calculadas.
+- Etapa 4 parcial (2026-10-03, sem formato novo): normais/tangentes e BVH de física compartilhadas entre malhas
+  de conteúdo igual (800 esferas: conversão 2,9 s → 0,8 s). Malhas únicas ainda calculam tudo; guardar pronto
+  exigiria o `.cooked`.
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

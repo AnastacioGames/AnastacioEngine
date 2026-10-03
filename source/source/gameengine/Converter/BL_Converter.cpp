@@ -337,7 +337,8 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(PIL_check_seconds_timer() - convertStart)
 	           << "ms, " << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
 	           << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
-	           << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, physics "
+	           << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
+	           << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
 	           << load_ms(loadStats.physics) << "ms");
 }
 

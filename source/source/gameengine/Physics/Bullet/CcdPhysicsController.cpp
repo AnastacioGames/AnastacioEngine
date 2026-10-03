@@ -49,6 +49,88 @@
 
 #include "BLI_utildefines.h"
 
+#include <mutex>
+#include <map>
+#include <tuple>
+
+/** Building the BVH of a triangle mesh shape is most of the physics load time (~1.2 ms for a 2k triangle
+ * sphere), and every object built its own, even linked duplicates. Shapes whose vertex and triangle arrays
+ * are identical (linked duplicates, Shift+D copies) now share one btOptimizedBvh: it only stores triangle
+ * indices and quantized bounds, never a pointer to the mesh, so it is valid for any identical array. Each
+ * object keeps its own shape and arrays, so replacing one object's physics mesh never touches the others.
+ * The BVH is freed with the last shape using it; the mutex covers asynchronous LibLoad. */
+namespace {
+
+struct SharedBvhKey
+{
+	uint64_t hash[2];
+	int numVerts;
+	int numTris;
+
+	bool operator<(const SharedBvhKey& other) const
+	{
+		return std::tie(hash[0], hash[1], numVerts, numTris) <
+		       std::tie(other.hash[0], other.hash[1], other.numVerts, other.numTris);
+	}
+};
+
+struct SharedBvhEntry
+{
+	btOptimizedBvh *bvh;
+	int users;
+};
+
+std::mutex sharedBvhMutex;
+std::map<SharedBvhKey, SharedBvhEntry> sharedBvhs;
+
+/// Two independent 64 bit hashes (FNV-1a and a multiply-xorshift), so a false match is out of reach.
+void shared_bvh_hash(uint64_t hash[2], const void *data, size_t size)
+{
+	const unsigned char *bytes = (const unsigned char *)data;
+	for (size_t i = 0; i < size; ++i) {
+		hash[0] = (hash[0] ^ bytes[i]) * 1099511628211ULL;
+		hash[1] = (hash[1] + bytes[i] + 1) * 0x9E3779B97F4A7C15ULL;
+		hash[1] ^= hash[1] >> 29;
+	}
+}
+
+class CcdSharedBvhTriangleMeshShape : public btBvhTriangleMeshShape
+{
+private:
+	SharedBvhKey m_key;
+
+public:
+	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface, const SharedBvhKey& key)
+		:btBvhTriangleMeshShape(meshInterface, true, false),
+		m_key(key)
+	{
+		std::lock_guard<std::mutex> lock(sharedBvhMutex);
+		SharedBvhEntry& entry = sharedBvhs[m_key];
+		if (!entry.bvh) {
+			// Same build as btBvhTriangleMeshShape::buildOptimizedBvh(), but owned by the cache.
+			void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
+			entry.bvh = new (mem) btOptimizedBvh();
+			entry.bvh->build(m_meshInterface, true, m_localAabbMin, m_localAabbMax);
+			entry.users = 0;
+		}
+		++entry.users;
+		setOptimizedBvh(entry.bvh, btVector3(1.0f, 1.0f, 1.0f));
+	}
+
+	virtual ~CcdSharedBvhTriangleMeshShape()
+	{
+		std::lock_guard<std::mutex> lock(sharedBvhMutex);
+		std::map<SharedBvhKey, SharedBvhEntry>::iterator it = sharedBvhs.find(m_key);
+		if (it != sharedBvhs.end() && --it->second.users == 0) {
+			it->second.bvh->~btOptimizedBvh();
+			btAlignedFree(it->second.bvh);
+			sharedBvhs.erase(it);
+		}
+	}
+};
+
+} // namespace
+
 /// todo: fill all the empty CcdPhysicsController methods, hook them up to the btRigidBody class
 
 //'temporarily' global variables
@@ -2714,7 +2796,18 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 					m_forceReInstance = false;
 				}
 
-				btBvhTriangleMeshShape *unscaledShape = new btBvhTriangleMeshShape(m_triangleIndexVertexArray, true, useBvh);
+				btBvhTriangleMeshShape *unscaledShape;
+				if (useBvh && m_weldingThreshold1 == 0.0f) {
+					// The BVH is shared with every shape of identical arrays (see CcdSharedBvhTriangleMeshShape).
+					SharedBvhKey key = {{14695981039346656037ULL, 0x2545F4914F6CDD1DULL},
+					                    (int)m_vertexArray.size(), (int)m_triFaceArray.size()};
+					shared_bvh_hash(key.hash, &m_vertexArray[0], m_vertexArray.size() * sizeof(btScalar));
+					shared_bvh_hash(key.hash, m_triFaceArray.data(), m_triFaceArray.size() * sizeof(int));
+					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray, key);
+				}
+				else {
+					unscaledShape = new btBvhTriangleMeshShape(m_triangleIndexVertexArray, true, useBvh);
+				}
 				unscaledShape->setMargin(margin);
 				collisionShape = new btScaledBvhTriangleMeshShape(unscaledShape, btVector3(1.0f, 1.0f, 1.0f));
 				collisionShape->setMargin(margin);

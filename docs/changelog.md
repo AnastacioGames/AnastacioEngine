@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Carregamento: normais/tangentes e BVH de física compartilhadas entre malhas iguais
+
+- Etapa 4 do plano "Cozinhar" sem formato novo. Cópias Shift+D são Mesh separadas com dados idênticos, então o
+  reaproveitamento por ponteiro (`FindGameMesh`, `FindMesh`) não as pegava.
+- `BL_ConvertDerivedMeshToArray`: normais por loop e tangentes MikkTSpace ficam num cache por conteúdo
+  (`BL_LoopDataHash`: vértices, arestas com sharp, loops, faces com smooth, autosmooth e UV ativa), válido só
+  durante `BL_ConvertBlenderObjects`. Malhas com normais customizadas não entram. A camada `CD_TANGENT` tem 16
+  floats por elemento (legado), então a cópia cria a camada e copia só os 4 de cada loop.
+  `RANGE_NO_LOOPDATA_CACHE=1` desliga para comparação.
+- `CcdPhysicsController.cpp`: a BVH da malha triangular (`btOptimizedBvh`) era construída por objeto, até em
+  duplicatas linkadas, e era quase todo o tempo de física. `CcdSharedBvhTriangleMeshShape` reaproveita a BVH de
+  arrays de vértices/triângulos idênticos (dois hashes de 64 bit + tamanhos); cada objeto mantém a própria forma
+  e arrays, então trocar a malha física de um não afeta os outros. A BVH é liberada com a última forma que a usa
+  (mutex por causa do LibLoad assíncrono). Sem welding (soft body) e Gimpact continuam como antes.
+- 800 esferas (`tools/create_shader_fps_test.py`): conversão 2,9 s → 0,8 s (malhas 1,8 s → 0,54 s com 93 ms de
+  hash; física 1,03 s → 0,25 s). Imagem com e sem cache de normais/tangentes (`spheres.range`): 22 pixels
+  diferentes, abaixo do ruído de alpha entre rodadas iguais. Colisão: bolas sobre chãos copiados, linkados e uma
+  cópia deslocada param cada uma na altura do próprio chão.
+
 ## 2026-10-03 - Fast Shader Loading no painel Render
 
 - O modo de valores como uniform (entrada abaixo) virou opção por jogo: Render > Shading > Shader Compilation >
