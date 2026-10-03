@@ -55,6 +55,8 @@ completo e redesenhava todas as views com `NC_OBJECT|ND_DRAW`.
 - Speaker: antialias e passada transparente, como lâmpada/empty/câmera.
 - Metaball: os círculos de raio e rigidez vão para a passada transparente com antialias; a superfície fica no
   desenho normal. Nova flag `DRAW_OVERLAY_ONLY` (`view3d_intern.h`) faz a 2ª passada pular a superfície.
+  Com essa flag, `draw_object` só desenha os círculos e retorna cedo (antes repetia contorno de seleção,
+  extras, bounds, motion path, centro etc.).
 - Force fields: antialias quando o objeto já é desenhado na passada transparente (empties, lâmpadas, câmeras,
   speakers); em malhas continuam como antes.
 

@@ -305,6 +305,10 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Frames = 5 a 60 Hz a conta dá ~0,02 e vira `sleep_for(0ms)`, o loop gira sem dormir. É intencional?
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
+- **Metaball no jogo (futuro, sem pressa)**: hoje o conversor (`BL_BlenderDataConversion.cpp`) ignora
+  `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
+  estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
+  frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
 
 ## Performance
 

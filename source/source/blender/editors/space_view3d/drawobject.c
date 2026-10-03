@@ -508,6 +508,10 @@ static void draw_xyz_wire(const float viewmat_local_unit[3][3], const float c[3]
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+/* when set, OB_ARROWS draws each axis (line + letter) in the theme axis color, like Blender 5's
+ * object "Axes" overlay */
+static bool drawaxes_use_axis_color = false;
+
 void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 {
 	int axis;
@@ -594,6 +598,10 @@ void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 
 			for (axis = 0; axis < 3; axis++) {
 				const int arrow_axis = (axis == 0) ? 1 : 0;
+
+				if (drawaxes_use_axis_color) {
+					UI_ThemeColor(TH_AXIS_X + axis);
+				}
 
 				glBegin(GL_LINES);
 
@@ -7942,6 +7950,22 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 	}
 
 
+	/* deferred metaball circles: the 1st pass already drew everything else (outline, extras, paths...),
+	 * running the whole function again would draw it all twice */
+	if (dflag & DRAW_OVERLAY_ONLY) {
+		if (ob->type == OB_MBALL) {
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			ED_view3d_init_mats_rv3d_gl(ob, rv3d);
+			if ((dflag & DRAW_CONSTCOLOR) == 0) {
+				draw_object_wire_color(scene, base, _ob_wire_col);
+				ob_wire_col = _ob_wire_col;
+			}
+			drawmball(bmain, scene, v3d, rv3d, base, v3d->drawtype, dflag, ob_wire_col);
+			ED_view3d_clear_mats_rv3d(rv3d);
+		}
+		return;
+	}
+
 	/* -------------------------------------------------------------------- */
 	/* no return after this point, otherwise leaks */
 
@@ -8420,7 +8444,20 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 		if (dtx && (G.f & G_RENDER_OGL) == 0) {
 
 			if (dtx & OB_AXIS) {
+				const bool fancy = !(G.f & G_PICKSEL) && !(dflag & DRAW_CONSTCOLOR);
+				if (fancy) {
+					glEnable(GL_LINE_SMOOTH);
+					glEnable(GL_BLEND);
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+					drawaxes_use_axis_color = true;
+				}
 				drawaxes(rv3d->viewmatob, 1.0f, OB_ARROWS);
+				if (fancy) {
+					drawaxes_use_axis_color = false;
+					glDisable(GL_BLEND);
+					glDisable(GL_LINE_SMOOTH);
+					glColor3ubv(ob_wire_col);
+				}
 			}
 			if (dtx & OB_DRAWBOUNDOX) {
 				draw_bounding_volume(ob, ob->boundtype);
