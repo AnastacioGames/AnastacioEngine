@@ -806,6 +806,7 @@ class USERPREF_PT_theme(Panel):
         subrow.menu("USERPREF_MT_interface_theme_presets", text=USERPREF_MT_interface_theme_presets.bl_label)
         subrow.operator("wm.interface_theme_preset_add", text="", icon='ZOOMIN')
         subrow.operator("wm.interface_theme_preset_add", text="", icon='ZOOMOUT').remove_active = True
+        subrow.operator("wm.interface_theme_preset_overwrite", text="", icon='FILE_TICK')
         sub.separator(factor=1)
 
         sub.prop(theme, "theme_area", expand=True)

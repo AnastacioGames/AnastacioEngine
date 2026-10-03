@@ -7181,7 +7181,8 @@ static PyObject* bpy_types_module_dir(PyObject *self, PyObject *Py_UNUSED(ignore
 	PyObject *key, *value;
 	Py_ssize_t pos = 0;
 	while (PyDict_Next(submodule_dict, &pos, &key, &value)) {
-		PyList_APPEND(ret, key);
+		/* Borrowed reference: must not use #PyList_APPEND (it steals). */
+		PyList_Append(ret, key);
 	}
 	return ret;
 }

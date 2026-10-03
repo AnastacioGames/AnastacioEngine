@@ -935,6 +935,91 @@ class AddPresetInterfaceTheme(AddPresetBase, Operator):
     preset_menu = "USERPREF_MT_interface_theme_presets"
     preset_subdir = "interface_theme"
 
+
+class OverwritePresetInterfaceTheme(Operator):
+    """Overwrite the selected theme preset with the current theme"""
+    bl_idname = "wm.interface_theme_preset_overwrite"
+    bl_label = "Overwrite Theme Preset"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    preset_menu = "USERPREF_MT_interface_theme_presets"
+    preset_subdir = "interface_theme"
+
+    name: StringProperty(
+        name="Name",
+        description="Name of the theme preset (rename it while overwriting)",
+        maxlen=64,
+        options={'SKIP_SAVE'},
+    )
+
+    def _active_filepath(self):
+        preset_active = getattr(bpy.types, self.preset_menu).bl_label
+        if preset_active == "Presets":
+            return None
+        return (bpy.utils.preset_find(preset_active, self.preset_subdir, ext=".xml") or
+                bpy.utils.preset_find(preset_active, self.preset_subdir, display_name=True, ext=".xml"))
+
+    @classmethod
+    def poll(cls, context):
+        return getattr(bpy.types, cls.preset_menu).bl_label != "Presets"
+
+    def invoke(self, context, event):
+        if not self._active_filepath():
+            self.report({'WARNING'}, "No theme preset selected")
+            return {'CANCELLED'}
+        self.name = getattr(bpy.types, self.preset_menu).bl_label
+        return context.window_manager.invoke_props_dialog(self, width=360)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Overwrite the selected theme with the current settings?", icon='ERROR')
+        layout.label(text="Preset: %s" % getattr(bpy.types, self.preset_menu).bl_label)
+        layout.prop(self, "name")
+
+    def execute(self, context):
+        import rna_xml
+
+        old_filepath = self._active_filepath()
+        if not old_filepath:
+            self.report({'WARNING'}, "No theme preset selected")
+            return {'CANCELLED'}
+
+        name = self.name.strip()
+        if not name:
+            self.report({'WARNING'}, "Theme name cannot be empty")
+            return {'CANCELLED'}
+
+        target_path = bpy.utils.user_resource('SCRIPTS', os.path.join("presets", self.preset_subdir), create=True)
+        if not target_path:
+            self.report({'WARNING'}, "Failed to create presets path")
+            return {'CANCELLED'}
+
+        filename = AddPresetBase.as_filename(name)
+        filepath = os.path.join(target_path, filename) + ".xml"
+        preset_menu_class = getattr(bpy.types, self.preset_menu)
+
+        try:
+            rna_xml.xml_file_write(context, filepath, preset_menu_class.preset_xml_map)
+        except Exception as ex:
+            self.report({'ERROR'}, "Unable to save preset: %s" % ex)
+            import traceback
+            traceback.print_exc()
+            return {'CANCELLED'}
+
+        # Renamed: remove the old copy from the user presets folder
+        # (bundled presets are read-only and stay untouched).
+        old_user_filepath = os.path.join(target_path, os.path.basename(old_filepath))
+        if os.path.normcase(old_user_filepath) != os.path.normcase(filepath) and os.path.isfile(old_user_filepath):
+            try:
+                os.remove(old_user_filepath)
+            except OSError as ex:
+                self.report({'WARNING'}, "Could not remove old preset: %s" % ex)
+
+        preset_menu_class.bl_label = bpy.path.display_name(filename)
+        self.report({'INFO'}, "Theme preset overwritten: %s" % preset_menu_class.bl_label)
+        return {'FINISHED'}
+
+
 class AddPresetKeyconfig(AddPresetBase, Operator):
     """Add or remove a Key-config Preset"""
     bl_idname = "wm.keyconfig_preset_add"
@@ -1093,6 +1178,7 @@ classes = (
     AddInputBinding_Rename,
     AddProcessor,
     AddPresetInterfaceTheme,
+    OverwritePresetInterfaceTheme,
     AddPresetKeyconfig,
     AddPresetNodeColor,
     AddPresetOperator,
