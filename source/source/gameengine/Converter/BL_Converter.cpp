@@ -191,7 +191,9 @@ EXP_ListValue<EXP_StringValue> *BL_Converter::GetInactiveSceneNames()
 KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX_Scene *scene_merge)
 {
 	Object *ob = (Object *)BLI_findstring(&m_maggie->object, name.c_str(), offsetof(ID, name) + 2);
-	if (!ob) {
+	/* Only linked objects: a local one already belongs to a scene (active layer or a scene that
+	 * isn't running) and converting it here would add a second object with the same name. */
+	if (!ob || !ob->id.lib) {
 		return nullptr;
 	}
 
@@ -604,6 +606,16 @@ void BL_Converter::AsyncConvertTask(TaskPool *pool, void *ptr, int UNUSED(thread
 	}
 
 	status->GetConverter()->AddScenesToMergeQueue(status);
+}
+
+KX_LibLoadStatus *BL_Converter::GetLibLoadStatus(const std::string& path)
+{
+	Main *maggie = GetLibraryPath(path);
+	if (!maggie) {
+		return nullptr;
+	}
+	const auto it = m_libloadStatus.find(maggie);
+	return (it != m_libloadStatus.end()) ? it->second.get() : nullptr;
 }
 
 Main *BL_Converter::GetLibraryPath(const std::string& path)

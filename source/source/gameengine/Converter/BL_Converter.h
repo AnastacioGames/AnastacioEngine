@@ -224,6 +224,8 @@ public:
 	Main *CreateLibrary(const std::string& path);
 	bool ExistLibrary(const std::string& path) const;
 	std::vector<std::string> GetLibraryNames() const;
+	/// Status of an opened library (still loading or finished), nullptr if it isn't open.
+	KX_LibLoadStatus *GetLibLoadStatus(const std::string& path);
 
 	KX_LibLoadStatus *LinkBlendFileMemory(void *data, int length, const char *path, char *group, KX_Scene *scene_merge, char **err_str, short options);
 	KX_LibLoadStatus *LinkBlendFilePath(const char *path, char *group, KX_Scene *scene_merge, char **err_str, short options);

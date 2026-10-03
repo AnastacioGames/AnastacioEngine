@@ -3948,7 +3948,13 @@ EXP_PYMETHODDEF_DOC(KX_Scene, addObject,
 
 			BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
 
-			if (!asynchronous && converter->ExistLibrary(abs_path)) {
+			if (converter->ExistLibrary(abs_path)) {
+				/* Asynchronous call repeated while the library still loads (e.g. every frame of a
+				 * loading screen): hand back the same status instead of trying to open it again. */
+				KX_LibLoadStatus *pending = converter->GetLibLoadStatus(abs_path);
+				if (asynchronous && pending && !pending->IsFinished()) {
+					return pending->GetProxy();
+				}
 				PyErr_Format(PyExc_ValueError, "scene.addObject(object, reference, time, libpath): KX_Scene (first argument): library \"%s\" is already loaded but does not contain an inactive object named \"%s\"", abs_path, name.c_str());
 				return nullptr;
 			}
