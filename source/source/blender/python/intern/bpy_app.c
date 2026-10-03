@@ -329,6 +329,14 @@ static PyObject *bpy_app_tempdir_get(PyObject *UNUSED(self), void *UNUSED(closur
 PyDoc_STRVAR(bpy_app_driver_dict_doc,
 "Dictionary for drivers namespace, editable in-place, reset on file load (read-only)"
 );
+PyDoc_STRVAR(bpy_app_is_game_live_ui_doc,
+"True while the embedded game runs with the editor UI unlocked (Live UI), read-only"
+);
+static PyObject *bpy_app_is_game_live_ui_get(PyObject *UNUSED(self), void *UNUSED(closure))
+{
+	return PyBool_FromLong(WM_game_live_ui_active());
+}
+
 static PyObject *bpy_app_driver_dict_get(PyObject *UNUSED(self), void *UNUSED(closure))
 {
 	if (bpy_pydriver_Dict == NULL) {
@@ -383,6 +391,7 @@ static PyGetSetDef bpy_app_getsets[] = {
 	{(char *)"debug_value", bpy_app_debug_value_get, bpy_app_debug_value_set, (char *)bpy_app_debug_value_doc, NULL},
 	{(char *)"tempdir", bpy_app_tempdir_get, NULL, (char *)bpy_app_tempdir_doc, NULL},
 	{(char *)"driver_namespace", bpy_app_driver_dict_get, NULL, (char *)bpy_app_driver_dict_doc, NULL},
+	{(char *)"is_game_live_ui", bpy_app_is_game_live_ui_get, NULL, (char *)bpy_app_is_game_live_ui_doc, NULL},
 
 	{(char *)"render_icon_size", bpy_app_preview_render_size_get, NULL, (char *)bpy_app_preview_render_size_doc, (void *)ICON_SIZE_ICON},
 	{(char *)"render_preview_size", bpy_app_preview_render_size_get, NULL, (char *)bpy_app_preview_render_size_doc, (void *)ICON_SIZE_PREVIEW},

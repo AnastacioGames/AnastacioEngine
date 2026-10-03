@@ -100,6 +100,43 @@ void KX_PythonComponent::SetBlenderPythonComponent(PythonComponent *pc)
 	m_pc = pc;
 }
 
+PythonComponent *KX_PythonComponent::GetBlenderPythonComponent() const
+{
+	return m_pc;
+}
+
+void KX_PythonComponent::LiveUpdateArgs()
+{
+	if (m_failed || !m_init || !m_pc) {
+		return;
+	}
+	PyObject *proxy = GetProxy();
+	PyObject *arg_dict = (PyObject *)BKE_python_component_argument_dict_new(m_pc);
+	if (!arg_dict) {
+		return;
+	}
+
+	if (PyObject_HasAttrString(proxy, "update_args")) {
+		PyObject *ret = PyObject_CallMethod(proxy, "update_args", "O", arg_dict);
+		if (!ret) {
+			EXP_ReportPythonDiagnostic("component.update_args", m_name.c_str());
+			PyErr_Print();
+		}
+		Py_XDECREF(ret);
+	}
+	else {
+		// Só self._args (cópia guardada no start); "args" seria o dict padrão da classe.
+		PyObject *stored = PyObject_GetAttrString(proxy, "_args");
+		if (stored && PyDict_Check(stored)) {
+			PyDict_Update(stored, arg_dict);
+		}
+		Py_XDECREF(stored);
+		PyErr_Clear();
+	}
+
+	Py_DECREF(arg_dict);
+}
+
 void KX_PythonComponent::Awake()
 {
 	PyObject *arg_dict = (PyObject *)BKE_python_component_argument_dict_new(m_pc);

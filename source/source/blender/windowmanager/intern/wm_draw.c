@@ -1012,11 +1012,11 @@ void wm_draw_update(bContext *C)
 	}
 }
 
-/* UI ao vivo durante o jogo embutido: redesenha as regiões marcadas (menos a do jogo) e compõe a
- * janela inteira no back buffer, sem trocar buffer -- o jogo desenha por cima na sua região e
- * faz a troca. Compõe todo quadro: com troca de buffer, um quadro sem composição mostraria a UI
- * antiga no outro buffer. Só no método Triple (o padrão); nos outros a UI não é redesenhada. */
-void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
+/* UI ao vivo durante o jogo embutido: redesenha as regiÃµes marcadas (menos a do jogo) e compÃµe a
+ * janela inteira no back buffer, sem trocar buffer -- o jogo desenha por cima na sua regiÃ£o e
+ * faz a troca. CompÃµe todo quadro: com troca de buffer, um quadro sem composiÃ§Ã£o mostraria a UI
+ * antiga no outro buffer. SÃ³ no mÃ©todo Triple (o padrÃ£o); nos outros a UI nÃ£o Ã© redesenhada. */
+void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool dim)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 
@@ -1041,8 +1041,8 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(0);
 
-	/* O jogo deixa VAO/VBO/IBO e arrays genéricos ligados; o desenho da UI usa arrays do lado do
-	 * cliente e com IBO ligado o glDrawElements dos widgets lê lixo (crash no driver). */
+	/* O jogo deixa VAO/VBO/IBO e arrays genÃ©ricos ligados; o desenho da UI usa arrays do lado do
+	 * cliente e com IBO ligado o glDrawElements dos widgets lÃª lixo (crash no driver). */
 	GLint prev_vao = 0, prev_vbo = 0, prev_ibo = 0, prev_tex_unit = 0;
 	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
 	glBindVertexArray(0);
@@ -1071,8 +1071,8 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-	/* Estado padrão que a UI do editor assume; o jogo deixa luz, névoa, sRGB, blend etc. ligados
-	 * e a região redesenhada (ao clicar) saía escurecida. */
+	/* Estado padrÃ£o que a UI do editor assume; o jogo deixa luz, nÃ©voa, sRGB, blend etc. ligados
+	 * e a regiÃ£o redesenhada (ao clicar) saÃ­a escurecida. */
 	glDisable(GL_LIGHTING);
 	glDisable(GL_FOG);
 	glDisable(GL_FRAMEBUFFER_SRGB);
@@ -1104,7 +1104,22 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 
-	wm_method_draw_triple(C, win);
+	if (dim) {
+		/* Cadeado fechado: UI travada; sÃ³ recompÃµe a imagem guardada, escurecida. */
+		wmDrawData *drawdata = win->drawdata.first;
+		if (drawdata->triple) {
+			wmSubWindowSet(win, win->screen->mainwin);
+			wm_triple_draw_textures(win, drawdata->triple, 1.0f, false);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glColor4f(0.0f, 0.0f, 0.0f, 0.45f);
+			glRecti(0, 0, WM_window_pixels_x(win), WM_window_pixels_y(win));
+			glDisable(GL_BLEND);
+		}
+	}
+	else {
+		wm_method_draw_triple(C, win);
+	}
 
 	glMatrixMode(GL_TEXTURE);
 	glPopMatrix();
@@ -1132,7 +1147,7 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar)
 	win->screen->do_draw_paintcursor = false;
 	win->screen->do_draw_drag = false;
 
-	/* A região do jogo nunca é desenhada pelo editor enquanto o jogo roda. */
+	/* A regiÃ£o do jogo nunca Ã© desenhada pelo editor enquanto o jogo roda. */
 	game_ar->do_draw = false;
 }
 

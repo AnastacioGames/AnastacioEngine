@@ -277,6 +277,8 @@ void        WM_game_live_ui_begin(struct ARegion *game_region);
 void        WM_game_live_ui_end(void);
 bool        WM_game_live_ui_active(void);
 bool        WM_game_live_ui_step(struct bContext *C); /* true se havia eventos na fila */
+			/* Cadeado fechado: recompõe a UI travada escurecida (sem eventos, sem redesenho). */
+void        WM_game_locked_ui_draw(struct bContext *C, struct ARegion *game_ar);
 bool        WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, short context);
 int         WM_operator_call_ex(struct bContext *C, struct wmOperator *op, const bool store);
 int			WM_operator_call		(struct bContext *C, struct wmOperator *op);

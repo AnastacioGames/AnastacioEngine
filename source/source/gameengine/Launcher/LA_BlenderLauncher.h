@@ -35,6 +35,7 @@
 #include "RAS_Rect.h"
 
 struct Object;
+class KX_GameObject;
 struct bContext;
 struct ARegion;
 struct View3D;
@@ -74,11 +75,22 @@ protected:
 		RangeGPUParticleSettings gpuParticles;
 		RangeGPUParticleSettings gpuParticlesMix;
 		std::vector<LivePropSnapshot> props;
+		// Veículo nativo: rodas (bWheelSettings sem next/prev/ob) e parâmetros do chassi.
+		std::vector<bWheelSettings> wheels;
+		std::vector<float> gears;
+		float vehicleMaxTorque;
+		float vehicleMaxRPM;
+		short gearboxType;
+		short vehicleRayCastMask;
+		Object *steeringWheel;
+		// Argumentos dos componentes Python, achatados na ordem componente/propriedade.
+		std::vector<std::string> componentArgs;
 	};
 	std::map<Object *, LiveObjectSnapshot> m_liveSnapshots;
 
 	static void LiveSnapshotTake(Object *ob, LiveObjectSnapshot &snap);
 	void LiveSyncFromBlender();
+	static void LiveSyncVehicle(KX_GameObject *gameobj, Object *ob, const LiveObjectSnapshot &old);
 
 	virtual void RenderEngine();
 

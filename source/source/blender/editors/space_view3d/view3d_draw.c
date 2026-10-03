@@ -4563,9 +4563,9 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 
 	uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
 	uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
-	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
 	uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
 	        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
+	uiItemR(row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
 	uiItemS(row);
 
 	/* Object Mode dropdown now lives only in the header; keep the shading
@@ -4620,6 +4620,40 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	UI_block_draw(C, block);
 }
 
+/* Atalhos de debug do jogo no canto superior esquerdo, logo à direita do nome da vista
+ * (draw_viewport_name; os mesmos do menu Game > Overlays/Debug). Só ícones; o nome aparece na dica. */
+static void view3d_draw_floating_debug_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
+{
+	PointerRNA gameptr;
+	uiBlock *block;
+	uiLayout *layout;
+	uiLayout *row;
+	rcti rect;
+
+	ED_region_visible_rect(ar, &rect);
+	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
+
+	const char *name = view3d_get_name(v3d, ar->regiondata);
+	int name_width = (int)BLF_width_default(name, BLF_DRAW_STR_DUMMY_MAX);
+	if (v3d->localvd) {
+		name_width += (int)BLF_width_default(IFACE_(" (Local)"), BLF_DRAW_STR_DUMMY_MAX);
+	}
+	const int x = rect.xmin + U.widget_unit + name_width + UI_UNIT_X / 2;
+	/* Linha de base do nome em ymax - widget_unit; centraliza os botões nela. */
+	const int y = rect.ymax - U.widget_unit + (UI_UNIT_Y * 3) / 4;
+
+	block = UI_block_begin(C, ar, "view3d_floating_debug_controls", UI_EMBOSS);
+	layout = UI_block_layout(
+	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
+	row = uiLayoutRow(layout, true);
+	uiItemR(row, &gameptr, "show_framerate_profile", UI_ITEM_R_TOGGLE | UI_ITEM_R_ICON_ONLY, "", ICON_TIME);
+	uiItemR(row, &gameptr, "show_debug_mode", UI_ITEM_R_TOGGLE | UI_ITEM_R_ICON_ONLY, "", ICON_VIEWZOOM);
+
+	UI_block_layout_resolve(block, NULL, NULL);
+	UI_block_end(C, block);
+	UI_block_draw(C, block);
+}
+
 void view3d_main_region_draw(const bContext *C, ARegion *ar)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -4652,6 +4686,7 @@ void view3d_main_region_draw(const bContext *C, ARegion *ar)
 
 	view3d_main_region_draw_info(C, scene, ar, v3d, grid_unit, render_border);
 	view3d_draw_floating_controls(C, ar, v3d, scene);
+	view3d_draw_floating_debug_controls(C, ar, v3d, scene);
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
 

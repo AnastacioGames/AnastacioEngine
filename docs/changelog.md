@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-02 - Live UI: veículo, componentes, UI escurecida e atalhos de debug
+
+- Veículo ao vivo no Play (`LA_BlenderLauncher::LiveSyncVehicle`): raio, atrito, suspensão, Steering/Drive
+  (FWD/RWD/AWD), Max Torque/RPM, câmbio e marchas, volante. Raio, rest length e steering entraram na fila
+  `PHY_VehicleParameterCommand` (`PHY_VEHICLE_PARAM_WHEEL_RADIUS`, `_SUSPENSION_REST_LENGTH`, `_WHEEL_HAS_STEERING`),
+  aplicada entre passos da física. Painel Vehicle marca com * (e desativa durante o Play, via
+  `bpy.app.is_game_live_ui`) o que só vale no próximo Play: Enabled, Center of Mass Offset, objeto da roda,
+  Add Wheel, Add Vehicle Component.
+- Argumentos de componentes Python ao vivo (`KX_PythonComponent::LiveUpdateArgs`): chama `update_args(args)` se o
+  componente definir, senão atualiza `self._args`. O template do Vehicle Player relê teclas, papéis das rodas e
+  volante; componentes já copiados para projetos antigos só têm o `_args` atualizado.
+- Cadeado fechado: a UI travada é recomposta escurecida (45%) durante o Play (`WM_game_locked_ui_draw`).
+- Botão do console ao lado do cadeado (barra da 3D view e painel Player) e do Start do Standalone. Show Profile e
+  Debug Mode como ícones flutuantes ao lado do nome da vista, no topo da 3D view.
+- Legenda "* Not applied while the game is running" traduzida (PT-BR, ES, RU).
+
 ## 2026-10-02 - UI do editor liberada durante o Play (Live UI)
 
 - Cadeado `scene.game_settings.use_live_ui` (`GAME_LIVE_UI`, desligado por padrão) ao lado do Play na barra

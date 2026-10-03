@@ -578,11 +578,28 @@ static bool game_live_op_blocked(const char *idname)
 void WM_game_live_ui_begin(ARegion *game_region)
 {
 	g_game_live_region = game_region;
+	/* Painéis redesenham já mostrando os campos inativos durante o Play. */
+	WM_main_add_notifier(NC_WINDOW, NULL);
 }
 
 void WM_game_live_ui_end(void)
 {
 	g_game_live_region = NULL;
+	WM_main_add_notifier(NC_WINDOW, NULL);
+}
+
+void WM_game_locked_ui_draw(bContext *C, ARegion *game_ar)
+{
+	wmWindow *win = CTX_wm_window(C);
+	ScrArea *sa = CTX_wm_area(C);
+	ARegion *ar = CTX_wm_region(C);
+	if (win == NULL || game_ar == NULL) {
+		return;
+	}
+	wm_draw_update_game_live(C, win, game_ar, true);
+	CTX_wm_window_set(C, win);
+	CTX_wm_area_set(C, sa);
+	CTX_wm_region_set(C, ar);
 }
 
 bool WM_game_live_ui_active(void)
@@ -624,7 +641,7 @@ bool WM_game_live_ui_step(bContext *C)
 
 	wm_event_do_handlers(C);
 	wm_event_do_notifiers(C);
-	wm_draw_update_game_live(C, win, game_ar);
+	wm_draw_update_game_live(C, win, game_ar, false);
 
 	/* O jogo continua desenhando com o contexto da sua área. */
 	CTX_wm_window_set(C, win);

@@ -55,6 +55,11 @@ public:
 	void SetGameObject(KX_GameObject *gameobj);
 
 	void SetBlenderPythonComponent(PythonComponent *pc);
+	PythonComponent *GetBlenderPythonComponent() const;
+
+	/// UI ao vivo no Play: argumentos editados no painel durante o jogo. Chama update_args(args)
+	/// se o componente definir; senão atualiza no lugar o dict self._args, se existir.
+	void LiveUpdateArgs();
 
 	void Awake();
 	void Start();

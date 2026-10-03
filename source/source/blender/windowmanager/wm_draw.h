@@ -44,7 +44,7 @@ struct wmWindow;
 
 /* wm_draw.c */
 void		wm_draw_update			(struct bContext *C);
-void		wm_draw_update_game_live(struct bContext *C, struct wmWindow *win, struct ARegion *game_ar);
+void		wm_draw_update_game_live(struct bContext *C, struct wmWindow *win, struct ARegion *game_ar, bool dim);
 void		wm_draw_window_clear	(struct wmWindow *win);
 void		wm_draw_region_clear	(struct wmWindow *win, struct ARegion *ar);
 

@@ -919,6 +919,7 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
         row = box.row(align=True)
         row.operator("view3d.game_start", text="Start")
         row.prop(gs, "use_live_ui", text="", icon='UNLOCKED' if gs.use_live_ui else 'LOCKED')
+        row.prop(gs, "show_console", text="", icon='CONSOLE')
         row = box.row()
         row.label(text="Resolution:", icon="SCENE")
         row = box.row(align=True)
@@ -931,8 +932,9 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
 
         box = split.box()
         box.label(text="Standalone Player:", icon="WORLD")
-        row = box.row()
+        row = box.row(align=True)
         row.operator("wm.blenderplayer_start", text="Start")
+        row.prop(gs, "show_console", text="", icon='CONSOLE')
         row = box.row()
         row.label(text="Resolution:", icon="SCENE")
         row = box.row(align=True)

@@ -4,6 +4,19 @@ import os
 import sys
 from bpy.types import Operator, Panel
 from bpy.app.translations import pgettext_tip as tip_
+from bpy.app.translations import pgettext_iface as iface_
+
+
+def not_live(text):
+    """Rótulo de campo que não muda com a UI liberada no Play (só vale no próximo Play)."""
+    return iface_(text) + " *"
+
+
+def not_live_layout(layout):
+    """Sub-layout para campos com *: inativo enquanto o jogo roda com a UI liberada."""
+    sub = layout.row(align=True)
+    sub.enabled = not getattr(bpy.app, "is_game_live_ui", False)
+    return sub
 
 # ==============================================================================
 # CRIAÇÃO/REGISTRO DO COMPONENT DE CONDUÇÃO DO VEHICLE
@@ -147,24 +160,13 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
             return
 
         self._num_wheels = self._vehicle.getNumWheels()
-        configs = [self._vehicle.getWheelConfig(i) for i in range(self._num_wheels)]
-        self._steering_wheels = [i for i, c in enumerate(configs) if c["hasSteering"]]
-
-        explicit_drive_wheels = [i for i, c in enumerate(configs) if c.get("isDriveWheel")]
-        if explicit_drive_wheels:
-            # has_drive foi marcado manualmente no painel Vehicle para pelo menos
-            # uma roda; respeita essa escolha (permite FWD/RWD/AWD reais).
-            self._drive_wheels = explicit_drive_wheels
-        else:
-            # Nenhuma roda marcada como "Drive": mantém o comportamento legado
-            # (todas as rodas não-esterçantes recebem força de motor) para não
-            # quebrar carros/presets já configurados antes deste campo existir.
-            self._drive_wheels = [i for i in range(self._num_wheels) if i not in self._steering_wheels]
+        self._refresh_wheel_roles()
 
         # Orientação de repouso do volante visual, capturada uma vez para que a
         # rotação de esterço seja sempre relativa a ela (evita deriva ao
         # acumular pequenas rotações quadro a quadro).
         self._steering_wheel_base_orientation = None
+        self._steering_wheel_object = None
 
         # Esterço atual (rad), interpolado gradualmente em direção ao alvo em
         # vez de saltar direto pro valor máximo — tanto para virar quanto para
@@ -176,15 +178,7 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         self._current_gear_index = self._first_forward_gear_index() or 0
         # Câmbio manual começa em ponto morto (N), como num carro real.
         self._neutral = self._gearbox_type == self.GEARBOX_MANUAL
-        self._shift_up_key = self._key_arg("Shift Up Key", "EKEY")
-        self._shift_down_key = self._key_arg("Shift Down Key", "QKEY")
-        self._throttle_key = self._key_arg("Throttle Key", "WKEY")
-        self._reverse_key = self._key_arg("Reverse Key", "SKEY")
-        self._steer_left_key = self._key_arg("Steer Left Key", "AKEY")
-        self._steer_right_key = self._key_arg("Steer Right Key", "DKEY")
-        self._brake_key = self._key_arg("Brake Key", "SPACEKEY")
-        self._handbrake_key = self._key_arg("Handbrake Key", "LEFTSHIFTKEY")
-        self._wheelie_key = self._key_arg("Wheelie Key", "LEFTSHIFTKEY")
+        self._read_keys()
         self._prev_shift_up_held = False
         self._prev_shift_down_held = False
         self._joy = self._empty_joy()
@@ -201,10 +195,44 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
               (self._num_wheels, len(self._steering_wheels), len(self._drive_wheels),
                len(self._gear_ratios)))
 
+    def _read_keys(self):
+        self._shift_up_key = self._key_arg("Shift Up Key", "EKEY")
+        self._shift_down_key = self._key_arg("Shift Down Key", "QKEY")
+        self._throttle_key = self._key_arg("Throttle Key", "WKEY")
+        self._reverse_key = self._key_arg("Reverse Key", "SKEY")
+        self._steer_left_key = self._key_arg("Steer Left Key", "AKEY")
+        self._steer_right_key = self._key_arg("Steer Right Key", "DKEY")
+        self._brake_key = self._key_arg("Brake Key", "SPACEKEY")
+        self._handbrake_key = self._key_arg("Handbrake Key", "LEFTSHIFTKEY")
+        self._wheelie_key = self._key_arg("Wheelie Key", "LEFTSHIFTKEY")
+
+    def update_args(self, args):
+        # Chamado pela engine quando um argumento muda no painel com a UI liberada no Play.
+        self._args.update(args)
+        if self._vehicle is not None:
+            self._read_keys()
+
+    def _refresh_wheel_roles(self):
+        # Relido todo quadro: Steering/Drive podem mudar no painel durante o Play.
+        configs = [self._vehicle.getWheelConfig(i) for i in range(self._num_wheels)]
+        self._steering_wheels = [i for i, c in enumerate(configs) if c["hasSteering"]]
+
+        explicit_drive_wheels = [i for i, c in enumerate(configs) if c.get("isDriveWheel")]
+        if explicit_drive_wheels:
+            # has_drive foi marcado manualmente no painel Vehicle para pelo menos
+            # uma roda; respeita essa escolha (permite FWD/RWD/AWD reais).
+            self._drive_wheels = explicit_drive_wheels
+        else:
+            # Nenhuma roda marcada como "Drive": mantém o comportamento legado
+            # (todas as rodas não-esterçantes recebem força de motor) para não
+            # quebrar carros/presets já configurados antes deste campo existir.
+            self._drive_wheels = [i for i in range(self._num_wheels) if i not in self._steering_wheels]
+
     def update(self):
         if self._vehicle is None:
             return
         try:
+            self._refresh_wheel_roles()
             self._poll_joystick()
             throttle, steering, brake, handbrake = self._read_input()
             self._refresh_gearbox()
@@ -617,6 +645,10 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         steering_wheel = self.object.getVehicleSteeringWheel()
         if steering_wheel is None:
             return
+        if steering_wheel is not self._steering_wheel_object:
+            # Volante trocado no painel durante o Play: captura a orientação do novo.
+            self._steering_wheel_object = steering_wheel
+            self._steering_wheel_base_orientation = None
         if self._steering_wheel_base_orientation is None:
             self._steering_wheel_base_orientation = steering_wheel.localOrientation.copy()
 
@@ -1209,14 +1241,16 @@ class PHYSICS_PT_game_vehicle(VehicleButtonsPanel, Panel):
             layout.label(text="Only Rigid Body/Dynamic objects can be a Vehicle.", icon='INFO')
             return
 
-        layout.prop(game, "is_vehicle", text="Enabled")
+        not_live_layout(layout).prop(game, "is_vehicle", text=not_live("Enabled"))
         layout = layout.column()
         layout.active = game.is_vehicle
 
         box = layout.box()
         box.label(text="Chassis:", icon='AUTO')
         box.prop(ob, "vehicle_steering_wheel", text="Steering Wheel")
-        box.row(align=True).prop(ob, "vehicle_com_offset", text="Center of Mass Offset")
+        not_live_layout(box).prop(ob, "vehicle_com_offset", text=not_live("Center of Mass Offset"))
+
+        layout.label(text="* Not applied while the game is running", icon='INFO')
 
 
 class PHYSICS_PT_game_vehicle_engine(VehicleSubPanel, Panel):
@@ -1245,8 +1279,9 @@ class PHYSICS_PT_game_vehicle_wheels(VehicleSubPanel, Panel):
             box = layout.box()
             row = box.row(align=True)
             row.prop(wheel, "show_expanded", text="", emboss=False)
-            row.prop(wheel, "object", text="Wheel %d" % (i + 1))
-            row.operator("object.vehicle_wheel_remove", text="", icon='PANEL_CLOSE').index = i
+            sub = not_live_layout(row)
+            sub.prop(wheel, "object", text="%s %d *" % (iface_("Wheel"), i + 1))
+            sub.operator("object.vehicle_wheel_remove", text="", icon='PANEL_CLOSE').index = i
 
             if wheel.show_expanded:
                 split = box.split(factor=0.5)
@@ -1269,7 +1304,7 @@ class PHYSICS_PT_game_vehicle_wheels(VehicleSubPanel, Panel):
                 col_susp.prop(wheel, "max_suspension_travel", text="Max Travel")
                 col_susp.prop(wheel, "max_suspension_force", text="Max Force")
 
-        layout.operator("object.vehicle_wheel_add", text="Add Wheel", icon='ZOOMIN')
+        not_live_layout(layout).operator("object.vehicle_wheel_add", text=not_live("Add Wheel"), icon='ZOOMIN')
 
 
 class PHYSICS_PT_game_vehicle_gearbox(VehicleSubPanel, Panel):
@@ -1295,4 +1330,4 @@ class PHYSICS_PT_game_vehicle_component(VehicleSubPanel, Panel):
     bl_label = "Player Component"
 
     def draw_content(self, layout, ob):
-        layout.operator("object.vehicle_add_player_component", text="Add Vehicle Component", icon='PLUGIN')
+        not_live_layout(layout).operator("object.vehicle_add_player_component", text=not_live("Add Vehicle Component"), icon='PLUGIN')

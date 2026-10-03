@@ -68,6 +68,10 @@ enum PHY_VehicleParameterId
 	/* wheelIndex is ignored for these two. */
 	PHY_VEHICLE_PARAM_CHASSIS_MASS,
 	PHY_VEHICLE_PARAM_RESET_SUSPENSION,
+	/* Geometria da roda, editável ao vivo (UI liberada no Play). HAS_STEERING: value != 0. */
+	PHY_VEHICLE_PARAM_WHEEL_RADIUS,
+	PHY_VEHICLE_PARAM_SUSPENSION_REST_LENGTH,
+	PHY_VEHICLE_PARAM_WHEEL_HAS_STEERING,
 };
 
 struct PHY_VehicleParameterCommand

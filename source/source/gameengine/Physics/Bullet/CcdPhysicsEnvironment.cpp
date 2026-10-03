@@ -586,6 +586,25 @@ public:
 				case PHY_VEHICLE_PARAM_RESET_SUSPENSION:
 					ResetSuspension();
 					break;
+				case PHY_VEHICLE_PARAM_WHEEL_RADIUS:
+					if (cmd.value > 0.0f) {
+						m_vehicle->getWheelInfo(cmd.wheelIndex).m_wheelsRadius = cmd.value;
+						m_wheelConfigs[cmd.wheelIndex].wheelRadius = cmd.value;
+					}
+					break;
+				case PHY_VEHICLE_PARAM_SUSPENSION_REST_LENGTH:
+					if (cmd.value > 0.0f) {
+						m_vehicle->getWheelInfo(cmd.wheelIndex).m_suspensionRestLength1 = cmd.value;
+						m_wheelConfigs[cmd.wheelIndex].suspensionRestLength = cmd.value;
+					}
+					break;
+				case PHY_VEHICLE_PARAM_WHEEL_HAS_STEERING:
+					m_vehicle->getWheelInfo(cmd.wheelIndex).m_bIsFrontWheel = (cmd.value != 0.0f);
+					m_wheelConfigs[cmd.wheelIndex].hasSteering = (cmd.value != 0.0f);
+					if (cmd.value == 0.0f) {
+						m_vehicle->setSteeringValue(0.0f, cmd.wheelIndex);
+					}
+					break;
 			}
 		}
 		m_pendingCommands.clear();
