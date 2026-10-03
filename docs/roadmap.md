@@ -31,7 +31,9 @@ Aberto:
   objeto, depois texturas e shaders um a um) e o merge se espalha em frames de ~8 ms. Falta o usuário testar
   num jogo real; a abertura/link do arquivo ainda é síncrona. Luz nova recompila a cena uma vez só depois
   de todas as bibliotecas da fila (20 arquivos com lâmpada: 9,8 s → 5,6 s); sobra o custo de compilar ~15 ms por
-  shader com muitas luzes e um frame de ~230 ms no primeiro merge com lâmpada.
+  shader com muitas luzes. `Range.logic.setLibLoadFrameBudget(30)` na tela de loading: 5,3 s → 3,6 s. Ideia aberta:
+  com lâmpada, cada material novo compila duas vezes; esconder os objetos até a recompilação final cortaria ~metade.
+  Compilação paralela no driver testada e descartada (despacho já custa ~4 ms por shader).
 - Último caso (decisão do usuário): etapa 3, `.cooked` v1 (`.range` enxuto + texturas DDS), interruptor e
   status na UI. Só se o `[Load]` ainda mostrar ganho a buscar.
 

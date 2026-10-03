@@ -1,6 +1,6 @@
 """Heavy loading benchmark: many external .range chunks + many inactive-layer objects.
 
-Run with:  RangeEngine -b --python tools/create_load_bench.py -- <output_dir> [chunks] [per_chunk] [inactive] [async] [nolamp]
+Run with:  RangeEngine -b --python tools/create_load_bench.py -- <output_dir> [chunks] [per_chunk] [inactive] [async] [nolamp] [budget=<ms>]
 Defaults:  20 chunks, 15 objects per chunk, 200 inactive objects in main, synchronous LibLoad, one lamp per chunk.
 
 Writes <output_dir>/chunk_XX.range and <output_dir>/main.range. Play main.range with the system
@@ -19,6 +19,8 @@ per_chunk = int(argv[2]) if len(argv) > 2 else 15
 inactive = int(argv[3]) if len(argv) > 3 else 200
 use_async = "async" in argv[4:]
 no_lamp = "nolamp" in argv[4:]  # Chunks without lamps: the merge then compiles only the new materials.
+# budget=<ms>: Range.logic.setLibLoadFrameBudget() before loading, as a loading screen would.
+budget = next((float(a.split("=")[1]) for a in argv[4:] if a.startswith("budget=")), None)
 
 os.makedirs(output_dir, exist_ok=True)
 
@@ -102,9 +104,12 @@ import time
 
 CHUNKS = %d
 ASYNC = %s
+BUDGET = %s
 
 g = Range.logic.globalDict
 if "load_bench" not in g:
+    if BUDGET is not None:
+        Range.logic.setLibLoadFrameBudget(BUDGET)
     t0 = time.perf_counter()
     status = [Range.logic.LibLoad(Range.logic.expandPath("//chunk_%%02d.range" %% i), "Scene",
                                   asynchronous=ASYNC) for i in range(CHUNKS)]
@@ -128,7 +133,7 @@ if all(s.finished for s in status):
         CHUNKS, "async" if ASYNC else "sync", (time.perf_counter() - t0) * 1000.0,
         len(scene.objects), len(scene.objectsInactive)))
     Range.logic.endGame()
-''' % (chunks, use_async))
+''' % (chunks, use_async, budget))
 
 bpy.context.scene.objects.active = cam
 bpy.ops.logic.sensor_add(type='ALWAYS', name="Always", object=cam.name)

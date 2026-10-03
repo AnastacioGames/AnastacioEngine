@@ -141,6 +141,8 @@ BL_Converter::BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUse
 	m_alwaysUseExpandFraming(alwaysUseExpandFraming),
 	m_camZoom(camZoom)
 {
+	// ~half a 60 Hz frame: the game keeps its frame rate while libraries merge.
+	m_mergeFrameBudget = 0.008;
 	BKE_main_id_tag_all(maggie, LIB_TAG_DOIT, false);  // avoid re-tagging later on
 	m_threadinfo.m_pool = BLI_task_pool_create(engine->GetTaskScheduler(), nullptr);
 
@@ -443,7 +445,6 @@ std::vector<std::string> BL_Converter::GetLibraryNames() const
 }
 
 /// Main thread time spent per frame merging async libraries, the loading screen draws in between.
-static const double merge_frame_budget = 0.008;
 
 /// Async LibLoad progress of a scene: conversion in the thread, textures, shaders, then the merge.
 static const float progress_converted = 0.6f;
@@ -572,6 +573,16 @@ void BL_Converter::StepReloads(double deadline)
 	}
 }
 
+void BL_Converter::SetMergeFrameBudget(double seconds)
+{
+	m_mergeFrameBudget = seconds;
+}
+
+double BL_Converter::GetMergeFrameBudget() const
+{
+	return m_mergeFrameBudget;
+}
+
 void BL_Converter::ProcessScheduledLibraries()
 {
 	m_threadinfo.m_mutex.Lock();
@@ -582,7 +593,7 @@ void BL_Converter::ProcessScheduledLibraries()
 	m_threadinfo.m_mutex.Unlock();
 
 	// Merge in loading order, at least one step per frame even when a step outlasts the budget.
-	const double deadline = PIL_check_seconds_timer() + merge_frame_budget;
+	const double deadline = PIL_check_seconds_timer() + m_mergeFrameBudget;
 	while (!m_merging.empty()) {
 		if (!StepMerge(m_merging.front(), deadline)) {
 			break;

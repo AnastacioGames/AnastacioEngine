@@ -9,6 +9,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - LibLoad assíncrono: orçamento por frame configurável (`setLibLoadFrameBudget`)
+
+- `Range.logic.setLibLoadFrameBudget([ms])` (`BL_Converter::SetMergeFrameBudget`): tempo por frame do merge
+  assíncrono, padrão 8 ms; devolve o valor atual. Tela de loading pode subir para ~30 ms.
+- `create_load_bench.py` aceita `budget=<ms>`. 20 bibliotecas com lâmpada: 8 ms → 5,3 s (pior frame 20 ms);
+  30 ms → 3,6 s (~26 fps).
+- Testado e descartado: pré-compilar shaders em paralelo (`GL_ARB_parallel_shader_compile`, presente na NVIDIA)
+  antes de usá-los. Só despachar a compilação já custa ~4 ms por shader na thread principal (o driver analisa o
+  GLSL na hora); com a reconstrução do material, ganho nulo no total (5,8 s). Código revertido.
+- Achado: com lâmpada, cada material novo compila duas vezes (antes de entrar na cena, para não aparecer sem
+  shader, e de novo na recompilação final pelas luzes). Evitar exigiria esconder os objetos até a recompilação.
+
 ## 2026-10-03 - LibLoad assíncrono: recompilação por luz nova uma vez só, não por biblioteca
 
 - Antes: cada biblioteca assíncrona com lâmpada recompilava todos os materiais da cena logo depois do seu

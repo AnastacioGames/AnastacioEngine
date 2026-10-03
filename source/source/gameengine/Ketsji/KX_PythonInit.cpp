@@ -1006,6 +1006,19 @@ static PyObject *gLibList(PyObject *, PyObject *args)
 	return list;
 }
 
+static PyObject *gLibLoadFrameBudget(PyObject *, PyObject *args)
+{
+	float ms = -1.0f;
+	if (!PyArg_ParseTuple(args, "|f:setLibLoadFrameBudget", &ms)) {
+		return nullptr;
+	}
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	if (ms >= 0.0f) {
+		converter->SetMergeFrameBudget(ms / 1000.0);
+	}
+	return PyFloat_FromDouble(converter->GetMergeFrameBudget() * 1000.0);
+}
+
 struct PyNextFrameState pynextframestate;
 static PyObject *gPyNextFrame(PyObject *, PyObject *Py_UNUSED(ignored))
 {
@@ -1088,6 +1101,9 @@ static struct PyMethodDef game_methods[] = {
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
 	{"LibFree", (PyCFunction)gLibFree, METH_VARARGS, (const char *)""},
 	{"LibList", (PyCFunction)gLibList, METH_VARARGS, (const char *)""},
+	{"setLibLoadFrameBudget", (PyCFunction)gLibLoadFrameBudget, METH_VARARGS,
+	 (const char *)"setLibLoadFrameBudget([ms]): time per frame the asynchronous LibLoad merge may use (default 8). "
+	 "A loading screen can raise it (e.g. 30) to finish sooner at a lower frame rate. Returns the current value."},
 
 	{nullptr, (PyCFunction)nullptr, 0, nullptr }
 };

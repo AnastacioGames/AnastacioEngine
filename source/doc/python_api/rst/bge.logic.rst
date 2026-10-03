@@ -238,6 +238,17 @@ General functions
 
    :rtype: list [str]
 
+.. function:: setLibLoadFrameBudget([ms])
+
+   Time per frame, in milliseconds, that asynchronous LibLoad may spend merging loaded libraries into the
+   scene (textures, shaders, objects). The default of 8 keeps the game frame rate; a loading screen can raise
+   it (e.g. 30) to finish sooner at a lower frame rate, then set it back.
+
+   :arg ms: New budget; omitted, only returns the current one.
+   :type ms: float
+   :return: The current budget in milliseconds.
+   :rtype: float
+
 .. function:: addScene(name, overlay=1)
 
    Loads a scene into the game engine.

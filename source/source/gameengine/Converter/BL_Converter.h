@@ -114,6 +114,8 @@ private:
 		/// Next material to compile in STAGE_SHADERS.
 		unsigned int m_material;
 	};
+	/// Seconds per frame the async merge may use (Range.logic.setLibLoadFrameBudget).
+	double m_mergeFrameBudget;
 	/// Libraries being merged, only touched by the main thread.
 	std::vector<PendingMerge> m_merging;
 
@@ -246,6 +248,9 @@ public:
 	bool FreeBlendFile(const std::string& path);
 
 	KX_Mesh *ConvertMeshSpecial(KX_Scene *kx_scene, Main *maggie, const std::string& name);
+
+	void SetMergeFrameBudget(double seconds);
+	double GetMergeFrameBudget() const;
 
 	/// Merge scheduled loaded libraries and remove scheduled libraries.
 	void ProcessScheduledLibraries();
