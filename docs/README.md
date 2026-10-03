@@ -43,6 +43,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Preset físico de veículo v1](vehicle-preset-v1.md): contrato do arquivo, save/load e rebuild explícito.
 - [Relatório de bugs silenciosos](relatorio-varredura-bugs-silenciosos.md): candidatos da auditoria estática
   de `source/source/blender`.
+- [Análise de carregamento](load-analysis-plan.md): diagnóstico de por que cenas e `.range` externos
+  demoram a carregar e plano do botão de análise no Outliner (não iniciado).
 - [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
   validação para CPU, memória, GPU e ciclo de vida.
 

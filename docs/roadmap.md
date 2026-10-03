@@ -17,6 +17,11 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 (tinta → metal enferrujado) e decals que acompanham amassados posteriores. Validados pelo usuário em
 `damage_marks_test.range` (`tools/create_damage_marks_test.py`).
 
+### Carregamento de cenas e `.range` externos
+
+Planejado, não iniciado: botão de análise no Outliner (só Python), depois cronômetro no runtime, correção da
+recompilação de shaders no merge e botão "Otimizar". Plano: [load-analysis-plan.md](load-analysis-plan.md).
+
 ### Web (WebGL/WebAssembly)
 
 Estado: o runtime Web roda no navegador com render (luz GLSL, normal map `.dds`, sombras, filtros 2D), teclado,
