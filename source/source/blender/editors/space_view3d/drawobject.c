@@ -2438,6 +2438,33 @@ static void drawcamera(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3
 	/* arrow on top */
 	tvec[2] = vec[1][2]; /* copy the depth */
 
+	/* outline on every camera, filled on the scene camera (like Blender 2.79/5) */
+	if (is_view == false) {
+		/* sized from the frame itself: small and flat, just above the top edge */
+		const float half_w = fabsf(vec[0][0] - shift[0]);
+		const float half_h = fabsf(vec[0][1] - shift[1]);
+		const float unit = min_ff(half_w, half_h);
+		const float base_y = vec[0][1] + 0.1f * unit;
+
+		for (int i = 0; i < 2; i++) {
+			if (i == 0) glBegin(GL_LINE_LOOP);
+			else if (i == 1 && ob == scene->camera) glBegin(GL_TRIANGLES);
+			else break;
+
+			tvec[0] = shift[0] - 0.5f * unit;
+			tvec[1] = base_y;
+			glVertex3fv(tvec);
+
+			tvec[0] = shift[0] + 0.5f * unit;
+			glVertex3fv(tvec);
+
+			tvec[0] = shift[0];
+			tvec[1] = base_y + 0.4f * unit;
+			glVertex3fv(tvec);
+			glEnd();
+		}
+	}
+
 	if ((dflag & DRAW_SCENESET) == 0) {
 		if (cam->flag & (CAM_SHOWLIMITS | CAM_SHOWMIST)) {
 			float nobmat[4][4];

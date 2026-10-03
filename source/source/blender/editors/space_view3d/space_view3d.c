@@ -51,6 +51,7 @@
 
 #include "ED_space_api.h"
 #include "ED_screen.h"
+#include "ED_transform.h"
 #include "ED_view3d.h"
 
 #include "GPU_compositing.h"
@@ -1138,9 +1139,12 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 }
 
 /* concept is to retrieve cursor type context-less */
-static void view3d_main_region_cursor(wmWindow *win, ScrArea *UNUSED(sa), ARegion *UNUSED(ar))
+static void view3d_main_region_cursor(wmWindow *win, ScrArea *sa, ARegion *ar)
 {
 	Scene *scene = win->screen->scene;
+
+	/* called on mouse move: highlight the transform manipulator handle under the mouse */
+	BIF_manipulator_hover_update(win, sa, ar);
 
 	if (scene->obedit) {
 		WM_cursor_set(win, CURSOR_EDIT);

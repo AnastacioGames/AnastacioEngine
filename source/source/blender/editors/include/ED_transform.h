@@ -27,6 +27,8 @@
 /* ******************* Registration Function ********************** */
 
 struct ARegion;
+struct ScrArea;
+struct wmWindow;
 struct ListBase;
 struct Main;
 struct Object;
@@ -149,6 +151,7 @@ void Transform_Properties(struct wmOperatorType *ot, int flags);
 
 int BIF_do_manipulator(struct bContext *C, const struct wmEvent *event, struct wmOperator *op);
 void BIF_draw_manipulator(const struct bContext *C);
+void BIF_manipulator_hover_update(struct wmWindow *win, struct ScrArea *sa, struct ARegion *ar);
 
 /* Snapping */
 

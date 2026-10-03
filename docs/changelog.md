@@ -9,6 +9,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 2026-10-03 - Gizmo de transformação: hover e contorno (fase 2)
+
+- Destaque ao passar o mouse: `BIF_manipulator_hover_update` (chamado pelo cursor callback da 3D view a cada
+  movimento) usa `manipulator_selectbuf` com os mesmos hotspots do clique e clareia o handle sob o mouse.
+- Contorno escuro: o gizmo é desenhado em duas passadas; a primeira desenha só as linhas (hastes, círculos,
+  bordas dos planos) em preto translúcido e 2px mais largas. Sólidos (cones, cubos, anéis) não têm contorno.
+- Feito em OpenGL imediato com `GL_LINE_SMOOTH`, não com shader GLSL.
+
+## 2026-10-03 - Gizmo de transformação: visual renovado (fase 1)
+
+- `transform_manipulator.c`: linhas com antialias (`GL_LINE_SMOOTH`) e largura escalada por `U.pixelsize`;
+  cones/cilindros com 24 lados (eram 8); anéis de rotação 12×96 (eram 8×48); círculos com 64 segmentos
+  (`manipulator_circle`); quadrados de plano com contorno opaco (`manipulator_planar_quad`); círculo central
+  cinza-claro em vez de preto. Seleção por clique usa a mesma geometria.
+
+## 2026-10-03 - Triângulo "lado de cima" da câmera de volta
+
+- `drawcamera` (`drawobject.c`) volta a desenhar o triângulo acima do frame da câmera, como no Blender 2.79/5:
+  contorno em toda câmera, preenchido só na câmera da cena (`scene->camera`); não desenha olhando pela câmera.
+  Ícones 3D da câmera continuam iguais.
+
 ## 2026-10-02 - Live UI: veículo, componentes, UI escurecida e atalhos de debug
 
 - Veículo ao vivo no Play (`LA_BlenderLauncher::LiveSyncVehicle`): raio, atrito, suspensão, Steering/Drive

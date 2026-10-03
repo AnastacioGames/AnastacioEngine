@@ -64,6 +64,7 @@
 #include "ED_particle.h"
 #include "ED_view3d.h"
 #include "ED_gpencil.h"
+#include "ED_screen.h"
 
 #include "UI_resources.h"
 
@@ -706,6 +707,51 @@ static void test_manipulator_axis(const bContext *C)
 
 /* ******************** DRAWING STUFFIES *********** */
 
+/* draw state shared by the draw functions below (drawing is single threaded) */
+static bool man_outline_pass = false;   /* dark, wider lines drawn under the colored pass */
+static int man_draw_kind = 0;           /* V3D_MANIP_TRANSLATE/ROTATE/SCALE being drawn */
+static int man_hover_id = 0;            /* MAN_* handle under the mouse, 0 = none */
+static ARegion *man_hover_ar = NULL;    /* region man_hover_id belongs to */
+static bool man_hover_draw = false;     /* hover highlight enabled for the current draw */
+
+/* line widths follow the UI scale (HiDPI), outline pass is 2px wider */
+#define MAN_OUTLINE_EXTRA (man_outline_pass ? 2.0f : 0.0f)
+#define MAN_LINE_WIDTH ((2.0f + MAN_OUTLINE_EXTRA) * U.pixelsize)
+#define MAN_LINE_WIDTH_THICK ((3.0f + MAN_OUTLINE_EXTRA) * U.pixelsize)
+#define MAN_CONE_SLICES 24
+#define MAN_CIRCLE_RESOL 64
+
+/* smooth circle in the local XY plane, centered at the origin */
+static void manipulator_circle(float rad)
+{
+	glBegin(GL_LINE_LOOP);
+	for (int a = 0; a < MAN_CIRCLE_RESOL; a++) {
+		const float ang = 2.0f * (float)M_PI * (float)a / (float)MAN_CIRCLE_RESOL;
+		glVertex3f(rad * cosf(ang), rad * sinf(ang), 0.0f);
+	}
+	glEnd();
+}
+
+/* filled planar handle with a crisp opaque outline */
+static void manipulator_planar_quad(const float v[4][3], const bool is_picksel)
+{
+	if (man_outline_pass == false) {
+		glBegin(GL_QUADS);
+		for (int i = 0; i < 4; i++) glVertex3fv(v[i]);
+		glEnd();
+	}
+
+	if (is_picksel == false) {
+		float col[4];
+		glGetFloatv(GL_CURRENT_COLOR, col);
+		col[3] = min_ff(1.0f, col[3] * 1.6f);
+		glColor4fv(col);
+		glBegin(GL_LINE_LOOP);
+		for (int i = 0; i < 4; i++) glVertex3fv(v[i]);
+		glEnd();
+	}
+}
+
 static float screen_aligned(RegionView3D *rv3d, float mat[4][4])
 {
 	glTranslate3fv(mat[3]);
@@ -727,6 +773,7 @@ static float screen_aligned(RegionView3D *rv3d, float mat[4][4])
  */
 static void partial_doughnut(float radring, float radhole, int start, int end, int nsides, int nrings)
 {
+	if (man_outline_pass) return; /* solids get no outline */
 	float theta, phi, theta1;
 	float cos_theta, sin_theta;
 	float cos_theta1, sin_theta1;
@@ -820,6 +867,24 @@ static char axisBlendAngle(float idot)
  * moving: in transform theme color
  * else the red/green/blue
  */
+/* MAN_* id of the handle drawn with this axis color in the current draw kind */
+static int manipulator_handle_id(char axis, bool is_planar)
+{
+	const int ax = (axis == 'X') ? 0 : (axis == 'Y') ? 1 : (axis == 'Z') ? 2 : -1;
+
+	switch (man_draw_kind) {
+		case V3D_MANIP_TRANSLATE:
+			if (ax == -1) return MAN_TRANS_C;
+			return is_planar ? (MAN_TRANS_X_PLANAR << ax) : (MAN_TRANS_X << ax);
+		case V3D_MANIP_SCALE:
+			if (ax == -1) return MAN_SCALE_C;
+			return is_planar ? (MAN_SCALE_X_PLANAR << ax) : (MAN_SCALE_X << ax);
+		case V3D_MANIP_ROTATE:
+			return (ax == -1) ? 0 : (MAN_ROT_X << ax);
+	}
+	return 0;
+}
+
 static void manipulator_setcolor(View3D *v3d, char axis, int colcode, unsigned char alpha, bool is_planar)
 {
 	unsigned char col[4] = {0};
@@ -836,6 +901,7 @@ static void manipulator_setcolor(View3D *v3d, char axis, int colcode, unsigned c
 	else {
 		switch (axis) {
 			case 'C':
+				col[0] = col[1] = col[2] = 230;
 				/*if (v3d->twmode == V3D_MANIP_LOCAL) {
 				 	col[0] = col[0] > 200 ? 255 : col[0] + 55;
 				 	col[1] = col[1] > 200 ? 255 : col[1] + 55;
@@ -860,6 +926,17 @@ static void manipulator_setcolor(View3D *v3d, char axis, int colcode, unsigned c
 				BLI_assert(0);
 				break;
 		}
+	}
+
+	if (man_outline_pass) {
+		col[0] = col[1] = col[2] = 0;
+		col[3] = (unsigned char)(col[3] * 0.55f);
+	}
+	else if (man_hover_draw && man_hover_id && colcode == MAN_RGB &&
+	         manipulator_handle_id(axis, is_planar) == man_hover_id)
+	{
+		for (int i = 0; i < 3; i++) col[i] = (unsigned char)(col[i] + (255 - col[i]) * 0.45f);
+		col[3] = is_planar ? 210 : 255;
 	}
 
 	glColor4ubv(col);
@@ -960,12 +1037,10 @@ static void draw_manipulator_planar_axes_single(View3D *v3d, RegionView3D *rv3d,
 					manipulator_setcolor(v3d, 'X', colcode, axisBlendAngle(rv3d->tw_idot[1]), true);
 				}
 
-				glBegin(GL_QUADS);
-				glVertex3f(0.0f, 0.4f, 0.4f);
-				glVertex3f(0.0f, 0.4f, 0.6f);
-				glVertex3f(0.0f, 0.6f, 0.6f);
-				glVertex3f(0.0f, 0.6f, 0.4f);
-				glEnd();
+				{
+					const float v[4][3] = {{0.0f, 0.4f, 0.4f}, {0.0f, 0.4f, 0.6f}, {0.0f, 0.6f, 0.6f}, {0.0f, 0.6f, 0.4f}};
+					manipulator_planar_quad(v, is_picksel);
+				}
 			}
 			break;
 		case 1:
@@ -977,12 +1052,10 @@ static void draw_manipulator_planar_axes_single(View3D *v3d, RegionView3D *rv3d,
 				else {
 					manipulator_setcolor(v3d, 'Y', colcode, axisBlendAngle(rv3d->tw_idot[0]), true);
 				}
-				glBegin(GL_QUADS);
-				glVertex3f(0.4f, 0.0f, 0.4f);
-				glVertex3f(0.6f, 0.0f, 0.4f);
-				glVertex3f(0.6f, 0.0f, 0.6f);
-				glVertex3f(0.4f, 0.0f, 0.6f);
-				glEnd();
+				{
+					const float v[4][3] = {{0.4f, 0.0f, 0.4f}, {0.6f, 0.0f, 0.4f}, {0.6f, 0.0f, 0.6f}, {0.4f, 0.0f, 0.6f}};
+					manipulator_planar_quad(v, is_picksel);
+				}
 			}
 			break;
 		case 2:
@@ -994,12 +1067,10 @@ static void draw_manipulator_planar_axes_single(View3D *v3d, RegionView3D *rv3d,
 				else {
 					manipulator_setcolor(v3d, 'Z', colcode, 255, true);
 				}
-				glBegin(GL_QUADS);
-				glVertex3f(0.4f, 0.4f, 0.0f);
-				glVertex3f(0.4f, 0.6f, 0.0f);
-				glVertex3f(0.6f, 0.6f, 0.0f);
-				glVertex3f(0.6f, 0.4f, 0.0f);
-				glEnd();
+				{
+					const float v[4][3] = {{0.4f, 0.4f, 0.0f}, {0.4f, 0.6f, 0.0f}, {0.6f, 0.6f, 0.0f}, {0.6f, 0.4f, 0.0f}};
+					manipulator_planar_quad(v, is_picksel);
+				}
 			}
 			break;
 	}
@@ -1076,7 +1147,7 @@ static void draw_manipulator_rotate(
 	/*if (arcs) { // Don't use it to make it look like 3.0. 
 		if (is_picksel == false) {
 			UI_ThemeColorShade(TH_BACK, -30);
-			drawcircball(GL_LINE_LOOP, unitmat[3], size, unitmat);
+			manipulator_circle(size);
 		}
 	}*/
 
@@ -1085,14 +1156,14 @@ static void draw_manipulator_rotate(
 		if (is_picksel) GPU_select_load_id(MAN_ROT_T);
 		else UI_ThemeColor(TH_TRANSFORM);
 
-		drawcircball(GL_LINE_LOOP, unitmat[3], 0.2f * size, unitmat);
+		manipulator_circle(0.2f * size);
 	}
 
 	/* Screen aligned view rot circle */
 	if (drawflags & MAN_ROT_V) {
 		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
 		else UI_ThemeColor(TH_TRANSFORM);
-		drawcircball(GL_LINE_LOOP, unitmat[3], 1.2f * size, unitmat);
+		manipulator_circle(1.2f * size);
 
 		if (is_moving) {
 			float vec[3];
@@ -1170,7 +1241,7 @@ static void draw_manipulator_rotate(
 			preOrthoFront(ortho, matt, 2);
 			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255, false);
-			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
+			manipulator_circle(1.0);
 			postOrtho(ortho);
 		}
 		/* X circle */
@@ -1179,7 +1250,7 @@ static void draw_manipulator_rotate(
 			if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 			else manipulator_setcolor(v3d, 'X', colcode, 255, false);
 			glRotatef(90.0, 0.0, 1.0, 0.0);
-			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
+			manipulator_circle(1.0);
 			glRotatef(-90.0, 0.0, 1.0, 0.0);
 			postOrtho(ortho);
 		}
@@ -1189,7 +1260,7 @@ static void draw_manipulator_rotate(
 			if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 			else manipulator_setcolor(v3d, 'Y', colcode, 255, false);
 			glRotatef(-90.0, 1.0, 0.0, 0.0);
-			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
+			manipulator_circle(1.0);
 			glRotatef(90.0, 1.0, 0.0, 0.0);
 			postOrtho(ortho);
 		}
@@ -1203,7 +1274,7 @@ static void draw_manipulator_rotate(
 			preOrthoFront(ortho, rv3d->twmat, 2);
 			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255, false);
-			partial_doughnut(cusize / 3.0f, 1.0f, 0, 48, 8, 48);
+			partial_doughnut(cusize / 3.0f, 1.0f, 0, 96, 12, 96);
 			postOrtho(ortho);
 		}
 		/* X circle */
@@ -1212,7 +1283,7 @@ static void draw_manipulator_rotate(
 			if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 			else manipulator_setcolor(v3d, 'X', colcode, 255, false);
 			glRotatef(90.0, 0.0, 1.0, 0.0);
-			partial_doughnut(cusize / 3.0f, 1.0f, 0, 48, 8, 48);
+			partial_doughnut(cusize / 3.0f, 1.0f, 0, 96, 12, 96);
 			glRotatef(-90.0, 0.0, 1.0, 0.0);
 			postOrtho(ortho);
 		}
@@ -1222,7 +1293,7 @@ static void draw_manipulator_rotate(
 			if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 			else manipulator_setcolor(v3d, 'Y', colcode, 255, false);
 			glRotatef(-90.0, 1.0, 0.0, 0.0);
-			partial_doughnut(cusize / 3.0f, 1.0f, 0, 48, 8, 48);
+			partial_doughnut(cusize / 3.0f, 1.0f, 0, 96, 12, 96);
 			glRotatef(90.0, 1.0, 0.0, 0.0);
 			postOrtho(ortho);
 		}
@@ -1239,7 +1310,7 @@ static void draw_manipulator_rotate(
 			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255, false);
 
-			partial_doughnut(0.7f * cusize, 1.0f, 31, 33, 8, 64);
+			partial_doughnut(0.7f * cusize, 1.0f, 62, 66, 12, 128);
 
 			glPopMatrix();
 			postOrtho(ortho);
@@ -1254,7 +1325,7 @@ static void draw_manipulator_rotate(
 
 			glRotatef(90.0, 1.0, 0.0, 0.0);
 			glRotatef(90.0, 0.0, 0.0, 1.0);
-			partial_doughnut(0.7f * cusize, 1.0f, 31, 33, 8, 64);
+			partial_doughnut(0.7f * cusize, 1.0f, 62, 66, 12, 128);
 
 			glPopMatrix();
 			postOrtho(ortho);
@@ -1269,7 +1340,7 @@ static void draw_manipulator_rotate(
 
 			glRotatef(-90.0, 0.0, 1.0, 0.0);
 			glRotatef(90.0, 0.0, 0.0, 1.0);
-			partial_doughnut(0.7f * cusize, 1.0f, 31, 33, 8, 64);
+			partial_doughnut(0.7f * cusize, 1.0f, 62, 66, 12, 128);
 
 			glPopMatrix();
 			postOrtho(ortho);
@@ -1285,6 +1356,7 @@ static void draw_manipulator_rotate(
 
 static void drawsolidcube(float size)
 {
+	if (man_outline_pass) return; /* solids get no outline */
 	const float cube[8][3] = {
 		{-1.0, -1.0, -1.0},
 		{-1.0, -1.0,  1.0},
@@ -1370,11 +1442,11 @@ static void draw_manipulator_scale(
 		if (is_picksel && shift == 0) GPU_select_load_id(MAN_SCALE_C);
 		else manipulator_setcolor(v3d, 'C', colcode, 255, false);
 
-		glLineWidth(3.0f);
+		glLineWidth(MAN_LINE_WIDTH_THICK);
 		glPushMatrix();
 		size = screen_aligned(rv3d, rv3d->twmat);
 		unit_m4(unitmat);
-		drawcircball(GL_LINE_LOOP, unitmat[3], 0.15f * size, unitmat);
+		manipulator_circle(0.15f * size);
 		glPopMatrix();
 
 		dz = 1.0;
@@ -1484,11 +1556,11 @@ static void draw_manipulator_scale_planar(
 		if (is_picksel && shift == 0) GPU_select_load_id(MAN_SCALE_C);
 		else manipulator_setcolor(v3d, 'C', colcode, 255, true);
 
-		glLineWidth(3.0f);
+		glLineWidth(MAN_LINE_WIDTH_THICK);
 		glPushMatrix();
 		size = screen_aligned(rv3d, rv3d->twmat);
 		unit_m4(unitmat);
-		drawcircball(GL_LINE_LOOP, unitmat[3], 0.15f * size, unitmat);
+		manipulator_circle(0.15f * size);
 		glPopMatrix();
 
 		dz = 1.0;
@@ -1527,26 +1599,28 @@ static void draw_manipulator_scale_planar(
 
 static void draw_cone(GLUquadricObj *qobj, float len, float width)
 {
+	if (man_outline_pass) return; /* solids get no outline */
 	glTranslatef(0.0, 0.0, -0.5f * len);
-	gluCylinder(qobj, width, 0.0, len, 8, 1);
+	gluCylinder(qobj, width, 0.0, len, MAN_CONE_SLICES, 1);
 	gluQuadricOrientation(qobj, GLU_INSIDE);
-	gluDisk(qobj, 0.0, width, 8, 1);
+	gluDisk(qobj, 0.0, width, MAN_CONE_SLICES, 1);
 	gluQuadricOrientation(qobj, GLU_OUTSIDE);
 	glTranslatef(0.0, 0.0, 0.5f * len);
 }
 
 static void draw_cylinder(GLUquadricObj *qobj, float len, float width)
 {
+	if (man_outline_pass) return; /* solids get no outline */
 
 	width *= 0.8f;   // just for beauty
 
 	glTranslatef(0.0, 0.0, -0.5f * len);
-	gluCylinder(qobj, width, width, len, 8, 1);
+	gluCylinder(qobj, width, width, len, MAN_CONE_SLICES, 1);
 	gluQuadricOrientation(qobj, GLU_INSIDE);
-	gluDisk(qobj, 0.0, width, 8, 1);
+	gluDisk(qobj, 0.0, width, MAN_CONE_SLICES, 1);
 	gluQuadricOrientation(qobj, GLU_OUTSIDE);
 	glTranslatef(0.0, 0.0, len);
-	gluDisk(qobj, 0.0, width, 8, 1);
+	gluDisk(qobj, 0.0, width, MAN_CONE_SLICES, 1);
 	glTranslatef(0.0, 0.0, -0.5f * len);
 }
 
@@ -1575,11 +1649,11 @@ static void draw_manipulator_translate(
 	if (is_picksel && shift == 0) GPU_select_load_id(MAN_TRANS_C);
 	else manipulator_setcolor(v3d, 'C', colcode, 255, false);
 
-	glLineWidth(3.0f);
+	glLineWidth(MAN_LINE_WIDTH_THICK);
 	glPushMatrix();
 	size = screen_aligned(rv3d, rv3d->twmat);
 	unit_m4(unitmat);
-	drawcircball(GL_LINE_LOOP, unitmat[3], 0.15f * size, unitmat);
+	manipulator_circle(0.15f * size);
 	glPopMatrix();
 
 	/* and now apply matrix, we move to local matrix drawing */
@@ -1679,7 +1753,7 @@ static void draw_manipulator_rotate_cyl(
 
 		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
 		UI_ThemeColor(TH_TRANSFORM);
-		drawcircball(GL_LINE_LOOP, unitmat[3], 1.2f * size, unitmat);
+		manipulator_circle(1.2f * size);
 
 		if (is_moving) {
 			float vec[3];
@@ -1889,28 +1963,48 @@ void BIF_draw_manipulator(const bContext *C)
 	if (v3d->twflag & V3D_DRAW_MANIPULATOR) {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glEnable(GL_BLEND);
-		glLineWidth(2.0f);
+		glLineWidth(MAN_LINE_WIDTH);
+		/* anti-aliased lines, also when the window has no multisample buffer */
+		glEnable(GL_LINE_SMOOTH);
+		glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 
-		if (v3d->twtype & V3D_MANIP_ROTATE) {
-			if (G.debug_value == 3) {
-				if (G.moving & (G_TRANSFORM_OBJ | G_TRANSFORM_EDIT))
-					draw_manipulator_rotate_cyl(v3d, rv3d, drawflags, v3d->twtype, MAN_MOVECOL, true, is_picksel);
-				else
-					draw_manipulator_rotate_cyl(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
-			}
-			else {
-				draw_manipulator_rotate(v3d, rv3d, drawflags, v3d->twtype, false, is_picksel);
-			}
-		}
-		if (v3d->twtype & V3D_MANIP_SCALE) {
-			draw_manipulator_scale(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
-			draw_manipulator_scale_planar(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
-		}
-		if (v3d->twtype & V3D_MANIP_TRANSLATE) {
-			draw_manipulator_translate(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
-			draw_manipulator_translate_planar(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
-		}
+		man_hover_draw = (man_hover_ar == ar) && (G.moving == 0);
 
+		/* pass 0: dark outline under the lines, pass 1: colored handles */
+		for (int pass = 0; pass < 2; pass++) {
+			man_outline_pass = (pass == 0);
+			glLineWidth(MAN_LINE_WIDTH);
+
+			if (v3d->twtype & V3D_MANIP_ROTATE) {
+				man_draw_kind = V3D_MANIP_ROTATE;
+				if (G.debug_value == 3) {
+					if (G.moving & (G_TRANSFORM_OBJ | G_TRANSFORM_EDIT))
+						draw_manipulator_rotate_cyl(v3d, rv3d, drawflags, v3d->twtype, MAN_MOVECOL, true, is_picksel);
+					else
+						draw_manipulator_rotate_cyl(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
+				}
+				else {
+					draw_manipulator_rotate(v3d, rv3d, drawflags, v3d->twtype, false, is_picksel);
+				}
+			}
+			if (v3d->twtype & V3D_MANIP_SCALE) {
+				man_draw_kind = V3D_MANIP_SCALE;
+				draw_manipulator_scale(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
+				draw_manipulator_scale_planar(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
+			}
+			if (v3d->twtype & V3D_MANIP_TRANSLATE) {
+				man_draw_kind = V3D_MANIP_TRANSLATE;
+				draw_manipulator_translate(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
+				draw_manipulator_translate_planar(v3d, rv3d, drawflags, v3d->twtype, MAN_RGB, false, is_picksel);
+			}
+
+		}
+		man_outline_pass = false;
+		man_hover_draw = false;
+		man_draw_kind = 0;
+
+		glDisable(GL_LINE_SMOOTH);
+		glLineWidth(1.0f);
 		glDisable(GL_BLEND);
 	}
 }
@@ -2040,6 +2134,37 @@ static const char *manipulator_get_operator_name(int man_val)
 }
 
 /* return 0; nothing happened */
+/* Highlight the handle under the mouse: called on mouse move over the 3D view main region. */
+void BIF_manipulator_hover_update(wmWindow *win, ScrArea *sa, ARegion *ar)
+{
+	View3D *v3d = sa->spacedata.first;
+	Scene *scene = win->screen->scene;
+	int val = 0;
+
+	if ((v3d->twflag & V3D_USE_MANIPULATOR) && (v3d->twflag & V3D_DRAW_MANIPULATOR) &&
+	    (v3d->twtype & (V3D_MANIP_TRANSLATE | V3D_MANIP_ROTATE | V3D_MANIP_SCALE)) &&
+	    G.moving == 0 && win->eventstate)
+	{
+		const int mval[2] = {win->eventstate->x - ar->winrct.xmin, win->eventstate->y - ar->winrct.ymin};
+
+		if (mval[0] >= 0 && mval[1] >= 0 && mval[0] < ar->winx && mval[1] < ar->winy) {
+			wmSubWindowSet(win, ar->swinid);
+			/* same hotspot order as BIF_do_manipulator, so the highlight matches the click */
+			val = manipulator_selectbuf(scene, sa, ar, mval, 0.5f * (float)U.tw_hotspot);
+			if (val) {
+				const int narrow = manipulator_selectbuf(scene, sa, ar, mval, 0.2f * (float)U.tw_hotspot);
+				if (narrow) val = narrow;
+			}
+		}
+	}
+
+	if (val != man_hover_id || (val && man_hover_ar != ar)) {
+		man_hover_id = val;
+		man_hover_ar = val ? ar : NULL;
+		ED_region_tag_redraw(ar);
+	}
+}
+
 int BIF_do_manipulator(bContext *C, const struct wmEvent *event, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
