@@ -58,6 +58,14 @@ class VIEW3D_HT_header(Header):
             layout.label(text="", icon='OBJECT_DATA')
             layout.prop(obj, "name", text="")
 
+            # Pose Mode: active bone name right after the armature name.
+            if object_mode == 'POSE' and obj.type == 'ARMATURE':
+                bone = context.active_bone
+                if bone:
+                    row = layout.row()
+                    row.label(text="", icon='BONE_DATA')
+                    row.prop(bone, "name", text="")
+
         # Viewport shading, pivot point and the manipulator toggles now live
         # only in the floating 3D View controls (bottom-left) to avoid
         # duplicating the same buttons in the header. template_header_3D_mode()
