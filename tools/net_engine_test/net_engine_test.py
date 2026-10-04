@@ -12,7 +12,7 @@ Scenarios (existing scenes of projects-teste/, no editor needed):
 With NET_PREDICT=1 (runner scenario "predict", spawner scene) the server also spawns a 'Rig' owned by the client,
 moved by net.predict() with the client's input (client prediction + reconciliation), and gives the Spawner a hitbox
 the client shoots at through the input (lag compensation, net.raycast_past()).
-With NET_PREDICT_DYN=1 (scenario "predict-car", car scene) the server gives the dynamic 'Car' to the client, which
+With NET_PREDICT_DYN=1 (scenario "predict-cube", make_dyn_scene.py: a frictionless dynamic box named "Car") the server gives it to the client, which
 predicts it with Bullet running locally (net.predict() with a step that sets the linear velocity).
 With NET_RPC=1 (scenario "rpc") the peers register game RPCs and check every target, argument type, obj.net and
 the refusals.
@@ -237,7 +237,7 @@ DYN_REPORT = {"y": None}  # last car position the server sent (RPC car_pos)
 
 
 class PredictDyn:
-    """net.predict() on a dynamic body owned by the client (NET_PREDICT_DYN=1, car scene)."""
+    """net.predict() on a dynamic body owned by the client (NET_PREDICT_DYN=1, predict-cube scene)."""
 
     def __init__(self, car):
         @net.rpc(target="others")

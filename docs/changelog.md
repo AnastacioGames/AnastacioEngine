@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: predição de corpo dinâmico, posse de objeto da cena e IPv6 no WebSocket (2026-10-04)
+- **Posse de objeto da cena**: `Replicator::update` reenvia `Ownership` dos objetos da cena com dono ao cliente que fica ativo (objeto da cena não tem `Spawn`, então um `set_owner` feito antes do cliente ficar pronto se perdia). Teste `SceneObjectOwnerReachesClientThatWasNotReady`.
+- **Predição de corpo dinâmico**: no cliente dono, `net.predict` reativa a física do corpo (`SetDynamicPredicted`); o estado do tick é gravado depois do passo do Bullet (`ClientTickEnd`, chamado no `EndTick`); o replay aplica o passo e integra `pos += v*dt`; a reconciliação compara só o transform. Cenário `predict-cube` (`tools/net_engine_test/make_dyn_scene.py`, caixa dinâmica sem atrito, `40,5,1`): PASS, resposta em 0 tick, termina a 0,0004 do servidor, erro máximo 0,195, 0 teleportes.
+- **Limitação**: veículo (`createVehicle`) não é previsto direito: o replay não refaz a suspensão por raycast e o carro fica ~0,5 atrás do servidor com correção quase todo tick (cenário `predict-car` removido). Para veículo, usar só interpolação, ou um replay que rode o passo completo do Bullet.
+- **IPv6 (núcleo)**: o WebSocket escuta em socket dual-stack (fallback IPv4) e `connectTcp` resolve com `AF_UNSPEC` (`::1`, `[::1]`, nomes); o cliente browser põe literal IPv6 entre colchetes na URL. O ENet embutido (1.3.x) é só IPv4 (`ENetAddress.host` de 32 bits): o cliente ENet recusa literal IPv6 logo de início; IPv6 por UDP exige um fork do ENet com IPv6. Descoberta LAN segue IPv4. O teste por `::1` pula em máquina sem IPv6 (o container não tem; não exercitado aqui). Testes do núcleo: 117 PASS.
+
 ## Multiplayer: contrato do `201 InputTiming` fechado (2026-10-04)
 
 - `201 InputTiming` deixa de ser provisória em `docs/multiplayer-protocol.md`, como a `200 RpcFrom`: aditiva, fora do `protocolVersion`. Revalidada no Windows (5 rodadas do `predict` PASS, erro 0, 0 correções) e no Linux. Só documentação; o código já era o definitivo.

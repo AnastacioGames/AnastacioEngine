@@ -35,8 +35,12 @@ case "$SCENARIO" in
   predict) export NET_PREDICT=1; SCENARIO=spawner; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   spawner) SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
-  predict-car) export NET_PREDICT_DYN=1; SCENARIO=car; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
-    SCENE_SERVER="$ROOT/projects-teste/car_framerate/car_com_fr0.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  predict-cube) export NET_PREDICT_DYN=1; SCENARIO=car; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_dyn_scene.py" -- "$OUT/cube.range" ) \
+      > "$OUT/make.log" 2>&1
+    grep -q "NETDYN SAVED" "$OUT/make.log" || { echo "NET ENGINE TEST (predict-cube): FAIL (editor step, logs in $OUT)"; exit 1; }
+    SCENE_SERVER="$OUT/cube.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   car) SCENE_SERVER="$ROOT/projects-teste/car_framerate/car_com_fr0.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   scene|scene-server)
     if [ "$SCENARIO" = scene-server ]; then SERVER_ARGS="--server"; export NET_HEADLESS=1; fi
