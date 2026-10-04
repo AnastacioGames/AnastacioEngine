@@ -39,19 +39,27 @@ set(NET_SRC
 	NET_Snapshot.cpp
 	NET_TransportENet.cpp
 	NET_TransportLoopback.cpp
+	NET_TransportMulti.cpp
 	NET_TransportSimulated.cpp
+	NET_TransportWebClient.cpp
+	NET_TransportWebSocketServer.cpp
 
 	NET_BitStream.h
 	NET_ITransport.h
 	NET_Messages.h
 	NET_Session.h
 	NET_Snapshot.h
+	NET_Socket.h
+	NET_TransportWeb.h
 	NET_Types.h
 )
 
 add_library(ge_network STATIC ${NET_SRC})
 target_include_directories(ge_network PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(ge_network PUBLIC extern_enet)
+if(WIN32)
+	target_link_libraries(ge_network PUBLIC ws2_32)  # WebSocket server sockets
+endif()
 set_target_properties(ge_network PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 if(NET_STANDALONE)
@@ -94,6 +102,7 @@ if(NET_STANDALONE)
 		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp
 		tests/NET_Transport_test.cpp
+		tests/NET_WebSocket_test.cpp
 	)
 
 	add_executable(net_tests ${NET_TEST_SRC})
