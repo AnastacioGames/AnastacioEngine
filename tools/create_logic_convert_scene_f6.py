@@ -36,7 +36,11 @@ def cube(name, loc, ptype='NO_COLLISION', scale=(1, 1, 1), actor=False):
 
 
 def material(name):
-    m = bpy.data.materials.new(name)
+    # Reaproveita pelo nome: dois materials.new("Red") dariam "Red" e "Red.001", e o Ray
+    # por material (que compara o nome) nunca dispararia no segundo objeto.
+    m = bpy.data.materials.get(name)
+    if m is None:
+        m = bpy.data.materials.new(name)
     return m
 
 

@@ -298,11 +298,11 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo em
   [notes-logic-f4.md](notes-logic-f4.md): Track To com pai de vértice; sensores Actuator/Animation Event/Movement/
   Ray Gaze/VR Head ligados de outro objeto; actuators de outro objeto que usam helper do componente.
-- F5 (2026-10-04, branch `logic/convert-f5`, sem merge): Camera, Constraint, Steering e Mouse Look de outro objeto. Só geração
-  validada; falta rodar o roteiro de runtime em [NOTES-logic-f5.md](../NOTES-logic-f5.md) no Windows.
-- F6 (2026-10-04, branch `logic/convert-f6`, sem merge): Track To com pai, Sound loop/ping-pong/3D, Movement e Animation Event de
-  outro objeto; Delay em segundos. Só geração validada; falta rodar o roteiro de runtime (CHECK idêntico, `LEFT_AS_BRICK 0`)
-  e o teste de áudio à mão em [NOTES-logic-f6.md](../NOTES-logic-f6.md) no Windows.
+- F5 (2026-10-04, na main): Camera, Constraint, Steering e Mouse Look de outro objeto. Runtime validado no Windows
+  ([NOTES-logic-f5.md](../NOTES-logic-f5.md)); falta só o Mouse Look à mão com mouse real.
+- F6 (2026-10-04, na main): Track To com pai, Sound loop/ping-pong/3D, Movement e Animation Event de outro objeto;
+  Delay em segundos. Runtime validado no Windows (CHECK idêntico nos 4 modos, `LEFT_AS_BRICK 0`); falta só o teste de
+  áudio à mão em [NOTES-logic-f6.md](../NOTES-logic-f6.md).
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
   Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.

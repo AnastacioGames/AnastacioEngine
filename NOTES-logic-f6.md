@@ -70,3 +70,15 @@ Não compilei a engine (sem build nesta máquina; o build completo leva horas). 
 - Mouse Over com x-ray/material; Property sensor com runtime API (`GetRuntimeProperty` da engine); Sound empacotado;
   controller Python (já é código); os motivos de Steering da F5 (obstáculos, normal up, path sem navmesh).
 - Actuators de outro objeto que chamam helpers que não são da lista `_OWN_CALLS` (ex.: VR walk/teleport).
+
+## Validação local (Windows, MSVC, 2026-10-04)
+
+- Geração: `LEFT_AS_BRICK 0 []` em Component, Module e Script.
+- Runtime: `CHECK rayx=1 rayplain=1 col=1 near=1 radar=1 moved=1 delayed=1 turret=0.71,0.68,-0.19,...` idêntico nos 4
+  modos (sem a diferença de 1 frame da F5, como previsto). O `RangeRuntime` não escreve no console quando o stdout é
+  redirecionado; o resultado sai em `Scene_check_f6.txt` ao lado do `.range`.
+- Corrigido na cena de teste: `material("Red")` criava um material novo a cada chamada, então o Glass2 ficava com
+  `Red.001` e o Ray sem x-ray dava `rayplain=0` também com bricks. O helper agora reaproveita pelo nome.
+- Regressão: F5 igual à validação anterior (slider/looker idênticos, `cam`/`chaser` com 1 frame de leitura); cena
+  antiga com CHECK idêntico, só `cam y` -0,04 × -0,03 (já conhecido). `LEFT_AS_BRICK 0` em todas.
+- Não testado: o áudio à mão (passo 5).
