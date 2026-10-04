@@ -29,6 +29,7 @@
 #include "EXP_PythonCallBack.h"
 
 #include "PIL_time.h"
+#include "BL_LoadStats.h"
 
 KX_LibLoadStatus::KX_LibLoadStatus(BL_Converter *converter, KX_KetsjiEngine *engine, KX_Scene *merge_scene, const std::string& path)
 	:m_converter(converter),
@@ -51,6 +52,7 @@ void KX_LibLoadStatus::Finish()
 	m_finished = true;
 	m_progress = 1.f;
 	m_endtime = PIL_check_seconds_timer();
+	BL_LoadLog::Add(m_libname, "LibLoad total", m_endtime - m_starttime, "", true);
 
 	RunFinishCallback();
 	RunProgressCallback();

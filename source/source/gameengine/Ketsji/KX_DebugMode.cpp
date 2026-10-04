@@ -36,6 +36,7 @@
 #include "KX_Globals.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
+#include "BL_LoadStats.h"
 
 #include "RAS_Query.h"
 #include "RAS_Rasterizer.h"
@@ -230,59 +231,60 @@ void KX_DebugMode::RenderDebugProperties()
 	// Show Render Queries.
     if (KX_GetActiveEngine()->GetFlag(KX_KetsjiEngine::SHOW_RENDER_QUERIES)) {
       ImGui::Separator();
-      ImGui::TextUnformatted("Render Queries");
+      if (ImGui::CollapsingHeader("Render Queries", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-      std::string debugtxt;
+        std::string debugtxt;
 
-      for (unsigned short i = 0; i < KX_KetsjiEngine::QUERY_MAX; ++i) {
+        for (unsigned short i = 0; i < KX_KetsjiEngine::QUERY_MAX; ++i) {
 
-        ImGui::TextUnformatted(KX_GetActiveEngine()->GetRenderQueryLabel(i).c_str());
-		// Tooltip.
-        if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s", profileQueryTips[i].c_str());
+          ImGui::TextUnformatted(KX_GetActiveEngine()->GetRenderQueryLabel(i).c_str());
+  		// Tooltip.
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", profileQueryTips[i].c_str());
+          }
+          ImGui::SameLine();
+          if (i == KX_KetsjiEngine::QUERY_TIME) {
+            ImGui::TextColored(ImVec4(0, 255, 0, 225), "%.2fms", (((float)KX_GetActiveEngine()->GetRenderQueryValue(i)) / 1e6));
+          }
+          else {
+            ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i", KX_GetActiveEngine()->GetRenderQueryValue(i));
+          }
         }
-        ImGui::SameLine();
-        if (i == KX_KetsjiEngine::QUERY_TIME) {
-          ImGui::TextColored(ImVec4(0, 255, 0, 225), "%.2fms", (((float)KX_GetActiveEngine()->GetRenderQueryValue(i)) / 1e6));
+
+        // Show culling object counters (main camera pass only).
+        ImGui::Separator();
+        ImGui::TextUnformatted("Culling (Objects)");
+        for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
+          ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i total | %i tested | %i visible",
+            scene->GetName().c_str(), scene->GetLastCullingTotalObjects(),
+            scene->GetLastCullingTestedObjects(), scene->GetLastCullingVisibleObjects());
         }
-        else {
-          ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i", KX_GetActiveEngine()->GetRenderQueryValue(i));
+
+        // Show light/shadow counters (last RenderShadowBuffers() pass).
+        ImGui::Separator();
+        ImGui::TextUnformatted("Lights / Shadow Passes");
+        for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
+          ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i lights | %i updated | %i shadow passes",
+            scene->GetName().c_str(), scene->GetLastLightsTotal(),
+            scene->GetLastLightsShadowUpdated(), scene->GetLastShadowPasses());
         }
-      }
 
-      // Show culling object counters (main camera pass only).
-      ImGui::Separator();
-      ImGui::TextUnformatted("Culling (Objects)");
-      for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
-        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i total | %i tested | %i visible",
-          scene->GetName().c_str(), scene->GetLastCullingTotalObjects(),
-          scene->GetLastCullingTestedObjects(), scene->GetLastCullingVisibleObjects());
-      }
+        // Show draw call / material bind counters from the last completed frame
+        // (all passes: main, shadow, filters, etc).
+        ImGui::Separator();
+        ImGui::TextUnformatted("Draw Calls");
+        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i draw calls | %i material binds",
+          RAS_Rasterizer::GetLastDrawCalls(), RAS_Rasterizer::GetLastMaterialChanges());
 
-      // Show light/shadow counters (last RenderShadowBuffers() pass).
-      ImGui::Separator();
-      ImGui::TextUnformatted("Lights / Shadow Passes");
-      for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
-        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i lights | %i updated | %i shadow passes",
-          scene->GetName().c_str(), scene->GetLastLightsTotal(),
-          scene->GetLastLightsShadowUpdated(), scene->GetLastShadowPasses());
-      }
-
-      // Show draw call / material bind counters from the last completed frame
-      // (all passes: main, shadow, filters, etc).
-      ImGui::Separator();
-      ImGui::TextUnformatted("Draw Calls");
-      ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i draw calls | %i material binds",
-        RAS_Rasterizer::GetLastDrawCalls(), RAS_Rasterizer::GetLastMaterialChanges());
-
-      // Show logic execution counters (last BeginFrame()/UpdateFrame() pass).
-      ImGui::Separator();
-      ImGui::TextUnformatted("Logic");
-      for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
-        SCA_LogicManager *logicmgr = scene->GetLogicManager();
-        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i sensors | %i controllers triggered | %i actuators updated",
-          scene->GetName().c_str(), logicmgr->GetTotalRegisteredSensors(),
-          logicmgr->GetLastControllersTriggered(), logicmgr->GetLastActuatorsUpdated());
+        // Show logic execution counters (last BeginFrame()/UpdateFrame() pass).
+        ImGui::Separator();
+        ImGui::TextUnformatted("Logic");
+        for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
+          SCA_LogicManager *logicmgr = scene->GetLogicManager();
+          ImGui::TextColored(ImVec4(0, 255, 0, 225), "%s: %i sensors | %i controllers triggered | %i actuators updated",
+            scene->GetName().c_str(), logicmgr->GetTotalRegisteredSensors(),
+            logicmgr->GetLastControllersTriggered(), logicmgr->GetLastActuatorsUpdated());
+        }
       }
     }
 	
@@ -292,56 +294,94 @@ void KX_DebugMode::RenderDebugProperties()
       return;
     }
 
-	ImGui::Separator();
-    if (ImGui::BeginTable("##DebugCategoriesTable", 2, ImGuiTableFlags_SizingStretchProp)) {
-      ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthStretch, 0.45f);
-      ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.55f);
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Profile", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (ImGui::BeginTable("##DebugCategoriesTable", 2, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthStretch, 0.45f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.55f);
 
-      const ImU32 barCol = ImColor(0.2f, 0.2f, 0.2f, 0.85f);
-      for (int j = KX_GetActiveEngine()->tc_first; j < KX_GetActiveEngine()->tc_numCategories; j++) {
-        double time = KX_GetActiveEngine()->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)j);
-        int percentage = (int)(time / tottime * 100.f);
+        const ImU32 barCol = ImColor(0.2f, 0.2f, 0.2f, 0.85f);
+        for (int j = KX_GetActiveEngine()->tc_first; j < KX_GetActiveEngine()->tc_numCategories; j++) {
+          double time = KX_GetActiveEngine()->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)j);
+          int percentage = (int)(time / tottime * 100.f);
 
-        ImVec4 color = ImVec4(0, 255, 0, 225);  // green (Default)
-        if (j != KX_GetActiveEngine()->tc_latency) {
-          /* Red */
-          if (percentage > 50)
-            color = ImVec4(225, 0, 0, 225);
-          /* Yellow */
-          else if (percentage > 25)
-            color = ImVec4(225, 255, 0, 225);
+          ImVec4 color = ImVec4(0, 255, 0, 225);  // green (Default)
+          if (j != KX_GetActiveEngine()->tc_latency) {
+            /* Red */
+            if (percentage > 50)
+              color = ImVec4(225, 0, 0, 225);
+            /* Yellow */
+            else if (percentage > 25)
+              color = ImVec4(225, 255, 0, 225);
+          }
+          else {
+            /* Red */
+            if (percentage < 10)
+              color = ImVec4(225, 0, 0, 225);
+            /* Yellow */
+            else if (percentage < 50)
+              color = ImVec4(225, 255, 0, 225);
+          }
+
+          ImGui::TableNextRow();
+          ImGui::TableSetColumnIndex(0);
+          ImGui::TextColored(color, "%s", KX_GetActiveEngine()->m_profileLabels[j].c_str());
+          if (ImGui::IsItemHovered()) {
+            static_assert(sizeof(profileTips) / sizeof(profileTips[0]) == KX_KetsjiEngine::tc_numCategories,
+                          "profileTips must have one entry per profile category");
+            ImGui::SetTooltip("%s", profileTips[j].c_str());
+          }
+
+          ImGui::TableSetColumnIndex(1);
+          /* Draw the load bar behind the text, sized relative to this column's own width
+           * so it never overlaps the label column regardless of font size. */
+          const ImVec2 cellPos = ImGui::GetCursorScreenPos();
+          const float cellWidth = ImGui::GetContentRegionAvail().x;
+          const float rowHeight = ImGui::GetTextLineHeight();
+          const float barWidth = cellWidth * (percentage * 0.01f);
+          ImGui::GetWindowDrawList()->AddRectFilled(
+              cellPos, ImVec2(cellPos.x + barWidth, cellPos.y + rowHeight), barCol);
+          ImGui::Text("%5.2fms | %i%%", (time * 1000.f), percentage);
         }
-        else {
-          /* Red */
-          if (percentage < 10)
-            color = ImVec4(225, 0, 0, 225);
-          /* Yellow */
-          else if (percentage < 50)
-            color = ImVec4(225, 255, 0, 225);
-        }
 
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::TextColored(color, "%s", KX_GetActiveEngine()->m_profileLabels[j].c_str());
-        if (ImGui::IsItemHovered()) {
-          static_assert(sizeof(profileTips) / sizeof(profileTips[0]) == KX_KetsjiEngine::tc_numCategories,
-                        "profileTips must have one entry per profile category");
-          ImGui::SetTooltip("%s", profileTips[j].c_str());
-        }
-
-        ImGui::TableSetColumnIndex(1);
-        /* Draw the load bar behind the text, sized relative to this column's own width
-         * so it never overlaps the label column regardless of font size. */
-        const ImVec2 cellPos = ImGui::GetCursorScreenPos();
-        const float cellWidth = ImGui::GetContentRegionAvail().x;
-        const float rowHeight = ImGui::GetTextLineHeight();
-        const float barWidth = cellWidth * (percentage * 0.01f);
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            cellPos, ImVec2(cellPos.x + barWidth, cellPos.y + rowHeight), barCol);
-        ImGui::Text("%5.2fms | %i%%", (time * 1000.f), percentage);
+        ImGui::EndTable();
       }
+    }
 
-      ImGui::EndTable();
+    // Scene load log: filled only when something loads (BL_LoadLog), so this costs nothing per frame
+    // beyond drawing it while the header is open.
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Scene Load")) {
+      const std::vector<BL_LoadLog::Entry> entries = BL_LoadLog::GetEntries();
+      if (entries.empty()) {
+        ImGui::TextUnformatted("Nothing loaded yet.");
+      }
+      else if (ImGui::BeginTable("##SceneLoadTable", 3, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("Scene", ImGuiTableColumnFlags_WidthStretch, 0.4f);
+        ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch, 0.4f);
+        ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthStretch, 0.2f);
+        // Newest first.
+        for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
+          const ImVec4 color = it->total ? ImVec4(1.0f, 0.85f, 0.2f, 1.0f) : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+          ImGui::TableNextRow();
+          ImGui::TableSetColumnIndex(0);
+          ImGui::TextColored(color, "%s", it->scene.c_str());
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", it->scene.c_str());
+          }
+          ImGui::TableSetColumnIndex(1);
+          ImGui::TextColored(color, "%s", it->stage.c_str());
+          if (!it->detail.empty() && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", it->detail.c_str());
+          }
+          ImGui::TableSetColumnIndex(2);
+          ImGui::TextColored(color, "%.0fms", it->seconds * 1000.0);
+        }
+        ImGui::EndTable();
+      }
+      if (!entries.empty() && ImGui::SmallButton("Clear##SceneLoad")) {
+        BL_LoadLog::Clear();
+      }
     }
 
     // Properties
@@ -711,6 +751,9 @@ void KX_DebugMode::RenderImguiDebug_MainMenuTop() {
 			KX_GetActiveEngine()->SetShowVehicleDebug(imgui_showVehicleDebug == 1 ? KX_DebugOption::FORCE : KX_DebugOption::DISABLE);
 		}
 		ImGui::Checkbox("Vehicle Lab", &imgui_showVehicleLab);
+		// The flag may already be on (scene setting or -g show_render_queries), so read it back
+		// every frame: otherwise the box shows unchecked while the panel is being drawn.
+		imgui_showRenderQueries = KX_GetActiveEngine()->GetFlag(KX_KetsjiEngine::SHOW_RENDER_QUERIES);
 		if (ImGui::Checkbox("Show Render Queries", &imgui_showRenderQueries)) {
 			KX_GetActiveEngine()->SetFlag(KX_KetsjiEngine::SHOW_RENDER_QUERIES, imgui_showRenderQueries);
 		}

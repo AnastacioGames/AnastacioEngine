@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Debug Mode: tempos de carregamento no painel de profile (2026-10-04)
+
+- `BL_LoadStats.h`: novo `BL_LoadLog`, log circular de 64 eventos (cena, etapa, segundos, linha completa do console como tooltip, marca de "total") protegido por mutex porque a conversão assíncrona roda em thread de trabalho. Só escreve quando algo carrega; nada por frame.
+- Quem alimenta: `BL_Converter` (convert, textures, merge, shaders, `open file`, `link`), `KX_LibLoadStatus::Finish` (`LibLoad total`), `LA_Launcher::InitEngine` (`start scene total`) e `KX_SceneScheduler` (`async scene total`, `add scene total (overlay)`, `add scene total (background)` e `replace scene total`). Cada cena carregada custa um timestamp a mais.
+- `KX_DebugMode`: seção **Scene Load** no painel de profile (tabela Cena/Etapa/Tempo, mais recente no topo, totais em amarelo, tooltip com a linha do console e botão Clear). As **Render Queries** e o bloco verde/vermelho de categorias viraram abas recolhíveis (`CollapsingHeader`, abertas por padrão) para o painel não crescer sem limite.
+- Correção: o checkbox "Show Render Queries" do menu ImGui guardava um estado próprio iniciado em `false`, enquanto a flag podia já vir ligada da cena (`GAME_SHOW_RENDER_QUERIES`) ou de `-g show_render_queries` — a caixa aparecia desmarcada com o painel visível e era preciso ligar e desligar. Agora o valor é lido da engine a cada frame.
+- Compilado no Windows/MSVC (`RangeRuntime`, `RangeEngine`). **Não validado em runtime** nesta sessão.
+
 ## Logic Bricks → Python Component, fase 6 (2026-10-04, branch `logic/convert-f6`)
 
 - `logic_to_python.py`: Track To com pai, Sound (loop/ping-pong/3D), Movement e Animation Event agora funcionam em sensores/actuators de **outro objeto** (`own=`, estado `Dono/Actuator`, `_plm_init` por dono). Sound reescrito em `_snd_play/_snd_stop/_snd_update` com a flag `m_isplaying` da engine (recomeça após pulso negativo). Novos: Sound 3D e Delay em segundos (antes `Unsupported`).
