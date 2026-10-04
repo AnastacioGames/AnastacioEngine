@@ -35,6 +35,7 @@ set(INC
 	../Ketsji
 	../Ketsji/KXImgui
 	../Ketsji/KXNetwork
+	../Network
 	../Physics/Common
 	../Rasterizer
 	../Rasterizer/Node

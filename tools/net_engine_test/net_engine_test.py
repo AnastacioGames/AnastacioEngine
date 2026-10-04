@@ -57,6 +57,8 @@ def run():
     net.on_connect(lambda cid: events.append(("connect", cid)))
     net.on_disconnect(lambda reason, detail: events.append(("disconnect", reason)))
     net.on_reject(lambda reason, detail: events.append(("reject", reason, detail)))
+    net.on_chat(lambda cid, text: events.append(("chat", cid, text)))
+    net.on_start(lambda: events.append(("start",)))
     net.on_player_join(lambda cid, name: events.append(("join", cid, name)))
     net.on_player_leave(lambda cid: events.append(("leave", cid)))
     net.playerName = "Tester-" + ROLE
@@ -97,6 +99,7 @@ def run():
     hps = []
     spawn_seen = []
     clients_seen = 0
+    lobby = {"chat_sent": False, "start": None, "ready_sent": False, "lan": None}
     t_connected = None
     last_log = 0.0
 
@@ -116,10 +119,23 @@ def run():
                 # constant speed along +y: the client must see a slope of CAR_SPEED m/s
                 tracked.setLinearVelocity([0.0, CAR_SPEED, 0.0], False)
             clients_seen = max(clients_seen, len(net.clients))
+            if not lobby["chat_sent"] and any(e[0] == "join" for e in events):
+                lobby["chat_sent"] = net.send_chat("welcome")
+            if lobby["start"] is None and any(c.ready and not c.isHost for c in net.clients):
+                lobby["start"] = net.start_game()
+                log("start_game() -> %s" % lobby["start"])
         else:
             if t_connected is None and net.isConnected:
                 t_connected = t
                 log("connected as client %d" % net.localId)
+            if net.isConnected and t_connected is not None and t - t_connected > 0.5 and not lobby["ready_sent"]:
+                lobby["ready_sent"] = True
+                net.set_ready(True)
+                net.send_chat("hello")
+            if net.isConnected and not lobby["lan"]:
+                found = net.discover_lan()
+                if any(entry["name"] == "engine-test" for entry in found):
+                    lobby["lan"] = found
             if net.isConnected:
                 p = tracked.worldPosition
                 if (p.x, p.y, p.z) != initial or positions:  # nothing before the first snapshot
@@ -143,6 +159,8 @@ def run():
         check("net.clients lists host + client", clients_seen >= 2, "max=%d" % clients_seen)
         names = [c.name for c in net.clients]
         check("client name arrived", any(n == "Tester-client" for n in names), str(names))
+        check("lobby: client chat reached the server", ("chat", 1, "hello") in events, str(events))
+        check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
     else:
         check("client connected", t_connected is not None, str(events))
         if positions:
@@ -159,15 +177,25 @@ def run():
             if SCENARIO == "spawner":
                 # The server moves it on a circle of radius 4 at z = 1: any wrong transform shows here.
                 radii = [math.hypot(p[0], p[1]) for p in positions]
-                check("client positions stay on the server's path", min(radii) > 3.3 and max(radii) < 4.05
+                # Interpolating across a stall of the server draws a chord (radius < 4), so a few samples may be
+                # inside the circle on a loaded machine; the large majority must be on it.
+                on_path = sum(1 for r in radii if 3.9 < r < 4.05)
+                check("client positions stay on the server's path", on_path >= 0.8 * len(radii) and max(radii) < 4.05
                       and all(abs(p[2] - 1.0) < 0.05 for p in positions),
-                      "radius %.2f..%.2f" % (min(radii), max(radii)))
+                      "%d/%d samples on the circle, radius %.2f..%.2f" % (on_path, len(radii), min(radii), max(radii)))
         else:
             check("replicated object moves on the client", False, "never connected")
         if props:
             check("replicated property changes", len(set(hps)) > 3, "hp values %s..%s" % (min(hps) if hps else None, max(hps) if hps else None))
         if proto:
             check("spawned object appears on the client", any(n >= 1 for n in spawn_seen), "max=%d" % max(spawn_seen or [0]))
+        check("lobby: server chat reached the client", ("chat", 0, "welcome") in events, str(events))
+        check("lobby: on_start fired on the client", ("start",) in events, str(events))
+        if lobby["lan"]:
+            entry = [e for e in lobby["lan"] if e["name"] == "engine-test"][0]
+            check("LAN discovery lists the room", entry["port"] == PORT and entry["max_players"] == 4, str(entry))
+        else:
+            log("skip LAN discovery (no answer on this network)")
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
 
     net.disconnect()
