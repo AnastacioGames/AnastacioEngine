@@ -46,6 +46,7 @@
 #include "BL_Converter.h"
 #include "BL_SceneConverter.h"
 #include "BL_BlenderDataConversion.h"
+#include "BL_LoadStats.h"
 
 #include "KX_Imgui.h"
 #include "KX_DebugMode.h"
@@ -327,6 +328,7 @@ void LA_Launcher::InitEngine()
 	m_converter = new BL_Converter(m_maggie, m_ketsjiEngine, m_alwaysUseExpandFraming, m_camZoom);
 	m_ketsjiEngine->SetConverter(m_converter);
 
+	const double sceneLoadStart = PIL_check_seconds_timer();
 	m_kxStartScene = m_ketsjiEngine->CreateScene(m_startScene);
 
 	KX_SetActiveScene(m_kxStartScene);
@@ -350,6 +352,7 @@ void LA_Launcher::InitEngine()
 	m_converter->ConvertScene(m_kxStartScene);
 	m_converter->ConvertCustomMouseCursor(m_kxStartScene, gm.cursorimage_path);
 
+	BL_LoadLog::Add(m_kxStartScene->GetName(), "start scene total", PIL_check_seconds_timer() - sceneLoadStart, "", true);
 	m_ketsjiEngine->AddScene(m_kxStartScene);
 	m_kxStartScene->Release();
 

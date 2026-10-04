@@ -15,6 +15,18 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - `projects-teste/teste-editor-web/criar_m1c_nos.py`: gera `m1c-nos-{fragment,vertex,link}.range` (Shading Nodes, Image Texture → Diffuse BSDF, material `MatNosQuebrado`) com GLSL inválido no fragment, no vertex ou varying de tipos diferentes entre estágios. Roteiro D em `ROTEIRO-M1.md`.
 - `tools/tests/web_profile/test_preflight_node_material.py` (7 testes) + `fixtures/preflight-node-material.json`: `WEB-GFX-002` com origem `MA…`, estágio e log; mesmo log em materiais diferentes não é fundido; vertex/link; guarda estática do caminho de injeção (codegen, `gpu_shader.c` e RNA). Suíte `tools/tests/web_profile`: 131 testes, OK (3 pulados), Python 3.11 no Linux.
 - **Sem build da engine nesta sessão (nuvem Linux):** as cenas não foram geradas nem executadas no navegador. O modo `link` pode não reprovar, porque o `fragment()` do usuário não é chamado em material de nós.
+## Debug Mode: tempos de carregamento no painel de profile (2026-10-04)
+
+- `BL_LoadStats.h`: novo `BL_LoadLog`, log circular de 64 eventos (cena, etapa, segundos, linha completa do console como tooltip, marca de "total") protegido por mutex porque a conversão assíncrona roda em thread de trabalho. Só escreve quando algo carrega; nada por frame.
+- Quem alimenta: `BL_Converter` (convert, textures, merge, shaders, `open file`, `link`), `KX_LibLoadStatus::Finish` (`LibLoad total`), `LA_Launcher::InitEngine` (`start scene total`) e `KX_SceneScheduler` (`async scene total`, `add scene total (overlay)`, `add scene total (background)` e `replace scene total`). Cada cena carregada custa um timestamp a mais.
+- `KX_DebugMode`: seção **Scene Load** no painel de profile (tabela Cena/Etapa/Tempo, mais recente no topo, totais em amarelo, tooltip com a linha do console e botão Clear). As **Render Queries** e o bloco verde/vermelho de categorias viraram abas recolhíveis (`CollapsingHeader`, abertas por padrão) para o painel não crescer sem limite.
+- Correção: o checkbox "Show Render Queries" do menu ImGui guardava um estado próprio iniciado em `false`, enquanto a flag podia já vir ligada da cena (`GAME_SHOW_RENDER_QUERIES`) ou de `-g show_render_queries` — a caixa aparecia desmarcada com o painel visível e era preciso ligar e desligar. Agora o valor é lido da engine a cada frame.
+- Compilado no Windows/MSVC (`RangeRuntime`, `RangeEngine`). **Não validado em runtime** nesta sessão.
+
+## Logic Bricks → Python Component, fase 6 (2026-10-04, branch `logic/convert-f6`)
+
+- `logic_to_python.py`: Track To com pai, Sound (loop/ping-pong/3D), Movement e Animation Event agora funcionam em sensores/actuators de **outro objeto** (`own=`, estado `Dono/Actuator`, `_plm_init` por dono). Sound reescrito em `_snd_play/_snd_stop/_snd_update` com a flag `m_isplaying` da engine (recomeça após pulso negativo). Novos: Sound 3D e Delay em segundos (antes `Unsupported`).
+- Testes: `tools/create_logic_convert_scene_f6.py` (Ray material+x-ray, Collision, Near, Radar, Movement, Delay, Track To com pai e Sound em outros objetos) e `tools/test_logic_convert_f6_codegen.py` (geração + fluxo do Sound com `aud` falso; F5 como regressão: OK). **Sem build da engine**: runtime/CHECK e API 3D do `aud` não validados; roteiro Windows e o que segue brick em `NOTES-logic-f6.md`.
 
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 

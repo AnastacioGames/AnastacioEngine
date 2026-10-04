@@ -26,6 +26,7 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
 #include "BL_Converter.h"
+#include "BL_LoadStats.h"
 #include "CM_Message.h"
 #include "EXP_ListValue.h"
 #include "DNA_scene_types.h"
@@ -142,12 +143,14 @@ void KX_SceneScheduler::AddScheduledScenes()
 {
 	if (!m_addingOverlayScenes.empty()) {
 		for (const std::string& scenename : m_addingOverlayScenes) {
+			const double start = PIL_check_seconds_timer();
 			KX_Scene *tmpscene = CreateScene(scenename);
 
 			if (tmpscene) {
 				m_engine->GetConverter()->ConvertScene(tmpscene);
 				m_engine->GetScenes()->Add(CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
+				BL_LoadLog::Add(scenename, "add scene total (overlay)", PIL_check_seconds_timer() - start, "", true);
 				tmpscene->Release();
 			}
 			else {
@@ -159,12 +162,14 @@ void KX_SceneScheduler::AddScheduledScenes()
 
 	if (!m_addingBackgroundScenes.empty()) {
 		for (const std::string& scenename : m_addingBackgroundScenes) {
+			const double start = PIL_check_seconds_timer();
 			KX_Scene *tmpscene = CreateScene(scenename);
 
 			if (tmpscene) {
 				m_engine->GetConverter()->ConvertScene(tmpscene);
 				m_engine->GetScenes()->Insert(0, CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
+				BL_LoadLog::Add(scenename, "add scene total (background)", PIL_check_seconds_timer() - start, "", true);
 				tmpscene->Release();
 			}
 			else {
@@ -215,11 +220,13 @@ void KX_SceneScheduler::ReplaceScheduledScenes()
 					if (blScene) {
 						DestructScene(scene);
 
+						const double start = PIL_check_seconds_timer();
 						KX_Scene *tmpscene = CreateScene(blScene);
 						m_engine->GetConverter()->ConvertScene(tmpscene);
 
 						m_engine->GetScenes()->SetValue(sce_idx, CM_AddRef(tmpscene));
 						PostProcessScene(tmpscene);
+						BL_LoadLog::Add(newscenename, "replace scene total", PIL_check_seconds_timer() - start, "", true);
 						tmpscene->Release();
 					}
 					else {
@@ -292,6 +299,8 @@ void KX_SceneScheduler::StepPendingScenes()
 	}
 
 	KX_Scene *scene = pending.m_scene;
+	BL_LoadLog::Add(scene->GetName(), "async shaders", pending.m_shaderTime);
+	BL_LoadLog::Add(scene->GetName(), "async scene total", PIL_check_seconds_timer() - pending.m_start, "", true);
 	CM_Message("[Load] async scene \"" << scene->GetName() << "\": " << pending.m_material << " materials, shaders "
 	           << (int)(pending.m_shaderTime * 1000.0) << "ms, ready after "
 	           << (int)((PIL_check_seconds_timer() - pending.m_start) * 1000.0) << "ms");
