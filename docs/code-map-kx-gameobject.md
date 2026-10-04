@@ -1,16 +1,16 @@
 # Mapa de código — `KX_GameObject.cpp`
 
 Guia de navegação para achar rápido onde fica cada responsabilidade de
-[`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (6.390 linhas) sem ler o
+[`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (6.439 linhas) sem ler o
 arquivo inteiro. Não descreve arquitetura nem decisões; é só um índice.
 
-**Linhas conferidas em 2026-10-04 (`HEAD` `0cf4f7a5`).** Números de linha são aproximados e envelhecem a cada
+**Linhas conferidas em 2026-10-04 (`HEAD` `4b67d15b`).** Números de linha são aproximados e envelhecem a cada
 edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`. Se o arquivo
 for dividido, este mapa deve
 ser refeito.
 
 Para a declaração das classes e membros, o header é
-[`KX_GameObject.h`](../source/source/gameengine/Ketsji/KX_GameObject.h) (1.364 linhas).
+[`KX_GameObject.h`](../source/source/gameengine/Ketsji/KX_GameObject.h) (1.368 linhas).
 
 ## Núcleo C++ (linhas 1–2360)
 

@@ -6,7 +6,7 @@ e detalhados no [`changelog.md`](changelog.md). O histórico Web que antes ocupa
 shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) está nas entradas de 2026-09-12 a
 2026-09-20 do changelog.
 
-Auditado contra o git log e o changelog em 2026-09-20.
+Auditado contra o git log e o changelog em 2026-09-20; status de merge das branches revisto em 2026-10-04.
 
 ## Prioridade atual
 
@@ -55,9 +55,9 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 
 Plano em [`multiplayer-plan.md`](multiplayer-plan.md), contrato em [`multiplayer-protocol.md`](multiplayer-protocol.md). Núcleo isolado pronto na main (2026-10-04, frentes A–J, `source/source/gameengine/Network/`): protocolo, ENet + WebSocket, servidor, replicação com delta/relevância/orçamento, predição e lag compensation, relógio, RPC, descoberta LAN, menu (`tools/net_menu/`), CI (`.github/workflows/network.yml`: gcc, clang, MSVC, wasm32, pytest, Docker).
 
-Ligado na engine na branch `net/engine` (2026-10-04, ainda não mergeada; registro em [`NOTES-engine.md`](../source/source/gameengine/Network/NOTES-engine.md)): `KX_NetworkManager` (host, cliente, replicação de transform/velocidade/propriedades, spawn/despawn, dono, chat, pronto/iniciar, LAN, simulador), DNA/RNA/painéis Network (cena e objeto, "Rep" nas propriedades, versioning), `Range.network` com a API de `tools/net_menu/NOTES-D.md`, `ge_network` no CMake. Testado no Linux (build headless + editor): servidor e cliente `RangeRuntime` sob xvfb, o objeto replicado se move no cliente, nos modos script e cena (`tools/net_engine_test/run_net_test.sh spawner|car|scene`).
+Ligado na engine na main (2026-10-04, vindo da branch `net/engine`; registro em [`NOTES-engine.md`](../source/source/gameengine/Network/NOTES-engine.md)): `KX_NetworkManager` (host, cliente, replicação de transform/velocidade/propriedades, spawn/despawn, dono, chat, pronto/iniciar, LAN, simulador), DNA/RNA/painéis Network (cena e objeto, "Rep" nas propriedades, versioning), `Range.network` com a API de `tools/net_menu/NOTES-D.md`, `ge_network` no CMake. Testado no Linux (build headless + editor): servidor e cliente `RangeRuntime` sob xvfb, o objeto replicado se move no cliente, nos modos script e cena (`tools/net_engine_test/run_net_test.sh spawner|car|scene`).
 
-Aberto: revisar e mergear `net/engine`; **validar no Windows/MSVC** (nada disso foi compilado lá; `msvc_deps_prefix` e rebuild limpo por causa dos `DNA_*.h`); ver os painéis Network desenhados numa janela do editor (só confirmei que registram e que o RNA funciona); servidor sem janela (`--server`: hoje o `RangeRuntime` abre canvas, o modo Dedicated só dispensa o jogador local); ligar predição, lag compensation e input (`skipOwned`) e o dono de objeto; RPC do usuário (`@net.rpc`) e `obj.net`; relevância por distância (`setClientView`) e faixa/bits por propriedade float na UI; troca de cena durante a partida; cliente/Web no navegador real; decidir as propostas provisórias (`7 WrongPassword` + senha no `Hello`, `200 RpcFrom`, `Server Name` da LAN já virou campo da cena, ver `NOTES-*.md`); cliente por IPv6 (núcleo só IPv4).
+Aberto: **validar no Windows/MSVC** (nada disso foi compilado lá; `msvc_deps_prefix` e rebuild limpo por causa dos `DNA_*.h`); ver os painéis Network desenhados numa janela do editor (só confirmei que registram e que o RNA funciona); servidor sem janela (`--server`: hoje o `RangeRuntime` abre canvas, o modo Dedicated só dispensa o jogador local); ligar predição, lag compensation e input (`skipOwned`) e o dono de objeto; RPC do usuário (`@net.rpc`) e `obj.net`; relevância por distância (`setClientView`) e faixa/bits por propriedade float na UI; troca de cena durante a partida; cliente/Web no navegador real; decidir as propostas provisórias (`7 WrongPassword` + senha no `Hello`, `200 RpcFrom`, `Server Name` da LAN já virou campo da cena, ver `NOTES-*.md`); cliente por IPv6 (núcleo só IPv4).
 
 ### Web (WebGL/WebAssembly)
 
@@ -179,7 +179,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
     2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,
     pacote 0.4.6 leva `libOpenColorIO.so.1` e a pasta, sem "fallback mode". Falta o Kitsuy confirmar.
-  - ~~`RangeRuntime` ignora `SIGTERM`~~: corrigido em 2026-10-04 (branch `claude/great-babbage-58sugr`, sem merge):
+  - ~~`RangeRuntime` ignora `SIGTERM`~~: corrigido em 2026-10-04 (branch `claude/great-babbage-58sugr`, mesclada em 2026-10-04):
     o SDL do gamepad engolia o sinal; `kill`, `timeout` e Ctrl+C fecham o jogo, o segundo sinal mata. Ver changelog.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
@@ -223,7 +223,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   varios minutos. Cubins CUDA para sm_75/sm_86/sm_89/sm_120 (RTX 20/30/40/50) no release desde 2026-09-26;
   so sm_120 testado em hardware real. OSL fica desligado (sem pacote no Ubuntu
   24.04; exige OSL 1.9 com LLVM antigo).
-- OpenColorIO 2.x e FFmpeg 5+/6.x portados em 2026-10-04 (branch `claude/great-babbage-58sugr`, sem merge; ver
+- OpenColorIO 2.x e FFmpeg 5+/6.x portados em 2026-10-04 (branch `claude/great-babbage-58sugr`, mesclada; ver
   changelog): `intern/opencolorio` e os usuários do FFmpeg compilam com as duas gerações (a antiga segue igual
   no Windows). Testado no Linux com OCIO 2.1 e FFmpeg 6.1: player sem "fallback mode", vídeo em textura nos
   jogos, export de vídeo com áudio, filme no sequencer e proxy (`tools/linux/av_ports_test.py`,
@@ -238,7 +238,7 @@ Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ve
 [plano](cutscene-native-integration-plan.md) e [roteiro](cutscene-native-example.md).
 Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testar no jogo. Export/import JSON cobre
 os 18 tipos de evento (schema 2) e o Wait Trigger é liberado por mensagem ou `scene.release_cutscene_trigger()`
-(branch `cutscene/events`, 2026-10-04, testes headless no Linux passaram; falta o usuário testar no Windows/jogo
+(na main desde 2026-10-04, branch `cutscene/events`; testes headless no Linux passaram; falta o usuário testar no Windows/jogo
 real). Pendente: liberar por propriedade (decisão em aberto, ver [notas](notes-cutscene-events.md)).
 
 ### World Status
@@ -297,7 +297,7 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
 - F3 (2026-09-30): campo Mode no operador: Python Component (padrão), Always + Python (Module) e
   Always + Python (Script). Os dois últimos criam `LC_always` (pulso contínuo) e um controller `LC_state_<n>`
   por estado usado; o código é o mesmo, com `main(cont)` no fim. Mesmo CHECK nos três modos.
-- F4 (2026-10-04, branch `logic/convert-f4`, ainda sem merge): Ray por material com x-ray, Collision/Near/Radar de
+- F4 (2026-10-04, na main, branch `logic/convert-f4`): Ray por material com x-ray, Collision/Near/Radar de
   sensor ligado de outro objeto, Sound ping-pong e Track To com pai. Validado no build Linux headless com
   `create_logic_convert_scene.py`: CHECK idêntico em bricks e Component; Module/Script iguais entre si e só
   `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo em
