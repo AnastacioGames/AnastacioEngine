@@ -246,6 +246,12 @@ previsto), confirmando `Range.network.headless`/`isServer`, a predição complet
 engine MSVC. `run_net_test_win.sh` ainda não tem os cenários `scene`/`scene-server` (dependem do editor Windows,
 que também não linka — `IMB_exr`, problema pré-existente, igual ao Linux).
 
+**Windows/MSVC revalidado com `08816d92`** (2026-10-04, Rig com propriedade replicada `ammo`): `spawner` PASS,
+`predict` 3/3 rodadas PASS (22-23/22-23 hit in the past em cada uma, sem necessidade de `NET_DEBUG=1`), com a
+nova checagem `prediction: the owner gets the rig's replicated property ammo values [19, 20, 21, 22, 23]`
+passando igual ao Linux — confirma que `8b5885c5` (propriedades de objeto previsto chegam ao dono) também
+funciona no nível de engine, não só no núcleo de rede. `server` PASS de novo, sem erro de janela GL.
+
 **Armadilha de build encontrada:** depois de um `git checkout` para esta branch, `ninja RangeRuntime` não
 recompilou `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` já mais novo que o `.obj` (`ninja -n` não via nada
 pendente). O binário rodava com o módulo `Range.network` antigo (sem `predict`, `rpc`, `headless`...),
