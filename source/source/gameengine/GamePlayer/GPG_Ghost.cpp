@@ -734,6 +734,23 @@ static void sigHandleAbort(int signum)
 	sigHandleCrash(signum);
 }
 
+#ifndef WIN32
+/* SIGTERM/SIGINT end the game like closing the window. Installed before SDL starts:
+ * SDL only adds its own handlers over SIG_DFL, and those turn the signal into an
+ * SDL_QUIT event nobody reads (the joystick code only takes its own events), so
+ * `kill`, `timeout` and Ctrl+C were ignored. A second signal kills the process,
+ * for a game stuck before its next frame. */
+static void sigHandleQuit(int signum)
+{
+	if (LA_Launcher::QuitRequested()) {
+		signal(signum, SIG_DFL);
+		raise(signum);
+		return;
+	}
+	LA_Launcher::RequestQuit();
+}
+#endif
+
 static void terminateHandler()
 {
 	fputs("\nstd::terminate() called (uncaught C++ exception)\n", stderr);
@@ -937,6 +954,8 @@ int main(int argc,
 #else
 	/* after parsing args */
 	signal(SIGSEGV, sigHandleCrash);
+	signal(SIGTERM, sigHandleQuit);
+	signal(SIGINT, sigHandleQuit);
 #endif  // WIN32
 	signal(SIGABRT, sigHandleAbort);
 	std::set_terminate(terminateHandler);

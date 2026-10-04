@@ -160,6 +160,12 @@ public:
 	/// Execute the loop of the engine, return when receive a exit request from the engine.
 	KX_ExitInfo EngineMainLoop();
 
+	/// Asks the running game to quit at the next frame, like closing the window.
+	/// Async-signal-safe: the player calls it from its SIGTERM/SIGINT handler.
+	static void RequestQuit();
+	/// True after RequestQuit().
+	static bool QuitRequested();
+
 #ifdef WITH_PYTHON
 	static int PythonEngineNextFrame(void *state);
 #endif  // WITH_PYTHON
