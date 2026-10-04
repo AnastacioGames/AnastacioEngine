@@ -693,6 +693,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, suspend);
 	EXP_PYMETHOD_DOC(KX_Scene, resume);
 	EXP_PYMETHOD_DOC(KX_Scene, play_cutscene);
+	EXP_PYMETHOD_DOC(KX_Scene, release_cutscene_trigger);
 	EXP_PYMETHOD_DOC(KX_Scene, stop_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, restart_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, explode);

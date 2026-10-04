@@ -225,8 +225,10 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 Fases 0–2 e 4–5 implementadas; validação manual (Play → Stop → Play e standalone) aceita em 2026-09-20.
 Aberto: Fase 3 (ícones PNG próprios, sem substituir os `ZOOMIN`/`ZOOMOUT`). Ver
 [plano](cutscene-native-integration-plan.md) e [roteiro](cutscene-native-example.md).
-Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testar no jogo. Wait Trigger ainda não
-é liberado por nada no código, e o export/import só cobre Spawn Object.
+Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testar no jogo. Export/import JSON cobre
+os 18 tipos de evento (schema 2) e o Wait Trigger é liberado por mensagem ou `scene.release_cutscene_trigger()`
+(branch `cutscene/events`, 2026-10-04, testes headless no Linux passaram; falta o usuário testar no Windows/jogo
+real). Pendente: liberar por propriedade (decisão em aberto, ver [notas](notes-cutscene-events.md)).
 
 ### World Status
 

@@ -104,6 +104,13 @@ public:
 	void StartWaitTrigger(const std::string &triggerName);
 	void StartWaitCameraEnd();
 	void ClearWait();
+	/**
+	 * Release a Wait Trigger. Returns true when it ended the current wait.
+	 * A trigger released while nothing waits for it is latched and consumed by the
+	 * next Wait Trigger with the same name, so a trigger fired in the same frame
+	 * (or just before) the wait begins is not lost. Latches are cleared by Start()/Stop().
+	 */
+	bool ReleaseTrigger(const std::string &triggerName);
 	WaitType GetWaitType() const { return m_waitType; }
 	const std::string& GetWaitTriggerName() const { return m_waitTriggerName; }
 	double GetWaitUntilTime() const { return m_waitUntilTime; }
@@ -121,6 +128,7 @@ private:
 	WaitType m_waitType;
 	double m_waitUntilTime;
 	std::string m_waitTriggerName;
+	std::vector<std::string> m_latchedTriggers;
 };
 
 #endif  // __KX_CUTSCENEMANAGER_H__
