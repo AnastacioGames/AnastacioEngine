@@ -512,6 +512,11 @@ def _world_property_code(act):
     raise Unsupported("world property actuator %s" % m)
 
 
+# Helpers do componente que agem sobre o objeto passado em own= (atuador de outro objeto).
+# Estado (self._ticks) e chaves por 'dono/atuador'; o resto de self.* continua sendo brick.
+_OWN_CALLS = r"self\._(follow|mouse_look|cst\w*|steer)\(|self\._ticks\.pop\("
+
+
 def _actuator_code(ob, act):
     t = act.type
     if t == 'MOTION':
@@ -615,7 +620,7 @@ def _actuator_code(ob, act):
         axis, neg = {'POS_X': (0, False), 'POS_Y': (1, False),
                      'NEG_X': (0, True), 'NEG_Y': (1, True)}[act.axis]
         # A engine atualiza todo frame com o controller positivo.
-        return ["self._follow(%s, %s, %s, %s, %s, %d, %s)" %
+        return ["self._follow(%s, %s, %s, %s, %s, %d, %s, own=ob)" %
                 (_act_arg("Object", act.object.name), _act_arg("Height", act.height),
                  _act_arg("Min", act.min), _act_arg("Max", act.max),
                  _act_arg("Damping", act.damping), axis, neg)], True
@@ -651,8 +656,8 @@ def _actuator_code(ob, act):
                 _act_arg("Min " + C, getattr(act, "min_" + c)),
                 _act_arg("Max " + C, getattr(act, "max_" + c))))
         # Continuo com o controller positivo; o pulso negativo refaz o salto inicial.
-        return (["self._mouse_look(%r, (%s))" % (act.name, ", ".join(cfg))], True,
-                ["self._ticks.pop(%r, None)" % ("mlk:" + act.name)])
+        return (["self._mouse_look(%r, (%s), own=ob)" % (_ACT_LABEL[0], ", ".join(cfg))], True,
+                ["self._ticks.pop(%r, None)" % ("mlk:" + _ACT_LABEL[0])])
     if t == 'CONSTRAINT':
         return _constraint_code(ob, act)
     if t == 'STEERING':
@@ -667,7 +672,7 @@ def _constraint_code(ob, act):
     if m == 'LOC':
         if act.limit == 'NONE':
             raise Unsupported("constraint loc sem eixo")
-        call = "self._cst_loc(%d, %s, %s, %s)" % ({'LOCX': 0, 'LOCY': 1, 'LOCZ': 2}[act.limit],
+        call = "self._cst_loc(%d, %s, %s, %s, own=ob)" % ({'LOCX': 0, 'LOCY': 1, 'LOCZ': 2}[act.limit],
                                                 A("Min", act.limit_min), A("Max", act.limit_max),
                                                 A("Damping", act.damping))
     elif m == 'ORI':
@@ -675,7 +680,7 @@ def _constraint_code(ob, act):
             raise Unsupported("constraint orientacao sem eixo")
         if not _nonzero(act.rotation_max):
             raise Unsupported("constraint orientacao sem direcao de referencia")
-        call = "self._cst_ori(%d, %s, %s, %s, %s)" % (_DIR_AXES[act.direction_axis_pos][0],
+        call = "self._cst_ori(%d, %s, %s, %s, %s, own=ob)" % (_DIR_AXES[act.direction_axis_pos][0],
                                                     A("Reference", act.rotation_max),
                                                     A("Min Angle", act.angle_min), A("Max Angle", act.angle_max),
                                                     A("Damping", act.damping))
@@ -688,7 +693,7 @@ def _constraint_code(ob, act):
         prop = A("Material", act.material) if mat else A("Property", act.property)
         dyn = ob.game.physics_type in _DYNAMIC
         if m == 'DIST':
-            call = "self._cst_dist(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % (
+            call = "self._cst_dist(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, own=ob)" % (
                 axis, neg, A("Local", act.use_local), A("Normal", act.use_normal),
                 A("Force Distance", act.use_force_distance), A("Persistent", act.use_persistent),
                 mat, prop, A("Distance", act.distance), A("Range", act.range), A("Damping", act.damping),
@@ -696,14 +701,14 @@ def _constraint_code(ob, act):
         else:
             if not dyn:
                 raise Unsupported("constraint fh em objeto nao dinamico")
-            call = "self._cst_fh(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %r)" % (
+            call = "self._cst_fh(%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %r, own=ob)" % (
                 axis, neg, A("Height", act.fh_height), A("Force", act.fh_force), A("Fh Damping", act.fh_damping),
                 A("Rot Fh Damping", act.rotation_max[1]), A("Normal", act.use_fh_normal),
                 A("Rot Fh", act.use_fh_paralel_axis), A("Persistent", act.use_persistent), mat, prop,
                 ob.game.radius)
     else:
         raise Unsupported("constraint %s" % m)
-    key = "cst:" + act.name
+    key = "cst:" + _ACT_LABEL[0]
     _ACT_STATE[0] = "%r in self._ticks" % key
     return (["self._cst(%r, %s, %s, lambda: %s)" % (key, _FIRE, A("Time", act.time), call)], True,
             ["self._ticks.pop(%r, None)" % key])
@@ -724,9 +729,9 @@ def _steering_code(ob, act):
     if mode == 2 and navmesh is None:
         raise Unsupported("steering path following sem navmesh")
     facing = ['X', 'Y', 'Z', 'NEG_X', 'NEG_Y', 'NEG_Z'].index(act.facing_axis) + 1 if act.facing else 0
-    key = "str:" + act.name
+    key = "str:" + _ACT_LABEL[0]
     _ACT_STATE[0] = "%r in self._ticks" % key
-    call = "self._steer(%r, %s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s)" % (
+    call = "self._steer(%r, %s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s, own=ob)" % (
         key, _FIRE, mode, A("Target", act.target.name), A("Navmesh", navmesh) if navmesh else None,
         A("Distance", act.distance), A("Velocity", act.velocity), A("Update Period", act.update_period),
         A("Self Terminated", act.self_terminated), facing, ob.game.physics_type in _DYNAMIC,
@@ -1078,10 +1083,10 @@ class %(classname)s(%(base)s):
             n += 1
         return n
 
-    def _mouse_look(self, key, axes):
+    def _mouse_look(self, key, axes, own=None):
         """Mouse actuator Look (KX_MouseActuator): gira o objeto e recentraliza o cursor."""
         from Range import render
-        ob = self.object
+        ob = own or self.object
         pos = list(logic.mouse.position)
         center = [0.5, 0.5]
         for i, size in enumerate((render.getWindowWidth(), render.getWindowHeight())):
@@ -1117,9 +1122,9 @@ class %(classname)s(%(base)s):
             logic.mouse.position = tuple(setpos)
         st["old"] = pos
 
-    def _follow(self, target, height, dmin, dmax, damping, axis, neg):
+    def _follow(self, target, height, dmin, dmax, damping, axis, neg, own=None):
         """Mesma conta de KX_CameraActuator: fica atras do alvo e olha para ele."""
-        ob = self.object
+        ob = own or self.object
         tgt = ob.scene.objects.get(target)
         if tgt is None:
             return
@@ -1215,8 +1220,8 @@ _EXTRA["_cst"] = '''
         else:
             self._ticks.pop(key, None)
 
-    def _cst_loc(self, axis, lo, hi, damp):
-        ob = self.object
+    def _cst_loc(self, axis, lo, hi, damp, own=None):
+        ob = own or self.object
         pos = ob.localPosition.copy()
         new = pos.copy()
         new[axis] = lo if new[axis] < lo else (hi if new[axis] > hi else new[axis])
@@ -1226,8 +1231,8 @@ _EXTRA["_cst"] = '''
         ob.localPosition = new
         return True
 
-    def _cst_ori(self, axis, ref, amin, amax, damp):
-        ob = self.object
+    def _cst_ori(self, axis, ref, amin, amax, damp, own=None):
+        ob = own or self.object
         ref = Vector(ref).normalized()
         cmin, cmax = math.cos(amin), math.cos(amax)
         f = damp / (1.0 + damp) if damp else 0.0
@@ -1248,17 +1253,17 @@ _EXTRA["_cst"] = '''
         ob.alignAxisToVect(f * direction + (1.0 - f) * ref, axis, 1.0)
         return True
 
-    def _cst_ray(self, to, prop, material):
+    def _cst_ray(self, to, prop, material, own=None):
         """Primeiro objeto no raio; precisa ter a propriedade/material (sem x-ray)."""
-        ob = self.object
+        ob = own or self.object
         hit, point, normal = ob.rayCast(to, ob.worldPosition, 0, "" if material else prop, 1, 0, 0)
         if hit is not None and material and prop and not self._has_mat(hit, prop):
             hit = None
         return hit, point, normal
 
     def _cst_dist(self, axis, neg, local, use_normal, use_dist, persistent, material, prop,
-                  dmin, dmax, damp, rotdamp, dyn):
-        ob = self.object
+                  dmin, dmax, damp, rotdamp, dyn, own=None):
+        ob = own or self.object
         pos = ob.worldPosition.copy()
         normal = ob.worldOrientation.col[axis].normalized() * (-1.0 if neg else 1.0)
         if local:
@@ -1267,7 +1272,7 @@ _EXTRA["_cst"] = '''
             direction = Vector((0.0, 0.0, 0.0))
             direction[axis] = -1.0 if neg else 1.0
         f = damp / (1.0 + damp) if damp else 0.0
-        hit, point, hitnormal = self._cst_ray(pos + dmax * direction, prop, material)
+        hit, point, hitnormal = self._cst_ray(pos + dmax * direction, prop, material, own)
         if hit is None:
             return persistent
         if not (use_normal or use_dist):
@@ -1293,14 +1298,14 @@ _EXTRA["_cst"] = '''
         return True
 
     def _cst_fh(self, axis, neg, height, force, damp, rotdamp, use_normal, use_rot, persistent,
-                material, prop, radius):
-        ob = self.object
+                material, prop, radius, own=None):
+        ob = own or self.object
         pos = ob.worldPosition.copy()
         sign = -1.0 if neg else 1.0
         normal = -sign * ob.worldOrientation.col[axis].normalized()
         direction = Vector((0.0, 0.0, 0.0))
         direction[axis] = sign
-        hit, point, hitnormal = self._cst_ray(pos + (height + radius) * direction, prop, material)
+        hit, point, hitnormal = self._cst_ray(pos + (height + radius) * direction, prop, material, own)
         if hit is None:
             return persistent
         point, hitnormal = Vector(point), Vector(hitnormal)
@@ -1322,14 +1327,14 @@ _EXTRA["_cst"] = '''
 '''
 _EXTRA["_steer"] = '''
     def _steer(self, key, fire, mode, target, navmesh, dist, speed, period, self_term, facing, dyn,
-               lock_z, show):
+               lock_z, show, own=None):
         """Steering actuator (KX_SteeringActuator): 0 seek, 1 flee, 2 path following."""
         now = logic.getFrameTime()
         st = self._ticks.get(key)
         if st is None:
             # Ativacao: so marca o tempo; o movimento comeca no proximo frame.
             if fire:
-                parent = self.object.parent
+                parent = (own or self.object).parent
                 self._ticks[key] = {"t": now, "pt": -1.0, "path": [], "wp": -1,
                                     "plm": parent.localOrientation.copy() if parent else None}
             return
@@ -1337,7 +1342,7 @@ _EXTRA["_steer"] = '''
         st["t"] = now
         if not delta:
             return
-        ob = self.object
+        ob = own or self.object
         tgt = ob.scene.objects.get(target)
         if tgt is None:
             self._ticks.pop(key, None)
@@ -1380,7 +1385,7 @@ _EXTRA["_steer"] = '''
                 steer.normalize()
             vel = speed * steer
             if facing:
-                self._steer_face(st, facing, vel)
+                self._steer_face(st, facing, vel, ob)
             if dyn:
                 vel.z = 0.0 if lock_z else ob.worldLinearVelocity.z
                 ob.worldLinearVelocity = vel
@@ -1389,7 +1394,7 @@ _EXTRA["_steer"] = '''
         if done and self_term:
             self._ticks.pop(key, None)
 
-    def _steer_face(self, st, facing, vel):
+    def _steer_face(self, st, facing, vel, own=None):
         """Aponta o eixo escolhido (1 X, 2 Y, 3 Z, 4-6 negativos) na direcao do movimento."""
         if vel.length < 1e-6:
             return
@@ -1416,7 +1421,7 @@ _EXTRA["_steer"] = '''
             d = left
             left = safe(d.cross(up))
         mat = Matrix((left, d, up)).transposed()
-        ob = self.object
+        ob = own or self.object
         if ob.parent is not None:
             pos = ob.localPosition.copy()
             ob.localOrientation = st["plm"] * ob.parent.worldOrientation.inverted() * mat
@@ -1814,7 +1819,8 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 code = _actuator_code(owner, a)
                 code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0], _ACT_ALWAYS[0])
                 if owner != ob:
-                    if any(re.search(r"self\.(?!_a\[)", line) for part in code[:1] + code[2:3] for line in part):
+                    if any(re.search(r"self\.(?!_a\[)", re.sub(_OWN_CALLS, "", line))
+                           for part in code[:1] + code[2:3] for line in part):
                         raise Unsupported("actuator %s de %s ligado" % (a.type, owner.name))
                     code = (on(owner, code[0]), code[1], on(owner, code[2])) + code[3:]
                 actuators.append((a, owner, code))
