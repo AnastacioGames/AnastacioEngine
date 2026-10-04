@@ -22,14 +22,17 @@
  *  \ingroup network
  *  \brief Manual test tool: chat echo server (ENet + WebSocket) and ENet client.
  *
- *   net_echo server [udpPort] [wsPort]   (wsPort 0 = no WebSocket)
+ *   net_echo server [udpPort] [wsPort]   (wsPort 0 = no WebSocket; answers LAN discovery on 7779)
  *   net_echo client <host> <port> [name] [messages]
+ *   net_echo lan [seconds]                (lists the servers found on the LAN)
  */
 
 #include "NET_ITransport.h"
+#include "NET_LanDiscovery.h"
 #include "NET_Session.h"
 #include "NET_TransportWeb.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <csignal>
@@ -79,6 +82,21 @@ static int runServer(uint16_t port, uint16_t wsPort)
 		std::printf(", WebSocket on TCP port %u", unsigned(ws->localPort()));
 	}
 	std::printf("\n");
+
+	LanResponder lan;
+	if (lan.start(kLanDiscoveryPort)) {
+		std::printf("net_echo: answering LAN discovery on UDP port %u\n", unsigned(lan.localPort()));
+	}
+	else {
+		std::printf("net_echo: LAN discovery port %u busy, not answering\n", unsigned(kLanDiscoveryPort));
+	}
+	LanServerInfo lanInfo;
+	lanInfo.gameId = kGameId;
+	lanInfo.name = "net_echo";
+	lanInfo.sceneName = config.sceneName;
+	lanInfo.maxPlayers = uint16_t(config.maxClients);
+	lanInfo.enetPort = transport->localPort();
+	lanInfo.webSocketPort = ws ? ws->localPort() : 0;
 	std::fflush(stdout);
 
 	const uint64_t start = steadyClockMs();
@@ -111,10 +129,44 @@ static int runServer(uint16_t port, uint16_t wsPort)
 					break;
 			}
 		}
+		lanInfo.players = uint16_t(server.clients().size());
+		lan.setInfo(lanInfo);
+		lan.update(now);
 		std::fflush(stdout);
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
 	}
+	lan.stop();
 	server.stop();
+	return 0;
+}
+
+static int runLan(int seconds)
+{
+	LanDiscovery lan;
+	if (!lan.start()) {
+		std::fprintf(stderr, "net_echo: cannot open a UDP socket\n");
+		return 1;
+	}
+	const uint64_t start = steadyClockMs();
+	uint64_t nextRequest = 0;
+	while (!g_quit && steadyClockMs() - start < uint64_t(seconds) * 1000) {
+		const uint64_t now = steadyClockMs();
+		if (now >= nextRequest) {
+			// Broadcast plus localhost, for machines where broadcast does not loop back.
+			lan.request(kGameId, now);
+			lan.request(kGameId, now, kLanDiscoveryPort, "127.0.0.1");
+			nextRequest = now + 500;
+		}
+		lan.update(now);
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	}
+	std::printf("%zu server(s) found\n", lan.servers().size());
+	for (const LanServerEntry &e : lan.servers()) {
+		std::printf("  %-15s %-20s %u/%u players, ENet %u, WebSocket %u, %s, ping %u ms\n", e.address.c_str(),
+		            e.info.name.c_str(), unsigned(e.info.players), unsigned(e.info.maxPlayers),
+		            unsigned(e.info.enetPort), unsigned(e.info.webSocketPort), e.info.password ? "password" : "open",
+		            unsigned(e.pingMs));
+	}
 	return 0;
 }
 
@@ -204,6 +256,9 @@ int main(int argc, char **argv)
 		return runServer(uint16_t(argc > 2 ? std::atoi(argv[2]) : 7777),
 		                 uint16_t(argc > 3 ? std::atoi(argv[3]) : 7778));
 	}
+	if (mode == "lan") {
+		return runLan(argc > 2 ? std::max(1, std::atoi(argv[2])) : 2);
+	}
 	if (mode == "client" && argc > 3) {
 		return runClient(argv[2], uint16_t(std::atoi(argv[3])), argc > 4 ? argv[4] : "player",
 		                 argc > 5 ? std::atoi(argv[5]) : 3);
@@ -211,6 +266,7 @@ int main(int argc, char **argv)
 	std::fprintf(stderr,
 	             "usage:\n"
 	             "  net_echo server [udpPort=7777] [wsPort=7778, 0 = off]\n"
-	             "  net_echo client <host> <port> [name] [messages]\n");
+	             "  net_echo client <host> <port> [name] [messages]\n"
+	             "  net_echo lan [seconds=2]\n");
 	return 1;
 }

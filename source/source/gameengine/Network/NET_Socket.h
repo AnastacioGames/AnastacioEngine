@@ -20,7 +20,7 @@
 
 /** \file NET_Socket.h
  *  \ingroup network
- *  \brief Minimal non-blocking TCP socket helpers (winsock2 / POSIX), internal to the network core.
+ *  \brief Minimal non-blocking TCP and UDP socket helpers (winsock2 / POSIX), internal to the network core.
  */
 
 #ifndef __NET_SOCKET_H__
@@ -225,6 +225,92 @@ inline Handle connectTcp(const std::string &host, uint16_t port)
 		setNoDelay(s);
 	}
 	return s;
+}
+
+/* UDP (IPv4 only), used by LAN discovery. Addresses are in host byte order. */
+
+/// Non-blocking UDP socket bound to port on all interfaces (0 = any free port).
+inline Handle openUdp(uint16_t port, bool broadcast, bool reuseAddress)
+{
+	Handle s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (s == kInvalid) {
+		return kInvalid;
+	}
+	int on = 1;
+	if (reuseAddress) {
+		setsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&on), sizeof(on));
+	}
+	if (broadcast) {
+		setsockopt(s, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char *>(&on), sizeof(on));
+	}
+	sockaddr_in addr = {};
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_port = htons(port);
+	if (bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0 || !setNonBlocking(s)) {
+		close(s);
+		return kInvalid;
+	}
+	return s;
+}
+
+/// Parses a dotted IPv4 address ("255.255.255.255" included). False when invalid.
+inline bool parseIpv4(const std::string &text, uint32_t &address)
+{
+	in_addr a = {};
+	if (inet_pton(AF_INET, text.c_str(), &a) != 1) {
+		return false;
+	}
+	address = ntohl(a.s_addr);
+	return true;
+}
+
+inline std::string formatIpv4(uint32_t address)
+{
+	return std::to_string((address >> 24) & 0xFF) + "." + std::to_string((address >> 16) & 0xFF) + "." +
+	       std::to_string((address >> 8) & 0xFF) + "." + std::to_string(address & 0xFF);
+}
+
+/// True when the whole datagram was handed to the system.
+inline bool sendTo(Handle s, uint32_t address, uint16_t port, const uint8_t *data, size_t size)
+{
+	sockaddr_in addr = {};
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(address);
+	addr.sin_port = htons(port);
+#ifdef _WIN32
+	const int n = ::sendto(s, reinterpret_cast<const char *>(data), int(size), 0,
+	                       reinterpret_cast<const sockaddr *>(&addr), sizeof(addr));
+#else
+	const ssize_t n = ::sendto(s, data, size, 0, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr));
+#endif
+	return n >= 0 && size_t(n) == size;
+}
+
+/// One datagram: bytes read (a longer datagram is cut at size), 0 = nothing pending, -1 = error.
+inline IoResult recvFrom(Handle s, uint8_t *data, size_t size, uint32_t &address, uint16_t &port)
+{
+	sockaddr_in addr = {};
+	socklen_t len = sizeof(addr);
+#ifdef _WIN32
+	const int n = ::recvfrom(s, reinterpret_cast<char *>(data), int(size), 0, reinterpret_cast<sockaddr *>(&addr), &len);
+	if (n < 0 && WSAGetLastError() == WSAEMSGSIZE) {
+		address = ntohl(addr.sin_addr.s_addr);
+		port = ntohs(addr.sin_port);
+		return IoResult(size);
+	}
+	if (n < 0 && WSAGetLastError() == WSAECONNRESET) {
+		return 0;  // ICMP port unreachable from an earlier send: not an error for UDP
+	}
+#else
+	const ssize_t n = ::recvfrom(s, data, size, 0, reinterpret_cast<sockaddr *>(&addr), &len);
+#endif
+	if (n < 0) {
+		return wouldBlock() ? 0 : -1;
+	}
+	address = ntohl(addr.sin_addr.s_addr);
+	port = ntohs(addr.sin_port);
+	return IoResult(n);
 }
 
 }  // namespace sock

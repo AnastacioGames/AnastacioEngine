@@ -36,6 +36,7 @@ set(NET_SRC
 	NET_BitStream.cpp
 	NET_Clock.cpp
 	NET_LagCompensation.cpp
+	NET_LanDiscovery.cpp
 	NET_Messages.cpp
 	NET_Prediction.cpp
 	NET_RPC.cpp
@@ -55,6 +56,7 @@ set(NET_SRC
 	NET_ITransport.h
 	NET_IWorld.h
 	NET_LagCompensation.h
+	NET_LanDiscovery.h
 	NET_Messages.h
 	NET_Prediction.h
 	NET_RPC.h
@@ -111,6 +113,7 @@ if(NET_STANDALONE)
 		tests/net_test_util.h
 		tests/NET_BitStream_test.cpp
 		tests/NET_Golden_test.cpp
+		tests/NET_LanDiscovery_test.cpp
 		tests/NET_Messages_test.cpp
 		tests/NET_Prediction_test.cpp
 		tests/NET_RPC_test.cpp
