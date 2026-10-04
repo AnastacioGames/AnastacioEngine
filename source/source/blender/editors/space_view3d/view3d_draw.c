@@ -4379,16 +4379,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	                             (WO_WEATHER_LENSFLARE | WO_WEATHER_RAIN | WO_WEATHER_CLOUDS)))) &&
 	         v3d->drawtype >= OB_SOLID);
 
-	/* Without FX, a partial (scissored) stroke redraw would leave an un-composited
-	 * patch over the last composited frame: draw the whole region instead, which
-	 * stays cheap with shadows and FX skipped. */
-	if (paint_stroke && want_compositing && (ar->do_draw & RGN_DRAW_PARTIAL)) {
-		ar->drawrct = ar->winrct;
-		wmSubWindowScissorSet(win, ar->swinid, &ar->drawrct, true);
-		ar->do_draw &= ~RGN_DRAW_PARTIAL;
-	}
-
-	if (want_compositing && !paint_stroke) {
+	if (want_compositing) {
 		GPUFXSettings fx_settings;
 		BKE_screen_gpu_fx_validate(&v3d->fx_settings);
 		BKE_scene_fx_validate(scene);
@@ -4409,7 +4400,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * keeping a "zombie" GPUFX around, which forced this branch (and its GL
 	 * framebuffer/attribute bookkeeping) to re-run every single frame even
 	 * with every filter off. */
-	if (!do_compositing && rv3d->compositor && !paint_stroke) {
+	if (!do_compositing && rv3d->compositor) {
 		GPU_fx_compositor_destroy(rv3d->compositor);
 		rv3d->compositor = NULL;
 	}
