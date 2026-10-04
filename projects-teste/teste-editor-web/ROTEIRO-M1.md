@@ -38,3 +38,16 @@ via `getShader().setSource()`, sem montar material pela UI.
 6. Esperado: `shader_errors` com stage `vertex`; no editor `WEB-GFX-002` com o log em "fix".
 7. Se o log aparecer no console mas `shader_errors` vier vazio, anote o texto exato: é lacuna do coletor.
 8. Se `getShader()` devolver None ou o objeto sem material, registre e siga para o M2.
+
+## D. Falha de shader em material de nós (cena gerada em 2026-10-04, ainda não executada)
+Diferente do C, aqui o shader que falha é o GERADO do grafo de nós: o GLSL inválido entra por
+`script_frag`/`script_vert` do material (ver `NOTA-SHADER-MATERIAL-NODES.md`). Não usa controller Python.
+1. Gere as cenas: `RangeEngine.exe -b --python criar_m1c_nos.py -- fragment` (repita com `vertex` e `link`).
+2. Para cada `m1c-nos-<modo>.range`: **Export Web** com **Preflight after export** ligado.
+3. Rode `node claude_m1c_diag.cjs <pasta-do-pacote>` (Node do emsdk) ou abra com `?preflight=1` e clique em Jogar.
+4. Esperado em `shader_errors`, com `material` = `MAMatNosQuebrado` e `structured: true`:
+   - fragment: `operation` "compile", `stage` "fragment";
+   - vertex: `operation` "compile", `stage` "vertex";
+   - link: `operation` "link", `stage` "" (se o link passar, anote: o varying do fragment não tem uso estático).
+5. Importe o relatório no editor: `WEB-GFX-002` com "MAMatNosQuebrado" na mensagem e o log em "fix".
+6. Se `material` vier vazio ou `engine-shader`, ou `shader_errors` vazio com erro no console, anote o texto exato.

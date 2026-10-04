@@ -1,0 +1,16 @@
+{
+  "schema": "range-web-preflight",
+  "schema_version": 2,
+  "diagnostics": [
+    {"version": 1, "category": "shader", "severity": "error", "operation": "compile", "stage": "fragment",
+     "origin": "MAMatNosQuebrado", "log": "ERROR: 0:412: ';' : syntax error"},
+    {"version": 1, "category": "shader", "severity": "error", "operation": "compile", "stage": "fragment",
+     "origin": "MAOutroNos", "log": "ERROR: 0:412: ';' : syntax error"}
+  ],
+  "shader_errors": [
+    {"material": "MAMatNosQuebrado", "stage": "fragment", "operation": "compile",
+     "log": "ERROR: 0:412: ';' : syntax error", "structured": true},
+    {"material": "MAOutroNos", "stage": "fragment", "operation": "compile",
+     "log": "ERROR: 0:412: ';' : syntax error", "structured": true}
+  ]
+}
