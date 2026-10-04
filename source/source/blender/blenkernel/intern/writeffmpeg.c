@@ -151,6 +151,10 @@ static int write_audio_frame(FFMpegContext *context)
 #ifdef FFMPEG_HAVE_FRAME_CHANNEL_LAYOUT
 	frame->channel_layout = c->channel_layout;
 #endif
+#ifdef FFMPEG_HAVE_CH_LAYOUT
+	/* Encoders check the new layout field (FFmpeg 5.1+): without it every audio frame was refused. */
+	av_channel_layout_copy(&frame->ch_layout, &c->ch_layout);
+#endif
 
 	if (context->audio_deinterleave) {
 		int channel, i;
@@ -239,6 +243,10 @@ static AVFrame *alloc_picture(int pix_fmt, int width, int height)
 		return NULL;
 	}
 	avpicture_fill((AVPicture *)f, buf, pix_fmt, width, height);
+	/* avcodec_send_frame() (FFmpeg 5+) copies the frame and needs these. */
+	f->format = pix_fmt;
+	f->width = width;
+	f->height = height;
 	return f;
 }
 
@@ -426,7 +434,9 @@ static AVFrame *generate_video_frame(FFMpegContext *context, uint8_t *pixels, Re
 		delete_picture(rgb_frame);
 	}
 
-	context->current_frame->format = AV_PIX_FMT_BGR32;
+	/* The frame holds the encoder's format after the conversion above (it was
+	 * always tagged BGR32; FFmpeg 5+ copies the frame by this field). */
+	context->current_frame->format = c->pix_fmt;
 	context->current_frame->width = width;
 	context->current_frame->height = height;
 
