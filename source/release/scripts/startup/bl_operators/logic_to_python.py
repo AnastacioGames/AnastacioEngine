@@ -317,18 +317,16 @@ def _sensor_expr(ob, sens, key=None):
             expr = ("ob.rayCast(ob.worldPosition + %s * %s, ob, %s, %s, 0, %d, 0, %d)[0] is not None" %
                     (_axis(sens.axis), rng, rng, prop, sens.use_x_ray, mask))
     elif t == 'DELAY':
-        if sens.use_deltatime:
-            raise Unsupported("delay em segundos")
-        expr = "self._delay(%r, %s, %s, %s, %s)" % (key, A("Delay", sens.delay), A("Duration", sens.duration),
-                                                   A("Repeat", sens.use_repeat),
-                                                   A("Repeat Times", sens.repeat_times))
+        expr = "self._delay(%r, %s, %s, %s, %s, %s)" % (key, A("Delay", sens.delay), A("Duration", sens.duration),
+                                                       A("Repeat", sens.use_repeat),
+                                                       A("Repeat Times", sens.repeat_times), sens.use_deltatime)
     elif t == 'RANDOM':
         # Mesma cadencia (um sorteio a cada tick_skip + 1 frames), sequencia do random do Python.
         expr = "self._random(%r, %s, %d)" % (key, A("Seed", sens.seed), sens.tick_skip)
     elif t == 'MOVEMENT':
         axis, sign = _MOVE_AXES[sens.axis]
-        expr = "self._moved(%r, %s, %d, %d, %s)" % (key, sens.use_local, axis, sign,
-                                                    A("Threshold", sens.threshold))
+        expr = "self._moved(%r, %s, %d, %d, %s, own=ob)" % (key, sens.use_local, axis, sign,
+                                                           A("Threshold", sens.threshold))
     elif t == 'JOYSTICK':
         expr = _joystick_expr(sens, A)
     elif t == 'ACTUATOR':
@@ -338,7 +336,7 @@ def _sensor_expr(ob, sens, key=None):
         expr = "self._act_on.get(%r, False)" % sens.actuator
     elif t == 'ANIMATIONEVENT':
         trigger = -1 if sens.trigger_all else sens.trigger_index - 1
-        expr = "self._anim_event(%r, %d, %d)" % (key, sens.event_index - 1, trigger)
+        expr = "self._anim_event(%r, %d, %d, own=ob)" % (key, sens.event_index - 1, trigger)
     elif t == 'MESSAGE':
         # Mensagens enviadas no frame anterior para este objeto (ou sem destino), como o sensor.
         expr = "bool(logic.getMessages(ob.name, %s))" % A("Subject", sens.subject)
@@ -514,7 +512,7 @@ def _world_property_code(act):
 
 # Helpers do componente que agem sobre o objeto passado em own= (atuador de outro objeto).
 # Estado (self._ticks) e chaves por 'dono/atuador'; o resto de self.* continua sendo brick.
-_OWN_CALLS = r"self\._(follow|mouse_look|cst\w*|steer)\(|self\._ticks\.pop\("
+_OWN_CALLS = r"self\._(follow|mouse_look|cst\w*|steer|track_parent|snd_play|snd_stop)\(|self\._ticks\.pop\("
 
 
 def _actuator_code(ob, act):
@@ -858,9 +856,9 @@ def _track_to_code(ob, act):
         # Com pai a engine corrige pela orientacao inicial do pai (m_parentlocalmat); conta portada inteira.
         return ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
                 "if tgt is not None:",
-                "    self._track_parent(tgt, %d, %d, %s, %s)" % (axis + (3 if sign else 0), up,
-                                                                _act_arg("Time", act.time),
-                                                                act.use_3d_tracking)]
+                "    self._track_parent(tgt, %d, %d, %s, %s, own=ob)" % (axis + (3 if sign else 0), up,
+                                                                       _act_arg("Time", act.time),
+                                                                       act.use_3d_tracking)]
     # KX_TrackToActuator: orientacao = (antiga * time + nova) / (time + 1).
     factor = 1.0 / (act.time + 1) if act.time > 0 else 1.0
     lines = ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
@@ -874,9 +872,13 @@ def _track_to_code(ob, act):
     return lines
 
 
+_SND3D = [False]  # algum Sound 3D no objeto convertido (gera self._snd_update() no fim dos actuators)
+
+
 def _sound_code(act):
-    # Mesmo fluxo de KX_SoundActuator: o pulso positivo toca se nao estiver tocando;
-    # o negativo para (modos *STOP) ou deixa a volta atual terminar (LOOPEND).
+    # Mesmo fluxo de KX_SoundActuator: o pulso positivo toca se nao estiver tocando; o negativo para
+    # (modos *STOP) ou deixa a volta atual terminar (LOOPEND); depois de um pulso negativo o proximo positivo
+    # recomeca o som mesmo que a volta anterior ainda esteja tocando (flag m_isplaying da engine).
     if act.mode not in {'PLAYSTOP', 'PLAYEND', 'LOOPSTOP', 'LOOPEND', 'LOOPBIDIRECTIONAL',
                         'LOOPBIDIRECTIONALSTOP'}:
         raise Unsupported("sound %s" % act.mode)
@@ -884,32 +886,22 @@ def _sound_code(act):
         raise Unsupported("sound sem som")
     if act.sound.packed_file is not None:
         raise Unsupported("sound empacotado")
+    key = _ACT_LABEL[0]
+    d3 = "None"
     if act.use_sound_3d:
-        raise Unsupported("sound 3D")
-    key = act.name
-    pingpong = act.mode.startswith('LOOPBIDIRECTIONAL')
-    # Sem dispositivo de audio o handle falha ao ajustar volume/pitch: a engine ignora, aqui tambem.
-    on = ["import aud",
-          "snd = self.__dict__.setdefault('_snd', {})",
-          "h = snd.get(%r)" % key,
-          "if h is None or h.status != aud.STATUS_PLAYING:",
-          "    try:",
-          "        h = aud.Device().play(aud.Sound.file(logic.expandPath(%r))%s)" % (
-              act.sound.filepath, ".pingpong()" if pingpong else ""),
-          "        h.volume = %s" % _act_arg("Volume", act.volume),
-          "        h.pitch = %s" % _act_arg("Pitch", act.pitch)]
-    if act.mode.startswith('LOOP'):
-        on.append("        h.loop_count = -1")
-    on += ["        snd[%r] = h" % key,
-           "    except aud.error:",
-           "        snd.pop(%r, None)" % key]
+        _SND3D[0] = True
+        d3 = repr((act.gain_3d_min, act.gain_3d_max, act.distance_3d_reference, act.distance_3d_max,
+                   act.rolloff_factor_3d, act.cone_inner_angle_3d, act.cone_outer_angle_3d,
+                   act.cone_outer_gain_3d))
+    on = ["self._snd_play(%r, %r, %s, %s, %s, %s, %s, own=ob)" % (
+        key, act.sound.filepath, _act_arg("Volume", act.volume), _act_arg("Pitch", act.pitch),
+        act.mode.startswith('LOOP'), act.mode.startswith('LOOPBIDIRECTIONAL'), d3)]
     off = []
     if act.mode != 'PLAYEND':
-        off = ["import aud",
-               "h = self.__dict__.get('_snd', {}).get(%r)" % key,
-               "if h is not None and h.status == aud.STATUS_PLAYING:"]
         # *END deixa a volta atual terminar; *STOP corta na hora.
-        off.append("    h.loop_count = 0" if act.mode in {'LOOPEND', 'LOOPBIDIRECTIONAL'} else "    h.stop()")
+        off = ["self._snd_stop(%r, %r)" % (key, 'end' if act.mode in {'LOOPEND', 'LOOPBIDIRECTIONAL'} else 'stop')]
+    else:
+        off = ["self._snd_stop(%r, 'none')" % key]
     return on, False, off
 
 
@@ -1015,12 +1007,12 @@ class %(classname)s(%(base)s):
         x, y = logic.mouse.position
         return cam.getScreenRay(x, y, 10000.0, prop) if cam else None
 
-    def _delay(self, key, delay, duration, repeat, times):
-        """Mesma contagem de SCA_DelaySensor (em frames)."""
+    def _delay(self, key, delay, duration, repeat, times, seconds=False):
+        """Mesma contagem de SCA_DelaySensor (frames; com seconds o atraso conta deltaTime e a duracao, frames)."""
         key = "dly:" + key
         n, left = self._ticks.get(key, (0, times))
         if n < delay:
-            n += 1
+            n += logic.deltaTime() if seconds else 1
             on = False
         elif duration > 0 and n < delay + duration:
             n += 1
@@ -1045,9 +1037,9 @@ class %(classname)s(%(base)s):
         self._ticks[key] = (gen, n, value)
         return value
 
-    def _moved(self, key, local, axis, sign, threshold):
+    def _moved(self, key, local, axis, sign, threshold, own=None):
         """Movement sensor: compara com a posicao do frame anterior (KX_MovementSensor)."""
-        ob = self.object
+        ob = own or self.object
         if local:
             pos = ob.localOrientation.inverted() * ob.localPosition
         else:
@@ -1191,9 +1183,9 @@ class %(classname)s(%(base)s):
 
 _EXTRA = OrderedDict()
 _EXTRA["_anim_event"] = '''
-    def _anim_event(self, key, index, trigger):
+    def _anim_event(self, key, index, trigger, own=None):
         """Animation Event sensor: positivo no frame em que o gatilho disparou (-1 = qualquer)."""
-        mgr = self.object.animationEventManager
+        mgr = (own or self.object).animationEventManager
         evs = mgr.events if mgr is not None else []
         if not 0 <= index < len(evs):
             return False
@@ -1471,10 +1463,16 @@ _EXTRA["_track_parent"] = '''
                        (cj * sh, sj * ss + cc, sj * cs - sc),
                        (-sj, cj * si, cj * ci)))
 
-    def _track_parent(self, tgt, axis, up, time, use3d):
+    def _plm_init(self, o):
+        """Pai e orientacao local inicial dele para o Track To de o (a engine guarda no carregamento)."""
+        if o is not None:
+            p = o.parent
+            self.__dict__.setdefault("_plm", {})[o.name] = (p, p.localOrientation.copy() if p is not None else None)
+
+    def _track_parent(self, tgt, axis, up, time, use3d, own=None):
         """Track To de objeto com pai: mesma conta do KX_TrackToActuator (vectomat, interpolacao em
         euler com 'time', correcao pela orientacao inicial do pai, posicao local mantida)."""
-        ob = self.object
+        ob = own or self.object
         mat = self._track_vectomat(ob.worldPosition - tgt.worldPosition, axis, up, use3d)
         old, new = self._track_eul(ob.worldOrientation), self._track_eul(mat)
         for i in range(3):
@@ -1483,13 +1481,70 @@ _EXTRA["_track_parent"] = '''
                 new[i] += -2.0 * math.pi if d > 0.0 else 2.0 * math.pi
             new[i] = (time * old[i] + new[i]) / (1.0 + time)
         mat = self._track_mat(new)
-        parent, plm = self._plm
+        parent, plm = self.__dict__.get("_plm", {}).get(ob.name, (None, None))
         if parent is not None and not parent.invalid:
             pos = ob.localPosition.copy()
             ob.localOrientation = plm * (parent.worldOrientation.inverted() * mat)
             ob.localPosition = pos
         else:
             ob.localOrientation = mat
+'''
+_EXTRA["_snd_play"] = '''
+    def _snd_play(self, key, path, volume, pitch, loop, pingpong, d3, own=None):
+        """Sound actuator: toca se nao estava tocando (KX_SoundActuator::play); d3 = ajustes 3D ou None."""
+        import aud
+        st = self.__dict__.setdefault("_snd", {})
+        old = st.get(key)
+        if old is not None and old[1] and old[0] is not None and old[0].status == aud.STATUS_PLAYING:
+            return
+        if old is not None and old[0] is not None:
+            old[0].stop()
+        st[key] = [None, True, None]
+        # Sem dispositivo de audio o handle falha ao ajustar volume/pitch: a engine ignora, aqui tambem.
+        try:
+            snd = aud.Sound.file(logic.expandPath(path))
+            h = aud.Device().play(snd.pingpong() if pingpong else snd)
+            if d3 is not None:
+                h.relative = True
+                (h.volume_minimum, h.volume_maximum, h.distance_reference, h.distance_maximum, h.attenuation,
+                 h.cone_angle_inner, h.cone_angle_outer, h.cone_volume_outer) = d3
+            if loop:
+                h.loop_count = -1
+            h.pitch = pitch
+            h.volume = volume
+            st[key] = [h, True, own if d3 is not None else None]
+        except aud.error:
+            st[key][1] = False
+
+    def _snd_stop(self, key, how):
+        """Pulso negativo: stop corta, end deixa terminar a volta atual, none so libera o proximo play."""
+        import aud
+        st = self.__dict__.get("_snd", {}).get(key)
+        if st is None:
+            return
+        h = st[0]
+        if st[1] and h is not None and h.status == aud.STATUS_PLAYING:
+            if how == "stop":
+                h.stop()
+                st[0] = None
+            elif how == "end":
+                h.loop_count = 0
+        st[1] = False
+
+    def _snd_update(self):
+        """Sound 3D: posicao/velocidade/orientacao relativas a camera ativa, todo frame enquanto toca."""
+        import aud
+        for h, _on, own in self.__dict__.get("_snd", {}).values():
+            if h is None or own is None or own.invalid or h.status != aud.STATUS_PLAYING:
+                continue
+            cam = own.scene.active_camera
+            if cam is None:
+                continue
+            mo = cam.worldOrientation.inverted()
+            h.location = mo * (own.worldPosition - cam.worldPosition)
+            h.velocity = mo * (own.getLinearVelocity() - cam.getLinearVelocity())
+            q = (mo * own.worldOrientation).to_quaternion()
+            h.orientation = (q.w, q.x, q.y, q.z)
 '''
 _EXTRA["_hold"] = '''
     def _hold(self, key, active, time):
@@ -1754,6 +1809,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     sensor_masks = {}
     _GROUP[0] = ""
     _GROUP_ICON.clear()
+    _SND3D[0] = False
     del _ARGS[:]  # nome da variavel -> estados dos controllers ligados
     plans = []
 
@@ -1790,7 +1846,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                     var, key = _ident(owner.name + "_" + s.name, "s"), owner.name + "/" + s.name
                     expr = _sensor_expr(owner, s, key)
                     # Helpers que leem o estado do proprio objeto (self.object) nao valem para outro dono.
-                    if re.search(r"self\._(act_on|anim_event|moved|gaze|vr_head)\b", expr):
+                    if re.search(r"self\._(act_on|gaze|vr_head)\b", expr):
                         raise Unsupported("sensor %s de %s ligado" % (s.type, owner.name))
                     expr = on(owner, expr)
                     if s.type == 'COLLISION':
@@ -1910,6 +1966,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 out.append("        if %s:" % (code[3] or cond))
                 out.append("            self._act_on[%r] = True" % act.name)
 
+    if _SND3D[0] and any("self._snd_play(" in line for line in out):
+        out.append("        self._snd_update()")
+
     for todo in todos:
         out.append("        # TODO: controller %s (nao convertido, brick continua ativo)" % todo)
 
@@ -1923,9 +1982,11 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
         actors = sorted(o.name for o in bpy.data.objects if o.game.use_actor)
         start_extra += "        self._actors = frozenset(%r)\n" % (actors,)
     if "self._track_parent(" in body:
-        # Pai e orientacao local inicial dele (a engine guarda no carregamento).
-        start_extra += ("        _p = self.object.parent\n"
-                        "        self._plm = (_p, _p.localOrientation.copy() if _p is not None else None)\n")
+        # Pai e orientacao local inicial dele (a engine guarda no carregamento), por dono do actuator.
+        for own in sorted(set(re.findall(r"self\._track_parent\([^\n]*own=(\w+)\)", body))):
+            start_extra += "        self._plm_init(%s)\n" % (
+                "self.object" if own == "ob" else "self.object.scene.objects.get(%r)" % next(
+                    n for n, v in foreign.items() if v == own))
     extra = "".join(text for name, text in _EXTRA.items() if "self.%s(" % name in body)
     header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra,
                         "base": "types.KX_PythonComponent" if component else "object",

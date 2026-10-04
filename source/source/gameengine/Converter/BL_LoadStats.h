@@ -20,6 +20,10 @@
 #ifndef __BL_LOADSTATS_H__
 #define __BL_LOADSTATS_H__
 
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "PIL_time.h"
 
 struct BL_LoadStats
@@ -62,6 +66,58 @@ public:
 	~BL_LoadTimer()
 	{
 		m_acc += PIL_check_seconds_timer() - m_start;
+	}
+};
+
+/// Recent load events ("[Load]" reports) kept for the Debug Mode profile panel.
+/// Written only on load (never per frame); bounded so it never grows during a session.
+class BL_LoadLog
+{
+public:
+	struct Entry
+	{
+		std::string scene;   // Scene or library the event belongs to.
+		std::string stage;   // "convert", "shaders", "startup total"...
+		double seconds;      // Duration of this stage.
+		std::string detail;  // Full console line (tooltip).
+		bool total;          // Wall time of a whole load (highlighted).
+	};
+
+	static void Add(const std::string& scene, const std::string& stage, double seconds,
+	                const std::string& detail = "", bool total = false)
+	{
+		BL_LoadLog& log = Get();
+		std::lock_guard<std::mutex> lock(log.m_mutex);
+		if (log.m_entries.size() >= maxEntries) {
+			log.m_entries.erase(log.m_entries.begin());
+		}
+		log.m_entries.push_back({scene, stage, seconds, detail, total});
+	}
+
+	/// Copy, since conversion may run on a worker thread.
+	static std::vector<Entry> GetEntries()
+	{
+		BL_LoadLog& log = Get();
+		std::lock_guard<std::mutex> lock(log.m_mutex);
+		return log.m_entries;
+	}
+
+	static void Clear()
+	{
+		BL_LoadLog& log = Get();
+		std::lock_guard<std::mutex> lock(log.m_mutex);
+		log.m_entries.clear();
+	}
+
+private:
+	static const size_t maxEntries = 64;
+	std::mutex m_mutex;
+	std::vector<Entry> m_entries;
+
+	static BL_LoadLog& Get()
+	{
+		static BL_LoadLog log;
+		return log;
 	}
 };
 

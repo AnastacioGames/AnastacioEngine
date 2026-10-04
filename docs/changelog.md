@@ -15,6 +15,18 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Só é registrado quando o navegador tem AudioWorklet em contexto seguro; senão, ou com `?audio=sdl` na URL, o player usa o SDL (ScriptProcessor) como antes (`GPG_Ghost.cpp`). Sem exceções: o construtor nunca lança.
 - Estado em `Module.rangeAudio` (contexto, blocos, pico, underruns, alvo). `package-web.py` suspende/retoma esse contexto ao esconder a página; `verify-capabilities.cjs audio` lê os contadores dele e confere a ausência do aviso de API obsoleta.
 - Validação (Linux, emsdk 6.0.11, `web-runtime-release` completo, Chromium headless): demo Destruction toca a música por AudioWorklet, nenhum aviso `ScriptProcessorNode is deprecated` (com `?audio=sdl` o aviso volta), suspender/retomar ok. Teste isolado Audaspace+WebAudio com carga simulada (quadros de 40 ms, pico de 300 ms a cada 25): 66 quanta silenciosos no primeiro pico, depois 0 em 15 s. No Chromium sem GPU daqui (3–4 fps, pausas de até 1,3 s na thread principal) ainda há buracos, porque essas pausas passam do limite de 0,5 s. **Falta o teste audível no navegador/celular real.**
+## Debug Mode: tempos de carregamento no painel de profile (2026-10-04)
+
+- `BL_LoadStats.h`: novo `BL_LoadLog`, log circular de 64 eventos (cena, etapa, segundos, linha completa do console como tooltip, marca de "total") protegido por mutex porque a conversão assíncrona roda em thread de trabalho. Só escreve quando algo carrega; nada por frame.
+- Quem alimenta: `BL_Converter` (convert, textures, merge, shaders, `open file`, `link`), `KX_LibLoadStatus::Finish` (`LibLoad total`), `LA_Launcher::InitEngine` (`start scene total`) e `KX_SceneScheduler` (`async scene total`, `add scene total (overlay)`, `add scene total (background)` e `replace scene total`). Cada cena carregada custa um timestamp a mais.
+- `KX_DebugMode`: seção **Scene Load** no painel de profile (tabela Cena/Etapa/Tempo, mais recente no topo, totais em amarelo, tooltip com a linha do console e botão Clear). As **Render Queries** e o bloco verde/vermelho de categorias viraram abas recolhíveis (`CollapsingHeader`, abertas por padrão) para o painel não crescer sem limite.
+- Correção: o checkbox "Show Render Queries" do menu ImGui guardava um estado próprio iniciado em `false`, enquanto a flag podia já vir ligada da cena (`GAME_SHOW_RENDER_QUERIES`) ou de `-g show_render_queries` — a caixa aparecia desmarcada com o painel visível e era preciso ligar e desligar. Agora o valor é lido da engine a cada frame.
+- Compilado no Windows/MSVC (`RangeRuntime`, `RangeEngine`). **Não validado em runtime** nesta sessão.
+
+## Logic Bricks → Python Component, fase 6 (2026-10-04, branch `logic/convert-f6`)
+
+- `logic_to_python.py`: Track To com pai, Sound (loop/ping-pong/3D), Movement e Animation Event agora funcionam em sensores/actuators de **outro objeto** (`own=`, estado `Dono/Actuator`, `_plm_init` por dono). Sound reescrito em `_snd_play/_snd_stop/_snd_update` com a flag `m_isplaying` da engine (recomeça após pulso negativo). Novos: Sound 3D e Delay em segundos (antes `Unsupported`).
+- Testes: `tools/create_logic_convert_scene_f6.py` (Ray material+x-ray, Collision, Near, Radar, Movement, Delay, Track To com pai e Sound em outros objetos) e `tools/test_logic_convert_f6_codegen.py` (geração + fluxo do Sound com `aud` falso; F5 como regressão: OK). **Sem build da engine**: runtime/CHECK e API 3D do `aud` não validados; roteiro Windows e o que segue brick em `NOTES-logic-f6.md`.
 
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 

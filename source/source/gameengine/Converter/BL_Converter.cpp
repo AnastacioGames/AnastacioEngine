@@ -47,6 +47,8 @@
 #include "BL_BlenderDataConversion.h"
 #include "BL_ConvertObjectInfo.h"
 #include "BL_LoadStats.h"
+
+#include <sstream>
 #include "BL_ActionActuator.h"
 #include "KX_BlenderMaterial.h"
 #include "KX_WorldInfo.h"
@@ -246,10 +248,17 @@ static void print_load_shaders(KX_Scene *scene, const char *stage, size_t materi
 	int reused, compiled;
 	double compileTime;
 	GPU_shader_cache_stats(&reused, &compiled, &compileTime, true);
-	CM_Message("[Load] " << stage << " \"" << scene->GetName() << "\": textures " << load_ms(textures)
-	           << "ms, merge " << load_ms(merge) << "ms, shaders " << load_ms(shaders) << "ms ("
-	           << materials << " materials x " << scene->GetLightList()->GetCount() << " lights; compiled "
-	           << compiled << " " << load_ms(compileTime) << "ms, reused " << reused << ")");
+	std::ostringstream detail;
+	detail << "textures " << load_ms(textures)
+	       << "ms, merge " << load_ms(merge) << "ms, shaders " << load_ms(shaders) << "ms ("
+	       << materials << " materials x " << scene->GetLightList()->GetCount() << " lights; compiled "
+	       << compiled << " " << load_ms(compileTime) << "ms, reused " << reused << ")";
+	CM_Message("[Load] " << stage << " \"" << scene->GetName() << "\": " << detail.str());
+	BL_LoadLog::Add(scene->GetName(), std::string(stage) + " textures", textures, detail.str());
+	if (merge > 0.0) {
+		BL_LoadLog::Add(scene->GetName(), std::string(stage) + " merge", merge, detail.str());
+	}
+	BL_LoadLog::Add(scene->GetName(), std::string(stage) + " shaders", shaders, detail.str());
 }
 
 void BL_Converter::ConvertScene(KX_Scene *scene, bool compileShaders)
@@ -369,12 +378,15 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 		BL_ConvertActions(scene, m_maggie, converter);
 	}
 
-	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(PIL_check_seconds_timer() - convertStart)
-	           << "ms, " << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
-	           << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
-	           << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
-	           << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
-	           << load_ms(loadStats.physics) << "ms");
+	const double convertTime = PIL_check_seconds_timer() - convertStart;
+	std::ostringstream detail;
+	detail << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
+	       << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
+	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
+	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
+	       << load_ms(loadStats.physics) << "ms";
+	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(convertTime) << "ms, " << detail.str());
+	BL_LoadLog::Add(scene->GetName(), "convert", convertTime, detail.str());
 }
 
 void BL_Converter::PostConvertScene(const BL_SceneConverter& converter)
@@ -510,8 +522,10 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 			{
 				const double start = PIL_check_seconds_timer();
 				PostConvertScene(converter);
+				const double texturesTime = PIL_check_seconds_timer() - start;
 				CM_Message("[Load] async textures \"" << converter.GetScene()->GetName() << "\": "
-				           << load_ms(PIL_check_seconds_timer() - start) << "ms");
+				           << load_ms(texturesTime) << "ms");
+				BL_LoadLog::Add(converter.GetScene()->GetName(), "async textures", texturesTime);
 				set_scene_progress(status, merge.m_scene, progress_textures);
 				merge.m_stage = PendingMerge::STAGE_SHADERS;
 				merge.m_material = 0;
@@ -733,7 +747,9 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFilePath(const char *filepath, char *gr
 {
 	const double openStart = PIL_check_seconds_timer();
 	BlendHandle *blendlib = BLO_blendhandle_from_file(filepath, nullptr);
-	CM_Message("[Load] open \"" << filepath << "\": " << load_ms(PIL_check_seconds_timer() - openStart) << "ms");
+	const double openTime = PIL_check_seconds_timer() - openStart;
+	CM_Message("[Load] open \"" << filepath << "\": " << load_ms(openTime) << "ms");
+	BL_LoadLog::Add(filepath, "open file", openTime);
 
 	// Error checking is done in LinkBlendFile
 	return LinkBlendFile(blendlib, filepath, group, scene_merge, err_str, options);
@@ -812,7 +828,9 @@ KX_LibLoadStatus *BL_Converter::LinkBlendFile(BlendHandle *blendlib, const char 
 
 	BLI_strncpy(main_newlib->name, path, sizeof(main_newlib->name));
 
-	CM_Message("[Load] link \"" << path << "\" (" << group << "): " << load_ms(PIL_check_seconds_timer() - linkStart) << "ms");
+	const double linkTime = PIL_check_seconds_timer() - linkStart;
+	CM_Message("[Load] link \"" << path << "\" (" << group << "): " << load_ms(linkTime) << "ms");
+	BL_LoadLog::Add(path, std::string("link (") + group + ")", linkTime);
 
 	// Debug data to load.
 	if (options & LIB_LOAD_VERBOSE) {
