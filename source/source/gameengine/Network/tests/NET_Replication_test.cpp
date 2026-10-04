@@ -551,7 +551,7 @@ TEST(NetReplication, ConvergesWithLoss)
 		EXPECT_EQ(c->world.objects.size(), net.world.objects.size());
 		for (const auto &pair : net.world.objects) {
 			const MapWorld::Obj *o = c->world.find(pair.first);
-			ASSERT_NE(o, nullptr) << pair.first;
+			ASSERT_TRUE(o != nullptr) << pair.first;
 			EXPECT_TRUE(samePosition(o->s, pair.second.s)) << pair.first;
 			float dot = 0.0f;
 			for (int i = 0; i < 4; ++i) {
