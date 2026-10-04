@@ -9,8 +9,13 @@ getattr so the real module can omit them.
 Simulation (advance with _tick(dt), the menu calls it every frame when present):
 - join("full.test") -> Reject ServerFull; "old.test" -> Reject VersionMismatch;
   "banned.test" -> Reject Banned; "timeout.test" -> Disconnect Timeout after 3 s;
+  a LAN room with password rejects a wrong one (provisional reason 7, see NOTES-D.md);
   anything else connects after 0.5 s and two bots join with varying ping.
-- host(port) connects immediately as server.
+- host(port) connects immediately as server; bots join and get ready after a while.
+- discover_lan(): LAN rooms answer over time (format of NET_LanDiscovery, front H).
+- send_chat echoes to on_chat; set_ready on a client makes the host bot start the game
+  1.5 s later (on_start); start_game() on the server needs every player ready.
+- set_simulation(latency_ms, jitter_ms, loss_percent) adds to the shown pings.
 """
 
 import random
@@ -30,6 +35,19 @@ DISCONNECT_TIMEOUT = 2
 DISCONNECT_KICKED = 3
 DISCONNECT_PROTOCOL_VIOLATION = 4
 DISCONNECT_SERVER_SHUTDOWN = 5
+# Provisional: not in the contract yet (proposed in NOTES-D.md).
+REJECT_WRONG_PASSWORD = 7
+
+# Simulated LAN rooms: (seconds until they answer, entry).
+_LAN_ROOMS = (
+	(0.1, {"name": "Sala da Ana", "address": "192.168.0.10", "port": 7777, "ws_port": 7778,
+		"players": 2, "max_players": 8, "ping": 12, "password": False, "scene": "Arena"}),
+	(0.4, {"name": "Full room", "address": "192.168.0.12", "port": 7777, "ws_port": 0,
+		"players": 8, "max_players": 8, "ping": 30, "password": False, "scene": "Arena"}),
+	(0.8, {"name": "Private", "address": "192.168.0.11", "port": 7790, "ws_port": 0,
+		"players": 1, "max_players": 4, "ping": 18, "password": True, "scene": "Docks"}),
+)
+_LAN_PASSWORDS = {"192.168.0.11": "1234"}
 
 _FAKE_REJECTS = {
 	"full.test": (REJECT_SERVER_FULL, "8/8"),
@@ -58,13 +76,20 @@ class _StubNetwork:
 		self._start_cbs = []
 
 	def _reset(self):
+		name = getattr(self, "playerName", "Player")
 		self.isServer = False
 		self.isConnected = False
 		self.clients = []
 		self.localId = None
 		self._pending = None  # (kind, time_left, data)
 		self._time = 0.0
-		self.playerName = "Player"
+		self._start_in = None
+		self._lan_since = None
+		self.playerName = name
+		self.maxPlayers = 0
+		self.roomName = ""
+		if not hasattr(self, "simulation"):
+			self.simulation = (0, 0, 0)
 
 	# --- events --------------------------------------------------------------
 	def on_connect(self, fn):
@@ -107,9 +132,13 @@ class _StubNetwork:
 		self._pending = ("bot", 1.0, None)
 
 	def join(self, addr, password=""):
+		lan_since = self._lan_since
 		self._reset()
+		self._lan_since = lan_since
 		host = str(addr).split(":")[0].strip("[]").lower()
-		if host in _FAKE_REJECTS:
+		if host in _LAN_PASSWORDS and password != _LAN_PASSWORDS[host]:
+			self._pending = ("reject", 0.3, (REJECT_WRONG_PASSWORD, ""))
+		elif host in _FAKE_REJECTS:
 			self._pending = ("reject", 0.3, _FAKE_REJECTS[host])
 		elif host == "timeout.test":
 			self._pending = ("timeout", 3.0, None)
@@ -126,22 +155,41 @@ class _StubNetwork:
 		for c in self.clients:
 			if c.id == self.localId:
 				c.ready = bool(ready)
+		if not self.isServer and self.isConnected:
+			# The host bot starts once this client is ready.
+			self._start_in = 1.5 if ready else None
 
 	def send_chat(self, text):
-		self._emit(self._chat_cbs, self.localId, text)
+		text = str(text)[:200]
+		if text and self.isConnected:
+			self._emit(self._chat_cbs, self.localId, text)
 
 	def start_game(self):
-		if self.isServer:
-			self._emit(self._start_cbs)
+		"""Server only, when every player is ready. Returns True when the game started."""
+		if not self.isServer or not all(c.ready for c in self.clients):
+			return False
+		self._emit(self._start_cbs)
+		return True
+
+	def set_simulation(self, latency_ms=0, jitter_ms=0, loss_percent=0):
+		self.simulation = (int(latency_ms), int(jitter_ms), float(loss_percent))
 
 	def discover_lan(self):
-		"""Returns list of dicts: name, address, players, max_players, ping."""
-		return [
-			{"name": "Sala do Ana", "address": "192.168.0.10:7777", "players": 2,
-				"max_players": 8, "ping": 12},
-			{"name": "Full room", "address": "full.test:7777", "players": 8,
-				"max_players": 8, "ping": 30},
-		]
+		"""Rooms answered so far (non-blocking; the first call starts the search).
+
+		List of dicts: name, address (IPv4), port (ENet), ws_port, players, max_players,
+		ping (ms), password (bool), scene.
+		"""
+		if self._lan_since is None:
+			self._lan_since = self._time
+		age = self._time - self._lan_since
+		out = []
+		for delay, room in _LAN_ROOMS:
+			if age >= delay:
+				entry = dict(room)
+				entry["ping"] = max(1, room["ping"] + self._rng.randint(-2, 2) + self.simulation[0])
+				out.append(entry)
+		return out
 
 	# --- simulation ----------------------------------------------------------
 	def _tick(self, dt):
@@ -149,6 +197,13 @@ class _StubNetwork:
 		for c in self.clients:
 			if c.id != self.localId:
 				c.ping = max(1, int(c.ping + self._rng.randint(-3, 3)))
+				if self._time > 1.0:
+					c.ready = True  # bots get ready after a second
+		if self._start_in is not None:
+			self._start_in -= dt
+			if self._start_in <= 0:
+				self._start_in = None
+				self._emit(self._start_cbs)
 		if not self._pending:
 			return
 		kind, left, data = self._pending

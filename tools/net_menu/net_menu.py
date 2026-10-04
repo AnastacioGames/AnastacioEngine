@@ -53,12 +53,31 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 		("show_settings", True),
 		("dev_build", False),
 		("open_on_start", True),
+		("settings_file", ""),
 	])
 
 	def start(self, args):
 		self.cfg = dict(args)
 		lang = args.get("language", "en")
-		self.lang = lang if lang in L.LANGUAGES else "en"
+		defaults = {
+			"language": lang if lang in L.LANGUAGES else "en",
+			"touch": args.get("touch", "auto") if args.get("touch", "auto") in L.TOUCH_MODES else "auto",
+		}
+		try:
+			scale = float(args.get("ui_scale", 1.0))
+			if L.UI_SCALE_MIN <= scale <= L.UI_SCALE_MAX:
+				defaults["ui_scale"] = scale
+		except (TypeError, ValueError):
+			pass
+		self.settings_defaults = defaults
+		self.settings_path = ""
+		path = args.get("settings_file") or ""
+		if path:
+			self.settings_path = Range.logic.expandPath(path)
+			self.settings = L.load_settings(self.settings_path, defaults)
+		else:
+			self.settings = L.validate_settings({}, defaults)
+		self.lang = self.settings["language"]
 		hidden = []
 		if not args.get("show_lan", True):
 			hidden.append(L.LAN)
@@ -68,7 +87,7 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 		if not args.get("open_on_start", True):
 			self.state.screen = L.CLOSED
 		self.theme = L.build_theme(args)
-		self.touch = L.detect_touch(sys.platform, args.get("touch", "auto"))
+		self.touch = L.detect_touch(sys.platform, self.settings["touch"])
 		self.osk = L.OnScreenKeyboard()
 		self.font = None
 		path = args.get("font_path") or ""
@@ -86,20 +105,23 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 			"password": "",
 			"address": "",
 			"chat": "",
-			"player_name": "Player",
+			"player_name": self.settings["player_name"],
+			"lan_password": "",
 		}
 		self.errors = {}
 		self.lan_list = []
 		self.lan_sel = -1
-		self.lan_last_click = (-1, 0.0)
+		self.lan_password_for = None
+		self.lan_next_refresh = 0.0
 		self.chat_log = []
 		self.ready = False
-		self.sim_latency = 0
-		self.sim_loss = 0
 		self._prev_buttons = set()
 		self._last_time = time.monotonic()
 
 		self.net = net_api_stub.load_network()
+		if hasattr(self.net, "playerName"):
+			self.net.playerName = self.settings["player_name"]
+		self._apply_simulation()
 		self._register_events()
 
 	# ------------------------------------------------------------------ network
@@ -145,6 +167,7 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 		just = getattr(Range.logic, "KX_INPUT_JUST_ACTIVATED", None)
 		if kb is not None and ev is not None and not imgui.get_io_want_capture_keyboard():
 			for key, act in (("UPARROWKEY", L.NAV_UP), ("DOWNARROWKEY", L.NAV_DOWN),
+					("LEFTARROWKEY", L.NAV_LEFT), ("RIGHTARROWKEY", L.NAV_RIGHT),
 					("RETKEY", L.NAV_ACCEPT), ("ESCKEY", L.NAV_BACK)):
 				code = getattr(ev, key, None)
 				if code is not None and just in kb.inputs[code].queue:
@@ -156,6 +179,7 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 			pressed = now - self._prev_buttons
 			self._prev_buttons = now
 			for name, act in (("JOYSTICKPADUP", L.NAV_UP), ("JOYSTICKPADDOWN", L.NAV_DOWN),
+					("JOYSTICKPADLEFT", L.NAV_LEFT), ("JOYSTICKPADRIGHT", L.NAV_RIGHT),
 					("JOYSTICKA", L.NAV_ACCEPT), ("JOYSTICKB", L.NAV_BACK)):
 				code = getattr(Range.logic, name, None)
 				if code is not None and code in pressed:
@@ -174,8 +198,14 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 			if act == L.NAV_BACK:
 				if self.osk.active:
 					self.osk.field = None
+				elif self.state.notice or self.state.confirm:
+					self.state.back()
+				elif self.state.screen == L.LAN and self.lan_password_for is not None:
+					self._close_lan_password()
 				elif self.state.screen == L.LOBBY:
 					self._leave()
+				elif self.state.screen == L.SETTINGS:
+					self._leave_settings()
 				else:
 					self.state.back(connected=self._connected())
 			else:
@@ -192,7 +222,7 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 
 	def _draw(self):
 		w, h = imgui.get_display_size()
-		self.layout = L.compute_layout(w, h, self.touch, self.cfg.get("ui_scale", 1.0))
+		self.layout = L.compute_layout(w, h, self.touch, self.settings["ui_scale"])
 		lay = self.layout
 		th = self.theme
 		self.state.focus.begin_frame()
@@ -214,11 +244,14 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 			if is_open:
 				if self.osk.active:
 					self._draw_keyboard()
+				elif self.state.confirm:
+					self._draw_confirm()
 				else:
 					getattr(self, "_screen_" + self.state.screen)()
 			imgui.end()
 
 		self._draw_notice()
+		self.state.focus.end_frame()
 		imgui.pop_style_color(6)
 		if self.font is not None:
 			imgui.pop_font()
@@ -237,15 +270,50 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 			imgui.pop_style_color(2)
 		return clicked or self.state.focus.consume_accept(key)
 
+	def _stepper(self, key, label_key, value, lo, hi, step, unit=""):
+		"""Value with - / + buttons; left/right on the focused row or accept (wraps) change it."""
+		lay = self.layout
+		small = lay["button_h"] * 1.2
+		full = lay["win_w"] - 2 * lay["spacing"]
+		delta = 0
+		if imgui.button("-##{}_dec".format(key), small, lay["button_h"]):
+			delta -= 1
+		imgui.same_line()
+		label = "{}: {}{}".format(self._t(label_key), value, unit)
+		if self._button(key, label, width=max(small, full - 2 * small - 2 * lay["spacing"])):
+			delta += 1
+			if value >= hi:
+				return lo
+		delta += self.state.focus.consume_adjust(key)
+		imgui.same_line()
+		if imgui.button("+##{}_inc".format(key), small, lay["button_h"]):
+			delta += 1
+		return L.step_value(value, delta, lo, hi, step) if delta else value
+
+	def _cycle(self, key, label_key, options, current, names):
+		"""Button showing the current option; accept/right goes to the next one, left to the previous."""
+		label = "{}: {}".format(self._t(label_key), self._t(names[current]))
+		if self._button(key, label):
+			return L.cycle(options, current, 1)
+		delta = self.state.focus.consume_adjust(key)
+		return L.cycle(options, current, delta) if delta else current
+
 	def _input(self, field, label_key, max_length=64):
+		"""Text field. It is also a focus item: accept opens the on-screen keyboard (gamepad)."""
 		value = str(self.fields[field])
+		key = "kb_" + field
 		if self.touch:
-			if self._button("kb_" + field, "{}: {}".format(self._t(label_key), value or "...")):
+			if self._button(key, "{}: {}".format(self._t(label_key), value or "...")):
 				self.osk.open(field, value, max_length)
 			return
-		changed, value = imgui.input_text("{}##{}".format(self._t(label_key), field), value, max_length)
+		focused = self.state.focus.item(key)
+		# "###" keeps the ImGui id stable while the focus marker changes the label.
+		label = "{}{}###{}".format("> " if focused else "", self._t(label_key), field)
+		changed, value = imgui.input_text(label, value, max_length)
 		if changed:
 			self.fields[field] = value
+		if self.state.focus.consume_accept(key):
+			self.osk.open(field, str(self.fields[field]), max_length)
 		err = self.errors.get(field)
 		if err:
 			imgui.text(self._t(err))
@@ -330,39 +398,91 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 					fmt = "[{}]:{}" if ":" in value[0] else "{}:{}"
 					addr = fmt.format(*value)
 				self.state.on_connecting()
-				self.net.join(addr)
+				self._join(addr)
 		if self._button("back"):
 			self.state.back()
 
 	def _refresh_lan(self):
 		discover = getattr(self.net, "discover_lan", None)
-		self.lan_list = list(discover()) if callable(discover) else []
+		selected = self.lan_list[self.lan_sel] if 0 <= self.lan_sel < len(self.lan_list) else None
+		self.lan_list = L.lan_servers(discover()) if callable(discover) else []
 		self.lan_sel = -1
+		if selected is not None:
+			for i, e in enumerate(self.lan_list):
+				if (e["address"], e["port"]) == (selected["address"], selected["port"]):
+					self.lan_sel = i
+		self.lan_next_refresh = time.monotonic() + 1.0
 
 	def _screen_lan(self):
+		if self.lan_password_for is not None:
+			self._screen_lan_password()
+			return
+		if time.monotonic() >= self.lan_next_refresh:
+			self._refresh_lan()  # discover_lan() does not block: poll it once a second
 		if not self.lan_list:
+			imgui.text(self._t("searching"))
 			imgui.text(self._t("no_servers"))
 		else:
-			items = ["{}  {}/{}  {} ms".format(s["name"], s["players"], s["max_players"], s["ping"])
-				for s in self.lan_list]
-			changed, sel = imgui.listbox("##lan", self.lan_sel, items, min(8, len(items)))
-			if changed:
-				last, t = self.lan_last_click
-				now = time.monotonic()
-				self.lan_sel = sel
-				if last == sel and now - t < 0.4:  # double click joins
-					self._join_lan(sel)
-				self.lan_last_click = (sel, now)
+			imgui.text("{} ({})".format(self._t("servers_found"), len(self.lan_list)))
+			for i, e in enumerate(self.lan_list):
+				row = L.format_lan_row(e, self.lang)
+				if i == self.lan_sel:
+					row = "> " + row
+				if self._button("lan_{}".format(i), row):
+					self._lan_pick(i)
+		imgui.separator()
 		if self._button("refresh"):
 			self._refresh_lan()
-		if self.lan_sel >= 0 and self._button("connect"):
+		if 0 <= self.lan_sel < len(self.lan_list) and self._button("connect"):
 			self._join_lan(self.lan_sel)
 		if self._button("back"):
 			self.state.back()
 
+	def _lan_pick(self, index):
+		"""First press selects a room, the second one (or a double click) joins it."""
+		if index == self.lan_sel:
+			self._join_lan(index)
+		else:
+			self.lan_sel = index
+
+	def _screen_lan_password(self):
+		entry = self.lan_password_for
+		imgui.text(entry["name"])
+		self._input("lan_password", "room_password", 32)
+		if self._button("connect"):
+			self._close_lan_password()
+			self.state.on_connecting()
+			self._join(L.lan_join_address(entry), self.fields["lan_password"])
+		if self._button("back"):
+			self._close_lan_password()
+
+	def _close_lan_password(self):
+		"""Back to the list with the focus on the selected room (rows are the first items)."""
+		self.lan_password_for = None
+		self.state.focus.reset()
+		self.state.focus.index = max(0, self.lan_sel)
+
 	def _join_lan(self, index):
+		entry = self.lan_list[index]
+		if entry["full"]:
+			self.state.show_notice("reject_full", "{}/{}".format(entry["players"], entry["max_players"]))
+			return
+		if entry["password"]:
+			self.fields["lan_password"] = ""
+			self.lan_password_for = entry
+			self.state.focus.reset()
+			return
 		self.state.on_connecting()
-		self.net.join(self.lan_list[index]["address"])
+		self._join(L.lan_join_address(entry))
+
+	def _join(self, addr, password=""):
+		if password:
+			try:
+				self.net.join(addr, password=password)
+				return
+			except TypeError:
+				pass  # minimal 6.2 signature
+		self.net.join(addr)
 
 	def _player_rows(self):
 		rows = []
@@ -408,38 +528,90 @@ class NetworkMenu(Range.types.KX_PythonComponent):
 		self.state.focus.reset()
 
 	def _screen_pause(self):
+		imgui.text(self._t("pause"))
+		room = getattr(self.net, "roomName", "")
+		if room:
+			imgui.text("{}: {}".format(self._t("room"), room))
 		if self._button("resume"):
 			self.state.go(L.CLOSED)
-		imgui.text(self._t("connected_players"))
-		for row in self._player_rows():
+		imgui.separator()
+		rows = self._player_rows()
+		maxp = getattr(self.net, "maxPlayers", 0)
+		imgui.text("{} ({}{})".format(self._t("connected_players"), len(rows), "/{}".format(maxp) if maxp else ""))
+		for row in rows:
 			imgui.text("  " + row)
+		imgui.separator()
 		if L.SETTINGS not in self.state.hidden and self._button("settings"):
 			self.state.go(L.SETTINGS)
 		if self._button("disconnect"):
-			self._leave()
+			self.state.ask("confirm_disconnect")
 
 	def _screen_settings(self):
+		st = self.settings
 		self._input("player_name", "player_name", 16)
-		changed, idx = imgui.combo(self._t("language"), L.LANGUAGES.index(self.lang), list(L.LANGUAGES))
-		if changed:
-			self.lang = L.LANGUAGES[idx]
+		lang = self._cycle("language", "language", L.LANGUAGES, st["language"],
+			{code: "lang_" + code for code in L.LANGUAGES})
+		if lang != st["language"]:
+			st["language"] = self.lang = lang
+		st["ui_scale"] = self._stepper("ui_scale", "ui_scale", st["ui_scale"], L.UI_SCALE_MIN,
+			L.UI_SCALE_MAX, L.UI_SCALE_STEP, "x")
+		touch = self._cycle("touch_mode", "touch_mode", L.TOUCH_MODES, st["touch"],
+			{m: "touch_" + m for m in L.TOUCH_MODES})
+		if touch != st["touch"]:
+			st["touch"] = touch
+			self.touch = L.detect_touch(sys.platform, touch)
 		if self.cfg.get("dev_build", False):
 			imgui.separator()
 			imgui.text(self._t("net_sim"))
-			_, self.sim_latency = imgui.slider_int(self._t("latency"), self.sim_latency, 0, 500)
-			_, self.sim_loss = imgui.slider_int(self._t("loss"), self.sim_loss, 0, 50)
+			before = (st["sim_latency"], st["sim_jitter"], st["sim_loss"])
+			for key, label in (("sim_latency", "latency"), ("sim_jitter", "jitter"), ("sim_loss", "loss")):
+				lo, hi, step = L.SIM_LIMITS[key]
+				st[key] = self._stepper(key, label, st[key], lo, hi, step)
+			if (st["sim_latency"], st["sim_jitter"], st["sim_loss"]) != before:
+				self._apply_simulation()
+		imgui.separator()
+		if self._button("reset_defaults"):
+			self.settings = L.validate_settings({}, self.settings_defaults)
+			self.lang = self.settings["language"]
+			self.touch = L.detect_touch(sys.platform, self.settings["touch"])
+			self.fields["player_name"] = self.settings["player_name"]
+			self._apply_simulation()
 		if self._button("back"):
-			name = L.validate_player_name(self.fields["player_name"])
-			if name is None:
-				self.errors["player_name"] = "err_name"
-			else:
-				self.errors.pop("player_name", None)
-				if hasattr(self.net, "playerName"):
-					self.net.playerName = name
-				self.state.back()
+			self._leave_settings()
+
+	def _leave_settings(self):
+		"""Validates the name, saves the settings and goes back. Stays on the screen if invalid."""
+		name = L.validate_player_name(self.fields["player_name"])
+		if name is None:
+			self.errors["player_name"] = "err_name"
+			return False
+		self.errors.pop("player_name", None)
+		self.settings["player_name"] = name
+		if hasattr(self.net, "playerName"):
+			self.net.playerName = name
+		if self.settings_path:
+			L.save_settings(self.settings_path, self.settings)
+		self.state.back()
+		return True
+
+	def _apply_simulation(self):
+		setter = getattr(self.net, "set_simulation", None)
+		if callable(setter) and self.cfg.get("dev_build", False):
+			st = self.settings
+			setter(st["sim_latency"], st["sim_jitter"], st["sim_loss"])
 
 	def _screen_closed(self):
 		pass
+
+	def _draw_confirm(self):
+		imgui.text(self._t(self.state.confirm))
+		imgui.separator()
+		if self._button("yes"):
+			key, self.state.confirm = self.state.confirm, None
+			if key == "confirm_disconnect":
+				self._leave()
+		if self._button("no"):
+			self.state.confirm = None
 
 	# ------------------------------------------------------------------ notices
 	def _draw_notice(self):
