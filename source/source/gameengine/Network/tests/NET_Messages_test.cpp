@@ -193,6 +193,15 @@ TEST(NetMessages, RoundTripInputAndRpc)
 	ASSERT_EQ(f.rpc.args.size(), 2u);
 	EXPECT_EQ(f.rpc.args[0].s, "abc");
 
+	// Provisional InputTiming: u32 tick + i16 slack in 1/16 tick.
+	InputTimingMsg timing;
+	timing.tick = 1234;
+	timing.slackQ4 = -40;
+	EXPECT_TRUE(isKnownMessageType(uint8_t(MessageType::InputTiming)));
+	const InputTimingMsg t = roundTrip(timing);
+	EXPECT_EQ(t.tick, 1234u);
+	EXPECT_EQ(t.slackQ4, -40);
+
 	// Arguments above 1024 bytes.
 	RpcMsg big;
 	a = RpcArg();

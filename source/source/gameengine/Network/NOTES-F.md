@@ -6,7 +6,7 @@ Criado em 2026-10-04. Branch `net/prediction`. Arquivos: `NET_Prediction.h/.cpp`
 ## Interpretações
 
 - **Tick de input = tick do servidor.** O cliente prevê à frente (`NetClock::predictionTick`: tempo do
-  servidor + RTT/2 + jitter + 1 tick) e o servidor aplica o input do tick T quando simula T. O estado do
+  servidor + RTT/2 + jitter + 2 ticks) e o servidor aplica o input do tick T quando simula T. O estado do
   tick T que volta ao cliente já inclui o input de T. O contrato (seção 7) não diz isso explicitamente.
 - **Blocos contíguos:** `Input` leva os blocos `newestTick, newestTick-1, ...`. Um buraco ou volta no tick do
   cliente limpa o histórico de predição (manda menos de 8 blocos até completar de novo).

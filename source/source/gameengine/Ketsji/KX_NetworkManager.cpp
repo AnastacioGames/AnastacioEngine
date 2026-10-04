@@ -180,6 +180,7 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_lagCompTickRate(60),
 	m_predTick(net::kNoTick),
 	m_predResyncs(0),
+	m_predDrift(0.0f),
 	m_lastLanRequestMs(0),
 	m_discoveryStarted(false)
 {
@@ -1315,6 +1316,24 @@ void KX_NetworkManager::ServerTickBegin(uint64_t now)
 	}
 	if (m_role == Role::SERVER) {
 		ServerStepPredicted();
+		if (m_tick % kInputTimingTicks == 0) {
+			SendInputTiming();
+		}
+	}
+}
+
+void KX_NetworkManager::SendInputTiming()
+{
+	for (const net::ClientId client : m_server->clients()) {
+		const net::InputQueue *queue = m_predServer->queue(client);
+		float slack;
+		if (!queue || !queue->slack(slack)) {
+			continue;
+		}
+		net::InputTimingMsg msg;
+		msg.tick = m_tick;
+		msg.slackQ4 = int16_t(std::min(std::max(slack * 16.0f, -32768.0f), 32767.0f));
+		m_server->send(client, net::Channel::Snapshot, net::makePacket(msg));
 	}
 }
 
@@ -1509,13 +1528,20 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 			break;
 		}
 		case net::SessionEvent::Type::Message: {
-			if (event.messageType != uint8_t(net::MessageType::Chat)) {
-				break;
-			}
 			net::RawMessage raw;
 			raw.type = event.messageType;
 			raw.body = event.body.data();
 			raw.size = event.body.size();
+			if (event.messageType == uint8_t(net::MessageType::InputTiming)) {
+				net::InputTimingMsg timing;
+				if (m_clock && net::decodeMessage(raw, timing)) {
+					m_clock->addInputSlack(float(timing.slackQ4) / 16.0f);
+				}
+				break;
+			}
+			if (event.messageType != uint8_t(net::MessageType::Chat)) {
+				break;
+			}
 			net::ChatMsg chat;
 			if (net::decodeMessage(raw, chat)) {
 				Event e;
@@ -1602,6 +1628,19 @@ bool KX_NetworkManager::GetViewTime(net::ClientId client, net::Tick &tick, float
 	return view.tick != net::kNoTick;
 }
 
+bool KX_NetworkManager::GetInputStats(net::ClientId client, net::InputQueueStats &stats) const
+{
+	if (m_role != Role::SERVER || !m_predServer) {
+		return false;
+	}
+	const net::InputQueue *queue = m_predServer->queue(client);
+	if (!queue) {
+		return false;
+	}
+	stats = queue->stats();
+	return true;
+}
+
 bool KX_NetworkManager::GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info) const
 {
 	const Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;
@@ -1613,6 +1652,7 @@ bool KX_NetworkManager::GetPredictionStats(KX_GameObject *obj, net::PredictionSt
 		info->tick = entry->prediction->newestTick();
 		info->snapshotTick = entry->lastReconciled;
 		info->resyncs = m_predResyncs;
+		info->leadAdjust = m_clock ? m_clock->leadAdjustTicks() : 0.0f;
 	}
 	return true;
 }
@@ -1817,17 +1857,42 @@ void KX_NetworkManager::ClientPredict(uint64_t now)
 		return;
 	}
 
-	/* Ticks grow by one. The clock's estimate moves in steps (several ticks run back to back in a slow frame,
-	 * then none), so only a drift of half a second (stall, clock resync) restarts the timeline: that drops the
-	 * input history, and the corrections wait until it covers the snapshots again. */
+	/* Ticks grow by one per step. The clock's estimate moves in steps (several ticks run back to back in a slow
+	 * frame, then none), so the timeline follows its smoothed drift: two steps in a frame when it falls behind
+	 * (inputs would reach the server late), none when it runs ahead (extra latency). Only a drift of half a second
+	 * (stall, clock resync) restarts the timeline: that drops the input history, and the corrections wait until
+	 * it covers the snapshots again. */
 	const net::Tick target = m_clock->predictionTick(now);
-	net::Tick tick = m_predTick == net::kNoTick ? target : m_predTick + 1;
-	const int32_t drift = int32_t(target - tick);
+	if (m_predTick == net::kNoTick) {
+		m_predDrift = 0.0f;
+		ClientPredictTick(target, ids);
+		return;
+	}
+	const int32_t drift = int32_t(target - (m_predTick + 1));
 	const int32_t maxDrift = std::max(8, int(m_client->tickRate()) / 2);
 	if (drift > maxDrift || drift < -maxDrift) {
-		tick = target;
 		++m_predResyncs;
+		m_predDrift = 0.0f;
+		ClientPredictTick(target, ids);
+		return;
 	}
+	m_predDrift += (float(drift) - m_predDrift) * 0.1f;
+	int steps = 1;
+	if (m_predDrift > 1.5f) {
+		steps = 2;
+		m_predDrift -= 1.0f;
+	}
+	else if (m_predDrift < -1.5f) {
+		steps = 0;
+		m_predDrift += 1.0f;
+	}
+	for (int i = 0; i < steps; ++i) {
+		ClientPredictTick(m_predTick + 1, ids);
+	}
+}
+
+void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net::NetId> &ids)
+{
 	m_predTick = tick;
 
 	net::InputBlock block;

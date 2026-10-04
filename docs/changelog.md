@@ -9,6 +9,41 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: contrato do `201 InputTiming` fechado (2026-10-04)
+
+- `201 InputTiming` deixa de ser provisória em `docs/multiplayer-protocol.md`, como a `200 RpcFrom`: aditiva, fora do `protocolVersion`. Revalidada no Windows (5 rodadas do `predict` PASS, erro 0, 0 correções) e no Linux. Só documentação; o código já era o definitivo.
+
+## Multiplayer: inputs atrasados restantes medidos (2026-10-04)
+
+- Log temporário (removido) em `InputQueue::receive`: 0 a 11 `late` por rodada do `predict`, espalhados pela rodada, cada um 1 ou 2 ticks antes do `nextTick` e com folga média de 2 a 3,3: pacotes perdidos ou atrasados isolados, não viés do relógio. Sem correções; alvo 3 e ganho 0,3 mantidos. Detalhes em `NOTES-engine.md`.
+- Causa: soluços de agendamento do container Linux (persistem com perda 0). No Windows o `predict` com `201` deu PASS, 0 correções e `late` 0 em 5 rodadas.
+
+## Multiplayer: servidor devolve a folga dos inputs (`201 InputTiming`) (2026-10-04)
+
+- Mensagem provisória `201 InputTiming` (S→C, canal 2, ~4 Hz): `u32 tick`, `i16 slack` em 1/16 de tick (tick mais novo de cada `Input` − próximo tick a simular, suavizado). Aditiva como a `200 RpcFrom`: cliente antigo descarta. Documentada em `docs/multiplayer-protocol.md`.
+- `InputQueue::slack()`, `KX_NetworkManager::SendInputTiming()`, `NetClock::addInputSlack()`/`leadAdjustTicks()` (alvo 3 ticks, ganho 0,3, limite ±1 s); `network.prediction_stats(obj)` ganhou `lead_adjust`.
+- Resultado: 8 rodadas do `predict`, todas PASS, erro máximo 0 (antes até 0,134, e a falha original 0,6); `rpc`, `spawner` e `car` PASS; testes do núcleo 113 PASS com testes novos de mensagem, folga e ajuste.
+- Roadmap: os cenários `predict`/`server`/`scene`/`scene-server` e o `--server` no Windows já estavam feitos (`87fe6d1`, `19e1437`); removidos dos abertos.
+
+## Multiplayer: predição do cliente segue o relógio (2026-10-04)
+
+- `KX_NetworkManager::ClientPredict` não cresce mais o tick previsto cegamente de um em um: segue a deriva suavizada em relação a `NetClock::predictionTick` (dois passos num quadro quando fica para trás, nenhum quando fica à frente; ressincroniza só acima de meio segundo, como antes). O passo de um tick foi para `ClientPredictTick`.
+- `NetClock::predictionTick`: margem de 1 para 2 ticks (teste `NET_Prediction_test` ajustado).
+- Medição (folga = tick do input − próximo tick do servidor na chegada): antes, a linha de ticks ficava em qualquer ponto até ±8 ticks do alvo, diferente a cada rodada, e as rodadas com folga negativa geravam inputs atrasados e correções. Depois, 8 rodadas do `predict`, todas PASS, erro máximo ≤ 0,134. Resta um viés por rodada da estimativa do relógio (0 a 4 ticks), detalhado em `NOTES-engine.md`.
+
+## Multiplayer: `network.input_stats` e causa do `predict` intermitente (2026-10-04)
+
+- `KX_NetworkManager::GetInputStats` e `network.input_stats(client)` (servidor): contadores da `InputQueue` do cliente.
+- `net_engine_test.py` (`predict`) loga os contadores no servidor. Confirmado: as correções do cliente vêm de inputs que chegam depois do tick simulado (`late`/`repeated`); detalhes em `NOTES-engine.md`.
+
+## Multiplayer: revalidação no Linux após o merge do PR #4 (2026-10-04, main `9e7925f`)
+
+- `run_net_test.sh` `spawner`, `car`, `server`, `scene`, `scene-server` e `rpc` passam na main; `predict` passou
+  3 de 4 rodadas. A falha: `prediction: corrections stay small` com `max_error` 0,6 (limite 0,5), 21 correções,
+  0 teleportes; nas rodadas boas `max_error` fica entre 0 e 0,067. Intermitente, ainda sem causa: fica aberto.
+- Armadilha do ambiente: sem `PYTHONPATH=/opt/py311-site` o `RangeRuntime` não acha o `numpy`, o módulo `aud`
+  falha e `AUD_initPython` dá segfault (`PyModule_AddObject` com módulo nulo) antes de qualquer teste rodar.
+
 ## Multiplayer: spawner/car validados no Windows com as 3 correções da predição; armadilha de build achada (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `run_net_test_win.sh spawner` e `car` passam no Windows/MSVC com os commits `11a0c1e7` (reconciliação),

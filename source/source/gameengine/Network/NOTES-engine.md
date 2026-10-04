@@ -145,8 +145,9 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
 **Como funciona:**
 
 - **Cliente.** A cada tick, antes de aplicar os snapshots, `ClientPredict()` escolhe o tick previsto
-  (`NetClock::predictionTick`, crescendo de um em um; só volta à estimativa do relógio se divergir mais de meio
-  segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
+  (`NetClock::predictionTick`, crescendo de um em um por passo; segue a deriva suavizada em relação à estimativa do
+  relógio com dois passos num quadro quando fica para trás e nenhum quando fica à frente; só volta direto à estimativa
+  se divergir mais de meio segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
   mais novo (`PredictionClient::reconcile`: se o estado do servidor difere da previsão daquele tick, volta a ele e
   re-executa os inputs seguintes), roda o passo com o input atual e guarda o estado. A correção visual
   (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
@@ -328,3 +329,23 @@ em vez de um único arquivo compartilhado).
 - **Esquema de protótipo antes do spawn.** O cliente decodifica os campos do `Spawn` com o esquema do protótipo
   antes de criar o objeto; `SchemaFor` monta o esquema do objeto inativo se ainda não existe (`CacheProtoSchema`).
   Sem isso, protótipo com propriedade replicada travava toda a replicação no cliente.
+
+## Revalidação Linux na main `9e7925f` (2026-10-04, nuvem)
+
+- `PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh <cenário>`: spawner, car, server, scene,
+  scene-server e rpc PASS; predict PASS 3/4.
+- Falha intermitente do predict: `max_error` 0,6 com 21 correções (normal: 0–0,067, 0–1 correção). Investigar.
+- Sem o `PYTHONPATH` acima o player cai em `AUD_initPython` (segfault por `numpy` ausente): não é bug de rede.
+
+### Investigação do `predict` intermitente (Linux)
+
+- 16 rodadas com `NET_DEBUG=1`: todas PASS, mas o erro máximo varia de 0 a 0,33, com 0 a 15 correções por rodada; a falha anterior (0,6) é a cauda dessa distribuição.
+- O erro é sempre múltiplo de 1 tick de input (2,0/30 ≈ 0,067), inclusive em trechos de velocidade constante. Hipótese: o servidor não recebe o input a tempo do tick e aplica `InputQueue::consume` com repetição (até `maxRepeatTicks = 4`) ou sem input (`missing`). Com o simulador 40,5,1 e a renderização por software, quadros lentos do cliente atrasam os inputs.
+- Carregar a CPU não reproduz: a falha passa a ser "server applied the client's input" (poucos frames), não o erro de predição.
+- Os contadores `late`/`repeated`/`missing` da `InputQueue` não estão expostos ao Python, então a hipótese ainda não foi confirmada. Próximo passo proposto: expor esses contadores no servidor (por exemplo, em `prediction_stats` do lado do servidor) e cruzá-los com as correções do cliente, antes de decidir entre corrigir o motor ou ajustar a margem do teste.
+- **Confirmada** com `network.input_stats(client)` (novo, só no servidor: `received`, `duplicates`, `late`, `too_far`, `applied`, `repeated`, `missing`, `invalid`), logado pelo `predict` a cada mudança. Em 6 rodadas: as 5 com `late` 0 a 5 tiveram 0 correções; a com `late` 95 (`repeated` 95) teve 2 correções (erro 0,13). Os ~30 `missing` de toda rodada são os ticks antes do primeiro input do cliente (início), não afetam o erro.
+- Causa: o tick de predição do cliente às vezes não fica adiantado o bastante em relação ao servidor e o input chega depois do tick simulado; o servidor repete o anterior e o cliente reconcilia. Próximo passo: medir a folga (tick do input − tick do servidor na chegada) e ajustar a margem de adiantamento do `NetClock::predictionTick`, em vez de afrouxar o 0,5 do teste.
+- **Folga medida** (log temporário em `InputQueue::receive`: tick do input − próximo tick do servidor): a linha de ticks do cliente só crescia de um em um e ficava em qualquer ponto até ±8 ticks do alvo, diferente a cada rodada (folga de 3 a 11 nas boas, de −3 a 5 na ruim). Corrigido: `ClientPredict` segue a deriva suavizada (média 0,1; passa de 1,5 tick → dois passos no quadro ou nenhum), o passo foi para `ClientPredictTick`, e a margem do `predictionTick` subiu de 1 para 2 ticks. Em 8 rodadas: todas PASS, erro máximo ≤ 0,134, folga com espalhamento de ±4 ticks e centro ainda variando de ~0 a ~4 entre rodadas (3 rodadas com `late` 47 a 82).
+- Resta um viés por rodada na estimativa do relógio (offset dos `Pong`). Próximo passo proposto: o servidor devolver a folga medida (por exemplo, no `Pong` ou numa mensagem nova) e o cliente ajustar a margem por ela; é mudança de protocolo, então fica para uma tarefa própria.
+- **Feito com a mensagem `201 InputTiming`** (contrato fechado em 2026-10-04, `docs/multiplayer-protocol.md` seção 5, após o `predict` passar no Windows: 5 rodadas PASS, erro 0, 0 correções) (S→C, canal 2, a cada 15 ticks): `InputQueue::slack()` suaviza a folga de cada `Input` recebido; `KX_NetworkManager::SendInputTiming()` manda a cada cliente; o cliente chama `NetClock::addInputSlack()`, que move o adiantamento 30% do erro em relação ao alvo de 3 ticks por relato (limitado a ±1 s). `prediction_stats(obj)` ganhou `lead_adjust`. Em 8 rodadas do `predict`: todas PASS com erro máximo 0 e 0 correções; `lead_adjust` final de −2,4 a +3,5 ticks (o viés de cada rodada); `late` 3 a 21 por rodada, sem correção. Testes do núcleo: 113 PASS (build `NET_STANDALONE`).
+- **De onde vêm os `late` restantes** (2026-10-04, log temporário em `InputQueue::receive`, 7 rodadas PASS): 0 a 11 por rodada, espalhados pela rodada inteira (não só na convergência); todos são o bloco de **1 ou 2 ticks** antes do `nextTick`, quase sempre numa mensagem cujo `newestTick` já está à frente (folga média 2 a 3,3 no momento). Ou seja: o pacote original daquele tick e as cópias redundantes seguintes não chegaram a tempo (perda de 1% do simulador ou um quadro atrasado), não um viés do relógio. Nenhum gerou correção. Decisão: alvo (3) e ganho (0,3) ficam; não vale subir o alvo (custa latência sempre para cobrir um tick raro). **Causa confirmada** (mesmo dia): com perda 0 (`net-sim 40,5,0`) o Linux ainda dá 5 a 8 `late` por rodada (com 1%: 9 a 12), e a redundância de 8 blocos torna impossível um `late` só por perda de 1%; logo são soluços de agendamento do container (4 vCPUs, servidor e cliente na mesma máquina), não perda. No Windows (máquina dedicada) o `predict` deu `late` 0 em 5 rodadas, PASS, 0 correções: coerente, não é falha da contagem (a lógica de `late` é a mesma nas duas plataformas).

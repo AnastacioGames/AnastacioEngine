@@ -194,6 +194,24 @@ TEST(NetPrediction, QueueDropsInputsTooFarAhead)
 	EXPECT_EQ(q.pending(), 0u);
 }
 
+TEST(NetPrediction, QueueMeasuresSlack)
+{
+	InputQueue q;
+	float slack;
+	EXPECT_FALSE(q.slack(slack));
+	InputMsg msg;
+	msg.newestTick = 105;
+	msg.blocks = {block(1)};
+	q.receive(msg, 100);
+	ASSERT_TRUE(q.slack(slack));
+	EXPECT_FLOAT_EQ(slack, 5.0f);
+	// Smoothed: a late input pulls the average down a tenth of the way.
+	msg.newestTick = 95;
+	q.receive(msg, 100);
+	ASSERT_TRUE(q.slack(slack));
+	EXPECT_FLOAT_EQ(slack, 4.0f);
+}
+
 TEST(NetPrediction, ServerRoutesSessionEvents)
 {
 	PredictionServer server;
@@ -585,12 +603,34 @@ TEST(NetClock, OffsetFromPongs)
 	EXPECT_TRUE(clock.synced());
 	EXPECT_NEAR(clock.serverTime(5000), 603.0, 0.01);
 	EXPECT_NEAR(clock.serverTime(6000), 663.0, 0.01);
-	// Prediction runs half a round trip plus one tick ahead.
-	EXPECT_EQ(clock.predictionTick(5000), 607u);
+	// Prediction runs half a round trip plus two ticks ahead.
+	EXPECT_EQ(clock.predictionTick(5000), 608u);
 	Tick tick;
 	float alpha;
 	clock.renderTime(5000, tick, alpha);
 	EXPECT_EQ(tick, 597u);  // 100 ms (2 snapshots at 20 Hz) behind
+}
+
+TEST(NetClock, InputSlackMovesPredictionLead)
+{
+	ClockConfig config;
+	config.tickRate = 60;
+	config.targetInputSlack = 3.0f;
+	config.inputSlackGain = 0.5f;
+	NetClock clock(config);
+	clock.addPong(100.0f, 600, 5000);
+	EXPECT_EQ(clock.predictionTick(5000), 608u);
+	// Inputs arrive 1 tick late: the lead grows by half of the 4 missing ticks.
+	clock.addInputSlack(-1.0f);
+	EXPECT_FLOAT_EQ(clock.leadAdjustTicks(), 2.0f);
+	EXPECT_EQ(clock.predictionTick(5000), 610u);
+	// Far too early: the lead shrinks, bounded by one second.
+	for (int i = 0; i < 100; ++i) {
+		clock.addInputSlack(500.0f);
+	}
+	EXPECT_FLOAT_EQ(clock.leadAdjustTicks(), -60.0f);
+	clock.reset();
+	EXPECT_FLOAT_EQ(clock.leadAdjustTicks(), 0.0f);
 }
 
 TEST(NetClock, InterpDelayFollowsJitter)

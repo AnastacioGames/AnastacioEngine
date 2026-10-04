@@ -48,6 +48,10 @@ struct ClockConfig {
 	float resyncMs = 250.0f;
 	/// EMA factor of the offset (contract, section 2: alpha 0.1).
 	float offsetAlpha = 0.1f;
+	/// Input slack (ticks) the prediction aims for when the server reports it (provisional InputTiming).
+	float targetInputSlack = 3.0f;
+	/// Fraction of the slack error corrected per report.
+	float inputSlackGain = 0.3f;
 };
 
 class NetClock {
@@ -58,6 +62,11 @@ public:
 	void addPong(float rttMs, Tick serverTick, uint64_t nowMs);
 	/// A snapshot of the given server tick was received now (only new ones should be fed).
 	void addSnapshot(Tick tick, uint64_t nowMs);
+	/// Slack of this client's inputs measured by the server (InputTiming): moves the prediction lead so the
+	/// inputs arrive about targetInputSlack ticks before they are simulated.
+	void addInputSlack(float slackTicks);
+	/// Ticks added to the prediction lead by addInputSlack.
+	float leadAdjustTicks() const;
 	/// Forgets every sample (new connection or scene).
 	void reset();
 
@@ -83,6 +92,7 @@ private:
 	/// Server time in ms minus local time in ms.
 	double m_offsetMs = 0.0;
 	float m_rttMs = 0.0f;
+	float m_leadAdjust = 0.0f;
 	float m_rttJitterMs = 0.0f;
 	bool m_hasTransit = false;
 	double m_lastTransitMs = 0.0;

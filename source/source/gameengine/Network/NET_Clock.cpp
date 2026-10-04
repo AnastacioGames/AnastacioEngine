@@ -96,6 +96,21 @@ void NetClock::addSnapshot(Tick tick, uint64_t nowMs)
 	updateDelay(nowMs);
 }
 
+void NetClock::addInputSlack(float slackTicks)
+{
+	if (!(std::fabs(slackTicks) < 1000.0f)) {
+		return;
+	}
+	const float limit = float(m_config.tickRate);  // one second either way
+	m_leadAdjust += (m_config.targetInputSlack - slackTicks) * m_config.inputSlackGain;
+	m_leadAdjust = std::min(std::max(m_leadAdjust, -limit), limit);
+}
+
+float NetClock::leadAdjustTicks() const
+{
+	return m_leadAdjust;
+}
+
 void NetClock::reset()
 {
 	*this = NetClock(m_config);
@@ -137,8 +152,8 @@ void NetClock::renderTime(uint64_t nowMs, Tick &tick, float &alpha) const
 
 Tick NetClock::predictionTick(uint64_t nowMs) const
 {
-	const double lead = (double(m_rttMs) / 2.0 + double(jitterMs())) / tickMs() + 1.0;
-	return Tick(uint64_t(std::ceil(serverTime(nowMs) + lead)));
+	const double lead = (double(m_rttMs) / 2.0 + double(jitterMs())) / tickMs() + 2.0;
+	return Tick(uint64_t(std::ceil(serverTime(nowMs) + std::max(1.0, lead + double(m_leadAdjust)))));
 }
 
 float NetClock::interpDelayMs() const

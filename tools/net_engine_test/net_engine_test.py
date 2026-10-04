@@ -94,6 +94,7 @@ class Predict:
         self.response_ticks = None
         self.server_x = None
         self.server_xs = []
+        self.last_input_stats = None
         self.inputs_seen = 0
         self.last_report = 0.0
         self.stats = None
@@ -150,6 +151,10 @@ class Predict:
             if t - self.last_report > 0.25:
                 self.last_report = t
                 net.call("rig_pos", self.rig.worldPosition.x)
+                st = net.input_stats(joined)
+                if st and st != self.last_input_stats:
+                    self.last_input_stats = st
+                    log("input_stats t=%.2f %s" % (t, st))
 
     def client_frame(self, t, events):
         self.server_x = RIG_REPORT["x"]
