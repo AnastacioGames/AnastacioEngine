@@ -20,14 +20,15 @@
 
 /** \file gameengine/Network/tools/net_echo.cpp
  *  \ingroup network
- *  \brief Manual test tool: chat echo server and client over ENet.
+ *  \brief Manual test tool: chat echo server (ENet + WebSocket) and ENet client.
  *
- *   net_echo server [port]
+ *   net_echo server [udpPort] [wsPort]   (wsPort 0 = no WebSocket)
  *   net_echo client <host> <port> [name] [messages]
  */
 
 #include "NET_ITransport.h"
 #include "NET_Session.h"
+#include "NET_TransportWeb.h"
 
 #include <atomic>
 #include <chrono>
@@ -49,9 +50,19 @@ static void onSignal(int)
 static const char *kGameId = "anastacio.net_echo";
 static const uint64_t kSceneHash = 0x4543484F;  // "ECHO"
 
-static int runServer(uint16_t port)
+static int runServer(uint16_t port, uint16_t wsPort)
 {
-	std::unique_ptr<ITransport> transport = createENetTransport();
+	std::vector<MultiTransportEntry> entries(1);
+	entries[0].transport = createENetTransport();
+	entries[0].port = port;
+	ITransport *ws = nullptr;
+	if (wsPort) {
+		entries.emplace_back();
+		entries.back().transport = createWebSocketServerTransport();
+		entries.back().port = wsPort;
+		ws = entries.back().transport.get();
+	}
+	std::unique_ptr<ITransport> transport = createMultiTransport(std::move(entries));
 	ServerConfig config;
 	config.gameId = kGameId;
 	config.sceneName = "Echo";
@@ -59,10 +70,15 @@ static int runServer(uint16_t port)
 	config.maxClients = kMaxClients;
 	ServerSession server(*transport, config);
 	if (!server.start(port)) {
-		std::fprintf(stderr, "net_echo: cannot listen on UDP port %u\n", unsigned(port));
+		std::fprintf(stderr, "net_echo: cannot listen on UDP port %u / TCP port %u\n", unsigned(port),
+		             unsigned(wsPort));
 		return 1;
 	}
-	std::printf("net_echo: server on UDP port %u\n", unsigned(transport->localPort()));
+	std::printf("net_echo: server on UDP port %u", unsigned(transport->localPort()));
+	if (ws) {
+		std::printf(", WebSocket on TCP port %u", unsigned(ws->localPort()));
+	}
+	std::printf("\n");
 	std::fflush(stdout);
 
 	const uint64_t start = steadyClockMs();
@@ -185,7 +201,8 @@ int main(int argc, char **argv)
 	std::signal(SIGTERM, onSignal);
 	const std::string mode = argc > 1 ? argv[1] : "";
 	if (mode == "server") {
-		return runServer(uint16_t(argc > 2 ? std::atoi(argv[2]) : 7777));
+		return runServer(uint16_t(argc > 2 ? std::atoi(argv[2]) : 7777),
+		                 uint16_t(argc > 3 ? std::atoi(argv[3]) : 7778));
 	}
 	if (mode == "client" && argc > 3) {
 		return runClient(argv[2], uint16_t(std::atoi(argv[3])), argc > 4 ? argv[4] : "player",
@@ -193,7 +210,7 @@ int main(int argc, char **argv)
 	}
 	std::fprintf(stderr,
 	             "usage:\n"
-	             "  net_echo server [port]\n"
+	             "  net_echo server [udpPort=7777] [wsPort=7778, 0 = off]\n"
 	             "  net_echo client <host> <port> [name] [messages]\n");
 	return 1;
 }
