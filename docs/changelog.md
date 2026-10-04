@@ -13,9 +13,12 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 - A integração de rede (`KX_NetworkManager`, `Range.network`, painéis Network) compila no MSVC sem mudança.
 - Novo `tools/net_engine_test/run_net_test_win.sh` (Git Bash): servidor e cliente `RangeRuntime` em janelas pequenas, um
-  `TEMP` por processo (os `NETTEST` vão para `%TEMP%ange_runtime.log.txt`). Passaram `spawner`, `car` e `spawner` com
+  `TEMP` por processo (os `NETTEST` vão para `%TEMP%
+ange_runtime.log.txt`). Passaram `spawner`, `car` e `spawner` com
   simulador 100 ms/20 ms/2 %.
 - Editor: painéis Network da cena e do objeto (aba Game) conferidos por screenshot numa janela real.
+- Painel Network da cena movido para a aba **Export Game** (junto do RangeArmor/Web/Android); o do objeto segue na aba
+  Game. Cada um tem uma linha apontando para o outro.
 - Não rodado no Windows: modo `scene` do teste. Registro em `source/source/gameengine/Network/NOTES-engine.md`.
 
 ## Áudio Web: AudioWorklet no lugar do ScriptProcessorNode (2026-10-04, branch `claude/project-thread-8r9ysi`)

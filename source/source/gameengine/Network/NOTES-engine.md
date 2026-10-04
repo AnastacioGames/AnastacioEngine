@@ -76,7 +76,7 @@ não deu para testar.
 
 ## Uso rápido
 
-Sem código: Properties > Scene > Game Settings > **Network** (modo, portas, Server Name, máximo de jogadores, tick rate,
+Sem código: Properties > Export Game > **Network** (modo, portas, Server Name, máximo de jogadores, tick rate,
 taxa de envio, game id/versão), Properties > Object > Game > **Network** (Replicate e opções), checkbox **Rep** nas
 Game Properties. O modo da cena (Host, Client, Dedicated) abre a sessão ao iniciar o jogo; no modo Client o endereço
 é `host`, `host:porta` ou `[v6]:porta`. Todos precisam do mesmo `.range`.
@@ -117,9 +117,10 @@ compilados aqui (só a versão enxuta acima).
 
 Compila sem mudança. `tools/net_engine_test/run_net_test_win.sh spawner|car ["100,20,2"]` (Git Bash) abre dois
 `RangeRuntime` em janelas 320×240; cada um recebe um `TEMP` próprio, porque o player grava os `NETTEST` em
-`%TEMP%ange_runtime.log.txt` (o stdout não chega ao shell). Passaram: `spawner` (círculo 382/382 amostras, `hp`,
+`%TEMP%
+ange_runtime.log.txt` (o stdout não chega ao shell). Passaram: `spawner` (círculo 382/382 amostras, `hp`,
 spawn, lobby, chat, LAN), `car` (cliente segue o carro a 4,93 m/s) e `spawner` com simulador 100,20,2. Editor:
-painéis Network da cena (Properties > Scene) e do objeto (Properties > Game, checkbox no cabeçalho) desenhados
+painéis Network da cena (hoje em Properties > Export Game) e do objeto (Properties > Game, checkbox no cabeçalho) desenhados
 certos numa janela (screenshot). Modo `scene` (editor gera os `.range`) não foi rodado no Windows.
 
 Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro

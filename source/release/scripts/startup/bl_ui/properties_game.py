@@ -1485,6 +1485,8 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
 
 class SCENE_PT_game_network(SceneButtonsPanel, Panel):
     bl_label = "Network"
+    # Export Game tab: the room settings (ports, server, game id) belong with how the game is shipped.
+    bl_context = "export"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -1527,6 +1529,7 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
             layout.label(text="Everyone must run the same .range file", icon='INFO')
         if is_server and net.tick_rate == 0:
             layout.label(text="Tick rate 0: uses the Logic Tic Rate of the scene", icon='INFO')
+        layout.label(text="Which objects sync: Object > Game > Network", icon='OBJECT_DATA')
 
 
 class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):
@@ -1987,6 +1990,7 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
         if net.use_replicate:
             layout.label(text="ID: %d" % net.net_id)
             layout.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
+        layout.label(text="Room, ports and server: Export Game > Network", icon='EXPORT')
 
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
