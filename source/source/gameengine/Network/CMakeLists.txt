@@ -34,7 +34,10 @@ endif()
 
 set(NET_SRC
 	NET_BitStream.cpp
+	NET_Clock.cpp
+	NET_LagCompensation.cpp
 	NET_Messages.cpp
+	NET_Prediction.cpp
 	NET_Session.cpp
 	NET_Snapshot.cpp
 	NET_TransportENet.cpp
@@ -45,8 +48,11 @@ set(NET_SRC
 	NET_TransportWebSocketServer.cpp
 
 	NET_BitStream.h
+	NET_Clock.h
 	NET_ITransport.h
+	NET_LagCompensation.h
 	NET_Messages.h
+	NET_Prediction.h
 	NET_Session.h
 	NET_Snapshot.h
 	NET_Socket.h
@@ -99,6 +105,7 @@ if(NET_STANDALONE)
 		tests/NET_BitStream_test.cpp
 		tests/NET_Golden_test.cpp
 		tests/NET_Messages_test.cpp
+		tests/NET_Prediction_test.cpp
 		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp
 		tests/NET_Transport_test.cpp

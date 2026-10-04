@@ -224,6 +224,14 @@ public:
 		uint8_t flags = 0;
 	};
 
+	/// Last Pong received; count grows by one per Pong (feeds NetClock).
+	struct PongSample {
+		uint32_t count = 0;
+		float rttMs = 0.0f;
+		Tick serverTick = kNoTick;
+		uint64_t receivedMs = 0;
+	};
+
 	ClientSession(ITransport &transport, const ClientConfig &config);
 	/// Drops the connection without Quit (the server treats it as lost).
 	~ClientSession();
@@ -248,6 +256,7 @@ public:
 	/// Server tick estimated from Welcome/Pong and the local clock.
 	Tick estimatedServerTick(uint64_t nowMs) const;
 	const std::map<ClientId, PlayerInfo> &players() const;
+	const PongSample &lastPong() const;
 
 private:
 	void handleReceive(const std::vector<uint8_t> &data, Channel channel, uint64_t nowMs,
@@ -270,6 +279,7 @@ private:
 	Tick m_baseTick = kNoTick;
 	uint64_t m_baseTickMs = 0;
 	std::map<ClientId, PlayerInfo> m_players;
+	PongSample m_lastPong;
 };
 
 /** \} */
