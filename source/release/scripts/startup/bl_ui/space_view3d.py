@@ -4076,10 +4076,12 @@ class VIEW3D_PT_layer_names(Panel):
             row.prop(view, "layers", index=i, text="", toggle=True,
                      icon='RESTRICT_VIEW_OFF' if view.layers[i] else 'RESTRICT_VIEW_ON')
             sub = row.row(align=True)
+            sub.ui_units_x = 1.5
             sub.alignment = 'RIGHT'
             sub.label(text="%d" % (i + 1))
             row.prop(item, "name", text="")
             sub = row.row(align=True)
+            sub.ui_units_x = 1.5
             sub.alignment = 'RIGHT'
             sub.label(text="%d" % counts[i] if counts[i] else "-")
 

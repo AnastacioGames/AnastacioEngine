@@ -106,6 +106,12 @@ class LOGIC_PT_states(Panel):
         layout = self.layout
         game = context.active_object.game
 
+        header = layout.row()
+        header.label(text="Visible  #   State Name")
+        sub = header.row()
+        sub.alignment = 'RIGHT'
+        sub.label(text="Initial")
+
         col = layout.column(align=True)
         for item in game.state_names:
             i = item.index
@@ -113,6 +119,7 @@ class LOGIC_PT_states(Panel):
             row.prop(game, "states_visible", index=i, text="", toggle=True,
                      icon='LAYER_USED' if game.used_states[i] else 'BLANK1')
             sub = row.row(align=True)
+            sub.ui_units_x = 1.5
             sub.alignment = 'RIGHT'
             sub.label(text="%d" % (i + 1))
             row.prop(item, "name", text="")
