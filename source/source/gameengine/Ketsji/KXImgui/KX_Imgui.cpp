@@ -79,8 +79,9 @@ void KX_Imgui::Init(DEV_InputDevice *inputDevice)
 	ImGui_ImplOpenGL3_Init("#version 120");
 #endif
 
-	// Load imgui.ini file
-	imguiConfigPath = std::string(BKE_appdir_program_dir()) + "\\imgui.ini";
+	// Load imgui.ini file. The program dir already ends with the separator: an extra "\\"
+	// made Linux write a file literally named "\imgui.ini".
+	imguiConfigPath = std::string(BKE_appdir_program_dir()) + "imgui.ini";
 	std::ifstream ini_file(imguiConfigPath.c_str());
 
 	if (ini_file.is_open()) {
@@ -194,8 +195,7 @@ void KX_Imgui::Stop()
 	ImGui_ImplOpenGL3_Shutdown();
 	KX_ImGui_Impl_Inputs_Shutdown();
 
-	std::string finalpath = std::string(BKE_appdir_program_dir()) + "\\imgui.ini";
-	ImGui::SaveIniSettingsToDisk(finalpath.c_str());
+	ImGui::SaveIniSettingsToDisk(imguiConfigPath.c_str());
 
 	ImPlot::DestroyContext();
 	ImGui::DestroyContext();
