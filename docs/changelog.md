@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Logic Bricks → Python Component, fase 6 (2026-10-04, branch `logic/convert-f6`)
+
+- `logic_to_python.py`: Track To com pai, Sound (loop/ping-pong/3D), Movement e Animation Event agora funcionam em sensores/actuators de **outro objeto** (`own=`, estado `Dono/Actuator`, `_plm_init` por dono). Sound reescrito em `_snd_play/_snd_stop/_snd_update` com a flag `m_isplaying` da engine (recomeça após pulso negativo). Novos: Sound 3D e Delay em segundos (antes `Unsupported`).
+- Testes: `tools/create_logic_convert_scene_f6.py` (Ray material+x-ray, Collision, Near, Radar, Movement, Delay, Track To com pai e Sound em outros objetos) e `tools/test_logic_convert_f6_codegen.py` (geração + fluxo do Sound com `aud` falso; F5 como regressão: OK). **Sem build da engine**: runtime/CHECK e API 3D do `aud` não validados; roteiro Windows e o que segue brick em `NOTES-logic-f6.md`.
+
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 
 - `logic_to_python.py`: actuators **Camera, Constraint (Loc/Ori/Dist/FH), Steering e Mouse Look** de outro objeto agora são convertidos. Os helpers (`_follow`, `_mouse_look`, `_cst_*`, `_steer`) recebem `own=` e agem sobre `scene.objects[dono]`; estado separado por `Dono/Actuator`. Os demais helpers de outro dono seguem como brick.
