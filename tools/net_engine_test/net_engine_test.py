@@ -29,6 +29,11 @@ SCENARIO = os.environ.get("NET_SCENARIO", "spawner")
 SECONDS = float(os.environ.get("NET_SECONDS", "10"))
 CAR_SPEED = 5.0
 SIM = os.environ.get("NET_SIM", "")  # "latency,jitter,loss", for the network simulator
+# Scene mode: the .range files (make_net_scenes.py) carry the Network panel settings, so the session opens
+# when the game starts and the script neither replicates nor hosts/joins.
+FROM_SCENE = os.environ.get("NET_FROM_SCENE") == "1"
+# The name goes in the Hello message, so a scene-mode client (connected before any script runs) is "Player".
+CLIENT_NAME = "Player" if FROM_SCENE else "Tester-client"
 
 failures = []
 
@@ -69,9 +74,10 @@ def run():
 
     if SCENARIO == "spawner":
         tracked = find(scene, "Spawner")
-        tracked["hp"] = 0
         props = ["hp"]
-        net.replicate(tracked, props=props, velocity=False)
+        if not FROM_SCENE:
+            tracked["hp"] = 0
+            net.replicate(tracked, props=props, velocity=False)
         proto = "Rig"
     else:
         tracked = find(scene, "Car")
@@ -81,11 +87,18 @@ def run():
     check("replicate gives an id", net.net_id(tracked) != 0, "id=%d" % net.net_id(tracked))
     initial = tuple(tracked.worldPosition)
 
-    if ROLE == "server":
-        ok = net.host(PORT, max_players=4, room_name="engine-test", websocket_port=0)
+    room = "scene-mode-test" if FROM_SCENE else "engine-test"
+    if FROM_SCENE:
+        expected = int(os.environ.get("NET_EXPECT_ID", "0"))
+        check("the saved net id reached the engine", net.net_id(tracked) == expected, "%d vs %d" % (net.net_id(tracked), expected))
+        if ROLE == "server":
+            check("scene mode opened the server", net.isServer and net.roomName == room and net.maxPlayers == 4,
+                  "%r %r" % (net.roomName, net.maxPlayers))
+    elif ROLE == "server":
+        ok = net.host(PORT, max_players=4, room_name=room, websocket_port=0)
         check("host() opens the room", ok)
         check("isServer", net.isServer and net.isConnected)
-        check("roomName/maxPlayers", net.roomName == "engine-test" and net.maxPlayers == 4,
+        check("roomName/maxPlayers", net.roomName == room and net.maxPlayers == 4,
               "%r %r" % (net.roomName, net.maxPlayers))
     else:
         time.sleep(float(os.environ.get("NET_CLIENT_DELAY", "1.5")))
@@ -136,7 +149,7 @@ def run():
                 lobby["clients"] = [(c.id, c.name, c.isHost, c.ready) for c in net.clients]
             if net.isConnected and not lobby["lan"]:
                 found = net.discover_lan()
-                if any(entry["name"] == "engine-test" for entry in found):
+                if any(entry["name"] == room for entry in found):
                     lobby["lan"] = found
             if net.isConnected:
                 p = tracked.worldPosition
@@ -160,7 +173,7 @@ def run():
         check("a client joined", any(e[0] == "join" for e in events), str(events))
         check("net.clients lists host + client", clients_seen >= 2, "max=%d" % clients_seen)
         names = [c.name for c in net.clients]
-        check("client name arrived", any(n == "Tester-client" for n in names), str(names))
+        check("client name arrived", any(n == CLIENT_NAME for n in names), str(names))
         check("lobby: client chat reached the server", ("chat", 1, "hello") in events, str(events))
         check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
     else:
@@ -192,18 +205,18 @@ def run():
         if proto:
             check("spawned object appears on the client", any(n >= 1 for n in spawn_seen), "max=%d" % max(spawn_seen or [0]))
         check("lobby: client list has the host and itself", (0, "Tester-server", True) in [c[:3] for c in lobby["clients"]]
-              and any(c[0] == 1 and c[1] == "Tester-client" for c in lobby["clients"]), str(lobby["clients"]))
+              and any(c[0] == 1 and c[1] == CLIENT_NAME for c in lobby["clients"]), str(lobby["clients"]))
         check("lobby: server chat reached the client", ("chat", 0, "welcome") in events, str(events))
         check("lobby: on_start fired on the client", ("start",) in events, str(events))
         if lobby["lan"]:
-            entry = [e for e in lobby["lan"] if e["name"] == "engine-test"][0]
+            entry = [e for e in lobby["lan"] if e["name"] == room][0]
             check("LAN discovery lists the room", entry["port"] == PORT and entry["max_players"] == 4, str(entry))
         else:
             log("skip LAN discovery (no answer on this network)")
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
 
     net.disconnect()
-    if ROLE == "server":
+    if ROLE == "server" and not FROM_SCENE:
         # The registration of a scene object survives leaving and hosting again.
         check("disconnect() leaves the session", not net.isServer and not net.isConnected)
         first_id = net.net_id(tracked)

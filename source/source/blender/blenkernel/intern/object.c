@@ -59,6 +59,7 @@
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
 #include "BLI_linklist.h"
+#include "BLI_hash.h"
 #include "BLI_rand.h"
 #include "PIL_time.h"
 #include "BLI_kdtree.h"
@@ -618,11 +619,10 @@ void BKE_object_net_id_generate(Main *bmain, Object *ob)
 {
 	/* The id is saved in the .range file, so it is random on purpose: ids chosen from the object name would
 	 * change on rename, and two artists adding objects in sequence would hand out the same numbers. */
-	static RNG *rng = NULL;
-	if (rng == NULL) {
-		rng = BLI_rng_new_srandom((unsigned int)(PIL_check_seconds_timer() * 1000000.0) ^ (unsigned int)(intptr_t)ob);
-	}
+	RNG *rng = BLI_rng_new_srandom((unsigned int)(PIL_check_seconds_timer() * 1000000.0) ^
+	                               (unsigned int)(uintptr_t)ob ^ BLI_hash_int_2d(bmain ? BLI_listbase_count(&bmain->object) : 0, 7));
 
+	ob->net.net_id = 0;  /* stays 0 only if 1000 draws all collide, which never happens in practice */
 	for (int attempt = 0; attempt < 1000; attempt++) {
 		const unsigned int id = (unsigned int)BLI_rng_get_int(rng) & 0x7FFFFFFFu;
 		bool used = (id == 0);
@@ -636,10 +636,10 @@ void BKE_object_net_id_generate(Main *bmain, Object *ob)
 		}
 		if (!used) {
 			ob->net.net_id = id;
-			return;
+			break;
 		}
 	}
-	ob->net.net_id = 0;  /* never happens in practice; the game converter hands out a deterministic id */
+	BLI_rng_free(rng);
 }
 
 void BKE_object_init(Object *ob)
