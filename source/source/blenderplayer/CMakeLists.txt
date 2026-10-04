@@ -203,6 +203,8 @@ endif()
 		ge_common
 		ge_scenegraph
 		ge_msg_network
+		ge_network
+		extern_enet
 		ge_logic_imgui
 		ge_videotexture
 

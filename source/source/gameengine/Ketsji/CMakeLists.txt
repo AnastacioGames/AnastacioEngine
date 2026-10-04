@@ -314,6 +314,7 @@ set(LIB
   ge_logic_bricks
   ge_scenegraph
   ge_msg_network
+  ge_network
   ge_device
   extern_recastnavigation
   bf_blenkernel

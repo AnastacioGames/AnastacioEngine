@@ -235,6 +235,23 @@ static void rna_GameObjectSettings_is_vehicle_set(PointerRNA *ptr, bool value)
 	}
 }
 
+/* Multiplayer: the first enable seeds the sync flags and generates the id saved in the .range file. */
+static void rna_RangeNetObjectSettings_replicate_set(PointerRNA *ptr, bool value)
+{
+	Object *ob = ptr->id.data;
+
+	if (value) {
+		ob->net.flags |= NET_OBJ_REPLICATE;
+		if (ob->net.net_id == 0) {
+			BKE_object_net_defaults(ob);
+			BKE_object_net_id_generate(G_MAIN, ob);
+		}
+	}
+	else {
+		ob->net.flags &= ~NET_OBJ_REPLICATE;
+	}
+}
+
 /* Native destruction: the struct is zeroed on objects created before it existed (and on new ones),
  * so the first enable seeds the defaults. Values validated by the Python prototype. */
 static void rna_GameObjectSettings_use_destruction_set(PointerRNA *ptr, bool value)
@@ -2679,6 +2696,65 @@ static void rna_def_object_reverb_area(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, "rna_ReverbAreaSettings_param_update");
 }
 
+static void rna_def_object_network(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "RangeNetObjectSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeNetObjectSettings");
+	RNA_def_struct_nested(brna, srna, "Object");
+	RNA_def_struct_ui_text(srna, "Network Settings", "Multiplayer replication of the object");
+
+	prop = RNA_def_property(srna, "use_replicate", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_REPLICATE);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_RangeNetObjectSettings_replicate_set");
+	RNA_def_property_ui_text(prop, "Replicate",
+	                         "The server sends this object to the players. Everyone must run the same .range file");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "net_id", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "net_id");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Network ID",
+	                         "Identifier saved in the file (random, does not change when the object is renamed)");
+
+	prop = RNA_def_property(srna, "sync_transform", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_SYNC_TRANSFORM);
+	RNA_def_property_ui_text(prop, "Transform", "Replicate position and rotation");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "sync_velocity", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_SYNC_VELOCITY);
+	RNA_def_property_ui_text(prop, "Velocity", "Replicate the linear velocity (smoother physics objects on the players)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "sync_angular_velocity", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_SYNC_ANGULAR);
+	RNA_def_property_ui_text(prop, "Angular Velocity", "Replicate the angular velocity");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_always_relevant", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_ALWAYS_RELEVANT);
+	RNA_def_property_ui_text(prop, "Always Relevant", "Send to every player whatever the distance");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_interpolate", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_OBJ_INTERPOLATE);
+	RNA_def_property_ui_text(prop, "Interpolate",
+	                         "Players draw the object between two snapshots (smooth) instead of jumping to the last one");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "priority", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "priority");
+	RNA_def_property_range(prop, 0.01f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 10.0f, 10, 2);
+	RNA_def_property_float_default(prop, 1.0f);
+	RNA_def_property_ui_text(prop, "Priority",
+	                         "Objects with more priority get the bandwidth first when the connection is busy");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+}
+
 static void rna_def_object_destruction(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -3118,6 +3194,12 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "RangeDestructionSettings");
 	RNA_def_property_ui_text(prop, "Destruction Settings", "");
 
+	prop = RNA_def_property(srna, "network", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "net");
+	RNA_def_property_struct_type(prop, "RangeNetObjectSettings");
+	RNA_def_property_ui_text(prop, "Network Settings", "");
+
 	prop = RNA_def_property(srna, "use_explosive", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_EXPLOSIVE);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_GameObjectSettings_use_explosive_set");
@@ -3447,6 +3529,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	rna_def_object_gpu_particles(brna);
 	rna_def_object_reverb_area(brna);
 	rna_def_object_lightning(brna);
+	rna_def_object_network(brna);
 	rna_def_object_destruction(brna);
 	rna_def_object_deform(brna);
 	rna_def_object_explosive(brna);

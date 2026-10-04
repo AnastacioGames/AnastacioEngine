@@ -36,6 +36,7 @@ struct EvaluationContext;
 struct Main;
 struct Main;
 struct Object;
+struct RangeNetworkSettings;
 struct RenderData;
 struct Scene;
 struct SceneRenderLayer;
@@ -60,6 +61,8 @@ void free_avicodecdata(struct AviCodecData *acd);
 
 void BKE_scene_free(struct Scene *sce);
 void BKE_scene_init(struct Scene *sce);
+/** Multiplayer defaults (Network panel); also used to seed scenes saved before the settings existed. */
+void BKE_scene_network_defaults(struct RangeNetworkSettings *net);
 struct Scene *BKE_scene_add(struct Main *bmain, const char *name);
 
 /* base functions */

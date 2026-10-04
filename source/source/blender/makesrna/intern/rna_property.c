@@ -137,6 +137,13 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Debug", "Print debug information for this property");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_replicate", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", PROP_REPLICATED);
+	RNA_def_property_ui_text(prop, "Replicate",
+	                         "Send this property to the players (multiplayer). Only Boolean, Integer and Float "
+	                         "are replicated, in the order of the property list");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	/* GameBooleanProperty */
 	srna = RNA_def_struct(brna, "GameBooleanProperty", "GameProperty");
 	RNA_def_struct_ui_text(srna, "Game Boolean Property", "Game engine user defined Boolean property");

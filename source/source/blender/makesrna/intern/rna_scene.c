@@ -4718,6 +4718,102 @@ static void rna_def_game_render_attachment(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Attachment", "Render attachment used by this slot");
 }
 
+static void rna_def_scene_network(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem network_mode_items[] = {
+		{NET_MODE_OFFLINE, "OFFLINE", 0, "Offline", "Single player, nothing is sent over the network"},
+		{NET_MODE_HOST, "HOST", 0, "Host",
+		 "Play and host the game: this process is the server and has a local player"},
+		{NET_MODE_CLIENT, "CLIENT", 0, "Client", "Join the game of the address below when the game starts"},
+		{NET_MODE_DEDICATED, "DEDICATED", 0, "Dedicated Server",
+		 "Server without a local player (use with the player in background mode)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "RangeNetworkSettings", NULL);
+	RNA_def_struct_sdna(srna, "RangeNetworkSettings");
+	RNA_def_struct_nested(brna, srna, "Scene");
+	RNA_def_struct_ui_text(srna, "Network Settings", "Multiplayer settings of the scene");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "mode");
+	RNA_def_property_enum_items(prop, network_mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "What the game does when it starts (scripts can still call Range.network)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "server_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "server_name");
+	RNA_def_property_ui_text(prop, "Server Name", "Room name shown in the LAN server list");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "address", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "address");
+	RNA_def_property_ui_text(prop, "Address", "Server to join in Client mode: host, host:port or [ipv6]:port");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "game_id", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "game_id");
+	RNA_def_property_ui_text(prop, "Game ID", "Games with another ID do not see each other (LAN list and handshake)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "game_version", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "game_version");
+	RNA_def_property_range(prop, 0, INT_MAX);
+	RNA_def_property_ui_text(prop, "Game Version", "Players with another version are refused when they connect");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "port", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "port");
+	RNA_def_property_range(prop, 1, 65535);
+	RNA_def_property_int_default(prop, 7777);
+	RNA_def_property_ui_text(prop, "Port", "UDP port of the server (ENet)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "websocket_port", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "ws_port");
+	RNA_def_property_range(prop, 0, 65535);
+	RNA_def_property_int_default(prop, 7778);
+	RNA_def_property_ui_text(prop, "WebSocket Port",
+	                         "TCP port for players on the Web and Android (0 = no WebSocket)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "max_players", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "max_players");
+	RNA_def_property_range(prop, 1, 64);
+	RNA_def_property_int_default(prop, 8);
+	RNA_def_property_ui_text(prop, "Max Players", "Most players connected at once");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "tick_rate", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "tick_rate");
+	RNA_def_property_range(prop, 0, 240);
+	RNA_def_property_ui_range(prop, 0, 120, 1, 0);
+	RNA_def_property_ui_text(prop, "Tick Rate",
+	                         "Logic steps per second while a session is open, set by the server "
+	                         "(0 = Logic Tic Rate of the scene)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "snapshot_rate", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "snapshot_rate");
+	RNA_def_property_range(prop, 1, 120);
+	RNA_def_property_int_default(prop, 20);
+	RNA_def_property_ui_text(prop, "Send Rate", "Snapshots per second the server sends to each player");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "use_lan_discovery", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_SCENE_LAN_DISCOVERY);
+	RNA_def_property_ui_text(prop, "LAN Discovery", "Answer LAN server list requests while hosting");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "use_late_join", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", NET_SCENE_LATE_JOIN);
+	RNA_def_property_ui_text(prop, "Late Join", "Players can join after the game started");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+}
+
 static void rna_def_scene_game_data(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -5132,6 +5228,12 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "Most fragments of destroyed objects alive at once; the oldest disappear first "
 	                         "(keep it low for Web and Android)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "network", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "network");
+	RNA_def_property_struct_type(prop, "RangeNetworkSettings");
+	RNA_def_property_ui_text(prop, "Network", "Multiplayer settings");
 
 	/* mode */
 	prop = RNA_def_property(srna, "use_occlusion_culling", PROP_BOOLEAN, PROP_NONE);
@@ -8505,6 +8607,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	rna_def_statvis(brna);
 	rna_def_unit_settings(brna);
 	rna_def_scene_image_format_data(brna);
+	rna_def_scene_network(brna);
 	rna_def_scene_game_data(brna);
 	rna_def_scene_collection(brna);
 	rna_def_scene_shaders_fx(brna);

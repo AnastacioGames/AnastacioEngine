@@ -195,6 +195,7 @@ class GAME_PT_game_properties(GameButtonsPanel, Panel):
             row.prop(prop, "type", text="")
             row.prop(prop, "value", text="")
             row.prop(prop, "show_debug", text="", toggle=True, icon='INFO')
+            row.prop(prop, "use_replicate", text="Rep", toggle=True)
             sub = row.row(align=True)
             props = sub.operator("object.game_property_move", text="", icon='TRIA_UP')
             props.index = i
@@ -1482,6 +1483,52 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             box.label(text="Speaker objects only; frames skipped between updates, 0 = every frame", icon='INFO')
 
 
+class SCENE_PT_game_network(SceneButtonsPanel, Panel):
+    bl_label = "Network"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.render.engine in cls.COMPAT_ENGINES
+
+    def draw(self, context):
+        layout = self.layout
+        net = context.scene.game_settings.network
+
+        layout.prop(net, "mode")
+        is_client = net.mode == 'CLIENT'
+        is_server = net.mode in {'HOST', 'DEDICATED'}
+
+        if is_client:
+            layout.prop(net, "address")
+
+        col = layout.column()
+        col.prop(net, "port")
+        sub = col.column()
+        sub.active = not is_client
+        sub.prop(net, "websocket_port")
+
+        box = layout.box()
+        box.active = net.mode != 'OFFLINE'
+        box.label(text="Server:", icon='WORLD')
+        box.prop(net, "server_name")
+        box.prop(net, "max_players")
+        box.prop(net, "tick_rate")
+        box.prop(net, "snapshot_rate")
+        box.prop(net, "use_lan_discovery")
+        box.prop(net, "use_late_join")
+
+        box = layout.box()
+        box.label(text="Game:", icon='GAME')
+        box.prop(net, "game_id")
+        box.prop(net, "game_version")
+        if net.mode != 'OFFLINE':
+            layout.label(text="Everyone must run the same .range file", icon='INFO')
+        if is_server and net.tick_rate == 0:
+            layout.label(text="Tick rate 0: uses the Logic Tic Rate of the scene", icon='INFO')
+
+
 class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):
     bl_label = "Navigation Mesh"
     bl_options = {'DEFAULT_CLOSED'}
@@ -1910,6 +1957,37 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
 
         layout.label(text="Predefined Bound:")
         layout.prop(game, "predefined_bound", "")
+
+class OBJECT_PT_game_network(GameButtonsPanel, Panel):
+    bl_label = "Network"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and ob.type not in {'CAMERA'})
+
+    def draw_header(self, context):
+        self.layout.prop(context.object.game.network, "use_replicate", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        net = context.object.game.network
+
+        layout.active = net.use_replicate
+        col = layout.column()
+        col.prop(net, "sync_transform")
+        col.prop(net, "sync_velocity")
+        col.prop(net, "sync_angular_velocity")
+        col.prop(net, "use_interpolate")
+        col.prop(net, "use_always_relevant")
+        col.prop(net, "priority")
+        if net.use_replicate:
+            layout.label(text="ID: %d" % net.net_id)
+            layout.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
+
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
     bl_label = "Activity Culling"
@@ -2409,6 +2487,7 @@ classes = (
     RENDER_PT_game_animations,
 	RENDER_UL_attachments,
     SCENE_PT_game_physics,
+    SCENE_PT_game_network,
     SCENE_PT_game_navmesh,
     WORLD_PT_game_context_world,
     WORLD_PT_game_world,
@@ -2419,6 +2498,7 @@ classes = (
     OBJECT_MT_lod_tools,
     OBJECT_PT_game_object_tasks,
     OBJECT_MT_culling,
+    OBJECT_PT_game_network,
     OBJECT_PT_activity_culling,
     OBJECT_OT_bake_lod_impostor,
     OBJECT_PT_levels_of_detail,
