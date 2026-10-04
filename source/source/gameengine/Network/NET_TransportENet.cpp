@@ -94,6 +94,12 @@ public:
 				return false;
 			}
 		}
+		// The bundled ENet (1.3.x) is IPv4-only: ENetAddress holds a 32-bit host. Reject IPv6
+		// literals up front instead of letting the resolver fail obscurely; a hostname with
+		// only AAAA records fails in enet_address_set_host for the same reason.
+		if (host.find(':') != std::string::npos) {  // IPv6 literal (with or without brackets)
+			return false;
+		}
 		ENetAddress address;
 		if (enet_address_set_host(&address, host.c_str()) != 0) {
 			return false;

@@ -8,6 +8,7 @@
 #include "gtest/gtest.h"
 
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <string>
@@ -60,7 +61,12 @@ public:
 
 	bool connect(uint16_t port)
 	{
-		m_socket = sock::connectTcp("127.0.0.1", port);
+		return connectHost("127.0.0.1", port);
+	}
+
+	bool connectHost(const std::string &host, uint16_t port)
+	{
+		m_socket = sock::connectTcp(host, port);
 		return m_socket != sock::kInvalid && sock::setNonBlocking(m_socket);
 	}
 
@@ -671,4 +677,48 @@ TEST(NetMultiTransport, SessionCrossPlay)
 	EXPECT_TRUE(welcomed);
 	udpClient.disconnect();
 	server.stop();
+}
+
+/* IPv6: dual-stack listener reached over ::1; skipped when the host has no IPv6. */
+
+TEST(NetWebSocket, Ipv6LiteralDetection)
+{
+	EXPECT_TRUE(sock::isIpv6Literal("::1"));
+	EXPECT_TRUE(sock::isIpv6Literal("[::1]"));
+	EXPECT_TRUE(sock::isIpv6Literal("fe80::1"));
+	EXPECT_FALSE(sock::isIpv6Literal("127.0.0.1"));
+	EXPECT_FALSE(sock::isIpv6Literal("localhost"));
+}
+
+TEST(NetWebSocket, Ipv6LoopbackHandshake)
+{
+	sock::acquire();
+	const bool ipv6 = sock::hasIpv6Loopback();
+	sock::release();
+	if (!ipv6) {
+		std::printf("[  SKIPPED ] no IPv6 loopback on this host\n");
+		return;
+	}
+	std::unique_ptr<ITransport> server = startServer();
+	for (const char *host : {"::1", "[::1]", "127.0.0.1"}) {
+		sock::acquire();
+		const sock::Handle s = sock::connectTcp(host, server->localPort());
+		EXPECT_NE(s, sock::kInvalid) << host;
+		sock::close(s);
+		sock::release();
+	}
+	WsTestClient client;
+	std::vector<TransportEvent> events;
+	ASSERT_TRUE(client.connectHost("::1", server->localPort()));
+	ASSERT_TRUE(client.handshake(*server, events));
+	pump([&] { server->poll(events); }, [&] { return !events.empty(); });
+	ASSERT_EQ(events.size(), 1u);
+	EXPECT_EQ(events[0].type, TransportEvent::Type::Connected);
+}
+
+TEST(NetWebSocket, EnetRejectsIpv6Literal)
+{
+	std::unique_ptr<ITransport> client = createENetTransport();
+	EXPECT_FALSE(client->connect("::1", 7777));
+	EXPECT_FALSE(client->connect("[::1]", 7777));
 }

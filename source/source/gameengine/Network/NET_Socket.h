@@ -121,28 +121,49 @@ inline bool wouldBlock()
 #endif
 }
 
-/// Non-blocking IPv4 listener on all interfaces; port 0 picks a free port.
-inline Handle listenTcp(uint16_t port, int backlog)
+/// Binds and listens; family is AF_INET or AF_INET6 (dual-stack, IPV6_V6ONLY off).
+inline Handle listenTcpFamily(int family, uint16_t port, int backlog)
 {
-	Handle s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	Handle s = socket(family, SOCK_STREAM, IPPROTO_TCP);
 	if (s == kInvalid) {
 		return kInvalid;
 	}
-#ifndef _WIN32
 	int on = 1;
+#ifndef _WIN32
 	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 #endif
-	sockaddr_in addr = {};
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.sin_port = htons(port);
-	if (bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0 || ::listen(s, backlog) != 0 ||
-	    !setNonBlocking(s))
-	{
+	int ok;
+	if (family == AF_INET6) {
+		int off = 0;
+		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char *>(&off), sizeof(off));
+		sockaddr_in6 addr = {};
+		addr.sin6_family = AF_INET6;
+		addr.sin6_addr = in6addr_any;
+		addr.sin6_port = htons(port);
+		ok = bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
+	}
+	else {
+		sockaddr_in addr = {};
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_port = htons(port);
+		ok = bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
+	}
+	(void)on;
+	if (ok != 0 || ::listen(s, backlog) != 0 || !setNonBlocking(s)) {
 		close(s);
 		return kInvalid;
 	}
 	return s;
+}
+
+/// Non-blocking listener on all interfaces; port 0 picks a free port. Tries a dual-stack
+/// IPv6 socket first (accepts IPv4 and IPv6 clients) and falls back to IPv4 only when the
+/// host has no IPv6.
+inline Handle listenTcp(uint16_t port, int backlog)
+{
+	Handle s = listenTcpFamily(AF_INET6, port, backlog);
+	return s != kInvalid ? s : listenTcpFamily(AF_INET, port, backlog);
 }
 
 /// Returns kInvalid when nothing is pending. The accepted socket is non-blocking.
@@ -197,28 +218,66 @@ inline IoResult send(Handle s, const uint8_t *data, size_t size)
 
 inline uint16_t localPort(Handle s)
 {
-	sockaddr_in addr = {};
+	sockaddr_storage addr = {};
 	socklen_t len = sizeof(addr);
 	if (getsockname(s, reinterpret_cast<sockaddr *>(&addr), &len) != 0) {
 		return 0;
 	}
-	return ntohs(addr.sin_port);
+	if (addr.ss_family == AF_INET6) {
+		return ntohs(reinterpret_cast<const sockaddr_in6 *>(&addr)->sin6_port);
+	}
+	return ntohs(reinterpret_cast<const sockaddr_in *>(&addr)->sin_port);
 }
 
-/// Blocking IPv4 connect (tests and tools only); the socket is left blocking.
+/// True when text is a literal IPv6 address (brackets allowed: "[::1]").
+inline bool isIpv6Literal(const std::string &text)
+{
+	std::string t = text;
+	if (t.size() >= 2 && t.front() == '[' && t.back() == ']') {
+		t = t.substr(1, t.size() - 2);
+	}
+	in6_addr a = {};
+	return inet_pton(AF_INET6, t.c_str(), &a) == 1;
+}
+
+/// True when the host can open an IPv6 loopback socket (used by tests to skip).
+inline bool hasIpv6Loopback()
+{
+	Handle s = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+	if (s == kInvalid) {
+		return false;
+	}
+	sockaddr_in6 addr = {};
+	addr.sin6_family = AF_INET6;
+	addr.sin6_addr = in6addr_loopback;
+	const bool ok = bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0;
+	close(s);
+	return ok;
+}
+
+/// Blocking connect (tests and tools only); the socket is left blocking. Resolves host with
+/// AF_UNSPEC (IPv4 or IPv6, literal or name; "[::1]" brackets accepted) and tries each
+/// address in resolver order.
 inline Handle connectTcp(const std::string &host, uint16_t port)
 {
+	std::string name = host;
+	if (name.size() >= 2 && name.front() == '[' && name.back() == ']') {
+		name = name.substr(1, name.size() - 2);
+	}
 	addrinfo hints = {};
-	hints.ai_family = AF_INET;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	addrinfo *info = nullptr;
-	if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &info) != 0 || !info) {
+	if (getaddrinfo(name.c_str(), std::to_string(port).c_str(), &hints, &info) != 0 || !info) {
 		return kInvalid;
 	}
-	Handle s = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
-	if (s != kInvalid && ::connect(s, info->ai_addr, int(info->ai_addrlen)) != 0) {
-		close(s);
-		s = kInvalid;
+	Handle s = kInvalid;
+	for (addrinfo *it = info; it && s == kInvalid; it = it->ai_next) {
+		s = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+		if (s != kInvalid && ::connect(s, it->ai_addr, int(it->ai_addrlen)) != 0) {
+			close(s);
+			s = kInvalid;
+		}
 	}
 	freeaddrinfo(info);
 	if (s != kInvalid) {
