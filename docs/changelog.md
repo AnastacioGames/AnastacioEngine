@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: inputs atrasados restantes medidos (2026-10-04)
+
+- Log temporário (removido) em `InputQueue::receive`: 0 a 11 `late` por rodada do `predict`, espalhados pela rodada, cada um 1 ou 2 ticks antes do `nextTick` e com folga média de 2 a 3,3: pacotes perdidos ou atrasados isolados, não viés do relógio. Sem correções; alvo 3 e ganho 0,3 mantidos. Detalhes em `NOTES-engine.md`.
+
 ## Multiplayer: servidor devolve a folga dos inputs (`201 InputTiming`) (2026-10-04)
 
 - Mensagem provisória `201 InputTiming` (S→C, canal 2, ~4 Hz): `u32 tick`, `i16 slack` em 1/16 de tick (tick mais novo de cada `Input` − próximo tick a simular, suavizado). Aditiva como a `200 RpcFrom`: cliente antigo descarta. Documentada em `docs/multiplayer-protocol.md`.
