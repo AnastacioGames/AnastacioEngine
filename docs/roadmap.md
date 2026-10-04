@@ -296,6 +296,8 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo em
   [notes-logic-f4.md](notes-logic-f4.md): Track To com pai de vértice; sensores Actuator/Animation Event/Movement/
   Ray Gaze/VR Head ligados de outro objeto; actuators de outro objeto que usam helper do componente.
+- F5 (2026-10-04, branch `logic/convert-f5`, sem merge): Camera, Constraint, Steering e Mouse Look de outro objeto. Só geração
+  validada; falta rodar o roteiro de runtime em [NOTES-logic-f5.md](NOTES-logic-f5.md) no Windows.
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
   Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.

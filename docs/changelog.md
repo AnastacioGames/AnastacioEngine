@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
+
+- `logic_to_python.py`: actuators **Camera, Constraint (Loc/Ori/Dist/FH), Steering e Mouse Look** de outro objeto agora são convertidos. Os helpers (`_follow`, `_mouse_look`, `_cst_*`, `_steer`) recebem `own=` e agem sobre `scene.objects[dono]`; estado separado por `Dono/Actuator`. Os demais helpers de outro dono seguem como brick.
+- Testes: `tools/create_logic_convert_scene_f5.py` (cena com os 4 actuators em outros objetos) e `tools/test_logic_convert_f5_codegen.py` (geração, python puro). **Sem build da engine nesta sessão**: runtime não validado; roteiro Windows em `NOTES-logic-f5.md` (CHECK idêntico nos 4 modos, `LEFT_AS_BRICK 0`).
+
 ## Python: atrito anisotrópico em tempo de jogo (2026-10-04)
 
 - Pedido do Kitsuy (Discord). `KX_GameObject.anisotropicFriction` (bool) e `KX_GameObject.anisotropicFrictionCoefficients` (vetor X/Y/Z, valores >= 0) leem e mudam o atrito anisotrópico com o jogo rodando; antes só valia o que o painel Physics gravava no carregamento.
