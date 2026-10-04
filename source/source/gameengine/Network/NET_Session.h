@@ -143,6 +143,9 @@ public:
 	bool send(ClientId client, Channel channel, const std::vector<uint8_t> &packet);
 	void broadcast(Channel channel, const std::vector<uint8_t> &packet, ClientId except = 0, bool readyOnly = false);
 	void kick(ClientId client, DisconnectReason reason = DisconnectReason::Kicked);
+	/// Counts a protocol violation found by a layer above the session (bad RPC, bad Input...).
+	/// Returns false when it closed the connection (events gets ClientLeft).
+	bool reportViolation(ClientId client, uint64_t nowMs, std::vector<SessionEvent> &events);
 	/// Sends SceneChange to everyone; clients become not ready until SceneLoaded.
 	void changeScene(const std::string &sceneName, uint64_t sceneHash);
 	void setGameStarted(bool started);

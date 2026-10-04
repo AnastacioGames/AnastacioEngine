@@ -38,6 +38,7 @@ set(NET_SRC
 	NET_LagCompensation.cpp
 	NET_Messages.cpp
 	NET_Prediction.cpp
+	NET_RPC.cpp
 	NET_ReplicaClient.cpp
 	NET_Replicator.cpp
 	NET_Session.cpp
@@ -56,6 +57,7 @@ set(NET_SRC
 	NET_LagCompensation.h
 	NET_Messages.h
 	NET_Prediction.h
+	NET_RPC.h
 	NET_ReplicaClient.h
 	NET_Replicator.h
 	NET_Session.h
@@ -111,6 +113,7 @@ if(NET_STANDALONE)
 		tests/NET_Golden_test.cpp
 		tests/NET_Messages_test.cpp
 		tests/NET_Prediction_test.cpp
+		tests/NET_RPC_test.cpp
 		tests/NET_Replication_test.cpp
 		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp

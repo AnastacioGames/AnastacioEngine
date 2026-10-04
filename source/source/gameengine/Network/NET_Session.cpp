@@ -471,6 +471,19 @@ void ServerSession::reject(Connection &conn, RejectReason reason, const std::str
 	m_transport.disconnect(peer);
 }
 
+bool ServerSession::reportViolation(ClientId client, uint64_t nowMs, std::vector<SessionEvent> &events)
+{
+	const auto it = m_clients.find(client);
+	if (it == m_clients.end()) {
+		return false;
+	}
+	const auto conn = m_connections.find(it->second);
+	if (conn == m_connections.end()) {
+		return false;
+	}
+	return violation(conn->second, nowMs, events);
+}
+
 bool ServerSession::violation(Connection &conn, uint64_t nowMs, std::vector<SessionEvent> &events)
 {
 	if (!conn.violations.add(nowMs)) {
