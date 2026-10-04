@@ -183,7 +183,9 @@ void KX_FontObject::UpdateBuckets()
 	const float RES = BGE_FONT_RES * m_resolution;
 
 	const float size = fabs(m_fsize * RES);
-	const float aspect = m_fsize / size;
+	// Scale down from FreeType's nominal em-square to the font's real ink bbox,
+	// so game text matches the 3D viewport Text object's apparent size.
+	const float aspect = (m_fsize / size) * BLF_character_to_curve_scale(m_fontid);
 
 	// Account for offset
 	mt::vec3 offset = NodeGetWorldOrientation() * m_text_offset * NodeGetWorldScaling();
@@ -292,7 +294,7 @@ void KX_FontObject::GetTextAabb(mt::vec2& min, mt::vec2& max)
 	const float RES = BGE_FONT_RES * m_resolution;
 
 	const float size = m_fsize * RES;
-	const float aspect = m_fsize / size;
+	const float aspect = (m_fsize / size) * BLF_character_to_curve_scale(m_fontid);
 	const float lineSpacing = m_line_spacing / aspect;
 
 	BLF_size(m_fontid, size, m_dpi);

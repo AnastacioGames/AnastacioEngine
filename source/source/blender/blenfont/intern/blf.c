@@ -358,6 +358,23 @@ void BLF_addref_id(int fontid)
 	}
 }
 
+float BLF_character_to_curve_scale(int fontid)
+{
+	FontBLF *font = blf_get(fontid);
+	if (font && font->face) {
+		FT_Face face = font->face;
+		const float em = (float)face->units_per_EM;
+		const float bbox_height = (float)(face->bbox.yMax - face->bbox.yMin);
+		/* Matches the normalization BKE_vfont/freetypefont.c uses for 3D viewport
+		 * Text objects (1/(bbox.yMax - bbox.yMin)), so BLF-rasterized game text
+		 * ends up the same apparent size as the equivalent curve-converted text. */
+		if (em > 0.0f && bbox_height > 0.0f) {
+			return bbox_height / em;
+		}
+	}
+	return 1.0f;
+}
+
 void BLF_enable(int fontid, int option)
 {
 	FontBLF *font = blf_get(fontid);

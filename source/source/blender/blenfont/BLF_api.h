@@ -50,6 +50,10 @@ void BLF_unload(const char *name) ATTR_NONNULL();
 void BLF_unload_id(int fontid);
 void BLF_addref_id(int fontid);
 
+/* Ratio between the font's ink bounding box and its nominal em-square, so callers
+ * can match the 3D viewport Text object's curve-conversion scale (see freetypefont.c). */
+float BLF_character_to_curve_scale(int fontid);
+
 /* Attach a file with metrics information from memory. */
 void BLF_metrics_attach(int fontid, unsigned char *mem, int mem_size);
 
