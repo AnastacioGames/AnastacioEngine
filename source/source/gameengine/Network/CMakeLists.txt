@@ -22,22 +22,36 @@
 cmake_minimum_required(VERSION 3.10)
 
 if(NET_STANDALONE)
-	project(anastacio_network CXX)
+	project(anastacio_network C CXX)
+endif()
+
+set(NET_EXTERN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../extern)
+
+# ENet: built here because the engine's extern list is not touched by the network core.
+if(NOT TARGET extern_enet)
+	add_subdirectory(${NET_EXTERN_DIR}/enet ${CMAKE_CURRENT_BINARY_DIR}/extern_enet)
 endif()
 
 set(NET_SRC
 	NET_BitStream.cpp
 	NET_Messages.cpp
+	NET_Session.cpp
 	NET_Snapshot.cpp
+	NET_TransportENet.cpp
+	NET_TransportLoopback.cpp
+	NET_TransportSimulated.cpp
 
 	NET_BitStream.h
+	NET_ITransport.h
 	NET_Messages.h
+	NET_Session.h
 	NET_Snapshot.h
 	NET_Types.h
 )
 
 add_library(ge_network STATIC ${NET_SRC})
 target_include_directories(ge_network PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ge_network PUBLIC extern_enet)
 set_target_properties(ge_network PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 if(NET_STANDALONE)
@@ -68,7 +82,6 @@ if(NET_STANDALONE)
 		endif()
 	endfunction()
 
-	set(NET_EXTERN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../extern)
 	add_subdirectory(${NET_EXTERN_DIR}/gtest ${CMAKE_CURRENT_BINARY_DIR}/extern_gtest)
 
 	set(NET_TEST_SRC
@@ -78,7 +91,9 @@ if(NET_STANDALONE)
 		tests/NET_BitStream_test.cpp
 		tests/NET_Golden_test.cpp
 		tests/NET_Messages_test.cpp
+		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp
+		tests/NET_Transport_test.cpp
 	)
 
 	add_executable(net_tests ${NET_TEST_SRC})
@@ -94,4 +109,14 @@ if(NET_STANDALONE)
 	endif()
 
 	add_test(NAME net_tests COMMAND net_tests)
+
+	# Manual test tool.
+	add_executable(net_echo tools/net_echo.cpp)
+	target_link_libraries(net_echo PRIVATE ge_network)
+	set_target_properties(net_echo PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+	if(MSVC)
+		target_compile_options(net_echo PRIVATE /W4)
+	else()
+		target_compile_options(net_echo PRIVATE -Wall -Wextra)
+	endif()
 endif()
