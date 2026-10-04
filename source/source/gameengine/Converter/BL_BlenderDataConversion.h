@@ -65,7 +65,8 @@ KX_Mesh *BL_ConvertMesh(Mesh *mesh, Object *lightobj, KX_Scene *scene, BL_SceneC
 bool BL_MaterialUsesWireframe(const struct Material *ma);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo,
-                                  std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr);
+                                  std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr,
+                                  bool needTangents = true);
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj);
 

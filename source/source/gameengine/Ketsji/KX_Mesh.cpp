@@ -420,17 +420,18 @@ PyObject *KX_Mesh::PyTransformUV(PyObject *args, PyObject *kwds)
 		return nullptr;
 	}
 
-	if (uvindex < -1 || uvindex > RAS_Texture::MaxUnits) {
+	if (uvindex < -1 || uvindex >= RAS_Texture::MaxUnits) {
 		PyErr_Format(PyExc_ValueError,
 		             "mesh.transformUV(...): invalid uv_index %d", uvindex);
 		return nullptr;
 	}
-	if (uvindex_from < -1 || uvindex_from > RAS_Texture::MaxUnits) {
+	if (uvindex_from < -1 || uvindex_from >= RAS_Texture::MaxUnits) {
 		PyErr_Format(PyExc_ValueError,
-		             "mesh.transformUV(...): invalid uv_index_from %d", uvindex);
+		             "mesh.transformUV(...): invalid uv_index_from %d", uvindex_from);
 		return nullptr;
 	}
-	if (uvindex_from == uvindex) {
+	// Copying needs a single destination layer.
+	if (uvindex_from == uvindex || uvindex == -1) {
 		uvindex_from = -1;
 	}
 
@@ -452,7 +453,7 @@ PyObject *KX_Mesh::PyTransformUV(PyObject *args, PyObject *kwds)
 
 		for (unsigned int j = 0, size = array->GetVertexCount(); j < size; ++j) {
 			// Copy one layer (optional).
-			if (uvindex_from != -1 && uvExist(uvindex_from, format)) {
+			if (uvindex_from != -1 && uvExist(uvindex_from, format) && uvExist(uvindex, format)) {
 				array->SetUv(j, uvindex, array->GetUv(j, uvindex_from));
 			}
 

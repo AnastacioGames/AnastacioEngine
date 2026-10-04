@@ -114,25 +114,38 @@ const RAS_AttributeArray::AttribList BL_BlenderShader::GetAttribs(const RAS_Mesh
 				continue;
 			}
 
+			// Like Blender, a layer name missing from the mesh falls back to the active layer.
 			if (type == CD_MTFACE) {
+				unsigned short index = layersInfo.activeUv;
 				for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
 					if (layer.name == attribname) {
-						attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_UV, false, layer.index});
+						index = layer.index;
 						break;
 					}
 				}
+				attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_UV, false, index});
 			}
 			else {
+				unsigned short index = layersInfo.activeColor;
 				for (const RAS_Mesh::Layer& layer : layersInfo.colorLayers) {
 					if (layer.name == attribname) {
-						attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_COLOR, false, layer.index});
+						index = layer.index;
 						break;
 					}
 				}
+				attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_COLOR, false, index});
 			}
 		}
 		else if (type == CD_TANGENT) {
-			attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_TANGENT, false, 0});
+			// The layer is the UV layer the tangents are computed from (see BL_ConvertDerivedMeshToArray).
+			unsigned short index = layersInfo.activeUv;
+			for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
+				if (layer.name == gpuAttribs.layer[i].name) {
+					index = layer.index;
+					break;
+				}
+			}
+			attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_TANGENT, false, index});
 		}
 		else if (type == CD_ORCO) {
 			attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_POS, false, 0});

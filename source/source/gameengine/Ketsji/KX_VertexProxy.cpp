@@ -103,6 +103,7 @@ PyAttributeDef KX_VertexProxy::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("color", KX_VertexProxy, pyattr_get_color, pyattr_set_color),
 	EXP_PYATTRIBUTE_RW_FUNCTION("colors", KX_VertexProxy, pyattr_get_colors, pyattr_set_colors),
 	EXP_PYATTRIBUTE_RW_FUNCTION("normal", KX_VertexProxy, pyattr_get_normal, pyattr_set_normal),
+	EXP_PYATTRIBUTE_RO_FUNCTION("tangent", KX_VertexProxy, pyattr_get_tangent),
 
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
@@ -253,6 +254,12 @@ PyObject *KX_VertexProxy::pyattr_get_color(EXP_PyObjectPlus *self_v, const EXP_P
 	mt::vec4 color(colp[0], colp[1], colp[2], colp[3]);
 	color /= 255.0f;
 	return PyObjectFrom(color);
+}
+
+PyObject *KX_VertexProxy::pyattr_get_tangent(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_VertexProxy *self = static_cast<KX_VertexProxy *>(self_v);
+	return PyObjectFrom(self->m_array->GetTangent(self->m_vertexIndex));
 }
 
 PyObject *KX_VertexProxy::pyattr_get_normal(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

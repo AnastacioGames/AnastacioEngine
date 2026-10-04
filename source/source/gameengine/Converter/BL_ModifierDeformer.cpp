@@ -36,6 +36,7 @@
 #include "MEM_guardedalloc.h"
 #include "BL_ModifierDeformer.h"
 #include "BL_BlenderDataConversion.h"
+#include <algorithm>
 #include <string>
 #include "RAS_IMaterial.h"
 #include "RAS_MaterialBucket.h"
@@ -169,6 +170,10 @@ void BL_ModifierDeformer::UpdateTransverts()
 
 	const unsigned short nummat = m_slots.size();
 	std::vector<BL_MeshMaterial> mats(nummat);
+	const RAS_Mesh::LayersInfo& layersInfo = m_mesh->GetLayersInfo();
+	/* A dynamic mesh is rebuilt every frame: skip the tangents while no shader reads them, the next frame
+	 * picks them up if one starts to. Empty attributes mean the shader is not built yet: keep them. */
+	bool needTangents = !m_bDynamic;
 
 	for (unsigned short i = 0; i < nummat; ++i) {
 		const DisplayArraySlot& slot = m_slots[i];
@@ -179,9 +184,17 @@ void BL_ModifierDeformer::UpdateTransverts()
 		RAS_IMaterial *mat = meshmat->GetBucket()->GetMaterial();
 		mats[i] = {array, meshmat->GetBucket(), mat->IsVisible(), mat->IsTwoSided(), mat->IsCollider(), mat->IsWire(),
 		           BL_MaterialUsesWireframe(mat->GetBlenderMaterial())};
+
+		if (!needTangents) {
+			const RAS_AttributeArray::AttribList attribs = mat->GetAttribs(layersInfo);
+			needTangents = attribs.empty() ||
+			               std::any_of(attribs.begin(), attribs.end(), [](const RAS_AttributeArray::Attrib& attrib) {
+				return attrib.m_type == RAS_AttributeArray::RAS_ATTRIB_TANGENT;
+			});
+		}
 	}
 
-	BL_ConvertDerivedMeshToArray(m_dm, m_bmesh, m_objMesh, mats, m_mesh->GetLayersInfo());
+	BL_ConvertDerivedMeshToArray(m_dm, m_bmesh, m_objMesh, mats, layersInfo, nullptr, needTangents);
 
 	for (const DisplayArraySlot& slot : m_slots) {
 		RAS_DisplayArray *array = slot.m_displayArray;

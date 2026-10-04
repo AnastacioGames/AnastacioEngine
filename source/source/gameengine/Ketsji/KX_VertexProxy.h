@@ -72,6 +72,7 @@ public:
 	static PyObject *pyattr_get_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_colors(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_normal(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_tangent(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_uvs(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_x(EXP_PyObjectPlus *self, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static int pyattr_set_y(EXP_PyObjectPlus *self, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);

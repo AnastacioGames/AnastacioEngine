@@ -35,6 +35,12 @@ base class --- :class:`SCA_IObject`
 
       :type: Vector((nx, ny, nz))
 
+   .. attribute:: tangent
+
+      The tangent of the vertex (read-only), computed from the UV map used by the material's Normal Map or Tangent node (the active UV map by default). The w component holds the bitangent sign.
+
+      :type: Vector((tx, ty, tz, w))
+
    .. attribute:: color
 
       The color of the vertex.

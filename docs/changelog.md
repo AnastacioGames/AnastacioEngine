@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Vários UV maps: tangentes do UV pedido, fallback para o ativo e transformUV
+
+- Tangentes passam a ser calculadas a partir do UV map que o material pede (campo UV Map do Normal Map/Tangent node), não sempre do ativo; antes um normal map no UV2 ficava com relevo torto. Como os shaders só são criados depois da conversão dos meshes, `BL_ConvertDerivedMeshToArray` lê a árvore de nós (`BL_NodeTreeTangentUv`, entra em grupos) e usa o primeiro UV nomeado entre os materiais do mesh, ou o ativo; o cache de loop data inclui esse UV no hash. O `m_layer` de `RAS_ATTRIB_TANGENT` também passou a guardar o índice do UV. Limite: um só conjunto de tangentes por mesh.
+- Python: `KX_VertexProxy.tangent` (somente leitura, xyz + sinal da bitangente), documentado em `bge.types.KX_VertexProxy.rst`.
+- `BL_ModifierDeformer`: mesh dinâmico (refeito a cada frame) não calcula mais tangentes enquanto nenhum material lê `RAS_ATTRIB_TANGENT`; atributos vazios (shader ainda não montado) mantêm o cálculo, e um shader que passe a pedir tangente recebe no frame seguinte. Mesh estático continua sempre com tangentes.
+- Conferido: pedaços do `KX_DestructionManager` já preenchem todos os UV maps.
+- Teste: `tools/create_uv_layers_test.py` (dois planos iguais com UV2 girado; confere tangente X/Y, cache e `transformUV`, grava `uv_layers_test.log` ao lado do `.range` e fecha; `UV_LAYERS_TEST ok`).
+- UV/vertex color por nome inexistente no mesh (layer renomeado/removido) caía sem atributo ligado (lixo/zero no shader); agora usa o layer ativo, como o Blender. Vale para nodes (`BL_BlenderShader`) e MTex/shaders Python (`BL_Shader`).
+- `mesh.transformUV()`: índice 8 era aceito (leitura fora do array), `uv_index=-1` com `uv_index_from` escrevia no layer -1, a cópia não checava o layer destino e a mensagem de erro de `uv_index_from` mostrava o valor errado.
+
 ## Property actuator: lista de Weather Effects atualizada e conversão para Python
 
 - Categorias novas no modo Weather Effects: Rain Splash, Rain Aura, Lightning e Earthquake; Rain ganhou Droplets, Streak Width e Ripple Normal. IDs `ACT_RUNTIME_PROP_WEATHER_*` 28–49 (sem mudar struct); tabela única caminho/tipo/categoria em `DNA_actuator_weather.h`, usada por RNA, Logic Editor e conversor.

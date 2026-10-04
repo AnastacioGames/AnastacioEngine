@@ -535,6 +535,34 @@ static bool BL_NodeTreeHasWireframe(const bNodeTree *ntree, int depth)
 	return false;
 }
 
+/// UV map named by the first tangent space Normal Map or UV Map Tangent node, nullptr when none names one.
+static const char *BL_NodeTreeTangentUv(const bNodeTree *ntree, int depth)
+{
+	if (!ntree || depth > 8) {
+		return nullptr;
+	}
+	for (const bNode *node = (const bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_NORMAL_MAP && node->storage) {
+			const NodeShaderNormalMap *nm = (const NodeShaderNormalMap *)node->storage;
+			if (nm->space == SHD_SPACE_TANGENT && nm->uv_map[0]) {
+				return nm->uv_map;
+			}
+		}
+		else if (node->type == SH_NODE_TANGENT && node->storage) {
+			const NodeShaderTangent *nt = (const NodeShaderTangent *)node->storage;
+			if (nt->direction_type == SHD_TANGENT_UVMAP && nt->uv_map[0]) {
+				return nt->uv_map;
+			}
+		}
+		else if (node->type == NODE_GROUP) {
+			if (const char *name = BL_NodeTreeTangentUv((const bNodeTree *)node->id, depth + 1)) {
+				return name;
+			}
+		}
+	}
+	return nullptr;
+}
+
 bool BL_MaterialUsesWireframe(const Material *ma)
 {
 	return ma && ma->use_nodes && BL_NodeTreeHasWireframe(ma->nodetree, 0);
@@ -727,7 +755,7 @@ static void hash_bytes(uint64_t& h, const void *data, size_t size)
 }
 
 /// Hash of everything the loop normals and tangents depend on; 0 when the mesh can't be cached.
-static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, bool withTangents)
+static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 {
 	if (CustomData_has_layer(&dm->loopData, CD_CUSTOMLOOPNORMAL) || CustomData_has_layer(&dm->loopData, CD_NORMAL)) {
 		return 0;
@@ -765,9 +793,9 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, bool withTangents)
 		const int poly[3] = {mpolys[i].loopstart, mpolys[i].totloop, mpolys[i].flag & ME_SMOOTH};
 		hash_bytes(h, poly, sizeof(poly));
 	}
-	if (withTangents) {
-		// The first CD_TANGENT layer, the one read below, comes from the active UV layer.
-		const int uvLayer = max_ii(0, CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV));
+	if (tangentUv != -1) {
+		// Tangents come from the UV layer the materials ask for.
+		const int uvLayer = tangentUv;
 		const MLoopUV *uvs = (const MLoopUV *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPUV, uvLayer);
 		hash_bytes(h, &uvLayer, sizeof(uvLayer));
 		for (int i = 0; uvs && i < totloop; ++i) {
@@ -778,7 +806,8 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, bool withTangents)
 }
 
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
-                                  const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces)
+                                  const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces,
+                                  bool needTangents)
 {
 	const MTexPoly *mtpolys = bitmapTextFaces ? (MTexPoly *)CustomData_get_layer(&dm->polyData, CD_MTEXPOLY) : nullptr;
 	std::map<Image *, std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > > fontGlyphs;
@@ -794,14 +823,32 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	const MEdge *medges = (MEdge *)dm->getEdgeArray(dm);
 	const unsigned int numpolys = dm->getNumPolys(dm);
 
-	const bool withTangents = !layersInfo.uvLayers.empty();
+	const bool withTangents = needTangents && !layersInfo.uvLayers.empty();
+	/* Tangents follow the UV layer the materials ask for (Normal Map/Tangent node "UV Map"),
+	 * the active layer when none asks. Shaders are built after the mesh conversion, so read the node trees. */
+	int tangentUv = max_ii(0, CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV));
+	if (withTangents) {
+		for (const BL_MeshMaterial& mat : mats) {
+			const Material *ma = mat.bucket ? mat.bucket->GetMaterial()->GetBlenderMaterial() : nullptr;
+			const char *name = (ma && ma->use_nodes) ? BL_NodeTreeTangentUv(ma->nodetree, 0) : nullptr;
+			const int index = name ? CustomData_get_named_layer(&dm->loopData, CD_MLOOPUV, name) : -1;
+			if (index != -1) {
+				tangentUv = index;
+				break;
+			}
+		}
+	}
+	char tangentUvName[MAX_NAME] = "";
+	if (withTangents) {
+		BLI_strncpy(tangentUvName, CustomData_get_layer_name(&dm->loopData, CD_MLOOPUV, tangentUv), sizeof(tangentUvName));
+	}
 	const int totloop = dm->getNumLoops(dm);
 	BL_LoadStats& loadStats = BL_LoadStats::Get();
 	uint64_t loopHash = 0;
 	const BL_LoopDataCache::Entry *cached = nullptr;
 	if (loopDataCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
 		BL_LoadTimer hashTimer(loadStats.loopHash);
-		loopHash = BL_LoopDataHash(dm, me, withTangents);
+		loopHash = BL_LoopDataHash(dm, me, withTangents ? tangentUv : -1);
 		const auto it = loopHash ? loopDataCache->entries.find(loopHash) : loopDataCache->entries.end();
 		if (it != loopDataCache->entries.end() && it->second.totloop == totloop &&
 		    it->second.tangents.empty() == !withTangents)
@@ -814,13 +861,9 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		++loadStats.loopDataReused;
 		CustomData_add_layer(&dm->loopData, CD_NORMAL, CD_DUPLICATE, (void *)cached->normals.data(), totloop);
 		if (withTangents) {
-			// Copy the name: adding a layer reallocates the layer array it points into.
-			const int uvLayer = max_ii(0, CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV));
-			char uvName[MAX_CUSTOMDATA_LAYER_NAME];
-			BLI_strncpy(uvName, CustomData_get_layer_name(&dm->loopData, CD_MLOOPUV, uvLayer), sizeof(uvName));
 			// CD_TANGENT elements are 16 floats (legacy face size) while loops use the first 4: copy those only.
 			float(*tangents)[4] = (float(*)[4])CustomData_add_layer_named(&dm->loopData, CD_TANGENT, CD_CALLOC, nullptr,
-			                                                              totloop, uvName);
+			                                                              totloop, tangentUvName);
 			memcpy(tangents, cached->tangents.data(), sizeof(float[4]) * totloop);
 		}
 	}
@@ -832,12 +875,17 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 
 	float(*tangent)[4] = nullptr;
 	if (withTangents) {
-		if (CustomData_get_layer_index(&dm->loopData, CD_TANGENT) == -1) {
+		if (CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, tangentUvName) == -1) {
 			BL_LoadTimer tangentTimer(loadStats.tangent);
 			++loadStats.tangentMeshes;
-			DM_calc_loop_tangents(dm, true, nullptr, 0);
+			char tangentNames[1][MAX_NAME];
+			BLI_strncpy(tangentNames[0], tangentUvName, MAX_NAME);
+			DM_calc_loop_tangents(dm, false, (const char(*)[MAX_NAME])tangentNames, 1);
 		}
-		tangent = (float(*)[4])dm->getLoopDataArray(dm, CD_TANGENT);
+		tangent = (float(*)[4])CustomData_get_layer_named(&dm->loopData, CD_TANGENT, tangentUvName);
+		if (!tangent) {
+			tangent = (float(*)[4])dm->getLoopDataArray(dm, CD_TANGENT);
+		}
 	}
 
 	if (loopHash && !cached && normals && (!withTangents || tangent)) {

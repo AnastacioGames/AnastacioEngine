@@ -120,30 +120,27 @@ RAS_AttributeArray::AttribList BL_Shader::GetAttribs(const RAS_Mesh::LayersInfo&
 				attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_POS, true, 0});
 			}
 			else if (mtex->texco & TEXCO_UV) {
-				// UV layer not specified, use default layer.
-				if (strlen(mtex->uvname) == 0) {
-					attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_UV, true, layersInfo.activeUv});
-				}
-
-				// Search for the UV layer index used by the texture.
+				// Search for the UV layer index used by the texture, unspecified or missing uses the active layer.
+				unsigned short index = layersInfo.activeUv;
 				for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
 					if (layer.name == mtex->uvname) {
-						attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_UV, true, layer.index});
+						index = layer.index;
 						break;
 					}
 				}
+				attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_UV, true, index});
 			}
 			else if (mtex->texco & TEXCO_NORM) {
 				attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_NORM, true, 0});
 			}
 			else if (mtex->texco & TEXCO_TANGENT) {
-				attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_TANGENT, true, 0});
+				attribs.push_back({i, RAS_AttributeArray::RAS_ATTRIB_TANGENT, true, layersInfo.activeUv});
 			}
 		}
 	}
 
 	if (m_attr == SHD_TANGENT) {
-		attribs.push_back({1, RAS_AttributeArray::RAS_ATTRIB_TANGENT, false, 0});
+		attribs.push_back({1, RAS_AttributeArray::RAS_ATTRIB_TANGENT, false, layersInfo.activeUv});
 	}
 
 	return attribs;
