@@ -1451,7 +1451,33 @@ void CcdPhysicsController::SetMass(float newmass)
 	}
 }
 
-float CcdPhysicsController::GetFriction()
+bool CcdPhysicsController::GetAnisotropicFrictionEnabled() const
+{
+	return m_cci.m_do_anisotropic;
+}
+
+void CcdPhysicsController::SetAnisotropicFrictionEnabled(bool enabled)
+{
+	m_cci.m_do_anisotropic = enabled;
+	if (m_object) {
+		// Modo 0 desliga o atrito anisotrópico no Bullet sem perder os coeficientes.
+		m_object->setAnisotropicFriction(m_cci.m_anisotropicFriction,
+		                                 enabled ? btCollisionObject::CF_ANISOTROPIC_FRICTION : 0);
+	}
+}
+
+mt::vec3 CcdPhysicsController::GetAnisotropicFriction() const
+{
+	return ToMt(m_cci.m_anisotropicFriction);
+}
+
+void CcdPhysicsController::SetAnisotropicFriction(const mt::vec3& friction)
+{
+	m_cci.m_anisotropicFriction = ToBullet(friction);
+	SetAnisotropicFrictionEnabled(m_cci.m_do_anisotropic);
+}
+
+float CcdPhysicsController::GetFriction()
 {
 	btSoftBody *softBody = GetSoftBody();
 	if (softBody) {

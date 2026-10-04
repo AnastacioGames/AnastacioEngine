@@ -2988,6 +2988,8 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("life",     KX_GameObject, pyattr_get_life),
 	EXP_PYATTRIBUTE_RW_FUNCTION("mass",     KX_GameObject, pyattr_get_mass,     pyattr_set_mass),
 	EXP_PYATTRIBUTE_RW_FUNCTION("friction", KX_GameObject, pyattr_get_friction, pyattr_set_friction),
+	EXP_PYATTRIBUTE_RW_FUNCTION("anisotropicFriction", KX_GameObject, pyattr_get_anisotropicFriction, pyattr_set_anisotropicFriction),
+	EXP_PYATTRIBUTE_RW_FUNCTION("anisotropicFrictionCoefficients", KX_GameObject, pyattr_get_anisotropicFrictionCoefficients, pyattr_set_anisotropicFrictionCoefficients),
 	EXP_PYATTRIBUTE_RO_FUNCTION("isSuspendDynamics",        KX_GameObject, pyattr_get_is_suspend_dynamics),
 	EXP_PYATTRIBUTE_RO_FUNCTION("isDestructible", KX_GameObject, pyattr_get_is_destructible),
 	EXP_PYATTRIBUTE_RO_FUNCTION("isExplosive", KX_GameObject, pyattr_get_is_explosive),
@@ -3653,6 +3655,53 @@ int KX_GameObject::pyattr_set_friction(EXP_PyObjectPlus* self_v,
 	if (spc)
 		spc->SetFriction(val);
 
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_anisotropicFriction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	PHY_IPhysicsController *spc = self->GetPhysicsController();
+	return PyBool_FromLong(spc ? spc->GetAnisotropicFrictionEnabled() : false);
+}
+
+int KX_GameObject::pyattr_set_anisotropicFriction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const int enabled = PyObject_IsTrue(value);
+	if (enabled == -1) {
+		PyErr_SetString(PyExc_AttributeError, "gameOb.anisotropicFriction = bool: KX_GameObject, expected True or False");
+		return PY_SET_ATTR_FAIL;
+	}
+	PHY_IPhysicsController *spc = self->GetPhysicsController();
+	if (spc) {
+		spc->SetAnisotropicFrictionEnabled(enabled);
+	}
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_anisotropicFrictionCoefficients(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	PHY_IPhysicsController *spc = self->GetPhysicsController();
+	return PyObjectFrom(spc ? spc->GetAnisotropicFriction() : mt::one3);
+}
+
+int KX_GameObject::pyattr_set_anisotropicFrictionCoefficients(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	mt::vec3 friction;
+	if (!PyVecTo(value, friction)) {
+		return PY_SET_ATTR_FAIL;
+	}
+	if (friction.x < 0.0f || friction.y < 0.0f || friction.z < 0.0f) {
+		PyErr_SetString(PyExc_AttributeError, "gameOb.anisotropicFrictionCoefficients = [x, y, z]: KX_GameObject, expected values zero or above");
+		return PY_SET_ATTR_FAIL;
+	}
+	PHY_IPhysicsController *spc = self->GetPhysicsController();
+	if (spc) {
+		spc->SetAnisotropicFriction(friction);
+	}
 	return PY_SET_ATTR_SUCCESS;
 }
 

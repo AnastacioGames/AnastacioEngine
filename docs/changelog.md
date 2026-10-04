@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Python: atrito anisotrópico em tempo de jogo (2026-10-04)
+
+- Pedido do Kitsuy (Discord). `KX_GameObject.anisotropicFriction` (bool) e `KX_GameObject.anisotropicFrictionCoefficients` (vetor X/Y/Z, valores >= 0) leem e mudam o atrito anisotrópico com o jogo rodando; antes só valia o que o painel Physics gravava no carregamento.
+- `PHY_IPhysicsController`/`CcdPhysicsController`: `Get/SetAnisotropicFrictionEnabled` e `Get/SetAnisotropicFriction`, que atualizam `m_cci` e chamam `btCollisionObject::setAnisotropicFriction` (modo 0 desliga sem perder os coeficientes).
+- Teste: `tools/create_anisotropic_friction_test.py` gera um `.range` com duas caixas deslizando; com coeficientes (0, 1, 1) a caixa mantém 5,76 m/s contra 4,03 da caixa normal: `ANISO_FRICTION_TEST PASS` no Windows/MSVC.
+
 ## Logic Bricks → Python Component, fase 4 (2026-10-04)
 
 - `logic_to_python.py`: **Ray por material com x-ray** (marca os objetos com o material numa propriedade privada `__lcmat_*` e usa o `rayCast` x-ray; vale também no eixo Gaze); **Collision/Near/Radar** de sensor ligado de outro objeto (`_near`/`_radar` com o objeto dono, `_take` com callback de colisão por objeto); **Sound ping-pong** (`aud.Sound.pingpong()`, Loop Bidirectional e Stop) e som tolerante a falta de dispositivo de áudio; **Track To com pai** (porta de `vectomat` + interpolação Euler, orientação local inicial do pai guardada no `start`).
