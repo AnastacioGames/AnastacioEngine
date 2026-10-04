@@ -101,17 +101,19 @@ bool VideoFFmpeg::release()
 {
 	// release
 	stopCache();
-	if (m_codecCtx) {
-		avcodec_close(m_codecCtx);
-		m_codecCtx = nullptr;
-	}
+	ffmpeg_stream_context_close(&m_codecCtx);
 	if (m_formatCtx) {
 		avformat_close_input(&m_formatCtx);
 		m_formatCtx = nullptr;
 	}
 	if (m_frame) {
+#ifdef FFMPEG_NO_STREAM_CODEC
+		// Decoded frames are reference counted from FFmpeg 5.0 on.
+		av_frame_free(&m_frame);
+#else
 		av_free(m_frame);
 		m_frame = nullptr;
+#endif
 	}
 	if (m_frameDeinterlaced) {
 		MEM_freeN(m_frameDeinterlaced->data[0]);
@@ -169,11 +171,11 @@ void VideoFFmpeg::initParams(short width, short height, float rate, bool image)
 }
 
 
-int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AVDictionary **formatParams)
+int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *inputFormat, AVDictionary **formatParams)
 {
 	AVFormatContext *formatCtx = nullptr;
 	int i, videoStream;
-	AVCodec         *codec;
+	const AVCodec   *codec;
 	AVCodecContext  *codecCtx;
 
     if (avformat_open_input(&formatCtx, filename, inputFormat, formatParams) != 0) {
@@ -195,8 +197,7 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 	for (i = 0; i < formatCtx->nb_streams; i++)
 	{
 		if (formatCtx->streams[i] &&
-		    get_codec_from_stream(formatCtx->streams[i]) &&
-		    (get_codec_from_stream(formatCtx->streams[i])->codec_type == AVMEDIA_TYPE_VIDEO)) {
+		    (ffmpeg_stream_codec_type(formatCtx->streams[i]) == AVMEDIA_TYPE_VIDEO)) {
 			videoStream = i;
 			break;
 		}
@@ -207,16 +208,20 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 		return -1;
 	}
 
-	codecCtx = get_codec_from_stream(formatCtx->streams[videoStream]);
-
 	/* Find the decoder for the video stream */
-	codec = avcodec_find_decoder(codecCtx->codec_id);
+	codec = avcodec_find_decoder(ffmpeg_stream_codec_id(formatCtx->streams[videoStream]));
 	if (codec == nullptr) {
+		avformat_close_input(&formatCtx);
+		return -1;
+	}
+	codecCtx = ffmpeg_stream_context_open(formatCtx->streams[videoStream], codec);
+	if (codecCtx == nullptr) {
 		avformat_close_input(&formatCtx);
 		return -1;
 	}
 	codecCtx->workaround_bugs = 1;
 	if (avcodec_open2(codecCtx, codec, nullptr) < 0) {
+		ffmpeg_stream_context_close(&codecCtx);
 		avformat_close_input(&formatCtx);
 		return -1;
 	}
@@ -241,8 +246,7 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 	m_frameDeinterlaced = av_frame_alloc();
 
 	if (!m_frame || !m_frameDeinterlaced) {
-		avcodec_close(m_codecCtx);
-		m_codecCtx = nullptr;
+		ffmpeg_stream_context_close(&m_codecCtx);
 		avformat_close_input(&m_formatCtx);
 		m_formatCtx = nullptr;
 		av_free(m_frame);
@@ -295,8 +299,7 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 	m_frameRGB = allocFrameRGB();
 
 	if (!m_imgConvertCtx || !m_frameRGB) {
-		avcodec_close(m_codecCtx);
-		m_codecCtx = nullptr;
+		ffmpeg_stream_context_close(&m_codecCtx);
 		avformat_close_input(&m_formatCtx);
 		m_formatCtx = nullptr;
 		av_free(m_frame);
@@ -597,7 +600,7 @@ void VideoFFmpeg::openFile(char *filename)
 void VideoFFmpeg::openCam(char *file, short camIdx)
 {
 	// open camera source
-	AVInputFormat       *inputFormat;
+	FFMPEG_CONST AVInputFormat *inputFormat;
 	AVDictionary        *formatParams = nullptr;
 	char filename[256], rateStr[20];
 

@@ -47,6 +47,187 @@
 
 #include <libswscale/swscale.h>
 
+/* FFmpeg 5.0 (libavcodec 59) removed AVPicture, AVStream.codec, the old decode and
+ * packet calls and more. The shims below keep the 4.x call sites working on 5.0+
+ * (Linux distros ship 6.x); builds against 4.x (Windows) don't use them. */
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+#  define FFMPEG_NO_STREAM_CODEC 1
+/* Lookups return const pointers from 5.0 on; 4.x functions still take them non-const. */
+#  define FFMPEG_CONST const
+#  include <libavutil/imgutils.h>
+
+typedef struct AVPicture {
+	uint8_t *data[AV_NUM_DATA_POINTERS];
+	int linesize[AV_NUM_DATA_POINTERS];
+} AVPicture;
+
+#  define av_register_all() ((void)0)
+#  define av_free_packet av_packet_unref
+
+/* Packets from av_read_frame() are reference counted: already owned. */
+FFMPEG_INLINE
+int av_dup_packet(AVPacket *pkt)
+{
+	(void) pkt;
+	return 0;
+}
+
+FFMPEG_INLINE
+int avpicture_get_size(enum AVPixelFormat pix_fmt, int width, int height)
+{
+	return av_image_get_buffer_size(pix_fmt, width, height, 1);
+}
+
+FFMPEG_INLINE
+int avpicture_fill(AVPicture *picture, const uint8_t *ptr, enum AVPixelFormat pix_fmt, int width, int height)
+{
+	return av_image_fill_arrays(picture->data, picture->linesize, ptr, pix_fmt, width, height, 1);
+}
+
+/* The old one-call decode: one packet in, at most one frame out. An empty packet
+ * (data NULL, size 0) drains the delayed frames, as before. */
+FFMPEG_INLINE
+int avcodec_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_frame, const AVPacket *pkt)
+{
+	int ret;
+
+	*got_frame = 0;
+	ret = avcodec_send_packet(avctx, pkt);
+	if (ret == AVERROR(EAGAIN)) {
+		/* Decoder full: hand out the pending frame, then queue the packet. */
+		ret = avcodec_receive_frame(avctx, frame);
+		if (ret < 0) {
+			return ret;
+		}
+		*got_frame = 1;
+		avcodec_send_packet(avctx, pkt);
+		return pkt->size;
+	}
+	if (ret < 0 && ret != AVERROR_EOF) {
+		return ret;
+	}
+	ret = avcodec_receive_frame(avctx, frame);
+	if (ret >= 0) {
+		*got_frame = 1;
+	}
+	else if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+		return ret;
+	}
+	return pkt->size;
+}
+
+/* The old one-call encode: at most one packet out per call. A NULL frame drains
+ * the encoder; call again until *got_packet stays 0. */
+FFMPEG_INLINE
+int ffmpeg_compat_encode(AVCodecContext *avctx, AVPacket *pkt, const AVFrame *frame, int *got_packet)
+{
+	int ret;
+
+	*got_packet = 0;
+	ret = avcodec_send_frame(avctx, frame);
+	if (ret == AVERROR(EAGAIN)) {
+		/* Encoder full: hand out a packet first, then queue the frame. */
+		ret = avcodec_receive_packet(avctx, pkt);
+		if (ret < 0) {
+			return ret;
+		}
+		*got_packet = 1;
+		avcodec_send_frame(avctx, frame);
+		return 0;
+	}
+	if (ret < 0 && ret != AVERROR_EOF) {
+		return ret;
+	}
+	ret = avcodec_receive_packet(avctx, pkt);
+	if (ret >= 0) {
+		*got_packet = 1;
+	}
+	else if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+		return ret;
+	}
+	return 0;
+}
+
+#  define avcodec_encode_video2 ffmpeg_compat_encode
+#  define avcodec_encode_audio2 ffmpeg_compat_encode
+
+/* AVFormatContext.filename became the allocated url. */
+#  define FFMPEG_FORMAT_FILENAME(s) ((s)->url)
+#else
+#  define FFMPEG_FORMAT_FILENAME(s) ((s)->filename)
+#endif
+
+#ifndef FFMPEG_CONST
+#  define FFMPEG_CONST
+#endif
+
+/* AVChannelLayout (FFmpeg 5.1+); the old channel_layout fields still exist next to it. */
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 24, 100)
+#  define FFMPEG_HAVE_CH_LAYOUT 1
+#endif
+
+/* Stream codec info and context, both APIs. Before 5.0 the stream owns its
+ * context (AVStream.codec); from 5.0 the caller makes one from codecpar.
+ * Pair ffmpeg_stream_context_open() with ffmpeg_stream_context_close(). */
+FFMPEG_INLINE
+enum AVMediaType ffmpeg_stream_codec_type(const AVStream *stream)
+{
+#ifdef FFMPEG_NO_STREAM_CODEC
+	return stream->codecpar->codec_type;
+#else
+	return stream->codec->codec_type;
+#endif
+}
+
+FFMPEG_INLINE
+enum AVCodecID ffmpeg_stream_codec_id(const AVStream *stream)
+{
+#ifdef FFMPEG_NO_STREAM_CODEC
+	return stream->codecpar->codec_id;
+#else
+	return stream->codec->codec_id;
+#endif
+}
+
+FFMPEG_INLINE
+AVCodecContext *ffmpeg_stream_context_open(AVStream *stream, const AVCodec *codec)
+{
+#ifdef FFMPEG_NO_STREAM_CODEC
+	AVCodecContext *context = avcodec_alloc_context3(codec);
+	if (context && avcodec_parameters_to_context(context, stream->codecpar) < 0) {
+		avcodec_free_context(&context);
+	}
+	if (context) {
+		context->pkt_timebase = stream->time_base;
+	}
+	return context;
+#else
+	(void) codec;
+	return stream->codec;
+#endif
+}
+
+FFMPEG_INLINE
+void ffmpeg_stream_context_close(AVCodecContext **context)
+{
+	if (*context == NULL) {
+		return;
+	}
+#ifdef FFMPEG_NO_STREAM_CODEC
+	avcodec_free_context(context);
+#else
+	avcodec_close(*context);
+	*context = NULL;
+#endif
+}
+
+/* Presentation time of a decoded frame (AVFrame.pkt_pts is gone in 5.0). */
+#ifdef FFMPEG_NO_STREAM_CODEC
+#  define FFMPEG_FRAME_PTS(frame) ((frame)->pts)
+#else
+#  define FFMPEG_FRAME_PTS(frame) ((frame)->pkt_pts)
+#endif
+
 /* Stupid way to distinguish FFmpeg from Libav:
  * - FFmpeg's MICRO version starts from 100 and goes up, while
  * - Libav's micro is always below 100.
@@ -290,7 +471,10 @@ int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
 }
 #endif
 
-#if ((LIBAVFORMAT_VERSION_MAJOR > 53) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR > 32)) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR == 24) && (LIBAVFORMAT_VERSION_MICRO >= 100)))
+#ifdef FFMPEG_NO_STREAM_CODEC
+/* 5.0 hides AVStream.cur_dts; av_seek_frame() keeps it right by itself. */
+#  define av_update_cur_dts(s, ref_st, timestamp) ((void)0)
+#elif ((LIBAVFORMAT_VERSION_MAJOR > 53) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR > 32)) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR == 24) && (LIBAVFORMAT_VERSION_MICRO >= 100)))
 FFMPEG_INLINE
 void my_update_cur_dts(AVFormatContext *s, AVStream *ref_st, int64_t timestamp)
 {

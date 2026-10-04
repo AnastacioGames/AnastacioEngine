@@ -51,17 +51,6 @@ extern "C" {
 #  define FFMPEG_CODEC_IS_POINTER 1
 #endif
 
-#ifdef FFMPEG_CODEC_IS_POINTER
-static inline AVCodecContext *get_codec_from_stream(AVStream* stream)
-{
-	return stream->codec;
-}
-#else
-static inline AVCodecContext *get_codec_from_stream(AVStream* stream)
-{
-	return &stream->codec;
-}
-#endif
 
 #include "VideoBase.h"
 
@@ -107,7 +96,7 @@ public:
 
 protected:
 	// format and codec information
-	AVCodec	*m_codec;
+	const AVCodec *m_codec;
 	AVFormatContext *m_formatCtx;
 	AVCodecContext *m_codecCtx;
 	// raw frame extracted from video file
@@ -174,7 +163,7 @@ protected:
 	double actFrameRate (void) { return m_frameRate * m_baseFrameRate; }
 
 	/// common function to video file and capture
-	int openStream(const char *filename, AVInputFormat *inputFormat, AVDictionary **formatParams);
+	int openStream(const char *filename, FFMPEG_CONST AVInputFormat *inputFormat, AVDictionary **formatParams);
 
 	/// check if a frame is available and load it in pFrame, return true if a frame could be retrieved
 	AVFrame* grabFrame(long frame);

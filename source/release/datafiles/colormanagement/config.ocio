@@ -41,7 +41,7 @@ roles:
   data: Non-Color
 
   # CIE XYZ color space
-  XYZ: XYZ
+  cie_xyz_d65_interchange: XYZ
 
 displays:
   sRGB:
@@ -69,7 +69,7 @@ displays:
   None:
     - !<View> {name: Default, colorspace: Raw}
 
-active_displays: [sRGB, DCIP3, Rec709, XYZ, None]
+active_displays: [sRGB, Rec709, XYZ, None]
 active_views: [Default, RRT, Raw, Log]
 
 colorspaces:

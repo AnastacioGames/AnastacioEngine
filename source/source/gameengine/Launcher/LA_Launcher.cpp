@@ -72,6 +72,8 @@
 #  include <emscripten.h>
 #endif
 
+#include <csignal>
+
 extern "C" {
 #  include "GPU_extensions.h"
 #  include "GPU_material.h"
@@ -539,6 +541,18 @@ void LA_Launcher::RunPythonMainLoop(const std::string& pythonCode)
 
 #endif  // WITH_PYTHON
 
+static volatile std::sig_atomic_t la_quit_requested = 0;
+
+void LA_Launcher::RequestQuit()
+{
+	la_quit_requested = 1;
+}
+
+bool LA_Launcher::QuitRequested()
+{
+	return la_quit_requested != 0;
+}
+
 KX_ExitInfo LA_Launcher::EngineNextFrame()
 {
 #ifdef WITH_PYTHON
@@ -572,6 +586,9 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 	         m_inputDevice->GetInput(SCA_IInputDevice::WINQUIT).Find(SCA_InputEvent::ACTIVE)) {
 		m_inputDevice->ConvertEvent(SCA_IInputDevice::WINCLOSE, 0, 0);
 		m_inputDevice->ConvertEvent(SCA_IInputDevice::WINQUIT, 0, 0);
+		exitInfo.m_code = KX_ExitInfo::OUTSIDE;
+	}
+	else if (QuitRequested()) {
 		exitInfo.m_code = KX_ExitInfo::OUTSIDE;
 	}
 

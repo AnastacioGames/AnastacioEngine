@@ -60,6 +60,7 @@ if(WITH_OPENCOLORIO)
 	list(APPEND SRC
 		ocio_impl.cc
 		ocio_impl_glsl.cc
+		ocio_impl_v2.h
 	)
 	
 	list(APPEND LIB

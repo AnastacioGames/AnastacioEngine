@@ -446,7 +446,7 @@ struct proxy_output_ctx {
 	AVFormatContext *of;
 	AVStream *st;
 	AVCodecContext *c;
-	AVCodec *codec;
+	const AVCodec *codec;
 	struct SwsContext *sws_ctx;
 	AVFrame *frame;
 	int cfra;
@@ -462,9 +462,10 @@ static int round_up(int x, int mod)
 	return x + ((mod - (x % mod)) % mod);
 }
 
+/* icodec: the opened decoder of the source stream. */
 static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
         struct anim *anim,
-        AVStream *st, int proxy_size, int width, int height,
+        AVCodecContext *icodec, int proxy_size, int width, int height,
         int quality)
 {
 	struct proxy_output_ctx *rv = MEM_callocN(
@@ -486,19 +487,35 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 	rv->of = avformat_alloc_context();
 	rv->of->oformat = av_guess_format("avi", NULL, NULL);
 
+#ifdef FFMPEG_NO_STREAM_CODEC
+	rv->of->url = av_strdup(fname);
+#else
 	BLI_strncpy(rv->of->filename, fname, sizeof(rv->of->filename));
+#endif
 
-	fprintf(stderr, "Starting work on proxy: %s\n", rv->of->filename);
+	fprintf(stderr, "Starting work on proxy: %s\n", fname);
 
 	rv->st = avformat_new_stream(rv->of, NULL);
 	rv->st->id = 0;
 
+#ifdef FFMPEG_NO_STREAM_CODEC
+	rv->codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
+	rv->c = rv->codec ? avcodec_alloc_context3(rv->codec) : NULL;
+	if (!rv->c) {
+		fprintf(stderr, "No ffmpeg MJPEG encoder available? "
+		        "Proxy not built!\n");
+		avformat_free_context(rv->of);
+		return NULL;
+	}
+#else
 	rv->c = rv->st->codec;
+#endif
 	rv->c->codec_type = AVMEDIA_TYPE_VIDEO;
 	rv->c->codec_id = AV_CODEC_ID_MJPEG;
 	rv->c->width = width;
 	rv->c->height = height;
 
+#ifndef FFMPEG_NO_STREAM_CODEC
 	rv->of->oformat->video_codec = rv->c->codec_id;
 	rv->codec = avcodec_find_encoder(rv->c->codec_id);
 
@@ -508,6 +525,7 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 		av_free(rv->of);
 		return NULL;
 	}
+#endif
 
 	if (rv->codec->pix_fmts) {
 		rv->c->pix_fmt = rv->codec->pix_fmts[0];
@@ -518,7 +536,7 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 
 	rv->c->sample_aspect_ratio =
 	    rv->st->sample_aspect_ratio =
-	        st->codec->sample_aspect_ratio;
+	        icodec->sample_aspect_ratio;
 
 	rv->c->time_base.den = 25;
 	rv->c->time_base.num = 1;
@@ -537,16 +555,22 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 	if (avio_open(&rv->of->pb, fname, AVIO_FLAG_WRITE) < 0) {
 		fprintf(stderr, "Couldn't open outputfile! "
 		        "Proxy not built!\n");
+#ifdef FFMPEG_NO_STREAM_CODEC
+		avcodec_free_context(&rv->c);
+#endif
 		av_free(rv->of);
 		return 0;
 	}
 
 	avcodec_open2(rv->c, rv->codec, NULL);
+#ifdef FFMPEG_NO_STREAM_CODEC
+	avcodec_parameters_from_context(rv->st->codecpar, rv->c);
+#endif
 
-	rv->orig_height = av_get_cropped_height_from_codec(st->codec);
+	rv->orig_height = av_get_cropped_height_from_codec(icodec);
 
-	if (st->codec->width != width || st->codec->height != height ||
-	    st->codec->pix_fmt != rv->c->pix_fmt)
+	if (icodec->width != width || icodec->height != height ||
+	    icodec->pix_fmt != rv->c->pix_fmt)
 	{
 		rv->frame = av_frame_alloc();
 		avpicture_fill((AVPicture *) rv->frame,
@@ -555,11 +579,15 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 		                               round_up(width, 16), height),
 		                           "alloc proxy output frame"),
 		               rv->c->pix_fmt, round_up(width, 16), height);
+		/* avcodec_send_frame() (FFmpeg 5+) copies the frame and needs these. */
+		rv->frame->format = rv->c->pix_fmt;
+		rv->frame->width = width;
+		rv->frame->height = height;
 
 		rv->sws_ctx = sws_getContext(
-		        st->codec->width,
+		        icodec->width,
 		        rv->orig_height,
-		        st->codec->pix_fmt,
+		        icodec->pix_fmt,
 		        width, height,
 		        rv->c->pix_fmt,
 		        SWS_FAST_BILINEAR | SWS_PRINT_INFO,
@@ -606,7 +634,7 @@ static int add_to_proxy_output_ffmpeg(
 	ret = avcodec_encode_video2(ctx->c, &packet, frame, &got_output);
 	if (ret < 0) {
 		fprintf(stderr, "Error encoding proxy frame %d for '%s'\n",
-		        ctx->cfra - 1, ctx->of->filename);
+		        ctx->cfra - 1, FFMPEG_FORMAT_FILENAME(ctx->of));
 		return 0;
 	}
 
@@ -627,7 +655,7 @@ static int add_to_proxy_output_ffmpeg(
 		if (av_interleaved_write_frame(ctx->of, &packet) != 0) {
 			fprintf(stderr, "Error writing proxy frame %d "
 			        "into '%s'\n", ctx->cfra - 1,
-			        ctx->of->filename);
+			        FFMPEG_FORMAT_FILENAME(ctx->of));
 			return 0;
 		}
 
@@ -656,7 +684,11 @@ static void free_proxy_output_ffmpeg(struct proxy_output_ctx *ctx,
 
 	av_write_trailer(ctx->of);
 
+#ifdef FFMPEG_NO_STREAM_CODEC
+	avcodec_free_context(&ctx->c);
+#else
 	avcodec_close(ctx->c);
+#endif
 
 	if (ctx->of->oformat) {
 		if (!(ctx->of->oformat->flags & AVFMT_NOFILE)) {
@@ -693,7 +725,7 @@ typedef struct FFmpegIndexBuilderContext {
 
 	AVFormatContext *iFormatCtx;
 	AVCodecContext *iCodecCtx;
-	AVCodec *iCodec;
+	const AVCodec *iCodec;
 	AVStream *iStream;
 	int videoStream;
 
@@ -750,7 +782,7 @@ static IndexBuildContext *index_ffmpeg_create_context(struct anim *anim, IMB_Tim
 	/* Find the video stream */
 	context->videoStream = -1;
 	for (i = 0; i < context->iFormatCtx->nb_streams; i++)
-		if (context->iFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+		if (ffmpeg_stream_codec_type(context->iFormatCtx->streams[i]) == AVMEDIA_TYPE_VIDEO) {
 			if (streamcount > 0) {
 				streamcount--;
 				continue;
@@ -766,11 +798,17 @@ static IndexBuildContext *index_ffmpeg_create_context(struct anim *anim, IMB_Tim
 	}
 
 	context->iStream = context->iFormatCtx->streams[context->videoStream];
-	context->iCodecCtx = context->iStream->codec;
 
-	context->iCodec = avcodec_find_decoder(context->iCodecCtx->codec_id);
+	context->iCodec = avcodec_find_decoder(ffmpeg_stream_codec_id(context->iStream));
 
 	if (context->iCodec == NULL) {
+		avformat_close_input(&context->iFormatCtx);
+		MEM_freeN(context);
+		return NULL;
+	}
+
+	context->iCodecCtx = ffmpeg_stream_context_open(context->iStream, context->iCodec);
+	if (context->iCodecCtx == NULL) {
 		avformat_close_input(&context->iFormatCtx);
 		MEM_freeN(context);
 		return NULL;
@@ -779,6 +817,7 @@ static IndexBuildContext *index_ffmpeg_create_context(struct anim *anim, IMB_Tim
 	context->iCodecCtx->workaround_bugs = 1;
 
 	if (avcodec_open2(context->iCodecCtx, context->iCodec, NULL) < 0) {
+		ffmpeg_stream_context_close(&context->iCodecCtx);
 		avformat_close_input(&context->iFormatCtx);
 		MEM_freeN(context);
 		return NULL;
@@ -787,7 +826,7 @@ static IndexBuildContext *index_ffmpeg_create_context(struct anim *anim, IMB_Tim
 	for (i = 0; i < num_proxy_sizes; i++) {
 		if (proxy_sizes_in_use & proxy_sizes[i]) {
 			context->proxy_ctx[i] = alloc_proxy_output_ffmpeg(
-			        anim, context->iStream, proxy_sizes[i],
+			        anim, context->iCodecCtx, proxy_sizes[i],
 			        context->iCodecCtx->width * proxy_fac[i],
 			        av_get_cropped_height_from_codec(
 			        context->iCodecCtx) * proxy_fac[i],
@@ -830,7 +869,7 @@ static void index_rebuild_ffmpeg_finish(FFmpegIndexBuilderContext *context, int 
 		}
 	}
 
-	avcodec_close(context->iCodecCtx);
+	ffmpeg_stream_context_close(&context->iCodecCtx);
 	avformat_close_input(&context->iFormatCtx);
 
 	MEM_freeN(context);

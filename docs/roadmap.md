@@ -179,7 +179,8 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
     2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,
     pacote 0.4.6 leva `libOpenColorIO.so.1` e a pasta, sem "fallback mode". Falta o Kitsuy confirmar.
-  - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
+  - ~~`RangeRuntime` ignora `SIGTERM`~~: corrigido em 2026-10-04 (branch `claude/great-babbage-58sugr`, sem merge):
+    o SDL do gamepad engolia o sinal; `kill`, `timeout` e Ctrl+C fecham o jogo, o segundo sinal mata. Ver changelog.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
     `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
@@ -222,10 +223,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   varios minutos. Cubins CUDA para sm_75/sm_86/sm_89/sm_120 (RTX 20/30/40/50) no release desde 2026-09-26;
   so sm_120 testado em hardware real. OSL fica desligado (sem pacote no Ubuntu
   24.04; exige OSL 1.9 com LLVM antigo).
-- Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
-  do editor para OpenColorIO 2.x/FFmpeg 5+. Só necessário fora do container 22.04 (Ubuntu 24.04+ só tem OCIO
-  2.x): o container usa a OCIO 1.1.1 do apt desde 2026-09-30. FFmpeg segue desligado; só o wrapper `audaspace`
-  do FFmpeg foi ajustado.
+- OpenColorIO 2.x e FFmpeg 5+/6.x portados em 2026-10-04 (branch `claude/great-babbage-58sugr`, sem merge; ver
+  changelog): `intern/opencolorio` e os usuários do FFmpeg compilam com as duas gerações (a antiga segue igual
+  no Windows). Testado no Linux com OCIO 2.1 e FFmpeg 6.1: player sem "fallback mode", vídeo em textura nos
+  jogos, export de vídeo com áudio, filme no sequencer e proxy (`tools/linux/av_ports_test.py`,
+  `tools/linux/video_texture_test.py`). Falta: compilar no Windows/MSVC; decidir se os presets/pacote Linux
+  ligam `WITH_CODEC_FFMPEG` (hoje desligado; o pacote teria de levar as `libav*`); conferir na janela do
+  editor a imagem com Filmic (caminho GLSL do OCIO 2, verificado só por teste numérico).
 
 ### Cutscene nativo
 
