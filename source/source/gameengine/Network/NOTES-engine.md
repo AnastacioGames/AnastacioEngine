@@ -72,7 +72,7 @@ não deu para testar.
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
-- **Windows/MSVC e editor completo no Linux**: ver "Testes" abaixo.
+- **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
 
 ## Uso rápido
 
@@ -112,6 +112,15 @@ PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene
 O `RangeEngine -b` precisa de `BLENDER_SYSTEM_SCRIPTS=source/release/scripts` e `BLENDER_SYSTEM_DATAFILES=source/release/datafiles`
 fora de uma instalação (o runner já define). O editor completo e o preset `linux-editor` com Cycles/OIIO/OCIO/Embree **não** foram
 compilados aqui (só a versão enxuta acima).
+
+### Windows (2026-10-04, MSVC, `build/`)
+
+Compila sem mudança. `tools/net_engine_test/run_net_test_win.sh spawner|car ["100,20,2"]` (Git Bash) abre dois
+`RangeRuntime` em janelas 320×240; cada um recebe um `TEMP` próprio, porque o player grava os `NETTEST` em
+`%TEMP%ange_runtime.log.txt` (o stdout não chega ao shell). Passaram: `spawner` (círculo 382/382 amostras, `hp`,
+spawn, lobby, chat, LAN), `car` (cliente segue o carro a 4,93 m/s) e `spawner` com simulador 100,20,2. Editor:
+painéis Network da cena (Properties > Scene) e do objeto (Properties > Game, checkbox no cabeçalho) desenhados
+certos numa janela (screenshot). Modo `scene` (editor gera os `.range`) não foi rodado no Windows.
 
 Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro
 é lento (5–15 fps) e o servidor às vezes para por centenas de ms; o teste de trajetória tolera isso (80 % das amostras na curva).

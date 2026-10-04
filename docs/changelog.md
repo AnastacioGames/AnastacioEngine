@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: validação no Windows/MSVC (2026-10-04)
+
+- A integração de rede (`KX_NetworkManager`, `Range.network`, painéis Network) compila no MSVC sem mudança.
+- Novo `tools/net_engine_test/run_net_test_win.sh` (Git Bash): servidor e cliente `RangeRuntime` em janelas pequenas, um
+  `TEMP` por processo (os `NETTEST` vão para `%TEMP%ange_runtime.log.txt`). Passaram `spawner`, `car` e `spawner` com
+  simulador 100 ms/20 ms/2 %.
+- Editor: painéis Network da cena e do objeto (aba Game) conferidos por screenshot numa janela real.
+- Não rodado no Windows: modo `scene` do teste. Registro em `source/source/gameengine/Network/NOTES-engine.md`.
+
 ## Áudio Web: AudioWorklet no lugar do ScriptProcessorNode (2026-10-04, branch `claude/project-thread-8r9ysi`)
 
 - Novo dispositivo Audaspace `WebAudio` (`extern/audaspace/plugins/webaudio/`, só no Emscripten): `AudioWorkletNode` alimentado pela thread principal via `MessagePort`, sem `SharedArrayBuffer` (não exige COOP/COEP; GitHub Pages e o WebView do APK seguem servindo). O worklet pede o que falta para a fila chegar ao alvo (2 blocos de `mixbufsize`); se faltar dado, toca silêncio e, quando os dados voltam, soma ao alvo o que faltou (até ~0,5 s).
