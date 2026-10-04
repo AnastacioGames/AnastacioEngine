@@ -575,7 +575,7 @@ static void ui_draw_linkline(uiLinkLine *line, int highlightActiveLines, int das
 	else if (line->color)
 		glColor3ub(line->color[0], line->color[1], line->color[2]);
 	else
-		glColor3ub(0, 0, 0);
+		glColor3ub(190, 190, 190);  /* light link on dark editors, like node links */
 
 	ui_draw_link_bezier(&rect);
 }

@@ -1285,6 +1285,15 @@ void BLO_version_defaults_userpref_blend(UserDef *userdef)
     }
   }
 
+  if (!USER_VERSION_ATLEAST(1, 6, 116)) {
+    /* Active face/vert/edge: translucent orange tint (no stipple since 1.6.116). */
+    for (bTheme *btheme = userdef->themes.first; btheme; btheme = btheme->next) {
+      rgba_char_args_set(btheme->tv3d.editmesh_active, 255, 93, 0, 51);
+      rgba_char_args_set(btheme->tglobal.editmesh_active, 255, 93, 0, 51);
+      rgba_char_args_set(btheme->tima.editmesh_active, 255, 93, 0, 51);
+    }
+  }
+
   // we default to the first audio device
   userdef->audiodevice = 0;
 

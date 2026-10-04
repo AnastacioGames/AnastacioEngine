@@ -2910,7 +2910,7 @@ bool ui_link_bezier_points(const rcti *rect, float coord_array[][2], int resol)
 	return true;
 }
 
-#define LINK_RESOL  24
+#define LINK_RESOL  64
 void ui_draw_link_bezier(const rcti *rect)
 {
 	float coord_array[LINK_RESOL + 1][2];
@@ -2920,13 +2920,25 @@ void ui_draw_link_bezier(const rcti *rect)
 		/* we can reuse the dist variable here to increment the GL curve eval amount*/
 		const float dist = 1.0f / (float)LINK_RESOL;
 #endif
-		glLineWidth(2.);
+		float col[4];
+		glGetFloatv(GL_CURRENT_COLOR, col);
+
 		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glEnable(GL_LINE_SMOOTH);
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glVertexPointer(2, GL_FLOAT, 0, coord_array);
+
+		/* soft dark halo, then the colored link on top */
+		glLineWidth(4.5f * U.pixelsize);
+		glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
 		glDrawArrays(GL_LINE_STRIP, 0, LINK_RESOL + 1);
+
+		glLineWidth(2.0f * U.pixelsize);
+		glColor4fv(col);
+		glDrawArrays(GL_LINE_STRIP, 0, LINK_RESOL + 1);
+
 		glDisableClientState(GL_VERTEX_ARRAY);
 
 		glDisable(GL_BLEND);

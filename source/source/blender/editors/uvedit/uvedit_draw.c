@@ -34,6 +34,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
+#include "DNA_userdef_types.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -640,9 +641,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 					BM_elem_flag_enable(efa, BM_ELEM_TAG);
 
 					if (tf == activetf) {
-						/* only once */
-						GPU_basic_shader_bind(GPU_SHADER_STIPPLE | GPU_SHADER_USE_COLOR);
-						GPU_basic_shader_stipple(GPU_SHADER_STIPPLE_QUARTTONE);
+						/* solid translucent tint, no stipple */
 						UI_ThemeColor4(TH_EDITMESH_ACTIVE);
 					}
 					else {
@@ -652,10 +651,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 					glBegin(GL_TRIANGLES);
 					draw_uvs_looptri(em, &i, cd_loop_uv_offset);
 					glEnd();
-
-					if (tf == activetf) {
-						GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
-					}
 				}
 				else {
 					BM_elem_flag_disable(efa, BM_ELEM_TAG);
@@ -717,9 +712,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			UI_ThemeColor4(TH_EDITMESH_ACTIVE);
 
-			GPU_basic_shader_bind(GPU_SHADER_STIPPLE | GPU_SHADER_USE_COLOR);
-			GPU_basic_shader_stipple(GPU_SHADER_STIPPLE_QUARTTONE);
-
 			glBegin(GL_POLYGON);
 			BM_ITER_ELEM (l, &liter, activef, BM_LOOPS_OF_FACE) {
 				luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
@@ -727,7 +719,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 			}
 			glEnd();
 
-			GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 			glDisable(GL_BLEND);
 		}
 	}
@@ -735,13 +726,12 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 
 	/* 4. draw edges */
 
-	if (sima->flag & SI_SMOOTH_UV) {
-		glEnable(GL_LINE_SMOOTH);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	}
+	/* always smooth, like the 3D View overlays */
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glLineWidth(1);
+	glLineWidth(1.2f * U.pixelsize);
 
 	switch (sima->dt_uv) {
 		case SI_UVDT_DASH:
@@ -777,8 +767,9 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 			}
 			break;
 		case SI_UVDT_OUTLINE:
-			glLineWidth(3);
-			cpack(0x0);
+			/* soft dark halo instead of a hard 3px black line */
+			glLineWidth(3.0f * U.pixelsize);
+			glColor4ub(0, 0, 0, 120);
 
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 				if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
@@ -787,7 +778,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 				draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset);
 			}
 
-			glLineWidth(1);
+			glLineWidth(1.2f * U.pixelsize);
 			UI_GetThemeColor4ubv(TH_WIRE_EDIT, col2);
 			glColor4ubv((unsigned char *)col2);
 
@@ -846,17 +837,18 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 			break;
 	}
 
-	if (sima->flag & SI_SMOOTH_UV) {
-		glDisable(GL_LINE_SMOOTH);
-		glDisable(GL_BLEND);
-	}
+	glLineWidth(1);
+	glDisable(GL_LINE_SMOOTH);
+
+	/* round smooth points for face centers and vertices */
+	glEnable(GL_POINT_SMOOTH);
 
 	/* 5. draw face centers */
 
 	if (drawfaces) {
 		float cent[2];
 
-		pointsize = UI_GetThemeValuef(TH_FACEDOT_SIZE);
+		pointsize = UI_GetThemeValuef(TH_FACEDOT_SIZE) * U.pixelsize;
 		glPointSize(pointsize);
 
 		glBegin(GL_POINTS);
@@ -895,7 +887,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 	if (drawfaces != 2) { /* 2 means Mesh Face Mode */
 		/* unselected uvs */
 		UI_ThemeColor(TH_VERTEX);
-		pointsize = UI_GetThemeValuef(TH_VERTEX_SIZE);
+		pointsize = UI_GetThemeValuef(TH_VERTEX_SIZE) * U.pixelsize;
 		glPointSize(pointsize);
 
 		glBegin(GL_POINTS);
@@ -948,6 +940,9 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 		}
 		glEnd();
 	}
+
+	glDisable(GL_POINT_SMOOTH);
+	glDisable(GL_BLEND);
 }
 
 

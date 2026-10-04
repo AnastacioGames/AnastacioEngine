@@ -2829,6 +2829,15 @@ void ED_region_grid_draw(ARegion *ar, float zoomx, float zoomy)
 		fac += 4.0f * gridstep;
 	}
 	glEnd();
+
+	/* light border around the 0..1 UV space */
+	UI_ThemeColorShade(TH_BACK, 45);
+	glBegin(GL_LINE_LOOP);
+	glVertex2f(x1, y1);
+	glVertex2f(x2, y1);
+	glVertex2f(x2, y2);
+	glVertex2f(x1, y2);
+	glEnd();
 }
 
 /* If the area has overlapping regions, it returns visible rect for Region *ar */

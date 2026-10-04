@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Edit Mode, UV editor, tema e Logic Bricks com visual no estilo Blender 5
+
+- Edit Mode (`drawobject.c`): face ativa com preenchimento translúcido sólido (sem stipple); arestas suaves de 1,5 px escalados por DPI; vértices e face dots redondos.
+- UV editor (`uvedit_draw.c`): face ativa sem stipple; arestas sempre suaves (antes só com a opção Smooth), 1,2 px por DPI; modo Outline com halo escuro translúcido em vez de linha preta de 3 px; pontos redondos escalados por DPI. Grade sem imagem ganhou borda clara no espaço 0..1 (`ED_region_grid_draw`).
+- Tema: Active Vert/Edge/Face = `#ff5d0033` (laranja, alpha 0,2) em todos os presets de `interface_theme`, no default de `resources.c` e via versioning em preferências salvas (`RANGE_MINSUBVERSION` 115 → 116; bloco 1.6.116 em `versioning_userdef.c`, 3D View, tema global e Image Editor).
+- Logic Bricks (`ui_draw_link_bezier`): curva com 64 segmentos, halo escuro de 4,5 px + linha de 2 px escalados por DPI; cor padrão cinza claro em vez de preto.
+
 ## 3D View: contorno de seleção, prévia do Ctrl+R e wireframe com linhas suaves
 
 - Contorno do objeto selecionado (`draw_mesh_object_outline`) desenhado com `GL_LINE_SMOOTH` + blend, como grid, eixos, câmera e empty; desligado no picking.

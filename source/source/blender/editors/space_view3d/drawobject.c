@@ -3316,8 +3316,9 @@ static DMDrawOption draw_dm_faces_sel__setDrawOptions(void *userData, int index)
 
 	if (!BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
 		if (efa == data->efa_act) {
+			/* solid translucent fill (like Blender 5) instead of the stipple pattern */
 			glColor4ubv(data->cols[2]);
-			return DM_DRAW_OPTION_STIPPLE;
+			return DM_DRAW_OPTION_NORMAL;
 		}
 		else {
 #ifdef WITH_FREESTYLE
@@ -3502,6 +3503,11 @@ static void draw_em_fancy_verts(Scene *scene, View3D *v3d, Object *obedit,
 
 	if (v3d->zbuf) glDepthMask(0);  /* disable write in zbuffer, zbuf select */
 
+	/* round, antialiased points */
+	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	for (int sel = 0; sel < 2; sel++) {
 		unsigned char col[4], fcol[4];
 
@@ -3542,11 +3548,13 @@ static void draw_em_fancy_verts(Scene *scene, View3D *v3d, Object *obedit,
 			}
 
 			if (pass == 0) {
-				glDisable(GL_BLEND);
 				glEnable(GL_DEPTH_TEST);
 			}
 		}
 	}
+
+	glDisable(GL_BLEND);
+	glDisable(GL_POINT_SMOOTH);
 
 	if (v3d->zbuf) glDepthMask(1);
 }
@@ -3567,6 +3575,13 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 	 * textured draw mode when the 'edges' option is disabled */
 	if (sel_only)
 		wireCol[3] = 0;
+
+	/* antialiased edges, matching the smoothed object-mode wire */
+	glEnable(GL_LINE_SMOOTH);
+	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glLineWidth(1.5f * U.pixelsize);
 
 	for (int pass = 0; pass < 2; pass++) {
 		/* show wires in transparent when no zbuf clipping for select */
@@ -3614,10 +3629,13 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 		}
 
 		if (pass == 0) {
-			glDisable(GL_BLEND);
 			glEnable(GL_DEPTH_TEST);
 		}
 	}
+
+	glLineWidth(1.0f);
+	glDisable(GL_BLEND);
+	glDisable(GL_LINE_SMOOTH);
 }
 
 static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMesh *em, UnitSettings *unit)

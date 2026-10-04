@@ -932,7 +932,7 @@ void ui_theme_init_default(void)
 	rgba_char_args_set(btheme->tv3d.vertex_normal, 0x23, 0x61, 0xDD, 255);
 	rgba_char_args_set(btheme->tv3d.loop_normal, 0xDD, 0x23, 0xDD, 255);
 	rgba_char_args_set(btheme->tv3d.face_dot, 255, 133, 0, 255);
-	rgba_char_args_set(btheme->tv3d.editmesh_active, 255, 255, 255, 128);
+	rgba_char_args_set(btheme->tv3d.editmesh_active, 255, 93, 0, 51);
 	rgba_char_args_set_fl(btheme->tv3d.edge_crease, 0.8, 0, 0.6, 1.0);
 	rgba_char_args_set(btheme->tv3d.edge_sharp, 0, 255, 255, 255);
 	rgba_char_args_set(btheme->tv3d.header_text, 0, 0, 0, 255);
@@ -1100,7 +1100,7 @@ void ui_theme_init_default(void)
 	btheme->tima.facedot_size = 3;
 	rgba_char_args_set(btheme->tima.face,   255, 255, 255, 10);
 	rgba_char_args_set(btheme->tima.face_select, 255, 133, 0, 60);
-	rgba_char_args_set(btheme->tima.editmesh_active, 255, 255, 255, 128);
+	rgba_char_args_set(btheme->tima.editmesh_active, 255, 93, 0, 51);
 	rgba_char_args_set_fl(btheme->tima.preview_back,        0.0, 0.0, 0.0, 0.3);
 	rgba_char_args_set_fl(btheme->tima.preview_stitch_face, 0.5, 0.5, 0.0, 0.2);
 	rgba_char_args_set_fl(btheme->tima.preview_stitch_edge, 1.0, 0.0, 1.0, 0.2);
