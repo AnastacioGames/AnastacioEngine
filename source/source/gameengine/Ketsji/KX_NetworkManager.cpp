@@ -1149,11 +1149,30 @@ void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64
 
 	switch (event.type) {
 		case net::SessionEvent::Type::ClientJoined: {
+			if (!m_dedicated) {
+				/* The session announces clients to each other but not the server itself: the host is client 0
+				 * and shows up in the lobby of the new player with its name. */
+				net::ClientInfoMsg host;
+				host.clientId = net::kServerClientId;
+				host.name = m_playerName;
+				host.flags = net::CLIENT_CONNECTED | net::CLIENT_READY;
+				m_server->send(event.client, net::Channel::Control, net::makePacket(host));
+			}
 			Event e;
 			e.type = Event::PLAYER_JOIN;
 			e.client = event.client;
 			e.text = event.text;
 			Emit(e);
+			break;
+		}
+		case net::SessionEvent::Type::ClientExpired: {
+			/* The replicator already forgot the objects the client had spawned (despawnOnExpire): remove them
+			 * from the game too. */
+			for (auto &pair : m_entries) {
+				if (pair.second.spawned && pair.second.owner == event.client && pair.second.obj && m_scene) {
+					m_scene->DelayedRemoveObject(pair.second.obj);
+				}
+			}
 			break;
 		}
 		case net::SessionEvent::Type::ClientLeft: {
@@ -1406,6 +1425,7 @@ std::vector<KX_NetworkManager::PlayerInfo> KX_NetworkManager::GetPlayers() const
 			info.name = pair.second.name;
 			const auto it = m_remoteReady.find(pair.first);
 			info.ready = it != m_remoteReady.end() && it->second;
+			info.isHost = (pair.first == net::kServerClientId);
 			if (pair.first == m_client->clientId()) {
 				info.ping = int(std::lround(m_client->rttMs()));
 			}

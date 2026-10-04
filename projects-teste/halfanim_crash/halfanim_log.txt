@@ -60,3 +60,11 @@ SPAWNED 303
 frame 100
 frame 100
 frame 200
+START
+frame 0
+SPAWNED 303
+START
+frame 0
+SPAWNED 303
+frame 100
+frame 100

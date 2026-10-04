@@ -99,7 +99,7 @@ def run():
     hps = []
     spawn_seen = []
     clients_seen = 0
-    lobby = {"chat_sent": False, "start": None, "ready_sent": False, "lan": None}
+    lobby = {"chat_sent": False, "start": None, "ready_sent": False, "lan": None, "clients": []}
     t_connected = None
     last_log = 0.0
 
@@ -132,6 +132,8 @@ def run():
                 lobby["ready_sent"] = True
                 net.set_ready(True)
                 net.send_chat("hello")
+            if net.isConnected and net.clients:
+                lobby["clients"] = [(c.id, c.name, c.isHost, c.ready) for c in net.clients]
             if net.isConnected and not lobby["lan"]:
                 found = net.discover_lan()
                 if any(entry["name"] == "engine-test" for entry in found):
@@ -189,6 +191,8 @@ def run():
             check("replicated property changes", len(set(hps)) > 3, "hp values %s..%s" % (min(hps) if hps else None, max(hps) if hps else None))
         if proto:
             check("spawned object appears on the client", any(n >= 1 for n in spawn_seen), "max=%d" % max(spawn_seen or [0]))
+        check("lobby: client list has the host and itself", (0, "Tester-server", True) in [c[:3] for c in lobby["clients"]]
+              and any(c[0] == 1 and c[1] == "Tester-client" for c in lobby["clients"]), str(lobby["clients"]))
         check("lobby: server chat reached the client", ("chat", 0, "welcome") in events, str(events))
         check("lobby: on_start fired on the client", ("start",) in events, str(events))
         if lobby["lan"]:
