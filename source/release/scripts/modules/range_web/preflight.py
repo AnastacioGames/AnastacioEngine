@@ -131,7 +131,11 @@ def _check_shaders(data):
     out = []
     for s in data.get("shader_errors", ()):
         where = ", material %s" % s["material"] if s.get("material") else ""
-        out.append(_err("WEB-GFX-002", Msg("Shader did not compile (stage %s%s).", s.get("stage", "?"), where),
+        if s.get("operation") == "link":
+            msg = Msg("Shader did not link (program%s).", where)
+        else:
+            msg = Msg("Shader did not compile (stage %s%s).", s.get("stage", "?"), where)
+        out.append(_err("WEB-GFX-002", msg,
                         fix=s.get("log", ""), location={"source": s.get("material", "")}))
     return out
 

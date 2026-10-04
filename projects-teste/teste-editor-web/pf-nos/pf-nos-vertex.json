@@ -1,0 +1,92 @@
+{
+  "schema": "range-web-preflight",
+  "schema_version": 2,
+  "cross_origin_isolated": false,
+  "webgl": {
+    "version": 2,
+    "missing_extensions": []
+  },
+  "files": [
+    {
+      "name": "game/m1c-nos-vertex.range",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "17204ef562245d1d53657bf6f6b9d72121c293788c1c490f76d20e6e665c4dc2",
+      "sha256": "17204ef562245d1d53657bf6f6b9d72121c293788c1c490f76d20e6e665c4dc2"
+    },
+    {
+      "name": "HOSTING.md",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b",
+      "sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b"
+    },
+    {
+      "name": "index.html",
+      "status": 200,
+      "mime": "text/html",
+      "error": "",
+      "expected_sha256": "bae69a7fa569f7d964a15e7141457f7caa637e861d801acf9adfc034d3754c4f",
+      "sha256": "bae69a7fa569f7d964a15e7141457f7caa637e861d801acf9adfc034d3754c4f"
+    },
+    {
+      "name": "RangeRuntime.data",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "fcf1a75c283fa54d1deca31db31b24a18f08a4104467cb1f81011320a73f3346",
+      "sha256": "fcf1a75c283fa54d1deca31db31b24a18f08a4104467cb1f81011320a73f3346"
+    },
+    {
+      "name": "RangeRuntime.js",
+      "status": 200,
+      "mime": "text/javascript",
+      "error": "",
+      "expected_sha256": "aaf26cc24781e871875a6f9be5086ac16db862aeff6447e933f1a022c4d431aa",
+      "sha256": "aaf26cc24781e871875a6f9be5086ac16db862aeff6447e933f1a022c4d431aa"
+    },
+    {
+      "name": "RangeRuntime.wasm",
+      "status": 200,
+      "mime": "application/wasm",
+      "error": "",
+      "expected_sha256": "d8ef094cb0feeba8f6b34a13762f3c209a03bae2fdd8bb9acbc77b564ab12be3",
+      "sha256": "d8ef094cb0feeba8f6b34a13762f3c209a03bae2fdd8bb9acbc77b564ab12be3"
+    },
+    {
+      "name": "serve.py",
+      "status": 200,
+      "mime": "text/x-python",
+      "error": "",
+      "expected_sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92",
+      "sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92"
+    }
+  ],
+  "context_lost": false,
+  "runtime_initialized": true,
+  "runtime_aborted": "",
+  "runtime_failure": "",
+  "diagnostics": [
+    {
+      "version": 1,
+      "category": "shader",
+      "severity": "error",
+      "operation": "compile",
+      "stage": "vertex",
+      "origin": "MAMatNosQuebrado",
+      "log": "ERROR: 0:410: ';' : syntax error\n"
+    }
+  ],
+  "shader_errors": [
+    {
+      "material": "MAMatNosQuebrado",
+      "stage": "vertex",
+      "operation": "compile",
+      "log": "ERROR: 0:410: ';' : syntax error\n",
+      "structured": true
+    }
+  ],
+  "python_errors": []
+}

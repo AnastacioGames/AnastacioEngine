@@ -1,0 +1,92 @@
+{
+  "schema": "range-web-preflight",
+  "schema_version": 2,
+  "cross_origin_isolated": false,
+  "webgl": {
+    "version": 2,
+    "missing_extensions": []
+  },
+  "files": [
+    {
+      "name": "game/m1c-nos-link.range",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "da98a410126e78332680b204a0b6340a35a115a5e04c8314920741b5bfa93e41",
+      "sha256": "da98a410126e78332680b204a0b6340a35a115a5e04c8314920741b5bfa93e41"
+    },
+    {
+      "name": "HOSTING.md",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b",
+      "sha256": "5b83383780c0f4ec8ad9efea5360a2478f8d42b3e91810a00e9a8fdc49ae1c5b"
+    },
+    {
+      "name": "index.html",
+      "status": 200,
+      "mime": "text/html",
+      "error": "",
+      "expected_sha256": "1ae40a729c87b1f3ebe95d9bc9e3dee42f6bbca3340adcaefbb02eee0daef7af",
+      "sha256": "1ae40a729c87b1f3ebe95d9bc9e3dee42f6bbca3340adcaefbb02eee0daef7af"
+    },
+    {
+      "name": "RangeRuntime.data",
+      "status": 200,
+      "mime": "application/octet-stream",
+      "error": "",
+      "expected_sha256": "fcf1a75c283fa54d1deca31db31b24a18f08a4104467cb1f81011320a73f3346",
+      "sha256": "fcf1a75c283fa54d1deca31db31b24a18f08a4104467cb1f81011320a73f3346"
+    },
+    {
+      "name": "RangeRuntime.js",
+      "status": 200,
+      "mime": "text/javascript",
+      "error": "",
+      "expected_sha256": "aaf26cc24781e871875a6f9be5086ac16db862aeff6447e933f1a022c4d431aa",
+      "sha256": "aaf26cc24781e871875a6f9be5086ac16db862aeff6447e933f1a022c4d431aa"
+    },
+    {
+      "name": "RangeRuntime.wasm",
+      "status": 200,
+      "mime": "application/wasm",
+      "error": "",
+      "expected_sha256": "d8ef094cb0feeba8f6b34a13762f3c209a03bae2fdd8bb9acbc77b564ab12be3",
+      "sha256": "d8ef094cb0feeba8f6b34a13762f3c209a03bae2fdd8bb9acbc77b564ab12be3"
+    },
+    {
+      "name": "serve.py",
+      "status": 200,
+      "mime": "text/x-python",
+      "error": "",
+      "expected_sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92",
+      "sha256": "92e1493c0f92cae3e33e016a0ca86ef924010ed8455add367dab78282556be92"
+    }
+  ],
+  "context_lost": false,
+  "runtime_initialized": true,
+  "runtime_aborted": "",
+  "runtime_failure": "",
+  "diagnostics": [
+    {
+      "version": 1,
+      "category": "shader",
+      "severity": "error",
+      "operation": "link",
+      "stage": "",
+      "origin": "MAMatNosQuebrado",
+      "log": "Types of varying 'm1c_conflito' differ between VERTEX and FRAGMENT shaders.\nFRAGMENT varying m1c_conflito does not match any VERTEX varying\n"
+    }
+  ],
+  "shader_errors": [
+    {
+      "material": "MAMatNosQuebrado",
+      "stage": "",
+      "operation": "link",
+      "log": "Types of varying 'm1c_conflito' differ between VERTEX and FRAGMENT shaders.\nFRAGMENT varying m1c_conflito does not match any VERTEX varying\n",
+      "structured": true
+    }
+  ],
+  "python_errors": []
+}

@@ -291,7 +291,7 @@ Estado: `D:\AnastacioEngine-claude-rna`, branch `claude/web-m1-python-diag`. M0-
 
 **Claude (arquivos: `KX_2DFilter*`, `KX_2DFilterManager*`, `RAS_2DFilter*`, `KX_KetsjiEngine.cpp`, `RAS_Query*`, `BL_Shader*`, `RAS_Shader*`, `gpu_shader.c`, docs; integração):**
 1. (Feito) integração e regressões. Ao receber T3/T4 do Codex, integrar de novo, recompilar e repetir as mesmas verificações mais `claude_r3_probe`.
-2. (Feito) nome de material em `shader_errors` e teste de falha de link. Material de nós (2026-10-04): cena `criar_m1c_nos.py` (falha via `script_frag`/`script_vert` no shader gerado) e `test_preflight_node_material.py`; falta rodar a cena no navegador. T4 integrado. T5 parcial: `frame-time-perf.js` integrado, sem ligação ao `index.html` e sem script CDP. T3 aberto (`codex/r3-audio-fix-new` incompleto).
+2. (Feito) nome de material em `shader_errors` e teste de falha de link. Material de nós (2026-10-04): cena `criar_m1c_nos.py` (falha via `script_frag`/`script_vert` no shader gerado) e `test_preflight_node_material.py`; navegador e importação no editor (por script) validados. T4 integrado. T5 parcial: `frame-time-perf.js` integrado, sem ligação ao `index.html` e sem script CDP. T3 aberto (`codex/r3-audio-fix-new` incompleto).
 3. SSAO na Web: aguarda a comparação do usuário.
 4. (Feito 2026-09-23) M4 adiado: celular físico (OPPO Reno14 5G) mediu p50 22 ms sem filtros 2D na cena; picos do p95 são esporádicos. Ver roadmap.
 

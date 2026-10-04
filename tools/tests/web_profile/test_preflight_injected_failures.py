@@ -30,7 +30,7 @@ class ShaderFailureTests(unittest.TestCase):
         log = "ERROR: 0:12: 'foo' : undeclared identifier"
         found = preflight.check_preflight(shader_report(stage, operation, log))
         self.assertEqual([f.rule_id for f in found], ["WEB-GFX-002"])
-        self.assertIn("stage %s" % stage, found[0].message)
+        self.assertIn("did not link" if operation == "link" else "stage %s" % stage, found[0].message)
         self.assertIn("MAMaterial", found[0].message)
         self.assertEqual(found[0].fix, log)
         self.assertEqual(found[0].location["source"], "MAMaterial")

@@ -383,6 +383,10 @@ _TABLE = {
         "Shader não compilou (estágio %s%s).",
         "El shader no compiló (etapa %s%s).",
         "Шейдер не скомпилировался (стадия %s%s)."),
+    "Shader did not link (program%s).": (
+        "Shader não linkou (programa%s).",
+        "El shader no enlazó (programa%s).",
+        "Шейдер не слинковался (программа%s)."),
     "Import failed at runtime: %s.": (
         "Import falhou no runtime: %s.",
         "Import falló en el runtime: %s.",

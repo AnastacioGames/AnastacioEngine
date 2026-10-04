@@ -59,6 +59,7 @@ class NodeMaterialReportTests(unittest.TestCase):
             self.assertEqual([f.rule_id for f in found], ["WEB-GFX-002"], operation)
             self.assertIn("MAMatNosQuebrado", found[0].message)
             self.assertEqual(found[0].fix, "ERROR: m1c")
+            self.assertIn("did not link" if operation == "link" else "stage vertex", found[0].message)
 
 
 class NodeMaterialInjectionPathTests(unittest.TestCase):
