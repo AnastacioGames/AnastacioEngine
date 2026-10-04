@@ -42,9 +42,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 extern "C" {
+#  include "BLI_listbase.h"
 #  include "DNA_object_types.h"
 #  include "DNA_property_types.h"
 #  include "DNA_scene_types.h"
@@ -167,6 +169,7 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_gameVersion(1),
 	m_maxPlayers(8),
 	m_snapshotRate(20),
+	m_relevanceRadius(0.0f),
 	m_sceneHash(0),
 	m_tick(net::kNoTick),
 	m_simEnabled(false),
@@ -217,6 +220,7 @@ KX_NetworkManager::SceneSettings KX_NetworkManager::ReadSceneSettings(KX_Scene *
 	settings.gameVersion = net.game_version > 0 ? uint32_t(net.game_version) : 1u;
 	settings.tickRate = net.tick_rate;
 	settings.snapshotRate = net.snapshot_rate > 0 ? net.snapshot_rate : 20;
+	settings.relevanceRadius = std::max(net.relevance_radius, 0.0f);
 	settings.lan = (net.flags & NET_SCENE_LAN_DISCOVERY) != 0;
 	settings.lateJoin = (net.flags & NET_SCENE_LATE_JOIN) != 0;
 	return settings;
@@ -352,6 +356,24 @@ void KX_NetworkManager::CollectProps(KX_GameObject *obj, std::vector<std::string
 	}
 }
 
+void KX_NetworkManager::FloatQuantization(KX_GameObject *obj, const std::string &name, net::PropertyDesc &desc)
+{
+	Object *ob = obj->GetBlenderObject();
+	const bProperty *prop = ob ? (const bProperty *)BLI_findstring(&ob->prop, name.c_str(), offsetof(bProperty, name))
+	                           : nullptr;
+	if (!prop || prop->net_bits <= 0) {
+		return;
+	}
+	if (prop->net_bits > 31 || !(prop->net_min < prop->net_max)) {
+		CM_Warning("network: float property '" << name << "' of '" << obj->GetName()
+		           << "' needs Min < Max and 1 to 31 bits, sent as raw 32 bits");
+		return;
+	}
+	desc.min = prop->net_min;
+	desc.max = prop->net_max;
+	desc.bits = prop->net_bits;
+}
+
 void KX_NetworkManager::BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const
 {
 	entry.propNames.clear();
@@ -365,6 +387,9 @@ void KX_NetworkManager::BuildSchema(KX_GameObject *obj, const std::vector<std::s
 		}
 		net::PropertyDesc desc;
 		desc.kind = kind;
+		if (kind == net::PropKind::Float) {
+			FloatQuantization(obj, name, desc);
+		}
 		entry.propNames.push_back(name);
 		entry.schema.push_back(desc);
 	}
@@ -804,6 +829,8 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	m_gameId = settings.gameId;
 	m_gameVersion = settings.gameVersion;
 	m_snapshotRate = std::max(options.snapshotRate > 0 ? options.snapshotRate : settings.snapshotRate, 1);
+	m_relevanceRadius = settings.relevanceRadius;
+	m_views.clear();
 	const int tickSetting = options.tickRate > 0 ? options.tickRate : settings.tickRate;
 	const bool lan = options.lan >= 0 ? options.lan != 0 : settings.lan;
 	const bool lateJoin = options.lateJoin >= 0 ? options.lateJoin != 0 : settings.lateJoin;
@@ -1286,11 +1313,82 @@ void KX_NetworkManager::EndTick()
 	}
 	const uint64_t now = net::steadyClockMs();
 	RecordHitboxes();
+	UpdateClientViews();
 	m_replicator->update(m_tick, now);
 	if (m_lanActive) {
 		UpdateLanInfo();
 		m_lanResponder.update(now);
 	}
+}
+
+void KX_NetworkManager::UpdateClientViews()
+{
+	for (const net::ClientId client : m_server->clients()) {
+		const auto ov = m_views.find(client);
+		float radius = m_relevanceRadius;
+		float center[3] = {0.0f, 0.0f, 0.0f};
+		float rotation[4];
+		bool hasCenter = false;
+		if (ov != m_views.end()) {
+			if (ov->second.radius >= 0.0f) {
+				radius = ov->second.radius;
+			}
+			if (ov->second.follow != net::kInvalidNetId) {
+				hasCenter = getTransform(ov->second.follow, center, rotation);
+			}
+			else if (ov->second.fixed) {
+				std::copy(ov->second.position, ov->second.position + 3, center);
+				hasCenter = true;
+			}
+		}
+		if (!hasCenter) {
+			/* Default center: the first object the client owns (usually its player). */
+			for (const auto &pair : m_entries) {
+				if (pair.second.owner == client && pair.second.obj && getTransform(pair.first, center, rotation)) {
+					hasCenter = true;
+					break;
+				}
+			}
+		}
+		/* No center yet (player not spawned): everything stays relevant. */
+		m_replicator->setClientView(client, center, hasCenter ? radius : 0.0f);
+	}
+}
+
+bool KX_NetworkManager::SetClientView(net::ClientId client, KX_GameObject *obj, const float *position, float radius,
+                                      bool clear, std::string &error)
+{
+	if (m_role != Role::SERVER || !m_server) {
+		error = "server only";
+		return false;
+	}
+	if (!m_server->client(client)) {
+		error = "unknown client " + std::to_string(client);
+		return false;
+	}
+	if (clear) {
+		m_views.erase(client);
+		return true;
+	}
+	ViewOverride view;
+	if (obj) {
+		view.follow = GetNetId(obj);
+		if (view.follow == net::kInvalidNetId) {
+			error = "object '" + obj->GetName() + "' is not replicated";
+			return false;
+		}
+	}
+	else if (position) {
+		std::copy(position, position + 3, view.position);
+		view.fixed = true;
+	}
+	else if (m_views.count(client)) {
+		/* Only the radius changes. */
+		view = m_views[client];
+	}
+	view.radius = radius;
+	m_views[client] = view;
+	return true;
 }
 
 void KX_NetworkManager::UpdateLanInfo()
@@ -1389,6 +1487,7 @@ void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64
 			m_ready.erase(event.client);
 			m_appliedInput.erase(event.client);
 			m_clientView.erase(event.client);
+			m_views.erase(event.client);
 			m_inputInvalid.erase(event.client);
 			Event e;
 			e.type = Event::PLAYER_LEAVE;

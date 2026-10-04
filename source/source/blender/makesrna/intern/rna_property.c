@@ -178,6 +178,24 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	RNA_def_property_float_funcs(prop, "rna_GameFloatProperty_value_get", "rna_GameFloatProperty_value_set", NULL);
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "net_bits", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "net_bits");
+	RNA_def_property_range(prop, 0, 31);
+	RNA_def_property_ui_text(prop, "Network Bits",
+	                         "Replicated: bits used over Min..Max (values outside are clamped). "
+	                         "0 = exact 32-bit float");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "net_min", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "net_min");
+	RNA_def_property_ui_text(prop, "Network Min", "Replicated: lowest value sent when Network Bits is not 0");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "net_max", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "net_max");
+	RNA_def_property_ui_text(prop, "Network Max", "Replicated: highest value sent when Network Bits is not 0");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	/* GameTimerProperty */
 	srna = RNA_def_struct(brna, "GameTimerProperty", "GameProperty");
 	RNA_def_struct_ui_text(srna, "Game Timer Property", "Game engine user defined timer property");

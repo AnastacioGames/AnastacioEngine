@@ -40,7 +40,8 @@ não deu para testar.
   do **nome** (FNV-1a), com aviso; objetos com id salvo reivindicam primeiro, os demais em ordem de nome, então
   servidor e cliente chegam ao mesmo resultado com o mesmo `.range`. Objeto criado só por script usa o mesmo caminho.
 - **Esquema de propriedades** = propriedades de jogo com "Rep" ligado, na ordem da lista do objeto, só Boolean/Integer/Float
-  (string e timer ficam de fora; aviso). Float sai com 32 bits crus (a UI ainda não tem faixa/bits por propriedade).
+  (string e timer ficam de fora; aviso). Float sai com 32 bits crus, ou quantizado com "Bits/Min/Max" da propriedade
+  (`bProperty.net_bits/net_min/net_max`, `KX_NetworkManager::FloatQuantization`; faixa inválida avisa e fica crua).
 - **Cliente não simula.** Objetos replicados dinâmicos têm a dinâmica suspensa no cliente (`SuspendDynamics(false)`:
   ainda colidem, só os snapshots os movem) e voltam ao normal ao desconectar.
 - **Interpolação.** O cliente renderiza em `NetClock::renderTime` com `applyInterpolated`, e `applyLatest` enquanto o
@@ -74,7 +75,11 @@ não deu para testar.
   Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
   abaixo).
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
-- **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
+- **Relevância por distância** (2026-10-04). `Relevance Radius` da cena (0 = tudo); `UpdateClientViews` chama
+  `Replicator::setClientView` a cada tick com centro no primeiro objeto replicado do cliente (sem objeto: tudo
+  relevante). `net.set_client_view(client, center, radius)` sobrescreve (objeto seguido pelo net id ou posição fixa;
+  só raio mantém o centro padrão; sem argumentos volta ao padrão); a sobrescrita some quando o cliente sai.
+  Testado pelo cenário `relevance`; o centro automático (objeto do cliente) não tem cenário próprio.
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
 

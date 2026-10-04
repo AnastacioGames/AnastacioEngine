@@ -14,6 +14,9 @@ moved by net.predict() with the client's input (client prediction + reconciliati
 the client shoots at through the input (lag compensation, net.raycast_past()).
 With NET_PREDICT_DYN=1 (scenario "predict-cube", make_dyn_scene.py: a frictionless dynamic box named "Car") the server gives it to the client, which
 predicts it with Bullet running locally (net.predict() with a step that sets the linear velocity).
+With NET_RELEVANCE=1 (scenario "relevance") the server narrows the client's view with net.set_client_view() after
+RELEVANCE_AT seconds: the Spawner must freeze on the client while the Rig keeps moving.
+In scene mode the float 'heat' (8 bits over 0..10 in the editor) must arrive quantized.
 With NET_RPC=1 (scenario "rpc") the peers register game RPCs and check every target, argument type, obj.net and
 the refusals.
 NET_DEBUG=1 logs every shot, aim and prediction state.
@@ -49,6 +52,11 @@ HEADLESS = os.environ.get("NET_HEADLESS") == "1"
 PREDICT = os.environ.get("NET_PREDICT") == "1"
 RPC = os.environ.get("NET_RPC") == "1"
 PREDICT_DYN = os.environ.get("NET_PREDICT_DYN") == "1"
+RELEVANCE = os.environ.get("NET_RELEVANCE") == "1"
+# Relevance scenario: from this time on the client's view is a sphere of radius 3 around the origin, which keeps
+# the spawned Rig (circle of radius 2) and leaves out the Spawner (circle of radius 4).
+RELEVANCE_AT = 5.0
+HEAT_STEP = 10.0 / 255.0  # scene mode: 'heat' is 8 bits over 0..10
 
 failures = []
 
@@ -506,6 +514,8 @@ def run():
     times = []
     hps = []
     spawn_seen = []
+    heats = []
+    rel = []  # client, relevance scenario: (time, Spawner xy, Rig xy)
     clients_seen = 0
     lobby = {"chat_sent": False, "start": None, "ready_sent": False, "lan": None, "clients": []}
     t_connected = None
@@ -518,6 +528,14 @@ def run():
                 if not pred:
                     tracked.worldPosition = [math.cos(t) * 4.0, math.sin(t) * 4.0, 1.0]
                 tracked["hp"] = int(t * 2)
+                if FROM_SCENE:
+                    tracked["heat"] = (t * 1.37) % 10.0
+                if RELEVANCE and t > RELEVANCE_AT and not lobby.get("view"):
+                    joined = [e[1] for e in events if e[0] == "join"]
+                    if joined:
+                        net.set_client_view(joined[0], (0.0, 0.0, 1.0), radius=3.0)
+                        lobby["view"] = True
+                        log("set_client_view(%d, origin, 3)" % joined[0])
                 if proto and spawned is None and any(e[0] == "join" for e in events):
                     spawned = net.spawn(proto, owner=0, position=[1.0, 2.0, 3.0])
                     check("spawn() returns the replica", spawned is not None and net.net_id(spawned) >= 0x80000000,
@@ -563,6 +581,11 @@ def run():
                     times.append(time.time())
                 if props:
                     hps.append(tracked["hp"])
+                if FROM_SCENE:
+                    heats.append(tracked["heat"])
+                if RELEVANCE and proto:
+                    rig = [o for o in scene.objects if o.name == proto and net.net_id(o) != 0]
+                    rel.append((t, (p.x, p.y), tuple(rig[0].worldPosition)[:2] if rig else None))
                 if dyn:
                     dyn.client_frame(t)
                 if proto:
@@ -621,6 +644,18 @@ def run():
                       "%d/%d samples on the circle, radius %.2f..%.2f" % (on_path, len(radii), min(radii), max(radii)))
         else:
             check("replicated object moves on the client", False, "never connected")
+        if FROM_SCENE:
+            off = [h for h in heats if abs(h / HEAT_STEP - round(h / HEAT_STEP)) > 1e-3]
+            check("float with 8 bits arrives quantized", len(set(heats)) > 3 and not off,
+                  "%d values, %d off the 10/255 grid %s" % (len(set(heats)), len(off), off[:3]))
+        if RELEVANCE:
+            early = [r for r in rel if r[0] < RELEVANCE_AT]
+            late = [r for r in rel if r[0] > RELEVANCE_AT + 1.5]
+            moved = lambda rows, i: len(set((round(r[i][0], 3), round(r[i][1], 3)) for r in rows if r[i])) > 3
+            check("relevance: Spawner moves while everything is relevant", moved(early, 1), "%d samples" % len(early))
+            check("relevance: Spawner outside the view stops updating", len(late) > 10 and not moved(late, 1),
+                  str(sorted(set(r[1] for r in late))[:4]))
+            check("relevance: Rig inside the view keeps moving", moved(late, 2), "%d samples" % len(late))
         if props:
             check("replicated property changes", len(set(hps)) > 3, "hp values %s..%s" % (min(hps) if hps else None, max(hps) if hps else None))
         if proto:

@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: relevância por distância e faixa/bits por propriedade float (2026-10-04)
+- **Relevância**: campo `Relevance Radius` da cena (`RangeNetworkSettings.relevance_radius`, Export Game > Network; 0 = tudo relevante, o padrão, sem versioning). O servidor chama `Replicator::setClientView` a cada tick (`KX_NetworkManager::UpdateClientViews`): centro = primeiro objeto replicado do cliente; sem objeto, tudo relevante. `Range.network.set_client_view(client, center=None, radius=None)` sobrescreve (centro = objeto seguido ou posição; raio 0 = tudo; tudo `None` volta ao padrão da cena). "Always Relevant" segue valendo.
+- **Float quantizado**: `bProperty.net_min/net_max/net_bits` (RNA `net_min`, `net_max`, `net_bits` em `GameFloatProperty`); a linha "Bits / Min / Max" aparece sob a propriedade Float com "Rep". 0 bits = 32 bits crus; faixa inválida avisa e cai para cru. Vale também para `net.replicate(props=[...])`.
+- Testes: cenário novo `relevance` (Spawner sai da vista e congela no cliente, Rig dentro continua) PASS; `scene` checa o round trip do DNA e que o float `heat` (8 bits, 0..10) chega na grade 10/255; `spawner` e `server` PASS.
+
 ## Multiplayer: `--server` sem janela nem display no Linux (2026-10-04)
 - `GHOST_ISystem::createSystemHeadless()` + `intern/ghost/intern/GHOST_SystemHeadless.h`: sistema GHOST sem display, janela virtual com contexto OpenGL EGL surfaceless do Mesa (`libEGL` por `dlopen`, sem dependência de link). `GPG_Ghost.cpp` usa esse sistema com `--server`; nos outros sistemas cai no `createSystem()` (Windows segue com a janela pequena).
 - `run_net_test.sh`: o `--server` roda sem `xvfb-run` e com `DISPLAY` removido. `server`, `scene-server` e `spawner` PASS (servidor 0,98 s user de CPU em 10 s).

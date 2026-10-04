@@ -204,6 +204,13 @@ class GAME_PT_game_properties(GameButtonsPanel, Panel):
             props.index = i
             props.direction = 'DOWN'
             row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = i
+            if prop.use_replicate and prop.type == 'FLOAT':
+                row = box.row(align=True)
+                row.prop(prop, "net_bits", text="Bits")
+                sub = row.row(align=True)
+                sub.active = prop.net_bits > 0
+                sub.prop(prop, "net_min", text="Min")
+                sub.prop(prop, "net_max", text="Max")
 
 class PhysicsButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -1518,6 +1525,7 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
         box.prop(net, "max_players")
         box.prop(net, "tick_rate")
         box.prop(net, "snapshot_rate")
+        box.prop(net, "relevance_radius")
         box.prop(net, "use_lan_discovery")
         box.prop(net, "use_late_join")
 

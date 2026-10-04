@@ -39,6 +39,7 @@
 
 #include "CM_Message.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -616,6 +617,62 @@ PyObject *Net_spawn(PyObject *, PyObject *args, PyObject *kwds)
 	return obj->GetProxy();
 }
 
+/// set_client_view(client, center=None, radius=None): center is an object (followed) or a 3D position.
+PyObject *Net_set_client_view(PyObject *, PyObject *args, PyObject *kwds)
+{
+	static const char *kwlist[] = {"client", "center", "radius", nullptr};
+	int client;
+	PyObject *pycenter = Py_None;
+	PyObject *pyradius = Py_None;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|OO", const_cast<char **>(kwlist), &client, &pycenter,
+	                                 &pyradius)) {
+		return nullptr;
+	}
+	if (client < 0 || client > 0xFFFF) {
+		PyErr_SetString(PyExc_ValueError, "network.set_client_view(): invalid client");
+		return nullptr;
+	}
+	float radius = -1.0f;
+	if (pyradius != Py_None) {
+		radius = float(PyFloat_AsDouble(pyradius));
+		if (PyErr_Occurred()) {
+			return nullptr;
+		}
+		radius = std::max(radius, 0.0f);
+	}
+	KX_GameObject *obj = nullptr;
+	float position[3];
+	bool hasPosition = false;
+	if (pycenter != Py_None) {
+		mt::vec3 pos;
+		if (PyVecTo(pycenter, pos)) {
+			position[0] = pos.x;
+			position[1] = pos.y;
+			position[2] = pos.z;
+			hasPosition = true;
+		}
+		else {
+			PyErr_Clear();
+			if (!ObjectFromPy(pycenter, &obj, "network.set_client_view()")) {
+				return nullptr;
+			}
+		}
+	}
+	KX_NetworkManager *manager = Manager();
+	if (!manager) {
+		PyErr_SetString(PyExc_RuntimeError, "network.set_client_view(): server only");
+		return nullptr;
+	}
+	const bool clear = !obj && !hasPosition && pyradius == Py_None;
+	std::string error;
+	if (!manager->SetClientView(net::ClientId(client), obj, hasPosition ? position : nullptr, radius, clear,
+	                            error)) {
+		PyErr_Format(PyExc_RuntimeError, "network.set_client_view(): %s", error.c_str());
+		return nullptr;
+	}
+	Py_RETURN_NONE;
+}
+
 PyObject *Net_despawn(PyObject *, PyObject *arg)
 {
 	KX_GameObject *obj;
@@ -1102,6 +1159,10 @@ PyMethodDef g_methods[] = {
 	{"prediction_stats", Net_prediction_stats, METH_O, "prediction_stats(obj) -> dict or None\nClient only."},
 	{"input_stats", Net_input_stats, METH_O,
 	 "input_stats(client) -> dict or None\nServer: how the client's inputs arrived (late, repeated, missing...)."},
+	{"set_client_view", (PyCFunction)Net_set_client_view, METH_VARARGS | METH_KEYWORDS,
+	 "set_client_view(client, center=None, radius=None)\nServer only: relevance center (object or position) and "
+	 "radius of a client; radius 0 sends everything. No center: first object the client owns. All None: back to "
+	 "the scene's Relevance Radius."},
 	{"set_hitbox", Net_set_hitbox, METH_VARARGS,
 	 "set_hitbox(obj, radius, half_height=0.0) -> bool\nServer: sphere or capsule (local Z) kept 1 s back for\n"
 	 "raycast_past(); radius 0 removes it."},

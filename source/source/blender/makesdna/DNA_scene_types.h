@@ -983,6 +983,8 @@ typedef struct RangeNetworkSettings {
 	char server_name[64];  /* room name shown in the LAN list */
 	char address[64];      /* default address for NET_MODE_CLIENT */
 	char game_id[32];      /* peers with another game id do not see each other */
+	float relevance_radius; /* objects farther than this from a player's object are not sent, 0 = all */
+	int pad_net;
 } RangeNetworkSettings;
 
 /* RangeNetworkSettings.mode */

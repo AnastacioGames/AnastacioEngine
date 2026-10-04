@@ -224,6 +224,12 @@ public:
 	/// Server: how the inputs of a client arrived and were applied. False when the client has no input queue.
 	bool GetInputStats(net::ClientId client, net::InputQueueStats &stats) const;
 
+	/// Server: relevance center of a client. obj (followed every tick) or position; radius < 0 keeps the
+	/// Relevance Radius of the scene, 0 makes everything relevant. Without a call, the center is the first
+	/// object the client owns. clear removes the override.
+	bool SetClientView(net::ClientId client, KX_GameObject *obj, const float *position, float radius, bool clear,
+	                   std::string &error);
+
 	/// Server: sphere (halfHeight 0) or capsule along the local Z axis, recorded every tick. radius <= 0 removes it.
 	bool SetHitbox(KX_GameObject *obj, float radius, float halfHeight);
 	/// Server: ray against the hitboxes as the client `viewOf` saw them (its view time, at most maxRewindMs back,
@@ -293,6 +299,7 @@ private:
 		uint32_t gameVersion = 1;
 		int tickRate = 0;
 		int snapshotRate = 20;
+		float relevanceRadius = 0.0f;
 		bool lan = true;
 		bool lateJoin = true;
 	};
@@ -331,6 +338,7 @@ private:
 	void CollectSceneObjects();
 	net::NetId AssignNetId(KX_GameObject *obj, net::NetId wanted);
 	bool BuildEntry(KX_GameObject *obj, net::NetId id, const ReplicateOptions *scriptOptions, Entry &entry) const;
+	static void FloatQuantization(KX_GameObject *obj, const std::string &name, net::PropertyDesc &desc);
 	void BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const;
 	static void CollectProps(KX_GameObject *obj, std::vector<std::string> &names);
 	uint64_t ComputeSceneHash(const std::string &sceneName) const;
@@ -350,6 +358,7 @@ private:
 	void HandleServerEvent(const net::SessionEvent &event, uint64_t now, std::vector<net::SessionEvent> &events);
 	void HandleClientEvent(const net::SessionEvent &event, uint64_t now);
 	void UpdateLanInfo();
+	void UpdateClientViews();
 	Entry *FindEntry(net::NetId id);
 	const Entry *FindEntry(net::NetId id) const;
 	const std::vector<net::PropertyDesc> *SchemaFor(net::NetId id, const std::string &prototype);
@@ -385,6 +394,14 @@ private:
 	uint32_t m_gameVersion;
 	int m_maxPlayers;
 	int m_snapshotRate;
+	float m_relevanceRadius;
+	struct ViewOverride {
+		net::NetId follow = net::kInvalidNetId;
+		float position[3] = {0.0f, 0.0f, 0.0f};
+		bool fixed = false;  // position is the center
+		float radius = -1.0f;
+	};
+	std::map<net::ClientId, ViewOverride> m_views;
 	uint64_t m_sceneHash;
 	std::string m_sceneName;
 	net::Tick m_tick;

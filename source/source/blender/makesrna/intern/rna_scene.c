@@ -4796,6 +4796,15 @@ static void rna_def_scene_network(BlenderRNA *brna)
 	                         "(0 = Logic Tic Rate of the scene)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "relevance_radius", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "relevance_radius");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 10000.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Relevance Radius",
+	                         "Objects farther than this from a player's first owned object are not sent to that "
+	                         "player (Always Relevant objects are). 0 = send everything");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "snapshot_rate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "snapshot_rate");
 	RNA_def_property_range(prop, 1, 120);

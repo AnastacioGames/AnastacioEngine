@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Starts a server and a client RangeRuntime (xvfb; a --server one without any display) and checks that a replicated object moves
-# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|predict-car|rpc] [build dir] [net-sim "lat,jit,loss"]
+# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|predict-cube|rpc|relevance] [build dir] [net-sim "lat,jit,loss"]
 #   spawner, car  the script registers the objects (net.replicate) and calls host()/join()
 #   server        spawner with the server started as a headless server (RangeRuntime --server): no render, no
 #                 audio, dedicated (no host player); also prints the CPU time of both processes
@@ -9,6 +9,8 @@
 #   scene-server  scene with the server started as --server: the Host scene must run as Dedicated
 #   predict-cube  dynamic box (make_dyn_scene.py): the server gives the Car body to the client, both predict it
 #                 (Bullet runs on the client too; the replay integrates the velocity); same simulator default as predict
+#   relevance     spawner; after 5 s the server narrows the client's view (net.set_client_view): the Spawner
+#                 leaves it and freezes on the client, the spawned Rig stays inside and keeps moving
 #   rpc           spawner plus game RPCs (@net.rpc, net.call, obj.net): every target and argument type, refusals
 #   predict       spawner plus a rig owned by the client, moved by net.predict() with the client's input
 #                 (prediction, reconciliation) and shots at the Spawner through the input (lag compensation);
@@ -29,6 +31,8 @@ SCENE_SERVER=""; SCENE_CLIENT=""
 SERVER_ARGS=""
 case "$SCENARIO" in
   server) SERVER_ARGS="--server"; export NET_HEADLESS=1; SCENARIO=spawner
+    SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  relevance) export NET_RELEVANCE=1; SCENARIO=spawner; SECONDS_RUN="${NET_SECONDS:-11}"
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   rpc) export NET_RPC=1; SCENARIO=spawner
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
