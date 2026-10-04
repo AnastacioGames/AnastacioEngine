@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: revalidação no Linux após o merge do PR #4 (2026-10-04, main `9e7925f`)
+
+- `run_net_test.sh` `spawner`, `car`, `server`, `scene`, `scene-server` e `rpc` passam na main; `predict` passou
+  3 de 4 rodadas. A falha: `prediction: corrections stay small` com `max_error` 0,6 (limite 0,5), 21 correções,
+  0 teleportes; nas rodadas boas `max_error` fica entre 0 e 0,067. Intermitente, ainda sem causa: fica aberto.
+- Armadilha do ambiente: sem `PYTHONPATH=/opt/py311-site` o `RangeRuntime` não acha o `numpy`, o módulo `aud`
+  falha e `AUD_initPython` dá segfault (`PyModule_AddObject` com módulo nulo) antes de qualquer teste rodar.
+
 ## Multiplayer: spawner/car validados no Windows com as 3 correções da predição; armadilha de build achada (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `run_net_test_win.sh spawner` e `car` passam no Windows/MSVC com os commits `11a0c1e7` (reconciliação),

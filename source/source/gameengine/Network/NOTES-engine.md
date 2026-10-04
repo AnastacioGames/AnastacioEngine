@@ -319,3 +319,10 @@ Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software 
 - **Esquema de protótipo antes do spawn.** O cliente decodifica os campos do `Spawn` com o esquema do protótipo
   antes de criar o objeto; `SchemaFor` monta o esquema do objeto inativo se ainda não existe (`CacheProtoSchema`).
   Sem isso, protótipo com propriedade replicada travava toda a replicação no cliente.
+
+## Revalidação Linux na main `9e7925f` (2026-10-04, nuvem)
+
+- `PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh <cenário>`: spawner, car, server, scene,
+  scene-server e rpc PASS; predict PASS 3/4.
+- Falha intermitente do predict: `max_error` 0,6 com 21 correções (normal: 0–0,067, 0–1 correção). Investigar.
+- Sem o `PYTHONPATH` acima o player cai em `AUD_initPython` (segfault por `numpy` ausente): não é bug de rede.
