@@ -46,6 +46,10 @@
 #  endif
 #endif
 
+#if defined(WITH_X11) && !defined(WITH_GL_EGL)
+#  include "GHOST_SystemHeadless.h"
+#endif
+
 GHOST_ISystem *GHOST_ISystem::m_system = NULL;
 
 
@@ -77,6 +81,19 @@ GHOST_TSuccess GHOST_ISystem::createSystem()
 		success = m_system->init();
 	}
 	return success;
+}
+
+GHOST_TSuccess GHOST_ISystem::createSystemHeadless()
+{
+#if defined(WITH_X11) && !defined(WITH_GL_EGL)
+	if (m_system) {
+		return GHOST_kFailure;
+	}
+	m_system = new GHOST_SystemHeadless();
+	return m_system->init();
+#else
+	return createSystem();
+#endif
 }
 
 GHOST_TSuccess GHOST_ISystem::disposeSystem()

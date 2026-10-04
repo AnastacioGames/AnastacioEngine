@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts a server and a client RangeRuntime (headless, xvfb) and checks that a replicated object moves
+# Starts a server and a client RangeRuntime (xvfb; a --server one without any display) and checks that a replicated object moves
 # on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|predict-car|rpc] [build dir] [net-sim "lat,jit,loss"]
 #   spawner, car  the script registers the objects (net.replicate) and calls host()/join()
 #   server        spawner with the server started as a headless server (RangeRuntime --server): no render, no
@@ -7,8 +7,8 @@
 #   scene         the .range files are authored by the editor (make_net_scenes.py, needs build-linux-editor):
 #                 Replicate checkbox, Rep property and the scene mode (Host/Client) open the session
 #   scene-server  scene with the server started as --server: the Host scene must run as Dedicated
-#   predict-car   car scene: the server gives the dynamic Car to the client, both predict it (Bullet runs on the
-#                 client too; the replay integrates the velocity); same network simulator default as predict
+#   predict-cube  dynamic box (make_dyn_scene.py): the server gives the Car body to the client, both predict it
+#                 (Bullet runs on the client too; the replay integrates the velocity); same simulator default as predict
 #   rpc           spawner plus game RPCs (@net.rpc, net.call, obj.net): every target and argument type, refusals
 #   predict       spawner plus a rig owned by the client, moved by net.predict() with the client's input
 #                 (prediction, reconciliation) and shots at the Spawner through the input (lag compensation);
@@ -65,8 +65,11 @@ run() { # role scene [extra player args: the server's go first, -w after them wo
   local role="$1" scene="$2"; shift 2
   local window="-w 160 120"
   [ $# -gt 0 ] && window=""
+  # --server opens no window: it runs without xvfb and with DISPLAY unset, which proves it needs no display.
+  local xvfb="xvfb-run -a"
+  case " $* " in *" --server "*) xvfb="env -u DISPLAY -u WAYLAND_DISPLAY" ;; esac
   # /usr/bin/time -f: user+system CPU seconds of the player (xvfb-run is outside the measured command).
-  ( cd "$BUILD/bin" && NET_ROLE="$role" timeout 120 xvfb-run -a /usr/bin/time -f "NETCPU $role %U %S" \
+  ( cd "$BUILD/bin" && NET_ROLE="$role" timeout 120 $xvfb /usr/bin/time -f "NETCPU $role %U %S" \
       ./RangeRuntime "$@" $window -p "$HERE/net_engine_test.py" "$scene" > "$OUT/$role.log" 2>&1 ) &
 }
 run server "$SCENE_SERVER" $SERVER_ARGS

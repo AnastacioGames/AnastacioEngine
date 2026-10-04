@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: `--server` sem janela nem display no Linux (2026-10-04)
+- `GHOST_ISystem::createSystemHeadless()` + `intern/ghost/intern/GHOST_SystemHeadless.h`: sistema GHOST sem display, janela virtual com contexto OpenGL EGL surfaceless do Mesa (`libEGL` por `dlopen`, sem dependência de link). `GPG_Ghost.cpp` usa esse sistema com `--server`; nos outros sistemas cai no `createSystem()` (Windows segue com a janela pequena).
+- `run_net_test.sh`: o `--server` roda sem `xvfb-run` e com `DISPLAY` removido. `server`, `scene-server` e `spawner` PASS (servidor 0,98 s user de CPU em 10 s).
+
 ## Multiplayer: predição de corpo dinâmico, posse de objeto da cena e IPv6 no WebSocket (2026-10-04)
 - **Posse de objeto da cena**: `Replicator::update` reenvia `Ownership` dos objetos da cena com dono ao cliente que fica ativo (objeto da cena não tem `Spawn`, então um `set_owner` feito antes do cliente ficar pronto se perdia). Teste `SceneObjectOwnerReachesClientThatWasNotReady`.
 - **Predição de corpo dinâmico**: no cliente dono, `net.predict` reativa a física do corpo (`SetDynamicPredicted`); o estado do tick é gravado depois do passo do Bullet (`ClientTickEnd`, chamado no `EndTick`); o replay aplica o passo e integra `pos += v*dt`; a reconciliação compara só o transform. Cenário `predict-cube` (`tools/net_engine_test/make_dyn_scene.py`, caixa dinâmica sem atrito, `40,5,1`): PASS, resposta em 0 tick, termina a 0,0004 do servidor, erro máximo 0,195, 0 teleportes.

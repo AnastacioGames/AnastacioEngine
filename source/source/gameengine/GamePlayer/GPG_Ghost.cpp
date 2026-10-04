@@ -543,8 +543,8 @@ static void usage(const std::string& program, bool isBlenderPlayer)
 	CM_Message("       show_shadow_frustum            0         Show debug light shadow frustum volume");
 	CM_Message("       ignore_deprecation_warnings    1         Ignore deprecation warnings" << std::endl);
 	CM_Message("  -p: override python main loop script");
-	CM_Message("  --server: headless game server: no render, no audio, smallest window (still needs a display,");
-	CM_Message("            e.g. xvfb-run on Linux); a Host scene runs as Dedicated");
+	CM_Message("  --server: headless game server: no render, no audio, no window; a Host scene runs as Dedicated");
+	CM_Message("            (Linux: offscreen EGL/Mesa context, no display or xvfb needed)");
 	CM_Message(std::endl);
 	CM_Message("  - : all arguments after this are ignored, allowing python to access them from sys.argv");
 	CM_Message(std::endl);
@@ -870,7 +870,7 @@ int main(int argc,
 	bool borderlessWindow = false;
 	bool fullScreenParFound = false;
 	bool windowParFound = false;
-	// --server: headless game server (no render, no audio device; GHOST still needs a small GL window).
+	// --server: headless game server (no render, no audio device, no window: headless GHOST system on Linux).
 	bool serverMode = false;
 #ifdef WIN32
 	bool closeConsole = true;
@@ -1407,7 +1407,8 @@ int main(int argc,
 #endif
 	{
 		// Create the system
-		if (GHOST_ISystem::createSystem() == GHOST_kSuccess) {
+		// --server needs no display: a headless GHOST system with an offscreen GL context.
+		if ((serverMode ? GHOST_ISystem::createSystemHeadless() : GHOST_ISystem::createSystem()) == GHOST_kSuccess) {
 			GHOST_ISystem *system = GHOST_ISystem::getSystem();
 			BLI_assert(system);
 

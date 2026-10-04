@@ -68,10 +68,8 @@ não deu para testar.
 
 ## O que não está feito (e por quê)
 
-- **Servidor totalmente sem janela.** `RangeRuntime --server` (seção abaixo) já não desenha nem toca som, mas ainda abre
-  uma janela GL de 100×100: a conversão da cena compila materiais e cria buffers no OpenGL, e o GHOST desta base (2.79)
-  não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
-  de conversão sem rasterizer.
+- **Servidor sem janela no Windows.** No Linux o `--server` não abre janela nem precisa de display (seção abaixo); no
+  Windows ainda abre a janela pequena do GHOST (não bloqueia, mas existe). Um contexto offscreen WGL ficaria para depois.
 - **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
   Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
   abaixo).
@@ -215,7 +213,13 @@ sem ter sido enviada). Uso: `RangeRuntime --server [-p script.py] jogo.range`.
   aviso. Lógica, física e ações (poses) seguem rodando no tic rate; o **skinning da malha** (`UpdateAnimationDeformers`)
   é pulado, porque ninguém vê os vértices (física sobre malha deformada não acompanha a animação no servidor).
 - **Sem áudio.** O player força o dispositivo `None` do Audaspace.
-- **Janela mínima** (100×100, nunca tela cheia); um `-w` depois de `--server` vence.
+- **Sem janela (Linux).** `GHOST_ISystem::createSystemHeadless()` (`intern/ghost/intern/GHOST_SystemHeadless.h`): sistema
+  GHOST sem conexão com display; a "janela" é virtual e tem um contexto OpenGL **EGL surfaceless** do Mesa
+  (`EGL_MESA_platform_surfaceless`, perfil de compatibilidade). A conversão da cena e o `GPU_init` continuam tendo GL
+  corrente; o GLEW resolve as funções por `glXGetProcAddress`, que com o libglvnd despacha para o contexto EGL. O
+  `libEGL` é aberto por `dlopen` (o player não linka com ele; sem EGL/Mesa o `--server` falha ao criar a janela com
+  mensagem `GHOST headless: ...`). `run_net_test.sh` sobe o `--server` sem xvfb e com `DISPLAY` removido.
+  Windows/macOS: `createSystemHeadless()` cai no sistema normal, ainda com janela mínima (100×100).
 - **Dedicated.** Com `--server`, `host()` e o modo Host da cena abrem a sala como Dedicated (sem jogador do host no lobby).
   `join()` funciona, com aviso (um cliente que não desenha só serve de bot).
 - **Pausa entre quadros.** O laço de recuperação de `UpdateSleepTime()` converte a espera em milissegundos inteiros e
