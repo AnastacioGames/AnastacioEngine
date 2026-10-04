@@ -22,6 +22,17 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Pendente: `run_net_test_win.sh` ainda não tem os cenários `server`/`predict`/`scene`/`scene-server` para
   cobrir essas correções direto no Windows.
 
+## Multiplayer: `spawn()` de protótipo com propriedade replicada (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Bug: se o protótipo do `net.spawn()` tinha propriedade replicada, o cliente nunca decodificava o `Spawn` nem os
+  snapshots (Spawner parado, `Rig` nunca aparece). O cliente pede o esquema do protótipo para decodificar os
+  campos do `Spawn`, mas o esquema só era montado em `CreateReplica`, depois do decode. Agora `SchemaFor` monta e
+  guarda o esquema a partir do objeto inativo (`CacheProtoSchema`) quando ainda não o tem.
+- Achado ao dar ao `Rig` de `projects-teste/halfanim_crash` uma propriedade replicada `ammo` (pelo editor). O
+  cenário `predict` agora confere que o dono do objeto previsto recebe `ammo` (cobre `8b5885c` no motor).
+- Linux: `predict` ×4 (16/16 a 18/18 no passado), `rpc`, `server`, `car`, `scene`, `scene-server`, `spawner` PASS;
+  net_menu 102 passed. Falta Windows.
+
 ## Build Linux do editor: `RangeRuntime` linka sem OpenEXR (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - No `build-linux-editor` (`WITH_IMAGE_OPENEXR=OFF`, `WITH_PLAYER=ON`) o `RangeEngine` linkava, mas o

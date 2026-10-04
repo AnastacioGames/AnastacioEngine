@@ -345,6 +345,7 @@ private:
 	const Entry *FindEntry(net::NetId id) const;
 	const std::vector<net::PropertyDesc> *SchemaFor(net::NetId id, const std::string &prototype);
 	KX_GameObject *CreateReplica(const std::string &prototype, std::string &error);
+	void CacheProtoSchema(const std::string &prototype, KX_GameObject *original);
 	void ServerStepPredicted();
 	void RecordHitboxes();
 	void ClientPredict(uint64_t now);

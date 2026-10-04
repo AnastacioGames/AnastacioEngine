@@ -152,7 +152,8 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
   (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
 - **`skipOwned` ligado** no `ReplicaClient`, com um filtro novo no núcleo (`skipFilter`): só os objetos do cliente
   **com `predict()`** deixam de seguir o transform e a velocidade dos snapshots; os outros objetos dele continuam
-  interpolados. As propriedades replicadas do objeto previsto continuam chegando ao dono (o `apply` só pula o
+  interpolados. As propriedades replicadas do objeto previsto continuam chegando ao dono (testado no `predict`
+  com `ammo` do `Rig`) (o `apply` só pula o
   movimento; antes pulava o objeto inteiro).
 - **Servidor.** `Input` vai para `PredictionServer` (bloco inválido conta violação na sessão). No começo do tick,
   `ServerStepPredicted()` consome o input de cada cliente para este tick (o núcleo repete o último por até 4 ticks
@@ -308,3 +309,7 @@ certos numa janela (screenshot). Modo `scene` (editor gera os `.range`) não foi
 
 Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro
 é lento (5–15 fps) e o servidor às vezes para por centenas de ms; o teste de trajetória tolera isso (80 % das amostras na curva).
+
+- **Esquema de protótipo antes do spawn.** O cliente decodifica os campos do `Spawn` com o esquema do protótipo
+  antes de criar o objeto; `SchemaFor` monta o esquema do objeto inativo se ainda não existe (`CacheProtoSchema`).
+  Sem isso, protótipo com propriedade replicada travava toda a replicação no cliente.

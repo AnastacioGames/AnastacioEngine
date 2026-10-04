@@ -100,6 +100,7 @@ class Predict:
         self.stopped_at = None
         self.last_x = None
         self.hist = {}  # server, NET_DEBUG: tick -> Spawner position
+        self.ammo = set()  # client: values of the rig's replicated 'ammo' seen by its owner
 
     def step(self, obj, data):
         if len(data) != INPUT.size:
@@ -145,6 +146,7 @@ class Predict:
             if net.input(joined) is not None:
                 self.inputs_seen += 1
             self.server_xs.append(self.rig.worldPosition.x)
+            self.rig["ammo"] = int(t * 2)  # replicated property of the predicted object
             if t - self.last_report > 0.25:
                 self.last_report = t
                 net.call("rig_pos", self.rig.worldPosition.x)
@@ -163,6 +165,7 @@ class Predict:
             return
         age = t - self.t0
         x = self.rig.worldPosition.x
+        self.ammo.add(self.rig.get("ammo"))
         self.last_x = x
         if self.flip is not None and self.response_ticks is None and net.tick > self.flip[0]:
             # First look after the input turned around (a frame may hold several ticks): ticks elapsed minus the
@@ -216,6 +219,8 @@ class Predict:
         x = self.last_x  # the rig itself is gone once the server left
         check("prediction: rig ends where the server has it", settled and self.server_x is not None and
               x is not None and abs(x - self.server_x) < 0.05, "client %s server %s settled=%s" % (x, self.server_x, settled))
+        check("prediction: the owner gets the rig's replicated property", len(self.ammo - {None, 0}) > 3,
+              "ammo values %s" % sorted(v for v in self.ammo if v is not None)[-5:])
         check("prediction: corrections stay small", st.get("max_error", 99.0) < 0.5, str(st))
 
 

@@ -512,6 +512,10 @@ const std::vector<net::PropertyDesc> *KX_NetworkManager::SchemaFor(net::NetId id
 		return &entry->schema;
 	}
 	if (!prototype.empty()) {
+		/* A client decodes the Spawn fields with this schema before it creates the object. */
+		if (!m_protoSchemas.count(prototype) && m_scene) {
+			CacheProtoSchema(prototype, m_scene->GetInactiveList()->FindValue(prototype));
+		}
 		const auto it = m_protoSchemas.find(prototype);
 		if (it != m_protoSchemas.end()) {
 			return &it->second;
@@ -537,17 +541,22 @@ KX_GameObject *KX_NetworkManager::CreateReplica(const std::string &prototype, st
 		return nullptr;
 	}
 	replica->Release();  // the scene holds the object now, as KX_AddObjectActuator does
-
-	/* Remember what the prototype replicates, for the schema of this and later spawns. */
-	if (!m_protoSchemas.count(prototype)) {
-		Entry proto;
-		std::vector<std::string> names;
-		CollectProps(original, names);
-		BuildSchema(original, names, proto);
-		m_protoSchemas[prototype] = proto.schema;
-		m_protoPropNames[prototype] = proto.propNames;
-	}
+	CacheProtoSchema(prototype, original);
 	return replica;
+}
+
+void KX_NetworkManager::CacheProtoSchema(const std::string &prototype, KX_GameObject *original)
+{
+	/* Remember what the prototype replicates, for the schema of this and later spawns. */
+	if (m_protoSchemas.count(prototype) || !original) {
+		return;
+	}
+	Entry proto;
+	std::vector<std::string> names;
+	CollectProps(original, names);
+	BuildSchema(original, names, proto);
+	m_protoSchemas[prototype] = proto.schema;
+	m_protoPropNames[prototype] = proto.propNames;
 }
 
 /** \} */
