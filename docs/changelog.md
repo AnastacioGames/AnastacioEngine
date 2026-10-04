@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: predição do cliente, input e lag compensation na engine (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Refaz a `net/engine-predict`, perdida no limite de uso. `NET_Prediction` e `NET_LagCompensation` ligados no
+  `KX_NetworkManager`; `Range.network` ganha `predict(obj, fn)`, `set_input(bytes)`, `input(client)`,
+  `view_time()`, `prediction_stats(obj)`, `set_hitbox(obj, radius, half_height)` e
+  `raycast_past(origin, direction, distance, client, ignore, max_rewind_ms)`.
+- Cliente prevê os próprios objetos com `predict()` (passo do jogo com o input, reconciliação com o snapshot, correção
+  visual suavizada); servidor aplica o input do dono a cada tick. O bloco de input leva o tempo de vista do cliente
+  (no momento do `set_input()`), usado pelo `raycast_past`.
+- Núcleo: `ReplicaClientConfig::skipFilter` (o `skipOwned` agora é ligado e pula só os objetos previstos; teste
+  `NetReplication.SkipOwnedLeavesPredictedObjectsAlone`) e throttle do ENet desligado ao conectar (descartava
+  snapshots, `Input` e `Pong` por segundos com quadros lentos; o relógio do cliente não sincronizava).
+- Testes (Linux, `linux-runtime` + editor enxuto): novo `run_net_test.sh predict` passou (rig responde em 0 tick de
+  atraso, termina na posição do servidor, 17/17 tiros acertam no passado e 0/17 no presente), 5 de 5 rodadas com a
+  versão final; `server`, `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102
+  passaram; `net_tests` do núcleo 109 passaram.
+- Não testado: Windows, predição de corpos dinâmicos, predição pelo modo cena. Detalhes em
+  `source/source/gameengine/Network/NOTES-engine.md`, seção "Predição, input e lag compensation".
+
 ## Multiplayer: servidor headless `RangeRuntime --server` (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - Refaz o trabalho da `net/server-headless`, que parou no limite de uso sem chegar ao GitHub (a `net/engine-predict` também

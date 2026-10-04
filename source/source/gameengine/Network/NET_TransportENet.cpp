@@ -154,6 +154,10 @@ public:
 		while (enet_host_service(m_host, &event, 0) > 0) {
 			switch (event.type) {
 				case ENET_EVENT_TYPE_CONNECT: {
+					/* ENet's packet throttle drops unreliable packets while the round trip varies. A slow frame
+					 * (both ends service ENet once per frame) throttled snapshots, Input and Pong for seconds; their
+					 * rate is already set by the game, so the throttle stays at full. */
+					enet_peer_throttle_configure(event.peer, ENET_PEER_PACKET_THROTTLE_INTERVAL, 0, 0);
 					TransportEvent ev;
 					ev.type = TransportEvent::Type::Connected;
 					ev.peer = event.peer->data ? peerId(event.peer) : registerPeer(event.peer);

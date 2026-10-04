@@ -1,7 +1,8 @@
 # Integração do núcleo na engine (branch `net/engine`)
 
-Criado em 2026-10-04. O núcleo (`NET_*`) **não foi alterado**: tudo está fora dele, em `Ketsji/KX_NetworkManager.*`,
-`Ketsji/KX_PyNetwork.*`, DNA/RNA, painéis Python e CMake. Este arquivo registra as decisões, as dúvidas e o que
+Criado em 2026-10-04. A integração fica fora do núcleo (`NET_*`), em `Ketsji/KX_NetworkManager.*`,
+`Ketsji/KX_PyNetwork.*`, DNA/RNA, painéis Python e CMake. O núcleo só mudou em dois pontos da predição (seção
+"Predição, input e lag compensation"): `ReplicaClientConfig::skipFilter` e o throttle do ENet. Este arquivo registra as decisões, as dúvidas e o que
 não deu para testar.
 
 ## Onde está cada peça
@@ -21,6 +22,7 @@ não deu para testar.
 | Painéis | `properties_game.py`: `SCENE_PT_game_network`, `OBJECT_PT_game_network`, botão "Rep" em Game Properties |
 | CMake | `gameengine/CMakeLists.txt` (`add_subdirectory(Network)`), `Ketsji/CMakeLists.txt` (`ge_network` na LIB), `blenderplayer/CMakeLists.txt` (`ge_network extern_enet`) |
 | Teste | `tools/net_engine_test/` (dois `RangeRuntime`, servidor + cliente) |
+| Input, predição, lag compensation | `Ketsji/KX_NetworkManager.*` (`ClientPredict`, `ServerStepPredicted`, `RecordHitboxes`, `RaycastPast`), `Ketsji/KX_PyNetwork.cpp` (`predict`, `set_input`, `raycast_past`...) |
 | Servidor headless (`RangeRuntime --server`) | `GamePlayer/GPG_Ghost.cpp` (opção), `Launcher/LA_Launcher.*` (`SetServerMode`), `Ketsji/KX_KetsjiEngine.*` (`SetServerMode`, `ServerSleep`), `Ketsji/KX_SimulationPipeline.cpp` (sem skinning) |
 
 ## Decisões
@@ -69,13 +71,85 @@ não deu para testar.
   uma janela GL de 100×100: a conversão da cena compila materiais e cria buffers no OpenGL, e o GHOST desta base (2.79)
   não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
   de conversão sem rasterizer.
-- **Predição, lag compensation, input.** As classes do núcleo (`NET_Prediction`, `NET_LagCompensation`) não foram ligadas;
-  o dono de um objeto também só segue os snapshots. `skipOwned` fica `false`.
+- **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
+  Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades de um objeto previsto
+  não chegam ao dono, ver abaixo).
 - **`@net.rpc` / RPC do usuário e `obj.net`.** Só os três RPCs internos. A API de NOTES-D não pede mais que isso.
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
+
+## Predição, input e lag compensation
+
+Refeito em 2026-10-04 na branch `claude/project-thread-l2znr0` (a `net/engine-predict` original se perdeu no limite
+de uso). Liga `NET_Prediction` e `NET_LagCompensation` na engine.
+
+**API (`Range.network`):**
+
+```python
+INPUT = struct.Struct("<fB")                     # o formato é do jogo; até 57 bytes
+
+def step(obj, data):                             # um tick do objeto com o input do dono; mesmo código nos dois lados
+    vx, fire = INPUT.unpack(data) if len(data) == INPUT.size else (0.0, 0)
+    obj.worldPosition.x += vx / logic.getLogicTicRate()
+    if net.isServer and fire:
+        hit = net.raycast_past(origin, direction, 50.0, client=net.owner(obj), ignore=obj)
+
+net.predict(obj, step)                           # servidor e cliente dono (objeto replicado); None desliga
+net.set_input(INPUT.pack(vx, fire))              # cliente, todo quadro; no host vale para os objetos do cliente 0
+net.set_hitbox(alvo, 0.35)                       # servidor: esfera (ou cápsula com half_height) guardada 1 s
+```
+
+Também: `net.input(client)` (servidor: input aplicado neste tick), `net.view_time(client=0)` (cliente: tempo em
+que os objetos remotos são desenhados; servidor: o que o cliente mandou), `net.prediction_stats(obj)` (cliente:
+inputs, reconciliações, correções, teleportes, erro, ticks).
+
+**Como funciona:**
+
+- **Cliente.** A cada tick, antes de aplicar os snapshots, `ClientPredict()` escolhe o tick previsto
+  (`NetClock::predictionTick`, crescendo de um em um; só volta à estimativa do relógio se divergir mais de meio
+  segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
+  mais novo (`PredictionClient::reconcile`: se o estado do servidor difere da previsão daquele tick, volta a ele e
+  re-executa os inputs seguintes), roda o passo com o input atual e guarda o estado. A correção visual
+  (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
+- **`skipOwned` ligado** no `ReplicaClient`, com um filtro novo no núcleo (`skipFilter`): só os objetos do cliente
+  **com `predict()`** deixam de seguir os snapshots; os outros objetos dele continuam interpolados. Consequência:
+  propriedades replicadas de um objeto previsto não chegam ao dono (o snapshot inteiro do objeto é pulado).
+- **Servidor.** `Input` vai para `PredictionServer` (bloco inválido conta violação na sessão). No começo do tick,
+  `ServerStepPredicted()` consome o input de cada cliente para este tick (o núcleo repete o último por até 4 ticks
+  se faltar) e chama o passo de cada objeto previsto com o input do dono; objetos do host (cliente 0) usam o
+  `set_input()` local (não em Dedicated).
+- **Bloco de input.** 7 bytes do motor + até 57 do jogo: `[1][render tick u32][alpha u16]`. O tempo é o que estava
+  na tela quando o jogo chamou `set_input()` (e não o do tick em que o bloco saiu): um bloco que chega atrasado e é
+  repetido não muda o instante do tiro. Por isso `set_input()` deve ser chamado todo quadro.
+- **Lag compensation.** O servidor grava as hitboxes no fim de cada tick (`RecordHitboxes`, 1 s). `raycast_past`
+  usa o tempo de vista do cliente, limitado a `max_rewind_ms` (400 por padrão, anti-abuso; o limite agora é do
+  `RaycastPast`, a história fica com 1 s); `client=-1` testa o presente.
+- **Throttle do ENet desligado** (`NET_TransportENet.cpp`, `enet_peer_throttle_configure(peer, ..., 0, 0)` ao
+  conectar). Com quadros lentos o RTT varia e o ENet passava a descartar a maior parte dos pacotes não confiáveis
+  (snapshots, `Input`, `Pong`) por segundos: o relógio do cliente ficava sem `Pong` (sem sincronizar, sem input) e
+  os snapshots só chegavam pelo pedido de estado completo, a cada 1 s. Problema anterior a esta branch (o `rtt` do
+  cenário `spawner` ficava parado), achado pelo teste novo.
+
+**Decisões provisórias:**
+
+1. O passo é uma função Python por objeto, chamada pelo motor; não há passo de física no replay.
+2. Input é por cliente (um por tick), não por objeto: todos os objetos previstos de um cliente recebem o mesmo bloco.
+3. O motor não deduplica ações: um bloco repetido pelo servidor (input atrasado) chega ao passo de novo. O teste
+   usa um número de sequência no input para contar cada tiro uma vez; o jogo deve fazer o mesmo.
+
+**Teste:** `run_net_test.sh predict` (spawner + simulador 40 ms/5 ms/1 % de cada lado, tic rate 30). O servidor
+cria um `Rig` do cliente movido por `predict()`; o Spawner gira por `predict()` do host (um passo por tick) com
+hitbox de 0,35 m e o cliente atira nele pelo input a cada 0,4 s. Confere: o rig responde ao input em ≤ 2 ticks (sem
+predição seria um RTT, ~13 ticks aqui), termina na posição do servidor (±5 cm), correções < 0,5 m, o servidor
+aplicou o input, e os tiros acertam o Spawner no passado (17/17) e erram no presente (0/17). `NET_DEBUG=1` loga
+cada tiro e o estado da predição.
+
+Limites medidos na máquina de teste (4 núcleos, dois players em llvmpipe): a 60 Hz nenhum dos dois mantinha o tic
+rate e a linha do tempo da predição não fechava com os snapshots; a 30 Hz fecha. O RTT medido fica em ~450 ms (80 ms
+simulados + quadros lentos) e o atraso de interpolação passa de 400 ms, por isso o teste chama `raycast_past` com
+`max_rewind_ms=1000`. Não testado: Windows, cenário de cena (painel) com predição, corpos dinâmicos previstos.
 
 ## Servidor headless (`--server`)
 

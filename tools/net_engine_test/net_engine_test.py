@@ -9,6 +9,10 @@ Scenarios (existing scenes of projects-teste/, no editor needed):
            the inactive prototype 'Rig' is spawned by the server and moved too.
   car      car_framerate/car_com_fr0.range: the dynamic 'Car' drives on physics (server) and is followed on the
            client (dynamics suspended there).
+With NET_PREDICT=1 (runner scenario "predict", spawner scene) the server also spawns a 'Rig' owned by the client,
+moved by net.predict() with the client's input (client prediction + reconciliation), and gives the Spawner a hitbox
+the client shoots at through the input (lag compensation, net.raycast_past()).
+NET_DEBUG=1 logs every shot, aim and prediction state.
 With NET_HEADLESS=1 the server runs as RangeRuntime --server: it must report net.headless, draw nothing and host
 as Dedicated (no host player in the lobby).
 
@@ -18,6 +22,7 @@ not used (the player does not forward it), the runner greps the output.
 
 import math
 import os
+import struct
 import sys
 import time
 import traceback
@@ -37,6 +42,7 @@ FROM_SCENE = os.environ.get("NET_FROM_SCENE") == "1"
 # The name goes in the Hello message, so a scene-mode client (connected before any script runs) is "Player".
 CLIENT_NAME = "Player" if FROM_SCENE else "Tester-client"
 HEADLESS = os.environ.get("NET_HEADLESS") == "1"
+PREDICT = os.environ.get("NET_PREDICT") == "1"
 
 failures = []
 
@@ -58,6 +64,151 @@ def find(scene, name):
     return None
 
 
+# Input of the predicted rig: x speed, shot sequence (0 = none), shot origin and direction.
+INPUT = struct.Struct("<fB3f3f")
+RIG_SPEED = 2.0
+RIG_REPORT = {"x": None}  # last rig position the server sent by chat
+HITBOX_RADIUS = 0.35
+
+
+class Predict:
+    """net.predict() + net.raycast_past() check (NET_PREDICT=1)."""
+
+    def __init__(self, scene, tracked):
+        self.scene = scene
+        self.tracked = tracked
+        self.rig = None
+        self.t0 = None
+        self.vx = 0.0
+        self.seq = 0
+        self.last_shot = 0.0
+        self.shots = {}  # server: seq -> (hit in the past, hit now)
+        self.flip = None  # client: (tick, x) when the input turned around
+        self.response_ticks = None
+        self.server_x = None
+        self.server_xs = []
+        self.inputs_seen = 0
+        self.last_report = 0.0
+        self.stats = None
+        self.stopped_at = None
+        self.last_x = None
+
+    def step(self, obj, data):
+        if len(data) != INPUT.size:
+            return
+        vals = INPUT.unpack(data)
+        p = obj.worldPosition.copy()
+        p.x += vals[0] / logic.getLogicTicRate()
+        obj.worldPosition = p
+        if net.isServer and vals[1] and vals[1] not in self.shots:
+            origin, direction = vals[2:5], vals[5:8]
+            owner = net.owner(obj)
+            # The software-rendered test machine draws ~0.5 s in the past (slow frames make the snapshots arrive
+            # in bursts and the interpolation delay grows), beyond the default 400 ms limit.
+            past = net.raycast_past(origin, direction, 20.0, client=owner, ignore=obj, max_rewind_ms=1000)
+            now = net.raycast_past(origin, direction, 20.0, ignore=obj)
+            self.shots[vals[1]] = (past is not None and past[0] == self.tracked, now is not None and now[0] == self.tracked)
+            if os.environ.get("NET_DEBUG") or len(self.shots) <= 3:
+                log("shot %d tick=%d view=%s dir=%s past=%s now=%s spawner=%s" % (
+                    vals[1], net.tick, net.view_time(owner), tuple(round(v, 2) for v in direction),
+                    past and (past[0].name, tuple(round(v, 2) for v in past[1])), now and now[0].name,
+                    tuple(round(v, 2) for v in self.tracked.worldPosition)))
+
+    def spin(self, obj, data):
+        # The host's object, moved every tick by the step function (host input): the hitbox history then
+        # changes every tick like the snapshots. Moved once per frame it would jump in steps the client
+        # interpolates differently when a snapshot is missing.
+        self.angle += 1.0 / logic.getLogicTicRate()
+        obj.worldPosition = [math.cos(self.angle) * 4.0, math.sin(self.angle) * 4.0, 1.0]
+
+    def server_start(self):
+        self.angle = 0.0
+        check("set_hitbox() on a replicated object", net.set_hitbox(self.tracked, HITBOX_RADIUS))
+        net.set_input(b"")
+        check("predict() on a host object", net.predict(self.tracked, self.spin))
+
+    def server_frame(self, t, joined):
+        if self.rig is None and joined:
+            self.rig = net.spawn("Rig", owner=joined, position=[0.0, -6.0, 3.0])
+            check("predict() on the server", self.rig is not None and net.predict(self.rig, self.step))
+        if self.rig is not None:
+            if net.input(joined) is not None:
+                self.inputs_seen += 1
+            self.server_xs.append(self.rig.worldPosition.x)
+            if t - self.last_report > 0.25:
+                self.last_report = t
+                net.send_chat("rig %.4f" % self.rig.worldPosition.x)
+
+    def client_frame(self, t, events):
+        self.server_x = RIG_REPORT["x"]
+        if self.rig is None:
+            for o in self.scene.objects:
+                if o.name == "Rig" and net.net_id(o) != 0 and net.is_owner(o):
+                    self.rig = o
+                    check("predict() on the owning client", net.predict(o, self.step))
+                    self.t0 = t
+            if self.rig is None:
+                return
+        if net.view_time() is None:
+            return
+        age = t - self.t0
+        x = self.rig.worldPosition.x
+        self.last_x = x
+        if self.flip is not None and self.response_ticks is None and net.tick > self.flip[0]:
+            # First look after the input turned around (a frame may hold several ticks): ticks elapsed minus the
+            # ticks the rig has already moved back. Without prediction it keeps going forward for a round trip.
+            moved = (self.flip[1] - x) * logic.getLogicTicRate() / RIG_SPEED
+            self.response_ticks = (net.tick - self.flip[0]) - moved
+        vx = RIG_SPEED if age < 2.5 else (-RIG_SPEED if age < 4.5 else 0.0)
+        if vx < 0.0 and self.flip is None:
+            self.flip = (net.tick, x)
+        if vx == 0.0 and self.stopped_at is None:
+            self.stopped_at = t
+        shot = 0
+        if age > 0.5 and t - self.last_shot > 0.4 and self.seq < 250:
+            # Aim at the Spawner where this client draws it (in the past of the server).
+            self.last_shot = t
+            self.seq += 1
+            shot = self.seq
+        origin = (0.0, 0.0, 1.0)
+        target = self.tracked.worldPosition
+        direction = (target.x - origin[0], target.y - origin[1], target.z - origin[2])
+        net.set_input(INPUT.pack(vx, shot, *origin, *direction))
+        if shot and os.environ.get("NET_DEBUG"):
+            log("aim %d view=%s target=%s" % (shot, net.view_time(), tuple(round(v, 2) for v in target)))
+        self.stats = net.prediction_stats(self.rig)
+        if os.environ.get("NET_DEBUG") and self.stats:
+            log("pred tick=%d x=%.3f server=%s %s" % (net.tick, x, self.server_x, self.stats))
+
+    def server_checks(self):
+        check("server applied the client's input", self.inputs_seen > 30, "frames=%d" % self.inputs_seen)
+        xs = self.server_xs
+        check("rig moved by the input on the server", bool(xs) and max(xs) - min(xs) > 2.0,
+              "x %.2f..%.2f" % (min(xs or [0]), max(xs or [0])))
+        shots = len(self.shots)
+        past = sum(1 for v in self.shots.values() if v[0])
+        now = sum(1 for v in self.shots.values() if v[1])
+        check("lag compensation: shots hit the Spawner where the client saw it", shots >= 5 and past >= 0.8 * shots,
+              "%d/%d hit in the past, %d/%d now" % (past, shots, now, shots))
+        check("lag compensation: the same shots mostly miss the present", now <= shots // 2,
+              "%d/%d hit now" % (now, shots))
+
+    def client_checks(self, t_end):
+        check("client found its rig", self.rig is not None)
+        if self.rig is None:
+            return
+        check("prediction: the rig answers the input within 2 ticks", self.response_ticks is not None and
+              self.response_ticks <= 2.0, "delay=%s ticks" % (None if self.response_ticks is None else
+                                                              round(self.response_ticks, 2)))
+        st = self.stats or {}
+        check("prediction: inputs recorded", st.get("inputs", 0) > 60, str(st))
+        settled = self.stopped_at is not None and t_end - self.stopped_at > 1.5
+        x = self.last_x  # the rig itself is gone once the server left
+        check("prediction: rig ends where the server has it", settled and self.server_x is not None and
+              x is not None and abs(x - self.server_x) < 0.05, "client %s server %s settled=%s" % (x, self.server_x, settled))
+        check("prediction: corrections stay small", st.get("max_error", 99.0) < 0.5, str(st))
+
+
 def run():
     scene = logic.getCurrentScene()
     events = []
@@ -65,7 +216,9 @@ def run():
     net.on_connect(lambda cid: events.append(("connect", cid)))
     net.on_disconnect(lambda reason, detail: events.append(("disconnect", reason)))
     net.on_reject(lambda reason, detail: events.append(("reject", reason, detail)))
-    net.on_chat(lambda cid, text: events.append(("chat", cid, text)))
+    # "rig x" reports of the predict check stay out of the event list.
+    net.on_chat(lambda cid, text: RIG_REPORT.__setitem__("x", float(text[4:])) if text.startswith("rig ")
+                else events.append(("chat", cid, text)))
     net.on_start(lambda: events.append(("start",)))
     net.on_player_join(lambda cid, name: events.append(("join", cid, name)))
     net.on_player_leave(lambda cid: events.append(("leave", cid)))
@@ -87,6 +240,7 @@ def run():
         props = []
         net.replicate(tracked, velocity=True)
         proto = None
+    pred = Predict(scene, tracked) if PREDICT else None
     check("replicate gives an id", net.net_id(tracked) != 0, "id=%d" % net.net_id(tracked))
     initial = tuple(tracked.worldPosition)
 
@@ -105,11 +259,17 @@ def run():
             check("scene mode opened the server", net.isServer and net.roomName == room and net.maxPlayers == 4,
                   "%r %r" % (net.roomName, net.maxPlayers))
     elif ROLE == "server":
+        if pred:
+            # The test machine renders two players in software: at 60 Hz neither keeps the tick rate, and
+            # prediction needs both sides to run every tick on time.
+            logic.setLogicTicRate(30.0)
         ok = net.host(PORT, max_players=4, room_name=room, websocket_port=0)
         check("host() opens the room", ok)
         check("isServer", net.isServer and net.isConnected)
         check("roomName/maxPlayers", net.roomName == room and net.maxPlayers == 4,
               "%r %r" % (net.roomName, net.maxPlayers))
+        if pred:
+            pred.server_start()
     else:
         time.sleep(float(os.environ.get("NET_CLIENT_DELAY", "1.5")))
         ok = net.join("127.0.0.1:%d" % PORT)
@@ -130,7 +290,8 @@ def run():
         t = time.time() - start
         if ROLE == "server":
             if SCENARIO == "spawner":
-                tracked.worldPosition = [math.cos(t) * 4.0, math.sin(t) * 4.0, 1.0]
+                if not pred:
+                    tracked.worldPosition = [math.cos(t) * 4.0, math.sin(t) * 4.0, 1.0]
                 tracked["hp"] = int(t * 2)
                 if proto and spawned is None and any(e[0] == "join" for e in events):
                     spawned = net.spawn(proto, owner=0, position=[1.0, 2.0, 3.0])
@@ -141,6 +302,9 @@ def run():
             else:
                 # constant speed along +y: the client must see a slope of CAR_SPEED m/s
                 tracked.setLinearVelocity([0.0, CAR_SPEED, 0.0], False)
+            if pred:
+                joined = [e[1] for e in events if e[0] == "join"]
+                pred.server_frame(t, joined[0] if joined else 0)
             clients_seen = max(clients_seen, len(net.clients))
             if not lobby["chat_sent"] and any(e[0] == "join" for e in events):
                 lobby["chat_sent"] = net.send_chat("welcome")
@@ -169,14 +333,16 @@ def run():
                 if props:
                     hps.append(tracked["hp"])
                 if proto:
+                    if pred:
+                        pred.client_frame(t, events)
                     rig = [o for o in scene.objects if o.name == proto and net.net_id(o) != 0]
                     spawn_seen.append(len(rig))
             if any(e[0] == "reject" for e in events):
                 break
         if t - last_log > 2.0:
             last_log = t
-            log("t=%.1f tick=%d connected=%s pos=%s" % (
-                t, net.tick, net.isConnected, tuple(round(v, 2) for v in tracked.worldPosition)))
+            log("t=%.1f tick=%d connected=%s rtt=%.0f pos=%s" % (
+                t, net.tick, net.isConnected, net.rtt, tuple(round(v, 2) for v in tracked.worldPosition)))
         logic.NextFrame()
 
     if ROLE == "server":
@@ -190,6 +356,8 @@ def run():
         check("client name arrived", any(n == CLIENT_NAME for n in names), str(names))
         check("lobby: client chat reached the server", ("chat", 1, "hello") in events, str(events))
         check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
+        if pred:
+            pred.server_checks()
     else:
         check("client connected", t_connected is not None, str(events))
         if positions:
@@ -232,6 +400,8 @@ def run():
         else:
             log("skip LAN discovery (no answer on this network)")
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
+        if pred:
+            pred.client_checks(time.time() - start)
 
     net.disconnect()
     if ROLE == "server" and not FROM_SCENE:

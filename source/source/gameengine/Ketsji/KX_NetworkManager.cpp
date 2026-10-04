@@ -120,6 +120,36 @@ mt::mat3 FromQuat(const float rotation[4])
 	return mt::quat(rotation[3] * inv, rotation[0] * inv, rotation[1] * inv, rotation[2] * inv).ToMatrix();
 }
 
+/* Input block: [1][render tick u32][alpha u16] then the game's bytes; [0][6 zero bytes] before the first
+ * snapshot was drawn. The server rewinds the hitboxes to that time (lag compensation). */
+void WriteView(net::InputBlock &block, net::Tick tick, float alpha)
+{
+	const bool has = tick != net::kNoTick;
+	const uint16_t a = uint16_t(std::min(std::max(alpha, 0.0f), 1.0f) * 65535.0f + 0.5f);
+	block.push_back(has ? 1 : 0);
+	for (int i = 0; i < 4; ++i) {
+		block.push_back(has ? uint8_t(tick >> (8 * i)) : 0);
+	}
+	block.push_back(has ? uint8_t(a) : 0);
+	block.push_back(has ? uint8_t(a >> 8) : 0);
+}
+
+bool ReadView(const net::InputBlock &block, net::Tick &tick, float &alpha, net::InputBlock &user)
+{
+	if (block.size() < KX_NetworkManager::kInputViewBytes || block[0] > 1) {
+		return false;
+	}
+	tick = net::kNoTick;
+	alpha = 0.0f;
+	if (block[0] == 1) {
+		tick = net::Tick(block[1]) | (net::Tick(block[2]) << 8) | (net::Tick(block[3]) << 16) |
+		       (net::Tick(block[4]) << 24);
+		alpha = float(uint16_t(block[5] | (block[6] << 8))) / 65535.0f;
+	}
+	user.assign(block.begin() + KX_NetworkManager::kInputViewBytes, block.end());
+	return true;
+}
+
 }  // namespace
 
 KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
@@ -146,6 +176,10 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_pongCount(0),
 	m_lastClockSnapshot(net::kNoTick),
 	m_connectedEmitted(false),
+	m_inputSet(false),
+	m_lagCompTickRate(60),
+	m_predTick(net::kNoTick),
+	m_predResyncs(0),
 	m_lastLanRequestMs(0),
 	m_discoveryStarted(false)
 {
@@ -709,6 +743,12 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	net::ReplicatorConfig rc;
 	rc.snapshotIntervalTicks = uint32_t(std::max(1, tickRate / m_snapshotRate));
 	m_replicator.reset(new net::Replicator(*m_server, *this, rc));
+	m_predServer.reset(new net::PredictionServer());
+	net::LagCompensationConfig lc;
+	lc.tickRate = uint16_t(tickRate);
+	lc.maxRewindMs = lc.historyMs;  // RaycastPast() clamps with the limit the game asks for
+	m_lagCompTickRate = tickRate;
+	m_lagComp.reset(new net::LagCompensation(lc));
 	for (const auto &pair : m_entries) {
 		if (!pair.second.spawned) {
 			m_replicator->addSceneObject(pair.first, pair.second.desc);
@@ -789,6 +829,12 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 
 	net::ReplicaClientConfig rc;
 	rc.schema = [this](net::NetId id, const std::string &prototype) { return SchemaFor(id, prototype); };
+	/* Predicted objects owned by this client are moved by ClientPredict(), not by the snapshots. */
+	rc.skipOwned = true;
+	rc.skipFilter = [this](net::NetId id) {
+		const Entry *entry = FindEntry(id);
+		return entry && entry->predicted;
+	};
 	m_replica.reset(new net::ReplicaClient(*m_client, *this, rc));
 	m_rpcClient.reset(new net::RpcClient(*m_client, m_rpcTable, [this](net::NetId id, net::ClientId &owner) {
 		const Entry *entry = FindEntry(id);
@@ -921,6 +967,8 @@ void KX_NetworkManager::CloseSession(bool sendQuit, bool shutdown)
 			m_server->stop();
 		}
 		m_rpcServer.reset();
+		m_predServer.reset();
+		m_lagComp.reset();
 		m_replicator.reset();
 		m_server.reset();
 		m_serverTransport.reset();
@@ -946,6 +994,15 @@ void KX_NetworkManager::CloseSession(bool sendQuit, bool shutdown)
 		m_clientTransport.reset();
 		m_clock.reset();
 	}
+	for (auto &pair : m_entries) {
+		ResetPrediction(pair.second);
+	}
+	m_inputLog.reset();
+	m_predTick = net::kNoTick;
+	m_view = ViewTime();
+	m_inputView = ViewTime();
+	m_appliedInput.clear();
+	m_clientView.clear();
 
 	if (m_sessionOpen) {
 		m_engine->SetUseFixedTimestep(m_prevFixedTimestep);
@@ -1118,6 +1175,7 @@ void KX_NetworkManager::EndTick()
 		return;
 	}
 	const uint64_t now = net::steadyClockMs();
+	RecordHitboxes();
 	m_replicator->update(m_tick, now);
 	if (m_lanActive) {
 		UpdateLanInfo();
@@ -1150,12 +1208,23 @@ void KX_NetworkManager::ServerTickBegin(uint64_t now)
 		const net::SessionEvent event = events[i];
 		HandleServerEvent(event, now, events);
 	}
+	if (m_role == Role::SERVER) {
+		ServerStepPredicted();
+	}
 }
 
 void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64_t now,
                                           std::vector<net::SessionEvent> &events)
 {
 	m_replicator->handleEvent(event);
+	if (m_predServer->handleEvent(event, m_tick)) {
+		const net::InputQueue *queue = m_predServer->queue(event.client);
+		if (queue && queue->stats().invalid > m_inputInvalid[event.client]) {
+			m_inputInvalid[event.client] = queue->stats().invalid;
+			m_server->reportViolation(event.client, now, events);
+		}
+		return;
+	}
 	if (m_rpcServer->handleEvent(event, now, events)) {
 		return;
 	}
@@ -1190,6 +1259,9 @@ void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64
 		}
 		case net::SessionEvent::Type::ClientLeft: {
 			m_ready.erase(event.client);
+			m_appliedInput.erase(event.client);
+			m_clientView.erase(event.client);
+			m_inputInvalid.erase(event.client);
 			Event e;
 			e.type = Event::PLAYER_LEAVE;
 			e.client = event.client;
@@ -1249,11 +1321,18 @@ void KX_NetworkManager::ClientTickBegin(uint64_t now)
 			m_lastClockSnapshot = newest;
 			m_clock->addSnapshot(newest, now);
 		}
+		/* Before the remote objects move: the input goes out with the view time the player has been seeing. */
+		ClientPredict(now);
 		net::Tick renderTick;
 		float alpha;
 		m_clock->renderTime(now, renderTick, alpha);
-		if (!m_clock->synced() || !m_replica->applyInterpolated(renderTick, alpha)) {
-			m_replica->applyLatest();
+		if (m_clock->synced() && m_replica->applyInterpolated(renderTick, alpha)) {
+			m_view.tick = renderTick;
+			m_view.alpha = alpha;
+		}
+		else if (m_replica->applyLatest()) {
+			m_view.tick = m_replica->lastAcceptedTick();
+			m_view.alpha = 0.0f;
 		}
 	}
 }
@@ -1337,6 +1416,380 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 		}
 		default:
 			break;
+	}
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Input, client prediction and lag compensation
+ * \{ */
+
+void KX_NetworkManager::SetStepSink(const StepFunc &sink)
+{
+	m_stepSink = sink;
+}
+
+bool KX_NetworkManager::SetPredicted(KX_GameObject *obj, bool predicted)
+{
+	Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;
+	if (!entry || entry->obj != obj) {
+		return false;
+	}
+	if (!predicted) {
+		ResetPrediction(*entry);
+	}
+	entry->predicted = predicted;
+	return true;
+}
+
+bool KX_NetworkManager::SetInput(const net::InputBlock &input)
+{
+	if (input.size() > kMaxUserInputBytes) {
+		return false;
+	}
+	m_input = input;
+	m_inputSet = true;
+	/* The input goes out with the view the player had when the game made it (what is on screen now), in every
+	 * tick it is repeated: a block that reaches the server late still leaves the next ones with the same time. */
+	m_inputView = m_view;
+	return true;
+}
+
+bool KX_NetworkManager::GetClientInput(net::ClientId client, net::InputBlock &input) const
+{
+	if (m_role == Role::CLIENT) {
+		if (!m_client || client != m_client->clientId() || !m_inputSet) {
+			return false;
+		}
+		input = m_input;
+		return true;
+	}
+	const auto it = m_appliedInput.find(client);
+	if (it == m_appliedInput.end()) {
+		return false;
+	}
+	input = it->second;
+	return true;
+}
+
+bool KX_NetworkManager::GetViewTime(net::ClientId client, net::Tick &tick, float &alpha) const
+{
+	ViewTime view;
+	if (m_role == Role::CLIENT) {
+		view = m_view;
+	}
+	else if (m_role == Role::SERVER) {
+		const auto it = m_clientView.find(client);
+		if (it != m_clientView.end()) {
+			view = it->second;
+		}
+	}
+	tick = view.tick;
+	alpha = view.alpha;
+	return view.tick != net::kNoTick;
+}
+
+bool KX_NetworkManager::GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info) const
+{
+	const Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;
+	if (!entry || !entry->prediction) {
+		return false;
+	}
+	stats = entry->prediction->stats();
+	if (info) {
+		info->tick = entry->prediction->newestTick();
+		info->snapshotTick = entry->lastReconciled;
+		info->resyncs = m_predResyncs;
+	}
+	return true;
+}
+
+bool KX_NetworkManager::SetHitbox(KX_GameObject *obj, float radius, float halfHeight)
+{
+	Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;
+	if (!entry || entry->obj != obj) {
+		return false;
+	}
+	if (!(radius > 0.0f)) {
+		entry->hasHitbox = false;
+		return true;
+	}
+	entry->hasHitbox = true;
+	entry->hitbox = net::Hitbox();
+	entry->hitbox.shape = halfHeight > 0.0f ? net::HitShape::Capsule : net::HitShape::Sphere;
+	entry->hitbox.radius = radius;
+	entry->hitbox.halfHeight = std::max(halfHeight, 0.0f);
+	return true;
+}
+
+bool KX_NetworkManager::RaycastPast(const float origin[3], const float direction[3], float maxDistance, int viewOf,
+                                    KX_GameObject *ignore, KX_GameObject *&hitObj, float point[3], float &distance,
+                                    int maxRewindMs, net::Tick *usedTick) const
+{
+	hitObj = nullptr;
+	if (m_role != Role::SERVER || !m_lagComp) {
+		return false;
+	}
+	const float len = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] +
+	                            direction[2] * direction[2]);
+	if (!(len > 1e-6f)) {
+		return false;
+	}
+	const float dir[3] = {direction[0] / len, direction[1] / len, direction[2] / len};
+	/* The newest recorded tick is the present: the current one is recorded at the end of the step. */
+	net::Tick tick = m_lagComp->newestTick();
+	float alpha = 0.0f;
+	if (viewOf >= 0) {
+		const auto it = m_clientView.find(net::ClientId(viewOf));
+		if (it != m_clientView.end() && it->second.tick != net::kNoTick) {
+			tick = it->second.tick;
+			alpha = it->second.alpha;
+		}
+	}
+	/* Anti-abuse: a client cannot ask for a time older than the server allows (the history keeps 1 s). */
+	const int32_t maxTicks = int32_t(std::max(0, maxRewindMs) * m_lagCompTickRate / 1000);
+	if (int32_t(m_tick - tick) > maxTicks) {
+		tick = m_tick - net::Tick(maxTicks);
+		alpha = 0.0f;
+	}
+	net::RayHit hit;
+	const net::NetId ignoreId = ignore ? ignore->GetNetId() : net::kInvalidNetId;
+	if (!m_lagComp->raycast(origin, dir, maxDistance, tick, alpha, m_tick, hit, ignoreId)) {
+		return false;
+	}
+	const Entry *entry = FindEntry(hit.id);
+	if (!entry || !entry->obj) {
+		return false;
+	}
+	hitObj = entry->obj;
+	std::copy(hit.point, hit.point + 3, point);
+	distance = hit.distance;
+	if (usedTick) {
+		*usedTick = hit.tick;
+	}
+	return true;
+}
+
+void KX_NetworkManager::ServerStepPredicted()
+{
+	m_appliedInput.clear();
+	for (const net::ClientId client : m_server->clients()) {
+		net::InputBlock block;
+		if (!m_predServer->consume(client, m_tick, block)) {
+			continue;
+		}
+		ViewTime view;
+		net::InputBlock user;
+		if (!ReadView(block, view.tick, view.alpha, user)) {
+			continue;
+		}
+		if (view.tick != net::kNoTick) {
+			m_clientView[client] = view;
+		}
+		m_appliedInput[client] = std::move(user);
+	}
+	if (!m_dedicated && m_inputSet) {
+		m_appliedInput[net::kServerClientId] = m_input;
+	}
+	if (!m_stepSink) {
+		return;
+	}
+	/* The step runs game code that may remove objects: collect first, look up again before each call. */
+	std::vector<net::NetId> ids;
+	for (const auto &pair : m_entries) {
+		if (pair.second.predicted && pair.second.obj) {
+			ids.push_back(pair.first);
+		}
+	}
+	for (const net::NetId id : ids) {
+		const Entry *entry = FindEntry(id);
+		if (!entry || !entry->obj) {
+			continue;
+		}
+		const auto input = m_appliedInput.find(entry->owner);
+		if (input != m_appliedInput.end()) {
+			m_stepSink(entry->obj, input->second);
+		}
+	}
+}
+
+void KX_NetworkManager::RecordHitboxes()
+{
+	if (!m_lagComp) {
+		return;
+	}
+	std::vector<net::Hitbox> boxes;
+	for (const auto &pair : m_entries) {
+		const Entry &entry = pair.second;
+		if (!entry.hasHitbox || !entry.obj) {
+			continue;
+		}
+		net::Hitbox box = entry.hitbox;
+		box.id = pair.first;
+		const mt::vec3 &pos = entry.obj->NodeGetWorldPosition();
+		box.center[0] = pos.x;
+		box.center[1] = pos.y;
+		box.center[2] = pos.z;
+		ToQuat(entry.obj->NodeGetWorldOrientation(), box.rotation);
+		boxes.push_back(box);
+	}
+	m_lagComp->record(m_tick, boxes);
+}
+
+bool KX_NetworkManager::PredictedState(const Entry &entry, net::ObjectState &state) const
+{
+	if (!entry.obj) {
+		return false;
+	}
+	state = net::ObjectState();
+	state.id = entry.obj->GetNetId();
+	state.hasTransform = true;
+	const mt::vec3 &pos = entry.obj->NodeGetWorldPosition();
+	state.position[0] = pos.x;
+	state.position[1] = pos.y;
+	state.position[2] = pos.z;
+	ToQuat(entry.obj->NodeGetWorldOrientation(), state.rotation);
+	return true;
+}
+
+void KX_NetworkManager::SetPredictedState(Entry &entry, const net::ObjectState &state)
+{
+	if (!entry.obj || !state.hasTransform) {
+		return;
+	}
+	entry.obj->NodeSetWorldPosition(mt::vec3(state.position[0], state.position[1], state.position[2]));
+	entry.obj->NodeSetGlobalOrientation(FromQuat(state.rotation));
+}
+
+void KX_NetworkManager::ApplyOffset(Entry &entry, const float offset[3])
+{
+	if (!entry.obj) {
+		return;
+	}
+	const float delta[3] = {offset[0] - entry.shownOffset[0], offset[1] - entry.shownOffset[1],
+	                        offset[2] - entry.shownOffset[2]};
+	if (delta[0] != 0.0f || delta[1] != 0.0f || delta[2] != 0.0f) {
+		const mt::vec3 &pos = entry.obj->NodeGetWorldPosition();
+		entry.obj->NodeSetWorldPosition(mt::vec3(pos.x + delta[0], pos.y + delta[1], pos.z + delta[2]));
+	}
+	std::copy(offset, offset + 3, entry.shownOffset);
+}
+
+void KX_NetworkManager::ResetPrediction(Entry &entry)
+{
+	const float zero[3] = {0.0f, 0.0f, 0.0f};
+	ApplyOffset(entry, zero);
+	std::copy(zero, zero + 3, entry.shownOffset);
+	entry.prediction.reset();
+	entry.lastReconciled = net::kNoTick;
+}
+
+void KX_NetworkManager::ClientPredict(uint64_t now)
+{
+	const net::ClientId self = m_client->clientId();
+	std::vector<net::NetId> ids;
+	for (auto &pair : m_entries) {
+		Entry &entry = pair.second;
+		if (entry.predicted && entry.obj && self != net::kServerClientId && entry.owner == self) {
+			ids.push_back(pair.first);
+		}
+		else if (entry.prediction) {
+			ResetPrediction(entry);
+		}
+	}
+	if ((ids.empty() && !m_inputSet) || !m_clock->synced() || !IsConnected()) {
+		return;
+	}
+
+	/* Ticks grow by one. The clock's estimate moves in steps (several ticks run back to back in a slow frame,
+	 * then none), so only a drift of half a second (stall, clock resync) restarts the timeline: that drops the
+	 * input history, and the corrections wait until it covers the snapshots again. */
+	const net::Tick target = m_clock->predictionTick(now);
+	net::Tick tick = m_predTick == net::kNoTick ? target : m_predTick + 1;
+	const int32_t drift = int32_t(target - tick);
+	const int32_t maxDrift = std::max(8, int(m_client->tickRate()) / 2);
+	if (drift > maxDrift || drift < -maxDrift) {
+		tick = target;
+		++m_predResyncs;
+	}
+	m_predTick = tick;
+
+	net::InputBlock block;
+	const ViewTime &view = m_inputSet ? m_inputView : m_view;
+	WriteView(block, view.tick, view.alpha);
+	block.insert(block.end(), m_input.begin(), m_input.end());
+	if (!m_inputLog) {
+		m_inputLog.reset(new net::PredictionClient(net::PredictionCallbacks()));
+	}
+	net::InputMsg msg;
+	if (m_inputLog->recordInput(tick, block, msg)) {
+		m_client->send(net::Channel::Input, net::makePacket(msg));
+	}
+	if (!m_stepSink) {
+		return;
+	}
+
+	const net::Snapshot *snapshot = m_replica->buffer().newest();
+	const float tickMs = 1000.0f / float(std::max<int>(1, m_client->tickRate()));
+	for (const net::NetId id : ids) {
+		Entry *entry = FindEntry(id);
+		if (!entry || !entry->obj) {
+			continue;
+		}
+		const float zero[3] = {0.0f, 0.0f, 0.0f};
+		ApplyOffset(*entry, zero);  // back to the simulated position
+		if (!entry->prediction) {
+			net::PredictionCallbacks callbacks;
+			callbacks.setState = [this, id](const net::ObjectState &state) {
+				if (Entry *e = FindEntry(id)) {
+					SetPredictedState(*e, state);
+				}
+			};
+			callbacks.getState = [this, id](net::ObjectState &state) {
+				const Entry *e = FindEntry(id);
+				return e && PredictedState(*e, state);
+			};
+			callbacks.replay = [this, id](net::Tick, const net::InputBlock &input) {
+				Entry *e = FindEntry(id);
+				ViewTime view;
+				net::InputBlock user;
+				if (e && e->obj && m_stepSink && ReadView(input, view.tick, view.alpha, user)) {
+					m_stepSink(e->obj, user);
+				}
+			};
+			entry->prediction.reset(new net::PredictionClient(callbacks));
+		}
+		if (snapshot && snapshot->tick != entry->lastReconciled) {
+			entry->lastReconciled = snapshot->tick;
+			const net::ObjectState *server = snapshot->find(id);
+			if (server && server->hasTransform) {
+				/* Only the transform is predicted: velocities of a suspended body read as zero here. */
+				net::ObjectState state = *server;
+				state.hasVelocity = false;
+				state.hasAngularVelocity = false;
+				entry->prediction->reconcile(snapshot->tick, state);
+			}
+		}
+		entry = FindEntry(id);
+		if (!entry || !entry->obj || !entry->prediction) {
+			continue;
+		}
+		net::InputMsg unused;
+		entry->prediction->recordInput(tick, block, unused);
+		m_stepSink(entry->obj, m_input);
+		entry = FindEntry(id);
+		if (!entry || !entry->obj || !entry->prediction) {
+			continue;
+		}
+		net::ObjectState state;
+		if (PredictedState(*entry, state)) {
+			entry->prediction->recordState(tick, state);
+		}
+		entry->prediction->update(tickMs);
+		float offset[3];
+		entry->prediction->visualOffset(offset);
+		ApplyOffset(*entry, offset);
 	}
 }
 
@@ -1643,6 +2096,9 @@ void KX_NetworkManager::despawn(net::NetId id)
 void KX_NetworkManager::setOwner(net::NetId id, net::ClientId owner)
 {
 	if (Entry *entry = FindEntry(id)) {
+		if (entry->owner != owner) {
+			ResetPrediction(*entry);
+		}
 		entry->owner = owner;
 	}
 }

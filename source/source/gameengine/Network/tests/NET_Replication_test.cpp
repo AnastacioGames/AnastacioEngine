@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 #include <cmath>
+#include <functional>
 #include <map>
 
 using namespace net;
@@ -260,7 +261,8 @@ struct Net {
 		}
 	}
 
-	Client &addClient(const std::string &name, uint64_t token = 0)
+	Client &addClient(const std::string &name, uint64_t token = 0,
+	                  const std::function<void(ReplicaClientConfig &)> &tweak = nullptr)
 	{
 		auto c = std::make_unique<Client>();
 		auto spy = std::make_unique<SpyTransport>(wrap());
@@ -275,6 +277,9 @@ struct Net {
 		c->session = std::make_unique<ClientSession>(*c->transport, cc);
 		ReplicaClientConfig rc;
 		rc.schema = [](NetId, const std::string &) { return &propSchema(); };
+		if (tweak) {
+			tweak(rc);
+		}
 		c->replica = std::make_unique<ReplicaClient>(*c->session, c->world, rc);
 		for (const auto &pair : sceneObjects) {
 			c->world.add(pair.first).s = pair.second;
@@ -715,6 +720,44 @@ TEST(NetReplication, OwnershipAndSpawnOrder)
 	net.step(2);
 	EXPECT_EQ(a.world.objects[player].owner, kServerClientId);
 	EXPECT_EQ(a.replica->owner(player), kServerClientId);
+}
+
+TEST(NetReplication, SkipOwnedLeavesPredictedObjectsAlone)
+{
+	Net net;
+	NetId predicted = kInvalidNetId;
+	Client &a = net.addClient("Ana", 0, [&predicted](ReplicaClientConfig &rc) {
+		rc.skipOwned = true;
+		rc.skipFilter = [&predicted](NetId id) { return id == predicted; };
+	});
+	net.connectAll();
+	const ClientId id = a.session->clientId();
+
+	ReplicatedObjectDesc desc;
+	desc.prototype = "Player";
+	desc.owner = id;
+	predicted = net.replicator->spawn(desc);
+	const NetId other = net.replicator->spawn(desc);
+	for (NetId n : {predicted, other}) {
+		net.world.add(n).s = stateAt(1.0f, 0.0f, 0.0f);
+		net.world.objects[n].s.id = n;
+	}
+	net.step(3);
+	ASSERT_TRUE(a.world.exists(predicted));
+	ASSERT_TRUE(a.world.exists(other));
+
+	// The client moves its predicted object itself; the server moves both.
+	a.world.objects[predicted].s.position[0] = 7.0f;
+	net.world.objects[predicted].s.position[0] = 3.0f;
+	net.world.objects[other].s.position[0] = 3.0f;
+	net.step(4);
+	EXPECT_NEAR(a.world.objects[predicted].s.position[0], 7.0f, 0.001f);
+	EXPECT_NEAR(a.world.objects[other].s.position[0], 3.0f, 0.001f);
+
+	// Given back to the server: the snapshots drive it again.
+	net.replicator->setOwner(predicted, kServerClientId);
+	net.step(4);
+	EXPECT_NEAR(a.world.objects[predicted].s.position[0], 3.0f, 0.001f);
 }
 
 TEST(NetReplication, ReconnectGetsFullState)

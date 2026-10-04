@@ -49,6 +49,8 @@ struct ReplicaClientConfig {
 	uint32_t fullStateRetryMs = 1000;
 	/// Leaves objects owned by this client alone when applying snapshots (prediction drives them).
 	bool skipOwned = false;
+	/// With skipOwned: which owned objects are left alone (the predicted ones); empty = all of them.
+	std::function<bool(NetId id)> skipFilter;
 };
 
 struct ReplicaClientStats {

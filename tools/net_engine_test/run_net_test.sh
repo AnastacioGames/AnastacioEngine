@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Starts a server and a client RangeRuntime (headless, xvfb) and checks that a replicated object moves
-# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server] [build dir] [net-sim "lat,jit,loss"]
+# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict] [build dir] [net-sim "lat,jit,loss"]
 #   spawner, car  the script registers the objects (net.replicate) and calls host()/join()
 #   server        spawner with the server started as a headless server (RangeRuntime --server): no render, no
 #                 audio, dedicated (no host player); also prints the CPU time of both processes
 #   scene         the .range files are authored by the editor (make_net_scenes.py, needs build-linux-editor):
 #                 Replicate checkbox, Rep property and the scene mode (Host/Client) open the session
 #   scene-server  scene with the server started as --server: the Host scene must run as Dedicated
+#   predict       spawner plus a rig owned by the client, moved by net.predict() with the client's input
+#                 (prediction, reconciliation) and shots at the Spawner through the input (lag compensation);
+#                 runs through the network simulator, 40 ms / 5 ms / 1 % on each side unless a net-sim is given
+#                 (the server rewinds at most 400 ms: a longer round trip plus the interpolation delay is clamped)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -22,6 +26,8 @@ SCENE_SERVER=""; SCENE_CLIENT=""
 SERVER_ARGS=""
 case "$SCENARIO" in
   server) SERVER_ARGS="--server"; export NET_HEADLESS=1; SCENARIO=spawner
+    SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  predict) export NET_PREDICT=1; SCENARIO=spawner; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   spawner) SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   car) SCENE_SERVER="$ROOT/projects-teste/car_framerate/car_com_fr0.range"; SCENE_CLIENT="$SCENE_SERVER" ;;

@@ -194,7 +194,9 @@ void ReplicaClient::apply(const std::vector<ObjectState> &objects)
 		if (!m_world.exists(o.id)) {
 			continue;
 		}
-		if (m_config.skipOwned && self != kServerClientId && owner(o.id) == self) {
+		if (m_config.skipOwned && self != kServerClientId && owner(o.id) == self &&
+		    (!m_config.skipFilter || m_config.skipFilter(o.id)))
+		{
 			continue;
 		}
 		if (o.hasTransform) {
