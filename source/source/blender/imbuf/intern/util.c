@@ -269,7 +269,7 @@ static int isffmpeg(const char *filename)
 	AVFormatContext *pFormatCtx = NULL;
 	unsigned int i;
 	int videoStream;
-	AVCodec *pCodec;
+	const AVCodec *pCodec;
 	AVCodecContext *pCodecCtx;
 
 	if (BLI_path_extension_check_n(
@@ -297,8 +297,7 @@ static int isffmpeg(const char *filename)
 	videoStream = -1;
 	for (i = 0; i < pFormatCtx->nb_streams; i++)
 		if (pFormatCtx->streams[i] &&
-		    pFormatCtx->streams[i]->codec &&
-		    (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO))
+		    (ffmpeg_stream_codec_type(pFormatCtx->streams[i]) == AVMEDIA_TYPE_VIDEO))
 		{
 			videoStream = i;
 			break;
@@ -309,21 +308,26 @@ static int isffmpeg(const char *filename)
 		return 0;
 	}
 
-	pCodecCtx = pFormatCtx->streams[videoStream]->codec;
-
 	/* Find the decoder for the video stream */
-	pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+	pCodec = avcodec_find_decoder(ffmpeg_stream_codec_id(pFormatCtx->streams[videoStream]));
 	if (pCodec == NULL) {
 		avformat_close_input(&pFormatCtx);
 		return 0;
 	}
 
-	if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+	pCodecCtx = ffmpeg_stream_context_open(pFormatCtx->streams[videoStream], pCodec);
+	if (pCodecCtx == NULL) {
 		avformat_close_input(&pFormatCtx);
 		return 0;
 	}
 
-	avcodec_close(pCodecCtx);
+	if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+		ffmpeg_stream_context_close(&pCodecCtx);
+		avformat_close_input(&pFormatCtx);
+		return 0;
+	}
+
+	ffmpeg_stream_context_close(&pCodecCtx);
 	avformat_close_input(&pFormatCtx);
 
 	return 1;

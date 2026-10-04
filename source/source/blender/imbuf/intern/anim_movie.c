@@ -469,7 +469,7 @@ static int startffmpeg(struct anim *anim)
 {
 	int i, videoStream;
 
-	AVCodec *pCodec;
+	const AVCodec *pCodec;
 	AVFormatContext *pFormatCtx = NULL;
 	AVCodecContext *pCodecCtx;
 	AVRational frame_rate;
@@ -504,7 +504,7 @@ static int startffmpeg(struct anim *anim)
 	videoStream = -1;
 
 	for (i = 0; i < pFormatCtx->nb_streams; i++)
-		if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+		if (ffmpeg_stream_codec_type(pFormatCtx->streams[i]) == AVMEDIA_TYPE_VIDEO) {
 			if (streamcount > 0) {
 				streamcount--;
 				continue;
@@ -518,11 +518,15 @@ static int startffmpeg(struct anim *anim)
 		return -1;
 	}
 
-	pCodecCtx = pFormatCtx->streams[videoStream]->codec;
-
 	/* Find the decoder for the video stream */
-	pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+	pCodec = avcodec_find_decoder(ffmpeg_stream_codec_id(pFormatCtx->streams[videoStream]));
 	if (pCodec == NULL) {
+		avformat_close_input(&pFormatCtx);
+		return -1;
+	}
+
+	pCodecCtx = ffmpeg_stream_context_open(pFormatCtx->streams[videoStream], pCodec);
+	if (pCodecCtx == NULL) {
 		avformat_close_input(&pFormatCtx);
 		return -1;
 	}
@@ -530,11 +534,12 @@ static int startffmpeg(struct anim *anim)
 	pCodecCtx->workaround_bugs = 1;
 
 	if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+		ffmpeg_stream_context_close(&pCodecCtx);
 		avformat_close_input(&pFormatCtx);
 		return -1;
 	}
 	if (pCodecCtx->pix_fmt == AV_PIX_FMT_NONE) {
-		avcodec_close(anim->pCodecCtx);
+		ffmpeg_stream_context_close(&pCodecCtx);
 		avformat_close_input(&pFormatCtx);
 		return -1;
 	}
@@ -594,7 +599,7 @@ static int startffmpeg(struct anim *anim)
 
 		if (av_frame_get_buffer(anim->pFrameRGB, 32) < 0) {
 			fprintf(stderr, "Could not allocate frame data.\n");
-			avcodec_close(anim->pCodecCtx);
+			ffmpeg_stream_context_close(&anim->pCodecCtx);
 			avformat_close_input(&anim->pFormatCtx);
 			av_frame_free(&anim->pFrameRGB);
 			av_frame_free(&anim->pFrameDeinterlaced);
@@ -609,7 +614,7 @@ static int startffmpeg(struct anim *anim)
 	{
 		fprintf(stderr,
 		        "ffmpeg has changed alloc scheme ... ARGHHH!\n");
-		avcodec_close(anim->pCodecCtx);
+		ffmpeg_stream_context_close(&anim->pCodecCtx);
 		avformat_close_input(&anim->pFormatCtx);
 		av_frame_free(&anim->pFrameRGB);
 		av_frame_free(&anim->pFrameDeinterlaced);
@@ -650,7 +655,7 @@ static int startffmpeg(struct anim *anim)
 	if (!anim->img_convert_ctx) {
 		fprintf(stderr,
 		        "Can't transform color space??? Bailing out...\n");
-		avcodec_close(anim->pCodecCtx);
+		ffmpeg_stream_context_close(&anim->pCodecCtx);
 		avformat_close_input(&anim->pFormatCtx);
 		av_frame_free(&anim->pFrameRGB);
 		av_frame_free(&anim->pFrameDeinterlaced);
@@ -860,8 +865,8 @@ static int ffmpeg_decode_video_frame(struct anim *anim)
 				       "pkt_pts=%lld, guessed_pts=%lld\n",
 				       (anim->pFrame->pts == AV_NOPTS_VALUE) ?
 				       -1 : (long long int)anim->pFrame->pts,
-				       (anim->pFrame->pkt_pts == AV_NOPTS_VALUE) ?
-				       -1 : (long long int)anim->pFrame->pkt_pts,
+				       (FFMPEG_FRAME_PTS(anim->pFrame) == AV_NOPTS_VALUE) ?
+				       -1 : (long long int)FFMPEG_FRAME_PTS(anim->pFrame),
 				       (long long int)anim->next_pts);
 				break;
 			}
@@ -899,8 +904,8 @@ static int ffmpeg_decode_video_frame(struct anim *anim)
 			       "pkt_pts=%lld, guessed_pts=%lld\n",
 			       (anim->pFrame->pts == AV_NOPTS_VALUE) ?
 			       -1 : (long long int)anim->pFrame->pts,
-			       (anim->pFrame->pkt_pts == AV_NOPTS_VALUE) ?
-			       -1 : (long long int)anim->pFrame->pkt_pts,
+			       (FFMPEG_FRAME_PTS(anim->pFrame) == AV_NOPTS_VALUE) ?
+			       -1 : (long long int)FFMPEG_FRAME_PTS(anim->pFrame),
 			       (long long int)anim->next_pts);
 			rval = 0;
 		}
@@ -1188,7 +1193,7 @@ static void free_anim_ffmpeg(struct anim *anim)
 	if (anim == NULL) return;
 
 	if (anim->pCodecCtx) {
-		avcodec_close(anim->pCodecCtx);
+		ffmpeg_stream_context_close(&anim->pCodecCtx);
 		avformat_close_input(&anim->pFormatCtx);
 
 		/* Special case here: pFrame could share pointers with codec,
@@ -1197,7 +1202,12 @@ static void free_anim_ffmpeg(struct anim *anim)
 		 *
 		 * Could it be a bug in FFmpeg?
 		 */
+#ifdef FFMPEG_NO_STREAM_CODEC
+		/* Decoded frames are reference counted from 5.0 on. */
+		av_frame_free(&anim->pFrame);
+#else
 		av_free(anim->pFrame);
+#endif
 
 		if (!need_aligned_ffmpeg_buffer(anim)) {
 			/* If there's no need for own aligned buffer it means that FFmpeg's
