@@ -8,3 +8,46 @@ frame 400
 frame 500
 frame 600
 OK frames=600
+START
+frame 0
+START
+frame 0
+SPAWNED 303
+START
+frame 0
+SPAWNED 303
+frame 100
+frame 100
+frame 200
+START
+frame 0
+SPAWNED 303
+START
+frame 0
+SPAWNED 303
+frame 100
+frame 100
+frame 200
+frame 200
+START
+frame 0
+SPAWNED 303
+START
+frame 0
+SPAWNED 303
+frame 100
+frame 100
+frame 200
+frame 200
+START
+frame 0
+SPAWNED 303
+START
+frame 0
+SPAWNED 303
+frame 100
+frame 100
+frame 200
+frame 200
+frame 300
+frame 300
