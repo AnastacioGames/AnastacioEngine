@@ -32,11 +32,13 @@
 #define __KX_NETWORKMANAGER_H__
 
 #include "NET_IWorld.h"
+#include "NET_LagCompensation.h"
 #include "NET_LanDiscovery.h"
 #include "NET_ITransport.h"
 #include "NET_RPC.h"
 #include "NET_ReplicaClient.h"
 #include "NET_Replicator.h"
+#include "NET_Prediction.h"
 #include "NET_Session.h"
 #include "NET_Clock.h"
 
@@ -162,6 +164,69 @@ public:
 	/// Owner of a replicated object; false when it is not replicated.
 	bool GetOwner(KX_GameObject *obj, net::ClientId &owner) const;
 	net::NetId GetNetId(KX_GameObject *obj) const;
+	/// Replicated object with this net id, nullptr when unknown.
+	KX_GameObject *FindObject(net::NetId id) const;
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Game RPCs
+	 * \{ */
+
+	struct RpcOptions {
+		std::string name;
+		net::RpcTarget target = net::RpcTarget::Server;
+		bool reliable = true;
+		/// The caller must own the object the call is made on.
+		bool requireOwner = false;
+	};
+	/// Runs a game RPC here. sender: calling client on the server, always 0 on clients. obj: the object of the
+	/// call, nullptr for a global one.
+	using RpcFunc = std::function<void(const std::string &name, net::ClientId sender, KX_GameObject *obj,
+	                                   const std::vector<net::RpcArg> &args)>;
+	void SetRpcSink(const RpcFunc &sink);
+	/// Before host()/join(), with the same names on every peer. Names starting with "net." are reserved.
+	bool RegisterRpc(const RpcOptions &options, std::string &error);
+	/// obj = nullptr for a global call. False with error when it was refused here.
+	bool CallRpc(const std::string &name, KX_GameObject *obj, const std::vector<net::RpcArg> &args,
+	             std::string &error);
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Input, client prediction and lag compensation
+	 * \{ */
+
+	/// Bytes of an input block the game can use; the rest carries the view time of the client.
+	static constexpr size_t kInputViewBytes = 7;
+	static constexpr size_t kMaxUserInputBytes = net::kMaxInputBlockBytes - kInputViewBytes;
+
+	/// Moves a predicted object by one tick with an input (the user part of the block). Same code on every peer.
+	using StepFunc = std::function<void(KX_GameObject *obj, const net::InputBlock &input)>;
+	void SetStepSink(const StepFunc &sink);
+	/// Marks a replicated object as moved by the step function: on the server with the owner's input, on the
+	/// owning client ahead of the server (prediction, reconciled with the snapshots). False when not replicated.
+	bool SetPredicted(KX_GameObject *obj, bool predicted);
+	/// Input of the local player, sent every tick from now on (client) or used for the host's objects (server).
+	bool SetInput(const net::InputBlock &input);
+	/// Input the server applied for a client this tick (client 0 = host); false when none arrived.
+	bool GetClientInput(net::ClientId client, net::InputBlock &input) const;
+	/// Client: time the remote objects are drawn at. Server: the view time a client sent with its last input.
+	bool GetViewTime(net::ClientId client, net::Tick &tick, float &alpha) const;
+	struct PredictionInfo {
+		/// Newest predicted tick, tick of the last snapshot compared with the prediction.
+		net::Tick tick = net::kNoTick;
+		net::Tick snapshotTick = net::kNoTick;
+		/// Times the prediction timeline restarted (drift from the clock).
+		uint32_t resyncs = 0;
+	};
+	bool GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info = nullptr) const;
+
+	/// Server: sphere (halfHeight 0) or capsule along the local Z axis, recorded every tick. radius <= 0 removes it.
+	bool SetHitbox(KX_GameObject *obj, float radius, float halfHeight);
+	/// Server: ray against the hitboxes as the client `viewOf` saw them (its view time, at most maxRewindMs back,
+	/// up to the 1 s of history); viewOf < 0 tests the present. direction need not be normalized.
+	bool RaycastPast(const float origin[3], const float direction[3], float maxDistance, int viewOf,
+	                 KX_GameObject *ignore, KX_GameObject *&hitObj, float point[3], float &distance,
+	                 int maxRewindMs = 400, net::Tick *usedTick = nullptr) const;
 	/** \} */
 
 	/* -------------------------------------------------------------------- */
@@ -237,6 +302,20 @@ private:
 		bool spawned = false;
 		bool dynamicsSuspended = false;
 		net::ClientId owner = net::kServerClientId;
+		/* Prediction (client) and step with the owner's input (server). */
+		bool predicted = false;
+		std::unique_ptr<net::PredictionClient> prediction;
+		net::Tick lastReconciled = net::kNoTick;
+		/// Visual correction added to the position after the step (client).
+		float shownOffset[3] = {0.0f, 0.0f, 0.0f};
+		/* Lag compensation (server). */
+		bool hasHitbox = false;
+		net::Hitbox hitbox;
+	};
+
+	struct ViewTime {
+		net::Tick tick = net::kNoTick;
+		float alpha = 0.0f;
 	};
 
 	SceneSettings ReadSceneSettings(KX_Scene *scene) const;
@@ -266,6 +345,14 @@ private:
 	const Entry *FindEntry(net::NetId id) const;
 	const std::vector<net::PropertyDesc> *SchemaFor(net::NetId id, const std::string &prototype);
 	KX_GameObject *CreateReplica(const std::string &prototype, std::string &error);
+	void CacheProtoSchema(const std::string &prototype, KX_GameObject *original);
+	void ServerStepPredicted();
+	void RecordHitboxes();
+	void ClientPredict(uint64_t now);
+	void ResetPrediction(Entry &entry);
+	void ApplyOffset(Entry &entry, const float offset[3]);
+	bool PredictedState(const Entry &entry, net::ObjectState &state) const;
+	void SetPredictedState(Entry &entry, const net::ObjectState &state);
 
 	KX_KetsjiEngine *m_engine;
 	KX_Scene *m_scene;
@@ -316,7 +403,27 @@ private:
 	bool m_connectedEmitted;
 	std::map<net::ClientId, bool> m_remoteReady;
 
+	/* Input and prediction. */
+	StepFunc m_stepSink;
+	net::InputBlock m_input;
+	bool m_inputSet;
+	std::unique_ptr<net::PredictionServer> m_predServer;
+	std::unique_ptr<net::LagCompensation> m_lagComp;
+	int m_lagCompTickRate;
+	std::map<net::ClientId, net::InputBlock> m_appliedInput;
+	std::map<net::ClientId, ViewTime> m_clientView;
+	std::map<net::ClientId, uint32_t> m_inputInvalid;
+	/// Builds the redundant Input messages (no callbacks: the objects have their own PredictionClient).
+	std::unique_ptr<net::PredictionClient> m_inputLog;
+	net::Tick m_predTick;
+	uint32_t m_predResyncs;
+	ViewTime m_view;
+	/// m_view when the game last called SetInput().
+	ViewTime m_inputView;
+
 	net::RpcTable m_rpcTable;
+	std::vector<RpcOptions> m_userRpcs;
+	RpcFunc m_rpcSink;
 	std::function<void(const Event &)> m_eventSink;
 
 	net::LanDiscovery m_discovery;

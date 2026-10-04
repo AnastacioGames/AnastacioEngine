@@ -108,6 +108,7 @@ só se `len` passar do fim do pacote.
 | 16 | `Rpc` | 1 | ambos | `u32 netId` (0 = global), `u16 rpcId`, `u32 tick`, argumentos (seção 8) |
 | 17 | `FullStateRequest` | 0 | C→S | vazio (cliente perdeu sincronia) |
 | 18 | `Chat` | 1 | ambos | `u16 fromClient`, `str text` (≤ 200 bytes) |
+| 200 | `RpcFrom` (provisória) | 1/2 | S→C | `u16 fromClient` + corpo do `Rpc`; repasse de `All`/`Others` vindo de um cliente (`NOTES-G.md`) |
 
 `protocolVersion` = 1. Mudança incompatível no formato incrementa.
 

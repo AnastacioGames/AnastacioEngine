@@ -270,6 +270,43 @@ TEST(NetRpc, OthersDoesNotReturnToTheCaller)
 	EXPECT_EQ(w.clients[0].log.calls.back().args[0].s, "xxx");
 }
 
+TEST(NetRpc, RelayCarriesTheCaller)
+{
+	World w;
+	ASSERT_TRUE(w.clients[0].rpc->call("jump", 10, {}));
+	ASSERT_TRUE(w.clients[1].rpc->call("chat", 0, {strArg(2)}));
+	w.pump();
+	ASSERT_EQ(w.clients[1].log.count("jump"), 1u);
+	EXPECT_EQ(w.serverLog.calls[0].caller, w.id(0));
+	for (const auto &e : w.clients[1].log.calls) {
+		EXPECT_EQ(e.caller, e.name == "jump" ? w.id(0) : w.id(1));
+	}
+	ASSERT_EQ(w.clients[0].log.count("chat"), 1u);
+	EXPECT_EQ(w.clients[0].log.calls.back().caller, w.id(1));
+
+	// Calls made by the server still arrive with caller 0.
+	ASSERT_TRUE(w.serverRpc->call("chat", 0, {strArg(1)}));
+	w.pump();
+	ASSERT_EQ(w.clients[0].log.count("chat"), 2u);
+	EXPECT_EQ(w.clients[0].log.calls.back().caller, kServerClientId);
+}
+
+TEST(NetRpc, ClientCannotSendRpcFrom)
+{
+	World w;
+	RpcFromMsg from;
+	from.fromClient = w.id(1);
+	from.rpc.rpcId = uint16_t(w.serverTable.idOf("say"));
+	std::vector<uint8_t> packet;
+	ASSERT_TRUE(appendMessage(packet, from));
+	for (int i = 0; i < 10; ++i) {
+		w.clients[0].session->send(Channel::Rpc, packet);
+	}
+	w.pump();
+	EXPECT_EQ(w.serverLog.count("say"), 0u);
+	EXPECT_TRUE(w.clients[0].disconnected);
+}
+
 TEST(NetRpc, RefusedByTargetAndOwner)
 {
 	World w;
@@ -474,6 +511,8 @@ TEST(NetRpcFuzz, ClientDecode)
 	e.type = SessionEvent::Type::Message;
 	e.messageType = uint8_t(MessageType::Rpc);
 	for (int i = 0; i < 100000; ++i) {
+		// Half as relayed calls, with a leading caller id.
+		e.messageType = uint8_t((i & 2) ? MessageType::RpcFrom : MessageType::Rpc);
 		fuzzBody(rng, e.body, i, table.size());
 		EXPECT_TRUE(client.handleEvent(e));
 	}

@@ -127,6 +127,7 @@ set(SRC
 )
 
 set(LIB
+	bf_imbuf  # IMB_exr_* (the stub when OpenEXR is off)
 )
 
 if(WITH_PYTHON)

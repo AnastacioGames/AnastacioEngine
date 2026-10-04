@@ -194,7 +194,13 @@ void ReplicaClient::apply(const std::vector<ObjectState> &objects)
 		if (!m_world.exists(o.id)) {
 			continue;
 		}
-		if (m_config.skipOwned && self != kServerClientId && owner(o.id) == self) {
+		// Skipped objects are moved by the client's prediction; their properties still follow the server.
+		const bool skipMotion = m_config.skipOwned && self != kServerClientId && owner(o.id) == self &&
+		                        (!m_config.skipFilter || m_config.skipFilter(o.id));
+		if (!o.props.empty()) {
+			m_world.setProperties(o.id, o.props);
+		}
+		if (skipMotion) {
 			continue;
 		}
 		if (o.hasTransform) {
@@ -202,9 +208,6 @@ void ReplicaClient::apply(const std::vector<ObjectState> &objects)
 		}
 		if (o.hasVelocity || o.hasAngularVelocity) {
 			m_world.setVelocity(o.id, o.velocity, o.angularVelocity);
-		}
-		if (!o.props.empty()) {
-			m_world.setProperties(o.id, o.props);
 		}
 	}
 }

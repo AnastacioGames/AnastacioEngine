@@ -48,6 +48,9 @@ struct Main;
 class LA_Launcher
 {
 protected:
+	/// Headless game server (--server): no render, no audio device.
+	bool m_serverMode;
+
 	/// \section The game data.
 	std::string m_startSceneName;
 	Scene *m_startScene;
@@ -144,6 +147,12 @@ public:
 #endif  // WITH_PYTHON
 
 	GlobalSettings *GetGlobalSettings();
+
+	/// Run as a headless game server (player option --server). Call before InitEngine().
+	void SetServerMode(bool server)
+	{
+		m_serverMode = server;
+	}
 
 	inline KX_Scene *GetStartScene() const
 	{

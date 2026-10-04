@@ -93,5 +93,5 @@ aceita o formato antigo do stub (`"address": "ip:porta"` sem `port`).
 seguem abertas) e `discover_lan()` devolve `password=False`; código de sala em `join()` devolve `False` com aviso (sem serviço de
 lobby); `set_simulation` vale a partir do próximo `host()`/`join()`; `clients` do lado do cliente traz o host como `id 0, isHost`,
 o `ping` só do próprio jogador (os dos outros ficam 0) e `ready` pelos RPCs internos `net.ready*`; `roomName`/`maxPlayers`
-só existem no servidor (no cliente: `""` e `0`). Extras além da tabela: `on_player_join`, `on_player_leave`, `tick`, `rtt`, `localId`,
+só existem no servidor (no cliente: `""` e `0`). Extras além da tabela: `on_player_join`, `on_player_leave`, `tick`, `rtt`, `localId`, `headless` (processo `RangeRuntime --server`),
 `replicate`, `spawn`, `despawn`, `set_owner`, `owner`, `is_owner`, `net_id`. Detalhes em `source/source/gameengine/Network/NOTES-engine.md`.

@@ -301,6 +301,8 @@ private:
 	bool m_needsParents;
 
 	bool m_doRender;  /* whether or not the scene should be rendered after the logic frame */
+	/// Player started with --server: no render, no audio device, animations still run.
+	bool m_serverMode;
 
 	/// Key used to exit the BGE
 	SCA_IInputDevice::SCA_EnumInputs m_exitKey;
@@ -360,6 +362,8 @@ private:
 	 * total pause duration not set.
 	 */
 	void UpdateSleepTime();
+	/// Headless server: sleeps until the next logic frame is due (the catch-up loop alone would spin).
+	void ServerSleep();
 
 	/// Update and return the projection matrix of a camera depending on the viewport.
 	mt::mat4 GetCameraProjectionMatrix(KX_Scene *scene, KX_Camera *cam, RAS_Rasterizer::StereoMode stereoMode,
@@ -763,6 +767,16 @@ public:
 	 * Get the current render flag value
 	 */
 	bool GetRender();
+
+	/**
+	 * Headless game server (player started with --server): stops rendering for good (Python cannot turn
+	 * it back on) but keeps the logic, physics and animations, which the game state may depend on.
+	 */
+	void SetServerMode(bool server);
+	bool IsServerMode() const
+	{
+		return m_serverMode;
+	}
 
 	/// Allow debug bounding box debug.
 	void SetShowBoundingBox(KX_DebugOption mode);

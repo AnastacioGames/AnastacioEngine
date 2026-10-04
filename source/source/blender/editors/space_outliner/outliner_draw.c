@@ -1868,7 +1868,7 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 		tselem = TREESTORE(te);
 
 		/* horizontal line? */
-		if (tselem->type == 0 && (te->idcode == ID_OB || te->idcode == ID_SCE))
+		if (tselem->type == 0 || tselem->type == TSE_ID_BASE)
 			glRecti(startx, *starty, startx + UI_UNIT_X, *starty - 1);
 
 		*starty -= UI_UNIT_Y;
@@ -1881,7 +1881,7 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 	te = lb->last;
 	if (te->parent || lb->first != lb->last) {
 		tselem = TREESTORE(te);
-		if (tselem->type == 0 && te->idcode == ID_OB) {
+		if (tselem->type == 0 || tselem->type == TSE_ID_BASE) {
 
 			glRecti(startx, y1 + UI_UNIT_Y, startx + 1, y2);
 		}

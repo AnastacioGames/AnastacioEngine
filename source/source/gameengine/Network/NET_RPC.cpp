@@ -228,8 +228,12 @@ bool RpcServer::handleEvent(const SessionEvent &event, uint64_t nowMs, std::vect
 	}
 
 	if (desc->target == RpcTarget::All || desc->target == RpcTarget::Others) {
+		// Relayed as RpcFrom so the clients know who called.
+		RpcFromMsg from;
+		from.fromClient = caller;
+		from.rpc = msg;
 		std::vector<uint8_t> packet;
-		if (makeRpcPacket(msg.rpcId, msg.netId, msg.tick, msg.args, packet)) {
+		if (appendMessage(packet, from)) {
 			for (ClientId id : m_session.clients()) {
 				if (desc->target == RpcTarget::All || id != caller) {
 					m_session.send(id, channelOf(*desc), packet);
@@ -375,12 +379,28 @@ bool RpcClient::call(const std::string &name, NetId netId, const std::vector<Rpc
 
 bool RpcClient::handleEvent(const SessionEvent &event)
 {
-	if (!isRpcEvent(event)) {
+	if (!isRpcEvent(event) && !(event.type == SessionEvent::Type::Message &&
+	                              event.messageType == uint8_t(MessageType::RpcFrom))) {
 		return false;
 	}
 	++m_stats.received;
 	RpcMsg msg;
-	if (!decodeRpcEvent(event, msg)) {
+	ClientId caller = kServerClientId;
+	bool decoded;
+	if (event.messageType == uint8_t(MessageType::RpcFrom)) {
+		RpcFromMsg from;
+		RawMessage raw;
+		raw.type = event.messageType;
+		raw.body = event.body.data();
+		raw.size = event.body.size();
+		decoded = decodeMessage(raw, from);
+		caller = from.fromClient;
+		msg = std::move(from.rpc);
+	}
+	else {
+		decoded = decodeRpcEvent(event, msg);
+	}
+	if (!decoded) {
 		++m_stats.invalid;
 		return true;
 	}
@@ -408,6 +428,7 @@ bool RpcClient::handleEvent(const SessionEvent &event)
 		RpcCall call;
 		call.desc = desc;
 		call.rpcId = msg.rpcId;
+		call.caller = caller;
 		call.netId = msg.netId;
 		call.tick = msg.tick;
 		call.args = &msg.args;

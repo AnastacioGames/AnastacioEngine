@@ -97,7 +97,8 @@ struct PythonMainLoopState
 
 LA_Launcher::LA_Launcher(GHOST_ISystem *system, Main *maggie, Scene *scene, GlobalSettings *gs,
                          RAS_Rasterizer::StereoMode stereoMode, int samples, bool alwaysUseExpandFraming, int argc, char **argv)
-	:m_startSceneName(scene->id.name + 2),
+	:m_serverMode(false),
+	m_startSceneName(scene->id.name + 2),
 	m_startScene(scene),
 	m_maggie(maggie),
 	m_kxStartScene(nullptr),
@@ -294,6 +295,10 @@ void LA_Launcher::InitEngine()
 
 	m_ketsjiEngine->SetFlag(flags, true);
 	m_ketsjiEngine->SetRender(true);
+	if (m_serverMode) {
+		m_ketsjiEngine->SetServerMode(true);
+		CM_Message("headless server (--server): rendering and audio are off");
+	}
 	m_ketsjiEngine->SetShowBoundingBox((KX_DebugOption)showBoundingBox);
 	m_ketsjiEngine->SetShowArmatures((KX_DebugOption)showArmatures);
 	m_ketsjiEngine->SetShowCameraFrustum((KX_DebugOption)showCameraFrustum);

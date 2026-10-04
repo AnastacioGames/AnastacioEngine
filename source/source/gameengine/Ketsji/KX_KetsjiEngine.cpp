@@ -205,6 +205,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_needsAnimation(true),
 	m_needsParents(true),
 	m_doRender(true),
+	m_serverMode(false),
 	m_exitKey(SCA_IInputDevice::ENDKEY),
 	m_dynamicResolutionQuery(RAS_Query::TIME),
 	m_dynamicResolutionEnabled(false),
@@ -664,11 +665,27 @@ bool KX_KetsjiEngine::NextFrame()
 	m_sceneScheduler->ProcessScheduledScenes();
 
 	if (!m_doRender) {
+		if (m_serverMode) {
+			ServerSleep();
+		}
 		UpdateSleepTime();
 	}
 
 
 	return m_doRender;
+}
+
+void KX_KetsjiEngine::ServerSleep()
+{
+	/* The catch-up loop of UpdateSleepTime() turns its wait into whole milliseconds and sleeps 0 ms for any
+	 * wait under a few frames, so without a frame to draw (and a swap to block on) it spins on a full core.
+	 * A headless server sleeps for the rest of the frame here, minus a margin that the loop then spins. */
+	m_logger.StartLog(tc_outside);
+	ClockTiming();
+	const double wait = m_timestep - m_deltatime + m_overframetime - 0.0005;
+	if (wait > 0.0) {
+		std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+	}
 }
 
 void KX_KetsjiEngine::UpdateSleepTime()
@@ -746,7 +763,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	// Get last Animation start time.
 	m_lastanimationtime = m_animationtime - m_animationtimestart;
 	// If we do not need render yet pass it.
-	if (m_doRender && m_lastanimationtime + m_overanimationtime > m_animationrate) {
+	if ((m_doRender || m_serverMode) && m_lastanimationtime + m_overanimationtime > m_animationrate) {
 		m_needsAnimation = true;
 		// get the render time for next time
 		m_animationtimestart = m_animationtime;
@@ -1227,7 +1244,17 @@ SCA_IInputDevice::SCA_EnumInputs KX_KetsjiEngine::GetExitKey() const
 
 void KX_KetsjiEngine::SetRender(bool render)
 {
+	if (m_serverMode && render) {
+		CM_Warning("render.setRender(True) ignored: the player runs as a headless server (--server)");
+		return;
+	}
 	m_doRender = render;
+}
+
+void KX_KetsjiEngine::SetServerMode(bool server)
+{
+	m_serverMode = server;
+	m_doRender = !server;
 }
 
 bool KX_KetsjiEngine::GetRender()

@@ -2987,6 +2987,19 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{nullptr, nullptr} //Sentinel
 };
 
+/// obj.net: built by Range.network (_object_net), so the object class needs no network code.
+static PyObject *KX_GameObject_pyattr_get_net(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	PyObject *module = PyImport_ImportModule("Range.network");
+	if (!module) {
+		return nullptr;
+	}
+	PyObject *result = PyObject_CallMethod(module, "_object_net", "N",
+	                                       static_cast<KX_GameObject *>(self_v)->GetProxy());
+	Py_DECREF(module);
+	return result;
+}
+
 PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_SHORT_RO("currentLodLevel", KX_GameObject, m_currentLodLevel),
 	EXP_PYATTRIBUTE_RW_FUNCTION("lodManager", KX_GameObject, pyattr_get_lodManager, pyattr_set_lodManager),
@@ -3062,6 +3075,9 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("components", KX_GameObject, pyattr_get_components),
 	EXP_PYATTRIBUTE_RW_FUNCTION("debugRecursive",   KX_GameObject, pyattr_get_debugRecursive, pyattr_set_debugRecursive),
 	EXP_PYATTRIBUTE_RW_FUNCTION("gravity", KX_GameObject, pyattr_get_gravity, pyattr_set_gravity),
+	/* EXP_PYATTRIBUTE_RO_FUNCTION spelled out: the getter is a free function. */
+	{"net", EXP_PYATTRIBUTE_TYPE_FUNCTION, EXP_PYATTRIBUTE_RO, 0, 0, 0.f, 0.f, false, false, 0, 0, 1, nullptr, nullptr,
+	 &KX_GameObject_pyattr_get_net},
 
 	/* experimental, don't rely on these yet */
 	EXP_PYATTRIBUTE_RO_FUNCTION("sensors",      KX_GameObject, pyattr_get_sensors),

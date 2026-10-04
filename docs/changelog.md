@@ -9,6 +9,124 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: spawner/car validados no Windows com as 3 correções da predição; armadilha de build achada (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `run_net_test_win.sh spawner` e `car` passam no Windows/MSVC com os commits `11a0c1e7` (reconciliação),
+  `45012fc0` (lag compensation) e `8b5885c5` (propriedades de objeto previsto) já integrados: `net.headless`,
+  `net.isServer` e o módulo `Range.network` completo (predict/rpc/call/...) respondem certo.
+- Achado durante a validação: depois de `git checkout` para a branch, `ninja RangeRuntime` não recompilou
+  `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` mais novo que o `.obj` (`ninja -n` não via nada pendente); o
+  binário rodava com o módulo de rede antigo (sem `headless`/`predict`/`rpc`), dando `AttributeError` em
+  runtime apesar do código-fonte estar certo. Contorno: apagar o `.obj` suspeito força a recompilação. Ver
+  `NOTES-engine.md` ("Armadilha de build encontrada").
+- Pendente: `run_net_test_win.sh` ainda não tem os cenários `server`/`predict`/`scene`/`scene-server` para
+  cobrir essas correções direto no Windows.
+
+## Multiplayer: `spawn()` de protótipo com propriedade replicada (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Bug: se o protótipo do `net.spawn()` tinha propriedade replicada, o cliente nunca decodificava o `Spawn` nem os
+  snapshots (Spawner parado, `Rig` nunca aparece). O cliente pede o esquema do protótipo para decodificar os
+  campos do `Spawn`, mas o esquema só era montado em `CreateReplica`, depois do decode. Agora `SchemaFor` monta e
+  guarda o esquema a partir do objeto inativo (`CacheProtoSchema`) quando ainda não o tem.
+- Achado ao dar ao `Rig` de `projects-teste/halfanim_crash` uma propriedade replicada `ammo` (pelo editor). O
+  cenário `predict` agora confere que o dono do objeto previsto recebe `ammo` (cobre `8b5885c` no motor).
+- Linux: `predict` ×4 (16/16 a 18/18 no passado), `rpc`, `server`, `car`, `scene`, `scene-server`, `spawner` PASS;
+  net_menu 102 passed. Falta Windows.
+
+## Build Linux do editor: `RangeRuntime` linka sem OpenEXR (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- No `build-linux-editor` (`WITH_IMAGE_OPENEXR=OFF`, `WITH_PLAYER=ON`) o `RangeEngine` linkava, mas o
+  `RangeRuntime` falhava com `undefined reference to IMB_exr_*` vindo de `libbf_render.a`. O stub
+  (`openexr_stub.cpp`) está em `bf_imbuf`, mas `bf_render` não declarava essa dependência e ficava depois do último
+  `libbf_imbuf.a` na linha de link. `source/blender/render/CMakeLists.txt` agora lista `bf_imbuf` em `LIB`.
+- Os cenários `scene` e `scene-server` (que usam o editor para gerar os `.range`) passam no Linux.
+
+## Multiplayer: propriedades de objeto previsto chegam ao dono (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `ReplicaClient::apply` (núcleo) pulava o objeto inteiro quando ele era do cliente e previsto (`skipOwned` +
+  `skipFilter`), então o dono nunca recebia as propriedades replicadas dele (vida, pontos). Agora só o transform e
+  a velocidade são pulados; as propriedades seguem o servidor.
+- Teste `NetReplication.SkipOwnedLeavesPredictedObjectsAlone` estendido: posição do previsto fica com o cliente,
+  propriedade vem do servidor. Núcleo: 111/111. Motor (Linux): `predict` ×3, `spawner`, `rpc`, `car`, `server`
+  PASS. O cenário `predict` não cobre isso porque o protótipo `Rig` do `.range` não tem propriedade replicada
+  (precisa do editor, que ainda não linka).
+
+## Multiplayer: `view_time` da lag compensation segue o snapshot desenhado (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Quando o tempo de render passava do snapshot mais novo, o cliente desenhava esse snapshot mas mandava o
+  `renderTick` como tempo de visão; o servidor rebobinava 1–3 ticks à frente do que foi visto e errava ~1 tiro por
+  rodada do `predict` (às vezes abaixo dos 80%). `KX_NetworkManager::ClientTickBegin` passa a informar o tick do
+  snapshot mais novo com alpha 0. Núcleo não mudou.
+- Teste: limite da lag compensation de 80% para 90%; com `NET_DEBUG` o servidor registra a posição do Spawner por
+  tick e a mostra em cada tiro.
+- Testes (Linux): `predict` 20 de 20 com 100% dos tiros acertando no passado (antes ~94% por rodada); `rpc`,
+  `server`, `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102 passaram.
+
+## Multiplayer: correção da reconciliação da predição (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `KX_NetworkManager` chama `NodeUpdate()` depois de `SetPredictedState`, `ApplyOffset` e `setTransform`. Sem isso
+  a posição mundial ficava velha, o replay do passo partia dela e desfazia a correção: o rig do cliente terminava
+  longe do servidor (`predict` falhava 7 de 20 vezes, `corrections` subindo com `last_error` 0).
+- Testes (Linux): `predict` 19 de 20 (a predição passou nas 20; a falha restante é a lag compensation, 14/18 tiros
+  no passado contra 80% exigidos, já vista antes); `rpc`, `server`, `scene-server`, `spawner`, `car`, `scene`
+  passam; `tools/net_menu/tests` 102 passaram. Núcleo não mudou.
+
+## Multiplayer: `sender` do RPC nos clientes (`200 RpcFrom`) (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Mensagem provisória `200 RpcFrom` (S→C, `u16 fromClient` + corpo do `Rpc`): o servidor repassa `All`/`Others`
+  vindos de um cliente com o id de quem chamou; `RpcClient` preenche `RpcCall::caller`, e o `sender` do `@net.rpc`
+  deixa de ser sempre 0 nos clientes. Cliente que manda 200 conta violação. Os dois lados precisam desta versão.
+- Testes (Linux): núcleo 111 passaram (novos `RelayCarriesTheCaller`, `ClientCannotSendRpcFrom`, ida e volta do
+  `RpcFrom`, fuzz do cliente com 200); `run_net_test.sh rpc` com o `sender` no cliente, `predict`, `server`,
+  `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102 passaram.
+
+## Multiplayer: RPC do jogo (`@net.rpc`) e `obj.net` (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `Range.network.rpc` (decorador, alvos `server`/`owner`/`all`/`others`, `reliable`, `owner_only`, `name`) e
+  `net.call(name, *args, obj=None)`. Argumentos bool, int, float, str, objeto de jogo, vetor e quaternion; a função
+  recebe `sender` (e o objeto, em chamadas de objeto). Registro antes de `host()`/`join()`.
+- `obj.net` em todo objeto de jogo: `id`, `replicated`, `owner`, `isOwner`, `call()`, `predict()`.
+- `KX_NetworkManager` refaz a tabela de RPC com os internos e os do jogo a cada registro; o núcleo não mudou.
+- Testes (Linux): novo `run_net_test.sh rpc` passou; `predict` (agora com RPC no lugar do chat), `server`,
+  `scene-server`, `spawner`, `car` e `scene` passam; `tools/net_menu/tests` 102 passaram.
+- Não testado: Windows. Detalhes em `source/source/gameengine/Network/NOTES-engine.md`, seção "RPC do jogo".
+
+## Multiplayer: predição do cliente, input e lag compensation na engine (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Refaz a `net/engine-predict`, perdida no limite de uso. `NET_Prediction` e `NET_LagCompensation` ligados no
+  `KX_NetworkManager`; `Range.network` ganha `predict(obj, fn)`, `set_input(bytes)`, `input(client)`,
+  `view_time()`, `prediction_stats(obj)`, `set_hitbox(obj, radius, half_height)` e
+  `raycast_past(origin, direction, distance, client, ignore, max_rewind_ms)`.
+- Cliente prevê os próprios objetos com `predict()` (passo do jogo com o input, reconciliação com o snapshot, correção
+  visual suavizada); servidor aplica o input do dono a cada tick. O bloco de input leva o tempo de vista do cliente
+  (no momento do `set_input()`), usado pelo `raycast_past`.
+- Núcleo: `ReplicaClientConfig::skipFilter` (o `skipOwned` agora é ligado e pula só os objetos previstos; teste
+  `NetReplication.SkipOwnedLeavesPredictedObjectsAlone`) e throttle do ENet desligado ao conectar (descartava
+  snapshots, `Input` e `Pong` por segundos com quadros lentos; o relógio do cliente não sincronizava).
+- Testes (Linux, `linux-runtime` + editor enxuto): novo `run_net_test.sh predict` passou (rig responde em 0 tick de
+  atraso, termina na posição do servidor, 17/17 tiros acertam no passado e 0/17 no presente), 5 de 5 rodadas com a
+  versão final; `server`, `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102
+  passaram; `net_tests` do núcleo 109 passaram.
+- Não testado: Windows, predição de corpos dinâmicos, predição pelo modo cena. Detalhes em
+  `source/source/gameengine/Network/NOTES-engine.md`, seção "Predição, input e lag compensation".
+
+## Multiplayer: servidor headless `RangeRuntime --server` (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Refaz o trabalho da `net/server-headless`, que parou no limite de uso sem chegar ao GitHub (a `net/engine-predict` também
+  se perdeu e segue pendente).
+- `RangeRuntime --server`: render desligado de vez (`logic.setRender(True)` recusado), dispositivo de áudio `None`, janela
+  mínima 100×100, `host()` e cena Host viram Dedicated; `join()` avisa. Lógica, física e poses seguem; o skinning da malha
+  é pulado. Novo `Range.network.headless`.
+- `KX_KetsjiEngine::ServerSleep()`: o laço de `UpdateSleepTime()` dormia 0 ms (espera truncada para milissegundos) e o
+  servidor sem swap girava num núcleo. Só o modo servidor usa o sleep novo.
+- Medido (Linux, llvmpipe, `halfanim_crash.range`, servidor sozinho 25 s): `--server` 4,2 s de CPU e 60 ticks/s;
+  modo normal 37,7 s de CPU e ~49 ticks/s.
+- Testes (`tools/net_engine_test/run_net_test.sh`, Linux, build `linux-runtime` + editor enxuto): novos `server` e
+  `scene-server` passaram, `server` com simulador 100,20,2 passou; `spawner`, `car` e `scene` seguem passando.
+  `tools/net_menu/tests`: 102 passaram.
+- Não testado: Windows (`run_net_test_win.sh` sem o cenário `server`). Detalhes em
+  `source/source/gameengine/Network/NOTES-engine.md`, seção "Servidor headless".
+
 ## Multiplayer: validação no Windows/MSVC (2026-10-04)
 
 - A integração de rede (`KX_NetworkManager`, `Range.network`, painéis Network) compila no MSVC sem mudança.

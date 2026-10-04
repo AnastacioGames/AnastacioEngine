@@ -1,7 +1,8 @@
 # Integração do núcleo na engine (branch `net/engine`)
 
-Criado em 2026-10-04. O núcleo (`NET_*`) **não foi alterado**: tudo está fora dele, em `Ketsji/KX_NetworkManager.*`,
-`Ketsji/KX_PyNetwork.*`, DNA/RNA, painéis Python e CMake. Este arquivo registra as decisões, as dúvidas e o que
+Criado em 2026-10-04. A integração fica fora do núcleo (`NET_*`), em `Ketsji/KX_NetworkManager.*`,
+`Ketsji/KX_PyNetwork.*`, DNA/RNA, painéis Python e CMake. O núcleo só mudou em dois pontos da predição (seção
+"Predição, input e lag compensation"): `ReplicaClientConfig::skipFilter` e o throttle do ENet. Este arquivo registra as decisões, as dúvidas e o que
 não deu para testar.
 
 ## Onde está cada peça
@@ -21,6 +22,9 @@ não deu para testar.
 | Painéis | `properties_game.py`: `SCENE_PT_game_network`, `OBJECT_PT_game_network`, botão "Rep" em Game Properties |
 | CMake | `gameengine/CMakeLists.txt` (`add_subdirectory(Network)`), `Ketsji/CMakeLists.txt` (`ge_network` na LIB), `blenderplayer/CMakeLists.txt` (`ge_network extern_enet`) |
 | Teste | `tools/net_engine_test/` (dois `RangeRuntime`, servidor + cliente) |
+| Input, predição, lag compensation | `Ketsji/KX_NetworkManager.*` (`ClientPredict`, `ServerStepPredicted`, `RecordHitboxes`, `RaycastPast`), `Ketsji/KX_PyNetwork.cpp` (`predict`, `set_input`, `raycast_past`...) |
+| RPC do jogo, `obj.net` | `Ketsji/KX_NetworkManager.*` (`RegisterRpc`, `CallRpc`, `BuildRpc`), `Ketsji/KX_PyNetwork.cpp` (`rpc`, `call`, `ObjectNet`), `Ketsji/KX_GameObject.cpp` (atributo `net`) |
+| Servidor headless (`RangeRuntime --server`) | `GamePlayer/GPG_Ghost.cpp` (opção), `Launcher/LA_Launcher.*` (`SetServerMode`), `Ketsji/KX_KetsjiEngine.*` (`SetServerMode`, `ServerSleep`), `Ketsji/KX_SimulationPipeline.cpp` (sem skinning) |
 
 ## Decisões
 
@@ -64,15 +68,200 @@ não deu para testar.
 
 ## O que não está feito (e por quê)
 
-- **Servidor sem janela.** `RangeRuntime` ainda abre canvas e rasterizer; o teste usa `xvfb-run`. O modo "Dedicated" da cena
-  só dispensa o jogador local (`IsDedicated()`), não a janela. Falta um `--server` que pule rasterizer/áudio.
-- **Predição, lag compensation, input.** As classes do núcleo (`NET_Prediction`, `NET_LagCompensation`) não foram ligadas;
-  o dono de um objeto também só segue os snapshots. `skipOwned` fica `false`.
-- **`@net.rpc` / RPC do usuário e `obj.net`.** Só os três RPCs internos. A API de NOTES-D não pede mais que isso.
+- **Servidor totalmente sem janela.** `RangeRuntime --server` (seção abaixo) já não desenha nem toca som, mas ainda abre
+  uma janela GL de 100×100: a conversão da cena compila materiais e cria buffers no OpenGL, e o GHOST desta base (2.79)
+  não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
+  de conversão sem rasterizer.
+- **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
+  Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
+  abaixo).
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
+
+## RPC do jogo e `obj.net`
+
+Feito em 2026-10-04 na branch `claude/project-thread-l2znr0`, sobre `NET_RPC` (núcleo sem mudança).
+
+```python
+@net.rpc                                    # target 'server'; nome = nome da função
+def hello(sender, n, text): ...
+
+@net.rpc(target="owner")                    # servidor -> dono do objeto da chamada
+def poke(obj, sender, n): ...
+
+@net.rpc(target="server", owner_only=True, reliable=False, name="move")
+def move_req(obj, sender, dx): ...
+
+net.call("hello", 3, "oi")                  # global
+rig.net.call("poke", 7)                     # chamada no objeto (igual a net.call("poke", 7, obj=rig))
+```
+
+- **Alvos:** `server`, `owner` (só o servidor chama; roda no dono do objeto, ou no servidor se ele é o dono),
+  `all` (servidor e todos os clientes, inclusive quem chamou), `others` (todos menos quem chamou).
+- **Assinatura:** `fn(sender, *args)` global, `fn(obj, sender, *args)` no objeto. `sender` é o cliente que chamou;
+  0 quando quem chamou foi o servidor. Um `all`/`others` de um cliente é repassado pelo servidor como `200 RpcFrom`
+  (provisória, ver `NOTES-G.md`), então os outros clientes e o próprio autor (no `all`) recebem o id dele.
+- **Argumentos:** bool, int, float, str, objeto de jogo (vai como net id; volta como o objeto ou `None`), 3 números
+  (`mathutils.Vector`), 4 números (quaternion w, x, y, z; volta `mathutils.Quaternion`). Até 1024 bytes por chamada.
+- **Registro:** antes de `host()`/`join()` (durante a sessão levanta `RuntimeError`), com os mesmos nomes em todos os
+  peers. Os ids seguem os nomes em ordem alfabética, então a ordem de registro não importa; nomes `net.` são
+  reservados. Registrar de novo o mesmo nome troca a função (script rodado outra vez).
+- **Recusas locais** (`call()` devolve `False`): sem sessão, `owner` chamado por cliente, `owner_only` num objeto de
+  outro, argumentos grandes demais. Nome desconhecido levanta `KeyError`. O servidor recusa e conta violação para
+  chamadas forjadas (núcleo).
+- **`obj.net`:** `id`, `replicated`, `owner`, `isOwner`, `call(name, *args)`, `predict(fn)`. O atributo é criado
+  pelo `Range.network` (`_object_net`), então `KX_GameObject` não depende do código de rede.
+- **Teste:** `run_net_test.sh rpc`: todos os alvos, todos os tipos de argumento, `sender`, objeto da chamada,
+  `owner_only`, `others` sem eco para quem chamou, `sender` de um `all` repassado de volta ao cliente, RPC não confiável (≥ 15/30), nome trocado, `obj.net`, e as
+  recusas locais. O cenário `predict` passou a mandar a posição do rig por RPC (`rig_pos`) em vez de chat.
+
+## Predição, input e lag compensation
+
+Refeito em 2026-10-04 na branch `claude/project-thread-l2znr0` (a `net/engine-predict` original se perdeu no limite
+de uso). Liga `NET_Prediction` e `NET_LagCompensation` na engine.
+
+**API (`Range.network`):**
+
+```python
+INPUT = struct.Struct("<fB")                     # o formato é do jogo; até 57 bytes
+
+def step(obj, data):                             # um tick do objeto com o input do dono; mesmo código nos dois lados
+    vx, fire = INPUT.unpack(data) if len(data) == INPUT.size else (0.0, 0)
+    obj.worldPosition.x += vx / logic.getLogicTicRate()
+    if net.isServer and fire:
+        hit = net.raycast_past(origin, direction, 50.0, client=net.owner(obj), ignore=obj)
+
+net.predict(obj, step)                           # servidor e cliente dono (objeto replicado); None desliga
+net.set_input(INPUT.pack(vx, fire))              # cliente, todo quadro; no host vale para os objetos do cliente 0
+net.set_hitbox(alvo, 0.35)                       # servidor: esfera (ou cápsula com half_height) guardada 1 s
+```
+
+Também: `net.input(client)` (servidor: input aplicado neste tick), `net.view_time(client=0)` (cliente: tempo em
+que os objetos remotos são desenhados; servidor: o que o cliente mandou), `net.prediction_stats(obj)` (cliente:
+inputs, reconciliações, correções, teleportes, erro, ticks).
+
+**Como funciona:**
+
+- **Cliente.** A cada tick, antes de aplicar os snapshots, `ClientPredict()` escolhe o tick previsto
+  (`NetClock::predictionTick`, crescendo de um em um; só volta à estimativa do relógio se divergir mais de meio
+  segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
+  mais novo (`PredictionClient::reconcile`: se o estado do servidor difere da previsão daquele tick, volta a ele e
+  re-executa os inputs seguintes), roda o passo com o input atual e guarda o estado. A correção visual
+  (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
+- **`skipOwned` ligado** no `ReplicaClient`, com um filtro novo no núcleo (`skipFilter`): só os objetos do cliente
+  **com `predict()`** deixam de seguir o transform e a velocidade dos snapshots; os outros objetos dele continuam
+  interpolados. As propriedades replicadas do objeto previsto continuam chegando ao dono (testado no `predict`
+  com `ammo` do `Rig`) (o `apply` só pula o
+  movimento; antes pulava o objeto inteiro).
+- **Servidor.** `Input` vai para `PredictionServer` (bloco inválido conta violação na sessão). No começo do tick,
+  `ServerStepPredicted()` consome o input de cada cliente para este tick (o núcleo repete o último por até 4 ticks
+  se faltar) e chama o passo de cada objeto previsto com o input do dono; objetos do host (cliente 0) usam o
+  `set_input()` local (não em Dedicated).
+- **Bloco de input.** 7 bytes do motor + até 57 do jogo: `[1][render tick u32][alpha u16]`. O tempo é o que estava
+  na tela quando o jogo chamou `set_input()` (e não o do tick em que o bloco saiu): um bloco que chega atrasado e é
+  repetido não muda o instante do tiro. Por isso `set_input()` deve ser chamado todo quadro.
+- **Lag compensation.** O servidor grava as hitboxes no fim de cada tick (`RecordHitboxes`, 1 s). `raycast_past`
+  usa o tempo de vista do cliente, limitado a `max_rewind_ms` (400 por padrão, anti-abuso; o limite agora é do
+  `RaycastPast`, a história fica com 1 s); `client=-1` testa o presente.
+- **Throttle do ENet desligado** (`NET_TransportENet.cpp`, `enet_peer_throttle_configure(peer, ..., 0, 0)` ao
+  conectar). Com quadros lentos o RTT varia e o ENet passava a descartar a maior parte dos pacotes não confiáveis
+  (snapshots, `Input`, `Pong`) por segundos: o relógio do cliente ficava sem `Pong` (sem sincronizar, sem input) e
+  os snapshots só chegavam pelo pedido de estado completo, a cada 1 s. Problema anterior a esta branch (o `rtt` do
+  cenário `spawner` ficava parado), achado pelo teste novo.
+- **`view_time` é o que foi desenhado.** Quando o tempo de render passa do snapshot mais novo (atraso, perda), o
+  `SnapshotBuffer` segura esse snapshot, mas o manager informava o `renderTick`: o input levava um tempo 1–3 ticks à
+  frente do desenhado e o servidor rebobinava para lá (0,1–0,4 m a 4 m/s, hitbox de 0,35), errando ~1 tiro por
+  rodada do `predict`. `ClientTickBegin` agora informa o tick do snapshot mais novo (alpha 0) nesse caso.
+- **`NodeUpdate()` depois de mover o objeto** (`SetPredictedState`, `ApplyOffset`, `setTransform`). Os setters do
+  nó só mudam a transformação local; a posição mundial ficava velha até o fim do quadro. Na reconciliação, o passo do
+  jogo lia a posição antiga no replay e desfazia a volta ao estado do servidor: o cliente ficava preso a até metros
+  do servidor, com `corrections` subindo e `last_error` 0. O `predict` falhava 7 de 20 vezes; depois, 0 de 20 na
+  predição.
+
+**Decisões provisórias:**
+
+1. O passo é uma função Python por objeto, chamada pelo motor; não há passo de física no replay.
+2. Input é por cliente (um por tick), não por objeto: todos os objetos previstos de um cliente recebem o mesmo bloco.
+3. O motor não deduplica ações: um bloco repetido pelo servidor (input atrasado) chega ao passo de novo. O teste
+   usa um número de sequência no input para contar cada tiro uma vez; o jogo deve fazer o mesmo.
+
+**Teste:** `run_net_test.sh predict` (spawner + simulador 40 ms/5 ms/1 % de cada lado, tic rate 30). O servidor
+cria um `Rig` do cliente movido por `predict()`; o Spawner gira por `predict()` do host (um passo por tick) com
+hitbox de 0,35 m e o cliente atira nele pelo input a cada 0,4 s. Confere: o rig responde ao input em ≤ 2 ticks (sem
+predição seria um RTT, ~13 ticks aqui), termina na posição do servidor (±5 cm), correções < 0,5 m, o servidor
+aplicou o input, e os tiros acertam o Spawner no passado (17/17) e erram no presente (0/17). `NET_DEBUG=1` loga
+cada tiro e o estado da predição.
+
+Limites medidos na máquina de teste (4 núcleos, dois players em llvmpipe): a 60 Hz nenhum dos dois mantinha o tic
+rate e a linha do tempo da predição não fechava com os snapshots; a 30 Hz fecha. O RTT medido fica em ~450 ms (80 ms
+simulados + quadros lentos) e o atraso de interpolação passa de 400 ms, por isso o teste chama `raycast_past` com
+`max_rewind_ms=1000`. Não testado: cenário de cena (painel) com predição, corpos dinâmicos previstos.
+
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh predict`, mesmo rig/sim/tic rate do Linux): 5 rodadas
+seguidas, todas PASS, lag compensation 22/22 a 23/23 tiros no passado (nenhuma rodada abaixo de 100%, não precisou
+de `NET_DEBUG=1`). `run_net_test_win.sh server` também passou de primeira, sem o problema de janela GL
+offscreen que trava no Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
+`--server`); `headless=True`, sem render, hospeda como Dedicated, tudo certo.
+
+## Servidor headless (`--server`)
+
+Refeito em 2026-10-04 na branch `claude/project-thread-l2znr0` (a `net/server-headless` original parou no limite de uso
+sem ter sido enviada). Uso: `RangeRuntime --server [-p script.py] jogo.range`.
+
+- **Sem render.** `KX_KetsjiEngine::SetServerMode(true)` desliga o render de vez: `logic.setRender(True)` é recusado com
+  aviso. Lógica, física e ações (poses) seguem rodando no tic rate; o **skinning da malha** (`UpdateAnimationDeformers`)
+  é pulado, porque ninguém vê os vértices (física sobre malha deformada não acompanha a animação no servidor).
+- **Sem áudio.** O player força o dispositivo `None` do Audaspace.
+- **Janela mínima** (100×100, nunca tela cheia); um `-w` depois de `--server` vence.
+- **Dedicated.** Com `--server`, `host()` e o modo Host da cena abrem a sala como Dedicated (sem jogador do host no lobby).
+  `join()` funciona, com aviso (um cliente que não desenha só serve de bot).
+- **Pausa entre quadros.** O laço de recuperação de `UpdateSleepTime()` converte a espera em milissegundos inteiros e
+  dorme 0 ms para esperas menores que alguns quadros; sem swap para bloquear, o servidor girava num núcleo inteiro.
+  `ServerSleep()` dorme o resto do quadro (menos 0,5 ms que o laço antigo completa). Só vale no modo servidor; o
+  caminho normal ficou como estava.
+- **Python:** `Range.network.headless` (somente leitura) diz se o processo é um servidor headless.
+
+Medido no Linux (4 núcleos, llvmpipe, `halfanim_crash.range` com armaduras, servidor sozinho, 5 s e 25 s de jogo):
+
+| Modo | CPU (user+sys) 5 s | CPU 25 s | Ticks em 24 s |
+|---|---|---|---|
+| normal (janela 160×120) | 16,3 s | 37,7 s | 1176 (abaixo de 60/s) |
+| `--server` | 1,5 s | 4,2 s | 1446 (60/s) |
+
+Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `ServerSleep()` e do corte do skinning o
+`--server` gastava ~1,6 núcleo (dois terços no skinning das armaduras).
+
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`): passou de primeira, sem o problema de
+janela GL offscreen que trava o Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
+`--server`). `headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web
+(sem sentido para servidor).
+
+## Validado no Windows/MSVC (2026-10-04)
+
+`run_net_test_win.sh spawner`, `car`, `predict` (5 rodadas) e `server` passam no Windows com os três commits
+desta branch (`11a0c1e7` reconciliação, `45012fc0` lag compensation, `8b5885c5` propriedades de objeto
+previsto), confirmando `Range.network.headless`/`isServer`, a predição completa e o servidor headless na
+engine MSVC. `run_net_test_win.sh` ainda não tem os cenários `scene`/`scene-server` (dependem do editor Windows,
+que também não linka — `IMB_exr`, problema pré-existente, igual ao Linux).
+
+**Windows/MSVC revalidado com `08816d92`** (2026-10-04, Rig com propriedade replicada `ammo`): `spawner` PASS,
+`predict` 3/3 rodadas PASS (22-23/22-23 hit in the past em cada uma, sem necessidade de `NET_DEBUG=1`), com a
+nova checagem `prediction: the owner gets the rig's replicated property ammo values [19, 20, 21, 22, 23]`
+passando igual ao Linux — confirma que `8b5885c5` (propriedades de objeto previsto chegam ao dono) também
+funciona no nível de engine, não só no núcleo de rede. `server` PASS de novo, sem erro de janela GL.
+
+**Armadilha de build encontrada:** depois de um `git checkout` para esta branch, `ninja RangeRuntime` não
+recompilou `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` já mais novo que o `.obj` (`ninja -n` não via nada
+pendente). O binário rodava com o módulo `Range.network` antigo (sem `predict`, `rpc`, `headless`...),
+causando `AttributeError: module 'Range.network' has no attribute 'headless'` mesmo com o código-fonte
+correto. Causa não totalmente isolada (suspeita: cmake regenerando o `build.ninja` e perdendo o stat do
+arquivo, ou timestamp do checkout não propagado a tempo do primeiro scan do ninja). **Contorno**: apagar o
+`.obj` suspeito antes de rebuildar (`rm build/.../KX_PyNetwork.cpp.obj && ninja RangeRuntime`) força a
+recompilação; depois disso o `ninja -n` volta a detectar mudanças normalmente. Se depois de um `git
+checkout`/`pull` um símbolo novo "não existir" em runtime apesar de estar no `.cpp`, suspeite disto antes
+de supor bug de código.
 
 ## Uso rápido
 
@@ -104,9 +293,10 @@ cmake --preset linux-runtime -S source -DPYTHON_ROOT_DIR=/usr -DPYTHON_EXECUTABL
 cmake --build build-linux --target RangeRuntime -j4
 # Python 3.11 precisa de numpy < 2 (o do apt serve ao Python 3.12): pip install --target /opt/py311-site "numpy<2"
 PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh spawner     # ou car; 3o argumento: "100,20,2" (simulador)
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh server      # spawner com o servidor em --server (Dedicated)
 # modo cena (precisa do editor: cmake --preset linux-editor ... -DWITH_CYCLES=OFF -DWITH_OPENIMAGEIO=OFF
 #   -DWITH_OPENCOLORIO=OFF -DWITH_COMPOSITOR=OFF -DWITH_CYCLES_EMBREE=OFF; cmake --build build-linux-editor --target RangeEngine)
-PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene        # ou scene-server (cena Host + --server)
 ```
 
 O `RangeEngine -b` precisa de `BLENDER_SYSTEM_SCRIPTS=source/release/scripts` e `BLENDER_SYSTEM_DATAFILES=source/release/datafiles`
@@ -125,3 +315,7 @@ certos numa janela (screenshot). Modo `scene` (editor gera os `.range`) não foi
 
 Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro
 é lento (5–15 fps) e o servidor às vezes para por centenas de ms; o teste de trajetória tolera isso (80 % das amostras na curva).
+
+- **Esquema de protótipo antes do spawn.** O cliente decodifica os campos do `Spawn` com o esquema do protótipo
+  antes de criar o objeto; `SchemaFor` monta o esquema do objeto inativo se ainda não existe (`CacheProtoSchema`).
+  Sem isso, protótipo com propriedade replicada travava toda a replicação no cliente.

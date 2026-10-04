@@ -325,6 +325,12 @@ bool encode(BitWriter &w, const FullStateRequestMsg &)
 	return done(w);
 }
 
+bool encode(BitWriter &w, const RpcFromMsg &m)
+{
+	w.writeU16(m.fromClient);
+	return encode(w, m.rpc);
+}
+
 bool encode(BitWriter &w, const ChatMsg &m)
 {
 	w.writeU16(m.fromClient);
@@ -537,6 +543,12 @@ bool decode(BitReader &r, RpcMsg &m)
 bool decode(BitReader &r, FullStateRequestMsg &)
 {
 	return finish(r);
+}
+
+bool decode(BitReader &r, RpcFromMsg &m)
+{
+	m.fromClient = r.readU16();
+	return decode(r, m.rpc);
 }
 
 bool decode(BitReader &r, ChatMsg &m)
