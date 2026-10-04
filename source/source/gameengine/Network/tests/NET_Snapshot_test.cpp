@@ -108,8 +108,8 @@ TEST(NetSnapshot, DeltaChangesRemovalsAndAdds)
 	for (size_t i = 0; i < current.size(); ++i) {
 		expectClose(s.objects[i], current[i]);
 	}
-	EXPECT_EQ(s.find(2), nullptr);
-	ASSERT_NE(s.find(0x110), nullptr);
+	EXPECT_TRUE(s.find(2) == nullptr);
+	ASSERT_TRUE(s.find(0x110) != nullptr);
 	EXPECT_EQ(s.find(0x110)->props[1].i, 7);
 }
 
@@ -294,7 +294,7 @@ TEST(NetSnapshotBuffer, CapacityOrderAndWrap)
 	ASSERT_TRUE(buffer.sample(base + 2, 0.5f, out));
 	EXPECT_NEAR(out[0].position[0], 51.0f, 1e-4f);
 	buffer.clear();
-	EXPECT_EQ(buffer.newest(), nullptr);
+	EXPECT_TRUE(buffer.newest() == nullptr);
 	EXPECT_FALSE(buffer.sample(1, 0.0f, out));
 }
 

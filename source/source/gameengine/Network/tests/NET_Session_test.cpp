@@ -150,7 +150,7 @@ TEST(NetSession, ServerAndTwoClients)
 
 	// Scene handshake.
 	const SessionEvent *scene = a.find(SessionEvent::Type::SceneChange);
-	ASSERT_NE(scene, nullptr);
+	ASSERT_TRUE(scene != nullptr);
 	EXPECT_EQ(scene->sceneHash, kScene);
 	a.session->sceneLoaded(kScene);
 	b.session->sceneLoaded(kScene + 1);  // stale scene: ignored
@@ -188,7 +188,7 @@ TEST(NetSession, ServerAndTwoClients)
 			left = &e;
 		}
 	}
-	ASSERT_NE(left, nullptr);
+	ASSERT_TRUE(left != nullptr);
 	EXPECT_EQ(left->disconnectReason, DisconnectReason::Quit);
 	EXPECT_EQ(b.session->players().size(), 1u);
 }
@@ -201,7 +201,7 @@ TEST(NetSession, PingPongRtt)
 	// Loopback with 10 ms steps: about one step of round trip.
 	EXPECT_GE(a.session->rttMs(), 0.0f);
 	EXPECT_LT(a.session->rttMs(), 30.0f);
-	ASSERT_NE(w.server->client(1), nullptr);
+	ASSERT_TRUE(w.server->client(1) != nullptr);
 	EXPECT_TRUE(w.server->client(1)->rtt.hasSample());
 }
 
@@ -223,7 +223,7 @@ TEST(NetSession, RejectVersion)
 	Peer &a = w.addClient(c);
 	w.step(30);
 	const SessionEvent *ev = a.find(SessionEvent::Type::Rejected);
-	ASSERT_NE(ev, nullptr);
+	ASSERT_TRUE(ev != nullptr);
 	EXPECT_EQ(ev->rejectReason, RejectReason::VersionMismatch);
 	EXPECT_EQ(a.session->state(), ClientSession::State::Disconnected);
 	EXPECT_TRUE(w.server->clients().empty());
@@ -232,7 +232,7 @@ TEST(NetSession, RejectVersion)
 	s.sceneHash = 1;
 	Peer &b = w.addClient(s);
 	w.step(30);
-	ASSERT_NE(b.find(SessionEvent::Type::Rejected), nullptr);
+	ASSERT_TRUE(b.find(SessionEvent::Type::Rejected) != nullptr);
 	EXPECT_EQ(b.find(SessionEvent::Type::Rejected)->rejectReason, RejectReason::SceneMismatch);
 	EXPECT_EQ(b.find(SessionEvent::Type::Rejected)->text, "Arena");
 }
@@ -244,7 +244,7 @@ TEST(NetSession, RejectServerFullAndLateJoin)
 	w.addClient(clientConfig("2"));
 	Peer &c = w.addClient(clientConfig("3"));
 	w.step(30);
-	ASSERT_NE(c.find(SessionEvent::Type::Rejected), nullptr);
+	ASSERT_TRUE(c.find(SessionEvent::Type::Rejected) != nullptr);
 	EXPECT_EQ(c.find(SessionEvent::Type::Rejected)->rejectReason, RejectReason::ServerFull);
 
 	ServerConfig config = serverConfig(4);
@@ -253,14 +253,14 @@ TEST(NetSession, RejectServerFullAndLateJoin)
 	w2.server->setGameStarted(true);
 	Peer &d = w2.addClient(clientConfig("late"));
 	w2.step(30);
-	ASSERT_NE(d.find(SessionEvent::Type::Rejected), nullptr);
+	ASSERT_TRUE(d.find(SessionEvent::Type::Rejected) != nullptr);
 	EXPECT_EQ(d.find(SessionEvent::Type::Rejected)->rejectReason, RejectReason::GameInProgress);
 
 	World w3;
 	w3.server->ban(77);
 	Peer &e = w3.addClient(clientConfig("banned", 77));
 	w3.step(30);
-	ASSERT_NE(e.find(SessionEvent::Type::Rejected), nullptr);
+	ASSERT_TRUE(e.find(SessionEvent::Type::Rejected) != nullptr);
 	EXPECT_EQ(e.find(SessionEvent::Type::Rejected)->rejectReason, RejectReason::Banned);
 }
 
@@ -328,7 +328,7 @@ TEST(NetSession, ReconnectByToken)
 	// Same token while still connected: BadToken.
 	Peer &dup = w.addClient(clientConfig("Ana2", 1111));
 	w.step(30);
-	ASSERT_NE(dup.find(SessionEvent::Type::Rejected), nullptr);
+	ASSERT_TRUE(dup.find(SessionEvent::Type::Rejected) != nullptr);
 	EXPECT_EQ(dup.find(SessionEvent::Type::Rejected)->rejectReason, RejectReason::BadToken);
 
 	// Ana loses the connection (session dropped without Quit).
@@ -376,7 +376,7 @@ TEST(NetSession, ViolationsDisconnect)
 	w.step(20);
 	EXPECT_TRUE(w.server->clients().empty());
 	const SessionEvent *ev = a.find(SessionEvent::Type::Disconnected);
-	ASSERT_NE(ev, nullptr);
+	ASSERT_TRUE(ev != nullptr);
 	EXPECT_EQ(ev->disconnectReason, DisconnectReason::ProtocolViolation);
 }
 
@@ -408,11 +408,11 @@ TEST(NetSession, KickAndShutdown)
 	w.step(30);
 	w.server->kick(1);
 	w.step(20);
-	ASSERT_NE(a.find(SessionEvent::Type::Disconnected), nullptr);
+	ASSERT_TRUE(a.find(SessionEvent::Type::Disconnected) != nullptr);
 	EXPECT_EQ(a.find(SessionEvent::Type::Disconnected)->disconnectReason, DisconnectReason::Kicked);
 	w.server->stop();
 	w.step(20);
-	ASSERT_NE(b.find(SessionEvent::Type::Disconnected), nullptr);
+	ASSERT_TRUE(b.find(SessionEvent::Type::Disconnected) != nullptr);
 	EXPECT_EQ(b.find(SessionEvent::Type::Disconnected)->disconnectReason, DisconnectReason::ServerShutdown);
 }
 
