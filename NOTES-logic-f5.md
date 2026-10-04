@@ -51,3 +51,11 @@ Não compilei a engine nesta sessão (build `linux-editor` leva horas; ver `note
 - Steering com simulação de obstáculos, normal up e path following sem navmesh continuam brick (como antes).
 - `_steer`/Camera: o componente roda dentro do Driver; se o Driver for removido, os actuators param (bricks
   originais continuariam no dono). Mesmo comportamento dos demais links entre objetos.
+
+## Validação local (Windows, MSVC, 2026-10-04)
+
+- Geração: `LEFT_AS_BRICK 0 []` em Component, Module e Script. Cena antiga (`create_logic_convert_scene.py`): CHECK idêntico.
+- `slider` e `looker` idênticos aos bricks. `cam` e `chaser` diferem por exatamente 1 frame de leitura: o componente
+  é igual aos bricks lidos no frame 59, Module/Script iguais aos bricks no frame 61 (o Checker lê antes/depois do
+  Driver na ordem de execução). Determinístico; não é erro de conversão.
+- Mouse Look com mouse real ainda não testado à mão.
