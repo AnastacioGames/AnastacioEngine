@@ -106,6 +106,8 @@ enum class MessageType : uint8_t {
 	Chat = 18,
 	/// Provisional: relayed Rpc with its caller (S→C only). Outside the 1–18 range of the contract.
 	RpcFrom = 200,
+	/// Provisional: how early the client's inputs reach the server (S→C only).
+	InputTiming = 201,
 };
 
 constexpr uint8_t kFirstMessageType = 1;
@@ -113,7 +115,8 @@ constexpr uint8_t kLastMessageType = 18;
 
 inline bool isKnownMessageType(uint8_t type)
 {
-	return (type >= kFirstMessageType && type <= kLastMessageType) || type == uint8_t(MessageType::RpcFrom);
+	return (type >= kFirstMessageType && type <= kLastMessageType) || type == uint8_t(MessageType::RpcFrom) ||
+	       type == uint8_t(MessageType::InputTiming);
 }
 
 enum class RejectReason : uint8_t {
@@ -148,6 +151,7 @@ inline uint8_t messageChannel(MessageType type)
 		case MessageType::Chat:
 			return 1;
 		case MessageType::Snapshot:
+		case MessageType::InputTiming:
 			return 2;
 		case MessageType::SnapshotAck:
 		case MessageType::Input:

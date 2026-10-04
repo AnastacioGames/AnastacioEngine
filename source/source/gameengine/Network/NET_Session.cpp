@@ -95,6 +95,7 @@ static bool isServerToClient(MessageType type)
 		case MessageType::Ownership:
 		case MessageType::Snapshot:
 		case MessageType::RpcFrom:
+		case MessageType::InputTiming:
 			return true;
 		default:
 			return false;

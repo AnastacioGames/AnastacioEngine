@@ -218,6 +218,11 @@ InputQueue::InputQueue(const InputQueueConfig &config) : m_config(config)
 
 void InputQueue::receive(const InputMsg &msg, Tick nextTick)
 {
+	if (msg.newestTick != kNoTick && !msg.blocks.empty()) {
+		const float slack = float(int32_t(msg.newestTick - nextTick));
+		m_slack = m_hasSlack ? m_slack + (slack - m_slack) * 0.1f : slack;
+		m_hasSlack = true;
+	}
 	for (size_t i = 0; i < msg.blocks.size(); ++i) {
 		const Tick t = msg.newestTick - Tick(i);
 		if (t == kNoTick) {
@@ -299,6 +304,12 @@ void InputQueue::reset()
 	const InputQueueStats stats = m_stats;
 	*this = InputQueue(m_config);
 	m_stats = stats;
+}
+
+bool InputQueue::slack(float &ticks) const
+{
+	ticks = m_slack;
+	return m_hasSlack;
 }
 
 void InputQueue::countInvalid()

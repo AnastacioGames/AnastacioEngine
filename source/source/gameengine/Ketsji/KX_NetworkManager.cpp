@@ -1316,6 +1316,24 @@ void KX_NetworkManager::ServerTickBegin(uint64_t now)
 	}
 	if (m_role == Role::SERVER) {
 		ServerStepPredicted();
+		if (m_tick % kInputTimingTicks == 0) {
+			SendInputTiming();
+		}
+	}
+}
+
+void KX_NetworkManager::SendInputTiming()
+{
+	for (const net::ClientId client : m_server->clients()) {
+		const net::InputQueue *queue = m_predServer->queue(client);
+		float slack;
+		if (!queue || !queue->slack(slack)) {
+			continue;
+		}
+		net::InputTimingMsg msg;
+		msg.tick = m_tick;
+		msg.slackQ4 = int16_t(std::min(std::max(slack * 16.0f, -32768.0f), 32767.0f));
+		m_server->send(client, net::Channel::Snapshot, net::makePacket(msg));
 	}
 }
 
@@ -1510,13 +1528,20 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 			break;
 		}
 		case net::SessionEvent::Type::Message: {
-			if (event.messageType != uint8_t(net::MessageType::Chat)) {
-				break;
-			}
 			net::RawMessage raw;
 			raw.type = event.messageType;
 			raw.body = event.body.data();
 			raw.size = event.body.size();
+			if (event.messageType == uint8_t(net::MessageType::InputTiming)) {
+				net::InputTimingMsg timing;
+				if (m_clock && net::decodeMessage(raw, timing)) {
+					m_clock->addInputSlack(float(timing.slackQ4) / 16.0f);
+				}
+				break;
+			}
+			if (event.messageType != uint8_t(net::MessageType::Chat)) {
+				break;
+			}
 			net::ChatMsg chat;
 			if (net::decodeMessage(raw, chat)) {
 				Event e;
@@ -1627,6 +1652,7 @@ bool KX_NetworkManager::GetPredictionStats(KX_GameObject *obj, net::PredictionSt
 		info->tick = entry->prediction->newestTick();
 		info->snapshotTick = entry->lastReconciled;
 		info->resyncs = m_predResyncs;
+		info->leadAdjust = m_clock ? m_clock->leadAdjustTicks() : 0.0f;
 	}
 	return true;
 }

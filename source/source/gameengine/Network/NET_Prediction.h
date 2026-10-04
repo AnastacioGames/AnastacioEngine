@@ -159,6 +159,9 @@ public:
 	Tick lastConsumedTick() const;
 	size_t pending() const;
 	const InputQueueStats &stats() const;
+	/// Smoothed slack of the received inputs: newest tick of each Input minus the next tick to simulate on
+	/// arrival, in ticks (negative: late). False before the first Input.
+	bool slack(float &ticks) const;
 
 private:
 	enum : uint8_t { TICK_REAL = 1, TICK_MISSED = 2, TICK_LATE = 3 };
@@ -172,6 +175,8 @@ private:
 	bool m_hasLast = false;
 	int m_repeats = 0;
 	InputQueueStats m_stats;
+	float m_slack = 0.0f;
+	bool m_hasSlack = false;
 };
 
 /// Input queues of every client, fed with the session's Input message events.

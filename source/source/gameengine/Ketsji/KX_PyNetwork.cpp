@@ -784,12 +784,12 @@ PyObject *Net_prediction_stats(PyObject *, PyObject *arg)
 	if (!manager || !manager->GetPredictionStats(obj, stats, &info)) {
 		Py_RETURN_NONE;
 	}
-	return Py_BuildValue("{s:k,s:k,s:k,s:k,s:d,s:d,s:k,s:k,s:k}", "inputs", (unsigned long)stats.inputsRecorded,
+	return Py_BuildValue("{s:k,s:k,s:k,s:k,s:d,s:d,s:k,s:k,s:k,s:d}", "inputs", (unsigned long)stats.inputsRecorded,
 	                     "reconciles", (unsigned long)stats.reconciles, "corrections",
 	                     (unsigned long)stats.corrections, "teleports", (unsigned long)stats.teleports, "last_error",
 	                     double(stats.lastError), "max_error", double(stats.maxError), "tick",
 	                     (unsigned long)info.tick, "snapshot_tick", (unsigned long)info.snapshotTick, "resyncs",
-	                     (unsigned long)info.resyncs);
+	                     (unsigned long)info.resyncs, "lead_adjust", double(info.leadAdjust));
 }
 
 /// input_stats(client) -> dict or None

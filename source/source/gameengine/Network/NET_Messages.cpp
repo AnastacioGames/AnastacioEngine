@@ -331,6 +331,13 @@ bool encode(BitWriter &w, const RpcFromMsg &m)
 	return encode(w, m.rpc);
 }
 
+bool encode(BitWriter &w, const InputTimingMsg &m)
+{
+	w.writeU32(m.tick);
+	w.writeU16(uint16_t(m.slackQ4));
+	return done(w);
+}
+
 bool encode(BitWriter &w, const ChatMsg &m)
 {
 	w.writeU16(m.fromClient);
@@ -549,6 +556,13 @@ bool decode(BitReader &r, RpcFromMsg &m)
 {
 	m.fromClient = r.readU16();
 	return decode(r, m.rpc);
+}
+
+bool decode(BitReader &r, InputTimingMsg &m)
+{
+	m.tick = r.readU32();
+	m.slackQ4 = int16_t(r.readU16());
+	return finish(r);
 }
 
 bool decode(BitReader &r, ChatMsg &m)

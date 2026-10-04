@@ -206,6 +206,14 @@ struct RpcFromMsg {
 	RpcMsg rpc;
 };
 
+/// Input slack measured by the server (provisional message 201): newest input tick received minus the next tick
+/// to simulate, smoothed, in 1/16 tick. Negative: the inputs arrive after their tick was simulated.
+struct InputTimingMsg {
+	static constexpr MessageType kType = MessageType::InputTiming;
+	Tick tick = kNoTick;  // server tick of the measurement
+	int16_t slackQ4 = 0;
+};
+
 struct FullStateRequestMsg {
 	static constexpr MessageType kType = MessageType::FullStateRequest;
 };
@@ -232,6 +240,7 @@ bool encode(BitWriter &w, const SnapshotAckMsg &m);
 bool encode(BitWriter &w, const InputMsg &m);
 bool encode(BitWriter &w, const RpcMsg &m);
 bool encode(BitWriter &w, const RpcFromMsg &m);
+bool encode(BitWriter &w, const InputTimingMsg &m);
 bool encode(BitWriter &w, const FullStateRequestMsg &m);
 bool encode(BitWriter &w, const ChatMsg &m);
 
@@ -251,6 +260,7 @@ bool decode(BitReader &r, SnapshotAckMsg &m);
 bool decode(BitReader &r, InputMsg &m);
 bool decode(BitReader &r, RpcMsg &m);
 bool decode(BitReader &r, RpcFromMsg &m);
+bool decode(BitReader &r, InputTimingMsg &m);
 bool decode(BitReader &r, FullStateRequestMsg &m);
 bool decode(BitReader &r, ChatMsg &m);
 

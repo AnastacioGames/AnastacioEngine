@@ -217,6 +217,8 @@ public:
 		net::Tick snapshotTick = net::kNoTick;
 		/// Times the prediction timeline restarted (drift from the clock).
 		uint32_t resyncs = 0;
+		/// Ticks the server's input slack reports added to the prediction lead.
+		float leadAdjust = 0.0f;
 	};
 	bool GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info = nullptr) const;
 	/// Server: how the inputs of a client arrived and were applied. False when the client has no input queue.
@@ -351,6 +353,9 @@ private:
 	void ServerStepPredicted();
 	void RecordHitboxes();
 	void ClientPredict(uint64_t now);
+	/// Server: sends each client the slack of its inputs (provisional InputTiming, every kInputTimingTicks).
+	void SendInputTiming();
+	static constexpr net::Tick kInputTimingTicks = 15;
 	/// One predicted tick: records and sends the input, steps and reconciles the owned objects.
 	void ClientPredictTick(net::Tick tick, const std::vector<net::NetId> &ids);
 	void ResetPrediction(Entry &entry);
