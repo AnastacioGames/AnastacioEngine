@@ -834,6 +834,10 @@ void ClientSession::handleReceive(const std::vector<uint8_t> &data, Channel chan
 					// The server tick was taken half a round trip ago.
 					m_baseTick = pong.serverTick;
 					m_baseTickMs = nowMs - std::min<uint64_t>(nowMs, uint64_t(m_rtt.rttMs() / 2.0f));
+					++m_lastPong.count;
+					m_lastPong.rttMs = rtt;
+					m_lastPong.serverTick = pong.serverTick;
+					m_lastPong.receivedMs = nowMs;
 				}
 				break;
 			}
@@ -946,6 +950,11 @@ Tick ClientSession::estimatedServerTick(uint64_t nowMs) const
 const std::map<ClientId, ClientSession::PlayerInfo> &ClientSession::players() const
 {
 	return m_players;
+}
+
+const ClientSession::PongSample &ClientSession::lastPong() const
+{
+	return m_lastPong;
 }
 
 /** \} */
