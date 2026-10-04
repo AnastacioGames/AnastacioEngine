@@ -269,6 +269,9 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 		{"rain_enabled",   (blenderworld->weather_flag & WO_WEATHER_RAIN) != 0},
 		{"clouds_enabled", (blenderworld->weather_flag & WO_WEATHER_CLOUDS) != 0},
 		{"mist_enabled",   (blenderworld->mode & WO_MIST) != 0},
+		{"lens_flare_enabled", (blenderworld->weather_flag & WO_WEATHER_LENSFLARE) != 0},
+		{"lightning_enabled",  (blenderworld->weather_flag & WO_WEATHER_RAIN_LIGHTNING) != 0},
+		{"earthquake_enabled", (blenderworld->weather_flag & WO_WEATHER_EARTHQUAKE) != 0},
 	};
 	for (const auto &status : wo_status_bools) {
 		if (worldinfo->GetProperty(status.name)) {
@@ -288,6 +291,12 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 			worldinfo->SetProperty(status.name, propval);
 			propval->Release();
 		}
+	}
+
+	if (worldinfo->GetProperty("earthquake_level")) {
+		EXP_Value *propval = new EXP_IntValue(blenderworld->earthquake_level);
+		worldinfo->SetProperty("earthquake_level", propval);
+		propval->Release();
 	}
 }
 

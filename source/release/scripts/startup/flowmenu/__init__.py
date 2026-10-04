@@ -34,6 +34,7 @@ from .custom_pt_components import (
 )
 from .custom_pt_properties import (
     OBJECT_OT_game_header_add, 
+    OBJECT_OT_game_header_edit,
     FLOWMENU_HeaderColor,
     OBJECT_OT_game_header_color_add,
     CUSTOM_PT_game_properties,
@@ -59,6 +60,8 @@ from .custom_pt_world import (
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_weather,
+    WORLD_OT_game_header_add,
+    WORLD_OT_game_header_edit,
     CUSTOM_PT_game_global_properties
 )
 
@@ -87,6 +90,7 @@ classes = [
     FLOWMENU_HeaderColor,
     OBJECT_OT_game_header_color_add,
     OBJECT_OT_game_header_add,
+    OBJECT_OT_game_header_edit,
     CUSTOM_PT_game_components,
     CUSTOM_PT_game_existing_components,
     CUSTOM_PT_game_object_components,
@@ -111,6 +115,8 @@ classes = [
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_weather,
+    WORLD_OT_game_header_add,
+    WORLD_OT_game_header_edit,
     CUSTOM_PT_game_global_properties,
 ]
 

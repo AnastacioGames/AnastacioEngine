@@ -110,6 +110,54 @@ class OBJECT_OT_game_header_add(Operator):
         return context.window_manager.invoke_props_dialog(self)
 
 
+class OBJECT_OT_game_header_edit(Operator):
+    bl_idname = "object.game_header_edit"
+    bl_label = "Edit Header"
+    bl_description = "Change the title and icon of this header"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index: IntProperty()
+    title: StringProperty(name="Title", default="Header")
+    icon: EnumProperty(name="Icon", items=get_icon_enum_items)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "title")
+        layout.prop(self, "icon")
+
+    def _prop(self, context):
+        ob = context.active_object
+        if not ob or not getattr(ob, "game", None):
+            return None
+        gp = ob.game.properties
+        return gp[self.index] if 0 <= self.index < len(gp) else None
+
+    def execute(self, context):
+        prop = self._prop(context)
+        if prop is None:
+            return {'CANCELLED'}
+        title = self.title.replace("/", " ").strip() or "Header"
+        old_name = prop.name
+        prop.name = "C_Header/{}/{}".format(title, self.icon or "GRIP")
+        # A cor do cabeçalho é guardada pelo nome da propriedade
+        hc = find_header_color(prop.id_data, old_name)
+        if hc is not None:
+            hc.name = prop.name
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        prop = self._prop(context)
+        if prop is None:
+            return {'CANCELLED'}
+        parts = prop.name.split("/")
+        self.title = parts[1] if len(parts) > 1 else "Header"
+        try:
+            self.icon = parts[2] if len(parts) > 2 else "GRIP"
+        except Exception:
+            self.icon = "GRIP"
+        return context.window_manager.invoke_props_dialog(self)
+
+
 # ==============================================================================
 # PAINEL CUSTOMIZADO: PROPERTIES 
 # ==============================================================================
@@ -164,6 +212,7 @@ class CUSTOM_PT_game_properties(Panel):
                  icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT')
         title, icon = self._split_tag(prop.name, "HEADER", "FULLSCREEN")
         row.label(text=title, icon=icon)
+        row.operator("object.game_header_edit", text="", icon='GREASEPENCIL', emboss=False).index = index
 
         # Quadrado de cor pequeno, como no cabeçalho dos Logic Bricks
         color = None

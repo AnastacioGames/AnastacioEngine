@@ -1,5 +1,6 @@
 import bpy
-from bpy.types import Panel
+from bpy.types import Panel, Operator
+from bpy.props import StringProperty, EnumProperty, BoolProperty, IntProperty
 from bpy.app.translations import pgettext_iface as iface_
 
 
@@ -373,16 +374,101 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 # ==============================================================================
 # GLOBAL PROPERTIES (COMPARTILHADAS ENTRE OBJETOS VIA WORLD)
 # ==============================================================================
+# Propriedades criadas pela engine, agrupadas por efeito: (título, ícone, nomes).
+BUILTIN_WORLD_PROPERTY_GROUPS = (
+    ("Sun", 'LAMP_SUN', ("sun_hour", "sun_direction")),
+    ("Rain", 'MOD_FLUIDSIM', ("rain_enabled", "rain_intensity")),
+    ("Lightning", 'FORCE_CHARGE', ("lightning_enabled",)),
+    ("Clouds", 'MOD_SMOKE', ("clouds_enabled", "cloud_type")),
+    ("Mist", 'RESTRICT_VIEW_ON', ("mist_enabled", "mist_density")),
+    ("Lens Flare", 'LAMP_POINT', ("lens_flare_enabled",)),
+    ("Earthquake", 'FORCE_TURBULENCE', ("earthquake_enabled", "earthquake_level")),
+    ("Player", 'POSE_HLT', ("player_under_cover",)),
+)
+
 BUILTIN_WORLD_PROPERTIES = {
-    "sun_hour",
-    "rain_enabled",
-    "rain_intensity",
-    "clouds_enabled",
-    "mist_enabled",
-    "mist_density",
-    "cloud_type",
-    "player_under_cover",
+    name for _title, _icon, names in BUILTIN_WORLD_PROPERTY_GROUPS for name in names
 }
+
+
+def _split_header(name):
+    parts = name.split("/")
+    title = parts[1] if len(parts) > 1 else "Header"
+    icon = parts[2] if len(parts) > 2 else "GRIP"
+    return title, icon
+
+
+def _header_icon_items(self, context):
+    from .custom_pt_properties import get_icon_enum_items
+    return get_icon_enum_items(self, context)
+
+
+class WORLD_OT_game_header_add(Operator):
+    bl_idname = "world.game_header_add"
+    bl_label = "Add Header"
+    bl_description = "Create a Bool World Property in the format C_Header/Title/Icon"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    title: StringProperty(name="Title", default="Header")
+    icon: EnumProperty(name="Icon", items=_header_icon_items)
+    expanded: BoolProperty(name="Expanded", default=True)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "title")
+        layout.prop(self, "icon")
+        layout.prop(self, "expanded")
+
+    def execute(self, context):
+        world = context.world
+        if not world:
+            return {'CANCELLED'}
+        title = self.title.replace("/", " ").strip() or "Header"
+        bpy.ops.world.game_property_new(name="C_Header/{}/{}".format(title, self.icon or "GRIP"), type='BOOL')
+        world.properties[-1].value = bool(self.expanded)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        try:
+            self.icon = "GRIP"
+        except Exception:
+            pass
+        return context.window_manager.invoke_props_dialog(self)
+
+
+class WORLD_OT_game_header_edit(Operator):
+    bl_idname = "world.game_header_edit"
+    bl_label = "Edit Header"
+    bl_description = "Change the title and icon of this header"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index: IntProperty()
+    title: StringProperty(name="Title", default="Header")
+    icon: EnumProperty(name="Icon", items=_header_icon_items)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "title")
+        layout.prop(self, "icon")
+
+    def execute(self, context):
+        world = context.world
+        if not world or not (0 <= self.index < len(world.properties)):
+            return {'CANCELLED'}
+        title = self.title.replace("/", " ").strip() or "Header"
+        world.properties[self.index].name = "C_Header/{}/{}".format(title, self.icon or "GRIP")
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        world = context.world
+        if not world or not (0 <= self.index < len(world.properties)):
+            return {'CANCELLED'}
+        self.title, icon = _split_header(world.properties[self.index].name)
+        try:
+            self.icon = icon
+        except Exception:
+            self.icon = "GRIP"
+        return context.window_manager.invoke_props_dialog(self)
 
 
 class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
@@ -395,28 +481,80 @@ class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
         scene = context.scene
         return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
 
+    def _draw_prop_row(self, parent, prop, index, builtin):
+        row = parent.box().row()
+        row.prop(prop, "name", text="")
+        row.prop(prop, "type", text="")
+        row.prop(prop, "value", text="")
+        if builtin:
+            # Propriedades criadas pela engine: ordem fixa pelo grupo e sem botão de apagar.
+            return
+        sub = row.row(align=True)
+        props = sub.operator("world.game_property_move", text="", icon='TRIA_UP')
+        props.index = index
+        props.direction = 'UP'
+        props = sub.operator("world.game_property_move", text="", icon='TRIA_DOWN')
+        props.index = index
+        props.direction = 'DOWN'
+        row.operator("world.game_property_remove", text="", icon='X', emboss=False).index = index
+
     def draw(self, context):
         layout = self.layout
         world = context.world
 
-        props = layout.operator("world.game_property_new", text="Add World Property", icon='PLUS')
+        row = layout.row(align=True)
+        props = row.operator("world.game_property_new", text="Add World Property", icon='PLUS')
         props.name = ""
+        row.operator("world.game_header_add", text="Add Header", icon='PLUS')
 
-        for i, prop in enumerate(world.properties):
+        index_by_name = {prop.name: i for i, prop in enumerate(world.properties)}
+
+        for title, icon, names in BUILTIN_WORLD_PROPERTY_GROUPS:
+            present = [name for name in names if name in index_by_name]
+            if not present:
+                continue
             box = layout.box()
-            row = box.row()
-            row.prop(prop, "name", text="")
-            row.prop(prop, "type", text="")
-            row.prop(prop, "value", text="")
-            sub = row.row(align=True)
-            props = sub.operator("world.game_property_move", text="", icon='TRIA_UP')
-            props.index = i
-            props.direction = 'UP'
-            props = sub.operator("world.game_property_move", text="", icon='TRIA_DOWN')
-            props.index = i
-            props.direction = 'DOWN'
-            if prop.name in BUILTIN_WORLD_PROPERTIES:
-                # Propriedades criadas pela engine: sem botão de apagar.
-                row.label(text="", icon='BLANK1')
-            else:
-                row.operator("world.game_property_remove", text="", icon='X', emboss=False).index = i
+            box.label(text=title, icon=icon)
+            col = box.column()
+            for name in present:
+                i = index_by_name[name]
+                self._draw_prop_row(col, world.properties[i], i, True)
+
+        custom = [(i, prop) for i, prop in enumerate(world.properties)
+                  if prop.name not in BUILTIN_WORLD_PROPERTIES]
+        col = None
+        group_open = True
+        for i, prop in custom:
+            if prop.name.startswith("C_Header/"):
+                box = layout.box()
+                group_open = self._draw_header_row(box, prop, i)
+                col = box.column() if group_open else None
+                continue
+            if col is None:
+                if not group_open:
+                    continue
+                box = layout.box()
+                box.label(text="Custom Properties", icon='LINENUMBERS_ON')
+                col = box.column()
+            self._draw_prop_row(col, prop, i, False)
+
+    def _draw_header_row(self, box, prop, index):
+        row = box.row(align=True)
+        is_open = bool(prop.value)
+        row.prop(prop, "value", text="", emboss=False,
+                 icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT')
+        title, icon = _split_header(prop.name)
+        try:
+            row.label(text=title, icon=icon)
+        except TypeError:
+            row.label(text=title, icon='GRIP')
+        row.operator("world.game_header_edit", text="", icon='GREASEPENCIL', emboss=False).index = index
+        sub = row.row(align=True)
+        props = sub.operator("world.game_property_move", text="", icon='TRIA_UP')
+        props.index = index
+        props.direction = 'UP'
+        props = sub.operator("world.game_property_move", text="", icon='TRIA_DOWN')
+        props.index = index
+        props.direction = 'DOWN'
+        row.operator("world.game_property_remove", text="", icon='X', emboss=False).index = index
+        return is_open
