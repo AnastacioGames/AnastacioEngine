@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Sombra: bias escalado pelo ângulo da luz (fim das colunas em luz rasante)
+
+- `shadow_proj_coord` (`gpu_shader_material.glsl`) agora escala o offset na normal por `0.5 + sin(θ)` e o bias de profundidade por `1 + min(tan(θ), 8)`, com θ = ângulo luz/superfície. Antes ambos eram constantes e a luz quase paralela ao plano gerava faixas de acne.
+- A direção da luz vem da própria `shadowpersmat` (ortográfica: linha de profundidade; perspectiva: interseção dos planos x=y=w=0), sem mudar assinaturas nem o codegen. Vale para simple/PCF/cascatas; VSM e sombra pontual não usam essa função.
+- Teste: `tools/create_grazing_shadow_test.py` (sol varrendo de a pino até rasante sobre chão + cubo).
+
 ## Film Grain vira pós-processamento da cena
 
 - O grão saiu da câmera (`useGrain`/`grainStrength` e `CAM_GFX_GRAIN` removidos; `DNA_camera_types.h` voltou ao `pad`) e foi para `SCENEFXSettings` (`use_grain`, `grain_strength`, padrão 0.035 também por versionamento). A UI fica em Render > Post Processing Shaders, com expandir/viewport/checkbox como os outros efeitos (bit `SCENE_FX_UI_GRAIN` em `expand_flag`/`editor_render_flag`).

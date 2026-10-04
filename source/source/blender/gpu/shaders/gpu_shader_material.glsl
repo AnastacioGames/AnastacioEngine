@@ -3219,10 +3219,34 @@ vec4 shadow_proj_coord(vec3 rco, mat4 shadowpersmat)
 	return lco;
 }
 
+/* Direction from the fragment toward the lamp, in view space, recovered from the shadow matrix
+ * itself (no extra uniform/argument). Ortho (sun): the depth row is the light axis. Perspective
+ * (spot): the lamp is the point where clip x, y and w are all zero -- intersection of 3 planes. */
+vec3 shadow_light_dir(vec3 rco, mat4 m)
+{
+	vec4 r0 = vec4(m[0][0], m[1][0], m[2][0], m[3][0]);
+	vec4 r1 = vec4(m[0][1], m[1][1], m[2][1], m[3][1]);
+	vec4 r2 = vec4(m[0][2], m[1][2], m[2][2], m[3][2]);
+	vec4 r3 = vec4(m[0][3], m[1][3], m[2][3], m[3][3]);
+	if (dot(r3.xyz, r3.xyz) < 1e-12) {
+		return -normalize(r2.xyz);
+	}
+	vec3 c01 = cross(r0.xyz, r1.xyz), c13 = cross(r1.xyz, r3.xyz), c30 = cross(r3.xyz, r0.xyz);
+	float det = dot(r0.xyz, c13);
+	vec3 lpos = -(r0.w * c13 + r1.w * c30 + r3.w * c01) / det;
+	return normalize(lpos - rco);
+}
+
 vec4 shadow_proj_coord(vec3 rco, vec3 vn, mat4 shadowpersmat, float bias, float slopebias)
 {
-	vec4 lco = shadowpersmat * vec4(rco + vn * slopebias, 1.0);
-	lco.z -= bias * lco.w;
+	/* Slope-scaled bias: at grazing light angles one shadow texel spans a long strip of the
+	 * receiver, so a constant bias leaves acne in stripes. Normal offset grows with sin(angle),
+	 * depth bias with tan(angle) (capped), so head-on lighting keeps the shadow attached. */
+	float NL = abs(dot(vn, shadow_light_dir(rco, shadowpersmat)));
+	float sinNL = sqrt(max(1.0 - NL * NL, 0.0));
+	float tanNL = min(sinNL / max(NL, 1e-3), 8.0);
+	vec4 lco = shadowpersmat * vec4(rco + vn * (slopebias * (0.5 + sinNL)), 1.0);
+	lco.z -= bias * (1.0 + tanNL) * lco.w;
 	return lco / lco.w;
 }
 
