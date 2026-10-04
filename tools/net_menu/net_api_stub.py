@@ -81,6 +81,7 @@ class _StubNetwork:
 		self.isConnected = False
 		self.clients = []
 		self.localId = None
+		self.headless = False  # RangeRuntime --server
 		self._pending = None  # (kind, time_left, data)
 		self._time = 0.0
 		self._start_in = None

@@ -65,7 +65,9 @@ void KX_SimulationPipeline::Update()
 				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations);
 				const bool animationsRan = m_engine->UpdateAnimations(scene);
 				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations_deform);
-				if (animationsRan) {
+				/* A headless server (--server) keeps the poses (bone parents, logic) but skips the mesh
+				 * skinning: nobody sees the vertices and it was most of the idle server's CPU. */
+				if (animationsRan && !m_engine->IsServerMode()) {
 					scene->UpdateAnimationDeformers();
 				}
 			}

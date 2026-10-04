@@ -9,6 +9,8 @@ Scenarios (existing scenes of projects-teste/, no editor needed):
            the inactive prototype 'Rig' is spawned by the server and moved too.
   car      car_framerate/car_com_fr0.range: the dynamic 'Car' drives on physics (server) and is followed on the
            client (dynamics suspended there).
+With NET_HEADLESS=1 the server runs as RangeRuntime --server: it must report net.headless, draw nothing and host
+as Dedicated (no host player in the lobby).
 
 Prints one "NETTEST <role> ..." line per check and "NETTEST <role> PASS|FAIL" at the end; the exit code is
 not used (the player does not forward it), the runner greps the output.
@@ -34,6 +36,7 @@ SIM = os.environ.get("NET_SIM", "")  # "latency,jitter,loss", for the network si
 FROM_SCENE = os.environ.get("NET_FROM_SCENE") == "1"
 # The name goes in the Hello message, so a scene-mode client (connected before any script runs) is "Player".
 CLIENT_NAME = "Player" if FROM_SCENE else "Tester-client"
+HEADLESS = os.environ.get("NET_HEADLESS") == "1"
 
 failures = []
 
@@ -88,6 +91,13 @@ def run():
     initial = tuple(tracked.worldPosition)
 
     room = "scene-mode-test" if FROM_SCENE else "engine-test"
+    if ROLE == "server":
+        check("headless flag matches --server", net.headless == HEADLESS, "headless=%r" % net.headless)
+        if HEADLESS:
+            logic.setRender(True)  # must be refused: a headless server never draws
+            check("headless server does not render", not logic.getRender())
+    else:
+        check("client is not headless", not net.headless)
     if FROM_SCENE:
         expected = int(os.environ.get("NET_EXPECT_ID", "0"))
         check("the saved net id reached the engine", net.net_id(tracked) == expected, "%d vs %d" % (net.net_id(tracked), expected))
@@ -171,7 +181,11 @@ def run():
 
     if ROLE == "server":
         check("a client joined", any(e[0] == "join" for e in events), str(events))
-        check("net.clients lists host + client", clients_seen >= 2, "max=%d" % clients_seen)
+        if HEADLESS:
+            check("headless server hosts as Dedicated (net.clients has only the client)", clients_seen == 1,
+                  "max=%d" % clients_seen)
+        else:
+            check("net.clients lists host + client", clients_seen >= 2, "max=%d" % clients_seen)
         names = [c.name for c in net.clients]
         check("client name arrived", any(n == CLIENT_NAME for n in names), str(names))
         check("lobby: client chat reached the server", ("chat", 1, "hello") in events, str(events))
@@ -204,8 +218,12 @@ def run():
             check("replicated property changes", len(set(hps)) > 3, "hp values %s..%s" % (min(hps) if hps else None, max(hps) if hps else None))
         if proto:
             check("spawned object appears on the client", any(n >= 1 for n in spawn_seen), "max=%d" % max(spawn_seen or [0]))
-        check("lobby: client list has the host and itself", (0, "Tester-server", True) in [c[:3] for c in lobby["clients"]]
-              and any(c[0] == 1 and c[1] == CLIENT_NAME for c in lobby["clients"]), str(lobby["clients"]))
+        has_host = (0, "Tester-server", True) in [c[:3] for c in lobby["clients"]]
+        has_self = any(c[0] == 1 and c[1] == CLIENT_NAME for c in lobby["clients"])
+        if HEADLESS:
+            check("lobby: dedicated server is not listed, the client is", not has_host and has_self, str(lobby["clients"]))
+        else:
+            check("lobby: client list has the host and itself", has_host and has_self, str(lobby["clients"]))
         check("lobby: server chat reached the client", ("chat", 0, "welcome") in events, str(events))
         check("lobby: on_start fired on the client", ("start",) in events, str(events))
         if lobby["lan"]:

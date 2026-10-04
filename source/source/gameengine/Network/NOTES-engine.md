@@ -21,6 +21,7 @@ não deu para testar.
 | Painéis | `properties_game.py`: `SCENE_PT_game_network`, `OBJECT_PT_game_network`, botão "Rep" em Game Properties |
 | CMake | `gameengine/CMakeLists.txt` (`add_subdirectory(Network)`), `Ketsji/CMakeLists.txt` (`ge_network` na LIB), `blenderplayer/CMakeLists.txt` (`ge_network extern_enet`) |
 | Teste | `tools/net_engine_test/` (dois `RangeRuntime`, servidor + cliente) |
+| Servidor headless (`RangeRuntime --server`) | `GamePlayer/GPG_Ghost.cpp` (opção), `Launcher/LA_Launcher.*` (`SetServerMode`), `Ketsji/KX_KetsjiEngine.*` (`SetServerMode`, `ServerSleep`), `Ketsji/KX_SimulationPipeline.cpp` (sem skinning) |
 
 ## Decisões
 
@@ -64,8 +65,10 @@ não deu para testar.
 
 ## O que não está feito (e por quê)
 
-- **Servidor sem janela.** `RangeRuntime` ainda abre canvas e rasterizer; o teste usa `xvfb-run`. O modo "Dedicated" da cena
-  só dispensa o jogador local (`IsDedicated()`), não a janela. Falta um `--server` que pule rasterizer/áudio.
+- **Servidor totalmente sem janela.** `RangeRuntime --server` (seção abaixo) já não desenha nem toca som, mas ainda abre
+  uma janela GL de 100×100: a conversão da cena compila materiais e cria buffers no OpenGL, e o GHOST desta base (2.79)
+  não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
+  de conversão sem rasterizer.
 - **Predição, lag compensation, input.** As classes do núcleo (`NET_Prediction`, `NET_LagCompensation`) não foram ligadas;
   o dono de um objeto também só segue os snapshots. `skipOwned` fica `false`.
 - **`@net.rpc` / RPC do usuário e `obj.net`.** Só os três RPCs internos. A API de NOTES-D não pede mais que isso.
@@ -73,6 +76,36 @@ não deu para testar.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
+
+## Servidor headless (`--server`)
+
+Refeito em 2026-10-04 na branch `claude/project-thread-l2znr0` (a `net/server-headless` original parou no limite de uso
+sem ter sido enviada). Uso: `RangeRuntime --server [-p script.py] jogo.range`.
+
+- **Sem render.** `KX_KetsjiEngine::SetServerMode(true)` desliga o render de vez: `logic.setRender(True)` é recusado com
+  aviso. Lógica, física e ações (poses) seguem rodando no tic rate; o **skinning da malha** (`UpdateAnimationDeformers`)
+  é pulado, porque ninguém vê os vértices (física sobre malha deformada não acompanha a animação no servidor).
+- **Sem áudio.** O player força o dispositivo `None` do Audaspace.
+- **Janela mínima** (100×100, nunca tela cheia); um `-w` depois de `--server` vence.
+- **Dedicated.** Com `--server`, `host()` e o modo Host da cena abrem a sala como Dedicated (sem jogador do host no lobby).
+  `join()` funciona, com aviso (um cliente que não desenha só serve de bot).
+- **Pausa entre quadros.** O laço de recuperação de `UpdateSleepTime()` converte a espera em milissegundos inteiros e
+  dorme 0 ms para esperas menores que alguns quadros; sem swap para bloquear, o servidor girava num núcleo inteiro.
+  `ServerSleep()` dorme o resto do quadro (menos 0,5 ms que o laço antigo completa). Só vale no modo servidor; o
+  caminho normal ficou como estava.
+- **Python:** `Range.network.headless` (somente leitura) diz se o processo é um servidor headless.
+
+Medido no Linux (4 núcleos, llvmpipe, `halfanim_crash.range` com armaduras, servidor sozinho, 5 s e 25 s de jogo):
+
+| Modo | CPU (user+sys) 5 s | CPU 25 s | Ticks em 24 s |
+|---|---|---|---|
+| normal (janela 160×120) | 16,3 s | 37,7 s | 1176 (abaixo de 60/s) |
+| `--server` | 1,5 s | 4,2 s | 1446 (60/s) |
+
+Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `ServerSleep()` e do corte do skinning o
+`--server` gastava ~1,6 núcleo (dois terços no skinning das armaduras).
+
+Não testado: Windows (o `run_net_test_win.sh` não tem o cenário `server`), Android/Web (sem sentido para servidor).
 
 ## Uso rápido
 
@@ -104,9 +137,10 @@ cmake --preset linux-runtime -S source -DPYTHON_ROOT_DIR=/usr -DPYTHON_EXECUTABL
 cmake --build build-linux --target RangeRuntime -j4
 # Python 3.11 precisa de numpy < 2 (o do apt serve ao Python 3.12): pip install --target /opt/py311-site "numpy<2"
 PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh spawner     # ou car; 3o argumento: "100,20,2" (simulador)
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh server      # spawner com o servidor em --server (Dedicated)
 # modo cena (precisa do editor: cmake --preset linux-editor ... -DWITH_CYCLES=OFF -DWITH_OPENIMAGEIO=OFF
 #   -DWITH_OPENCOLORIO=OFF -DWITH_COMPOSITOR=OFF -DWITH_CYCLES_EMBREE=OFF; cmake --build build-linux-editor --target RangeEngine)
-PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene        # ou scene-server (cena Host + --server)
 ```
 
 O `RangeEngine -b` precisa de `BLENDER_SYSTEM_SCRIPTS=source/release/scripts` e `BLENDER_SYSTEM_DATAFILES=source/release/datafiles`

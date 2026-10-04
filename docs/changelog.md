@@ -9,6 +9,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: servidor headless `RangeRuntime --server` (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Refaz o trabalho da `net/server-headless`, que parou no limite de uso sem chegar ao GitHub (a `net/engine-predict` também
+  se perdeu e segue pendente).
+- `RangeRuntime --server`: render desligado de vez (`logic.setRender(True)` recusado), dispositivo de áudio `None`, janela
+  mínima 100×100, `host()` e cena Host viram Dedicated; `join()` avisa. Lógica, física e poses seguem; o skinning da malha
+  é pulado. Novo `Range.network.headless`.
+- `KX_KetsjiEngine::ServerSleep()`: o laço de `UpdateSleepTime()` dormia 0 ms (espera truncada para milissegundos) e o
+  servidor sem swap girava num núcleo. Só o modo servidor usa o sleep novo.
+- Medido (Linux, llvmpipe, `halfanim_crash.range`, servidor sozinho 25 s): `--server` 4,2 s de CPU e 60 ticks/s;
+  modo normal 37,7 s de CPU e ~49 ticks/s.
+- Testes (`tools/net_engine_test/run_net_test.sh`, Linux, build `linux-runtime` + editor enxuto): novos `server` e
+  `scene-server` passaram, `server` com simulador 100,20,2 passou; `spawner`, `car` e `scene` seguem passando.
+  `tools/net_menu/tests`: 102 passaram.
+- Não testado: Windows (`run_net_test_win.sh` sem o cenário `server`). Detalhes em
+  `source/source/gameengine/Network/NOTES-engine.md`, seção "Servidor headless".
+
 ## Multiplayer: validação no Windows/MSVC (2026-10-04)
 
 - A integração de rede (`KX_NetworkManager`, `Range.network`, painéis Network) compila no MSVC sem mudança.

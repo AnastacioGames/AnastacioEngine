@@ -667,7 +667,8 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	const int tickSetting = options.tickRate > 0 ? options.tickRate : settings.tickRate;
 	const bool lan = options.lan >= 0 ? options.lan != 0 : settings.lan;
 	const bool lateJoin = options.lateJoin >= 0 ? options.lateJoin != 0 : settings.lateJoin;
-	m_dedicated = options.dedicated;
+	/* A headless server (--server) has no local player: always dedicated. */
+	m_dedicated = options.dedicated || m_engine->IsServerMode();
 
 	OpenSession();
 	if (tickSetting > 0) {
@@ -750,6 +751,9 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 {
 	if (!Prepare(scene, error)) {
 		return false;
+	}
+	if (m_engine->IsServerMode()) {
+		CM_Warning("network: join() on a headless server (--server): this client draws nothing");
 	}
 	const SceneSettings settings = ReadSceneSettings(m_scene);
 	if (port <= 0) {

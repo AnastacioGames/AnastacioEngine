@@ -543,6 +543,8 @@ static void usage(const std::string& program, bool isBlenderPlayer)
 	CM_Message("       show_shadow_frustum            0         Show debug light shadow frustum volume");
 	CM_Message("       ignore_deprecation_warnings    1         Ignore deprecation warnings" << std::endl);
 	CM_Message("  -p: override python main loop script");
+	CM_Message("  --server: headless game server: no render, no audio, smallest window (still needs a display,");
+	CM_Message("            e.g. xvfb-run on Linux); a Host scene runs as Dedicated");
 	CM_Message(std::endl);
 	CM_Message("  - : all arguments after this are ignored, allowing python to access them from sys.argv");
 	CM_Message(std::endl);
@@ -868,6 +870,8 @@ int main(int argc,
 	bool borderlessWindow = false;
 	bool fullScreenParFound = false;
 	bool windowParFound = false;
+	// --server: headless game server (no render, no audio device; GHOST still needs a small GL window).
+	bool serverMode = false;
 #ifdef WIN32
 	bool closeConsole = true;
 #endif
@@ -1355,6 +1359,22 @@ int main(int argc,
 					pythonControllerFile = argv[i++];
 					break;
 				}
+				case '-':
+				{
+					if (strcmp(argv[i], "--server") == 0) {
+						serverMode = true;
+						// The smallest window the player accepts, never full screen (an explicit -w after it wins).
+						fullScreen = false;
+						windowParFound = true;
+						windowWidth = kMinWindowWidth;
+						windowHeight = kMinWindowHeight;
+					}
+					else {
+						CM_Warning("unknown argument: " << argv[i]);
+					}
+					i++;
+					break;
+				}
 				default: //not recognized
 				{
 					CM_Warning("unknown argument: " << argv[i++]);
@@ -1365,6 +1385,11 @@ int main(int argc,
 		else {
 			i++;
 		}
+	}
+
+	if (serverMode) {
+		// No sound card on a server, and nothing to hear: the null device of audaspace.
+		BKE_sound_force_device("None");
 	}
 
 	if ((windowWidth < kMinWindowWidth) || (windowHeight < kMinWindowHeight)) {
@@ -1662,6 +1687,7 @@ int main(int argc,
 						// This argc cant be argc_py_clamped, since python uses it.
 						LA_PlayerLauncher launcher(system, window, maggie, scene, &gs, stereomode, aasamples,
 						                           argc, argv, pythonControllerFile);
+						launcher.SetServerMode(serverMode);
 
 #ifdef WITH_PYTHON
 						launcher.SetPythonGlobalDict(globalDict);

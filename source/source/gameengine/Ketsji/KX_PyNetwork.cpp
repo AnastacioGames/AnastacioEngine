@@ -527,6 +527,13 @@ PyObject *Net_set_player_name(PyObject *, PyObject *arg)
 	return nullptr;
 }
 
+/// The player runs as a headless server (--server); false without an engine.
+PyObject *Net_headless(PyObject *, PyObject *)
+{
+	KX_KetsjiEngine *engine = KX_GetActiveEngine();
+	return PyBool_FromLong(engine && engine->IsServerMode());
+}
+
 PyObject *Net_clients_raw(PyObject *, PyObject *)
 {
 	PyObject *list = PyList_New(0);
@@ -622,13 +629,14 @@ PyMethodDef g_methods[] = {
 	{"_state", Net_state, METH_NOARGS, nullptr},
 	{"_set_player_name", Net_set_player_name, METH_O, nullptr},
 	{"_clients", Net_clients_raw, METH_NOARGS, nullptr},
+	{"_headless", Net_headless, METH_NOARGS, nullptr},
 	{nullptr, nullptr, 0, nullptr},
 };
 
 PyDoc_STRVAR(Network_module_documentation,
              "Multiplayer: host or join a game, replicate objects and react to the session.\n\n"
              "Attributes: isServer, isConnected, playerName (writable), roomName, maxPlayers, clients, tick, rtt,\n"
-             "localId. See tools/net_menu/NOTES-D.md for the contract with the lobby menu.\n");
+             "localId, headless. See tools/net_menu/NOTES-D.md for the contract with the lobby menu.\n");
 
 PyModuleDef g_module_def = {
 	PyModuleDef_HEAD_INIT,
@@ -673,6 +681,9 @@ const char *kModuleClassSource =
 	"    @property\n"
 	"    def localId(self):\n"
 	"        return self._state()[7]\n"
+	"    @property\n"
+	"    def headless(self):\n"
+	"        return self._headless()\n"
 	"    @property\n"
 	"    def clients(self):\n"
 	"        return [types.SimpleNamespace(id=i, name=n, ping=p, ready=r, isHost=h)\n"
