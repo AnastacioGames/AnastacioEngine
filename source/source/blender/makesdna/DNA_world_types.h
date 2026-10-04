@@ -153,7 +153,8 @@ typedef struct World {
 
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
 	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */
-	float earthquake_pad2;
+	short weather_editor_hide; /* bits WO_WEATHER_* (+ WO_WEATHER_FOG) escondidos so na viewport; era earthquake_pad2, 0 = tudo visivel */
+	short weather_editor_pad;
 	float earthquake_camera; /* tremor da camera ativa, 0 (off) a 2 (era earthquake_pad; arquivos antigos = 0) */
 
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
@@ -209,6 +210,8 @@ typedef struct World {
 #define WO_RAIN_AURA_STATIC   0
 #define WO_RAIN_AURA_ANIMATED 1
 #define WO_WEATHER_RAIN_LIGHTNING  (1 << 8)
+/* So em weather_expand_flag/weather_editor_hide: o Fog continua sendo World.mode & WO_MIST. */
+#define WO_WEATHER_FOG             (1 << 9)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

@@ -432,7 +432,7 @@ static void draw_aura(Scene *scene, View3D *v3d, World *world, RegionView3D *rv3
 void view3d_draw_rain_effects(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 {
 	World *world = scene->world;
-	const bool world_fx = world && (world->weather_flag & WO_WEATHER_RAIN) &&
+	const bool world_fx = world && (world->weather_flag & ~world->weather_editor_hide & WO_WEATHER_RAIN) &&
 	                      (world->weather_flag & (WO_WEATHER_RAIN_AURA | WO_WEATHER_RAIN_LIGHTNING));
 	bool emitters = false;
 	for (Base *base = scene->base.first; base && !emitters; base = base->next) {

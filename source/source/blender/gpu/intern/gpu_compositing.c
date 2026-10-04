@@ -483,24 +483,23 @@ bool GPU_fx_compositor_initialize_passes(
 	scenefx_flag &= (SCENE_FX_FLAG_BLOOM | SCENE_FX_FLAG_TONEMAP | SCENE_FX_FLAG_LIGHTSCATTER |
 	                  SCENE_FX_FLAG_SSR | SCENE_FX_FLAG_SSAO | SCENE_FX_FLAG_FXAA);
 
-	/* Lens Flare/Rain/Clouds have no separate viewport on/off toggle: they mirror the
-	 * existing World > Weather settings directly, same World data used by the
-	 * in-game filters, so there is nothing new to configure. */
-	if (scene->world && (scene->world->weather_flag & WO_WEATHER_LENSFLARE)) {
+	/* Lens Flare/Rain/Clouds mirror World > Weather directly (same World data used by
+	 * the in-game filters); World.weather_editor_hide only hides them in the viewport. */
+	if (scene->world && (scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_LENSFLARE)) {
 		scenefx_flag |= SCENE_FX_FLAG_LENSFLARE;
 	}
 	else {
 		scenefx_flag &= ~SCENE_FX_FLAG_LENSFLARE;
 	}
 
-	if (scene->world && (scene->world->weather_flag & WO_WEATHER_RAIN)) {
+	if (scene->world && (scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_RAIN)) {
 		scenefx_flag |= SCENE_FX_FLAG_RAIN;
 	}
 	else {
 		scenefx_flag &= ~SCENE_FX_FLAG_RAIN;
 	}
 
-	if (scene->world && (scene->world->weather_flag & WO_WEATHER_CLOUDS)) {
+	if (scene->world && (scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_CLOUDS)) {
 		scenefx_flag |= SCENE_FX_FLAG_CLOUDS;
 	}
 	else {

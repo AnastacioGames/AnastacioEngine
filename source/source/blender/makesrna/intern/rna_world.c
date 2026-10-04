@@ -542,6 +542,32 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Use Rain", "Render procedural rain streaks and ground ripples");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "show_viewport_rain", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_RAIN);
+	RNA_def_property_ui_text(prop, "Render Rain", "Render Rain in Viewport");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_viewport_clouds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_CLOUDS);
+	RNA_def_property_ui_text(prop, "Render Clouds", "Render Clouds in Viewport");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_viewport_lensflare", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_LENSFLARE);
+	RNA_def_property_ui_text(prop, "Render Lens Flare", "Render Lens Flare in Viewport");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_viewport_fog", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_FOG);
+	RNA_def_property_ui_text(prop, "Render Fog", "Render Fog in Viewport");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_expanded_fog", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_FOG);
+	RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
 	prop = RNA_def_property(srna, "show_expanded_rain", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN);
 	RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");

@@ -203,50 +203,34 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
 
 
 # ==============================================================================
-# FOG / MIST (NEBLINA)
+# FOG / MIST (NEBLINA) -- desenhado dentro do painel Weather
 # ==============================================================================
-class CUSTOM_PT_game_mist(CustomWorldButtonsPanel, Panel):
-    bl_label = "Fog"
-    bl_idname = "WORLD_PT_game_mist_custom"
-    COMPAT_ENGINES = {'BLENDER_GAME'}
+def draw_fog_settings(layout, world):
+    mist = world.mist_settings
 
-    @classmethod
-    def poll(cls, context):
-        scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
+    box = layout.box()
+    if world.sky_type == 'ATMOSPHERIC':
+        # In the atmospheric sky the horizon/zenith/nadir colors are only the fog colors.
+        row = box.row()
+        row.prop(world, "horizon_color", text="Color")
+        row.prop(world, "zenith_color", text="Extinction")
+        row.prop(world, "nadir_color", text="Inscattering")
+    else:
+        box.label(text="Uses the sky horizon color", icon='INFO')
+    row = box.row(align=True)
+    row.prop(mist, "mist_blend_type", text="")
+    row.prop(mist, "falloff", text="")
+    box.prop(mist, "intensity", text="Minimum Intensity", slider=True)
 
-    def draw_header(self, context):
-        self.layout.prop(context.world.mist_settings, "use_mist", text="")
-
-    def draw(self, context):
-        layout = self.layout
-        world = context.world
-        mist = world.mist_settings
-        layout.active = mist.use_mist
-
-        box = layout.box()
-        if world.sky_type == 'ATMOSPHERIC':
-            # In the atmospheric sky the horizon/zenith/nadir colors are only the fog colors.
-            row = box.row()
-            row.prop(world, "horizon_color", text="Color")
-            row.prop(world, "zenith_color", text="Extinction")
-            row.prop(world, "nadir_color", text="Inscattering")
-        else:
-            box.label(text="Uses the sky horizon color", icon='INFO')
+    box = layout.box()
+    box.label(text="Distance:", icon='ARROW_LEFTRIGHT')
+    row = box.row(align=True)
+    row.prop(mist, "start")
+    row.prop(mist, "depth")
+    if mist.falloff == 'HEIGHT':
         row = box.row(align=True)
-        row.prop(mist, "mist_blend_type", text="")
-        row.prop(mist, "falloff", text="")
-        box.prop(mist, "intensity", text="Minimum Intensity", slider=True)
-
-        box = layout.box()
-        box.label(text="Distance:", icon='ARROW_LEFTRIGHT')
-        row = box.row(align=True)
-        row.prop(mist, "start")
-        row.prop(mist, "depth")
-        if mist.falloff == 'HEIGHT':
-            row = box.row(align=True)
-            row.prop(mist, "height_fog")
-            row.prop(mist, "density_fog")
+        row.prop(mist, "height_fog")
+        row.prop(mist, "density_fog")
 
 
 # ==============================================================================
@@ -271,7 +255,18 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         main_box.label(text="Weather Effects:", icon="WORLD")
 
         row = main_box.row(align=True)
+        row.prop(weather, "show_expanded_fog", text="Fog", emboss=True)
+        row.prop(weather, "show_viewport_fog", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
+        row.prop(context.world.mist_settings, "use_mist", text="")
+
+        if weather.show_expanded_fog:
+            col = main_box.column()
+            col.active = context.world.mist_settings.use_mist
+            draw_fog_settings(col, context.world)
+
+        row = main_box.row(align=True)
         row.prop(weather, "show_expanded_rain", text="Rain", emboss=True)
+        row.prop(weather, "show_viewport_rain", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_rain", text="")
 
         if weather.show_expanded_rain:
@@ -338,6 +333,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)
+        row.prop(weather, "show_viewport_clouds", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_clouds", text="")
 
         if weather.show_expanded_clouds:
@@ -350,6 +346,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)
+        row.prop(weather, "show_viewport_lensflare", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_lens_flare", text="")
 
         if weather.show_expanded_lensflare:

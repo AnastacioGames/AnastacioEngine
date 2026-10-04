@@ -3117,7 +3117,8 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 
 	/* update world values */
 	if (world) {
-		GPU_mist_update_enable(world->mode & WO_MIST && v3d->flag2 & V3D_SHOW_MIST);
+		GPU_mist_update_enable(world->mode & WO_MIST && v3d->flag2 & V3D_SHOW_MIST &&
+		                       !(world->weather_editor_hide & WO_WEATHER_FOG));
 		GPU_mist_update_values(world->mistype, world->miststa, world->mistdist, world->mistheight, world->mistdensity, world->misi, &world->horr);
 		GPU_horizon_update_color(&world->horr);
 		GPU_ambient_update_color(&world->ambr);
@@ -4374,7 +4375,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * compositor path at all when one of them is the only effect turned on. */
 	const bool want_compositing =
 	        ((v3d->fx_settings.fx_flag || scene->scenefx_settings.scenefx_flag ||
-	          (scene->world && (scene->world->weather_flag &
+	          (scene->world && (scene->world->weather_flag & ~scene->world->weather_editor_hide &
 	                             (WO_WEATHER_LENSFLARE | WO_WEATHER_RAIN | WO_WEATHER_CLOUDS)))) &&
 	         v3d->drawtype >= OB_SOLID);
 

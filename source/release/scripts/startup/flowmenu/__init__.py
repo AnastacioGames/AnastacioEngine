@@ -58,7 +58,6 @@ from .custom_pt_world import (
     WORLD_OT_atmosphere_reset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
-    CUSTOM_PT_game_mist,
     CUSTOM_PT_game_weather,
     CUSTOM_PT_game_global_properties
 )
@@ -111,7 +110,6 @@ classes = [
     WORLD_OT_atmosphere_reset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
-    CUSTOM_PT_game_mist,
     CUSTOM_PT_game_weather,
     CUSTOM_PT_game_global_properties,
 ]
