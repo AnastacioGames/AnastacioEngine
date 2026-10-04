@@ -228,6 +228,24 @@ Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `Ser
 
 Não testado: Windows (o `run_net_test_win.sh` não tem o cenário `server`), Android/Web (sem sentido para servidor).
 
+## Validado no Windows/MSVC (2026-10-04)
+
+`run_net_test_win.sh spawner` e `car` passam no Windows com os três commits desta branch (`11a0c1e7`
+reconciliação, `45012fc0` lag compensation, `8b5885c5` propriedades de objeto previsto), confirmando
+`Range.network.headless`/`isServer` e o caminho de predição básico na engine MSVC. `run_net_test_win.sh`
+ainda não tem os cenários `server`/`predict`/`scene`/`scene-server`: ficam pendentes.
+
+**Armadilha de build encontrada:** depois de um `git checkout` para esta branch, `ninja RangeRuntime` não
+recompilou `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` já mais novo que o `.obj` (`ninja -n` não via nada
+pendente). O binário rodava com o módulo `Range.network` antigo (sem `predict`, `rpc`, `headless`...),
+causando `AttributeError: module 'Range.network' has no attribute 'headless'` mesmo com o código-fonte
+correto. Causa não totalmente isolada (suspeita: cmake regenerando o `build.ninja` e perdendo o stat do
+arquivo, ou timestamp do checkout não propagado a tempo do primeiro scan do ninja). **Contorno**: apagar o
+`.obj` suspeito antes de rebuildar (`rm build/.../KX_PyNetwork.cpp.obj && ninja RangeRuntime`) força a
+recompilação; depois disso o `ninja -n` volta a detectar mudanças normalmente. Se depois de um `git
+checkout`/`pull` um símbolo novo "não existir" em runtime apesar de estar no `.cpp`, suspeite disto antes
+de supor bug de código.
+
 ## Uso rápido
 
 Sem código: Properties > Export Game > **Network** (modo, portas, Server Name, máximo de jogadores, tick rate,

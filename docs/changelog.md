@@ -9,6 +9,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: spawner/car validados no Windows com as 3 correções da predição; armadilha de build achada (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `run_net_test_win.sh spawner` e `car` passam no Windows/MSVC com os commits `11a0c1e7` (reconciliação),
+  `45012fc0` (lag compensation) e `8b5885c5` (propriedades de objeto previsto) já integrados: `net.headless`,
+  `net.isServer` e o módulo `Range.network` completo (predict/rpc/call/...) respondem certo.
+- Achado durante a validação: depois de `git checkout` para a branch, `ninja RangeRuntime` não recompilou
+  `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` mais novo que o `.obj` (`ninja -n` não via nada pendente); o
+  binário rodava com o módulo de rede antigo (sem `headless`/`predict`/`rpc`), dando `AttributeError` em
+  runtime apesar do código-fonte estar certo. Contorno: apagar o `.obj` suspeito força a recompilação. Ver
+  `NOTES-engine.md` ("Armadilha de build encontrada").
+- Pendente: `run_net_test_win.sh` ainda não tem os cenários `server`/`predict`/`scene`/`scene-server` para
+  cobrir essas correções direto no Windows.
+
 ## Multiplayer: propriedades de objeto previsto chegam ao dono (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `ReplicaClient::apply` (núcleo) pulava o objeto inteiro quando ele era do cliente e previsto (`skipOwned` +
