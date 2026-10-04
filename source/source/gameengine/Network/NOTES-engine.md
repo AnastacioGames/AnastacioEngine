@@ -196,7 +196,13 @@ cada tiro e o estado da predição.
 Limites medidos na máquina de teste (4 núcleos, dois players em llvmpipe): a 60 Hz nenhum dos dois mantinha o tic
 rate e a linha do tempo da predição não fechava com os snapshots; a 30 Hz fecha. O RTT medido fica em ~450 ms (80 ms
 simulados + quadros lentos) e o atraso de interpolação passa de 400 ms, por isso o teste chama `raycast_past` com
-`max_rewind_ms=1000`. Não testado: Windows, cenário de cena (painel) com predição, corpos dinâmicos previstos.
+`max_rewind_ms=1000`. Não testado: cenário de cena (painel) com predição, corpos dinâmicos previstos.
+
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh predict`, mesmo rig/sim/tic rate do Linux): 5 rodadas
+seguidas, todas PASS, lag compensation 22/22 a 23/23 tiros no passado (nenhuma rodada abaixo de 100%, não precisou
+de `NET_DEBUG=1`). `run_net_test_win.sh server` também passou de primeira, sem o problema de janela GL
+offscreen que trava no Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
+`--server`); `headless=True`, sem render, hospeda como Dedicated, tudo certo.
 
 ## Servidor headless (`--server`)
 
@@ -226,14 +232,18 @@ Medido no Linux (4 núcleos, llvmpipe, `halfanim_crash.range` com armaduras, ser
 Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `ServerSleep()` e do corte do skinning o
 `--server` gastava ~1,6 núcleo (dois terços no skinning das armaduras).
 
-Não testado: Windows (o `run_net_test_win.sh` não tem o cenário `server`), Android/Web (sem sentido para servidor).
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`): passou de primeira, sem o problema de
+janela GL offscreen que trava o Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
+`--server`). `headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web
+(sem sentido para servidor).
 
 ## Validado no Windows/MSVC (2026-10-04)
 
-`run_net_test_win.sh spawner` e `car` passam no Windows com os três commits desta branch (`11a0c1e7`
-reconciliação, `45012fc0` lag compensation, `8b5885c5` propriedades de objeto previsto), confirmando
-`Range.network.headless`/`isServer` e o caminho de predição básico na engine MSVC. `run_net_test_win.sh`
-ainda não tem os cenários `server`/`predict`/`scene`/`scene-server`: ficam pendentes.
+`run_net_test_win.sh spawner`, `car`, `predict` (5 rodadas) e `server` passam no Windows com os três commits
+desta branch (`11a0c1e7` reconciliação, `45012fc0` lag compensation, `8b5885c5` propriedades de objeto
+previsto), confirmando `Range.network.headless`/`isServer`, a predição completa e o servidor headless na
+engine MSVC. `run_net_test_win.sh` ainda não tem os cenários `scene`/`scene-server` (dependem do editor Windows,
+que também não linka — `IMB_exr`, problema pré-existente, igual ao Linux).
 
 **Armadilha de build encontrada:** depois de um `git checkout` para esta branch, `ninja RangeRuntime` não
 recompilou `KX_PyNetwork.cpp.obj` mesmo com o `.cpp` já mais novo que o `.obj` (`ninja -n` não via nada
