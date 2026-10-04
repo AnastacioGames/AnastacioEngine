@@ -278,3 +278,29 @@ repetíveis).
 - Encode/decode de cada mensagem; mensagem com `len` mentiroso; tipo desconhecido pulado.
 - Transporte loopback e simulado: entrega, perda e ordem conforme as configurações, com semente fixa.
 - Fuzz curto (libFuzzer quando disponível, ou 100 000 entradas aleatórias com semente fixa) no decode.
+
+## 11. Interpretações aceitas das frentes A–D (2026-10-03)
+
+Valem como parte do contrato. Detalhes em `Network/NOTES-A.md`, `NOTES-B.md`, `NOTES-C.md` e
+`tools/net_menu/NOTES-D.md`.
+
+- **Bitstream:** inteiros e varints não alinham sozinhos; cada corpo termina com `alignToByte()`.
+  `PositionQuant { int bits = 22; }` (16–32), passo fixo de 1 mm, offset binário. Quantização de faixa em
+  `double` com arredondamento simétrico: o zero não é exato (velocidade 0 volta ~0,0015 m/s em 16 bits).
+  Rotação: empate vai para o menor índice; 9–15 bits por componente.
+- **Mensagens:** decode estrito (byte sobrando = inválido); `Hello` com magic errado = inválido;
+  `Input` = `varu len` (≤ 64) + bytes por bloco; tipos de argumento de RPC 1–7 na ordem da seção 8;
+  `Chat.text` ≤ 200 bytes; `Spawn` = bits de presença + campos de um objeto.
+- **Snapshot:** propriedades por esquema de cada objeto; animação é provisória (pode mudar na frente E).
+- **Transporte:** `ITransport::localPort()` (0 se não houver); `createLoopbackHub()`; simulado perde/duplica
+  só nos canais não confiáveis. ENet: Control/Rpc `RELIABLE`, Snapshot/Input `UNSEQUENCED`.
+- **Sessão:** ordem das checagens do `Hello`: versão/gameId/gameVersion → banido → cena → token já
+  conectado → reconexão → cheio → partida em andamento. Ping a cada 1 s, RTT por EMA α = 0,1. Servidor
+  escuta com `maxClients + 16` peers para conseguir mandar `Reject ServerFull`.
+- **WebSocket:** um frame binário por mensagem, primeiro byte = canal; limite 65 537 bytes (close 1009);
+  erros de protocolo 1002, texto 1003; sem checagem de `Origin`; só IPv4; TLS no proxy reverso.
+- **Multi-transporte:** `reliableAll() = false` (limite de 1200 bytes nos canais não confiáveis vale para
+  todos); `maxPeers` por transporte, o total de jogadores é limitado pela sessão; `localPort()` é a do
+  primeiro transporte.
+- **Descarte de snapshot/input antigo** no WebSocket é da camada de replicação, não do transporte.
+- **Menu:** fica em `tools/net_menu/` até o template da etapa 5; API Python esperada descrita em NOTES-D.
