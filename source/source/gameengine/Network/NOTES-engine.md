@@ -326,3 +326,10 @@ Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software 
   scene-server e rpc PASS; predict PASS 3/4.
 - Falha intermitente do predict: `max_error` 0,6 com 21 correções (normal: 0–0,067, 0–1 correção). Investigar.
 - Sem o `PYTHONPATH` acima o player cai em `AUD_initPython` (segfault por `numpy` ausente): não é bug de rede.
+
+### Investigação do `predict` intermitente (Linux)
+
+- 16 rodadas com `NET_DEBUG=1`: todas PASS, mas o erro máximo varia de 0 a 0,33, com 0 a 15 correções por rodada; a falha anterior (0,6) é a cauda dessa distribuição.
+- O erro é sempre múltiplo de 1 tick de input (2,0/30 ≈ 0,067), inclusive em trechos de velocidade constante. Hipótese: o servidor não recebe o input a tempo do tick e aplica `InputQueue::consume` com repetição (até `maxRepeatTicks = 4`) ou sem input (`missing`). Com o simulador 40,5,1 e a renderização por software, quadros lentos do cliente atrasam os inputs.
+- Carregar a CPU não reproduz: a falha passa a ser "server applied the client's input" (poucos frames), não o erro de predição.
+- Os contadores `late`/`repeated`/`missing` da `InputQueue` não estão expostos ao Python, então a hipótese ainda não foi confirmada. Próximo passo proposto: expor esses contadores no servidor (por exemplo, em `prediction_stats` do lado do servidor) e cruzá-los com as correções do cliente, antes de decidir entre corrigir o motor ou ajustar a margem do teste.
