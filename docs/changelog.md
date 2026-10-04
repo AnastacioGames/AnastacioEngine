@@ -12,6 +12,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 ## Multiplayer: inputs atrasados restantes medidos (2026-10-04)
 
 - Log temporário (removido) em `InputQueue::receive`: 0 a 11 `late` por rodada do `predict`, espalhados pela rodada, cada um 1 ou 2 ticks antes do `nextTick` e com folga média de 2 a 3,3: pacotes perdidos ou atrasados isolados, não viés do relógio. Sem correções; alvo 3 e ganho 0,3 mantidos. Detalhes em `NOTES-engine.md`.
+- Causa: soluços de agendamento do container Linux (persistem com perda 0). No Windows o `predict` com `201` deu PASS, 0 correções e `late` 0 em 5 rodadas.
 
 ## Multiplayer: servidor devolve a folga dos inputs (`201 InputTiming`) (2026-10-04)
 
