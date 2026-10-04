@@ -31,6 +31,7 @@
 
 
 #include "KX_WorldInfo.h"
+#include <algorithm>
 #include <cstring>
 #include "KX_LightObject.h"
 #include "KX_PyMath.h"
@@ -166,6 +167,15 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.ripples") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_RIPPLE; else world->weather_flag &= ~WO_WEATHER_RAIN_RIPPLE;
 	}
+	else if (std::strcmp(identifier, "weather.droplets") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_DROPLETS; else world->weather_flag &= ~WO_WEATHER_RAIN_DROPLETS;
+	}
+	else if (std::strcmp(identifier, "weather.earthquake") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_EARTHQUAKE; else world->weather_flag &= ~WO_WEATHER_EARTHQUAKE;
+	}
+	else if (std::strcmp(identifier, "weather.earthquake_level") == 0) world->earthquake_level = (std::max)(0, (std::min)(5, (int)(value + 0.5f)));
+	else if (std::strcmp(identifier, "weather.earthquake_scale") == 0) world->earthquake_scale = value;
+	else if (std::strcmp(identifier, "weather.earthquake_camera") == 0) world->earthquake_camera = value;
 	else if (std::strcmp(identifier, "weather.rain_streak_width") == 0) world->rain_streak_width = value;
 	else if (std::strcmp(identifier, "weather.splash") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_SPLASH; else world->weather_flag &= ~WO_WEATHER_RAIN_SPLASH;
@@ -211,6 +221,68 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.mist_density") == 0) { world->mistdensity = value; m_mistdensity = value; }
 	else return false;
 	return true;
+}
+
+bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &value, bool &isBool)
+{
+	if (!m_scene || !m_scene->world || !identifier) return false;
+	World *world = m_scene->world;
+	if (std::strncmp(identifier, "weather.", 8) == 0) identifier += 8;
+
+	static const struct { const char *name; int flag; } flags[] = {
+		{"rain", WO_WEATHER_RAIN}, {"ripples", WO_WEATHER_RAIN_RIPPLE}, {"droplets", WO_WEATHER_RAIN_DROPLETS},
+		{"splash", WO_WEATHER_RAIN_SPLASH}, {"aura", WO_WEATHER_RAIN_AURA}, {"lightning", WO_WEATHER_RAIN_LIGHTNING},
+		{"clouds", WO_WEATHER_CLOUDS}, {"lens_flare", WO_WEATHER_LENSFLARE}, {"earthquake", WO_WEATHER_EARTHQUAKE},
+	};
+	for (const auto &f : flags) {
+		if (std::strcmp(identifier, f.name) == 0) {
+			isBool = true;
+			value = (world->weather_flag & f.flag) ? 1.0f : 0.0f;
+			return true;
+		}
+	}
+	if (std::strcmp(identifier, "mist") == 0) {
+		isBool = true;
+		value = (world->mode & WO_MIST) ? 1.0f : 0.0f;
+		return true;
+	}
+	if (std::strcmp(identifier, "earthquake_level") == 0) {
+		isBool = false;
+		value = (float)world->earthquake_level;
+		return true;
+	}
+	if (std::strcmp(identifier, "aura_style") == 0) {
+		isBool = false;
+		value = (world->rain_aura_style == WO_RAIN_AURA_ANIMATED) ? 1.0f : 0.0f;
+		return true;
+	}
+
+	const struct { const char *name; const float *ptr; } floats[] = {
+		{"rain_intensity", &world->rain_intensity}, {"rain_density", &world->rain_density},
+		{"rain_speed", &world->rain_speed}, {"rain_wind", &world->rain_wind},
+		{"rain_darken", &world->rain_darken}, {"ripple_intensity", &world->rain_ripple},
+		{"ripple_normal", &world->rain_ripple_normal}, {"rain_streak_width", &world->rain_streak_width},
+		{"splash_size", &world->rain_splash_size}, {"splash_rate", &world->rain_splash_rate},
+		{"splash_intensity", &world->rain_splash_intensity}, {"splash_distance", &world->rain_splash_distance},
+		{"aura_size", &world->rain_aura_size}, {"aura_rate", &world->rain_aura_rate},
+		{"aura_intensity", &world->rain_aura_intensity}, {"aura_distance", &world->rain_aura_distance},
+		{"lightning_rate", &world->rain_lightning_rate}, {"lightning_intensity", &world->rain_lightning_intensity},
+		{"lightning_distance", &world->rain_lightning_distance}, {"lightning_width", &world->rain_lightning_width},
+		{"cloud_coverage", &world->cloud_coverage}, {"cloud_scale", &world->cloud_scale},
+		{"cloud_speed", &world->cloud_speed}, {"flare_scale", &world->flare_scale},
+		{"flare_intensity", &world->flare_intensity}, {"mist_intensity", &world->misi},
+		{"mist_start", &world->miststa}, {"mist_depth", &world->mistdist},
+		{"mist_height", &world->mistheight}, {"mist_density", &world->mistdensity},
+		{"earthquake_scale", &world->earthquake_scale}, {"earthquake_camera", &world->earthquake_camera},
+	};
+	for (const auto &f : floats) {
+		if (std::strcmp(identifier, f.name) == 0) {
+			isBool = false;
+			value = *f.ptr;
+			return true;
+		}
+	}
+	return false;
 }
 
 bool KX_WorldInfo::hasWorld()
@@ -560,6 +632,7 @@ PyTypeObject KX_WorldInfo::Type = {
 
 PyMethodDef KX_WorldInfo::Methods[] = {
 	{"setWeather", (PyCFunction)KX_WorldInfo::sPysetWeather, METH_VARARGS, "setWeather(name, value): change a World weather setting at runtime"},
+	{"getWeather", (PyCFunction)KX_WorldInfo::sPygetWeather, METH_VARARGS, "getWeather(name): current value of a World weather setting (bool or float)"},
 	{"strikeLightning", (PyCFunction)KX_WorldInfo::sPystrikeLightning, METH_VARARGS, "strikeLightning(bolt=True): a lightning strike now (rain must be on)"},
 	{nullptr, nullptr} /* Sentinel */
 };
@@ -585,6 +658,24 @@ PyObject *KX_WorldInfo::PysetWeather(PyObject *args)
 		return nullptr;
 	}
 	Py_RETURN_NONE;
+}
+
+PyObject *KX_WorldInfo::PygetWeather(PyObject *args)
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:getWeather", &name)) {
+		return nullptr;
+	}
+	float value = 0.0f;
+	bool isBool = false;
+	if (!GetWeatherRuntimeProperty(name, value, isBool)) {
+		PyErr_Format(PyExc_ValueError, "world.getWeather(): unknown setting \"%s\"", name);
+		return nullptr;
+	}
+	if (isBool) {
+		return PyBool_FromLong(value != 0.0f);
+	}
+	return PyFloat_FromDouble(value);
 }
 
 PyObject *KX_WorldInfo::PystrikeLightning(PyObject *args)

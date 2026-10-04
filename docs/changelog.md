@@ -9,6 +9,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Property actuator: lista de Weather Effects atualizada e conversão para Python
+
+- Categorias novas no modo Weather Effects: Rain Splash, Rain Aura, Lightning e Earthquake; Rain ganhou Droplets, Streak Width e Ripple Normal. IDs `ACT_RUNTIME_PROP_WEATHER_*` 28–49 (sem mudar struct); tabela única caminho/tipo/categoria em `DNA_actuator_weather.h`, usada por RNA, Logic Editor e conversor.
+- Corrigido: campo Property vazio quando o efeito gravado não pertencia à categoria (agora mostra o liga/desliga dela, e o conversor usa o mesmo fallback); valor Float aparecia como X/Y/Z e o conversor mandava `"x,y,z"` para efeitos Float, que `CM_StringTo` rejeitava.
+- Novo `world.getWeather(nome)` (bool ou float). `KX_WorldInfo::SetWeatherRuntimeProperty`/`world.setWeather()`: `droplets`, `earthquake`, `earthquake_level`, `earthquake_scale`, `earthquake_camera`.
+- `logic_to_python.py`: Weather Effects vira `scene.world.setWeather(nome, valor)`; World Property (Assign/Add/Toggle) vira `scene.world[prop]`.
+- Teste: `projects-teste/weather_logic/make_weather_logic_test.py` gera a versão em bricks e a convertida; as duas conferem com `getWeather` os valores gravados pelos actuators e a ida e volta set/get de todos os nomes (`WEATHER_CHECK ok`).
+
 ## Sombra: bias escalado pelo ângulo da luz (fim das colunas em luz rasante)
 
 - `shadow_proj_coord` (`gpu_shader_material.glsl`) agora escala o offset na normal por `0.5 + sin(θ)` e o bias de profundidade por `1 + min(tan(θ), 8)`, com θ = ângulo luz/superfície. Antes ambos eram constantes e a luz quase paralela ao plano gerava faixas de acne.

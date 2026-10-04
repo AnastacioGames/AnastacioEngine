@@ -27,6 +27,7 @@
 #include <float.h>
 
 #include "DNA_actuator_types.h"
+#include "DNA_actuator_weather.h"
 #include "DNA_controller_types.h"
 #include "DNA_property_types.h"
 #include "DNA_space_types.h"
@@ -2182,38 +2183,44 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 			uiItemR(runtime_box, ptr, "runtime_property", 0, "Exposed Property", ICON_NONE);
 		}
 		else {
+			static const char *effect_props[] = {
+				"weather_effect", "cloud_effect", "lens_flare_effect", "mist_effect",
+				"splash_effect", "aura_effect", "lightning_effect", "earthquake_effect",
+			};
 			const int weather_category = RNA_enum_get(ptr, "weather_category");
 			uiItemR(runtime_box, ptr, "weather_category", 0, NULL, ICON_NONE);
-			if (weather_category == 1)
-				uiItemR(runtime_box, ptr, "cloud_effect", 0, "Property", ICON_NONE);
-			else if (weather_category == 2)
-				uiItemR(runtime_box, ptr, "lens_flare_effect", 0, "Property", ICON_NONE);
-			else if (weather_category == 3)
-				uiItemR(runtime_box, ptr, "mist_effect", 0, "Property", ICON_NONE);
-			else
-				uiItemR(runtime_box, ptr, "weather_effect", 0, "Property", ICON_NONE);
+			uiItemR(runtime_box, ptr, effect_props[weather_category], 0, "Property", ICON_NONE);
+		}
+		if (actuator_mode == 2) {
+			/* O clima so faz Assign: o valor gravado substitui o do World. */
+			const ActWeatherRuntimeInfo *info = act_weather_runtime_find(RNA_enum_get(ptr, "weather_effect"));
+			if (info && info->is_bool) {
+				uiItemL(runtime_box, "Category: Weather  |  Type: Boolean", ICON_NONE);
+				uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
+			}
+			else {
+				uiItemL(runtime_box, "Category: Weather  |  Type: Float", ICON_NONE);
+				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
+			}
+			return;
 		}
 		uiItemR(runtime_box, ptr, "mode", 0, NULL, ICON_NONE);
-		if (runtime_property == ACT_RUNTIME_PROP_VISIBLE ||
-		    runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN ||
-		    runtime_property == ACT_RUNTIME_PROP_WEATHER_RIPPLES ||
-		    runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUDS ||
-		    runtime_property == ACT_RUNTIME_PROP_WEATHER_LENS_FLARE ||
-		    runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST) {
-			uiItemL(runtime_box, actuator_mode == 2 ?
-			        "Category: Weather  |  Type: Boolean" : "Category: Render  |  Type: Boolean", ICON_NONE);
+		if (runtime_property == ACT_RUNTIME_PROP_VISIBLE) {
+			uiItemL(runtime_box, "Category: Render  |  Type: Boolean", ICON_NONE);
 			uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
 		}
-		else if (runtime_property == ACT_RUNTIME_PROP_MASS ||
-		         runtime_property >= ACT_RUNTIME_PROP_WEATHER_RAIN_INTENSITY) {
-			uiItemL(runtime_box, actuator_mode == 2 ?
-			        "Category: Weather  |  Type: Float" : "Category: Physics  |  Type: Float", ICON_NONE);
-			uiItemR(runtime_box, ptr, "runtime_value", 0, "Value", ICON_NONE);
+		else if (runtime_property == ACT_RUNTIME_PROP_MASS) {
+			uiItemL(runtime_box, "Category: Physics  |  Type: Float", ICON_NONE);
+			uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
 		}
-		else if (actuator_mode == 2) {
-			/* Weather controls are Boolean or scalar Float, never Vector3. */
-			uiItemL(runtime_box, "Category: Weather  |  Type: Float", ICON_NONE);
-			uiItemR(runtime_box, ptr, "runtime_value", 0, "Value", ICON_NONE);
+		else if (act_weather_runtime_find(runtime_property)) {
+			const ActWeatherRuntimeInfo *info = act_weather_runtime_find(runtime_property);
+			uiItemL(runtime_box, info->is_bool ? "Category: Weather  |  Type: Boolean" :
+			        "Category: Weather  |  Type: Float", ICON_NONE);
+			if (info->is_bool)
+				uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
+			else
+				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
 		}
 		else {
 			if (RNA_enum_get(ptr, "runtime_property") == ACT_RUNTIME_PROP_LOCAL_POSITION ||

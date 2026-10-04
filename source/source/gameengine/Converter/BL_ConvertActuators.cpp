@@ -105,6 +105,7 @@
 #include "DNA_sound_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_actuator_types.h"
+#include "DNA_actuator_weather.h"
 #include "DNA_packedFile_types.h"
 #include "BL_ActionActuator.h"
 #include "BL_ArmatureActuator.h"
@@ -432,51 +433,39 @@ void BL_ConvertActuators(const char *maggiename,
 
 				std::string runtimeValue = propact->value;
 				const bool actuatorRuntime = propact->runtime_enabled || propact->pad == 1 || propact->pad == 2;
+				const char *runtimePath = "";
 				if (actuatorRuntime) {
+					int runtimeProp = propact->runtime_property;
+					const ActWeatherRuntimeInfo *weather = act_weather_runtime_find(runtimeProp);
+					if (propact->pad == 2 && !weather) {
+						/* Mesmo fallback da UI (rna_PropertyActuator_weather_effect_get). */
+						const int category = (propact->runtime_enabled >= 0 &&
+						                      propact->runtime_enabled <= ACT_WEATHER_CAT_EARTHQUAKE) ? propact->runtime_enabled : 0;
+						runtimeProp = act_weather_category_default(category);
+						weather = act_weather_runtime_find(runtimeProp);
+					}
 					char value[64];
-					if (propact->runtime_property == ACT_RUNTIME_PROP_VISIBLE ||
-					    propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN ||
-					    propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RIPPLES ||
-					    propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUDS ||
-					    propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_LENS_FLARE ||
-					    propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST) {
+					if (runtimeProp == ACT_RUNTIME_PROP_VISIBLE || (weather && weather->is_bool)) {
 						std::snprintf(value, sizeof(value), "%s", propact->runtime_bool_value ? "true" : "false");
 					}
-					else if (propact->runtime_property == ACT_RUNTIME_PROP_MASS) {
+					else if (runtimeProp == ACT_RUNTIME_PROP_MASS || weather) {
 						std::snprintf(value, sizeof(value), "%g", propact->runtime_value[0]);
 					}
 					else {
 						std::snprintf(value, sizeof(value), "%g,%g,%g", propact->runtime_value[0], propact->runtime_value[1], propact->runtime_value[2]);
 					}
 					runtimeValue = value;
+					switch (runtimeProp) {
+						case ACT_RUNTIME_PROP_LOCAL_POSITION: runtimePath = "transform.local_position"; break;
+						case ACT_RUNTIME_PROP_VISIBLE: runtimePath = "render.visible"; break;
+						case ACT_RUNTIME_PROP_MASS: runtimePath = "physics.mass"; break;
+						case ACT_RUNTIME_PROP_LINEAR_VELOCITY: runtimePath = "physics.linear_velocity"; break;
+						case ACT_RUNTIME_PROP_ANGULAR_VELOCITY: runtimePath = "physics.angular_velocity"; break;
+						case ACT_RUNTIME_PROP_GRAVITY: runtimePath = "physics.gravity"; break;
+						case ACT_RUNTIME_PROP_LOCAL_SCALE: runtimePath = "transform.local_scale"; break;
+						default: runtimePath = weather ? weather->path : ""; break;
+					}
 				}
-				const char *runtimePath = actuatorRuntime ? (propact->runtime_property == ACT_RUNTIME_PROP_LOCAL_POSITION ? "transform.local_position" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_VISIBLE ? "render.visible" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_MASS ? "physics.mass" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_LINEAR_VELOCITY ? "physics.linear_velocity" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_ANGULAR_VELOCITY ? "physics.angular_velocity" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_GRAVITY ? "physics.gravity" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_LOCAL_SCALE ? "transform.local_scale" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN_INTENSITY ? "weather.rain_intensity" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN_DENSITY ? "weather.rain_density" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN_SPEED ? "weather.rain_speed" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN_WIND ? "weather.rain_wind" :
-				                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN_DARKEN ? "weather.rain_darken" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RIPPLE_INTENSITY ? "weather.ripple_intensity" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RAIN ? "weather.rain" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_RIPPLES ? "weather.ripples" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUDS ? "weather.clouds" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUD_COVERAGE ? "weather.cloud_coverage" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUD_SCALE ? "weather.cloud_scale" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_CLOUD_SPEED ? "weather.cloud_speed" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_LENS_FLARE ? "weather.lens_flare" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_FLARE_SCALE ? "weather.flare_scale" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_FLARE_INTENSITY ? "weather.flare_intensity" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST ? "weather.mist" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST_INTENSITY ? "weather.mist_intensity" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST_START ? "weather.mist_start" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST_DEPTH ? "weather.mist_depth" :
-					                              propact->runtime_property == ACT_RUNTIME_PROP_WEATHER_MIST_HEIGHT ? "weather.mist_height" : "weather.mist_density") : "";
 				SCA_PropertyActuator *tmppropact = new SCA_PropertyActuator(
 					gameobj,
 					destinationObj,

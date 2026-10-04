@@ -131,6 +131,7 @@ public:
 	void UpdateBackGround(RAS_Rasterizer *rasty, KX_LightObject *light);
 	void UpdateWorldSettings(RAS_Rasterizer *rasty);
 	bool SetWeatherRuntimeProperty(const char *identifier, float value, bool boolValue, bool useBool);
+	bool GetWeatherRuntimeProperty(const char *identifier, float &value, bool &isBool);
 	void RenderBackground(RAS_Rasterizer *rasty);
 
 #ifdef WITH_PYTHON
@@ -140,6 +141,7 @@ public:
 
 	/* setWeather("rain_splash_size", 1.5): same names as the Property actuator ("weather." optional) */
 	EXP_PYMETHOD_VARARGS(KX_WorldInfo, setWeather);
+	EXP_PYMETHOD_VARARGS(KX_WorldInfo, getWeather);
 	EXP_PYMETHOD_VARARGS(KX_WorldInfo, strikeLightning);
 
 	/* attributes */

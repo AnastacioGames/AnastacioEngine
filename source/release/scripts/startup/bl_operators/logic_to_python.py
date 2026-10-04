@@ -444,6 +444,72 @@ def _expression(ob, cont, sensor_vars):
 # Actuators: retornam (linhas, continuo). Continuo roda todo frame com o
 # controller positivo; os demais so no pulso positivo.
 
+# Categoria do Property actuator em Weather Effects -> propriedade RNA do efeito.
+_WEATHER_EFFECT_PROPS = {
+    'RAIN': "weather_effect",
+    'CLOUDS': "cloud_effect",
+    'LENS_FLARE': "lens_flare_effect",
+    'MIST': "mist_effect",
+    'SPLASH': "splash_effect",
+    'AURA': "aura_effect",
+    'LIGHTNING': "lightning_effect",
+    'EARTHQUAKE': "earthquake_effect",
+}
+
+# Efeitos liga/desliga (os demais sao Float); nome = setWeather() de KX_WorldInfo.
+_WEATHER_BOOLS = {"rain", "ripples", "droplets", "clouds", "lens_flare", "mist",
+                  "splash", "aura", "lightning", "earthquake"}
+
+
+def _weather_code(act):
+    """Weather Effects: a engine so faz Assign, igual aqui via world.setWeather()."""
+    ident = getattr(act, _WEATHER_EFFECT_PROPS[act.weather_category])
+    name = ident[len("WEATHER_"):].lower()
+    if name in _WEATHER_BOOLS:
+        value = _act_arg(name.replace("_", " ").title(), act.runtime_bool_value)
+    else:
+        value = _act_arg(name.replace("_", " ").title(), round(act.runtime_value[0], 6))
+    return ["scene.world.setWeather(%r, %s)" % (name, value)]
+
+
+def _world_literal(name, text, label):
+    """Valor do actuator convertido para o tipo da World Property."""
+    world = bpy.context.scene.world
+    prop = world.properties.get(name) if world else None
+    ptype = prop.type if prop else None
+    if ptype == 'STRING':
+        return _arg(label, text)
+    if ptype == 'BOOL':
+        return _arg(label, text.strip().lower() in {"true", "1"})
+    try:
+        value = ast.literal_eval(text.strip())
+    except (ValueError, SyntaxError):
+        raise Unsupported("valor '%s' da World Property %s" % (text, name))
+    if not isinstance(value, (bool, int, float, str)):
+        raise Unsupported("valor '%s' da World Property %s" % (text, name))
+    if ptype == 'INT' and isinstance(value, float):
+        value = int(value)
+    return _arg(label, value)
+
+
+def _world_property_code(act):
+    p = act.property
+    pa = _act_arg("Property", p)
+    m = act.mode
+    w = "scene.world[%s]" % pa
+    if m == 'ASSIGN':
+        return ["%s = %s" % (w, _world_literal(p, act.value, _ACT_LABEL[0] + " Value"))]
+    if m == 'ADD':
+        return ["%s = %s + %s" % (w, w, _world_literal(p, act.value, _ACT_LABEL[0] + " Value"))]
+    if m == 'TOGGLE':
+        world = bpy.context.scene.world
+        prop = world.properties.get(p) if world else None
+        if prop and prop.type == 'BOOL':
+            return ["%s = not %s" % (w, w)]
+        return ["%s = 0 if %s else 1" % (w, w)]
+    raise Unsupported("world property actuator %s" % m)
+
+
 def _actuator_code(ob, act):
     t = act.type
     if t == 'MOTION':
@@ -485,7 +551,11 @@ def _actuator_code(ob, act):
             return vr + (["if %s:" % _ON] + ["    " + line for line in lines] if lines else []), True
         return lines or ["pass"], True
     if t == 'PROPERTY':
-        if act.actuator_mode != 'NONE' or act.use_world_property:
+        if act.actuator_mode == 'WEATHER_EFFECTS':
+            return _weather_code(act), False
+        if act.actuator_mode == 'GLOBAL_PROPERTY' or (act.actuator_mode == 'NONE' and act.use_world_property):
+            return _world_property_code(act), False
+        if act.actuator_mode != 'NONE':
             raise Unsupported("property actuator %s" % act.actuator_mode)
         p = act.property
         m = act.mode
