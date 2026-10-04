@@ -145,8 +145,9 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
 **Como funciona:**
 
 - **Cliente.** A cada tick, antes de aplicar os snapshots, `ClientPredict()` escolhe o tick previsto
-  (`NetClock::predictionTick`, crescendo de um em um; só volta à estimativa do relógio se divergir mais de meio
-  segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
+  (`NetClock::predictionTick`, crescendo de um em um por passo; segue a deriva suavizada em relação à estimativa do
+  relógio com dois passos num quadro quando fica para trás e nenhum quando fica à frente; só volta direto à estimativa
+  se divergir mais de meio segundo), manda o `Input` (redundância 8) e, para cada objeto previsto do próprio cliente: reconcilia com o snapshot
   mais novo (`PredictionClient::reconcile`: se o estado do servidor difere da previsão daquele tick, volta a ele e
   re-executa os inputs seguintes), roda o passo com o input atual e guarda o estado. A correção visual
   (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
@@ -344,3 +345,5 @@ em vez de um único arquivo compartilhado).
 - Os contadores `late`/`repeated`/`missing` da `InputQueue` não estão expostos ao Python, então a hipótese ainda não foi confirmada. Próximo passo proposto: expor esses contadores no servidor (por exemplo, em `prediction_stats` do lado do servidor) e cruzá-los com as correções do cliente, antes de decidir entre corrigir o motor ou ajustar a margem do teste.
 - **Confirmada** com `network.input_stats(client)` (novo, só no servidor: `received`, `duplicates`, `late`, `too_far`, `applied`, `repeated`, `missing`, `invalid`), logado pelo `predict` a cada mudança. Em 6 rodadas: as 5 com `late` 0 a 5 tiveram 0 correções; a com `late` 95 (`repeated` 95) teve 2 correções (erro 0,13). Os ~30 `missing` de toda rodada são os ticks antes do primeiro input do cliente (início), não afetam o erro.
 - Causa: o tick de predição do cliente às vezes não fica adiantado o bastante em relação ao servidor e o input chega depois do tick simulado; o servidor repete o anterior e o cliente reconcilia. Próximo passo: medir a folga (tick do input − tick do servidor na chegada) e ajustar a margem de adiantamento do `NetClock::predictionTick`, em vez de afrouxar o 0,5 do teste.
+- **Folga medida** (log temporário em `InputQueue::receive`: tick do input − próximo tick do servidor): a linha de ticks do cliente só crescia de um em um e ficava em qualquer ponto até ±8 ticks do alvo, diferente a cada rodada (folga de 3 a 11 nas boas, de −3 a 5 na ruim). Corrigido: `ClientPredict` segue a deriva suavizada (média 0,1; passa de 1,5 tick → dois passos no quadro ou nenhum), o passo foi para `ClientPredictTick`, e a margem do `predictionTick` subiu de 1 para 2 ticks. Em 8 rodadas: todas PASS, erro máximo ≤ 0,134, folga com espalhamento de ±4 ticks e centro ainda variando de ~0 a ~4 entre rodadas (3 rodadas com `late` 47 a 82).
+- Resta um viés por rodada na estimativa do relógio (offset dos `Pong`). Próximo passo proposto: o servidor devolver a folga medida (por exemplo, no `Pong` ou numa mensagem nova) e o cliente ajustar a margem por ela; é mudança de protocolo, então fica para uma tarefa própria.

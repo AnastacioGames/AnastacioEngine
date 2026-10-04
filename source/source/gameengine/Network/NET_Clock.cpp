@@ -137,7 +137,7 @@ void NetClock::renderTime(uint64_t nowMs, Tick &tick, float &alpha) const
 
 Tick NetClock::predictionTick(uint64_t nowMs) const
 {
-	const double lead = (double(m_rttMs) / 2.0 + double(jitterMs())) / tickMs() + 1.0;
+	const double lead = (double(m_rttMs) / 2.0 + double(jitterMs())) / tickMs() + 2.0;
 	return Tick(uint64_t(std::ceil(serverTime(nowMs) + lead)));
 }
 

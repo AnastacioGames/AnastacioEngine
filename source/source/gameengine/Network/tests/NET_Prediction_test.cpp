@@ -585,8 +585,8 @@ TEST(NetClock, OffsetFromPongs)
 	EXPECT_TRUE(clock.synced());
 	EXPECT_NEAR(clock.serverTime(5000), 603.0, 0.01);
 	EXPECT_NEAR(clock.serverTime(6000), 663.0, 0.01);
-	// Prediction runs half a round trip plus one tick ahead.
-	EXPECT_EQ(clock.predictionTick(5000), 607u);
+	// Prediction runs half a round trip plus two ticks ahead.
+	EXPECT_EQ(clock.predictionTick(5000), 608u);
 	Tick tick;
 	float alpha;
 	clock.renderTime(5000, tick, alpha);

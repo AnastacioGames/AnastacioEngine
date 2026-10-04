@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: predição do cliente segue o relógio (2026-10-04)
+
+- `KX_NetworkManager::ClientPredict` não cresce mais o tick previsto cegamente de um em um: segue a deriva suavizada em relação a `NetClock::predictionTick` (dois passos num quadro quando fica para trás, nenhum quando fica à frente; ressincroniza só acima de meio segundo, como antes). O passo de um tick foi para `ClientPredictTick`.
+- `NetClock::predictionTick`: margem de 1 para 2 ticks (teste `NET_Prediction_test` ajustado).
+- Medição (folga = tick do input − próximo tick do servidor na chegada): antes, a linha de ticks ficava em qualquer ponto até ±8 ticks do alvo, diferente a cada rodada, e as rodadas com folga negativa geravam inputs atrasados e correções. Depois, 8 rodadas do `predict`, todas PASS, erro máximo ≤ 0,134. Resta um viés por rodada da estimativa do relógio (0 a 4 ticks), detalhado em `NOTES-engine.md`.
+
 ## Multiplayer: `network.input_stats` e causa do `predict` intermitente (2026-10-04)
 
 - `KX_NetworkManager::GetInputStats` e `network.input_stats(client)` (servidor): contadores da `InputQueue` do cliente.

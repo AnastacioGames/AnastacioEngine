@@ -180,6 +180,7 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_lagCompTickRate(60),
 	m_predTick(net::kNoTick),
 	m_predResyncs(0),
+	m_predDrift(0.0f),
 	m_lastLanRequestMs(0),
 	m_discoveryStarted(false)
 {
@@ -1830,17 +1831,42 @@ void KX_NetworkManager::ClientPredict(uint64_t now)
 		return;
 	}
 
-	/* Ticks grow by one. The clock's estimate moves in steps (several ticks run back to back in a slow frame,
-	 * then none), so only a drift of half a second (stall, clock resync) restarts the timeline: that drops the
-	 * input history, and the corrections wait until it covers the snapshots again. */
+	/* Ticks grow by one per step. The clock's estimate moves in steps (several ticks run back to back in a slow
+	 * frame, then none), so the timeline follows its smoothed drift: two steps in a frame when it falls behind
+	 * (inputs would reach the server late), none when it runs ahead (extra latency). Only a drift of half a second
+	 * (stall, clock resync) restarts the timeline: that drops the input history, and the corrections wait until
+	 * it covers the snapshots again. */
 	const net::Tick target = m_clock->predictionTick(now);
-	net::Tick tick = m_predTick == net::kNoTick ? target : m_predTick + 1;
-	const int32_t drift = int32_t(target - tick);
+	if (m_predTick == net::kNoTick) {
+		m_predDrift = 0.0f;
+		ClientPredictTick(target, ids);
+		return;
+	}
+	const int32_t drift = int32_t(target - (m_predTick + 1));
 	const int32_t maxDrift = std::max(8, int(m_client->tickRate()) / 2);
 	if (drift > maxDrift || drift < -maxDrift) {
-		tick = target;
 		++m_predResyncs;
+		m_predDrift = 0.0f;
+		ClientPredictTick(target, ids);
+		return;
 	}
+	m_predDrift += (float(drift) - m_predDrift) * 0.1f;
+	int steps = 1;
+	if (m_predDrift > 1.5f) {
+		steps = 2;
+		m_predDrift -= 1.0f;
+	}
+	else if (m_predDrift < -1.5f) {
+		steps = 0;
+		m_predDrift += 1.0f;
+	}
+	for (int i = 0; i < steps; ++i) {
+		ClientPredictTick(m_predTick + 1, ids);
+	}
+}
+
+void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net::NetId> &ids)
+{
 	m_predTick = tick;
 
 	net::InputBlock block;

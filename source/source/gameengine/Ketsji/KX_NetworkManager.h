@@ -351,6 +351,8 @@ private:
 	void ServerStepPredicted();
 	void RecordHitboxes();
 	void ClientPredict(uint64_t now);
+	/// One predicted tick: records and sends the input, steps and reconciles the owned objects.
+	void ClientPredictTick(net::Tick tick, const std::vector<net::NetId> &ids);
 	void ResetPrediction(Entry &entry);
 	void ApplyOffset(Entry &entry, const float offset[3]);
 	bool PredictedState(const Entry &entry, net::ObjectState &state) const;
@@ -419,6 +421,8 @@ private:
 	std::unique_ptr<net::PredictionClient> m_inputLog;
 	net::Tick m_predTick;
 	uint32_t m_predResyncs;
+	/// Smoothed distance from the prediction timeline to the clock's target, in ticks.
+	float m_predDrift;
 	ViewTime m_view;
 	/// m_view when the game last called SetInput().
 	ViewTime m_inputView;
