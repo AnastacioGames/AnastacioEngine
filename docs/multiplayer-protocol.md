@@ -109,7 +109,7 @@ só se `len` passar do fim do pacote.
 | 17 | `FullStateRequest` | 0 | C→S | vazio (cliente perdeu sincronia) |
 | 18 | `Chat` | 1 | ambos | `u16 fromClient`, `str text` (≤ 200 bytes) |
 | 200 | `RpcFrom` | 1/2 | S→C | `u16 fromClient` + corpo do `Rpc`; repasse de `All`/`Others` vindo de um cliente (`NOTES-G.md`) |
-| 201 | `InputTiming` | 2 | S→C | `u32 tick` (tick do servidor na medição), `i16 slack` em 1/16 de tick: tick mais novo de cada `Input` − próximo tick a simular na chegada, suavizado (EMA 0,1); negativo = inputs atrasados. Provisória, ~4 Hz (`NOTES-engine.md`) |
+| 201 | `InputTiming` | 2 | S→C | `u32 tick` (tick do servidor na medição), `i16 slack` em 1/16 de tick: tick mais novo de cada `Input` − próximo tick a simular na chegada, suavizado (EMA 0,1); negativo = inputs atrasados. A cada 15 ticks (~4 Hz) (`NOTES-engine.md`) |
 
 `protocolVersion` = 1. Mudança incompatível no formato incrementa. `RpcFrom` (200) é aditiva: ficou fora
 desse contador porque um cliente que não a conhece simplesmente descarta a mensagem (via
@@ -120,7 +120,8 @@ suportado mas degradado, não um erro de protocolo.
 
 `InputTiming` (201) segue a mesma regra: aditiva e descartável. O cliente usa a folga para ajustar o
 adiantamento da predição (`NetClock::addInputSlack`, alvo de 3 ticks); um cliente que não a conhece só
-fica com a margem fixa do `predictionTick`.
+fica com a margem fixa do `predictionTick`. Contrato fechado em 2026-10-04 após o `predict` passar no Linux e
+no Windows (PASS, erro máximo 0, 0 correções).
 
 `RejectReason`: 1 `VersionMismatch`, 2 `SceneMismatch`, 3 `ServerFull`, 4 `BadToken`, 5 `Banned`,
 6 `GameInProgress` (se o jogo não aceitar entrada tardia).

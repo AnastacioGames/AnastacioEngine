@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: contrato do `201 InputTiming` fechado (2026-10-04)
+
+- `201 InputTiming` deixa de ser provisória em `docs/multiplayer-protocol.md`, como a `200 RpcFrom`: aditiva, fora do `protocolVersion`. Revalidada no Windows (5 rodadas do `predict` PASS, erro 0, 0 correções) e no Linux. Só documentação; o código já era o definitivo.
+
 ## Multiplayer: inputs atrasados restantes medidos (2026-10-04)
 
 - Log temporário (removido) em `InputQueue::receive`: 0 a 11 `late` por rodada do `predict`, espalhados pela rodada, cada um 1 ou 2 ticks antes do `nextTick` e com folga média de 2 a 3,3: pacotes perdidos ou atrasados isolados, não viés do relógio. Sem correções; alvo 3 e ganho 0,3 mantidos. Detalhes em `NOTES-engine.md`.
