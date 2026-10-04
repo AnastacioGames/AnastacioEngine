@@ -35,6 +35,7 @@ endif()
 set(NET_SRC
 	NET_BitStream.cpp
 	NET_Messages.cpp
+	NET_RPC.cpp
 	NET_Session.cpp
 	NET_Snapshot.cpp
 	NET_TransportENet.cpp
@@ -47,6 +48,7 @@ set(NET_SRC
 	NET_BitStream.h
 	NET_ITransport.h
 	NET_Messages.h
+	NET_RPC.h
 	NET_Session.h
 	NET_Snapshot.h
 	NET_Socket.h
@@ -99,6 +101,7 @@ if(NET_STANDALONE)
 		tests/NET_BitStream_test.cpp
 		tests/NET_Golden_test.cpp
 		tests/NET_Messages_test.cpp
+		tests/NET_RPC_test.cpp
 		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp
 		tests/NET_Transport_test.cpp
