@@ -883,17 +883,21 @@ def _sound_code(act):
         raise Unsupported("sound 3D")
     key = act.name
     pingpong = act.mode.startswith('LOOPBIDIRECTIONAL')
+    # Sem dispositivo de audio o handle falha ao ajustar volume/pitch: a engine ignora, aqui tambem.
     on = ["import aud",
           "snd = self.__dict__.setdefault('_snd', {})",
           "h = snd.get(%r)" % key,
           "if h is None or h.status != aud.STATUS_PLAYING:",
-          "    h = aud.Device().play(aud.Sound.file(logic.expandPath(%r))%s)" % (
+          "    try:",
+          "        h = aud.Device().play(aud.Sound.file(logic.expandPath(%r))%s)" % (
               act.sound.filepath, ".pingpong()" if pingpong else ""),
-          "    h.volume = %s" % _act_arg("Volume", act.volume),
-          "    h.pitch = %s" % _act_arg("Pitch", act.pitch)]
+          "        h.volume = %s" % _act_arg("Volume", act.volume),
+          "        h.pitch = %s" % _act_arg("Pitch", act.pitch)]
     if act.mode.startswith('LOOP'):
-        on.append("    h.loop_count = -1")
-    on.append("    snd[%r] = h" % key)
+        on.append("        h.loop_count = -1")
+    on += ["        snd[%r] = h" % key,
+           "    except aud.error:",
+           "        snd.pop(%r, None)" % key]
     off = []
     if act.mode != 'PLAYEND':
         off = ["import aud",
@@ -967,14 +971,18 @@ class %(classname)s(%(base)s):
         """Near sensor com histerese: depois de detectar, so solta alem de reset."""
         key = "near:" + key
         limit = reset if self._prev.get(key) else dist
-        found = any(o is not ob and (not prop or prop in o) and ob.getDistanceTo(o) <= limit
+        found = any(o is not ob and self._actor(o) and (not prop or prop in o) and ob.getDistanceTo(o) <= limit
                     for o in ob.scene.objects)
         self._prev[key] = found
         return found
 
+    def _actor(self, o):
+        """Near/Radar so enxergam objetos Actor com fisica (a lista vem do carregamento: nomes com Actor ligado)."""
+        return o.name in self._actors and o.getPhysicsId() != 0
+
     def _radar(self, ob, axis, prop, dist, half_angle):
         for o in ob.scene.objects:
-            if o is ob or (prop and prop not in o):
+            if o is ob or not self._actor(o) or (prop and prop not in o):
                 continue
             d, vec, _local = ob.getVectTo(o)
             if 0 < d <= dist and axis.angle(vec) <= half_angle:
@@ -1905,6 +1913,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             mask |= 1 << (cont.states - 1)
         out.append(_RUNNER % {"classname": classname, "mask": mask})
     body = "\n".join(out)
+    if "self._near(" in body or "self._radar(" in body:
+        actors = sorted(o.name for o in bpy.data.objects if o.game.use_actor)
+        start_extra += "        self._actors = frozenset(%r)\n" % (actors,)
     if "self._track_parent(" in body:
         # Pai e orientacao local inicial dele (a engine guarda no carregamento).
         start_extra += ("        _p = self.object.parent\n"

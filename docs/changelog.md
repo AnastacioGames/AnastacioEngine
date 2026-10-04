@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Logic Bricks → Python Component, fase 4 (2026-10-04)
+
+- `logic_to_python.py`: **Ray por material com x-ray** (marca os objetos com o material numa propriedade privada `__lcmat_*` e usa o `rayCast` x-ray; vale também no eixo Gaze); **Collision/Near/Radar** de sensor ligado de outro objeto (`_near`/`_radar` com o objeto dono, `_take` com callback de colisão por objeto); **Sound ping-pong** (`aud.Sound.pingpong()`, Loop Bidirectional e Stop) e som tolerante a falta de dispositivo de áudio; **Track To com pai** (porta de `vectomat` + interpolação Euler, orientação local inicial do pai guardada no `start`).
+- Achado: Near/Radar da engine só enxergam objetos **Actor** com física; o helper detectava qualquer objeto com a propriedade. Corrigido com a lista de Actors do carregamento. Sensores Movement/Gaze/VR Head de outro objeto liam o objeto errado sem aviso; agora ficam como brick.
+- `tools/create_logic_convert_scene.py`: Veil/Target (x-ray), Faller/Floor/Decoy (Collision, Near, Radar e controle negativo), Turret filho de Pivot (Track To com pai, time=3), Sound ping-pong; `LEFT_AS_BRICK` lista o que sobrou (0).
+- Validado no build `linux-editor` headless (`RangeRuntime` sob xvfb): CHECK idêntico em bricks e Component; Module e Script iguais entre si, só `cam y` difere (-0,03 vs -0,04), igual na `origin/main`. Ambiente e contornos de build em [notes-logic-f4.md](notes-logic-f4.md).
+
 ## Multiplayer: núcleo de rede completo (frentes A–J, 2026-10-04)
 
 - Frentes E–J feitas em sessões na nuvem e revisadas no Windows: replicação (`NET_Replicator`, `NET_ReplicaClient`, `NET_IWorld`, `net_bench`), predição/lag compensation/relógio (`NET_Prediction`, `NET_LagCompensation`, `NET_Clock`), RPC (`NET_RPC`, `ServerSession::reportViolation`), descoberta LAN (`NET_LanDiscovery`, `net_echo lan`), telas de pausa/configurações/LAN do menu e CI com wasm32 e Docker.

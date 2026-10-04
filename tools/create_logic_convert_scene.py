@@ -5,6 +5,7 @@ With "convert" the bricks of "Player" are converted by logic.convert_to_componen
 before saving. Running both files in RangeRuntime must print the same CHECK line.
 """
 import bpy
+import math
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -33,6 +34,7 @@ bpy.ops.mesh.primitive_cube_add(location=(20, 0, 0))
 wall = bpy.context.active_object
 wall.name = "Wall"
 wall.game.physics_type = 'STATIC'
+wall.game.use_actor = True
 bpy.ops.object.game_property_new(type='BOOL', name="wall")
 wall.data.materials.append(bpy.data.materials.new("WallMat"))
 scene.objects.active = player
@@ -298,7 +300,7 @@ for sname, xray, prop in (("SeeTargetXray", True, "sawx"), ("SeeTargetNoXray", F
     link([s_x], c_x, [a_x])
 
 # F4: Collision/Near/Radar de outro objeto (Faller, dinamico, cai no Floor) ligados a controllers do Player.
-for name in ("landed", "nearw", "radw"):
+for name in ("landed", "nearw", "radw", "neard"):
     bpy.ops.object.game_property_new(type='INT', name=name)
 bpy.ops.mesh.primitive_cube_add(location=(0, 0, -5))
 floor = bpy.context.active_object
@@ -311,6 +313,13 @@ faller = bpy.context.active_object
 faller.name = "Faller"
 faller.scale = (0.5, 0.5, 0.5)
 faller.game.physics_type = 'RIGID_BODY'
+# Decoy: tem a propriedade, mas nao e Actor; Near/Radar da engine nao enxergam (controle negativo).
+bpy.ops.mesh.primitive_cube_add(location=(0, 3, -3.5))
+decoy = bpy.context.active_object
+decoy.name = "Decoy"
+decoy.game.physics_type = 'STATIC'
+decoy.game.use_actor = False
+bpy.ops.object.game_property_new(type='BOOL', name="decoy")
 scene.objects.active = faller
 bpy.ops.logic.sensor_add(type='COLLISION', name="Landed", object=faller.name)
 s_land = faller.game.sensors["Landed"]
@@ -324,10 +333,17 @@ bpy.ops.logic.sensor_add(type='RADAR', name="RadarWall", object=faller.name)
 s_rad = faller.game.sensors["RadarWall"]
 s_rad.property = "wall"
 s_rad.axis = 'XAXIS'
-s_rad.angle = 90.0
+s_rad.angle = math.radians(90.0)
 s_rad.distance = 100.0
 scene.objects.active = player
-for sens, cname, prop in ((s_land, "Landed", "landed"), (s_near, "NearWall", "nearw"), (s_rad, "RadarWall", "radw")):
+bpy.ops.logic.sensor_add(type='NEAR', name="NearDecoy", object=faller.name)
+s_nd = faller.game.sensors["NearDecoy"]
+s_nd.property = "decoy"
+s_nd.distance = 25.0
+s_nd.reset_distance = 30.0
+scene.objects.active = player
+for sens, cname, prop in ((s_land, "Landed", "landed"), (s_near, "NearWall", "nearw"), (s_rad, "RadarWall", "radw"),
+                          (s_nd, "NearDecoy", "neard")):
     c_f = brick("controller", 'LOGIC_AND', cname, 2)
     a_f = brick("actuator", 'PROPERTY', cname)
     a_f.mode = 'ADD'
@@ -379,10 +395,10 @@ text.from_string(
     "if own['frames'] == 60:\n"
     "    p = logic.getCurrentScene().objects['Player']\n"
     "    bullets = len([o for o in own.scene.objects if o.name == 'Bullet'])\n"
-    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f moved=%d rv=%d joy=%d kid=%s mvis=%s sawx=%d sawn=%d landed=%d nearw=%d radw=%d aim=%s' % (\n"
+    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f moved=%d rv=%d joy=%d kid=%s mvis=%s sawx=%d sawn=%d landed=%d nearw=%d radw=%d neard=%d aim=%s' % (\n"
     "        p['score'], p['ticks'], p['alive'], p.state, p.worldPosition.x, p.worldPosition.y,\n"
     "        p['pulses'], bullets, p['saw'], p['sawmat'], own.scene.objects['Box']['boxn'], own.scene.objects['Box'].worldPosition.z, p['msgs'], *own.scene.objects['Cam'].worldPosition, p['moved'], p['rv'], p['joy'], own.scene.objects['Kid'].parent, logic.mouse.visible,\n"
-    "        p['sawx'], p['sawn'], p['landed'], p['nearw'], p['radw'],\n"
+    "        p['sawx'], p['sawn'], p['landed'], p['nearw'], p['radw'], p['neard'],\n"
     "        ','.join('%.2f' % v for row in own.scene.objects['Turret'].worldOrientation for v in row))\n"
     "    print(line, flush=True)\n"
     "    with open(logic.expandPath('//' + own.scene.name + '_check.txt'), 'w') as f:\n"

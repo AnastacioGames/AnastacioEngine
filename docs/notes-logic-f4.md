@@ -41,3 +41,19 @@ Sessão automática (2026-10-04), sem perguntas ao usuário; dúvidas e bloqueio
   carregamento). Fica como brick: **pai de vértice** (a engine ignora o pai e grava a orientação de mundo como
   local; não dá para reproduzir com a API de Python) e Track To por propriedade/objeto dinâmico (já era brick).
 - OpenColorIO tambem precisa de -DWITH_OPENCOLORIO=OFF -DWITH_CODEC_FFMPEG=OFF (ocio_impl.cc usa API v1; Ubuntu 24.04 traz v2.1).
+
+## Validação (2026-10-04)
+
+- Rodar: `PYTHONPATH=<numpy 1.26 para py3.11> BLENDER_SYSTEM_SCRIPTS=source/release/scripts`, gerar com
+  `RangeEngine -b --python tools/create_logic_convert_scene.py -- <saida.range> [convert[:MODULE|SCRIPT]]` e
+  rodar `xvfb-run RangeRuntime <saida.range>`. O numpy do apt é de outro Python (3.12): usei
+  `pip install --target /tmp/np311 numpy==1.26.4` com o `python3.11` do sistema (sem numpy o runtime dá segfault).
+- Resultado: CHECK idêntico em bricks e Component. Module/Script: idênticos entre si; só `cam y` (-0,03 contra
+  -0,04) difere de bricks, também em `origin/main` (ordem de avaliação do Camera actuator entre objetos): pendência
+  antiga, não da F4.
+- `LEFT_AS_BRICK 0`: nada do objeto de teste sobrou como brick.
+- Sem áudio (ALSA sem placa) `h.volume = ...` levanta `aud.error`; o código gerado agora ignora, como a engine.
+- Near/Radar: continuam aproximados (distância ao centro e ângulo ao centro, não esfera/cone físico). Só Actor
+  com física, igual à engine. Objetos criados depois herdam o nome, então a lista de Actors vale para cópias.
+- Dúvida para o usuário: vale portar os actuators de outro objeto que usam helper (Camera, Constraint, Steering,
+  Mouse Look)? Hoje continuam brick quando o dono do actuator não é o objeto convertido.
