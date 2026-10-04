@@ -85,3 +85,13 @@ aceita o formato antigo do stub (`"address": "ip:porta"` sem `port`).
 2. A senha vai em que campo do `Hello`? Proposta: `str password` no fim do `Hello` (versão 2 do protocolo),
    ou um hash dela no `token`. Fica para a frente que implementar `host(password=)`.
 3. `set_simulation` só faz sentido no build de desenvolvimento; a engine pode ignorar no build final.
+
+## Implementação na engine (2026-10-04, branch `net/engine`)
+
+`Range.network` (`Ketsji/KX_PyNetwork.cpp`) implementa esta tabela. Diferenças e respostas às dúvidas:
+`host(password=)`/`join(password=)` aceitam a senha mas **ignoram com aviso** (o `Hello` v1 não tem campo; dúvidas 1 e 2
+seguem abertas) e `discover_lan()` devolve `password=False`; código de sala em `join()` devolve `False` com aviso (sem serviço de
+lobby); `set_simulation` vale a partir do próximo `host()`/`join()`; `clients` do lado do cliente traz o host como `id 0, isHost`,
+o `ping` só do próprio jogador (os dos outros ficam 0) e `ready` pelos RPCs internos `net.ready*`; `roomName`/`maxPlayers`
+só existem no servidor (no cliente: `""` e `0`). Extras além da tabela: `on_player_join`, `on_player_leave`, `tick`, `rtt`, `localId`,
+`replicate`, `spawn`, `despawn`, `set_owner`, `owner`, `is_owner`, `net_id`. Detalhes em `source/source/gameengine/Network/NOTES-engine.md`.

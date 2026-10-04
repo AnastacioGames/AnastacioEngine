@@ -51,6 +51,7 @@ typedef struct bProperty {
 
 /* property->flag */
 #define PROP_DEBUG		1
+#define PROP_REPLICATED	2	/* sent to the network clients (multiplayer) */
 
 #define MAX_PROPSTRING	128
 

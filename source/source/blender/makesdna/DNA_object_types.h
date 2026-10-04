@@ -472,6 +472,25 @@ enum {
 	OB_ACTIVITY_LOGIC_COMPONENTS = (1 << 3)
 };
 
+/* Multiplayer: per-object replication settings (Object properties > Game > Network). Zeroed on objects
+ * created before it existed; the first "Replicate" enable seeds the defaults and generates the net_id. */
+typedef struct RangeNetObjectSettings {
+	unsigned int net_id;   /* id in the .range file, 1..0x7FFFFFFF; 0 = not generated yet */
+	int flags;             /* NET_OBJ_* */
+	float priority;        /* added to the replication priority of the object on every snapshot it waits */
+	int pad;
+} RangeNetObjectSettings;
+
+/* RangeNetObjectSettings.flags */
+enum {
+	NET_OBJ_REPLICATE        = 1 << 0,
+	NET_OBJ_SYNC_TRANSFORM   = 1 << 1,
+	NET_OBJ_SYNC_VELOCITY    = 1 << 2,
+	NET_OBJ_SYNC_ANGULAR     = 1 << 3,
+	NET_OBJ_ALWAYS_RELEVANT  = 1 << 4,  /* sent to every client whatever the distance */
+	NET_OBJ_INTERPOLATE      = 1 << 5,  /* clients render it between snapshots */
+};
+
 typedef struct Object {
 	ID id;
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
@@ -735,6 +754,9 @@ typedef struct Object {
 
 	/* User names for the 30 logic states (empty = unnamed). */
 	char state_names[30][32];
+
+	/* Multiplayer replication, opt-in via net.flags & NET_OBJ_REPLICATE. */
+	struct RangeNetObjectSettings net;
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */

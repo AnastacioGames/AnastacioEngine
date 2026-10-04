@@ -57,6 +57,7 @@
 #include "SCA_PythonController.h"
 #include "KX_CollisionEventManager.h"
 #include "KX_CutsceneManager.h"
+#include "KX_NetworkManager.h"
 #include "SCA_KeyboardManager.h"
 #include "SCA_MouseManager.h"
 #include "SCA_ActuatorEventManager.h"
@@ -1375,6 +1376,14 @@ void KX_Scene::RemoveEuthanasyObjects()
 
 bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 {
+	// Multiplayer: the replication layer forgets the object before it is destroyed.
+	if (gameobj->GetNetId() != 0) {
+		KX_NetworkManager *network = KX_GetActiveEngine()->GetNetworkManager();
+		if (network) {
+			network->OnObjectRemoved(gameobj);
+		}
+	}
+
 	// Remove property from debug list.
 	RemoveObjectDebugProperties(gameobj);
 

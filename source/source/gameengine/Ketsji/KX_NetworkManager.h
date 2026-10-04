@@ -1,0 +1,327 @@
+/*
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file KX_NetworkManager.h
+ *  \ingroup ketsji
+ *  \brief Bridge between the network core (gameengine/Network, namespace net) and the game engine.
+ *
+ * It owns the server or client session, the replication layer and the LAN discovery, implements
+ * net::IWorld on top of KX_GameObject and is ticked by KX_SimulationPipeline: one fixed logic step is
+ * one network tick (docs/multiplayer-plan.md, section 2.3). Not related to the local-message classes in
+ * KXNetwork/ (Message sensor/actuator), which stay as they were.
+ */
+
+#ifndef __KX_NETWORKMANAGER_H__
+#define __KX_NETWORKMANAGER_H__
+
+#include "NET_IWorld.h"
+#include "NET_LanDiscovery.h"
+#include "NET_ITransport.h"
+#include "NET_RPC.h"
+#include "NET_ReplicaClient.h"
+#include "NET_Replicator.h"
+#include "NET_Session.h"
+#include "NET_Clock.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+class KX_GameObject;
+class KX_KetsjiEngine;
+class KX_Scene;
+
+class KX_NetworkManager : public net::IWorld
+{
+public:
+	struct HostOptions {
+		/// ENet (UDP) port; 0 = scene setting.
+		int port = 0;
+		/// WebSocket (TCP) port; < 0 = scene setting, 0 = no WebSocket.
+		int wsPort = -1;
+		/// 0 = scene setting.
+		int maxPlayers = 0;
+		/// Empty = scene setting (Server Name).
+		std::string roomName;
+		/// 0 = scene setting, then the Logic tic rate of the engine.
+		int tickRate = 0;
+		/// 0 = scene setting.
+		int snapshotRate = 0;
+		/// < 0 = scene setting.
+		int lan = -1;
+		int lateJoin = -1;
+		/// Server without local player.
+		bool dedicated = false;
+	};
+
+	/// What the game script learns about the session.
+	struct Event {
+		enum Type {
+			CONNECT,  // client: Welcome received; server: room open (client = 0)
+			DISCONNECT,  // reason = DisconnectReason
+			REJECT,  // reason = RejectReason, text = detail
+			CHAT,  // client = sender
+			START,  // the host started the match
+			PLAYER_JOIN,  // client, text = name
+			PLAYER_LEAVE,  // client
+		};
+		Type type = CONNECT;
+		int client = 0;
+		int reason = 0;
+		std::string text;
+	};
+
+	struct PlayerInfo {
+		int id = 0;
+		std::string name;
+		int ping = 0;
+		bool ready = false;
+		bool isHost = false;
+	};
+
+	explicit KX_NetworkManager(KX_KetsjiEngine *engine);
+	~KX_NetworkManager() override;
+
+	/* -------------------------------------------------------------------- */
+	/** \name Session
+	 * \{ */
+
+	/// Opens a server. The scene is the active scene (KX_GetActiveScene()) unless one is given.
+	bool Host(const HostOptions &options, std::string &error, KX_Scene *scene = nullptr);
+	/// Joins a server. port <= 0 = scene setting.
+	bool Join(const std::string &host, int port, std::string &error, KX_Scene *scene = nullptr);
+	/// Leaves the session (Quit / ServerShutdown) and gives the objects back to the local simulation.
+	void Disconnect();
+	/// Engine stopping: Disconnect() without events, before the scenes are destroyed.
+	void Shutdown();
+	/// Starts the session the scene settings ask for (Host, Client or Dedicated); no-op for Offline.
+	bool StartFromScene(KX_Scene *scene);
+
+	/// A session is open (server running or client connecting/connected): the pipeline ticks us.
+	bool IsActive() const;
+	bool IsServer() const;
+	bool IsClient() const;
+	/// Server running, or client past the handshake.
+	bool IsConnected() const;
+	bool IsAdoptingTickRate() const;
+	bool IsDedicated() const;
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Called by KX_SimulationPipeline once per fixed logic step
+	 * \{ */
+	void BeginTick();
+	void EndTick();
+	/** \} */
+
+	/// KX_Scene::NewRemoveObject: forget an object before it is destroyed.
+	void OnObjectRemoved(KX_GameObject *obj);
+
+	/* -------------------------------------------------------------------- */
+	/** \name Replication
+	 * \{ */
+
+	struct ReplicateOptions {
+		bool syncTransform = true;
+		bool syncVelocity = false;
+		bool syncAngular = false;
+		bool alwaysRelevant = false;
+		float priority = 1.0f;
+		/// Names of the game properties to replicate (Bool, Int and Float only).
+		std::vector<std::string> props;
+	};
+
+	/// Script registration of a scene object (same effect as the Replicate checkbox). Returns its net id
+	/// (0 on failure). Run it before host()/join(), in the same order on every peer.
+	net::NetId Replicate(KX_GameObject *obj, const ReplicateOptions &options, std::string &error);
+	/// Server only: creates a replica of the inactive object `prototype` and replicates it. Returns it
+	/// (nullptr + error on failure).
+	KX_GameObject *Spawn(const std::string &prototype, net::ClientId owner, const float *position,
+	                     const float *orientation, std::string &error);
+	bool Despawn(KX_GameObject *obj);
+	bool SetOwner(KX_GameObject *obj, net::ClientId owner);
+	/// Owner of a replicated object; false when it is not replicated.
+	bool GetOwner(KX_GameObject *obj, net::ClientId &owner) const;
+	net::NetId GetNetId(KX_GameObject *obj) const;
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Lobby
+	 * \{ */
+	void SetReady(bool ready);
+	bool SendChat(const std::string &text);
+	/// Server only. False when someone is not ready or there is no session.
+	bool StartGame();
+	std::vector<PlayerInfo> GetPlayers() const;
+	void SetEventSink(const std::function<void(const Event &)> &sink);
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name LAN list and network simulator
+	 * \{ */
+	/// First call opens the search; the following ones return what answered (request resent every ~1 s).
+	const std::vector<net::LanServerEntry> &DiscoverLan();
+	/// Applies to the next Host()/Join() (the transports are wrapped when created).
+	void SetSimulation(uint32_t latencyMs, uint32_t jitterMs, float lossPercent);
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Settings and state
+	 * \{ */
+	const std::string &GetPlayerName() const;
+	void SetPlayerName(const std::string &name);
+	const std::string &GetRoomName() const;
+	int GetMaxPlayers() const;
+	net::ClientId GetLocalClientId() const;
+	net::Tick GetTick() const;
+	float GetRttMs() const;
+	std::string GetGameId() const;
+	/** \} */
+
+	/* IWorld */
+	bool getTransform(net::NetId id, float position[3], float rotation[4]) const override;
+	bool getVelocity(net::NetId id, float linear[3], float angular[3]) const override;
+	bool getProperties(net::NetId id, std::vector<net::PropValue> &props) const override;
+	bool isSleeping(net::NetId id) const override;
+	void setTransform(net::NetId id, const float position[3], const float rotation[4]) override;
+	void setVelocity(net::NetId id, const float linear[3], const float angular[3]) override;
+	void setProperties(net::NetId id, const std::vector<net::PropValue> &props) override;
+	bool spawn(net::NetId id, const std::string &prototype, net::ClientId owner,
+	           const net::ObjectState &state) override;
+	void despawn(net::NetId id) override;
+	void setOwner(net::NetId id, net::ClientId owner) override;
+	bool exists(net::NetId id) const override;
+
+private:
+	enum class Role { NONE, SERVER, CLIENT };
+
+	struct SceneSettings {
+		int port = 7777;
+		int wsPort = 0;
+		int maxPlayers = 8;
+		std::string roomName;
+		std::string address;
+		std::string gameId;
+		uint32_t gameVersion = 1;
+		int tickRate = 0;
+		int snapshotRate = 20;
+		bool lan = true;
+		bool lateJoin = true;
+	};
+
+	struct Entry {
+		KX_GameObject *obj = nullptr;
+		std::vector<std::string> propNames;
+		std::vector<net::PropertyDesc> schema;
+		net::ReplicatedObjectDesc desc;
+		std::string prototype;
+		bool spawned = false;
+		bool dynamicsSuspended = false;
+		net::ClientId owner = net::kServerClientId;
+	};
+
+	SceneSettings ReadSceneSettings(KX_Scene *scene) const;
+	bool Prepare(KX_Scene *scene, std::string &error);
+	/// Registers every object with the Replicate flag of the scene and gives it its net id.
+	void CollectSceneObjects();
+	net::NetId AssignNetId(KX_GameObject *obj, net::NetId wanted);
+	bool BuildEntry(KX_GameObject *obj, net::NetId id, const ReplicateOptions *scriptOptions, Entry &entry) const;
+	void BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const;
+	static void CollectProps(KX_GameObject *obj, std::vector<std::string> &names);
+	uint64_t ComputeSceneHash(const std::string &sceneName) const;
+	std::unique_ptr<net::ITransport> WrapSim(std::unique_ptr<net::ITransport> inner) const;
+	void BuildRpc();
+	void OpenSession();
+	void CloseSession(bool sendQuit, bool shutdown = false);
+	void ReleaseEntries(bool all);
+	void AbortOpen();
+	void SuspendForClient(Entry &entry);
+	void RestoreFromClient(Entry &entry);
+	void Emit(const Event &event);
+	void ServerTickBegin(uint64_t now);
+	void ClientTickBegin(uint64_t now);
+	void HandleServerEvent(const net::SessionEvent &event, uint64_t now, std::vector<net::SessionEvent> &events);
+	void HandleClientEvent(const net::SessionEvent &event, uint64_t now);
+	void UpdateLanInfo();
+	Entry *FindEntry(net::NetId id);
+	const Entry *FindEntry(net::NetId id) const;
+	const std::vector<net::PropertyDesc> *SchemaFor(net::NetId id, const std::string &prototype);
+	KX_GameObject *CreateReplica(const std::string &prototype, std::string &error);
+
+	KX_KetsjiEngine *m_engine;
+	KX_Scene *m_scene;
+	Role m_role;
+	bool m_dedicated;
+	bool m_adoptingTickRate;
+	bool m_prevFixedTimestep;
+	double m_prevTicRate;
+	bool m_sessionOpen;
+	bool m_applyingRemote;
+	bool m_inEmit;
+
+	std::string m_playerName;
+	std::string m_roomName;
+	std::string m_gameId;
+	uint32_t m_gameVersion;
+	int m_maxPlayers;
+	int m_snapshotRate;
+	uint64_t m_sceneHash;
+	std::string m_sceneName;
+	net::Tick m_tick;
+	net::NetSimSettings m_sim;
+	bool m_simEnabled;
+
+	std::map<net::NetId, Entry> m_entries;
+	std::map<std::string, std::vector<net::PropertyDesc>> m_protoSchemas;
+	std::map<std::string, std::vector<std::string>> m_protoPropNames;
+
+	/* Server. */
+	std::unique_ptr<net::ITransport> m_serverTransport;
+	std::unique_ptr<net::ServerSession> m_server;
+	std::unique_ptr<net::Replicator> m_replicator;
+	std::unique_ptr<net::RpcServer> m_rpcServer;
+	net::LanResponder m_lanResponder;
+	bool m_lanActive;
+	bool m_gameStarted;
+	std::map<net::ClientId, bool> m_ready;
+	bool m_hostReady;
+
+	/* Client. */
+	std::unique_ptr<net::ITransport> m_clientTransport;
+	std::unique_ptr<net::ClientSession> m_client;
+	std::unique_ptr<net::ReplicaClient> m_replica;
+	std::unique_ptr<net::RpcClient> m_rpcClient;
+	std::unique_ptr<net::NetClock> m_clock;
+	uint32_t m_pongCount;
+	net::Tick m_lastClockSnapshot;
+	bool m_connectedEmitted;
+	std::map<net::ClientId, bool> m_remoteReady;
+
+	net::RpcTable m_rpcTable;
+	std::function<void(const Event &)> m_eventSink;
+
+	net::LanDiscovery m_discovery;
+	uint64_t m_lastLanRequestMs;
+	bool m_discoveryStarted;
+};
+
+#endif  // __KX_NETWORKMANAGER_H__

@@ -76,6 +76,10 @@ bool BKE_object_is_in_editmode_vgroup(const struct Object *ob);
 bool BKE_object_is_in_wpaint_select_vert(const struct Object *ob);
 
 void BKE_object_init(struct Object *ob);
+/** Seeds the multiplayer settings of an object on its first "Replicate" enable (sync transform + interpolate). */
+void BKE_object_net_defaults(struct Object *ob);
+/** Gives ob a random multiplayer id (1..0x7FFFFFFF) that no other object of bmain uses. */
+void BKE_object_net_id_generate(struct Main *bmain, struct Object *ob);
 struct Object *BKE_object_add_only_object(
         struct Main *bmain,
         int type, const char *name)

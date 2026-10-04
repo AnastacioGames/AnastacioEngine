@@ -51,6 +51,7 @@
 #include "KX_DebugMode.h"
 
 #include "KX_NetworkMessageManager.h"
+#include "KX_NetworkManager.h"
 
 #ifdef WITH_PYTHON
 #  include "Texture.h" // For FreeAllTextures.
@@ -372,6 +373,12 @@ void LA_Launcher::InitEngine()
 	 */
 	Scene *scene = m_kxStartScene->GetBlenderScene(); // needed for macro
 	m_ketsjiEngine->SetAnimFrameRate(FPS);
+
+	/* Multiplayer: the Network panel of the scene (Host, Client, Dedicated) opens the session when the game
+	 * starts; scripts can still call Range.network later. Offline scenes never create the manager. */
+	if (scene->gm.network.mode != NET_MODE_OFFLINE) {
+		m_ketsjiEngine->GetOrCreateNetworkManager()->StartFromScene(m_kxStartScene);
+	}
 }
 
 

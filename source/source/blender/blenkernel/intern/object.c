@@ -59,6 +59,9 @@
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
 #include "BLI_linklist.h"
+#include "BLI_hash.h"
+#include "BLI_rand.h"
+#include "PIL_time.h"
 #include "BLI_kdtree.h"
 
 #include "BLT_translation.h"
@@ -602,6 +605,41 @@ void *BKE_object_obdata_add_from_type(Main *bmain, int type, const char *name)
 			printf("%s: Internal error, bad type: %d\n", __func__, type);
 			return NULL;
 	}
+}
+
+void BKE_object_net_defaults(Object *ob)
+{
+	ob->net.flags |= NET_OBJ_SYNC_TRANSFORM | NET_OBJ_INTERPOLATE;
+	if (ob->net.priority <= 0.0f) {
+		ob->net.priority = 1.0f;
+	}
+}
+
+void BKE_object_net_id_generate(Main *bmain, Object *ob)
+{
+	/* The id is saved in the .range file, so it is random on purpose: ids chosen from the object name would
+	 * change on rename, and two artists adding objects in sequence would hand out the same numbers. */
+	RNG *rng = BLI_rng_new_srandom((unsigned int)(PIL_check_seconds_timer() * 1000000.0) ^
+	                               (unsigned int)(uintptr_t)ob ^ BLI_hash_int_2d(bmain ? BLI_listbase_count(&bmain->object) : 0, 7));
+
+	ob->net.net_id = 0;  /* stays 0 only if 1000 draws all collide, which never happens in practice */
+	for (int attempt = 0; attempt < 1000; attempt++) {
+		const unsigned int id = (unsigned int)BLI_rng_get_int(rng) & 0x7FFFFFFFu;
+		bool used = (id == 0);
+		if (!used && bmain) {
+			for (Object *other = bmain->object.first; other; other = other->id.next) {
+				if (other != ob && other->net.net_id == id) {
+					used = true;
+					break;
+				}
+			}
+		}
+		if (!used) {
+			ob->net.net_id = id;
+			break;
+		}
+	}
+	BLI_rng_free(rng);
 }
 
 void BKE_object_init(Object *ob)
@@ -1350,7 +1388,7 @@ void BKE_object_transform_copy(Object *ob_tar, const Object *ob_src)
  *
  * \param flag: Copying options (see BKE_library.h's LIB_ID_COPY_... flags for more).
  */
-void BKE_object_copy_data(Main *UNUSED(bmain), Object *ob_dst, const Object *ob_src, const int flag)
+void BKE_object_copy_data(Main *bmain, Object *ob_dst, const Object *ob_src, const int flag)
 {
 	ModifierData *md;
 
@@ -1373,6 +1411,14 @@ void BKE_object_copy_data(Main *UNUSED(bmain), Object *ob_dst, const Object *ob_
 
 	if (ob_src->bb) ob_dst->bb = MEM_dupallocN(ob_src->bb);
 	ob_dst->flag &= ~OB_FROMGROUP;
+
+	/* A duplicate is a new replicated object: it never shares the net_id of the original. */
+	if (ob_dst->net.net_id != 0) {
+		ob_dst->net.net_id = 0;
+		if (ob_dst->net.flags & NET_OBJ_REPLICATE) {
+			BKE_object_net_id_generate(bmain, ob_dst);
+		}
+	}
 
 	BLI_listbase_clear(&ob_dst->modifiers);
 

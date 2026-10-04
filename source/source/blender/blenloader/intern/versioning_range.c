@@ -590,6 +590,13 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "GameData", "RangeNetworkSettings", "network")) {
+    /* Multiplayer: old scenes start offline with the same defaults as new ones. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      BKE_scene_network_defaults(&scene->gm.network);
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Camera", "CameraGameFX", "gamefx")) {
     /* Camera focus/FX: old cameras get the defaults, with every effect off. */
     LISTBASE_FOREACH (Camera *, camera, &main->camera) {

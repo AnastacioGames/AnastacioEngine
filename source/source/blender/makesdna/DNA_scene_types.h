@@ -968,6 +968,37 @@ typedef struct RenderAttachment {
 
 #define GAME_ATTACHMENT_COUNT 7
 
+/* Multiplayer: per-scene network settings (Scene properties > Game > Network). The struct is zeroed on
+ * scenes saved before it existed: versioning_range.c seeds the defaults, and the game engine also treats
+ * 0 as "default" for port, rates and max players. */
+typedef struct RangeNetworkSettings {
+	short mode;            /* NET_MODE_* */
+	short max_players;     /* 1..64 */
+	int port;              /* ENet (UDP) port */
+	int ws_port;           /* WebSocket (TCP) port for Web/Android clients, 0 = off */
+	short tick_rate;       /* logic steps per second while a session is open, 0 = Logic tic rate of the scene */
+	short snapshot_rate;   /* snapshots per second sent to each client */
+	int flags;             /* NET_SCENE_* */
+	int game_version;      /* peers with another version are refused in the handshake */
+	char server_name[64];  /* room name shown in the LAN list */
+	char address[64];      /* default address for NET_MODE_CLIENT */
+	char game_id[32];      /* peers with another game id do not see each other */
+} RangeNetworkSettings;
+
+/* RangeNetworkSettings.mode */
+enum {
+	NET_MODE_OFFLINE   = 0,
+	NET_MODE_HOST      = 1,  /* server + local player in the same process */
+	NET_MODE_CLIENT    = 2,
+	NET_MODE_DEDICATED = 3,  /* server only (no local player) */
+};
+
+/* RangeNetworkSettings.flags */
+enum {
+	NET_SCENE_LAN_DISCOVERY = 1 << 0,  /* answers LAN discovery requests while hosting */
+	NET_SCENE_LATE_JOIN     = 1 << 1,  /* clients can join after the game started */
+};
+
 typedef struct GameData {
 
 	/* standalone player */
@@ -1042,6 +1073,9 @@ typedef struct GameData {
 	char cursorimage_path[1024]; /* FILE_MAX */
 	int cursor_size;
 	int cursor_offset_x, cursor_offset_y;
+
+	/* Multiplayer */
+	struct RangeNetworkSettings network;
 } GameData;
 
 /* GameData.stereoflag */

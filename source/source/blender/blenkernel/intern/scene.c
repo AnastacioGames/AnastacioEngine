@@ -655,6 +655,22 @@ void BKE_scene_free(Scene *sce)
 	}
 }
 
+void BKE_scene_network_defaults(RangeNetworkSettings *net)
+{
+	memset(net, 0, sizeof(*net));
+	net->mode = NET_MODE_OFFLINE;
+	net->max_players = 8;
+	net->port = 7777;
+	net->ws_port = 7778;
+	net->tick_rate = 0;
+	net->snapshot_rate = 20;
+	net->flags = NET_SCENE_LAN_DISCOVERY | NET_SCENE_LATE_JOIN;
+	net->game_version = 1;
+	BLI_strncpy(net->server_name, "Anastacio Server", sizeof(net->server_name));
+	BLI_strncpy(net->address, "127.0.0.1", sizeof(net->address));
+	BLI_strncpy(net->game_id, "anastacio-game", sizeof(net->game_id));
+}
+
 void BKE_scene_init(Scene *sce)
 {
 	ParticleEditSettings *pset;
@@ -938,6 +954,8 @@ void BKE_scene_init(Scene *sce)
 	sce->gm.lodflag = SCE_LOD_USE_HYST;
 	sce->gm.scehysteresis = 10;
 	sce->gm.max_debris = 150;
+
+	BKE_scene_network_defaults(&sce->gm.network);
 
 	sce->gm.exitkey = 218; // Blender key code for ESC
 
