@@ -35,6 +35,8 @@ endif()
 set(NET_SRC
 	NET_BitStream.cpp
 	NET_Messages.cpp
+	NET_ReplicaClient.cpp
+	NET_Replicator.cpp
 	NET_Session.cpp
 	NET_Snapshot.cpp
 	NET_TransportENet.cpp
@@ -46,7 +48,10 @@ set(NET_SRC
 
 	NET_BitStream.h
 	NET_ITransport.h
+	NET_IWorld.h
 	NET_Messages.h
+	NET_ReplicaClient.h
+	NET_Replicator.h
 	NET_Session.h
 	NET_Snapshot.h
 	NET_Socket.h
@@ -99,6 +104,7 @@ if(NET_STANDALONE)
 		tests/NET_BitStream_test.cpp
 		tests/NET_Golden_test.cpp
 		tests/NET_Messages_test.cpp
+		tests/NET_Replication_test.cpp
 		tests/NET_Session_test.cpp
 		tests/NET_Snapshot_test.cpp
 		tests/NET_Transport_test.cpp
@@ -127,5 +133,15 @@ if(NET_STANDALONE)
 		target_compile_options(net_echo PRIVATE /W4)
 	else()
 		target_compile_options(net_echo PRIVATE -Wall -Wextra)
+	endif()
+
+	# Replication benchmark (plan, section 4 targets).
+	add_executable(net_bench tools/net_bench.cpp)
+	target_link_libraries(net_bench PRIVATE ge_network)
+	set_target_properties(net_bench PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+	if(MSVC)
+		target_compile_options(net_bench PRIVATE /W4)
+	else()
+		target_compile_options(net_bench PRIVATE -Wall -Wextra)
 	endif()
 endif()
