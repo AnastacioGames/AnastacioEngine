@@ -74,6 +74,44 @@ não deu para testar.
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Windows/MSVC e editor completo no Linux**: ver "Testes" abaixo.
 
+## Uso rápido
+
+Sem código: Properties > Scene > Game Settings > **Network** (modo, portas, Server Name, máximo de jogadores, tick rate,
+taxa de envio, game id/versão), Properties > Object > Game > **Network** (Replicate e opções), checkbox **Rep** nas
+Game Properties. O modo da cena (Host, Client, Dedicated) abre a sessão ao iniciar o jogo; no modo Client o endereço
+é `host`, `host:porta` ou `[v6]:porta`. Todos precisam do mesmo `.range`.
+
+Com script:
+
+```python
+import Range.network as net
+
+net.replicate(obj, props=["hp"], velocity=True)   # antes de host()/join(), na mesma ordem em todos
+net.on_connect(lambda client_id: print("conectado", client_id))
+net.on_player_join(lambda client_id, name: print(name, "entrou"))
+
+net.playerName = "Maria"                           # vale para o próximo join()
+net.host(7777, max_players=4, room_name="Sala")    # ou net.join("192.168.0.10:7777")
+car = net.spawn("Car", owner=1, position=[0, 0, 2])  # servidor; "Car" fica numa camada inativa
+```
+
 ## Testes
 
-Ver o resultado de cada um no `docs/changelog.md` (entrada "Multiplayer: núcleo ligado na engine").
+Resultados no `docs/changelog.md` (entrada "Multiplayer: núcleo ligado na engine"). Como repetir no Linux:
+
+```bash
+cmake --preset linux-runtime -S source -DPYTHON_ROOT_DIR=/usr -DPYTHON_EXECUTABLE=/usr/bin/python3.11
+cmake --build build-linux --target RangeRuntime -j4
+# Python 3.11 precisa de numpy < 2 (o do apt serve ao Python 3.12): pip install --target /opt/py311-site "numpy<2"
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh spawner     # ou car; 3o argumento: "100,20,2" (simulador)
+# modo cena (precisa do editor: cmake --preset linux-editor ... -DWITH_CYCLES=OFF -DWITH_OPENIMAGEIO=OFF
+#   -DWITH_OPENCOLORIO=OFF -DWITH_COMPOSITOR=OFF -DWITH_CYCLES_EMBREE=OFF; cmake --build build-linux-editor --target RangeEngine)
+PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh scene
+```
+
+O `RangeEngine -b` precisa de `BLENDER_SYSTEM_SCRIPTS=source/release/scripts` e `BLENDER_SYSTEM_DATAFILES=source/release/datafiles`
+fora de uma instalação (o runner já define). O editor completo e o preset `linux-editor` com Cycles/OIIO/OCIO/Embree **não** foram
+compilados aqui (só a versão enxuta acima).
+
+Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro
+é lento (5–15 fps) e o servidor às vezes para por centenas de ms; o teste de trajetória tolera isso (80 % das amostras na curva).
