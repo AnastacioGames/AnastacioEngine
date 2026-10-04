@@ -81,8 +81,9 @@ Aberto:
   (`Module.onDiagnostic`, relatório v2) para shader (estágio, material real, compile/link) e Python (tipo, texto,
   traceback, controller/componente/callback), testados no navegador; a heurística sobre o texto fica só como fallback.
   "Importar pré-voo Web" segue para JSON manual. Detalhes em [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
-  Validação pendente (usuário, Windows/Edge): falha em **material de nós** com `projects-teste/teste-editor-web/criar_m1c_nos.py`
-  (modos fragment, vertex e link; roteiro D em `ROTEIRO-M1.md`). Formato e caminho de injeção já cobertos por teste unitário.
+  Falha em **material de nós** validada no Windows/Edge headless em 2026-10-04 (roteiro D em `ROTEIRO-M1.md`): fragment,
+  vertex e link saem com `material` "MAMatNosQuebrado" e `structured: true`; o link também reprova. Falta só importar
+  o relatório no editor (passo 5, UI).
 - **Rodada Web de 2026-09-20 (M0-M3, R1, R3)**: M2 e as correções do M3 validados em runtime; R1 (ABI de
   constraints Python) integrado e verificado (nativo e Web); R3 (aborts de áudio sem exceções) **corrigido**
   no runtime Web (`FileManager` devolve leitor silencioso; sonda com 10 casos termina com `[r3] TODOS`;

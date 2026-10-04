@@ -39,7 +39,7 @@ via `getShader().setSource()`, sem montar material pela UI.
 7. Se o log aparecer no console mas `shader_errors` vier vazio, anote o texto exato: é lacuna do coletor.
 8. Se `getShader()` devolver None ou o objeto sem material, registre e siga para o M2.
 
-## D. Falha de shader em material de nós (cena gerada em 2026-10-04, ainda não executada)
+## D. Falha de shader em material de nós (executado em 2026-10-04, ver resultado no fim da seção)
 Diferente do C, aqui o shader que falha é o GERADO do grafo de nós: o GLSL inválido entra por
 `script_frag`/`script_vert` do material (ver `NOTA-SHADER-MATERIAL-NODES.md`). Não usa controller Python.
 1. Gere as cenas: `RangeEngine.exe -b --python criar_m1c_nos.py -- fragment` (repita com `vertex` e `link`).
@@ -51,3 +51,9 @@ Diferente do C, aqui o shader que falha é o GERADO do grafo de nós: o GLSL inv
    - link: `operation` "link", `stage` "" (se o link passar, anote: o varying do fragment não tem uso estático).
 5. Importe o relatório no editor: `WEB-GFX-002` com "MAMatNosQuebrado" na mensagem e o log em "fix".
 6. Se `material` vier vazio ou `engine-shader`, ou `shader_errors` vazio com erro no console, anote o texto exato.
+
+**Resultado (2026-10-04, Windows, runtime Web com AudioWorklet, `package-web.py` + `claude_m1c_diag.cjs`, Edge headless/SwiftShader):**
+- fragment: `compile` / `fragment`, `MAMatNosQuebrado`, `structured: true` (`ERROR: 0:640: ';' : syntax error`).
+- vertex: `compile` / `vertex`, `MAMatNosQuebrado`, `structured: true` (`ERROR: 0:410: ';' : syntax error`).
+- link: `link` / `""`, `MAMatNosQuebrado`, `structured: true` (`Types of varying 'm1c_conflito' differ between VERTEX and FRAGMENT shaders`). O link reprova mesmo sem uso do `fragment()` do usuário.
+- Passo 5 (importar no editor) não feito: é UI.
