@@ -102,7 +102,7 @@ Aberto:
   o áudio MP3 não custa desempenho mensurável (diferença do p95 é variação entre rodadas). M3 do áudio fechado. **M4 adiado** (2026-09-23): o jogo medido não usa filtros 2D e os picos do p95 são
   esporádicos, não custo fixo de passe; reabrir só se um jogo com filtros medir mal no celular.
   Desktop (Chrome, `/musica/`, DPR 2): p50 18,1/p95 18,5 ms, sem picos; os picos são do celular. Console: aviso de
-  `ScriptProcessorNode` obsoleto (resolvido em 2026-10-04: saída AudioWorklet, ouvida pelo usuário no navegador do PC sem problemas; falta o celular; ver changelog) e um quadro de 104 ms na carga. Divisão vigente e pendências em
+  `ScriptProcessorNode` obsoleto (resolvido em 2026-10-04: saída AudioWorklet, ouvida pelo usuário no navegador do PC e no Chrome do celular (via `adb reverse`) sem problemas; ver changelog) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Reverb Area (2026-09-29)**: validar ouvindo no jogo real (entrar/sair de uma área com um speaker 3D
   tocando) e no Web, onde o OpenAL de compatibilidade (`web-no-openal/efx.h`) pode não ter EFX. Sem desenho
