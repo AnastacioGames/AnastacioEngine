@@ -59,4 +59,4 @@ Diferente do C, aqui o shader que falha é o GERADO do grafo de nós: o GLSL inv
 - Passo 5 (2026-10-04, por script no editor `-b`, `scene.range_web_import_preflight` com os relatórios em `pf-nos/`):
   1 `WEB-GFX-002` por modo, com "MAMatNosQuebrado" na mensagem e o log do compilador em "fix". No link a mensagem
   passou a ser "Shader did not link (program, material …)" (antes saía "did not compile (stage , …)"). Clique na UI
-  não testado.
+  testado pelo usuário: alerta nos 3.
