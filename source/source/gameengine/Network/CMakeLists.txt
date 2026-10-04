@@ -76,6 +76,9 @@ if(WIN32)
 	target_link_libraries(ge_network PUBLIC ws2_32)  # WebSocket server sockets
 endif()
 set_target_properties(ge_network PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+if(EMSCRIPTEN)
+	target_link_options(ge_network INTERFACE "-lwebsocket.js")  # NET_TransportWebClient
+endif()
 
 if(NET_STANDALONE)
 	if(MSVC)
@@ -136,7 +139,16 @@ if(NET_STANDALONE)
 		target_compile_options(net_tests PRIVATE -Wall -Wextra)
 	endif()
 
-	add_test(NAME net_tests COMMAND net_tests)
+	if(EMSCRIPTEN)
+		# wasm32 under node: core tests only (no sockets, no ENet); golden files read from the host.
+		target_link_options(net_tests PRIVATE -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1)
+		set(NET_WASM_TEST_FILTER
+			"NetTypes.*:NetBitStream.*:NetGolden.*:NetMessages.*:NetSnapshot.*:NetSnapshotBuffer.*:NetSession.*:NetTransportLoopback.*:NetTransportSimulated.*:NetWebSocket.AcceptKeyRfcVector-NetSession.OverENet"
+		)
+		add_test(NAME net_tests COMMAND net_tests "--gtest_filter=${NET_WASM_TEST_FILTER}")
+	else()
+		add_test(NAME net_tests COMMAND net_tests)
+	endif()
 
 	# Manual test tool.
 	add_executable(net_echo tools/net_echo.cpp)
@@ -148,13 +160,20 @@ if(NET_STANDALONE)
 		target_compile_options(net_echo PRIVATE -Wall -Wextra)
 	endif()
 
+	# Browser/node client for net_echo over WebSocket (Emscripten only).
 	# Replication benchmark (plan, section 4 targets).
 	add_executable(net_bench tools/net_bench.cpp)
-	target_link_libraries(net_bench PRIVATE ge_network)
-	set_target_properties(net_bench PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-	if(MSVC)
-		target_compile_options(net_bench PRIVATE /W4)
+		add_executable(net_web_echo tools/net_web_echo.cpp)
 	else()
+	if(EMSCRIPTEN)
+	if(MSVC)
+	set_target_properties(net_bench PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+		set_target_properties(net_web_echo PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 		target_compile_options(net_bench PRIVATE -Wall -Wextra)
+		target_compile_options(net_bench PRIVATE /W4)
+		target_compile_options(net_web_echo PRIVATE -Wall -Wextra)
+	target_link_libraries(net_bench PRIVATE ge_network)
+		target_link_libraries(net_web_echo PRIVATE ge_network)
+		target_link_options(net_web_echo PRIVATE -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1)
 	endif()
 endif()
