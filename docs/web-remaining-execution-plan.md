@@ -7,8 +7,8 @@ Preparado em 2026-09-20 para execução pelo Claude, a partir da análise soment
 - M0-M3, R1, R3 (áudio) e T5 (`perf-run.cjs`/`frame-time-perf.js`) concluídos e integrados na `linux-sync`.
 - M3 medido em celular físico e desktop: áudio com custo desprezível; picos do p95 só no celular. **M4 adiado.**
 - Mensagens das regras Web traduzidas (en/pt/es/ru) em 2026-09-23; es/ru pedem revisão nativa.
-- Em aberto: comparar o SSAO na Web com o desktop (usuário); migrar o áudio SDL de `ScriptProcessorNode`
-  (obsoleto) para AudioWorklet; push/PR só com pedido do usuário. As seções abaixo são histórico.
+- Em aberto: comparar o SSAO na Web com o desktop (usuário); ouvir o áudio AudioWorklet (migrado do
+  `ScriptProcessorNode` em 2026-10-04) no aparelho; push/PR só com pedido do usuário. As seções abaixo são histórico.
 
 ## Estado de execução (2026-09-20)
 
