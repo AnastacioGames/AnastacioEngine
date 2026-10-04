@@ -40,3 +40,4 @@ Sessão automática (2026-10-04), sem perguntas ao usuário; dúvidas e bloqueio
   `KX_TrackToActuator`, com a orientação local inicial do pai guardada no `start` (a engine guarda no
   carregamento). Fica como brick: **pai de vértice** (a engine ignora o pai e grava a orientação de mundo como
   local; não dá para reproduzir com a API de Python) e Track To por propriedade/objeto dinâmico (já era brick).
+- OpenColorIO tambem precisa de -DWITH_OPENCOLORIO=OFF -DWITH_CODEC_FFMPEG=OFF (ocio_impl.cc usa API v1; Ubuntu 24.04 traz v2.1).
