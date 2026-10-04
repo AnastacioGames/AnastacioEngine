@@ -251,8 +251,8 @@ private:
 	std::unique_ptr<net::ITransport> WrapSim(std::unique_ptr<net::ITransport> inner) const;
 	void BuildRpc();
 	void OpenSession();
-	void CloseSession(bool sendQuit);
-	void ReleaseEntries();
+	void CloseSession(bool sendQuit, bool shutdown = false);
+	void ReleaseEntries(bool all);
 	void AbortOpen();
 	void SuspendForClient(Entry &entry);
 	void RestoreFromClient(Entry &entry);

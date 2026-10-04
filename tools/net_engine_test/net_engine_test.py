@@ -203,6 +203,16 @@ def run():
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
 
     net.disconnect()
+    if ROLE == "server":
+        # The registration of a scene object survives leaving and hosting again.
+        check("disconnect() leaves the session", not net.isServer and not net.isConnected)
+        first_id = net.net_id(tracked)
+        again = net.host(PORT + 1, max_players=2, room_name="again", websocket_port=0)
+        check("host() again after disconnect()", again and net.isServer and net.net_id(tracked) == first_id and first_id != 0,
+              "id=%d" % net.net_id(tracked))
+        for _ in range(30):
+            logic.NextFrame()
+        net.disconnect()
     log("PASS" if not failures else "FAIL " + ",".join(failures))
     logic.endGame()
     logic.NextFrame()

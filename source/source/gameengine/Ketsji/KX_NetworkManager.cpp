@@ -643,7 +643,7 @@ void KX_NetworkManager::AbortOpen()
 	m_replica.reset();
 	m_client.reset();
 	m_clientTransport.reset();
-	ReleaseEntries();
+	ReleaseEntries(false);
 	m_sessionOpen = false;
 	m_scene = nullptr;
 	m_role = Role::NONE;
@@ -883,23 +883,31 @@ void KX_NetworkManager::RestoreFromClient(Entry &entry)
 	entry.dynamicsSuspended = false;
 }
 
-void KX_NetworkManager::ReleaseEntries()
+void KX_NetworkManager::ReleaseEntries(bool all)
 {
-	for (auto &pair : m_entries) {
-		Entry &entry = pair.second;
+	/* Scene objects keep their registration between sessions (a script calls replicate() once at start and
+	 * the player may host, leave and join again); what the session created or changed is undone. */
+	for (auto it = m_entries.begin(); it != m_entries.end();) {
+		Entry &entry = it->second;
 		if (m_role == Role::CLIENT) {
 			RestoreFromClient(entry);
 		}
-		if (entry.obj) {
-			entry.obj->SetNetId(0);
+		if (all || entry.spawned) {
+			if (entry.obj) {
+				entry.obj->SetNetId(0);
+			}
+			it = m_entries.erase(it);
+		}
+		else {
+			entry.owner = net::kServerClientId;
+			++it;
 		}
 	}
-	m_entries.clear();
 	m_protoSchemas.clear();
 	m_protoPropNames.clear();
 }
 
-void KX_NetworkManager::CloseSession(bool sendQuit)
+void KX_NetworkManager::CloseSession(bool sendQuit, bool shutdown)
 {
 	if (m_role == Role::NONE && !m_sessionOpen) {
 		return;
@@ -946,7 +954,7 @@ void KX_NetworkManager::CloseSession(bool sendQuit)
 			m_adoptingTickRate = false;
 		}
 	}
-	ReleaseEntries();
+	ReleaseEntries(shutdown);
 	m_role = Role::NONE;
 	m_sessionOpen = false;
 	m_scene = nullptr;
@@ -970,7 +978,8 @@ void KX_NetworkManager::Disconnect()
 void KX_NetworkManager::Shutdown()
 {
 	m_eventSink = nullptr;
-	CloseSession(true);
+	CloseSession(true, true);
+	ReleaseEntries(true);
 	m_lanResponder.stop();
 	m_discovery.stop();
 	m_discoveryStarted = false;
