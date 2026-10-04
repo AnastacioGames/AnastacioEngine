@@ -6,6 +6,7 @@
 //   modo touch    : toque (touchStart/End) no canvas deve virar clique de mouse ("mouse click flipped")
 //   modo sim      : jogo web-capabilities: fisica, addObject/endObject, addScene (overlay) e replace de cena
 //   modo audio    : jogo web-audio: tom WAV em loop; confere mixer ativo e amplitude nao nula na saida Web Audio
+//                   (AudioWorklet por Module.rangeAudio; com ?audio=sdl, o fallback ScriptProcessor do SDL)
 //   modo render   : jogo web-render: sobe, roda 8 s sem excecao e confere o padrao xadrez do chao por pixels da captura
 //   modo keys     : jogo web-smoke: seta direita (teclado real) move o cubo via controller Python ("keyboard moved cube")
 //   modo filters  : 1..0,Q (filtros simples ligam/desligam) e W,E,R,T (embutidos) sem erro de shader
@@ -22,6 +23,7 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
     const m = JSON.parse(e.data);
     if (m.id) { pending.get(m.id)?.(m.result); pending.delete(m.id); }
     else if (m.method === 'Runtime.consoleAPICalled') logs.push(m.params.args.map(a => a.value ?? a.description).join(' '));
+    else if (m.method === 'Log.entryAdded') logs.push(`[${m.params.entry.source}] ${m.params.entry.text}`);
     else if (m.method === 'Runtime.exceptionThrown') logs.push('[exception] ' + JSON.stringify(m.params.exceptionDetails.text) + ' ' + ((m.params.exceptionDetails.exception || {}).description || '').slice(0, 1500));
   };
   const call = (method, params = {}) => new Promise(r => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
@@ -35,7 +37,8 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
   };
 
   if (mode === 'audio') {
-    // Espia a saida Web Audio (SDL usa ScriptProcessor): conta frames e a amplitude maxima do que o jogo mixou.
+    // Espia a saida Web Audio do fallback SDL (ScriptProcessor): conta frames e a amplitude maxima do que o jogo mixou.
+    // A saida AudioWorklet ja publica os mesmos contadores em Module.rangeAudio.
     await call('Page.addScriptToEvaluateOnNewDocument', { source: `(function(){
       var A = window.__aud = { ctx: 0, procs: 0, frames: 0, peak: 0 };
       var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -50,7 +53,7 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
         return c; };
       W.prototype = AC.prototype; window.AudioContext = W; window.webkitAudioContext = W; })();` });
   }
-  await call('Runtime.enable'); await call('Page.enable');
+  await call('Runtime.enable'); await call('Page.enable'); await call('Log.enable');
   await call('Network.enable'); await call('Network.setCacheDisabled', { cacheDisabled: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await call('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'debug=1' });
@@ -95,7 +98,10 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
     } else if (mode === 'audio') {
       await sleep(9000);
       const has = re => logs.some(l => re.test(l));
-      const a = JSON.parse(await evalJs(`JSON.stringify({ctx:__aud.ctx,procs:__aud.procs,frames:__aud.frames,peak:__aud.peak,state:__aud.last&&__aud.last.state,rate:__aud.last&&__aud.last.sampleRate})`));
+      const ctxExpr = `(Module.rangeAudio ? Module.rangeAudio.ctx : __aud.last)`;
+      const a = JSON.parse(await evalJs(`JSON.stringify((function(){var R=Module.rangeAudio;
+        if(R)return{backend:R.backend,ctx:1,procs:R.node?1:0,frames:R.frames,peak:R.peak,underruns:R.underruns,state:R.ctx.state,rate:R.ctx.sampleRate};
+        return{backend:'SDL',ctx:__aud.ctx,procs:__aud.procs,frames:__aud.frames,peak:__aud.peak,state:__aud.last&&__aud.last.state,rate:__aud.last&&__aud.last.sampleRate};})())`));
       console.log('web audio:', JSON.stringify(a));
       expect('cena de audio rodando', has(/\[aud\] scene running/));
       expect('actuator de som ativado', has(/\[aud\] sound actuator activated/));
@@ -109,13 +115,14 @@ if (!url || !mode) { console.error('uso: verify-capabilities.cjs <url> <touch|fi
         get: () => ${hidden} }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden;`);
       await visibility(true);
       await sleep(1000);
-      const away = await evalJs(`__aud.last.state`);
+      const away = await evalJs(`${ctxExpr}.state`);
       await visibility(false);
       await sleep(1000);
-      const back = await evalJs(`__aud.last.state`);
+      const back = await evalJs(`${ctxExpr}.state`);
       console.log('audio escondido/visivel:', away, back);
       expect('pagina escondida suspende o audio', away === 'suspended');
       expect('pagina visivel retoma o audio', back === 'running');
+      if (a.backend === 'AudioWorklet') expect('sem aviso de ScriptProcessorNode obsoleto', !has(/ScriptProcessorNode is deprecated/));
       logs.filter(l => /\[aud\]|audio|Audaspace|aud:/i.test(l)).slice(0, 15).forEach(l => console.log('  ' + l.slice(0, 200)));
     } else if (mode === 'render') {
       await sleep(8000);

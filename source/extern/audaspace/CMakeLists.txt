@@ -579,6 +579,13 @@ if(EMSCRIPTEN AND NOT WITH_LIBSNDFILE)
 	list(APPEND STATIC_PLUGINS WAVFile)
 endif()
 
+# Saida AudioWorklet do runtime Web (substitui o ScriptProcessorNode do port SDL2; plugins/webaudio).
+if(EMSCRIPTEN)
+	list(APPEND SRC plugins/webaudio/WebAudioDevice.cpp)
+	list(APPEND HDR plugins/webaudio/WebAudioDevice.h)
+	list(APPEND STATIC_PLUGINS WebAudioDevice)
+endif()
+
 # OpenAL
 if(WITH_OPENAL)
 	if(AUDASPACE_STANDALONE)

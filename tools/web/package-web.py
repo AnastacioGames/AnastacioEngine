@@ -642,11 +642,12 @@ __PERF_SCRIPT__
   window.addEventListener("orientationchange", releaseTouch);
   document.addEventListener("visibilitychange", function () { if (document.hidden) releaseTouch(); });
 
-  // Audio: com a pagina escondida (app em segundo plano, outra aba) o jogo para, mas o Web Audio do SDL seguia
+  // Audio: com a pagina escondida (app em segundo plano, outra aba) o jogo para, mas o Web Audio seguia
   // tocando a musica. Suspende o contexto ao esconder e retoma ao voltar (so o que esta pagina suspendeu).
+  // Module.rangeAudio e a saida AudioWorklet (plugins/webaudio); Module.SDL2 e o fallback ScriptProcessor.
   var audioHeld = false;
   function syncAudio() {
-    var sdl = window.Module && Module.SDL2, ctx = sdl && sdl.audioContext;
+    var M = window.Module, ctx = M && ((M.rangeAudio && M.rangeAudio.ctx) || (M.SDL2 && M.SDL2.audioContext));
     if (!ctx) return;
     if (!ctx.rangeWatched) {
       ctx.rangeWatched = true;

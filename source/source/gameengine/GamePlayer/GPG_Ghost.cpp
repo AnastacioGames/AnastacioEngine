@@ -1057,8 +1057,18 @@ int main(int argc,
 
 	BKE_sound_init_once();
 #ifdef __EMSCRIPTEN__
-	// A ordem da lista de dispositivos nao e estavel no Web (so ha None e SDL): pedir o SDL pelo nome.
-	BKE_sound_force_device("SDL");
+	// A ordem da lista de dispositivos nao e estavel no Web: pedir pelo nome. WebAudio (AudioWorklet) so e
+	// registrado quando o navegador o suporta; sem ele, o SDL (ScriptProcessorNode, obsoleto) segue como saida.
+	{
+		const char *web_device = "SDL";
+		char **names = BKE_sound_get_device_names();
+		for (int i = 0; names && names[i]; i++) {
+			if (strcmp(names[i], "WebAudio") == 0) {
+				web_device = "WebAudio";
+			}
+		}
+		BKE_sound_force_device(web_device);
+	}
 #endif
 
 	// Initialize a default material for meshes without materials.
