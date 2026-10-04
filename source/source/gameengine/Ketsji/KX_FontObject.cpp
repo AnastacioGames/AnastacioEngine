@@ -30,6 +30,7 @@
  */
 
 #include "KX_FontObject.h"
+#include <exception>
 #include "DNA_curve_types.h"
 #include "DNA_vfont_types.h"
 #include "KX_Scene.h"
@@ -122,8 +123,9 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 
 KX_FontObject::~KX_FontObject()
 {
-	//remove font from the scene list
-	//it's handled in KX_Scene::NewRemoveObject
+	if (m_fontid != -1) {
+		BLF_unload_id(m_fontid);
+	}
 }
 
 EXP_Value *KX_FontObject::GetReplica()
@@ -136,6 +138,10 @@ EXP_Value *KX_FontObject::GetReplica()
 void KX_FontObject::ProcessReplica()
 {
 	KX_GameObject::ProcessReplica();
+
+	if (m_fontid != -1) {
+		BLF_addref_id(m_fontid);
+	}
 
 	m_boundingBox = m_boundingBox->GetReplica();
 }
@@ -259,7 +265,12 @@ void KX_FontObject::UpdateTextFromProperty()
 		SetText(prop->GetText());
 	}
 	if (propR && propR->GetText() != m_res) {
-		m_resolution = std::stof(propR->GetText());
+		try {
+			m_resolution = std::stof(propR->GetText());
+		}
+		catch (const std::exception &) {
+			// Ignore non-numeric logic brick value, keep previous resolution.
+		}
 		m_res = m_resolution;
 	}
 }
@@ -399,7 +410,10 @@ PyAttributeDef KX_FontObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("text", KX_FontObject, pyattr_get_text, pyattr_set_text),
 	EXP_PYATTRIBUTE_RO_FUNCTION("dimensions", KX_FontObject, pyattr_get_dimensions),
 	EXP_PYATTRIBUTE_FLOAT_RW("size", 0.0001f, 40.0f, KX_FontObject, m_fsize),
-	EXP_PYATTRIBUTE_FLOAT_RW("resolution", 0.1f, 50.0f, KX_FontObject, m_resolution),
+	// Clamped from the historical 50.0f: above ~10x the glyph atlas/FreeType rasterization
+	// cost grows quadratically for no visible gain, and each new resolution value used at
+	// runtime creates a glyph cache entry that is never evicted until the font is unloaded.
+	EXP_PYATTRIBUTE_FLOAT_RW("resolution", 0.1f, 10.0f, KX_FontObject, m_resolution),
     EXP_PYATTRIBUTE_RW_FUNCTION("useShadows", KX_FontObject, pyattr_get_use_shadows, pyattr_set_use_shadows),
     EXP_PYATTRIBUTE_RW_FUNCTION("shadowOffset", KX_FontObject, pyattr_get_shadow_offset, pyattr_set_shadow_offset),
     EXP_PYATTRIBUTE_RW_FUNCTION("shadowColor", KX_FontObject, pyattr_get_shadow_color, pyattr_set_shadow_color),

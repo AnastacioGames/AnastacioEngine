@@ -258,7 +258,8 @@ int BLF_load_mem(const char *name, const unsigned char *mem, int mem_size)
 
 	i = blf_search(name);
 	if (i >= 0) {
-		/*font = global_font[i];*/ /*UNUSED*/
+		font = global_font[i];
+		font->reference_count++;
 		return i;
 	}
 
@@ -346,6 +347,14 @@ void BLF_unload_id(int fontid)
 			blf_font_free(font);
 			global_font[fontid] = NULL;
 		}
+	}
+}
+
+void BLF_addref_id(int fontid)
+{
+	FontBLF *font = blf_get(fontid);
+	if (font) {
+		font->reference_count++;
 	}
 }
 
