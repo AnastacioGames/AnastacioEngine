@@ -73,8 +73,8 @@ não deu para testar.
   não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
   de conversão sem rasterizer.
 - **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
-  Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades de um objeto previsto
-  não chegam ao dono, ver abaixo).
+  Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
+  abaixo).
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
@@ -151,8 +151,9 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
   re-executa os inputs seguintes), roda o passo com o input atual e guarda o estado. A correção visual
   (`visualOffset`, decai em 100 ms) é somada à posição depois do passo e retirada antes do próximo.
 - **`skipOwned` ligado** no `ReplicaClient`, com um filtro novo no núcleo (`skipFilter`): só os objetos do cliente
-  **com `predict()`** deixam de seguir os snapshots; os outros objetos dele continuam interpolados. Consequência:
-  propriedades replicadas de um objeto previsto não chegam ao dono (o snapshot inteiro do objeto é pulado).
+  **com `predict()`** deixam de seguir o transform e a velocidade dos snapshots; os outros objetos dele continuam
+  interpolados. As propriedades replicadas do objeto previsto continuam chegando ao dono (o `apply` só pula o
+  movimento; antes pulava o objeto inteiro).
 - **Servidor.** `Input` vai para `PredictionServer` (bloco inválido conta violação na sessão). No começo do tick,
   `ServerStepPredicted()` consome o input de cada cliente para este tick (o núcleo repete o último por até 4 ticks
   se faltar) e chama o passo de cada objeto previsto com o input do dono; objetos do host (cliente 0) usam o

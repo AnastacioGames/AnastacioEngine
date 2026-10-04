@@ -736,11 +736,13 @@ TEST(NetReplication, SkipOwnedLeavesPredictedObjectsAlone)
 	ReplicatedObjectDesc desc;
 	desc.prototype = "Player";
 	desc.owner = id;
+	desc.props = propSchema();
 	predicted = net.replicator->spawn(desc);
 	const NetId other = net.replicator->spawn(desc);
 	for (NetId n : {predicted, other}) {
 		net.world.add(n).s = stateAt(1.0f, 0.0f, 0.0f);
 		net.world.objects[n].s.id = n;
+		net.world.objects[n].s.props = {PropValue::makeInt(1), PropValue::makeFloat(1.0f)};
 	}
 	net.step(3);
 	ASSERT_TRUE(a.world.exists(predicted));
@@ -750,9 +752,13 @@ TEST(NetReplication, SkipOwnedLeavesPredictedObjectsAlone)
 	a.world.objects[predicted].s.position[0] = 7.0f;
 	net.world.objects[predicted].s.position[0] = 3.0f;
 	net.world.objects[other].s.position[0] = 3.0f;
+	net.world.objects[predicted].s.props[0] = PropValue::makeInt(42);
 	net.step(4);
 	EXPECT_NEAR(a.world.objects[predicted].s.position[0], 7.0f, 0.001f);
 	EXPECT_NEAR(a.world.objects[other].s.position[0], 3.0f, 0.001f);
+	// Properties of the predicted object still come from the server.
+	ASSERT_EQ(a.world.objects[predicted].s.props.size(), 2u);
+	EXPECT_EQ(a.world.objects[predicted].s.props[0].i, 42);
 
 	// Given back to the server: the snapshots drive it again.
 	net.replicator->setOwner(predicted, kServerClientId);

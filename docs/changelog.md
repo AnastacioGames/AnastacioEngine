@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: propriedades de objeto previsto chegam ao dono (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `ReplicaClient::apply` (núcleo) pulava o objeto inteiro quando ele era do cliente e previsto (`skipOwned` +
+  `skipFilter`), então o dono nunca recebia as propriedades replicadas dele (vida, pontos). Agora só o transform e
+  a velocidade são pulados; as propriedades seguem o servidor.
+- Teste `NetReplication.SkipOwnedLeavesPredictedObjectsAlone` estendido: posição do previsto fica com o cliente,
+  propriedade vem do servidor. Núcleo: 111/111. Motor (Linux): `predict` ×3, `spawner`, `rpc`, `car`, `server`
+  PASS. O cenário `predict` não cobre isso porque o protótipo `Rig` do `.range` não tem propriedade replicada
+  (precisa do editor, que ainda não linka).
+
 ## Multiplayer: `view_time` da lag compensation segue o snapshot desenhado (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - Quando o tempo de render passava do snapshot mais novo, o cliente desenhava esse snapshot mas mandava o
