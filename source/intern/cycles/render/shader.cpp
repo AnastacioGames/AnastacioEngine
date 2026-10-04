@@ -372,8 +372,14 @@ ShaderManager::ShaderManager()
 	OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
 	if(config) {
 		if(config->hasRole("XYZ") && config->hasRole("scene_linear")) {
+#if OCIO_VERSION_HEX >= 0x02000000
+			/* OpenColorIO 2.x: applyRGB vive no CPU processor. */
+			OCIO::ConstCPUProcessorRcPtr to_rgb_processor = config->getProcessor("XYZ", "scene_linear")->getDefaultCPUProcessor();
+			OCIO::ConstCPUProcessorRcPtr to_xyz_processor = config->getProcessor("scene_linear", "XYZ")->getDefaultCPUProcessor();
+#else
 			OCIO::ConstProcessorRcPtr to_rgb_processor = config->getProcessor("XYZ", "scene_linear");
 			OCIO::ConstProcessorRcPtr to_xyz_processor = config->getProcessor("scene_linear", "XYZ");
+#endif
 			if(to_rgb_processor && to_xyz_processor) {
 				float r[] = {1.0f, 0.0f, 0.0f};
 				float g[] = {0.0f, 1.0f, 0.0f};
