@@ -2916,6 +2916,15 @@ void KX_Scene::UpdateCutscene(double time)
 		return;
 	}
 
+	/* Wait Trigger is released by a message sent with the trigger name as subject
+	 * (Send Message actuator or Python), or by scene.release_cutscene_trigger(). */
+	if (m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_TRIGGER && m_networkScene) {
+		const std::string triggerName = m_cutsceneManager->GetWaitTriggerName();
+		if (!m_networkScene->FindMessages("", triggerName).empty()) {
+			m_cutsceneManager->ReleaseTrigger(triggerName);
+		}
+	}
+
 	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Update(time);
 	m_pendingCutsceneEvents.insert(
 		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
@@ -3487,6 +3496,7 @@ PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE(KX_Scene, play_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, stop_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, restart_cutscene),
+	EXP_PYMETHODTABLE(KX_Scene, release_cutscene_trigger),
 	EXP_PYMETHODTABLE(KX_Scene, drawObstacleSimulation),
 	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, explode),
 
@@ -4118,6 +4128,27 @@ EXP_PYMETHODDEF_DOC(KX_Scene, restart_cutscene,
 	}
 
 	Py_RETURN_TRUE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, release_cutscene_trigger,
+                    "release_cutscene_trigger(name)\n"
+                    "Releases a Cutscene Wait Trigger event waiting for 'name'. Returns True if the\n"
+                    "Cutscene was waiting for it now; otherwise the trigger is kept and satisfies the\n"
+                    "next Wait Trigger with the same name. A message whose subject is 'name' does the same.\n")
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:release_cutscene_trigger", &name)) {
+		return nullptr;
+	}
+
+	KX_CutsceneManager *manager = GetCutsceneManager();
+	if (!manager) {
+		PyErr_SetString(PyExc_RuntimeError,
+		                "scene.release_cutscene_trigger(): this scene has no converted Cutscene");
+		return nullptr;
+	}
+
+	return PyBool_FromLong(manager->ReleaseTrigger(name));
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, drawObstacleSimulation,

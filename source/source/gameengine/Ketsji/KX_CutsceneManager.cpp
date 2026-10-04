@@ -47,6 +47,8 @@ bool KX_CutsceneManager::Start(int sequenceIndex)
 	});
 	m_nextEventIndex = 0;
 	m_time = 0.0;
+	ClearWait();
+	m_latchedTriggers.clear();
 	m_isPlaying = true;
 	return true;
 }
@@ -57,6 +59,8 @@ void KX_CutsceneManager::Stop()
 	m_eventOrder.clear();
 	m_nextEventIndex = 0;
 	m_time = 0.0;
+	ClearWait();
+	m_latchedTriggers.clear();
 	m_isPlaying = false;
 }
 
@@ -147,8 +151,26 @@ void KX_CutsceneManager::StartWaitTime(double untilTime)
 
 void KX_CutsceneManager::StartWaitTrigger(const std::string &triggerName)
 {
+	const auto latched = std::find(m_latchedTriggers.begin(), m_latchedTriggers.end(), triggerName);
+	if (latched != m_latchedTriggers.end()) {
+		m_latchedTriggers.erase(latched);
+		return;
+	}
 	m_waitType = WAIT_TRIGGER;
 	m_waitTriggerName = triggerName;
+}
+
+bool KX_CutsceneManager::ReleaseTrigger(const std::string &triggerName)
+{
+	if (m_waitType == WAIT_TRIGGER && m_waitTriggerName == triggerName) {
+		ClearWait();
+		return true;
+	}
+	if (m_isPlaying && std::find(m_latchedTriggers.begin(), m_latchedTriggers.end(), triggerName) ==
+	                       m_latchedTriggers.end()) {
+		m_latchedTriggers.push_back(triggerName);
+	}
+	return false;
 }
 
 void KX_CutsceneManager::StartWaitCameraEnd()

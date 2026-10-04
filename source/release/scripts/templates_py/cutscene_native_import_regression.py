@@ -106,9 +106,37 @@ def main():
     check(len(scene.cutscene_settings.sequences) == 1,
           "clear_existing did not remove the previous sequence")
 
+    # Schema 1 aceita qualquer tipo de evento, não só Spawn Object.
+    write_json({
+        "schema_version": 1,
+        "scenes": {scene.name: {"Mixed": [
+            {"action": "wait_trigger", "name": "Espera", "time": 2.0,
+             "params": {"trigger_name": "porta_aberta"}},
+            {"action": "wait_time", "time": 3.0, "params": {"wait_seconds": 1.5}},
+            {"action": "dialog", "time": 4.0, "params": {"dialog_text_pt": "Olá"}},
+        ]}},
+    })
+    check(cutscene_native_import.import_native_cutscene(TEST_FILE, clear_existing=True) == 3,
+          "eventos não-spawn não foram importados")
+    events = scene.cutscene_settings.sequences[0].events
+    check(events[0].type == "WAIT_TRIGGER" and events[0].trigger_name == "porta_aberta",
+          "Wait Trigger não importado")
+    check(events[1].type == "WAIT_TIME" and abs(events[1].wait_seconds - 1.5) < 0.0001,
+          "Wait Time não importado")
+    check(events[2].type == "DIALOG" and events[2].dialog_text_pt == "Olá", "Dialog não importado")
+
     expect_value_error({"schema_version": 99, "scenes": {}}, "schema_version")
     expect_value_error({scene.name: {"Bad": [{"action": "play_sound"}]}},
                        "equivalente nativo")
+    expect_value_error({scene.name: {"Bad": [{"action": "camera_path",
+                                              "params": {"path_object": template.name}}]}},
+                       "exige")
+    expect_value_error({scene.name: {"Bad": [{"action": "wait_time",
+                                              "params": {"wait_seconds": "abc"}}]}},
+                       "inválido")
+    check(len(scene.cutscene_settings.sequences) == 1 and
+          len(scene.cutscene_settings.sequences[0].events) == 0,
+          "falha de validação deixou evento criado")
     print("[cutscene_native_import_regression] PASS", flush=True)
 
 

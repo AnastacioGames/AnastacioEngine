@@ -35,7 +35,14 @@ build\bin\RangeEngine.exe --background docs\cutscene-native-example.blend --pyth
 ```
 
 O JSON é apenas intercâmbio versionado; a fonte de verdade continua sendo o
-`.blend`/`.range`. A importação rejeita ações sem equivalente nativo.
+`.blend`/`.range`. O export cobre todos os tipos de evento (schema 2); a importação aceita o formato legado, v1 e v2
+e rejeita ações sem equivalente nativo.
+
+Regressões headless (no Linux: `BLENDER_SYSTEM_SCRIPTS=source/release/scripts RangeEngine --background --factory-startup --python <script>`):
+`cutscene_native_export_regression.py`, `cutscene_native_import_regression.py` e `cutscene_persistence_regression.py`.
+Wait Trigger no runtime: `RangeEngine -b --python tools/create_cutscene_wait_test.py -- wait.range` e depois
+`RangeRuntime wait.range` (`xvfb-run -a` sem display); espera `CUTSCENE_WAIT_TEST PASS`. Um Wait Trigger é liberado por
+mensagem com o nome do trigger como subject ou por `scene.release_cutscene_trigger("nome")`.
 
 ## Roteiro no editor/runtime
 
