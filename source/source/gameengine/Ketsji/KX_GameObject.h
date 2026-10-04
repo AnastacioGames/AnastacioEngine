@@ -124,6 +124,8 @@ public:
 protected:
 
 	KX_ClientObjectInfo m_clientInfo;
+	/// Multiplayer id (net::NetId), 0 = not replicated. Never copied to replicas (see the copy constructor).
+	unsigned int m_netId;
 	std::string							m_name;
 	int									m_layer;
 	short m_passIndex;
@@ -692,6 +694,10 @@ public:
 	}
 
 	Object *GetBlenderObject() const;
+
+	/// Multiplayer id assigned by KX_NetworkManager; 0 when the object is not replicated.
+	unsigned int GetNetId() const;
+	void SetNetId(unsigned int netId);
 
 	BL_ConvertObjectInfo *GetConvertObjectInfo() const;
 	void SetConvertObjectInfo(BL_ConvertObjectInfo *info);

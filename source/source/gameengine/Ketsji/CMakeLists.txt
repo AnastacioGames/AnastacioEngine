@@ -34,6 +34,7 @@ set(INC
 	../Expressions
 	../GameLogic
 	../Launcher
+	../Network
 	../Physics/Common
 	../Rasterizer
 	../Rasterizer/Node
@@ -131,6 +132,7 @@ set(SRC
 	KX_MovementSensor.cpp
 	KX_VRHeadSensor.cpp
 	KX_NavMeshObject.cpp
+	KX_NetworkManager.cpp
 	KX_NearSensor.cpp
 	KX_ObColorIpoSGController.cpp
 	KX_ObjectActuator.cpp
@@ -142,6 +144,7 @@ set(SRC
 	KX_PolyProxy.cpp
 	KX_PyConstraintBinding.cpp
 	KX_PyMath.cpp
+	KX_PyNetwork.cpp
 	KX_PythonComponent.cpp
 	KX_PythonComponentManager.cpp
 	KX_PythonInit.cpp
@@ -247,6 +250,7 @@ set(SRC
 	KX_VRHeadSensor.h
 	KX_NavMeshObject.h
 	KX_NearSensor.h
+	KX_NetworkManager.h
 	KX_ObColorIpoSGController.h
 	KX_ObjectActuator.h
 	KX_ObstacleSimulation.h
@@ -258,6 +262,7 @@ set(SRC
 	KX_PolyProxy.h
 	KX_PyConstraintBinding.h
 	KX_PyMath.h
+	KX_PyNetwork.h
 	KX_PythonComponent.h
 	KX_PythonComponentManager.h
 	KX_PythonInit.h

@@ -97,6 +97,7 @@ extern "C" {
 #include "KX_Imgui.h"
 #include "KX_ShadowRenderer.h"
 #include "KX_SimulationPipeline.h"
+#include "KX_NetworkManager.h"
 #include "KX_SceneScheduler.h"
 #include "KX_DebugRenderer.h"
 
@@ -168,6 +169,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_shadowRenderer(new KX_ShadowRenderer(this)),
 	m_renderPipeline(new KX_RenderPipeline(this)),
 	m_simulationPipeline(new KX_SimulationPipeline(this)),
+	m_networkManager(nullptr),
 	m_sceneScheduler(new KX_SceneScheduler(this)),
 	m_debugRenderer(new KX_DebugRenderer(this)),
 	m_flags(AUTO_ADD_DEBUG_PROPERTIES),
@@ -238,6 +240,9 @@ KX_KetsjiEngine::KX_KetsjiEngine()
  */
 KX_KetsjiEngine::~KX_KetsjiEngine()
 {
+	delete m_networkManager;
+	m_networkManager = nullptr;
+
 #ifdef WITH_PYTHON
 	Py_CLEAR(m_pyprofiledict);
 #endif
@@ -842,6 +847,11 @@ bool KX_KetsjiEngine::IsStaticShadowSettled() const
 
 void KX_KetsjiEngine::StopEngine()
 {
+	if (m_networkManager) {
+		// Before the scenes go away: the manager holds pointers to their objects.
+		m_networkManager->Shutdown();
+	}
+
 	if (m_bInitialized) {
 		m_converter->FinalizeAsyncLoads();
 		m_sceneScheduler->DestructPendingScenes();
@@ -1004,8 +1014,21 @@ double KX_KetsjiEngine::GetTicRate()
 	return m_ticrate;
 }
 
+KX_NetworkManager *KX_KetsjiEngine::GetOrCreateNetworkManager()
+{
+	if (!m_networkManager) {
+		m_networkManager = new KX_NetworkManager(this);
+	}
+	return m_networkManager;
+}
+
 void KX_KetsjiEngine::SetTicRate(double ticrate)
 {
+	if (m_networkManager && m_networkManager->IsClient() && !m_networkManager->IsAdoptingTickRate()) {
+		// The server owns the tick rate of a session (docs/multiplayer-plan.md, section 2.3).
+		CM_Warning("the logic tic rate is set by the server while connected, keeping " << m_ticrate);
+		return;
+	}
 	if (!KX_IsValidRate(ticrate)) {
 		CM_Warning("invalid logic tic rate (" << ticrate << "), keeping previous value " << m_ticrate);
 		return;

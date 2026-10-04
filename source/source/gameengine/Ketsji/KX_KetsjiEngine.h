@@ -62,6 +62,7 @@ class KX_GameObject;
 class KX_Imgui;
 class KX_DebugMode;
 class KX_NetworkMessageManager;
+class KX_NetworkManager;
 class RAS_ICanvas;
 class RAS_OffScreen;
 class SCA_IInputDevice;
@@ -207,6 +208,8 @@ private:
 	/// docs/ketsji-engine-modernization-plan.md.
 	std::unique_ptr<KX_RenderPipeline> m_renderPipeline;
 	std::unique_ptr<KX_SimulationPipeline> m_simulationPipeline;
+	/// Multiplayer bridge (net::ServerSession/ClientSession + replication), created on first use.
+	KX_NetworkManager *m_networkManager;
 
 	/// Owns scene add/remove/replace/suspend/convert scheduling. See KX_SceneScheduler and Plano 7
 	/// in docs/ketsji-engine-modernization-plan.md.
@@ -554,6 +557,14 @@ public:
 	{
 		return m_networkMessageManager;
 	}
+
+	/// nullptr until the game uses the network (Range.network or a scene started in Host/Client mode).
+	KX_NetworkManager *GetNetworkManager() const
+	{
+		return m_networkManager;
+	}
+	/// Creates the manager when it does not exist yet.
+	KX_NetworkManager *GetOrCreateNetworkManager();
 
 	CustomMouseCursor *GetCustomMouseCursor()
 	{

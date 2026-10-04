@@ -124,6 +124,7 @@ KX_GameObject::ActivityCullingInfo::ActivityCullingInfo()
 KX_GameObject::KX_GameObject(void *sgReplicationInfo,
                              SG_Callbacks callbacks)
 	:m_clientInfo(this, KX_ClientObjectInfo::ACTOR),
+	m_netId(0),
 	m_layer(0),
 	m_passIndex(0),
 	m_lodManager(nullptr),
@@ -175,6 +176,7 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	:SCA_IObject(other),
 	m_clientInfo(this, other.m_clientInfo.m_type),
+	m_netId(0),
 	m_name(other.m_name),
 	m_layer(other.m_layer),
 	m_passIndex(other.m_passIndex),
@@ -2184,6 +2186,16 @@ Object *KX_GameObject::GetBlenderObject() const
 {
 	// Non converted objects has default camera doesn't have convert info.
 	return (m_convertInfo) ? m_convertInfo->m_blenderObject : nullptr;
+}
+
+unsigned int KX_GameObject::GetNetId() const
+{
+	return m_netId;
+}
+
+void KX_GameObject::SetNetId(unsigned int netId)
+{
+	m_netId = netId;
 }
 
 BL_ConvertObjectInfo *KX_GameObject::GetConvertObjectInfo() const

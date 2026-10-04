@@ -27,6 +27,7 @@
 #include "KX_Scene.h"
 #include "KX_Camera.h"
 #include "KX_Globals.h"
+#include "KX_NetworkManager.h"
 #include "EXP_ListValue.h"
 #include "PHY_IPhysicsEnvironment.h"
 
@@ -37,6 +38,14 @@ KX_SimulationPipeline::KX_SimulationPipeline(KX_KetsjiEngine *engine)
 
 void KX_SimulationPipeline::Update()
 {
+	/* Multiplayer: one Update() is one fixed logic step = one network tick (the manager turns the fixed
+	 * timestep on while a session is open). Before the step the received state is applied to the objects;
+	 * after it, the server captures the objects and sends. */
+	KX_NetworkManager *network = m_engine->GetNetworkManager();
+	if (network && network->IsActive()) {
+		network->BeginTick();
+	}
+
 	// for each scene, call the proceed functions
 	for (KX_Scene *scene : m_engine->GetScenes()) {
 		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_overhead);
@@ -152,5 +161,9 @@ void KX_SimulationPipeline::Update()
 			scene->UpdateRainAura(m_engine->GetFrameTime());
 			scene->UpdateRainLightning(m_engine->GetFrameTime());
 		}
+	}
+
+	if (network && network->IsActive()) {
+		network->EndTick();
 	}
 }
