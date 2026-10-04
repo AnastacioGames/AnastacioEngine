@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Pré-voo Web: teste de falha em material de nós (2026-10-04, branch `claude/project-thread-cya89w`)
+
+- Fecha (no lado de código) a lacuna "link e materiais de nós não foram testados" do M1. A nota do Codex que dizia não haver como injetar GLSL num material de nós estava errada: `Material.script_frag`/`script_vert` são acrescentados por `GPU_generate_pass` ao shader gerado do grafo (`gpu_material_construct_end` → `code_generate_fragment`/`code_generate_vertex`). Nota corrigida em `projects-teste/teste-editor-web/NOTA-SHADER-MATERIAL-NODES.md`.
+- `projects-teste/teste-editor-web/criar_m1c_nos.py`: gera `m1c-nos-{fragment,vertex,link}.range` (Shading Nodes, Image Texture → Diffuse BSDF, material `MatNosQuebrado`) com GLSL inválido no fragment, no vertex ou varying de tipos diferentes entre estágios. Roteiro D em `ROTEIRO-M1.md`.
+- `tools/tests/web_profile/test_preflight_node_material.py` (7 testes) + `fixtures/preflight-node-material.json`: `WEB-GFX-002` com origem `MA…`, estágio e log; mesmo log em materiais diferentes não é fundido; vertex/link; guarda estática do caminho de injeção (codegen, `gpu_shader.c` e RNA). Suíte `tools/tests/web_profile`: 131 testes, OK (3 pulados), Python 3.11 no Linux.
+- **Sem build da engine nesta sessão (nuvem Linux):** as cenas não foram geradas nem executadas no navegador. O modo `link` pode não reprovar, porque o `fragment()` do usuário não é chamado em material de nós.
+
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 
 - `logic_to_python.py`: actuators **Camera, Constraint (Loc/Ori/Dist/FH), Steering e Mouse Look** de outro objeto agora são convertidos. Os helpers (`_follow`, `_mouse_look`, `_cst_*`, `_steer`) recebem `own=` e agem sobre `scene.objects[dono]`; estado separado por `Dono/Actuator`. Os demais helpers de outro dono seguem como brick.
