@@ -1,5 +1,8 @@
 uniform sampler2D image_texture;
+#ifndef OCIO_V2
+/* OpenColorIO 2.x declares its own LUT samplers. */
 uniform sampler3D lut3d_texture;
+#endif
 
 #ifdef USE_DITHER
 uniform float dither;
@@ -162,7 +165,11 @@ void main()
 	 *       for straight alpha at this moment
 	 */
 
+#ifdef OCIO_V2
+	vec4 result = OCIODisplay(col);
+#else
 	vec4 result = OCIODisplay(col, lut3d_texture);
+#endif
 
 #ifdef USE_DITHER
 	result = apply_dither(gl_TexCoord[0].st, result);
