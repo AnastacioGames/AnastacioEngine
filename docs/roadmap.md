@@ -277,14 +277,22 @@ And/Or/Nand/Nor/Xor/Xnor; Motion simples, Property (Assign/Add/Toggle/Copy), Sta
 Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e com componente). Próximas fases:
 - F2 (parcial, 2026-09-30): feitos Collision (propriedade), Near, Radar, Ray (propriedade), Delay (frames),
   Mouse Over, controller Expression, actuators Edit Object (Add/End/Replace Mesh/Dynamics), Scene, Game,
-  Visibility; depois Random (mesma cadência, sequência do `random` do Python), Track To (alvo fixo, sem pai) e
-  Sound (Play/Loop Stop/End, via `aud`; ping-pong fica como brick) e Camera actuator. Controller
-  Python fica como brick (já é código). Collision/Ray por material convertidos (Ray por material com x-ray fica como brick). Links entre objetos convertidos (sensor/actuator de outro objeto via `scene.objects.get`; Collision/Near/Radar e actuators com helper do próprio objeto ficam como brick). Message sensor convertido
+  Visibility; depois Random (mesma cadência, sequência do `random` do Python), Track To (alvo fixo) e
+  Sound (Play/Loop Stop/End e ping-pong, via `aud`) e Camera actuator. Controller
+  Python fica como brick (já é código). Collision/Ray por material convertidos. Links entre objetos convertidos (sensor/actuator de outro objeto via `scene.objects.get`; actuators com helper do próprio objeto ficam como brick). Message sensor convertido
   via `logic.getMessages` (nova API).
 - F3 (2026-09-30): campo Mode no operador: Python Component (padrão), Always + Python (Module) e
   Always + Python (Script). Os dois últimos criam `LC_always` (pulso contínuo) e um controller `LC_state_<n>`
   por estado usado; o código é o mesmo, com `main(cont)` no fim. Mesmo CHECK nos três modos.
-- Pendente: usuário testar no editor com um objeto real lotado de bricks.
+- F4 (2026-10-04, branch `logic/convert-f4`, ainda sem merge): Ray por material com x-ray, Collision/Near/Radar de
+  sensor ligado de outro objeto, Sound ping-pong e Track To com pai. Validado no build Linux headless com
+  `create_logic_convert_scene.py`: CHECK idêntico em bricks e Component; Module/Script iguais entre si e só
+  `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo em
+  [notes-logic-f4.md](notes-logic-f4.md): Track To com pai de vértice; sensores Actuator/Animation Event/Movement/
+  Ray Gaze/VR Head ligados de outro objeto; actuators de outro objeto que usam helper do componente.
+- Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
+  Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
+  esfera/cone físico) e só enxergam Actor com física, como a engine.
 
 ### Android / iOS
 

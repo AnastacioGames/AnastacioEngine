@@ -282,18 +282,16 @@ def _sensor_expr(ob, sens, key=None):
             expr = "bool(hits)"
     elif t == 'NEAR':
         dist = A("Distance", sens.distance)
-        expr = "self._near(%r, %s, %s, max(%s, %s))" % (key, A("Property", sens.property), dist, dist,
-                                                        A("Reset", sens.reset_distance))
+        expr = "self._near(ob, %r, %s, %s, max(%s, %s))" % (key, A("Property", sens.property), dist, dist,
+                                                            A("Reset", sens.reset_distance))
     elif t == 'RADAR':
-        expr = "self._radar(%s, %s, %s, %s / 2.0)" % (_axis(sens.axis), A("Property", sens.property),
-                                                      A("Distance", sens.distance), A("Angle", sens.angle))
+        expr = "self._radar(ob, %s, %s, %s, %s / 2.0)" % (_axis(sens.axis), A("Property", sens.property),
+                                                          A("Distance", sens.distance), A("Angle", sens.angle))
     elif t == 'VR_HEAD':
         expr = "self._vr_head(%r, %r, %s, %s)" % (key, sens.mode, A("Angle", sens.angle), A("Time", sens.time))
     elif t == 'RAY' and sens.axis == 'GAZE':
         mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
         mat = sens.ray_type != 'PROPERTY' and bool(sens.material)
-        if mat and sens.use_x_ray:
-            raise Unsupported("ray por material com x-ray")
         prop = A("Material", sens.material) if mat else (
             A("Property", sens.property) if sens.ray_type == 'PROPERTY' else "''")
         expr = "self._gaze(%r, %s, %s, %s, %s, %d, %s, %s, %s, %s, %s)" % (
@@ -302,9 +300,13 @@ def _sensor_expr(ob, sens, key=None):
             A("Reticle", sens.use_gaze_reticle), A("Highlight", sens.use_gaze_highlight))
     elif t == 'RAY':
         mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
-        if sens.ray_type != 'PROPERTY' and sens.material:
-            if sens.use_x_ray:
-                raise Unsupported("ray por material com x-ray")
+        if sens.ray_type != 'PROPERTY' and sens.material and sens.use_x_ray:
+            # X-ray: a engine pula (enxerga atraves de) quem nao tem o material, e o rayCast so
+            # filtra por propriedade; _mat_mark marca os objetos com o material numa propriedade privada.
+            rng = A("Range", sens.range)
+            expr = ("ob.rayCast(ob.worldPosition + %s * %s, ob, %s, self._mat_mark(%s), 0, 1, 0, %d)[0] is not None" %
+                    (_axis(sens.axis), rng, rng, A("Material", sens.material), mask))
+        elif sens.ray_type != 'PROPERTY' and sens.material:
             # Primeiro objeto atingido precisa ter o material (como KX_RaySensor sem x-ray).
             rng = A("Range", sens.range)
             expr = ("self._has_mat(ob.rayCast(ob.worldPosition + %s * %s, ob, %s, '', 0, 0, 0, %d)[0], %s)" %
@@ -593,7 +595,7 @@ def _actuator_code(ob, act):
     if t == 'EDIT_OBJECT':
         if act.mode == 'TRACKTO':
             # Track To roda todo frame com o controller positivo (como a engine).
-            return _track_to_code(act), True
+            return _track_to_code(ob, act), True
         return _edit_object_code(act), False
     if t == 'SOUND':
         return _sound_code(act)
@@ -837,13 +839,23 @@ _TRACK_AXES = {
 }
 
 
-def _track_to_code(act):
+def _track_to_code(ob, act):
     if act.object is None:
         raise Unsupported("track to sem objeto fixo")
     axis, sign = _TRACK_AXES[act.track_axis]
     up = {'UPAXISX': 0, 'UPAXISY': 1, 'UPAXISZ': 2}[act.up_axis]
     if axis == up:
         raise Unsupported("track to com eixo de track igual ao up")
+    if ob.parent is not None:
+        if ob.parent_type in {'VERTEX', 'VERTEX_3'}:
+            # A engine ignora o pai de vertice e grava a orientacao de mundo como local.
+            raise Unsupported("track to com pai de vertice (a engine grava a orientacao de mundo como local)")
+        # Com pai a engine corrige pela orientacao inicial do pai (m_parentlocalmat); conta portada inteira.
+        return ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
+                "if tgt is not None:",
+                "    self._track_parent(tgt, %d, %d, %s, %s)" % (axis + (3 if sign else 0), up,
+                                                                _act_arg("Time", act.time),
+                                                                act.use_3d_tracking)]
     # KX_TrackToActuator: orientacao = (antiga * time + nova) / (time + 1).
     factor = 1.0 / (act.time + 1) if act.time > 0 else 1.0
     lines = ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
@@ -860,7 +872,8 @@ def _track_to_code(act):
 def _sound_code(act):
     # Mesmo fluxo de KX_SoundActuator: o pulso positivo toca se nao estiver tocando;
     # o negativo para (modos *STOP) ou deixa a volta atual terminar (LOOPEND).
-    if act.mode not in {'PLAYSTOP', 'PLAYEND', 'LOOPSTOP', 'LOOPEND'}:
+    if act.mode not in {'PLAYSTOP', 'PLAYEND', 'LOOPSTOP', 'LOOPEND', 'LOOPBIDIRECTIONAL',
+                        'LOOPBIDIRECTIONALSTOP'}:
         raise Unsupported("sound %s" % act.mode)
     if act.sound is None:
         raise Unsupported("sound sem som")
@@ -869,22 +882,29 @@ def _sound_code(act):
     if act.use_sound_3d:
         raise Unsupported("sound 3D")
     key = act.name
+    pingpong = act.mode.startswith('LOOPBIDIRECTIONAL')
+    # Sem dispositivo de audio o handle falha ao ajustar volume/pitch: a engine ignora, aqui tambem.
     on = ["import aud",
           "snd = self.__dict__.setdefault('_snd', {})",
           "h = snd.get(%r)" % key,
           "if h is None or h.status != aud.STATUS_PLAYING:",
-          "    h = aud.Device().play(aud.Sound.file(logic.expandPath(%r)))" % act.sound.filepath,
-          "    h.volume = %s" % _act_arg("Volume", act.volume),
-          "    h.pitch = %s" % _act_arg("Pitch", act.pitch)]
+          "    try:",
+          "        h = aud.Device().play(aud.Sound.file(logic.expandPath(%r))%s)" % (
+              act.sound.filepath, ".pingpong()" if pingpong else ""),
+          "        h.volume = %s" % _act_arg("Volume", act.volume),
+          "        h.pitch = %s" % _act_arg("Pitch", act.pitch)]
     if act.mode.startswith('LOOP'):
-        on.append("    h.loop_count = -1")
-    on.append("    snd[%r] = h" % key)
+        on.append("        h.loop_count = -1")
+    on += ["        snd[%r] = h" % key,
+           "    except aud.error:",
+           "        snd.pop(%r, None)" % key]
     off = []
     if act.mode != 'PLAYEND':
         off = ["import aud",
                "h = self.__dict__.get('_snd', {}).get(%r)" % key,
                "if h is not None and h.status == aud.STATUS_PLAYING:"]
-        off.append("    h.loop_count = 0" if act.mode == 'LOOPEND' else "    h.stop()")
+        # *END deixa a volta atual terminar; *STOP corta na hora.
+        off.append("    h.loop_count = 0" if act.mode in {'LOOPEND', 'LOOPBIDIRECTIONAL'} else "    h.stop()")
     return on, False, off
 
 
@@ -934,25 +954,51 @@ class %(classname)s(%(base)s):
     def _on_hit(self, other, *_args):
         self._hits.append(other)
 
-    def _near(self, key, prop, dist, reset):
+    def _take(self, o):
+        """Colisoes de outro objeto desde a ultima leitura (registra o callback na primeira vez)."""
+        if o is None:
+            return []
+        reg = self.__dict__.setdefault("_fhits", {})
+        for dead in [k for k in reg if k.invalid]:
+            del reg[dead]
+        if o not in reg:
+            lst = reg[o] = []
+            o.collisionCallbacks.append(lambda other, *_a: lst.append(other))
+        hits, reg[o][:] = list(reg[o]), []
+        return hits
+
+    def _near(self, ob, key, prop, dist, reset):
         """Near sensor com histerese: depois de detectar, so solta alem de reset."""
         key = "near:" + key
         limit = reset if self._prev.get(key) else dist
-        ob = self.object
-        found = any(o is not ob and (not prop or prop in o) and ob.getDistanceTo(o) <= limit
+        found = any(o is not ob and self._actor(o) and (not prop or prop in o) and ob.getDistanceTo(o) <= limit
                     for o in ob.scene.objects)
         self._prev[key] = found
         return found
 
-    def _radar(self, axis, prop, dist, half_angle):
-        ob = self.object
+    def _actor(self, o):
+        """Near/Radar so enxergam objetos Actor com fisica (a lista vem do carregamento: nomes com Actor ligado)."""
+        return o.name in self._actors and o.getPhysicsId() != 0
+
+    def _radar(self, ob, axis, prop, dist, half_angle):
         for o in ob.scene.objects:
-            if o is ob or (prop and prop not in o):
+            if o is ob or not self._actor(o) or (prop and prop not in o):
                 continue
             d, vec, _local = ob.getVectTo(o)
             if 0 < d <= dist and axis.angle(vec) <= half_angle:
                 return True
         return False
+
+    def _mat_mark(self, name):
+        """Propriedade privada nos objetos da cena que usam o material (Ray x-ray com material)."""
+        key = "__lcmat_" + name
+        for o in self.object.scene.objects:
+            has = self._has_mat(o, name)
+            if has and key not in o:
+                o[key] = True
+            elif not has and key in o:
+                del o[key]
+        return key
 
     def _has_mat(self, o, name):
         """Mesmo teste de RAS_Mesh::FindMaterialName (nome sem o prefixo MA)."""
@@ -1380,6 +1426,66 @@ _EXTRA["_steer"] = '''
 '''
 
 
+_EXTRA["_track_parent"] = '''
+    @staticmethod
+    def _track_vectomat(d, axis, up, use3d):
+        """vectomat() de KX_TrackToActuator: eixo (0-5; 3-5 = negativo) aponta para o alvo, up para cima."""
+        z = Vector((0.0, 0.0, 1.0))
+        safe = lambda v, fallback: v.normalized() if v.length > 1e-6 else fallback.copy()
+        vec = safe(d, z)
+        if not use3d:
+            vec.z = 0.0
+            vec = safe(vec, z)
+        if axis > 2:
+            axis -= 3
+        else:
+            vec = -vec
+        proj = safe(z - vec * (z.dot(vec) / vec.dot(vec)), Vector((0.0, 1.0, 0.0)))
+        if axis == up:
+            return Matrix.Identity(3)
+        right = proj.cross(vec).normalized() * {1: 1.0, -2: 1.0, -1: -1.0, 2: -1.0}.get(axis - up, 0.0)
+        cols = [None, None, None]
+        cols[3 - axis - up], cols[up], cols[axis] = right, proj, vec
+        return Matrix(cols).transposed()
+
+    @staticmethod
+    def _track_eul(m):
+        """Mat3ToEulOld da engine."""
+        cy = math.sqrt(m[0][0] * m[0][0] + m[1][0] * m[1][0])
+        if cy > 16.0 * 1.1920929e-07:
+            return [math.atan2(m[2][1], m[2][2]), math.atan2(-m[2][0], cy), math.atan2(m[1][0], m[0][0])]
+        return [math.atan2(-m[1][2], m[1][1]), math.atan2(-m[2][0], cy), 0.0]
+
+    @staticmethod
+    def _track_mat(e):
+        """EulToMat3 da engine."""
+        ci, cj, ch = math.cos(e[0]), math.cos(e[1]), math.cos(e[2])
+        si, sj, sh = math.sin(e[0]), math.sin(e[1]), math.sin(e[2])
+        cc, cs, sc, ss = ci * ch, ci * sh, si * ch, si * sh
+        return Matrix(((cj * ch, sj * sc - cs, sj * cc + ss),
+                       (cj * sh, sj * ss + cc, sj * cs - sc),
+                       (-sj, cj * si, cj * ci)))
+
+    def _track_parent(self, tgt, axis, up, time, use3d):
+        """Track To de objeto com pai: mesma conta do KX_TrackToActuator (vectomat, interpolacao em
+        euler com 'time', correcao pela orientacao inicial do pai, posicao local mantida)."""
+        ob = self.object
+        mat = self._track_vectomat(ob.worldPosition - tgt.worldPosition, axis, up, use3d)
+        old, new = self._track_eul(ob.worldOrientation), self._track_eul(mat)
+        for i in range(3):
+            d = new[i] - old[i]
+            if abs(d) > math.pi:
+                new[i] += -2.0 * math.pi if d > 0.0 else 2.0 * math.pi
+            new[i] = (time * old[i] + new[i]) / (1.0 + time)
+        mat = self._track_mat(new)
+        parent, plm = self._plm
+        if parent is not None and not parent.invalid:
+            pos = ob.localPosition.copy()
+            ob.localOrientation = plm * (parent.worldOrientation.inverted() * mat)
+            ob.localPosition = pos
+        else:
+            ob.localOrientation = mat
+'''
 _EXTRA["_hold"] = '''
     def _hold(self, key, active, time):
         """Mouse com Hold: positivo depois de time segundos com o botao segurado (long press)."""
@@ -1457,7 +1563,8 @@ _EXTRA["_gaze"] = '''
         gazed = st[0] if st[0] is not None and not st[0].invalid else None
 
         def cast(to):
-            hit, point = caster.rayCast(to, frm, rng, "" if mat else prop, 0, xray, 0, mask)[:2]
+            hit, point = caster.rayCast(to, frm, rng, (self._mat_mark(prop) if xray else "") if mat else prop,
+                                        0, xray, 0, mask)[:2]
             if mat and not self._has_mat(hit, prop):
                 return None, None
             return hit, point
@@ -1646,6 +1753,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     plans = []
 
     foreign = {}  # objeto de outro dono -> variavel local no update()
+    foreign_hits = set()  # donos de sensores Collision ligados (colisoes lidas por _take)
 
     def on(owner, lines_or_expr):
         """Reescreve 'ob' para o objeto dono do brick (links entre objetos)."""
@@ -1676,10 +1784,14 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 else:
                     var, key = _ident(owner.name + "_" + s.name, "s"), owner.name + "/" + s.name
                     expr = _sensor_expr(owner, s, key)
-                    # Helpers que usam self.object so valem para o proprio objeto.
-                    if re.search(r"hits|self\._(near|radar|act_on|anim_event)\b", expr):
+                    # Helpers que leem o estado do proprio objeto (self.object) nao valem para outro dono.
+                    if re.search(r"self\._(act_on|anim_event|moved|gaze|vr_head)\b", expr):
                         raise Unsupported("sensor %s de %s ligado" % (s.type, owner.name))
                     expr = on(owner, expr)
+                    if s.type == 'COLLISION':
+                        # Colisoes do dono do sensor: lista propria, lida uma vez por frame (_take).
+                        foreign_hits.add(owner.name)
+                        expr = re.sub(r"\bhits\b", "hits_" + foreign[owner.name], expr)
                     expr = "%s is not None and (%s)" % (foreign[owner.name], expr)
                 exprs[var] = (expr, s.name if owner == ob else "%s/%s" % (owner.name, s.name))
                 sensor_vars[s.name] = var
@@ -1723,12 +1835,16 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
 
     # Mesma ordem da engine: sensores, depois controllers, depois actuators.
     # Assim nenhum sensor enxerga uma mudanca feita por actuator no mesmo frame.
-    uses_hits = any("hits" in expr for expr, _orig in sensor_exprs.values())
+    uses_hits = any(re.search(r"\bhits\b", expr) for expr, _orig in sensor_exprs.values())
     start_extra = "        self.object.collisionCallbacks.append(self._on_hit)\n" if uses_hits else ""
     out = []
     for name, var in sorted(foreign.items()):
         # Bricks ligados de outro objeto: some se o objeto for removido.
         out.append("        %s = scene.objects.get(%r)" % (var, name))
+        if name in foreign_hits:
+            out.append("        hits_%s = self._take(%s)" % (var, var))
+            # Registra o callback ja no start (a engine escuta colisoes desde o primeiro frame).
+            start_extra += "        self._take(self.object.scene.objects.get(%r))\n" % name
     out.append("        # Sensores")
     if uses_hits:
         # Colisoes do passo de fisica anterior, como o Collision sensor.
@@ -1797,6 +1913,13 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             mask |= 1 << (cont.states - 1)
         out.append(_RUNNER % {"classname": classname, "mask": mask})
     body = "\n".join(out)
+    if "self._near(" in body or "self._radar(" in body:
+        actors = sorted(o.name for o in bpy.data.objects if o.game.use_actor)
+        start_extra += "        self._actors = frozenset(%r)\n" % (actors,)
+    if "self._track_parent(" in body:
+        # Pai e orientacao local inicial dele (a engine guarda no carregamento).
+        start_extra += ("        _p = self.object.parent\n"
+                        "        self._plm = (_p, _p.localOrientation.copy() if _p is not None else None)\n")
     extra = "".join(text for name, text in _EXTRA.items() if "self.%s(" % name in body)
     header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra,
                         "base": "types.KX_PythonComponent" if component else "object",

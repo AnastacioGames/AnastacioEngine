@@ -5,6 +5,7 @@ With "convert" the bricks of "Player" are converted by logic.convert_to_componen
 before saving. Running both files in RangeRuntime must print the same CHECK line.
 """
 import bpy
+import math
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -33,6 +34,7 @@ bpy.ops.mesh.primitive_cube_add(location=(20, 0, 0))
 wall = bpy.context.active_object
 wall.name = "Wall"
 wall.game.physics_type = 'STATIC'
+wall.game.use_actor = True
 bpy.ops.object.game_property_new(type='BOOL', name="wall")
 wall.data.materials.append(bpy.data.materials.new("WallMat"))
 scene.objects.active = player
@@ -272,6 +274,114 @@ a_look.sensitivity_y = 0.0
 link([kid.game.sensors["KidGo"]], kid.game.controllers["KidGo"], [kid.game.actuators["ToWall"], a_look])
 scene.objects.active = player
 
+# F4: Ray por material com x-ray (Veil bloqueia sem x-ray; com x-ray o Ray enxerga o Target atras dele).
+for name in ("sawx", "sawn"):
+    bpy.ops.object.game_property_new(type='INT', name=name)
+for name, z, mat in (("Veil", 10, "VeilMat"), ("Target", 20, "TargetMat")):
+    bpy.ops.mesh.primitive_cube_add(location=(0, 0, z))
+    o = bpy.context.active_object
+    o.name = name
+    o.scale = (10, 10, 1)
+    o.game.physics_type = 'STATIC'
+    o.data.materials.append(bpy.data.materials.new(mat))
+scene.objects.active = player
+for sname, xray, prop in (("SeeTargetXray", True, "sawx"), ("SeeTargetNoXray", False, "sawn")):
+    s_x = brick("sensor", 'RAY', sname)
+    s_x.axis = 'ZAXIS'
+    s_x.range = 100.0
+    s_x.ray_type = 'MATERIAL'
+    s_x.material = "TargetMat"
+    s_x.use_x_ray = xray
+    c_x = brick("controller", 'LOGIC_AND', sname, 2)
+    a_x = brick("actuator", 'PROPERTY', sname)
+    a_x.mode = 'ADD'
+    a_x.property = prop
+    a_x.value = "1"
+    link([s_x], c_x, [a_x])
+
+# F4: Collision/Near/Radar de outro objeto (Faller, dinamico, cai no Floor) ligados a controllers do Player.
+for name in ("landed", "nearw", "radw", "neard"):
+    bpy.ops.object.game_property_new(type='INT', name=name)
+bpy.ops.mesh.primitive_cube_add(location=(0, 0, -5))
+floor = bpy.context.active_object
+floor.name = "Floor"
+floor.scale = (30, 30, 1)
+floor.game.physics_type = 'STATIC'
+bpy.ops.object.game_property_new(type='BOOL', name="floor")
+bpy.ops.mesh.primitive_cube_add(location=(0, 0, -3.5))
+faller = bpy.context.active_object
+faller.name = "Faller"
+faller.scale = (0.5, 0.5, 0.5)
+faller.game.physics_type = 'RIGID_BODY'
+# Decoy: tem a propriedade, mas nao e Actor; Near/Radar da engine nao enxergam (controle negativo).
+bpy.ops.mesh.primitive_cube_add(location=(0, 3, -3.5))
+decoy = bpy.context.active_object
+decoy.name = "Decoy"
+decoy.game.physics_type = 'STATIC'
+decoy.game.use_actor = False
+bpy.ops.object.game_property_new(type='BOOL', name="decoy")
+scene.objects.active = faller
+bpy.ops.logic.sensor_add(type='COLLISION', name="Landed", object=faller.name)
+s_land = faller.game.sensors["Landed"]
+s_land.property = "floor"
+bpy.ops.logic.sensor_add(type='NEAR', name="NearWall", object=faller.name)
+s_near = faller.game.sensors["NearWall"]
+s_near.property = "wall"
+s_near.distance = 25.0
+s_near.reset_distance = 30.0
+bpy.ops.logic.sensor_add(type='RADAR', name="RadarWall", object=faller.name)
+s_rad = faller.game.sensors["RadarWall"]
+s_rad.property = "wall"
+s_rad.axis = 'XAXIS'
+s_rad.angle = math.radians(90.0)
+s_rad.distance = 100.0
+scene.objects.active = player
+bpy.ops.logic.sensor_add(type='NEAR', name="NearDecoy", object=faller.name)
+s_nd = faller.game.sensors["NearDecoy"]
+s_nd.property = "decoy"
+s_nd.distance = 25.0
+s_nd.reset_distance = 30.0
+scene.objects.active = player
+for sens, cname, prop in ((s_land, "Landed", "landed"), (s_near, "NearWall", "nearw"), (s_rad, "RadarWall", "radw"),
+                          (s_nd, "NearDecoy", "neard")):
+    c_f = brick("controller", 'LOGIC_AND', cname, 2)
+    a_f = brick("actuator", 'PROPERTY', cname)
+    a_f.mode = 'ADD'
+    a_f.property = prop
+    a_f.value = "1"
+    link([sens], c_f, [a_f])
+
+# F4: Sound em ping-pong (loop bidirecional, para no pulso negativo).
+c_pp = brick("controller", 'LOGIC_AND', "BeepPP", 3)
+a_pp = brick("actuator", 'SOUND', "BeepPP")
+a_pp.sound = a_snd.sound
+a_pp.mode = 'LOOPBIDIRECTIONALSTOP'
+link([s_wait], c_pp, [a_pp])
+
+# F4: Track To de objeto com pai (Turret filho do Pivot) olhando o Player, com suavizacao (time=3).
+bpy.ops.object.empty_add(location=(0, 8, 0), rotation=(0.0, 0.0, 0.6))
+pivot = bpy.context.active_object
+pivot.name = "Pivot"
+bpy.ops.mesh.primitive_cube_add(location=(0, 8, 0))
+turret = bpy.context.active_object
+turret.name = "Turret"
+turret.game.physics_type = 'NO_COLLISION'
+turret.parent = pivot
+turret.location = (2, 0, 1)
+scene.objects.active = turret
+bpy.ops.logic.sensor_add(type='ALWAYS', name="Aim", object=turret.name)
+bpy.ops.logic.controller_add(type='LOGIC_AND', name="Aim", object=turret.name)
+bpy.ops.logic.actuator_add(type='EDIT_OBJECT', name="Aim", object=turret.name)
+a_aim = turret.game.actuators["Aim"]
+a_aim.mode = 'TRACKTO'
+a_aim.object = player
+a_aim.time = 3
+a_aim.use_3d_tracking = True
+a_aim.track_axis = 'TRACKAXISY'
+a_aim.up_axis = 'UPAXISZ'
+link([turret.game.sensors["Aim"]], turret.game.controllers["Aim"], [a_aim])
+scene.objects.active = player
+
 # Checker: script comum (nao convertido) que imprime o resultado e sai.
 checker = bpy.data.objects.new("Checker", None)
 scene.objects.link(checker)
@@ -285,9 +395,11 @@ text.from_string(
     "if own['frames'] == 60:\n"
     "    p = logic.getCurrentScene().objects['Player']\n"
     "    bullets = len([o for o in own.scene.objects if o.name == 'Bullet'])\n"
-    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f moved=%d rv=%d joy=%d kid=%s mvis=%s' % (\n"
+    "    line = 'CHECK score=%d ticks=%d alive=%s state=%d x=%.2f y=%.2f pulses=%d bullets=%d saw=%d sawmat=%d boxn=%d boxz=%.2f msgs=%d cam=%.2f,%.2f,%.2f moved=%d rv=%d joy=%d kid=%s mvis=%s sawx=%d sawn=%d landed=%d nearw=%d radw=%d neard=%d aim=%s' % (\n"
     "        p['score'], p['ticks'], p['alive'], p.state, p.worldPosition.x, p.worldPosition.y,\n"
-    "        p['pulses'], bullets, p['saw'], p['sawmat'], own.scene.objects['Box']['boxn'], own.scene.objects['Box'].worldPosition.z, p['msgs'], *own.scene.objects['Cam'].worldPosition, p['moved'], p['rv'], p['joy'], own.scene.objects['Kid'].parent, logic.mouse.visible)\n"
+    "        p['pulses'], bullets, p['saw'], p['sawmat'], own.scene.objects['Box']['boxn'], own.scene.objects['Box'].worldPosition.z, p['msgs'], *own.scene.objects['Cam'].worldPosition, p['moved'], p['rv'], p['joy'], own.scene.objects['Kid'].parent, logic.mouse.visible,\n"
+    "        p['sawx'], p['sawn'], p['landed'], p['nearw'], p['radw'], p['neard'],\n"
+    "        ','.join('%.2f' % v for row in own.scene.objects['Turret'].worldOrientation for v in row))\n"
     "    print(line, flush=True)\n"
     "    with open(logic.expandPath('//' + own.scene.name + '_check.txt'), 'w') as f:\n"
     "        f.write(line + '\\n')\n"
@@ -299,10 +411,12 @@ checker.game.controllers["Check"].text = text
 checker.game.sensors["Frame"].link(checker.game.controllers["Check"])
 
 if convert:
-    for target in (player, cam, kid):
+    for target in (player, cam, kid, turret):
         scene.objects.active = target
         print("CONVERT", target.name, bpy.ops.logic.convert_to_component(mode=mode))
     print(bpy.data.texts["player_logic.py"].as_string())
     print(bpy.data.texts["cam_logic.py"].as_string())
+    todos = [(t.name, ln.strip()) for t in bpy.data.texts for ln in t.as_string().splitlines() if "# TODO:" in ln]
+    print("LEFT_AS_BRICK", len(todos), todos)
 
 bpy.ops.wm.save_as_mainfile(filepath=output)
