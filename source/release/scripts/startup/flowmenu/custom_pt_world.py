@@ -373,6 +373,18 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 # ==============================================================================
 # GLOBAL PROPERTIES (COMPARTILHADAS ENTRE OBJETOS VIA WORLD)
 # ==============================================================================
+BUILTIN_WORLD_PROPERTIES = {
+    "sun_hour",
+    "rain_enabled",
+    "rain_intensity",
+    "clouds_enabled",
+    "mist_enabled",
+    "mist_density",
+    "cloud_type",
+    "player_under_cover",
+}
+
+
 class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
     bl_label = "World Properties"
     bl_idname = "WORLD_PT_game_global_properties_custom"
@@ -403,4 +415,8 @@ class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
             props = sub.operator("world.game_property_move", text="", icon='TRIA_DOWN')
             props.index = i
             props.direction = 'DOWN'
-            row.operator("world.game_property_remove", text="", icon='X', emboss=False).index = i
+            if prop.name in BUILTIN_WORLD_PROPERTIES:
+                # Propriedades criadas pela engine: sem botão de apagar.
+                row.label(text="", icon='BLANK1')
+            else:
+                row.operator("world.game_property_remove", text="", icon='X', emboss=False).index = i
