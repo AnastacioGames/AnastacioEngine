@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Áudio Web: AudioWorklet no lugar do ScriptProcessorNode (2026-10-04, branch `claude/project-thread-8r9ysi`)
+
+- Novo dispositivo Audaspace `WebAudio` (`extern/audaspace/plugins/webaudio/`, só no Emscripten): `AudioWorkletNode` alimentado pela thread principal via `MessagePort`, sem `SharedArrayBuffer` (não exige COOP/COEP; GitHub Pages e o WebView do APK seguem servindo). O worklet pede o que falta para a fila chegar ao alvo (2 blocos de `mixbufsize`); se faltar dado, toca silêncio e, quando os dados voltam, soma ao alvo o que faltou (até ~0,5 s).
+- Só é registrado quando o navegador tem AudioWorklet em contexto seguro; senão, ou com `?audio=sdl` na URL, o player usa o SDL (ScriptProcessor) como antes (`GPG_Ghost.cpp`). Sem exceções: o construtor nunca lança.
+- Estado em `Module.rangeAudio` (contexto, blocos, pico, underruns, alvo). `package-web.py` suspende/retoma esse contexto ao esconder a página; `verify-capabilities.cjs audio` lê os contadores dele e confere a ausência do aviso de API obsoleta.
+- Validação (Linux, emsdk 6.0.11, `web-runtime-release` completo, Chromium headless): demo Destruction toca a música por AudioWorklet, nenhum aviso `ScriptProcessorNode is deprecated` (com `?audio=sdl` o aviso volta), suspender/retomar ok. Teste isolado Audaspace+WebAudio com carga simulada (quadros de 40 ms, pico de 300 ms a cada 25): 66 quanta silenciosos no primeiro pico, depois 0 em 15 s. No Chromium sem GPU daqui (3–4 fps, pausas de até 1,3 s na thread principal) ainda há buracos, porque essas pausas passam do limite de 0,5 s. **Falta o teste audível no navegador/celular real.**
+
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 
 - `logic_to_python.py`: actuators **Camera, Constraint (Loc/Ori/Dist/FH), Steering e Mouse Look** de outro objeto agora são convertidos. Os helpers (`_follow`, `_mouse_look`, `_cst_*`, `_steer`) recebem `own=` e agem sobre `scene.objects[dono]`; estado separado por `Dono/Actuator`. Os demais helpers de outro dono seguem como brick.

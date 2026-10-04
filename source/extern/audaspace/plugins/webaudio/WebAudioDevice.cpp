@@ -20,9 +20,11 @@
 
 #include <emscripten.h>
 
-/* Fluxo: o AudioWorkletProcessor pede blocos de `block` frames pela porta sempre que tem menos de
- * dois blocos na fila; a thread principal mixa (WebAudioDevice::mixBlock) e devolve um Float32Array
- * intercalado transferido. Faltando dados, o worklet toca silencio e conta um underrun.
+/* Fluxo: o AudioWorkletProcessor pede pela porta os frames que faltam para a fila chegar ao alvo
+ * (multiplos de `block`); a thread principal mixa (WebAudioDevice::mixBlock) e devolve um Float32Array
+ * intercalado transferido. O alvo comeca em dois blocos. Faltando dados (a thread principal
+ * ficou presa num quadro longo), o worklet toca silencio, conta underruns e, quando os dados voltam,
+ * soma ao alvo o que faltou, ate ~0,5 s. Assim o primeiro pico ja dimensiona a fila.
  * Estado exposto em Module.rangeAudio (contexto, contadores) para a pagina e os testes. */
 
 EM_JS(int, aud_webaudio_supported, (), {
@@ -44,9 +46,11 @@ EM_JS(int, aud_webaudio_open, (int channels, int block, void* device), {
 			constructor(options) {
 				super();
 				var o = options.processorOptions;
-				this.ch = o.channels; this.block = o.block; this.target = 2 * o.block;
+				this.ch = o.channels; this.block = o.block;
+				this.target = 2 * o.block;
+				this.maxTarget = Math.max(this.target, Math.ceil(0.5 * sampleRate / o.block) * o.block);
 				this.queue = []; this.offset = 0; this.queued = 0; this.pending = 0;
-				this.underruns = 0; this.started = false; this.stopped = false;
+				this.underruns = 0; this.missing = 0; this.started = false; this.stopped = false;
 				this.port.onmessage = (e) => {
 					var d = e.data;
 					if (d.stop) { this.stopped = true; return; }
@@ -55,10 +59,11 @@ EM_JS(int, aud_webaudio_open, (int channels, int block, void* device), {
 				this.request();
 			}
 			request() {
-				while (this.queued + this.pending < this.target) {
-					this.pending += this.block;
-					this.port.postMessage({ need: this.block, underruns: this.underruns });
-				}
+				var missing = this.target - this.queued - this.pending;
+				if (missing <= 0) return;
+				var need = Math.ceil(missing / this.block) * this.block;
+				this.pending += need;
+				this.port.postMessage({ need: need, underruns: this.underruns, target: this.target });
 			}
 			process(inputs, outputs) {
 				if (this.stopped) return false;
@@ -73,7 +78,15 @@ EM_JS(int, aud_webaudio_open, (int channels, int block, void* device), {
 					i += take; this.offset += take; this.queued -= take;
 					if (this.offset >= frames) { this.queue.shift(); this.offset = 0; }
 				}
-				if (i < n && this.started) this.underruns++;
+				if (i < n && this.started) {
+					this.underruns++;
+					this.missing += n - i;
+				}
+				else if (i === n && this.missing) {
+					var grow = Math.ceil(this.missing / this.block) * this.block;
+					this.target = Math.min(this.maxTarget, this.target + grow);
+					this.missing = 0;
+				}
 				this.request();
 				return true;
 			}
@@ -105,7 +118,7 @@ EM_JS(int, aud_webaudio_open, (int channels, int block, void* device), {
 		node.port.onmessage = function (e) {
 			if (A.closed || !A.device) return;
 			var frames = e.data.need, len = frames * channels, buf;
-			A.underruns = e.data.underruns;
+			A.underruns = e.data.underruns; A.target = e.data.target;
 			if (A.playing) {
 				var ptr = _aud_webaudio_mix(A.device, frames) >> 2;
 				buf = HEAPF32.slice(ptr, ptr + len);
