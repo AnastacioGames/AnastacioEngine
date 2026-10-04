@@ -579,6 +579,10 @@ static struct proxy_output_ctx *alloc_proxy_output_ffmpeg(
 		                               round_up(width, 16), height),
 		                           "alloc proxy output frame"),
 		               rv->c->pix_fmt, round_up(width, 16), height);
+		/* avcodec_send_frame() (FFmpeg 5+) copies the frame and needs these. */
+		rv->frame->format = rv->c->pix_fmt;
+		rv->frame->width = width;
+		rv->frame->height = height;
 
 		rv->sws_ctx = sws_getContext(
 		        icodec->width,

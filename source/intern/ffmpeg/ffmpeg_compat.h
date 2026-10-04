@@ -161,6 +161,11 @@ int ffmpeg_compat_encode(AVCodecContext *avctx, AVPacket *pkt, const AVFrame *fr
 #  define FFMPEG_CONST
 #endif
 
+/* AVChannelLayout (FFmpeg 5.1+); the old channel_layout fields still exist next to it. */
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 24, 100)
+#  define FFMPEG_HAVE_CH_LAYOUT 1
+#endif
+
 /* Stream codec info and context, both APIs. Before 5.0 the stream owns its
  * context (AVStream.codec); from 5.0 the caller makes one from codecpar.
  * Pair ffmpeg_stream_context_open() with ffmpeg_stream_context_close(). */
