@@ -746,10 +746,15 @@ static void sigHandleAbort(int signum)
  * if the signal reaches the main thread outside of any syscall with a disposition that
  * masks it (worker thread pools can shift where it lands). Set a flag here (the only
  * async-signal-safe option) and let LA_Launcher::EngineNextFrame() check it once per frame,
- * the same clean-shutdown path as closing the window. */
-static void sigHandleTerm(int /*signum*/)
+ * the same clean-shutdown path as closing the window. SIGINT (Ctrl+C) takes the same path;
+ * installed before SDL, which only replaces SIG_DFL with handlers that queue an unread
+ * SDL_QUIT. A second signal kills the process, for a game stuck before its next frame. */
+static void sigHandleTerm(int signum)
 {
-	LA_SigTermRequested.store(true);
+	if (LA_SigTermRequested.exchange(true)) {
+		signal(signum, SIG_DFL);
+		raise(signum);
+	}
 }
 
 static void terminateHandler()
@@ -968,6 +973,7 @@ int main(int argc,
 	/* after parsing args */
 	signal(SIGSEGV, sigHandleCrash);
 	signal(SIGTERM, sigHandleTerm);
+	signal(SIGINT, sigHandleTerm);
 #endif  // WIN32
 	signal(SIGABRT, sigHandleAbort);
 	std::set_terminate(terminateHandler);
