@@ -811,3 +811,170 @@ TEST(NetReplication, ClientDropsOldSnapshotsAndRequestsFullState)
 	replica.applyLatest();
 	EXPECT_NEAR(world.objects[5].s.position[0], 3.0f, 0.001f);
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Fuzz
+ * \{ */
+
+namespace {
+
+/// Message bodies seen by a client in a short session with spawns, props and movement.
+std::vector<std::pair<uint8_t, std::vector<uint8_t>>> collectBodies()
+{
+	Net net;
+	ReplicatedObjectDesc desc;
+	desc.props = propSchema();
+	desc.syncVelocity = true;
+	for (NetId id = 1; id <= 5; ++id) {
+		ObjectState s = stateAt(float(id), 0.0f, 0.0f);
+		s.props = {PropValue::makeInt(id), PropValue::makeFloat(1.0f)};
+		net.addSceneObject(id * 1000, desc, s);
+	}
+	Client &a = net.addClient("Ana");
+	net.connectAll();
+	desc.prototype = "Crate";
+	for (int i = 0; i < 4; ++i) {
+		const NetId id = net.replicator->spawn(desc);
+		ObjectState s = stateAt(0.0f, float(i), 0.0f);
+		s.id = id;
+		s.props = {PropValue::makeInt(i), PropValue::makeFloat(2.0f)};
+		net.world.add(id).s = s;
+	}
+	for (int t = 0; t < 20; ++t) {
+		for (auto &pair : net.world.objects) {
+			pair.second.s.position[0] += 0.1f;
+			pair.second.s.props[0] = PropValue::makeInt(t);
+		}
+		if (t == 10) {
+			net.replicator->setOwner(kFirstRuntimeNetId, 1);
+			net.replicator->despawn(kFirstRuntimeNetId + 1);
+		}
+		net.step();
+	}
+	std::vector<std::pair<uint8_t, std::vector<uint8_t>>> bodies;
+	for (const SpyTransport::Packet &p : a.spy->received) {
+		PacketReader reader(p.data.data(), p.data.size());
+		RawMessage raw;
+		while (reader.next(raw)) {
+			bodies.push_back({raw.type, std::vector<uint8_t>(raw.body, raw.body + raw.size)});
+		}
+	}
+	return bodies;
+}
+
+SessionEvent messageEvent(ClientId client, uint8_t type, const std::vector<uint8_t> &body)
+{
+	SessionEvent e;
+	e.type = SessionEvent::Type::Message;
+	e.client = client;
+	e.messageType = type;
+	e.body = body;
+	return e;
+}
+
+/// Random bytes, or a valid body with flipped bits, truncated or extended.
+std::vector<uint8_t> mutate(net_test::Rng &rng, const std::vector<uint8_t> &valid)
+{
+	std::vector<uint8_t> body;
+	switch (rng.below(4)) {
+		case 0:
+			body.resize(rng.below(80));
+			for (uint8_t &b : body) {
+				b = uint8_t(rng.below(256));
+			}
+			break;
+		case 1:
+			body = valid;
+			for (uint32_t n = rng.below(4) + 1; n > 0 && !body.empty(); --n) {
+				body[rng.below(uint32_t(body.size()))] ^= uint8_t(1u << rng.below(8));
+			}
+			break;
+		case 2:
+			body.assign(valid.begin(), valid.begin() + rng.below(uint32_t(valid.size()) + 1));
+			break;
+		default:
+			body = valid;
+			for (uint32_t n = rng.below(8) + 1; n > 0; --n) {
+				body.push_back(uint8_t(rng.below(256)));
+			}
+			break;
+	}
+	return body;
+}
+
+}  // namespace
+
+TEST(NetReplicationFuzz, ReplicaClientDecode)
+{
+	const auto bodies = collectBodies();
+	ASSERT_FALSE(bodies.empty());
+	const uint8_t types[] = {uint8_t(MessageType::Snapshot), uint8_t(MessageType::Spawn),
+	                         uint8_t(MessageType::Despawn), uint8_t(MessageType::Ownership)};
+
+	std::unique_ptr<ITransport> other;
+	auto transport = createLoopbackPair(other);
+	ClientSession session(*transport, ClientConfig());
+	MapWorld world;
+	for (NetId id = 1; id <= 5; ++id) {
+		world.add(id * 1000).s = stateAt(0.0f, 0.0f, 0.0f);
+	}
+	ReplicaClientConfig rc;
+	rc.schema = [](NetId, const std::string &) { return &propSchema(); };
+	ReplicaClient replica(session, world, rc);
+
+	net_test::Rng rng(12345);
+	for (int i = 0; i < 100000; ++i) {
+		const auto &valid = bodies[rng.below(uint32_t(bodies.size()))];
+		// Mostly the real type of the body, sometimes another replication type.
+		const uint8_t type = rng.below(4) == 0 ? types[rng.below(4)] : valid.first;
+		replica.handleEvent(messageEvent(0, type, mutate(rng, valid.second)), uint64_t(i));
+		if (i % 64 == 0) {
+			replica.applyLatest();
+			replica.applyInterpolated(replica.lastAcceptedTick(), 0.5f);
+		}
+		if (i % 20000 == 0) {
+			replica.reset();
+		}
+	}
+	// Still works with valid input after the noise.
+	replica.reset();
+	for (const auto &b : bodies) {
+		replica.handleEvent(messageEvent(0, b.first, b.second), 0);
+	}
+	EXPECT_NE(replica.lastAcceptedTick(), kNoTick);
+	EXPECT_TRUE(replica.applyLatest());
+}
+
+TEST(NetReplicationFuzz, ReplicatorAckDecode)
+{
+	Net net;
+	net.addSceneObject(1, ReplicatedObjectDesc(), stateAt(0.0f, 0.0f, 0.0f));
+	Client &a = net.addClient("Ana");
+	net.connectAll();
+	net.step(3);
+	const ClientId id = a.session->clientId();
+
+	SnapshotAckMsg ack;
+	ack.tick = net.tick - 1;
+	std::vector<uint8_t> validAck;
+	BitWriter w(validAck);
+	encode(w, ack);
+	const uint8_t types[] = {uint8_t(MessageType::SnapshotAck), uint8_t(MessageType::FullStateRequest),
+	                         uint8_t(MessageType::Input), uint8_t(MessageType::Rpc)};
+
+	net_test::Rng rng(777);
+	for (int i = 0; i < 100000; ++i) {
+		const uint8_t type = types[rng.below(4)];
+		const ClientId client = rng.below(4) == 0 ? ClientId(rng.below(70)) : id;
+		net.replicator->handleEvent(messageEvent(client, type, mutate(rng, validAck)));
+		if (i % 5000 == 0) {
+			net.step();
+		}
+	}
+	// Replication recovers: the object moves on the client.
+	net.world.objects[1].s.position[0] = 3.0f;
+	net.step(10);
+	EXPECT_NEAR(a.world.objects[1].s.position[0], 3.0f, 0.001f);
+}
+
+/** \} */

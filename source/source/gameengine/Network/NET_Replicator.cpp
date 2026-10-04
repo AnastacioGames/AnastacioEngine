@@ -63,8 +63,8 @@ struct ReliableBatch {
 	}
 };
 
-/// Removed entries in one snapshot; more are deferred to the next ones.
-constexpr size_t kMaxRemovalsPerSnapshot = 256;
+/// Removed entries in one snapshot (at most ~5.25 bytes each); more are deferred to the next ones.
+constexpr size_t kMaxRemovalsPerSnapshot = 128;
 /// Below this many budget bytes no snapshot is sent.
 constexpr double kMinSnapshotBudget = 32.0;
 /// Snapshot packet overhead: message header (<= 4), two ticks, object count (<= 3).

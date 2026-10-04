@@ -26,7 +26,7 @@ Arquivos: `NET_IWorld.h`, `NET_Replicator.h/.cpp` (servidor), `NET_ReplicaClient
   espera; entra primeiro o maior acumulador, que zera ao ser enviado. O tamanho é estimado pelo
   encode completo do objeto (limite superior do delta) e o pacote é cortado até caber em
   `min(1200, tokens)`.
-- **Remoções:** até 256 por snapshot; as outras ficam como no baseline e saem nos seguintes.
+- **Remoções:** até 128 por snapshot (cabem em 1200 bytes mesmo com NetId espalhados); as outras ficam como no baseline e saem nos seguintes.
 - **Mudança detectada por hash** (FNV-1a 64) dos campos quantizados de cada objeto, calculado uma vez
   por tick. Colisão de hash (2^-64) faria um objeto não ser enviado até a próxima mudança.
 - **Objeto dormindo** (`IWorld::isSleeping`): o servidor não relê o estado; o último capturado vale.

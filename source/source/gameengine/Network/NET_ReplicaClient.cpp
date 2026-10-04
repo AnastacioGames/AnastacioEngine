@@ -124,11 +124,10 @@ bool ReplicaClient::handleEvent(const SessionEvent &event, uint64_t nowMs)
 		}
 		case MessageType::Ownership: {
 			OwnershipMsg msg;
-			if (decodeMessage(raw, msg)) {
+			// Unknown objects are ignored (the Spawn carries the owner).
+			if (decodeMessage(raw, msg) && m_world.exists(msg.netId)) {
 				m_owners[msg.netId] = msg.newOwner;
-				if (m_world.exists(msg.netId)) {
-					m_world.setOwner(msg.netId, msg.newOwner);
-				}
+				m_world.setOwner(msg.netId, msg.newOwner);
 			}
 			return true;
 		}
