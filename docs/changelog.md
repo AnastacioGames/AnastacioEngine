@@ -22,6 +22,14 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Pendente: `run_net_test_win.sh` ainda não tem os cenários `server`/`predict`/`scene`/`scene-server` para
   cobrir essas correções direto no Windows.
 
+## Build Linux do editor: `RangeRuntime` linka sem OpenEXR (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- No `build-linux-editor` (`WITH_IMAGE_OPENEXR=OFF`, `WITH_PLAYER=ON`) o `RangeEngine` linkava, mas o
+  `RangeRuntime` falhava com `undefined reference to IMB_exr_*` vindo de `libbf_render.a`. O stub
+  (`openexr_stub.cpp`) está em `bf_imbuf`, mas `bf_render` não declarava essa dependência e ficava depois do último
+  `libbf_imbuf.a` na linha de link. `source/blender/render/CMakeLists.txt` agora lista `bf_imbuf` em `LIB`.
+- Os cenários `scene` e `scene-server` (que usam o editor para gerar os `.range`) passam no Linux.
+
 ## Multiplayer: propriedades de objeto previsto chegam ao dono (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `ReplicaClient::apply` (núcleo) pulava o objeto inteiro quando ele era do cliente e previsto (`skipOwned` +
