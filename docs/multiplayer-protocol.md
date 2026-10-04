@@ -108,9 +108,14 @@ só se `len` passar do fim do pacote.
 | 16 | `Rpc` | 1 | ambos | `u32 netId` (0 = global), `u16 rpcId`, `u32 tick`, argumentos (seção 8) |
 | 17 | `FullStateRequest` | 0 | C→S | vazio (cliente perdeu sincronia) |
 | 18 | `Chat` | 1 | ambos | `u16 fromClient`, `str text` (≤ 200 bytes) |
-| 200 | `RpcFrom` (provisória) | 1/2 | S→C | `u16 fromClient` + corpo do `Rpc`; repasse de `All`/`Others` vindo de um cliente (`NOTES-G.md`) |
+| 200 | `RpcFrom` | 1/2 | S→C | `u16 fromClient` + corpo do `Rpc`; repasse de `All`/`Others` vindo de um cliente (`NOTES-G.md`) |
 
-`protocolVersion` = 1. Mudança incompatível no formato incrementa.
+`protocolVersion` = 1. Mudança incompatível no formato incrementa. `RpcFrom` (200) é aditiva: ficou fora
+desse contador porque um cliente que não a conhece simplesmente descarta a mensagem (via
+`isKnownMessageType`) e só perde os repasses de RPC `All`/`Others` vindos de outro cliente — chamadas do
+próprio servidor continuam chegando como `Rpc` normal. Os dois lados de uma mesma sessão devem rodar a
+versão que já tem `RpcFrom` (commit que a introduziu); misturar um cliente velho com um servidor novo é
+suportado mas degradado, não um erro de protocolo.
 
 `RejectReason`: 1 `VersionMismatch`, 2 `SceneMismatch`, 3 `ServerFull`, 4 `BadToken`, 5 `Banned`,
 6 `GameInProgress` (se o jogo não aceitar entrada tardia).
