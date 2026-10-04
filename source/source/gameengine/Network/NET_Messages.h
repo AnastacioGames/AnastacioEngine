@@ -199,6 +199,13 @@ struct RpcMsg {
 	std::vector<RpcArg> args;
 };
 
+/// Rpc relayed by the server with the client that made the call (provisional message 200).
+struct RpcFromMsg {
+	static constexpr MessageType kType = MessageType::RpcFrom;
+	ClientId fromClient = 0;
+	RpcMsg rpc;
+};
+
 struct FullStateRequestMsg {
 	static constexpr MessageType kType = MessageType::FullStateRequest;
 };
@@ -224,6 +231,7 @@ bool encode(BitWriter &w, const OwnershipMsg &m);
 bool encode(BitWriter &w, const SnapshotAckMsg &m);
 bool encode(BitWriter &w, const InputMsg &m);
 bool encode(BitWriter &w, const RpcMsg &m);
+bool encode(BitWriter &w, const RpcFromMsg &m);
 bool encode(BitWriter &w, const FullStateRequestMsg &m);
 bool encode(BitWriter &w, const ChatMsg &m);
 
@@ -242,6 +250,7 @@ bool decode(BitReader &r, OwnershipMsg &m);
 bool decode(BitReader &r, SnapshotAckMsg &m);
 bool decode(BitReader &r, InputMsg &m);
 bool decode(BitReader &r, RpcMsg &m);
+bool decode(BitReader &r, RpcFromMsg &m);
 bool decode(BitReader &r, FullStateRequestMsg &m);
 bool decode(BitReader &r, ChatMsg &m);
 

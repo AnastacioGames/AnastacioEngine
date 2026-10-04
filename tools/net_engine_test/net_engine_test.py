@@ -271,6 +271,9 @@ class Rpc:
             self.local["move_not_owner"] = self.tracked.net.call("move_req", 0.5)
             self.local["poke_from_client"] = self.rig.net.call("poke", 1)
             self.local["shout"] = net.call("shout", "from-client")
+            # 'all' from a client comes back relayed (RpcFrom) with this client as the sender.
+            self.local["my_id"] = net.localId
+            self.local["all_from_client"] = net.call("renamed", -2)
             self.local["owner"] = (self.rig.net.owner == net.localId, self.rig.net.isOwner,
                                    self.tracked.net.id == net.net_id(self.tracked) != 0)
             try:
@@ -291,6 +294,8 @@ class Rpc:
             hello[0][5] == (1.0, 2.0, 3.0) and hello[0][6] == (0.7071, 0.0, 0.0, 0.7071) and hello[0][7] == "Spawner"
         check("rpc: client to server, every argument type and the sender", ok, str(hello))
         check("rpc: target 'all' runs on the server too", (0, 42) in self.got.get("notice", []), str(self.got.get("notice")))
+        check("rpc: 'all' from the client runs on the server with its sender", (1, -2) in self.got.get("renamed", []),
+              str(self.got.get("renamed")))
         mv = self.got.get("move_req", [])
         check("rpc: object call with owner_only reaches the server once", len(mv) == 1 and mv[0][0] == "Rig" and
               mv[0][1:] == (1, 0.5), str(mv))
@@ -312,6 +317,9 @@ class Rpc:
         check("rpc: registering during a session raises", self.late == "refused")
         check("rpc: target 'all' from the server runs here", (0, 42) in self.got.get("notice", []), str(self.got.get("notice")))
         check("rpc: registered under another name", (0, -1) in self.got.get("renamed", []))
+        mine = self.local.get("my_id")
+        check("rpc: 'all' relayed back to the calling client carries it as the sender",
+              bool(mine) and (mine, -2) in self.got.get("renamed", []), "%r %r" % (mine, self.got.get("renamed")))
         poke = self.got.get("poke", [])
         check("rpc: target 'owner' reaches the owner with its object", len(poke) == 1 and poke[0][0] == "Rig" and
               poke[0][1:] == (0, 7), str(poke))

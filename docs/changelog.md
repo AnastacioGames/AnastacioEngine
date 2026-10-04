@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: `sender` do RPC nos clientes (`200 RpcFrom`) (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Mensagem provisória `200 RpcFrom` (S→C, `u16 fromClient` + corpo do `Rpc`): o servidor repassa `All`/`Others`
+  vindos de um cliente com o id de quem chamou; `RpcClient` preenche `RpcCall::caller`, e o `sender` do `@net.rpc`
+  deixa de ser sempre 0 nos clientes. Cliente que manda 200 conta violação. Os dois lados precisam desta versão.
+- Testes (Linux): núcleo 111 passaram (novos `RelayCarriesTheCaller`, `ClientCannotSendRpcFrom`, ida e volta do
+  `RpcFrom`, fuzz do cliente com 200); `run_net_test.sh rpc` com o `sender` no cliente, `predict`, `server`,
+  `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102 passaram.
+
 ## Multiplayer: RPC do jogo (`@net.rpc`) e `obj.net` (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `Range.network.rpc` (decorador, alvos `server`/`owner`/`all`/`others`, `reliable`, `owner_only`, `name`) e

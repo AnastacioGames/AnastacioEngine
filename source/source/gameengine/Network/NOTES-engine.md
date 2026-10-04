@@ -100,8 +100,9 @@ rig.net.call("poke", 7)                     # chamada no objeto (igual a net.cal
 
 - **Alvos:** `server`, `owner` (só o servidor chama; roda no dono do objeto, ou no servidor se ele é o dono),
   `all` (servidor e todos os clientes, inclusive quem chamou), `others` (todos menos quem chamou).
-- **Assinatura:** `fn(sender, *args)` global, `fn(obj, sender, *args)` no objeto. `sender` é o cliente que chamou no
-  servidor e **sempre 0 nos clientes** (o contrato não tem o campo; um `all` vindo de um cliente chega com 0).
+- **Assinatura:** `fn(sender, *args)` global, `fn(obj, sender, *args)` no objeto. `sender` é o cliente que chamou;
+  0 quando quem chamou foi o servidor. Um `all`/`others` de um cliente é repassado pelo servidor como `200 RpcFrom`
+  (provisória, ver `NOTES-G.md`), então os outros clientes e o próprio autor (no `all`) recebem o id dele.
 - **Argumentos:** bool, int, float, str, objeto de jogo (vai como net id; volta como o objeto ou `None`), 3 números
   (`mathutils.Vector`), 4 números (quaternion w, x, y, z; volta `mathutils.Quaternion`). Até 1024 bytes por chamada.
 - **Registro:** antes de `host()`/`join()` (durante a sessão levanta `RuntimeError`), com os mesmos nomes em todos os
@@ -113,7 +114,7 @@ rig.net.call("poke", 7)                     # chamada no objeto (igual a net.cal
 - **`obj.net`:** `id`, `replicated`, `owner`, `isOwner`, `call(name, *args)`, `predict(fn)`. O atributo é criado
   pelo `Range.network` (`_object_net`), então `KX_GameObject` não depende do código de rede.
 - **Teste:** `run_net_test.sh rpc`: todos os alvos, todos os tipos de argumento, `sender`, objeto da chamada,
-  `owner_only`, `others` sem eco para quem chamou, RPC não confiável (≥ 15/30), nome trocado, `obj.net`, e as
+  `owner_only`, `others` sem eco para quem chamou, `sender` de um `all` repassado de volta ao cliente, RPC não confiável (≥ 15/30), nome trocado, `obj.net`, e as
   recusas locais. O cenário `predict` passou a mandar a posição do rig por RPC (`rig_pos`) em vez de chat.
 
 ## Predição, input e lag compensation

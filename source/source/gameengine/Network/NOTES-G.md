@@ -32,7 +32,10 @@ Criado em 2026-10-04. Branch `net/rpc`. Arquivos: `NET_RPC.h/.cpp`, `tests/NET_R
 
 1. **Quem chamou:** o `Rpc` não tem campo de origem; no cliente, um RPC repassado (`All`/`Others`) chega com
    `caller = 0`. Proposta: mensagem provisória `200 RpcFrom` = `u16 fromClient` + corpo do `Rpc`, só de
-   servidor para cliente. Não implementada: a sessão descarta tipos acima de 18 sem repassar, então exigiria
-   mudar a sessão nas duas pontas.
+   servidor para cliente. **Implementada (2026-10-04, `claude/project-thread-l2znr0`):** `MessageType::RpcFrom = 200`,
+   `RpcFromMsg`, `isKnownMessageType` aceita 200; o servidor conta violação se um cliente mandar 200;
+   `RpcServer` repassa `All`/`Others` como `RpcFrom`, `RpcClient` aceita `Rpc` e `RpcFrom` e preenche `caller`.
+   Chamadas feitas pelo próprio servidor continuam como `Rpc` (caller 0). Cliente antigo descarta o 200, ou seja,
+   perde os repasses: os dois lados precisam desta versão (`protocolVersion` não foi incrementado).
 2. Clientes que ainda não carregaram a cena também recebem o repasse; o RPC num objeto que eles não conhecem é
    descartado. Se for preciso, dá para filtrar por `ready`.

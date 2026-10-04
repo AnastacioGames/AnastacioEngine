@@ -94,6 +94,7 @@ static bool isServerToClient(MessageType type)
 		case MessageType::Despawn:
 		case MessageType::Ownership:
 		case MessageType::Snapshot:
+		case MessageType::RpcFrom:
 			return true;
 		default:
 			return false;

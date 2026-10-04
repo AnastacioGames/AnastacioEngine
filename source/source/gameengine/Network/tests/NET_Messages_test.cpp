@@ -181,6 +181,18 @@ TEST(NetMessages, RoundTripInputAndRpc)
 	EXPECT_EQ(r.args[1].i, -5);
 	EXPECT_EQ(r.rpcId, 65535);
 
+	// Provisional RpcFrom: u16 fromClient + Rpc body.
+	RpcFromMsg from;
+	from.fromClient = 513;
+	from.rpc = rpc;
+	EXPECT_TRUE(isKnownMessageType(uint8_t(MessageType::RpcFrom)));
+	const RpcFromMsg f = roundTrip(from);
+	EXPECT_EQ(f.fromClient, 513);
+	EXPECT_EQ(f.rpc.rpcId, 65535);
+	EXPECT_EQ(f.rpc.tick, 9u);
+	ASSERT_EQ(f.rpc.args.size(), 2u);
+	EXPECT_EQ(f.rpc.args[0].s, "abc");
+
 	// Arguments above 1024 bytes.
 	RpcMsg big;
 	a = RpcArg();
@@ -262,7 +274,7 @@ TEST(NetMessages, HeaderAndPacketFraming)
 
 	// Unknown type in the middle is skipped by its length.
 	const uint8_t unknown[3] = {0xAA, 0xBB, 0xCC};
-	ASSERT_TRUE(appendRawMessage(packet, 200, unknown, sizeof(unknown)));
+	ASSERT_TRUE(appendRawMessage(packet, 250, unknown, sizeof(unknown)));
 	ASSERT_TRUE(appendMessage(packet, ping));
 
 	PacketReader reader(packet.data(), packet.size());
@@ -270,7 +282,7 @@ TEST(NetMessages, HeaderAndPacketFraming)
 	ASSERT_TRUE(reader.next(raw));
 	EXPECT_EQ(raw.type, uint8_t(MessageType::Ping));
 	ASSERT_TRUE(reader.next(raw));
-	EXPECT_EQ(raw.type, 200);
+	EXPECT_EQ(raw.type, 250);
 	EXPECT_FALSE(isKnownMessageType(raw.type));
 	EXPECT_EQ(raw.size, 3u);
 	ASSERT_TRUE(reader.next(raw));

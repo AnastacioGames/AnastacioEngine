@@ -24,7 +24,8 @@
  *
  * Both sides register the same RPCs; rpcId is the index in the table sorted by name. Clients
  * may call Server, All and Others RPCs; the server checks target and owner, counts a violation
- * on the session for a bad call and relays All/Others to the clients. Owner RPCs go only from
+ * on the session for a bad call and relays All/Others to the clients as RpcFrom (provisional
+ * message 200 = u16 fromClient + Rpc body), so they know who called. Owner RPCs go only from
  * the server to the owner of the object. The 120 RPC/s limit is enforced by ServerSession.
  */
 
@@ -54,7 +55,8 @@ struct RpcDesc;
 struct RpcCall {
 	const RpcDesc *desc = nullptr;
 	uint16_t rpcId = 0;
-	/// Calling client on the server; on clients always 0 (the contract has no caller field).
+	/// Calling client: on the server the sender; on clients the client whose All/Others call the
+	/// server relayed (provisional RpcFrom message), else 0 (the server).
 	ClientId caller = kServerClientId;
 	NetId netId = kInvalidNetId;
 	Tick tick = kNoTick;
