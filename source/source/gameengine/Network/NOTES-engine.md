@@ -316,6 +316,15 @@ certos numa janela (screenshot). Modo `scene` (editor gera os `.range`) não foi
 Limites dos testes: a máquina de teste tem 4 núcleos e rasteriza por software (llvmpipe, 160×120), então o quadro
 é lento (5–15 fps) e o servidor às vezes para por centenas de ms; o teste de trajetória tolera isso (80 % das amostras na curva).
 
+### Windows (2026-10-04, modo cena)
+
+`run_net_test_win.sh` ganhou `scene` e `scene-server`, espelhando a versão Linux: chama `RangeEngine.exe -b
+--python make_net_scenes.py` (sem xvfb, não é necessário no Windows) para gerar `net_host.range`/`net_client.range`
+a partir de `halfanim_crash.blend`, e os dois cenários passam (`NETSCENE PASS` + `NETTEST server/client PASS`),
+incluindo o caso Dedicated (`scene-server`: host headless não aparece em `net.clients`). `spawner` revalidado sem
+regressão depois da mudança nos caminhos de cópia do `.range` (agora por papel, `ts/scene.range` e `tc/scene.range`,
+em vez de um único arquivo compartilhado).
+
 - **Esquema de protótipo antes do spawn.** O cliente decodifica os campos do `Spawn` com o esquema do protótipo
   antes de criar o objeto; `SchemaFor` monta o esquema do objeto inativo se ainda não existe (`CacheProtoSchema`).
   Sem isso, protótipo com propriedade replicada travava toda a replicação no cliente.
