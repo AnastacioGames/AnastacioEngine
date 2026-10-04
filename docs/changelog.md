@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: núcleo de rede completo (frentes A–J, 2026-10-04)
+
+- Frentes E–J feitas em sessões na nuvem e revisadas no Windows: replicação (`NET_Replicator`, `NET_ReplicaClient`, `NET_IWorld`, `net_bench`), predição/lag compensation/relógio (`NET_Prediction`, `NET_LagCompensation`, `NET_Clock`), RPC (`NET_RPC`, `ServerSession::reportViolation`), descoberta LAN (`NET_LanDiscovery`, `net_echo lan`), telas de pausa/configurações/LAN do menu e CI com wasm32 e Docker.
+- Correções na integração: `ASSERT_NE(ptr, nullptr)` não compila com o gtest do repo no MSVC (trocado por `ASSERT_TRUE`); conflitos do `CMakeLists.txt` do `Network/` resolvidos à mão.
+- Verificado no MSVC: 108/108 gtests, 102/102 pytest, `net_echo lan` acha o servidor local, `net_bench` 0,79 ms/tick e 32 KB/s por cliente.
+
 ## Edit Mode, UV editor, tema e Logic Bricks com visual no estilo Blender 5
 
 - Edit Mode (`drawobject.c`): face ativa com preenchimento translúcido sólido (sem stipple); arestas suaves de 1,5 px escalados por DPI; vértices e face dots redondos.

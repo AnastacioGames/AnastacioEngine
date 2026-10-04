@@ -53,10 +53,7 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 
 ### Multiplayer nativo
 
-Planejado em 2026-10-03, nada implementado. Plano completo em [`multiplayer-plan.md`](multiplayer-plan.md):
-servidor autoritativo com snapshots em C++, painel Network sem código, `Range.network` em Python. v1
-(etapas 0–6) = multiplayer básico no Desktop via ENet; v1.1 = predição e compensação de lag; v1.2 =
-Web/Android (WebSocket, cross-play). Próximo passo: etapa 0 (contrato do protocolo + `NET_BitStream`).
+Plano em [`multiplayer-plan.md`](multiplayer-plan.md), contrato em [`multiplayer-protocol.md`](multiplayer-protocol.md). Núcleo isolado pronto na main (2026-10-04, frentes A–J, `source/source/gameengine/Network/`): protocolo, ENet + WebSocket, servidor, replicação com delta/relevância/orçamento, predição e lag compensation, relógio, RPC, descoberta LAN, menu (`tools/net_menu/`), CI (`.github/workflows/network.yml`: gcc, clang, MSVC, wasm32, pytest, Docker). 108 gtests e 102 pytest no MSVC; `net_bench` 16×300 dentro das metas. Aberto: integração na engine (`KX_NetworkManager`, `NET_IWorld` com `KX_GameObject`, DNA, painel, `Range.network`); decidir as propostas provisórias (`7 WrongPassword` + senha no `Hello`, `200 RpcFrom`, `Server Name` da LAN; ver `NOTES-*.md`); cliente wasm testado só no node, falta navegador real.
 
 ### Web (WebGL/WebAssembly)
 
