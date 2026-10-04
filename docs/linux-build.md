@@ -239,12 +239,18 @@ confirma Python/bpy operacionais)** depois de seis bugs reais encontrados e corr
    `DisplayTransformRcPtr`), removida na 2.x; o Ubuntu 24.04 só tem `libopencolorio-dev` 2.1+. Portar
    exigiria reescrever dezenas de chamadas — fora do escopo desta validacao de build. **`WITH_OPENCOLORIO`
    desligado** para o preset `linux-editor` (`source/CMakePresets.json`).
+   **Resolvido em 2026-10-04:** `intern/opencolorio` compila com a OCIO 1.x e a 2.x (caminho 2.x atras de
+   `OCIO_VERSION_HEX`); o `config.ocio` tambem foi ajustado para a 2.x aceitar o arquivo. Ver changelog.
 3. **FFmpeg (export de video): API pre-3.1 removida** — `source/blender/blenkernel/intern/writeffmpeg.c` usa
    `AVStream::codec`, `avcodec_encode_video2`/`avcodec_encode_audio2`, `av_free_packet`, `avpicture_fill`,
    `AVFormatContext::filename`, todos removidos do FFmpeg ha varios anos. Mesmo caso do item 2 em escopo:
    **`WITH_CODEC_FFMPEG` desligado** para o preset `linux-editor`. Sem isso, o RangeEngine linux nao exporta
    video nem tem os codecs FFmpeg da libavformat/libavcodec do sistema; import/export de imagem estatica via
    OpenImageIO continua ligado normalmente.
+   **Resolvido em 2026-10-04:** o codigo compila com FFmpeg 4.x e 5+/6.x (`intern/ffmpeg/ffmpeg_compat.h`).
+   Com `-DWITH_CODEC_FFMPEG=ON` num host 24.04 (FFmpeg 6.1) o editor exporta video com audio e o player toca
+   video em textura; testes em `tools/linux/av_ports_test.py` e `tools/linux/video_texture_test.py`. Os presets
+   seguem com FFmpeg desligado ate decidir o empacotamento das `libav*`.
 4. **`strcmp` sem declaracao implicita** — `source/blender/editors/interface/interface_context_menu.c` usava
    `strcmp` (via `BLI_string.h`) sem incluir `<string.h>` diretamente; o gcc do Ubuntu 24.04 trata declaracao
    implicita de funcao como erro (`-Werror=implicit-function-declaration`). Corrigido com
@@ -486,7 +492,8 @@ vazio. **Audio (2026-09-30):** o FFmpeg fica desligado no Linux e o `aud` le tud
 (1.0.31) nao le MP3, entao o script compila a 1.2.2 com MPEG em `/usr/local` e confere que o tarball leva essa.
 OpenColorIO (2026-09-30): o container usa a OCIO 1.1.1 do apt (`libopencolorio-dev`, API 1.x) e os presets
 Linux ligam `WITH_OPENCOLORIO`; o pacote leva `lib/libOpenColorIO.so.1` e `2.79/datafiles/colormanagement`, que o
-script confere no fim. Num host 24.04+ (so OCIO 2.x) configure com `-DWITH_OPENCOLORIO=OFF`.
+script confere no fim. Num host 24.04+ (so OCIO 2.x) o preset compila direto desde 2026-10-04 (antes era preciso
+`-DWITH_OPENCOLORIO=OFF`).
 `libva`, `libvdpau` e `libOpenCL` vao em `lib/` (sem elas o pacote nao abria em Ubuntu 22.04/26.04, Debian 12
 e Fedora limpos); `libgbm`, ALSA/Pulse e Wayland ficam no sistema, como em qualquer desktop. O pacote tambem traz `range-engine.png`, `RangeEngine.desktop` e `install-desktop.sh` (icone no menu e na
 dock; a janela X11 ja define o icone sozinha via `_NET_WM_ICON`).

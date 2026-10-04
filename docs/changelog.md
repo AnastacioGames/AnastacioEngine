@@ -9,6 +9,38 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Linux: SIGTERM no player, OpenColorIO 2.x, FFmpeg 5+ e imgui.ini (2026-10-04, branch `claude/great-babbage-58sugr`)
+
+Feito e testado num container Ubuntu 24.04 (headless, xvfb/llvmpipe); Windows/MSVC não compilado.
+
+- **SIGTERM/SIGINT no `RangeRuntime`.** Causa: o SDL aberto para o gamepad instala handlers que viram um
+  `SDL_QUIT`, e ninguém lê esse evento (o `DEV_Joystick` só tira os eventos de joystick da fila). O player
+  instala os próprios handlers antes do SDL (`GPG_Ghost.cpp`): o primeiro sinal pede a saída no próximo frame
+  (`LA_Launcher::RequestQuit`, mesmo caminho de fechar a janela); o segundo mata, para jogo travado. Teste:
+  `kill`, Ctrl+C e `timeout` fecham em ~0,1 s com código 0; jogo preso em loop Python sai no segundo SIGTERM.
+- **OpenColorIO 2.x** (`intern/opencolorio`, caminho 2.x atrás de `OCIO_VERSION_HEX`, 1.x intocado): processador
+  com CPU processor, `DisplayViewTransform` + `LegacyViewingPipeline` (exposição, gama e looks), GLSL com os LUTs
+  e uniforms do `GpuShaderDesc`. A 2.x esconde as views fora de `active_views` (sumiam Filmic, Film e False
+  Color): o wrapper lista todas, como a 1.x. `config.ocio`: o papel `XYZ` tinha o nome do espaço de cor (a 2.x
+  recusa o arquivo) e virou `cie_xyz_d65_interchange`; `DCIP3`, display inexistente, saiu de `active_displays`.
+  Verificado com o mesmo wrapper contra OCIO 1.1.1 e 2.1.3: views iguais, Filmic padrão idêntico, diferenças só
+  nas pontas dos LUTs (até 0,11 no preto do False Color); GLSL 2.x × CPU até 0,0067 em 120 combinações (a 1.x
+  chega a 0,6 com o LUT 3D assado). Player com OCIO 2.1 sai do "fallback mode"; editor aceita Filmic etc.
+- **FFmpeg 5+/6.x.** `ffmpeg_compat.h` ganha shims só para libavcodec ≥ 59 (`AVPicture`, decode/encode por
+  send/receive, `av_free_packet`…) e helpers das duas APIs para o contexto do codec do stream. `VideoFFmpeg`,
+  `anim_movie`, `util`, `indexer` e `writeffmpeg` usam os helpers; o `writeffmpeg` guarda os contextos de encode
+  e escolhe os codecs em variáveis locais (não escreve mais no `AVOutputFormat` global). Achados no teste do
+  editor: o frame convertido era sempre marcado BGR32 e os frames não tinham `width/height/format` (o 5+ copia o
+  frame e abortava); no 5.1+ o áudio era recusado sem `ch_layout` e o arquivo saía mudo, sem erro. Testes:
+  `tools/linux/video_texture_test.py` (player: H.264, MPEG-4, VP9 e MJPEG em ordem e em loop) e
+  `tools/linux/av_ports_test.py` (editor: 4 formatos com 30 frames, áudio e cores certas, filme como imagem e
+  strip, proxy de 25%, views do OCIO; 14/14). Os arquivos compilam sem erro contra os headers do FFmpeg 4.4.
+  Presets Linux seguem com `WITH_CODEC_FFMPEG=OFF` (decisão de empacotamento). O `rebuild_proxy` em `-b`
+  deixa 1 bloco de memória sem liberar mesmo sem gerar nada (já existia).
+- **`imgui.ini`.** O caminho era `program_dir + "\\imgui.ini"`; no Linux nascia um arquivo chamado `\imgui.ini`.
+  Agora `program_dir + "imgui.ini"` (no Windows dá o mesmo arquivo). O ImGui continua gravando também um
+  `imgui.ini` no diretório de trabalho (padrão do `io.IniFilename`), nas duas plataformas.
+
 ## Logic Bricks → Python Component, fase 5 (2026-10-04, branch `logic/convert-f5`)
 
 - `logic_to_python.py`: actuators **Camera, Constraint (Loc/Ori/Dist/FH), Steering e Mouse Look** de outro objeto agora são convertidos. Os helpers (`_follow`, `_mouse_look`, `_cst_*`, `_steer`) recebem `own=` e agem sobre `scene.objects[dono]`; estado separado por `Dono/Actuator`. Os demais helpers de outro dono seguem como brick.
