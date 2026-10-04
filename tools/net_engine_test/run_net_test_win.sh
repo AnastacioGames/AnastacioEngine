@@ -25,6 +25,8 @@ SRC_SERVER=""; SRC_CLIENT=""
 case "$SC" in
   spawner) SRC="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range" ;;
   car) SRC="$ROOT/projects-teste/car_framerate/car_com_fr0.range" ;;
+  rpc) export NET_RPC=1
+    SRC="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range" ;;
   predict) export NET_PREDICT=1; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
     SRC="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range" ;;
   server) SERVER_ARGS=(--server); export NET_HEADLESS=1
@@ -48,7 +50,8 @@ if [ -n "$SRC_SERVER" ]; then
 else
   cp "$SRC" "$OUT/ts/scene.range"; cp "$SRC" "$OUT/tc/scene.range"
 fi
-export NET_PORT="${NET_PORT:-$((20000 + RANDOM % 20000))}" NET_SECONDS="$SECONDS_RUN" NET_SIM="$SIM" NET_SCENARIO="spawner"
+PY_SCENARIO="spawner"; [ "$SC" = car ] && PY_SCENARIO="car"
+export NET_PORT="${NET_PORT:-$((20000 + RANDOM % 20000))}" NET_SECONDS="$SECONDS_RUN" NET_SIM="$SIM" NET_SCENARIO="$PY_SCENARIO"
 cd "$ROOT/build/bin" || exit 1
 TEMP="$(cygpath -w "$OUT/ts")" TMP="$(cygpath -w "$OUT/ts")" NET_ROLE=server timeout 120 ./RangeRuntime.exe "${SERVER_ARGS[@]}" -w 320 240 \
   -p "$HERE/net_engine_test.py" "$OUT/ts/scene.range" > "$OUT/ts/stdout.txt" 2>&1 &

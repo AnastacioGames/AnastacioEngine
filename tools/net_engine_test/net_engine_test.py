@@ -483,8 +483,8 @@ def run():
                   "max=%d" % clients_seen)
         else:
             check("net.clients lists host + client", clients_seen >= 2, "max=%d" % clients_seen)
-        names = [c.name for c in net.clients]
-        check("client name arrived", any(n == CLIENT_NAME for n in names), str(names))
+        join_names = [e[2] for e in events if e[0] == "join"]
+        check("client name arrived", any(n == CLIENT_NAME for n in join_names), str(join_names))
         check("lobby: client chat reached the server", ("chat", 1, "hello") in events, str(events))
         check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
         if pred:
