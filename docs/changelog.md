@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: correção da reconciliação da predição (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `KX_NetworkManager` chama `NodeUpdate()` depois de `SetPredictedState`, `ApplyOffset` e `setTransform`. Sem isso
+  a posição mundial ficava velha, o replay do passo partia dela e desfazia a correção: o rig do cliente terminava
+  longe do servidor (`predict` falhava 7 de 20 vezes, `corrections` subindo com `last_error` 0).
+- Testes (Linux): `predict` 19 de 20 (a predição passou nas 20; a falha restante é a lag compensation, 14/18 tiros
+  no passado contra 80% exigidos, já vista antes); `rpc`, `server`, `scene-server`, `spawner`, `car`, `scene`
+  passam; `tools/net_menu/tests` 102 passaram. Núcleo não mudou.
+
 ## Multiplayer: `sender` do RPC nos clientes (`200 RpcFrom`) (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - Mensagem provisória `200 RpcFrom` (S→C, `u16 fromClient` + corpo do `Rpc`): o servidor repassa `All`/`Others`

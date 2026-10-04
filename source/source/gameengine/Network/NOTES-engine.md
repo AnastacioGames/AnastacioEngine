@@ -168,6 +168,11 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
   (snapshots, `Input`, `Pong`) por segundos: o relógio do cliente ficava sem `Pong` (sem sincronizar, sem input) e
   os snapshots só chegavam pelo pedido de estado completo, a cada 1 s. Problema anterior a esta branch (o `rtt` do
   cenário `spawner` ficava parado), achado pelo teste novo.
+- **`NodeUpdate()` depois de mover o objeto** (`SetPredictedState`, `ApplyOffset`, `setTransform`). Os setters do
+  nó só mudam a transformação local; a posição mundial ficava velha até o fim do quadro. Na reconciliação, o passo do
+  jogo lia a posição antiga no replay e desfazia a volta ao estado do servidor: o cliente ficava preso a até metros
+  do servidor, com `corrections` subindo e `last_error` 0. O `predict` falhava 7 de 20 vezes; depois, 0 de 20 na
+  predição.
 
 **Decisões provisórias:**
 

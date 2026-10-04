@@ -1756,6 +1756,8 @@ void KX_NetworkManager::SetPredictedState(Entry &entry, const net::ObjectState &
 	}
 	entry.obj->NodeSetWorldPosition(mt::vec3(state.position[0], state.position[1], state.position[2]));
 	entry.obj->NodeSetGlobalOrientation(FromQuat(state.rotation));
+	/* The setters only change the local transform: without this the replay reads the old world position. */
+	entry.obj->NodeUpdate();
 }
 
 void KX_NetworkManager::ApplyOffset(Entry &entry, const float offset[3])
@@ -1768,6 +1770,7 @@ void KX_NetworkManager::ApplyOffset(Entry &entry, const float offset[3])
 	if (delta[0] != 0.0f || delta[1] != 0.0f || delta[2] != 0.0f) {
 		const mt::vec3 &pos = entry.obj->NodeGetWorldPosition();
 		entry.obj->NodeSetWorldPosition(mt::vec3(pos.x + delta[0], pos.y + delta[1], pos.z + delta[2]));
+		entry.obj->NodeUpdate();
 	}
 	std::copy(offset, offset + 3, entry.shownOffset);
 }
@@ -2104,6 +2107,7 @@ void KX_NetworkManager::setTransform(net::NetId id, const float position[3], con
 	}
 	entry->obj->NodeSetWorldPosition(mt::vec3(position[0], position[1], position[2]));
 	entry->obj->NodeSetGlobalOrientation(FromQuat(rotation));
+	entry->obj->NodeUpdate();
 }
 
 void KX_NetworkManager::setVelocity(net::NetId id, const float linear[3], const float angular[3])
