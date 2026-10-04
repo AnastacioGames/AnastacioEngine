@@ -3514,9 +3514,8 @@ class VIEW3D_PT_view3d_properties(Panel):
         subcol.label(text="Local Camera:")
         subcol.prop(view, "camera", text="")
 
-        col = layout.column(align=True)
-        col.prop(view, "use_render_border")
-        col.active = view.region_3d.view_perspective != 'CAMERA'
+        col = layout.column()
+        col.prop(view, "show_transform_values")
 
 
 class VIEW3D_PT_view3d_cursor(Panel):

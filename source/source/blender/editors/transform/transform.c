@@ -1840,11 +1840,74 @@ static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *ar)
 	glDisable(GL_BLEND);
 }
 
+/* AnastacioEngine: rotation angle / scale factor drawn next to the pivot,
+ * toggled by View3D.show_transform_values (N panel > View). */
+static void drawTransformValues(TransInfo *t, ARegion *ar)
+{
+	View3D *v3d = t->view;
+	char str[64];
+	int axis = -1;
+	float value;
+	int xco, yco;
+
+	if (t->spacetype != SPACE_VIEW3D || v3d == NULL || (v3d->flag2 & V3D_SHOW_TRANSFORM_VALUES) == 0) {
+		return;
+	}
+	if (!ELEM(t->mode, TFM_ROTATION, TFM_RESIZE)) {
+		return;
+	}
+
+	/* a single axis constraint gives the label and color */
+	if (t->con.mode & CON_APPLY) {
+		const int axes = t->con.mode & (CON_AXIS0 | CON_AXIS1 | CON_AXIS2);
+		if (axes == CON_AXIS0) axis = 0;
+		else if (axes == CON_AXIS1) axis = 1;
+		else if (axes == CON_AXIS2) axis = 2;
+	}
+
+	if (t->mode == TFM_ROTATION) {
+		value = RAD2DEGF(t->values[0]);
+		BLI_snprintf(str, sizeof(str), "%.1f\xc2\xb0%s%c", value,
+		             axis != -1 ? " " : "", axis != -1 ? "XYZ"[axis] : '\0');
+	}
+	else {
+		if (axis != -1 || (t->values[0] == t->values[1] && t->values[1] == t->values[2])) {
+			value = t->values[axis != -1 ? axis : 0];
+			BLI_snprintf(str, sizeof(str), "%.3f%s%c", value,
+			             axis != -1 ? " " : "", axis != -1 ? "XYZ"[axis] : '\0');
+		}
+		else {
+			BLI_snprintf(str, sizeof(str), "%.3f  %.3f  %.3f", t->values[0], t->values[1], t->values[2]);
+		}
+	}
+
+	xco = (int)t->center2d[0] + U.widget_unit;
+	yco = (int)t->center2d[1] + U.widget_unit;
+	CLAMP(xco, 0, ar->winx - U.widget_unit);
+	CLAMP(yco, 0, ar->winy - U.widget_unit);
+
+	/* shadow for readability over any background */
+	glColor3ub(0, 0, 0);
+	BLF_draw_default(xco + 1, yco - 1, 0.0f, str, sizeof(str));
+
+	if (axis != -1) {
+		UI_ThemeColor(TH_AXIS_X + axis);
+	}
+	else {
+		glColor3ub(255, 255, 255);
+	}
+	BLF_draw_default(xco, yco, 0.0f, str, sizeof(str));
+}
+
 static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *ar, void *arg)
 {
 	TransInfo *t = arg;
 	Scene *scene = t->scene;
 	Object *ob = OBACT;
+
+	if (ar == t->ar) {
+		drawTransformValues(t, ar);
+	}
 
 	/* draw autokeyframing hint in the corner
 	 * - only draw if enabled (advanced users may be distracted/annoyed),

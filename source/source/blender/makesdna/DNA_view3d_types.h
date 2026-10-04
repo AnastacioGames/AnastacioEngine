@@ -313,6 +313,7 @@ typedef struct View3D {
 #define V3D_RENDER_SHOW_COMPONENTS	(1 << 19) /* view3D Icons, only the SCRIPT icon */
 #define V3D_LOD_INVISIBLE_SHOW		(1 << 20)
 #define V3D_ALWAYS_RENDER	        (1 << 21)
+#define V3D_SHOW_TRANSFORM_VALUES	(1 << 22) /* show rotate/scale value next to the pivot while transforming */
 
 
 /* View3D->around */

@@ -2686,6 +2686,12 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show Components", "Show component icon on every object that has at least one component");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
+	prop = RNA_def_property(srna, "show_transform_values", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_TRANSFORM_VALUES);
+	RNA_def_property_ui_text(prop, "Show Transform Values",
+	                         "Show the rotation angle / scale factor next to the pivot while rotating or scaling");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	prop = RNA_def_property(srna, "show_invisible_lods", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_LOD_INVISIBLE_SHOW);
 	RNA_def_property_ui_text(prop, "Show Invisible LODs", "Shows all objects that have invisible lod enabled");
