@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## 3D View: contorno de seleção, prévia do Ctrl+R e wireframe com linhas suaves
+
+- Contorno do objeto selecionado (`draw_mesh_object_outline`) desenhado com `GL_LINE_SMOOTH` + blend, como grid, eixos, câmera e empty; desligado no picking.
+- Prévia do loop cut (`ringsel_draw`): linha magenta suave com 2 px escalados por DPI e alpha leve; pontos redondos de 4 px.
+- Wireframe de mesh no Object Mode (modo Wireframe e opção Wireframe do objeto): suave e com 1,5 px escalado por DPI, em vez de 2 px fixos.
+- Pendentes: wire do Edit Mode e de curvas/texto/metaball ainda sem suavização; ruído pontilhado do contorno em arestas de fundo não verificado.
+
 ## Vários UV maps: tangentes do UV pedido, fallback para o ativo e transformUV
 
 - Tangentes passam a ser calculadas a partir do UV map que o material pede (campo UV Map do Normal Map/Tangent node), não sempre do ativo; antes um normal map no UV2 ficava com relevo torto. Como os shaders só são criados depois da conversão dos meshes, `BL_ConvertDerivedMeshToArray` lê a árvore de nós (`BL_NodeTreeTangentUv`, entra em grupos) e usa o primeiro UV nomeado entre os materiais do mesh, ou o ativo; o cache de loop data inclui esse UV no hash. O `m_layer` de `RAS_ATTRIB_TANGENT` também passou a guardar o índice do UV. Limite: um só conjunto de tangentes por mesh.

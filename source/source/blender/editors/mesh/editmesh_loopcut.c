@@ -22,6 +22,7 @@
  */
 
 #include "DNA_object_types.h"
+#include "DNA_userdef_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -100,22 +101,36 @@ static void ringsel_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 		glPushMatrix();
 		glMultMatrixf(lcd->ob->obmat);
 
-		glColor3ub(255, 0, 255);
+		/* antialiased preview lines, matching the smoothed viewport overlays */
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_POINT_SMOOTH);
+		glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		glColor4ub(255, 0, 255, 230);
 		if (lcd->totedge > 0) {
+			glLineWidth(2.0f * U.pixelsize);
 			glEnableClientState(GL_VERTEX_ARRAY);
 			glVertexPointer(3, GL_FLOAT, 0, lcd->edges);
 			glDrawArrays(GL_LINES, 0, lcd->totedge * 2);
 			glDisableClientState(GL_VERTEX_ARRAY);
+			glLineWidth(1.0f);
 		}
 
 		if (lcd->totpoint > 0) {
-			glPointSize(3.0f);
+			glPointSize(4.0f * U.pixelsize);
 
 			glEnableClientState(GL_VERTEX_ARRAY);
 			glVertexPointer(3, GL_FLOAT, 0, lcd->points);
 			glDrawArrays(GL_POINTS, 0, lcd->totpoint);
 			glDisableClientState(GL_VERTEX_ARRAY);
+			glPointSize(1.0f);
 		}
+
+		glDisable(GL_BLEND);
+		glDisable(GL_POINT_SMOOTH);
+		glDisable(GL_LINE_SMOOTH);
 
 		glPopMatrix();
 		if (v3d && v3d->zbuf)

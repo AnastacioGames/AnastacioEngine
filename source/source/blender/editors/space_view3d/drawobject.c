@@ -4282,8 +4282,18 @@ static void draw_mesh_object_outline(View3D *v3d, Object *ob, DerivedMesh *dm)
 	if ((v3d->transp == false) &&  /* not when we draw the transparent pass */
 	    (ob->mode & OB_MODE_ALL_PAINT) == false) /* not when painting (its distracting) - campbell */
 	{
+		const bool smooth = !(G.f & G_PICKSEL);
+
 		glLineWidth(UI_GetThemeValuef(TH_OUTLINE_WIDTH) * 2.0f);
 		glDepthMask(0);
+
+		/* antialiased outline, matching the smoothed grid/axes/extras lines */
+		if (smooth) {
+			glEnable(GL_LINE_SMOOTH);
+			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
 
 		/* if transparent, we cannot draw the edges for solid select... edges
 		 * have no material info. GPU_object_material_visible will skip the
@@ -4295,6 +4305,11 @@ static void draw_mesh_object_outline(View3D *v3d, Object *ob, DerivedMesh *dm)
 		}
 		else {
 			dm->drawEdges(dm, 0, 1);
+		}
+
+		if (smooth) {
+			glDisable(GL_BLEND);
+			glDisable(GL_LINE_SMOOTH);
 		}
 
 		glDepthMask(1);
@@ -4541,8 +4556,23 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			glDepthMask(0);  /* disable write in zbuffer, selected edge wires show better */
 		}
 
-		glLineWidth(2.0f);
+		/* antialiased wire, matching the smoothed grid/axes lines */
+		const bool smooth_wire = !(G.f & G_PICKSEL);
+		if (smooth_wire) {
+			glEnable(GL_LINE_SMOOTH);
+			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+
+		glLineWidth(1.5f * U.pixelsize);
 		dm->drawEdges(dm, ((dt == OB_WIRE) || no_faces), (ob->dtx & OB_DRAW_ALL_EDGES) != 0);
+		glLineWidth(1.0f);
+
+		if (smooth_wire) {
+			glDisable(GL_BLEND);
+			glDisable(GL_LINE_SMOOTH);
+		}
 
 		if (dt != OB_WIRE && (draw_wire == OBDRAW_WIRE_ON_DEPTH)) {
 			glDepthMask(1);
