@@ -25,6 +25,7 @@
 #include "KX_SceneScheduler.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
+#include "KX_NetworkManager.h"
 #include "BL_Converter.h"
 #include "BL_LoadStats.h"
 #include "CM_Message.h"
@@ -90,6 +91,10 @@ void KX_SceneScheduler::PostProcessScene(KX_Scene *scene)
 void KX_SceneScheduler::DestructScene(KX_Scene *scene)
 {
 	scene->RunOnRemoveCallbacks();
+	// Multiplayer: the session lets go of the scene's objects (and follows a replacement).
+	if (KX_NetworkManager *network = m_engine->GetNetworkManager()) {
+		network->OnSceneRemoved(scene);
+	}
 	m_engine->GetConverter()->RemoveScene(scene);
 }
 

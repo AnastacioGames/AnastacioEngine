@@ -377,7 +377,8 @@ void ServerSession::handleHello(Connection &conn, const RawMessage &raw, uint64_
 		reject(conn, RejectReason::Banned, "");
 		return;
 	}
-	if (hello.sceneHash != m_config.sceneHash) {
+	if (hello.sceneHash != m_config.sceneHash &&
+	    std::find(m_earlierScenes.begin(), m_earlierScenes.end(), hello.sceneHash) == m_earlierScenes.end()) {
 		reject(conn, RejectReason::SceneMismatch, m_config.sceneName);
 		return;
 	}
@@ -592,6 +593,10 @@ void ServerSession::kick(ClientId client, DisconnectReason reason)
 
 void ServerSession::changeScene(const std::string &sceneName, uint64_t sceneHash)
 {
+	if (m_config.sceneHash != sceneHash &&
+	    std::find(m_earlierScenes.begin(), m_earlierScenes.end(), m_config.sceneHash) == m_earlierScenes.end()) {
+		m_earlierScenes.push_back(m_config.sceneHash);
+	}
 	m_config.sceneName = sceneName;
 	m_config.sceneHash = sceneHash;
 	for (auto &pair : m_connections) {

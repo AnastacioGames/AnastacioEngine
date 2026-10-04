@@ -171,6 +171,9 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_snapshotRate(20),
 	m_relevanceRadius(0.0f),
 	m_sceneHash(0),
+	m_sceneDetached(false),
+	m_detachedIndex(-1),
+	m_targetHash(0),
 	m_tick(net::kNoTick),
 	m_simEnabled(false),
 	m_lanActive(false),
@@ -791,6 +794,10 @@ void KX_NetworkManager::OpenSession()
 	m_connectedEmitted = false;
 	m_pongCount = 0;
 	m_lastClockSnapshot = net::kNoTick;
+	m_sceneDetached = false;
+	m_detachedIndex = -1;
+	m_targetScene.clear();
+	m_targetHash = 0;
 }
 
 void KX_NetworkManager::AbortOpen()
@@ -873,9 +880,9 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 		return false;
 	}
 
-	net::ReplicatorConfig rc;
-	rc.snapshotIntervalTicks = uint32_t(std::max(1, tickRate / m_snapshotRate));
-	m_replicator.reset(new net::Replicator(*m_server, *this, rc));
+	m_replicatorConfig = net::ReplicatorConfig();
+	m_replicatorConfig.snapshotIntervalTicks = uint32_t(std::max(1, tickRate / m_snapshotRate));
+	m_replicator.reset(new net::Replicator(*m_server, *this, m_replicatorConfig));
 	m_predServer.reset(new net::PredictionServer());
 	net::LagCompensationConfig lc;
 	lc.tickRate = uint16_t(tickRate);
@@ -1152,6 +1159,8 @@ void KX_NetworkManager::CloseSession(bool sendQuit, bool shutdown)
 	m_role = Role::NONE;
 	m_sessionOpen = false;
 	m_scene = nullptr;
+	m_sceneDetached = false;
+	m_targetScene.clear();
 	m_tick = net::kNoTick;
 	m_dedicated = false;
 }
@@ -1193,6 +1202,122 @@ void KX_NetworkManager::OnObjectRemoved(KX_GameObject *obj)
 		m_entries.erase(id);
 	}
 	obj->SetNetId(0);
+}
+
+void KX_NetworkManager::OnSceneRemoved(KX_Scene *scene)
+{
+	if (!scene) {
+		return;
+	}
+	const bool session = m_sessionOpen && scene == m_scene;
+	/* The objects die with the scene: forget them without despawning (the clients drop the whole scene). */
+	for (auto it = m_entries.begin(); it != m_entries.end();) {
+		Entry &entry = it->second;
+		if (session || (entry.obj && entry.obj->GetScene() == scene)) {
+			ResetPrediction(entry);
+			if (entry.obj) {
+				entry.obj->SetNetId(0);
+			}
+			it = m_entries.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+	if (!session) {
+		return;
+	}
+	m_protoSchemas.clear();
+	m_protoPropNames.clear();
+	m_detachedIndex = -1;
+	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
+	for (int i = 0; i < scenes->GetCount(); ++i) {
+		if (scenes->GetValue(i) == scene) {
+			m_detachedIndex = i;
+		}
+	}
+	m_scene = nullptr;
+	m_sceneDetached = true;
+	m_inputLog.reset();
+	m_predTick = net::kNoTick;
+	m_appliedInput.clear();
+	if (m_role == Role::SERVER) {
+		/* An empty replicator until the next scene is adopted: the clients get nothing about the old one. */
+		m_replicator.reset(new net::Replicator(*m_server, *this, m_replicatorConfig));
+		net::LagCompensationConfig lc;
+		lc.tickRate = uint16_t(m_lagCompTickRate);
+		lc.maxRewindMs = lc.historyMs;
+		m_lagComp.reset(new net::LagCompensation(lc));
+		m_clientView.clear();
+		/* Followed objects are gone; fixed positions and radii stay. */
+		for (auto &pair : m_views) {
+			pair.second.follow = net::kInvalidNetId;
+		}
+	}
+}
+
+bool KX_NetworkManager::ChangeScene(const std::string &name, std::string &error)
+{
+	if (m_role != Role::SERVER || !m_scene) {
+		error = m_role != Role::SERVER ? "server only" : "a scene change is already in progress";
+		return false;
+	}
+	if (name == m_sceneName) {
+		error = "already in scene '" + name + "'";
+		return false;
+	}
+	if (!m_engine->ReplaceScene(m_sceneName, name)) {
+		error = "no scene named '" + name + "'";
+		return false;
+	}
+	m_targetScene = name;
+	return true;
+}
+
+void KX_NetworkManager::AdoptScene()
+{
+	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
+	KX_Scene *scene = nullptr;
+	if (!m_targetScene.empty()) {
+		scene = scenes->FindValue(m_targetScene);
+	}
+	else if (m_detachedIndex >= 0 && m_detachedIndex < scenes->GetCount()) {
+		/* The game replaced the scene itself (scene.replace()): take what is in its place. */
+		scene = scenes->GetValue(m_detachedIndex);
+	}
+	if (!scene) {
+		return;  // not converted yet
+	}
+	m_sceneDetached = false;
+	m_targetScene.clear();
+	m_scene = scene;
+	m_sceneName = scene->GetName();
+	CollectSceneObjects();
+	m_sceneHash = ComputeSceneHash(m_sceneName);
+
+	if (m_role == Role::SERVER) {
+		for (const auto &pair : m_entries) {
+			m_replicator->addSceneObject(pair.first, pair.second.desc);
+		}
+		m_server->changeScene(m_sceneName, m_sceneHash);
+		CM_Message("network: moved to scene '" << m_sceneName << "', " << m_entries.size()
+		           << " replicated object(s); waiting for the clients to load it");
+	}
+	else if (m_role == Role::CLIENT) {
+		for (auto &pair : m_entries) {
+			SuspendForClient(pair.second);
+		}
+		if (m_sceneHash != m_targetHash) {
+			CM_Warning("network: scene '" << m_sceneName << "' does not match the server's (other replicated "
+			           "objects or another .range); the server will not send it");
+		}
+		m_client->sceneLoaded(m_sceneHash);
+		CM_Message("network: scene '" << m_sceneName << "' loaded");
+	}
+	Event e;
+	e.type = Event::SCENE;
+	e.text = m_sceneName;
+	Emit(e);
 }
 
 /** \} */
@@ -1293,6 +1418,9 @@ bool KX_NetworkManager::SetOwner(KX_GameObject *obj, net::ClientId owner)
 
 void KX_NetworkManager::BeginTick()
 {
+	if (m_sceneDetached) {
+		AdoptScene();
+	}
 	const uint64_t now = net::steadyClockMs();
 	if (m_role == Role::SERVER) {
 		ServerTickBegin(now);
@@ -1621,13 +1749,24 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 			break;
 		}
 		case net::SessionEvent::Type::SceneChange: {
-			if (event.sceneHash != m_sceneHash) {
-				/* The handshake already compared the hash, so this only happens when the server changes
-				 * scene during a match, which this version does not follow. */
-				CM_Warning("network: the server moved to scene '" << event.text
-				           << "'; scene changes during a match are not supported yet");
+			if (!m_sceneDetached && event.text == m_sceneName && event.sceneHash == m_sceneHash) {
+				m_targetScene.clear();
+				m_client->sceneLoaded(m_sceneHash);
+				break;
 			}
-			m_client->sceneLoaded(m_sceneHash);
+			/* The server moved to another scene: load the same one, SceneLoaded goes out from AdoptScene(). */
+			m_targetScene = event.text;
+			m_targetHash = event.sceneHash;
+			CM_Message("network: the server moved to scene '" << event.text << "', loading it");
+			if (!m_sceneDetached && !m_engine->ReplaceScene(m_sceneName, event.text)) {
+				CM_Error("network: this game has no scene '" << event.text << "', leaving the session");
+				CloseSession(true);
+				Event e;
+				e.type = Event::DISCONNECT;
+				e.reason = int(net::DisconnectReason::Quit);
+				e.text = "missing scene " + event.text;
+				Emit(e);
+			}
 			break;
 		}
 		case net::SessionEvent::Type::Message: {

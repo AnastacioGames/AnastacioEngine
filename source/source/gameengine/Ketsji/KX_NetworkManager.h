@@ -85,6 +85,7 @@ public:
 			START,  // the host started the match
 			PLAYER_JOIN,  // client, text = name
 			PLAYER_LEAVE,  // client
+			SCENE,  // the session moved to another scene (text = name), after it is loaded
 		};
 		Type type = CONNECT;
 		int client = 0;
@@ -137,6 +138,11 @@ public:
 
 	/// KX_Scene::NewRemoveObject: forget an object before it is destroyed.
 	void OnObjectRemoved(KX_GameObject *obj);
+	/// Called by the scene scheduler before a scene is destroyed: the session lets go of its objects and
+	/// adopts the scene that replaces it on the next tick.
+	void OnSceneRemoved(KX_Scene *scene);
+	/// Server: replaces the session scene during the match; clients follow and load the same scene.
+	bool ChangeScene(const std::string &name, std::string &error);
 
 	/* -------------------------------------------------------------------- */
 	/** \name Replication
@@ -342,6 +348,8 @@ private:
 	void BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const;
 	static void CollectProps(KX_GameObject *obj, std::vector<std::string> &names);
 	uint64_t ComputeSceneHash(const std::string &sceneName) const;
+	/// After OnSceneRemoved(): takes the new scene, registers its objects and tells the other side.
+	void AdoptScene();
 	std::unique_ptr<net::ITransport> WrapSim(std::unique_ptr<net::ITransport> inner) const;
 	void BuildRpc();
 	void OpenSession();
@@ -404,6 +412,12 @@ private:
 	std::map<net::ClientId, ViewOverride> m_views;
 	uint64_t m_sceneHash;
 	std::string m_sceneName;
+	/* Scene change: the session scene was destroyed and the next one is not adopted yet. */
+	bool m_sceneDetached;
+	int m_detachedIndex;
+	std::string m_targetScene;
+	uint64_t m_targetHash;
+	net::ReplicatorConfig m_replicatorConfig;
 	net::Tick m_tick;
 	net::NetSimSettings m_sim;
 	bool m_simEnabled;

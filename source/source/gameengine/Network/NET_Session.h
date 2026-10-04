@@ -146,7 +146,8 @@ public:
 	/// Counts a protocol violation found by a layer above the session (bad RPC, bad Input...).
 	/// Returns false when it closed the connection (events gets ClientLeft).
 	bool reportViolation(ClientId client, uint64_t nowMs, std::vector<SessionEvent> &events);
-	/// Sends SceneChange to everyone; clients become not ready until SceneLoaded.
+	/// Sends SceneChange to everyone; clients become not ready until SceneLoaded. A client that joins
+	/// later with an earlier scene of this session is accepted and gets the SceneChange too.
 	void changeScene(const std::string &sceneName, uint64_t sceneHash);
 	void setGameStarted(bool started);
 	void ban(uint64_t token);
@@ -197,6 +198,8 @@ private:
 	std::map<ClientId, PeerId> m_clients;
 	std::vector<ReconnectSlot> m_slots;
 	std::vector<uint64_t> m_banned;
+	/// Scenes this session hosted before the current one (late joiners still on one are moved).
+	std::vector<uint64_t> m_earlierScenes;
 	bool m_gameStarted = false;
 	bool m_running = false;
 	uint64_t m_lastNowMs = 0;

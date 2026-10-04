@@ -47,6 +47,7 @@ namespace {
 
 const char *kEventNames[] = {
 	"on_connect", "on_disconnect", "on_reject", "on_chat", "on_start", "on_player_join", "on_player_leave",
+	"on_scene",
 };
 
 KX_NetworkManager *Manager()
@@ -101,6 +102,10 @@ void DispatchEvent(const KX_NetworkManager::Event &event)
 		case KX_NetworkManager::Event::PLAYER_LEAVE:
 			name = "on_player_leave";
 			args = Py_BuildValue("(i)", event.client);
+			break;
+		case KX_NetworkManager::Event::SCENE:
+			name = "on_scene";
+			args = Py_BuildValue("(s)", event.text.c_str());
 			break;
 	}
 
@@ -617,6 +622,22 @@ PyObject *Net_spawn(PyObject *, PyObject *args, PyObject *kwds)
 	return obj->GetProxy();
 }
 
+/// change_scene(name): server only.
+PyObject *Net_change_scene(PyObject *, PyObject *arg)
+{
+	if (!PyUnicode_Check(arg)) {
+		PyErr_SetString(PyExc_TypeError, "network.change_scene(): expected a scene name");
+		return nullptr;
+	}
+	KX_NetworkManager *manager = Manager();
+	std::string error = "server only";
+	if (!manager || !manager->ChangeScene(PyUnicode_AsUTF8(arg), error)) {
+		PyErr_Format(PyExc_RuntimeError, "network.change_scene(): %s", error.c_str());
+		return nullptr;
+	}
+	Py_RETURN_NONE;
+}
+
 /// set_client_view(client, center=None, radius=None): center is an object (followed) or a 3D position.
 PyObject *Net_set_client_view(PyObject *, PyObject *args, PyObject *kwds)
 {
@@ -1106,6 +1127,7 @@ NET_CALLBACK_FUNC(on_chat)
 NET_CALLBACK_FUNC(on_start)
 NET_CALLBACK_FUNC(on_player_join)
 NET_CALLBACK_FUNC(on_player_leave)
+NET_CALLBACK_FUNC(on_scene)
 
 #undef NET_CALLBACK_FUNC
 
@@ -1145,6 +1167,11 @@ PyMethodDef g_methods[] = {
 	{"on_start", Net_on_start, METH_O, "on_start(fn())\nThe host started the match."},
 	{"on_player_join", Net_on_player_join, METH_O, "on_player_join(fn(client_id, name))\nServer only."},
 	{"on_player_leave", Net_on_player_leave, METH_O, "on_player_leave(fn(client_id))\nServer only."},
+	{"on_scene", Net_on_scene, METH_O,
+	 "on_scene(fn(scene_name))\nThe session moved to another scene and it is loaded (server and clients)."},
+	{"change_scene", Net_change_scene, METH_O,
+	 "change_scene(name)\nServer only: replaces the session scene during the match; the clients load the same\n"
+	 "scene and get everything again once it is loaded."},
 	{"predict", Net_predict, METH_VARARGS,
 	 "predict(obj, fn) -> bool\nfn(obj, input) moves obj by one tick with the owner's input (bytes): on the server\n"
 	 "every tick, on the owning client ahead of the server (prediction, corrected by the snapshots).\n"
