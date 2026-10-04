@@ -310,6 +310,9 @@ private:
 		bool predicted = false;
 		std::unique_ptr<net::PredictionClient> prediction;
 		net::Tick lastReconciled = net::kNoTick;
+		/// Dynamic body predicted by this client: Bullet runs it, the state is recorded after physics (EndTick).
+		bool dynamicPredicted = false;
+		net::Tick pendingRecord = net::kNoTick;
 		/// Visual correction added to the position after the step (client).
 		float shownOffset[3] = {0.0f, 0.0f, 0.0f};
 		/* Lag compensation (server). */
@@ -342,6 +345,8 @@ private:
 	void Emit(const Event &event);
 	void ServerTickBegin(uint64_t now);
 	void ClientTickBegin(uint64_t now);
+	void ClientTickEnd();
+	void SetDynamicPredicted(Entry &entry, bool on);
 	void HandleServerEvent(const net::SessionEvent &event, uint64_t now, std::vector<net::SessionEvent> &events);
 	void HandleClientEvent(const net::SessionEvent &event, uint64_t now);
 	void UpdateLanInfo();

@@ -1277,6 +1277,10 @@ void KX_NetworkManager::BeginTick()
 
 void KX_NetworkManager::EndTick()
 {
+	if (m_role == Role::CLIENT) {
+		ClientTickEnd();
+		return;
+	}
 	if (m_role != Role::SERVER || !m_replicator) {
 		return;
 	}
@@ -1802,6 +1806,13 @@ bool KX_NetworkManager::PredictedState(const Entry &entry, net::ObjectState &sta
 	state.position[1] = pos.y;
 	state.position[2] = pos.z;
 	ToQuat(entry.obj->NodeGetWorldOrientation(), state.rotation);
+	if (entry.dynamicPredicted) {
+		const mt::vec3 lin = entry.obj->GetLinearVelocity();
+		state.hasVelocity = true;
+		state.velocity[0] = lin.x;
+		state.velocity[1] = lin.y;
+		state.velocity[2] = lin.z;
+	}
 	return true;
 }
 
@@ -1814,6 +1825,31 @@ void KX_NetworkManager::SetPredictedState(Entry &entry, const net::ObjectState &
 	entry.obj->NodeSetGlobalOrientation(FromQuat(state.rotation));
 	/* The setters only change the local transform: without this the replay reads the old world position. */
 	entry.obj->NodeUpdate();
+	if (entry.dynamicPredicted && state.hasVelocity) {
+		entry.obj->SetLinearVelocity(mt::vec3(state.velocity[0], state.velocity[1], state.velocity[2]), false);
+	}
+}
+
+void KX_NetworkManager::SetDynamicPredicted(Entry &entry, bool on)
+{
+	if (on == entry.dynamicPredicted) {
+		return;
+	}
+	if (on) {
+		/* Only a body the client suspended is dynamic: it runs in the local Bullet world while predicted. */
+		if (!entry.dynamicsSuspended) {
+			return;
+		}
+		RestoreFromClient(entry);
+		entry.dynamicPredicted = true;
+	}
+	else {
+		entry.dynamicPredicted = false;
+		entry.pendingRecord = net::kNoTick;
+		if (m_role == Role::CLIENT) {
+			SuspendForClient(entry);
+		}
+	}
 }
 
 void KX_NetworkManager::ApplyOffset(Entry &entry, const float offset[3])
@@ -1838,6 +1874,7 @@ void KX_NetworkManager::ResetPrediction(Entry &entry)
 	std::copy(zero, zero + 3, entry.shownOffset);
 	entry.prediction.reset();
 	entry.lastReconciled = net::kNoTick;
+	SetDynamicPredicted(entry, false);
 }
 
 void KX_NetworkManager::ClientPredict(uint64_t now)
@@ -1847,6 +1884,7 @@ void KX_NetworkManager::ClientPredict(uint64_t now)
 	for (auto &pair : m_entries) {
 		Entry &entry = pair.second;
 		if (entry.predicted && entry.obj && self != net::kServerClientId && entry.owner == self) {
+			SetDynamicPredicted(entry, true);
 			ids.push_back(pair.first);
 		}
 		else if (entry.prediction) {
@@ -1937,6 +1975,15 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 				if (e && e->obj && m_stepSink && ReadView(input, view.tick, view.alpha, user)) {
 					m_stepSink(e->obj, user);
 				}
+				e = FindEntry(id);
+				if (e && e->obj && e->dynamicPredicted) {
+					/* Bullet cannot step one body alone: the replay integrates the velocity the step left
+					 * (no gravity or contacts), and the next snapshots correct the rest. */
+					const float dt = 1.0f / float(std::max<int>(1, m_client->tickRate()));
+					const mt::vec3 v = e->obj->GetLinearVelocity();
+					e->obj->NodeSetWorldPosition(e->obj->NodeGetWorldPosition() + v * dt);
+					e->obj->NodeUpdate();
+				}
 			};
 			entry->prediction.reset(new net::PredictionClient(callbacks));
 		}
@@ -1944,7 +1991,8 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 			entry->lastReconciled = snapshot->tick;
 			const net::ObjectState *server = snapshot->find(id);
 			if (server && server->hasTransform) {
-				/* Only the transform is predicted: velocities of a suspended body read as zero here. */
+				/* Only the transform is compared: a suspended body reads zero velocity, and the velocity in the
+				 * snapshot can be older than the transform (it is not resent once the body is at rest). */
 				net::ObjectState state = *server;
 				state.hasVelocity = false;
 				state.hasAngularVelocity = false;
@@ -1962,6 +2010,11 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 		if (!entry || !entry->obj || !entry->prediction) {
 			continue;
 		}
+		if (entry->dynamicPredicted) {
+			/* The state of this tick exists after the physics step: recorded in ClientTickEnd(). */
+			entry->pendingRecord = tick;
+			continue;
+		}
 		net::ObjectState state;
 		if (PredictedState(*entry, state)) {
 			entry->prediction->recordState(tick, state);
@@ -1970,6 +2023,28 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 		float offset[3];
 		entry->prediction->visualOffset(offset);
 		ApplyOffset(*entry, offset);
+	}
+}
+
+void KX_NetworkManager::ClientTickEnd()
+{
+	if (!m_client) {
+		return;
+	}
+	const float tickMs = 1000.0f / float(std::max<int>(1, m_client->tickRate()));
+	for (auto &pair : m_entries) {
+		Entry &entry = pair.second;
+		if (!entry.dynamicPredicted || !entry.obj || !entry.prediction || entry.pendingRecord == net::kNoTick) {
+			continue;
+		}
+		net::ObjectState state;
+		if (PredictedState(entry, state)) {
+			entry.prediction->recordState(entry.pendingRecord, state);
+		}
+		entry.pendingRecord = net::kNoTick;
+		/* No visual offset: it would move the Bullet body, and a frame without a prediction step would run the
+		 * physics from the shifted place. A correction of a dynamic body shows at once. */
+		entry.prediction->update(tickMs);
 	}
 }
 

@@ -720,6 +720,16 @@ void Replicator::update(Tick tick, uint64_t nowMs)
 		}
 		if (!rep.active) {
 			activate(rep);
+			// Scene objects have no Spawn: an owner set before the client was ready goes out now.
+			for (const auto &obj : m_objects) {
+				if (isRuntimeNetId(obj.first) || obj.second.desc.owner == kServerClientId) {
+					continue;
+				}
+				OwnershipMsg msg;
+				msg.netId = obj.first;
+				msg.newOwner = obj.second.desc.owner;
+				m_session.send(id, Channel::Control, makePacket(msg));
+			}
 		}
 		if (rep.hasLastMs && nowMs > rep.lastMs) {
 			rep.tokens = std::min(capTokens,

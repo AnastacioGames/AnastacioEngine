@@ -12,6 +12,8 @@ Scenarios (existing scenes of projects-teste/, no editor needed):
 With NET_PREDICT=1 (runner scenario "predict", spawner scene) the server also spawns a 'Rig' owned by the client,
 moved by net.predict() with the client's input (client prediction + reconciliation), and gives the Spawner a hitbox
 the client shoots at through the input (lag compensation, net.raycast_past()).
+With NET_PREDICT_DYN=1 (scenario "predict-car", car scene) the server gives the dynamic 'Car' to the client, which
+predicts it with Bullet running locally (net.predict() with a step that sets the linear velocity).
 With NET_RPC=1 (scenario "rpc") the peers register game RPCs and check every target, argument type, obj.net and
 the refusals.
 NET_DEBUG=1 logs every shot, aim and prediction state.
@@ -46,6 +48,7 @@ CLIENT_NAME = "Player" if FROM_SCENE else "Tester-client"
 HEADLESS = os.environ.get("NET_HEADLESS") == "1"
 PREDICT = os.environ.get("NET_PREDICT") == "1"
 RPC = os.environ.get("NET_RPC") == "1"
+PREDICT_DYN = os.environ.get("NET_PREDICT_DYN") == "1"
 
 failures = []
 
@@ -229,6 +232,96 @@ class Predict:
         check("prediction: corrections stay small", st.get("max_error", 99.0) < 0.5, str(st))
 
 
+DYN_INPUT = struct.Struct("<f")
+DYN_REPORT = {"y": None}  # last car position the server sent (RPC car_pos)
+
+
+class PredictDyn:
+    """net.predict() on a dynamic body owned by the client (NET_PREDICT_DYN=1, car scene)."""
+
+    def __init__(self, car):
+        @net.rpc(target="others")
+        def car_pos(sender, y):
+            DYN_REPORT["y"] = y
+
+        self.car = car
+        self.given = False
+        self.predicting = False
+        self.t0 = None
+        self.flip = None
+        self.response_ticks = None
+        self.stopped_at = None
+        self.last_y = None
+        self.server_ys = []
+        self.last_report = 0.0
+        self.stats = None
+
+    def step(self, obj, data):
+        if len(data) != DYN_INPUT.size:
+            return
+        vy = DYN_INPUT.unpack(data)[0]
+        v = obj.getLinearVelocity(False)
+        obj.setLinearVelocity([0.0, vy, v.z], False)
+
+    def server_frame(self, t, joined):
+        if not self.given and joined:
+            self.given = net.set_owner(self.car, joined)
+            check("set_owner() gives the dynamic car to the client", self.given)
+            check("predict() on the server (dynamic)", net.predict(self.car, self.step))
+        if self.given:
+            self.server_ys.append(self.car.worldPosition.y)
+            if t - self.last_report > 0.25:
+                self.last_report = t
+                net.call("car_pos", self.car.worldPosition.y)
+
+    def client_frame(self, t):
+        if not self.predicting:
+            if net.is_owner(self.car):
+                self.predicting = net.predict(self.car, self.step)
+                check("predict() on the owning client (dynamic)", self.predicting)
+                self.t0 = t
+            return
+        if net.view_time() is None:
+            return
+        age = t - self.t0
+        y = self.car.worldPosition.y
+        self.last_y = y
+        if self.flip is not None and self.response_ticks is None and net.tick > self.flip[0]:
+            moved = (self.flip[1] - y) * logic.getLogicTicRate() / CAR_SPEED
+            self.response_ticks = (net.tick - self.flip[0]) - moved
+        vy = CAR_SPEED if age < 2.5 else (-CAR_SPEED if age < 4.5 else 0.0)
+        if vy < 0.0 and self.flip is None:
+            self.flip = (net.tick, y)
+        if vy == 0.0 and self.stopped_at is None:
+            self.stopped_at = t
+        net.set_input(DYN_INPUT.pack(vy))
+        self.stats = net.prediction_stats(self.car)
+        if os.environ.get("NET_DEBUG") and self.stats:
+            log("pred tick=%d y=%.3f server=%s %s" % (net.tick, y, DYN_REPORT["y"], self.stats))
+
+    def server_checks(self):
+        ys = self.server_ys
+        check("dynamic car moved by the client's input on the server", bool(ys) and max(ys) - min(ys) > 5.0,
+              "y %.2f..%.2f" % (min(ys or [0]), max(ys or [0])))
+
+    def client_checks(self, t_end):
+        check("client predicts the dynamic car", self.predicting)
+        if not self.predicting:
+            return
+        check("dynamic prediction: the car answers the input within 2 ticks", self.response_ticks is not None and
+              self.response_ticks <= 2.0, "delay=%s ticks" % (None if self.response_ticks is None else
+                                                              round(self.response_ticks, 2)))
+        st = self.stats or {}
+        check("dynamic prediction: inputs recorded", st.get("inputs", 0) > 60, str(st))
+        settled = self.stopped_at is not None and t_end - self.stopped_at > 1.5
+        server_y = DYN_REPORT["y"]
+        check("dynamic prediction: car ends where the server has it", settled and server_y is not None and
+              self.last_y is not None and abs(self.last_y - server_y) < 0.1,
+              "client %s server %s settled=%s" % (self.last_y, server_y, settled))
+        check("dynamic prediction: corrections stay small", st.get("max_error", 99.0) < 0.5, str(st))
+        log("dynamic prediction stats %s" % st)
+
+
 class Rpc:
     """@net.rpc, net.call() and obj.net (NET_RPC=1): every target, argument type, owner check and refusal."""
 
@@ -371,6 +464,7 @@ def run():
         net.replicate(tracked, velocity=True)
         proto = None
     pred = Predict(scene, tracked) if PREDICT else None
+    dyn = PredictDyn(tracked) if PREDICT_DYN and SCENARIO == "car" else None
     rpc = Rpc(tracked) if RPC else None
     check("replicate gives an id", net.net_id(tracked) != 0, "id=%d" % net.net_id(tracked))
     initial = tuple(tracked.worldPosition)
@@ -390,7 +484,7 @@ def run():
             check("scene mode opened the server", net.isServer and net.roomName == room and net.maxPlayers == 4,
                   "%r %r" % (net.roomName, net.maxPlayers))
     elif ROLE == "server":
-        if pred:
+        if pred or dyn:
             # The test machine renders two players in software: at 60 Hz neither keeps the tick rate, and
             # prediction needs both sides to run every tick on time.
             logic.setLogicTicRate(30.0)
@@ -430,6 +524,9 @@ def run():
                           "id=%s" % (net.net_id(spawned) if spawned else None))
                 if spawned is not None:
                     spawned.worldPosition = [-math.cos(t) * 2.0, -math.sin(t) * 2.0, 3.0]
+            elif dyn:
+                joined = [e[1] for e in events if e[0] == "join"]
+                dyn.server_frame(t, joined[0] if joined else 0)
             else:
                 # constant speed along +y: the client must see a slope of CAR_SPEED m/s
                 tracked.setLinearVelocity([0.0, CAR_SPEED, 0.0], False)
@@ -466,6 +563,8 @@ def run():
                     times.append(time.time())
                 if props:
                     hps.append(tracked["hp"])
+                if dyn:
+                    dyn.client_frame(t)
                 if proto:
                     if pred:
                         pred.client_frame(t, events)
@@ -494,6 +593,8 @@ def run():
         check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
         if pred:
             pred.server_checks()
+        if dyn:
+            dyn.server_checks()
         if rpc:
             rpc.server_checks()
     else:
@@ -504,7 +605,7 @@ def run():
             zs = [p[2] for p in positions]
             span = max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs))
             check("replicated object moves on the client", span > 1.0, "span=%.2f over %d frames" % (span, len(positions)))
-            if SCENARIO == "car" and len(positions) > 20:
+            if SCENARIO == "car" and not dyn and len(positions) > 20:
                 dt = times[-1] - times[0]
                 slope = (positions[-1][1] - positions[0][1]) / dt if dt > 0 else 0.0
                 check("client follows the dynamic car at the server's speed", abs(slope - CAR_SPEED) < 0.2 * CAR_SPEED,
@@ -540,6 +641,8 @@ def run():
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
         if pred:
             pred.client_checks(time.time() - start)
+        if dyn:
+            dyn.client_checks(time.time() - start)
         if rpc:
             rpc.client_checks()
 
