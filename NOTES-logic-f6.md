@@ -81,4 +81,6 @@ Não compilei a engine (sem build nesta máquina; o build completo leva horas). 
   `Red.001` e o Ray sem x-ray dava `rayplain=0` também com bricks. O helper agora reaproveita pelo nome.
 - Regressão: F5 igual à validação anterior (slider/looker idênticos, `cam`/`chaser` com 1 frame de leitura); cena
   antiga com CHECK idêntico, só `cam y` -0,04 × -0,03 (já conhecido). `LEFT_AS_BRICK 0` em todas.
-- Não testado: o áudio à mão (passo 5).
+- Áudio à mão (2026-10-04, `tools/create_logic_manual_test.py`, junto com o Mouse Look da F5): bricks e convertido
+  iguais; loop recomeça após soltar a tecla, ping-pong sobe e desce, 3D acompanha o Speaker e a câmera. Mouse Look
+  com `threshold` 0,1 ficava aos trancos; com 0 fica suave (é o comportamento do actuator, não da conversão).
