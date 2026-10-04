@@ -1425,6 +1425,13 @@ void KX_NetworkManager::ClientTickBegin(uint64_t now)
 		if (m_clock->synced() && m_replica->applyInterpolated(renderTick, alpha)) {
 			m_view.tick = renderTick;
 			m_view.alpha = alpha;
+			/* Past the newest snapshot the buffer holds it (no extrapolation): the view time is that snapshot,
+			 * or the server would rewind the shots to a moment ahead of what was drawn. */
+			const net::Snapshot *newest = m_replica->buffer().newest();
+			if (newest && !net::tickNewer(newest->tick, renderTick)) {
+				m_view.tick = newest->tick;
+				m_view.alpha = 0.0f;
+			}
 		}
 		else if (m_replica->applyLatest()) {
 			m_view.tick = m_replica->lastAcceptedTick();

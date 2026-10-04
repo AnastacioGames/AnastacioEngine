@@ -99,6 +99,7 @@ class Predict:
         self.stats = None
         self.stopped_at = None
         self.last_x = None
+        self.hist = {}  # server, NET_DEBUG: tick -> Spawner position
 
     def step(self, obj, data):
         if len(data) != INPUT.size:
@@ -116,10 +117,11 @@ class Predict:
             now = net.raycast_past(origin, direction, 20.0, ignore=obj)
             self.shots[vals[1]] = (past is not None and past[0] == self.tracked, now is not None and now[0] == self.tracked)
             if os.environ.get("NET_DEBUG") or len(self.shots) <= 3:
-                log("shot %d tick=%d view=%s dir=%s past=%s now=%s spawner=%s" % (
+                log("shot %d tick=%d view=%s dir=%s past=%s now=%s spawner=%s hist=%s" % (
                     vals[1], net.tick, net.view_time(owner), tuple(round(v, 2) for v in direction),
                     past and (past[0].name, tuple(round(v, 2) for v in past[1])), now and now[0].name,
-                    tuple(round(v, 2) for v in self.tracked.worldPosition)))
+                    tuple(round(v, 2) for v in self.tracked.worldPosition),
+                    [(k, self.hist.get(k)) for k in range(net.view_time(owner)[0] - 1, net.view_time(owner)[0] + 3)]))
 
     def spin(self, obj, data):
         # The host's object, moved every tick by the step function (host input): the hitbox history then
@@ -127,6 +129,7 @@ class Predict:
         # interpolates differently when a snapshot is missing.
         self.angle += 1.0 / logic.getLogicTicRate()
         obj.worldPosition = [math.cos(self.angle) * 4.0, math.sin(self.angle) * 4.0, 1.0]
+        self.hist[net.tick] = (round(math.cos(self.angle) * 4.0, 2), round(math.sin(self.angle) * 4.0, 2))
 
     def server_start(self):
         self.angle = 0.0
@@ -195,7 +198,7 @@ class Predict:
         shots = len(self.shots)
         past = sum(1 for v in self.shots.values() if v[0])
         now = sum(1 for v in self.shots.values() if v[1])
-        check("lag compensation: shots hit the Spawner where the client saw it", shots >= 5 and past >= 0.8 * shots,
+        check("lag compensation: shots hit the Spawner where the client saw it", shots >= 5 and past >= 0.9 * shots,
               "%d/%d hit in the past, %d/%d now" % (past, shots, now, shots))
         check("lag compensation: the same shots mostly miss the present", now <= shots // 2,
               "%d/%d hit now" % (now, shots))

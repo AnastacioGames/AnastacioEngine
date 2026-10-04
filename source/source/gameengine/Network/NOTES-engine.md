@@ -168,6 +168,10 @@ inputs, reconciliações, correções, teleportes, erro, ticks).
   (snapshots, `Input`, `Pong`) por segundos: o relógio do cliente ficava sem `Pong` (sem sincronizar, sem input) e
   os snapshots só chegavam pelo pedido de estado completo, a cada 1 s. Problema anterior a esta branch (o `rtt` do
   cenário `spawner` ficava parado), achado pelo teste novo.
+- **`view_time` é o que foi desenhado.** Quando o tempo de render passa do snapshot mais novo (atraso, perda), o
+  `SnapshotBuffer` segura esse snapshot, mas o manager informava o `renderTick`: o input levava um tempo 1–3 ticks à
+  frente do desenhado e o servidor rebobinava para lá (0,1–0,4 m a 4 m/s, hitbox de 0,35), errando ~1 tiro por
+  rodada do `predict`. `ClientTickBegin` agora informa o tick do snapshot mais novo (alpha 0) nesse caso.
 - **`NodeUpdate()` depois de mover o objeto** (`SetPredictedState`, `ApplyOffset`, `setTransform`). Os setters do
   nó só mudam a transformação local; a posição mundial ficava velha até o fim do quadro. Na reconciliação, o passo do
   jogo lia a posição antiga no replay e desfazia a volta ao estado do servidor: o cliente ficava preso a até metros

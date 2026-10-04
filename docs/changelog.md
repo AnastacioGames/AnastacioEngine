@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: `view_time` da lag compensation segue o snapshot desenhado (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- Quando o tempo de render passava do snapshot mais novo, o cliente desenhava esse snapshot mas mandava o
+  `renderTick` como tempo de visão; o servidor rebobinava 1–3 ticks à frente do que foi visto e errava ~1 tiro por
+  rodada do `predict` (às vezes abaixo dos 80%). `KX_NetworkManager::ClientTickBegin` passa a informar o tick do
+  snapshot mais novo com alpha 0. Núcleo não mudou.
+- Teste: limite da lag compensation de 80% para 90%; com `NET_DEBUG` o servidor registra a posição do Spawner por
+  tick e a mostra em cada tiro.
+- Testes (Linux): `predict` 20 de 20 com 100% dos tiros acertando no passado (antes ~94% por rodada); `rpc`,
+  `server`, `scene-server`, `spawner`, `car`, `scene` passam; `tools/net_menu/tests` 102 passaram.
+
 ## Multiplayer: correção da reconciliação da predição (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - `KX_NetworkManager` chama `NodeUpdate()` depois de `SetPredictedState`, `ApplyOffset` e `setTransform`. Sem isso
