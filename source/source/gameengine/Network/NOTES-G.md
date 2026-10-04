@@ -30,12 +30,14 @@ Criado em 2026-10-04. Branch `net/rpc`. Arquivos: `NET_RPC.h/.cpp`, `tests/NET_R
 
 ## Dúvidas para o contrato
 
-1. **Quem chamou:** o `Rpc` não tem campo de origem; no cliente, um RPC repassado (`All`/`Others`) chega com
-   `caller = 0`. Proposta: mensagem provisória `200 RpcFrom` = `u16 fromClient` + corpo do `Rpc`, só de
-   servidor para cliente. **Implementada (2026-10-04, `claude/project-thread-l2znr0`):** `MessageType::RpcFrom = 200`,
-   `RpcFromMsg`, `isKnownMessageType` aceita 200; o servidor conta violação se um cliente mandar 200;
-   `RpcServer` repassa `All`/`Others` como `RpcFrom`, `RpcClient` aceita `Rpc` e `RpcFrom` e preenche `caller`.
-   Chamadas feitas pelo próprio servidor continuam como `Rpc` (caller 0). Cliente antigo descarta o 200, ou seja,
-   perde os repasses: os dois lados precisam desta versão (`protocolVersion` não foi incrementado).
+1. **Quem chamou — RESOLVIDO (2026-10-04):** o `Rpc` não tem campo de origem; no cliente, um RPC repassado
+   (`All`/`Others`) chega com `caller = 0`. `200 RpcFrom` = `u16 fromClient` + corpo do `Rpc`, só de servidor
+   para cliente. Implementado e no contrato definitivo (`docs/multiplayer-protocol.md`, seção 5, sem mais
+   marca de "provisória"): `MessageType::RpcFrom = 200`, `RpcFromMsg`, `isKnownMessageType` aceita 200; o
+   servidor conta violação se um cliente mandar 200; `RpcServer` repassa `All`/`Others` como `RpcFrom`,
+   `RpcClient` aceita `Rpc` e `RpcFrom` e preenche `caller`. Chamadas feitas pelo próprio servidor continuam
+   como `Rpc` (caller 0). `200` ficou fora do `protocolVersion` (aditiva): cliente antigo descarta a mensagem
+   e só perde os repasses, não quebra a sessão — mas os dois lados da mesma partida devem rodar a versão que
+   já tem `RpcFrom`.
 2. Clientes que ainda não carregaram a cena também recebem o repasse; o RPC num objeto que eles não conhecem é
    descartado. Se for preciso, dá para filtrar por `ready`.
