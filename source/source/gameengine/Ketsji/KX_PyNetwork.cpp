@@ -792,6 +792,25 @@ PyObject *Net_prediction_stats(PyObject *, PyObject *arg)
 	                     (unsigned long)info.resyncs);
 }
 
+/// input_stats(client) -> dict or None
+PyObject *Net_input_stats(PyObject *, PyObject *arg)
+{
+	const long client = PyLong_AsLong(arg);
+	if (client == -1 && PyErr_Occurred()) {
+		return nullptr;
+	}
+	KX_NetworkManager *manager = Manager();
+	net::InputQueueStats stats;
+	if (!manager || client < 0 || client > 0xFFFF || !manager->GetInputStats(net::ClientId(client), stats)) {
+		Py_RETURN_NONE;
+	}
+	return Py_BuildValue("{s:k,s:k,s:k,s:k,s:k,s:k,s:k,s:k}", "received", (unsigned long)stats.received,
+	                     "duplicates", (unsigned long)stats.duplicates, "late", (unsigned long)stats.late, "too_far",
+	                     (unsigned long)stats.tooFar, "applied", (unsigned long)stats.applied, "repeated",
+	                     (unsigned long)stats.repeated, "missing", (unsigned long)stats.missing, "invalid",
+	                     (unsigned long)stats.invalid);
+}
+
 /// set_hitbox(obj, radius, half_height=0.0) -> bool
 PyObject *Net_set_hitbox(PyObject *, PyObject *args)
 {
@@ -1081,6 +1100,8 @@ PyMethodDef g_methods[] = {
 	 "view_time(client=0) -> (tick, alpha) or None\nClient: time the remote objects are drawn at.\n"
 	 "Server: the view time the client sent with its last input."},
 	{"prediction_stats", Net_prediction_stats, METH_O, "prediction_stats(obj) -> dict or None\nClient only."},
+	{"input_stats", Net_input_stats, METH_O,
+	 "input_stats(client) -> dict or None\nServer: how the client's inputs arrived (late, repeated, missing...)."},
 	{"set_hitbox", Net_set_hitbox, METH_VARARGS,
 	 "set_hitbox(obj, radius, half_height=0.0) -> bool\nServer: sphere or capsule (local Z) kept 1 s back for\n"
 	 "raycast_past(); radius 0 removes it."},

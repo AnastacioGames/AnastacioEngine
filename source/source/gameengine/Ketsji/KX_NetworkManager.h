@@ -219,6 +219,8 @@ public:
 		uint32_t resyncs = 0;
 	};
 	bool GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info = nullptr) const;
+	/// Server: how the inputs of a client arrived and were applied. False when the client has no input queue.
+	bool GetInputStats(net::ClientId client, net::InputQueueStats &stats) const;
 
 	/// Server: sphere (halfHeight 0) or capsule along the local Z axis, recorded every tick. radius <= 0 removes it.
 	bool SetHitbox(KX_GameObject *obj, float radius, float halfHeight);

@@ -1602,6 +1602,19 @@ bool KX_NetworkManager::GetViewTime(net::ClientId client, net::Tick &tick, float
 	return view.tick != net::kNoTick;
 }
 
+bool KX_NetworkManager::GetInputStats(net::ClientId client, net::InputQueueStats &stats) const
+{
+	if (m_role != Role::SERVER || !m_predServer) {
+		return false;
+	}
+	const net::InputQueue *queue = m_predServer->queue(client);
+	if (!queue) {
+		return false;
+	}
+	stats = queue->stats();
+	return true;
+}
+
 bool KX_NetworkManager::GetPredictionStats(KX_GameObject *obj, net::PredictionStats &stats, PredictionInfo *info) const
 {
 	const Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;

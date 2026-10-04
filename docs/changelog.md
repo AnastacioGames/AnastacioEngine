@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: `network.input_stats` e causa do `predict` intermitente (2026-10-04)
+
+- `KX_NetworkManager::GetInputStats` e `network.input_stats(client)` (servidor): contadores da `InputQueue` do cliente.
+- `net_engine_test.py` (`predict`) loga os contadores no servidor. Confirmado: as correções do cliente vêm de inputs que chegam depois do tick simulado (`late`/`repeated`); detalhes em `NOTES-engine.md`.
+
 ## Multiplayer: revalidação no Linux após o merge do PR #4 (2026-10-04, main `9e7925f`)
 
 - `run_net_test.sh` `spawner`, `car`, `server`, `scene`, `scene-server` e `rpc` passam na main; `predict` passou
