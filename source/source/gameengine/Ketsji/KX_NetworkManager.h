@@ -164,6 +164,31 @@ public:
 	/// Owner of a replicated object; false when it is not replicated.
 	bool GetOwner(KX_GameObject *obj, net::ClientId &owner) const;
 	net::NetId GetNetId(KX_GameObject *obj) const;
+	/// Replicated object with this net id, nullptr when unknown.
+	KX_GameObject *FindObject(net::NetId id) const;
+	/** \} */
+
+	/* -------------------------------------------------------------------- */
+	/** \name Game RPCs
+	 * \{ */
+
+	struct RpcOptions {
+		std::string name;
+		net::RpcTarget target = net::RpcTarget::Server;
+		bool reliable = true;
+		/// The caller must own the object the call is made on.
+		bool requireOwner = false;
+	};
+	/// Runs a game RPC here. sender: calling client on the server, always 0 on clients. obj: the object of the
+	/// call, nullptr for a global one.
+	using RpcFunc = std::function<void(const std::string &name, net::ClientId sender, KX_GameObject *obj,
+	                                   const std::vector<net::RpcArg> &args)>;
+	void SetRpcSink(const RpcFunc &sink);
+	/// Before host()/join(), with the same names on every peer. Names starting with "net." are reserved.
+	bool RegisterRpc(const RpcOptions &options, std::string &error);
+	/// obj = nullptr for a global call. False with error when it was refused here.
+	bool CallRpc(const std::string &name, KX_GameObject *obj, const std::vector<net::RpcArg> &args,
+	             std::string &error);
 	/** \} */
 
 	/* -------------------------------------------------------------------- */
@@ -396,6 +421,8 @@ private:
 	ViewTime m_inputView;
 
 	net::RpcTable m_rpcTable;
+	std::vector<RpcOptions> m_userRpcs;
+	RpcFunc m_rpcSink;
 	std::function<void(const Event &)> m_eventSink;
 
 	net::LanDiscovery m_discovery;

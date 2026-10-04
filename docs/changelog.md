@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: RPC do jogo (`@net.rpc`) e `obj.net` (2026-10-04, branch `claude/project-thread-l2znr0`)
+
+- `Range.network.rpc` (decorador, alvos `server`/`owner`/`all`/`others`, `reliable`, `owner_only`, `name`) e
+  `net.call(name, *args, obj=None)`. Argumentos bool, int, float, str, objeto de jogo, vetor e quaternion; a função
+  recebe `sender` (e o objeto, em chamadas de objeto). Registro antes de `host()`/`join()`.
+- `obj.net` em todo objeto de jogo: `id`, `replicated`, `owner`, `isOwner`, `call()`, `predict()`.
+- `KX_NetworkManager` refaz a tabela de RPC com os internos e os do jogo a cada registro; o núcleo não mudou.
+- Testes (Linux): novo `run_net_test.sh rpc` passou; `predict` (agora com RPC no lugar do chat), `server`,
+  `scene-server`, `spawner`, `car` e `scene` passam; `tools/net_menu/tests` 102 passaram.
+- Não testado: Windows. Detalhes em `source/source/gameengine/Network/NOTES-engine.md`, seção "RPC do jogo".
+
 ## Multiplayer: predição do cliente, input e lag compensation na engine (2026-10-04, branch `claude/project-thread-l2znr0`)
 
 - Refaz a `net/engine-predict`, perdida no limite de uso. `NET_Prediction` e `NET_LagCompensation` ligados no

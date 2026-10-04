@@ -12,6 +12,8 @@ Scenarios (existing scenes of projects-teste/, no editor needed):
 With NET_PREDICT=1 (runner scenario "predict", spawner scene) the server also spawns a 'Rig' owned by the client,
 moved by net.predict() with the client's input (client prediction + reconciliation), and gives the Spawner a hitbox
 the client shoots at through the input (lag compensation, net.raycast_past()).
+With NET_RPC=1 (scenario "rpc") the peers register game RPCs and check every target, argument type, obj.net and
+the refusals.
 NET_DEBUG=1 logs every shot, aim and prediction state.
 With NET_HEADLESS=1 the server runs as RangeRuntime --server: it must report net.headless, draw nothing and host
 as Dedicated (no host player in the lobby).
@@ -43,6 +45,7 @@ FROM_SCENE = os.environ.get("NET_FROM_SCENE") == "1"
 CLIENT_NAME = "Player" if FROM_SCENE else "Tester-client"
 HEADLESS = os.environ.get("NET_HEADLESS") == "1"
 PREDICT = os.environ.get("NET_PREDICT") == "1"
+RPC = os.environ.get("NET_RPC") == "1"
 
 failures = []
 
@@ -67,7 +70,7 @@ def find(scene, name):
 # Input of the predicted rig: x speed, shot sequence (0 = none), shot origin and direction.
 INPUT = struct.Struct("<fB3f3f")
 RIG_SPEED = 2.0
-RIG_REPORT = {"x": None}  # last rig position the server sent by chat
+RIG_REPORT = {"x": None}  # last rig position the server sent (RPC rig_pos)
 HITBOX_RADIUS = 0.35
 
 
@@ -75,6 +78,10 @@ class Predict:
     """net.predict() + net.raycast_past() check (NET_PREDICT=1)."""
 
     def __init__(self, scene, tracked):
+        @net.rpc(target="others")
+        def rig_pos(sender, x):
+            RIG_REPORT["x"] = x
+
         self.scene = scene
         self.tracked = tracked
         self.rig = None
@@ -137,7 +144,7 @@ class Predict:
             self.server_xs.append(self.rig.worldPosition.x)
             if t - self.last_report > 0.25:
                 self.last_report = t
-                net.send_chat("rig %.4f" % self.rig.worldPosition.x)
+                net.call("rig_pos", self.rig.worldPosition.x)
 
     def client_frame(self, t, events):
         self.server_x = RIG_REPORT["x"]
@@ -209,6 +216,110 @@ class Predict:
         check("prediction: corrections stay small", st.get("max_error", 99.0) < 0.5, str(st))
 
 
+class Rpc:
+    """@net.rpc, net.call() and obj.net (NET_RPC=1): every target, argument type, owner check and refusal."""
+
+    def __init__(self, tracked):
+        self.tracked = tracked
+        self.got = {}  # name -> list of calls seen here
+        self.rig = None
+        self.sent = False
+        self.unreliable = 0
+        self.local = {}
+        self.late = None
+
+        def keep(name):
+            def fn(*args):
+                # Objects by name, vectors as tuples: the objects are freed before the checks run.
+                norm = tuple(a.name if hasattr(a, "worldPosition") else
+                             tuple(round(v, 4) for v in a) if hasattr(a, "__len__") and not isinstance(a, str) else a
+                             for a in args)
+                self.got.setdefault(name, []).append(norm)
+            fn.__name__ = name
+            return fn
+
+        net.rpc(keep("hello"))  # bare form: target 'server'
+        net.rpc(target="all")(keep("notice"))
+        net.rpc(target="owner")(keep("poke"))
+        net.rpc(target="server", owner_only=True)(keep("move_req"))
+        net.rpc(target="others")(keep("shout"))
+        net.rpc(target="server", reliable=False)(keep("tick_u"))
+        net.rpc(name="renamed", target="all")(keep("renamed"))
+
+    def server_frame(self, t, joined):
+        if self.rig is None and joined:
+            self.rig = net.spawn("Rig", owner=joined, position=[0.0, -6.0, 3.0])
+            self.t_spawn = t
+        if self.rig is not None and not self.sent and t - self.t_spawn > 2.0:
+            self.sent = True
+            self.local["notice"] = net.call("notice", 42)
+            self.local["poke"] = self.rig.net.call("poke", 7)
+            self.local["shout"] = net.call("shout", "from-server")
+            self.local["renamed"] = net.call("renamed", -1)
+
+    def client_frame(self, scene):
+        if self.rig is None:
+            for o in scene.objects:
+                if o.name == "Rig" and o.net.replicated and o.net.isOwner:
+                    self.rig = o
+            return
+        if not self.sent:
+            self.sent = True
+            q = [0.70710678, 0.0, 0.0, 0.70710678]  # w, x, y, z
+            self.local["hello"] = net.call("hello", 3, 2.5, "olá", True, [1.0, 2.0, 3.0], q, self.tracked)
+            self.local["move_req"] = self.rig.net.call("move_req", 0.5)
+            self.local["move_not_owner"] = self.tracked.net.call("move_req", 0.5)
+            self.local["poke_from_client"] = self.rig.net.call("poke", 1)
+            self.local["shout"] = net.call("shout", "from-client")
+            self.local["owner"] = (self.rig.net.owner == net.localId, self.rig.net.isOwner,
+                                   self.tracked.net.id == net.net_id(self.tracked) != 0)
+            try:
+                net.rpc(lambda sender: None, name="too_late")
+            except RuntimeError:
+                self.late = "refused"
+            try:
+                net.call("nope")
+            except KeyError:
+                self.local["unknown"] = "KeyError"
+        if self.unreliable < 30:
+            self.unreliable += 1
+            net.call("tick_u", self.unreliable)
+
+    def server_checks(self):
+        hello = self.got.get("hello", [])
+        ok = bool(hello) and hello[0][0] == 1 and hello[0][1:5] == (3, 2.5, "olá", True) and \
+            hello[0][5] == (1.0, 2.0, 3.0) and hello[0][6] == (0.7071, 0.0, 0.0, 0.7071) and hello[0][7] == "Spawner"
+        check("rpc: client to server, every argument type and the sender", ok, str(hello))
+        check("rpc: target 'all' runs on the server too", (0, 42) in self.got.get("notice", []), str(self.got.get("notice")))
+        mv = self.got.get("move_req", [])
+        check("rpc: object call with owner_only reaches the server once", len(mv) == 1 and mv[0][0] == "Rig" and
+              mv[0][1:] == (1, 0.5), str(mv))
+        check("rpc: target 'others' from the client reaches the server", (1, "from-client") in self.got.get("shout", []),
+              str(self.got.get("shout")))
+        check("rpc: 'others' from the server does not run here", (0, "from-server") not in self.got.get("shout", []))
+        check("rpc: calls made here", all(self.local.get(k) for k in ("notice", "poke", "shout", "renamed")), str(self.local))
+        n = len(self.got.get("tick_u", []))
+        check("rpc: unreliable calls arrive", n >= 15, "%d/30" % n)
+
+    def client_checks(self):
+        check("rpc: client found its rig through obj.net", self.rig is not None)
+        loc = self.local
+        check("rpc: obj.net owner/isOwner/id", loc.get("owner") == (True, True, True), str(loc.get("owner")))
+        check("rpc: calls accepted here", loc.get("hello") and loc.get("move_req") and loc.get("shout"), str(loc))
+        check("rpc: owner_only on an object of someone else is refused here", loc.get("move_not_owner") is False)
+        check("rpc: a client cannot call an 'owner' RPC", loc.get("poke_from_client") is False)
+        check("rpc: unknown name raises KeyError", loc.get("unknown") == "KeyError")
+        check("rpc: registering during a session raises", self.late == "refused")
+        check("rpc: target 'all' from the server runs here", (0, 42) in self.got.get("notice", []), str(self.got.get("notice")))
+        check("rpc: registered under another name", (0, -1) in self.got.get("renamed", []))
+        poke = self.got.get("poke", [])
+        check("rpc: target 'owner' reaches the owner with its object", len(poke) == 1 and poke[0][0] == "Rig" and
+              poke[0][1:] == (0, 7), str(poke))
+        shout = self.got.get("shout", [])
+        check("rpc: 'others' reaches the client, not the caller", (0, "from-server") in shout and
+              not any(a[1] == "from-client" for a in shout), str(shout))
+
+
 def run():
     scene = logic.getCurrentScene()
     events = []
@@ -216,9 +327,7 @@ def run():
     net.on_connect(lambda cid: events.append(("connect", cid)))
     net.on_disconnect(lambda reason, detail: events.append(("disconnect", reason)))
     net.on_reject(lambda reason, detail: events.append(("reject", reason, detail)))
-    # "rig x" reports of the predict check stay out of the event list.
-    net.on_chat(lambda cid, text: RIG_REPORT.__setitem__("x", float(text[4:])) if text.startswith("rig ")
-                else events.append(("chat", cid, text)))
+    net.on_chat(lambda cid, text: events.append(("chat", cid, text)))
     net.on_start(lambda: events.append(("start",)))
     net.on_player_join(lambda cid, name: events.append(("join", cid, name)))
     net.on_player_leave(lambda cid: events.append(("leave", cid)))
@@ -241,6 +350,7 @@ def run():
         net.replicate(tracked, velocity=True)
         proto = None
     pred = Predict(scene, tracked) if PREDICT else None
+    rpc = Rpc(tracked) if RPC else None
     check("replicate gives an id", net.net_id(tracked) != 0, "id=%d" % net.net_id(tracked))
     initial = tuple(tracked.worldPosition)
 
@@ -305,6 +415,9 @@ def run():
             if pred:
                 joined = [e[1] for e in events if e[0] == "join"]
                 pred.server_frame(t, joined[0] if joined else 0)
+            if rpc:
+                joined = [e[1] for e in events if e[0] == "join"]
+                rpc.server_frame(t, joined[0] if joined else 0)
             clients_seen = max(clients_seen, len(net.clients))
             if not lobby["chat_sent"] and any(e[0] == "join" for e in events):
                 lobby["chat_sent"] = net.send_chat("welcome")
@@ -335,6 +448,8 @@ def run():
                 if proto:
                     if pred:
                         pred.client_frame(t, events)
+                    if rpc:
+                        rpc.client_frame(scene)
                     rig = [o for o in scene.objects if o.name == proto and net.net_id(o) != 0]
                     spawn_seen.append(len(rig))
             if any(e[0] == "reject" for e in events):
@@ -358,6 +473,8 @@ def run():
         check("lobby: ready + start_game()", lobby["start"] is True, str(lobby["start"]))
         if pred:
             pred.server_checks()
+        if rpc:
+            rpc.server_checks()
     else:
         check("client connected", t_connected is not None, str(events))
         if positions:
@@ -402,6 +519,8 @@ def run():
         check("client has no reject", not any(e[0] == "reject" for e in events), str(events))
         if pred:
             pred.client_checks(time.time() - start)
+        if rpc:
+            rpc.client_checks()
 
     net.disconnect()
     if ROLE == "server" and not FROM_SCENE:

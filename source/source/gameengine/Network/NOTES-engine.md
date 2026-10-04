@@ -23,6 +23,7 @@ não deu para testar.
 | CMake | `gameengine/CMakeLists.txt` (`add_subdirectory(Network)`), `Ketsji/CMakeLists.txt` (`ge_network` na LIB), `blenderplayer/CMakeLists.txt` (`ge_network extern_enet`) |
 | Teste | `tools/net_engine_test/` (dois `RangeRuntime`, servidor + cliente) |
 | Input, predição, lag compensation | `Ketsji/KX_NetworkManager.*` (`ClientPredict`, `ServerStepPredicted`, `RecordHitboxes`, `RaycastPast`), `Ketsji/KX_PyNetwork.cpp` (`predict`, `set_input`, `raycast_past`...) |
+| RPC do jogo, `obj.net` | `Ketsji/KX_NetworkManager.*` (`RegisterRpc`, `CallRpc`, `BuildRpc`), `Ketsji/KX_PyNetwork.cpp` (`rpc`, `call`, `ObjectNet`), `Ketsji/KX_GameObject.cpp` (atributo `net`) |
 | Servidor headless (`RangeRuntime --server`) | `GamePlayer/GPG_Ghost.cpp` (opção), `Launcher/LA_Launcher.*` (`SetServerMode`), `Ketsji/KX_KetsjiEngine.*` (`SetServerMode`, `ServerSleep`), `Ketsji/KX_SimulationPipeline.cpp` (sem skinning) |
 
 ## Decisões
@@ -74,11 +75,46 @@ não deu para testar.
 - **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
   Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades de um objeto previsto
   não chegam ao dono, ver abaixo).
-- **`@net.rpc` / RPC do usuário e `obj.net`.** Só os três RPCs internos. A API de NOTES-D não pede mais que isso.
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
 - **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
 - **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
+
+## RPC do jogo e `obj.net`
+
+Feito em 2026-10-04 na branch `claude/project-thread-l2znr0`, sobre `NET_RPC` (núcleo sem mudança).
+
+```python
+@net.rpc                                    # target 'server'; nome = nome da função
+def hello(sender, n, text): ...
+
+@net.rpc(target="owner")                    # servidor -> dono do objeto da chamada
+def poke(obj, sender, n): ...
+
+@net.rpc(target="server", owner_only=True, reliable=False, name="move")
+def move_req(obj, sender, dx): ...
+
+net.call("hello", 3, "oi")                  # global
+rig.net.call("poke", 7)                     # chamada no objeto (igual a net.call("poke", 7, obj=rig))
+```
+
+- **Alvos:** `server`, `owner` (só o servidor chama; roda no dono do objeto, ou no servidor se ele é o dono),
+  `all` (servidor e todos os clientes, inclusive quem chamou), `others` (todos menos quem chamou).
+- **Assinatura:** `fn(sender, *args)` global, `fn(obj, sender, *args)` no objeto. `sender` é o cliente que chamou no
+  servidor e **sempre 0 nos clientes** (o contrato não tem o campo; um `all` vindo de um cliente chega com 0).
+- **Argumentos:** bool, int, float, str, objeto de jogo (vai como net id; volta como o objeto ou `None`), 3 números
+  (`mathutils.Vector`), 4 números (quaternion w, x, y, z; volta `mathutils.Quaternion`). Até 1024 bytes por chamada.
+- **Registro:** antes de `host()`/`join()` (durante a sessão levanta `RuntimeError`), com os mesmos nomes em todos os
+  peers. Os ids seguem os nomes em ordem alfabética, então a ordem de registro não importa; nomes `net.` são
+  reservados. Registrar de novo o mesmo nome troca a função (script rodado outra vez).
+- **Recusas locais** (`call()` devolve `False`): sem sessão, `owner` chamado por cliente, `owner_only` num objeto de
+  outro, argumentos grandes demais. Nome desconhecido levanta `KeyError`. O servidor recusa e conta violação para
+  chamadas forjadas (núcleo).
+- **`obj.net`:** `id`, `replicated`, `owner`, `isOwner`, `call(name, *args)`, `predict(fn)`. O atributo é criado
+  pelo `Range.network` (`_object_net`), então `KX_GameObject` não depende do código de rede.
+- **Teste:** `run_net_test.sh rpc`: todos os alvos, todos os tipos de argumento, `sender`, objeto da chamada,
+  `owner_only`, `others` sem eco para quem chamou, RPC não confiável (≥ 15/30), nome trocado, `obj.net`, e as
+  recusas locais. O cenário `predict` passou a mandar a posição do rig por RPC (`rig_pos`) em vez de chat.
 
 ## Predição, input e lag compensation
 

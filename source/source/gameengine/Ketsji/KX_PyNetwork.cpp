@@ -55,6 +55,7 @@ KX_NetworkManager *Manager()
 }
 
 KX_NetworkManager *ManagerCreate();
+bool ObjectFromPy(PyObject *value, KX_GameObject **obj, const char *prefix);
 
 /// Calls the callbacks registered for an event; their exceptions are printed and never reach the engine.
 void DispatchEvent(const KX_NetworkManager::Event &event)
@@ -148,6 +149,154 @@ void DispatchStep(KX_GameObject *obj, const net::InputBlock &input)
 	Py_DECREF(table);
 }
 
+/// Python value of an RPC argument (a new reference).
+PyObject *ArgToPy(const net::RpcArg &arg)
+{
+	switch (arg.type) {
+		case net::RpcArgType::Bool:
+			return PyBool_FromLong(arg.b);
+		case net::RpcArgType::Int:
+			return PyLong_FromLongLong(arg.i);
+		case net::RpcArgType::Float:
+			return PyFloat_FromDouble(arg.v[0]);
+		case net::RpcArgType::Vec3:
+			return PyObjectFrom(mt::vec3(arg.v[0], arg.v[1], arg.v[2]));
+		case net::RpcArgType::Quat: {
+			/* mathutils order w, x, y, z; the wire is x, y, z, w. */
+			PyObject *mathutils = PyImport_ImportModule("mathutils");
+			PyObject *q = mathutils ? PyObject_CallMethod(mathutils, "Quaternion", "((dddd))", double(arg.v[3]),
+			                                              double(arg.v[0]), double(arg.v[1]), double(arg.v[2]))
+			                        : nullptr;
+			Py_XDECREF(mathutils);
+			if (!q) {
+				PyErr_Clear();
+				return Py_BuildValue("(dddd)", double(arg.v[3]), double(arg.v[0]), double(arg.v[1]), double(arg.v[2]));
+			}
+			return q;
+		}
+		case net::RpcArgType::Str:
+			return PyUnicode_DecodeUTF8(arg.s.data(), Py_ssize_t(arg.s.size()), "replace");
+		case net::RpcArgType::NetId: {
+			KX_NetworkManager *manager = Manager();
+			KX_GameObject *obj = manager ? manager->FindObject(arg.id) : nullptr;
+			if (obj) {
+				return obj->GetProxy();
+			}
+			Py_RETURN_NONE;
+		}
+	}
+	Py_RETURN_NONE;
+}
+
+/// bool, int, float, str, game object (sent as its net id), 3 numbers (vector), 4 numbers (quaternion w,x,y,z).
+bool ArgFromPy(PyObject *value, net::RpcArg &arg)
+{
+	if (PyBool_Check(value)) {
+		arg.type = net::RpcArgType::Bool;
+		arg.b = value == Py_True;
+		return true;
+	}
+	if (PyLong_Check(value)) {
+		arg.type = net::RpcArgType::Int;
+		arg.i = PyLong_AsLongLong(value);
+		return !PyErr_Occurred();
+	}
+	if (PyFloat_Check(value)) {
+		arg.type = net::RpcArgType::Float;
+		arg.v[0] = float(PyFloat_AsDouble(value));
+		return true;
+	}
+	if (PyUnicode_Check(value)) {
+		Py_ssize_t size;
+		const char *text = PyUnicode_AsUTF8AndSize(value, &size);
+		if (!text) {
+			return false;
+		}
+		arg.type = net::RpcArgType::Str;
+		arg.s.assign(text, size_t(size));
+		return true;
+	}
+	if (PyObject_TypeCheck(value, &KX_GameObject::Type)) {
+		KX_GameObject *obj;
+		if (!ObjectFromPy(value, &obj, "network.call()")) {
+			return false;
+		}
+		arg.type = net::RpcArgType::NetId;
+		arg.id = obj->GetNetId();
+		if (arg.id == net::kInvalidNetId) {
+			PyErr_SetString(PyExc_ValueError, "network.call(): a game object argument must be replicated");
+			return false;
+		}
+		return true;
+	}
+	const Py_ssize_t size = PySequence_Check(value) ? PySequence_Size(value) : -1;
+	if (size == 3) {
+		mt::vec3 vec;
+		if (PyVecTo(value, vec)) {
+			arg.type = net::RpcArgType::Vec3;
+			arg.v[0] = vec.x;
+			arg.v[1] = vec.y;
+			arg.v[2] = vec.z;
+			return true;
+		}
+	}
+	else if (size == 4) {
+		/* w, x, y, z like mathutils.Quaternion. */
+		double w[4];
+		bool ok = true;
+		for (Py_ssize_t i = 0; i < 4 && ok; ++i) {
+			PyObject *item = PySequence_GetItem(value, i);
+			w[i] = item ? PyFloat_AsDouble(item) : -1.0;
+			ok = item && !PyErr_Occurred();
+			Py_XDECREF(item);
+		}
+		if (ok) {
+			arg.type = net::RpcArgType::Quat;
+			arg.v[0] = float(w[1]);
+			arg.v[1] = float(w[2]);
+			arg.v[2] = float(w[3]);
+			arg.v[3] = float(w[0]);
+			return true;
+		}
+	}
+	PyErr_Clear();
+	PyErr_Format(PyExc_TypeError, "network.call(): unsupported argument type '%s' (bool, int, float, str, game "
+	             "object, 3D vector or quaternion)", Py_TYPE(value)->tp_name);
+	return false;
+}
+
+/// Runs the Python function of a game RPC; its exceptions are printed.
+void DispatchRpc(const std::string &name, net::ClientId sender, KX_GameObject *obj, const std::vector<net::RpcArg> &args)
+{
+	PyObject *module = PyDict_GetItemString(PyImport_GetModuleDict(), "Range.network");  // borrowed
+	PyObject *table = module ? PyObject_GetAttrString(module, "_rpcs") : nullptr;
+	if (!table) {
+		PyErr_Clear();
+		return;
+	}
+	PyObject *fn = PyDict_GetItemString(table, name.c_str());  // borrowed
+	if (fn) {
+		const Py_ssize_t first = obj ? 2 : 1;
+		PyObject *tuple = PyTuple_New(first + Py_ssize_t(args.size()));
+		if (obj) {
+			PyTuple_SET_ITEM(tuple, 0, obj->GetProxy());
+		}
+		PyTuple_SET_ITEM(tuple, first - 1, PyLong_FromLong(sender));
+		for (size_t i = 0; i < args.size(); ++i) {
+			PyTuple_SET_ITEM(tuple, first + Py_ssize_t(i), ArgToPy(args[i]));
+		}
+		PyObject *result = PyObject_CallObject(fn, tuple);
+		if (result) {
+			Py_DECREF(result);
+		}
+		else {
+			PyErr_Print();
+		}
+		Py_DECREF(tuple);
+	}
+	Py_DECREF(table);
+}
+
 KX_NetworkManager *ManagerCreate()
 {
 	KX_KetsjiEngine *engine = KX_GetActiveEngine();
@@ -158,6 +307,7 @@ KX_NetworkManager *ManagerCreate()
 	KX_NetworkManager *manager = engine->GetOrCreateNetworkManager();
 	manager->SetEventSink(DispatchEvent);
 	manager->SetStepSink(DispatchStep);
+	manager->SetRpcSink(DispatchRpc);
 	return manager;
 }
 
@@ -695,6 +845,104 @@ PyObject *Net_raycast_past(PyObject *, PyObject *args, PyObject *kwds)
 	                     double(hitDistance));
 }
 
+/// _register_rpc(name, target, reliable, owner_only, fn): see rpc() in kModuleClassSource.
+PyObject *Net_register_rpc(PyObject *, PyObject *args)
+{
+	const char *name, *target;
+	int reliable, ownerOnly;
+	PyObject *fn;
+	if (!PyArg_ParseTuple(args, "sspp" "O", &name, &target, &reliable, &ownerOnly, &fn)) {
+		return nullptr;
+	}
+	if (!PyCallable_Check(fn)) {
+		PyErr_SetString(PyExc_TypeError, "network.rpc(): the function must be callable");
+		return nullptr;
+	}
+	KX_NetworkManager::RpcOptions options;
+	options.name = name;
+	options.reliable = reliable != 0;
+	options.requireOwner = ownerOnly != 0;
+	const std::string t = target;
+	if (t == "server") {
+		options.target = net::RpcTarget::Server;
+	}
+	else if (t == "owner") {
+		options.target = net::RpcTarget::Owner;
+	}
+	else if (t == "all") {
+		options.target = net::RpcTarget::All;
+	}
+	else if (t == "others") {
+		options.target = net::RpcTarget::Others;
+	}
+	else {
+		PyErr_Format(PyExc_ValueError, "network.rpc(): target must be 'server', 'owner', 'all' or 'others', not '%s'",
+		             target);
+		return nullptr;
+	}
+	KX_NetworkManager *manager = ManagerCreate();
+	if (!manager) {
+		return nullptr;
+	}
+	std::string error;
+	if (!manager->RegisterRpc(options, error)) {
+		PyErr_Format(PyExc_RuntimeError, "network.rpc(): %s", error.c_str());
+		return nullptr;
+	}
+	PyObject *module = PyDict_GetItemString(PyImport_GetModuleDict(), "Range.network");
+	PyObject *table = module ? PyObject_GetAttrString(module, "_rpcs") : nullptr;
+	if (!table) {
+		return nullptr;
+	}
+	PyDict_SetItemString(table, name, fn);
+	Py_DECREF(table);
+	Py_RETURN_NONE;
+}
+
+/// call(name, *args, obj=None) -> bool
+PyObject *Net_call(PyObject *, PyObject *args, PyObject *kwds)
+{
+	const Py_ssize_t count = PyTuple_GET_SIZE(args);
+	if (count < 1 || !PyUnicode_Check(PyTuple_GET_ITEM(args, 0))) {
+		PyErr_SetString(PyExc_TypeError, "network.call(name, *args, obj=None): name must be a string");
+		return nullptr;
+	}
+	const char *name = PyUnicode_AsUTF8(PyTuple_GET_ITEM(args, 0));
+	KX_GameObject *obj = nullptr;
+	if (kwds) {
+		PyObject *key, *value;
+		Py_ssize_t pos = 0;
+		while (PyDict_Next(kwds, &pos, &key, &value)) {
+			if (!PyUnicode_Check(key) || PyUnicode_CompareWithASCIIString(key, "obj") != 0) {
+				PyErr_SetString(PyExc_TypeError, "network.call(): the only keyword argument is obj");
+				return nullptr;
+			}
+			if (value != Py_None && !ObjectFromPy(value, &obj, "network.call()")) {
+				return nullptr;
+			}
+		}
+	}
+	std::vector<net::RpcArg> rpcArgs(size_t(count - 1));
+	for (Py_ssize_t i = 1; i < count; ++i) {
+		if (!ArgFromPy(PyTuple_GET_ITEM(args, i), rpcArgs[size_t(i - 1)])) {
+			return nullptr;
+		}
+	}
+	KX_NetworkManager *manager = Manager();
+	if (!manager) {
+		Py_RETURN_FALSE;
+	}
+	std::string error;
+	if (!manager->CallRpc(name, obj, rpcArgs, error)) {
+		if (error.compare(0, 7, "unknown") == 0) {
+			PyErr_Format(PyExc_KeyError, "network.call(): %s", error.c_str());
+			return nullptr;
+		}
+		Py_RETURN_FALSE;
+	}
+	Py_RETURN_TRUE;
+}
+
 /* Helpers for the module subclass below. */
 
 PyObject *Net_state(PyObject *, PyObject *)
@@ -840,6 +1088,10 @@ PyMethodDef g_methods[] = {
 	 "raycast_past(origin, direction, distance=100.0, client=-1, ignore=None, max_rewind_ms=400)\n"
 	 "    -> (obj, point, distance) or None\n"
 	 "Server: ray against the hitboxes as client saw them (lag compensation, 1 s of history); -1 = now."},
+	{"call", (PyCFunction)Net_call, METH_VARARGS | METH_KEYWORDS,
+	 "call(name, *args, obj=None) -> bool\nCalls a game RPC registered with @rpc; obj makes it an object call\n"
+	 "(target 'owner' and owner_only use its owner). False when refused here (no session, wrong target...)."},
+	{"_register_rpc", Net_register_rpc, METH_VARARGS, nullptr},
 	{"_state", Net_state, METH_NOARGS, nullptr},
 	{"_set_player_name", Net_set_player_name, METH_O, nullptr},
 	{"_clients", Net_clients_raw, METH_NOARGS, nullptr},
@@ -863,6 +1115,40 @@ PyModuleDef g_module_def = {
 	nullptr,
 	nullptr,
 };
+
+const char *kModuleHelpersSource =
+	"def rpc(fn=None, *, name=None, target='server', reliable=True, owner_only=False):\n"
+	"    \"\"\"Registers a game RPC (decorator), before host()/join() and with the same names on every peer.\n"
+	"    target: 'server', 'owner' (server to the owner of the object), 'all' or 'others'.\n"
+	"    The function gets (sender, *args), or (obj, sender, *args) for a call made on an object;\n"
+	"    sender is the calling client on the server and 0 on clients.\"\"\"\n"
+	"    def wrap(f):\n"
+	"        _register_rpc(name or f.__name__, target, bool(reliable), bool(owner_only), f)\n"
+	"        return f\n"
+	"    return wrap(fn) if fn is not None else wrap\n"
+	"class ObjectNet:\n"
+	"    \"\"\"obj.net: the network side of a game object.\"\"\"\n"
+	"    __slots__ = ('_obj',)\n"
+	"    def __init__(self, obj):\n"
+	"        self._obj = obj\n"
+	"    @property\n"
+	"    def id(self):\n"
+	"        return net_id(self._obj)\n"
+	"    @property\n"
+	"    def replicated(self):\n"
+	"        return net_id(self._obj) != 0\n"
+	"    @property\n"
+	"    def owner(self):\n"
+	"        return owner(self._obj)\n"
+	"    @property\n"
+	"    def isOwner(self):\n"
+	"        return is_owner(self._obj)\n"
+	"    def call(self, name, *args):\n"
+	"        return call(name, *args, obj=self._obj)\n"
+	"    def predict(self, fn):\n"
+	"        return predict(self._obj, fn)\n"
+	"def _object_net(obj):\n"
+	"    return ObjectNet(obj)\n";
 
 /* Python side of the module: read/write attributes, which a plain C module cannot compute. */
 const char *kModuleClassSource =
@@ -921,6 +1207,9 @@ PyMODINIT_FUNC initNetworkPythonBinding()
 	}
 	PyDict_SetItemString(dict, "_callbacks", table);
 	Py_DECREF(table);
+	PyObject *rpcs = PyDict_New();
+	PyDict_SetItemString(dict, "_rpcs", rpcs);
+	Py_DECREF(rpcs);
 	PyObject *predict = PyDict_New();
 	PyDict_SetItemString(dict, "_predict", predict);
 	Py_DECREF(predict);
@@ -940,6 +1229,16 @@ PyMODINIT_FUNC initNetworkPythonBinding()
 		PyObject *value = PyLong_FromLong(constant.value);
 		PyDict_SetItemString(dict, constant.name, value);
 		Py_DECREF(value);
+	}
+
+	/* Python helpers that live in the module itself: the rpc() decorator and obj.net. */
+	PyDict_SetItemString(dict, "__builtins__", PyEval_GetBuiltins());
+	PyObject *helpers = PyRun_String(kModuleHelpersSource, Py_file_input, dict, dict);
+	if (helpers) {
+		Py_DECREF(helpers);
+	}
+	else {
+		PyErr_Print();
 	}
 
 	/* Module subclass with the properties. */

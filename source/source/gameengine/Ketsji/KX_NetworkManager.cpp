@@ -478,6 +478,12 @@ net::NetId KX_NetworkManager::GetNetId(KX_GameObject *obj) const
 	return obj ? obj->GetNetId() : net::kInvalidNetId;
 }
 
+KX_GameObject *KX_NetworkManager::FindObject(net::NetId id) const
+{
+	const Entry *entry = FindEntry(id);
+	return entry ? entry->obj : nullptr;
+}
+
 bool KX_NetworkManager::GetOwner(KX_GameObject *obj, net::ClientId &owner) const
 {
 	const Entry *entry = obj ? FindEntry(obj->GetNetId()) : nullptr;
@@ -552,6 +558,7 @@ KX_GameObject *KX_NetworkManager::CreateReplica(const std::string &prototype, st
 
 void KX_NetworkManager::BuildRpc()
 {
+	m_rpcTable = net::RpcTable();
 	/* Lobby messages that the protocol has no message for. "Owner" RPCs go from the server to one
 	 * client only, so a client cannot fake them. */
 	net::RpcDesc ready;
@@ -601,7 +608,96 @@ void KX_NetworkManager::BuildRpc()
 	};
 	m_rpcTable.add(start);
 
+	for (const RpcOptions &options : m_userRpcs) {
+		net::RpcDesc desc;
+		desc.name = options.name;
+		desc.target = options.target;
+		desc.reliable = options.reliable;
+		desc.requireOwner = options.requireOwner;
+		const std::string name = options.name;
+		desc.handler = [this, name](const net::RpcCall &call) {
+			if (!m_rpcSink || !call.args) {
+				return;
+			}
+			KX_GameObject *obj = nullptr;
+			if (call.netId != net::kInvalidNetId) {
+				const Entry *entry = FindEntry(call.netId);
+				if (!entry || !entry->obj) {
+					return;
+				}
+				obj = entry->obj;
+			}
+			m_rpcSink(name, call.caller, obj, *call.args);
+		};
+		m_rpcTable.add(desc);
+	}
+
+	/* Ids follow the sorted names, so every peer with the same RPCs agrees on them. */
 	m_rpcTable.finalize();
+}
+
+void KX_NetworkManager::SetRpcSink(const RpcFunc &sink)
+{
+	m_rpcSink = sink;
+}
+
+bool KX_NetworkManager::RegisterRpc(const RpcOptions &options, std::string &error)
+{
+	if (m_role != Role::NONE) {
+		error = "register RPCs before host()/join(): the table is fixed while a session is open";
+		return false;
+	}
+	if (options.name.empty() || options.name.size() > net::kMaxStringBytes || options.name.compare(0, 4, "net.") == 0) {
+		error = "invalid or reserved name '" + options.name + "'";
+		return false;
+	}
+	for (RpcOptions &existing : m_userRpcs) {
+		if (existing.name == options.name) {
+			existing = options;  // the script ran again (scene restart): same name, latest settings
+			BuildRpc();
+			return true;
+		}
+	}
+	if (m_rpcTable.size() >= 0xFFFF) {
+		error = "RPC table full";
+		return false;
+	}
+	m_userRpcs.push_back(options);
+	BuildRpc();
+	return true;
+}
+
+bool KX_NetworkManager::CallRpc(const std::string &name, KX_GameObject *obj, const std::vector<net::RpcArg> &args,
+                                std::string &error)
+{
+	const net::RpcDesc *desc = m_rpcTable.find(name);
+	if (!desc || name.compare(0, 4, "net.") == 0) {
+		error = "unknown RPC '" + name + "'";
+		return false;
+	}
+	net::NetId id = net::kInvalidNetId;
+	if (obj) {
+		id = obj->GetNetId();
+		if (id == net::kInvalidNetId || !FindEntry(id)) {
+			error = "the object is not replicated";
+			return false;
+		}
+	}
+	bool ok = false;
+	if (m_role == Role::SERVER && m_rpcServer) {
+		ok = m_rpcServer->call(name, id, args);
+	}
+	else if (m_role == Role::CLIENT && m_rpcClient && IsConnected()) {
+		ok = m_rpcClient->call(name, id, args);
+	}
+	else {
+		error = "no session";
+		return false;
+	}
+	if (!ok) {
+		error = "refused (target, owner, arguments over 1024 bytes, or an 'owner' RPC called by a client)";
+	}
+	return ok;
 }
 
 /** \} */
