@@ -391,8 +391,20 @@ Decisão (com o usuário): usar um fork pronto em vez de portar a struct na mão
 Superfície de contato no engine (fora do próprio vendor do ENet): só **um** ponto, `NET_TransportENet.cpp:80` (`address.host = ENET_HOST_ANY;`), que o fork também define — baixo risco de regressão na engine em si.
 
 Trabalho restante (não feito ainda, fica para quando houver crédito/prioridade):
-1. Trocar `source/extern/enet` pelo header do `zpl-c/enet` (ou vendorizá-lo ao lado, decidir layout no CMake).
-2. Ajustar `CMakeLists.txt` de `source/extern/enet` e dependentes (é single-header, então o build muda de "biblioteca C" para "header-only").
-3. Recompilar e rodar `run_net_test.sh spawner|rpc|predict|server|scene` (regressão IPv4) nas 3 plataformas (gcc, MSVC, wasm32 — CI em `.github/workflows/network.yml`).
-4. Testar `::1` numa máquina com IPv6 de fato (a sandbox atual pode não ter IPv6 disponível — checar antes).
+1. ~~Trocar `source/extern/enet` pelo header do `zpl-c/enet`~~ **Feito (2026-10-05, Linux).**
+2. ~~Ajustar `CMakeLists.txt`~~ **Feito (2026-10-05).**
+3. ~~Recompilar e rodar a regressão IPv4~~ **Feito no Linux (2026-10-05).** Falta MSVC e wasm32.
+4. Testar `::1` numa máquina com IPv6 de fato.
 5. Decidir se `net.host`/`net.join` expõem IPv6 na API Python (`tools/net_menu/NOTES-D.md`) ou se fica transparente (dual-stack automático).
+
+### Troca de vendor concretizada (2026-10-05, Linux)
+
+- `source/extern/enet/include/enet/enet.h` substituído pelo header único do `zpl-c/enet` (upstream, sem modificações). Removidos os antigos `.c`/`.h` multi-arquivo (`host.c`, `peer.c`, `protocol.c`, `unix.c`, `win32.c`, `list.c`, `packet.c`, `compress.c`, `callbacks.c` e headers correspondentes).
+- Adicionado `source/extern/enet/enet_impl.c` (Blender-added): única TU que faz `#define ENET_IMPLEMENTATION` antes de incluir `enet.h`, como a lib exige para single-header.
+- `CMakeLists.txt` do vendor reescrito para biblioteca header-only (não precisa mais dos `check_function_exists`/`check_struct_has_member` do ENet clássico — o fork resolve isso internamente nas macros do próprio header).
+- **Achado importante:** o fork, por padrão, cria socket dual-stack (`AF_INET6`, `ENET_HOST_ANY = in6addr_any`). A sandbox Linux de build não tem suporte a IPv6 no kernel/container (`AF_INET6` nem existe: `socket.socket(AF_INET6, ...)` dá `OSError: Address family not supported by protocol`), e nesse modo o `host()` falhava silenciosamente com "could not listen on port NNNN (in use?)" — mensagem enganosa, a causa real é a ausência de pilha IPv6, não a porta.
+- Como o engine ainda não expõe IPv6 na API (`net.host`/`net.join` — isso é o item 5 da lista acima, ainda não decidido), optei por manter o comportamento **IPv4-only** por enquanto: adicionada a opção de CMake `ENET_IPV4_ONLY` (ON por padrão) que define a macro `ENET_IPV4_ONLY` do fork como `PUBLIC` no target `extern_enet` (precisa ser `PUBLIC`, não `PRIVATE`: a macro muda o layout de `ENetAddress`, que `NET_TransportENet.cpp` também inclui/usa — se divergisse entre a lib e o consumidor seria ODR violation/corrupção de memória).
+- Com `ENET_IPV4_ONLY` ligado, `ENetAddress.host` volta a ser `in_addr` de 32 bits, idêntico em layout/semântica ao vendor antigo — o fork aqui é um drop-in replacement puro, sem mudar nada de observável.
+- **Regressão completa no Linux, build incremental (`build-linux` e `build-linux-editor`, sem rebuild total):** `spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`, `scene-change`, `predict-cube`, `car` — **todos PASS** (`PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh <cenário>`).
+- Um warning novo e inofensivo no build: `enumeration value 'ENET_EVENT_TYPE_DISCONNECT_TIMEOUT' not handled in switch` em `NET_TransportENet.cpp:161` (o fork tem um valor de enum a mais que o ENet clássico não tinha; o `switch` não trata esse caso, mas não quebra nada — o `default`/fallthrough já cobria antes). Não corrigido ainda, é cosmético.
+- **Ainda não feito:** rebuild/teste no Windows (MSVC) e no build wasm32 (CI `.github/workflows/network.yml`); teste de conectividade `::1` real (precisa desligar `ENET_IPV4_ONLY` e rodar numa máquina com IPv6 disponível); decisão sobre expor IPv6 na API Python.
