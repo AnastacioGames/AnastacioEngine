@@ -46,6 +46,22 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
   validação para CPU, memória, GPU e ciclo de vida.
 
+### Frentes recentes
+
+- [Multiplayer nativo](multiplayer-plan.md): plano da rede integrada à engine, com [protocolo](multiplayer-protocol.md),
+  [guia de uso](multiplayer-guide-J.md) e notas de implementação em `source/source/gameengine/Network/`.
+  A implementação atual cobre host/cliente, replicação, RPC, predição, servidor headless, relevância,
+  troca de cena e cliente Web; o estado validado e as pendências ficam no [roadmap](roadmap.md).
+- [Efeitos de câmera](camera-fx.md) e [plano de efeitos de câmera](camera-fx-plan.md): efeitos e integração
+  com o pipeline de renderização.
+- [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
+- [Destruição e deformação](destruction-plan.md): planejamento e integração dos recursos de dano visual.
+- [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
+- [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
+  [eventos de cutscene](notes-cutscene-events.md) e [fase 4](notes-logic-f4.md).
+- [Exportação mobile/VR](mobile-export-plan.md), [Android WebView](android-export-plan.md) e
+  [controles de toque](android-touch-controls-plan.md).
+
 ## Referência e manutenção
 
 - [Pesquisa de áudio Web](web-audio-analysis.md): Audaspace/SDL2 e OpenAL do Emscripten,

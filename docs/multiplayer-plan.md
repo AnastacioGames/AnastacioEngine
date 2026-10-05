@@ -1,6 +1,12 @@
 # Plano: Multiplayer nativo
 
-Criado em 2026-10-03. Status: planejamento, nada implementado.
+Criado em 2026-10-03. Status: **implementação avançada, funcional e validada**.
+
+O núcleo e a integração com a engine já estão implementados na main. Desktop/Linux, Windows/MSVC,
+wasm32 e o runtime Web foram exercitados com cenários automatizados; o cliente Web também foi validado
+em Chrome real contra um `RangeRuntime --server` nativo. Este documento continua sendo o plano de
+arquitetura e o inventário de pendências, enquanto o estado factual mais recente fica no
+[`roadmap.md`](roadmap.md) e os detalhes de cada sessão no [`changelog.md`](changelog.md).
 
 Documentos ligados: contrato do formato e das interfaces em [`multiplayer-protocol.md`](multiplayer-protocol.md);
 tarefas prontas para sessões na nuvem (frentes A–D, em paralelo com o trabalho local) em
@@ -11,10 +17,12 @@ para quem quiser mais. Rodar em Desktop, Web e Android (APK WebView, mesmo camin
 
 Escopo por versão (para não prometer antes da hora):
 
-- **v1 (etapas 0–6):** multiplayer funcional básico no Desktop: host/servidor dedicado, replicação de
+- **v1 (etapas 0–6):** implementada no Desktop: host/servidor dedicado, replicação de
   transform e propriedades com interpolação, spawn/ownership, RPC, UI, logic bricks e ferramentas de teste.
-- **v1.1 (etapas 7–8):** predição no cliente, compensação de lag, prioridade/orçamento de banda.
-- **v1.2 (etapas 9–10):** Web/Android via WebSocket com cross-play, lobby LAN.
+- **v1.1 (etapas 7–8):** implementada em grande parte: predição no cliente, compensação de lag,
+  prioridade/orçamento de banda e relevância por distância.
+- **v1.2 (etapas 9–10):** Web via WebSocket com cross-play implementado e validado; Android WebView,
+  descoberta LAN completa e alguns itens de endurecimento ainda estão pendentes.
 
 ## 1. Por que nativo e não um SDK em Python
 
@@ -290,10 +298,15 @@ Regras de design para funcionar em todas as plataformas:
 Etapas: telas Principal/Hospedar/Entrar/Sala/Avisos na etapa 5 (com o template); Pausa e Configurações na
 etapa 6; Servidores LAN na etapa 10. Teste manual em Desktop, navegador e APK a cada entrega.
 
-## 7. Etapas
+## 7. Etapas e estado atual
 
 Cada etapa termina com uma cena de teste em `tools/create_*_test.py` (padrão do repositório) e entrada no
 changelog.
+
+As etapas abaixo foram escritas como estimativa inicial e não representam mais o estado atual. As etapas
+0–9 estão implementadas total ou parcialmente; a validação recente inclui Linux, Windows/MSVC, wasm32 e
+o runtime Web completo. Permanecem como trabalho aberto principalmente o servidor Windows sem janela,
+validação de IPv6 real, APK WebView, descoberta LAN completa e a decisão sobre recursos pós-v1.
 
 | # | Etapa | Entrega verificável | Esforço |
 |---|---|---|---|
