@@ -3588,6 +3588,18 @@ static int header_toggle_menus_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
+static int header_hide_menus_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	ScrArea *sa = CTX_wm_area(C);
+
+	sa->flag = sa->flag ^ HEADER_HIDE_MENUS;
+
+	ED_area_tag_redraw(sa);
+	WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
 
 static void SCREEN_OT_header_toggle_menus(wmOperatorType *ot)
 {
@@ -3598,6 +3610,19 @@ static void SCREEN_OT_header_toggle_menus(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = header_toggle_menus_exec;
+	ot->poll = ED_operator_areaactive;
+	ot->flag = 0;
+}
+
+static void SCREEN_OT_header_hide_menus(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Show/Hide Header Menus";
+	ot->idname = "SCREEN_OT_header_hide_menus";
+	ot->description = "Show or hide the header pulldown menus";
+
+	/* api callbacks */
+	ot->exec = header_hide_menus_exec;
 	ot->poll = ED_operator_areaactive;
 	ot->flag = 0;
 }
@@ -3621,6 +3646,24 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 	uiItemO(layout, IFACE_("Collapse Menus"),
 	        (sa->flag & HEADER_NO_PULLDOWN) ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT,
 	        "SCREEN_OT_header_toggle_menus");
+	uiItemO(layout, IFACE_("Hide Menus"),
+	        (sa->flag & HEADER_HIDE_MENUS) ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT,
+	        "SCREEN_OT_header_hide_menus");
+
+	if (sa->spacetype == SPACE_INFO) {
+		PointerRNA space_ptr;
+
+		RNA_pointer_create(&CTX_wm_screen(C)->id, &RNA_SpaceInfo, sa->spacedata.first, &space_ptr);
+		uiItemR(layout, &space_ptr, "show_screen_selector", 0, IFACE_("Screen Selector"), ICON_NONE);
+		uiItemR(layout, &space_ptr, "show_scene_selector", 0, IFACE_("Scene Selector"), ICON_NONE);
+	}
+	else if (sa->spacetype == SPACE_VIEW3D) {
+		PointerRNA space_ptr;
+
+		RNA_pointer_create(&CTX_wm_screen(C)->id, &RNA_SpaceView3D, sa->spacedata.first, &space_ptr);
+		uiItemR(layout, &space_ptr, "show_floating_controls_in_header", 0, IFACE_("Floating Controls in Header"), ICON_NONE);
+		uiItemR(layout, &space_ptr, "show_floating_debug_controls", 0, IFACE_("Floating Debug Controls"), ICON_NONE);
+	}
 
 	uiItemS(layout);
 
@@ -4770,6 +4813,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_region_flip);
 	WM_operatortype_append(SCREEN_OT_header);
 	WM_operatortype_append(SCREEN_OT_header_toggle_menus);
+	WM_operatortype_append(SCREEN_OT_header_hide_menus);
 	WM_operatortype_append(SCREEN_OT_header_toolbox);
 	WM_operatortype_append(SCREEN_OT_screen_set);
 	WM_operatortype_append(SCREEN_OT_screen_rename);

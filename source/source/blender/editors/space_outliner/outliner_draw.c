@@ -676,6 +676,7 @@ static void namebutton_cb(bContext *C, void *tsep, char *oldname)
 				case TSE_R_LAYER:
 					break;
 				case TSE_SCENE_COLLECTION:
+				case TSE_SCENE_ROOT_COLLECTION:
 				{
 					SceneCollection *sc = te->directdata;
 
@@ -1360,6 +1361,20 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 				}
 				break;
 			}
+			case TSE_SCENE_ROOT_COLLECTION:
+			{
+				SceneCollection *sc = te->directdata;
+
+				if (sc == NULL || arg.x >= arg.xmax) {
+					UI_icon_draw(x, y, ICON_FILE_FOLDER);
+				}
+				else {
+					uiBut *but = uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_FILE_FOLDER, arg.xb, arg.yb,
+					                          UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 1.0, arg.alpha, "");
+					UI_but_drag_set_name(but, sc->name);
+				}
+				break;
+			}
 			case TSE_LINKED_LAMP:
 				UI_icon_draw(x, y, ICON_LAMP_DATA); break;
 			case TSE_LINKED_MAT:
@@ -1879,11 +1894,17 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 
 	/* vertical line */
 	te = lb->last;
-	if (te->parent || lb->first != lb->last) {
+	if (te->parent) {
 		tselem = TREESTORE(te);
 		if (tselem->type == 0 || tselem->type == TSE_ID_BASE) {
 
 			glRecti(startx, y1 + UI_UNIT_Y, startx + 1, y2);
+		}
+	}
+	else {
+		tselem = TREESTORE(te);
+		if (lb->first != lb->last && (tselem->type == 0 || tselem->type == TSE_ID_BASE)) {
+			glRecti(startx, y1, startx + 1, y2);
 		}
 	}
 }

@@ -89,6 +89,7 @@ typedef struct TreeStore {
 #define TSE_ID_BASE         36  /* NO ID */
 #define TSE_GP_LAYER        37  /* NO ID */
 #define TSE_SCENE_COLLECTION 38  /* id is the Scene, nr is SceneCollection.uid */
+#define TSE_SCENE_ROOT_COLLECTION 39  /* id is the owner Scene, nr is SceneCollection.uid */
 
 
 /* Check whether given TreeStoreElem should have a real ID in its ->id member. */
@@ -96,7 +97,8 @@ typedef struct TreeStore {
 	(!ELEM((_tse)->type, TSE_NLA, TSE_NLA_TRACK, TSE_DRIVER_BASE, \
 	                     TSE_SEQUENCE, TSE_SEQ_STRIP, TSE_SEQUENCE_DUP, \
                          TSE_RNA_STRUCT, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM, \
-                         TSE_KEYMAP, TSE_KEYMAP_ITEM, TSE_ID_BASE, TSE_GP_LAYER))
+                         TSE_KEYMAP, TSE_KEYMAP_ITEM, TSE_ID_BASE, TSE_GP_LAYER, \
+                         TSE_SCENE_ROOT_COLLECTION))
 
 
 #endif

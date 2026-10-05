@@ -308,6 +308,20 @@ static SceneCollection *outliner_collection_from_drag(ListBase *lb, const void *
 	return NULL;
 }
 
+static SceneCollection *outliner_scene_root_collection_from_drag(ListBase *lb, const void *poin)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		if ((sc->flag & SCECOL_SCENE_GROUP) && (const void *)sc->name == poin) {
+			return sc;
+		}
+		SceneCollection *found = outliner_scene_root_collection_from_drag(&sc->children, poin);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
 /* The scene owning the dragged collection ("All Scenes" shows the folders of every scene). */
 static Scene *outliner_collection_drag_scene(Main *bmain, const void *poin, SceneCollection **r_sc)
 {
@@ -335,6 +349,9 @@ static bool outliner_collection_drop_poll(bContext *C, wmDrag *drag, const wmEve
 	if (scene == NULL || ID_IS_LINKED(scene)) {
 		return false;
 	}
+	if (sc->flag & SCECOL_SCENE_GROUP) {
+		return false;
+	}
 
 	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
 	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
@@ -357,6 +374,80 @@ static void outliner_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_string_set(drop->ptr, "scene", scene ? scene->id.name + 2 : "");
 }
 
+static SceneCollection *outliner_scene_root_collection_drag(Main *bmain, const void *poin)
+{
+	Scene *owner = bmain ? bmain->scene.first : NULL;
+
+	return owner ? outliner_scene_root_collection_from_drag(&owner->collections, poin) : NULL;
+}
+
+static bool outliner_collection_scene_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
+{
+	ARegion *ar = CTX_wm_region(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	float fmval[2];
+
+	if (soops->outlinevis != SO_ALL_SCENES || drag->type != WM_DRAG_ID) {
+		return false;
+	}
+	ID *id = drag->poin;
+	if (GS(id->name) != ID_SCE || ID_IS_LINKED(id)) {
+		return false;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_ROOT_COLLECTION) {
+			return ((Scene *)id)->collection_uid != te->index;
+		}
+		return (tselem->type == TSE_ID_BASE && tselem->nr == 3 && ((Scene *)id)->collection_uid != 0);
+	}
+	return ((Scene *)id)->collection_uid != 0;
+}
+
+static void outliner_collection_scene_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	ID *id = drag->poin;
+	RNA_string_set(drop->ptr, "scene", id->name + 2);
+}
+
+static bool outliner_collection_scene_folder_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
+{
+	ARegion *ar = CTX_wm_region(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	SceneCollection *sc;
+	float fmval[2];
+
+	if (soops->outlinevis != SO_ALL_SCENES || drag->type != WM_DRAG_NAME) {
+		return false;
+	}
+	sc = outliner_scene_root_collection_drag(CTX_data_main(C), drag->poin);
+	if (sc == NULL) {
+		return false;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_ROOT_COLLECTION) {
+			SceneCollection *target = te->directdata;
+			return target && target != sc && !BKE_scene_collection_is_inside(target, sc) &&
+			       BKE_scene_collection_parent_find((Scene *)TREESTORE(te)->id, sc) != target;
+		}
+		return (tselem->type == TSE_ID_BASE && tselem->nr == 3 &&
+		        BKE_scene_collection_parent_find((Scene *)TREESTORE(te)->id, sc) != NULL);
+	}
+	return BKE_scene_collection_parent_find((Scene *)CTX_data_main(C)->scene.first, sc) != NULL;
+}
+
+static void outliner_collection_scene_folder_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	RNA_string_set(drop->ptr, "collection", drag->poin);
+}
+
 /* region dropbox definition */
 static void outliner_dropboxes(void)
 {
@@ -370,6 +461,10 @@ static void outliner_dropboxes(void)
 	WM_dropbox_add(lb, "OUTLINER_OT_collection_object_drop", outliner_collection_object_drop_poll,
 	               outliner_collection_object_drop_copy);
 	WM_dropbox_add(lb, "OUTLINER_OT_collection_drop", outliner_collection_drop_poll, outliner_collection_drop_copy);
+	WM_dropbox_add(lb, "OUTLINER_OT_collection_scene_drop", outliner_collection_scene_drop_poll,
+	               outliner_collection_scene_drop_copy);
+	WM_dropbox_add(lb, "OUTLINER_OT_collection_scene_folder_drop", outliner_collection_scene_folder_drop_poll,
+	               outliner_collection_scene_folder_drop_copy);
 }
 
 static void outliner_main_region_draw(const bContext *C, ARegion *ar)

@@ -1999,7 +1999,7 @@ static int do_outliner_operation_event(bContext *C, ARegion *ar, SpaceOops *soop
 				else if (datalevel == TSE_ID_BASE) {
 					/* do nothing... there are no ops needed here yet */
 				}
-				else if (datalevel == TSE_SCENE_COLLECTION) {
+				else if (ELEM(datalevel, TSE_SCENE_COLLECTION, TSE_SCENE_ROOT_COLLECTION)) {
 					WM_menu_name_call(C, "OUTLINER_MT_collection", WM_OP_INVOKE_REGION_WIN);
 				}
 				else if (datalevel == TSE_CONSTRAINT) {

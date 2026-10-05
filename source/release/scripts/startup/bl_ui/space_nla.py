@@ -35,7 +35,8 @@ class NLA_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        NLA_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            NLA_MT_editor_menus.draw_collapsible(context, layout)
 
         dopesheet_filter(layout, context)
 

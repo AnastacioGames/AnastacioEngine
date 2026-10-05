@@ -9,6 +9,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## UI: Collections de cenas no Outliner (2026-10-05)
+- O root visual `Scenes` do Outliner agora pode receber `New Collection`; essas pastas ficam no mesmo nivel das cenas e servem para organizar cenas, sem afetar as `SceneCollection` de objetos/layers do jogo.
+- O menu `Collection` ganhou `Move Scenes to Collection`, com opcoes para voltar para `Scenes Root`, usar uma pasta existente ou criar uma nova. Apagar uma pasta de cenas devolve as cenas para o root.
+- O desenho das linhas de hierarquia deixou de puxar uma linha vertical entre roots do Outliner, removendo o pequeno risco acima da divisao perto de `External Files`/`Scenes`.
+- Ajuste posterior: clicar no root `Scenes` agora seleciona a linha para permitir `New Collection` no mesmo nivel das cenas; a linha vertical de root voltou apenas entre `External Files` e a seta de `Scenes`, sem o trecho acima de `External Files`.
+- As pastas de cenas agora tambem participam do drag/drop: cenas podem ser arrastadas para dentro de uma pasta ou de volta para `Scenes`, e pastas de cenas podem ser arrastadas para outra pasta ou de volta para o root, inclusive quando estiverem vazias.
+- A tentativa de colorir pastas por item foi removida: o `ICON_FILE_FOLDER` original do tema/atlas voltou a ser usado para manter o visual antigo e mais polido.
+
+## UI: opcoes do cabecalho da 3D View (2026-10-05)
+- O menu de contexto dos cabecalhos ganhou `Hide Menus`, disponivel junto de `Collapse Menus` e salvo em `Area.show_header_menus`; os headers que usam `draw_collapsible` agora escondem seus menus quando a opcao esta desligada.
+- A 3D View ganhou `Floating Controls in Header`: quando ligada, a fileira de controles flutuantes inferior (Play/Standalone, shading, overlay, layers, gizmo, snap, proporcional etc.) e desenhada dentro do cabecalho e deixa de aparecer sobre a viewport.
+- A 3D View tambem ganhou `Floating Debug Controls`, controlando os atalhos flutuantes de debug no canto superior esquerdo (`show_framerate_profile`/relogio e `show_debug_mode`/lupa).
+
+## UI: seletor de cena opcional no cabeçalho Info (2026-10-05)
+- `INFO_HT_header` voltou a poder desenhar `layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")`, posicionado ao lado direito do seletor de telas/tabs.
+- O seletor fica desligado por padrão e é controlado por `SpaceInfo.show_scene_selector`, salvo no layout da área.
+- O menu de contexto do cabeçalho (`Header`, botão direito) ganhou a opção `Scene Selector` somente quando a área clicada é `SPACE_INFO`, sem aparecer nos demais cabeçalhos.
+- O mesmo menu ganhou `Screen Selector`, controlando `SpaceInfo.show_screen_selector`; este fica ligado por padrão para preservar o layout atual e permite esconder o seletor de telas/tabs do cabeçalho Info.
+
 ## Multiplayer: `--server` sem janela visível no Windows (2026-10-05)
 - `GHOST_ISystem::createSystemHeadless()` agora também tem caminho Win32: cria `GHOST_SystemWin32(true)`.
   Diferente do Linux, não é contexto offscreen puro; é uma janela Win32/WGL normal mantida oculta, suficiente para

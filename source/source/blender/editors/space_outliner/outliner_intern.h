@@ -266,8 +266,11 @@ void OUTLINER_OT_collection_new(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_delete(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_objects_select(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_move_objects(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_move_scenes(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_object_drop(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_drop(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_scene_drop(struct wmOperatorType *ot);
+void OUTLINER_OT_collection_scene_folder_drop(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_game_exclude(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_to_group(struct wmOperatorType *ot);
 

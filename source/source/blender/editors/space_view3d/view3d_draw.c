@@ -4565,6 +4565,10 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 
 static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
 {
+	if (v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) {
+		return;
+	}
+
 	bScreen *screen = CTX_wm_screen(C);
 	PointerRNA v3dptr;
 	PointerRNA gameptr;
@@ -4689,6 +4693,10 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
  * (draw_viewport_name; os mesmos do menu Game > Overlays/Debug). Só ícones; o nome aparece na dica. */
 static void view3d_draw_floating_debug_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
 {
+	if (v3d->flag2 & V3D_HIDE_FLOATING_DEBUG_CONTROLS) {
+		return;
+	}
+
 	PointerRNA gameptr;
 	uiBlock *block;
 	uiLayout *layout;

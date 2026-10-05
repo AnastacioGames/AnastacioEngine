@@ -120,7 +120,8 @@ class DOPESHEET_HT_header(Header):
 
         row = layout.row(align=True)
         row.template_header()
-        DOPESHEET_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            DOPESHEET_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.prop(st, "mode", text="")
 

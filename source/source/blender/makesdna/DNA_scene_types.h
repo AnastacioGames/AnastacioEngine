@@ -85,6 +85,7 @@ typedef struct SceneCollection {
 
 /* SceneCollection.flag */
 #define SCECOL_GAME_EXCLUDE	(1 << 0)	/* objects start inactive in the game (for Add Object) */
+#define SCECOL_SCENE_GROUP	(1 << 1)	/* folder under the Outliner "Scenes" root */
 
 /* Layer 20: objects of "not in game" collections, never active when the game starts. */
 #define SCECOL_GAME_LAYER	(1 << 19)
@@ -1931,6 +1932,8 @@ typedef struct Scene {
 	struct Base *basact;		/* active base */
 	struct Object *obedit;		/* name replaces old G.obedit */
 	ListBase collections;		/* SceneCollection, Outliner organization only */
+	int collection_uid;			/* SceneCollection.uid for Outliner scene folders, 0 = Scenes root */
+	int pad_collection_uid;
 
 	float cursor[3];			/* 3d cursor location */
 	char _pad[4];

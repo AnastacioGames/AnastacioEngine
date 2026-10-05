@@ -242,6 +242,10 @@ static void rna_def_area(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", HEADER_NO_PULLDOWN);
 	RNA_def_property_ui_text(prop, "Show Menus", "Show menus in the header");
 
+	prop = RNA_def_property(srna, "show_header_menus", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", HEADER_HIDE_MENUS);
+	RNA_def_property_ui_text(prop, "Header Menus", "Show the editor menus in the header");
+
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "spacetype");
 	RNA_def_property_enum_items(prop, rna_enum_space_type_items);

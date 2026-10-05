@@ -2681,6 +2681,22 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_update(
 	    prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_realtime_viewport_update");
 
+	prop = RNA_def_property(srna, "show_floating_controls_in_header", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_FLOATING_CONTROLS_IN_HEADER);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Floating Controls in Header",
+	                         "Show the 3D View floating controls in the header instead of inside the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_floating_debug_controls", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag2", V3D_HIDE_FLOATING_DEBUG_CONTROLS);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Floating Debug Controls",
+	                         "Show the 3D View debug shortcut buttons inside the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	prop = RNA_def_property(srna, "show_icon_components", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_RENDER_SHOW_COMPONENTS);
 	RNA_def_property_ui_text(prop, "Show Components", "Show component icon on every object that has at least one component");
@@ -4314,6 +4330,16 @@ static void rna_def_space_info(BlenderRNA *brna)
 	srna = RNA_def_struct(brna, "SpaceInfo", "Space");
 	RNA_def_struct_sdna(srna, "SpaceInfo");
 	RNA_def_struct_ui_text(srna, "Space Info", "Info space data");
+
+	prop = RNA_def_property(srna, "show_scene_selector", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", INFO_SHOW_SCENE_SELECTOR);
+	RNA_def_property_ui_text(prop, "Scene Selector", "Show the scene selector in the Info header");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_INFO_REPORT, NULL);
+
+	prop = RNA_def_property(srna, "show_screen_selector", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", INFO_HIDE_SCREEN_SELECTOR);
+	RNA_def_property_ui_text(prop, "Screen Selector", "Show the screen selector in the Info header");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_INFO_REPORT, NULL);
 
 	/* reporting display */
 	prop = RNA_def_property(srna, "show_report_debug", PROP_BOOLEAN, PROP_NONE);

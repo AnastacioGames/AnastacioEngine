@@ -145,7 +145,8 @@ class LOGIC_HT_header(Header):
 
         layout.template_header()
 
-        LOGIC_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            LOGIC_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.separator()
         layout.operator("logic.convert_to_component", text="Convert to Python", icon='SCRIPT')
