@@ -1229,18 +1229,49 @@ bool KX_Scene::IsObjectInGroup(KX_GameObject *gameobj) const
 
 KX_GameObject *KX_Scene::FindInactiveObjectAcrossScenes(const std::string& name)
 {
-	if (KX_GameObject *ob = m_inactivelist->FindValue(name)) {
+	if (KX_GameObject *ob = FindInactiveObjectByName(name)) {
 		return ob;
 	}
 	for (KX_Scene *scene : KX_GetActiveEngine()->CurrentScenes()) {
 		if (scene == this) {
 			continue;
 		}
-		if (KX_GameObject *ob = scene->GetInactiveList()->FindValue(name)) {
+		if (KX_GameObject *ob = scene->FindInactiveObjectByName(name)) {
 			return ob;
 		}
 	}
 	return nullptr;
+}
+
+KX_GameObject *KX_Scene::FindInactiveObjectByName(const std::string& name) const
+{
+	const auto it = m_inactiveNameIndex.find(name);
+	return (it != m_inactiveNameIndex.end()) ? it->second : nullptr;
+}
+
+void KX_Scene::IndexInactiveObject(KX_GameObject *gameobj)
+{
+	// emplace() never overwrites an existing key, matching the "first match in list order"
+	// behaviour of the old linear FindValue() scan when two inactive objects share a name.
+	m_inactiveNameIndex.emplace(gameobj->GetName(), gameobj);
+}
+
+void KX_Scene::UnindexInactiveObject(KX_GameObject *gameobj)
+{
+	const auto it = m_inactiveNameIndex.find(gameobj->GetName());
+	if (it == m_inactiveNameIndex.end() || it->second != gameobj) {
+		return;
+	}
+	m_inactiveNameIndex.erase(it);
+	// Rare case: another inactive object still shares this name (duplicate-named templates
+	// in the inactive layer). Re-index it so FindValue-by-name keeps finding the next one in
+	// list order, same as the old linear scan would after removing the first match.
+	for (KX_GameObject *other : m_inactivelist) {
+		if (other != gameobj && other->GetName() == gameobj->GetName()) {
+			m_inactiveNameIndex.emplace(other->GetName(), other);
+			break;
+		}
+	}
 }
 
 KX_GameObject *KX_Scene::AddReplicaObject(KX_GameObject *originalobj, KX_GameObject *referenceobj, float lifespan)
@@ -1490,6 +1521,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_inactivelist->RemoveValue(gameobj)) {
+		UnindexInactiveObject(gameobj);
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_fontlist->RemoveValue(gameobj)) {
@@ -2816,6 +2848,13 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 	m_inactivelist->MergeList(other->GetInactiveList());
 	other->GetInactiveList()->ReleaseAndRemoveAll();
+	// emplace() keeps this scene's own entries winning on a name clash, matching the order
+	// FindInactiveObjectByName() would see them in after the merge (this scene's objects
+	// come before other's in m_inactivelist).
+	for (const auto& pair : other->m_inactiveNameIndex) {
+		m_inactiveNameIndex.emplace(pair.first, pair.second);
+	}
+	other->m_inactiveNameIndex.clear();
 
 	m_parentlist->MergeList(other->GetRootParentList());
 	other->GetRootParentList()->ReleaseAndRemoveAll();

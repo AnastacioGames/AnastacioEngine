@@ -207,6 +207,12 @@ private:
 	EXP_ListValue<KX_LightObject> *m_lightlist;
 	/// All objects that are not in the active layer.
 	EXP_ListValue<KX_GameObject> *m_inactivelist;
+	/** Name -> object index mirroring m_inactivelist, so FindInactiveObjectByName() is O(1)
+	 * instead of the linear EXP_BaseListValue::FindValue() scan (hot path: every addObject()
+	 * with a template name resolves through here). Keeps "first match wins" semantics of the
+	 * old linear scan via emplace() (no overwrite) on insert; see IndexInactiveObject() /
+	 * UnindexInactiveObject(). */
+	std::unordered_map<std::string, KX_GameObject *> m_inactiveNameIndex;
 	/// All animated objects, no need of EXP_ListValue because the list isn't exposed in python.
 	std::vector<KX_GameObject *> m_animatedlist;
 
@@ -414,6 +420,14 @@ private:
 	KX_GameObject *FindInactiveObjectAcrossScenes(const std::string& name);
 
 public:
+	/** O(1) name lookup into m_inactivelist via m_inactiveNameIndex (see its comment).
+	 * Used instead of GetInactiveList()->FindValue(name) on the hot addObject() path. */
+	KX_GameObject *FindInactiveObjectByName(const std::string& name) const;
+	/// Register/unregister a single object in m_inactiveNameIndex. Call alongside every
+	/// m_inactivelist->Add()/RemoveValue() so the index never goes stale.
+	void IndexInactiveObject(KX_GameObject *gameobj);
+	void UnindexInactiveObject(KX_GameObject *gameobj);
+
 	KX_Scene(SCA_IInputDevice *inputDevice,
 	         const std::string& scenename,
 	         Scene *scene,

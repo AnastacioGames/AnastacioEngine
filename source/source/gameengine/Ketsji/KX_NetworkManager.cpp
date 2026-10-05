@@ -543,7 +543,7 @@ const std::vector<net::PropertyDesc> *KX_NetworkManager::SchemaFor(net::NetId id
 	if (!prototype.empty()) {
 		/* A client decodes the Spawn fields with this schema before it creates the object. */
 		if (!m_protoSchemas.count(prototype) && m_scene) {
-			CacheProtoSchema(prototype, m_scene->GetInactiveList()->FindValue(prototype));
+			CacheProtoSchema(prototype, m_scene->FindInactiveObjectByName(prototype));
 		}
 		const auto it = m_protoSchemas.find(prototype);
 		if (it != m_protoSchemas.end()) {
@@ -559,7 +559,7 @@ KX_GameObject *KX_NetworkManager::CreateReplica(const std::string &prototype, st
 		error = "no scene";
 		return nullptr;
 	}
-	KX_GameObject *original = m_scene->GetInactiveList()->FindValue(prototype);
+	KX_GameObject *original = m_scene->FindInactiveObjectByName(prototype);
 	if (!original) {
 		error = "prototype '" + prototype + "' not found among the inactive objects (put it in a hidden layer)";
 		return nullptr;
@@ -1354,7 +1354,7 @@ KX_GameObject *KX_NetworkManager::Spawn(const std::string &prototype, net::Clien
 	entry.prototype = prototype;
 	entry.spawned = true;
 	entry.owner = owner;
-	KX_GameObject *proto = m_scene->GetInactiveList()->FindValue(prototype);
+	KX_GameObject *proto = m_scene->FindInactiveObjectByName(prototype);
 	if (Object *ob = proto ? proto->GetBlenderObject() : nullptr) {
 		const int flags = ob->net.flags;
 		const bool configured = (flags & NET_OBJ_REPLICATE) != 0;

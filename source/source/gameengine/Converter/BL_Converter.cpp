@@ -225,7 +225,7 @@ KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX
 
 	BKE_libblock_free(m_maggie, tempScene);
 
-	return scene_merge->GetInactiveList()->FindValue(name);
+	return scene_merge->FindInactiveObjectByName(name);
 }
 
 /// Milliseconds, for the "[Load]" console report (see BL_LoadStats.h).
