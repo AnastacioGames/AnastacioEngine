@@ -191,6 +191,7 @@ private:
 	/// Manager used to update all the mesh bounding box.
 	RAS_BoundingBoxManager *m_boundingBoxManager;
 
+	/// Objects with a lifetime (KX_GameObject::m_lifeTime > 0), counted down in LogicBeginFrame.
 	std::vector<KX_GameObject *> m_tempObjectList;
 
 	/**
@@ -552,6 +553,10 @@ public:
 
 	/// Replicate the logic bricks associated to this object.
 	void ReplicateLogic(KX_GameObject *newobj);
+
+	/** Set remaining lifetime in seconds (0 = lives forever) and keep m_tempObjectList in sync.
+	 * Returns false for inactive (template) objects, which must never be auto removed. */
+	bool SetObjectLifeTime(KX_GameObject *gameobj, float seconds);
 
 	// Suspend the entire scene.
 	void Suspend();

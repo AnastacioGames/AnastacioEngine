@@ -139,6 +139,7 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_convertInfo(nullptr),
 	m_objectColor(mt::one4),
 	m_distance(0.0f),
+	m_lifeTime(0.0f),
 	m_bVisible(true),
 	m_bRender(true),
 	m_bVisibleLOD(true),
@@ -193,6 +194,8 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_convertInfo(other.m_convertInfo),
 	m_objectColor(other.m_objectColor),
 	m_distance(other.m_distance),
+	// Not inherited: a replica only dies if its own addObject()/life asks for it.
+	m_lifeTime(0.0f),
 	m_bVisible(other.m_bVisible),
 	m_bRender(other.m_bRender),
 	m_bVisibleLOD(other.m_bVisibleLOD),
@@ -3010,7 +3013,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("groupMembers", KX_GameObject, pyattr_get_group_members),
 	EXP_PYATTRIBUTE_RO_FUNCTION("groupObject",  KX_GameObject, pyattr_get_group_object),
 	EXP_PYATTRIBUTE_RO_FUNCTION("scene",        KX_GameObject, pyattr_get_scene),
-	EXP_PYATTRIBUTE_RO_FUNCTION("life",     KX_GameObject, pyattr_get_life),
+	EXP_PYATTRIBUTE_RW_FUNCTION("life",     KX_GameObject, pyattr_get_life, pyattr_set_life),
 	EXP_PYATTRIBUTE_RW_FUNCTION("mass",     KX_GameObject, pyattr_get_mass,     pyattr_set_mass),
 	EXP_PYATTRIBUTE_RW_FUNCTION("friction", KX_GameObject, pyattr_get_friction, pyattr_set_friction),
 	EXP_PYATTRIBUTE_RW_FUNCTION("anisotropicFriction", KX_GameObject, pyattr_get_anisotropicFriction, pyattr_set_anisotropicFriction),
@@ -3624,15 +3627,36 @@ PyObject *KX_GameObject::pyattr_get_life(EXP_PyObjectPlus *self_v, const EXP_PYA
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 
-	EXP_Value *life = self->GetProperty("::timebomb");
-	if (life) {
-		// this convert the timebomb seconds to frames, hard coded 50.0f (assuming 50fps)
-		// value hardcoded in KX_Scene::AddReplicaObject()
-		return PyFloat_FromDouble(life->GetNumber() * 50.0);
+	// None (not 0.0) for objects without lifetime keeps the historical API.
+	if (self->m_lifeTime > 0.0f) {
+		return PyFloat_FromDouble(self->m_lifeTime * LifeFramesPerSecond);
 	}
-	else {
-		Py_RETURN_NONE;
+	Py_RETURN_NONE;
+}
+
+int KX_GameObject::pyattr_set_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+
+	float frames = 0.0f;
+	if (value != Py_None) {
+		frames = PyFloat_AsDouble(value);
+		if (frames == -1.0f && PyErr_Occurred()) {
+			PyErr_SetString(PyExc_TypeError, "gameOb.life = float or None: KX_GameObject, expected a number (frames) or None");
+			return PY_SET_ATTR_FAIL;
+		}
+		if (!(frames >= 0.0f)) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.life = float: KX_GameObject, expected zero or above (0/None = lives forever)");
+			return PY_SET_ATTR_FAIL;
+		}
 	}
+
+	KX_Scene *scene = self->GetScene();
+	if (!scene->SetObjectLifeTime(self, frames / LifeFramesPerSecond)) {
+		PyErr_SetString(PyExc_ValueError, "gameOb.life: KX_GameObject, can't set life on an inactive (template) object");
+		return PY_SET_ATTR_FAIL;
+	}
+	return PY_SET_ATTR_SUCCESS;
 }
 
 PyObject *KX_GameObject::pyattr_get_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

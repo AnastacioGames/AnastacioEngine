@@ -810,8 +810,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	m_map_gameobject_to_replica[gameobj] = newobj;
 
 	// Also register 'timers' (time properties) of the replica.
-	for (unsigned short i = 0, numprops = newobj->GetPropertyCount(); i < numprops; ++i) {
-		EXP_Value *prop = newobj->GetProperty(i);
+	// Iterate the map directly: GetProperty(i) restarts the walk on every call (O(n^2)).
+	for (const auto& pair : newobj->GetProperties()) {
+		EXP_Value *prop = pair.second;
 
 		if (prop->GetProperty("timer")) {
 			m_timemgr->AddTimeProperty(prop);
@@ -960,6 +961,25 @@ void KX_Scene::StartInitSpeakers()
       speaker->startInitPlay();
     }
   }
+}
+
+bool KX_Scene::SetObjectLifeTime(KX_GameObject *gameobj, float seconds)
+{
+	if (m_inactivelist->SearchValue(gameobj)) {
+		return false;
+	}
+
+	const auto it = std::find(m_tempObjectList.begin(), m_tempObjectList.end(), gameobj);
+	if (seconds > 0.0f) {
+		if (it == m_tempObjectList.end()) {
+			m_tempObjectList.push_back(gameobj);
+		}
+	}
+	else if (it != m_tempObjectList.end()) {
+		m_tempObjectList.erase(it);
+	}
+	gameobj->SetLifeTime(seconds > 0.0f ? seconds : 0.0f);
+	return true;
 }
 
 /*
@@ -1237,13 +1257,9 @@ KX_GameObject *KX_Scene::AddReplicaObject(KX_GameObject *originalobj, KX_GameObj
 	/* Add a timebomb to this object
 	 * lifespan of zero means 'this object lives forever'. */
 	if (lifespan > 0.0f) {
-		// For now, convert between so called frames and realtime.
+		// lifespan is in legacy 50 Hz logic frames, stored as seconds.
 		m_tempObjectList.push_back(replica);
-		/* This convert the life from frames to sort-of seconds, hard coded 0.02 that assumes we have 50 frames per second
-		 * if you change this value, make sure you change it in KX_GameObject::pyattr_get_life property too. */
-		EXP_Value *fval = new EXP_FloatValue(lifespan * 0.02f);
-		replica->SetProperty("::timebomb", fval);
-		fval->Release();
+		replica->SetLifeTime(lifespan / KX_GameObject::LifeFramesPerSecond);
 	}
 
 	// Add to 'rootparent' list (this is the list of top hierarchy objects, updated each frame).
@@ -1424,8 +1440,8 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	// The sensors/controllers/actuators must also be released, this is done in ~SCA_IObject.
 
 	// Now remove the timer properties from the time manager.
-	for (unsigned short i = 0, numprops = gameobj->GetPropertyCount(); i < numprops; ++i) {
-		EXP_Value *propval = gameobj->GetProperty(i);
+	for (const auto& pair : gameobj->GetProperties()) {
+		EXP_Value *propval = pair.second;
 		if (propval->GetProperty("timer")) {
 			m_timemgr->RemoveTimeProperty(propval);
 		}
@@ -1961,22 +1977,14 @@ void KX_Scene::LogicBeginFrame(double curtime, double framestep)
 {
 	// Have a look at temp objects.
 	for (KX_GameObject *gameobj : m_tempObjectList) {
-		EXP_FloatValue *propval = static_cast<EXP_FloatValue *>(gameobj->GetProperty("::timebomb"));
+		const float timeleft = gameobj->GetLifeTime() - (float)framestep;
 
-		if (propval) {
-			const float timeleft = propval->GetNumber() - framestep;
-
-			if (timeleft > 0) {
-				propval->SetFloat(timeleft);
-			}
-			else {
-				// Remove obj, remove the object from tempObjectList in NewRemoveObject only.
-				DelayedRemoveObject(gameobj);
-			}
+		if (timeleft > 0.0f) {
+			gameobj->SetLifeTime(timeleft);
 		}
 		else {
-			// All object is the tempObjectList should have a clock.
-			BLI_assert(false);
+			// Remove obj, remove the object from tempObjectList in NewRemoveObject only.
+			DelayedRemoveObject(gameobj);
 		}
 	}
 	m_logicmgr->BeginFrame(curtime, framestep);
@@ -2811,6 +2819,10 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 	m_parentlist->MergeList(other->GetRootParentList());
 	other->GetRootParentList()->ReleaseAndRemoveAll();
+
+	// Timed objects keep counting down in the target scene.
+	m_tempObjectList.insert(m_tempObjectList.end(), other->m_tempObjectList.begin(), other->m_tempObjectList.end());
+	other->m_tempObjectList.clear();
 
 	m_lightlist->MergeList(other->GetLightList());
 	other->GetLightList()->ReleaseAndRemoveAll();

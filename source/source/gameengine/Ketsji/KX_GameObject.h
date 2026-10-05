@@ -152,6 +152,8 @@ protected:
 	mt::vec4							m_objectColor;
 	/// objects activity culling distance
 	float							m_distance;
+	/// Seconds left before auto removal (addObject time), 0 = lives forever.
+	float							m_lifeTime;
 
 	// visible = user setting
 	// visibleLOD = LOD setting
@@ -523,6 +525,19 @@ public:
 	 */
 		float
 	GetActivityCullingDistance();
+
+	/// Legacy BGE lifetime unit: addObject()/life count "logic frames" at a fixed 50 Hz.
+	static constexpr float LifeFramesPerSecond = 50.0f;
+
+	/// Remaining lifetime in seconds, 0 = lives forever. Use KX_Scene::SetObjectLifeTime to change it.
+	float GetLifeTime() const
+	{
+		return m_lifeTime;
+	}
+	void SetLifeTime(float seconds)
+	{
+		m_lifeTime = seconds;
+	}
 
 	/**
 	 * Return the local inertia vector of the object
@@ -1234,6 +1249,7 @@ public:
 	static PyObject*	pyattr_get_scene(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 	static PyObject*	pyattr_get_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_friction(EXP_PyObjectPlus* self_v, const EXP_PYATTRIBUTE_DEF* attrdef);
