@@ -595,6 +595,7 @@ struct uiPopupBlockHandle {
 	bool refresh;
 
 	struct wmTimer *scrolltimer;
+	struct wmTimer *mouseouttimer;
 	float scrolloffset;
 
 	struct uiKeyNavLock keynav_state;

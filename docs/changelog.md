@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## UI: menus de cabecalho toleram movimento rapido do mouse (2026-10-05)
+- Popups de menu com `UI_BLOCK_MOVEMOUSE_QUIT` agora aguardam uma pequena janela (`0.35s`) antes de fechar quando o cursor sai apenas por movimento do mouse. Entrar de volta no menu cancela o timer; cliques/teclas continuam fechando imediatamente como antes.
+- Isso corrige o seletor de tipo de editor dos cabecalhos (icone no canto esquerdo, `More Editors`, etc.), permitindo sair rapidamente do botao e entrar no menu sem ele desaparecer no primeiro `MOUSEMOVE` fora da area.
+
+## Branding: cabecalho Info com Anastacio Engine (2026-10-05)
+- O texto do topo direito do cabecalho Info/About foi atualizado de `Range Engine - Custom Version` para `Anastacio Engine - Custom Version`, mantendo o restante dos links/creditos Range como referencia ao fork original.
+
 ## Branding: icone do app vira cubo Anastacio sem engrenagem Range (2026-10-05)
 - O icone Windows dos executaveis (`winrange.ico`, embutido por `winblender.rc`) e o icone de arquivo (`winblenderfile.ico`) foram substituidos por uma versao isolada do cubo dourado do splash atual, removendo a engrenagem vermelha/composicao antiga da Range Engine.
 - O PNG-fonte versionado ficou em `source/release/windows/icons/anastacio-engine-cube-splash-v2.png`, com ICO multi-resolucao correspondente em `anastacio-engine-cube-splash-v2.ico`.

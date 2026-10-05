@@ -121,6 +121,7 @@ static bool ui_mouse_motion_keynav_test(struct uiKeyNavLock *keynav, const wmEve
 #define MENU_SCROLL_INTERVAL        0.1
 #define PIE_MENU_INTERVAL           0.01
 #define BUTTON_AUTO_OPEN_THRESH     0.3
+#define MENU_MOUSEOUT_DELAY         0.35
 #define BUTTON_MOUSE_TOWARDS_THRESH 1.0
 /* pixels to move the cursor to get out of keyboard navigation */
 #define BUTTON_KEYNAV_PX_LIMIT      8
@@ -8887,6 +8888,17 @@ static int ui_handle_menu_event(
 	else if (event->type == TIMER) {
 		if (event->customdata == menu->scrolltimer)
 			ui_menu_scroll(ar, block, my, NULL);
+		else if (event->customdata == menu->mouseouttimer) {
+			WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), menu->mouseouttimer);
+			menu->mouseouttimer = NULL;
+
+			if (inside == 0 && !menu->dotowards) {
+				if (block->flag & (UI_BLOCK_OUT_1))
+					menu->menuretval = UI_RETURN_OK;
+				else
+					menu->menuretval = UI_RETURN_OUT;
+			}
+		}
 		else if (block->block_event_func && block->block_event_func(C, block, event)) {
 			retval = WM_UI_HANDLER_BREAK;
 		}
@@ -9232,13 +9244,26 @@ static int ui_handle_menu_event(
 
 					/* strict check, and include the parent rect */
 					if (!menu->dotowards && !saferct) {
-						if (block->flag & (UI_BLOCK_OUT_1))
-							menu->menuretval = UI_RETURN_OK;
-						else
-							menu->menuretval = UI_RETURN_OUT;
+						if (event->type == MOUSEMOVE) {
+							if (menu->mouseouttimer == NULL) {
+								menu->mouseouttimer = WM_event_add_timer(
+								        CTX_wm_manager(C), CTX_wm_window(C), TIMER, MENU_MOUSEOUT_DELAY);
+							}
+							retval = WM_UI_HANDLER_BREAK;
+						}
+						else {
+							if (block->flag & (UI_BLOCK_OUT_1))
+								menu->menuretval = UI_RETURN_OK;
+							else
+								menu->menuretval = UI_RETURN_OUT;
+						}
 					}
 					else if (menu->dotowards && event->type == MOUSEMOVE)
 						retval = WM_UI_HANDLER_BREAK;
+				}
+				else if (inside && menu->mouseouttimer) {
+					WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), menu->mouseouttimer);
+					menu->mouseouttimer = NULL;
 				}
 			}
 

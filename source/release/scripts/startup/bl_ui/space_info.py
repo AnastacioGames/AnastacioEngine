@@ -57,7 +57,7 @@ class INFO_HT_header(Header):
         layout.separator_spacer()
 
         layout.operator("wm.splash", text="", icon='BLENDER', emboss=False)
-        layout.operator("wm.splash_about", text="Range Engine - Custom Version", emboss=False)
+        layout.operator("wm.splash_about", text="Anastacio Engine - Custom Version", emboss=False)
 
         layout.separator_spacer()
 
