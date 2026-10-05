@@ -170,7 +170,8 @@ public:
 					events.push_back(std::move(ev));
 					break;
 				}
-				case ENET_EVENT_TYPE_DISCONNECT: {
+				case ENET_EVENT_TYPE_DISCONNECT:
+				case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
 					// Peers we disconnected ourselves were already reported.
 					if (event.peer->data) {
 						TransportEvent ev;

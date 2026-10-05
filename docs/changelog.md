@@ -9,6 +9,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: corrige warning do switch em NET_TransportENet (ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) (2026-10-05)
+- `NET_TransportENet.cpp:161`: o `switch` sobre `event.type` não tratava `ENET_EVENT_TYPE_DISCONNECT_TIMEOUT` (valor de enum exclusivo do fork `zpl-c/enet`, ausente no ENet clássico), gerando warning `-Wswitch` no build. Corrigido empilhando esse case junto de `ENET_EVENT_TYPE_DISCONNECT` (mesmo tratamento: reporta `Disconnected` e limpa o peer — timeout é só outra forma do peer cair).
+- Revalidado: build sem warnings e testes 100% PASS em Linux (`build-linux`, 0,30 s) e wasm32 (Emscripten 6.0.11, `build-wasm`, 0,18 s).
+
 ## Multiplayer: troca do ENet pelo fork zpl-c/enet (IPv4-only por ora), validado no Linux e wasm32 (2026-10-05)
 - Vendor `source/extern/enet` trocado: o ENet clássico 1.3.18 (multi-arquivo, IPv4-only) saiu, entrou o header único do [`zpl-c/enet`](https://github.com/zpl-c/enet) (`include/enet/enet.h`, upstream sem modificações) + `enet_impl.c` novo (TU que faz `#define ENET_IMPLEMENTATION`, exigido pela lib single-header). `CMakeLists.txt` do vendor reescrito para biblioteca header-only.
 - O fork por padrão cria socket dual-stack (IPv6 com mapeamento IPv4). A sandbox de build não tem pilha IPv6 (`AF_INET6` indisponível), e nesse modo `host()` falhava com uma mensagem enganosa ("could not listen on port NNNN (in use?)"). Como a API (`net.host`/`net.join`) ainda não expõe IPv6, mantido **IPv4-only** por enquanto via nova opção de CMake `ENET_IPV4_ONLY` (ON por padrão, propagada `PUBLIC` porque muda o layout de `ENetAddress`) — comportamento e layout de `ENetAddress` idênticos aos do vendor antigo.
