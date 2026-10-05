@@ -152,6 +152,7 @@ bool encode(BitWriter &w, const HelloMsg &m)
 	w.writeU64(m.sceneHash);
 	w.writeString(m.playerName);
 	w.writeU64(m.token);
+	w.writeString(m.password);
 	return done(w);
 }
 
@@ -362,6 +363,7 @@ bool decode(BitReader &r, HelloMsg &m)
 	m.sceneHash = r.readU64();
 	r.readString(m.playerName);
 	m.token = r.readU64();
+	r.readString(m.password);
 	return finish(r);
 }
 
@@ -379,7 +381,7 @@ bool decode(BitReader &r, WelcomeMsg &m)
 bool decode(BitReader &r, RejectMsg &m)
 {
 	const uint8_t reason = r.readU8();
-	if (reason < uint8_t(RejectReason::VersionMismatch) || reason > uint8_t(RejectReason::GameInProgress)) {
+	if (reason < uint8_t(RejectReason::VersionMismatch) || reason > uint8_t(RejectReason::WrongPassword)) {
 		r.fail();
 	}
 	m.reason = RejectReason(reason);

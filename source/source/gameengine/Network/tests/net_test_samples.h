@@ -89,6 +89,7 @@ inline std::vector<NamedPacket> sampleMessagePackets()
 		m.sceneHash = 0x0123456789ABCDEFull;
 		m.playerName = "Jogador";
 		m.token = 0xFEDCBA9876543210ull;
+		m.password = "segredo";
 		std::vector<uint8_t> p;
 		appendMessage(p, m);
 		add("hello", p);

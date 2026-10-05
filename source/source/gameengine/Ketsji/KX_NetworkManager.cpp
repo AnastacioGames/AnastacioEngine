@@ -873,6 +873,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	config.snapshotRate = uint16_t(m_snapshotRate);
 	config.maxClients = m_maxPlayers;
 	config.allowLateJoin = lateJoin;
+	config.password = options.password.substr(0, net::kMaxStringBytes);
 	m_server.reset(new net::ServerSession(*m_serverTransport, config));
 	if (!m_server->start(uint16_t(port))) {
 		error = "could not listen on port " + std::to_string(port) + " (in use?)";
@@ -927,7 +928,8 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	return true;
 }
 
-bool KX_NetworkManager::Join(const std::string &host, int port, std::string &error, KX_Scene *scene)
+bool KX_NetworkManager::Join(const std::string &host, int port, std::string &error, const std::string &password,
+                             KX_Scene *scene)
 {
 	if (!Prepare(scene, error)) {
 		return false;
@@ -965,6 +967,7 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 	config.gameVersion = m_gameVersion;
 	config.playerName = m_playerName;
 	config.sceneHash = m_sceneHash;
+	config.password = password.substr(0, net::kMaxStringBytes);
 	m_client.reset(new net::ClientSession(*m_clientTransport, config));
 
 	net::ReplicaClientConfig rc;
@@ -1037,7 +1040,7 @@ bool KX_NetworkManager::StartFromScene(KX_Scene *scene)
 					host = host.substr(0, colon);
 				}
 			}
-			ok = Join(host, port, error, scene);
+			ok = Join(host, port, error, "", scene);
 			break;
 		}
 		default:
@@ -1307,7 +1310,7 @@ void KX_NetworkManager::AdoptScene()
 		for (auto &pair : m_entries) {
 			SuspendForClient(pair.second);
 		}
-		if (m_sceneHash != m_targetHash) {
+		if (m_targetHash != 0 && m_sceneHash != m_targetHash) {
 			CM_Warning("network: scene '" << m_sceneName << "' does not match the server's (other replicated "
 			           "objects or another .range); the server will not send it");
 		}
@@ -1530,7 +1533,7 @@ void KX_NetworkManager::UpdateLanInfo()
 	info.maxPlayers = uint16_t(m_maxPlayers);
 	info.enetPort = m_serverTransport ? m_serverTransport->localPort() : 0;
 	info.webSocketPort = 0;
-	info.password = false;
+	info.password = m_server && !m_server->config().password.empty();
 	m_lanResponder.setInfo(info);
 }
 

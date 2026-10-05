@@ -16,6 +16,11 @@ endif()
 option(ENET_IPV4_ONLY "Build ENet in IPv4-only mode (no dual-stack IPv6)" ON)
 if(ENET_IPV4_ONLY)
 	list(APPEND ENET_DEFS ENET_IPV4_ONLY)
+else()
+	# Dual-stack: use the fork's IPv6-aware address functions (set_host/get_host resolve and
+	# format AF_INET6 too). Without this the macros fall back to the AF_INET-only *_old
+	# variants, so an IPv6 literal like "::1" never resolves on the dual-stack socket.
+	list(APPEND ENET_DEFS ENET_FEATURE_ADDRESS_MAPPING)
 endif()
 
 set(SRC

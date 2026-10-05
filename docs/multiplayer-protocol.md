@@ -90,7 +90,7 @@ só se `len` passar do fim do pacote.
 
 | Id | Nome | Canal | Direção | Corpo |
 |---|---|---|---|---|
-| 1 | `Hello` | 0 | C→S | `u32 magic='ANET'`, `u16 protocolVersion`, `str gameId`, `u32 gameVersion`, `u64 sceneHash`, `str playerName`, `u64 token` |
+| 1 | `Hello` | 0 | C→S | `u32 magic='ANET'`, `u16 protocolVersion`, `str gameId`, `u32 gameVersion`, `u64 sceneHash`, `str playerName`, `u64 token`, `str password` |
 | 2 | `Welcome` | 0 | S→C | `u16 clientId`, `u16 tickRate`, `u16 snapshotRate`, `u32 serverTick`, `u16 maxClients`, `str sceneName` |
 | 3 | `Reject` | 0 | S→C | `u8 reason` (`RejectReason`), `str detail` |
 | 4 | `Disconnect` | 0 | ambos | `u8 reason` (`DisconnectReason`) |
@@ -111,7 +111,8 @@ só se `len` passar do fim do pacote.
 | 200 | `RpcFrom` | 1/2 | S→C | `u16 fromClient` + corpo do `Rpc`; repasse de `All`/`Others` vindo de um cliente (`NOTES-G.md`) |
 | 201 | `InputTiming` | 2 | S→C | `u32 tick` (tick do servidor na medição), `i16 slack` em 1/16 de tick: tick mais novo de cada `Input` − próximo tick a simular na chegada, suavizado (EMA 0,1); negativo = inputs atrasados. A cada 15 ticks (~4 Hz) (`NOTES-engine.md`) |
 
-`protocolVersion` = 1. Mudança incompatível no formato incrementa. `RpcFrom` (200) é aditiva: ficou fora
+`protocolVersion` = 2 (v2 acrescentou `str password` ao `Hello`; o `Hello` mudou de formato, então foi um
+incremento incompatível, não aditivo). Mudança incompatível no formato incrementa. `RpcFrom` (200) é aditiva: ficou fora
 desse contador porque um cliente que não a conhece simplesmente descarta a mensagem (via
 `isKnownMessageType`) e só perde os repasses de RPC `All`/`Others` vindos de outro cliente — chamadas do
 próprio servidor continuam chegando como `Rpc` normal. Os dois lados de uma mesma sessão devem rodar a
@@ -124,7 +125,10 @@ fica com a margem fixa do `predictionTick`. Contrato fechado em 2026-10-04 após
 no Windows (PASS, erro máximo 0, 0 correções).
 
 `RejectReason`: 1 `VersionMismatch`, 2 `SceneMismatch`, 3 `ServerFull`, 4 `BadToken`, 5 `Banned`,
-6 `GameInProgress` (se o jogo não aceitar entrada tardia).
+6 `GameInProgress` (se o jogo não aceitar entrada tardia), 7 `WrongPassword` (servidor com `host(password=)`
+e `Hello.password` diferente; vazio no servidor = sala aberta, campo ignorado).
+
+A senha viaja em claro no `Hello` (UDP/WS sem TLS): é um *gate* de acesso casual, não segurança real.
 
 `DisconnectReason`: 1 `Quit`, 2 `Timeout`, 3 `Kicked`, 4 `ProtocolViolation`, 5 `ServerShutdown`.
 
@@ -306,7 +310,7 @@ Valem como parte do contrato. Detalhes em `Network/NOTES-A.md`, `NOTES-B.md`, `N
 - **Snapshot:** propriedades por esquema de cada objeto; animação é provisória (pode mudar na frente E).
 - **Transporte:** `ITransport::localPort()` (0 se não houver); `createLoopbackHub()`; simulado perde/duplica
   só nos canais não confiáveis. ENet: Control/Rpc `RELIABLE`, Snapshot/Input `UNSEQUENCED`.
-- **Sessão:** ordem das checagens do `Hello`: versão/gameId/gameVersion → banido → cena → token já
+- **Sessão:** ordem das checagens do `Hello`: versão/gameId/gameVersion → senha → banido → cena → token já
   conectado → reconexão → cheio → partida em andamento. Ping a cada 1 s, RTT por EMA α = 0,1. Servidor
   escuta com `maxClients + 16` peers para conseguir mandar `Reject ServerFull`.
 - **WebSocket:** um frame binário por mensagem, primeiro byte = canal; limite 65 537 bytes (close 1009);

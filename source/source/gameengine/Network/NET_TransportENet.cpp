@@ -76,7 +76,7 @@ public:
 		if (!m_initialized || m_host || maxPeers <= 0 || maxPeers > ENET_PROTOCOL_MAXIMUM_PEER_ID) {
 			return false;
 		}
-		ENetAddress address;
+		ENetAddress address = {};  // zero sin6_scope_id (and the rest): dual-stack bind fails on garbage
 		address.host = ENET_HOST_ANY;
 		address.port = port;
 		m_host = enet_host_create(&address, size_t(maxPeers), kChannelCount, 0, 0);
@@ -106,7 +106,7 @@ public:
 			return false;
 		}
 #endif  // ENET_IPV4_ONLY
-		ENetAddress address;
+		ENetAddress address = {};  // zero sin6_scope_id (and the rest) before set_host fills the address
 		if (enet_address_set_host(&address, host.c_str()) != 0) {
 			return false;
 		}

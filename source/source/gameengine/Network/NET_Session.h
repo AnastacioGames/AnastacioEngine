@@ -118,6 +118,7 @@ struct ServerConfig {
 	int maxClients = 16;  // <= kMaxClients
 	bool allowLateJoin = true;
 	uint32_t pingIntervalMs = 1000;
+	std::string password;  // empty = no password required
 };
 
 class ServerSession {
@@ -219,6 +220,7 @@ struct ClientConfig {
 	/// Reconnection token; 0 = generate a random one on the first connect.
 	uint64_t token = 0;
 	uint32_t pingIntervalMs = 1000;
+	std::string password;  // sent in Hello; must match the server's if it set one
 };
 
 class ClientSession {

@@ -386,9 +386,11 @@ PyObject *Net_host(PyObject *, PyObject *args, PyObject *kwds)
 		return nullptr;
 	}
 	if (password[0]) {
-		/* The v1 Hello message has no password field (NOTES-D, doubt 2): do not pretend it protects. */
-		CM_Warning("network: host(password=...) is not enforced by protocol v1, the room is open");
+		/* Protocol v2 carries the password in Hello; the server rejects a mismatch with WrongPassword.
+		 * It travels in clear over the UDP/WS link: a casual access gate, not real security. */
+		CM_Warning("network: host password travels in clear text; it gates casual access, not real security");
 	}
+	options.password = password;
 	options.roomName = room;
 	options.dedicated = dedicated != 0;
 	std::string error;
@@ -411,9 +413,6 @@ PyObject *Net_join(PyObject *, PyObject *args, PyObject *kwds)
 	if (!manager) {
 		return nullptr;
 	}
-	if (password[0]) {
-		CM_Warning("network: join(password=...) is ignored, protocol v1 has no password");
-	}
 	std::string host;
 	int port = 0;
 	if (!ParseAddress(address, host, port)) {
@@ -422,7 +421,7 @@ PyObject *Net_join(PyObject *, PyObject *args, PyObject *kwds)
 		Py_RETURN_FALSE;
 	}
 	std::string error;
-	if (!manager->Join(host, port, error)) {
+	if (!manager->Join(host, port, error, password)) {
 		CM_Warning("network: join failed: " << error);
 		Py_RETURN_FALSE;
 	}

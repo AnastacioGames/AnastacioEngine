@@ -10,6 +10,8 @@ build-android/
 build-cycles/
 build-linux/
 build-linux-editor/
+build-net/
+build-net-v6/
 build-linux-gtest/
 build-linux-cycles/
 build-linux-cycles.*.log

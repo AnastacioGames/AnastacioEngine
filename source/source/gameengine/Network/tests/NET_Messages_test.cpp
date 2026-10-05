@@ -33,6 +33,7 @@ TEST(NetMessages, RoundTripControl)
 	hello.sceneHash = 0x1122334455667788ull;
 	hello.playerName = "P1";
 	hello.token = 42;
+	hello.password = "segredo";
 	const HelloMsg h = roundTrip(hello);
 	EXPECT_EQ(h.protocolVersion, kProtocolVersion);
 	EXPECT_EQ(h.gameId, "game");
@@ -40,6 +41,7 @@ TEST(NetMessages, RoundTripControl)
 	EXPECT_EQ(h.sceneHash, hello.sceneHash);
 	EXPECT_EQ(h.playerName, "P1");
 	EXPECT_EQ(h.token, 42u);
+	EXPECT_EQ(h.password, "segredo");
 
 	WelcomeMsg welcome;
 	welcome.clientId = 64;

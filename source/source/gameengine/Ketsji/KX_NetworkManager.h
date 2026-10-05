@@ -73,6 +73,8 @@ public:
 		int lateJoin = -1;
 		/// Server without local player.
 		bool dedicated = false;
+		/// Empty = open room; otherwise the client must send the same password.
+		std::string password;
 	};
 
 	/// What the game script learns about the session.
@@ -111,7 +113,8 @@ public:
 	/// Opens a server. The scene is the active scene (KX_GetActiveScene()) unless one is given.
 	bool Host(const HostOptions &options, std::string &error, KX_Scene *scene = nullptr);
 	/// Joins a server. port <= 0 = scene setting.
-	bool Join(const std::string &host, int port, std::string &error, KX_Scene *scene = nullptr);
+	bool Join(const std::string &host, int port, std::string &error, const std::string &password = "",
+	          KX_Scene *scene = nullptr);
 	/// Leaves the session (Quit / ServerShutdown) and gives the objects back to the local simulation.
 	void Disconnect();
 	/// Engine stopping: Disconnect() without events, before the scenes are destroyed.

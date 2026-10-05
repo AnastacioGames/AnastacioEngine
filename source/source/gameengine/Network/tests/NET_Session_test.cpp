@@ -237,6 +237,29 @@ TEST(NetSession, RejectVersion)
 	EXPECT_EQ(b.find(SessionEvent::Type::Rejected)->text, "Arena");
 }
 
+TEST(NetSession, RejectWrongPassword)
+{
+	ServerConfig config = serverConfig();
+	config.password = "segredo";
+	World w(config);
+
+	ClientConfig bad = clientConfig("Bad");
+	bad.password = "errada";
+	Peer &a = w.addClient(bad);
+	w.step(30);
+	const SessionEvent *ev = a.find(SessionEvent::Type::Rejected);
+	ASSERT_TRUE(ev != nullptr);
+	EXPECT_EQ(ev->rejectReason, RejectReason::WrongPassword);
+	EXPECT_EQ(a.session->state(), ClientSession::State::Disconnected);
+
+	ClientConfig good = clientConfig("Good");
+	good.password = "segredo";
+	Peer &b = w.addClient(good);
+	w.step(50);
+	EXPECT_EQ(b.session->state(), ClientSession::State::Connected);
+	EXPECT_TRUE(b.find(SessionEvent::Type::Rejected) == nullptr);
+}
+
 TEST(NetSession, RejectServerFullAndLateJoin)
 {
 	World w(serverConfig(2));

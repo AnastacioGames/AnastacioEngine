@@ -59,8 +59,10 @@ não deu para testar.
 
 ## Dúvidas e decisões provisórias
 
-1. **Senha** (`host(password=)`, `join(password=)`): o `Hello` v1 não tem campo, então a senha é **ignorada com aviso** e
-   `discover_lan()` devolve `password=False`. Não fingi proteção. Decisão pendente de NOTES-D (7 `WrongPassword` + campo no `Hello`).
+1. **Senha** (`host(password=)`, `join(password=)`): **implementada** no protocolo v2 (NOTES-D resolvido). O `Hello`
+   ganhou `str password`; o servidor compara com `host(password=)` e recusa divergência com `7 WrongPassword`
+   (servidor sem senha = sala aberta, campo ignorado). `discover_lan()` reporta `password=True` quando a sala tem senha.
+   A senha viaja em claro (UDP/WS sem TLS): *gate* de acesso casual, não segurança real — o `host()` avisa isso.
 2. **Código de sala** (4–8 caracteres base 36) em `join()`: sem serviço de lobby não dá para resolver; `join()` avisa e devolve `False`.
 3. **`Server Name`**: virou `game_settings.network.server_name` (padrão "Anastacio Server"), como sugerido em NOTES-H.
 4. **`game_id`/`game_version`** entraram no painel (o handshake exige) em vez de ficarem fixos.

@@ -373,6 +373,10 @@ void ServerSession::handleHello(Connection &conn, const RawMessage &raw, uint64_
 		reject(conn, RejectReason::VersionMismatch, "");
 		return;
 	}
+	if (!m_config.password.empty() && hello.password != m_config.password) {
+		reject(conn, RejectReason::WrongPassword, "");
+		return;
+	}
 	if (hello.token != 0 && std::find(m_banned.begin(), m_banned.end(), hello.token) != m_banned.end()) {
 		reject(conn, RejectReason::Banned, "");
 		return;
@@ -744,6 +748,7 @@ void ClientSession::update(uint64_t nowMs, std::vector<SessionEvent> &events)
 				hello.sceneHash = m_config.sceneHash;
 				hello.playerName = m_config.playerName.substr(0, kMaxStringBytes);
 				hello.token = m_config.token;
+				hello.password = m_config.password.substr(0, kMaxStringBytes);
 				send(Channel::Control, makePacket(hello));
 				break;
 			}
