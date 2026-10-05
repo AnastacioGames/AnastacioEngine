@@ -91,7 +91,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 ## Histórico
 
 - [Changelog](changelog.md): registro detalhado por sessão. Entradas antigas podem conter hipóteses depois
-  corrigidas; para decisões vigentes, use o roadmap e o relatório de melhorias.
+  corrigidas; para decisões vigentes, use o roadmap e o relatório de melhorias. Inclui o diagnóstico de 2026-10-05
+  do timeout IPv6 `::1` no Windows (isolado como bug de loopback local, não do ENet/engine).
 
 ## Regras de manutenção documental
 

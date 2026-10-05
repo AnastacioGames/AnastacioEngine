@@ -2849,6 +2849,21 @@ Só interface e textos, sem mudar como o jogo desenha nem o que o `.blend` guard
 - Userpref padrão liga os addons Icon Viewer e Game Engine Scene Statistics (vale para userpref novo; um
   `userpref.blend` salvo mantém a escolha do usuário).
 
+## 2026-10-05 - Diagnóstico: timeout do handshake ENet em `::1` no Windows é loopback local, não bug de código
+
+- Build dual-stack isolado (`build-net-v6`, `ENET_IPV4_ONLY=OFF`) reproduziu o timeout (`DisconnectReason::Timeout`)
+  do handshake ENet em `::1`. Instrumentação temporária em `source/extern/enet/include/enet/enet.h` (revertida depois,
+  `git diff` limpo) mostrou todo `sendto()` do cliente retornando sucesso, mas o `recvfrom()` do servidor nunca
+  disparava — a perda acontece fora do ENet/engine.
+- Confirmado fora do ENet e do engine: um teste isolado com `System.Net.Sockets.UdpClient` (IPv6 puro) reproduz o
+  mesmo timeout em `::1` nesta máquina, descartando bug de código.
+- Testado IPv6 UDP real entre dois dispositivos (PC Windows ↔ celular Android via tethering USB/RNDIS, endereços
+  link-local `fe80::`), nos dois sentidos: funcionou perfeitamente.
+- Conclusão: o bug é específico de loopback IPv6 nesta máquina Windows (suspeita: interface
+  `vEthernet (WSL (Hyper-V firewall))` interceptando/derrubando tráfego de loopback), não do ENet, do engine nem da
+  pilha IPv6 em geral. Não é corrigível por mudança de código; depende de config local de rede/Hyper-V/antivírus.
+  Registrado em [roadmap.md](roadmap.md).
+
 ## 2026-09-25 - Build: correções para Android NDK e Cycles no player
 
 - `source/CMakeLists.txt`: sem GLU no Android mesmo com perfil compat. `mallocn_intern.h`: sem `malloc_stats()` no
