@@ -377,3 +377,7 @@ em vez de um único arquivo compartilhado).
   (Emscripten 6.0.11). Driver: `NODE_PATH` com `playwright`.
 - Resultado: 3 rodadas PASS (1 Spawn, 40 snapshots, 8 distintos; o servidor vê "browser" entrar e ficar).
 - Falta: compilar o runtime Web completo com `ge_network` e jogar uma cena replicada no navegador.
+
+## Troca de cena durante a partida (2026-10-05)
+
+`net.change_scene("Arena2")` (só servidor) troca a cena de todos; clientes conectados recebem `on_scene`, e quem entra depois já é levado para a cena atual. Teste: `run_net_test.sh scene-change` (servidor + cliente + cliente atrasado, PASS). Cuidado ao gerar cenas por script: um objeto ligado a uma cena que não é a do contexto precisa de `scene.object_bases[nome].layers`, porque `Object.layers` só muda a base da cena do contexto; sem isso o protótipo fica numa camada visível e `net.spawn` não o acha.

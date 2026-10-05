@@ -24,8 +24,11 @@ def add(scene, name, location, hidden=False):
     obj.location = location
     obj.game.physics_type = 'NO_COLLISION'
     scene.objects.link(obj)
-    # Linked to a scene that is not the active one, the object gets no layer at all: set it.
-    obj.layers = [i == (19 if hidden else 0) for i in range(20)]
+    # link() gives the base the scene's layers, and Object.layers only updates the base in the context scene
+    # (Arena1): set the base of this scene directly, or Shot stays visible (active) in Arena2.
+    layers = [i == (19 if hidden else 0) for i in range(20)]
+    obj.layers = layers
+    scene.object_bases[obj.name].layers = layers
     obj.game.network.use_replicate = True
     return obj
 
