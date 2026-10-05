@@ -619,7 +619,7 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
             bpy.ops.paint.texture_paint_toggle()
         brush = ip.brush
         if brush:
-            brush.color = (1.0, 0.0, 0.0)
+            brush.color = (1.0, 1.0, 1.0) if mat.get(RECIPE_KEY) == "wet_patches" else (1.0, 0.0, 0.0)
         if mat.get(RECIPE_KEY) == "wet_patches":
             self.report({'INFO'}, "Paint white for wet/reflective patches and black for the dry base. Save the mask image when done")
         else:
