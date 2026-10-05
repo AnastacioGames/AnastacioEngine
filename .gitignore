@@ -5,6 +5,7 @@ build_gtest/
 build_opencl/
 build_opencl_validate/
 build-web/
+build-wasm/
 build-android/
 build-cycles/
 build-linux/
