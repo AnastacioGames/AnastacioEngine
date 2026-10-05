@@ -309,7 +309,7 @@ static uiBlock *wm_block_create_about(bContext *C, ARegion *region, void *UNUSED
   uiLayout *layout = UI_block_layout(
       block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, dialog_width, 0, 0, style);
 
-  /* Range Engine wordmark customized for Anastacio Games. */
+  /* Anastacio Engine wordmark. */
 #ifndef WITH_HEADLESS
   extern char datatoc_range_logo_png[];
   extern int datatoc_range_logo_png_size;

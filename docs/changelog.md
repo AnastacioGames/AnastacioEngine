@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Branding: icone do app vira cubo Anastacio sem engrenagem Range (2026-10-05)
+- O icone Windows dos executaveis (`winrange.ico`, embutido por `winblender.rc`) e o icone de arquivo (`winblenderfile.ico`) foram substituidos por uma versao isolada do cubo dourado do splash atual, removendo a engrenagem vermelha/composicao antiga da Range Engine.
+- O PNG-fonte versionado ficou em `source/release/windows/icons/anastacio-engine-cube-splash-v2.png`, com ICO multi-resolucao correspondente em `anastacio-engine-cube-splash-v2.ico`.
+- Os PNGs freedesktop (`16`, `22`, `24`, `32`, `48` e `256` px) e o payload X11 hardcoded em `GHOST_WindowX11.cpp` foram regenerados para manter o icone do app alinhado fora do Windows.
+- `source/release/datafiles/range_logo.png`, usado no topo do splash/About como `datatoc_range_logo_png`, tambem foi atualizado para um wordmark Anastacio Engine com o cubo dourado do splash e creditos menores (`Powered by Anastacio Games`, `Built on Range Engine 1.6`); o PNG-fonte versionado ficou em `anastacio_engine_logo_v2.png`.
+
 ## UI: Collections de cenas no Outliner (2026-10-05)
 - O root visual `Scenes` do Outliner agora pode receber `New Collection`; essas pastas ficam no mesmo nivel das cenas e servem para organizar cenas, sem afetar as `SceneCollection` de objetos/layers do jogo.
 - O menu `Collection` ganhou `Move Scenes to Collection`, com opcoes para voltar para `Scenes Root`, usar uma pasta existente ou criar uma nova. Apagar uma pasta de cenas devolve as cenas para o root.
