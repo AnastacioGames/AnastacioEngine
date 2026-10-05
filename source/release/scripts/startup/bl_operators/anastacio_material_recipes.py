@@ -149,6 +149,28 @@ class TreeBuilder:
     def link(self, a, b):
         self.links.new(a, b)
 
+    def frame(self, label, nodes):
+        """Agrupa nós dentro de um Frame (caixa com título) para organizar o editor de nós."""
+        f = self.add("NodeFrame", 0, 0, label=label)
+        f.label_size = 18
+        for n in nodes:
+            n.parent = f
+        return f
+
+    def note(self, label, body, x, y, width=380, height=140):
+        """Caixa só com texto (sem nós dentro), para explicar o grafo no editor de nós.
+        O Frame do Blender mostra o conteúdo de um Text (bpy.data.texts) dentro dele."""
+        f = self.add("NodeFrame", x, y, label=label)
+        f.label_size = 16
+        f.shrink = False
+        f.width = width
+        f.height = height
+        name = "AE_Note_" + label
+        txt = bpy.data.texts.get(name) or bpy.data.texts.new(name)
+        txt.from_string(body)
+        f.text = txt
+        return f
+
     # Imagem: no PBR é o Image Texture; no legado é o nó Texture com um Texture do tipo Image.
     def image(self, pbr, img, x, y, name=None, label=None, data=False):
         if pbr:
@@ -415,19 +437,35 @@ def build_wet_patches(mat, pbr, scale, mask_img):
         b.link(wet_tint.outputs["Color"], bsdf.inputs["Base Color"])
         b.link(rough.outputs["Color"], bsdf.inputs["Roughness"])
         b.link(normal_mix.outputs["Color"], bsdf.inputs["Normal"])
-        return
+    else:
+        mnode = b.legacy_output(mat, 260, 0)
+        base = mnode.material
+        base.diffuse_color = (0.08, 0.085, 0.08)
+        base.specular_intensity = 0.95
+        base.specular_hardness = 420
+        base.specular_roughness_bsdf = 0.04
+        b.link(wet_tint.outputs["Color"], mnode.inputs["Color"])
+        inv = b.add("ShaderNodeInvert", 0, 40)
+        b.link(rough.outputs["Color"], inv.inputs["Color"])
+        b.link(inv.outputs["Color"], mnode.inputs["Spec"])
+        b.link(normal_mix.outputs["Color"], mnode.inputs["Normal"])
 
-    mnode = b.legacy_output(mat, 260, 0)
-    base = mnode.material
-    base.diffuse_color = (0.08, 0.085, 0.08)
-    base.specular_intensity = 0.95
-    base.specular_hardness = 420
-    base.specular_roughness_bsdf = 0.04
-    b.link(wet_tint.outputs["Color"], mnode.inputs["Color"])
-    inv = b.add("ShaderNodeInvert", 0, 40)
-    b.link(rough.outputs["Color"], inv.inputs["Color"])
-    b.link(inv.outputs["Color"], mnode.inputs["Spec"])
-    b.link(normal_mix.outputs["Color"], mnode.inputs["Normal"])
+    # Organiza o grafo em caixas (Frames) e deixa uma nota explicando a receita.
+    uv_node = uv_raw.node
+    b.frame("UV / Tiling", [uv_node, b.nodes[MAPPING]])
+    b.frame("Wet Mask (pinte branco = poça)", [mask, sep])
+    b.frame("Asfalto Procedural", [asphalt, asphalt_color])
+    b.frame("Mistura Seco / Molhado", [wet_tint, rough, wet_noise, asphalt_bump, wet_bump, normal_mix])
+    b.note(
+        "Como usar",
+        "Pinte BRANCO na mascara 'Wet Mask' para marcar poca/mancha\n"
+        "molhada (barro, oleo ou agua); PRETO volta ao asfalto seco.\n"
+        "Use o botao 'Paint the Mask' no painel: ele ja troca o pincel\n"
+        "para branco e aplica uma textura no pincel para pocas com\n"
+        "formato irregular (nao so circulos). Gire/redimensione a\n"
+        "textura do pincel (R / S em modo pintura) para variar o formato.",
+        -1250, 650, width=620, height=260,
+    )
 
 
 def get_tiling(mapping):
@@ -598,6 +636,33 @@ class MATERIAL_OT_recipe_layer_set(Operator):
         return {'FINISHED'}
 
 
+def ensure_puddle_brush_texture():
+    """Textura 'Nuvens' para o pincel: dá borda irregular (poça), não um círculo perfeito.
+    Girando/redimensionando essa textura no pincel (R/S em modo pintura) muda o formato."""
+    tex = bpy.data.textures.get("AE_Puddle_Shape")
+    if tex is None:
+        tex = bpy.data.textures.new("AE_Puddle_Shape", 'CLOUDS')
+        tex.noise_basis = 'BLENDER_ORIGINAL'
+        tex.noise_scale = 0.6
+        tex.intensity = 1.3
+        tex.contrast = 2.2
+    return tex
+
+
+def apply_puddle_brush(context, color):
+    ip = context.scene.tool_settings.image_paint
+    brush = ip.brush
+    if not brush:
+        return
+    brush.color = color
+    brush.use_alpha = True
+    brush.texture = ensure_puddle_brush_texture()
+    slot = brush.texture_slot
+    slot.map_mode = 'STENCIL'
+    brush.stencil_pos = (256, 256)
+    brush.stencil_dimension = (180, 180)
+
+
 class MATERIAL_OT_recipe_paint_mask(Operator):
     """Enter Texture Paint on the blend mask: paint red, green or blue to show each layer, black for the base"""
     bl_idname = "material.recipe_paint_mask"
@@ -617,12 +682,14 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
         ip.canvas = img
         if context.object.mode != 'TEXTURE_PAINT':
             bpy.ops.paint.texture_paint_toggle()
-        brush = ip.brush
-        if brush:
-            brush.color = (1.0, 1.0, 1.0) if mat.get(RECIPE_KEY) == "wet_patches" else (1.0, 0.0, 0.0)
         if mat.get(RECIPE_KEY) == "wet_patches":
-            self.report({'INFO'}, "Paint white for wet/reflective patches and black for the dry base. Save the mask image when done")
+            apply_puddle_brush(context, (1.0, 1.0, 1.0))
+            self.report({'INFO'}, "Paint white for wet/reflective patches, black for dry. Brush has a puddle-shaped "
+                                   "stencil: press R/S in the viewport to rotate/resize it for different puddle shapes")
         else:
+            brush = ip.brush
+            if brush:
+                brush.color = (1.0, 0.0, 0.0)
             self.report({'INFO'}, "Red, green and blue show layers; black shows the base. Save the mask image when done")
         return {'FINISHED'}
 
