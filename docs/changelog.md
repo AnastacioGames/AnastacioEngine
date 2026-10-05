@@ -9,11 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
-## Multiplayer: troca do ENet pelo fork zpl-c/enet (IPv4-only por ora), validado no Linux (2026-10-05)
+## Multiplayer: troca do ENet pelo fork zpl-c/enet (IPv4-only por ora), validado no Linux e wasm32 (2026-10-05)
 - Vendor `source/extern/enet` trocado: o ENet clássico 1.3.18 (multi-arquivo, IPv4-only) saiu, entrou o header único do [`zpl-c/enet`](https://github.com/zpl-c/enet) (`include/enet/enet.h`, upstream sem modificações) + `enet_impl.c` novo (TU que faz `#define ENET_IMPLEMENTATION`, exigido pela lib single-header). `CMakeLists.txt` do vendor reescrito para biblioteca header-only.
 - O fork por padrão cria socket dual-stack (IPv6 com mapeamento IPv4). A sandbox de build não tem pilha IPv6 (`AF_INET6` indisponível), e nesse modo `host()` falhava com uma mensagem enganosa ("could not listen on port NNNN (in use?)"). Como a API (`net.host`/`net.join`) ainda não expõe IPv6, mantido **IPv4-only** por enquanto via nova opção de CMake `ENET_IPV4_ONLY` (ON por padrão, propagada `PUBLIC` porque muda o layout de `ENetAddress`) — comportamento e layout de `ENetAddress` idênticos aos do vendor antigo.
-- Regressão completa no Linux (build incremental, sem rebuild total): `spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`, `scene-change`, `predict-cube`, `car` — todos PASS.
-- Falta: rebuild/teste no Windows (MSVC) e wasm32; teste de `::1` real (desligando `ENET_IPV4_ONLY` numa máquina com IPv6); decisão sobre expor IPv6 na API Python. Detalhes em `NOTES-engine.md` ("IPv6 no ENet/UDP — investigação").
+- Regressão completa no Linux (build incremental, sem rebuild total): `spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`, `scene-change`, `predict-cube`, `car` — todos PASS. Regressão wasm32 (Emscripten 6.0.11, Node.js): core tests via CI filter (sem sockets/ENet) — **PASS** (100%, 0,18 s).
+- Falta: rebuild/teste no Windows (MSVC); teste de `::1` real (desligando `ENET_IPV4_ONLY` numa máquina com IPv6); decisão sobre expor IPv6 na API Python. Detalhes em `NOTES-engine.md` ("IPv6 no ENet/UDP — investigação").
 
 ## Multiplayer: cliente no navegador real contra o `RangeRuntime --server` (2026-10-05)
 - `Network/tools/net_web_watch.cpp` (Emscripten, gera `net_web_watch.html`): cliente wasm do núcleo que entra por WebSocket num servidor da engine (opções `host`, `port`, `game`, `version`, `hash` na query da página ou como `chave=valor` no node), responde `SceneLoaded` e conta `Spawn`/`Snapshot`; o resultado vai para `document.title` (`NETWEB PASS|FAIL`).
