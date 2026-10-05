@@ -159,19 +159,19 @@ class PHYSICS_PT_dp_advanced_canvas(PhysicButtonsPanel, Panel):
 
         # dissolve
         if surface_type == 'PAINT':
-            split = layout.split(percentage=0.35)
+            split = layout.split(factor=0.35)
             split.prop(surface, "use_drying", text="Dry:")
 
             col = split.column()
             col.active = surface.use_drying
-            split = col.split(percentage=0.7)
+            split = col.split(factor=0.7)
             col = split.column(align=True)
             col.prop(surface, "dry_speed", text="Time")
             col.prop(surface, "color_dry_threshold")
             split.prop(surface, "use_dry_log", text="Slow")
 
         if surface_type != 'WAVE':
-            split = layout.split(percentage=0.35)
+            split = layout.split(factor=0.35)
             col = split.column()
             if surface_type == 'WEIGHT':
                 col.prop(surface, "use_dissolve", text="Fade:")
@@ -179,7 +179,7 @@ class PHYSICS_PT_dp_advanced_canvas(PhysicButtonsPanel, Panel):
                 col.prop(surface, "use_dissolve", text="Dissolve:")
             col = split.column()
             col.active = surface.use_dissolve
-            split = col.split(percentage=0.7)
+            split = col.split(factor=0.7)
             split.prop(surface, "dissolve_speed", text="Time")
             split.prop(surface, "use_dissolve_log", text="Slow")
 
@@ -285,13 +285,13 @@ class PHYSICS_PT_dp_canvas_output(PhysicButtonsPanel, Panel):
             row.prop(surface, "use_premultiply", text="Premultiply Alpha")
 
             if surface_type == 'PAINT':
-                split = layout.split(percentage=0.4)
+                split = layout.split(factor=0.4)
                 split.prop(surface, "use_output_a", text="Paintmaps:")
                 sub = split.row()
                 sub.active = surface.use_output_a
                 sub.prop(surface, "output_name_a", text="")
 
-                split = layout.split(percentage=0.4)
+                split = layout.split(factor=0.4)
                 split.prop(surface, "use_output_b", text="Wetmaps:")
                 sub = split.row()
                 sub.active = surface.use_output_b
@@ -448,7 +448,7 @@ class PHYSICS_PT_dp_brush_source(PhysicButtonsPanel, Panel):
 
         if brush.paint_source in {'DISTANCE', 'VOLUME_DISTANCE', 'POINT'}:
             col.prop(brush, "paint_distance", text="Paint Distance")
-            split = layout.row().split(percentage=0.4)
+            split = layout.row().split(factor=0.4)
             sub = split.column()
             if brush.paint_source in {'DISTANCE', 'VOLUME_DISTANCE'}:
                 sub.prop(brush, "use_proximity_project")

@@ -53,17 +53,17 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
         ob = context.object
         field = ob.field
 
-        split = layout.split(percentage=0.2)
+        split = layout.split(factor=0.2)
         split.label(text="Type:")
 
         split.prop(field, "type", text="")
 
         if field.type not in {'NONE', 'GUIDE', 'TEXTURE'}:
-            split = layout.split(percentage=0.2)
+            split = layout.split(factor=0.2)
             split.label(text="Shape:")
             split.prop(field, "shape", text="")
         elif field.type == 'TEXTURE':
-            split = layout.split(percentage=0.2)
+            split = layout.split(factor=0.2)
             split.label(text="Texture:")
             split.row().template_ID(field, "texture", new="texture.new")
 
@@ -135,7 +135,7 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
             if field.falloff_type == 'CONE':
                 layout.separator(factor=1)
 
-                split = layout.split(percentage=0.35)
+                split = layout.split(factor=0.35)
 
                 col = split.column()
                 col.label(text="Angular:")
@@ -156,7 +156,7 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
             elif field.falloff_type == 'TUBE':
                 layout.separator(factor=1)
 
-                split = layout.split(percentage=0.35)
+                split = layout.split(factor=0.35)
 
                 col = split.column()
                 col.label(text="Radial:")

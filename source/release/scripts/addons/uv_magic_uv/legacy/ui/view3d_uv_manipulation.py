@@ -102,11 +102,11 @@ class MUV_PT_View3D_UVManipulation(bpy.types.Panel):
             box.prop(sc, "muv_world_scale_uv_mode", text="")
 
             if sc.muv_world_scale_uv_mode == 'MANUAL':
-                sp = box.split(percentage=0.5)
+                sp = box.split(factor=0.5)
                 col = sp.column()
                 col.prop(sc, "muv_world_scale_uv_tgt_texture_size",
                          text="Texture Size")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column()
                 col.label("Density:")
                 col.prop(sc, "muv_world_scale_uv_tgt_density", text="")
@@ -120,20 +120,20 @@ class MUV_PT_View3D_UVManipulation(bpy.types.Panel):
                 ops.show_dialog = False
 
             elif sc.muv_world_scale_uv_mode == 'SAME_DENSITY':
-                sp = box.split(percentage=0.4)
+                sp = box.split(factor=0.4)
                 col = sp.column(align=True)
                 col.label("Source:")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.operator(
                     world_scale_uv.MUV_OT_WorldScaleUV_Measure.bl_idname,
                     text="Measure")
 
-                sp = box.split(percentage=0.7)
+                sp = box.split(factor=0.7)
                 col = sp.column(align=True)
                 col.prop(sc, "muv_world_scale_uv_src_density", text="Density")
                 col.enabled = False
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("px2/cm2")
 
@@ -148,20 +148,20 @@ class MUV_PT_View3D_UVManipulation(bpy.types.Panel):
                 ops.show_dialog = False
 
             elif sc.muv_world_scale_uv_mode == 'SCALING_DENSITY':
-                sp = box.split(percentage=0.4)
+                sp = box.split(factor=0.4)
                 col = sp.column(align=True)
                 col.label("Source:")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.operator(
                     world_scale_uv.MUV_OT_WorldScaleUV_Measure.bl_idname,
                     text="Measure")
 
-                sp = box.split(percentage=0.7)
+                sp = box.split(factor=0.7)
                 col = sp.column(align=True)
                 col.prop(sc, "muv_world_scale_uv_src_density", text="Density")
                 col.enabled = False
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("px2/cm2")
 
@@ -180,23 +180,23 @@ class MUV_PT_View3D_UVManipulation(bpy.types.Panel):
                     sc.muv_world_scale_uv_tgt_scaling_factor
 
             elif sc.muv_world_scale_uv_mode == 'PROPORTIONAL_TO_MESH':
-                sp = box.split(percentage=0.4)
+                sp = box.split(factor=0.4)
                 col = sp.column(align=True)
                 col.label("Source:")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.operator(
                     world_scale_uv.MUV_OT_WorldScaleUV_Measure.bl_idname,
                     text="Measure")
 
-                sp = box.split(percentage=0.7)
+                sp = box.split(factor=0.7)
                 col = sp.column(align=True)
                 col.prop(sc, "muv_world_scale_uv_src_mesh_area",
                          text="Mesh Area")
                 col.prop(sc, "muv_world_scale_uv_src_uv_area", text="UV Area")
                 col.prop(sc, "muv_world_scale_uv_src_density", text="Density")
                 col.enabled = False
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("cm2")
                 col.label("px2")

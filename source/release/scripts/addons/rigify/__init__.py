@@ -149,7 +149,7 @@ class RigifyPreferences(AddonPreferences):
         sub.prop(self, 'legacy_mode')
 
         if expand:
-            split = col.row().split(percentage=0.15)
+            split = col.row().split(factor=0.15)
             split.label('Description:')
             split.label(text='When enabled the add-on will run in legacy mode using the old 2.76b feature set.')
 

@@ -4359,7 +4359,7 @@ class VIEW3D_PT_tools_looptools(Panel):
         lt = context.window_manager.looptools
 
         # bridge - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_bridge:
             split.prop(lt, "display_bridge", text="", icon='DOWNARROW_HLT')
         else:
@@ -4395,7 +4395,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             row.prop(lt, "bridge_reverse")
 
         # circle - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_circle:
             split.prop(lt, "display_circle", text="", icon='DOWNARROW_HLT')
         else:
@@ -4433,7 +4433,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             col_move.prop(lt, "circle_influence")
 
         # curve - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_curve:
             split.prop(lt, "display_curve", text="", icon='DOWNARROW_HLT')
         else:
@@ -4465,7 +4465,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             col_move.prop(lt, "curve_influence")
 
         # flatten - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_flatten:
             split.prop(lt, "display_flatten", text="", icon='DOWNARROW_HLT')
         else:
@@ -4495,7 +4495,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             col_move.prop(lt, "flatten_influence")
 
         # gstretch - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_gstretch:
             split.prop(lt, "display_gstretch", text="", icon='DOWNARROW_HLT')
         else:
@@ -4536,7 +4536,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             box.operator("remove.gp", text="Delete GP Strokes")
 
         # loft - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_loft:
             split.prop(lt, "display_loft", text="", icon='DOWNARROW_HLT')
         else:
@@ -4573,7 +4573,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             row.prop(lt, "bridge_reverse")
 
         # relax - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_relax:
             split.prop(lt, "display_relax", text="", icon='DOWNARROW_HLT')
         else:
@@ -4588,7 +4588,7 @@ class VIEW3D_PT_tools_looptools(Panel):
             box.prop(lt, "relax_regular")
 
         # space - first line
-        split = col.split(percentage=0.15, align=True)
+        split = col.split(factor=0.15, align=True)
         if lt.display_space:
             split.prop(lt, "display_space", text="", icon='DOWNARROW_HLT')
         else:

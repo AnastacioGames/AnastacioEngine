@@ -164,7 +164,7 @@ class PieToolsPreferences(AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
-        split = layout.split(percentage=0.5, align=True)
+        split = layout.split(factor=0.5, align=True)
         row = split.row()
         row.alignment = "LEFT"
         sub_box = row.box()
@@ -205,32 +205,32 @@ class PieToolsPreferences(AddonPreferences):
             # The second stage
             if expand:
                 if info.get('description'):
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label('Description:')
                     split.label(info['description'])
                 if info.get('location'):
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label('Location:')
                     split.label(info['location'])
                 """
                 if info.get('author'):
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label('Author:')
                     split.label(info['author'])
                 """
                 if info.get('version'):
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label('Version:')
                     split.label('.'.join(str(x) for x in info['version']),
                                 translate=False)
                 if info.get('warning'):
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label('Warning:')
                     split.label('  ' + info['warning'], icon='ERROR')
 
                 tot_row = int(bool(info.get('wiki_url')))
                 if tot_row:
-                    split = col.row().split(percentage=0.15)
+                    split = col.row().split(factor=0.15)
                     split.label(text='Internet:')
                     if info.get('wiki_url'):
                         op = split.operator('wm.url_open',
