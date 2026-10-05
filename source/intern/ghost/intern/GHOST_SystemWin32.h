@@ -59,7 +59,7 @@ public:
 	/**
 	 * Constructor.
 	 */
-	GHOST_SystemWin32();
+	GHOST_SystemWin32(bool hiddenWindows = false);
 
 	/**
 	 * Destructor.
@@ -378,6 +378,9 @@ protected:
 
 	/** Wheel delta accumulator **/
 	int m_wheelDeltaAccum;
+
+	/** Create GL windows without showing them. Used by RangeRuntime --server. */
+	bool m_hiddenWindows;
 };
 
 inline void GHOST_SystemWin32::retrieveModifierKeys(GHOST_ModifierKeys& keys) const

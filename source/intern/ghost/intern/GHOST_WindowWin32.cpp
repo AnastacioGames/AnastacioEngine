@@ -125,7 +125,8 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 	bool alphaBackground,
         GHOST_TUns16 wantNumOfAASamples,
         GHOST_TEmbedderWindowID parentwindowhwnd,
-        bool is_debug)
+        bool is_debug,
+        bool hidden)
     : GHOST_Window(width, height, state,
                    wantStereoVisual, false, wantNumOfAASamples),
       m_inLiveResize(false),
@@ -139,9 +140,10 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       m_normal_state(GHOST_kWindowStateNormal),
 	  m_user32(NULL),
       m_parentWindowHwnd(parentwindowhwnd),
-      m_debug_context(is_debug),
       m_appIcon(NULL),
-      m_appIconSmall(NULL)
+      m_appIconSmall(NULL),
+      m_debug_context(is_debug),
+      m_hidden(hidden)
 {
 	// Initialize tablet variables
 	memset(&m_wintab, 0, sizeof(m_wintab));
@@ -202,7 +204,7 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 		else if (top < monitor.rcWork.top)
 			top = monitor.rcWork.top;
 
-		int wintype = WS_OVERLAPPEDWINDOW;
+		int wintype = m_hidden ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 		if (m_parentWindowHwnd != 0) {
 			wintype = WS_CHILD;
 			GetWindowRect((HWND)m_parentWindowHwnd, &rect);
@@ -299,10 +301,12 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 
 			ThemeRefresh();
 
-			::ShowWindow(m_hWnd, nCmdShow);
-			m_appIcon = loadExternalAppIcon();
-			m_appIconSmall = m_appIcon;
-			applyWindowIcon();
+			if (!m_hidden) {
+				::ShowWindow(m_hWnd, nCmdShow);
+				m_appIcon = loadExternalAppIcon();
+				m_appIconSmall = m_appIcon;
+				applyWindowIcon();
+			}
 #ifdef WIN32_COMPOSITING
 			if (alphaBackground && parentwindowhwnd == 0) {
 

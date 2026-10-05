@@ -71,8 +71,6 @@ não deu para testar.
 
 ## O que não está feito (e por quê)
 
-- **Servidor sem janela no Windows.** No Linux o `--server` não abre janela nem precisa de display (seção abaixo); no
-  Windows ainda abre a janela pequena do GHOST (não bloqueia, mas existe). Um contexto offscreen WGL ficaria para depois.
 - **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
   Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
   abaixo).
@@ -226,7 +224,10 @@ sem ter sido enviada). Uso: `RangeRuntime --server [-p script.py] jogo.range`.
   corrente; o GLEW resolve as funções por `glXGetProcAddress`, que com o libglvnd despacha para o contexto EGL. O
   `libEGL` é aberto por `dlopen` (o player não linka com ele; sem EGL/Mesa o `--server` falha ao criar a janela com
   mensagem `GHOST headless: ...`). `run_net_test.sh` sobe o `--server` sem xvfb e com `DISPLAY` removido.
-  Windows/macOS: `createSystemHeadless()` cai no sistema normal, ainda com janela mínima (100×100).
+- **Sem janela visível (Windows).** Desde 2026-10-05, `createSystemHeadless()` cria `GHOST_SystemWin32(true)`: o
+  player ainda usa uma janela Win32/WGL real para inicializar OpenGL, mas ela nasce como `WS_POPUP` oculta e não chama
+  `ShowWindow()`. Validação por `EnumWindows` no PID do servidor: 3 janelas top-level criadas, 0 visíveis.
+  macOS ainda cai no sistema normal.
 - **Dedicated.** Com `--server`, `host()` e o modo Host da cena abrem a sala como Dedicated (sem jogador do host no lobby).
   `join()` funciona, com aviso (um cliente que não desenha só serve de bot).
 - **Pausa entre quadros.** O laço de recuperação de `UpdateSleepTime()` converte a espera em milissegundos inteiros e
@@ -245,10 +246,9 @@ Medido no Linux (4 núcleos, llvmpipe, `halfanim_crash.range` com armaduras, ser
 Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `ServerSleep()` e do corte do skinning o
 `--server` gastava ~1,6 núcleo (dois terços no skinning das armaduras).
 
-**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`): passou de primeira, sem o problema de
-janela GL offscreen que trava o Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
-`--server`). `headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web
-(sem sentido para servidor).
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`) e revalidado em 2026-10-05 com janela oculta:
+`headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web (sem sentido
+para servidor).
 
 ## Validado no Windows/MSVC (2026-10-04)
 

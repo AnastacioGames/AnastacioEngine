@@ -94,7 +94,8 @@ public:
 	    bool alphaBackground = false,
 	    GHOST_TUns16 wantNumOfAASamples = 0,
 	    GHOST_TEmbedderWindowID parentWindowHwnd = 0,
-	    bool is_debug = false);
+	    bool is_debug = false,
+	    bool hidden = false);
 
 	/**
 	 * Destructor.
@@ -386,6 +387,7 @@ private:
 	HICON m_appIcon;
 	HICON m_appIconSmall;
 	bool m_debug_context;
+	bool m_hidden;
 };
 
 #endif // __GHOST_WINDOWWIN32_H__

@@ -140,8 +140,8 @@ public:
 
 	/**
 	 * Creates the system without any display connection: windows are virtual and own an
-	 * offscreen (EGL surfaceless) OpenGL context. Used by the game player's --server mode.
-	 * Only available on X11 builds; elsewhere it behaves like createSystem().
+	 * offscreen or hidden OpenGL context. Used by the game player's --server mode.
+	 * X11 uses EGL surfaceless; Win32 creates the usual WGL window without showing it.
 	 * \return An indication of success.
 	 */
 	static GHOST_TSuccess createSystemHeadless();

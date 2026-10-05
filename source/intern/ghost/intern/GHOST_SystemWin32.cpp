@@ -171,9 +171,13 @@ typedef enum MONITOR_DPI_TYPE {
 typedef HRESULT(API * GHOST_WIN32_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS);
 typedef BOOL(API * GHOST_WIN32_EnableNonClientDpiScaling)(HWND);
 
-GHOST_SystemWin32::GHOST_SystemWin32()
+GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 	: m_hasPerformanceCounter(false), m_freq(0), m_start(0)
 {
+	m_hiddenWindows = hiddenWindows;
+	if (m_hiddenWindows) {
+		m_windowFocus = false;
+	}
 	m_displayManager = new GHOST_DisplayManagerWin32();
 	GHOST_ASSERT(m_displayManager, "GHOST_SystemWin32::GHOST_SystemWin32(): m_displayManager==0\n");
 	m_displayManager->initialize();
@@ -277,7 +281,8 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(
 		        ((glSettings.flags & GHOST_glAlphaBackground) != 0),
 		        glSettings.numOfAASamples,
 		        parentWindow,
-		        ((glSettings.flags & GHOST_glDebugContext) != 0));
+		        ((glSettings.flags & GHOST_glDebugContext) != 0),
+		        m_hiddenWindows);
 
 	if (window->getValid()) {
 		// Store the pointer to the window

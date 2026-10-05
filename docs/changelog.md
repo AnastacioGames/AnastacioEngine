@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: `--server` sem janela visível no Windows (2026-10-05)
+- `GHOST_ISystem::createSystemHeadless()` agora também tem caminho Win32: cria `GHOST_SystemWin32(true)`.
+  Diferente do Linux, não é contexto offscreen puro; é uma janela Win32/WGL normal mantida oculta, suficiente para
+  inicializar OpenGL sem mostrar a janelinha do `RangeRuntime --server`.
+- `GHOST_WindowWin32` ganhou o modo `hidden`: usa `WS_POPUP`, não chama `ShowWindow()` nem aplica ícone quando o
+  sistema foi criado para headless. O runtime/editor comum continuam no caminho antigo.
+- Validação Windows/MSVC: `ninja RangeRuntime` PASS; cenário equivalente a `run_net_test_win.sh server` PASS
+  (`NETTEST server PASS` e `NETTEST client PASS`); checagem Win32 via `EnumWindows` no processo servidor:
+  3 janelas top-level criadas (`scene`, `MSCTFIME UI`, `Default IME`), **0 visíveis**.
+
 ## Converter: hierarquia pai-filho deixa de ser O(n²) na conversão de cena (2026-10-05)
 - `BL_BlenderDataConversion.cpp` (criação da hierarquia pai-filho, antes `BL_BlenderDataConversion.cpp:2352`): para cada link pai-filho, checava se pai e filho estavam na mesma camada via `objectlist->SearchValue(childobj) != objectlist->SearchValue(parentobj)`. `SearchValue` é scan linear por ponteiro (`EXP_BaseListValue`) — duas buscas O(n) por link, O(n²) na conversão de cenas com muitos objetos/muitos filhos.
 - Trocado por um `std::unordered_set<KX_GameObject*>` (`objectset`) construído uma vez a partir de `objectlist` antes do loop; as duas checagens de membership agora são O(1) via `objectset.count(...)`. Mesma troca aplicada ao segundo uso de `objectlist->SearchValue` logo depois, no loop de criação do graphic controller (culling).

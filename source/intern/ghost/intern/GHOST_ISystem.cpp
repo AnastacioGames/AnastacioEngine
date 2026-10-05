@@ -91,6 +91,12 @@ GHOST_TSuccess GHOST_ISystem::createSystemHeadless()
 	}
 	m_system = new GHOST_SystemHeadless();
 	return m_system->init();
+#elif defined(WIN32)
+	if (m_system) {
+		return GHOST_kFailure;
+	}
+	m_system = new GHOST_SystemWin32(true);
+	return m_system->init();
 #else
 	return createSystem();
 #endif
