@@ -53,6 +53,7 @@
 #include <memory>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <cstdint>
 
 
@@ -2341,6 +2342,10 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	}
 
 	// Create hierarchy information.
+	// Membership in objectlist (active layer) is checked for every link below;
+	// SearchValue is a linear scan, so with many parent-child links that is O(n^2).
+	// Mirror objectlist in a set kept in sync with the RemoveObject call below.
+	std::unordered_set<KX_GameObject *> objectset(objectlist->begin(), objectlist->end());
 	for (const BL_ParentChildLink& link : vec_parent_child) {
 
 		Object *blenderchild = link.m_blenderchild;
@@ -2350,7 +2355,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 
 		BLI_assert(childobj);
 
-		if (!parentobj || objectlist->SearchValue(childobj) != objectlist->SearchValue(parentobj)) {
+		if (!parentobj || objectset.count(childobj) != objectset.count(parentobj)) {
 			/* Special case: the parent and child object are not in the same layer.
 			 * This weird situation is used in Apricot for test purposes.
 			 * Resolve it by not converting the child
@@ -2379,6 +2384,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			}
 
 			kxscene->RemoveObject(childobj);
+			objectset.erase(childobj);
 
 			continue;
 		}
@@ -2451,7 +2457,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 				continue;
 			}
 
-			bool isactive = objectlist->SearchValue(gameobj);
+			bool isactive = objectset.count(gameobj) != 0;
 			BL_CreateGraphicObjectNew(gameobj, kxscene, isactive, physics_engine);
 			if (gameobj->GetOccluder()) {
 				occlusion = true;

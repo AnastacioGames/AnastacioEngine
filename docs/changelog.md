@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Converter: hierarquia pai-filho deixa de ser O(n²) na conversão de cena (2026-10-05)
+- `BL_BlenderDataConversion.cpp` (criação da hierarquia pai-filho, antes `BL_BlenderDataConversion.cpp:2352`): para cada link pai-filho, checava se pai e filho estavam na mesma camada via `objectlist->SearchValue(childobj) != objectlist->SearchValue(parentobj)`. `SearchValue` é scan linear por ponteiro (`EXP_BaseListValue`) — duas buscas O(n) por link, O(n²) na conversão de cenas com muitos objetos/muitos filhos.
+- Trocado por um `std::unordered_set<KX_GameObject*>` (`objectset`) construído uma vez a partir de `objectlist` antes do loop; as duas checagens de membership agora são O(1) via `objectset.count(...)`. Mesma troca aplicada ao segundo uso de `objectlist->SearchValue` logo depois, no loop de criação do graphic controller (culling).
+- O loop de hierarquia remove objetos de `objectlist`/`inactivelist` no caso raro de pai e filho em camadas diferentes (`kxscene->RemoveObject(childobj)`); `objectset.erase(childobj)` foi adicionado no mesmo ponto para manter o set sincronizado — sem isso, uma checagem posterior para o mesmo objeto daria um resultado de membership desatualizado.
+- Build completo e os dois testes (`gen_object_life.py`, `gen_timer_props.py`) PASS no Windows.
+
 ## Converter/Ketsji: busca de objeto inativo por nome deixa de ser O(n) em `addObject`/replicação de rede (2026-10-05)
 - Mesmo padrão da varredura anterior (busca cara escondida num caminho que roda por spawn): `KX_Scene::GetInactiveList()->FindValue(name)` é um scan linear sobre `EXP_BaseListValue::FindValue` (compara string contra cada elemento). Chamado em 4 pontos de código quente: `BL_Converter::FindInactiveObjectAcrossScenes` (todo `addObject`/`AddOverlayCollection` que usa um template de outra cena) e 3 pontos em `KX_NetworkManager` (resolução de prototype na replicação de rede).
 - Adicionado `KX_Scene::m_inactiveNameIndex` (`std::unordered_map<std::string, KX_GameObject*>`), espelhando `m_inactivelist`, com `FindInactiveObjectByName`/`IndexInactiveObject`/`UnindexInactiveObject`. Indexado em `BL_BlenderDataConversion.cpp` (conversão da cena), desindexado em `KX_Scene::RemoveObject`, e mesclado em `KX_Scene::MergeScene` (LibLoad) com a mesma ordem de precedência do `MergeList` antigo.
