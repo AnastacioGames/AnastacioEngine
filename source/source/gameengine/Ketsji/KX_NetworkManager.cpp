@@ -918,7 +918,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	CM_Message("network: hosting '" << m_roomName << "' (scene " << m_sceneName << ") on UDP " << port
 	           << (wsPort > 0 ? " and WebSocket " + std::to_string(wsPort) : std::string())
 	           << ", tick " << tickRate << " Hz, snapshots " << m_snapshotRate << " Hz, "
-	           << m_entries.size() << " replicated object(s)");
+	           << m_entries.size() << " replicated object(s), scene hash " << std::hex << m_sceneHash << std::dec);
 
 	Event event;
 	event.type = Event::CONNECT;

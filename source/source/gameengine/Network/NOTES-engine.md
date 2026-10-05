@@ -80,7 +80,7 @@ não deu para testar.
   relevante). `net.set_client_view(client, center, radius)` sobrescreve (objeto seguido pelo net id ou posição fixa;
   só raio mantém o centro padrão; sem argumentos volta ao padrão); a sobrescrita some quando o cliente sai.
   Testado pelo cenário `relevance`; o centro automático (objeto do cliente) não tem cenário próprio.
-- **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
+- **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o runtime Web completo com rede não foi compilado aqui. O transporte em si foi testado no navegador real contra o servidor da engine (seção "Cliente no navegador").
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
 
 ## RPC do jogo e `obj.net`
@@ -363,3 +363,17 @@ em vez de um único arquivo compartilhado).
 - Cliente dono reativa a física do corpo previsto (`SetDynamicPredicted`); grava o estado após o Bullet em `ClientTickEnd`; replay = passo + `pos += v*dt`; reconcilia só o transform. Validado com `run_net_test.sh predict-cube`. Veículo não funciona (suspensão por raycast não é refeita no replay).
 - Objetos da cena com dono: `Ownership` reenviado quando o cliente fica ativo.
 - IPv6 só no WebSocket (dual-stack, `AF_UNSPEC`); ENet 1.3.x é só IPv4 e recusa literal IPv6.
+
+## Cliente no navegador (2026-10-05)
+
+`tools/net_engine_test/run_net_web_test.sh <dir do build wasm>`: o `RangeRuntime --server` roda `net_web_server.py`
+(hospeda com `websocket_port`, replica o Spawner e cria o Rig quando alguém entra) e o Chromium headless abre
+`net_web_watch.html` (`Network/tools/net_web_watch.cpp`), servido por `python3 -m http.server`. O cliente wasm usa
+`ClientSession` + `createWebClientTransport`, o mesmo caminho do runtime Web.
+
+- O cliente avulso precisa do hash da cena: o servidor agora o imprime no log de "network: hosting" (`scene hash <hex>`).
+- `gameVersion` padrão da engine é 1 (`Hello` com 0 é recusado com `VersionMismatch`, foi o primeiro erro).
+- Build: `emcmake cmake -S source/source/gameengine/Network -B <dir> -DNET_STANDALONE=ON && cmake --build <dir> --target net_web_watch`
+  (Emscripten 6.0.11). Driver: `NODE_PATH` com `playwright`.
+- Resultado: 3 rodadas PASS (1 Spawn, 40 snapshots, 8 distintos; o servidor vê "browser" entrar e ficar).
+- Falta: compilar o runtime Web completo com `ge_network` e jogar uma cena replicada no navegador.

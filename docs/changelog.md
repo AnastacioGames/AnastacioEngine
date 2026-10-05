@@ -9,6 +9,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: cliente no navegador real contra o `RangeRuntime --server` (2026-10-05)
+- `Network/tools/net_web_watch.cpp` (Emscripten, gera `net_web_watch.html`): cliente wasm do núcleo que entra por WebSocket num servidor da engine (opções `host`, `port`, `game`, `version`, `hash` na query da página ou como `chave=valor` no node), responde `SceneLoaded` e conta `Spawn`/`Snapshot`; o resultado vai para `document.title` (`NETWEB PASS|FAIL`).
+- O servidor imprime o hash da cena no log de "network: hosting ..." (`scene hash <hex>`), que o cliente avulso precisa para o `Hello`.
+- `tools/net_engine_test/run_net_web_test.sh` (+ `net_web_server.py`, `net_web_browser.js`): `RangeRuntime --server` hospeda `halfanim_crash.range` com porta WebSocket, a página é servida por HTTP e aberta no Chromium headless (Playwright). 3 rodadas PASS (1 Spawn, 40 snapshots distintos, Chromium 141); `spawner` PASS. Emscripten 6.0.11.
+- Não coberto: o runtime Web completo (`RangeRuntime` em wasm com o `KX_NetworkManager`) não foi compilado aqui; o caminho `createWebClientTransport` dele é o mesmo transporte exercitado por este teste.
+- Troca de cena durante a partida segue em andamento (commit WIP; a fixture `make_scene_change.py` ainda deixa o protótipo `Shot` ativo na Arena2).
+
 ## Multiplayer: relevância por distância e faixa/bits por propriedade float (2026-10-04)
 - **Relevância**: campo `Relevance Radius` da cena (`RangeNetworkSettings.relevance_radius`, Export Game > Network; 0 = tudo relevante, o padrão, sem versioning). O servidor chama `Replicator::setClientView` a cada tick (`KX_NetworkManager::UpdateClientViews`): centro = primeiro objeto replicado do cliente; sem objeto, tudo relevante. `Range.network.set_client_view(client, center=None, radius=None)` sobrescreve (centro = objeto seguido ou posição; raio 0 = tudo; tudo `None` volta ao padrão da cena). "Always Relevant" segue valendo.
 - **Float quantizado**: `bProperty.net_min/net_max/net_bits` (RNA `net_min`, `net_max`, `net_bits` em `GameFloatProperty`); a linha "Bits / Min / Max" aparece sob a propriedade Float com "Rep". 0 bits = 32 bits crus; faixa inválida avisa e cai para cru. Vale também para `net.replicate(props=[...])`.
