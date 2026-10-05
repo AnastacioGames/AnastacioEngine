@@ -95,6 +95,8 @@ struct PythonMainLoopState
 
 #endif
 
+std::atomic<bool> LA_SigTermRequested(false);
+
 LA_Launcher::LA_Launcher(GHOST_ISystem *system, Main *maggie, Scene *scene, GlobalSettings *gs,
                          RAS_Rasterizer::StereoMode stereoMode, int samples, bool alwaysUseExpandFraming, int argc, char **argv)
 	:m_serverMode(false),
@@ -555,6 +557,13 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 
 	// First check if we want to exit.
 	KX_ExitInfo exitInfo = m_ketsjiEngine->GetExitInfo();
+
+	// A SIGTERM (e.g. an orchestrator stopping a `--server` dedicated process) requests the
+	// same clean shutdown as closing the window, checked once per frame since the signal
+	// handler itself only sets this flag (async-signal-safe).
+	if (exitInfo.m_code == KX_ExitInfo::NO_REQUEST && LA_SigTermRequested.load()) {
+		exitInfo.m_code = KX_ExitInfo::OUTSIDE;
+	}
 
 	if (exitInfo.m_code == KX_ExitInfo::NO_REQUEST) {
 		if (renderFrame) {

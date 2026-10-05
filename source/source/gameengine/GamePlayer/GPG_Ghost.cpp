@@ -736,6 +736,17 @@ static void sigHandleAbort(int signum)
 	sigHandleCrash(signum);
 }
 
+/* `kill -TERM` (e.g. an orchestrator stopping a `--server` dedicated process) used to be
+ * ignored: no handler was installed, so the default disposition applied, which only works
+ * if the signal reaches the main thread outside of any syscall with a disposition that
+ * masks it (worker thread pools can shift where it lands). Set a flag here (the only
+ * async-signal-safe option) and let LA_Launcher::EngineNextFrame() check it once per frame,
+ * the same clean-shutdown path as closing the window. */
+static void sigHandleTerm(int /*signum*/)
+{
+	LA_SigTermRequested.store(true);
+}
+
 static void terminateHandler()
 {
 	fputs("\nstd::terminate() called (uncaught C++ exception)\n", stderr);
@@ -941,6 +952,7 @@ int main(int argc,
 #else
 	/* after parsing args */
 	signal(SIGSEGV, sigHandleCrash);
+	signal(SIGTERM, sigHandleTerm);
 #endif  // WIN32
 	signal(SIGABRT, sigHandleAbort);
 	std::set_terminate(terminateHandler);

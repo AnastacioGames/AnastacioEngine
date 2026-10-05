@@ -33,7 +33,14 @@
 
 #include "SCA_IInputDevice.h"
 
+#include <atomic>
 #include <string>
+
+/** Set by the process's SIGTERM handler (GPG_Ghost.cpp); checked once per
+ * frame in LA_Launcher::EngineNextFrame() so `kill -TERM` (e.g. an
+ * orchestrator stopping a `--server` dedicated process) triggers the same
+ * clean shutdown path as closing the window. */
+extern std::atomic<bool> LA_SigTermRequested;
 
 class KX_Scene;
 class BL_Converter;

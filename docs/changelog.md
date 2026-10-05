@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## RangeRuntime: corrige SIGTERM ignorado (2026-10-05)
+- O item do roadmap ("handler instalado, processo segue rodando") estava com a causa errada: não havia handler
+  nenhum de `SIGTERM` — só `SIGSEGV`/`SIGABRT` (dump de crash) em `GPG_Ghost.cpp`. Adicionado
+  `signal(SIGTERM, sigHandleTerm)` (seta `LA_SigTermRequested`, `std::atomic<bool>` novo declarado em
+  `LA_Launcher.h`/definido em `LA_Launcher.cpp`), checado em `LA_Launcher::EngineNextFrame()` uma vez por
+  quadro — como o loop já processa eventos de forma não bloqueante (`m_system->processEvents(false)`), a
+  checagem nunca fica presa esperando. Reaproveita `KX_ExitInfo::OUTSIDE`, o mesmo código de saída do fechar
+  de janela (WINCLOSE/WINQUIT), então o shutdown é idêntico ao caminho já testado.
+- Relevante sobretudo para `RangeRuntime --server` (modo Dedicated headless, usado em `run_net_test.sh
+  server`/`scene-server` e por qualquer orquestrador que precise parar o processo com `kill`/`SIGTERM` em vez
+  de `SIGKILL`).
+- Testado manualmente: `RangeRuntime --server` iniciado sem display (`env -u DISPLAY -u WAYLAND_DISPLAY`),
+  `kill -TERM <pid>` — saída limpa em ~0,1 s (antes, o processo não saía sozinho). Regressão
+  `run_net_test.sh server` e `spawner` PASS no Linux (`build-linux-editor`), sem warnings novos no build.
+
 ## Multiplayer: corrige warning do switch em NET_TransportENet (ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) (2026-10-05)
 - `NET_TransportENet.cpp:161`: o `switch` sobre `event.type` não tratava `ENET_EVENT_TYPE_DISCONNECT_TIMEOUT` (valor de enum exclusivo do fork `zpl-c/enet`, ausente no ENet clássico), gerando warning `-Wswitch` no build. Corrigido empilhando esse case junto de `ENET_EVENT_TYPE_DISCONNECT` (mesmo tratamento: reporta `Disconnected` e limpa o peer — timeout é só outra forma do peer cair).
 - Revalidado: build sem warnings e testes 100% PASS em Linux (`build-linux`, 0,30 s) e wasm32 (Emscripten 6.0.11, `build-wasm`, 0,18 s).

@@ -181,7 +181,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
     2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,
     pacote 0.4.6 leva `libOpenColorIO.so.1` e a pasta, sem "fallback mode". Falta o Kitsuy confirmar.
-  - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
+  - ~~`RangeRuntime` ignora `SIGTERM`~~ **Corrigido (2026-10-05).** A premissa ("handler instalado") estava
+    errada: não havia handler nenhum, só os de `SIGSEGV`/`SIGABRT` (crash dump) em `GPG_Ghost.cpp`. Adicionado
+    `signal(SIGTERM, ...)` que seta `LA_SigTermRequested` (atomic), checada em
+    `LA_Launcher::EngineNextFrame()` a cada frame (mesmo caminho de saída limpa do fechar de janela,
+    `KX_ExitInfo::OUTSIDE`). Testado manualmente com `RangeRuntime --server` headless: processo saía em até
+    timeout (`kill -9` externo) antes, agora sai limpo em ~0,1 s. `run_net_test.sh server`/`spawner` PASS
+    (Linux, `build-linux-editor`) sem regressão.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
     `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
