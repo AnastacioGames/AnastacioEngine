@@ -200,6 +200,7 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
         col = layout.column(align=True)
         col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
         col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
+        col.operator("material.recipe_wet_patches", icon='MOD_OCEAN')
         col.operator_menu_enum("material.recipe_preset", "preset", text="Ready-made Material", icon='MATERIAL')
 
         if not mat or RECIPE_KEY not in mat:
@@ -210,6 +211,18 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
             row = layout.row()
             row.label(text="Tiling: %.2f" % get_tiling(mapping))
             row.operator("material.recipe_tiling", text="Change", icon='FULLSCREEN_ENTER')
+
+        if mat.get(RECIPE_KEY) == "wet_patches":
+            box = layout.box()
+            box.label(text="Wet/reflective patches (paint white where they appear)")
+            mask = find_node(mat, "AE_wet_mask")
+            if mask:
+                row = box.row()
+                row.operator("material.recipe_paint_mask", icon='BRUSH_DATA')
+                img = node_image(mask)
+                if img and img.is_dirty:
+                    box.label(text="The mask was painted: save it (Image > Save As) or pack it", icon='ERROR')
+            return
 
         if mat.get(RECIPE_KEY) != "mask_blend":
             return

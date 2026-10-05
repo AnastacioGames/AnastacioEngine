@@ -15,6 +15,7 @@ LAYERS = ("AE_layer_base", "AE_layer_r", "AE_layer_g", "AE_layer_b")
 LAYER_LABELS = ("Base (black)", "Red", "Green", "Blue")
 MASK = "AE_mask"
 MAPPING = "AE_mapping"
+WET_MASK = "AE_wet_mask"
 
 # Sufixos comuns dos pacotes de textura (Poly Haven, ambientCG, Substance, Quixel...).
 MAP_WORDS = (
@@ -355,6 +356,80 @@ def build_mask_blend(mat, pbr, scale, mask_img, layers=None):
             b.link(normal, mnode.inputs["Normal"])
 
 
+def build_wet_patches(mat, pbr, scale, mask_img):
+    b = TreeBuilder(mat)
+    uv_raw = b.uv(pbr, -1500, 0)
+    uv = b.mapping(uv_raw, scale, -1250, 250)
+
+    mask, mask_color = b.image(pbr, mask_img, -1250, -250, WET_MASK, "Wet Mask (paint white)")
+    b.link(uv_raw, mask.inputs["Vector"])
+    sep = b.add("ShaderNodeSeparateRGB", -1000, -250)
+    b.link(mask_color, sep.inputs["Image"])
+    fac = sep.outputs["R"]
+
+    asphalt = b.add("ShaderNodeTexNoise", -1000, 350, "AE_asphalt_noise", "Asphalt Grain")
+    asphalt.inputs["Scale"].default_value = 55.0
+    asphalt.inputs["Detail"].default_value = 12.0
+    b.link(uv, asphalt.inputs["Vector"])
+
+    asphalt_color = b.add("ShaderNodeValToRGB", -760, 350, "AE_asphalt_color", "Asphalt Color")
+    asphalt_color.color_ramp.elements[0].position = 0.22
+    asphalt_color.color_ramp.elements[0].color = (0.035, 0.038, 0.04, 1.0)
+    asphalt_color.color_ramp.elements[1].position = 1.0
+    asphalt_color.color_ramp.elements[1].color = (0.22, 0.23, 0.22, 1.0)
+    b.link(asphalt.outputs["Fac"], asphalt_color.inputs["Fac"])
+
+    wet_tint = b.add("ShaderNodeMixRGB", -500, 320, "AE_wet_tint", "Wet Patch Darkens Surface")
+    wet_tint.blend_type = 'MIX'
+    wet_tint.inputs["Color2"].default_value = (0.015, 0.025, 0.035, 1.0)
+    b.link(fac, wet_tint.inputs["Fac"])
+    b.link(asphalt_color.outputs["Color"], wet_tint.inputs["Color1"])
+
+    rough = b.add("ShaderNodeMixRGB", -500, 40, "AE_wet_roughness", "Roughness: dry to wet")
+    rough.inputs["Color1"].default_value = (0.82, 0.82, 0.82, 1.0)
+    rough.inputs["Color2"].default_value = (0.025, 0.025, 0.025, 1.0)
+    b.link(fac, rough.inputs["Fac"])
+
+    wet_noise = b.add("ShaderNodeTexNoise", -760, -520, "AE_wet_micro_detail", "Wet Micro Detail")
+    wet_noise.inputs["Scale"].default_value = 95.0
+    wet_noise.inputs["Detail"].default_value = 8.0
+    b.link(uv, wet_noise.inputs["Vector"])
+
+    asphalt_bump = b.add("ShaderNodeBump", -260, -300, "AE_asphalt_bump", "Asphalt Bump")
+    asphalt_bump.inputs["Strength"].default_value = 0.06
+    asphalt_bump.inputs["Distance"].default_value = 0.055
+    b.link(asphalt.outputs["Fac"], asphalt_bump.inputs["Height"])
+
+    wet_bump = b.add("ShaderNodeBump", -260, -560, "AE_wet_bump", "Wet Smooth Bump")
+    wet_bump.inputs["Strength"].default_value = 0.018
+    wet_bump.inputs["Distance"].default_value = 0.018
+    b.link(wet_noise.outputs["Fac"], wet_bump.inputs["Height"])
+
+    normal_mix = b.add("ShaderNodeMixRGB", 0, -420, "AE_wet_normal_mix", "Mask mixes dry/wet normal")
+    b.link(fac, normal_mix.inputs["Fac"])
+    b.link(asphalt_bump.outputs["Normal"], normal_mix.inputs["Color1"])
+    b.link(wet_bump.outputs["Normal"], normal_mix.inputs["Color2"])
+
+    if pbr:
+        bsdf = b.pbr_output(260, 0)
+        b.link(wet_tint.outputs["Color"], bsdf.inputs["Base Color"])
+        b.link(rough.outputs["Color"], bsdf.inputs["Roughness"])
+        b.link(normal_mix.outputs["Color"], bsdf.inputs["Normal"])
+        return
+
+    mnode = b.legacy_output(mat, 260, 0)
+    base = mnode.material
+    base.diffuse_color = (0.08, 0.085, 0.08)
+    base.specular_intensity = 0.95
+    base.specular_hardness = 420
+    base.specular_roughness_bsdf = 0.04
+    b.link(wet_tint.outputs["Color"], mnode.inputs["Color"])
+    inv = b.add("ShaderNodeInvert", 0, 40)
+    b.link(rough.outputs["Color"], inv.inputs["Color"])
+    b.link(inv.outputs["Color"], mnode.inputs["Spec"])
+    b.link(normal_mix.outputs["Color"], mnode.inputs["Normal"])
+
+
 def get_tiling(mapping):
     # Neste fork a escala do Mapping é uma entrada (socket); no 2.79 original, uma propriedade.
     if "Scale" in mapping.inputs:
@@ -451,6 +526,37 @@ class MATERIAL_OT_recipe_mask_blend(Operator):
         return {'FINISHED'}
 
 
+class MATERIAL_OT_recipe_wet_patches(Operator):
+    """Asphalt material with a paintable wet mask: paint white where reflective wet patches should appear"""
+    bl_idname = "material.recipe_wet_patches"
+    bl_label = "Wet/Reflective Patches"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    tiling: FloatProperty(name="Surface Tiling", description="How many times the surface grain repeats over the UV",
+                           default=12.0, min=0.01, soft_max=256.0)
+    mask_size: IntProperty(name="Mask Size", description="Resolution of the wet/reflection mask image to paint",
+                            default=1024, min=64, max=8192)
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'MESH'
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        ob = context.object
+        mat = target_material(context, ob.name + " Wet Surface")
+        mask = bpy.data.images.new(mat.name + " Wet Mask", self.mask_size, self.mask_size)
+        mask.generated_color = (0.0, 0.0, 0.0, 1.0)
+        mask.colorspace_settings.name = 'Non-Color'
+        build_wet_patches(mat, use_pbr(context), self.tiling, mask)
+        mat[RECIPE_KEY] = "wet_patches"
+        if ensure_uv(ob):
+            self.report({'WARNING'}, "The mesh had no UV map: one was created with Smart UV Project")
+        return {'FINISHED'}
+
+
 class MATERIAL_OT_recipe_layer_set(Operator):
     """Pick one texture of a set for this layer: its normal and roughness are found by name and connected too"""
     bl_idname = "material.recipe_layer_set"
@@ -499,11 +605,13 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
 
     @classmethod
     def poll(cls, context):
-        return node_image(find_node(active_material(context), MASK)) is not None
+        mat = active_material(context)
+        return (node_image(find_node(mat, MASK)) is not None or
+                node_image(find_node(mat, WET_MASK)) is not None)
 
     def execute(self, context):
         mat = active_material(context)
-        img = node_image(find_node(mat, MASK))
+        img = node_image(find_node(mat, WET_MASK)) or node_image(find_node(mat, MASK))
         ip = context.scene.tool_settings.image_paint
         ip.mode = 'IMAGE'
         ip.canvas = img
@@ -512,7 +620,10 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
         brush = ip.brush
         if brush:
             brush.color = (1.0, 0.0, 0.0)
-        self.report({'INFO'}, "Red, green and blue show layers; black shows the base. Save the mask image when done")
+        if mat.get(RECIPE_KEY) == "wet_patches":
+            self.report({'INFO'}, "Paint white for wet/reflective patches and black for the dry base. Save the mask image when done")
+        else:
+            self.report({'INFO'}, "Red, green and blue show layers; black shows the base. Save the mask image when done")
         return {'FINISHED'}
 
 
@@ -693,6 +804,7 @@ def build_legacy_preset(mat, preset, color, metal, rough, alpha, emit):
 classes = (
     MATERIAL_OT_recipe_texture_set,
     MATERIAL_OT_recipe_mask_blend,
+    MATERIAL_OT_recipe_wet_patches,
     MATERIAL_OT_recipe_layer_set,
     MATERIAL_OT_recipe_paint_mask,
     MATERIAL_OT_recipe_brush_color,

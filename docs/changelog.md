@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Quick Material: receita "Wet/Reflective Patches" (poca/barro/oleo com mascara pintavel) (2026-10-05)
+- Nova receita de nos em `anastacio_material_recipes.py` (`MATERIAL_OT_recipe_wet_patches`, `material.recipe_wet_patches`): gera um material de superficie (asfalto procedural via `ShaderNodeTexNoise`/`ValToRGB`) com uma mascara preta/branca pintavel (`AE_wet_mask`) que escurece, alisa (rugosidade) e troca a normal para uma variante quase-especular onde for pintado de branco — da a ilusao de poca/mancha molhada sem reflexo raytraced real.
+- Generica de proposito (nao so "agua"): serve igual para barro molhado, oleo leve ou asfalto umido; o botao/label no painel e "Wet/Reflective Patches" em vez de algo especifico de agua.
+- `MATERIAL_OT_recipe_paint_mask` (botao "Paint the Mask") foi estendido para reconhecer tanto a mascara antiga (`AE_mask`, usada por `mask_blend`) quanto a nova `AE_wet_mask`, trocando a mensagem do Report de acordo com a receita ativa.
+- Painel (`properties_material.py`, `MATERIAL_PT_recipes`): novo botao com icone `MOD_OCEAN` e uma caixa dedicada que mostra o botao de pintura e avisa (icone `ERROR`) quando a mascara foi pintada e ainda nao foi salva/empacotada.
+- Cena de teste (`tools/create_material_recipes_test.py`): adicionado um objeto "Wet Patch Road" com duas faixas pintadas na mascara; validado rodando `RangeEngine -b --python tools/create_material_recipes_test.py -- <out> --auto-screenshot` seguido de `RangeEngine <out>` — o highlight especular da Sun aparece nitidamente nas faixas pintadas contra o asfalto fosco ao redor.
+- Achado durante o teste: `ShaderNodeTexNoise` neste Blender 2.79 nao tem o socket `Roughness` (adicionado so em versoes bem mais novas do Blender) — tentar setar `default_value` nele falha com `KeyError`. A receita usa apenas `Scale`/`Detail`.
+- Achado secundario (nao corrigido aqui, so documentado): a BGE deste fork escolhe a camera inicial do jogo pela ordem de criacao do objeto `Camera` na cena, nao por `scene.camera`; um `scene.camera = outro_objeto` setado via script antes de salvar e ignorado em runtime.
+
 ## UI: menus de cabecalho toleram movimento rapido do mouse (2026-10-05)
 - Popups de menu com `UI_BLOCK_MOVEMOUSE_QUIT` agora aguardam uma pequena janela (`0.35s`) antes de fechar quando o cursor sai apenas por movimento do mouse. Entrar de volta no menu cancela o timer; cliques/teclas continuam fechando imediatamente como antes.
 - Isso corrige o seletor de tipo de editor dos cabecalhos (icone no canto esquerdo, `More Editors`, etc.), permitindo sair rapidamente do botao e entrar no menu sem ele desaparecer no primeiro `MOUSEMOVE` fora da area.

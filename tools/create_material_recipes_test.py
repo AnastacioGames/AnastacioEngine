@@ -4,6 +4,7 @@ Run with:  RangeEngine -b --python tools/create_material_recipes_test.py -- <out
 Without "legacy" the scene uses PBR Shading Nodes; with it, the Blender Internal nodes.
   - Plane: Blend Textures by Mask, mask filled with black/red/green/blue quarters
   - Cube: Material from Texture Set (generated bricks_albedo/normal/roughness images)
+  - Road strip: Wet/Reflective Patches, mask filled with two wet streaks
   - Spheres: Ready-made Material presets
 """
 import bpy
@@ -80,6 +81,26 @@ bpy.ops.object.material_slot_add()
 bpy.ops.material.recipe_texture_set(filepath=os.path.join(folder, "bricks_roughness.png"), tiling=2.0)
 print("RECIPE texture set:", sorted(n.name for n in cube.active_material.node_tree.nodes if n.name.startswith("AE_")))
 
+bpy.ops.mesh.primitive_cube_add(radius=1, location=(0, 3.2, 0.03))
+road = scene.objects.active
+road.name = "Wet Patch Road"
+road.scale = (4.0, 1.0, 0.03)
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+bpy.ops.material.recipe_wet_patches(tiling=16.0, mask_size=128)
+mat = road.active_material
+from bl_operators.anastacio_material_recipes import WET_MASK
+wet_mask = node_image(find_node(mat, WET_MASK))
+px = []
+for y in range(128):
+    for x in range(128):
+        stripe = 1.0 if (34 < x < 54 and 16 < y < 112) or (76 < x < 100 and 28 < y < 104) else 0.0
+        feather = 0.35 if (28 < x < 108 and 10 < y < 118 and stripe == 0.0 and (x + y) % 17 < 3) else 0.0
+        v = max(stripe, feather)
+        px.extend((v, v, v, 1.0))
+wet_mask.pixels = px
+wet_mask.pack(as_png=True)
+print("RECIPE wet patches:", sorted(n.name for n in mat.node_tree.nodes if n.name.startswith("AE_")))
+
 for i, preset in enumerate(("PLASTIC", "METAL", "GOLD", "RUBBER", "GLASS", "EMISSIVE")):
     bpy.ops.mesh.primitive_uv_sphere_add(size=0.5, location=(-3 + i * 1.2, -2.5, 0.6))
     bpy.ops.material.recipe_preset(preset=preset)
@@ -90,9 +111,44 @@ scene.objects.active.data.shadow_method = 'RAY_SHADOW'
 bpy.ops.object.camera_add(location=(0, -9, 5), rotation=(1.05, 0, 0))
 scene.camera = scene.objects.active
 
+main_cam = scene.camera
+
+scene.game_settings.show_framerate_profile = False
+scene.game_settings.show_debug_properties = False
+scene.game_settings.show_debug_mode = False
+
 for m in bpy.data.materials:
     if m.use_nodes:
         print("RECIPE", m.name, m.get("anastacio_recipe"), len(m.node_tree.nodes), "nodes",
               len(m.node_tree.links), "links")
 bpy.ops.wm.save_as_mainfile(filepath=output)
 print("RECIPE saved", output)
+
+if "--auto-screenshot" in sys.argv:
+    shot_path = os.path.join(os.path.dirname(output), "material_recipes_test.png").replace("\\", "/")
+    controller = (
+        "import Range\n"
+        "from Range import logic\n"
+        "cont = logic.getCurrentController()\n"
+        "own = cont.owner\n"
+        "own['frame'] = own.get('frame', 0) + 1\n"
+        "if own['frame'] == 12:\n"
+        "    Range.render.makeScreenshot('%s')\n"
+        "if own['frame'] == 16:\n"
+        "    logic.endGame()\n"
+    ) % shot_path
+    text = bpy.data.texts.new("auto_screenshot.py")
+    text.write(controller)
+    # Angulo raso sobre a faixa molhada da pista, pegando o highlight especular da Sun.
+    main_cam.location = (0, 2.0, 0.5)
+    main_cam.rotation_euler = (1.3, 0, 0)
+    main_cam.data.lens = 35.0
+    cam_ob = scene.camera
+    scene.objects.active = cam_ob
+    bpy.ops.logic.sensor_add(type='ALWAYS', object=cam_ob.name)
+    bpy.ops.logic.controller_add(type='PYTHON', object=cam_ob.name)
+    cam_ob.game.sensors[-1].use_pulse_true_level = True
+    cam_ob.game.controllers[-1].text = text
+    cam_ob.game.sensors[-1].link(cam_ob.game.controllers[-1])
+    bpy.ops.wm.save_as_mainfile(filepath=output)
+    print("RECIPE auto-screenshot wired ->", shot_path)
