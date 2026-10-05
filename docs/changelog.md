@@ -9,6 +9,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Multiplayer: IPv6 no ENet — investigação, sem implementação (2026-10-05)
+- O ENet vendorizado (`source/extern/enet`, 1.3.18) é IPv4-only: `ENetAddress.host` é `enet_uint32` (32 bits), usado em `host.c`/`peer.c`/`protocol.c`/`unix.c`/`win32.c`; não dá para portar a struct sem reescrever esses arquivos.
+- Decisão com o usuário: usar fork pronto em vez de reescrever na mão. Avaliado [`zpl-c/enet`](https://github.com/zpl-c/enet) (single-header, `ENetAddress.host` vira `struct in6_addr`, dual-stack com mapeamento IPv4↔IPv6 embutido). Superfície de contato no engine fora do vendor: só `NET_TransportENet.cpp:80` (`address.host = ENET_HOST_ANY;`), que o fork também define.
+- Nada implementado ainda (sem crédito disponível para o trabalho de troca de vendor + CMake + rebuild nas 3 plataformas). Detalhes e próximos passos em `NOTES-engine.md` ("IPv6 no ENet/UDP — investigação").
+
 ## Multiplayer: cliente no navegador real contra o `RangeRuntime --server` (2026-10-05)
 - `Network/tools/net_web_watch.cpp` (Emscripten, gera `net_web_watch.html`): cliente wasm do núcleo que entra por WebSocket num servidor da engine (opções `host`, `port`, `game`, `version`, `hash` na query da página ou como `chave=valor` no node), responde `SceneLoaded` e conta `Spawn`/`Snapshot`; o resultado vai para `document.title` (`NETWEB PASS|FAIL`).
 - O servidor imprime o hash da cena no log de "network: hosting ..." (`scene hash <hex>`), que o cliente avulso precisa para o `Hello`.

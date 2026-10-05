@@ -381,3 +381,18 @@ em vez de um único arquivo compartilhado).
 ## Troca de cena durante a partida (2026-10-05)
 
 `net.change_scene("Arena2")` (só servidor) troca a cena de todos; clientes conectados recebem `on_scene`, e quem entra depois já é levado para a cena atual. Teste: `run_net_test.sh scene-change` (servidor + cliente + cliente atrasado, PASS). Cuidado ao gerar cenas por script: um objeto ligado a uma cena que não é a do contexto precisa de `scene.object_bases[nome].layers`, porque `Object.layers` só muda a base da cena do contexto; sem isso o protótipo fica numa camada visível e `net.spawn` não o acha.
+
+## IPv6 no ENet/UDP — investigação (2026-10-05)
+
+O ENet vendorizado (`source/extern/enet`, 1.3.18) é IPv4-only de verdade: `ENetAddress.host` é `enet_uint32` (32 bits), usado em `host.c`, `peer.c`, `protocol.c`, `unix.c`, `win32.c`. Não cabe endereço IPv6; não dá para "patchear" a struct sem reescrever esses arquivos inteiros.
+
+Decisão (com o usuário): usar um fork pronto em vez de portar a struct na mão. Candidato avaliado: [`zpl-c/enet`](https://github.com/zpl-c/enet) — single-header (~5300 linhas), `ENetAddress.host` vira `struct in6_addr` (16 bytes), dual-stack real com mapeamento IPv4↔IPv6 embutido (`enet_inaddr_map4to6`/`map6to4`), `ENET_SOCKOPT_IPV6_V6ONLY` desligado por padrão (aceita IPv4 e IPv6 no mesmo socket). API muito parecida com o ENet clássico.
+
+Superfície de contato no engine (fora do próprio vendor do ENet): só **um** ponto, `NET_TransportENet.cpp:80` (`address.host = ENET_HOST_ANY;`), que o fork também define — baixo risco de regressão na engine em si.
+
+Trabalho restante (não feito ainda, fica para quando houver crédito/prioridade):
+1. Trocar `source/extern/enet` pelo header do `zpl-c/enet` (ou vendorizá-lo ao lado, decidir layout no CMake).
+2. Ajustar `CMakeLists.txt` de `source/extern/enet` e dependentes (é single-header, então o build muda de "biblioteca C" para "header-only").
+3. Recompilar e rodar `run_net_test.sh spawner|rpc|predict|server|scene` (regressão IPv4) nas 3 plataformas (gcc, MSVC, wasm32 — CI em `.github/workflows/network.yml`).
+4. Testar `::1` numa máquina com IPv6 de fato (a sandbox atual pode não ter IPv6 disponível — checar antes).
+5. Decidir se `net.host`/`net.join` expõem IPv6 na API Python (`tools/net_menu/NOTES-D.md`) ou se fica transparente (dual-stack automático).
