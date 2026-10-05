@@ -461,9 +461,8 @@ def build_wet_patches(mat, pbr, scale, mask_img):
         "Pinte BRANCO na mascara 'Wet Mask' para marcar poca/mancha\n"
         "molhada (barro, oleo ou agua); PRETO volta ao asfalto seco.\n"
         "Use o botao 'Paint the Mask' no painel: ele ja troca o pincel\n"
-        "para branco e aplica uma textura no pincel para pocas com\n"
-        "formato irregular (nao so circulos). Gire/redimensione a\n"
-        "textura do pincel (R / S em modo pintura) para variar o formato.",
+        "para branco e da uma borda irregular (nao um circulo perfeito),\n"
+        "para parecer poca/mancha de verdade em vez de um disco liso.",
         -1250, 650, width=620, height=260,
     )
 
@@ -657,10 +656,9 @@ def apply_puddle_brush(context, color):
     brush.color = color
     brush.use_alpha = True
     brush.texture = ensure_puddle_brush_texture()
-    slot = brush.texture_slot
-    slot.map_mode = 'STENCIL'
-    brush.stencil_pos = (256, 256)
-    brush.stencil_dimension = (180, 180)
+    # TILED: a textura acompanha o pincel no cursor (dá a borda irregular em cada
+    # pincelada); diferente de STENCIL, que fica fixa e grande sobre a 3D view.
+    brush.texture_slot.map_mode = 'TILED'
 
 
 class MATERIAL_OT_recipe_paint_mask(Operator):
@@ -684,8 +682,8 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
             bpy.ops.paint.texture_paint_toggle()
         if mat.get(RECIPE_KEY) == "wet_patches":
             apply_puddle_brush(context, (1.0, 1.0, 1.0))
-            self.report({'INFO'}, "Paint white for wet/reflective patches, black for dry. Brush has a puddle-shaped "
-                                   "stencil: press R/S in the viewport to rotate/resize it for different puddle shapes")
+            self.report({'INFO'}, "Paint white for wet/reflective patches, black for dry. The brush edge is "
+                                   "irregular (puddle-shaped) instead of a perfect circle")
         else:
             brush = ip.brush
             if brush:
