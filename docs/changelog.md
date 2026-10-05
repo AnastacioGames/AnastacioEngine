@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Addons Brush/Pie Menus preservados no source e compatíveis com API atual (2026-10-05)
+- O addon `space_view3d_brush_menus` existia apenas na instalação gerada (`build/bin/2.79/scripts/addons`), então uma correção feita ali seria perdida em `ninja install`/rebuild. A pasta completa foi promovida para `source/release/scripts/addons/space_view3d_brush_menus`.
+- `__init__.py` deixou de usar `bpy.utils.register_module(__name__)`, removido nesta base, e passou a registrar/desregistrar explicitamente as classes do pacote via `bpy.utils.register_class`/`unregister_class`, filtrando somente classes definidas nos módulos do próprio addon.
+- O addon `pie_menus_official` também foi conferido contra a pasta permanente em `source/release/scripts/addons/pie_menus_official`; os arquivos `.py` estão alinhados com a versão corrigida instalada em `build/bin`, deixando a correção preservada para rebuild/install.
+- Validação: `RangeEngine.exe --background --python-expr` habilitou e desabilitou `space_view3d_brush_menus` e `pie_menus_official` sem `AttributeError`/traceback.
+
 ## Quick Material: receita "Wet/Reflective Patches" (poca/barro/oleo com mascara pintavel) (2026-10-05)
 - Nova receita de nos em `anastacio_material_recipes.py` (`MATERIAL_OT_recipe_wet_patches`, `material.recipe_wet_patches`): gera um material de superficie (asfalto procedural via `ShaderNodeTexNoise`/`ValToRGB`) com uma mascara preta/branca pintavel (`AE_wet_mask`) que escurece, alisa (rugosidade) e troca a normal para uma variante quase-especular onde for pintado de branco — da a ilusao de poca/mancha molhada sem reflexo raytraced real.
 - Generica de proposito (nao so "agua"): serve igual para barro molhado, oleo leve ou asfalto umido; o botao/label no painel e "Wet/Reflective Patches" em vez de algo especifico de agua.
