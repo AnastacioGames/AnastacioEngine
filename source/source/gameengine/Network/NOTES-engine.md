@@ -64,7 +64,7 @@ não deu para testar.
 2. **Código de sala** (4–8 caracteres base 36) em `join()`: sem serviço de lobby não dá para resolver; `join()` avisa e devolve `False`.
 3. **`Server Name`**: virou `game_settings.network.server_name` (padrão "Anastacio Server"), como sugerido em NOTES-H.
 4. **`game_id`/`game_version`** entraram no painel (o handshake exige) em vez de ficarem fixos.
-5. **IPv6**: o núcleo só fala IPv4 (NOTES-C); `join("[::1]:7777")` é aceito pelo parser mas o ENet não conecta.
+5. **IPv6**: a API já aceita `join("[::1]:7777")` pela string; no build padrão (`ENET_IPV4_ONLY=ON`) o transporte ENet ainda recusa IPv6 de propósito. Num build dual-stack (`-DENET_IPV4_ONLY=OFF`, máquina com pilha IPv6) o `connect()` passa a conectar sem mudança de código (decisão 2026-10-05, ver seção "IPv6 no ENet/UDP").
 6. **Versão do DNA**: não mexi em `RANGE_MINSUBVERSION`; o bloco de versioning usa `DNA_struct_elem_find` (como os blocos vizinhos), então não depende do número.
 
 ## O que não está feito (e por quê)
@@ -395,7 +395,7 @@ Trabalho restante (não feito ainda, fica para quando houver crédito/prioridade
 2. ~~Ajustar `CMakeLists.txt`~~ **Feito (2026-10-05).**
 3. ~~Recompilar e rodar a regressão IPv4~~ **Feito no Linux (2026-10-05).** Falta MSVC e wasm32.
 4. Testar `::1` numa máquina com IPv6 de fato.
-5. Decidir se `net.host`/`net.join` expõem IPv6 na API Python (`tools/net_menu/NOTES-D.md`) ou se fica transparente (dual-stack automático).
+5. ~~Decidir se `net.host`/`net.join` expõem IPv6 na API Python~~ **Decidido (2026-10-05): transparente, pela string de endereço, sem parâmetro novo — ver abaixo.**
 
 ### Troca de vendor concretizada (2026-10-05, Linux)
 
@@ -409,4 +409,5 @@ Trabalho restante (não feito ainda, fica para quando houver crédito/prioridade
 - Um warning novo e inofensivo no build: `enumeration value 'ENET_EVENT_TYPE_DISCONNECT_TIMEOUT' not handled in switch` em `NET_TransportENet.cpp:161` (o fork tem um valor de enum a mais que o ENet clássico não tinha; o `switch` não trata esse caso, mas não quebra nada — o `default`/fallthrough já cobria antes). ~~Não corrigido ainda, é cosmético.~~ **Corrigido (2026-10-05):** ver abaixo.
 - **Validação wasm32 (2026-10-05):** `emcmake cmake -S source/source/gameengine/Network -B build-wasm -DNET_STANDALONE=ON -DCMAKE_BUILD_TYPE=Release && cmake --build build-wasm && ctest --test-dir build-wasm` (Emscripten 6.0.11, Node.js, CI filter=core tests sem sockets/ENet). Resultado: **PASS** (`net_tests.js` com 100% testes passando em 0,18 seg). O mesmo warning do switch em `NET_TransportENet.cpp:161` apareceu (cosmético, corrigido depois — ver abaixo).
 - **Correção do warning do switch (2026-10-05):** `NET_TransportENet.cpp:161` passou a tratar `ENET_EVENT_TYPE_DISCONNECT_TIMEOUT` com o mesmo `case` de `ENET_EVENT_TYPE_DISCONNECT` (peer cai por timeout sem um disconnect limpo — o tratamento correto é idêntico: reportar `Disconnected` e limpar o peer). Revalidado: build sem warnings e testes 100% PASS em Linux (`build-linux`, 0,30 s) e wasm32 (`build-wasm`/Emscripten 6.0.11, 0,18 s).
-- **Ainda não feito:** rebuild/teste no Windows (MSVC); teste de conectividade `::1` real (precisa desligar `ENET_IPV4_ONLY` e rodar numa máquina com IPv6 disponível); decisão sobre expor IPv6 na API Python.
+- **API Python de IPv6 — decidida (2026-10-05):** fica **transparente pela própria string de endereço**, sem parâmetro novo. `net.join("[::1]:7777")` já é documentado e já era parseado por `ParseAddress()` em `KX_PyNetwork.cpp` (aceita `host`, `host:port`, `[v6]:port` e já tira os colchetes antes de chegar ao transporte); `net.host(port=...)` já faz bind em `ENET_HOST_ANY` (= `in6addr_any` no modo dual-stack). O único ponto que bloqueava IPv6 em runtime era o guard em `NET_TransportENet.cpp::connect()`, que rejeitava qualquer `:` no endereço (e cujo comentário ainda citava, erradamente, "the bundled ENet (1.3.x)"). Esse guard virou condicional (`#ifdef ENET_IPV4_ONLY`): no build IPv4-only atual o comportamento é idêntico; num build dual-stack (`-DENET_IPV4_ONLY=OFF`) o `connect()` entrega o endereço ao `enet_address_set_host` do fork e o IPv6 passa a funcionar ponta-a-ponta sem mais mudança de código. Revalidado: `ENET_IPV4_ONLY=ON` compila 0 warnings e passa 100% no `ctest`; `ENET_IPV4_ONLY=OFF` **compila** limpo (0 warnings) — runtime `::1` ainda depende de máquina com pilha IPv6.
+- **Ainda não feito:** rebuild/teste no Windows (MSVC); teste de conectividade `::1` real (precisa desligar `ENET_IPV4_ONLY` e rodar numa máquina com IPv6 disponível — o código já está pronto).

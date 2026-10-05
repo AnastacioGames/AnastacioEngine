@@ -24,6 +24,32 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Bug antigo corrigido junto: `KX_Scene::MergeScene` (LibLoad com merge) não transferia `m_tempObjectList`, então objetos temporários da cena mesclada nunca morriam.
 - Outros `GetProperty("...")` por frame no C++ revisados (`Text`/`Text-Res` de fontes e texto bitmap, `sun_hour`/`sun_direction` do mundo, debug de veículo): ficam como estão, porque são properties de usuário que precisam ser controláveis por logic bricks e custam 1–2 buscas por objeto, não uma por objeto temporário.
 - Teste: `projects-teste/object_life/gen_object_life.py` (gera a cena com o editor em `-b`, roda no `RangeRuntime`, log em `object_life_log.txt`) — PASS no Windows: vida via `addObject`, escrita via Python, cancelamento com `None`, ida e volta sem perda, erros de tipo/negativo, template inativo protegido e ausência de `::timebomb` em `getPropertyNames()`.
+## Multiplayer: API Python de IPv6 decidida e transporte pronto p/ dual-stack (2026-10-05)
+
+Fecha o item aberto do roadmap "decidir se `net.host`/`net.join` expõem IPv6 na API Python".
+
+**Decisão:** a API já é IPv6-ready pela própria string de endereço; **não se adiciona parâmetro novo**.
+- `net.join("[::1]:7777")` já é documentado e já era parseado por `ParseAddress()` em
+  `KX_PyNetwork.cpp` (aceita `host`, `host:port` e `[v6]:port`, e já tira os colchetes antes de
+  entregar ao transporte).
+- `net.host(port=...)` já faz bind em `ENET_HOST_ANY`, que no fork `zpl-c/enet` em modo dual-stack
+  (sem `ENET_IPV4_ONLY`) vira `in6addr_any` com socket dual-stack (`IPV6_V6ONLY=0`).
+
+**Código deixado pronto (sem ligar o default):** o único ponto que bloqueava IPv6 em runtime era o
+guard em `NET_TransportENet.cpp::connect()`, que rejeitava qualquer endereço com `:`. Esse guard
+passou a ser condicional (`#ifdef ENET_IPV4_ONLY`):
+- Build atual (IPv4-only, default): comportamento idêntico ao anterior — rejeita literais IPv6 cedo,
+  em vez de deixar o resolver falhar de forma obscura.
+- Build dual-stack (`-DENET_IPV4_ONLY=OFF`, numa máquina com pilha IPv6): o `connect()` entrega o
+  endereço direto ao `enet_address_set_host` do fork, que resolve IPv6. Como `ParseAddress()` já tira
+  os colchetes, `[::1]:port` chega como `::1` e funciona ponta-a-ponta sem mais nenhuma mudança.
+- Corrigido de passagem o comentário obsoleto que ainda citava "the bundled ENet (1.3.x)" (o vendor
+  foi trocado pelo fork em 2026-10-05).
+
+**Validação:** `ENET_IPV4_ONLY=ON` (default) compila 0 warnings e passa 100% no `ctest`
+(`net_tests`, 0.49 s). `ENET_IPV4_ONLY=OFF` (dual-stack) **compila** limpo, 0 warnings — provando
+que o novo caminho de `connect()` e o bind dual-stack estão corretos. O runtime IPv6 em si não é
+testável nesta sandbox (sem `AF_INET6`); falta apenas rodar `::1` de verdade numa máquina com IPv6.
 
 ## RangeRuntime: corrige SIGTERM ignorado (2026-10-05)
 - O item do roadmap ("handler instalado, processo segue rodando") estava com a causa errada: não havia handler

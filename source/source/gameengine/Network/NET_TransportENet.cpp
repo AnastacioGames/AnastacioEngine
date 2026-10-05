@@ -94,12 +94,18 @@ public:
 				return false;
 			}
 		}
-		// The bundled ENet (1.3.x) is IPv4-only: ENetAddress holds a 32-bit host. Reject IPv6
-		// literals up front instead of letting the resolver fail obscurely; a hostname with
-		// only AAAA records fails in enet_address_set_host for the same reason.
+#ifdef ENET_IPV4_ONLY
+		// This build compiles the ENet fork in ENET_IPV4_ONLY mode: ENetAddress keeps the old
+		// IPv4 layout and the socket has no IPv6 stack, so reject IPv6 literals up front instead
+		// of letting the resolver fail obscurely; a hostname with only AAAA records fails in
+		// enet_address_set_host for the same reason. Build the fork without ENET_IPV4_ONLY
+		// (dual-stack, the fork's default, needs an IPv6-capable host) and this path accepts them:
+		// ParseAddress() in the Python binding already strips the brackets, so a '[::1]:port'
+		// from net.join() reaches here as a bare '::1' that enet_address_set_host resolves.
 		if (host.find(':') != std::string::npos) {  // IPv6 literal (with or without brackets)
 			return false;
 		}
+#endif  // ENET_IPV4_ONLY
 		ENetAddress address;
 		if (enet_address_set_host(&address, host.c_str()) != 0) {
 			return false;
