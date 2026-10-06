@@ -59,6 +59,9 @@ extern char datatoc_roboto_medium_pfb[];
 extern int datatoc_roboto_medium_ttf_size;
 extern char datatoc_roboto_medium_ttf[];
 
+extern int datatoc_inter_medium_ttf_size;
+extern char datatoc_inter_medium_ttf[];
+
 extern int datatoc_roboto_mono_medium_ttf_size;
 extern char datatoc_roboto_mono_medium_ttf[];
 

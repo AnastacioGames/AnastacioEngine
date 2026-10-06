@@ -437,8 +437,8 @@ void uiStyleInit(void)
 
 		if (font->uifont_id == UIFONT_DEFAULT) {
 #ifdef WITH_INTERNATIONAL
-			int font_size = datatoc_roboto_medium_ttf_size;
-			uchar *font_ttf = (uchar *)datatoc_roboto_medium_ttf;
+			int font_size = datatoc_inter_medium_ttf_size;
+			uchar *font_ttf = (uchar *)datatoc_inter_medium_ttf;
 			static int last_font_size = 0;
 
 			/* use unicode font for translation */
@@ -447,8 +447,8 @@ void uiStyleInit(void)
 
 				if (!font_ttf) {
 					/* fall back if not found */
-					font_size = datatoc_roboto_medium_ttf_size;
-					font_ttf = (uchar *)datatoc_roboto_medium_ttf;
+					font_size = datatoc_inter_medium_ttf_size;
+					font_ttf = (uchar *)datatoc_inter_medium_ttf;
 				}
 			}
 
@@ -460,13 +460,13 @@ void uiStyleInit(void)
 
 			font->blf_id = BLF_load_mem("default", font_ttf, font_size);
 #else
-			font->blf_id = BLF_load_mem("default", (uchar *)datatoc_roboto_medium_ttf, datatoc_roboto_medium_ttf_size);
+			font->blf_id = BLF_load_mem("default", (uchar *)datatoc_inter_medium_ttf, datatoc_inter_medium_ttf_size);
 #endif
 		}
 		else {
 			font->blf_id = BLF_load(font->filename);
 			if (font->blf_id == -1) {
-				font->blf_id = BLF_load_mem("default", (uchar *)datatoc_roboto_medium_ttf, datatoc_roboto_medium_ttf_size);
+				font->blf_id = BLF_load_mem("default", (uchar *)datatoc_inter_medium_ttf, datatoc_inter_medium_ttf_size);
 			}
 		}
 
