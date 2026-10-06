@@ -316,6 +316,22 @@ void GPU_clear_tpage(bool force)
 
 static void gpu_set_alpha_blend(GPUBlendMode alphablend)
 {
+	/* Alpha-to-coverage só existe com MSAA: sem sample buffer o GL_SAMPLE_ALPHA_TO_COVERAGE
+	 * é ignorado e sobra o alpha test em U.glalphaclip (0.004 por padrão), que quase nada
+	 * recorta -- o fundo opaco da textura (o verde das folhas) aparece sólido. O jogo não
+	 * sofre disso porque força gm.aasamples >= 2 e cria um canvas multisample
+	 * (LA_Launcher.cpp, BL_Converter.cpp), mas a 3D view desenha no framebuffer da janela,
+	 * que é single-sample. O shader também não ajuda: o dither de gpu_material.c só entra
+	 * quando gm.aasamples <= 1, e aqui a cena pede 4. Então, quando o alvo atual não é
+	 * multisample, cai para alpha blend normal -- é o que mais se aproxima do jogo. */
+	if (alphablend == GPU_BLEND_ALPHA_TO_COVERAGE) {
+		GLint sample_buffers = 0;
+		glGetIntegerv(GL_SAMPLE_BUFFERS, &sample_buffers);
+		if (sample_buffers == 0) {
+			alphablend = GPU_BLEND_ALPHA;
+		}
+	}
+
 #if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	if (alphablend == GPU_BLEND_SOLID) {
 		glDisable(GL_BLEND);
