@@ -5165,8 +5165,10 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 1, 10000, 1, 1);
 	RNA_def_property_int_default(prop, 5);
 	RNA_def_property_ui_text(prop, "Sleep Timer",
-	                         "Lowers the number of sleep times it can run per game logic frame, "
-	                         "higher value allows better cooling at the cost of frame rate synchronization, Python: logic.getMaxLogicFrame(), logic.setMaxLogicFrame(10000)");
+	                         "Only used by online multiplayer (most logic steps run in one frame to catch up) "
+	                         "and by the frame rate limiter wait. A local game runs one logic step per "
+	                         "displayed frame, so this does not change its speed. "
+	                         "Python: logic.getMaxLogicFrame(), logic.setMaxLogicFrame()");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	prop = RNA_def_property(srna, "shadows_on_off", PROP_INT, PROP_NONE);
