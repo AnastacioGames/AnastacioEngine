@@ -9,10 +9,6 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
-## Quick Material: mascaras Wet/Blend sem escurecer a textura (2026-10-05)
-- `Blend Textures by Mask` manteve a mascara inicial preta (base), mas a camada base placeholder passou de cinza escuro para branco, evitando que a textura pareca apagada antes de o usuario carregar/pintar as camadas.
-- `Wet/Reflective Patches` inverteu a leitura da mascara: branco agora significa seco e preto significa molhado/reflexivo. A mascara nova nasce branca, o botao `Paint the Mask` coloca o pincel em preto, e o tint molhado deixou de jogar a cor para quase preto, mantendo a superficie clara enquanto muda roughness/normal para dar o brilho.
-
 ## UI: delay de mouse restrito ao seletor de editor (2026-10-05)
 - O atraso de `0.35s` ao sair de popup por `MOUSEMOVE` deixou de ser aplicado a todo `UI_BLOCK_MOVEMOUSE_QUIT`. A nova flag `UI_BLOCK_DELAY_MOUSEOUT_QUIT` e ligada apenas no menu de tipo de editor do cabecalho, mantendo menus contextuais/submenus (ex.: Add Node > Input) responsivos ao hover.
 
