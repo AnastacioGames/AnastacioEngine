@@ -2256,8 +2256,8 @@ static void project_bucket_clip_face(
 
 
 
-		/* Maximum possible 6 intersections when using a rectangle and triangle */
-		float isectVCosSS[8][3]; /* The 3rd float is used to store angle for qsort(), NOT as a Z location */
+		/* Rectangle corners + triangle vertices + up to 2 intersections for each triangle edge. */
+		float isectVCosSS[13][3]; /* The 3rd float is used to store angle for qsort(), NOT as a Z location */
 		float v1_clipSS[2], v2_clipSS[2];
 		float w[3];
 
@@ -4145,6 +4145,13 @@ static bool project_bucket_iter_init(ProjPaintState *ps, const float mval_f[2])
 	return 1;
 }
 
+static bool project_paint_is_over_active_surface(const ProjPaintState *ps, const float pos[2])
+{
+	float w[3];
+
+	return (project_paint_PickFace(ps, pos, w) != -1);
+}
+
 
 static bool project_bucket_iter_next(
         ProjPaintState *ps, int *bucket_index,
@@ -5041,6 +5048,10 @@ static void paint_proj_stroke_ps(
 		}
 	}
 
+	if (ps->source == PROJ_SRC_VIEW && !project_paint_is_over_active_surface(ps, pos)) {
+		return;
+	}
+
 	if (project_paint_op(ps, prev_pos, pos)) {
 		ps_handle->need_redraw = true;
 		project_image_refresh_tagged(ps);
@@ -5274,7 +5285,9 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 
 		paint_proj_begin_clone(ps, mouse);
 
-		if (ps->dm == NULL) {
+		if (ps->dm == NULL ||
+		    (ps->source == PROJ_SRC_VIEW && !project_paint_is_over_active_surface(ps, mouse)))
+		{
 			goto fail;
 			return NULL;
 		}

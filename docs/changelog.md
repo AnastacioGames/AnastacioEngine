@@ -9,6 +9,32 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Texture Paint: travamento ao clicar fora do objeto pintado (2026-10-05)
+- Investigado travamento ao pintar material/mascara e clicar ou passar o pincel sobre outro objeto. O erro de
+  GPU visto nos logs vinha de uniforms dinamicos cujo `shaderloc` ficava zerado apos `MEM_callocN`; quando o
+  GLSL otimizava/removia o uniform, o redraw tentava enviar valores para a location 0 e podia entrar em uma
+  enxurrada de `GL_INVALID_OPERATION`. `GPUInput.shaderloc` agora inicia em `-1` e `GPU_pass_update_uniforms`
+  ignora inputs sem location valida.
+- Apos remover esse ruido de GPU, sobrou o caso em que o stroke 3D era iniciado/processado mesmo quando o
+  centro do pincel nao atingia nenhuma face do objeto ativo em texture paint. `paint_image_proj.c` agora usa o
+  proprio `project_paint_PickFace` para cancelar o inicio do stroke e ignorar passos sobre outro objeto/vazio,
+  evitando criar undo e varrer buckets de projecao fora da superficie realmente pintavel.
+- O operador `PAINT_OT_image_paint` tambem passou a testar o clique inicial no backbuffer do objeto ativo antes
+  de criar o stroke 3D. Isso evita entrar no setup de projecao quando o usuario clica sobre Empty/componente ou
+  outro objeto durante texture paint.
+- Cada atualizacao do stroke agora tambem e descartada assim que o cursor sai da malha ativa, antes de atualizar
+  brush ou undo. Isso elimina o custo de pintura residual ao cruzar Empty, icone de componente ou caixa de colisao.
+
+## Texture Paint: overflow no recorte de bucket ao pintar mascara (2026-10-05)
+- Investigado novo travamento ao pintar mascara na malha: o backtrace ainda explodia depois em
+  `CTX_store_free_list`/`UI_blocklist_free_inactive`, mas a causa provavel era corrupcao anterior em
+  `project_bucket_clip_face`. Ao adicionar o teste da terceira aresta (`v3-v1`), o acumulador local de pontos
+  de recorte continuou com tamanho 8; o caso maximo real e 13 pontos (4 cantos do bucket + 3 vertices do
+  triangulo + ate 2 intersecoes por aresta), antes da remocao de duplicados.
+- `paint_image_proj.c` agora dimensiona `isectVCosSS` para 13 pontos, preservando a correcao de pintura em
+  planos rasantes sem escrever fora da pilha. Validacao: `bf_editor_sculpt_paint` recompilou; o link final de
+  `RangeEngine` ficou bloqueado porque `build/bin/RangeEngine.exe` estava aberto pelo processo `RangeEngine`.
+
 ## UI: delay de mouse restrito ao seletor de editor (2026-10-05)
 - O atraso de `0.35s` ao sair de popup por `MOUSEMOVE` deixou de ser aplicado a todo `UI_BLOCK_MOVEMOUSE_QUIT`. A nova flag `UI_BLOCK_DELAY_MOUSEOUT_QUIT` e ligada apenas no menu de tipo de editor do cabecalho, mantendo menus contextuais/submenus (ex.: Add Node > Input) responsivos ao hover.
 

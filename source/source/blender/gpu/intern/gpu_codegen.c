@@ -1779,6 +1779,9 @@ void GPU_pass_update_uniforms(GPUPass *pass)
 	/* pass dynamic inputs to opengl, others were removed */
 	for (input = inputs->first; input; input = input->next) {
 		if (!(input->ima || input->tex || input->prv || input->texptr)) {
+			if (input->shaderloc == -1) {
+				continue;
+			}
 			if (input->type == GPU_INT) {
 				GPU_shader_uniform_vector_int(shader, input->shaderloc, 1, 1, (int *)input->dynamicvec);
 			}
@@ -1875,6 +1878,7 @@ static void gpu_node_input_link(GPUNode *node, GPUNodeLink *link, const GPUType 
 
 	input = MEM_callocN(sizeof(GPUInput), "GPUInput");
 	input->node = node;
+	input->shaderloc = -1;
 
 	if (link->builtin) {
 		/* builtin uniform */

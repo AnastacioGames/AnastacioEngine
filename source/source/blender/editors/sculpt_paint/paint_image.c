@@ -40,6 +40,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "DNA_brush_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 
@@ -412,6 +413,27 @@ static void gradient_draw_line(bContext *UNUSED(C), int x, int y, void *customda
 	}
 }
 
+static bool texture_paint_mouse_over_active_face(bContext *C, PaintOperation *pop, Object *ob, const float mouse[2])
+{
+	Mesh *me;
+	const int mval[2] = {(int)mouse[0], (int)mouse[1]};
+	unsigned int face_index;
+
+	if (ob == NULL || ob->type != OB_MESH) {
+		return false;
+	}
+
+	me = ob->data;
+	if (me->totpoly == 0) {
+		return false;
+	}
+
+	view3d_operator_needs_opengl(C);
+
+	face_index = ED_view3d_backbuf_sample(&pop->vc, mval[0], mval[1]);
+	return (face_index != 0 && face_index <= (unsigned int)me->totpoly);
+}
+
 
 static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const float mouse[2])
 {
@@ -429,6 +451,10 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
 	if (CTX_wm_region_view3d(C)) {
 		Object *ob = OBACT;
 		bool uvs, mat, tex, stencil;
+		if (!texture_paint_mouse_over_active_face(C, pop, ob, mouse)) {
+			MEM_freeN(pop);
+			return NULL;
+		}
 		if (!BKE_paint_proj_mesh_data_check(scene, ob, &uvs, &mat, &tex, &stencil)) {
 			BKE_paint_data_warning(op->reports, uvs, mat, tex, stencil);
 			MEM_freeN(pop);
@@ -481,6 +507,14 @@ static void paint_stroke_update_step(bContext *C, struct PaintStroke *stroke, Po
 	pressure = RNA_float_get(itemptr, "pressure");
 	eraser = RNA_boolean_get(itemptr, "pen_flip");
 	size = max_ff(1.0f, RNA_float_get(itemptr, "size"));
+
+	/* Do not keep processing a 3D stroke over viewport overlays or other
+	 * objects. This avoids stray dabs and expensive image-undo updates. */
+	if (pop->mode == PAINT_MODE_3D_PROJECT &&
+	    !texture_paint_mouse_over_active_face(C, pop, OBACT, mouse)) {
+		copy_v2_v2(pop->prevmouse, mouse);
+		return;
+	}
 
 	/* stroking with fill tool only acts on stroke end */
 	if (brush->imagepaint_tool == PAINT_TOOL_FILL) {
