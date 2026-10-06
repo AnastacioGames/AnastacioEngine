@@ -38,6 +38,7 @@
 #include "DNA_world_types.h"
 
 #include "GPU_glew.h"
+#include "GPU_draw.h"
 
 #include <algorithm>
 #include <cmath>
@@ -481,5 +482,8 @@ void KX_RainAura::Draw(const mt::mat4& view, const mt::mat4& projection)
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+	// Blend mexido direto no GL: invalida o cache de GPU_set_material_alpha_blend(),
+	// senão o próximo material com o mesmo modo pula a chamada e sai sem blend.
+	GPU_set_material_alpha_blend(-1);
 	glUseProgram(0);
 }

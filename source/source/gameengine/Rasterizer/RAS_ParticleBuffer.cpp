@@ -36,6 +36,7 @@
 #include "BKE_colortools.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "GPU_draw.h"
 #include "GPU_texture.h"
 #include "RAS_Texture.h"
 #include "DNA_color_types.h"
@@ -459,6 +460,9 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+	// Blend mexido direto no GL: invalida o cache de GPU_set_material_alpha_blend(),
+	// senão o próximo material com o mesmo modo pula a chamada e sai sem blend.
+	GPU_set_material_alpha_blend(-1);
 	if (m_texture != 0) {
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}

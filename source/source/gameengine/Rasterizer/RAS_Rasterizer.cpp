@@ -116,14 +116,27 @@ RAS_Rasterizer::~RAS_Rasterizer()
 {
 }
 
+/* GPU_set_material_alpha_blend() guarda o último modo em cache e não reaplica o mesmo
+ * modo. Quem liga/desliga GL_BLEND ou GL_ALPHA_TEST por fora (filtros 2D, blend
+ * customizado de material) deixa esse cache mentindo: o próximo material com o mesmo
+ * modo pula a chamada e desenha sem blend. -1 marca o estado como desconhecido. */
+static void ras_invalidate_alpha_blend(RAS_Rasterizer::EnableBit bit)
+{
+	if (ELEM(bit, RAS_Rasterizer::RAS_BLEND, RAS_Rasterizer::RAS_ALPHA_TEST)) {
+		GPU_set_material_alpha_blend(-1);
+	}
+}
+
 void RAS_Rasterizer::Enable(RAS_Rasterizer::EnableBit bit)
 {
 	m_impl->Enable(bit);
+	ras_invalidate_alpha_blend(bit);
 }
 
 void RAS_Rasterizer::Disable(RAS_Rasterizer::EnableBit bit)
 {
 	m_impl->Disable(bit);
+	ras_invalidate_alpha_blend(bit);
 }
 
 void RAS_Rasterizer::SetDepthFunc(RAS_Rasterizer::DepthFunc func)
@@ -134,6 +147,7 @@ void RAS_Rasterizer::SetDepthFunc(RAS_Rasterizer::DepthFunc func)
 void RAS_Rasterizer::SetBlendFunc(BlendFunc src, BlendFunc dst)
 {
 	m_impl->SetBlendFunc(src, dst);
+	GPU_set_material_alpha_blend(-1);
 }
 
 void RAS_Rasterizer::SetAmbientColor(const mt::vec3& color)
