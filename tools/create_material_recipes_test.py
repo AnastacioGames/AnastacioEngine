@@ -95,7 +95,7 @@ for y in range(128):
     for x in range(128):
         stripe = 1.0 if (34 < x < 54 and 16 < y < 112) or (76 < x < 100 and 28 < y < 104) else 0.0
         feather = 0.35 if (28 < x < 108 and 10 < y < 118 and stripe == 0.0 and (x + y) % 17 < 3) else 0.0
-        v = max(stripe, feather)
+        v = 1.0 - max(stripe, feather)
         px.extend((v, v, v, 1.0))
 wet_mask.pixels = px
 wet_mask.pack(as_png=True)

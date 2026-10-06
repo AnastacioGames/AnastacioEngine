@@ -8892,7 +8892,7 @@ static int ui_handle_menu_event(
 			WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), menu->mouseouttimer);
 			menu->mouseouttimer = NULL;
 
-			if (inside == 0 && !menu->dotowards) {
+			if ((block->flag & UI_BLOCK_DELAY_MOUSEOUT_QUIT) && inside == 0 && !menu->dotowards) {
 				if (block->flag & (UI_BLOCK_OUT_1))
 					menu->menuretval = UI_RETURN_OK;
 				else
@@ -9244,7 +9244,7 @@ static int ui_handle_menu_event(
 
 					/* strict check, and include the parent rect */
 					if (!menu->dotowards && !saferct) {
-						if (event->type == MOUSEMOVE) {
+						if ((block->flag & UI_BLOCK_DELAY_MOUSEOUT_QUIT) && event->type == MOUSEMOVE) {
 							if (menu->mouseouttimer == NULL) {
 								menu->mouseouttimer = WM_event_add_timer(
 								        CTX_wm_manager(C), CTX_wm_window(C), TIMER, MENU_MOUSEOUT_DELAY);

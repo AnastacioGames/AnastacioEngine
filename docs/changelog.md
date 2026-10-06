@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Quick Material: mascaras Wet/Blend sem escurecer a textura (2026-10-05)
+- `Blend Textures by Mask` manteve a mascara inicial preta (base), mas a camada base placeholder passou de cinza escuro para branco, evitando que a textura pareca apagada antes de o usuario carregar/pintar as camadas.
+- `Wet/Reflective Patches` inverteu a leitura da mascara: branco agora significa seco e preto significa molhado/reflexivo. A mascara nova nasce branca, o botao `Paint the Mask` coloca o pincel em preto, e o tint molhado deixou de jogar a cor para quase preto, mantendo a superficie clara enquanto muda roughness/normal para dar o brilho.
+
+## UI: delay de mouse restrito ao seletor de editor (2026-10-05)
+- O atraso de `0.35s` ao sair de popup por `MOUSEMOVE` deixou de ser aplicado a todo `UI_BLOCK_MOVEMOUSE_QUIT`. A nova flag `UI_BLOCK_DELAY_MOUSEOUT_QUIT` e ligada apenas no menu de tipo de editor do cabecalho, mantendo menus contextuais/submenus (ex.: Add Node > Input) responsivos ao hover.
+
+## Texture Paint: recuo do near-clip pinning apos crash no RolimaRacer (2026-10-05)
+- Investigado `C:\Users\f_bro\AppData\Local\Temp\RolimaRacer.crash.txt` (21:38): o usuario estava pintando mascara na malha, e o backtrace caiu em `CTX_store_free_list`/`UI_blocklist_free_inactive` durante redraw, sinal de corrupcao anterior de memoria. O candidato mais forte era a parte de `paint_image_proj.c` que trocou vertices atras do near clip por coordenadas finitas presas em `clipsta`.
+- A mudanca arriscada foi revertida para o sentinel `FLT_MAX`/cull antigo, mantendo o default `IMAGEPAINT_PROJECT_FLAT` e o teste extra da aresta `v3-v1` nos buckets. Isso preserva a correcao principal contra falloff de normal em planos rasantes sem alimentar o recorte de pintura com triangulos projetados artificialmente.
+
 ## Texture Paint: planos rasantes/pertos voltam a entrar nos buckets de pintura (2026-10-05)
 - Corrigido o relato de Texture Paint em que um plano so aceitava pintura quando a camera ficava mais alta ou mais afastada, enquanto o cubo continuava pintando normalmente. Alem do default antigo de `use_normal_falloff`, o caminho de projecao descartava casos rasantes do plano: o teste de intersecao bucket/triangulo ignorava a aresta `v3-v1`, o cull de perspectiva removia o triangulo inteiro quando apenas um vertice ficava antes do clip, e vertices perto demais da camera viravam `FLT_MAX`.
 - `paint_image_proj.c` agora testa as tres arestas do triangulo contra cada borda do bucket, so descarta por `FLT_MAX` quando todos os vertices da face estao invalidos, e no modo perspective prende vertices antes do near clip em `clipsta` para manter coordenadas de tela finitas. Isso evita buracos/faixas dependentes de distancia e angulo em planos grandes perto da camera.

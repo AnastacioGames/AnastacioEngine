@@ -292,7 +292,7 @@ def placeholder_image(name, color):
 
 
 LAYER_COLORS = (
-    (0.35, 0.35, 0.35, 1.0),
+    (1.0, 1.0, 1.0, 1.0),
     (0.6, 0.25, 0.2, 1.0),
     (0.25, 0.5, 0.2, 1.0),
     (0.2, 0.3, 0.6, 1.0),
@@ -383,11 +383,13 @@ def build_wet_patches(mat, pbr, scale, mask_img):
     uv_raw = b.uv(pbr, -1500, 0)
     uv = b.mapping(uv_raw, scale, -1250, 250)
 
-    mask, mask_color = b.image(pbr, mask_img, -1250, -250, WET_MASK, "Wet Mask (paint white)")
+    mask, mask_color = b.image(pbr, mask_img, -1250, -250, WET_MASK, "Wet Mask (paint black)")
     b.link(uv_raw, mask.inputs["Vector"])
     sep = b.add("ShaderNodeSeparateRGB", -1000, -250)
     b.link(mask_color, sep.inputs["Image"])
-    fac = sep.outputs["R"]
+    inv_mask = b.add("ShaderNodeInvert", -760, -160, "AE_wet_mask_invert", "Black = Wet")
+    b.link(sep.outputs["R"], inv_mask.inputs["Color"])
+    fac = inv_mask.outputs["Color"]
 
     asphalt = b.add("ShaderNodeTexNoise", -1000, 350, "AE_asphalt_noise", "Asphalt Grain")
     asphalt.inputs["Scale"].default_value = 55.0
@@ -396,14 +398,14 @@ def build_wet_patches(mat, pbr, scale, mask_img):
 
     asphalt_color = b.add("ShaderNodeValToRGB", -760, 350, "AE_asphalt_color", "Asphalt Color")
     asphalt_color.color_ramp.elements[0].position = 0.22
-    asphalt_color.color_ramp.elements[0].color = (0.035, 0.038, 0.04, 1.0)
+    asphalt_color.color_ramp.elements[0].color = (0.22, 0.23, 0.22, 1.0)
     asphalt_color.color_ramp.elements[1].position = 1.0
-    asphalt_color.color_ramp.elements[1].color = (0.22, 0.23, 0.22, 1.0)
+    asphalt_color.color_ramp.elements[1].color = (0.78, 0.78, 0.72, 1.0)
     b.link(asphalt.outputs["Fac"], asphalt_color.inputs["Fac"])
 
-    wet_tint = b.add("ShaderNodeMixRGB", -500, 320, "AE_wet_tint", "Wet Patch Darkens Surface")
+    wet_tint = b.add("ShaderNodeMixRGB", -500, 320, "AE_wet_tint", "Wet Patch Keeps Color")
     wet_tint.blend_type = 'MIX'
-    wet_tint.inputs["Color2"].default_value = (0.015, 0.025, 0.035, 1.0)
+    wet_tint.inputs["Color2"].default_value = (0.55, 0.58, 0.58, 1.0)
     b.link(fac, wet_tint.inputs["Fac"])
     b.link(asphalt_color.outputs["Color"], wet_tint.inputs["Color1"])
 
@@ -453,15 +455,15 @@ def build_wet_patches(mat, pbr, scale, mask_img):
     # Organiza o grafo em caixas (Frames) e deixa uma nota explicando a receita.
     uv_node = uv_raw.node
     b.frame("UV / Tiling", [uv_node, b.nodes[MAPPING]])
-    b.frame("Wet Mask (pinte branco = poça)", [mask, sep])
+    b.frame("Wet Mask (pinte preto = poça)", [mask, sep, inv_mask])
     b.frame("Asfalto Procedural", [asphalt, asphalt_color])
     b.frame("Mistura Seco / Molhado", [wet_tint, rough, wet_noise, asphalt_bump, wet_bump, normal_mix])
     b.note(
         "Como usar",
-        "Pinte BRANCO na mascara 'Wet Mask' para marcar poca/mancha\n"
-        "molhada (barro, oleo ou agua); PRETO volta ao asfalto seco.\n"
+        "Pinte PRETO na mascara 'Wet Mask' para marcar poca/mancha\n"
+        "molhada (barro, oleo ou agua); BRANCO volta ao seco.\n"
         "Use o botao 'Paint the Mask' no painel: ele ja troca o pincel\n"
-        "para branco e da uma borda irregular (nao um circulo perfeito),\n"
+        "para preto e da uma borda irregular (nao um circulo perfeito),\n"
         "para parecer poca/mancha de verdade em vez de um disco liso.",
         -1250, 650, width=620, height=260,
     )
@@ -564,7 +566,7 @@ class MATERIAL_OT_recipe_mask_blend(Operator):
 
 
 class MATERIAL_OT_recipe_wet_patches(Operator):
-    """Asphalt material with a paintable wet mask: paint white where reflective wet patches should appear"""
+    """Asphalt material with a paintable wet mask: paint black where reflective wet patches should appear"""
     bl_idname = "material.recipe_wet_patches"
     bl_label = "Wet/Reflective Patches"
     bl_options = {'REGISTER', 'UNDO'}
@@ -585,7 +587,7 @@ class MATERIAL_OT_recipe_wet_patches(Operator):
         ob = context.object
         mat = target_material(context, ob.name + " Wet Surface")
         mask = bpy.data.images.new(mat.name + " Wet Mask", self.mask_size, self.mask_size)
-        mask.generated_color = (0.0, 0.0, 0.0, 1.0)
+        mask.generated_color = (1.0, 1.0, 1.0, 1.0)
         mask.colorspace_settings.name = 'Non-Color'
         build_wet_patches(mat, use_pbr(context), self.tiling, mask)
         mat[RECIPE_KEY] = "wet_patches"
@@ -681,8 +683,8 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
         if context.object.mode != 'TEXTURE_PAINT':
             bpy.ops.paint.texture_paint_toggle()
         if mat.get(RECIPE_KEY) == "wet_patches":
-            apply_puddle_brush(context, (1.0, 1.0, 1.0))
-            self.report({'INFO'}, "Paint white for wet/reflective patches, black for dry. The brush edge is "
+            apply_puddle_brush(context, (0.0, 0.0, 0.0))
+            self.report({'INFO'}, "Paint black for wet/reflective patches, white for dry. The brush edge is "
                                    "irregular (puddle-shaped) instead of a perfect circle")
         else:
             brush = ip.brush
