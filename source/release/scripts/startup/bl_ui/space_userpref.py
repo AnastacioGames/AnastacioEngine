@@ -407,150 +407,138 @@ class USERPREF_PT_system_general(Panel):
     def draw(self, context):
         import sys
         layout = self.layout
-        layout = layout.box()
 
         userpref = context.user_preferences
         system = userpref.system
 
-        split = layout.split()
+        row = layout.row()
 
         # 1. Column
-        column = split.column()
-        colsplit = column.split(factor=0.85)
+        col = row.column()
+        panel = col.box()
+        panel.label(text="General:")
+        panel.prop(system, "frame_server_port")
+        panel.prop(system, "scrollback", text="Console Scrollback")
 
-        col = colsplit.column()
-        col.label(text="General:")
-
-        col.prop(system, "frame_server_port")
-        col.prop(system, "scrollback", text="Console Scrollback")
-
-        col.separator(factor=1)
-
-        col.label(text="Sound:")
-        col.row().prop(system, "audio_device", expand=False)
-        sub = col.column()
+        panel = col.box()
+        panel.label(text="Sound:")
+        panel.row().prop(system, "audio_device", expand=False)
+        sub = panel.column()
         sub.active = system.audio_device not in {'NONE', 'Null'}
-        #sub.prop(system, "use_preview_images")
         sub.prop(system, "audio_channels", text="Channels")
         sub.prop(system, "audio_mixing_buffer", text="Mixing Buffer")
         sub.prop(system, "audio_sample_rate", text="Sample Rate")
         sub.prop(system, "audio_sample_format", text="Sample Format")
 
-        col.separator(factor=1)
-
         if bpy.app.build_options.cycles:
             addon = userpref.addons.get("cycles")
             if addon is not None:
-                addon.preferences.draw_impl(col, context)
+                panel = col.box()
+                panel.label(text="Compute Device:")
+                addon.preferences.draw_impl(panel, context)
             del addon
 
         if hasattr(system, "opensubdiv_compute_type"):
-            col.label(text="OpenSubdiv compute:")
-            col.row().prop(system, "opensubdiv_compute_type", text="")
+            panel = col.box()
+            panel.label(text="OpenSubdiv Compute:")
+            panel.row().prop(system, "opensubdiv_compute_type", text="")
+
+        row.separator(factor=1)
+        row.separator(factor=1)
 
         # 2. Column
-        column = split.column()
-        colsplit = column.split(factor=0.85)
+        col = row.column()
+        panel = col.box()
+        panel.label(text="OpenGL:")
+        panel.prop(system, "gl_clip_alpha", slider=True)
+        panel.prop(system, "use_mipmaps")
+        panel.prop(system, "use_gpu_mipmap")
+        panel.prop(system, "use_16bit_textures")
 
-        col = colsplit.column()
-        col.label(text="OpenGL:")
-        col.prop(system, "gl_clip_alpha", slider=True)
-        col.prop(system, "use_mipmaps")
-        col.prop(system, "use_gpu_mipmap")
-        col.prop(system, "use_16bit_textures")
+        panel = col.box()
+        panel.label(text="Selection:")
+        panel.prop(system, "select_method", text="")
+        panel.prop(system, "use_select_pick_depth")
 
-        col.separator(factor=1)
-        col.label(text="Selection")
-        col.prop(system, "select_method", text="")
-        col.prop(system, "use_select_pick_depth")
+        panel = col.box()
+        panel.label(text="Anisotropic Filtering:")
+        panel.prop(system, "anisotropic_filter", text="")
 
-        col.separator(factor=1)
-
-        col.label(text="Anisotropic Filtering")
-        col.prop(system, "anisotropic_filter", text="")
-
-        col.separator(factor=1)
-
-        col.label(text="Window Draw Method:")
-        col.prop(system, "window_draw_method", text="")
-        col.prop(system, "multi_sample", text="")
+        panel = col.box()
+        panel.label(text="Window Draw Method:")
+        panel.prop(system, "window_draw_method", text="")
+        panel.prop(system, "multi_sample", text="")
         if sys.platform == "linux" and system.multi_sample != 'NONE':
-            col.label(text="Might fail for Mesh editing selection!")
-            col.separator(factor=1)
-        col.prop(system, "use_region_overlap")
+            panel.label(text="Might fail for Mesh editing selection!")
+        panel.prop(system, "use_region_overlap")
 
-        col.separator(factor=1)
-
-        col.label(text="Text Draw Options:")
-        col.prop(system, "use_text_antialiasing", text="Anti-aliasing")
-        sub = col.column()
+        panel = col.box()
+        panel.label(text="Text Draw Options:")
+        panel.prop(system, "use_text_antialiasing", text="Anti-aliasing")
+        sub = panel.column()
         sub.active = system.use_text_antialiasing
         sub.prop(system, "text_hinting", text="Hinting")
 
-        col.separator(factor=1)
-
-        col.label(text="Textures:")
-        col.prop(system, "gl_texture_limit", text="Limit Size")
-        col.prop(system, "texture_time_out", text="Time Out")
-        col.prop(system, "texture_collection_rate", text="Collection Rate")
-
-        col.separator(factor=1)
-
-        col.label(text="Images Draw Method:")
-        col.prop(system, "image_draw_method", text="")
-
-        col.separator(factor=1)
-
-        col.label(text="Sequencer/Clip Editor:")
-        # currently disabled in the code
-        # col.prop(system, "prefetch_frames")
-        col.prop(system, "memory_cache_limit")
+        row.separator(factor=1)
+        row.separator(factor=1)
 
         # 3. Column
-        column = split.column()
+        col = row.column()
+        panel = col.box()
+        panel.label(text="Textures:")
+        panel.prop(system, "gl_texture_limit", text="Limit Size")
+        panel.prop(system, "texture_time_out", text="Time Out")
+        panel.prop(system, "texture_collection_rate", text="Collection Rate")
 
-        column.label(text="Solid OpenGL Lights:")
+        panel = col.box()
+        panel.label(text="Images Draw Method:")
+        panel.prop(system, "image_draw_method", text="")
 
-        split = column.split(factor=0.1)
+        panel = col.box()
+        panel.label(text="Sequencer/Clip Editor:")
+        # currently disabled in the code
+        # panel.prop(system, "prefetch_frames")
+        panel.prop(system, "memory_cache_limit")
+
+        panel = col.box()
+        panel.label(text="Color Picker Type:")
+        panel.row().prop(system, "color_picker_type", text="")
+
+        row.separator(factor=1)
+        row.separator(factor=1)
+
+        # 4. Column
+        col = row.column()
+        panel = col.box()
+        panel.label(text="Solid OpenGL Lights:")
+        split = panel.split(factor=0.1)
         split.label()
         split.label(text="Colors:")
         split.label(text="Direction:")
+        for lamp in system.solid_lights[:3]:
+            opengl_lamp_buttons(panel, lamp)
 
-        lamp = system.solid_lights[0]
-        opengl_lamp_buttons(column, lamp)
-
-        lamp = system.solid_lights[1]
-        opengl_lamp_buttons(column, lamp)
-
-        lamp = system.solid_lights[2]
-        opengl_lamp_buttons(column, lamp)
-
-        column.separator(factor=1)
-
-        column.label(text="Color Picker Type:")
-        column.row().prop(system, "color_picker_type", text="")
-
-        column.separator(factor=1)
-
-        column.prop(system, "use_weight_color_range", text="Custom Weight Paint Range")
-        sub = column.column()
+        panel = col.box()
+        panel.prop(system, "use_weight_color_range", text="Custom Weight Paint Range")
+        sub = panel.column()
         sub.active = system.use_weight_color_range
         sub.template_color_ramp(system, "weight_color_range", expand=True)
 
-        column.separator(factor=1)
-        column.prop(system, "font_path_ui")
-        column.prop(system, "font_path_ui_mono")
+        panel = col.box()
+        panel.label(text="Fonts:")
+        panel.prop(system, "font_path_ui")
+        panel.prop(system, "font_path_ui_mono")
 
         if bpy.app.build_options.international:
-            column.prop(system, "use_international_fonts")
+            panel.prop(system, "use_international_fonts")
             if system.use_international_fonts:
-                column.prop(system, "language")
-                row = column.row()
-                row.label(text="Translate:", text_ctxt=i18n_contexts.id_windowmanager)
-                row = column.row(align=True)
-                row.prop(system, "use_translate_interface", text="Interface", toggle=True)
-                row.prop(system, "use_translate_tooltips", text="Tooltips", toggle=True)
-                row.prop(system, "use_translate_new_dataname", text="New Data", toggle=True)
+                panel.prop(system, "language")
+                sub = panel.row()
+                sub.label(text="Translate:", text_ctxt=i18n_contexts.id_windowmanager)
+                sub = panel.row(align=True)
+                sub.prop(system, "use_translate_interface", text="Interface", toggle=True)
+                sub.prop(system, "use_translate_tooltips", text="Tooltips", toggle=True)
+                sub.prop(system, "use_translate_new_dataname", text="New Data", toggle=True)
 
 
 class USERPREF_MT_interface_theme_presets(Menu):
@@ -985,21 +973,19 @@ class USERPREF_PT_file(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout = layout.box()
 
         userpref = context.user_preferences
         paths = userpref.filepaths
         system = userpref.system
 
-        split = layout.split(factor=0.7)
+        row = layout.row()
 
-        col = split.column()
-        col.label(text="File Paths:")
-
-        colsplit = col.split(factor=0.95)
-        col1 = colsplit.split(factor=0.3)
-
-        sub = col1.column()
+        # 1. Column
+        col = row.column()
+        panel = col.box()
+        panel.label(text="File Paths:")
+        split = panel.split(factor=0.3)
+        sub = split.column()
         sub.label(text="Fonts:")
         sub.label(text="Icons:")
         sub.label(text="Textures:")
@@ -1009,10 +995,7 @@ class USERPREF_PT_file(Panel):
         sub.label(text="Temp:")
         sub.label(text="Render Cache:")
         sub.label(text="I18n Branches:")
-        sub.label(text="Image Editor:")
-        sub.label(text="Animation Player:")
-
-        sub = col1.column()
+        sub = split.column()
         sub.prop(paths, "font_directory", text="")
         sub.prop(paths, "icon_directory", text="")
         sub.prop(paths, "texture_directory", text="")
@@ -1022,70 +1005,74 @@ class USERPREF_PT_file(Panel):
         sub.prop(paths, "temporary_directory", text="")
         sub.prop(paths, "render_cache_directory", text="")
         sub.prop(paths, "i18n_branches_directory", text="")
+
+        panel = col.box()
+        panel.label(text="External Programs:")
+        split = panel.split(factor=0.3)
+        sub = split.column()
+        sub.label(text="Image Editor:")
+        sub.label(text="Animation Player:")
+        sub = split.column()
         sub.prop(paths, "image_editor", text="")
         subsplit = sub.split(factor=0.3)
         subsplit.prop(paths, "animation_player_preset", text="")
         subsplit.prop(paths, "animation_player", text="")
 
-        col.separator(factor=1)
-        col.separator(factor=1)
-
-        colsplit = col.split(factor=0.95)
-        sub = colsplit.column()
-
-        row = sub.split(factor=0.3)
-        row.label(text="Auto Execution:")
-        row.prop(system, "use_scripts_auto_execute")
-
+        panel = col.box()
+        panel.label(text="Auto Execution:")
+        panel.prop(system, "use_scripts_auto_execute")
         if system.use_scripts_auto_execute:
-            box = sub.box()
-            row = box.row()
-            row.label(text="Excluded Paths:")
-            row.operator("wm.userpref_autoexec_path_add", text="", icon='ZOOMIN', emboss=False)
+            box = panel.box()
+            sub = box.row()
+            sub.label(text="Excluded Paths:")
+            sub.operator("wm.userpref_autoexec_path_add", text="", icon='ZOOMIN', emboss=False)
             for i, path_cmp in enumerate(userpref.autoexec_paths):
-                row = box.row()
-                row.prop(path_cmp, "path", text="")
-                row.prop(path_cmp, "use_glob", text="", icon='FILTER')
-                row.operator("wm.userpref_autoexec_path_remove", text="", icon='X', emboss=False).index = i
+                sub = box.row()
+                sub.prop(path_cmp, "path", text="")
+                sub.prop(path_cmp, "use_glob", text="", icon='FILTER')
+                sub.operator("wm.userpref_autoexec_path_remove", text="", icon='X', emboss=False).index = i
 
-        col = split.column()
-        col.label(text="Save & Load:")
-        col.prop(paths, "use_relative_paths")
-        col.prop(paths, "use_file_compression")
-        col.prop(paths, "use_load_ui")
-        col.prop(paths, "use_filter_files")
-        col.prop(paths, "show_hidden_files_datablocks")
-        col.prop(paths, "hide_recent_locations")
-        col.prop(paths, "hide_system_bookmarks")
-        col.prop(paths, "show_thumbnails")
+        row.separator(factor=1)
+        row.separator(factor=1)
 
-        col.separator(factor=1)
+        # 2. Column
+        col = row.column()
+        panel = col.box()
+        panel.label(text="Save & Load:")
+        panel.prop(paths, "use_relative_paths")
+        panel.prop(paths, "use_file_compression")
+        panel.prop(paths, "use_load_ui")
+        panel.prop(paths, "use_save_preview_images")
+        panel.prop(paths, "save_version")
+        panel.prop(paths, "recent_files")
 
-        col.prop(paths, "save_version")
-        col.prop(paths, "recent_files")
-        col.prop(paths, "use_save_preview_images")
+        panel = col.box()
+        panel.label(text="File Browser:")
+        panel.prop(paths, "use_filter_files")
+        panel.prop(paths, "show_hidden_files_datablocks")
+        panel.prop(paths, "hide_recent_locations")
+        panel.prop(paths, "hide_system_bookmarks")
+        panel.prop(paths, "show_thumbnails")
 
-        col.separator(factor=1)
+        row.separator(factor=1)
+        row.separator(factor=1)
 
-        col.label(text="Auto Save:")
-        col.prop(paths, "use_keep_session")
-        col.prop(paths, "use_auto_save_temporary_files")
-        sub = col.column()
+        # 3. Column
+        col = row.column()
+        panel = col.box()
+        panel.label(text="Auto Save:")
+        panel.prop(paths, "use_keep_session")
+        panel.prop(paths, "use_auto_save_temporary_files")
+        sub = panel.column()
         sub.active = paths.use_auto_save_temporary_files
         sub.prop(paths, "auto_save_time", text="Timer (mins)")
 
-        col.separator(factor=1)
-
-        col.label(text="Text Editor:")
-        col.prop(system, "use_tabs_as_spaces")
-
-        colsplit = col.split(factor=0.95)
-        col1 = colsplit.split(factor=0.3)
-
-        sub = col1.column()
-        sub.label(text="Author:")
-        sub = col1.column()
-        sub.prop(system, "author", text="")
+        panel = col.box()
+        panel.label(text="Text Editor:")
+        panel.prop(system, "use_tabs_as_spaces")
+        split = panel.split(factor=0.3)
+        split.label(text="Author:")
+        split.prop(system, "author", text="")
 
 
 class USERPREF_MT_ndof_settings(Menu):
