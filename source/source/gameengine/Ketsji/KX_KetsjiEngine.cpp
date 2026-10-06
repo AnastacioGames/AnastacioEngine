@@ -53,6 +53,7 @@ extern "C" {
 
 #include "KX_DebugMode.h"
 #include "KX_KetsjiEngine.h"
+#include "KX_EngineProfiler.h"
 
 #include "EXP_ListValue.h"
 #include "EXP_IntValue.h"
@@ -113,118 +114,7 @@ KX_ExitInfo::KX_ExitInfo()
 {
 }
 
-/* Hitch log: RANGE_HITCH_LOG=<file> appends one line per slow frame (over twice the recent
- * average and over RANGE_HITCH_MS, default 25) with the profile categories of that frame, to
- * find what a periodic stutter is made of. Off: one cached branch per frame. */
-extern "C" int GPU_hitch_counters[3];
-// Temporary: ms per frame in libload merge, scene scheduler and outside the engine (launcher/events).
-// [3] glFinish before swap (GPU drain), [4] SwapBuffers after the drain.
-extern double g_hitchSub[21];
-double g_hitchSub[21] = {};
-static double g_hitchFrameEnd = 0.0;
-// Temporary: names and ms of scenes added this frame, filled by KX_SceneScheduler.
-std::string g_hitchScenes;
-
-static void LogFrameHitch(KX_TimeCategoryLogger& logger, const std::string *labels, int numCategories, double now)
-{
-	static int state = -1;
-	static std::string path;
-	static double thresholdMs = 25.0;
-	static double avgMs = 0.0;
-	static double lastNow = 0.0;
-	static long frame = 0;
-	static long lastCreateFrame[3] = {0, 0, 0};
-	if (state < 0) {
-		const char *env = getenv("RANGE_HITCH_LOG");
-		state = (env && env[0]) ? 1 : 0;
-		if (state) {
-			path = env;
-			const char *ms = getenv("RANGE_HITCH_MS");
-			if (ms && atof(ms) > 0.0) {
-				thresholdMs = atof(ms);
-			}
-		}
-	}
-	if (state == 0) {
-		return;
-	}
-
-	const double wallMs = (lastNow > 0.0) ? (now - lastNow) * 1000.0 : 0.0;
-	lastNow = now;
-	++frame;
-	double totalMs = 0.0;
-	for (int i = 0; i < numCategories; ++i) {
-		totalMs += logger.GetLast(i) * 1000.0;
-	}
-
-	// Skip the first frames: loading and first shader compiles are expected to be slow.
-	if (frame > 30 && totalMs > thresholdMs && totalMs > avgMs * 2.0) {
-		FILE *f = fopen(path.c_str(), "a");
-		if (f) {
-			fprintf(f, "t=%.2fs frame=%ld wall=%.1fms profiled=%.1fms avg=%.1fms |", now, frame, wallMs, totalMs, avgMs);
-			for (int i = 0; i < numCategories; ++i) {
-				const double ms = logger.GetLast(i) * 1000.0;
-				if (ms >= 1.0) {
-					fprintf(f, " %s=%.1f", labels[i].c_str(), ms);
-				}
-			}
-			fprintf(f, " | lib=%.1f scenes=%.1f outside=%.1f gpufinish=%.1f swap=%.1f render=%.1f events=%.1f | rp: begin=%.1f shadows=%.1f cams=%.1f filters=%.1f endframe=%.1f", g_hitchSub[0], g_hitchSub[1], g_hitchSub[2], g_hitchSub[3], g_hitchSub[4], g_hitchSub[5], g_hitchSub[6], g_hitchSub[7], g_hitchSub[8], g_hitchSub[9], g_hitchSub[10], g_hitchSub[11]);
-			if (!g_hitchScenes.empty()) {
-				fprintf(f, " | added:%s", g_hitchScenes.c_str());
-			}
-			fprintf(f, " | shaders=%d gputex=%d imgupload=%d | frames since: shader=%ld gputex=%ld imgupload=%ld\n", GPU_hitch_counters[0], GPU_hitch_counters[1], GPU_hitch_counters[2],
-			        frame - lastCreateFrame[0], frame - lastCreateFrame[1], frame - lastCreateFrame[2]);
-			fclose(f);
-		}
-	}
-	// Average of every frame over ~2 s (spikes included), to see what a normal frame is made of.
-	static const int avgFrames = 120;
-	static double sumWall = 0.0;
-	static double sumCat[64] = {};
-	static double sumSub[21] = {};
-	static int sumCount = 0;
-	if (frame > 30) {
-		sumWall += wallMs;
-		for (int i = 0; i < numCategories && i < 64; ++i) {
-			sumCat[i] += logger.GetLast(i) * 1000.0;
-		}
-		for (int i = 0; i < 21; ++i) {
-			sumSub[i] += g_hitchSub[i];
-		}
-		if (++sumCount == avgFrames) {
-			FILE *f = fopen(path.c_str(), "a");
-			if (f) {
-				const double n = (double)avgFrames;
-				fprintf(f, "AVG t=%.2fs frames=%d wall=%.1fms fps=%.1f |", now, avgFrames, sumWall / n, 1000.0 * n / std::max(sumWall, 1.0));
-				for (int i = 0; i < numCategories && i < 64; ++i) {
-					if (sumCat[i] / n >= 0.1) {
-						fprintf(f, " %s=%.1f", labels[i].c_str(), sumCat[i] / n);
-					}
-				}
-				fprintf(f, " | outside=%.1f gpufinish=%.1f swap=%.1f render=%.1f | rp: begin=%.1f shadows=%.1f cams=%.1f filters=%.1f endframe=%.1f | ef: sleep=%.1f gpudrain=%.1f imgui=%.1f rasend=%.1f shots+enddraw=%.1f | gpu: begin=%.1f shadows=%.1f cams=%.1f filters=%.1f\n",
-				        sumSub[2] / n, sumSub[3] / n, sumSub[4] / n, sumSub[5] / n, sumSub[7] / n, sumSub[8] / n, sumSub[9] / n, sumSub[10] / n, sumSub[11] / n, sumSub[12] / n, sumSub[16] / n, sumSub[13] / n, sumSub[14] / n, sumSub[15] / n, sumSub[17] / n, sumSub[18] / n, sumSub[19] / n, sumSub[20] / n);
-				fclose(f);
-			}
-			sumWall = 0.0;
-			std::fill(std::begin(sumCat), std::end(sumCat), 0.0);
-			std::fill(std::begin(sumSub), std::end(sumSub), 0.0);
-			sumCount = 0;
-		}
-	}
-
-	for (double& v : g_hitchSub) {
-		v = 0.0;
-	}
-	g_hitchScenes.clear();
-	for (int i = 0; i < 3; ++i) {
-		if (GPU_hitch_counters[i]) {
-			lastCreateFrame[i] = frame;
-		}
-		GPU_hitch_counters[i] = 0;
-	}
-	// Spikes barely move the average, so a run of them still stands out.
-	avgMs = (avgMs == 0.0) ? totalMs : avgMs * 0.95 + std::min(totalMs, avgMs * 2.0) * 0.05;
-}
+static double g_profileFrameEnd = 0.0;
 
 const std::string KX_KetsjiEngine::m_profileLabels[tc_numCategories] = {
 	"Physics", // tc_physics
@@ -521,17 +411,13 @@ void KX_KetsjiEngine::EndFrame()
 		m_rasterizer->MotionBlur();
 	}
 	/// main frame timings
-	double hitchT = m_clock.GetTimeSecond();
+	KX_EngineProfiler::Sections prof;
 	UpdateSleepTime();
-	// Hitch log [12..15]: sleep/catch-up, imgui, rasterizer end frame, screenshots + end draw.
-	g_hitchSub[12] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
-	hitchT = m_clock.GetTimeSecond();
-	// Drain the GPU here so the imgui timer below holds only imgui; the drain goes to [16].
-	static const bool hitchDrain = getenv("RANGE_HITCH_LOG") != nullptr;
-	if (hitchDrain && m_needsRender) {
+	RANGE_PROFILE_MARK(prof, "endframe.sleep");
+	// Sync mode drains the GPU here so the imgui stage below holds only imgui.
+	if (KX_EngineProfiler::SyncGpu() && m_needsRender) {
 		glFinish();
-		g_hitchSub[16] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
-		hitchT = m_clock.GetTimeSecond();
+		RANGE_PROFILE_MARK(prof, "endframe.gpu_sync");
 	}
 
 	if (m_needsRender) {// needed or profile bugs
@@ -565,13 +451,11 @@ void KX_KetsjiEngine::EndFrame()
 			}
 			m_imgui->Render();
 		}
-		g_hitchSub[13] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
-		hitchT = m_clock.GetTimeSecond();
+		RANGE_PROFILE_MARK(prof, "endframe.imgui");
 
 		m_logger.StartLog(tc_rasterizer);
 		m_rasterizer->EndFrame();
-		g_hitchSub[14] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
-		hitchT = m_clock.GetTimeSecond();
+		RANGE_PROFILE_MARK(prof, "endframe.rasterizer");
 
 		if (m_dynamicResolutionQueryActive) {
 			m_dynamicResolutionQuery.End();
@@ -581,27 +465,20 @@ void KX_KetsjiEngine::EndFrame()
 
 		m_logger.StartLog(tc_overhead);
 		m_canvas->FlushScreenshots(m_rasterizer);
-		g_hitchSub[15] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
+		RANGE_PROFILE_MARK(prof, "endframe.screenshots");
 
 		// swap backbuffer (drawing into this buffer) <-> front/visible buffer
 		m_logger.StartLog(tc_latency);
-		static const bool hitchFinish = getenv("RANGE_HITCH_LOG") != nullptr;
-		if (hitchFinish) {
-			const double t0 = m_clock.GetTimeSecond();
+		if (KX_EngineProfiler::SyncGpu()) {
 			glFinish();
-			const double t1 = m_clock.GetTimeSecond();
-			m_canvas->SwapBuffers();
-			g_hitchSub[3] += (t1 - t0) * 1000.0;
-			g_hitchSub[4] += (m_clock.GetTimeSecond() - t1) * 1000.0;
+			RANGE_PROFILE_MARK(prof, "endframe.gpu_sync");
 		}
-		else {
-			m_canvas->SwapBuffers();
-		}
+		m_canvas->SwapBuffers();
+		RANGE_PROFILE_MARK(prof, "endframe.swap");
 		m_logger.StartLog(tc_rasterizer);
 
-		hitchT = m_clock.GetTimeSecond();
 		m_canvas->EndDraw();
-		g_hitchSub[15] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
+		RANGE_PROFILE_MARK(prof, "endframe.enddraw");
 		m_logger.StartLog(tc_overhead);
 	}
 }
@@ -674,8 +551,8 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 
 bool KX_KetsjiEngine::NextFrame()
 {
-	if (g_hitchFrameEnd > 0.0) {
-		g_hitchSub[2] += (m_clock.GetTimeSecond() - g_hitchFrameEnd) * 1000.0;
+	if (g_profileFrameEnd > 0.0) {
+		RANGE_PROFILE_ADD("frame.outside", (m_clock.GetTimeSecond() - g_profileFrameEnd) * 1000.0);
 	}
 	m_logger.StartLog(tc_input);
 
@@ -807,14 +684,16 @@ bool KX_KetsjiEngine::NextFrame()
 	m_networkMessageManager->ClearMessages();
 
 
-	double hitchT = m_clock.GetTimeSecond();
-	m_converter->ProcessScheduledLibraries();
-	g_hitchSub[0] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
+	{
+		RANGE_PROFILE_SCOPE("engine.libload");
+		m_converter->ProcessScheduledLibraries();
+	}
 
 	// scene management
-	hitchT = m_clock.GetTimeSecond();
-	m_sceneScheduler->ProcessScheduledScenes();
-	g_hitchSub[1] += (m_clock.GetTimeSecond() - hitchT) * 1000.0;
+	{
+		RANGE_PROFILE_SCOPE("engine.scenes");
+		m_sceneScheduler->ProcessScheduledScenes();
+	}
 
 	if (!m_doRender) {
 		if (m_serverMode) {
@@ -885,8 +764,14 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	// Go to next profiling measurement, time spent after this call is shown in the next frame.
 	m_logger.NextMeasurement();
 	m_logger.StartLog(tc_overhead);
-	LogFrameHitch(m_logger, m_profileLabels, tc_numCategories, m_clock.GetTimeSecond());
-	g_hitchFrameEnd = m_clock.GetTimeSecond();
+	{
+		double categoryMs[tc_numCategories];
+		for (int i = 0; i < tc_numCategories; ++i) {
+			categoryMs[i] = m_logger.GetLast(i) * 1000.0;
+		}
+		KX_EngineProfiler::EndFrame(m_clock.GetTimeSecond(), categoryMs, m_profileLabels, tc_numCategories);
+		g_profileFrameEnd = m_clock.GetTimeSecond();
+	}
 
 	// Get logic frame time.
 	m_logicframetime = m_clock.GetTimeSecond();

@@ -45,6 +45,7 @@ set(INC
 	../../blender/blenfont
 	../../blender/blenkernel
 	../../blender/blenlib
+	../../blender/blentranslation
 	../../blender/blenloader
 	../../blender/editors/include
 	../../blender/gpu
@@ -106,6 +107,7 @@ set(SRC
 	KX_CutsceneManager.cpp
 	KX_DestructionManager.cpp
 	KX_DebugMode.cpp
+	KX_EngineProfiler.cpp
 	KX_EmptyObject.cpp
 	KX_FontObject.cpp
 	KX_GameActuator.cpp
@@ -222,6 +224,7 @@ set(SRC
 	KX_CutsceneManager.h
 	KX_DestructionManager.h
 	KX_DebugMode.h
+	KX_EngineProfiler.h
 	KX_EmptyObject.h
 	KX_FontObject.h
 	KX_GameActuator.h

@@ -156,6 +156,15 @@ typedef struct GPUVertexAttribs {
 	int barycentric;
 } GPUVertexAttribs;
 
+/* Per-frame counters read and cleared by the game engine profiler (KX_EngineProfiler). */
+enum {
+	GPU_PROFILE_SHADERS = 0,
+	GPU_PROFILE_TEXTURES,
+	GPU_PROFILE_IMAGE_UPLOADS,
+	GPU_PROFILE_TOT
+};
+extern int GPU_profile_counters[GPU_PROFILE_TOT];
+
 #ifdef __cplusplus
 }
 #endif

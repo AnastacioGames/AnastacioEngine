@@ -97,7 +97,7 @@ void KX_Imgui::Init(DEV_InputDevice *inputDevice)
 	// Add Blender Font in C to Dear ImGui.
     ImFontConfig font_cfg;
 	font_cfg.FontDataOwnedByAtlas = false; // Important to set this to false to prevent ImGui from trying to free memory.
-	io.Fonts->AddFontFromMemoryTTF((void*)datatoc_roboto_medium_ttf, (int)datatoc_roboto_medium_ttf_size, 12.0f, &font_cfg);
+	io.Fonts->AddFontFromMemoryTTF((void*)datatoc_roboto_medium_ttf, (int)datatoc_roboto_medium_ttf_size, 12.0f, &font_cfg, io.Fonts->GetGlyphRangesCyrillic());
 
 	/* Kenney Icons */
 	ImFontConfig icon_cfg;

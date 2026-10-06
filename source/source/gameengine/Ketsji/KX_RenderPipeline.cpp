@@ -56,67 +56,10 @@
 
 #include "CM_RefCount.h"
 
-#include <chrono>
-
 #include "GPU_glew.h"
 
-// Hitch log (RANGE_HITCH_LOG): ms per frame of each render stage, printed by KX_KetsjiEngine.
-// [7] begin, [8] shadows, [9] cameras, [10] filters and final blit, [11] end frame.
-extern double g_hitchSub[21];
+#include "KX_EngineProfiler.h"
 
-namespace {
-double HitchNowMs()
-{
-	using namespace std::chrono;
-	return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
-}
-
-/* GPU side of the same stages: a GL timestamp at each stage boundary, read back on the next
- * frame (the hitch log drains the GPU at the end of every frame, so results are ready).
- * The GPU ms of stage [7..10] go to [17..20]. */
-struct HitchGpuStamps
-{
-	static const int maxStamps = 32;
-	GLuint queries[maxStamps] = {};
-	int slots[maxStamps] = {};
-	int count = 0;
-	bool enabled = false;
-	bool init = false;
-
-	void BeginFrame()
-	{
-		if (!init) {
-			init = true;
-			enabled = getenv("RANGE_HITCH_LOG") && GLEW_ARB_timer_query;
-			if (enabled) {
-				glGenQueries(maxStamps, queries);
-			}
-		}
-		if (!enabled) {
-			return;
-		}
-		// Collect the previous frame.
-		for (int i = 1; i < count; ++i) {
-			GLuint64 t0 = 0, t1 = 0;
-			glGetQueryObjectui64v(queries[i - 1], GL_QUERY_RESULT, &t0);
-			glGetQueryObjectui64v(queries[i], GL_QUERY_RESULT, &t1);
-			g_hitchSub[slots[i] + 10] += (double)(t1 - t0) * 1e-6;
-		}
-		count = 0;
-		Stamp(0);
-	}
-
-	/// Marks the end of the stage stored in g_hitchSub[slot].
-	void Stamp(int slot)
-	{
-		if (enabled && count < maxStamps) {
-			slots[count] = slot;
-			glQueryCounter(queries[count++], GL_TIMESTAMP);
-		}
-	}
-};
-HitchGpuStamps g_hitchGpu;
-}  // namespace
 
 KX_CameraRenderData::KX_CameraRenderData(KX_Camera *rendercam, KX_Camera *cullingcam, const RAS_Rect& area,
                                           const RAS_Rect& viewport, RAS_Rasterizer::StereoMode stereoMode, RAS_Rasterizer::StereoEye eye)
@@ -176,8 +119,8 @@ void KX_RenderPipeline::Render()
 
 		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
-		double hitchT = HitchNowMs();
-		g_hitchGpu.BeginFrame();
+		KX_EngineProfiler::BeginGpuFrame();
+		KX_EngineProfiler::Sections prof;
 		m_engine->BeginFrame();
 
 		// Advance once before visiting any scene/light so the entire frame sees the same
@@ -201,10 +144,7 @@ void KX_RenderPipeline::Render()
 
 		EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
 
-		double hitchNow = HitchNowMs();
-		g_hitchSub[7] += hitchNow - hitchT;
-		hitchT = hitchNow;
-		g_hitchGpu.Stamp(7);
+		RANGE_PROFILE_MARK_GPU(prof, "render.begin");
 
 		for (KX_Scene *scene : scenes) {
 			// shadow buffers
@@ -220,10 +160,7 @@ void KX_RenderPipeline::Render()
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 		}
 
-		hitchNow = HitchNowMs();
-		g_hitchSub[8] += hitchNow - hitchT;
-		hitchT = hitchNow;
-		g_hitchGpu.Stamp(8);
+		RANGE_PROFILE_MARK_GPU(prof, "render.shadows");
 
 		KX_RenderData renderData = GetRenderData();
 
@@ -269,10 +206,7 @@ void KX_RenderPipeline::Render()
 					RenderCamera(scene, cameraFrameData, offScreen, pass++, isfirstscene);
 				}
 
-				hitchNow = HitchNowMs();
-				g_hitchSub[9] += hitchNow - hitchT;
-				hitchT = hitchNow;
-				g_hitchGpu.Stamp(9);
+				RANGE_PROFILE_MARK_GPU(prof, "render.cameras");
 
 				/* Choose final render off screen target. If the current off screen is using multisamples we
 				 * are sure that it will be copied to a non-multisamples off screen before render the filters.
@@ -298,10 +232,7 @@ void KX_RenderPipeline::Render()
 				offScreen = PostRenderScene(scene, offScreen, canvas->GetOffScreen(target));
 				frameData.m_ofsType = offScreen->GetType();
 
-				hitchNow = HitchNowMs();
-				g_hitchSub[10] += hitchNow - hitchT;
-				hitchT = hitchNow;
-				g_hitchGpu.Stamp(10);
+				RANGE_PROFILE_MARK_GPU(prof, "render.filters");
 			}
 		}
 
@@ -327,13 +258,11 @@ void KX_RenderPipeline::Render()
 		else {
 			rasterizer->DrawOffScreen(canvas, canvas->GetOffScreen(renderData.m_frameDataList[0].m_ofsType));
 		}
-		g_hitchSub[10] += HitchNowMs() - hitchT;
-		g_hitchGpu.Stamp(10);
+		RANGE_PROFILE_MARK_GPU(prof, "render.present");
 	}
 
-	const double hitchEnd = HitchNowMs();
+	RANGE_PROFILE_SCOPE("render.endframe");
 	m_engine->EndFrame();
-	g_hitchSub[11] += HitchNowMs() - hitchEnd;
 }
 
 namespace {

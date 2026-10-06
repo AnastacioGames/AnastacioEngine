@@ -380,16 +380,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
-- **Profiler da engine (`KX_EngineProfiler`) — a fazer (2026-10-06):** transformar a instrumentação
-  temporária usada no diagnóstico do RolimaRacer (`RANGE_HITCH_LOG`, array `g_hitchSub[]` com índices
-  fixos, `GPU_hitch_counters`, `HitchNoteScene`, timestamps de GPU em `KX_RenderPipeline.cpp`, `glFinish`
-  de diagnóstico) numa ferramenta da engine, separada do debug de jogo, em pasta própria. Plano: (1) escopos
-  CPU nomeados e hierárquicos (`RANGE_PROFILE_SCOPE("render.cams")`), custo zero desligado; (2) tempo de GPU
-  por etapa com timestamps lidos 2-3 frames depois, sem `glFinish` (que fica opcional); (3) contadores
-  oficiais (draw calls, compilações de shader, uploads de textura, cenas adicionadas); (4) saídas: arquivo
-  de picos + médias (`RANGE_PROFILE=<arquivo>`, `RANGE_PROFILE_SPIKE_MS`), painel ImGui no modo debug e
-  `Range.logic.getEngineProfile()`; (5) `docs/engine-profiling.md`. Em aberto: o painel substitui o profile
-  atual do overlay ou fica em janela própria. Um passo por vez, com build e teste em cada um.
+- **Profiler da engine (`KX_EngineProfiler`) — feito (2026-10-06):** ver `docs/engine-profiling.md`.
+  Opcional, só se fizer falta: painel ImGui com as etapas e `Range.logic.getEngineProfile()`.
 - Contadores de render como opção para o usuário final (2026-10-06): `Range.logic.getRenderStats()` já
   expõe draw calls, material binds, light binds, culling, luzes/shadow passes e lógica, e o overlay ImGui
   mostra os mesmos números sob "Show Render Queries". Falta uma apresentação pensada para quem faz jogo

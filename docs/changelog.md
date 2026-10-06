@@ -9,6 +9,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Profiler da engine (`KX_EngineProfiler`) (2026-10-06)
+
+- A medição temporária do diagnóstico do RolimaRacer (`RANGE_HITCH_LOG`, `g_hitchSub[]` com índices fixos,
+  `HitchGpuStamps`, `GPU_hitch_counters`, `HitchNoteScene`, `glFinish` sempre ligado) virou
+  `KX_EngineProfiler`: etapas com nome (`RANGE_PROFILE_SCOPE`/`RANGE_PROFILE_MARK`), GPU por etapa
+  com 3 frames de queries em voo e sem `glFinish` (opcional com `RANGE_PROFILE_SYNC=1`), e contadores
+  `GPU_profile_counters`. Ligado com `RANGE_PROFILE=<arquivo>`. Guia: `docs/engine-profiling.md`.
+- Validado no `benchmark.range` (~30 FPS): sem sync, a espera pela GPU (~23 ms) aparece em
+  `endframe.imgui`; com sync, ela vai para `endframe.gpu_sync` e o imgui cai para 0,5 ms.
+
 ## Filtros 2D: feedback loop no ping-pong; resolução dinâmica por Python (2026-10-06)
 
 - **Linhas/blocos no Speed Blur (nitro do RolimaRacer):** `RAS_2DFilterManager::RenderFilters` podia

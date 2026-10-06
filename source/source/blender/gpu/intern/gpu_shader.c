@@ -687,8 +687,7 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 	                                 input, output, number, flags, NULL);
 }
 
-/* Temporary hitch counters (RANGE_HITCH_LOG): shaders, GPU textures, image uploads this frame. */
-int GPU_hitch_counters[3];
+int GPU_profile_counters[GPU_PROFILE_TOT];
 
 GPUShader *GPU_shader_create_ex_named(const char *vertexcode,
                                       const char *fragcode,
@@ -701,7 +700,7 @@ GPUShader *GPU_shader_create_ex_named(const char *vertexcode,
                                       const int flags,
                                       const char *name)
 {
-	GPU_hitch_counters[0]++;
+	GPU_profile_counters[GPU_PROFILE_SHADERS]++;
 	return gpu_shader_create_ex_impl(vertexcode, fragcode, geocode, libcode, defines,
 	                                 input, output, number, flags, name);
 }

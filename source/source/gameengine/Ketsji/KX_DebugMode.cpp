@@ -33,6 +33,8 @@
 
 #include "KX_Camera.h"
 #include "KX_DebugMode.h"
+#include "KX_EngineProfiler.h"
+#include "BLT_lang.h"
 #include "KX_Globals.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
@@ -158,6 +160,46 @@ void KX_DebugMode::RenderImguiDebugMode() {
 }
 
 // Override the old Debug properties.
+namespace {
+/* Tooltips of the engine profiler controls, in the editor languages (docs/i18n-glossary.md):
+ * en, pt_BR, es, ru. Picked by the UI language; anything else falls back to English. */
+enum { PROF_TIP_RECORD, PROF_TIP_SYNC, PROF_TIP_TOT };
+const char *const profilerTips[PROF_TIP_TOT][4] = {
+    {"Writes the CPU and GPU time of each engine stage, averages and spikes to a text file.\n"
+     "Run about 10 s on the slow part of the game, then send the file. See docs/engine-profiling.md.",
+     "Grava num arquivo de texto o tempo de CPU e GPU de cada etapa da engine, as médias e os picos.\n"
+     "Rode uns 10 s na parte lenta do jogo e depois mande o arquivo. Veja docs/engine-profiling.md.",
+     "Guarda en un archivo de texto el tiempo de CPU y GPU de cada etapa del motor, los promedios y los picos.\n"
+     "Ejecuta unos 10 s en la parte lenta del juego y luego envía el archivo. Consulta docs/engine-profiling.md.",
+     "Записывает в текстовый файл время CPU и GPU каждого этапа движка, средние значения и пики.\n"
+     "Запустите примерно 10 с на медленном участке игры и отправьте файл. См. docs/engine-profiling.md."},
+    {"Waits for the GPU at the end of every frame (glFinish): the wait shows as endframe.gpu_sync\n"
+     "instead of inside the stage that blocked. Costs some FPS.",
+     "Espera a GPU no fim de cada frame (glFinish): a espera aparece como endframe.gpu_sync\n"
+     "em vez de ficar dentro da etapa que travou. Custa um pouco de FPS.",
+     "Espera a la GPU al final de cada fotograma (glFinish): la espera aparece como endframe.gpu_sync\n"
+     "en lugar de dentro de la etapa que se bloqueó. Cuesta algo de FPS.",
+     "Ожидает GPU в конце каждого кадра (glFinish): ожидание отображается как endframe.gpu_sync,\n"
+     "а не внутри этапа, который блокировал. Немного снижает FPS."},
+};
+
+const char *ProfilerTip(int tip)
+{
+	const char *lang = BLT_lang_get();
+	int col = 0;
+	if (lang && strncmp(lang, "pt", 2) == 0) {
+		col = 1;
+	}
+	else if (lang && strncmp(lang, "es", 2) == 0) {
+		col = 2;
+	}
+	else if (lang && strncmp(lang, "ru", 2) == 0) {
+		col = 3;
+	}
+	return profilerTips[tip][col];
+}
+}  // namespace
+
 void KX_DebugMode::RenderDebugProperties()
 {
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
@@ -346,6 +388,28 @@ void KX_DebugMode::RenderDebugProperties()
         }
 
         ImGui::EndTable();
+      }
+
+      // Engine profiler (docs/engine-profiling.md): named CPU/GPU stages written to a file.
+      bool recording = KX_EngineProfiler::IsRequested();
+      if (ImGui::Checkbox("Record engine profile", &recording)) {
+        KX_EngineProfiler::SetEnabled(recording);
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", ProfilerTip(PROF_TIP_RECORD));
+      }
+      if (recording) {
+        ImGui::SameLine();
+        bool sync = KX_EngineProfiler::SyncGpu();
+        if (ImGui::Checkbox("GPU sync", &sync)) {
+          KX_EngineProfiler::SetSyncGpu(sync);
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s", ProfilerTip(PROF_TIP_SYNC));
+        }
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "REC");
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", KX_EngineProfiler::GetPath().c_str());
       }
     }
 
