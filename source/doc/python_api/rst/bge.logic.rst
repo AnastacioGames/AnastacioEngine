@@ -533,6 +533,22 @@ Utility functions
 
    Returns a Python dictionary that contains the same information as the on screen profiler. The keys are the profiler categories and the values are tuples with the first element being time taken (in ms) and the second element being the percentage of total time.
 
+.. function:: getRenderStats()
+
+   Returns a Python dictionary of integer counters from the last completed frame, the same numbers the Debug Mode render queries show. Unlike the frame times from :func:`getProfileInfo`, these do not depend on the hardware or the clock, so they are what A/B tests should compare.
+
+   Rasterizer counters, covering every pass of the frame (main camera, shadows, 2D filters):
+
+   * ``drawCalls`` -- draw calls issued.
+   * ``materialBinds`` -- material (shader program) binds.
+   * ``lightBinds`` -- uploads of the scene light and shadow lamp uniforms. The light set is constant per light layer, so this counts how often the same values were re-uploaded.
+
+   Counters of the active scene:
+
+   * ``cullingTotal``, ``cullingTested``, ``cullingVisible`` -- objects in the render list, tested against the frustum/DBVT, and found visible, from the last main-camera culling pass.
+   * ``lightsTotal``, ``lightsShadowUpdated``, ``shadowPasses`` -- lights in the scene, lights whose shadow buffer was refreshed, and shadow passes rendered (each cascade split counts as one).
+   * ``sensors``, ``controllersTriggered``, ``actuatorsUpdated`` -- registered sensors, and controllers/actuators run on the logic frame. Beware that these two are counted as the frame runs, and a Python controller calling this function is itself part of that frame: it sees only what ran before it, so from a controller the value is usually 0. The Debug Mode overlay reads them after the frame and shows the complete count. The rasterizer and culling counters above have no such caveat -- they are always from the last completed frame.
+
 *********
 Constants
 *********

@@ -129,6 +129,7 @@ extern "C" {
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_InputSystem.h"
+#include "SCA_LogicManager.h" // Needed for getRenderStats()
 
 #include "KX_NetworkMessageScene.h" //Needed for sendMessage()
 
@@ -341,6 +342,54 @@ PyDoc_STRVAR(gPyGetProfileInfo_doc,
 static PyObject *gPyGetProfileInfo(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return KX_GetActiveEngine()->GetPyProfileDict();
+}
+
+PyDoc_STRVAR(gPyGetRenderStats_doc,
+             "getRenderStats()\n"
+             "returns a dictionary of counters from the last completed frame: draw calls,\n"
+             "material and light uniform binds, culling object counts, light/shadow pass\n"
+             "counts and logic brick counts. Same numbers the Debug Mode render queries show."
+             );
+static PyObject *gPyGetRenderStats(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	PyObject *dict = PyDict_New();
+	if (!dict) {
+		return nullptr;
+	}
+
+	/* Adds the item and drops our reference, so the dict owns the only one. */
+	auto setInt = [dict](const char *key, int value) {
+		PyObject *obj = PyLong_FromLong(value);
+		if (obj) {
+			PyDict_SetItemString(dict, key, obj);
+			Py_DECREF(obj);
+		}
+	};
+
+	/* Rasterizer counters are frame-scoped across every pass (main, shadow, filters). */
+	setInt("drawCalls", RAS_Rasterizer::GetLastDrawCalls());
+	setInt("materialBinds", RAS_Rasterizer::GetLastMaterialChanges());
+	setInt("lightBinds", RAS_Rasterizer::GetLastLightBinds());
+
+	/* The rest is per scene: report the active one, like getCurrentScene() does. */
+	KX_Scene *scene = KX_GetActiveScene();
+	if (scene) {
+		setInt("cullingTotal", scene->GetLastCullingTotalObjects());
+		setInt("cullingTested", scene->GetLastCullingTestedObjects());
+		setInt("cullingVisible", scene->GetLastCullingVisibleObjects());
+		setInt("lightsTotal", scene->GetLastLightsTotal());
+		setInt("lightsShadowUpdated", scene->GetLastLightsShadowUpdated());
+		setInt("shadowPasses", scene->GetLastShadowPasses());
+
+		SCA_LogicManager *logicmgr = scene->GetLogicManager();
+		if (logicmgr) {
+			setInt("sensors", logicmgr->GetTotalRegisteredSensors());
+			setInt("controllersTriggered", logicmgr->GetLastControllersTriggered());
+			setInt("actuatorsUpdated", logicmgr->GetLastActuatorsUpdated());
+		}
+	}
+
+	return dict;
 }
 
 PyDoc_STRVAR(gPySendMessage_doc,
@@ -1103,6 +1152,7 @@ static struct PyMethodDef game_methods[] = {
 	{"PrintMemInfo", (PyCFunction)pyPrintStats, METH_NOARGS, (const char *)"Print engine statistics"},
 	{"NextFrame", (PyCFunction)gPyNextFrame, METH_NOARGS, (const char *)"Render next frame (if Python has control)"},
 	{"getProfileInfo", (PyCFunction)gPyGetProfileInfo, METH_NOARGS, gPyGetProfileInfo_doc},
+	{"getRenderStats", (PyCFunction)gPyGetRenderStats, METH_NOARGS, gPyGetRenderStats_doc},
 	/* library functions */
 	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS | METH_KEYWORDS, (const char *)""},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
@@ -1714,6 +1764,31 @@ static PyObject *gPyGetVsync(PyObject *, PyObject *Py_UNUSED(ignored))
 	return PyLong_FromLong(KX_GetActiveEngine()->GetCanvas()->GetSwapControl());
 }
 
+/* Runtime version of the scene's Dynamic Resolution settings. minScale == maxScale gives a
+ * fixed render scale; enabled=False renders at 100%. */
+static PyObject *gPySetDynamicResolution(PyObject *, PyObject *args, PyObject *kwds)
+{
+	int enabled;
+	int targetFPS = 60;
+	int minScale = 50;
+	int maxScale = 100;
+	int step = 5;
+	static const char *kwlist[] = {"enabled", "targetFPS", "minScale", "maxScale", "step", nullptr};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|iiii:setDynamicResolution", (char **)kwlist,
+	                                 &enabled, &targetFPS, &minScale, &maxScale, &step)) {
+		return nullptr;
+	}
+
+	KX_GetActiveEngine()->SetDynamicResolution(enabled != 0, targetFPS, minScale, maxScale, step);
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetRenderScale(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	return PyFloat_FromDouble(KX_GetActiveEngine()->GetCanvas()->GetRenderScale());
+}
+
 /* Master volume for the actual device the engine plays sound through
  * (BKE_sound_get_device()) -- NOT the same thing as a Python script doing
  * `aud.Device()`, which constructs an unrelated, separate playback device. */
@@ -1867,6 +1942,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 	{"setMipmapping", (PyCFunction)gPySetMipmapping, METH_VARARGS, ""},
 	{"getMipmapping", (PyCFunction)gPyGetMipmapping, METH_NOARGS, ""},
 	{"setVsync", (PyCFunction)gPySetVsync, METH_VARARGS, ""},
+	{"setDynamicResolution", (PyCFunction)gPySetDynamicResolution, METH_VARARGS | METH_KEYWORDS, ""},
+	{"getRenderScale", (PyCFunction)gPyGetRenderScale, METH_NOARGS, ""},
 	{"getVsync", (PyCFunction)gPyGetVsync, METH_NOARGS, ""},
 	{"setMasterVolume", (PyCFunction)gPySetMasterVolume, METH_VARARGS,
 	 "setMasterVolume(volume) -- volume in [0, 1], applies to the engine's actual audio device"},

@@ -131,8 +131,8 @@ void RAS_2DFilterOffScreen::NotifyRebuilt()
 bool RAS_2DFilterOffScreen::Update(RAS_ICanvas *canvas)
 {
 	if (m_flag & RAS_VIEWPORT_SIZE) {
-		const unsigned int width = canvas->GetWidth();
-		const unsigned int height = canvas->GetHeight();
+		const unsigned int width = canvas->GetRenderWidth();
+		const unsigned int height = canvas->GetRenderHeight();
 		if (m_width != width || m_height != height) {
 			m_width = width;
 			m_height = height;
@@ -143,8 +143,8 @@ bool RAS_2DFilterOffScreen::Update(RAS_ICanvas *canvas)
 	}
 	else if (m_flag & RAS_CANVAS_DIVISOR) {
 		// Follow the canvas (resize, fullscreen), the creation size is only the initial one.
-		const unsigned int width = std::max(1u, (unsigned int)(canvas->GetWidth() / m_sizeDivisor));
-		const unsigned int height = std::max(1u, (unsigned int)(canvas->GetHeight() / m_sizeDivisor));
+		const unsigned int width = std::max(1u, (unsigned int)(canvas->GetRenderWidth() / m_sizeDivisor));
+		const unsigned int height = std::max(1u, (unsigned int)(canvas->GetRenderHeight() / m_sizeDivisor));
 		if (m_width != width || m_height != height) {
 			m_width = width;
 			m_height = height;
@@ -174,8 +174,8 @@ void RAS_2DFilterOffScreen::Unbind(RAS_Rasterizer *rasty, RAS_ICanvas *canvas)
 	}
 
 	if (!(m_flag & RAS_VIEWPORT_SIZE)) {
-		const int width = canvas->GetWidth();
-		const int height = canvas->GetHeight();
+		const int width = canvas->GetRenderWidth();
+		const int height = canvas->GetRenderHeight();
 		rasty->SetViewport(0, 0, width, height);
 		rasty->SetScissor(0, 0, width, height);
 	}

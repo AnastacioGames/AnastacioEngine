@@ -424,6 +424,13 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 		// a "ghost" of an object that's gone. Invalidate once per scene per frame, not per pass.
 		const bool staticCasterListDirty = scene->IsStaticShadowCasterListDirty();
 
+		// One bounds snapshot for every light/cascade/face culled below.
+		struct ShadowCullingScope {
+			KX_Scene *m_scene;
+			ShadowCullingScope(KX_Scene *scene) : m_scene(scene) { m_scene->BeginShadowCulling(); }
+			~ShadowCullingScope() { m_scene->EndShadowCulling(); }
+		} shadowCullingScope(scene);
+
 		for (KX_LightObject *light : lightlist) {
 			RAS_ILightObject *raslight = light->GetLightData();
 			if (staticCasterListDirty && raslight->m_staticShadow && raslight->HasCascadedShadow()) {

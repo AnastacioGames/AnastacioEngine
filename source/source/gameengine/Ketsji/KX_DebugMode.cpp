@@ -273,8 +273,9 @@ void KX_DebugMode::RenderDebugProperties()
         // (all passes: main, shadow, filters, etc).
         ImGui::Separator();
         ImGui::TextUnformatted("Draw Calls");
-        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i draw calls | %i material binds",
-          RAS_Rasterizer::GetLastDrawCalls(), RAS_Rasterizer::GetLastMaterialChanges());
+        ImGui::TextColored(ImVec4(0, 255, 0, 225), "%i draw calls | %i material binds | %i light binds",
+          RAS_Rasterizer::GetLastDrawCalls(), RAS_Rasterizer::GetLastMaterialChanges(),
+          RAS_Rasterizer::GetLastLightBinds());
 
         // Show logic execution counters (last BeginFrame()/UpdateFrame() pass).
         ImGui::Separator();

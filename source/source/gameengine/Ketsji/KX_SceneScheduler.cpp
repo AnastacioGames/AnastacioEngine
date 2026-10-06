@@ -1,3 +1,4 @@
+#include <cstdio>
 /*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -98,6 +99,14 @@ void KX_SceneScheduler::DestructScene(KX_Scene *scene)
 	m_engine->GetConverter()->RemoveScene(scene);
 }
 
+extern std::string g_hitchScenes;
+static void HitchNoteScene(const std::string& name, double start)
+{
+	char buf[32];
+	snprintf(buf, sizeof(buf), "=%.0fms", (PIL_check_seconds_timer() - start) * 1000.0);
+	g_hitchScenes += " " + name + buf;
+}
+
 void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
 {
 	// only add scene when it doesn't exist!
@@ -156,6 +165,7 @@ void KX_SceneScheduler::AddScheduledScenes()
 				m_engine->GetScenes()->Add(CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
 				BL_LoadLog::Add(scenename, "add scene total (overlay)", PIL_check_seconds_timer() - start, "", true);
+				HitchNoteScene(scenename, start);
 				tmpscene->Release();
 			}
 			else {
@@ -175,6 +185,7 @@ void KX_SceneScheduler::AddScheduledScenes()
 				m_engine->GetScenes()->Insert(0, CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
 				BL_LoadLog::Add(scenename, "add scene total (background)", PIL_check_seconds_timer() - start, "", true);
+				HitchNoteScene(scenename, start);
 				tmpscene->Release();
 			}
 			else {
@@ -304,6 +315,7 @@ void KX_SceneScheduler::StepPendingScenes()
 	}
 
 	KX_Scene *scene = pending.m_scene;
+	HitchNoteScene(scene->GetName() + "(async)", stepStart);
 	BL_LoadLog::Add(scene->GetName(), "async shaders", pending.m_shaderTime);
 	BL_LoadLog::Add(scene->GetName(), "async scene total", PIL_check_seconds_timer() - pending.m_start, "", true);
 	CM_Message("[Load] async scene \"" << scene->GetName() << "\": " << pending.m_material << " materials, shaders "

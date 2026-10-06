@@ -95,6 +95,11 @@ void KX_TimeCategoryLogger::NextMeasurement()
 	}
 }
 
+double KX_TimeCategoryLogger::GetLast(TimeCategory tc)
+{
+	return m_loggers[tc].GetLast();
+}
+
 double KX_TimeCategoryLogger::GetAverage(TimeCategory tc)
 {
 	return m_loggers[tc].GetAverage();

@@ -92,6 +92,11 @@ void KX_TimeLogger::NextMeasurement(double now)
 	}
 }
 
+double KX_TimeLogger::GetLast() const
+{
+	return (m_measurements.size() > 1) ? m_measurements[1] : 0.0;
+}
+
 double KX_TimeLogger::GetAverage() const
 {
 	double avg = 0.0;

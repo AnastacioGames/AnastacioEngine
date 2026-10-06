@@ -1703,9 +1703,81 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, RA
 	return CalculateVisibleMeshes(cam, cam->GetFrustum(eye), layer, is_shadowbuf);
 }
 
+void KX_Scene::BeginShadowCulling()
+{
+	m_shadowCullScope = true;
+	m_shadowCullCacheValid = false;
+}
+
+void KX_Scene::BuildShadowCullCache()
+{
+	m_boundingBoxManager->Update(false);
+
+	m_shadowCullCache.clear();
+	m_shadowCullCache.reserve(m_renderlist->GetCount());
+	for (KX_GameObject *gameobj : m_renderlist) {
+		if (!gameobj->Renderable(0)) {
+			continue;
+		}
+		gameobj->UpdateBounds(false);
+
+		const SG_BBox& aabb = gameobj->GetCullingNode().GetAabb();
+		const mt::vec3& scale = gameobj->NodeGetWorldScaling();
+		const float maxscale = std::max(std::max(fabs(scale.x), fabs(scale.y)), fabs(scale.z));
+
+		ShadowCullEntry entry;
+		entry.m_object = gameobj;
+		entry.m_layer = gameobj->GetLayer();
+		entry.m_trans = gameobj->NodeGetWorldTransform();
+		entry.m_center = entry.m_trans * aabb.GetCenter();
+		entry.m_radius = maxscale * aabb.GetRadius();
+		entry.m_aabbMin = aabb.GetMin();
+		entry.m_aabbMax = aabb.GetMax();
+		m_shadowCullCache.push_back(entry);
+	}
+
+	m_boundingBoxManager->ClearModified();
+	m_shadowCullCacheValid = true;
+}
+
+void KX_Scene::EndShadowCulling()
+{
+	m_shadowCullScope = false;
+	m_shadowCullCacheValid = false;
+	m_shadowCullCache.clear();
+}
+
 std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf)
 {
 	std::vector<KX_GameObject *> objects;
+
+	if (is_shadowbuf && m_shadowCullScope) {
+		if (!m_shadowCullCacheValid) {
+			BuildShadowCullCache();
+		}
+		// Same sphere-then-box test as KX_CullingHandler, on the snapshot. The objects'
+		// culled flags are left alone: the main camera pass rewrites them after the shadows.
+		objects.reserve(m_shadowCullCache.size());
+		for (const ShadowCullEntry& entry : m_shadowCullCache) {
+			if (layer != 0 && !(entry.m_layer & layer)) {
+				continue;
+			}
+			const SG_Frustum::TestType sphereTest = frustum.SphereInsideFrustum(entry.m_center, entry.m_radius);
+			bool culled = true;
+			if (sphereTest == SG_Frustum::INSIDE) {
+				culled = false;
+			}
+			else if (sphereTest == SG_Frustum::INTERSECT) {
+				const mt::mat4 mat = mt::mat4::FromAffineTransform(entry.m_trans);
+				culled = (frustum.AabbInsideFrustum(entry.m_aabbMin, entry.m_aabbMax, mat) == SG_Frustum::OUTSIDE);
+			}
+			if (!culled) {
+				objects.push_back(entry.m_object);
+			}
+		}
+		return objects;
+	}
+
 	objects.reserve(m_renderlist->GetCount());
 	m_boundingBoxManager->Update(false);
 

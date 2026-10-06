@@ -4768,12 +4768,15 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
 			 * same registration GPU_lamp_get_data() does for the Lamp Data node path. */
 			material->dynproperty |= DYN_LAMP_PERSMAT;
-			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once. */
+			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once.
+			 * Both lists are filled and freed together, so a lamp already in the short
+			 * material->lamps list means the material is already in lamp->materials; only search
+			 * that one (it grows with every material lit by the lamp) on first registration. */
 			if (!BLI_findptr(&material->lamps, lamp, offsetof(LinkData, data))) {
 				add_user_list(&material->lamps, lamp);
-			}
-			if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
-				add_user_list(&lamp->materials, material->ma);
+				if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
+					add_user_list(&lamp->materials, material->ma);
+				}
 			}
 
 			if (material->shadowmaploc[i] != -1) {

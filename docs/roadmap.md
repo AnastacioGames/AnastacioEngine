@@ -380,6 +380,30 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- **Profiler da engine (`KX_EngineProfiler`) — a fazer (2026-10-06):** transformar a instrumentação
+  temporária usada no diagnóstico do RolimaRacer (`RANGE_HITCH_LOG`, array `g_hitchSub[]` com índices
+  fixos, `GPU_hitch_counters`, `HitchNoteScene`, timestamps de GPU em `KX_RenderPipeline.cpp`, `glFinish`
+  de diagnóstico) numa ferramenta da engine, separada do debug de jogo, em pasta própria. Plano: (1) escopos
+  CPU nomeados e hierárquicos (`RANGE_PROFILE_SCOPE("render.cams")`), custo zero desligado; (2) tempo de GPU
+  por etapa com timestamps lidos 2-3 frames depois, sem `glFinish` (que fica opcional); (3) contadores
+  oficiais (draw calls, compilações de shader, uploads de textura, cenas adicionadas); (4) saídas: arquivo
+  de picos + médias (`RANGE_PROFILE=<arquivo>`, `RANGE_PROFILE_SPIKE_MS`), painel ImGui no modo debug e
+  `Range.logic.getEngineProfile()`; (5) `docs/engine-profiling.md`. Em aberto: o painel substitui o profile
+  atual do overlay ou fica em janela própria. Um passo por vez, com build e teste em cada um.
+- Contadores de render como opção para o usuário final (2026-10-06): `Range.logic.getRenderStats()` já
+  expõe draw calls, material binds, light binds, culling, luzes/shadow passes e lógica, e o overlay ImGui
+  mostra os mesmos números sob "Show Render Queries". Falta uma apresentação pensada para quem faz jogo
+  (hoje o painel é de debug interno): decidir se vira um HUD próprio de FPS + contadores, ligável no painel
+  Render, em vez de ficar junto das render queries.
+- **Gargalo confirmado (2026-10-06) — uniforms de luz por objeto:** cena de 9 cubos com **um único
+  material** deu `materialBinds` 2 e `lightBinds` 9, ou seja um upload por objeto, não por bucket.
+  `BL_BlenderShader::BindShadowLamps()` roda dentro de `ActivateMeshUser()`, reenviando
+  `GPU_material_bind_scene_lights` (8 luzes × ~11 uniforms) e `GPU_material_bind_shadow_lamps`
+  (4 lamps, com 2 `BLI_findptr` lineares cada) com dados que são constantes por camada de luz.
+  Só vale para materiais de nós/PBR (`use_scene_lights` liga com `unflightsource[]`).
+  Correção planejada: contador de geração de luzes em `RAS_Rasterizer`, subindo só quando
+  `ProcessLighting()` recalcula, e o bind sobe para o `Activate()` do bucket. Prova: `lightBinds` cai de
+  ~objetos visíveis para ~material binds.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"

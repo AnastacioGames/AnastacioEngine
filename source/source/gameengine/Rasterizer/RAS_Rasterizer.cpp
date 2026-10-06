@@ -195,8 +195,10 @@ void RAS_Rasterizer::Exit()
 namespace {
 int g_lastDrawCalls = 0;
 int g_lastMaterialChanges = 0;
+int g_lastLightBinds = 0;
 int g_drawCallsThisFrame = 0;
 int g_materialChangesThisFrame = 0;
+int g_lightBindsThisFrame = 0;
 
 /// Calls RAS_Rasterizer::PopMatrix on scope exit, matching a prior PushMatrix.
 class RAS_PopMatrixGuard
@@ -219,8 +221,10 @@ void RAS_Rasterizer::ResetDrawCallCounters()
 {
 	g_lastDrawCalls = g_drawCallsThisFrame;
 	g_lastMaterialChanges = g_materialChangesThisFrame;
+	g_lastLightBinds = g_lightBindsThisFrame;
 	g_drawCallsThisFrame = 0;
 	g_materialChangesThisFrame = 0;
+	g_lightBindsThisFrame = 0;
 }
 
 void RAS_Rasterizer::IncDrawCallCount()
@@ -233,6 +237,11 @@ void RAS_Rasterizer::IncMaterialChangeCount()
 	++g_materialChangesThisFrame;
 }
 
+void RAS_Rasterizer::IncLightBindCount()
+{
+	++g_lightBindsThisFrame;
+}
+
 int RAS_Rasterizer::GetLastDrawCalls()
 {
 	return g_lastDrawCalls;
@@ -241,6 +250,11 @@ int RAS_Rasterizer::GetLastDrawCalls()
 int RAS_Rasterizer::GetLastMaterialChanges()
 {
 	return g_lastMaterialChanges;
+}
+
+int RAS_Rasterizer::GetLastLightBinds()
+{
+	return g_lastLightBinds;
 }
 
 void RAS_Rasterizer::BeginFrame(double time)

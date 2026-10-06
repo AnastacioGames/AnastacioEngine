@@ -226,3 +226,118 @@ legadas. Build de `ge_ketsji` e link de `RangeRuntime` concluídos com sucesso.
   propriedades a cada frame, mas só recalculam o texto quando o valor muda.
   Ambos permanecem como hotspots de baixo risco, sem correção necessária sem
   uma medição específica.
+
+### Suíte de perf reproduzível e baseline PBR (2026-10-06)
+
+Os testes de 2026-09-16 acima foram feitos com scripts descartáveis que nunca entraram no repo, então
+não dava para reproduzir nem comparar. A suíte nova substitui isso:
+
+- `tools/tests/perf/perf_probe.py` — coletor embutido nas cenas: warmup adaptativo (só começa a
+  amostrar quando 20 ticks seguidos ficam abaixo de 120 ms, porque GLSL compila no primeiro desenho
+  e uma cena de 900 materiais únicos gasta segundos dentro de poucos ticks), 10 s de amostra por
+  tempo real, relatório com as 23 categorias do profiler e os contadores de `getRenderStats()`.
+- `tools/create_perf_pbr_lights_test.py` — gera as 20 cenas da matriz do gargalo A.
+- `tools/run_perf_suite.py` — roda rodadas **alternando** as tags (A,B,A,B,…) em vez de AAABBB,
+  porque clock de GPU e throttling derivam ao longo da sessão, e imprime a dispersão entre rodadas.
+
+**Teto de FPS:** `KX_KetsjiEngine::EndFrame()` chama `UpdateSleepTime()` sem condição
+(`KX_KetsjiEngine.cpp:408`), que dorme até completar `1/ticrate`. O FPS **nunca** passa do ticrate
+lógico, mesmo com "Use Frame Rate" desligado e vsync off. As cenas de perf usam `game.fps = 1000`
+para o teto ficar longe do custo medido; sem isso todo caso lê exatamente 60 fps.
+
+**Baseline (variante `cpu`, 1280×720, 3 rodadas, dispersão ≤10%)** — relatórios em
+`projects-teste/perf/baseline/`:
+
+| objetos | luzes | materiais | ms/tick | fps | drawCalls | lightBinds |
+|---|---|---|---|---|---|---|
+| 100 | 8 | 1 | 1.158 | 870 | 1078 | 100 |
+| 100 | 8 | N | 1.717 | 647 | 1078 | 100 |
+| 400 | 8 | 1 | 3.987 | 251 | 3637 | 400 |
+| 400 | 8 | N | 6.470 | 155 | 3637 | 400 |
+| 900 | 1 | 1 | 1.879 | 553 | 900 | 900 |
+| 900 | 1 | N | 4.013 | 251 | 900 | 900 |
+| 900 | 4 | 1 | 5.457 | 184 | 3040 | 900 |
+| 900 | 4 | N | 13.955 | 72 | 3040 | 900 |
+| 900 | 8 | 1 | 8.388 | 119 | 5794 | 900 |
+| 900 | 8 | N | 18.954 | 53 | 5794 | 900 |
+
+**O gargalo A existe mas é pequeno — a hipótese estava errada em magnitude.** `lightBinds = 900`
+confirma que os uniforms de luz são enviados por objeto e não por bucket (com 1 material há 2
+buckets). Só que o custo é baixo: com 900 objetos e 1 material, ir de 1 para 8 luzes move
+`MainRender` de 1.14 ms para 1.71 ms — **+0.57 ms**. Hoistar `BindShadowLamps` para o bucket não
+pode render mais que isso.
+
+**Os dois gargalos reais desta cena:**
+
+1. **Troca de material no `MainRender`** — 900 objetos / 8 luzes: 1.71 ms com 1 material contra
+   **9.89 ms** com 900 materiais, **+8.2 ms**. É custo por bucket (bind de programa e de uniforms de
+   material), 14× maior que o custo por objeto de luz. Mesmo padrão em todas as contagens de objeto.
+2. **`ShadowCulling`** — 900 objetos: 0.20 ms com 1 luz contra **4.44 ms** com 8 luzes, a categoria
+   mais caro do caso de 1 material. Escala com luzes × objetos, ou seja, o culling é refeito por luz.
+   `Shadows` sobe junto (0.03 → 1.96 ms). `drawCalls` vai de 900 para 5794 pelas passadas de sombra.
+
+Consequência para a ordem de otimização: A cai para o fim da fila; o alvo passa a ser o custo por
+bucket no `MainRender` e o `ShadowCulling` por luz.
+
+### MainRender: busca linear em `lamp->materials` por objeto (corrigido, 2026-10-06)
+
+A explicação do item 1 acima ("bind de programa e de uniforms de material") estava errada. Medido
+com cronômetros temporários no caminho de desenho (900 objetos, 8 luzes, por frame):
+
+- `GPU_material_bind` inteiro (programa, texturas, uniforms) custava só ~1 ms com 900 materiais.
+- Rodar com `RANGE_SHADER_UNIFORM_VALUES=1` confirmou 0 trocas de programa e o mesmo `MainRender`:
+  trocar de programa GLSL não é o custo.
+- O custo estava em `BL_BlenderShader::BindShadowLamps()`, por objeto: 1,3 µs com 1 material
+  contra 9,1 µs com 900. `GPU_material_bind_shadow_lamps()` fazia, para cada uma das 4 luzes com
+  sombra, `BLI_findptr(&lamp->materials, ma)` — busca linear numa lista encadeada com **todos** os
+  materiais que a luz ilumina. Com 900 materiais, ~1800 nós percorridos por objeto por frame.
+
+Correção: as duas listas (`material->lamps` e `lamp->materials`) são preenchidas e liberadas
+juntas, então a busca na lista longa só roda quando a luz ainda não está na lista curta do
+material (≤4 itens), isto é, no primeiro registro. Comportamento de render idêntico (mesmos
+`drawCalls`/`lightBinds`).
+
+| objetos | luzes | materiais | antes ms/tick | depois ms/tick |
+|---|---|---|---|---|
+| 100 | 8 | N | 1.717 | 1.572 |
+| 400 | 8 | N | 6.470 | 5.350 |
+| 900 | 1 | N | 4.013 | 3.758 |
+| 900 | 4 | N | 13.955 | 7.277 |
+| 900 | 8 | N | 18.954 | 11.657 |
+
+`MainRender` no caso 900/8/N: 9,89 → 3,11 ms (o caso de 1 material fica em 1,71 ms). Casos de
+1 material inalterados. Relatórios `perf_*_cpu_lampfix.txt` em `projects-teste/perf/pbr_lights/`
+(1 rodada).
+
+**Variante `gpu` igual à `cpu`:** esfera 48×24 em 1080p deu os mesmos ms/tick da icosfera em 720p
+em todos os casos — a cena é inteiramente limitada pela CPU. O gargalo seguinte é o
+`ShadowCulling` por luz (~4,6 ms com 8 luzes), agora o maior item do frame.
+
+### ShadowCulling: snapshot dos bounds para todos os passes de sombra (2026-10-06)
+
+Com 8 luzes a cena faz 43 passes de sombra (faces de point, cascatas), e cada passe chamava
+`CalculateVisibleMeshes()`, que percorre os 900 objetos lendo `KX_GameObject` → `SG_Node` →
+mesh user → bounding box → culling node. Medido por dentro: ~0,31 ms por passe, ~340 ns por
+objeto, igual com TBB ou serial — é latência de memória, não conta. Repetido 43 vezes: ~4,7 ms.
+
+Correção: `KX_ShadowRenderer::Render()` abre um escopo (`KX_Scene::BeginShadowCulling` /
+`EndShadowCulling`); no primeiro passe de sombra, a cena monta um array compacto (centro/raio da
+esfera em mundo, AABB, transform, layer) e os passes seguintes testam só esse array, com o mesmo
+teste esfera-depois-caixa do `KX_CullingHandler`. O snapshot é preguiçoso: cena sem sombra não
+paga nada. O caminho de sombra deixa de escrever a flag `culled` dos objetos, que a culling da
+câmera principal reescreve logo depois. Junto, `SG_Frustum::SphereInsideFrustum` passou a checar
+todos os planos antes de responder `INTERSECT` (antes, uma esfera que cruzava um plano mas estava
+fora de outro ia para o teste de caixa).
+
+A/B alternado com o mesmo binário (chave temporária, removida), `drawCalls` idênticos:
+
+| caso | ShadowCulling antes → depois | ms/tick antes → depois |
+|---|---|---|
+| 900 obj / 8 luzes / N mat | 4,91 → 0,80 ms | 12,45 → 9,63 (−22,6%) |
+| 900 obj / 4 luzes / N mat | 2,24 → 0,60 ms | 7,39 → 7,08 (−4,1%) |
+
+**Efeito colateral medido:** nas duas cenas a `MainRender` subiu ~0,8–1,3 ms e a
+`CameraCulling` ~0,26 ms, sem mudança de código nelas. O teste serial anterior (TBB desligado no
+culling) mostrou o mesmo padrão. Leitura: as threads do TBB acordando a cada passe mantinham a CPU
+em clock alto; sem elas, o resto do frame roda mais devagar. O saldo continua positivo. Com 1 passe
+de sombra o snapshot serial custa ~0,04 ms a mais que o TBB (ruído).

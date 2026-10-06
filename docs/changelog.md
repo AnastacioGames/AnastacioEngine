@@ -9,6 +9,45 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Filtros 2D: feedback loop no ping-pong; resolução dinâmica por Python (2026-10-06)
+
+- **Linhas/blocos no Speed Blur (nitro do RolimaRacer):** `RAS_2DFilterManager::RenderFilters` podia
+  mandar um filtro desenhar no off screen que ele mesmo lia. Com MSAA a profundidade fica em FILTER0; um
+  filtro que lê profundidade (Camera Lens) entre outros dois era desviado de FILTER0 para FILTER1, que era
+  a própria entrada de cor. Resultado: blocos e faixas horizontais deslocadas (leitura de ladrilhos já
+  escritos). Agora o alvo é o primeiro off screen livre entre o preferido, FILTER0, FILTER1 e o off screen
+  final (sem multisample). O número de amostras do Camera Lens passou a seguir o comprimento do rastro
+  (4-32), mas não era a causa.
+- **`Range.render.setDynamicResolution(enabled, targetFPS, minScale, maxScale, step)` e
+  `getRenderScale()`:** versão em runtime das opções Dynamic Resolution da cena; `minScale == maxScale` dá
+  escala fixa. Mudar a faixa aplica a escala na hora. Diagnóstico no RolimaRacer com 10 CPUs: GPU no
+  desenho da cena 14-18 ms em 1080p e 4-5 ms em 960x540 (custo por pixel), 60 FPS cravado em meia
+  resolução.
+- **Escala de render < 100% mostrava só um canto da imagem, ampliado:** `RAS_2DFilterOffScreen`
+  (bloom, blur e outros filtros com off screen próprio) restaurava o viewport e dimensionava seus buffers
+  pelo tamanho da janela, e `RAS_2DFilter` passava esse tamanho aos shaders. Passaram a usar
+  `GetRenderWidth/Height`. `GetSceneViewport` também escala o viewport de câmera definido em pixels
+  (`camera.setViewport`).
+
+## Perf: ShadowCulling com snapshot de bounds por frame (2026-10-06)
+
+Cada passe de sombra (face de point, cascata) relia os bounds de todos os objetos, pagando
+cache misses por objeto: ~0,31 ms por passe com 900 objetos, 4,7 ms com 8 luzes (43 passes).
+Agora `KX_ShadowRenderer` abre um escopo em que `KX_Scene` monta, no primeiro passe, um array
+compacto (esfera, AABB, transform, layer) e os demais passes testam só ele. Cena sem sombra não
+paga nada. `SG_Frustum::SphereInsideFrustum` passou a checar todos os planos antes de responder
+`INTERSECT`. 900 objetos / 8 luzes: `ShadowCulling` 4,91 → 0,80 ms, frame −22,6% (A/B
+alternado, `drawCalls` idênticos). Detalhes em `docs/performance-audit.md`.
+
+## Perf: MainRender sem busca linear de lamp->materials por objeto (2026-10-06)
+
+Com muitos materiais distintos e luzes com sombra, `GPU_material_bind_shadow_lamps()` percorria a
+lista encadeada `lamp->materials` (todos os materiais iluminados pela luz) a cada objeto, para cada
+uma das 4 luzes de sombra. A busca agora só roda no primeiro registro da luz no material, porque as
+duas listas são sempre preenchidas e liberadas juntas. Cena de 900 objetos / 8 luzes / 900
+materiais: `MainRender` 9,89 → 3,11 ms, frame 18,95 → 11,66 ms (53 → 86 fps). Detalhes e a
+matriz completa em `docs/performance-audit.md`.
+
 ## Lamp Point: visualizacao do volume de sombra como esfera (2026-10-06)
 
 O "Show Shadow Box" do painel de sombra do game e apenas visualizacao de viewport: desenha o

@@ -1,3 +1,4 @@
+#include <chrono>
 /*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -546,6 +547,13 @@ void LA_Launcher::RunPythonMainLoop(const std::string& pythonCode)
 
 #endif  // WITH_PYTHON
 
+// Temporary hitch log: [5] render, [6] OS events + dispatch (see KX_KetsjiEngine.cpp).
+extern double g_hitchSub[21];
+static double HitchNow()
+{
+	return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 KX_ExitInfo LA_Launcher::EngineNextFrame()
 {
 #ifdef WITH_PYTHON
@@ -567,12 +575,16 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 
 	if (exitInfo.m_code == KX_ExitInfo::NO_REQUEST) {
 		if (renderFrame) {
+			const double t0 = HitchNow();
 			RenderEngine();
+			g_hitchSub[5] += (HitchNow() - t0) * 1000.0;
 		}
 	}
 
+	const double t1 = HitchNow();
 	m_system->processEvents(false);
 	m_system->dispatchEvents();
+	g_hitchSub[6] += (HitchNow() - t1) * 1000.0;
 	// Teclas do controle na tela (Web) entram depois das do teclado, no mesmo ponto do quadro.
 	m_inputDevice->PollVirtualKeys();
 

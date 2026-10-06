@@ -783,6 +783,8 @@ void GPU_create_gl_tex(
         int textarget, bool mipmap, bool use_high_bit_depth, Image *ima)
 {
 	ImBuf *ibuf = NULL;
+	extern int GPU_hitch_counters[3];
+	GPU_hitch_counters[2]++;
 
 	int tpx = rectw;
 	int tpy = recth;

@@ -115,6 +115,8 @@ static GPUTexture *GPU_texture_create_nD(
 {
 	GLenum type, format, internalformat;
 	void *pixels = NULL;
+	extern int GPU_hitch_counters[3];
+	GPU_hitch_counters[1]++;
 
 	if (samples) {
 		CLAMP_MAX(samples, GPU_max_color_texture_samples());

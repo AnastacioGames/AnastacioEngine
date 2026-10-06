@@ -377,8 +377,8 @@ void RAS_2DFilter::ParseShaderProgram()
    of nearby fragments. Or vertices or whatever.*/
 void RAS_2DFilter::ComputeTextureOffsets(RAS_ICanvas *canvas)
 {
-	const GLfloat texturewidth = (GLfloat)canvas->GetWidth();
-	const GLfloat textureheight = (GLfloat)canvas->GetHeight();
+	const GLfloat texturewidth = (GLfloat)canvas->GetRenderWidth();
+	const GLfloat textureheight = (GLfloat)canvas->GetRenderHeight();
 	const GLfloat xInc = 1.0f / texturewidth;
 	const GLfloat yInc = 1.0f / textureheight;
 
@@ -478,12 +478,12 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[RENDERED_TEXTURE_WIDTH_UNIFORM] != -1) {
 		// Bind rendered texture width.
-		const unsigned int texturewidth = canvas->GetWidth();
+		const unsigned int texturewidth = canvas->GetRenderWidth();
 		SetUniform(m_predefinedUniforms[RENDERED_TEXTURE_WIDTH_UNIFORM], (float)texturewidth);
 	}
 	if (m_predefinedUniforms[RENDERED_TEXTURE_HEIGHT_UNIFORM] != -1) {
 		// Bind rendered texture height.
-		const unsigned int textureheight = canvas->GetHeight();
+		const unsigned int textureheight = canvas->GetRenderHeight();
 		SetUniform(m_predefinedUniforms[RENDERED_TEXTURE_HEIGHT_UNIFORM], (float)textureheight);
 	}
 	if (m_predefinedUniforms[TEXTURE_COORDINATE_OFFSETS_UNIFORM] != -1) {
@@ -508,7 +508,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 
 	if (m_predefinedUniforms[GE_BLOOM_PARAMETERS_UNIFORM] != -1) {
 		float params[4] = {m_buildInFilters.bloom_intensity, m_buildInFilters.bloom_threshold,
-						   (float)canvas->GetWidth(), (float)canvas->GetHeight()};
+						   (float)canvas->GetRenderWidth(), (float)canvas->GetRenderHeight()};
 		SetUniformfv(m_predefinedUniforms[GE_BLOOM_PARAMETERS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
 	}
 

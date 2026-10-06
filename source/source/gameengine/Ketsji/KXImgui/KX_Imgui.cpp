@@ -408,8 +408,10 @@ void SetupDebugModeStyle() {
 
 	style.Colors[ImGuiCol_Text] = ImVec4(1.000f, 1.000f, 1.000f, 1.000f);
 	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.498f, 0.498f, 0.498f, 1.000f);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.059f, 0.059f, 0.059f, 0.25f); //
-	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.098f);
+	/* Nearly opaque: at the old 0.25 the game behind the panel showed through and the text was
+	 * hard to read over bright scenes. */
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.045f, 0.045f, 0.045f, 0.94f);
+	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.45f);
 	style.Colors[ImGuiCol_PopupBg] = ImVec4(0.078f, 0.078f, 0.078f, 0.940f);
 	style.Colors[ImGuiCol_Border] = ImVec4(0.427f, 0.427f, 0.498f, 0.502f);
 	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.000f, 0.000f, 0.000f, 0.000f);
@@ -419,7 +421,7 @@ void SetupDebugModeStyle() {
 	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.2f, 0.05f, 0.05f, 1.0f); // Dark and discreet red
 	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.3f, 0.1f, 0.1f, 1.0f); // A little brighter red, but still soft
 	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.000f, 0.000f, 0.000f, 0.510f);
-	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.137f, 0.137f, 0.137f, 0.5f);
+	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.100f, 0.100f, 0.100f, 0.94f);
 	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.020f, 0.020f, 0.020f, 0.530f);
 	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.310f, 0.310f, 0.310f, 1.000f);
 	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.408f, 0.408f, 0.408f, 1.000f);

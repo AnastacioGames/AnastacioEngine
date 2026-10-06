@@ -89,6 +89,9 @@ public:
 	 */
 	double GetAverage() const;
 
+	/// Time of the last finished measurement (the one before the current), 0 if none.
+	double GetLast() const;
+
 protected:
 	/// Storage for the measurements.
 	std::deque<double> m_measurements;

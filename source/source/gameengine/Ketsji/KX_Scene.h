@@ -294,6 +294,23 @@ private:
 	int m_lastCullingTestedObjects;
 	int m_lastCullingVisibleObjects;
 
+	/** Per-object culling data gathered once for all shadow passes of a frame (see
+	 * BeginShadowCulling). Reading it back from the objects costs several cache misses per
+	 * object, and with point lights and cascades that was repeated for every pass. */
+	struct ShadowCullEntry {
+		KX_GameObject *m_object;
+		int m_layer;
+		float m_radius;
+		mt::vec3 m_center;
+		mt::vec3 m_aabbMin;
+		mt::vec3 m_aabbMax;
+		mt::mat3x4 m_trans;
+	};
+	std::vector<ShadowCullEntry> m_shadowCullCache;
+	bool m_shadowCullScope = false;
+	bool m_shadowCullCacheValid = false;
+	void BuildShadowCullCache();
+
 	/** Light/shadow counters from the last KX_ShadowRenderer::Render() call for
 	 * this scene: total lights in the scene, and how many shadow passes (cascade splits
 	 * count as one pass each) were actually rendered this frame. Used only for the Debug
@@ -556,6 +573,11 @@ public:
 
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, RAS_Rasterizer::StereoEye eye, int layer, bool is_shadowbuf);
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf);
+	/** Until EndShadowCulling(), shadow-buffer CalculateVisibleMeshes() calls test a snapshot
+	 * of the renderable objects' bounds, taken at the first such call. Objects must not move
+	 * in between (shadow rendering runs no logic). */
+	void BeginShadowCulling();
+	void EndShadowCulling();
 
 	RAS_DebugDraw& GetDebugDraw();
 	/// \section Debug draw.

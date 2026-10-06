@@ -745,16 +745,23 @@ public:
   const unsigned char* GetGraphicsCardVendor();
   const unsigned char* GetGraphicsCardRenderer();
 
-	/** Frame-scoped draw call / material bind counters, incremented from
-	 * RAS_DisplayArrayStorage::IndexPrimitives*() and RAS_BucketManager::PrepareBuckets()
-	 * across every backend/pass in a frame (main, shadow, filters, etc). Static because
-	 * the increment sites don't hold a RAS_Rasterizer instance. Used only for the Debug
-	 * Mode "Draw Calls" counters. */
+	/** Frame-scoped draw call / material bind / light bind counters, incremented from
+	 * RAS_DisplayArrayStorage::IndexPrimitives*(), RAS_BucketManager::PrepareBuckets() and
+	 * BL_BlenderShader::BindShadowLamps() across every backend/pass in a frame (main, shadow,
+	 * filters, etc). Static because the increment sites don't hold a RAS_Rasterizer instance.
+	 * Read by the Debug Mode "Draw Calls" counters and by Range.logic.getRenderStats().
+	 *
+	 * The light bind count is the number of times the per-object scene light / shadow lamp
+	 * uniforms were uploaded. The light set is constant per light layer, so this number
+	 * measures redundant uploads: it tracks the visible object count today, and a bind that
+	 * is hoisted to the material bucket would make it track the material bind count instead. */
 	static void ResetDrawCallCounters();
 	static void IncDrawCallCount();
 	static void IncMaterialChangeCount();
+	static void IncLightBindCount();
 	static int GetLastDrawCalls();
 	static int GetLastMaterialChanges();
+	static int GetLastLightBinds();
 };
 
 #endif  /* __RAS_RASTERIZER_H__ */
