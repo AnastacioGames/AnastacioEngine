@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Texture Paint: relatorio da instancia em primeiro plano (2026-10-06)
+- Registrado `docs/texture-paint-foreground-instance-report.md` para continuidade do diagnostico: ao pintar uma
+  malha e atravessar uma instancia de grupo que fica visualmente a frente dela, o processo deixa de responder e
+  cresce memoria em atualizacoes repetidas de undo de imagem. O relatorio separa a configuracao verificada do
+  grupo CheckPoint, evidencias do log, correcoes ja feitas em `fff04797` e os proximos passos recomendados.
+
 ## Texture Paint: travamento ao clicar fora do objeto pintado (2026-10-05)
 - Investigado travamento ao pintar material/mascara e clicar ou passar o pincel sobre outro objeto. O erro de
   GPU visto nos logs vinha de uniforms dinamicos cujo `shaderloc` ficava zerado apos `MEM_callocN`; quando o
