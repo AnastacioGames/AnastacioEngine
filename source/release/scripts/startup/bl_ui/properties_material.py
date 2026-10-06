@@ -69,6 +69,10 @@ class MATERIAL_MT_specials(Menu):
         layout.operator("material.copy", icon='COPYDOWN')
         layout.operator("material.paste", icon='PASTEDOWN')
 
+        if context.scene.render.engine == 'BLENDER_GAME':
+            layout.separator()
+            layout.operator("material.to_pbr_nodes", icon='NODETREE')
+
 
 class MATERIAL_UL_matslots(UIList):
 
@@ -200,8 +204,16 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
         col = layout.column(align=True)
         col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
         col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
-        col.operator("material.recipe_wet_patches", icon='MOD_OCEAN')
+
+        # A receita existe nos dois caminhos de shading; cada botão monta um e deixa a cena
+        # no modo correspondente, senão o material fica montado para um caminho que não desenha.
+        col.label(text="Wet/Reflective Patches:")
+        row = col.row(align=True)
+        row.operator("material.recipe_wet_patches", text="PBR", icon='MOD_OCEAN').shading = 'PBR'
+        row.operator("material.recipe_wet_patches", text="Classic", icon='MOD_OCEAN').shading = 'LEGACY'
+
         col.operator_menu_enum("material.recipe_preset", "preset", text="Ready-made Material", icon='MATERIAL')
+        col.operator("material.to_pbr_nodes", icon='NODETREE')
 
         if not mat or RECIPE_KEY not in mat:
             return

@@ -2,12 +2,14 @@
 # Cada receita funciona nos dois caminhos do Game: PBR (Shading Nodes ligado, nós do Cycles) e
 # legado (nós do Blender Internal). Os nós criados recebem nomes "AE_*" para o painel achá-los depois.
 
+import math
 import os
 import re
 
 import bpy
 from bpy.types import Operator
-from bpy.props import EnumProperty, FloatProperty, IntProperty, StringProperty, CollectionProperty
+from bpy.props import (
+    BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty, CollectionProperty)
 
 
 RECIPE_KEY = "anastacio_recipe"
@@ -31,6 +33,32 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".bmp", ".dds", 
 
 def use_pbr(context):
     return context.scene.render.use_shading_nodes
+
+
+SHADING_MODES = (
+    ('AUTO', "Scene Setting", "Build for whatever PBR Shading Nodes is set to right now"),
+    ('PBR', "PBR", "Cycles-style nodes (Principled); turns PBR Shading Nodes on"),
+    ('LEGACY', "Classic", "Blender Internal nodes; turns PBR Shading Nodes off"),
+)
+
+
+def resolve_pbr(context, mode):
+    """Diz para que caminho montar o grafo e, se preciso, alinha a cena.
+
+    O toggle da cena é quem escolhe o caminho de desenho (GPU_material_from_blender chama
+    ntreeGPUMaterialNodes com NODE_NEW_SHADING ou NODE_OLD_SHADING conforme ele), então montar
+    nós de um modo com a cena no outro dá um material que simplesmente não aparece. Por isso
+    pedir um modo explícito também ajusta a cena. Devolve (pbr, mudou_a_cena).
+    """
+    if mode == 'AUTO':
+        return use_pbr(context), False
+    want = (mode == 'PBR')
+    # render.use_shading_nodes é derivado e somente leitura; o gravável é o do game_settings.
+    gs = context.scene.game_settings
+    switched = gs.use_shading_nodes != want
+    if switched:
+        gs.use_shading_nodes = want
+    return want, switched
 
 
 def classify(filename):
@@ -481,6 +509,19 @@ def set_tiling(mapping, value):
         mapping.scale = (value, value, value)
 
 
+def set_mapping(mapping, translation, rotation, scale):
+    """Preenche um nó Mapping nas duas formas que ele já teve: sockets (Location/
+    Rotation/Scale) no nó atual, propriedades no antigo."""
+    if "Location" in mapping.inputs:
+        mapping.inputs["Location"].default_value = translation
+        mapping.inputs["Rotation"].default_value = rotation
+        mapping.inputs["Scale"].default_value = scale
+    else:
+        mapping.translation = translation
+        mapping.rotation = rotation
+        mapping.scale = scale
+
+
 def find_node(mat, name):
     if mat and mat.use_nodes and mat.node_tree:
         return mat.node_tree.nodes.get(name)
@@ -573,6 +614,8 @@ class MATERIAL_OT_recipe_wet_patches(Operator):
                            default=12.0, min=0.01, soft_max=256.0)
     mask_size: IntProperty(name="Mask Size", description="Resolution of the wet/reflection mask image to paint",
                             default=1024, min=64, max=8192)
+    shading: EnumProperty(name="Shading", description="Which of the two shading paths to build the nodes for",
+                           items=SHADING_MODES, default='AUTO')
 
     @classmethod
     def poll(cls, context):
@@ -583,12 +626,15 @@ class MATERIAL_OT_recipe_wet_patches(Operator):
 
     def execute(self, context):
         ob = context.object
+        pbr, switched = resolve_pbr(context, self.shading)
         mat = target_material(context, ob.name + " Wet Surface")
         mask = bpy.data.images.new(mat.name + " Wet Mask", self.mask_size, self.mask_size)
         mask.generated_color = (0.0, 0.0, 0.0, 1.0)
         mask.colorspace_settings.name = 'Non-Color'
-        build_wet_patches(mat, use_pbr(context), self.tiling, mask)
+        build_wet_patches(mat, pbr, self.tiling, mask)
         mat[RECIPE_KEY] = "wet_patches"
+        if switched:
+            self.report({'INFO'}, "PBR Shading Nodes was turned %s to match" % ("on" if pbr else "off"))
         if ensure_uv(ob):
             self.report({'WARNING'}, "The mesh had no UV map: one was created with Smart UV Project")
         return {'FINISHED'}
@@ -872,6 +918,259 @@ def build_legacy_preset(mat, preset, color, metal, rough, alpha, emit):
         b.link(pw.outputs["Value"], a.inputs[1])
         b.link(a.outputs["Value"], out.inputs["Alpha"])
 
+# ---------------------------------------------------------------------------
+# Converter material do jeito antigo (slots de textura) para nós PBR
+# ---------------------------------------------------------------------------
+
+# Que papel cada "Influence" do slot cumpre no grafo novo. A ordem importa: é a ordem
+# em que os slots são lidos e empilhados.
+SLOT_ROLES = (
+    ("use_map_color_diffuse", "color"),
+    ("use_map_normal", "normal"),
+    ("use_map_specular", "specular"),
+    ("use_map_hardness", "roughness"),
+    ("use_map_alpha", "alpha"),
+    ("use_map_emit", "emit"),
+)
+
+
+def legacy_slots(mat):
+    """Slots de textura ligados do material, como (slot, imagem ou None, [papéis])."""
+    out = []
+    for i, slot in enumerate(mat.texture_slots):
+        if slot is None or not mat.use_textures[i] or slot.texture is None:
+            continue
+        roles = [role for prop, role in SLOT_ROLES if getattr(slot, prop, False)]
+        if not roles:
+            continue
+        tex = slot.texture
+        img = tex.image if tex.type == 'IMAGE' else None
+        out.append((slot, img, roles))
+    return out
+
+
+def build_pbr_from_legacy(mat):
+    """Monta um grafo Principled a partir dos slots de textura do material.
+
+    Devolve (trazidos, ignorados): nomes de textura que entraram no grafo e os que não
+    deram (texturas procedurais do BI não têm equivalente direto em nó do Cycles).
+    """
+    slots = legacy_slots(mat)
+    b = TreeBuilder(mat)
+
+    bsdf = b.add("ShaderNodeBsdfPrincipled", 300, 0)
+    out = b.add("ShaderNodeOutputMaterial", 900, 0)
+
+    # Valores do material entram como ponto de partida; textura, quando houver, sobrescreve.
+    bsdf.inputs["Base Color"].default_value = tuple(mat.diffuse_color) + (1.0,)
+    bsdf.inputs["Metallic"].default_value = mat.specular_metallic_bsdf
+    bsdf.inputs["Roughness"].default_value = max(mat.specular_roughness_bsdf, 0.02)
+    bsdf.inputs["Specular"].default_value = min(mat.specular_intensity, 1.0)
+
+    coords = {}
+
+    def coord_source(slot):
+        """Fonte de coordenada do slot, reaproveitada entre slots que usam a mesma."""
+        key = (slot.texture_coords, slot.uv_layer)
+        if key not in coords:
+            y = 400 - 220 * len(coords)
+            if slot.texture_coords == 'UV' and slot.uv_layer:
+                n = b.add("ShaderNodeUVMap", -1500, y, label="UV: " + slot.uv_layer)
+                n.uv_map = slot.uv_layer
+                coords[key] = n.outputs["UV"]
+            else:
+                n = b.add("ShaderNodeTexCoord", -1500, y)
+                coords[key] = n.outputs["Generated" if slot.texture_coords == 'ORCO' else "UV"]
+        return coords[key]
+
+    def place(slot, node, y):
+        """Liga a coordenada no nó de imagem com o Offset/Size/Rotation do painel.
+
+        O shader do jogo faz (gpu_shader_material.glsl, mtex_mapping_transform):
+
+            out = R(rot) * (co - 0.5) * size + 0.5 + ofs      # gira, depois escala
+
+        Já um Mapping -- tanto o nó quanto o texture_mapping embutido do nó de imagem,
+        que BKE_texture_mapping_init monta como loc*rot*size -- faz o contrário:
+
+            out = loc + R(rot) * (size * co)                  # escala, depois gira
+
+        Os dois batem quando a rotação e a escala comutam: sem rotação, ou com escala
+        igual em X e Y. Aí a conta toda cabe numa matriz só, com
+        loc = (ofs + 0.5) - R*(0.5*size), e vale a pena usar o texture_mapping do
+        próprio nó em vez de um nó Mapping separado: o modo Texture da 3D view não roda
+        GLSL, ele só carrega essa matriz (drawmesh.c, tex_mat_set_texture_cb), então
+        mapping que mora num nó à parte simplesmente some ali.
+
+        Com rotação E escala diferente em X/Y não existe matriz única equivalente, e aí
+        volta a cadeia de três nós (centraliza, gira, escala+offset) para não trocar a
+        ordem e cisalhar a textura. Nesse caso o modo Texture fica sem o mapping; o modo
+        Material e o jogo continuam certos.
+        """
+        src = coord_source(slot)
+        size = tuple(slot.scale)
+        ofs = tuple(slot.offset)
+        rot = slot.rotation
+
+        if size != (1.0, 1.0, 1.0) or ofs != (0.0, 0.0, 0.0) or rot != 0.0:
+            if rot == 0.0 or abs(size[0] - size[1]) < 1e-6:
+                c, s = math.cos(rot), math.sin(rot)
+                hx, hy, hz = 0.5 * size[0], 0.5 * size[1], 0.5 * size[2]
+                tm = node.texture_mapping
+                tm.vector_type = 'POINT'
+                tm.translation = (ofs[0] + 0.5 - (hx * c - hy * s),
+                                  ofs[1] + 0.5 - (hx * s + hy * c),
+                                  ofs[2] + 0.5 - hz)
+                tm.rotation = (0.0, 0.0, rot)
+                tm.scale = size
+            else:
+                steps = [
+                    ("Centro", (-0.5, -0.5, -0.5), 0.0, (1.0, 1.0, 1.0)),
+                    ("Rotation", (0.0, 0.0, 0.0), rot, (1.0, 1.0, 1.0)),
+                    ("Offset/Size", (ofs[0] + 0.5, ofs[1] + 0.5, ofs[2] + 0.5), 0.0, size),
+                ]
+                x = -1050 - 150 * (len(steps) - 1)
+                for label, translation, rotation, scale in steps:
+                    m = b.add("ShaderNodeMapping", x, y + 150, label=label)
+                    m.vector_type = 'POINT'
+                    set_mapping(m, translation, (0.0, 0.0, rotation), scale)
+                    b.link(src, m.inputs["Vector"])
+                    src = m.outputs["Vector"]
+                    x += 150
+
+        b.link(src, node.inputs["Vector"])
+
+    brought, skipped = [], []
+    color_out = None
+    alpha_out = None
+    emit_out = None
+    row = 0
+
+    for slot, img, roles in slots:
+        if img is None:
+            skipped.append("%s (%s)" % (slot.texture.name, slot.texture.type.lower()))
+            continue
+        y = 300 - 320 * row
+        row += 1
+        # Normal/specular/roughness/alpha são dados, não cor: fora do espaço sRGB.
+        data = roles != ["color"]
+        node, img_color = b.image(True, img, -850, y, label=slot.texture.name, data=data)
+        place(slot, node, y)
+        brought.append("%s -> %s" % (slot.texture.name, "/".join(roles)))
+
+        for role in roles:
+            if role == "color":
+                if color_out is None:
+                    color_out = img_color
+                    # Nó de textura ativo: é ele que o modo Texture da 3D view desenha
+                    # (nodeGetActiveTexture) e o que o Texture Paint pinta. Sem marcar,
+                    # sobra o primeiro nó de textura da lista, que pode ser o normal map.
+                    b.tree.nodes.active = node
+                else:
+                    # Segundo slot de cor em diante: empilha com o blend do próprio slot.
+                    m = b.add("ShaderNodeMixRGB", -550, y, label="Layer: " + slot.texture.name)
+                    # Os modos do slot do BI e os do MixRGB quase coincidem; o que não existir
+                    # lá vira MIX em vez de estourar.
+                    try:
+                        m.blend_type = slot.blend_type
+                    except TypeError:
+                        m.blend_type = 'MIX'
+                    m.inputs["Fac"].default_value = slot.diffuse_color_factor
+                    b.link(color_out, m.inputs["Color1"])
+                    b.link(img_color, m.inputs["Color2"])
+                    color_out = m.outputs["Color"]
+            elif role == "normal":
+                nm = b.add("ShaderNodeNormalMap", -550, y - 150)
+                nm.inputs["Strength"].default_value = abs(slot.normal_factor)
+                b.link(img_color, nm.inputs["Color"])
+                b.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
+            elif role == "specular":
+                b.link(img_color, bsdf.inputs["Specular"])
+            elif role == "roughness":
+                # No BI o mapa é de Hardness: mais claro = mais liso, ou seja, roughness invertido.
+                inv = b.add("ShaderNodeInvert", -550, y - 150, label="Hardness -> Roughness")
+                b.link(img_color, inv.inputs["Color"])
+                b.link(inv.outputs["Color"], bsdf.inputs["Roughness"])
+            elif role == "alpha":
+                alpha_out = node.outputs["Alpha"] if img.depth in {32, 64, 128} else img_color
+            elif role == "emit":
+                emit_out = img_color
+
+    if color_out is not None:
+        b.link(color_out, bsdf.inputs["Base Color"])
+
+    surface = bsdf.outputs["BSDF"]
+
+    if emit_out is not None:
+        em = b.add("ShaderNodeEmission", 550, -250, label="Emit")
+        em.inputs["Strength"].default_value = max(mat.emit, 0.1)
+        b.link(emit_out, em.inputs["Color"])
+        add = b.add("ShaderNodeAddShader", 720, -100)
+        b.link(surface, add.inputs[0])
+        b.link(em.outputs["Emission"], add.inputs[1])
+        surface = add.outputs["Shader"]
+
+    if alpha_out is not None:
+        tr = b.add("ShaderNodeBsdfTransparent", 550, 250)
+        mix = b.add("ShaderNodeMixShader", 720, 150, label="Alpha")
+        b.link(alpha_out, mix.inputs["Fac"])
+        b.link(tr.outputs["BSDF"], mix.inputs[1])
+        b.link(surface, mix.inputs[2])
+        surface = mix.outputs["Shader"]
+        # GPU_material_from_blender só liga o blend quando ma->alpha < 1, mesmo com a
+        # transparência vindo de nó; sem isto o mapa de alpha não recorta nada.
+        mat.use_transparency = True
+        if mat.alpha >= 1.0:
+            mat.alpha = 0.999
+
+    b.link(surface, out.inputs["Surface"])
+    return brought, skipped
+
+
+class MATERIAL_OT_material_to_pbr(Operator):
+    """Rebuild this material as PBR nodes, bringing its texture slots along as Image Texture nodes"""
+    bl_idname = "material.to_pbr_nodes"
+    bl_label = "Convert Material to PBR Nodes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    keep_slots: BoolProperty(
+        name="Keep Texture Slots", default=True,
+        description="Leave the old texture slots in place, so switching PBR Shading Nodes off "
+                    "brings the classic material back")
+
+    @classmethod
+    def poll(cls, context):
+        return active_material(context) is not None
+
+    def invoke(self, context, event):
+        mat = active_material(context)
+        # Converter apaga a árvore atual: se já houver um grafo novo, confirma antes.
+        if mat.use_nodes and mat.node_tree and any(
+                n.bl_idname == "ShaderNodeOutputMaterial" for n in mat.node_tree.nodes):
+            return context.window_manager.invoke_confirm(self, event)
+        return self.execute(context)
+
+    def execute(self, context):
+        mat = active_material(context)
+        brought, skipped = build_pbr_from_legacy(mat)
+        if not context.scene.game_settings.use_shading_nodes:
+            context.scene.game_settings.use_shading_nodes = True
+            self.report({'INFO'}, "PBR Shading Nodes was turned on so the new nodes render")
+        if not self.keep_slots:
+            for i, slot in enumerate(mat.texture_slots):
+                if slot is not None and slot.texture is not None:
+                    mat.texture_slots.clear(i)
+        if skipped:
+            self.report({'WARNING'},
+                        "Not converted (no node equivalent): " + ", ".join(skipped))
+        elif not brought:
+            self.report({'WARNING'},
+                        "The material had no active texture slot: only its colors were carried over")
+        else:
+            self.report({'INFO'}, "Converted %d texture(s) to nodes" % len(brought))
+        return {'FINISHED'}
+
+
 classes = (
     MATERIAL_OT_recipe_texture_set,
     MATERIAL_OT_recipe_mask_blend,
@@ -881,4 +1180,5 @@ classes = (
     MATERIAL_OT_recipe_brush_color,
     MATERIAL_OT_recipe_tiling,
     MATERIAL_OT_recipe_preset,
+    MATERIAL_OT_material_to_pbr,
 )

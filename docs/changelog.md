@@ -9,6 +9,56 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Materiais: conversao de material classico para nos PBR (2026-10-06)
+- Novo operador `material.to_pbr_nodes`, no menu de especiais da lista de materiais e no painel Quick Material:
+  monta um grafo Principled a partir dos slots de textura do material antigo, respeitando o papel de cada slot
+  (`use_map_color_diffuse`, `use_map_normal`, `use_map_specular`, `use_map_hardness`, `use_map_alpha`,
+  `use_map_emit`). Textura procedural do BI nao tem equivalente direto em no do Cycles e e recusada com aviso,
+  sem quebrar o resto da conversao. A receita Wet/Reflective Patches tambem ganhou botoes separados PBR e
+  Classic, ja que cada caminho de shading precisa de um grafo diferente.
+- O Offset/Size/Rotation do painel de textura passou a ser convertido; antes a coordenada UV ia direto para o
+  no de imagem e a colocacao era descartada, o que deslocava ou girava a textura de parte dos materiais. A
+  referencia e o proprio shader do jogo (`mtex_mapping_transform` em `gpu_shader_material.glsl`):
+  `out = R(rot) * (co - 0.5) * size + 0.5 + ofs`. Note que ele gira e depois escala, enquanto um Mapping faz o
+  inverso (`loc + R * (size * co)`); as duas contas so coincidem quando rotacao e escala comutam, isto e, sem
+  rotacao ou com escala igual em X e Y.
+- Nesses casos -- praticamente todos -- a colocacao cabe numa matriz so e e gravada no `texture_mapping` do
+  proprio no de imagem, com `loc = (ofs + 0.5) - R*(0.5*size)`. Isso importa porque o modo Texture da 3D view
+  nao roda GLSL: `tex_mat_set_texture_cb` (`drawmesh.c`) so carrega essa matriz, entao mapping que mora num no
+  Mapping separado nao aparece ali. Com rotacao E escala diferente em X/Y nao existe matriz unica equivalente e
+  a cadeia de tres nos (centraliza, gira, escala+offset) e mantida; nesse caso o modo Texture fica sem o
+  mapping, mas o modo Material e o jogo continuam corretos.
+- O no de imagem da cor passou a ser marcado como no de textura ativo. Sem isso `nodeGetActiveTexture` caia no
+  primeiro no de textura da lista, que podia ser o normal map -- era ele que aparecia no modo Texture e era ele
+  que o Texture Paint pintava.
+- Nao sao convertidos, de proposito, o Mapping X/Y/Z (troca de eixos), `repeat_x/y` e o `extension` da textura:
+  o caminho GPU do jogo ignora os tres (nenhum consumidor em `source/blender/gpu/`), entao reproduzi-los em no
+  faria o grafo divergir do jogo em vez de acompanha-lo.
+- Validacao: teste de conformidade que roda o conversor e compara a cadeia gerada contra a formula do GLSL em 4
+  coordenadas por caso, cobrindo offset, escala nao uniforme, escala negativa e rotacoes de 30/45/90 graus --
+  8 de 8 casos batem com erro da ordem de 1e-7.
+
+## 3D view: alpha do material no modo Texture (2026-10-06)
+- No modo de visualizacao Texture com Shading Nodes ligado, textura com alpha desenhava opaca enquanto aparecia
+  recortada no modo Material e no jogo. Esse caminho nao passa pelo GLSL, e quem aplica `mat->game.alpha_blend`
+  e so o ramo GLSL de `GPU_object_material_bind`; no caminho de funcao fixa `GPU_begin_object_materials` recebe
+  `do_alpha_after = NULL`, `use_alpha_pass` fica falso e o blend acaba sempre em `GPU_BLEND_SOLID`.
+- `tex_mat_set_texture_cb` passou a aplicar o blend do proprio material depois de amarrar a textura.
+
+## 3D view: alpha-to-coverage degrada para alpha blend sem MSAA (2026-10-06)
+- Material com folhagem (ex.: `Arvore_3`) aparecia opaco na 3D view e transparente no jogo. Alpha-to-coverage so
+  existe com MSAA: sem sample buffer o `GL_SAMPLE_ALPHA_TO_COVERAGE` e ignorado e sobra o alpha test em
+  `U.glalphaclip` (0.004 por padrao), que quase nada recorta. O jogo nao sofre disso porque forca
+  `gm.aasamples >= 2` e cria um canvas multisample, mas a 3D view desenha no framebuffer da janela, que e
+  single-sample; o dither de `gpu_material.c` tambem nao entra, porque so vale com `gm.aasamples <= 1`.
+- `gpu_set_alpha_blend` agora consulta `GL_SAMPLE_BUFFERS` e, quando o alvo atual nao e multisample, cai para
+  alpha blend normal -- o que mais se aproxima do jogo.
+
+## GPU: GPU_pass_shader tolera pass nulo (2026-10-06)
+- Material cujo pass GLSL falha ao gerar mantem `material->pass` nulo (`GPU_material_from_blender`). Os binds de
+  luz/sombra/probe/dano da cena so testavam o shader devolvido e acabavam desreferenciando o pass. O teste de
+  nulo ficou dentro de `GPU_pass_shader` em vez de repetido em cada chamador.
+
 ## Texture Paint: relatorio da instancia em primeiro plano (2026-10-06)
 - Registrado `docs/texture-paint-foreground-instance-report.md` para continuidade do diagnostico: ao pintar uma
   malha e atravessar uma instancia de grupo que fica visualmente a frente dela, o processo deixa de responder e
