@@ -1642,9 +1642,13 @@ void GPU_code_generate_glsl_lib(void)
 
 /* GPU pass binding/unbinding */
 
+/* A material whose GLSL pass failed to generate keeps material->pass NULL (see
+ * GPU_material_from_blender), so callers that only guard on the returned shader -- the scene
+ * light/shadow/probe/damage binds -- would dereference it. Tolerate a NULL pass here instead of
+ * repeating the check at every call site. */
 GPUShader *GPU_pass_shader(GPUPass *pass)
 {
-	return pass->shader;
+	return pass ? pass->shader : NULL;
 }
 
 static void gpu_nodes_extract_dynamic_inputs(GPUPass *pass, ListBase *nodes)
