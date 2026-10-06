@@ -1395,6 +1395,48 @@ static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camo
 	}
 }
 
+/* A Point has no shadow box: its shadow range is a sphere (6 cube faces sharing one radius),
+ * so the volume is drawn as a shaded ball at Clip End plus the Clip Start circles inside it. */
+static void draw_transp_point_shadow_volume(Lamp *la)
+{
+	GLUquadricObj *qobj = gluNewQuadric();
+
+	/* outer and inner silhouettes (three great circles each, like an empty sphere) */
+	glColor4f(0.2f, 0.2f, 0.2f, 1.0f);
+	draw_empty_sphere(la->clipend);
+	if (la->clipsta > 0.0f && la->clipsta < la->clipend) {
+		setlinestyle(3);
+		draw_empty_sphere(la->clipsta);
+		setlinestyle(0);
+	}
+
+	/* shaded shell, same two-pass look as draw_shadow_volume() */
+	gluQuadricDrawStyle(qobj, GLU_FILL);
+	gluQuadricNormals(qobj, GLU_NONE);
+
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glDepthMask(0);
+
+	glCullFace(GL_FRONT);
+	glBlendFunc(GL_ZERO, GL_SRC_ALPHA);
+	glColor4f(0.0f, 0.0f, 0.0f, 0.4f);
+	gluSphere(qobj, la->clipend, 32, 16);
+
+	glCullFace(GL_BACK);
+	glBlendFunc(GL_ONE, GL_ONE);
+	glColor4f(0.2f, 0.2f, 0.2f, 0.35f);
+	gluSphere(qobj, la->clipend, 32, 16);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_BLEND);
+	glDepthMask(1);
+	glDisable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	gluDeleteQuadric(qobj);
+}
+
 static void draw_transp_spot_shadow_volume(Lamp *la)
 {
 	float box[8][3];
@@ -1449,9 +1491,11 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 	        (dt > OB_WIRE) &&
 	        !(G.f & G_PICKSEL) &&
 	        ((la->type == LA_SUN) ||
-	        (la->type == LA_SPOT)) &&
-	        ((la->mode & LA_SHAD_BUF) ||
-	        (la->mode & LA_SHAD_RAY)) &&
+	        (la->type == LA_SPOT) ||
+	        (la->type == LA_LOCAL)) &&
+	        /* same test as lamp.use_shadow: only a Spot counts the legacy buffer bit */
+	        ((la->type == LA_SPOT) ? ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+	                                 ((la->mode & LA_SHAD_RAY) != 0)) &&
 	        ((la->mode & LA_SHOW_SHADOW_BOX) ||
 	        /* Cascade+Debug alone (without Show Shadow Box) also shows the
 	         * camera-fit cascade box, independent of the plain shadow box. */
@@ -1702,6 +1746,14 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 		}
 #endif
 
+	}
+	else if (la->type == LA_LOCAL) {
+#ifdef WITH_GAMEENGINE
+		if (drawshadowbox) {
+			setlinestyle(0);
+			draw_transp_point_shadow_volume(la);
+		}
+#endif
 	}
 	else if (la->type == LA_HEMI) {
 

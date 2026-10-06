@@ -4104,6 +4104,12 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 	lamp->bias = 0.02f * la->bias;
 	lamp->slopebias = la->slopebias;
 	lamp->size = la->bufsize;
+	/* A Point packs its 6 cube faces into one size*3 x size*2 depth texture
+	 * (gpu_lamp_create_point_shadow_buffer), so Size has to stay well below the driver's maximum
+	 * texture size -- past it the allocation fails and the lamp silently loses its shadow. */
+	if (la->type == LA_LOCAL && lamp->size > 2048) {
+		lamp->size = 2048;
+	}
 	lamp->d = la->clipsta;
 	lamp->clipend = la->clipend;
 
@@ -4295,22 +4301,31 @@ static bool gpu_lamp_create_point_shadow_buffer(GPULamp *lamp)
 	return true;
 }
 
-/* Whether a Sun/Spot/Point gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
- * "Cast Shadow" (lamp.cycles.cast_shadow, an ID property, default on) and hides the BI shadow
- * method, so follow that instead of LA_SHAD_RAY/LA_SHAD_BUF. */
+/* Whether a Sun/Spot/Point gets a shadow buffer. Both the traditional and the Shading Nodes
+ * (PBR) path follow the game lamp panel's "Use Shadow" (lamp.use_shadow): LA_SHAD_BUF is the
+ * legacy spot buffer bit, LA_SHAD_RAY is what that checkbox writes for every lamp type.
+ * With Shading Nodes a lamp authored in Cycles additionally keeps its "Cast Shadow"
+ * (lamp.cycles.cast_shadow, an ID property, default on). */
 static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
 {
-	const bool nodes = scene && BKE_scene_use_new_shading_nodes(scene);
 	if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
 		return false;
 	}
-	if (nodes) {
+
+	const bool use_shadow = (la->type == LA_SPOT) ?
+	                        ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+	                        ((la->mode & LA_SHAD_RAY) != 0);
+	if (!use_shadow) {
+		return false;
+	}
+
+	if (scene && BKE_scene_use_new_shading_nodes(scene)) {
 		IDProperty *cycles = la->id.properties ? IDP_GetPropertyFromGroup(la->id.properties, "cycles") : NULL;
 		IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ? IDP_GetPropertyFromGroup(cycles, "cast_shadow") : NULL;
 		return cast ? (IDP_Int(cast) != 0) : true;
 	}
-	return (la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
-	       (ELEM(la->type, LA_SUN, LA_LOCAL) && (la->mode & LA_SHAD_RAY));
+
+	return true;
 }
 
 GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
@@ -4971,7 +4986,27 @@ GPUNodeLink *GPU_lamp_get_data(
 
 	shade_light_textures(mat, lamp, r_col, NULL);
 
-	if (GPU_lamp_has_shadow_buffer(lamp) && !GPU_lamp_has_point_shadow(lamp)) {
+	if (GPU_lamp_has_shadow_buffer(lamp) && GPU_lamp_has_point_shadow(lamp)) {
+		/* Point: cube atlas sampled by shadow_point(); dynpersmat is view to light space
+		 * (GPU_material_update_lamps). No VSM/CSM/filter variants here. */
+		GPUNodeLink *vn, *inp;
+		float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
+
+		GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &vn);
+		GPU_link(mat, "shade_inp", vn, *r_lv, &inp);
+		mat->dynproperty |= DYN_LAMP_PERSMAT;
+
+		GPU_link(mat, "shadow_point_bi",
+		         GPU_material_builtin(mat, GPU_VIEW_POSITION),
+		         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+		         GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
+		         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+		         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias), GPU_uniform(point),
+		         inp, &shadowfac);
+
+		GPU_link(mat, "shadows_only", inp, shadowfac, GPU_uniform(lamp->shadow_color), r_shadow);
+	}
+	else if (GPU_lamp_has_shadow_buffer(lamp)) {
 		GPUNodeLink *vn, *inp;
 
 		GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &vn);

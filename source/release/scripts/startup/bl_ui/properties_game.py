@@ -1780,7 +1780,7 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        COMPAT_LIGHTS = {'SPOT', 'SUN'}
+        COMPAT_LIGHTS = {'SPOT', 'SUN', 'POINT'}
         lamp = context.lamp
         engine = context.scene.render.engine
         return (lamp and lamp.type in COMPAT_LIGHTS) and (engine in cls.COMPAT_ENGINES)
@@ -1795,6 +1795,12 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
 
         lamp = context.lamp
 
+        # A Point has no single shadow direction, so the engine re-renders the casters once per
+        # cube face: 6 passes per frame against 1 for Spot/Sun. Warn before the panel is greyed
+        # out by layout.active, so it stays readable with the shadow off.
+        if lamp.type == 'POINT':
+            layout.label("Point shadow costs 6 render passes per frame", icon='ERROR')
+
         layout.active = lamp.use_shadow
 
         main_box = layout.box()
@@ -1802,11 +1808,17 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
         # --- General ---
         split = main_box.split()
 
+        # A Point renders its shadow as a 6-face cube atlas: no shadow box, no static cache
+        # and no VSM/CSM/filter variants (see gpu_lamp_create_point_shadow_buffer).
+        is_point = lamp.type == 'POINT'
+
         col = split.column()
         col.prop(lamp, "shadow_color", text="")
-        if lamp.type in ('SUN', 'SPOT'):
-            col.prop(lamp, "show_shadow_box")
-        col.prop(lamp, "static_shadow")
+        # Point draws its shadow range as a sphere instead of a box
+        # (draw_transp_point_shadow_volume).
+        col.prop(lamp, "show_shadow_box", text="Show Shadow Sphere" if is_point else "Show Shadow Box")
+        if not is_point:
+            col.prop(lamp, "static_shadow")
 
         col = split.column()
         col.prop(lamp, "use_shadow_layer", text="This Layer Only")
@@ -1822,16 +1834,20 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
             box = main_box.box()
 
             col = box.column()
-            col.label("Buffer Type:")
-            col.prop(lamp, "ge_shadow_buffer_type", text="", toggle=True)
-            if lamp.ge_shadow_buffer_type == "SIMPLE":
-                col.label("Filter Type:")
-                col.prop(lamp, "shadow_filter", text="", toggle=True)
+            if not is_point:
+                col.label("Buffer Type:")
+                col.prop(lamp, "ge_shadow_buffer_type", text="", toggle=True)
+                if lamp.ge_shadow_buffer_type == "SIMPLE":
+                    col.label("Filter Type:")
+                    col.prop(lamp, "shadow_filter", text="", toggle=True)
 
             col.label("Quality:")
             col = box.column(align=True)
             col.prop(lamp, "shadow_buffer_size", text="Size")
-            if lamp.ge_shadow_buffer_type == "VARIANCE":
+            if is_point:
+                # The atlas is Size*3 x Size*2 texels, so the engine caps Size at 2048.
+                col.label("Size above 2048 is clamped (cube atlas)", icon='INFO')
+            elif lamp.ge_shadow_buffer_type == "VARIANCE":
                 col.prop(lamp, "shadow_buffer_sharp", text="Sharpness")
             elif lamp.shadow_filter in ("PCF", "PCF_BAIL", "PCF_JITTER", "PCF_PENUMBRA"):
                 col.prop(lamp, "shadow_buffer_samples", text="Samples")
@@ -1841,7 +1857,7 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
             row.label("Bias:")
             row = box.row(align=True)
             row.prop(lamp, "shadow_buffer_bias", text="Bias")
-            if lamp.ge_shadow_buffer_type == "VARIANCE":
+            if not is_point and lamp.ge_shadow_buffer_type == "VARIANCE":
                 row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
             else:
                 row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")

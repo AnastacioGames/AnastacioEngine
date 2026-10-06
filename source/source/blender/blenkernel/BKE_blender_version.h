@@ -36,7 +36,7 @@
 #define RANGE_SUBVERSION		6
 /* Versao publica da AnastacioEngine (splash; manter igual ao About em wm.py e a tag da release). */
 #define ANASTACIO_VERSION_STRING	"0.4.6"
-#define RANGE_MINSUBVERSION		117 /* it's the preview versions, 100 is treated as the final version. 101 and 102 is A and B final version. */
+#define RANGE_MINSUBVERSION		118 /* it's the preview versions, 100 is treated as the final version. 101 and 102 is A and B final version. */
 
 /* used by packaging tools */
 /* can be left blank, otherwise a,b,c... etc with no quotes */

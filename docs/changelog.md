@@ -9,6 +9,53 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Lamp Point: visualizacao do volume de sombra como esfera (2026-10-06)
+
+O "Show Shadow Box" do painel de sombra do game e apenas visualizacao de viewport: desenha o
+volume dentro do qual a lamp projeta sombra (caixa ortografica no Sun, cone no Spot). O Point
+nao tinha equivalente porque seu alcance de sombra nao e uma caixa: sao 6 faces de cubo
+compartilhando um raio, ou seja, uma esfera.
+
+- `drawobject.c`: nova `draw_transp_point_shadow_volume()`. Desenha os tres grandes circulos em
+  Clip End (`draw_empty_sphere`), os mesmos circulos tracejados em Clip Start quando ele e menor,
+  e uma casca esferica translucida com o mesmo passe duplo front/back de `draw_shadow_volume()`.
+- `drawobject.c`: `drawshadowbox` passou a aceitar `LA_LOCAL` e usa o teste de sombra por tipo
+  (so Spot conta `LA_SHAD_BUF`), igual a `lamp.use_shadow`. Novo branch `LA_LOCAL` em `drawlamp()`.
+- `properties_game.py`: aviso no topo do painel para Point -- "Point shadow costs 6 render passes
+  per frame" (icone ERROR), desenhado antes de `layout.active` para continuar legivel com a
+  sombra desligada. O `KX_ShadowRenderer` roda um passe por face do cubo.
+- `properties_game.py`: `show_shadow_box` agora aparece para Point, rotulado
+  "Show Shadow Sphere" para nao prometer uma caixa.
+
+Sem mudanca de shader, DNA, RNA ou versioning -- a flag `LA_SHOW_SHADOW_BOX` ja existia e so
+valia para Sun/Spot. Pendente: confirmacao visual na viewport.
+
+## Lamp Point: sombra com liga/desliga e no modo tradicional (2026-10-06)
+- A lamp Point no modo PBR (Shading Nodes) sempre lancava sombra e nao havia onde desligar. O motivo:
+  `gpu_lamp_wants_shadow` (`gpu_material.c`) ignorava as flags de sombra do datablock no caminho de nos e
+  seguia so o `cycles.cast_shadow`, uma ID property que aparece apenas no painel do Cycles -- com o engine em
+  BLENDER_GAME esse painel nao existe, entao o usuario nao tinha controle nenhum.
+- Agora os dois caminhos (tradicional e PBR) seguem o mesmo `lamp.use_shadow` (`LA_SHAD_RAY`, mais o bit
+  legado `LA_SHAD_BUF` no caso do Spot). O `cycles.cast_shadow` continua valendo como gate extra no modo PBR,
+  para nao mudar o resultado de quem autorou a cena no Cycles.
+- Painel: `DATA_PT_shadow_game` (`properties_game.py`) so aceitava SPOT e SUN; passou a aceitar POINT. O Point
+  mostra cor da sombra, This Layer Only / Only Shadow, Size, Bias e Slope Bias, Clip Start/End. Ficam de fora
+  as opcoes que o caminho dele nao usa: shadow box, static shadow, buffer type (VSM), filter type, samples/soft,
+  CSM e frustum size -- a sombra de Point e sempre um depth map simples das 6 faces do cubo.
+- A sombra de Point no modo tradicional ja existia no shader (`shadow_point_bi`, usado em `shade_one_light`) e
+  no render loop (`KX_ShadowRenderer`, 6 passes), mas era inalcancavel porque o painel de sombra do BI e
+  render-only e o do game nao listava POINT. Com o item acima ela ficou acessivel sem mudanca de shader.
+- No modo PBR sem Fast Shader Loading, `GPU_lamp_get_data` excluia explicitamente o Point
+  (`&& !GPU_lamp_has_point_shadow(lamp)`) e devolvia sombra branca; so o caminho de uniformes do Fast Shader
+  Loading (`scene_light_shadow` no GLSL) tinha a sombra. Foi acrescentado o branch de Point ali, ligando
+  `shadow_point_bi` + `shadows_only`, para a sombra existir nos dois sub-caminhos.
+- `lamp->size` do Point e limitado a 2048: o atlas e `size*3 x size*2` texels, e com o Size do painel chegando
+  a 10240 a textura passaria de 30k de largura, a alocacao falharia e a lamp perderia a sombra em silencio.
+- Versionamento (`RANGE_MINSUBVERSION` 118, `versioning_range.c`): arquivos antigos de cenas PBR tinham a
+  sombra ligada por padrao e perderiam ela ao carregar, ja que o default de `la->mode` e `LA_SHAD_BUF` (que nao
+  conta para Sun/Point). A migracao percorre as cenas com `GAME_USE_SHADING_NODES` e marca `LA_SHAD_RAY` nas
+  lamps Sun/Spot/Point que ainda nao contavam como casters, exceto as que tem `cycles.cast_shadow` em 0.
+
 ## Materiais: conversao de material classico para nos PBR (2026-10-06)
 - Novo operador `material.to_pbr_nodes`, no menu de especiais da lista de materiais e no painel Quick Material:
   monta um grafo Principled a partir dos slots de textura do material antigo, respeitando o papel de cada slot
