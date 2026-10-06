@@ -45,6 +45,7 @@
 #include "DNA_property_types.h"
 #include "DNA_python_component_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_sdna_types.h"
 #include "DNA_sensor_types.h"
 #include "DNA_space_types.h"
@@ -547,6 +548,19 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
      * GAME_DISPLAY_LISTS and may still be set, so start every old scene with it off. */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {
       scene->gm.flag &= ~GAME_FAST_SHADER_LOAD;
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 117)) {
+    /* The old Texture Paint default kept Normal falloff enabled at 80 degrees.
+     * That masks out nearly horizontal planes when the view is grazing the surface,
+     * making brush strokes appear to stop at a camera-angle-dependent distance.
+     * Preserve intentional custom angles, but migrate untouched defaults to the
+     * new behavior: flat projection unless the artist opts into normal falloff. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      if (scene->toolsettings && scene->toolsettings->imapaint.normal_angle == 80) {
+        scene->toolsettings->imapaint.flag |= IMAGEPAINT_PROJECT_FLAT;
+      }
     }
   }
 

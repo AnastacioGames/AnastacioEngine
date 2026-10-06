@@ -9,6 +9,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Texture Paint: planos rasantes/pertos voltam a entrar nos buckets de pintura (2026-10-05)
+- Corrigido o relato de Texture Paint em que um plano so aceitava pintura quando a camera ficava mais alta ou mais afastada, enquanto o cubo continuava pintando normalmente. Alem do default antigo de `use_normal_falloff`, o caminho de projecao descartava casos rasantes do plano: o teste de intersecao bucket/triangulo ignorava a aresta `v3-v1`, o cull de perspectiva removia o triangulo inteiro quando apenas um vertice ficava antes do clip, e vertices perto demais da camera viravam `FLT_MAX`.
+- `paint_image_proj.c` agora testa as tres arestas do triangulo contra cada borda do bucket, so descarta por `FLT_MAX` quando todos os vertices da face estao invalidos, e no modo perspective prende vertices antes do near clip em `clipsta` para manter coordenadas de tela finitas. Isso evita buracos/faixas dependentes de distancia e angulo em planos grandes perto da camera.
+- Novas cenas agora iniciam com `IMAGEPAINT_PROJECT_FLAT` ligado (`use_normal_falloff` desligado), mantendo o controle disponivel no painel Options > Project Paint para quem quiser limitar pintura por normal.
+- Versionamento Range `1.6.117`: arquivos antigos que ainda estavam no angulo padrao `80` tambem sao migrados para o novo default flat. Angulos customizados sao preservados como escolha explicita do artista.
+
 ## Addons Brush/Pie Menus preservados no source e compatíveis com API atual (2026-10-05)
 - O addon `space_view3d_brush_menus` existia apenas na instalação gerada (`build/bin/2.79/scripts/addons`), então uma correção feita ali seria perdida em `ninja install`/rebuild. A pasta completa foi promovida para `source/release/scripts/addons/space_view3d_brush_menus`.
 - `__init__.py` deixou de usar `bpy.utils.register_module(__name__)`, removido nesta base, e passou a registrar/desregistrar explicitamente as classes do pacote via `bpy.utils.register_class`/`unregister_class`, filtrando somente classes definidas nos módulos do próprio addon.

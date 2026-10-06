@@ -1261,7 +1261,6 @@ static void screen_px_from_persp(
 	interp_v3_v3v3v3(pixelScreenCo, v1co, v2co, v3co, w_int);
 }
 
-
 /**
  * Set a direction vector based on a screen location.
  * (use for perspective view, else we can simply use `ps->viewDir`)
@@ -3031,11 +3030,18 @@ static bool project_bucket_face_isect(ProjPaintState *ps, int bucket_x, int buck
 	    isect_point_tri_v2(p2, v1, v2, v3) ||
 	    isect_point_tri_v2(p3, v1, v2, v3) ||
 	    isect_point_tri_v2(p4, v1, v2, v3) ||
-	    /* we can avoid testing v3,v1 because another intersection MUST exist if this intersects */
-	    (isect_seg_seg_v2(p1, p2, v1, v2) || isect_seg_seg_v2(p1, p2, v2, v3)) ||
-	    (isect_seg_seg_v2(p2, p3, v1, v2) || isect_seg_seg_v2(p2, p3, v2, v3)) ||
-	    (isect_seg_seg_v2(p3, p4, v1, v2) || isect_seg_seg_v2(p3, p4, v2, v3)) ||
-	    (isect_seg_seg_v2(p4, p1, v1, v2) || isect_seg_seg_v2(p4, p1, v2, v3)))
+	    (isect_seg_seg_v2(p1, p2, v1, v2) ||
+	     isect_seg_seg_v2(p1, p2, v2, v3) ||
+	     isect_seg_seg_v2(p1, p2, v3, v1)) ||
+	    (isect_seg_seg_v2(p2, p3, v1, v2) ||
+	     isect_seg_seg_v2(p2, p3, v2, v3) ||
+	     isect_seg_seg_v2(p2, p3, v3, v1)) ||
+	    (isect_seg_seg_v2(p3, p4, v1, v2) ||
+	     isect_seg_seg_v2(p3, p4, v2, v3) ||
+	     isect_seg_seg_v2(p3, p4, v3, v1)) ||
+	    (isect_seg_seg_v2(p4, p1, v1, v2) ||
+	     isect_seg_seg_v2(p4, p1, v2, v3) ||
+	     isect_seg_seg_v2(p4, p1, v3, v1)))
 	{
 		return 1;
 	}
@@ -3254,19 +3260,20 @@ static void proj_paint_state_screen_coords_init(ProjPaintState *ps, const int di
 
 			mul_m4_v4(ps->projectMat, projScreenCo);
 
-			if (projScreenCo[3] > ps->clipsta) {
+			{
+				/* Large planes viewed in perspective can have one or more vertices closer than
+				 * the near clip while the brush still lands on a visible part of the face. The
+				 * old FLT_MAX sentinel made the whole bucket/triangle clipping path lose those
+				 * near-camera strokes. Keep a finite projected point by pinning it to clipsta;
+				 * this is not exact near-plane clipping, but it preserves the paintable span. */
+				const float proj_w = max_ff(projScreenCo[3], ps->clipsta);
+
 				/* screen space, not clamped */
-				projScreenCo[0] = (float)(ps->winx * 0.5f) + (ps->winx * 0.5f) * projScreenCo[0] / projScreenCo[3];
-				projScreenCo[1] = (float)(ps->winy * 0.5f) + (ps->winy * 0.5f) * projScreenCo[1] / projScreenCo[3];
-				projScreenCo[2] = projScreenCo[2] / projScreenCo[3]; /* Use the depth for bucket point occlusion */
+				projScreenCo[0] = (float)(ps->winx * 0.5f) + (ps->winx * 0.5f) * projScreenCo[0] / proj_w;
+				projScreenCo[1] = (float)(ps->winy * 0.5f) + (ps->winy * 0.5f) * projScreenCo[1] / proj_w;
+				projScreenCo[2] = projScreenCo[2] / proj_w; /* Use the depth for bucket point occlusion */
+				projScreenCo[3] = proj_w;
 				minmax_v2v2_v2(ps->screenMin, ps->screenMax, projScreenCo);
-			}
-			else {
-				/* TODO - deal with cases where 1 side of a face goes behind the view ?
-				 *
-				 * After some research this is actually very tricky, only option is to
-				 * clip the derived mesh before painting, which is a Pain */
-				projScreenCo[0] = FLT_MAX;
 			}
 		}
 	}
@@ -3620,8 +3627,8 @@ static bool project_paint_flt_max_cull(
         const ProjPaintFaceCoSS *coSS)
 {
 	if (!ps->is_ortho) {
-		if (coSS->v1[0] == FLT_MAX ||
-		    coSS->v2[0] == FLT_MAX ||
+		if (coSS->v1[0] == FLT_MAX &&
+		    coSS->v2[0] == FLT_MAX &&
 		    coSS->v3[0] == FLT_MAX)
 		{
 			return true;

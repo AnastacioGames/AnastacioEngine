@@ -841,6 +841,7 @@ void BKE_scene_init(Scene *sce)
 	sce->toolsettings->proportional_size = 1.0f;
 
 	sce->toolsettings->imapaint.paint.flags |= PAINT_SHOW_BRUSH;
+	sce->toolsettings->imapaint.flag |= IMAGEPAINT_PROJECT_FLAT;
 	sce->toolsettings->imapaint.normal_angle = 80;
 	sce->toolsettings->imapaint.seam_bleed = 2;
 
