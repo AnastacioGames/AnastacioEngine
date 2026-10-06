@@ -301,36 +301,14 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(
 
 void GHOST_SystemWin32::setFullScreen(bool enable, GHOST_IWindow *window)
 {
-	GHOST_DisplaySetting setting;
-
+	/* Tela cheia sem borda na resolucao do desktop: a janela vira popup maximizada
+	 * (GHOST_WindowWin32::setState). Nao troca o modo de video com ChangeDisplaySettings,
+	 * que derruba o player com EXCEPTION_ACCESS_VIOLATION em alguns drivers (AMD/OpenGL 4.6). */
 	if (enable) {
-		GHOST_Rect cBnds;
-
-		m_displayManager->getCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting);
-		window->getClientBounds(cBnds);
-
-		setting.xPixels   = cBnds.getWidth();
-		setting.yPixels   = cBnds.getHeight();
-		// default...
-		setting.bpp       = 32;
-		setting.frequency = 60;
-
-		if (m_displayManager->setCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting)) {
-			window->setState(GHOST_kWindowStateFullScreen);
-		} else {
-			ChangeDisplaySettings(NULL, 0);
-		}
+		window->setState(GHOST_kWindowStateFullScreen);
 	}
 	else {
-		m_displayManager->getCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting);
-
-		ChangeDisplaySettings(NULL, 0);
-
 		window->setState(GHOST_kWindowStateNormal);
-
-		if (window->getState() != GHOST_kWindowStateMaximized) {
-			window->setClientSize(setting.xPixels, setting.yPixels);
-		}
 	}
 }
 

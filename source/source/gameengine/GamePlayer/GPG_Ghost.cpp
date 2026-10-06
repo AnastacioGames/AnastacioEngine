@@ -1630,9 +1630,25 @@ int main(int argc,
 								else
 #endif
 								{
+#ifdef WIN32
+									/* Tela cheia sem borda na resolucao do desktop. A tela cheia exclusiva
+									 * (beginFullScreen/ChangeDisplaySettings) crasha em alguns drivers. */
+									std::string fsTitle = "Anastacio Engine Standalone";
+									GHOST_TUns32 sysWidth = 0, sysHeight = 0;
+									system->getMainDisplayDimensions(sysWidth, sysHeight);
+									/* A janela nasce na resolucao do Display (volta a ela com setFullScreen(False)). */
+									int fsWidth = (fullScreenWidth > 0) ? (int)fullScreenWidth : (int)sysWidth;
+									int fsHeight = (fullScreenHeight > 0) ? (int)fullScreenHeight : (int)sysHeight;
+									window = startWindow(system, fsTitle, ((int)sysWidth - fsWidth) / 2,
+									                     ((int)sysHeight - fsHeight) / 2, fsWidth, fsHeight,
+									                     stereoWindow, alphaBackground);
+									window->setState(GHOST_kWindowStateFullScreen);
+									window->setCursorVisibility(false);
+#else
 									window = startFullScreen(system, fullScreenWidth, fullScreenHeight, fullScreenBpp,
 									                         fullScreenFrequency, stereoWindow, alphaBackground,
 									                         (scene->gm.playerflag & GAME_PLAYER_DESKTOP_RESOLUTION));
+#endif
 								}
 							}
 							else {

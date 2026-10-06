@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Tela cheia sem borda no Windows (2026-10-06)
+
+- `render.setFullScreen(True)`, o Fullscreen de Render > Game > Display e o `-f` do player trocavam o
+  modo de vídeo (`ChangeDisplaySettings`/`beginFullScreen`), que dá `EXCEPTION_ACCESS_VIOLATION` antes
+  do primeiro frame em alguns drivers (relato: AMD RX 6700 XT, OpenGL 4.6). No Windows agora é sempre
+  tela cheia sem borda na resolução do desktop: `GHOST_SystemWin32::setFullScreen` só troca o estado da
+  janela; o player abre uma janela normal na resolução do Display e entra em `GHOST_kWindowStateFullScreen`;
+  `setWindowSize` em tela cheia é ignorado. `setFullScreen(False)` volta à resolução do Display.
+- Teste: `tools/create_fullscreen_test.py` (liga/desliga 4x e grava `fullscreen_test.log`). Validado em
+  janela, com Fullscreen no arquivo e com `-f`. O crash original não foi reproduzido aqui (falta testar numa AMD).
+
 ## Profiler da engine (`KX_EngineProfiler`) (2026-10-06)
 
 - A medição temporária do diagnóstico do RolimaRacer (`RANGE_HITCH_LOG`, `g_hitchSub[]` com índices fixos,
