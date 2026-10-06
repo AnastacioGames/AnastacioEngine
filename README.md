@@ -40,6 +40,8 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **Outliner:** arrastar um objeto selecionado para uma coleção move toda a seleção.
 - MSAA mínimo do jogo passa de 4x para 2x (cenas novas vêm com 2x).
 
+Galeria de imagens por versão: [release-images/](release-images/README.md), com os [prints das novidades da 0.4.7](release-images/v0.4.7/README.md) (em desenvolvimento).
+
 ## Novidades da 0.4.5
 
 - **Abre em mais distros:** o pacote agora é compilado no Ubuntu 22.04 (exige glibc 2.35) e leva as bibliotecas
