@@ -2269,13 +2269,149 @@ void world_zen_mapping(vec3 view, float zenup, float zendown, out float zenfac)
 
 float world_stars(vec3 view, vec3 sundir, float factor){
 	if (view.z <= 0.0) return 0.0;
-	float pixel = 0.0005;
-	vec2 coord = pixel * floor(((view.xy / (view.z * 0.5 + 1.0)) * 0.25) / pixel);
-	vec2 starPos = vec2(rando(coord.xy + 1.0), rando(coord.yx + 3.0));
-	float stars = (smoothstep(0.02, 0.01, length(coord - starPos)) +
-	               smoothstep(0.02, 0.01, length(coord + starPos))) * view.z * view.z;
+	/* One possible star per grid cell over the upper hemisphere, so every
+	 * direction gets the same density (the old hash only hit coords where x and y
+	 * shared a sign, leaving two quadrants of the sky black). */
+	vec2 p = view.xy / (view.z + 1.0) * 300.0;
+	vec2 cell = floor(p);
+	float h = rando(cell);
+	vec2 starPos = vec2(rando(cell + 17.31), rando(cell + 41.73)) * 0.6 + 0.2;
+	float present = step(0.82, h);
+	float twinkle = 0.6 + 0.4 * fract(h * 37.0);
+	float stars = 1.8 * present * twinkle * smoothstep(0.22, 0.0, length(fract(p) - starPos)) *
+	              smoothstep(0.0, 0.15, view.z);
 
 	return stars * (max(0.0, dot(-sundir, vec3(0.0, 0.0, 1.0)) + 0.5) + factor);
+}
+
+/* ---- Realistic night sky (World > Night > Style) ---- */
+
+float stars_hash3(vec3 p)
+{
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float stars_noise3(vec3 p)
+{
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix(stars_hash3(i), stars_hash3(i + vec3(1, 0, 0)), f.x),
+	               mix(stars_hash3(i + vec3(0, 1, 0)), stars_hash3(i + vec3(1, 1, 0)), f.x), f.y),
+	           mix(mix(stars_hash3(i + vec3(0, 0, 1)), stars_hash3(i + vec3(1, 0, 1)), f.x),
+	               mix(stars_hash3(i + vec3(0, 1, 1)), stars_hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+
+float stars_fbm(vec3 p)
+{
+	return 0.5 * stars_noise3(p) + 0.25 * stars_noise3(p * 2.03) + 0.125 * stars_noise3(p * 4.01) +
+	       0.0625 * stars_noise3(p * 8.07);
+}
+
+/* Right ascension (hours) and declination (degrees) to a celestial unit vector. */
+vec3 stars_radec(float ra, float dec)
+{
+	float a = radians(ra * 15.0);
+	float d = radians(dec);
+	return vec3(cos(d) * cos(a), cos(d) * sin(a), sin(d));
+}
+
+vec3 stars_temperature(float t)
+{
+	return mix(vec3(0.62, 0.74, 1.0), vec3(1.0, 0.82, 0.6), t);
+}
+
+/* Procedural background stars: equal-area grid in (longitude, sin(latitude)) of the celestial sphere. */
+vec3 stars_field(vec3 c, float cells, float chance, float bmin, float bmax, float seed)
+{
+	float lon = atan(c.y, c.x) / (2.0 * M_PI) + 0.5;
+	float coslat = sqrt(max(1.0 - c.z * c.z, 1e-4));
+	vec2 p = vec2(lon * cells, (c.z * 0.5 + 0.5) * cells / M_PI);
+	vec2 cell = floor(p);
+	cell.x = mod(cell.x, cells);
+	float h = rando(cell + seed);
+	if (h > chance) return vec3(0.0);
+	vec2 pos = vec2(rando(cell + seed + 17.31), rando(cell + seed + 41.73)) * 0.7 + 0.15;
+	/* cell size in radians: longitude shrinks with latitude, sin(latitude) stretches */
+	float ang = 2.0 * M_PI / cells;
+	vec2 d = (fract(p) - pos) * vec2(ang * coslat, ang / coslat);
+	float b = mix(bmin, bmax, pow(rando(cell + seed + 7.7), 3.0));
+	float core = smoothstep(0.0014, 0.0, length(d));
+	return stars_temperature(rando(cell + seed + 3.1)) * b * core;
+}
+
+#define STARS_COUNT 58
+
+vec3 world_stars_real(vec3 view, vec3 sundir, float factor, bool vivid)
+{
+	if (view.z <= 0.0) return vec3(0.0);
+	vec3 v = normalize(view);
+
+	/* Celestial sphere seen from latitude -23 (southern Brazil); it turns with the sun azimuth. */
+	const float lat = radians(-23.0);
+	vec3 zc = vec3(0.0, cos(lat), sin(lat));
+	float spin = atan(sundir.y, sundir.x);
+	vec3 xc = vec3(cos(spin), 0.0, sin(spin));
+	xc = normalize(xc - zc * dot(xc, zc));
+	vec3 yc = cross(zc, xc);
+	vec3 c = vec3(dot(v, xc), dot(v, yc), dot(v, zc));
+
+	/* Milky Way */
+	vec3 gnp = stars_radec(12.857, 27.13);
+	vec3 gcen = stars_radec(17.761, -28.94);
+	float g = dot(c, gnp);
+	float band = exp(-g * g * 45.0);
+	float bulge = pow(max(dot(c, gcen), 0.0), 6.0);
+	float n = stars_fbm(c * 6.0);
+	float dust = smoothstep(0.45, 0.7, stars_fbm(c * 11.0 + 3.0)) * exp(-g * g * 260.0);
+	vec3 col = vec3(0.5, 0.55, 0.72) * (vivid ? 2.2 : 1.0) * band * (0.05 + 0.25 * bulge) * (0.4 + 1.2 * n) * (1.0 - 0.8 * dust);
+
+	/* background stars, denser along the galactic band */
+	col += stars_field(c, 1400.0, 0.20 + 0.35 * band, 0.08, 0.4, 0.0);
+	col += stars_field(c, 600.0, 0.18, 0.25, 1.1, 91.0);
+
+	/* Named stars: ra (h), dec (deg), visual magnitude. */
+	const vec3 cat[STARS_COUNT] = vec3[STARS_COUNT](
+		/* Orion 0-6 */
+		vec3(5.919, 7.41, 0.5), vec3(5.242, -8.20, 0.13), vec3(5.418, 6.35, 1.64), vec3(5.533, -0.30, 2.2),
+		vec3(5.603, -1.20, 1.69), vec3(5.679, -1.94, 1.77), vec3(5.796, -9.67, 2.07),
+		/* Crux 7-10, Centaurus pointers 11-12 */
+		vec3(12.443, -63.10, 0.77), vec3(12.795, -59.69, 1.25), vec3(12.519, -57.11, 1.6), vec3(12.252, -58.75, 2.8),
+		vec3(14.660, -60.83, -0.27), vec3(14.064, -60.37, 0.6),
+		/* Scorpius 13-25 */
+		vec3(16.490, -26.43, 1.0), vec3(16.006, -22.62, 2.3), vec3(16.091, -19.81, 2.6), vec3(15.981, -26.11, 2.9),
+		vec3(16.598, -28.22, 2.8), vec3(16.836, -34.29, 2.3), vec3(16.864, -38.05, 3.0), vec3(16.910, -42.36, 3.6),
+		vec3(17.203, -43.24, 3.3), vec3(17.622, -43.00, 1.86), vec3(17.793, -40.13, 3.0), vec3(17.708, -39.03, 2.4),
+		vec3(17.560, -37.10, 1.62),
+		/* Big Dipper 26-32 */
+		vec3(11.062, 61.75, 1.8), vec3(11.031, 56.38, 2.4), vec3(11.897, 53.69, 2.4), vec3(12.257, 57.03, 3.3),
+		vec3(12.900, 55.96, 1.8), vec3(13.399, 54.93, 2.2), vec3(13.792, 49.31, 1.9),
+		/* Cassiopeia 33-37 */
+		vec3(0.153, 59.15, 2.3), vec3(0.675, 56.54, 2.2), vec3(0.945, 60.72, 2.4), vec3(1.430, 60.24, 2.7),
+		vec3(1.907, 63.67, 3.4),
+		/* Canis Major 38-41: Sirius, Mirzam, Wezen, Adhara */
+		vec3(6.752, -16.72, -1.46), vec3(6.378, -17.96, 1.98), vec3(7.140, -26.39, 1.83), vec3(6.977, -28.97, 1.5),
+		/* Other bright stars 42-57: Canopus, Procyon, Aldebaran, Vega, Altair, Deneb, Arcturus, Spica,
+		 * Achernar, Fomalhaut, Capella, Polaris, Pleiades, Pollux, Regulus, Avior */
+		vec3(6.399, -52.70, -0.74), vec3(7.655, 5.22, 0.34), vec3(4.599, 16.51, 0.85), vec3(18.616, 38.78, 0.03),
+		vec3(19.846, 8.87, 0.77), vec3(20.690, 45.28, 1.25), vec3(14.261, 19.18, -0.05), vec3(13.420, -11.16, 0.97),
+		vec3(1.629, -57.24, 0.46), vec3(22.961, -29.62, 1.16), vec3(5.278, 46.0, 0.08), vec3(2.530, 89.26, 1.98),
+		vec3(3.791, 24.10, 1.6), vec3(7.755, 28.03, 1.14), vec3(10.140, 11.97, 1.35), vec3(8.159, -47.34, 1.8)
+	);
+	for (int i = 0; i < STARS_COUNT; i++) {
+		vec3 s = stars_radec(cat[i].x, cat[i].y);
+		float d = length(c - s);
+		if (d > 0.03) continue;
+		float b = clamp(pow(2.512, 1.0 - cat[i].z), 0.15, 6.0);
+		/* Constellations style: the named stars stand out a little more. */
+		if (vivid) b = min(b * 1.6 + 0.4, 4.0);
+		float r = 0.0011 + 0.0004 * sqrt(b);
+		vec3 tint = stars_temperature(rando(vec2(float(i), 5.0)));
+		col += tint * (smoothstep(r, 0.0, d) * min(b, 2.0) + 0.03 * b * exp(-d / (r * 1.2)));
+	}
+
+	float night = max(0.0, dot(-sundir, vec3(0.0, 0.0, 1.0)) + 0.5) + factor;
+	return col * night * smoothstep(0.0, 0.12, v.z);
 }
 
 vec2 rsi(vec3 r0, vec3 rd, float sr) {
@@ -2380,18 +2516,77 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 	return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
 }
 
+/* ---- Aurora (World > Night > Aurora) ---- */
+
+vec3 aurora_palette(float mode, float layer, float shift)
+{
+	vec3 green = vec3(0.1, 1.0, 0.45);
+	if (mode < 0.5)
+		return mix(green, vec3(0.25, 0.95, 0.75), layer);
+	if (mode < 1.5)
+		return mix(mix(green, vec3(0.65, 0.25, 0.95), smoothstep(0.2, 0.6, layer)),
+		           vec3(0.95, 0.2, 0.35), smoothstep(0.65, 1.0, layer));
+	vec3 c = 0.5 + 0.5 * cos(6.2831 * (shift + vec3(0.0, 0.33, 0.67)));
+	return mix(c, green, 0.25);
+}
+
+void sky_aurora(vec3 view, vec3 sundir, float time, float mode, vec4 col, out vec4 outcol)
+{
+	outcol = col;
+	vec3 v = normalize(view);
+	float night = smoothstep(0.1, -0.2, sundir.z);
+	if (v.z < 0.01 || night <= 0.0) return;
+
+	float t = time * 0.1;
+	vec3 acc = vec3(0.0);
+	/* march through stacked layers: the bottom edge is sharp and bright, the top fades out */
+	for (int i = 0; i < 28; i++) {
+		float fi = float(i) / 27.0;
+		float h = 1.0 + fi * 0.9;
+		vec2 q = v.xy / (v.z + 0.04) * h * 0.35;
+		float warp = stars_noise3(vec3(q * 0.35, t * 0.3)) * 3.0 + 0.6 * sin(q.x * 0.7 + t);
+		float d = sin(q.y * 0.9 + warp);
+		float ribbon = exp(-d * d * 18.0);
+		float rays = 0.35 + 0.65 * stars_noise3(vec3(q.x * 9.0 + warp * 2.0, t * 2.0, 3.0));
+		float a = ribbon * rays * exp(-fi * 2.2) * (1.0 - fi);
+		acc += aurora_palette(mode, fi, t * 0.5 + q.x * 0.05 + fi * 0.3) * a;
+	}
+	outcol.rgb += acc * 0.12 * night * smoothstep(0.01, 0.25, v.z);
+}
+
 void sky_moon(vec3 view, vec3 sundir, float enabled, float size, float brightness, out vec3 moon)
 {
-	/* Visual only: a cool disc with a deliberately short, dim halo.
-	 * Full inverse of the sun direction, so the moon sits opposite the sun
-	 * across the sky and rises above the horizon precisely when the sun sets. */
+	/* Moon opposite the sun, drawn as a lit sphere with maria and craters. */
+	moon = vec3(0.0);
 	vec3 moonDir = normalize(-sundir);
-	float radius = max(size * 0.05, 0.00005);
-	float alignment = dot(normalize(view), moonDir);
-	float disk = smoothstep(1.0 - radius, 1.0, alignment);
-	float halo = smoothstep(1.0 - radius * 4.0, 1.0, alignment) - disk;
 	float aboveHorizon = smoothstep(-0.02, 0.02, moonDir.z);
-	moon = vec3(0.72, 0.78, 0.90) * brightness * enabled * aboveHorizon * (disk + halo * 0.08);
+	if (enabled * aboveHorizon <= 0.0) return;
+	vec3 v = normalize(view);
+	float ang = sqrt(2.0 * max(size * 0.05, 0.00005)); /* angular radius */
+	float align = dot(v, moonDir);
+	if (align < cos(ang * 6.0)) return;
+
+	vec3 t = normalize(cross(moonDir, abs(moonDir.z) < 0.99 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
+	vec3 bt = cross(t, moonDir);
+	vec2 uv = vec2(dot(v, t), dot(v, bt)) / sin(ang);
+	float r2 = dot(uv, uv);
+	float edge = fwidth(length(uv)) + 0.002;
+	float disk = smoothstep(1.0 + edge, 1.0 - edge, sqrt(r2));
+	vec3 col = vec3(0.0);
+	if (r2 < 1.1) {
+		vec3 n = vec3(uv, sqrt(max(1.0 - r2, 0.0)));
+		/* maria: big dark basins */
+		float maria = smoothstep(0.48, 0.62, stars_fbm(n * 2.2 + vec3(4.1, 1.7, 0.3)));
+		/* craters and highlands roughness */
+		float fine = stars_fbm(n * 14.0 + 7.0);
+		float crat = smoothstep(0.62, 0.75, stars_fbm(n * 26.0 + 2.0));
+		float albedo = mix(0.95, 0.52, maria) * (0.82 + 0.3 * fine) + 0.15 * crat * (1.0 - maria);
+		float limb = 0.55 + 0.45 * pow(n.z, 0.35);
+		col = vec3(0.96, 0.94, 0.89) * albedo * limb * disk;
+	}
+	float d = acos(clamp(align, -1.0, 1.0)) / ang;
+	float glow = exp(-max(d - 1.0, 0.0) * 2.5) * (1.0 - disk) * 0.06;
+	moon = (col + vec3(0.6, 0.68, 0.85) * glow) * brightness * enabled * aboveHorizon;
 }
 
 void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float sunsize,
@@ -2435,7 +2630,10 @@ void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float suns
 	outcol.rgb += moon;
 
 	float starFactor = step(env_sky, 0.001);
-	outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
+	if (env_sky < -0.5)
+		outcol.rgb += world_stars_real(view, sundir, 0.0, env_sky < -1.5) * (1.0 - rough) * starFactor;
+	else
+		outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
 }
 
 /* rlh: Rayleigh coefficients (rgb) and w = 1 for the sky's own tonemap (0 when Filmic follows);
@@ -2467,7 +2665,10 @@ void do_sky_atmospheric(vec3 view, vec4 rlh, vec4 atmo, vec3 sundir, vec3 suncol
 
 	// Stars, only if (env_sky == 0.0)
 	float starFactor = step(env_sky, 0.001);
-	outcol.rgb += vec3(world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor);
+	if (env_sky < -0.5)
+		outcol.rgb += world_stars_real(view, sundir, 1.0 - Ssize, env_sky < -1.5) * (1.0 - rough) * starFactor;
+	else
+		outcol.rgb += vec3(world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor);
 }
 
 void world_blend_paper_real(vec3 vec, out float blend)

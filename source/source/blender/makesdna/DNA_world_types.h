@@ -65,7 +65,10 @@ typedef struct World {
 	float sun_size, turbidity, ground;
 	/* Visual moon only: it mirrors the World Sun and never creates a Lamp. */
 	float moon_enabled, moon_size, moon_brightness;
-	short pad2[4];
+	short star_style; /* WO_STARS_SIMPLE/REALISTIC/CONSTELLATIONS (era pad2[0]; arquivos antigos = 0 = simples) */
+	short aurora_flag;   /* WO_AURORA_ENABLE (era pad2[0]; 0 = desligada) */
+	short aurora_colors; /* WO_AURORA_GREEN/CLASSIC/RAINBOW */
+	short pad2[1];
 
 	/**
 	 * Gravitation constant for the game world
@@ -182,6 +185,17 @@ typedef struct World {
 #define WO_SKYPAPER             (1 << 2)
 #define WO_SKYATMOSPHERIC       (1 << 3)
 #define WO_SKYATMOSPHERIC_STARS (1 << 4) // Draw stars
+
+/* star_style */
+#define WO_STARS_SIMPLE         0
+#define WO_STARS_REALISTIC      1
+#define WO_STARS_CONSTELLATIONS 2
+
+/* aurora_flag / aurora_colors */
+#define WO_AURORA_ENABLE        (1 << 0)
+#define WO_AURORA_GREEN         0
+#define WO_AURORA_CLASSIC       1
+#define WO_AURORA_RAINBOW       2
 /* while render: */
 #define WO_SKYTEX               (1 << 5)
 #define WO_ZENUP                (1 << 6)

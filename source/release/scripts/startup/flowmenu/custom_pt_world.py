@@ -161,6 +161,14 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             row = box.row()
             row.prop(world, "use_sky_stars", text="Stars")
             row.prop(world, "use_sky_moon", text="Moon")
+            row = box.row()
+            row.active = world.use_sky_stars
+            row.prop(world, "star_style", text="Style")
+            row = box.row(align=True)
+            row.prop(world, "use_sky_aurora", text="Aurora")
+            sub = row.row()
+            sub.active = world.use_sky_aurora
+            sub.prop(world, "aurora_colors", text="")
             row = box.row(align=True)
             row.active = world.use_sky_moon
             row.prop(world, "moon_size", text="Size")

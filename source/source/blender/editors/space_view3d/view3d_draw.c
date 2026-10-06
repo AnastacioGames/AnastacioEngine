@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "PIL_time.h"
+
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_customdata_types.h"
@@ -3533,7 +3535,7 @@ static void view3d_main_region_clear(Scene *scene, View3D *v3d, ARegion *ar)
 		GPUMaterial *gpumat = GPU_material_world(scene, scene->world);
 
 		/* calculate full shader for background */
-		GPU_material_bind(gpumat, 1, 1.0, true, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0), rv3d->winmat);
+		GPU_material_bind(gpumat, 1, fmod(PIL_check_seconds_timer(), 3600.0), true, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0), rv3d->winmat);
 
 		bool material_not_bound = !GPU_material_bound(gpumat);
 

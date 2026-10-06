@@ -3637,24 +3637,28 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_brightness, GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS, NULL), &moonBrightness);
 				}
 				else {
-					float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
-					float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
-					float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
-					float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
-					float moonDisabled = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&moonDisabled), &moonEnabled);
-					float moonDefaultSize = 0.01f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultSize), &moonSize);
-					float moonDefaultBrightness = 0.25f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultBrightness), &moonBrightness);
+					static float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
+					static float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
+					static float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
+					static float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
+					static float moonDisabled = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&moonDisabled), &moonEnabled);
+					static float moonDefaultSize = 0.01f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultSize), &moonSize);
+					static float moonDefaultBrightness = 0.25f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultBrightness), &moonBrightness);
 				}
 
-				float env_sky = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 0.0f : 1.0f;
+				/* 1 = no stars; 0, -1, -2 = star_style simple/realistic/constellations (the shader tests env_sky <= 0). */
+				/* static: GPU_uniform keeps the pointer and reads it after this function returns */
+				static float env_sky_values[4] = { 1.0f, 0.0f, -1.0f, -2.0f };
+				int env_sky_index = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 1 + CLAMPIS(wo->star_style, 0, 2) : 0;
+				float *env_sky = &env_sky_values[env_sky_index];
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
 					GPUNodeLink *rlh, *atmo;
 					gpu_world_atmosphere_links(mat, wo, &rlh, &atmo);
-					GPU_link(mat, "do_sky_atmospheric", shi.view, rlh, atmo, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(&env_sky), blend, &shi.rgb);
+					GPU_link(mat, "do_sky_atmospheric", shi.view, rlh, atmo, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(env_sky), blend, &shi.rgb);
 
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
-						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(&env_sky), &shi.rgb);
+						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(env_sky), &shi.rgb);
 				}
 
 				if (GPUWorld.mistype == 3) { // use Height Fog
@@ -3671,6 +3675,13 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 				}
 				else {
 					GPU_link(mat, (wo && wo->aomix == WO_AOADD) ? "mix_screen" : "mix_blend", blend, shi.rgb, hor, &shi.rgb);
+				}
+
+				if (wo->aurora_flag & WO_AURORA_ENABLE) {
+					/* static: GPU_uniform keeps the pointer */
+					static float aurora_values[3] = { 0.0f, 1.0f, 2.0f };
+					GPU_link(mat, "sky_aurora", shi.view, sunDir, GPU_builtin(GPU_TIME),
+					         GPU_uniform(&aurora_values[CLAMPIS(wo->aurora_colors, 0, 2)]), shi.rgb, &shi.rgb);
 				}
 			}
 			else

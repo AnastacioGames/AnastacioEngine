@@ -976,6 +976,37 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Render Stars", "Render stars");
 	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
 
+	static EnumPropertyItem star_style_items[] = {
+		{WO_STARS_SIMPLE, "SIMPLE", 0, "Simple", "Uniform field of small stars"},
+		{WO_STARS_REALISTIC, "REALISTIC", 0, "Realistic",
+		 "Stars with varied brightness and color, the Milky Way and the real constellations"},
+		{WO_STARS_CONSTELLATIONS, "CONSTELLATIONS", 0, "Constellations",
+		 "Realistic sky with a brighter Milky Way and the constellation stars highlighted"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "star_style", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "star_style");
+	RNA_def_property_enum_items(prop, star_style_items);
+	RNA_def_property_ui_text(prop, "Star Style", "How the night sky stars are drawn");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
+	prop = RNA_def_property(srna, "use_sky_aurora", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "aurora_flag", WO_AURORA_ENABLE);
+	RNA_def_property_ui_text(prop, "Aurora", "Draw an animated aurora in the night sky");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_draw_update");
+
+	static EnumPropertyItem aurora_colors_items[] = {
+		{WO_AURORA_GREEN, "GREEN", 0, "Green", "Green curtains, the most common aurora"},
+		{WO_AURORA_CLASSIC, "CLASSIC", 0, "Green and Purple", "Green base fading to purple and red at the top"},
+		{WO_AURORA_RAINBOW, "SHIFTING", 0, "Shifting", "Colors slowly shift over time and along the curtains"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "aurora_colors", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "aurora_colors");
+	RNA_def_property_enum_items(prop, aurora_colors_items);
+	RNA_def_property_ui_text(prop, "Aurora Colors", "Color scheme of the aurora");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
 	prop = RNA_def_property(srna, "use_sky_atmospheric", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "skytype", WO_SKYATMOSPHERIC);
 	RNA_def_property_ui_text(prop, "Atmospheric Sky", "Render background with a realistic sky");
