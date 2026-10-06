@@ -4148,8 +4148,48 @@ static bool project_bucket_iter_init(ProjPaintState *ps, const float mval_f[2])
 static bool project_paint_is_over_active_surface(const ProjPaintState *ps, const float pos[2])
 {
 	float w[3];
+	int tri_index;
 
-	return (project_paint_PickFace(ps, pos, w) != -1);
+	tri_index = project_paint_PickFace(ps, pos, w);
+	if (tri_index == -1) {
+		return false;
+	}
+
+	/* The screen-space pick above only knows about the active mesh's own
+	 * triangles; it reports a hit even when a foreign object (e.g. a group
+	 * instance) is drawn in front of the painted surface at this pixel.
+	 * Cross-check against the viewport depth buffer, which reflects every
+	 * visible object, to reject that case instead of continuing to paint
+	 * (and accumulate image-undo tiles) on a surface the user can't see. */
+	if (ps->rv3d && ps->rv3d->depths && ps->ar) {
+		const MLoopTri *lt = &ps->dm_mlooptri[tri_index];
+		const int lt_vtri[3] = { PS_LOOPTRI_AS_VERT_INDEX_3(ps, lt) };
+		float co_local[3], visible_world[3], visible_local[3];
+		const int mval_i[2] = {(int)pos[0], (int)pos[1]};
+
+		interp_v3_v3v3v3(
+		        co_local,
+		        ps->dm_mvert[lt_vtri[0]].co,
+		        ps->dm_mvert[lt_vtri[1]].co,
+		        ps->dm_mvert[lt_vtri[2]].co,
+		        w);
+
+		if (ED_view3d_autodist_simple((ARegion *)ps->ar, mval_i, visible_world, 0, NULL)) {
+			mul_v3_m4v3(visible_local, ps->obmat_imat, visible_world);
+
+			{
+				const float dist_to_pick = len_v3v3(ps->viewPos, co_local);
+				const float dist_to_visible = len_v3v3(ps->viewPos, visible_local);
+				const float epsilon = max_ff(dist_to_pick * 1e-3f, 1e-4f);
+
+				if (dist_to_visible + epsilon < dist_to_pick) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
 }
 
 
@@ -5260,6 +5300,23 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 		if (ps->ob == NULL || !(ps->ob->lay & ps->v3d->lay)) {
 			ps_handle->ps_views_tot = i + 1;
 			goto fail;
+		}
+	}
+
+	/* Capture the full-scene viewport depth buffer once per stroke, so the
+	 * active-surface check below can tell a real foreground occluder (e.g. a
+	 * group instance placed in front of the painted mesh) apart from empty
+	 * space or the painted mesh's own back faces. The view doesn't change
+	 * while a stroke is held, so one capture per stroke is sufficient. */
+	{
+		ProjPaintState *ps0 = ps_handle->ps_views[0];
+		if (ps0->v3d && ps0->ar) {
+			view3d_operator_needs_opengl(C);
+			ED_view3d_autodist_init(CTX_data_main(C), scene, ps0->ar, ps0->v3d, 0);
+			if (ps0->rv3d->depths) {
+				ps0->rv3d->depths->damaged = true;
+			}
+			ED_view3d_depth_update(ps0->ar);
 		}
 	}
 

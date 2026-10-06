@@ -678,7 +678,13 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
         ip = context.scene.tool_settings.image_paint
         ip.mode = 'IMAGE'
         ip.canvas = img
+        if context.object.mode == 'EDIT':
+            bpy.ops.object.mode_set(mode='OBJECT')
         if context.object.mode != 'TEXTURE_PAINT':
+            if not bpy.ops.paint.texture_paint_toggle.poll():
+                self.report({'ERROR'}, "Can't enter Texture Paint on this object (needs to be a mesh, "
+                                        "not linked, and out of Edit Mode)")
+                return {'CANCELLED'}
             bpy.ops.paint.texture_paint_toggle()
         if mat.get(RECIPE_KEY) == "wet_patches":
             apply_puddle_brush(context, (1.0, 1.0, 1.0))
