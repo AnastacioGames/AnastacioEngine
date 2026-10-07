@@ -745,6 +745,7 @@ typedef enum eUserpref_UI_Flag2 {
 	USER_KEEP_SESSION			= (1 << 0),
 	USER_REGION_OVERLAP			= (1 << 1),
 	USER_TRACKPAD_NATURAL		= (1 << 2),
+	USER_HIDE_PAINT_HINTS		= (1 << 3), /* negativo: prefs antigas mostram as dicas */
 } eUserpref_UI_Flag2;
 
 /* UserDef.app_flag */

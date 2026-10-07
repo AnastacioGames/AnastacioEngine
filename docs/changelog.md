@@ -1,5 +1,20 @@
 # Changelog — AnastacioEngine
 
+## Editor: dicas de atalho nos modos de pintura e sculpt (2026-10-07)
+
+- `view3d_draw.c`: faixa no rodapé da 3D View, alinhada à esquerda e acima da barra flutuante Play/Standalone,
+  com tecla + ação para Texture Paint, Sculpt, Vertex Paint e Weight Paint (tirado dos keymaps de
+  `paint_ops.c`). Contextual: traço Line mostra `Drag Draw line · Alt Snap angle`; Fill com degradê mostra
+  `Drag Gradient direction`. Quebra em linhas quando a viewport é estreita. O BLF desliga `GL_BLEND` a cada
+  texto, por isso o blend é religado antes de cada moldura.
+- Textos em inglês via `IFACE_`/`N_`, traduzíveis por Preferences > International Fonts.
+- Liga/desliga: `UserDef.uiflag2` `USER_HIDE_PAINT_HINTS` (negativa, prefs antigas mostram as dicas), RNA
+  `show_paint_hints`, em Preferences > Interface e no menu de botão direito do cabeçalho da 3D View
+  (`screen_ops.c`). Nada novo no .blend da cena.
+- `properties_paint_common.py`: topo do painel do pincel com `Free | Line | Curve` (`stroke_method`) e
+  `Solid | Gradient` (`use_gradient`); o checkbox de degradê do fim do painel saiu.
+- Build `RangeEngine` OK; screenshot validado em Texture Paint e Sculpt. Botões do painel ainda sem teste manual.
+
 ## Viewport: overlays restantes no estilo Blender 5 (2026-10-07)
 
 Linhas com `GL_LINE_SMOOTH` + blend (desligado no picking, estado de blend do chamador restaurado),

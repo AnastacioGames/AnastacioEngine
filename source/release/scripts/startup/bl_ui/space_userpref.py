@@ -214,6 +214,7 @@ class USERPREF_PT_interface(Panel):
         box.prop(view, "show_object_info", text="Object Info")
         box.prop(view, "show_large_cursors")
         box.prop(view, "show_view_name", text="View Name")
+        box.prop(view, "show_paint_hints", text="Paint Shortcut Hints")
         box.prop(view, "show_playback_fps", text="Playback FPS")
         box.prop(view, "use_global_scene")
 

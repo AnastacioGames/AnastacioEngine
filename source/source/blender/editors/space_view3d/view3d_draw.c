@@ -4555,6 +4555,146 @@ static bool is_cursor_visible(Scene *scene)
 	return true;
 }
 
+
+/* Dicas de atalho dos modos de pintura/sculpt no rodapé da viewport (a 2.79 não tem Status Bar).
+ * Textos em inglês passam por IFACE_ e seguem a tradução das preferências. */
+typedef struct PaintHint {
+	const char *key;
+	const char *label;
+} PaintHint;
+
+#define PAINT_HINTS_MAX 16
+
+static int paint_hints_collect(Scene *scene, int mode, PaintHint hints[PAINT_HINTS_MAX])
+{
+	const Paint *p = BKE_paint_get_active(scene);
+	const Brush *br = p ? BKE_paint_brush((Paint *)p) : NULL;
+	int n = 0;
+
+#define HINT(k, l) { hints[n].key = k; hints[n].label = l; n++; } (void)0
+
+	if (br && (br->flag & BRUSH_LINE)) {
+		HINT(N_("Drag"), N_("Draw line"));
+		HINT(N_("Alt"), N_("Snap angle"));
+	}
+	else if (mode == OB_MODE_TEXTURE_PAINT && br &&
+	         br->imagepaint_tool == PAINT_TOOL_FILL && (br->flag & BRUSH_USE_GRADIENT))
+	{
+		HINT(N_("Drag"), N_("Gradient direction"));
+	}
+	else {
+		HINT(N_("LMB"), mode == OB_MODE_SCULPT ? N_("Sculpt") : N_("Paint"));
+	}
+	HINT("F", N_("Size"));
+	HINT(N_("Shift F"), N_("Strength"));
+
+	switch (mode) {
+		case OB_MODE_SCULPT:
+			HINT(N_("Ctrl LMB"), N_("Invert"));
+			HINT(N_("Shift LMB"), N_("Smooth"));
+			HINT("E", N_("Stroke type"));
+			HINT("X", N_("Draw"));
+			HINT("G", N_("Grab"));
+			HINT("C", N_("Clay"));
+			HINT("M", N_("Mask"));
+			break;
+		case OB_MODE_VERTEX_PAINT:
+			HINT(N_("Ctrl F"), N_("Rotate"));
+			HINT("E", N_("Stroke type"));
+			HINT("S", N_("Pick color"));
+			HINT("X", N_("Swap colors"));
+			HINT(N_("Shift K"), N_("Fill color"));
+			HINT("M", N_("Face mask"));
+			break;
+		case OB_MODE_WEIGHT_PAINT:
+			HINT("W", N_("Weight"));
+			HINT(N_("Ctrl LMB"), N_("Sample weight"));
+			HINT(N_("Alt LMB"), N_("Gradient"));
+			HINT(N_("Shift K"), N_("Fill weight"));
+			HINT("M", N_("Face mask"));
+			HINT("V", N_("Vertex mask"));
+			break;
+		default: /* OB_MODE_TEXTURE_PAINT */
+			HINT(N_("Ctrl F"), N_("Rotate"));
+			HINT("E", N_("Stroke type"));
+			HINT("S", N_("Pick color"));
+			HINT("X", N_("Swap colors"));
+			HINT(N_("Ctrl LMB"), N_("Invert"));
+			break;
+	}
+	HINT(N_("Ctrl Z"), N_("Undo"));
+
+#undef HINT
+	return n;
+}
+
+static void draw_paint_hints(Scene *scene, int mode, ARegion *ar, View3D *v3d, const rcti *rect)
+{
+	PaintHint hints[PAINT_HINTS_MAX];
+	const uiStyle *style = UI_style_get();
+	const uiFontStyle *fs = &style->widgetlabel;
+	const int n = paint_hints_collect(scene, mode, hints);
+	const int pad = U.widget_unit / 4;
+	const int gap = U.widget_unit;
+	const int line_h = UI_UNIT_Y;
+	int widths[PAINT_HINTS_MAX], key_w[PAINT_HINTS_MAX];
+	int line_start[PAINT_HINTS_MAX + 1];
+	int lines = 0, cur = 0, i;
+
+	/* Rodapé, alinhado à esquerda, acima da barra flutuante (Play/Standalone). */
+	const int x0 = rect->xmin + U.widget_unit;
+	const int base_y = rect->ymin + pad +
+	        ((v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) ? 0 : (UI_UNIT_Y / 2) + 20 + pad);
+	const int max_w = rect->xmax - U.widget_unit - x0;
+
+	(void)ar;
+	if (n == 0 || max_w <= 0) {
+		return;
+	}
+
+	line_start[0] = 0;
+	for (i = 0; i < n; i++) {
+		key_w[i] = UI_fontstyle_string_width(fs, IFACE_(hints[i].key));
+		widths[i] = key_w[i] + 2 * pad + pad + UI_fontstyle_string_width(fs, IFACE_(hints[i].label));
+		if (cur > 0 && cur + gap + widths[i] > max_w) {
+			line_start[++lines] = i;
+			cur = 0;
+		}
+		cur += (cur > 0 ? gap : 0) + widths[i];
+	}
+	line_start[++lines] = n;
+
+	glEnable(GL_BLEND);
+	for (int l = 0; l < lines; l++) {
+		/* última linha fica embaixo */
+		const int y = base_y + (lines - 1 - l) * (line_h + pad);
+		int x = x0;
+		int w = 0;
+
+		for (i = line_start[l]; i < line_start[l + 1]; i++) {
+			w += (w > 0 ? gap : 0) + widths[i];
+		}
+		glEnable(GL_BLEND);
+		glColor4f(0.0f, 0.0f, 0.0f, 0.55f);
+		glRecti(x - pad, y, x + w + pad, y + line_h);
+
+		for (i = line_start[l]; i < line_start[l + 1]; i++) {
+			const int ty = y + (line_h - (int)(fs->points * U.pixelsize)) / 2 + 1;
+
+			/* tecla com moldura clara, rótulo ao lado; o BLF desliga o blend a cada texto */
+			glEnable(GL_BLEND);
+			glColor4f(1.0f, 1.0f, 1.0f, 0.18f);
+			glRecti(x, y + 2, x + key_w[i] + 2 * pad, y + line_h - 2);
+			UI_ThemeColor(TH_TEXT_HI);
+			UI_fontstyle_draw_simple(fs, x + pad, ty, IFACE_(hints[i].key));
+			UI_ThemeColorShade(TH_TEXT_HI, -15);
+			UI_fontstyle_draw_simple(fs, x + key_w[i] + 3 * pad, ty, IFACE_(hints[i].label));
+			x += widths[i] + gap;
+		}
+	}
+	glDisable(GL_BLEND);
+}
+
 static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
                                        ARegion *ar, View3D *v3d,
                                        const char *grid_unit, bool render_border)
@@ -4601,6 +4741,17 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 		ob = OBACT;
 		if (U.uiflag & USER_DRAWVIEWINFO)
 			draw_selected_name(scene, ob, &rect);
+
+		if (ob && !(U.uiflag2 & USER_HIDE_PAINT_HINTS)) {
+			const int paint_modes[] = {OB_MODE_TEXTURE_PAINT, OB_MODE_SCULPT,
+			                           OB_MODE_VERTEX_PAINT, OB_MODE_WEIGHT_PAINT};
+			for (int m = 0; m < ARRAY_SIZE(paint_modes); m++) {
+				if (ob->mode & paint_modes[m]) {
+					draw_paint_hints(scene, paint_modes[m], ar, v3d, &rect);
+					break;
+				}
+			}
+		}
 	}
 
 	if (rv3d->render_engine) {

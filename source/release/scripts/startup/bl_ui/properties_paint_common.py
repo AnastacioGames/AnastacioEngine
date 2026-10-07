@@ -109,6 +109,20 @@ def brush_texpaint_common(panel, context, layout, brush, settings, projpaint=Fal
 
     if brush.image_tool in {'DRAW', 'FILL'}:
         if brush.blend not in {'ERASE_ALPHA', 'ADD_ALPHA'}:
+            # Atalhos visíveis: tipo de traço e cor sólida/degradê no topo do painel
+            if brush.image_tool == 'DRAW':
+                row = col.row(align=True)
+                row.prop_enum(brush, "stroke_method", 'SPACE', text="Free")
+                row.prop_enum(brush, "stroke_method", 'LINE', text="Line", icon='IPO_LINEAR')
+                row.prop_enum(brush, "stroke_method", 'CURVE', text="Curve", icon='CURVE_BEZCURVE')
+            row = col.row(align=True)
+            path = "tool_settings.image_paint.brush.use_gradient"
+            op = row.operator("wm.context_set_boolean", text="Solid", depress=not brush.use_gradient)
+            op.data_path, op.value = path, False
+            op = row.operator("wm.context_set_boolean", text="Gradient", depress=brush.use_gradient)
+            op.data_path, op.value = path, True
+            col.separator()
+
             if not brush.use_gradient:
                 panel.prop_unified_color_picker(col, context, brush, "color", value_slider=True)
 
@@ -219,8 +233,6 @@ def brush_texpaint_common(panel, context, layout, brush, settings, projpaint=Fal
 
     if projpaint:
         col.prop(brush, "use_alpha")
-
-    col.prop(brush, "use_gradient")
 
     col.separator()
     col.template_ID(settings, "palette", new="palette.new")

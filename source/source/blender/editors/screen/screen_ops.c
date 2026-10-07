@@ -3663,6 +3663,12 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 		RNA_pointer_create(&CTX_wm_screen(C)->id, &RNA_SpaceView3D, sa->spacedata.first, &space_ptr);
 		uiItemR(layout, &space_ptr, "show_floating_controls_in_header", 0, IFACE_("Floating Controls in Header"), ICON_NONE);
 		uiItemR(layout, &space_ptr, "show_floating_debug_controls", 0, IFACE_("Floating Debug Controls"), ICON_NONE);
+
+		{
+			PointerRNA view_ptr;
+			RNA_pointer_create(NULL, &RNA_UserPreferencesView, &U, &view_ptr);
+			uiItemR(layout, &view_ptr, "show_paint_hints", 0, IFACE_("Paint Shortcut Hints"), ICON_NONE);
+		}
 	}
 
 	uiItemS(layout);
