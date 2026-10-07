@@ -48,8 +48,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ### Frentes recentes
 
-- [Multiplayer nativo](multiplayer-plan.md): plano da rede integrada à engine, com [protocolo](multiplayer-protocol.md),
-  [guia de uso](multiplayer-guide-J.md) e notas de implementação em `source/source/gameengine/Network/`.
+- [Multiplayer nativo](multiplayer-plan.md): plano da rede integrada à engine, com [protocolo](multiplayer-protocol.md)
+  e notas de implementação em `source/source/gameengine/Network/`.
   A implementação atual cobre host/cliente, replicação, RPC, predição, servidor headless, relevância,
   troca de cena e cliente Web; o estado validado e as pendências ficam no [roadmap](roadmap.md).
 - [Efeitos de câmera](camera-fx.md): efeitos e integração
