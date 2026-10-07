@@ -55,7 +55,6 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Efeitos de câmera](camera-fx.md): efeitos e integração
   com o pipeline de renderização.
 - [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
-- [Destruição e deformação](destruction-plan.md): planejamento e integração dos recursos de dano visual.
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
   [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).

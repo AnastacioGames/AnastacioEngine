@@ -30,4 +30,4 @@ O componente destruction_demo.ExplosionTester (texto interno, no Player) so
 cuida das teclas E e G e mostra os callbacks: onExplode faz a camera tremer.
 Nada nele e necessario para os objetos quebrarem ou explodirem.
 
-Detalhes e API Python: docs/destruction-plan.md no repositorio.
+API Python: KX_GameObject.shatter() e KX_Scene.explode() na referencia (source/doc/python_api/rst/bge_types).

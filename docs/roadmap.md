@@ -267,7 +267,7 @@ está fechada. O componente do demo `Vehicle` foi sincronizado com a versão com
 
 ### Destruição e explosões
 
-[Plano](destruction-plan.md) aprovado em 2026-09-29; F0 (DNA, RNA e painéis), F1 (Generate Fragments), F2 (quebra por colisão e `shatter()` no runtime), F3 (`scene.explode()`, pavio, impacto, cadeia, Effect e `detonate()`), F4 (Max Debris, `onBreak`/`onExplode`, impulso por massa nos pedaços) e F5 (demo em `source/release/demos/Destruction/`, API no `.rst`) prontas; falta o usuário jogar a demo e ajustar a sensação: objetos
+Plano aprovado em 2026-09-29; F0 (DNA, RNA e painéis), F1 (Generate Fragments), F2 (quebra por colisão e `shatter()` no runtime), F3 (`scene.explode()`, pavio, impacto, cadeia, Effect e `detonate()`), F4 (Max Debris, `onBreak`/`onExplode`, impulso por massa nos pedaços) e F5 (demo em `source/release/demos/Destruction/`, API no `.rst`) prontas; falta o usuário jogar a demo e ajustar a sensação: objetos
 pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Explosive na aba Physics e
 `scene.explode()`, em fases F0–F5. Protótipo Python validado por teste automático no runtime
 0.4.5 (fora do git, em `tools/ADD na engine anastacioEngine/`).
