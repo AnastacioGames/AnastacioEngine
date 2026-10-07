@@ -1,5 +1,21 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — `bge.logic.setObjectConvert`: escolher objetos convertidos antes do load
+
+- Novas funções `bge.logic.setObjectConvert(scene, object, convert, children=True)` e
+  `getObjectConvert(scene, object)` em `KX_PythonInit.cpp`. Ligam/desligam o flag Convert
+  (`OB_TASK_CONVERT`, painel Game Object Tasks) de um objeto e, por padrão, dos descendentes, numa
+  cena ainda não carregada (busca inclui set scenes). Uso: no menu, desligar pilotos não escolhidos
+  antes de `replace("Pista_1")`. `ValueError` se cena/objeto não existir; retorna quantos mudaram.
+- Flags originais são guardados e restaurados em `exitGamePython()`, só para objetos ainda no
+  `G.main`: no Play embutido as mudanças não vazam para o editor nem para o `.blend` salvo.
+- Limites: só vale antes da conversão da cena; membros de dupli group ignoram o flag; logic bricks
+  apontando para objeto desligado perdem o alvo; objeto ligado a várias cenas é afetado em todas;
+  dados brutos do mesh continuam na RAM (economiza conversão: GPU, física, logic).
+- Teste `tests/convert_flag/make_test.py` (8 pilotos pesados, 3 rodadas): load da Pista_1 com todos
+  ~972 ms / 680 MB; com 2 via setObjectConvert ~356 ms / 466 MB; com 2 via LibLoad de arquivos
+  separados ~377 ms / 421 MB. Custo dos flags ~0,05 ms. Build `RangeEngine RangeRuntime` passou.
+
 ## 2026-10-07 — Material Atlas nativo em C++ e correções de bake
 
 - Nova ferramenta em Properties > Material > Anastacio Material Atlas. Operador C++
