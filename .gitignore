@@ -71,3 +71,6 @@ tools/recastnavigation-upstream/
 
 # demos ficam fora do repo e da publicacao (repo proprio no futuro)
 demos/
+
+# projetos de teste ficam fora do repo e da publicacao
+projects-teste/
