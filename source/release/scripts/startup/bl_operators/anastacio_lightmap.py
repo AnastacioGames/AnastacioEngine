@@ -376,6 +376,22 @@ def dilate(pixels, mask, size, passes, keep_empty=None):
     return out.reshape(-1, 4), valid.reshape(-1).astype(np.float32)
 
 
+def bake_progress(percent, status):
+    """Bar in the Info header (drawn by INFO_HT_header). The bake blocks the UI, so the window is
+    redrawn by hand at each step; status "" hides the bar."""
+    wm = bpy.context.window_manager
+    wm.ae_bake_progress = percent
+    wm.ae_bake_status = status
+    if bpy.app.background:
+        return
+    if status:
+        print("AE lightmap: %3d%% %s" % (percent, status))
+    try:
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+    except RuntimeError:
+        pass
+
+
 def encode_rgbm(pixels, alpha_mask):
     """Linear irradiance -> RGBM (gamma 2, range 8). Texels outside the charts get alpha 0."""
     import numpy as np
@@ -411,6 +427,7 @@ class SCENE_OT_lightmap_bake(Operator):
         import addon_utils
         addon_utils.enable("cycles", default_set=False)
 
+        bake_progress(2, "Lightmap UVs")
         # objects created or moved by a script are only placed where Cycles sees them after an update
         scene.update()
         size = int(settings.resolution)
@@ -449,7 +466,8 @@ class SCENE_OT_lightmap_bake(Operator):
                                 max(settings.samples * 32, 512))  # few texels: cheap
                 scene.update()
 
-            def bake_target(passes, target):
+            def bake_target(passes, target, percent, status):
+                bake_progress(percent, status)
                 targets, nodes, (width, height), margin, samples = target
                 select_only(scene, targets)
                 scene.cycles.samples = samples
@@ -469,16 +487,17 @@ class SCENE_OT_lightmap_bake(Operator):
 
             lightmap_target = (objects, added, (size, size), settings.margin, settings.samples)
 
-            def bake(passes):
+            def bake(passes, percent, status):
                 # the light volume gets the same passes (same lamps), so moving objects match the lightmap
                 if probe_target:
-                    volume_passes.append(bake_target(passes, probe_target))
-                return bake_target(passes, lightmap_target)
+                    volume_passes.append(bake_target(passes, probe_target, percent, status + " (light volume)"))
+                    percent += 10
+                return bake_target(passes, lightmap_target, percent, status)
 
             # 1. bounces of the game lamps
             for ob in lamps:
                 swapped.append((ob, ) + emulate_game_lamp(ob))
-            indirect = bake({'INDIRECT'})
+            indirect = bake({'INDIRECT'}, 8, "Baking lamp bounces")
             for ob, original, temp in swapped:
                 ob.data = original
                 bpy.data.lamps.remove(temp)
@@ -486,7 +505,8 @@ class SCENE_OT_lightmap_bake(Operator):
             # 2. World and emissive meshes, direct (the game lamps stay live)
             for ob in lamps:
                 ob.hide_render = True
-            direct = bake({'DIRECT'}) if settings.use_world else np.zeros_like(indirect)
+            direct = (bake({'DIRECT'}, 45, "Baking World light") if settings.use_world
+                      else np.zeros_like(indirect))
             for ob in lamps:
                 ob.hide_render = False
 
@@ -498,6 +518,7 @@ class SCENE_OT_lightmap_bake(Operator):
             corners[:2, :2] = corners[:2, -2:] = corners[-2:, :2] = corners[-2:, -2:] = True
             mask[corners.reshape(-1)] = 0.0
             # fill the gutters before denoising so OIDN does not pull black into the chart borders
+            bake_progress(80, "Denoising" if settings.use_denoise else "Filling margins")
             pad = max(4, settings.margin * 2)
             total[mask <= 0.5, :3] = 0.0
             total, grown = dilate(total, mask, size, pad, corners)
@@ -517,6 +538,7 @@ class SCENE_OT_lightmap_bake(Operator):
                 fill_buried_probes(vol, grid[2])
                 volume_encoded = encode_rgbm(vol, np.ones(len(vol), dtype=np.float32))
         finally:
+            bake_progress(0, "")
             for ob in hidden:
                 ob.hide_render = False
             if probe_ob:
@@ -625,7 +647,7 @@ class AnastacioLightmapSettings(bpy.types.PropertyGroup):
         "than the CPU", default=True)
     samples: IntProperty(
         name="Samples", description="Cycles samples per texel (more = less noise, slower bake)",
-        default=256, min=8, max=8192)
+        default=80, min=8, max=8192)
     margin: IntProperty(
         name="Margin", description="Pixels the baked charts are extended by (avoids dark seams)",
         default=4, min=0, max=32)
@@ -670,12 +692,17 @@ def register_props():
         name="Use Light Volume",
         description="Light the moving objects with the baked light volume (6 texture reads per pixel)",
         default=False)
+    bpy.types.WindowManager.ae_bake_progress = FloatProperty(
+        name="Bake Progress", subtype='PERCENTAGE', min=0.0, max=100.0, options={'SKIP_SAVE'})
+    bpy.types.WindowManager.ae_bake_status = StringProperty(options={'SKIP_SAVE'})
     bpy.types.Scene.ae_lightvol_grid = FloatVectorProperty(
         name="Light Volume Grid", description="Minimum xyz, cell size xyz and probe counts xyz",
         size=9, options={'HIDDEN'})
 
 
 def unregister_props():
+    del bpy.types.WindowManager.ae_bake_status
+    del bpy.types.WindowManager.ae_bake_progress
     del bpy.types.Object.ae_lightmap_scale
     del bpy.types.Scene.ae_lightvol_grid
     del bpy.types.Scene.ae_lightvol_use

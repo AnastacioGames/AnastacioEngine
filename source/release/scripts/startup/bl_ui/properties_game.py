@@ -1002,9 +1002,6 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
         return (context.scene.render.engine in cls.COMPAT_ENGINES and
                 hasattr(context.scene, "ae_lightmap_settings"))
 
-    def draw_header(self, context):
-        self.layout.prop(context.scene, "ae_lightmap_use", text="")
-
     def draw(self, context):
         layout = self.layout
         scene = context.scene
@@ -1014,9 +1011,12 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
             layout.label(text="Needs PBR Shading Nodes (Shading panel)", icon='INFO')
 
         box = layout.box()
-        box.active = scene.ae_lightmap_use or not scene.ae_lightmap
-        box.label(text="Lightmap:", icon="IMAGE_DATA")
+        row = box.row()
+        row.label(text="Lightmap:", icon="IMAGE_DATA")
+        if scene.ae_lightmap:
+            row.prop(scene, "ae_lightmap_use", text="Use in Game")
         split = box.split()
+        split.active = scene.ae_lightmap_use or not scene.ae_lightmap
         col = split.column(align=True)
         col.prop(settings, "resolution", text="")
         col.prop(settings, "samples")
@@ -1039,7 +1039,7 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
         sub.active = settings.use_volume
         sub.prop(settings, "volume_spacing")
         if scene.ae_lightvol:
-            box.prop(scene, "ae_lightvol_use", text="Light Moving Objects")
+            box.prop(scene, "ae_lightvol_use", text="Use in Game (moving objects)")
 
         row = layout.row(align=True)
         row.scale_y = 1.3

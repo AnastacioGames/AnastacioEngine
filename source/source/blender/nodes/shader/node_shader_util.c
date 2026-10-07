@@ -336,9 +336,10 @@ void node_shader_gpu_world_env(GPUMaterial *mat, GPUNodeLink *rough,
 
 /* Baked indirect light (Game PBR): one RGBM lightmap atlas for the scene, read through the UV layer
  * named "Lightmap" (see bl_operators/anastacio_lightmap.py). The scene ID properties are "ae_lightmap"
- * (image name) and "ae_lightmap_use" (on/off, World > Baked Lighting). Gives rgb = irradiance, a = 1 where baked (0 for
+ * (image name) and "ae_lightmap_use" (on/off, Render > Baked Lighting). Gives rgb = irradiance, a = 1 where baked (0 for
  * objects outside the atlas, which keep the probe/World ambient). Off: a constant zero, no sampling.
- * Where the lightmap does not reach, the baked light volume ("ae_lightvol*", same panel) fills in. */
+ * Where the lightmap does not reach, the baked light volume ("ae_lightvol*", same panel) fills in;
+ * Web and Android get the lightmap only (6 texture reads per pixel are too much there). */
 static Image *scene_baked_image(Scene *scene, const char *name_prop, const char *use_prop)
 {
 	if (!scene || !scene->id.properties || !G.main) {
@@ -365,7 +366,11 @@ GPUNodeLink *node_shader_gpu_lightmap(GPUMaterial *mat, GPUNodeLink *normal)
 	}
 
 	/* light volume grid: "ae_lightvol_grid" = min xyz, cell size xyz, probe count xyz */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	Image *vol = NULL;
+#else
 	Image *vol = scene_baked_image(scene, "ae_lightvol", "ae_lightvol_use");
+#endif
 	IDProperty *grid = vol ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_lightvol_grid") : NULL;
 	if (grid && grid->type == IDP_ARRAY && grid->len == 9 &&
 	    ELEM(grid->subtype, IDP_FLOAT, IDP_DOUBLE))

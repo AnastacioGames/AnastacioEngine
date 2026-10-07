@@ -83,6 +83,11 @@ class INFO_HT_header(Header):
         layout.separator_spacer()
 
         layout.template_running_jobs()
+        wm = context.window_manager
+        if getattr(wm, "ae_bake_status", ""):  # Bake Lightmap (anastacio_lightmap.py)
+            row = layout.row()
+            row.ui_units_x = 14
+            row.prop(wm, "ae_bake_progress", text=wm.ae_bake_status, slider=True)
         layout.template_reports_banner()
 
         layout.separator(factor=1)

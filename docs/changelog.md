@@ -143,10 +143,13 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   por objeto (`Object.ae_lightmap_scale`); margem entre ilhas em texels + dilatação antes/depois do denoise
   (sem emendas escuras nas bordas das ilhas).
 - Painel: Render > Baked Lighting (`RENDER_PT_game_baked_lighting`), em caixas "Lightmap:" e
-  "Light Volume:" no padrão das outras abas; saiu do World.
+  "Light Volume:" no padrão das outras abas; saiu do World. "Use in Game" dentro de cada caixa (não no
+  título). Barra de progresso no cabeçalho do Info durante o bake (`WindowManager.ae_bake_progress`,
+  redesenho forçado a cada passo). Samples padrão: 80.
 - Light volume: grade de sondas (ambient cube, 6 faces) assada com cubos minúsculos no mesmo bake; objetos
   móveis ficam escondidos no bake e são iluminados pelo volume (`lightvol_sample`, onde `lm.a < 0.5`).
-  Liga/desliga separado (`ae_lightvol_use`); padrão desligado em Web/Android.
+  Liga/desliga separado (`ae_lightvol_use`). Web/Android: só a lightmap (volume compilado fora com
+  `__EMSCRIPTEN__`/`__ANDROID__` em `node_shader_gpu_lightmap`).
 - Shader: `node_shader_gpu_lightmap()` em `node_shader_util.c`, chamado pelo Principled. Crash corrigido:
   link builtin (normal) é liberado pelo nó que o consome; o volume recebe um link próprio.
 - Teste: `tools/create_gi_test.py` → `projects-teste/gi/` (sala, cornell, refs Cycles).
@@ -156,6 +159,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   horizontes por fatia, normal pela menor diferença de profundidade, falloff no raio e multi-bounce.
   GLSL ES (Web/Android) mantém o SSAO espiral antigo. Mesmos parâmetros (samples → fatias × passos,
   strength = expoente, distance = raio). Sala 1280×720: ~0,28 ms por quadro.
+- Custo (sala `projects-teste/gi/`, 1280×720, ms/quadro): RX 6800M sem GI 0,44, lightmap 0,47, +volume
+  0,47, +GTAO 0,77; iGPU (Radeon integrada) 3,02, 3,15, 2,89, 5,10. Lightmap e volume ~0; GTAO custa
+  ~2 ms na iGPU.
+- Objeto móvel: esfera varrida de x=-2,4 a 3,4 (25 posições) com volume ligado: brilho sobe contínuo
+  em direção à janela (20→73 em 0-255), sem saltos, no tom das paredes; sem volume fica clara e manchada.
 - Pendente: testar Linux e Web. `ae_denoise.dll` e `tbb.dll`
   já vão para `build/bin/` pelo `install` do CMake, logo entram no ZIP do release. Manchas na
   lightmap eram ruído de 8 amostras (64 limpa); faixa clara na base da parede era o shadow bias 1.0 do sol
