@@ -1875,6 +1875,8 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
         col.prop(lamp, "show_shadow_box", text="Show Shadow Sphere" if is_point else "Show Shadow Box")
         if not is_point:
             col.prop(lamp, "static_shadow")
+        if lamp.type in {'SPOT', 'POINT'}:
+            col.prop(lamp, "use_auto_shadow_update", text="Auto Update")
 
         col = split.column()
         col.prop(lamp, "use_shadow_layer", text="This Layer Only")

@@ -9,6 +9,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Sombra: atualização automática para Spot/Point (2026-10-07)
+
+- Nova opção por lâmpada **Auto Update** (Spot/Point, painel de sombra; `LA_AUTO_SHADOW`, RNA
+  `use_auto_shadow_update`, Python `light.autoShadowUpdate`), desligada por padrão. Com ela, a sombra só é
+  redesenhada quando a lâmpada (transform, distância, cone, clip, bias, layer) ou algum objeto dentro da distância
+  dela mudou, entrou ou saiu; objetos com deformador (armature/shape keys) contam sempre como movidos.
+  Comparação no snapshot de bounds das passadas de sombra (`KX_Scene::GetShadowCullSnapshot`) em
+  `KX_ShadowRenderer.cpp` (`AutoShadowStillValid`); `updateShadow()` e mudança na lista de casters forçam
+  o redesenho. Limitação: movimento só por shader de vértice (vento/grama) não é detectado; deixe Auto desligado
+  nessas lâmpadas. Etapa 1 do plano de otimização de luzes (etapas 2-3 sem GLSL; 4-5 dependem dos shaders).
+- Teste `tools/create_auto_shadow_test.py` (`projects-teste/auto_shadow/`): 8 Points com sombra, 441 cubos,
+  um cubo girando perto de 2 lâmpadas. Auto desligado: 48 passadas/8 lâmpadas por frame; ligado: 12/2.
+  FPS travado em 60 nos dois (RX 6800M), então o ganho de tempo ainda não foi medido; falta a checagem visual
+  do usuário (sombra acompanhando o cubo, sem sombra congelada).
+
 ## Chuva: poças d'água (2026-10-07)
 
 - Weather > Rain > Puddles (`WO_WEATHER_RAIN_PUDDLES`, bit 11). Campos novos no DNA: `rain_puddle_amount`,

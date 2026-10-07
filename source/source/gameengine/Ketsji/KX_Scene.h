@@ -581,6 +581,9 @@ public:
 	 * in between (shadow rendering runs no logic). */
 	void BeginShadowCulling();
 	void EndShadowCulling();
+	/** The bounds snapshot of the current shadow culling scope (built on first use). Lets the
+	 * shadow renderer see which objects moved near a light without walking the objects again. */
+	const std::vector<ShadowCullEntry>& GetShadowCullSnapshot();
 
 	RAS_DebugDraw& GetDebugDraw();
 	/// \section Debug draw.

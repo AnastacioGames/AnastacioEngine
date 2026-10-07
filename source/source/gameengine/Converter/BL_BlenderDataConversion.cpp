@@ -1362,6 +1362,7 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 	lightobj->m_spotblend = la->spotblend;
 	lightobj->m_spotsize = la->spotsize;
 	lightobj->m_staticShadow = la->mode & LA_STATIC_SHADOW;
+	lightobj->m_autoShadow = (la->mode & LA_AUTO_SHADOW) != 0;
 	lightobj->m_useCullDistance = (la->mode & LA_CULL_DISTANCE) != 0;
 	lightobj->m_cullDistance = la->cull_distance;
 	lightobj->m_glowScale = la->glow_scale;

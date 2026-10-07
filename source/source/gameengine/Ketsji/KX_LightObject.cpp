@@ -96,6 +96,7 @@ EXP_Value *KX_LightObject::GetReplica()
 	replica->ProcessReplica();
 
 	replica->m_lightobj = m_lightobj->Clone();
+	replica->m_lightobj->m_autoShadowValid = false;
 	replica->m_lightobj->m_light = replica;
 	m_rasterizer->AddLight(replica->m_lightobj);
 	if (m_base) {
@@ -250,6 +251,7 @@ PyAttributeDef KX_LightObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("HEMI", KX_LightObject, pyattr_get_typeconst),
 	EXP_PYATTRIBUTE_RW_FUNCTION("type", KX_LightObject, pyattr_get_type, pyattr_set_type),
 	EXP_PYATTRIBUTE_RW_FUNCTION("staticShadow", KX_LightObject, pyattr_get_static_shadow, pyattr_set_static_shadow),
+	EXP_PYATTRIBUTE_RW_FUNCTION("autoShadowUpdate", KX_LightObject, pyattr_get_auto_shadow, pyattr_set_auto_shadow),
 	EXP_PYATTRIBUTE_NULL // Sentinel
 };
 
@@ -582,6 +584,25 @@ int KX_LightObject::pyattr_set_static_shadow(EXP_PyObjectPlus *self_v, const EXP
 	}
 
 	self->m_lightobj->m_staticShadow = param;
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_LightObject::pyattr_get_auto_shadow(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_LightObject *self = static_cast<KX_LightObject *>(self_v);
+	return PyBool_FromLong(self->m_lightobj->m_autoShadow);
+}
+
+int KX_LightObject::pyattr_set_auto_shadow(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_LightObject *self = static_cast<KX_LightObject *>(self_v);
+	int param = PyObject_IsTrue(value);
+	if (param == -1) {
+		PyErr_SetString(PyExc_AttributeError, "light.autoShadowUpdate = val: KX_LightObject, expected True or False");
+		return PY_SET_ATTR_FAIL;
+	}
+
+	self->m_lightobj->m_autoShadow = param;
 	return PY_SET_ATTR_SUCCESS;
 }
 #endif // WITH_PYTHON

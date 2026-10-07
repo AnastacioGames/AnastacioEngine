@@ -625,6 +625,12 @@ static void rna_def_lamp_shadow(StructRNA *srna, int spot, int area)
 	RNA_def_property_ui_text(prop, "Static Shadow",
 	                         "Enable static shadows");
 
+	prop = RNA_def_property(srna, "use_auto_shadow_update", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_AUTO_SHADOW);
+	RNA_def_property_ui_text(prop, "Auto Shadow Update",
+	                         "Spot/Point: redraw the shadow only when the lamp or an object within its "
+	                         "distance moved (objects moved only by vertex shader code are not detected)");
+
 	prop = RNA_def_property(srna, "shadow_filter_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "filtertype");
 	RNA_def_property_enum_items(prop, prop_shadbuffiltertype_items);

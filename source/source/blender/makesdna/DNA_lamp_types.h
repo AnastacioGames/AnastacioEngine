@@ -165,6 +165,7 @@ typedef struct Lamp {
 #define LA_SHOW_SHADOW_BOX (1 << 18)
 #define LA_STATIC_SHADOW (1 << 19)
 #define LA_CULL_DISTANCE (1 << 20)	/* BGE/Range only: enable distance-based light culling */
+#define LA_AUTO_SHADOW (1 << 21)	/* BGE only: Spot/Point redraw their shadow only when something in range moved */
 
 /* shadow_filter */
 #define LA_SHADOW_FILTER_NONE			0

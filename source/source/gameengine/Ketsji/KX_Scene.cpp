@@ -1764,6 +1764,14 @@ void KX_Scene::BuildShadowCullCache()
 	m_shadowCullCacheValid = true;
 }
 
+const std::vector<KX_Scene::ShadowCullEntry>& KX_Scene::GetShadowCullSnapshot()
+{
+	if (m_shadowCullScope && !m_shadowCullCacheValid) {
+		BuildShadowCullCache();
+	}
+	return m_shadowCullCache;
+}
+
 void KX_Scene::EndShadowCulling()
 {
 	m_shadowCullScope = false;
