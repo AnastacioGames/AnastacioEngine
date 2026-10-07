@@ -2355,6 +2355,10 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			for (Group *group : tempglist) {
 				for (GroupObject *go = (GroupObject *)group->gobject.first; go; go = (GroupObject *)go->next) {
 					Object *blenderobject = go->ob;
+					/* Members unchecked for conversion stay out; DupliGroupRecurse skips unconverted objects. */
+					if (!(blenderobject->gameflag & OB_TASK_CONVERT)) {
+						continue;
+					}
 					if (!converter.FindGameObject(blenderobject)) {
 						allblobj.insert(blenderobject);
 						groupobj.insert(blenderobject);

@@ -1,5 +1,11 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Membros de dupli group respeitam o Convert
+
+- `BL_ConvertBlenderObjects`: objetos de grupo com `convert_object` desligado não são mais
+  convertidos ao instanciar o grupo (antes o flag só valia para objetos da cena). `DupliGroupRecurse`
+  já ignora membros não convertidos. Teste: `tests/convert_flag/make_group_test.py`.
+
 ## 2026-10-07 — Conversão de malhas ~33% mais rápida, `getLoadLog` e armature sem pose
 
 - `BL_ConvertDerivedMeshToArray`: a lista de vértices compartilhados (um `std::vector` por vértice
