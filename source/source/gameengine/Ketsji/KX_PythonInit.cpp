@@ -172,6 +172,7 @@ extern "C" {
 
 /* for converting new scenes */
 #include "BL_Converter.h"
+#include "BL_LoadStats.h"
 #include "KX_LibLoadStatus.h"
 #include "KX_Mesh.h" /* for creating a new library of mesh objects */
 extern "C" {
@@ -1064,6 +1065,31 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 	return PyLong_FromLong(changed);
 }
 
+PyDoc_STRVAR(gPyGetLoadLog_doc,
+"getLoadLog(clear=False)\n"
+"Returns the recent scene load reports as a list of dicts (scene, stage, ms, detail, total).");
+static PyObject *gPyGetLoadLog(PyObject *, PyObject *args, PyObject *kwds)
+{
+	int clear = 0;
+	static const char *kwlist[] = {"clear", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|p:getLoadLog", const_cast<char **>(kwlist), &clear)) {
+		return nullptr;
+	}
+	const std::vector<BL_LoadLog::Entry> entries = BL_LoadLog::GetEntries();
+	if (clear) {
+		BL_LoadLog::Clear();
+	}
+	PyObject *list = PyList_New(entries.size());
+	for (unsigned int i = 0; i < entries.size(); ++i) {
+		const BL_LoadLog::Entry& entry = entries[i];
+		PyList_SET_ITEM(list, i, Py_BuildValue("{s:s,s:s,s:d,s:s,s:O}",
+		                                       "scene", entry.scene.c_str(), "stage", entry.stage.c_str(),
+		                                       "ms", entry.seconds * 1000.0, "detail", entry.detail.c_str(),
+		                                       "total", entry.total ? Py_True : Py_False));
+	}
+	return list;
+}
+
 PyDoc_STRVAR(gPyGetObjectConvert_doc,
 "getObjectConvert(scene, object)\n"
 "Returns the object's Convert flag in the given scene.");
@@ -1258,6 +1284,7 @@ static struct PyMethodDef game_methods[] = {
 	/* library functions */
 	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS | METH_KEYWORDS, (const char *)""},
 	{"setObjectConvert", (PyCFunction)gPySetObjectConvert, METH_VARARGS | METH_KEYWORDS, gPySetObjectConvert_doc},
+	{"getLoadLog", (PyCFunction)gPyGetLoadLog, METH_VARARGS | METH_KEYWORDS, gPyGetLoadLog_doc},
 	{"getObjectConvert", (PyCFunction)gPyGetObjectConvert, METH_VARARGS, gPyGetObjectConvert_doc},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
 	{"LibFree", (PyCFunction)gLibFree, METH_VARARGS, (const char *)""},

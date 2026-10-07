@@ -1,5 +1,22 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Conversão de malhas ~33% mais rápida, `getLoadLog` e armature sem pose
+
+- `BL_ConvertDerivedMeshToArray`: a lista de vértices compartilhados (um `std::vector` por vértice
+  da malha, uma alocação cada) virou cadeias num pool único (`BL_SharedVertexMap`), mesma ordem de
+  busca; `RAS_DisplayArray::Reserve` pré-aloca vértices/índices por material. Vale para qualquer
+  cena e para malhas de modifiers em runtime (`BL_ModifierDeformer`). Teste de 8 pilotos (~327k
+  tris cada): etapa de malhas 595 → ~399 ms, load da Pista_1 ~976 → ~793 ms. Verificação
+  temporária comparando busca nova x antiga: 0 diferenças em 2,46 M vértices (com e sem UV).
+- `[Load] convert` detalha objetos, logic, mesh users, culling, bounds e malha (dm, normals, end).
+  Nova `bge.logic.getLoadLog(clear=False)`: lista de dicts (scene, stage, ms, detail, total).
+- `BL_ArmatureObject`: armature nunca avaliada (sem `pose`, ex. criada por script numa cena
+  inativa) travava o player; a pose é construída com `BKE_pose_rebuild` antes da cópia.
+- Medições (`tests/convert_flag/make_test.py`, opções `mat` e `arm`): material de nó com textura +
+  Normal Map soma ~135 ms de tangentes (calculadas uma vez e copiadas para malhas iguais), shader
+  1 compilado e 7 reutilizados; 20 armatures de 60 ossos com Action em layer inativo: ≤5 ms.
+  Ainda dominam malha (~400 ms) e física triangle mesh (~345 ms). Build `RangeEngine RangeRuntime`.
+
 ## 2026-10-07 — `bge.logic.setObjectConvert`: escolher objetos convertidos antes do load
 
 - Novas funções `bge.logic.setObjectConvert(scene, object, convert, children=True)` e

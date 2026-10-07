@@ -384,7 +384,10 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	       << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
-	       << load_ms(loadStats.physics) << "ms";
+	       << load_ms(loadStats.physics) << "ms (mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "
+	       << load_ms(loadStats.normals) << "ms, end " << load_ms(loadStats.meshEnd) << "ms), objects " << load_ms(loadStats.objects) << "ms, logic "
+	       << load_ms(loadStats.logic) << "ms, mesh users " << load_ms(loadStats.meshUsers) << "ms, culling "
+	       << load_ms(loadStats.culling) << "ms, bounds " << load_ms(loadStats.bounds) << "ms";
 	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(convertTime) << "ms, " << detail.str());
 	BL_LoadLog::Add(scene->GetName(), "convert", convertTime, detail.str());
 }

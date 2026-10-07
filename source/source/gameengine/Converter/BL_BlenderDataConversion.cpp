@@ -214,10 +214,37 @@ extern Material defmaterial;
 struct BL_SharedVertex {
 	RAS_DisplayArray *array;
 	unsigned int offset;
+	int next; // Next display vertex made from the same mesh vertex, -1 ends the chain.
 };
 
-using BL_SharedVertexList = std::vector<BL_SharedVertex>;
-using BL_SharedVertexMap = std::vector<BL_SharedVertexList>;
+/* Display vertices made from each mesh vertex, as chains in one pool: a vector per mesh
+ * vertex meant one heap allocation per vertex, the bulk of the conversion time on dense meshes. */
+struct BL_SharedVertexMap {
+	// First and last entry of each chain; appending at the tail keeps the oldest-first search order.
+	std::vector<int> heads;
+	std::vector<int> tails;
+	std::vector<BL_SharedVertex> pool;
+
+	BL_SharedVertexMap(unsigned int totverts, unsigned int totloops)
+		:heads(totverts, -1),
+		tails(totverts, -1)
+	{
+		pool.reserve((std::min)(totverts + totverts / 2, totloops));
+	}
+
+	void Add(unsigned int vertid, RAS_DisplayArray *array, unsigned int offset)
+	{
+		const int index = (int)pool.size();
+		pool.push_back({array, offset, -1});
+		if (tails[vertid] == -1) {
+			heads[vertid] = index;
+		}
+		else {
+			pool[tails[vertid]].next = index;
+		}
+		tails[vertid] = index;
+	}
+};
 
 class BL_SharedVertexPredicate
 {
@@ -597,7 +624,11 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 	if (debugNav) {
 	}
 	// Get DerivedMesh data.
-	DerivedMesh *dm = CDDM_from_mesh(me);
+	DerivedMesh *dm;
+	{
+		BL_LoadTimer dmTimer(loadStats.meshDm);
+		dm = CDDM_from_mesh(me);
+	}
 	if (debugNav) {
 	}
 
@@ -668,7 +699,10 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo, bitmapText ? &bitmapTextFaces : nullptr);
 	meshobj->SetBitmapTextFaces(bitmapTextFaces);
 
-	meshobj->EndConversion(scene->GetBoundingBoxManager());
+	{
+		BL_LoadTimer endTimer(loadStats.meshEnd);
+		meshobj->EndConversion(scene->GetBoundingBoxManager());
+	}
 
 	dm->release(dm);
 
@@ -870,6 +904,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	}
 
 	if (CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1) {
+		BL_LoadTimer normalsTimer(loadStats.normals);
 		dm->calcLoopNormals(dm, (me->flag & ME_AUTOSMOOTH), me->smoothresh);
 	}
 	const float(*normals)[3] = (float(*)[3])dm->getLoopDataArray(dm, CD_NORMAL);
@@ -912,7 +947,28 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		colorLayers[index] = (MLoopCol *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPCOL, index);
 	}
 
-	BL_SharedVertexMap sharedMap(totverts);
+	BL_SharedVertexMap sharedMap(totverts, totloop);
+
+	/* Preallocate each material's arrays: index counts are exact, vertex counts are estimated
+	 * by the material's loops capped at the mesh vertices (smooth meshes share most loops). */
+	if (!mtpolys) {
+		std::vector<unsigned int> matLoops(mats.size(), 0);
+		std::vector<unsigned int> matTris(mats.size(), 0);
+		for (unsigned int i = 0; i < numpolys; ++i) {
+			const unsigned int m = min_ii(mpolys[i].mat_nr, (int)mats.size() - 1);
+			matLoops[m] += mpolys[i].totloop;
+			matTris[m] += ME_POLY_TRI_TOT(&mpolys[i]);
+		}
+		for (unsigned int m = 0; m < mats.size(); ++m) {
+			const BL_MeshMaterial& mat = mats[m];
+			if (matLoops[m] == 0 || mat.wire || !mat.array) {
+				continue;
+			}
+			const unsigned int indices = matTris[m] * 3;
+			const unsigned int vertices = mat.barycentric ? indices : (std::min)(matLoops[m], (unsigned int)totverts);
+			mat.array->Reserve(vertices, mat.visible ? indices : 0, indices);
+		}
+	}
 
 	// Tracked vertices during a mpoly conversion, should never be used by the next mpoly.
 	std::vector<unsigned int> vertices(totverts, -1);
@@ -1025,13 +1081,15 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 
 			BL_GetUvRgba(layersInfo, uvLayers, colorLayers, j, uvs, rgba);
 
-			BL_SharedVertexList& sharedList = sharedMap[vertid];
-			BL_SharedVertexList::iterator it = std::find_if(sharedList.begin(), sharedList.end(),
-					BL_SharedVertexPredicate(array, nor, tan, uvs, rgba));
+			const BL_SharedVertexPredicate predicate(array, nor, tan, uvs, rgba);
+			int shared = sharedMap.heads[vertid];
+			while (shared != -1 && !predicate(sharedMap.pool[shared])) {
+				shared = sharedMap.pool[shared].next;
+			}
 
 			unsigned int offset;
-			if (it != sharedList.end()) {
-				offset = it->offset;
+			if (shared != -1) {
+				offset = sharedMap.pool[shared].offset;
 			}
 			else {
 				mt::vec4_packed boneIndices(mt::zero4);
@@ -1040,7 +1098,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 					BL_ComputeVertexBoneData(me->dvert[vertid], defbaseTot, boneIndices, boneWeights);
 				}
 				offset = array->AddVertex(pos, nor, tan, uvs, rgba, vertid, flat, boneIndices, boneWeights);
-				sharedList.push_back({array, offset});
+				sharedMap.Add(vertid, array, offset);
 			}
 
 			// Add tracked vertices by the mpoly.
@@ -2117,6 +2175,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 
 
 #define BL_CONVERTBLENDEROBJECT_SINGLE                                 \
+	BL_LoadTimer logicTimer(BL_LoadStats::Get().logic);                \
 	bl_ConvertBlenderObject_Single(converter,                          \
 	                               blenderobject,                      \
 	                               vec_parent_child,                   \
@@ -2257,9 +2316,11 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		Object *blenderobject = base->object;
 		allblobj.insert(blenderobject);
 
-		KX_GameObject *gameobj = (blenderobject->gameflag & OB_TASK_CONVERT) ?
-						BL_GameObjectFromBlenderObject(base->object, kxscene, rendertools, canvas, converter, camZoom)
-						:nullptr;
+		KX_GameObject *gameobj = nullptr;
+		if (blenderobject->gameflag & OB_TASK_CONVERT) {
+			BL_LoadTimer objectsTimer(BL_LoadStats::Get().objects);
+			gameobj = BL_GameObjectFromBlenderObject(base->object, kxscene, rendertools, canvas, converter, camZoom);
+		}
 
 		if (gameobj) {
 			bool isInActiveLayer = (blenderobject->lay & activeLayerBitInfo) != 0;
@@ -2439,6 +2500,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		}
 	}
 
+	const double meshUsersStart = PIL_check_seconds_timer();
 	for (KX_GameObject *gameobj : objectlist) {
 		// Init mesh users, mesh slots and deformers.
 		gameobj->AddMeshUser();
@@ -2449,7 +2511,10 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		}
 	}
 
+	BL_LoadStats::Get().meshUsers += PIL_check_seconds_timer() - meshUsersStart;
+
 	// Create graphic controller for culling.
+	const double cullingStart = PIL_check_seconds_timer();
 	if (kxscene->GetDbvtCulling()) {
 		bool occlusion = false;
 		for (KX_GameObject *gameobj : sumolist) {
@@ -2468,6 +2533,8 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			kxscene->SetDbvtOcclusionRes(blenderscene->gm.occlusionRes);
 		}
 	}
+
+	BL_LoadStats::Get().culling += PIL_check_seconds_timer() - cullingStart;
 
 	if (blenderscene->world) {
 		kxscene->GetPhysicsEnvironment()->SetNumTimeSubSteps(blenderscene->gm.physubstep);
@@ -2554,6 +2621,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	BL_LoadStats::Get().physics += PIL_check_seconds_timer() - physicsStart;
 
 	// Create and set bounding volume.
+	const double boundsStart = PIL_check_seconds_timer();
 	for (KX_GameObject *gameobj : sumolist) {
 		Object *blenderobject = gameobj->GetBlenderObject();
 		Mesh *predifinedBoundMesh = blenderobject->gamePredefinedBound;
@@ -2583,6 +2651,8 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			gameobj->UpdateBounds(true);
 		}
 	}
+
+	BL_LoadStats::Get().bounds += PIL_check_seconds_timer() - boundsStart;
 
 	// Create physics joints.
 	for (KX_GameObject *gameobj : sumolist) {

@@ -104,6 +104,27 @@ unsigned int RAS_DisplayArray::AddVertex(const mt::vec3_packed& pos, const mt::v
 	return m_vertexInfos.size() - 1;
 }
 
+void RAS_DisplayArray::Reserve(unsigned int vertices, unsigned int primitiveIndices, unsigned int triangleIndices)
+{
+	vertices += m_vertexInfos.size();
+	m_vertexData.positions.reserve(vertices);
+	m_vertexData.normals.reserve(vertices);
+	m_vertexData.tangents.reserve(vertices);
+	for (unsigned short i = 0; i < m_format.uvSize; ++i) {
+		m_vertexData.uvs[i].reserve(vertices);
+	}
+	for (unsigned short i = 0; i < m_format.colorSize; ++i) {
+		m_vertexData.colors[i].reserve(vertices);
+	}
+	if (m_format.hasBoneData) {
+		m_vertexData.boneIndices.reserve(vertices);
+		m_vertexData.boneWeights.reserve(vertices);
+	}
+	m_vertexInfos.reserve(vertices);
+	m_primitiveIndices.reserve(m_primitiveIndices.size() + primitiveIndices);
+	m_triangleIndices.reserve(m_triangleIndices.size() + triangleIndices);
+}
+
 template <class List>
 void removeRange(List& list, unsigned int start, unsigned int end)
 {

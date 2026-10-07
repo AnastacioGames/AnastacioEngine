@@ -281,6 +281,8 @@ public:
 	unsigned int AddVertex(const mt::vec3_packed& pos, const mt::vec3_packed& nor, const mt::vec4_packed& tan,
 			mt::vec2_packed uvs[RAS_Texture::MaxUnits], unsigned int colors[RAS_Texture::MaxUnits], unsigned int origIndex, uint8_t flag,
 			const mt::vec4_packed& boneIndices, const mt::vec4_packed& boneWeights);
+	/// Preallocates storage before a conversion fills the array (avoids repeated reallocations).
+	void Reserve(unsigned int vertices, unsigned int primitiveIndices, unsigned int triangleIndices);
 
 	inline void AddPrimitiveIndex(const unsigned int index)
 	{
