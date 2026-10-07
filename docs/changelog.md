@@ -9,6 +9,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Nó Parallax corrigido + receitas de blocos parallax e interior mapping (2026-10-06)
+
+- Nó `Parallax` (Game): com Shading Nodes a entrada/saída agora é UV 0..1 (antes exigia -1..1 do caminho
+  legado e dava resultado errado ligado direto no Texture Coordinate); o caminho legado segue em -1..1. UV
+  desligado usa o mapa UV ativo (antes era (0,0)); Steps mínimo 1 (evita divisão por zero); inclinação da
+  vista limitada (ângulos rasantes não espalham mais o mapa); amostras com `textureGrad` (mipmap, sem
+  cintilação de longe); rótulo "Parallax (Red)" em vez de só "Red". Materiais antigos com Shading Nodes que
+  compensavam a conversão com Mapping precisam tirar essa compensação.
+- `tools/create_parallax_interior_test.py`: material "Blocos Parallax" (height map de blocos + Parallax +
+  Bump) e grupo de nós "Interior Mapping" (cômodos falsos atrás das janelas: raio × grade de caixas em espaço
+  de objeto, parede/piso/teto, cômodos acesos/apagados por hash). Cena em `projects-teste/parallax/`.
+  Raio e posição em unidades de cômodo (cômodos não cúbicos sem distorção), epsilon com sinal contra
+  divisão por zero, entrada Offset para alinhar a grade quando a fachada não é múltipla do Room Size.
+
 ## Luz indireta baked: lightmap Cycles + OIDN + light volume (2026-10-06)
 
 - Operador `anastacio_lightmap.py` (Bake GI): UV "Lightmap" por objeto estático empacotada num atlas, bake

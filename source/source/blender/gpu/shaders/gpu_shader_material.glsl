@@ -6586,8 +6586,16 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	// The component to extract the height information from
 	int ci = int(comp);
 
-	// The uv shift per depth step.
-	vec2 delta = (vec3(-vv.x, gl_FrontFacing ? vv.y : -vv.y, 0.0) * bumpscale / vv.z).xy;
+	// The uv shift per depth step. Clamp the view slope so grazing angles do not smear the map
+	// across the whole surface (1/vv.z grows without bound near the horizon).
+	float vz = (vv.z < 0.0) ? min(vv.z, -0.15) : max(vv.z, 0.15);
+	vec2 delta = (vec3(-vv.x, gl_FrontFacing ? vv.y : -vv.y, 0.0) * bumpscale / vz).xy;
+	numsteps = clamp(numsteps, 1.0, 256.0);
+
+	// Mip level from the unshifted uv: the shifted one jumps between steps and would pick level 0
+	// (aliasing/shimmer at distance); the shift is small so the footprint is the same.
+	vec2 duvdx = dFdx(texco.xy);
+	vec2 duvdy = dFdy(texco.xy);
 
 	float height = 0.0;
 
@@ -6601,7 +6609,7 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 
 	// Linear sample from top.
 	for (int i = 0; float(i) < numsteps; ++i) {
-		height = textureLod(ima, texco.xy - delta * (1.0 - depth), 0.0)[ci];
+		height = textureGrad(ima, texco.xy - delta * (1.0 - depth), duvdx, duvdy)[ci];
 		// Stop if the texture height is greater than current depth.
 		if (height > depth) {
 			break;
@@ -6624,7 +6632,7 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	// The shift between the texture height and the last depth.
 	float depthshiftcurlay = height - depth;
 	// The shift between the texture height with precedent uv computed with pre detph and the pre depth.
-	float depthshiftprelay = textureLod(ima, texuvprelay, 0.0)[ci] - depthprelay;
+	float depthshiftprelay = textureGrad(ima, texuvprelay, duvdx, duvdy)[ci] - depthprelay;
 
 	float weight = 1.0;
 	// If the height is right in the middle of two step the difference of the two shifts will be null.
@@ -6647,6 +6655,11 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	}
 
 	ptexcoord = vec3(finaltexuv, texco.z);
+}
+
+void parallax_uv_in(vec3 uv, out vec3 outuv)
+{
+	outuv = uv;
 }
 
 void parallax_uv_attribute(vec3 uv, out vec3 outuv)

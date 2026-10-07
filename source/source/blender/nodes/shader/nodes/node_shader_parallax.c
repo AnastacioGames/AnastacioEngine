@@ -30,7 +30,7 @@
 /* **************** OBJECT INFO  ******************** */
 static bNodeSocketTemplate sh_node_mapping_in[] = {
 	{	SOCK_VECTOR, 1, N_("UV")},
-	{   SOCK_FLOAT, 1, N_("Steps"), 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1000.0f, PROP_NONE, 0 },
+	{   SOCK_FLOAT, 1, N_("Steps"), 10.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1000.0f, PROP_NONE, 0 },
 	{   SOCK_FLOAT, 1, N_("Bump Scale"), 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 1000.0f, PROP_NONE, 0 },
 	{	-1, 0, ""	}
 };
@@ -51,21 +51,42 @@ static int gpu_shader_parallax(GPUMaterial *mat, bNode *node, bNodeExecData *UNU
 		GPUNodeLink *outuv;
 		float one[3] = { 1.0f, 1.0f, 1.0f };
 
-		for (unsigned short i = 0; i < 3; ++i) {
+		/* Shading Nodes hand out UVs in 0..1 (Texture Coordinate, UV Map); the legacy node path uses
+		 * -1..1 (Geometry node). Keep each path in its own convention so no Mapping is needed. */
+		const bool new_shading = GPU_material_use_new_shading_nodes(mat);
+
+		if (!in[0].link) {
+			/* unlinked: the active UV map instead of (0, 0) */
+			in[0].link = GPU_attribute(CD_MTFACE, "");
+			if (!new_shading) {
+				GPU_link(mat, "uv_attribute", in[0].link, &in[0].link);
+			}
+		}
+		for (unsigned short i = 1; i < 3; ++i) {
 			if (!in[i].link) {
 				in[i].link = GPU_uniform(in[i].vec);
 			}
 		}
 
 		GPU_link(mat, "texco_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &norm);
-		GPU_link(mat, "mtex_2d_mapping", in[0].link, &texco);
+		if (new_shading) {
+			GPU_link(mat, "parallax_uv_in", in[0].link, &texco);
+		}
+		else {
+			GPU_link(mat, "mtex_2d_mapping", in[0].link, &texco);
+		}
 
 		float comp = (float) node->custom1;
 		float discard = (float) node->custom2;
 		GPU_link(mat, "mtex_parallax", texco, GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_attribute(CD_TANGENT, ""), norm, texlink,
 			in[1].link, in[2].link, GPU_uniform(one), GPU_uniform(&discard), GPU_uniform(&comp), &outuv);
 
-		GPU_link(mat, "parallax_uv_attribute", outuv, &out[0].link);
+		if (new_shading) {
+			out[0].link = outuv;
+		}
+		else {
+			GPU_link(mat, "parallax_uv_attribute", outuv, &out[0].link);
+		}
 
 		return true;
 	}
