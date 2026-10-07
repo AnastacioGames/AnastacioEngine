@@ -1088,28 +1088,41 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
 		translation[1] = ups->anchored_initial_mouse[1];
 	}
 
-	/* make lines pretty */
-	glLineWidth(1.0f);
-	glEnable(GL_BLEND);
-	glEnable(GL_LINE_SMOOTH);
+	/* Blender 5 style: the sculpt ring is as readable as the other paint modes */
+	if (mode == PAINT_MODE_SCULPT) {
+		outline_alpha = 0.8f;
+	}
 
-	/* set brush color */
-	glColor4f(outline_col[0], outline_col[1], outline_col[2], outline_alpha);
+	/* make lines pretty: smooth, DPI-scaled, many segments */
+	const int ring_segments = 96;
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_LINE_SMOOTH);
 
 	/* draw brush outline */
 	glTranslate2fv(translation);
 
+	/* faint dark halo so the ring reads over light surfaces */
+	glLineWidth(3.0f * U.pixelsize);
+	glColor4f(0.0f, 0.0f, 0.0f, 0.25f * outline_alpha);
+	glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius, ring_segments);
+
+	/* set brush color */
+	glLineWidth(1.5f * U.pixelsize);
+	glColor4f(outline_col[0], outline_col[1], outline_col[2], outline_alpha);
+
 	/* draw an inner brush */
 	if (ups->stroke_active && BKE_brush_use_size_pressure(scene, brush)) {
 		/* inner at full alpha */
-		glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius * ups->size_pressure_value, 40);
+		glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius * ups->size_pressure_value, ring_segments);
 		/* outer at half alpha */
 		glColor4f(outline_col[0], outline_col[1], outline_col[2], outline_alpha * 0.5f);
 	}
-	glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius, 40);
+	glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius, ring_segments);
 	glTranslatef(-translation[0], -translation[1], 0);
 
 	/* restore GL state */
+	glLineWidth(1.0f);
 	glDisable(GL_BLEND);
 	glDisable(GL_LINE_SMOOTH);
 }

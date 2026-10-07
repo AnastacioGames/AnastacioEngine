@@ -58,6 +58,7 @@
 #include "WM_types.h"
 
 #include "DNA_object_types.h"
+#include "DNA_userdef_types.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -997,7 +998,7 @@ static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
 	}
 
 	UI_ThemeColor(TH_TRANSFORM);
-	glLineWidth(2.0);
+	glLineWidth(2.0f * U.pixelsize);
 	glBegin(GL_LINES);
 	glVertex3fv(v1);
 	glVertex3fv(v2);
@@ -1032,13 +1033,19 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 	glPushMatrix();
 	glMultMatrixf(kcd->ob->obmat);
 
+	/* smooth lines and round points, like the other edit overlays */
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	if (kcd->mode == MODE_DRAGGING) {
 		if (kcd->is_angle_snapping)
 			knifetool_draw_angle_snapping(kcd);
 
 		glColor3ubv(kcd->colors.line);
 
-		glLineWidth(2.0);
+		glLineWidth(2.0f * U.pixelsize);
 
 		glBegin(GL_LINES);
 		glVertex3fv(kcd->prev.cage);
@@ -1048,7 +1055,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 	if (kcd->prev.vert) {
 		glColor3ubv(kcd->colors.point);
-		glPointSize(11);
+		glPointSize(11.0f * U.pixelsize);
 
 		glBegin(GL_POINTS);
 		glVertex3fv(kcd->prev.cage);
@@ -1057,7 +1064,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 	if (kcd->prev.bmface) {
 		glColor3ubv(kcd->colors.curpoint);
-		glPointSize(9);
+		glPointSize(9.0f * U.pixelsize);
 
 		glBegin(GL_POINTS);
 		glVertex3fv(kcd->prev.cage);
@@ -1066,7 +1073,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 	if (kcd->curr.edge) {
 		glColor3ubv(kcd->colors.edge);
-		glLineWidth(2.0);
+		glLineWidth(2.0f * U.pixelsize);
 
 		glBegin(GL_LINES);
 		glVertex3fv(kcd->curr.edge->v1->cageco);
@@ -1075,7 +1082,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 	}
 	else if (kcd->curr.vert) {
 		glColor3ubv(kcd->colors.point);
-		glPointSize(11);
+		glPointSize(11.0f * U.pixelsize);
 
 		glBegin(GL_POINTS);
 		glVertex3fv(kcd->curr.cage);
@@ -1084,7 +1091,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 	if (kcd->curr.bmface) {
 		glColor3ubv(kcd->colors.curpoint);
-		glPointSize(9);
+		glPointSize(9.0f * U.pixelsize);
 
 		glBegin(GL_POINTS);
 		glVertex3fv(kcd->curr.cage);
@@ -1100,7 +1107,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 		/* draw any snapped verts first */
 		glColor4ubv(kcd->colors.point_a);
-		glPointSize(11);
+		glPointSize(11.0f * U.pixelsize);
 		glBegin(GL_POINTS);
 		lh = kcd->linehits;
 		for (i = 0; i < kcd->totlinehit; i++, lh++) {
@@ -1111,7 +1118,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 		/* now draw the rest */
 		glColor4ubv(kcd->colors.curpoint_a);
-		glPointSize(7);
+		glPointSize(7.0f * U.pixelsize);
 		glBegin(GL_POINTS);
 		lh = kcd->linehits;
 		for (i = 0; i < kcd->totlinehit; i++, lh++) {
@@ -1119,14 +1126,13 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 				glVertex3fv(lh->cagehit);
 		}
 		glEnd();
-		glDisable(GL_BLEND);
 	}
 
 	if (kcd->totkedge > 0) {
 		BLI_mempool_iter iter;
 		KnifeEdge *kfe;
 
-		glLineWidth(1.0);
+		glLineWidth(1.5f * U.pixelsize);
 		glBegin(GL_LINES);
 
 		BLI_mempool_iternew(kcd->kedges, &iter);
@@ -1147,7 +1153,7 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 		BLI_mempool_iter iter;
 		KnifeVert *kfv;
 
-		glPointSize(5.0);
+		glPointSize(6.0f * U.pixelsize);
 
 		glBegin(GL_POINTS);
 		BLI_mempool_iternew(kcd->kverts, &iter);
@@ -1162,6 +1168,12 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 
 		glEnd();
 	}
+
+	glDisable(GL_BLEND);
+	glDisable(GL_POINT_SMOOTH);
+	glDisable(GL_LINE_SMOOTH);
+	glLineWidth(1.0f);
+	glPointSize(1.0f);
 
 	glPopMatrix();
 

@@ -709,7 +709,12 @@ static void drawfloor(Scene *scene, RegionView3D *rv3d, View3D *v3d, const char 
 	/* draw the Z axis line */
 	/* check for the 'show Z axis' preference */
 	if (v3d->gridflag & axis_flags) {
-		glLineWidth(3.0f);
+		/* thin anti-aliased axis line, matching the shader-drawn X/Y axes */
+		const bool had_blend = glIsEnabled(GL_BLEND);
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glLineWidth(1.5f * U.pixelsize);
 		glBegin(GL_LINES);
 		int axis;
 		for (axis = 0; axis < 3; axis++) {
@@ -728,6 +733,8 @@ static void drawfloor(Scene *scene, RegionView3D *rv3d, View3D *v3d, const char 
 			}
 		}
 		glEnd();
+		if (!had_blend) glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
 	}
 
 	glLineWidth(1.0f);
@@ -745,36 +752,62 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		const float f10 = 0.5f * U.widget_unit;
 		const float f20 = U.widget_unit;
 
-		glLineWidth(1);
+		/* Blender 5 style: ring of solid red/white dashes over a faint dark halo,
+		 * and a crosshair with a gap in the middle, all anti-aliased. */
+		const int segments = 64;
+		const int dashes = 8;
+		const float cross[8][2] = {
+			{co[0] - f20, co[1]}, {co[0] - f5, co[1]}, {co[0] + f5, co[1]}, {co[0] + f20, co[1]},
+			{co[0], co[1] - f20}, {co[0], co[1] - f5}, {co[0], co[1] + f5}, {co[0], co[1] + f20},
+		};
+
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glShadeModel(GL_FLAT);
+
+		/* halo, so the cursor reads on light and dark backgrounds */
+		glLineWidth(3.0f * U.pixelsize);
+		glColor4ub(0, 0, 0, 70);
 		glBegin(GL_LINE_LOOP);
-
-		const int segments = 16;
-		for (int i = 0; i < segments; ++i) {
-			float angle = 2 * M_PI * ((float)i / (float)segments);
-			float x = co[0] + f10 * cosf(angle);
-			float y = co[1] + f10 * sinf(angle);
-
-			if (i % 2 == 0)
-				glColor3ub(255, 0, 0);
-			else
-				glColor3ub(255, 255, 255);
-
-			glVertex2f(x, y);
+		for (int i = 0; i < segments; i++) {
+			const float angle = 2.0f * (float)M_PI * ((float)i / (float)segments);
+			glVertex2f(co[0] + f10 * cosf(angle), co[1] + f10 * sinf(angle));
+		}
+		glEnd();
+		glBegin(GL_LINES);
+		for (int i = 0; i < 8; i++) {
+			glVertex2fv(cross[i]);
 		}
 		glEnd();
 
+		/* dashed ring: each dash is its own strip so colors don't bleed */
+		glLineWidth(1.5f * U.pixelsize);
+		for (int d = 0; d < dashes; d++) {
+			const int per_dash = segments / dashes;
+			if (d % 2 == 0)
+				glColor4ub(255, 40, 40, 255);
+			else
+				glColor4ub(255, 255, 255, 255);
+			glBegin(GL_LINE_STRIP);
+			for (int i = 0; i <= per_dash; i++) {
+				const float angle = 2.0f * (float)M_PI * ((float)(d * per_dash + i) / (float)segments);
+				glVertex2f(co[0] + f10 * cosf(angle), co[1] + f10 * sinf(angle));
+			}
+			glEnd();
+		}
+
+		glLineWidth(U.pixelsize);
 		UI_ThemeColor(TH_VIEW_OVERLAY);
 		glBegin(GL_LINES);
-		glVertex2f(co[0] - f20, co[1]);
-		glVertex2f(co[0] - f5, co[1]);
-		glVertex2f(co[0] + f5, co[1]);
-		glVertex2f(co[0] + f20, co[1]);
-		glVertex2f(co[0], co[1] - f20);
-		glVertex2f(co[0], co[1] - f5);
-		glVertex2f(co[0], co[1] + f5);
-		glVertex2f(co[0], co[1] + f20);
+		for (int i = 0; i < 8; i++) {
+			glVertex2fv(cross[i]);
+		}
 		glEnd();
 
+		glLineWidth(1.0f);
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
 		glShadeModel(GL_SMOOTH);
 	}
 }
@@ -1096,6 +1129,18 @@ static const char *view3d_get_name(View3D *v3d, RegionView3D *rv3d)
 	return name;
 }
 
+/* Blender 5 style: overlay text gets a soft dark shadow so it reads over any scene */
+static void view3d_overlay_text_shadow(bool enable)
+{
+	if (enable) {
+		BLF_enable_default(BLF_SHADOW);
+		BLF_shadow_default(3, (const float[4]){0.0f, 0.0f, 0.0f, 0.6f}, 1, -1);
+	}
+	else {
+		BLF_disable_default(BLF_SHADOW);
+	}
+}
+
 static void draw_viewport_name(ARegion *ar, View3D *v3d, rcti *rect)
 {
 	RegionView3D *rv3d = ar->regiondata;
@@ -1113,11 +1158,13 @@ static void draw_viewport_name(ARegion *ar, View3D *v3d, rcti *rect)
 	}
 
 	UI_ThemeColor(TH_TEXT_HI);
+	view3d_overlay_text_shadow(true);
 #ifdef WITH_INTERNATIONAL
 	BLF_draw_default(U.widget_unit + rect->xmin,  rect->ymax - U.widget_unit, 0.0f, name, sizeof(tmpstr));
 #else
 	BLF_draw_default_ascii(U.widget_unit + rect->xmin,  rect->ymax - U.widget_unit, 0.0f, name, sizeof(tmpstr));
 #endif
+	view3d_overlay_text_shadow(false);
 }
 
 /* draw info beside axes in bottom left-corner:
@@ -1230,7 +1277,9 @@ static void draw_selected_name(Scene *scene, Object *ob, const rcti *rect)
 	if (U.uiflag & USER_SHOW_ROTVIEWICON)
 		offset = (U.rvisize) + rect->xmin;
 
+	view3d_overlay_text_shadow(true);
 	BLF_draw_default(offset, 0.5f * U.widget_unit, 0.0f, info, sizeof(info));
+	view3d_overlay_text_shadow(false);
 }
 
 static void view3d_camera_border(

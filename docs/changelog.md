@@ -1,13 +1,19 @@
 # Changelog — AnastacioEngine
 
-Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas antigas preservam o contexto
-da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
-`docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
+## Viewport: overlays restantes no estilo Blender 5 (2026-10-07)
 
-**Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, como sempre). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
-
-Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
-Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
+Linhas com `GL_LINE_SMOOTH` + blend (desligado no picking, estado de blend do chamador restaurado),
+larguras e pontos escalados por `U.pixelsize`, pontos redondos (`GL_POINT_SMOOTH`).
+- `view3d_draw.c`: cursor 3D com anel de 8 traços vermelho/branco, halo escuro e cruz com vão; eixo Z do
+  grid fino e suave; nome da vista e info do canto com sombra (novo `BLF_shadow_default` em `blf.c`).
+- `drawobject.c`: origem do objeto quase opaca com borda escura; wire de curva/texto/superfície/metaball;
+  edição de curvas (alças, splines, pontos); lattice; normais e marcas seam/sharp/crease/bevel do Edit Mode;
+  bounds, colisão, rigid body e texture space; moldura do empty de imagem; particle edit.
+- Transform: linhas de restrição, círculo proporcional, snap e helplines suaves; snap ativo vira anel com
+  halo e ponto central. Knife suave e com pontos redondos. Motion paths suaves com pontos redondos.
+- Anel do pincel: 96 segmentos, 1,5 px, halo escuro; no Sculpt alpha 0,8.
+- Sem mudança: ruler e gestos de seleção (já seguiam o padrão), desenho de partículas fora do particle edit.
+- Build `RangeEngine` OK; validação visual pendente.
 
 ## Viewport: bones e cursor de pintura no estilo Blender 5 (2026-10-07)
 
@@ -27,6 +33,151 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   quando um vértice fica antes do near clip (`project_paint_flt_max_cull`, com `TODO`); não há correção para
   portar, e o teste de bucket da engine já é mais completo (aresta `v3-v1`).
 
+## Multiplayer: correções da revisão Steam, retorno à sala e adaptadores (2026-10-07)
+
+- ImGui Python: `push_style_var`/`pop_style_var` com constantes `STYLE_*` e
+  `load_default_font(size)`, fonte da engine com ícones ForkAwesome em outro tamanho. O atlas
+  fica travado durante o frame, então o tamanho é montado no `NextFrame` seguinte (retorna
+  `None` até lá). Menu `AnastacioNetworkComponent` redesenhado (16 px, tema, ícones); capturas
+  de configuração, sala e espera conferidas no player.
+- Testes de plataforma da rede (local, 2026-10-07): Linux (WSL Ubuntu, GCC 15) build isolado com
+  121/121 gtests, incluindo o plugin ABI via `.so`; wasm (emsdk local) 60/60 no filtro do CI, golden
+  incluídos (rodar no node Linux: com `NODERAWFS` no Windows o gtest aborta sem cwd, e o caminho
+  `D:/…` do golden precisa de um link `D:` → `/mnt/d` na pasta atual). Interoperabilidade:
+  `net_echo` cliente Linux→servidor Windows (ENet) e Windows/wasm→servidor Linux (ENet e
+  WebSocket), 3/3 ecos. Navegador: `RangeRuntime --server` no Windows + `net_web_watch` no Chrome
+  headless (`--enable-logging=stderr`, sem playwright): `NETWEB PASS spawns=1 snapshots=40`,
+  servidor `NETTEST server PASS`. Falta o RangeRuntime completo no Linux e o player web da engine.
+- ImGui Python: `push_item_width`/`pop_item_width`/`set_next_item_width`; campos, slider e chat
+  do menu de rede agora ocupam a largura do conteúdo. `load_font` não mexe mais no atlas no meio
+  do frame: valida o arquivo, enfileira e devolve o id definitivo (fila única com
+  `load_default_font`, montada em ordem no `NextFrame`); `push_font` com id ainda na fila usa a
+  fonte atual, mantendo push/pop balanceados.
+- Revisão final: sair da sala preserva convites não lidos; "Iniciar partida" some durante a
+  partida; o controlador guarda a cena da sessão ao hospedar (`lobby_scene`). No RolimaRacer,
+  o botão de resultado online faz o host chamar `return_to_lobby` (cliente aguarda) e `on_lobby`
+  limpa HUD/resultado e reabre `_network_menu`. Só checagem de sintaxe; falta teste no jogo real.
+- Complemento Windows lê `+connect_lobby` dos argumentos reais do processo, com tokens
+  completos, validação de ID e suporte a caminhos com espaços. Mantido fallback da API Steam.
+  Player externo aceita argumento de convite após o arquivo, sem tratá-lo como filename.
+- Cancelamento e timeout retiram CCallResults, zeram pending e permitem nova operação.
+  Handles tardios de create/join são recolhidos separadamente para deixar salas abandonadas;
+  acompanhamento limitado a 64 operações. Teste SDK passou cancelar e recriar sem espera.
+- Eventos de desconexão não são descartados; novas conexões são limitadas quando a fila
+  acumula. Snapshot/Input descartam mensagens antigas por número da lane. ReplicaClient
+  já descartava snapshots antigos por tick e InputQueue já descartava inputs consumidos.
+  Membro cuja lista local ainda não atualizou aguarda até 3 segundos, com limite de conexões.
+- `Range.network.return_to_lobby()`/`on_lobby` resetam partida/prontidão e notificam clientes.
+  Controlador reabre Steam; retorno com nome de cena espera seu carregamento no host.
+  Componente tem show/hide/return_to_lobby e reaparece ao voltar; show explícito funciona
+  durante a partida. Convite em sessão pede confirmação, chat usa nomes, LAN mostra IPv4
+  locais/porta, nome só é escrito ao editar e capacidade usa slider 2..64.
+- Agente solicitado pelo usuário corrigiu adaptadores RolimaRacer: início delegado uma vez
+  ao NetworkManager, responsável persistente pelo tick no SteamComponent e fallback no menu,
+  enable_steam=False evita init e seleção de pista/carro fica com host. Pacote instalado
+  foi adicionado ao ignore do jogo. Assets/veículos não alterados nem mudanças commitadas.
+- Builds MSVC do complemento/editor/player e CTests passaram. Teste determinístico do
+  complemento cobre argv, cancelamento/timeout, fila e sequenciamento; teste dos adaptadores
+  simula on_start atrasado e confirma início único, tick, convite e chat. Dois players ENet
+  passaram duas partidas, retorno/reset e reentrada; regressão spawner passou.
+- SDK socket pair passou canais/handshake/replicação; menu Steam passou retorno, busca
+  pública após propagação de metadados e segunda partida. Primeiro teste de busca consultou
+  antes da publicação; aguardada propagação e PASS. Cena mínima de adaptadores passou
+  pista → menu: corrigido o teste para resolver o componente vivo após a troca, em vez de
+  conservar proxy destruído. Exportado Steam passou convite argv entregue ao componente
+  e menu real; exportado LAN passou sem DLL Steam. Teste de lobby de baixo nível não pode
+  competir com o componente pela mesma fila; prova de convite exportado usa o controlador.
+- Exportador foi conferido contra distribution-0.1.md: RangeRuntime como player, Python
+  completo e blender.crt são requisitos do pacote testado, já registrados na entrada anterior.
+  Nenhum release publicado. Convites reais entre contas, relay externo, condição de ordem
+  dos membros e corrida/carros reais continuam pendentes; argv com ID fictício não os prova.
+
+## Multiplayer: transporte Steam, salas, componente e exportação nativa (2026-10-07)
+
+- ABI C v2 do complemento, adaptador ITransport em Network e seleção `transport='steam'`
+  em host/join. Control/Rpc confiáveis em lanes separadas; Snapshot/Input não confiáveis;
+  envelope versionado preserva payload/protocolo nativo. Unload bloqueado com transportes vivos.
+- Complemento SDK: P2P, poll groups, limites de payload/orçamento, identificação de peers,
+  consulta de rota e desativação de ICE direto para prova de relay; callbacks compartilhados.
+  Salas públicas/amigos, filtros jogo/build/protocolo, convites, cancelamento/tardios,
+  host saindo e acesso por membros quando há lobby. Sem migração automática de host.
+- Componente e estado reutilizáveis em `release/scripts/modules/anastacio_network/`, com menu
+  ImGui LAN/Steam, pronto/chat/iniciar/sair. Player adiciona scripts/modules; editor purga
+  helpers com Range temporário, inclusive quando importados por adaptadores de jogo.
+- RolimaRacer: net_menu virou adaptador da engine, configuração em network_settings;
+  SteamComponent compartilha init/callbacks e idioma/conquistas; NetworkManager coordena
+  sala/saída e pista. RPC de pista não chama change_scene no cliente (SceneChange é do host).
+  Assets `.range` e veículos originais preservados. Scripts anteriores do menu/Steam guardados
+  localmente em build-steam/game-script-backup antes da alteração.
+- Exportador legado: módulo reutilizável incluído mesmo sem Copy Scripts, seleção opcional de
+  pasta Steam, Python completo e blender.crt, player RangeRuntime e perf_counter. Instalador
+  explícito para outros exports nativos. AppID dev só entra com opção explícita; nada publicado.
+- MSVC: complemento, RangeEngine/RangeRuntime, CTest rede PASS. SDK socket pair passou quatro
+  canais nos limites 1200/65536, handshake, chat, transform/propriedade, spawn/despawn/ownership.
+  Primeiro probe de spawn não inseria objeto no IWorld do teste; corrigido o fixture e PASS.
+- Steam online numa conta: criar/listar sala pública com filtros, metadados, cancelamento,
+  host nativo e unload guard PASS. Componente com ImGui no player PASS. Cópias dos adaptadores
+  RolimaRacer em cena mínima passaram init compartilhado e transição para Pista_1.
+- Regressão LAN spawner em dois players PASS (movimento, propriedade, spawn, pronto/chat/início
+  e descoberta). Exports Steam/LAN executados e players passaram; LAN sem DLL Steam.
+  ZIP local extraído para build-steam/export-extracted: Game.exe passou com sala real e componente.
+- Pendentes: relay real entre duas redes/contas, convites aberto/fechado, corrida/carros reais,
+  AppID comercial/conquistas, review da distribuição pública e Linux. Testes locais não são
+  evidência desses itens. [Procedimentos](steam-complement-development.md).
+
+## Multiplayer: inicialização Steam online validada, B2 (2026-10-07)
+
+- Steam iniciada localmente; smoke test no RangeRuntime headless com AppID 480 e conta
+  conectada confirmou inicialização SDK, identidade, callbacks e shutdown/reinit.
+- `STEAMTEST real SDK online PASS` e `STEAMTEST PASS`; contexto de prova final permaneceu
+  ativo até StopEngine, que o encerrou corretamente. Log local em build-steam/online-runtime-test.log.
+- B2 encerrado para Windows/AppID de desenvolvimento. Transporte, salas, migração de
+  conquistas/idioma e validação com AppID comercial continuam pendentes; jogo não foi alterado.
+
+## Multiplayer: inicialização opcional Steam, B2 offline (2026-10-07)
+
+- Novo projeto separado `source/complements/anastacio_steam/`: SDK local, DLL opcional,
+  validação do AppID de lançamento, cliente/conta e dono existente; sem relançar editor.
+- Serviço por processo em Network, API Python initialize/status/shutdown e bombeamento no
+  NextFrame; StopEngine libera após destruir componentes. Nenhum script do RolimaRacer alterado.
+- Builds Windows/MSVC de complemento, RangeEngine e RangeRuntime passaram. CTest da rede PASS.
+  Smoke test no player headless: API, uint64, callbacks, duplicação e limpeza PASS; DLL real
+  carregou e reportou `Steam client is not running`. Init online não validado, Steam fechada.
+- Diagnóstico do erro Windows 126: dependência CRT inicial removida com CRT estático;
+  a falha persistiu até normalizar separadores de caminho para busca DLL_LOAD_DIR. Provas
+  isoladas WinDLL com caminho nativo carregaram; reteste no player passou depois do fix.
+- [Guia local](steam-complement-development.md) e script `tools/net_engine_test/steam_runtime_test.py`.
+  SDK mantém warnings C4996 nos próprios headers. Sem export/release, transporte ou salas.
+
+## Multiplayer: carregador opcional do complemento, B1 (2026-10-07)
+
+- ABI C v1 e carregador RAII em Network, sem SDK Steam: caminho absoluto, busca Windows
+  restrita ao diretório da DLL/System32, validação de tabela e limpeza de contexto/biblioteca.
+- Quatro DLLs de prova testam ciclo de vida, identidade uint64, falha/retry de init,
+  recarga, versões/tamanhos incompatíveis e ponteiro ausente. Não são complemento Steam real.
+- Builds MSVC `build-net/net_tests` e `build/ge_network` passaram. CTest da rede passou.
+  Sem API Python ou ligação do serviço ao runtime; próximos passos na etapa B2.
+
+## Multiplayer: inventário inicial do complemento Steam (2026-10-07)
+
+- Consulta bpy no RolimaRacer.range pelo editor de build/bin, sem salvar: SteamComponent,
+  NetworkManager, NetworkMenu e quatro NetworkVehicleSync confirmados; processo saiu com c?digo 0.
+- SDK 1.55 local encontrado, incluindo lanes; AppID de desenvolvimento ? 480, comercial pendente.
+- [Decis?o proposta](steam-multiplayer-inventory.md): pacote reutiliz?vel da engine, complemento
+  opcional por ABI C, ?nico dono do runtime e canais compat?veis com a sess?o atual.
+- Pr?xima pe?a isolada: carregador e DLL de prova antes da integra??o SDK. N?o houve mudan?a C++
+  nem gameplay; exportador efetivo e distribui??o do complemento ainda precisam ser fechados.
+
+## Multiplayer: plano do complemento Steam (2026-10-07)
+
+- Criado [plano do complemento Steam](steam-multiplayer-plan.md), com salas/convites Steamworks e
+  adaptador opcional para o transporte da rede nativa. Componente e menu reutilizáveis devem ser
+  distribuídos pela engine; RolimaRacer mantém configuração e regras da corrida.
+- Etapas incluem inicialização única, contrato de canais/identidade, prova de relay em duas redes,
+  integração de sessão, corrida real e distribuição. Não implementado; nenhum C++ ou jogo alterado.
+- Fontes oficiais Steamworks consultadas; SDK/AppID e forma de distribuição precisam ser conferidos
+  no inventário inicial. Engine padrão continua independente da biblioteca Steam.
+
 ## Sombra: atualização automática para Spot/Point (2026-10-07)
 
 - Nova opção por lâmpada **Auto Update** (Spot/Point, painel de sombra; `LA_AUTO_SHADOW`, RNA
@@ -41,6 +192,108 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   um cubo girando perto de 2 lâmpadas. Auto desligado: 48 passadas/8 lâmpadas por frame; ligado: 12/2.
   FPS travado em 60 nos dois (RX 6800M), então o ganho de tempo ainda não foi medido; falta a checagem visual
   do usuário (sombra acompanhando o cubo, sem sombra congelada).
+
+## Demos de nós: cópias revisadas com frames e controles robustos (2026-10-07)
+
+- Revisadas as 11 receitas da lista do usuário, com cópias `_revisado.range` em
+  [`demos/revisados/`](../demos/revisados/README.md). Originais `.range` e geradores preservados.
+  `tools/review_recipe_nodes.py` abre os assets existentes e organiza materiais, World, lâmpadas e
+  grupos em frames por etapa, com notas separadas e colunas por dependência. Parentes são atribuídos
+  antes das posições, evitando deslocamentos relativos da API 2.79; nós altos têm espaço reservado.
+- Dissolve: extremos exatos (q <= 0 inteiro, q >= 1 invisível), brasa limitada à parte visível e
+  largura única ligada à faixa e ao gradiente. Neve/musgo: extremos exatos de Amount, independentemente
+  de ruído/suavidade; ruído em Object acompanha o objeto, normal do mundo mantém orientação da cobertura.
+- Água: espuma acompanha Bump das ondas; materiais da costa usam Geometry Position para a altura do
+  mundo. Triplanar: Bump discreto pela luminância (aproximação desligável por Strength = 0).
+  Interior Mapping: dimensões limitadas a 0.001 nos divisores; limites nas entradas do grupo.
+  Escudo, lava e shaders de vértice de vento/grama/pelos mantêm a lógica original; frames indicam
+  o texto GLSL correspondente. Nenhuma mudança em C++ ou no build.
+- Toon: a primeira rodada do player avisou que o material de contorno não tinha vértices/primitivas.
+  O casco Solidify ainda estava no modificador, mas o conversor usa a malha base (`CDDM_from_mesh`).
+  Aplicado somente o modificador Contorno na cópia, preservando espessura, normais invertidas e slot
+  de material; o gerador verifica que as faces do contorno existem. As faixas de iluminação não mudam.
+- `python tools/validate_recipe_nodes.py`: **11/11 PASS** no player atual de `build/bin/` (RX 6800M),
+  cada cópia temporária executando 120 ticks de lógica e encerrando, sem erros de shader/Python detectados.
+  Testes percorrem conexões Math reais para os extremos, verificam limites dos frames e comprovam por
+  SHA-256 a preservação dos originais. Os assets entregues não encerram automaticamente; logs e cópias
+  de teste ficam em TEMP. A primeira execução do gerador expôs uma falha no avaliador de testes
+  (override de quantidade no nó Math de Time); corrigido antes da validação completa.
+- Validação visual da qualidade dos efeitos e do layout permanece para o usuário no editor/jogo real;
+  não foi usada captura automatizada. `check_docs.py` antes da atualização: 54 erros/4 avisos já existentes
+  nos mapas/referências, relacionados a linhas de código fora desta revisão.
+
+## Tesla Piano: acentos de partículas GPU (2026-10-07)
+
+- `tools/add_tesla_gpu_effects.py` adiciona 11 emissores nativos, com pool total de 348 partículas:
+  oito Sparkle azulados nos toros (32 cada), carga sutil na bola central (20) e dois Smoke baixos
+  nas laterais (36 cada). Sem texturas externas, shaders novos ou alterações em C++.
+- Controlador musical aciona o emissor correspondente por 0.45 s; espaço aciona todos por 0.75 s.
+  A opacidade cai nos últimos 0.2 s antes de desligar. Névoa e carga central são ambientes contínuos.
+- Atualizada `TeslaPiano_Cinematic.range`, preservando backup `TeslaPiano_Cinematic_before_gpu_effects.range`.
+  Sonda no runtime passou: acionamentos reais de nota/espaço, emissores ativos, redução temporizada
+  e desligamento (`debug-logs/tesla-gpu-result.txt`). `check_docs.py`: mesmos 35 erros/23 avisos anteriores.
+  Aparência e desempenho precisam ser avaliados pelo usuário no jogo real.
+
+Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas antigas preservam o contexto
+da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
+`docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
+
+**Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, como sempre). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
+
+Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
+Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
+
+## Tesla Piano: UV do fundo e tremor reduzido (2026-10-07)
+
+- Fundo preto diagnosticado na cena salva: plano `Anastacio_Fundo_Industrial` sem qualquer UV.
+  A cena já usava Game PBR, no qual Image Texture/Emission são suportados. Corrigido com UV
+  completo 0..1 e nó UV Map ligado explicitamente à imagem; textura convencional adicional
+  disponível para fallback legado. A autoria usa `uv_textures.new` da API 2.79.
+- Amplitude do tremor 0.045 → 0.012, frequência 18 → 14 Hz, decay 0.65 → 0.85/s, roll desligado;
+  impulso por nota 0.24 → 0.18 e espaço 1 → 0.85. Fator do blur associado 0.75 → 0.35.
+- `tools/fix_tesla_background_shake.py` atualiza a cena com backup separado; corrigida também a
+  criação de UV em `tools/upgrade_tesla_atmosphere.py`. Gravação e verificações de UV/nós/amplitude
+  bem-sucedidas no editor. Validação visual do fundo deve ser feita pelo usuário no jogo real.
+
+## Tesla Piano: foco central e Camera FX (2026-10-07)
+
+- `tools/configure_tesla_camera_fx.py` configura a câmera de `TeslaPiano_Cinematic.range`
+  com foco Object no `Terminal` (bola central), faixa nítida de 8 m, suavização de 0.2 s,
+  DOF Medium com blur de 3.5 px e diafragma de seis lâminas.
+- Speed Blur e Directional Blur ligados com forças moderadas e Protect Focus; Cat Eye Bokeh
+  suave e vinheta de 0.12. O Speed Blur acompanha trauma² via `speedOverride`, pois o tremor
+  por lens shift não translada a câmera. Sem trauma, o override volta a zero.
+- Cena atualizada com backup `TeslaPiano_Cinematic_before_camera_fx.range`. Sonda separada
+  no runtime confirmou foco válido no Terminal, efeitos ligados, blur seguindo o impacto
+  e voltando a zero, além da inicialização musical (`debug-logs/tesla-focus-result.txt`: PASS).
+  Avaliação visual permanece no jogo real pelo usuário.
+
+## Tesla Piano: tremor musical e fundo industrial (2026-10-07)
+
+- `tools/upgrade_tesla_atmosphere.py` aplica o tremor existente de `KX_Camera` ao controlador
+  musical: cada nota chama `shake(0.24)` e espaço chama `shake(1.0)`. O trauma nativo acumula,
+  limita em 1 e decai a 0.65/s; amplitude 0.045, frequência 18 Hz e roll ligado no Camera Game FX.
+- Gerada paisagem industrial noturna com imagegen integrado, salva em
+  `build/bin/demos/TeslaPiano/textures/tesla_background.png` e empacotada na cena. Plano de fundo
+  emissivo, alinhado à câmera, sem colisão e com margem para tremor.
+- Entrega em `build/bin/demos/TeslaPiano/TeslaPiano_Cinematic.range`, preservando as versões
+  original e PBR. Execução no editor e teste no runtime bem-sucedidos; sonda separada confirmou
+  inicialização do piano, impulso isolado, acumulação rápida, redução até zero e impacto forte.
+  Resultado em `debug-logs/tesla-shake-result.txt`. Aparência/enquadramento e sensação do tremor
+  aguardam avaliação do usuário no jogo real; nenhuma captura automática usada como prova visual.
+
+## Tesla Piano: materiais procedurais PBR (2026-10-07)
+
+- `tools/upgrade_tesla_materials.py` transforma uma cena existente sem recriar sua lógica e grava
+  uma cópia irmã `TeslaPiano_PBR.range`. Aplicado a 35 objetos da demo em `build/bin/demos/TeslaPiano/`.
+- Nós editáveis: cobre com espiras horizontais, aço com microtextura, bases grafite, concreto com
+  variação de cor/relevo e máscara procedural de rugosidade molhada, terminal e teclas emissivos.
+  Game Shading Nodes ligado; luz Hemi convertida em Sun, compatível com Game PBR.
+- Build `RangeEngine` bem-sucedido com `vcvars64.bat` e `VSLANG=1033`; execução do script e gravação
+  bem-sucedidas. Runtime manteve-se aberto no teste de inicialização; validação visual e musical
+  no jogo real pendente. A geometria/cenário da referência artística não foi recriada.
+- `check_docs.py` encontra 35 erros e 23 avisos preexistentes, sobretudo linhas dos mapas de código
+  alteradas por trabalho paralelo; nenhum mapa foi reescrito nesta tarefa.
 
 ## Chuva: poças d'água (2026-10-07)
 

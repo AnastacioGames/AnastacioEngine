@@ -394,6 +394,13 @@ void BLF_disable_default(int option)
 	}
 }
 
+/* shadow level/color/offset for the default font (used with BLF_enable_default(BLF_SHADOW)) */
+void BLF_shadow_default(int level, const float rgba[4], int x, int y)
+{
+	BLF_shadow(global_font_default, level, rgba);
+	BLF_shadow_offset(global_font_default, x, y);
+}
+
 void BLF_aspect(int fontid, float x, float y, float z)
 {
 	FontBLF *font = blf_get(fontid);
