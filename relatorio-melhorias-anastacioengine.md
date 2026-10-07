@@ -169,6 +169,11 @@ ferramenta correspondente.
   binário desatualizado volte a causar o jogo exportado "abrindo e fechando" na hora. Ver
   `docs/changelog.md` (2026-09-12).
 
+- `bge.logic.setObjectConvert(scene, object, convert)` desliga o Convert de objetos de uma cena
+  antes de carregá-la (ex.: só converter os pilotos escolhidos), cortando ~63% do load no teste;
+  flags restaurados ao sair do jogo. `LibLoad` segue melhor quando a RAM pesa. Ver
+  `docs/changelog.md` (2026-10-07).
+
 ## Decisões técnicas vigentes
 
 - GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para

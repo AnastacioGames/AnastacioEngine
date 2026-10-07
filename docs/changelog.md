@@ -1,5 +1,48 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Material Atlas nativo em C++ e correções de bake
+
+- Nova ferramenta em Properties > Material > Anastacio Material Atlas. Operador C++
+  `material.anastacio_atlas_bake`; painel padrão apenas invoca o operador, sem depender do addon.
+  Um mesh ativo, materiais PBR opacos com Principled: Base Color, Roughness, Metallic, Specular e
+  Normal, packed PNG 16 bits, UV AnastacioAtlas e material único. Malha fonte fica como backup;
+  materiais fonte e demais objetos compartilhando a malha não são alterados.
+- Reutiliza `ae_uvatlas` diretamente; triangulação real e detecção de UV conflitante por loop.
+  Bake de cor/scalars por emissão evita iluminação duplicada e Base Color preto em materiais
+  metálicos. Normal usa tangent space do atlas, preservando a UV fonte do Normal Map.
+  Não aplica denoise de GI em mapas físicos; Lightmap e configuração de iluminação permanecem.
+- `bake_api.c`: busca de UV nomeada corrigida de CD_MTFACE para CD_MLOOPUV; inicialização de
+  primitivas inválidas acontece antes de retornar por UV ausente; stride da normal por polígono
+  corrigido para poly * 3. A UV nomeada incorreta provocou crash reproduzido durante o teste.
+- Execução prepara cópias, verifica os cinco passes/pixels, cria o material e só então aplica.
+  Restaura render, samples/device e seleção; falha no pack libera temporários. Node tree final é
+  embedded ID do material. Stubs de progresso adicionados ao player para permitir link do editor
+  compartilhado, sem UI de bake no standalone.
+- `ninja RangeEngine RangeRuntime` com vcvars64 e VSLANG=1033 passou; instalação em build/bin.
+  No rebuild final, player e editor foram construídos em chamadas separadas, nessa ordem:
+  a chamada conjunta apresentou LNK1104 no player e a instalação do editor tentou ler o EXE ausente.
+  `ninja RangeRuntime` e depois `ninja RangeEngine` passaram sem alterar flags de compilação.
+  `tools/test_material_atlas.py` passou: seis materiais, metal total, gradiente na UV fonte, normal
+  inclinada reconstruída na UV de atlas, source/Lightmap preservadas, mesh compartilhado,
+  rejeição de transmissão, rollback de pack degenerado, proteção contra rebake e save/reload.
+  Também valida UV fonte ausente e rollback após passes executados com valores fora de 0–1;
+  o formato PNG não pode cortar silenciosamente mapas HDR/dados inválidos.
+  RangeRuntime carregou a cena, compilou shaders e confirmou material único, encerrando com código 0.
+- Limites e pendências no [plano](material-atlas-plan.md): materiais legados, vários objetos,
+  transparência, modifiers/shape keys e grafos mais amplos não entram nesta primeira peça.
+  Visual no jogo real, Undo na interface, GPU e Web/Linux ainda pendentes.
+- Check documental padrão encontrou arquivos rastreados removidos por outra tarefa (ex.
+  `docs/parallel-work-plan.md`); execução do mesmo verificador filtrando arquivos ausentes passou
+  com 0 erros e 35 avisos de mapas existentes. Nenhum arquivo removido foi restaurado.
+
+## 2026-10-07 — pesquisa e preparação do atlas de materiais
+
+- Complemento: auditoria do Baked Lighting atual, matriz de reutilização de UV/xatlas, bake Cycles, GPU, padding e progresso; contrato de coexistência Lightmap + AnastacioAtlas. Na etapa de preparação somente documentação foi alterada.
+
+- Auditoria estática do `automate_atlas_bake.py` 1.3: gera mapas, mas não cria material final; falhas de passe podem terminar em FINISHED; UVs, materiais e imagens requerem proteção.
+- Pesquisa de Material Combiner, Bake Groups, BakeToSingleMaterial e Auto-Bake, com versões/API e licenças observadas. Recomendação: evolução própria e reutilização das capacidades locais de UV/bake.
+- [Plano](material-atlas-plan.md) registra contrato, etapas, limites, matriz de validação e fontes. A implementação foi autorizada posteriormente e registrada em entrada separada.
+
 ## Texture Paint: traços Line e Curve voltam a pintar (2026-10-07)
 
 - `paint_image.c`: a checagem "mouse sobre face do objeto ativo" (`fff04797`) lê o backbuf de seleção a cada

@@ -1324,12 +1324,39 @@ class MATERIAL_PT_custom_props(MaterialButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Material
 
 
+class MATERIAL_PT_anastacio_atlas(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'material'
+    bl_label = "Anastacio Material Atlas"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob is not None and ob.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        layout.label("Combine opaque PBR materials", icon='MATERIAL')
+        layout.label("Keeps original mesh and Lightmap UV", icon='INFO')
+        col = layout.column()
+        col.enabled = (ob.mode == 'OBJECT' and
+                       context.scene.game_settings.use_shading_nodes)
+        col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
+        if not context.scene.game_settings.use_shading_nodes:
+            layout.label("Enable PBR Shading Nodes", icon='INFO')
+        if ob.mode != 'OBJECT':
+            layout.label("Switch to Object Mode", icon='INFO')
+
+
 classes = (
     MATERIAL_MT_sss_presets,
     MATERIAL_MT_specials,
     MATERIAL_UL_matslots,
     MATERIAL_PT_context_material,
     MATERIAL_PT_recipes,
+    MATERIAL_PT_anastacio_atlas,
     MATERIAL_PT_preview,
     MATERIAL_PT_pipeline,
     MATERIAL_PT_diffuse,

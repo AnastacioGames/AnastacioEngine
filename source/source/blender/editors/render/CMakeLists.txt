@@ -40,6 +40,7 @@ set(INC_SYS
 )
 
 set(SRC
+	anastacio_material_atlas.cpp
 	render_internal.c
 	render_opengl.c
 	render_ops.c

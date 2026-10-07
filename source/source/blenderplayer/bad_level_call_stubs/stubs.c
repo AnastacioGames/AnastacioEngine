@@ -1736,6 +1736,9 @@ bool WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, sho
 int WM_operator_props_popup(struct bContext *C, struct wmOperator *op, const struct wmEvent *event) RET_ZERO
 void WM_operator_properties_free(struct PointerRNA *ptr) RET_NONE
 void WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring) RET_NONE
+/* Editor-only Material Atlas progress has no window taskbar in the player. */
+void WM_progress_set(struct wmWindow *win, float progress) RET_NONE
+void WM_progress_clear(struct wmWindow *win) RET_NONE
 void WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot) RET_NONE
 void WM_operator_properties_sanitize(struct PointerRNA *ptr, const bool no_context) RET_NONE
 void WM_operatortype_append_ptr(void (*opfunc)(struct wmOperatorType *, void *), void *userdata) RET_NONE

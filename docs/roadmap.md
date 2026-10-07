@@ -8,6 +8,10 @@ shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) está n
 
 Auditado contra o git log e o changelog em 2026-09-20.
 
+## Atlas de materiais
+
+- [Ferramenta nativa e plano](material-atlas-plan.md): primeira versão para um mesh com materiais PBR opacos. Pendente: usuário validar no jogo real, Undo pela interface, GPU, Web/Linux e rebake de GI nas duas ordens. Próximas peças, após revisão: materiais legados, vários objetos, transparência e grafos mais amplos; combinação direta sem bake permanece futura.
+
 ## Prioridade atual
 
 ### Carregamento mais rápido ("Cozinhar")

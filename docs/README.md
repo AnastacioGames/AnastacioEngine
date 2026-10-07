@@ -48,6 +48,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ### Frentes recentes
 
+- [Atlas de materiais](material-atlas-plan.md): ferramenta nativa em C++ para materiais PBR opacos, limites, validação e pesquisa de referência.
+
 - [Multiplayer nativo](multiplayer-plan.md): plano da rede integrada à engine, com [protocolo](multiplayer-protocol.md)
   e notas de implementação em `source/source/gameengine/Network/`.
   A implementação atual cobre host/cliente, replicação, RPC, predição, servidor headless, relevância,
