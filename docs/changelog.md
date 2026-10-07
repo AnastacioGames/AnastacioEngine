@@ -9,6 +9,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Demo grama interativa: vento + trilha amassada pela bola (2026-10-06)
+
+- `tools/create_grass_trail_test.py` → `demos/grama_trilha.range`: ~136 mil lâminas em 8×8 blocos,
+  vento no vertex shader do material (`grama_vertex.glsl`, `#define` ajustáveis), bola física (setas/WASD)
+  com câmera seguindo. A trilha é uma textura 256² (40×40 m) pintada em Python (numpy +
+  `Range.texture.ImageBuff`) e lida no vertex shader (`textureLod` em `samp0`): a grama deita na direção
+  do movimento e se recupera em ~18 s. Névoa feita por grupo de nós "Nevoa" (a névoa do World não age em
+  materiais de nós). ~305 FPS sem vsync na RX 6800M.
+
 ## Receitas de nós: dissolve, escudo, água, neve/musgo, vento, toon, lava + correções (2026-10-06)
 
 - Demos em `demos/` (dissolve, escudo, agua, neve_musgo, vento, toon, lava), cada uma gerada por
