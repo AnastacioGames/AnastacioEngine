@@ -3203,6 +3203,15 @@ void outliner_collection_game_exclude_set(bContext *C, Scene *scene, SceneCollec
 	}
 	else {
 		sc->flag &= ~SCECOL_GAME_EXCLUDE;
+		/* Layer 20 was shown for the excluded objects; once none is left, hide it again, or
+		 * the game would start whatever else lives on it (e.g. Add Object templates). */
+		if (!BKE_scene_collections_game_exclude_any(scene) &&
+		    (scene->lay & SCECOL_GAME_LAYER) && (scene->lay & ~SCECOL_GAME_LAYER))
+		{
+			scene->lay &= ~SCECOL_GAME_LAYER;
+			BKE_screen_view3d_main_sync(&CTX_data_main(C)->screen, scene);
+			WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+		}
 	}
 	outliner_collection_notify(C, scene);
 }

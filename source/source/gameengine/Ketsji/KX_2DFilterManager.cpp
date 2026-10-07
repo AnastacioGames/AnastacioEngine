@@ -437,9 +437,10 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		data.shaderText = datatoc_RAS_CameraDof2DFilter_glsl;
 		dof = AddFilter(data, true);
 	}
-	else if (!useDof && dof) {
-		RemoveReservedFilterPass(FILTERPASS_CAMERA_DOF);
-		dof = nullptr;
+	else if (dof) {
+		/* Keep the pass built and only toggle it: removing it here meant the shader was compiled
+		 * again every time the effect came back (nitro, camera switch), a visible hitch. */
+		dof->SetEnabled(useDof);
 	}
 
 	RAS_2DFilter *lens = GetFilterPass(FILTERPASS_CAMERA_LENS, true);
@@ -454,13 +455,14 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		data.shaderText = datatoc_RAS_CameraLens2DFilter_glsl;
 		lens = AddFilter(data, true);
 	}
-	else if (!useLens && lens) {
-		RemoveReservedFilterPass(FILTERPASS_CAMERA_LENS);
-		lens = nullptr;
+	else if (lens) {
+		/* Keep the pass built and only toggle it: removing it here meant the shader was compiled
+		 * again every time the effect came back (nitro, camera switch), a visible hitch. */
+		lens->SetEnabled(useLens);
 	}
 
 	for (RAS_2DFilter *filter : {dof, lens}) {
-		if (filter) {
+		if (filter && filter->GetEnabled()) {
 			std::copy(fx, fx + 24, filter->GetBuildInFilters()->camera_fx);
 		}
 	}

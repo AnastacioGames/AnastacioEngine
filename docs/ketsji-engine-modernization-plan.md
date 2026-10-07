@@ -1081,6 +1081,12 @@ vezes. A opção saiu da UI e `LA_Launcher` passa sempre `false`; o bit
 `GAME_USE_FIXED_TIMESTEP` continua no DNA e é ignorado. O código do acumulador
 em `NextFrame()` fica inerte. Ver changelog de 2026-09-26.
 
+**2026-10-06 — acumulador corrigido e religado:** relógios avançam por passo
+(`AdvanceStepTime()`), entradas e mensagens são limpas entre passos, o catch-up
+legado não roda no modo fixo (espera até o próximo passo) e a opção voltou à UI.
+A física com vários passos fixos por frame não reproduziu crash. Ver changelog
+de 2026-10-06. Próximo passo possível: interpolação de transform no render.
+
 ### Plano 9 — Otimizações orientadas por perfil
 
 **Objetivo:** implementar somente ganhos sustentados pelos baselines.

@@ -144,6 +144,51 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   lightmap eram ruído de 8 amostras (64 limpa); faixa clara na base da parede era o shadow bias 1.0 do sol
   (0.1 resolve).
 
+## Efeitos de câmera não recompilam mais ao ligar/desligar (2026-10-07)
+
+- `KX_2DFilterManager::UpdateCameraFX` removia os passes `FILTERPASS_CAMERA_DOF`/`FILTERPASS_CAMERA_LENS`
+  quando o efeito desligava e recriava (compilando o shader) quando voltava. No RolimaRacer isso
+  acontecia a cada nitro e a cada troca de câmera, com travada visível.
+- Agora o passe é criado uma vez e só alterna `SetEnabled`; desligado, o `RAS_2DFilter::Render` já
+  devolve a entrada sem desenhar.
+
+## Coleção "fora do jogo" deixava a layer 20 ligada (2026-10-07)
+
+- Marcar uma coleção do outliner como "fora do jogo" liga a layer 20 da cena (para os objetos movidos
+  continuarem visíveis), mas religá-la não desligava. Sem nenhuma coleção excluída, o conversor deixa de
+  ignorar a layer 20, e tudo que mora nela (no RolimaRacer, o molde `group_Cameras` da Pista_1) entrava
+  ativo no jogo: um segundo rig de câmera parado longe do carro. `outliner_collection_game_exclude_set()`
+  agora desliga a layer 20 quando a última coleção excluída volta ao jogo. Arquivos já salvos com a layer
+  presa precisam desligar a layer 20 da cena uma vez (ou excluir e religar uma coleção).
+
+## Fixed Timestep (Plano 8) religado e corrigido (2026-10-06)
+
+- Validado em 2026-10-07 numa corrida real do RolimaRacer (`-g fixed_timestep = 1`, árvores e 10 carros):
+  60 FPS, sem câmera lenta, câmera/nitro/grid ok. Na bateria, com o FPS mais baixo, a velocidade
+  continuou real; restam travadas com todos os filtros ligados (desligáveis nas opções do jogo).
+
+- Motivação: o Range Engine refez o loop com passo fixo (repo privado, nada portado). O nosso acumulador
+  estava desligado desde 2026-09-26, mas o multiplayer o liga em toda sessão (`KX_NetworkManager.cpp`),
+  então os bugs listados naquela entrada valiam para jogos em rede.
+- `KX_KetsjiEngine::NextFrame()`: o número de passos é calculado antes do laço; cada passo chama
+  `AdvanceStepTime()` (novo; `m_frameTime`/`m_logicTime`/`m_animationsTime`) e, do 2º passo em diante,
+  `ClearInputs()` + `ReleaseMoveEvent()` + `ClearMessages()`, então tecla e mensagem disparam uma vez só.
+  Animação roda só no último passo do frame (é por tempo; evita pagar o skinning por passo de catch-up).
+  Frame sem passo não limpa entradas nem mensagens. `FrameTiming()` não avança os relógios no modo fixo.
+- `UpdateSleepTime()`/`FrameOver()`: no modo fixo o catch-up legado não roda; o frame dorme até o próximo
+  passo devido (margem 0,5 ms), também com v-sync, porque sem render (loop por `logic.NextFrame()`) não
+  há swap para bloquear. Sem essa espera o cenário `predict` falhava: frames com 0 passos deixavam o
+  `net.set_input` seguinte apagar o tiro antes de um tick consumi-lo.
+- Opção de volta: checkbox em Physics (`properties_game.py`), descrição RNA nova, `LA_Launcher` lê o bit
+  `GAME_USE_FIXED_TIMESTEP`; `-g fixed_timestep = 1|0` no player sobrepõe o arquivo (testar sem salvar).
+- Física: o crash suspeito (física "só aguenta 1 passo") não reproduziu; vários `ProceedDeltaTime` de
+  tempo fixo por frame funcionaram (queda livre bate com 0,5·g·t²).
+- Teste: `tools/create_fixed_timestep_test.py` → `projects-teste/fixed_timestep/`. Tic 60, display a
+  ~25 fps (`FT_SLEEP`): fixo = 181 passos em 3 s, tempo de jogo 3,00 s, mensagem 1x, 2-3 passos por frame;
+  legado = 74 passos, 1,22 s (câmera lenta). Sem limite: 1 passo por frame nos dois, sem 0/2 alternado.
+  Rede: `spawner`, `rpc`, `predict` (2x, 0 correções/0 teleportes), `server`, `scene`, `scene-server` PASS.
+  RolimaRacer com `-g fixed_timestep = 1`: 12 s no menu sem erro; corrida real ainda não testada.
+
 ## Tela cheia sem borda no Windows (2026-10-06)
 
 - `render.setFullScreen(True)`, o Fullscreen de Render > Game > Display e o `-f` do player trocavam o

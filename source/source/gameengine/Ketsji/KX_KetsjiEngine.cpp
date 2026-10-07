@@ -639,23 +639,38 @@ bool KX_KetsjiEngine::NextFrame()
 
 
 	// for each scene, call the proceed functions
+	int steps = 1;
 	if (m_useFixedTimestep) {
 		// Plano 8: fixed-timestep accumulator. m_framestep is the fixed logical step
-		// (set by FrameTiming(), already m_timestep * m_timescale); here we measure real
-		// elapsed time independently of m_previousRealTime/m_deltatime (owned by the
-		// legacy sleep-based catch-up below) and run as many whole steps as are owed,
-		// capped at m_maxLogicFrame to avoid a spiral of death under a stall.
+		// (m_timestep * m_timescale); real elapsed time is measured here, and as many whole
+		// steps as are owed run, capped at m_maxLogicFrame to avoid a spiral of death.
+		// Each step advances the game clocks itself (AdvanceStepTime), so logic, physics and
+		// animation time stay in step with the number of simulation updates.
 		double now = m_clock.GetTimeSecond();
 		double realDelta = now - m_accumulatorPreviousRealTime;
 		m_accumulatorPreviousRealTime = now;
 		m_simAccumulator += realDelta * m_timescale;
 
-		int steps = 0;
-		while (m_simAccumulator >= m_framestep && steps < m_maxLogicFrame) {
+		steps = std::min((int)(m_simAccumulator / m_framestep), m_maxLogicFrame);
+		const bool frameNeedsAnimation = m_needsAnimation;
+		for (int i = 0; i < steps; ++i) {
+			if (i > 0) {
+				// The previous step consumed this frame's edge events (JUSTACTIVATED etc.);
+				// later steps must see held keys as held, not pressed again.
+				if (m_inputDevice) {
+					m_inputDevice->ClearInputs();
+					m_inputDevice->ReleaseMoveEvent();
+				}
+				m_networkMessageManager->ClearMessages();
+			}
+			// Animations are time based, so evaluating them once (on the last step) is enough
+			// for the drawn pose and avoids paying the skinning per catch-up step.
+			m_needsAnimation = frameNeedsAnimation && (i == steps - 1);
+			AdvanceStepTime();
 			m_simulationPipeline->Update();
 			m_simAccumulator -= m_framestep;
-			++steps;
 		}
+		m_needsAnimation = frameNeedsAnimation;
 		double maxBacklog = m_framestep * m_maxLogicFrame;
 		if (m_simAccumulator > maxBacklog) {
 			m_simAccumulator = maxBacklog;
@@ -664,7 +679,8 @@ bool KX_KetsjiEngine::NextFrame()
 	else {
 		m_simulationPipeline->Update();
 	}
-	if (m_inputDevice) {
+	// A frame with no simulation step keeps its input and messages for the next step.
+	if (m_inputDevice && steps > 0) {
 		m_logger.StartLog(tc_overhead);
 		// update system devices
 		m_inputDevice->ClearInputs();
@@ -681,7 +697,9 @@ bool KX_KetsjiEngine::NextFrame()
 	
 
 	m_logger.StartLog(tc_overhead);
-	m_networkMessageManager->ClearMessages();
+	if (steps > 0) {
+		m_networkMessageManager->ClearMessages();
+	}
 
 
 	{
@@ -724,7 +742,23 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	m_logger.StartLog(tc_outside);
 	ClockTiming();
 	m_sleeptime = 2.0;
-	if (m_timestep > m_deltatime - m_overframetime + 6e-6) {
+	if (m_useFixedTimestep) {
+		// The accumulator owns pacing: wait until the next whole step is owed (minus a margin)
+		// instead of the legacy catch-up, which made steps alternate 0/2. Frames without a step
+		// would let per-frame Python (e.g. net.set_input) overwrite state no step consumed.
+		// With v-sync the swap has usually taken that long already, so the wait is ~0.
+		m_overframetime = 0.0;
+		if (m_timescale > 0.0) {
+			const double owed = m_simAccumulator +
+			                    (m_clock.GetTimeSecond() - m_accumulatorPreviousRealTime) * m_timescale;
+			const double wait = (m_framestep - owed) / m_timescale - 0.0005;
+			if (wait > 0.0) {
+				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+			}
+			ClockTiming();
+		}
+	}
+	else if (m_timestep > m_deltatime - m_overframetime + 6e-6) {
 		while (m_timestep > m_deltatime - m_overframetime + 6e-6) {
 			if (m_timestep > (m_deltatime * 1.5)) {
 				m_sleeptime += 2.0;
@@ -959,6 +993,11 @@ void KX_KetsjiEngine::ClockTiming()
 void KX_KetsjiEngine::FrameOver()
 {
 	m_previousRealTime = m_clockTime;
+	if (m_useFixedTimestep) {
+		// Pacing comes from the accumulator; no drift to carry.
+		m_overframetime = 0.0;
+		return;
+	}
 	// With v-sync, SwapBuffers() blocks until the next refresh, so that wait lands in
 	// m_deltatime and would be counted as drift; the display already paces the frame.
 	if (m_canvas && m_canvas->GetSwapControl() != RAS_ICanvas::VSYNC_OFF) {
@@ -986,9 +1025,17 @@ void KX_KetsjiEngine::FrameTiming()
 	m_timestep = 1.0 / m_ticrate;
 	m_framestep = m_timestep * m_timescale;
 	m_deltaTime = m_framestep;
+	m_physicsTime = m_framestep;
+	// With the fixed timestep, NextFrame() advances the clocks once per simulation step.
+	if (!m_useFixedTimestep) {
+		AdvanceStepTime();
+	}
+}
+
+void KX_KetsjiEngine::AdvanceStepTime()
+{
 	m_frameTime += m_timestep;
 	m_logicTime += m_timestep;
-	m_physicsTime = m_framestep;
 	m_animationsTime += m_timestep;
 }
 
