@@ -962,9 +962,21 @@ def build_pbr_from_legacy(mat):
     out = b.add("ShaderNodeOutputMaterial", 900, 0)
 
     # Valores do material entram como ponto de partida; textura, quando houver, sobrescreve.
-    bsdf.inputs["Base Color"].default_value = tuple(mat.diffuse_color) + (1.0,)
-    bsdf.inputs["Metallic"].default_value = mat.specular_metallic_bsdf
-    bsdf.inputs["Roughness"].default_value = max(mat.specular_roughness_bsdf, 0.02)
+    # O BI multiplica a cor pelo Intensity; sem isso o cubo padrão (0.8 x 0.8) clareia.
+    k = mat.diffuse_intensity
+    bsdf.inputs["Base Color"].default_value = tuple(c * k for c in mat.diffuse_color) + (1.0,)
+    # Metallic/Roughness BSDF só valem com os shaders GGX/Lambert Custom. Todo material
+    # nasce com metallic_bsdf = 0.5 (BKE_material_init), então copiar sem checar deixava
+    # o cubo padrão meio metálico: escuro e espelhado.
+    if mat.specular_shader == 'GGX' or mat.diffuse_shader == 'LAMBERT_CUSTOM':
+        metallic = mat.specular_metallic_bsdf
+        roughness = mat.specular_roughness_bsdf
+    else:
+        # Hardness do Phong/CookTorr para roughness (aprox. Blinn-Phong <-> Beckmann).
+        metallic = 0.0
+        roughness = math.sqrt(2.0 / (mat.specular_hardness + 2.0))
+    bsdf.inputs["Metallic"].default_value = metallic
+    bsdf.inputs["Roughness"].default_value = max(roughness, 0.02)
     bsdf.inputs["Specular"].default_value = min(mat.specular_intensity, 1.0)
 
     coords = {}
@@ -978,6 +990,26 @@ def build_pbr_from_legacy(mat):
                 n = b.add("ShaderNodeUVMap", -1500, y, label="UV: " + slot.uv_layer)
                 n.uv_map = slot.uv_layer
                 coords[key] = n.outputs["UV"]
+            elif slot.texture_coords in {'REFLECTION', 'NORMAL'}:
+                # Matcap e afins: o BI usa o vetor em espaço de câmera e remapeia de -1..1
+                # para 0..1 (mtex_2d_mapping). O Texture Coordinate devolve em espaço de
+                # mundo, então volta para câmera e aplica o mesmo remapeamento.
+                n = b.add("ShaderNodeTexCoord", -1900, y)
+                vt = b.add("ShaderNodeVectorTransform", -1700, y,
+                           label=slot.texture_coords.title() + " (camera)")
+                vt.vector_type = 'NORMAL' if slot.texture_coords == 'NORMAL' else 'VECTOR'
+                vt.convert_from = 'WORLD'
+                vt.convert_to = 'CAMERA'
+                if slot.texture_coords == 'NORMAL':
+                    geo = b.add("ShaderNodeNewGeometry", -1900, y - 200)
+                    b.link(geo.outputs["Normal"], vt.inputs["Vector"])
+                else:
+                    b.link(n.outputs["Reflection"], vt.inputs["Vector"])
+                m = b.add("ShaderNodeMapping", -1500, y, label="-1..1 -> 0..1")
+                m.vector_type = 'POINT'
+                set_mapping(m, (0.5, 0.5, 0.0), (0.0, 0.0, 0.0), (0.5, 0.5, 1.0))
+                b.link(vt.outputs["Vector"], m.inputs["Vector"])
+                coords[key] = m.outputs["Vector"]
             else:
                 n = b.add("ShaderNodeTexCoord", -1500, y)
                 coords[key] = n.outputs["Generated" if slot.texture_coords == 'ORCO' else "UV"]
@@ -1060,7 +1092,8 @@ def build_pbr_from_legacy(mat):
 
         for role in roles:
             if role == "color":
-                if color_out is None:
+                first = color_out is None
+                if first and slot.blend_type == 'MIX' and slot.diffuse_color_factor >= 1.0:
                     color_out = img_color
                     # Nó de textura ativo: é ele que o modo Texture da 3D view desenha
                     # (nodeGetActiveTexture) e o que o Texture Paint pinta. Sem marcar,
@@ -1076,9 +1109,23 @@ def build_pbr_from_legacy(mat):
                     except TypeError:
                         m.blend_type = 'MIX'
                     m.inputs["Fac"].default_value = slot.diffuse_color_factor
-                    b.link(color_out, m.inputs["Color1"])
+                    if first:
+                        # Primeiro slot com Multiply/Add/fator < 1: no BI ele se mistura
+                        # com a cor do material, não a substitui.
+                        m.inputs["Color1"].default_value = bsdf.inputs["Base Color"].default_value[:]
+                        b.tree.nodes.active = node
+                    else:
+                        b.link(color_out, m.inputs["Color1"])
                     b.link(img_color, m.inputs["Color2"])
                     color_out = m.outputs["Color"]
+            elif role == "normal" and not getattr(slot.texture, "use_normal_map", False):
+                # Sem "Normal Map" marcado na textura o BI usa a imagem como altura (bump),
+                # mesmo que ela seja um normal map: vira nó Bump, não Normal Map.
+                bp = b.add("ShaderNodeBump", -550, y - 150, label="Bump")
+                bp.invert = slot.normal_factor < 0.0
+                bp.inputs["Strength"].default_value = min(abs(slot.normal_factor), 1.0)
+                b.link(img_color, bp.inputs["Height"])
+                b.link(bp.outputs["Normal"], bsdf.inputs["Normal"])
             elif role == "normal":
                 nm = b.add("ShaderNodeNormalMap", -550, y - 150)
                 nm.inputs["Strength"].default_value = abs(slot.normal_factor)
