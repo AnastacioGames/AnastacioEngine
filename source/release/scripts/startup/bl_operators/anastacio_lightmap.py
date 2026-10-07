@@ -195,6 +195,84 @@ def lightmap_scale(ob):
     return max(0.01, float(getattr(ob, "ae_lightmap_scale", 1.0)))
 
 
+def native_library(name, setup):
+    """Engine helper library (source/intern/<name>) next to the executable, or None."""
+    import ctypes
+    import os
+    import sys
+    path = os.path.join(os.path.dirname(bpy.app.binary_path),
+                        name + ".dll" if sys.platform == "win32" else "lib" + name + ".so")
+    if not os.path.isfile(path):
+        return None
+    try:
+        lib = ctypes.CDLL(path)
+    except OSError:
+        return None
+    setup(lib)
+    return lib
+
+
+XATLAS_BRUTE_FORCE = 0  # 1: brute-force chart placement, measured slower with no gain
+
+
+def xatlas_pack(objects, size, margin_px):
+    """Charts and packs the "Lightmap" UV layer of all objects with xatlas (ae_uvatlas): charts follow
+    the mesh shape and fill the atlas tightly, so the same resolution gives more texels per meter.
+    Sizes are in world units (object scale and Object.ae_lightmap_scale). False if unavailable."""
+    import ctypes
+    import numpy as np
+    lib = native_library("ae_uvatlas", lambda lib: setattr(lib.ae_uvatlas, "argtypes", (
+        ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p)))
+    if lib is None:
+        return False
+    positions, indices, corners, vert_counts, tri_counts = [], [], [], [], []
+    for ob in objects:
+        me = ob.data
+        co = np.empty(len(me.vertices) * 3, dtype=np.float32)
+        me.vertices.foreach_get("co", co)
+        co = co.reshape(-1, 3)
+        m = np.array(ob.matrix_world, dtype=np.float32)
+        co = (co @ m[:3, :3].T) * lightmap_scale(ob)
+        loop_vert = np.empty(len(me.loops), dtype=np.int64)
+        me.loops.foreach_get("vertex_index", loop_vert)
+        start = np.empty(len(me.polygons), dtype=np.int64)
+        total = np.empty(len(me.polygons), dtype=np.int64)
+        me.polygons.foreach_get("loop_start", start)
+        me.polygons.foreach_get("loop_total", total)
+        # fan triangles of every polygon, as loop indices (the UV is written per loop)
+        n = total - 2
+        poly = np.repeat(np.arange(len(start)), n)
+        k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
+        tris = np.stack([start[poly], start[poly] + k, start[poly] + k + 1], axis=1).reshape(-1)
+        positions.append(co)
+        indices.append(loop_vert[tris].astype(np.uint32))
+        corners.append(tris)
+        vert_counts.append(len(co))
+        tri_counts.append(len(tris) // 3)
+    pos = np.ascontiguousarray(np.concatenate(positions), dtype=np.float32)
+    idx = np.ascontiguousarray(np.concatenate(indices), dtype=np.uint32)
+    vc = np.array(vert_counts, dtype=np.int32)
+    tc = np.array(tri_counts, dtype=np.int32)
+    out = np.zeros(len(idx) * 2, dtype=np.float32)
+    err = lib.ae_uvatlas(len(objects), vc.ctypes.data, pos.ctypes.data, tc.ctypes.data, idx.ctypes.data,
+                         size, max(1, int(margin_px)), XATLAS_BRUTE_FORCE, out.ctypes.data)
+    if err != 0:
+        print("AE lightmap: xatlas failed (%d), using Lightmap Pack" % err)
+        return False
+    out = out.reshape(-1, 2)
+    offset = 0
+    for ob, tris in zip(objects, corners):
+        me = ob.data
+        uv = np.zeros(len(me.loops) * 2, dtype=np.float32)
+        uv.reshape(-1, 2)[tris] = out[offset:offset + len(tris)]
+        offset += len(tris)
+        me.uv_layers[UV_NAME].data.foreach_set("uv", uv)
+        me.update()
+    print("AE lightmap: UV atlas by xatlas")
+    return True
+
+
 def make_lightmap_uvs(scene, objects, size, margin_px=4):
     """Adds/refreshes the "Lightmap" UV layer and packs all objects in one atlas. Meshes shared by
     several objects are made single-user (each object needs its own place in the atlas)."""
@@ -211,11 +289,17 @@ def make_lightmap_uvs(scene, objects, size, margin_px=4):
             other = next((uv for uv in me.uv_textures if uv != layer), None)
             if other:
                 other.active_render = True
+
+    if xatlas_pack(objects, size, margin_px):
+        return
+    for ob in objects:
+        me = ob.data
         # the packer measures faces in mesh space: apply the object scale meanwhile so a stretched
         # wall gets as many texels per meter as a small box
         # (times the per-object lightmap scale, to give an object more or fewer texels)
         me.transform(scale_matrix(ob.scale * lightmap_scale(ob)))
 
+    # fallback without ae_uvatlas: Blender's Lightmap Pack (one box per face group, more empty space)
     # margin in texels of the atlas: each chart is contracted by this on every side, so two charts are
     # 2*margin_px apart and the dilation after the bake has room without bleeding into the neighbour.
     # (the operator turns the percentage into a divisor of the packed size)
@@ -301,18 +385,8 @@ def use_gpu_device(scene):
 def oidn_library():
     """ae_denoise (Intel Open Image Denoise wrapper, source/intern/ae_denoise) next to the executable, or None."""
     import ctypes
-    import os
-    import sys
-    name = "ae_denoise.dll" if sys.platform == "win32" else "libae_denoise.so"
-    path = os.path.join(os.path.dirname(bpy.app.binary_path), name)
-    if not os.path.isfile(path):
-        return None
-    try:
-        lib = ctypes.CDLL(path)
-    except OSError:
-        return None
-    lib.ae_denoise.argtypes = (ctypes.c_void_p, ctypes.c_int, ctypes.c_int)
-    return lib
+    return native_library("ae_denoise", lambda lib: setattr(
+        lib.ae_denoise, "argtypes", (ctypes.c_void_p, ctypes.c_int, ctypes.c_int)))
 
 
 def denoise_oidn(lib, pixels, mask, size):

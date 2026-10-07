@@ -164,6 +164,12 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   ~2 ms na iGPU.
 - Objeto móvel: esfera varrida de x=-2,4 a 3,4 (25 posições) com volume ligado: brilho sobe contínuo
   em direção à janela (20→73 em 0-255), sem saltos, no tom das paredes; sem volume fica clara e manchada.
+- UV da lightmap por xatlas (`extern/xatlas`, MIT, commit f700c779) em `intern/ae_uvatlas` (DLL via
+  ctypes, como o `ae_denoise`): charts seguem a forma da malha, densidade buscada para o atlas caber
+  exato na resolução. Sem a DLL, volta ao Lightmap Pack. Cobertura da textura (1024): sala 75→77%,
+  Cornell 90→70% (caixas grandes: Lightmap Pack já é bom), cena orgânica (esfera, Suzanne subdividida,
+  toro, terreno) 2→86%, ~6× texels por metro. Tempo: 0,7 s sala, 6 s orgânica. Brute force medido:
+  mais lento e sem ganho, desligado.
 - Pendente: testar Linux e Web. `ae_denoise.dll` e `tbb.dll`
   já vão para `build/bin/` pelo `install` do CMake, logo entram no ZIP do release. Manchas na
   lightmap eram ruído de 8 amostras (64 limpa); faixa clara na base da parede era o shadow bias 1.0 do sol

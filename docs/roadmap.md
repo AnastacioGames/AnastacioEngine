@@ -441,7 +441,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 - **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
   GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
-  validar no Linux e no build Web; opcional SSGI (fase 4) e xatlas.
+  validar no Linux e no build Web; opcional SSGI (fase 4). UV da lightmap por xatlas.
 - **Compatibilidade UPBGE 0.2.5b adiada:** ao abrir um `.blend` dessa versão, migrar somente quando
   `upbgeversionfile != 0` e o arquivo ainda não tiver versão Range. Há duas conversões verificadas que não
   devem ser misturadas à correção dos Mouse Logic Bricks: (1) em `World.skytype`, mover `Sky Texture` do bit
