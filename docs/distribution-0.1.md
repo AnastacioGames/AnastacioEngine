@@ -62,7 +62,7 @@ build/dist/
   RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git). O painel (GUI,
   Godot) só roda no Windows; não existe nem é necessário um pacote `RangeArmor-<versao>-linux-x64`
   separado, porque o painel já exporta jogos para Linux x86_64 embutindo o launcher Rust compilado para
-  `x86_64-unknown-linux-gnu` (ver `docs/rangearmor-modernization-plan.md`).
+  `x86_64-unknown-linux-gnu`.
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
   arquivos para permitir verificação de integridade por quem baixar.
 

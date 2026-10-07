@@ -167,7 +167,7 @@ ferramenta correspondente.
   antigo que seu source Rust (`source/launcher/src/main.rs`), é recompilado automaticamente com
   `cargo build --release` antes de ser copiado, sem diálogo nem passo manual — evita que um
   binário desatualizado volte a causar o jogo exportado "abrindo e fechando" na hora. Ver
-  `docs/export-presets-plan.md` e `docs/changelog.md` (2026-09-12).
+  `docs/changelog.md` (2026-09-12).
 
 ## Decisões técnicas vigentes
 
