@@ -413,6 +413,14 @@ static void gradient_draw_line(bContext *UNUSED(C), int x, int y, void *customda
 	}
 }
 
+/* Traços Line/Curve geram todas as pinceladas de uma vez, sem redesenho entre elas: o backbuf de
+ * seleção só vale na primeira leitura (depois devolve as cores da viewport), então a checagem descartaria
+ * o traço inteiro. Esses traços não têm o problema que ela resolve (arrasto livre sobre outros objetos). */
+static bool texture_paint_brush_is_batched(const Brush *brush)
+{
+	return brush && (brush->flag & (BRUSH_LINE | BRUSH_CURVE));
+}
+
 static bool texture_paint_mouse_over_active_face(bContext *C, PaintOperation *pop, Object *ob, const float mouse[2])
 {
 	Mesh *me;
@@ -451,7 +459,9 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
 	if (CTX_wm_region_view3d(C)) {
 		Object *ob = OBACT;
 		bool uvs, mat, tex, stencil;
-		if (!texture_paint_mouse_over_active_face(C, pop, ob, mouse)) {
+		if (!texture_paint_brush_is_batched(brush) &&
+		    !texture_paint_mouse_over_active_face(C, pop, ob, mouse))
+		{
 			MEM_freeN(pop);
 			return NULL;
 		}
@@ -510,8 +520,9 @@ static void paint_stroke_update_step(bContext *C, struct PaintStroke *stroke, Po
 
 	/* Do not keep processing a 3D stroke over viewport overlays or other
 	 * objects. This avoids stray dabs and expensive image-undo updates. */
-	if (pop->mode == PAINT_MODE_3D_PROJECT &&
-	    !texture_paint_mouse_over_active_face(C, pop, OBACT, mouse)) {
+	if (pop->mode == PAINT_MODE_3D_PROJECT && !texture_paint_brush_is_batched(brush) &&
+	    !texture_paint_mouse_over_active_face(C, pop, OBACT, mouse))
+	{
 		copy_v2_v2(pop->prevmouse, mouse);
 		return;
 	}

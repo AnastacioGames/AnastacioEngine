@@ -4574,8 +4574,19 @@ static int paint_hints_collect(Scene *scene, int mode, PaintHint hints[PAINT_HIN
 #define HINT(k, l) { hints[n].key = k; hints[n].label = l; n++; } (void)0
 
 	if (br && (br->flag & BRUSH_LINE)) {
-		HINT(N_("Drag"), N_("Draw line"));
+		HINT(N_("Drag + release"), N_("Draw line"));
 		HINT(N_("Alt"), N_("Snap angle"));
+	}
+	else if (br && (br->flag & BRUSH_CURVE)) {
+		/* curva de pintura: só os atalhos dela, os do pincel confundem aqui */
+		HINT(N_("Ctrl LMB"), N_("Add point"));
+		HINT(N_("LMB drag"), N_("Move point"));
+		HINT(N_("RMB"), N_("Select"));
+		HINT("X", N_("Delete point"));
+		HINT(N_("Enter"), N_("Paint along curve"));
+		HINT("F", N_("Size"));
+		HINT(N_("Ctrl Z"), N_("Undo"));
+		return n;
 	}
 	else if (mode == OB_MODE_TEXTURE_PAINT && br &&
 	         br->imagepaint_tool == PAINT_TOOL_FILL && (br->flag & BRUSH_USE_GRADIENT))

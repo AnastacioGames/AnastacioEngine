@@ -1,5 +1,16 @@
 # Changelog — AnastacioEngine
 
+## Texture Paint: traços Line e Curve voltam a pintar (2026-10-07)
+
+- `paint_image.c`: a checagem "mouse sobre face do objeto ativo" (`fff04797`) lê o backbuf de seleção a cada
+  pincelada. Line e Curve geram as pinceladas de uma vez, sem redesenho; depois da primeira o backbuf devolve
+  as cores da viewport (índices como 466210 numa malha de 6 faces) e o traço inteiro era descartado. Esses
+  traços agora pulam a checagem (`texture_paint_brush_is_batched`); o traço livre continua com ela.
+- Dicas do rodapé: modo Curve mostra os atalhos da curva (Ctrl LMB ponto, Enter pinta); Line diz
+  `Drag + release`.
+- Validado: curva por script altera os pixels; usuário confirmou pintura com Line e Curve.
+- Em aberto: crash por corrupção de heap (`0xc0000374`) visto em 06/10 e 07/10 pintando, sem reprodução.
+
 ## Editor: dicas de atalho nos modos de pintura e sculpt (2026-10-07)
 
 - `view3d_draw.c`: faixa no rodapé da 3D View, alinhada à esquerda e acima da barra flutuante Play/Standalone,
