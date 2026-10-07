@@ -1033,6 +1033,16 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
 	translation[1] = y;
 	outline_alpha = 0.5;
 	outline_col = brush->add_col;
+
+	/* Blender 5 style outside sculpt: light gray at 0.9 alpha. Only replaces the untouched
+	 * light red default, so a custom cursor color saved in the file is still respected. */
+	static float paint_cursor_gray[3] = {0.75f, 0.75f, 0.75f};
+	static const float paint_cursor_old_red[3] = {1.0f, 0.39f, 0.39f};
+	if (mode != PAINT_MODE_SCULPT) {
+		outline_alpha = 0.9f;
+		if (compare_v3v3(brush->add_col, paint_cursor_old_red, 0.005f))
+			outline_col = paint_cursor_gray;
+	}
 	final_radius = (BKE_brush_size_get(scene, brush) * zoomx);
 
 	/* don't calculate rake angles while a stroke is active because the rake variables are global

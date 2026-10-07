@@ -9,6 +9,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Viewport: bones e cursor de pintura no estilo Blender 5 (2026-10-07)
+
+- Referência: fonte do Blender 5.0 em `D:\blender5-ref` (sparse: `sculpt_paint`, `uvedit`, `blenkernel`,
+  `geometry`, `draw/engines/overlay`). Só overlays; shading dos meshes e formato do .blend inalterados.
+- Bones (`drawarmature.c`): sólidos sem luz GL, com a mistura de 2 tons do
+  `overlay_armature_shape_solid_vert.glsl` (luz `(0.1, 0.1, 0.8)` em view space, tom escuro = 35% da cor) em
+  Octahedral, B-Bone (caixas) e Envelope (esfera/cilindro próprios no lugar do GLU). No Object Mode, arestas
+  finas suaves na cor de wire do objeto (laranja quando selecionado); a primeira tentativa, um contorno escuro
+  grosso por silhueta, foi rejeitada pelo usuário. Wire e Stick com linha suave, 2 px no bone selecionado.
+  Seleção por clique (`G_PICKSEL`) continua com o desenho antigo.
+- Axes dos bones (`drawaxes_colored` em `drawobject.c`): X/Y/Z em vermelho/verde/azul misturados com a cor do
+  texto (0.1 selecionado, 0.65 não selecionado), letras mais claras, linhas suaves. Empties sem mudança.
+- Cursor do pincel (`paint_cursor.c`): fora do Sculpt, cinza 0.75 com alpha 0.9 como os brushes essentials do
+  5.2; só substitui o vermelho padrão, então uma cor de cursor customizada salva no arquivo é mantida.
+- Texture Paint em plano grande perto da câmera: o Blender 5.0 tem o mesmo descarte do triângulo inteiro
+  quando um vértice fica antes do near clip (`project_paint_flt_max_cull`, com `TODO`); não há correção para
+  portar, e o teste de bucket da engine já é mais completo (aresta `v3-v1`).
+
 ## Sombra: atualização automática para Spot/Point (2026-10-07)
 
 - Nova opção por lâmpada **Auto Update** (Spot/Point, painel de sombra; `LA_AUTO_SHADOW`, RNA

@@ -627,6 +627,54 @@ void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 }
 
 
+/* Blender 5 style bone axes (overlay_extra_vert.glsl VCLASS_EMPTY_AXES): OB_ARROWS with each axis
+ * in red/green/blue mixed with base_col by fac (0 = pure axis color), with smooth lines. */
+void drawaxes_colored(const float viewmat_local[4][4], float size, const float base_col[3], float fac)
+{
+	float viewmat_local_unit[3][3];
+	int axis;
+
+	copy_m3_m4(viewmat_local_unit, (float (*)[4])viewmat_local);
+	normalize_m3(viewmat_local_unit);
+
+	glLineWidth(U.pixelsize);
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+
+	for (axis = 0; axis < 3; axis++) {
+		const int arrow_axis = (axis == 0) ? 1 : 0;
+		float v1[3] = {0.0f, 0.0f, 0.0f}, v2[3] = {0.0f, 0.0f, 0.0f};
+		float axis_col[3] = {0.0f, 0.0f, 0.0f}, col[3];
+
+		axis_col[axis] = 1.0f;
+		interp_v3_v3v3(col, axis_col, base_col, fac);
+		glColor3fv(col);
+
+		glBegin(GL_LINES);
+		v2[axis] = size;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		v1[axis] = size * 0.85f;
+		v1[arrow_axis] = -size * 0.08f;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		v1[arrow_axis] = size * 0.08f;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		glEnd();
+
+		/* letters a bit lighter, as the fract() offset of the axis color in Blender 5 */
+		add_v3_fl(axis_col, 0.4f);
+		interp_v3_v3v3(col, axis_col, base_col, fac);
+		glColor3f(min_ff(col[0], 1.0f), min_ff(col[1], 1.0f), min_ff(col[2], 1.0f));
+		v2[axis] += size * 0.125f;
+		draw_xyz_wire(viewmat_local_unit, v2, size, axis);
+	}
+
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+}
+
 /* Function to draw an Image on an empty Object */
 static void draw_empty_image(Object *ob, const short dflag, const unsigned char ob_wire_col[4], eStereoViews sview)
 {
