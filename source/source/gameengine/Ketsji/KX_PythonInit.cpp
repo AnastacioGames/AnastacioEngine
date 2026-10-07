@@ -1003,28 +1003,6 @@ static void restoreObjectConvertFlags()
 	gConvertFlagBackup.clear();
 }
 
-static bool objectIsChildOf(Object *ob, Object *parent)
-{
-	for (Object *par = ob->parent; par; par = par->parent) {
-		if (par == parent) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static Object *findSceneObject(Scene *scene, const char *name)
-{
-	Scene *sce_iter;
-	Base *base;
-	for (SETLOOPER(scene, sce_iter, base)) {
-		if (STREQ(base->object->id.name + 2, name)) {
-			return base->object;
-		}
-	}
-	return nullptr;
-}
-
 PyDoc_STRVAR(gPySetObjectConvert_doc,
 "setObjectConvert(scene, object, convert, children=True)\n"
 "Sets the object's Convert flag in a scene not loaded yet; returns the number of objects changed.");
@@ -1043,7 +1021,7 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 		PyErr_Format(PyExc_ValueError, "setObjectConvert: scene \"%s\" not found", scenename);
 		return nullptr;
 	}
-	Object *target = findSceneObject(scene, obname);
+	Object *target = BL_Converter::FindSceneObject(scene, obname);
 	if (!target) {
 		PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" not found in scene \"%s\"", obname, scenename);
 		return nullptr;
@@ -1055,7 +1033,7 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 	Base *base;
 	for (SETLOOPER(scene, sce_iter, base)) {
 		Object *ob = base->object;
-		if (ob != target && !(children && objectIsChildOf(ob, target))) {
+		if (ob != target && !(children && BL_Converter::IsChildOf(ob, target))) {
 			continue;
 		}
 		if (convert && converter->IsObjectDataFreed(ob)) {
@@ -1131,7 +1109,7 @@ static PyObject *gPyGetObjectConvert(PyObject *, PyObject *args)
 		return nullptr;
 	}
 	Scene *scene = KX_GetActiveEngine()->GetConverter()->GetBlenderSceneForName(scenename);
-	Object *ob = scene ? findSceneObject(scene, obname) : nullptr;
+	Object *ob = scene ? BL_Converter::FindSceneObject(scene, obname) : nullptr;
 	if (!ob) {
 		PyErr_Format(PyExc_ValueError, "getObjectConvert: object \"%s\" not found in scene \"%s\"", obname, scenename);
 		return nullptr;

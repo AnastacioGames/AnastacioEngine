@@ -263,6 +263,10 @@ public:
 	bool IsObjectDataFreed(Object *ob) const;
 	/// Set by the standalone player: the Main belongs to the game, not to the editor.
 	static void SetMainOwnedByGame(bool owned);
+	/// Object of the given name in blscene or its background sets, nullptr if absent.
+	static Object *FindSceneObject(Scene *blscene, const std::string& name);
+	/// True when parent is an ancestor of ob, at any depth.
+	static bool IsChildOf(Object *ob, Object *parent);
 
 	/// Return a new empty library of name path.
 	Main *CreateLibrary(const std::string& path);

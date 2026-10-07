@@ -238,7 +238,7 @@ KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX
 	return scene_merge->FindInactiveObjectByName(name);
 }
 
-static bool object_is_child_of(Object *ob, Object *parent)
+bool BL_Converter::IsChildOf(Object *ob, Object *parent)
 {
 	for (Object *par = ob->parent; par; par = par->parent) {
 		if (par == parent) {
@@ -248,20 +248,24 @@ static bool object_is_child_of(Object *ob, Object *parent)
 	return false;
 }
 
+Object *BL_Converter::FindSceneObject(Scene *blscene, const std::string& name)
+{
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		if (STREQ(base->object->id.name + 2, name.c_str())) {
+			return base->object;
+		}
+	}
+	return nullptr;
+}
+
 KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::string& name, bool children, std::string& error)
 {
 	Scene *blscene = scene->GetBlenderScene();
 	SCA_LogicManager *logicmgr = scene->GetLogicManager();
 
-	Object *target = nullptr;
-	Scene *sce_iter;
-	Base *base;
-	for (SETLOOPER(blscene, sce_iter, base)) {
-		if (STREQ(base->object->id.name + 2, name.c_str())) {
-			target = base->object;
-			break;
-		}
-	}
+	Object *target = FindSceneObject(blscene, name);
 	if (!target) {
 		error = "object not found in the scene";
 		return nullptr;
@@ -299,9 +303,11 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 	}
 
 	std::vector<std::pair<Object *, int> > objects;
+	Scene *sce_iter;
+	Base *base;
 	for (SETLOOPER(blscene, sce_iter, base)) {
 		Object *ob = base->object;
-		if ((ob == target || (children && object_is_child_of(ob, target))) &&
+		if ((ob == target || (children && IsChildOf(ob, target))) &&
 		    !logicmgr->FindGameObjByBlendObj(ob) && !IsObjectDataFreed(ob))
 		{
 			objects.emplace_back(ob, ob->gameflag);

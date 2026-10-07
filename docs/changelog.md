@@ -1,5 +1,19 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Flag Convert vira "Load with Scene", com avisos no painel
+
+- O rótulo da flag (`Object.convert_object`, bit `OB_TASK_CONVERT`) passa a ser "Load with Scene";
+  o nome no Python e no arquivo não mudam. O tooltip cita `scene.convertObject()`.
+- O painel "Game Object Tasks" virou "Loading" e vem aberto. Ele avisa os casos que antes falhavam
+  em silêncio: objeto ligado sob um ancestral desligado (sai da carga do mesmo jeito), membro desligado
+  de um grupo usado por um dupli group ligado, e malha compartilhada com objetos ligados
+  (`freeUnconvertedData` não a libera). Com a flag desligada, mostra a chamada `scene.convertObject("nome")`
+  e quantos filhos ficam de fora junto.
+- Operador `object.game_load_with_scene` (botões "Load All" / "Leave Out All"): liga ou desliga a
+  flag nos objetos selecionados e nos filhos deles, com undo.
+- `BL_Converter::FindSceneObject` e `BL_Converter::IsChildOf` substituem as cópias que existiam em
+  `BL_Converter.cpp` e `KX_PythonInit.cpp`. O teste de runtime de `tests/convert_flag/` sai igual.
+
 ## 2026-10-07 - Revalidacao das melhorias do Material Atlas
 
 - Nova execucao em build/bin, sem alterar codigo: quatro casos modais passaram com exit 0
