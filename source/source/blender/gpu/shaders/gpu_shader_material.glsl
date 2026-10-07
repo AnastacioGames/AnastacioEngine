@@ -292,6 +292,13 @@ void direction_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 	vout = (mat * vec4(vin, 0.0)).xyz;
 }
 
+/* Normal from world to object space: transpose of the object matrix (the inverse is only right for
+ * uniform scale). */
+void normal_world_to_object_m4v3(vec3 vin, mat4 objmat, out vec3 vout)
+{
+	vout = normalize((vec4(vin, 0.0) * objmat).xyz);
+}
+
 void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 {
 	vout = (mat * vec4(vin, 1.0)).xyz;
@@ -5528,7 +5535,7 @@ void node_tex_image_box(vec3 texco,
 
 	/* project from direction vector to barycentric coordinates in triangles */
 	N = vec3(abs(N.x), abs(N.y), abs(N.z));
-	N /= (N.x + N.y + N.z);
+	N /= max(N.x + N.y + N.z, 1e-6);
 
 	/* basic idea is to think of this as a triangle, each corner representing
 	 * one of the 3 faces of the cube. in the corners we have single textures,
@@ -5581,28 +5588,21 @@ void node_tex_image_box(vec3 texco,
 		/* Desperate mode, no valid choice anyway, fallback to one side.*/
 		weight.x = 1.0;
 	}
-	color = vec4(0);
-	if (weight.x > 0.0) {
-		vec2 uv = texco.yz;
-		if(signed_N.x < 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.x * texture2D(ima, uv);
+	/* Sample all three projections unconditionally: texture2D inside a branch that changes per pixel
+	 * gets undefined derivatives, so the mip level breaks along the blend borders (seam lines). */
+	vec2 uvx = texco.yz;
+	if (signed_N.x < 0.0) {
+		uvx.x = 1.0 - uvx.x;
 	}
-	if (weight.y > 0.0) {
-		vec2 uv = texco.xz;
-		if(signed_N.y > 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.y * texture2D(ima, uv);
+	vec2 uvy = texco.xz;
+	if (signed_N.y > 0.0) {
+		uvy.x = 1.0 - uvy.x;
 	}
-	if (weight.z > 0.0) {
-		vec2 uv = texco.yx;
-		if(signed_N.z > 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.z * texture2D(ima, uv);
+	vec2 uvz = texco.yx;
+	if (signed_N.z > 0.0) {
+		uvz.x = 1.0 - uvz.x;
 	}
+	color = weight.x * texture2D(ima, uvx) + weight.y * texture2D(ima, uvy) + weight.z * texture2D(ima, uvz);
 
 	alpha = color.a;
 }

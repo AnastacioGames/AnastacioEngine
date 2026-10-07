@@ -9,6 +9,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Triplanar: projeção Box do Image Texture corrigida + demo (2026-10-06)
+
+- `node_tex_image_box` (GLSL): as três projeções são amostradas sempre e pesadas, em vez de dentro de `if`
+  por pixel (derivadas indefinidas no desvio quebravam o mipmap e deixavam linhas na emenda); soma das
+  normais protegida contra zero.
+- Normal da projeção Box vai para o espaço do objeto pela transposta da matriz do objeto
+  (`normal_world_to_object_m4v3`); a inversa usada antes só valia para escala uniforme.
+- `tools/create_triplanar_test.py` → `demos/triplanar.range`: material "Pedra Triplanar" (Object →
+  Mapping → Image Texture Box, rugosidade pela luminância) e "Pedra Plana" para comparação, em rochas
+  deformadas e paredão sem UV; nós em frames com notas.
+
 ## Nó Parallax corrigido + receitas de blocos parallax e interior mapping (2026-10-06)
 
 - Nó `Parallax` (Game): com Shading Nodes a entrada/saída agora é UV 0..1 (antes exigia -1..1 do caminho
