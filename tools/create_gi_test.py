@@ -84,6 +84,7 @@ def lamp(kind, name, location, rotation, energy, cycles_strength, color=(1.0, 0.
     ob.data.energy = energy
     ob.data.color = color
     ob.data.shadow_method = 'RAY_SHADOW'
+    ob.data.shadow_buffer_bias = 0.1  # default 1.0 leaves a lit strip where the walls meet the floor
     ob.data.use_nodes = True
     ob.data.node_tree.nodes["Emission"].inputs["Strength"].default_value = cycles_strength
     if hasattr(ob.data, "cycles"):
@@ -112,20 +113,22 @@ else:
     w, d, h = 8.0, 6.0, 3.0
     box("Floor", (0, 0, -t / 2), (w, d, t), WOOD)
     box("Ceiling", (0, 0, h + t / 2), (w, d, t), WHITE)
-    box("Back", (0, d / 2 + t / 2, h / 2), (w, t, h), WHITE)
-    box("Front", (0, -d / 2 - t / 2, h / 2), (w, t, h), WHITE)
-    box("Left", (-w / 2 - t / 2, 0, h / 2), (t, d, h), RED)
+    # walls overlap the floor, the ceiling and each other by the wall thickness: faces that only touch
+    # leave a zero-width crack the bake sees through (sunlight leaking along the edges)
+    box("Back", (0, d / 2 + t / 2, h / 2), (w + 2 * t, t, h + 2 * t), WHITE)
+    box("Front", (0, -d / 2 - t / 2, h / 2), (w + 2 * t, t, h + 2 * t), WHITE)
+    box("Left", (-w / 2 - t / 2, 0, h / 2), (t, d, h + 2 * t), RED)
     # right wall with a window 2.4 wide x 1.4 tall (sill at 0.8)
     win_w, sill, win_h = 2.4, 0.8, 1.4
     side = (d - win_w) / 2
-    box("RightA", (w / 2 + t / 2, -d / 2 + side / 2, h / 2), (t, side, h), WHITE)
-    box("RightB", (w / 2 + t / 2, d / 2 - side / 2, h / 2), (t, side, h), WHITE)
-    box("RightSill", (w / 2 + t / 2, 0, sill / 2), (t, win_w, sill), WHITE)
+    box("RightA", (w / 2 + t / 2, -d / 2 + side / 2, h / 2), (t, side, h + 2 * t), WHITE)
+    box("RightB", (w / 2 + t / 2, d / 2 - side / 2, h / 2), (t, side, h + 2 * t), WHITE)
+    box("RightSill", (w / 2 + t / 2, 0, (sill - t) / 2), (t, win_w, sill + t), WHITE)
     box("RightTop", (w / 2 + t / 2, 0, (sill + win_h + h) / 2), (t, win_w, h - sill - win_h), WHITE)
     box("Sofa", (-2.6, 1.2, 0.4), (1.2, 2.6, 0.8), GREEN)
     box("Table", (0.2, 0.8, 0.35), (1.4, 0.9, 0.7), WHITE)
     # Sun from the right, low, through the window onto the floor
-    lamp('SUN', "Sun", (8, 0, 6), (0, math.radians(55), 0), 3.0, 4.0)
+    lamp('SUN', "Sun", (8, 0, 6), (0, math.radians(55), 0), 4.0 / math.pi, 4.0)  # game sun = Cycles W/m2 / pi
     bpy.ops.mesh.primitive_uv_sphere_add(location=(1.5, -1.2, 0.5), size=0.5, segments=32, ring_count=16)
     sphere = bpy.context.object
     sphere.name = "MovingSphere"
@@ -187,7 +190,7 @@ if want_shot:
     cam.game.sensors[-1].link(cam.game.controllers[-1])
 
 if want_bake:
-    scene.ae_lightmap_settings.samples = 8
+    scene.ae_lightmap_settings.samples = int(next((a[10:] for a in argv if a.startswith('--samples=')), '64'))
     scene.ae_lightmap_settings.resolution = next((a[6:] for a in argv if a.startswith('--res=')), '256')
     scene.ae_lightmap_settings.use_gpu = False
     print("GI_TEST bake", bpy.ops.scene.ae_lightmap_bake())
