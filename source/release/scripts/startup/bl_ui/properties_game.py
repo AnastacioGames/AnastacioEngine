@@ -1716,6 +1716,53 @@ class WORLD_PT_game_environment_lighting(WorldButtonsPanel, Panel):
         split.prop(light, "environment_color", text="")
 
 
+class WORLD_PT_game_lightmap(WorldButtonsPanel, Panel):
+    bl_label = "Baked Lighting"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and
+                hasattr(scene, "ae_lightmap_settings"))
+
+    def draw_header(self, context):
+        self.layout.prop(context.scene, "ae_lightmap_use", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        settings = scene.ae_lightmap_settings
+
+        if not scene.game_settings.use_shading_nodes:
+            layout.label(text="Needs Shading Nodes (Game PBR)", icon='INFO')
+        col = layout.column()
+        col.active = scene.ae_lightmap_use or not scene.ae_lightmap
+        row = col.row(align=True)
+        row.prop(settings, "resolution", text="")
+        row.prop(settings, "samples")
+        row.prop(settings, "use_gpu")
+        row = col.row(align=True)
+        row.prop(settings, "margin")
+        row.prop(settings, "use_world")
+        row.prop(settings, "use_denoise")
+        row = col.row(align=True)
+        row.prop(settings, "use_volume")
+        sub = row.row(align=True)
+        sub.active = settings.use_volume
+        sub.prop(settings, "volume_spacing")
+        ob = context.object
+        if ob and ob.type == 'MESH' and hasattr(ob, "ae_lightmap_scale"):
+            col.prop(ob, "ae_lightmap_scale", text="Scale (" + ob.name + ")")
+        row = layout.row(align=True)
+        row.operator("scene.ae_lightmap_bake", icon='RENDER_STILL')
+        row.operator("scene.ae_lightmap_clear", text="", icon='X')
+        if scene.ae_lightmap:
+            layout.label(text="Image: " + scene.ae_lightmap, icon='IMAGE_DATA')
+        if scene.ae_lightvol:
+            layout.prop(scene, "ae_lightvol_use", text="Use Light Volume (moving objects)")
+
+
 class WORLD_PT_game_mist(WorldButtonsPanel, Panel):
     bl_label = "Fog"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -2520,6 +2567,7 @@ classes = (
     WORLD_PT_game_context_world,
     WORLD_PT_game_world,
     WORLD_PT_game_environment_lighting,
+    WORLD_PT_game_lightmap,
     WORLD_PT_game_mist,
     DATA_PT_shadow_game,
     DATA_PT_light_culling_game,

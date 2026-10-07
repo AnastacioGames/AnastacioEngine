@@ -117,11 +117,18 @@ const RAS_AttributeArray::AttribList BL_BlenderShader::GetAttribs(const RAS_Mesh
 			// Like Blender, a layer name missing from the mesh falls back to the active layer.
 			if (type == CD_MTFACE) {
 				unsigned short index = layersInfo.activeUv;
+				bool found = false;
 				for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
 					if (layer.name == attribname) {
 						index = layer.index;
+						found = true;
 						break;
 					}
+				}
+				/* Except the baked lightmap UV: a mesh outside the atlas gets no attribute (reads 0,0,
+				 * an empty texel), so it keeps the probe/World ambient (see node_shader_gpu_lightmap). */
+				if (!found && strcmp(attribname, "Lightmap") == 0) {
+					continue;
 				}
 				attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_UV, false, index});
 			}

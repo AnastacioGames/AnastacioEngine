@@ -70,6 +70,7 @@ endif()
 
 if(WITH_CYCLES)
 	add_subdirectory(cycles)
+	add_subdirectory(ae_denoise)
 endif()
 
 if(WITH_INTERNATIONAL)

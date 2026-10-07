@@ -439,6 +439,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Iluminação e gráficos
 
+- **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
+  Falta: aproximar o tom do Cycles, GTAO no lugar do SSAO legado, empacotar `ae_denoise.dll`/`tbb.dll` no
+  release, validar no Linux e no build Web.
 - **Compatibilidade UPBGE 0.2.5b adiada:** ao abrir um `.blend` dessa versão, migrar somente quando
   `upbgeversionfile != 0` e o arquivo ainda não tiver versão Range. Há duas conversões verificadas que não
   devem ser misturadas à correção dos Mouse Logic Bricks: (1) em `World.skytype`, mover `Sky Texture` do bit

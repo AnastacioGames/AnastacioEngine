@@ -34,6 +34,7 @@ _modules = [
     "console",
     "file",
     "image",
+    "anastacio_lightmap",
     "anastacio_material_recipes",
     "logic_to_python",
     "mask",
@@ -71,11 +72,16 @@ def register():
     for mod in _modules_loaded:
         for cls in mod.classes:
             register_class(cls)
+        # properties that need the classes above (e.g. a PointerProperty to a PropertyGroup)
+        if hasattr(mod, "register_props"):
+            mod.register_props()
 
 
 def unregister():
     from bpy.utils import unregister_class
     for mod in reversed(_modules_loaded):
+        if hasattr(mod, "unregister_props"):
+            mod.unregister_props()
         for cls in reversed(mod.classes):
             if getattr(cls, "is_registered", False):
                 unregister_class(cls)

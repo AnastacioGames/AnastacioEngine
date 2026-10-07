@@ -4722,10 +4722,54 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 
 	result = vec4(L * color.rgb, color.a);
 }
 
+/* Baked lightmap atlas (RGBM, gamma 2, range 8, see anastacio_lightmap.py). Texels outside the charts
+ * have alpha 0: a = 0 means "not baked here". */
+void lightmap_sample(vec3 uv, sampler2D tex, out vec4 lm)
+{
+	vec4 c = texture2D(tex, uv.xy);
+	vec3 g = c.rgb * c.a * 8.0;
+	lm = vec4(g * g, (c.a > 0.004) ? 1.0 : 0.0);
+}
+
+/* One face of the baked light volume (ambient cube, RGBM like the lightmap) at grid position p (in cells,
+ * probe i at i + 0.5). Layout: x = face * dim.x + i, y = k * dim.y + j; x/y interpolate in the hardware,
+ * z between two slices here. */
+vec3 lightvol_face(sampler2D tex, vec3 p, vec3 dim, float face)
+{
+	vec2 size = vec2(dim.x * 6.0, dim.y * dim.z);
+	vec2 xy = clamp(p.xy, vec2(0.5), dim.xy - 0.5);
+	float z = clamp(p.z, 0.5, dim.z - 0.5) - 0.5;
+	float k0 = floor(z);
+	float k1 = min(k0 + 1.0, dim.z - 1.0);
+	vec4 a = texture2D(tex, (vec2(face * dim.x, k0 * dim.y) + xy) / size);
+	vec4 b = texture2D(tex, (vec2(face * dim.x, k1 * dim.y) + xy) / size);
+	vec3 ga = a.rgb * a.a * 8.0;
+	vec3 gb = b.rgb * b.a * 8.0;
+	return mix(ga * ga, gb * gb, z - k0);
+}
+
+/* Baked light volume for meshes outside the lightmap (moving objects): fills lm where lm.a = 0 with the
+ * irradiance of the probe grid around the shaded point (faces +X -X +Y -Y +Z -Z). */
+void lightvol_sample(vec4 lm, vec3 viewpos, mat4 viewinv, vec3 N, sampler2D tex, vec3 vmin, vec3 vinv, vec3 dim,
+                     out vec4 result)
+{
+	result = lm;
+	if (lm.a < 0.5) {
+		vec3 wpos = (viewinv * vec4(viewpos, 1.0)).xyz;
+		vec3 wn = normalize((viewinv * vec4(N, 0.0)).xyz);
+		vec3 p = (wpos - vmin) * vinv;
+		vec3 n2 = wn * wn;
+		vec3 irr = n2.x * lightvol_face(tex, p, dim, (wn.x >= 0.0) ? 0.0 : 1.0) +
+		           n2.y * lightvol_face(tex, p, dim, (wn.y >= 0.0) ? 2.0 : 3.0) +
+		           n2.z * lightvol_face(tex, p, dim, (wn.z >= 0.0) ? 4.0 : 5.0);
+		result = vec4(irr, 1.0);
+	}
+}
+
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
-	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, out vec4 result)
+	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result)
 {
 	/* ambient light */
 	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
@@ -4733,6 +4777,10 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	if (env_on > 0.5) {
 		/* world environment (sky/HDRI) as diffuse irradiance; specular is added after the lights */
 		L = env_diffuse.rgb * diffuse_albedo * (1.0 - metallic);
+	}
+	if (lightmap.a > 0.5) {
+		/* baked indirect light replaces the probe/World diffuse; direct light stays dynamic below */
+		L = lightmap.rgb * diffuse_albedo * (1.0 - metallic);
 	}
 
 	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;

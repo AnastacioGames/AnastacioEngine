@@ -30,6 +30,8 @@
 
 #include "GPU_texture.h"
 
+#include "BKE_idprop.h"
+
 
 bool sh_node_poll_default(bNodeType *UNUSED(ntype), bNodeTree *ntree)
 {
@@ -330,6 +332,58 @@ void node_shader_gpu_world_env(GPUMaterial *mat, GPUNodeLink *rough,
 		*r_diffuse = *r_mirror;
 		*r_flag = GPU_uniform(&env_off);
 	}
+}
+
+/* Baked indirect light (Game PBR): one RGBM lightmap atlas for the scene, read through the UV layer
+ * named "Lightmap" (see bl_operators/anastacio_lightmap.py). The scene ID properties are "ae_lightmap"
+ * (image name) and "ae_lightmap_use" (on/off, World > Baked Lighting). Gives rgb = irradiance, a = 1 where baked (0 for
+ * objects outside the atlas, which keep the probe/World ambient). Off: a constant zero, no sampling.
+ * Where the lightmap does not reach, the baked light volume ("ae_lightvol*", same panel) fills in. */
+static Image *scene_baked_image(Scene *scene, const char *name_prop, const char *use_prop)
+{
+	if (!scene || !scene->id.properties || !G.main) {
+		return NULL;
+	}
+	IDProperty *name = IDP_GetPropertyFromGroup(scene->id.properties, name_prop);
+	IDProperty *use = IDP_GetPropertyFromGroup(scene->id.properties, use_prop);
+	if (name && name->type == IDP_STRING && use && use->type == IDP_INT && IDP_Int(use)) {
+		return BLI_findstring(&G.main->image, IDP_String(name), offsetof(ID, name) + 2);
+	}
+	return NULL;
+}
+
+GPUNodeLink *node_shader_gpu_lightmap(GPUMaterial *mat, GPUNodeLink *normal)
+{
+	Scene *scene = GPU_material_scene(mat);
+	Image *ima = scene_baked_image(scene, "ae_lightmap", "ae_lightmap_use");
+	GPUNodeLink *lm;
+	if (ima) {
+		GPU_link(mat, "lightmap_sample", GPU_attribute(CD_MTFACE, "Lightmap"), GPU_image(ima, NULL, true), &lm);
+	}
+	else {
+		GPU_link(mat, "set_rgba_zero", &lm);
+	}
+
+	/* light volume grid: "ae_lightvol_grid" = min xyz, cell size xyz, probe count xyz */
+	Image *vol = scene_baked_image(scene, "ae_lightvol", "ae_lightvol_use");
+	IDProperty *grid = vol ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_lightvol_grid") : NULL;
+	if (grid && grid->type == IDP_ARRAY && grid->len == 9 &&
+	    ELEM(grid->subtype, IDP_FLOAT, IDP_DOUBLE))
+	{
+		float g[9];
+		for (int i = 0; i < 9; i++) {
+			g[i] = (grid->subtype == IDP_FLOAT) ? ((float *)IDP_Array(grid))[i] : (float)((double *)IDP_Array(grid))[i];
+		}
+		float vmin[3] = {g[0], g[1], g[2]};
+		float vinv[3], dim[3] = {max_ff(g[6], 1.0f), max_ff(g[7], 1.0f), max_ff(g[8], 1.0f)};
+		for (int i = 0; i < 3; i++) {
+			vinv[i] = (g[3 + i] > 1e-6f) ? 1.0f / g[3 + i] : 0.0f;
+		}
+		GPU_link(mat, "lightvol_sample", lm, GPU_material_builtin(mat, GPU_VIEW_POSITION),
+		         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX),
+		         normal, GPU_image(vol, NULL, true), GPU_uniform(vmin), GPU_uniform(vinv), GPU_uniform(dim), &lm);
+	}
+	return lm;
 }
 
 /* Scene color copy for screen-space refraction (Glass, Refraction), see

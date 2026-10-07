@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Luz indireta baked: lightmap Cycles + OIDN + light volume (2026-10-06)
+
+- Operador `anastacio_lightmap.py` (Bake GI): UV "Lightmap" por objeto estático empacotada num atlas, bake
+  Cycles `DIFFUSE` (direto+indireto), denoise OIDN via `intern/ae_denoise` (ctypes), RGBM 8 bits (gama 2,
+  faixa 8) em PNG embutido. Funciona igual em desktop, Web e Android (só uma textura). Escala de resolução
+  por objeto (`Object.ae_lightmap_scale`); margem entre ilhas em texels + dilatação antes/depois do denoise
+  (sem emendas escuras nas bordas das ilhas).
+- Light volume: grade de sondas (ambient cube, 6 faces) assada com cubos minúsculos no mesmo bake; objetos
+  móveis ficam escondidos no bake e são iluminados pelo volume (`lightvol_sample`, onde `lm.a < 0.5`).
+  Liga/desliga separado (`ae_lightvol_use`); padrão desligado em Web/Android.
+- Shader: `node_shader_gpu_lightmap()` em `node_shader_util.c`, chamado pelo Principled. Crash corrigido:
+  link builtin (normal) é liberado pelo nó que o consome; o volume recebe um link próprio.
+- Teste: `tools/create_gi_test.py` → `projects-teste/gi/` (sala, cornell, refs Cycles).
+- Pendente: tom ainda mais claro que o Cycles; GTAO (fase 3); empacotar `ae_denoise.dll`/`tbb.dll` no
+  release; testar Linux.
+
 ## Tela cheia sem borda no Windows (2026-10-06)
 
 - `render.setFullScreen(True)`, o Fullscreen de Render > Game > Display e o `-f` do player trocavam o

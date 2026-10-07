@@ -171,6 +171,10 @@ ferramenta correspondente.
 
 ## Decisões técnicas vigentes
 
+- GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
+  objetos móveis), não GI em tempo real. Qualidade vem da densidade de texels (`ae_lightmap_scale` por objeto)
+  e da margem/dilatação das ilhas, não de uma textura por objeto. Cada recurso liga/desliga; Web/Android usam
+  no máximo a textura da lightmap.
 - `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity
   Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
   will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity
