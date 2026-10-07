@@ -9,6 +9,44 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Chuva: poças d'água (2026-10-07)
+
+- Weather > Rain > Puddles (`WO_WEATHER_RAIN_PUDDLES`, bit 11). Campos novos no DNA: `rain_puddle_amount`,
+  `_size`, `_darkness`, `_reflection`, `_distance`, `_min_up` (versioning dá os padrões 0.5/4/0.4/0.8/40/0.9).
+- No filtro de chuva (jogo e viewport): ruído em XY do mundo nas superfícies viradas para cima; borda
+  molhada escura, água refletindo a cor horizonte/zênite do World com fresnel, e a normal dos Ripples
+  distorce o reflexo. Profundidade/normal agora calculadas uma vez para poças e ripples.
+- Game property `puddles_effect` com a mesma regra dos outros efeitos (bit 4 de `KX_RainSurfaceMask`).
+- Com Intensity 0 o filtro continua desenhando as poças (secam pelo Amount). `setWeather`: `puddles`,
+  `puddle_amount`, `puddle_size`, `puddle_darkness`, `puddle_reflection`, `puddle_distance`, `puddle_min_up`.
+- Ripples + Puddles: o fresnel usa a água plana e a refração dos ripples dentro da poça foi reduzida,
+  para os anéis não ficarem azuis demais.
+- Screen Space Reflection opcional (`WO_WEATHER_RAIN_PUDDLE_SSR`, bit 12; `setWeather('puddle_ssr')`): 32 passos
+  em world space contra o depth, refino por bisseção, cai no céu onde o raio sai da tela ou passa atrás de objeto.
+- Only in Puddles em Ripples (bit 13) e Splash (bit 14), `ripple_puddle_only`/`splash_puddle_only`: o efeito só
+  aparece na água da poça e liga o Puddles junto. As duas podem ficar ligadas: vão em `Puddle1.x = 1 + 1 + 2`.
+- Revisão: `fwidth` da borda das poças saiu de dentro do branch por pixel (derivada indefinida em fluxo
+  não uniforme) e `setWeather('puddle_ssr')` ganhou o setter que faltava.
+
+## Chuva: Ripples/Splash/Aura por propriedade, ajustes iguais e raios laterais (2026-10-07)
+
+- UI do Weather > Rain: checkbox Droplets no topo; Ripples e Splash com a mesma lista e ordem
+  (Intensity, Size, Rate, Normal, Distance, Upward Surface). Campos novos no DNA: `rain_ripple_size`,
+  `rain_ripple_rate`, `rain_splash_normal`, `rain_splash_min_up` (antes fixos no shader: 1, 0.8, 1, 0.7);
+  viewport e engine usam os mesmos valores.
+- Game properties `ripples_effect`/`splash_effect`: se algum objeto tiver, só ele recebe o efeito; sem
+  nenhum, continua em toda superfície. `KX_RainSurfaceMask` desenha os objetos marcados numa textura RG32F
+  (bits + profundidade de vista) e o filtro de chuva compara com a profundidade da cena. Não segue
+  armature/shape key. Só no jogo (a viewport mostra em tudo).
+- Aura: propriedade padrão `aura_chuva` → `aura_rain_effect` (versioning renomeia no World e nos objetos);
+  sem objeto marcado, todo objeto com malha dentro de Distance recebe a aura.
+- Lightning > Sideways Bolts (`WO_WEATHER_RAIN_LIGHTNING_SIDE`): metade dos raios corre na horizontal
+  entre nuvens. `setWeather`: `ripple_size`, `ripple_rate`, `splash_normal`, `splash_min_up`, `lightning_side`.
+- Otimizações: a máscara pula objetos fora da câmera ou além da Distance (pela esfera do AABB) e não
+  redesenha quando câmera/objetos não mudaram; Aura mede a Distance pelo AABB (não pela origem) e, sem
+  objeto marcado, usa só os 32 mais próximos; splash rejeita pela máscara antes de reconstruir
+  profundidade/normal. Corrigido teste de bit da máscara (objeto com as duas propriedades perdia o splash).
+
 ## Sombra com materiais Clip / código de vértice corrigida + demo de pelos (2026-10-07)
 
 - Materiais que fazem a sombra com o próprio shader (Clip, alpha-to-coverage e, desde 2026-10-06, opacos

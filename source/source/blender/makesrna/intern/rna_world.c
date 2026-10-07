@@ -130,6 +130,17 @@ static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA 
 	}
 }
 
+/* Ripples/Splash > Only in Puddles need the puddles: turning one on turns them on too. */
+static void rna_World_ripple_puddle_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	World *wo = ptr->id.data;
+
+	if (wo->weather_flag & (WO_WEATHER_RAIN_RIPPLE_PUDDLE | WO_WEATHER_RAIN_SPLASH_PUDDLE)) {
+		wo->weather_flag |= WO_WEATHER_RAIN_PUDDLES;
+	}
+	rna_World_draw_update(bmain, scene, ptr);
+}
+
 static bool rna_World_use_sky_moon_get(PointerRNA *ptr)
 {
 	return ((World *)ptr->data)->moon_enabled > 0.0f;
@@ -599,7 +610,7 @@ static void rna_def_world_weather(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_rain_ripple", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_RIPPLE);
-	RNA_def_property_ui_text(prop, "Ripples", "Render rain ripples on ground puddles");
+	RNA_def_property_ui_text(prop, "Ripples", "Render rain ripples on ground puddles; only on objects with the game property ripples_effect when any object has it");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "rain_speed", PROP_FLOAT, PROP_NONE);
@@ -642,6 +653,23 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Ripple Normal", "Strength of the ripple normal: surface bending, refraction and highlights of the waves");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "use_rain_ripple_puddle_only", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_RIPPLE_PUDDLE);
+	RNA_def_property_ui_text(prop, "Only in Puddles", "Ripples only inside the puddle water (turns Puddles on)");
+	RNA_def_property_update(prop, 0, "rna_World_ripple_puddle_update");
+
+	prop = RNA_def_property(srna, "rain_ripple_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.3f, 6.0f);
+	RNA_def_property_ui_range(prop, 0.3f, 6.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Ripple Size", "Size of the ripple rings");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_ripple_rate", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 6.0f);
+	RNA_def_property_ui_range(prop, 0.1f, 6.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Ripple Rate", "Ripples per surface cell per second");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "rain_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "rain_color");
 	RNA_def_property_array(prop, 3);
@@ -656,7 +684,7 @@ static void rna_def_world_weather(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_rain_splash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_SPLASH);
-	RNA_def_property_ui_text(prop, "Splash", "Drops bouncing up when the rain hits upward-facing surfaces and edges");
+	RNA_def_property_ui_text(prop, "Splash", "Drops bouncing up when the rain hits upward-facing surfaces and edges; only on objects with the game property splash_effect when any object has it");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "rain_splash_size", PROP_FLOAT, PROP_NONE);
@@ -677,20 +705,78 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Splash Intensity", "Brightness of the splash drops");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "use_rain_splash_puddle_only", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_SPLASH_PUDDLE);
+	RNA_def_property_ui_text(prop, "Only in Puddles", "Splash drops only inside the puddle water (turns Puddles on)");
+	RNA_def_property_update(prop, 0, "rna_World_ripple_puddle_update");
+
+	prop = RNA_def_property(srna, "rain_splash_normal", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Splash Normal", "Strength of the splash drops normal: refraction of what is behind and sky highlights");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "rain_splash_distance", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_range(prop, 0.0f, 1000.0f);
 	RNA_def_property_ui_range(prop, 1.0f, 100.0f, 1, 2);
 	RNA_def_property_ui_text(prop, "Splash Distance", "Maximum distance from the active camera where splashes are drawn");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "rain_splash_min_up", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Splash Upward Surface", "Minimum upward-facing normal for splashes; 0.7 accepts slopes up to about 45 degrees");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_puddles", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_PUDDLES);
+	RNA_def_property_ui_text(prop, "Puddles", "Water puddles on upward-facing surfaces, reflecting the sky; only on objects with the game property puddles_effect when any object has it");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_puddle_ssr", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_PUDDLE_SSR);
+	RNA_def_property_ui_text(prop, "Puddle SSR", "Puddles reflect the visible scene (screen-space reflection), falling back to the sky where the ray leaves the screen; costs more GPU");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_amount", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Puddle Amount", "How much of the ground is covered by puddles (0 = dry, 1 = flooded); animate it to make the puddles grow or dry");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_size", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.1f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.5f, 20.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Puddle Size", "Typical size of the puddles in meters");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_darkness", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Puddle Darkness", "How much the wet ground around and under the puddles gets darker");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_reflection", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Puddle Reflection", "Strength of the sky reflection on the puddles (stronger at grazing angles)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 200.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Puddle Distance", "Maximum distance from the active camera where puddles are drawn");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_puddle_min_up", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Puddle Upward Surface", "Minimum upward-facing normal for puddles; 0.9 keeps them on nearly flat ground");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "use_rain_aura", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_AURA);
-	RNA_def_property_ui_text(prop, "Aura", "Manga-style short spray strokes on the upper silhouette of marked objects");
+	RNA_def_property_ui_text(prop, "Aura", "Manga-style short spray strokes on the upper silhouette of the objects with the aura property (every nearby object when none has it)");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "rain_aura_property", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "rain_aura_prop");
-	RNA_def_property_ui_text(prop, "Aura Property", "Game property (True) that marks the objects receiving the aura");
+	RNA_def_property_ui_text(prop, "Aura Property", "Game property (True) that marks the objects receiving the aura; when no object has it, every nearby object gets the aura");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	static const EnumPropertyItem rain_aura_style_items[] = {
@@ -731,6 +817,11 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_rain_lightning", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_LIGHTNING);
 	RNA_def_property_ui_text(prop, "Lightning", "Branching lightning bolts far in front of the camera with a flickering flash");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "use_rain_lightning_side", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_LIGHTNING_SIDE);
+	RNA_def_property_ui_text(prop, "Sideways Bolts", "Some bolts run sideways from cloud to cloud instead of only down to the ground");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "rain_lightning_rate", PROP_FLOAT, PROP_NONE);

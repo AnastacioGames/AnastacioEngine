@@ -79,11 +79,12 @@ float BKE_rain_lightning_flash(unsigned int seed, bool big, float t, bool *r_ove
 
 /**
  * Builds the bolt of a strike in front of the camera (\a cam_fwd is the view direction),
- * about \a distance meters away. \a width scales the thickness.
+ * about \a distance meters away. \a width scales the thickness. With \a sideways, half of
+ * the strikes run across the clouds instead of down to the ground.
  */
 void BKE_rain_lightning_bolt(
         unsigned int seed, const float cam_pos[3], const float cam_fwd[3], float distance, float width,
-        RainLightningBolt *r_bolt);
+        bool sideways, RainLightningBolt *r_bolt);
 
 /**
  * Camera facing side vector of point \a i of the bolt, already scaled to the glow half
@@ -121,7 +122,7 @@ bool BKE_rain_lightning_eval(
 /* The bolt for a 3D View: camera from the inverse view matrix, kept within 60% of `clip_end`. */
 void BKE_rain_lightning_view_bolt(
         unsigned int seed, const float viewinv[4][4], float clip_end, float distance, float width,
-        RainLightningBolt *r_bolt);
+        bool sideways, RainLightningBolt *r_bolt);
 
 #ifdef __cplusplus
 }

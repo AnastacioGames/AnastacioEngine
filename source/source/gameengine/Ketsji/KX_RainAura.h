@@ -84,6 +84,10 @@ private:
 	bool EnsureGL();
 
 	std::vector<KX_GameObject *> m_targets;
+	/// Targets within Distance this frame, with their distance (scratch, kept to avoid allocations).
+	std::vector<std::pair<float, KX_GameObject *> > m_nearby;
+	/// No object carries the property: every mesh object is a target.
+	bool m_everyObject = false;
 	std::unordered_map<RAS_Mesh *, std::vector<Edge> > m_edgeCache;
 	std::vector<Silhouette> m_silhouette;
 	std::vector<float> m_cumulative;

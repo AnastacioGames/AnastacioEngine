@@ -249,7 +249,8 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 			const mt::vec3 fwd = camera->NodeGetWorldOrientation() * mt::vec3(0.0f, 0.0f, -1.0f);
 			const float camPos[3] = {m_camPos.x, m_camPos.y, m_camPos.z};
 			const float camFwd[3] = {fwd.x, fwd.y, fwd.z};
-			BKE_rain_lightning_bolt(seed, camPos, camFwd, distance, world->rain_lightning_width, &strike.bolt);
+			BKE_rain_lightning_bolt(seed, camPos, camFwd, distance, world->rain_lightning_width,
+			                        (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &strike.bolt);
 			strike.center = mt::vec3(strike.bolt.center);
 			strike.hasBolt = true;
 		}

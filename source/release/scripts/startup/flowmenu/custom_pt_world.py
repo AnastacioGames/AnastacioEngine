@@ -281,6 +281,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         if weather.show_expanded_rain:
             col = main_box.column(align=True)
             col.active = weather.use_rain
+            row = col.row()
+            row.prop(weather, "use_rain_droplets", text="")
+            row.label(text="Droplets")
             col.prop(weather, "rain_style")
             col.prop(weather, "rain_intensity", slider=True)
             col.prop(weather, "rain_speed", text="Fall Speed")
@@ -291,29 +294,37 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "rain_darken", slider=True)
             col.prop(weather, "rain_color", text="Rain Color")
 
-            row = col.row()
-            row.prop(weather, "use_rain_droplets", text="")
-            row.label(text="Droplets")
+            # Ripples e Splash: mesma lista, na mesma ordem.
+            for effect, label, prop_name in (("ripple", "Ripples", "ripples_effect"),
+                                             ("splash", "Splash", "splash_effect")):
+                row = col.row()
+                row.prop(weather, "use_rain_" + effect, text="")
+                row.label(text=label)
+                sub = col.column()
+                sub.active = getattr(weather, "use_rain_" + effect)
+                prefix = "rain_" + effect + "_"
+                sub.prop(weather, prefix + "intensity")
+                sub.prop(weather, "use_rain_" + effect + "_puddle_only")
+                sub.prop(weather, prefix + "size")
+                sub.prop(weather, prefix + "rate")
+                sub.prop(weather, prefix + "normal")
+                sub.prop(weather, prefix + "distance", text=label.rstrip("s") + " Distance")
+                sub.prop(weather, prefix + "min_up")
+                sub.label(text="Only objects with \"%s\" (all when none has it)" % prop_name, icon='INFO')
 
             row = col.row()
-            row.prop(weather, "use_rain_ripple", text="")
-            row.label(text="Ripples")
+            row.prop(weather, "use_rain_puddles", text="")
+            row.label(text="Puddles")
             sub = col.column()
-            sub.active = weather.use_rain_ripple
-            sub.prop(weather, "rain_ripple_intensity")
-            sub.prop(weather, "rain_ripple_normal")
-            sub.prop(weather, "rain_ripple_distance")
-            sub.prop(weather, "rain_ripple_min_up")
-
-            row = col.row()
-            row.prop(weather, "use_rain_splash", text="")
-            row.label(text="Splash")
-            sub = col.column()
-            sub.active = weather.use_rain_splash
-            sub.prop(weather, "rain_splash_size")
-            sub.prop(weather, "rain_splash_rate")
-            sub.prop(weather, "rain_splash_intensity")
-            sub.prop(weather, "rain_splash_distance")
+            sub.active = weather.use_rain_puddles
+            sub.prop(weather, "rain_puddle_amount", text="Amount", slider=True)
+            sub.prop(weather, "rain_puddle_size", text="Size")
+            sub.prop(weather, "rain_puddle_darkness", text="Darkness", slider=True)
+            sub.prop(weather, "rain_puddle_reflection", text="Reflection", slider=True)
+            sub.prop(weather, "use_rain_puddle_ssr", text="Screen Space Reflection")
+            sub.prop(weather, "rain_puddle_distance", text="Puddle Distance")
+            sub.prop(weather, "rain_puddle_min_up", text="Upward Surface")
+            sub.label(text="Only objects with \"puddles_effect\" (all when none has it)", icon='INFO')
 
             row = col.row()
             row.prop(weather, "use_rain_aura", text="")
@@ -322,8 +333,8 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.active = weather.use_rain_aura
             sub.prop(weather, "rain_aura_property", text="Property")
             info = sub.column(align=True)
-            info.label(text="Objects need a Bool game property", icon='INFO')
-            info.label(text="\"%s\" set to True" % (weather.rain_aura_property or "..."))
+            info.label(text="Only objects with \"%s\" set to True" % (weather.rain_aura_property or "..."), icon='INFO')
+            info.label(text="(every nearby object when none has it)")
             sub.prop(weather, "rain_aura_style", text="Style")
             sub.prop(weather, "rain_aura_size")
             sub.prop(weather, "rain_aura_rate")
@@ -339,6 +350,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.prop(weather, "rain_lightning_intensity", text="Intensity")
             sub.prop(weather, "rain_lightning_distance", text="Distance")
             sub.prop(weather, "rain_lightning_width", text="Width")
+            sub.prop(weather, "use_rain_lightning_side")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)

@@ -95,6 +95,9 @@ RAS_ScopeExit<Fn> MakeScopeExit(Fn fn)
 }
 }  // namespace
 
+/// Texture unit of the rain mask (ge_RainMask); custom filters keep 0-7 but the rain filter has none.
+static const int kRainMaskUnit = 7;
+
 static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_TYPE] = {
 	"bgl_RenderedTexture", // RENDERED_TEXTURE_UNIFORM
 	"bgl_DataTextures[0]", // DATA_TEXTURES_UNIFORM
@@ -123,6 +126,13 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainStreakWidth", // GE_RAIN_STREAK_WIDTH_UNIFORM
 	"ge_RainRippleNormal", // GE_RAIN_RIPPLE_NORMAL_UNIFORM
 	"ge_RainLightning", // GE_RAIN_LIGHTNING_UNIFORM
+	"ge_RainParams5", // GE_RAIN_PARAMS5_UNIFORM
+	"ge_RainMask", // GE_RAIN_MASK_UNIFORM
+	"ge_RainMaskFlags", // GE_RAIN_MASK_FLAGS_UNIFORM
+	"ge_RainPuddle1", // GE_RAIN_PUDDLE1_UNIFORM
+	"ge_RainPuddle2", // GE_RAIN_PUDDLE2_UNIFORM
+	"ge_RainSkyHorizon", // GE_RAIN_SKY_HORIZON_UNIFORM
+	"ge_RainSkyZenith", // GE_RAIN_SKY_ZENITH_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
@@ -412,6 +422,12 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		depthofs->BindDepthTexture(8);
 	}
 
+	// Rain: mask of the objects with ripples_effect/splash_effect (KX_RainSurfaceMask).
+	if (m_predefinedUniforms[GE_RAIN_MASK_UNIFORM] != -1 && m_buildInFilters.rain_mask_flags) {
+		glActiveTexture(GL_TEXTURE0 + kRainMaskUnit);
+		glBindTexture(GL_TEXTURE_2D, m_buildInFilters.rain_mask_texture);
+	}
+
 	// Bind custom textures.
 	for (const auto& pair : m_textures) {
 		glActiveTexture(GL_TEXTURE0 + pair.first);
@@ -439,6 +455,11 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 
 	if (m_predefinedUniforms[DEPTH_TEXTURE_UNIFORM] != -1) {
 		depthofs->UnbindDepthTexture();
+	}
+
+	if (m_predefinedUniforms[GE_RAIN_MASK_UNIFORM] != -1 && m_buildInFilters.rain_mask_flags) {
+		glActiveTexture(GL_TEXTURE0 + kRainMaskUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
 	// Unbind custom textures.
@@ -568,6 +589,38 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		/* 0 = file saved before the field existed: default strength. */
 		float strength = m_buildInFilters.rain_ripple_normal > 0.0f ? m_buildInFilters.rain_ripple_normal : 1.0f;
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_RIPPLE_NORMAL_UNIFORM], RAS_Uniform::UNI_FLOAT, &strength, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_PARAMS5_UNIFORM] != -1) {
+		/* 0 = file saved before the fields existed: the values the shader had fixed. */
+		float params[4] = {m_buildInFilters.rain_ripple_size > 0.0f ? m_buildInFilters.rain_ripple_size : 1.0f,
+		                   m_buildInFilters.rain_ripple_rate > 0.0f ? m_buildInFilters.rain_ripple_rate : 0.8f,
+		                   m_buildInFilters.rain_splash_normal, m_buildInFilters.rain_splash_min_up};
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_PARAMS5_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_MASK_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[GE_RAIN_MASK_UNIFORM], kRainMaskUnit);
+	}
+	if (m_predefinedUniforms[GE_RAIN_MASK_FLAGS_UNIFORM] != -1) {
+		float flags[3] = {(m_buildInFilters.rain_mask_flags & 1) ? 1.0f : 0.0f, (m_buildInFilters.rain_mask_flags & 2) ? 1.0f : 0.0f,
+		                  (m_buildInFilters.rain_mask_flags & 4) ? 1.0f : 0.0f};
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_MASK_FLAGS_UNIFORM], RAS_Uniform::UNI_FLOAT3, flags, sizeof(float) * 3, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_PUDDLE1_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.useRainPuddles ?
+		                   1.0f + (m_buildInFilters.useRainRipplePuddle ? 1.0f : 0.0f) + (m_buildInFilters.useRainSplashPuddle ? 2.0f : 0.0f) : 0.0f, m_buildInFilters.rain_puddle_amount,
+		                   m_buildInFilters.rain_puddle_size, m_buildInFilters.rain_puddle_darkness};
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_PUDDLE1_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_PUDDLE2_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.rain_puddle_reflection, m_buildInFilters.rain_puddle_distance,
+		                   m_buildInFilters.rain_puddle_min_up, m_buildInFilters.useRainPuddleSSR ? 1.0f : 0.0f};
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_PUDDLE2_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_SKY_HORIZON_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_SKY_HORIZON_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.rain_sky_horizon, sizeof(float) * 3, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_SKY_ZENITH_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_SKY_ZENITH_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.rain_sky_zenith, sizeof(float) * 3, 1);
 	}
 	if (m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_LIGHTNING_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_lightning, sizeof(float) * 4, 1);

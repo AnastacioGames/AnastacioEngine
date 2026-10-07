@@ -161,6 +161,10 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.rain_darken") == 0) world->rain_darken = value;
 	else if (std::strcmp(identifier, "weather.ripple_intensity") == 0) world->rain_ripple = value;
 	else if (std::strcmp(identifier, "weather.ripple_normal") == 0) world->rain_ripple_normal = value;
+	else if (std::strcmp(identifier, "weather.ripple_size") == 0) world->rain_ripple_size = value;
+	else if (std::strcmp(identifier, "weather.ripple_rate") == 0) world->rain_ripple_rate = value;
+	else if (std::strcmp(identifier, "weather.splash_normal") == 0) world->rain_splash_normal = value;
+	else if (std::strcmp(identifier, "weather.splash_min_up") == 0) world->rain_splash_min_up = value;
 	else if (std::strcmp(identifier, "weather.rain") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN; else world->weather_flag &= ~WO_WEATHER_RAIN;
 	}
@@ -184,6 +188,25 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.splash_rate") == 0) world->rain_splash_rate = value;
 	else if (std::strcmp(identifier, "weather.splash_intensity") == 0) world->rain_splash_intensity = value;
 	else if (std::strcmp(identifier, "weather.splash_distance") == 0) world->rain_splash_distance = value;
+	else if (std::strcmp(identifier, "weather.puddles") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_PUDDLES;
+	}
+	else if (std::strcmp(identifier, "weather.ripple_puddle_only") == 0 && useBool) {
+		// Needs the puddles, like the checkbox.
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_RIPPLE_PUDDLE | WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_RIPPLE_PUDDLE;
+	}
+	else if (std::strcmp(identifier, "weather.splash_puddle_only") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_SPLASH_PUDDLE | WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_SPLASH_PUDDLE;
+	}
+	else if (std::strcmp(identifier, "weather.puddle_ssr") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_PUDDLE_SSR; else world->weather_flag &= ~WO_WEATHER_RAIN_PUDDLE_SSR;
+	}
+	else if (std::strcmp(identifier, "weather.puddle_amount") == 0) world->rain_puddle_amount = (std::max)(0.0f, (std::min)(1.0f, value));
+	else if (std::strcmp(identifier, "weather.puddle_size") == 0) world->rain_puddle_size = value;
+	else if (std::strcmp(identifier, "weather.puddle_darkness") == 0) world->rain_puddle_darkness = value;
+	else if (std::strcmp(identifier, "weather.puddle_reflection") == 0) world->rain_puddle_reflection = value;
+	else if (std::strcmp(identifier, "weather.puddle_distance") == 0) world->rain_puddle_distance = value;
+	else if (std::strcmp(identifier, "weather.puddle_min_up") == 0) world->rain_puddle_min_up = value;
 	else if (std::strcmp(identifier, "weather.aura") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_AURA; else world->weather_flag &= ~WO_WEATHER_RAIN_AURA;
 	}
@@ -194,6 +217,9 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.aura_distance") == 0) world->rain_aura_distance = value;
 	else if (std::strcmp(identifier, "weather.lightning") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_LIGHTNING; else world->weather_flag &= ~WO_WEATHER_RAIN_LIGHTNING;
+	}
+	else if (std::strcmp(identifier, "weather.lightning_side") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_LIGHTNING_SIDE; else world->weather_flag &= ~WO_WEATHER_RAIN_LIGHTNING_SIDE;
 	}
 	else if (std::strcmp(identifier, "weather.lightning_rate") == 0) world->rain_lightning_rate = value;
 	else if (std::strcmp(identifier, "weather.lightning_intensity") == 0) world->rain_lightning_intensity = value;
@@ -231,7 +257,8 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 
 	static const struct { const char *name; int flag; } flags[] = {
 		{"rain", WO_WEATHER_RAIN}, {"ripples", WO_WEATHER_RAIN_RIPPLE}, {"droplets", WO_WEATHER_RAIN_DROPLETS},
-		{"splash", WO_WEATHER_RAIN_SPLASH}, {"aura", WO_WEATHER_RAIN_AURA}, {"lightning", WO_WEATHER_RAIN_LIGHTNING},
+		{"splash", WO_WEATHER_RAIN_SPLASH}, {"puddles", WO_WEATHER_RAIN_PUDDLES}, {"puddle_ssr", WO_WEATHER_RAIN_PUDDLE_SSR}, {"ripple_puddle_only", WO_WEATHER_RAIN_RIPPLE_PUDDLE}, {"splash_puddle_only", WO_WEATHER_RAIN_SPLASH_PUDDLE}, {"aura", WO_WEATHER_RAIN_AURA}, {"lightning", WO_WEATHER_RAIN_LIGHTNING},
+		{"lightning_side", WO_WEATHER_RAIN_LIGHTNING_SIDE},
 		{"clouds", WO_WEATHER_CLOUDS}, {"lens_flare", WO_WEATHER_LENSFLARE}, {"earthquake", WO_WEATHER_EARTHQUAKE},
 	};
 	for (const auto &f : flags) {
@@ -261,9 +288,14 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"rain_intensity", &world->rain_intensity}, {"rain_density", &world->rain_density},
 		{"rain_speed", &world->rain_speed}, {"rain_wind", &world->rain_wind},
 		{"rain_darken", &world->rain_darken}, {"ripple_intensity", &world->rain_ripple},
-		{"ripple_normal", &world->rain_ripple_normal}, {"rain_streak_width", &world->rain_streak_width},
+		{"ripple_normal", &world->rain_ripple_normal},
+		{"ripple_size", &world->rain_ripple_size}, {"ripple_rate", &world->rain_ripple_rate},
+		{"splash_normal", &world->rain_splash_normal}, {"splash_min_up", &world->rain_splash_min_up}, {"rain_streak_width", &world->rain_streak_width},
 		{"splash_size", &world->rain_splash_size}, {"splash_rate", &world->rain_splash_rate},
 		{"splash_intensity", &world->rain_splash_intensity}, {"splash_distance", &world->rain_splash_distance},
+		{"puddle_amount", &world->rain_puddle_amount}, {"puddle_size", &world->rain_puddle_size},
+		{"puddle_darkness", &world->rain_puddle_darkness}, {"puddle_reflection", &world->rain_puddle_reflection},
+		{"puddle_distance", &world->rain_puddle_distance}, {"puddle_min_up", &world->rain_puddle_min_up},
 		{"aura_size", &world->rain_aura_size}, {"aura_rate", &world->rain_aura_rate},
 		{"aura_intensity", &world->rain_aura_intensity}, {"aura_distance", &world->rain_aura_distance},
 		{"lightning_rate", &world->rain_lightning_rate}, {"lightning_intensity", &world->rain_lightning_intensity},

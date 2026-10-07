@@ -74,6 +74,7 @@ class KX_NavMeshObject;
 class KX_WorldInfo;
 class KX_Camera;
 class KX_RainAura;
+class KX_RainSurfaceMask;
 class KX_RainLightning;
 class KX_FontObject;
 class KX_Speaker;
@@ -159,6 +160,8 @@ private:
 	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
 	std::unique_ptr<KX_RainAura> m_rainAura;
 	std::unique_ptr<KX_RainLightning> m_rainLightning;
+	/// World > Rain > Ripples/Splash only on objects with ripples_effect/splash_effect.
+	std::unique_ptr<KX_RainSurfaceMask> m_rainSurfaceMask;
 
 	/// Objects flagged use_gpu_particle_collider (Object.gameflag2 & OB_GPU_PARTICLE_COLLIDER),
 	/// cached the same way as m_gpuParticleObjects. Drives the Screen-Space collision depth
@@ -616,6 +619,8 @@ public:
 	/// World > Rain > Aura: silhouette strokes, once per frame after the final transforms.
 	void UpdateRainAura(double time);
 	KX_RainAura *GetRainAura() const;
+	/// Created on first use (render thread, GL context current).
+	KX_RainSurfaceMask *GetRainSurfaceMask();
 	/// World > Rain > Lightning: created on the first strike or when the option is on.
 	void UpdateRainLightning(double time);
 	KX_RainLightning *GetRainLightning() const;

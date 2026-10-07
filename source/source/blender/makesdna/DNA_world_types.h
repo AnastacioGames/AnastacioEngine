@@ -150,6 +150,12 @@ typedef struct World {
 	float rain_lightning_intensity, rain_lightning_distance, rain_lightning_width;
 	short rain_aura_style; /* WO_RAIN_AURA_STATIC/ANIMATED; ocupa o antigo pad, 0 = Static */
 	short rain_aura_pad;
+	/* Ripples e Splash com a mesma lista de ajustes (tamanho/taxa/normal/superficie de cima) */
+	float rain_ripple_size, rain_ripple_rate;
+	float rain_splash_normal, rain_splash_min_up;
+	/* Pocas de agua nas superficies de cima, ver WO_WEATHER_RAIN_PUDDLES */
+	float rain_puddle_amount, rain_puddle_size, rain_puddle_darkness;
+	float rain_puddle_reflection, rain_puddle_distance, rain_puddle_min_up;
 
 	float cloud_coverage, cloud_scale, cloud_speed;
 	float cloud_color[3];
@@ -226,6 +232,16 @@ typedef struct World {
 #define WO_WEATHER_RAIN_LIGHTNING  (1 << 8)
 /* So em weather_expand_flag/weather_editor_hide: o Fog continua sendo World.mode & WO_MIST. */
 #define WO_WEATHER_FOG             (1 << 9)
+/* Lightning: alguns raios correm na horizontal (nuvem a nuvem), nao so para baixo */
+#define WO_WEATHER_RAIN_LIGHTNING_SIDE (1 << 10)
+/* Pocas de agua no chao (Rain > Puddles) */
+#define WO_WEATHER_RAIN_PUDDLES    (1 << 11)
+/* Pocas refletem a cena por screen-space (SSR) antes de cair no ceu */
+#define WO_WEATHER_RAIN_PUDDLE_SSR (1 << 12)
+/* Ripples so dentro da agua das pocas (liga as Pocas junto) */
+#define WO_WEATHER_RAIN_RIPPLE_PUDDLE (1 << 13)
+/* Splash so dentro da agua das pocas (liga as Pocas junto) */
+#define WO_WEATHER_RAIN_SPLASH_PUDDLE (1 << 14)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

@@ -224,7 +224,17 @@ void BKE_world_init(World *wrld)
 	wrld->rain_aura_rate = 0.6f;
 	wrld->rain_aura_intensity = 1.0f;
 	wrld->rain_aura_distance = 30.0f;
-	BLI_strncpy(wrld->rain_aura_prop, "aura_chuva", sizeof(wrld->rain_aura_prop));
+	BLI_strncpy(wrld->rain_aura_prop, "aura_rain_effect", sizeof(wrld->rain_aura_prop));
+	wrld->rain_ripple_size = 1.0f;
+	wrld->rain_ripple_rate = 0.8f;
+	wrld->rain_splash_normal = 1.0f;
+	wrld->rain_puddle_amount = 0.5f;
+	wrld->rain_puddle_size = 4.0f;
+	wrld->rain_puddle_darkness = 0.4f;
+	wrld->rain_puddle_reflection = 0.8f;
+	wrld->rain_puddle_distance = 40.0f;
+	wrld->rain_puddle_min_up = 0.9f;
+	wrld->rain_splash_min_up = 0.7f;
 	wrld->rain_lightning_rate = 7.0f;
 	wrld->rain_lightning_intensity = 1.0f;
 	wrld->rain_lightning_distance = 80.0f;

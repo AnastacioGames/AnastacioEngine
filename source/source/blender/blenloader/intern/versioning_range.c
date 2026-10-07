@@ -613,6 +613,40 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_ripple_size")) {
+    /* Ripples e Splash ganharam os ajustes um do outro: os valores antigos fixos no shader.
+     * A propriedade da Aura passou de "aura_chuva" para "aura_rain_effect"; renomeia tambem
+     * a game property dos objetos para a cena continuar igual. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_ripple_size = 1.0f;
+      wo->rain_ripple_rate = 0.8f;
+      wo->rain_splash_normal = 1.0f;
+      wo->rain_splash_min_up = 0.7f;
+      if (STREQ(wo->rain_aura_prop, "aura_chuva")) {
+        BLI_strncpy(wo->rain_aura_prop, "aura_rain_effect", sizeof(wo->rain_aura_prop));
+      }
+    }
+    LISTBASE_FOREACH (Object *, ob, &main->object) {
+      LISTBASE_FOREACH (bProperty *, prop, &ob->prop) {
+        if (STREQ(prop->name, "aura_chuva")) {
+          BLI_strncpy(prop->name, "aura_rain_effect", sizeof(prop->name));
+        }
+      }
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_puddle_amount")) {
+    /* Pocas da chuva: desligadas (flag nova), so recebem os valores padrao. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_puddle_amount = 0.5f;
+      wo->rain_puddle_size = 4.0f;
+      wo->rain_puddle_darkness = 0.4f;
+      wo->rain_puddle_reflection = 0.8f;
+      wo->rain_puddle_distance = 40.0f;
+      wo->rain_puddle_min_up = 0.9f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "foliage_distance")) {
     /* Files from before Foliage Optimization get the same wind distance as new materials. */
     LISTBASE_FOREACH (Material *, ma, &main->mat) {

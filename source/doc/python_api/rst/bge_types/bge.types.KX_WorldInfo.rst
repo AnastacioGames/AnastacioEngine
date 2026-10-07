@@ -117,10 +117,11 @@ base class --- :class:`EXP_PyObjectPlus`
    .. method:: setWeather(name, value)
 
       Changes a World weather setting at runtime (the "weather." prefix is optional).
-      Booleans: ``rain``, ``ripples``, ``splash``, ``aura``, ``lightning``, ``clouds``, ``lens_flare``, ``mist``.
+      Booleans: ``rain``, ``ripples``, ``splash``, ``puddles``, ``puddle_ssr``, ``ripple_puddle_only``, ``splash_puddle_only`` (both also turn ``puddles`` on), ``aura``, ``lightning``, ``lightning_side``, ``clouds``, ``lens_flare``, ``mist``.
       Floats: ``rain_intensity``, ``rain_density``, ``rain_speed``, ``rain_wind``, ``rain_darken``,
-      ``rain_streak_width``, ``ripple_intensity``, ``ripple_normal``, ``splash_size``, ``splash_rate``, ``splash_intensity``,
-      ``splash_distance``, ``aura_size``, ``aura_rate``, ``aura_intensity``, ``aura_distance``,
+      ``rain_streak_width``, ``ripple_intensity``, ``ripple_normal``, ``ripple_size``, ``ripple_rate``, ``splash_normal``, ``splash_min_up``, ``splash_size``, ``splash_rate``, ``splash_intensity``,
+      ``splash_distance``, ``puddle_amount``, ``puddle_size``, ``puddle_darkness``, ``puddle_reflection``,
+      ``puddle_distance``, ``puddle_min_up``, ``aura_size``, ``aura_rate``, ``aura_intensity``, ``aura_distance``,
       ``lightning_rate``, ``lightning_intensity``, ``lightning_distance``, ``lightning_width``,
       ``cloud_coverage``, ``cloud_scale``, ``cloud_speed``, ``flare_scale``, ``flare_intensity``, ``mist_*``.
 

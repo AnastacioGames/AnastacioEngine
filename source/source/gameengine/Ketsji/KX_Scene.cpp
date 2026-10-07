@@ -40,6 +40,7 @@
 
 #include "KX_Scene.h"
 #include "KX_RainAura.h"
+#include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
@@ -291,6 +292,26 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_splash_rate = world->rain_splash_rate;
 			filters.rain_splash_intensity = world->rain_splash_intensity;
 			filters.rain_splash_distance = world->rain_splash_distance;
+			filters.rain_ripple_size = world->rain_ripple_size;
+			filters.rain_ripple_rate = world->rain_ripple_rate;
+			filters.rain_splash_normal = world->rain_splash_normal;
+			filters.rain_splash_min_up = world->rain_splash_min_up;
+			filters.useRainPuddles = (world->weather_flag & WO_WEATHER_RAIN_PUDDLES) ? true : false;
+			filters.useRainPuddleSSR = (world->weather_flag & WO_WEATHER_RAIN_PUDDLE_SSR) ? true : false;
+			filters.useRainRipplePuddle = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) ? true : false;
+			filters.useRainSplashPuddle = (world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) ? true : false;
+			filters.rain_puddle_amount = world->rain_puddle_amount;
+			filters.rain_puddle_size = world->rain_puddle_size;
+			filters.rain_puddle_darkness = world->rain_puddle_darkness;
+			filters.rain_puddle_reflection = world->rain_puddle_reflection;
+			filters.rain_puddle_distance = world->rain_puddle_distance;
+			filters.rain_puddle_min_up = world->rain_puddle_min_up;
+			filters.rain_sky_horizon[0] = world->horr;
+			filters.rain_sky_horizon[1] = world->horg;
+			filters.rain_sky_horizon[2] = world->horb;
+			filters.rain_sky_zenith[0] = world->zenr;
+			filters.rain_sky_zenith[1] = world->zeng;
+			filters.rain_sky_zenith[2] = world->zenb;
 		}
 
 		if (world->weather_flag & WO_WEATHER_CLOUDS) {
@@ -1547,6 +1568,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	if (m_rainAura) {
 		m_rainAura->RemoveObject(gameobj);
 	}
+	if (m_rainSurfaceMask) {
+		m_rainSurfaceMask->RemoveObject(gameobj);
+	}
 	if (m_rainLightning) {
 		m_rainLightning->RemoveObject(gameobj);
 	}
@@ -2456,6 +2480,14 @@ void KX_Scene::UpdateRainAura(double time)
 KX_RainAura *KX_Scene::GetRainAura() const
 {
 	return m_rainAura.get();
+}
+
+KX_RainSurfaceMask *KX_Scene::GetRainSurfaceMask()
+{
+	if (!m_rainSurfaceMask) {
+		m_rainSurfaceMask.reset(new KX_RainSurfaceMask());
+	}
+	return m_rainSurfaceMask.get();
 }
 
 void KX_Scene::UpdateRainLightning(double time)

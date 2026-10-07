@@ -37,6 +37,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
 #include "KX_RainAura.h"
+#include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
 #include "RAS_ParticleBuffer.h" // Per-object GPU particle emitters, see KX_GameObject::GetParticleBuffer.
 #include "GPU_texture.h"
@@ -696,6 +697,39 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_splash_rate = world->rain_splash_rate;
 				rainParams->rain_splash_intensity = world->rain_splash_intensity;
 				rainParams->rain_splash_distance = world->rain_splash_distance;
+				rainParams->rain_ripple_size = world->rain_ripple_size;
+				rainParams->rain_ripple_rate = world->rain_ripple_rate;
+				rainParams->rain_splash_normal = world->rain_splash_normal;
+				rainParams->rain_splash_min_up = world->rain_splash_min_up;
+				rainParams->useRainPuddles = (world->weather_flag & WO_WEATHER_RAIN_PUDDLES) != 0;
+				rainParams->useRainPuddleSSR = (world->weather_flag & WO_WEATHER_RAIN_PUDDLE_SSR) != 0;
+				rainParams->useRainRipplePuddle = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) != 0;
+				rainParams->useRainSplashPuddle = (world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) != 0;
+				rainParams->rain_puddle_amount = world->rain_puddle_amount;
+				rainParams->rain_puddle_size = world->rain_puddle_size;
+				rainParams->rain_puddle_darkness = world->rain_puddle_darkness;
+				rainParams->rain_puddle_reflection = world->rain_puddle_reflection;
+				rainParams->rain_puddle_distance = world->rain_puddle_distance;
+				rainParams->rain_puddle_min_up = world->rain_puddle_min_up;
+				rainParams->rain_sky_horizon[0] = world->horr;
+				rainParams->rain_sky_horizon[1] = world->horg;
+				rainParams->rain_sky_horizon[2] = world->horb;
+				rainParams->rain_sky_zenith[0] = world->zenr;
+				rainParams->rain_sky_zenith[1] = world->zeng;
+				rainParams->rain_sky_zenith[2] = world->zenb;
+
+				// Ripples/Splash only on the objects with ripples_effect/splash_effect, when any
+				// object has them: those objects go into a mask with this camera's matrices.
+				rainParams->rain_mask_flags = 0;
+				if ((world->weather_flag & WO_WEATHER_RAIN) &&
+				    (world->weather_flag & (WO_WEATHER_RAIN_RIPPLE | WO_WEATHER_RAIN_SPLASH | WO_WEATHER_RAIN_PUDDLES)))
+				{
+					KX_RainSurfaceMask *mask = scene->GetRainSurfaceMask();
+					rainParams->rain_mask_flags = mask->Render(scene, world, m_engine->GetFrameTime(),
+					                                           rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix(),
+					                                           width, height);
+					rainParams->rain_mask_texture = mask->GetTexture();
+				}
 			}
 			// Lightning flash: flash, bolt brightness and where the bolt is on screen.
 			const mt::vec4 lightning = scene->GetRainLightning() ?

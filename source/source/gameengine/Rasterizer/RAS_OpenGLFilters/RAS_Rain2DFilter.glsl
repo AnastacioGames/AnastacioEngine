@@ -21,6 +21,13 @@ uniform vec4 ge_RainParams4; // use splash, splash size, splash rate, splash int
 uniform vec4 ge_RainLightning; // flash, bolt, bolt screen position
 uniform float ge_RainStreakWidth; // Classic streak width, 1 = 2 px at 1080p
 uniform float ge_RainRippleNormal; // ripple normal strength, 1 = default
+uniform vec4 ge_RainParams5; // ripple size, ripple rate, splash normal, splash minimum upward normal
+uniform sampler2D ge_RainMask; // KX_RainSurfaceMask: R = 1 ripples + 2 splash, G = view depth
+uniform vec3 ge_RainMaskFlags; // x: ripples only on marked objects, y: same for splash, z: puddles
+uniform vec4 ge_RainPuddle1; // use puddles, amount, size (m), darkness
+uniform vec4 ge_RainPuddle2; // reflection, distance, minimum upward normal, use SSR
+uniform vec3 ge_RainSkyHorizon; // World horizon/zenith: what the puddles reflect
+uniform vec3 ge_RainSkyZenith;
 uniform vec3 ge_RainColor;
 uniform float ge_RainStyle; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
 
@@ -89,7 +96,7 @@ vec3 rainCellHash(vec3 position)
 
 /* Ripple water height: each cell drops once per cycle; the wave is a damped sine
  * inside an expanding ring (crest + trough), so its gradient reads as a bump normal. */
-float rainRippleHeight(vec2 p, float time)
+float rainRippleHeight(vec2 p, float time, float rate)
 {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
@@ -100,7 +107,7 @@ float rainRippleHeight(vec2 p, float time)
 			vec2 n = vec2(float(x), float(y));
 			vec3 r = rainCellHash(vec3(i + n, 0.0));
 			float dist = length(n - f + r.xy);
-			float t = fract(time * 0.8 + r.z);
+			float t = fract(time * rate + r.z);
 			float x0 = dist - t * 1.1;
 			float wave = sin(x0 * 55.0) * exp(-x0 * x0 * 180.0);
 			h += wave * (1.0 - t) * (1.0 - t);
@@ -168,7 +175,6 @@ float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float t
  * then draw a crown + drops in a parabola for the 2x2 nearest cells of a world-space grid. */
 #define SPLASH_SEARCH_STEPS 10
 #define SPLASH_DROPS 8
-#define SPLASH_MIN_UP 0.7
 #define SPLASH_GRAVITY 9.8
 
 float splashCell;
@@ -177,6 +183,9 @@ float splashHeight;
 float splashRadius;
 float splashDrop;
 float splashTime;
+float splashMinUp;
+/* Splash > Only in Puddles: drops only where the puddle water is. */
+bool splashInPuddles;
 vec2 splashRes;
 
 vec3 splashHash(vec3 p)
@@ -207,6 +216,50 @@ vec3 splashProject(vec3 w)
 {
 	vec4 c = unfprojmat * (unfviewmat * vec4(w, 1.0));
 	return vec3(c.xy / c.w * 0.5 + 0.5, c.w);
+}
+
+/* Puddle screen-space reflection: marches the reflected ray in world space, projecting each
+ * step against the depth buffer, and refines the first crossing. rgb = scene color,
+ * a = confidence (0 = left the screen, went behind an object or hit the sky). */
+vec4 puddleSSR(sampler2D colorTex, vec3 origin, vec3 dir, float maxDist)
+{
+	float t = 0.05;
+	float prevT = 0.0;
+	for (int i = 0; i < 32; i++) {
+		vec3 s = splashProject(origin + dir * t);
+		if (s.z <= 0.0 || s.x < 0.0 || s.y < 0.0 || s.x > 1.0 || s.y > 1.0) {
+			break;
+		}
+		float d = texture(bgl_DepthTexture, s.xy).x;
+		if (s.z > -splashViewPos(s.xy, d).z) {
+			float a = prevT;
+			float b = t;
+			for (int j = 0; j < 5; j++) {
+				float m = (a + b) * 0.5;
+				vec3 sm = splashProject(origin + dir * m);
+				if (sm.z > -splashViewPos(sm.xy, texture(bgl_DepthTexture, sm.xy).x).z) {
+					b = m;
+				}
+				else {
+					a = m;
+				}
+			}
+			s = splashProject(origin + dir * b);
+			d = texture(bgl_DepthTexture, s.xy).x;
+			/* Too far behind the surface found: the ray passed behind an object. */
+			if (d >= 0.9999 || s.z + splashViewPos(s.xy, d).z > max(0.3, b * 0.1)) {
+				break;
+			}
+			vec2 edge = smoothstep(vec2(0.0), vec2(0.08), s.xy) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - s.xy);
+			return vec4(texture(colorTex, s.xy).rgb, clamp(edge.x * edge.y * (1.0 - b / maxDist), 0.0, 1.0));
+		}
+		prevT = t;
+		t += 0.1 + t * 0.15;
+		if (t > maxDist) {
+			break;
+		}
+	}
+	return vec4(0.0);
 }
 
 /* Neighbour on the side that stays on the same surface (avoids the silhouette). */
@@ -294,9 +347,28 @@ float splashOne(vec3 cell, float surfZ, vec2 uv, float sceneZ)
 	return a;
 }
 
-/* Returns the splash coverage (0..1) for this pixel. */
-float rainSplash(vec2 uv, float size, float rate, float maxDist, float time)
+/* Only objects with ripples_effect/splash_effect: the mask holds the marked surface (bit) and
+ * its view depth, so a surface counts only where it is the one the scene shows. */
+bool rainMaskBit(float flags, float bit)
 {
+	return mod(floor(flags / bit + 0.001), 2.0) > 0.5;
+}
+
+bool rainMarked(vec2 uv, float bit, float viewZ)
+{
+	vec2 m = texture(ge_RainMask, uv).xy;
+	if (!rainMaskBit(m.x, bit)) {
+		return false;
+	}
+	return abs(m.y - viewZ) < 0.02 + 0.01 * viewZ;
+}
+
+float puddleWaterAt(vec3 wp, float nz, vec2 uv, float viewZ, vec3 camPos);
+
+/* Returns the splash coverage (0..1) for this pixel. */
+float rainSplash(vec2 uv, float size, float rate, float maxDist, float minUp, float time)
+{
+	splashMinUp = minUp;
 	splashRes = vec2(textureSize(bgl_DepthTexture, 0));
 	vec2 texel = 1.0 / splashRes;
 	splashCell = 0.1 * max(size, 1.0);
@@ -320,6 +392,10 @@ float rainSplash(vec2 uv, float size, float rate, float maxDist, float time)
 		if (suv.y < 0.0) {
 			break;
 		}
+		/* Cheap reject first: an unmarked spot skips the depth and normal work. */
+		if (ge_RainMaskFlags.y > 0.5 && !rainMaskBit(texture(ge_RainMask, suv).x, 2.0)) {
+			continue;
+		}
 		float ds = splashDepthAt(suv);
 		if (ds >= 0.9999) {
 			continue;
@@ -328,11 +404,17 @@ float rainSplash(vec2 uv, float size, float rate, float maxDist, float time)
 		if (distance(wp, camPos) > maxDist) {
 			continue;
 		}
+		if (ge_RainMaskFlags.y > 0.5 && !rainMarked(suv, 2.0, -splashViewPos(suv, ds).z)) {
+			continue;
+		}
 		vec3 n = normalize(cross(splashNeighbour(suv, vec2(texel.x, 0.0), wp), splashNeighbour(suv, vec2(0.0, texel.y), wp)));
 		if (dot(n, camPos - wp) < 0.0) {
 			n = -n;
 		}
-		if (n.z < SPLASH_MIN_UP) {
+		if (n.z < splashMinUp) {
+			continue;
+		}
+		if (splashInPuddles && puddleWaterAt(wp, n.z, suv, -splashViewPos(suv, ds).z, camPos) < 0.5) {
 			continue;
 		}
 		/* The two nearest cells on each axis, so a crown is not cut at a cell border. */
@@ -352,6 +434,39 @@ float rainSplash(vec2 uv, float size, float rate, float maxDist, float time)
 
 /* Lightning flash: the whole scene gets brighter and colder, the sky much more, and the
  * sky around the bolt even more. x = flash, y = bolt brightness, zw = bolt on screen (uv). */
+/* Puddles: smooth value noise in world XY, so the puddles stay on the ground. */
+float puddleNoise(vec2 p)
+{
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = rainCellHash(vec3(i, 7.0)).x;
+	float b = rainCellHash(vec3(i + vec2(1.0, 0.0), 7.0)).x;
+	float c = rainCellHash(vec3(i + vec2(0.0, 1.0), 7.0)).x;
+	float d = rainCellHash(vec3(i + vec2(1.0, 1.0), 7.0)).x;
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+/* Large blobs plus finer octaves for irregular borders, about 0..1. */
+float puddleField(vec2 p)
+{
+	return puddleNoise(p) * 0.6 + puddleNoise(p * 2.07 + 17.3) * 0.28 + puddleNoise(p * 4.31 + 3.9) * 0.12;
+}
+
+/* Puddle water (0..1) at a surface point, same rules as the puddle pass without the edge
+ * antialiasing: used by Splash > Only in Puddles for the spot where the drop lands. */
+float puddleWaterAt(vec3 wp, float nz, vec2 uv, float viewZ, vec3 camPos)
+{
+	if (nz < ge_RainPuddle2.z || distance(wp, camPos) > ge_RainPuddle2.y) {
+		return 0.0;
+	}
+	if (ge_RainMaskFlags.z > 0.5 && !rainMarked(uv, 4.0, viewZ)) {
+		return 0.0;
+	}
+	float threshold = mix(0.82, 0.22, ge_RainPuddle1.y);
+	return smoothstep(threshold, threshold + 0.03, puddleField(wp.xy / max(ge_RainPuddle1.z, 0.05)));
+}
+
 vec3 rainLightning(vec3 col, vec2 uv, float depth, vec2 res, vec4 lightning)
 {
 	float sky = step(0.9999, depth);
@@ -384,8 +499,12 @@ void main()
 	float density = max(ge_RainParams3.x, 0.25);
 	float rippleRadius = ge_RainParams3.y;
 	float rippleMinUp = ge_RainParams3.z;
+	/* 0 = values never set (old filter data): the ones the shader had fixed. */
+	float rippleSize = ge_RainParams5.x > 0.0 ? ge_RainParams5.x : 1.0;
+	float rippleRate = ge_RainParams5.y > 0.0 ? ge_RainParams5.y : 0.8;
 
-	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001) {
+	/* Puddles stay after the rain stops (Intensity 0); they dry with Amount. */
+	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001 && !(ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001)) {
 		gl_FragColor = direct;
 		return;
 	}
@@ -417,56 +536,127 @@ void main()
 		finalColor += ge_RainColor * streaks * intensity;
 	}
 
-	if (useRipple && rippleIntensity > 0.001) {
+	bool rippleOn = useRipple && rippleIntensity > 0.001;
+	bool puddlesOn = ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001;
+	/* Only in Puddles: Puddle1.x = 1 + 1 (ripples) + 2 (splash); both can be on together. */
+	float puddleOnly = ge_RainPuddle1.x > 0.5 ? floor(ge_RainPuddle1.x - 0.5) : 0.0;
+	bool ripplePuddleOnly = mod(puddleOnly, 2.0) > 0.5;
+	splashInPuddles = puddleOnly > 1.5;
+	if (rippleOn || puddlesOn) {
+		/* Surface under the pixel, shared by puddles and ripples. Derivatives stay outside the
+		 * per-pixel branches below. */
 		float depth = texture(bgl_DepthTexture, texcoord).x;
-		float isBackground = step(0.9999, depth);
+		bool isBackground = depth >= 0.9999;
+		vec3 worldPos = getWorldPositionFromDepth(texcoord, depth);
+		vec3 camPos = (unfinvviewmat * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+		vec3 normal = normalize(cross(dFdx(worldPos), dFdy(worldPos)));
+		/* Derivative orientation is screen-dependent. Point it at the camera so
+		 * undersides remain down-facing and cannot receive puddle ripples. */
+		if (dot(normal, camPos - worldPos) < 0.0) {
+			normal = -normal;
+		}
+		float camDist = length(worldPos - camPos);
+		float viewZ = -splashViewPos(texcoord, depth).z;
+		vec3 V = normalize(camPos - worldPos);
 
-		if (isBackground < 0.5) {
-			vec3 worldPos = getWorldPositionFromDepth(texcoord, depth);
-			vec3 camPos = (unfinvviewmat * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-			vec3 normal = normalize(cross(dFdx(worldPos), dFdy(worldPos)));
-			/* Derivative orientation is screen-dependent. Point it at the camera so
-			 * undersides remain down-facing and cannot receive puddle ripples. */
-			if (dot(normal, camPos - worldPos) < 0.0) {
-				normal = -normal;
+		/* Puddles: wet darker ground with standing water reflecting the sky. Computed before
+		 * the ripples, which can be limited to the puddle water. */
+		/* Puddle field and its derivative before the per-pixel branch: fwidth inside it is undefined.
+		 * puddlesOn is uniform, so the pixels of a quad always run this together. */
+		float field = 0.0;
+		float aa = 0.008;
+		if (puddlesOn) {
+			field = puddleField(worldPos.xy / max(ge_RainPuddle1.z, 0.05));
+			aa = max(fwidth(field) * 1.5, 0.008);
+		}
+		float puddleDist = ge_RainPuddle2.y;
+		bool puddleHere = puddlesOn && !isBackground && camDist <= puddleDist && normal.z >= ge_RainPuddle2.z &&
+		    (ge_RainMaskFlags.z < 0.5 || rainMarked(texcoord, 4.0, viewZ));
+		float water = 0.0;
+		float wet = 0.0;
+		if (puddleHere) {
+			/* Amount 0 -> nothing above the threshold, 1 -> almost everything. */
+			float threshold = mix(0.82, 0.22, ge_RainPuddle1.y);
+			water = smoothstep(threshold, threshold + aa + 0.02, field);
+			wet = smoothstep(threshold - 0.14, threshold, field);
+			float fade = 1.0 - smoothstep(puddleDist * 0.75, puddleDist, camDist);
+			water *= fade;
+			wet *= fade;
+		}
+
+		/* Ripples: height -> gradient -> perturbed Z-up normal, like a material normal map
+		 * projected from above in world XY (no mesh UV needed). Blender/Range uses Z as the
+		 * world-up axis. */
+		bool rippleHere = false;
+		float puddleWater = 0.0;
+		vec3 N = vec3(0.0, 0.0, 1.0);
+		float amount = 0.0;
+		if (rippleOn && !isBackground && camDist <= rippleRadius && normal.z >= rippleMinUp &&
+		    (!ripplePuddleOnly || water > 0.001) &&
+		    (ge_RainMaskFlags.x < 0.5 || rainMarked(texcoord, 1.0, viewZ)))
+		{
+			rippleHere = true;
+			vec2 p = worldPos.xy * 6.0 / rippleSize;
+			const float e = 0.02;
+			float h = rainRippleHeight(p, time, rippleRate);
+			vec2 grad = vec2(rainRippleHeight(p + vec2(e, 0.0), time, rippleRate) - h,
+			                 rainRippleHeight(p + vec2(0.0, e), time, rippleRate) - h) / e;
+			N = normalize(vec3(-grad * 0.075 * ge_RainRippleNormal, 1.0));
+			float fadeOut = 1.0 - smoothstep(rippleRadius * 0.7, rippleRadius, camDist);
+			amount = rippleIntensity * 2.5 * fadeOut * (ripplePuddleOnly ? water : 1.0);
+		}
+
+		if (puddleHere) {
+			float darkness = ge_RainPuddle1.w;
+			finalColor *= 1.0 - darkness * (0.3 * wet + 0.55 * water);
+
+			/* The ripples only bend the reflection direction; the fresnel uses the flat water
+			 * surface, otherwise every ring edge turns into a full sky-colored line. */
+			vec3 Nw = rippleHere ? N : vec3(0.0, 0.0, 1.0);
+			puddleWater = water * clamp(ge_RainPuddle2.x, 0.0, 1.0);
+			vec3 R = reflect(-V, Nw);
+			float skyT = sqrt(clamp(R.z, 0.0, 1.0));
+			vec3 sky = mix(ge_RainSkyHorizon, ge_RainSkyZenith, skyT);
+			sky = mix(sky, vec3(dot(sky, vec3(0.299, 0.587, 0.114))) * 0.85, darken);
+			/* Optional SSR: the visible scene where the ray finds it, the sky elsewhere. */
+			if (ge_RainPuddle2.w > 0.5 && water > 0.001) {
+				vec4 ssr = puddleSSR(bgl_RenderedTexture, worldPos + vec3(0.0, 0.0, 0.02), R, puddleDist);
+				vec3 ssrCol = mix(ssr.rgb, vec3(dot(ssr.rgb, vec3(0.299, 0.587, 0.114))) * 0.85, darken);
+				sky = mix(sky, ssrCol, ssr.a);
 			}
-			/* Blender/Range uses Z as the world-up axis. Testing Y here rejects
-			 * horizontal floors and lets some vertical faces through. */
-			if (length(worldPos - camPos) <= rippleRadius && normal.z >= rippleMinUp) {
-				/* Height -> gradient -> perturbed Z-up normal, like a material normal map
-				 * projected from above in world XY (no mesh UV needed). */
-				vec2 p = worldPos.xy * 6.0;
-				const float e = 0.02;
-				float h = rainRippleHeight(p, time);
-				vec2 grad = vec2(rainRippleHeight(p + vec2(e, 0.0), time) - h,
-				                 rainRippleHeight(p + vec2(0.0, e), time) - h) / e;
-				vec3 N = normalize(vec3(-grad * 0.075 * ge_RainRippleNormal, 1.0));
-				float fadeOut = 1.0 - smoothstep(rippleRadius * 0.7, rippleRadius, length(worldPos - camPos));
-				float amount = rippleIntensity * 2.5 * fadeOut;
+			float fres = mix(0.2, 1.0, pow(1.0 - max(V.z, 0.0), 4.0));
+			finalColor = mix(finalColor, sky, clamp(water * fres * ge_RainPuddle2.x, 0.0, 1.0));
 
-				/* Refraction: shift what is under the water by the normal slope. */
-				vec3 refr = texture(bgl_RenderedTexture, texcoord + N.xy * 0.012 * amount).rgb;
-				float refrLuma = dot(refr, vec3(0.299, 0.587, 0.114));
-				finalColor += mix(refr, vec3(refrLuma) * 0.85, darken) - overcast;
+			vec3 H = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
+			finalColor += vec3(pow(max(dot(Nw, H), 0.0), 200.0)) * water * ge_RainPuddle2.x * 0.6;
+		}
 
-				/* Highlight + fresnel from the bent normal, only where there is a wave. */
-				vec3 V = normalize(camPos - worldPos);
-				vec3 H = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
-				float spec = pow(max(dot(N, H), 0.0), 120.0);
-				float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-				float slope = clamp((1.0 - N.z) * 40.0, 0.0, 1.0);
-				finalColor += vec3(spec * 0.8 + fres * 0.25) * slope * amount * 0.4;
-			}
+		if (rippleHere) {
+			/* Refraction: shift what is under the water by the normal slope. */
+			vec3 refr = texture(bgl_RenderedTexture, texcoord + N.xy * 0.012 * amount).rgb;
+			float refrLuma = dot(refr, vec3(0.299, 0.587, 0.114));
+			/* Inside a puddle the reflection already shows the waves: keep only part of the
+			 * refraction, which was added on top of the sky and doubled the rings. */
+			finalColor += (mix(refr, vec3(refrLuma) * 0.85, darken) - overcast) * (1.0 - 0.75 * puddleWater);
+
+			/* Highlight + fresnel from the bent normal, only where there is a wave. */
+			vec3 H = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
+			float spec = pow(max(dot(N, H), 0.0), 120.0);
+			float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+			float slope = clamp((1.0 - N.z) * 40.0, 0.0, 1.0);
+			finalColor += vec3(spec * 0.8 + fres * 0.25 * (1.0 - puddleWater)) * slope * amount * 0.4;
 		}
 	}
 
 	if (ge_RainParams4.x > 0.5 && ge_RainParams4.w > 0.001) {
-		float splash = rainSplash(texcoord, ge_RainParams4.y, ge_RainParams4.z, ge_RainParams3.w, time) * ge_RainParams4.w * 0.85;
+		float splash = rainSplash(texcoord, ge_RainParams4.y, ge_RainParams4.z, ge_RainParams3.w, ge_RainParams5.w, time) * ge_RainParams4.w * 0.85;
 		if (splash > 0.0) {
 			/* Water: slightly refracts what is behind it and catches the sky light. */
 			vec2 texel = 1.0 / vec2(textureSize(bgl_DepthTexture, 0));
-			vec3 behind = texture(bgl_RenderedTexture, texcoord + vec2(0.0, 2.0) * texel).rgb;
-			vec3 water = behind * 0.55 + vec3(0.78, 0.85, 0.95) * 0.6;
+			/* Splash Normal: how much the drop bends what is behind it and catches the sky (1 = default). */
+			float splashNormal = ge_RainParams5.z;
+			vec3 behind = texture(bgl_RenderedTexture, texcoord + vec2(0.0, 2.0 * splashNormal) * texel).rgb;
+			vec3 water = behind * (1.0 - 0.45 * min(splashNormal, 2.0)) + vec3(0.78, 0.85, 0.95) * 0.6 * splashNormal;
 			finalColor = mix(finalColor, water, clamp(splash, 0.0, 1.0));
 		}
 	}

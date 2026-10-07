@@ -95,6 +95,30 @@ typedef struct BuildInFilters {
 	float rain_splash_rate;
 	float rain_splash_intensity;
 	float rain_splash_distance;
+	float rain_ripple_size;
+	float rain_ripple_rate;
+	float rain_splash_normal;
+	float rain_splash_min_up;
+	/* Puddles: amount, size (m), darkness, reflection, distance, minimum upward normal */
+	bool useRainPuddles;
+	bool useRainPuddleSSR;
+	/* Ripples only inside the puddle water (adds 1 to Puddle1.x) */
+	bool useRainRipplePuddle;
+	/* Splash only inside the puddle water (adds 2 to Puddle1.x) */
+	bool useRainSplashPuddle;
+	float rain_puddle_amount;
+	float rain_puddle_size;
+	float rain_puddle_darkness;
+	float rain_puddle_reflection;
+	float rain_puddle_distance;
+	float rain_puddle_min_up;
+	/* World horizon/zenith colors: what the puddles reflect */
+	float rain_sky_horizon[3];
+	float rain_sky_zenith[3];
+	/* Ripples/Splash only on marked objects: mask texture (KX_RainSurfaceMask) and which
+	 * effects use it (bit 1 ripples, bit 2 splash, bit 4 puddles; 0 = every surface). Refreshed every frame. */
+	unsigned int rain_mask_texture;
+	int rain_mask_flags;
 	/* Lightning: flash, bolt brightness, bolt screen position (refreshed every frame) */
 	float rain_lightning[4];
 
