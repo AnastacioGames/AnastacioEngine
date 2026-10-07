@@ -24,7 +24,11 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 - Teste: `tools/create_gi_test.py` → `projects-teste/gi/` (sala, cornell, refs Cycles).
 - Tom: a diferença para o Cycles era a cena de teste (sol 3.0 no jogo x 4 W/m² no Cycles). Sol do jogo
   = força do Cycles / π; com 4/π paredes, teto e chão ficam a ±6% da referência.
-- Pendente: GTAO (fase 3); testar Linux. `ae_denoise.dll` e `tbb.dll`
+- GTAO (fase 3): o SSAO (`use_ssao`) agora é Ground Truth AO no desktop (`RAS_SSAO2DFilter.glsl`):
+  horizontes por fatia, normal pela menor diferença de profundidade, falloff no raio e multi-bounce.
+  GLSL ES (Web/Android) mantém o SSAO espiral antigo. Mesmos parâmetros (samples → fatias × passos,
+  strength = expoente, distance = raio). Sala 1280×720: ~0,28 ms por quadro.
+- Pendente: testar Linux e Web. `ae_denoise.dll` e `tbb.dll`
   já vão para `build/bin/` pelo `install` do CMake, logo entram no ZIP do release. Manchas na
   lightmap eram ruído de 8 amostras (64 limpa); faixa clara na base da parede era o shadow bias 1.0 do sol
   (0.1 resolve).
