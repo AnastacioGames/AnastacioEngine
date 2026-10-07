@@ -22,6 +22,10 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   de objeto, parede/piso/teto, cômodos acesos/apagados por hash). Cena em `projects-teste/parallax/`.
   Raio e posição em unidades de cômodo (cômodos não cúbicos sem distorção), epsilon com sinal contra
   divisão por zero, entrada Offset para alinhar a grade quando a fachada não é múltipla do Room Size.
+- Parallax sem riscos em ângulo rasante: depois da busca linear, refinamento binário (6 iterações) acha a
+  borda exata em vez de interpolar (a interpolação falhava em bordas duras e deixava degraus nas laterais dos
+  blocos); passos dobram perto do horizonte. Na receita, o Bump (derivada de tela, ruidoso nas laterais) foi
+  trocado por normal map gerado do height map, e os blocos ganharam chanfro.
 
 ## Luz indireta baked: lightmap Cycles + OIDN + light volume (2026-10-06)
 

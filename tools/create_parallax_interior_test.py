@@ -4,7 +4,8 @@ Run with:  RangeEngine -b --python tools/create_parallax_interior_test.py -- <ou
 
 - "Blocos Parallax": a wall whose surface looks made of blocks sticking out at random heights. Uses the
   engine's own Parallax node (steep parallax / occlusion on a height map) fed by a generated 8x8 block height
-  map; the same shifted UV reads the color map and drives a Bump, so block sides and grooves shade right.
+  map; the same shifted UV reads the color map and a normal map baked from the height, so block sides and
+  grooves shade right (a Bump node on the height map turns noisy on the block sides).
 - "Interior Mapping": node group that fakes a real room behind every window of a building. The view ray is
   taken to object space and intersected with the grid of room boxes (floor/ceil/fract per axis); the face it
   hits picks wall, floor or ceiling color, a hash of the room id picks lit/unlit and tint. Works on every face
@@ -38,7 +39,7 @@ scene.world = world
 
 # ---------------------------------------------------------------- block maps
 
-def block_images(n=8, size=512, gap=0.06, seed=7):
+def block_images(n=8, size=512, gap=0.04, bevel=0.05, depth_scale=0.1, seed=7):
     """Height map (blocks at random heights, grooves at 0) and matching color map."""
     rnd = random.Random(seed)
     heights = [[0.35 + 0.65 * rnd.random() for _ in range(n)] for _ in range(n)]
@@ -54,7 +55,12 @@ def block_images(n=8, size=512, gap=0.06, seed=7):
             cx = int(cx)
             u, v = fx / cell, fy / cell
             groove = u < gap or u > 1.0 - gap or v < gap or v > 1.0 - gap
-            h = 0.0 if groove else heights[cy][cx]
+            # bevel: a short ramp from the groove up to the block top. A hard step makes the
+            # parallax hit and the shading slope land on a single texel and the block sides get noisy.
+            e = min(u, 1.0 - u, v, 1.0 - v) - gap
+            r = max(0.0, min(1.0, e / bevel))
+            r = r * r * (3.0 - 2.0 * r)
+            h = heights[cy][cx] * r
             t = tints[cy][cx]
             i = (y * size + x) * 4
             hpx[i:i + 4] = (h, h, h, 1.0)
@@ -65,13 +71,30 @@ def block_images(n=8, size=512, gap=0.06, seed=7):
     himg.colorspace_settings.name = 'Non-Color'
     himg.pixels = hpx
     cimg.pixels = cpx
+    # tangent-space normal map from the height (central differences, wraps like the texture)
+    k = depth_scale * size / 2.0
+    npx = [0.0] * (size * size * 4)
+    for y in range(size):
+        yu, yd = ((y + 1) % size) * size, ((y - 1) % size) * size
+        row = y * size
+        for x in range(size):
+            xr, xl = (x + 1) % size, (x - 1) % size
+            dx = (hpx[(row + xr) * 4] - hpx[(row + xl) * 4]) * k
+            dy = (hpx[(yu + x) * 4] - hpx[(yd + x) * 4]) * k
+            inv = 1.0 / math.sqrt(dx * dx + dy * dy + 1.0)
+            i = (row + x) * 4
+            npx[i:i + 4] = (0.5 - 0.5 * dx * inv, 0.5 - 0.5 * dy * inv, 0.5 + 0.5 * inv, 1.0)
+    nimg = bpy.data.images.new("blocos_normal", size, size)
+    nimg.colorspace_settings.name = 'Non-Color'
+    nimg.pixels = npx
     himg.pack(as_png=True)
     cimg.pack(as_png=True)
-    return himg, cimg
+    nimg.pack(as_png=True)
+    return himg, cimg, nimg
 
 
 def blocks_material():
-    himg, cimg = block_images()
+    himg, cimg, nimg = block_images()
     tex = bpy.data.textures.new("blocos_height", 'IMAGE')
     tex.image = himg
 
@@ -92,13 +115,13 @@ def blocks_material():
     L(coord.outputs["UV"], par.inputs["UV"])
 
     col = N("ShaderNodeTexImage"); col.image = cimg
-    hgt = N("ShaderNodeTexImage"); hgt.image = himg; hgt.color_space = 'NONE'
+    hgt = N("ShaderNodeTexImage"); hgt.image = nimg; hgt.color_space = 'NONE'
     uvsrc = coord.outputs["UV"] if "--plain" in argv else par.outputs["UV"]
     L(uvsrc, col.inputs["Vector"]); L(uvsrc, hgt.inputs["Vector"])
 
-    bump = N("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 1.0
-    L(hgt.outputs["Color"], bump.inputs["Height"])
+    bump = N("ShaderNodeNormalMap")
+    bump.space = 'TANGENT'
+    L(hgt.outputs["Color"], bump.inputs["Color"])
 
     bsdf = N("ShaderNodeBsdfPrincipled")
     bsdf.inputs["Roughness"].default_value = 0.7

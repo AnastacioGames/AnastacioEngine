@@ -6590,7 +6590,8 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	// across the whole surface (1/vv.z grows without bound near the horizon).
 	float vz = (vv.z < 0.0) ? min(vv.z, -0.15) : max(vv.z, 0.15);
 	vec2 delta = (vec3(-vv.x, gl_FrontFacing ? vv.y : -vv.y, 0.0) * bumpscale / vz).xy;
-	numsteps = clamp(numsteps, 1.0, 256.0);
+	// More steps at grazing angles, where each step covers a longer stretch of the map.
+	numsteps = clamp(numsteps * mix(2.0, 1.0, abs(vz)), 1.0, 256.0);
 
 	// Mip level from the unshifted uv: the shifted one jumps between steps and would pick level 0
 	// (aliasing/shimmer at distance); the shift is small so the footprint is the same.
@@ -6618,30 +6619,21 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 		depth -= depthstep;
 	}
 
-	vec2 texuv = texco.xy - delta * (1.0 - depth);
-
-	/* Interpolation.
-	 * Compare the distance of the height texture with current level and previous level.
-	 */
-
-	// Compute the depth before the last step, reverse operation.
-	float depthprelay = depth + depthstep;
-	// Compute the uv with the pre depth.
-	vec2 texuvprelay = texco.xy - delta * (1.0 - depthprelay);
-
-	// The shift between the texture height and the last depth.
-	float depthshiftcurlay = height - depth;
-	// The shift between the texture height with precedent uv computed with pre detph and the pre depth.
-	float depthshiftprelay = textureGrad(ima, texuvprelay, duvdx, duvdy)[ci] - depthprelay;
-
-	float weight = 1.0;
-	// If the height is right in the middle of two step the difference of the two shifts will be null.
-	if ((depthshiftcurlay - depthshiftprelay) > 0.0) {
-		// Get shift ratio.
-		weight = depthshiftcurlay / (depthshiftcurlay - depthshiftprelay);
+	/* Binary refinement between the last step above the surface and the first one below it.
+	 * A linear interpolation fails on hard edges (block sides) and leaves stair-step streaks. */
+	float above = min(depth + depthstep, 1.0);
+	float below = depth;
+	for (int i = 0; i < 6; ++i) {
+		float mid = 0.5 * (above + below);
+		if (textureGrad(ima, texco.xy - delta * (1.0 - mid), duvdx, duvdy)[ci] > mid) {
+			below = mid;
+		}
+		else {
+			above = mid;
+		}
 	}
-
-	vec2 finaltexuv = mix(texuv, texuvprelay, weight);
+	// Take the point already inside the surface so hard edges (block sides) read a stable texel.
+	vec2 finaltexuv = texco.xy - delta * (1.0 - below);
 
 	// Discard if uv is out of the range 0 to 1.
 	vec2 clampmin = vec2(-0.5) * scale.xy;
