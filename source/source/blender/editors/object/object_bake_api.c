@@ -104,6 +104,10 @@ typedef struct BakeAPIRender {
 	const char *identifier;
 
 	int result;
+	/* Optional completion sink for a caller coordinating multiple bake jobs.
+	 * Written only by freejob on the main thread, after the worker has joined. */
+	int *result_out;
+	short *stop;
 	bool ready;
 
 	/* callbacks */
@@ -154,6 +158,12 @@ static int bake_break(void *UNUSED(rjv))
 	if (G.is_break)
 		return 1;
 	return 0;
+}
+
+static int bake_job_break(void *bkv)
+{
+	BakeAPIRender *bkr = (BakeAPIRender *)bkv;
+	return G.is_break || (bkr->stop && *bkr->stop);
 }
 
 
@@ -1226,12 +1236,13 @@ finally:
 	return result;
 }
 
-static void bake_startjob(void *bkv, short *UNUSED(stop), short *do_update, float *progress)
+static void bake_startjob(void *bkv, short *stop, short *do_update, float *progress)
 {
 	BakeAPIRender *bkr = (BakeAPIRender *)bkv;
 
 	/* setup new render */
 	bkr->do_update = do_update;
+	bkr->stop = stop;
 	bkr->progress = progress;
 
 	RE_SetReports(bkr->render, bkr->reports);
@@ -1284,6 +1295,12 @@ static void bake_startjob(void *bkv, short *UNUSED(stop), short *do_update, floa
 static void bake_freejob(void *bkv)
 {
 	BakeAPIRender *bkr = (BakeAPIRender *)bkv;
+	RE_SetReports(bkr->render, NULL);
+	if (bkr->result_out) {
+		*bkr->result_out = bake_job_break(bkr) ? OPERATOR_CANCELLED : bkr->result;
+	}
+	/* Render outlives this job; do not leave its break callback pointing at bkr. */
+	RE_test_break_cb(bkr->render, NULL, bake_break);
 
 	BLI_freelistN(&bkr->selected_objects);
 	MEM_freeN(bkr);
@@ -1382,7 +1399,9 @@ static void bake_set_props(wmOperator *op, Scene *scene)
 	}
 }
 
-static int bake_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+/* Start the existing baker without installing a child modal operator. The caller
+ * must keep its reports and result_out alive until this job finishes or is joined. */
+int ED_object_bake_job_start(bContext *C, wmOperator *op, int *result_out)
 {
 	wmJob *wm_job;
 	BakeAPIRender *bkr;
@@ -1395,14 +1414,15 @@ static int bake_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event)
 	if (WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_OBJECT_BAKE))
 		return OPERATOR_CANCELLED;
 
-	bkr = MEM_mallocN(sizeof(BakeAPIRender), "render bake");
+	bkr = MEM_callocN(sizeof(BakeAPIRender), "render bake");
 
 	/* init bake render */
 	bake_init_api_data(op, C, bkr);
+	bkr->result_out = result_out;
 	re = bkr->render;
 
 	/* setup new render */
-	RE_test_break_cb(re, NULL, bake_break);
+	RE_test_break_cb(re, bkr, bake_job_break);
 	RE_progress_cb(re, bkr, bake_progress_update);
 
 	/* setup job */
@@ -1419,11 +1439,15 @@ static int bake_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event)
 
 	WM_cursor_wait(0);
 
-	/* add modal handler for ESC */
-	WM_event_add_modal_handler(C, op);
-
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_RESULT, scene);
 	return OPERATOR_RUNNING_MODAL;
+}
+
+static int bake_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	int result = ED_object_bake_job_start(C, op, NULL);
+	if (result & OPERATOR_RUNNING_MODAL) WM_event_add_modal_handler(C, op);
+	return result;
 }
 
 void OBJECT_OT_bake(wmOperatorType *ot)

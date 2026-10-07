@@ -10,7 +10,7 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ## Atlas de materiais
 
-- [Ferramenta nativa e plano](material-atlas-plan.md): primeira versão para um mesh com materiais PBR opacos. Pendente: usuário validar no jogo real, Undo pela interface, GPU, Web/Linux e rebake de GI nas duas ordens. Próximas peças, após revisão: materiais legados, vários objetos, transparência e grafos mais amplos; combinação direta sem bake permanece futura.
+- [Ferramenta nativa e plano](material-atlas-plan.md): primeira versão para um mesh com materiais PBR opacos. Pendente: usuário validar no jogo real, Escape físico/fechamento da janela, Linux e integração GI com denoise/light volume. GPU OpenCL, Undo/Redo automático na conclusão modal, restauração persistente, cancelamento via API/rollback, Web no navegador e bakes de GI nas duas ordens passaram em cena controlada. Próximas peças, após revisão: materiais legados, vários objetos, transparência e grafos mais amplos; combinação direta sem bake permanece futura.
 
 ## Prioridade atual
 

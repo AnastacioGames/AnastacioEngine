@@ -1,5 +1,58 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 - Revalidacao das melhorias do Material Atlas
+
+- Nova execucao em build/bin, sem alterar codigo: quatro casos modais passaram com exit 0
+  (cancelamento inicial, cancelamento apos dois mapas, falha intermediaria e sucesso com Undo/Redo).
+- Suite principal de pixels e persistencia, restauracao com save/reload e objeto compartilhado,
+  integracao GI/atlas nas duas ordens e GPU AMD Radeon RX 6800M passaram com exit 0.
+- Logs em debug-logs/material-atlas-{core,restore,integration}-retest.log e
+  debug-logs/material-atlas-modal-*.log. Aparencia no jogo e Escape fisico seguem pendentes.
+
+## 2026-10-07 - Cancelamento seguro do Material Atlas
+
+- Interface passa a coordenar cinco jobs nativos do baker; Escape e a API
+  material.anastacio_atlas_cancel solicitam parada. Main/mesh/nodes, validacao, packing e
+  commit ficam na UI thread; a interface e operadores concorrentes de atlas ficam bloqueados.
+- object_bake_api.c compartilha o inicio de job sem criar operador modal filho. Completion sink
+  recebe FINISHED/CANCELLED na liberacao do job. Callback verifica G.is_break e stop do job;
+  imagem parcial nao vira sucesso. ReportList privado evita leitura concorrente pela UI; report
+  e callback do Render deixam de apontar para o job depois de liberar sua memoria.
+- Rollback aguarda job finalizar/join antes de liberar IDs. Remove timer, restaura configuracao,
+  selecao, malha e interface; commit so depois dos cinco mapas validados. Scripts/background
+  permanecem sincronos; use_async=True habilita modo modal no editor com janela. Preparacao UV
+  e validacao/packing continuam sincronos; nao prometer cancelamento instantaneo.
+- Build RangeRuntime e depois RangeEngine, vcvars64 e VSLANG=1033: exit 0. Erro inicial C2664
+  em RNA_def_property_flag corrigido com cast explicito de PropertyFlag, sem repetir cegamente.
+- tools/run_material_atlas_modal_tests.py: quatro processos isolados com janela, todos exit 0.
+  Cancelamento no inicio e apos dois mapas, erro Metallic fora de 0-1 e sucesso com pixels/packed
+  maps/Undo/Redo automatico. Fonte/usuarios/UVs/selecao/settings preservados, sem IDs temporarios.
+  A tecla fisica Escape nao foi validada: GHOST usa Raw Input e ignora PostMessage de teclado.
+  Harness chama a mesma rotina nativa via API. Corrigidos Event.timer inexistente e quit dialog
+  que mantinha o processo aberto; runner Python registra exit codes reais (PowerShell retornou null).
+- Suites de pixels/rollback, GI nas duas ordens/GPU OpenCL e restore/save/reload passaram.
+  Alguns encerramentos do harness modal avisaram 458 bytes nao liberados, origem nao determinada;
+  caso final de sucesso encerrou com aviso de 64 bytes tambem visto antes desta mudanca.
+  IDs de dados foram conferidos. Player final: exit 0 e ANASTACIO_ATLAS_RUNTIME_PASS.
+  check_docs.py: 63 documentos, 0 erros e 36 avisos em mapas existentes; diff --check passou.
+
+## 2026-10-07 - Restauracao explicita do Material Atlas
+
+- Operador C++ material.anastacio_atlas_restore no painel Material Atlas. O commit do bake
+  registra fonte e slot ativo com IDProperties da malha. Referencia ID sobrevive a renomeacao,
+  duplicacao e salvar/reabrir; sem mudancas de DNA/headers.
+- Restaura a malha fonte inteira e slots data-linked, preserva atlas com fake user e nao remove
+  materiais/imagens compartilhados. Recusa modifiers, shape keys e slots object-linked.
+  Atlas antigos nao recebem busca heuristica. Edicoes posteriores nao sao transferidas;
+  GUI/report explicam rebake de GI quando a iluminacao foi feita depois do atlas.
+- RangeRuntime compilou/linkou; RangeEngine terminou com exit 0 via vcvars64/VSLANG=1033.
+  Teste --restore passou com fonte renomeada, reload, atlas compartilhado, recusa de modifier,
+  slot ativo, UV fonte, packed maps e novo save/reload. Suite original de pixels/rollback passou.
+  Player executou native_atlas_test.range, exit 0 e ANASTACIO_ATLAS_RUNTIME_PASS.
+- Cancelamento permanece separado: object_bake_api.c bake_exec nao processa Escape em execucao
+  sincrona. Exige jobs/controle de interrupcao; proxima peca aguardando revisao pelo workflow.
+  Logs material-atlas-restore-{build,player-build,test,runtime}.log em debug-logs.
+
 ## 2026-10-07 — `scene.convertObject` e `bge.logic.freeUnconvertedData`
 
 - `scene.convertObject(nome, children=True)` (`BL_Converter::ConvertSceneObject`): converte em runtime
@@ -40,6 +93,25 @@
   Normal Map soma ~135 ms de tangentes (calculadas uma vez e copiadas para malhas iguais), shader
   1 compilado e 7 reutilizados; 20 armatures de 60 ossos com Action em layer inativo: ≤5 ms.
   Ainda dominam malha (~400 ms) e física triangle mesh (~345 ms). Build `RangeEngine RangeRuntime`.
+
+## 2026-10-07 - Validacao adicional do Material Atlas
+
+- `tools/test_material_atlas_integration.py`: GI -> atlas -> GI e atlas -> GI passaram com bake
+  real de World, 256px/8 samples, sem denoise/light volume. Pixels finitos e iluminacao nao preta;
+  atlas preserva pixels/UV de GI e rebake de GI preserva as cinco imagens/UV do atlas.
+- GPU OpenCL AMD Radeon RX 6800M selecionada, CPU desabilitada nas preferencias: cinco passes
+  e cores esperadas passaram; configuracao GPU preservada depois da operacao.
+- Editor com janela: Undo/Redo restaurou dois materiais/UV fonte e depois material unico/cinco
+  imagens packed. Script insere undo_push explicitamente; clique habitual permanece pendente.
+  Primeira tentativa do harness perdeu contexto apos factory reset; corrigido preservando a janela.
+  Ao encerrar, editor avisou um bloco nao liberado de 64 bytes; origem nao determinada.
+- Pacote Web exportado por validate-web.py; preflight sem incompatibilidades. Edge 154.0.4258.62
+  headless/WebGL 2 carregou cena, compilou shaders e emitiu ANASTACIO_ATLAS_RUNTIME_PASS.
+  `tools/test_material_atlas_web.cjs` usa playwright-core e navegador instalado; nao captura telas.
+- Logs em debug-logs/material-atlas-{integration,undo,web,web-runtime}.log. Nenhuma mudanca de
+  producao nesta validacao; executaveis existentes usados. Linux sem binario atual disponivel;
+  visual real, GI com denoise/volume e clique habitual de Undo seguem abertos.
+- check_docs.py: 0 erros, 36 avisos de mapas existentes antes da atualizacao documental.
 
 ## 2026-10-07 — `bge.logic.setObjectConvert`: escolher objetos convertidos antes do load
 

@@ -25,6 +25,30 @@ fica preto só porque Metallic = 1. Normal é tangent space OpenGL na UV do atla
 nos Normal Map temporários. Imagens de dados não recebem conversão sRGB nem denoise.
 Resultado é aplicado apenas depois dos cinco passes e da criação do material final.
 
+**Restore Original Materials** aparece para novos atlas que tenham uma referência de backup.
+Restaura a malha fonte inteira (materiais, índices de faces e UVs), conservando a malha de atlas
+com fake user e sem alterar outros objetos que a compartilhem. A referência é um IDProperty de
+mesh para mesh: funciona após renomear e salvar/reabrir, sem procurar backups pelo nome.
+Modificadores, shape keys e slots ligados ao objeto impedem restauração para evitar perda silenciosa.
+Edições posteriores na malha de atlas não são transferidas à fonte. Se GI foi baked depois do atlas,
+refaça a iluminação após restaurar. Atlas de versões anteriores não têm essa referência e precisam
+de restauração manual; não se tenta adivinhar a malha original.
+Teste `test_material_atlas_integration.py -- --restore` passou, incluindo backup renomeado,
+reload, material ativo, recusa de modifier e atlas compartilhado.
+
+Na interface, **Escape cancela** os passes de bake. O operador usa os jobs existentes do Cycles,
+bloqueia edições durante a operação e só aplica o resultado depois dos cinco mapas validados.
+Após pedir cancelamento, aguarda o baker parar antes de remover temporários e restaurar a fonte,
+seleção, render e configuração Cycles. Preparação/empacotamento de UV e validação/packing de imagens
+ainda são síncronos; a interrupção depende de o backend alcançar seus pontos de parada.
+Scripts continuam síncronos por padrão; `use_async=True` habilita jobs no editor com janela.
+`material.anastacio_atlas_cancel` chama a mesma rotina de cancelamento usada por Escape.
+O cancelamento nativo de job também é reconhecido, inclusive quando a imagem parcial parece válida.
+[run_material_atlas_modal_tests.py](../tools/run_material_atlas_modal_tests.py) passou nos quatro
+cenários: cancelamento no início, após dois mapas, erro no terceiro passe e conclusão normal.
+Verifica IDs/usuários/UVs/configuração/seleção, pixels e Undo/Redo automático. O teste chama a API de
+cancelamento; a tecla física Escape e fechamento da janela permanecem como checks manuais.
+
 Limites explícitos: sem materiais legados, grupos/Mix Shader, transparência, volume, displacement,
 modifiers, shape keys, shaders customizados, foliage, animação de materiais/nós ou entradas não
 baked diferentes entre materiais. Nós sem suporte são recusados com motivo. Não une objetos nem
@@ -37,7 +61,16 @@ Teste: [test_material_atlas.py](../tools/test_material_atlas.py), executado no e
 Cobre cores/scalars conhecidos, material totalmente metálico, textura na UV fonte, normal inclinada
 reconstruída depois do reempacotamento, Lightmap existente, mesh compartilhado e save/reload.
 Inclui rollback depois de passes já executados quando um mapa não cabe no formato de saída.
-Aceitação visual no jogo real e GPU/Web/Linux permanecem pendentes.
+Testes adicionais em [test_material_atlas_integration.py](../tools/test_material_atlas_integration.py):
+bake real de GI → atlas → rebake de GI e atlas → GI, sem denoise/light volume, com iluminação World.
+Validam GI não preta, pixels finitos, mapas físicos sem contaminação e preservação das duas UVs.
+GPU OpenCL AMD Radeon RX 6800M passou os cinco mapas com CPU desabilitada nas preferências.
+Undo/Redo em editor com janela restaurou malha/materiais e imagens packed. A suíte modal adicional
+validou o passo automático de Undo criado na conclusão nativa, sem push manual após o bake.
+Aceitação visual no jogo real continua pendente.
+Exportação Web passou preflight e execução no Edge 154/WebGL 2, incluindo shaders e marcador
+de material único ([teste de navegador](../tools/test_material_atlas_web.cjs)). Não valida aparência.
+Linux e casos de GI com denoise/light volume permanecem pendentes.
 
 ### Aproveitamento do Baked Lighting
 
@@ -45,7 +78,7 @@ Aceitação visual no jogo real e GPU/Web/Linux permanecem pendentes.
 |---|---|---|
 | ae_uvatlas / xatlas | Mesma biblioteca, chamada diretamente do C++ | Exige biblioteca ao lado do executável; sem fallback nesta versão |
 | UV por canto | Adaptador nativo usa triangulação real do mesh | Recusa n-gon quando há UV conflitante no mesmo loop |
-| Bake Cycles | Execução síncrona do operador nativo de bake | Sem cancelamento instantâneo/interação durante o passe |
+| Bake Cycles | Jobs nativos por passe na interface; execução síncrona em scripts/background | Escape solicita interrupção; preparação de UV e packing ainda síncronos |
 | Margens | Baker nativo preenche gutters dos mapas | Não aplica blur/denoise de iluminação aos mapas físicos |
 | GPU | Configuração atual do Cycles opcional | Detector Python do GI não foi copiado |
 | Progresso | Barra nativa da janela e logs por passe | Não compartilha campos ae_bake_progress do GI |
@@ -58,7 +91,7 @@ O material final usa nó UV Map explícito para AnastacioAtlas, sem apagar/reemp
 alterar scene.ae_lightmap/ae_lightmap_use. Não é necessário refazer GI apenas por adicionar a UV e
 trocar slots com aparência equivalente. Alterações de geometria, posição, emissão ou resposta da
 superfície podem desatualizar a iluminação. O teste atual comprova preservação dos dados; não é uma
-comparação visual de GI nem um rebake nas duas ordens.
+comparação visual de GI. O teste adicional executa rebake nas duas ordens em uma cena controlada.
 
 ### Defeitos do baker corrigidos durante a validação
 

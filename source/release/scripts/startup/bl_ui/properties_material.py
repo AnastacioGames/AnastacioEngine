@@ -1344,6 +1344,13 @@ class MATERIAL_PT_anastacio_atlas(Panel):
         col.enabled = (ob.mode == 'OBJECT' and
                        context.scene.game_settings.use_shading_nodes)
         col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
+        layout.label("Escape cancels the bake and restores the source", icon='INFO')
+        if ob.data.get('_anastacio_atlas_source') is not None:
+            row = layout.row()
+            row.enabled = ob.mode == 'OBJECT'
+            row.operator("material.anastacio_atlas_restore", icon='LOOP_BACK')
+            layout.label("Restores the original mesh, including UVs", icon='INFO')
+            layout.label("Rebake lighting if baked after the atlas", icon='INFO')
         if not context.scene.game_settings.use_shading_nodes:
             layout.label("Enable PBR Shading Nodes", icon='INFO')
         if ob.mode != 'OBJECT':

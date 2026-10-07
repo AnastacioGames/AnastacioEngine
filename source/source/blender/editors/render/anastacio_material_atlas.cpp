@@ -3,9 +3,11 @@
  * only invokes this operator. Source materials and the Lightmap UV are never edited.
  */
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -19,6 +21,7 @@ extern "C" {
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_windowmanager_types.h"
 #include "BLI_dynlib.h"
 #include "BLI_math.h"
 #include "BLI_path_util.h"
@@ -31,6 +34,7 @@ extern "C" {
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "BKE_idprop.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -48,10 +52,14 @@ extern "C" {
 #include "ED_screen.h"
 #include "WM_api.h"
 #include "WM_types.h"
+int ED_object_bake_job_start(bContext *C, wmOperator *op, int *result_out);
 }
 
 namespace {
 constexpr const char *atlas_uv = "AnastacioAtlas";
+constexpr const char *backup_key = "_anastacio_atlas_source";
+constexpr const char *backup_slot_key = "_anastacio_atlas_source_slot";
+bool atlas_busy = false;
 const char *map_inputs[] = {"Base Color", "Roughness", "Metallic", "Specular"};
 const char *map_names[] = {"BaseColor", "Roughness", "Metallic", "Specular", "Normal"};
 
@@ -463,7 +471,9 @@ void route_pass(AtlasTransaction &tx, int pass, Image *image)
   evaluate_scene(tx.main, tx.scene);
 }
 
-void bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int size, int margin)
+int start_bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int size,
+                    int margin, int *result_out = nullptr, ReportList *reports = nullptr,
+                    const bool *cancel_requested = nullptr)
 {
   const float clear[4] = {0, 0, 0, 0};
   std::string name = std::string("AnastacioAtlas_") + map_names[pass];
@@ -483,6 +493,10 @@ void bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int 
   }
   BKE_image_release_ibuf(image, target_buffer, target_lock);
   route_pass(tx, pass, image);
+  if (cancel_requested && *cancel_requested) {
+    *result_out = OPERATOR_CANCELLED;
+    return OPERATOR_CANCELLED;
+  }
   PointerRNA props;
   WM_operator_properties_create(&props, "OBJECT_OT_bake");
   RNA_enum_set(&props, "type", pass == 4 ? SCE_PASS_NORMAL : SCE_PASS_EMIT);
@@ -499,9 +513,16 @@ void bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int 
   wmOperator child = {};
   child.type = WM_operatortype_find("OBJECT_OT_bake", false);
   child.ptr = &props;
-  child.reports = op->reports;
-  const int status = child.type->exec(C, &child);
+  child.reports = reports ? reports : op->reports;
+  const int status = result_out ? ED_object_bake_job_start(C, &child, result_out) :
+                                 child.type->exec(C, &child);
   WM_operator_properties_free(&props);
+  return status;
+}
+
+void finish_bake_pass(AtlasTransaction &tx, int pass, int size, int status)
+{
+  Image *image = tx.images.back();
   for (auto &stage : tx.materials) {
     stage.target->id = nullptr;
     id_us_min(&image->id);
@@ -529,6 +550,12 @@ void bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int 
    * The API baker has already filled the gutters; never blur material maps. */
   BKE_image_memorypack(image);
   require(BKE_image_has_packedfile(image), "Cannot pack the atlas image");
+}
+
+void bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass, int size, int margin)
+{
+  const int status = start_bake_pass(C, op, tx, pass, size, margin);
+  finish_bake_pass(tx, pass, size, status);
 }
 
 void build_result(bContext *C, AtlasTransaction &tx)
@@ -596,6 +623,13 @@ void build_result(bContext *C, AtlasTransaction &tx)
   for (Image *image : tx.images) id_us_min(&image->id); /* result texture nodes own them. */
   for (int i = 0; i < tx.work->totpoly; i++) tx.work->mpoly[i].mat_nr = 0;
   /* Commit only after every pass, packing and material construction succeeded. */
+  IDProperty *properties = IDP_GetProperties(&tx.work->id, true);
+  IDPropertyTemplate source_value = {};
+  source_value.id = &tx.source->id;
+  IDP_ReplaceInGroup(properties, IDP_New(IDP_ID, &source_value, backup_key));
+  IDPropertyTemplate slot_value = {};
+  slot_value.i = tx.active_slot;
+  IDP_ReplaceInGroup(properties, IDP_New(IDP_INT, &slot_value, backup_slot_key));
   tx.restore_object();
   id_fake_user_set(&tx.source->id);
   id_us_min(&tx.source->id);
@@ -611,13 +645,68 @@ void build_result(bContext *C, AtlasTransaction &tx)
 bool atlas_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  return ob && ob->type == OB_MESH && ob->mode == OB_MODE_OBJECT &&
+  return !atlas_busy && ob && ob->type == OB_MESH && ob->mode == OB_MODE_OBJECT &&
          !ob->id.lib && !static_cast<Mesh *>(ob->data)->id.lib && !G.is_rendering;
 }
 
-int atlas_exec(bContext *C, wmOperator *op)
+Mesh *source_backup(Mesh *mesh)
 {
-  try {
+  IDProperty *properties = IDP_GetProperties(&mesh->id, false);
+  if (!properties) return nullptr;
+  IDProperty *property = IDP_GetPropertyTypeFromGroup(properties, backup_key, IDP_ID);
+  ID *id = property ? IDP_Id(property) : nullptr;
+  return id && GS(id->name) == ID_ME && id != &mesh->id ? reinterpret_cast<Mesh *>(id) : nullptr;
+}
+
+bool restore_poll(bContext *C)
+{
+  if (!atlas_poll(C)) return false;
+  Mesh *mesh = static_cast<Mesh *>(CTX_data_active_object(C)->data);
+  Mesh *source = source_backup(mesh);
+  return source && !source->id.lib;
+}
+
+int restore_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  Mesh *atlas = static_cast<Mesh *>(ob->data);
+  Mesh *source = source_backup(atlas);
+  if (!source || source->id.lib) {
+    BKE_report(op->reports, RPT_ERROR, "No local source backup recorded for this mesh");
+    return OPERATOR_CANCELLED;
+  }
+  if (ob->modifiers.first || atlas->key) {
+    BKE_report(op->reports, RPT_ERROR, "Remove modifiers and shape keys before restoring the source mesh");
+    return OPERATOR_CANCELLED;
+  }
+  for (int i = 0; i < ob->totcol; i++) {
+    if (ob->matbits && ob->matbits[i]) {
+      BKE_report(op->reports, RPT_ERROR, "Use data-linked slots before restoring the source mesh");
+      return OPERATOR_CANCELLED;
+    }
+  }
+  IDProperty *slot = IDP_GetPropertyTypeFromGroup(
+      IDP_GetProperties(&atlas->id, false), backup_slot_key, IDP_INT);
+  const int active_slot = slot ? IDP_Int(slot) : 1;
+  Main *main = CTX_data_main(C);
+  /* Preserve both variants. Do not remove images/materials used by another object. */
+  id_fake_user_set(&atlas->id);
+  id_us_plus(&source->id);
+  id_us_min(&atlas->id);
+  ob->data = source;
+  BKE_material_resize_object(main, ob, 0, true);
+  BKE_material_resize_object(main, ob, source->totcol, false);
+  for (int i = 0; i < ob->totcol; i++) ob->matbits[i] = 0;
+  ob->actcol = source->totcol ? std::max(1, std::min(active_slot, int(source->totcol))) : 0;
+  update_object(main, ob);
+  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+  WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING, nullptr);
+  BKE_report(op->reports, RPT_INFO, "Source mesh restored; atlas kept as backup. Rebake lighting if baked after the atlas");
+  return OPERATOR_FINISHED;
+}
+
+std::unique_ptr<AtlasTransaction> prepare_atlas(bContext *C, wmOperator *op)
+{
     Scene *scene = CTX_data_scene(C);
     evaluate_scene(CTX_data_main(C), scene);
     Object *ob = CTX_data_active_object(C);
@@ -656,7 +745,8 @@ int atlas_exec(bContext *C, wmOperator *op)
     const int margin = RNA_int_get(op->ptr, "margin");
     require((size & (size - 1)) == 0, "Resolution must be a power of two");
     require(margin * 4 < size, "Margin is too large for this resolution");
-    AtlasTransaction tx(C);
+    std::unique_ptr<AtlasTransaction> transaction(new AtlasTransaction(C));
+    AtlasTransaction &tx = *transaction;
     stage_materials(C, tx);
     pack_uv(tx.work, ob, size, margin);
     BLI_strncpy(scene->r.engine, "CYCLES", sizeof(scene->r.engine));
@@ -664,6 +754,160 @@ int atlas_exec(bContext *C, wmOperator *op)
     if (!RNA_boolean_get(op->ptr, "use_configured_device")) {
       RNA_enum_set_identifier(C, &tx.cycles, "device", "CPU");
     }
+    return transaction;
+}
+
+struct AtlasModal {
+  std::unique_ptr<AtlasTransaction> tx;
+  wmWindowManager *wm = nullptr;
+  wmWindow *window = nullptr;
+  wmTimer *timer = nullptr;
+  ReportList reports = {};
+  int size = 0, margin = 0, pass = 0, result = OPERATOR_RUNNING_MODAL;
+  bool cancelled = false, locked_before = false;
+
+  AtlasModal() { BKE_reports_init(&reports, RPT_STORE); }
+  ~AtlasModal() { BKE_reports_clear(&reports); }
+};
+AtlasModal *active_atlas = nullptr;
+
+void request_cancel(AtlasModal &state)
+{
+  state.cancelled = true;
+  G.is_break = true;
+  WM_jobs_stop(state.wm, state.tx->scene, nullptr);
+}
+
+bool cancel_poll(bContext *) { return active_atlas != nullptr; }
+
+int cancel_exec(bContext *, wmOperator *op)
+{
+  request_cancel(*active_atlas);
+  BKE_report(op->reports, RPT_INFO, "Cancelling atlas; waiting for the baker to stop");
+  return OPERATOR_FINISHED;
+}
+
+/* All Main/mesh/node operations stay on the UI thread. Only the existing baker
+ * runs in a worker, while the interface and competing atlas operators are locked. */
+void modal_cleanup(bContext *C, wmOperator *op)
+{
+  AtlasModal *state = static_cast<AtlasModal *>(op->customdata);
+  if (!state) return;
+  Scene *scene = state->tx->scene;
+  if (WM_jobs_test(state->wm, scene, WM_JOB_TYPE_OBJECT_BAKE)) {
+    G.is_break = true;
+    WM_jobs_kill_type(state->wm, scene, WM_JOB_TYPE_OBJECT_BAKE);
+  }
+  if (state->timer) WM_event_remove_timer(state->wm, state->window, state->timer);
+  const bool locked_before = state->locked_before;
+  wmWindowManager *wm = state->wm;
+  wmWindow *window = state->window;
+  active_atlas = nullptr;
+  delete state; /* Rollback only after the job has finished/joined. */
+  op->customdata = nullptr;
+  atlas_busy = false;
+  G.is_break = false;
+  WM_set_locked_interface(wm, locked_before);
+  WM_progress_clear(window);
+  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, CTX_data_active_object(C));
+  WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING, nullptr);
+}
+
+void modal_start_pass(bContext *C, wmOperator *op, AtlasModal &state)
+{
+  state.result = OPERATOR_RUNNING_MODAL;
+  printf("Anastacio Material Atlas: baking %s (%d/5), Escape cancels\n",
+         map_names[state.pass], state.pass + 1);
+  fflush(stdout);
+  const int status = start_bake_pass(C, op, *state.tx, state.pass, state.size,
+                                    state.margin, &state.result, &state.reports, &state.cancelled);
+  require((status & OPERATOR_RUNNING_MODAL) || state.cancelled, "Cannot start atlas bake job");
+}
+
+int atlas_async_exec(bContext *C, wmOperator *op)
+{
+  try {
+    std::unique_ptr<AtlasModal> state(new AtlasModal());
+    state->tx = prepare_atlas(C, op);
+    state->wm = CTX_wm_manager(C);
+    state->window = CTX_wm_window(C);
+    state->locked_before = state->wm->is_interface_locked;
+    state->size = RNA_int_get(op->ptr, "resolution");
+    state->margin = RNA_int_get(op->ptr, "margin");
+    state->timer = WM_event_add_timer(state->wm, state->window, TIMER, 0.1);
+    require(state->timer != nullptr, "Cannot create atlas bake timer");
+    op->customdata = state.release();
+    active_atlas = static_cast<AtlasModal *>(op->customdata);
+    atlas_busy = true;
+    WM_set_locked_interface(CTX_wm_manager(C), true);
+    modal_start_pass(C, op, *static_cast<AtlasModal *>(op->customdata));
+    WM_event_add_modal_handler(C, op);
+    return OPERATOR_RUNNING_MODAL;
+  }
+  catch (const std::exception &error) {
+    modal_cleanup(C, op);
+    BKE_report(op->reports, RPT_ERROR, error.what());
+    return OPERATOR_CANCELLED;
+  }
+}
+
+int atlas_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  AtlasModal *state = static_cast<AtlasModal *>(op->customdata);
+  if (event->type == ESCKEY && event->val == KM_PRESS) {
+    request_cancel(*state);
+    BKE_report(op->reports, RPT_INFO, "Cancelling atlas; waiting for the baker to stop");
+    return OPERATOR_RUNNING_MODAL;
+  }
+  if (event->type != TIMER || event->customdata != state->timer) {
+    /* Job timers must reach WM, but edits must not reach scene/UI handlers. */
+    return event->type == TIMERJOBS ? OPERATOR_PASS_THROUGH : OPERATOR_RUNNING_MODAL;
+  }
+  if (WM_jobs_test(state->wm, state->tx->scene, WM_JOB_TYPE_OBJECT_BAKE)) {
+    return OPERATOR_RUNNING_MODAL;
+  }
+  try {
+    for (Report *report = static_cast<Report *>(state->reports.list.first); report; report = report->next) {
+      BKE_report(op->reports, ReportType(report->type), report->message);
+    }
+    BKE_reports_clear(&state->reports);
+    if (state->cancelled || G.is_break || state->result == OPERATOR_CANCELLED) {
+      modal_cleanup(C, op);
+      BKE_report(op->reports, RPT_INFO, "Atlas cancelled; original mesh and settings restored");
+      return OPERATOR_CANCELLED;
+    }
+    finish_bake_pass(*state->tx, state->pass, state->size, state->result);
+    if (++state->pass < 5) {
+      modal_start_pass(C, op, *state);
+      return OPERATOR_RUNNING_MODAL;
+    }
+    build_result(C, *state->tx);
+    BKE_report(op->reports, RPT_INFO, "Atlas complete: 5 packed maps; source mesh kept as backup");
+    modal_cleanup(C, op);
+    return OPERATOR_FINISHED;
+  }
+  catch (const std::exception &error) {
+    modal_cleanup(C, op);
+    BKE_report(op->reports, RPT_ERROR, error.what());
+    return OPERATOR_CANCELLED;
+  }
+}
+
+void atlas_cancel(bContext *C, wmOperator *op)
+{
+  modal_cleanup(C, op);
+}
+
+int atlas_exec(bContext *C, wmOperator *op)
+{
+  if (!G.background && CTX_wm_window(C) && RNA_boolean_get(op->ptr, "use_async")) {
+    return atlas_async_exec(C, op);
+  }
+  try {
+    std::unique_ptr<AtlasTransaction> transaction = prepare_atlas(C, op);
+    AtlasTransaction &tx = *transaction;
+    const int size = RNA_int_get(op->ptr, "resolution");
+    const int margin = RNA_int_get(op->ptr, "margin");
     for (int pass = 0; pass < 5; pass++) {
       if (!G.background && CTX_wm_window(C)) WM_progress_set(CTX_wm_window(C), float(pass) / 5.0f);
       printf("Anastacio Material Atlas: baking %s (%d/5)\n", map_names[pass], pass + 1);
@@ -687,6 +931,7 @@ int atlas_exec(bContext *C, wmOperator *op)
 
 int atlas_invoke(bContext *C, wmOperator *op, const wmEvent *)
 {
+  RNA_boolean_set(op->ptr, "use_async", true);
   return WM_operator_props_dialog_popup(C, op, 420, 320);
 }
 }  // namespace
@@ -699,10 +944,35 @@ extern "C" void MATERIAL_OT_anastacio_atlas_bake(wmOperatorType *ot)
   ot->poll = atlas_poll;
   ot->exec = atlas_exec;
   ot->invoke = atlas_invoke;
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->modal = atlas_modal;
+  ot->cancel = atlas_cancel;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_LOCK_BYPASS;
+  PropertyRNA *async = RNA_def_boolean(ot->srna, "use_async", false, "Cancellable Bake",
+                                      "Use native bake jobs in a windowed editor; Escape cancels");
+  RNA_def_property_flag(async, PropertyFlag(PROP_HIDDEN | PROP_SKIP_SAVE));
   RNA_def_int(ot->srna, "resolution", 1024, 64, 4096, "Resolution", "Power of two, in pixels", 64, 4096);
   RNA_def_int(ot->srna, "margin", 4, 1, 64, "Margin", "Padding between UV islands, in pixels", 1, 32);
   RNA_def_int(ot->srna, "samples", 32, 1, 1024, "Samples", "Cycles samples per bake", 1, 128);
   RNA_def_boolean(ot->srna, "use_configured_device", false, "Use Configured Cycles Device",
                   "Use the current Cycles CPU/GPU configuration; disabled uses CPU");
+}
+
+extern "C" void MATERIAL_OT_anastacio_atlas_restore(wmOperatorType *ot)
+{
+  ot->name = "Restore Original Materials";
+  ot->idname = "MATERIAL_OT_anastacio_atlas_restore";
+  ot->description = "Restore the recorded source mesh and materials, keeping the atlas as a backup; later mesh edits are not transferred";
+  ot->poll = restore_poll;
+  ot->exec = restore_exec;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+extern "C" void MATERIAL_OT_anastacio_atlas_cancel(wmOperatorType *ot)
+{
+  ot->name = "Cancel Material Atlas";
+  ot->idname = "MATERIAL_OT_anastacio_atlas_cancel";
+  ot->description = "Request cancellation of the running atlas and restore its original mesh and settings";
+  ot->poll = cancel_poll;
+  ot->exec = cancel_exec;
+  ot->flag = OPTYPE_LOCK_BYPASS;
 }
