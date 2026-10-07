@@ -170,6 +170,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   Cornell 90→70% (caixas grandes: Lightmap Pack já é bom), cena orgânica (esfera, Suzanne subdividida,
   toro, terreno) 2→86%, ~6× texels por metro. Tempo: 0,7 s sala, 6 s orgânica. Brute force medido:
   mais lento e sem ganho, desligado.
+- O bake roda os dois empacotadores e fica com o que cobre mais o atlas (Lightmap Pack leva
+  milissegundos): sala 75%, Cornell 90% (Lightmap Pack), orgânica 86% (xatlas).
 - Pendente: testar Linux e Web. `ae_denoise.dll` e `tbb.dll`
   já vão para `build/bin/` pelo `install` do CMake, logo entram no ZIP do release. Manchas na
   lightmap eram ruído de 8 amostras (64 limpa); faixa clara na base da parede era o shadow bias 1.0 do sol

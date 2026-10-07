@@ -269,8 +269,33 @@ def xatlas_pack(objects, size, margin_px):
         offset += len(tris)
         me.uv_layers[UV_NAME].data.foreach_set("uv", uv)
         me.update()
-    print("AE lightmap: UV atlas by xatlas")
     return True
+
+
+def read_uvs(ob):
+    import numpy as np
+    uv = np.empty(len(ob.data.loops) * 2, dtype=np.float32)
+    ob.data.uv_layers[UV_NAME].data.foreach_get("uv", uv)
+    return uv
+
+
+def uv_area(objects, uvs=None):
+    """Fraction of the atlas covered by the "Lightmap" UVs (fan triangles of every polygon)."""
+    import numpy as np
+    total = 0.0
+    for i, ob in enumerate(objects):
+        me = ob.data
+        uv = (uvs[i] if uvs else read_uvs(ob)).reshape(-1, 2)
+        start = np.empty(len(me.polygons), dtype=np.int64)
+        count = np.empty(len(me.polygons), dtype=np.int64)
+        me.polygons.foreach_get("loop_start", start)
+        me.polygons.foreach_get("loop_total", count)
+        n = count - 2
+        poly = np.repeat(np.arange(len(start)), n)
+        k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
+        a, b, c = uv[start[poly]], uv[start[poly] + k], uv[start[poly] + k + 1]
+        total += 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1])).sum()
+    return total
 
 
 def make_lightmap_uvs(scene, objects, size, margin_px=4):
@@ -290,8 +315,11 @@ def make_lightmap_uvs(scene, objects, size, margin_px=4):
             if other:
                 other.active_render = True
 
+    # both packers run (Lightmap Pack takes milliseconds) and the one that covers more of the atlas wins:
+    # xatlas for curved meshes, Lightmap Pack for rooms of big rectangles
+    xatlas_uvs = None
     if xatlas_pack(objects, size, margin_px):
-        return
+        xatlas_uvs = [read_uvs(ob) for ob in objects]
     for ob in objects:
         me = ob.data
         # the packer measures faces in mesh space: apply the object scale meanwhile so a stretched
@@ -311,6 +339,16 @@ def make_lightmap_uvs(scene, objects, size, margin_px=4):
 
     for ob in objects:
         ob.data.transform(scale_matrix(ob.scale * lightmap_scale(ob)).inverted())
+
+    if xatlas_uvs:
+        pack_area = uv_area(objects)
+        xatlas_area = uv_area(objects, xatlas_uvs)
+        print("AE lightmap: atlas coverage xatlas %.0f%%, Lightmap Pack %.0f%%" %
+              (100 * xatlas_area, 100 * pack_area))
+        if xatlas_area >= pack_area:
+            for ob, uv in zip(objects, xatlas_uvs):
+                ob.data.uv_layers[UV_NAME].data.foreach_set("uv", uv)
+                ob.data.update()
 
 
 def emulate_game_lamp(ob):
