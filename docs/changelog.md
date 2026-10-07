@@ -9,6 +9,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Sombra com materiais Clip / código de vértice corrigida + demo de pelos (2026-10-07)
+
+- Materiais que fazem a sombra com o próprio shader (Clip, alpha-to-coverage e, desde 2026-10-06, opacos
+  com código de vértice) deixavam a cena inteira "na sombra" e travavam a GPU (~60 ms). Na passada de
+  sombra o material ligava como sampler a textura de profundidade da lâmpada que era o próprio alvo
+  (feedback) e recalculava luzes/matrizes compartilhadas da lâmpada com a vista dela. Agora, com
+  `GetShadowMode() != RAS_SHADOW_NONE` (`GetDrawingMode()` não marca a passada de sombra): sem
+  `ProcessLighting`/`UpdateLights` e sem lâmpadas ligadas (unidades de textura de sombra esvaziadas).
+  Objetos com esses materiais passam também a receber sombra corretamente (a grama da demo de vento
+  ficou mais escura por isso).
+- Código de vértice do usuário: `UV`, `ORCO`, `TANGENT` e `COLOR` eram globais inicializadas com
+  atributo (inválido no GLSL atual: o shader não compilava e o material ficava branco); viram `#define`.
+- `tools/create_fur_test.py` → `demos/pelos.range`: pelo em 40 cascas no vertex shader
+  (`pelos_vertex.glsl`, `#define` ajustáveis), fios afinando, gravidade e vento, xadrez e malhado; ~42 FPS
+  com duas Suzannes e sombra na RX 6800M.
+
 ## Demo grama interativa: vento + trilha amassada pela bola (2026-10-06)
 
 - `tools/create_grass_trail_test.py` → `demos/grama_trilha.range`: ~136 mil lâminas em 8×8 blocos,

@@ -330,7 +330,10 @@ void KX_BlenderMaterial::ActivateBlenderShaders(RAS_Rasterizer *rasty)
 void KX_BlenderMaterial::Prepare(RAS_Rasterizer *rasty)
 {
 	UpdateTextures();
-	if (m_blenderShader && m_blenderShader->Ok()) {
+	/* Not in the shadow pass: the lamp's dynamic matrices (dynpersmat...) are shared by every
+	 * material and would be computed from the lamp's own view there, so the next materials
+	 * looked their shadows up with a wrong matrix (whole scene in shadow). */
+	if (m_blenderShader && m_blenderShader->Ok() && rasty->GetShadowMode() == RAS_Rasterizer::RAS_SHADOW_NONE) {
 		m_blenderShader->UpdateLights(rasty);
 	}
 }
@@ -410,7 +413,11 @@ void KX_BlenderMaterial::ActivateMeshUser(RAS_MeshUser *meshUser, RAS_Rasterizer
 		if (m_blenderShader->Ok()) {
 			/* Node materials never went through ProcessLighting(), so gl_LightSource[] and the
 			 * per-slot GPULamps (RAS_Rasterizer::GetShadowLamps()) were never set for this object. */
-			rasty->ProcessLighting(true, camtrans);
+			/* Not in the shadow pass: lights computed there use the lamp's view and get cached per
+			 * object, so the main pass then lit the scene with the wrong light directions. */
+			if (rasty->GetShadowMode() == RAS_Rasterizer::RAS_SHADOW_NONE) {
+				rasty->ProcessLighting(true, camtrans);
+			}
 			m_blenderShader->BindShadowLamps(rasty);
 		}
 

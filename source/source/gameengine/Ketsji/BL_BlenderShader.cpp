@@ -246,7 +246,13 @@ void BL_BlenderShader::BindShadowLamps(RAS_Rasterizer *rasty)
 	 * so it can't live in UpdateLights() which runs from Prepare() before BindProg(). */
 	if (GPU_material_bound(m_gpuMat)) {
 		RAS_Rasterizer::IncLightBindCount();
-		GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
+		/* In the shadow pass (Clip / vertex-code materials draw with their own shader) the lamp's
+		 * depth texture is the render target: binding it as a sampler too is a feedback loop
+		 * (undefined result: the whole scene came out shadowed, plus a GPU stall). A shadow caster
+		 * needs no received shadows, so bind no lamps (samplers parked, shadows disabled). */
+		static GPULamp * const no_lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS] = {nullptr};
+		GPU_material_bind_shadow_lamps(m_gpuMat, (rasty->GetShadowMode() != RAS_Rasterizer::RAS_SHADOW_NONE) ?
+		                               no_lamps : rasty->GetShadowLamps());
 		/* CORE (Web) has no gl_LightSource: upload the same per-slot light values as uniforms. */
 		GPU_material_bind_scene_lights(m_gpuMat, rasty->GetSceneLights());
 	}

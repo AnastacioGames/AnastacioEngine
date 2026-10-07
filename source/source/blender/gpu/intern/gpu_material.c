@@ -4819,6 +4819,11 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			 * texture: two sampler types on one unit is GL_INVALID_OPERATION at draw time. Point
 			 * the unused slot at its own (unbound) unit instead. */
 			GPU_shader_uniform_int(shader, material->shadowmaploc[i], texunit + i);
+			/* The unit may still hold a lamp depth texture from an earlier bind: in the shadow
+			 * pass that texture is the render target, so leave nothing bound there. */
+			glActiveTexture(GL_TEXTURE0 + texunit + i);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glActiveTexture(GL_TEXTURE0);
 		}
 
 		if (material->shadowenabledloc[i] != -1) {

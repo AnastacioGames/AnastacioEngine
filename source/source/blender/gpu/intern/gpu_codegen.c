@@ -1087,13 +1087,13 @@ static char *code_generate_vertex(ListBase *nodes, const char *usercode, const G
 			for (input = node->inputs.first; input; input = input->next) {
 				if (input->source == GPU_SOURCE_ATTRIB && input->attribfirst) {
 					if (input->attribtype == CD_MTFACE && input->type == 2)
-						BLI_dynstr_appendf(ds, "vec2 UV = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef UV\n#define UV att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_ORCO && input->type == 3)
-						BLI_dynstr_appendf(ds, "vec3 ORCO = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef ORCO\n#define ORCO att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_TANGENT && input->type == 4)
-						BLI_dynstr_appendf(ds, "vec4 TANGENT = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef TANGENT\n#define TANGENT att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_MCOL && input->type == 4)
-						BLI_dynstr_appendf(ds, "vec4 COLOR = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef COLOR\n#define COLOR att%d\n#endif\n", input->attribid);
 				}
 			}
 		}
