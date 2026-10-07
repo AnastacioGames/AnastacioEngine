@@ -7,7 +7,7 @@ Usa um bpy simulado, converte o "Driver" da cena F6 (create_logic_convert_scene_
  - o codigo compila, os sensores agem no dono (o_<nome>) e os helpers recebem own=<dono>;
  - as chaves de estado usam 'Dono/Actuator';
  - o fluxo do Sound (flag de tocando da engine, ping-pong, loop end/stop, 3D) funciona com um modulo aud falso.
-Nao substitui o teste de runtime (ver NOTES-logic-f6.md).
+Nao substitui o teste de runtime (ver docs/changelog.md).
 """
 import importlib.util
 import os

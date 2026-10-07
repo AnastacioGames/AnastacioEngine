@@ -29,7 +29,7 @@ LIMITE = 20  # desvio em linhas a partir do qual um metodo do mapa conta como er
 DOCS = ['README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'relatorio-melhorias-anastacioengine.md']
 DOCS_IGNORADOS = {'docs/changelog.md'}  # historico: links e linhas antigos sao esperados
 # Documentos cujas referencias arquivo:linha apontam para o SDK do Emscripten ou para JS gerado no build.
-REFS_EXTERNAS = {'docs/web-gl-emulation-analysis.md', 'docs/web-audio-analysis.md'}
+REFS_EXTERNAS = {'docs/web-audio-analysis.md'}
 CODE_MAPS = {
     'docs/code-map-gameengine.md': None,
     'docs/code-map-kx-gameobject.md': 'Ketsji/KX_GameObject.cpp',

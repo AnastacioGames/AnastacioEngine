@@ -9,8 +9,7 @@ arquitetura e o inventário de pendências, enquanto o estado factual mais recen
 [`roadmap.md`](roadmap.md) e os detalhes de cada sessão no [`changelog.md`](changelog.md).
 
 Documentos ligados: contrato do formato e das interfaces em [`multiplayer-protocol.md`](multiplayer-protocol.md);
-tarefas prontas para sessões na nuvem (frentes A–D, em paralelo com o trabalho local) em
-[`multiplayer-cloud-tasks.md`](multiplayer-cloud-tasks.md).
+as rodadas A–J de tarefas na nuvem estão concluídas (histórico no [changelog](changelog.md)).
 
 Objetivo: multiplayer **dentro da engine** (C++), configurável pela UI sem código, com API Python curta
 para quem quiser mais. Rodar em Desktop, Web e Android (APK WebView, mesmo caminho do Web) com o mesmo `.range`.

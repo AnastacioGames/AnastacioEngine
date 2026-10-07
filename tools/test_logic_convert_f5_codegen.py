@@ -5,7 +5,7 @@ Usa um bpy simulado, converte o "Driver" da cena F5 (create_logic_convert_scene_
  - nada fica como TODO/brick;
  - o codigo compila e age sobre scene.objects[dono do actuator] (own=<variavel do dono>), nunca sobre o Driver;
  - o update() executado com helpers gravadores chama Camera/Constraint/Steering/Mouse Look no objeto certo.
-Nao substitui o teste de runtime (ver NOTES-logic-f5.md).
+Nao substitui o teste de runtime (ver docs/changelog.md).
 """
 import importlib.util
 import os

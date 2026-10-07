@@ -279,13 +279,12 @@ Windows com dependências Unix reais. O trabalho Android deve começar pelos err
      - Estimativas reais de esforço por etapa
      - Reuso das lições Linux: Python isolado, RPATH/equivalente de empacotamento, seleção de libs,
        validação em hardware real
-   - Criar `android-build.md` espelhando `linux-build.md` e `web-export-plan.md`
+   - Criar `android-build.md` espelhando `linux-build.md` e `web-deploy.md`
 
 ---
 
 ## Leitura complementar
 
-- [`web-export-plan.md`](web-export-plan.md) — levantamento original de Web
 - [`web-python-poc-plan.md`](web-python-poc-plan.md) — prova de conceito de Python no navegador
 - [`mobile-export-plan.md`](mobile-export-plan.md) — levantamento original de mobile
 - [`docs/roadmap.md`](roadmap.md) — work-in-progress de engine, seção "Export para Web"

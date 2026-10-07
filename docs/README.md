@@ -58,7 +58,7 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Destruição e deformação](destruction-plan.md): planejamento e integração dos recursos de dano visual.
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
-  [eventos de cutscene](notes-cutscene-events.md) e [fase 4](notes-logic-f4.md).
+  [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).
 - [Exportação mobile/VR](mobile-export-plan.md), [Android WebView](android-export-plan.md) e
   [controles de toque](android-touch-controls-plan.md).
 
@@ -66,8 +66,6 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 - [Pesquisa de áudio Web](web-audio-analysis.md): Audaspace/SDL2 e OpenAL do Emscripten,
   streaming, codecs e roteiro de validação para integração.
-- [Auditoria da emulação OpenGL Web](web-gl-emulation-analysis.md): flags verificadas,
-  incompatibilidade FULL_ES3/legacy e reprodução isolada de perda do VBO no VAO emulado.
 - [Arquitetura](architecture.md): fluxo do runtime e mapa dos módulos.
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.
