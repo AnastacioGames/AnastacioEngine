@@ -813,15 +813,19 @@ static void view_axis_disc(float x, float y, float radius, const uchar col[4], b
  * pull in an incompatible GPU/UI subsystem. */
 static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 {
-	const float k = U.rvisize * U.pixelsize;
-	const float axis_length = k * 0.95f;
-	const float disc_radius = max_ff(7.0f * U.pixelsize, k * 0.24f);
-	const float startx = rect->xmax - (k * 1.15f + UI_UNIT_X);
-	const float starty = rect->ymax - (k * 1.15f + UI_UNIT_Y);
+	/* Proportions of Blender 5's navigation gizmo: 80px wide, axis discs of 0.2 radius placed
+	 * at 0.8 of the radius, 2px lines that end at the disc edge. */
+	const float radius = 40.0f * U.pixelsize;
+	const float disc_radius = radius * 0.20f;
+	const float axis_length = radius - disc_radius;
+	const float startx = rect->xmax - (radius + 0.5f * UI_UNIT_X);
+	const float starty = rect->ymax - (radius + 0.5f * UI_UNIT_Y);
 	/* Blender 5 default theme axis colors */
 	const uchar axis_col[3][3] = {
 		{255, 51, 82}, {139, 220, 0}, {40, 144, 255}
 	};
+	const uiStyle *style = UI_style_get();
+	const int fontid = style->widget.uifont_id;
 	float axis_vec[3][3];
 	/* the six ends: index = axis * 2 + (negative ? 1 : 0) */
 	int order[6] = {0, 1, 2, 3, 4, 5};
@@ -842,6 +846,8 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		}
 	}
 
+	BLF_size(fontid, 12 * U.pixelsize, 72);
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_LINE_SMOOTH);
@@ -851,10 +857,12 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		const int axis = end / 2;
 		const bool negative = (end & 1) != 0;
 		const float sign = negative ? -1.0f : 1.0f;
-		const float x = startx + axis_vec[axis][0] * axis_length * sign;
-		const float y = starty + axis_vec[axis][1] * axis_length * sign;
+		const float dx = axis_vec[axis][0] * sign;
+		const float dy = axis_vec[axis][1] * sign;
+		const float x = startx + dx * axis_length;
+		const float y = starty + dy * axis_length;
 		/* ends pointing away from the viewer are slightly dimmer */
-		const float fade = 0.75f + 0.25f * (depth[end] * 0.5f + 0.5f);
+		const float fade = 0.80f + 0.20f * (depth[end] * 0.5f + 0.5f);
 		uchar col[4] = {
 			(uchar)(axis_col[axis][0] * fade),
 			(uchar)(axis_col[axis][1] * fade),
@@ -863,26 +871,35 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		};
 
 		if (negative) {
-			uchar fill[4] = {col[0], col[1], col[2], 70};
+			/* translucent fill with a solid colored rim */
+			uchar fill[4] = {col[0], col[1], col[2], 64};
 			glLineWidth(1.5f * U.pixelsize);
-			view_axis_disc(x, y, disc_radius * 0.85f, fill, false);
+			view_axis_disc(x, y, disc_radius - 0.75f * U.pixelsize, fill, false);
 		}
 		else {
 			const char axis_text[2] = {'X' + axis, '\0'};
+			const float line_len = max_ff(0.0f, axis_length - disc_radius);
+			const float tx = x - BLF_width(fontid, axis_text, 1) * 0.5f;
+			const float ty = y - BLF_height(fontid, axis_text, 1) * 0.5f;
 
-			glLineWidth(2.0f * U.pixelsize);
-			glColor4ubv(col);
-			glBegin(GL_LINES);
-			glVertex2f(startx, starty);
-			glVertex2f(x, y);
-			glEnd();
+			if (line_len > 0.5f) {
+				glLineWidth(2.0f * U.pixelsize);
+				glColor4ubv(col);
+				glBegin(GL_LINES);
+				glVertex2f(startx, starty);
+				glVertex2f(startx + dx * line_len, starty + dy * line_len);
+				glEnd();
+			}
 
 			glLineWidth(1.0f);
 			view_axis_disc(x, y, disc_radius, col, true);
 
-			glColor4ub(20, 20, 20, 255);
-			BLF_draw_default_ascii(x - BLF_width_default(axis_text, 1) * 0.5f,
-			                       y - 4.0f * U.pixelsize, 0.0f, axis_text, 1);
+			/* dark letter, drawn twice with a sub-pixel offset to read as bold */
+			glColor4ub(0, 0, 0, 230);
+			BLF_position(fontid, tx, ty, 0.0f);
+			BLF_draw(fontid, axis_text, 1);
+			BLF_position(fontid, tx + 0.6f * U.pixelsize, ty, 0.0f);
+			BLF_draw(fontid, axis_text, 1);
 			glEnable(GL_BLEND); /* BLF changes the OpenGL blend state. */
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}

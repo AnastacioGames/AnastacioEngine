@@ -33,6 +33,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
+#include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 
 #include "BKE_addon.h"
@@ -329,6 +330,13 @@ void BLO_update_defaults_startup_blend(Main *bmain)
         if (space_link->spacetype == SPACE_CLIP) {
           SpaceClip *space_clip = (SpaceClip *)space_link;
           space_clip->flag &= ~SC_MANUAL_CALIBRATION;
+        }
+        else if (space_link->spacetype == SPACE_VIEW3D) {
+          /* AnastacioEngine: viewport abre em Material (GLSL) por padrao. */
+          View3D *v3d = (View3D *)space_link;
+          if (v3d->drawtype == OB_TEXTURE) {
+            v3d->drawtype = OB_MATERIAL;
+          }
         }
       }
 
