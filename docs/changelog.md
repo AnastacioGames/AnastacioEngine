@@ -19,7 +19,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   compensavam a conversão com Mapping precisam tirar essa compensação.
 - `tools/create_parallax_interior_test.py`: material "Blocos Parallax" (height map de blocos + Parallax +
   Bump) e grupo de nós "Interior Mapping" (cômodos falsos atrás das janelas: raio × grade de caixas em espaço
-  de objeto, parede/piso/teto, cômodos acesos/apagados por hash). Cena em `projects-teste/parallax/`.
+  de objeto, parede/piso/teto, cômodos acesos/apagados por hash). Demo em `demos/parallax_interior_mapping.range`,
+  nós organizados em frames coloridos com notas explicando cada etapa.
   Raio e posição em unidades de cômodo (cômodos não cúbicos sem distorção), epsilon com sinal contra
   divisão por zero, entrada Offset para alinhar a grade quando a fachada não é múltipla do Room Size.
 - Parallax sem riscos em ângulo rasante: depois da busca linear, refinamento binário (6 iterações) acha a
