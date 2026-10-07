@@ -59,9 +59,12 @@
   um objeto da própria cena deixado de fora pelo Convert, mais os filhos não convertidos. Usa a
   cena temporária de `FindOrConvertMainObject` com os layers da cena de origem: vai para `objects`
   se estiver num layer ativo, senão para `objectsInactive`. Objeto já convertido é devolvido como
-  está. Pai já vivo na cena: o filho é convertido como raiz e religado com `SetParent`, mantendo
-  `parentinv * local` do Blender (parentesco simples; vertex/bone parent não). Pai não convertido
+  está. Pai já vivo na cena: o filho é convertido como raiz, religado com `SetParent` e posto sob
+  um nó de `parentinv` com a relação da carga normal (normal, vértice, pai lento ou osso). Pai não convertido
   ou em layer ativo/inativo diferente: `ValueError`, como o load que descarta esse filho.
+- Conferido no Play do editor (`make_editor_test.py` + `run_editor_test.py`, roda o player
+  embutido e confere depois): os flags mudados por `setObjectConvert` voltam ao valor original e
+  `freeUnconvertedData` dá `RuntimeError` sem tocar na malha.
 - `bge.logic.freeUnconvertedData(scene)`: só no player standalone (`initPlayerPython` marca o Main
   como do jogo; no player embutido o Main é o do editor e a chamada dá `RuntimeError`). Libera a
   geometria (CustomData) das malhas cujos únicos usuários são objetos da cena com Convert

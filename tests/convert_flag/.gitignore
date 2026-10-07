@@ -1,0 +1,4 @@
+# Saídas dos scripts make_*.py / run_*.py (recriadas a cada teste)
+*.blend
+*.blend1
+*.txt

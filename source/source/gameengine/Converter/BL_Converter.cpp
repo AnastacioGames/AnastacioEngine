@@ -42,6 +42,8 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_PythonInit.h" // So we can handle adding new text datablocks for Python to import
 #include "KX_LibLoadStatus.h"
+#include "KX_NodeRelationships.h"
+#include "KX_BoneParentNodeRelationship.h"
 #include "BL_ActionData.h"
 #include "BL_Converter.h"
 #include "BL_SceneConverter.h"
@@ -87,6 +89,8 @@ extern "C" {
 #  include "BKE_report.h"
 #  include "BKE_scene.h" // BKE_scene_add, BKE_scene_base_add
 #  include "BKE_object.h" // BKE_object_to_mat4, BKE_object_free_derived_caches
+#  include "BKE_armature.h" // BKE_armature_from_object, BKE_armature_find_bone_name
+#  include "DNA_armature_types.h"
 #  include "BKE_customdata.h"
 #  include "BLI_math.h"
 #  include "DNA_mesh_types.h"
@@ -333,16 +337,54 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 	}
 
 	if (liveParent) {
-		// Blender child transform relative to its parent: parentinv * local.
-		float local[4][4], relative[4][4], loc[3], rot[3][3], size[3];
-		BKE_object_to_mat4(target, local);
-		mul_m4_m4m4(relative, target->parentinv, local);
-		mat4_to_loc_rot_size(loc, rot, size, relative);
+		// SetParent() handles the root list and compound shapes, then the node chain is rebuilt as
+		// at load: parent -> parent-inverse node (carrying the vertex/slow/bone relation) -> child.
 		gameobj->SetParent(liveParent, true, false);
+
+		SG_ParentRelation *relation = nullptr;
+		switch (target->partype) {
+			case PARVERT1:
+				relation = new KX_VertexParentRelation();
+				break;
+			case PARSLOW:
+				relation = new KX_SlowParentRelation(target->sf);
+				break;
+			case PARBONE:
+			{
+				bArmature *arm = BKE_armature_from_object(parentOb);
+				Bone *bone = arm ? BKE_armature_find_bone_name(arm, target->parsubstr) : nullptr;
+				if (bone) {
+					relation = new KX_BoneParentRelation(bone);
+				}
+				break;
+			}
+		}
+		if (!relation) {
+			relation = new KX_NormalParentRelation();
+		}
+
+		SG_Callbacks callback(nullptr, nullptr, nullptr, KX_Scene::KX_ScenegraphUpdateFunc, KX_Scene::KX_ScenegraphRescheduleFunc);
+		SG_Node *inverseNode = new SG_Node(nullptr, scene, callback);
+		inverseNode->SetParentRelation(relation);
+		float loc[3], rot[3][3], size[3];
+		mat4_to_loc_rot_size(loc, rot, size, target->parentinv);
+		inverseNode->SetLocalPosition(mt::vec3(loc));
+		inverseNode->SetLocalOrientation(mt::mat3(rot));
+		inverseNode->SetLocalScale(mt::vec3(size));
+
+		SG_Node *childNode = gameobj->GetNode();
+		childNode->DisconnectFromParent();
+		inverseNode->AddChild(childNode);
+		liveParent->GetNode()->AddChild(inverseNode);
+
+		// The child keeps its own Blender transform, below the parent-inverse node.
+		float local[4][4];
+		BKE_object_to_mat4(target, local);
+		mat4_to_loc_rot_size(loc, rot, size, local);
 		gameobj->NodeSetLocalPosition(mt::vec3(loc));
 		gameobj->NodeSetLocalOrientation(mt::mat3(rot));
 		gameobj->NodeSetLocalScale(mt::vec3(size));
-		gameobj->NodeUpdate();
+		inverseNode->UpdateWorldData();
 	}
 
 	return gameobj;

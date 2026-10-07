@@ -33,7 +33,31 @@ carro = esfera("Carro", (5, 0, 0), 16)
 piloto = esfera("Piloto_Carro", (5, 0, 2), 16)
 filho(piloto, carro)
 pesados = [esfera("Pesado_%d" % i, (0, -5 - 3 * i, 0)) for i in range(4)]
-for ob in [raiz, raiz_filho, piloto] + pesados:
+
+# Filho de osso e filho de vértice (Convert off); a posição do Blender vai em propriedades.
+arm = bpy.data.objects.new("Arm", bpy.data.armatures.new("Arm"))
+arm.location = (-6, 0, 0)
+arm.rotation_euler = (0, 0, 0.7)
+scene.objects.link(arm)
+scene.objects.active = arm
+bpy.ops.object.mode_set(mode='EDIT')
+b = arm.data.edit_bones.new("Osso")
+b.head, b.tail = (0, 0, 0), (0, 0, 2)
+bpy.ops.object.mode_set(mode='OBJECT')
+no_osso = esfera("No_Osso", (-6, 1, 3), 16)
+no_osso.parent, no_osso.parent_type, no_osso.parent_bone = arm, 'BONE', "Osso"
+alvo = esfera("Alvo", (-10, 0, 0), 8)
+no_vert = esfera("No_Vertice", (-10, 2, 1), 16)
+no_vert.parent, no_vert.parent_type, no_vert.parent_vertices[0] = alvo, 'VERTEX', 0
+scene.update()
+# O BGE (KX_VertexParentRelation) segue só a origem do pai: esperado = origem do pai + local.
+esperado = {no_osso: no_osso.matrix_world.translation, no_vert: alvo.location + no_vert.location}
+for ob in (no_osso, no_vert):
+    for eixo, v in zip("xyz", esperado[ob]):
+        bpy.ops.object.game_property_new({"object": ob, "active_object": ob}, type='FLOAT', name=eixo)
+        ob.game.properties[eixo].value = v
+
+for ob in [raiz, raiz_filho, piloto, no_osso, no_vert] + pesados:
     ob.convert_object = False
 
 txt = bpy.data.texts.new("teste.py")
@@ -71,6 +95,11 @@ p = tenta("convertObject(Piloto_Carro)", lambda: sc.convertObject("Piloto_Carro"
 if p:
     rel = carro.worldTransform.inverted() * p.worldTransform
     log.append("  pai=%s pos_rel=%s (esperado ~(0,0,2))" % (p.parent and p.parent.name, tuple(round(v, 3) for v in rel.translation)))
+for nome in ("No_Osso", "No_Vertice"):
+    o = tenta("convertObject(%s)" % nome, lambda: sc.convertObject(nome))
+    if o:
+        log.append("  pai=%s pos=%s esperado=%s" % (o.parent and o.parent.name,
+                   tuple(round(v, 3) for v in o.worldPosition), tuple(round(o[e], 3) for e in "xyz")))
 tenta("convertObject(Raiz) de novo", lambda: sc.convertObject("Raiz").name)
 tenta("convertObject(Inexistente)", lambda: sc.convertObject("Inexistente"))
 antes = rss()
