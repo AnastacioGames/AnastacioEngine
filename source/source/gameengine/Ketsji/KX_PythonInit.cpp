@@ -1049,6 +1049,7 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 		return nullptr;
 	}
 
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
 	int changed = 0;
 	Scene *sce_iter;
 	Base *base;
@@ -1057,12 +1058,42 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 		if (ob != target && !(children && objectIsChildOf(ob, target))) {
 			continue;
 		}
+		if (convert && converter->IsObjectDataFreed(ob)) {
+			PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" mesh data was released by freeUnconvertedData()",
+			             ob->id.name + 2);
+			return nullptr;
+		}
 		const int old = ob->gameflag;
 		gConvertFlagBackup.emplace(ob, old);
 		SET_FLAG_FROM_TEST(ob->gameflag, convert, OB_TASK_CONVERT);
 		changed += (old != ob->gameflag);
 	}
 	return PyLong_FromLong(changed);
+}
+
+PyDoc_STRVAR(gPyFreeUnconvertedData_doc,
+"freeUnconvertedData(scene)\n"
+"Standalone player only: releases the mesh geometry used solely by objects of the scene left out by\n"
+"their Convert flag; they can't be converted anymore. Returns the bytes released.");
+static PyObject *gPyFreeUnconvertedData(PyObject *, PyObject *args)
+{
+	const char *scenename;
+	if (!PyArg_ParseTuple(args, "s:freeUnconvertedData", &scenename)) {
+		return nullptr;
+	}
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	Scene *scene = converter->GetBlenderSceneForName(scenename);
+	if (!scene) {
+		PyErr_Format(PyExc_ValueError, "freeUnconvertedData: scene \"%s\" not found", scenename);
+		return nullptr;
+	}
+	std::string error;
+	const size_t freed = converter->FreeUnconvertedData(scene, error);
+	if (!error.empty()) {
+		PyErr_Format(PyExc_RuntimeError, "freeUnconvertedData: %s", error.c_str());
+		return nullptr;
+	}
+	return PyLong_FromSize_t(freed);
 }
 
 PyDoc_STRVAR(gPyGetLoadLog_doc,
@@ -1284,6 +1315,7 @@ static struct PyMethodDef game_methods[] = {
 	/* library functions */
 	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS | METH_KEYWORDS, (const char *)""},
 	{"setObjectConvert", (PyCFunction)gPySetObjectConvert, METH_VARARGS | METH_KEYWORDS, gPySetObjectConvert_doc},
+	{"freeUnconvertedData", (PyCFunction)gPyFreeUnconvertedData, METH_VARARGS, gPyFreeUnconvertedData_doc},
 	{"getLoadLog", (PyCFunction)gPyGetLoadLog, METH_VARARGS | METH_KEYWORDS, gPyGetLoadLog_doc},
 	{"getObjectConvert", (PyCFunction)gPyGetObjectConvert, METH_VARARGS, gPyGetObjectConvert_doc},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
@@ -2821,6 +2853,9 @@ static struct _inittab bge_internal_modules[] = {
  */
 void initPlayerPython(int argc, char **argv)
 {
+	// Only the standalone player calls this: its Main is the game's own copy of the file.
+	BL_Converter::SetMainOwnedByGame(true);
+
 	const char *const py_path_bundle = BKE_appdir_folder_id(BLENDER_SYSTEM_PYTHON, nullptr);
 
 	// Not essential but nice to set our name, not that python holds a reference to program path string.

@@ -1,5 +1,23 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — `scene.convertObject` e `bge.logic.freeUnconvertedData`
+
+- `scene.convertObject(nome, children=True)` (`BL_Converter::ConvertSceneObject`): converte em runtime
+  um objeto da própria cena deixado de fora pelo Convert, mais os filhos não convertidos. Usa a
+  cena temporária de `FindOrConvertMainObject` com os layers da cena de origem: vai para `objects`
+  se estiver num layer ativo, senão para `objectsInactive`. Objeto já convertido é devolvido como
+  está. Pai já vivo na cena: o filho é convertido como raiz e religado com `SetParent`, mantendo
+  `parentinv * local` do Blender (parentesco simples; vertex/bone parent não). Pai não convertido
+  ou em layer ativo/inativo diferente: `ValueError`, como o load que descarta esse filho.
+- `bge.logic.freeUnconvertedData(scene)`: só no player standalone (`initPlayerPython` marca o Main
+  como do jogo; no player embutido o Main é o do editor e a chamada dá `RuntimeError`). Libera a
+  geometria (CustomData) das malhas cujos únicos usuários são objetos da cena com Convert
+  desligado e não convertidos; `Mesh`, materiais e shape keys ficam. Depois disso
+  `convertObject`, `setObjectConvert(..., True)` e `ConvertMeshSpecial` recusam esses dados.
+  Teste de 8 pilotos, 2 convertidos: 37,5 MB liberados em 5 ms (a diferença para o `LibLoad`
+  era ~45 MB). Testes: `tests/convert_flag/make_runtime_test.py` e `FREE_UNCONVERTED=1` em
+  `make_test.py`.
+
 ## 2026-10-07 — Membros de dupli group respeitam o Convert
 
 - `BL_ConvertBlenderObjects`: objetos de grupo com `convert_object` desligado não são mais

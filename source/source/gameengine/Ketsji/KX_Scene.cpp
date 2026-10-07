@@ -3660,6 +3660,7 @@ PyTypeObject KX_Scene::Type = {
 
 PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, addObject),
+	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, convertObject),
 	EXP_PYMETHODTABLE(KX_Scene, end),
 	EXP_PYMETHODTABLE(KX_Scene, restart),
 	EXP_PYMETHODTABLE(KX_Scene, replace),
@@ -4194,6 +4195,28 @@ EXP_PYMETHODDEF_DOC(KX_Scene, addObject,
 	 * the object is added to the scene so we don't want python to own a reference. */
 	replica->Release();
 	return replica->GetProxy();
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, convertObject,
+                    "convertObject(name, children=True)\n"
+                    "Converts an object of this scene left out at load by its Convert flag (and its\n"
+                    "unconverted children). It lands in objects when on an active layer, otherwise in\n"
+                    "objectsInactive (ready for addObject). Returns the object; an object already\n"
+                    "converted is returned as is.\n")
+{
+	const char *name;
+	int children = 1;
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "s|p:convertObject", {"name", "children", 0}, &name, &children)) {
+		return nullptr;
+	}
+
+	std::string error;
+	KX_GameObject *gameobj = KX_GetActiveEngine()->GetConverter()->ConvertSceneObject(this, name, children, error);
+	if (!gameobj) {
+		PyErr_Format(PyExc_ValueError, "scene.convertObject(): \"%s\": %s", name, error.c_str());
+		return nullptr;
+	}
+	return gameobj->GetProxy();
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, end,

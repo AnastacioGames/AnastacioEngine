@@ -61,8 +61,13 @@ try:
   dt = time.perf_counter() - bge.logic.convert_t0
   sc = bge.logic.getCurrentScene()
   pil = sorted(o.name for o in sc.objects if o.name.startswith("Piloto_"))
+  livre = ""
+  if os.environ.get("FREE_UNCONVERTED") == "1":
+      t1 = time.perf_counter()
+      n = bge.logic.freeUnconvertedData("Pista_1")
+      livre = ", freeUnconvertedData = %.1f MB em %.1f ms" % (n / 1048576.0, (time.perf_counter() - t1) * 1000)
   with open(bge.logic.expandPath("//convert_results.txt"), "a") as f:
-      f.write("%s | load Pista_1 = %.0f ms, objetos=%d, pilotos=%s\n" % (bge.logic.convert_log, dt*1000, len(sc.objects), pil))
+      f.write("%s | load Pista_1 = %.0f ms, objetos=%d, pilotos=%s%s\n" % (bge.logic.convert_log, dt*1000, len(sc.objects), pil, livre))
       for e in bge.logic.getLoadLog():
           if e["scene"] == "Pista_1":
               f.write("    %s %.0f ms: %s\n" % (e["stage"], e["ms"], e["detail"]))

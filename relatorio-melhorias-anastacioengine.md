@@ -171,12 +171,16 @@ ferramenta correspondente.
 
 - `bge.logic.setObjectConvert(scene, object, convert)` desliga o Convert de objetos de uma cena
   antes de carregá-la (ex.: só converter os pilotos escolhidos), cortando ~63% do load no teste;
-  flags restaurados ao sair do jogo. `LibLoad` segue melhor quando a RAM pesa. Ver
+  flags restaurados ao sair do jogo. No player standalone, `bge.logic.freeUnconvertedData(scene)`
+  libera a geometria dos objetos que ficaram fora (37,5 MB de 6 pilotos no teste), quase
+  igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
   `docs/changelog.md` (2026-10-07).
 
 - `bge.logic.setObjectConvert(scene, object, convert)` desliga o Convert de objetos de uma cena
   antes de carregá-la (ex.: só converter os pilotos escolhidos), cortando ~63% do load no teste;
-  flags restaurados ao sair do jogo. `LibLoad` segue melhor quando a RAM pesa. Ver
+  flags restaurados ao sair do jogo. No player standalone, `bge.logic.freeUnconvertedData(scene)`
+  libera a geometria dos objetos que ficaram fora (37,5 MB de 6 pilotos no teste), quase
+  igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
   `docs/changelog.md` (2026-10-07).
 
 ## Decisões técnicas vigentes

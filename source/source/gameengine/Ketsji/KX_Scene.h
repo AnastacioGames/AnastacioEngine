@@ -736,6 +736,7 @@ public:
 #ifdef WITH_PYTHON
 
 	EXP_PYMETHOD_DOC(KX_Scene, addObject);
+	EXP_PYMETHOD_DOC(KX_Scene, convertObject);
 	EXP_PYMETHOD_DOC(KX_Scene, end);
 	EXP_PYMETHOD_DOC(KX_Scene, restart);
 	EXP_PYMETHOD_DOC(KX_Scene, replace);

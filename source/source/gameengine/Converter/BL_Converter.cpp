@@ -35,6 +35,7 @@
 
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
+#include "SCA_LogicManager.h"
 #include "KX_Mesh.h"
 #include "RAS_BucketManager.h"
 #include "KX_PhysicsEngineEnums.h"
@@ -85,6 +86,11 @@ extern "C" {
 #  include "BKE_idcode.h"
 #  include "BKE_report.h"
 #  include "BKE_scene.h" // BKE_scene_add, BKE_scene_base_add
+#  include "BKE_object.h" // BKE_object_to_mat4, BKE_object_free_derived_caches
+#  include "BKE_customdata.h"
+#  include "BLI_math.h"
+#  include "DNA_mesh_types.h"
+#  include "MEM_guardedalloc.h"
 }
 
 #include "BLI_task.h"
@@ -226,6 +232,197 @@ KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX
 	BKE_libblock_free(m_maggie, tempScene);
 
 	return scene_merge->FindInactiveObjectByName(name);
+}
+
+static bool object_is_child_of(Object *ob, Object *parent)
+{
+	for (Object *par = ob->parent; par; par = par->parent) {
+		if (par == parent) {
+			return true;
+		}
+	}
+	return false;
+}
+
+KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::string& name, bool children, std::string& error)
+{
+	Scene *blscene = scene->GetBlenderScene();
+	SCA_LogicManager *logicmgr = scene->GetLogicManager();
+
+	Object *target = nullptr;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		if (STREQ(base->object->id.name + 2, name.c_str())) {
+			target = base->object;
+			break;
+		}
+	}
+	if (!target) {
+		error = "object not found in the scene";
+		return nullptr;
+	}
+	KX_GameObject *existing = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(target));
+	if (existing) {
+		return existing;
+	}
+	if (IsObjectDataFreed(target)) {
+		error = "its mesh data was released by freeUnconvertedData()";
+		return nullptr;
+	}
+
+	int lay = blscene->lay;
+	if (BKE_scene_collections_game_exclude_any(blscene)) {
+		lay &= ~SCECOL_GAME_LAYER;
+	}
+
+	/* At load a child whose parent isn't converted, or sits on the other side of the active
+	 * layers, is dropped: refuse the same cases instead of silently converting nothing. */
+	Object *parentOb = target->parent;
+	KX_GameObject *liveParent = nullptr;
+	if (parentOb) {
+		liveParent = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(parentOb));
+		if (!liveParent) {
+			error = "its parent is not converted, convert the parent instead";
+			return nullptr;
+		}
+		const bool targetActive = (target->lay & lay) != 0;
+		const bool parentActive = scene->GetObjectList()->SearchValue(liveParent);
+		if (targetActive != parentActive) {
+			error = "it and its parent are not both on active (or both on inactive) layers";
+			return nullptr;
+		}
+	}
+
+	std::vector<std::pair<Object *, int> > objects;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		Object *ob = base->object;
+		if ((ob == target || (children && object_is_child_of(ob, target))) &&
+		    !logicmgr->FindGameObjByBlendObj(ob) && !IsObjectDataFreed(ob))
+		{
+			objects.emplace_back(ob, ob->gameflag);
+		}
+	}
+
+	// Same throwaway scene trick as FindOrConvertMainObject(), keeping the layers of the source scene.
+	Scene *tempScene = BKE_scene_add(m_maggie, "..ConvertSceneObject..");
+	tempScene->lay = lay;
+	for (const std::pair<Object *, int>& item : objects) {
+		BKE_scene_base_add(tempScene, item.first);
+		id_us_plus(&item.first->id);
+		item.first->gameflag |= OB_TASK_CONVERT;
+	}
+
+	// Converted as a root (the parent lives in the other scene), linked back after the merge.
+	target->parent = nullptr;
+	KX_Scene *kxTempScene = m_ketsjiEngine->CreateScene(tempScene);
+	BL_SceneConverter sceneConverter(kxTempScene, BL_Resource::Library(m_maggie));
+	ConvertScene(sceneConverter, true, false);
+	target->parent = parentOb;
+	for (const std::pair<Object *, int>& item : objects) {
+		item.first->gameflag = item.second;
+	}
+
+	MergeScene(scene, sceneConverter);
+	BKE_libblock_free(m_maggie, tempScene);
+
+	KX_GameObject *gameobj = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(target));
+	if (!gameobj) {
+		error = "conversion failed";
+		return nullptr;
+	}
+
+	if (liveParent) {
+		// Blender child transform relative to its parent: parentinv * local.
+		float local[4][4], relative[4][4], loc[3], rot[3][3], size[3];
+		BKE_object_to_mat4(target, local);
+		mul_m4_m4m4(relative, target->parentinv, local);
+		mat4_to_loc_rot_size(loc, rot, size, relative);
+		gameobj->SetParent(liveParent, true, false);
+		gameobj->NodeSetLocalPosition(mt::vec3(loc));
+		gameobj->NodeSetLocalOrientation(mt::mat3(rot));
+		gameobj->NodeSetLocalScale(mt::vec3(size));
+		gameobj->NodeUpdate();
+	}
+
+	return gameobj;
+}
+
+/// The embedded player converts the editor's own Main: its data must never be released.
+static bool s_mainOwnedByGame = false;
+
+void BL_Converter::SetMainOwnedByGame(bool owned)
+{
+	s_mainOwnedByGame = owned;
+}
+
+bool BL_Converter::IsObjectDataFreed(Object *ob) const
+{
+	return m_freedObjects.count(ob) != 0;
+}
+
+size_t BL_Converter::FreeUnconvertedData(Scene *blscene, std::string& error)
+{
+	if (!s_mainOwnedByGame) {
+		error = "only available in the standalone player (the embedded one shares the editor data)";
+		return 0;
+	}
+
+	EXP_ListValue<KX_Scene> *scenes = m_ketsjiEngine->CurrentScenes();
+	auto isConverted = [scenes](Object *ob) {
+		for (KX_Scene *scene : scenes) {
+			if (scene->GetLogicManager()->FindGameObjByBlendObj(ob)) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	// Mesh objects of blscene left out by the Convert flag and not converted anywhere.
+	std::set<Object *> candidates;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		Object *ob = base->object;
+		if (ob->type == OB_MESH && !(ob->gameflag & OB_TASK_CONVERT) && !isConverted(ob)) {
+			candidates.insert(ob);
+		}
+	}
+
+	// A mesh is released only when every user is a candidate (no other scene or ID uses it).
+	std::map<Mesh *, int> users;
+	for (Object *ob = (Object *)m_maggie->object.first; ob; ob = (Object *)ob->id.next) {
+		if (ob->type == OB_MESH && ob->data) {
+			int& count = users[(Mesh *)ob->data];
+			count = (count < 0 || !candidates.count(ob)) ? -1 : count + 1;
+		}
+	}
+
+	const size_t before = MEM_get_memory_in_use();
+	for (const std::pair<Mesh * const, int>& item : users) {
+		Mesh *me = item.first;
+		const int idUsers = me->id.us - ((me->id.flag & LIB_FAKEUSER) ? 1 : 0);
+		if (item.second <= 0 || item.second != idUsers || m_freedMeshes.count(me)) {
+			continue;
+		}
+		CustomData_free(&me->vdata, me->totvert);
+		CustomData_free(&me->edata, me->totedge);
+		CustomData_free(&me->fdata, me->totface);
+		CustomData_free(&me->ldata, me->totloop);
+		CustomData_free(&me->pdata, me->totpoly);
+		me->totvert = me->totedge = me->totface = me->totloop = me->totpoly = me->totselect = 0;
+		MEM_SAFE_FREE(me->mselect);
+		BKE_mesh_update_customdata_pointers(me, false);
+		m_freedMeshes.insert(me);
+	}
+	for (Object *ob : candidates) {
+		if (m_freedMeshes.count((Mesh *)ob->data)) {
+			BKE_object_free_derived_caches(ob);
+			m_freedObjects.insert(ob);
+		}
+	}
+	const size_t after = MEM_get_memory_in_use();
+	return (before > after) ? before - after : 0;
 }
 
 /// Milliseconds, for the "[Load]" console report (see BL_LoadStats.h).
@@ -1163,6 +1360,10 @@ KX_Mesh *BL_Converter::ConvertMeshSpecial(KX_Scene *kx_scene, Main *maggie, cons
 
 	if (me == nullptr) {
 		CM_Error("could not be found \"" << name << "\"");
+		return nullptr;
+	}
+	if (m_freedMeshes.count((Mesh *)me)) {
+		CM_Error("mesh data was released by freeUnconvertedData() \"" << name << "\"");
 		return nullptr;
 	}
 

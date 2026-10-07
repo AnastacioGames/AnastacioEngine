@@ -33,6 +33,7 @@
 #define __KX_BLENDERCONVERTER_H__
 
 #include <map>
+#include <set>
 #include <vector>
 
 #ifdef _MSC_VER // MSVC doesn't support incomplete type in std::unique_ptr.
@@ -138,6 +139,10 @@ private:
 	std::vector<Main *> m_dynamicMaggies;
 	/// All maggies, original and loaded.
 	std::vector<Main *> m_maggies;
+	/// Objects and meshes whose geometry FreeUnconvertedData() released.
+	std::set<Object *> m_freedObjects;
+	std::set<Mesh *> m_freedMeshes;
+
 	/// Loaded library status associated to library.
 	std::unordered_map<Main *, std::unique_ptr<KX_LibLoadStatus> > m_libloadStatus;
 
@@ -241,6 +246,23 @@ public:
 	 * addObject(). Returns nullptr if no such object exists in bmain.
 	 */
 	KX_GameObject *FindOrConvertMainObject(const std::string& name, KX_Scene *scene_merge);
+
+	/** Convert into a running scene an object of its own blender scene left out at load by the
+	 * Convert flag, plus (with children) its unconverted descendants. Lands in the active list when
+	 * on an active layer, otherwise in the inactive one (ready for addObject()). A parent already in
+	 * the scene is linked back keeping the blender relative transform (plain object parenting).
+	 * Returns the object, or nullptr with error set.
+	 */
+	KX_GameObject *ConvertSceneObject(KX_Scene *scene, const std::string& name, bool children, std::string& error);
+
+	/** Standalone player only: frees the mesh geometry used solely by objects of blscene left out by
+	 * the Convert flag, which then can't be converted anymore. Returns the bytes released.
+	 */
+	size_t FreeUnconvertedData(Scene *blscene, std::string& error);
+	/// True once FreeUnconvertedData() released this object's mesh.
+	bool IsObjectDataFreed(Object *ob) const;
+	/// Set by the standalone player: the Main belongs to the game, not to the editor.
+	static void SetMainOwnedByGame(bool owned);
 
 	/// Return a new empty library of name path.
 	Main *CreateLibrary(const std::string& path);
