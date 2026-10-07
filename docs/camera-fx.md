@@ -1,7 +1,7 @@
 # Câmera do jogo: foco, rastreio, Camera FX e tremor
 
 Recursos nativos da câmera no jogo, configurados no painel da câmera (Properties > Camera, só no motor
-Range Game) e no Python (`KX_Camera`). Plano original: [camera-fx-plan.md](camera-fx-plan.md).
+Range Game) e no Python (`KX_Camera`).
 
 Tudo vem desligado. Uma câmera antiga continua igual: o foco é calculado, mas nada é desenhado nem movido.
 Só a câmera ativa da cena é atualizada (uma vez por frame, depois da física e do scenegraph).
