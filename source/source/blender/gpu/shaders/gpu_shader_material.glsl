@@ -4693,8 +4693,8 @@ void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec
 
 void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 ambient, float glossy, out vec4 result)
 {
-	/* ambient light from the World color */
-	vec3 L = ambient;
+	/* ambient light from the World color (diffuse only: a glossy highlight has no ambient term) */
+	vec3 L = (glossy > 0.5) ? vec3(0.0) : ambient;
 
 	/* same banding as Cycles' diffuse toon: full light inside size, linear falloff over smooth */
 	float max_angle = clamp(size, 0.0, 1.0) * M_PI * 0.5;
@@ -4976,11 +4976,9 @@ void node_wireframe(float size, float use_pixel_size, vec3 bary, vec3 co, out fl
 
 void node_bsdf_transparent(vec4 color, out vec4 result)
 {
-	/* this isn't right */
-	result.r = color.r;
-	result.g = color.g;
-	result.b = color.b;
-	result.a = 0.0;
+	/* Fully see-through: no light of its own (Add blend would add the color) and alpha 0. The tint
+	 * of colored transparency is not representable with plain alpha blending. */
+	result = vec4(0.0);
 }
 
 /* Game approximation of Velvet: sheen that grows toward grazing view angles (narrower for low Sigma). */
@@ -5227,7 +5225,11 @@ void node_background(vec4 color, float strength, vec3 N, out vec4 result)
 
 void node_mix_shader(float fac, vec4 shader1, vec4 shader2, out vec4 shader)
 {
-	shader = mix(shader1, shader2, fac);
+	/* Weight the colors by their alpha (premultiplied mix): mixing with a Transparent shader must
+	 * only lower alpha, not blend its color in (it washed the surface toward white). */
+	float a = mix(shader1.a, shader2.a, fac);
+	vec3 rgb = shader1.rgb * shader1.a * (1.0 - fac) + shader2.rgb * shader2.a * fac;
+	shader = vec4((a > 1e-6) ? rgb / a : mix(shader1.rgb, shader2.rgb, fac), a);
 }
 
 void node_add_shader(vec4 shader1, vec4 shader2, out vec4 shader)
@@ -5315,13 +5317,15 @@ void node_geometry(
 }
 
 void node_tex_coord(
-        vec3 I, vec3 N, mat4 viewinvmat, mat4 obinvmat, vec4 camerafac,
+        vec3 I, vec3 N, mat4 viewinvmat, mat4 obinvmat, mat4 obmat, vec4 camerafac,
         vec3 attr_orco, vec3 attr_uv,
         out vec3 generated, out vec3 normal, out vec3 uv, out vec3 object,
         out vec3 camera, out vec3 window, out vec3 reflection)
 {
 	generated = attr_orco * 0.5 + vec3(0.5);
-	normal = normalize((obinvmat * (viewinvmat * vec4(N, 0.0))).xyz);
+	/* Object-space normal = transpose(object matrix) * world normal, as Cycles; the inverse matrix
+	 * is only right for uniform scale. */
+	normal = normalize((vec4((viewinvmat * vec4(N, 0.0)).xyz, 0.0) * obmat).xyz);
 	uv = attr_uv;
 	object = (obinvmat * (viewinvmat * vec4(I, 1.0))).xyz;
 	camera = vec3(I.xy, -I.z);

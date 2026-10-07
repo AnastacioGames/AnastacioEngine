@@ -267,6 +267,7 @@ void main()
 #endif
 
 	VERTEX = position.xyz;
+	NORMAL = normal; /* after instancing/skinning, like VERTEX */
 	varvertexid = float(gl_VertexID);
 	int corner = gl_VertexID % 3;
 	varbarycentric = vec3(corner == 0 ? 1.0 : 0.0, corner == 1 ? 1.0 : 0.0, corner == 2 ? 1.0 : 0.0);
@@ -278,6 +279,7 @@ void main()
 #ifdef USE_USER_CODE
 	/* for user code */
 	vertex();
+	normal = NORMAL; /* user code may bend the normal too */
 #endif
 
 #ifdef USE_CORE_PROFILE

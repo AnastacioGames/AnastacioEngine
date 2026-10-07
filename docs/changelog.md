@@ -9,6 +9,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
+## Receitas de nós: dissolve, escudo, água, neve/musgo, vento, toon, lava + correções (2026-10-06)
+
+- Demos em `demos/` (dissolve, escudo, agua, neve_musgo, vento, toon, lava), cada uma gerada por
+  `tools/create_*_test.py`, com nós em frames e notas. Controle por objeto via nó Object Data
+  (`KX_GameObject.color`); animação pelo nó Time (tempo lógico em segundos).
+- Mix Shader pondera as cores pelo alpha e Transparent BSDF não tem cor própria: misturar com Transparent
+  só baixa o alpha (antes puxava a cor para o branco; em Add somava branco).
+- Emission sai com alpha 1 (antes alpha = força: emissão fraca ficava translúcida em Alpha Blend).
+- Toon BSDF Glossy sem termo ambiente (somava a cor do World na superfície inteira, como no Cycles não há).
+- Texture Coordinate > Normal: espaço de objeto pela transposta da matriz do objeto (escala não uniforme).
+- Vertex shader do usuário (`script_vert`): `NORMAL` escrito em `vertex()` passa a valer e é o normal
+  pós-instancing/skinning; `MODEL_MATRIX`/`VIEW_MATRIX` sempre enviados quando há código de vértice;
+  materiais opacos com código de vértice ou Foliage fazem a sombra com o próprio shader (a sombra
+  acompanha o vento; com variance shadows ainda não).
+- Conhecido, não alterado: tempo dos materiais não dá a volta (só perde precisão após muitas horas);
+  luz ambiente dos BSDFs vem de `world.horizon_color`, não do nó Background; espuma por profundidade
+  não é possível (nós não recebem a textura de profundidade).
+
 ## Triplanar: projeção Box do Image Texture corrigida + demo (2026-10-06)
 
 - `node_tex_image_box` (GLSL): as três projeções são amostradas sempre e pesadas, em vez de dentro de `if`

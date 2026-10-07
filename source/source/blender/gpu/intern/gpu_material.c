@@ -437,6 +437,13 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX | GPU_PROJECTION_MATRIX | GPU_NORMAL_MATRIX;
 #endif
 
+		/* User vertex code is told it can use VIEW_MATRIX/MODEL_MATRIX (#defines in
+		 * code_generate_vertex), but outside the core profile the uniforms are only uploaded
+		 * when a node asks for them: force them so they are never left uninitialized. */
+		if (has_user_vertcode) {
+			material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX;
+		}
+
 		gpu_material_set_attrib_id(material);
 
 		GPUShader *shader = GPU_pass_shader(material->pass);
