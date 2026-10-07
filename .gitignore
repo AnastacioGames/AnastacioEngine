@@ -12,6 +12,7 @@ build-linux/
 build-linux-editor/
 build-net/
 build-net-v6/
+build-steam/
 build-linux-gtest/
 build-linux-cycles/
 build-linux-cycles.*.log
@@ -67,3 +68,6 @@ __pycache__/
 chrome-profile-web-test-vscode/
 projects-teste/teste-editor-web/web/
 tools/recastnavigation-upstream/
+
+# demos ficam fora do repo e da publicacao (repo proprio no futuro)
+demos/
