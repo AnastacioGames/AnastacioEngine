@@ -127,6 +127,8 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
   faixa 8) em PNG embutido. Funciona igual em desktop, Web e Android (só uma textura). Escala de resolução
   por objeto (`Object.ae_lightmap_scale`); margem entre ilhas em texels + dilatação antes/depois do denoise
   (sem emendas escuras nas bordas das ilhas).
+- Painel: Render > Baked Lighting (`RENDER_PT_game_baked_lighting`), em caixas "Lightmap:" e
+  "Light Volume:" no padrão das outras abas; saiu do World.
 - Light volume: grade de sondas (ambient cube, 6 faces) assada com cubos minúsculos no mesmo bake; objetos
   móveis ficam escondidos no bake e são iluminados pelo volume (`lightvol_sample`, onde `lm.a < 0.5`).
   Liga/desliga separado (`ae_lightvol_use`); padrão desligado em Web/Android.
