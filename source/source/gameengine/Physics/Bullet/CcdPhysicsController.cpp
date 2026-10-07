@@ -21,6 +21,7 @@
 #endif
 
 #include "CM_Message.h"
+#include "CM_List.h"
 
 #include "CcdPhysicsController.h"
 #include "btBulletDynamicsCommon.h"
@@ -49,8 +50,12 @@
 
 #include "BLI_utildefines.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstring>
 #include <mutex>
 #include <map>
+#include <thread>
 #include <tuple>
 
 /** Building the BVH of a triangle mesh shape is most of the physics load time (~1.2 ms for a 2k triangle
@@ -58,7 +63,9 @@
  * are identical (linked duplicates, Shift+D copies) now share one btOptimizedBvh: it only stores triangle
  * indices and quantized bounds, never a pointer to the mesh, so it is valid for any identical array. Each
  * object keeps its own shape and arrays, so replacing one object's physics mesh never touches the others.
- * The BVH is freed with the last shape using it; the mutex covers asynchronous LibLoad. */
+ * The BVH is freed with the last shape using it; the mutex covers asynchronous LibLoad.
+ * Inside CcdBeginBvhBatch()/CcdEndBvhBatch() (the converter's physics pass) the hash and the build of
+ * each distinct mesh wait for the end of the pass and run on all cores. */
 namespace {
 
 struct SharedBvhKey
@@ -83,53 +90,188 @@ struct SharedBvhEntry
 std::mutex sharedBvhMutex;
 std::map<SharedBvhKey, SharedBvhEntry> sharedBvhs;
 
-/// Two independent 64 bit hashes (FNV-1a and a multiply-xorshift), so a false match is out of reach.
+/// Two independent 64 bit hashes (FNV-1a and a multiply-xorshift) over 8 byte words, so a false match is
+/// out of reach.
 void shared_bvh_hash(uint64_t hash[2], const void *data, size_t size)
 {
 	const unsigned char *bytes = (const unsigned char *)data;
-	for (size_t i = 0; i < size; ++i) {
-		hash[0] = (hash[0] ^ bytes[i]) * 1099511628211ULL;
-		hash[1] = (hash[1] + bytes[i] + 1) * 0x9E3779B97F4A7C15ULL;
+	auto mix = [hash](uint64_t word) {
+		hash[0] = (hash[0] ^ word) * 1099511628211ULL;
+		hash[1] = (hash[1] + word + 1) * 0x9E3779B97F4A7C15ULL;
 		hash[1] ^= hash[1] >> 29;
+	};
+	size_t i = 0;
+	for (; i + 8 <= size; i += 8) {
+		uint64_t word;
+		memcpy(&word, bytes + i, 8);
+		mix(word);
+	}
+	for (; i < size; ++i) {
+		mix(bytes[i]);
 	}
 }
+
+/// Key of the vertex and triangle arrays (contiguous, see CreateBulletShape()).
+SharedBvhKey shared_bvh_key(btStridingMeshInterface *meshInterface)
+{
+	const unsigned char *verts;
+	const unsigned char *indices;
+	int numVerts, vertStride, numFaces, indexStride;
+	PHY_ScalarType vertType, indexType;
+	meshInterface->getLockedReadOnlyVertexIndexBase(&verts, numVerts, vertType, vertStride, &indices, indexStride,
+	                                                numFaces, indexType, 0);
+	SharedBvhKey key = {{14695981039346656037ULL, 0x2545F4914F6CDD1DULL}, numVerts, numFaces};
+	shared_bvh_hash(key.hash, verts, (size_t)numVerts * vertStride);
+	shared_bvh_hash(key.hash, indices, (size_t)numFaces * indexStride);
+	meshInterface->unLockReadOnlyVertexBase(0);
+	return key;
+}
+
+/// Runs func(0) .. func(count - 1) on all cores, returning when all are done.
+template <class Func>
+void shared_bvh_parallel(size_t count, const Func& func)
+{
+	const size_t numThreads = std::min<size_t>(count, std::max(1u, std::thread::hardware_concurrency()));
+	std::atomic<size_t> next(0);
+	auto work = [&]() {
+		for (size_t i = next++; i < count; i = next++) {
+			func(i);
+		}
+	};
+	std::vector<std::thread> threads;
+	for (size_t t = 1; t < numThreads; ++t) {
+		threads.emplace_back(work);
+	}
+	work();
+	for (std::thread& thread : threads) {
+		thread.join();
+	}
+}
+
+class CcdSharedBvhTriangleMeshShape;
+
+/// Shapes created on this thread inside CcdBeginBvhBatch()/CcdEndBvhBatch(), waiting for their BVH.
+struct PendingBvhBatch
+{
+	int depth = 0;
+	std::vector<CcdSharedBvhTriangleMeshShape *> shapes;
+};
+thread_local PendingBvhBatch pendingBvhBatch;
 
 class CcdSharedBvhTriangleMeshShape : public btBvhTriangleMeshShape
 {
 private:
 	SharedBvhKey m_key;
+	bool m_attached = false;
 
 public:
-	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface, const SharedBvhKey& key)
-		:btBvhTriangleMeshShape(meshInterface, true, false),
-		m_key(key)
+	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface)
+		:btBvhTriangleMeshShape(meshInterface, true, false)
 	{
-		std::lock_guard<std::mutex> lock(sharedBvhMutex);
-		SharedBvhEntry& entry = sharedBvhs[m_key];
-		if (!entry.bvh) {
-			// Same build as btBvhTriangleMeshShape::buildOptimizedBvh(), but owned by the cache.
-			void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
-			entry.bvh = new (mem) btOptimizedBvh();
-			entry.bvh->build(m_meshInterface, true, m_localAabbMin, m_localAabbMax);
-			entry.users = 0;
+		// In a batch the BVH waits for CcdEndBvhBatch(): adding the body to the world only reads the
+		// local bounds computed by the base constructor.
+		if (pendingBvhBatch.depth > 0) {
+			pendingBvhBatch.shapes.push_back(this);
 		}
-		++entry.users;
-		setOptimizedBvh(entry.bvh, btVector3(1.0f, 1.0f, 1.0f));
+		else {
+			Attach(shared_bvh_key(m_meshInterface), nullptr);
+		}
 	}
 
 	virtual ~CcdSharedBvhTriangleMeshShape()
 	{
+		if (!m_attached) {
+			// Freed before the end of its batch (e.g. an object dropped by the converter).
+			CM_ListRemoveIfFound(pendingBvhBatch.shapes, this);
+			return;
+		}
 		std::lock_guard<std::mutex> lock(sharedBvhMutex);
 		std::map<SharedBvhKey, SharedBvhEntry>::iterator it = sharedBvhs.find(m_key);
 		if (it != sharedBvhs.end() && --it->second.users == 0) {
-			it->second.bvh->~btOptimizedBvh();
-			btAlignedFree(it->second.bvh);
+			FreeBvh(it->second.bvh);
 			sharedBvhs.erase(it);
+		}
+	}
+
+	static void FreeBvh(btOptimizedBvh *bvh)
+	{
+		bvh->~btOptimizedBvh();
+		btAlignedFree(bvh);
+	}
+
+	/// Same build as btBvhTriangleMeshShape::buildOptimizedBvh(), but owned by the cache.
+	btOptimizedBvh *BuildBvh()
+	{
+		void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
+		btOptimizedBvh *bvh = new (mem) btOptimizedBvh();
+		bvh->build(m_meshInterface, true, m_localAabbMin, m_localAabbMax);
+		return bvh;
+	}
+
+	/// Uses the cached BVH of key, else 'built' (handed to the cache), else builds it now.
+	void Attach(const SharedBvhKey& key, btOptimizedBvh *built)
+	{
+		std::unique_lock<std::mutex> lock(sharedBvhMutex);
+		SharedBvhEntry& entry = sharedBvhs[key];
+		if (!entry.bvh) {
+			entry.bvh = built ? built : BuildBvh();
+			entry.users = 0;
+			built = nullptr;
+		}
+		++entry.users;
+		m_key = key;
+		m_attached = true;
+		setOptimizedBvh(entry.bvh, btVector3(1.0f, 1.0f, 1.0f));
+		lock.unlock();
+		// Another thread (asynchronous LibLoad) cached the same mesh meanwhile.
+		if (built) {
+			FreeBvh(built);
 		}
 	}
 };
 
 } // namespace
+
+void CcdBeginBvhBatch()
+{
+	++pendingBvhBatch.depth;
+}
+
+void CcdEndBvhBatch()
+{
+	BLI_assert(pendingBvhBatch.depth > 0);
+	if (--pendingBvhBatch.depth > 0) {
+		return;
+	}
+	std::vector<CcdSharedBvhTriangleMeshShape *> shapes;
+	shapes.swap(pendingBvhBatch.shapes);
+
+	std::vector<SharedBvhKey> keys(shapes.size());
+	shared_bvh_parallel(shapes.size(), [&](size_t i) {
+		keys[i] = shared_bvh_key(shapes[i]->getMeshInterface());
+	});
+
+	// One build per distinct mesh not cached yet, done for its first shape.
+	std::vector<size_t> builders;
+	{
+		std::lock_guard<std::mutex> lock(sharedBvhMutex);
+		std::map<SharedBvhKey, size_t> first;
+		for (size_t i = 0; i < shapes.size(); ++i) {
+			if (sharedBvhs.find(keys[i]) == sharedBvhs.end() && first.emplace(keys[i], i).second) {
+				builders.push_back(i);
+			}
+		}
+	}
+	std::vector<btOptimizedBvh *> built(shapes.size(), nullptr);
+	shared_bvh_parallel(builders.size(), [&](size_t j) {
+		built[builders[j]] = shapes[builders[j]]->BuildBvh();
+	});
+
+	// In order: the first shape of a mesh caches its BVH, the copies after it find it there.
+	for (size_t i = 0; i < shapes.size(); ++i) {
+		shapes[i]->Attach(keys[i], built[i]);
+	}
+}
 
 /// todo: fill all the empty CcdPhysicsController methods, hook them up to the btRigidBody class
 
@@ -2822,14 +2964,29 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 					m_forceReInstance = false;
 				}
 
+				if (m_weldingThreshold1 == 0.0f) {
+					/* The bounds btTriangleMeshShape::recalcLocalAabb() would find (min/max of the triangle
+					 * vertices, the margin is still 0 there) in one pass instead of six passes over every
+					 * triangle. Set before each shape, as the arrays may have changed since the last one. */
+					btVector3 aabbMin(0.0f, 0.0f, 0.0f);
+					btVector3 aabbMax(0.0f, 0.0f, 0.0f);
+					if (!m_triFaceArray.empty()) {
+						aabbMin.setValue(BT_LARGE_FLOAT, BT_LARGE_FLOAT, BT_LARGE_FLOAT);
+						aabbMax.setValue(-BT_LARGE_FLOAT, -BT_LARGE_FLOAT, -BT_LARGE_FLOAT);
+						for (const int index : m_triFaceArray) {
+							const btScalar *co = &m_vertexArray[3 * index];
+							const btVector3 vertex(co[0], co[1], co[2]);
+							aabbMin.setMin(vertex);
+							aabbMax.setMax(vertex);
+						}
+					}
+					m_triangleIndexVertexArray->setPremadeAabb(aabbMin, aabbMax);
+				}
+
 				btBvhTriangleMeshShape *unscaledShape;
 				if (useBvh && m_weldingThreshold1 == 0.0f) {
 					// The BVH is shared with every shape of identical arrays (see CcdSharedBvhTriangleMeshShape).
-					SharedBvhKey key = {{14695981039346656037ULL, 0x2545F4914F6CDD1DULL},
-					                    (int)m_vertexArray.size(), (int)m_triFaceArray.size()};
-					shared_bvh_hash(key.hash, &m_vertexArray[0], m_vertexArray.size() * sizeof(btScalar));
-					shared_bvh_hash(key.hash, m_triFaceArray.data(), m_triFaceArray.size() * sizeof(int));
-					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray, key);
+					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray);
 				}
 				else {
 					unscaledShape = new btBvhTriangleMeshShape(m_triangleIndexVertexArray, true, useBvh);

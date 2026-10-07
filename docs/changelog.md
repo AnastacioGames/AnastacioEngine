@@ -53,6 +53,20 @@
   sincrona. Exige jobs/controle de interrupcao; proxima peca aguardando revisao pelo workflow.
   Logs material-atlas-restore-{build,player-build,test,runtime}.log em debug-logs.
 
+## 2026-10-07 — Física de malha de triângulos na conversão: metade do tempo
+
+- A caixa local da forma (`btTriangleMeshShape::recalcLocalAabb`) varria todos os triângulos 6 vezes.
+  `CreateBulletShape` agora calcula o mesmo mínimo/máximo numa passada pelos vértices dos triângulos e
+  entrega pronto (`setPremadeAabb`), antes de cada forma, então vale também para `reinstancePhysicsMesh`.
+- Durante a etapa de física do conversor (`CcdBeginBvhBatch`/`CcdEndBvhBatch`), o hash e a BVH de cada
+  malha diferente ficam para o fim da etapa e rodam em todos os núcleos; cópias idênticas seguem
+  dividindo uma BVH. Fila por thread, então o LibLoad assíncrono monta a sua. O hash agora lê 8 bytes
+  por vez. `RANGE_NO_BVH_BATCH=1` volta à construção uma a uma, para comparar.
+- 8 pilotos de ~327k triângulos: física 295 → 147 ms, load da cena 779 → 627 ms.
+- Conferido com `tests/convert_flag/make_bvh_test.py` (malhas únicas, Shift+D, Alt+D com escala,
+  LibLoad assíncrono e `reinstancePhysicsMesh`): 900 raios por grupo e 6 bolas caindo por 120 frames
+  saem byte a byte iguais ao caminho original.
+
 ## 2026-10-07 — `scene.convertObject` e `bge.logic.freeUnconvertedData`
 
 - `scene.convertObject(nome, children=True)` (`BL_Converter::ConvertSceneObject`): converte em runtime

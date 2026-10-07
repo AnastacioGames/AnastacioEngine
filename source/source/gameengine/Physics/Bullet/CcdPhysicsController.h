@@ -984,4 +984,9 @@ public:
 	btVector3 m_localScaling;
 };
 
+/** Triangle mesh shapes created on this thread between these calls get their BVH at the end, built on
+ * all cores. Nothing may query those shapes (ray casts, simulation) before CcdEndBvhBatch(). Nestable. */
+void CcdBeginBvhBatch();
+void CcdEndBvhBatch();
+
 #endif  /* __CCDPHYSICSCONTROLLER_H__ */

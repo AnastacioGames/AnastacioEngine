@@ -2582,6 +2582,15 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 
 	// Create physics information.
 	const double physicsStart = PIL_check_seconds_timer();
+#ifdef WITH_BULLET
+	// The BVH of the triangle meshes is built in parallel at the end of the pass.
+	// RANGE_NO_BVH_BATCH=1 builds each one on creation, to compare.
+	const char *noBvhBatch = getenv("RANGE_NO_BVH_BATCH");
+	const bool bvhBatch = !(noBvhBatch && noBvhBatch[0] && noBvhBatch[0] != '0');
+	if (bvhBatch) {
+		CcdBeginBvhBatch();
+	}
+#endif
 	for (unsigned short i = 0; i < 2; ++i) {
 		const bool processCompoundChildren = (i == 1);
 		const bool processCustomMesh = (i == 1);
@@ -2622,6 +2631,11 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			BL_CreatePhysicsObjectNew(gameobj, blenderobject, meshobj, kxscene, layerMask, converter, processCompoundChildren);
 		}
 	}
+#ifdef WITH_BULLET
+	if (bvhBatch) {
+		CcdEndBvhBatch();
+	}
+#endif
 	BL_LoadStats::Get().physics += PIL_check_seconds_timer() - physicsStart;
 
 	// Create and set bounding volume.
