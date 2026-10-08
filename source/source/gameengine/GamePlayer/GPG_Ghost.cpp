@@ -1425,7 +1425,13 @@ int main(int argc,
 	{
 		// Create the system
 		// --server needs no display: a headless GHOST system with an offscreen GL context.
-		if ((serverMode ? GHOST_ISystem::createSystemHeadless() : GHOST_ISystem::createSystem()) == GHOST_kSuccess) {
+		// The editor's Cook button (ANASTACIO_COOK) draws its own progress, so on Windows the game window stays hidden.
+#ifdef WIN32
+		const bool hiddenWindow = serverMode || getenv("ANASTACIO_COOK") != nullptr;
+#else
+		const bool hiddenWindow = serverMode;
+#endif
+		if ((hiddenWindow ?GHOST_ISystem::createSystemHeadless() : GHOST_ISystem::createSystem()) == GHOST_kSuccess) {
 			GHOST_ISystem *system = GHOST_ISystem::getSystem();
 			BLI_assert(system);
 
