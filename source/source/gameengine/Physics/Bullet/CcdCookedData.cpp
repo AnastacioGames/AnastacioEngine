@@ -26,6 +26,7 @@ static const char magic[8] = {'A', 'N', 'A', 'C', 'O', 'O', 'K', '2'};
 static const uint32_t kindHull = 1;
 static const uint32_t kindShader = 2;
 static const uint32_t kindMesh = 3;
+static const uint32_t kindBvh = 4;
 static const char userMagic[8] = {'A', 'N', 'A', 'S', 'H', 'A', 'D', '1'};
 
 // Key: hash of the vertex bytes and the vertex count.
@@ -42,6 +43,7 @@ struct Shader
 };
 static std::map<uint64_t, Shader> shaders;
 static std::map<uint64_t, std::vector<char> > meshes;
+static std::map<uint64_t, std::vector<char> > bvhs;
 static std::string filePath;
 static bool record = false;
 // Cook button: the file is rewritten even with nothing in it (removed then).
@@ -53,6 +55,7 @@ static bool warmUp = false;
 static unsigned int numLoaded = 0, numHits = 0, numAdded = 0;
 static unsigned int numShadersLoaded = 0, numShaderHits = 0, numShadersAdded = 0;
 static unsigned int numMeshesLoaded = 0, numMeshHits = 0, numMeshesAdded = 0;
+static unsigned int numBvhsLoaded = 0, numBvhHits = 0, numBvhsAdded = 0;
 
 static_assert(sizeof(btScalar) == sizeof(uint32_t), "the vertex hash reads floats");
 
@@ -110,14 +113,15 @@ static void ReadRecords(FILE *file, bool user)
 			}
 			++numShadersLoaded;
 		}
-		else if (kind == kindMesh && !user) {
-			std::vector<char>& data = meshes[hash];
+		else if ((kind == kindMesh || kind == kindBvh) && !user) {
+			std::map<uint64_t, std::vector<char> >& blobs = (kind == kindMesh) ? meshes : bvhs;
+			std::vector<char>& data = blobs[hash];
 			data.resize(count2);
 			if (fread(data.data(), 1, count2, file) != count2) {
-				meshes.erase(hash);
+				blobs.erase(hash);
 				break;
 			}
-			++numMeshesLoaded;
+			++((kind == kindMesh) ? numMeshesLoaded : numBvhsLoaded);
 		}
 		else {
 			break;
@@ -187,9 +191,11 @@ void Open(const std::string& mainFile, unsigned long long deviceKey)
 	hulls.clear();
 	shaders.clear();
 	meshes.clear();
+	bvhs.clear();
 	numLoaded = numHits = numAdded = 0;
 	numShadersLoaded = numShaderHits = numShadersAdded = 0;
 	numMeshesLoaded = numMeshHits = numMeshesAdded = 0;
+	numBvhsLoaded = numBvhHits = numBvhsAdded = 0;
 	filePath.clear();
 	userPath.clear();
 	record = cooking = warmUp = false;
@@ -253,6 +259,12 @@ static bool WriteFile(const std::string& path, bool user)
 				     fwrite(item.second.data(), sizeof(btScalar), item.second.size(), file) == item.second.size();
 			}
 			const uint32_t zero = 0;
+			for (const auto& item : bvhs) {
+				const uint32_t size = (uint32_t)item.second.size();
+				ok = ok && fwrite(&kindBvh, 4, 1, file) == 1 && fwrite(&item.first, 8, 1, file) == 1 &&
+				     fwrite(&zero, 4, 1, file) == 1 && fwrite(&size, 4, 1, file) == 1 &&
+				     fwrite(item.second.data(), 1, size, file) == size;
+			}
 			for (const auto& item : meshes) {
 				const uint32_t size = (uint32_t)item.second.size();
 				ok = ok && fwrite(&kindMesh, 4, 1, file) == 1 && fwrite(&item.first, 8, 1, file) == 1 &&
@@ -287,12 +299,13 @@ static bool WriteFile(const std::string& path, bool user)
 void Close()
 {
 	std::lock_guard<std::mutex> lock(mutex);
-	const bool added = numAdded || numShadersAdded || numMeshesAdded;
-	if (!filePath.empty() && (numLoaded || numShadersLoaded || numMeshesLoaded || added)) {
+	const bool added = numAdded || numShadersAdded || numMeshesAdded || numBvhsAdded;
+	if (!filePath.empty() && (numLoaded || numShadersLoaded || numMeshesLoaded || numBvhsLoaded || added)) {
 		CM_Message("[Cooked] " << filePath << ": hulls " << numLoaded << " loaded, " << numHits << " used, "
 		           << numAdded << " new; shaders " << numShadersLoaded << " loaded, " << numShaderHits << " used, "
 		           << numShadersAdded << " new; meshes " << numMeshesLoaded << " loaded, " << numMeshHits << " used, "
-		           << numMeshesAdded << " new" << (userPath.empty() ? "" : " (user cache " + userPath + ")"));
+		           << numMeshesAdded << " new; bvh " << numBvhsLoaded << " loaded, " << numBvhHits << " used, "
+		           << numBvhsAdded << " new" << (userPath.empty() ? "" : " (user cache " + userPath + ")"));
 	}
 	if (cooking && !added) {
 		if (BLI_exists(filePath.c_str())) {
@@ -312,6 +325,7 @@ void Close()
 	hulls.clear();
 	shaders.clear();
 	meshes.clear();
+	bvhs.clear();
 	filePath.clear();
 	userPath.clear();
 	record = cooking = warmUp = false;
@@ -397,6 +411,25 @@ void AddMesh(unsigned long long key, const std::vector<char>& data)
 	std::lock_guard<std::mutex> lock(mutex);
 	if (record && !data.empty() && meshes.emplace(key, data).second) {
 		++numMeshesAdded;
+	}
+}
+
+const std::vector<char> *FindBvh(unsigned long long key)
+{
+	std::lock_guard<std::mutex> lock(mutex);
+	const auto it = bvhs.find(key);
+	if (it == bvhs.end()) {
+		return nullptr;
+	}
+	++numBvhHits;
+	return &it->second;
+}
+
+void AddBvh(unsigned long long key, const std::vector<char>& data)
+{
+	std::lock_guard<std::mutex> lock(mutex);
+	if (record && !data.empty() && bvhs.emplace(key, data).second) {
+		++numBvhsAdded;
 	}
 }
 }

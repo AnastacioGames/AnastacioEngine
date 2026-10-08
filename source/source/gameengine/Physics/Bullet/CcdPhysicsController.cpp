@@ -129,6 +129,61 @@ SharedBvhKey shared_bvh_key(btStridingMeshInterface *meshInterface)
 	return key;
 }
 
+/// Header of a cooked BVH (.cooked file): the full key, checked before the BVH is used.
+struct CookedBvhHeader
+{
+	uint64_t hash[2];
+	int32_t numVerts;
+	int32_t numTris;
+	uint32_t version;
+	uint32_t size;
+};
+
+uint64_t cooked_bvh_key(const SharedBvhKey& key)
+{
+	return key.hash[0] ^ (key.hash[1] * 0x9E3779B97F4A7C15ULL) ^ ((uint64_t)key.numVerts << 32) ^ (uint64_t)key.numTris;
+}
+
+/// BVH of key from the .cooked file, nullptr when not cooked. Loading is a copy (deSerializeInPlace).
+btOptimizedBvh *load_cooked_bvh(const SharedBvhKey& key)
+{
+	const std::vector<char> *data = CcdCookedData::FindBvh(cooked_bvh_key(key));
+	CookedBvhHeader head;
+	if (!data || data->size() <= sizeof(head)) {
+		return nullptr;
+	}
+	memcpy(&head, data->data(), sizeof(head));
+	if (head.hash[0] != key.hash[0] || head.hash[1] != key.hash[1] || head.numVerts != key.numVerts ||
+	    head.numTris != key.numTris || head.version != 1 || head.size != data->size() - sizeof(head))
+	{
+		return nullptr;
+	}
+	// The BVH lives at the start of its buffer: FreeBvh() releases both.
+	void *mem = btAlignedAlloc(head.size, 16);
+	memcpy(mem, data->data() + sizeof(head), head.size);
+	btOptimizedBvh *bvh = btOptimizedBvh::deSerializeInPlace(mem, head.size, false);
+	if (!bvh) {
+		btAlignedFree(mem);
+	}
+	return bvh;
+}
+
+void save_cooked_bvh(const SharedBvhKey& key, const btOptimizedBvh *bvh)
+{
+	if (!CcdCookedData::IsRecording()) {
+		return;
+	}
+	CookedBvhHeader head = {{key.hash[0], key.hash[1]}, key.numVerts, key.numTris, 1, bvh->calculateSerializeBufferSize()};
+	void *mem = btAlignedAlloc(head.size, 16);
+	if (bvh->serializeInPlace(mem, head.size, false)) {
+		std::vector<char> data(sizeof(head) + head.size);
+		memcpy(data.data(), &head, sizeof(head));
+		memcpy(data.data() + sizeof(head), mem, head.size);
+		CcdCookedData::AddBvh(cooked_bvh_key(key), data);
+	}
+	btAlignedFree(mem);
+}
+
 /// Runs func(0) .. func(count - 1) on all cores, returning when all are done.
 template <class Func>
 void shared_bvh_parallel(size_t count, const Func& func)
@@ -201,7 +256,18 @@ public:
 		btAlignedFree(bvh);
 	}
 
-	/// Same build as btBvhTriangleMeshShape::buildOptimizedBvh(), but owned by the cache.
+	/// The cooked BVH of key, else the same build as btBvhTriangleMeshShape::buildOptimizedBvh() (recorded
+	/// when playing a .blend). Owned by the cache.
+	btOptimizedBvh *BuildBvh(const SharedBvhKey& key)
+	{
+		if (btOptimizedBvh *cooked = load_cooked_bvh(key)) {
+			return cooked;
+		}
+		btOptimizedBvh *bvh = BuildBvh();
+		save_cooked_bvh(key, bvh);
+		return bvh;
+	}
+
 	btOptimizedBvh *BuildBvh()
 	{
 		void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
@@ -216,7 +282,7 @@ public:
 		std::unique_lock<std::mutex> lock(sharedBvhMutex);
 		SharedBvhEntry& entry = sharedBvhs[key];
 		if (!entry.bvh) {
-			entry.bvh = built ? built : BuildBvh();
+			entry.bvh = built ? built : BuildBvh(key);
 			entry.users = 0;
 			built = nullptr;
 		}
@@ -266,7 +332,7 @@ void CcdEndBvhBatch()
 	}
 	std::vector<btOptimizedBvh *> built(shapes.size(), nullptr);
 	shared_bvh_parallel(builders.size(), [&](size_t j) {
-		built[builders[j]] = shapes[builders[j]]->BuildBvh();
+		built[builders[j]] = shapes[builders[j]]->BuildBvh(keys[builders[j]]);
 	});
 
 	// In order: the first shape of a mesh caches its BVH, the copies after it find it there.

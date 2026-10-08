@@ -55,6 +55,18 @@ def checksum(cont):
                 poly = mesh.getPolygon(p)
                 mix((poly.material_id, tuple(poly.getVertexIndex(k) for k in range(poly.getNumVertex()))))
             linhas.append("%s: %d polygons" % (mesh.name, mesh.numPolygons))
+    # Raycasts contra a malha de física (BVH cozida ou construída).
+    juiz = cont.owner
+    import math
+    acertos = 0
+    for i in range(400):
+        a, b = i * 0.37, (i % 20) * 0.157 - 1.5
+        de = (6 * math.cos(a) * math.cos(b), 6 * math.sin(a) * math.cos(b), 6 * math.sin(b))
+        ob, ponto, normal, poly = juiz.rayCast((0, 0, 0), de, 0, "", 0, 1, 1)
+        if ob:
+            acertos += 1
+            mix((tuple(round(c, 4) for c in ponto), tuple(round(c, 3) for c in normal), poly.v1 if poly else -1))
+    linhas.append("%d raios" % acertos)
     with open(bge.logic.expandPath("//cooked_mesh.txt"), "a") as fh:
         cozidas = [str(e) for e in bge.logic.getLoadLog() if "cooked" in str(e)]
         fh.write("checksum %016x | %s | %s\n" % (nonlocal_h[0], ", ".join(linhas), " ".join(cozidas)[:300]))

@@ -856,7 +856,7 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
                                  const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
 {
 	// Bump when the vertex loop or BL_CookedArrays change.
-	const uint32_t version = 2;
+	const uint32_t version = 3;
 	uint64_t h = loopHash;
 	hash_bytes(h, &version, sizeof(version));
 	const int head[5] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
@@ -891,13 +891,15 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
 }
 
 /** Cooked display arrays: for every array (material slots in order, each array once) the source loop of each
- * vertex (top bit: flat face), its tangent when the mesh uses them, and the primitive and triangle indices. Rebuilding the vertices from their loops
+ * vertex (top bit: flat face), its normal, its tangent when the mesh uses them, and the primitive and triangle indices. Rebuilding the vertices from their loops
  * skips the vertex sharing search, the slow part of the conversion, and keeps the file small. */
 struct BL_CookedArrays
 {
 	struct View
 	{
 		const uint32_t *loops;
+		// 3 floats per vertex.
+		const float *normals;
 		// 4 floats per vertex, nullptr without tangents.
 		const float *tangents;
 		const uint32_t *primitives;
@@ -947,8 +949,13 @@ struct BL_CookedArrays
 			}
 			std::vector<uint32_t> values = {(uint32_t)loops[a].size(), numPrimitives, numTriangles};
 			values.insert(values.end(), loops[a].begin(), loops[a].end());
+			// Loop normals and tangents (mikktspace) are most of the conversion time left with cooked arrays.
+			for (unsigned int i = 0; i < loops[a].size(); ++i) {
+				uint32_t bits[3];
+				memcpy(bits, const_cast<RAS_DisplayArray *>(array)->GetNormal(i).data, sizeof(bits));
+				values.insert(values.end(), bits, bits + 3);
+			}
 			if (withTangents) {
-				// Computing the tangents (mikktspace) is most of the conversion time left with cooked arrays.
 				for (unsigned int i = 0; i < loops[a].size(); ++i) {
 					const mt::vec4_packed& tan = const_cast<RAS_DisplayArray *>(array)->GetTangent(i);
 					uint32_t bits[4];
@@ -991,13 +998,15 @@ struct BL_CookedArrays
 			view.numTriangles = same ? view.numPrimitives : pos[2];
 			pos += 3;
 			const size_t tanCount = withTangents ? (size_t)view.numVerts * 4 : 0;
-			const size_t count = (size_t)view.numVerts + tanCount + view.numPrimitives + (same ? 0 : view.numTriangles);
+			const size_t norCount = (size_t)view.numVerts * 3;
+			const size_t count = (size_t)view.numVerts + norCount + tanCount + view.numPrimitives + (same ? 0 : view.numTriangles);
 			if ((size_t)(end - pos) < count) {
 				return false;
 			}
 			view.loops = pos;
-			view.tangents = withTangents ? (const float *)(pos + view.numVerts) : nullptr;
-			view.primitives = pos + view.numVerts + tanCount;
+			view.normals = (const float *)(pos + view.numVerts);
+			view.tangents = withTangents ? (const float *)(pos + view.numVerts + norCount) : nullptr;
+			view.primitives = pos + view.numVerts + norCount + tanCount;
 			view.triangles = same ? view.primitives : view.primitives + view.numPrimitives;
 			pos += count;
 			for (unsigned int i = 0; i < view.numVerts; ++i) {
@@ -1111,19 +1120,19 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		}
 	}
 
-	if (CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1) {
+	// Cooked arrays carry their normals and tangents.
+	bool arraysCooked = false;
+#ifdef WITH_BULLET
+	arraysCooked = !cookedViews.empty();
+#endif
+	if (!arraysCooked && CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1) {
 		BL_LoadTimer normalsTimer(loadStats.normals);
 		dm->calcLoopNormals(dm, (me->flag & ME_AUTOSMOOTH), me->smoothresh);
 	}
 	const float(*normals)[3] = (float(*)[3])dm->getLoopDataArray(dm, CD_NORMAL);
 
 	float(*tangent)[4] = nullptr;
-	// Cooked arrays carry their tangents.
-	bool tangentsCooked = false;
-#ifdef WITH_BULLET
-	tangentsCooked = !cookedViews.empty();
-#endif
-	if (withTangents && !tangentsCooked) {
+	if (withTangents && !arraysCooked) {
 		if (CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, tangentUvName) == -1) {
 			BL_LoadTimer tangentTimer(loadStats.tangent);
 			++loadStats.tangentMeshes;
@@ -1175,7 +1184,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 				mt::vec2_packed uvs[RAS_Texture::MaxUnits];
 				unsigned int rgba[RAS_Texture::MaxUnits];
 				BL_GetUvRgba(layersInfo, uvLayers, colorLayers, loop, uvs, rgba);
-				array->AddVertex(mt::vec3_packed(mverts[vertid].co), mt::vec3_packed(normals[loop]),
+				array->AddVertex(mt::vec3_packed(mverts[vertid].co), mt::vec3_packed(view.normals + i * 3),
 				                 mt::vec4_packed(view.tangents ? view.tangents + i * 4 : dummyTangent), uvs, rgba, vertid,
 				                 (view.loops[i] & BL_CookedArrays::flatBit) != 0, boneZero, boneZero);
 			}
@@ -2920,6 +2929,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	}
 #ifdef WITH_BULLET
 	if (bvhBatch) {
+		BL_LoadTimer bvhTimer(BL_LoadStats::Get().bvh);
 		CcdEndBvhBatch();
 	}
 #endif

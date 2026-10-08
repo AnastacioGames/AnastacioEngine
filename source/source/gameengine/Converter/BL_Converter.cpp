@@ -668,7 +668,7 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	       << load_ms(loadStats.meshCooked) << "ms) " << load_ms(loadStats.mesh) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
-	       << load_ms(loadStats.physics) << "ms (mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "
+	       << load_ms(loadStats.physics) << "ms (bvh " << load_ms(loadStats.bvh) << "ms; mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "
 	       << load_ms(loadStats.normals) << "ms, end " << load_ms(loadStats.meshEnd) << "ms), objects " << load_ms(loadStats.objects) << "ms, logic "
 	       << load_ms(loadStats.logic) << "ms, mesh users " << load_ms(loadStats.meshUsers) << "ms, culling "
 	       << load_ms(loadStats.culling) << "ms, bounds " << load_ms(loadStats.bounds) << "ms";

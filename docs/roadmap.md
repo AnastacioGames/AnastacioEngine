@@ -82,7 +82,7 @@ Aberto:
   Game (física 1,6 s → 0,04 s no teste de 12 objetos). Binário dos shaders de material também (310 → 3 ms);
   com o botão Cook o LibLoad do teste foi de 2,4 s → 0,47 s. Buffers de malha (2026-10-08): malhas com
   10 mil loops ou mais guardam de que loop vem cada vértice e os índices; LibLoad do teste 850 → 295 ms.
-  Tangentes cozidas também (2026-10-08): malha do teste 32 → 4 ms. Sem mínimo de loops: 200 malhas de 112 loops 45 → 21 ms. Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
+  Tangentes cozidas também (2026-10-08): malha do teste 32 → 4 ms. Sem mínimo de loops: 200 malhas de 112 loops 45 → 21 ms. Normais e BVH de física cozidas: 200 malhas de 8 064 loops 1 820 → 259 ms. Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
   usuário e aquece todos na primeira abertura em cada GPU/driver, com tela de texto (sem barra de progresso).
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
   serial na GPU; DDS no `.cooked` cortaria ambos.

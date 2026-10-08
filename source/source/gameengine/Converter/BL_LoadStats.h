@@ -31,6 +31,7 @@ struct BL_LoadStats
 	double mesh = 0.0;      // BL_ConvertMesh total (includes normals and tangents).
 	double tangent = 0.0;   // MikkTSpace tangents only.
 	double physics = 0.0;   // BL_CreatePhysicsObjectNew.
+	double bvh = 0.0;       // Triangle mesh BVH of the physics pass (CcdEndBvhBatch, part of physics).
 	double loopHash = 0.0;  // Content hash of meshes for the normal/tangent cache.
 	double meshDm = 0.0;    // CDDM_from_mesh.
 	double normals = 0.0;   // Loop normals.

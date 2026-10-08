@@ -31,6 +31,19 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — `.cooked`: normais e BVH de física
+
+- O registro de malha (chave versão 3) guarda também a normal de cada vértice gerado: com o cozido o
+  `calcLoopNormals` é pulado (200 malhas de 8 064 loops: 56 → 0 ms).
+- Registro novo (tipo 4): a BVH das formas Triangle Mesh serializada pelo Bullet
+  (`btOptimizedBvh::serializeInPlace`), com chave do hash dos arrays de física que o `CcdEndBvhBatch` já
+  calculava. Carregar é uma cópia mais `deSerializeInPlace`. O cabeçalho repete a chave inteira e é conferido
+  antes do uso. `[Load] convert` mostra `physics Xms (bvh Xms; ...)` e o `[Cooked]` conta as BVHs.
+- `make_cooked_mesh_test.py` faz 400 raycasts na malha de física e põe ponto, normal e polígono no checksum:
+  idêntico entre rodada normal e cozida; física do teste 15 → 1 ms.
+- `make_cooked_small_test.py`, convert com cozido antes → depois: 8 064 loops 396 → 259 ms (BVH 100 → 14 ms),
+  1 984 loops 98 → 78 ms. O `.cooked` desse teste foi de 42 para 87 MB.
+
 ## 2026-10-08 — `.cooked`: todas as malhas
 
 - Removido o mínimo de 10 mil loops: o registro cozido ganha em qualquer tamanho. Novo
