@@ -54,3 +54,18 @@ RANGE_PROFILE_MARK_GPU(prof, "minha.etapa2");   // CPU + timestamp de GPU (só d
 
 `RANGE_PROFILE_ADD("nome", ms)` soma um tempo medido à mão. Contadores em C ficam em
 `GPU_profile_counters` (`GPU_shader.h`). Use nomes `area.etapa`; o limite é de 64 etapas.
+
+## Log de tempo das animações (`RANGE_ANIM_LOG`)
+
+Para bugs de animação que pulam, correm rápido demais ou não tocam. Com `RANGE_ANIM_LOG=<arquivo>` a engine grava,
+com o tempo real desde a abertura do processo:
+
+- `===== START`: cada início de jogo (P no editor), com tic rate, fps das animações e os relógios da engine;
+- `F`: cada quadro, com o delta real, os passos de lógica e os relógios `frameT` (onde as actions começam) e
+  `animT` (onde elas tocam), que devem andar juntos;
+- `PLAY` / `DONE`: cada action iniciada e quanto tempo levou até terminar;
+- `TIMESCALE`: mudanças de velocidade do jogo.
+
+No Windows, `tools/debug/abrir_engine_log_animacao.bat` abre o editor com o log em `debug-logs/anim_log.txt`.
+Desligado, o custo é um teste de booleano por chamada. Achou o bug do P em 2026-10-08: `animT` começava com o valor
+da engine anterior (membro não inicializado).

@@ -818,4 +818,9 @@ public:
 	void Resize();
 };
 
+/** RANGE_ANIM_LOG=<file>: timing log of the game clocks and the actions (to chase animations that skip).
+ * Appends a printf line with the real time since the process started. */
+bool KX_AnimLogEnabled();
+void KX_AnimLog(const char *fmt, ...);
+
 #endif  /* __KX_KETSJIENGINE_H__ */

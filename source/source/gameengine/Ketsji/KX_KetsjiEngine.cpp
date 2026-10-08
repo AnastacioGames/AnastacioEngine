@@ -40,6 +40,10 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include <cstdio>
 #include <cstdlib>
 
@@ -183,6 +187,11 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_debugRenderer(new KX_DebugRenderer(this)),
 	m_flags(AUTO_ADD_DEBUG_PROPERTIES),
 	m_frameTime(0.0f),
+	m_logicTime(0.0f),
+	m_physicsTime(0.0f),
+	/* Actions start on m_frameTime and run on m_animationsTime: left uninitialized, a new engine took the old one's
+	 * value when the allocator gave it the same memory, and the menu animations jumped to their end (bug of P). */
+	m_animationsTime(0.0f),
 	m_clockTime(0.0f),
 	m_timescale(1.0f),
 	m_previousRealTime(0.0f),
@@ -353,6 +362,32 @@ void KX_KetsjiEngine::SetConverter(BL_Converter *converter)
 	m_converter = converter;
 }
 
+bool KX_AnimLogEnabled()
+{
+	static const bool enabled = getenv("RANGE_ANIM_LOG") && getenv("RANGE_ANIM_LOG")[0];
+	return enabled;
+}
+
+void KX_AnimLog(const char *fmt, ...)
+{
+	if (!KX_AnimLogEnabled()) {
+		return;
+	}
+	static FILE *file = fopen(getenv("RANGE_ANIM_LOG"), "a");
+	if (!file) {
+		return;
+	}
+	using namespace std::chrono;
+	static const steady_clock::time_point origin = steady_clock::now();
+	fprintf(file, "%10.3f ", duration<double>(steady_clock::now() - origin).count());
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(file, fmt, args);
+	va_end(args);
+	fputs("\n", file);
+	fflush(file);
+}
+
 void KX_KetsjiEngine::StartEngine()
 {
 	// Reset the clock to start at 0.0.
@@ -373,6 +408,8 @@ void KX_KetsjiEngine::StartEngine()
 
 	m_renderrate = 1.0 / m_ticrate;
 	m_animationrate = 1.0 / m_ticrate;
+	KX_AnimLog("===== START engine=%p tic=%.1f anim_fps=%.1f fixed=%d timescale=%.3f frameT=%.3f animT=%.3f", (void *)this,
+	           m_ticrate, GetAnimFrameRate(), (int)m_useFixedTimestep, m_timescale, m_frameTime, m_animationsTime);
 
 	// Initialize Debug Mode (ImGui)
 	if (m_flags & (SHOW_DEBUG_MODE)) {
@@ -680,6 +717,8 @@ bool KX_KetsjiEngine::NextFrame()
 			m_simAccumulator -= m_framestep;
 		}
 		m_needsAnimation = frameNeedsAnimation;
+		KX_AnimLog("F real_dt=%.4f steps=%d acc=%.4f timescale=%.3f frameT=%.3f animT=%.3f", realDelta, steps,
+		           m_simAccumulator, m_timescale, m_frameTime, m_animationsTime);
 		double maxBacklog = m_framestep * m_maxLogicFrame;
 		if (m_simAccumulator > maxBacklog) {
 			m_simAccumulator = maxBacklog;
@@ -687,6 +726,8 @@ bool KX_KetsjiEngine::NextFrame()
 	}
 	else {
 		m_simulationPipeline->Update();
+		KX_AnimLog("F variable dt=%.4f timescale=%.3f frameT=%.3f animT=%.3f", m_deltatime, m_timescale, m_frameTime,
+		           m_animationsTime);
 	}
 	// A frame with no simulation step keeps its input and messages for the next step.
 	if (m_inputDevice && steps > 0) {
@@ -1195,6 +1236,9 @@ double KX_KetsjiEngine::GetTimeScale() const
 
 void KX_KetsjiEngine::SetTimeScale(double timeScale)
 {
+	if (timeScale != m_timescale) {
+		KX_AnimLog("TIMESCALE %.3f -> %.3f", m_timescale, timeScale);
+	}
 	m_timescale = timeScale;
 }
 
