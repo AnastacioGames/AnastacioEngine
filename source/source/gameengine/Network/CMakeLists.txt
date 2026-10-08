@@ -69,9 +69,13 @@ set(NET_SRC
 	NET_Types.h
 )
 
+if(NOT EMSCRIPTEN)
+    list(APPEND NET_SRC NET_AnastacioPlugin.cpp NET_AnastacioPlugin.h NET_AnastacioPluginABI.h
+        NET_TransportSteam.cpp NET_TransportSteam.h)
+endif()
 add_library(ge_network STATIC ${NET_SRC})
 target_include_directories(ge_network PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(ge_network PUBLIC extern_enet)
+target_link_libraries(ge_network PUBLIC extern_enet ${CMAKE_DL_LIBS})
 if(WIN32)
 	target_link_libraries(ge_network PUBLIC ws2_32)  # WebSocket server sockets
 endif()
@@ -127,7 +131,25 @@ if(NET_STANDALONE)
 		tests/NET_WebSocket_test.cpp
 	)
 
-	add_executable(net_tests ${NET_TEST_SRC})
+	if(NOT EMSCRIPTEN)
+        list(APPEND NET_TEST_SRC tests/NET_AnastacioPlugin_test.cpp)
+        foreach(mode RANGE 0 3)
+            add_library(anastacio_plugin_fixture_${mode} SHARED tests/AnastacioPluginFixture.cpp)
+            target_include_directories(anastacio_plugin_fixture_${mode} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+            target_compile_definitions(anastacio_plugin_fixture_${mode} PRIVATE FIXTURE_MODE=${mode})
+            set_target_properties(anastacio_plugin_fixture_${mode} PROPERTIES CXX_STANDARD 17)
+        endforeach()
+    endif()
+    add_executable(net_tests ${NET_TEST_SRC})
+    if(NOT EMSCRIPTEN)
+        add_dependencies(net_tests anastacio_plugin_fixture_0 anastacio_plugin_fixture_1
+                         anastacio_plugin_fixture_2 anastacio_plugin_fixture_3)
+        target_compile_definitions(net_tests PRIVATE
+            ANASTACIO_FIXTURE_GOOD="$<TARGET_FILE:anastacio_plugin_fixture_0>"
+            ANASTACIO_FIXTURE_BAD_VERSION="$<TARGET_FILE:anastacio_plugin_fixture_1>"
+            ANASTACIO_FIXTURE_BAD_SIZE="$<TARGET_FILE:anastacio_plugin_fixture_2>"
+            ANASTACIO_FIXTURE_BAD_FUNCTION="$<TARGET_FILE:anastacio_plugin_fixture_3>")
+    endif()
 	target_link_libraries(net_tests PRIVATE ge_network extern_gtest)
 	set_target_properties(net_tests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 	target_compile_definitions(net_tests PRIVATE
@@ -150,7 +172,12 @@ if(NET_STANDALONE)
 		add_test(NAME net_tests COMMAND net_tests)
 	endif()
 
-	# Manual test tool.
+	if(NOT EMSCRIPTEN)
+        add_executable(net_steam_probe tools/net_steam_probe.cpp)
+        target_link_libraries(net_steam_probe PRIVATE ge_network)
+        set_target_properties(net_steam_probe PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+    endif()
+    # Manual test tool.
 	add_executable(net_echo tools/net_echo.cpp)
 	target_link_libraries(net_echo PRIVATE ge_network)
 	set_target_properties(net_echo PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)

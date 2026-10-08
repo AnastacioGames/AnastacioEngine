@@ -39,6 +39,10 @@
 
 #include "NET_Messages.h"
 #include "NET_TransportWeb.h"
+#ifndef __EMSCRIPTEN__
+#include "NET_AnastacioPlugin.h"
+#include "NET_TransportSteam.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -646,6 +650,19 @@ void KX_NetworkManager::BuildRpc()
 	};
 	m_rpcTable.add(start);
 
+	net::RpcDesc lobby;
+	lobby.name = "net.lobby";
+	lobby.target = net::RpcTarget::Owner;
+	lobby.checkArgs = true;
+	lobby.handler = [this](const net::RpcCall &) {
+		m_gameStarted = false;
+		m_remoteReady.clear();
+		Event event;
+		event.type = Event::LOBBY;
+		Emit(event);
+	};
+	m_rpcTable.add(lobby);
+
 	for (const RpcOptions &options : m_userRpcs) {
 		net::RpcDesc desc;
 		desc.name = options.name;
@@ -829,7 +846,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	const SceneSettings settings = ReadSceneSettings(m_scene);
 
 	const int port = options.port > 0 ? options.port : settings.port;
-	const int wsPort = options.wsPort >= 0 ? options.wsPort : settings.wsPort;
+	const int wsPort = options.steam ? 0 : (options.wsPort >= 0 ? options.wsPort : settings.wsPort);
 	m_maxPlayers = std::min(std::max(options.maxPlayers > 0 ? options.maxPlayers : settings.maxPlayers, 1),
 	                        net::kMaxClients);
 	m_roomName = options.roomName.empty() ? settings.roomName : options.roomName;
@@ -839,7 +856,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	m_relevanceRadius = settings.relevanceRadius;
 	m_views.clear();
 	const int tickSetting = options.tickRate > 0 ? options.tickRate : settings.tickRate;
-	const bool lan = options.lan >= 0 ? options.lan != 0 : settings.lan;
+	const bool lan = !options.steam && (options.lan >= 0 ? options.lan != 0 : settings.lan);
 	const bool lateJoin = options.lateJoin >= 0 ? options.lateJoin != 0 : settings.lateJoin;
 	/* A headless server (--server) has no local player: always dedicated. */
 	m_dedicated = options.dedicated || m_engine->IsServerMode();
@@ -851,7 +868,13 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	const int tickRate = std::min(std::max(int(std::lround(m_engine->GetTicRate())), 1), 240);
 	m_snapshotRate = std::min(m_snapshotRate, tickRate);
 
-	std::unique_ptr<net::ITransport> enet = net::createENetTransport();
+	std::unique_ptr<net::ITransport> enet;
+#ifndef __EMSCRIPTEN__
+    enet = options.steam ? net::createAnastacioSteamTransport(net::anastacioSteamService()) : net::createENetTransport();
+#else
+    if (!options.steam) enet = net::createENetTransport();
+#endif
+    if (!enet) { error = "Requested transport unavailable (initialize Steam complement first)"; AbortOpen(); return false; }
 	std::unique_ptr<net::ITransport> transport;
 	if (wsPort > 0) {
 		std::vector<net::MultiTransportEntry> entries;
@@ -916,7 +939,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	}
 
 	m_role = Role::SERVER;
-	CM_Message("network: hosting '" << m_roomName << "' (scene " << m_sceneName << ") on UDP " << port
+	CM_Message("network: hosting '" << m_roomName << "' (scene " << m_sceneName << (options.steam ? ") on Steam virtual port " : ") on UDP ") << port
 	           << (wsPort > 0 ? " and WebSocket " + std::to_string(wsPort) : std::string())
 	           << ", tick " << tickRate << " Hz, snapshots " << m_snapshotRate << " Hz, "
 	           << m_entries.size() << " replicated object(s), scene hash " << std::hex << m_sceneHash << std::dec);
@@ -929,7 +952,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 }
 
 bool KX_NetworkManager::Join(const std::string &host, int port, std::string &error, const std::string &password,
-                             KX_Scene *scene)
+                             KX_Scene *scene, bool steam)
 {
 	if (!Prepare(scene, error)) {
 		return false;
@@ -951,9 +974,9 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 
 	std::unique_ptr<net::ITransport> transport;
 #ifdef __EMSCRIPTEN__
-	transport = net::createWebClientTransport();
+	if (!steam) transport = net::createWebClientTransport();
 #else
-	transport = net::createENetTransport();
+	transport = steam ? net::createAnastacioSteamTransport(net::anastacioSteamService()) : net::createENetTransport();
 #endif
 	if (!transport) {
 		error = "no client transport on this platform";
@@ -2350,6 +2373,23 @@ bool KX_NetworkManager::StartGame()
 	Event e;
 	e.type = Event::START;
 	Emit(e);
+	return true;
+}
+
+bool KX_NetworkManager::ReturnToLobby()
+{
+	if (m_role != Role::SERVER || !m_server) return false;
+	m_gameStarted = false;
+	m_hostReady = false;
+	m_ready.clear();
+	m_server->setGameStarted(false);
+	const int id = m_rpcTable.idOf("net.lobby");
+	for (net::ClientId client : m_server->clients()) {
+		m_rpcServer->callClient(client, uint16_t(id), net::kInvalidNetId, {});
+	}
+	Event event;
+	event.type = Event::LOBBY;
+	Emit(event);
 	return true;
 }
 

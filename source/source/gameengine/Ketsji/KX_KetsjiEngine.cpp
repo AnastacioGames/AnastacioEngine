@@ -101,6 +101,9 @@ extern "C" {
 #include "KX_ShadowRenderer.h"
 #include "KX_SimulationPipeline.h"
 #include "KX_NetworkManager.h"
+#ifndef __EMSCRIPTEN__
+#include "NET_AnastacioPlugin.h"
+#endif
 #include "KX_SceneScheduler.h"
 #include "KX_DebugRenderer.h"
 #include "GPU_glew.h"
@@ -249,6 +252,9 @@ KX_KetsjiEngine::~KX_KetsjiEngine()
 {
 	delete m_networkManager;
 	m_networkManager = nullptr;
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().unload();
+#endif
 
 #ifdef WITH_PYTHON
 	Py_CLEAR(m_pyprofiledict);
@@ -551,6 +557,9 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 
 bool KX_KetsjiEngine::NextFrame()
 {
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().pump(); // Once per rendered frame, shared by all scenes.
+#endif
 	if (g_profileFrameEnd > 0.0) {
 		RANGE_PROFILE_ADD("frame.outside", (m_clock.GetTimeSecond() - g_profileFrameEnd) * 1000.0);
 	}
@@ -964,6 +973,9 @@ void KX_KetsjiEngine::StopEngine()
 		m_rasterizer->Exit();
 	}
 
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().unload(); // After scene components have been destroyed.
+#endif
 	// Shutdown KX_Imgui
 	if (m_imgui) {
 		m_imgui->Stop();

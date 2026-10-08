@@ -52,6 +52,13 @@ public:
 	void Render();
 	void Stop();
 
+	/** Index of the engine font (Roboto + ForkAwesome) at  size in the atlas, or -1 while it
+	 * is queued: the atlas is locked during a frame, so NextFrame() builds queued sizes. */
+	static int RequestDefaultFont(float size);
+	/** Queues a font file and returns the index it will have once NextFrame() builds it. */
+	static int RequestFileFont(const char *path, float size);
+	static int PendingFontCount();
+
 	// imgui.ini disk location.
 	std::string imguiConfigPath;
 

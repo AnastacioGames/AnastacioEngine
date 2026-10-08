@@ -555,6 +555,11 @@ static void usage(const std::string& program, bool isBlenderPlayer)
 
 static void get_filename(int argc, char **argv, char *filename)
 {
+	/* Optional lobby invitations may be appended after the external game file.
+	 * Preserve the real argv for Python/complements; only trim filename lookup. */
+	while (argc > 2 && strcmp(argv[argc - 2], "+connect_lobby") == 0) {
+		argc -= 2;
+	}
 #ifdef __APPLE__
 	/* On Mac we park the game file (called game.blend) in the application bundle.
 	 * The executable is located in the bundle as well.

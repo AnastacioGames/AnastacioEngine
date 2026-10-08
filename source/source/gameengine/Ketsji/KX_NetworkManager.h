@@ -56,6 +56,7 @@ class KX_NetworkManager : public net::IWorld
 {
 public:
 	struct HostOptions {
+        bool steam = false;
 		/// ENet (UDP) port; 0 = scene setting.
 		int port = 0;
 		/// WebSocket (TCP) port; < 0 = scene setting, 0 = no WebSocket.
@@ -85,6 +86,7 @@ public:
 			REJECT,  // reason = RejectReason, text = detail
 			CHAT,  // client = sender
 			START,  // the host started the match
+			LOBBY,  // the host returned the session to its lobby
 			PLAYER_JOIN,  // client, text = name
 			PLAYER_LEAVE,  // client
 			SCENE,  // the session moved to another scene (text = name), after it is loaded
@@ -114,7 +116,7 @@ public:
 	bool Host(const HostOptions &options, std::string &error, KX_Scene *scene = nullptr);
 	/// Joins a server. port <= 0 = scene setting.
 	bool Join(const std::string &host, int port, std::string &error, const std::string &password = "",
-	          KX_Scene *scene = nullptr);
+	          KX_Scene *scene = nullptr, bool steam = false);
 	/// Leaves the session (Quit / ServerShutdown) and gives the objects back to the local simulation.
 	void Disconnect();
 	/// Engine stopping: Disconnect() without events, before the scenes are destroyed.
@@ -255,6 +257,7 @@ public:
 	bool SendChat(const std::string &text);
 	/// Server only. False when someone is not ready or there is no session.
 	bool StartGame();
+	bool ReturnToLobby();
 	std::vector<PlayerInfo> GetPlayers() const;
 	void SetEventSink(const std::function<void(const Event &)> &sink);
 	/** \} */

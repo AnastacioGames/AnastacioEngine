@@ -144,7 +144,8 @@ static int verify_class(PyObject *cls)
  * validation could stay cached with stub bindings all the way into an actual
  * Play session, causing intermittent AttributeErrors depending on reload order.
  * Purging the whole "scripts" namespace here forces every helper module to be
- * re-imported the next time it's needed, once real Range.* modules are back. */
+ * re-imported the next time it's needed, once real Range.* modules are back.
+ * Engine-shipped component helpers need the same treatment when imported by a game adapter. */
 static void purge_scripts_package(PyObject *sys_modules)
 {
 	PyObject *key, *keys_to_delete;
@@ -158,7 +159,8 @@ static void purge_scripts_package(PyObject *sys_modules)
 		}
 
 		const char *name = _PyUnicode_AsString(key);
-		if (name && (strcmp(name, "scripts") == 0 || strncmp(name, "scripts.", 8) == 0)) {
+		if (name && (strcmp(name, "scripts") == 0 || strncmp(name, "scripts.", 8) == 0 ||
+		             strcmp(name, "anastacio_network") == 0 || strncmp(name, "anastacio_network.", 18) == 0)) {
 			PyList_Append(keys_to_delete, key);
 		}
 	}

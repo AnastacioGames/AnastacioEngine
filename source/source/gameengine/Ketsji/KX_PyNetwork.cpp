@@ -29,6 +29,9 @@
 #ifdef WITH_PYTHON
 
 #include "KX_PyNetwork.h"
+#ifndef __EMSCRIPTEN__
+#include "NET_AnastacioPlugin.h"
+#endif
 
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
@@ -47,7 +50,7 @@ namespace {
 
 const char *kEventNames[] = {
 	"on_connect", "on_disconnect", "on_reject", "on_chat", "on_start", "on_player_join", "on_player_leave",
-	"on_scene",
+	"on_scene", "on_lobby",
 };
 
 KX_NetworkManager *Manager()
@@ -93,6 +96,10 @@ void DispatchEvent(const KX_NetworkManager::Event &event)
 			break;
 		case KX_NetworkManager::Event::START:
 			name = "on_start";
+			args = PyTuple_New(0);
+			break;
+		case KX_NetworkManager::Event::LOBBY:
+			name = "on_lobby";
 			args = PyTuple_New(0);
 			break;
 		case KX_NetworkManager::Event::PLAYER_JOIN:
@@ -371,16 +378,20 @@ bool ParseAddress(const std::string &text, std::string &host, int &port)
 
 PyObject *Net_host(PyObject *, PyObject *args, PyObject *kwds)
 {
-	static const char *kwlist[] = {"port", "max_players", "room_name", "password", "dedicated", "websocket_port",
+	static const char *kwlist[] = {"port", "max_players", "room_name", "password", "dedicated", "websocket_port", "transport",
 	                               nullptr};
 	KX_NetworkManager::HostOptions options;
 	const char *room = "";
 	const char *password = "";
 	int dedicated = 0;
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iissp" "i", const_cast<char **>(kwlist), &options.port,
-	                                 &options.maxPlayers, &room, &password, &dedicated, &options.wsPort)) {
+    const char *transport = "enet";
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iissp" "is", const_cast<char **>(kwlist), &options.port,
+	                                 &options.maxPlayers, &room, &password, &dedicated, &options.wsPort, &transport)) {
 		return nullptr;
 	}
+	if (std::strcmp(transport, "enet") != 0 && std::strcmp(transport, "steam") != 0) {
+        PyErr_SetString(PyExc_ValueError, "transport must be enet or steam"); return nullptr;
+    }
 	KX_NetworkManager *manager = ManagerCreate();
 	if (!manager) {
 		return nullptr;
@@ -390,7 +401,8 @@ PyObject *Net_host(PyObject *, PyObject *args, PyObject *kwds)
 		 * It travels in clear over the UDP/WS link: a casual access gate, not real security. */
 		CM_Warning("network: host password travels in clear text; it gates casual access, not real security");
 	}
-	options.password = password;
+    options.steam = std::strcmp(transport, "steam") == 0;
+    options.password = password;
 	options.roomName = room;
 	options.dedicated = dedicated != 0;
 	std::string error;
@@ -403,12 +415,16 @@ PyObject *Net_host(PyObject *, PyObject *args, PyObject *kwds)
 
 PyObject *Net_join(PyObject *, PyObject *args, PyObject *kwds)
 {
-	static const char *kwlist[] = {"address", "password", nullptr};
+	static const char *kwlist[] = {"address", "password", "transport", nullptr};
 	const char *address = nullptr;
 	const char *password = "";
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|s", const_cast<char **>(kwlist), &address, &password)) {
+	const char *transport = "enet";
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ss", const_cast<char **>(kwlist), &address, &password, &transport)) {
 		return nullptr;
 	}
+	if (std::strcmp(transport, "enet") != 0 && std::strcmp(transport, "steam") != 0) {
+        PyErr_SetString(PyExc_ValueError, "transport must be enet or steam"); return nullptr;
+    }
 	KX_NetworkManager *manager = ManagerCreate();
 	if (!manager) {
 		return nullptr;
@@ -421,7 +437,7 @@ PyObject *Net_join(PyObject *, PyObject *args, PyObject *kwds)
 		Py_RETURN_FALSE;
 	}
 	std::string error;
-	if (!manager->Join(host, port, error, password)) {
+    if (!manager->Join(host, port, error, password, nullptr, std::strcmp(transport, "steam") == 0)) {
 		CM_Warning("network: join failed: " << error);
 		Py_RETURN_FALSE;
 	}
@@ -462,6 +478,12 @@ PyObject *Net_start_game(PyObject *, PyObject *)
 {
 	KX_NetworkManager *manager = Manager();
 	return PyBool_FromLong(manager && manager->StartGame());
+}
+
+PyObject *Net_return_to_lobby(PyObject *, PyObject *)
+{
+	KX_NetworkManager *manager = Manager();
+	return PyBool_FromLong(manager && manager->ReturnToLobby());
 }
 
 PyObject *Net_discover_lan(PyObject *, PyObject *)
@@ -1124,6 +1146,7 @@ NET_CALLBACK_FUNC(on_disconnect)
 NET_CALLBACK_FUNC(on_reject)
 NET_CALLBACK_FUNC(on_chat)
 NET_CALLBACK_FUNC(on_start)
+NET_CALLBACK_FUNC(on_lobby)
 NET_CALLBACK_FUNC(on_player_join)
 NET_CALLBACK_FUNC(on_player_leave)
 NET_CALLBACK_FUNC(on_scene)
@@ -1132,15 +1155,188 @@ NET_CALLBACK_FUNC(on_scene)
 
 /** \} */
 
+
+PyObject *SteamInitialize(PyObject *, PyObject *args)
+{
+    const char *path;
+    PyObject *appIdObject;
+    if (!PyArg_ParseTuple(args, "sO:initialize", &path, &appIdObject)) return nullptr;
+    const unsigned long appId = PyLong_AsUnsignedLong(appIdObject);
+    if (PyErr_Occurred()) return nullptr;
+    if (appId == 0 || appId > UINT32_MAX) {
+        PyErr_SetString(PyExc_ValueError, "AppID must be an integer from 1 to 4294967295");
+        return nullptr;
+    }
+#ifndef __EMSCRIPTEN__
+    if (!KX_GetActiveEngine()) {
+        PyErr_SetString(PyExc_RuntimeError, "Steam initialization requires a running game");
+        return nullptr;
+    }
+    auto &service = net::anastacioSteamService();
+    if (service.loaded()) {
+        PyErr_SetString(PyExc_RuntimeError, "Steam service already loaded; shutdown before reconfiguration");
+        return nullptr;
+    }
+    if (!service.load(path) || !service.initialize(appId)) {
+        const std::string error = service.error();
+        service.unload();
+        PyErr_SetString(PyExc_RuntimeError, error.c_str());
+        return nullptr;
+    }
+    Py_RETURN_TRUE;
+#else
+    PyErr_SetString(PyExc_RuntimeError, "Steam complement is unavailable on Web");
+    return nullptr;
+#endif
+}
+PyObject *SteamStatus(PyObject *, PyObject *)
+{
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    return Py_BuildValue("{s:O,s:O,s:K}", "loaded", service.loaded() ? Py_True : Py_False,
+        "ready", service.ready() ? Py_True : Py_False,
+        "steam_id", static_cast<unsigned long long>(service.identity()));
+#else
+    return Py_BuildValue("{s:O,s:O,s:K}", "loaded", Py_False, "ready", Py_False, "steam_id", 0ULL);
+#endif
+}
+PyObject *SteamShutdown(PyObject *, PyObject *)
+{
+#ifndef __EMSCRIPTEN__
+    if (net::anastacioSteamService().busy()) {
+        PyErr_SetString(PyExc_RuntimeError, "Disconnect Steam session before shutdown"); return nullptr;
+    }
+    net::anastacioSteamService().unload();
+#endif
+    Py_RETURN_NONE;
+}
+
+PyObject *SteamLobbyRequest(PyObject *, PyObject *args, PyObject *kwds)
+{
+    static const char *keys[] = {"operation", "name", "game_id", "build", "capacity", "port", "friends_only", "lobby_id", nullptr};
+    unsigned int operation, capacity = 8, port = 7777;
+    int friends = 0; const char *name = "Room", *game = "anastacio-game", *build = "1";
+    PyObject *lobby = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "I|sssIIpO", const_cast<char **>(keys),
+            &operation, &name, &game, &build, &capacity, &port, &friends, &lobby)) return nullptr;
+    unsigned long long id = lobby == Py_None ? 0 : PyLong_AsUnsignedLongLong(lobby);
+    if (PyErr_Occurred()) return nullptr;
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (!service.ready() || !service.api()->lobby_request) {
+        PyErr_SetString(PyExc_RuntimeError, "Steam lobby service unavailable"); return nullptr;
+    }
+    AnastacioLobbyRequest request = {}; request.operation = operation;
+    request.capacity = capacity; request.port = port; request.friends_only = friends != 0; request.lobby = id;
+    if (std::strlen(name) >= sizeof(request.name) || std::strlen(game) >= sizeof(request.game) ||
+        std::strlen(build) >= sizeof(request.build)) {
+        PyErr_SetString(PyExc_ValueError, "Lobby metadata exceeds UTF-8 byte limit"); return nullptr;
+    }
+    std::strcpy(request.name, name); std::strcpy(request.game, game); std::strcpy(request.build, build);
+    char error[512] = {};
+    if (!service.api()->lobby_request(service.context(), &request, error, sizeof(error))) {
+        error[sizeof(error)-1] = 0;
+        PyErr_SetString(PyExc_RuntimeError, error[0] ? error : "Steam lobby request failed"); return nullptr;
+    }
+    Py_RETURN_TRUE;
+#else
+    PyErr_SetString(PyExc_RuntimeError, "Steam unavailable on Web"); return nullptr;
+#endif
+}
+PyObject *SteamLobbyEvents(PyObject *, PyObject *)
+{
+    PyObject *list = PyList_New(0);
+    if (!list) return nullptr;
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (service.ready() && service.api()->lobby_poll) {
+        for (int i = 0; i < 256; ++i) {
+            AnastacioLobbyEvent event = {};
+            if (!service.api()->lobby_poll(service.context(), &event)) break;
+            PyObject *item = Py_BuildValue("{s:I,s:K,s:K,s:I,s:I,s:I,s:s,s:s}",
+                "type", event.type, "lobby_id", static_cast<unsigned long long>(event.lobby),
+                "host_id", static_cast<unsigned long long>(event.host), "port", event.port,
+                "members", event.members, "capacity", event.capacity, "name", event.name, "detail", event.detail);
+            if (!item || PyList_Append(list, item) < 0) { Py_XDECREF(item); Py_DECREF(list); return nullptr; }
+            Py_DECREF(item);
+        }
+    }
+#endif
+    return list;
+}
+PyObject *SteamLanguage(PyObject *, PyObject *)
+{
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (service.ready() && service.api()->language) return PyUnicode_FromString(service.api()->language(service.context()));
+#endif
+    return PyUnicode_FromString("");
+}
+PyObject *SteamAchievement(PyObject *, PyObject *args)
+{
+    const char *name; int unlock = 0;
+    if (!PyArg_ParseTuple(args, "s|p", &name, &unlock)) return nullptr;
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (service.ready() && service.api()->achievement)
+        return PyBool_FromLong(service.api()->achievement(service.context(), name, unlock));
+#endif
+    Py_RETURN_FALSE;
+}
+PyObject *SteamRelay(PyObject *, PyObject *arg)
+{
+    const int force = PyObject_IsTrue(arg); if (force < 0) return nullptr;
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (service.ready() && service.api()->relay_mode && service.api()->relay_mode(service.context(), force)) Py_RETURN_TRUE;
+#endif
+    PyErr_SetString(PyExc_RuntimeError, "Initialize Steam and set relay mode before opening a session"); return nullptr;
+}
+
+PyObject *SteamRoutes(PyObject *, PyObject *)
+{
+    PyObject *list = PyList_New(0); if (!list) return nullptr;
+#ifndef __EMSCRIPTEN__
+    auto &service = net::anastacioSteamService();
+    if (service.ready() && service.api()->connections) {
+        for (uint32_t i = 0; i < 128; ++i) {
+            AnastacioConnectionInfo info = {};
+            if (!service.api()->connections(service.context(), i, &info)) break;
+            const char *route = info.route == 2 ? "relay" : info.route == 1 ? "direct" : "unknown";
+            PyObject *entry = Py_BuildValue("{s:I,s:K,s:s}", "peer", info.peer,
+                "steam_id", static_cast<unsigned long long>(info.remote), "route", route);
+            if (!entry || PyList_Append(list, entry) < 0) { Py_XDECREF(entry); Py_DECREF(list); return nullptr; }
+            Py_DECREF(entry);
+        }
+    }
+#endif
+    return list;
+}
+PyMethodDef steamMethods[] = {
+    {"connection_routes", SteamRoutes, METH_NOARGS, "Reported SDK routes: direct, relay or unknown. Empty without peers."},
+    {"_lobby_request", (PyCFunction)SteamLobbyRequest, METH_VARARGS | METH_KEYWORDS, "Internal asynchronous lobby request."},
+    {"poll_events", SteamLobbyEvents, METH_NOARGS, "Consume bounded lobby/invite events; does not pump SDK callbacks."},
+    {"language", SteamLanguage, METH_NOARGS, "Current Steam game language, empty when unavailable."},
+    {"achievement", SteamAchievement, METH_VARARGS, "achievement(name, unlock=False): query or unlock an achievement."},
+    {"force_relay", SteamRelay, METH_O, "Disable direct ICE before connecting; external route proof still required."},
+    {"initialize", SteamInitialize, METH_VARARGS, "initialize(absolute_dll_path, app_id): initialize optional Steam runtime."},
+    {"status", SteamStatus, METH_NOARGS, "Return loaded, ready and exact integer steam_id."},
+    {"shutdown", SteamShutdown, METH_NOARGS, "Release optional Steam runtime. Engine stop also releases it."},
+    {nullptr, nullptr, 0, nullptr}
+};
+PyModuleDef steamModule = { PyModuleDef_HEAD_INIT, "Range.network.steam", nullptr, -1, steamMethods,
+    nullptr, nullptr, nullptr, nullptr };
 PyMethodDef g_methods[] = {
 	{"host", (PyCFunction)Net_host, METH_VARARGS | METH_KEYWORDS,
-	 "host(port=0, max_players=0, room_name='', password='', dedicated=False, websocket_port=-1) -> bool\n"
+	 "host(port=0, max_players=0, room_name='', password='', dedicated=False, websocket_port=-1, transport='enet') -> bool\n"
 	 "Opens a server. Zero or empty values use the Network panel of the scene."},
 	{"join", (PyCFunction)Net_join, METH_VARARGS | METH_KEYWORDS,
-	 "join(address, password='') -> bool\nJoins 'host', 'host:port' or '[v6]:port'."},
+	 "join(address, password='', transport='enet') -> bool\nJoins 'host', 'host:port' or '[v6]:port'."},
 	{"disconnect", Net_disconnect, METH_NOARGS, "disconnect()\nLeaves the session."},
 	{"set_ready", Net_set_ready, METH_O, "set_ready(ready)\nLobby: marks this player as ready."},
 	{"send_chat", Net_send_chat, METH_O, "send_chat(text) -> bool\nLobby chat, up to 200 bytes of UTF-8."},
+	{"return_to_lobby", Net_return_to_lobby, METH_NOARGS,
+	 "return_to_lobby() -> bool\nHost resets match/readiness and notifies clients; scene changes belong to the game."},
 	{"start_game", Net_start_game, METH_NOARGS,
 	 "start_game() -> bool\nHost only: starts the match. False when some player is not ready."},
 	{"discover_lan", Net_discover_lan, METH_NOARGS,
@@ -1164,6 +1360,7 @@ PyMethodDef g_methods[] = {
 	{"on_reject", Net_on_reject, METH_O, "on_reject(fn(reason, detail))\nRejectReason 1 to 6."},
 	{"on_chat", Net_on_chat, METH_O, "on_chat(fn(client_id, text))"},
 	{"on_start", Net_on_start, METH_O, "on_start(fn())\nThe host started the match."},
+	{"on_lobby", Net_on_lobby, METH_O, "on_lobby(fn())\nThe host returned the session to the lobby."},
 	{"on_player_join", Net_on_player_join, METH_O, "on_player_join(fn(client_id, name))\nServer only."},
 	{"on_player_leave", Net_on_player_leave, METH_O, "on_player_leave(fn(client_id))\nServer only."},
 	{"on_scene", Net_on_scene, METH_O,
@@ -1305,6 +1502,35 @@ PyMODINIT_FUNC initNetworkPythonBinding()
 	if (!module) {
 		return nullptr;
 	}
+	PyObject *steam = PyModule_Create(&steamModule);
+    if (!steam || PyModule_AddObject(module, "steam", steam) < 0) {
+        Py_XDECREF(steam);
+        Py_DECREF(module);
+        return nullptr;
+    }
+    if (PyDict_SetItemString(PyImport_GetModuleDict(), "Range.network.steam", steam) < 0) {
+        Py_DECREF(module);
+        return nullptr;
+    }
+
+    PyObject *steamDict = PyModule_GetDict(steam);
+    PyDict_SetItemString(steamDict, "__builtins__", PyEval_GetBuiltins());
+    const char *steamHelpers =
+        "def create_lobby(name='Room', capacity=8, friends_only=False, game_id='anastacio-game', build='1', port=7777):\n"
+        "    return _lobby_request(1, name, game_id, build, capacity, port, friends_only)\n"
+        "def list_lobbies(game_id='anastacio-game', build='1'):\n"
+        "    return _lobby_request(2, game_id=game_id, build=build)\n"
+        "def join_lobby(lobby_id, game_id='anastacio-game', build='1'):\n"
+        "    return _lobby_request(3, game_id=game_id, build=build, lobby_id=lobby_id)\n"
+        "def leave_lobby():\n"
+        "    return _lobby_request(4)\n"
+        "def invite_friends():\n"
+        "    return _lobby_request(5)\n"
+        "def set_joinable(value):\n"
+        "    return _lobby_request(6, capacity=int(bool(value)))\n";
+    PyObject *steamResult = PyRun_String(steamHelpers, Py_file_input, steamDict, steamDict);
+    if (!steamResult) { Py_DECREF(module); return nullptr; }
+    Py_DECREF(steamResult);
 	PyObject *dict = PyModule_GetDict(module);
 
 	PyObject *table = PyDict_New();
