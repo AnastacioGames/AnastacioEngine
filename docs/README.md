@@ -54,9 +54,14 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   e notas de implementação em `source/source/gameengine/Network/`.
   A implementação atual cobre host/cliente, replicação, RPC, predição, servidor headless, relevância,
   troca de cena e cliente Web; o estado validado e as pendências ficam no [roadmap](roadmap.md).
+- [Complemento Steam para multiplayer](steam-multiplayer-plan.md): plano de componente reutilizável
+  entregue pela engine, salas, convites e transporte Steam opcional; primeira validação no RolimaRacer.
+  [Desenvolvimento do complemento](steam-complement-development.md): build local e API de inicialização.
 - [Efeitos de câmera](camera-fx.md): efeitos e integração
   com o pipeline de renderização.
 - [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
+- [Demos de nós revisadas](../demos/revisados/README.md): cópias das 11 receitas, frames explicativos,
+  correções de controles e procedimento de validação no player.
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
   [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).

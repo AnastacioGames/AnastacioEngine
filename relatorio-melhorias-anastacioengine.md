@@ -22,6 +22,31 @@ Um item só entra no roadmap de engine quando exige mudança em `source/` e reco
 cena, preparação de assets e scripts independentes são registrados no changelog ou na documentação da
 ferramenta correspondente.
 
+## Demos de materiais de nós
+
+As [11 demos de nós revisadas](demos/revisados/README.md) ficam em `demos/revisados/`, com frames e
+notas por etapa, preservando os originais. A revisão inclui extremos exatos de dissolve e cobertura,
+nível de espuma em coordenadas do mundo, microrelevo triplanar, dimensões seguras de Interior Mapping
+e casco de contorno toon gravado na malha para o player.
+São mudanças de assets/Python, com execução das 11 cópias validada no player em 2026-10-07; a avaliação
+visual no editor e no jogo real permanece pendente.
+
+## Atlas de materiais nativo
+
+Properties > Material > Anastacio Material Atlas: operador C++ para um mesh ativo com materiais PBR
+opacos Principled. Gera Base Color, Roughness, Metallic, Specular e Normal, packed PNG 16 bits, UV
+AnastacioAtlas e material único; preserva malha fonte como backup e a UV Lightmap existente.
+Build editor/player, testes de dados/pixels e carregamento no standalone validados em 2026-10-07;
+GPU OpenCL AMD RX 6800M, bakes reais de GI nas duas ordens, Undo/Redo com passos explícitos em editor
+com janela e execução Web no Edge/WebGL 2 passaram em cena controlada. Aceitação visual no jogo real
+permanece pendente. [Escopo, uso e pesquisa](docs/material-atlas-plan.md).
+Restore Original Materials restaura a malha fonte inteira a partir de referência persistente,
+preservando o atlas e outros objetos. Novos bakes registram o backup; restore após renomear,
+salvar/reabrir e compartilhar a malha passou. Interface usa jobs nativos por passe e Escape pede
+cancelamento, aguardando o baker antes do rollback. Testes modais de cancelamento no início/depois
+de mapas, erro intermediário e conclusão com Undo/Redo automático passaram; scripts/background
+continuam síncronos por padrão. Tecla física e aparência real ainda precisam de teste manual.
+
 ## Capacidades herdadas que não devem ser reimplementadas
 
 - GPU instancing com `RAS_InstancingBuffer` e `RAS_DisplayArrayBucket::RunInstancingNode`.
@@ -34,6 +59,34 @@ ferramenta correspondente.
 - MSAA de ponta a ponta, já confirmado no código e no runtime.
 
 ## Melhorias implementadas
+
+### Complemento Steam opcional (Windows)
+
+Carregador opcional nativo com ABI C versionada, contexto opaco e encerramento antes
+de descarregar a biblioteca, em `source/source/gameengine/Network/NET_AnastacioPlugin.*`.
+Windows/MSVC: módulo `ge_network` compilado e DLLs de prova executadas na suíte isolada.
+A engine comum não depende de Steamworks. Complemento separado Windows x64 compilado
+com SDK 1.55, serviço único por processo e API `Range.network.steam` para init/status/shutdown.
+Player real validou callbacks com DLL de prova e carregamento da DLL SDK, que informou Steam fechada.
+Inicialização online, identidade, callbacks e reinicialização validados no player Windows com
+conta conectada e AppID 480 (2026-10-07). AppID comercial ainda não validado.
+Adaptador ISteamNetworkingSockets reutiliza a sessão/replicação nativa via seleção
+`transport='steam'` em host/join. ABI C v2, lanes independentes e bloqueio de unload com
+transporte ativo. Socket pair real do SDK validou canais, handshake, chat, transform/propriedade,
+spawn/despawn e ownership. Salas filtradas, cancelamento e menu ImGui passaram numa conta.
+Componente `anastacio_network.component.AnastacioNetworkComponent` distribuído com a engine;
+player importa módulos instalados e editor limpa helpers validados com Range temporário.
+Exportador nativo inclui componente e complemento opcional, Python e CRT; pacote LAN inicia
+sem Steam. RolimaRacer recebeu adaptadores de menu/regras e SDK compartilhado para idioma/conquistas.
+Revisão local: cancelamento/timeout liberam operações e recolhem salas tardias; convites
+de abertura leem argv. Transporte preserva desconexões e descarta pacotes antigos por lane.
+Componente tem show/hide/return_to_lobby, confirmação ao trocar de sessão, nomes no chat
+e endereços LAN. Retorno nativo reseta prontidão e libera novas entradas; controlador
+reabre Steam após carregar a cena de menu. Duas partidas e reentrada passaram em dois
+players ENet locais; ida/volta de cenas mínimas e menu Steam passaram numa conta.
+Ainda pendentes: prova externa/relay, convites em duas contas, corrida/carros reais e AppID comercial.
+Detalhes no [guia](docs/steam-complement-development.md) e [plano](docs/steam-multiplayer-plan.md).
+Web exclui o carregador; build Web não revalidado. Linux Steam ainda não suportado nesta entrega.
 
 ### Performance
 
@@ -176,13 +229,6 @@ ferramenta correspondente.
   igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
   `docs/changelog.md` (2026-10-07).
 
-- `bge.logic.setObjectConvert(scene, object, convert)` desliga o Convert de objetos de uma cena
-  antes de carregá-la (ex.: só converter os pilotos escolhidos), cortando ~63% do load no teste;
-  flags restaurados ao sair do jogo. No player standalone, `bge.logic.freeUnconvertedData(scene)`
-  libera a geometria dos objetos que ficaram fora (37,5 MB de 6 pilotos no teste), quase
-  igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
-  `docs/changelog.md` (2026-10-07).
-
 ## Decisões técnicas vigentes
 
 - GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
@@ -269,6 +315,10 @@ ferramenta correspondente.
   [`docs/changelog.md`](docs/changelog.md) (2026-09-30).
 
 ## Fontes relacionadas
+
+- [Tesla Rhythm](docs/tesla-rhythm.md): demo via Python Component com cinco pistas,
+  música original e relógio de áudio compartilhado para notas e câmera; runtime validado,
+  avaliação visual pendente.
 
 - [Roadmap atual](docs/roadmap.md)
 - [Histórico técnico](docs/changelog.md)

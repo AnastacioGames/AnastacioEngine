@@ -8,6 +8,32 @@ shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) está n
 
 Auditado contra o git log e o changelog em 2026-09-20.
 
+## Sumário
+
+- [Atlas de materiais](#atlas-de-materiais)
+- [Prioridade atual](#prioridade-atual)
+  - [Carregamento mais rápido ("Cozinhar")](#carregamento-mais-rápido-cozinhar)
+  - [Dano visual por impacto (Deformation)](#dano-visual-por-impacto-deformation)
+  - [Multiplayer nativo](#multiplayer-nativo)
+  - [Web (WebGL/WebAssembly)](#web-webglwebassembly)
+  - [VR no celular (Web, estilo Cardboard)](#vr-no-celular-web-estilo-cardboard)
+  - [Idioma (English, Português, Español, Русский)](#idioma-english-português-español-русский)
+  - [Linux x86_64](#linux-x86_64)
+  - [Cutscene nativo](#cutscene-nativo)
+  - [World Status](#world-status)
+  - [Animation Events](#animation-events)
+  - [Vehicle System / Vehicle Lab](#vehicle-system--vehicle-lab)
+  - [Destruição e explosões](#destruição-e-explosões)
+  - [Deformação por impacto](#deformação-por-impacto)
+  - [Câmera: foco, rastreio e Camera FX](#câmera-foco-rastreio-e-camera-fx)
+  - [Logic Bricks → Python Component](#logic-bricks--python-component)
+  - [Android / iOS](#android--ios)
+  - [Outros](#outros)
+- [Performance](#performance)
+- [Iluminação e gráficos](#iluminação-e-gráficos)
+- [Validações manuais pendentes](#validações-manuais-pendentes)
+- [Fora do escopo atual](#fora-do-escopo-atual)
+
 ## Atlas de materiais
 
 - [Ferramenta nativa e plano](material-atlas-plan.md): primeira versão para um mesh com materiais PBR opacos. Pendente: usuário validar no jogo real, Escape físico/fechamento da janela, Linux e integração GI com denoise/light volume. GPU OpenCL, Undo/Redo automático na conclusão modal, restauração persistente, cancelamento via API/rollback, Web no navegador e bakes de GI nas duas ordens passaram em cena controlada. Próximas peças, após revisão: materiais legados, vários objetos, transparência e grafos mais amplos; combinação direta sem bake permanece futura.
@@ -61,6 +87,23 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 `damage_marks_test.range` (`tools/create_damage_marks_test.py`).
 
 ### Multiplayer nativo
+
+- **Complemento Steam (Windows implementado, prova externa pendente, 2026-10-07):** componente/menu
+  reutilizável distribuído pela engine; SDK/transporte opcionais, salas e convites.
+  [Inventário e contrato](steam-multiplayer-inventory.md): componentes reais conferidos,
+  SDK local encontrado; AppID comercial e exportador do jogo pendentes. B2 compilado com SDK 1.55,
+  serviço único e API `Range.network.steam`; player validou DLL real e erro de Steam fechada.
+  SDK real passou canais, handshake, transform/propriedade, spawn/despawn e ownership em sockets
+  locais; salas/menu, adaptadores do jogo e export Steam/LAN passaram. [Guia](steam-complement-development.md).
+  Pendentes: dois jogadores em redes distintas e relay confirmado, convites aberto/fechado,
+  carros/corrida real e saída/reentrada, AppID comercial, revisão de distribuição e Linux.
+  Revisão local corrigiu cancelamento/timeout, argv de convites, descarte por lane,
+  fila de desconexão, confirmação na UI e retorno/reabertura de sala. Dois players ENet
+  passaram duas partidas e reentrada; Steam numa conta passou retorno/busca/segunda partida.
+  Esses resultados locais não encerram os critérios externos de saída/reentrada e convites.
+  Web continua com WebSocket; não inferir cross-play Steam. A migração de SDK é única, mas
+  conquistas comerciais e avaliação visual do RolimaRacer ainda precisam de teste.
+  Etapas e critérios em [steam-multiplayer-plan.md](steam-multiplayer-plan.md).
 
 Plano em [`multiplayer-plan.md`](multiplayer-plan.md), contrato em [`multiplayer-protocol.md`](multiplayer-protocol.md). Núcleo isolado pronto na main (2026-10-04, frentes A–J, `source/source/gameengine/Network/`): protocolo, ENet + WebSocket, servidor, replicação com delta/relevância/orçamento, predição e lag compensation, relógio, RPC, descoberta LAN, menu (`tools/net_menu/`), CI (`.github/workflows/network.yml`: gcc, clang, MSVC, wasm32, pytest, Docker).
 
@@ -497,6 +540,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).
 
 ## Validações manuais pendentes
+
+- Tesla Rhythm: avaliar overlay, enquadramento e latência percebida no jogo real;
+  [modo de cinco pistas via Python Component](tesla-rhythm.md) passou sonda no runtime.
 
 Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
