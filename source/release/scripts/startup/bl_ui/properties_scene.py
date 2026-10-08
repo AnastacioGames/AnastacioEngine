@@ -691,6 +691,9 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
+    def draw_header(self, context):
+        self.layout.label(text="", icon='DESKTOP')
+
     def draw(self, context):
         layout = self.layout
 
@@ -712,7 +715,7 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box.label(text="Empty fields keep the RangeArmor Panel defaults", icon='INFO')
 
         box = layout.box()
-        box.label(text="Export:", icon="RENDER_ANIMATION")
+        box.label(text="Export:", icon="EXPORT")
         box.prop(export, "cook_before_export")
         box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
         box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')

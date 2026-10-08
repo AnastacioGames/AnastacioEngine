@@ -38,7 +38,7 @@ PT_BR = {
         "Pasta do Android SDK; só é usada se ANDROID_HOME e o Android Studio não forem encontrados",
 
     # Painel e operadores
-    "Android (Range)": "Android (Range)",
+    "Android (Web)": "Android (Web)",
     "Tools (only if not found automatically):": "Ferramentas (só se não forem achadas sozinhas):",
     "Uses the package from the Web panel; exports it again if it is outdated.":
         "Usa o pacote do painel Web; exporta de novo se estiver desatualizado.",
@@ -197,7 +197,7 @@ ES = {
         "Carpeta del JDK; solo se usa si no se encuentran JAVA_HOME ni Android Studio",
     "Android SDK folder; only used if ANDROID_HOME and Android Studio are not found":
         "Carpeta del Android SDK; solo se usa si no se encuentran ANDROID_HOME ni Android Studio",
-    "Android (Range)": "Android (Range)",
+    "Android (Web)": "Android (Web)",
     "Tools (only if not found automatically):": "Herramientas (solo si no se encuentran solas):",
     "Uses the package from the Web panel; exports it again if it is outdated.":
         "Usa el paquete del panel Web; lo exporta de nuevo si está desactualizado.",
@@ -328,7 +328,7 @@ RU = {
     "Landscape": "Альбомная",
     "Portrait": "Портретная",
     "Build type": "Тип сборки",
-    "Android (Range)": "Android (Range)",
+    "Android (Web)": "Android (Web)",
     "Tools (only if not found automatically):": "Инструменты (только если не найдены автоматически):",
     "No APK in the destination yet.": "В папке назначения ещё нет APK.",
     "Building APK": "Сборка APK",

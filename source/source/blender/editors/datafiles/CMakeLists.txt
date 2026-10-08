@@ -119,6 +119,10 @@ set(ICON_NAMES
 	edit
 	game
 	cook
+	network
+	web
+	android
+	desktop
 	radio
 	script
 	particles

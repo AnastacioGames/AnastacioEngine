@@ -1582,6 +1582,9 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
     def poll(cls, context):
         return context.scene.render.engine in cls.COMPAT_ENGINES
 
+    def draw_header(self, context):
+        self.layout.label(text="", icon='NETWORK')
+
     def draw(self, context):
         layout = self.layout
         net = context.scene.game_settings.network

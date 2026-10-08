@@ -227,10 +227,13 @@ class RangeAndroidSettings(PropertyGroup):
 
 
 class SCENE_PT_range_android(SceneButtonsPanel, Panel):
-    bl_label = "Android (Range)"
+    bl_label = "Android (Web)"
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon='ANDROID')
 
     def draw(self, context):
         layout = self.layout

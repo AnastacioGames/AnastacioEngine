@@ -196,10 +196,13 @@ class RangeWebSettings(PropertyGroup):
 
 
 class SCENE_PT_range_web(SceneButtonsPanel, Panel):
-    bl_label = "Web (Range)"
+    bl_label = "Web"
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon='WEB')
 
     def draw(self, context):
         layout = self.layout
