@@ -65,6 +65,7 @@
 #ifdef WITH_BULLET
 #  include "CcdPhysicsEnvironment.h"
 #  include "CcdGraphicController.h"
+#  include "CcdCookedData.h"
 #endif
 
 #include "RAS_Rasterizer.h"
@@ -848,6 +849,169 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 	return (h == 0) ? 1 : h;
 }
 
+#ifdef WITH_BULLET
+/// Smaller meshes convert in well under a millisecond: not worth the space in the .cooked file.
+#define BL_COOKED_MESH_MIN_LOOPS 10000
+
+/** Key of the cooked display arrays: the loop data hash plus everything else the vertex loop reads
+ * (material slots, UV and color layers). */
+static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_MeshMaterial>& mats,
+                                 const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
+{
+	// Bump when the vertex loop or BL_CookedArrays change.
+	const uint32_t version = 1;
+	uint64_t h = loopHash;
+	hash_bytes(h, &version, sizeof(version));
+	const int head[5] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
+	                     (int)layersInfo.colorLayers.size()};
+	hash_bytes(h, head, sizeof(head));
+	for (const BL_MeshMaterial& mat : mats) {
+		const int flags[7] = {mat.array != nullptr, mat.visible, mat.twoside, mat.collider, mat.wire, mat.barycentric,
+		                      mat.array ? mat.array->GetFormat().uvSize | (mat.array->GetFormat().colorSize << 8) |
+		                      (mat.array->GetFormat().hasBoneData << 16) : 0};
+		hash_bytes(h, flags, sizeof(flags));
+	}
+
+	const int totloop = dm->getNumLoops(dm);
+	const int totpoly = dm->getNumPolys(dm);
+	const MPoly *mpolys = dm->getPolyArray(dm);
+	for (int i = 0; i < totpoly; ++i) {
+		hash_bytes(h, &mpolys[i].mat_nr, sizeof(mpolys[i].mat_nr));
+	}
+	for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
+		const MLoopUV *uvs = (const MLoopUV *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPUV, layer.index);
+		for (int i = 0; uvs && i < totloop; ++i) {
+			hash_bytes(h, uvs[i].uv, sizeof(uvs[i].uv));
+		}
+	}
+	for (const RAS_Mesh::Layer& layer : layersInfo.colorLayers) {
+		const MLoopCol *cols = (const MLoopCol *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPCOL, layer.index);
+		if (cols) {
+			hash_bytes(h, cols, sizeof(MLoopCol) * totloop);
+		}
+	}
+	return (h == 0) ? 1 : h;
+}
+
+/** Cooked display arrays: for every array (material slots in order, each array once) the source loop of each
+ * vertex (top bit: flat face) and the primitive and triangle indices. Rebuilding the vertices from their loops
+ * skips the vertex sharing search, the slow part of the conversion, and keeps the file small. */
+struct BL_CookedArrays
+{
+	struct View
+	{
+		const uint32_t *loops;
+		const uint32_t *primitives;
+		const uint32_t *triangles;
+		unsigned int numVerts, numPrimitives, numTriangles;
+	};
+
+	static const uint32_t flatBit = 0x80000000u;
+	static const uint32_t sameIndices = 0xffffffffu;
+
+	std::vector<RAS_DisplayArray *> arrays;
+	// Per material slot: index in arrays, -1 without array.
+	std::vector<int> slots;
+	// Recording: the source loops of each array.
+	std::vector<std::vector<uint32_t> > loops;
+
+	BL_CookedArrays(const std::vector<BL_MeshMaterial>& mats)
+	{
+		for (const BL_MeshMaterial& mat : mats) {
+			int slot = -1;
+			if (mat.array) {
+				const auto it = std::find(arrays.begin(), arrays.end(), mat.array);
+				slot = (int)(it - arrays.begin());
+				if (it == arrays.end()) {
+					arrays.push_back(mat.array);
+				}
+			}
+			slots.push_back(slot);
+		}
+		loops.resize(arrays.size());
+	}
+
+	inline void Add(unsigned int matIndex, unsigned int loop, bool flat)
+	{
+		loops[slots[matIndex]].push_back(loop | (flat ? flatBit : 0));
+	}
+
+	/// False when an array was filled outside Add() (its vertices don't match the loops).
+	bool Save(std::vector<char>& data) const
+	{
+		for (unsigned int a = 0; a < arrays.size(); ++a) {
+			const RAS_DisplayArray *array = arrays[a];
+			const unsigned int numPrimitives = array->GetPrimitiveIndexCount();
+			const unsigned int numTriangles = array->GetTriangleIndexCount();
+			if (loops[a].size() != array->GetVertexCount()) {
+				return false;
+			}
+			std::vector<uint32_t> values = {(uint32_t)loops[a].size(), numPrimitives, numTriangles};
+			values.insert(values.end(), loops[a].begin(), loops[a].end());
+			bool same = (numPrimitives == numTriangles);
+			for (unsigned int i = 0; i < numPrimitives; ++i) {
+				values.push_back(array->GetPrimitiveIndex(i));
+				same = same && array->GetPrimitiveIndex(i) == array->GetTriangleIndex(i);
+			}
+			if (same) {
+				values[2] = sameIndices;
+			}
+			else {
+				for (unsigned int i = 0; i < numTriangles; ++i) {
+					values.push_back(array->GetTriangleIndex(i));
+				}
+			}
+			const char *bytes = (const char *)values.data();
+			data.insert(data.end(), bytes, bytes + values.size() * sizeof(uint32_t));
+		}
+		return true;
+	}
+
+	/// Checks the whole data against the mesh before anything is added to the arrays.
+	bool Parse(const std::vector<char>& data, unsigned int totloop, std::vector<View>& views) const
+	{
+		const uint32_t *pos = (const uint32_t *)data.data();
+		const uint32_t *end = pos + data.size() / sizeof(uint32_t);
+		for (unsigned int a = 0; a < arrays.size(); ++a) {
+			if (end - pos < 3) {
+				return false;
+			}
+			View view;
+			view.numVerts = pos[0];
+			view.numPrimitives = pos[1];
+			const bool same = (pos[2] == sameIndices);
+			view.numTriangles = same ? view.numPrimitives : pos[2];
+			pos += 3;
+			const size_t count = (size_t)view.numVerts + view.numPrimitives + (same ? 0 : view.numTriangles);
+			if ((size_t)(end - pos) < count) {
+				return false;
+			}
+			view.loops = pos;
+			view.primitives = pos + view.numVerts;
+			view.triangles = same ? view.primitives : view.primitives + view.numPrimitives;
+			pos += count;
+			for (unsigned int i = 0; i < view.numVerts; ++i) {
+				if ((view.loops[i] & ~flatBit) >= totloop) {
+					return false;
+				}
+			}
+			for (unsigned int i = 0; i < view.numPrimitives; ++i) {
+				if (view.primitives[i] >= view.numVerts) {
+					return false;
+				}
+			}
+			for (unsigned int i = 0; i < view.numTriangles; ++i) {
+				if (view.triangles[i] >= view.numVerts) {
+					return false;
+				}
+			}
+			views.push_back(view);
+		}
+		return pos == end;
+	}
+};
+#endif
+
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces,
                                   bool needTangents)
@@ -892,6 +1056,32 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	if (loopDataCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
 		BL_LoadTimer hashTimer(loadStats.loopHash);
 		loopHash = BL_LoopDataHash(dm, me, withTangents ? tangentUv : -1);
+	}
+
+#ifdef WITH_BULLET
+	// Cooked display arrays (.cooked file): the vertex sharing loop below is skipped.
+	uint64_t cookKey = 0;
+	std::unique_ptr<BL_CookedArrays> cookedArrays;
+	std::vector<BL_CookedArrays::View> cookedViews;
+	if (loopHash && !bitmapTextFaces && !bMayHaveBoneData && totloop >= BL_COOKED_MESH_MIN_LOOPS) {
+		BL_LoadTimer cookTimer(loadStats.meshCooked);
+		cookKey = BL_CookedMeshKey(loopHash, dm, mats, layersInfo, withTangents);
+		cookedArrays.reset(new BL_CookedArrays(mats));
+		const std::vector<char> *data = CcdCookedData::FindMesh(cookKey);
+		if (data && cookedArrays->Parse(*data, totloop, cookedViews)) {
+			++loadStats.meshesCooked;
+			cookKey = 0;
+		}
+		else if (!CcdCookedData::IsRecording()) {
+			cookKey = 0;
+			cookedArrays.reset();
+		}
+	}
+	// Recording when cookKey is still set; loading when cookedViews is filled.
+	BL_CookedArrays *recorder = cookKey ? cookedArrays.get() : nullptr;
+#endif
+
+	if (loopHash) {
 		const auto it = loopHash ? loopDataCache->entries.find(loopHash) : loopDataCache->entries.end();
 		if (it != loopDataCache->entries.end() && it->second.totloop == totloop &&
 		    it->second.tangents.empty() == !withTangents)
@@ -955,6 +1145,36 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		colorLayers[index] = (MLoopCol *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPCOL, index);
 	}
 
+#ifdef WITH_BULLET
+	if (!cookedViews.empty()) {
+		BL_LoadTimer cookTimer(loadStats.meshCooked);
+		static const float dummyTangent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+		const mt::vec4_packed boneZero(mt::zero4);
+		for (unsigned int a = 0; a < cookedViews.size(); ++a) {
+			const BL_CookedArrays::View& view = cookedViews[a];
+			RAS_DisplayArray *array = cookedArrays->arrays[a];
+			array->Reserve(view.numVerts, view.numPrimitives, view.numTriangles);
+			for (unsigned int i = 0; i < view.numVerts; ++i) {
+				const unsigned int loop = view.loops[i] & ~BL_CookedArrays::flatBit;
+				const unsigned int vertid = mloops[loop].v;
+				mt::vec2_packed uvs[RAS_Texture::MaxUnits];
+				unsigned int rgba[RAS_Texture::MaxUnits];
+				BL_GetUvRgba(layersInfo, uvLayers, colorLayers, loop, uvs, rgba);
+				array->AddVertex(mt::vec3_packed(mverts[vertid].co), mt::vec3_packed(normals[loop]),
+				                 mt::vec4_packed(tangent ? tangent[loop] : dummyTangent), uvs, rgba, vertid,
+				                 (view.loops[i] & BL_CookedArrays::flatBit) != 0, boneZero, boneZero);
+			}
+			for (unsigned int i = 0; i < view.numPrimitives; ++i) {
+				array->AddPrimitiveIndex(view.primitives[i]);
+			}
+			for (unsigned int i = 0; i < view.numTriangles; ++i) {
+				array->AddTriangleIndex(view.triangles[i]);
+			}
+		}
+		return;
+	}
+#endif
+
 	BL_SharedVertexMap sharedMap(totverts, totloop);
 
 	/* Preallocate each material's arrays: index counts are exact, vertex counts are estimated
@@ -985,7 +1205,8 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		const MPoly& mpoly = mpolys[i];
 
 		// Old files can store a material index past the mesh material count; clamp like Blender does.
-		const BL_MeshMaterial& mat = mats[min_ii(mpoly.mat_nr, (int)mats.size() - 1)];
+		const unsigned int matIndex = min_ii(mpoly.mat_nr, (int)mats.size() - 1);
+		const BL_MeshMaterial& mat = mats[matIndex];
 		RAS_DisplayArray *array = mat.array;
 
 		// Mark face as flat, so vertices are split.
@@ -1066,6 +1287,11 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 					const unsigned int offset = array->AddVertex(mt::vec3_packed(mverts[vertid].co),
 						mt::vec3_packed(normals[loop]), mt::vec4_packed(tangent ? tangent[loop] : dummyTangent),
 						uvs, rgba, vertid, flat, boneIndices, boneWeights);
+#ifdef WITH_BULLET
+					if (recorder) {
+						recorder->Add(matIndex, loop, flat);
+					}
+#endif
 					if (mat.visible) {
 						array->AddPrimitiveIndex(offset);
 					}
@@ -1106,6 +1332,11 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 					BL_ComputeVertexBoneData(me->dvert[vertid], defbaseTot, boneIndices, boneWeights);
 				}
 				offset = array->AddVertex(pos, nor, tan, uvs, rgba, vertid, flat, boneIndices, boneWeights);
+#ifdef WITH_BULLET
+				if (recorder) {
+					recorder->Add(matIndex, j, flat);
+				}
+#endif
 				sharedMap.Add(vertid, array, offset);
 			}
 
@@ -1141,6 +1372,13 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 			}
 		}
 	}
+
+#ifdef WITH_BULLET
+	std::vector<char> cookedData;
+	if (recorder && recorder->Save(cookedData)) {
+		CcdCookedData::AddMesh(cookKey, cookedData);
+	}
+#endif
 }
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj)

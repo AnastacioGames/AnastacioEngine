@@ -36,6 +36,14 @@ void AddHull(const btScalar *vertices, unsigned int numVertices, const btScalar 
 /// GL program binary of a shader key (GPUShaderBinaryFind/Add signatures), nullptr when not cooked.
 const void *FindShader(unsigned long long key, unsigned int *format, int *size);
 void AddShader(unsigned long long key, unsigned int format, const void *data, int size);
+
+/** Display arrays of a converted mesh (RAS_DisplayArray::SaveCooked), keyed by a hash of everything the
+ *  conversion reads. nullptr when not cooked; the data stays valid until Close().
+ */
+const std::vector<char> *FindMesh(unsigned long long key);
+/// New entries are kept (playing a .blend): only then AddMesh() is worth preparing the data.
+bool IsRecording();
+void AddMesh(unsigned long long key, const std::vector<char>& data);
 }
 
 #endif  // __CCD_COOKED_DATA_H__

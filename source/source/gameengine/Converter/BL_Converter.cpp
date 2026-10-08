@@ -664,7 +664,8 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	std::ostringstream detail;
 	detail << converter.GetObjects().size() << " objects, " << leftOut << " left out (" << editorOnly
 	       << " editor only), meshes " << loadStats.meshes << " (+"
-	       << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
+	       << loadStats.meshesReused << " reused, " << loadStats.meshesCooked << " cooked "
+	       << load_ms(loadStats.meshCooked) << "ms) " << load_ms(loadStats.mesh) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
 	       << load_ms(loadStats.physics) << "ms (mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "

@@ -31,6 +31,25 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — `.cooked`: buffers de malha
+
+- O `.cooked` ganhou um registro novo (tipo 3) com a montagem dos display arrays de cada malha: para cada
+  vértice gerado, de qual loop ele veio (o bit alto marca face plana), mais os índices de primitiva e de
+  triângulo (os de triângulo só quando diferem). Ao carregar, os vértices são remontados direto dos loops,
+  sem a busca de vértices compartilhados, que era a parte lenta (`BL_CookedArrays` em
+  `BL_BlenderDataConversion.cpp`).
+- Chave: o hash de normais/tangentes que já existia mais slots de material, `mat_nr` das faces, todas as
+  camadas de UV e de cor e uma versão. Ficam de fora malhas com menos de 10 mil loops, com dados de osso
+  (GPU skinning) e com texto bitmap. Dados que não batem com a malha são rejeitados antes de tocar nos arrays.
+- Primeira versão guardava os vértices prontos: 104 MB no teste de 12 objetos. Guardando só os loops ficou
+  22,6 MB, com a malha um pouco mais lenta (esfera de 130 mil triângulos: 57 → 14 ms com vértices prontos,
+  57 → 26 ms com loops).
+- `[Load] convert` mostra `N cooked Xms` e o resumo `[Cooked]` conta as malhas.
+- Validação (`tests/convert_flag/make_vs_libload.py`, Runtime, rodadas repetidas): convertObject
+  834 → 332 ms e LibLoad 850 → 295 ms (convert 496 → 244 ms). Novo
+  `tests/convert_flag/make_cooked_mesh_test.py` (2 materiais com um wire, faces lisas e planas, 2 UVs e cor):
+  checksum de vértices, normais, UVs, cores e polígonos idêntico entre a rodada normal e a cozida.
+
 ## 2026-10-08 — Aquecimento de shaders: idiomas, reinício no editor e cache único
 
 - Tela de aquecimento (`LA_Launcher.cpp`) em inglês, português, espanhol e russo, pelo idioma da engine (`BLT_lang_get`).

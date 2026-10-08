@@ -35,6 +35,7 @@ struct BL_LoadStats
 	double meshDm = 0.0;    // CDDM_from_mesh.
 	double normals = 0.0;   // Loop normals.
 	double meshEnd = 0.0;   // KX_Mesh::EndConversion (bounding box, shared arrays).
+	double meshCooked = 0.0; // Key and reading of cooked display arrays.
 	double objects = 0.0;  // BL_GameObjectFromBlenderObject (includes mesh).
 	double logic = 0.0;     // Per object properties, logic bricks and components.
 	double meshUsers = 0.0; // Mesh users, mesh slots and deformers.
@@ -44,6 +45,7 @@ struct BL_LoadStats
 	int meshesReused = 0;   // Requests served by an already converted mesh.
 	int tangentMeshes = 0;  // Meshes that needed tangents (have UVs).
 	int loopDataReused = 0; // Meshes whose normals/tangents came from an identical mesh.
+	int meshesCooked = 0;   // Meshes whose display arrays came from the .cooked file.
 
 	void Reset()
 	{

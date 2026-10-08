@@ -80,8 +80,9 @@ Aberto:
   exigiria o `.cooked`.
 - `.cooked` começou (2026-10-07): pontos do Convex Hull gravados ao jogar o `.blend` e copiados pelo Export
   Game (física 1,6 s → 0,04 s no teste de 12 objetos). Binário dos shaders de material também (310 → 3 ms);
-  com o botão Cook o LibLoad do teste foi de 2,4 s → 0,47 s. Próximo candidato medido: buffers de malha
-  (~320 ms dos 12 objetos). Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
+  com o botão Cook o LibLoad do teste foi de 2,4 s → 0,47 s. Buffers de malha (2026-10-08): malhas com
+  10 mil loops ou mais guardam de que loop vem cada vértice e os índices; LibLoad do teste 850 → 295 ms.
+  Próximo: tangentes (21 de 24 ms numa malha com UV). Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
   usuário e aquece todos na primeira abertura em cada GPU/driver, com tela de texto (sem barra de progresso).
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
   serial na GPU; DDS no `.cooked` cortaria ambos.
