@@ -104,6 +104,35 @@ unsigned int RAS_DisplayArray::AddVertex(const mt::vec3_packed& pos, const mt::v
 	return m_vertexInfos.size() - 1;
 }
 
+RAS_DisplayArray::VertexSpan RAS_DisplayArray::AppendVertices(unsigned int count)
+{
+	const size_t first = m_vertexData.positions.size();
+	VertexSpan span;
+	m_vertexData.positions.resize(first + count);
+	m_vertexData.normals.resize(first + count);
+	m_vertexData.tangents.resize(first + count);
+	span.positions = m_vertexData.positions.data() + first;
+	span.normals = m_vertexData.normals.data() + first;
+	span.tangents = m_vertexData.tangents.data() + first;
+	for (unsigned short i = 0; i < RAS_Texture::MaxUnits; ++i) {
+		span.uvs[i] = nullptr;
+		span.colors[i] = nullptr;
+	}
+	for (unsigned short i = 0; i < m_format.uvSize; ++i) {
+		m_vertexData.uvs[i].resize(first + count);
+		span.uvs[i] = m_vertexData.uvs[i].data() + first;
+	}
+	for (unsigned short i = 0; i < m_format.colorSize; ++i) {
+		m_vertexData.colors[i].resize(first + count);
+		span.colors[i] = &m_vertexData.colors[i][first].m_flat;
+	}
+	if (m_format.hasBoneData) {
+		m_vertexData.boneIndices.resize(first + count, mt::vec4_packed(mt::zero4));
+		m_vertexData.boneWeights.resize(first + count, mt::vec4_packed(mt::zero4));
+	}
+	return span;
+}
+
 void RAS_DisplayArray::Reserve(unsigned int vertices, unsigned int primitiveIndices, unsigned int triangleIndices)
 {
 	vertices += m_vertexInfos.size();

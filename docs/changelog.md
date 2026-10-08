@@ -31,6 +31,16 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — `.cooked`: carregamento das malhas em bloco
+
+- Vértices cozidos escritos em bloco (`RAS_DisplayArray::AppendVertices`/`AddVertexInfo`/`AddIndices`):
+  normais e tangentes por `memcpy`, UV e cor camada por camada, em vez de um `AddVertex` por vértice.
+- `hash_bytes` com 4 trilhas de 64 bits e campos juntados em bloco antes do hash (`hash_strided`); chave
+  versão 4 (registros antigos de malha são regravados).
+- `make_cooked_small_test.py`, 8 064 loops com cozido: 259 → 206 ms (parte cozida 141 → 96 ms, hash
+  35 → 27 ms). O que sobra é limitado por memória (alocar e preencher os vértices).
+  Checksum de `make_cooked_mesh_test.py` idêntico.
+
 ## 2026-10-08 — `.cooked`: normais e BVH de física
 
 - O registro de malha (chave versão 3) guarda também a normal de cada vértice gerado: com o cozido o

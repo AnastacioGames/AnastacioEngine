@@ -783,19 +783,48 @@ static thread_local BL_LoopDataCache *loopDataCache = nullptr;
 
 static void hash_bytes(uint64_t& h, const void *data, size_t size)
 {
-	/* 4 bytes per step (multiply + xorshift), the rest FNV-1a. Only compared in memory, never stored:
-	 * byte by byte took ~80 ms for 12 meshes of 130k triangles. */
+	/* Large blocks: 4 independent 64-bit lanes (multiply + xorshift) so the steps overlap; then 8 bytes,
+	 * the rest FNV-1a. Part of the .cooked mesh keys: changing it only makes old records miss. */
 	const unsigned char *bytes = (const unsigned char *)data;
+	const uint64_t k = 0x9e3779b97f4a7c15ULL;
 	size_t i = 0;
-	for (; i + 4 <= size; i += 4) {
-		uint32_t word;
+	if (size >= 64) {
+		uint64_t lanes[4] = {h, h ^ 0x632be59bd9b4e019ULL, h ^ 0x8cb92ba72f3d8dd7ULL, h ^ 0xc2b2ae3d27d4eb4fULL};
+		for (; i + 32 <= size; i += 32) {
+			uint64_t w[4];
+			memcpy(w, bytes + i, sizeof(w));
+			for (int l = 0; l < 4; ++l) {
+				lanes[l] = (lanes[l] ^ w[l]) * k;
+				lanes[l] ^= lanes[l] >> 29;
+			}
+		}
+		for (int l = 0; l < 4; ++l) {
+			h = (h ^ lanes[l]) * k;
+			h ^= h >> 29;
+		}
+	}
+	for (; i + 8 <= size; i += 8) {
+		uint64_t word;
 		memcpy(&word, bytes + i, sizeof(word));
-		h = (h ^ word) * 0x9e3779b97f4a7c15ULL;
+		h = (h ^ word) * k;
 		h ^= h >> 29;
 	}
 	for (; i < size; ++i) {
 		h = (h ^ bytes[i]) * 1099511628211ULL;
 	}
+}
+
+/// Gathers count fields of size bytes (stride apart) and hashes them as one block.
+static void hash_strided(uint64_t& h, const void *base, size_t stride, size_t size, size_t count)
+{
+	static thread_local std::vector<unsigned char> buffer;
+	buffer.resize(size * count);
+	const unsigned char *src = (const unsigned char *)base;
+	unsigned char *dst = buffer.data();
+	for (size_t i = 0; i < count; ++i) {
+		memcpy(dst + i * size, src + i * stride, size);
+	}
+	hash_bytes(h, dst, buffer.size());
 }
 
 /// Hash of everything the loop normals and tangents depend on; 0 when the mesh can't be cached.
@@ -818,32 +847,35 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 		hash_bytes(h, &me->smoothresh, sizeof(me->smoothresh));
 	}
 
+	// Fields gathered into blocks: one hash call per element was most of the time.
 	const MVert *mverts = dm->getVertArray(dm);
-	for (int i = 0; i < totvert; ++i) {
-		hash_bytes(h, mverts[i].co, sizeof(mverts[i].co));
-	}
+	hash_strided(h, mverts->co, sizeof(MVert), sizeof(mverts->co), totvert);
+	static thread_local std::vector<int> fields;
 	const MEdge *medges = dm->getEdgeArray(dm);
+	fields.resize(totedge * 3);
 	for (int i = 0; i < totedge; ++i) {
-		const int edge[3] = {(int)medges[i].v1, (int)medges[i].v2, medges[i].flag & ME_SHARP};
-		hash_bytes(h, edge, sizeof(edge));
+		fields[i * 3] = (int)medges[i].v1;
+		fields[i * 3 + 1] = (int)medges[i].v2;
+		fields[i * 3 + 2] = medges[i].flag & ME_SHARP;
 	}
-	const MLoop *mloops = dm->getLoopArray(dm);
-	for (int i = 0; i < totloop; ++i) {
-		const int loop[2] = {(int)mloops[i].v, (int)mloops[i].e};
-		hash_bytes(h, loop, sizeof(loop));
-	}
+	hash_bytes(h, fields.data(), fields.size() * sizeof(int));
+	// MLoop is only {v, e}.
+	hash_bytes(h, dm->getLoopArray(dm), sizeof(MLoop) * totloop);
 	const MPoly *mpolys = dm->getPolyArray(dm);
+	fields.resize(totpoly * 3);
 	for (int i = 0; i < totpoly; ++i) {
-		const int poly[3] = {mpolys[i].loopstart, mpolys[i].totloop, mpolys[i].flag & ME_SMOOTH};
-		hash_bytes(h, poly, sizeof(poly));
+		fields[i * 3] = mpolys[i].loopstart;
+		fields[i * 3 + 1] = mpolys[i].totloop;
+		fields[i * 3 + 2] = mpolys[i].flag & ME_SMOOTH;
 	}
+	hash_bytes(h, fields.data(), fields.size() * sizeof(int));
 	if (tangentUv != -1) {
 		// Tangents come from the UV layer the materials ask for.
 		const int uvLayer = tangentUv;
 		const MLoopUV *uvs = (const MLoopUV *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPUV, uvLayer);
 		hash_bytes(h, &uvLayer, sizeof(uvLayer));
-		for (int i = 0; uvs && i < totloop; ++i) {
-			hash_bytes(h, uvs[i].uv, sizeof(uvs[i].uv));
+		if (uvs) {
+			hash_strided(h, uvs->uv, sizeof(MLoopUV), sizeof(uvs->uv), totloop);
 		}
 	}
 	return (h == 0) ? 1 : h;
@@ -856,7 +888,7 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
                                  const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
 {
 	// Bump when the vertex loop or BL_CookedArrays change.
-	const uint32_t version = 3;
+	const uint32_t version = 4;
 	uint64_t h = loopHash;
 	hash_bytes(h, &version, sizeof(version));
 	const int head[5] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
@@ -872,13 +904,11 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
 	const int totloop = dm->getNumLoops(dm);
 	const int totpoly = dm->getNumPolys(dm);
 	const MPoly *mpolys = dm->getPolyArray(dm);
-	for (int i = 0; i < totpoly; ++i) {
-		hash_bytes(h, &mpolys[i].mat_nr, sizeof(mpolys[i].mat_nr));
-	}
+	hash_strided(h, &mpolys->mat_nr, sizeof(MPoly), sizeof(mpolys->mat_nr), totpoly);
 	for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
 		const MLoopUV *uvs = (const MLoopUV *)CustomData_get_layer_n(&dm->loopData, CD_MLOOPUV, layer.index);
-		for (int i = 0; uvs && i < totloop; ++i) {
-			hash_bytes(h, uvs[i].uv, sizeof(uvs[i].uv));
+		if (uvs) {
+			hash_strided(h, uvs->uv, sizeof(MLoopUV), sizeof(uvs->uv), totloop);
 		}
 	}
 	for (const RAS_Mesh::Layer& layer : layersInfo.colorLayers) {
@@ -1172,28 +1202,46 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 #ifdef WITH_BULLET
 	if (!cookedViews.empty()) {
 		BL_LoadTimer cookTimer(loadStats.meshCooked);
-		static const float dummyTangent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-		const mt::vec4_packed boneZero(mt::zero4);
+		// Same vertices as the loop below would add (see BL_GetUvRgba), written in bulk layer by layer.
 		for (unsigned int a = 0; a < cookedViews.size(); ++a) {
 			const BL_CookedArrays::View& view = cookedViews[a];
 			RAS_DisplayArray *array = cookedArrays->arrays[a];
-			array->Reserve(view.numVerts, view.numPrimitives, view.numTriangles);
-			for (unsigned int i = 0; i < view.numVerts; ++i) {
-				const unsigned int loop = view.loops[i] & ~BL_CookedArrays::flatBit;
-				const unsigned int vertid = mloops[loop].v;
-				mt::vec2_packed uvs[RAS_Texture::MaxUnits];
-				unsigned int rgba[RAS_Texture::MaxUnits];
-				BL_GetUvRgba(layersInfo, uvLayers, colorLayers, loop, uvs, rgba);
-				array->AddVertex(mt::vec3_packed(mverts[vertid].co), mt::vec3_packed(view.normals + i * 3),
-				                 mt::vec4_packed(view.tangents ? view.tangents + i * 4 : dummyTangent), uvs, rgba, vertid,
-				                 (view.loops[i] & BL_CookedArrays::flatBit) != 0, boneZero, boneZero);
+			const unsigned int n = view.numVerts;
+			array->Reserve(n, view.numPrimitives, view.numTriangles);
+			const RAS_DisplayArray::VertexSpan span = array->AppendVertices(n);
+			for (unsigned int i = 0; i < n; ++i) {
+				const unsigned int vertid = mloops[view.loops[i] & ~BL_CookedArrays::flatBit].v;
+				span.positions[i] = mt::vec3_packed(mverts[vertid].co);
+				array->AddVertexInfo(vertid, (view.loops[i] & BL_CookedArrays::flatBit) != 0);
 			}
-			for (unsigned int i = 0; i < view.numPrimitives; ++i) {
-				array->AddPrimitiveIndex(view.primitives[i]);
+			memcpy(span.normals, view.normals, sizeof(float[3]) * n);
+			if (view.tangents) {
+				memcpy(span.tangents, view.tangents, sizeof(float[4]) * n);
 			}
-			for (unsigned int i = 0; i < view.numTriangles; ++i) {
-				array->AddTriangleIndex(view.triangles[i]);
+			else {
+				memset(span.tangents, 0, sizeof(float[4]) * n);
 			}
+			for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
+				mt::vec2_packed *dst = span.uvs[layer.index];
+				const MLoopUV *src = uvLayers[layer.index];
+				for (unsigned int i = 0; dst && i < n; ++i) {
+					dst[i] = mt::vec2_packed(src[view.loops[i] & ~BL_CookedArrays::flatBit].uv);
+				}
+			}
+			for (const RAS_Mesh::Layer& layer : layersInfo.colorLayers) {
+				unsigned int *dst = span.colors[layer.index];
+				const MLoopCol *src = colorLayers[layer.index];
+				for (unsigned int i = 0; dst && i < n; ++i) {
+					memcpy(&dst[i], &src[view.loops[i] & ~BL_CookedArrays::flatBit], sizeof(unsigned int));
+				}
+			}
+			if (layersInfo.uvLayers.empty() && span.uvs[0]) {
+				std::fill(span.uvs[0], span.uvs[0] + n, mt::vec2_packed(mt::zero2));
+			}
+			if (layersInfo.colorLayers.empty() && span.colors[0]) {
+				std::fill(span.colors[0], span.colors[0] + n, 0xFFFFFFFFu);
+			}
+			array->AddIndices(view.primitives, view.numPrimitives, view.triangles, view.numTriangles);
 		}
 		return;
 	}
