@@ -5,4 +5,5 @@ set ROOT=%~dp0..\..
 if not exist "%ROOT%\debug-logs" mkdir "%ROOT%\debug-logs"
 set RANGE_ANIM_LOG=%ROOT%\debug-logs\anim_log.txt
 if exist "%RANGE_ANIM_LOG%" del "%RANGE_ANIM_LOG%"
+cd /d "%ROOT%\debug-logs"
 start "" "%ROOT%\build\bin\AnastacioEngine.exe" %*
