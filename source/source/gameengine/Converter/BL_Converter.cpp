@@ -62,6 +62,7 @@
 
 #ifdef WITH_BULLET
 #  include "CcdPhysicsEnvironment.h"
+#  include "CcdCookedData.h"
 #endif
 
 #include "EXP_StringValue.h"
@@ -101,11 +102,13 @@ extern "C" {
 #include "CM_Message.h"
 
 #include "GPU_material.h" // GPU_shader_cache_stats
+#include "GPU_shader.h" // GPU_shader_binary_cache_set
 
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
 #include <memory>
+#include <set>
 
 BL_Converter::SceneSlot::SceneSlot() = default;
 
@@ -160,6 +163,18 @@ BL_Converter::BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUse
 	m_threadinfo.m_pool = BLI_task_pool_create(engine->GetTaskScheduler(), nullptr);
 
 	m_maggies.push_back(m_maggie);
+
+#ifdef WITH_BULLET
+	CcdCookedData::Open(maggie->name, GPU_shader_binary_device_key());
+	GPU_shader_binary_cache_set(CcdCookedData::FindShader, CcdCookedData::AddShader);
+	/* First start of an exported game on this GPU/driver: every shader is compiled once (once per file and
+	 * process, so a cache that can't be written doesn't restart the game forever). */
+	static std::set<std::string> warmedUp;
+	BL_SetShaderWarmUp(CcdCookedData::NeedsWarmUp() && warmedUp.insert(maggie->name).second);
+	if (BL_ShaderWarmUp()) {
+		CM_Message("[Cooked] compiling every shader once for this GPU/driver, then restarting");
+	}
+#endif
 }
 
 BL_Converter::~BL_Converter()
@@ -173,6 +188,12 @@ BL_Converter::~BL_Converter()
 	   Because it needs to lock the mutex, even if there's no active task when it's
 	   in the scene converter destructor. */
 	BLI_task_pool_free(m_threadinfo.m_pool);
+
+#ifdef WITH_BULLET
+	GPU_shader_binary_cache_set(nullptr, nullptr);
+	CcdCookedData::Close();
+	BL_SetShaderWarmUp(false);
+#endif
 }
 
 Scene *BL_Converter::GetBlenderSceneForName(const std::string &name)

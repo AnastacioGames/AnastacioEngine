@@ -782,9 +782,17 @@ static thread_local BL_LoopDataCache *loopDataCache = nullptr;
 
 static void hash_bytes(uint64_t& h, const void *data, size_t size)
 {
-	// FNV-1a, 64 bit.
+	/* 4 bytes per step (multiply + xorshift), the rest FNV-1a. Only compared in memory, never stored:
+	 * byte by byte took ~80 ms for 12 meshes of 130k triangles. */
 	const unsigned char *bytes = (const unsigned char *)data;
-	for (size_t i = 0; i < size; ++i) {
+	size_t i = 0;
+	for (; i + 4 <= size; i += 4) {
+		uint32_t word;
+		memcpy(&word, bytes + i, sizeof(word));
+		h = (h ^ word) * 0x9e3779b97f4a7c15ULL;
+		h ^= h >> 29;
+	}
+	for (; i < size; ++i) {
 		h = (h ^ bytes[i]) * 1099511628211ULL;
 	}
 }
@@ -2150,6 +2158,32 @@ static void BL_ConvertCutscene(KX_Scene *kxscene, Scene *blenderscene, const BL_
 }
 
 /// Convert blender objects into ketsji gameobjects.
+static bool shaderWarmUp = false;
+
+void BL_SetShaderWarmUp(bool warmUp)
+{
+	shaderWarmUp = warmUp;
+}
+
+bool BL_ShaderWarmUp()
+{
+	return shaderWarmUp;
+}
+
+bool BL_CookAll()
+{
+	static const bool cookAll = getenv("ANASTACIO_COOK") != nullptr;
+	return cookAll || shaderWarmUp;
+}
+
+bool BL_ObjectConverted(const Object *ob)
+{
+	if (BL_CookAll()) {
+		return !(ob->gameflag & OB_TASK_EDITOR_ONLY);
+	}
+	return (ob->gameflag & OB_TASK_CONVERT) != 0;
+}
+
 void BL_ConvertBlenderObjects(struct Main *maggie,
                               KX_Scene *kxscene,
                               KX_KetsjiEngine *ketsjiEngine,
@@ -2317,7 +2351,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		allblobj.insert(blenderobject);
 
 		KX_GameObject *gameobj = nullptr;
-		if (blenderobject->gameflag & OB_TASK_CONVERT) {
+		if (BL_ObjectConverted(blenderobject)) {
 			BL_LoadTimer objectsTimer(BL_LoadStats::Get().objects);
 			gameobj = BL_GameObjectFromBlenderObject(base->object, kxscene, rendertools, canvas, converter, camZoom);
 		}
@@ -2356,7 +2390,7 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 				for (GroupObject *go = (GroupObject *)group->gobject.first; go; go = (GroupObject *)go->next) {
 					Object *blenderobject = go->ob;
 					/* Members unchecked for conversion stay out; DupliGroupRecurse skips unconverted objects. */
-					if (!(blenderobject->gameflag & OB_TASK_CONVERT)) {
+					if (!BL_ObjectConverted(blenderobject)) {
 						continue;
 					}
 					if (!converter.FindGameObject(blenderobject)) {

@@ -3148,10 +3148,12 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 							GPU_link(mat, "set_value", GPU_dynamic_uniform(&world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 						}
 						else {
-							float sdir[3] = {0.0f, 0.0f, 1.0f}; sunDir = GPU_uniform(sdir);
-							float scol[3] = {0.0f, 0.0f, 0.0f}; sunCol = GPU_uniform(scol);
-							float sunEng = 20.0; sunEnergy = GPU_uniform(&sunEng);
-							float sunsi = 0.0; sunSize = GPU_uniform(&sunsi);
+							/* Static: GPU_link copies the value later, after this block (stack values gave garbage constants). */
+							static float sdir[3] = {0.0f, 0.0f, 1.0f}, scol[3] = {0.0f, 0.0f, 0.0f}, sunEng = 20.0f, sunsi = 0.0f;
+							sunDir = GPU_uniform(sdir);
+							sunCol = GPU_uniform(scol);
+							sunEnergy = GPU_uniform(&sunEng);
+							sunSize = GPU_uniform(&sunsi);
 						}
 
 						if (mat->scene->world->skytype & WO_SKYATMOSPHERIC) {
@@ -3265,8 +3267,9 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			GPU_link(mat, "set_value", GPU_dynamic_uniform(&mat->scene->world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 		}
 		else {
-			float sdir[3] = {0.0f, 0.0f, 1.0f};
-			float ssize = 0.1f;
+			/* Static: GPU_link copies the value after this block. */
+			static float sdir[3] = {0.0f, 0.0f, 1.0f};
+			static float ssize = 0.1f;
 			sunDir = GPU_uniform(sdir);
 			sunSize = GPU_uniform(&ssize);
 		}
@@ -3820,10 +3823,12 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 			GPU_link(mat, "set_value", GPU_dynamic_uniform(&world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 		}
 		else {
-			float sdir[3] = {0.0f, 0.0f, 1.0f}; sunDir = GPU_uniform(sdir);
-			float scol[3] = {0.0f, 0.0f, 0.0f}; sunCol = GPU_uniform(scol);
-			float sunEng = 20.0f; sunEnergy = GPU_uniform(&sunEng);
-			float sunsi = 0.0f; sunSize = GPU_uniform(&sunsi);
+			/* Static: GPU_link copies the value later, after this block (stack values gave garbage constants). */
+			static float sdir[3] = {0.0f, 0.0f, 1.0f}, scol[3] = {0.0f, 0.0f, 0.0f}, sunEng = 20.0f, sunsi = 0.0f;
+			sunDir = GPU_uniform(sdir);
+			sunCol = GPU_uniform(scol);
+			sunEnergy = GPU_uniform(&sunEng);
+			sunSize = GPU_uniform(&sunsi);
 		}
 
 		if (world->skytype & WO_SKYATMOSPHERIC) {

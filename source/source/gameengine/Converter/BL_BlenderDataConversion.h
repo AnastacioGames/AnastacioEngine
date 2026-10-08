@@ -63,6 +63,14 @@ struct BL_MeshMaterial {
 
 KX_Mesh *BL_ConvertMesh(Mesh *mesh, Object *lightobj, KX_Scene *scene, BL_SceneConverter& converter);
 bool BL_MaterialUsesWireframe(const struct Material *ma);
+/// Cook mode (Cook button, env ANASTACIO_COOK = output file): every scene and object is converted once.
+/// Also true during the shader warm-up of an exported game (first start on a GPU/driver, see BL_SetShaderWarmUp()).
+bool BL_CookAll();
+/// Shader warm-up: the game is converted like Cook, one frame drawn, then restarted with the shaders cached.
+void BL_SetShaderWarmUp(bool warmUp);
+bool BL_ShaderWarmUp();
+/// The object is converted with its scene: its Load Mode, or everything but editor only objects when cooking.
+bool BL_ObjectConverted(const struct Object *ob);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo,
                                   std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr,

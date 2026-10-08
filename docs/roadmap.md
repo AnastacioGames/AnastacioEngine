@@ -29,6 +29,11 @@ Aberto:
 - Etapa 4 parcial (2026-10-03, sem formato novo): normais/tangentes e BVH de física compartilhadas entre malhas
   de conteúdo igual (800 esferas: conversão 2,9 s → 0,8 s). Malhas únicas ainda calculam tudo; guardar pronto
   exigiria o `.cooked`.
+- `.cooked` começou (2026-10-07): pontos do Convex Hull gravados ao jogar o `.blend` e copiados pelo Export
+  Game (física 1,6 s → 0,04 s no teste de 12 objetos). Binário dos shaders de material também (310 → 3 ms);
+  com o botão Cook o LibLoad do teste foi de 2,4 s → 0,47 s. Próximo candidato medido: buffers de malha
+  (~320 ms dos 12 objetos). Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
+  usuário e aquece todos na primeira abertura em cada GPU/driver, com tela de texto (sem barra de progresso).
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
   serial na GPU; DDS no `.cooked` cortaria ambos.
 - Tela de loading do LibLoad (2026-10-03): `asynchronous=True` agora tem progresso real (conversão por

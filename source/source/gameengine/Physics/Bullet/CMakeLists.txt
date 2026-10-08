@@ -60,11 +60,13 @@ set(INC_SYS
 
 set(SRC
 	CcdConstraint.cpp
+	CcdCookedData.cpp
 	CcdPhysicsEnvironment.cpp
 	CcdPhysicsController.cpp
 	CcdGraphicController.cpp
 
 	CcdConstraint.h
+	CcdCookedData.h
 	CcdMathUtils.h
 	CcdGraphicController.h
 	CcdPhysicsController.h

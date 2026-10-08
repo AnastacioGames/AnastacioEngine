@@ -2508,7 +2508,7 @@ GPUPass *GPU_generate_pass(
 		                              0,
 		                              0,
 		                              0,
-		                              flags,
+		                              flags | GPU_SHADER_FLAGS_BINARY_CACHE,
 		                              name);
 		MEM_SAFE_FREE(libcode);
 		SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;

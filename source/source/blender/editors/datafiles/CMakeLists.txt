@@ -118,6 +118,7 @@ set(ICON_NAMES
 	scene
 	edit
 	game
+	cook
 	radio
 	script
 	particles

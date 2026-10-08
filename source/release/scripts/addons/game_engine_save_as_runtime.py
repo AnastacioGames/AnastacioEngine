@@ -141,6 +141,15 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
 
     print("done")
 
+    # Cooked conversion data recorded while playing the .blend ("<blend>.cooked"): the runtime reads
+    # "<runtime>.cooked" next to itself.
+    cooked_src = os.path.splitext(bpy.data.filepath)[0] + ".cooked" if bpy.data.filepath else ""
+    cooked_dst = os.path.splitext(output_path)[0] + ".cooked"
+    if os.path.isfile(cooked_src):
+        shutil.copy2(cooked_src, cooked_dst)
+    elif os.path.isfile(cooked_dst):
+        os.remove(cooked_dst)
+
     # Make the runtime executable on Linux
     if os.name == 'posix':
         os.chmod(output_path, 0o755)

@@ -89,6 +89,7 @@ def passo():
     g["f"] = f + 1
     if f == 5:
         g["m0"] = mem()
+        bge.logic.getLoadLog(clear=True)
         g["t0"] = time.perf_counter()
         if modo == "convert":
             for n in NOMES:
@@ -106,6 +107,9 @@ def passo():
         grava("%-9s chamada %7.1f ms | pronto %7.1f ms em %3d frames | memoria +%6.1f MB | ativos %d/%d | "
               "freeUnconverted %5.1f MB | commit final %6.1f MB"
               % (modo, g["chamada"], pronto, f - g["f0"], m1 - g["m0"], ativos, len(NOMES), livre, mem()))
+        # Tempo por etapa da conversão (o CM_Message "[Load]" não chega ao stdout do runtime).
+        for e in bge.logic.getLoadLog():
+            grava("  log %-28s %8.1f ms  %s" % (e["stage"], e["ms"], e["detail"]))
         bge.logic.endGame()
     elif f > 1200:
         raise RuntimeError("nao terminou em 1200 frames")

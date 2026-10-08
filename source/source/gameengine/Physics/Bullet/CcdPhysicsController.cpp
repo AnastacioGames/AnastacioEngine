@@ -44,6 +44,8 @@
 #include "BulletSoftBody/btSoftBodyHelpers.h"
 #include "LinearMath/btConvexHull.h"
 #include "LinearMath/btConvexHullComputer.h"
+
+#include "CcdCookedData.h"
 #include "BulletCollision/Gimpact/btGImpactShape.h"
 
 #include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
@@ -2882,11 +2884,22 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 
 			// Keep only the points that lie on the hull: exact same shape, but
 			// support queries no longer iterate over every interior vertex.
-			btConvexHullComputer hullComputer;
-			hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), m_vertexArray.size() / 3, 0.0f, 0.0f);
+			// The hull points come from the cooked file when this vertex set was already computed.
+			const unsigned int numVertices = m_vertexArray.size() / 3;
+			std::vector<btScalar> points;
+			if (!CcdCookedData::FindHull(&m_vertexArray[0], numVertices, points)) {
+				btConvexHullComputer hullComputer;
+				hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), numVertices, 0.0f, 0.0f);
+				points.reserve(hullComputer.vertices.size() * 3);
+				for (int i = 0; i < hullComputer.vertices.size(); ++i) {
+					const btVector3& point = hullComputer.vertices[i];
+					points.insert(points.end(), {point.x(), point.y(), point.z()});
+				}
+				CcdCookedData::AddHull(&m_vertexArray[0], numVertices, points.data(), points.size() / 3);
+			}
 			btConvexHullShape *hullShape;
-			if (hullComputer.vertices.size() >= 4) {
-				hullShape = new btConvexHullShape(&hullComputer.vertices[0].getX(), hullComputer.vertices.size(), sizeof(btVector3));
+			if (points.size() >= 12) {
+				hullShape = new btConvexHullShape(points.data(), points.size() / 3, 3 * sizeof(btScalar));
 			}
 			else {
 				hullShape = new btConvexHullShape(&m_vertexArray[0], m_vertexArray.size() / 3, 3 * sizeof(btScalar));

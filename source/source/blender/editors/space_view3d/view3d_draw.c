@@ -4835,6 +4835,9 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		row = uiLayoutRow(layout, true);
 		uiLayoutSetEnabled(row, game_ok);
 
+		/* Cook (convert everything once into the .cooked file) and Clear Cooked, right before Play. */
+		uiItemO(row, "Cook", ICON_COOK, "GAME_OT_cook");
+		uiItemO(row, "", ICON_X, "GAME_OT_cook_clear");
 		uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
 		uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 		uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",

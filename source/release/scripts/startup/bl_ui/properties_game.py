@@ -902,6 +902,31 @@ class RENDER_MT_game_refresh_rate(Menu):
         layout.prop(context.scene.game_settings, "frequency", text="Value")
 
 
+class RENDER_PT_game_cook(RenderButtonsPanel, Panel):
+    # Second panel, right after the engine selector: loading speed matters for every game.
+    bl_label = "Cook"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        import os
+        from bl_operators.anastacio_cook import cooked_path
+        layout = self.layout
+
+        row = layout.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.cook", icon='COOK')
+        row.operator("game.cook_clear", text="", icon='X')
+
+        path = cooked_path()
+        if not path:
+            layout.label(text="Save the .blend to cook", icon='INFO')
+        elif os.path.isfile(path):
+            layout.label(text="%s: %.1f MB" % (os.path.basename(path), os.path.getsize(path) / 1048576.0),
+                         icon='FILE_TICK')
+        else:
+            layout.label(text="Not cooked: shapes and shaders are computed while loading", icon='INFO')
+
+
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):
     # Embedded and Standalone players side by side, one column each.
     bl_label = "Player"
@@ -2645,6 +2670,7 @@ classes = (
     RENDER_MT_game_animation_fps,
     RENDER_MT_game_bit_depth,
     RENDER_MT_game_refresh_rate,
+    RENDER_PT_game_cook,
     RENDER_PT_embedded,
     RENDER_PT_game_display,
     RENDER_PT_game_vr,

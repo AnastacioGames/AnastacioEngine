@@ -43,7 +43,17 @@ enum {
 	GPU_SHADER_FLAGS_FOLIAGE			= (1 << 3),
 	GPU_SHADER_FLAGS_USER_CODE			= (1 << 4),
 	GPU_SHADER_FLAGS_SPECIAL_SKINNING	= (1 << 5),
+	/* Program binary may come from / go to the cooked file (only for programs never relinked later). */
+	GPU_SHADER_FLAGS_BINARY_CACHE		= (1 << 6),
 };
+
+/* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.
+ * find returns the binary of the key (valid until the hooks are cleared) or NULL. */
+typedef const void *(*GPUShaderBinaryFind)(unsigned long long key, unsigned int *format, int *size);
+typedef void (*GPUShaderBinaryAdd)(unsigned long long key, unsigned int format, const void *data, int size);
+void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add);
+/* Hash of the GPU and driver (binaries of another one are useless), 0 when program binaries are unsupported. */
+unsigned long long GPU_shader_binary_device_key(void);
 
 GPUShader *GPU_shader_create(
         const char *vertexcode,

@@ -1,5 +1,57 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Arquivo cozido: pontos do Convex Hull em `.cooked`
+
+- Medição por etapa (teste `tests/convert_flag/make_vs_libload.py`, que agora grava o `getLoadLog()` em
+  `vs_results.txt`): LibLoad de 12 objetos 2336 ms = física 1604 ms (cada esfera Convex Hull de 130k
+  triângulos ~210 ms no `btConvexHullComputer`), malhas 406 ms, 1º shader 317 ms; terreno Triangle Mesh
+  ~13 ms. Tangentes e texturas 0.
+- Novo `CcdCookedData` (Physics/Bullet): guarda os pontos do casco por hash dos vértices em
+  `<arquivo principal>.cooked`, aberto/fechado pelo `BL_Converter`. Grava só quando o principal é `.blend`
+  (jogar no editor); jogo exportado só lê. O hash ignora a ordem dos vértices: a mesma malha chegava em ordem
+  diferente a cada objeto (8 esferas iguais davam 8 hashes).
+- Export Game copia `<blend>.cooked` para `<jogo>.cooked` (ou apaga um antigo).
+- Resultado (1 entrada de 464 KB): física 1661 → 41 ms; LibLoad 2388 → 763 ms; `convertObject` 2490 → 878
+  ms; assíncrono 2770 → 967 ms. Mesmo sem arquivo, a 1ª rodada cai para ~1,2 s (as esferas iguais
+  reaproveitam o casco). Jogo exportado conferido: física 40 ms no LibLoad.
+- Botão **Cook** (`game.cook`, `bl_operators/anastacio_cook.py`) e **Clear Cooked** (`game.cook_clear`): painel
+  "Cook" logo abaixo do Engine (Render) e os dois botões antes do Play no cabeçalho e na barra flutuante da 3D
+  View. O Cook salva uma cópia temporária e abre o RangeRuntime com `ANASTACIO_COOK=<blend>.cooked`: converte
+  todas as cenas e objetos (inclusive On Demand; só Editor Only fica fora) e sai antes do 1º frame, sem lógica.
+  Testado com o `vs_convert.blend` (tudo On Demand): gerou a entrada do casco; runtime 5,4 s.
+- Ícone novo `COOK` (panela) no espaço BLANK 42: `.dat` 16/32 do atlas embutido e PNGs de `icons_blender5` e
+  `icons_upbge`.
+- Shaders de material cozidos: `GPU_SHADER_FLAGS_BINARY_CACHE` (só no codegen; `RAS_Shader` religa o programa e
+  fica fora) faz `gpu_shader.c` procurar o binário GL (`glProgramBinary`) pelos ganchos
+  `GPU_shader_binary_cache_set`, ligados pelo `BL_Converter` ao `CcdCookedData` (registro tipo 2). Chave = hash
+  de todos os trechos do código + flags + vendor/renderer/versão do driver; binário recusado pelo driver volta a
+  compilar e é trocado. Shader do LibLoad 310 → 3 ms; com o Cook, LibLoad 2388 → 473 ms e `convertObject`
+  2490 → 536 ms. Imagem conferida igual com e sem cache.
+- Bug antigo achado pela chave instável: em `gpu_material.c`, sem sol no mundo (céu atmosférico e névoa), a
+  direção/energia/tamanho do sol eram ponteiros para variáveis de bloco já encerrado quando o `GPU_link` lia —
+  o shader recebia lixo (ex. `cons35 = vec3(2.2e38, ...)`), diferente a cada execução. Agora `static`.
+- Cook não roda mais um passo de lógica: a cena inicial fica suspensa e o launcher desenha um frame (compila os
+  shaders do desenho) e sai. Conferido com script que marca arquivo: não rodou. Cena sem Convex Hull agora gera
+  `.cooked` (shaders), então o botão de limpar acende.
+- `hash_bytes` do cache de normais/tangentes (`BL_BlenderDataConversion.cpp`) passa a ler 4 bytes por passo:
+  hash 79 → 35 ms nos 12 objetos; LibLoad do teste 473 → 427 ms. Sobra a montagem dos buffers (~370 ms).
+- Shaders no PC do jogador: o binário GL só vale na mesma GPU/driver, então o jogo exportado guarda os seus num
+  cache do usuário (`%LOCALAPPDATA%\AnastacioEngine\ShaderCache\<jogo>-<hash do caminho>.shaders`; Linux
+  `$XDG_CACHE_HOME` ou `~/.cache`), com cabeçalho `ANASHAD1` + chave da GPU/driver
+  (`GPU_shader_binary_device_key`). O `.cooked` ao lado do jogo segue só leitura. Shaders novos durante o jogo
+  entram no cache ao fechar.
+- Aquecimento na primeira abertura (ou GPU/driver trocado): sem cache válido, `BL_SetShaderWarmUp` liga o mesmo
+  modo do Cook (todas as cenas convertidas, cena inicial suspensa, um frame) e o launcher pede `RESTART_GAME`; o
+  jogo volta já lendo o cache. Uma vez por arquivo e processo, e o cache é gravado mesmo vazio, para não reiniciar
+  em loop. Teste exportado sem `.cooked`: 1ª abertura compilou (314 ms) e reiniciou; 2ª abertura 3 ms.
+- Tela do aquecimento: `LA_Launcher` desenha fundo escuro e "Preparing shaders for this graphics card (first
+  start only)..." (BLF, perfil compat) antes de converter. Conferido lendo os pixels (a captura do Windows não
+  enxerga a janela GL). Launcher passa a incluir blenfont/glew com `GL_DEFINITIONS_RASTERIZER`.
+- Testes do cache do usuário: chave de driver trocada no arquivo → aquece de novo; pasta impossível de gravar →
+  aquece uma vez, avisa "could not write" e segue sem loop; shader de LibLoad no meio do jogo 310 ms → 3 ms na
+  abertura seguinte. Aviso "compiling every shader" saiu do `CcdCookedData` para o `BL_Converter` (só quando
+  aquece de fato).
+
 ## 2026-10-07 — Teste auditivo Web de Reverb Area com alternância de dois segundos
 
 - Revisão a pedido do usuário: versão 0.1.1 troca pulsos por som contínuo em loop sem

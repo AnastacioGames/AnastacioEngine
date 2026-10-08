@@ -450,6 +450,59 @@ static void gpu_dump_shaders(const char **code, const int num_shaders, const cha
 	printf("Shader file written to disk: %s\n", shader_path);
 }
 
+static GPUShaderBinaryFind binary_find = NULL;
+static GPUShaderBinaryAdd binary_add = NULL;
+
+void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add)
+{
+	binary_find = find;
+	binary_add = add;
+}
+
+static void binary_hash_str(unsigned long long *h, const char *str)
+{
+	/* FNV-1a, 64 bit; the terminator separates consecutive strings. */
+	if (!str) {
+		str = "";
+	}
+	do {
+		*h = (*h ^ (unsigned char)*str) * 1099511628211ULL;
+	} while (*str++);
+}
+
+/* Key of a program: every source piece and the driver (a new driver can't load old binaries). */
+static unsigned long long binary_key(const char *pieces[], int num_pieces, int flags)
+{
+	unsigned long long h = 14695981039346656037ULL;
+	char flagstr[16];
+	BLI_snprintf(flagstr, sizeof(flagstr), "%d", flags & ~GPU_SHADER_FLAGS_BINARY_CACHE);
+	binary_hash_str(&h, flagstr);
+	binary_hash_str(&h, (const char *)glGetString(GL_VENDOR));
+	binary_hash_str(&h, (const char *)glGetString(GL_RENDERER));
+	binary_hash_str(&h, (const char *)glGetString(GL_VERSION));
+	for (int i = 0; i < num_pieces; i++) {
+		binary_hash_str(&h, pieces[i]);
+	}
+	return h ? h : 1;
+}
+
+unsigned long long GPU_shader_binary_device_key(void)
+{
+	GLint num_formats = 0;
+	if (!GLEW_ARB_get_program_binary) {
+		return 0;
+	}
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &num_formats);
+	if (num_formats <= 0) {
+		return 0;
+	}
+	unsigned long long h = 14695981039346656037ULL;
+	binary_hash_str(&h, (const char *)glGetString(GL_VENDOR));
+	binary_hash_str(&h, (const char *)glGetString(GL_RENDERER));
+	binary_hash_str(&h, (const char *)glGetString(GL_VERSION));
+	return h ? h : 1;
+}
+
 static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const char *fragcode,
                                             const char *geocode,
@@ -513,6 +566,30 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 								(flags & GPU_SHADER_FLAGS_NEW_SHADING) != 0,
 								(flags & GPU_SHADER_FLAGS_USER_CODE) != 0);
 	gpu_shader_standard_extensions(standard_extensions, geocode != NULL);
+
+	/* Cooked binary: skip compile and link. Geometry shaders keep the normal path (primitive io is set before link). */
+	unsigned long long cache_key = 0;
+	const bool use_binary = (flags & GPU_SHADER_FLAGS_BINARY_CACHE) && !geocode && !use_opensubdiv && binary_find &&
+	                        GLEW_ARB_get_program_binary;
+	if (use_binary) {
+		const char *pieces[] = {gpu_shader_version(), standard_extensions, standard_defines, datatoc_gpu_shader_lib_glsl,
+		                        defines, vertexcode, libcode, fragcode};
+		cache_key = binary_key(pieces, ARRAY_SIZE(pieces), flags);
+		unsigned int format;
+		int size;
+		const void *binary = binary_find(cache_key, &format, &size);
+		if (binary) {
+			glProgramBinary(shader->program, format, binary, size);
+			glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
+			if (status) {
+				return shader;
+			}
+			/* Rejected by the driver: compile and link as usual (a fresh program, the failed load can leave state). */
+			glDeleteProgram(shader->program);
+			shader->program = glCreateProgram();
+		}
+		glProgramParameteri(shader->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+	}
 
 	if (vertexcode) {
 		const char *source[6];
@@ -655,6 +732,21 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		if (fragcode) shader_print_errors("linking", log, &fragcode, 1);
 		GPU_shader_free(shader);
 		return NULL;
+	}
+
+	if (use_binary && binary_add) {
+		GLint size = 0;
+		glGetProgramiv(shader->program, GL_PROGRAM_BINARY_LENGTH, &size);
+		if (size > 0) {
+			void *binary = MEM_mallocN(size, "GPUShader binary");
+			GLenum format;
+			GLsizei written = 0;
+			glGetProgramBinary(shader->program, size, &written, &format, binary);
+			if (written > 0) {
+				binary_add(cache_key, format, binary, written);
+			}
+			MEM_freeN(binary);
+		}
 	}
 
 #ifdef WITH_OPENSUBDIV
