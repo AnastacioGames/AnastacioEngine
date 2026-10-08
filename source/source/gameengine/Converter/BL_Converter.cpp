@@ -504,6 +504,65 @@ static int load_ms(double seconds)
 	return (int)(seconds * 1000.0 + 0.5);
 }
 
+/* Parallel shader compile (GL_ARB_parallel_shader_compile): the material programs are sent to the driver before
+ * they are built one by one (ReloadMaterial), so the driver threads compile them together and each build only takes
+ * its finished program. RANGE_NO_PARALLEL_SHADERS=1 keeps the one by one compile. */
+static bool parallel_shaders()
+{
+	static const bool disabled = getenv("RANGE_NO_PARALLEL_SHADERS") != nullptr;
+	if (disabled || !GPU_shader_prefetch_begin()) {
+		return false;
+	}
+	GPU_shader_prefetch_end();
+	return true;
+}
+
+/// Sends all the materials at once, for a compile that waits anyway (ReloadShaders).
+template <class List>
+static void prefetch_shaders(const List& materials)
+{
+	if (!parallel_shaders()) {
+		return;
+	}
+	GPU_shader_prefetch_begin();
+	for (const auto& mat : materials) {
+		mat->PrefetchMaterial();
+	}
+	GPU_shader_prefetch_end();
+}
+
+/* One frame of an async compile, until deadline: first sends all the materials to the driver, then builds them in
+ * the same order, by then mostly compiled. Spread over frames so the loading screen keeps drawing; a single call can
+ * still take a while (sending waits while the driver queue is full, building waits for its program). Not "build when
+ * ready": GL_COMPLETION_STATUS_ARB blocks until the compile ends on AMD drivers. Without parallel compile, builds one
+ * by one. send(i) / build(i) act on material i. Returns true when all count are built. */
+template <class Send, class Build>
+static bool step_shaders(unsigned int count, unsigned int& built, unsigned int& sent, double deadline, Send send,
+                         Build build)
+{
+	const bool parallel = parallel_shaders();
+	while (built < count) {
+		if (parallel && sent < count) {
+			GPU_shader_prefetch_begin();
+			send(sent++);
+			GPU_shader_prefetch_end();
+		}
+		else {
+			build(built++);
+		}
+		if (PIL_check_seconds_timer() >= deadline) {
+			break;
+		}
+	}
+	if (built < count) {
+		return false;
+	}
+	if (parallel) {
+		GPU_shader_prefetch_clear();
+	}
+	return true;
+}
+
 /// Clears the shader cache counters before a shader stage.
 static void reset_load_shader_stats()
 {
@@ -563,17 +622,13 @@ void BL_Converter::UseSceneWorld(KX_Scene *scene)
 	}
 }
 
-bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline)
+bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsigned int& sent, double deadline)
 {
 	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
 	UseSceneWorld(scene);
-	while (next < materials.size()) {
-		materials[next++]->ReloadMaterial();
-		if (PIL_check_seconds_timer() >= deadline) {
-			break;
-		}
-	}
-	return (next >= materials.size());
+	return step_shaders((unsigned int)materials.size(), next, sent, deadline,
+	                    [&](unsigned int i) { materials[i]->PrefetchMaterial(); },
+	                    [&](unsigned int i) { materials[i]->ReloadMaterial(); });
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
@@ -824,17 +879,24 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 				 * one per step. New lights recompile everything later anyway (StepReloads()), but this
 				 * way the new objects never draw without shader meanwhile. */
 				const std::vector<KX_BlenderMaterial *>& materials = converter.GetMaterials();
-				if (merge.m_material < materials.size()) {
-					KX_BlenderMaterial *mat = materials[merge.m_material++];
-					mat->ReplaceScene(mergeScene);
-					UseSceneWorld(mergeScene);
-					mat->ReloadMaterial();
-					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
-					                   (float)merge.m_material / (float)materials.size());
+				UseSceneWorld(mergeScene);
+				const bool done = step_shaders((unsigned int)materials.size(), merge.m_material, merge.m_sent, deadline,
+					[&](unsigned int i) {
+						materials[i]->ReplaceScene(mergeScene);
+						materials[i]->PrefetchMaterial();
+					},
+					[&](unsigned int i) {
+						materials[i]->ReplaceScene(mergeScene);
+						materials[i]->ReloadMaterial();
+						set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
+						                   (float)(i + 1) / (float)materials.size());
+					});
+				if (!done) {
+					// Out of time or waiting for the driver: next frame.
+					return false;
 				}
-				else {
-					merge.m_stage = PendingMerge::STAGE_MERGE;
-				}
+				merge.m_stage = PendingMerge::STAGE_MERGE;
+				merge.m_sent = 0;
 				break;
 			}
 			case PendingMerge::STAGE_MERGE:
@@ -843,6 +905,7 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 					// Restart the scene reload: materials already redone miss these lights.
 					PendingReload& reload = m_reloads[mergeScene];
 					reload.m_material = 0;
+					reload.m_sent = 0;
 					if (std::find(reload.m_waiting.begin(), reload.m_waiting.end(), status) == reload.m_waiting.end()) {
 						reload.m_waiting.push_back(status);
 					}
@@ -885,15 +948,18 @@ void BL_Converter::StepReloads(double deadline)
 		UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[it->first].m_materials;
 		const float total = (float)std::max<size_t>(materials.size(), 1);
 		UseSceneWorld(it->first);
-		while (reload.m_material < materials.size() && PIL_check_seconds_timer() < deadline) {
-			materials[materials.size() - 1 - reload.m_material++]->ReloadMaterial();
-			for (KX_LibLoadStatus *status : reload.m_waiting) {
-				const unsigned int lastScene = (unsigned int)std::max<size_t>(status->GetSceneConverters().size(), 1) - 1;
-				set_scene_progress(status, lastScene, progress_shaders + (1.0f - progress_shaders) *
-				                   (float)reload.m_material / total);
-			}
-		}
-		if (reload.m_material < materials.size()) {
+		const unsigned int count = (unsigned int)materials.size();
+		const bool done = step_shaders(count, reload.m_material, reload.m_sent, deadline,
+			[&](unsigned int i) { materials[count - 1 - i]->PrefetchMaterial(); },
+			[&](unsigned int i) {
+				materials[count - 1 - i]->ReloadMaterial();
+				for (KX_LibLoadStatus *status : reload.m_waiting) {
+					const unsigned int lastScene = (unsigned int)std::max<size_t>(status->GetSceneConverters().size(), 1) - 1;
+					set_scene_progress(status, lastScene, progress_shaders + (1.0f - progress_shaders) *
+					                   (float)(i + 1) / total);
+				}
+			});
+		if (!done) {
 			return;
 		}
 		CM_Message("[Load] async light reload \"" << it->first->GetName() << "\": " << materials.size()
@@ -1419,16 +1485,20 @@ void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter, 
 
 void BL_Converter::ReloadShaders(KX_Scene *scene)
 {
+	prefetch_shaders(m_sceneSlots[scene].m_materials);
 	for (std::unique_ptr<KX_BlenderMaterial>& mat : m_sceneSlots[scene].m_materials) {
 		mat->ReloadMaterial();
 	}
+	GPU_shader_prefetch_clear();
 }
 
 void BL_Converter::ReloadShaders(const BL_SceneConverter& converter)
 {
+	prefetch_shaders(converter.m_materials);
 	for (KX_BlenderMaterial *mat : converter.m_materials) {
 		mat->ReloadMaterial();
 	}
+	GPU_shader_prefetch_clear();
 }
 
 /** This function merges a mesh from the current scene into another main

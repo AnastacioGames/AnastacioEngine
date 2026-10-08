@@ -55,6 +55,15 @@ void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd ad
 /* Hash of the GPU and driver (binaries of another one are useless), 0 when program binaries are unsupported. */
 unsigned long long GPU_shader_binary_device_key(void);
 
+/* Parallel compile (GL_ARB_parallel_shader_compile): between begin and end, material programs (BINARY_CACHE flag)
+ * are only sent to the driver and kept pending, create returns NULL. The next create of the same sources takes
+ * the pending program. begin returns false (nothing changes) when the driver lacks the extension. */
+bool GPU_shader_prefetch_begin(void);
+void GPU_shader_prefetch_end(void);
+bool GPU_shader_prefetching(void);
+/* Deletes the pending programs nobody took. */
+void GPU_shader_prefetch_clear(void);
+
 GPUShader *GPU_shader_create(
         const char *vertexcode,
         const char *fragcode,

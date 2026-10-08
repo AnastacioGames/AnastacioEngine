@@ -2494,7 +2494,7 @@ GPUPass *GPU_generate_pass(
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :
 	                     NULL;
-	if (shader) {
+	if (shader && !GPU_shader_prefetching()) {
 		SHADER_CACHE_STAT_REUSED++;
 	}
 	else {
@@ -2511,8 +2511,10 @@ GPUPass *GPU_generate_pass(
 		                              flags | GPU_SHADER_FLAGS_BINARY_CACHE,
 		                              name);
 		MEM_SAFE_FREE(libcode);
-		SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;
-		SHADER_CACHE_STAT_COMPILED++;
+		if (!GPU_shader_prefetching()) {
+			SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;
+			SHADER_CACHE_STAT_COMPILED++;
+		}
 		if (shader && use_cache) {
 			shader_cache_add(shader, vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash);
 		}

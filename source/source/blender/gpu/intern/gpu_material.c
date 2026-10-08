@@ -3948,6 +3948,28 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 	return mat;
 }
 
+void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool is_skinning)
+{
+	ListBase *gpumaterials = is_skinning ? &ma->gpumaterialskinning :
+	                         (is_instancing ? &ma->gpumaterialinstancing : &ma->gpumaterial);
+	/* Built in an empty list only to generate the shader sources: a material already built stays untouched
+	 * (it may be reloaded next). The pass fails (the program stays pending) and the copy is dropped. */
+	ListBase kept = *gpumaterials;
+	BLI_listbase_clear(gpumaterials);
+	GPU_material_from_blender(scene, ma, false, is_instancing, is_skinning);
+	for (LinkData *link = gpumaterials->first; link; link = link->next) {
+		GPUMaterial *material = link->data;
+		if (material->pass) {
+			GPU_pass_free(material->pass);
+		}
+		/* lamp->materials keeps ma: the kept material still uses these lamps. */
+		BLI_freelistN(&material->lamps);
+		MEM_freeN(material);
+	}
+	BLI_freelistN(gpumaterials);
+	*gpumaterials = kept;
+}
+
 /* Materials whose Shader Sources use this Text compile again on the next draw. */
 bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {

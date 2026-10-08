@@ -31,6 +31,21 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — Compilação paralela dos shaders de material
+
+- Com `GL_ARB_parallel_shader_compile`, os programas de todos os materiais são enviados ao driver antes de
+  montar cada material (`GPU_shader_prefetch_*` em `gpu_shader.c`, `GPU_material_prefetch`,
+  `KX_BlenderMaterial::PrefetchMaterial`); o driver compila vários ao mesmo tempo e cada montagem só pega o
+  programa pronto (mesma chave do binário do `.cooked`). Sem a extensão, nada muda.
+- `addScene` assíncrono, LibLoad assíncrono e recarga por luzes novas enviam os materiais aos poucos, dentro do
+  orçamento do frame, e só depois montam (`step_shaders` em `BL_Converter.cpp`): a tela de loading segue
+  desenhando. No AMD a consulta `GL_COMPLETION_STATUS_ARB` espera a compilação acabar, por isso não é usada.
+- `RANGE_NO_PARALLEL_SHADERS=1` volta à compilação um por um; `RANGE_SHADER_SALT=<texto>` põe um comentário em
+  todo shader para o cache do driver errar e medir a primeira abertura.
+- AMD RX 6800M, compilação a frio: `make_parallel_shader_test.py` (48 materiais) 16,5 → 4,2 s, imagens
+  idênticas; RolimaRacer até a corrida 61,7 → 22,6 s (shaders da pista 49,1 → 11,2 s até ficar pronta).
+  Sem testar ainda em NVIDIA.
+
 ## 2026-10-08 — `.cooked`: carregamento das malhas em bloco
 
 - Vértices cozidos escritos em bloco (`RAS_DisplayArray::AppendVertices`/`AddVertexInfo`/`AddIndices`):

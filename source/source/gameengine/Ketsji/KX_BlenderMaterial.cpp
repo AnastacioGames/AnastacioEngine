@@ -241,6 +241,13 @@ void KX_BlenderMaterial::ReloadMaterial()
 	}
 }
 
+void KX_BlenderMaterial::PrefetchMaterial()
+{
+	if (m_material) {
+		BL_BlenderShader::Prefetch(m_scene, m_material);
+	}
+}
+
 void KX_BlenderMaterial::ReplaceScene(KX_Scene *scene)
 {
 	m_scene = scene;

@@ -503,6 +503,90 @@ unsigned long long GPU_shader_binary_device_key(void)
 	return h ? h : 1;
 }
 
+/* Programs sent to the driver by a prefetch pass, compiling on its threads until a create takes them. */
+typedef struct PendingProgram {
+	unsigned long long key;
+	GLuint program, vertex, fragment;
+} PendingProgram;
+
+static PendingProgram *pending_programs = NULL;
+static int pending_len = 0, pending_cap = 0;
+static bool prefetching = false;
+
+bool GPU_shader_prefetch_begin(void)
+{
+#ifdef __EMSCRIPTEN__
+	return false;
+#else
+	static int support = -1;
+	if (support == -1) {
+		support = GLEW_ARB_parallel_shader_compile ? 1 : 0;
+		if (support) {
+			/* Let the driver pick the number of compiler threads. */
+			glMaxShaderCompilerThreadsARB(0xFFFFFFFF);
+		}
+	}
+	prefetching = (support == 1);
+	return prefetching;
+#endif
+}
+
+void GPU_shader_prefetch_end(void)
+{
+	prefetching = false;
+}
+
+bool GPU_shader_prefetching(void)
+{
+	return prefetching;
+}
+
+static int pending_find(unsigned long long key)
+{
+	for (int i = 0; i < pending_len; i++) {
+		if (pending_programs[i].key == key) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static void pending_delete(int i)
+{
+	PendingProgram *item = &pending_programs[i];
+	if (item->vertex) glDeleteShader(item->vertex);
+	if (item->fragment) glDeleteShader(item->fragment);
+	if (item->program) glDeleteProgram(item->program);
+	/* Keeps the order, the oldest first. */
+	memmove(item, item + 1, sizeof(PendingProgram) * (pending_len - i - 1));
+	pending_len--;
+}
+
+void GPU_shader_prefetch_clear(void)
+{
+	while (pending_len > 0) {
+		pending_delete(pending_len - 1);
+	}
+	MEM_SAFE_FREE(pending_programs);
+	pending_cap = 0;
+}
+
+static void pending_add(unsigned long long key, GPUShader *shader)
+{
+	if (pending_len == pending_cap) {
+		pending_cap = pending_cap ? pending_cap * 2 : 64;
+		pending_programs = pending_programs ?
+		                   MEM_reallocN(pending_programs, sizeof(PendingProgram) * pending_cap) :
+		                   MEM_mallocN(sizeof(PendingProgram) * pending_cap, "PendingProgram");
+	}
+	PendingProgram *item = &pending_programs[pending_len++];
+	item->key = key;
+	item->program = shader->program;
+	item->vertex = shader->vertex;
+	item->fragment = shader->fragment;
+	shader->program = shader->vertex = shader->fragment = 0;
+}
+
 static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const char *fragcode,
                                             const char *geocode,
@@ -566,19 +650,39 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 								(flags & GPU_SHADER_FLAGS_NEW_SHADING) != 0,
 								(flags & GPU_SHADER_FLAGS_USER_CODE) != 0);
 	gpu_shader_standard_extensions(standard_extensions, geocode != NULL);
+	/* RANGE_SHADER_SALT=<text>: added as a comment to every shader, so the driver cache misses and a run measures
+	 * a first (cold) compile. */
+	const char *salt = getenv("RANGE_SHADER_SALT");
+	if (salt && salt[0]) {
+		const size_t len = strlen(standard_defines);
+		BLI_snprintf(standard_defines + len, sizeof(standard_defines) - len, "// salt %s\n", salt);
+	}
 
 	/* Cooked binary: skip compile and link. Geometry shaders keep the normal path (primitive io is set before link). */
 	unsigned long long cache_key = 0;
-	const bool use_binary = (flags & GPU_SHADER_FLAGS_BINARY_CACHE) && !geocode && !use_opensubdiv && binary_find &&
-	                        GLEW_ARB_get_program_binary;
-	if (use_binary) {
+	const bool keyed = (flags & GPU_SHADER_FLAGS_BINARY_CACHE) && !geocode && !use_opensubdiv;
+	const bool use_binary = keyed && binary_find && GLEW_ARB_get_program_binary;
+	/* Prefetch pass: only material programs are sent ahead, the others are built when really created. */
+	const bool prefetch = prefetching;
+	if (prefetch && !keyed) {
+		GPU_shader_free(shader);
+		return NULL;
+	}
+	if (keyed && (use_binary || prefetch || pending_len > 0)) {
 		const char *pieces[] = {gpu_shader_version(), standard_extensions, standard_defines, datatoc_gpu_shader_lib_glsl,
 		                        defines, vertexcode, libcode, fragcode};
 		cache_key = binary_key(pieces, ARRAY_SIZE(pieces), flags);
+	}
+	if (use_binary) {
 		unsigned int format;
 		int size;
 		const void *binary = binary_find(cache_key, &format, &size);
 		if (binary) {
+			if (prefetch) {
+				/* Loading a binary is fast, nothing to send ahead. */
+				GPU_shader_free(shader);
+				return NULL;
+			}
 			glProgramBinary(shader->program, format, binary, size);
 			glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
 			if (status) {
@@ -589,6 +693,30 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 			shader->program = glCreateProgram();
 		}
 		glProgramParameteri(shader->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+	}
+	if (keyed && cache_key) {
+		const int found = pending_find(cache_key);
+		if (prefetch && found != -1) {
+			GPU_shader_free(shader);
+			return NULL;
+		}
+		if (!prefetch && found != -1) {
+			/* Sent ahead by a prefetch pass: waits only for what the driver threads have not finished. */
+			glGetProgramiv(pending_programs[found].program, GL_LINK_STATUS, &status);
+			if (status) {
+				glDeleteShader(shader->vertex);
+				glDeleteShader(shader->fragment);
+				glDeleteProgram(shader->program);
+				shader->program = pending_programs[found].program;
+				shader->vertex = pending_programs[found].vertex;
+				shader->fragment = pending_programs[found].fragment;
+				pending_programs[found].program = pending_programs[found].vertex = pending_programs[found].fragment = 0;
+				pending_delete(found);
+				goto linked;
+			}
+			/* Failed: compiled again below, which prints the errors. */
+			pending_delete(found);
+		}
 	}
 
 	if (vertexcode) {
@@ -610,7 +738,11 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		gpu_shader_source(shader->vertex, num_source, source);
 
 		glCompileShader(shader->vertex);
-		glGetShaderiv(shader->vertex, GL_COMPILE_STATUS, &status);
+		/* Prefetch: asking the status would wait for the driver threads; errors show on the real create. */
+		status = prefetch ? 1 : 0;
+		if (!prefetch) {
+			glGetShaderiv(shader->vertex, GL_COMPILE_STATUS, &status);
+		}
 
 		if (!status) {
 			glGetShaderInfoLog(shader->vertex, sizeof(log), &length, log);
@@ -655,7 +787,11 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		gpu_shader_source(shader->fragment, num_source, source);
 
 		glCompileShader(shader->fragment);
-		glGetShaderiv(shader->fragment, GL_COMPILE_STATUS, &status);
+		/* Prefetch: asking the status would wait for the driver threads; errors show on the real create. */
+		status = prefetch ? 1 : 0;
+		if (!prefetch) {
+			glGetShaderiv(shader->fragment, GL_COMPILE_STATUS, &status);
+		}
 
 		if (!status) {
 			glGetShaderInfoLog(shader->fragment, sizeof(log), &length, log);
@@ -717,6 +853,11 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 #endif
 
 	glLinkProgram(shader->program);
+	if (prefetch) {
+		pending_add(cache_key, shader);
+		GPU_shader_free(shader);
+		return NULL;
+	}
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
 	if (!status) {
 		glGetProgramInfoLog(shader->program, sizeof(log), &length, log);
@@ -734,6 +875,7 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		return NULL;
 	}
 
+linked:
 	if (use_binary && binary_add) {
 		GLint size = 0;
 		glGetProgramiv(shader->program, GL_PROGRAM_BINARY_LENGTH, &size);

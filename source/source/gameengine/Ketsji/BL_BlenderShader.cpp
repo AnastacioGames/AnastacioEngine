@@ -338,6 +338,14 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 	}
 }
 
+void BL_BlenderShader::Prefetch(KX_Scene *scene, Material *ma)
+{
+	// Same variant as UseSkinning() / UseInstancing().
+	const bool skinning = (ma->shade_flag & MA_SKINNING) != 0;
+	const bool instancing = GPU_instanced_drawing_support() && (ma->shade_flag & MA_INSTANCING) && !skinning;
+	GPU_material_prefetch(scene->GetBlenderScene(), ma, instancing, skinning);
+}
+
 bool BL_BlenderShader::UseInstancing() const
 {
 	// Combined instancing + per-instance bone palettes is unsupported; skinning wins.

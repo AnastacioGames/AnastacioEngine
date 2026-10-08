@@ -310,7 +310,7 @@ void KX_SceneScheduler::StepPendingScenes()
 	BL_Converter *converter = m_engine->GetConverter();
 	PendingScene& pending = m_pendingScenes.front();
 	const double stepStart = PIL_check_seconds_timer();
-	const bool done = converter->CompileSceneShaders(pending.m_scene, pending.m_material,
+	const bool done = converter->CompileSceneShaders(pending.m_scene, pending.m_material, pending.m_sent,
 	                                                 stepStart + converter->GetMergeFrameBudget());
 	pending.m_shaderTime += PIL_check_seconds_timer() - stepStart;
 	if (!done) {

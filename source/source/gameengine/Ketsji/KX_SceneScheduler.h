@@ -66,6 +66,8 @@ class KX_SceneScheduler
 		unsigned int m_material;
 		double m_start;
 		double m_shaderTime;
+		/// Materials already sent to the driver (parallel compile).
+		unsigned int m_sent = 0;
 	};
 	std::vector<PendingScene> m_pendingScenes;
 

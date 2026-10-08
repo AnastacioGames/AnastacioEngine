@@ -114,6 +114,8 @@ private:
 		} m_stage;
 		/// Next material to compile in STAGE_SHADERS.
 		unsigned int m_material;
+		/// Materials already sent to the driver in STAGE_SHADERS (parallel compile).
+		unsigned int m_sent = 0;
 	};
 	/// Seconds per frame the async merge may use (Range.logic.setLibLoadFrameBudget).
 	double m_mergeFrameBudget;
@@ -126,6 +128,8 @@ private:
 	struct PendingReload {
 		/// Materials already recompiled, counted from the end of the scene list.
 		unsigned int m_material;
+		/// Materials already sent to the driver (parallel compile), same order.
+		unsigned int m_sent = 0;
 		/// Libraries finished once the reload ends.
 		std::vector<KX_LibLoadStatus *> m_waiting;
 	};
@@ -219,7 +223,7 @@ public:
 	/** Compile the shaders of a scene converted without them, from material next, until the deadline (PIL
 	 * time) passes; at least one per call. True when all are compiled.
 	 */
-	bool CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline);
+	bool CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsigned int& sent, double deadline);
 
 	/** This function removes all entities stored in the converter for that scene
 	 * It should be used instead of direct delete scene
