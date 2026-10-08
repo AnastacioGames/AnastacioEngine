@@ -14,8 +14,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 DEST = ROOT / 'demos' / 'revisados'
-EDITOR = ROOT / 'build' / 'bin' / 'RangeEngine.exe'
-PLAYER = ROOT / 'build' / 'bin' / 'RangeRuntime.exe'
+EDITOR = ROOT / 'build' / 'bin' / 'AnastacioEngine.exe'
+PLAYER = ROOT / 'build' / 'bin' / 'AnastacioRuntime.exe'
 
 
 def digest(path):

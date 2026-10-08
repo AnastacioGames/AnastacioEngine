@@ -1624,10 +1624,10 @@ static bool isStartedFromCommandPrompt()
 
 		GetWindowThreadProcessId(hwnd, &pid);
 		if (getProcessName(ppid, parent_name, sizeof(parent_name))) {
-			char *filename = strrchr(parent_name, '\\');
-			if (filename != NULL) {
-				start_from_launcher = strstr(filename, "RangeEngine.exe") != NULL;
-			}
+			const char *filename = strrchr(parent_name, '\\');
+			filename = filename ? filename + 1 : parent_name;
+			start_from_launcher = _stricmp(filename, "AnastacioEngine.exe") == 0 ||
+			                      _stricmp(filename, "RangeEngine.exe") == 0;
 		}
 
 		/* When we're starting from a wrapper we need to compare with parent process ID. */

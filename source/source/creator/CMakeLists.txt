@@ -298,6 +298,10 @@ if(WITH_PYTHON_MODULE)
 
 else()
 	add_executable(RangeEngine ${EXETYPE} ${SRC})
+	if(WIN32)
+		# Preserve the internal target and Python-module output names.
+		set_target_properties(RangeEngine PROPERTIES OUTPUT_NAME "AnastacioEngine")
+	endif()
 	WINDOWS_SIGN_TARGET(RangeEngine)
 endif()
 

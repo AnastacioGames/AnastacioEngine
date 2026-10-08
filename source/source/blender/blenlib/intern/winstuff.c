@@ -136,7 +136,7 @@ void BLI_windows_register_file_extensions(void)
 		file_extensions_fail(NULL);
 	}
 	BLI_strncpy(runtime_path, engine_path, sizeof(runtime_path));
-	if (!path_set_filename(runtime_path, "RangeRuntime.exe")) {
+	if (!path_set_filename(runtime_path, "AnastacioRuntime.exe")) {
 		file_extensions_fail(NULL);
 	}
 

@@ -7,7 +7,7 @@ corrupcao que RND-001 corrigiu: resolucao com overflow de int e leitura
 truncada (arquivo menor que o esperado pelo header).
 
 Rodar em background, sem GUI:
-    RangeEngine.exe --background --python tools/tests/bugfix_regression/test_rnd001_voxeldata_bvox.py
+    AnastacioEngine.exe --background --python tools/tests/bugfix_regression/test_rnd001_voxeldata_bvox.py
 """
 import bpy
 import os

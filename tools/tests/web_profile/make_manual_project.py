@@ -1,6 +1,6 @@
 """Gera o projeto de teste manual do perfil Web em build/web-manual/ (ver docs/web-profile-manual-tests.md):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
 
 Cria bom.blend (deve exportar) e ruim.blend (deve ser bloqueado com WEB-PKG-003).
 """

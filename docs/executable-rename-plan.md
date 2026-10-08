@@ -1,6 +1,8 @@
 # Plano de migração: RangeEngine.exe → AnastacioEngine.exe
 
-Data: 2026-10-07. Estado: levantamento e plano; nenhuma renomeação implementada.
+Plano de 2026-10-07, atualizado em 2026-10-08: renomeação do editor Windows implementada;
+segunda etapa do player Windows autorizada pelo usuário e validada localmente (seção 14).
+Build e execução local passaram; validações e limites da entrega estão na seção 9.
 
 ## 1. Objetivo e decisões de escopo
 
@@ -12,7 +14,7 @@ Proposta de escopo para a primeira entrega:
 |---|---|---|
 | `RangeEngine.exe` | `AnastacioEngine.exe` | Obrigatório: editor Windows e referências ao arquivo/processo. |
 | Alvo CMake/Ninja `RangeEngine` | `RangeEngine` | Preservar inicialmente; definir `OUTPUT_NAME` no Windows. O alvo interno pode produzir um arquivo com outro nome. |
-| `RangeRuntime.exe` | `RangeRuntime.exe` | Preservar na primeira etapa. Renomear para `AnastacioRuntime.exe` é uma segunda migração, descrita abaixo. |
+| `RangeRuntime.exe` | `AnastacioRuntime.exe` | Segunda etapa Windows autorizada em 2026-10-08; nome legado aceito na leitura de projetos. |
 | `RangeArmor Panel.exe`, pasta `rangearmor/`, ZIP `RangeArmor-*` | Mesmos nomes inicialmente | Adaptar integração com o editor novo. Rebatizar a ferramenta para AnastacioArmor é uma decisão separada. |
 | `.range`, `.blend`, `.rasec`, `.bgeconf`, APIs `Range`/`bge` | Mesmos nomes | Preservar arquivos, scripts e jogos existentes. |
 | ProgIDs `RangeEngine.BlendFile` e `RangeEngine.RangeFile` | Mesmos nomes | Atualizar os caminhos dos comandos/ícones, preservando os identificadores do Registro. |
@@ -36,7 +38,10 @@ A propriedade `OUTPUT_NAME` evita alterar todas as dependências, bibliotecas, t
 
 ## 3. RangeArmor: integração e limite do levantamento
 
-Confirmado: `tools/RangeArmor-master/` está ignorado pelo Git e **não existe neste checkout**, mas seu fonte está disponível no histórico, no commit `69df19d9`. Houve leitura direta desse snapshot com `git show`; antes de implementar, recuperar a versão local em diretório isolado e comparar com a ferramenta realmente distribuída. Preservar as adaptações locais.
+O fonte foi localizado no commit `69df19d9` e recuperado para `tools/rangearmor/` em 2026-10-08,
+fora do caminho ignorado `tools/RangeArmor-master/`. Os scripts instalados diferiam do snapshot;
+foram preservados em backup antes da integração inicial do cooking e atualização do launcher.
+O estado dessa frente está no [plano de atualização](rangearmor-update-plan.md).
 
 ### Integração existente na engine
 
@@ -84,7 +89,7 @@ Prioridades confirmadas para o editor Windows:
 
 ## 5. Caso o player também seja renomeado
 
-Proposta de nome: `AnastacioRuntime.exe`; pendente de decisão de escopo. Isso amplia a migração:
+Nome aprovado em 2026-10-08: `AnastacioRuntime.exe`, somente Windows. Isso amplia a migração:
 
 | Área | Arquivos/pontos já localizados |
 |---|---|
@@ -130,20 +135,170 @@ Critérios de aceite: `AnastacioEngine.exe` é produzido e instalado pelo build;
 
 ## 9. Estado deste relatório
 
-Foi realizada inspeção estática do checkout e das entradas relevantes do changelog. Não houve alteração de C++, scripts de produto, executáveis ou Registro, nem build: a entrega solicitada é o plano. O inventário cobre arquivos rastreados e inclui separadamente o Cook ainda não rastreado; não cobre fontes externas ausentes, binários, configurações pessoais ou integrações fora deste repositório. A implementação permanece aberta.
+Renomeação inicial implementada em 2026-10-08:
+
+- Alvo CMake `RangeEngine` produz `AnastacioEngine.exe` somente no ramo executável Windows;
+  módulo Python e nomes Linux/Web não foram alterados.
+- Recurso Windows distingue `AnastacioEngine.exe` e `RangeRuntime.exe`, pois é compartilhado.
+  Reconhecimento do processo pai aceita os nomes novo e legado, com comparação exata sem
+  distinguir maiúsculas/minúsculas.
+- Dependência Windows do editor no player evita instalação global concorrente com o link
+  do player. Primeiro build teve LNK1104; após ordenar os alvos, build completo passou.
+- Ferramentas e comandos Windows atuais foram atualizados. README diferencia builds novos
+  dos pacotes anteriormente publicados, que ainda usam `RangeEngine.exe`.
+- Editor novo iniciou, expôs o caminho correto em `bpy.app.binary_path` e executou Cook.
+  Player manteve nome e comportamento. Os sete testes de segurança do RangeArmor passaram.
+- Projeto `.range` existente abriu e foi salvo como cópia. Caminho do painel foi capturado
+  em teste e existe; não houve validação visual da GUI. ZIP local extraído em pasta com
+  espaços iniciou o editor, gerou `.cooked` pelo player e executou `.rasec`.
+- Editor antigo foi movido de `build/bin/` para o backup, evitando duas versões na instalação.
+  Backup: `build/safety-backups/editor-rename-20261008-095726/`.
+- Associações usam `GetModuleFileName` e preservam ProgIDs; nenhuma associação existente
+  apontando ao executável antigo desta instalação foi encontrada. Não houve registro novo.
+
+Pendências de validação: uso visual do editor/painel no jogo real, console, Steam/LAN, Windows
+sem Visual Studio e registro/remoção HKCU/HKLM em ambiente de teste. O pacote local de
+validação não é um release publicado. Player e ferramenta não foram rebatizados.
 
 
-## 10. Complemento: fonte da RangeArmor localizado no Git
+## 10. Continuação: Web e Android após a renomeação
 
-Corre??o do levantamento inicial em 2026-10-07: `git log --all -- tools/RangeArmor-master` e `git ls-tree -r 69df19d9 -- tools/RangeArmor-master` confirmaram o snapshot. Foi feita leitura direta com `git show` e busca com `git grep`, sem restaurar arquivos nem alterar o ?ndice.
+Validação em 2026-10-08, mantendo os nomes internos dos runtimes:
+
+- Usuário confirmou que o editor `AnastacioEngine.exe` funcionou. Essa confirmação não
+  representa validação do painel RangeArmor nem de todas as exportações no jogo real.
+- 131 testes do núcleo Web/Android passaram (`unittest discover` em
+  `tools/tests/web_profile`).
+- `engine_web_export.py` executado pelo editor novo passou: geração de pacote,
+  manifesto, controles na tela e preservação da entrega anterior quando há erro.
+  O preflight inicial reportou `WEB-GFX-002`, mas o diagnóstico em
+  `build/editor-rename-web-preflight.json` mostrou falso positivo: log de tempo de carga
+  com "shaders" e "compiled". Corrigida a heurística em `tools/web/package-web.py` para
+  exigir indicação de falha; diagnóstico estruturado continua preservado. Teste JavaScript
+  de regressão passou, incluindo falha real e log GLSL complementar. Nova exportação e
+  preflight no navegador passaram sem problemas nas duas variantes de controles.
+- `engine_android_export.py` executado pelo editor novo passou: export Web prévio,
+  Gradle `assembleDebug`, relatório e conteúdo do APK conferidos. Artefato de teste:
+  `C:\Users\f_bro\AppData\Local\Temp\tmpk4jravny\android\jogo-0.2-debug.apk`.
+  Instalação e execução em aparelho não realizadas; APK não publicado.
+- Android oficial continua sendo APK WebView sobre `build-web-release`. Não há
+  renomeação de `.exe` dentro dele. Android NDK continua congelado.
+- RangeArmor mantém saídas desktop Windows/Linux; os exportadores Web/Android são
+  próprios. Cooking desktop não foi declarado compatível com Web/Android por esses testes.
+
+Painel RangeArmor posteriormente recompilado e validado pela GUI, conforme seu plano.
+Usuário confirmou que o jogo rodou; essa confirmação não comprova todas as plataformas
+ou uso do cache. Próximas verificações: Web no jogo real, APK no aparelho, LibLoad e outra
+GPU. A etapa 5 do player Windows foi posteriormente autorizada e implementada; ver seção 14.
+
+## 11. Complemento: fonte da RangeArmor localizado no Git
+
+Correção do levantamento inicial em 2026-10-07: `git log --all -- tools/RangeArmor-master` e
+`git ls-tree -r 69df19d9 -- tools/RangeArmor-master` confirmaram o snapshot. Naquela inspeção
+foi feita leitura direta com `git show` e `git grep`, sem restaurar arquivos nem alterar o índice.
+Em 2026-10-08 o fonte foi recuperado, conforme a seção 3 e o plano de atualização da ferramenta.
 
 Achados confirmados no snapshot `69df19d9`:
 
-- `release/scripts/get_rangeengine_currentplatform.py`: tabela `PLATFORMS` exige `RangeRuntime.exe` e `RangeRuntime`; a valida??o e a c?pia dependem desses nomes. Se apenas o editor mudar, esses contratos continuam v?lidos. A c?pia leva a pasta da instala??o, portanto conferir tamb?m o editor novo eventualmente copiado e filtros de distribui??o.
-- `source/launcher/src/main.rs`: o launcher l? `Engine<plataforma>` do JSON e executa esse caminho com `Command::new(&engine)`. O nome do editor n?o ? uma depend?ncia literal nesse fluxo; renomear o player exige atualizar configura??o/c?pia, e n?o necessariamente mudar a l?gica de execu??o Rust.
-- `source/gui-rs/src/project.rs`: padr?es Windows/Linux usam `RangeRuntime`; inclui campos legados 32-bit. N?o confundir exist?ncia desses campos com suporte atual a exporta??es 32-bit.
-- `source/gui-rs/src/screens/editor.rs`: mensagens e testes referem-se ao player; incluir essa interface na auditoria, al?m de `scenes/editor.gd`.
-- `source/gui-rs/Cargo.toml`: metadado `CompanyName = "RangeEngine"`; revisar se a marca da ferramenta tamb?m for alterada.
-- `source/launcher.py`, `release/scripts/build_release.py`, `release/scripts/common.py`, `scenes/editor.gd`, `export_presets.cfg` e `project.godot`: fontes dispon?veis para completar auditoria de templates, painel e empacotamento.
+- `release/scripts/get_rangeengine_currentplatform.py`: tabela `PLATFORMS` usa `RangeRuntime.exe`
+  e `RangeRuntime`. A cópia e validação continuam válidas quando apenas o editor muda.
+- `source/launcher/src/main.rs`: lê `Engine<plataforma>` do JSON e executa o caminho configurado;
+  o nome do editor não é uma dependência literal desse fluxo.
+- `source/gui-rs/src/project.rs`: padrões Windows/Linux usam `RangeRuntime`; campos legados
+  32-bit não comprovam suporte atual a essas plataformas.
+- `source/gui-rs/src/screens/editor.rs`: mensagens e testes referem-se ao player; incluir
+  essa interface na auditoria, além do painel Godot.
+- `source/gui-rs/Cargo.toml`: metadado `CompanyName = "RangeEngine"`; revisar somente se a
+  marca da ferramenta também for alterada.
+- Scripts, cenas e presets estão disponíveis no snapshot para manutenção da ferramenta.
 
-O upstream p?blico tamb?m existe em https://github.com/rangeengine/RangeArmor, mas o snapshot local cont?m adapta??es AnastacioEngine e deve ter prioridade para preservar o trabalho j? realizado. Fonte recuper?vel n?o comprova que os bin?rios distribu?dos foram gerados desse exato snapshot; essa confer?ncia permanece necess?ria.
+O upstream público existe em <https://github.com/rangeengine/RangeArmor>, mas o snapshot local
+contém adaptações AnastacioEngine que precisam ser preservadas. Fonte recuperável não comprova
+que os binários distribuídos foram gerados desse exato snapshot; a sessão de implementação
+confirmou diferenças e atualizou o launcher Windows após teste do pacote extraído.
+
+## 12. Conferência da instalação e limpeza das sobras — 2026-10-08
+
+Usuário confirmou: “o jogo rodou”. Registro de execução manual bem-sucedida, sem
+atribuir esse resultado a uma plataforma/exportador ou medir ganho do cooking.
+
+Inspeção de `build/bin/`: editor atual é `AnastacioEngine.exe`; `RangeEngine.exe`
+não estava presente. Cinco artefatos antigos foram movidos para backup: `RangeEngine.exp`,
+`RangeEngine.lib`, `RangeEngine.pdb`, `RangeEngine-obj-drop-test.exe` e seu `.exp`.
+O Ninja atual gera import library e PDB como `AnastacioEngine`, confirmando a mudança.
+Backup: `D:/AnastacioEngine/build/safety-backups/editor-legacy-artifacts-20261008-110641/`. Editor instalado executou em background
+com startup de fábrica e confirmou `bpy.app.binary_path`, retornando 0 após a limpeza.
+
+`RangeRuntime.exe`, seus símbolos e `rangearmor/` permanecem ativos, conforme o escopo
+da primeira etapa. `build/bin/Release/` contém bibliotecas de builds anteriores e não
+foi alterado: não confundir essa subpasta com os executáveis atuais na raiz de `bin/`.
+Recompilar não remove saídas antigas automaticamente; não foi necessário rebuild limpo
+para retirar essas sobras. Renomear o player continua sendo a migração da seção 5.
+
+## 13. Pacotes Windows atualizados — 2026-10-08
+
+Pacotes locais em `build/dist/validation-20261008-111756/`, sem substituir releases
+existentes nem publicar. Engine: `AnastacioEngine-validation-20261008-111756-windows-x64.zip`
+(188.011.888 bytes); ferramenta: `RangeArmor-validation-20261008-111756-windows-x64.zip`
+(10.435.006 bytes). `SHA256SUMS.txt` acompanha os dois arquivos.
+
+Staging isolado excluiu símbolos `.pdb/.map/.lib/.exp`, caches Python, logs e testes;
+editor contém DLLs, assembly `blender.crt/`, Python/scripts/datafiles e licenças. Ferramenta
+separada contém painel Rust atualizado, scripts/templates e licença MIT. Para instalar,
+extrair a pasta `rangearmor` ao lado de `AnastacioEngine.exe`; Godot fica somente no backup
+da instalação de desenvolvimento. Launcher Linux herdado mantido, sem execução nesta sessão.
+
+ZIPs conferidos por CRC e extraídos de fato em pasta com espaços. Editor extraído abriu,
+resolveu player e painel pelo diretório novo; painel extraído criou janela e fechou com 0.
+Scripts/Python do pacote copiaram o runtime, prepararam `.cooked` e exportaram o projeto
+temporário. Jogo dessa entrega retornou 0 e log confirmou execução e hull preparado usado.
+Nenhum símbolo de debug foi incluído na entrega. Configuração do painel restaurada.
+
+Evidência e hashes em `build/current-windows-packages.json`; logs `build/current-package-*`.
+Scripts locais: `build/package_windows_current.py` e `build/validate_current_windows_packages.py`.
+Primeiro teste tinha config temporário sem `DataSource`; corrigido o fixture, execução passou.
+Limites: mesma máquina de desenvolvimento, cena controlada; Windows limpo/sem Visual Studio,
+Linux, outra GPU e APK em aparelho ainda exigem validação própria. Não foi feito rebuild
+nativo: pacotes usam os executáveis já compilados e a instalação atual.
+
+## 14. Player Windows renomeado — 2026-10-08
+
+Usuário autorizou a segunda etapa após esclarecer que o player ainda tinha o nome antigo.
+O alvo `RangeRuntime` agora produz `AnastacioRuntime.exe` somente no Windows; recurso
+`OriginalFilename` e caminho usado no registro de `.range` acompanham o arquivo novo.
+Alvos internos, ícones herdados, APIs, formatos, preferências e nomes Linux/Web/Android
+foram preservados. RangeArmor mantém sua marca e recebe a integração com o runtime novo.
+
+Standalone, cooking e export nativo preferem o player novo e aceitam o legado em instalações
+antigas. Novos projetos RangeArmor usam o nome novo; configurações antigas continuam lidas.
+Se um caminho configurado existe, ele ganha prioridade, inclusive para runtime personalizado.
+O config do autor não é sobrescrito: somente o config da entrega recebe o nome do executável
+efetivamente copiado. Launchers antigos conhecidos por SHA256 podem usar o template atualizado
+no Run/Export; launchers personalizados não são substituídos. A instalação portátil é descoberta
+pela posição dos scripts, sem precisar configurar variáveis de ambiente.
+
+Build nativo com vcvars64/VSLANG passou (14 etapas), incluindo editor e player. Launcher:
+três testes e build release; painel: 26 testes release e build release. Primeiro link dos
+testes debug do painel teve LNK1104 no executável de teste antigo; perfil release evitou
+o artefato de debug e passou. Quatro avisos preexistentes de campos não lidos no painel.
+Doze testes Python do RangeArmor e 132 testes Web/Android passaram.
+
+Execução direta do player novo, Cook pelo editor, operador standalone real e export nativo
+com jogo incorporado passaram. Logs confirmaram lógica da cena e hull preparado usado.
+O primeiro fixture do editor tentou abrir um arquivo protegido renomeado como `.range`;
+corrigido para usar a cena editável e adicionar a lógica de encerramento do teste.
+Player antigo e símbolos antigos da raiz de `build/bin/` foram movidos para backup,
+após execução bem-sucedida do player novo: `build/safety-backups/runtime-rename-20261008-112914/`.
+Evidência: `build/runtime-rename-execution.json` e `build/runtime-rename-*.log`.
+
+Novos ZIPs locais em `build/dist/validation-20261008-113829/`, com CRT, DLLs, scripts e
+licenças preservados; sem símbolos de debug. Integridade CRC, caminhos `/` e extração
+conferidos. Editor e painel extraídos iniciaram; scripts/Python do pacote encontraram o
+runtime sem variáveis de ambiente, copiaram, cozinharam e exportaram um projeto com config
+e launcher antigos. Run e jogo exportado retornaram 0; hull preparado foi usado. Config
+original preservado e config da entrega aponta para `AnastacioRuntime.exe`.
+Execução após extração registrada em `build/current-windows-packages.json`.
+Nenhuma publicação ou alteração das associações do Windows foi realizada. Re-registrar
+associações antigas e teste em Windows limpo seguem pendentes. O usuário confirmou que o jogo
+funciona após a migração. A implementação Windows está concluída; Windows limpo verifica
+as dependências do pacote e Linux exige uma validação separada em outra máquina.

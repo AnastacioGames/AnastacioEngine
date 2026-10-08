@@ -1,6 +1,6 @@
 """Integracao do operador Validar Web e do Localizar (precisa do motor):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_web_ui.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_web_ui.py
 
 Sai com codigo != 0 se alguma verificacao falhar.
 """

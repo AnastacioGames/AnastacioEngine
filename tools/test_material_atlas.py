@@ -1,4 +1,4 @@
-"""Run with build/bin/RangeEngine.exe -b --factory-startup --python this_file.
+"""Run with build/bin/AnastacioEngine.exe -b --factory-startup --python this_file.
 Data/pixel tests only: visual acceptance still belongs in the user's real game.
 """
 import json

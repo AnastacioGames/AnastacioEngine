@@ -22,6 +22,9 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [Atualização do RangeArmor](rangearmor-update-plan.md): integração com cooking, fonte recuperado,
+  exportação em staging, validação Windows e verificações ainda pendentes.
+
 - [Perfil Web e validação de exportação](web-profile-validation-plan.md): autoria na Range Engine com compatibilidade Web,
   catálogo de avisos/bloqueios, manifesto de capacidades e marcos de implementação; marcos A (painel) e B (núcleo puro) implementados.
 - [Empacotamento e hospedagem Web](web-deploy.md): `tools/web/package-web.py` gera pasta/ZIP hospedável a partir

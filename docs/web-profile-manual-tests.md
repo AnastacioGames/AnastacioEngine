@@ -7,12 +7,12 @@ Idioma Português (Preferências > System) aparecem como Validar Web, Exportar W
 
 ## Preparação
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
 
 Gera `build/web-manual/` com `bom.blend` (controller em `meu_mod.main`, que importa `pkg.util`)
 e `ruim.blend` (módulo inexistente).
 
-## A. Painel no editor (RangeEngine.exe com janela)
+## A. Painel no editor (AnastacioEngine.exe com janela)
 
 1. Abra `build/web-manual/bom.blend`. Propriedades > aba Export Game > painel **Web (Range)**.
 2. Clique **Validar Web**. Esperado: resumo sem erros ("Nenhuma incompatibilidade").

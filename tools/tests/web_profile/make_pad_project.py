@@ -1,6 +1,6 @@
 """Gera a cena de teste do controle na tela (gamepad 0 virtual) em projects-teste/pad/pad.range:
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_pad_project.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_pad_project.py
 
 Um cubo andando pelo plano com o stick esquerdo de logic.joysticks[0] (vermelho sem gamepad, verde com) ou
 com WASD/setas. O botao A, lido por um sensor Joystick (logic brick), ou o espaco fazem o cubo pular. A cada 30

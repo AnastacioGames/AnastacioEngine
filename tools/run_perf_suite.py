@@ -18,7 +18,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUNTIME = os.path.join(ROOT, "build", "bin", "RangeRuntime.exe")
+RUNTIME = os.path.join(ROOT, "build", "bin", "AnastacioRuntime.exe")
 
 HEADER = re.compile(r"^scene (\S+)\s+tag (\S+)")
 FPS = re.compile(r"([\d.]+) fps reported\s+([\d.]+) ticks/s\s+([\d.]+) ms/tick")

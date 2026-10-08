@@ -3,14 +3,14 @@
 Correctness (compares each bone's pose matrix, frame by frame, with the
 editor's evaluation, saved next to the scene as bone_constraint_reference.json):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/bone_constraint_test.py -- --make-scene bone_constraints.range
-    build/bin/RangeRuntime.exe bone_constraints.range
+    build/bin/AnastacioEngine.exe -b --python tools/tests/bone_constraint_test.py -- --make-scene bone_constraints.range
+    build/bin/AnastacioRuntime.exe bone_constraints.range
 
 IK cost (N rigs with a 10-bone IK chain each; run plugged in, dedicated GPU,
 and compare LEGACY with ITASC):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/bone_constraint_test.py -- --make-perf-scene ik_perf.range 20 LEGACY
-    build/bin/RangeRuntime.exe ik_perf.range
+    build/bin/AnastacioEngine.exe -b --python tools/tests/bone_constraint_test.py -- --make-perf-scene ik_perf.range 20 LEGACY
+    build/bin/AnastacioRuntime.exe ik_perf.range
 
 Results are printed with the BONE_CONSTRAINT prefix and written to
 bone_constraint_test_result.txt (IK_PERF / ik_perf_result.txt for the perf scene).

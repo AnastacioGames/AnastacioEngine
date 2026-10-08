@@ -1,7 +1,7 @@
 """Gera um exemplo mínimo de Cutscene nativa e salva um arquivo .blend.
 
 Uso:
-    RangeEngine.exe --background --factory-startup --python cutscene_native_example.py -- exemplo.blend
+    AnastacioEngine.exe --background --factory-startup --python cutscene_native_example.py -- exemplo.blend
 """
 
 import os

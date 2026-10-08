@@ -59,7 +59,7 @@ compatibility; `WITH_GL_PROFILE_CORE_RANGERUNTIME` cobre o caminho core específ
 - `ge_rasterizer`, `ge_rasterizer_opengl`: verificações rápidas do rasterizador.
 - `ge_rasterizer_shaders`: reconstruir após editar `.glsl`; o alvo apenas incorpora o texto.
 - `RangeEngine`: editor completo.
-- `RangeRuntime`: player standalone, executado como `RangeRuntime.exe <arquivo.range>`.
+- `RangeRuntime`: player standalone, executado como `AnastacioRuntime.exe <arquivo.range>`.
 
 Erros de sintaxe GLSL aparecem somente em runtime, via `glCompileShader`, normalmente como `CM_Error` ou
 `CM_Warning` no console.
@@ -79,7 +79,7 @@ No `build/` atual o Ninja não rastreia nenhum header: o `msvc_deps_prefix` em `
 
 - Compile o menor alvo afetado e depois os executáveis que distribuem a mudança.
 - Para rasterizador/shader, valide compatibility e core quando aplicável.
-- Execute `RangeEngine.exe` e `RangeRuntime.exe` no fluxo afetado.
+- Execute `AnastacioEngine.exe` e `AnastacioRuntime.exe` no fluxo afetado.
 - Para comportamento visual, use o jogo real; screenshots automatizados não são evidência confiável neste
   projeto.
 - Nunca declare uma mudança de código concluída apenas porque compilou.

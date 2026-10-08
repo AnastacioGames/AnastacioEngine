@@ -1214,7 +1214,7 @@ materialbinds=...` entre pontos/áreas da cena. Build limpo (`RangeEngine`/`Rang
 rebuild de `ge_ketsji` por alteração de header).
 
 **Estado em 2026-09-07 (medido em jogo real — candidato descartado, sem ganho mensurável):**
-Usuário mediu em RolimaRacer (RTX 5060 Laptop, `RangeRuntime.exe` standalone com
+Usuário mediu em RolimaRacer (RTX 5060 Laptop, `AnastacioRuntime.exe` standalone com
 `-g show_render_queries=1 -g show_debug_mode=1`, e também via Play do editor). Resultado ao longo de
 uma sessão de gameplay com trocas de câmera: draw calls entre ~145 e ~296 por frame, material binds
 estável em ~166 (poucas trocas de material — instancing/bucket routing já reduzindo binds na

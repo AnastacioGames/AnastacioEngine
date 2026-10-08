@@ -20,7 +20,7 @@ com uma linha `START`.
 | `RANGE_PROFILE_SPIKE_MS=<ms>` | limite mínimo para um frame contar como pico (padrão 25). |
 | `RANGE_PROFILE_SYNC=1` | faz `glFinish` no fim do frame (`endframe.gpu_sync`). Sem ele, a espera pela GPU aparece dentro da etapa que bloqueou (normalmente `endframe.imgui` ou `endframe.swap`). Com ele, o FPS cai um pouco. |
 
-Exemplo (PowerShell): `$env:RANGE_PROFILE="prof.txt"; RangeRuntime.exe jogo.range`.
+Exemplo (PowerShell): `$env:RANGE_PROFILE="prof.txt"; AnastacioRuntime.exe jogo.range`.
 Rodadas de ~10 s bastam; os primeiros 30 frames (carregamento) são ignorados.
 
 ## Como ler

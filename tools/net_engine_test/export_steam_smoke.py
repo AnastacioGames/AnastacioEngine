@@ -10,7 +10,7 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 out=root/'build-steam/export-test'
 out.mkdir(exist_ok=True)
 if (out/'steam_appid.txt').exists(): (out/'steam_appid.txt').unlink()
-assert module.WriteRuntime(str(root/'build/bin/RangeRuntime.exe'),str(out/'Game.exe'),True,True,True,False,False,
+assert module.WriteRuntime(str(root/'build/bin/AnastacioRuntime.exe'),str(out/'Game.exe'),True,True,True,False,False,
                     steam_complement_dir=str(root/'build-steam'))
 assert (out/'Game.exe').is_file()
 assert (out/'blender.crt/blender.crt.manifest').is_file()
@@ -24,7 +24,7 @@ assert not (out/'steam_appid.txt').exists()
 
 lan=root/'build-steam/export-lan'
 lan.mkdir(exist_ok=True)
-assert module.WriteRuntime(str(root/'build/bin/RangeRuntime.exe'),str(lan/'Game.exe'),True,True,True,False,False)
+assert module.WriteRuntime(str(root/'build/bin/AnastacioRuntime.exe'),str(lan/'Game.exe'),True,True,True,False,False)
 assert not (lan/'complements/steam/AnastacioSteam.dll').exists()
 print('STEAMEXPORT author PASS (Steam selected and LAN without Steam)',flush=True)
 

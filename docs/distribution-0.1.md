@@ -6,8 +6,8 @@ Distribua uma cópia limpa de `build/bin/` em um único ZIP, preservando esta es
 
 ```text
 AnastacioEngine-0.1-windows-x64/
-  RangeEngine.exe
-  RangeRuntime.exe
+  AnastacioEngine.exe
+  AnastacioRuntime.exe
   *.dll
   blender.crt/
     blender.crt.manifest
@@ -22,7 +22,7 @@ portátil real gerada pelo projeto; a pasta `install/` da raiz pode estar obsole
 de build literalmente: exclua logs, arquivos `.pdb`/`.map`/`.lib`/`.exp`, ferramentas internas
 (`datatoc`, `makesdna`, `makesrna`), cenas de teste, backups e configurações locais do ImGui.
 
-**Runtime do Visual C++ (pasta `blender.crt/`):** `RangeEngine.exe`/`RangeRuntime.exe` têm um manifesto
+**Runtime do Visual C++ (pasta `blender.crt/`):** `AnastacioEngine.exe`/`AnastacioRuntime.exe` têm um manifesto
 embutido que declara dependência de uma assembly privada chamada `blender.crt` (mecanismo herdado do
 Blender/UPBGE para versionar o runtime do VC++ via side-by-side). Essa assembly só é resolvida se existir
 uma **subpasta `blender.crt/`** ao lado do `.exe`, contendo o `blender.crt.manifest` gerado pelo CMake
@@ -59,8 +59,9 @@ build/dist/
 - `RangeArmor-<versao>-windows-x64.zip`: **asset separado**, não mais embutido no zip da engine — o
   painel, launcher, scripts de exportação e a licença MIT da ferramenta (© BGEmpire Studio). Publicado na
   mesma página/release do GitHub que a engine, mas como arquivo distinto, já que o código-fonte da
-  RangeArmor não está neste repositório (`tools/RangeArmor-master/` é ignorado pelo Git). O painel (GUI,
-  Godot) só roda no Windows; não existe nem é necessário um pacote `RangeArmor-<versao>-linux-x64`
+  RangeArmor foi recuperado do histórico para `tools/rangearmor/` em 2026-10-08 para revisão e
+  versionamento (`tools/RangeArmor-master/` continua ignorado pelo Git). O painel (GUI,
+  Rust/eframe, com Godot preservado como backup) só foi validado no Windows; não existe pacote `RangeArmor-<versao>-linux-x64`
   separado, porque o painel já exporta jogos para Linux x86_64 embutindo o launcher Rust compilado para
   `x86_64-unknown-linux-gnu`.
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
@@ -73,7 +74,7 @@ partir de `0.3.0` em favor do asset separado acima.
 **Não copie `concrt140.dll`, `msvcp140*.dll`, `vcruntime140.dll` nem `vccorlib140.dll` soltos ao lado do `.exe`**: além de não resolverem a dependência, com eles presentes o `RangeRuntime.exe` encerra com código 11 ao abrir um `.range` (o `RangeEngine.exe` continua abrindo). A `0.3.0` foi publicada assim; a `0.4.0` usa só `blender.crt/` + `ucrtbase.dll`.
 
 A criação dos ZIPs deve preservar o build original. Primeiro monte as pastas descartáveis em
-`build/release-staging/`, valide que `RangeEngine.exe`, `RangeRuntime.exe` e, no pacote ampliado, o
+`build/release-staging/`, valide que `AnastacioEngine.exe`, `AnastacioRuntime.exe` e, no pacote ampliado, o
 `RangeArmor Panel.exe` e `release/launcher/Launcher.exe` existem. Depois compacte para `build/dist/`
 e gere os hashes. Antes do upload, execute os binários a partir de uma cópia extraída do ZIP.
 
@@ -89,7 +90,7 @@ Quando disponível, o atlas legado da UPBGE deve ficar em:
   blender_icons32.png
 ```
 
-Antes de publicar, confirme que `RangeEngine.exe` e `RangeRuntime.exe` iniciam a partir de uma cópia limpa
+Antes de publicar, confirme que `AnastacioEngine.exe` e `AnastacioRuntime.exe` iniciam a partir de uma cópia limpa
 do pacote e que os scripts, datafiles e DLLs necessários continuam presentes.
 
 ## Linux x86_64

@@ -2,7 +2,7 @@
 Roda todos os testes automatizados de regressao dos bugs corrigidos em
 2026-09-03. Uso:
 
-    RangeEngine.exe --background --python tools/tests/bugfix_regression/run_all.py
+    AnastacioEngine.exe --background --python tools/tests/bugfix_regression/run_all.py
 
 GPU-001 e pulado: precisa de uma sessao interativa ja aberta. Em --background
 nao existe contexto OpenGL e durante --python o gl_load() bloqueia.

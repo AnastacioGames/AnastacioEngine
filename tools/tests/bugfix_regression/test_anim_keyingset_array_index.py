@@ -4,7 +4,7 @@ intervalo da propriedade RNA, caindo para -1 (whole array) em vez de manter
 um indice invalido silenciosamente.
 
 Rodar em background, sem GUI:
-    RangeEngine.exe --background --python tools/tests/bugfix_regression/test_anim_keyingset_array_index.py
+    AnastacioEngine.exe --background --python tools/tests/bugfix_regression/test_anim_keyingset_array_index.py
 
 Ou dentro do Text Editor da Range (Alt+P) com uma cena qualquer aberta.
 """

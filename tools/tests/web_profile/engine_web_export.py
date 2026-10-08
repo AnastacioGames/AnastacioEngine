@@ -1,6 +1,6 @@
 """Integracao do operador Exportar Web (precisa do motor e de build-web-release/bin):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_web_export.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_web_export.py
 
 Sai com codigo != 0 se alguma verificacao falhar.
 """

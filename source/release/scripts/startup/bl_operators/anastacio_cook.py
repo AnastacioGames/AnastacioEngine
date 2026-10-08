@@ -35,7 +35,11 @@ def cooked_path(context=None):
 
 def _runtime_path():
     binary = bpy.app.binary_path
-    return os.path.join(os.path.dirname(binary), "RangeRuntime" + os.path.splitext(binary)[1])
+    directory = os.path.dirname(binary)
+    extension = os.path.splitext(binary)[1]
+    names = ("AnastacioRuntime.exe", "RangeRuntime.exe") if os.name == 'nt' else ("RangeRuntime" + extension,)
+    candidates = [os.path.join(directory, name) for name in names]
+    return next((path for path in candidates if os.path.isfile(path)), candidates[0])
 
 
 class GAME_OT_cook(Operator):
@@ -54,33 +58,51 @@ class GAME_OT_cook(Operator):
 
         runtime = _runtime_path()
         if not os.path.isfile(runtime):
-            self.report({'ERROR'}, "RangeRuntime not found: %s" % runtime)
+            self.report({'ERROR'}, "Game runtime not found: %s" % runtime)
             return {'CANCELLED'}
 
         target = cooked_path()
         # The game runs from a copy, so unsaved changes are cooked too and the .blend is left untouched.
         tempdir = tempfile.mkdtemp(prefix="anastacio_cook_")
         copy = os.path.join(tempdir, "cook.blend")
+        fresh_target = os.path.join(tempdir, "cook.cooked")
         try:
-            bpy.ops.wm.save_as_mainfile(filepath=copy, copy=True, relative_remap=True, compress=False)
-            env = dict(os.environ, ANASTACIO_COOK=target)
+            saved = bpy.ops.wm.save_as_mainfile(filepath=copy, copy=True, relative_remap=True, compress=False)
+            if 'FINISHED' not in saved:
+                self.report({'ERROR'}, "Could not save the temporary cooking scene")
+                return {'CANCELLED'}
+            env = dict(os.environ, ANASTACIO_COOK=fresh_target)
             if context.window:
                 context.window.cursor_set('WAIT')
             result = subprocess.run([runtime, "-w", "320", "180", copy], env=env, timeout=600,
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if result.returncode != 0:
+                self.report({'ERROR'}, "Cook failed (runtime exit code %d)" % result.returncode)
+                return {'CANCELLED'}
+            if os.path.isfile(fresh_target):
+                # Replace only after success, on the destination filesystem.
+                import shutil
+                staged = target + ".export-tmp"
+                try:
+                    shutil.copy2(fresh_target, staged)
+                    os.replace(staged, target)
+                finally:
+                    if os.path.isfile(staged):
+                        os.remove(staged)
+            elif os.path.isfile(target):
+                # A successful empty cook must not leave results from an older scene.
+                os.remove(target)
         except subprocess.TimeoutExpired:
             self.report({'ERROR'}, "Cook did not finish in 10 minutes")
+            return {'CANCELLED'}
+        except (OSError, RuntimeError) as ex:
+            self.report({'ERROR'}, "Cook failed: %s" % ex)
             return {'CANCELLED'}
         finally:
             if context.window:
                 context.window.cursor_set('DEFAULT')
-            for name in os.listdir(tempdir):
-                os.remove(os.path.join(tempdir, name))
-            os.rmdir(tempdir)
-
-        if result.returncode != 0:
-            self.report({'ERROR'}, "Cook failed (RangeRuntime exit code %d)" % result.returncode)
-            return {'CANCELLED'}
+            import shutil
+            shutil.rmtree(tempdir, ignore_errors=True)
         if os.path.isfile(target):
             self.report({'INFO'}, "Cooked: %s (%.1f MB)" % (os.path.basename(target),
                                                          os.path.getsize(target) / 1048576.0))

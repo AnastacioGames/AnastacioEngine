@@ -799,7 +799,7 @@ __PERF_SCRIPT__
       m = /^([\\w.]*(Error|Exception))\\b/.exec(t);
       if (m) { pfPyOpen = false; pfAddPy({ kind: m[1], text: t, file: "" }); return; }
     }
-    if (!pfStructuredShader && /shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
+    if (!pfStructuredShader && /shader/i.test(t) && /\\b(fail(?:ed|ure)?|error|unable|cannot|invalid|unsuccessful)\\b/i.test(t)) {
       var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t,
                   structured: false };
       pfAddShader(rec);

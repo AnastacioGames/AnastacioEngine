@@ -105,7 +105,7 @@ antes de investigar um crash "esquisito" que não bate com a mudança feita.
   (erro cometido e corrigido duas vezes no changelog).
 - **Shaders de viewport do editor** (`gpu_shader_fx_*`, usados por `view3d_draw.c`) **nunca são compilados
   pelo `RangeRuntime`** — não entram em esforços de migração de core profile do jogo.
-- **Manter `RangeEngine.exe` (editor) e `RangeRuntime.exe` (player) em paridade**: toda mudança de
+- **Manter `AnastacioEngine.exe` (editor) e `AnastacioRuntime.exe` (player) em paridade**: toda mudança de
   C++/shader deveria ser compilada e smoke-testada nos dois.
 - **Malhas compartilhadas entre Objects**: a conversão de dados Blender→Ketsji faz cache de mesh por
   `Mesh*` compartilhado entre Objects — dado por-objeto que dependa da ordem de vertex groups (ex.: índices
@@ -130,7 +130,7 @@ executáveis que historicamente divergem (ver item 3 e item 5 acima) — validar
 1. **Compilar os dois builds relevantes**: `build/` (compat) e, se a mudança toca shader/rasterizador/GPU,
    também `build_core/` (`WITH_GL_PROFILE_CORE_RANGERUNTIME`). Mudança em `DNA_*.h` ou em header muito
    incluído exige rebuild limpo nos dois (`ninja -t clean` + rebuild), nunca incremental — ver item 4.
-2. **Rodar os dois executáveis**: `RangeEngine.exe` (editor) e `RangeRuntime.exe` (player standalone). Uma
+2. **Rodar os dois executáveis**: `AnastacioEngine.exe` (editor) e `AnastacioRuntime.exe` (player standalone). Uma
    mudança que só é testada no editor pode esconder regressão que só aparece no Play/player (aconteceu com o
    bug de "Reload All Components", ver changelog 2026-08-25).
 3. **Testar na cena real do usuário, não em screenshot automatizado por script de câmera** — captura

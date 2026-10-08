@@ -1,6 +1,6 @@
 """Scan estatico de traducao dos textos de interface escritos em C, fora do RNA.
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/i18n_scan_c.py -- pt_BR [saida.txt]
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/i18n_scan_c.py -- pt_BR [saida.txt]
 
 Complementa i18n_audit.py (RNA) e i18n_scan_labels.py (layouts Python). Le os .c/.cc/.cpp de source/source e
 procura IFACE_("..."), TIP_("..."), N_("..."), CTX_IFACE_(ctx, "...") e CTX_N_(ctx, "...") com literal (literais

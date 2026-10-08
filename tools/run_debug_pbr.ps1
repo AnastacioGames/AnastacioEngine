@@ -14,9 +14,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $repo "build\bin\RangeEngine.exe"
+$exe = Join-Path $repo "build\bin\AnastacioEngine.exe"
 if (-not (Test-Path $exe)) {
-    throw "RangeEngine.exe nao encontrado em $exe - compile antes (skill build-anastacio)."
+    throw "AnastacioEngine.exe nao encontrado em $exe - compile antes (skill build-anastacio)."
 }
 
 $logDir = Join-Path $repo "debug-logs"

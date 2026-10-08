@@ -249,6 +249,10 @@ class SaveAsRuntime(bpy.types.Operator):
         ext = os.path.splitext(blender_bin_path)[-1].lower()
 
     default_player_path = os.path.join(blender_bin_dir, 'RangeRuntime' + ext)
+    if sys.platform == 'win32':
+        new_player_path = os.path.join(blender_bin_dir, 'AnastacioRuntime.exe')
+        if os.path.isfile(new_player_path) or not os.path.isfile(default_player_path):
+            default_player_path = new_player_path
     player_path: StringProperty(
             name="Player Path",
             description="The path to the player to use",

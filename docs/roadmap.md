@@ -8,6 +8,11 @@ shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) está n
 
 Auditado contra o git log e o changelog em 2026-09-20.
 
+Continuação da migração de nome em 2026-10-08: geração Web, preflight no navegador e APK pelo
+editor novo passaram após corrigir falso positivo no diagnóstico de shaders. APK ainda precisa
+de teste em aparelho. Exportação pela GUI RangeArmor passou em cena controlada; jogo real permanece pendente.
+Evidências e limites no [plano de renomeação](executable-rename-plan.md).
+
 ## Sumário
 
 - [Atlas de materiais](#atlas-de-materiais)
@@ -40,7 +45,25 @@ Auditado contra o git log e o changelog em 2026-09-20.
 
 ## Prioridade atual
 
+- Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
+  Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
+  confirmou que o jogo funciona após a migração. Pendente: console,
+  Steam/LAN, associações HKCU/HKLM e Windows sem Visual Studio; [plano](executable-rename-plan.md).
+  Linux e artefatos Web/Android mantêm nomes anteriores.
+
 ### Carregamento mais rápido ("Cozinhar")
+
+- RangeArmor: preparo de `.cooked` na exportação, opção de exportar sem cache, staging e launcher
+  Windows atualizado passaram em cena controlada e pacote extraído. Pendente: jogo real,
+  Linux/outra GPU e migração dos runtimes dos projetos antigos; [plano](rangearmor-update-plan.md).
+  Cópia da instalação real, Cook e execução pelo player copiado passaram em caminho com
+  espaço/acento. Aberto: codificação de destinos não ASCII em `ANASTACIO_COOK` direto no runtime.
+  Painel Rust recompilado com tratamento de exit code; 26 testes e abertura/fechamento
+  passaram. Exportação pela GUI e diagnóstico de falha passaram em cena controlada;
+  export comprimido pela GUI também passou, com execução do ZIP extraído e uso do cache.
+  Usuário confirmou execução do jogo; falta validar LibLoad, benefício do cache no jogo
+  real e outras plataformas/GPU. Pacotes locais sem símbolos de debug foram extraídos e
+  executados; permanece validação em Windows limpo antes de publicar.
 
 Plano: arquivo `.cooked` preparado para o jogo ao lado do `.range`, com fallback para o cru. Etapas 1 (medição
 `[Load]`) e 2 (cache de shader GLSL, merge do LibLoad só com materiais novos) feitas em 2026-10-03; comparação

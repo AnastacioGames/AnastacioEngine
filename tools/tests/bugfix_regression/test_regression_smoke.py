@@ -6,7 +6,7 @@ bilhoes de vertices) porque isso exigiria alocacoes de dezenas de GB so para
 provocar o overflow original - impraticavel de automatizar com seguranca.
 
 Rodar em background, sem GUI:
-    RangeEngine.exe --background --python tools/tests/bugfix_regression/test_regression_smoke.py
+    AnastacioEngine.exe --background --python tools/tests/bugfix_regression/test_regression_smoke.py
 """
 import bpy
 

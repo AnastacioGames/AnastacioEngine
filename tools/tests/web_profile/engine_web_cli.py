@@ -1,6 +1,6 @@
 """Integracao de tools/web/validate-web.py (precisa do motor e de build-web-release/bin):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_web_cli.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_web_cli.py
 
 Roda o motor filho sobre um arquivo limpo e outro com erro Web. Sai != 0 se algo falhar.
 """

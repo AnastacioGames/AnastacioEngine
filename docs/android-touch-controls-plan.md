@@ -143,7 +143,7 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    escondida (`visibilitychange`, como na troca de app) com o stick apertado. 25/25.
 
    **Roteiro no celular:**
-   1. Gerar a cena: `build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
+   1. Gerar a cena: `build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
    2. Abrir `projects-teste/pad/pad.range` no editor. Em Android (Range), usar um applicationId de teste (ex.:
       `com.anastaciogames.pad`), gerar o APK debug e instalar com "Instalar no celular". Log:
       `adb logcat -s RangeWeb`, com o app aberto com `?debug=1` (`--es query "debug=1"`).

@@ -31,6 +31,192 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — Player Windows AnastacioRuntime.exe e integração com RangeArmor
+
+- Usuário autorizou a segunda etapa. Alvo `RangeRuntime` mantém seu nome interno e
+  produz `AnastacioRuntime.exe` no Windows; recurso e registro de `.range` atualizados.
+  Linux e artefatos Web/Android mantidos. Standalone, Cook e export nativo adaptados.
+- RangeArmor cria caminhos novos, aceita configuração legada e mantém prioridade de
+  caminhos existentes/personalizados. Somente config da entrega é ajustado ao runtime
+  copiado. Templates antigos conhecidos por hash usam launcher atual no Run/Export;
+  descoberta da instalação portátil não exige variáveis de ambiente.
+- Build editor/player passou (14 etapas). Launcher: três testes/build; painel: 26 testes
+  release/build. Link dos testes debug falhou com LNK1104 no artefato antigo; perfil release
+  passou. Doze testes Python e 132 Web/Android passaram. Quatro avisos herdados do painel.
+- Player novo, Cook pelo editor, standalone e export nativo executaram a cena controlada;
+  hull preparado usado. Corrigido fixture do editor que tentava abrir `.rasec` como `.range`.
+  Artefatos antigos do player retirados da raiz de `build/bin/` para backup reversível.
+- ZIPs atuais em `build/dist/validation-20261008-113829/`, CRC/caminhos/extração conferidos.
+  Primeiro ensaio sem override usou pacote anterior enquanto o novo staging terminava;
+  repetido sequencialmente com o pacote atualizado. Projeto/config/launcher legados,
+  Cook, export e jogo extraído passaram. Evidências e limites na seção 14 do
+  [plano](executable-rename-plan.md#14-player-windows-renomeado--2026-10-08).
+  Nenhuma publicação ou alteração das associações no Registro.
+
+## 2026-10-08 — Pacotes Windows atuais preparados e executados após extração
+
+- Staging isolado da instalação atual gerou engine (188.011.888 bytes) e RangeArmor
+  (10.435.006 bytes), com SHA256, caminhos `/` e CRC conferidos. Símbolos, logs,
+  caches Python, testes e backup Godot excluídos; CRT e licenças preservados.
+- Editor/painel extraídos iniciaram. Scripts e Python extraídos copiaram runtime,
+  prepararam `.cooked` e exportaram fixture; launcher executou e confirmou uso do hull.
+  Preferências restauradas. Corrigido campo DataSource ausente no primeiro fixture.
+- Sem publicação nem rebuild nativo. Pacotes em `build/dist/validation-20261008-111756/`;
+  evidências, instrução de instalação da ferramenta e limites no
+  [plano de migração](executable-rename-plan.md#13-pacotes-windows-atualizados--2026-10-08).
+
+## 2026-10-08 — Mapas atualizados e export comprimido pela GUI validado
+
+- `check_docs.py --fix` atualizou 91 referências/contagens do mapa. Checagem posterior:
+  zero erros e zero avisos. Alteração documental, sem necessidade de rebuild nativo.
+- 132 testes Web/Android e nove testes de segurança/cópia da RangeArmor passaram.
+- Export Windows64 pela GUI com compressão gerou ZIP, preservando entrega anterior.
+  Integridade e caminhos `/` conferidos; pacote extraído em pasta com espaços executou
+  launcher com exit 0 e confirmou uso do hull preparado. CRT e `.cooked` presentes.
+- Preferências restauradas; nenhuma publicação. Evidências e limites no
+  [plano da ferramenta](rangearmor-update-plan.md). Runtime de desenvolvimento torna
+  ZIP grande; staging público deve excluir símbolos e arquivos internos.
+
+## 2026-10-08 — Jogo confirmado pelo usuário e sobras do editor retiradas
+
+- Usuário confirmou execução do jogo; plataforma/pacote e desempenho não especificados.
+- Cinco artefatos antigos do editor movidos de `build/bin/` para backup reversível,
+  incluindo executável de teste de setembro e símbolos antigos. Editor atual executou
+  com startup de fábrica e retornou 0. Nenhum rebuild limpo necessário.
+- Runtime e RangeArmor mantêm os nomes da primeira etapa. Inventário e backup no
+  [plano de migração](executable-rename-plan.md).
+
+## 2026-10-08 — Exportação pela GUI da RangeArmor testada e logotipo ampliado
+
+- Projeto temporário aberto pelo botão Open Project/seletor de pasta; botão Export
+  Windows64 gerou cache/entrega e mostrou sucesso. Launcher exportado executou a lógica
+  da cena e utilizou hull preparado. MainFile inexistente mostrou falha na GUI e manteve
+  entrega anterior. Controles reais acionados por automação de acessibilidade do Windows.
+- Logotipo do cabeçalho ganhou área fixa de 280 × 84 pontos, com proporção preservada.
+  Build release passou; painel instalado aberto para conferir aparência. Backup em
+  `build/safety-backups/rangearmor-logo-20261008-105253/` e imagem em
+  `build/rangearmor-logo-validation.png`.
+- Lista de recentes/config do painel restaurada byte a byte. Sem alteração de projeto
+  real ou publicação. Limites e evidências no [plano](rangearmor-update-plan.md).
+
+## 2026-10-08 — Painel RangeArmor recompilado com tratamento de exit code
+
+- Runner Rust considera exit code além de mensagens `X ` e aguarda leitura dos dois
+  streams antes de marcar conclusão. Novo teste cobre saída 7 sem prefixo de erro.
+- 26 testes passaram e build release concluiu com MSVC/vcvars64/VSLANG. Rust 1.92
+  não satisfazia dependências egui/eframe; instalado toolchain 1.95.0 separado e usado
+  explicitamente, sem mudar o compilador padrão. Avisos de campos não lidos em `project.rs`.
+- Executável novo criou janela e fechou com exit 0 antes/depois da instalação; hashes
+  SHA256 conferem. Backup em `build/safety-backups/rangearmor-panel-20261008-104444/`.
+  Nenhuma publicação. Exportação pela GUI/jogo real continua pendente; [plano](rangearmor-update-plan.md).
+
+## 2026-10-08 — Inicialização do painel RangeArmor verificada
+
+- Painel instalado Rust/eframe criou sua janela e fechou normalmente, exit 0.
+  Teste identificou janela por PID/título e enviou fechamento; `WaitForInputIdle`
+  não era adequado ao executável. Evidência em `build/rangearmor-panel-startup.json`.
+- GUI Godot permanece como backup. Interação com projetos/botões ainda pendente.
+  Fonte Rust do runner ignora exit code e depende de prefixo `X `; correção para
+  falhas silenciosas ficou registrada no [plano](rangearmor-update-plan.md).
+
+## 2026-10-08 — Erros na cópia de runtimes da RangeArmor propagados ao chamador
+
+- Script de cópia retornava sucesso após diagnóstico de falha. Agora encerra com código 1
+  para projeto inválido, runtime ausente, plataforma não suportada ou exceção na cópia.
+- Nove testes passaram, incluindo CLI real e restauração do runtime anterior após falha
+  na substituição pelo staging. Script instalado atualizado com backup; execução sem
+  config retornou 1. GUI permanece pendente; [plano](rangearmor-update-plan.md).
+
+## 2026-10-08 — Runtime copiado pela RangeArmor executado fora do build
+
+- Script instalado copiou instalação real para projeto temporário em caminho com espaço
+  e acento. CRT/Python/player presentes, editores excluídos. Preparador instalado gerou
+  `ANACOOK2` usando player copiado; execução de `.rasec` confirmou uso do cache e marcador
+  da lógica da cena. Evidência em `build/rangearmor-real-copy-validation.txt`.
+- Teste direto anterior revelou limitação de codificação do destino de `ANASTACIO_COOK`
+  com acento; preparador atual passou com arquivo temporário e cópia Python. Limitação
+  nativa registrada no [plano](rangearmor-update-plan.md), sem alteração de C++.
+- GUI, jogo real, outra GPU/Linux e APK em aparelho continuam pendentes.
+
+## 2026-10-08 — Cópia dos runtimes da RangeArmor atualizada
+
+- Script instalado legado foi preservado em backup e substituído pelo fonte recuperado.
+  Removida dependência de corte fixo do caminho Python e de lista fixa de DLLs que omitia CRT.
+- Cópia exclui editores RangeEngine/AnastacioEngine, preserva player e dependências,
+  usa staging e mantém runtime anterior em pasta `.previous-*`. Destinos sobrepostos
+  à origem ou fora do projeto são recusados.
+- Oito testes Python passaram; cópia executada sobre instalação simulada, com falha
+  injetada e preservação do destino anterior. GUI, instalação completa e jogo real
+  continuam pendentes. Ver [plano](rangearmor-update-plan.md).
+
+## 2026-10-08 — Exportadores Web/Android verificados com o editor renomeado
+
+- Usuário confirmou funcionamento do editor novo. 131 testes puros Web/Android passaram.
+- Integração `engine_web_export.py` passou no `AnastacioEngine.exe`: pacote/manifesto,
+  controles e preservação da exportação anterior verificados. Preflight inicial reportou
+  `WEB-GFX-002`: falso positivo causado por log de tempo com "shaders" e "compiled".
+  Heurística em `tools/web/package-web.py` agora exige indicação de falha. Teste JavaScript
+  de regressão passou para logs de sucesso, falha real e diagnóstico estruturado; novo
+  export/preflight real passou sem problemas. Diagnóstico inicial preservado em
+  `build/editor-rename-web-preflight.json`. Jogo real continua exigindo validação visual.
+- Integração `engine_android_export.py` passou, incluindo Gradle `assembleDebug`, relatório
+  e conteúdo do APK. APK de teste gerado no diretório temporário registrado no plano;
+  não instalado em aparelho nem publicado. Android NDK permanece congelado.
+- Nomes `RangeRuntime.exe` e artefatos `RangeRuntime` Web preservados. Nenhuma alteração
+  de C++ ou do formato de cooking nesta continuação. Ver [plano](executable-rename-plan.md).
+
+## 2026-10-08 — Editor Windows renomeado para AnastacioEngine.exe
+
+- `OUTPUT_NAME` no ramo executável Windows do alvo `RangeEngine`; módulo `bpy`, alvo interno,
+  player, APIs, preferências, ProgIDs e nomes Linux/Web preservados. Recurso Windows compartilhado
+  distingue `OriginalFilename` do editor e do player. Detecção do processo pai aceita nomes
+  novo/legado com comparação exata sem distinção de caixa; ícones externos não dependem do nome novo.
+- Build inicial teve LNK1104 no player e falha no install do editor por arquivo ausente.
+  A instalação global do pós-build podia concorrer com o link do player. Dependência Windows
+  `RangeEngine` → `RangeRuntime` agora ordena essas etapas; segundo build completo passou.
+  CMake informou ausência do compilador CUDA neste ambiente; recompilação de cubins não foi validada.
+- 32 arquivos de ferramentas/templates tiveram comandos Windows atualizados, além das instruções
+  vigentes. README distingue fonte atual de releases anteriores, cujos executáveis não mudaram.
+- Backup em `build/safety-backups/editor-rename-20261008-095726/`; editor antigo movido de
+  `build/bin/` para esse backup. Não foi encontrado Registro apontando ao antigo executável desta
+  instalação, portanto não foi criada nem removida associação de arquivos.
+- Validação: `ninja RangeEngine RangeRuntime` passou com vcvars64/VSLANG; editor iniciou e expôs
+  novo caminho; metadados dos dois executáveis corretos; Cook real, abertura de `.range`, save
+  de cópia e resolução do painel pelo editor novo passaram. Caminho do painel foi capturado em
+  teste, sem iniciar a GUI. Sete testes Python do backend RangeArmor continuam passando.
+- ZIP local `build/dist/AnastacioEngine-rename-validation-20261008-100156.zip` extraído em pasta
+  com espaços: editor iniciou; player gerou `.cooked` e executou `.rasec`. `blender.crt/` presente,
+  executável antigo ausente do ZIP. Pacote de validação não publicado.
+- Pendente: jogo real/GUI/console, Steam/LAN, registro e remoção HKCU/HKLM em ambiente de teste,
+  Windows sem Visual Studio. Ver [plano de migração](executable-rename-plan.md).
+  Verificador de docs mantém os 30 erros/61 avisos anteriores dos mapas de código.
+
+## 2026-10-08 — RangeArmor: preparo do cooking e exportação com staging
+
+- Backup em `build/safety-backups/rangearmor-20261008-093834/`: módulos de fonte antes da edição,
+  scripts instalados originais da RangeArmor, launcher original e comparação com o snapshot.
+  Fonte histórico `69df19d9` recuperado em `tools/rangearmor/`, fora da pasta ignorada.
+- Cook manual prepara saída temporária, substitui o cache após sucesso e preserva o anterior em
+  falha/timeout. Uma preparação vazia bem-sucedida remove o resultado antigo.
+- Backend RangeArmor prepara o `.cooked` do `MainFile` protegido antes de empacotar. Export de um
+  clique fornece o runtime do host; save protegido e JSON precisam terminar com sucesso.
+  Painel usa caminho derivado do diretório do editor, sem corte fixo pelo nome do executável.
+- Opção `Cook before export`, ligada por padrão no export de um clique. Desligada usa `--no-cook`:
+  entrega sem `.cooked`, preservando os caches de autoria. Painel independente mantém preparo padrão.
+- Release em staging, com entrega anterior preservada em `.previous-*`, falhas com exit code 1,
+  nomes de saída confinados ao projeto e ZIP com `/`; formato escolhido pelo alvo Windows/Linux.
+- Teste inicial do pacote extraído encontrou launcher obsoleto com panic `Option::unwrap()`.
+  Launcher Windows recompilado do fonte recuperado, template instalado atualizado e hash do
+  template antigo registrado para substituição apenas na entrega. Launchers personalizados e
+  binários originais dos projetos existentes permanecem preservados.
+- Validação: build `RangeEngine RangeRuntime` com vcvars64/VSLANG passou após um LNK1104 transitório
+  no primeiro link; Cook, preset e opção de export executados no editor; sete testes Python de segurança e dois
+  testes Rust passaram. Exportador instalado gerou ZIP, extraído em outra pasta, cujo launcher
+  retornou 0 e cujo jogo gravou marcador de execução. Incluiu `blender.crt/` e `.cooked`.
+- Pendente: jogo real, interação visual da GUI, Linux, outra GPU e
+  migração dos runtimes de projetos antigos. GUI preservada; executáveis da engine não renomeados.
+  `check_docs.py` continua apontando 30 erros/61 avisos anteriores nos mapas de código.
+
 ## 2026-10-08 — YoFrankie: fases cozidas e ReplaceMesh sem malha
 
 - Medição no porte do YoFrankie (`D:\yofrankie`): o carregamento lento das fases era compilação de shaders

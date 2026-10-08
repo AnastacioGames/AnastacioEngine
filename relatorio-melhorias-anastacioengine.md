@@ -6,6 +6,28 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+Editor Windows: `AnastacioEngine.exe`, produzido pelo alvo interno `RangeEngine` desde 2026-10-08.
+Player Windows: `AnastacioRuntime.exe`, produzido pelo alvo `RangeRuntime` desde 2026-10-08.
+Resolução do player aceita o nome legado nos projetos; formatos, APIs e preferências mantêm compatibilidade.
+Linux e artefatos Web/Android conservam os nomes anteriores.
+Build, abertura/save de projeto, Cook e pacote extraído passaram em testes controlados;
+validações manuais pendentes estão no [plano de migração](docs/executable-rename-plan.md).
+Pacotes Windows locais atualizados, separados para engine e RangeArmor, passaram em
+extração/execução, cooking e exportação sem símbolos de debug. Hashes em
+`build/dist/validation-20261008-113829/SHA256SUMS.txt`; não publicados.
+
+A integração inicial de cooking no RangeArmor prepara o `.cooked` do arquivo protegido antes
+de empacotar, gera a entrega em staging e preserva a entrega anterior. Fonte recuperado em
+`tools/rangearmor/`; launcher Windows atualizado e pacote extraído executado em cena controlada.
+RangeArmor resolve nomes Windows novo/legado sem alterar config do autor, adapta o config
+da entrega e encontra a instalação portátil sem variáveis de ambiente. Novo player passou
+Cook, standalone pelo editor e export nativo com jogo incorporado.
+Painel Rust recompilado com tratamento de exit code e leitura completa dos logs das tarefas;
+26 testes e abertura/fechamento do executável instalado passaram.
+Exportação pelos botões da GUI, ZIP extraído/executado e diagnóstico de erro passaram em
+cena controlada. Usuário confirmou que o jogo rodou; benefício do cache no jogo real,
+LibLoad, Linux e outra GPU seguem pendentes no [plano](docs/rangearmor-update-plan.md).
+
 RangeArmor estÃ¡ validada para runtimes Windows/Linux x86_64, com cÃ³pia dos runtimes disponÃ­veis,
 exportaÃ§Ã£o `.zip`/`.tar.xz` e interface sem alvos 32-bit. Campos 32-bit antigos permanecem aceitos
 somente para leitura de projetos legados.

@@ -13,7 +13,7 @@ for case in ('cancel', 'cancel-late', 'error', 'success'):
     errors = log.with_name(log.stem + '-error.log')
     with log.open('w') as output, errors.open('w') as err:
         process = subprocess.Popen([
-            str(root / 'build/bin/RangeEngine.exe'), '--factory-startup',
+            str(root / 'build/bin/AnastacioEngine.exe'), '--factory-startup',
             '--python-exit-code', '1', '--python',
             str(root / 'tools/test_material_atlas_modal.py'), '--', '--case', case,
         ], cwd=root, stdout=output, stderr=err, startupinfo=startup)

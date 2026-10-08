@@ -1,7 +1,7 @@
 """Testes puros do nucleo range_web (marco B). Sem bpy.
 
     python -m unittest discover -s tools/tests/web_profile -v
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/test_range_web.py  (Python do motor, 3.11)
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/test_range_web.py  (Python do motor, 3.11)
 """
 
 import hashlib

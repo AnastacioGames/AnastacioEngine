@@ -1,6 +1,6 @@
 """Integracao da selecao de idioma (English/Portugues) do editor (precisa do motor com WITH_INTERNATIONAL):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_i18n.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_i18n.py
 
 Sai com codigo != 0 se alguma verificacao falhar. O desenho na janela (fonte, acentos, menu de idioma)
 nao e coberto aqui: so a janela real mostra isso.
