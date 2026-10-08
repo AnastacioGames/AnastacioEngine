@@ -30,6 +30,7 @@
 #include "CM_Message.h"
 
 #include "KX_Camera.h"
+#include "KX_Scene.h"
 #include "DNA_camera_types.h"
 
 #include <algorithm>
@@ -359,6 +360,66 @@ void KX_2DFilterManager::EnsureLensFlareFilters(BuildInFilters filters)
 	AddFilter(flareData, true);
 }
 
+RAS_2DFilterData KX_2DFilterManager::CameraFXData(int pass)
+{
+	RAS_2DFilterData data;
+	data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	data.filterPassIndex = pass;
+	data.gameObject = nullptr;
+	data.mipmap = false;
+	data.propertyNames = {};
+	data.buildInFilters = {};
+	data.shaderText = (pass == FILTERPASS_CAMERA_DOF) ? datatoc_RAS_CameraDof2DFilter_glsl :
+	                                                    datatoc_RAS_CameraLens2DFilter_glsl;
+	return data;
+}
+
+void KX_2DFilterManager::CameraFXUsed(KX_Scene *scene, bool& dof, bool& lens) const
+{
+	/* Any camera: the effects are often turned on from Python only during the game (nitro, countdown), so the
+	 * flags at load say nothing. Disabled passes cost no draw. Inactive layers too: a camera spawned later (the
+	 * player's car) is there. */
+	dof = lens = false;
+	for (EXP_ListValue<KX_GameObject> *list : {scene->GetObjectList(), scene->GetInactiveList()}) {
+		for (KX_GameObject *gameobj : list) {
+			if (dynamic_cast<KX_Camera *>(gameobj)) {
+				dof = lens = true;
+				return;
+			}
+		}
+	}
+}
+
+void KX_2DFilterManager::PrefetchCameraFX(KX_Scene *scene)
+{
+	bool use[2];
+	CameraFXUsed(scene, use[0], use[1]);
+	const int passes[2] = {FILTERPASS_CAMERA_DOF, FILTERPASS_CAMERA_LENS};
+	for (int i = 0; i < 2; ++i) {
+		if (use[i] && !GetFilterPass(passes[i], true)) {
+			// Inside a prefetch pass the link only sends the program to the driver; the filter itself is dropped.
+			RAS_2DFilterData data = CameraFXData(passes[i]);
+			delete NewFilter(data);
+		}
+	}
+}
+
+void KX_2DFilterManager::PrepareCameraFX(KX_Scene *scene)
+{
+	bool use[2];
+	CameraFXUsed(scene, use[0], use[1]);
+	const int passes[2] = {FILTERPASS_CAMERA_DOF, FILTERPASS_CAMERA_LENS};
+	for (int i = 0; i < 2; ++i) {
+		if (use[i] && !GetFilterPass(passes[i], true)) {
+			RAS_2DFilterData data = CameraFXData(passes[i]);
+			if (RAS_2DFilter *filter = AddFilter(data, true)) {
+				// UpdateCameraFX turns it on when the active camera uses it.
+				filter->SetEnabled(false);
+			}
+		}
+	}
+}
+
 void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 {
 	bool useDof = false;
@@ -427,14 +488,7 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 
 	RAS_2DFilter *dof = GetFilterPass(FILTERPASS_CAMERA_DOF, true);
 	if (useDof && !dof) {
-		RAS_2DFilterData data;
-		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
-		data.filterPassIndex = FILTERPASS_CAMERA_DOF;
-		data.gameObject = nullptr;
-		data.mipmap = false;
-		data.propertyNames = {};
-		data.buildInFilters = {};
-		data.shaderText = datatoc_RAS_CameraDof2DFilter_glsl;
+		RAS_2DFilterData data = CameraFXData(FILTERPASS_CAMERA_DOF);
 		dof = AddFilter(data, true);
 	}
 	else if (dof) {
@@ -445,14 +499,7 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 
 	RAS_2DFilter *lens = GetFilterPass(FILTERPASS_CAMERA_LENS, true);
 	if (useLens && !lens) {
-		RAS_2DFilterData data;
-		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
-		data.filterPassIndex = FILTERPASS_CAMERA_LENS;
-		data.gameObject = nullptr;
-		data.mipmap = false;
-		data.propertyNames = {};
-		data.buildInFilters = {};
-		data.shaderText = datatoc_RAS_CameraLens2DFilter_glsl;
+		RAS_2DFilterData data = CameraFXData(FILTERPASS_CAMERA_LENS);
 		lens = AddFilter(data, true);
 	}
 	else if (lens) {

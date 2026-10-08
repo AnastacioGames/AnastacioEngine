@@ -54,6 +54,7 @@
 #include <sstream>
 #include "BL_ActionActuator.h"
 #include "KX_BlenderMaterial.h"
+#include "KX_2DFilterManager.h"
 #include "KX_WorldInfo.h"
 
 #include "LA_SystemCommandLine.h"
@@ -625,10 +626,30 @@ void BL_Converter::UseSceneWorld(KX_Scene *scene)
 bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsigned int& sent, double deadline)
 {
 	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
+	KX_2DFilterManager *filters = scene->Get2DFilterManager();
 	UseSceneWorld(scene);
-	return step_shaders((unsigned int)materials.size(), next, sent, deadline,
-	                    [&](unsigned int i) { materials[i]->PrefetchMaterial(); },
-	                    [&](unsigned int i) { materials[i]->ReloadMaterial(); });
+	// Step 0 is the Camera FX passes, built here instead of at the first frame that uses them.
+	return step_shaders((unsigned int)materials.size() + 1, next, sent, deadline,
+	                    [&](unsigned int i) {
+		if (i == 0) {
+			if (filters) {
+				filters->PrefetchCameraFX(scene);
+			}
+		}
+		else {
+			materials[i - 1]->PrefetchMaterial();
+		}
+	},
+	                    [&](unsigned int i) {
+		if (i == 0) {
+			if (filters) {
+				filters->PrepareCameraFX(scene);
+			}
+		}
+		else {
+			materials[i - 1]->ReloadMaterial();
+		}
+	});
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
@@ -1486,7 +1507,16 @@ void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter, 
 
 void BL_Converter::ReloadShaders(KX_Scene *scene)
 {
+	KX_2DFilterManager *filters = scene->Get2DFilterManager();
+	if (filters && parallel_shaders()) {
+		GPU_shader_prefetch_begin();
+		filters->PrefetchCameraFX(scene);
+		GPU_shader_prefetch_end();
+	}
 	prefetch_shaders(m_sceneSlots[scene].m_materials);
+	if (filters) {
+		filters->PrepareCameraFX(scene);
+	}
 	for (std::unique_ptr<KX_BlenderMaterial>& mat : m_sceneSlots[scene].m_materials) {
 		mat->ReloadMaterial();
 	}

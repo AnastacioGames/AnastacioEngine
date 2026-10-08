@@ -33,6 +33,7 @@
 #include "EXP_PyObjectPlus.h"
 
 class KX_Camera;
+class KX_Scene;
 
 class KX_2DFilterManager : public RAS_2DFilterManager, public EXP_PyObjectPlus
 {
@@ -66,8 +67,16 @@ public:
 	/** Camera FX of the active camera: adds/removes the DOF and Lens passes when the set of enabled
 	 * effects changes (so everything off costs no pass) and uploads this frame's values. */
 	void UpdateCameraFX(KX_Camera *camera);
+	/** Scene load, inside a shader prefetch pass: sends the programs of the Camera FX passes the scene's cameras
+	 * use to the driver, compiled together with the materials. */
+	void PrefetchCameraFX(KX_Scene *scene);
+	/** Scene load: builds those passes (disabled), instead of at the first frame that uses them. */
+	void PrepareCameraFX(KX_Scene *scene);
 
 private:
+	RAS_2DFilterData CameraFXData(int pass);
+	void CameraFXUsed(KX_Scene *scene, bool& dof, bool& lens) const;
+
 	RAS_ICanvas *m_canvas;
 	/** Film Grain, a scene post-process drawn in the camera lens pass. */
 	bool m_useGrain;
