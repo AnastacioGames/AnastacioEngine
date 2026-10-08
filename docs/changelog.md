@@ -31,6 +31,13 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — `.cooked`: tangentes
+
+- O registro de malha (versão 2 da chave) guarda também a tangente de cada vértice gerado (4 floats) quando a
+  malha usa tangentes; com o registro cozido o `DM_calc_loop_tangents` (mikktspace) é pulado.
+- `make_cooked_mesh_test.py` agora inclui as tangentes no checksum: idêntico entre rodada normal e cozida.
+  Malha do teste (24 mil vértices): meshes 32 → 4 ms, tangentes 24 → 0 ms; `.cooked` de 849 KB.
+
 ## 2026-10-08 — `.cooked`: buffers de malha
 
 - O `.cooked` ganhou um registro novo (tipo 3) com a montagem dos display arrays de cada malha: para cada

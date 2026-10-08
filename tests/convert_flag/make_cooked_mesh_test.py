@@ -48,7 +48,7 @@ def checksum(cont):
                 n = mesh.getVertexArrayLength(m)
                 for i in range(n):
                     v = mesh.getVertex(m, i)
-                    mix((tuple(round(c, 5) for c in v.XYZ), tuple(round(c, 4) for c in v.normal),
+                    mix((tuple(round(c, 5) for c in v.XYZ), tuple(round(c, 4) for c in v.normal), tuple(round(c, 4) for c in v.tangent),
                          tuple(round(c, 5) for uv in v.uvs for c in uv), tuple(round(c, 3) for c in v.color)))
                 linhas.append("%s/%d: %d vertices" % (mesh.name, m, n))
             for p in range(mesh.numPolygons):
