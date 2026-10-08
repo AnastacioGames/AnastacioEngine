@@ -4823,7 +4823,8 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 
 	/* Grupo do jogo (Play, Standalone, cadeado, console) em bloco próprio: fora do
 	 * Object Mode todos ficam desabilitados juntos, como o Play (game_engine_poll).
-	 * Botão desabilitado é desenhado com alpha 0.5, então pinta um fundo opaco antes
+	 * Botão desabilitado (o grupo fora do Object Mode, ou o Cook sem .blend salvo) é desenhado
+	 * com alpha 0.5, então sempre pinta um fundo opaco antes
 	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás. */
 	{
 		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
@@ -4835,9 +4836,8 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		row = uiLayoutRow(layout, true);
 		uiLayoutSetEnabled(row, game_ok);
 
-		/* Cook (convert everything once into the .cooked file) and Clear Cooked, right before Play. */
+		/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
 		uiItemO(row, "Cook", ICON_COOK, "GAME_OT_cook");
-		uiItemO(row, "", ICON_X, "GAME_OT_cook_clear");
 		uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
 		uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 		uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
@@ -4847,7 +4847,7 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		UI_block_layout_resolve(block, &end_x, &end_y);
 		UI_block_end(C, block);
 
-		if (!game_ok && end_x > x) {
+		if (end_x > x) {
 			bTheme *btheme = UI_GetTheme();
 			unsigned char col[4];
 

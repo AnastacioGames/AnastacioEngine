@@ -50,7 +50,14 @@ class GAME_OT_cook(Operator):
 
     @classmethod
     def poll(cls, context):
-        return bool(bpy.data.filepath)
+        if not bpy.data.filepath:
+            return False
+        # Already up to date: the cooked file is newer than the saved .blend and nothing changed since.
+        target = cooked_path()
+        try:
+            return bpy.data.is_dirty or os.path.getmtime(target) < os.path.getmtime(bpy.data.filepath)
+        except OSError:
+            return True
 
     def execute(self, context):
         import subprocess
