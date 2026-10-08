@@ -2012,7 +2012,7 @@ class OBJECT_MT_lod_tools(Menu):
         layout.operator("object.lod_clear_all", text="Clear All", icon='PANEL_CLOSE')
         
 class OBJECT_OT_game_load_with_scene(Operator):
-    """Set the game Load Mode of the selected objects"""
+    """Set the game Load Mode of the active and selected objects and their children"""
     bl_idname = "object.game_load_with_scene"
     bl_label = "Set Load Mode"
     bl_options = {'REGISTER', 'UNDO'}
@@ -2028,10 +2028,12 @@ class OBJECT_OT_game_load_with_scene(Operator):
 
     @classmethod
     def poll(cls, context):
-        return bool(context.selected_objects)
+        return bool(context.object or context.selected_objects)
 
     def execute(self, context):
         selected = set(context.selected_objects)
+        if context.object:
+            selected.add(context.object)
         targets = set(selected)
         if self.children:
             for ob in context.scene.objects:
@@ -2061,7 +2063,11 @@ class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
         scene = context.scene
 
         box = layout.box()
-        box.prop(ob, "game_load_mode", expand=True)
+        row = box.row(align=True)
+        for mode, text in (('SCENE', "With Scene"), ('ON_DEMAND', "On Demand"), ('EDITOR_ONLY', "Editor Only")):
+            row.operator("object.game_load_with_scene", text=text,
+                         depress=(ob.game_load_mode == mode)).mode = mode
+        box.label(text="Applies to the selected objects and their children")
 
         # The converter drops any object below an ancestor left out at load.
         par = ob.parent
@@ -2093,13 +2099,6 @@ class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
                 if any(o.data == ob.data and o.game_load_mode == 'SCENE' for o in scene.objects if o != ob):
                     box.label(text="Mesh shared with loaded objects: freeUnconvertedData() keeps it",
                               icon='INFO')
-
-        box = layout.box()
-        box.label(text="Apply to selected objects and their children:")
-        row = box.row(align=True)
-        row.operator("object.game_load_with_scene", text="With Scene").mode = 'SCENE'
-        row.operator("object.game_load_with_scene", text="On Demand").mode = 'ON_DEMAND'
-        row.operator("object.game_load_with_scene", text="Editor Only").mode = 'EDITOR_ONLY'
 
 
 def BL_is_child_of(ob, parent):
