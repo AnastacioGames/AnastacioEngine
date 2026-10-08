@@ -523,6 +523,16 @@ static void restrictbutton_scene_collection_render(bContext *C, void *poin, void
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_RENDER, poin);
 }
 
+/* Object Load Mode: With Scene <-> On Demand (Editor Only is set in the properties). */
+static void restrictbutton_load_mode_cb(bContext *C, void *poin, void *UNUSED(poin2))
+{
+	Object *ob = poin;
+	PointerRNA ptr;
+	RNA_pointer_create(&ob->id, &RNA_Object, ob, &ptr);
+	RNA_boolean_set(&ptr, "convert_object", (ob->gameflag & OB_TASK_CONVERT) == 0);
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+}
+
 static void restrictbutton_scene_collection_game(bContext *C, void *poin, void *poin2)
 {
 	Scene *scene = poin;
@@ -744,15 +754,23 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				/* Game load mode, left of the eye like the collections' game checkbox. */
 				if (BKE_scene_uses_blender_game(scene)) {
 					if (ob->gameflag & OB_TASK_EDITOR_ONLY) {
-						uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_GHOST_DISABLED,
+						/* Faded, so it differs from the On Demand empty ghost. */
+						bt = uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_GHOST_DISABLED,
 						             (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
-						             NULL, 0, 0, 0, 0, TIP_("Editor Only: never created in the game"));
+						             NULL, 0, 0, 0, 0, TIP_("Load Mode: Editor Only, never created in the game (change it in Object > Game)"));
+						UI_but_flag_enable(bt, UI_BUT_INACTIVE);
 					}
 					else {
-						bt = uiDefIconButR(block, UI_BTYPE_ICON_TOGGLE, 0, ICON_CHECKBOX_DEHLT,
-						                   (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
-						                   &ptr, "convert_object", -1, 0, 0, -1, -1,
-						                   TIP_("Load with Scene: unchecked, a script creates it with scene.convertObject()"));
+						/* Load Mode: filled ghost With Scene, empty ghost On Demand. */
+						const bool with_scene = (ob->gameflag & OB_TASK_CONVERT) != 0;
+						bt = uiDefIconBut(block, UI_BTYPE_BUT, 0, with_scene ? ICON_GHOST_ENABLED : ICON_GHOST_DISABLED,
+						                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+						                  NULL, 0, 0, 0, 0,
+						                  with_scene ? TIP_("Load Mode: With Scene. Click: On Demand, a script creates it "
+						                                    "with scene.convertObject()") :
+						                               TIP_("Load Mode: On Demand, a script creates it with "
+						                                    "scene.convertObject(). Click: With Scene"));
+						UI_but_func_set(bt, restrictbutton_load_mode_cb, ob, NULL);
 						UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 					}
 				}

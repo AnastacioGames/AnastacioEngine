@@ -541,8 +541,14 @@ void BL_ConvertActuators(const char *maggiename,
 					case ACT_EDOB_REPLACE_MESH:
 					{
 						KX_Mesh *tmpmesh = converter.FindGameMesh(editobact->me);
+						/* Mesh no object of the scene uses (e.g. HUD digits kept with a fake user):
+						 * converted here, as Blender 2.4x did. */
+						if (!tmpmesh && editobact->me) {
+							tmpmesh = BL_ConvertMesh(editobact->me, nullptr, scene, converter);
+						}
 
-						if (!tmpmesh) {
+						// No mesh is fine: scripts often set it by name (actuator.mesh = "...").
+						if (!tmpmesh && editobact->me) {
 							CM_Warning("object \"" << objectname << "\" from ReplaceMesh actuator \"" << uniquename
 							                       << "\" uses a mesh not owned by an object in scene \"" << scene->GetName() << "\".");
 						}

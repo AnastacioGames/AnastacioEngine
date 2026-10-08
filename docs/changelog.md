@@ -31,6 +31,16 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — YoFrankie: fases cozidas e ReplaceMesh sem malha
+
+- Medição no porte do YoFrankie (`D:\yofrankie`): o carregamento lento das fases era compilação de shaders
+  (ex. `level_1_home`: 9,6 s com cache do driver frio, 1,1 s com ele quente, 0,2 s com o `.cooked`).
+  Cook de todas as fases: minilevels 6–8 s → ~0,1 s, `level_underworld` 5,7 s → 0,19 s, seletor 2,1 s → 0,08 s.
+  Sobra por fase ~0,3 s de conversão (tangentes ~0,2 s) e ~0,25 s de texturas.
+- ReplaceMesh (`BL_ConvertActuators.cpp`): malha que nenhum objeto da cena usa agora é convertida na hora,
+  como no Blender 2.4x. Actuator sem malha não avisa mais: os scripts do HUD a definem por nome
+  (`actuator.mesh = ...`); o aviso aparecia 14 vezes em toda fase.
+
 ## 2026-10-07 — Arquivo cozido: pontos do Convex Hull em `.cooked`
 
 - Medição por etapa (teste `tests/convert_flag/make_vs_libload.py`, que agora grava o `getLoadLog()` em
