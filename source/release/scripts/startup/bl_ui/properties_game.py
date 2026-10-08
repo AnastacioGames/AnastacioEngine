@@ -2060,45 +2060,46 @@ class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
         ob = context.object
         scene = context.scene
 
-        layout.prop(ob, "game_load_mode", expand=True)
+        box = layout.box()
+        box.prop(ob, "game_load_mode", expand=True)
 
         # The converter drops any object below an ancestor left out at load.
         par = ob.parent
         while par and par.game_load_mode == 'SCENE':
             par = par.parent
         if par and ob.game_load_mode == 'SCENE':
-            layout.label(text="Left out anyway: parent \"%s\" doesn't load with the scene" % par.name, icon='ERROR')
+            box.label(text="Left out anyway: parent \"%s\" doesn't load with the scene" % par.name, icon='ERROR')
 
         if ob.game_load_mode == 'ON_DEMAND':
-            col = layout.column(align=True)
+            col = box.column(align=True)
             col.label(text="Left out at load. Create it from a script with:", icon='INFO')
             col.label(text="    scene.convertObject(\"%s\")" % ob.name)
         elif ob.game_load_mode == 'EDITOR_ONLY':
-            layout.label(text="Never created in the game, not even by scene.convertObject()", icon='INFO')
+            box.label(text="Never created in the game, not even by scene.convertObject()", icon='INFO')
 
         if ob.game_load_mode != 'SCENE':
             descendants = [o for o in scene.objects if o.parent and BL_is_child_of(o, ob)]
             if descendants:
-                layout.label(text="%d child object(s) stay out with it" % len(descendants), icon='OUTLINER_OB_EMPTY')
+                box.label(text="%d child object(s) stay out with it" % len(descendants), icon='OUTLINER_OB_EMPTY')
 
             for group in ob.users_group:
                 for inst in scene.objects:
                     if inst.game_load_mode == 'SCENE' and inst.dupli_type == 'GROUP' and inst.dupli_group == group:
-                        layout.label(text="Missing from the instances of group \"%s\" (\"%s\")" % (group.name, inst.name),
-                                     icon='ERROR')
+                        box.label(text="Missing from the instances of group \"%s\" (\"%s\")" % (group.name, inst.name),
+                                  icon='ERROR')
                         break
 
             if ob.type == 'MESH' and ob.data and ob.data.users > 1:
                 if any(o.data == ob.data and o.game_load_mode == 'SCENE' for o in scene.objects if o != ob):
-                    layout.label(text="Mesh shared with loaded objects: freeUnconvertedData() keeps it",
-                                 icon='INFO')
+                    box.label(text="Mesh shared with loaded objects: freeUnconvertedData() keeps it",
+                              icon='INFO')
 
-        layout.separator()
-        layout.label(text="Selected objects and their children:")
-        row = layout.row(align=True)
-        row.operator("object.game_load_with_scene", text="With Scene", icon='CHECKBOX_HLT').mode = 'SCENE'
-        row.operator("object.game_load_with_scene", text="On Demand", icon='CHECKBOX_DEHLT').mode = 'ON_DEMAND'
-        row.operator("object.game_load_with_scene", text="Editor Only", icon='GHOST_DISABLED').mode = 'EDITOR_ONLY'
+        box = layout.box()
+        box.label(text="Apply to selected objects and their children:")
+        row = box.row(align=True)
+        row.operator("object.game_load_with_scene", text="With Scene").mode = 'SCENE'
+        row.operator("object.game_load_with_scene", text="On Demand").mode = 'ON_DEMAND'
+        row.operator("object.game_load_with_scene", text="Editor Only").mode = 'EDITOR_ONLY'
 
 
 def BL_is_child_of(ob, parent):
@@ -2137,15 +2138,14 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
                 and ob.type not in {'CAMERA'})
 
-    def draw_header(self, context):
-        self.layout.prop(context.object.game.network, "use_replicate", text="")
-
     def draw(self, context):
         layout = self.layout
         net = context.object.game.network
 
-        layout.active = net.use_replicate
-        col = layout.column()
+        box = layout.box()
+        box.prop(net, "use_replicate", text="Replicate")
+        col = box.column()
+        col.active = net.use_replicate
         col.prop(net, "sync_transform")
         col.prop(net, "sync_velocity")
         col.prop(net, "sync_angular_velocity")
@@ -2153,9 +2153,9 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
         col.prop(net, "use_always_relevant")
         col.prop(net, "priority")
         if net.use_replicate:
-            layout.label(text="ID: %d" % net.net_id)
-            layout.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
-        layout.label(text="Room, ports and server: Export Game > Network", icon='EXPORT')
+            col.label(text="ID: %d" % net.net_id)
+            col.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
+        box.label(text="Room, ports and server: Export Game > Network", icon='EXPORT')
 
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
