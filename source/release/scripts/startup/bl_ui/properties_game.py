@@ -2049,7 +2049,7 @@ class OBJECT_OT_game_load_with_scene(Operator):
 
 
 class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
-    bl_label = "Loading"
+    bl_label = "Load Object with Scene"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
