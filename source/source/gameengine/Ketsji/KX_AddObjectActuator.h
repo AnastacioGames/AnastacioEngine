@@ -70,6 +70,8 @@ class KX_AddObjectActuator : public SCA_IActuator
 	std::string m_objectProperty;
 	/// The property lives in the World (World Property) instead of the owner object.
 	bool m_objectPropertyGlobal;
+	/// Object left out at load (Load Mode "On Demand"): converted the first time the actuator adds it.
+	std::string m_onDemandName;
 
 	/// Object to replicate: the one named by the property when set, otherwise m_OriginalObject.
 	KX_GameObject *ResolveOriginalObject();
@@ -114,6 +116,11 @@ public:
 	{
 		m_objectProperty = name;
 		m_objectPropertyGlobal = global;
+	}
+
+	void SetOnDemandObject(const std::string& name)
+	{
+		m_onDemandName = name;
 	}
 
 #ifdef WITH_PYTHON

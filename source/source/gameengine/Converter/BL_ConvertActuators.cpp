@@ -515,6 +515,13 @@ void BL_ConvertActuators(const char *maggiename,
 							mt::vec3(editobact->angVelocity),
 							(editobact->localflag & ACT_EDOB_LOCAL_ANGV) != 0);
 
+						// Load Mode "On Demand": nothing is converted until the actuator first adds it.
+						if (!originalval && editobact->ob && !editobact->ob->id.lib &&
+						    !(editobact->ob->gameflag & (OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY)))
+						{
+							tmpaddact->SetOnDemandObject(editobact->ob->id.name + 2);
+						}
+
 						if (editobact->flag & ACT_EDOB_ADD_FROM_PROP) {
 							tmpaddact->SetObjectProperty(editobact->name,
 							                             (editobact->flag & ACT_EDOB_ADD_PROP_GLOBAL) != 0);
