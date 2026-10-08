@@ -2467,7 +2467,7 @@ class WM_MT_splash(Menu):
         col1.operator("wm.recover_last_session", icon='RECOVER_LAST')
         col1.separator()
         col1.label(text="Range Engine Network")
-        col1.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col1.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         col1.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
         api_url = ("https://rangeengine.tech/api/" +
                    (bpy.app.range_version_string[0] + bpy.app.range_version_string[2]) + "/html/index.html")
@@ -2506,7 +2506,7 @@ class WM_MT_splash_about(Menu):
         col.emboss = 'PULLDOWN_MENU'
         col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
         col.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
-        col.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
 
 class WM_OT_create_project(Operator):
