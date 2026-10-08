@@ -1,5 +1,25 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Teste auditivo Web de Reverb Area com alternância de dois segundos
+
+- Revisão a pedido do usuário: versão 0.1.1 troca pulsos por som contínuo em loop sem
+  descontinuidade; gain 1, decay 10 s, reflections 3 e late gain 10. Mantém a limitação EFX.
+
+- Novo gerador `tools/create_web_reverb_ab_scene.py`: Speaker 3D com WAV empacotado,
+  pulsos idênticos e pausas, listener fixo e área CAVERN movida para dentro/fora a cada 2 s.
+- `tools/web/reverb-ab-status.js` mostra o estado emitido pelo jogo;
+  `tools/web/verify-reverb-ab.cjs` verifica logs, intervalo e saída AudioWorklet sem screenshots.
+- Editor executou o gerador com exit 0; pacote usa o runtime release existente de 2026-10-04,
+  sem recompilação. Edge passou seis estados (0–10 s), alternância ~2 s, effect 0/1 e gain 0,9
+  na caverna; AudioWorklet running, 518144 frames, peak 0,12725. Não comprova reverb audível.
+- Limitação confirmada no cache (`WITH_OPENAL=OFF`) e no header de compatibilidade:
+  o backend SDL não oferece EFX. Estado Python ativo não significa aplicação de reverb no mixer.
+  Usuário confirmou nenhuma diferença audível na versão contínua com reverb forte;
+  pacote local em `build-web/dist/reverb-ab/`. Segunda execução: peak 0,12844, 518144 frames,
+  seis estados PASS. Parser do verificador corrigido para aceitar tempo inicial -0.000.
+- Suíte pura Web executada nesta sessão: 131 testes, todos OK (17,329 s).
+
+
 ## 2026-10-07 — Add Object carrega o objeto On Demand só quando dispara
 
 - O atuador Add Object com alvo em Load Mode "On Demand" não converte nada na carga: guarda o nome e

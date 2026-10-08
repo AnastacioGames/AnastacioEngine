@@ -111,7 +111,10 @@ Aberto:
   `ScriptProcessorNode` obsoleto (resolvido em 2026-10-04: saída AudioWorklet, ouvida pelo usuário no navegador do PC e no Chrome do celular (via `adb reverse`) sem problemas; ver changelog) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Reverb Area (2026-09-29)**: validar ouvindo no jogo real (entrar/sair de uma área com um speaker 3D
-  tocando) e no Web, onde o OpenAL de compatibilidade (`web-no-openal/efx.h`) pode não ter EFX. Sem desenho
+  tocando). Web: EFX indisponível no backend SDL atual (`web-no-openal/efx.h`); em 2026-10-07,
+  teste A/B no Edge passou alternância seco/caverna a cada 2 s e saída AudioWorklet ativa,
+  usuário confirmou ausência de diferença audível mesmo com som contínuo e reverb forte em
+  `build-web/dist/reverb-ab/` (gerador `tools/create_web_reverb_ab_scene.py`). Sem desenho
   da zona de efeito total no viewport (só a borda externa, pelo Empty).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.

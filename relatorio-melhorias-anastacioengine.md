@@ -196,6 +196,9 @@ ferramenta correspondente.
   procedural wind. Non-instanced objects are tested on the CPU per object; instanced foliage is tested in the
   shader per instance (`unfoliagecamera`). Wind is applied in mesh space before instancing/skinning.
 
+- Reverb Area no Web: o estado do Speaker alterna normalmente, mas o backend SDL não aplica
+  EFX (OpenAL desligado). Teste A/B com som contínuo e intervalos de 2 s passou estados/saída
+  AudioWorklet em 2026-10-07; usuário confirmou nenhuma diferença audível com reverb forte.
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
   framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são
   considerados disponíveis no Emscripten; adaptações Web devem usar a API GLES3 correspondente. O
