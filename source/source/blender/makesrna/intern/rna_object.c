@@ -1466,6 +1466,34 @@ static char *rna_MaterialSlot_path(PointerRNA *ptr)
 	return BLI_sprintfN("material_slots[%d]", index);
 }
 
+/* Game load mode: OB_TASK_CONVERT (with the scene), none (on demand), OB_TASK_EDITOR_ONLY. */
+static int rna_Object_game_load_mode_get(PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->data;
+	if (ob->gameflag & OB_TASK_EDITOR_ONLY) {
+		return OB_TASK_EDITOR_ONLY;
+	}
+	return ob->gameflag & OB_TASK_CONVERT;
+}
+
+static void rna_Object_game_load_mode_set(PointerRNA *ptr, int value)
+{
+	Object *ob = (Object *)ptr->data;
+	ob->gameflag &= ~(OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY);
+	ob->gameflag |= value & (OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY);
+}
+
+static void rna_Object_convert_object_set(PointerRNA *ptr, int value)
+{
+	Object *ob = (Object *)ptr->data;
+	if (value) {
+		rna_Object_game_load_mode_set(ptr, OB_TASK_CONVERT);
+	}
+	else {
+		ob->gameflag &= ~OB_TASK_CONVERT;
+	}
+}
+
 /* why does this have to be so complicated?, can't all this crap be
  * moved to in BGE conversion function? - Campbell *
  *
@@ -4806,7 +4834,22 @@ static void rna_def_object(BlenderRNA *brna)
 	/* Game Object Tasks */
 	prop = RNA_def_property(srna, "convert_object", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag", OB_TASK_CONVERT);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_Object_convert_object_set");
 	RNA_def_property_ui_text(prop, "Load with Scene", "Creates this object in the game when its scene loads. When disabled the object (and its children) is left out: no render, logic or physics. A script can still create it later with scene.convertObject(), e.g. only the racers picked in a menu, or it can stay an editor-only helper");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	static const EnumPropertyItem game_load_mode_items[] = {
+		{OB_TASK_CONVERT, "SCENE", 0, "With Scene", "Created in the game when its scene loads"},
+		{0, "ON_DEMAND", 0, "On Demand", "Left out at load; a script creates it with scene.convertObject()"},
+		{OB_TASK_EDITOR_ONLY, "EDITOR_ONLY", 0, "Editor Only",
+		 "Never created in the game, not even by scene.convertObject(): a helper for the editor"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "game_load_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, game_load_mode_items);
+	RNA_def_property_enum_funcs(prop, "rna_Object_game_load_mode_get", "rna_Object_game_load_mode_set", NULL);
+	RNA_def_property_ui_text(prop, "Load Mode", "When the game creates this object; its children follow it");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
 	/* Animation Event */
 	prop = RNA_def_property(srna, "anim_events", PROP_COLLECTION, PROP_NONE);

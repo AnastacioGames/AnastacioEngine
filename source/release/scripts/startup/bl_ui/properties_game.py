@@ -2012,12 +2012,17 @@ class OBJECT_MT_lod_tools(Menu):
         layout.operator("object.lod_clear_all", text="Clear All", icon='PANEL_CLOSE')
         
 class OBJECT_OT_game_load_with_scene(Operator):
-    """Set "Load with Scene" on the selected objects"""
+    """Set the game Load Mode of the selected objects"""
     bl_idname = "object.game_load_with_scene"
-    bl_label = "Set Load with Scene"
+    bl_label = "Set Load Mode"
     bl_options = {'REGISTER', 'UNDO'}
 
-    enable: bpy.props.BoolProperty(name="Load with Scene", default=True)
+    mode: bpy.props.EnumProperty(
+        name="Load Mode",
+        items=(('SCENE', "With Scene", "Created in the game when its scene loads"),
+               ('ON_DEMAND', "On Demand", "Left out at load; a script creates it with scene.convertObject()"),
+               ('EDITOR_ONLY', "Editor Only", "Never created in the game, not even by scene.convertObject()")),
+        default='SCENE')
     children: bpy.props.BoolProperty(name="Children", default=True,
                                      description="Also set it on the children of the selected objects")
 
@@ -2026,18 +2031,16 @@ class OBJECT_OT_game_load_with_scene(Operator):
         return bool(context.selected_objects)
 
     def execute(self, context):
-        targets = set(context.selected_objects)
+        selected = set(context.selected_objects)
+        targets = set(selected)
         if self.children:
             for ob in context.scene.objects:
-                par = ob.parent
-                while par and par not in targets:
-                    par = par.parent
-                if par:
+                if any(BL_is_child_of(ob, sel) for sel in selected):
                     targets.add(ob)
         changed = 0
         for ob in targets:
-            if ob.convert_object != self.enable:
-                ob.convert_object = self.enable
+            if ob.game_load_mode != self.mode:
+                ob.game_load_mode = self.mode
                 changed += 1
         self.report({'INFO'}, "%d object(s) changed" % changed)
         return {'FINISHED'}
@@ -2057,41 +2060,45 @@ class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
         ob = context.object
         scene = context.scene
 
-        layout.prop(ob, "convert_object")
+        layout.prop(ob, "game_load_mode", expand=True)
 
         # The converter drops any object below an ancestor left out at load.
         par = ob.parent
-        while par and par.convert_object:
+        while par and par.game_load_mode == 'SCENE':
             par = par.parent
-        if par:
+        if par and ob.game_load_mode == 'SCENE':
             layout.label(text="Left out anyway: parent \"%s\" doesn't load with the scene" % par.name, icon='ERROR')
 
-        if not ob.convert_object:
+        if ob.game_load_mode == 'ON_DEMAND':
             col = layout.column(align=True)
             col.label(text="Left out at load. Create it from a script with:", icon='INFO')
             col.label(text="    scene.convertObject(\"%s\")" % ob.name)
+        elif ob.game_load_mode == 'EDITOR_ONLY':
+            layout.label(text="Never created in the game, not even by scene.convertObject()", icon='INFO')
 
+        if ob.game_load_mode != 'SCENE':
             descendants = [o for o in scene.objects if o.parent and BL_is_child_of(o, ob)]
             if descendants:
                 layout.label(text="%d child object(s) stay out with it" % len(descendants), icon='OUTLINER_OB_EMPTY')
 
             for group in ob.users_group:
                 for inst in scene.objects:
-                    if inst.convert_object and inst.dupli_type == 'GROUP' and inst.dupli_group == group:
+                    if inst.game_load_mode == 'SCENE' and inst.dupli_type == 'GROUP' and inst.dupli_group == group:
                         layout.label(text="Missing from the instances of group \"%s\" (\"%s\")" % (group.name, inst.name),
                                      icon='ERROR')
                         break
 
             if ob.type == 'MESH' and ob.data and ob.data.users > 1:
-                if any(o.data == ob.data and o.convert_object for o in scene.objects if o != ob):
+                if any(o.data == ob.data and o.game_load_mode == 'SCENE' for o in scene.objects if o != ob):
                     layout.label(text="Mesh shared with loaded objects: freeUnconvertedData() keeps it",
                                  icon='INFO')
 
         layout.separator()
         layout.label(text="Selected objects and their children:")
         row = layout.row(align=True)
-        row.operator("object.game_load_with_scene", text="Load All", icon='CHECKBOX_HLT').enable = True
-        row.operator("object.game_load_with_scene", text="Leave Out All", icon='CHECKBOX_DEHLT').enable = False
+        row.operator("object.game_load_with_scene", text="With Scene", icon='CHECKBOX_HLT').mode = 'SCENE'
+        row.operator("object.game_load_with_scene", text="On Demand", icon='CHECKBOX_DEHLT').mode = 'ON_DEMAND'
+        row.operator("object.game_load_with_scene", text="Editor Only", icon='GHOST_DISABLED').mode = 'EDITOR_ONLY'
 
 
 def BL_is_child_of(ob, parent):

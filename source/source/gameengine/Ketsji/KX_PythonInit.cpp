@@ -1027,13 +1027,21 @@ static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
 		return nullptr;
 	}
 
+	if (convert && (target->gameflag & OB_TASK_EDITOR_ONLY)) {
+		PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" Load Mode is Editor Only", obname);
+		return nullptr;
+	}
+
 	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
 	int changed = 0;
 	Scene *sce_iter;
 	Base *base;
 	for (SETLOOPER(scene, sce_iter, base)) {
 		Object *ob = base->object;
-		if (ob != target && !(children && BL_Converter::IsChildOf(ob, target))) {
+		// Editor-only children keep their mode.
+		if ((ob != target && !(children && BL_Converter::IsChildOf(ob, target))) ||
+		    (ob->gameflag & OB_TASK_EDITOR_ONLY))
+		{
 			continue;
 		}
 		if (convert && converter->IsObjectDataFreed(ob)) {

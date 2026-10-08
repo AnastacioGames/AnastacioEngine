@@ -95,6 +95,8 @@
 #include "DNA_scene_types.h"
 #include "DNA_property_types.h"
 #include "DNA_world_types.h"
+#include "DNA_object_types.h"
+#include "BKE_scene.h" // SETLOOPER
 
 #include "KX_NodeRelationships.h"
 
@@ -3836,6 +3838,27 @@ PyObject *KX_Scene::pyattr_get_objects_inactive(EXP_PyObjectPlus *self_v, const 
 	return self->GetInactiveList()->GetProxy();
 }
 
+PyObject *KX_Scene::pyattr_get_unconverted_objects(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	// Names scene.convertObject() can still create: left out at load, not Editor Only nor released.
+	KX_Scene *self = static_cast<KX_Scene *>(self_v);
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	PyObject *list = PyList_New(0);
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(self->GetBlenderScene(), sce_iter, base)) {
+		Object *ob = base->object;
+		if (!self->m_logicmgr->FindGameObjByBlendObj(ob) && !(ob->gameflag & OB_TASK_EDITOR_ONLY) &&
+		    !converter->IsObjectDataFreed(ob))
+		{
+			PyObject *name = PyUnicode_FromString(ob->id.name + 2);
+			PyList_Append(list, name);
+			Py_DECREF(name);
+		}
+	}
+	return list;
+}
+
 PyObject *KX_Scene::pyattr_get_lights(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_Scene *self = static_cast<KX_Scene *>(self_v);
@@ -4060,6 +4083,7 @@ PyAttributeDef KX_Scene::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("name", KX_Scene, pyattr_get_name),
 	EXP_PYATTRIBUTE_RO_FUNCTION("objects", KX_Scene, pyattr_get_objects),
 	EXP_PYATTRIBUTE_RO_FUNCTION("objectsInactive", KX_Scene, pyattr_get_objects_inactive),
+	EXP_PYATTRIBUTE_RO_FUNCTION("unconvertedObjects", KX_Scene, pyattr_get_unconverted_objects),
 	EXP_PYATTRIBUTE_RO_FUNCTION("lights", KX_Scene, pyattr_get_lights),
 	EXP_PYATTRIBUTE_RO_FUNCTION("texts", KX_Scene, pyattr_get_texts),
     EXP_PYATTRIBUTE_RO_FUNCTION("speakers", KX_Scene, pyattr_get_speakers),

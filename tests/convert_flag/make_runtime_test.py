@@ -4,6 +4,7 @@
 #   Raiz (+ filho Raiz_Filho)  Convert off -> convertObject("Raiz") traz os dois
 #   Carro (Convert on) com filho Piloto_Carro (off) -> convertObject mantém a posição relativa ao Carro
 #   Pesado_0..3 (off)          -> freeUnconvertedData libera; depois convertObject/setObjectConvert recusam
+#   Ajudante (Editor Only) e Raiz_Ajudante (Editor Only, filho de Raiz) -> nunca convertidos
 import bpy, sys
 
 out = sys.argv[sys.argv.index("--") + 1]
@@ -59,6 +60,12 @@ for ob in (no_osso, no_vert):
 
 for ob in [raiz, raiz_filho, piloto, no_osso, no_vert] + pesados:
     ob.convert_object = False
+ajudante = esfera("Ajudante", (0, 10, 0), 8)
+raiz_ajudante = esfera("Raiz_Ajudante", (0, 6, 0), 8)
+filho(raiz_ajudante, raiz)
+for ob in (ajudante, raiz_ajudante):
+    ob.game_load_mode = 'EDITOR_ONLY'
+assert not ajudante.convert_object
 
 txt = bpy.data.texts.new("teste.py")
 txt.write('''import bge, ctypes, ctypes.wintypes
@@ -85,9 +92,13 @@ def tenta(nome, f):
 
 sc = bge.logic.getCurrentScene()
 log.append("inicio ativos=%s" % sorted(o.name for o in sc.objects))
+log.append("unconvertedObjects=%s" % sorted(sc.unconvertedObjects))
+log.append("loadLog convert=%s" % [e["detail"].split(", meshes")[0] for e in bge.logic.getLoadLog() if e["stage"] == "convert"])
+tenta("convertObject(Ajudante)", lambda: sc.convertObject("Ajudante"))
+tenta("setObjectConvert(Ajudante)", lambda: bge.logic.setObjectConvert(sc.name, "Ajudante", True))
 r = tenta("convertObject(Raiz)", lambda: sc.convertObject("Raiz"))
 if r:
-    log.append("  Raiz ativo=%s filhos=%s" % (r in sc.objects, [c.name for c in r.children]))
+    log.append("  Raiz ativo=%s filhos=%s" % (r in sc.objects, sorted(c.name for c in r.children)))
 carro = sc.objects["Carro"]
 carro.worldPosition.x += 10.0
 carro.applyRotation((0, 0, 1.5708))
@@ -109,6 +120,7 @@ tenta("convertObject(Pesado_0) apos free", lambda: sc.convertObject("Pesado_0"))
 tenta("setObjectConvert(Pesado_1) apos free", lambda: bge.logic.setObjectConvert(sc.name, "Pesado_1", True))
 tenta("freeUnconvertedData de novo", lambda: bge.logic.freeUnconvertedData(sc.name))
 log.append("fim ativos=%s" % sorted(o.name for o in sc.objects))
+log.append("fim unconvertedObjects=%s" % sorted(sc.unconvertedObjects))
 with open(bge.logic.expandPath("//runtime_results.txt"), "w") as f:
     f.write("\\n".join(log) + "\\n")
 bge.logic.endGame()

@@ -1041,6 +1041,8 @@ enum {
 	OB_LOD_UPDATE_PHYSICS	 = 1 << 25,
 
 	OB_TASK_CONVERT			 = 1 << 26,
+	/* Never converted, not even by scene.convertObject(): editor-only helper. Clears OB_TASK_CONVERT. */
+	OB_TASK_EDITOR_ONLY		 = 1 << 27,
 };
 
 /* ob->gameflag2 */

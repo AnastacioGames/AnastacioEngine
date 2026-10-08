@@ -278,6 +278,10 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 		error = "its mesh data was released by freeUnconvertedData()";
 		return nullptr;
 	}
+	if (target->gameflag & OB_TASK_EDITOR_ONLY) {
+		error = "its Load Mode is Editor Only";
+		return nullptr;
+	}
 
 	int lay = blscene->lay;
 	if (BKE_scene_collections_game_exclude_any(blscene)) {
@@ -308,7 +312,7 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 	for (SETLOOPER(blscene, sce_iter, base)) {
 		Object *ob = base->object;
 		if ((ob == target || (children && IsChildOf(ob, target))) &&
-		    !logicmgr->FindGameObjByBlendObj(ob) && !IsObjectDataFreed(ob))
+		    !logicmgr->FindGameObjByBlendObj(ob) && !IsObjectDataFreed(ob) && !(ob->gameflag & OB_TASK_EDITOR_ONLY))
 		{
 			objects.emplace_back(ob, ob->gameflag);
 		}
@@ -624,8 +628,21 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	}
 
 	const double convertTime = PIL_check_seconds_timer() - convertStart;
+	// Objects of the scene left out by their Load Mode (or by an ancestor's).
+	int leftOut = 0, editorOnly = 0;
+	{
+		Scene *sce_iter;
+		Base *base;
+		for (SETLOOPER(scene->GetBlenderScene(), sce_iter, base)) {
+			if (!converter.FindGameObject(base->object)) {
+				++leftOut;
+				editorOnly += (base->object->gameflag & OB_TASK_EDITOR_ONLY) != 0;
+			}
+		}
+	}
 	std::ostringstream detail;
-	detail << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
+	detail << converter.GetObjects().size() << " objects, " << leftOut << " left out (" << editorOnly
+	       << " editor only), meshes " << loadStats.meshes << " (+"
 	       << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "

@@ -1,5 +1,17 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Load Mode do objeto: com a cena, sob demanda ou só no editor
+
+- Nova propriedade `Object.game_load_mode` (`SCENE` / `ON_DEMAND` / `EDITOR_ONLY`) sobre os bits
+  `OB_TASK_CONVERT` e o novo `OB_TASK_EDITOR_ONLY` (bit 27 de `gameflag`, sem mudança de struct).
+  `convert_object` continua valendo; ligá-lo tira o modo Editor Only.
+- Editor Only nunca é convertido: `scene.convertObject()` e `setObjectConvert()` recusam o objeto, e filhos
+  Editor Only ficam de fora quando o pai é convertido com `children=True`.
+- `scene.unconvertedObjects`: nomes que `convertObject()` ainda pode criar (sem Editor Only nem malha liberada).
+- `getLoadLog()`: o detalhe de "convert" traz "N left out (M editor only)".
+- Outliner (motor de jogo): checkbox de Load with Scene à esquerda do olho; Editor Only aparece como fantasma.
+- Painel "Loading" com os 3 modos e botões para os selecionados e filhos; textos traduzidos (pt_BR, es, ru).
+
 ## 2026-10-07 — Flag Convert vira "Load with Scene", com avisos no painel
 
 - O rótulo da flag (`Object.convert_object`, bit `OB_TASK_CONVERT`) passa a ser "Load with Scene";

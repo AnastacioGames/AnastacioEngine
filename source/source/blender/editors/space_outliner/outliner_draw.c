@@ -741,6 +741,22 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				UI_but_func_set(bt, restrictbutton_rend_cb, scene, ob);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
 
+				/* Game load mode, left of the eye like the collections' game checkbox. */
+				if (BKE_scene_uses_blender_game(scene)) {
+					if (ob->gameflag & OB_TASK_EDITOR_ONLY) {
+						uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_GHOST_DISABLED,
+						             (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+						             NULL, 0, 0, 0, 0, TIP_("Editor Only: never created in the game"));
+					}
+					else {
+						bt = uiDefIconButR(block, UI_BTYPE_ICON_TOGGLE, 0, ICON_CHECKBOX_DEHLT,
+						                   (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+						                   &ptr, "convert_object", -1, 0, 0, -1, -1,
+						                   TIP_("Load with Scene: unchecked, a script creates it with scene.convertObject()"));
+						UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+					}
+				}
+
 				UI_block_emboss_set(block, UI_EMBOSS);
 
 			}
