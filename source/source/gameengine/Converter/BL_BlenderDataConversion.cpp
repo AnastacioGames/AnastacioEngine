@@ -55,6 +55,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdint>
+#include <atomic>
+#include <thread>
 
 
 #include "mathfu.h"
@@ -597,6 +599,31 @@ bool BL_MaterialUsesWireframe(const Material *ma)
 	return ma && ma->use_nodes && BL_NodeTreeHasWireframe(ma->nodetree, 0);
 }
 
+/** Mesh data computed ahead by BL_PrepareMeshes on worker threads: the derived mesh with its loop normals and
+ * tangents already added (when they will be needed), and the loop data hash taken before. */
+struct BL_PreparedMesh
+{
+	Mesh *me;
+	Object *ob;
+	std::vector<Material *> materials;
+	bool boneData;
+	DerivedMesh *dm = nullptr;
+	uint64_t loopHash = 0;
+	uint64_t cookKey = 0;
+	bool withTangents = false;
+	char tangentUvName[MAX_NAME] = "";
+	bool compute = false;
+};
+
+struct BL_PreparedMeshes
+{
+	std::vector<BL_PreparedMesh> meshes;
+	std::unordered_map<Mesh *, unsigned int> index;
+};
+
+// Only set while BL_ConvertBlenderObjects runs (thread_local: async LibLoad converts in a worker).
+static thread_local BL_PreparedMeshes *preparedMeshes = nullptr;
+
 KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneConverter& converter)
 {
 	KX_Mesh *meshobj;
@@ -624,9 +651,21 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 
 	if (debugNav) {
 	}
-	// Get DerivedMesh data.
-	DerivedMesh *dm;
-	{
+	// Get DerivedMesh data, prepared ahead for the meshes of the scene objects.
+	DerivedMesh *dm = nullptr;
+	uint64_t preparedLoopHash = 0;
+	if (preparedMeshes && blenderobj) {
+		const auto it = preparedMeshes->index.find(me);
+		if (it != preparedMeshes->index.end()) {
+			BL_PreparedMesh& prepared = preparedMeshes->meshes[it->second];
+			if (prepared.ob == blenderobj && prepared.dm) {
+				dm = prepared.dm;
+				preparedLoopHash = prepared.loopHash;
+				prepared.dm = nullptr;
+			}
+		}
+	}
+	if (!dm) {
 		BL_LoadTimer dmTimer(loadStats.meshDm);
 		dm = CDDM_from_mesh(me);
 	}
@@ -697,7 +736,8 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 	}
 
 	std::vector<KX_Mesh::BitmapTextFace> bitmapTextFaces;
-	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo, bitmapText ? &bitmapTextFaces : nullptr);
+	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo, bitmapText ? &bitmapTextFaces : nullptr, true,
+	                             preparedLoopHash);
 	meshobj->SetBitmapTextFaces(bitmapTextFaces);
 
 	{
@@ -884,8 +924,14 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 #ifdef WITH_BULLET
 /** Key of the cooked display arrays: the loop data hash plus everything else the vertex loop reads
  * (material slots, UV and color layers). */
-static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_MeshMaterial>& mats,
-                                 const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
+/// Per material slot flags of the cooked key (array, visible, twoside, collider, wire, barycentric, format).
+struct BL_CookedSlotFlags
+{
+	int flags[7];
+};
+
+static uint64_t BL_CookedMeshKeyFlags(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_CookedSlotFlags>& slots,
+                                      const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
 {
 	// Bump when the vertex loop or BL_CookedArrays change.
 	const uint32_t version = 4;
@@ -894,11 +940,8 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
 	const int head[5] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
 	                     (int)layersInfo.colorLayers.size()};
 	hash_bytes(h, head, sizeof(head));
-	for (const BL_MeshMaterial& mat : mats) {
-		const int flags[7] = {mat.array != nullptr, mat.visible, mat.twoside, mat.collider, mat.wire, mat.barycentric,
-		                      mat.array ? mat.array->GetFormat().uvSize | (mat.array->GetFormat().colorSize << 8) |
-		                      (mat.array->GetFormat().hasBoneData << 16) : 0};
-		hash_bytes(h, flags, sizeof(flags));
+	for (const BL_CookedSlotFlags& slot : slots) {
+		hash_bytes(h, slot.flags, sizeof(slot.flags));
 	}
 
 	const int totloop = dm->getNumLoops(dm);
@@ -918,6 +961,20 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
 		}
 	}
 	return (h == 0) ? 1 : h;
+}
+
+static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_MeshMaterial>& mats,
+                                 const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
+{
+	std::vector<BL_CookedSlotFlags> slots(mats.size());
+	for (unsigned int i = 0; i < mats.size(); ++i) {
+		const BL_MeshMaterial& mat = mats[i];
+		const BL_CookedSlotFlags slot = {{mat.array != nullptr, mat.visible, mat.twoside, mat.collider, mat.wire, mat.barycentric,
+		                                  mat.array ? mat.array->GetFormat().uvSize | (mat.array->GetFormat().colorSize << 8) |
+		                                  (mat.array->GetFormat().hasBoneData << 16) : 0}};
+		slots[i] = slot;
+	}
+	return BL_CookedMeshKeyFlags(loopHash, dm, slots, layersInfo, withTangents);
 }
 
 /** Cooked display arrays: for every array (material slots in order, each array once) the source loop of each
@@ -1063,7 +1120,7 @@ struct BL_CookedArrays
 
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces,
-                                  bool needTangents)
+                                  bool needTangents, uint64_t preparedLoopHash)
 {
 	const MTexPoly *mtpolys = bitmapTextFaces ? (MTexPoly *)CustomData_get_layer(&dm->polyData, CD_MTEXPOLY) : nullptr;
 	std::map<Image *, std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > > fontGlyphs;
@@ -1102,7 +1159,11 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	BL_LoadStats& loadStats = BL_LoadStats::Get();
 	uint64_t loopHash = 0;
 	const BL_LoopDataCache::Entry *cached = nullptr;
-	if (loopDataCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
+	if (preparedLoopHash) {
+		// Hashed by BL_PrepareMeshes before it added the normals and tangents.
+		loopHash = preparedLoopHash;
+	}
+	else if (loopDataCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
 		BL_LoadTimer hashTimer(loadStats.loopHash);
 		loopHash = BL_LoopDataHash(dm, me, withTangents ? tangentUv : -1);
 	}
@@ -1132,8 +1193,9 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 
 	if (loopHash) {
 		const auto it = loopHash ? loopDataCache->entries.find(loopHash) : loopDataCache->entries.end();
+		// A prepared mesh already has its own normals (same values, the hash covers their inputs).
 		if (it != loopDataCache->entries.end() && it->second.totloop == totloop &&
-		    it->second.tangents.empty() == !withTangents)
+		    it->second.tangents.empty() == !withTangents && CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1)
 		{
 			cached = &it->second;
 		}
@@ -1451,6 +1513,159 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		CcdCookedData::AddMesh(cookKey, cookedData);
 	}
 #endif
+}
+
+/// Material of a mesh slot, as BL_ConvertMesh picks it.
+static Material *BL_MeshSlotMaterial(Mesh *me, Object *ob, unsigned short slot)
+{
+	Material *ma = ob ? give_current_material(ob, slot + 1) : (me->mat ? me->mat[slot] : nullptr);
+	return ma ? ma : &defmaterial;
+}
+
+/// Runs func(i) for i in [0, count) on up to hardware_concurrency threads.
+template <class Func>
+static void BL_ParallelFor(unsigned int count, const Func& func)
+{
+	const unsigned int numThreads = (std::min)(count, (std::max)(1u, std::thread::hardware_concurrency()));
+	std::atomic<unsigned int> next(0);
+	auto worker = [&]() {
+		for (unsigned int i = next++; i < count; i = next++) {
+			func(i);
+		}
+	};
+	std::vector<std::thread> threads;
+	for (unsigned int t = 1; t < numThreads; ++t) {
+		threads.emplace_back(worker);
+	}
+	worker();
+	for (std::thread& thread : threads) {
+		thread.join();
+	}
+}
+
+/** Computes on worker threads, for the meshes of the given objects, what BL_ConvertDerivedMeshToArray would compute
+ * one mesh after the other: the derived mesh, the loop data hash, the loop normals and the tangents. Only Blender
+ * data of distinct meshes is read and each derived mesh is written by one thread; materials, display arrays and the
+ * loop data cache stay on the calling thread. Meshes that will reuse the normals of an identical mesh or come from
+ * the .cooked file are only hashed, like in the sequential path. */
+static void BL_PrepareMeshes(const std::vector<Object *>& objects, BL_PreparedMeshes& prepared)
+{
+	for (Object *ob : objects) {
+		Mesh *me = static_cast<Mesh *>(ob->data);
+		if (!me || BL_MeshHasBitmapText(me) || prepared.index.count(me)) {
+			continue;
+		}
+		BL_PreparedMesh entry;
+		entry.me = me;
+		entry.ob = ob;
+		const unsigned short totmat = max_ii(me->totcol, 1);
+		for (unsigned short i = 0; i < totmat; ++i) {
+			entry.materials.push_back(BL_MeshSlotMaterial(me, ob, i));
+		}
+		entry.boneData = (me->dvert && ob->defbase.first && BL_ModifierDeformer::HasArmatureDeformer(ob));
+		prepared.index[me] = prepared.meshes.size();
+		prepared.meshes.push_back(entry);
+	}
+	if (prepared.meshes.empty()) {
+		return;
+	}
+
+	const bool useCache = (loopDataCache != nullptr);
+#ifdef WITH_BULLET
+	const bool cookLookup = useCache;
+#endif
+
+	BLI_threaded_malloc_begin();
+
+	// Derived mesh, tangent layer and hashes.
+	BL_ParallelFor(prepared.meshes.size(), [&](unsigned int i) {
+		BL_PreparedMesh& entry = prepared.meshes[i];
+		DerivedMesh *dm = CDDM_from_mesh(entry.me);
+		entry.dm = dm;
+
+		const short activeUv = CustomData_get_active_layer(&dm->loopData, CD_MLOOPUV);
+		const short activeColor = CustomData_get_active_layer(&dm->loopData, CD_MLOOPCOL);
+		const unsigned short uvCount = CustomData_number_of_layers(&dm->loopData, CD_MLOOPUV);
+		const unsigned short colorCount = CustomData_number_of_layers(&dm->loopData, CD_MLOOPCOL);
+
+		entry.withTangents = (uvCount > 0);
+		int tangentUv = max_ii(0, activeUv);
+		if (entry.withTangents) {
+			for (Material *ma : entry.materials) {
+				const char *name = (ma && ma->use_nodes) ? BL_NodeTreeTangentUv(ma->nodetree, 0) : nullptr;
+				const int index = name ? CustomData_get_named_layer(&dm->loopData, CD_MLOOPUV, name) : -1;
+				if (index != -1) {
+					tangentUv = index;
+					break;
+				}
+			}
+			BLI_strncpy(entry.tangentUvName, CustomData_get_layer_name(&dm->loopData, CD_MLOOPUV, tangentUv),
+			            sizeof(entry.tangentUvName));
+		}
+
+		if (useCache && !CustomData_has_layer(&dm->loopData, CD_TANGENT)) {
+			entry.loopHash = BL_LoopDataHash(dm, entry.me, entry.withTangents ? tangentUv : -1);
+		}
+
+#ifdef WITH_BULLET
+		// Cooked key as BL_ConvertDerivedMeshToArray will build it, from the Blender materials.
+		if (cookLookup && entry.loopHash && !entry.boneData) {
+			RAS_Mesh::LayersInfo layersInfo;
+			layersInfo.activeUv = (activeUv == -1) ? 0 : activeUv;
+			layersInfo.activeColor = (activeColor == -1) ? 0 : activeColor;
+			for (unsigned short l = 0; l < uvCount; ++l) {
+				layersInfo.uvLayers.push_back({l, CustomData_get_layer_name(&dm->loopData, CD_MLOOPUV, l)});
+			}
+			for (unsigned short l = 0; l < colorCount; ++l) {
+				layersInfo.colorLayers.push_back({l, CustomData_get_layer_name(&dm->loopData, CD_MLOOPCOL, l)});
+			}
+			const int format = max_ii(1, uvCount) | (max_ii(1, colorCount) << 8);
+			std::vector<BL_CookedSlotFlags> slots(entry.materials.size());
+			for (unsigned int m = 0; m < slots.size(); ++m) {
+				const Material *ma = entry.materials[m];
+				const BL_CookedSlotFlags slot = {{1, (ma->game.flag & GEMAT_INVISIBLE) == 0, (ma->game.flag & GEMAT_BACKCULL) == 0,
+				                                  (ma->game.flag & GEMAT_NOPHYSICS) == 0, ma->material_type == MA_TYPE_WIRE,
+				                                  BL_MaterialUsesWireframe(ma), format}};
+				slots[m] = slot;
+			}
+			entry.cookKey = BL_CookedMeshKeyFlags(entry.loopHash, dm, slots, layersInfo, entry.withTangents);
+		}
+#endif
+	});
+
+	/* Which meshes compute their normals here: not those found in the .cooked file (a wrong guess of the key only
+	 * moves the work back to the sequential path) and only the first of identical meshes, the others copy its
+	 * normals from the loop data cache. */
+	std::unordered_set<uint64_t> hashes;
+	std::vector<unsigned int> work;
+	for (unsigned int i = 0; i < prepared.meshes.size(); ++i) {
+		BL_PreparedMesh& entry = prepared.meshes[i];
+#ifdef WITH_BULLET
+		if (entry.cookKey && CcdCookedData::FindMesh(entry.cookKey)) {
+			continue;
+		}
+#endif
+		if (entry.loopHash && !hashes.insert(entry.loopHash).second) {
+			continue;
+		}
+		entry.compute = true;
+		work.push_back(i);
+	}
+
+	BL_ParallelFor(work.size(), [&](unsigned int w) {
+		BL_PreparedMesh& entry = prepared.meshes[work[w]];
+		DerivedMesh *dm = entry.dm;
+		if (CustomData_get_layer_index(&dm->loopData, CD_NORMAL) == -1) {
+			dm->calcLoopNormals(dm, (entry.me->flag & ME_AUTOSMOOTH), entry.me->smoothresh);
+		}
+		if (entry.withTangents && CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, entry.tangentUvName) == -1) {
+			char tangentNames[1][MAX_NAME];
+			BLI_strncpy(tangentNames[0], entry.tangentUvName, MAX_NAME);
+			DM_calc_loop_tangents(dm, false, (const char(*)[MAX_NAME])tangentNames, 1);
+		}
+	});
+
+	BLI_threaded_malloc_end();
 }
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj)
@@ -2517,6 +2732,25 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		~LoopDataCacheScope() { loopDataCache = nullptr; }
 	} loopDataCacheScope(&sceneLoopDataCache);
 
+	// Meshes prepared on worker threads (BL_PrepareMeshes); the leftovers are released on exit.
+	BL_PreparedMeshes scenePreparedMeshes;
+	struct PreparedMeshesScope {
+		BL_PreparedMeshes& m_prepared;
+		PreparedMeshesScope(BL_PreparedMeshes& prepared)
+			:m_prepared(prepared)
+		{
+		}
+		~PreparedMeshesScope()
+		{
+			preparedMeshes = nullptr;
+			for (BL_PreparedMesh& entry : m_prepared.meshes) {
+				if (entry.dm) {
+					entry.dm->release(entry.dm);
+				}
+			}
+		}
+	} preparedMeshesScope(scenePreparedMeshes);
+
 
 #define BL_CONVERTBLENDEROBJECT_SINGLE                                 \
 	BL_LoadTimer logicTimer(BL_LoadStats::Get().logic);                \
@@ -2654,6 +2888,45 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	for (SETLOOPER(blenderscene, sce_iter, base)) {
 		++totalBases;
 	}
+	/* Normals, tangents and hashes of the meshes are computed in parallel first, in the order the objects convert
+	 * (scene, then dupli groups). RANGE_NO_MESH_BATCH=1 computes each mesh when its object converts, to compare. */
+	const char *noMeshBatch = getenv("RANGE_NO_MESH_BATCH");
+	if (!(noMeshBatch && noMeshBatch[0] && noMeshBatch[0] != '0')) {
+		const double batchStart = PIL_check_seconds_timer();
+		std::vector<Object *> meshObjects;
+		std::set<Group *> groups;
+		std::vector<Group *> groupQueue;
+		auto addObject = [&](Object *ob) {
+			if (!BL_ObjectConverted(ob)) {
+				return;
+			}
+			if (ob->type == OB_MESH && ob->data) {
+				meshObjects.push_back(ob);
+			}
+			if ((ob->transflag & OB_DUPLIGROUP) && ob->dup_group && groups.insert(ob->dup_group).second) {
+				groupQueue.push_back(ob->dup_group);
+			}
+		};
+		for (SETLOOPER(blenderscene, sce_iter, base)) {
+			addObject(base->object);
+		}
+		for (unsigned int g = 0; g < groupQueue.size(); ++g) {
+			for (GroupObject *go = (GroupObject *)groupQueue[g]->gobject.first; go; go = (GroupObject *)go->next) {
+				addObject(go->ob);
+			}
+		}
+		BL_PrepareMeshes(meshObjects, scenePreparedMeshes);
+		preparedMeshes = &scenePreparedMeshes;
+		BL_LoadStats& loadStats = BL_LoadStats::Get();
+		for (const BL_PreparedMesh& entry : scenePreparedMeshes.meshes) {
+			++loadStats.meshesPrepared;
+			if (entry.compute && entry.withTangents) {
+				++loadStats.tangentMeshes;
+			}
+		}
+		loadStats.meshBatch += PIL_check_seconds_timer() - batchStart;
+	}
+
 	int convertedBases = 0;
 	for (SETLOOPER(blenderscene, sce_iter, base)) {
 		converter.ReportProgress((float)convertedBases++ / (float)max_ii(totalBases, 1));

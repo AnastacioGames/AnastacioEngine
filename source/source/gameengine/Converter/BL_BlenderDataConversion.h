@@ -32,6 +32,8 @@
 #ifndef __BL_BLENDERDATACONVERSION_H__
 #define __BL_BLENDERDATACONVERSION_H__
 
+#include <cstdint>
+
 #include "RAS_Mesh.h"
 #include "KX_Mesh.h"
 #include "KX_PhysicsEngineEnums.h"
@@ -74,7 +76,7 @@ bool BL_ObjectConverted(const struct Object *ob);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo,
                                   std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr,
-                                  bool needTangents = true);
+                                  bool needTangents = true, uint64_t preparedLoopHash = 0);
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj);
 

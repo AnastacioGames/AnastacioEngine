@@ -11,7 +11,7 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-10-07 | 33 | 44 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-10-07 | 34 | 44 KB |
 | [14_2026-10-06_a_2026-10-05.md](changelog/14_2026-10-06_a_2026-10-05.md) | 2026-10-06 a 2026-10-05 | 42 | 54 KB |
 | [15_2026-10-04_a_2026-10-03.md](changelog/15_2026-10-04_a_2026-10-03.md) | 2026-10-04 a 2026-10-03 | 60 | 63 KB |
 | [16_2026-10-02_a_2026-10-01.md](changelog/16_2026-10-02_a_2026-10-01.md) | 2026-10-02 a 2026-10-01 | 76 | 68 KB |
@@ -30,6 +30,26 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [06_2026-08-31_a_2026-08-26.md](changelog/06_2026-08-31_a_2026-08-26.md) | 2026-08-31 a 2026-08-26 | 7 | 71 KB |
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
+
+## 2026-10-08 — Conversão: normais e tangentes das malhas em paralelo
+
+- `BL_PrepareMeshes` (`BL_BlenderDataConversion.cpp`), chamado no início de `BL_ConvertBlenderObjects`:
+  junta as malhas dos objetos que vão converter (cena e grupos de dupli, na ordem da conversão) e calcula em
+  threads (`std::thread`, uma por núcleo) o `CDDM_from_mesh`, o hash de loops, as normais de loop e as
+  tangentes MikkTSpace. Cada thread só lê dados Blender de malhas distintas e escreve no próprio
+  DerivedMesh; materiais, display arrays, `KX_Mesh`, cache de loops e `.cooked` continuam na thread principal.
+  `BL_ConvertMesh` usa o DerivedMesh pronto (com o hash tirado antes das normais) e o resto do caminho é o mesmo.
+- Malhas que vão sair do `.cooked` (chave prevista a partir dos materiais Blender) e cópias idênticas
+  (mesmo hash; copiam do cache de loops) não calculam nada no lote. Previsão errada só devolve o trabalho
+  ao caminho sequencial; o resultado não muda.
+- `RANGE_NO_MESH_BATCH=1` volta ao cálculo malha a malha, para comparar. `[Load] convert` mostra
+  `mesh batch N Xms` (tempo de parede do lote).
+- Medido (10 núcleos), convert sequencial → lote: `level_1_home` (YoFrankie) sem `.cooked` 324–504 → 149–167 ms,
+  com `.cooked` 101–134 → 74–79 ms; `make_cooked_small_test.py` 16 segmentos sem cozido 128–134 → 63 ms,
+  com cozido 25–27 → 28–30 ms (todas cozidas: o lote só custa ~4 ms de threads e DerivedMesh).
+- Checksum exato (posição, normal, tangente, UV, cor e polígonos em float32) idêntico entre build anterior,
+  lote e `RANGE_NO_MESH_BATCH=1`, com e sem `.cooked`, em `level_1_home`, `make_cooked_small_test.py` e
+  `make_cooked_mesh_test.py`.
 
 ## 2026-10-08 — Compilação paralela dos shaders de material
 

@@ -720,7 +720,8 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	detail << converter.GetObjects().size() << " objects, " << leftOut << " left out (" << editorOnly
 	       << " editor only), meshes " << loadStats.meshes << " (+"
 	       << loadStats.meshesReused << " reused, " << loadStats.meshesCooked << " cooked "
-	       << load_ms(loadStats.meshCooked) << "ms) " << load_ms(loadStats.mesh) << "ms, tangents "
+	       << load_ms(loadStats.meshCooked) << "ms) " << load_ms(loadStats.mesh) << "ms, mesh batch "
+	       << loadStats.meshesPrepared << " " << load_ms(loadStats.meshBatch) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
 	       << load_ms(loadStats.physics) << "ms (bvh " << load_ms(loadStats.bvh) << "ms; mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "
