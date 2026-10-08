@@ -136,7 +136,14 @@ static void OpenUserCache(const char *gamePath)
 	}
 	uint64_t pathHash = 14695981039346656037ULL;
 	for (const char *c = gamePath; *c; ++c) {
-		pathHash = (pathHash ^ (unsigned char)*c) * 1099511628211ULL;
+		unsigned char ch = (unsigned char)*c;
+#ifdef _WIN32
+		// The editor gives "D:/game\x.blend", the player "D:\game\x.blend": one cache for both.
+		if (ch == '/') {
+			ch = '\\';
+		}
+#endif
+		pathHash = (pathHash ^ ch) * 1099511628211ULL;
 	}
 	char name[FILE_MAX], hex[32];
 	BLI_strncpy(name, BLI_path_basename(gamePath), sizeof(name));

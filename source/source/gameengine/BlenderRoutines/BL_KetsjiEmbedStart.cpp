@@ -131,7 +131,11 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 
 	do {
 		// if we got an exitcode 3 (KX_ExitInfo::START_OTHER_GAME) load a different file
-		if (ELEM(exitInfo.m_code, KX_ExitInfo::START_OTHER_GAME, KX_ExitInfo::RESTART_GAME)) {
+		// Restart without a file (shader warm-up): the same data again, unsaved changes included.
+		if (exitInfo.m_code == KX_ExitInfo::RESTART_GAME && exitInfo.m_fileName.empty()) {
+			exitInfo.m_code = KX_ExitInfo::NO_REQUEST;
+		}
+		else if (ELEM(exitInfo.m_code, KX_ExitInfo::START_OTHER_GAME, KX_ExitInfo::RESTART_GAME)) {
 			exitInfo.m_code = KX_ExitInfo::NO_REQUEST;
 			if (bfd) {
 				BLO_blendfiledata_free(bfd);

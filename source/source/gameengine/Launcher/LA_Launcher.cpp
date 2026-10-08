@@ -78,6 +78,7 @@
 
 extern "C" {
 #  include "BLF_api.h"
+#  include "BLT_lang.h"
 #  include "GPU_glew.h"
 #  include "GPU_extensions.h"
 #  include "GPU_material.h"
@@ -170,7 +171,17 @@ static void DrawWarmUpScreen(RAS_ICanvas *canvas)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	const char *lang = BLT_lang_get();
 	const char *text = "Preparing shaders for this graphics card (first start only)...";
+	if (lang && strncmp(lang, "pt", 2) == 0) {
+		text = "Preparando os shaders para esta placa de vídeo (só na primeira vez)...";
+	}
+	else if (lang && strncmp(lang, "es", 2) == 0) {
+		text = "Preparando los shaders para esta tarjeta gráfica (solo la primera vez)...";
+	}
+	else if (lang && strncmp(lang, "ru", 2) == 0) {
+		text = "Подготовка шейдеров для этой видеокарты (только при первом запуске)...";
+	}
 	const int size = std::max(12, height / 40);
 	BLF_size(blf_mono_font, size, 72);
 	const float textWidth = BLF_width(blf_mono_font, text, strlen(text));

@@ -31,6 +31,13 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — Aquecimento de shaders: idiomas, reinício no editor e cache único
+
+- Tela de aquecimento (`LA_Launcher.cpp`) em inglês, português, espanhol e russo, pelo idioma da engine (`BLT_lang_get`).
+- Editor: o reinício pedido pelo aquecimento vinha sem arquivo e lia um caminho inválido (`Error: loading C:\ failed`). `BL_KetsjiEmbedStart.cpp` agora reinicia com os dados da memória quando não há arquivo, mantendo alterações não salvas.
+- Cache do usuário (`CcdCookedData.cpp`): o hash do caminho trata `/` como `\` no Windows. O editor passava `D:/...` e o player `D:\...`, criando dois caches do mesmo jogo.
+- Validado com RolimaRacer no editor: aquecimento de 321 shaders, reinício sem erro, e na abertura seguinte o editor reusou o cache do player (menu: 33 shaders em 55 ms). Tela traduzida não foi verificada visualmente.
+
 ## 2026-10-08 — Player Windows AnastacioRuntime.exe e integração com RangeArmor
 
 - Usuário autorizou a segunda etapa. Alvo `RangeRuntime` mantém seu nome interno e
