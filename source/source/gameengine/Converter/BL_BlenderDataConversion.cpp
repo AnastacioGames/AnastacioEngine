@@ -850,9 +850,6 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 }
 
 #ifdef WITH_BULLET
-/// Smaller meshes convert in well under a millisecond: not worth the space in the .cooked file.
-#define BL_COOKED_MESH_MIN_LOOPS 10000
-
 /** Key of the cooked display arrays: the loop data hash plus everything else the vertex loop reads
  * (material slots, UV and color layers). */
 static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_MeshMaterial>& mats,
@@ -1076,7 +1073,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	uint64_t cookKey = 0;
 	std::unique_ptr<BL_CookedArrays> cookedArrays;
 	std::vector<BL_CookedArrays::View> cookedViews;
-	if (loopHash && !bitmapTextFaces && !bMayHaveBoneData && totloop >= BL_COOKED_MESH_MIN_LOOPS) {
+	if (loopHash && !bitmapTextFaces && !bMayHaveBoneData) {
 		BL_LoadTimer cookTimer(loadStats.meshCooked);
 		cookKey = BL_CookedMeshKey(loopHash, dm, mats, layersInfo, withTangents);
 		cookedArrays.reset(new BL_CookedArrays(mats));

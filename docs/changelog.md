@@ -31,6 +31,14 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
 
+## 2026-10-08 — `.cooked`: todas as malhas
+
+- Removido o mínimo de 10 mil loops: o registro cozido ganha em qualquer tamanho. Novo
+  `tests/convert_flag/make_cooked_small_test.py` (200 malhas únicas com UV), convert sem → com cozido:
+  112 loops 45 → 21 ms (0,8 MB), 480 loops 120 → 35 ms (2,7 MB), 1 984 loops 436 → 98 ms (10 MB),
+  8 064 loops 1 820 → 396 ms (42 MB). No RolimaRacer (537 malhas, só 15 com 10 mil+ loops) o mínimo
+  antigo deixava quase tudo de fora.
+
 ## 2026-10-08 — `.cooked`: tangentes
 
 - O registro de malha (versão 2 da chave) guarda também a tangente de cada vértice gerado (4 floats) quando a
