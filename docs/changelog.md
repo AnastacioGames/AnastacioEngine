@@ -1,5 +1,17 @@
 # Changelog — AnastacioEngine
 
+## 2026-10-07 — Add Object carrega o objeto On Demand só quando dispara
+
+- O atuador Add Object com alvo em Load Mode "On Demand" não converte nada na carga: guarda o nome e
+  chama `BL_Converter::ConvertSceneObject` na primeira vez que adiciona (com os filhos). As vezes
+  seguintes só replicam. Alvo "Editor Only" gera um aviso no console. Não é mais preciso deixar o
+  atuador com o objeto vazio para evitar a carga antecipada.
+- Nome vindo de propriedade: depois das camadas inativas e do External Files, procura um objeto
+  On Demand da cena.
+- O atuador mostra os botões With Scene / On Demand / Editor Only do objeto alvo (`logic_window.c`).
+- Teste `tests/convert_flag/make_vs_libload.py`: mesmos 12 objetos por `convertObject` e por LibLoad.
+  Tempo igual (~2,3 s), `convertObject` usa ~55 MB a menos; o LibLoad assíncrono não trava o frame.
+
 ## 2026-10-07 — Load Mode do objeto: com a cena, sob demanda ou só no editor
 
 - Nova propriedade `Object.game_load_mode` (`SCENE` / `ON_DEMAND` / `EDITOR_ONLY`) sobre os bits
