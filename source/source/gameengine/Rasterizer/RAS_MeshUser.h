@@ -31,6 +31,7 @@
 
 #include "RAS_MeshSlot.h"
 
+#include <cstdint>
 #include <memory>
 
 class RAS_BoundingBox;
@@ -62,6 +63,8 @@ private:
 	RAS_BatchGroup *m_batchGroup;
 	/// Deformer of this mesh user modifying the display array of the mesh slots.
 	std::unique_ptr<RAS_Deformer> m_deformer;
+	/// Advances only when data packed into an instancing VBO changes.
+	uint64_t m_instancingVersion;
 
 public:
 	RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer);
@@ -79,6 +82,7 @@ public:
 	std::vector<RAS_MeshSlot>& GetMeshSlots();
 	RAS_BatchGroup *GetBatchGroup() const;
 	RAS_Deformer *GetDeformer();
+	uint64_t GetInstancingVersion() const;
 
 	void SetLayer(unsigned int layer);
 	void SetPassIndex(short index);

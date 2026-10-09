@@ -304,8 +304,12 @@ void RAS_DisplayArrayBucket::RunInstancingNode(const RAS_DisplayArrayNodeTuple& 
 		buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, meshSlots);
 	}
 	else {
-		// Fill the buffer with the original mesh slots.
-		buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, m_activeMeshSlots);
+		// Billboards and halos are camera-dependent. A normal material can reuse the
+		// stream while its visible slots and per-object render data stay unchanged.
+		if (materialData->m_drawingMode != RAS_IMaterial::RAS_NORMAL ||
+		    !buffer->HasCachedData(matPasIndex, m_activeMeshSlots)) {
+			buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, m_activeMeshSlots);
+		}
 	}
 
 	RAS_AttributeArrayStorage *attribStorage = m_nodeData.m_attribStorage;

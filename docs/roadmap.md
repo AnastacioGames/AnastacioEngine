@@ -468,9 +468,10 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   ativos; editor/player e comparacao de ocultacao/frustum/reativacao passaram.
   Nao houve medicao de tempo/FPS; validacoes adicionais deixam de bloquear o item.
 
-- RA4 em passagem para Claude: cache de stream para instancing normal sem sort foi
-  iniciado; falta a conclusao da compilacao e a cena controlada que mede uploads,
-  movimento, cor e visibilidade. Detalhes em `auditoria-handoff-claude.md`.
+- RA4 concluido: cache de stream para instancing normal sem sort. Cena controlada
+  (100 cubos, 1 draw) mede 1 upload inicial, 0 em repouso e 1 a cada mudanca de
+  posicao/cor/visibilidade. Sem benchmark de tempo/FPS. Detalhes em
+  `auditoria-claude-resultados.md`.
 
 - RA3: integrado em `12741810`, validado visualmente no jogo pelo usuario.
   Pendente apenas ampliar cobertura dos casos adicionais do plano e obter benchmark

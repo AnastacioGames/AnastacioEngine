@@ -42,6 +42,8 @@ enum CM_WorkCounter {
 	CM_WORK_LIGHT_UNIFORMS,
 	/// glUniform calls of the material's dynamic inputs (GPU_pass_update_uniforms) per bind.
 	CM_WORK_PASS_UNIFORMS,
+	/// Instance VBO streams submitted after their cached contents changed.
+	CM_WORK_INSTANCING_UPLOADS,
 	CM_WORK_COUNTER_MAX
 };
 

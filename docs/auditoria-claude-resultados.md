@@ -80,3 +80,20 @@ alocacao pequena por frame nao aparece em medicao.
 **Mudanca minima:** retorna cedo sempre que nao ha propriedades Timer (antes
 alocava e liberava o valor sem uso quando `fixedtime > 0`). Sem efeito funcional.
 GL7 e GL8 (Ketsji) ficaram de fora por estarem fora do escopo GameLogic do handoff.
+
+## RA4 — cache do stream VBO de instancing
+
+**Diagnostico: confirmado.** O VBO de instancing era reenviado a cada passe mesmo
+com todas as instancias paradas.
+
+**Mudanca:** o buffer guarda slots, revisoes e pass index do ultimo stream e pula
+`GPU_buffer_lock_stream` quando nada mudou (so `RAS_NORMAL` sem sort). A revisao
+de `RAS_MeshUser` vem de um contador atomico global `uint64_t`. Uma revisao local
+iniciada em 1 permitia ABA: um objeto novo no endereco de um removido podia
+casar ponteiro e revisao e herdar a matriz/cor antigas.
+
+**Teste:** `criar_cena_ra4_instancing.py`, 100 cubos com instancing. drawCalls = 1
+em todos os frames; instancingUploads = 1 inicial, 0 em repouso, 1 em cada mudanca
+(posicao f60, cor f100, ocultar f140, mostrar f180). Build editor/player ok.
+Sem benchmark de FPS. Pendencia a parte: o player nao fecha apos `endGame()`
+nessa cena.

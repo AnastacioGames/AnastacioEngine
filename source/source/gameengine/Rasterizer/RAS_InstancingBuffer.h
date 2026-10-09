@@ -31,6 +31,9 @@
 
 #include "RAS_MeshSlot.h"
 
+#include <cstdint>
+#include <vector>
+
 class RAS_Rasterizer;
 
 struct GPUBuffer;
@@ -86,6 +89,11 @@ private:
 	bool m_boundOverride;
 	/// RAS_Rasterizer::OverrideShaderType, stored as int to avoid pulling in RAS_Rasterizer.h.
 	int m_boundOverrideType;
+	/// Last packed slots and their render-data revisions.
+	RAS_MeshSlotList m_cachedMeshSlots;
+	std::vector<uint64_t> m_cachedVersions;
+	short m_cachedMaterialPassIndex;
+	bool m_dataValid;
 
 public:
 	RAS_InstancingBuffer(Attrib attribs);
@@ -116,6 +124,8 @@ public:
 	{
 		m_bound = false;
 	}
+	/// True when normal, unsorted instances still match the VBO contents.
+	bool HasCachedData(short matPassIndex, const RAS_MeshSlotList& meshSlots) const;
 
 	/** Allocate the VBO and fill it with a InstancingObject per mesh slots.
 	 * \param rasty Rasterizer used to compute the mesh slot matrix, useful for billboard material.

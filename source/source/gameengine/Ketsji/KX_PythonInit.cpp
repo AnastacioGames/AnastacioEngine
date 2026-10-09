@@ -384,6 +384,7 @@ static PyObject *gPyGetRenderStats(PyObject *, PyObject *Py_UNUSED(ignored))
 	setInt("updateNotifies", CM_WorkCountLast(CM_WORK_UPDATE_NOTIFIES));
 	setInt("lightUniforms", CM_WorkCountLast(CM_WORK_LIGHT_UNIFORMS));
 	setInt("passUniforms", CM_WorkCountLast(CM_WORK_PASS_UNIFORMS));
+	setInt("instancingUploads", CM_WorkCountLast(CM_WORK_INSTANCING_UPLOADS));
 
 	/* The rest is per scene: report the active one, like getCurrentScene() does. */
 	KX_Scene *scene = KX_GetActiveScene();

@@ -30,6 +30,8 @@
 #include "RAS_Rasterizer.h"
 #include "RAS_MeshUser.h"
 
+#include "CM_WorkCounters.h"
+
 extern "C" {
 // To avoid include BKE_DerivedMesh.h.
 typedef int (*DMSetMaterial)(int mat_nr, void *attribs);
@@ -42,7 +44,9 @@ RAS_InstancingBuffer::RAS_InstancingBuffer(Attrib attribs)
 	m_attribs(attribs),
 	m_bound(false),
 	m_boundOverride(false),
-	m_boundOverrideType(0)
+	m_boundOverrideType(0),
+	m_cachedMaterialPassIndex(0),
+	m_dataValid(false)
 {
 }
 
@@ -94,8 +98,25 @@ void RAS_InstancingBuffer::Realloc(unsigned int size)
 	// Use next offset as memory size.
 	m_vbo = GPU_buffer_alloc(offset);
 	m_capacity = capacity;
+	m_dataValid = false;
 	// New GL buffer id and offsets: any previously-bound vertex-attribute-pointers are stale.
 	InvalidateBinding();
+}
+
+bool RAS_InstancingBuffer::HasCachedData(short matPassIndex, const RAS_MeshSlotList& meshSlots) const
+{
+	if (!m_dataValid || m_cachedMaterialPassIndex != matPassIndex ||
+	    m_cachedMeshSlots.size() != meshSlots.size()) {
+		return false;
+	}
+
+	for (size_t i = 0; i < meshSlots.size(); ++i) {
+		if (m_cachedMeshSlots[i] != meshSlots[i] ||
+		    m_cachedVersions[i] != meshSlots[i]->m_meshUser->GetInstancingVersion()) {
+			return false;
+		}
+	}
+	return true;
 }
 
 void RAS_InstancingBuffer::Bind()
@@ -110,6 +131,7 @@ void RAS_InstancingBuffer::Unbind()
 
 void RAS_InstancingBuffer::Update(RAS_Rasterizer *rasty, int drawingmode, short matPassIndex, const RAS_MeshSlotList &meshSlots)
 {
+	CM_WorkCount(CM_WORK_INSTANCING_UPLOADS);
 	const intptr_t buffer = (intptr_t)GPU_buffer_lock_stream(m_vbo, GPU_BINDING_ARRAY);
 	const unsigned int count = meshSlots.size();
 
@@ -170,4 +192,11 @@ void RAS_InstancingBuffer::Update(RAS_Rasterizer *rasty, int drawingmode, short 
 	}
 
 	GPU_buffer_unlock(m_vbo, GPU_BINDING_ARRAY);
+	m_cachedMeshSlots = meshSlots;
+	m_cachedVersions.resize(meshSlots.size());
+	for (size_t i = 0; i < meshSlots.size(); ++i) {
+		m_cachedVersions[i] = meshSlots[i]->m_meshUser->GetInstancingVersion();
+	}
+	m_cachedMaterialPassIndex = matPassIndex;
+	m_dataValid = true;
 }

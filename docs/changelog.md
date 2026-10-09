@@ -6,6 +6,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - RA4: cache do stream VBO de instancing
+
+- `RAS_InstancingBuffer` so chama `GPU_buffer_lock_stream` se a lista/ordem de slots, o pass index do material ou alguma revisao de `RAS_MeshUser` mudou; `Realloc` invalida. Apenas `RAS_NORMAL` sem sort; billboard, halo e transparencia ordenada enviam como antes.
+- Revisao de `RAS_MeshUser` agora e `uint64_t` vinda de um contador atomico global (na criacao e a cada mudanca de matriz/cor/layer/pass index). Evita ABA: objeto novo reaproveitando a memoria de um removido (addObject/endObject no mesmo tick, replaceMesh, LibFree) nunca repete a revisao cacheada.
+- Novo contador `instancingUploads` em `getRenderStats()`. Cena `tools/debug/cenas/criar_cena_ra4_instancing.py` (agora grava todos os frames): 1 draw o tempo todo; uploads 1 inicial, 0 em repouso, 1 ao mover (f60), mudar cor (f100), ocultar (f140) e mostrar (f180). Sem medicao de FPS.
+- Observado a parte: o player nao encerra apos `bge.logic.endGame()` nessa cena; nao investigado.
+
 ## 2026-10-09 - RA5 aceito; RA4 entregue para continuidade
 
 - Usuario declarou RA5 concluido. Roadmap, relatorio e auditoria agora registram o aceite; nao se atribui ganho de ms/FPS sem medicao.

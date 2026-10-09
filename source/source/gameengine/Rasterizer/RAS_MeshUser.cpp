@@ -35,7 +35,16 @@
 
 #include "BLI_hash.h"
 
+#include <atomic>
 #include <cstring>
+
+/// Process-wide revisions: a mesh user reusing freed memory never repeats a cached revision.
+static std::atomic<uint64_t> s_instancingVersion(0);
+
+static uint64_t NextInstancingVersion()
+{
+	return ++s_instancingVersion;
+}
 
 RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer)
 	:m_layer((1 << 20) - 1),
@@ -46,7 +55,8 @@ RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_De
 	m_boundingBox(boundingBox),
 	m_clientObject(clientobj),
 	m_batchGroup(nullptr),
-	m_deformer(deformer)
+	m_deformer(deformer),
+	m_instancingVersion(NextInstancingVersion())
 {
 	BLI_assert(m_boundingBox);
 	m_boundingBox->AddUser();
@@ -124,14 +134,25 @@ RAS_Deformer *RAS_MeshUser::GetDeformer()
 	return m_deformer.get();
 }
 
+uint64_t RAS_MeshUser::GetInstancingVersion() const
+{
+	return m_instancingVersion;
+}
+
 void RAS_MeshUser::SetLayer(unsigned int layer)
 {
-	m_layer = layer;
+	if (m_layer != layer) {
+		m_layer = layer;
+		m_instancingVersion = NextInstancingVersion();
+	}
 }
 
 void RAS_MeshUser::SetPassIndex(short index)
 {
-	m_passIndex = index;
+	if (m_passIndex != index) {
+		m_passIndex = index;
+		m_instancingVersion = NextInstancingVersion();
+	}
 }
 
 void RAS_MeshUser::SetFrontFace(bool frontFace)
@@ -141,13 +162,17 @@ void RAS_MeshUser::SetFrontFace(bool frontFace)
 
 void RAS_MeshUser::SetColor(const mt::vec4& color)
 {
-	m_color = color;
+	if (m_color != color) {
+		m_color = color;
+		m_instancingVersion = NextInstancingVersion();
+	}
 }
 
 void RAS_MeshUser::SetMatrix(const mt::mat4& matrix)
 {
 	if (std::memcmp(&m_matrix, &matrix, sizeof(mt::mat4)) != 0) {
 		CM_WorkCount(CM_WORK_MESH_MATRIX_CHANGES);
+		m_instancingVersion = NextInstancingVersion();
 		if (m_batchGroup) {
 			m_batchGroup->SplitMeshUser(this);
 		}
