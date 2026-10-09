@@ -224,17 +224,17 @@ Nenhum framebuffer/textura recriado por frame (offscreens só em resize/mudança
 |---|---|---|---|---|---|
 | LP1 | `Rasterizer/RAS_2DFilterManager.cpp:240-316` `RenderFilters`; `Ketsji/KX_2DFilterManager.cpp:489-509` `UpdateCameraFX` | passes de Camera FX ficam montados e só desligados → `m_filters` nunca vazio → cópia de tela inteira (`DrawOffScreen`, + blit com MSAA) por cena todo frame depois que um efeito foi usado uma vez (nitro, troca de câmera) | 1 quad/blit de tela cheia por frame | alta | corrigido: RenderFilters sai cedo se nenhum filtro está Ok() |
 | LP2 | `Ketsji/KX_KetsjiEngine.cpp:911-921` `UpdateSleepTime` | `m_pyprofiledict` refeito todo frame (tuplas/floats Python + média de 25) sem ninguém ler; só `getProfileInfo()` usa | ~45 alocações Python por frame | alta (padrão) / baixa (custo) | corrigido: dicionário montado só em getProfileInfo() |
-| LP3 | `Ketsji/KX_RenderPipeline.cpp:345-353`, `:382-466` | estéreo: `new KX_Camera` por olho por frame; mono: vetores alocados por frame | alto só em estéreo | média | suspeito |
+| LP3 | `Ketsji/KX_RenderPipeline.cpp:345-353`, `:382-466` | estéreo: `new KX_Camera` por olho por frame; mono: vetores alocados por frame | alto só em estéreo | média | parcial: mono sem alocação (vetores→arrays); estéreo adiado (tempo de vida da câmera) |
 | LP4 | `Ketsji/KXImgui/KX_Imgui.cpp:192-226`; `KX_KetsjiEngine.cpp:498/613` | `ImGui::NewFrame`/`Render` todo frame mesmo sem nenhuma UI ativa | dezenas de µs CPU | média | não vale: NewFrame é necessário p/ imgui.* em scripts; Render já sai cedo sem vértices |
 | LP5 | `KXImgui/KX_Imgui_Impl_Inputs.cpp:522-541` | `SDL_SetCursor`/`SDL_ShowCursor` todo frame sem comparar; pode brigar com o mouse do engine | baixo | baixa | não vale: cache divergiria do cursor da engine |
 | LP6 | `KX_Imgui_Impl_Inputs.cpp:451-519` | `NavEnableGamepad` sempre: varre joysticks e lê ~24 entradas por frame sem UI | baixo | média | descartado: já sai cedo sem NavEnableGamepad |
 | LP7 | `KX_Imgui_Impl_Inputs.cpp:254-268` | laço sobre todas as teclas com mapeamento + `AddKeyEvent` + `std::count` mesmo sem mudança (só com debug/profile/game UI) | 100-200 lookups | média/baixa | descartado: AddKeyEvent ignora repetidos |
 | LP8 | `KX_Imgui.cpp:237-258` `DrawCustomCursor` | bind + `glTexParameteri` do cursor todo frame | 4 GL | baixa | não vale |
-| LP9 | `Launcher/LA_BlenderLauncher.cpp:383-490` `LiveSyncFromBlender` | Play embutido: movimento do mouse conta como evento → varre todos os Objects do Main (strings de componentes, props O(P²)) | O(objetos × props²) por frame | média (só editor) | suspeito |
-| LP10 | `source/source/blender/windowmanager/intern/wm_draw.c:1019-1152` `wm_draw_update_game_live` | ~40 `glGet*` + Push/PopAttrib + recomposição de tela inteira por frame no Play embutido | sync de GPU + 1 quad | média (só editor) | suspeito |
+| LP9 | `Launcher/LA_BlenderLauncher.cpp:383-490` `LiveSyncFromBlender` | Play embutido: movimento do mouse conta como evento → varre todos os Objects do Main (strings de componentes, props O(P²)) | O(objetos × props²) por frame | média (só editor) | adiado: arrasto pode mudar sliders; mapa já é sob demanda |
+| LP10 | `source/source/blender/windowmanager/intern/wm_draw.c:1019-1152` `wm_draw_update_game_live` | ~40 `glGet*` + Push/PopAttrib + recomposição de tela inteira por frame no Play embutido | sync de GPU + 1 quad | média (só editor) | adiado: estado GL sujo já causou crash de driver |
 | LP11 | `Rasterizer/RAS_2DFilter.cpp:404-420` `BindTextures` | `MipmapTextures` 2× quando o shader usa as duas texturas; mipmap de slots não lidos (só com `filter.mipmap`) | `glGenerateMipmap` dobrado | baixa | corrigido: um único MipmapTextures |
 | LP12 | `RAS_2DFilter.cpp:475-688`, `KX_RenderPipeline.cpp:672-762` | uniforms de filtro reenviados e parâmetros do World copiados todo frame | desprezível (1 draw) | baixa | não vale |
-| LP13 | `KX_SoundActuator.cpp:200-280` (complementa KX14) | `AUD_Handle_*` sem comparar; cada um trava mutex do device; `getStatus` 2× | baixo | baixa | suspeito |
+| LP13 | `KX_SoundActuator.cpp:200-280` (complementa KX14) | `AUD_Handle_*` sem comparar; cada um trava mutex do device; `getStatus` 2× | baixo | baixa | corrigido: getStatus só repete após play() |
 | LP14 | `KX_KetsjiEngine.cpp:624-636` | varre todas as partículas GPU de todas as cenas por frame só p/ achar `debugUI` | O(partículas) | baixa | não vale: laço já tem break |
 
 **Bug de correção à parte:** `RAS_2DFilter::ComputeTextureOffsets` (:389) roda uma vez só; com resize ou resolução
@@ -283,13 +283,13 @@ Custo por evento (spawn/remoção/carga), não por frame — mas vira por frame 
 | SP6 | `KX_Scene.cpp:1448` `NewRemoveObject`; `BaseListValue.cpp:82` | ~20 remoções lineares por objeto; `RemoveValue` não para ao achar | O(N)×20 por remoção | alta | adiado: ganho real exige índice por lista |
 | SP7 | `KX_Scene.cpp:1421` `DelayedRemoveObject`/`RemoveEuthanasyObjects` | AddIfNotFound O(K) + erase do front | O(K²) | alta | adiado: consumir pelo fim muda a ordem de destruição |
 | SP8 | `Converter/BL_Converter.cpp:1420` `FreeBlendFileData` | `ReloadMaterials()` de todos os materiais sem checar luzes | recompila shaders | alta | corrigido: ReloadMaterials só se uma luz da biblioteca foi removida |
-| SP9 | `CcdPhysicsEnvironment.cpp:868` `RemoveCcdPhysicsController` | Varre todos os pares antes do Bullet fazer o mesmo | O(pares)×2 | média | suspeito |
-| SP10 | `KX_GameObject.cpp:792` `SetupGPUParticlesBuffer` | Lê shader do disco, imagem, assa curvas em texturas novas, copia vértices por spawn; poll de reload por emissor | I/O + texturas | alta/média | suspeito |
+| SP9 | `CcdPhysicsEnvironment.cpp:868` `RemoveCcdPhysicsController` | Varre todos os pares antes do Bullet fazer o mesmo | O(pares)×2 | média | adiado: risco de par pendurado no Bullet |
+| SP10 | `KX_GameObject.cpp:792` `SetupGPUParticlesBuffer` | Lê shader do disco, imagem, assa curvas em texturas novas, copia vértices por spawn; poll de reload por emissor | I/O + texturas | alta/média | adiado: custo em RAS_ParticleBuffer; cache quebraria hot-reload; só no setup |
 | SP11 | `BL_Converter.cpp:228-423`; `BL_BlenderDataConversion.cpp:493` | Conversão sob demanda não reaproveita material/malha/shape existentes (quebra lote/instancing) | conversão + shader | média-alta | adiado: mudança estrutural |
-| SP12 | `KX_AddObjectActuator.cpp:278`; `KX_Scene.cpp:4140` | Modo propriedade busca linear no Main a cada disparo | O(objetos) | média | suspeito |
-| SP13 | `Rasterizer/RAS_BatchDisplayArray.cpp:107` `Split` | Separar membro reenvia o VBO do lote inteiro; `RemoveObject` 2× | O(vértices do lote) | média-alta | suspeito |
-| SP14 | `BL_Converter.cpp:800` `UnregisterMesh` | Por decal expirado percorre todos os objetos × malhas | O(N) | média | suspeito |
-| SP15 | `KX_DestructionManager.cpp:740` `SpawnDecal` | Monta mesh user/bounds e logo refaz com `ReplaceMesh` | 2× | média | suspeito |
+| SP12 | `KX_AddObjectActuator.cpp:278`; `KX_Scene.cpp:4140` | Modo propriedade busca linear no Main a cada disparo | O(objetos) | média | adiado: cache nome→objeto exige invalidação ampla |
+| SP13 | `Rasterizer/RAS_BatchDisplayArray.cpp:107` `Split` | Separar membro reenvia o VBO do lote inteiro; `RemoveObject` 2× | O(vértices do lote) | média-alta | adiado: reenvio inerente ao Split; chamada dupla não confirmada |
+| SP14 | `BL_Converter.cpp:800` `UnregisterMesh` | Por decal expirado percorre todos os objetos × malhas | O(N) | média | adiado: exige índice reverso; só ao expirar decal |
+| SP15 | `KX_DestructionManager.cpp:740` `SpawnDecal` | Monta mesh user/bounds e logo refaz com `ReplaceMesh` | 2× | média | adiado: ReplaceMesh necessário (malha própria) |
 
 Menores: `ReplicateLogic` SearchValue O(N) por link externo; `RegisterObject` FindEntry linear; `RemoveStaticShadowCasterObject` com dirty incondicional (código morto); cópias nunca entram nas listas de shadow casters (verificar).
 

@@ -404,9 +404,10 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 	};
 
 	// Pre-compute the display area used for stereo or normal rendering.
-	std::vector<RAS_Rect> displayAreas;
+	// Fixed-size arrays: at most 2 eyes, avoids per-frame heap allocations.
+	RAS_Rect displayAreas[2];
 	for (unsigned short eye = 0; eye < numeyes; ++eye) {
-		displayAreas.push_back(rasterizer->GetRenderArea(m_engine->GetCanvas(), stereomode, (RAS_Rasterizer::StereoEye)eye));
+		displayAreas[eye] = rasterizer->GetRenderArea(m_engine->GetCanvas(), stereomode, (RAS_Rasterizer::StereoEye)eye);
 	}
 
 	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
@@ -430,18 +431,23 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 		KX_FrameRenderData& frameData = renderData.m_frameDataList.back();
 
 		// Get the eyes managed per frame.
-		std::vector<RAS_Rasterizer::StereoEye> eyes;
+		RAS_Rasterizer::StereoEye eyes[2];
+		unsigned short numframeeyes;
 		// One eye per frame but different.
 		if (renderpereye) {
-			eyes = {(RAS_Rasterizer::StereoEye)frame};
+			eyes[0] = (RAS_Rasterizer::StereoEye)frame;
+			numframeeyes = 1;
 		}
 		// Two eyes for unique frame.
 		else if (usestereo) {
-			eyes = {RAS_Rasterizer::RAS_STEREO_LEFTEYE, RAS_Rasterizer::RAS_STEREO_RIGHTEYE};
+			eyes[0] = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+			eyes[1] = RAS_Rasterizer::RAS_STEREO_RIGHTEYE;
+			numframeeyes = 2;
 		}
 		// Only one eye for unique frame.
 		else {
-			eyes = {RAS_Rasterizer::RAS_STEREO_LEFTEYE};
+			eyes[0] = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+			numframeeyes = 1;
 		}
 
 		for (KX_Scene *scene : scenes) {
@@ -455,7 +461,8 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 					continue;
 				}
 
-				for (RAS_Rasterizer::StereoEye eye : eyes) {
+				for (unsigned short i = 0; i < numframeeyes; ++i) {
+					const RAS_Rasterizer::StereoEye eye = eyes[i];
 					sceneFrameData.m_cameraDataList.push_back(GetCameraRenderData(scene, cam, overrideCullingCam, displayAreas[eye],
 					                                                              stereomode, eye));
 				}

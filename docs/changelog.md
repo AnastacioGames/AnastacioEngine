@@ -6,6 +6,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Lote 4 de auditoria: itens restantes LP/SP
+
+- LP3 (parcial): `KX_RenderPipeline::GetRenderData` usa arrays fixos em vez de `std::vector` por quadro (mono sem alocação). Estéreo adiado.
+- LP13: `KX_SoundActuator::Update` só repete `AUD_Handle_getStatus` logo após `play()`.
+- Revisados e adiados: LP9, LP10, SP9, SP10, SP12, SP13, SP14, SP15 (motivos em `docs/auditoria-suspeitos.md`).
+- Verificação: build RangeEngine/RangeRuntime ok; `demos/escudo.range` 10 s sem erro.
+
 ## 2026-10-09 - Lote 3 de auditoria: PY, LP, SP
 
 - LP1: `RAS_2DFilterManager::RenderFilters` sai cedo quando nenhum filtro está `Ok()` (passes de Camera FX desligados não copiam mais a tela inteira por frame).
