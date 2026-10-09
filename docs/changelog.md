@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Lote 3 de auditoria: PY, LP, SP
+
+- LP1: `RAS_2DFilterManager::RenderFilters` sai cedo quando nenhum filtro está `Ok()` (passes de Camera FX desligados não copiam mais a tela inteira por frame).
+- LP2: dicionário de profile Python montado só em `GetPyProfileDict()`.
+- LP11: `BindTextures` faz um único `MipmapTextures`.
+- PY4: `RAS_Shader::SetUniformfv/iv` com valor igual não marca o shader como sujo.
+- PY5: `KX_Camera` lens/fov comparam antes de `InvalidateProjectionMatrix`.
+- SP2: `ReplaceMesh` sai cedo com a mesma malha única sem física.
+- SP8: `FreeBlendFileData` só chama `ReloadMaterials` se uma luz da biblioteca saiu.
+- Já corrigidos: PY2 (bug), PY3, SP1, SP3. Adiados/decisão: PY1, PY6, PY7, LP4-LP8, LP12, LP14, SP4-SP7, SP11. Não revisados: LP3, LP9, LP10, LP13, SP9, SP10, SP12-SP15.
+- Build ok; demos/escudo.range roda 10 s sem erro. Sem A/B de tempo; LP1 pede medição no RolimaRacer após o nitro.
+
 ## 2026-10-09 - Lote 2 de auditoria: CV1/KX2, GL2, GL3, GL4, PH9
 
 - CV1/KX2: `BL_Action` guarda `m_hasObjectIpo` no `Play()` (lista de controladores nao vazia apos `BL_CreateIPO`); `Update()` so liga `m_requestIpo` com canais de transform do objeto. Acao so de bones nao chama mais `UpdateWorldDataThread` na subarvore. Shape/material/cor seguem atualizando.

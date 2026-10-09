@@ -214,6 +214,10 @@ void RAS_Shader::SetUniformfv(int location, int type, const float *param, int si
 	RAS_Uniform *uni = FindUniform(location);
 
 	if (uni) {
+		// Same value: GL program state persists, no need to dirty the shader.
+		if (memcmp(uni->GetData(), param, size) == 0) {
+			return;
+		}
 		memcpy(uni->GetData(), param, size);
 		uni->SetData(location, type, count, transpose);
 	}
@@ -234,6 +238,10 @@ void RAS_Shader::SetUniformiv(int location, int type, const int *param, int size
 	RAS_Uniform *uni = FindUniform(location);
 
 	if (uni) {
+		// Same value: GL program state persists, no need to dirty the shader.
+		if (memcmp(uni->GetData(), param, size) == 0) {
+			return;
+		}
 		memcpy(uni->GetData(), param, size);
 		uni->SetData(location, type, count, transpose);
 	}

@@ -411,18 +411,17 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 {
 	if (m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] != -1) {
 		colorofs->BindColorTexture(0, 9);
-		if (m_mipmap) {
-			colorofs->MipmapTextures();
-		}
 	}
 
 	if (m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1) {
 		for (unsigned short i = 1, slots = colorofs->GetNumColorSlot(); i < slots; ++i) {
 			colorofs->BindColorTexture(i, 9 + i);
 		}
-		if (m_mipmap) {
-			colorofs->MipmapTextures();
-		}
+	}
+
+	if (m_mipmap && (m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] != -1 ||
+	                 m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1)) {
+		colorofs->MipmapTextures();
 	}
 
 	if (m_predefinedUniforms[DEPTH_TEXTURE_UNIFORM] != -1) {

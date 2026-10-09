@@ -1402,6 +1402,11 @@ void KX_GameObject::UpdateBuckets()
 
 void KX_GameObject::ReplaceMesh(KX_Mesh *mesh, bool use_gfx, bool use_phys)
 {
+	// Same single mesh already assigned and no physics rebuild requested: nothing changes.
+	if (use_gfx && !use_phys && mesh && m_meshes.size() == 1 && m_meshes[0] == mesh && m_meshUser) {
+		return;
+	}
+
 	if (use_gfx && mesh) {
 		RemoveMeshes();
 		AddMesh(mesh);

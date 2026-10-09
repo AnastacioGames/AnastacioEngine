@@ -239,8 +239,17 @@ RAS_2DFilter *RAS_2DFilterManager::GetFilterPass(unsigned int passIndex, bool us
 
 RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
-	if (m_filters.empty()) {
-		// No filters, discard.
+	/* Camera FX passes stay built and are only toggled off, so the map is rarely empty.
+	 * When no pass would draw, skip the chain instead of copying the full screen every frame. */
+	bool anyActive = false;
+	for (const auto &pair : m_filters) {
+		if (pair.second->Ok()) {
+			anyActive = true;
+			break;
+		}
+	}
+	if (!anyActive) {
+		// No active filters, discard.
 		return inputofs;
 	}
 

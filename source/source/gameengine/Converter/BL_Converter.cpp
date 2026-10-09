@@ -1334,6 +1334,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 		}
 	}
 
+	// Material shaders loop over lamps: only reload them if a lamp of this library goes away.
+	bool removedLights = false;
+
 	// For each scene try to remove any usage of ressources from the library.
 	for (KX_Scene *scene : m_ketsjiEngine->CurrentScenes()) {
 		// Both list containing all the scene objects.
@@ -1349,6 +1352,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 
 				// Free object directly depending on blender object of the library.
 				if (info->Belong(libraryId)) {
+					if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
+						removedLights = true;
+					}
 					scene->DelayedRemoveObject(gameobj);
 				}
 				// Else try to remove used ressource (e.g actions, meshes, materials...).
@@ -1418,7 +1424,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 		}
 
 		// Reload materials cause they used lamps removed now.
-		scene->GetBucketManager()->ReloadMaterials();
+		if (removedLights) {
+			scene->GetBucketManager()->ReloadMaterials();
+		}
 	}
 
 	// Remove and destruct the KX_LibLoadStatus associated to the just free library.

@@ -1335,6 +1335,9 @@ int KX_Camera::pyattr_set_lens(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_D
 		return PY_SET_ATTR_FAIL;
 	}
 
+	if (self->m_camdata.m_lens == param) {
+		return PY_SET_ATTR_SUCCESS;
+	}
 	self->m_camdata.m_lens = param;
 	self->InvalidateProjectionMatrix();
 	return PY_SET_ATTR_SUCCESS;
@@ -1363,6 +1366,9 @@ int KX_Camera::pyattr_set_fov(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DE
 	float width = self->m_camdata.m_sensor_x;
 	float lens = width / (2.0f * tanf(0.5f * DEG2RADF(fov)));
 
+	if (self->m_camdata.m_lens == lens) {
+		return PY_SET_ATTR_SUCCESS;
+	}
 	self->m_camdata.m_lens = lens;
 	self->InvalidateProjectionMatrix();
 	return PY_SET_ATTR_SUCCESS;
