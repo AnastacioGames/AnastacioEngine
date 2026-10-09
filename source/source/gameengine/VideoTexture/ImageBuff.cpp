@@ -117,6 +117,7 @@ void ImageBuff::load(unsigned char *img, short width, short height)
 	}
 	// image is available
 	m_avail = true;
+	++m_imageVersion;
 }
 
 void ImageBuff::clear(short width, short height, unsigned char color)
@@ -144,6 +145,7 @@ void ImageBuff::clear(short width, short height, unsigned char color)
 	}
 	// image is available
 	m_avail = true;
+	++m_imageVersion;
 }
 
 // img must point to a array of RGBA data of size width*height
@@ -170,6 +172,7 @@ void ImageBuff::plot(unsigned char *img, short width, short height, short x, sho
 	m_imbuf->rect = nullptr;
 	tmpbuf->rect = nullptr;
 	IMB_freeImBuf(tmpbuf);
+	++m_imageVersion;
 }
 
 void ImageBuff::plot(ImageBuff *img, short x, short y, short mode)
@@ -193,6 +196,7 @@ void ImageBuff::plot(ImageBuff *img, short x, short y, short mode)
 	// remove so that MB_freeImBuf will free our buffer
 	m_imbuf->rect = nullptr;
 	img->m_imbuf->rect = nullptr;
+	++m_imageVersion;
 }
 
 

@@ -84,6 +84,7 @@ BL_Action::BL_Action(KX_GameObject *gameobj)
 	m_done(true),
 	m_appliedToObject(true),
 	m_requestIpo(false),
+	m_hasObjectIpo(false),
 	m_calc_localtime(true),
 	m_prevUpdate(-1.0f),
 	m_eventsIncludeCurrentFrame(false)
@@ -179,6 +180,8 @@ bool BL_Action::Play(const std::string& name,
 
 	// Create an SG_Controller
 	AddController(BL_CreateIPO(m_actionData, m_obj, kxscene));
+	// Only object transform channels need a world data update (CV1/KX2).
+	m_hasObjectIpo = !m_controllers.empty();
 	// World
 	AddController(BL_CreateWorldIPO(m_actionData, kxscene->GetBlenderScene()->world, kxscene));
 	// Try obcolor
@@ -454,7 +457,7 @@ void BL_Action::Update(float curtime, bool applyToObject)
 		return;
 	}
 
-	m_requestIpo = true;
+	m_requestIpo = m_hasObjectIpo;
 
 	SG_Node *node = m_obj->GetNode();
 	// Update controllers time.

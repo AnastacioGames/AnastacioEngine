@@ -169,6 +169,8 @@ private:
 	std::vector<NetId> m_ungridded;  // always relevant or without transform
 	std::vector<uint8_t> m_scratch;
 	NetId m_nextRuntimeId = kFirstRuntimeNetId;
+	/// Grid needs a rebuild (object added/removed or moved to another cell).
+	bool m_gridDirty = true;
 };
 
 }  // namespace net

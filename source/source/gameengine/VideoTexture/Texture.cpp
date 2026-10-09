@@ -84,6 +84,10 @@ Texture::Texture()
 	m_mipmap(false),
 	m_scaledImBuf(nullptr),
 	m_lastClock(0.0),
+	m_lastImage(nullptr),
+	m_lastVersion(0),
+	m_lastTex(0),
+	m_lastMipmap(false),
 	m_source(nullptr)
 {
 	textures.push_back(this);
@@ -149,6 +153,7 @@ void Texture::Close()
 		if (m_actTex != 0) {
 			glDeleteTextures(1, (GLuint *)&m_actTex);
 			m_actTex = 0;
+			m_lastImage = nullptr;
 		}
 	}
 }
@@ -159,6 +164,7 @@ void Texture::SetSource(PyImage *source)
 	Py_XDECREF(m_source);
 	Py_INCREF(source);
 	m_source = source;
+	m_lastImage = nullptr;
 }
 
 // load texture
@@ -409,9 +415,16 @@ EXP_PYMETHODDEF_DOC(Texture, refresh, "Refresh texture from source")
 				}
 
 				// get texture
-				unsigned int *texture = m_source->m_image->getImage(m_actTex, ts, m_mipmap);
+				ImageBase *image = m_source->m_image;
+				unsigned int *texture = image->getImage(m_actTex, ts, m_mipmap);
+				// skip upload if this exact image version is already in the texture
+				// (exported buffers may be written from python, always upload then)
+				const bool uploaded = (texture != nullptr && image == m_lastImage &&
+				                       image->getImageVersion() == m_lastVersion &&
+				                       m_actTex == m_lastTex && m_mipmap == m_lastMipmap &&
+				                       image->m_exports == 0);
 				// if texture is available
-				if (texture != nullptr) {
+				if (texture != nullptr && !uploaded) {
 					// get texture size
 					short *orgSize = m_source->m_image->getSize();
 					// calc scaled sizes
@@ -434,6 +447,10 @@ EXP_PYMETHODDEF_DOC(Texture, refresh, "Refresh texture from source")
 					}
 					// load texture for rendering
 					loadTexture(m_actTex, texture, size, m_mipmap, m_source->m_image->GetInternalFormat());
+					m_lastImage = image;
+					m_lastVersion = image->getImageVersion();
+					m_lastTex = m_actTex;
+					m_lastMipmap = m_mipmap;
 				}
 				// refresh texture source, if required
 				if (refreshSource) {

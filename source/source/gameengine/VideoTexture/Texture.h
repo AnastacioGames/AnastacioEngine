@@ -80,6 +80,11 @@ public:
 	ImBuf * m_scaledImBuf;
 	// last refresh
 	double m_lastClock;
+	// last uploaded image (GL4: skip re-upload of unchanged source)
+	ImageBase *m_lastImage;
+	unsigned int m_lastVersion;
+	unsigned int m_lastTex;
+	bool m_lastMipmap;
 
 	// image source
 	PyImage * m_source;

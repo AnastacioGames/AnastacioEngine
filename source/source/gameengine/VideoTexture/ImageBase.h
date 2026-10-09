@@ -120,6 +120,9 @@ public:
 	/// number of buffer pointing to m_image, public because not handled by this class
 	int m_exports;
 
+	/// version of image content, bumped whenever it changes
+	unsigned int getImageVersion (void) { return m_imageVersion; }
+
 protected:
 	/// image buffer
 	unsigned int * m_image;
@@ -131,6 +134,8 @@ protected:
 	short m_size[2];
 	/// image is available
 	bool m_avail;
+	/// incremented whenever the image content may have changed (GL4: lets Texture skip re-upload)
+	unsigned int m_imageVersion;
 
 	/// scale image to power 2 sizes
 	bool m_scale;

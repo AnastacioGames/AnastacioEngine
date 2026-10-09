@@ -78,6 +78,8 @@ private:
 
 	/// Set to true when the action was updated and applied. Back to false in the IPO update (UpdateIPO).
 	bool m_requestIpo;
+	/// True when the action has object transform channels (cached in Play).
+	bool m_hasObjectIpo;
 	bool m_calc_localtime;
 
 	// The last update time to avoid double animation update.

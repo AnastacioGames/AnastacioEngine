@@ -64,7 +64,7 @@ ExpDesc InvalidImageModeDesc(InvalidImageMode, "Invalid image mode, only RGBA an
 
 // constructor
 ImageBase::ImageBase(bool staticSrc) :m_image(nullptr), m_imgSize(0), m_internalFormat(GL_RGBA8),
-	m_avail(false), m_scale(false), m_scaleChange(false), m_flip(false),
+	m_avail(false), m_imageVersion(0), m_scale(false), m_scaleChange(false), m_flip(false),
 	m_zbuff(false),
 	m_depth(false),
 	m_staticSources(staticSrc), m_pyfilter(nullptr)
@@ -118,6 +118,7 @@ unsigned int *ImageBase::getImage(unsigned int texId, double ts, bool mipmap)
 		}
 		// calculate new image
 		calcImage(texId, ts, mipmap, m_internalFormat);
+		++m_imageVersion;
 	}
 	// if image is available, return it, otherwise nullptr
 	return m_avail ? m_image : nullptr;
@@ -155,6 +156,7 @@ void ImageBase::refresh(void)
 {
 	// invalidate this image
 	m_avail = false;
+	++m_imageVersion;
 	// refresh all sources
 	for (ImageSourceList::iterator it = m_sources.begin(); it != m_sources.end(); ++it) {
 		(*it)->refresh();
