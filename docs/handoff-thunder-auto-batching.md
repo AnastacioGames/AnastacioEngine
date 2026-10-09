@@ -118,3 +118,16 @@ O A/B justifica investigar/prototipar; ainda nao autoriza concluir que o caminho
 - Cena e medições: `D:/ThunderPlayer-investigacao/benchmark/` e `D:/ThunderPlayer-investigacao/benchmark/diagnostico/`
 
 Nenhum código da engine foi alterado por esta investigação. Cores continuam adiadas. A validação visual deve ser feita no jogo real conforme `AGENTS.md`.
+
+## Validação visual e reload (Claude, 2026-10-08, após `ae1370bc`)
+
+- Movimento: 64 cubos agrupados (1 draw); um membro sobe e desce por 5 s. O usuário
+  confirmou na tela que só esse cubo se moveu, sem cópia fantasma. Medido: parado
+  64 membros/1 draw; movendo 63 membros/2 draws, `batchGroup=None` no movido; exit 0.
+- Reload: `scene.restart()` 3 vezes com grupo ativo; em cada rodada o grupo refeito
+  teve 64 membros/1 draw; sem crash, exit 0.
+- `destruct()` apaga o próprio grupo (`delete this`); acessar o grupo no Python depois
+  disso gera exceção. Não há lista stale a limpar.
+- Pendente: falha parcial de `SplitMeshSlot` deixa `m_batchGroup` setado (antigo);
+  os `static_cast` para `KX_BatchGroup`/`KX_ClientObjectInfo` assumem que não existem
+  grupos só RAS.
