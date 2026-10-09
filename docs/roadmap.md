@@ -458,6 +458,23 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- **Onde perdemos feio para o ThunderPlayer (benchmark 2026-10-09)** — refeito o teste do Codex
+  (`D:\ThunderPlayer-investigacao\benchmark\diagnostico\`, `run_diagnostics_2026_10_09.py`, `runs-2026-10-09.json`;
+  relatorio original em `RESULTADO-DIAGNOSTICO.md`). RX 6800M, 1280x720, MSAA 2x, FPS medio de 2 rodadas:
+  1. **Muitos objetos sem instancing (1.600 esferas):** Anastacio 587 FPS x Thunder 1585 com culling;
+     570 x 2524 sem culling (3-4x atras). Custo e CPU por objeto no render (`cpu:render.cameras` ~1,07 ms
+     contra ~0,05 ms com tudo numa malha); a GPU sozinha nao explica. Prioridade: achar a funcao C++ por
+     desenho (bind de material/uniforms, matriz, estado GL por slot) e cortar.
+  2. **Culling por frustum caro:** ~0,5 ms para 1.600 objetos (CameraCulling 0,47-0,53 ms; desligado 0,04 ms).
+     Thunder perde pouco ao ligar culling. Investigar o teste por objeto (BVH/DBVT, AABB, chamadas virtuais).
+  3. **400 objetos sem instancing:** 1911 x 2630 com culling, 2033 x 2908 sem (~1,4x atras) — mesmo custo do item 1.
+  **Causa (2026-10-09, `docs/analise-thunder-vs-anastacio.md`):** a Thunder agrupa estaticos sozinha
+  (auto-batch, padrao ligado); nos temos o mesmo recurso (Static Batch, `377a0026`) mas desligado.
+  Com Static Batch marcado: 1.600 obj 1579 x 1353 (culling ligado), 2331 x 2330 (desligado);
+  400 obj 3190 x 2293 / 3471 x 2998. Proximo passo: tornar Static Batch automatico ou facil de ligar.
+  Onde ja ganhamos: instancing (1779 x 728 com culling, 2581 x 720 sem) e malha unica (empate/vitoria, ~3200).
+  Variacao alta entre rodadas no caso 1 (479 x 696 FPS na mesma cena); repetir antes de concluir ganho pequeno.
+
 - Auditoria KX14: cache de `Text-Res` e envios espaciais de `KX_Speaker` corrigidos,
   editor/player compilados e testes isolados/runtime passaram. Pendente: benchmark de FPS/tempo,
   visual do texto e avaliacao auditiva 3D no jogo real (movimento/camera, Doppler, pausa e replicas).
