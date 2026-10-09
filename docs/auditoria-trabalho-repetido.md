@@ -65,5 +65,22 @@ primeiro segundo (carregamento). Recolocando temporariamente o bug de `98f54d7f`
 - `BL_Shader::setAttrib`: ignora valor repetido. OK.
 - Demais `NotifyUpdate` estão em caminhos de edição explícita (Python, deformers, destruição).
 
-Próximo passo: rodar o detector nos jogos reais (parado e em movimento) e investigar
-o contador que não zerar.
+## Plano aberto (para a próxima sessão)
+
+Objetivo: o padrão não pode voltar. Três camadas, nesta ordem:
+
+1. **Regra no `AGENTS.md`** (seção "Outras regras práticas"): toda marca de mudança só liga
+   dentro do ramo que detectou a mudança; laço por frame sobre todos os objetos precisa de
+   uma lista só dos que mudam ou de uma checagem barata antes; depois de mexer em
+   atualização/culling/transform, rodar o detector numa cena parada.
+2. **Verificador estático** em `tools/` (ex.: `check_trabalho_repetido.py`): varrer
+   `source/source/gameengine` atrás de marcas ligadas incondicionalmente no fim de funções
+   `Update*`, `NotifyUpdate`/`SetModified` sem comparação, e laços sobre
+   `m_objectlist`/`m_renderlist`/`m_parentlist` em funções por frame. Listar como suspeitos
+   com `arquivo:linha`; não precisa ser perfeito, precisa achar o caso de `98f54d7f`.
+3. **Detector em execução** (já existe): rodar nos jogos reais, parado e em movimento, e
+   investigar todo contador que não zerar parado. Cada achado: medir antes/depois, corrigir,
+   registrar aqui.
+
+Critério de pronto: o verificador estático acha o bug antigo se ele for recolocado, e os
+jogos reais ficam com contadores ~0 quando nada se move.
