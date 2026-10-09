@@ -33,6 +33,7 @@
 #include "GPU_extensions.h"
 #include "GPU_glew.h"
 #include "GPU_shader.h"
+#include "GPU_render_profile.h"
 #include "GPU_texture.h"
 #include "GPU_material.h"
 #include "gpu_codegen.h"
@@ -923,6 +924,11 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 
 int GPU_profile_counters[GPU_PROFILE_TOT];
 
+bool GPU_render_profile_enabled = false;
+GPU_RENDER_THREAD_LOCAL int GPU_render_profile_phase = -1;
+unsigned long long GPU_render_profile_calls[GPU_RENDER_PHASE_TOT];
+unsigned long long GPU_render_profile_counts[GPU_RENDER_PHASE_TOT][GPU_RENDER_KIND_TOT];
+
 GPUShader *GPU_shader_create_ex_named(const char *vertexcode,
                                       const char *fragcode,
                                       const char *geocode,
@@ -1041,6 +1047,10 @@ void GPU_shader_uniform_vector(GPUShader *UNUSED(shader), int location, int leng
 	if (location == -1 || value == NULL)
 		return;
 
+	if (length >= 1 && length <= 4) GPU_render_profile_count(GPU_RENDER_FLOAT1 + length - 1);
+	else if (length == 9) GPU_render_profile_count(GPU_RENDER_MATRIX3);
+	else if (length == 16) GPU_render_profile_count(GPU_RENDER_MATRIX4);
+
 	GPU_ASSERT_NO_GL_ERRORS("Pre Uniform Vector");
 
 	if (length == 1) glUniform1fv(location, arraysize, value);
@@ -1058,6 +1068,8 @@ void GPU_shader_uniform_vector_int(GPUShader *UNUSED(shader), int location, int 
 	if (location == -1)
 		return;
 
+	if (length >= 1 && length <= 4) GPU_render_profile_count(GPU_RENDER_INTEGER);
+
 	GPU_ASSERT_NO_GL_ERRORS("Pre Uniform Vector");
 
 	if (length == 1) glUniform1iv(location, arraysize, value);
@@ -1073,6 +1085,7 @@ void GPU_shader_uniform_int(GPUShader *UNUSED(shader), int location, int value)
 	if (location == -1)
 		return;
 
+	GPU_render_profile_count(GPU_RENDER_INTEGER);
 	GPU_CHECK_ERRORS_AROUND(glUniform1i(location, value));
 }
 
@@ -1081,6 +1094,7 @@ void GPU_shader_uniform_float(GPUShader *UNUSED(shader), int location, float val
 	if (location == -1)
 		return;
 
+	GPU_render_profile_count(GPU_RENDER_FLOAT1);
 	GPU_CHECK_ERRORS_AROUND(glUniform1f(location, value));
 }
 
@@ -1121,6 +1135,7 @@ void GPU_shader_uniform_texture(GPUShader *UNUSED(shader), int location, GPUText
 		glBindTexture(target, bindcode);
 	else
 		GPU_invalid_tex_bind(target);
+	GPU_render_profile_count(GPU_RENDER_SAMPLER);
 	glUniform1i(location, number);
 	if (GPU_texture_unit_fixed_function(number)) glEnable(target);
 	if (number != 0) glActiveTexture(GL_TEXTURE0);

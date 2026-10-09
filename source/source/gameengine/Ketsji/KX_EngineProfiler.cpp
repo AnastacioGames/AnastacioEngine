@@ -26,6 +26,7 @@
 
 #include "GPU_glew.h"
 #include "GPU_shader.h"
+#include "GPU_render_profile.h"
 
 #include <algorithm>
 #include <chrono>
@@ -63,6 +64,8 @@ struct State
 	double sumCpu[maxStages] = {};
 	double sumGpu[maxStages] = {};
 	double sumCat[maxStages] = {};
+	double sumRenderCalls[GPU_RENDER_PHASE_TOT] = {};
+	double sumRenderCounts[GPU_RENDER_PHASE_TOT][GPU_RENDER_KIND_TOT] = {};
 	double sumWall = 0.0;
 	int sumCount = 0;
 	std::string notes;
@@ -95,6 +98,8 @@ struct State
 		std::fill(std::begin(sumCpu), std::end(sumCpu), 0.0);
 		std::fill(std::begin(sumGpu), std::end(sumGpu), 0.0);
 		std::fill(std::begin(sumCat), std::end(sumCat), 0.0);
+		std::fill(std::begin(sumRenderCalls), std::end(sumRenderCalls), 0.0);
+		for (auto& counts : sumRenderCounts) std::fill(std::begin(counts), std::end(counts), 0.0);
 		sumWall = 0.0;
 		sumCount = 0;
 		notes.clear();
@@ -237,6 +242,7 @@ void AddCpu(int id, double ms)
 
 void BeginGpuFrame()
 {
+	GPU_render_profile_enabled = g_enabled;
 	if (g_enabled) {
 		GetGpu().BeginFrame();
 	}
@@ -260,6 +266,11 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 	// Toggled only here, between frames, so no stage is half measured.
 	if (state.requested != g_enabled) {
 		g_enabled = state.requested;
+		GPU_render_profile_enabled = g_enabled;
+		for (int phase = 0; phase < GPU_RENDER_PHASE_TOT; ++phase) {
+			GPU_render_profile_calls[phase] = 0;
+			std::fill(std::begin(GPU_render_profile_counts[phase]), std::end(GPU_render_profile_counts[phase]), 0);
+		}
 		if (g_enabled) {
 			state.Reset();
 			GetGpu().dropPending = true;
@@ -310,6 +321,12 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 
 	if (state.frame > warmupFrames) {
 		state.sumWall += wallMs;
+		for (int phase = 0; phase < GPU_RENDER_PHASE_TOT; ++phase) {
+			state.sumRenderCalls[phase] += GPU_render_profile_calls[phase];
+			for (int kind = 0; kind < GPU_RENDER_KIND_TOT; ++kind) {
+				state.sumRenderCounts[phase][kind] += GPU_render_profile_counts[phase][kind];
+			}
+		}
 		for (int i = 0; i < numCategories; ++i) {
 			state.sumCat[i] += categoryMs[i];
 		}
@@ -331,9 +348,20 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 				PrintStages(f, state, state.sumCpu, 1.0 / n, 0.05);
 				fprintf(f, " | gpu:");
 				PrintStages(f, state, state.sumGpu, 1.0 / n, 0.05);
+				static const char *phases[] = {"object", "shadow", "lights", "probes", "damage", "skinning"};
+				static const char *kinds[] = {"float1", "float2", "float3", "float4", "matrix3", "matrix4", "integer", "sampler", "mul", "inverse"};
+				fprintf(f, " | uploads:");
+				for (int phase = 0; phase < GPU_RENDER_PHASE_TOT; ++phase) {
+					fprintf(f, " %s.calls=%.2f", phases[phase], state.sumRenderCalls[phase] / n);
+					for (int kind = 0; kind < GPU_RENDER_KIND_TOT; ++kind) {
+						fprintf(f, " %s.%s=%.2f", phases[phase], kinds[kind], state.sumRenderCounts[phase][kind] / n);
+					}
+				}
 				fprintf(f, "\n");
 				fclose(f);
 			}
+			std::fill(std::begin(state.sumRenderCalls), std::end(state.sumRenderCalls), 0.0);
+			for (auto& counts : state.sumRenderCounts) std::fill(std::begin(counts), std::end(counts), 0.0);
 			state.sumWall = 0.0;
 			std::fill(std::begin(state.sumCat), std::end(state.sumCat), 0.0);
 			std::fill(std::begin(state.sumCpu), std::end(state.sumCpu), 0.0);
@@ -345,6 +373,10 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 	std::fill(std::begin(state.cpu), std::end(state.cpu), 0.0);
 	std::fill(std::begin(state.gpu), std::end(state.gpu), 0.0);
 	state.notes.clear();
+	for (int phase = 0; phase < GPU_RENDER_PHASE_TOT; ++phase) {
+		GPU_render_profile_calls[phase] = 0;
+		std::fill(std::begin(GPU_render_profile_counts[phase]), std::end(GPU_render_profile_counts[phase]), 0);
+	}
 	for (int i = 0; i < GPU_PROFILE_TOT; ++i) {
 		if (GPU_profile_counters[i]) {
 			state.lastCounterFrame[i] = state.frame;

@@ -59,6 +59,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
+#include "GPU_render_profile.h"
 #include "GPU_texture.h"
 
 #include "gpu_codegen.h"
@@ -143,6 +144,9 @@ struct GPUMaterial {
 
 	int objectinfoloc;
 	int objectlayloc;
+	/* Uniform state is only trusted within the current material activation. */
+	bool objectlay_valid;
+	int objectlay_value;
 
 	int ininstposloc;
 	int ininstmatloc;
@@ -180,6 +184,10 @@ struct GPUMaterial {
 	int probecubeloc, probeinfoloc, probeposloc;
 	int probecube2loc, probeinfo2loc, probepos2loc;
 	int probeboxloc, probebox2loc;
+	/* Only cache absent probes within one material activation. Active textures
+	 * must still bind per object; reactivation resets potentially shared programs. */
+	bool probe_absent_valid[2];
+	float probe_absent_maxlod[2];
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 
@@ -782,6 +790,9 @@ void GPU_material_bind(
 
 		/* note material must be bound before setting uniforms */
 		GPU_pass_bind(material->pass, time, mipmap);
+		material->probe_absent_valid[0] = false;
+		material->probe_absent_valid[1] = false;
+		material->objectlay_valid = false;
 
 		if (material->baryuniformloc != -1) {
 			float use = (gpu_viewport_barycentric && material->attribs.barycentric) ? 1.0f : 0.0f;
@@ -913,11 +924,13 @@ void GPU_material_bind_uniforms(
 			GPU_shader_uniform_vector(shader, material->obmatloc, 16, 1, (float *)obmat);
 		}
 		if (material->builtins & GPU_INVERSE_OBJECT_MATRIX) {
+			GPU_render_profile_count(GPU_RENDER_INVERSE);
 			invert_m4_m4(invmat, obmat);
 			GPU_shader_uniform_vector(shader, material->invobmatloc, 16, 1, (float *)invmat);
 		}
 		if (material->builtins & GPU_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
+				GPU_render_profile_count(GPU_RENDER_MUL);
 				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				GPU_shader_uniform_vector(shader, material->localtoviewmatloc, 16, 1, (float *)localtoviewmat);
 			}
@@ -925,8 +938,10 @@ void GPU_material_bind_uniforms(
 		if (material->builtins & GPU_NORMAL_MATRIX) {
 			if (viewmat) {
 				float mat3[3][3], normalmat[3][3];
+				GPU_render_profile_count(GPU_RENDER_MUL);
 				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				copy_m3_m4(mat3, localtoviewmat);
+				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m3_m3(normalmat, mat3);
 				transpose_m3(normalmat);
 				GPU_shader_uniform_vector(shader, material->normalmatloc, 9, 1, (float *)normalmat);
@@ -934,7 +949,9 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_INVERSE_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
+				GPU_render_profile_count(GPU_RENDER_MUL);
 				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m4_m4(invlocaltoviewmat, localtoviewmat);
 				GPU_shader_uniform_vector(shader, material->invlocaltoviewmatloc, 16, 1, (float *)invlocaltoviewmat);
 			}
@@ -968,7 +985,11 @@ void GPU_material_bind_uniforms(
 			GPU_shader_uniform_vector(shader, material->objectinfoloc, 3, 1, object_info);
 		}
 		if (material->builtins & GPU_OBJECT_LAY) {
-			GPU_shader_uniform_vector_int(shader, material->objectlayloc, 1, 1, &oblay);
+			if (!material->objectlay_valid || material->objectlay_value != oblay) {
+				GPU_shader_uniform_vector_int(shader, material->objectlayloc, 1, 1, &oblay);
+				material->objectlay_value = oblay;
+				material->objectlay_valid = true;
+			}
 		}
 	}
 }
@@ -4870,6 +4891,12 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 	if (!shader || material->probeinfoloc == -1) {
 		return;
 	}
+	if (!cube && material->probe_absent_valid[0] &&
+	    material->probe_absent_maxlod[0] == maxlod) {
+		return;
+	}
+	material->probe_absent_valid[0] = !cube;
+	material->probe_absent_maxlod[0] = maxlod;
 
 	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 1;
 	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};
@@ -4910,6 +4937,13 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	if (!shader || material->probeinfo2loc == -1) {
 		return;
 	}
+	const bool absent = !(cube && weight > 0.0f && material->probecube2loc != -1);
+	if (absent && material->probe_absent_valid[1] &&
+	    material->probe_absent_maxlod[1] == maxlod) {
+		return;
+	}
+	material->probe_absent_valid[1] = absent;
+	material->probe_absent_maxlod[1] = maxlod;
 
 	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 2;
 	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};

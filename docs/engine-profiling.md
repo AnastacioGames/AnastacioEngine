@@ -69,3 +69,35 @@ com o tempo real desde a abertura do processo:
 No Windows, `tools/debug/abrir_engine_log_animacao.bat` abre o editor com o log em `debug-logs/anim_log.txt`.
 Desligado, o custo é um teste de booleano por chamada. Achou o bug do P em 2026-10-08: `animT` começava com o valor
 da engine anterior (membro não inicializado).
+
+## Amostragem do caminho de desenho por objeto
+
+Os marcadores `draw.mesh_slot`, `draw.object_update`, `draw.object_uniforms`,
+`draw.light_selection`, `draw.light_uniforms` e `draw.submit` usam
+`KX_RenderProfileSample.h`: uma chamada a cada 61, com estimativa multiplicada por 61.
+São usados na thread principal de render. `draw.timer_floor` mede um bloco vazio para
+mostrar o custo mínimo do cronômetro. Etapas se sobrepõem e não devem ser somadas;
+tempos próximos do piso não permitem atribuir custo útil à função. A ausência de um
+marcador no log pode resultar do limiar de impressão. Compare FPS com o profiler desligado.
+
+RunNode também expõe `draw.object_state`, `draw.material_activate`, `draw.matrix_push`,
+`draw.matrix_apply` e `draw.matrix_pop`. Ativação do material contém atualização do
+objeto e luzes. Submissão mede a chamada CPU a `glDrawElements`, não a duração de
+execução do desenho na GPU. Nenhum cache ou operação de render muda com esses marcadores.
+
+## Contagem de uniforms enviados na atualização do objeto
+
+As linhas AVG incluem `uploads:` com médias por quadro para `object`, `shadow`,
+`lights`, `probes`, `damage` e `skinning`. `calls` conta entradas na fase; os demais
+campos contam chamadas de envio depois dos retornos por localização ausente ou
+ponteiro nulo. `float1` a `float4`, `matrix3`, `matrix4`, `integer` e `sampler`
+contam comandos, não elementos dos arrays, bytes ou alterações efetivas do valor.
+`sampler` conta a chamada pelo wrapper de textura; sampler sem textura ativa pode
+ser enviado como `integer`. Não representam uploads de imagens.
+
+`mul` e `inverse` contam operações somente em GPU_material_bind_uniforms.
+O campo de fase é local à thread; os escopos são usados na thread principal de
+render. Outros caminhos de render, filtros e preparo por bucket ficam fora dessa
+contagem. Os contadores zeram a cada quadro e desligam junto com o profiler.
+Os zeros são impressos para distinguir entrada na função de upload executado.
+Essa instrumentação não altera frequência ou passos de lógica, física e veículos.

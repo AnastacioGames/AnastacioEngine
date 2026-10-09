@@ -29,6 +29,8 @@
  *  \ingroup bgerast
  */
 
+#include "KX_RenderProfileSample.h"
+
 #include "RAS_MeshSlot.h"
 #include "RAS_MeshUser.h"
 #include "RAS_IMaterial.h"
@@ -80,17 +82,28 @@ void RAS_MeshSlot::GenerateTree(RAS_DisplayArrayUpwardNode& root, RAS_UpwardTree
 
 void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 {
+	RANGE_RENDER_SAMPLE("draw.mesh_slot");
+	{
+		// Empty block estimates the timer floor for these very short calls.
+		RANGE_RENDER_SAMPLE("draw.timer_floor");
+	}
 	RAS_ManagerNodeData *managerData = tuple.m_managerData;
 	RAS_MaterialNodeData *materialData = tuple.m_materialData;
 	RAS_DisplayArrayNodeData *displayArrayData = tuple.m_displayArrayData;
 	RAS_Rasterizer *rasty = managerData->m_rasty;
-	rasty->SetClientObject(m_meshUser->GetClientObject());
-	rasty->SetFrontFace(m_meshUser->GetFrontFace());
+	{
+		RANGE_RENDER_SAMPLE("draw.object_state");
+		rasty->SetClientObject(m_meshUser->GetClientObject());
+		rasty->SetFrontFace(m_meshUser->GetFrontFace());
+	}
 
 	RAS_DisplayArrayStorage *storage = displayArrayData->m_arrayStorage;
 
 	if (!managerData->m_shaderOverride) {
-		materialData->m_material->ActivateMeshUser(m_meshUser, rasty, managerData->m_trans);
+		{
+			RANGE_RENDER_SAMPLE("draw.material_activate");
+			materialData->m_material->ActivateMeshUser(m_meshUser, rasty, managerData->m_trans);
+		}
 
 		if (materialData->m_zsort && storage) {
 			unsigned int *indexmap = storage->GetIndexMap();
@@ -102,13 +115,17 @@ void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 		}
 	}
 
-	rasty->PushMatrix();
+	{
+		RANGE_RENDER_SAMPLE("draw.matrix_push");
+		rasty->PushMatrix();
+	}
 
 	if (materialData->m_text) {
 		rasty->IndexPrimitivesText(this);
 	}
 	else {
 		if (displayArrayData->m_applyMatrix) {
+			RANGE_RENDER_SAMPLE("draw.matrix_apply");
 			float mat[16];
 			rasty->GetTransform(m_meshUser->GetMatrix(), materialData->m_drawingMode, mat);
 			rasty->MultMatrix(mat);
@@ -123,7 +140,13 @@ void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 				materialData->m_material->UpdateObjectMatrix(m_meshUser, rasty, mat);
 			}
 		}
-		storage->IndexPrimitives();
+		{
+			RANGE_RENDER_SAMPLE("draw.submit");
+			storage->IndexPrimitives();
+		}
 	}
-	rasty->PopMatrix();
+	{
+		RANGE_RENDER_SAMPLE("draw.matrix_pop");
+		rasty->PopMatrix();
+	}
 }

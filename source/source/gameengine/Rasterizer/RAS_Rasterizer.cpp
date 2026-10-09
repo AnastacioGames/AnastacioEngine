@@ -29,6 +29,8 @@
  *  \ingroup bgerastogl
  */
 
+#include "KX_RenderProfileSample.h"
+
 #include "RAS_Rasterizer.h"
 #include "RAS_OpenGLRasterizer.h"
 #include "RAS_OpenGLDebugDraw.h"
@@ -1191,6 +1193,7 @@ void RAS_Rasterizer::ActivateOverrideShaderInstancing(RAS_InstancingBuffer *buff
 
 void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 {
+	RANGE_RENDER_SAMPLE("draw.light_selection");
 	bool enable = false;
 	int layer = -1;
 
