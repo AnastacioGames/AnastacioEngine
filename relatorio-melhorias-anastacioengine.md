@@ -73,6 +73,13 @@ continuam síncronos por padrão. Tecla física e aparência real ainda precisam
 
 - GPU instancing com `RAS_InstancingBuffer` e `RAS_DisplayArrayBucket::RunInstancingNode`.
 - Batching estático com `RAS_BatchDisplayArray` e `RAS_BatchGroup`.
+- Batching estático (2026-10-08): opção **Static Batch** por objeto (Static/No Collision) junta os
+  marcados num `KX_BatchGroup` ao iniciar; membro que se move ou é destruído sai do grupo sozinho
+  (`SetMatrix` compara a matriz). Culling DBVT só reenvia AABB quando a malha muda
+  (`RAS_MeshBoundingBox::Update`). Decisão: numa cena parada, o trabalho de atualização por frame
+  deve ser ~0; conferir com os contadores de `getRenderStats()`. Detalhes em
+  [batching-estatico-e-culling.md](docs/batching-estatico-e-culling.md) e
+  [auditoria-trabalho-repetido.md](docs/auditoria-trabalho-repetido.md).
 - LOD por distância com `KX_LodManager` e `KX_LodLevel`.
 - Frustum culling com `SG_CullingNode`, `KX_CullingHandler` e `SG_Frustum`.
 - Occlusion culling por DBVT do Bullet. A cena usa `use_occlusion_culling`, e objetos grandes podem ser
@@ -111,6 +118,31 @@ Detalhes no [guia](docs/steam-complement-development.md) e [plano](docs/steam-mu
 Web exclui o carregador; build Web não revalidado. Linux Steam ainda não suportado nesta entrega.
 
 ### Performance
+
+- O profiler conta entradas e comandos efetivos de uniform nas fases de objeto,
+  sombra, luzes/IES, probes, dano e skinning (2026-10-08). Controle de Object Info
+  confirmou envios de matriz/vetor. Material legado: só camada por objeto; controle
+  Principled: 19 comandos de estado padrão por objeto mesmo sem mapas de sombra e
+  probes locais antes do cache. Probes ausentes agora enviam uma vez por ativação
+  do material (12800 → 8 comandos/quadro no controle de 1600 objetos); sombras e
+  luzes/IES permanecem por objeto. Transições isoladas passaram. Série sem profiler
+  no controle PBR: 240 → 289 FPS em MSAA 2/AF 2 e 243 → 293 em 4/4 (cerca de 20%).
+  Visual e ganho no jogo real seguem pendentes. Lógica/física intactas.
+
+- Cache da camada do objeto por ativação do material (2026-10-08): 1600 → 1
+  uniforms inteiros no controle legado. Trocas de camada e reativação de programa
+  compartilhado continuam enviando o valor; matrizes permanecem por objeto.
+  Ganho consistente de FPS não demonstrado (+0,89% em 2X; 4X variável).
+  Física boa/sem lag confirmados pelo usuário no standalone de 2560×1440 antes
+  dessa segunda peça, com limite de 60 FPS; validação visual desta peça pendente.
+
+- Diagnóstico do render por objeto (2026-10-08): profiler com amostragem 1/61 separa
+  estado, ativação de material, matrizes e submissão. Na cena sintética de 1600 objetos
+  sem instancing, ativação do material foi a maior fase individual, com custo também
+  em matrizes e desenhos. Contadores de entrada em bind de luz não equivalem a uploads
+  efetivos. Tempos pequenos exigem comparar com o piso do cronômetro; nenhuma otimização
+  de comportamento introduzida pelos marcadores. Caches posteriores são descritos
+  acima. Procedimento em `docs/engine-profiling.md`.
 
 - O buffer de instancing conserva capacidade e só realoca quando necessário; o rebind redundante dos
   atributos por frame também foi eliminado.

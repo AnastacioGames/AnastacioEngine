@@ -6,12 +6,92 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-08 - Static Batch, culling sem AABB repetida e detector de trabalho repetido
+
+- `377a0026`: checkbox **Static Batch** (`ob.use_static_batch`) no painel Physics; o conversor junta
+  os objetos marcados num `KX_BatchGroup`. Cena de 1.600 objetos: ~707 → ~2.513 FPS sem culling.
+- `98f54d7f`: `RAS_MeshBoundingBox::Update()` marcava `m_modified = true` sempre; com DBVT cada objeto
+  reenviava a AABB ao Bullet todo frame (~320 µs com 1.600). Agora só marca quando a malha muda.
+  Com culling e Static Batch: ~1.170 → ~1.700 FPS, empatando com a referência; sem Static Batch
+  ~512 → ~640. Validado no jogo do usuário (nada sumiu ou piscou).
+- `61d35afc`: contadores por frame em `getRenderStats()` (`sceneNodeUpdates`, `transformSyncs`,
+  `boundsPushes`, `meshMatrixChanges`, `updateNotifies`) e `tools/debug/auditar_trabalho_repetido.py`.
+  Com o bug recolocado, `boundsPushes` = 1.600/frame; corrigido, 0.
+- Documentos: [batching-estatico-e-culling.md](batching-estatico-e-culling.md),
+  [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
+
+## 2026-10-08 - `SetMatrix()` separa membro do batch quando a matriz muda
+
+`RAS_MeshUser::SetMatrix()` compara a matriz antes de separar; matriz igual mantém o
+batch. `RAS_BatchGroup::SplitMeshUser()` notifica um hook virtual, e `KX_BatchGroup`
+atualiza a lista e a referência sem acoplar RAS ao KX. `RAS_MeshUser` agora separa os
+slots antes de destruí-los. `RangeRuntime` compilou. Teste estático: 64 membros/1 draw
+até frame 119; mover referência: 63 membros, `batchGroup=None`, referência seguinte e
+draws 1→2; `destruct()` restaurou 64. Remoção da referência e de membro comum também
+passou. Validação visual do objeto movido, reload e falha parcial seguem pendentes. A
+leitura do checkout da referência não confirmou rebuild integral por quadro; não portar `Reset()`
+sem entender o split/restauração. Evidências em `<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/RESULTADO.md`.
+
+## 2026-10-08 - Ciclo de remoção de membro do KX_BatchGroup corrigido
+
+`KX_GameObject::RemoveMeshes()` agora notifica `KX_BatchGroup` antes de destruir o
+mesh user. O grupo remove o ponteiro da lista não proprietária e, se o membro removido
+era a referência, troca para um membro restante ou limpa a referência RAS. `RangeRuntime`
+compilou; no standalone, remoção do primeiro membro e de um membro comum passou, contagem
+ficou em 63, referência correta, `destruct()` completou e exit code foi 0. A próxima peça
+separada é invalidação por `SetMatrix`; reload, grupo vazio e falha parcial seguem pendentes.
+Evidências em `<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/RESULTADO.md`.
+
+## 2026-10-08 - Ciclo de remoção de membro do KX_BatchGroup corrigido
+
+`KX_GameObject::RemoveMeshes()` agora notifica `KX_BatchGroup` antes de destruir o
+mesh user. O grupo remove o ponteiro da lista não proprietária e, se o membro removido
+era a referência, troca para um membro restante ou limpa a referência RAS. `RangeRuntime`
+compilou; no standalone, remover o primeiro membro e um membro comum passou, contagem
+ficou em 63, referência correta, `destruct()` completou e exit code foi 0. A próxima peça
+separada é invalidação por `SetMatrix`; reload, grupo vazio e falha parcial seguem pendentes.
+Evidências em `<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/RESULTADO.md`.
+
+## 2026-10-08 - Split manual antes de mover membro do batch
+
+Na cena sintética de 64 objetos, `KX_BatchGroup.split([obj])` antes da alteração
+de `worldPosition` removeu o membro do grupo. Após um frame, `drawCalls` subiu de
+1 para 2, mantendo os outros 63 objetos agregados; `destruct()` restaurou 64. O
+standalone terminou com exit code 0. Isso valida um fallback manual quando o jogo
+antecipa a transformação. Não resolve invalidação automática, referências na lista
+Python após `endObject()` nem reload/troca de cena. Reproduções e log em
+`<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/`.
+
+## 2026-10-08 - Auditoria do batching existente para auto-batching
+
+Continuação da investigação da referência. A Anastacio já possui batching estático via
+`KX_BatchGroup`/`RAS_BatchGroup`/`RAS_BatchDisplayArray`, mas o uso é explícito por
+Python. A principal lacuna para automação é que `RAS_MeshUser::SetMatrix()` não
+separa/reconstrói o membro do batch quando sua transformação muda. Também foram
+registrados os limites do mesh user de referência, `frontFace=true`, transparência,
+deformers/atributos por objeto, falha parcial de merge e validação das passadas de
+sombra. Próxima etapa recomendada: testar o batch manual, especialmente transformação,
+remoção e reload, antes de automatizar a elegibilidade. Nenhum código C++ foi alterado
+nesta etapa; mudanças de profiler que já estavam no workspace foram preservadas.
+Detalhes em `docs/batching-estatico-e-culling.md`.
+
+## 2026-10-08 - Teste do KX_BatchGroup manual no standalone
+
+Cena sintética local de 64 objetos/16 meshes compartilhados executada no
+`AnastacioRuntime.exe`: batch manual resultou em 1 draw call e `destruct()` restaurou
+64. Mover membro manteve `batchGroup` ativo, consistente com a matriz copiada para os
+vértices agregados; confirmação visual pendente. Remover um membro com `endObject()` e
+destruir o grupo completou sem crash, mas `group.objects` ainda mostrava 64 no intervalo
+observado; após destruição, 63 draws. Reload de cena no mesmo processo não testado.
+Nenhum C++ foi alterado. Dados e limites em
+`<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/RESULTADO.md`.
+
 Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
 | Arquivo | Datas | Entradas | Tamanho |
 |---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-10-07 | 34 | 44 KB |
+| [este arquivo](changelog.md) (entradas recentes) | 2026-10-08 | 35 | 45 KB |
 | [14_2026-10-06_a_2026-10-05.md](changelog/14_2026-10-06_a_2026-10-05.md) | 2026-10-06 a 2026-10-05 | 42 | 54 KB |
 | [15_2026-10-04_a_2026-10-03.md](changelog/15_2026-10-04_a_2026-10-03.md) | 2026-10-04 a 2026-10-03 | 60 | 63 KB |
 | [16_2026-10-02_a_2026-10-01.md](changelog/16_2026-10-02_a_2026-10-01.md) | 2026-10-02 a 2026-10-01 | 76 | 68 KB |
@@ -30,6 +110,167 @@ Entradas antigas não estão em ordem cronológica estrita; a data no título é
 | [06_2026-08-31_a_2026-08-26.md](changelog/06_2026-08-31_a_2026-08-26.md) | 2026-08-31 a 2026-08-26 | 7 | 71 KB |
 | [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
 | [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
+
+## 2026-10-08 - Auto-batching RAS confirmado na engine de referência
+
+Comparacao direta do checkout da referência com a Anastacio identificou `TryAutoBatch` no
+RAS da referência. A cena estatica do benchmark tem 1.600 objetos em 16 meshes
+compartilhados, um material; o player de junho marca `isMDEI=false`. Logo, MDEI nao
+explica o resultado.
+
+Foi feito A/B no mesmo executavel da referência de junho (SHA-256 no manifesto) e na mesma
+cena, mudando apenas `bge_allow_auto_batch` nos 16 datablocks de mesh. Resolucao
+1280x720, viewport 1281x721, MSAA/AF 2, VSync 0, culling desligado, ticrate 10000,
+2 s de aquecimento e 4 s de amostra. Duas repeticoes alternadas: False 661,8/667,2
+FPS (media 664,5); True 2610,0/2595,0 (media 2602,5), ganho de 3,92x. Todas as
+rodadas produziram 128600 primitivas. A cena original sem a propriedade explicita
+mediu 2636 FPS, alinhada ao valor True.
+
+No fonte da referência, a conversao le a propriedade (default true) e configura
+`RAS_Mesh::SetAllowAutoBatching`; o renderer so a consulta para decidir se tenta
+`TryAutoBatch`. O A/B com o player real confirma que o auto-batching explica a maior
+parte da diferenca na cena estatica. Nao houve alteracao de fonte/build da engine.
+Nao foi capturado o numero exato de draws GL; a medicao de primitivas confirma que a
+geometria permaneceu presente. Dados, cenas, scripts e hashes em
+`<investigacao-local>/benchmark/diagnostico/autobatch_ab/RESULTADO-AUTOBATCH-AB.md`.
+
+Proximo passo: avaliar um prototipo opt-in na Anastacio para objetos estaticos ou
+raramente alterados, preservando fallback e invalidacao de transformacoes. Nao
+inferir beneficio para carros dinamicos.
+
+## 2026-10-08 — Cache da camada do objeto e validação do standalone
+
+Usuário confirmou ausência de lag percebido na rodada sem instrumentação do
+standalone e física funcionando bem, com limite de 60 FPS. Área da janela
+confirmada em 2560×1440 usando configurações salvas (sem -w 1280 720). Agente
+entrou pelo menu na Pista_1 e enviou I depois da contagem; teste anterior em janela
+menor confirmou progresso automático pelos checkpoints. Isso valida funcionamento
+da primeira otimização; não estabelece ganho de FPS no jogo.
+
+Nova peça em gpu_material.c: GPU_OBJECT_LAY só é reenviado quando muda, com
+invalidação em GPU_material_bind para programas compartilhados e novas passadas.
+Nenhuma outra atualização de objeto é pulada. Editor e player recompilados.
+Seis execuções de controle passaram: legado 1600 → 1 inteiros/quadro; camada
+alternada 1600 → 16 (ordem de desenho por malha); ObjectInfo preserva 1600 matrizes
+e vetores; PBR conserva 8 comandos de probes. Teste C do bloco real passou
+troca/retorno de camada, zero, bits altos/múltiplos, reativação de programa
+compartilhado e localização ausente.
+
+Oito rodadas sem profiler, OFF/ON/ON/OFF, 5 s de aquecimento + 15 s de amostra:
+MSAA 2/AF 2: 704,3 → 710,6 FPS (+0,89%, pequeno/inconclusivo). MSAA 4/AF 4:
+controle variou de 561,5 a 672,8 e cache de 685,9 a 715,5; não atribuir a
+diferença média ao cache sem repetição mais estável. Não há ganho consistente
+demonstrado dessa peça, nem explicação da diferença grande com a referência legada.
+Física/lógica intactas; validação visual no jogo dessa segunda peça pendente.
+Checker mantém 30 referências antigas de física e 3 avisos preexistentes.
+Evidências: `<investigacao-local>/benchmark/diagnostico/CACHE-CAMADAS.md`.
+
+## 2026-10-08 — Segunda rodada do RolimaRacer e hipótese de desfoque
+
+Usuário confirmou Pista_1, 10 carros e muitos efeitos; orientou continuar testes
+e apenas registrar lags, investigando se forem frequentes. Suspeita de desfoque
+da câmera em movimento rápido registrada como hipótese. Player de controle sem
+cache executou o jogo: 37 médias e 26 picos, incluindo espera de 6,45 s em swap.
+Nas duas sessões, recortes após 25 s com física tiveram mediana de 60 FPS e zero
+uploads de probes. Sem ganho demonstrado do cache na pista; não comparar taxas
+de picos porque trajetos/durações diferiram. Próxima rodada sem profiler/log de
+animação, com efeitos preservados. Fonte/editor/player otimizado permanecem iguais.
+Evidências: `<investigacao-local>/benchmark/diagnostico/rolima-real/COMPARACAO-PISTA1.md`.
+
+## 2026-10-08 — Primeira execução do cache no RolimaRacer
+
+Player principal abriu `D:/ProjetoRolimaRacer/RolimaRacer.range` pelo menu normal,
+com profiler e log de animação, sem modificar jogo ou frequência de lógica/física
+(tic rate inicial 60). Usuário relatou que chegou à corrida com alguns lags.
+50 médias/19 picos: muitos trechos em 60 FPS; maiores pausas em `endframe.swap`,
+incluindo 6,64 s, sem compilação/criação de textura naquele quadro. Causa ainda
+não identificada; foco da janela e comparação sem cache pendentes. Houve também
+picos de preparação de cenas. Probes tiveram zero uploads em todas as médias:
+ganho do controle PBR não demonstrado no jogo. Pista não confirmada. Evidências:
+`<investigacao-local>/benchmark/diagnostico/rolima-real/PRIMEIRA-VALIDACAO.md`.
+
+## 2026-10-08 — Comparação de FPS do cache de probes ausentes
+
+Dois players de teste compilados com o mesmo código de diagnóstico: o controle
+desliga somente os retornos antecipados do cache. Fonte restaurada e editor/player
+principais recompilados com a otimização. Série longa sem RANGE_PROFILE, ordem
+OFF/ON/ON/OFF, 5 s de aquecimento e 15 s de amostra, 1600 objetos com Principled:
+MSAA 2/AF 2: 240,2 → 288,9 FPS (+20,3%); MSAA 4/AF 4: 242,7 → 292,8 (+20,6%).
+Janela 1280×720, viewport de desenho 1281×721, VSync 0 e 128602 primitivas iguais;
+hardware AMD RX 6800M. O tic rate elevado só pertence à cena estática de benchmark.
+
+Série curta exploratória teve variação grande no controle legado e não fundamenta
+ganho nesse material; primeira rodada curta coincidiu com o término do rebuild.
+Série longa ocorreu após os builds e é a evidência de FPS do PBR. Resultado não
+mede jogo real nem compara com a referência. Cores seguem adiadas. Validação do carro
+e probes visuais no jogo depende do arquivo do usuário. Dados/hashes em
+`<investigacao-local>/benchmark/diagnostico/cache_long_summary.json`.
+
+## 2026-10-08 — Cache de probes ausentes por ativação do material
+
+`gpu_material.c` evita repetir os uniforms das duas probes ausentes durante uma
+ativação do material. Reinicia em `GPU_material_bind`; probe ativa invalida o estado
+ausente e continua vinculando textura por objeto. Mudança de maxlod força envio.
+Não muda lógica, física, matrizes ou seleção de probes.
+
+Editor e player compilados via MSVC. Quatro cenas executadas com MSAA 2 e AF 2:
+PBR passou de 12.800 comandos de probe/quadro para 8; legado manteve 1.600 inteiros
+de objeto, ObjectInfo manteve 1.600 matrizes e instancing permaneceu fora desse caminho.
+Teste C com as funções reais extraídas e wrappers simulados passou repetição,
+alteração de maxlod, probe ativa repetida, ativa para ausente, reinício e peso zero.
+Ganho de FPS sem profiler e validação visual com probes no jogo real ficam pendentes.
+Evidências: `<investigacao-local>/benchmark/diagnostico/CACHE-PROBES.md`.
+Checker de docs: 30 referências antigas da física e 3 avisos preexistentes.
+
+## 2026-10-08 — Contagem de uploads na atualização do objeto
+
+- Novo GPU_render_profile.h e contadores no ponto de envio ao OpenGL, classificados
+  por objeto, sombras, luzes/IES, probes, dano e skinning. Contagem de comandos após
+  retornos por localização ausente/ponteiro nulo, não bytes nem uploads de imagem.
+  Profiler grava médias por quadro e zeros; fases locais à thread.
+- Na cena legada de 1600 objetos: 1600 uniforms inteiros de camada e zero uploads
+  nas fases de sombra/luzes/probes/dano. No controle Principled: 30400 comandos por
+  quadro, incluindo estado padrão de recursos ausentes. Controle Object Info:
+  1600 matrizes 4×4 e 1600 vetores por quadro, validando os contadores positivos.
+- Cenas de nós sem opt-in PBR não exercitaram o shader esperado e foram excluídas;
+  os controles positivos usam game_settings.use_shading_nodes=True.
+- RangeRuntime e RangeEngine compilados com VSLANG=1033/vcvars64. Execuções instrumentadas
+  e controles sem profiler passaram. Nenhum corte de atualização implementado;
+  frequência/passos de lógica/física e comportamento de veículos não foram alterados.
+- Evidências locais: `<investigacao-local>/benchmark/diagnostico/CONTAGEM-UPLOADS.md`.
+  Próxima peça: cache específico de um estado padrão, com invalidação e teste no jogo.
+
+## 2026-10-08 — Decomposição do desenho por objeto
+
+- RunNode dividido em medições de estado, ativação de material, push/apply/pop de
+  matriz e submissão. Duas rodadas das quatro cenas, com ordem inversa na segunda,
+  e quatro controles com profiler desligado encerraram com sucesso.
+- Ativação do material foi a maior fase individual nas duas rodadas; matrizes e
+  submissão também contribuem. Estados de alpha, front face e seleção de luzes já
+  têm caches. Medições curtas continuam limitadas pelo piso do cronômetro.
+- RangeRuntime compilado com ambiente MSVC correto. Controles sem profiler:
+  681/1894/2186/3119 FPS (1600/400 objetos separados, instancing e mesh unido).
+- Evidências locais: `<investigacao-local>/benchmark/diagnostico/FASES-DO-DESENHO.md`.
+  Próxima peça: contar uploads e trabalho realmente executado na atualização do
+  objeto. Nenhum corte de recursos ou otimização de comportamento aplicado.
+
+## 2026-10-08 — Diagnóstico de render por objeto versus a engine de referência
+
+- Adicionadas medições por amostragem ao profiler existente: mesh slot, atualização do
+  objeto/uniforms, seleção/envio de luzes e submissão. Helper novo sem alterar layouts de structs.
+- Quatro cenas executadas; o caminho `RAS_MeshSlot::RunNode` concentrou a maior parte do
+  tempo de CPU de render na cena de 1600 objetos sem instancing. `ProcessLighting` já tem
+  cache por camada/cena; contagem de entradas não indica reconstrução de luzes.
+- Medição completa descartada por overhead; amostragem 1/61 inclui bloco vazio e fases
+  separadas. Estimativas pequenas permanecem limitadas pelo custo do cronômetro.
+- `RangeRuntime` compilado com ambiente MSVC correto e cenas instrumentadas encerraram
+  com sucesso. Sem otimização gráfica aplicada; cores adiadas por decisão do usuário.
+- Quatro controles com profiler desligado encerraram com sucesso: 683/2026/2179/3062 FPS
+  (1600/400 objetos, instancing e mesh unido). Editor e runtime recompilados com sucesso.
+- Checker de docs: 30 referências antigas no mapa de física e três avisos de tamanho,
+  fora dos arquivos instrumentados.
+- Evidências locais: `<investigacao-local>/benchmark/diagnostico/LOCALIZACAO-GARGALO.md`.
+  Próxima investigação: decompor estado/matrizes/submissão de RunNode; culling é frente separada.
 
 ## 2026-10-08 — Conversão: normais e tangentes das malhas em paralelo
 

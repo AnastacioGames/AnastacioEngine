@@ -465,15 +465,43 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   mostra os mesmos números sob "Show Render Queries". Falta uma apresentação pensada para quem faz jogo
   (hoje o painel é de debug interno): decidir se vira um HUD próprio de FPS + contadores, ligável no painel
   Render, em vez de ficar junto das render queries.
-- **Gargalo confirmado (2026-10-06) — uniforms de luz por objeto:** cena de 9 cubos com **um único
-  material** deu `materialBinds` 2 e `lightBinds` 9, ou seja um upload por objeto, não por bucket.
-  `BL_BlenderShader::BindShadowLamps()` roda dentro de `ActivateMeshUser()`, reenviando
-  `GPU_material_bind_scene_lights` (8 luzes × ~11 uniforms) e `GPU_material_bind_shadow_lamps`
-  (4 lamps, com 2 `BLI_findptr` lineares cada) com dados que são constantes por camada de luz.
-  Só vale para materiais de nós/PBR (`use_scene_lights` liga com `unflightsource[]`).
-  Correção planejada: contador de geração de luzes em `RAS_Rasterizer`, subindo só quando
-  `ProcessLighting()` recalcula, e o bind sobe para o `Activate()` do bucket. Prova: `lightBinds` cai de
-  ~objetos visíveis para ~material binds.
+- **Uploads repetidos de estado padrão no PBR (2026-10-08):** contadores reais no
+  profiler confirmaram 19 comandos por objeto na cena Principled sem mapas de sombra
+  e sem probes locais: 8 de sombra, 3 de luzes/IES e 8 de probes. Com 1600 objetos,
+  30400 comandos/quadro. No material legado da comparação com a referência, essas fases enviam
+  zero uniforms; apenas a camada do objeto é enviada. `lightBinds` conta entradas,
+  não uploads. O caso PBR é adicional e não explica sozinho o teste legado.
+  Primeira peça aplicada: cache de probes ausentes restrito à ativação do material,
+  reiniciado em cada bind e invalidado por probe ativa ou alteração de maxlod.
+  Controle PBR: 12800 comandos de probe/quadro → 8; total 17608 em vez de 30400.
+  Sombras e luzes/IES continuam sem esse cache.
+  Não reduzir atualizações de transformações, animação, lógica ou física de veículos.
+  Uploads, transições isoladas e FPS sem profiler passaram: PBR com 1600 objetos,
+  240,2 → 288,9 FPS em MSAA 2/AF 2 (+20,3%), 242,7 → 292,8 em 4/4 (+20,6%).
+  Validar comportamento visual no jogo com probes e veículo; ganho no material
+  legado não demonstrado. Procedimento em [engine-profiling.md](engine-profiling.md).
+  RolimaRacer abriu e usuário chegou à corrida com lags: muitas médias em 60 FPS,
+  probes sem uploads no trecho registrado; maiores pausas na apresentação da janela.
+  Pista_1 confirmada, 10 carros e muitos efeitos ligados. Repetir sem cache;
+  orientação do usuário: registrar lags e continuar, investigar se forem frequentes.
+  Segunda execução sem cache também teve pausas grandes na apresentação; mediana
+  de 60 FPS nos recortes com física nas duas sessões, sem uploads de probes.
+  Nenhum ganho demonstrado na Pista_1. Rodada sem instrumentação em standalone
+  com área 2560×1440: usuário confirmou sem lag percebido e física boa, FPS limitado
+  a 60. Suspeita de desfoque registrada, sem alterar efeitos.
+- **Camada de objeto repetida (2026-10-08):** cache por ativação do material aplicado,
+  legado 1600 → 1 uniforms de camada/quadro; alternância preservada (16 transições
+  na ordem por malha), matrizes e probes passaram. Editor/player compilados.
+  FPS sem profiler: +0,89% em 2X, série 4X com grande variação; ganho consistente
+  não demonstrado. Validar visual no jogo dessa segunda peça. A diferença grande
+  com a referência legada foi fechada em 2026-10-08: ver [batching estático e culling](batching-estatico-e-culling.md)
+  (Static Batch `377a0026`, ciclo do grupo `ae1370bc`, culling `98f54d7f`; validados no jogo do usuário).
+- **Trabalho repetido por frame (aberto, 2026-10-08):** generalizar a lição do `98f54d7f` (marca
+  "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`). Falta:
+  regra no `AGENTS.md`, verificador estático (`tools/`) e rodar o detector nos jogos reais
+  (parado e em movimento). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
+- **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
+  `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"
