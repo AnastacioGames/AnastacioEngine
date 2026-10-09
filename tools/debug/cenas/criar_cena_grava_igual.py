@@ -80,5 +80,13 @@ cam.rotation_euler = (0.9, 0, 0)
 scene.objects.link(cam)
 scene.camera = cam
 
+sol = bpy.data.objects.new('sol', bpy.data.lamps.new('sol', 'SUN'))
+sol.rotation_euler = (0.6, 0.3, 0)
+scene.objects.link(sol)
+# Sem nevoa: a cena e grande e os postes do fundo sumiam.
+if scene.world is None:
+    scene.world = bpy.data.worlds.new('mundo')
+scene.world.mist_settings.use_mist = False
+
 bpy.ops.wm.save_as_mainfile(filepath=out, check_existing=False)
 print('CENA salva', out)

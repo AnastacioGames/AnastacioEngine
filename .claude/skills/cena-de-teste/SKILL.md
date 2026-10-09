@@ -13,6 +13,8 @@ Exemplos prontos: `tools/debug/cenas/criar_cena_luzes_sombra.py` (luzes/sombra) 
 - **Todo mesh precisa de material**, senão não aparece no jogo. Um `bpy.data.materials.new()` com `diffuse_color` basta.
 - Material com nós Principled exige `scene.game_settings.use_shading_nodes = True`; sem isso o material fica sem shader e nada aparece.
 - `obj['x'] = ...` cria propriedade do **editor**, invisível para o jogo (`'x' in obj` dá falso no bge). Para propriedade de jogo use `bpy.ops.object.game_property_new` / `obj.game.properties`, ou identifique os objetos pelo nome (`o.name.startswith(...)`).
+- **Ponha uma luz Sun** (`bpy.data.lamps.new('sol', 'SUN')` + objeto linkado e inclinado); a cena criada do zero não tem luz e fica escura.
+- **Desligue a névoa** (`scene.world.mist_settings.use_mist = False`, criando `scene.world` se faltar) ou mantenha a cena pequena: com névoa ligada os objetos longe da câmera somem.
 - Passe `location=` explícito em todo `primitive_*_add`: sem ele o objeto nasce no cursor 3D.
 - Filho: `filho.parent = pai` e `filho.matrix_parent_inverse = pai.matrix_world.inverted()`.
 - Câmera: crie, linke e defina `scene.camera`; aponte para o centro com `(-Vector(loc)).to_track_quat('-Z', 'Y').to_euler()`.
