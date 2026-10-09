@@ -376,6 +376,13 @@ static PyObject *gPyGetRenderStats(PyObject *, PyObject *Py_UNUSED(ignored))
 	setInt("materialBinds", RAS_Rasterizer::GetLastMaterialChanges());
 	setInt("lightBinds", RAS_Rasterizer::GetLastLightBinds());
 
+	/* Update work of the last frame (CM_WorkCounters.h): near zero when nothing moves. */
+	setInt("sceneNodeUpdates", CM_WorkCountLast(CM_WORK_SCENE_NODE_UPDATES));
+	setInt("transformSyncs", CM_WorkCountLast(CM_WORK_TRANSFORM_SYNCS));
+	setInt("boundsPushes", CM_WorkCountLast(CM_WORK_BOUNDS_PUSHES));
+	setInt("meshMatrixChanges", CM_WorkCountLast(CM_WORK_MESH_MATRIX_CHANGES));
+	setInt("updateNotifies", CM_WorkCountLast(CM_WORK_UPDATE_NOTIFIES));
+
 	/* The rest is per scene: report the active one, like getCurrentScene() does. */
 	KX_Scene *scene = KX_GetActiveScene();
 	if (scene) {

@@ -26,6 +26,7 @@
  *  \ingroup bgerast
  */
 
+#include "CM_WorkCounters.h"
 #include "RAS_MeshUser.h"
 #include "RAS_DisplayArrayBucket.h"
 #include "RAS_BoundingBox.h"
@@ -145,8 +146,11 @@ void RAS_MeshUser::SetColor(const mt::vec4& color)
 
 void RAS_MeshUser::SetMatrix(const mt::mat4& matrix)
 {
-	if (m_batchGroup && std::memcmp(&m_matrix, &matrix, sizeof(mt::mat4)) != 0) {
-		m_batchGroup->SplitMeshUser(this);
+	if (std::memcmp(&m_matrix, &matrix, sizeof(mt::mat4)) != 0) {
+		CM_WorkCount(CM_WORK_MESH_MATRIX_CHANGES);
+		if (m_batchGroup) {
+			m_batchGroup->SplitMeshUser(this);
+		}
 	}
 
 	m_matrix = matrix;

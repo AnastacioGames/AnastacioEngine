@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "CM_WorkCounters.h"
 #include "KX_Scene.h"
 #include "KX_RainAura.h"
 #include "KX_RainSurfaceMask.h"
@@ -2413,9 +2414,12 @@ void KX_Scene::UpdateParents()
 	// We use the SG dynamic list
 	SG_Node *node;
 
+	int updatedNodes = 0;
 	while ((node = SG_Node::GetNextScheduled(m_sghead))) {
 		node->UpdateWorldData();
+		++updatedNodes;
 	}
+	CM_WorkCount(CM_WORK_SCENE_NODE_UPDATES, updatedNodes);
 
 	// The list must be empty here
 	BLI_assert(m_sghead.Empty());

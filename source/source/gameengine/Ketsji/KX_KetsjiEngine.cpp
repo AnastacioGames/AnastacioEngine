@@ -51,6 +51,7 @@ extern "C" {
 	#include "BLI_math_base.h"
 }
 
+#include "CM_WorkCounters.h"
 #include "CM_Message.h"
 
 #include "BLI_task.h"
@@ -431,6 +432,8 @@ void KX_KetsjiEngine::StartEngine()
 
 void KX_KetsjiEngine::BeginFrame()
 {
+	CM_WorkCountersSwap();
+
 	if (m_flags & SHOW_RENDER_QUERIES) {
 		m_logger.StartLog(tc_overhead);
 

@@ -36,6 +36,7 @@
 #  pragma warning( disable:4786 )
 #endif
 
+#include "CM_WorkCounters.h"
 #include "KX_GameObject.h"
 #include "KX_RuntimePropertyRegistry.h"
 #include "KX_PythonComponent.h"
@@ -1634,6 +1635,7 @@ void KX_GameObject::UpdateActivity(float distance)
 
 void KX_GameObject::UpdateTransform()
 {
+	CM_WorkCount(CM_WORK_TRANSFORM_SYNCS);
 	// HACK: saves function call for dynamic object, they are handled differently
 	if (m_physicsController && !m_physicsController->IsDynamic()) {
 		m_physicsController->SetTransform();
@@ -2251,6 +2253,7 @@ void KX_GameObject::UpdateBounds(bool force)
 
 void KX_GameObject::SetBoundsAabb(const mt::vec3 &aabbMin, const mt::vec3 &aabbMax)
 {
+	CM_WorkCount(CM_WORK_BOUNDS_PUSHES);
 	// Set the AABB in culling node box.
 	m_cullingNode.GetAabb().Set(aabbMin, aabbMax);
 
