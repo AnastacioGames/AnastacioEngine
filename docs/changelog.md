@@ -6,6 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - GL5/GL6/GL9/GL10: auditoria GameLogic integrada
+
+- Integrado o lote validado em worktree isolada: cache seguro de literais no Property Actuator (GL5), uma só leitura de texto no Property Sensor Changed (GL6), retorno cedo do TimeEventManager sem Timer (GL9) e menos lookups/varreduras invariantes nos sensores de teclado/mouse (GL10).
+- Cena de 300 objetos, 1.800 atuadores e 300 sensores de cada tipo: seis rodadas alternadas mantiveram valores finais idênticos e reduziram a média de 1,82 para 1,26 ms/frame (-31%). GL6 e GL9 foram falsos positivos em grande parte; o relatório preserva limites e ramos não alterados em [auditoria-claude-resultados.md](auditoria-claude-resultados.md).
+
 ## 2026-10-09 - RA3: benchmark A/B isolado
 
 - Reconstruidos dois players isolados com os mesmos objetos/headers atuais, variando apenas a chamada zsort em RAS_MeshSlot (map/sort/unmap antigo versus cache). Ambiente VSLANG/vcvars; builds e dependencias fora de build/bin. Isso isola ativacao do cache, sem alegar baseline historico completo. Fontes C++ e trabalho do Claude preservados.

@@ -49,7 +49,7 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 - Só no Play embutido do editor: LP9, LP10.
 
 **4. Baixo — trivial ou raro**
-KX7, KX9, KX12, KX14, RA7, PH5, PH6 = GL8, PH8 (custo), PH9, GL5, GL6, GL9, GL10, PY5, PY6, PY7, LP5-LP8,
+KX7, KX9, KX12, KX14, RA7, PH5, PH6 = GL8, PH8 (custo), PH9, PY5, PY6, PY7, LP5-LP8,
 LP11-LP14, GP5, GP8, SP9, SP12, SP14, SP15.
 
 
@@ -65,7 +65,7 @@ Agrupado por causa raiz; vários IDs são o mesmo problema visto de áreas difer
 4. **Marca sempre ligada (forma de 98f54d7f)**: ~~KX9~~ e ~~PH3~~ corrigidos. `KX_SoftBodyDeformer::Apply` compara as posições e normais exatas antes de atualizar o array, notifica apenas os atributos alterados e só recalcula o AABB se as posições mudaram. Sem gravidade o solver Bullet ainda move os nós e o upload continua corretamente; com o corpo suspenso, uma grade de 6 561 nós passou de 1 para 0 `updateNotifies`/`boundsPushes` por frame. O custo do solver continua separado.
 5. **Animacao**: ~~CV5/CV8~~, KX5 (animacao das probes) e KX13 corrigidos; decisoes de design CV3/CV4.
 6. **Render**: RA3 (zsort), KX4 (billboard), RA4 (instancing), RA6, KX10.
-7. **Resto de custo baixo**: GL2-GL10, RA2/RA7/RA8, GP3-GP5/GP7/GP8, PH9, KX7/KX12/KX14.
+7. **Resto de custo baixo**: GL2-GL4/GL7/GL8, RA2/RA7/RA8, GP3-GP5/GP7/GP8, PH9, KX7/KX12/KX14.
 
 Grupo 1 também cobre PY1/PY2 (caminho Python + `activate(true)` da física). PY3 e PY4 entram no grupo 7 se a cena tiver muitos componentes/shaders custom.
 
@@ -138,7 +138,7 @@ Padrão dominante aqui não é marca sempre ligada, e sim reenvio à GPU de valo
 |---|---|---|---|---|---|
 | RA1 | `Ketsji/BL_BlenderShader.cpp:246` `BindShadowLamps` | = GP1 + GP2 (confirmado por dois agentes) | ~100 GL por draw | alta | medido 2026-10-09: 0 no RolimaRacer (sem lâmpada com sombra em buffer); ~880 GL/frame (~22 por draw) na cena `tools/debug/cenas/criar_cena_luzes_sombra.py` com 3 spots com sombra; **corrigido 2026-10-09** com cache do último valor no GPUShader: ~334 GL/frame contra ~902 sem o cache, com os 40 cubos visíveis (sobram os binds de textura de sombra) |
 | RA2 | `Ketsji/BL_BlenderShader.cpp:332` -> `gpu/intern/gpu_material.c:902` `GPU_material_bind_uniforms` | produto view x object reutilizado dentro da chamada para local-to-view, normal e inversa; inversas continuam por draw; cast apenas com uniform Damage ativo (GP8) | ate 2 produtos 4x4 eliminados por chamada | confirmada para produto duplicado | parcial: produto e Damage/GP8 corrigidos; build editor/player e diferenciais passaram; benchmark/visual real pendentes; cache de inversas nao implementado |
-| RA3 | `Rasterizer/RAS_MeshSlot.cpp:108-115` → `RAS_DisplayArray.cpp:219` `SortPolygons`, `RAS_StorageVbo.cpp:128` | zsort: aloca vector + `std::sort` + reenvio do IBO inteiro por slot por draw, mesmo com câmera e objeto parados; também no shadow pass | alto p/ malhas alpha grandes | alta | suspeito |
+| RA3 | `Rasterizer/RAS_MeshSlot.cpp`, `RAS_DisplayArrayStorage.cpp`, `RAS_DisplayArray.cpp` `SortPolygons` | cache da ultima direcao gravada no IBO compartilhado; posicoes/topologia/storage invalidam; map/unmap com falha nao validam | sort + escrita evitados com direcao igual | confirmada no diferencial isolado | referencia visual, build/runtime e abertura real em Pista_1 passaram; benchmark A/B inconclusivo; inspeção visual detalhada e passes adicionais pendentes |
 | RA4 | `Rasterizer/RAS_DisplayArrayBucket.cpp:268-309` → `RAS_InstancingBuffer.cpp:111` | VBO de instancing refeito por completo a cada passada | ~100 B × instância × passada | média | suspeito |
 | RA5 | `Rasterizer/RAS_BucketManager.cpp:102-113` `PrepareBuckets` | `Prepare` (texturas + `update_lamps`) em todos os buckets, inclusive sem slot ativo; infla `IncMaterialChangeCount` | O(materiais × lamps) por passada | alta (laço) / média (custo) | suspeito |
 | RA6 | `Rasterizer/RAS_MaterialBucket.cpp:113`, `RAS_BucketManager.cpp:366` | `GenerateTree` e `RemoveActiveMeshSlots` percorrem todos os display-array buckets de todos os materiais | O(buckets da cena) por passada | média | suspeito |
@@ -184,12 +184,12 @@ Teste sugerido: cena com dinâmicos dormindo + cinemáticos parados, com e sem "
 | GL2 | `Network/NET_Replicator.cpp:318` `capture` | só pula `isSleeping`, que é falso p/ estático/cinemático/sem física → serializa + hash todo tick (envio OK: delta por hash) | O(N replicados) CPU + alocação por tick | média | suspeito |
 | GL3 | `Network/NET_Replicator.cpp:377` `rebuildGrid` | limpa e reinsere a grade inteira todo tick | O(N) por tick | média | suspeito |
 | GL4 | `VideoTexture/Texture.cpp:385-440`, `loadTexture` :165 | `refresh()` com fonte estática refaz `glTexImage2D` (+ mipmap CPU, rescale) sem "versão já enviada" | upload completo por chamada | média | suspeito |
-| GL5 | `GameLogic/SCA_PropertyActuator.cpp:151-180` | cria parser e reprocessa expressão constante a cada ativação; modo runtime reconverte strings | baixo-médio | média | suspeito |
-| GL6 | `GameLogic/SCA_PropertySensor.cpp:149-280` | lookup + `GetText()` + upper/`CM_StringTo` de constantes todo frame | baixo × sensores | média | suspeito |
+| GL5 | `GameLogic/SCA_PropertyActuator.cpp` | literais em Assign/Add/Copy reutilizam parser; expressões com identificadores e runtime property preservam o caminho dinâmico | baixo-médio | confirmada | corrigido: cache só de literal; réplica e `value` invalidam |
+| GL6 | `GameLogic/SCA_PropertySensor.cpp` | conversão de constante curta não compensa cache; Changed evitava um `GetText()` por valor mudado | baixo × sensores | falso positivo predominante | corrigido somente `GetText()` duplicado no Changed |
 | GL7 | `Ketsji/KX_RaySensor.cpp:348-380` (gaze-cone) | percorre `GetObjectList()` inteiro por sensor por frame quando o raio erra | O(N objetos) por sensor | média | suspeito |
 | GL8 | `Ketsji/KX_NearSensor.cpp:94`, `KX_RadarSensor.cpp:116` `SynchronizeTransform` | reescreve transform do sensor na física sem checar se o pai se moveu; Radar recalcula sen/cos | baixo × sensores | baixa | suspeito |
-| GL9 | `GameLogic/SCA_TimeEventManager.cpp:75` | `new EXP_FloatValue` por frame (atualização em si é necessária) | baixo | baixa | suspeito |
-| GL10 | `GameLogic/SCA_KeyboardSensor.cpp:122`, `SCA_MouseManager.cpp:69` | lookup de `m_toggleprop` vazio; `GetInput` invariante dentro do laço | trivial | baixa | suspeito |
+| GL9 | `GameLogic/SCA_TimeEventManager.cpp` | uma alocação só por frame, e apenas com Timer/fixedtime; sem Timer retorna cedo | baixo | falso positivo prático | retorno cedo sem propriedades Timer |
+| GL10 | `GameLogic/SCA_KeyboardSensor.cpp`, `SCA_MouseManager.cpp` | pula lookup de toggle vazio, consolida varredura de teclas e lê mouse uma vez por ciclo | trivial | confirmada | corrigido; sem mudança de captura/toggle |
 
 Verificados OK: `SCA_LogicManager` (guiado por evento), `SCA_ISensor::Activate`, Always/Actuator/Joystick managers,
 `KX_NearSensor::Evaluate`, `KX_CollisionEventManager`, `KX_ObjectActuator` (exceto Set position), `CM_UpdateServer`

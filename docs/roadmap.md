@@ -481,6 +481,12 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   visual antes/depois no player real. Sem essa checagem, RA3 permanece pendente.
   Sombras alpha sem override entram; sombras com override ignoram este trecho.
 
+- GL5/GL6/GL9/GL10: lote GameLogic integrado. Em cena de 300 objetos com 1.800
+  atuadores e sensores, 1,82 -> 1,26 ms/frame (-31%) sem mudar valores finais.
+  GL5 e GL10 corrigidos; GL6 e GL9 foram majoritariamente falsos positivos,
+  recebendo apenas remoções locais de trabalho comprovadamente redundante.
+  Evidências e limites em [resultados da auditoria GL](auditoria-claude-resultados.md).
+
 - RA2 parcial: produto `view x object` reutilizado na mesma chamada de
   `GPU_material_bind_uniforms`; editor/player compilados e diferencial passou.
   Damage/GP8 corrigido: cast so com uniform ativo e count com cache por GPUShader;
