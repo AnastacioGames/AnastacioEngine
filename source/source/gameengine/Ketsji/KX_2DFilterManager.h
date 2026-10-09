@@ -81,6 +81,10 @@ private:
 	/** Film Grain, a scene post-process drawn in the camera lens pass. */
 	bool m_useGrain;
 	float m_grainStrength;
+	/** Scene FXAA settings, for an FXAA pass built later from Python. */
+	BuildInFilters m_sceneFilters;
+	/** The FXAA pass, built (disabled) when missing. Its parameters hold the scene values. */
+	RAS_2DFilter *EnsureFxaaPass();
 public:
 
 #ifdef WITH_PYTHON
@@ -97,6 +101,10 @@ public:
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSRValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSAOValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeGrainValues);
+
+	/* fxaa* and grain* attributes, one pair dispatched on the attribute name */
+	static PyObject *pyattr_get_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 
 #endif  // WITH_PYTHON
 };

@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Python: céu, destruição, FXAA/grão e quantização de rede
+
+Prioridade 1 de `D:\AnastacioDocs\inventario\faltando_python.md`.
+
+- `KX_WorldInfo`: `skyType`, `useSkyStars`, `starStyle`, `useSkyMoon`, `moonSize`, `moonBrightness`, `useSkyAurora`, `auroraColors`, `atmosphere*` (enums pelos nomes do RNA). A lua é uniform ao vivo; o resto recompila só o shader do world no quadro seguinte. Os valores originais voltam ao fim do jogo. Materiais de objetos mantêm o tipo de céu com que foram compilados.
+- `KX_GameObject`: `fragments`, `burstSpeed`, `debrisLifetime`, `useBreakOnCollision`, `useInheritVelocity`, `impactImpulse`, `useExplodeOnImpact`, `useChainReaction`, `dentImpulse`, `useDentOnCollision`, `bendAxis`, `bendAngle`, `bendMaxAngle`, `decal`, `decalSize`, `decalLife`, `maxDecals`, `isDeformable`. Valem por instância: o `KX_DestructionManager` guarda cópias das configurações e liga ou desliga os callbacks de colisão quando os flags mudam.
+- `scene.filterManager`: `fxaaEnabled`, `fxaaEdgeThreshold`, `fxaaEdgeThresholdMin`, `fxaaSubpix`, `fxaaSearchSteps`, `grainEnabled`, `grainStrength`.
+- `Range.network.replicate(..., quantize={nome: (min, max, bits)})`.
+- Já existiam: `light.autoShadowUpdate` e os sync/priority/net_id de rede (`replicate()`, `net_id()`). `use_interpolate` não é lido pelo runtime, então ficou sem binding.
+- Verificação: build RangeEngine/RangeRuntime ok; `tools/debug/cenas/criar_cena_api_prioridade1.py` teve 73/73 checagens ok no runtime.
+
 ## 2026-10-09 - Lote 4 de auditoria: itens restantes LP/SP
 
 - LP3 (parcial): `KX_RenderPipeline::GetRenderData` usa arrays fixos em vez de `std::vector` por quadro (mono sem alocação). Estéreo adiado.

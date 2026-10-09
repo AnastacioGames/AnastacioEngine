@@ -429,6 +429,18 @@ bool KX_NetworkManager::BuildEntry(KX_GameObject *obj, net::NetId id, const Repl
 		CollectProps(obj, names);
 	}
 	BuildSchema(obj, names, entry);
+	if (scriptOptions) {
+		for (const ReplicateOptions::Quantization &q : scriptOptions->quantize) {
+			for (size_t i = 0; i < entry.propNames.size(); ++i) {
+				if (entry.propNames[i] == q.name && entry.schema[i].kind == net::PropKind::Float) {
+					entry.schema[i].min = q.min;
+					entry.schema[i].max = q.max;
+					entry.schema[i].bits = q.bits;
+				}
+			}
+		}
+		entry.desc.props = entry.schema;
+	}
 	return true;
 }
 

@@ -49,6 +49,13 @@ static const float DENT_COOLDOWN = 0.1f;
 /// Segments of one Scrape Strip mesh; a longer trail goes on in a new strip.
 static const unsigned int STRIP_SEGMENTS = 128;
 
+struct KX_DestructionManager::InstanceSettings
+{
+	RangeDestructionSettings m_destruction;
+	RangeExplosiveSettings m_explosive;
+	RangeDeformSettings m_deform;
+};
+
 static bool is_destructible(KX_GameObject *gameobj)
 {
 	Object *blenderobj = gameobj->GetBlenderObject();
@@ -65,34 +72,6 @@ static bool is_deformable(KX_GameObject *gameobj)
 {
 	Object *blenderobj = gameobj->GetBlenderObject();
 	return blenderobj && (blenderobj->gameflag2 & OB_DEFORMABLE);
-}
-
-static bool dents_on_collision(KX_GameObject *gameobj)
-{
-	return is_deformable(gameobj) && (gameobj->GetBlenderObject()->deform.flags & DEFORM_ON_COLLISION);
-}
-
-static bool scrapes(KX_GameObject *gameobj)
-{
-	return is_deformable(gameobj) && (gameobj->GetBlenderObject()->deform.flags & DEFORM_SCRAPE) &&
-	       gameobj->GetBlenderObject()->deform.decal;
-}
-
-static bool breaks_on_collision(KX_GameObject *gameobj)
-{
-	return is_destructible(gameobj) && (gameobj->GetBlenderObject()->destruction.flags & DESTRUCTION_BREAK_ON_COLLISION);
-}
-
-static bool explodes_on_impact(KX_GameObject *gameobj)
-{
-	return is_explosive(gameobj) && (gameobj->GetBlenderObject()->explosive.flags & EXPLOSIVE_ON_IMPACT);
-}
-
-static bool wants_collisions(KX_GameObject *gameobj)
-{
-	return (breaks_on_collision(gameobj) || explodes_on_impact(gameobj) || dents_on_collision(gameobj) || scrapes(gameobj)) &&
-	       gameobj->GetPhysicsController() &&
-	       !gameobj->GetClientInfo().isSensor();
 }
 
 static bool contains(const std::vector<KX_GameObject *>& list, KX_GameObject *gameobj)
@@ -159,6 +138,88 @@ const KX_DestructionManager::Entry *KX_DestructionManager::FindEntry(KX_GameObje
 	return nullptr;
 }
 
+bool KX_DestructionManager::DentsOnCollision(KX_GameObject *gameobj) const
+{
+	return is_deformable(gameobj) && (GetDeformSettings(gameobj).flags & DEFORM_ON_COLLISION);
+}
+
+bool KX_DestructionManager::Scrapes(KX_GameObject *gameobj) const
+{
+	const RangeDeformSettings& settings = GetDeformSettings(gameobj);
+	return is_deformable(gameobj) && (settings.flags & DEFORM_SCRAPE) && settings.decal;
+}
+
+bool KX_DestructionManager::BreaksOnCollision(KX_GameObject *gameobj) const
+{
+	return is_destructible(gameobj) && (GetDestructionSettings(gameobj).flags & DESTRUCTION_BREAK_ON_COLLISION);
+}
+
+bool KX_DestructionManager::ExplodesOnImpact(KX_GameObject *gameobj) const
+{
+	return is_explosive(gameobj) && (GetExplosiveSettings(gameobj).flags & EXPLOSIVE_ON_IMPACT);
+}
+
+bool KX_DestructionManager::WantsCollisions(KX_GameObject *gameobj) const
+{
+	return (BreaksOnCollision(gameobj) || ExplodesOnImpact(gameobj) || DentsOnCollision(gameobj) || Scrapes(gameobj)) &&
+	       gameobj->GetPhysicsController() &&
+	       !gameobj->GetClientInfo().isSensor();
+}
+
+const RangeDestructionSettings& KX_DestructionManager::GetDestructionSettings(KX_GameObject *gameobj) const
+{
+	static const RangeDestructionSettings none = {};
+	const Entry *entry = FindEntry(gameobj);
+	return entry ? entry->m_settings->m_destruction : gameobj->GetBlenderObject() ? gameobj->GetBlenderObject()->destruction : none;
+}
+
+const RangeExplosiveSettings& KX_DestructionManager::GetExplosiveSettings(KX_GameObject *gameobj) const
+{
+	static const RangeExplosiveSettings none = {};
+	const Entry *entry = FindEntry(gameobj);
+	return entry ? entry->m_settings->m_explosive : gameobj->GetBlenderObject() ? gameobj->GetBlenderObject()->explosive : none;
+}
+
+const RangeDeformSettings& KX_DestructionManager::GetDeformSettings(KX_GameObject *gameobj) const
+{
+	static const RangeDeformSettings none = {};
+	const Entry *entry = FindEntry(gameobj);
+	return entry ? entry->m_settings->m_deform : gameobj->GetBlenderObject() ? gameobj->GetBlenderObject()->deform : none;
+}
+
+RangeDestructionSettings *KX_DestructionManager::EditDestructionSettings(KX_GameObject *gameobj)
+{
+	Entry *entry = FindEntry(gameobj);
+	return (entry && is_destructible(gameobj)) ? &entry->m_settings->m_destruction : nullptr;
+}
+
+RangeExplosiveSettings *KX_DestructionManager::EditExplosiveSettings(KX_GameObject *gameobj)
+{
+	Entry *entry = FindEntry(gameobj);
+	return (entry && is_explosive(gameobj)) ? &entry->m_settings->m_explosive : nullptr;
+}
+
+RangeDeformSettings *KX_DestructionManager::EditDeformSettings(KX_GameObject *gameobj)
+{
+	Entry *entry = FindEntry(gameobj);
+	return (entry && is_deformable(gameobj)) ? &entry->m_settings->m_deform : nullptr;
+}
+
+void KX_DestructionManager::SettingsChanged(KX_GameObject *gameobj, bool wantedBefore)
+{
+	const bool wanted = WantsCollisions(gameobj);
+	if (wanted == wantedBefore || !gameobj->GetPhysicsController()) {
+		return;
+	}
+	PHY_IPhysicsEnvironment *env = m_scene->GetPhysicsEnvironment();
+	if (wanted) {
+		env->RequestCollisionCallback(gameobj->GetPhysicsController());
+	}
+	else {
+		env->RemoveCollisionCallback(gameobj->GetPhysicsController());
+	}
+}
+
 void KX_DestructionManager::Arm(Entry *entry, long long frame)
 {
 	if (entry && !entry->m_done && (entry->m_armFrame < 0 || frame < entry->m_armFrame)) {
@@ -178,6 +239,10 @@ void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 	entry.m_breakImpulse = is_destructible(gameobj) ? blenderobj->destruction.break_impulse : 0.0f;
 	// The fuse counts from the moment the object enters the game (scene start or Add Object).
 	entry.m_fuse = is_explosive(gameobj) ? std::max(blenderobj->explosive.fuse, 0.0f) : 0.0f;
+	entry.m_settings = std::make_shared<InstanceSettings>();
+	entry.m_settings->m_destruction = blenderobj->destruction;
+	entry.m_settings->m_explosive = blenderobj->explosive;
+	entry.m_settings->m_deform = blenderobj->deform;
 	entry.m_armFrame = -1;
 	entry.m_done = false;
 	entry.m_dentCooldown = 0.0f;
@@ -187,7 +252,7 @@ void KX_DestructionManager::RegisterObject(KX_GameObject *gameobj)
 	entry.m_strip = nullptr;
 	m_entries.push_back(entry);
 
-	if (wants_collisions(gameobj)) {
+	if (WantsCollisions(gameobj)) {
 		m_scene->GetPhysicsEnvironment()->RequestCollisionCallback(gameobj->GetPhysicsController());
 	}
 }
@@ -196,8 +261,10 @@ void KX_DestructionManager::UnregisterObject(KX_GameObject *gameobj)
 {
 	for (std::vector<Entry>::iterator it = m_entries.begin(), end = m_entries.end(); it != end; ++it) {
 		if (it->m_object == gameobj) {
+			// With the instance settings, before the entry goes.
+			const bool wanted = WantsCollisions(gameobj);
 			m_entries.erase(it);
-			if (wants_collisions(gameobj)) {
+			if (wanted) {
 				m_scene->GetPhysicsEnvironment()->RemoveCollisionCallback(gameobj->GetPhysicsController());
 			}
 			break;
@@ -260,14 +327,14 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 		return;
 	}
 
-	if (scrapes(gameobj)) {
+	if (Scrapes(gameobj)) {
 		Scrape(entry, other, collData, first);
 	}
 
-	const bool detonates = explodes_on_impact(gameobj);
-	const bool breaks = breaks_on_collision(gameobj) && gameobj->GetBlenderObject()->destruction.fragments;
+	const bool detonates = ExplodesOnImpact(gameobj);
+	const bool breaks = BreaksOnCollision(gameobj) && GetDestructionSettings(gameobj).fragments;
 	bool dents = false;
-	if (dents_on_collision(gameobj)) {
+	if (DentsOnCollision(gameobj)) {
 		// A hit is a contact with an object that wasn't touching on the previous frame.
 		bool newContact = true;
 		bool found = false;
@@ -304,7 +371,7 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 		}
 	}
 
-	if (detonates && total >= gameobj->GetBlenderObject()->explosive.impact_impulse) {
+	if (detonates && total >= GetExplosiveSettings(gameobj).impact_impulse) {
 		// Detonates at the end of this frame.
 		Arm(entry, m_frame);
 		return;
@@ -320,7 +387,7 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 		return;
 	}
 
-	if (dents && total >= gameobj->GetBlenderObject()->deform.dent_impulse) {
+	if (dents && total >= GetDeformSettings(gameobj).dent_impulse) {
 		// Seen from the hitting object, which tells the sides of a flat mesh apart (see DentNow).
 		hitter = other ? other->NodeGetWorldPosition() : origin;
 		// One dent per object and frame, the strongest contact.
@@ -339,7 +406,7 @@ void KX_DestructionManager::NotifyCollision(KX_GameObject *gameobj, KX_GameObjec
 bool KX_DestructionManager::Dent(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse)
 {
 	const Entry *entry = gameobj ? FindEntry(gameobj) : nullptr;
-	if (!entry || entry->m_done || !is_deformable(gameobj) || impulse < gameobj->GetBlenderObject()->deform.dent_impulse) {
+	if (!entry || entry->m_done || !is_deformable(gameobj) || impulse < GetDeformSettings(gameobj).dent_impulse) {
 		return false;
 	}
 	return DentNow(gameobj, point, direction, impulse);
@@ -361,7 +428,7 @@ KX_DentDeformer *KX_DestructionManager::GetDentDeformer(KX_GameObject *gameobj)
 
 void KX_DestructionManager::Dented(KX_GameObject *gameobj, const mt::vec3& point, float impulse)
 {
-	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
+	if ((GetDeformSettings(gameobj).flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
 		m_dirtyShapes.push_back(gameobj);
 	}
 	FollowDents(gameobj);
@@ -371,7 +438,7 @@ void KX_DestructionManager::Dented(KX_GameObject *gameobj, const mt::vec3& point
 bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& direction, float impulse,
                                     const mt::vec3 *hitter)
 {
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	const bool bend = (settings.mode == DEFORM_MODE_BEND);
 	const float excess = impulse - settings.dent_impulse;
 	const float depth = bend ? excess * settings.bend_angle : std::min(excess * settings.depth, settings.max_depth);
@@ -422,7 +489,7 @@ bool KX_DestructionManager::DentNow(KX_GameObject *gameobj, const mt::vec3& poin
 
 void KX_DestructionManager::BlastDent(KX_GameObject *gameobj, const mt::vec3& center, float radius, float force)
 {
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	if (settings.mode == DEFORM_MODE_BEND) {
 		// Bent by the blast at the point of the object closest to the center, away from it.
 		const float impulse = impulse_at(gameobj->NodeGetWorldPosition(), center, radius, force);
@@ -508,7 +575,7 @@ static void clip_polygon(std::vector<mt::vec3>& polygon, int axis, float sign)
 void KX_DestructionManager::Scrape(Entry *entry, KX_GameObject *other, const PHY_ICollData *collData, bool first)
 {
 	KX_GameObject *gameobj = entry->m_object;
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	const unsigned int num = collData->GetNumContacts();
 	if (num == 0) {
 		return;
@@ -571,7 +638,7 @@ void KX_DestructionManager::Scrape(Entry *entry, KX_GameObject *other, const PHY
 void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& inward,
                                      const mt::vec3 *along)
 {
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	KX_GameObject *templateobj = GetDecalTemplate(gameobj);
 	if (!templateobj) {
 		return;
@@ -701,7 +768,7 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 
 KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)
 {
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.decal));
 	if (!templateobj || templateobj->GetMeshList().empty() ||
 	    templateobj->GetMeshList().front()->GetMeshMaterialList().empty())
@@ -719,7 +786,7 @@ KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)
 
 void KX_DestructionManager::TrimDecals(KX_GameObject *gameobj)
 {
-	const int maxDecals = std::max(gameobj->GetBlenderObject()->deform.max_decals, 1);
+	const int maxDecals = std::max(GetDeformSettings(gameobj).max_decals, 1);
 	int count = 0;
 	for (std::deque<Decal>::reverse_iterator it = m_decals.rbegin(); it != m_decals.rend(); ++it) {
 		if (it->m_target == gameobj && !it->m_removing && ++count >= maxDecals) {
@@ -735,7 +802,7 @@ KX_DestructionManager::Decal *KX_DestructionManager::SpawnDecal(KX_GameObject *g
 	// Over Max Decals: the oldest ones of this target go.
 	TrimDecals(gameobj);
 
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
 	KX_GameObject *decalobj = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
 	decalobj->ReplaceMesh(mesh, true, false);
@@ -846,7 +913,7 @@ void KX_DestructionManager::AddStripSegment(Entry *entry, const mt::vec3& point,
                                             const mt::vec3& along)
 {
 	KX_GameObject *gameobj = entry->m_object;
-	const RangeDeformSettings& settings = gameobj->GetBlenderObject()->deform;
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
 	const float half = ((settings.decal_size > 0.0f) ? settings.decal_size : 0.5f) * 0.5f;
 	const float lift = std::max(half * 0.004f, 0.001f);
 	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
@@ -932,7 +999,7 @@ bool KX_DestructionManager::ResetDent(KX_GameObject *gameobj)
 	}
 	deformer->Reset();
 	FollowDents(gameobj);
-	if ((gameobj->GetBlenderObject()->deform.flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
+	if ((GetDeformSettings(gameobj).flags & DEFORM_UPDATE_PHYSICS) && !contains(m_dirtyShapes, gameobj)) {
 		m_dirtyShapes.push_back(gameobj);
 	}
 	return true;
@@ -977,7 +1044,7 @@ std::vector<KX_GameObject *> KX_DestructionManager::Shatter(KX_GameObject *gameo
 	}
 
 	return ShatterNow(gameobj, origin ? *origin : gameobj->NodeGetWorldPosition(),
-	                  burst ? *burst : gameobj->GetBlenderObject()->destruction.burst_speed);
+	                  burst ? *burst : GetDestructionSettings(gameobj).burst_speed);
 }
 
 std::vector<KX_GameObject *> KX_DestructionManager::ShatterNow(KX_GameObject *gameobj, const mt::vec3& center, float burstSpeed)
@@ -985,7 +1052,7 @@ std::vector<KX_GameObject *> KX_DestructionManager::ShatterNow(KX_GameObject *ga
 	std::vector<KX_GameObject *> pieces;
 
 	Object *blenderobj = gameobj->GetBlenderObject();
-	const RangeDestructionSettings& settings = blenderobj->destruction;
+	const RangeDestructionSettings settings = GetDestructionSettings(gameobj);
 	Group *group = settings.fragments;
 	if (!group) {
 		CM_Warning("\"" << gameobj->GetName() << "\" is destructible but has no Fragments group; it can't break.");
@@ -1086,7 +1153,7 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 	entry->m_armFrame = -1;
 	entry->m_fuse = 0.0f;
 
-	const RangeExplosiveSettings& settings = gameobj->GetBlenderObject()->explosive;
+	const RangeExplosiveSettings settings = GetExplosiveSettings(gameobj);
 	const mt::vec3 center = gameobj->NodeGetWorldPosition();
 
 	if (settings.effect) {
@@ -1176,7 +1243,7 @@ std::vector<KX_GameObject *> KX_DestructionManager::Explode(const mt::vec3& cent
 
 		const bool breaks = destructible && impulse >= entry->m_breakImpulse;
 		if (explosive) {
-			const RangeExplosiveSettings& settings = gameobj->GetBlenderObject()->explosive;
+			const RangeExplosiveSettings settings = GetExplosiveSettings(gameobj);
 			if (breaks || ((settings.flags & EXPLOSIVE_CHAIN_REACTION) && impulse >= settings.impact_impulse)) {
 				// One link of a chain reaction per frame.
 				Arm(FindEntry(gameobj), m_frame + 1);
@@ -1256,6 +1323,11 @@ bool KX_DestructionManager::IsDestructible(KX_GameObject *gameobj) const
 bool KX_DestructionManager::IsExplosive(KX_GameObject *gameobj) const
 {
 	return is_explosive(gameobj);
+}
+
+bool KX_DestructionManager::IsDeformable(KX_GameObject *gameobj) const
+{
+	return is_deformable(gameobj);
 }
 
 float KX_DestructionManager::GetBreakImpulse(KX_GameObject *gameobj) const
@@ -1371,7 +1443,7 @@ void KX_DestructionManager::Update(float frameStep)
 			if (!entry || entry->m_done) {
 				continue;
 			}
-			if (scrape.m_object->GetBlenderObject()->deform.flags & DEFORM_SCRAPE_STRIP) {
+			if (GetDeformSettings(scrape.m_object).flags & DEFORM_SCRAPE_STRIP) {
 				AddStripSegment(entry, scrape.m_point, scrape.m_normal, scrape.m_along);
 			}
 			else if (GetDentDeformer(scrape.m_object)) {

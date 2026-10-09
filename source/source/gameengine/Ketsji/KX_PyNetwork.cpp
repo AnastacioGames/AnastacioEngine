@@ -531,17 +531,18 @@ PyObject *Net_set_simulation(PyObject *, PyObject *args)
 }
 
 /// replicate(obj, props=(), transform=True, velocity=False, angular_velocity=False, always_relevant=False,
-///           priority=1.0) -> net id
+///           priority=1.0, quantize=None) -> net id
 PyObject *Net_replicate(PyObject *, PyObject *args, PyObject *kwds)
 {
 	static const char *kwlist[] = {"obj", "props", "transform", "velocity", "angular_velocity", "always_relevant",
-	                               "priority", nullptr};
+	                               "priority", "quantize", nullptr};
 	PyObject *pyobj = nullptr;
 	PyObject *pyprops = nullptr;
+	PyObject *pyquantize = nullptr;
 	int transform = 1, velocity = 0, angular = 0, relevant = 0;
 	float priority = 1.0f;
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Opppp" "f", const_cast<char **>(kwlist), &pyobj, &pyprops,
-	                                 &transform, &velocity, &angular, &relevant, &priority)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Opppp" "fO", const_cast<char **>(kwlist), &pyobj, &pyprops,
+	                                 &transform, &velocity, &angular, &relevant, &priority, &pyquantize)) {
 		return nullptr;
 	}
 	KX_GameObject *obj;
@@ -554,6 +555,30 @@ PyObject *Net_replicate(PyObject *, PyObject *args, PyObject *kwds)
 	options.syncAngular = angular != 0;
 	options.alwaysRelevant = relevant != 0;
 	options.priority = priority;
+	// quantize={"speed": (min, max, bits)}: Float properties in fewer bits, as the property panel.
+	if (pyquantize && pyquantize != Py_None) {
+		if (!PyDict_Check(pyquantize)) {
+			PyErr_SetString(PyExc_TypeError, "network.replicate(): quantize must be a dict {name: (min, max, bits)}");
+			return nullptr;
+		}
+		PyObject *key, *value;
+		Py_ssize_t pos = 0;
+		while (PyDict_Next(pyquantize, &pos, &key, &value)) {
+			KX_NetworkManager::ReplicateOptions::Quantization q;
+			const char *name = PyUnicode_Check(key) ? PyUnicode_AsUTF8(key) : nullptr;
+			if (!name || !PyArg_ParseTuple(value, "ffi", &q.min, &q.max, &q.bits)) {
+				PyErr_Clear();
+				PyErr_SetString(PyExc_TypeError, "network.replicate(): quantize must be a dict {name: (min, max, bits)}");
+				return nullptr;
+			}
+			if (q.bits < 1 || q.bits > 31 || !(q.min < q.max)) {
+				PyErr_Format(PyExc_ValueError, "network.replicate(): quantize['%s'] needs min < max and 1 to 31 bits", name);
+				return nullptr;
+			}
+			q.name = name;
+			options.quantize.push_back(q);
+		}
+	}
 	if (pyprops && pyprops != Py_None) {
 		PyObject *iter = PyObject_GetIter(pyprops);
 		if (!iter) {
@@ -1345,8 +1370,8 @@ PyMethodDef g_methods[] = {
 	 "set_simulation(latency_ms, jitter_ms, loss_percent)\nNetwork simulator for the next host()/join()."},
 	{"replicate", (PyCFunction)Net_replicate, METH_VARARGS | METH_KEYWORDS,
 	 "replicate(obj, props=(), transform=True, velocity=False, angular_velocity=False, always_relevant=False, "
-	 "priority=1.0) -> int\nSame as the Replicate checkbox; run it before host()/join(), in the same order "
-	 "on every peer."},
+	 "priority=1.0, quantize=None) -> int\nSame as the Replicate checkbox; run it before host()/join(), in the same "
+	 "order on every peer. quantize={name: (min, max, bits)} sends Float properties in fewer bits."},
 	{"spawn", (PyCFunction)Net_spawn, METH_VARARGS | METH_KEYWORDS,
 	 "spawn(prototype, owner=0, position=None, orientation=None) -> object\n"
 	 "Server only: adds a copy of the inactive object 'prototype' and replicates it."},

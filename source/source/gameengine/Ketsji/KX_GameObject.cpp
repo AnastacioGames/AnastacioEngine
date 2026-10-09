@@ -86,6 +86,11 @@
 #include "KX_ParticleSystem.h"
 
 #include "BKE_object.h"
+#include "BKE_global.h"
+#include "BKE_main.h"
+#include "BLI_listbase.h"
+#include "DNA_group_types.h"
+#include "DNA_object_types.h"
 
 #include "BL_BlenderDataConversion.h" // For BL_ConvertDeformer.
 #include "BL_ConvertObjectInfo.h"
@@ -3044,6 +3049,219 @@ static PyObject *KX_GameObject_pyattr_get_net(EXP_PyObjectPlus *self_v, const EX
 	return result;
 }
 
+/* Destruction, Explosive and Deformation settings (Physics panels), per instance: they start from
+ * the panels and only change this object. Writing needs an object that is destructible / explosive /
+ * deformable in the panels (the type itself is fixed, see isDestructible). */
+namespace {
+enum DestructionGroup { DESTRUCTION_SETTINGS, EXPLOSIVE_SETTINGS, DEFORM_SETTINGS };
+
+struct DestructionAttribute {
+	const char *name;
+	DestructionGroup group;
+	/// 'f' float, 'i' int, 'b' flag bit.
+	char kind;
+	size_t offset;
+	int flag;
+	float min, max;
+};
+}
+
+static const DestructionAttribute destruction_attributes[] = {
+	{"burstSpeed", DESTRUCTION_SETTINGS, 'f', offsetof(RangeDestructionSettings, burst_speed), 0, 0.0f, 1000.0f},
+	{"debrisLifetime", DESTRUCTION_SETTINGS, 'f', offsetof(RangeDestructionSettings, debris_lifetime), 0, 0.0f, 3600.0f},
+	{"useBreakOnCollision", DESTRUCTION_SETTINGS, 'b', offsetof(RangeDestructionSettings, flags), DESTRUCTION_BREAK_ON_COLLISION, 0, 0},
+	{"useInheritVelocity", DESTRUCTION_SETTINGS, 'b', offsetof(RangeDestructionSettings, flags), DESTRUCTION_INHERIT_VELOCITY, 0, 0},
+	{"impactImpulse", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, impact_impulse), 0, 0.0f, 100000.0f},
+	{"useExplodeOnImpact", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_ON_IMPACT, 0, 0},
+	{"useChainReaction", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_CHAIN_REACTION, 0, 0},
+	{"dentImpulse", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, dent_impulse), 0, 0.0f, 100000.0f},
+	{"useDentOnCollision", DEFORM_SETTINGS, 'b', offsetof(RangeDeformSettings, flags), DEFORM_ON_COLLISION, 0, 0},
+	{"bendAngle", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, bend_angle), 0, 0.0f, (float)M_PI},
+	{"bendMaxAngle", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, bend_max_angle), 0, 0.0f, (float)M_PI},
+	{"decalSize", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, decal_size), 0, 0.001f, 1000.0f},
+	{"decalLife", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, decal_life), 0, 0.0f, 100000.0f},
+	{"maxDecals", DEFORM_SETTINGS, 'i', offsetof(RangeDeformSettings, max_decals), 0, 1.0f, 1000.0f},
+};
+
+static const char *bend_axis_names[] = {"X", "Y", "Z"};
+
+static const char *destruction_group_names[] = {"destructible", "explosive", "deformable"};
+
+/// Settings of the group, from the instance (or the panels for an unregistered object).
+static const char *destruction_settings_read(KX_GameObject *gameobj, DestructionGroup group)
+{
+	const KX_DestructionManager& manager = gameobj->GetScene()->GetDestructionManager();
+	switch (group) {
+		case DESTRUCTION_SETTINGS: return (const char *)&manager.GetDestructionSettings(gameobj);
+		case EXPLOSIVE_SETTINGS: return (const char *)&manager.GetExplosiveSettings(gameobj);
+		default: return (const char *)&manager.GetDeformSettings(gameobj);
+	}
+}
+
+static char *destruction_settings_edit(KX_GameObject *gameobj, DestructionGroup group, const char *attr)
+{
+	KX_DestructionManager& manager = gameobj->GetScene()->GetDestructionManager();
+	char *settings = (group == DESTRUCTION_SETTINGS) ? (char *)manager.EditDestructionSettings(gameobj) :
+	                 (group == EXPLOSIVE_SETTINGS) ? (char *)manager.EditExplosiveSettings(gameobj) :
+	                 (char *)manager.EditDeformSettings(gameobj);
+	if (!settings) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.%s: KX_GameObject, \"%s\" is not %s", attr,
+		             gameobj->GetName().c_str(), destruction_group_names[group]);
+	}
+	return settings;
+}
+
+static PyObject *KX_GameObject_pyattr_get_destruction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const std::string& name = attrdef->m_name;
+	KX_DestructionManager& manager = self->GetScene()->GetDestructionManager();
+
+	if (name == "isDeformable") {
+		return PyBool_FromLong(manager.IsDeformable(self));
+	}
+	if (name == "fragments") {
+		const Group *group = manager.GetDestructionSettings(self).fragments;
+		if (!group) {
+			Py_RETURN_NONE;
+		}
+		return PyUnicode_FromString(group->id.name + 2);
+	}
+	if (name == "decal") {
+		Object *decal = manager.GetDeformSettings(self).decal;
+		KX_GameObject *decalobj = decal ? static_cast<KX_GameObject *>(
+			self->GetScene()->GetLogicManager()->FindGameObjByBlendObj(decal)) : nullptr;
+		if (!decalobj) {
+			Py_RETURN_NONE;
+		}
+		return decalobj->GetProxy();
+	}
+	if (name == "bendAxis") {
+		return PyUnicode_FromString(bend_axis_names[CLAMPIS(manager.GetDeformSettings(self).bend_axis, 0, 2)]);
+	}
+	for (const DestructionAttribute& attr : destruction_attributes) {
+		if (name == attr.name) {
+			const char *field = destruction_settings_read(self, attr.group) + attr.offset;
+			switch (attr.kind) {
+				case 'f': return PyFloat_FromDouble(*(const float *)field);
+				case 'i': return PyLong_FromLong(*(const int *)field);
+				default: return PyBool_FromLong((*(const int *)field & attr.flag) != 0);
+			}
+		}
+	}
+	Py_RETURN_NONE;
+}
+
+static int KX_GameObject_pyattr_set_destruction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const std::string& name = attrdef->m_name;
+	const char *attrname = name.c_str();
+	KX_DestructionManager& manager = self->GetScene()->GetDestructionManager();
+	const bool wanted = manager.WantsCollisions(self);
+
+	if (name == "fragments") {
+		RangeDestructionSettings *settings = (RangeDestructionSettings *)destruction_settings_edit(self, DESTRUCTION_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (value == Py_None) {
+			settings->fragments = nullptr;
+			return PY_SET_ATTR_SUCCESS;
+		}
+		const char *groupname = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+		Group *group = groupname ? (Group *)BLI_findstring(&G.main->group, groupname, offsetof(ID, name) + 2) : nullptr;
+		if (!group) {
+			PyErr_Format(PyExc_ValueError, "gameOb.fragments = str: KX_GameObject, expected the name of a group or None");
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->fragments = group;
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "decal") {
+		KX_GameObject *decalobj;
+		if (!ConvertPythonToGameObject(self->GetScene()->GetLogicManager(), value, &decalobj, true,
+		                               "gameOb.decal = KX_GameObject or None: KX_GameObject")) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (decalobj && !decalobj->GetBlenderObject()) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.decal = KX_GameObject: KX_GameObject, the decal must be an object of the scene file");
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeDeformSettings *settings = (RangeDeformSettings *)destruction_settings_edit(self, DEFORM_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->decal = decalobj ? decalobj->GetBlenderObject() : nullptr;
+		manager.SettingsChanged(self, wanted);
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "bendAxis") {
+		const char *axis = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+		int index = -1;
+		for (int i = 0; axis && i < 3; ++i) {
+			if (std::strcmp(axis, bend_axis_names[i]) == 0) {
+				index = i;
+			}
+		}
+		if (index < 0) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.bendAxis = str: KX_GameObject, expected 'X', 'Y' or 'Z'");
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeDeformSettings *settings = (RangeDeformSettings *)destruction_settings_edit(self, DEFORM_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->bend_axis = index;
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	for (const DestructionAttribute& attr : destruction_attributes) {
+		if (name != attr.name) {
+			continue;
+		}
+		double number = 0.0;
+		int flag = 0;
+		if (attr.kind == 'b') {
+			flag = PyObject_IsTrue(value);
+			if (flag == -1) {
+				PyErr_Format(PyExc_TypeError, "gameOb.%s = bool: KX_GameObject, expected True or False", attrname);
+				return PY_SET_ATTR_FAIL;
+			}
+		}
+		else {
+			number = PyFloat_AsDouble(value);
+			if (number == -1.0 && PyErr_Occurred()) {
+				PyErr_Format(PyExc_TypeError, "gameOb.%s = %s: KX_GameObject, expected a number", attrname,
+				             (attr.kind == 'i') ? "int" : "float");
+				return PY_SET_ATTR_FAIL;
+			}
+			number = CLAMPIS(number, (double)attr.min, (double)attr.max);
+		}
+		char *settings = destruction_settings_edit(self, attr.group, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		void *field = settings + attr.offset;
+		switch (attr.kind) {
+			case 'f': *(float *)field = (float)number; break;
+			case 'i': *(int *)field = (int)number; break;
+			default: SET_FLAG_FROM_TEST(*(int *)field, flag, attr.flag); break;
+		}
+		manager.SettingsChanged(self, wanted);
+		return PY_SET_ATTR_SUCCESS;
+	}
+	return PY_SET_ATTR_FAIL;
+}
+
+/* EXP_PYATTRIBUTE_RW_FUNCTION spelled out: the getter and setter are free functions. */
+#define EXP_PYATTRIBUTE_RW_DESTRUCTION(name) \
+	{name, EXP_PYATTRIBUTE_TYPE_FUNCTION, EXP_PYATTRIBUTE_RW, 0, 0, 0.f, 0.f, false, false, 0, 0, 1, nullptr, \
+	 &KX_GameObject_pyattr_set_destruction, &KX_GameObject_pyattr_get_destruction}
+#define EXP_PYATTRIBUTE_RO_DESTRUCTION(name) \
+	{name, EXP_PYATTRIBUTE_TYPE_FUNCTION, EXP_PYATTRIBUTE_RO, 0, 0, 0.f, 0.f, false, false, 0, 0, 1, nullptr, \
+	 nullptr, &KX_GameObject_pyattr_get_destruction}
+
 PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_SHORT_RO("currentLodLevel", KX_GameObject, m_currentLodLevel),
 	EXP_PYATTRIBUTE_RW_FUNCTION("lodManager", KX_GameObject, pyattr_get_lodManager, pyattr_set_lodManager),
@@ -3067,6 +3285,24 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("onDent", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
 	EXP_PYATTRIBUTE_RW_FUNCTION("breakImpulse", KX_GameObject, pyattr_get_break_impulse, pyattr_set_break_impulse),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fuse", KX_GameObject, pyattr_get_fuse, pyattr_set_fuse),
+	EXP_PYATTRIBUTE_RO_DESTRUCTION("isDeformable"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("fragments"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("burstSpeed"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("debrisLifetime"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useBreakOnCollision"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useInheritVelocity"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("impactImpulse"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useExplodeOnImpact"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useChainReaction"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("dentImpulse"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useDentOnCollision"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendAxis"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendAngle"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendMaxAngle"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decal"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalSize"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalLife"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("maxDecals"),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",       KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMax",       KX_GameObject, pyattr_get_lin_vel_max, pyattr_set_lin_vel_max),
 	EXP_PYATTRIBUTE_RW_FUNCTION("angularVelocityMin", KX_GameObject, pyattr_get_ang_vel_min, pyattr_set_ang_vel_min),

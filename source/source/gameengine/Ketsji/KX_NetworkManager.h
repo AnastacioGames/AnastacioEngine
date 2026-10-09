@@ -161,6 +161,15 @@ public:
 		float priority = 1.0f;
 		/// Names of the game properties to replicate (Bool, Int and Float only).
 		std::vector<std::string> props;
+		/// Float properties sent in `bits` bits between min and max (the Bits/Min/Max of the
+		/// property panel), instead of 32 bits.
+		struct Quantization {
+			std::string name;
+			float min;
+			float max;
+			int bits;
+		};
+		std::vector<Quantization> quantize;
 	};
 
 	/// Script registration of a scene object (same effect as the Replicate checkbox). Returns its net id

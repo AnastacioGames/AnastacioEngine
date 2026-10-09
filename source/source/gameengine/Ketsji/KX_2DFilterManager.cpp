@@ -32,6 +32,8 @@
 #include "KX_Camera.h"
 #include "KX_Scene.h"
 #include "DNA_camera_types.h"
+#include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
+#include "BLI_utildefines.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,7 +59,7 @@ extern "C" {
 
 KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filters) :
 	RAS_2DFilterManager(filters), m_canvas(canvas),
-	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength)
+	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength), m_sceneFilters(filters)
 {
 	/* This location doesn't seem very good to me but it works fine here, we need to generate the KX_2DFilter to have offscreen and not RAS_* */
 	/* Only for Range legacy, the code can be deprecated after Range 2.0+ */
@@ -543,6 +545,25 @@ KX_2DFilter *KX_2DFilterManager::BloomPass(BuildInFilters filters, int time, int
 	return bloom;
 }
 
+RAS_2DFilter *KX_2DFilterManager::EnsureFxaaPass()
+{
+	RAS_2DFilter *fxaa = GetFilterPass(FILTERPASS_FXAA, true);
+	if (!fxaa) {
+		fxaa = EnsureFxaaFilter(m_sceneFilters);
+		fxaa->SetEnabled(false);
+	}
+	BuildInFilters *params = fxaa->GetBuildInFilters();
+	// A pass without scene values (search steps 0) draws with the defaults: write them, so a
+	// single parameter can change.
+	if (params->fxaa_search_steps <= 0) {
+		params->fxaa_edge_threshold = SCENE_FX_FXAA_EDGE_THRESHOLD;
+		params->fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+		params->fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
+		params->fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+	}
+	return fxaa;
+}
+
 RAS_2DFilter *KX_2DFilterManager::NewFilter(RAS_2DFilterData& filterData)
 {
 	return new KX_2DFilter(filterData);
@@ -565,8 +586,83 @@ PyMethodDef KX_2DFilterManager::Methods[] = {
 };
 
 PyAttributeDef KX_2DFilterManager::Attributes[] = {
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEdgeThreshold", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEdgeThresholdMin", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSubpix", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSearchSteps", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("grainEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("grainStrength", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
+
+/* Scene > Post-process: FXAA and Film Grain, same names and ranges as the panel (rna_scene.c). */
+PyObject *KX_2DFilterManager::pyattr_get_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
+	const std::string& name = attrdef->m_name;
+	if (name == "grainEnabled") {
+		return PyBool_FromLong(self->m_useGrain);
+	}
+	if (name == "grainStrength") {
+		return PyFloat_FromDouble(self->m_grainStrength);
+	}
+
+	RAS_2DFilter *fxaa = self->GetFilterPass(FILTERPASS_FXAA, true);
+	if (name == "fxaaEnabled") {
+		return PyBool_FromLong(fxaa && fxaa->GetEnabled());
+	}
+	BuildInFilters params = fxaa ? *fxaa->GetBuildInFilters() : self->m_sceneFilters;
+	if (params.fxaa_search_steps <= 0) {
+		params.fxaa_edge_threshold = SCENE_FX_FXAA_EDGE_THRESHOLD;
+		params.fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+		params.fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
+		params.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+	}
+	if (name == "fxaaEdgeThreshold") return PyFloat_FromDouble(params.fxaa_edge_threshold);
+	if (name == "fxaaEdgeThresholdMin") return PyFloat_FromDouble(params.fxaa_edge_threshold_min);
+	if (name == "fxaaSubpix") return PyFloat_FromDouble(params.fxaa_subpix);
+	return PyLong_FromLong(params.fxaa_search_steps);
+}
+
+int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
+	const std::string& name = attrdef->m_name;
+
+	if (name == "fxaaEnabled" || name == "grainEnabled") {
+		const int enabled = PyObject_IsTrue(value);
+		if (enabled == -1) {
+			PyErr_Format(PyExc_TypeError, "filterManager.%s = bool: KX_2DFilterManager, expected True or False", name.c_str());
+			return PY_SET_ATTR_FAIL;
+		}
+		if (name == "grainEnabled") {
+			self->m_useGrain = enabled;
+		}
+		else {
+			self->EnsureFxaaPass()->SetEnabled(enabled);
+		}
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	const double number = PyFloat_AsDouble(value);
+	if (number == -1.0 && PyErr_Occurred()) {
+		PyErr_Format(PyExc_TypeError, "filterManager.%s = number: KX_2DFilterManager, expected a number", name.c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	const float factor = (float)CLAMPIS(number, 0.0, 1.0);
+	if (name == "grainStrength") {
+		self->m_grainStrength = factor;
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	BuildInFilters *params = self->EnsureFxaaPass()->GetBuildInFilters();
+	if (name == "fxaaEdgeThreshold") params->fxaa_edge_threshold = factor;
+	else if (name == "fxaaEdgeThresholdMin") params->fxaa_edge_threshold_min = factor;
+	else if (name == "fxaaSubpix") params->fxaa_subpix = factor;
+	else params->fxaa_search_steps = (int)CLAMPIS(number, 2.0, (double)SCENE_FX_FXAA_SEARCH_STEPS_MAX);
+	return PY_SET_ATTR_SUCCESS;
+}
 
 PyTypeObject KX_2DFilterManager::Type = {
 	PyVarObject_HEAD_INIT(nullptr, 0)

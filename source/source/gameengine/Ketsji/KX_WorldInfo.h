@@ -72,6 +72,15 @@ class KX_WorldInfo : public EXP_Value, public mt::SimdClassAllocator
 	mt::vec3 m_ambientcolor;
 	mt::vec3 m_con_mistcolor;
 	mt::vec3 m_con_ambientcolor;
+	/// Sky settings changed from Python: the world shader is rebuilt before the next background.
+	bool m_skyDirty;
+	/// Some sky setting changed during the game: the original World is restored at the end.
+	bool m_skyChanged;
+	struct SkySettings {
+		short skytype, star_style, aurora_flag, aurora_colors;
+		float moon_enabled, moon_size, moon_brightness;
+		float atmo_intensity, atmo_rayleigh_col[3], atmo_rayleigh_density, atmo_mie_density, atmo_mie_g, atmo_altitude;
+	} m_savedSky;
 public:
 	/**
 	 * Mist options
@@ -156,6 +165,9 @@ public:
 	static int pyattr_set_zenith_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_ambient_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_ambient_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	/* sky settings (World > Sky panel), one pair dispatched on the attribute name */
+	static PyObject *pyattr_get_sky(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_sky(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 #endif
 };
 
