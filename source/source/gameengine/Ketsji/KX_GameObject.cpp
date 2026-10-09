@@ -1393,7 +1393,8 @@ void KX_GameObject::ReplaceMesh(KX_Mesh *mesh, bool use_gfx, bool use_phys)
 	// Update the new assigned mesh with the physics mesh.
 	if (use_phys) {
 		if (m_physicsController) {
-			m_physicsController->ReinstancePhysicsShape(nullptr, use_gfx ? nullptr : mesh);
+			// dupli: replicas share the shape info, give this object its own so siblings keep their collision.
+			m_physicsController->ReinstancePhysicsShape(nullptr, use_gfx ? nullptr : mesh, true);
 		}
 	}
 	// Always make sure that the bounding box is updated to the new mesh.

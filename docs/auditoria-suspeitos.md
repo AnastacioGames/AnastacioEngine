@@ -13,8 +13,8 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 
 **0. Bugs de correção (comportamento errado, independem de desempenho)**
 1. ~~`RemoveRessources`~~ **corrigido** (`KX_GameObject.cpp:989`): ramo do material só saía do laço interno e seguia iterando `m_meshes` limpo (UB no LibFree); agora `return` nos dois ramos.
-2. PH8: `ProcessFhSprings` desreferencia `body` nulo — crash com sensor/personagem e algum Fh na cena.
-3. SP3: `m_shapeInfo` compartilhado — trocar malha com física muda a colisão das cópias irmãs.
+2. ~~PH8~~ **corrigido**: `ProcessFhSprings` testa `body` nulo antes de usar (sensores/personagens não têm rigid body).
+3. ~~SP3~~ **corrigido**: `ReplaceMesh` com física passa `dupli=true` a `ReinstancePhysicsShape`; o objeto ganha shape info próprio e as cópias irmãs mantêm a colisão.
 4. SP1: navmesh reconstruída no original; a cópia fica sem navmesh (e Recast inteiro por spawn).
 5. PY2: `worldOrientation[i] = ...` grava orientação local.
 6. Texto bitmap duplicado nunca desregistrado — vazamento a cada spawn.

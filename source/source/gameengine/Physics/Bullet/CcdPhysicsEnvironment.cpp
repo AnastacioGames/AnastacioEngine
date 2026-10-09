@@ -1177,11 +1177,12 @@ void CcdPhysicsEnvironment::ProcessFhSprings()
 	for (it = m_controllers.begin(); it != m_controllers.end(); it++) {
 		CcdPhysicsController *ctrl = (*it);
 		btRigidBody *body = ctrl->GetRigidBody();
-		if (body->isStaticOrKinematicObject()) {
+		// Sensors and characters have no rigid body.
+		if (!body || body->isStaticOrKinematicObject()) {
 			continue;
 		}
 
-		if (body && (ctrl->GetConstructionInfo().m_do_fh || ctrl->GetConstructionInfo().m_do_rot_fh)) {
+		if ((ctrl->GetConstructionInfo().m_do_fh || ctrl->GetConstructionInfo().m_do_rot_fh)) {
 			//re-implement SM_FhObject.cpp using btCollisionWorld::rayTest and info from ctrl->getConstructionInfo()
 			//send a ray from {0.0, 0.0, 0.0} towards {0.0, 0.0, -10.0}, in local coordinates
 			CcdPhysicsController *parentCtrl = ctrl->GetParentRoot();
