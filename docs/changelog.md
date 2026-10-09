@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - RA5 aceito; RA4 entregue para continuidade
+
+- Usuario declarou RA5 concluido. Roadmap, relatorio e auditoria agora registram o aceite; nao se atribui ganho de ms/FPS sem medicao.
+- RA4 foi iniciado e repassado ao Claude em `docs/auditoria-handoff-claude.md`. Editor e player compilaram; o diff local ainda exige a cena/runtime antes de qualquer conclusao: revisoes por `RAS_MeshUser`, snapshot de slots/revisoes no `RAS_InstancingBuffer`, contador `instancingUploads` em `getRenderStats()` e cache somente para instancing normal sem sort. Billboards, halos e transparencia ordenada continuam enviando o VBO a cada passe. Gerador novo: `tools/debug/cenas/criar_cena_ra4_instancing.py`.
+
+## 2026-10-09 - RA5: preparar apenas materiais com geometria ativa no passe
+
+- Confirmado: `PrepareBuckets` chamava `Prepare` (validacao de texturas e atualizacao de luzes) e incrementava `materialBinds` mesmo sem slots ativos. Agora consulta os display-array buckets e prepara somente materiais com geometria ativa no passe atual. Preparacao continua antes de `GenerateTree`; override permanece com retorno antecipado. Sem cache entre frames ou mudanca de layout de dados.
+- Gerador reutilizavel `tools/debug/cenas/criar_cena_ra5.py`: 24 cubos com materiais Principled distintos, ocultacao/retorno, saida/entrada do frustum e ocultacao total. Cena reaberta e inspecionada; player anterior/corrigido encerraram com exit code 0 e sete amostras com draws identicos (24/1/24/1/24/0/24). `materialBinds` antes: 25 em todas; depois: 24/1/24/1/24/0/24. O contador mede preparacoes neste caminho, nao binds GL efetivos. Nenhum ganho de FPS atribuido.
+- Editor/player compilados com vcvars64/VSLANG=1033, incluindo dependencias do header. Primeira linkagem falhou LNK1104 porque o player da referencia ainda estava aberto; apos encerramento confirmado, segunda tentativa passou. Ollama recusou conexao; leitura direta dos efeitos de Prepare/UpdateTextures usada como fallback. Evidencias em `%TEMP%/anastacio-ra5/`. Visual, texturas dinamicas e multiplos passes de sombra/probe no jogo real permanecem para validacao. Alteracoes preexistentes nos dois repositorios preservadas; sem commit.
+- Variante `ALPHA_SORT` tambem encerrou com exit code 0 e as mesmas sete amostras de draws/preparacoes da versao opaca corrigida, sem erros Python/shader nos logs. Inspecao inicial corrigida para usar nome no membership da colecao bpy; gerador da variante corrigido para `mat.alpha`, pois o Principled legado nao tem socket Alpha. Falhas restritas aos scripts temporarios. Documentacao e diff verificados.
+- Estado informado pelo usuario nesta retomada: RA3 validado no jogo e integrado em `12741810`; lote GL integrado a partir de `4fc43c91` (commit local `1d2462da`). Efeitos de roda do RolimaRacer validados, commits `81d53c1`/`ee41118`; nenhuma mudanca no jogo nesta sessao.
+
 ## 2026-10-09 - GL5/GL6/GL9/GL10: auditoria GameLogic integrada
 
 - Integrado o lote validado em worktree isolada: cache seguro de literais no Property Actuator (GL5), uma só leitura de texto no Property Sensor Changed (GL6), retorno cedo do TimeEventManager sem Timer (GL9) e menos lookups/varreduras invariantes nos sensores de teclado/mouse (GL10).

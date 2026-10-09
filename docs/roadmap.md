@@ -464,13 +464,24 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `SetModelMatrix` de particulas apenas copia 16 floats CPU; sem correcao neste item.
   KX13 e RA1 ja constam como corrigidos.
 
-- RA3: primeira peca implementada; cache da ultima direcao aceita no IBO compartilhado.
+- RA5 concluido por aceite do usuario: preparacao restrita a materiais com slots
+  ativos; editor/player e comparacao de ocultacao/frustum/reativacao passaram.
+  Nao houve medicao de tempo/FPS; validacoes adicionais deixam de bloquear o item.
+
+- RA4 em passagem para Claude: cache de stream para instancing normal sem sort foi
+  iniciado; falta a conclusao da compilacao e a cena controlada que mede uploads,
+  movimento, cor e visibilidade. Detalhes em `auditoria-handoff-claude.md`.
+
+- RA3: integrado em `12741810`, validado visualmente no jogo pelo usuario.
+  Pendente apenas ampliar cobertura dos casos adicionais do plano e obter benchmark
+  conclusivo; a primeira peca nao aguarda novo aceite visual.
+  Cache da ultima direcao aceita no IBO compartilhado.
   Referencia visual aprovada pelo usuario; diferencial isolado, editor/player e runtime passaram.
   Usuario confirmou visual da cena corrigida em 2026-10-09, incluindo troca de topologia (T).
   Benchmark A/B isolado em repouso/movimento passou (3 rodadas por modo/versao),
   mas ganho de tempo/FPS foi inconclusivo; detalhes no plano. RolimaRacer/Pista_1
-  abriu estavel e o usuario confirmou a execucao; pendem inspeção visual detalhada
-  de transparencia/fumaca e os casos adicionais do plano. O diagnostico inicial:
+  abriu estavel e o usuario confirmou a validacao visual; pendem os casos adicionais
+  do plano. O diagnostico inicial:
   zsort aloca, ordena e escreve o IBO por draw, mesmo em repouso.
   O buffer pertence ao display array e e compartilhado entre slots: cache por objeto nao basta.
   Plano da primeira peca: conservar a direcao de profundidade da ultima ordem efetivamente
@@ -478,7 +489,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   de mapeamento. Preservar a ordenacao existente para empates e alternancia de objetos/cameras.
   [Plano de implementacao e validacao visual](ra3-transparencia-plan.md): primeiro preparar
   a cena e conferir a referencia com o usuario; depois diferencial, build/runtime e comparacao
-  visual antes/depois no player real. Sem essa checagem, RA3 permanece pendente.
+  visual antes/depois no player real (aceite concluido nesta retomada).
   Sombras alpha sem override entram; sombras com override ignoram este trecho.
 
 - GL5/GL6/GL9/GL10: lote GameLogic integrado. Em cena de 300 objetos com 1.800

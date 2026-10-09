@@ -93,6 +93,8 @@ public:
 
 	/// \section Active Mesh Slots Management.
 	void ActivateMesh(RAS_MeshSlot *slot);
+	/// Whether this bucket contributes geometry to the current pass.
+	bool HasActiveMeshSlots() const { return !m_activeMeshSlots.empty(); }
 	/// Remove all mesh slots from the list.
 	void RemoveActiveMeshSlots();
 

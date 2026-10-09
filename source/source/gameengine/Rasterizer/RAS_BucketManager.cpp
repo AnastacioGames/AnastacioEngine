@@ -106,6 +106,14 @@ void RAS_BucketManager::PrepareBuckets(RAS_Rasterizer *rasty, RAS_BucketManager:
 	}
 
 	for (RAS_MaterialBucket *bucket : m_buckets[bucketType]) {
+		const RAS_DisplayArrayBucketList& arrays = bucket->GetDisplayArrayBucketList();
+		// Visibility is rebuilt for each pass. Prepare newly visible materials before
+		// GenerateTree updates attributes; inactive materials need no texture/lamp work.
+		if (std::none_of(arrays.begin(), arrays.end(), [](RAS_DisplayArrayBucket *array) {
+			return array->HasActiveMeshSlots();
+		})) {
+			continue;
+		}
 		RAS_IMaterial *mat = bucket->GetMaterial();
 		mat->Prepare(rasty);
 		RAS_Rasterizer::IncMaterialChangeCount();

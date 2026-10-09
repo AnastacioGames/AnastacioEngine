@@ -1,7 +1,8 @@
 # RA3 — cache de ordenação com validação visual
 
-Estado: primeira peça implementada, testada automaticamente e confirmada visualmente pelo usuário na cena controlada. A validação visual antes/depois
-é requisito de saída, conforme pedido do usuário em 2026-10-09.
+Estado vigente nesta retomada: RA3 concluido, validado no jogo pelo usuario e integrado
+em `12741810`. A/B de tempo/FPS inconclusivo; cobertura adicional continua opcionalmente
+ampliavel. As notas abaixo preservam os limites dos testes anteriores ao aceite final.
 
 ## Objetivo e limites
 

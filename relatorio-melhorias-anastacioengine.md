@@ -119,13 +119,19 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar
+  luzes. Reativacao prepara o material antes de gerar a arvore de desenho. Editor/player
+  e comparacao no runtime passaram: 25 preparacoes -> 1 com um cubo desenhado,
+  -> 0 com todos ocultos; retorno dos 24 draws preservado. Concluido por aceite do
+  usuario; FPS e visual real nao foram medidos.
+
 - **RA3 (zsort):** primeira peca conserva a direcao da ultima ordenacao aceita no IBO
   compartilhado, evitando map/sort/escrita quando continua valida. Posicoes, topologia,
   recriacao e sobrescrita invalidam; falhas de map/unmap exigem nova tentativa. Diferencial
   isolado, editor/player e runtime passaram; usuario confirmou o visual da cena corrigida
   em 2026-10-09. A/B isolado de repouso/movimento executado: ganho de tempo/FPS
   inconclusivo nas tres rodadas por modo/versao. RolimaRacer/Pista_1 abriu estavel
-  e o usuario confirmou a execucao; a inspecao visual detalhada permanece pendente.
+  e o usuario confirmou a validacao visual no jogo nesta retomada; integrado em `12741810`.
   Procedimento em [plano RA3](docs/ra3-transparencia-plan.md).
 
 - KX14 (2026-10-09): `Text-Res` conserva o texto da propriedade, evitando conversao/excecao
