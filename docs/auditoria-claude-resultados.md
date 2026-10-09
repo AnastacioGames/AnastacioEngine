@@ -1,4 +1,4 @@
-# Auditoria: resultados do Claude (GL5, GL6, GL10)
+# Auditoria: resultados do Claude (GL5-GL10)
 
 Lote delegado por `docs/auditoria-handoff-claude.md`. Branch `claude/auditoria-gl`
 (worktree separada). Codex integra estados em roadmap/changelog/suspeitos.
@@ -79,4 +79,39 @@ alocacao pequena por frame nao aparece em medicao.
 
 **Mudanca minima:** retorna cedo sempre que nao ha propriedades Timer (antes
 alocava e liberava o valor sem uso quando `fixedtime > 0`). Sem efeito funcional.
-GL7 e GL8 (Ketsji) ficaram de fora por estarem fora do escopo GameLogic do handoff.
+GL7 e GL8 foram auditados depois, na branch `claude/auditoria-gl7` (secoes abaixo).
+
+## GL7 — KX_RaySensor, cone Gaze
+
+**Diagnostico: confirmado.** Quando o raio fino erra, o cone percorre todos os
+objetos da cena por sensor e por frame e calcula `acos` em cada candidato que
+passa no filtro de propriedade/material.
+
+**Medicao** (`gl7.range`: grade de 2116 cubos, 1 em 7 com material `alvo`; 40
+empties com Ray Gaze, filtro de material, alcance 100, cone 10 graus; 1000 frames
+medidos apos 200 de aquecimento, sem vsync; 3 rodadas por binario):
+
+| Versao | r1 | r2 | r3 | media |
+|---|---|---|---|---|
+| base (869cc1ad) | 8,68 | 9,20 | 8,79 | 8,89 ms |
+| teste do cone antes do filtro, com `acos` | 10,97 | 10,45 | 11,09 | 10,84 ms |
+| final: cossenos, sem `acos` | 7,65 | 8,25 | 7,68 | 7,86 ms |
+
+Os 40 alvos escolhidos (`hitObject`) foram identicos nas tres versoes.
+
+**Mudanca:** compara `dot(to, dir) / dist` com `cos(limite)` precalculado fora do
+laco (ordem identica em [0, pi]); o filtro de nome so roda para candidatos que
+venceriam o melhor atual. A primeira tentativa (so reordenar, mantendo `acos`)
+piorou ~22%: com malha compartilhada o filtro de material descarta barato, e o
+`acos` passava a rodar em todos os objetos. Ganho final ~12% nesta cena.
+
+**Pendencia:** o laco continua O(objetos) por sensor; uma lista de candidatos por
+material/propriedade so compensa com muitos sensores Gaze, raro (recurso de VR).
+
+## GL8 — SynchronizeTransform de Near e Radar
+
+**Diagnostico: falso positivo na pratica.** Para o objeto-sensor,
+`WriteMotionStateToDynamics` termina em `setWorldTransform` e na transformacao de
+interpolacao: so copia matrizes, sem acordar o corpo nem recalcular AABB. O Radar
+soma tres seno/cosseno. Comparar a transformacao anterior custaria o mesmo.
+**Sem mudanca.**

@@ -349,12 +349,26 @@ bool KX_RaySensor::Evaluate()
 		/* Gaze cone: the thin ray missed, take the visible target closest to the view center inside the cone.
 		 * The object already being looked at keeps a wider cone so small head shakes don't reset the gaze time. */
 		KX_GameObject *best = nullptr;
-		float bestAngle = m_gazeAngle;
+		float bestCos = -1.0f;
+		/* Compare cosines instead of angles: no acos per object, same ordering on [0, pi]. */
+		const float cosLimit = std::cos(m_gazeAngle);
+		const float cosLimitHeld = std::cos(std::min(m_gazeAngle * 1.5f, float(M_PI)));
 		for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
 			if (gameobj == obj || !gameobj->GetVisible() || !(gameobj->GetCollisionGroup() & m_mask)) {
 				continue;
 			}
 			if (gazeSelf && !IsSelf(owner, gameobj)) {
+				continue;
+			}
+			/* Cheap cone test first: the name lookups below only run for candidates that could win. */
+			const mt::vec3 to = gameobj->NodeGetWorldPosition() - frompoint;
+			const float dist = to.Length();
+			if (dist < 1e-4f || dist > m_distance) {
+				continue;
+			}
+			const float cosAngle = mt::dot(to, todir) / dist;
+			const float limit = (gameobj == m_gazeObject) ? cosLimitHeld : cosLimit;
+			if (cosAngle < limit || (best && cosAngle <= bestCos)) {
 				continue;
 			}
 			if (!gazeSelf && !m_propertyname.empty()) {
@@ -374,17 +388,8 @@ bool KX_RaySensor::Evaluate()
 					continue;
 				}
 			}
-			const mt::vec3 to = gameobj->NodeGetWorldPosition() - frompoint;
-			const float dist = to.Length();
-			if (dist < 1e-4f || dist > m_distance) {
-				continue;
-			}
-			const float angle = std::acos(mt::Clamp(mt::dot(to / dist, todir), -1.0f, 1.0f));
-			const float limit = (gameobj == m_gazeObject) ? m_gazeAngle * 1.5f : m_gazeAngle;
-			if (angle <= limit && (!best || angle < bestAngle)) {
-				best = gameobj;
-				bestAngle = angle;
-			}
+			best = gameobj;
+			bestCos = cosAngle;
 		}
 		if (best) {
 			/* Line of sight: the ray toward the target must hit it first. */
