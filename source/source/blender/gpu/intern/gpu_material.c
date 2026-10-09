@@ -4857,23 +4857,21 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			}
 
 			if (material->shadowmaploc[i] != -1) {
+				/* The bind stays every draw (other draws reuse the unit); the sampler uniform only
+				 * when it changes. */
 				GPU_texture_bind(lamp->depthtex, texunit + i);
-				GPU_shader_uniform_texture(shader, material->shadowmaploc[i], lamp->depthtex);
-				LIGHT_GL_CALLS += 2;
+				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
 			}
 			if (material->shadowpersmatloc[i] != -1) {
-				GPU_shader_uniform_vector(shader, material->shadowpersmatloc[i], 16, 1, (float *)lamp->dynpersmat);
-				LIGHT_GL_CALLS++;
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpersmatloc[i], 16, (float *)lamp->dynpersmat);
 			}
 			if (material->shadowbiasloc[i] != -1) {
 				float bias[2] = {lamp->bias, lamp->slopebias};
-				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
-				LIGHT_GL_CALLS++;
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowbiasloc[i], 2, bias);
 			}
 			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
 				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
-				GPU_shader_uniform_vector(shader, material->shadowpointloc[i], 4, 1, point);
-				LIGHT_GL_CALLS++;
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpointloc[i], 4, point);
 			}
 		}
 
@@ -4881,20 +4879,19 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Unset sampler2DShadow uniforms default to unit 0, which may hold a plain sampler2D
 			 * texture: two sampler types on one unit is GL_INVALID_OPERATION at draw time. Point
 			 * the unused slot at its own (unbound) unit instead. */
-			GPU_shader_uniform_int(shader, material->shadowmaploc[i], texunit + i);
+			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
 			/* The unit may still hold a lamp depth texture from an earlier bind: in the shadow
 			 * pass that texture is the render target, so leave nothing bound there. */
 			glActiveTexture(GL_TEXTURE0 + texunit + i);
 			glBindTexture(GL_TEXTURE_2D, 0);
 			glActiveTexture(GL_TEXTURE0);
-			LIGHT_GL_CALLS += 4;
+			LIGHT_GL_CALLS += 3;
 		}
 
 		if (material->shadowenabledloc[i] != -1) {
 			/* 2 = Point lamp: unfshadowpersmat is then view to light space (see shadow_point()). */
 			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : 1.0f) : 0.0f;
-			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
-			LIGHT_GL_CALLS++;
+			LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowenabledloc[i], 1, &enabled);
 		}
 	}
 }
@@ -5059,18 +5056,17 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 
 	for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 		const GPUSceneLight *light = &lights[i];
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].position, 4, 1, light->position);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].diffuse, 4, 1, light->diffuse);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].specular, 4, 1, light->specular);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].halfvector, 4, 1, light->halfvector);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotdirection, 3, 1, light->spotdirection);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotexponent, 1, 1, &light->spotexponent);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcutoff, 1, 1, &light->spotcutoff);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcoscutoff, 1, 1, &light->spotcoscutoff);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].constantatt, 1, 1, &light->constantatt);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].linearatt, 1, 1, &light->linearatt);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].quadraticatt, 1, 1, &light->quadraticatt);
-		LIGHT_GL_CALLS += 11;
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].position, 4, light->position);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].diffuse, 4, light->diffuse);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].specular, 4, light->specular);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].halfvector, 4, light->halfvector);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotdirection, 3, light->spotdirection);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotexponent, 1, &light->spotexponent);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotcutoff, 1, &light->spotcutoff);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotcoscutoff, 1, &light->spotcoscutoff);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].constantatt, 1, &light->constantatt);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].linearatt, 1, &light->linearatt);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].quadraticatt, 1, &light->quadraticatt);
 	}
 }
 

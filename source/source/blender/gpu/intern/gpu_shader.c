@@ -17,6 +17,8 @@
  * All rights reserved.
  */
 
+#include <string.h>
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_utildefines.h"
@@ -151,6 +153,11 @@ struct GPUShader {
 	int uniforms;    /* required uniforms */
 
 	void *uniform_interface; /* cached uniform interface for shader. Data depends on shader */
+
+	/* Last value sent per uniform location, for GPU_shader_uniform_*_cached(). Entry layout:
+	 * [0] = length tag (0 unset, -1 int), [1..16] = value. Grown on demand. */
+	float (*uniform_cache)[17];
+	int uniform_cache_len;
 };
 
 static void shader_print_errors(const char *task, const char *log, const char **code, int totcode)
@@ -999,6 +1006,8 @@ void GPU_shader_free(GPUShader *shader)
 
 	if (shader->uniform_interface)
 		MEM_freeN(shader->uniform_interface);
+	if (shader->uniform_cache)
+		MEM_freeN(shader->uniform_cache);
 
 	MEM_freeN(shader);
 }
@@ -1061,6 +1070,57 @@ void GPU_shader_uniform_vector(GPUShader *UNUSED(shader), int location, int leng
 	else if (length == 16) glUniformMatrix4fv(location, arraysize, 0, value);
 
 	GPU_ASSERT_NO_GL_ERRORS("Post Uniform Vector");
+}
+
+/* Cache entry for a location, or NULL when the location can't be cached. */
+static float *shader_uniform_cache_entry(GPUShader *shader, int location)
+{
+	if (location < 0 || location >= 4096)
+		return NULL;
+	if (location >= shader->uniform_cache_len) {
+		int len = max_ii(location + 1, shader->uniform_cache_len * 2);
+		len = max_ii(len, 64);
+		if (shader->uniform_cache)
+			shader->uniform_cache = MEM_recallocN(shader->uniform_cache, sizeof(*shader->uniform_cache) * len);
+		else
+			shader->uniform_cache = MEM_callocN(sizeof(*shader->uniform_cache) * len, "GPUShader uniform cache");
+		shader->uniform_cache_len = len;
+	}
+	return shader->uniform_cache[location];
+}
+
+/* Same as GPU_shader_uniform_vector() with arraysize 1, but skips the GL call when the value
+ * is the one last sent through this function. Programs are shared between materials, so the
+ * cache lives in the shader. Only for uniforms always set through the cached path.
+ * Returns true when the value was sent. */
+bool GPU_shader_uniform_vector_cached(GPUShader *shader, int location, int length, const float *value)
+{
+	if (location == -1 || value == NULL)
+		return false;
+	float *entry = (length >= 1 && length <= 16) ? shader_uniform_cache_entry(shader, location) : NULL;
+	if (entry) {
+		if (entry[0] == (float)length && memcmp(&entry[1], value, sizeof(float) * length) == 0)
+			return false;
+		entry[0] = (float)length;
+		memcpy(&entry[1], value, sizeof(float) * length);
+	}
+	GPU_shader_uniform_vector(shader, location, length, 1, value);
+	return true;
+}
+
+bool GPU_shader_uniform_int_cached(GPUShader *shader, int location, int value)
+{
+	if (location == -1)
+		return false;
+	float *entry = shader_uniform_cache_entry(shader, location);
+	if (entry) {
+		if (entry[0] == -1.0f && memcmp(&entry[1], &value, sizeof(int)) == 0)
+			return false;
+		entry[0] = -1.0f;
+		memcpy(&entry[1], &value, sizeof(int));
+	}
+	GPU_shader_uniform_int(shader, location, value);
+	return true;
 }
 
 void GPU_shader_uniform_vector_int(GPUShader *UNUSED(shader), int location, int length, int arraysize, const int *value)

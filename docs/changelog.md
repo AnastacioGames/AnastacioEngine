@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Cache de uniforms de luz e sombra no GPUShader (GP1/GP2/RA1 corrigidos)
+
+- `GPU_shader_uniform_vector_cached` / `GPU_shader_uniform_int_cached` (`gpu_shader.c`): guardam o último
+  valor enviado por location dentro do `GPUShader` (os programas são compartilhados entre materiais pelo
+  shader_cache) e pulam o `glUniform` quando o valor não mudou.
+- `GPU_material_bind_shadow_lamps` e `GPU_material_bind_scene_lights` usam essas funções para persmat, bias,
+  point, enabled, sampler das sombras e as 11 uniforms das luzes de cena. Os binds de textura de sombra
+  continuam a cada draw, porque outros draws reusam as unidades.
+- Medido na cena `tools/debug/cenas/criar_cena_luzes_sombra.py` (3 spots com sombra, ~91 draws):
+  `lightUniforms` de ~880 para ~324 por frame. RolimaRacer não muda (já era 0).
+
 ## 2026-10-09 - Contador de uniforms de luz (GP1/GP2/RA1 medidos)
 
 - Novo contador `lightUniforms` em `bge.logic.getRenderStats()` (`CM_WORK_LIGHT_UNIFORMS`): chamadas GL de
