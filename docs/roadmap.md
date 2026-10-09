@@ -458,6 +458,12 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- KX10 (Auto Shadow): mapa de casters reconstruido somente na invalidacao; Point passou em comparacao
+  antes/depois; benchmark estatico mediu ganho (ver changelog). Pendente: Spot, deformadores,
+  layers/parametros, ganho no jogo real e visual.
+  A varredura por frame permanece; evidencias na [auditoria](auditoria-suspeitos.md).
+
+
 - **Profiler da engine (`KX_EngineProfiler`) — feito (2026-10-06):** ver `docs/engine-profiling.md`.
   Opcional, só se fizer falta: painel ImGui com as etapas e `Range.logic.getEngineProfile()`.
 - Contadores de render como opção para o usuário final (2026-10-06): `Range.logic.getRenderStats()` já

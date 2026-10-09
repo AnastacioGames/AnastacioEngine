@@ -191,6 +191,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   compatibility profile. Os no-ops aceitos no core são motion blur legado e texto de debug baseado
   em `BLF_draw`. O corte de espelho/água (`KX_PlanarMap`) usa projeção oblíqua e funciona em compat, core e
   WebGL2. A textura Realtime Planar precisa de uma imagem associada, senão não renderiza.
+- Auto Shadow de Spot/Point compara casters com o mapa existente e so o reconstrui quando a sombra
+  invalida; a varredura do snapshot por frame permanece. Build e regressao em Point passaram;
+  benchmark sintetico estatico mediu 0,613 -> 0,194 ms em sombras e +28,3% na mediana de FPS.
+  Ganho no jogo real e demais validacoes ficam na auditoria KX10.
 - CSM para luzes Sun usa três cascatas ajustadas ao frustum e considera os bounds dos casters no recorte Z.
   O bug de sombra estática ausente no ângulo inicial foi corrigido e confirmado visualmente.
 - Novas Lamps já nascem com o preset de sombras para Sun: mapa Simple com filtro PCF, 1024 px na cascata

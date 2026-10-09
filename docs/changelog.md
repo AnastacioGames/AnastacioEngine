@@ -6,6 +6,43 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - KX10: benchmark antes/depois com ganho medido
+
+- Cena sintetica estatica: 1600 meshes com material, sem colisao, 16 Point com Auto Shadow e alcance 50, camera mirando a cena, Sun, 640x360, vsync OFF e logica a 1000 Hz (limite que ainda introduz espera). Gerador reutilizavel `tools/debug/cenas/criar_cena_benchmark_kx10.py`, derivado dos testes existentes. Cena reaberta e inspecionada: contagens, materiais, sombras/Auto, camera, modulo/funcao e pulso confirmados.
+- Comparacao isolou o KX10: compilado temporariamente o CPP anterior, mantendo KX6/KX7; restaurado o CPP corrigido e recompilado `RangeRuntime` com vcvars64/VSLANG=1033. Tres rodadas por versao, cada uma com 3 s de aquecimento e 10 s medidos, profiler desligado: antes 704,3 / 701,9 / 717,9 FPS; depois 899,3 / 903,5 / 908,6 FPS. Medianas 704,3 -> 903,5 FPS (+28,3%); periodo medio correspondente 1,420 -> 1,107 ms. Todas as rodadas encerraram com exit code 0 e mantiveram shadowPasses/lightsShadowUpdated em zero no intervalo medido.
+- Rodada separada por versao com profiler existente: media de `render.shadows` apos aquecimento 0,613 -> 0,194 ms (-68,3%, aproximadamente 0,419 ms poupados). 58/75 janelas de 120 frames. FPS acima vem das rodadas sem profiler. Rodadas agrupadas por versao, sem alternancia; resultado limitado a esta carga estatica sintetica, nao e previsao para o jogo real ou sombras continuamente invalidadas.
+- Evidencias em `%TEMP%/anastacio-kx10-bench/`: `bench.range`, `inspection.json`, `before-1..3.json`, `after-1..3.json`, logs `before-profile.txt`/`after-profile.txt` e `summary.json`. Fonte corrigida conferida byte a byte com backup; player final compilado com KX10. Spot, deformadores, layers/parametros e visual real continuam pendentes. Sem commit.
+
+## 2026-10-09 - KX10: mapa de casters somente na invalidacao de Auto Shadow
+
+- `AutoShadowStillValid` consulta o mapa persistente da luz e conta casters no snapshot atual; so cria/substitui um `unordered_map` quando a sombra invalida. Preservados filtros de layer/alcance, tolerancia de transformacao, parametros da luz e invalidacao por deformadores. O snapshot de `BuildShadowCullCache` ja e compartilhado entre luzes/passadas no escopo de sombra do frame; varredura por frame e por luz permanece para detectar mudancas. Sem cache entre frames novo.
+- `RangeRuntime` compilou com vcvars64/VSLANG=1033. Cena `%TEMP%/anastacio-kx10/test.range` com Point Auto Update, gerador `make.py` e inspecao `verify_scene.py`; `inspection.json` confirmou camera, luz, Auto Update, modulo/funcao e material. Player encerrou com exit code 0 antes e depois do patch. `before.json` e `after.json` tem 18 amostras identicas: 0 passadas em repouso e 6/1 luz apos movimento, saida/entrada do alcance, ocultar/mostrar, escala, movimento da luz e remocao do caster; volta a 0 apos cada evento.
+- Removida a construcao/destruicao do mapa no caminho valido por inspecao de codigo; ganho de tempo/FPS nao medido. Spot, deformadores, layers, parametros e visual no jogo real ainda pendentes. KX10 parcial: custo da varredura permanece. KX6/KX7 e demais alteracoes locais preservadas, sem commit.
+
+## 2026-10-09 - KX9: revisao da correcao existente e teste de frustum
+
+- `KX_Camera::UpdateView` ja corrigido no commit `6d8c640d`: compara os 16 elementos de modelview, marca mudanca ao recalcular projecao e so entao liga `frustumDirty`. `ExtractFrustum` reconstrui sob demanda e limpa a flag. Atualizada a linha desatualizada da auditoria; nenhuma alteracao C++ nesta rodada. Culling de objetos continua por frame.
+- Cena `%TEMP%/anastacio-kx9/test.range`, gerador `make.py`, inspecao `verify_scene.py` e resultados `inspection.json`/`result.json`. Camera, modulo, funcao e pulso conferidos; player encerrou automaticamente com exit code 0. Consultas `pointInsideFrustum` estaveis em repouso: origem e ponto lateral dentro; mover camera +1000 em X colocou ambos fora, retornar colocou ambos dentro. Lente 16 para 120 colocou ponto lateral fora, mantendo origem dentro; restaurar 16 recuperou classificacao original.
+- Teste confirma resposta funcional de modelview/projecao; nao mede numero de reconstrucoes nem ganho em ms/FPS. Stereo, Camera FX e visual no jogo real pendentes. KX6/KX7 e demais alteracoes locais preservadas, sem commit.
+
+## 2026-10-09 - KX8: Auto World Sun sem invalidacao continua reproduzida
+
+- Auditoria de `UpdateAutoWorldSun`: `SG_Node::SetLocalPosition` e `SetLocalOrientation` ja ignoram valores iguais; a recaptura do World compara assinatura (incluindo direcao do sol) antes de `ForceUpdate`. Nenhuma mudanca C++ neste item.
+- Cena temporaria `%TEMP%/anastacio-kx8/test.range`, gerador `make.py` e inspecao `verify_scene.py`: Auto World Sun ligado, camera e controlador MODULE conferidos em `inspection.json`. Player encerrou com exit code 0 e escreveu `result.json`. Frames 160/175 e 330/345: `sceneNodeUpdates`, `transformSyncs` e `meshMatrixChanges` zerados. Ao mover camera x=4 para x=8, sol acompanhou +4 em X, mantendo orientacao.
+- A primeira execucao falhou porque o script temporario `inspect.py` ocultou o modulo padrao usado por numpy; renomeado para `verify_scene.py`, execucao passou. Nao foi erro de build/engine.
+- Evidencia limitada a transformacoes em cena controlada; sombras com cascatas, sol com parent, alteracao de hora/direcao e visual no jogo real pendentes. Sem alegacao de ganho em ms/FPS. KX6/KX7 preservados, sem commit.
+
+## 2026-10-09 - KX7: slow parent dorme no ponto fixo
+
+- `KX_SlowParentRelation` compara exatamente posicao, escala e orientacao antes/depois da interpolacao. Resultado igual deixa de reagendar e de propagar `parentUpdated`. Primeira chamada preserva o reagendamento inicial; mudancas no pai/filho reativam pelo scene graph. Formula mantida, sem epsilon.
+- `RangeRuntime` compilou. Cena temporaria `%TEMP%/anastacio-kx7/test.range` inspecionada via bpy e executada ate encerramento automatico: filho convergiu para x=4, retomou ao mover pai e convergiu para x=8. Frames 160/175 e 330/345: `sceneNodeUpdates`, `transformSyncs` e `meshMatrixChanges` em 0; frame 182: x=7.9375 com atualizacoes ativas. Evidencias `inspection.json` e `result.json` na mesma pasta.
+- Translacao/repouso/retomada validados; rotacao/escala, visual no jogo real e ganho em ms/FPS pendentes. KX6 preservado, sem commit.
+
+## 2026-10-09 - KX6: anexos de osso dormem com a armature parada
+
+- `BL_ArmatureObject::UpdateTimestep()` agora agenda os filhos com relacao de osso quando uma acao, constraint actuator ou `armature.update()` avanca a pose. A relacao deixou de se reagendar incondicionalmente; armas e acessorios de uma armature ociosa nao percorrem mais sua subarvore a cada frame.
+- A relacao ainda marca os descendentes quando executa, preservando anexos ligados ao objeto preso ao osso. `RangeRuntime` recompilou; falta apenas a conferencia visual no jogo real de um objeto preso a osso durante uma animacao.
+
 ## 2026-10-09 - KX13: animacao percorre filhos sem alocar vetor temporario
 
 - Os passes de pose e de deformer de `KX_Scene` agora visitam diretamente os filhos de `SG_Node`, preservando a travessia por links sem objeto e encerrando assim que encontra um filho que exige pose. Armatures com muitos filhos deixam de alocar e preencher dois vetores por atualizacao.

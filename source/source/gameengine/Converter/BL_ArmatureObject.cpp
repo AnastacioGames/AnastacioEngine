@@ -456,6 +456,17 @@ bool BL_ArmatureObject::UpdateTimestep(double curtime)
 		 */
 		m_objArma->pose->ctime = (float)(curtime - m_lastframe);
 		m_lastframe = curtime;
+
+		// Bone children used to reschedule themselves forever because the relation had
+		// no way to know whether this pose would advance. The timestep is that signal:
+		// wake only those children when an action, constraint actuator or Python update()
+		// actually requests a new pose.
+		for (SG_Node *child : GetNode()->GetChildren()) {
+			SG_ParentRelation *relation = child->GetParentRelation();
+			if (relation && relation->NeedsParentUpdate()) {
+				child->SetModified();
+			}
+		}
 	}
 
 	return false;

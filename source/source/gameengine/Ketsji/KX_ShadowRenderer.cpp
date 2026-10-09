@@ -363,37 +363,43 @@ static bool AutoShadowStillValid(KX_Scene *scene, KX_LightObject *light, RAS_ILi
 	const mt::vec3 lightPos = light->NodeGetWorldPosition();
 	const int layer = raslight->GetShadowLayer();
 
-	std::unordered_map<const void *, mt::mat3x4> casters;
-	bool deformed = false;
-	for (const KX_Scene::ShadowCullEntry& entry : scene->GetShadowCullSnapshot()) {
+	const auto& snapshot = scene->GetShadowCullSnapshot();
+	const auto inRange = [&](const KX_Scene::ShadowCullEntry& entry) {
 		if (layer != 0 && !(entry.m_layer & layer)) {
-			continue;
+			return false;
 		}
 		const float reach = raslight->m_distance + entry.m_radius;
-		if ((entry.m_center - lightPos).LengthSquared() > reach * reach) {
-			continue;
-		}
-		casters.emplace(entry.m_object, entry.m_trans);
-		if (entry.m_object->GetDeformer()) {
-			deformed = true;
-		}
-	}
+		return !((entry.m_center - lightPos).LengthSquared() > reach * reach);
+	};
 
-	bool valid = raslight->m_autoShadowValid && !deformed &&
+	bool valid = raslight->m_autoShadowValid &&
 	             Mat3x4NearlyEqual(lightTrans, raslight->m_autoShadowLightTrans) &&
-	             memcmp(params, raslight->m_autoShadowParams, sizeof(params)) == 0 &&
-	             casters.size() == raslight->m_autoShadowCasters.size();
+	             memcmp(params, raslight->m_autoShadowParams, sizeof(params)) == 0;
 	if (valid) {
-		for (const auto& item : casters) {
-			const auto it = raslight->m_autoShadowCasters.find(item.first);
-			if (it == raslight->m_autoShadowCasters.end() || !Mat3x4NearlyEqual(item.second, it->second)) {
+		size_t casterCount = 0;
+		for (const KX_Scene::ShadowCullEntry& entry : snapshot) {
+			if (!inRange(entry)) {
+				continue;
+			}
+			++casterCount;
+			const auto it = raslight->m_autoShadowCasters.find(entry.m_object);
+			if (entry.m_object->GetDeformer() || it == raslight->m_autoShadowCasters.end() ||
+			    !Mat3x4NearlyEqual(entry.m_trans, it->second)) {
 				valid = false;
 				break;
 			}
 		}
+		valid = valid && casterCount == raslight->m_autoShadowCasters.size();
 	}
 
 	if (!valid) {
+		// Allocate caster entries only when replacing an invalid shadow snapshot.
+		std::unordered_map<const void *, mt::mat3x4> casters;
+		for (const KX_Scene::ShadowCullEntry& entry : snapshot) {
+			if (inRange(entry)) {
+				casters.emplace(entry.m_object, entry.m_trans);
+			}
+		}
 		raslight->m_autoShadowLightTrans = lightTrans;
 		memcpy(raslight->m_autoShadowParams, params, sizeof(params));
 		raslight->m_autoShadowCasters.swap(casters);

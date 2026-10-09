@@ -49,8 +49,8 @@ KX_BoneParentRelation::~KX_BoneParentRelation()
 bool KX_BoneParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node *parent, bool& parentUpdated)
 {
 	BLI_assert(child != nullptr);
-
-	// We don't know if the armature has been updated or not, assume yes.
+	// This relation is called only after the armature requested a pose update or the
+	// child changed locally. Its descendants must follow the resulting bone transform.
 	parentUpdated = true;
 
 	// The childs world locations which we will update.
@@ -92,9 +92,12 @@ bool KX_BoneParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node
 	}
 
 	child->ClearModified();
-	// This node must always be updated, so reschedule it for next time.
-	child->ActivateRecheduleUpdateCallback();
 	return valid_parent_transform;
+}
+
+bool KX_BoneParentRelation::NeedsParentUpdate()
+{
+	return true;
 }
 
 SG_ParentRelation *KX_BoneParentRelation::NewCopy()
