@@ -14,9 +14,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - O detector aceita `-` no lugar da cópia: põe o medidor só na memória do editor aberto (sem `-b`) e não salva.
   Assim os imports `scripts.*` dos componentes continuam resolvendo, o que não acontecia na cópia salva fora da
   pasta do jogo.
-- Medição: 0 no desktop no LightManager e no RolimaRacer em corrida (até ~400 draws por frame). O COMPAT usa
-  `gl_LightSource`, e os materiais desses jogos não têm uniforms de sombra por slot. O cache de "último enviado"
-  no `GPUShader` ficou de fora; só valeria na Web (CORE), que ainda não foi medida.
+- Medição: 0 no RolimaRacer em corrida (~400 draws), que não tem lâmpada com sombra em buffer; no COMPAT as luzes vão
+  por `gl_LightSource`. Na cena nova `tools/debug/cenas/criar_cena_luzes_sombra.py` (41 malhas com Principled, 3 spots
+  com sombra): ~880 GL por frame, ~22 por draw, repetidas com a cena parada.
+- O detector também registra `lightBinds`. Foi ele que mostrou que a primeira versão da cena não tinha shader: sem
+  `use_shading_nodes` o Principled cai nos nós antigos, o material fica sem programa e nada é desenhado.
 
 ## 2026-10-08 - Varredura de trabalho repetido e os 8 bugs de correção encontrados
 
