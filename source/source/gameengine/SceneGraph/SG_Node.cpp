@@ -218,9 +218,10 @@ void SG_Node::RemoveChild(SG_Node *child)
 
 void SG_Node::UpdateWorldData(bool parentUpdated)
 {
-	UpdateSpatialData(m_parent, parentUpdated);
-
-	ActivateUpdateTransformCallback();
+	// KX1: nothing changed (not modified, parent untouched), physics and culling are already in sync.
+	if (UpdateSpatialData(m_parent, parentUpdated)) {
+		ActivateUpdateTransformCallback();
+	}
 
 	// The node is updated, remove it from the update list
 	Delink();
@@ -243,9 +244,9 @@ void SG_Node::UpdateWorldDataThread(bool parentUpdated)
 
 void SG_Node::UpdateWorldDataThreadSchedule(bool parentUpdated)
 {
-	UpdateSpatialData(m_parent, parentUpdated);
-
-	ActivateUpdateTransformCallback();
+	if (UpdateSpatialData(m_parent, parentUpdated)) {
+		ActivateUpdateTransformCallback();
+	}
 
 	scheduleMutex.Lock();
 	// The node is updated, remove it from the update list
@@ -353,10 +354,10 @@ SG_ParentRelation *SG_Node::GetParentRelation()
  * Update Spatial Data.
  * Calculates WorldTransform., (either doing its self or using the linked SGControllers)
  */
-void SG_Node::UpdateSpatialData(const SG_Node *parent, bool& parentUpdated)
+bool SG_Node::UpdateSpatialData(const SG_Node *parent, bool& parentUpdated)
 {
 	// Ask the parent_relation object owned by this class to update our world coordinates.
-	ComputeWorldTransforms(parent, parentUpdated);
+	return ComputeWorldTransforms(parent, parentUpdated);
 }
 
 /**
@@ -378,8 +379,25 @@ void SG_Node::RelativeTranslate(const mt::vec3& trans, const SG_Node *parent, bo
 	SetModified();
 }
 
+/* GL1/CV2: actuators, IPOs and physics rewrite the same transform every frame; skipping the
+ * identical write keeps the node out of the update list (and its physics/culling sync). */
+static bool SG_SameMatrix(const mt::mat3& a, const mt::mat3& b)
+{
+	for (int col = 0; col < 3; ++col) {
+		for (int row = 0; row < 3; ++row) {
+			if (a(row, col) != b(row, col)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 void SG_Node::SetLocalPosition(const mt::vec3& trans)
 {
+	if (trans == m_localPosition) {
+		return;
+	}
 	m_localPosition = trans;
 	SetModified();
 }
@@ -408,6 +426,9 @@ void SG_Node::RelativeRotate(const mt::mat3& rot, bool local)
 
 void SG_Node::SetLocalOrientation(const mt::mat3& rot)
 {
+	if (SG_SameMatrix(rot, m_localRotation)) {
+		return;
+	}
 	m_localRotation = rot;
 	SetModified();
 }
@@ -425,6 +446,9 @@ void SG_Node::RelativeScale(const mt::vec3& scale)
 
 void SG_Node::SetLocalScale(const mt::vec3& scale)
 {
+	if (scale == m_localScaling) {
+		return;
+	}
 	m_localScaling = scale;
 	SetModified();
 }

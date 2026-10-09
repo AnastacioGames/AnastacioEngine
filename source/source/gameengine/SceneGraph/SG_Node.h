@@ -321,7 +321,7 @@ protected:
 	/**
 	 * Update the world coordinates of this spatial node.
 	 */
-	void UpdateSpatialData(const SG_Node *parent, bool& parentUpdated);
+	bool UpdateSpatialData(const SG_Node *parent, bool& parentUpdated);
 
 private:
 	void UpdateWorldDataThreadSchedule(bool parentUpdated = false);
