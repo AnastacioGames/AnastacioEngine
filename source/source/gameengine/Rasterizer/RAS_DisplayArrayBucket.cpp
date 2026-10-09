@@ -362,8 +362,10 @@ void RAS_DisplayArrayBucket::RunBatchingNode(const RAS_DisplayArrayNodeTuple& tu
 	const unsigned int nummeshslots = m_activeMeshSlots.size();
 
 	// We must use a int instead of unsigned size to match GLsizei type.
-	std::vector<int> counts(nummeshslots);
-	std::vector<intptr_t> indices(nummeshslots);
+	std::vector<int>& counts = m_batchCounts;
+	std::vector<intptr_t>& indices = m_batchIndices;
+	counts.resize(nummeshslots);
+	indices.resize(nummeshslots);
 
 	RAS_BatchDisplayArray *batchArray = static_cast<RAS_BatchDisplayArray *>(m_displayArray);
 

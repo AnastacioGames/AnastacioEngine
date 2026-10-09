@@ -1531,8 +1531,22 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 				rot(0, 0) = ch;    rot(0, 1) = -sh;   rot(0, 2) = 0.0f;
 				rot(1, 0) = sh;    rot(1, 1) = ch;    rot(1, 2) = 0.0f;
 				rot(2, 0) = 0.0f;  rot(2, 1) = 0.0f;  rot(2, 2) = 1.0f;
-				this->NodeSetGlobalOrientation(rot);
-				this->NodeUpdate();
+				// Skip the scene graph update when the world turn is already right:
+				// rewriting it every frame adds float noise that splits batches.
+				const mt::mat3& cur = this->NodeGetWorldOrientation();
+				bool same = true;
+				for (unsigned short i = 0; i < 3 && same; ++i) {
+					for (unsigned short j = 0; j < 3; ++j) {
+						if (fabsf(cur(i, j) - rot(i, j)) > 1e-5f) {
+							same = false;
+							break;
+						}
+					}
+				}
+				if (!same) {
+					this->NodeSetGlobalOrientation(rot);
+					this->NodeUpdate();
+				}
 
 				if (lodLevel.GetFlag() & KX_LodLevel::USE_ATLAS) {
 					const int cols = lodLevel.GetAtlasColumns();
