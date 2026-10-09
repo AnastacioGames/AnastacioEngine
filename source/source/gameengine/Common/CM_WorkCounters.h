@@ -40,6 +40,8 @@ enum CM_WorkCounter {
 	CM_WORK_UPDATE_NOTIFIES,
 	/// GL calls (uniforms + shadow texture binds) uploading lights/shadow lamps per draw.
 	CM_WORK_LIGHT_UNIFORMS,
+	/// glUniform calls of the material's dynamic inputs (GPU_pass_update_uniforms) per bind.
+	CM_WORK_PASS_UNIFORMS,
 	CM_WORK_COUNTER_MAX
 };
 

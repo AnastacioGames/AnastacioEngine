@@ -19,7 +19,7 @@ out_blend, log_path = argv[0], argv[1].replace('\\', '/')
 
 MEDIDOR = r'''import bge, os, time
 LOG = %r
-KEYS = ("sceneNodeUpdates", "transformSyncs", "boundsPushes", "meshMatrixChanges", "updateNotifies", "lightUniforms", "lightBinds", "drawCalls")
+KEYS = ("sceneNodeUpdates", "transformSyncs", "boundsPushes", "meshMatrixChanges", "updateNotifies", "lightUniforms", "passUniforms", "lightBinds", "drawCalls")
 _s = {}
 
 def _write(line):

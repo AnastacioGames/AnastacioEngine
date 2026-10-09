@@ -233,6 +233,7 @@ void BL_BlenderShader::BindProg(RAS_Rasterizer *rasty)
 	GPU_material_bind(m_gpuMat, m_blenderScene->lay, rasty->GetTime(), 1,
 					  rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data(), nullptr, false,
 					  rasty->GetProjectionMatrix().Data());
+	CM_WorkCount(CM_WORK_PASS_UNIFORMS, GPU_pass_uniform_gl_calls_take());
 }
 
 void BL_BlenderShader::UnbindProg()

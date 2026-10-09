@@ -533,6 +533,9 @@ typedef struct GPUSceneLight {
 void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
 /* GL calls issued by the two light binds above since the last call (CM_WORK_LIGHT_UNIFORMS); resets. */
 int GPU_material_light_gl_calls_take(void);
+/* glUniform calls of the material's own dynamic inputs (node values, CSM/VSM lamp data) since the
+ * last call (CM_WORK_PASS_UNIFORMS); resets. */
+int GPU_pass_uniform_gl_calls_take(void);
 
 /* Material shader cache counters (gpu_codegen.c): programs reused, programs compiled and seconds spent
  * compiling since the last reset. Used by the game engine "[Load]" console lines. */

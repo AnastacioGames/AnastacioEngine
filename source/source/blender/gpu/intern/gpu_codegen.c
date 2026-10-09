@@ -1771,6 +1771,17 @@ void GPU_pass_bind(GPUPass *pass, double time, int mipmap)
 	}
 }
 
+/* glUniform calls of GPU_pass_update_uniforms(), for the game engine's per-frame work counters
+ * (passUniforms in getRenderStats()). */
+static int PASS_GL_CALLS = 0;
+
+int GPU_pass_uniform_gl_calls_take(void)
+{
+	const int count = PASS_GL_CALLS;
+	PASS_GL_CALLS = 0;
+	return count;
+}
+
 void GPU_pass_update_uniforms(GPUPass *pass)
 {
 	GPUInput *input;
@@ -1786,6 +1797,9 @@ void GPU_pass_update_uniforms(GPUPass *pass)
 			if (input->shaderloc == -1) {
 				continue;
 			}
+			/* Not cached: a last-value cache here skipped nothing in RolimaRacer (~1700 calls per
+			 * frame with and without it, 2026-10-09). */
+			PASS_GL_CALLS++;
 			if (input->type == GPU_INT) {
 				GPU_shader_uniform_vector_int(shader, input->shaderloc, 1, 1, (int *)input->dynamicvec);
 			}
