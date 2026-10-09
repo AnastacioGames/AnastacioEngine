@@ -131,3 +131,22 @@ Nenhum código da engine foi alterado por esta investigação. Cores continuam a
 - Pendente: falha parcial de `SplitMeshSlot` deixa `m_batchGroup` setado (antigo);
   os `static_cast` para `KX_BatchGroup`/`KX_ClientObjectInfo` assumem que não existem
   grupos só RAS.
+
+## Benchmark da opção Static Batch (Claude, 2026-10-08, após `377a0026`)
+
+Cena `n1600_separate_draws.blend` (1.600 objetos No Collision, 16 meshes, 1 material),
+salva duas vezes mudando só `use_static_batch`. Mesmo `diag_measure.py`: 1280x720, MSAA 2,
+AF 2, aquecimento 2 s, amostra 4 s, ordem alternada, 2 rodadas por caso. Primitivas 128.602
+em todas. Cenas, runner e JSONs no scratchpad da sessão (`bench/`).
+
+| Culling | Desligado (FPS) | Static Batch (FPS) | Ganho | Thunder junho |
+|---|---:|---:|---:|---:|
+| desligado | 707 / 706 | 2.507 / 2.519 | 3,56x | 2.628 |
+| ligado | 520 / 505 | 1.195 / 1.146 | 2,28x | 1.860 |
+
+Sem culling a Anastacio chega a ~96% do Thunder: o primeiro gargalo (custo por objeto)
+está fechado para objetos estáticos marcados. Com culling ligado sobra a diferença
+1.170 vs 1.860: é o segundo problema já isolado, custo do frustum culling por objeto
+(`KX_CullingHandler`/TBB, ~0,5 ms com 1.600 objetos), que o batch não reduz porque o
+teste de visibilidade continua por membro. Próxima etapa: A/B de granularidade/reuso
+de vetores no culling.
