@@ -14,8 +14,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `GPU_material_bind_shadow_lamps` e `GPU_material_bind_scene_lights` usam essas funções para persmat, bias,
   point, enabled, sampler das sombras e as 11 uniforms das luzes de cena. Os binds de textura de sombra
   continuam a cada draw, porque outros draws reusam as unidades.
-- Medido na cena `tools/debug/cenas/criar_cena_luzes_sombra.py` (3 spots com sombra, ~91 draws):
-  `lightUniforms` de ~880 para ~324 por frame. RolimaRacer não muda (já era 0).
+- Medido na cena `tools/debug/cenas/criar_cena_luzes_sombra.py` (3 spots com sombra, 164 draws por frame com os cubos visíveis):
+  `lightUniforms` de ~902 para ~334 por frame. RolimaRacer não muda (já era 0). O script da cena criava o plano no
+  cursor 3D (acima dos cubos, que ficavam escondidos); agora o plano vai para a origem e os cubos são vermelhos.
 
 ## 2026-10-09 - Contador de uniforms de luz (GP1/GP2/RA1 medidos)
 
