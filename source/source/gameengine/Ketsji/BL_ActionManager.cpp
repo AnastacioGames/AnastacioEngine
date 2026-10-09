@@ -171,6 +171,17 @@ bool BL_ActionManager::IsActionDone(short layer)
 	return action ? action->IsDone() : true;
 }
 
+bool BL_ActionManager::HasActiveActions()
+{
+	for (const auto& pair : m_layers) {
+		if (!pair.second->IsDone()) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void BL_ActionManager::Suspend()
 {
 	m_suspended = true;

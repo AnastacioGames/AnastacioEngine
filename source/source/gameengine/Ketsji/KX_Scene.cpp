@@ -2152,6 +2152,27 @@ void KX_Scene::RemoveCullingObject(KX_GameObject *gameobj)
 	CM_ListRemoveIfFound(m_cullinglist, gameobj);
 }
 
+/* Visit the same direct game-object children returned by KX_GameObject::GetChildren()
+ * without building a temporary vector. Nodes without a client object are inverse-parent
+ * links, so walk through them; a node that owns a game object ends this branch. */
+template<class Callback>
+static bool visit_child_game_objects(const SG_Node *node, Callback&& callback)
+{
+	const NodeList& children = node->GetChildren();
+	for (SG_Node *childNode : children) {
+		KX_GameObject *child = static_cast<KX_GameObject *>(childNode->GetClientObject());
+		if (child) {
+			if (!callback(child)) {
+				return false;
+			}
+		}
+		else if (!visit_child_game_objects(childNode, callback)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 // Shared by both passes: decide whether this object's pose is worth resolving in full this frame
 // (culled armatures with all children culled only need their animation time/events tracked).
 static bool anim_needs_update(KX_GameObject *gameobj)
@@ -2171,21 +2192,11 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 	if (!needs_update) {
 		// If we got here, we're looking to update an armature, so check its children meshes
 		// to see if we need to bother with a more expensive pose update
-		const std::vector<KX_GameObject *> children = gameobj->GetChildren();
-
-		bool has_mesh = false;
-		//, has_non_mesh = false
-
-		// Check for meshes that haven't been culled
-		for (KX_GameObject *child : children) {
+		// Check for meshes that haven't been culled. Stop as soon as a child requires a pose.
+		visit_child_game_objects(gameobj->GetNode(), [&needs_update](KX_GameObject *child) {
 			if (!child->GetCullingNode().GetCulled()) {
 				needs_update = true;
-				break;
-			}
-
-			if (!child->GetMeshList().empty()) {
-				has_mesh = true;
-				//has_non_mesh = true;
+				return false;
 			}
 
 			/* A skinned child's culling box follows the last applied pose, so skipping the pose
@@ -2193,19 +2204,10 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 			 * view from off-screen never shows up). Blender 2.4x always updated armatures. */
 			if (child->GetDeformer()) {
 				needs_update = true;
-				break;
+				return false;
 			}
-			//else {
-			//	has_mesh = true;
-			//}
-		}
-
-		// If we didn't find a non-culled mesh, check to see
-		// if we even have any meshes, and update if this
-		// armature has only non-mesh children.
-		//if (!needs_update && !has_mesh && has_non_mesh) {
-		//	needs_update = true;
-		//}
+			return true;
+		});
 	}
 
 	return needs_update;
@@ -2244,7 +2246,6 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 
 	KX_GameObject *gameobj = (KX_GameObject *)taskdata;
 
-	const std::vector<KX_GameObject *> children = gameobj->GetChildren();
 	KX_GameObject *parent = gameobj->GetParent();
 
 	// Only do deformers here if they are not parented to an armature, otherwise the armature will
@@ -2253,11 +2254,12 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 		gameobj->GetDeformer()->Update();
 	}
 
-	for (KX_GameObject *child : children) {
+	visit_child_game_objects(gameobj->GetNode(), [](KX_GameObject *child) {
 		if (child->GetDeformer()) {
 			child->GetDeformer()->Update();
 		}
-	}
+		return true;
+	});
 
 	if (doProfiling) {
 		// set time elapsed.
@@ -2357,6 +2359,17 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 		PyGILState_Release(gilstate);
 	}
 #endif  // WITH_PYTHON
+
+	// Armatures stay registered: their pose can be driven by constraints and child deformers even
+	// without a KX action. Ordinary objects need this list only while one of their action layers is
+	// active. This runs after event callbacks so an action restarted by its final event remains in
+	// the list for the next frame.
+	m_animatedlist.erase(std::remove_if(m_animatedlist.begin(), m_animatedlist.end(),
+	                                    [](KX_GameObject *gameobj) {
+		                                    return gameobj->GetGameObjectType() != SCA_IObject::OBJ_ARMATURE &&
+		                                           !gameobj->HasActiveActions();
+	                                    }),
+	                     m_animatedlist.end());
 
 	return true;
 }

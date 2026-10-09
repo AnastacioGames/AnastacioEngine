@@ -407,6 +407,9 @@ public:
 	 */
 	bool IsActionDone(short layer);
 
+	/// True when an action layer still requires an animation update.
+	bool HasActiveActions();
+
 	bool IsActionsSuspended();
 
 	/**
@@ -1059,11 +1062,8 @@ public:
 	void RestorePhysics();
 
 	/// Suspend/resume this object's BL_ActionManager, so KX_Scene::UpdateAnimations skips it
-	/// entirely (IsActionsSuspended()) instead of still dispatching an update task every frame
-	/// for an object whose actions were merely stopped (stopAction only clears layers, it never
-	/// removes the object from KX_Scene::m_animatedlist -- that only happens when the object is
-	/// destroyed). Meant for pooled/recycled objects (e.g. particle effects) that are hidden but
-	/// never actually removed from the scene.
+	/// entirely (IsActionsSuspended()). Meant for pooled/recycled objects with an action that must
+	/// resume later (e.g. particle effects) while they are hidden from the scene.
 	void SuspendAnimations();
 	void ResumeAnimations();
 

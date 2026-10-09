@@ -6,6 +6,36 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - KX13: animacao percorre filhos sem alocar vetor temporario
+
+- Os passes de pose e de deformer de `KX_Scene` agora visitam diretamente os filhos de `SG_Node`, preservando a travessia por links sem objeto e encerrando assim que encontra um filho que exige pose. Armatures com muitos filhos deixam de alocar e preencher dois vetores por atualizacao.
+- A investigacao tambem descartou a parte de strings do suspeito: `KX_AnimationEventManager::EventCall` armazena `const char*`; a conversao para a string Python so ocorre quando ha evento e callback a chamar.
+- `RangeRuntime` recompilou com os warnings preexistentes de ordem de inicializacao e variavel nao usada em `KX_Scene.cpp`.
+
+## 2026-10-09 - KX5: probe nao atualiza animacao seis vezes durante a captura
+
+- A simulacao ja atualiza poses e deformers antes do pipeline de render. `KX_TextureRendererManager` deixou de chamar `UpdateAnimations()` dentro do loop de faces da probe; assim `setHalfAnimations()` continua alternando uma vez por passo, e uma probe cubica nao reavalia a mesma animacao ate seis vezes.
+- A selecao de LOD por face foi mantida. A distancia correta para uma reflexao e a distancia da probe, portanto substituir a malha quando ela difere da camera principal e necessario para a imagem capturada.
+- `RangeRuntime` recompilou. A confirmacao visual de uma probe atualizada com um objeto em `setHalfAnimations()` permanece para teste no jogo real.
+
+## 2026-10-09 - CV5/CV6: shape keys paradas nao deformam a malha outra vez
+
+- `BL_Action` pede nova deformacao apenas quando a avaliacao e os blends alteram algum `KeyBlock::curval`. `BL_ShapeDeformer` conserva os coeficientes usados anteriormente; curvas em hold deixam de chamar `BKE_key_evaluate_relative`, reskin e upload da malha a cada frame.
+- `LoadShapeDrivers()` so habilita `BKE_animsys_evaluate_animdata` e `ForceUpdate()` se a key copiada tiver curvas de driver. Uma armature pai sem driver nao aciona esse caminho.
+- `RangeRuntime` recompilou. A cena temporaria criada para medir no player confirmou a estrutura (acao, controlador, camera 16 mm, Sun e materiais contrastantes), mas o player desta sessao encerrou antes de executar o primeiro controlador e nao gerou marcador; a medicao em runtime permanece pendente.
+
+## 2026-10-09 - CV7/CV8: objetos sem acao ativa deixam a atualizacao por frame
+
+- `GetActionManager()` nao registra mais o objeto apenas porque um getter Python consultou nome, frame ou estado da acao. `PlayAction()` so adiciona a lista depois que iniciou uma layer com sucesso.
+- Ao fim de `KX_Scene::UpdateAnimations`, depois de disparar eventos, objetos comuns sem nenhuma layer ativa saem de `m_animatedlist`; por isso deixam de gerar task e de entrar em `m_animNeedsUpdateCache` nos frames seguintes. Armatures permanecem na lista, pois constraints e deformers podem precisar de pose mesmo sem uma acao KX.
+- Regressao controlada no `AnastacioRuntime.exe`: uma acao one-shot chegou a `x=4.000`, terminou, foi iniciada de novo e chegou a `x=3.556` antes de terminar (`PASS=True`). A mudanca elimina o trabalho ocioso, mas esta rodada nao mediu tempo de CPU numa cena grande.
+
+## 2026-10-09 - PH3: deformer de soft body só invalida a malha quando ela mudou
+
+- `KX_SoftBodyDeformer::Apply`: compara exatamente cada posição e normal de saída antes de escrever o array; `NotifyUpdate` recebe somente os atributos que mudaram. AABB deixa de ser percorrido, reinicializado e invalidado quando nenhuma posição mudou. Não há limiar nem estado artificial de sono: uma deformação real continua atualizando e subindo ao VBO.
+- Medição temporária com grade triangular de 6 561 nós, câmera 16 mm, materiais contrastantes e Sun: com gravidade zerada o solver ainda altera nós e, corretamente, manteve `updateNotifies=1` e `boundsPushes=1` por frame (física ~7,5 ms). Após `suspendDynamics()`, os frames estáveis tiveram ambos os contadores em 0; a física ficou ~5,1 ms, mostrando que o custo do solver é independente do envio da malha.
+- Correção complementar do defeito visual: pose matching não é criado para mesh planar, pois Bullet inverte uma matriz singular e a malha cresce sem limite. `soft_body_test.py` passou 16/16 no runtime recompilado.
+
 ## 2026-10-09 - Cache de uniforms de luz e sombra no GPUShader (GP1/GP2/RA1 corrigidos)
 
 - `GPU_shader_uniform_vector_cached` / `GPU_shader_uniform_int_cached` (`gpu_shader.c`): guardam o último

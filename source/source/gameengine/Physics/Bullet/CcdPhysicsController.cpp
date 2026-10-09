@@ -816,11 +816,20 @@ bool CcdPhysicsController::CreateSoftbody()
 	psb->m_cfg.diterations = m_cci.m_soft_diterations;
 	psb->m_cfg.citerations = m_cci.m_soft_citerations;
 
-	if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
-		psb->setPose(false, true);
+	/* Pose matching in Bullet inverts the covariance matrix of the rest shape.
+	 * A planar cloth has zero volume and a singular matrix, which makes node
+	 * positions grow without bounds after a few simulation steps.  Do not
+	 * create a pose for it; cloth constraints do not require one. */
+	if (btFabs(psb->getVolume()) > SIMD_EPSILON) {
+		if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
+			psb->setPose(false, true);
+		}
+		else {
+			psb->setPose(true, false);
+		}
 	}
-	else {
-		psb->setPose(true, false);
+	else if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
+		CM_Warning("soft body shape matching requires a non-planar mesh; ignoring it");
 	}
 
 	psb->randomizeConstraints();
@@ -2273,6 +2282,13 @@ void CcdPhysicsController::SetSoftPoseMatching(bool enableShapeMatching) {
     btSoftBody* softBody = GetSoftBody();
     if (!softBody)
         return;
+
+    if (btFabs(softBody->getVolume()) <= SIMD_EPSILON) {
+        if (enableShapeMatching) {
+            CM_Warning("soft body shape matching requires a non-planar mesh; ignoring it");
+        }
+        return;
+    }
 
     if (enableShapeMatching) {
         softBody->setPose(false, true); // Shape matching enabled: disable pose update, relative pose.

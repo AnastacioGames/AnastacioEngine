@@ -120,6 +120,11 @@ public:
 	 */
 	bool IsActionDone(short layer);
 
+	/**
+	 * Check whether any layer still needs per-frame animation updates.
+	 */
+	bool HasActiveActions();
+
 	void Suspend();
 	void Resume();
 	bool IsSuspended() const;

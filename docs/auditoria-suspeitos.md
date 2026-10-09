@@ -36,14 +36,14 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 **2. Alto — por frame, por objeto/feature comum**
 - RA3 (zsort refaz sort + IBO com tudo parado), KX6 (filhos de osso sempre atualizam), CV4/CV5 (reskin/shape key
   sem mudança), KX5 (probes refazem animação por face e trocam LOD 2×/frame), PH3 (soft body + `ExtendAabb`),
-  RA5/RA6 (laços sobre todos os buckets), KX4 (billboard quebra lote), CV7/CV8 (lista de animados só cresce),
+  RA5/RA6 (lacos sobre todos os buckets), KX4 (billboard quebra lote), ~~CV7/CV8~~ (objetos inativos removidos),
   GP3/GP4/GP6 (texturas/uniforms/matrizes de lamp por material), RA4 (VBO de instancing refeito), KX10.
 - Por evento, mas com travada visível: SP8 (LibFree recompila todos os shaders), SP11 (on demand não reaproveita
   material/malha → quebra lote e compila shader), SP13 (separar membro reenvia o lote inteiro), SP6/SP7 (remoção
   O(N)×20 e O(K²)).
 
 **3. Médio**
-- Por frame: KX8 (Auto World Sun invalida sombras), GP7, RA2, RA9 = KX11, PH7, PH4, CV6, KX13, PY4, RA8, GL2/GL3
+- Por frame: KX8 (Auto World Sun invalida sombras), GP7, RA2, RA9 = KX11, PH7, PH4, ~~CV6~~, KX13, PY4, RA8, GL2/GL3
   (rede: serializa e refaz grade todo tick), GL4, GL7, LP2, LP4, LP3 (só estéreo).
 - Por evento: SP2, SP4, SP5, SP10.
 - Só no Play embutido do editor: LP9, LP10.
@@ -62,8 +62,8 @@ Agrupado por causa raiz; vários IDs são o mesmo problema visto de áreas difer
    Medir: `sceneNodeUpdates`/`transformSyncs` com personagens em idle, atuador Set position, objetos em osso.
 2. **Luzes reenviadas por objeto**: GP1 = GP2 = RA1; depois GP6/RA5, RA9 = KX11. Precisa de contador novo de uniforms.
 3. **Física**: PH2 (se os jogos usam "Use Frame Rate"), PH1, PH7.
-4. **Marca sempre ligada (forma de 98f54d7f)**: ~~KX9~~ e ~~PH3 (`ExtendAabb`)~~ corrigidos (marca só liga se mudou; compilado, não medido). Falta em PH3: soft body dormindo ainda reescreve vértices + `NotifyUpdate` (`KX_SoftBodyDeformer::Apply`).
-5. **Animação**: CV7/CV8, CV5/CV6, KX5, KX13; decisões de design CV3/CV4.
+4. **Marca sempre ligada (forma de 98f54d7f)**: ~~KX9~~ e ~~PH3~~ corrigidos. `KX_SoftBodyDeformer::Apply` compara as posições e normais exatas antes de atualizar o array, notifica apenas os atributos alterados e só recalcula o AABB se as posições mudaram. Sem gravidade o solver Bullet ainda move os nós e o upload continua corretamente; com o corpo suspenso, uma grade de 6 561 nós passou de 1 para 0 `updateNotifies`/`boundsPushes` por frame. O custo do solver continua separado.
+5. **Animacao**: ~~CV5/CV8~~, KX5 (animacao das probes) e KX13 corrigidos; decisoes de design CV3/CV4.
 6. **Render**: RA3 (zsort), KX4 (billboard), RA4 (instancing), RA6, KX10.
 7. **Resto de custo baixo**: GL2-GL10, RA2/RA7/RA8, GP3-GP5/GP7/GP8, PH9, KX7/KX12/KX14.
 
@@ -93,15 +93,15 @@ LP9/LP10 só afetam o Play embutido no editor.
 | CV4 | `Converter/BL_SkinDeformer.h:70` `PoseUpdated` | compara tempo, não o conteúdo do pose → reskin + reenvio de VBO com bones parados | alto por personagem, só com ação ativa | média | suspeito |
 | CV5 | `Ketsji/BL_Action.cpp:530` | ação de shape key chama `SetLastFrame` sem checar se `curval` mudou → `BKE_key_evaluate_relative` + malha inteira (modifier deformer: derived mesh) | alto | média | suspeito |
 | CV6 | `Converter/BL_ShapeDeformer.cpp:117-132` | `m_useShapeDrivers` sempre true → avalia animdata + `ForceUpdate` mesmo sem drivers | médio | média | suspeito |
-| CV7 | `Ketsji/KX_GameObject.cpp:681-688`, remoção só em `KX_Scene.cpp:1566` | objeto nunca sai de `m_animatedlist` (até getters Python inserem) → task por frame com ações terminadas | baixo por objeto, cresce com a cena | alta | suspeito |
-| CV8 | `Ketsji/KX_Scene.cpp:~2287` | `m_animNeedsUpdateCache` limpo e repopulado todo frame sobre toda a lista | baixo; agrava CV7 | média | suspeito |
+| CV7 | `Ketsji/KX_GameObject.cpp:680-729`, `KX_Scene.cpp:2362-2372` | getters nao registram mais; objeto comum sai de `m_animatedlist` quando todos os layers terminam e `PlayAction` o registra de novo ao iniciar | baixo por objeto, cresce com a cena | alta | corrigido |
+| CV8 | `Ketsji/KX_Scene.cpp:2286-2372` | `m_animNeedsUpdateCache` so recebe objetos com acao ativa; a poda pos-eventos evita repovoa-lo nos frames ociosos | baixo; agrava CV7 | media | corrigido |
 
 Verificados OK: `BL_Action::Update` (sai cedo se terminada/pausada/tempo repetido), `ApplyPose` (guarda `m_lastapplyframe`),
 `UpdateTimestep`, `BL_SkinDeformer::Apply` (`GetInvalidAndClear`), `BL_MeshDeformer::Apply`, `BL_ModifierDeformer::Update`
 (guarda `m_lastModifierUpdate`), skinning por GPU (só a paleta muda).
 
 Validação sugerida: cena com personagens em idle loop; `transformSyncs` proporcional a ações tocando confirma CV1/CV2;
-objetos com ações terminadas ainda custando tempo de `UpdateAnimations` confirma CV7.
+CV5/CV6 corrigidos (2026-10-09): shape key constante nao remarca a malha e key sem driver nao avalia animdata; validacao no runtime pendente. CV7/CV8 corrigidos (2026-10-09): getters de acao nao inserem mais o objeto; apos eventos, objetos comuns sem layer ativa saem de `m_animatedlist`, enquanto armatures continuam para constraints/deformers. `PlayAction` reinseriu corretamente uma acao terminada no teste de runtime.
 
 ## Ketsji + SceneGraph
 
@@ -111,7 +111,7 @@ objetos com ações terminadas ainda custando tempo de `UpdateAnimations` confir
 | KX2 | `Ketsji/BL_Action.cpp:~455` | = CV1 (dois agentes) | subárvore por objeto animado | alta | suspeito |
 | KX3 | `SG_Controller.cpp:58`, `KX_IpoController.cpp:150+`, `SG_Node.cpp:381/409/426`, `KX_GameObject.cpp:2052-2091` | = CV2/GL1; setters do nó e da física não comparam (pode acordar corpo) | nó + física por escrita | média | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
 | KX4 | `Ketsji/KX_GameObject.cpp:1497-1517` `UpdateLod` (billboard) | `NodeSetGlobalOrientation` + `NodeUpdate` todo frame sem comparar heading; ruído de float quebra lote (`SplitMeshUser`) | por billboard visível × câmera × face de probe | alta | suspeito |
-| KX5 | `Ketsji/KX_TextureRendererManager.cpp:335-345` | probe com autoUpdate refaz `UpdateAnimations` por face (alterna meia-taxa); LOD da probe ≠ principal troca malha 2×/frame (`ReplaceMesh` + `ReinstancePhysicsShape`) | animados × 6 faces | média-alta / média | suspeito |
+| KX5 | `Ketsji/KX_TextureRendererManager.cpp:335-345` | a probe nao reavalia animacao durante cada face; a simulacao ja atualiza pose/deformer antes do render. LOD por face permanece: e necessario para a reflexao usar a distancia da probe, e troca a malha quando difere da camera principal | animados × 6 faces eliminado; LOD depende da cena | média-alta / média | corrigido (animacao); LOD intencional |
 | KX6 | `Ketsji/KX_BoneParentNodeRelationship.cpp:54/96` | `parentUpdated = true` sempre + reagenda p/ sempre (armas/acessórios em osso) | nó + descendentes por frame | alta (padrão) | suspeito |
 | KX7 | `Ketsji/KX_NodeRelationships.cpp:138/183` `KX_SlowParentRelation` | reagenda mesmo depois de convergir | raro | média | suspeito |
 | KX8 | `Ketsji/KX_Scene.cpp:666-670` `UpdateAutoWorldSun` | move o sol sem comparar → invalida cache de cascata/auto-shadow e talvez recaptura probe de World | 1 nó, mas pode re-renderizar sombra | alta (só c/ Auto World Sun) | suspeito |
@@ -119,7 +119,7 @@ objetos com ações terminadas ainda custando tempo de `UpdateAnimations` confir
 | KX10 | `Ketsji/KX_ShadowRenderer.cpp:357-401`, `KX_Scene.cpp:1743` `BuildShadowCullCache` | monta `unordered_map` de casters por luz e percorre todo `m_renderlist` todo frame | O(N) + O(casters) por luz | média | suspeito |
 | KX11 | `KX_LightObject.cpp:119` → `RAS_OpenGLLight.cpp:560` | = RA9 | baixo × luzes | média | suspeito |
 | KX12 | `Ketsji/KX_GameObject.cpp:1363-1384` `UpdateBuckets` | trabalho fixo por objeto por passe (inerente) | — | baixa | suspeito |
-| KX13 | `KX_Scene.cpp:2152/2240`, `KX_GameObject.cpp:2499` `GetChildren` | vetor novo por objeto animado por passo; cópia de string em eventos | alocação × animados (× KX5) | média | suspeito |
+| KX13 | `KX_Scene.cpp:2155-2270` | os passes de pose/deformer percorrem filhos pelo `SG_Node`, sem vetor temporario. Eventos ja carregavam `const char*`, sem copia de string C++ | alocacao × animados eliminada | média | corrigido |
 | KX14 | `KX_GameObject.cpp:862-886` partículas, `KX_FontObject.cpp:258`, `KX_Speaker.cpp:251-269` | `SetModelMatrix`/lookups/`AUD_Handle_set*` sem comparar | baixo | baixa | suspeito |
 
 Verificados OK: `UpdateParents` (só agendados; relações normal/vertex saem cedo), `ClearModified`, `UpdateBuckets`
@@ -160,7 +160,7 @@ por frame num MotionState vira `UpdateParents` + `UpdateTransform`. Bullet em `s
 |---|---|---|---|---|---|
 | PH1 | `btCollisionWorld.cpp:73/200`; mundo criado em `Physics/Bullet/CcdPhysicsEnvironment.cpp:695-709` | `m_forceUpdateAllAabbs` fica true → AABB de todos (estáticos incluídos) recalculado e reinserido no broadphase a cada sub-passo; estáticos nunca vão p/ árvore fixa | O(objetos × sub-passos) | alta | suspeito |
 | PH2 | `CcdPhysicsEnvironment.cpp:1106/1132` `ProceedDeltaTimeCar`; `CcdPhysicsController.cpp:1129-1177` | modo "Use Frame Rate": `SynchronizeMotionStates` em todos os controllers 2×/frame (dormindo e cinemáticos inclusos); `setLocalScaling` incondicional (compound/hull recalculam AABB); cinemático fica acordado p/ sempre (linha 1617) | O(N) × 2 por frame + `UpdateParents` de todos | alta | corrigido (8f45943b): pula dinâmico dormindo e escala igual; RolimaRacer (Use Frame Rate ligado) sem ganho mensurável, física ~0,23 ms/frame |
-| PH3 | `Ketsji/KX_SoftBodyDeformer.cpp:70-152`; `Rasterizer/RAS_BoundingBox.cpp:111-116` `ExtendAabb` | soft body reescreve todos os vértices + `NotifyUpdate` sem checar `isActive`; `ExtendAabb` liga `m_modified` sempre (família de 98f54d7f, também usado em `KX_DentDeformer.cpp:448`) | O(vértices) + upload por soft body | alta | suspeito |
+| PH3 | `Ketsji/KX_SoftBodyDeformer.cpp:70-160`; `Rasterizer/RAS_BoundingBox.cpp:111-116` `ExtendAabb` | `ExtendAabb` e o deformer só invalidam quando posições/normais realmente mudam; sem gravidade o solver pode continuar mudando nós, sem pular deformação real | O(vértices) de comparação; o upload/AABB é 0 com corpo suspenso (grade de 6 561 nós) | alta | corrigido |
 | PH4 | `CcdPhysicsEnvironment.cpp:275-290` `SyncWheels` | rodas sincronizadas com carro parado/dormindo | ~4 nós por carro | média | suspeito |
 | PH5 | `CcdPhysicsController.cpp:363-371` `CcdCharacter::updateAction` | publica transform todo sub-passo sem comparar | baixo | média | suspeito |
 | PH6 | `KX_CollisionEventManager.cpp:179`, Near/Radar | = GL8 | baixo × sensores | média | suspeito |

@@ -101,19 +101,10 @@ void KX_SoftBodyDeformer::Apply(RAS_DisplayArray *array)
 
 	const bool autoUpdate = m_gameobj->GetAutoUpdateBounds();
 
-	// AABB Box : min/max.
-	mt::vec3 aabbMin(FLT_MAX);
-	mt::vec3 aabbMax(-FLT_MAX);
-
-	// Reset only when this deformer computes the bounds, a predefined bound must stay untouched.
-	if (m_needUpdateAabb && autoUpdate) {
-		m_boundingBox->SetAabb(aabbMin, aabbMax);
-		m_needUpdateAabb = false;
-	}
-
 	const mt::mat3x4 trans = m_gameobj->NodeGetWorldTransform();
-	const mt::mat3x4 invtrans = trans.Inverse();
 	const mt::mat3& rot = m_gameobj->NodeGetWorldOrientation();
+	bool positionsChanged = false;
+	bool normalsChanged = false;
 
 	for (unsigned int i = 0, size = array->GetVertexCount(); i < size; ++i) {
 		const RAS_VertexInfo& vinfo = array->GetVertexInfo(i);
@@ -121,32 +112,54 @@ void KX_SoftBodyDeformer::Apply(RAS_DisplayArray *array)
 		const unsigned int index = (origIndex < indices.size()) ? indices[origIndex] : -1;
 
 		mt::vec3 pos;
+		mt::vec3 normal;
 		if (index < numNodes) {
 			pos = ToMt(nodes[index].m_x);
-			array->SetNormal(i, ToMt(nodes[index].m_n));
+			normal = ToMt(nodes[index].m_n);
 		}
 		else if (origArray) {
 			/* Vertex without soft body node (material with physics disabled):
 			 * follow the object transform, the vertices are drawn in world space. */
 			pos = trans * mt::vec3(origArray->GetPosition(i));
-			array->SetNormal(i, rot * mt::vec3(origArray->GetNormal(i)));
+			normal = rot * mt::vec3(origArray->GetNormal(i));
 		}
 		else {
 			continue;
 		}
-		array->SetPosition(i, pos);
 
-		if (autoUpdate) {
-			// Extract object transform from the vertex position.
-			const mt::vec3 ptLocal = invtrans * pos;
-			aabbMin = mt::vec3::Min(aabbMin, ptLocal);
-			aabbMax = mt::vec3::Max(aabbMax, ptLocal);
+		/* Bullet soft bodies do not sleep. Compare the exact values that would be
+		 * uploaded instead of treating an active solver as a changed mesh. */
+		if (mt::vec3(array->GetPosition(i)) != pos) {
+			array->SetPosition(i, pos);
+			positionsChanged = true;
+		}
+		if (mt::vec3(array->GetNormal(i)) != normal) {
+			array->SetNormal(i, normal);
+			normalsChanged = true;
 		}
 	}
 
-	array->NotifyUpdate(RAS_DisplayArray::POSITION_MODIFIED | RAS_DisplayArray::NORMAL_MODIFIED);
+	if (positionsChanged || normalsChanged) {
+		array->NotifyUpdate((positionsChanged ? RAS_DisplayArray::POSITION_MODIFIED : 0) |
+		                    (normalsChanged ? RAS_DisplayArray::NORMAL_MODIFIED : 0));
+	}
 
-	if (autoUpdate) {
+	if (autoUpdate && positionsChanged) {
+		// Bounds only need rebuilding when the world-space vertex data changed.
+		mt::vec3 aabbMin(FLT_MAX);
+		mt::vec3 aabbMax(-FLT_MAX);
+		if (m_needUpdateAabb) {
+			m_boundingBox->SetAabb(aabbMin, aabbMax);
+			m_needUpdateAabb = false;
+		}
+
+		const mt::mat3x4 invtrans = trans.Inverse();
+		for (unsigned int i = 0, size = array->GetVertexCount(); i < size; ++i) {
+			// Extract object transform from the vertex position.
+			const mt::vec3 ptLocal = invtrans * mt::vec3(array->GetPosition(i));
+			aabbMin = mt::vec3::Min(aabbMin, ptLocal);
+			aabbMax = mt::vec3::Max(aabbMax, ptLocal);
+		}
 		m_boundingBox->ExtendAabb(aabbMin, aabbMax);
 	}
 }

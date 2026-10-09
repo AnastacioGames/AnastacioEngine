@@ -681,7 +681,6 @@ BL_ActionManager *KX_GameObject::GetActionManager()
 {
 	// We only want to create an action manager if we need it
 	if (!m_actionManager) {
-		GetScene()->AddAnimatedObject(this);
 		m_actionManager.reset(new BL_ActionManager(this));
 	}
 	return m_actionManager.get();
@@ -699,7 +698,15 @@ bool KX_GameObject::PlayAction(const std::string& name,
                                float playback_speed,
                                short blend_mode)
 {
-	return GetActionManager()->PlayAction(name, start, end, layer, priority, blendin, play_mode, layer_weight, ipo_flags, playback_speed, blend_mode);
+	BL_ActionManager *actionManager = GetActionManager();
+	if (!actionManager->PlayAction(name, start, end, layer, priority, blendin, play_mode, layer_weight, ipo_flags, playback_speed, blend_mode)) {
+		return false;
+	}
+
+	// A finished action removes ordinary objects from the scene's update list. Register again only
+	// after PlayAction actually started a layer, so queries and failed action names stay idle.
+	GetScene()->AddAnimatedObject(this);
+	return true;
 }
 
 void KX_GameObject::StopAction(short layer)
@@ -710,6 +717,11 @@ void KX_GameObject::StopAction(short layer)
 bool KX_GameObject::IsActionDone(short layer)
 {
 	return GetActionManager()->IsActionDone(layer);
+}
+
+bool KX_GameObject::HasActiveActions()
+{
+	return m_actionManager && m_actionManager->HasActiveActions();
 }
 
 bool KX_GameObject::IsActionsSuspended()
