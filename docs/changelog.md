@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Lote de auditoria: CV4, PH5, GL7, GL8
+
+- CV4: `BL_SkinDeformer` guarda snapshot de `obmat`/`chan_mat`/`pose_mat`; tempo novo com pose identica nao refaz skinning nem reenvia VBO. Forcado, shape aplicada ou qualquer diferenca ainda refazem.
+- PH5: `CcdCharacter::updateAction` so publica a transform no motion state se o ghost mudou.
+- GL7: cone do Ray Gaze testa distancia e cosseno (contra `cos(limite)`) antes de `IsSelf`/propriedade/material; sem `acos` por objeto.
+- GL8: Near/Radar guardam a ultima transform gravada e so chamam `WriteMotionStateToDynamics` quando muda; cache zerado em replica e reparent.
+- Cena `tools/debug/cenas/criar_cena_lote_auditoria.py`: personagem cai/anda/para; Near liga com alvo perto, desliga com dono afastado e volta; Ray com cone acompanha; armature girando e parada sem erro; exit 0. Visual de skinning e FPS pendentes.
+- Analisados sem mudanca (motivo na tabela): RA6, RA7, PH1, PH4, PH7, GP3-GP7. CV5/CV6 ja estavam corrigidos. CV1/KX2, GL2-GL4, PH6/PH9 ficam para tarefa propria.
+
 ## 2026-10-09 - KX4, RA8; PH8 conferido
 
 - KX4: billboard LOD (`KX_GameObject::UpdateLod`) so chama `NodeSetGlobalOrientation`/`NodeUpdate` quando a orientacao mundial difere da desejada (>1e-5 por elemento); comparar a matriz mundial cobre pai girando. Cena `tools/debug/cenas/criar_cena_kx4_ra8.py`: orientacao fixa com camera parada, gira no frame seguinte ao mover a camera.

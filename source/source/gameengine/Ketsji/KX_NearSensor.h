@@ -48,6 +48,14 @@ protected:
 	bool m_drawDebug;
 
 	KX_ClientObjectInfo*	m_client_info;
+
+	/// Last transform written to the sensor physics object (GL8): skip the rewrite when unchanged.
+	bool m_syncedTransformValid;
+	mt::vec3 m_syncedPosition;
+	mt::mat3 m_syncedOrientation;
+
+	/// Write the transform to the sensor physics object only if it differs from the last one written.
+	void WriteSensorTransform(const mt::vec3& position, const mt::mat3& orientation);
 public:
 	KX_NearSensor(class SCA_EventManager* eventmgr,
 	              class KX_GameObject* gameobj,

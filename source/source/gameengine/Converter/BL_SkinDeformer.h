@@ -86,6 +86,10 @@ protected:
 	float m_obmat[4][4]; // the reference matrix for skeleton deform
 	bool m_copyNormals; // dirty flag so we know if Apply() needs to copy normal information (used for BGEDeformVerts())
 	std::vector<bPoseChannel *> m_dfnrToPC;
+	/// Snapshot of armature obmat + every channel chan_mat/pose_mat used by the last skinning (CV4).
+	std::vector<float> m_lastPoseSnapshot;
+	/// Refresh m_lastPoseSnapshot; returns true if the pose differs from the previous snapshot.
+	bool PoseContentChanged();
 	short m_deformflags;
 	/// Flattened, column-major bone-matrix palette for GPU skinning (see ARM_VDEF_BGE_GPU).
 	std::vector<float> m_boneMatrices;

@@ -367,7 +367,15 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	}
 
 	btKinematicCharacterController::updateAction(collisionWorld, dt);
-	m_motionState->setWorldTransform(getGhostObject()->getWorldTransform());
+
+	/* Publish to the scene node only when the ghost actually moved (idle characters
+	 * otherwise trigger a node update every substep). */
+	const btTransform &ghostTrans = getGhostObject()->getWorldTransform();
+	btTransform nodeTrans;
+	m_motionState->getWorldTransform(nodeTrans);
+	if (!(nodeTrans == ghostTrans)) {
+		m_motionState->setWorldTransform(ghostTrans);
+	}
 }
 
 unsigned char CcdCharacter::getMaxJumps() const
