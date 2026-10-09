@@ -1151,14 +1151,20 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 
 	btRigidBody *body = GetRigidBody();
 
+	// Sleeping dynamic body: its transform didn't move since the last sync, rewriting it only marks the
+	// node modified (PH2: "Use Frame Rate" syncs every controller twice per frame).
+	if (body && !body->isStaticOrKinematicObject() && !body->isActive()) {
+		SyncCollisionScaling();
+		return true;
+	}
+
 	if (body && !body->isStaticObject()) {
 		const btTransform& xform = body->getCenterOfMassTransform();
 		if (m_bulletMotionState) {
 			// Goes through BlenderBulletMotionState so the vehicle_com_offset compensation applies;
 			// writing the COM transform directly drew the chassis shifted by the offset.
 			m_bulletMotionState->setWorldTransform(xform);
-			const mt::vec3& scale = m_MotionState->GetWorldScaling();
-			GetCollisionShape()->setLocalScaling(ToBullet(scale));
+			SyncCollisionScaling();
 			return true;
 		}
 		const btMatrix3x3& worldOri = xform.getBasis();
@@ -1168,10 +1174,19 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 		m_MotionState->CalculateWorldTransformations();
 	}
 
-	const mt::vec3& scale = m_MotionState->GetWorldScaling();
-	GetCollisionShape()->setLocalScaling(ToBullet(scale));
+	SyncCollisionScaling();
 
 	return true;
+}
+
+/* Only when the scale changed: compound and hull shapes recompute their AABB on every setLocalScaling. */
+void CcdPhysicsController::SyncCollisionScaling()
+{
+	btCollisionShape *shape = GetCollisionShape();
+	const btVector3 scale = ToBullet(m_MotionState->GetWorldScaling());
+	if (shape && !(shape->getLocalScaling() == scale)) {
+		shape->setLocalScaling(scale);
+	}
 }
 
 /**
@@ -1661,33 +1676,33 @@ void CcdPhysicsController::SetMass(float newmass)
 	}
 }
 
-bool CcdPhysicsController::GetAnisotropicFrictionEnabled() const
-{
-	return m_cci.m_do_anisotropic;
-}
-
-void CcdPhysicsController::SetAnisotropicFrictionEnabled(bool enabled)
-{
-	m_cci.m_do_anisotropic = enabled;
-	if (m_object) {
-		// Modo 0 desliga o atrito anisotrópico no Bullet sem perder os coeficientes.
-		m_object->setAnisotropicFriction(m_cci.m_anisotropicFriction,
-		                                 enabled ? btCollisionObject::CF_ANISOTROPIC_FRICTION : 0);
-	}
-}
-
-mt::vec3 CcdPhysicsController::GetAnisotropicFriction() const
-{
-	return ToMt(m_cci.m_anisotropicFriction);
-}
-
-void CcdPhysicsController::SetAnisotropicFriction(const mt::vec3& friction)
-{
-	m_cci.m_anisotropicFriction = ToBullet(friction);
-	SetAnisotropicFrictionEnabled(m_cci.m_do_anisotropic);
-}
-
-float CcdPhysicsController::GetFriction()
+bool CcdPhysicsController::GetAnisotropicFrictionEnabled() const
+{
+	return m_cci.m_do_anisotropic;
+}
+
+void CcdPhysicsController::SetAnisotropicFrictionEnabled(bool enabled)
+{
+	m_cci.m_do_anisotropic = enabled;
+	if (m_object) {
+		// Modo 0 desliga o atrito anisotrópico no Bullet sem perder os coeficientes.
+		m_object->setAnisotropicFriction(m_cci.m_anisotropicFriction,
+		                                 enabled ? btCollisionObject::CF_ANISOTROPIC_FRICTION : 0);
+	}
+}
+
+mt::vec3 CcdPhysicsController::GetAnisotropicFriction() const
+{
+	return ToMt(m_cci.m_anisotropicFriction);
+}
+
+void CcdPhysicsController::SetAnisotropicFriction(const mt::vec3& friction)
+{
+	m_cci.m_anisotropicFriction = ToBullet(friction);
+	SetAnisotropicFrictionEnabled(m_cci.m_do_anisotropic);
+}
+
+float CcdPhysicsController::GetFriction()
 {
 	btSoftBody *softBody = GetSoftBody();
 	if (softBody) {

@@ -706,6 +706,7 @@ public:
 	 * SynchronizeMotionStates ynchronizes dynas, kinematic and deformable entities (and do 'late binding')
 	 */
 	virtual bool SynchronizeMotionStates(float time);
+	void SyncCollisionScaling();
 
 	/**
 	 * Called for every physics simulation step. Use this method for
@@ -737,11 +738,11 @@ public:
 	virtual void SetMass(float newmass);
 
 	virtual float GetFriction();
-	virtual void SetFriction(float newfriction);
-	virtual bool GetAnisotropicFrictionEnabled() const;
-	virtual void SetAnisotropicFrictionEnabled(bool enabled);
-	virtual mt::vec3 GetAnisotropicFriction() const;
-	virtual void SetAnisotropicFriction(const mt::vec3& friction);
+	virtual void SetFriction(float newfriction);
+	virtual bool GetAnisotropicFrictionEnabled() const;
+	virtual void SetAnisotropicFrictionEnabled(bool enabled);
+	virtual mt::vec3 GetAnisotropicFriction() const;
+	virtual void SetAnisotropicFriction(const mt::vec3& friction);
 
 	float GetInertiaFactor() const;
 

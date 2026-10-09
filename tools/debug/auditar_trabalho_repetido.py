@@ -30,7 +30,7 @@ def tick(cont):
     if not _s:
         _s.update(start=time.perf_counter(), last=time.perf_counter(), frames=0, acc=dict.fromkeys(KEYS, 0))
         _s["limit"] = float(os.environ.get("AUDIT_SECONDS", "20"))
-        _write("# segundo objetos " + " ".join(KEYS))
+        _write("# segundo objetos " + " ".join(KEYS) + " physicsMs")
         bge.logic.getCurrentScene().pre_draw.append(_frame)
     if _s["limit"] > 0 and time.perf_counter() - _s["start"] > _s["limit"]:
         _write("# fim")
@@ -46,7 +46,8 @@ def _frame():
         n = max(_s["frames"], 1)
         scene = bge.logic.getCurrentScene()
         _write("%%.0f %%d " %% (now - _s["start"], len(scene.objects)) +
-               " ".join("%%.1f" %% (_s["acc"][k] / n) for k in KEYS))
+               " ".join("%%.1f" %% (_s["acc"][k] / n) for k in KEYS) +
+               " %%.3f" %% bge.logic.getProfileInfo().get("Physics", (0.0,))[0])
         _s.update(last=now, frames=0, acc=dict.fromkeys(KEYS, 0))
 ''' % log_path
 
