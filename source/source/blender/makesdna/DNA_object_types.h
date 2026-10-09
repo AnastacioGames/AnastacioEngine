@@ -1087,6 +1087,8 @@ enum {
 	OB_DEFORMABLE                    = 1 << 16,
 	/* ob->lightning: this Empty is a lightning emitter (where and when strikes fall). */
 	OB_LIGHTNING                     = 1 << 17,
+	/* Merged at game start with the other flagged static meshes into one KX_BatchGroup. */
+	OB_STATIC_BATCH                  = 1 << 18,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };

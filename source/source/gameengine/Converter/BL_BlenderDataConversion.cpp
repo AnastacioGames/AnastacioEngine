@@ -86,6 +86,7 @@
 
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
+#include "KX_BatchGroup.h"
 #include "KX_BlenderMaterial.h"
 #include "KX_BoneParentNodeRelationship.h"
 #include "KX_Camera.h"
@@ -3521,6 +3522,36 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	for (KX_GameObject *gameobj : objectlist) {
 		if (gameobj->GetBlenderObject()->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) {
 			kxscene->GetDestructionManager().RegisterObject(gameobj);
+		}
+	}
+
+	// Static batch: active objects flagged use_static_batch are merged into one batch group
+	// (one draw per material). Only meshes that never move: a member that moves later is split
+	// out by RAS_MeshUser::SetMatrix. Deformed, destructible and physics-driven objects stay out.
+	{
+		std::vector<KX_GameObject *> batchObjects;
+		for (KX_GameObject *gameobj : objectlist) {
+			Object *blenderobj = gameobj->GetBlenderObject();
+			if (!(blenderobj->gameflag2 & OB_STATIC_BATCH) || !gameobj->GetMeshUser() || gameobj->GetDeformer()) {
+				continue;
+			}
+			if (blenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) {
+				continue;
+			}
+			if (blenderobj->body_type != OB_BODY_TYPE_STATIC && blenderobj->body_type != OB_BODY_TYPE_NO_COLLISION) {
+				continue;
+			}
+			batchObjects.push_back(gameobj);
+		}
+		if (batchObjects.size() > 1) {
+			KX_BatchGroup *batchGroup = new KX_BatchGroup();
+			batchGroup->MergeObjects(batchObjects);
+			if (batchGroup->GetObjects()->Empty()) {
+				delete batchGroup;
+			}
+			else {
+				batchGroup->SetReferenceObject(batchGroup->GetObjects()->GetFront());
+			}
 		}
 	}
 

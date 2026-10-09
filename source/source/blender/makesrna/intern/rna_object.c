@@ -4381,6 +4381,11 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "GPU Particle Collider", "Include this object's depth in the Screen-Space collision pass for GPU particles");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_static_batch", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_STATIC_BATCH);
+	RNA_def_property_ui_text(prop, "Static Batch", "Merge this mesh at game start with the other Static Batch objects of the scene, drawing them together in fewer draw calls (only for objects that never move; Static or No Collision physics)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_force_dynamic_shadow", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_FORCE_DYNAMIC_SHADOW);
 	RNA_def_property_ui_text(prop, "Force Dynamic Shadow", "Always redraw this object's shadow every frame in the Sun static shadow cache, even though its Physics Type would normally classify it as static (use for scripted-moving static-physics objects, e.g. platforms)");

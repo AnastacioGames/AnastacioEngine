@@ -417,6 +417,8 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             col.prop(game, "use_ghost")
             col.prop(ob, "hide_render", text="Invisible")
             col.prop(game, "use_occlude_culling", text="Occluder (keeps collision)")
+            if ob.type == 'MESH':
+                col.prop(ob, "use_static_batch")
 
             layout.separator()
 
@@ -446,6 +448,8 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
 
         elif physics_type in {'INVISIBLE', 'NO_COLLISION', 'OCCLUDER'}:
             layout.prop(ob, "hide_render", text="Invisible")
+            if physics_type == 'NO_COLLISION' and ob.type == 'MESH':
+                layout.prop(ob, "use_static_batch")
 
         elif physics_type == 'NAVMESH':
             layout.operator("mesh.navmesh_face_copy")
