@@ -84,3 +84,5 @@ Objetivo: o padrão não pode voltar. Três camadas, nesta ordem:
 
 Critério de pronto: o verificador estático acha o bug antigo se ele for recolocado, e os
 jogos reais ficam com contadores ~0 quando nada se move.
+
+Suspeitos levantados na varredura completa, com classificação por gravidade: [auditoria-suspeitos.md](auditoria-suspeitos.md).

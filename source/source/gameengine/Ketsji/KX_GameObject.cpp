@@ -995,17 +995,16 @@ void KX_GameObject::RemoveRessources(const BL_Resource::Library& libraryId)
 
 	for (KX_Mesh *mesh : m_meshes) {
 		// If the mesh comes from this lirbary, remove all meshes.
+		// RemoveMeshes() clears m_meshes, so return right away instead of continuing the loop.
 		if (mesh->Belong(libraryId)) {
 			RemoveMeshes();
-			break;
+			return;
 		}
-		else {
-			// If one of the material used by the mesh comes from this library, remove all meshes too.
-			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
-				if (static_cast<KX_BlenderMaterial *>(meshmat->GetBucket()->GetMaterial())->Belong(libraryId)) {
-					RemoveMeshes();
-					break;
-				}
+		// If one of the material used by the mesh comes from this library, remove all meshes too.
+		for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+			if (static_cast<KX_BlenderMaterial *>(meshmat->GetBucket()->GetMaterial())->Belong(libraryId)) {
+				RemoveMeshes();
+				return;
 			}
 		}
 	}

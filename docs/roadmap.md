@@ -500,6 +500,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`). Falta:
   regra no `AGENTS.md`, verificador estático (`tools/`) e rodar o detector nos jogos reais
   (parado e em movimento). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
+  Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
+  [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Próximo: bugs do nível 0
+  (1/8 corrigido: `RemoveRessources`), depois verificar o nível 1 com o detector.
 - **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
   `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
