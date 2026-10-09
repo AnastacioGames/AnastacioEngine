@@ -6,6 +6,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Travadas do RolimaRacer: preloadScene e instrumentos de pico
+
+- Medição (`debug-logs/travadas-20261009a`..`k`, rodadas de ~22 s, cache de shader quente): o pico de 62 ms em t≈7,5 s era o `addScene` síncrono de `HUD` (13 ms) + `Pista_MiniMap` (44 ms: convert 12, texturas 22, shaders 7). Não era shader compilado no jogo. Também `Contagem_3_2_1` (28 ms, às vezes). O pico de ~40 ms em `render.cameras` é intermitente (4 de 11 rodadas, instante aleatório), cai em `cam.buckets(Pista_1)` sem draw lento ou em `Skinning`, sem shader novo: parece espera de driver/GL, ainda aberto.
+- `Range.logic.preloadScene(name)`: converte a cena no fim do quadro (shaders e texturas) sem adicioná-la; `addScene`/`replaceScene`/`addScene(asynchronous=True)` do mesmo nome só inserem a cena pronta (`KX_SceneScheduler::PreloadScene`/`TakeOrConvertScene`). Cenas não usadas são liberadas no stop da engine.
+- RolimaRacer: `scripts/AddOverlayScene.py` pré-carrega suas overlays no `start()` (tela de loading ainda aberta). Resultado (`debug-logs/travadas-preload-20261009o`..`q`): nenhum quadro acima de 16 ms em 3 rodadas; antes 62 ms em todas.
+- Instrumentos (só com variável ligada): `RANGE_SHADER_LOG=<arquivo>` grava cada shader criado (tempo, flags, nome); o `SPIKE` do `RANGE_PROFILE` anota draws ≥3 ms, fases `cam.*` da câmera e `texreload:<imagem>`.
+
 ## 2026-10-09 - Python: céu, destruição, FXAA/grão e quantização de rede
 
 Prioridade 1 de `D:\AnastacioDocs\inventario\faltando_python.md`.

@@ -38,6 +38,8 @@
 #include "RAS_DisplayArrayStorage.h"
 #include "RAS_Mesh.h"
 
+#include <chrono>
+
 #ifdef _MSC_VER
 #  pragma warning (disable:4786)
 #endif
@@ -82,6 +84,32 @@ void RAS_MeshSlot::GenerateTree(RAS_DisplayArrayUpwardNode& root, RAS_UpwardTree
 
 void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 {
+	// Profiler on: names a draw slow enough to be a hitch (first use compiled by the driver, upload...).
+	struct SlowDrawNote
+	{
+		const RAS_MeshSlotNodeTuple& tuple;
+		const bool on = KX_EngineProfiler::Enabled();
+		std::chrono::steady_clock::time_point start;
+		SlowDrawNote(const RAS_MeshSlotNodeTuple& t) : tuple(t)
+		{
+			if (on) {
+				start = std::chrono::steady_clock::now();
+			}
+		}
+		~SlowDrawNote()
+		{
+			if (!on) {
+				return;
+			}
+			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			if (ms >= 3.0) {
+				char buf[32];
+				snprintf(buf, sizeof(buf), "=%.0fms", ms);
+				KX_EngineProfiler::Note("draw:" + tuple.m_materialData->m_material->GetName() +
+				                        (tuple.m_managerData->m_shaderOverride ? "(override)" : "") + buf);
+			}
+		}
+	} slowDrawNote(tuple);
 	RANGE_RENDER_SAMPLE("draw.mesh_slot");
 	{
 		// Empty block estimates the timer floor for these very short calls.

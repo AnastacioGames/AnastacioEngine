@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <map>
 
 template <class T> class EXP_ListValue;
 class KX_Scene;
@@ -71,6 +72,16 @@ class KX_SceneScheduler
 	};
 	std::vector<PendingScene> m_pendingScenes;
 
+	/// Names scheduled with preloadScene(), converted at the end of the frame.
+	std::vector<std::string> m_preloadingScenes;
+	/** Scenes converted ahead by preloadScene() (shaders and textures ready), kept out of the scene list until an
+	 * addScene/replaceScene of the same name only has to insert them. */
+	std::map<std::string, KX_Scene *> m_preparedScenes;
+
+	void PreloadScheduledScenes();
+	/// The scene preloaded under this name, removed from the prepared ones, or a new converted scene.
+	KX_Scene *TakeOrConvertScene(const std::string& scenename, Scene *blScene = nullptr);
+
 	void StepPendingScenes();
 	bool IsPending(const std::string& scenename) const;
 
@@ -96,6 +107,8 @@ public:
 	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
 	/// Free the scenes still compiling their shaders (engine stop).
 	void DestructPendingScenes();
+	/// Converts a scene ahead (end of frame), so a later add of it does not stall. False if it does not exist.
+	bool PreloadScene(const std::string& scenename);
 	void RemoveScene(const std::string& scenename);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);
 	void SuspendScene(const std::string& scenename);

@@ -1136,6 +1136,11 @@ void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool over
 	m_sceneScheduler->ConvertAndAddScene(scenename, overlay, asynchronous);
 }
 
+bool KX_KetsjiEngine::PreloadScene(const std::string& scenename)
+{
+	return m_sceneScheduler->PreloadScene(scenename);
+}
+
 void KX_KetsjiEngine::RemoveScene(const std::string& scenename)
 {
 	m_sceneScheduler->RemoveScene(scenename);

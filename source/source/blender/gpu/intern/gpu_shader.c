@@ -26,6 +26,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "PIL_time.h"
 
 #include "BKE_appdir.h"
 #include "BKE_global.h"
@@ -595,7 +596,7 @@ static void pending_add(unsigned long long key, GPUShader *shader)
 	shader->program = shader->vertex = shader->fragment = 0;
 }
 
-static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
+static GPUShader *gpu_shader_create_ex_impl_raw(const char *vertexcode,
                                             const char *fragcode,
                                             const char *geocode,
                                             const char *libcode,
@@ -912,6 +913,46 @@ linked:
 	}
 #endif
 
+	return shader;
+}
+
+/* RANGE_SHADER_LOG=<file>: one line per shader creation (time since the first one, duration, flags, name), to find
+ * which shader caused a hitch in game. */
+static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
+                                            const char *fragcode,
+                                            const char *geocode,
+                                            const char *libcode,
+                                            const char *defines,
+                                            int input,
+                                            int output,
+                                            int number,
+                                            const int flags,
+                                            const char *diagnostic_name)
+{
+	static int log_init = 0;
+	static FILE *log_file = NULL;
+	static double log_start = 0.0;
+	if (!log_init) {
+		log_init = 1;
+		const char *path = getenv("RANGE_SHADER_LOG");
+		if (path && path[0]) {
+			log_file = fopen(path, "a");
+			log_start = PIL_check_seconds_timer();
+		}
+	}
+	if (!log_file) {
+		return gpu_shader_create_ex_impl_raw(vertexcode, fragcode, geocode, libcode, defines,
+		                                     input, output, number, flags, diagnostic_name);
+	}
+	const bool was_prefetching = prefetching;
+	const double t0 = PIL_check_seconds_timer();
+	GPUShader *shader = gpu_shader_create_ex_impl_raw(vertexcode, fragcode, geocode, libcode, defines,
+	                                                   input, output, number, flags, diagnostic_name);
+	const double t1 = PIL_check_seconds_timer();
+	fprintf(log_file, "t=%.3fs ms=%.2f %s flags=0x%x frag=%d %s\n", t0 - log_start, (t1 - t0) * 1000.0,
+	        was_prefetching ? "prefetch" : (shader ? "create" : "null"), flags,
+	        fragcode ? (int)strlen(fragcode) : 0, diagnostic_name ? diagnostic_name : "-");
+	fflush(log_file);
 	return shader;
 }
 

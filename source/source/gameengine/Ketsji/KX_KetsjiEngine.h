@@ -618,6 +618,8 @@ public:
 	KX_Scene *FindScene(const std::string& scenename);
 	void AddScene(KX_Scene *scene);
 	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
+	/// See KX_SceneScheduler::PreloadScene.
+	bool PreloadScene(const std::string& scenename);
 
 	void RemoveScene(const std::string& scenename);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);

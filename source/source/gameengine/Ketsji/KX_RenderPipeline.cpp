@@ -61,6 +61,9 @@
 
 #include "KX_EngineProfiler.h"
 
+#include <chrono>
+#include <memory>
+
 
 KX_CameraRenderData::KX_CameraRenderData(KX_Camera *rendercam, KX_Camera *cullingcam, const RAS_Rect& area,
                                           const RAS_Rect& viewport, RAS_Rasterizer::StereoMode stereoMode, RAS_Rasterizer::StereoEye eye)
@@ -489,6 +492,35 @@ const std::vector<KX_GameObject *>& KX_RenderPipeline::GetVisibleMeshes(KX_Scene
 }
 
 // update graphics
+namespace {
+/// Profiler on: names a camera render phase slow enough to be a hitch, in the spike log.
+struct SlowPhaseNote
+{
+	const char *phase;
+	KX_Scene *scene;
+	const bool on = KX_EngineProfiler::Enabled();
+	std::chrono::steady_clock::time_point start;
+	SlowPhaseNote(const char *p, KX_Scene *s) : phase(p), scene(s)
+	{
+		if (on) {
+			start = std::chrono::steady_clock::now();
+		}
+	}
+	~SlowPhaseNote()
+	{
+		if (!on) {
+			return;
+		}
+		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		if (ms >= 3.0) {
+			char buf[32];
+			snprintf(buf, sizeof(buf), "=%.0fms", ms);
+			KX_EngineProfiler::Note(std::string(phase) + "(" + scene->GetName() + ")" + buf);
+		}
+	}
+};
+}
+
 void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData& cameraFrameData, RAS_OffScreen *offScreen,
                                       unsigned short pass, bool isFirstScene)
 {
@@ -505,7 +537,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	 * which need to be recomputed by each view in case of multi-viewport or stereo.
 	 */
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_texturerenderers);
-	scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_DEPENDENT, rasterizer, offScreen, rendercam, viewport, area);
+	{ SlowPhaseNote note("cam.texrenderers", scene); scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_DEPENDENT, rasterizer, offScreen, rendercam, viewport, area); }
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
 	// set the viewport for this frame and scene
@@ -532,7 +564,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		KX_WorldInfo *worldInfo = scene->GetWorldInfo();
 		// Update background and render it.
 		worldInfo->UpdateBackGround(rasterizer, scene->GetWorldSun());
-		worldInfo->RenderBackground(rasterizer);
+		{ SlowPhaseNote note("cam.background", scene); worldInfo->RenderBackground(rasterizer); }
 	}
 
 	// The following actually reschedules all vertices to be
@@ -544,7 +576,9 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 
 	// Culling + LOD update, reused across cameras of this scene/frame that share the same
 	// cullingcam/eye pair (see GetVisibleMeshes doc comment on the header).
+	std::unique_ptr<SlowPhaseNote> cullingNote(new SlowPhaseNote("cam.culling", scene));
 	const std::vector<KX_GameObject *>& objects = GetVisibleMeshes(scene, cullingcam, eye);
+	cullingNote.reset();
 
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
@@ -557,10 +591,10 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 
 #ifdef WITH_PYTHON
 	// Run any pre-drawing python callbacks
-	scene->RunDrawingCallbacks(KX_Scene::PRE_DRAW, rendercam);
+	{ SlowPhaseNote note("cam.predraw", scene); scene->RunDrawingCallbacks(KX_Scene::PRE_DRAW, rendercam); }
 #endif
 
-	scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen);
+	{ SlowPhaseNote note("cam.buckets", scene); scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen); }
 
 	// GPU particle emitters (simulated once per frame in KX_Scene::UpdateGpuParticleEmitters,
 	// called from NextFrame -- not here, since RenderCamera runs once per camera and would

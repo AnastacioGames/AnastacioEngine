@@ -784,6 +784,22 @@ static PyObject *gPyAddScene(PyObject *, PyObject *args, PyObject *kwds)
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(gPyPreloadScene_doc,
+             "preloadScene(name)\n"
+             "Converts a scene ahead, at the end of this frame (shaders and textures included), without adding it.\n"
+             "A later addScene/replaceScene of it then only inserts the ready scene, without a stall. Call it\n"
+             "while a loading screen is up. Returns False if the scene does not exist.\n"
+             " name = Name of the scene"
+             );
+static PyObject *gPyPreloadScene(PyObject *, PyObject *args)
+{
+	char *name;
+	if (!PyArg_ParseTuple(args, "s:preloadScene", &name)) {
+		return nullptr;
+	}
+	return PyBool_FromLong(KX_GetActiveEngine()->PreloadScene(name));
+}
+
 PyDoc_STRVAR(gPyGetCurrentScene_doc,
              "getCurrentScene()\n"
              "Gets a reference to the current scene."
@@ -1263,6 +1279,7 @@ static struct PyMethodDef game_methods[] = {
 	{"getInactiveSceneNames", (PyCFunction)gPyGetInactiveSceneNames, METH_NOARGS, (const char *)gPyGetInactiveSceneNames_doc},
 	{"getSceneList", (PyCFunction)gPyGetSceneList, METH_NOARGS, (const char *)gPyGetSceneList_doc},
 	{"addScene", (PyCFunction)gPyAddScene, METH_VARARGS | METH_KEYWORDS, (const char *)gPyAddScene_doc},
+	{"preloadScene", (PyCFunction)gPyPreloadScene, METH_VARARGS, (const char *)gPyPreloadScene_doc},
 	{"getRandomFloat", (PyCFunction)gPyGetRandomFloat, METH_NOARGS, (const char *)gPyGetRandomFloat_doc},
 	{"setGravity", (PyCFunction)gPySetGravity, METH_O, (const char *)"set Gravitation"},
 	{"getSpectrum", (PyCFunction)gPyGetSpectrum, METH_NOARGS, (const char *)"get audio spectrum"},
