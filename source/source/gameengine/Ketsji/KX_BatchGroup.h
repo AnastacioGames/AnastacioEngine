@@ -37,6 +37,10 @@ class EXP_ListValue;
 class KX_BatchGroup : public EXP_Value, public RAS_BatchGroup
 {
 	Py_Header
+
+protected:
+	void OnMeshUserSplit(RAS_MeshUser *meshUser) override;
+
 private:
 	/// The objects currently merged in the batch group.
 	EXP_ListValue<KX_GameObject> *m_objects;
@@ -54,6 +58,8 @@ public:
 	KX_GameObject *GetReferenceObject() const;
 	/// Set reference object with error checking. Return false on error.
 	bool SetReferenceObject(KX_GameObject *object);
+	/// Remove an object before its mesh user is destroyed.
+	void RemoveObject(KX_GameObject *object);
 
 	/** Merge a list of objects using their mesh user and transformation.
 	 * \param objects The list of objects to merge.

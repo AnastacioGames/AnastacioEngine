@@ -60,6 +60,9 @@ private:
 	/// The batch per material.
 	std::map<RAS_IMaterial *, Batch> m_batchs;
 
+	/** Notify the engine layer after a mesh user has been split from this group. */
+	virtual void OnMeshUserSplit(RAS_MeshUser *meshUser) {}
+
 	/** Merge the display array of the passed mesh slot.
 	 * \param slot The mesh slot using the display array to merge.
 	 * \param mat The transform matrix to apply to vertices during merging.

@@ -34,6 +34,8 @@
 
 #include "BLI_hash.h"
 
+#include <cstring>
+
 RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer)
 	:m_layer((1 << 20) - 1),
 	m_passIndex(0),
@@ -51,14 +53,14 @@ RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_De
 
 RAS_MeshUser::~RAS_MeshUser()
 {
+	if (m_batchGroup) {
+		// Split while the mesh slots are still alive.
+		m_batchGroup->SplitMeshUser(this);
+	}
+
 	m_meshSlots.clear();
 
 	m_boundingBox->RemoveUser();
-
-	if (m_batchGroup) {
-		// Has the side effect to deference the batch group.
-		m_batchGroup->SplitMeshUser(this);
-	}
 }
 
 void RAS_MeshUser::NewMeshSlot(RAS_DisplayArrayBucket *arrayBucket)
@@ -143,6 +145,10 @@ void RAS_MeshUser::SetColor(const mt::vec4& color)
 
 void RAS_MeshUser::SetMatrix(const mt::mat4& matrix)
 {
+	if (m_batchGroup && std::memcmp(&m_matrix, &matrix, sizeof(mt::mat4)) != 0) {
+		m_batchGroup->SplitMeshUser(this);
+	}
+
 	m_matrix = matrix;
 }
 

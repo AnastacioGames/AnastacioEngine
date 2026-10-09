@@ -1405,6 +1405,10 @@ void KX_GameObject::RemoveMeshes()
 {
 	// Remove all mesh slots.
 	if (m_meshUser) {
+		KX_BatchGroup *batchGroup = static_cast<KX_BatchGroup *>(m_meshUser->GetBatchGroup());
+		if (batchGroup) {
+			batchGroup->RemoveObject(this);
+		}
 		delete m_meshUser;
 		m_meshUser = nullptr;
 	}
