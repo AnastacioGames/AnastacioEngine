@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - KX4, RA8; PH8 conferido
+
+- KX4: billboard LOD (`KX_GameObject::UpdateLod`) so chama `NodeSetGlobalOrientation`/`NodeUpdate` quando a orientacao mundial difere da desejada (>1e-5 por elemento); comparar a matriz mundial cobre pai girando. Cena `tools/debug/cenas/criar_cena_kx4_ra8.py`: orientacao fixa com camera parada, gira no frame seguinte ao mover a camera.
+- RA8: `RunBatchingNode` reusa `m_batchCounts`/`m_batchIndices` do `RAS_DisplayArrayBucket` em vez de alocar dois vetores por passada. Mesma cena: `KX_BatchGroup` de 40 cubos, 41 -> 2 draws, estavel apos mover um cubo.
+- PH8: `ProcessFhSprings` ja testava `body` nulo; tabela da auditoria atualizada. Sem medicao de FPS.
+
 ## 2026-10-09 - RA4: cache do stream VBO de instancing
 
 - `RAS_InstancingBuffer` so chama `GPU_buffer_lock_stream` se a lista/ordem de slots, o pass index do material ou alguma revisao de `RAS_MeshUser` mudou; `Realloc` invalida. Apenas `RAS_NORMAL` sem sort; billboard, halo e transparencia ordenada enviam como antes.
