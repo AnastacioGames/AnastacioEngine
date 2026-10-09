@@ -6,6 +6,46 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - RA3: benchmark A/B isolado
+
+- Reconstruidos dois players isolados com os mesmos objetos/headers atuais, variando apenas a chamada zsort em RAS_MeshSlot (map/sort/unmap antigo versus cache). Ambiente VSLANG/vcvars; builds e dependencias fora de build/bin. Isso isola ativacao do cache, sem alegar baseline historico completo. Fontes C++ e trabalho do Claude preservados.
+- Copia da cena aprovada com `tools/debug/cenas/preparar_benchmark_ra3.py`: post_draw conta frames, movimento por tempo real, 1280x720, vsync OFF, limites logica/render 10000 Hz, 3 s warmup + 10 s medidos. Tres rodadas por versao/modo, alternadas; 12 runtimes exit 0/END e sem erros Python/shader. Pilotos limitados descartados; diferencial anterior reexecutado com PASS.
+- Medianas sem/com cache: repouso 0,6498/0,6497 ms; movimento 0,6225/0,6336 ms. Faixas sobrepostas e variacao alta: ganho/regressao inconclusivos. Profiling separado em repouso passou, mas draw.mesh_slot inclui mais que zsort e nao isola seu custo. Resultados completos, limites e evidencias no [plano RA3](ra3-transparencia-plan.md) e `%TEMP%/anastacio-ra3-benchmark/`.
+- Usuario autorizou RolimaRacer/Pista_1; preparada e aberta copia temporaria com caminhos absolutos, sem salvar sobre o original. Visual do jogo real e casos adicionais continuam pendentes. Sem commit.
+
+## 2026-10-09 - RA3: execucao no RolimaRacer/Pista_1
+
+- O jogo original encerrava apos cerca de 20 s porque continha acidentalmente `audit_work.py`: 27 controladores `audit_py` e sensores `audit_always` chamavam `Range.logic.endGame()`. Copia de seguranca criada ao lado do jogo; a instrumentacao foi removida e a cena inicial restaurada para `0_SCN_System` (a limpeza inicial tinha salvo `Speed_FX` como ativa, produzindo tela cinza).
+- O player atual carregou o fluxo `0_SCN_System` -> Loading -> `Pista_1`, com `Contagem_3_2_1`, HUD e minimapa. Uma copia de teste no diretorio do projeto solicitou Pista_1 ao BrainCore, preservando caminhos relativos dos componentes; o usuario confirmou que ficou rodando. A tecla I foi enviada apos a carga para testar o piloto automatico, sem inferir visual por log.
+- Isto confirma abertura estavel da pista no jogo real e remove o fechamento artificial; nao mede FPS nem substitui inspeção visual detalhada de fumaça/transparencia e dos casos adicionais do plano.
+- Revisao final simplificou `UpdateSize`: o VBO ja invalida os centros de poligono, e esta invalidacao propaga a ordem do IBO. Editor/player foram recompilados depois disso; o diferencial MSVC passou novamente (9.600 ordenacoes, 2.005+ comparacoes e retry map/unmap) e a cena automatica concluiu 240 frames, exit 0, sem erros Python/shader.
+
+## 2026-10-09 - RA3: aceite visual da cena controlada
+
+- Usuario confirmou a cena corrigida como correta apos esclarecer T: alterna o objeto esquerdo entre 9 e 5 camadas e restaura a topologia original. Aceite visual registrado no plano, roadmap e relatorio vigente.
+- Diferencial/build/runtime ja passaram. Validacao no jogo real e benchmark continuam pendentes; casos adicionais ausentes da cena nao foram considerados aprovados. Nenhum commit nesta etapa.
+
+## 2026-10-09 - RA3: primeira peca do cache de zsort
+
+- Usuario confirmou a cena de referencia adequada para comparacao. Gerador `tools/debug/cenas/criar_cena_ra3_transparencia.py`: ALPHA_SORT, objetos compartilhando malha, duas cameras, movimento/escala negativa, deformacao e substituicao de topologia; controles Opaque/Alpha/Clip/Add. Inspecao bpy e runtime com marcador END passaram.
+- Cache no RAS_DisplayArrayStorage representa a ultima direcao efetivamente escrita no IBO compartilhado. Comparacao exata; sorter/comparador preservados. Posicoes, topologia, recriacao/redimensionamento e mapeamento invalidam. FlushIndexMap retorna sucesso do unmap; falhas nao validam o cache.
+- Teste isolado MSVC extrai sorter/cache reais com adaptadores minimos e map/unmap simulados: 9600 ordenacoes de referencia e mais de 2000 comparacoes passaram; 1000 chamadas repetidas nao acrescentaram maps apos a primeira. Nao comprova OpenGL real, mathfu, visual ou FPS.
+- Editor/player compilados com VSLANG/vcvars. Primeira ligacao do editor falhou LNK1104; ausencia de processo conferida e repeticao passou. Player corrigido terminou 240 frames, exit 0, sem erros Python/shader. Referencia/detalhes em [plano RA3](ra3-transparencia-plan.md).
+- Comparacao visual da versao corrigida, jogo real e benchmark pendentes. Sem commit. A copia tentada do player anterior ocorreu depois da ligacao: nao e baseline binario valido.
+
+## 2026-10-09 - RA3: planejamento com checagem visual obrigatoria
+
+- Pedido do usuario incorporado no [plano RA3](ra3-transparencia-plan.md): referencia visual antes de mudar C++, cache em peca pequena, diferencial/build/runtime, comparacao visual antes/depois no player real e medicao separada. Sem avaliacao visual, item permanece pendente.
+- Roteiro cobre faces sobrepostas, IBO compartilhado entre objetos com rotacoes diferentes, movimento/escala negativa, troca de camera, geometria/topologia e empates. Materiais de controle e passes adicionais exigem conferir flags/caminho efetivo; ALPHA_SORT e configuracao explicita do caso principal. Map/unmap e recriacao do storage fazem parte dos testes de validade.
+- Planejamento e documentacao apenas; nenhuma cena gerada, mudanca C++ ou benchmark nesta etapa. Proxima acao: preparar e executar a cena de referencia para avaliacao do usuario.
+
+## 2026-10-09 - RA3: diagnostico da ordenacao e do IBO compartilhado
+
+- Retomada apos RA2/GP8. `RAS_MeshSlot::RunNode` mapeia o IBO antes de `SortPolygons`; este conserva centros de poligonos, mas cria vector de PolygonSort e executa std::sort por chamada. `FlushIndexMap` desmapeia apos escrever todos os indices. Nao existe teste de repouso nesse caminho.
+- O storage pertence ao display array, compartilhado entre slots; cache por objeto permitiria usar a ordem deixada por outro objeto. A chave deve representar a ultima ordem efetivamente escrita no buffer compartilhado. O algoritmo usa apenas a direcao Z da transformacao view x object para comparar profundidades: translacao nao altera a ordem. Posicoes/topologia e recriacao do IBO exigem invalidacao independente; falha de map nao pode validar o cache.
+- Refinada a alegacao sobre sombras: RunNode ignora zsort com shader override; BucketManager desliga override para sombras alpha nao-variance, permitindo esse caminho. Nao ocorre em todas as sombras.
+- Plano registrado no roadmap para uma primeira peca autocontida, preservando algoritmo e empates, com diferencial para slots/cameras alternados, geometria, recriacao e falha de map, seguido de build/runtime. Apenas leitura e documentacao nesta etapa; sem mudanca C++, benchmark ou ganho alegado. Skill do Claude modificada anteriormente e artefatos nao relacionados preservados.
+
 ## 2026-10-09 - Consolidacao KX14 e RA2/GP8 em commit
 
 - Consolidado o cache de Text-Res/estado espacial dos speakers, reutilizacao do produto view x object, Damage seletivo/cache do contador e nome AnastacioRuntime nos textos do dialogo/log Windows. Builds editor/player e testes registrados nas entradas abaixo; player final apos ajuste de nome encerrou com exit code 0 e mesmas seis amostras dent/reset. Inicio do log atualizado confirmado.

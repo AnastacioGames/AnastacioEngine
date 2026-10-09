@@ -464,6 +464,23 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `SetModelMatrix` de particulas apenas copia 16 floats CPU; sem correcao neste item.
   KX13 e RA1 ja constam como corrigidos.
 
+- RA3: primeira peca implementada; cache da ultima direcao aceita no IBO compartilhado.
+  Referencia visual aprovada pelo usuario; diferencial isolado, editor/player e runtime passaram.
+  Usuario confirmou visual da cena corrigida em 2026-10-09, incluindo troca de topologia (T).
+  Benchmark A/B isolado em repouso/movimento passou (3 rodadas por modo/versao),
+  mas ganho de tempo/FPS foi inconclusivo; detalhes no plano. RolimaRacer/Pista_1
+  abriu estavel e o usuario confirmou a execucao; pendem inspeção visual detalhada
+  de transparencia/fumaca e os casos adicionais do plano. O diagnostico inicial:
+  zsort aloca, ordena e escreve o IBO por draw, mesmo em repouso.
+  O buffer pertence ao display array e e compartilhado entre slots: cache por objeto nao basta.
+  Plano da primeira peca: conservar a direcao de profundidade da ultima ordem efetivamente
+  gravada no IBO; invalidar por posicoes/topologia e recriacao do storage, e repetir apos falha
+  de mapeamento. Preservar a ordenacao existente para empates e alternancia de objetos/cameras.
+  [Plano de implementacao e validacao visual](ra3-transparencia-plan.md): primeiro preparar
+  a cena e conferir a referencia com o usuario; depois diferencial, build/runtime e comparacao
+  visual antes/depois no player real. Sem essa checagem, RA3 permanece pendente.
+  Sombras alpha sem override entram; sombras com override ignoram este trecho.
+
 - RA2 parcial: produto `view x object` reutilizado na mesma chamada de
   `GPU_material_bind_uniforms`; editor/player compilados e diferencial passou.
   Damage/GP8 corrigido: cast so com uniform ativo e count com cache por GPUShader;

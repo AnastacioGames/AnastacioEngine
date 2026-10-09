@@ -119,6 +119,15 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- **RA3 (zsort):** primeira peca conserva a direcao da ultima ordenacao aceita no IBO
+  compartilhado, evitando map/sort/escrita quando continua valida. Posicoes, topologia,
+  recriacao e sobrescrita invalidam; falhas de map/unmap exigem nova tentativa. Diferencial
+  isolado, editor/player e runtime passaram; usuario confirmou o visual da cena corrigida
+  em 2026-10-09. A/B isolado de repouso/movimento executado: ganho de tempo/FPS
+  inconclusivo nas tres rodadas por modo/versao. RolimaRacer/Pista_1 abriu estavel
+  e o usuario confirmou a execucao; a inspecao visual detalhada permanece pendente.
+  Procedimento em [plano RA3](docs/ra3-transparencia-plan.md).
+
 - KX14 (2026-10-09): `Text-Res` conserva o texto da propriedade, evitando conversao/excecao
   repetida enquanto a entrada nao muda; valores invalidos mantem a ultima resolucao valida.
   Speakers conservam separadamente posicao, velocidade e orientacao enviadas ao handle:

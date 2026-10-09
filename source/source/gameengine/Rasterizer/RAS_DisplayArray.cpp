@@ -167,6 +167,7 @@ void removeRange(List& list, unsigned int start, unsigned int end)
 
 void RAS_DisplayArray::RemoveVertex(unsigned int start, unsigned int end)
 {
+	InvalidatePolygonCenters();
 	removeRange(m_vertexData.positions, start, end);
 	removeRange(m_vertexData.normals, start, end);
 	removeRange(m_vertexData.tangents, start, end);
@@ -184,6 +185,7 @@ void RAS_DisplayArray::RemoveVertex(unsigned int start, unsigned int end)
 }
 void RAS_DisplayArray::RemovePrimitiveIndex(unsigned int start, unsigned int end)
 {
+	InvalidatePolygonCenters();
 	removeRange(m_primitiveIndices, start, end);
 }
 void RAS_DisplayArray::RemoveTriangleIndex(unsigned int start, unsigned int end)
@@ -193,6 +195,7 @@ void RAS_DisplayArray::RemoveTriangleIndex(unsigned int start, unsigned int end)
 
 void RAS_DisplayArray::Clear()
 {
+	InvalidatePolygonCenters();
 	m_vertexData.positions.clear();
 	m_vertexData.normals.clear();
 	m_vertexData.tangents.clear();
@@ -260,6 +263,7 @@ void RAS_DisplayArray::SortPolygons(const mt::mat3x4& transform, unsigned int *i
 void RAS_DisplayArray::InvalidatePolygonCenters()
 {
 	m_polygonCenters.clear();
+	m_storage.InvalidatePolygonOrder();
 }
 
 RAS_DisplayArray::PrimitiveType RAS_DisplayArray::GetPrimitiveType() const

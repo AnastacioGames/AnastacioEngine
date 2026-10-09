@@ -307,12 +307,14 @@ public:
 			unsigned int numTriangles)
 	{
 		m_primitiveIndices.insert(m_primitiveIndices.end(), primitives, primitives + numPrimitives);
+		InvalidatePolygonCenters();
 		m_triangleIndices.insert(m_triangleIndices.end(), triangles, triangles + numTriangles);
 	}
 
 	inline void AddPrimitiveIndex(const unsigned int index)
 	{
 		m_primitiveIndices.push_back(index);
+		InvalidatePolygonCenters();
 	}
 
 	inline void AddTriangleIndex(const unsigned int origIndex)

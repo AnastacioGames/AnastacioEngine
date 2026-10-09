@@ -112,6 +112,8 @@ void RAS_StorageVbo::UpdateVertexData(unsigned int modifiedFlag)
 
 void RAS_StorageVbo::UpdateSize()
 {
+	// Indices can change without changing their count (e.g. batch edits).
+	m_array->InvalidatePolygonCenters();
 	m_indices = m_array->GetPrimitiveIndexCount();
 
 	const RAS_DisplayArrayLayout layout = m_array->GetLayout();
@@ -132,9 +134,9 @@ unsigned int *RAS_StorageVbo::GetIndexMap()
 	return (unsigned int *)buffer;
 }
 
-void RAS_StorageVbo::FlushIndexMap()
+bool RAS_StorageVbo::FlushIndexMap()
 {
-	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+	return glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) == GL_TRUE;
 }
 
 void RAS_StorageVbo::IndexPrimitives()
