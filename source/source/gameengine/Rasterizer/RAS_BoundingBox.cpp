@@ -187,5 +187,9 @@ void RAS_MeshBoundingBox::Update(bool force)
 		}
 	}
 
-	m_modified = true;
+	/* Only flag a real change: an unconditional flag made every object with auto-updated
+	 * bounds push its AABB to the culling tree each frame (~0.3 ms with 1600 static objects). */
+	if (modified) {
+		m_modified = true;
+	}
 }

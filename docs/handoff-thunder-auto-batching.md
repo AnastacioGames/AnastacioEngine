@@ -150,3 +150,22 @@ está fechado para objetos estáticos marcados. Com culling ligado sobra a difer
 (`KX_CullingHandler`/TBB, ~0,5 ms com 1.600 objetos), que o batch não reduz porque o
 teste de visibilidade continua por membro. Próxima etapa: A/B de granularidade/reuso
 de vetores no culling.
+
+## Segundo gargalo: culling DBVT (Claude, 2026-10-08)
+
+Com Occlusion Culling (DBVT) ligado, o culling da câmera gastava ~0,3 ms com 1.600
+objetos parados. Cronômetros temporários em `KX_Scene::CalculateVisibleMeshes`
+mostraram ~320 µs no laço `SetCulled(true)`/`UpdateBounds(false)` e 1.600 caixas
+"modificadas" por frame. Causa: `RAS_MeshBoundingBox::Update()` terminava com
+`m_modified = true` incondicional, então todo objeto com auto-update reenviava a AABB
+ao Bullet (`SetLocalAabb`) a cada frame. O Thunder usa `m_modified = modified`.
+Correção: marcar só quando o array mudou (sem apagar marca posta por `SetAabb`).
+Deformers usam `RAS_BoundingBox` simples (`SetAabb`) e não são afetados;
+`replaceMesh`/`addObject` forçam `UpdateBounds(true)`.
+
+Descartado: grão 256 no `parallel_reduce` do `KX_CullingHandler` (sem ganho; a câmera
+usa o caminho DBVT) e cache de visibilidade do Thunder (câmera girando 1e-4 rad por
+frame não mudou o FPS do Thunder). Sem occlusion a Anastacio já ficava à frente.
+
+Câmera girando, culling ligado, mesma rodada: Anastacio Static Batch ~1.700 FPS
+(antes ~1.170), Thunder ~1.680; sem Static Batch 512 → ~640 FPS.
