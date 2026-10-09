@@ -562,7 +562,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (parado e em movimento). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
   Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
   [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Bugs do nível 0 (8/8)
-  corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Próximo: verificar o nível 1 com o detector.
+  corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09 (corrigidos ou descartados; só CV3 aberto); ganho por item não demonstrado em A/B. Abertos: PY, LP, SP.
 - **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
   `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa

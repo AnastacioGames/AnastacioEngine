@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Lote 2 de auditoria: CV1/KX2, GL2, GL3, GL4, PH9
+
+- CV1/KX2: `BL_Action` guarda `m_hasObjectIpo` no `Play()` (lista de controladores nao vazia apos `BL_CreateIPO`); `Update()` so liga `m_requestIpo` com canais de transform do objeto. Acao so de bones nao chama mais `UpdateWorldDataThread` na subarvore. Shape/material/cor seguem atualizando.
+- GL2: `NET_Replicator::capture` compara o estado bruto (transform, velocidades, props) bit a bit com o anterior; igual pula serializacao e hash (mesmo resultado do protocolo).
+- GL3: grade de relevancia so e reconstruida com `m_gridDirty` (objeto adicionado/removido, `hasTransform` mudou ou troca de celula).
+- GL4: `ImageBase::m_imageVersion` (sobe em `calcImage`/`refresh` e em `ImageBuff` load/clear/plot); `Texture::refresh` nao reenvia quando imagem, versao, tamanho e mipmap sao os mesmos e nao ha buffer exportado.
+- PH9: contador de pares do `CallbackTriggers` virou vetor ordenado reutilizado (sem no de `std::map` por par). `new CcdCollData` por par/frame continua: quem deleta e o `KX_CollisionEventManager`.
+- PH6 = GL8 (ja feito).
+- Cena `tools/debug/cenas/criar_cena_lote2_auditoria.py` (30 armatures com 20 filhos, cubo com acao de location, 150 caixas com sensor Collision, ImageBuff com plot): comportamento igual antes/depois (mesmos contatos, cubo anda, textura atualiza). A/B de tempo inconclusivo: variacao entre rodadas do mesmo build (Animations 0,4-1,1 ms) maior que a diferenca. GL2/GL3 so compilados, sem teste em rede.
+
 ## 2026-10-09 - Lote de auditoria: CV4, PH5, GL7, GL8
 
 - CV4: `BL_SkinDeformer` guarda snapshot de `obmat`/`chan_mat`/`pose_mat`; tempo novo com pose identica nao refaz skinning nem reenvia VBO. Forcado, shape aplicada ou qualquer diferenca ainda refazem.
