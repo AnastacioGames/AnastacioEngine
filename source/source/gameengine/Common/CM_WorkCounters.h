@@ -38,6 +38,8 @@ enum CM_WorkCounter {
 	CM_WORK_BOUNDS_PUSHES,
 	CM_WORK_MESH_MATRIX_CHANGES,
 	CM_WORK_UPDATE_NOTIFIES,
+	/// GL calls (uniforms + shadow texture binds) uploading lights/shadow lamps per draw.
+	CM_WORK_LIGHT_UNIFORMS,
 	CM_WORK_COUNTER_MAX
 };
 

@@ -4815,6 +4815,17 @@ int GPU_lamp_shadow_layer(GPULamp *lamp)
  * lamps are left unshadowed for this loop (slot disabled) rather than sampled incorrectly, same
  * as the existing "Point/Local lights never shadow" limitation already documented in the
  * roadmap -- narrowing this further is future work, not a regression. */
+/* GL calls of GPU_material_bind_shadow_lamps() / GPU_material_bind_scene_lights(), for the
+ * game engine's per-frame work counters (lightUniforms in getRenderStats()). */
+static int LIGHT_GL_CALLS = 0;
+
+int GPU_material_light_gl_calls_take(void)
+{
+	const int count = LIGHT_GL_CALLS;
+	LIGHT_GL_CALLS = 0;
+	return count;
+}
+
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS])
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
@@ -4848,17 +4859,21 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			if (material->shadowmaploc[i] != -1) {
 				GPU_texture_bind(lamp->depthtex, texunit + i);
 				GPU_shader_uniform_texture(shader, material->shadowmaploc[i], lamp->depthtex);
+				LIGHT_GL_CALLS += 2;
 			}
 			if (material->shadowpersmatloc[i] != -1) {
 				GPU_shader_uniform_vector(shader, material->shadowpersmatloc[i], 16, 1, (float *)lamp->dynpersmat);
+				LIGHT_GL_CALLS++;
 			}
 			if (material->shadowbiasloc[i] != -1) {
 				float bias[2] = {lamp->bias, lamp->slopebias};
 				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
+				LIGHT_GL_CALLS++;
 			}
 			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
 				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
 				GPU_shader_uniform_vector(shader, material->shadowpointloc[i], 4, 1, point);
+				LIGHT_GL_CALLS++;
 			}
 		}
 
@@ -4872,12 +4887,14 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			glActiveTexture(GL_TEXTURE0 + texunit + i);
 			glBindTexture(GL_TEXTURE_2D, 0);
 			glActiveTexture(GL_TEXTURE0);
+			LIGHT_GL_CALLS += 4;
 		}
 
 		if (material->shadowenabledloc[i] != -1) {
 			/* 2 = Point lamp: unfshadowpersmat is then view to light space (see shadow_point()). */
 			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : 1.0f) : 0.0f;
 			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
+			LIGHT_GL_CALLS++;
 		}
 	}
 }
@@ -5022,6 +5039,7 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 		}
 		GPU_shader_uniform_vector(shader, material->iesinfoloc, 4, GPU_MATERIAL_NUM_SCENE_LIGHTS, &info[0][0]);
 		GPU_shader_uniform_vector(shader, material->iesaxesloc, 3, GPU_MATERIAL_NUM_SCENE_LIGHTS * 3, &axes[0][0]);
+		LIGHT_GL_CALLS += 2;
 		if (material->iesatlasloc != -1) {
 			int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
 			GPUTexture *atlas = any ? gpu_ies_atlas() : NULL;
@@ -5052,6 +5070,7 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 		GPU_shader_uniform_vector(shader, material->scenelightloc[i].constantatt, 1, 1, &light->constantatt);
 		GPU_shader_uniform_vector(shader, material->scenelightloc[i].linearatt, 1, 1, &light->linearatt);
 		GPU_shader_uniform_vector(shader, material->scenelightloc[i].quadraticatt, 1, 1, &light->quadraticatt);
+		LIGHT_GL_CALLS += 11;
 	}
 }
 

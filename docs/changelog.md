@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Contador de uniforms de luz (GP1/GP2/RA1 medidos)
+
+- Novo contador `lightUniforms` em `bge.logic.getRenderStats()` (`CM_WORK_LIGHT_UNIFORMS`): chamadas GL de
+  `GPU_material_bind_shadow_lamps` e `GPU_material_bind_scene_lights` por frame. Também entra no detector
+  `tools/debug/auditar_trabalho_repetido.py`.
+- O detector aceita `-` no lugar da cópia: põe o medidor só na memória do editor aberto (sem `-b`) e não salva.
+  Assim os imports `scripts.*` dos componentes continuam resolvendo, o que não acontecia na cópia salva fora da
+  pasta do jogo.
+- Medição: 0 no desktop no LightManager e no RolimaRacer em corrida (até ~400 draws por frame). O COMPAT usa
+  `gl_LightSource`, e os materiais desses jogos não têm uniforms de sombra por slot. O cache de "último enviado"
+  no `GPUShader` ficou de fora; só valeria na Web (CORE), que ainda não foi medida.
+
 ## 2026-10-08 - Varredura de trabalho repetido e os 8 bugs de correção encontrados
 
 - [auditoria-suspeitos.md](auditoria-suspeitos.md): varredura por leitura de código de Converter, Ketsji/SceneGraph,

@@ -6,6 +6,8 @@
 # O log tem, a cada segundo, a media por frame de cada contador e quantos objetos a cena tem.
 # Um contador perto do numero de objetos numa cena parada indica trabalho refeito todo frame
 # sobre dados que nao mudaram (o mesmo tipo do bug do RAS_MeshBoundingBox, 98f54d7f).
+# Com copia.blend = '-' o medidor fica so na memoria do editor aberto (sem -b) e nada e salvo:
+# roda o jogo original e nao salve ao fechar.
 # Variavel AUDIT_SECONDS (padrao 20) define quanto tempo medir antes de fechar; 0 = nao fecha.
 import bpy
 import sys
@@ -17,7 +19,7 @@ out_blend, log_path = argv[0], argv[1].replace('\\', '/')
 
 MEDIDOR = r'''import bge, os, time
 LOG = %r
-KEYS = ("sceneNodeUpdates", "transformSyncs", "boundsPushes", "meshMatrixChanges", "updateNotifies", "drawCalls")
+KEYS = ("sceneNodeUpdates", "transformSyncs", "boundsPushes", "meshMatrixChanges", "updateNotifies", "lightUniforms", "drawCalls")
 _s = {}
 
 def _write(line):
@@ -75,5 +77,8 @@ for scene in bpy.data.scenes:
     sensor.link(ctrl)
     print('AUDIT medidor na camera', cam.name, 'cena', scene.name)
 
-bpy.ops.wm.save_as_mainfile(filepath=out_blend, check_existing=False, copy=True)
-print('AUDIT copia salva', out_blend, 'log', log_path)
+if out_blend == '-':
+    print('AUDIT medidor so na memoria, log', log_path)
+else:
+    bpy.ops.wm.save_as_mainfile(filepath=out_blend, check_existing=False, copy=True)
+    print('AUDIT copia salva', out_blend, 'log', log_path)

@@ -23,6 +23,8 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 
 **1. Crítico — todo frame, escala com a cena inteira, provável nos jogos atuais**
 - GP1 = GP2 = RA1: 8 luzes × 11 uniforms + sombras reenviados por objeto por passe (~100 GL por draw).
+  Medido (2026-10-09, contador `lightUniforms`): 0 no desktop, porque o COMPAT usa `gl_LightSource` e os jogos
+  não têm uniforms de sombra por slot. O cache no GPUShader fica para quando a Web (CORE) for medida.
 - KX1 + KX3 = CV2 = GL1, com PY1/PY2: setters do nó sem comparar + callback de transform sempre; pela física
   `activate(true)` impede o corpo de dormir.
 - PH1: AABB de todos os corpos (estáticos inclusos) recalculado a cada sub-passo.
@@ -134,7 +136,7 @@ Padrão dominante aqui não é marca sempre ligada, e sim reenvio à GPU de valo
 
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
-| RA1 | `Ketsji/BL_BlenderShader.cpp:246` `BindShadowLamps` | = GP1 + GP2 (confirmado por dois agentes) | ~100 GL por draw | alta | suspeito |
+| RA1 | `Ketsji/BL_BlenderShader.cpp:246` `BindShadowLamps` | = GP1 + GP2 (confirmado por dois agentes) | ~100 GL por draw | alta | descartado no desktop; medido 2026-10-09: `lightUniforms` = 0 no desktop (LightManager 14 draws, RolimaRacer corrida ~400 draws); só pesa na Web (CORE) ou com sombra não-cascata |
 | RA2 | `Ketsji/BL_BlenderShader.cpp:328-357` `UpdateObjectMatrix` | inversas/normal matrix recalculadas por draw; `dynamic_cast<KX_DentDeformer*>` + `damagecount=0` por draw (ver GP8) | baixo-médio por draw | média | suspeito |
 | RA3 | `Rasterizer/RAS_MeshSlot.cpp:108-115` → `RAS_DisplayArray.cpp:219` `SortPolygons`, `RAS_StorageVbo.cpp:128` | zsort: aloca vector + `std::sort` + reenvio do IBO inteiro por slot por draw, mesmo com câmera e objeto parados; também no shadow pass | alto p/ malhas alpha grandes | alta | suspeito |
 | RA4 | `Rasterizer/RAS_DisplayArrayBucket.cpp:268-309` → `RAS_InstancingBuffer.cpp:111` | VBO de instancing refeito por completo a cada passada | ~100 B × instância × passada | média | suspeito |
@@ -249,8 +251,8 @@ O runtime não usa `draw/`, UBO nem depsgraph (nenhum `DEG_id_tag_update` em `ga
 
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
-| GP1 | `gpu/intern/gpu_material.c:5004` `GPU_material_bind_scene_lights`, via `Ketsji/BL_BlenderShader.cpp:266` | sobe 8 luzes × 11 uniforms (+ IES) por objeto, embora `ProcessLighting` já saiba que nada mudou | ~90 glUniform por objeto por passe | alta | suspeito |
-| GP2 | `gpu_material.c:4818` `GPU_material_bind_shadow_lamps`, via `BL_BlenderShader.cpp:260` | por objeto: `BLI_findptr`, bind de textura de sombra, persmat/bias; slots vazios fazem bind(0) | ~20-30 chamadas GL por objeto | alta | suspeito |
+| GP1 | `gpu/intern/gpu_material.c:5004` `GPU_material_bind_scene_lights`, via `Ketsji/BL_BlenderShader.cpp:266` | sobe 8 luzes × 11 uniforms (+ IES) por objeto, embora `ProcessLighting` já saiba que nada mudou | ~90 glUniform por objeto por passe | alta | descartado no desktop; medido 2026-10-09: `lightUniforms` = 0 no desktop (LightManager 14 draws, RolimaRacer corrida ~400 draws); só pesa na Web (CORE) ou com sombra não-cascata |
+| GP2 | `gpu_material.c:4818` `GPU_material_bind_shadow_lamps`, via `BL_BlenderShader.cpp:260` | por objeto: `BLI_findptr`, bind de textura de sombra, persmat/bias; slots vazios fazem bind(0) | ~20-30 chamadas GL por objeto | alta | descartado no desktop; medido 2026-10-09: `lightUniforms` = 0 no desktop (LightManager 14 draws, RolimaRacer corrida ~400 draws); só pesa na Web (CORE) ou com sombra não-cascata |
 | GP3 | `gpu_codegen.c:1741` → `gpu_texture.c:453` → `gpu_draw.c:497` `GPU_verify_image` | por bind de material: acquire ibuf (spinlock global), bind/unbind, `compare=0` anula atalho | ~4 GL + lock por textura, por material | média | suspeito |
 | GP4 | `gpu_codegen.c:1774` `GPU_pass_update_uniforms` | reenvia todos os inputs dinâmicos a cada bind | por material × passe | média | suspeito |
 | GP5 | `gpu_material.c:754` `GPU_material_bind` | recalcula `dynlayer` de todos lamps, `BLI_findlink`, view/proj por bind | baixo | baixa | suspeito |

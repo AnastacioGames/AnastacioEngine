@@ -32,6 +32,8 @@ extern "C" {
 }
 #include "BKE_scene.h"
 
+#include "CM_WorkCounters.h"
+
 #include "GPU_material.h"
 #include "GPU_shader.h"
 #include "GPU_render_profile.h"
@@ -265,6 +267,7 @@ void BL_BlenderShader::BindShadowLamps(RAS_Rasterizer *rasty)
 			GPU_RenderProfileScope counterScope(GPU_RENDER_LIGHTS);
 			GPU_material_bind_scene_lights(m_gpuMat, rasty->GetSceneLights());
 		}
+		CM_WorkCount(CM_WORK_LIGHT_UNIFORMS, GPU_material_light_gl_calls_take());
 	}
 }
 
