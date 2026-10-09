@@ -55,7 +55,8 @@ SCA_PropertyActuator::SCA_PropertyActuator(SCA_IObject *gameobj, SCA_IObject *so
 	m_sourceObj(sourceObj),
 	m_useRuntimeProperty(!runtimeProperty.empty()),
 	m_runtimeProperty(runtimeProperty),
-	m_worldPropOwner(worldPropOwner)
+	m_worldPropOwner(worldPropOwner),
+	m_cachedExpr(nullptr)
 {
 	// protect ourselves against someone else deleting the source object
 	// don't protect against ourselves: it would create a dead lock
@@ -69,6 +70,60 @@ SCA_PropertyActuator::~SCA_PropertyActuator()
 	if (m_sourceObj) {
 		m_sourceObj->UnregisterActuator(this);
 	}
+	ClearCachedExpression();
+}
+
+static bool IsLiteralExpression(const std::string& text)
+{
+	size_t begin = text.find_first_not_of(" \t");
+	if (begin == std::string::npos) {
+		return false;
+	}
+	const size_t end = text.find_last_not_of(" \t") + 1;
+	if (text[begin] == '"') {
+		// A single quoted string without inner quotes.
+		return (end - begin >= 2 && text[end - 1] == '"' && text.find('"', begin + 1) == end - 1);
+	}
+	if (text[begin] == '+' || text[begin] == '-') {
+		++begin;
+	}
+	bool digit = false;
+	for (size_t i = begin; i < end; ++i) {
+		if (text[i] >= '0' && text[i] <= '9') {
+			digit = true;
+		}
+		else if (text[i] != '.') {
+			return false;
+		}
+	}
+	return digit;
+}
+
+void SCA_PropertyActuator::ClearCachedExpression()
+{
+	if (m_cachedExpr) {
+		m_cachedExpr->Release();
+		m_cachedExpr = nullptr;
+	}
+	m_cachedExprText.clear();
+}
+
+/// Return a new reference to the parsed m_exprtxt, or nullptr.
+EXP_Expression *SCA_PropertyActuator::GetExpression(EXP_Value *propowner)
+{
+	if (m_cachedExpr && m_cachedExprText == m_exprtxt) {
+		return m_cachedExpr->AddRef();
+	}
+	ClearCachedExpression();
+
+	EXP_Parser parser;
+	parser.SetContext(propowner->AddRef());
+	EXP_Expression *expr = parser.ProcessText(m_exprtxt);
+	if (expr && IsLiteralExpression(m_exprtxt)) {
+		m_cachedExpr = expr->AddRef();
+		m_cachedExprText = m_exprtxt;
+	}
+	return expr;
 }
 
 bool SCA_PropertyActuator::Update()
@@ -148,9 +203,6 @@ bool SCA_PropertyActuator::Update()
 	}
 
 
-	EXP_Parser parser;
-	parser.SetContext(propowner->AddRef());
-
 	EXP_Expression *userexpr = nullptr;
 
 	if (m_type == KX_ACT_PROP_TOGGLE) {
@@ -178,7 +230,7 @@ bool SCA_PropertyActuator::Update()
 		}
 		newval->Release();
 	}
-	else if ((userexpr = parser.ProcessText(m_exprtxt))) {
+	else if ((userexpr = GetExpression(propowner))) {
 		switch (m_type) {
 
 			case KX_ACT_PROP_ASSIGN:
@@ -188,6 +240,12 @@ bool SCA_PropertyActuator::Update()
 				EXP_Value *oldprop = propowner->GetProperty(m_propname);
 				if (oldprop) {
 					oldprop->SetValue(newval);
+				}
+				else if (userexpr == m_cachedExpr) {
+					// The cached tree may return its own constant: never share it as the property.
+					EXP_Value *copy = newval->GetReplica();
+					propowner->SetProperty(m_propname, copy);
+					copy->Release();
 				}
 				else {
 					propowner->SetProperty(m_propname, newval);
@@ -254,6 +312,9 @@ void SCA_PropertyActuator::ProcessReplica()
 {
 	// no need to check for self reference like in the constructor:
 	// the replica will always have a different parent
+	// The cached expression stays owned by the original actuator.
+	m_cachedExpr = nullptr;
+	m_cachedExprText.clear();
 	if (m_sourceObj) {
 		m_sourceObj->RegisterActuator(this);
 	}

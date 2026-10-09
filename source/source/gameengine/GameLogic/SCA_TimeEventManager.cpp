@@ -74,7 +74,8 @@ bool SCA_TimeEventManager::RemoveSensor(SCA_ISensor *sensor)
 
 void SCA_TimeEventManager::NextFrame(double curtime, double fixedtime)
 {
-	if (m_timevalues.empty() && fixedtime <= 0.0) {
+	// Without timer properties the loop below does nothing.
+	if (m_timevalues.empty()) {
 		return;
 	}
 

@@ -118,11 +118,12 @@ bool SCA_KeyboardSensor::Evaluate()
 
 	/* See if we need to do logging: togPropState exists and is
 	 * different from 0 */
-	EXP_Value *myparent = GetParent();
-	EXP_Value *togPropState = myparent->GetProperty(m_toggleprop);
-	if (togPropState &&
-	    (((int)togPropState->GetNumber()) != 0)) {
-		LogKeystrokes();
+	if (!m_toggleprop.empty()) {
+		EXP_Value *togPropState = GetParent()->GetProperty(m_toggleprop);
+		if (togPropState &&
+		    (((int)togPropState->GetNumber()) != 0)) {
+			LogKeystrokes();
+		}
 	}
 
 	m_reset = false;
@@ -132,20 +133,10 @@ bool SCA_KeyboardSensor::Evaluate()
 		bool status = false;
 		bool events = false;
 
-		for (int i = SCA_IInputDevice::BEGINKEY; i <= SCA_IInputDevice::ENDKEY; ++i) {
+		for (int i = SCA_IInputDevice::BEGINKEY; i <= SCA_IInputDevice::ENDKEY && !(status && events); ++i) {
 			const SCA_InputEvent& input = inputdev->GetInput((SCA_IInputDevice::SCA_EnumInputs)i);
-			if (input.End(SCA_InputEvent::ACTIVE)) {
-				status = true;
-				break;
-			}
-		}
-
-		for (int i = SCA_IInputDevice::BEGINKEY; i <= SCA_IInputDevice::ENDKEY; ++i) {
-			const SCA_InputEvent& input = inputdev->GetInput((SCA_IInputDevice::SCA_EnumInputs)i);
-			if (!input.m_queue.empty()) {
-				events = true;
-				break;
-			}
+			status = status || input.End(SCA_InputEvent::ACTIVE);
+			events = events || !input.m_queue.empty();
 		}
 
 		m_val = status;
@@ -219,8 +210,13 @@ void SCA_KeyboardSensor::LogKeystrokes()
 
 	SCA_IInputDevice *inputdev = ((SCA_KeyboardManager *)m_eventmgr)->GetInputDevice();
 
+	const std::wstring& typedtext = inputdev->GetText();
+	// Nothing typed: a string property would be rewritten with the same text.
+	if (typedtext.empty() && tprop->GetValueType() == VALUE_STRING_TYPE) {
+		return;
+	}
+
 	std::wstring_convert<std::codecvt_utf8<wchar_t> > converter;
-	const std::wstring typedtext = inputdev->GetText();
 	std::wstring proptext = converter.from_bytes(tprop->GetText());
 
 	/* Convert all typed key in the prop string, if the key are del or
