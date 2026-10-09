@@ -458,6 +458,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- KX11/RA9: cache seletivo de transformacao/cone implementado; diferencial isolado e
+  runtime antes/depois passaram. Pendente: medir ganho de FPS/tempo em cena com muitas luzes
+  e validar visualmente no jogo real (Point/Spot/CSM/Area e alternancia editor/jogo).
+  Medir separadamente a reconstrucao de `dynamicCasterSet` com Static Split ativo.
+
 - KX10 (Auto Shadow): mapa de casters reconstruido somente na invalidacao; Point passou em comparacao
   antes/depois; benchmark estatico mediu ganho (ver changelog). Pendente: Spot, deformadores,
   layers/parametros, ganho no jogo real e visual.

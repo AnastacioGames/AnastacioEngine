@@ -119,6 +119,11 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- KX11 (2026-10-09): `GPULamp` conserva a matriz de entrada e a escala para evitar
+  normalizacao/inversa repetidas; o cone recalcula o cosseno somente quando o angulo muda.
+  Hide/layer, dimensoes Area e projecoes de sombra continuam atualizados. Teste diferencial
+  isolado e runtime antes/depois passaram; ganho de FPS e visual no jogo real pendentes.
+
 - O profiler conta entradas e comandos efetivos de uniform nas fases de objeto,
   sombra, luzes/IES, probes, dano e skinning (2026-10-08). Controle de Object Info
   confirmou envios de matriz/vetor. Material legado: só camada por objeto; controle

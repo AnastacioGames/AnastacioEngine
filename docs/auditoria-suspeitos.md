@@ -117,8 +117,8 @@ CV5/CV6 corrigidos (2026-10-09): shape key constante nao remarca a malha e key s
 | KX8 | `Ketsji/KX_Scene.cpp:604-671` `UpdateAutoWorldSun` | setters do SG ja comparam transformacoes; probe compara assinatura | 1 no | alta (so c/ Auto World Sun) | invalidacao continua nao reproduzida: repouso sem updates, camera move sol; sombras/parenting e visual pendentes |
 | KX9 | `Ketsji/KX_Camera.cpp:654-731` `UpdateView` | frustumDirty condicionado a mudanca exata de modelview/projecao | baixo; culling continua por frame | alta (padrao) | corrigido em 6d8c640d; movimento/retorno e lente validados no player; stereo/Camera FX e visual pendentes |
 | KX10 | `Ketsji/KX_ShadowRenderer.cpp:357-407`, `KX_Scene.cpp:1747` `AutoShadowStillValid` / `BuildShadowCullCache` | mapa de casters so reconstruido ao invalidar; snapshot compartilhado por passada, varredura permanece | O(N) por luz Auto; alocacao so na invalidacao | media | parcial: build/player passaram; 18 amostras iguais; benchmark estatico: sombras 0,613 -> 0,194 ms, FPS +28,3%; jogo real, Spot/deformadores/layers e visual pendentes |
-| KX11 | `KX_LightObject.cpp:119` → `RAS_OpenGLLight.cpp:560` | = RA9 | baixo × luzes | média | suspeito |
-| KX12 | `Ketsji/KX_GameObject.cpp:1363-1384` `UpdateBuckets` | trabalho fixo por objeto por passe (inerente) | — | baixa | suspeito |
+| KX11 | `KX_LightObject.cpp:119`, `RAS_OpenGLLight.cpp:560`, `blender/gpu/intern/gpu_material.c:4063` | = RA9; cache da matriz de entrada/escala evita normalizacao e inversa repetidas; cache do angulo evita cosseno; hide/Area/projecao continuam atualizados | baixo × luzes | media | corrigido; diferencial e runtime antes/depois passaram; FPS e visual real pendentes |
+| KX12 | `Ketsji/KX_GameObject.cpp:1380` `UpdateBuckets` | matriz/front face protegidos por DIRTY_RENDER; bitmap text tem cache; setters CPU baratos; ativacao dos slots necessaria por passe | — | baixa | verificado por leitura; sem correcao ou ganho medido |
 | KX13 | `KX_Scene.cpp:2155-2270` | os passes de pose/deformer percorrem filhos pelo `SG_Node`, sem vetor temporario. Eventos ja carregavam `const char*`, sem copia de string C++ | alocacao × animados eliminada | média | corrigido |
 | KX14 | `KX_GameObject.cpp:862-886` partículas, `KX_FontObject.cpp:258`, `KX_Speaker.cpp:251-269` | `SetModelMatrix`/lookups/`AUD_Handle_set*` sem comparar | baixo | baixa | suspeito |
 
@@ -144,7 +144,7 @@ Padrão dominante aqui não é marca sempre ligada, e sim reenvio à GPU de valo
 | RA6 | `Rasterizer/RAS_MaterialBucket.cpp:113`, `RAS_BucketManager.cpp:366` | `GenerateTree` e `RemoveActiveMeshSlots` percorrem todos os display-array buckets de todos os materiais | O(buckets da cena) por passada | média | suspeito |
 | RA7 | `Rasterizer/RAS_Rasterizer.cpp:862-875` `SetCullFace` | checagem de estado repetido comentada; invalida alpha blend | baixo | média (ver por que foi comentado) | suspeito |
 | RA8 | `Rasterizer/RAS_DisplayArrayBucket.cpp:361-392` `RunBatchingNode` | aloca `counts`/`indices` por batch por passada | baixo-médio | média | suspeito |
-| RA9 | `Ketsji/KX_LightObject.cpp:119` → `RAS_OpenGLLight.cpp:560`; `KX_ShadowRenderer.cpp:592` | update de luz (inversa, winmat, cores, spot) todo frame sem comparar; `unordered_set` de casters reconstruído por luz | baixo × luzes | média | suspeito |
+| RA9 | `Ketsji/KX_LightObject.cpp:119`, `RAS_OpenGLLight.cpp:560`; `KX_ShadowRenderer.cpp:593` | = KX11; inversa/cone agora com cache seletivo; cores/atenuacao sao atribuicoes CPU; set de casters so preenchido com Static Split | baixo × luzes | media | cache KX11 corrigido/testado; FPS, visual e custo do Static Split pendentes |
 
 Verificados OK: `RAS_MeshBoundingBox::Update` (98f54d7f), `RAS_BoundingBoxManager::Update`, `RAS_MeshUser::SetMatrix`
 (memcmp; chamador protegido por `DIRTY_RENDER`), `UpdateActiveMeshSlots`, `RAS_InstancingBuffer::Realloc`,

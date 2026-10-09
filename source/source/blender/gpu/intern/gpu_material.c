@@ -225,6 +225,11 @@ struct GPULamp {
 	float dynco[3], dynvec[3];
 	float obmat[4][4];
 	float imat[4][4];
+	/* Cache only light-derived data; shadow passes overwrite the projection matrices. */
+	float update_obmat[4][4], update_scale[3];
+	bool update_obmat_valid;
+	float update_spotsize;
+	bool update_spotsize_valid;
 	float dynimat[4][4];
 	float dynarearight[3];
 	float dynareaup[3];
@@ -4063,12 +4068,19 @@ void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[4][4])
 	lamp->lay = lay;
 	lamp->hide = hide;
 
-	normalize_m4_m4_ex(mat, obmat, obmat_scale);
-
-	copy_v3_v3(lamp->vec, mat[2]);
-	copy_v3_v3(lamp->co, mat[3]);
-	copy_m4_m4(lamp->obmat, mat);
-	invert_m4_m4(lamp->imat, mat);
+	if (!lamp->update_obmat_valid || memcmp(lamp->update_obmat, obmat, sizeof(lamp->update_obmat)) != 0) {
+		normalize_m4_m4_ex(mat, obmat, obmat_scale);
+		copy_v3_v3(lamp->vec, mat[2]);
+		copy_v3_v3(lamp->co, mat[3]);
+		copy_m4_m4(lamp->obmat, mat);
+		invert_m4_m4(lamp->imat, mat);
+		copy_m4_m4(lamp->update_obmat, obmat);
+		copy_v3_v3(lamp->update_scale, obmat_scale);
+		lamp->update_obmat_valid = true;
+	}
+	else {
+		copy_v3_v3(obmat_scale, lamp->update_scale);
+	}
 
 	if (lamp->type == LA_HEMI) {
 		/* update XYZ scale for reflection probe */
@@ -4123,7 +4135,11 @@ void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float a
 
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend)
 {
-	lamp->spotsi = cosf(spotsize * 0.5f);
+	if (!lamp->update_spotsize_valid || lamp->update_spotsize != spotsize) {
+		lamp->spotsi = cosf(spotsize * 0.5f);
+		lamp->update_spotsize = spotsize;
+		lamp->update_spotsize_valid = true;
+	}
 	lamp->spotbl = (lamp->type == LA_SUN) ? spotblend : (1.0f - lamp->spotsi) * spotblend;
 }
 
@@ -4137,6 +4153,8 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 	/* add_render_lamp */
 	lamp->mode = la->mode;
 	lamp->type = la->type;
+	lamp->update_obmat_valid = false;
+	lamp->update_spotsize_valid = false;
 
 	lamp->energy = la->energy;
 	if (lamp->mode & LA_NEG) lamp->energy = -lamp->energy;
