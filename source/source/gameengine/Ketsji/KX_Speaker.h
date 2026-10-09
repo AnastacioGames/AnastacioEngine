@@ -92,6 +92,8 @@ protected:
 #ifdef WITH_AUDASPACE
   AUD_Sound *m_sound;
   AUD_Handle *m_handle;
+  float m_sound3DState[10] = {};
+  bool m_sound3DValid[3] = {};
 #endif  // WITH_AUDASPACE
   float m_volume;
   float m_pitch;

@@ -924,6 +924,14 @@ void GPU_material_bind_uniforms(
 			GPU_shader_uniform_vector(shader, material->infoliageparamsloc, 3, 1, params);
 		}
 
+		/* All view-dependent builtins share this product within the current draw.
+		 * Do not cache across calls: objects, cameras and halo matrices can differ. */
+		if (viewmat && (material->builtins &
+		               (GPU_LOC_TO_VIEW_MATRIX | GPU_NORMAL_MATRIX | GPU_INVERSE_LOC_TO_VIEW_MATRIX))) {
+			GPU_render_profile_count(GPU_RENDER_MUL);
+			mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+		}
+
 		/* handle per object builtins */
 		if (material->builtins & GPU_OBJECT_MATRIX) {
 			GPU_shader_uniform_vector(shader, material->obmatloc, 16, 1, (float *)obmat);
@@ -935,16 +943,12 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
-				GPU_render_profile_count(GPU_RENDER_MUL);
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				GPU_shader_uniform_vector(shader, material->localtoviewmatloc, 16, 1, (float *)localtoviewmat);
 			}
 		}
 		if (material->builtins & GPU_NORMAL_MATRIX) {
 			if (viewmat) {
 				float mat3[3][3], normalmat[3][3];
-				GPU_render_profile_count(GPU_RENDER_MUL);
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				copy_m3_m4(mat3, localtoviewmat);
 				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m3_m3(normalmat, mat3);
@@ -954,8 +958,6 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_INVERSE_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
-				GPU_render_profile_count(GPU_RENDER_MUL);
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m4_m4(invlocaltoviewmat, localtoviewmat);
 				GPU_shader_uniform_vector(shader, material->invlocaltoviewmatloc, 16, 1, (float *)invlocaltoviewmat);
@@ -5009,6 +5011,11 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 
 /* Binds the object's damage hits for the Damage node: count hits of (local xyz, radius) and strength.
  * Must run per object with the program bound; count 0 clears the mask. */
+bool GPU_material_use_damage(GPUMaterial *material)
+{
+	return material->pass && material->damagecountloc != -1;
+}
+
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count)
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
@@ -5023,7 +5030,9 @@ void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], con
 			GPU_shader_uniform_vector(shader, material->damagestrengthloc, 1, count, strength);
 		}
 	}
-	GPU_shader_uniform_int(shader, material->damagecountloc, count);
+	/* This uniform is written only here. The shader cache also handles materials
+	 * sharing a program and restores zero after an object with damage. */
+	GPU_shader_uniform_int_cached(shader, material->damagecountloc, count);
 }
 
 /* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into

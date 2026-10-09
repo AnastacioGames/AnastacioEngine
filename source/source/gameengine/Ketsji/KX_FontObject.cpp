@@ -264,14 +264,19 @@ void KX_FontObject::UpdateTextFromProperty()
 	if (prop && prop->GetText() != m_text) {
 		SetText(prop->GetText());
 	}
-	if (propR && propR->GetText() != m_res) {
-		try {
-			m_resolution = std::stof(propR->GetText());
+	if (propR) {
+		const std::string resolutionText = propR->GetText();
+		if (resolutionText != m_res) {
+			try {
+				m_resolution = std::stof(resolutionText);
+			}
+			catch (const std::exception &) {
+				// Ignore non-numeric logic brick value, keep previous resolution.
+			}
+			// Cache the input text, including invalid values, rather than converting the
+			// numeric resolution to a single character through std::string::operator=.
+			m_res = resolutionText;
 		}
-		catch (const std::exception &) {
-			// Ignore non-numeric logic brick value, keep previous resolution.
-		}
-		m_res = m_resolution;
 	}
 }
 

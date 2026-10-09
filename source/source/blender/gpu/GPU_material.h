@@ -505,6 +505,8 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);
+/* True when the linked shader consumes the Damage node's hit count. */
+bool GPU_material_use_damage(GPUMaterial *material);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);
 
 /* One slot of that same scene-light loop, with the values the fixed-function glLight* calls

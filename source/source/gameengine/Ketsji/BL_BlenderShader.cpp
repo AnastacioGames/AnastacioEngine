@@ -349,6 +349,11 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 	GPU_material_bind_uniforms(m_gpuMat, (float (*)[4])mat, rasty->GetViewMatrix().Data(),
 			obcol, meshUser->GetLayer(), 1.0f, nullptr, objectInfo);
 
+	// Materials without a live Damage uniform do not need a deformer lookup.
+	if (!GPU_material_use_damage(m_gpuMat)) {
+		return;
+	}
+
 	// Damage node: hits of the object's dent deformer, none for the others.
 	// The mesh user's own deformer: its client object is not always a KX_GameObject.
 	GPU_RenderProfileScope damageScope(GPU_RENDER_DAMAGE);

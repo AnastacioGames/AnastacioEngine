@@ -458,6 +458,20 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- Auditoria KX14: cache de `Text-Res` e envios espaciais de `KX_Speaker` corrigidos,
+  editor/player compilados e testes isolados/runtime passaram. Pendente: benchmark de FPS/tempo,
+  visual do texto e avaliacao auditiva 3D no jogo real (movimento/camera, Doppler, pausa e replicas).
+  `SetModelMatrix` de particulas apenas copia 16 floats CPU; sem correcao neste item.
+  KX13 e RA1 ja constam como corrigidos.
+
+- RA2 parcial: produto `view x object` reutilizado na mesma chamada de
+  `GPU_material_bind_uniforms`; editor/player compilados e diferencial passou.
+  Damage/GP8 corrigido: cast so com uniform ativo e count com cache por GPUShader;
+  diferencial com programa compartilhado e runtime dent/reset passaram. Pendente: benchmark/visual no jogo real
+  e avaliar se custo das inversas por draw justifica cache adicional.
+  Cache entre draws exige considerar objeto, camera/passe e matriz de halo/billboard.
+  Sem cache novo de matrizes entre draws; arrays de hits continuam enviados por objeto.
+
 - KX11/RA9: cache seletivo de transformacao/cone implementado; diferencial isolado e
   runtime antes/depois passaram. Pendente: medir ganho de FPS/tempo em cena com muitas luzes
   e validar visualmente no jogo real (Point/Spot/CSM/Area e alternancia editor/jogo).

@@ -119,6 +119,13 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- KX14 (2026-10-09): `Text-Res` conserva o texto da propriedade, evitando conversao/excecao
+  repetida enquanto a entrada nao muda; valores invalidos mantem a ultima resolucao valida.
+  Speakers conservam separadamente posicao, velocidade e orientacao enviadas ao handle:
+  dados iguais nao repetem setters de audio, falhas sao tentadas novamente e novos handles/
+  replicas invalidam o cache. Calculos relativos a camera continuam por update; testes
+  isolados/runtime passaram. Ganho de FPS, visual e avaliacao auditiva reais pendentes.
+
 - KX11 (2026-10-09): `GPULamp` conserva a matriz de entrada e a escala para evitar
   normalizacao/inversa repetidas; o cone recalcula o cosseno somente quando o angulo muda.
   Hide/layer, dimensoes Area e projecoes de sombra continuam atualizados. Teste diferencial
@@ -291,6 +298,13 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   libera a geometria dos objetos que ficaram fora (37,5 MB de 6 pilotos no teste), quase
   igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
   `docs/changelog.md` (2026-10-07).
+
+- Auditoria RA2: os uniforms local-to-view, normal e inversa compartilham o produto
+  `view x object` dentro de `GPU_material_bind_uniforms`, evitando ate duas multiplicacoes
+  4x4 por chamada. Inversas e uploads permanecem por draw; sem cache entre objetos/passes
+  e sem ganho de FPS medido. Damage consulta o uniform ativo antes do cast de deformer;
+  o contador de hits usa o cache por GPUShader, preservando transicoes entre objetos.
+  Arrays de hits/strength continuam enviados quando count > 0.
 
 ## Decisões técnicas vigentes
 

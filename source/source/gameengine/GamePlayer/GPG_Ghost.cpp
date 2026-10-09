@@ -837,10 +837,10 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 		char text[FILE_MAX + 128];
 		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
 		BLI_snprintf(text, sizeof(text),
-		             "RangeRuntime crashed.\n\nLog: %s\n"
+		             "AnastacioRuntime crashed.\n\nLog: %s\n"
 		             "Backtrace: <file>.crash.txt in the same folder.",
 		             logPath);
-		MessageBox(NULL, text, "RangeRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
+		MessageBox(NULL, text, "AnastacioRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
 	}
 
 	/* If this is a stack overflow then we can't walk the stack, so just show
@@ -989,7 +989,7 @@ int main(int argc,
 		_dup2(_fileno(stdout), _fileno(stderr));
 		setvbuf(stdout, nullptr, _IONBF, 0);
 		setvbuf(stderr, nullptr, _IONBF, 0);
-		printf("RangeRuntime log started, writing to: %s\n", logPath);
+		printf("AnastacioRuntime log started, writing to: %s\n", logPath);
 		fflush(stdout);
 	}
 #endif  // WIN32

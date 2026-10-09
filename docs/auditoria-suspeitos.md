@@ -120,7 +120,7 @@ CV5/CV6 corrigidos (2026-10-09): shape key constante nao remarca a malha e key s
 | KX11 | `KX_LightObject.cpp:119`, `RAS_OpenGLLight.cpp:560`, `blender/gpu/intern/gpu_material.c:4063` | = RA9; cache da matriz de entrada/escala evita normalizacao e inversa repetidas; cache do angulo evita cosseno; hide/Area/projecao continuam atualizados | baixo × luzes | media | corrigido; diferencial e runtime antes/depois passaram; FPS e visual real pendentes |
 | KX12 | `Ketsji/KX_GameObject.cpp:1380` `UpdateBuckets` | matriz/front face protegidos por DIRTY_RENDER; bitmap text tem cache; setters CPU baratos; ativacao dos slots necessaria por passe | — | baixa | verificado por leitura; sem correcao ou ganho medido |
 | KX13 | `KX_Scene.cpp:2155-2270` | os passes de pose/deformer percorrem filhos pelo `SG_Node`, sem vetor temporario. Eventos ja carregavam `const char*`, sem copia de string C++ | alocacao × animados eliminada | média | corrigido |
-| KX14 | `KX_GameObject.cpp:862-886` partículas, `KX_FontObject.cpp:258`, `KX_Speaker.cpp:251-269` | `SetModelMatrix`/lookups/`AUD_Handle_set*` sem comparar | baixo | baixa | suspeito |
+| KX14 | `KX_GameObject.cpp:874` particulas, `KX_FontObject.cpp:258`, `KX_Speaker.cpp:258` | Text-Res agora conserva texto de entrada; speaker conserva ultimo estado 3D aceito pelo handle; SetModelMatrix so copia 16 floats CPU | baixo | confirmada para texto/audio | corrigido texto/audio; build e testes passaram; FPS, visual e avaliacao auditiva pendentes; particulas sem mudanca |
 
 Verificados OK: `UpdateParents` (só agendados; relações normal/vertex saem cedo), `ClearModified`, `UpdateBuckets`
 (`SetMatrix` sob `DIRTY_RENDER`), `UpdateBounds` (98f54d7f), `UpdateLod` fora do billboard, `UpdateObjectActivity`,
@@ -137,7 +137,7 @@ Padrão dominante aqui não é marca sempre ligada, e sim reenvio à GPU de valo
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
 | RA1 | `Ketsji/BL_BlenderShader.cpp:246` `BindShadowLamps` | = GP1 + GP2 (confirmado por dois agentes) | ~100 GL por draw | alta | medido 2026-10-09: 0 no RolimaRacer (sem lâmpada com sombra em buffer); ~880 GL/frame (~22 por draw) na cena `tools/debug/cenas/criar_cena_luzes_sombra.py` com 3 spots com sombra; **corrigido 2026-10-09** com cache do último valor no GPUShader: ~334 GL/frame contra ~902 sem o cache, com os 40 cubos visíveis (sobram os binds de textura de sombra) |
-| RA2 | `Ketsji/BL_BlenderShader.cpp:328-357` `UpdateObjectMatrix` | inversas/normal matrix recalculadas por draw; `dynamic_cast<KX_DentDeformer*>` + `damagecount=0` por draw (ver GP8) | baixo-médio por draw | média | suspeito |
+| RA2 | `Ketsji/BL_BlenderShader.cpp:332` -> `gpu/intern/gpu_material.c:902` `GPU_material_bind_uniforms` | produto view x object reutilizado dentro da chamada para local-to-view, normal e inversa; inversas continuam por draw; cast apenas com uniform Damage ativo (GP8) | ate 2 produtos 4x4 eliminados por chamada | confirmada para produto duplicado | parcial: produto e Damage/GP8 corrigidos; build editor/player e diferenciais passaram; benchmark/visual real pendentes; cache de inversas nao implementado |
 | RA3 | `Rasterizer/RAS_MeshSlot.cpp:108-115` → `RAS_DisplayArray.cpp:219` `SortPolygons`, `RAS_StorageVbo.cpp:128` | zsort: aloca vector + `std::sort` + reenvio do IBO inteiro por slot por draw, mesmo com câmera e objeto parados; também no shadow pass | alto p/ malhas alpha grandes | alta | suspeito |
 | RA4 | `Rasterizer/RAS_DisplayArrayBucket.cpp:268-309` → `RAS_InstancingBuffer.cpp:111` | VBO de instancing refeito por completo a cada passada | ~100 B × instância × passada | média | suspeito |
 | RA5 | `Rasterizer/RAS_BucketManager.cpp:102-113` `PrepareBuckets` | `Prepare` (texturas + `update_lamps`) em todos os buckets, inclusive sem slot ativo; infla `IncMaterialChangeCount` | O(materiais × lamps) por passada | alta (laço) / média (custo) | suspeito |
@@ -258,7 +258,7 @@ O runtime não usa `draw/`, UBO nem depsgraph (nenhum `DEG_id_tag_update` em `ga
 | GP5 | `gpu_material.c:754` `GPU_material_bind` | recalcula `dynlayer` de todos lamps, `BLI_findlink`, view/proj por bind | baixo | baixa | suspeito |
 | GP6 | `gpu_material.c:696` `GPU_material_update_lamps`, via `KX_BlenderMaterial.cpp:344` | recalcula matrizes do lamp por material (só dependem de lamp+view) | CPU, N_mat × N_lamps | média | suspeito |
 | GP7 | `Ketsji/BL_BlenderShader.cpp:309-322` | `FindProbe` + bind de probe por objeto todo frame; cache só p/ probe ausente | médio | média | suspeito |
-| GP8 | `gpu_material.c:4975` `GPU_material_bind_damage` | sobe `count`=0 sempre + `dynamic_cast` por objeto | baixo | baixa | suspeito |
+| GP8 | `gpu_material.c:5014` `GPU_material_use_damage` / `GPU_material_bind_damage`, `BL_BlenderShader.cpp:353` | cast apenas se uniform Damage ativo; count usa cache por GPUShader; arrays de hits continuam enviados | casts desnecessarios e count repetido eliminados | confirmada | corrigido; diferencial com programa compartilhado passou; benchmark/visual real pendentes |
 
 Correção comum GP1/GP2: geração do estado de luz (incrementa só quando `ProcessLighting` recalcula) + "último enviado"
 por `GPUMaterial`, zerado em `GPU_material_bind` — mesmo padrão de `objectlay_valid`.
