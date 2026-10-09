@@ -656,8 +656,18 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 {
 	View& view = m_views[eye];
 
-	// Update modelview everytime.
-	view.modelview = rasty->GetViewMatrix(stereoMode, eye, GetWorldToCamera(), m_camdata.m_perspective);
+	// Update modelview everytime, the frustum is rebuilt only when it changed.
+	const mt::mat4 modelview = rasty->GetViewMatrix(stereoMode, eye, GetWorldToCamera(), m_camdata.m_perspective);
+	bool changed = false;
+	for (int col = 0; col < 4 && !changed; ++col) {
+		for (int row = 0; row < 4; ++row) {
+			if (modelview(row, col) != view.modelview(row, col)) {
+				changed = true;
+				break;
+			}
+		}
+	}
+	view.modelview = modelview;
 
 	// Update projection when setting changed.
 	if (view.projectionDirty) {
@@ -712,9 +722,12 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 		}
 
 		view.projectionDirty = false;
+		changed = true;
 	}
-	// Ask to rebuild the frustum as the projection and/or modelview changed.
-	view.frustumDirty = true;
+	// Ask to rebuild the frustum only when the projection and/or modelview changed.
+	if (changed) {
+		view.frustumDirty = true;
+	}
 }
 
 /**

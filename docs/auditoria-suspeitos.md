@@ -62,7 +62,7 @@ Agrupado por causa raiz; vários IDs são o mesmo problema visto de áreas difer
    Medir: `sceneNodeUpdates`/`transformSyncs` com personagens em idle, atuador Set position, objetos em osso.
 2. **Luzes reenviadas por objeto**: GP1 = GP2 = RA1; depois GP6/RA5, RA9 = KX11. Precisa de contador novo de uniforms.
 3. **Física**: PH2 (se os jogos usam "Use Frame Rate"), PH1, PH7.
-4. **Marca sempre ligada (forma de 98f54d7f)**: PH3 (`ExtendAabb`, soft body), KX9 (`frustumDirty`).
+4. **Marca sempre ligada (forma de 98f54d7f)**: ~~KX9~~ e ~~PH3 (`ExtendAabb`)~~ corrigidos (marca só liga se mudou; compilado, não medido). Falta em PH3: soft body dormindo ainda reescreve vértices + `NotifyUpdate` (`KX_SoftBodyDeformer::Apply`).
 5. **Animação**: CV7/CV8, CV5/CV6, KX5, KX13; decisões de design CV3/CV4.
 6. **Render**: RA3 (zsort), KX4 (billboard), RA4 (instancing), RA6, KX10.
 7. **Resto de custo baixo**: GL2-GL10, RA2/RA7/RA8, GP3-GP5/GP7/GP8, PH9, KX7/KX12/KX14.
