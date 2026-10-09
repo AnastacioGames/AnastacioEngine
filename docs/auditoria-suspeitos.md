@@ -88,7 +88,7 @@ LP9/LP10 só afetam o Play embutido no editor.
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
 | CV1 | `Ketsji/BL_Action.cpp:~457`, `UpdateIPOs` :569 | `m_requestIpo = true` sem condição, mesmo sem canais de objeto (armature só com bones) → `UpdateWorldDataThread` do nó e subárvore | transform sync por ação tocando × filhos | alta | suspeito |
-| CV2 | `Ketsji/KX_IpoController.cpp:84+`, `SceneGraph/SG_Node.cpp:381/409/426`, `SG_Controller.cpp:58` | IPO grava loc/rot/scale sem comparar; `SetLocal*` e `SetSimulatedTime` marcam modificado sempre | `sceneNodeUpdates`/`transformSyncs` com keys em hold | média | suspeito |
+| CV2 | `Ketsji/KX_IpoController.cpp:84+`, `SceneGraph/SG_Node.cpp:381/409/426`, `SG_Controller.cpp:58` | IPO grava loc/rot/scale sem comparar; `SetLocal*` e `SetSimulatedTime` marcam modificado sempre | `sceneNodeUpdates`/`transformSyncs` com keys em hold | média | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
 | CV3 | `Ketsji/KX_Scene.cpp:~2180` `anim_needs_update` | armature fora da tela faz pose + skinning completos (intencional: AABB segue o pose) | O(vértices × influências) por personagem culled | alta / decisão de design | suspeito |
 | CV4 | `Converter/BL_SkinDeformer.h:70` `PoseUpdated` | compara tempo, não o conteúdo do pose → reskin + reenvio de VBO com bones parados | alto por personagem, só com ação ativa | média | suspeito |
 | CV5 | `Ketsji/BL_Action.cpp:530` | ação de shape key chama `SetLastFrame` sem checar se `curval` mudou → `BKE_key_evaluate_relative` + malha inteira (modifier deformer: derived mesh) | alto | média | suspeito |
@@ -107,9 +107,9 @@ objetos com ações terminadas ainda custando tempo de `UpdateAnimations` confir
 
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
-| KX1 | `SceneGraph/SG_Node.cpp:219-232` `UpdateWorldData` (e `:244-258` thread) | ignora o retorno de `UpdateSpatialData`; `ActivateUpdateTransformCallback` roda sempre → física + DBVT em toda a subárvore visitada | sync por nó visitado | alta | suspeito |
+| KX1 | `SceneGraph/SG_Node.cpp:219-232` `UpdateWorldData` (e `:244-258` thread) | ignora o retorno de `UpdateSpatialData`; `ActivateUpdateTransformCallback` roda sempre → física + DBVT em toda a subárvore visitada | sync por nó visitado | alta | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
 | KX2 | `Ketsji/BL_Action.cpp:~455` | = CV1 (dois agentes) | subárvore por objeto animado | alta | suspeito |
-| KX3 | `SG_Controller.cpp:58`, `KX_IpoController.cpp:150+`, `SG_Node.cpp:381/409/426`, `KX_GameObject.cpp:2052-2091` | = CV2/GL1; setters do nó e da física não comparam (pode acordar corpo) | nó + física por escrita | média | suspeito |
+| KX3 | `SG_Controller.cpp:58`, `KX_IpoController.cpp:150+`, `SG_Node.cpp:381/409/426`, `KX_GameObject.cpp:2052-2091` | = CV2/GL1; setters do nó e da física não comparam (pode acordar corpo) | nó + física por escrita | média | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
 | KX4 | `Ketsji/KX_GameObject.cpp:1497-1517` `UpdateLod` (billboard) | `NodeSetGlobalOrientation` + `NodeUpdate` todo frame sem comparar heading; ruído de float quebra lote (`SplitMeshUser`) | por billboard visível × câmera × face de probe | alta | suspeito |
 | KX5 | `Ketsji/KX_TextureRendererManager.cpp:335-345` | probe com autoUpdate refaz `UpdateAnimations` por face (alterna meia-taxa); LOD da probe ≠ principal troca malha 2×/frame (`ReplaceMesh` + `ReinstancePhysicsShape`) | animados × 6 faces | média-alta / média | suspeito |
 | KX6 | `Ketsji/KX_BoneParentNodeRelationship.cpp:54/96` | `parentUpdated = true` sempre + reagenda p/ sempre (armas/acessórios em osso) | nó + descendentes por frame | alta (padrão) | suspeito |
@@ -180,7 +180,7 @@ Teste sugerido: cena com dinâmicos dormindo + cinemáticos parados, com e sem "
 
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
-| GL1 | `SceneGraph/SG_Node.cpp:381` `SetLocalPosition` (e Orientation/Scale); via `Ketsji/KX_ObjectActuator.cpp:~375` (modo Set position) e `SCA_PropertyActuator.cpp:132` | grava e `SetModified()` sem comparar; física também reescrita (`KX_GameObject.cpp:2052`) | nó + filhos por atuador ativo por frame | alta (mesma raiz de CV2) | suspeito |
+| GL1 | `SceneGraph/SG_Node.cpp:381` `SetLocalPosition` (e Orientation/Scale); via `Ketsji/KX_ObjectActuator.cpp:~375` (modo Set position) e `SCA_PropertyActuator.cpp:132` | grava e `SetModified()` sem comparar; física também reescrita (`KX_GameObject.cpp:2052`) | nó + filhos por atuador ativo por frame | alta (mesma raiz de CV2) | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
 | GL2 | `Network/NET_Replicator.cpp:318` `capture` | só pula `isSleeping`, que é falso p/ estático/cinemático/sem física → serializa + hash todo tick (envio OK: delta por hash) | O(N replicados) CPU + alocação por tick | média | suspeito |
 | GL3 | `Network/NET_Replicator.cpp:377` `rebuildGrid` | limpa e reinsere a grade inteira todo tick | O(N) por tick | média | suspeito |
 | GL4 | `VideoTexture/Texture.cpp:385-440`, `loadTexture` :165 | `refresh()` com fonte estática refaz `glTexImage2D` (+ mipmap CPU, rescale) sem "versão já enviada" | upload completo por chamada | média | suspeito |
