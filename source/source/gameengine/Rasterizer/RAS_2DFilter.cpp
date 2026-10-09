@@ -146,7 +146,9 @@ RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
 	m_gameObject(data.gameObject),
 	m_buildInFilters(data.buildInFilters),
 	m_uniformInitialized(false),
-	m_mipmap(data.mipmap)
+	m_mipmap(data.mipmap),
+	m_offsetsWidth(0),
+	m_offsetsHeight(0)
 {
 	m_diagnosticName = "2d-filter";
 	m_binaryCache = true;
@@ -201,8 +203,10 @@ void RAS_2DFilter::Initialize(RAS_ICanvas *canvas)
 	 * to solve this we initialize filter at the frist render frame. */
 	if (!m_uniformInitialized) {
 		ParseShaderProgram();
-		ComputeTextureOffsets(canvas);
 		m_uniformInitialized = true;
+	}
+	if (canvas->GetRenderWidth() != m_offsetsWidth || canvas->GetRenderHeight() != m_offsetsHeight) {
+		ComputeTextureOffsets(canvas);
 	}
 }
 
@@ -388,8 +392,10 @@ void RAS_2DFilter::ParseShaderProgram()
    of nearby fragments. Or vertices or whatever.*/
 void RAS_2DFilter::ComputeTextureOffsets(RAS_ICanvas *canvas)
 {
-	const GLfloat texturewidth = (GLfloat)canvas->GetRenderWidth();
-	const GLfloat textureheight = (GLfloat)canvas->GetRenderHeight();
+	m_offsetsWidth = canvas->GetRenderWidth();
+	m_offsetsHeight = canvas->GetRenderHeight();
+	const GLfloat texturewidth = (GLfloat)m_offsetsWidth;
+	const GLfloat textureheight = (GLfloat)m_offsetsHeight;
 	const GLfloat xInc = 1.0f / texturewidth;
 	const GLfloat yInc = 1.0f / textureheight;
 

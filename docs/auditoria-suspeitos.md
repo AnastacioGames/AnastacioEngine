@@ -15,11 +15,11 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 1. ~~`RemoveRessources`~~ **corrigido** (`KX_GameObject.cpp:989`): ramo do material só saía do laço interno e seguia iterando `m_meshes` limpo (UB no LibFree); agora `return` nos dois ramos.
 2. ~~PH8~~ **corrigido**: `ProcessFhSprings` testa `body` nulo antes de usar (sensores/personagens não têm rigid body).
 3. ~~SP3~~ **corrigido**: `ReplaceMesh` com física passa `dupli=true` a `ReinstancePhysicsShape`; o objeto ganha shape info próprio e as cópias irmãs mantêm a colisão.
-4. SP1: navmesh reconstruída no original; a cópia fica sem navmesh (e Recast inteiro por spawn).
-5. PY2: `worldOrientation[i] = ...` grava orientação local.
-6. Texto bitmap duplicado nunca desregistrado — vazamento a cada spawn.
-7. PY3: activity culling de componentes não desliga `update()`.
-8. LP `ComputeTextureOffsets`: filtros 2D com offsets errados depois de resize.
+4. ~~SP1~~ **corrigido**: `AddNodeReplicaObject` constrói a navmesh da cópia (`newobj`), não do original.
+5. ~~PY2~~ **corrigido**: `worldOrientation[i] = ...` (callback mathutils `ORI_GLOBAL`) usa `NodeSetGlobalOrientation`.
+6. ~~Texto bitmap~~ **corrigido**: o objeto guarda as malhas duplicadas em `m_bitmapTextMeshes`; `NewRemoveObject` as desregistra do conversor.
+7. ~~PY3~~ **corrigido**: `UpdateComponents` só deixa o activity culling parar os componentes com a opção Components ligada; outra suspensão sempre para.
+8. ~~LP `ComputeTextureOffsets`~~ **corrigido**: `RAS_2DFilter::Initialize` recalcula os offsets quando o tamanho do canvas muda.
 
 **1. Crítico — todo frame, escala com a cena inteira, provável nos jogos atuais**
 - GP1 = GP2 = RA1: 8 luzes × 11 uniforms + sombras reenviados por objeto por passe (~100 GL por draw).
@@ -68,7 +68,7 @@ Agrupado por causa raiz; vários IDs são o mesmo problema visto de áreas difer
 Grupo 1 também cobre PY1/PY2 (caminho Python + `activate(true)` da física). PY3 e PY4 entram no grupo 7 se a cena tiver muitos componentes/shaders custom.
 
 **Bugs de correção à parte (não são desempenho):**
-- PH8: `CcdPhysicsEnvironment.cpp:1178` desreferencia `body` antes do teste de nulo.
+- ~~PH8~~ (corrigido): `CcdPhysicsEnvironment.cpp:1178` desreferencia `body` antes do teste de nulo.
 - PY2: `worldOrientation` por índice grava orientação local (`KX_GameObject.cpp:2863`).
 - PY3: activity culling de componentes nunca desliga o `update()`.
 - LP: `RAS_2DFilter::ComputeTextureOffsets` não acompanha resize.

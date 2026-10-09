@@ -1355,8 +1355,14 @@ void KX_GameObject::DuplicateBitmapTextMeshes()
 	for (KX_Mesh *&mesh : m_meshes) {
 		if (mesh->HasBitmapText()) {
 			mesh = mesh->Duplicate();
+			m_bitmapTextMeshes.push_back(mesh);
 		}
 	}
+}
+
+const std::vector<KX_Mesh *>& KX_GameObject::GetBitmapTextMeshes() const
+{
+	return m_bitmapTextMeshes;
 }
 
 void KX_GameObject::UpdateBuckets()
@@ -2531,19 +2537,16 @@ void KX_GameObject::UpdateComponents()
 {
 #ifdef WITH_PYTHON
 	if (m_components) {
-		if (!m_suspended && (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) &&
-		    (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC)) {
-			for (KX_PythonComponent *comp : m_components) {
-				if (comp->GetActiveState()) {
-					comp->Update();
-				}
-			}
+		/* Activity culling suspends the logic (m_suspended) and clears m_bRender. Components only
+		 * follow that suspension when component culling is enabled; any other suspension stops them. */
+		const bool cullComponents = (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) != 0;
+		const bool suspendedByCulling = m_suspended && !m_bRender;
+		if (m_suspended && (cullComponents || !suspendedByCulling)) {
+			return;
 		}
-		else if (!m_suspended) {
-			for (KX_PythonComponent *comp : m_components) {
-				if (comp->GetActiveState()) {
-					comp->Update();
-				}
+		for (KX_PythonComponent *comp : m_components) {
+			if (comp->GetActiveState()) {
+				comp->Update();
 			}
 		}
 	}
@@ -2863,7 +2866,7 @@ static int mathutils_kxgameob_matrix_set(BaseMathObject *bmo, int subtype)
 		case MATHUTILS_MAT_CB_ORI_GLOBAL:
 		{
 			mat3x3 = mt::mat3(bmo->data);
-			self->NodeSetLocalOrientation(mat3x3);
+			self->NodeSetGlobalOrientation(mat3x3);
 			self->NodeUpdate();
 			break;
 		}

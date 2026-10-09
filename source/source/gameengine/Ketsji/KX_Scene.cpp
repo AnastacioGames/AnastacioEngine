@@ -871,9 +871,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 		}
 		AddNavMeshObstacle(newobj);
 	}
-	// Reconstruct nav mesh.
-	if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_NAVMESH) {
-		static_cast<KX_NavMeshObject *>(gameobj)->BuildNavMesh();
+	// Build the nav mesh of the replica (ProcessReplica leaves it empty); the original keeps its own.
+	if (newobj->GetGameObjectType() == SCA_IObject::OBJ_NAVMESH) {
+		static_cast<KX_NavMeshObject *>(newobj)->BuildNavMesh();
 	}
 
 	// Register object for component update.
@@ -1525,6 +1525,14 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 
 	m_componentManager.UnregisterObject(gameobj);
 	m_destructionManager.UnregisterObject(gameobj);
+
+	// Free the bitmap text meshes duplicated for this replica, the converter would keep them until the scene ends.
+	if (!gameobj->GetBitmapTextMeshes().empty()) {
+		BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+		for (KX_Mesh *mesh : gameobj->GetBitmapTextMeshes()) {
+			converter->UnregisterMesh(this, mesh);
+		}
+	}
 
 	gameobj->RemoveMeshes();
 

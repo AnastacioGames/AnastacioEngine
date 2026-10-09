@@ -107,6 +107,9 @@ protected:
 	The computation should be left to the glsl shader, I keep it for backward compatibility. */
 	static const int TEXTURE_OFFSETS_SIZE = 18; //9 vec2 entries
 	float m_textureOffsets[TEXTURE_OFFSETS_SIZE];
+	/// Canvas size the offsets were computed for, recomputed on resize.
+	int m_offsetsWidth;
+	int m_offsetsHeight;
 
 	std::unordered_map<unsigned short, std::pair<unsigned int, int> > m_textures;
 

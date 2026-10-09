@@ -6,7 +6,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
-## 2026-10-08 - Varredura de trabalho repetido e correções em `RemoveRessources`, Fh e `ReplaceMesh`
+## 2026-10-08 - Varredura de trabalho repetido e os 8 bugs de correção encontrados
 
 - [auditoria-suspeitos.md](auditoria-suspeitos.md): varredura por leitura de código de Converter, Ketsji/SceneGraph,
   Rasterizer, Physics, GameLogic/Network/VideoTexture, Python, laço principal/filtros/ImGui/áudio, gpu e
@@ -19,6 +19,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `KX_GameObject::ReplaceMesh` com física: as cópias compartilham o `CcdShapeConstructionInfo`, e
   `ReinstancePhysicsShape` sem `dupli` refazia o shape de todas elas. Agora passa `dupli=true`, como o
   `reinstancePhysicsMesh(dupli=True)` do Python. Compilou; falta conferir em jogo.
+- `KX_Scene::AddNodeReplicaObject`: reconstruía a navmesh do original a cada cópia e a cópia ficava sem
+  navmesh (`ProcessReplica` zera `m_navMesh`). Agora constrói a da cópia.
+- `worldOrientation[i] = ...` (mathutils, `MATHUTILS_MAT_CB_ORI_GLOBAL`) gravava a orientação local.
+- Texto bitmap 2.4x: cada cópia registrava uma malha duplicada no conversor que só saía no fim da cena.
+  O objeto guarda essas malhas (`m_bitmapTextMeshes`) e `NewRemoveObject` as desregistra.
+- `KX_GameObject::UpdateComponents`: os dois ramos eram iguais e o activity culling sempre parava os
+  componentes. Agora só para com a opção Components ligada; outras suspensões continuam parando.
+- `RAS_2DFilter`: offsets de amostragem (`ge_TextureCoordinateOffset`) eram calculados só no 1º frame;
+  agora são recalculados quando o canvas muda de tamanho.
+- Todos compilados no `RangeEngine`; nenhum conferido em jogo ainda.
 
 ## 2026-10-08 - Static Batch, culling sem AABB repetida e detector de trabalho repetido
 

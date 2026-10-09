@@ -140,6 +140,8 @@ protected:
 	/// Set on the first dent (OB_DEFORMABLE): AddMeshUser() gives the instance a KX_DentDeformer.
 	/// Lazy, so objects never hit keep the shared mesh (no copy, instancing kept).
 	bool								m_wantsDentDeformer;
+	/// Bitmap text meshes duplicated for this replica, unregistered from the converter when it is removed.
+	std::vector<KX_Mesh *>				m_bitmapTextMeshes;
 	/// True while a billboard LoD level drives the orientation; the original one is kept in
 	/// m_lodBillboardOrientation and restored when a non billboard level is reached.
 	bool								m_lodBillboardActive;
@@ -884,6 +886,7 @@ public:
 
 	/// Give a replica its own copy of the meshes showing 2.4x bitmap text, the text is stored in the mesh.
 	void DuplicateBitmapTextMeshes();
+	const std::vector<KX_Mesh *>& GetBitmapTextMeshes() const;
 	
 	/**
 	 * Update buckets with data about the mesh after
