@@ -164,6 +164,7 @@ protected:
 	bool       							m_bRender;
 	bool       							m_bVisibleLOD;
 	bool								m_bOccluder;
+	KX_Camera							*m_hiddenFromCamera = nullptr;
 	bool								m_halfAnimations;
 	bool								m_bDoAnimations;
 
@@ -981,6 +982,19 @@ public:
 	// Same as GetVisible, but this is a specific exception to CalculateVisibleMeshes, which causes it to
 	// not render objects with invisible LoD active
 	bool GetVisibleLOD(void);
+
+	/** Camera that must not draw this object (others still do), e.g. a player's own body in a first
+	 * person view during split screen. Compared only, never dereferenced; cleared when the camera is
+	 * removed from the scene. Replicas start without one. */
+	KX_Camera *GetHiddenFromCamera() const
+	{
+		return m_hiddenFromCamera;
+	}
+	void SetHiddenFromCamera(KX_Camera *cam);
+	/// Clears every object of the list hidden from cam (cam is being removed).
+	static void ClearHiddenFromCamera(EXP_ListValue<KX_GameObject> *objects, KX_Camera *cam);
+	/// Objects hidden from some camera, engine wide: the render loop skips the filter when zero.
+	static int s_hiddenFromCameraCount;
     void UpdateVisibleLOD(KX_Camera *cam);
 
 	/**
@@ -1278,6 +1292,8 @@ public:
 	static int			pyattr_set_layer(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject*	pyattr_get_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static int			pyattr_set_halfanimations(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_culled(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_cullingBox(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

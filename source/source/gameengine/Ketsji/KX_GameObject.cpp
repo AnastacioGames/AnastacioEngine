@@ -269,8 +269,31 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 #endif  // WITH_PYTHON
 }
 
+int KX_GameObject::s_hiddenFromCameraCount = 0;
+
+void KX_GameObject::SetHiddenFromCamera(KX_Camera *cam)
+{
+	if ((m_hiddenFromCamera != nullptr) != (cam != nullptr)) {
+		s_hiddenFromCameraCount += cam ? 1 : -1;
+	}
+	m_hiddenFromCamera = cam;
+}
+
+void KX_GameObject::ClearHiddenFromCamera(EXP_ListValue<KX_GameObject> *objects, KX_Camera *cam)
+{
+	if (s_hiddenFromCameraCount == 0 || !objects) {
+		return;
+	}
+	for (KX_GameObject *obj : objects) {
+		if (obj->m_hiddenFromCamera == cam) {
+			obj->SetHiddenFromCamera(nullptr);
+		}
+	}
+}
+
 KX_GameObject::~KX_GameObject()
 {
+	SetHiddenFromCamera(nullptr);
 #ifdef WITH_PYTHON
 	if (m_attr_dict) {
 		PyDict_Clear(m_attr_dict); /* in case of circular refs or other weird cases */
@@ -3315,6 +3338,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("layer", KX_GameObject, pyattr_get_layer, pyattr_set_layer),
 	EXP_PYATTRIBUTE_SHORT_RW("passIndex", 0, SHRT_MAX, false, KX_GameObject, m_passIndex),
 	EXP_PYATTRIBUTE_RW_FUNCTION("visible",  KX_GameObject, pyattr_get_visible,  pyattr_set_visible),
+	EXP_PYATTRIBUTE_RW_FUNCTION("hiddenFromCamera", KX_GameObject, pyattr_get_hidden_from_camera, pyattr_set_hidden_from_camera),
 	EXP_PYATTRIBUTE_RO_FUNCTION("culled", KX_GameObject, pyattr_get_culled),
 	EXP_PYATTRIBUTE_RO_FUNCTION("cullingBox",   KX_GameObject, pyattr_get_cullingBox),
 	EXP_PYATTRIBUTE_BOOL_RW("occlusion", KX_GameObject, m_bOccluder),
@@ -4266,6 +4290,27 @@ PyObject *KX_GameObject::pyattr_get_visible(EXP_PyObjectPlus *self_v, const EXP_
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 	return PyBool_FromLong(self->GetVisible());
+}
+
+PyObject *KX_GameObject::pyattr_get_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	KX_Camera *cam = self->m_hiddenFromCamera;
+	if (!cam) {
+		Py_RETURN_NONE;
+	}
+	return cam->GetProxy();
+}
+
+int KX_GameObject::pyattr_set_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	KX_Camera *cam = nullptr;
+	if (!ConvertPythonToCamera(self->GetScene(), value, &cam, true, "gameOb.hiddenFromCamera = camera: KX_GameObject")) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->SetHiddenFromCamera(cam);
+	return PY_SET_ATTR_SUCCESS;
 }
 
 int KX_GameObject::pyattr_set_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)

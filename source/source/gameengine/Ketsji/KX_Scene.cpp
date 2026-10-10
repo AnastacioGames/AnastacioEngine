@@ -1574,6 +1574,8 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_cameralist->RemoveValue(gameobj)) {
+		// Nothing may keep pointing at the camera being removed (hiddenFromCamera).
+		KX_GameObject::ClearHiddenFromCamera(m_objectlist, static_cast<KX_Camera *>(gameobj));
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_renderlist->RemoveValue(gameobj)) {

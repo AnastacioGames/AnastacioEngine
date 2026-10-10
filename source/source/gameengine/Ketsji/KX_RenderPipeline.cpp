@@ -577,8 +577,22 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	// Culling + LOD update, reused across cameras of this scene/frame that share the same
 	// cullingcam/eye pair (see GetVisibleMeshes doc comment on the header).
 	std::unique_ptr<SlowPhaseNote> cullingNote(new SlowPhaseNote("cam.culling", scene));
-	const std::vector<KX_GameObject *>& objects = GetVisibleMeshes(scene, cullingcam, eye);
+	const std::vector<KX_GameObject *>& culledObjects = GetVisibleMeshes(scene, cullingcam, eye);
 	cullingNote.reset();
+
+	// gameOb.hiddenFromCamera: drop the objects this camera must not draw. The cached culling result
+	// is shared by cameras with the same cullingcam, so filter a copy, and only when some object asks.
+	std::vector<KX_GameObject *> cameraObjects;
+	if (KX_GameObject::s_hiddenFromCameraCount > 0) {
+		cameraObjects.reserve(culledObjects.size());
+		for (KX_GameObject *gameobj : culledObjects) {
+			if (gameobj->GetHiddenFromCamera() != rendercam) {
+				cameraObjects.push_back(gameobj);
+			}
+		}
+	}
+	const std::vector<KX_GameObject *>& objects =
+	    (KX_GameObject::s_hiddenFromCameraCount > 0) ? cameraObjects : culledObjects;
 
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
