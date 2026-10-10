@@ -147,9 +147,8 @@ class KX_DebugMode
 
   /***************** No save variables ****************/
 
-  // s_physics, s_logic, s_animations, s_scenegraph, s_rasterizer, s_overhead. Note: Jump the
-  // s_network
-  ScrollingBuffer m_profileBuffer[8];
+  // One stacked series per Graph Profiler group (graphGroupLabels in KX_DebugMode.cpp).
+  ScrollingBuffer m_profileBuffer[9];
   float m_advprofileTime;
 
   // used for pick an GameObject by mouse position.

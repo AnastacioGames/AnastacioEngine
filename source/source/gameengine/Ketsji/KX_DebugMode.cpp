@@ -106,6 +106,17 @@ KX_DebugMode::~KX_DebugMode()
 {
 };
 
+/* The panels keep raw object pointers between frames; game logic may have ended the object. */
+static bool IsLiveObject(KX_GameObject *gameObj)
+{
+	for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
+		if (scene->GetObjectList()->SearchValue(gameObj)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /* Render Debug Mode */
 void KX_DebugMode::RenderImguiDebugMode() {
 	m_vehicleDebugUI.AutoLoadPresets();
@@ -130,6 +141,9 @@ void KX_DebugMode::RenderImguiDebugMode() {
 	}
 	ImGui::End();
 	// Check if have a selected object.
+	if (imgui_KXObSelected && !IsLiveObject(imgui_KXObSelected)) {
+		imgui_KXObSelected = nullptr;
+	}
 	if (imgui_KXObSelected) {
 		if (ImGui::Begin("GameObject Panel")) {
 			RenderGameObjectPanel();
@@ -216,12 +230,37 @@ void KX_DebugMode::RenderDebugProperties()
   window_pos_pivot.y = 0.0f;
   // Only pin the initial position/size: once placed, let the user drag/resize it like any other window.
   ImGui::SetNextWindowPos(window_pos, ImGuiCond_FirstUseEver, window_pos_pivot);
-  ImGui::SetNextWindowSize(ImVec2(230.0f * m_profileSize, 0.0f), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(350.0f * m_profileSize, 0.0f), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowViewport(viewport->ID);
+
+  /* Draw with the engine font built at the exact pixel size (as the AnastacioNetwork menu does)
+   * instead of stretching the 12 px one, so the text stays sharp at any Profile Size. A new size
+   * is only built once the mouse is released, so dragging the slider does not fill the atlas. */
+  const float targetPx = std::round(14.0f * m_profileSize);
+  static float builtPx = 0.0f;
+  if (builtPx == 0.0f || !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    builtPx = targetPx;
+  }
+  struct FontScope {
+    bool pushed = false;
+    ~FontScope()
+    {
+      if (pushed) {
+        ImGui::PopFont();
+      }
+    }
+  } fontScope;
+  float fontScale = targetPx / 12.0f;  // Fallback while the font is not built yet.
+  const int fontId = KX_Imgui::RequestDefaultFont(builtPx);
+  if (fontId >= 0) {
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[fontId]);
+    fontScope.pushed = true;
+    fontScale = targetPx / builtPx;
+  }
 
   ImGui::SetNextWindowBgAlpha(0.5f);  // Transparent background
   if (ImGui::Begin("DebugProperties", (bool *)0, window_flags)) {
-    ImGui::SetWindowFontScale(m_profileSize * 0.8f);
+    ImGui::SetWindowFontScale(fontScale);
 
     double tottime = KX_GetActiveEngine()->m_tottime;
     double rendertime = KX_GetActiveEngine()->m_rendertimeaverage;
@@ -479,30 +518,35 @@ void KX_DebugMode::RenderScenePanel() {
 			int sceneIndex = 0;
 
 			for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
-				char sceneName[64];
+				char sceneName[128];
 				// Scene Index / Name.
-				sprintf(sceneName, "%s ##%i", scene->GetName().c_str(), sceneIndex);
+				snprintf(sceneName, sizeof(sceneName), "%s ##%i", scene->GetName().c_str(), sceneIndex);
 
 				if (ImGui::CollapsingHeader(sceneName)) {
+					// Replicas share their name: the ID must come from scene + index.
+					ImGui::PushID(sceneIndex);
 					for (int i = 0; i < scene->GetObjectList()->GetCount(); i++)
 					{
 						KX_GameObject *gameObj = scene->GetObjectList()->GetValue(i);
 
-						if (ImGui::Selectable(gameObj->GetName().c_str(), false)) {
+						ImGui::PushID(i);
+						if (ImGui::Selectable(gameObj->GetName().c_str(), gameObj == imgui_KXObSelected)) {
 							imgui_KXObSelected = gameObj;
 						}
+						ImGui::PopID();
 					}
+					ImGui::PopID();
 				}
 			sceneIndex++;
 			}
-
-			/* Draw Projected Circle in selected object. */
-			if (imgui_KXObSelected) {
-				DrawCircleProjectedOnObject(imgui_KXObSelected);
-			}
-
-			ImGui::EndChild();
 		}
+		ImGui::EndChild();
+
+		/* Draw Projected Circle in selected object. */
+		if (imgui_KXObSelected) {
+			DrawCircleProjectedOnObject(imgui_KXObSelected);
+		}
+
 		if (ImGui::Button("Pick Object", ImVec2(100, 0))) {
 			m_pickSceneObject = !m_pickSceneObject;
 		}
@@ -530,38 +574,41 @@ void KX_DebugMode::RenderScenePanel() {
 	if (ImGui::CollapsingHeader("Cameras")) {
 		/* Camera Change */
 		ImGui::TextUnformatted("Scene Cameras");
-		ImGui::BulletText("Double click to control the camera");
+		ImGui::BulletText("Click a camera to look through it, click it again to control it");
 		ImGui::BeginChild("Scene Cameras", ImVec2(0, 150), true);
 
 		// Always Use Front Scene.
 		KX_Scene *scene = KX_GetActiveEngine()->GetScenes()->GetFront();
+		// The game may switch cameras by itself: highlight the one really in use.
+		for (int i = 0; i < scene->GetCameraList()->GetCount(); i++) {
+			if (scene->GetCameraList()->GetValue(i) == scene->GetActiveCamera()) {
+				imgui_cameraSelected = i;
+			}
+		}
 		for (int i = 0; i < scene->GetCameraList()->GetCount(); i++)
 		{
-			char label[64] = "Editor Camera";
+			char label[128] = "Editor Camera";
 			KX_Camera *camOb = scene->GetCameraList()->GetValue(i);
 
 			if (camOb->GetName() != "__default__cam__") {
-				sprintf(label, "%s", camOb->GetName().c_str());
+				snprintf(label, sizeof(label), "%s", camOb->GetName().c_str());
 			}
-			
-			if (ImGui::Selectable(label, imgui_cameraSelected == i)) {
+
+			ImGui::PushID(i);
+			const bool clicked = ImGui::Selectable(label, imgui_cameraSelected == i);
+			ImGui::PopID();
+			if (clicked) {
 				// Controll the camera, if selected previously
 				if (imgui_cameraSelected == i) {
 					// enable camera controller
 					this->EnableCameraController(camOb, false);
+					break;  // May have added the dev camera to the list.
 				}
-				// If it wasn't double-clicked, let's just look at the camera
+				// Otherwise let's just look at the camera
 				else {
 					scene->SetActiveCamera(camOb);
 					imgui_cameraSelected = i;
-					
-					if (camOb->GetName() == "__default__cam__") {
-						sprintf(label, "%s", camOb->GetName().c_str());
-						imgui_blockInputEvents = true;
-					}
-					else {
-						imgui_blockInputEvents = false;
-					}
+					imgui_blockInputEvents = (camOb->GetName() == "__default__cam__");
 				}
 			}
 		}
@@ -598,76 +645,100 @@ void KX_DebugMode::RenderOptionsPanel() {
 	ImGui::Separator();
 
 	ImGui::TextUnformatted("Profile settings");
-	if (ImGui::Button("Show Framerate")) {
-		KX_GetActiveEngine()->ToggleFlag(KX_KetsjiEngine::SHOW_FRAMERATE);
+	// Checkboxes read the flags back every frame, so they show what is really on.
+	KX_KetsjiEngine *engine = KX_GetActiveEngine();
+	bool framerate = engine->GetFlag(KX_KetsjiEngine::SHOW_FRAMERATE);
+	if (ImGui::Checkbox("Show Framerate", &framerate)) {
+		engine->SetFlag(KX_KetsjiEngine::SHOW_FRAMERATE, framerate);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Show Profile")) {
-		KX_GetActiveEngine()->ToggleFlag(KX_KetsjiEngine::SHOW_PROFILE);
+	bool profile = engine->GetFlag(KX_KetsjiEngine::SHOW_PROFILE);
+	if (ImGui::Checkbox("Show Profile", &profile)) {
+		engine->SetFlag(KX_KetsjiEngine::SHOW_PROFILE, profile);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Show Debug Properties")) {
-		KX_GetActiveEngine()->ToggleFlag(KX_KetsjiEngine::SHOW_DEBUG_PROPERTIES);
+	bool properties = engine->GetFlag(KX_KetsjiEngine::SHOW_DEBUG_PROPERTIES);
+	if (ImGui::Checkbox("Show Debug Properties", &properties)) {
+		engine->SetFlag(KX_KetsjiEngine::SHOW_DEBUG_PROPERTIES, properties);
 	}
 
 	ImGui::SliderFloat("Profile Size", &m_profileSize, 0.9f, 4.0f);
 	ImGui::SliderFloat("Debug Properties Size", &m_debugPropertiesSize, 1.0f, 10.0f);
 }
 
-void KX_DebugMode::RenderProfiling() {
-	ImGui::SetWindowFontScale(0.8f);
+namespace {
+/* Graph Profiler series: the engine time categories merged into a few readable groups, stacked
+ * in this order from the top of the chart. Sleeping (tc_outside) is idle time and is left out. */
+const int GRAPH_GROUPS = 9;
+const char *const graphGroupLabels[GRAPH_GROUPS] = {
+	"Physics", "Logic", "Animations", "Scenegraph", "Culling", "Render", "Shadows", "Overhead", "GPU Latency"};
 
-	if (ImGui::CollapsingHeader("Graph Profiler")) {
-		//ImGui::SetWindowSize(ImVec2(0, 20.0f));
-		if (!KX_GetActiveScene()->m_suspend) {
+int GraphGroup(int tc)
+{
+	switch (tc) {
+		case KX_KetsjiEngine::tc_physics:
+			return 0;
+		case KX_KetsjiEngine::tc_logic:
+		case KX_KetsjiEngine::tc_actuators:
+			return 1;
+		case KX_KetsjiEngine::tc_animations:
+		case KX_KetsjiEngine::tc_animations_deform:
+			return 2;
+		case KX_KetsjiEngine::tc_scenegraph:
+		case KX_KetsjiEngine::tc_scenegraph_logic:
+		case KX_KetsjiEngine::tc_scenegraph_actuators:
+		case KX_KetsjiEngine::tc_scenegraph_physics:
+			return 3;
+		case KX_KetsjiEngine::tc_network:  // CameraCulling
+		case KX_KetsjiEngine::tc_shadowculling:
+		case KX_KetsjiEngine::tc_services:  // ActivityCulling
+			return 4;
+		case KX_KetsjiEngine::tc_rasterizer:
+		case KX_KetsjiEngine::tc_collisiondepth:
+		case KX_KetsjiEngine::tc_texturerenderers:
+		case KX_KetsjiEngine::tc_particles:
+		case KX_KetsjiEngine::tc_filters2d:
+			return 5;
+		case KX_KetsjiEngine::tc_shadows:
+		case KX_KetsjiEngine::tc_lightupdate:
+			return 6;
+		case KX_KetsjiEngine::tc_input:
+		case KX_KetsjiEngine::tc_overhead:
+			return 7;
+		case KX_KetsjiEngine::tc_latency:
+			return 8;
+		default:
+			return -1;
+	}
+}
+}  // namespace
+
+void KX_DebugMode::RenderProfiling() {
+	static_assert(sizeof(m_profileBuffer) / sizeof(m_profileBuffer[0]) == GRAPH_GROUPS,
+	              "m_profileBuffer must have one buffer per Graph Profiler group");
+	KX_KetsjiEngine *engine = KX_GetActiveEngine();
+
+	const bool graphOpen = ImGui::CollapsingHeader("Graph Profiler");
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) {
+		ImGui::SetTooltip("Activate Graph Profiler (WARNING: This has a high impact on performance).");
+	}
+	if (graphOpen) {
+		if (!engine->GetScenes()->GetFront()->IsSuspended()) {
 			m_advprofileTime += ImGui::GetIO().DeltaTime;
 
-			// Physics, Logic, Animations, Scenegraph, Rasterizer, Overhead 
-			for (int i = 7; i >= 0; i--) {
-				KX_KetsjiEngine::KX_TimeCategory tc = (KX_KetsjiEngine::KX_TimeCategory)i;
-				if (i == KX_KetsjiEngine::tc_network) { tc = KX_KetsjiEngine::tc_scenegraph; }
-				if (i == KX_KetsjiEngine::tc_services) { tc = KX_KetsjiEngine::tc_overhead; }
+			float groupMs[GRAPH_GROUPS] = {};
+			for (int tc = KX_KetsjiEngine::tc_first; tc < KX_KetsjiEngine::tc_numCategories; tc++) {
+				const int group = GraphGroup(tc);
+				if (group >= 0) {
+					groupMs[group] += engine->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)tc) * 1000.f;
+				}
+			}
 
-				float time = KX_GetActiveEngine()->m_logger.GetAverage(tc) * 1000.f;
-
-				/* We need to stack all the values.
-				/* I tried to do a for loop but in this case i really couldn't do it.. if someone, be careful. */
-				float stime = 0;
-				if (i == KX_KetsjiEngine::tc_rasterizer) {
-					stime = KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_overhead) * 1000.f;
-				}
-				else if (i == KX_KetsjiEngine::tc_scenegraph) {
-					stime = KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_overhead) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_rasterizer) * 1000.f;
-				}
-				else if (i == KX_KetsjiEngine::tc_animations) {
-					stime = KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_overhead) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_rasterizer) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_scenegraph) * 1000.f;
-				}
-				else if (i == KX_KetsjiEngine::tc_logic) {
-					stime = KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_overhead) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_rasterizer) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_scenegraph) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_animations) * 1000.f;
-				}
-				else if (i == KX_KetsjiEngine::tc_physics) {
-					stime = KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_overhead) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_rasterizer) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_scenegraph) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_animations) * 1000.f;
-					stime += KX_GetActiveEngine()->m_logger.GetAverage(KX_KetsjiEngine::tc_logic) * 1000.f;
-				}
-
-				if (stime != 0) {
-					time += stime;
-				}
-
-				// Debugging
-				/*using namespace std;
-				if (i == KX_KetsjiEngine::tc_physics) { cout << time << "\n";  }*/
-
-				m_profileBuffer[i].AddPoint(m_advprofileTime, time);
+			// Stack from the last group up, so buffer 0 holds the whole frame's work time.
+			float stacked = 0.0f;
+			for (int group = GRAPH_GROUPS - 1; group >= 0; group--) {
+				stacked += groupMs[group];
+				m_profileBuffer[group].AddPoint(m_advprofileTime, stacked);
 			}
 		}
 
@@ -675,9 +746,13 @@ void KX_DebugMode::RenderProfiling() {
 		ImGui::SameLine();
 		ImGui::Checkbox("AutoResize", &m_autoResize);
 
+		// Nothing recorded yet (header opened with the scene paused).
+		const bool hasData = !m_profileBuffer[0].Data.empty();
+		const float workMs = hasData ? m_profileBuffer[0].GetLastPointY().y : 0.0f;
+
 		if (ImPlot::BeginPlot("##MainProfile", ImVec2(0, 175))) {
 
-			ImPlot::SetupAxes("Time (Seconds)", "Ms(milliseconds)");
+			ImPlot::SetupAxes("Time (Seconds)", "Milliseconds");
 			ImPlot::SetupAxisLimits(ImAxis_X1, m_advprofileTime - m_history, m_advprofileTime, ImGuiCond_Always);
 			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, m_axisLimit, m_axisCondition);
 
@@ -685,45 +760,46 @@ void KX_DebugMode::RenderProfiling() {
 				m_axisCondition = ImGuiCond_Once;
 			}
 			else if (m_autoResize){
-				m_axisLimit = m_profileBuffer[0].GetLastPointY().y + 5;
+				m_axisLimit = workMs + 5;
 				m_axisCondition = ImGuiCond_Always;
 			}
-		
-			for (int i = 0; i < 8; i++) {
-				int tc = i;
-				if (i == KX_KetsjiEngine::tc_network) { tc = KX_KetsjiEngine::tc_scenegraph; }
-				else if (i == KX_KetsjiEngine::tc_services) { tc = KX_KetsjiEngine::tc_overhead; }
 
-				ImPlot::PlotShaded(KX_GetActiveEngine()->m_profileLabels[tc].c_str(), &m_profileBuffer[tc].Data[0].x, &m_profileBuffer[tc].Data[0].y, m_profileBuffer[tc].Data.size(), 0, 0, m_profileBuffer[tc].Offset, 2 * sizeof(float));
+			if (hasData) {
+				for (int group = 0; group < GRAPH_GROUPS; group++) {
+					ScrollingBuffer &buffer = m_profileBuffer[group];
+					ImPlot::PlotShaded(graphGroupLabels[group], &buffer.Data[0].x, &buffer.Data[0].y, buffer.Data.size(), 0, 0, buffer.Offset, 2 * sizeof(float));
+				}
 			}
 
-			double linePos = 16.0;
+			// Frame budget reference lines.
+			double linePos = 1000.0 / 60.0;
 			ImPlot::DragLineY(0, &linePos, ImVec4(1, 1, 0, 1), 1, ImPlotDragToolFlags_NoInputs);
-			ImPlot::TagY(16.f, ImVec4(1, 1, 0, 1), "60FPS");
+			ImPlot::TagY(linePos, ImVec4(1, 1, 0, 1), "60FPS");
 
-			linePos = 33.0;
+			linePos = 1000.0 / 30.0;
 			ImPlot::DragLineY(0, &linePos, ImVec4(1, 1, 0, 1), 1, ImPlotDragToolFlags_NoInputs);
-			ImPlot::TagY(33.f, ImVec4(1, 1, 0, 1), "30FPS");
+			ImPlot::TagY(linePos, ImVec4(1, 1, 0, 1), "30FPS");
 
-			linePos = 66.0;
+			linePos = 1000.0 / 15.0;
 			ImPlot::DragLineY(0, &linePos, ImVec4(1, 1, 0, 1), 1, ImPlotDragToolFlags_NoInputs);
-			ImPlot::TagY(66.f, ImVec4(1, 1, 0, 1), "15FPS");
+			ImPlot::TagY(linePos, ImVec4(1, 1, 0, 1), "15FPS");
 
-			// FPS Line
-			linePos = m_profileBuffer[0].GetLastPointY().y;
-			ImPlot::DragLineY(0, &linePos, ImVec4(0, 1, 0, 0.5f), 1, ImPlotDragToolFlags_NoInputs);
-			ImPlot::TagY(m_profileBuffer[0].GetLastPointY().y, ImVec4(0, 1, 0, 1), "FPS %.1f", (1.0f / KX_GetActiveEngine()->m_logger.GetAverage()));
+			// Work time of the frame (top of the stack) and the frame rate actually reached.
+			if (hasData) {
+				linePos = workMs;
+				ImPlot::DragLineY(0, &linePos, ImVec4(0, 1, 0, 0.5f), 1, ImPlotDragToolFlags_NoInputs);
+				ImPlot::TagY(workMs, ImVec4(0, 1, 0, 1), "%.1fms | %.0fFPS", workMs, (1.0f / engine->m_logger.GetAverage()));
+			}
 
 			ImPlot::EndPlot();
 		}
 	}
 
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) {
-          ImGui::SetTooltip("Activate Graph Profiler (WARNING: This has a high impact on performance).");
-    }
-
 	// Toggle Advanced Profiling.
 	m_AdvancedProfiling = ImGui::CollapsingHeader("Advanced Profiling");
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) {
+		ImGui::SetTooltip("Activate Advanced Profiling (WARNING: This has a high impact on performance).");
+	}
     if (m_AdvancedProfiling) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.3f, 0.3f, 0.3f, 0.7f)); // Change Background color.
 		if (ImGui::BeginChild("Advanced Profiling Panel")) {
@@ -743,10 +819,19 @@ void KX_DebugMode::RenderProfiling() {
 			// List of objects, Order of more/less impact on performance.
 			if (ImGui::BeginChild("Profiling Objects List", ImVec2(0, 150), true)) {
 
-				// Update Vector List and sort.
-				if (m_sortObjectProfilingDelay >= m_sortObjectProfilingDelay_time) {
-					EXP_ListValue<KX_GameObject> *objects = KX_GetActiveEngine()->GetScenes()->GetFront()->GetObjectList();
+				EXP_ListValue<KX_GameObject> *objects = KX_GetActiveEngine()->GetScenes()->GetFront()->GetObjectList();
 
+				// Objects removed since the last sort would be dangling pointers: rebuild right away.
+				bool stale = m_ObjectsProfiling.empty();
+				for (KX_GameObject *gameObj : m_ObjectsProfiling) {
+					if (!objects->SearchValue(gameObj)) {
+						stale = true;
+						break;
+					}
+				}
+
+				// Update Vector List and sort.
+				if (stale || m_sortObjectProfilingDelay >= m_sortObjectProfilingDelay_time) {
 					m_ObjectsProfiling.clear(); // clear
 
 					for (KX_GameObject *gameobj : objects) {
@@ -761,7 +846,7 @@ void KX_DebugMode::RenderProfiling() {
 				for (KX_GameObject *gameObj : m_ObjectsProfiling) {
 
 					char name[128];
-					sprintf(name, "%i - %s", (index + 1), gameObj->GetName().c_str());
+					snprintf(name, sizeof(name), "%i - %s", (index + 1), gameObj->GetName().c_str());
 					if (ImGui::Selectable(name, false)) { // ToDo
 						imgui_KXObSelected = gameObj;
 					}
@@ -775,10 +860,6 @@ void KX_DebugMode::RenderProfiling() {
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
 	}
-
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) {
-          ImGui::SetTooltip("Activate Advanced Profiling (WARNING: This has a high impact on performance).");
-    }
 }
 
 void KX_DebugMode::RenderImguiDebug_MainMenuTop() {
@@ -1051,8 +1132,8 @@ void KX_DebugMode::RenderObjectProfiling() {
  Animation: %.4fms)";
 
 	// Format Text.
-    char profilingText[128];
-    sprintf(profilingText, profilingBase, 
+    char profilingText[256];
+    snprintf(profilingText, sizeof(profilingText), profilingBase,
 		isCamera ? R"( Active Camera Profile
 )" : "",
 		ICON_FK_INFO_CIRCLE, 
