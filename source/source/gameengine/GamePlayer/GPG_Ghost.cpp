@@ -1072,7 +1072,9 @@ int main(int argc,
 	U.audioformat = 0x24;
 	U.audiochannels = 2;
 
-	U.anisotropic_filter = 2;
+	// 8x is nearly free on current GPUs and keeps roads/floors sharp at grazing angles
+	// (clamped to the driver maximum, -n on the command line overrides it).
+	U.anisotropic_filter = 8;
 	// enable fast mipmap generation
 	U.use_gpu_mipmap = 1;
 

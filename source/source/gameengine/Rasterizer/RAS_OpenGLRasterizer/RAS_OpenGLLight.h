@@ -61,6 +61,7 @@ public:
 	}
 
 	bool HasShadowBuffer();
+	int GetShadowMapSize();
 	bool NeedShadowUpdate();
 	int GetShadowBindCode();
 	mt::mat4 GetViewMat();

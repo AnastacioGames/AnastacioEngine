@@ -81,6 +81,9 @@ struct GPUTexture {
 	GPUFrameBuffer *fb; /* GPUFramebuffer this texture is attached to */
 	int fb_attachment;  /* slot the texture is attached to */
 	int depth;          /* is a depth texture? if 3D how deep? */
+
+	/* storage of a GPU_texture_create_nD 2D texture, for GPU_texture_resize_2D (0 otherwise) */
+	GLenum internalformat, format, type;
 };
 
 static unsigned char *GPU_texture_convert_pixels(size_t length, const float *fpixels)
@@ -242,6 +245,9 @@ static GPUTexture *GPU_texture_create_nD(
 		else {
 			glTexImage2D(tex->target, 0, internalformat, tex->w, tex->h, 0,
 			             format, type, NULL);
+			tex->internalformat = internalformat;
+			tex->format = format;
+			tex->type = type;
 		}
 
 		if (fpixels) {
@@ -643,6 +649,30 @@ GPUTexture *GPU_texture_create_2D_multisample(
 		GPU_texture_unbind(tex);
 
 	return tex;
+}
+
+/* Reallocates the storage of a 2D texture made by GPU_texture_create_nD (render target, shadow
+ * map) at a new size, keeping the same texture object: materials and framebuffers that reference
+ * it stay valid. Contents are undefined afterwards. */
+bool GPU_texture_resize_2D(GPUTexture *tex, int w, int h)
+{
+	if (tex->target != GL_TEXTURE_2D || tex->internalformat == 0 || w <= 0 || h <= 0)
+		return false;
+
+	if (!GPU_full_non_power_of_two_support()) {
+		w = power_of_2_max_i(w);
+		h = power_of_2_max_i(h);
+	}
+
+	GLint prev = 0;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev);
+	glBindTexture(GL_TEXTURE_2D, tex->bindcode);
+	glTexImage2D(GL_TEXTURE_2D, 0, tex->internalformat, w, h, 0, tex->format, tex->type, NULL);
+	glBindTexture(GL_TEXTURE_2D, prev);
+
+	tex->w = w;
+	tex->h = h;
+	return true;
 }
 
 GPUTexture *GPU_texture_create_depth(int w, int h, bool compare, char err_out[256])

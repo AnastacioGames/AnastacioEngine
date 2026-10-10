@@ -164,6 +164,7 @@ extern "C" {
 #include "BKE_blender_version.h"
 #include "BKE_scene.h"
 #include "BLI_blenlib.h"
+#include "GPU_draw.h"
 #include "GPU_material.h"
 #include "MEM_guardedalloc.h"
 }
@@ -1764,6 +1765,27 @@ static PyObject *gPyGetMaterialType(PyObject *, PyObject *Py_UNUSED(ignored))
 	return PyLong_FromLong(0);
 }
 
+/** The rasterizer texture settings act on G.main; libloaded files keep their images in their own
+ * Main. reload: free the textures (settings applied at upload), otherwise only update filters. */
+static void UpdateLibraryTextures(bool reload)
+{
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	if (!converter) {
+		return;
+	}
+	for (Main *maggie : converter->GetMainList()) {
+		if (maggie == G.main) {
+			continue;
+		}
+		if (reload) {
+			GPU_free_images(maggie);
+		}
+		else {
+			GPU_update_image_filters(maggie);
+		}
+	}
+}
+
 static PyObject *gPySetAnisotropicFiltering(PyObject *, PyObject *args)
 {
 	short level;
@@ -1777,7 +1799,11 @@ static PyObject *gPySetAnisotropicFiltering(PyObject *, PyObject *args)
 		return nullptr;
 	}
 
-	KX_GetActiveEngine()->GetRasterizer()->SetAnisotropicFiltering(level);
+	RAS_Rasterizer *rasty = KX_GetActiveEngine()->GetRasterizer();
+	if (rasty->GetAnisotropicFiltering() != level) {
+		rasty->SetAnisotropicFiltering(level);
+		UpdateLibraryTextures(false);
+	}
 
 	Py_RETURN_NONE;
 }
@@ -1905,8 +1931,45 @@ static PyObject *gPySetMipmapping(PyObject *, PyObject *args)
 		return nullptr;
 	}
 
-	KX_GetActiveEngine()->GetRasterizer()->SetMipmapping((RAS_Rasterizer::MipmapOption)val);
+	RAS_Rasterizer *rasty = KX_GetActiveEngine()->GetRasterizer();
+	const RAS_Rasterizer::MipmapOption old = rasty->GetMipmapping();
+	if (old != val) {
+		rasty->SetMipmapping((RAS_Rasterizer::MipmapOption)val);
+		// Turning mipmaps on needs the mip levels: reload, as SetMipmapping did for G.main.
+		UpdateLibraryTextures(old == RAS_Rasterizer::RAS_MIPMAP_NONE);
+	}
 	Py_RETURN_NONE;
+}
+
+static PyObject *gPySetTextureQuality(PyObject *, PyObject *args)
+{
+	int level = 0;
+
+	if (!PyArg_ParseTuple(args, "i:setTextureQuality", &level)) {
+		return nullptr;
+	}
+
+	if (level < 0 || level > GPU_TEXTURE_QUALITY_MAX) {
+		PyErr_SetString(PyExc_ValueError, "Rasterizer.setTextureQuality(level): expected 0 (full), 1 (half) or 2 (quarter)");
+		return nullptr;
+	}
+
+	RAS_Rasterizer *rasty = KX_GetActiveEngine()->GetRasterizer();
+	if (!rasty) {
+		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.setTextureQuality(level): Rasterizer not available");
+		return nullptr;
+	}
+
+	if (rasty->GetTextureQuality() != level) {
+		rasty->SetTextureQuality(level);
+		UpdateLibraryTextures(true);
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetTextureQuality(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	return PyLong_FromLong(GPU_get_texture_quality());
 }
 
 static PyObject *gPyGetMipmapping(PyObject *, PyObject *Py_UNUSED(ignored))
@@ -2117,6 +2180,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 	 "Get the actual dimensions, in pixels, of the physical display (e.g., the monitor)."},
 	{"setMipmapping", (PyCFunction)gPySetMipmapping, METH_VARARGS, ""},
 	{"getMipmapping", (PyCFunction)gPyGetMipmapping, METH_NOARGS, ""},
+	{"setTextureQuality", (PyCFunction)gPySetTextureQuality, METH_VARARGS, "setTextureQuality(level): 0 full size, 1 half, 2 quarter (reloads textures)"},
+	{"getTextureQuality", (PyCFunction)gPyGetTextureQuality, METH_NOARGS, "getTextureQuality(): 0 full size, 1 half, 2 quarter"},
 	{"setVsync", (PyCFunction)gPySetVsync, METH_VARARGS, ""},
 	{"setDynamicResolution", (PyCFunction)gPySetDynamicResolution, METH_VARARGS | METH_KEYWORDS, ""},
 	{"getRenderScale", (PyCFunction)gPyGetRenderScale, METH_NOARGS, ""},

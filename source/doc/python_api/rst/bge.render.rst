@@ -299,7 +299,8 @@ Functions
    :arg level: The new anisotropic filtering level to use
    :type level: integer (must be one of 1, 2, 4, 8, 16)
 
-   .. note:: Changing this value can cause all textures to be recreated, which can be slow.
+   .. note:: Only the filter of the loaded textures changes, nothing is reloaded. The value is
+      clamped to the maximum of the graphics card. The exported game starts with 8.
 
 .. function:: getAnisotropicFiltering()
 
@@ -328,13 +329,38 @@ Functions
 
    :type value: RAS_MIPMAP_NONE, RAS_MIPMAP_NEAREST, RAS_MIPMAP_LINEAR
 
-   .. note:: Changing this value can cause all textures to be recreated, which can be slow.
+   .. note:: Turning mipmaps on (from RAS_MIPMAP_NONE) recreates all textures, which can be slow.
+      Switching between NEAREST and LINEAR or turning them off only changes the filters.
+      With mipmaps off textures are displayed unfiltered (nearest), useful for pixel art.
 
 .. function:: getMipmapping()
 
    Get the current mipmapping setting.
 
    :rtype: RAS_MIPMAP_NONE, RAS_MIPMAP_NEAREST, RAS_MIPMAP_LINEAR
+
+.. function:: setTextureQuality(level)
+
+   Texture quality of a graphics menu: keep only the high resolution texture in the project and
+   drop its largest mipmap levels when it is sent to the graphics card.
+
+   * ``0``: full size
+   * ``1``: half size (1/4 of the video memory)
+   * ``2``: quarter size (1/16 of the video memory)
+
+   Textures never go below 256 pixels on their larger side, and textures without mipmaps
+   (or with mipmapping off) keep their size. DDS files skip the levels stored in the file.
+
+   :arg level: 0, 1 or 2
+   :type level: integer
+
+   .. note:: All textures are reloaded when the value changes (short hitch): apply it from a
+      menu, not every frame. In the editor the value is restored when the game ends.
+
+.. function:: getTextureQuality()
+
+   :return: the current texture quality (0 full, 1 half, 2 quarter).
+   :rtype: integer
 
 .. function:: drawLine(fromVec,toVec,color)
 

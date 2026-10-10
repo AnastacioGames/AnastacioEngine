@@ -4592,6 +4592,50 @@ void GPU_lamp_free(Object *ob)
 	BLI_freelistN(&ob->gpulamp);
 }
 
+int GPU_lamp_shadow_size(GPULamp *lamp)
+{
+	return (lamp->fb && lamp->depthtex) ? lamp->size : 0;
+}
+
+static bool gpu_lamp_shadow_resize(GPULamp *lamp, int size)
+{
+	if (lamp->depthtex && !GPU_texture_resize_2D(lamp->depthtex, size, size))
+		return false;
+	if (lamp->tex && !GPU_texture_resize_2D(lamp->tex, size, size))
+		return false;
+	if (lamp->blurtex && !GPU_texture_resize_2D(lamp->blurtex, size / 2, size / 2))
+		return false;
+	if (lamp->static_depthtex && !GPU_texture_resize_2D(lamp->static_depthtex, size, size))
+		return false;
+	lamp->static_valid = false;
+	lamp->size = size;
+	return true;
+}
+
+bool GPU_lamp_shadow_set_size(GPULamp *lamp, int size)
+{
+	if (!lamp->fb || !lamp->depthtex || lamp->type == LA_LOCAL)
+		return false;
+
+	size = max_ii(64, min_ii(size, GPU_max_texture_size()));
+	const int old_size = lamp->size;
+	if (size == old_size)
+		return true;
+
+	if (!gpu_lamp_shadow_resize(lamp, size))
+		return false;
+
+	/* cascades keep their ratio to the Near buffer */
+	for (int i = 0; i < 2; i++) {
+		GPULamp *cascade = lamp->cascade[i];
+		if (cascade) {
+			const int cascade_size = max_ii(64, (int)((int64_t)cascade->size * size / old_size));
+			gpu_lamp_shadow_resize(cascade, min_ii(cascade_size, GPU_max_texture_size()));
+		}
+	}
+	return true;
+}
+
 bool GPU_lamp_has_shadow_buffer(GPULamp *lamp)
 {
 	return (!(lamp->scene->gm.flag & GAME_GLSL_NO_SHADOWS) &&

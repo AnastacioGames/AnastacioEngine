@@ -2082,7 +2082,8 @@ static void gpu_inputs_free(ListBase *inputs)
 	for (input = inputs->first; input; input = input->next) {
 		if (input->link)
 			gpu_node_link_free(input->link);
-		else if (input->tex && !input->dynamictex)
+		/* image and preview textures belong to the Image/PreviewImage, not to the pass */
+		else if (input->tex && !input->dynamictex && !input->ima && !input->prv)
 			GPU_texture_free(input->tex);
 	}
 

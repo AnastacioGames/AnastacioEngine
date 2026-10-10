@@ -224,7 +224,21 @@ GPULamp *RAS_OpenGLLight::GetGPULamp()
 
 	KX_GameObject *groupObj = kxlight->GetDupliGroupObject();
 	Object *blenderGroup = groupObj ? groupObj->GetBlenderObject() : nullptr;
-	return GPU_lamp_from_blender(kxlight->GetScene()->GetBlenderScene(), kxlight->GetBlenderObject(), blenderGroup);
+	GPULamp *lamp = GPU_lamp_from_blender(kxlight->GetScene()->GetBlenderScene(), kxlight->GetBlenderObject(), blenderGroup);
+	// Shadow size asked from Python; a recreated GPU lamp starts again from the lamp's Size.
+	if (lamp && m_shadowMapSize > 0) {
+		const int size = GPU_lamp_shadow_size(lamp);
+		if (size != 0 && size != m_shadowMapSize) {
+			GPU_lamp_shadow_set_size(lamp, m_shadowMapSize);
+		}
+	}
+	return lamp;
+}
+
+int RAS_OpenGLLight::GetShadowMapSize()
+{
+	GPULamp *lamp = GetGPULamp();
+	return lamp ? GPU_lamp_shadow_size(lamp) : 0;
 }
 
 bool RAS_OpenGLLight::HasShadowBuffer()

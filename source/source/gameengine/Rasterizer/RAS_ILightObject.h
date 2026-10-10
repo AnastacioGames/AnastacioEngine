@@ -88,6 +88,9 @@ public:
 
 	bool m_staticShadow;
 	bool m_requestShadowUpdate;
+	/// Shadow map resolution asked from Python (light.shadowMapSize), 0 = the lamp's own Size.
+	/// Reapplied whenever the GPU lamp is recreated (e.g. after setGLSLMaterialSetting).
+	int m_shadowMapSize = 0;
 	/// Spot/Point: skip the shadow redraw while nothing in range moved (KX_ShadowRenderer::Render).
 	bool m_autoShadow = false;
 	/// Auto shadow state of the last redraw: lamp transform/params and the transform of every
@@ -112,6 +115,8 @@ public:
 	virtual RAS_ILightObject* Clone() = 0;
 
 	virtual bool HasShadowBuffer() = 0;
+	/// Current shadow map resolution, 0 without shadow buffer.
+	virtual int GetShadowMapSize() = 0;
 	virtual bool NeedShadowUpdate() = 0;
 	virtual int GetShadowBindCode() = 0;
 	virtual mt::mat4 GetShadowMatrix() = 0;
