@@ -2398,8 +2398,12 @@ void KX_Scene::UpdateAnimationDeformers()
 
 void KX_Scene::LogicUpdateFrame(double curtime)
 {
+	// Python components and actuators are separate lines of the profile.
+	KX_TimeCategoryLogger& logger = KX_GetActiveEngine()->GetLogger();
+	logger.StartLog(KX_KetsjiEngine::tc_components);
 	m_componentManager.UpdateComponents();
 
+	logger.StartLog(KX_KetsjiEngine::tc_actuators);
 	m_logicmgr->UpdateFrame(curtime);
 
 	// 3D Audio Update. (only for speakers)

@@ -402,7 +402,8 @@ public:
 		tc_collisiondepth, // GPU particle screen-space collision depth pass
 		tc_texturerenderers, // KX_TextureRendererManager (planar/mirror probes) draw
 		tc_particles, // KX_Scene::UpdateGpuParticleEmitters
-		tc_actuators, // SCA_LogicManager::UpdateFrame (actuators), via KX_Scene::LogicUpdateFrame
+		tc_components, // KX_PythonComponentManager::UpdateComponents (Python components), in KX_Scene::LogicUpdateFrame
+		tc_actuators, // SCA_LogicManager::UpdateFrame (actuators) + 3D audio update, in KX_Scene::LogicUpdateFrame
 		tc_input, // input polling + ImGui NextFrame/ProcessInputEvents, in NextFrame()
 		tc_scenegraph_logic, // UpdateParents() after LogicBeginFrame, before actuators
 		tc_scenegraph_actuators, // UpdateParents() after actuators, before physics

@@ -78,6 +78,8 @@ KX_DebugMode::KX_DebugMode()
       m_sortObjectProfilingDelay(0),
       m_sortObjectProfilingDelay_time(120),
       m_advprofileTime(0.0f),
+      m_graphMode(0),
+      m_graphShowSleeping(true),
       m_pickSceneObject(false),
       m_showOnlyFrameRate(false),
 	  imgui_showDebugMenuTop(true),
@@ -117,8 +119,35 @@ static bool IsLiveObject(KX_GameObject *gameObj)
 	return false;
 }
 
+/* Draws the current scope with the engine font built at `size` px (as the AnastacioNetwork menu
+ * does) instead of the 12 px default. No-op on the frame the size is first asked for. */
+struct DebugFontScope {
+	bool pushed = false;
+
+	explicit DebugFontScope(float size)
+	{
+		const int fontId = KX_Imgui::RequestDefaultFont(size);
+		if (fontId >= 0) {
+			ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[fontId]);
+			pushed = true;
+		}
+	}
+
+	~DebugFontScope()
+	{
+		if (pushed) {
+			ImGui::PopFont();
+		}
+	}
+};
+
+/* Font size of the Debug Mode top bar and panels. */
+static const float DEBUG_FONT_SIZE = 14.0f;
+
 /* Render Debug Mode */
 void KX_DebugMode::RenderImguiDebugMode() {
+	DebugFontScope debugFont(DEBUG_FONT_SIZE);
+
 	m_vehicleDebugUI.AutoLoadPresets();
 	/* Console window is independent from the rest of the debug UI toggle. */
 	if (imgui_showConsole) {
@@ -233,30 +262,16 @@ void KX_DebugMode::RenderDebugProperties()
   ImGui::SetNextWindowSize(ImVec2(350.0f * m_profileSize, 0.0f), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowViewport(viewport->ID);
 
-  /* Draw with the engine font built at the exact pixel size (as the AnastacioNetwork menu does)
-   * instead of stretching the 12 px one, so the text stays sharp at any Profile Size. A new size
+  /* Font built at the exact pixel size, so the text stays sharp at any Profile Size. A new size
    * is only built once the mouse is released, so dragging the slider does not fill the atlas. */
-  const float targetPx = std::round(14.0f * m_profileSize);
+  const float targetPx = std::round(DEBUG_FONT_SIZE * m_profileSize);
   static float builtPx = 0.0f;
   if (builtPx == 0.0f || !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
     builtPx = targetPx;
   }
-  struct FontScope {
-    bool pushed = false;
-    ~FontScope()
-    {
-      if (pushed) {
-        ImGui::PopFont();
-      }
-    }
-  } fontScope;
-  float fontScale = targetPx / 12.0f;  // Fallback while the font is not built yet.
-  const int fontId = KX_Imgui::RequestDefaultFont(builtPx);
-  if (fontId >= 0) {
-    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[fontId]);
-    fontScope.pushed = true;
-    fontScale = targetPx / builtPx;
-  }
+  DebugFontScope fontScope(builtPx);
+  // Stretch the 12 px default while the font is not built yet.
+  const float fontScale = targetPx / (fontScope.pushed ? builtPx : 12.0f);
 
   ImGui::SetNextWindowBgAlpha(0.5f);  // Transparent background
   if (ImGui::Begin("DebugProperties", (bool *)0, window_flags)) {
@@ -270,10 +285,10 @@ void KX_DebugMode::RenderDebugProperties()
     auto rateColor = [](double time) -> ImVec4 {
       float fps = (float)(1.0 / time);
       if (fps < 24) {
-        return ImVec4(225, 255, 0, 225);  // yellow
+        return ImVec4(225, 0, 0, 225);  // red
       }
       if (fps < 30) {
-        return ImVec4(225, 0, 0, 225);  // red
+        return ImVec4(225, 255, 0, 225);  // yellow
       }
       return ImVec4(0, 255, 0, 225);  // green
     };
@@ -383,12 +398,16 @@ void KX_DebugMode::RenderDebugProperties()
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.55f);
 
         const ImU32 barCol = ImColor(0.2f, 0.2f, 0.2f, 0.85f);
+        // Share of the averaged frame: the category times are averages, so dividing them by
+        // the last frame alone made the percentages jump and not add up to 100.
+        const double averageTotal = std::max(KX_GetActiveEngine()->m_logger.GetAverage(), 1e-9);
         for (int j = KX_GetActiveEngine()->tc_first; j < KX_GetActiveEngine()->tc_numCategories; j++) {
           double time = KX_GetActiveEngine()->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)j);
-          int percentage = (int)(time / tottime * 100.f);
+          int percentage = (int)(time / averageTotal * 100.f);
 
           ImVec4 color = ImVec4(0, 255, 0, 225);  // green (Default)
-          if (j != KX_GetActiveEngine()->tc_latency) {
+          // Sleeping is spare time, so it reads the other way round: little of it is the warning.
+          if (j != KX_GetActiveEngine()->tc_outside) {
             /* Red */
             if (percentage > 50)
               color = ImVec4(225, 0, 0, 225);
@@ -547,7 +566,7 @@ void KX_DebugMode::RenderScenePanel() {
 			DrawCircleProjectedOnObject(imgui_KXObSelected);
 		}
 
-		if (ImGui::Button("Pick Object", ImVec2(100, 0))) {
+		if (ImGui::Button("Pick Object", ImVec2(120, 0))) {
 			m_pickSceneObject = !m_pickSceneObject;
 		}
 		if (m_pickSceneObject) {
@@ -566,7 +585,7 @@ void KX_DebugMode::RenderScenePanel() {
 		}
 
 		ImGui::SameLine();
-		if (ImGui::Button("Deselect Object", ImVec2(100, 0))) {
+		if (ImGui::Button("Deselect Object", ImVec2(120, 0))) {
 			imgui_KXObSelected = nullptr;
 		}
 	}
@@ -669,9 +688,17 @@ void KX_DebugMode::RenderOptionsPanel() {
 namespace {
 /* Graph Profiler series: the engine time categories merged into a few readable groups, stacked
  * in this order from the top of the chart. Sleeping (tc_outside) is idle time and is left out. */
-const int GRAPH_GROUPS = 9;
+const int GRAPH_GROUPS = 10;
 const char *const graphGroupLabels[GRAPH_GROUPS] = {
-	"Physics", "Logic", "Animations", "Scenegraph", "Culling", "Render", "Shadows", "Overhead", "GPU Latency"};
+	"Physics", "Logic+Actuators", "Components", "Animations+Skinning", "Scenegraph",
+	"Culling", "Render", "Shadows", "Overhead", "GPU Latency"};
+
+/* One fixed color per group plus Sleeping (last), shared by the three charts. */
+const ImVec4 graphColors[GRAPH_GROUPS + 1] = {
+	ImVec4(0.298f, 0.447f, 0.690f, 1.0f), ImVec4(0.867f, 0.518f, 0.322f, 1.0f), ImVec4(0.800f, 0.725f, 0.455f, 1.0f),
+	ImVec4(0.333f, 0.659f, 0.408f, 1.0f), ImVec4(0.769f, 0.306f, 0.322f, 1.0f), ImVec4(0.506f, 0.447f, 0.702f, 1.0f),
+	ImVec4(0.576f, 0.471f, 0.376f, 1.0f), ImVec4(0.855f, 0.545f, 0.765f, 1.0f), ImVec4(0.549f, 0.549f, 0.549f, 1.0f),
+	ImVec4(0.392f, 0.710f, 0.804f, 1.0f), ImVec4(0.230f, 0.230f, 0.260f, 1.0f)};
 
 int GraphGroup(int tc)
 {
@@ -681,32 +708,34 @@ int GraphGroup(int tc)
 		case KX_KetsjiEngine::tc_logic:
 		case KX_KetsjiEngine::tc_actuators:
 			return 1;
+		case KX_KetsjiEngine::tc_components:
+			return 2;
 		case KX_KetsjiEngine::tc_animations:
 		case KX_KetsjiEngine::tc_animations_deform:
-			return 2;
+			return 3;
 		case KX_KetsjiEngine::tc_scenegraph:
 		case KX_KetsjiEngine::tc_scenegraph_logic:
 		case KX_KetsjiEngine::tc_scenegraph_actuators:
 		case KX_KetsjiEngine::tc_scenegraph_physics:
-			return 3;
+			return 4;
 		case KX_KetsjiEngine::tc_network:  // CameraCulling
 		case KX_KetsjiEngine::tc_shadowculling:
 		case KX_KetsjiEngine::tc_services:  // ActivityCulling
-			return 4;
+			return 5;
 		case KX_KetsjiEngine::tc_rasterizer:
 		case KX_KetsjiEngine::tc_collisiondepth:
 		case KX_KetsjiEngine::tc_texturerenderers:
 		case KX_KetsjiEngine::tc_particles:
 		case KX_KetsjiEngine::tc_filters2d:
-			return 5;
+			return 6;
 		case KX_KetsjiEngine::tc_shadows:
 		case KX_KetsjiEngine::tc_lightupdate:
-			return 6;
+			return 7;
 		case KX_KetsjiEngine::tc_input:
 		case KX_KetsjiEngine::tc_overhead:
-			return 7;
-		case KX_KetsjiEngine::tc_latency:
 			return 8;
+		case KX_KetsjiEngine::tc_latency:
+			return 9;
 		default:
 			return -1;
 	}
@@ -723,16 +752,19 @@ void KX_DebugMode::RenderProfiling() {
 		ImGui::SetTooltip("Activate Graph Profiler (WARNING: This has a high impact on performance).");
 	}
 	if (graphOpen) {
+		float groupMs[GRAPH_GROUPS] = {};
+		float totalMs = 0.0f;
+		for (int tc = KX_KetsjiEngine::tc_first; tc < KX_KetsjiEngine::tc_numCategories; tc++) {
+			const int group = GraphGroup(tc);
+			if (group >= 0) {
+				const float ms = engine->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)tc) * 1000.f;
+				groupMs[group] += ms;
+				totalMs += ms;
+			}
+		}
+
 		if (!engine->GetScenes()->GetFront()->IsSuspended()) {
 			m_advprofileTime += ImGui::GetIO().DeltaTime;
-
-			float groupMs[GRAPH_GROUPS] = {};
-			for (int tc = KX_KetsjiEngine::tc_first; tc < KX_KetsjiEngine::tc_numCategories; tc++) {
-				const int group = GraphGroup(tc);
-				if (group >= 0) {
-					groupMs[group] += engine->m_logger.GetAverage((KX_KetsjiEngine::KX_TimeCategory)tc) * 1000.f;
-				}
-			}
 
 			// Stack from the last group up, so buffer 0 holds the whole frame's work time.
 			float stacked = 0.0f;
@@ -742,6 +774,114 @@ void KX_DebugMode::RenderProfiling() {
 			}
 		}
 
+		// The plot context is rebuilt with the engine, so look the colormap up instead of caching it.
+		ImPlotColormap colormap = ImPlot::GetColormapIndex("RangeProfile");
+		if (colormap == -1) {
+			colormap = ImPlot::AddColormap("RangeProfile", graphColors, GRAPH_GROUPS + 1);
+		}
+		ImPlot::PushColormap(colormap);
+
+		enum { GRAPH_TIMELINE, GRAPH_BARS, GRAPH_PIE };
+		ImGui::SetNextItemWidth(110.0f);
+		ImGui::Combo("Chart", &m_graphMode, "Timeline\0Bars\0Pie\0");
+
+		/* Bars and pie can count Sleeping (idle wait for the next frame) as one more slice: with it
+		 * the percentages are of the whole frame, the same ones the Profile overlay shows. */
+		const int CHART_MAX = GRAPH_GROUPS + 1;
+		float chartMs[CHART_MAX];
+		const char *chartNames[CHART_MAX];
+		ImVec4 chartColors[CHART_MAX];
+		int chartCount = GRAPH_GROUPS;
+		float chartTotal = totalMs;
+		for (int i = 0; i < GRAPH_GROUPS; i++) {
+			chartMs[i] = groupMs[i];
+			chartNames[i] = graphGroupLabels[i];
+			chartColors[i] = graphColors[i];
+		}
+		if (m_graphMode != GRAPH_TIMELINE) {
+			ImGui::SameLine();
+			ImGui::Checkbox("Sleeping", &m_graphShowSleeping);
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Count the idle time as a slice: percentages match the Profile overlay.\n"
+				                  "Off: percentages are of the time the engine actually worked.");
+			}
+			const float sleepMs = engine->m_logger.GetAverage(KX_KetsjiEngine::tc_outside) * 1000.f;
+			if (m_graphShowSleeping) {
+				chartMs[chartCount] = sleepMs;
+				chartNames[chartCount] = "Sleeping";
+				chartColors[chartCount] = graphColors[GRAPH_GROUPS];
+				chartCount++;
+				chartTotal += sleepMs;
+			}
+			ImGui::Text("Frame: %.2fms | Work: %.2fms", totalMs + sleepMs, totalMs);
+		}
+
+		if (m_graphMode == GRAPH_BARS) {
+			// Biggest consumer on top.
+			int order[CHART_MAX];
+			for (int i = 0; i < chartCount; i++) {
+				order[i] = i;
+			}
+			std::sort(order, order + chartCount, [&chartMs](int a, int b) { return chartMs[a] > chartMs[b]; });
+
+			double positions[CHART_MAX];
+			const char *labels[CHART_MAX];
+			for (int i = 0; i < chartCount; i++) {
+				positions[i] = i;
+				labels[i] = chartNames[order[i]];
+			}
+
+			if (ImPlot::BeginPlot("##BarsProfile", ImVec2(0, 250), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText)) {
+				ImPlot::SetupAxes("Milliseconds", nullptr, 0, ImPlotAxisFlags_Invert);
+				ImPlot::SetupAxisTicks(ImAxis_Y1, positions, chartCount, labels);
+				ImPlot::SetupAxisLimits(ImAxis_Y1, -0.6, chartCount - 0.4, ImGuiCond_Always);
+				// Room after the longest bar for its value text.
+				ImPlot::SetupAxisLimits(ImAxis_X1, 0, std::max(chartMs[order[0]] * 1.6f, 0.1f), ImGuiCond_Always);
+
+				for (int i = 0; i < chartCount; i++) {
+					const float ms = chartMs[order[i]];
+					// Same color the group has in the other charts.
+					ImPlot::SetNextFillStyle(chartColors[order[i]]);
+					ImPlot::PlotBars(labels[i], &ms, 1, 0.67, i, ImPlotBarsFlags_Horizontal);
+
+					char text[32];
+					snprintf(text, sizeof(text), "%.2fms | %.0f%%", ms, chartTotal > 0.0f ? ms / chartTotal * 100.0f : 0.0f);
+					ImPlot::PlotText(text, ms, i, ImVec2(ImGui::CalcTextSize(text).x * 0.5f + 4.0f, 0.0f));
+				}
+				ImPlot::EndPlot();
+			}
+		}
+		else if (m_graphMode == GRAPH_PIE) {
+			// Legend carries the time of each group; "###" keeps the item (and its color) stable.
+			char labelText[CHART_MAX][64];
+			const char *labels[CHART_MAX];
+			for (int i = 0; i < chartCount; i++) {
+				snprintf(labelText[i], sizeof(labelText[i]), "%s %.2fms###%s", chartNames[i], chartMs[i], chartNames[i]);
+				labels[i] = labelText[i];
+			}
+
+			if (chartTotal > 0.0f &&
+			    ImPlot::BeginPlot("##PieProfile", ImVec2(0, 250), ImPlotFlags_Equal | ImPlotFlags_NoMouseText)) {
+				ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
+				ImPlot::SetupAxesLimits(0, 1, 0, 1, ImGuiCond_Always);
+				ImPlot::SetupLegend(ImPlotLocation_East, ImPlotLegendFlags_Outside);
+
+				// Percentage inside the slice, hidden on slices too thin to hold it.
+				auto percentLabel = [](double value, char *buff, int size, void *userData) -> int {
+					const double percent = value / *(const float *)userData * 100.0;
+					if (percent < 5.0) {
+						buff[0] = '\0';
+						return 0;
+					}
+					return snprintf(buff, size, "%.0f%%", percent);
+				};
+				ImPlot::PlotPieChart(labels, chartMs, chartCount, 0.5, 0.5, 0.45, percentLabel, &chartTotal, 90,
+				                     ImPlotPieChartFlags_Normalize);
+				ImPlot::EndPlot();
+			}
+		}
+		else {
+		ImGui::SameLine();
 		ImGui::SliderFloat("History", &m_history, 1.0f, 15.0f, "%.1f s");
 		ImGui::SameLine();
 		ImGui::Checkbox("AutoResize", &m_autoResize);
@@ -750,9 +890,11 @@ void KX_DebugMode::RenderProfiling() {
 		const bool hasData = !m_profileBuffer[0].Data.empty();
 		const float workMs = hasData ? m_profileBuffer[0].GetLastPointY().y : 0.0f;
 
-		if (ImPlot::BeginPlot("##MainProfile", ImVec2(0, 175))) {
+		if (ImPlot::BeginPlot("##MainProfile", ImVec2(0, 200))) {
 
 			ImPlot::SetupAxes("Time (Seconds)", "Milliseconds");
+			// Outside the plot: the entries do not fit over it.
+			ImPlot::SetupLegend(ImPlotLocation_East, ImPlotLegendFlags_Outside);
 			ImPlot::SetupAxisLimits(ImAxis_X1, m_advprofileTime - m_history, m_advprofileTime, ImGuiCond_Always);
 			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, m_axisLimit, m_axisCondition);
 
@@ -793,6 +935,8 @@ void KX_DebugMode::RenderProfiling() {
 
 			ImPlot::EndPlot();
 		}
+		}
+		ImPlot::PopColormap();
 	}
 
 	// Toggle Advanced Profiling.

@@ -77,11 +77,11 @@ void KX_SimulationPipeline::Update()
 			// Cutscene time is game logic time, so pause/suspend and fixed-timestep
 			// behavior match the rest of the scene simulation. The scene retains
 			// crossed events until the native action dispatcher consumes them.
+			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_logic);
 			scene->UpdateCutscene(m_engine->GetLogicTime());
 			scene->DispatchCutsceneEvents();
 
 			// Process sensors, and controllers
-			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_logic);
 			scene->LogicBeginFrame(m_engine->GetLogicTime(), m_engine->GetFrameStep());
 		}
 		else {
@@ -103,9 +103,9 @@ void KX_SimulationPipeline::Update()
 		}
 
 		if (!scene->IsSuspended()) {
-			// Process actuators
+			// Process components and actuators (the scene logs each one in its own category)
 			// Do some cleanup work for this logic frame
-			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_actuators);
+			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_components);
 			scene->LogicUpdateFrame(m_engine->GetLogicTime());
 		}
 
@@ -123,10 +123,10 @@ void KX_SimulationPipeline::Update()
 		}
 
 		if (!scene->IsSuspended()) {
+			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_physics);
 			// Before physics so the shaken gravity is what this frame's solve uses.
 			scene->UpdateEarthquake(m_engine->GetFrameTime());
 
-			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_physics);
 			// Perform physics calculations on the scene. This can involve
 			// many iterations of the physics solver.
 			if (m_engine->GetFlags() & KX_KetsjiEngine::FIXED_FRAMERATE) {
@@ -165,6 +165,8 @@ void KX_SimulationPipeline::Update()
 		}
 	}
 
+	// What follows the scenes is not the last scene's particle update.
+	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_overhead);
 	if (network && network->IsActive()) {
 		network->EndTick();
 	}

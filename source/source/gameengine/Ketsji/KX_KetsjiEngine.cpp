@@ -137,6 +137,7 @@ const std::string KX_KetsjiEngine::m_profileLabels[tc_numCategories] = {
 	"CollisionDepth", // tc_collisiondepth
 	"TextureRenderers", // tc_texturerenderers
 	"ParticleUpdate", // tc_particles
+	"Components", // tc_components
 	"Actuators", // tc_actuators
 	"Input", // tc_input
 	"UpdateParents (Logic)", // tc_scenegraph_logic
@@ -353,11 +354,13 @@ void KX_KetsjiEngine::SetCustomMouseCursor(CustomMouseCursor *customCursor)
 PyObject *KX_KetsjiEngine::GetPyProfileDict()
 {
 	// Built on demand: only getProfileInfo() reads it.
+	// Share of the averaged frame, not of the last frame alone: the times are averages too.
+	const double total = std::max(m_logger.GetAverage(), 1e-9);
 	for (unsigned short i = tc_first; i < tc_numCategories; ++i) {
 		double time = m_logger.GetAverage((KX_TimeCategory)i);
 		PyObject *val = PyTuple_New(2);
 		PyTuple_SetItem(val, 0, PyFloat_FromDouble(time * 1000.0));
-		PyTuple_SetItem(val, 1, PyFloat_FromDouble(time / m_tottime * 100.0));
+		PyTuple_SetItem(val, 1, PyFloat_FromDouble(time / total * 100.0));
 
 		PyDict_SetItemString(m_pyprofiledict, m_profileLabels[i].c_str(), val);
 		Py_DECREF(val);
@@ -884,7 +887,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		// get the render time for next time
 		m_rendertimestart = m_rendertime;
 		m_overrendertime = (m_lastrendertime - m_renderrate + m_overrendertime);
-		if (m_flags & (SHOW_FRAMERATE)) {
+		if (m_flags & (SHOW_FRAMERATE | SHOW_PROFILE)) {
 			m_rendertimeaverage = ((m_rendertimeaverage * (m_ticrate - 1.0)) + m_lastrendertime) / m_ticrate;
 		}
 		if (m_overrendertime > (1.5 / m_renderrate)) {
@@ -904,7 +907,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		// get the render time for next time
 		m_animationtimestart = m_animationtime;
 		m_overanimationtime = ((m_lastanimationtime - m_animationrate) + m_overanimationtime);
-		if (m_flags & (SHOW_FRAMERATE)) {
+		if (m_flags & (SHOW_FRAMERATE | SHOW_PROFILE)) {
 			m_animationtimeaverage = ((m_animationtimeaverage * (m_ticrate - 1.0)) + m_lastanimationtime) / m_ticrate;
 		}
 		if (m_overanimationtime > (1.5 / m_animationrate)) {

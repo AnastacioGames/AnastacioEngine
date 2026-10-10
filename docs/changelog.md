@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Debug Mode: profile revisado, gráficos de barras/pizza e fonte maior
+
+- Categoria nova `tc_components` ("Components"): os componentes Python rodavam dentro de `KX_Scene::LogicUpdateFrame` e o tempo deles aparecia como "Actuators" (no RolimaRacer era a maior linha do profile). `getProfileInfo()` ganha a chave `"Components"`; "Actuators" passa a ser só atuadores + áudio 3D.
+- Porcentagens do painel Profile e de `getProfileInfo()`: o tempo (média de 25 quadros) era dividido pelo tempo do último quadro sozinho, então pulavam e não somavam 100. Agora dividem pela soma das médias.
+- Atribuições corrigidas em `KX_SimulationPipeline`: cutscene contava em Skinning/ActivityCulling (agora Logic), earthquake em UpdateParents/Logic (agora Physics) e o `EndTick` da rede em ParticleUpdate (agora Overhead).
+- Painel Profile: cor de "Sleeping" e "GPU Latency" estava trocada (a regra invertida "pouco é ruim" vale para Sleeping); cor de FPS < 24 era amarela e 24-30 vermelha (invertido); RenderRate/AnimationRate ficavam congelados com Show Profile ligado e Show Framerate desligado.
+- Graph Profiler: lia só as 8 primeiras categorias de uma lista antiga. Agora soma todas em 10 grupos (Physics, Logic+Actuators, Components, Animations+Skinning, Scenegraph, Culling, Render, Shadows, Overhead, GPU Latency) e tem seletor **Chart**: Timeline, Bars (ordenado, com ms e %) e Pie. Em Bars/Pie a caixa **Sleeping** conta o tempo ocioso como fatia, e aí as porcentagens são as mesmas do painel Profile.
+- Fonte: painel Profile, barra de cima e painéis do Debug Mode usam a fonte da engine gerada em 14 px (`KX_Imgui::RequestDefaultFont`), em vez da de 12 px reduzida a 80%.
+- Painéis Scene/Options: ID único para objetos de mesmo nome, seleção limpa quando o jogo remove o objeto (ponteiro solto), destaque segue a câmera ativa, Show Framerate/Profile/Debug Properties viram caixas de seleção.
+- Verificação: build RangeEngine/RangeRuntime ok; `tools/debug/cenas/criar_cena_profile_categorias.py` 4/4 no runtime (componente de 2 ms cai em Components, Actuators 0,00 ms, porcentagens somam 100). Falta: conferir no jogo os gráficos novos e a fonte da barra de cima.
+
 ## 2026-10-09 - Cenas: Preload/Keep no atuador Scene e scene.end(keep=True)
 
 - Atuador Scene: caixa **Preload** em Set/Add Overlay/Add Background (`use_preload`, flag `ACT_SCENE_PRELOAD` no antigo `pad1` de `bSceneActuator`, sem mudar o layout). Quando a cena dona do atuador é convertida, a cena alvo é pré-carregada; o add depois só insere a cena pronta.
