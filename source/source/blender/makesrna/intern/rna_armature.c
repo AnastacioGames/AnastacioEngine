@@ -984,17 +984,21 @@ static void rna_def_armature(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 	static const EnumPropertyItem prop_vdeformer[] = {
-		{ARM_VDEF_BLENDER, "BLENDER", 0, "Blender", "Use Blender's armature vertex deformation"},
-		{ARM_VDEF_BGE_CPU, "BGE_CPU", 0, "RanGE Optimized", "Use vertex deformation code optimized for the Range Engine"},
-		{ARM_VDEF_BGE_NORMALS_CPU, "BGE_NORMALS_CPU", 0, "RanGE Optimized With Normals", "Use vertex deformation code optimized for the Range Engine, But with fully calculated normals (More expensive than RanGE Optimized)"},
+		{ARM_VDEF_BLENDER, "BLENDER", 0, "Blender", "CPU, Blender's own armature code: the only one with Preserve Volume, envelopes and "
+		 "B-Bone segments; recalculates normals from the faces. Slowest, use it only when you need those"},
+		{ARM_VDEF_BGE_CPU, "BGE_CPU", 0, "RanGE Optimized", "CPU, linear blend of the bones; normals rotated with the bones. "
+		 "Several times faster than Blender, the usual choice for CPU skinning"},
+		{ARM_VDEF_BGE_NORMALS_CPU, "BGE_NORMALS_CPU", 0, "RanGE Optimized With Normals", "Like RanGE Optimized, but normals "
+		 "are recalculated from the deformed faces (exact on folds, more expensive)"},
 		{ARM_VDEF_BGE_GPU, "BGE_GPU", 0, "RanGE GPU Skinning", "Deform vertices on the GPU (vertex shader) instead of the CPU; fastest option, "
-		 "requires the object's material(s) to have GPU Skinning enabled and falls back to RanGE Optimized automatically if the armature "
-		 "has more deform groups than the GPU skinning budget"},
+		 "requires the object's material(s) to have GPU Skinning enabled, uses the 4 strongest bones per vertex and falls back "
+		 "to RanGE Optimized automatically if the mesh has more vertex groups than the GPU skinning budget (64)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	static const EnumPropertyItem prop_armculling[] = {
-		{ARM_CDEF_FULL, "FULL", 0, "Full", "Use full culling method for armature (recommended)"},
-		{ARM_CDEF_NONE, "NONE", 0, "None", "No culling method for armature (not recommended, use only when necessary)"},
+		{ARM_CDEF_FULL, "FULL", 0, "Full", "Skip the pose of the armature while all its children are off-screen. An armature that skins a mesh still "
+		 "updates every frame, so the mesh can come back into view"},
+		{ARM_CDEF_NONE, "NONE", 0, "None", "Always update the pose, even when every child is off-screen (needed when scripts read bones of a hidden armature)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	static const EnumPropertyItem prop_ghost_type_items[] = {

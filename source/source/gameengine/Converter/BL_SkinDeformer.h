@@ -91,8 +91,30 @@ protected:
 	/// Refresh m_lastPoseSnapshot; returns true if the pose differs from the previous snapshot.
 	bool PoseContentChanged();
 	short m_deformflags;
-	/// Flattened, column-major bone-matrix palette for GPU skinning (see ARM_VDEF_BGE_GPU).
+	/// Flattened, column-major bone-matrix palette (deform group index -> mesh-space skin matrix),
+	/// used by the RanGE CPU paths and uploaded for GPU skinning (see ARM_VDEF_BGE_GPU).
 	std::vector<float> m_boneMatrices;
+
+	enum class GPUSkinState : char {
+		UNCHECKED,
+		/// GPU skinning runs: the vertex shader reads m_boneMatrices.
+		ACTIVE,
+		/// GPU skinning asked but not possible (too many groups, no material with GPU Skinning): CPU path.
+		FALLBACK
+	};
+	GPUSkinState m_gpuSkinState;
+	/// Rest-pose AABB of the vertices of each deform group (GPU skinning culling box, see UpdateGroupAabbs).
+	std::vector<mt::vec3> m_groupAabbMin;
+	std::vector<mt::vec3> m_groupAabbMax;
+	/// Rest-pose AABB of the vertices no deform bone moves.
+	mt::vec3 m_restAabbMin;
+	mt::vec3 m_restAabbMax;
+
+	/// Decide once whether GPU skinning can run for this mesh, warning once when it falls back.
+	bool UseGPUSkinning();
+	void UpdateGroupAabbs();
+	/// Set the deformer box from the bone palette, for GPU skinning where vertices stay in rest pose on the CPU.
+	void UpdateGPUSkinBounds();
 
 	void BlenderDeformVerts(bool recalcNormal);
 	void BGEDeformVerts(bool recalcNormal, bool fullNormals);

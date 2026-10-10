@@ -1786,7 +1786,10 @@ void GPU_pass_load_images(GPUPass *pass, double time, int mipmap)
 				glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &boundcube);
 				any = true;
 			}
-			input->tex = GPU_texture_from_blender(input->ima, input->iuser, input->textarget, input->image_isdata, time, mipmap);
+			/* Only the upload is wanted: the image owns its GPUTexture. Keeping it in input->tex would
+			 * make gpu_inputs_free release the image texture when a never-bound pass is freed (shader
+			 * warm-up restart): negative refcount, then a crash. GPU_pass_unbind clears it the same way. */
+			GPU_texture_from_blender(input->ima, input->iuser, input->textarget, input->image_isdata, time, mipmap);
 		}
 	}
 

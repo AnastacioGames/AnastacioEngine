@@ -86,3 +86,14 @@ Critério de pronto: o verificador estático acha o bug antigo se ele for recolo
 jogos reais ficam com contadores ~0 quando nada se move.
 
 Suspeitos levantados na varredura completa, com classificação por gravidade: [auditoria-suspeitos.md](auditoria-suspeitos.md).
+
+## Deform da armature (2026-10-10)
+
+Revisão dos arquivos mexidos na correção de RanGE Optimized / GPU Skinning:
+
+- `BL_SkinDeformer::UpdateInternal`: skin, paleta e envio ao VBO só quando a pose muda (`PoseContentChanged`, CV4). OK.
+- `UseGPUSkinning`: decisão e aviso de fallback uma vez por deformer (antes o aviso saía a cada pose nova). Corrigido.
+- `UpdateGroupAabbs`: uma vez, ou quando shape key muda a pose de repouso. `UpdateGPUSkinBounds` só com pose nova e auto update ligado. OK.
+- `BL_DeformGroupsWithBone` (busca de ossos por nome): estava em `BL_ConvertDerivedMeshToArray`, que o `BL_ModifierDeformer` chama todo frame; agora só roda se algum material da malha lê os atributos de osso. Corrigido.
+- `UpdateTransverts` marca `NORMAL_MODIFIED` mesmo sem normal nova só no caminho sem recálculo de normais, que é o do `BL_ModifierDeformer` (já reconstrói os arrays inteiros). Sem custo extra; mantido.
+- `GPU_pass_load_images`: uma vez por material no load. OK.

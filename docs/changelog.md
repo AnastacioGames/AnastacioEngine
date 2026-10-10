@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-10 - Deform da armature: correções em RanGE Optimized e GPU Skinning
+
+- RanGE Optimized: vértice com peso só em grupo sem osso de deformação virava NaN (divisão por zero) e herdava a normal do vértice anterior; agora fica na pose de repouso, como no Blender. A normal ignorava a rotação entre armature e malha; agora usa a mesma paleta de matrizes da GPU (pre/post embutidos), com a rotação misturada pelos pesos.
+- GPU Skinning: aviso de fallback saía a cada frame (agora uma vez); a paleta só vai para o shader quando a GPU está ativa (antes um fallback com material GPU Skinning seria deformado duas vezes); shape keys agora chegam ao VBO; caixa de culling/LOD calculada pelos ossos (caixa de repouso de cada grupo transformada pelo osso) em vez de ficar na pose de repouso; grupos sem osso de deformação saem dos pesos da GPU, como na CPU.
+- Caixa com auto update desligado não fica mais invertida.
+- Crash na reinicialização do aquecimento de shaders (GPUTexture negative refcount): `GPU_pass_load_images` (8b50d426) deixava a textura da imagem no input do pass, que a liberava ao ser destruído sem nunca ter sido desenhado.
+- Descrições das opções de Deform e Culling no painel.
+- RolimaRacer (cópia de teste, 10 pilotos, 30 s): Blender ~1,4 ms de Skinning, RanGE Optimized ~1,6 ms, GPU ~0,3-0,8 ms; nenhum crash.
+- Pendente: Culling "Full" continua igual a "None" para armatures com malha deformada (91f7d8c0); torná-lo útil exige atualizar o skin só quando a malha volta a ser vista.
+
 ## 2026-10-10 - LOD de malha deformada mede do corpo, não da origem
 
 - `KX_GameObject::UpdateLod` media a distância da origem do objeto. No ragdoll do RolimaRacer o corpo do piloto (filho da armature, presa ao carro) voa com os ossos e a origem fica no carro: com o carro longe, o piloto trocava para LOD baixo mesmo com a câmera do ragdoll colada nele. Objetos com deformer e bounds automáticos (skinning na CPU, shape/modifier) agora medem do centro da caixa deformada; estáticos seguem na origem. Skinning na GPU não atualiza a caixa (continua na pose de repouso).

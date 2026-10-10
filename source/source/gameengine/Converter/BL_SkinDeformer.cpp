@@ -89,7 +89,8 @@ BL_SkinDeformer::BL_SkinDeformer(KX_GameObject *gameobj,
 	:BL_MeshDeformer(gameobj, bmeshobj_old, mesh),
 	m_armobj(arma),
 	m_lastArmaUpdate(-1),
-	m_copyNormals(false)
+	m_copyNormals(false),
+	m_gpuSkinState(GPUSkinState::UNCHECKED)
 {
 	// this is needed to ensure correct deformation of mesh:
 	// the deformation is done with Blender's armature_deform_verts() function
@@ -162,78 +163,64 @@ void BL_SkinDeformer::EnsureDfnrToPCCache()
 
 void BL_SkinDeformer::BGEDeformVerts(bool recalcNormal, bool fullNormals)
 {
-	MDeformVert *dverts = m_bmesh->dvert;
-	Eigen::Matrix4f pre_mat, post_mat, chan_mat, norm_chan_mat;
-
+	const MDeformVert *dverts = m_bmesh->dvert;
 	if (!dverts) {
 		return;
 	}
 
-	EnsureDfnrToPCCache();
+	/* The palette folds the armature/mesh space change (pre/post) into each bone matrix, so a vertex
+	 * is a plain weighted sum of palette[bone] * co, exactly what the GPU path does. Blending the
+	 * same matrices' 3x3 part for the normal keeps the normal in the mesh space even when the
+	 * armature and the mesh objects are rotated differently. */
+	UpdateBoneMatrixPalette();
 	const unsigned short defbase_tot = m_dfnrToPC.size();
+	const bool rotateNormals = recalcNormal && !fullNormals;
 
-	post_mat = Eigen::Matrix4f::Map((float*)m_obmat).inverse() * Eigen::Matrix4f::Map((float*)m_armobj->GetArmatureObject()->obmat);
-	pre_mat = post_mat.inverse();
-
-	MDeformVert *dv = dverts;
-	MDeformWeight *dw;
-
-	for (int i = 0; i < m_bmesh->totvert; ++i, dv++) {
-		if (!dv->totweight) {
+	for (int i = 0; i < m_bmesh->totvert; ++i) {
+		const MDeformVert& dv = dverts[i];
+		if (!dv.totweight) {
 			continue;
 		}
 
-		float contrib = 0.0f, weight, max_weight = -1.0f;
-		bPoseChannel *pchan = nullptr;
-		Eigen::Vector4f vec(0.0f, 0.0f, 0.0f, 1.0f);
-		Eigen::Vector4f co(m_transverts[i].x,
-						   m_transverts[i].y,
-						   m_transverts[i].z,
-						   1.0f);
+		const Eigen::Vector4f co(m_transverts[i].x, m_transverts[i].y, m_transverts[i].z, 1.0f);
+		Eigen::Vector3f pos = Eigen::Vector3f::Zero();
+		Eigen::Matrix3f rot = Eigen::Matrix3f::Zero();
+		float contrib = 0.0f;
 
-		co = pre_mat * co;
-
-		dw = dv->dw;
-
-		for (unsigned int j = dv->totweight; j != 0; j--, dw++) {
-			const int index = dw->def_nr;
-
-			if (index < defbase_tot && (pchan = m_dfnrToPC[index])) {
-				weight = dw->weight;
-
-				if (weight) {
-					chan_mat = Eigen::Matrix4f::Map((float*)pchan->chan_mat);
-
-					// Update Vertex Position
-					vec.noalias() += (chan_mat * co - co) * weight;
-
-					// Save the most influential channel so we can use it to update the vertex normal
-					if (weight > max_weight) {
-						max_weight = weight;
-						norm_chan_mat = chan_mat;
-					}
-
-					contrib += weight;
-				}
+		const MDeformWeight *dw = dv.dw;
+		for (unsigned int j = dv.totweight; j != 0; j--, dw++) {
+			const unsigned int index = dw->def_nr;
+			const float weight = dw->weight;
+			if (index >= defbase_tot || !m_dfnrToPC[index] || weight == 0.0f) {
+				continue;
 			}
+
+			const Eigen::Map<const Eigen::Matrix4f> mat(&m_boneMatrices[index * 16]);
+			pos.noalias() += weight * (mat.topLeftCorner<3, 4>() * co);
+			if (rotateNormals) {
+				rot.noalias() += weight * mat.topLeftCorner<3, 3>();
+			}
+			contrib += weight;
 		}
 
-		if (recalcNormal && !fullNormals) {
-			const Eigen::Vector3f normorg(m_bmesh->mvert[i].no[0], m_bmesh->mvert[i].no[1], m_bmesh->mvert[i].no[2]);
-			Eigen::Map<Eigen::Vector3f> norm = Eigen::Vector3f::Map(m_transnors[i].data);
-			// Update Vertex Normal
-			norm = norm_chan_mat.topLeftCorner<3, 3>() * normorg;
+		/* Only groups without a deform bone (or zero weights): leave the vertex in rest pose, like
+		 * Blender's armature_deform_verts, instead of dividing by zero. */
+		if (contrib <= 0.0001f) {
+			continue;
 		}
 
-		co.noalias() += vec / contrib;
-		co[3] = 1.0f; // Make sure we have a 1 for the w component!
+		pos /= contrib;
+		m_transverts[i] = mt::vec3(pos[0], pos[1], pos[2]);
 
-		co = post_mat * co;
-
-		m_transverts[i] = mt::vec3(co[0], co[1], co[2]);
+		if (rotateNormals) {
+			// Not normalized: the shaders normalize the normal anyway.
+			Eigen::Map<Eigen::Vector3f> norm(m_transnors[i].data);
+			const Eigen::Vector3f normorg = norm;
+			norm.noalias() = rot * normorg;
+		}
 	}
 
-	if (!fullNormals) {
+	if (rotateNormals) {
 		m_copyNormals = true;
 	}
 	else if (recalcNormal) {
@@ -269,7 +256,9 @@ void BL_SkinDeformer::UpdateBoneMatrixPalette()
 
 bool BL_SkinDeformer::GetBoneMatrices(const float **matrices, int *count) const
 {
-	if (m_boneMatrices.empty()) {
+	/* The CPU paths fill the palette too: handing it to a material with GPU Skinning on would skin
+	 * the already skinned vertices a second time. */
+	if (m_gpuSkinState != GPUSkinState::ACTIVE || m_boneMatrices.empty()) {
 		return false;
 	}
 
@@ -292,6 +281,94 @@ static bool mesh_has_gpu_skinning_material(Mesh *bmesh)
 		}
 	}
 	return false;
+}
+
+bool BL_SkinDeformer::UseGPUSkinning()
+{
+	/* Checked once: the deform groups and the materials do not change while the deformer lives, and
+	 * warning on every pose update flooded the console (and cost time) for a fallen back mesh. */
+	if (m_gpuSkinState == GPUSkinState::UNCHECKED) {
+		EnsureDfnrToPCCache();
+		Object *armob = m_armobj->GetArmatureObject();
+		if (m_dfnrToPC.size() > GPU_MAX_SKINNING_BONES) {
+			CM_Warning("armature \"" << armob->id.name + 2 << "\" deforms mesh \"" << m_bmesh->id.name + 2 << "\" with " <<
+					m_dfnrToPC.size() << " vertex groups, exceeding the GPU skinning budget of " << GPU_MAX_SKINNING_BONES <<
+					"; falling back to CPU skinning (RanGE Optimized)");
+			m_gpuSkinState = GPUSkinState::FALLBACK;
+		}
+		else if (!mesh_has_gpu_skinning_material(m_bmesh)) {
+			CM_Warning("mesh \"" << m_bmesh->id.name + 2 << "\" is deformed by armature \"" << armob->id.name + 2 <<
+					"\" using RanGE GPU Skinning, but none of its materials have \"GPU Skinning\" enabled "
+					"(Material Properties > Options); falling back to CPU skinning (RanGE Optimized)");
+			m_gpuSkinState = GPUSkinState::FALLBACK;
+		}
+		else {
+			m_gpuSkinState = GPUSkinState::ACTIVE;
+		}
+	}
+	return m_gpuSkinState == GPUSkinState::ACTIVE;
+}
+
+void BL_SkinDeformer::UpdateGroupAabbs()
+{
+	/* Rest-pose box of the vertices of each deform group, plus one for the vertices no bone moves.
+	 * A skinned vertex is a weighted average of its bones' transforms of the same point, so it lies
+	 * in the union of those boxes transformed by their bones: a cheap, conservative culling box
+	 * for GPU skinning, where the CPU never sees the deformed vertices. */
+	EnsureDfnrToPCCache();
+	const unsigned short defbase_tot = m_dfnrToPC.size();
+	m_groupAabbMin.assign(defbase_tot, mt::vec3(FLT_MAX));
+	m_groupAabbMax.assign(defbase_tot, mt::vec3(-FLT_MAX));
+	m_restAabbMin = mt::vec3(FLT_MAX);
+	m_restAabbMax = mt::vec3(-FLT_MAX);
+
+	const MDeformVert *dverts = m_bmesh->dvert;
+	for (int i = 0; i < m_bmesh->totvert; ++i) {
+		const mt::vec3 co = m_transverts.empty() ? mt::vec3(m_bmesh->mvert[i].co) : mt::vec3(m_transverts[i]);
+		bool moved = false;
+		if (dverts) {
+			const MDeformWeight *dw = dverts[i].dw;
+			for (unsigned int j = dverts[i].totweight; j != 0; j--, dw++) {
+				const unsigned int index = dw->def_nr;
+				if (index < defbase_tot && m_dfnrToPC[index] && dw->weight != 0.0f) {
+					m_groupAabbMin[index] = mt::vec3::Min(m_groupAabbMin[index], co);
+					m_groupAabbMax[index] = mt::vec3::Max(m_groupAabbMax[index], co);
+					moved = true;
+				}
+			}
+		}
+		if (!moved) {
+			m_restAabbMin = mt::vec3::Min(m_restAabbMin, co);
+			m_restAabbMax = mt::vec3::Max(m_restAabbMax, co);
+		}
+	}
+}
+
+void BL_SkinDeformer::UpdateGPUSkinBounds()
+{
+	mt::vec3 aabbMin = m_restAabbMin;
+	mt::vec3 aabbMax = m_restAabbMax;
+
+	for (unsigned short i = 0, size = m_groupAabbMin.size(); i < size; ++i) {
+		const mt::vec3& gmin = m_groupAabbMin[i];
+		const mt::vec3& gmax = m_groupAabbMax[i];
+		if (gmin.x > gmax.x) {
+			continue;
+		}
+
+		const Eigen::Map<const Eigen::Matrix4f> mat(&m_boneMatrices[i * 16]);
+		for (unsigned short c = 0; c < 8; ++c) {
+			const Eigen::Vector4f corner((c & 1) ? gmax.x : gmin.x, (c & 2) ? gmax.y : gmin.y, (c & 4) ? gmax.z : gmin.z, 1.0f);
+			const Eigen::Vector3f p = mat.topLeftCorner<3, 4>() * corner;
+			const mt::vec3 pos(p[0], p[1], p[2]);
+			aabbMin = mt::vec3::Min(aabbMin, pos);
+			aabbMax = mt::vec3::Max(aabbMax, pos);
+		}
+	}
+
+	if (aabbMin.x <= aabbMax.x) {
+		m_boundingBox->SetAabb(aabbMin, aabbMax);
+	}
 }
 
 void BL_SkinDeformer::UpdateTransverts()
@@ -333,7 +410,11 @@ void BL_SkinDeformer::UpdateTransverts()
 		array->NotifyUpdate(RAS_DisplayArray::POSITION_MODIFIED | RAS_DisplayArray::NORMAL_MODIFIED);
 	}
 
-	m_boundingBox->SetAabb(aabbMin, aabbMax);
+	/* Without auto update the min/max were never accumulated: an inverted box would hide the object
+	 * if the bounds get pushed anyway (UpdateBounds(true)). */
+	if (autoUpdate) {
+		m_boundingBox->SetAabb(aabbMin, aabbMax);
+	}
 
 	if (m_copyNormals) {
 		m_copyNormals = false;
@@ -414,23 +495,12 @@ bool BL_SkinDeformer::UpdateInternal(bool shape_applied, bool recalcNormal)
 				break;
 			}
 			case ARM_VDEF_BGE_GPU: {
-				EnsureDfnrToPCCache();
-				if (m_dfnrToPC.size() > GPU_MAX_SKINNING_BONES) {
-					CM_Warning("armature \"" << m_armobj->GetArmatureObject()->id.name + 2 << "\" has " << m_dfnrToPC.size() <<
-							" deform groups, exceeding the GPU skinning budget of " << GPU_MAX_SKINNING_BONES <<
-							"; falling back to CPU skinning");
-					BGEDeformVerts(recalcNormal, false);
-				}
-				else if (!mesh_has_gpu_skinning_material(m_bmesh)) {
-					CM_Warning("mesh \"" << m_bmesh->id.name + 2 << "\" is deformed by armature \"" <<
-							m_armobj->GetArmatureObject()->id.name + 2 << "\" using RanGE GPU Skinning, but none of its "
-							"materials have \"GPU Skinning\" enabled (Material Properties > Options); "
-							"falling back to CPU skinning");
-					BGEDeformVerts(recalcNormal, false);
-				}
-				else {
+				if (UseGPUSkinning()) {
 					UpdateBoneMatrixPalette();
 					gpuSkinned = true;
+				}
+				else {
+					BGEDeformVerts(recalcNormal, false);
 				}
 				break;
 			}
@@ -440,9 +510,19 @@ bool BL_SkinDeformer::UpdateInternal(bool shape_applied, bool recalcNormal)
 		m_lastArmaUpdate = m_armobj->GetLastFrame();
 
 		if (gpuSkinned) {
-			/* Vertex positions in the VBO stay in bind pose; only the bone-matrix uniform
-			 * changes per frame, so this mesh can be treated as static again. */
-			m_bDynamic = false;
+			/* Vertex positions in the VBO stay in rest pose; only the bone-matrix uniform changes per
+			 * frame. Shape keys still change that rest pose: upload it, the shader skins it. */
+			m_bDynamic = shape_applied;
+			if (shape_applied) {
+				UpdateTransverts();
+			}
+
+			if (m_gameobj->GetAutoUpdateBounds()) {
+				if (shape_applied || m_groupAabbMin.size() != m_dfnrToPC.size()) {
+					UpdateGroupAabbs();
+				}
+				UpdateGPUSkinBounds();
+			}
 		}
 		else {
 			/* dynamic vertex, cannot use display list */

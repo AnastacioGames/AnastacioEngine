@@ -164,6 +164,7 @@ extern "C" {
 #include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_modifier_types.h"
 #include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
 #include "DNA_property_types.h"
@@ -755,10 +756,39 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 	return meshobj;
 }
 
-/** Pick the top 4 vertex-group weights for a vertex (GPU skinning budget), renormalized to sum to 1,
- * and expressed as (def_nr, weight) pairs padded with (0, 0) for unused slots.
+/** Which vertex groups of  ob drive a deform bone of its armature, by def_nr. BL_SkinDeformer skips the
+ * other groups (no bone, or a bone with Deform off) and renormalizes over the rest, so the GPU weights
+ * must skip them too, otherwise a vertex painted in such a group stays partly in rest pose on the GPU.
+ * Without an armature to check against every group counts, as before.
  */
-static void BL_ComputeVertexBoneData(const MDeformVert& dv, unsigned short defbaseTot,
+static std::vector<bool> BL_DeformGroupsWithBone(Object *ob, unsigned short defbaseTot)
+{
+	std::vector<bool> groups(defbaseTot, true);
+	Object *armob = (ob->parent && ob->parent->type == OB_ARMATURE) ? ob->parent : nullptr;
+	if (!armob) {
+		ModifierData *md = (ModifierData *)ob->modifiers.first;
+		if (md && md->type == eModifierType_Armature) {
+			armob = ((ArmatureModifierData *)md)->object;
+		}
+	}
+	if (!armob || armob->type != OB_ARMATURE || !armob->data) {
+		return groups;
+	}
+
+	bArmature *arm = (bArmature *)armob->data;
+	unsigned short i = 0;
+	for (bDeformGroup *dg = (bDeformGroup *)ob->defbase.first; dg && i < defbaseTot; dg = dg->next, ++i) {
+		Bone *bone = BKE_armature_find_bone_name(arm, dg->name);
+		groups[i] = bone && !(bone->flag & BONE_NO_DEFORM);
+	}
+	return groups;
+}
+
+/** Pick the top 4 vertex-group weights for a vertex (GPU skinning budget), renormalized to sum to 1,
+ * and expressed as (def_nr, weight) pairs padded with (0, 0) for unused slots. Groups without a
+ * deform bone are skipped (see BL_DeformGroupsWithBone).
+ */
+static void BL_ComputeVertexBoneData(const MDeformVert& dv, const std::vector<bool>& deformGroups,
                                       mt::vec4_packed& boneIndices, mt::vec4_packed& boneWeights)
 {
 	float indices[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -767,7 +797,7 @@ static void BL_ComputeVertexBoneData(const MDeformVert& dv, unsigned short defba
 
 	for (unsigned int i = 0; i < dv.totweight; ++i) {
 		const MDeformWeight& dw = dv.dw[i];
-		if (dw.def_nr >= defbaseTot || dw.weight <= 0.0f) {
+		if (dw.def_nr >= deformGroups.size() || !deformGroups[dw.def_nr] || dw.weight <= 0.0f) {
 			continue;
 		}
 
@@ -1129,6 +1159,12 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	const bool bMayHaveBoneData = (blenderobj && me->dvert && blenderobj->defbase.first &&
 	                                BL_ModifierDeformer::HasArmatureDeformer(blenderobj));
 	const unsigned short defbaseTot = bMayHaveBoneData ? BLI_listbase_count(&blenderobj->defbase) : 0;
+	/* Bone name lookups: only when a material actually reads the bone attributes (GPU Skinning), since
+	 * BL_ModifierDeformer rebuilds the arrays through here every frame. */
+	const bool anyBoneData = bMayHaveBoneData && std::any_of(mats.begin(), mats.end(), [](const BL_MeshMaterial& mat) {
+		return mat.array && mat.array->GetFormat().hasBoneData;
+	});
+	const std::vector<bool> deformGroups = anyBoneData ? BL_DeformGroupsWithBone(blenderobj, defbaseTot) : std::vector<bool>();
 	const MVert *mverts = dm->getVertArray(dm);
 	const int totverts = dm->getNumVerts(dm);
 	const MPoly *mpolys = (MPoly *)dm->getPolyArray(dm);
@@ -1417,7 +1453,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 					mt::vec4_packed boneIndices(mt::zero4);
 					mt::vec4_packed boneWeights(mt::zero4);
 					if (bMayHaveBoneData && array->GetFormat().hasBoneData) {
-						BL_ComputeVertexBoneData(me->dvert[vertid], defbaseTot, boneIndices, boneWeights);
+						BL_ComputeVertexBoneData(me->dvert[vertid], deformGroups, boneIndices, boneWeights);
 					}
 					const unsigned int offset = array->AddVertex(mt::vec3_packed(mverts[vertid].co),
 						mt::vec3_packed(normals[loop]), mt::vec4_packed(tangent ? tangent[loop] : dummyTangent),
@@ -1464,7 +1500,7 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 				mt::vec4_packed boneIndices(mt::zero4);
 				mt::vec4_packed boneWeights(mt::zero4);
 				if (bMayHaveBoneData && array->GetFormat().hasBoneData) {
-					BL_ComputeVertexBoneData(me->dvert[vertid], defbaseTot, boneIndices, boneWeights);
+					BL_ComputeVertexBoneData(me->dvert[vertid], deformGroups, boneIndices, boneWeights);
 				}
 				offset = array->AddVertex(pos, nor, tan, uvs, rgba, vertid, flat, boneIndices, boneWeights);
 #ifdef WITH_BULLET
