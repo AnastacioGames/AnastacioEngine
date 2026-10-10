@@ -185,6 +185,8 @@ enum {
 	GPU_PROFILE_TOT
 };
 extern int GPU_profile_counters[GPU_PROFILE_TOT];
+/* RANGE_SHADER_LOG on: shaders bound for the first time since the profiler last cleared it. */
+extern char GPU_profile_first_binds[1024];
 
 #ifdef __cplusplus
 }

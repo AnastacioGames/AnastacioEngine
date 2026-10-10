@@ -38,6 +38,7 @@
 
 class KX_SceneActuator : public SCA_IActuator
 {
+	bool m_keep = false;
 	Py_Header
 	
 	int							m_mode;
@@ -75,6 +76,12 @@ class KX_SceneActuator : public SCA_IActuator
 					 const std::string& nextSceneName,
 					 KX_Camera* camera);
 	virtual ~KX_SceneActuator();
+
+	/// Remove Scene: hide and pause the scene instead of destroying it.
+	void SetKeep(bool keep)
+	{
+		m_keep = keep;
+	}
 
 	virtual EXP_Value* GetReplica();
 	virtual void ProcessReplica();

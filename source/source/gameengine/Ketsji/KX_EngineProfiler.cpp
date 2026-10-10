@@ -69,6 +69,7 @@ struct State
 	double sumWall = 0.0;
 	int sumCount = 0;
 	std::string notes;
+	std::string prevFirstBinds;
 
 	double avgMs = 0.0;
 	double lastNow = 0.0;
@@ -310,6 +311,9 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 			if (!state.notes.empty()) {
 				fprintf(f, " | added:%s", state.notes.c_str());
 			}
+			if (GPU_profile_first_binds[0] || !state.prevFirstBinds.empty()) {
+				fprintf(f, " | firstbind:%s | prev frame:%s", GPU_profile_first_binds, state.prevFirstBinds.c_str());
+			}
 			fprintf(f, " | shaders=%d gputex=%d imgupload=%d | frames since: shader=%ld gputex=%ld imgupload=%ld\n",
 			        GPU_profile_counters[GPU_PROFILE_SHADERS], GPU_profile_counters[GPU_PROFILE_TEXTURES],
 			        GPU_profile_counters[GPU_PROFILE_IMAGE_UPLOADS],
@@ -377,6 +381,8 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 		GPU_render_profile_calls[phase] = 0;
 		std::fill(std::begin(GPU_render_profile_counts[phase]), std::end(GPU_render_profile_counts[phase]), 0);
 	}
+	state.prevFirstBinds = GPU_profile_first_binds;
+	GPU_profile_first_binds[0] = '\0';
 	for (int i = 0; i < GPU_PROFILE_TOT; ++i) {
 		if (GPU_profile_counters[i]) {
 			state.lastCounterFrame[i] = state.frame;

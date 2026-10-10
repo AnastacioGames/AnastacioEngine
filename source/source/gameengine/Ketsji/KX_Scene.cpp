@@ -4269,11 +4269,18 @@ EXP_PYMETHODDEF_DOC(KX_Scene, convertObject,
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, end,
-                    "end()\n"
-                    "Removes this scene from the game.\n")
+                    "end(keep=False)\n"
+                    "Removes this scene from the game.\n"
+                    " keep = Hide and pause the scene instead of destroying it; addScene of it brings it back at once,\n"
+                    "   in the state it was left.\n")
 {
+	int keep = 0;
+	static const char *kwlist[] = {"keep", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|p:end", const_cast<char **>(kwlist), &keep)) {
+		return nullptr;
+	}
 
-	KX_GetActiveEngine()->RemoveScene(m_sceneName);
+	KX_GetActiveEngine()->RemoveScene(m_sceneName, keep != 0);
 
 	Py_RETURN_NONE;
 }

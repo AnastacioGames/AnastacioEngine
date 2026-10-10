@@ -621,7 +621,8 @@ public:
 	/// See KX_SceneScheduler::PreloadScene.
 	bool PreloadScene(const std::string& scenename);
 
-	void RemoveScene(const std::string& scenename);
+	/// keep: see KX_SceneScheduler::RemoveScene.
+	void RemoveScene(const std::string& scenename, bool keep = false);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);
 	void SuspendScene(const std::string& scenename);
 	void ResumeScene(const std::string& scenename);

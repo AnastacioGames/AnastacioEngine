@@ -855,6 +855,11 @@ void BL_ConvertActuators(const char *maggiename,
 
 						if (sceneact->scene) {
 							nextSceneName = sceneact->scene->id.name + 2;
+							if ((sceneact->flag & ACT_SCENE_PRELOAD) && (sceneact->type == ACT_SCENE_ADD_FRONT ||
+							    sceneact->type == ACT_SCENE_ADD_BACK || sceneact->type == ACT_SCENE_SET))
+							{
+								ketsjiEngine->PreloadScene(nextSceneName);
+							}
 						}
 
 						break;
@@ -886,6 +891,7 @@ void BL_ConvertActuators(const char *maggiename,
 					ketsjiEngine,
 					nextSceneName,
 					cam);
+				tmpsceneact->SetKeep((sceneact->flag & ACT_SCENE_KEEP) != 0);
 				baseact = tmpsceneact;
 				break;
 			}

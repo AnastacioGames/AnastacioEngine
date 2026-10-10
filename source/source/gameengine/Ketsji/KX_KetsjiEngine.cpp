@@ -1141,9 +1141,9 @@ bool KX_KetsjiEngine::PreloadScene(const std::string& scenename)
 	return m_sceneScheduler->PreloadScene(scenename);
 }
 
-void KX_KetsjiEngine::RemoveScene(const std::string& scenename)
+void KX_KetsjiEngine::RemoveScene(const std::string& scenename, bool keep)
 {
-	m_sceneScheduler->RemoveScene(scenename);
+	m_sceneScheduler->RemoveScene(scenename, keep);
 }
 
 KX_Scene *KX_KetsjiEngine::CreateScene(Scene *scene)

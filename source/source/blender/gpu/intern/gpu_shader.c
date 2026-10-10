@@ -159,6 +159,10 @@ struct GPUShader {
 	 * [0] = length tag (0 unset, -1 int), [1..16] = value. Grown on demand. */
 	float (*uniform_cache)[17];
 	int uniform_cache_len;
+
+	/* Profiler: name for the first-bind list, and if it was bound already. */
+	char profile_name[40];
+	bool bound_once;
 };
 
 static void shader_print_errors(const char *task, const char *log, const char **code, int totcode)
@@ -949,6 +953,10 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 	GPUShader *shader = gpu_shader_create_ex_impl_raw(vertexcode, fragcode, geocode, libcode, defines,
 	                                                   input, output, number, flags, diagnostic_name);
 	const double t1 = PIL_check_seconds_timer();
+	if (shader) {
+		BLI_snprintf(shader->profile_name, sizeof(shader->profile_name), "%s/%d", diagnostic_name ? diagnostic_name : "-",
+		             fragcode ? (int)strlen(fragcode) : 0);
+	}
 	fprintf(log_file, "t=%.3fs ms=%.2f %s flags=0x%x frag=%d %s\n", t0 - log_start, (t1 - t0) * 1000.0,
 	        was_prefetching ? "prefetch" : (shader ? "create" : "null"), flags,
 	        fragcode ? (int)strlen(fragcode) : 0, diagnostic_name ? diagnostic_name : "-");
@@ -1015,8 +1023,21 @@ char *GPU_shader_validate(GPUShader *shader)
 #undef DEBUG_SHADER_VERTEX
 #undef DEBUG_SHADER_NONE
 
+char GPU_profile_first_binds[1024];
+
 void GPU_shader_bind(GPUShader *shader)
 {
+	if (!shader->bound_once) {
+		/* A program's first draw is where some drivers (AMD) finish compiling it, the time then shows at swap. */
+		shader->bound_once = true;
+		if (shader->profile_name[0]) {
+			const size_t len = strlen(GPU_profile_first_binds);
+			if (len + 2 < sizeof(GPU_profile_first_binds)) {
+				BLI_snprintf(GPU_profile_first_binds + len, sizeof(GPU_profile_first_binds) - len, " %s",
+				             shader->profile_name);
+			}
+		}
+	}
 	GPU_ASSERT_NO_GL_ERRORS("Pre Shader Bind");
 	glUseProgram(shader->program);
 	GPU_ASSERT_NO_GL_ERRORS("Post Shader Bind");

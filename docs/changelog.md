@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-09 - Cenas: Preload/Keep no atuador Scene e scene.end(keep=True)
+
+- Atuador Scene: caixa **Preload** em Set/Add Overlay/Add Background (`use_preload`, flag `ACT_SCENE_PRELOAD` no antigo `pad1` de `bSceneActuator`, sem mudar o layout). Quando a cena dona do atuador é convertida, a cena alvo é pré-carregada; o add depois só insere a cena pronta.
+- Atuador Remove Scene: caixa **Keep** (`use_keep`, `ACT_SCENE_KEEP`) e `scene.end(keep=True)`: a cena sai da lista e fica pausada (sem lógica, física ou desenho), sem ser destruída; o próximo add/replace do mesmo nome a devolve como estava, retomada. Liberada no stop da engine.
+- `preloadScene` só enfileira (thread safe: o actuator pode ser convertido no LibLoad assíncrono); a checagem e a conversão rodam no fim do quadro.
+- Conversor Logic Bricks → Python: Preload vira `awake(self, args)` com `logic.preloadScene(args.get(...))` (roda 1 quadro antes do `start`); Keep vira `sc.end(keep=True)`.
+- RolimaRacer: `BrainCore.py` pré-carrega `_vignette` e `_pause` no estado 3 do loading.
+- Profiler: com `RANGE_SHADER_LOG`, o SPIKE lista `firstbind:` (programas usados pela 1ª vez no quadro e no anterior). Achado: travadas de ~800 ms no swap ao voltar do ragdoll, sem shader novo; investigação aberta.
+- Componente Python: `awake()` e `start()` agora rodam juntos no 1º quadro, e `update()` a partir do 2º. Antes o `awake()` ocupava o 1º quadro sozinho e `start()` + `update()` vinham no 2º. Ordem de um quadro: sensores/controllers → componentes → actuators; o `start()` agora cai no mesmo quadro dos primeiros bricks. `RANGE_COMPONENT_LEGACY_START=1` volta o horário antigo para comparar. Achado no RolimaRacer: o `PlayerController` procurava o piloto (`init_all`) antes de o `add_all_players` prendê-lo e o boneco ficava em pose T; o jogo dependia do quadro de atraso. Corrigido no jogo (`init_all` espera `can_start_logic`).
+- Verificação: build RangeEngine/RangeRuntime ok; `tools/debug/cenas/criar_cena_preload_keep.py` 15/15 e `tools/debug/cenas/criar_cena_component_timing.py` 6/6 checagens ok no runtime; conversor testado headless (código compila, sem pendências); RolimaRacer autopilot 22 s sem traceback, 60 FPS, nenhum quadro >16 ms.
+
 ## 2026-10-09 - Travadas do RolimaRacer: preloadScene e instrumentos de pico
 
 - Medição (`debug-logs/travadas-20261009a`..`k`, rodadas de ~22 s, cache de shader quente): o pico de 62 ms em t≈7,5 s era o `addScene` síncrono de `HUD` (13 ms) + `Pista_MiniMap` (44 ms: convert 12, texturas 22, shaders 7). Não era shader compilado no jogo. Também `Contagem_3_2_1` (28 ms, às vezes). O pico de ~40 ms em `render.cameras` é intermitente (4 de 11 rodadas, instante aleatório), cai em `cam.buckets(Pista_1)` sem draw lento ou em `Skinning`, sem shader novo: parece espera de driver/GL, ainda aberto.

@@ -28,6 +28,8 @@
 
 #include "CM_Message.h"
 
+#include <cstdlib>
+
 #include "DNA_python_component_types.h"
 
 #include "BKE_python_component.h"
@@ -177,18 +179,32 @@ void KX_PythonComponent::Update()
 		return;
 	}
 
-	// Call Awake Function (Optional).
-	if (!m_awake) {
+	/* First frame: awake() (optional) and start() together, before the logic bricks of the same frame, so the
+	 * setup done there (preloads, callbacks, initial values) is ready as early as the bricks' conversion.
+	 * update() starts on the next frame. */
+	/* RANGE_COMPONENT_LEGACY_START=1: old timing (awake alone on the 1st frame, start + update on the 2nd), to
+	 * compare when a game depends on it. */
+	static const bool legacyStart = getenv("RANGE_COMPONENT_LEGACY_START") && atoi(getenv("RANGE_COMPONENT_LEGACY_START"));
+	if (legacyStart && !m_awake) {
 		if (PyObject_HasAttrString(GetProxy(), "awake")) {
-		  Awake();
+			Awake();
 		}
 		m_awake = true;
 		return;
 	}
-	// Call Start Function.
 	if (!m_init) {
+		if (!m_awake) {
+			if (PyObject_HasAttrString(GetProxy(), "awake")) {
+				Awake();
+			}
+			m_awake = true;
+			if (m_failed) {
+				return;
+			}
+		}
 		Start();
 		m_init = true;
+		return;
 	}
 	// Call Update Function.
 	PyObject *pycomp = GetProxy();
