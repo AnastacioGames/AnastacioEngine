@@ -659,6 +659,11 @@ public:
 	void SetMipmapping(MipmapOption val);
 	MipmapOption GetMipmapping();
 
+	/** Mip levels dropped from every texture at upload (0 = full size, 1 = half, 2 = quarter).
+	 * Changing it reloads the textures of G.main. */
+	void SetTextureQuality(int level);
+	int GetTextureQuality();
+
 	void SetOverrideShader(OverrideShaderType type);
 	OverrideShaderType GetOverrideShader();
 	void ActivateOverrideShaderInstancing(RAS_InstancingBuffer *buffer);

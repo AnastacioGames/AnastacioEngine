@@ -140,7 +140,36 @@ static struct GPUTextureState {
 	float anisotropic;
 	int gpu_mipmap;
 	MTexPoly *lasttface;
-} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, 0, -1, 1.0f, 0, NULL};
+	/* mip levels dropped at upload, see GPU_set_texture_quality */
+	int texture_quality;
+} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, 0, -1, 1.0f, 0, NULL, 0};
+
+/* Texture quality */
+
+void GPU_set_texture_quality(int level)
+{
+	GTS.texture_quality = max_ii(0, min_ii(level, GPU_TEXTURE_QUALITY_MAX));
+}
+
+int GPU_get_texture_quality(void)
+{
+	return GTS.texture_quality;
+}
+
+/* Size of level 0 once the texture quality drops its top mip levels: halves both sides together
+ * (keeps the aspect) while the larger side stays >= GPU_TEXTURE_QUALITY_MIN_SIZE. */
+static int gpu_texture_quality_levels(int w, int h)
+{
+	int levels = 0;
+	while (levels < GTS.texture_quality &&
+	       max_ii(w, h) / 2 >= GPU_TEXTURE_QUALITY_MIN_SIZE && min_ii(w, h) >= 2)
+	{
+		w /= 2;
+		h /= 2;
+		levels++;
+	}
+	return levels;
+}
 
 /* Mipmap settings */
 
@@ -148,8 +177,10 @@ void GPU_set_gpu_mipmapping(Main *bmain, int gpu_mipmap)
 {
 	int old_value = GTS.gpu_mipmap;
 
-	/* only actually enable if it's supported */
-	GTS.gpu_mipmap = gpu_mipmap && GLEW_EXT_framebuffer_object;
+	/* only actually enable if it's supported (glGenerateMipmap: core in GL 3.0, or one of the
+	 * FBO extensions; same test as gpu_generate_mipmap) */
+	GTS.gpu_mipmap = gpu_mipmap &&
+	                 (GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object || GLEW_EXT_framebuffer_object);
 
 	if (old_value != GTS.gpu_mipmap) {
 		GPU_free_images(bmain);
@@ -182,11 +213,18 @@ static void gpu_generate_mipmap(GLenum target)
 void GPU_set_mipmap(Main *bmain, bool mipmap)
 {
 	if (GTS.domipmap != mipmap) {
-		GPU_free_images(bmain);
 		GTS.domipmap = mipmap;
+		if (mipmap) {
+			/* textures uploaded without mipmaps have no levels to sample: reload them */
+			GPU_free_images(bmain);
+		}
+		else {
+			GPU_update_image_filters(bmain);
+		}
 	}
 }
 
+/* Callers that change this on a running game call GPU_update_image_filters afterwards. */
 void GPU_set_linear_mipmap(bool linear)
 {
 	if (GTS.linearmipmap != linear) {
@@ -232,21 +270,85 @@ static GLenum gpu_get_mipmap_filter(bool mag)
 /* Anisotropic filtering settings */
 void GPU_set_anisotropic(Main *bmain, float value)
 {
+	/* Clamp value to the maximum value the graphics card supports */
+	const float max = GPU_max_texture_anisotropy();
+	if (value > max)
+		value = max;
+	if (value < 1.0f)
+		value = 1.0f;
+
 	if (GTS.anisotropic != value) {
-		GPU_free_images(bmain);
-
-		/* Clamp value to the maximum value the graphics card supports */
-		const float max = GPU_max_texture_anisotropy();
-		if (value > max)
-			value = max;
-
 		GTS.anisotropic = value;
+		GPU_update_image_filters(bmain);
 	}
 }
 
 float GPU_get_anisotropic(void)
 {
 	return GTS.anisotropic;
+}
+
+static bool gpu_is_mipmap_filter(GLint filter)
+{
+	return ELEM(filter, GL_NEAREST_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_NEAREST,
+	            GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_LINEAR);
+}
+
+/* Applies the current filters to one loaded texture. Whether it has mip levels is read back
+ * from its min filter: textures uploaded with mipmaps get a mipmap min filter
+ * (GPU_create_gl_tex, GPU_upload_dxt_texture) and lose it only with mipmaps off, and turning
+ * mipmaps back on reloads everything (GPU_set_mipmap). */
+static void gpu_update_texture_filters(GLenum textarget, GLuint bindcode)
+{
+	glBindTexture(textarget, bindcode);
+
+	GLint min_filter = 0;
+	glGetTexParameteriv(textarget, GL_TEXTURE_MIN_FILTER, &min_filter);
+	if (gpu_is_mipmap_filter(min_filter) && GTS.domipmap)
+		min_filter = gpu_get_mipmap_filter(false);
+	else
+		min_filter = GTS.domipmap ? GL_LINEAR : GL_NEAREST;
+
+	glTexParameteri(textarget, GL_TEXTURE_MIN_FILTER, min_filter);
+	glTexParameteri(textarget, GL_TEXTURE_MAG_FILTER, gpu_get_mipmap_filter(true));
+	if (GLEW_EXT_texture_filter_anisotropic)
+		glTexParameterf(textarget, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
+}
+
+void GPU_update_image_filters(Main *bmain)
+{
+	/* while texture painting the images keep plain filters (GPU_paint_set_mipmap) */
+	if (bmain == NULL || GTS.texpaint)
+		return;
+
+	bool saved = false;
+	GLint prev_2d = 0, prev_cube = 0;
+
+	for (Image *ima = bmain->image.first; ima; ima = ima->id.next) {
+		const bool has_repbind = (ima->repbind != NULL);
+		if (!ima->bindcode[TEXTARGET_TEXTURE_2D] && !ima->bindcode[TEXTARGET_TEXTURE_CUBE_MAP] && !has_repbind)
+			continue;
+
+		if (!saved) {
+			glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_2d);
+			glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &prev_cube);
+			saved = true;
+		}
+
+		if (ima->bindcode[TEXTARGET_TEXTURE_2D])
+			gpu_update_texture_filters(GL_TEXTURE_2D, ima->bindcode[TEXTARGET_TEXTURE_2D]);
+		if (ima->bindcode[TEXTARGET_TEXTURE_CUBE_MAP])
+			gpu_update_texture_filters(GL_TEXTURE_CUBE_MAP, ima->bindcode[TEXTARGET_TEXTURE_CUBE_MAP]);
+		for (int i = 0; has_repbind && i < ima->totbind; i++) {
+			if (ima->repbind[i])
+				gpu_update_texture_filters(GL_TEXTURE_2D, ima->repbind[i]);
+		}
+	}
+
+	if (saved) {
+		glBindTexture(GL_TEXTURE_2D, prev_2d);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, prev_cube);
+	}
 }
 
 /* Set OpenGL state for an MTFace */
@@ -796,15 +898,26 @@ void GPU_create_gl_tex(
 	int tpx = rectw;
 	int tpy = recth;
 
+	/* texture quality drops the top mip levels: only for mipmapped textures, a plain one
+	 * (UI, render targets read back 1:1) keeps its size */
+	const int quality_levels = (textarget == GL_TEXTURE_2D && mipmap && GPU_get_mipmap()) ?
+	                           gpu_texture_quality_levels(rectw, recth) : 0;
+
 	/* scale if not a power of two. this is not strictly necessary for newer
 	 * GPUs (OpenGL version >= 2.0) since they support non-power-of-two-textures
 	 * Then don't bother scaling for hardware that supports NPOT textures! */
 	if (textarget == GL_TEXTURE_2D &&
 	    ((!GPU_full_non_power_of_two_support() && !is_power_of_2_resolution(rectw, recth)) ||
-	     is_over_resolution_limit(textarget, rectw, recth)))
+	     is_over_resolution_limit(textarget, rectw, recth) || quality_levels > 0))
 	{
-		rectw = smaller_power_of_2_limit(rectw);
-		recth = smaller_power_of_2_limit(recth);
+		if ((!GPU_full_non_power_of_two_support() && !is_power_of_2_resolution(rectw, recth)) ||
+		    is_over_resolution_limit(textarget, rectw, recth))
+		{
+			rectw = smaller_power_of_2_limit(rectw);
+			recth = smaller_power_of_2_limit(recth);
+		}
+		rectw = max_ii(1, rectw >> quality_levels);
+		recth = max_ii(1, recth >> quality_levels);
 
 		if (use_high_bit_depth) {
 			ibuf = IMB_allocFromBuffer(NULL, frect, tpx, tpy);
@@ -870,7 +983,8 @@ void GPU_create_gl_tex(
 				ima->tpageflag |= IMA_MIPMAP_COMPLETE;
 		}
 		else {
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			/* same as the mag filter: mipmaps off means unfiltered display (pixel art) */
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GTS.domipmap ? GL_LINEAR : GL_NEAREST);
 		}
 	}
 	else if (textarget == GL_TEXTURE_CUBE_MAP) {
@@ -978,6 +1092,11 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 		return false;
 	}
 
+	/* a header with DDSD_MIPMAPCOUNT and a count of 0 would upload nothing */
+	if (ibuf->dds_data.nummipmaps == 0) {
+		return false;
+	}
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gpu_get_mipmap_filter(0));
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gpu_get_mipmap_filter(1));
 
@@ -985,6 +1104,15 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 
 	blocksize = (ibuf->dds_data.fourcc == FOURCC_DXT1) ? 8 : 16;
+
+	/* texture quality: skip the top levels stored in the file, keeping at least one */
+	int skip = 0;
+	if (GPU_get_mipmap()) {
+		skip = min_ii(gpu_texture_quality_levels(width, height), (int)ibuf->dds_data.nummipmaps - 1);
+		skip = max_ii(skip, 0);
+	}
+
+	int level = 0;
 	for (i = 0; i < ibuf->dds_data.nummipmaps && (width || height); ++i) {
 		if (width == 0)
 			width = 1;
@@ -993,8 +1121,11 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 
 		size = ((width + 3) / 4) * ((height + 3) / 4) * blocksize;
 
-		glCompressedTexImage2D(GL_TEXTURE_2D, i, format, width, height,
-			0, size, ibuf->dds_data.data + offset);
+		if (i >= skip) {
+			glCompressedTexImage2D(GL_TEXTURE_2D, level, format, width, height,
+				0, size, ibuf->dds_data.data + offset);
+			level++;
+		}
 
 		offset += size;
 		width >>= 1;
@@ -1002,7 +1133,11 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 	}
 
 	/* set number of mipmap levels we have, needed in case they don't go down to 1x1 */
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, i - 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, max_ii(level - 1, 0));
+	if (level <= 1) {
+		/* a single level: a mipmap min filter would sample nothing on some drivers */
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GTS.domipmap ? GL_LINEAR : GL_NEAREST);
+	}
 
 	return true;
 #else

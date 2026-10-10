@@ -214,6 +214,12 @@ public:
 	BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUseExpandFraming, float camZoom);
 	virtual ~BL_Converter();
 
+	/// Blender data of the game file and of every libloaded file.
+	const std::vector<Main *>& GetMainList() const
+	{
+		return m_maggies;
+	}
+
 	/** Fully convert a non-libloaded scene.
 	 * \param compileShaders False leaves the material shaders to CompileSceneShaders() (asynchronous addScene).
 	 */

@@ -1002,6 +1002,7 @@ short RAS_Rasterizer::GetAnisotropicFiltering()
 
 void RAS_Rasterizer::SetMipmapping(MipmapOption val)
 {
+	const MipmapOption old = GetMipmapping();
 	switch (val) {
 		case RAS_Rasterizer::RAS_MIPMAP_LINEAR:
 		{
@@ -1021,6 +1022,25 @@ void RAS_Rasterizer::SetMipmapping(MipmapOption val)
 			GPU_set_mipmap(G.main, 0);
 		}
 	}
+
+	// Linear <-> nearest keeps the textures: GPU_set_mipmap only acts on on/off.
+	if (old != RAS_MIPMAP_NONE && val != RAS_MIPMAP_NONE && old != val) {
+		GPU_update_image_filters(G.main);
+	}
+}
+
+void RAS_Rasterizer::SetTextureQuality(int level)
+{
+	if (level != GPU_get_texture_quality()) {
+		GPU_set_texture_quality(level);
+		// The quality is applied at upload: reload the textures.
+		GPU_free_images(G.main);
+	}
+}
+
+int RAS_Rasterizer::GetTextureQuality()
+{
+	return GPU_get_texture_quality();
 }
 
 RAS_Rasterizer::MipmapOption RAS_Rasterizer::GetMipmapping()

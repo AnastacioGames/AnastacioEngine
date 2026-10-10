@@ -409,6 +409,11 @@ GPULamp *GPU_lamp_from_blender(struct Scene *scene, struct Object *ob, struct Ob
 void GPU_lamp_free(struct Object *ob);
 
 bool GPU_lamp_has_shadow_buffer(GPULamp *lamp);
+/* Shadow map resolution of a Sun/Spot lamp (0 without shadow buffer). Resizing keeps the
+ * textures referenced by the materials, so no shader recompile; CSM cascades scale with it.
+ * Point lamps are not resizable (their texel size is a shader constant). */
+int GPU_lamp_shadow_size(GPULamp *lamp);
+bool GPU_lamp_shadow_set_size(GPULamp *lamp, int size);
 void GPU_lamp_update_buffer_mats(GPULamp *lamp);
 void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[4][4], int *winsize, float winmat[4][4]);
 void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp);

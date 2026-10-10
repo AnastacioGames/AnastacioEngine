@@ -244,6 +244,7 @@ PyAttributeDef KX_LightObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("shadowMapType", KX_LightObject, pyattr_get_shadow_map_type),
 	EXP_PYATTRIBUTE_RO_FUNCTION("shadowColor", KX_LightObject, pyattr_get_shadow_color),
 	EXP_PYATTRIBUTE_RO_FUNCTION("useShadow", KX_LightObject, pyattr_get_shadow_active),
+	EXP_PYATTRIBUTE_RW_FUNCTION("shadowMapSize", KX_LightObject, pyattr_get_shadow_map_size, pyattr_set_shadow_map_size),
 	EXP_PYATTRIBUTE_RO_FUNCTION("shadowMatrix", KX_LightObject, pyattr_get_shadow_matrix),
 	EXP_PYATTRIBUTE_RO_FUNCTION("SPOT", KX_LightObject, pyattr_get_typeconst),
 	EXP_PYATTRIBUTE_RO_FUNCTION("SUN", KX_LightObject, pyattr_get_typeconst),
@@ -565,6 +566,31 @@ int KX_LightObject::pyattr_set_type(EXP_PyObjectPlus *self_v, const EXP_PYATTRIB
 		}
 	}
 
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_LightObject::pyattr_get_shadow_map_size(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_LightObject *self = static_cast<KX_LightObject *>(self_v);
+	return PyLong_FromLong(self->m_lightobj->GetShadowMapSize());
+}
+
+int KX_LightObject::pyattr_set_shadow_map_size(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_LightObject *self = static_cast<KX_LightObject *>(self_v);
+	const long size = PyLong_AsLong(value);
+	if (size == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "light.shadowMapSize = int: KX_LightObject, expected an integer");
+		return PY_SET_ATTR_FAIL;
+	}
+	if (size < 64 || size > 16384) {
+		PyErr_SetString(PyExc_ValueError, "light.shadowMapSize = int: KX_LightObject, expected a value from 64 to 16384");
+		return PY_SET_ATTR_FAIL;
+	}
+
+	self->m_lightobj->m_shadowMapSize = (int)size;
+	// Applied now if the GPU lamp exists, otherwise when it is created.
+	self->m_lightobj->GetShadowMapSize();
 	return PY_SET_ATTR_SUCCESS;
 }
 

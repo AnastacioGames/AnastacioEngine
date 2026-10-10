@@ -94,7 +94,8 @@ int GPU_scene_object_lights(
         int lay, float viewmat[4][4], int ortho);
 
 /* Mipmap settings
- * - these will free textures on changes */
+ * - turning mipmaps on frees textures (they need the mip levels); turning them off or
+ *   changing linear/nearest only updates the filters (GPU_update_image_filters) */
 
 void GPU_set_mipmap(struct Main *bmain, bool mipmap);
 bool GPU_get_mipmap(void);
@@ -103,9 +104,20 @@ bool GPU_get_linear_mipmap(void);
 void GPU_paint_set_mipmap(struct Main *bmain, bool mipmap);
 
 /* Anisotropic filtering settings
- * - these will free textures on changes */
+ * - updates the filters of bmain's loaded textures, no reload */
 void GPU_set_anisotropic(struct Main *bmain, float value);
 float GPU_get_anisotropic(void);
+
+/* Reapplies min/mag filter and anisotropy to every loaded texture of bmain's images. */
+void GPU_update_image_filters(struct Main *bmain);
+
+/* Texture quality: mip levels dropped at upload (0 = full size, 1 = half, 2 = quarter),
+ * never going below GPU_TEXTURE_QUALITY_MIN_SIZE. Only textures uploaded afterwards are
+ * affected: free the images (GPU_free_images) to reload them. */
+#define GPU_TEXTURE_QUALITY_MAX 2
+#define GPU_TEXTURE_QUALITY_MIN_SIZE 256
+void GPU_set_texture_quality(int level);
+int GPU_get_texture_quality(void);
 
 /* enable gpu mipmapping */
 void GPU_set_gpu_mipmapping(struct Main *bmain, int gpu_mipmap);

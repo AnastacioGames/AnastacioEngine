@@ -108,6 +108,7 @@ protected:
 	struct SavedData {
 		RAS_Rasterizer::MipmapOption mipmap;
 		int anisotropic;
+		int textureQuality;
 	} m_savedData;
 
 	struct PythonConsole {

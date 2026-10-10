@@ -158,6 +158,15 @@ base class --- :class:`KX_GameObject`
 
          Higher values result in a more focused light source.
 
+   .. attribute:: shadowMapSize
+
+      Shadow map resolution in pixels (the lamp's Size). Setting it resizes the shadow buffer on
+      the fly without recompiling shaders, for a shadow quality option (e.g. 512 / 1024 / 2048).
+      Cascaded shadow maps keep their ratio to it. Reads 0 when the lamp has no shadow buffer.
+      Point lamps keep their own size.
+
+      :type: integer from 64 to 16384 (clamped to the graphics card maximum).
+
    .. attribute:: staticShadow
 
       Enables static shadows. By default (staticShadow=False) the shadow cast by the lamp is recalculated every frame. When this is not needed, set staticShadow=True. In that case, call :py:meth:`updateShadow` to request a shadow update.

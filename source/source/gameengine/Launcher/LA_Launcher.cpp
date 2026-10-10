@@ -265,6 +265,8 @@ void LA_Launcher::InitEngine()
 	m_savedData.anisotropic = m_rasterizer->GetAnisotropicFiltering();
 	// Copy current mipmap mode to restore at the game end.
 	m_savedData.mipmap = m_rasterizer->GetMipmapping();
+	// Copy current texture quality to restore at the game end.
+	m_savedData.textureQuality = m_rasterizer->GetTextureQuality();
 
 	static RAS_Rasterizer::HdrType hdrTable[] = {
 		RAS_Rasterizer::RAS_HDR_NONE, // GAME_HDR_NONE
@@ -479,6 +481,8 @@ void LA_Launcher::ExitEngine()
 	m_rasterizer->SetAnisotropicFiltering(m_savedData.anisotropic);
 	// Set mipmap setting back to its original value.
 	m_rasterizer->SetMipmapping(m_savedData.mipmap);
+	// Set texture quality back (reloads the textures only if the game changed it).
+	m_rasterizer->SetTextureQuality(m_savedData.textureQuality);
 
 	if (m_converter) {
 		delete m_converter;

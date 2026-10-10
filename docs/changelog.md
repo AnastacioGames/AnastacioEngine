@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+
+## 2026-10-10 - Qualidade de textura por mipmap, filtros sem recarga e tamanho de sombra em tempo real
+
+- `Range.render.setTextureQuality(0/1/2)`/`getTextureQuality()`: só a textura em alta fica no projeto; no envio para a GPU caem os maiores níveis de mipmap (metade/um quarto), nunca abaixo de 256 px no lado maior e só em texturas com mipmap. DDS pula os níveis gravados no arquivo. Trocar recarrega as texturas do jogo e dos arquivos do LibLoad; no editor o valor volta ao sair do jogo.
+- `setAnisotropicFiltering` e `setMipmapping` (linear/nearest, desligar) só atualizam os filtros das texturas carregadas (`GPU_update_image_filters`), sem `GPU_free_images`; antes recarregavam todas as texturas e ignoravam as do LibLoad. Linear <-> nearest antes não chegava às texturas já carregadas.
+- Geração de mipmap na GPU aceitava só `GL_EXT_framebuffer_object`; agora também GL 3.0/ARB, como a função que gera.
+- Mipmap desligado: o min filter das texturas sem mipmap era `GL_LINEAR` e o mag `GL_NEAREST`; agora ambos nearest (exibição sem filtro). DDS com um nível só não fica com filtro de mipmap; cabeçalho com 0 níveis cai para descompactado.
+- Anisotrópico padrão do jogo exportado 2 -> 8.
+- `light.shadowMapSize` (leitura/escrita): redimensiona o mapa de sombra de Sun/Spot sem recompilar (`GPU_texture_resize_2D` mantém os objetos de textura que os materiais referenciam); cascatas mantêm a proporção; o valor é reaplicado se a lâmpada da GPU for recriada (`setGLSLMaterialSetting`).
+- Teste: `tools/debug/cenas/criar_cena_textura_qualidade.py` (textura 1024: 1024/512/256/1024; aniso 16 no mesmo frame; nearest 0x2701, none 0x2600; sombra 2048 -> 512, mantida após recriar a lâmpada, -> 1024). Avaliação visual da sombra pendente no RolimaRacer.
 ## 2026-10-10 - LOD de malha deformada mede do corpo, não da origem
 
 - `KX_GameObject::UpdateLod` media a distância da origem do objeto. No ragdoll do RolimaRacer o corpo do piloto (filho da armature, presa ao carro) voa com os ossos e a origem fica no carro: com o carro longe, o piloto trocava para LOD baixo mesmo com a câmera do ragdoll colada nele. Objetos com deformer e bounds automáticos (skinning na CPU, shape/modifier) agora medem do centro da caixa deformada; estáticos seguem na origem. Skinning na GPU não atualiza a caixa (continua na pose de repouso).
