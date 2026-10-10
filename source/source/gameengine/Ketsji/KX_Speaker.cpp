@@ -435,6 +435,26 @@ void KX_Speaker::ApplyAreaReverb(const RangeReverbAreaSettings *area, float infl
 #endif  // WITH_AUDASPACE
 }
 
+void KX_Speaker::SuspendSound()
+{
+#ifdef WITH_AUDASPACE
+  if (m_handle && AUD_Handle_getStatus(m_handle) == AUD_STATUS_PLAYING) {
+    AUD_Handle_pause(m_handle);
+    m_suspendPaused = true;
+  }
+#endif  // WITH_AUDASPACE
+}
+
+void KX_Speaker::ResumeSound()
+{
+#ifdef WITH_AUDASPACE
+  if (m_suspendPaused && m_handle && AUD_Handle_getStatus(m_handle) == AUD_STATUS_PAUSED) {
+    AUD_Handle_resume(m_handle);
+  }
+#endif  // WITH_AUDASPACE
+  m_suspendPaused = false;
+}
+
 #ifdef WITH_PYTHON
 
 /* ------------------------------------------------------------------------- */

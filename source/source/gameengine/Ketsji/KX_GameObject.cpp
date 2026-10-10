@@ -1416,6 +1416,11 @@ void KX_GameObject::ReplaceMesh(KX_Mesh *mesh, bool use_gfx, bool use_phys)
 		RemoveMeshes();
 		AddMesh(mesh);
 		AddMeshUser();
+		// The new deformer starts in bind pose (T-pose) until the next animation pass, and LOD switches run
+		// after that pass, right before drawing: apply the current pose now so the swap frame is not undeformed.
+		if (RAS_Deformer *deformer = GetDeformer()) {
+			deformer->Update();
+		}
 	}
 
 	// Update the new assigned mesh with the physics mesh.

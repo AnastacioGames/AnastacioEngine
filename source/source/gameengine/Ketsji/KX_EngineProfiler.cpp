@@ -381,6 +381,8 @@ void EndFrame(double nowSec, const double *categoryMs, const std::string *labels
 		GPU_render_profile_calls[phase] = 0;
 		std::fill(std::begin(GPU_render_profile_counts[phase]), std::end(GPU_render_profile_counts[phase]), 0);
 	}
+	// Lines of RANGE_SHADER_LOG written during the next frame carry its number (the SPIKE "frame=").
+	GPU_profile_frame = state.frame + 1;
 	state.prevFirstBinds = GPU_profile_first_binds;
 	GPU_profile_first_binds[0] = '\0';
 	for (int i = 0; i < GPU_PROFILE_TOT; ++i) {

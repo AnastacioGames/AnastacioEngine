@@ -922,6 +922,35 @@ linked:
 
 /* RANGE_SHADER_LOG=<file>: one line per shader creation (time since the first one, duration, flags, name), to find
  * which shader caused a hitch in game. */
+static double log_start = 0.0;
+
+static FILE *gpu_profile_log_file(void)
+{
+	static int log_init = 0;
+	static FILE *log_file = NULL;
+	if (!log_init) {
+		log_init = 1;
+		const char *path = getenv("RANGE_SHADER_LOG");
+		if (path && path[0]) {
+			log_file = fopen(path, "a");
+			log_start = PIL_check_seconds_timer();
+		}
+	}
+	return log_file;
+}
+
+long GPU_profile_frame = 0;
+
+void GPU_profile_log_texture(int w, int h, bool depth, int samples)
+{
+	FILE *log_file = gpu_profile_log_file();
+	if (log_file) {
+		fprintf(log_file, "t=%.3fs frame=%ld texture %dx%d%s%s\n", PIL_check_seconds_timer() - log_start,
+		        GPU_profile_frame, w, h, depth ? " depth" : "", samples ? " multisample" : "");
+		fflush(log_file);
+	}
+}
+
 static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const char *fragcode,
                                             const char *geocode,
@@ -933,17 +962,7 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const int flags,
                                             const char *diagnostic_name)
 {
-	static int log_init = 0;
-	static FILE *log_file = NULL;
-	static double log_start = 0.0;
-	if (!log_init) {
-		log_init = 1;
-		const char *path = getenv("RANGE_SHADER_LOG");
-		if (path && path[0]) {
-			log_file = fopen(path, "a");
-			log_start = PIL_check_seconds_timer();
-		}
-	}
+	FILE *log_file = gpu_profile_log_file();
 	if (!log_file) {
 		return gpu_shader_create_ex_impl_raw(vertexcode, fragcode, geocode, libcode, defines,
 		                                     input, output, number, flags, diagnostic_name);
@@ -957,8 +976,8 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		BLI_snprintf(shader->profile_name, sizeof(shader->profile_name), "%s/%d", diagnostic_name ? diagnostic_name : "-",
 		             fragcode ? (int)strlen(fragcode) : 0);
 	}
-	fprintf(log_file, "t=%.3fs ms=%.2f %s flags=0x%x frag=%d %s\n", t0 - log_start, (t1 - t0) * 1000.0,
-	        was_prefetching ? "prefetch" : (shader ? "create" : "null"), flags,
+	fprintf(log_file, "t=%.3fs frame=%ld ms=%.2f %s flags=0x%x frag=%d %s\n", t0 - log_start, GPU_profile_frame,
+	        (t1 - t0) * 1000.0, was_prefetching ? "prefetch" : (shader ? "create" : "null"), flags,
 	        fragcode ? (int)strlen(fragcode) : 0, diagnostic_name ? diagnostic_name : "-");
 	fflush(log_file);
 	return shader;

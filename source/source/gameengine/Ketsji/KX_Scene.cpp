@@ -756,11 +756,22 @@ void KX_Scene::UpdateEarthquake(double curtime)
 
 void KX_Scene::Suspend()
 {
+	if (!m_suspend) {
+		// The logic that would stop the sounds does not run while suspended (pause menu): hold them here.
+		for (KX_Speaker *speaker : m_speakerlist) {
+			speaker->SuspendSound();
+		}
+	}
 	m_suspend = true;
 }
 
 void KX_Scene::Resume()
 {
+	if (m_suspend) {
+		for (KX_Speaker *speaker : m_speakerlist) {
+			speaker->ResumeSound();
+		}
+	}
 	m_suspend = false;
 }
 
