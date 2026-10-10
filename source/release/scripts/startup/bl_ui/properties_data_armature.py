@@ -75,6 +75,45 @@ class DATA_PT_skeleton(ArmatureButtonsPanel, Panel):
             col = box.column()
             col.prop(arm, "deform_method", expand=True)
             col.prop(arm, "culling_method", expand=False)
+            if arm.deform_method == 'BGE_GPU' and context.object:
+                self.draw_gpu_skinning_status(box, context.object)
+
+    # Mirrors BL_SkinDeformer::UseGPUSkinning (GPU_MAX_SKINNING_BONES): shows here what the engine
+    # would only print on the console when a mesh falls back to CPU skinning.
+    GPU_MAX_SKINNING_GROUPS = 64
+
+    @staticmethod
+    def skinned_meshes(armob):
+        import bpy
+        for ob in bpy.data.objects:
+            if ob.type != 'MESH' or not ob.modifiers:
+                continue
+            # Same rule as the converter: parented to the armature, Armature as the first modifier.
+            if ob.parent == armob and ob.modifiers[0].type == 'ARMATURE':
+                yield ob
+
+    def draw_gpu_skinning_status(self, layout, armob):
+        meshes = list(self.skinned_meshes(armob))
+        col = layout.column(align=True)
+        if not meshes:
+            col.label(text="No mesh deformed by this armature", icon='INFO')
+            return
+
+        for ob in meshes:
+            mats = [m for m in ob.data.materials if m]
+            groups = len(ob.vertex_groups)
+            if groups > self.GPU_MAX_SKINNING_GROUPS:
+                col.label(text="%s: CPU (%d vertex groups, GPU max %d)" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
+                          icon='ERROR')
+            elif not any(m.use_gpu_skinning for m in mats):
+                col.label(text="%s: CPU (enable GPU Skinning on a material)" % ob.name, icon='ERROR')
+            else:
+                col.label(text="%s: GPU (%d vertex groups)" % (ob.name, groups), icon='FILE_TICK')
+            for m in mats:
+                row = col.row()
+                row.separator()
+                row.prop(m, "use_gpu_skinning", text=m.name)
+        layout.label(text="GPU uses the 4 strongest bones per vertex (Weights > Limit Total)", icon='INFO')
 
 
 class DATA_PT_display(ArmatureButtonsPanel, Panel):
