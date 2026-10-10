@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-10 - LOD de malha deformada mede do corpo, não da origem
+
+- `KX_GameObject::UpdateLod` media a distância da origem do objeto. No ragdoll do RolimaRacer o corpo do piloto (filho da armature, presa ao carro) voa com os ossos e a origem fica no carro: com o carro longe, o piloto trocava para LOD baixo mesmo com a câmera do ragdoll colada nele. Objetos com deformer e bounds automáticos (skinning na CPU, shape/modifier) agora medem do centro da caixa deformada; estáticos seguem na origem. Skinning na GPU não atualiza a caixa (continua na pose de repouso).
+- RolimaRacer (jogo `d70b243`): a câmera do ragdoll segue o `foco_camera_ragdoll` do próprio piloto (grupo do personagem ou o mais perto do carro no início), não o primeiro dos 10 da cena; grava `ref_camera_ragdoll`, lido pelo DoF.
+- Verificação: `RangeEngine`/`RangeRuntime` compilados; cópia de teste com 10 pilotos e 4 ragdolls (tecla V): câmera no corpo do jogador em todos e corpo em LOD 0 com a origem a 10,3 m da câmera (LOD 1 começa em 10 m); usuário conferiu no jogo.
+
 ## 2026-10-10 - Travadas do RolimaRacer: imagens de nós no load e resolução dinâmica
 
 - **Pico de ~39 ms em `cam.buckets`** (aberto desde 2026-10-09, visto em todas as rodadas recentes): era o primeiro desenho das nuvens. `clouds.png` (1024x512, 38 ms entre leitura e mipmaps) está no material `sprite.001`, usado só como nó Material dentro de `NuvemNodes`. O load sobe as imagens dos slots do material, não as de dentro da árvore de nós; essas subiam no `GPU_pass_bind` do primeiro desenho. Agora `BL_BlenderShader::ReloadMaterial` chama `GPU_material_load_images` (→ `GPU_pass_load_images`, que sobe as imagens de todas as entradas do pass e restaura a textura ligada na unidade ativa).
