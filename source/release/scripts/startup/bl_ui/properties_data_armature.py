@@ -102,16 +102,21 @@ class DATA_PT_skeleton(ArmatureButtonsPanel, Panel):
         for ob in meshes:
             mats = [m for m in ob.data.materials if m]
             groups = len(ob.vertex_groups)
-            if groups > self.GPU_MAX_SKINNING_GROUPS:
-                col.label(text="%s: CPU (%d vertex groups, GPU max %d)" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
+            over_limit = groups > self.GPU_MAX_SKINNING_GROUPS
+            row = col.row()
+            if over_limit:
+                # Red text: the material switch cannot help, the mesh has too many groups for the GPU.
+                row.alert = True
+                row.label(text="%s: CPU, %d/%d groups, too many for the GPU" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
                           icon='ERROR')
             elif not any(m.use_gpu_skinning for m in mats):
-                col.label(text="%s: CPU, %d/%d groups OK, turn on GPU Skinning below" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
+                row.label(text="%s: CPU, %d/%d groups OK, turn on GPU Skinning below" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
                           icon='ERROR')
             else:
-                col.label(text="%s: GPU (%d vertex groups)" % (ob.name, groups), icon='FILE_TICK')
+                row.label(text="%s: GPU (%d vertex groups)" % (ob.name, groups), icon='FILE_TICK')
             for m in mats:
                 row = col.row()
+                row.enabled = not over_limit
                 row.separator()
                 row.prop(m, "use_gpu_skinning", text=m.name)
         layout.label(text="GPU uses the 4 strongest bones per vertex (Weights > Limit Total)", icon='INFO')
