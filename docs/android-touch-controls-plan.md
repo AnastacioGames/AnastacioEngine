@@ -173,6 +173,10 @@ Exemplo para quem está começando (2026-09-25): o template de componente `03_jo
 (Text Editor > Templates > Components) anda e pula lendo teclado e gamepad 0, então já funciona com os layouts
 `stick` e `dpad` sem nenhum código de toque.
 
+7. **T6, corrida (2026-10-09):** layout `race` com três jeitos de virar (stick, setas, inclinar o aparelho) trocados
+   por um botão da própria tela (`switch`), escolha guardada em `localStorage`. Pedais nos gatilhos (botão com alvo
+   `axis`). Conferido no Edge headless com toques simulados; falta o celular e o jogo real (RolimaRacer).
+
 Depois, fora deste escopo:
 - `logic.touches` (dedos crus via `SDL_FINGER*`);
 - vibração;

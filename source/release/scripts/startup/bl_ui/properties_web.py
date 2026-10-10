@@ -181,6 +181,9 @@ class RangeWebSettings(PropertyGroup):
             ('FPS', "First person (WASD + look)", "For first-person games that read the keyboard and mouse: the "
                                                   "left stick presses W/A/S/D, the right stick moves the mouse to "
                                                   "look around and the buttons press Space and the left mouse button"),
+            ('RACE', "Racing (steer + pedals)", "For racing games that read gamepad 0: steering on the left stick, "
+                                                "pedals on the triggers, A/B/X/Y, Start and RB. A button lets the "
+                                                "player switch between stick, arrows and tilting the device"),
         ),
         default='STICK',
     )
@@ -219,7 +222,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         box.label(text="Touch Controls:", icon="HAND")
         box.prop(web, "touch_layout")
         row = box.row()
-        row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD', 'FPS'}
+        row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD', 'FPS', 'RACE'}
         row.prop(web, "touch_stick", expand=True)
         box.label(text="Shown only on touch screens; test on a PC with ?touch=1 in the address.", icon='INFO')
 

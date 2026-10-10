@@ -17,6 +17,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Painéis Scene/Options: ID único para objetos de mesmo nome, seleção limpa quando o jogo remove o objeto (ponteiro solto), destaque segue a câmera ativa, Show Framerate/Profile/Debug Properties viram caixas de seleção.
 - Verificação: build RangeEngine/RangeRuntime ok; `tools/debug/cenas/criar_cena_profile_categorias.py` 4/4 no runtime (componente de 2 ms cai em Components, Actuators 0,00 ms, porcentagens somam 100). Falta: conferir no jogo os gráficos novos e a fonte da barra de cima.
 
+## 2026-10-09 - Controle na tela: layout de corrida (stick, setas ou inclinar)
+
+- `tools/web/package-web.py`: layout `race` (gamepad 0): stick esquerdo na direção, gatilhos nos pedais (eixo 5 acelera, 4 freia), A/B/X/Y, Start e RB pequenos no topo. Tipos novos de controle, que valem para qualquer layout: botão com alvo `axis` (com `value`; duas setas opostas se anulam), `tilt` (a gravidade de `Module.rangeMotion` vira um eixo; `full` = seno da inclinação de curso todo) e `switch` (troca o layout inteiro pelo próximo da lista e guarda a escolha em `localStorage`). No `race`, o `switch` alterna stick → setas → inclinar; o jogo lê sempre o mesmo gamepad. Botões aceitam `left`, `top` e `size` (`small`/`wide`).
+- `range_web/touch.py`: `race` em `LAYOUTS`/`_REACH` (com gatilhos, Start e RB); painel Web/Android: opção "Racing (steer + pedals)" com pt/es/ru.
+- Sem mudança de C++: a ponte `Module.rangePad` já levava os seis eixos.
+- RolimaRacer (fora deste repositório): controles do carro e das câmeras passaram a ler o Range Input System (`KeyMapping/Rolima*.json`, gerados de `scripts/input/InputConfig.py`), com leitor por jogador (tela dividida) e botões do controle na numeração da engine (Pause no Start; antes caía no clique do analógico).
+- Verificação: `test_range_web.py` 40/40; JS da página com `node --check`; no Edge headless com toques simulados: gatilhos, botões, Start/RB, setas (esquerda+direita = 0), inclinar (30° = curso todo, zona morta) e a troca dos três modos. Falta: celular de verdade, e o pacote Web/APK do RolimaRacer (ainda não gerado com este layout).
+- Achados não corrigidos no Input System: `process_scale` (`KX_InputTable.cpp`) tem erro de precedência no fator; `INDEX` de joystick em texto é lido como 0 (`valueint`); dois gatilhos na mesma ação não se subtraem; `inputMaps` monta um dict novo a cada leitura.
+
 ## 2026-10-09 - Cenas: Preload/Keep no atuador Scene e scene.end(keep=True)
 
 - Atuador Scene: caixa **Preload** em Set/Add Overlay/Add Background (`use_preload`, flag `ACT_SCENE_PRELOAD` no antigo `pad1` de `bSceneActuator`, sem mudar o layout). Quando a cena dona do atuador é convertida, a cena alvo é pré-carregada; o add depois só insere a cena pronta.
