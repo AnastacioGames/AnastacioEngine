@@ -54,6 +54,7 @@ extern "C" {
 #include "KX_Scene.h"
 #include "KX_TextureRendererManager.h"
 
+#include <algorithm>
 #include <cstring>
 #include <set>
 #include <string>
@@ -176,6 +177,16 @@ const RAS_AttributeArray::AttribList BL_BlenderShader::GetAttribs(const RAS_Mesh
 		}
 		if (boneweightloc != -1) {
 			attribs.push_back({(unsigned short)boneweightloc, RAS_AttributeArray::RAS_ATTRIB_BONE_WEIGHT, false, 0});
+		}
+
+		/* Also at the fixed locations of the skinning shadow shader (GPU_SHADER_BLACK_SKINNING),
+		 * which draws with this same VAO in the shadow pass. Skipped if the material uses them. */
+		const bool overrideLocsFree = std::none_of(attribs.begin(), attribs.end(), [](const RAS_AttributeArray::Attrib& a) {
+			return a.m_loc == GPU_SKINNING_OVERRIDE_BONE_INDEX_LOC || a.m_loc == GPU_SKINNING_OVERRIDE_BONE_WEIGHT_LOC;
+		});
+		if (overrideLocsFree && boneindexloc != -1 && boneweightloc != -1) {
+			attribs.push_back({GPU_SKINNING_OVERRIDE_BONE_INDEX_LOC, RAS_AttributeArray::RAS_ATTRIB_BONE_INDEX, false, 0});
+			attribs.push_back({GPU_SKINNING_OVERRIDE_BONE_WEIGHT_LOC, RAS_AttributeArray::RAS_ATTRIB_BONE_WEIGHT, false, 0});
 		}
 	}
 

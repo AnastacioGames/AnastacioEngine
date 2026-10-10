@@ -32,6 +32,7 @@
 #include "KX_RenderProfileSample.h"
 
 #include "RAS_MeshSlot.h"
+#include "RAS_Deformer.h"
 #include "RAS_MeshUser.h"
 #include "RAS_IMaterial.h"
 #include "RAS_DisplayArray.h"
@@ -127,6 +128,17 @@ void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 
 	RAS_DisplayArrayStorage *storage = displayArrayData->m_arrayStorage;
 
+	/* GPU skinning: the plain shadow shader would draw the rest pose (T-pose shadow). */
+	RAS_Rasterizer::OverrideShaderType skinRestore = RAS_Rasterizer::RAS_OVERRIDE_SHADER_NONE;
+	if (managerData->m_shaderOverride) {
+		RAS_Deformer *deformer = m_meshUser->GetDeformer();
+		const float *boneMatrices;
+		int boneCount;
+		if (deformer && deformer->GetBoneMatrices(&boneMatrices, &boneCount)) {
+			skinRestore = rasty->BeginOverrideShaderSkinning(boneMatrices, boneCount);
+		}
+	}
+
 	if (!managerData->m_shaderOverride) {
 		{
 			RANGE_RENDER_SAMPLE("draw.material_activate");
@@ -172,5 +184,8 @@ void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 	{
 		RANGE_RENDER_SAMPLE("draw.matrix_pop");
 		rasty->PopMatrix();
+	}
+	if (skinRestore != RAS_Rasterizer::RAS_OVERRIDE_SHADER_NONE) {
+		rasty->SetOverrideShader(skinRestore);
 	}
 }

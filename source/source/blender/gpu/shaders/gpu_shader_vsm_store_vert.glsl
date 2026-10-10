@@ -16,8 +16,23 @@ in mat3 ininstmatrix;
 in vec3 ininstposition;
 #endif
 
+#ifdef USE_SKINNING
+in vec4 boneIndices;
+in vec4 boneWeights;
+uniform mat4 boneMatrices[MAX_BONES];
+#endif
+
 void main()
 {
+#ifdef USE_SKINNING
+	/* Same palette as the material shader (gpu_shader_vertex.glsl): the shadow follows the pose. */
+	vec4 skinPosition = (boneWeights.x * boneMatrices[int(boneIndices.x)]
+	                   + boneWeights.y * boneMatrices[int(boneIndices.y)]
+	                   + boneWeights.z * boneMatrices[int(boneIndices.z)]
+	                   + boneWeights.w * boneMatrices[int(boneIndices.w)]) * gl_Vertex;
+#else
+	vec4 skinPosition = gl_Vertex;
+#endif
 #ifdef USE_INSTANCING
 	mat4 instmat = mat4(vec4(ininstmatrix[0], ininstposition.x),
 						vec4(ininstmatrix[1], ininstposition.y),
@@ -27,7 +42,7 @@ void main()
 	v_position = gl_ProjectionMatrix * gl_ModelViewMatrix * (gl_Vertex * instmat);
 	gl_Position = v_position;
 #else
-	gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * gl_Vertex;
+	gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * skinPosition;
 	v_position = gl_Position;
 #endif
 }

@@ -150,7 +150,14 @@ typedef enum GPUBuiltinShader {
 	GPU_SHADER_LIGHT_GLOW           = 15,
 	/* Frame buffer draw with per-eye barrel distortion for side by side VR (Cardboard lenses). */
 	GPU_SHADER_VR_LENS              = 16,
+	/* Shadow casters with GPU skinning: bone attributes at the fixed locations below, which the
+	 * mesh VAO also fills (BL_BlenderShader::GetAttribs), so the shadow follows the pose. */
+	GPU_SHADER_BLACK_SKINNING       = 17,
+	GPU_SHADER_VSM_STORE_SKINNING   = 18,
 } GPUBuiltinShader;
+
+#define GPU_SKINNING_OVERRIDE_BONE_INDEX_LOC 14
+#define GPU_SKINNING_OVERRIDE_BONE_WEIGHT_LOC 15
 
 GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader);
 GPUShader *GPU_shader_get_builtin_fx_shader(int effects, bool persp);

@@ -127,6 +127,8 @@ static struct GPUShadersGlobal {
 		GPUShader *smoke_coba;
 		GPUShader *black;
 		GPUShader *black_instancing;
+		GPUShader *black_skinning;
+		GPUShader *vsm_store_skinning;
 		GPUShader *draw_frame_buffer;
 		GPUShader *vr_lens;
 		GPUShader *stereo_stipple;
@@ -1347,6 +1349,28 @@ void GPU_shader_bind_instancing_attrib(GPUShader *shader, void *matrixoffset, vo
 	}
 }
 
+/* Shadow override shader with skinning: relinked with the bone attributes at fixed locations. */
+static GPUShader *gpu_shader_create_skinning_override(const char *vertexcode, const char *fragcode)
+{
+	char defines[64];
+	BLI_snprintf(defines, sizeof(defines), "#define USE_SKINNING\n#define MAX_BONES %d\n", GPU_MAX_SKINNING_BONES);
+	GPUShader *shader = GPU_shader_create(vertexcode, fragcode, NULL, NULL, defines, 0, 0, 0);
+	if (!shader) {
+		return NULL;
+	}
+	GPU_shader_bind_attribute(shader, GPU_SKINNING_OVERRIDE_BONE_INDEX_LOC, "boneIndices");
+	GPU_shader_bind_attribute(shader, GPU_SKINNING_OVERRIDE_BONE_WEIGHT_LOC, "boneWeights");
+	glLinkProgram(shader->program);
+	GLint status;
+	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
+	if (!status) {
+		fprintf(stderr, "GPUShader: skinning shadow shader failed to link.\n");
+		GPU_shader_free(shader);
+		return NULL;
+	}
+	return shader;
+}
+
 GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 {
 	GPUShader *retval = NULL;
@@ -1408,6 +1432,18 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 					datatoc_gpu_shader_black_vert_glsl, datatoc_gpu_shader_black_frag_glsl,
 					NULL, NULL, "#define USE_INSTANCING;\n", 0, 0, 0);
 			retval = GG.shaders.black_instancing;
+			break;
+		case GPU_SHADER_BLACK_SKINNING:
+			if (!GG.shaders.black_skinning)
+				GG.shaders.black_skinning = gpu_shader_create_skinning_override(
+					datatoc_gpu_shader_black_vert_glsl, datatoc_gpu_shader_black_frag_glsl);
+			retval = GG.shaders.black_skinning;
+			break;
+		case GPU_SHADER_VSM_STORE_SKINNING:
+			if (!GG.shaders.vsm_store_skinning)
+				GG.shaders.vsm_store_skinning = gpu_shader_create_skinning_override(
+					datatoc_gpu_shader_vsm_store_vert_glsl, datatoc_gpu_shader_vsm_store_frag_glsl);
+			retval = GG.shaders.vsm_store_skinning;
 			break;
 		case GPU_SHADER_DRAW_FRAME_BUFFER:
 			if (!GG.shaders.draw_frame_buffer)
@@ -1633,6 +1669,16 @@ void GPU_shader_free_builtin_shaders(void)
 	if (GG.shaders.black_instancing) {
 		GPU_shader_free(GG.shaders.black_instancing);
 		GG.shaders.black_instancing = NULL;
+	}
+
+	if (GG.shaders.black_skinning) {
+		GPU_shader_free(GG.shaders.black_skinning);
+		GG.shaders.black_skinning = NULL;
+	}
+
+	if (GG.shaders.vsm_store_skinning) {
+		GPU_shader_free(GG.shaders.vsm_store_skinning);
+		GG.shaders.vsm_store_skinning = NULL;
 	}
 
 	if (GG.shaders.draw_frame_buffer) {

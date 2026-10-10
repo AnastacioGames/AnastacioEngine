@@ -144,6 +144,8 @@ public:
 		RAS_OVERRIDE_SHADER_BLACK_INSTANCING,
 		RAS_OVERRIDE_SHADER_SHADOW_VARIANCE,
 		RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_INSTANCING,
+		RAS_OVERRIDE_SHADER_BLACK_SKINNING,
+		RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_SKINNING,
 	};
 
 	enum ShadowType {
@@ -260,6 +262,7 @@ private:
 		int viewMatLoc;
 		int objectMatLoc;
 		int projectionMatLoc;
+		int boneMatricesLoc;
 	};
 
 	double m_time;
@@ -712,6 +715,9 @@ public:
 
 	/// Upload the per-object matrix uniforms used by the shadow override shaders (core profile only).
 	void UpdateOverrideShaderObjectMatrix(const float obmat[16]);
+	/** Shadow pass: switch to the skinning variant of the override shader and upload the bone
+	 * palette. Returns the previous override to restore after the draw, or NONE if not switched. */
+	OverrideShaderType BeginOverrideShaderSkinning(const float *boneMatrices, int boneCount);
 
 	RAS_ILightObject *CreateLight();
 

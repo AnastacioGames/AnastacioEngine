@@ -51,6 +51,8 @@
 #include "GPU_extensions.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
+
+#include <algorithm>
 #include "GPU_texture.h"
 
 #include "BLI_math_vector.h"
@@ -1101,7 +1103,8 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 	{
 		GPUBuiltinShader shadowShaderTypes[] = {
 			GPU_SHADER_BLACK, GPU_SHADER_BLACK_INSTANCING,
-			GPU_SHADER_VSM_STORE, GPU_SHADER_VSM_STORE_INSTANCING
+			GPU_SHADER_VSM_STORE, GPU_SHADER_VSM_STORE_INSTANCING,
+			GPU_SHADER_BLACK_SKINNING, GPU_SHADER_VSM_STORE_SKINNING
 		};
 		for (unsigned int i = 0; i < ARRAY_SIZE(shadowShaderTypes); ++i) {
 			GPUShader *shader = GPU_shader_get_builtin_shader(shadowShaderTypes[i]);
@@ -1112,6 +1115,7 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 				interface->viewMatLoc = GPU_shader_get_uniform(shader, "unfviewmat");
 				interface->objectMatLoc = GPU_shader_get_uniform(shader, "unfobmat");
 				interface->projectionMatLoc = GPU_shader_get_uniform(shader, "unfprojmat");
+				interface->boneMatricesLoc = GPU_shader_get_uniform(shader, "boneMatrices");
 
 				GPU_shader_set_interface(shader, interface);
 			}
@@ -1145,6 +1149,16 @@ GPUShader *RAS_Rasterizer::GetOverrideGPUShader(OverrideShaderType type)
 		case RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_INSTANCING:
 		{
 			shader = GPU_shader_get_builtin_shader(GPU_SHADER_VSM_STORE_INSTANCING);
+			break;
+		}
+		case RAS_OVERRIDE_SHADER_BLACK_SKINNING:
+		{
+			shader = GPU_shader_get_builtin_shader(GPU_SHADER_BLACK_SKINNING);
+			break;
+		}
+		case RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_SKINNING:
+		{
+			shader = GPU_shader_get_builtin_shader(GPU_SHADER_VSM_STORE_SKINNING);
 			break;
 		}
 	}
@@ -1491,10 +1505,36 @@ void RAS_Rasterizer::LoadMatrix(const float mat[16])
 	m_impl->LoadMatrix(mat);
 }
 
+RAS_Rasterizer::OverrideShaderType RAS_Rasterizer::BeginOverrideShaderSkinning(const float *boneMatrices, int boneCount)
+{
+	OverrideShaderType skinType;
+	if (m_overrideShader == RAS_OVERRIDE_SHADER_BLACK) {
+		skinType = RAS_OVERRIDE_SHADER_BLACK_SKINNING;
+	}
+	else if (m_overrideShader == RAS_OVERRIDE_SHADER_SHADOW_VARIANCE) {
+		skinType = RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_SKINNING;
+	}
+	else {
+		return RAS_OVERRIDE_SHADER_NONE;
+	}
+
+	GPUShader *shader = GetOverrideGPUShader(skinType);
+	OverrideShaderShadowInterface *interface = shader ? (OverrideShaderShadowInterface *)GPU_shader_get_interface(shader) : nullptr;
+	if (!interface || interface->boneMatricesLoc == -1) {
+		return RAS_OVERRIDE_SHADER_NONE;
+	}
+
+	const OverrideShaderType previous = m_overrideShader;
+	SetOverrideShader(skinType);
+	GPU_shader_uniform_vector(shader, interface->boneMatricesLoc, 16, std::min(boneCount, GPU_MAX_SKINNING_BONES), boneMatrices);
+	return previous;
+}
+
 void RAS_Rasterizer::UpdateOverrideShaderObjectMatrix(const float obmat[16])
 {
 	if (!ELEM(m_overrideShader, RAS_OVERRIDE_SHADER_BLACK, RAS_OVERRIDE_SHADER_BLACK_INSTANCING,
-	          RAS_OVERRIDE_SHADER_SHADOW_VARIANCE, RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_INSTANCING)) {
+	          RAS_OVERRIDE_SHADER_SHADOW_VARIANCE, RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_INSTANCING,
+	          RAS_OVERRIDE_SHADER_BLACK_SKINNING, RAS_OVERRIDE_SHADER_SHADOW_VARIANCE_SKINNING)) {
 		return;
 	}
 
