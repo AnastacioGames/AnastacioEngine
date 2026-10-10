@@ -59,6 +59,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
+#include "GPU_render_profile.h"
 #include "GPU_texture.h"
 
 #include "gpu_codegen.h"
@@ -143,6 +144,9 @@ struct GPUMaterial {
 
 	int objectinfoloc;
 	int objectlayloc;
+	/* Uniform state is only trusted within the current material activation. */
+	bool objectlay_valid;
+	int objectlay_value;
 
 	int ininstposloc;
 	int ininstmatloc;
@@ -180,6 +184,10 @@ struct GPUMaterial {
 	int probecubeloc, probeinfoloc, probeposloc;
 	int probecube2loc, probeinfo2loc, probepos2loc;
 	int probeboxloc, probebox2loc;
+	/* Only cache absent probes within one material activation. Active textures
+	 * must still bind per object; reactivation resets potentially shared programs. */
+	bool probe_absent_valid[2];
+	float probe_absent_maxlod[2];
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 
@@ -217,6 +225,11 @@ struct GPULamp {
 	float dynco[3], dynvec[3];
 	float obmat[4][4];
 	float imat[4][4];
+	/* Cache only light-derived data; shadow passes overwrite the projection matrices. */
+	float update_obmat[4][4], update_scale[3];
+	bool update_obmat_valid;
+	float update_spotsize;
+	bool update_spotsize_valid;
 	float dynimat[4][4];
 	float dynarearight[3];
 	float dynareaup[3];
@@ -436,6 +449,13 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		 * usage to set these bits. */
 		material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX | GPU_PROJECTION_MATRIX | GPU_NORMAL_MATRIX;
 #endif
+
+		/* User vertex code is told it can use VIEW_MATRIX/MODEL_MATRIX (#defines in
+		 * code_generate_vertex), but outside the core profile the uniforms are only uploaded
+		 * when a node asks for them: force them so they are never left uninitialized. */
+		if (has_user_vertcode) {
+			material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX;
+		}
 
 		gpu_material_set_attrib_id(material);
 
@@ -775,6 +795,9 @@ void GPU_material_bind(
 
 		/* note material must be bound before setting uniforms */
 		GPU_pass_bind(material->pass, time, mipmap);
+		material->probe_absent_valid[0] = false;
+		material->probe_absent_valid[1] = false;
+		material->objectlay_valid = false;
 
 		if (material->baryuniformloc != -1) {
 			float use = (gpu_viewport_barycentric && material->attribs.barycentric) ? 1.0f : 0.0f;
@@ -901,25 +924,33 @@ void GPU_material_bind_uniforms(
 			GPU_shader_uniform_vector(shader, material->infoliageparamsloc, 3, 1, params);
 		}
 
+		/* All view-dependent builtins share this product within the current draw.
+		 * Do not cache across calls: objects, cameras and halo matrices can differ. */
+		if (viewmat && (material->builtins &
+		               (GPU_LOC_TO_VIEW_MATRIX | GPU_NORMAL_MATRIX | GPU_INVERSE_LOC_TO_VIEW_MATRIX))) {
+			GPU_render_profile_count(GPU_RENDER_MUL);
+			mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+		}
+
 		/* handle per object builtins */
 		if (material->builtins & GPU_OBJECT_MATRIX) {
 			GPU_shader_uniform_vector(shader, material->obmatloc, 16, 1, (float *)obmat);
 		}
 		if (material->builtins & GPU_INVERSE_OBJECT_MATRIX) {
+			GPU_render_profile_count(GPU_RENDER_INVERSE);
 			invert_m4_m4(invmat, obmat);
 			GPU_shader_uniform_vector(shader, material->invobmatloc, 16, 1, (float *)invmat);
 		}
 		if (material->builtins & GPU_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				GPU_shader_uniform_vector(shader, material->localtoviewmatloc, 16, 1, (float *)localtoviewmat);
 			}
 		}
 		if (material->builtins & GPU_NORMAL_MATRIX) {
 			if (viewmat) {
 				float mat3[3][3], normalmat[3][3];
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
 				copy_m3_m4(mat3, localtoviewmat);
+				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m3_m3(normalmat, mat3);
 				transpose_m3(normalmat);
 				GPU_shader_uniform_vector(shader, material->normalmatloc, 9, 1, (float *)normalmat);
@@ -927,7 +958,7 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_INVERSE_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
-				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+				GPU_render_profile_count(GPU_RENDER_INVERSE);
 				invert_m4_m4(invlocaltoviewmat, localtoviewmat);
 				GPU_shader_uniform_vector(shader, material->invlocaltoviewmatloc, 16, 1, (float *)invlocaltoviewmat);
 			}
@@ -961,7 +992,11 @@ void GPU_material_bind_uniforms(
 			GPU_shader_uniform_vector(shader, material->objectinfoloc, 3, 1, object_info);
 		}
 		if (material->builtins & GPU_OBJECT_LAY) {
-			GPU_shader_uniform_vector_int(shader, material->objectlayloc, 1, 1, &oblay);
+			if (!material->objectlay_valid || material->objectlay_value != oblay) {
+				GPU_shader_uniform_vector_int(shader, material->objectlayloc, 1, 1, &oblay);
+				material->objectlay_value = oblay;
+				material->objectlay_valid = true;
+			}
 		}
 	}
 }
@@ -3141,10 +3176,12 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 							GPU_link(mat, "set_value", GPU_dynamic_uniform(&world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 						}
 						else {
-							float sdir[3] = {0.0f, 0.0f, 1.0f}; sunDir = GPU_uniform(sdir);
-							float scol[3] = {0.0f, 0.0f, 0.0f}; sunCol = GPU_uniform(scol);
-							float sunEng = 20.0; sunEnergy = GPU_uniform(&sunEng);
-							float sunsi = 0.0; sunSize = GPU_uniform(&sunsi);
+							/* Static: GPU_link copies the value later, after this block (stack values gave garbage constants). */
+							static float sdir[3] = {0.0f, 0.0f, 1.0f}, scol[3] = {0.0f, 0.0f, 0.0f}, sunEng = 20.0f, sunsi = 0.0f;
+							sunDir = GPU_uniform(sdir);
+							sunCol = GPU_uniform(scol);
+							sunEnergy = GPU_uniform(&sunEng);
+							sunSize = GPU_uniform(&sunsi);
 						}
 
 						if (mat->scene->world->skytype & WO_SKYATMOSPHERIC) {
@@ -3258,8 +3295,9 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			GPU_link(mat, "set_value", GPU_dynamic_uniform(&mat->scene->world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 		}
 		else {
-			float sdir[3] = {0.0f, 0.0f, 1.0f};
-			float ssize = 0.1f;
+			/* Static: GPU_link copies the value after this block. */
+			static float sdir[3] = {0.0f, 0.0f, 1.0f};
+			static float ssize = 0.1f;
 			sunDir = GPU_uniform(sdir);
 			sunSize = GPU_uniform(&ssize);
 		}
@@ -3637,24 +3675,28 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_brightness, GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS, NULL), &moonBrightness);
 				}
 				else {
-					float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
-					float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
-					float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
-					float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
-					float moonDisabled = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&moonDisabled), &moonEnabled);
-					float moonDefaultSize = 0.01f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultSize), &moonSize);
-					float moonDefaultBrightness = 0.25f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultBrightness), &moonBrightness);
+					static float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
+					static float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
+					static float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
+					static float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
+					static float moonDisabled = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&moonDisabled), &moonEnabled);
+					static float moonDefaultSize = 0.01f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultSize), &moonSize);
+					static float moonDefaultBrightness = 0.25f; GPU_link(mat, "set_value", GPU_uniform(&moonDefaultBrightness), &moonBrightness);
 				}
 
-				float env_sky = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 0.0f : 1.0f;
+				/* 1 = no stars; 0, -1, -2 = star_style simple/realistic/constellations (the shader tests env_sky <= 0). */
+				/* static: GPU_uniform keeps the pointer and reads it after this function returns */
+				static float env_sky_values[4] = { 1.0f, 0.0f, -1.0f, -2.0f };
+				int env_sky_index = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 1 + CLAMPIS(wo->star_style, 0, 2) : 0;
+				float *env_sky = &env_sky_values[env_sky_index];
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
 					GPUNodeLink *rlh, *atmo;
 					gpu_world_atmosphere_links(mat, wo, &rlh, &atmo);
-					GPU_link(mat, "do_sky_atmospheric", shi.view, rlh, atmo, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(&env_sky), blend, &shi.rgb);
+					GPU_link(mat, "do_sky_atmospheric", shi.view, rlh, atmo, sunDir, sunCol, sunEnergy, sunSize, moonEnabled, moonSize, moonBrightness, GPU_uniform(env_sky), blend, &shi.rgb);
 
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
-						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(&env_sky), &shi.rgb);
+						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(env_sky), &shi.rgb);
 				}
 
 				if (GPUWorld.mistype == 3) { // use Height Fog
@@ -3671,6 +3713,13 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 				}
 				else {
 					GPU_link(mat, (wo && wo->aomix == WO_AOADD) ? "mix_screen" : "mix_blend", blend, shi.rgb, hor, &shi.rgb);
+				}
+
+				if (wo->aurora_flag & WO_AURORA_ENABLE) {
+					/* static: GPU_uniform keeps the pointer */
+					static float aurora_values[3] = { 0.0f, 1.0f, 2.0f };
+					GPU_link(mat, "sky_aurora", shi.view, sunDir, GPU_builtin(GPU_TIME),
+					         GPU_uniform(&aurora_values[CLAMPIS(wo->aurora_colors, 0, 2)]), shi.rgb, &shi.rgb);
 				}
 			}
 			else
@@ -3802,10 +3851,12 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 			GPU_link(mat, "set_value", GPU_dynamic_uniform(&world->sun_size, GPU_DYNAMIC_WORLD_SUN_SIZE, NULL), &sunSize);
 		}
 		else {
-			float sdir[3] = {0.0f, 0.0f, 1.0f}; sunDir = GPU_uniform(sdir);
-			float scol[3] = {0.0f, 0.0f, 0.0f}; sunCol = GPU_uniform(scol);
-			float sunEng = 20.0f; sunEnergy = GPU_uniform(&sunEng);
-			float sunsi = 0.0f; sunSize = GPU_uniform(&sunsi);
+			/* Static: GPU_link copies the value later, after this block (stack values gave garbage constants). */
+			static float sdir[3] = {0.0f, 0.0f, 1.0f}, scol[3] = {0.0f, 0.0f, 0.0f}, sunEng = 20.0f, sunsi = 0.0f;
+			sunDir = GPU_uniform(sdir);
+			sunCol = GPU_uniform(scol);
+			sunEnergy = GPU_uniform(&sunEng);
+			sunSize = GPU_uniform(&sunsi);
 		}
 
 		if (world->skytype & WO_SKYATMOSPHERIC) {
@@ -3925,6 +3976,28 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 	return mat;
 }
 
+void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool is_skinning)
+{
+	ListBase *gpumaterials = is_skinning ? &ma->gpumaterialskinning :
+	                         (is_instancing ? &ma->gpumaterialinstancing : &ma->gpumaterial);
+	/* Built in an empty list only to generate the shader sources: a material already built stays untouched
+	 * (it may be reloaded next). The pass fails (the program stays pending) and the copy is dropped. */
+	ListBase kept = *gpumaterials;
+	BLI_listbase_clear(gpumaterials);
+	GPU_material_from_blender(scene, ma, false, is_instancing, is_skinning);
+	for (LinkData *link = gpumaterials->first; link; link = link->next) {
+		GPUMaterial *material = link->data;
+		if (material->pass) {
+			GPU_pass_free(material->pass);
+		}
+		/* lamp->materials keeps ma: the kept material still uses these lamps. */
+		BLI_freelistN(&material->lamps);
+		MEM_freeN(material);
+	}
+	BLI_freelistN(gpumaterials);
+	*gpumaterials = kept;
+}
+
 /* Materials whose Shader Sources use this Text compile again on the next draw. */
 bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {
@@ -3997,12 +4070,19 @@ void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[4][4])
 	lamp->lay = lay;
 	lamp->hide = hide;
 
-	normalize_m4_m4_ex(mat, obmat, obmat_scale);
-
-	copy_v3_v3(lamp->vec, mat[2]);
-	copy_v3_v3(lamp->co, mat[3]);
-	copy_m4_m4(lamp->obmat, mat);
-	invert_m4_m4(lamp->imat, mat);
+	if (!lamp->update_obmat_valid || memcmp(lamp->update_obmat, obmat, sizeof(lamp->update_obmat)) != 0) {
+		normalize_m4_m4_ex(mat, obmat, obmat_scale);
+		copy_v3_v3(lamp->vec, mat[2]);
+		copy_v3_v3(lamp->co, mat[3]);
+		copy_m4_m4(lamp->obmat, mat);
+		invert_m4_m4(lamp->imat, mat);
+		copy_m4_m4(lamp->update_obmat, obmat);
+		copy_v3_v3(lamp->update_scale, obmat_scale);
+		lamp->update_obmat_valid = true;
+	}
+	else {
+		copy_v3_v3(obmat_scale, lamp->update_scale);
+	}
 
 	if (lamp->type == LA_HEMI) {
 		/* update XYZ scale for reflection probe */
@@ -4057,7 +4137,11 @@ void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float a
 
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend)
 {
-	lamp->spotsi = cosf(spotsize * 0.5f);
+	if (!lamp->update_spotsize_valid || lamp->update_spotsize != spotsize) {
+		lamp->spotsi = cosf(spotsize * 0.5f);
+		lamp->update_spotsize = spotsize;
+		lamp->update_spotsize_valid = true;
+	}
 	lamp->spotbl = (lamp->type == LA_SUN) ? spotblend : (1.0f - lamp->spotsi) * spotblend;
 }
 
@@ -4071,6 +4155,8 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 	/* add_render_lamp */
 	lamp->mode = la->mode;
 	lamp->type = la->type;
+	lamp->update_obmat_valid = false;
+	lamp->update_spotsize_valid = false;
 
 	lamp->energy = la->energy;
 	if (lamp->mode & LA_NEG) lamp->energy = -lamp->energy;
@@ -4104,6 +4190,12 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 	lamp->bias = 0.02f * la->bias;
 	lamp->slopebias = la->slopebias;
 	lamp->size = la->bufsize;
+	/* A Point packs its 6 cube faces into one size*3 x size*2 depth texture
+	 * (gpu_lamp_create_point_shadow_buffer), so Size has to stay well below the driver's maximum
+	 * texture size -- past it the allocation fails and the lamp silently loses its shadow. */
+	if (la->type == LA_LOCAL && lamp->size > 2048) {
+		lamp->size = 2048;
+	}
 	lamp->d = la->clipsta;
 	lamp->clipend = la->clipend;
 
@@ -4295,22 +4387,31 @@ static bool gpu_lamp_create_point_shadow_buffer(GPULamp *lamp)
 	return true;
 }
 
-/* Whether a Sun/Spot/Point gets a shadow buffer. With Shading Nodes the lamp panel shows Cycles'
- * "Cast Shadow" (lamp.cycles.cast_shadow, an ID property, default on) and hides the BI shadow
- * method, so follow that instead of LA_SHAD_RAY/LA_SHAD_BUF. */
+/* Whether a Sun/Spot/Point gets a shadow buffer. Both the traditional and the Shading Nodes
+ * (PBR) path follow the game lamp panel's "Use Shadow" (lamp.use_shadow): LA_SHAD_BUF is the
+ * legacy spot buffer bit, LA_SHAD_RAY is what that checkbox writes for every lamp type.
+ * With Shading Nodes a lamp authored in Cycles additionally keeps its "Cast Shadow"
+ * (lamp.cycles.cast_shadow, an ID property, default on). */
 static bool gpu_lamp_wants_shadow(Scene *scene, Lamp *la)
 {
-	const bool nodes = scene && BKE_scene_use_new_shading_nodes(scene);
 	if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
 		return false;
 	}
-	if (nodes) {
+
+	const bool use_shadow = (la->type == LA_SPOT) ?
+	                        ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+	                        ((la->mode & LA_SHAD_RAY) != 0);
+	if (!use_shadow) {
+		return false;
+	}
+
+	if (scene && BKE_scene_use_new_shading_nodes(scene)) {
 		IDProperty *cycles = la->id.properties ? IDP_GetPropertyFromGroup(la->id.properties, "cycles") : NULL;
 		IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ? IDP_GetPropertyFromGroup(cycles, "cast_shadow") : NULL;
 		return cast ? (IDP_Int(cast) != 0) : true;
 	}
-	return (la->type == LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) ||
-	       (ELEM(la->type, LA_SUN, LA_LOCAL) && (la->mode & LA_SHAD_RAY));
+
+	return true;
 }
 
 GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
@@ -4734,6 +4835,17 @@ int GPU_lamp_shadow_layer(GPULamp *lamp)
  * lamps are left unshadowed for this loop (slot disabled) rather than sampled incorrectly, same
  * as the existing "Point/Local lights never shadow" limitation already documented in the
  * roadmap -- narrowing this further is future work, not a regression. */
+/* GL calls of GPU_material_bind_shadow_lamps() / GPU_material_bind_scene_lights(), for the
+ * game engine's per-frame work counters (lightUniforms in getRenderStats()). */
+static int LIGHT_GL_CALLS = 0;
+
+int GPU_material_light_gl_calls_take(void)
+{
+	const int count = LIGHT_GL_CALLS;
+	LIGHT_GL_CALLS = 0;
+	return count;
+}
+
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS])
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
@@ -4753,28 +4865,33 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
 			 * same registration GPU_lamp_get_data() does for the Lamp Data node path. */
 			material->dynproperty |= DYN_LAMP_PERSMAT;
-			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once. */
+			/* This runs per object per frame, and add_user_list() doesn't dedupe: register once.
+			 * Both lists are filled and freed together, so a lamp already in the short
+			 * material->lamps list means the material is already in lamp->materials; only search
+			 * that one (it grows with every material lit by the lamp) on first registration. */
 			if (!BLI_findptr(&material->lamps, lamp, offsetof(LinkData, data))) {
 				add_user_list(&material->lamps, lamp);
-			}
-			if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
-				add_user_list(&lamp->materials, material->ma);
+				if (!BLI_findptr(&lamp->materials, material->ma, offsetof(LinkData, data))) {
+					add_user_list(&lamp->materials, material->ma);
+				}
 			}
 
 			if (material->shadowmaploc[i] != -1) {
+				/* The bind stays every draw (other draws reuse the unit); the sampler uniform only
+				 * when it changes. */
 				GPU_texture_bind(lamp->depthtex, texunit + i);
-				GPU_shader_uniform_texture(shader, material->shadowmaploc[i], lamp->depthtex);
+				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
 			}
 			if (material->shadowpersmatloc[i] != -1) {
-				GPU_shader_uniform_vector(shader, material->shadowpersmatloc[i], 16, 1, (float *)lamp->dynpersmat);
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpersmatloc[i], 16, (float *)lamp->dynpersmat);
 			}
 			if (material->shadowbiasloc[i] != -1) {
 				float bias[2] = {lamp->bias, lamp->slopebias};
-				GPU_shader_uniform_vector(shader, material->shadowbiasloc[i], 2, 1, bias);
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowbiasloc[i], 2, bias);
 			}
 			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
 				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
-				GPU_shader_uniform_vector(shader, material->shadowpointloc[i], 4, 1, point);
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpointloc[i], 4, point);
 			}
 		}
 
@@ -4782,13 +4899,19 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			/* Unset sampler2DShadow uniforms default to unit 0, which may hold a plain sampler2D
 			 * texture: two sampler types on one unit is GL_INVALID_OPERATION at draw time. Point
 			 * the unused slot at its own (unbound) unit instead. */
-			GPU_shader_uniform_int(shader, material->shadowmaploc[i], texunit + i);
+			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
+			/* The unit may still hold a lamp depth texture from an earlier bind: in the shadow
+			 * pass that texture is the render target, so leave nothing bound there. */
+			glActiveTexture(GL_TEXTURE0 + texunit + i);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glActiveTexture(GL_TEXTURE0);
+			LIGHT_GL_CALLS += 3;
 		}
 
 		if (material->shadowenabledloc[i] != -1) {
 			/* 2 = Point lamp: unfshadowpersmat is then view to light space (see shadow_point()). */
 			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : 1.0f) : 0.0f;
-			GPU_shader_uniform_vector(shader, material->shadowenabledloc[i], 1, 1, &enabled);
+			LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowenabledloc[i], 1, &enabled);
 		}
 	}
 }
@@ -4802,6 +4925,12 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 	if (!shader || material->probeinfoloc == -1) {
 		return;
 	}
+	if (!cube && material->probe_absent_valid[0] &&
+	    material->probe_absent_maxlod[0] == maxlod) {
+		return;
+	}
+	material->probe_absent_valid[0] = !cube;
+	material->probe_absent_maxlod[0] = maxlod;
 
 	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 1;
 	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};
@@ -4842,6 +4971,13 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	if (!shader || material->probeinfo2loc == -1) {
 		return;
 	}
+	const bool absent = !(cube && weight > 0.0f && material->probecube2loc != -1);
+	if (absent && material->probe_absent_valid[1] &&
+	    material->probe_absent_maxlod[1] == maxlod) {
+		return;
+	}
+	material->probe_absent_valid[1] = absent;
+	material->probe_absent_maxlod[1] = maxlod;
 
 	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 2;
 	float info[4] = {0.0f, maxlod, 0.0f, 0.0f};
@@ -4875,6 +5011,11 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 
 /* Binds the object's damage hits for the Damage node: count hits of (local xyz, radius) and strength.
  * Must run per object with the program bound; count 0 clears the mask. */
+bool GPU_material_use_damage(GPUMaterial *material)
+{
+	return material->pass && material->damagecountloc != -1;
+}
+
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count)
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
@@ -4889,7 +5030,9 @@ void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], con
 			GPU_shader_uniform_vector(shader, material->damagestrengthloc, 1, count, strength);
 		}
 	}
-	GPU_shader_uniform_int(shader, material->damagecountloc, count);
+	/* This uniform is written only here. The shader cache also handles materials
+	 * sharing a program and restores zero after an object with damage. */
+	GPU_shader_uniform_int_cached(shader, material->damagecountloc, count);
 }
 
 /* Uploads the scene-light slots RAS_Rasterizer::ProcessLighting() computed for this object into
@@ -4920,6 +5063,7 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 		}
 		GPU_shader_uniform_vector(shader, material->iesinfoloc, 4, GPU_MATERIAL_NUM_SCENE_LIGHTS, &info[0][0]);
 		GPU_shader_uniform_vector(shader, material->iesaxesloc, 3, GPU_MATERIAL_NUM_SCENE_LIGHTS * 3, &axes[0][0]);
+		LIGHT_GL_CALLS += 2;
 		if (material->iesatlasloc != -1) {
 			int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
 			GPUTexture *atlas = any ? gpu_ies_atlas() : NULL;
@@ -4939,17 +5083,17 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 
 	for (int i = 0; i < GPU_MATERIAL_NUM_SCENE_LIGHTS; i++) {
 		const GPUSceneLight *light = &lights[i];
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].position, 4, 1, light->position);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].diffuse, 4, 1, light->diffuse);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].specular, 4, 1, light->specular);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].halfvector, 4, 1, light->halfvector);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotdirection, 3, 1, light->spotdirection);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotexponent, 1, 1, &light->spotexponent);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcutoff, 1, 1, &light->spotcutoff);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].spotcoscutoff, 1, 1, &light->spotcoscutoff);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].constantatt, 1, 1, &light->constantatt);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].linearatt, 1, 1, &light->linearatt);
-		GPU_shader_uniform_vector(shader, material->scenelightloc[i].quadraticatt, 1, 1, &light->quadraticatt);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].position, 4, light->position);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].diffuse, 4, light->diffuse);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].specular, 4, light->specular);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].halfvector, 4, light->halfvector);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotdirection, 3, light->spotdirection);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotexponent, 1, &light->spotexponent);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotcutoff, 1, &light->spotcutoff);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].spotcoscutoff, 1, &light->spotcoscutoff);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].constantatt, 1, &light->constantatt);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].linearatt, 1, &light->linearatt);
+		LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->scenelightloc[i].quadraticatt, 1, &light->quadraticatt);
 	}
 }
 
@@ -4971,7 +5115,27 @@ GPUNodeLink *GPU_lamp_get_data(
 
 	shade_light_textures(mat, lamp, r_col, NULL);
 
-	if (GPU_lamp_has_shadow_buffer(lamp) && !GPU_lamp_has_point_shadow(lamp)) {
+	if (GPU_lamp_has_shadow_buffer(lamp) && GPU_lamp_has_point_shadow(lamp)) {
+		/* Point: cube atlas sampled by shadow_point(); dynpersmat is view to light space
+		 * (GPU_material_update_lamps). No VSM/CSM/filter variants here. */
+		GPUNodeLink *vn, *inp;
+		float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
+
+		GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &vn);
+		GPU_link(mat, "shade_inp", vn, *r_lv, &inp);
+		mat->dynproperty |= DYN_LAMP_PERSMAT;
+
+		GPU_link(mat, "shadow_point_bi",
+		         GPU_material_builtin(mat, GPU_VIEW_POSITION),
+		         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+		         GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
+		         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+		         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias), GPU_uniform(point),
+		         inp, &shadowfac);
+
+		GPU_link(mat, "shadows_only", inp, shadowfac, GPU_uniform(lamp->shadow_color), r_shadow);
+	}
+	else if (GPU_lamp_has_shadow_buffer(lamp)) {
 		GPUNodeLink *vn, *inp;
 
 		GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &vn);

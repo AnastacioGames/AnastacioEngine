@@ -22,6 +22,8 @@
  *  \ingroup ketsji
  */
 
+#include "KX_RenderProfileSample.h"
+
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
 
@@ -30,8 +32,11 @@ extern "C" {
 }
 #include "BKE_scene.h"
 
+#include "CM_WorkCounters.h"
+
 #include "GPU_material.h"
 #include "GPU_shader.h"
+#include "GPU_render_profile.h"
 #include "GPU_extensions.h"
 
 #include "BL_BlenderShader.h"
@@ -117,11 +122,18 @@ const RAS_AttributeArray::AttribList BL_BlenderShader::GetAttribs(const RAS_Mesh
 			// Like Blender, a layer name missing from the mesh falls back to the active layer.
 			if (type == CD_MTFACE) {
 				unsigned short index = layersInfo.activeUv;
+				bool found = false;
 				for (const RAS_Mesh::Layer& layer : layersInfo.uvLayers) {
 					if (layer.name == attribname) {
 						index = layer.index;
+						found = true;
 						break;
 					}
+				}
+				/* Except the baked lightmap UV: a mesh outside the atlas gets no attribute (reads 0,0,
+				 * an empty texel), so it keeps the probe/World ambient (see node_shader_gpu_lightmap). */
+				if (!found && strcmp(attribname, "Lightmap") == 0) {
+					continue;
 				}
 				attribs.push_back({glindex, RAS_AttributeArray::RAS_ATTRIB_UV, false, index});
 			}
@@ -221,6 +233,7 @@ void BL_BlenderShader::BindProg(RAS_Rasterizer *rasty)
 	GPU_material_bind(m_gpuMat, m_blenderScene->lay, rasty->GetTime(), 1,
 					  rasty->GetViewMatrix().Data(), rasty->GetViewInvMatrix().Data(), nullptr, false,
 					  rasty->GetProjectionMatrix().Data());
+	CM_WorkCount(CM_WORK_PASS_UNIFORMS, GPU_pass_uniform_gl_calls_take());
 }
 
 void BL_BlenderShader::UnbindProg()
@@ -235,17 +248,33 @@ void BL_BlenderShader::UpdateLights(RAS_Rasterizer *rasty)
 
 void BL_BlenderShader::BindShadowLamps(RAS_Rasterizer *rasty)
 {
+	RANGE_RENDER_SAMPLE("draw.light_uniforms");
 	/* Needs the program bound (glUniform*) and the per-object light set from ProcessLighting(),
 	 * so it can't live in UpdateLights() which runs from Prepare() before BindProg(). */
 	if (GPU_material_bound(m_gpuMat)) {
-		GPU_material_bind_shadow_lamps(m_gpuMat, rasty->GetShadowLamps());
+		RAS_Rasterizer::IncLightBindCount();
+		/* In the shadow pass (Clip / vertex-code materials draw with their own shader) the lamp's
+		 * depth texture is the render target: binding it as a sampler too is a feedback loop
+		 * (undefined result: the whole scene came out shadowed, plus a GPU stall). A shadow caster
+		 * needs no received shadows, so bind no lamps (samplers parked, shadows disabled). */
+		static GPULamp * const no_lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS] = {nullptr};
+		{
+			GPU_RenderProfileScope counterScope(GPU_RENDER_SHADOW);
+			GPU_material_bind_shadow_lamps(m_gpuMat, (rasty->GetShadowMode() != RAS_Rasterizer::RAS_SHADOW_NONE) ?
+			                               no_lamps : rasty->GetShadowLamps());
+		}
 		/* CORE (Web) has no gl_LightSource: upload the same per-slot light values as uniforms. */
-		GPU_material_bind_scene_lights(m_gpuMat, rasty->GetSceneLights());
+		{
+			GPU_RenderProfileScope counterScope(GPU_RENDER_LIGHTS);
+			GPU_material_bind_scene_lights(m_gpuMat, rasty->GetSceneLights());
+		}
+		CM_WorkCount(CM_WORK_LIGHT_UNIFORMS, GPU_material_light_gl_calls_take());
 	}
 }
 
 void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Rasterizer *rasty)
 {
+	RANGE_RENDER_SAMPLE("draw.object_update");
 	if (!GPU_material_bound(m_gpuMat)) {
 		return;
 	}
@@ -253,6 +282,7 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 	UpdateObjectMatrix(meshUser, matPassIndex, rasty, (const float *)meshUser->GetMatrix().Data());
 
 	if (GPU_material_use_skinning(m_gpuMat)) {
+		GPU_RenderProfileScope counterScope(GPU_RENDER_SKINNING);
 		const float *boneMatrices;
 		int boneCount;
 		RAS_Deformer *deformer = meshUser->GetDeformer();
@@ -283,20 +313,26 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		}
 	}
 
-	/* Local reflection probes around the object (blended near the edges), or none (World reflection). */
-	KX_TextureRendererManager::ProbeSlot probes[2];
-	float probeWeight2 = 0.0f;
-	const mt::vec3 position = meshUser->GetMatrix().TranslationVector3D();
-	const float pos[3] = {position.x, position.y, position.z};
-	m_scene->GetTextureRendererManager()->FindProbe(pos, probes, &probeWeight2);
-	GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box);
-	GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probeWeight2);
+	{
+		GPU_RenderProfileScope counterScope(GPU_RENDER_PROBES);
+		/* Local reflection probes around the object (blended near the edges), or none (World reflection). */
+		KX_TextureRendererManager::ProbeSlot probes[2];
+		float probeWeight2 = 0.0f;
+		const mt::vec3 position = meshUser->GetMatrix().TranslationVector3D();
+		const float pos[3] = {position.x, position.y, position.z};
+		m_scene->GetTextureRendererManager()->FindProbe(pos, probes, &probeWeight2);
+		GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box);
+		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probeWeight2);
+
+	}
 
 	m_alphaBlend = GPU_material_alpha_blend(m_gpuMat, meshUser->GetColor().Data());
 }
 
 void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassIndex, RAS_Rasterizer *rasty, const float mat[16])
 {
+	RANGE_RENDER_SAMPLE("draw.object_uniforms");
+	GPU_RenderProfileScope counterScope(GPU_RENDER_OBJECT);
 	if (!GPU_material_bound(m_gpuMat)) {
 		return;
 	}
@@ -313,8 +349,14 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 	GPU_material_bind_uniforms(m_gpuMat, (float (*)[4])mat, rasty->GetViewMatrix().Data(),
 			obcol, meshUser->GetLayer(), 1.0f, nullptr, objectInfo);
 
+	// Materials without a live Damage uniform do not need a deformer lookup.
+	if (!GPU_material_use_damage(m_gpuMat)) {
+		return;
+	}
+
 	// Damage node: hits of the object's dent deformer, none for the others.
 	// The mesh user's own deformer: its client object is not always a KX_GameObject.
+	GPU_RenderProfileScope damageScope(GPU_RENDER_DAMAGE);
 	KX_DentDeformer *dent = dynamic_cast<KX_DentDeformer *>(meshUser->GetDeformer());
 	if (dent) {
 		GPU_material_bind_damage(m_gpuMat, dent->GetHits(), dent->GetHitStrengths(), dent->GetHitCount());
@@ -322,6 +364,14 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 	else {
 		GPU_material_bind_damage(m_gpuMat, nullptr, nullptr, 0);
 	}
+}
+
+void BL_BlenderShader::Prefetch(KX_Scene *scene, Material *ma)
+{
+	// Same variant as UseSkinning() / UseInstancing().
+	const bool skinning = (ma->shade_flag & MA_SKINNING) != 0;
+	const bool instancing = GPU_instanced_drawing_support() && (ma->shade_flag & MA_INSTANCING) && !skinning;
+	GPU_material_prefetch(scene->GetBlenderScene(), ma, instancing, skinning);
 }
 
 bool BL_BlenderShader::UseInstancing() const

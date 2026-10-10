@@ -104,7 +104,9 @@ protected:
 			return ctrl2 < other.ctrl2;
 		}
 	};
-	std::map<CollisionPair, int> m_callbackCounter;
+	/// PH9: pares ja notificados neste ProceedDeltaTime. Vetor ordenado membro (clear() mantem
+	/// capacidade) em vez de std::map, para nao alocar um no por par a cada frame.
+	std::vector<CollisionPair> m_callbackCounter;
 
 
 

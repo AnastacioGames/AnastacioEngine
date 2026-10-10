@@ -80,18 +80,24 @@ def WriteAppleRuntime(player_path, output_path, copy_python, overwrite_lib):
     # Python doesn't need to be copied for OS X since it's already inside blenderplayer.app
 
 
-def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls, copy_scripts, copy_datafiles, report=print):
+def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls, copy_scripts, copy_datafiles, report=print, steam_complement_dir=""):
     import struct
+    if steam_complement_dir:
+        steam_complement_dir = bpy.path.abspath(steam_complement_dir)
+        if os.name != 'nt' or not all(os.path.isfile(os.path.join(steam_complement_dir, name))
+                                      for name in ('AnastacioSteam.dll', 'steam_api64.dll')):
+            report({'ERROR'}, "Select a Windows Steam complement folder containing both DLLs")
+            return False
 
     # Check the paths
     if not os.path.isfile(player_path) and not(os.path.exists(player_path) and player_path.endswith('.app')):
         report({'ERROR'}, "The player could not be found! Runtime not saved")
-        return
+        return False
 
     # Check if we're bundling a .app
     if player_path.endswith('.app'):
         WriteAppleRuntime(player_path, output_path, copy_python, overwrite_lib)
-        return
+        return True
 
     # Enforce "exe" extension on Windows
     if player_path.endswith('.exe') and not output_path.endswith('.exe'):
@@ -141,6 +147,15 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
 
     print("done")
 
+    # Cooked conversion data recorded while playing the .blend ("<blend>.cooked"): the runtime reads
+    # "<runtime>.cooked" next to itself.
+    cooked_src = os.path.splitext(bpy.data.filepath)[0] + ".cooked" if bpy.data.filepath else ""
+    cooked_dst = os.path.splitext(output_path)[0] + ".cooked"
+    if os.path.isfile(cooked_src):
+        shutil.copy2(cooked_src, cooked_dst)
+    elif os.path.isfile(cooked_dst):
+        os.remove(cooked_dst)
+
     # Make the runtime executable on Linux
     if os.name == 'posix':
         os.chmod(output_path, 0o755)
@@ -151,9 +166,15 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
 
     if copy_python:
         print("Copying Python files...", end=" ")
-        py_folder = os.path.join(bpy.app.version_string.split()[0], "python", "lib")
+        py_folder = os.path.join(bpy.app.version_string.split()[0], "python")
+        src = os.path.join(blender_dir, py_folder)
         dst = os.path.join(runtime_dir, py_folder)
-        CopyPythonLibs(dst, overwrite_lib, report)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns('__pycache__'))
+        else:
+            report({'ERROR'}, "Bundled Python directory not found")
+            return False
         print("done")
 
     # Copy DLLs
@@ -165,6 +186,16 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
             shutil.copy2(src, dst)
         print("done")
 
+    if copy_dlls and os.path.isdir(os.path.join(blender_dir, "blender.crt")):
+        shutil.copytree(os.path.join(blender_dir, "blender.crt"), os.path.join(runtime_dir, "blender.crt"),
+                        dirs_exist_ok=True)
+    if steam_complement_dir:
+        destination = os.path.join(runtime_dir, "complements", "steam")
+        os.makedirs(destination, exist_ok=True)
+        for name in ('AnastacioSteam.dll', 'steam_api64.dll'):
+            shutil.copy2(os.path.join(steam_complement_dir, name), os.path.join(destination, name))
+        # steam_appid.txt is deliberately a development file, not part of this export.
+
     # Copy Scripts folder
     if copy_scripts:
         print("Copying scripts...", end=" ")
@@ -173,6 +204,13 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         dst = os.path.join(runtime_dir, scripts_folder)
         shutil.copytree(src, dst)
         print("done")
+
+    # Reusable multiplayer components must be available even when Copy Scripts is off.
+    modules_dir = os.path.join(bpy.app.version_string.split()[0], "scripts", "modules")
+    multiplayer_src = os.path.join(blender_dir, modules_dir, "anastacio_network")
+    if os.path.isdir(multiplayer_src) and not copy_scripts:
+        shutil.copytree(multiplayer_src, os.path.join(runtime_dir, modules_dir, "anastacio_network"),
+                        dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
 
     # And copy datafiles folder
     if copy_datafiles:
@@ -191,6 +229,8 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         shutil.copytree(src, dst)
         print("done")
 
+    return True
+
 from bpy.props import *
 
 
@@ -208,7 +248,11 @@ class SaveAsRuntime(bpy.types.Operator):
         blender_bin_dir = os.path.dirname(blender_bin_path)
         ext = os.path.splitext(blender_bin_path)[-1].lower()
 
-    default_player_path = os.path.join(blender_bin_dir, 'blenderplayer' + ext)
+    default_player_path = os.path.join(blender_bin_dir, 'RangeRuntime' + ext)
+    if sys.platform == 'win32':
+        new_player_path = os.path.join(blender_bin_dir, 'AnastacioRuntime.exe')
+        if os.path.isfile(new_player_path) or not os.path.isfile(default_player_path):
+            default_player_path = new_player_path
     player_path: StringProperty(
             name="Player Path",
             description="The path to the player to use",
@@ -239,6 +283,12 @@ class SaveAsRuntime(bpy.types.Operator):
             default=True,
             )
 
+    steam_complement_dir: StringProperty(
+            name="Steam Complement Folder",
+            description="Optional: include Steam DLLs from this folder; leave empty for LAN/IP",
+            default="", subtype='DIR_PATH',
+            )
+
     # Only Windows has dlls to copy
     if ext == '.exe':
         copy_dlls: BoolProperty(
@@ -251,9 +301,9 @@ class SaveAsRuntime(bpy.types.Operator):
 
     def execute(self, context):
         import time
-        start_time = time.clock()
+        start_time = time.perf_counter()
         print("Saving runtime to %r" % self.filepath)
-        WriteRuntime(self.player_path,
+        success = WriteRuntime(self.player_path,
                      self.filepath,
                      self.copy_python,
                      self.overwrite_lib,
@@ -261,8 +311,11 @@ class SaveAsRuntime(bpy.types.Operator):
                      self.copy_scripts,
                      self.copy_datafiles,
                      self.report,
+                     steam_complement_dir=self.steam_complement_dir,
                      )
-        print("Finished in %.4fs" % (time.clock()-start_time))
+        if not success:
+            return {'CANCELLED'}
+        print("Finished in %.4fs" % (time.perf_counter()-start_time))
         return {'FINISHED'}
 
     def invoke(self, context, event):

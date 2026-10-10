@@ -1,6 +1,6 @@
 """Scan estatico de traducao: textos escritos direto em layout.label(text=...) e afins nos scripts Python.
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/i18n_scan_labels.py -- pt_BR [saida.txt]
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/i18n_scan_labels.py -- pt_BR [saida.txt]
 
 Complementa i18n_audit.py, que so ve o RNA. Le com ast os .py de release/scripts/startup e procura chamadas de
 layout (label, operator, prop, menu, ...) com text="..." literal ou label("...") posicional. Um texto e "sem

@@ -34,6 +34,8 @@
 
 #include "mathfu.h"
 
+#include <unordered_map>
+
 class RAS_ICanvas;
 
 class KX_Camera;
@@ -86,6 +88,14 @@ public:
 
 	bool m_staticShadow;
 	bool m_requestShadowUpdate;
+	/// Spot/Point: skip the shadow redraw while nothing in range moved (KX_ShadowRenderer::Render).
+	bool m_autoShadow = false;
+	/// Auto shadow state of the last redraw: lamp transform/params and the transform of every
+	/// caster in range. Invalid means "redraw next frame" (new lamp, replica, hidden last frame).
+	bool m_autoShadowValid = false;
+	mt::mat3x4 m_autoShadowLightTrans;
+	float m_autoShadowParams[8];
+	std::unordered_map<const void *, mt::mat3x4> m_autoShadowCasters;
 
 	/* Distance-based light culling ("light LOD"). When m_useCullDistance is true and the light
 	 * is farther than m_cullDistance from the active camera (with hysteresis, see

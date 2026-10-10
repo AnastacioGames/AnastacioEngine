@@ -373,11 +373,16 @@ void ServerSession::handleHello(Connection &conn, const RawMessage &raw, uint64_
 		reject(conn, RejectReason::VersionMismatch, "");
 		return;
 	}
+	if (!m_config.password.empty() && hello.password != m_config.password) {
+		reject(conn, RejectReason::WrongPassword, "");
+		return;
+	}
 	if (hello.token != 0 && std::find(m_banned.begin(), m_banned.end(), hello.token) != m_banned.end()) {
 		reject(conn, RejectReason::Banned, "");
 		return;
 	}
-	if (hello.sceneHash != m_config.sceneHash) {
+	if (hello.sceneHash != m_config.sceneHash &&
+	    std::find(m_earlierScenes.begin(), m_earlierScenes.end(), hello.sceneHash) == m_earlierScenes.end()) {
 		reject(conn, RejectReason::SceneMismatch, m_config.sceneName);
 		return;
 	}
@@ -592,6 +597,10 @@ void ServerSession::kick(ClientId client, DisconnectReason reason)
 
 void ServerSession::changeScene(const std::string &sceneName, uint64_t sceneHash)
 {
+	if (m_config.sceneHash != sceneHash &&
+	    std::find(m_earlierScenes.begin(), m_earlierScenes.end(), m_config.sceneHash) == m_earlierScenes.end()) {
+		m_earlierScenes.push_back(m_config.sceneHash);
+	}
 	m_config.sceneName = sceneName;
 	m_config.sceneHash = sceneHash;
 	for (auto &pair : m_connections) {
@@ -739,6 +748,7 @@ void ClientSession::update(uint64_t nowMs, std::vector<SessionEvent> &events)
 				hello.sceneHash = m_config.sceneHash;
 				hello.playerName = m_config.playerName.substr(0, kMaxStringBytes);
 				hello.token = m_config.token;
+				hello.password = m_config.password.substr(0, kMaxStringBytes);
 				send(Channel::Control, makePacket(hello));
 				break;
 			}

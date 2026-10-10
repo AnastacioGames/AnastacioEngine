@@ -96,6 +96,12 @@ public:
 		return false;
 	}
 
+	/** True when a parent pose update must explicitly schedule this child. */
+	virtual bool NeedsParentUpdate()
+	{
+		return false;
+	}
+
 protected:
 	/**
 	 * Protected constructors

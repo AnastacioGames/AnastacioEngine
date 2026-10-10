@@ -974,6 +974,15 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 			GPU_basic_shader_colors(diffuse, NULL, 0, 1.0f);
 			GPU_basic_shader_bind(options);
 
+			/* Transparencia do material. Este caminho nao passa pelo GLSL, que e quem
+			 * normalmente aplica mat->game.alpha_blend (gpu_draw.c, GPU_object_material_bind),
+			 * entao sem isto uma textura com alpha desenha opaca no modo Texture enquanto
+			 * aparece recortada no modo Material e no jogo. */
+			{
+				Material *ma = give_current_material(data->ob, mat_nr);
+				GPU_set_material_alpha_blend(ma ? ma->game.alpha_blend : GPU_BLEND_SOLID);
+			}
+
 			return;
 		}
 	}

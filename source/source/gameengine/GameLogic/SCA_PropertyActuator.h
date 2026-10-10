@@ -34,6 +34,8 @@
 
 #include "SCA_IActuator.h"
 
+class EXP_Expression;
+
 class SCA_PropertyActuator : public SCA_IActuator
 {
 	Py_Header
@@ -55,6 +57,14 @@ class SCA_PropertyActuator : public SCA_IActuator
 	bool m_useRuntimeProperty;
 	std::string m_runtimeProperty;
 	EXP_Value* m_worldPropOwner; // if set, read/write the property on the World instead of on the game object
+
+	// Parsed expression reused while m_exprtxt is a literal (number or quoted string).
+	// Literals hold no identifier, so the tree keeps no reference to the property owner.
+	EXP_Expression *m_cachedExpr;
+	std::string m_cachedExprText;
+
+	EXP_Expression *GetExpression(EXP_Value *propowner);
+	void ClearCachedExpression();
 
 public:
 

@@ -826,14 +826,22 @@ def _scene_code(act):
     if name is None:
         raise Unsupported("scene %s sem cena" % m)
     name = _act_arg("Scene", name)
+    if getattr(act, "use_preload", False) and m in {'SET', 'ADDFRONT', 'ADDBACK'}:
+        # awake() roda antes do start(): le o arg direto de args (self._a ainda nao existe).
+        arg_name, arg_src = _ARGS[int(name[len("self._a["):-1])][:2]
+        call = "logic.preloadScene(args.get(%r, %s))" % (arg_name, arg_src)
+        if call not in _PRELOAD:
+            _PRELOAD.append(call)
     if m == 'SET':
         return ["scene.replace(%s)" % name]
     if m in {'ADDFRONT', 'ADDBACK'}:
         return ["logic.addScene(%s, %d)" % (name, m == 'ADDFRONT')]
-    method = {'REMOVE': "end", 'SUSPEND': "suspend", 'RESUME': "resume"}[m]
+    call = {'REMOVE': "end()", 'SUSPEND': "suspend()", 'RESUME': "resume()"}[m]
+    if m == 'REMOVE' and getattr(act, "use_keep", False):
+        call = "end(keep=True)"
     return ["for sc in logic.getSceneList():",
             "    if sc.name == %s:" % name,
-            "        sc.%s()" % method]
+            "        sc.%s" % call]
 
 
 _TRACK_AXES = {
@@ -872,6 +880,7 @@ def _track_to_code(ob, act):
     return lines
 
 
+_PRELOAD = []  # cenas de actuators Scene com Preload (viram logic.preloadScene no start)
 _SND3D = [False]  # algum Sound 3D no objeto convertido (gera self._snd_update() no fim dos actuators)
 
 
@@ -922,7 +931,7 @@ class %(classname)s(%(base)s):
     args = OrderedDict([
 %(args)s    ])
 
-    def start(self, args):
+%(awake)s    def start(self, args):
 %(args_start)s        self._prev = {}
         self._dbg = {}
         self._ticks = {}
@@ -1810,6 +1819,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     _GROUP[0] = ""
     _GROUP_ICON.clear()
     _SND3D[0] = False
+    del _PRELOAD[:]
     del _ARGS[:]  # nome da variavel -> estados dos controllers ligados
     plans = []
 
@@ -1987,8 +1997,12 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             start_extra += "        self._plm_init(%s)\n" % (
                 "self.object" if own == "ob" else "self.object.scene.objects.get(%r)" % next(
                     n for n, v in foreign.items() if v == own))
+    awake = ""
+    if _PRELOAD:
+        # Scene com Preload: a cena comeca a ser preparada um quadro antes do start().
+        awake = "    def awake(self, args):\n" + "".join("        %s\n" % call for call in _PRELOAD) + "\n"
     extra = "".join(text for name, text in _EXTRA.items() if "self.%s(" % name in body)
-    header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra,
+    header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra, "awake": awake,
                         "base": "types.KX_PythonComponent" if component else "object",
                         "args": _args_source(), "args_start": _args_start(),
                         "extra": extra}

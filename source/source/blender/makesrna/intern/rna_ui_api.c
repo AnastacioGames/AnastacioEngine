@@ -1008,6 +1008,10 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	RNA_def_function_ui_description(func, "");
 
+	func = RNA_def_function(srna, "template_header_3D_controls", "uiTemplateHeader3D_controls");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	RNA_def_function_ui_description(func, "Inserts the 3D View controls normally drawn as floating viewport buttons");
+
 	func = RNA_def_function(srna, "template_edit_mode_selection", "uiTemplateEditModeSelection");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	RNA_def_function_ui_description(func, "Inserts common 3DView Edit modes header UI (selector for selection mode)");

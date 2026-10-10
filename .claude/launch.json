@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "anastacio-docs",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "D:/AnastacioDocs/site", "run", "preview", "--", "--port", "4321"],
+      "port": 4321
+    }
+  ]
+}

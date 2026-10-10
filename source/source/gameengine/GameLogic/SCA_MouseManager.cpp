@@ -71,18 +71,25 @@ void SCA_MouseManager::NextFrame()
 	// If have blockInputEvents, we simply don't update the sensors.
 	if (!KX_GetActiveEngine()->GetDebugMode()->imgui_blockInputEvents) {
 		if (m_mousedevice) {
+			// The position is the same for every sensor, read it once on first use.
+			bool positionRead = false;
+			int mx = 0;
+			int my = 0;
 			for (SCA_ISensor *sensor : m_sensors) {
 				SCA_MouseSensor *mousesensor = static_cast<SCA_MouseSensor*>(sensor);
 				// (0,0) is the Upper Left corner in our local window
 				// coordinates
 				if (!mousesensor->IsSuspended()) {
-					const SCA_InputEvent& event1 =
-						m_mousedevice->GetInput(SCA_IInputDevice::MOUSEX);
-					const SCA_InputEvent& event2 =
-						m_mousedevice->GetInput(SCA_IInputDevice::MOUSEY);
+					if (!positionRead) {
+						const SCA_InputEvent& event1 =
+							m_mousedevice->GetInput(SCA_IInputDevice::MOUSEX);
+						const SCA_InputEvent& event2 =
+							m_mousedevice->GetInput(SCA_IInputDevice::MOUSEY);
 
-					int mx = event1.m_values[event1.m_values.size() - 1];
-					int my = event2.m_values[event2.m_values.size() - 1];
+						mx = event1.m_values[event1.m_values.size() - 1];
+						my = event2.m_values[event2.m_values.size() - 1];
+						positionRead = true;
+					}
 
 					mousesensor->setX(mx);
 					mousesensor->setY(my);

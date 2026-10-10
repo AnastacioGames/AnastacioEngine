@@ -129,6 +129,7 @@ extern "C" {
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_InputSystem.h"
+#include "SCA_LogicManager.h" // Needed for getRenderStats()
 
 #include "KX_NetworkMessageScene.h" //Needed for sendMessage()
 
@@ -149,6 +150,9 @@ extern "C" {
 /* we only need this to get a list of libraries from the main struct */
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
+#include "DNA_object_types.h"
+
+#include <map>
 
 #include "PHY_IPhysicsEnvironment.h"
 
@@ -158,6 +162,7 @@ extern "C" {
 #include "BKE_library.h"
 #include "BKE_appdir.h"
 #include "BKE_blender_version.h"
+#include "BKE_scene.h"
 #include "BLI_blenlib.h"
 #include "GPU_material.h"
 #include "MEM_guardedalloc.h"
@@ -167,6 +172,7 @@ extern "C" {
 
 /* for converting new scenes */
 #include "BL_Converter.h"
+#include "BL_LoadStats.h"
 #include "KX_LibLoadStatus.h"
 #include "KX_Mesh.h" /* for creating a new library of mesh objects */
 extern "C" {
@@ -341,6 +347,64 @@ PyDoc_STRVAR(gPyGetProfileInfo_doc,
 static PyObject *gPyGetProfileInfo(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return KX_GetActiveEngine()->GetPyProfileDict();
+}
+
+PyDoc_STRVAR(gPyGetRenderStats_doc,
+             "getRenderStats()\n"
+             "returns a dictionary of counters from the last completed frame: draw calls,\n"
+             "material and light uniform binds, culling object counts, light/shadow pass\n"
+             "counts and logic brick counts. Same numbers the Debug Mode render queries show."
+             );
+static PyObject *gPyGetRenderStats(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	PyObject *dict = PyDict_New();
+	if (!dict) {
+		return nullptr;
+	}
+
+	/* Adds the item and drops our reference, so the dict owns the only one. */
+	auto setInt = [dict](const char *key, int value) {
+		PyObject *obj = PyLong_FromLong(value);
+		if (obj) {
+			PyDict_SetItemString(dict, key, obj);
+			Py_DECREF(obj);
+		}
+	};
+
+	/* Rasterizer counters are frame-scoped across every pass (main, shadow, filters). */
+	setInt("drawCalls", RAS_Rasterizer::GetLastDrawCalls());
+	setInt("materialBinds", RAS_Rasterizer::GetLastMaterialChanges());
+	setInt("lightBinds", RAS_Rasterizer::GetLastLightBinds());
+
+	/* Update work of the last frame (CM_WorkCounters.h): near zero when nothing moves. */
+	setInt("sceneNodeUpdates", CM_WorkCountLast(CM_WORK_SCENE_NODE_UPDATES));
+	setInt("transformSyncs", CM_WorkCountLast(CM_WORK_TRANSFORM_SYNCS));
+	setInt("boundsPushes", CM_WorkCountLast(CM_WORK_BOUNDS_PUSHES));
+	setInt("meshMatrixChanges", CM_WorkCountLast(CM_WORK_MESH_MATRIX_CHANGES));
+	setInt("updateNotifies", CM_WorkCountLast(CM_WORK_UPDATE_NOTIFIES));
+	setInt("lightUniforms", CM_WorkCountLast(CM_WORK_LIGHT_UNIFORMS));
+	setInt("passUniforms", CM_WorkCountLast(CM_WORK_PASS_UNIFORMS));
+	setInt("instancingUploads", CM_WorkCountLast(CM_WORK_INSTANCING_UPLOADS));
+
+	/* The rest is per scene: report the active one, like getCurrentScene() does. */
+	KX_Scene *scene = KX_GetActiveScene();
+	if (scene) {
+		setInt("cullingTotal", scene->GetLastCullingTotalObjects());
+		setInt("cullingTested", scene->GetLastCullingTestedObjects());
+		setInt("cullingVisible", scene->GetLastCullingVisibleObjects());
+		setInt("lightsTotal", scene->GetLastLightsTotal());
+		setInt("lightsShadowUpdated", scene->GetLastLightsShadowUpdated());
+		setInt("shadowPasses", scene->GetLastShadowPasses());
+
+		SCA_LogicManager *logicmgr = scene->GetLogicManager();
+		if (logicmgr) {
+			setInt("sensors", logicmgr->GetTotalRegisteredSensors());
+			setInt("controllersTriggered", logicmgr->GetLastControllersTriggered());
+			setInt("actuatorsUpdated", logicmgr->GetLastActuatorsUpdated());
+		}
+	}
+
+	return dict;
 }
 
 PyDoc_STRVAR(gPySendMessage_doc,
@@ -720,6 +784,22 @@ static PyObject *gPyAddScene(PyObject *, PyObject *args, PyObject *kwds)
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(gPyPreloadScene_doc,
+             "preloadScene(name)\n"
+             "Converts a scene ahead, at the end of this frame (shaders and textures included), without adding it.\n"
+             "A later addScene/replaceScene of it then only inserts the ready scene, without a stall. Call it\n"
+             "while a loading screen is up. Returns False if the scene does not exist.\n"
+             " name = Name of the scene"
+             );
+static PyObject *gPyPreloadScene(PyObject *, PyObject *args)
+{
+	char *name;
+	if (!PyArg_ParseTuple(args, "s:preloadScene", &name)) {
+		return nullptr;
+	}
+	return PyBool_FromLong(KX_GetActiveEngine()->PreloadScene(name));
+}
+
 PyDoc_STRVAR(gPyGetCurrentScene_doc,
              "getCurrentScene()\n"
              "Gets a reference to the current scene."
@@ -931,6 +1011,146 @@ static PyObject *gLibLoad(PyObject *, PyObject *args, PyObject *kwds)
 	Py_RETURN_FALSE;
 }
 
+/* Object "Convert" task flag (OB_TASK_CONVERT): lets a menu choose which objects a
+ * not-yet-loaded scene converts, e.g. only the selected racers. */
+/* Original flags of the objects touched by setObjectConvert, restored by exitGamePython.
+ * The embedded player converts the editor's own Main, so without this the change would
+ * stay in the editor (and be saved with the file) after the game stops. */
+static std::map<Object *, int> gConvertFlagBackup;
+
+static void restoreObjectConvertFlags()
+{
+	for (const std::pair<Object * const, int> &item : gConvertFlagBackup) {
+		// Objects of LibLoad'ed libraries may be freed already: only touch the file's own Main.
+		if (BLI_findindex(&G.main->object, item.first) != -1) {
+			SET_FLAG_FROM_TEST(item.first->gameflag, item.second & OB_TASK_CONVERT, OB_TASK_CONVERT);
+		}
+	}
+	gConvertFlagBackup.clear();
+}
+
+PyDoc_STRVAR(gPySetObjectConvert_doc,
+"setObjectConvert(scene, object, convert, children=True)\n"
+"Sets the object's Convert flag in a scene not loaded yet; returns the number of objects changed.");
+static PyObject *gPySetObjectConvert(PyObject *, PyObject *args, PyObject *kwds)
+{
+	const char *scenename, *obname;
+	int convert, children = 1;
+	static const char *kwlist[] = {"scene", "object", "convert", "children", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssp|p:setObjectConvert", const_cast<char **>(kwlist),
+	                                 &scenename, &obname, &convert, &children)) {
+		return nullptr;
+	}
+
+	Scene *scene = KX_GetActiveEngine()->GetConverter()->GetBlenderSceneForName(scenename);
+	if (!scene) {
+		PyErr_Format(PyExc_ValueError, "setObjectConvert: scene \"%s\" not found", scenename);
+		return nullptr;
+	}
+	Object *target = BL_Converter::FindSceneObject(scene, obname);
+	if (!target) {
+		PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" not found in scene \"%s\"", obname, scenename);
+		return nullptr;
+	}
+
+	if (convert && (target->gameflag & OB_TASK_EDITOR_ONLY)) {
+		PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" Load Mode is Editor Only", obname);
+		return nullptr;
+	}
+
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	int changed = 0;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(scene, sce_iter, base)) {
+		Object *ob = base->object;
+		// Editor-only children keep their mode.
+		if ((ob != target && !(children && BL_Converter::IsChildOf(ob, target))) ||
+		    (ob->gameflag & OB_TASK_EDITOR_ONLY))
+		{
+			continue;
+		}
+		if (convert && converter->IsObjectDataFreed(ob)) {
+			PyErr_Format(PyExc_ValueError, "setObjectConvert: object \"%s\" mesh data was released by freeUnconvertedData()",
+			             ob->id.name + 2);
+			return nullptr;
+		}
+		const int old = ob->gameflag;
+		gConvertFlagBackup.emplace(ob, old);
+		SET_FLAG_FROM_TEST(ob->gameflag, convert, OB_TASK_CONVERT);
+		changed += (old != ob->gameflag);
+	}
+	return PyLong_FromLong(changed);
+}
+
+PyDoc_STRVAR(gPyFreeUnconvertedData_doc,
+"freeUnconvertedData(scene)\n"
+"Standalone player only: releases the mesh geometry used solely by objects of the scene left out by\n"
+"their Convert flag; they can't be converted anymore. Returns the bytes released.");
+static PyObject *gPyFreeUnconvertedData(PyObject *, PyObject *args)
+{
+	const char *scenename;
+	if (!PyArg_ParseTuple(args, "s:freeUnconvertedData", &scenename)) {
+		return nullptr;
+	}
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	Scene *scene = converter->GetBlenderSceneForName(scenename);
+	if (!scene) {
+		PyErr_Format(PyExc_ValueError, "freeUnconvertedData: scene \"%s\" not found", scenename);
+		return nullptr;
+	}
+	std::string error;
+	const size_t freed = converter->FreeUnconvertedData(scene, error);
+	if (!error.empty()) {
+		PyErr_Format(PyExc_RuntimeError, "freeUnconvertedData: %s", error.c_str());
+		return nullptr;
+	}
+	return PyLong_FromSize_t(freed);
+}
+
+PyDoc_STRVAR(gPyGetLoadLog_doc,
+"getLoadLog(clear=False)\n"
+"Returns the recent scene load reports as a list of dicts (scene, stage, ms, detail, total).");
+static PyObject *gPyGetLoadLog(PyObject *, PyObject *args, PyObject *kwds)
+{
+	int clear = 0;
+	static const char *kwlist[] = {"clear", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|p:getLoadLog", const_cast<char **>(kwlist), &clear)) {
+		return nullptr;
+	}
+	const std::vector<BL_LoadLog::Entry> entries = BL_LoadLog::GetEntries();
+	if (clear) {
+		BL_LoadLog::Clear();
+	}
+	PyObject *list = PyList_New(entries.size());
+	for (unsigned int i = 0; i < entries.size(); ++i) {
+		const BL_LoadLog::Entry& entry = entries[i];
+		PyList_SET_ITEM(list, i, Py_BuildValue("{s:s,s:s,s:d,s:s,s:O}",
+		                                       "scene", entry.scene.c_str(), "stage", entry.stage.c_str(),
+		                                       "ms", entry.seconds * 1000.0, "detail", entry.detail.c_str(),
+		                                       "total", entry.total ? Py_True : Py_False));
+	}
+	return list;
+}
+
+PyDoc_STRVAR(gPyGetObjectConvert_doc,
+"getObjectConvert(scene, object)\n"
+"Returns the object's Convert flag in the given scene.");
+static PyObject *gPyGetObjectConvert(PyObject *, PyObject *args)
+{
+	const char *scenename, *obname;
+	if (!PyArg_ParseTuple(args, "ss:getObjectConvert", &scenename, &obname)) {
+		return nullptr;
+	}
+	Scene *scene = KX_GetActiveEngine()->GetConverter()->GetBlenderSceneForName(scenename);
+	Object *ob = scene ? BL_Converter::FindSceneObject(scene, obname) : nullptr;
+	if (!ob) {
+		PyErr_Format(PyExc_ValueError, "getObjectConvert: object \"%s\" not found in scene \"%s\"", obname, scenename);
+		return nullptr;
+	}
+	return PyBool_FromLong(ob->gameflag & OB_TASK_CONVERT);
+}
+
 static PyObject *gLibNew(PyObject *, PyObject *args)
 {
 	KX_Scene *kx_scene = KX_GetActiveScene();
@@ -1059,6 +1279,7 @@ static struct PyMethodDef game_methods[] = {
 	{"getInactiveSceneNames", (PyCFunction)gPyGetInactiveSceneNames, METH_NOARGS, (const char *)gPyGetInactiveSceneNames_doc},
 	{"getSceneList", (PyCFunction)gPyGetSceneList, METH_NOARGS, (const char *)gPyGetSceneList_doc},
 	{"addScene", (PyCFunction)gPyAddScene, METH_VARARGS | METH_KEYWORDS, (const char *)gPyAddScene_doc},
+	{"preloadScene", (PyCFunction)gPyPreloadScene, METH_VARARGS, (const char *)gPyPreloadScene_doc},
 	{"getRandomFloat", (PyCFunction)gPyGetRandomFloat, METH_NOARGS, (const char *)gPyGetRandomFloat_doc},
 	{"setGravity", (PyCFunction)gPySetGravity, METH_O, (const char *)"set Gravitation"},
 	{"getSpectrum", (PyCFunction)gPyGetSpectrum, METH_NOARGS, (const char *)"get audio spectrum"},
@@ -1103,8 +1324,13 @@ static struct PyMethodDef game_methods[] = {
 	{"PrintMemInfo", (PyCFunction)pyPrintStats, METH_NOARGS, (const char *)"Print engine statistics"},
 	{"NextFrame", (PyCFunction)gPyNextFrame, METH_NOARGS, (const char *)"Render next frame (if Python has control)"},
 	{"getProfileInfo", (PyCFunction)gPyGetProfileInfo, METH_NOARGS, gPyGetProfileInfo_doc},
+	{"getRenderStats", (PyCFunction)gPyGetRenderStats, METH_NOARGS, gPyGetRenderStats_doc},
 	/* library functions */
 	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS | METH_KEYWORDS, (const char *)""},
+	{"setObjectConvert", (PyCFunction)gPySetObjectConvert, METH_VARARGS | METH_KEYWORDS, gPySetObjectConvert_doc},
+	{"freeUnconvertedData", (PyCFunction)gPyFreeUnconvertedData, METH_VARARGS, gPyFreeUnconvertedData_doc},
+	{"getLoadLog", (PyCFunction)gPyGetLoadLog, METH_VARARGS | METH_KEYWORDS, gPyGetLoadLog_doc},
+	{"getObjectConvert", (PyCFunction)gPyGetObjectConvert, METH_VARARGS, gPyGetObjectConvert_doc},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
 	{"LibFree", (PyCFunction)gLibFree, METH_VARARGS, (const char *)""},
 	{"LibList", (PyCFunction)gLibList, METH_VARARGS, (const char *)""},
@@ -1714,6 +1940,31 @@ static PyObject *gPyGetVsync(PyObject *, PyObject *Py_UNUSED(ignored))
 	return PyLong_FromLong(KX_GetActiveEngine()->GetCanvas()->GetSwapControl());
 }
 
+/* Runtime version of the scene's Dynamic Resolution settings. minScale == maxScale gives a
+ * fixed render scale; enabled=False renders at 100%. */
+static PyObject *gPySetDynamicResolution(PyObject *, PyObject *args, PyObject *kwds)
+{
+	int enabled;
+	int targetFPS = 60;
+	int minScale = 50;
+	int maxScale = 100;
+	int step = 5;
+	static const char *kwlist[] = {"enabled", "targetFPS", "minScale", "maxScale", "step", nullptr};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|iiii:setDynamicResolution", (char **)kwlist,
+	                                 &enabled, &targetFPS, &minScale, &maxScale, &step)) {
+		return nullptr;
+	}
+
+	KX_GetActiveEngine()->SetDynamicResolution(enabled != 0, targetFPS, minScale, maxScale, step);
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetRenderScale(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	return PyFloat_FromDouble(KX_GetActiveEngine()->GetCanvas()->GetRenderScale());
+}
+
 /* Master volume for the actual device the engine plays sound through
  * (BKE_sound_get_device()) -- NOT the same thing as a Python script doing
  * `aud.Device()`, which constructs an unrelated, separate playback device. */
@@ -1867,6 +2118,8 @@ static struct PyMethodDef rasterizer_methods[] = {
 	{"setMipmapping", (PyCFunction)gPySetMipmapping, METH_VARARGS, ""},
 	{"getMipmapping", (PyCFunction)gPyGetMipmapping, METH_NOARGS, ""},
 	{"setVsync", (PyCFunction)gPySetVsync, METH_VARARGS, ""},
+	{"setDynamicResolution", (PyCFunction)gPySetDynamicResolution, METH_VARARGS | METH_KEYWORDS, ""},
+	{"getRenderScale", (PyCFunction)gPyGetRenderScale, METH_NOARGS, ""},
 	{"getVsync", (PyCFunction)gPyGetVsync, METH_NOARGS, ""},
 	{"setMasterVolume", (PyCFunction)gPySetMasterVolume, METH_VARARGS,
 	 "setMasterVolume(volume) -- volume in [0, 1], applies to the engine's actual audio device"},
@@ -2613,6 +2866,9 @@ static struct _inittab bge_internal_modules[] = {
  */
 void initPlayerPython(int argc, char **argv)
 {
+	// Only the standalone player calls this: its Main is the game's own copy of the file.
+	BL_Converter::SetMainOwnedByGame(true);
+
 	const char *const py_path_bundle = BKE_appdir_folder_id(BLENDER_SYSTEM_PYTHON, nullptr);
 
 	// Not essential but nice to set our name, not that python holds a reference to program path string.
@@ -2775,6 +3031,14 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	}
 
 	// Init Range
+	// Standalone Python does not run bpy.utils startup, which normally adds scripts/modules.
+	// Make engine-shipped reusable components available before scene components are imported.
+	if (const char *componentModules = BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS, "modules")) {
+		char moduleMarker[FILE_MAX];
+		BLI_strncpy(moduleMarker, componentModules, sizeof(moduleMarker));
+		BLI_path_append(moduleMarker, sizeof(moduleMarker), "__init__.py");
+		initPySysObjects__append(PySys_GetObject("path"), moduleMarker);
+	}
 	PyObject *mod = initRANGE();
 	PyDict_SetItemString(modules, "Range", mod);
 	Py_DECREF(mod);
@@ -2792,6 +3056,7 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 
 void exitGamePython()
 {
+	restoreObjectConvertFlags();
 	KX_Python_RestoreConsoleRedirect();
 
 	// Clean up the Python mouse and keyboard.

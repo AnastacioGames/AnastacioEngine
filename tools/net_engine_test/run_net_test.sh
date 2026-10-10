@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# Starts a server and a client RangeRuntime (headless, xvfb) and checks that a replicated object moves
-# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|rpc] [build dir] [net-sim "lat,jit,loss"]
+# Starts a server and a client RangeRuntime (xvfb; a --server one without any display) and checks that a replicated object moves
+# on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|predict-cube|rpc|relevance|scene-change] [build dir] [net-sim "lat,jit,loss"]
 #   spawner, car  the script registers the objects (net.replicate) and calls host()/join()
 #   server        spawner with the server started as a headless server (RangeRuntime --server): no render, no
 #                 audio, dedicated (no host player); also prints the CPU time of both processes
 #   scene         the .range files are authored by the editor (make_net_scenes.py, needs build-linux-editor):
 #                 Replicate checkbox, Rep property and the scene mode (Host/Client) open the session
 #   scene-server  scene with the server started as --server: the Host scene must run as Dedicated
+#   predict-cube  dynamic box (make_dyn_scene.py): the server gives the Car body to the client, both predict it
+#                 (Bullet runs on the client too; the replay integrates the velocity); same simulator default as predict
+#   relevance     spawner; after 5 s the server narrows the client's view (net.set_client_view): the Spawner
+#                 leaves it and freezes on the client, the spawned Rig stays inside and keeps moving
+#   scene-change  make_scene_change.py (editor): the server calls net.change_scene("Arena2") mid-match, the client
+#                 follows, a late client joining with the old scene is moved too (net_scene_change_test.py)
 #   rpc           spawner plus game RPCs (@net.rpc, net.call, obj.net): every target and argument type, refusals
 #   predict       spawner plus a rig owned by the client, moved by net.predict() with the client's input
 #                 (prediction, reconciliation) and shots at the Spawner through the input (lag compensation);
@@ -28,11 +34,25 @@ SERVER_ARGS=""
 case "$SCENARIO" in
   server) SERVER_ARGS="--server"; export NET_HEADLESS=1; SCENARIO=spawner
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  relevance) export NET_RELEVANCE=1; SCENARIO=spawner; SECONDS_RUN="${NET_SECONDS:-11}"
+    SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   rpc) export NET_RPC=1; SCENARIO=spawner
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   predict) export NET_PREDICT=1; SCENARIO=spawner; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   spawner) SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  predict-cube) export NET_PREDICT_DYN=1; SCENARIO=car; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_dyn_scene.py" -- "$OUT/cube.range" ) \
+      > "$OUT/make.log" 2>&1
+    grep -q "NETDYN SAVED" "$OUT/make.log" || { echo "NET ENGINE TEST (predict-cube): FAIL (editor step, logs in $OUT)"; exit 1; }
+    SCENE_SERVER="$OUT/cube.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
+  scene-change)
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_scene_change.py" -- "$OUT/change.range" ) \
+      > "$OUT/make.log" 2>&1
+    grep -q "NETCHANGE SAVED" "$OUT/make.log" || { echo "NET ENGINE TEST (scene-change): FAIL (editor step, logs in $OUT)"; exit 1; }
+    SCENE_SERVER="$OUT/change.range"; SCENE_CLIENT="$SCENE_SERVER"; TEST_PY="$HERE/net_scene_change_test.py" ;;
   car) SCENE_SERVER="$ROOT/projects-teste/car_framerate/car_com_fr0.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   scene|scene-server)
     if [ "$SCENARIO" = scene-server ]; then SERVER_ARGS="--server"; export NET_HEADLESS=1; fi
@@ -57,16 +77,25 @@ run() { # role scene [extra player args: the server's go first, -w after them wo
   local role="$1" scene="$2"; shift 2
   local window="-w 160 120"
   [ $# -gt 0 ] && window=""
+  # --server opens no window: it runs without xvfb and with DISPLAY unset, which proves it needs no display.
+  local xvfb="xvfb-run -a"
+  case " $* " in *" --server "*) xvfb="env -u DISPLAY -u WAYLAND_DISPLAY" ;; esac
   # /usr/bin/time -f: user+system CPU seconds of the player (xvfb-run is outside the measured command).
-  ( cd "$BUILD/bin" && NET_ROLE="$role" timeout 120 xvfb-run -a /usr/bin/time -f "NETCPU $role %U %S" \
-      ./RangeRuntime "$@" $window -p "$HERE/net_engine_test.py" "$scene" > "$OUT/$role.log" 2>&1 ) &
+  ( cd "$BUILD/bin" && NET_ROLE="$role" timeout 120 $xvfb /usr/bin/time -f "NETCPU $role %U %S" \
+      ./RangeRuntime "$@" $window -p "${TEST_PY:-$HERE/net_engine_test.py}" "$scene" > "$OUT/$role.log" 2>&1 ) &
 }
 run server "$SCENE_SERVER" $SERVER_ARGS
 sleep 1
 run client "$SCENE_CLIENT"
+LOGS="$OUT/server.log $OUT/client.log"
+if [ "$LABEL" = scene-change ]; then
+  # A second client joins after the server moved to Arena2, with the file that starts in Arena1.
+  sleep 6; run late "$SCENE_CLIENT"; LOGS="$LOGS $OUT/late.log"
+fi
 wait
-grep -h "NETTEST\|NETCPU" "$OUT/server.log" "$OUT/client.log"
-if grep -q "NETTEST server PASS" "$OUT/server.log" && grep -q "NETTEST client PASS" "$OUT/client.log"; then
+grep -h "NETTEST\|NETCPU" $LOGS
+if grep -q "NETTEST server PASS" "$OUT/server.log" && grep -q "NETTEST client PASS" "$OUT/client.log" &&
+   { [ "$LABEL" != scene-change ] || grep -q "NETTEST late PASS" "$OUT/late.log"; }; then
   echo "NET ENGINE TEST ($LABEL): PASS"
   exit 0
 fi

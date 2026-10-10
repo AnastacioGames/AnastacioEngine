@@ -67,6 +67,13 @@ public:
 		GE_RAIN_STREAK_WIDTH_UNIFORM,
 		GE_RAIN_RIPPLE_NORMAL_UNIFORM,
 		GE_RAIN_LIGHTNING_UNIFORM,
+		GE_RAIN_PARAMS5_UNIFORM,
+		GE_RAIN_MASK_UNIFORM,
+		GE_RAIN_MASK_FLAGS_UNIFORM,
+		GE_RAIN_PUDDLE1_UNIFORM,
+		GE_RAIN_PUDDLE2_UNIFORM,
+		GE_RAIN_SKY_HORIZON_UNIFORM,
+		GE_RAIN_SKY_ZENITH_UNIFORM,
 		GE_CLOUDS_PARAMS_UNIFORM,
 		GE_CLOUDS_COLOR_UNIFORM,
 		GE_LENSFLARE_PARAMS_UNIFORM,
@@ -100,6 +107,9 @@ protected:
 	The computation should be left to the glsl shader, I keep it for backward compatibility. */
 	static const int TEXTURE_OFFSETS_SIZE = 18; //9 vec2 entries
 	float m_textureOffsets[TEXTURE_OFFSETS_SIZE];
+	/// Canvas size the offsets were computed for, recomputed on resize.
+	int m_offsetsWidth;
+	int m_offsetsHeight;
 
 	std::unordered_map<unsigned short, std::pair<unsigned int, int> > m_textures;
 

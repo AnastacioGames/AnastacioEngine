@@ -4796,6 +4796,15 @@ static void rna_def_scene_network(BlenderRNA *brna)
 	                         "(0 = Logic Tic Rate of the scene)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "relevance_radius", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "relevance_radius");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 10000.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Relevance Radius",
+	                         "Objects farther than this from a player's first owned object are not sent to that "
+	                         "player (Always Relevant objects are). 0 = send everything");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "snapshot_rate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "snapshot_rate");
 	RNA_def_property_range(prop, 1, 120);
@@ -5156,8 +5165,10 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 1, 10000, 1, 1);
 	RNA_def_property_int_default(prop, 5);
 	RNA_def_property_ui_text(prop, "Sleep Timer",
-	                         "Lowers the number of sleep times it can run per game logic frame, "
-	                         "higher value allows better cooling at the cost of frame rate synchronization, Python: logic.getMaxLogicFrame(), logic.setMaxLogicFrame(10000)");
+	                         "Only used by online multiplayer (most logic steps run in one frame to catch up) "
+	                         "and by the frame rate limiter wait. A local game runs one logic step per "
+	                         "displayed frame, so this does not change its speed. "
+	                         "Python: logic.getMaxLogicFrame(), logic.setMaxLogicFrame()");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	prop = RNA_def_property(srna, "shadows_on_off", PROP_INT, PROP_NONE);
@@ -5331,9 +5342,10 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_fixed_timestep", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_USE_FIXED_TIMESTEP);
-	RNA_def_property_ui_text(prop, "Fixed Timestep Accumulator",
-	                         "Deprecated: ignored by the engine, which always runs one logic "
-	                         "update per displayed frame. Kept so old files and scripts still load");
+	RNA_def_property_ui_text(prop, "Fixed Timestep",
+	                         "Run logic and physics in fixed steps of the logic tic rate, as many per "
+	                         "frame as real time requires (up to Max Logic Frames), so the game keeps "
+	                         "real-time speed when the frame rate drops");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 

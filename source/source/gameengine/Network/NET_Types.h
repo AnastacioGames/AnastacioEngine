@@ -46,7 +46,7 @@ constexpr NetId kInvalidNetId = 0;
 constexpr NetId kFirstRuntimeNetId = 0x80000000u;
 constexpr ClientId kServerClientId = 0;
 
-constexpr uint16_t kProtocolVersion = 1;
+constexpr uint16_t kProtocolVersion = 2;
 /// 'ANET' as it appears on the wire (bytes 'A','N','E','T', little-endian u32).
 constexpr uint32_t kProtocolMagic = 0x54454E41u;
 
@@ -126,6 +126,7 @@ enum class RejectReason : uint8_t {
 	BadToken = 4,
 	Banned = 5,
 	GameInProgress = 6,
+	WrongPassword = 7,
 };
 
 enum class DisconnectReason : uint8_t {

@@ -1520,7 +1520,7 @@ class WM_OT_copy_prev_settings(Operator):
         return {'FINISHED'}
 
 class WM_OT_blenderplayer_start(Operator):
-    """Launch the RangeRuntime with the current range-file"""
+    """Launch the game runtime with the current range-file"""
     bl_idname = "wm.blenderplayer_start"
     bl_label = "Start Game In Player"
 
@@ -1535,7 +1535,8 @@ class WM_OT_blenderplayer_start(Operator):
         blender_bin_path = bpy.app.binary_path
         blender_bin_dir = os.path.dirname(blender_bin_path)
         ext = os.path.splitext(blender_bin_path)[-1]
-        player_path = os.path.join(blender_bin_dir, "RangeRuntime" + ext)
+        from .anastacio_cook import _runtime_path
+        player_path = _runtime_path()
         # done static vars
 
         if sys.platform == "darwin":
@@ -2466,7 +2467,7 @@ class WM_MT_splash(Menu):
         col1.operator("wm.recover_last_session", icon='RECOVER_LAST')
         col1.separator()
         col1.label(text="Range Engine Network")
-        col1.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col1.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         col1.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
         api_url = ("https://rangeengine.tech/api/" +
                    (bpy.app.range_version_string[0] + bpy.app.range_version_string[2]) + "/html/index.html")
@@ -2505,7 +2506,7 @@ class WM_MT_splash_about(Menu):
         col.emboss = 'PULLDOWN_MENU'
         col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
         col.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
-        col.operator("wm.url_open", text="Range Engine - Discord", icon='DISCORD').url = "https://discord.gg/hQ58MFpfdF"
+        col.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
 
 class WM_OT_create_project(Operator):
@@ -2596,28 +2597,27 @@ def _rangearmor_write_export_preset(context):
     DEFAULT_FIELDS): only known keys may be written, or the project
     fails to load there. GameName, Version, CompanyName, IconPath,
     ExportWindows64 and ExportLinux64 are all part of that schema, so
-    this is safe for old and new projects alike; it silently does
-    nothing if the file is missing or the current file isn't part of a
-    RangeArmor project structure.
+    this is safe for old and new projects alike. Return False when a fresh
+    protected snapshot or configuration could not be written.
     """
     filepath = bpy.data.filepath
     if not filepath:
-        return
+        return False
 
     data_dir = os.path.dirname(filepath)
     if os.path.basename(data_dir) != "data":
-        return
+        return False
 
     project_dir = os.path.dirname(data_dir)
     config_path = os.path.join(project_dir, "launcher", "config.json")
     if not os.path.isfile(config_path):
-        return
+        return False
 
     try:
         with open(config_path, "r", encoding="utf-8") as config_file:
             config_data = json.load(config_file)
     except (OSError, ValueError):
-        return
+        return False
 
     # The engine only ships the encrypted .rasec sibling of the currently
     # open .range file (*.range is excluded from the release data via
@@ -2630,10 +2630,11 @@ def _rangearmor_write_export_preset(context):
     # again must never reuse an old snapshot.
     rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
     rasec_path = os.path.join(data_dir, rasec_name)
-    bpy.ops.wm.save_as_mainfile_protected(
+    saved = bpy.ops.wm.save_as_mainfile_protected(
         'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
-    if os.path.isfile(rasec_path):
-        config_data["MainFile"] = rasec_name
+    if 'FINISHED' not in saved or not os.path.isfile(rasec_path):
+        return False
+    config_data["MainFile"] = rasec_name
 
     export_settings = getattr(context.scene, "rangearmor_export", None)
     if export_settings is None:
@@ -2641,8 +2642,8 @@ def _rangearmor_write_export_preset(context):
             with open(config_path, "w", encoding="utf-8") as config_file:
                 json.dump(config_data, config_file, indent="\t")
         except OSError:
-            pass
-        return
+            return False
+        return True
 
     if export_settings.product_name:
         config_data["GameName"] = export_settings.product_name
@@ -2659,7 +2660,8 @@ def _rangearmor_write_export_preset(context):
         with open(config_path, "w", encoding="utf-8") as config_file:
             json.dump(config_data, config_file, indent="\t")
     except OSError:
-        pass
+        return False
+    return True
 
 
 _RANGEARMOR_DEFAULT_FIELDS = {
@@ -2677,7 +2679,7 @@ _RANGEARMOR_DEFAULT_FIELDS = {
     "IconPath": "",
     "ExportWindows64": True,
     "ExportLinux64": True,
-    "EngineWindows64": "./engine/Windows64/RangeRuntime.exe",
+    "EngineWindows64": "./engine/Windows64/AnastacioRuntime.exe",
     "EngineLinux64": "./engine/Linux64/RangeRuntime",
     "PythonWindows64": "./engine/Windows64/2.79/python/bin/python.exe",
     "PythonLinux64": "./engine/Linux64/2.79/python/bin/python3.11",
@@ -2856,11 +2858,16 @@ class WM_OT_export_with_rangearmor(Operator):
     def execute(self, context):
         import os, sys, subprocess
 
-        _rangearmor_write_export_preset(context)
+        filepath = bpy.data.filepath
+        if filepath and os.path.basename(os.path.dirname(filepath)) == 'data':
+            config_path = os.path.join(os.path.dirname(os.path.dirname(filepath)), 'launcher', 'config.json')
+            if os.path.isfile(config_path) and not _rangearmor_write_export_preset(context):
+                self.report({'ERROR'}, "Could not prepare the protected game snapshot or config.json")
+                return {'CANCELLED'}
         _rangearmor_ensure_launcher_script(context)
 
         if sys.platform == "win32":
-            os.startfile(bpy.app.binary_path[:-15] + "rangearmor\RangeArmor Panel.exe")
+            os.startfile(os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel.exe"))
             return {'FINISHED'}
 
         exe_path = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel")
@@ -2926,7 +2933,9 @@ class WM_OT_one_click_export_rangearmor(Operator):
                 self.report({'ERROR'}, scaffold_error)
                 return {'CANCELLED'}
 
-            _rangearmor_write_export_preset(context)
+            if not _rangearmor_write_export_preset(context):
+                self.report({'ERROR'}, "Could not prepare the protected game snapshot or config.json")
+                return {'CANCELLED'}
             _rangearmor_ensure_launcher_script(context)
             wm.progress_update(2)
 
@@ -2949,9 +2958,10 @@ class WM_OT_one_click_export_rangearmor(Operator):
                 return {'CANCELLED'}
 
             get_range_script = os.path.join(rangearmor_dir, "release", "scripts", "get_rangeengine_currentplatform.py")
-            engine_windows = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
+            engine_windows = os.path.join(project_dir, "engine", "Windows64", "AnastacioRuntime.exe")
+            engine_windows_legacy = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
             engine_linux = os.path.join(project_dir, "engine", "Linux64", "RangeRuntime")
-            if os.path.isfile(get_range_script) and not (os.path.isfile(engine_windows) or os.path.isfile(engine_linux)):
+            if os.path.isfile(get_range_script) and not any(os.path.isfile(path) for path in (engine_windows, engine_windows_legacy, engine_linux)):
                 subprocess.run(
                     [python_exe, get_range_script, "--project", config_path, "--all-platforms"],
                     cwd=project_dir, capture_output=True, text=True, timeout=600,
@@ -2959,8 +2969,15 @@ class WM_OT_one_click_export_rangearmor(Operator):
             wm.progress_update(3)
 
             args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress"]
+            export_settings = getattr(context.scene, 'rangearmor_export', None)
+            if export_settings is not None and not export_settings.cook_before_export:
+                args.append('--no-cook')
             try:
-                result = subprocess.run(args, cwd=project_dir, capture_output=True, text=True, timeout=600)
+                from .anastacio_cook import _runtime_path
+                cook_runtime = _runtime_path()
+                export_env = dict(os.environ, RANGEARMOR_COOK_RUNTIME=cook_runtime)
+                result = subprocess.run(args, cwd=project_dir, env=export_env,
+                                        capture_output=True, text=True, timeout=1200)
             except Exception as e:
                 self.report({'ERROR'}, "Export failed to start: %s" % e)
                 return {'CANCELLED'}

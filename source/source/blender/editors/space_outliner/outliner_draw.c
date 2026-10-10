@@ -523,6 +523,16 @@ static void restrictbutton_scene_collection_render(bContext *C, void *poin, void
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_RENDER, poin);
 }
 
+/* Object Load Mode: With Scene <-> On Demand (Editor Only is set in the properties). */
+static void restrictbutton_load_mode_cb(bContext *C, void *poin, void *UNUSED(poin2))
+{
+	Object *ob = poin;
+	PointerRNA ptr;
+	RNA_pointer_create(&ob->id, &RNA_Object, ob, &ptr);
+	RNA_boolean_set(&ptr, "convert_object", (ob->gameflag & OB_TASK_CONVERT) == 0);
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+}
+
 static void restrictbutton_scene_collection_game(bContext *C, void *poin, void *poin2)
 {
 	Scene *scene = poin;
@@ -676,6 +686,7 @@ static void namebutton_cb(bContext *C, void *tsep, char *oldname)
 				case TSE_R_LAYER:
 					break;
 				case TSE_SCENE_COLLECTION:
+				case TSE_SCENE_ROOT_COLLECTION:
 				{
 					SceneCollection *sc = te->directdata;
 
@@ -739,6 +750,30 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				                        TIP_("Restrict rendering (Ctrl - Recursive)"));
 				UI_but_func_set(bt, restrictbutton_rend_cb, scene, ob);
 				UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+
+				/* Game load mode, left of the eye like the collections' game checkbox. */
+				if (BKE_scene_uses_blender_game(scene)) {
+					if (ob->gameflag & OB_TASK_EDITOR_ONLY) {
+						/* Faded, so it differs from the On Demand empty ghost. */
+						bt = uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_GHOST_DISABLED,
+						             (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+						             NULL, 0, 0, 0, 0, TIP_("Load Mode: Editor Only, never created in the game (change it in Object > Game)"));
+						UI_but_flag_enable(bt, UI_BUT_INACTIVE);
+					}
+					else {
+						/* Load Mode: filled ghost With Scene, empty ghost On Demand. */
+						const bool with_scene = (ob->gameflag & OB_TASK_CONVERT) != 0;
+						bt = uiDefIconBut(block, UI_BTYPE_BUT, 0, with_scene ? ICON_GHOST_ENABLED : ICON_GHOST_DISABLED,
+						                  (int)(ar->v2d.cur.xmax - OL_TOG_RESTRICT_VIEWX - UI_UNIT_X), te->ys, UI_UNIT_X, UI_UNIT_Y,
+						                  NULL, 0, 0, 0, 0,
+						                  with_scene ? TIP_("Load Mode: With Scene. Click: On Demand, a script creates it "
+						                                    "with scene.convertObject()") :
+						                               TIP_("Load Mode: On Demand, a script creates it with "
+						                                    "scene.convertObject(). Click: With Scene"));
+						UI_but_func_set(bt, restrictbutton_load_mode_cb, ob, NULL);
+						UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
+					}
+				}
 
 				UI_block_emboss_set(block, UI_EMBOSS);
 
@@ -1360,6 +1395,20 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 				}
 				break;
 			}
+			case TSE_SCENE_ROOT_COLLECTION:
+			{
+				SceneCollection *sc = te->directdata;
+
+				if (sc == NULL || arg.x >= arg.xmax) {
+					UI_icon_draw(x, y, ICON_FILE_FOLDER);
+				}
+				else {
+					uiBut *but = uiDefIconBut(block, UI_BTYPE_LABEL, 0, ICON_FILE_FOLDER, arg.xb, arg.yb,
+					                          UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 1.0, arg.alpha, "");
+					UI_but_drag_set_name(but, sc->name);
+				}
+				break;
+			}
 			case TSE_LINKED_LAMP:
 				UI_icon_draw(x, y, ICON_LAMP_DATA); break;
 			case TSE_LINKED_MAT:
@@ -1879,11 +1928,17 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 
 	/* vertical line */
 	te = lb->last;
-	if (te->parent || lb->first != lb->last) {
+	if (te->parent) {
 		tselem = TREESTORE(te);
 		if (tselem->type == 0 || tselem->type == TSE_ID_BASE) {
 
 			glRecti(startx, y1 + UI_UNIT_Y, startx + 1, y2);
+		}
+	}
+	else {
+		tselem = TREESTORE(te);
+		if (lb->first != lb->last && (tselem->type == 0 || tselem->type == TSE_ID_BASE)) {
+			glRecti(startx, y1, startx + 1, y2);
 		}
 	}
 }

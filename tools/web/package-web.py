@@ -127,6 +127,8 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #touch .btn { box-sizing: border-box; width: calc(var(--u) * 1.1); height: calc(var(--u) * 1.1); border-radius: 50%;
                 display: flex; align-items: center; justify-content: center; font: bold 20px system-ui, sans-serif;
                 color: rgba(255,255,255,.85); background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.4); }
+  #touch .btn.small { width: calc(var(--u) * .7); height: calc(var(--u) * .7); font-size: 14px; }
+  #touch .btn.wide { width: calc(var(--u) * 1.5); height: calc(var(--u) * 1.5); font-size: 28px; }
   #touch .dpad { box-sizing: border-box; width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4);
                  left: calc(var(--sl) + var(--u) * .7); bottom: calc(var(--sb) + var(--u) * .7);
                  border-radius: 50%; background: rgba(255,255,255,.06); }
@@ -307,6 +309,7 @@ __PERF_SCRIPT__
     motion.gravity = grav;
     motion.t = performance.now();
     if (ra) fuseHead(motion.gyro, motion.gravity);
+    touchTilt();
     if (debug && motion.t - motionLogAt > 1000) {
       motionLogAt = motion.t;
       log("[motion] accel " + accel.map(function (v) { return v.toFixed(2); }).join(" ") +
@@ -414,6 +417,23 @@ __PERF_SCRIPT__
           { type: "button", key: "SPACEKEY", label: "\\u2423", at: [0.3, -2] },
           { type: "button", key: "LEFTMOUSE", label: "\\u25ce", at: [-2, -1.4] }]
   };
+  // Corrida (gamepad 0): direcao no eixo X do stick esquerdo, pedais nos gatilhos (axis 5 acelera, 4 freia), A/B/X/Y,
+  // START (bit 6) e RB (bit 10) pequenos no topo. O botao "switch" troca o jeito de virar - stick, setas ou inclinar
+  // o aparelho - e a escolha fica guardada no aparelho. O jogo le sempre o mesmo gamepad.
+  var raceButtons = [
+    { type: "button", axis: 5, label: "\\u25b2", size: "wide", at: [0.55, 0.35] },
+    { type: "button", axis: 4, label: "\\u25bc", at: [-1.1, 0.55] },
+    { type: "button", bit: 3, label: "Y", at: [0.75, -1.3] }, { type: "button", bit: 0, label: "A", at: [-0.6, -0.9] },
+    { type: "button", bit: 1, label: "B", at: [-2.3, 0.55] }, { type: "button", bit: 2, label: "X", at: [-1.9, -0.9] },
+    { type: "button", bit: 6, label: "II", size: "small", top: true, at: [0.9, 0.9] },
+    { type: "button", bit: 10, label: "\\u25a3", size: "small", top: true, at: [-0.1, 0.9] },
+    { type: "switch", layouts: ["race", "race_arrows", "race_tilt"], labels: ["\\u25ce", "\\u25c4\\u25ba", "\\u27f3"],
+      size: "small", top: true, at: [-1.1, 0.9] }];
+  touchLayouts.race = [{ type: "stick", side: "left", axes: [0, 1] }].concat(raceButtons);
+  touchLayouts.race_arrows = [
+    { type: "button", axis: 0, value: -1, label: "\\u25c4", size: "wide", left: true, at: [-0.9, 0.35] },
+    { type: "button", axis: 0, value: 1, label: "\\u25ba", size: "wide", left: true, at: [0.9, 0.35] }].concat(raceButtons);
+  touchLayouts.race_tilt = [{ type: "tilt", axis: 0, full: 0.5 }].concat(raceButtons);
   // Ordem de SCA_IInputDevice::SCA_EnumInputs a partir de RETKEY (= 7), a mesma de bge.events. So as teclas
   // que fazem sentido num controle na tela; verify-touch.cjs confere W, SPACE e UPARROW com o bge.events.
   var KEY_NAMES = ("RET SPACE PADASTER COMMA MINUS PERIOD ZERO ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE " +
@@ -453,6 +473,8 @@ __PERF_SCRIPT__
     var axes = [0, 0, 0, 0, 0, 0], bits = 0, keys = [];
     touchControls.forEach(function (c) {
       if (c.axes) { axes[c.axes[0]] = c.value[0]; axes[c.axes[1]] = c.value[1]; }
+      // Botao ou sensor num eixo so (gatilho, seta de direcao, inclinar): soma, para duas setas se anularem.
+      if (c.axis != null) axes[c.axis] = Math.max(-1, Math.min(1, axes[c.axis] + c.amount));
       bits |= c.bits;
       keys = keys.concat(c.held);
     });
@@ -580,17 +602,64 @@ __PERF_SCRIPT__
     return ctl;
   }
   // Botoes em volta de um centro no canto inferior direito; "at" em unidades de --u (x para a direita, y para baixo).
+  // left: centro no canto inferior esquerdo; top: no canto de cima. Alvos: key (tecla), bit (botao do gamepad) ou
+  // axis (eixo do gamepad, com value; gatilho = 1).
+  function placeButton(b, c) {
+    if (c.size) b.classList.add(c.size);
+    if (c.left) b.style.left = "calc(var(--sl) + var(--u) * " + (1.35 + c.at[0]) + ")";
+    else b.style.right = "calc(var(--sr) + var(--u) * " + (1.35 - c.at[0]) + ")";
+    if (c.top) b.style.top = "calc(var(--u) * " + (c.at[1] - 0.6) + ")";
+    else b.style.bottom = "calc(var(--sb) + var(--u) * " + (1.35 - c.at[1]) + ")";
+  }
   function makeButton(c) {
     var code = c.key ? keyCode(c.key) : 0;
     var b = node("div", "btn", c.label || String(c.key || "").replace(/KEY$/, ""));
-    var ctl = { node: b, value: null, bits: 0, held: [] };
-    b.style.right = "calc(var(--sr) + var(--u) * " + (1.35 - c.at[0]) + ")";
-    b.style.bottom = "calc(var(--sb) + var(--u) * " + (1.35 - c.at[1]) + ")";
-    ctl.reset = function () { ctl.bits = 0; ctl.held = []; b.classList.remove("on"); };
+    var ctl = { node: b, value: null, bits: 0, held: [], axis: c.axis, amount: 0 };
+    placeButton(b, c);
+    ctl.reset = function () { ctl.bits = 0; ctl.held = []; ctl.amount = 0; b.classList.remove("on"); };
     bindPointer(b, ctl, function () {
-      if (code) ctl.held = [code]; else ctl.bits = 1 << c.bit;
+      if (code) ctl.held = [code];
+      else if (c.axis != null) ctl.amount = c.value || 1;
+      else ctl.bits = 1 << c.bit;
       b.classList.add("on");
     }, function () {});
+    return ctl;
+  }
+  // Inclinar o aparelho como eixo: a gravidade aponta para cima (W3C), entao abaixar a borda direita da x negativo.
+  // full: seno da inclinacao que da o curso todo (0.5 = 30 graus). Sem sensor o eixo fica em zero.
+  function makeTilt(c) {
+    var ctl = { node: node("div", ""), value: null, bits: 0, held: [], axis: c.axis, amount: 0 };
+    ctl.poll = function () {
+      var g = motion.gravity, len = Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+      var v = motion.t && len > 1 ? -g[0] / len / (c.full || 0.5) : 0;
+      ctl.amount = Math.abs(v) < 0.08 ? 0 : Math.max(-1, Math.min(1, v));
+    };
+    ctl.reset = function () { ctl.amount = 0; };
+    ctl.release = ctl.reset;
+    return ctl;
+  }
+  function touchTilt() {
+    var moved = false;
+    touchControls.forEach(function (c) { if (c.poll) { c.poll(); moved = true; } });
+    if (moved) updatePad();
+  }
+  // Botao que troca o layout inteiro pelo proximo da lista e guarda a escolha (localStorage) para a proxima visita.
+  var TOUCH_SAVED = "rangeTouchLayout";
+  function makeSwitch(c, current) {
+    var at = Math.max(0, c.layouts.indexOf(current));
+    var b = node("div", "btn", (c.labels || [])[at] || "\\u21c4");
+    var ctl = { node: b, value: null, bits: 0, held: [] };
+    placeButton(b, c);
+    ctl.reset = function () {};
+    ctl.release = ctl.reset;
+    b.addEventListener("pointerup", function (e) {
+      e.preventDefault();
+      var next = c.layouts[(at + 1) % c.layouts.length];
+      try { localStorage.setItem(TOUCH_SAVED, next); } catch (x) {}
+      if (next.indexOf("tilt") >= 0) requestMotionPermission();
+      clearTouch();
+      buildTouch(next);
+    });
     return ctl;
   }
   function startTouch() {
@@ -600,9 +669,24 @@ __PERF_SCRIPT__
     var layout = Array.isArray(chosen) ? chosen : touchLayouts[chosen];
     var coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
     if (!layout || show === "0" || (show !== "1" && !coarse) || touchControls.length) return;
+    // Escolha guardada pelo botao de troca: vale se o layout do projeto a oferece.
+    var saved = null;
+    try { saved = localStorage.getItem(TOUCH_SAVED); } catch (x) {}
+    if (!touchParam("touchlayout") &&
+        layout.some(function (c) { return c.type === "switch" && c.layouts.indexOf(saved) >= 0; })) chosen = saved;
+    buildTouch(chosen);
+  }
+  function clearTouch() {
+    releaseTouch();
+    touchControls.forEach(function (c) { if (c.node.parentNode) c.node.parentNode.removeChild(c.node); });
+    touchControls = [];
+  }
+  function buildTouch(chosen) {
+    var layout = Array.isArray(chosen) ? chosen : touchLayouts[chosen];
     var dynamic = (touchParam("touchstick") || TOUCH.stick) !== "fixed";
     layout.forEach(function (c) {
-      var ctl = c.type === "stick" ? makeStick(c, dynamic) : c.type === "dpad" ? makeDpad(c) : makeButton(c);
+      var ctl = c.type === "stick" ? makeStick(c, dynamic) : c.type === "dpad" ? makeDpad(c) :
+                c.type === "tilt" ? makeTilt(c) : c.type === "switch" ? makeSwitch(c, chosen) : makeButton(c);
       touchControls.push(ctl);
       el("touch").appendChild(ctl.node);
     });
@@ -799,7 +883,7 @@ __PERF_SCRIPT__
       m = /^([\\w.]*(Error|Exception))\\b/.exec(t);
       if (m) { pfPyOpen = false; pfAddPy({ kind: m[1], text: t, file: "" }); return; }
     }
-    if (!pfStructuredShader && /shader/i.test(t) && /(fail|error|compil|link)/i.test(t)) {
+    if (!pfStructuredShader && /shader/i.test(t) && /\\b(fail(?:ed|ure)?|error|unable|cannot|invalid|unsuccessful)\\b/i.test(t)) {
       var rec = { material: "", stage: /vertex/i.test(t) ? "vertex" : /fragment/i.test(t) ? "fragment" : "?", log: t,
                   structured: false };
       pfAddShader(rec);
@@ -991,7 +1075,7 @@ def main():
     ap.add_argument("--perf", action="store_true",
                     help="inclui frame-time-perf.js (ativo so com ?perf=1 na URL)")
     ap.add_argument("--zip", action="store_true", help="tambem gera <name>-<version>-web.zip")
-    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin", "wasd", "arrows", "fps"],
+    ap.add_argument("--touch-layout", choices=["none", "stick", "dpad", "twin", "wasd", "arrows", "fps", "race"],
                     default="stick",
                     help="controle na tela em aparelhos de toque: stick/dpad/twin viram gamepad 0; wasd/arrows "
                          "apertam teclas; fps = WASD, stick direito move o mouse, pulo e clique "

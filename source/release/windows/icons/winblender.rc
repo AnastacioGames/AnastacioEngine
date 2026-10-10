@@ -9,7 +9,7 @@
 	#define BLEN_VER_RC_STR STRINGIFY(BLEN_VER_RC_STR_M)
 #endif
 
-// Anastacio Engine composite brand icon (Range symbol + Anastacio cube).
+// Anastacio Engine cube brand icon.
 APPICON ICON DISCARDABLE "winrange.ico"
 BLENDERFILE ICON DISCARDABLE "winblenderfile.ico"
 
@@ -28,7 +28,11 @@ BEGIN
       VALUE "CompanyName", "Anastacio Games"
       VALUE "FileDescription", "Anastacio Engine (fork of Range Engine)"
       VALUE "LegalCopyright", "GPLv2"
-      VALUE "OriginalFilename", "RangeEngine.exe"
+#ifdef BLENDER_PLAYER_EXECUTABLE
+      VALUE "OriginalFilename", "AnastacioRuntime.exe"
+#else
+      VALUE "OriginalFilename", "AnastacioEngine.exe"
+#endif
       VALUE "ProductName", "Anastacio Engine"
     END
   END

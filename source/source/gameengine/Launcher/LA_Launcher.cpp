@@ -36,6 +36,7 @@
 #include "GPG_Canvas.h"
 
 #include "KX_KetsjiEngine.h"
+#include "KX_EngineProfiler.h"
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_PythonInit.h"
@@ -68,11 +69,17 @@
 
 #include "CM_Message.h"
 
+#include <algorithm>
+#include <cstring>
+
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>
 #endif
 
 extern "C" {
+#  include "BLF_api.h"
+#  include "BLT_lang.h"
+#  include "GPU_glew.h"
 #  include "GPU_extensions.h"
 #  include "GPU_material.h"
 
@@ -94,6 +101,8 @@ struct PythonMainLoopState
 };
 
 #endif
+
+std::atomic<bool> LA_SigTermRequested(false);
 
 LA_Launcher::LA_Launcher(GHOST_ISystem *system, Main *maggie, Scene *scene, GlobalSettings *gs,
                          RAS_Rasterizer::StereoMode stereoMode, int samples, bool alwaysUseExpandFraming, int argc, char **argv)
@@ -139,6 +148,49 @@ void LA_Launcher::SetPythonGlobalDict(PyObject *globalDict)
 GlobalSettings *LA_Launcher::GetGlobalSettings()
 {
 	return m_ketsjiEngine->GetGlobalSettings();
+}
+
+/// Shader warm-up (first start on a GPU/driver): one still screen while every scene is converted.
+static void DrawWarmUpScreen(RAS_ICanvas *canvas)
+{
+	const int width = canvas->GetWidth();
+	const int height = canvas->GetHeight();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDrawBuffer(GL_BACK);
+	glViewport(0, 0, width, height);
+	glDisable(GL_SCISSOR_TEST);
+	glClearColor(0.05f, 0.05f, 0.06f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+#ifdef WITH_GL_PROFILE_COMPAT
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, width, 0, height, -100, 100);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	const char *lang = BLT_lang_get();
+	const char *text = "Preparing shaders for this graphics card (first start only)...";
+	if (lang && strncmp(lang, "pt", 2) == 0) {
+		text = "Preparando os shaders para esta placa de vídeo (só na primeira vez)...";
+	}
+	else if (lang && strncmp(lang, "es", 2) == 0) {
+		text = "Preparando los shaders para esta tarjeta gráfica (solo la primera vez)...";
+	}
+	else if (lang && strncmp(lang, "ru", 2) == 0) {
+		text = "Подготовка шейдеров для этой видеокарты (только при первом запуске)...";
+	}
+	const int size = std::max(12, height / 40);
+	BLF_size(blf_mono_font, size, 72);
+	const float textWidth = BLF_width(blf_mono_font, text, strlen(text));
+	glColor4f(0.85f, 0.85f, 0.85f, 1.0f);
+	BLF_position(blf_mono_font, (width - textWidth) * 0.5f, height * 0.5f, 0.0f);
+	BLF_draw(blf_mono_font, text, strlen(text));
+	glDisable(GL_BLEND);
+#endif
+	canvas->SwapBuffers();
 }
 
 void LA_Launcher::InitEngine()
@@ -314,9 +366,9 @@ void LA_Launcher::InitEngine()
 	                                     gm.dynamicResolutionMaxScale,
 	                                     gm.dynamicResolutionStep);
 	m_ketsjiEngine->SetTimeScale(gm.timeScale);
-	// GAME_USE_FIXED_TIMESTEP stays in old files but is ignored: the fixed-rate physics
-	// needs exactly one simulation step per frame, which the accumulator did not keep.
-	m_ketsjiEngine->SetUseFixedTimestep(false);
+	// "-g fixed_timestep 1" overrides the scene option, to test a game without saving it.
+	m_ketsjiEngine->SetUseFixedTimestep(
+	        SYS_GetCommandLineInt(syshandle, "fixed_timestep", (gm.flag & GAME_USE_FIXED_TIMESTEP) != 0) != 0);
 
 	// Set the global settings (carried over if restart/load new files).
 	m_ketsjiEngine->SetGlobalSettings(m_globalSettings);
@@ -332,6 +384,9 @@ void LA_Launcher::InitEngine()
 	// Create a scene converter, create and convert the stratingscene.
 	m_converter = new BL_Converter(m_maggie, m_ketsjiEngine, m_alwaysUseExpandFraming, m_camZoom);
 	m_ketsjiEngine->SetConverter(m_converter);
+	if (BL_ShaderWarmUp()) {
+		DrawWarmUpScreen(m_canvas);
+	}
 
 	const double sceneLoadStart = PIL_check_seconds_timer();
 	m_kxStartScene = m_ketsjiEngine->CreateScene(m_startScene);
@@ -360,6 +415,20 @@ void LA_Launcher::InitEngine()
 	BL_LoadLog::Add(m_kxStartScene->GetName(), "start scene total", PIL_check_seconds_timer() - sceneLoadStart, "", true);
 	m_ketsjiEngine->AddScene(m_kxStartScene);
 	m_kxStartScene->Release();
+
+	/* Cook button: every other scene is converted once too (with all its objects, see BL_ObjectConverted())
+	 * so their shapes go to the cooked file; EngineNextFrame() then draws one frame (shaders) and quits: no logic runs. */
+	if (BL_CookAll()) {
+		for (Scene *sce = (Scene *)m_maggie->scene.first; sce; sce = (Scene *)sce->id.next) {
+			if (sce != m_startScene) {
+				KX_Scene *kxscene = m_ketsjiEngine->CreateScene(sce);
+				m_converter->ConvertScene(kxscene);
+				m_converter->RemoveScene(kxscene);
+			}
+		}
+		KX_SetActiveScene(m_kxStartScene);
+		m_kxStartScene->Suspend();
+	}
 
 	m_rasterizer->Init();
 	m_imgui->Init(m_inputDevice);
@@ -556,14 +625,32 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 	// First check if we want to exit.
 	KX_ExitInfo exitInfo = m_ketsjiEngine->GetExitInfo();
 
+	// A SIGTERM (e.g. an orchestrator stopping a `--server` dedicated process) requests the
+	// same clean shutdown as closing the window, checked once per frame since the signal
+	// handler itself only sets this flag (async-signal-safe).
+	if (exitInfo.m_code == KX_ExitInfo::NO_REQUEST && LA_SigTermRequested.load()) {
+		exitInfo.m_code = KX_ExitInfo::OUTSIDE;
+	}
+
+	// Cook button: the start scene is suspended (no logic); one frame is drawn for its shaders, then quit.
+	const bool cooking = BL_CookAll();
 	if (exitInfo.m_code == KX_ExitInfo::NO_REQUEST) {
-		if (renderFrame) {
+		if (renderFrame || cooking) {
+			RANGE_PROFILE_SCOPE("launcher.render");
 			RenderEngine();
 		}
 	}
+	if (cooking) {
+		// Shader warm-up: the game starts again, now loading every shader from the cache.
+		m_ketsjiEngine->RequestExit(BL_ShaderWarmUp() ? KX_ExitInfo::RESTART_GAME : KX_ExitInfo::QUIT_GAME);
+		exitInfo = m_ketsjiEngine->GetExitInfo();
+	}
 
-	m_system->processEvents(false);
-	m_system->dispatchEvents();
+	{
+		RANGE_PROFILE_SCOPE("launcher.events");
+		m_system->processEvents(false);
+		m_system->dispatchEvents();
+	}
 	// Teclas do controle na tela (Web) entram depois das do teclado, no mesmo ponto do quadro.
 	m_inputDevice->PollVirtualKeys();
 

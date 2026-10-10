@@ -42,7 +42,8 @@ cmd /c 'set VSLANG=1033&& "C:\Program Files\Microsoft Visual Studio\18\Community
 - Alvos úteis para checagens rápidas (não os produtos completos): `ge_rasterizer`, `ge_rasterizer_opengl`,
   `ge_rasterizer_shaders` (reconstrua este após editar qualquer `.glsl` de filtro — `datatoc` regenera um `.c`
   a partir do texto do shader).
-- Executáveis completos: `RangeEngine` (editor) e `RangeRuntime` (player standalone, aceita um `.range` como primeiro argumento). Saída em `build/bin/`.
+- Alvos completos: `RangeEngine` (editor) e `RangeRuntime` (player standalone, aceita um `.range` como primeiro argumento).
+  Saída Windows em `build/bin/`: `AnastacioEngine.exe` e `AnastacioRuntime.exe`.
 - Erros de sintaxe GLSL NÃO são pegos por este build em C++ (datatoc só embute o texto cru) — só aparecem em runtime via `glCompileShader`, logado como `CM_Error`/`CM_Warning` no stdout/console.
 
 ### Gotcha crítico: mudanças em headers podem exigir rebuild limpo
@@ -77,7 +78,10 @@ antes de começar:
   (título, splash, About, instalador, docs) usam "Anastacio Engine"; coisas novas (módulos, addons, classes)
   usam o prefixo `anastacio`/`Anastacio`. Identificadores herdados ficam como estão para não quebrar
   compatibilidade: formato `.range`, `import Range`, `bge`, pasta de config `%APPDATA%\RangeEngine\`, ProgIDs
-  `RangeEngine.*` no registro, alvos/executáveis `RangeEngine`/`RangeRuntime` e o arquivo `RangeEngine.desktop`.
+  `RangeEngine.*` no registro, alvos CMake `RangeEngine`/`RangeRuntime` e o arquivo `RangeEngine.desktop`.
+  Migração Windows aprovada em 2026-10-08: os alvos `RangeEngine` e `RangeRuntime` produzem
+  `AnastacioEngine.exe` e `AnastacioRuntime.exe`. Linux, Web/Android e identificadores de
+  compatibilidade mantêm os nomes anteriores; projetos antigos aceitam os dois nomes do player Windows.
   Não renomeie esses sem plano de migração aprovado. Links da comunidade Range Engine (site, Discord) são
   créditos ao projeto original e ficam.
 - `docs/roadmap.md` — somente trabalho aberto e validações pendentes.
@@ -128,7 +132,7 @@ estiver desatualizado.
   devido à configuração lado a lado incorreta" é causado por faltar a **subpasta `blender.crt/`** (com
   `blender.crt.manifest` + DLLs) ao lado do `.exe` — copiar só os DLLs soltos (`concrt140.dll`,
   `msvcp140*.dll`, `vcruntime140*.dll`, `vccorlib140.dll`) sem essa subpasta reproduz o mesmo erro. Sempre
-  valide extraindo o ZIP de fato (não rodando de `build/bin/`) e rodando `RangeEngine.exe`/`RangeRuntime.exe`
+  valide extraindo o ZIP de fato (não rodando de `build/bin/`) e rodando `AnastacioEngine.exe`/`AnastacioRuntime.exe`
   antes de subir para o GitHub; se falhar, o Log de Eventos do Windows
   (`Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='SideBySide'}`) diz exatamente qual
   assembly está faltando — mais rápido e confiável que `sxstrace.exe`, que exige elevação de admin.

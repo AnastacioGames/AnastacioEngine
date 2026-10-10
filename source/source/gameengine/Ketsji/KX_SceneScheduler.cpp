@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cstdio>
 /*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -24,7 +26,9 @@
 
 #include "KX_SceneScheduler.h"
 #include "KX_KetsjiEngine.h"
+#include "KX_EngineProfiler.h"
 #include "KX_Scene.h"
+#include "KX_NetworkManager.h"
 #include "BL_Converter.h"
 #include "BL_LoadStats.h"
 #include "CM_Message.h"
@@ -90,7 +94,21 @@ void KX_SceneScheduler::PostProcessScene(KX_Scene *scene)
 void KX_SceneScheduler::DestructScene(KX_Scene *scene)
 {
 	scene->RunOnRemoveCallbacks();
+	// Multiplayer: the session lets go of the scene's objects (and follows a replacement).
+	if (KX_NetworkManager *network = m_engine->GetNetworkManager()) {
+		network->OnSceneRemoved(scene);
+	}
 	m_engine->GetConverter()->RemoveScene(scene);
+}
+
+/// Names the scene added this frame and its cost in the profiler spike log.
+static void ProfileNoteScene(const std::string& name, double start)
+{
+	if (KX_EngineProfiler::Enabled()) {
+		char buf[32];
+		snprintf(buf, sizeof(buf), "=%.0fms", (PIL_check_seconds_timer() - start) * 1000.0);
+		KX_EngineProfiler::Note(name + buf);
+	}
 }
 
 void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
@@ -112,10 +130,13 @@ void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool ov
 	}
 }
 
-void KX_SceneScheduler::RemoveScene(const std::string& scenename)
+void KX_SceneScheduler::RemoveScene(const std::string& scenename, bool keep)
 {
 	if (FindScene(scenename)) {
 		m_removingScenes.push_back(scenename);
+		if (keep) {
+			m_removingKeep.push_back(scenename);
+		}
 	}
 	else {
 		CM_Warning("scene " << scenename << " does not exist, not removed!");
@@ -130,12 +151,26 @@ void KX_SceneScheduler::RemoveScheduledScenes()
 			std::string scenename = *scenenameit;
 
 			KX_Scene *scene = FindScene(scenename);
-			if (scene) {
-				DestructScene(scene);
-				m_engine->GetScenes()->RemoveValue(scene);
+			if (!scene) {
+				continue;
 			}
+			const bool keep = std::find(m_removingKeep.begin(), m_removingKeep.end(), scenename) != m_removingKeep.end();
+			if (keep && m_preparedScenes.find(scenename) == m_preparedScenes.end()) {
+				// Hidden and paused, not destroyed: the prepared map holds the reference the list had.
+				CM_AddRef(scene);
+				m_engine->GetScenes()->RemoveValue(scene);
+				if (!scene->IsSuspended()) {
+					scene->Suspend();
+					m_keptScenes.push_back(scenename);
+				}
+				m_preparedScenes[scenename] = scene;
+				continue;
+			}
+			DestructScene(scene);
+			m_engine->GetScenes()->RemoveValue(scene);
 		}
 		m_removingScenes.clear();
+		m_removingKeep.clear();
 	}
 }
 
@@ -144,13 +179,14 @@ void KX_SceneScheduler::AddScheduledScenes()
 	if (!m_addingOverlayScenes.empty()) {
 		for (const std::string& scenename : m_addingOverlayScenes) {
 			const double start = PIL_check_seconds_timer();
-			KX_Scene *tmpscene = CreateScene(scenename);
+			KX_Scene *tmpscene = TakeOrConvertScene(scenename);
 
 			if (tmpscene) {
-				m_engine->GetConverter()->ConvertScene(tmpscene);
+				ResumeIfKept(tmpscene);
 				m_engine->GetScenes()->Add(CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
 				BL_LoadLog::Add(scenename, "add scene total (overlay)", PIL_check_seconds_timer() - start, "", true);
+				ProfileNoteScene(scenename, start);
 				tmpscene->Release();
 			}
 			else {
@@ -163,13 +199,14 @@ void KX_SceneScheduler::AddScheduledScenes()
 	if (!m_addingBackgroundScenes.empty()) {
 		for (const std::string& scenename : m_addingBackgroundScenes) {
 			const double start = PIL_check_seconds_timer();
-			KX_Scene *tmpscene = CreateScene(scenename);
+			KX_Scene *tmpscene = TakeOrConvertScene(scenename);
 
 			if (tmpscene) {
-				m_engine->GetConverter()->ConvertScene(tmpscene);
+				ResumeIfKept(tmpscene);
 				m_engine->GetScenes()->Insert(0, CM_AddRef(tmpscene));
 				PostProcessScene(tmpscene);
 				BL_LoadLog::Add(scenename, "add scene total (background)", PIL_check_seconds_timer() - start, "", true);
+				ProfileNoteScene(scenename, start);
 				tmpscene->Release();
 			}
 			else {
@@ -221,8 +258,8 @@ void KX_SceneScheduler::ReplaceScheduledScenes()
 						DestructScene(scene);
 
 						const double start = PIL_check_seconds_timer();
-						KX_Scene *tmpscene = CreateScene(blScene);
-						m_engine->GetConverter()->ConvertScene(tmpscene);
+						KX_Scene *tmpscene = TakeOrConvertScene(newscenename, blScene);
+						ResumeIfKept(tmpscene);
 
 						m_engine->GetScenes()->SetValue(sce_idx, CM_AddRef(tmpscene));
 						PostProcessScene(tmpscene);
@@ -273,6 +310,21 @@ bool KX_SceneScheduler::IsPending(const std::string& scenename) const
 void KX_SceneScheduler::StepPendingScenes()
 {
 	for (const std::pair<std::string, bool>& item : m_addingAsyncScenes) {
+		const auto prepared = m_preparedScenes.find(item.first);
+		if (prepared != m_preparedScenes.end()) {
+			KX_Scene *scene = prepared->second;
+			m_preparedScenes.erase(prepared);
+			ResumeIfKept(scene);
+			if (item.second) {
+				m_engine->GetScenes()->Add(CM_AddRef(scene));
+			}
+			else {
+				m_engine->GetScenes()->Insert(0, CM_AddRef(scene));
+			}
+			PostProcessScene(scene);
+			scene->Release();
+			continue;
+		}
 		KX_Scene *scene = CreateScene(item.first);
 		if (!scene) {
 			CM_Warning("scene " << item.first << " could not be found, not added!");
@@ -291,7 +343,7 @@ void KX_SceneScheduler::StepPendingScenes()
 	BL_Converter *converter = m_engine->GetConverter();
 	PendingScene& pending = m_pendingScenes.front();
 	const double stepStart = PIL_check_seconds_timer();
-	const bool done = converter->CompileSceneShaders(pending.m_scene, pending.m_material,
+	const bool done = converter->CompileSceneShaders(pending.m_scene, pending.m_material, pending.m_sent,
 	                                                 stepStart + converter->GetMergeFrameBudget());
 	pending.m_shaderTime += PIL_check_seconds_timer() - stepStart;
 	if (!done) {
@@ -299,6 +351,7 @@ void KX_SceneScheduler::StepPendingScenes()
 	}
 
 	KX_Scene *scene = pending.m_scene;
+	ProfileNoteScene(scene->GetName() + "(async)", stepStart);
 	BL_LoadLog::Add(scene->GetName(), "async shaders", pending.m_shaderTime);
 	BL_LoadLog::Add(scene->GetName(), "async scene total", PIL_check_seconds_timer() - pending.m_start, "", true);
 	CM_Message("[Load] async scene \"" << scene->GetName() << "\": " << pending.m_material << " materials, shaders "
@@ -323,6 +376,73 @@ void KX_SceneScheduler::DestructPendingScenes()
 	}
 	m_pendingScenes.clear();
 	m_addingAsyncScenes.clear();
+	for (const auto& item : m_preparedScenes) {
+		DestructScene(item.second);
+	}
+	m_preparedScenes.clear();
+	m_keptScenes.clear();
+	m_preloadingScenes.clear();
+}
+
+void KX_SceneScheduler::ResumeIfKept(KX_Scene *scene)
+{
+	const auto it = std::find(m_keptScenes.begin(), m_keptScenes.end(), scene->GetName());
+	if (it != m_keptScenes.end()) {
+		m_keptScenes.erase(it);
+		scene->Resume();
+	}
+}
+
+bool KX_SceneScheduler::PreloadScene(const std::string& scenename)
+{
+	if (!m_engine->GetConverter()->GetBlenderSceneForName(scenename)) {
+		return false;
+	}
+	std::lock_guard<std::mutex> lock(m_preloadingMutex);
+	if (std::find(m_preloadingScenes.begin(), m_preloadingScenes.end(), scenename) == m_preloadingScenes.end()) {
+		m_preloadingScenes.push_back(scenename);
+	}
+	return true;
+}
+
+void KX_SceneScheduler::PreloadScheduledScenes()
+{
+	// Converting a scene can queue more (its Scene actuators with Preload): those wait for the next frame.
+	std::vector<std::string> names;
+	{
+		std::lock_guard<std::mutex> lock(m_preloadingMutex);
+		names.swap(m_preloadingScenes);
+	}
+	for (const std::string& scenename : names) {
+		// Running, compiling or prepared already: nothing to do.
+		if (FindScene(scenename) || IsPending(scenename) || m_preparedScenes.find(scenename) != m_preparedScenes.end()) {
+			continue;
+		}
+		const double start = PIL_check_seconds_timer();
+		KX_Scene *scene = CreateScene(scenename);
+		if (!scene) {
+			continue;
+		}
+		m_engine->GetConverter()->ConvertScene(scene);
+		m_preparedScenes[scenename] = scene;
+		BL_LoadLog::Add(scenename, "preload scene total", PIL_check_seconds_timer() - start, "", true);
+		ProfileNoteScene(scenename + "(preload)", start);
+	}
+}
+
+KX_Scene *KX_SceneScheduler::TakeOrConvertScene(const std::string& scenename, Scene *blScene)
+{
+	const auto prepared = m_preparedScenes.find(scenename);
+	if (prepared != m_preparedScenes.end()) {
+		KX_Scene *scene = prepared->second;
+		m_preparedScenes.erase(prepared);
+		return scene;
+	}
+	KX_Scene *scene = blScene ? CreateScene(blScene) : CreateScene(scenename);
+	if (scene) {
+		m_engine->GetConverter()->ConvertScene(scene);
+	}
+	return scene;
 }
 
 void KX_SceneScheduler::ProcessScheduledScenes()
@@ -336,6 +456,7 @@ void KX_SceneScheduler::ProcessScheduledScenes()
 		AddScheduledScenes();
 	}
 	StepPendingScenes();
+	PreloadScheduledScenes();
 
 	if (m_engine->GetScenes()->Empty()) {
 		m_engine->RequestExit(KX_ExitInfo::NO_SCENES_LEFT);

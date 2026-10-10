@@ -40,7 +40,8 @@ não deu para testar.
   do **nome** (FNV-1a), com aviso; objetos com id salvo reivindicam primeiro, os demais em ordem de nome, então
   servidor e cliente chegam ao mesmo resultado com o mesmo `.range`. Objeto criado só por script usa o mesmo caminho.
 - **Esquema de propriedades** = propriedades de jogo com "Rep" ligado, na ordem da lista do objeto, só Boolean/Integer/Float
-  (string e timer ficam de fora; aviso). Float sai com 32 bits crus (a UI ainda não tem faixa/bits por propriedade).
+  (string e timer ficam de fora; aviso). Float sai com 32 bits crus, ou quantizado com "Bits/Min/Max" da propriedade
+  (`bProperty.net_bits/net_min/net_max`, `KX_NetworkManager::FloatQuantization`; faixa inválida avisa e fica crua).
 - **Cliente não simula.** Objetos replicados dinâmicos têm a dinâmica suspensa no cliente (`SuspendDynamics(false)`:
   ainda colidem, só os snapshots os movem) e voltam ao normal ao desconectar.
 - **Interpolação.** O cliente renderiza em `NetClock::renderTime` com `applyInterpolated`, e `applyLatest` enquanto o
@@ -58,26 +59,28 @@ não deu para testar.
 
 ## Dúvidas e decisões provisórias
 
-1. **Senha** (`host(password=)`, `join(password=)`): o `Hello` v1 não tem campo, então a senha é **ignorada com aviso** e
-   `discover_lan()` devolve `password=False`. Não fingi proteção. Decisão pendente de NOTES-D (7 `WrongPassword` + campo no `Hello`).
+1. **Senha** (`host(password=)`, `join(password=)`): **implementada** no protocolo v2 (NOTES-D resolvido). O `Hello`
+   ganhou `str password`; o servidor compara com `host(password=)` e recusa divergência com `7 WrongPassword`
+   (servidor sem senha = sala aberta, campo ignorado). `discover_lan()` reporta `password=True` quando a sala tem senha.
+   A senha viaja em claro (UDP/WS sem TLS): *gate* de acesso casual, não segurança real — o `host()` avisa isso.
 2. **Código de sala** (4–8 caracteres base 36) em `join()`: sem serviço de lobby não dá para resolver; `join()` avisa e devolve `False`.
 3. **`Server Name`**: virou `game_settings.network.server_name` (padrão "Anastacio Server"), como sugerido em NOTES-H.
 4. **`game_id`/`game_version`** entraram no painel (o handshake exige) em vez de ficarem fixos.
-5. **IPv6**: o núcleo só fala IPv4 (NOTES-C); `join("[::1]:7777")` é aceito pelo parser mas o ENet não conecta.
+5. **IPv6**: a API já aceita `join("[::1]:7777")` pela string; no build padrão (`ENET_IPV4_ONLY=ON`) o transporte ENet ainda recusa IPv6 de propósito. Num build dual-stack (`-DENET_IPV4_ONLY=OFF`, máquina com pilha IPv6) o `connect()` passa a conectar sem mudança de código (decisão 2026-10-05, ver seção "IPv6 no ENet/UDP").
 6. **Versão do DNA**: não mexi em `RANGE_MINSUBVERSION`; o bloco de versioning usa `DNA_struct_elem_find` (como os blocos vizinhos), então não depende do número.
 
 ## O que não está feito (e por quê)
 
-- **Servidor totalmente sem janela.** `RangeRuntime --server` (seção abaixo) já não desenha nem toca som, mas ainda abre
-  uma janela GL de 100×100: a conversão da cena compila materiais e cria buffers no OpenGL, e o GHOST desta base (2.79)
-  não tem contexto offscreen. No Linux ainda precisa de um display (`xvfb-run`). Tirar o GL de vez exigiria um caminho
-  de conversão sem rasterizer.
 - **Predição de corpos dinâmicos.** A predição move o objeto pela função de passo do jogo (cinemática); física do
   Bullet não é re-simulada no replay. Só o transform é previsto e comparado (as propriedades seguem o servidor, ver
   abaixo).
 - **Troca de cena durante a partida** (`SceneChange`): o cliente avisa e responde `SceneLoaded` para a mesma cena; seguir o servidor para outra não existe.
-- **Relevância por distância.** `Replicator::setClientView` não é chamado (tudo relevante); o painel só tem "Always Relevant".
-- **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o build Web não foi feito aqui.
+- **Relevância por distância** (2026-10-04). `Relevance Radius` da cena (0 = tudo); `UpdateClientViews` chama
+  `Replicator::setClientView` a cada tick com centro no primeiro objeto replicado do cliente (sem objeto: tudo
+  relevante). `net.set_client_view(client, center, radius)` sobrescreve (objeto seguido pelo net id ou posição fixa;
+  só raio mantém o centro padrão; sem argumentos volta ao padrão); a sobrescrita some quando o cliente sai.
+  Testado pelo cenário `relevance`; o centro automático (objeto do cliente) não tem cenário próprio.
+- **Web/Android.** O caminho (`createWebClientTransport`) está ligado sob `__EMSCRIPTEN__`, mas o runtime Web completo com rede não foi compilado aqui. O transporte em si foi testado no navegador real contra o servidor da engine (seção "Cliente no navegador").
 - **Editor completo no Linux**: ver "Testes" abaixo. Windows/MSVC validado em 2026-10-04 (seção "Windows").
 
 ## RPC do jogo e `obj.net`
@@ -215,7 +218,16 @@ sem ter sido enviada). Uso: `RangeRuntime --server [-p script.py] jogo.range`.
   aviso. Lógica, física e ações (poses) seguem rodando no tic rate; o **skinning da malha** (`UpdateAnimationDeformers`)
   é pulado, porque ninguém vê os vértices (física sobre malha deformada não acompanha a animação no servidor).
 - **Sem áudio.** O player força o dispositivo `None` do Audaspace.
-- **Janela mínima** (100×100, nunca tela cheia); um `-w` depois de `--server` vence.
+- **Sem janela (Linux).** `GHOST_ISystem::createSystemHeadless()` (`intern/ghost/intern/GHOST_SystemHeadless.h`): sistema
+  GHOST sem conexão com display; a "janela" é virtual e tem um contexto OpenGL **EGL surfaceless** do Mesa
+  (`EGL_MESA_platform_surfaceless`, perfil de compatibilidade). A conversão da cena e o `GPU_init` continuam tendo GL
+  corrente; o GLEW resolve as funções por `glXGetProcAddress`, que com o libglvnd despacha para o contexto EGL. O
+  `libEGL` é aberto por `dlopen` (o player não linka com ele; sem EGL/Mesa o `--server` falha ao criar a janela com
+  mensagem `GHOST headless: ...`). `run_net_test.sh` sobe o `--server` sem xvfb e com `DISPLAY` removido.
+- **Sem janela visível (Windows).** Desde 2026-10-05, `createSystemHeadless()` cria `GHOST_SystemWin32(true)`: o
+  player ainda usa uma janela Win32/WGL real para inicializar OpenGL, mas ela nasce como `WS_POPUP` oculta e não chama
+  `ShowWindow()`. Validação por `EnumWindows` no PID do servidor: 3 janelas top-level criadas, 0 visíveis.
+  macOS ainda cai no sistema normal.
 - **Dedicated.** Com `--server`, `host()` e o modo Host da cena abrem a sala como Dedicated (sem jogador do host no lobby).
   `join()` funciona, com aviso (um cliente que não desenha só serve de bot).
 - **Pausa entre quadros.** O laço de recuperação de `UpdateSleepTime()` converte a espera em milissegundos inteiros e
@@ -234,10 +246,9 @@ Medido no Linux (4 núcleos, llvmpipe, `halfanim_crash.range` com armaduras, ser
 Ou seja, ~0,13 núcleo em regime contra ~1 núcleo no modo normal. Antes do `ServerSleep()` e do corte do skinning o
 `--server` gastava ~1,6 núcleo (dois terços no skinning das armaduras).
 
-**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`): passou de primeira, sem o problema de
-janela GL offscreen que trava o Linux sem xvfb (o GHOST do Windows abre a janela 320×240 sem bloquear mesmo em
-`--server`). `headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web
-(sem sentido para servidor).
+**Windows/MSVC validado** (2026-10-04, `run_net_test_win.sh server`) e revalidado em 2026-10-05 com janela oculta:
+`headless=True`, não renderiza, hospeda como Dedicated — tudo igual ao Linux. Não testado: Android/Web (sem sentido
+para servidor).
 
 ## Validado no Windows/MSVC (2026-10-04)
 
@@ -349,3 +360,56 @@ em vez de um único arquivo compartilhado).
 - Resta um viés por rodada na estimativa do relógio (offset dos `Pong`). Próximo passo proposto: o servidor devolver a folga medida (por exemplo, no `Pong` ou numa mensagem nova) e o cliente ajustar a margem por ela; é mudança de protocolo, então fica para uma tarefa própria.
 - **Feito com a mensagem `201 InputTiming`** (contrato fechado em 2026-10-04, `docs/multiplayer-protocol.md` seção 5, após o `predict` passar no Windows: 5 rodadas PASS, erro 0, 0 correções) (S→C, canal 2, a cada 15 ticks): `InputQueue::slack()` suaviza a folga de cada `Input` recebido; `KX_NetworkManager::SendInputTiming()` manda a cada cliente; o cliente chama `NetClock::addInputSlack()`, que move o adiantamento 30% do erro em relação ao alvo de 3 ticks por relato (limitado a ±1 s). `prediction_stats(obj)` ganhou `lead_adjust`. Em 8 rodadas do `predict`: todas PASS com erro máximo 0 e 0 correções; `lead_adjust` final de −2,4 a +3,5 ticks (o viés de cada rodada); `late` 3 a 21 por rodada, sem correção. Testes do núcleo: 113 PASS (build `NET_STANDALONE`).
 - **De onde vêm os `late` restantes** (2026-10-04, log temporário em `InputQueue::receive`, 7 rodadas PASS): 0 a 11 por rodada, espalhados pela rodada inteira (não só na convergência); todos são o bloco de **1 ou 2 ticks** antes do `nextTick`, quase sempre numa mensagem cujo `newestTick` já está à frente (folga média 2 a 3,3 no momento). Ou seja: o pacote original daquele tick e as cópias redundantes seguintes não chegaram a tempo (perda de 1% do simulador ou um quadro atrasado), não um viés do relógio. Nenhum gerou correção. Decisão: alvo (3) e ganho (0,3) ficam; não vale subir o alvo (custa latência sempre para cobrir um tick raro). **Causa confirmada** (mesmo dia): com perda 0 (`net-sim 40,5,0`) o Linux ainda dá 5 a 8 `late` por rodada (com 1%: 9 a 12), e a redundância de 8 blocos torna impossível um `late` só por perda de 1%; logo são soluços de agendamento do container (4 vCPUs, servidor e cliente na mesma máquina), não perda. No Windows (máquina dedicada) o `predict` deu `late` 0 em 5 rodadas, PASS, 0 correções: coerente, não é falha da contagem (a lógica de `late` é a mesma nas duas plataformas).
+
+## Predição de corpo dinâmico e IPv6 (2026-10-04)
+- Cliente dono reativa a física do corpo previsto (`SetDynamicPredicted`); grava o estado após o Bullet em `ClientTickEnd`; replay = passo + `pos += v*dt`; reconcilia só o transform. Validado com `run_net_test.sh predict-cube`. Veículo não funciona (suspensão por raycast não é refeita no replay).
+- Objetos da cena com dono: `Ownership` reenviado quando o cliente fica ativo.
+- IPv6 só no WebSocket (dual-stack, `AF_UNSPEC`); ENet 1.3.x é só IPv4 e recusa literal IPv6.
+
+## Cliente no navegador (2026-10-05)
+
+`tools/net_engine_test/run_net_web_test.sh <dir do build wasm>`: o `RangeRuntime --server` roda `net_web_server.py`
+(hospeda com `websocket_port`, replica o Spawner e cria o Rig quando alguém entra) e o Chromium headless abre
+`net_web_watch.html` (`Network/tools/net_web_watch.cpp`), servido por `python3 -m http.server`. O cliente wasm usa
+`ClientSession` + `createWebClientTransport`, o mesmo caminho do runtime Web.
+
+- O cliente avulso precisa do hash da cena: o servidor agora o imprime no log de "network: hosting" (`scene hash <hex>`).
+- `gameVersion` padrão da engine é 1 (`Hello` com 0 é recusado com `VersionMismatch`, foi o primeiro erro).
+- Build: `emcmake cmake -S source/source/gameengine/Network -B <dir> -DNET_STANDALONE=ON && cmake --build <dir> --target net_web_watch`
+  (Emscripten 6.0.11). Driver: `NODE_PATH` com `playwright`.
+- Resultado: 3 rodadas PASS (1 Spawn, 40 snapshots, 8 distintos; o servidor vê "browser" entrar e ficar).
+- Falta: compilar o runtime Web completo com `ge_network` e jogar uma cena replicada no navegador.
+
+## Troca de cena durante a partida (2026-10-05)
+
+`net.change_scene("Arena2")` (só servidor) troca a cena de todos; clientes conectados recebem `on_scene`, e quem entra depois já é levado para a cena atual. Teste: `run_net_test.sh scene-change` (servidor + cliente + cliente atrasado, PASS). Cuidado ao gerar cenas por script: um objeto ligado a uma cena que não é a do contexto precisa de `scene.object_bases[nome].layers`, porque `Object.layers` só muda a base da cena do contexto; sem isso o protótipo fica numa camada visível e `net.spawn` não o acha.
+
+## IPv6 no ENet/UDP — investigação (2026-10-05)
+
+O ENet vendorizado (`source/extern/enet`, 1.3.18) é IPv4-only de verdade: `ENetAddress.host` é `enet_uint32` (32 bits), usado em `host.c`, `peer.c`, `protocol.c`, `unix.c`, `win32.c`. Não cabe endereço IPv6; não dá para "patchear" a struct sem reescrever esses arquivos inteiros.
+
+Decisão (com o usuário): usar um fork pronto em vez de portar a struct na mão. Candidato avaliado: [`zpl-c/enet`](https://github.com/zpl-c/enet) — single-header (~5300 linhas), `ENetAddress.host` vira `struct in6_addr` (16 bytes), dual-stack real com mapeamento IPv4↔IPv6 embutido (`enet_inaddr_map4to6`/`map6to4`), `ENET_SOCKOPT_IPV6_V6ONLY` desligado por padrão (aceita IPv4 e IPv6 no mesmo socket). API muito parecida com o ENet clássico.
+
+Superfície de contato no engine (fora do próprio vendor do ENet): só **um** ponto, `NET_TransportENet.cpp:80` (`address.host = ENET_HOST_ANY;`), que o fork também define — baixo risco de regressão na engine em si.
+
+Trabalho restante (não feito ainda, fica para quando houver crédito/prioridade):
+1. ~~Trocar `source/extern/enet` pelo header do `zpl-c/enet`~~ **Feito (2026-10-05, Linux).**
+2. ~~Ajustar `CMakeLists.txt`~~ **Feito (2026-10-05).**
+3. ~~Recompilar e rodar a regressão IPv4~~ **Feito no Linux (2026-10-05).** Falta MSVC e wasm32.
+4. Testar `::1` numa máquina com IPv6 de fato.
+5. ~~Decidir se `net.host`/`net.join` expõem IPv6 na API Python~~ **Decidido (2026-10-05): transparente, pela string de endereço, sem parâmetro novo — ver abaixo.**
+
+### Troca de vendor concretizada (2026-10-05, Linux)
+
+- `source/extern/enet/include/enet/enet.h` substituído pelo header único do `zpl-c/enet` (upstream, sem modificações). Removidos os antigos `.c`/`.h` multi-arquivo (`host.c`, `peer.c`, `protocol.c`, `unix.c`, `win32.c`, `list.c`, `packet.c`, `compress.c`, `callbacks.c` e headers correspondentes).
+- Adicionado `source/extern/enet/enet_impl.c` (Blender-added): única TU que faz `#define ENET_IMPLEMENTATION` antes de incluir `enet.h`, como a lib exige para single-header.
+- `CMakeLists.txt` do vendor reescrito para biblioteca header-only (não precisa mais dos `check_function_exists`/`check_struct_has_member` do ENet clássico — o fork resolve isso internamente nas macros do próprio header).
+- **Achado importante:** o fork, por padrão, cria socket dual-stack (`AF_INET6`, `ENET_HOST_ANY = in6addr_any`). A sandbox Linux de build não tem suporte a IPv6 no kernel/container (`AF_INET6` nem existe: `socket.socket(AF_INET6, ...)` dá `OSError: Address family not supported by protocol`), e nesse modo o `host()` falhava silenciosamente com "could not listen on port NNNN (in use?)" — mensagem enganosa, a causa real é a ausência de pilha IPv6, não a porta.
+- Como o engine ainda não expõe IPv6 na API (`net.host`/`net.join` — isso é o item 5 da lista acima, ainda não decidido), optei por manter o comportamento **IPv4-only** por enquanto: adicionada a opção de CMake `ENET_IPV4_ONLY` (ON por padrão) que define a macro `ENET_IPV4_ONLY` do fork como `PUBLIC` no target `extern_enet` (precisa ser `PUBLIC`, não `PRIVATE`: a macro muda o layout de `ENetAddress`, que `NET_TransportENet.cpp` também inclui/usa — se divergisse entre a lib e o consumidor seria ODR violation/corrupção de memória).
+- Com `ENET_IPV4_ONLY` ligado, `ENetAddress.host` volta a ser `in_addr` de 32 bits, idêntico em layout/semântica ao vendor antigo — o fork aqui é um drop-in replacement puro, sem mudar nada de observável.
+- **Regressão completa no Linux, build incremental (`build-linux` e `build-linux-editor`, sem rebuild total):** `spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`, `scene-change`, `predict-cube`, `car` — **todos PASS** (`PYTHONPATH=/opt/py311-site tools/net_engine_test/run_net_test.sh <cenário>`).
+- Um warning novo e inofensivo no build: `enumeration value 'ENET_EVENT_TYPE_DISCONNECT_TIMEOUT' not handled in switch` em `NET_TransportENet.cpp:161` (o fork tem um valor de enum a mais que o ENet clássico não tinha; o `switch` não trata esse caso, mas não quebra nada — o `default`/fallthrough já cobria antes). ~~Não corrigido ainda, é cosmético.~~ **Corrigido (2026-10-05):** ver abaixo.
+- **Validação wasm32 (2026-10-05):** `emcmake cmake -S source/source/gameengine/Network -B build-wasm -DNET_STANDALONE=ON -DCMAKE_BUILD_TYPE=Release && cmake --build build-wasm && ctest --test-dir build-wasm` (Emscripten 6.0.11, Node.js, CI filter=core tests sem sockets/ENet). Resultado: **PASS** (`net_tests.js` com 100% testes passando em 0,18 seg). O mesmo warning do switch em `NET_TransportENet.cpp:161` apareceu (cosmético, corrigido depois — ver abaixo).
+- **Correção do warning do switch (2026-10-05):** `NET_TransportENet.cpp:161` passou a tratar `ENET_EVENT_TYPE_DISCONNECT_TIMEOUT` com o mesmo `case` de `ENET_EVENT_TYPE_DISCONNECT` (peer cai por timeout sem um disconnect limpo — o tratamento correto é idêntico: reportar `Disconnected` e limpar o peer). Revalidado: build sem warnings e testes 100% PASS em Linux (`build-linux`, 0,30 s) e wasm32 (`build-wasm`/Emscripten 6.0.11, 0,18 s).
+- **API Python de IPv6 — decidida (2026-10-05):** fica **transparente pela própria string de endereço**, sem parâmetro novo. `net.join("[::1]:7777")` já é documentado e já era parseado por `ParseAddress()` em `KX_PyNetwork.cpp` (aceita `host`, `host:port`, `[v6]:port` e já tira os colchetes antes de chegar ao transporte); `net.host(port=...)` já faz bind em `ENET_HOST_ANY` (= `in6addr_any` no modo dual-stack). O único ponto que bloqueava IPv6 em runtime era o guard em `NET_TransportENet.cpp::connect()`, que rejeitava qualquer `:` no endereço (e cujo comentário ainda citava, erradamente, "the bundled ENet (1.3.x)"). Esse guard virou condicional (`#ifdef ENET_IPV4_ONLY`): no build IPv4-only atual o comportamento é idêntico; num build dual-stack (`-DENET_IPV4_ONLY=OFF`) o `connect()` entrega o endereço ao `enet_address_set_host` do fork e o IPv6 passa a funcionar ponta-a-ponta sem mais mudança de código. Revalidado: `ENET_IPV4_ONLY=ON` compila 0 warnings e passa 100% no `ctest`; `ENET_IPV4_ONLY=OFF` **compila** limpo (0 warnings) — runtime `::1` ainda depende de máquina com pilha IPv6.
+- **Ainda não feito:** rebuild/teste no Windows (MSVC); teste de conectividade `::1` real (precisa desligar `ENET_IPV4_ONLY` e rodar numa máquina com IPv6 disponível — o código já está pronto).

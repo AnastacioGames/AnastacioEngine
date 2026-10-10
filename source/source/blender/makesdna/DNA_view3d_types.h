@@ -314,6 +314,8 @@ typedef struct View3D {
 #define V3D_LOD_INVISIBLE_SHOW		(1 << 20)
 #define V3D_ALWAYS_RENDER	        (1 << 21)
 #define V3D_SHOW_TRANSFORM_VALUES	(1 << 22) /* show rotate/scale value next to the pivot while transforming */
+#define V3D_FLOATING_CONTROLS_IN_HEADER	(1 << 23)
+#define V3D_HIDE_FLOATING_DEBUG_CONTROLS	(1 << 24)
 
 
 /* View3D->around */

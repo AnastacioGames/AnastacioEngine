@@ -53,17 +53,20 @@ SG_Frustum::TestType SG_Frustum::PointInsideFrustum(const mt::vec3& point) const
 
 SG_Frustum::TestType SG_Frustum::SphereInsideFrustum(const mt::vec3& center, float radius) const
 {
+	/* Check every plane before answering INTERSECT: a sphere crossing one plane can still be
+	 * fully outside another, and INTERSECT sends the caller to the costlier box test. */
+	TestType result = INSIDE;
 	for (const mt::vec4& plane : m_planes) {
 		const float distance = planeSide(plane, center);
 		if (distance < -radius) {
 			return OUTSIDE;
 		}
-		else if (fabs(distance) <= radius) {
-			return INTERSECT;
+		else if (distance <= radius) {
+			result = INTERSECT;
 		}
 	}
 
-	return INSIDE;
+	return result;
 }
 
 SG_Frustum::TestType SG_Frustum::BoxInsideFrustum(const std::array<mt::vec3, 8>& box) const

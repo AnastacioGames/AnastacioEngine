@@ -33,28 +33,31 @@ class INFO_HT_header(Header):
 
         row = layout.row(align=True)
 
-        INFO_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            INFO_MT_editor_menus.draw_collapsible(context, layout)
 
         if window.screen.show_fullscreen:
             layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
         else:
-            row = layout.row(align=True)
-            if context.user_preferences.view.screen_selector == 'CLASSIC':
-                layout.template_ID(window, "screen", new="screen.new", unlink="screen.delete")
-            else:
-                row.template_screen_tabs()
-                row.operator("screen.new", text="", icon='ZOOMIN')
-                # Delete via right-click on a tab (context menu).
+            if context.space_data.show_screen_selector:
+                row = layout.row(align=True)
+                if context.user_preferences.view.screen_selector == 'CLASSIC':
+                    layout.template_ID(window, "screen", new="screen.new", unlink="screen.delete")
+                else:
+                    row.template_screen_tabs()
+                    row.operator("screen.new", text="", icon='ZOOMIN')
+                    # Delete via right-click on a tab (context menu).
             # Scene add/copy/delete moved into the Outliner header, next to
             # the "Scenes" root (see OUTLINER_MT_scene_add in
             # space_outliner.py). Deleting a scene is done via right-click
             # on the scene entry in the Outliner.
-            # layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
+            if context.space_data.show_scene_selector:
+                layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
 
         layout.separator_spacer()
 
         layout.operator("wm.splash", text="", icon='BLENDER', emboss=False)
-        layout.operator("wm.splash_about", text="Range Engine - Custom Version", emboss=False)
+        layout.operator("wm.splash_about", text="Anastacio Engine - Custom Version", emboss=False)
 
         layout.separator_spacer()
 
@@ -80,6 +83,11 @@ class INFO_HT_header(Header):
         layout.separator_spacer()
 
         layout.template_running_jobs()
+        wm = context.window_manager
+        if getattr(wm, "ae_bake_status", ""):  # Bake Lightmap (anastacio_lightmap.py)
+            row = layout.row()
+            row.ui_units_x = 14
+            row.prop(wm, "ae_bake_progress", text=wm.ae_bake_status, slider=True)
         layout.template_reports_banner()
 
         layout.separator(factor=1)

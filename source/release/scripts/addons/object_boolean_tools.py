@@ -1280,13 +1280,13 @@ class PREFS_BoolTool_Props(AddonPreferences):
         layout = self.layout
         split_percent = 0.3
 
-        split = layout.split(percentage=split_percent)
+        split = layout.split(factor=split_percent)
         col = split.column()
         col.label(text="Tab Category:")
         col = split.column()
         col.prop(self, "category", text="")
 
-        split = layout.split(percentage=split_percent)
+        split = layout.split(factor=split_percent)
         col = split.column()
         col.label("Experimental Features:")
         col = split.column()

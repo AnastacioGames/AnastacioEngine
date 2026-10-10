@@ -34,7 +34,8 @@ class OUTLINER_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
 
         # Like Blender 2.8: "New Collection" button next to the menus.
         if space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
@@ -149,14 +150,17 @@ class OUTLINER_MT_collection(Menu):
     def draw(self, context):
         layout = self.layout
 
+        layout.operator_context = 'INVOKE_DEFAULT'
         layout.operator("outliner.collection_new", text="New Collection", icon='NEWFOLDER').nested = True
         layout.operator("outliner.collection_new", text="New Collection at Root").nested = False
         layout.operator("outliner.collection_delete", text="Delete Collection")
+        layout.operator_context = 'EXEC_DEFAULT'
 
         layout.separator(factor=1)
 
         layout.operator("outliner.collection_objects_select", text="Select Objects")
         layout.operator_menu_enum("outliner.collection_move_objects", "collection", text="Move Objects to Collection")
+        layout.operator_menu_enum("outliner.collection_move_scenes", "collection", text="Move Scenes to Collection")
 
         layout.separator(factor=1)
 

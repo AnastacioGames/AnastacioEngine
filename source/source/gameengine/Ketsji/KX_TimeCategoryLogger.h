@@ -108,6 +108,9 @@ public:
 	 */
 	double GetAverage(TimeCategory tc);
 
+	/// Time of the given category in the last finished measurement.
+	double GetLast(TimeCategory tc);
+
 	/**
 	 * Returns average for grand total.
 	 */

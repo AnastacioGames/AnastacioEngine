@@ -172,7 +172,7 @@ bool KX_SceneActuator::Update()
 		}
 		case KX_SCENE_REMOVE_SCENE:
 		{
-			m_KetsjiEngine->RemoveScene(m_nextSceneName);
+			m_KetsjiEngine->RemoveScene(m_nextSceneName, m_keep);
 			break;
 		}
 		case KX_SCENE_SUSPEND:

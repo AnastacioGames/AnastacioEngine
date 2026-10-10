@@ -116,6 +116,11 @@ typedef struct {
   int rain_lightning_uniform;
   int rain_streak_width_uniform;
   int rain_ripple_normal_uniform;
+  int rain_params5_uniform;
+  int rain_puddle1_uniform;
+  int rain_puddle2_uniform;
+  int rain_sky_horizon_uniform;
+  int rain_sky_zenith_uniform;
 } GPURAINShaderInterface;
 
 typedef struct {
@@ -1368,6 +1373,8 @@ bool GPU_fx_do_composite_pass(
 			    world->rain_splash_size, world->rain_splash_rate, world->rain_splash_intensity};
 			float rain_streak_width = (world->rain_streak_width > 0.0f) ? world->rain_streak_width : 1.0f;
 			float rain_ripple_normal = (world->rain_ripple_normal > 0.0f) ? world->rain_ripple_normal : 1.0f;
+			float rain_params5[4] = {world->rain_ripple_size, world->rain_ripple_rate,
+			                         world->rain_splash_normal, world->rain_splash_min_up};
 			float rain_lightning[4] = {0.0f, 0.0f, 0.5f, 0.5f};
 			unsigned int lightning_seed;
 			if ((world->weather_flag & WO_WEATHER_RAIN_LIGHTNING) &&
@@ -1382,7 +1389,8 @@ bool GPU_fx_do_composite_pass(
 				const float clip_end = is_persp ? projmat[3][2] / (projmat[2][2] + 1.0f) : 0.0f;
 				invert_m4_m4(viewinv, viewmat);
 				BKE_rain_lightning_view_bolt(lightning_seed, viewinv, clip_end, world->rain_lightning_distance,
-				                             world->rain_lightning_width, &bolt);
+				                             world->rain_lightning_width,
+				                             (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &bolt);
 				mul_m4_m4m4(persmat, projmat, viewmat);
 				copy_v3_v3(co, bolt.center);
 				co[3] = 1.0f;
@@ -1399,6 +1407,14 @@ bool GPU_fx_do_composite_pass(
 				rain_lightning[1] = 0.0f;
 			}
 			float rain_style = (world->rain_style == WO_RAIN_STYLE_VOLUMETRIC) ? 1.0f : 0.0f;
+			float rain_puddle1[4] = {(world->weather_flag & WO_WEATHER_RAIN_PUDDLES) ?
+			                         1.0f + ((world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) ? 1.0f : 0.0f) +
+			                         ((world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) ? 2.0f : 0.0f) : 0.0f,
+			                         world->rain_puddle_amount, world->rain_puddle_size, world->rain_puddle_darkness};
+			float rain_puddle2[4] = {world->rain_puddle_reflection, world->rain_puddle_distance,
+			                         world->rain_puddle_min_up, (world->weather_flag & WO_WEATHER_RAIN_PUDDLE_SSR) ? 1.0f : 0.0f};
+			float rain_sky_horizon[3] = {world->horr, world->horg, world->horb};
+			float rain_sky_zenith[3] = {world->zenr, world->zeng, world->zenb};
 
 			GPURAINShaderInterface *interface = GPU_shader_get_interface(rain_shader);
 
@@ -1420,6 +1436,11 @@ bool GPU_fx_do_composite_pass(
 			GPU_shader_uniform_vector(rain_shader, interface->rain_lightning_uniform, 4, 1, rain_lightning);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_streak_width_uniform, 1, 1, &rain_streak_width);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_ripple_normal_uniform, 1, 1, &rain_ripple_normal);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_params5_uniform, 4, 1, rain_params5);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_puddle1_uniform, 4, 1, rain_puddle1);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_puddle2_uniform, 4, 1, rain_puddle2);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_horizon_uniform, 3, 1, rain_sky_horizon);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_zenith_uniform, 3, 1, rain_sky_zenith);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2220,6 +2241,11 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_lightning_uniform = GPU_shader_get_uniform(shader, "rain_lightning");
 			interface->rain_streak_width_uniform = GPU_shader_get_uniform(shader, "rain_streak_width");
 			interface->rain_ripple_normal_uniform = GPU_shader_get_uniform(shader, "rain_ripple_normal");
+			interface->rain_params5_uniform = GPU_shader_get_uniform(shader, "rain_params5");
+			interface->rain_puddle1_uniform = GPU_shader_get_uniform(shader, "rain_puddle1");
+			interface->rain_puddle2_uniform = GPU_shader_get_uniform(shader, "rain_puddle2");
+			interface->rain_sky_horizon_uniform = GPU_shader_get_uniform(shader, "rain_sky_horizon");
+			interface->rain_sky_zenith_uniform = GPU_shader_get_uniform(shader, "rain_sky_zenith");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

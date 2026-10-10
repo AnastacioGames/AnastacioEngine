@@ -140,6 +140,8 @@ protected:
 	bool m_dirty;
 	/// Owner label used only in Web diagnostics (Module.onDiagnostic); not part of shader behaviour.
 	std::string m_diagnosticName;
+	/// The program binary can go to / come from the shader cache (never relinked with other attributes).
+	bool m_binaryCache;
 
 	// Stored uniform variables
 	RAS_UniformVec m_uniforms;

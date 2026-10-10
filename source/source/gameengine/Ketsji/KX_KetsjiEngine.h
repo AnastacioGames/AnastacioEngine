@@ -264,9 +264,8 @@ private:
 	/// maximum number of consecutive logic frame
 	int m_maxLogicFrame;
 
-	/// Plano 8: fixed-timestep accumulator. Disabled since 2026-09-26: LA_Launcher always
-	/// passes false (the fixed-rate physics needs one step per frame), so the path below is
-	/// inert. See docs/ketsji-engine-modernization-plan.md, Plano 8.
+	/// Plano 8: fixed-timestep accumulator, set from the scene's Fixed Timestep option and
+	/// turned on by the multiplayer session. See docs/ketsji-engine-modernization-plan.md, Plano 8.
 	/// When false, NextFrame() keeps the legacy single Update() call per frame with
 	/// catch-up handled by sleeping in UpdateSleepTime(), exactly as before this flag
 	/// existed. When true, NextFrame() accumulates real elapsed time (scaled by
@@ -372,6 +371,8 @@ private:
 	void ClockTiming();
 	void FrameOver();
 	void FrameTiming();
+	/// Advance the logic, frame and animation clocks by one logic step.
+	void AdvanceStepTime();
 	void UpdateDynamicResolution();
 public:
 	/// It is necessary to make the function public so that the debug mode can use it
@@ -401,7 +402,8 @@ public:
 		tc_collisiondepth, // GPU particle screen-space collision depth pass
 		tc_texturerenderers, // KX_TextureRendererManager (planar/mirror probes) draw
 		tc_particles, // KX_Scene::UpdateGpuParticleEmitters
-		tc_actuators, // SCA_LogicManager::UpdateFrame (actuators), via KX_Scene::LogicUpdateFrame
+		tc_components, // KX_PythonComponentManager::UpdateComponents (Python components), in KX_Scene::LogicUpdateFrame
+		tc_actuators, // SCA_LogicManager::UpdateFrame (actuators) + 3D audio update, in KX_Scene::LogicUpdateFrame
 		tc_input, // input polling + ImGui NextFrame/ProcessInputEvents, in NextFrame()
 		tc_scenegraph_logic, // UpdateParents() after LogicBeginFrame, before actuators
 		tc_scenegraph_actuators, // UpdateParents() after actuators, before physics
@@ -617,8 +619,11 @@ public:
 	KX_Scene *FindScene(const std::string& scenename);
 	void AddScene(KX_Scene *scene);
 	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
+	/// See KX_SceneScheduler::PreloadScene.
+	bool PreloadScene(const std::string& scenename);
 
-	void RemoveScene(const std::string& scenename);
+	/// keep: see KX_SceneScheduler::RemoveScene.
+	void RemoveScene(const std::string& scenename, bool keep = false);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);
 	void SuspendScene(const std::string& scenename);
 	void ResumeScene(const std::string& scenename);
@@ -816,5 +821,10 @@ public:
 	 */
 	void Resize();
 };
+
+/** RANGE_ANIM_LOG=<file>: timing log of the game clocks and the actions (to chase animations that skip).
+ * Appends a printf line with the real time since the process started. */
+bool KX_AnimLogEnabled();
+void KX_AnimLog(const char *fmt, ...);
 
 #endif  /* __KX_KETSJIENGINE_H__ */

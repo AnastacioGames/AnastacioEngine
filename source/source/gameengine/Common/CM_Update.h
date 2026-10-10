@@ -2,6 +2,7 @@
 #define __CM_UPDATE_H__
 
 #include "CM_List.h"
+#include "CM_WorkCounters.h"
 
 #include <vector>
 
@@ -98,6 +99,7 @@ public:
 
 	void NotifyUpdate(unsigned int flag)
 	{
+		CM_WorkCount(CM_WORK_UPDATE_NOTIFIES);
 		for (ClientType *client : m_clients) {
 			client->m_invalid |= (flag & client->m_filter);
 		}

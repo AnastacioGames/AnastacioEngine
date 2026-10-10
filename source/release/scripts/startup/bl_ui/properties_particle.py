@@ -1678,7 +1678,7 @@ _GPU_DEBUG_SIDECAR_NAME = "gpu_particles_debug.json"
 
 def _gpu_debug_sidecar_path():
     """Fase L: JSON sidecar written by particle_debug_overlay_component.py's "Apply to
-    .blend" button when running standalone (RangeRuntime.exe, no bpy available there)."""
+    .blend" button when running standalone (AnastacioRuntime.exe, no bpy available there)."""
     if not bpy.data.filepath:
         return None
     return os.path.join(os.path.dirname(bpy.data.filepath), _GPU_DEBUG_SIDECAR_NAME)

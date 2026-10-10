@@ -80,6 +80,20 @@ físico ligado. Os dois esperam a cena de `tools/tests/web_profile/make_pad_proj
 
 ## Requisitos de hospedagem
 
+### Teste auditivo de Reverb Area
+
+`RangeEngine -b --python tools/create_web_reverb_ab_scene.py` gera
+`build-web/reverb-ab/reverb-ab.range`, com WAV empacotado e som harmônico contínuo.
+Exporte com `package-web.py --game build-web/reverb-ab/reverb-ab.range --name reverb-ab
+--version 0.1.1 --runtime-dir build-web-release/bin`. Para mostrar o estado, inclua
+`tools/web/reverb-ab-status.js` no fim do HTML; a indicação acompanha o log real da engine.
+Reverb solicitado: gain 1, decaimento 10 s, reflexões 3 e cauda 10 (versão 0.1.1).
+O listener fica fixo e a área CAVERN entra/sai a cada dois segundos, preservando a fonte e seu volume.
+`node tools/web/verify-reverb-ab.cjs <url>` verifica estados, intervalos e saída AudioWorklet;
+requer Edge e a instalação local de playwright-core em `debug-logs/atlas-browser/node_modules/`.
+EFX não está disponível no backend Web SDL: alternar os parâmetros não comprova efeito no som.
+A confirmação auditiva deve distinguir reprodução do som de aplicação real do reverb.
+
 - Servidor estático com `.wasm` como `application/wasm`; habilitar gzip/brotli em `.wasm`/`.js`/`.data`.
 - Compressão medida (gzip nível 6): `.wasm` 20,3 → 8,0 MiB, `.data` 24,8 → 8,4 MiB, `.js` 0,9 → 0,2 MiB; o download
   cai de ~46 para ~17 MiB. Receitas por host (Netlify, GitHub Pages, itch.io, nginx, Apache) e o `curl -sI` de conferência

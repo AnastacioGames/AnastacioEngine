@@ -656,8 +656,18 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 {
 	View& view = m_views[eye];
 
-	// Update modelview everytime.
-	view.modelview = rasty->GetViewMatrix(stereoMode, eye, GetWorldToCamera(), m_camdata.m_perspective);
+	// Update modelview everytime, the frustum is rebuilt only when it changed.
+	const mt::mat4 modelview = rasty->GetViewMatrix(stereoMode, eye, GetWorldToCamera(), m_camdata.m_perspective);
+	bool changed = false;
+	for (int col = 0; col < 4 && !changed; ++col) {
+		for (int row = 0; row < 4; ++row) {
+			if (modelview(row, col) != view.modelview(row, col)) {
+				changed = true;
+				break;
+			}
+		}
+	}
+	view.modelview = modelview;
 
 	// Update projection when setting changed.
 	if (view.projectionDirty) {
@@ -712,9 +722,12 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 		}
 
 		view.projectionDirty = false;
+		changed = true;
 	}
-	// Ask to rebuild the frustum as the projection and/or modelview changed.
-	view.frustumDirty = true;
+	// Ask to rebuild the frustum only when the projection and/or modelview changed.
+	if (changed) {
+		view.frustumDirty = true;
+	}
 }
 
 /**
@@ -1322,6 +1335,9 @@ int KX_Camera::pyattr_set_lens(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_D
 		return PY_SET_ATTR_FAIL;
 	}
 
+	if (self->m_camdata.m_lens == param) {
+		return PY_SET_ATTR_SUCCESS;
+	}
 	self->m_camdata.m_lens = param;
 	self->InvalidateProjectionMatrix();
 	return PY_SET_ATTR_SUCCESS;
@@ -1350,6 +1366,9 @@ int KX_Camera::pyattr_set_fov(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DE
 	float width = self->m_camdata.m_sensor_x;
 	float lens = width / (2.0f * tanf(0.5f * DEG2RADF(fov)));
 
+	if (self->m_camdata.m_lens == lens) {
+		return PY_SET_ATTR_SUCCESS;
+	}
 	self->m_camdata.m_lens = lens;
 	self->InvalidateProjectionMatrix();
 	return PY_SET_ATTR_SUCCESS;

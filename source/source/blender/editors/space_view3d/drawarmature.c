@@ -66,6 +66,8 @@
 
 /* global here is reset before drawing each bone */
 static ThemeWireColor *bcolor = NULL;
+/* object wire color while drawing pose bones, outlines solid bones in object mode */
+static const unsigned char *bone_object_wire_col = NULL;
 
 /* values of colCode for set_pchan_glcolor */
 enum {
@@ -310,6 +312,110 @@ static const float cube[8][3] = {
 	{ 1.0,  1.0, -1.0},
 };
 
+/* Blender 5 style solid bone shading (overlay_armature_shape_solid_vert.glsl): no GL lighting,
+ * each vertex mixes a darker shade with the bone color by its view space normal against a light
+ * slightly off the view axis. bone_shade_begin() takes the current GL color as bone color. */
+static struct {
+	float color[4], hint[3], normal_mat[3][3];
+} bone_shade;
+
+static void bone_shade_begin(void)
+{
+	float modelview[4][4];
+
+	glGetFloatv(GL_CURRENT_COLOR, bone_shade.color);
+	glGetFloatv(GL_MODELVIEW_MATRIX, (float *)modelview);
+	copy_m3_m4(bone_shade.normal_mat, modelview);
+	invert_m3(bone_shade.normal_mat);
+	transpose_m3(bone_shade.normal_mat);
+	/* darker shade of the bone color for the faces turned away from the light */
+	mul_v3_v3fl(bone_shade.hint, bone_shade.color, 0.35f);
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+}
+
+static void bone_shade_end(void)
+{
+	glColor4fv(bone_shade.color);
+	GPU_basic_shader_bind(GPU_SHADER_LIGHTING | GPU_SHADER_USE_COLOR);
+}
+
+static void bone_shade_normal(const float no[3])
+{
+	const float light[3] = {0.1f, 0.1f, 0.8f};
+	const float s = 0.2f;
+	float n[3], col[3], fac;
+
+	mul_v3_m3v3(n, bone_shade.normal_mat, no);
+	normalize_v3(n);
+	fac = clamp_f(dot_v3v3(n, light) * (1.0f - s) + s, 0.0f, 1.0f);
+	interp_v3_v3v3(col, bone_shade.hint, bone_shade.color, fac * fac);
+	glColor4f(col[0], col[1], col[2], bone_shade.color[3]);
+}
+
+static bool bone_shade_use(const short dt)
+{
+	return (dt == OB_SOLID) && ((G.f & G_PICKSEL) == 0);
+}
+
+/* sphere along Z centered at the origin, as gluSphere(radius, 16, 10) */
+static void bone_shade_sphere(float radius)
+{
+	const int slices = 16, stacks = 10;
+	int i, j;
+
+	for (j = 0; j < stacks; j++) {
+		const float t0 = (float)M_PI * j / stacks, t1 = (float)M_PI * (j + 1) / stacks;
+		glBegin(GL_TRIANGLE_STRIP);
+		for (i = 0; i <= slices; i++) {
+			const float p = 2.0f * (float)M_PI * i / slices;
+			const float n0[3] = {sinf(t0) * cosf(p), sinf(t0) * sinf(p), cosf(t0)};
+			const float n1[3] = {sinf(t1) * cosf(p), sinf(t1) * sinf(p), cosf(t1)};
+			bone_shade_normal(n0);
+			glVertex3f(n0[0] * radius, n0[1] * radius, n0[2] * radius);
+			bone_shade_normal(n1);
+			glVertex3f(n1[0] * radius, n1[1] * radius, n1[2] * radius);
+		}
+		glEnd();
+	}
+}
+
+/* open cylinder from z = 0 to z = height, as gluCylinder(base, top, height, 16, 1) */
+static void bone_shade_cylinder(float base, float top, float height)
+{
+	const int slices = 16;
+	const float nz = (base - top) / height;
+	int i;
+
+	glBegin(GL_TRIANGLE_STRIP);
+	for (i = 0; i <= slices; i++) {
+		const float p = 2.0f * (float)M_PI * i / slices;
+		const float c = cosf(p), sn = sinf(p);
+		const float no[3] = {c, sn, nz};
+		bone_shade_normal(no);
+		glVertex3f(c * base, sn * base, 0.0f);
+		glVertex3f(c * top, sn * top, height);
+	}
+	glEnd();
+}
+
+static void drawsolidcube_size_shaded(float xsize, float ysize, float zsize)
+{
+	static const int quads[6][4] = {{0, 1, 2, 3}, {0, 4, 5, 1}, {4, 7, 6, 5}, {7, 3, 2, 6}, {1, 5, 6, 2}, {7, 4, 0, 3}};
+	static const float normals[6][3] = {{-1, 0, 0}, {0, -1, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}};
+	int i, j;
+
+	glScalef(xsize, ysize, zsize);
+	bone_shade_begin();
+	glBegin(GL_QUADS);
+	for (i = 0; i < 6; i++) {
+		bone_shade_normal(normals[i]);
+		for (j = 0; j < 4; j++)
+			glVertex3fv(cube[quads[i][j]]);
+	}
+	glEnd();
+	bone_shade_end();
+}
+
 static void drawsolidcube_size(float xsize, float ysize, float zsize)
 {
 	static GLuint displist = 0;
@@ -535,6 +641,38 @@ static void draw_bone_solid_octahedral(void)
 	}
 
 	glCallList(displist);
+}
+
+static void draw_bone_solid_octahedral_shaded(void)
+{
+	int i;
+
+	bone_shade_begin();
+	glBegin(GL_TRIANGLES);
+	for (i = 0; i < 8; i++) {
+		bone_shade_normal(bone_octahedral_solid_normals[i]);
+		glVertex3fv(bone_octahedral_verts[bone_octahedral_solid_tris[i][0]]);
+		glVertex3fv(bone_octahedral_verts[bone_octahedral_solid_tris[i][1]]);
+		glVertex3fv(bone_octahedral_verts[bone_octahedral_solid_tris[i][2]]);
+	}
+	glEnd();
+	bone_shade_end();
+}
+
+/* Blender 5 style wire: smoothed, 2px for selected/active bones and 1px otherwise. */
+static void draw_bone_octahedral_outline(int boneflag)
+{
+	if (G.f & G_PICKSEL) {
+		draw_bone_octahedral();
+		return;
+	}
+	glLineWidth((boneflag & (BONE_DRAW_ACTIVE | BONE_SELECTED)) ? 2.0f : 1.0f);
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	draw_bone_octahedral();
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+	glLineWidth(1.0f);
 }
 
 /* *************** Armature drawing, bones ******************* */
@@ -845,6 +983,30 @@ static void draw_sphere_bone_wire(float smat[4][4], float imat[4][4],
 }
 
 /* does wire only for outline selecting */
+static void bone_sphere(GLUquadricObj *qobj, const short dt, float radius)
+{
+	if (bone_shade_use(dt)) {
+		bone_shade_begin();
+		bone_shade_sphere(radius);
+		bone_shade_end();
+	}
+	else {
+		gluSphere(qobj, radius, 16, 10);
+	}
+}
+
+static void bone_cylinder(GLUquadricObj *qobj, const short dt, float base, float top, float height)
+{
+	if (bone_shade_use(dt)) {
+		bone_shade_begin();
+		bone_shade_cylinder(base, top, height);
+		bone_shade_end();
+	}
+	else {
+		gluCylinder(qobj, base, top, height, 16, 1);
+	}
+}
+
 static void draw_sphere_bone(const short dt, int armflag, int boneflag, short constflag, unsigned int id,
                              bPoseChannel *pchan, EditBone *ebone)
 {
@@ -900,7 +1062,7 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 	if ((boneflag & BONE_CONNECTED) == 0) {
 		if (id != -1)
 			GPU_select_load_id(id | BONESEL_ROOT);
-		gluSphere(qobj, head, 16, 10);
+		bone_sphere(qobj, dt, head);
 	}
 
 	/* Draw tip point */
@@ -913,7 +1075,7 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		GPU_select_load_id(id | BONESEL_TIP);
 
 	glTranslatef(0.0f, 0.0f, length);
-	gluSphere(qobj, tail, 16, 10);
+	bone_sphere(qobj, dt, tail);
 	glTranslatef(0.0f, 0.0f, -length);
 
 	/* base */
@@ -937,23 +1099,23 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		glPolygonOffset(-1.0f, -1.0f);
 
 		glTranslatef(0.0f, 0.0f, head);
-		gluCylinder(qobj, fac1 * head + (1.0f - fac1) * tail, fac2 * tail + (1.0f - fac2) * head, length - head - tail, 16, 1);
+		bone_cylinder(qobj, dt, fac1 * head + (1.0f - fac1) * tail, fac2 * tail + (1.0f - fac2) * head, length - head - tail);
 		glTranslatef(0.0f, 0.0f, -head);
 
 		glDisable(GL_POLYGON_OFFSET_FILL);
 
 		/* draw sphere on extrema */
 		glTranslatef(0.0f, 0.0f, length - tail);
-		gluSphere(qobj, fac2 * tail + (1.0f - fac2) * head, 16, 10);
+		bone_sphere(qobj, dt, fac2 * tail + (1.0f - fac2) * head);
 		glTranslatef(0.0f, 0.0f, -length + tail);
 
 		glTranslatef(0.0f, 0.0f, head);
-		gluSphere(qobj, fac1 * head + (1.0f - fac1) * tail, 16, 10);
+		bone_sphere(qobj, dt, fac1 * head + (1.0f - fac1) * tail);
 	}
 	else {
 		/* 1 sphere in center */
 		glTranslatef(0.0f, 0.0f, (head + length - tail) / 2.0f);
-		gluSphere(qobj, fac1 * head + (1.0f - fac1) * tail, 16, 10);
+		bone_sphere(qobj, dt, fac1 * head + (1.0f - fac1) * tail);
 	}
 
 	/* restore */
@@ -987,6 +1149,12 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 
 	glPushMatrix();
 	glScalef(length, length, length);
+
+	/* Blender 5 style: smooth lines */
+	if ((G.f & G_PICKSEL) == 0) {
+		glEnable(GL_BLEND);
+		glEnable(GL_LINE_SMOOTH);
+	}
 
 	/* this chunk not in object mode */
 	if (armflag & (ARM_EDITMODE | ARM_POSEMODE)) {
@@ -1081,6 +1249,8 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 		glBitmap(8, 8, 4, 4, 0, 0, bm_dot5);
 	}
 
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
 	glPopMatrix();
 }
 
@@ -1158,6 +1328,9 @@ static void ebone_spline_preview(EditBone *ebone, Mat4 result_array[MAX_BBONE_SU
 	}
 }
 
+/* set while drawing solid B-Bones, enables the Blender 5 style shading of the boxes */
+static bool bone_boxes_shaded = false;
+
 static void draw_b_bone_boxes(const short dt, bPoseChannel *pchan, EditBone *ebone, float xwidth, float length, float zwidth)
 {
 	int segments = 0;
@@ -1182,14 +1355,16 @@ static void draw_b_bone_boxes(const short dt, bPoseChannel *pchan, EditBone *ebo
 		for (a = 0; a < segments; a++) {
 			glPushMatrix();
 			glMultMatrixf(bbone[a].mat);
-			if (dt == OB_SOLID) drawsolidcube_size(xwidth, dlen, zwidth);
+			if (dt == OB_SOLID && bone_boxes_shaded) drawsolidcube_size_shaded(xwidth, dlen, zwidth);
+			else if (dt == OB_SOLID) drawsolidcube_size(xwidth, dlen, zwidth);
 			else drawcube_size(xwidth, dlen, zwidth);
 			glPopMatrix();
 		}
 	}
 	else {
 		glPushMatrix();
-		if (dt == OB_SOLID) drawsolidcube_size(xwidth, length, zwidth);
+		if (dt == OB_SOLID && bone_boxes_shaded) drawsolidcube_size_shaded(xwidth, length, zwidth);
+		else if (dt == OB_SOLID) drawsolidcube_size(xwidth, length, zwidth);
 		else drawcube_size(xwidth, length, zwidth);
 		glPopMatrix();
 	}
@@ -1249,7 +1424,28 @@ static void draw_b_bone(const short dt, int armflag, int boneflag, short constfl
 		else
 			UI_ThemeColor(TH_BONE_SOLID);
 
-		draw_b_bone_boxes(OB_SOLID, pchan, ebone, xwidth, length, zwidth);
+		bone_boxes_shaded = (G.f & G_PICKSEL) == 0;
+		if (bone_boxes_shaded && (armflag & (ARM_POSEMODE | ARM_EDITMODE)) == 0) {
+			/* object mode has no wire pass over solid: thin smooth edges in the object wire color */
+			glEnable(GL_POLYGON_OFFSET_FILL);
+			glPolygonOffset(1.0f, 1.0f);
+			draw_b_bone_boxes(OB_SOLID, pchan, ebone, xwidth, length, zwidth);
+			glDisable(GL_POLYGON_OFFSET_FILL);
+			GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+			if (bone_object_wire_col)
+				glColor3ubv(bone_object_wire_col);
+			else
+				UI_ThemeColor(TH_WIRE);
+			glEnable(GL_BLEND);
+			glEnable(GL_LINE_SMOOTH);
+			draw_b_bone_boxes(OB_WIRE, pchan, ebone, xwidth, length, zwidth);
+			glDisable(GL_LINE_SMOOTH);
+			glDisable(GL_BLEND);
+		}
+		else {
+			draw_b_bone_boxes(OB_SOLID, pchan, ebone, xwidth, length, zwidth);
+		}
+		bone_boxes_shaded = false;
 
 		/* disable solid drawing */
 		GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
@@ -1272,7 +1468,17 @@ static void draw_b_bone(const short dt, int armflag, int boneflag, short constfl
 			}
 		}
 
+		if ((G.f & G_PICKSEL) == 0) {
+			glLineWidth((boneflag & (BONE_DRAW_ACTIVE | BONE_SELECTED)) ? 2.0f : 1.0f);
+			glEnable(GL_BLEND);
+			glEnable(GL_LINE_SMOOTH);
+		}
 		draw_b_bone_boxes(OB_WIRE, pchan, ebone, xwidth, length, zwidth);
+		if ((G.f & G_PICKSEL) == 0) {
+			glDisable(GL_LINE_SMOOTH);
+			glDisable(GL_BLEND);
+			glLineWidth(1.0f);
+		}
 	}
 }
 
@@ -1357,8 +1563,18 @@ static void draw_wire_bone(const short dt, int armflag, int boneflag, short cons
 		set_ebone_glColor(boneflag);
 	}
 
-	/* draw normal */
+	/* draw normal, Blender 5 style: smooth and 2px when selected */
+	if ((G.f & G_PICKSEL) == 0) {
+		glLineWidth((boneflag & (BONE_DRAW_ACTIVE | BONE_SELECTED)) ? 2.0f : 1.0f);
+		glEnable(GL_BLEND);
+		glEnable(GL_LINE_SMOOTH);
+	}
 	draw_wire_bone_segments(pchan, bbones, length, segments);
+	if ((G.f & G_PICKSEL) == 0) {
+		glDisable(GL_LINE_SMOOTH);
+		glDisable(GL_BLEND);
+		glLineWidth(1.0f);
+	}
 }
 
 static void draw_bone(const short dt, int armflag, int boneflag, short constflag, unsigned int id, float length)
@@ -1412,7 +1628,7 @@ static void draw_bone(const short dt, int armflag, int boneflag, short constflag
 				set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, constflag);
 			}
 		}
-		draw_bone_octahedral();
+		draw_bone_octahedral_outline(boneflag);
 	}
 	else {
 		/* solid */
@@ -1420,7 +1636,29 @@ static void draw_bone(const short dt, int armflag, int boneflag, short constflag
 			set_pchan_glColor(PCHAN_COLOR_SOLID, boneflag, constflag);
 		else
 			UI_ThemeColor(TH_BONE_SOLID);
-		draw_bone_solid_octahedral();
+		if (G.f & G_PICKSEL) {
+			draw_bone_solid_octahedral();
+		}
+		else {
+			/* object mode has no wire pass over solid: thin smooth edges in the object wire
+			 * color (selection color when the armature is selected) */
+			if ((armflag & (ARM_POSEMODE | ARM_EDITMODE)) == 0) {
+				glEnable(GL_POLYGON_OFFSET_FILL);
+				glPolygonOffset(1.0f, 1.0f);
+				draw_bone_solid_octahedral_shaded();
+				glDisable(GL_POLYGON_OFFSET_FILL);
+				GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+				if (bone_object_wire_col)
+					glColor3ubv(bone_object_wire_col);
+				else
+					UI_ThemeColor(TH_WIRE);
+				draw_bone_octahedral_outline(0);
+				GPU_basic_shader_bind(GPU_SHADER_LIGHTING | GPU_SHADER_USE_COLOR);
+			}
+			else {
+				draw_bone_solid_octahedral_shaded();
+			}
+		}
 	}
 
 	/* disable solid drawing */
@@ -2153,11 +2391,15 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 							bone_matrix_translate_y(bmat, pchan->bone->length);
 							glMultMatrixf(bmat);
 
-							glColor3ubv(col);
-
 							float viewmat_pchan[4][4];
 							mul_m4_m4m4(viewmat_pchan, rv3d->viewmatob, bmat);
-							drawaxes(viewmat_pchan, pchan->bone->length * 0.25f, OB_ARROWS);
+							{
+								/* Blender 5: strong axis colors on selected bones */
+								float axes_col[3];
+								rgb_uchar_to_float(axes_col, col);
+								drawaxes_colored(viewmat_pchan, pchan->bone->length * 0.25f, axes_col,
+								                 (pchan->bone->flag & BONE_SELECTED) ? 0.1f : 0.65f);
+							}
 
 							glPopMatrix();
 						}
@@ -2361,11 +2603,15 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 							bone_matrix_translate_y(bmat, eBone->length);
 							glMultMatrixf(bmat);
 
-							glColor3ubv(col);
-
 							float viewmat_ebone[4][4];
 							mul_m4_m4m4(viewmat_ebone, rv3d->viewmatob, bmat);
-							drawaxes(viewmat_ebone, eBone->length * 0.25f, OB_ARROWS);
+							{
+								/* Blender 5: strong axis colors on selected bones */
+								float axes_col[3];
+								rgb_uchar_to_float(axes_col, col);
+								drawaxes_colored(viewmat_ebone, eBone->length * 0.25f, axes_col,
+								                 (eBone->flag & BONE_SELECTED) ? 0.1f : 0.65f);
+							}
 
 							glPopMatrix();
 						}
@@ -2764,7 +3010,9 @@ bool draw_armature(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 					}
 				}
 			}
+			bone_object_wire_col = ob_wire_col;
 			draw_pose_bones(scene, v3d, ar, base, dt, ob_wire_col, (dflag & DRAW_CONSTCOLOR), is_outline);
+			bone_object_wire_col = NULL;
 			arm->flag &= ~ARM_POSEMODE;
 
 			if (ob->mode & OB_MODE_POSE)

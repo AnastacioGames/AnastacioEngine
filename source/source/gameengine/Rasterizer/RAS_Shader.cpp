@@ -168,7 +168,8 @@ RAS_Shader::RAS_Shader()
 	m_use(false),
 	m_error(false),
 	m_dirty(true),
-	m_diagnosticName("engine-shader")
+	m_diagnosticName("engine-shader"),
+	m_binaryCache(false)
 {
 	for (unsigned short i = 0; i < MAX_PROGRAM; ++i) {
 		m_progs[i] = "";
@@ -213,6 +214,10 @@ void RAS_Shader::SetUniformfv(int location, int type, const float *param, int si
 	RAS_Uniform *uni = FindUniform(location);
 
 	if (uni) {
+		// Same value: GL program state persists, no need to dirty the shader.
+		if (memcmp(uni->GetData(), param, size) == 0) {
+			return;
+		}
 		memcpy(uni->GetData(), param, size);
 		uni->SetData(location, type, count, transpose);
 	}
@@ -233,6 +238,10 @@ void RAS_Shader::SetUniformiv(int location, int type, const int *param, int size
 	RAS_Uniform *uni = FindUniform(location);
 
 	if (uni) {
+		// Same value: GL program state persists, no need to dirty the shader.
+		if (memcmp(uni->GetData(), param, size) == 0) {
+			return;
+		}
 		memcpy(uni->GetData(), param, size);
 		uni->SetData(location, type, count, transpose);
 	}
@@ -309,7 +318,8 @@ bool RAS_Shader::LinkProgram()
 	frag = GetParsedProgram(FRAGMENT_PROGRAM);
 	geom = GetParsedProgram(GEOMETRY_PROGRAM);
 	m_shader = GPU_shader_create_ex_named(vert.c_str(), frag.c_str(), geom.empty() ? nullptr : geom.c_str(),
-	                                  nullptr, nullptr, 0, 0, 0, 0, m_diagnosticName.c_str());
+	                                  nullptr, nullptr, 0, 0, 0, m_binaryCache ? GPU_SHADER_FLAGS_BINARY_CACHE : 0,
+	                                  m_diagnosticName.c_str());
 	if (!m_shader) {
 		m_error = true;
 		return false;

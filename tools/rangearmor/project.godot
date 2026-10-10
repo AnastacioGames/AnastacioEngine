@@ -1,0 +1,79 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "Node",
+"class": "BGArmorGlobals",
+"language": "GDScript",
+"path": "res://scripts/globals.gd"
+}, {
+"base": "Button",
+"class": "EmojiButton",
+"language": "GDScript",
+"path": "res://addons/emojis-for-godot/nodes/EmojiButton.gd"
+}, {
+"base": "TextureRect",
+"class": "EmojiIcon",
+"language": "GDScript",
+"path": "res://addons/emojis-for-godot/nodes/EmojiIcon.gd"
+}, {
+"base": "Object",
+"class": "Emojis",
+"language": "GDScript",
+"path": "res://addons/emojis-for-godot/emojis/emojis.gd"
+} ]
+_global_script_class_icons={
+"BGArmorGlobals": "",
+"EmojiButton": "res://addons/emojis-for-godot/icons/EmojiButton.svg",
+"EmojiIcon": "res://addons/emojis-for-godot/icons/EmojiIcon.svg",
+"Emojis": ""
+}
+
+[application]
+
+config/name="RANGEARMOR Panel"
+run/main_scene="res://scenes/welcome.tscn"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="RangeArmor"
+boot_splash/image="res://textures/rangearmor_logo.png"
+boot_splash/bg_color=Color( 0, 0, 0, 1 )
+config/icon="res://icon.png"
+config/windows_native_icon="res://icon-engine.ico"
+
+[autoload]
+
+Globals="*res://scripts/globals.gd"
+
+[display]
+
+window/size/width=800
+window/size/height=450
+
+[editor_plugins]
+
+enabled=PoolStringArray( "res://addons/emojis-for-godot/plugin.cfg" )
+
+[global]
+
+custom=false
+use_custom_dir=false
+app_version=116
+blend=false
+
+[physics]
+
+common/enable_pause_aware_picking=true
+3d/active_soft_world=false
+
+[rendering]
+
+quality/filters/sharpen_intensity=0.1
+vram_compression/import_etc=true
+vram_compression/import_etc2=false

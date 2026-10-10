@@ -1177,11 +1177,12 @@ void CcdPhysicsEnvironment::ProcessFhSprings()
 	for (it = m_controllers.begin(); it != m_controllers.end(); it++) {
 		CcdPhysicsController *ctrl = (*it);
 		btRigidBody *body = ctrl->GetRigidBody();
-		if (body->isStaticOrKinematicObject()) {
+		// Sensors and characters have no rigid body.
+		if (!body || body->isStaticOrKinematicObject()) {
 			continue;
 		}
 
-		if (body && (ctrl->GetConstructionInfo().m_do_fh || ctrl->GetConstructionInfo().m_do_rot_fh)) {
+		if ((ctrl->GetConstructionInfo().m_do_fh || ctrl->GetConstructionInfo().m_do_rot_fh)) {
 			//re-implement SM_FhObject.cpp using btCollisionWorld::rayTest and info from ctrl->getConstructionInfo()
 			//send a ray from {0.0, 0.0, 0.0} towards {0.0, 0.0, -10.0}, in local coordinates
 			CcdPhysicsController *parentCtrl = ctrl->GetParentRoot();
@@ -2599,11 +2600,14 @@ void CcdPhysicsEnvironment::CallbackTriggers()
 			continue;
 		}
 
-		auto &counter = m_callbackCounter[pair];
-		if (counter < 1) {
+		// PH9: so o primeiro contato do par por ProceedDeltaTime gera callback (mesma semantica do
+		// antigo std::map<pair,int>), agora sem alocar no por par. O CcdCollData segue alocado aqui
+		// e o consumidor (KX_CollisionEventManager::RemoveNewCollisions) continua dono e da delete.
+		auto it = std::lower_bound(m_callbackCounter.begin(), m_callbackCounter.end(), pair);
+		if (it == m_callbackCounter.end() || pair < *it) {
+			m_callbackCounter.insert(it, pair);
 			const CcdCollData *coll_data = new CcdCollData(manifold);
 			m_triggerCallbacks[PHY_OBJECT_RESPONSE](m_triggerCallbacksUserPtrs[PHY_OBJECT_RESPONSE], ctrl1, ctrl0, coll_data, first);
-			counter++;
 		}
 	}
 }

@@ -37,6 +37,7 @@
 #include "DNA_world_types.h"
 
 #include "GPU_glew.h"
+#include "GPU_draw.h"
 
 #include <algorithm>
 #include <cmath>
@@ -248,7 +249,8 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 			const mt::vec3 fwd = camera->NodeGetWorldOrientation() * mt::vec3(0.0f, 0.0f, -1.0f);
 			const float camPos[3] = {m_camPos.x, m_camPos.y, m_camPos.z};
 			const float camFwd[3] = {fwd.x, fwd.y, fwd.z};
-			BKE_rain_lightning_bolt(seed, camPos, camFwd, distance, world->rain_lightning_width, &strike.bolt);
+			BKE_rain_lightning_bolt(seed, camPos, camFwd, distance, world->rain_lightning_width,
+			                        (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &strike.bolt);
 			strike.center = mt::vec3(strike.bolt.center);
 			strike.hasBolt = true;
 		}
@@ -567,5 +569,8 @@ void KX_RainLightning::Draw(const mt::mat4& view, const mt::mat4& projection)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+	// Blend mexido direto no GL: invalida o cache de GPU_set_material_alpha_blend(),
+	// senão o próximo material com o mesmo modo pula a chamada e sai sem blend.
+	GPU_set_material_alpha_blend(-1);
 	glUseProgram(0);
 }

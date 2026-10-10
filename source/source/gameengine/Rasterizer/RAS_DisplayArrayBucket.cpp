@@ -304,8 +304,12 @@ void RAS_DisplayArrayBucket::RunInstancingNode(const RAS_DisplayArrayNodeTuple& 
 		buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, meshSlots);
 	}
 	else {
-		// Fill the buffer with the original mesh slots.
-		buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, m_activeMeshSlots);
+		// Billboards and halos are camera-dependent. A normal material can reuse the
+		// stream while its visible slots and per-object render data stay unchanged.
+		if (materialData->m_drawingMode != RAS_IMaterial::RAS_NORMAL ||
+		    !buffer->HasCachedData(matPasIndex, m_activeMeshSlots)) {
+			buffer->Update(rasty, materialData->m_drawingMode, matPasIndex, m_activeMeshSlots);
+		}
 	}
 
 	RAS_AttributeArrayStorage *attribStorage = m_nodeData.m_attribStorage;
@@ -358,8 +362,10 @@ void RAS_DisplayArrayBucket::RunBatchingNode(const RAS_DisplayArrayNodeTuple& tu
 	const unsigned int nummeshslots = m_activeMeshSlots.size();
 
 	// We must use a int instead of unsigned size to match GLsizei type.
-	std::vector<int> counts(nummeshslots);
-	std::vector<intptr_t> indices(nummeshslots);
+	std::vector<int>& counts = m_batchCounts;
+	std::vector<intptr_t>& indices = m_batchIndices;
+	counts.resize(nummeshslots);
+	indices.resize(nummeshslots);
 
 	RAS_BatchDisplayArray *batchArray = static_cast<RAS_BatchDisplayArray *>(m_displayArray);
 

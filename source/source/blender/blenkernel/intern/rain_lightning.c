@@ -219,7 +219,7 @@ static void build_bolt(Rng *rng, const float top[3], const float ground[3], floa
 
 void BKE_rain_lightning_bolt(
         unsigned int seed, const float cam_pos[3], const float cam_fwd[3], float distance, float width,
-        RainLightningBolt *r_bolt)
+        bool sideways, RainLightningBolt *r_bolt)
 {
 	Rng rng = rng_seed(seed);
 	const float k = max_ff(distance, 1.0f) / REFERENCE_DISTANCE;
@@ -241,6 +241,21 @@ void BKE_rain_lightning_bolt(
 	madd_v3_v3fl(top, side, rng_range(&rng, -15.0f, 15.0f) * k);
 	madd_v3_v3fl(top, fwd, rng_range(&rng, -10.0f, 10.0f) * k);
 	top[2] = ground[2] + rng_range(&rng, 55.0f, 75.0f) * k;
+
+	/* Sideways: half of the strikes run across the clouds instead of down to the ground. Its
+	 * own hash keeps the choice out of the rng stream, so the downward bolts stay the same. */
+	if (sideways && (hash_uint(seed ^ 0x5bd1e995u) & 1u)) {
+		float end[3];
+		const float span = rng_range(&rng, 45.0f, 90.0f) * k;
+		const float dir = (rng_float(&rng) < 0.5f) ? -1.0f : 1.0f;
+		top[2] -= rng_range(&rng, 5.0f, 20.0f) * k;
+		copy_v3_v3(end, top);
+		madd_v3_v3fl(end, side, dir * span);
+		madd_v3_v3fl(end, fwd, rng_range(&rng, -0.25f, 0.25f) * span);
+		end[2] += rng_range(&rng, -12.0f, 6.0f) * k;
+		build_bolt(&rng, top, end, k, width, r_bolt);
+		return;
+	}
 
 	build_bolt(&rng, top, ground, k, width, r_bolt);
 }
@@ -338,11 +353,11 @@ bool BKE_rain_lightning_eval(
 
 void BKE_rain_lightning_view_bolt(
         unsigned int seed, const float viewinv[4][4], float clip_end, float distance, float width,
-        RainLightningBolt *r_bolt)
+        bool sideways, RainLightningBolt *r_bolt)
 {
 	const float fwd[3] = {-viewinv[2][0], -viewinv[2][1], -viewinv[2][2]};
 	if (clip_end > 0.0f) {
 		distance = min_ff(distance, clip_end * 0.6f);
 	}
-	BKE_rain_lightning_bolt(seed, viewinv[3], fwd, distance, width, r_bolt);
+	BKE_rain_lightning_bolt(seed, viewinv[3], fwd, distance, width, sideways, r_bolt);
 }

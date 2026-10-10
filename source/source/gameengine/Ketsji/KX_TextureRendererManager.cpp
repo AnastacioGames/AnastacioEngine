@@ -27,7 +27,6 @@
 #include "KX_TextureRendererManager.h"
 #include "KX_Camera.h"
 #include "KX_Scene.h"
-#include "KX_Globals.h"
 #include "KX_CubeMap.h"
 #include "KX_PlanarMap.h"
 #include "KX_LightProbe.h"
@@ -339,12 +338,6 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		 * but here we update only visible object of a face including the clip end and start.
 		 */
 		m_scene->UpdateObjectLods(m_camera, objects);
-
-		/* Update animations to use the culling of each faces, BL_ActionManager avoid redundants
-		 * updates internally. */
-		if (KX_GetActiveEngine()->UpdateAnimations(m_scene)) {
-			m_scene->UpdateAnimationDeformers();
-		}
 
 		renderer->BeginRenderFace(rasty);
 

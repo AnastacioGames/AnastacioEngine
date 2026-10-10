@@ -164,12 +164,7 @@ void KX_RadarSensor::SynchronizeTransform()
 	m_cone_origin = trans.TranslationVector3D();
 	m_cone_target = trans * mt::vec3(0, -m_coneheight/2.0f, 0);
 
-	if (m_physCtrl) {
-		PHY_IMotionState *motionState = m_physCtrl->GetMotionState();
-		motionState->SetWorldPosition(trans.TranslationVector3D());
-		motionState->SetWorldOrientation(trans.RotationMatrix());
-		m_physCtrl->WriteMotionStateToDynamics(true);
-	}
+	WriteSensorTransform(trans.TranslationVector3D(), trans.RotationMatrix());
 
 }
 

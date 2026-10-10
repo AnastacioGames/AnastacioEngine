@@ -1849,6 +1849,20 @@ static void rna_def_scene_actuator(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Scene", "Scene to be added/removed/paused/resumed");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_preload", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_SCENE_PRELOAD);
+	RNA_def_property_ui_text(prop, "Preload",
+	                         "Convert the scene ahead when the scene owning this actuator starts, so adding it later "
+	                         "does not stall the game (uses memory until then)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_keep", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_SCENE_KEEP);
+	RNA_def_property_ui_text(prop, "Keep",
+	                         "Hide and pause the scene instead of destroying it: adding it again brings it back at once, "
+	                         "in the state it was left (uses memory while hidden)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
 static void rna_def_random_actuator(BlenderRNA *brna)

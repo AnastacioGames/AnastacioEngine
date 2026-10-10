@@ -41,14 +41,17 @@ set(INC
 	../Rasterizer/Node
 	../SceneGraph
 	../VideoTexture
+	../../blender/blenfont
 	../../blender/blenkernel
 	../../blender/blenlib
+	../../blender/blentranslation
 	../../blender/gpu
 	../../blender/makesdna
 	../../blender/makesrna
 	../../blender/windowmanager
 	../../../intern/guardedalloc
 	../../../intern/ghost
+	../../../intern/glew-mx
 	../../../intern/string
 	../../../intern/termcolor
 )
@@ -60,7 +63,10 @@ set(INC_SYS
 	../../../extern/imgui/include
   ../../../extern/implot/include
 	${BOOST_INCLUDE_DIR}
+	${GLEW_INCLUDE_PATH}
 )
+
+add_definitions(${GL_DEFINITIONS_RASTERIZER})
 
 set(SRC
 	LA_BlenderLauncher.cpp

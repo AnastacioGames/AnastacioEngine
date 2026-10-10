@@ -2,7 +2,7 @@
 
 Run from the installed editor:
 
-    RangeEngine.exe --background --factory-startup --python cutscene_persistence_regression.py
+    AnastacioEngine.exe --background --factory-startup --python cutscene_persistence_regression.py
 
 The test creates one Spawn Object event, saves it, reopens the file in the
 same process, and checks both scalar data and Object ID references.  It is

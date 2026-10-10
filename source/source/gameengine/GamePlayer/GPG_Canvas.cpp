@@ -205,6 +205,10 @@ void GPG_Canvas::ResizeWindow(int width, int height)
 		return;
 	}
 	else if (m_window->getState() == GHOST_kWindowStateFullScreen) {
+#ifdef WIN32
+		/* Tela cheia sem borda no Windows: sem troca de modo de video, a janela fica no tamanho do desktop. */
+		return;
+#endif
 		GHOST_ISystem *system = GHOST_ISystem::getSystem();
 		GHOST_DisplaySetting setting;
 		setting.xPixels = width;

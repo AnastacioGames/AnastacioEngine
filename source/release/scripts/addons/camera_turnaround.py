@@ -297,13 +297,13 @@ class PanelUI(Panel):
                 row.prop(scene, "frame_end")
 
                 col = layout.column(align=True)
-                split = col.split(percentage=0.85, align=True)
+                split = col.split(factor=0.85, align=True)
                 split.prop(turn_camera, "camera_revol_x")
                 split.prop(turn_camera, "inverse_x", toggle=True)
-                split = col.split(percentage=0.85, align=True)
+                split = col.split(factor=0.85, align=True)
                 split.prop(turn_camera, "camera_revol_y")
                 split.prop(turn_camera, "inverse_y", toggle=True)
-                split = col.split(percentage=0.85, align=True)
+                split = col.split(factor=0.85, align=True)
                 split.prop(turn_camera, "camera_revol_z")
                 split.prop(turn_camera, "inverse_z", toggle=True)
 

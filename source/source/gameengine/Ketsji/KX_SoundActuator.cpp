@@ -252,10 +252,14 @@ bool KX_SoundActuator::Update(double curtime)
 	{
 		if (!m_isplaying) {
 			play();
+			// play() may have created/restarted the handle: re-query the status.
+			isplaying = m_handle ? (AUD_Handle_getStatus(m_handle) == AUD_STATUS_PLAYING) : false;
 		}
 	}
-	// verify that the sound is still playing
-	isplaying = m_handle ? (AUD_Handle_getStatus(m_handle) == AUD_STATUS_PLAYING) : false;
+	// Status was queried above; only stop() clears the handle in between.
+	if (!m_handle) {
+		isplaying = false;
+	}
 
 	if (isplaying) {
 		if (m_is3d) {

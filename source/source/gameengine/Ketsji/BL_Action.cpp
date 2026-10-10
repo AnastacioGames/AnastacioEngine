@@ -43,6 +43,7 @@
 
 // These three are for getting the action from the logic manager
 #include "KX_Scene.h"
+#include "KX_KetsjiEngine.h"
 #include "BL_Converter.h"
 #include "SCA_LogicManager.h"
 
@@ -83,6 +84,7 @@ BL_Action::BL_Action(KX_GameObject *gameobj)
 	m_done(true),
 	m_appliedToObject(true),
 	m_requestIpo(false),
+	m_hasObjectIpo(false),
 	m_calc_localtime(true),
 	m_prevUpdate(-1.0f),
 	m_eventsIncludeCurrentFrame(false)
@@ -178,6 +180,8 @@ bool BL_Action::Play(const std::string& name,
 
 	// Create an SG_Controller
 	AddController(BL_CreateIPO(m_actionData, m_obj, kxscene));
+	// Only object transform channels need a world data update (CV1/KX2).
+	m_hasObjectIpo = !m_controllers.empty();
 	// World
 	AddController(BL_CreateWorldIPO(m_actionData, kxscene->GetBlenderScene()->world, kxscene));
 	// Try obcolor
@@ -225,6 +229,10 @@ bool BL_Action::Play(const std::string& name,
 	// Now that we have an action, we have something we can play
 	m_starttime = KX_GetActiveEngine()->GetFrameTime() - kxscene->GetSuspendedDelta();
 	m_startframe = m_localframe = start;
+	KX_AnimLog("PLAY obj=%s action=%s frames=%.1f-%.1f speed=%.3f mode=%d frameT=%.3f susp=%.3f anim_fps=%.1f",
+	           m_obj->GetName().c_str(), name.c_str(), start, end, playback_speed, play_mode,
+	           KX_GetActiveEngine()->GetFrameTime(), kxscene->GetSuspendedDelta(),
+	           KX_GetActiveEngine()->GetAnimFrameRate());
 	m_endframe = end;
 	m_blendin = blendin;
 	m_playmode = play_mode;
@@ -396,6 +404,8 @@ void BL_Action::Update(float curtime, bool applyToObject)
 			case ACT_MODE_PLAY:
 			{
 				// Clamp
+				KX_AnimLog("DONE obj=%s action=%s frame=%.1f took=%.3fs curT=%.3f start=%.3f", m_obj->GetName().c_str(),
+				           GetName().c_str(), m_localframe, curtime - m_starttime, curtime, m_starttime);
 				m_localframe = m_endframe;
 				m_done = true;
 				break;
@@ -447,7 +457,7 @@ void BL_Action::Update(float curtime, bool applyToObject)
 		return;
 	}
 
-	m_requestIpo = true;
+	m_requestIpo = m_hasObjectIpo;
 
 	SG_Node *node = m_obj->GetNode();
 	// Update controllers time.
@@ -520,7 +530,7 @@ void BL_Action::Update(float curtime, bool applyToObject)
 				BlendShape(key, m_layer_weight, m_blendshape);
 			}
 
-			shape_deformer->SetLastFrame(curtime);
+			shape_deformer->SetLastFrameIfShapeChanged(curtime);
 		}
 	}
 

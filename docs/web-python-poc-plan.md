@@ -1,5 +1,8 @@
 # Plano — Prova de conceito Python-no-navegador (pré-requisito do port Web)
 
+> PoC concluída: o runtime Web roda no navegador. Os arquivos de teste das etapas 2 a 5
+> (`docs/web-python-poc-stage*`) foram removidos em 2026-10-07 e podem ser recuperados pelo histórico do git.
+
 ## Contexto
 
 O build `web-runtime` (Emscripten) já avança até compilar boa parte do

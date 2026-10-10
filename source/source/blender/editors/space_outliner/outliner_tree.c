@@ -1046,6 +1046,12 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		te->name = sc ? sc->name : IFACE_("Collection");
 		te->directdata = sc;
 	}
+	else if (type == TSE_SCENE_ROOT_COLLECTION) {
+		SceneCollection *sc = BKE_scene_collection_find((Scene *)id, index);
+
+		te->name = sc ? sc->name : IFACE_("Collection");
+		te->directdata = sc;
+	}
 	else if (type == TSE_SEQUENCE) {
 		Sequence *seq = (Sequence *) idv;
 		Sequence *p;
@@ -1408,8 +1414,45 @@ static void outliner_add_scene_collections(SpaceOops *soops, ListBase *lb, Scene
                                            TreeElement *parent, ListBase *collections)
 {
 	for (SceneCollection *sc = collections->first; sc; sc = sc->next) {
+		if (sc->flag & SCECOL_SCENE_GROUP) {
+			continue;
+		}
 		TreeElement *te = outliner_add_element(soops, lb, scene, parent, TSE_SCENE_COLLECTION, sc->uid);
 		outliner_add_scene_collections(soops, &te->subtree, scene, te, &sc->children);
+	}
+}
+
+static Scene *outliner_scene_root_collection_owner(Main *mainvar)
+{
+	return mainvar ? mainvar->scene.first : NULL;
+}
+
+static void outliner_add_scene_root_collection_recursive(
+        SpaceOops *soops, ListBase *lb, Scene *owner, TreeElement *parent, SceneCollection *sc)
+{
+	TreeElement *te = outliner_add_element(soops, lb, owner, parent, TSE_SCENE_ROOT_COLLECTION, sc->uid);
+
+	for (SceneCollection *child = sc->children.first; child; child = child->next) {
+		if ((child->flag & SCECOL_SCENE_GROUP) == 0) {
+			continue;
+		}
+		outliner_add_scene_root_collection_recursive(soops, &te->subtree, owner, te, child);
+	}
+}
+
+static void outliner_add_scene_root_collections(Main *mainvar, SpaceOops *soops, TreeElement *scenes_root)
+{
+	Scene *owner = outliner_scene_root_collection_owner(mainvar);
+
+	if (owner == NULL) {
+		return;
+	}
+
+	for (SceneCollection *sc = owner->collections.first; sc; sc = sc->next) {
+		if ((sc->flag & SCECOL_SCENE_GROUP) == 0) {
+			continue;
+		}
+		outliner_add_scene_root_collection_recursive(soops, &scenes_root->subtree, owner, scenes_root, sc);
 	}
 }
 
@@ -1445,6 +1488,43 @@ TreeElement *outliner_find_scene_collection_te(ListBase *lb, int uid)
 		}
 	}
 	return NULL;
+}
+
+static TreeElement *outliner_find_scene_root_collection_te(ListBase *lb, int uid)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_ROOT_COLLECTION && te->index == uid) {
+			return te;
+		}
+		TreeElement *found = outliner_find_scene_root_collection_te(&te->subtree, uid);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static void outliner_move_scenes_to_root_collections(ListBase *lb)
+{
+	TreeElement *te, *ten;
+
+	for (te = lb->first; te; te = ten) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		ten = te->next;
+
+		if (tselem->type == 0 && te->idcode == ID_SCE) {
+			Scene *scene = (Scene *)tselem->id;
+			if (scene->collection_uid != 0) {
+				TreeElement *te_coll = outliner_find_scene_root_collection_te(lb, scene->collection_uid);
+				if (te_coll) {
+					BLI_remlink(lb, te);
+					BLI_addtail(&te_coll->subtree, te);
+					te->parent = te_coll;
+				}
+			}
+		}
+	}
 }
 
 /* Moves root objects (after the parent hierarchy is built) into their collection folder.
@@ -1917,6 +1997,7 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 		scenes_root->flag |= TE_DIRECTDATA_ICON;
 		if (!TREESTORE(scenes_root)->used)
 			TREESTORE(scenes_root)->flag &= ~TSE_CLOSED;
+		outliner_add_scene_root_collections(mainvar, soops, scenes_root);
 		for (sce = mainvar->scene.first; sce; sce = sce->id.next) {
 			te = outliner_add_element(soops, &scenes_root->subtree, sce, scenes_root, 0, 0);
 			tselem = TREESTORE(te);
@@ -1943,6 +2024,7 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 			/* clear id.newid, to prevent objects be inserted in wrong scenes (parent in other scene) */
 			for (base = sce->base.first; base; base = base->next) base->object->id.newid = NULL;
 		}
+		outliner_move_scenes_to_root_collections(&scenes_root->subtree);
 	}
 	else if (soops->outlinevis == SO_CUR_SCENE) {
 

@@ -43,6 +43,8 @@ if(WIN32 AND NOT UNIX)
 			RangeRuntime ${EXETYPE}
 			bad_level_call_stubs/stubs.c
 			${CMAKE_SOURCE_DIR}/release/windows/icons/winblender.rc)
+	target_compile_definitions(RangeRuntime PRIVATE BLENDER_PLAYER_EXECUTABLE)
+	set_target_properties(RangeRuntime PROPERTIES OUTPUT_NAME "AnastacioRuntime")
 	WINDOWS_SIGN_TARGET(RangeRuntime)
 	install(TARGETS RangeRuntime
 			COMPONENT Blenderplayer

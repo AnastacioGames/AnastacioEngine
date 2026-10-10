@@ -1,7 +1,7 @@
 """Checks the game soft body fixes (scale, spawn, teleport, velocity, suspend, deformer).
 
-    build/bin/RangeEngine.exe -b --python tools/tests/soft_body_test.py -- --make-scene soft_body.range
-    build/bin/RangeRuntime.exe soft_body.range
+    build/bin/AnastacioEngine.exe -b --python tools/tests/soft_body_test.py -- --make-scene soft_body.range
+    build/bin/AnastacioRuntime.exe soft_body.range
 
 Results are printed with the SOFT_BODY prefix and written to
 soft_body_test_result.txt next to the scene.

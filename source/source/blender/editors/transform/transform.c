@@ -1684,12 +1684,17 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 		glPushMatrix();
 
+		/* smooth, DPI-scaled lines, like the other overlays */
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 		switch (t->helpline) {
 			case HLP_SPRING:
 				UI_ThemeColor(TH_VIEW_OVERLAY);
 
 				setlinestyle(3);
-				glLineWidth(1);
+				glLineWidth(U.pixelsize);
 				glBegin(GL_LINES);
 				glVertex2iv(t->mval);
 				glVertex2fv(cent);
@@ -1699,7 +1704,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glRotatef(-RAD2DEGF(atan2f(cent[0] - t->mval[0], cent[1] - t->mval[1])), 0, 0, 1);
 
 				setlinestyle(0);
-				glLineWidth(3.0);
+				glLineWidth(2.0f * U.pixelsize);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
 				break;
@@ -1708,7 +1713,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				glTranslate2iv(mval);
 
-				glLineWidth(3.0);
+				glLineWidth(2.0f * U.pixelsize);
 				drawArrow(RIGHT, 5, 10, 5);
 				drawArrow(LEFT, 5, 10, 5);
 				break;
@@ -1717,7 +1722,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				glTranslate2iv(mval);
 
-				glLineWidth(3.0);
+				glLineWidth(2.0f * U.pixelsize);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
 				break;
@@ -1731,7 +1736,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				UI_ThemeColor(TH_VIEW_OVERLAY);
 
 				setlinestyle(3);
-				glLineWidth(1);
+				glLineWidth(U.pixelsize);
 				glBegin(GL_LINES);
 				glVertex2iv(t->mval);
 				glVertex2fv(cent);
@@ -1740,7 +1745,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glTranslatef(cent[0] - t->mval[0] + mval[0], cent[1] - t->mval[1] + mval[1], 0);
 
 				setlinestyle(0);
-				glLineWidth(3.0);
+				glLineWidth(2.0f * U.pixelsize);
 				drawArc(dist, angle - delta_angle, angle - spacing_angle, 10);
 				drawArc(dist, angle + spacing_angle, angle + delta_angle, 10);
 
@@ -1766,7 +1771,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				glTranslate2iv(mval);
 
-				glLineWidth(3.0);
+				glLineWidth(2.0f * U.pixelsize);
 
 				UI_make_axis_color(col, col2, 'X');
 				glColor3ubv((GLubyte *)col2);
@@ -1783,6 +1788,10 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 			}
 		}
 
+		glLineWidth(1.0f);
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
+
 		glPopMatrix();
 	}
 }
@@ -1791,11 +1800,20 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 {
 	TransInfo *t = arg;
 
-	glLineWidth(1.0);
+	glLineWidth(U.pixelsize);
+
+	/* constraint axes, proportional circle and snap marks: anti-aliased */
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	drawConstraint(t);
 	drawPropCircle(C, t);
 	drawSnapping(C, t);
+
+	glDisable(GL_BLEND);
+	glDisable(GL_LINE_SMOOTH);
+	glLineWidth(1.0f);
 
 	/* edge slide, vert slide */
 	drawEdgeSlide(t);

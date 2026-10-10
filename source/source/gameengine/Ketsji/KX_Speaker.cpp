@@ -38,6 +38,7 @@
 #include "DNA_object_types.h"
 
 #include <cmath>
+#include <cstring>
 
 #ifdef WITH_AUDASPACE
 typedef float sample_t;
@@ -55,6 +56,25 @@ typedef float sample_t;
 #include "KX_Globals.h"
 #include "KX_PyMath.h"  // needed for PyObjectFrom()
 #include <iostream>
+
+#ifdef WITH_AUDASPACE
+/* Cache the values actually accepted by this handle, independently for each component. */
+static void update_sound_transform(AUD_Handle *handle,
+                                   int (*setter)(AUD_Handle *, const float *),
+                                   const float *value,
+                                   float *cached,
+                                   size_t count,
+                                   bool &valid)
+{
+  const size_t bytes = count * sizeof(float);
+  if (!valid || std::memcmp(value, cached, bytes) != 0) {
+    if (setter(handle, value)) {
+      std::memcpy(cached, value, bytes);
+      valid = true;
+    }
+  }
+}
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Native functions                                                          */
@@ -127,6 +147,7 @@ void KX_Speaker::startInitPlay()
 void KX_Speaker::play()
 {
 #ifdef WITH_AUDASPACE
+  m_sound3DValid[0] = m_sound3DValid[1] = m_sound3DValid[2] = false;
   if (m_handle) {
     AUD_Handle_stop(m_handle);
     m_handle = nullptr;
@@ -227,6 +248,7 @@ void KX_Speaker::ProcessReplica()
 #ifdef WITH_AUDASPACE
   m_handle = nullptr;
   m_sound = m_sound ? AUD_Sound_copy(m_sound) : nullptr;
+  m_sound3DValid[0] = m_sound3DValid[1] = m_sound3DValid[2] = false;
 
   if (m_startinit)
     play();
@@ -259,13 +281,16 @@ void KX_Speaker::Update()
       p = (NodeGetWorldPosition() - cam->NodeGetWorldPosition());
       p = Mo * p;
       p.Pack(data);
-      AUD_Handle_setLocation(m_handle, data);
+      update_sound_transform(m_handle, AUD_Handle_setLocation, data,
+                             m_sound3DState, 3, m_sound3DValid[0]);
       p = (GetLinearVelocity() - cam->GetLinearVelocity());
       p = Mo * p;
       p.Pack(data);
-      AUD_Handle_setVelocity(m_handle, data);
+      update_sound_transform(m_handle, AUD_Handle_setVelocity, data,
+                             m_sound3DState + 3, 3, m_sound3DValid[1]);
       mt::quat::FromMatrix(Mo * NodeGetWorldOrientation()).Pack(data);
-      AUD_Handle_setOrientation(m_handle, data);
+      update_sound_transform(m_handle, AUD_Handle_setOrientation, data,
+                             m_sound3DState + 6, 4, m_sound3DValid[2]);
     }
   }
   else {
@@ -408,6 +433,26 @@ void KX_Speaker::ApplyAreaReverb(const RangeReverbAreaSettings *area, float infl
   (void)area;
   (void)influence;
 #endif  // WITH_AUDASPACE
+}
+
+void KX_Speaker::SuspendSound()
+{
+#ifdef WITH_AUDASPACE
+  if (m_handle && AUD_Handle_getStatus(m_handle) == AUD_STATUS_PLAYING) {
+    AUD_Handle_pause(m_handle);
+    m_suspendPaused = true;
+  }
+#endif  // WITH_AUDASPACE
+}
+
+void KX_Speaker::ResumeSound()
+{
+#ifdef WITH_AUDASPACE
+  if (m_suspendPaused && m_handle && AUD_Handle_getStatus(m_handle) == AUD_STATUS_PAUSED) {
+    AUD_Handle_resume(m_handle);
+  }
+#endif  // WITH_AUDASPACE
+  m_suspendPaused = false;
 }
 
 #ifdef WITH_PYTHON

@@ -229,6 +229,7 @@ int KX_AddObjectActuator::pyattr_set_object(EXP_PyObjectPlus *self, const struct
 	}
 
 	actuator->m_OriginalObject = gameobj;
+	actuator->m_onDemandName.clear();
 
 	if (actuator->m_OriginalObject) {
 		actuator->m_OriginalObject->RegisterActuator(actuator);
@@ -260,6 +261,19 @@ PyObject *KX_AddObjectActuator::PyInstantAddObject()
 KX_GameObject *KX_AddObjectActuator::ResolveOriginalObject()
 {
 	if (m_objectProperty.empty()) {
+		if (!m_OriginalObject && !m_onDemandName.empty()) {
+			// Tried once: on failure the warning isn't repeated every frame.
+			const std::string name = m_onDemandName;
+			m_onDemandName.clear();
+			std::string error;
+			m_OriginalObject = KX_GetActiveEngine()->GetConverter()->ConvertSceneObject(m_scene, name, true, error);
+			if (m_OriginalObject) {
+				m_OriginalObject->RegisterActuator(this);
+			}
+			else {
+				CM_Warning("AddObject actuator \"" << GetName() << "\": can't load \"" << name << "\": " << error);
+			}
+		}
 		return m_OriginalObject;
 	}
 
@@ -278,6 +292,11 @@ KX_GameObject *KX_AddObjectActuator::ResolveOriginalObject()
 	if (!ob) {
 		// Linked object registered in bmain but not instantiated in any scene yet.
 		ob = KX_GetActiveEngine()->GetConverter()->FindOrConvertMainObject(name, m_scene);
+	}
+	if (!ob) {
+		// Object of this scene left out at load (Load Mode "On Demand").
+		std::string error;
+		ob = KX_GetActiveEngine()->GetConverter()->ConvertSceneObject(m_scene, name, true, error);
 	}
 	if (!ob) {
 		CM_Warning("AddObject actuator \"" << GetName() << "\": no inactive object named \"" << name

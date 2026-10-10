@@ -40,6 +40,7 @@
 #include "GPU_extensions.h"
 #include "GPU_framebuffer.h"
 #include "GPU_glew.h"
+#include "GPU_shader.h"
 #include "GPU_texture.h"
 
 static struct GPUTextureGlobal {
@@ -115,6 +116,7 @@ static GPUTexture *GPU_texture_create_nD(
 {
 	GLenum type, format, internalformat;
 	void *pixels = NULL;
+	GPU_profile_counters[GPU_PROFILE_TEXTURES]++;
 
 	if (samples) {
 		CLAMP_MAX(samples, GPU_max_color_texture_samples());
@@ -129,6 +131,7 @@ static GPUTexture *GPU_texture_create_nD(
 	tex->target_base = (n == 1) ? GL_TEXTURE_1D : GL_TEXTURE_2D;
 	tex->depth = (mode & GPU_TEXTURE_DEPTH);
 	tex->fb_attachment = -1;
+	GPU_profile_log_texture(w, h, tex->depth, samples);
 
 	glGenTextures(1, &tex->bindcode);
 

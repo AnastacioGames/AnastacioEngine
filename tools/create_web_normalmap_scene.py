@@ -4,7 +4,7 @@ Teste de normal map desktop x Web usando a cena que o motor abre ao iniciar
 (source/release/datafiles/startup.blend: cubo e plano com projects-teste/cubo_normal.dds como normal
 map, camera e Sun). A cena e aberta como esta; so as imagens sao convertidas para caminho absoluto e
 empacotadas, para o .range rodar em qualquer pasta e no pacote Web. Rode o mesmo
-build-web/bin/web-normalmap.range com RangeRuntime.exe e no navegador e compare.
+build-web/bin/web-normalmap.range com AnastacioRuntime.exe e no navegador e compare.
 Saida: build-web/bin/web-normalmap.range.
 """
 import bpy

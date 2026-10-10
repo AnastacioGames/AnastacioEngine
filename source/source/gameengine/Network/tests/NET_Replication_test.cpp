@@ -809,6 +809,27 @@ TEST(NetReplication, ReconnectGetsFullState)
 	EXPECT_NEAR(a->world.objects[crate2].s.position[1], 7.0f, 0.001f);
 }
 
+TEST(NetReplication, SceneObjectOwnerReachesClientThatWasNotReady)
+{
+	/* Scene objects have no Spawn: an owner set while the client was not ready must still reach it. */
+	Net net;
+	net.addSceneObject(3, ReplicatedObjectDesc(), stateAt(1.0f, 0.0f, 0.0f));
+	Client *a = &net.addClient("Ana", 777);
+	net.connectAll();
+	const ClientId id = a->session->clientId();
+	net.removeClient(*a);
+	net.step(5);
+	net.replicator->setOwner(3, id);
+	net.step(2);
+
+	a = &net.addClient("Ana", 777);
+	net.connectAll();
+	net.step(3);
+	ASSERT_EQ(a->session->clientId(), id);
+	EXPECT_EQ(a->world.objects[3].owner, id);
+	EXPECT_EQ(a->replica->owner(3), id);
+}
+
 TEST(NetReplication, ClientDropsOldSnapshotsAndRequestsFullState)
 {
 	// Feed the replica client directly, without a server.

@@ -92,6 +92,8 @@ protected:
 #ifdef WITH_AUDASPACE
   AUD_Sound *m_sound;
   AUD_Handle *m_handle;
+  float m_sound3DState[10] = {};
+  bool m_sound3DValid[3] = {};
 #endif  // WITH_AUDASPACE
   float m_volume;
   float m_pitch;
@@ -106,6 +108,8 @@ protected:
   /* Reverb area state (see ApplyAreaReverb): the effect currently on this speaker was set by
    * the scene's reverb areas, not by a script, and came from this area's settings. */
   bool m_areaReverb;
+  /// Paused by SuspendSound (scene suspended), not by a script.
+  bool m_suspendPaused = false;
   const struct RangeReverbAreaSettings *m_areaReverbSource;
 
   void startInitPlay();
@@ -138,6 +142,10 @@ protected:
 
   void Update();
   void UpdateEffect();
+
+  /// Scene suspend: pauses the sound if it is playing (remembered), resume plays only those again.
+  void SuspendSound();
+  void ResumeSound();
 
   /** Applies the listener's dominant reverb area to this speaker (3D speakers only).
    * \param area The area settings, nullptr when the listener is in no area.

@@ -74,6 +74,7 @@ class KX_NavMeshObject;
 class KX_WorldInfo;
 class KX_Camera;
 class KX_RainAura;
+class KX_RainSurfaceMask;
 class KX_RainLightning;
 class KX_FontObject;
 class KX_Speaker;
@@ -159,6 +160,8 @@ private:
 	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
 	std::unique_ptr<KX_RainAura> m_rainAura;
 	std::unique_ptr<KX_RainLightning> m_rainLightning;
+	/// World > Rain > Ripples/Splash only on objects with ripples_effect/splash_effect.
+	std::unique_ptr<KX_RainSurfaceMask> m_rainSurfaceMask;
 
 	/// Objects flagged use_gpu_particle_collider (Object.gameflag2 & OB_GPU_PARTICLE_COLLIDER),
 	/// cached the same way as m_gpuParticleObjects. Drives the Screen-Space collision depth
@@ -191,6 +194,7 @@ private:
 	/// Manager used to update all the mesh bounding box.
 	RAS_BoundingBoxManager *m_boundingBoxManager;
 
+	/// Objects with a lifetime (KX_GameObject::m_lifeTime > 0), counted down in LogicBeginFrame.
 	std::vector<KX_GameObject *> m_tempObjectList;
 
 	/**
@@ -206,6 +210,12 @@ private:
 	EXP_ListValue<KX_LightObject> *m_lightlist;
 	/// All objects that are not in the active layer.
 	EXP_ListValue<KX_GameObject> *m_inactivelist;
+	/** Name -> object index mirroring m_inactivelist, so FindInactiveObjectByName() is O(1)
+	 * instead of the linear EXP_BaseListValue::FindValue() scan (hot path: every addObject()
+	 * with a template name resolves through here). Keeps "first match wins" semantics of the
+	 * old linear scan via emplace() (no overwrite) on insert; see IndexInactiveObject() /
+	 * UnindexInactiveObject(). */
+	std::unordered_map<std::string, KX_GameObject *> m_inactiveNameIndex;
 	/// All animated objects, no need of EXP_ListValue because the list isn't exposed in python.
 	std::vector<KX_GameObject *> m_animatedlist;
 
@@ -286,6 +296,23 @@ private:
 	int m_lastCullingTotalObjects;
 	int m_lastCullingTestedObjects;
 	int m_lastCullingVisibleObjects;
+
+	/** Per-object culling data gathered once for all shadow passes of a frame (see
+	 * BeginShadowCulling). Reading it back from the objects costs several cache misses per
+	 * object, and with point lights and cascades that was repeated for every pass. */
+	struct ShadowCullEntry {
+		KX_GameObject *m_object;
+		int m_layer;
+		float m_radius;
+		mt::vec3 m_center;
+		mt::vec3 m_aabbMin;
+		mt::vec3 m_aabbMax;
+		mt::mat3x4 m_trans;
+	};
+	std::vector<ShadowCullEntry> m_shadowCullCache;
+	bool m_shadowCullScope = false;
+	bool m_shadowCullCacheValid = false;
+	void BuildShadowCullCache();
 
 	/** Light/shadow counters from the last KX_ShadowRenderer::Render() call for
 	 * this scene: total lights in the scene, and how many shadow passes (cascade splits
@@ -413,6 +440,14 @@ private:
 	KX_GameObject *FindInactiveObjectAcrossScenes(const std::string& name);
 
 public:
+	/** O(1) name lookup into m_inactivelist via m_inactiveNameIndex (see its comment).
+	 * Used instead of GetInactiveList()->FindValue(name) on the hot addObject() path. */
+	KX_GameObject *FindInactiveObjectByName(const std::string& name) const;
+	/// Register/unregister a single object in m_inactiveNameIndex. Call alongside every
+	/// m_inactivelist->Add()/RemoveValue() so the index never goes stale.
+	void IndexInactiveObject(KX_GameObject *gameobj);
+	void UnindexInactiveObject(KX_GameObject *gameobj);
+
 	KX_Scene(SCA_IInputDevice *inputDevice,
 	         const std::string& scenename,
 	         Scene *scene,
@@ -541,6 +576,14 @@ public:
 
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, RAS_Rasterizer::StereoEye eye, int layer, bool is_shadowbuf);
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf);
+	/** Until EndShadowCulling(), shadow-buffer CalculateVisibleMeshes() calls test a snapshot
+	 * of the renderable objects' bounds, taken at the first such call. Objects must not move
+	 * in between (shadow rendering runs no logic). */
+	void BeginShadowCulling();
+	void EndShadowCulling();
+	/** The bounds snapshot of the current shadow culling scope (built on first use). Lets the
+	 * shadow renderer see which objects moved near a light without walking the objects again. */
+	const std::vector<ShadowCullEntry>& GetShadowCullSnapshot();
 
 	RAS_DebugDraw& GetDebugDraw();
 	/// \section Debug draw.
@@ -552,6 +595,10 @@ public:
 
 	/// Replicate the logic bricks associated to this object.
 	void ReplicateLogic(KX_GameObject *newobj);
+
+	/** Set remaining lifetime in seconds (0 = lives forever) and keep m_tempObjectList in sync.
+	 * Returns false for inactive (template) objects, which must never be auto removed. */
+	bool SetObjectLifeTime(KX_GameObject *gameobj, float seconds);
 
 	// Suspend the entire scene.
 	void Suspend();
@@ -575,6 +622,8 @@ public:
 	/// World > Rain > Aura: silhouette strokes, once per frame after the final transforms.
 	void UpdateRainAura(double time);
 	KX_RainAura *GetRainAura() const;
+	/// Created on first use (render thread, GL context current).
+	KX_RainSurfaceMask *GetRainSurfaceMask();
 	/// World > Rain > Lightning: created on the first strike or when the option is on.
 	void UpdateRainLightning(double time);
 	KX_RainLightning *GetRainLightning() const;
@@ -687,6 +736,7 @@ public:
 #ifdef WITH_PYTHON
 
 	EXP_PYMETHOD_DOC(KX_Scene, addObject);
+	EXP_PYMETHOD_DOC(KX_Scene, convertObject);
 	EXP_PYMETHOD_DOC(KX_Scene, end);
 	EXP_PYMETHOD_DOC(KX_Scene, restart);
 	EXP_PYMETHOD_DOC(KX_Scene, replace);
@@ -704,6 +754,7 @@ public:
 	static PyObject *pyattr_get_name(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_objects(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_objects_inactive(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_unconverted_objects(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_lights(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_texts(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_speakers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

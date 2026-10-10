@@ -69,6 +69,10 @@ class MATERIAL_MT_specials(Menu):
         layout.operator("material.copy", icon='COPYDOWN')
         layout.operator("material.paste", icon='PASTEDOWN')
 
+        if context.scene.render.engine == 'BLENDER_GAME':
+            layout.separator()
+            layout.operator("material.to_pbr_nodes", icon='NODETREE')
+
 
 class MATERIAL_UL_matslots(UIList):
 
@@ -200,7 +204,16 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
         col = layout.column(align=True)
         col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
         col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
+
+        # A receita existe nos dois caminhos de shading; cada botão monta um e deixa a cena
+        # no modo correspondente, senão o material fica montado para um caminho que não desenha.
+        col.label(text="Wet/Reflective Patches:")
+        row = col.row(align=True)
+        row.operator("material.recipe_wet_patches", text="PBR", icon='MOD_OCEAN').shading = 'PBR'
+        row.operator("material.recipe_wet_patches", text="Classic", icon='MOD_OCEAN').shading = 'LEGACY'
+
         col.operator_menu_enum("material.recipe_preset", "preset", text="Ready-made Material", icon='MATERIAL')
+        col.operator("material.to_pbr_nodes", icon='NODETREE')
 
         if not mat or RECIPE_KEY not in mat:
             return
@@ -210,6 +223,18 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
             row = layout.row()
             row.label(text="Tiling: %.2f" % get_tiling(mapping))
             row.operator("material.recipe_tiling", text="Change", icon='FULLSCREEN_ENTER')
+
+        if mat.get(RECIPE_KEY) == "wet_patches":
+            box = layout.box()
+            box.label(text="Wet/reflective patches (paint white where they appear)")
+            mask = find_node(mat, "AE_wet_mask")
+            if mask:
+                row = box.row()
+                row.operator("material.recipe_paint_mask", icon='BRUSH_DATA')
+                img = node_image(mask)
+                if img and img.is_dirty:
+                    box.label(text="The mask was painted: save it (Image > Save As) or pack it", icon='ERROR')
+            return
 
         if mat.get(RECIPE_KEY) != "mask_blend":
             return
@@ -1299,12 +1324,46 @@ class MATERIAL_PT_custom_props(MaterialButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Material
 
 
+class MATERIAL_PT_anastacio_atlas(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'material'
+    bl_label = "Anastacio Material Atlas"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob is not None and ob.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        layout.label("Combine opaque PBR materials", icon='MATERIAL')
+        layout.label("Keeps original mesh and Lightmap UV", icon='INFO')
+        col = layout.column()
+        col.enabled = (ob.mode == 'OBJECT' and
+                       context.scene.game_settings.use_shading_nodes)
+        col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
+        layout.label("Escape cancels the bake and restores the source", icon='INFO')
+        if ob.data.get('_anastacio_atlas_source') is not None:
+            row = layout.row()
+            row.enabled = ob.mode == 'OBJECT'
+            row.operator("material.anastacio_atlas_restore", icon='LOOP_BACK')
+            layout.label("Restores the original mesh, including UVs", icon='INFO')
+            layout.label("Rebake lighting if baked after the atlas", icon='INFO')
+        if not context.scene.game_settings.use_shading_nodes:
+            layout.label("Enable PBR Shading Nodes", icon='INFO')
+        if ob.mode != 'OBJECT':
+            layout.label("Switch to Object Mode", icon='INFO')
+
+
 classes = (
     MATERIAL_MT_sss_presets,
     MATERIAL_MT_specials,
     MATERIAL_UL_matslots,
     MATERIAL_PT_context_material,
     MATERIAL_PT_recipes,
+    MATERIAL_PT_anastacio_atlas,
     MATERIAL_PT_preview,
     MATERIAL_PT_pipeline,
     MATERIAL_PT_diffuse,

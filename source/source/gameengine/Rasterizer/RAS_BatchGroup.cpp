@@ -184,6 +184,8 @@ bool RAS_BatchGroup::SplitMeshUser(RAS_MeshUser *meshUser)
 		}
 	}
 
+	OnMeshUserSplit(meshUser);
+
 	// Deference batch groups by setting it to nullptr.
 	meshUser->SetBatchGroup(nullptr);
 

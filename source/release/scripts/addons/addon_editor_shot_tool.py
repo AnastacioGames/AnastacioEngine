@@ -271,7 +271,7 @@ def draw_labeled_prop(layout, prop, label):
     try:
         split = layout.split(factor=0.45)
     except TypeError:
-        split = layout.split(percentage=0.45)
+        split = layout.split(factor=0.45)
     split.label(text=label)
     split.prop(prop, "value", text="")
 

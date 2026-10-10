@@ -98,6 +98,8 @@ _PT_BR = {
     "For games that read the keyboard: the d-pad presses the arrow keys and the buttons press Space and Enter": "Para jogos que leem o teclado: o d-pad aperta as setas e os botões apertam Espaço e Enter",
     "First person (WASD + look)": "Primeira pessoa (WASD + olhar)",
     "For first-person games that read the keyboard and mouse: the left stick presses W/A/S/D, the right stick moves the mouse to look around and the buttons press Space and the left mouse button": "Para jogos em primeira pessoa que leem teclado e mouse: o stick esquerdo aperta W/A/S/D, o direito move o mouse para olhar em volta e os botões apertam Espaço e o botão esquerdo do mouse",
+    "Racing (steer + pedals)": "Corrida (direção + pedais)",
+    "For racing games that read gamepad 0: steering on the left stick, pedals on the triggers, A/B/X/Y, Start and RB. A button lets the player switch between stick, arrows and tilting the device": "Para jogos de corrida que leem o gamepad 0: direção no stick esquerdo, pedais nos gatilhos, A/B/X/Y, Start e RB. Um botão deixa o jogador trocar entre stick, setas e inclinar o aparelho",
     "Stick mode": "Modo do stick",
     "Where the on-screen stick appears": "Onde o stick da tela aparece",
     "Where the finger touches": "Onde o dedo toca",

@@ -92,8 +92,15 @@ typedef struct SpaceInfo {
 	/* End 'SpaceLink' header. */
 
 	char rpt_mask;
-	char pad[7];
+	char flag;
+	char pad[6];
 } SpaceInfo;
+
+/* SpaceInfo.flag */
+typedef enum eSpaceInfo_Flag {
+	INFO_SHOW_SCENE_SELECTOR = (1 << 0),
+	INFO_HIDE_SCREEN_SELECTOR = (1 << 1),
+} eSpaceInfo_Flag;
 
 /* SpaceInfo.rpt_mask */
 typedef enum eSpaceInfo_RptMask {

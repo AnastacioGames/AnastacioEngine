@@ -6,6 +6,28 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+Editor Windows: `AnastacioEngine.exe`, produzido pelo alvo interno `RangeEngine` desde 2026-10-08.
+Player Windows: `AnastacioRuntime.exe`, produzido pelo alvo `RangeRuntime` desde 2026-10-08.
+Resolução do player aceita o nome legado nos projetos; formatos, APIs e preferências mantêm compatibilidade.
+Linux e artefatos Web/Android conservam os nomes anteriores.
+Build, abertura/save de projeto, Cook e pacote extraído passaram em testes controlados;
+validações manuais pendentes estão no [plano de migração](docs/executable-rename-plan.md).
+Pacotes Windows locais atualizados, separados para engine e RangeArmor, passaram em
+extração/execução, cooking e exportação sem símbolos de debug. Hashes em
+`build/dist/validation-20261008-113829/SHA256SUMS.txt`; não publicados.
+
+A integração inicial de cooking no RangeArmor prepara o `.cooked` do arquivo protegido antes
+de empacotar, gera a entrega em staging e preserva a entrega anterior. Fonte recuperado em
+`tools/rangearmor/`; launcher Windows atualizado e pacote extraído executado em cena controlada.
+RangeArmor resolve nomes Windows novo/legado sem alterar config do autor, adapta o config
+da entrega e encontra a instalação portátil sem variáveis de ambiente. Novo player passou
+Cook, standalone pelo editor e export nativo com jogo incorporado.
+Painel Rust recompilado com tratamento de exit code e leitura completa dos logs das tarefas;
+26 testes e abertura/fechamento do executável instalado passaram.
+Exportação pelos botões da GUI, ZIP extraído/executado e diagnóstico de erro passaram em
+cena controlada. Usuário confirmou que o jogo rodou; benefício do cache no jogo real,
+LibLoad, Linux e outra GPU seguem pendentes no [plano](docs/rangearmor-update-plan.md).
+
 RangeArmor estÃ¡ validada para runtimes Windows/Linux x86_64, com cÃ³pia dos runtimes disponÃ­veis,
 exportaÃ§Ã£o `.zip`/`.tar.xz` e interface sem alvos 32-bit. Campos 32-bit antigos permanecem aceitos
 somente para leitura de projetos legados.
@@ -22,10 +44,42 @@ Um item só entra no roadmap de engine quando exige mudança em `source/` e reco
 cena, preparação de assets e scripts independentes são registrados no changelog ou na documentação da
 ferramenta correspondente.
 
+## Demos de materiais de nós
+
+As [11 demos de nós revisadas](demos/revisados/README.md) ficam em `demos/revisados/`, com frames e
+notas por etapa, preservando os originais. A revisão inclui extremos exatos de dissolve e cobertura,
+nível de espuma em coordenadas do mundo, microrelevo triplanar, dimensões seguras de Interior Mapping
+e casco de contorno toon gravado na malha para o player.
+São mudanças de assets/Python, com execução das 11 cópias validada no player em 2026-10-07; a avaliação
+visual no editor e no jogo real permanece pendente.
+
+## Atlas de materiais nativo
+
+Properties > Material > Anastacio Material Atlas: operador C++ para um mesh ativo com materiais PBR
+opacos Principled. Gera Base Color, Roughness, Metallic, Specular e Normal, packed PNG 16 bits, UV
+AnastacioAtlas e material único; preserva malha fonte como backup e a UV Lightmap existente.
+Build editor/player, testes de dados/pixels e carregamento no standalone validados em 2026-10-07;
+GPU OpenCL AMD RX 6800M, bakes reais de GI nas duas ordens, Undo/Redo com passos explícitos em editor
+com janela e execução Web no Edge/WebGL 2 passaram em cena controlada. Aceitação visual no jogo real
+permanece pendente. [Escopo, uso e pesquisa](docs/material-atlas-plan.md).
+Restore Original Materials restaura a malha fonte inteira a partir de referência persistente,
+preservando o atlas e outros objetos. Novos bakes registram o backup; restore após renomear,
+salvar/reabrir e compartilhar a malha passou. Interface usa jobs nativos por passe e Escape pede
+cancelamento, aguardando o baker antes do rollback. Testes modais de cancelamento no início/depois
+de mapas, erro intermediário e conclusão com Undo/Redo automático passaram; scripts/background
+continuam síncronos por padrão. Tecla física e aparência real ainda precisam de teste manual.
+
 ## Capacidades herdadas que não devem ser reimplementadas
 
 - GPU instancing com `RAS_InstancingBuffer` e `RAS_DisplayArrayBucket::RunInstancingNode`.
 - Batching estático com `RAS_BatchDisplayArray` e `RAS_BatchGroup`.
+- Batching estático (2026-10-08): opção **Static Batch** por objeto (Static/No Collision) junta os
+  marcados num `KX_BatchGroup` ao iniciar; membro que se move ou é destruído sai do grupo sozinho
+  (`SetMatrix` compara a matriz). Culling DBVT só reenvia AABB quando a malha muda
+  (`RAS_MeshBoundingBox::Update`). Decisão: numa cena parada, o trabalho de atualização por frame
+  deve ser ~0; conferir com os contadores de `getRenderStats()`. Detalhes em
+  [batching-estatico-e-culling.md](docs/batching-estatico-e-culling.md) e
+  [auditoria-trabalho-repetido.md](docs/auditoria-trabalho-repetido.md).
 - LOD por distância com `KX_LodManager` e `KX_LodLevel`.
 - Frustum culling com `SG_CullingNode`, `KX_CullingHandler` e `SG_Frustum`.
 - Occlusion culling por DBVT do Bullet. A cena usa `use_occlusion_culling`, e objetos grandes podem ser
@@ -35,7 +89,87 @@ ferramenta correspondente.
 
 ## Melhorias implementadas
 
+### Complemento Steam opcional (Windows)
+
+Carregador opcional nativo com ABI C versionada, contexto opaco e encerramento antes
+de descarregar a biblioteca, em `source/source/gameengine/Network/NET_AnastacioPlugin.*`.
+Windows/MSVC: módulo `ge_network` compilado e DLLs de prova executadas na suíte isolada.
+A engine comum não depende de Steamworks. Complemento separado Windows x64 compilado
+com SDK 1.55, serviço único por processo e API `Range.network.steam` para init/status/shutdown.
+Player real validou callbacks com DLL de prova e carregamento da DLL SDK, que informou Steam fechada.
+Inicialização online, identidade, callbacks e reinicialização validados no player Windows com
+conta conectada e AppID 480 (2026-10-07). AppID comercial ainda não validado.
+Adaptador ISteamNetworkingSockets reutiliza a sessão/replicação nativa via seleção
+`transport='steam'` em host/join. ABI C v2, lanes independentes e bloqueio de unload com
+transporte ativo. Socket pair real do SDK validou canais, handshake, chat, transform/propriedade,
+spawn/despawn e ownership. Salas filtradas, cancelamento e menu ImGui passaram numa conta.
+Componente `anastacio_network.component.AnastacioNetworkComponent` distribuído com a engine;
+player importa módulos instalados e editor limpa helpers validados com Range temporário.
+Exportador nativo inclui componente e complemento opcional, Python e CRT; pacote LAN inicia
+sem Steam. RolimaRacer recebeu adaptadores de menu/regras e SDK compartilhado para idioma/conquistas.
+Revisão local: cancelamento/timeout liberam operações e recolhem salas tardias; convites
+de abertura leem argv. Transporte preserva desconexões e descarta pacotes antigos por lane.
+Componente tem show/hide/return_to_lobby, confirmação ao trocar de sessão, nomes no chat
+e endereços LAN. Retorno nativo reseta prontidão e libera novas entradas; controlador
+reabre Steam após carregar a cena de menu. Duas partidas e reentrada passaram em dois
+players ENet locais; ida/volta de cenas mínimas e menu Steam passaram numa conta.
+Ainda pendentes: prova externa/relay, convites em duas contas, corrida/carros reais e AppID comercial.
+Detalhes no [guia](docs/steam-complement-development.md) e [plano](docs/steam-multiplayer-plan.md).
+Web exclui o carregador; build Web não revalidado. Linux Steam ainda não suportado nesta entrega.
+
 ### Performance
+
+- **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar
+  luzes. Reativacao prepara o material antes de gerar a arvore de desenho. Editor/player
+  e comparacao no runtime passaram: 25 preparacoes -> 1 com um cubo desenhado,
+  -> 0 com todos ocultos; retorno dos 24 draws preservado. Concluido por aceite do
+  usuario; FPS e visual real nao foram medidos.
+
+- **RA3 (zsort):** primeira peca conserva a direcao da ultima ordenacao aceita no IBO
+  compartilhado, evitando map/sort/escrita quando continua valida. Posicoes, topologia,
+  recriacao e sobrescrita invalidam; falhas de map/unmap exigem nova tentativa. Diferencial
+  isolado, editor/player e runtime passaram; usuario confirmou o visual da cena corrigida
+  em 2026-10-09. A/B isolado de repouso/movimento executado: ganho de tempo/FPS
+  inconclusivo nas tres rodadas por modo/versao. RolimaRacer/Pista_1 abriu estavel
+  e o usuario confirmou a validacao visual no jogo nesta retomada; integrado em `12741810`.
+  Procedimento em [plano RA3](docs/ra3-transparencia-plan.md).
+
+- KX14 (2026-10-09): `Text-Res` conserva o texto da propriedade, evitando conversao/excecao
+  repetida enquanto a entrada nao muda; valores invalidos mantem a ultima resolucao valida.
+  Speakers conservam separadamente posicao, velocidade e orientacao enviadas ao handle:
+  dados iguais nao repetem setters de audio, falhas sao tentadas novamente e novos handles/
+  replicas invalidam o cache. Calculos relativos a camera continuam por update; testes
+  isolados/runtime passaram. Ganho de FPS, visual e avaliacao auditiva reais pendentes.
+
+- KX11 (2026-10-09): `GPULamp` conserva a matriz de entrada e a escala para evitar
+  normalizacao/inversa repetidas; o cone recalcula o cosseno somente quando o angulo muda.
+  Hide/layer, dimensoes Area e projecoes de sombra continuam atualizados. Teste diferencial
+  isolado e runtime antes/depois passaram; ganho de FPS e visual no jogo real pendentes.
+
+- O profiler conta entradas e comandos efetivos de uniform nas fases de objeto,
+  sombra, luzes/IES, probes, dano e skinning (2026-10-08). Controle de Object Info
+  confirmou envios de matriz/vetor. Material legado: só camada por objeto; controle
+  Principled: 19 comandos de estado padrão por objeto mesmo sem mapas de sombra e
+  probes locais antes do cache. Probes ausentes agora enviam uma vez por ativação
+  do material (12800 → 8 comandos/quadro no controle de 1600 objetos); sombras e
+  luzes/IES permanecem por objeto. Transições isoladas passaram. Série sem profiler
+  no controle PBR: 240 → 289 FPS em MSAA 2/AF 2 e 243 → 293 em 4/4 (cerca de 20%).
+  Visual e ganho no jogo real seguem pendentes. Lógica/física intactas.
+
+- Cache da camada do objeto por ativação do material (2026-10-08): 1600 → 1
+  uniforms inteiros no controle legado. Trocas de camada e reativação de programa
+  compartilhado continuam enviando o valor; matrizes permanecem por objeto.
+  Ganho consistente de FPS não demonstrado (+0,89% em 2X; 4X variável).
+  Física boa/sem lag confirmados pelo usuário no standalone de 2560×1440 antes
+  dessa segunda peça, com limite de 60 FPS; validação visual desta peça pendente.
+
+- Diagnóstico do render por objeto (2026-10-08): profiler com amostragem 1/61 separa
+  estado, ativação de material, matrizes e submissão. Na cena sintética de 1600 objetos
+  sem instancing, ativação do material foi a maior fase individual, com custo também
+  em matrizes e desenhos. Contadores de entrada em bind de luz não equivalem a uploads
+  efetivos. Tempos pequenos exigem comparar com o piso do cronômetro; nenhuma otimização
+  de comportamento introduzida pelos marcadores. Caches posteriores são descritos
+  acima. Procedimento em `docs/engine-profiling.md`.
 
 - O buffer de instancing conserva capacidade e só realoca quando necessário; o rebind redundante dos
   atributos por frame também foi eliminado.
@@ -84,6 +218,10 @@ ferramenta correspondente.
   compatibility profile. Os no-ops aceitos no core são motion blur legado e texto de debug baseado
   em `BLF_draw`. O corte de espelho/água (`KX_PlanarMap`) usa projeção oblíqua e funciona em compat, core e
   WebGL2. A textura Realtime Planar precisa de uma imagem associada, senão não renderiza.
+- Auto Shadow de Spot/Point compara casters com o mapa existente e so o reconstrui quando a sombra
+  invalida; a varredura do snapshot por frame permanece. Build e regressao em Point passaram;
+  benchmark sintetico estatico mediu 0,613 -> 0,194 ms em sombras e +28,3% na mediana de FPS.
+  Ganho no jogo real e demais validacoes ficam na auditoria KX10.
 - CSM para luzes Sun usa três cascatas ajustadas ao frustum e considera os bounds dos casters no recorte Z.
   O bug de sombra estática ausente no ângulo inicial foi corrigido e confirmado visualmente.
 - Novas Lamps já nascem com o preset de sombras para Sun: mapa Simple com filtro PCF, 1024 px na cascata
@@ -167,10 +305,28 @@ ferramenta correspondente.
   antigo que seu source Rust (`source/launcher/src/main.rs`), é recompilado automaticamente com
   `cargo build --release` antes de ser copiado, sem diálogo nem passo manual — evita que um
   binário desatualizado volte a causar o jogo exportado "abrindo e fechando" na hora. Ver
-  `docs/export-presets-plan.md` e `docs/changelog.md` (2026-09-12).
+  `docs/changelog.md` (2026-09-12).
+
+- `bge.logic.setObjectConvert(scene, object, convert)` desliga o Convert de objetos de uma cena
+  antes de carregá-la (ex.: só converter os pilotos escolhidos), cortando ~63% do load no teste;
+  flags restaurados ao sair do jogo. No player standalone, `bge.logic.freeUnconvertedData(scene)`
+  libera a geometria dos objetos que ficaram fora (37,5 MB de 6 pilotos no teste), quase
+  igualando a RAM do `LibLoad`. `scene.convertObject(nome)` converte um deles depois do load. Ver
+  `docs/changelog.md` (2026-10-07).
+
+- Auditoria RA2: os uniforms local-to-view, normal e inversa compartilham o produto
+  `view x object` dentro de `GPU_material_bind_uniforms`, evitando ate duas multiplicacoes
+  4x4 por chamada. Inversas e uploads permanecem por draw; sem cache entre objetos/passes
+  e sem ganho de FPS medido. Damage consulta o uniform ativo antes do cast de deformer;
+  o contador de hits usa o cache por GPUShader, preservando transicoes entre objetos.
+  Arrays de hits/strength continuam enviados quando count > 0.
 
 ## Decisões técnicas vigentes
 
+- GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
+  objetos móveis), não GI em tempo real. Qualidade vem da densidade de texels (`ae_lightmap_scale` por objeto)
+  e da margem/dilatação das ilhas, não de uma textura por objeto. Cada recurso liga/desliga; Web/Android usam
+  no máximo a textura da lightmap.
 - `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity
   Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
   will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity
@@ -178,6 +334,9 @@ ferramenta correspondente.
   procedural wind. Non-instanced objects are tested on the CPU per object; instanced foliage is tested in the
   shader per instance (`unfoliagecamera`). Wind is applied in mesh space before instancing/skinning.
 
+- Reverb Area no Web: o estado do Speaker alterna normalmente, mas o backend SDL não aplica
+  EFX (OpenAL desligado). Teste A/B com som contínuo e intervalos de 2 s passou estados/saída
+  AudioWorklet em 2026-10-07; usuário confirmou nenhuma diferença audível com reverb forte.
 - O port Web usa WebGL2/GLES3 e chama diretamente as entradas equivalentes para shaders, VAOs,
   framebuffers e renderbuffers. Os ponteiros de extensão OpenGL desktop mantidos pelo GLEW não são
   considerados disponíveis no Emscripten; adaptações Web devem usar a API GLES3 correspondente. O
@@ -217,10 +376,13 @@ ferramenta correspondente.
   O layout é configuração do export Web (Properties > Export Game > Web (Range) > Controle na tela, gravado no `.range`);
   o APK embute esse pacote e herda o layout, sem campo próprio no `android-export.json`.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).
-- Loop de tempo: 1 `Update()` de simulação por frame, com o catch-up por sleep herdado (`UpdateSleepTime()`/
-  `FrameOver()`). A física de taxa fixa depende disso. O acumulador de passo fixo do Plano 8 está desligado
-  (`LA_Launcher` passa sempre `false`; o bit no DNA é ignorado e a opção saiu da UI). Com v-sync ligado,
-  `FrameOver()` zera `m_overframetime`, porque a espera do `SwapBuffers()` não é atraso do jogo.
+- Loop de tempo: por padrão, 1 `Update()` de simulação por frame, com o catch-up por sleep herdado
+  (`UpdateSleepTime()`/`FrameOver()`). Com v-sync ligado, `FrameOver()` zera `m_overframetime`, porque a
+  espera do `SwapBuffers()` não é atraso do jogo. Opcional (checkbox Fixed Timestep em Physics, `-g
+  fixed_timestep = 1` no player, e sempre durante sessão multiplayer): acumulador do Plano 8, com N passos
+  de tic fixo por frame (até Max Logic Frames), relógios avançados por passo, entradas e mensagens limpas
+  entre passos e espera até o próximo passo; mantém velocidade real com FPS baixo. Sem interpolação no
+  render: com FPS abaixo do tic o movimento anda em degraus.
 - O contexto compatibility já expõe OpenGL 4.6 no hardware testado; core profile é uma decisão de
   arquitetura e validação estrita, não um desbloqueio automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e devem ser validados
@@ -245,6 +407,10 @@ ferramenta correspondente.
   [`docs/changelog.md`](docs/changelog.md) (2026-09-30).
 
 ## Fontes relacionadas
+
+- [Tesla Rhythm](docs/tesla-rhythm.md): demo via Python Component com cinco pistas,
+  música original e relógio de áudio compartilhado para notas e câmera; runtime validado,
+  avaliação visual pendente.
 
 - [Roadmap atual](docs/roadmap.md)
 - [Histórico técnico](docs/changelog.md)

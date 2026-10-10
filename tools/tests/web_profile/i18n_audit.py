@@ -1,6 +1,6 @@
 """Auditoria de traducao: lista textos de UI que nao mudam ao trocar de idioma.
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/i18n_audit.py -- pt_BR [saida.txt]
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/i18n_audit.py -- pt_BR [saida.txt]
 
 Percorre rotulos de Panel/Menu/Header/Operator e nome/descricao/itens de enum de todas as propriedades RNA.
 Um texto e "sem traducao" se pgettext devolve o mesmo texto no idioma escolhido. Nao cobre textos escritos

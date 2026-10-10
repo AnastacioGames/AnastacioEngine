@@ -34,6 +34,7 @@
 #include "DNA_node_types.h"
 #include "DNA_space_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_userdef_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_windowmanager_types.h"
 
@@ -168,9 +169,19 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 			}
 
 			if (t->tsnap.status & POINT_INIT) {
-				glColor4ubv(activeCol);
+				const float pix = ED_view3d_pixel_size(rv3d, t->tsnap.snapPoint);
 
-				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, ED_view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
+				/* Blender 5 style: ring with a dark halo plus a small center dot */
+				glLineWidth(3.0f * U.pixelsize);
+				glColor4ub(0, 0, 0, 110);
+				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, pix * size, imat);
+
+				glLineWidth(1.5f * U.pixelsize);
+				glColor4ubv(activeCol);
+				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, pix * size, imat);
+				drawcircball(GL_POLYGON, t->tsnap.snapPoint, pix * 1.5f * U.pixelsize, imat);
+
+				glLineWidth(U.pixelsize);
 			}
 
 			/* draw normal if needed */

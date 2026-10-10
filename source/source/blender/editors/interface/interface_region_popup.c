@@ -752,6 +752,11 @@ void ui_popup_block_free(bContext *C, uiPopupBlockHandle *handle)
 		handle->popup_create_vars.arg_free(handle->popup_create_vars.arg);
 	}
 
+	if (handle->mouseouttimer) {
+		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), handle->mouseouttimer);
+		handle->mouseouttimer = NULL;
+	}
+
 	ui_popup_block_remove(C, handle);
 
 	MEM_freeN(handle);

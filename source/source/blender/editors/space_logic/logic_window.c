@@ -1835,6 +1835,15 @@ static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr, bContex
 			}
 			uiItemR(row, ptr, "time", 0, NULL, ICON_NONE);
 
+			/* Load Mode of the added object: "On Demand" loads it the first time the actuator fires. */
+			if (!RNA_boolean_get(ptr, "use_object_from_property")) {
+				PointerRNA ob_ptr = RNA_pointer_get(ptr, "object");
+				if (ob_ptr.data) {
+					row = uiLayoutRow(layout, true);
+					uiItemR(row, &ob_ptr, "game_load_mode", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+				}
+			}
+
 			row = uiLayoutRow(layout, false);
 			uiItemR(row, ptr, "use_object_from_property", 0, NULL, ICON_NONE);
 			if (RNA_boolean_get(ptr, "use_object_from_property")) {
@@ -2344,7 +2353,17 @@ static void draw_actuator_scene(uiLayout *layout, PointerRNA *ptr)
 			break;
 		case ACT_SCENE_RESTART:
 			break;
-		default: // ACT_SCENE_SET|ACT_SCENE_ADD_FRONT|ACT_SCENE_ADD_BACK|ACT_SCENE_REMOVE|ACT_SCENE_SUSPEND|ACT_SCENE_RESUME
+		case ACT_SCENE_SET:
+		case ACT_SCENE_ADD_FRONT:
+		case ACT_SCENE_ADD_BACK:
+			uiItemR(layout, ptr, "scene", 0, NULL, ICON_NONE);
+			uiItemR(layout, ptr, "use_preload", 0, NULL, ICON_NONE);
+			break;
+		case ACT_SCENE_REMOVE:
+			uiItemR(layout, ptr, "scene", 0, NULL, ICON_NONE);
+			uiItemR(layout, ptr, "use_keep", 0, NULL, ICON_NONE);
+			break;
+		default: // ACT_SCENE_SUSPEND|ACT_SCENE_RESUME
 			uiItemR(layout, ptr, "scene", 0, NULL, ICON_NONE);
 			break;
 	}

@@ -39,12 +39,18 @@
 
 #include "NET_Messages.h"
 #include "NET_TransportWeb.h"
+#ifndef __EMSCRIPTEN__
+#include "NET_AnastacioPlugin.h"
+#include "NET_TransportSteam.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 extern "C" {
+#  include "BLI_listbase.h"
 #  include "DNA_object_types.h"
 #  include "DNA_property_types.h"
 #  include "DNA_scene_types.h"
@@ -167,7 +173,11 @@ KX_NetworkManager::KX_NetworkManager(KX_KetsjiEngine *engine)
 	m_gameVersion(1),
 	m_maxPlayers(8),
 	m_snapshotRate(20),
+	m_relevanceRadius(0.0f),
 	m_sceneHash(0),
+	m_sceneDetached(false),
+	m_detachedIndex(-1),
+	m_targetHash(0),
 	m_tick(net::kNoTick),
 	m_simEnabled(false),
 	m_lanActive(false),
@@ -217,6 +227,7 @@ KX_NetworkManager::SceneSettings KX_NetworkManager::ReadSceneSettings(KX_Scene *
 	settings.gameVersion = net.game_version > 0 ? uint32_t(net.game_version) : 1u;
 	settings.tickRate = net.tick_rate;
 	settings.snapshotRate = net.snapshot_rate > 0 ? net.snapshot_rate : 20;
+	settings.relevanceRadius = std::max(net.relevance_radius, 0.0f);
 	settings.lan = (net.flags & NET_SCENE_LAN_DISCOVERY) != 0;
 	settings.lateJoin = (net.flags & NET_SCENE_LATE_JOIN) != 0;
 	return settings;
@@ -352,6 +363,24 @@ void KX_NetworkManager::CollectProps(KX_GameObject *obj, std::vector<std::string
 	}
 }
 
+void KX_NetworkManager::FloatQuantization(KX_GameObject *obj, const std::string &name, net::PropertyDesc &desc)
+{
+	Object *ob = obj->GetBlenderObject();
+	const bProperty *prop = ob ? (const bProperty *)BLI_findstring(&ob->prop, name.c_str(), offsetof(bProperty, name))
+	                           : nullptr;
+	if (!prop || prop->net_bits <= 0) {
+		return;
+	}
+	if (prop->net_bits > 31 || !(prop->net_min < prop->net_max)) {
+		CM_Warning("network: float property '" << name << "' of '" << obj->GetName()
+		           << "' needs Min < Max and 1 to 31 bits, sent as raw 32 bits");
+		return;
+	}
+	desc.min = prop->net_min;
+	desc.max = prop->net_max;
+	desc.bits = prop->net_bits;
+}
+
 void KX_NetworkManager::BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const
 {
 	entry.propNames.clear();
@@ -365,6 +394,9 @@ void KX_NetworkManager::BuildSchema(KX_GameObject *obj, const std::vector<std::s
 		}
 		net::PropertyDesc desc;
 		desc.kind = kind;
+		if (kind == net::PropKind::Float) {
+			FloatQuantization(obj, name, desc);
+		}
 		entry.propNames.push_back(name);
 		entry.schema.push_back(desc);
 	}
@@ -397,6 +429,18 @@ bool KX_NetworkManager::BuildEntry(KX_GameObject *obj, net::NetId id, const Repl
 		CollectProps(obj, names);
 	}
 	BuildSchema(obj, names, entry);
+	if (scriptOptions) {
+		for (const ReplicateOptions::Quantization &q : scriptOptions->quantize) {
+			for (size_t i = 0; i < entry.propNames.size(); ++i) {
+				if (entry.propNames[i] == q.name && entry.schema[i].kind == net::PropKind::Float) {
+					entry.schema[i].min = q.min;
+					entry.schema[i].max = q.max;
+					entry.schema[i].bits = q.bits;
+				}
+			}
+		}
+		entry.desc.props = entry.schema;
+	}
 	return true;
 }
 
@@ -515,7 +559,7 @@ const std::vector<net::PropertyDesc> *KX_NetworkManager::SchemaFor(net::NetId id
 	if (!prototype.empty()) {
 		/* A client decodes the Spawn fields with this schema before it creates the object. */
 		if (!m_protoSchemas.count(prototype) && m_scene) {
-			CacheProtoSchema(prototype, m_scene->GetInactiveList()->FindValue(prototype));
+			CacheProtoSchema(prototype, m_scene->FindInactiveObjectByName(prototype));
 		}
 		const auto it = m_protoSchemas.find(prototype);
 		if (it != m_protoSchemas.end()) {
@@ -531,7 +575,7 @@ KX_GameObject *KX_NetworkManager::CreateReplica(const std::string &prototype, st
 		error = "no scene";
 		return nullptr;
 	}
-	KX_GameObject *original = m_scene->GetInactiveList()->FindValue(prototype);
+	KX_GameObject *original = m_scene->FindInactiveObjectByName(prototype);
 	if (!original) {
 		error = "prototype '" + prototype + "' not found among the inactive objects (put it in a hidden layer)";
 		return nullptr;
@@ -617,6 +661,19 @@ void KX_NetworkManager::BuildRpc()
 		Emit(event);
 	};
 	m_rpcTable.add(start);
+
+	net::RpcDesc lobby;
+	lobby.name = "net.lobby";
+	lobby.target = net::RpcTarget::Owner;
+	lobby.checkArgs = true;
+	lobby.handler = [this](const net::RpcCall &) {
+		m_gameStarted = false;
+		m_remoteReady.clear();
+		Event event;
+		event.type = Event::LOBBY;
+		Emit(event);
+	};
+	m_rpcTable.add(lobby);
 
 	for (const RpcOptions &options : m_userRpcs) {
 		net::RpcDesc desc;
@@ -766,6 +823,10 @@ void KX_NetworkManager::OpenSession()
 	m_connectedEmitted = false;
 	m_pongCount = 0;
 	m_lastClockSnapshot = net::kNoTick;
+	m_sceneDetached = false;
+	m_detachedIndex = -1;
+	m_targetScene.clear();
+	m_targetHash = 0;
 }
 
 void KX_NetworkManager::AbortOpen()
@@ -797,15 +858,17 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	const SceneSettings settings = ReadSceneSettings(m_scene);
 
 	const int port = options.port > 0 ? options.port : settings.port;
-	const int wsPort = options.wsPort >= 0 ? options.wsPort : settings.wsPort;
+	const int wsPort = options.steam ? 0 : (options.wsPort >= 0 ? options.wsPort : settings.wsPort);
 	m_maxPlayers = std::min(std::max(options.maxPlayers > 0 ? options.maxPlayers : settings.maxPlayers, 1),
 	                        net::kMaxClients);
 	m_roomName = options.roomName.empty() ? settings.roomName : options.roomName;
 	m_gameId = settings.gameId;
 	m_gameVersion = settings.gameVersion;
 	m_snapshotRate = std::max(options.snapshotRate > 0 ? options.snapshotRate : settings.snapshotRate, 1);
+	m_relevanceRadius = settings.relevanceRadius;
+	m_views.clear();
 	const int tickSetting = options.tickRate > 0 ? options.tickRate : settings.tickRate;
-	const bool lan = options.lan >= 0 ? options.lan != 0 : settings.lan;
+	const bool lan = !options.steam && (options.lan >= 0 ? options.lan != 0 : settings.lan);
 	const bool lateJoin = options.lateJoin >= 0 ? options.lateJoin != 0 : settings.lateJoin;
 	/* A headless server (--server) has no local player: always dedicated. */
 	m_dedicated = options.dedicated || m_engine->IsServerMode();
@@ -817,7 +880,13 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	const int tickRate = std::min(std::max(int(std::lround(m_engine->GetTicRate())), 1), 240);
 	m_snapshotRate = std::min(m_snapshotRate, tickRate);
 
-	std::unique_ptr<net::ITransport> enet = net::createENetTransport();
+	std::unique_ptr<net::ITransport> enet;
+#ifndef __EMSCRIPTEN__
+    enet = options.steam ? net::createAnastacioSteamTransport(net::anastacioSteamService()) : net::createENetTransport();
+#else
+    if (!options.steam) enet = net::createENetTransport();
+#endif
+    if (!enet) { error = "Requested transport unavailable (initialize Steam complement first)"; AbortOpen(); return false; }
 	std::unique_ptr<net::ITransport> transport;
 	if (wsPort > 0) {
 		std::vector<net::MultiTransportEntry> entries;
@@ -839,6 +908,7 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	config.snapshotRate = uint16_t(m_snapshotRate);
 	config.maxClients = m_maxPlayers;
 	config.allowLateJoin = lateJoin;
+	config.password = options.password.substr(0, net::kMaxStringBytes);
 	m_server.reset(new net::ServerSession(*m_serverTransport, config));
 	if (!m_server->start(uint16_t(port))) {
 		error = "could not listen on port " + std::to_string(port) + " (in use?)";
@@ -846,9 +916,9 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 		return false;
 	}
 
-	net::ReplicatorConfig rc;
-	rc.snapshotIntervalTicks = uint32_t(std::max(1, tickRate / m_snapshotRate));
-	m_replicator.reset(new net::Replicator(*m_server, *this, rc));
+	m_replicatorConfig = net::ReplicatorConfig();
+	m_replicatorConfig.snapshotIntervalTicks = uint32_t(std::max(1, tickRate / m_snapshotRate));
+	m_replicator.reset(new net::Replicator(*m_server, *this, m_replicatorConfig));
 	m_predServer.reset(new net::PredictionServer());
 	net::LagCompensationConfig lc;
 	lc.tickRate = uint16_t(tickRate);
@@ -881,10 +951,10 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	}
 
 	m_role = Role::SERVER;
-	CM_Message("network: hosting '" << m_roomName << "' (scene " << m_sceneName << ") on UDP " << port
+	CM_Message("network: hosting '" << m_roomName << "' (scene " << m_sceneName << (options.steam ? ") on Steam virtual port " : ") on UDP ") << port
 	           << (wsPort > 0 ? " and WebSocket " + std::to_string(wsPort) : std::string())
 	           << ", tick " << tickRate << " Hz, snapshots " << m_snapshotRate << " Hz, "
-	           << m_entries.size() << " replicated object(s)");
+	           << m_entries.size() << " replicated object(s), scene hash " << std::hex << m_sceneHash << std::dec);
 
 	Event event;
 	event.type = Event::CONNECT;
@@ -893,7 +963,8 @@ bool KX_NetworkManager::Host(const HostOptions &options, std::string &error, KX_
 	return true;
 }
 
-bool KX_NetworkManager::Join(const std::string &host, int port, std::string &error, KX_Scene *scene)
+bool KX_NetworkManager::Join(const std::string &host, int port, std::string &error, const std::string &password,
+                             KX_Scene *scene, bool steam)
 {
 	if (!Prepare(scene, error)) {
 		return false;
@@ -915,9 +986,9 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 
 	std::unique_ptr<net::ITransport> transport;
 #ifdef __EMSCRIPTEN__
-	transport = net::createWebClientTransport();
+	if (!steam) transport = net::createWebClientTransport();
 #else
-	transport = net::createENetTransport();
+	transport = steam ? net::createAnastacioSteamTransport(net::anastacioSteamService()) : net::createENetTransport();
 #endif
 	if (!transport) {
 		error = "no client transport on this platform";
@@ -931,6 +1002,7 @@ bool KX_NetworkManager::Join(const std::string &host, int port, std::string &err
 	config.gameVersion = m_gameVersion;
 	config.playerName = m_playerName;
 	config.sceneHash = m_sceneHash;
+	config.password = password.substr(0, net::kMaxStringBytes);
 	m_client.reset(new net::ClientSession(*m_clientTransport, config));
 
 	net::ReplicaClientConfig rc;
@@ -1003,7 +1075,7 @@ bool KX_NetworkManager::StartFromScene(KX_Scene *scene)
 					host = host.substr(0, colon);
 				}
 			}
-			ok = Join(host, port, error, scene);
+			ok = Join(host, port, error, "", scene);
 			break;
 		}
 		default:
@@ -1125,6 +1197,8 @@ void KX_NetworkManager::CloseSession(bool sendQuit, bool shutdown)
 	m_role = Role::NONE;
 	m_sessionOpen = false;
 	m_scene = nullptr;
+	m_sceneDetached = false;
+	m_targetScene.clear();
 	m_tick = net::kNoTick;
 	m_dedicated = false;
 }
@@ -1168,6 +1242,122 @@ void KX_NetworkManager::OnObjectRemoved(KX_GameObject *obj)
 	obj->SetNetId(0);
 }
 
+void KX_NetworkManager::OnSceneRemoved(KX_Scene *scene)
+{
+	if (!scene) {
+		return;
+	}
+	const bool session = m_sessionOpen && scene == m_scene;
+	/* The objects die with the scene: forget them without despawning (the clients drop the whole scene). */
+	for (auto it = m_entries.begin(); it != m_entries.end();) {
+		Entry &entry = it->second;
+		if (session || (entry.obj && entry.obj->GetScene() == scene)) {
+			ResetPrediction(entry);
+			if (entry.obj) {
+				entry.obj->SetNetId(0);
+			}
+			it = m_entries.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+	if (!session) {
+		return;
+	}
+	m_protoSchemas.clear();
+	m_protoPropNames.clear();
+	m_detachedIndex = -1;
+	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
+	for (int i = 0; i < scenes->GetCount(); ++i) {
+		if (scenes->GetValue(i) == scene) {
+			m_detachedIndex = i;
+		}
+	}
+	m_scene = nullptr;
+	m_sceneDetached = true;
+	m_inputLog.reset();
+	m_predTick = net::kNoTick;
+	m_appliedInput.clear();
+	if (m_role == Role::SERVER) {
+		/* An empty replicator until the next scene is adopted: the clients get nothing about the old one. */
+		m_replicator.reset(new net::Replicator(*m_server, *this, m_replicatorConfig));
+		net::LagCompensationConfig lc;
+		lc.tickRate = uint16_t(m_lagCompTickRate);
+		lc.maxRewindMs = lc.historyMs;
+		m_lagComp.reset(new net::LagCompensation(lc));
+		m_clientView.clear();
+		/* Followed objects are gone; fixed positions and radii stay. */
+		for (auto &pair : m_views) {
+			pair.second.follow = net::kInvalidNetId;
+		}
+	}
+}
+
+bool KX_NetworkManager::ChangeScene(const std::string &name, std::string &error)
+{
+	if (m_role != Role::SERVER || !m_scene) {
+		error = m_role != Role::SERVER ? "server only" : "a scene change is already in progress";
+		return false;
+	}
+	if (name == m_sceneName) {
+		error = "already in scene '" + name + "'";
+		return false;
+	}
+	if (!m_engine->ReplaceScene(m_sceneName, name)) {
+		error = "no scene named '" + name + "'";
+		return false;
+	}
+	m_targetScene = name;
+	return true;
+}
+
+void KX_NetworkManager::AdoptScene()
+{
+	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
+	KX_Scene *scene = nullptr;
+	if (!m_targetScene.empty()) {
+		scene = scenes->FindValue(m_targetScene);
+	}
+	else if (m_detachedIndex >= 0 && m_detachedIndex < scenes->GetCount()) {
+		/* The game replaced the scene itself (scene.replace()): take what is in its place. */
+		scene = scenes->GetValue(m_detachedIndex);
+	}
+	if (!scene) {
+		return;  // not converted yet
+	}
+	m_sceneDetached = false;
+	m_targetScene.clear();
+	m_scene = scene;
+	m_sceneName = scene->GetName();
+	CollectSceneObjects();
+	m_sceneHash = ComputeSceneHash(m_sceneName);
+
+	if (m_role == Role::SERVER) {
+		for (const auto &pair : m_entries) {
+			m_replicator->addSceneObject(pair.first, pair.second.desc);
+		}
+		m_server->changeScene(m_sceneName, m_sceneHash);
+		CM_Message("network: moved to scene '" << m_sceneName << "', " << m_entries.size()
+		           << " replicated object(s); waiting for the clients to load it");
+	}
+	else if (m_role == Role::CLIENT) {
+		for (auto &pair : m_entries) {
+			SuspendForClient(pair.second);
+		}
+		if (m_targetHash != 0 && m_sceneHash != m_targetHash) {
+			CM_Warning("network: scene '" << m_sceneName << "' does not match the server's (other replicated "
+			           "objects or another .range); the server will not send it");
+		}
+		m_client->sceneLoaded(m_sceneHash);
+		CM_Message("network: scene '" << m_sceneName << "' loaded");
+	}
+	Event e;
+	e.type = Event::SCENE;
+	e.text = m_sceneName;
+	Emit(e);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1202,7 +1392,7 @@ KX_GameObject *KX_NetworkManager::Spawn(const std::string &prototype, net::Clien
 	entry.prototype = prototype;
 	entry.spawned = true;
 	entry.owner = owner;
-	KX_GameObject *proto = m_scene->GetInactiveList()->FindValue(prototype);
+	KX_GameObject *proto = m_scene->FindInactiveObjectByName(prototype);
 	if (Object *ob = proto ? proto->GetBlenderObject() : nullptr) {
 		const int flags = ob->net.flags;
 		const bool configured = (flags & NET_OBJ_REPLICATE) != 0;
@@ -1266,6 +1456,9 @@ bool KX_NetworkManager::SetOwner(KX_GameObject *obj, net::ClientId owner)
 
 void KX_NetworkManager::BeginTick()
 {
+	if (m_sceneDetached) {
+		AdoptScene();
+	}
 	const uint64_t now = net::steadyClockMs();
 	if (m_role == Role::SERVER) {
 		ServerTickBegin(now);
@@ -1277,16 +1470,91 @@ void KX_NetworkManager::BeginTick()
 
 void KX_NetworkManager::EndTick()
 {
+	if (m_role == Role::CLIENT) {
+		ClientTickEnd();
+		return;
+	}
 	if (m_role != Role::SERVER || !m_replicator) {
 		return;
 	}
 	const uint64_t now = net::steadyClockMs();
 	RecordHitboxes();
+	UpdateClientViews();
 	m_replicator->update(m_tick, now);
 	if (m_lanActive) {
 		UpdateLanInfo();
 		m_lanResponder.update(now);
 	}
+}
+
+void KX_NetworkManager::UpdateClientViews()
+{
+	for (const net::ClientId client : m_server->clients()) {
+		const auto ov = m_views.find(client);
+		float radius = m_relevanceRadius;
+		float center[3] = {0.0f, 0.0f, 0.0f};
+		float rotation[4];
+		bool hasCenter = false;
+		if (ov != m_views.end()) {
+			if (ov->second.radius >= 0.0f) {
+				radius = ov->second.radius;
+			}
+			if (ov->second.follow != net::kInvalidNetId) {
+				hasCenter = getTransform(ov->second.follow, center, rotation);
+			}
+			else if (ov->second.fixed) {
+				std::copy(ov->second.position, ov->second.position + 3, center);
+				hasCenter = true;
+			}
+		}
+		if (!hasCenter) {
+			/* Default center: the first object the client owns (usually its player). */
+			for (const auto &pair : m_entries) {
+				if (pair.second.owner == client && pair.second.obj && getTransform(pair.first, center, rotation)) {
+					hasCenter = true;
+					break;
+				}
+			}
+		}
+		/* No center yet (player not spawned): everything stays relevant. */
+		m_replicator->setClientView(client, center, hasCenter ? radius : 0.0f);
+	}
+}
+
+bool KX_NetworkManager::SetClientView(net::ClientId client, KX_GameObject *obj, const float *position, float radius,
+                                      bool clear, std::string &error)
+{
+	if (m_role != Role::SERVER || !m_server) {
+		error = "server only";
+		return false;
+	}
+	if (!m_server->client(client)) {
+		error = "unknown client " + std::to_string(client);
+		return false;
+	}
+	if (clear) {
+		m_views.erase(client);
+		return true;
+	}
+	ViewOverride view;
+	if (obj) {
+		view.follow = GetNetId(obj);
+		if (view.follow == net::kInvalidNetId) {
+			error = "object '" + obj->GetName() + "' is not replicated";
+			return false;
+		}
+	}
+	else if (position) {
+		std::copy(position, position + 3, view.position);
+		view.fixed = true;
+	}
+	else if (m_views.count(client)) {
+		/* Only the radius changes. */
+		view = m_views[client];
+	}
+	view.radius = radius;
+	m_views[client] = view;
+	return true;
 }
 
 void KX_NetworkManager::UpdateLanInfo()
@@ -1300,7 +1568,7 @@ void KX_NetworkManager::UpdateLanInfo()
 	info.maxPlayers = uint16_t(m_maxPlayers);
 	info.enetPort = m_serverTransport ? m_serverTransport->localPort() : 0;
 	info.webSocketPort = 0;
-	info.password = false;
+	info.password = m_server && !m_server->config().password.empty();
 	m_lanResponder.setInfo(info);
 }
 
@@ -1385,6 +1653,7 @@ void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64
 			m_ready.erase(event.client);
 			m_appliedInput.erase(event.client);
 			m_clientView.erase(event.client);
+			m_views.erase(event.client);
 			m_inputInvalid.erase(event.client);
 			Event e;
 			e.type = Event::PLAYER_LEAVE;
@@ -1518,13 +1787,24 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 			break;
 		}
 		case net::SessionEvent::Type::SceneChange: {
-			if (event.sceneHash != m_sceneHash) {
-				/* The handshake already compared the hash, so this only happens when the server changes
-				 * scene during a match, which this version does not follow. */
-				CM_Warning("network: the server moved to scene '" << event.text
-				           << "'; scene changes during a match are not supported yet");
+			if (!m_sceneDetached && event.text == m_sceneName && event.sceneHash == m_sceneHash) {
+				m_targetScene.clear();
+				m_client->sceneLoaded(m_sceneHash);
+				break;
 			}
-			m_client->sceneLoaded(m_sceneHash);
+			/* The server moved to another scene: load the same one, SceneLoaded goes out from AdoptScene(). */
+			m_targetScene = event.text;
+			m_targetHash = event.sceneHash;
+			CM_Message("network: the server moved to scene '" << event.text << "', loading it");
+			if (!m_sceneDetached && !m_engine->ReplaceScene(m_sceneName, event.text)) {
+				CM_Error("network: this game has no scene '" << event.text << "', leaving the session");
+				CloseSession(true);
+				Event e;
+				e.type = Event::DISCONNECT;
+				e.reason = int(net::DisconnectReason::Quit);
+				e.text = "missing scene " + event.text;
+				Emit(e);
+			}
 			break;
 		}
 		case net::SessionEvent::Type::Message: {
@@ -1802,6 +2082,13 @@ bool KX_NetworkManager::PredictedState(const Entry &entry, net::ObjectState &sta
 	state.position[1] = pos.y;
 	state.position[2] = pos.z;
 	ToQuat(entry.obj->NodeGetWorldOrientation(), state.rotation);
+	if (entry.dynamicPredicted) {
+		const mt::vec3 lin = entry.obj->GetLinearVelocity();
+		state.hasVelocity = true;
+		state.velocity[0] = lin.x;
+		state.velocity[1] = lin.y;
+		state.velocity[2] = lin.z;
+	}
 	return true;
 }
 
@@ -1814,6 +2101,31 @@ void KX_NetworkManager::SetPredictedState(Entry &entry, const net::ObjectState &
 	entry.obj->NodeSetGlobalOrientation(FromQuat(state.rotation));
 	/* The setters only change the local transform: without this the replay reads the old world position. */
 	entry.obj->NodeUpdate();
+	if (entry.dynamicPredicted && state.hasVelocity) {
+		entry.obj->SetLinearVelocity(mt::vec3(state.velocity[0], state.velocity[1], state.velocity[2]), false);
+	}
+}
+
+void KX_NetworkManager::SetDynamicPredicted(Entry &entry, bool on)
+{
+	if (on == entry.dynamicPredicted) {
+		return;
+	}
+	if (on) {
+		/* Only a body the client suspended is dynamic: it runs in the local Bullet world while predicted. */
+		if (!entry.dynamicsSuspended) {
+			return;
+		}
+		RestoreFromClient(entry);
+		entry.dynamicPredicted = true;
+	}
+	else {
+		entry.dynamicPredicted = false;
+		entry.pendingRecord = net::kNoTick;
+		if (m_role == Role::CLIENT) {
+			SuspendForClient(entry);
+		}
+	}
 }
 
 void KX_NetworkManager::ApplyOffset(Entry &entry, const float offset[3])
@@ -1838,6 +2150,7 @@ void KX_NetworkManager::ResetPrediction(Entry &entry)
 	std::copy(zero, zero + 3, entry.shownOffset);
 	entry.prediction.reset();
 	entry.lastReconciled = net::kNoTick;
+	SetDynamicPredicted(entry, false);
 }
 
 void KX_NetworkManager::ClientPredict(uint64_t now)
@@ -1847,6 +2160,7 @@ void KX_NetworkManager::ClientPredict(uint64_t now)
 	for (auto &pair : m_entries) {
 		Entry &entry = pair.second;
 		if (entry.predicted && entry.obj && self != net::kServerClientId && entry.owner == self) {
+			SetDynamicPredicted(entry, true);
 			ids.push_back(pair.first);
 		}
 		else if (entry.prediction) {
@@ -1937,6 +2251,15 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 				if (e && e->obj && m_stepSink && ReadView(input, view.tick, view.alpha, user)) {
 					m_stepSink(e->obj, user);
 				}
+				e = FindEntry(id);
+				if (e && e->obj && e->dynamicPredicted) {
+					/* Bullet cannot step one body alone: the replay integrates the velocity the step left
+					 * (no gravity or contacts), and the next snapshots correct the rest. */
+					const float dt = 1.0f / float(std::max<int>(1, m_client->tickRate()));
+					const mt::vec3 v = e->obj->GetLinearVelocity();
+					e->obj->NodeSetWorldPosition(e->obj->NodeGetWorldPosition() + v * dt);
+					e->obj->NodeUpdate();
+				}
 			};
 			entry->prediction.reset(new net::PredictionClient(callbacks));
 		}
@@ -1944,7 +2267,8 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 			entry->lastReconciled = snapshot->tick;
 			const net::ObjectState *server = snapshot->find(id);
 			if (server && server->hasTransform) {
-				/* Only the transform is predicted: velocities of a suspended body read as zero here. */
+				/* Only the transform is compared: a suspended body reads zero velocity, and the velocity in the
+				 * snapshot can be older than the transform (it is not resent once the body is at rest). */
 				net::ObjectState state = *server;
 				state.hasVelocity = false;
 				state.hasAngularVelocity = false;
@@ -1962,6 +2286,11 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 		if (!entry || !entry->obj || !entry->prediction) {
 			continue;
 		}
+		if (entry->dynamicPredicted) {
+			/* The state of this tick exists after the physics step: recorded in ClientTickEnd(). */
+			entry->pendingRecord = tick;
+			continue;
+		}
 		net::ObjectState state;
 		if (PredictedState(*entry, state)) {
 			entry->prediction->recordState(tick, state);
@@ -1970,6 +2299,28 @@ void KX_NetworkManager::ClientPredictTick(net::Tick tick, const std::vector<net:
 		float offset[3];
 		entry->prediction->visualOffset(offset);
 		ApplyOffset(*entry, offset);
+	}
+}
+
+void KX_NetworkManager::ClientTickEnd()
+{
+	if (!m_client) {
+		return;
+	}
+	const float tickMs = 1000.0f / float(std::max<int>(1, m_client->tickRate()));
+	for (auto &pair : m_entries) {
+		Entry &entry = pair.second;
+		if (!entry.dynamicPredicted || !entry.obj || !entry.prediction || entry.pendingRecord == net::kNoTick) {
+			continue;
+		}
+		net::ObjectState state;
+		if (PredictedState(entry, state)) {
+			entry.prediction->recordState(entry.pendingRecord, state);
+		}
+		entry.pendingRecord = net::kNoTick;
+		/* No visual offset: it would move the Bullet body, and a frame without a prediction step would run the
+		 * physics from the shifted place. A correction of a dynamic body shows at once. */
+		entry.prediction->update(tickMs);
 	}
 }
 
@@ -2034,6 +2385,23 @@ bool KX_NetworkManager::StartGame()
 	Event e;
 	e.type = Event::START;
 	Emit(e);
+	return true;
+}
+
+bool KX_NetworkManager::ReturnToLobby()
+{
+	if (m_role != Role::SERVER || !m_server) return false;
+	m_gameStarted = false;
+	m_hostReady = false;
+	m_ready.clear();
+	m_server->setGameStarted(false);
+	const int id = m_rpcTable.idOf("net.lobby");
+	for (net::ClientId client : m_server->clients()) {
+		m_rpcServer->callClient(client, uint16_t(id), net::kInvalidNetId, {});
+	}
+	Event event;
+	event.type = Event::LOBBY;
+	Emit(event);
 	return true;
 }
 

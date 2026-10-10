@@ -37,6 +37,7 @@
 #include "RAS_MeshSlot.h"
 #include "RAS_AttributeArray.h"
 
+#include <cstdint>
 #include <vector>
 
 class RAS_MaterialBucket;
@@ -60,6 +61,9 @@ private:
 	RAS_MeshMaterial *m_meshMaterial;
 	/// The list of all visible mesh slots to render this frame.
 	RAS_MeshSlotList m_activeMeshSlots;
+	/// Scratch arrays reused by RunBatchingNode to avoid per-pass allocations.
+	std::vector<int> m_batchCounts;
+	std::vector<intptr_t> m_batchIndices;
 	/// The deformer using this display array.
 	RAS_Deformer *m_deformer;
 
@@ -93,6 +97,8 @@ public:
 
 	/// \section Active Mesh Slots Management.
 	void ActivateMesh(RAS_MeshSlot *slot);
+	/// Whether this bucket contributes geometry to the current pass.
+	bool HasActiveMeshSlots() const { return !m_activeMeshSlots.empty(); }
 	/// Remove all mesh slots from the list.
 	void RemoveActiveMeshSlots();
 

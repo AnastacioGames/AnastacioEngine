@@ -8,9 +8,62 @@ shader/GL, causas raiz de teclado/mouse/gamepad, IDBFS, cena de filtros) está n
 
 Auditado contra o git log e o changelog em 2026-09-20.
 
+Continuação da migração de nome em 2026-10-08: geração Web, preflight no navegador e APK pelo
+editor novo passaram após corrigir falso positivo no diagnóstico de shaders. APK ainda precisa
+de teste em aparelho. Exportação pela GUI RangeArmor passou em cena controlada; jogo real permanece pendente.
+Evidências e limites no [plano de renomeação](executable-rename-plan.md).
+
+## Sumário
+
+- [Atlas de materiais](#atlas-de-materiais)
+- [Prioridade atual](#prioridade-atual)
+  - [Carregamento mais rápido ("Cozinhar")](#carregamento-mais-rápido-cozinhar)
+  - [Dano visual por impacto (Deformation)](#dano-visual-por-impacto-deformation)
+  - [Multiplayer nativo](#multiplayer-nativo)
+  - [Web (WebGL/WebAssembly)](#web-webglwebassembly)
+  - [VR no celular (Web, estilo Cardboard)](#vr-no-celular-web-estilo-cardboard)
+  - [Idioma (English, Português, Español, Русский)](#idioma-english-português-español-русский)
+  - [Linux x86_64](#linux-x86_64)
+  - [Cutscene nativo](#cutscene-nativo)
+  - [World Status](#world-status)
+  - [Animation Events](#animation-events)
+  - [Vehicle System / Vehicle Lab](#vehicle-system--vehicle-lab)
+  - [Destruição e explosões](#destruição-e-explosões)
+  - [Deformação por impacto](#deformação-por-impacto)
+  - [Câmera: foco, rastreio e Camera FX](#câmera-foco-rastreio-e-camera-fx)
+  - [Logic Bricks → Python Component](#logic-bricks--python-component)
+  - [Android / iOS](#android--ios)
+  - [Outros](#outros)
+- [Performance](#performance)
+- [Iluminação e gráficos](#iluminação-e-gráficos)
+- [Validações manuais pendentes](#validações-manuais-pendentes)
+- [Fora do escopo atual](#fora-do-escopo-atual)
+
+## Atlas de materiais
+
+- [Ferramenta nativa e plano](material-atlas-plan.md): primeira versão para um mesh com materiais PBR opacos. Pendente: usuário validar no jogo real, Escape físico/fechamento da janela, Linux e integração GI com denoise/light volume. GPU OpenCL, Undo/Redo automático na conclusão modal, restauração persistente, cancelamento via API/rollback, Web no navegador e bakes de GI nas duas ordens passaram em cena controlada. Próximas peças, após revisão: materiais legados, vários objetos, transparência e grafos mais amplos; combinação direta sem bake permanece futura.
+
 ## Prioridade atual
 
+- Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
+  Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
+  confirmou que o jogo funciona após a migração. Pendente: console,
+  Steam/LAN, associações HKCU/HKLM e Windows sem Visual Studio; [plano](executable-rename-plan.md).
+  Linux e artefatos Web/Android mantêm nomes anteriores.
+
 ### Carregamento mais rápido ("Cozinhar")
+
+- RangeArmor: preparo de `.cooked` na exportação, opção de exportar sem cache, staging e launcher
+  Windows atualizado passaram em cena controlada e pacote extraído. Pendente: jogo real,
+  Linux/outra GPU e migração dos runtimes dos projetos antigos; [plano](rangearmor-update-plan.md).
+  Cópia da instalação real, Cook e execução pelo player copiado passaram em caminho com
+  espaço/acento. Aberto: codificação de destinos não ASCII em `ANASTACIO_COOK` direto no runtime.
+  Painel Rust recompilado com tratamento de exit code; 26 testes e abertura/fechamento
+  passaram. Exportação pela GUI e diagnóstico de falha passaram em cena controlada;
+  export comprimido pela GUI também passou, com execução do ZIP extraído e uso do cache.
+  Usuário confirmou execução do jogo; falta validar LibLoad, benefício do cache no jogo
+  real e outras plataformas/GPU. Pacotes locais sem símbolos de debug foram extraídos e
+  executados; permanece validação em Windows limpo antes de publicar.
 
 Plano: arquivo `.cooked` preparado para o jogo ao lado do `.range`, com fallback para o cru. Etapas 1 (medição
 `[Load]`) e 2 (cache de shader GLSL, merge do LibLoad só com materiais novos) feitas em 2026-10-03; comparação
@@ -25,6 +78,12 @@ Aberto:
 - Etapa 4 parcial (2026-10-03, sem formato novo): normais/tangentes e BVH de física compartilhadas entre malhas
   de conteúdo igual (800 esferas: conversão 2,9 s → 0,8 s). Malhas únicas ainda calculam tudo; guardar pronto
   exigiria o `.cooked`.
+- `.cooked` começou (2026-10-07): pontos do Convex Hull gravados ao jogar o `.blend` e copiados pelo Export
+  Game (física 1,6 s → 0,04 s no teste de 12 objetos). Binário dos shaders de material também (310 → 3 ms);
+  com o botão Cook o LibLoad do teste foi de 2,4 s → 0,47 s. Buffers de malha (2026-10-08): malhas com
+  10 mil loops ou mais guardam de que loop vem cada vértice e os índices; LibLoad do teste 850 → 295 ms.
+  Tangentes cozidas também (2026-10-08): malha do teste 32 → 4 ms. Sem mínimo de loops: 200 malhas de 112 loops 45 → 21 ms. Normais e BVH de física cozidas: 200 malhas de 8 064 loops 1 820 → 259 ms. Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
+  usuário e aquece todos na primeira abertura em cada GPU/driver, com tela de texto (sem barra de progresso).
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
   serial na GPU; DDS no `.cooked` cortaria ambos.
 - Tela de loading do LibLoad (2026-10-03): `asynchronous=True` agora tem progresso real (conversão por
@@ -53,13 +112,30 @@ Em 2026-10-02: Scrape Style Strip (faixa contínua, marca de pneu) ao lado dos c
 
 ### Multiplayer nativo
 
+- **Complemento Steam (Windows implementado, prova externa pendente, 2026-10-07):** componente/menu
+  reutilizável distribuído pela engine; SDK/transporte opcionais, salas e convites.
+  [Inventário e contrato](steam-multiplayer-inventory.md): componentes reais conferidos,
+  SDK local encontrado; AppID comercial e exportador do jogo pendentes. B2 compilado com SDK 1.55,
+  serviço único e API `Range.network.steam`; player validou DLL real e erro de Steam fechada.
+  SDK real passou canais, handshake, transform/propriedade, spawn/despawn e ownership em sockets
+  locais; salas/menu, adaptadores do jogo e export Steam/LAN passaram. [Guia](steam-complement-development.md).
+  Pendentes: dois jogadores em redes distintas e relay confirmado, convites aberto/fechado,
+  carros/corrida real e saída/reentrada, AppID comercial, revisão de distribuição e Linux.
+  Revisão local corrigiu cancelamento/timeout, argv de convites, descarte por lane,
+  fila de desconexão, confirmação na UI e retorno/reabertura de sala. Dois players ENet
+  passaram duas partidas e reentrada; Steam numa conta passou retorno/busca/segunda partida.
+  Esses resultados locais não encerram os critérios externos de saída/reentrada e convites.
+  Web continua com WebSocket; não inferir cross-play Steam. A migração de SDK é única, mas
+  conquistas comerciais e avaliação visual do RolimaRacer ainda precisam de teste.
+  Etapas e critérios em [steam-multiplayer-plan.md](steam-multiplayer-plan.md).
+
 Plano em [`multiplayer-plan.md`](multiplayer-plan.md), contrato em [`multiplayer-protocol.md`](multiplayer-protocol.md). Núcleo isolado pronto na main (2026-10-04, frentes A–J, `source/source/gameengine/Network/`): protocolo, ENet + WebSocket, servidor, replicação com delta/relevância/orçamento, predição e lag compensation, relógio, RPC, descoberta LAN, menu (`tools/net_menu/`), CI (`.github/workflows/network.yml`: gcc, clang, MSVC, wasm32, pytest, Docker).
 
 Ligado na engine (`net/engine`, na main desde 2026-10-04; registro em [`NOTES-engine.md`](../source/source/gameengine/Network/NOTES-engine.md)): `KX_NetworkManager` (host, cliente, replicação de transform/velocidade/propriedades, spawn/despawn, dono, chat, pronto/iniciar, LAN, simulador), DNA/RNA/painéis Network (cena e objeto, "Rep" nas propriedades, versioning), `Range.network` com a API de `tools/net_menu/NOTES-D.md`, `ge_network` no CMake. Testado no Linux (build headless + editor): servidor e cliente `RangeRuntime` sob xvfb, o objeto replicado se move no cliente, nos modos script e cena (`tools/net_engine_test/run_net_test.sh spawner|car|scene`). **Windows/MSVC validado** (2026-10-04): compila, `spawner`/`car`/simulador passam com dois `RangeRuntime` (`run_net_test_win.sh`) e os painéis Network aparecem certos no editor.
 
 Servidor headless e predição refeitos em `claude/project-thread-l2znr0` (2026-10-04, na main pelo PR #4, `9e7925f`): `RangeRuntime --server` sem render nem áudio, Dedicated, ~0,13 núcleo ocioso (`run_net_test.sh server|scene-server`); predição do cliente, input e lag compensation (`net.predict`, `set_input`, `set_hitbox`, `raycast_past`, `skipOwned` com filtro, throttle do ENet desligado), testados no Linux (`run_net_test.sh predict`); RPC do jogo (`@net.rpc`, `net.call`) e `obj.net` (`run_net_test.sh rpc`), com `sender` nos clientes pela mensagem provisória `200 RpcFrom`. Reconciliação da predição corrigida (`NodeUpdate()` ao mover o objeto previsto); `view_time` corrigido para o snapshot de fato desenhado (lag compensation do `predict` 100% em 20 rodadas no Linux); propriedades replicadas de objeto previsto agora chegam ao dono (só transform/velocidade eram puladas). **Windows/MSVC parcialmente validado** (2026-10-04): `run_net_test_win.sh spawner`/`car` passam com os três commits (`net.headless`, `net.isServer` e o módulo `Range.network` completo responderam certo); achada e documentada em `NOTES-engine.md` uma armadilha de build (ninja não recompilava `KX_PyNetwork.cpp.obj` após `git checkout`, mascarando o código novo). As branches `net/server-headless` e `net/engine-predict` originais nunca chegaram ao GitHub. **Linux revalidado na main `9e7925f`** (2026-10-04): os 7 cenários de `run_net_test.sh` passam; `predict` falhou 1 vez em 4 (`max_error` 0,6 > 0,5, 21 correções): causa confirmada com `network.input_stats` (inputs do cliente chegando depois do tick simulado no servidor); a linha de ticks do cliente agora segue o relógio (dois passos ou nenhum por quadro) e a margem subiu para 2 ticks (8 rodadas PASS, erro ≤ 0,134); o servidor devolve a folga dos inputs (mensagem `201 InputTiming`, contrato fechado após revalidação no Windows: 5 rodadas PASS, erro 0, 0 correções) e o cliente ajusta o adiantamento por ela: 8 rodadas PASS com erro máximo 0. Windows: `predict`/`server` (`87fe6d1`, inclui `--server` no Windows) e `scene`/`scene-server` (`19e1437`) já validados no `run_net_test_win.sh`.
 
-Aberto: predição com corpos dinâmicos (o passo é cinemático, sem replay de física); tirar a janela GL de vez do `--server` (hoje 100×100, precisa de display/xvfb; o GHOST 2.79 não tem contexto offscreen); relevância por distância (`setClientView`) e faixa/bits por propriedade float na UI; troca de cena durante a partida; cliente/Web no navegador real; decidir as propostas provisórias (`7 WrongPassword` + senha no `Hello`, `Server Name` da LAN já virou campo da cena, ver `NOTES-*.md`); cliente por IPv6 (núcleo só IPv4).
+Feito em 2026-10-05: troca de cena durante a partida (`net.change_scene`, teste `scene-change`). Feito em 2026-10-04: predição de corpo dinâmico simples (cenário `predict-cube`; veículo fica de fora, ver changelog), IPv6 no transporte WebSocket `--server` sem janela nem display no Linux (contexto EGL surfaceless), relevância por distância (`Relevance Radius` da cena + `net.set_client_view`) e faixa/bits por propriedade float na UI. **Windows/MSVC revalidado (2026-10-05)** após `git pull` + build incremental: os 6 cenários do `run_net_test_win.sh` (`spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`) PASS, `predict` com 0 correções/0 teleportes. `scene-change` não tem equivalente no script Windows (só `run_net_test.sh` no Linux); não revalidado por aqui. **Runtime Web completo com rede, fechado (2026-10-05, Windows, Chrome real não-headless)**: não é mais só o transporte isolado — `RangeRuntime` Web (`build-web-release`) rodando o jogo de verdade (modo cena Client, `make_net_web_scenes.py`) contra um `RangeRuntime --server` nativo, verificado por CDP num Chrome de verdade (`tools/web/verify-package.cjs`): `NETWEB client PASS connected=True hp_changed=True moved=True` (replicação de transform e de propriedade confirmadas dentro do Python do próprio jogo, não só pelo `net_web_watch`). Achado: a cena Client para a Web precisa ter o endereço apontando para o `websocket_port` do host, não o `port` ENet (ver changelog); isso é cuidado de deploy, não bug. IPv6 no ENet/UDP: vendor trocado em 2026-10-05 (ver `NOTES-engine.md` e changelog) — `source/extern/enet` agora é o fork `zpl-c/enet` (header único), compilado em modo `ENET_IPV4_ONLY` por enquanto (a sandbox de build nem tem pilha IPv6). **API Python decidida (2026-10-05):** `net.host`/`net.join` já expõem IPv6 pela própria string de endereço — `net.join("[::1]:7777")` já é documentado e parseado (`ParseAddress` em `KX_PyNetwork.cpp`), `net.host(port=...)` já faz bind em `ENET_HOST_ANY` (que no fork dual-stack vira `in6addr_any`); não há parâmetro novo a adicionar. O guard de rejeição de IPv6 em `NET_TransportENet.cpp::connect()` passou a ser condicional (`#ifdef ENET_IPV4_ONLY`): no build IPv4-only atual o comportamento é idêntico; num build dual-stack (`-DENET_IPV4_ONLY=OFF`, numa máquina com IPv6) o `connect()` entrega o endereço ao `enet_address_set_host` do fork e o IPv6 passa a funcionar ponta-a-ponta sem mais mudança de código. Ambos os modos compilam limpos (0 warnings); IPv4-only revalidado 100% PASS no `ctest`. Regressão completa validada no Linux (`spawner`, `rpc`, `predict`, `server`, `scene`, `scene-server`, `scene-change`, `predict-cube`, `car`, todos PASS) e wasm32 (Emscripten 6.0.11, Node.js, CI core tests PASS). **`--server` sem janela visível no Windows resolvido em 2026-10-05**: o GHOST Win32 cria a janela WGL oculta no caminho headless; cenário servidor PASS e `EnumWindows` confirmou 0 janelas visíveis no processo servidor. **`::1` testado e isolado (2026-10-05, Windows)**: com `ENET_IPV4_ONLY=OFF` (`build-net-v6`), o handshake ENet em `::1` reproduz timeout real (`DisconnectReason::Timeout`). Instrumentação em `enet.h` (revertida depois, `git diff` limpo) mostrou que todo `sendto()` do cliente retorna sucesso mas o `recvfrom()` do servidor nunca dispara — perda ocorre fora do ENet/engine. Confirmado com um teste `System.Net.Sockets.UdpClient` IPv6 puro, fora do ENet e do engine, reproduzindo o mesmo timeout em `::1` — descarta bug de código. Testado então IPv6 UDP real entre dois dispositivos (PC ↔ celular via tethering USB/RNDIS, endereços link-local `fe80::`), nos dois sentidos: funcionou perfeitamente (envio e recebimento OK). Conclusão: o bug é específico de **loopback IPv6 nesta máquina Windows** (suspeita: interface `vEthernet (WSL (Hyper-V firewall))` interceptando/derrubando tráfego de loopback), não do ENet/engine nem da pilha IPv6 em geral — não é corrigível por mudança de código; depende de config local de rede/Hyper-V/AV. Predição de veículo: avaliada e mantida fora da v1 (decisão do usuário em 2026-10-05, só interpolação; replay completo do Bullet fica para pós-v1).
 
 ### Web (WebGL/WebAssembly)
 
@@ -107,7 +183,10 @@ Aberto:
   `ScriptProcessorNode` obsoleto (resolvido em 2026-10-04: saída AudioWorklet, ouvida pelo usuário no navegador do PC e no Chrome do celular (via `adb reverse`) sem problemas; ver changelog) e um quadro de 104 ms na carga. Divisão vigente e pendências em
   [web-remaining-execution-plan.md](web-remaining-execution-plan.md).
 - **Reverb Area (2026-09-29)**: validar ouvindo no jogo real (entrar/sair de uma área com um speaker 3D
-  tocando) e no Web, onde o OpenAL de compatibilidade (`web-no-openal/efx.h`) pode não ter EFX. Sem desenho
+  tocando). Web: EFX indisponível no backend SDL atual (`web-no-openal/efx.h`); em 2026-10-07,
+  teste A/B no Edge passou alternância seco/caverna a cada 2 s e saída AudioWorklet ativa,
+  usuário confirmou ausência de diferença audível mesmo com som contínuo e reverb forte em
+  `build-web/dist/reverb-ab/` (gerador `tools/create_web_reverb_ab_scene.py`). Sem desenho
   da zona de efeito total no viewport (só a borda externa, pelo Empty).
 - **Áudio 3D/efeitos OpenAL**: só se algum jogo precisar; `Sound.data()`/`buffer()` do `aud` indisponíveis por
   falta de numpy.
@@ -119,7 +198,7 @@ Aberto:
 
 ### VR no celular (Web, estilo Cardboard)
 
-Plano e estado em [mobile-vr-plan.md](mobile-vr-plan.md): pose da cabeça pelo `deviceorientation`, head tracking
+Estado: pose da cabeça pelo `deviceorientation`, head tracking
 na câmera, distorção de lente no Side-by-Side e botão "Entrar em VR". OpenXR (headset) adiado até haver hardware.
 
 ### Idioma (English, Português, Español, Русский)
@@ -181,7 +260,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
     2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,
     pacote 0.4.6 leva `libOpenColorIO.so.1` e a pasta, sem "fallback mode". Falta o Kitsuy confirmar.
-  - **`RangeRuntime` ignora `SIGTERM`** (handler instalado, processo segue rodando): conferir o handler.
+  - ~~`RangeRuntime` ignora `SIGTERM`~~ **Corrigido (2026-10-05).** A premissa ("handler instalado") estava
+    errada: não havia handler nenhum, só os de `SIGSEGV`/`SIGABRT` (crash dump) em `GPG_Ghost.cpp`. Adicionado
+    `signal(SIGTERM, ...)` que seta `LA_SigTermRequested` (atomic), checada em
+    `LA_Launcher::EngineNextFrame()` a cada frame (mesmo caminho de saída limpa do fechar de janela,
+    `KX_ExitInfo::OUTSIDE`). Testado manualmente com `RangeRuntime --server` headless: processo saía em até
+    timeout (`kill -9` externo) antes, agora sai limpo em ~0,1 s. `run_net_test.sh server`/`spawner` PASS
+    (Linux, `build-linux-editor`) sem regressão.
   - ~~Menu do player Linux (Kitsuy)~~: cancelado pelo usuario em 2026-09-29.
   - **Build do zero:** Kitsuy so conseguiu compilar trocando a pasta `source` pela do RGE 1.6.13 dele (pedia
     `CMakePresets.json`) e voltando depois. Conferir que clone limpo + presets compila sem cache antigo.
@@ -261,7 +346,7 @@ está fechada. O componente do demo `Vehicle` foi sincronizado com a versão com
 
 ### Destruição e explosões
 
-[Plano](destruction-plan.md) aprovado em 2026-09-29; F0 (DNA, RNA e painéis), F1 (Generate Fragments), F2 (quebra por colisão e `shatter()` no runtime), F3 (`scene.explode()`, pavio, impacto, cadeia, Effect e `detonate()`), F4 (Max Debris, `onBreak`/`onExplode`, impulso por massa nos pedaços) e F5 (demo em `source/release/demos/Destruction/`, API no `.rst`) prontas; falta o usuário jogar a demo e ajustar a sensação: objetos
+Plano aprovado em 2026-09-29; F0 (DNA, RNA e painéis), F1 (Generate Fragments), F2 (quebra por colisão e `shatter()` no runtime), F3 (`scene.explode()`, pavio, impacto, cadeia, Effect e `detonate()`), F4 (Max Debris, `onBreak`/`onExplode`, impulso por massa nos pedaços) e F5 (demo em `source/release/demos/Destruction/`, API no `.rst`) prontas; falta o usuário jogar a demo e ajustar a sensação: objetos
 pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Explosive na aba Physics e
 `scene.explode()`, em fases F0–F5. Protótipo Python validado por teste automático no runtime
 0.4.5 (fora do git, em `tools/ADD na engine anastacioEngine/`).
@@ -274,7 +359,7 @@ amassado na cor de vértice para o material misturar tinta arranhada.
 
 ### Câmera: foco, rastreio e Camera FX
 
-Implementado em 2026-09-29 (fases 1 a 5 do [plano](camera-fx-plan.md)); referência em [camera-fx.md](camera-fx.md).
+Implementado em 2026-09-29 (fases 1 a 5 do plano original); referência em [camera-fx.md](camera-fx.md).
 Validado no `RangeRuntime` com `tools/create_camera_fx_scene.py` (foco por propriedade, Drone, shake, fallback
 após remover o alvo, efeitos desligados em jogo). Pendente: conferência visual dos filtros e custo medido
 (`tc_filters2d`) no Rolima Racer; troca dos scripts do jogo fica para quando o usuário decidir.
@@ -298,14 +383,13 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
 - F4 (2026-10-04, branch `logic/convert-f4`, ainda sem merge): Ray por material com x-ray, Collision/Near/Radar de
   sensor ligado de outro objeto, Sound ping-pong e Track To com pai. Validado no build Linux headless com
   `create_logic_convert_scene.py`: CHECK idêntico em bricks e Component; Module/Script iguais entre si e só
-  `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo em
-  [notes-logic-f4.md](notes-logic-f4.md): Track To com pai de vértice; sensores Actuator/Animation Event/Movement/
+  `cam y` difere (-0,03 vs -0,04, já ocorre na main). Continuam bricks, com motivo no changelog: Track To com pai de vértice; sensores Actuator/Animation Event/Movement/
   Ray Gaze/VR Head ligados de outro objeto; actuators de outro objeto que usam helper do componente.
 - F5 (2026-10-04, na main): Camera, Constraint, Steering e Mouse Look de outro objeto. Runtime validado no Windows
-  ([NOTES-logic-f5.md](../NOTES-logic-f5.md)); Mouse Look testado à mão com mouse real (bricks e convertido).
+  (detalhes no changelog); Mouse Look testado à mão com mouse real (bricks e convertido).
 - F6 (2026-10-04, na main): Track To com pai, Sound loop/ping-pong/3D, Movement e Animation Event de outro objeto;
   Delay em segundos. Runtime validado no Windows (CHECK idêntico nos 4 modos, `LEFT_AS_BRICK 0`); áudio testado à mão
-  (loop recomeça, ping-pong, 3D), cena `tools/create_logic_manual_test.py`, ver [NOTES-logic-f6.md](../NOTES-logic-f6.md).
+  (loop recomeça, ping-pong, 3D), cena `tools/create_logic_manual_test.py`.
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
   Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.
@@ -353,7 +437,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
   no Windows, duplo clique).
   Registro/remoção (`-r`/`-u`) e comandos do Registro validados em 2026-09-24; falta somente validar o duplo clique no Explorer.
-- **Export presets (RangeArmor)**: falta o teste manual (projeto novo e antigo) do [plano](export-presets-plan.md).
+- **Export presets (RangeArmor)**: falta o teste manual (projeto novo e antigo) do plano.
   `company_name`, `icon_path` e toggles desktop já são gravados por `wm.py`, com extensão do schema
   registrada no plano; a pendência é de validação manual, não de implementação desses campos.
 - **Auditoria de `source/blender`**: confirmar ou descartar os candidatos de
@@ -374,6 +458,130 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Performance
 
+- **Onde perdemos feio para o ThunderPlayer (benchmark 2026-10-09)** — refeito o teste do Codex
+  (`D:\ThunderPlayer-investigacao\benchmark\diagnostico\`, `run_diagnostics_2026_10_09.py`, `runs-2026-10-09.json`;
+  relatorio original em `RESULTADO-DIAGNOSTICO.md`). RX 6800M, 1280x720, MSAA 2x, FPS medio de 2 rodadas:
+  1. **Muitos objetos sem instancing (1.600 esferas):** Anastacio 587 FPS x Thunder 1585 com culling;
+     570 x 2524 sem culling (3-4x atras). Custo e CPU por objeto no render (`cpu:render.cameras` ~1,07 ms
+     contra ~0,05 ms com tudo numa malha); a GPU sozinha nao explica. Prioridade: achar a funcao C++ por
+     desenho (bind de material/uniforms, matriz, estado GL por slot) e cortar.
+  2. **Culling por frustum caro:** ~0,5 ms para 1.600 objetos (CameraCulling 0,47-0,53 ms; desligado 0,04 ms).
+     Thunder perde pouco ao ligar culling. Investigar o teste por objeto (BVH/DBVT, AABB, chamadas virtuais).
+  3. **400 objetos sem instancing:** 1911 x 2630 com culling, 2033 x 2908 sem (~1,4x atras) — mesmo custo do item 1.
+  **Causa (2026-10-09, `docs/analise-thunder-vs-anastacio.md`):** a Thunder agrupa estaticos sozinha
+  (auto-batch, padrao ligado); nos temos o mesmo recurso (Static Batch, `377a0026`) mas desligado.
+  Com Static Batch marcado: 1.600 obj 1579 x 1353 (culling ligado), 2331 x 2330 (desligado);
+  400 obj 3190 x 2293 / 3471 x 2998. Proximo passo: tornar Static Batch automatico ou facil de ligar.
+  Onde ja ganhamos: instancing (1779 x 728 com culling, 2581 x 720 sem) e malha unica (empate/vitoria, ~3200).
+  Variacao alta entre rodadas no caso 1 (479 x 696 FPS na mesma cena); repetir antes de concluir ganho pequeno.
+
+- Auditoria KX14: cache de `Text-Res` e envios espaciais de `KX_Speaker` corrigidos,
+  editor/player compilados e testes isolados/runtime passaram. Pendente: benchmark de FPS/tempo,
+  visual do texto e avaliacao auditiva 3D no jogo real (movimento/camera, Doppler, pausa e replicas).
+  `SetModelMatrix` de particulas apenas copia 16 floats CPU; sem correcao neste item.
+  KX13 e RA1 ja constam como corrigidos.
+
+- RA5 concluido por aceite do usuario: preparacao restrita a materiais com slots
+  ativos; editor/player e comparacao de ocultacao/frustum/reativacao passaram.
+  Nao houve medicao de tempo/FPS; validacoes adicionais deixam de bloquear o item.
+
+- RA4 concluido: cache de stream para instancing normal sem sort. Cena controlada
+  (100 cubos, 1 draw) mede 1 upload inicial, 0 em repouso e 1 a cada mudanca de
+  posicao/cor/visibilidade. Sem benchmark de tempo/FPS. Detalhes em
+  `auditoria-claude-resultados.md`.
+
+- RA3: integrado em `12741810`, validado visualmente no jogo pelo usuario.
+  Pendente apenas ampliar cobertura dos casos adicionais do plano e obter benchmark
+  conclusivo; a primeira peca nao aguarda novo aceite visual.
+  Cache da ultima direcao aceita no IBO compartilhado.
+  Referencia visual aprovada pelo usuario; diferencial isolado, editor/player e runtime passaram.
+  Usuario confirmou visual da cena corrigida em 2026-10-09, incluindo troca de topologia (T).
+  Benchmark A/B isolado em repouso/movimento passou (3 rodadas por modo/versao),
+  mas ganho de tempo/FPS foi inconclusivo; detalhes no plano. RolimaRacer/Pista_1
+  abriu estavel e o usuario confirmou a validacao visual; pendem os casos adicionais
+  do plano. O diagnostico inicial:
+  zsort aloca, ordena e escreve o IBO por draw, mesmo em repouso.
+  O buffer pertence ao display array e e compartilhado entre slots: cache por objeto nao basta.
+  Plano da primeira peca: conservar a direcao de profundidade da ultima ordem efetivamente
+  gravada no IBO; invalidar por posicoes/topologia e recriacao do storage, e repetir apos falha
+  de mapeamento. Preservar a ordenacao existente para empates e alternancia de objetos/cameras.
+  [Plano de implementacao e validacao visual](ra3-transparencia-plan.md): primeiro preparar
+  a cena e conferir a referencia com o usuario; depois diferencial, build/runtime e comparacao
+  visual antes/depois no player real (aceite concluido nesta retomada).
+  Sombras alpha sem override entram; sombras com override ignoram este trecho.
+
+- GL5/GL6/GL9/GL10: lote GameLogic integrado. Em cena de 300 objetos com 1.800
+  atuadores e sensores, 1,82 -> 1,26 ms/frame (-31%) sem mudar valores finais.
+  GL5 e GL10 corrigidos; GL6 e GL9 foram majoritariamente falsos positivos,
+  recebendo apenas remoções locais de trabalho comprovadamente redundante.
+  Evidências e limites em [resultados da auditoria GL](auditoria-claude-resultados.md).
+
+- RA2 parcial: produto `view x object` reutilizado na mesma chamada de
+  `GPU_material_bind_uniforms`; editor/player compilados e diferencial passou.
+  Damage/GP8 corrigido: cast so com uniform ativo e count com cache por GPUShader;
+  diferencial com programa compartilhado e runtime dent/reset passaram. Pendente: benchmark/visual no jogo real
+  e avaliar se custo das inversas por draw justifica cache adicional.
+  Cache entre draws exige considerar objeto, camera/passe e matriz de halo/billboard.
+  Sem cache novo de matrizes entre draws; arrays de hits continuam enviados por objeto.
+
+- KX11/RA9: cache seletivo de transformacao/cone implementado; diferencial isolado e
+  runtime antes/depois passaram. Pendente: medir ganho de FPS/tempo em cena com muitas luzes
+  e validar visualmente no jogo real (Point/Spot/CSM/Area e alternancia editor/jogo).
+  Medir separadamente a reconstrucao de `dynamicCasterSet` com Static Split ativo.
+
+- KX10 (Auto Shadow): mapa de casters reconstruido somente na invalidacao; Point passou em comparacao
+  antes/depois; benchmark estatico mediu ganho (ver changelog). Pendente: Spot, deformadores,
+  layers/parametros, ganho no jogo real e visual.
+  A varredura por frame permanece; evidencias na [auditoria](auditoria-suspeitos.md).
+
+
+- **Profiler da engine (`KX_EngineProfiler`) — feito (2026-10-06):** ver `docs/engine-profiling.md`.
+  Opcional, só se fizer falta: painel ImGui com as etapas e `Range.logic.getEngineProfile()`.
+- Contadores de render como opção para o usuário final (2026-10-06): `Range.logic.getRenderStats()` já
+  expõe draw calls, material binds, light binds, culling, luzes/shadow passes e lógica, e o overlay ImGui
+  mostra os mesmos números sob "Show Render Queries". Falta uma apresentação pensada para quem faz jogo
+  (hoje o painel é de debug interno): decidir se vira um HUD próprio de FPS + contadores, ligável no painel
+  Render, em vez de ficar junto das render queries.
+- **Uploads repetidos de estado padrão no PBR (2026-10-08):** contadores reais no
+  profiler confirmaram 19 comandos por objeto na cena Principled sem mapas de sombra
+  e sem probes locais: 8 de sombra, 3 de luzes/IES e 8 de probes. Com 1600 objetos,
+  30400 comandos/quadro. No material legado da comparação com a referência, essas fases enviam
+  zero uniforms; apenas a camada do objeto é enviada. `lightBinds` conta entradas,
+  não uploads. O caso PBR é adicional e não explica sozinho o teste legado.
+  Primeira peça aplicada: cache de probes ausentes restrito à ativação do material,
+  reiniciado em cada bind e invalidado por probe ativa ou alteração de maxlod.
+  Controle PBR: 12800 comandos de probe/quadro → 8; total 17608 em vez de 30400.
+  Sombras e luzes/IES continuam sem esse cache.
+  Não reduzir atualizações de transformações, animação, lógica ou física de veículos.
+  Uploads, transições isoladas e FPS sem profiler passaram: PBR com 1600 objetos,
+  240,2 → 288,9 FPS em MSAA 2/AF 2 (+20,3%), 242,7 → 292,8 em 4/4 (+20,6%).
+  Validar comportamento visual no jogo com probes e veículo; ganho no material
+  legado não demonstrado. Procedimento em [engine-profiling.md](engine-profiling.md).
+  RolimaRacer abriu e usuário chegou à corrida com lags: muitas médias em 60 FPS,
+  probes sem uploads no trecho registrado; maiores pausas na apresentação da janela.
+  Pista_1 confirmada, 10 carros e muitos efeitos ligados. Repetir sem cache;
+  orientação do usuário: registrar lags e continuar, investigar se forem frequentes.
+  Segunda execução sem cache também teve pausas grandes na apresentação; mediana
+  de 60 FPS nos recortes com física nas duas sessões, sem uploads de probes.
+  Nenhum ganho demonstrado na Pista_1. Rodada sem instrumentação em standalone
+  com área 2560×1440: usuário confirmou sem lag percebido e física boa, FPS limitado
+  a 60. Suspeita de desfoque registrada, sem alterar efeitos.
+- **Camada de objeto repetida (2026-10-08):** cache por ativação do material aplicado,
+  legado 1600 → 1 uniforms de camada/quadro; alternância preservada (16 transições
+  na ordem por malha), matrizes e probes passaram. Editor/player compilados.
+  FPS sem profiler: +0,89% em 2X, série 4X com grande variação; ganho consistente
+  não demonstrado. Validar visual no jogo dessa segunda peça. A diferença grande
+  com a referência legada foi fechada em 2026-10-08: ver [batching estático e culling](batching-estatico-e-culling.md)
+  (Static Batch `377a0026`, ciclo do grupo `ae1370bc`, culling `98f54d7f`; validados no jogo do usuário).
+- **Trabalho repetido por frame (aberto, 2026-10-08):** generalizar a lição do `98f54d7f` (marca
+  "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`). Falta:
+  regra no `AGENTS.md`, verificador estático (`tools/`) e rodar o detector nos jogos reais
+  (parado e em movimento). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
+  Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
+  [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Bugs do nível 0 (8/8)
+  corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09 (corrigidos ou descartados; só CV3 aberto); ganho por item não demonstrado em A/B. Abertos: PY, LP, SP.
+- **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
+  `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"
@@ -417,6 +625,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Iluminação e gráficos
 
+- **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
+  GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
+  validar no Linux e no build Web; opcional SSGI (fase 4). UV da lightmap por xatlas.
 - **Compatibilidade UPBGE 0.2.5b adiada:** ao abrir um `.blend` dessa versão, migrar somente quando
   `upbgeversionfile != 0` e o arquivo ainda não tiver versão Range. Há duas conversões verificadas que não
   devem ser misturadas à correção dos Mouse Logic Bricks: (1) em `World.skytype`, mover `Sky Texture` do bit
@@ -461,6 +672,9 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).
 
 ## Validações manuais pendentes
+
+- Tesla Rhythm: avaliar overlay, enquadramento e latência percebida no jogo real;
+  [modo de cinco pistas via Python Component](tesla-rhythm.md) passou sonda no runtime.
 
 Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no

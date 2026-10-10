@@ -4,7 +4,7 @@
 
 Opens projects-teste/halfanim_crash/halfanim_crash.blend (saved before the network settings existed, so this
 also exercises the versioning that seeds the scene defaults) and writes net_host.range and net_client.range:
-same scene, 'Spawner' with Replicate on and a replicated 'hp' game property; the scene mode is Host in one and
+same scene, 'Spawner' with Replicate on, a replicated 'hp' game property and a 'heat' float quantized to 8 bits over 0..10; the scene mode is Host in one and
 Client (127.0.0.1:<port>) in the other. Prints NETSCENE lines and ends with NETSCENE PASS or FAIL.
 """
 
@@ -64,6 +64,12 @@ prop = spawner.game.properties["hp"]
 check("property flag defaults to off", not prop.use_replicate)
 prop.use_replicate = True
 check("property flag sticks", prop.use_replicate)
+# Quantized float: 8 bits over 0..10 (the client only ever sees multiples of 10/255).
+bpy.ops.object.game_property_new(type='FLOAT', name="heat")
+heat = spawner.game.properties["heat"]
+check("float property starts raw", heat.net_bits == 0)
+heat.use_replicate = True
+heat.net_bits, heat.net_min, heat.net_max = 8, 0.0, 10.0
 
 os.makedirs(out_dir, exist_ok=True)
 for mode, name in (('HOST', "net_host.range"), ('CLIENT', "net_client.range")):
@@ -85,5 +91,8 @@ check("DNA round trip (scene)", (net.mode, net.port, net.max_players, net.server
       str((net.mode, net.port, net.max_players, net.server_name)))
 check("DNA round trip (object)", spawner.game.network.use_replicate and spawner.game.network.net_id == first_id
       and spawner.game.properties["hp"].use_replicate, str(spawner.game.network.net_id))
+heat = spawner.game.properties["heat"]
+check("DNA round trip (float bits/range)", (heat.net_bits, heat.net_min, heat.net_max) == (8, 0.0, 10.0),
+      str((heat.net_bits, heat.net_min, heat.net_max)))
 print("NETSCENE id=%d" % first_id)
 print("NETSCENE PASS" if not failures else "NETSCENE FAIL " + ",".join(failures), flush=True)

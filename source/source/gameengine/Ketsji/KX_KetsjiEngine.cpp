@@ -40,17 +40,25 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdio>
+#include <cstdlib>
 
 extern "C" {
 	#include "BLI_math_base.h"
 }
 
+#include "CM_WorkCounters.h"
 #include "CM_Message.h"
 
 #include "BLI_task.h"
 
 #include "KX_DebugMode.h"
 #include "KX_KetsjiEngine.h"
+#include "KX_EngineProfiler.h"
 
 #include "EXP_ListValue.h"
 #include "EXP_IntValue.h"
@@ -98,8 +106,12 @@ extern "C" {
 #include "KX_ShadowRenderer.h"
 #include "KX_SimulationPipeline.h"
 #include "KX_NetworkManager.h"
+#ifndef __EMSCRIPTEN__
+#include "NET_AnastacioPlugin.h"
+#endif
 #include "KX_SceneScheduler.h"
 #include "KX_DebugRenderer.h"
+#include "GPU_glew.h"
 
 #define DEFAULT_LOGIC_TIC_RATE 60.0
 
@@ -109,6 +121,8 @@ KX_ExitInfo::KX_ExitInfo()
 	:m_code(NO_REQUEST)
 {
 }
+
+static double g_profileFrameEnd = 0.0;
 
 const std::string KX_KetsjiEngine::m_profileLabels[tc_numCategories] = {
 	"Physics", // tc_physics
@@ -123,6 +137,7 @@ const std::string KX_KetsjiEngine::m_profileLabels[tc_numCategories] = {
 	"CollisionDepth", // tc_collisiondepth
 	"TextureRenderers", // tc_texturerenderers
 	"ParticleUpdate", // tc_particles
+	"Components", // tc_components
 	"Actuators", // tc_actuators
 	"Input", // tc_input
 	"UpdateParents (Logic)", // tc_scenegraph_logic
@@ -174,6 +189,11 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_debugRenderer(new KX_DebugRenderer(this)),
 	m_flags(AUTO_ADD_DEBUG_PROPERTIES),
 	m_frameTime(0.0f),
+	m_logicTime(0.0f),
+	m_physicsTime(0.0f),
+	/* Actions start on m_frameTime and run on m_animationsTime: left uninitialized, a new engine took the old one's
+	 * value when the allocator gave it the same memory, and the menu animations jumped to their end (bug of P). */
+	m_animationsTime(0.0f),
 	m_clockTime(0.0f),
 	m_timescale(1.0f),
 	m_previousRealTime(0.0f),
@@ -243,6 +263,9 @@ KX_KetsjiEngine::~KX_KetsjiEngine()
 {
 	delete m_networkManager;
 	m_networkManager = nullptr;
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().unload();
+#endif
 
 #ifdef WITH_PYTHON
 	Py_CLEAR(m_pyprofiledict);
@@ -330,6 +353,18 @@ void KX_KetsjiEngine::SetCustomMouseCursor(CustomMouseCursor *customCursor)
 #ifdef WITH_PYTHON
 PyObject *KX_KetsjiEngine::GetPyProfileDict()
 {
+	// Built on demand: only getProfileInfo() reads it.
+	// Share of the averaged frame, not of the last frame alone: the times are averages too.
+	const double total = std::max(m_logger.GetAverage(), 1e-9);
+	for (unsigned short i = tc_first; i < tc_numCategories; ++i) {
+		double time = m_logger.GetAverage((KX_TimeCategory)i);
+		PyObject *val = PyTuple_New(2);
+		PyTuple_SetItem(val, 0, PyFloat_FromDouble(time * 1000.0));
+		PyTuple_SetItem(val, 1, PyFloat_FromDouble(time / total * 100.0));
+
+		PyDict_SetItemString(m_pyprofiledict, m_profileLabels[i].c_str(), val);
+		Py_DECREF(val);
+	}
 	Py_INCREF(m_pyprofiledict);
 	return m_pyprofiledict;
 }
@@ -339,6 +374,32 @@ void KX_KetsjiEngine::SetConverter(BL_Converter *converter)
 {
 	BLI_assert(converter);
 	m_converter = converter;
+}
+
+bool KX_AnimLogEnabled()
+{
+	static const bool enabled = getenv("RANGE_ANIM_LOG") && getenv("RANGE_ANIM_LOG")[0];
+	return enabled;
+}
+
+void KX_AnimLog(const char *fmt, ...)
+{
+	if (!KX_AnimLogEnabled()) {
+		return;
+	}
+	static FILE *file = fopen(getenv("RANGE_ANIM_LOG"), "a");
+	if (!file) {
+		return;
+	}
+	using namespace std::chrono;
+	static const steady_clock::time_point origin = steady_clock::now();
+	fprintf(file, "%10.3f ", duration<double>(steady_clock::now() - origin).count());
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(file, fmt, args);
+	va_end(args);
+	fputs("\n", file);
+	fflush(file);
 }
 
 void KX_KetsjiEngine::StartEngine()
@@ -361,6 +422,8 @@ void KX_KetsjiEngine::StartEngine()
 
 	m_renderrate = 1.0 / m_ticrate;
 	m_animationrate = 1.0 / m_ticrate;
+	KX_AnimLog("===== START engine=%p tic=%.1f anim_fps=%.1f fixed=%d timescale=%.3f frameT=%.3f animT=%.3f", (void *)this,
+	           m_ticrate, GetAnimFrameRate(), (int)m_useFixedTimestep, m_timescale, m_frameTime, m_animationsTime);
 
 	// Initialize Debug Mode (ImGui)
 	if (m_flags & (SHOW_DEBUG_MODE)) {
@@ -382,6 +445,8 @@ void KX_KetsjiEngine::StartEngine()
 
 void KX_KetsjiEngine::BeginFrame()
 {
+	CM_WorkCountersSwap();
+
 	if (m_flags & SHOW_RENDER_QUERIES) {
 		m_logger.StartLog(tc_overhead);
 
@@ -405,7 +470,14 @@ void KX_KetsjiEngine::EndFrame()
 		m_rasterizer->MotionBlur();
 	}
 	/// main frame timings
+	KX_EngineProfiler::Sections prof;
 	UpdateSleepTime();
+	RANGE_PROFILE_MARK(prof, "endframe.sleep");
+	// Sync mode drains the GPU here so the imgui stage below holds only imgui.
+	if (KX_EngineProfiler::SyncGpu() && m_needsRender) {
+		glFinish();
+		RANGE_PROFILE_MARK(prof, "endframe.gpu_sync");
+	}
 
 	if (m_needsRender) {// needed or profile bugs
 
@@ -438,9 +510,11 @@ void KX_KetsjiEngine::EndFrame()
 			}
 			m_imgui->Render();
 		}
+		RANGE_PROFILE_MARK(prof, "endframe.imgui");
 
 		m_logger.StartLog(tc_rasterizer);
 		m_rasterizer->EndFrame();
+		RANGE_PROFILE_MARK(prof, "endframe.rasterizer");
 
 		if (m_dynamicResolutionQueryActive) {
 			m_dynamicResolutionQuery.End();
@@ -450,13 +524,20 @@ void KX_KetsjiEngine::EndFrame()
 
 		m_logger.StartLog(tc_overhead);
 		m_canvas->FlushScreenshots(m_rasterizer);
+		RANGE_PROFILE_MARK(prof, "endframe.screenshots");
 
 		// swap backbuffer (drawing into this buffer) <-> front/visible buffer
 		m_logger.StartLog(tc_latency);
+		if (KX_EngineProfiler::SyncGpu()) {
+			glFinish();
+			RANGE_PROFILE_MARK(prof, "endframe.gpu_sync");
+		}
 		m_canvas->SwapBuffers();
+		RANGE_PROFILE_MARK(prof, "endframe.swap");
 		m_logger.StartLog(tc_rasterizer);
 
 		m_canvas->EndDraw();
+		RANGE_PROFILE_MARK(prof, "endframe.enddraw");
 		m_logger.StartLog(tc_overhead);
 	}
 }
@@ -529,6 +610,12 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 
 bool KX_KetsjiEngine::NextFrame()
 {
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().pump(); // Once per rendered frame, shared by all scenes.
+#endif
+	if (g_profileFrameEnd > 0.0) {
+		RANGE_PROFILE_ADD("frame.outside", (m_clock.GetTimeSecond() - g_profileFrameEnd) * 1000.0);
+	}
 	m_logger.StartLog(tc_input);
 
 	if (m_inputDevice) {
@@ -614,23 +701,40 @@ bool KX_KetsjiEngine::NextFrame()
 
 
 	// for each scene, call the proceed functions
+	int steps = 1;
 	if (m_useFixedTimestep) {
 		// Plano 8: fixed-timestep accumulator. m_framestep is the fixed logical step
-		// (set by FrameTiming(), already m_timestep * m_timescale); here we measure real
-		// elapsed time independently of m_previousRealTime/m_deltatime (owned by the
-		// legacy sleep-based catch-up below) and run as many whole steps as are owed,
-		// capped at m_maxLogicFrame to avoid a spiral of death under a stall.
+		// (m_timestep * m_timescale); real elapsed time is measured here, and as many whole
+		// steps as are owed run, capped at m_maxLogicFrame to avoid a spiral of death.
+		// Each step advances the game clocks itself (AdvanceStepTime), so logic, physics and
+		// animation time stay in step with the number of simulation updates.
 		double now = m_clock.GetTimeSecond();
 		double realDelta = now - m_accumulatorPreviousRealTime;
 		m_accumulatorPreviousRealTime = now;
 		m_simAccumulator += realDelta * m_timescale;
 
-		int steps = 0;
-		while (m_simAccumulator >= m_framestep && steps < m_maxLogicFrame) {
+		steps = std::min((int)(m_simAccumulator / m_framestep), m_maxLogicFrame);
+		const bool frameNeedsAnimation = m_needsAnimation;
+		for (int i = 0; i < steps; ++i) {
+			if (i > 0) {
+				// The previous step consumed this frame's edge events (JUSTACTIVATED etc.);
+				// later steps must see held keys as held, not pressed again.
+				if (m_inputDevice) {
+					m_inputDevice->ClearInputs();
+					m_inputDevice->ReleaseMoveEvent();
+				}
+				m_networkMessageManager->ClearMessages();
+			}
+			// Animations are time based, so evaluating them once (on the last step) is enough
+			// for the drawn pose and avoids paying the skinning per catch-up step.
+			m_needsAnimation = frameNeedsAnimation && (i == steps - 1);
+			AdvanceStepTime();
 			m_simulationPipeline->Update();
 			m_simAccumulator -= m_framestep;
-			++steps;
 		}
+		m_needsAnimation = frameNeedsAnimation;
+		KX_AnimLog("F real_dt=%.4f steps=%d acc=%.4f timescale=%.3f frameT=%.3f animT=%.3f", realDelta, steps,
+		           m_simAccumulator, m_timescale, m_frameTime, m_animationsTime);
 		double maxBacklog = m_framestep * m_maxLogicFrame;
 		if (m_simAccumulator > maxBacklog) {
 			m_simAccumulator = maxBacklog;
@@ -638,8 +742,11 @@ bool KX_KetsjiEngine::NextFrame()
 	}
 	else {
 		m_simulationPipeline->Update();
+		KX_AnimLog("F variable dt=%.4f timescale=%.3f frameT=%.3f animT=%.3f", m_deltatime, m_timescale, m_frameTime,
+		           m_animationsTime);
 	}
-	if (m_inputDevice) {
+	// A frame with no simulation step keeps its input and messages for the next step.
+	if (m_inputDevice && steps > 0) {
 		m_logger.StartLog(tc_overhead);
 		// update system devices
 		m_inputDevice->ClearInputs();
@@ -656,13 +763,21 @@ bool KX_KetsjiEngine::NextFrame()
 	
 
 	m_logger.StartLog(tc_overhead);
-	m_networkMessageManager->ClearMessages();
+	if (steps > 0) {
+		m_networkMessageManager->ClearMessages();
+	}
 
 
-	m_converter->ProcessScheduledLibraries();
+	{
+		RANGE_PROFILE_SCOPE("engine.libload");
+		m_converter->ProcessScheduledLibraries();
+	}
 
 	// scene management
-	m_sceneScheduler->ProcessScheduledScenes();
+	{
+		RANGE_PROFILE_SCOPE("engine.scenes");
+		m_sceneScheduler->ProcessScheduledScenes();
+	}
 
 	if (!m_doRender) {
 		if (m_serverMode) {
@@ -693,7 +808,23 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	m_logger.StartLog(tc_outside);
 	ClockTiming();
 	m_sleeptime = 2.0;
-	if (m_timestep > m_deltatime - m_overframetime + 6e-6) {
+	if (m_useFixedTimestep) {
+		// The accumulator owns pacing: wait until the next whole step is owed (minus a margin)
+		// instead of the legacy catch-up, which made steps alternate 0/2. Frames without a step
+		// would let per-frame Python (e.g. net.set_input) overwrite state no step consumed.
+		// With v-sync the swap has usually taken that long already, so the wait is ~0.
+		m_overframetime = 0.0;
+		if (m_timescale > 0.0) {
+			const double owed = m_simAccumulator +
+			                    (m_clock.GetTimeSecond() - m_accumulatorPreviousRealTime) * m_timescale;
+			const double wait = (m_framestep - owed) / m_timescale - 0.0005;
+			if (wait > 0.0) {
+				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+			}
+			ClockTiming();
+		}
+	}
+	else if (m_timestep > m_deltatime - m_overframetime + 6e-6) {
 		while (m_timestep > m_deltatime - m_overframetime + 6e-6) {
 			if (m_timestep > (m_deltatime * 1.5)) {
 				m_sleeptime += 2.0;
@@ -733,6 +864,14 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	// Go to next profiling measurement, time spent after this call is shown in the next frame.
 	m_logger.NextMeasurement();
 	m_logger.StartLog(tc_overhead);
+	{
+		double categoryMs[tc_numCategories];
+		for (int i = 0; i < tc_numCategories; ++i) {
+			categoryMs[i] = m_logger.GetLast(i) * 1000.0;
+		}
+		KX_EngineProfiler::EndFrame(m_clock.GetTimeSecond(), categoryMs, m_profileLabels, tc_numCategories);
+		g_profileFrameEnd = m_clock.GetTimeSecond();
+	}
 
 	// Get logic frame time.
 	m_logicframetime = m_clock.GetTimeSecond();
@@ -748,7 +887,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		// get the render time for next time
 		m_rendertimestart = m_rendertime;
 		m_overrendertime = (m_lastrendertime - m_renderrate + m_overrendertime);
-		if (m_flags & (SHOW_FRAMERATE)) {
+		if (m_flags & (SHOW_FRAMERATE | SHOW_PROFILE)) {
 			m_rendertimeaverage = ((m_rendertimeaverage * (m_ticrate - 1.0)) + m_lastrendertime) / m_ticrate;
 		}
 		if (m_overrendertime > (1.5 / m_renderrate)) {
@@ -768,7 +907,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		// get the render time for next time
 		m_animationtimestart = m_animationtime;
 		m_overanimationtime = ((m_lastanimationtime - m_animationrate) + m_overanimationtime);
-		if (m_flags & (SHOW_FRAMERATE)) {
+		if (m_flags & (SHOW_FRAMERATE | SHOW_PROFILE)) {
 			m_animationtimeaverage = ((m_animationtimeaverage * (m_ticrate - 1.0)) + m_lastanimationtime) / m_ticrate;
 		}
 		if (m_overanimationtime > (1.5 / m_animationrate)) {
@@ -782,17 +921,6 @@ void KX_KetsjiEngine::UpdateSleepTime()
 	if (m_tottime < 1e-3) {
 		m_tottime = 1e-3;
 	}
-#ifdef WITH_PYTHON
-	for (unsigned short i = tc_first; i < tc_numCategories; ++i) {
-		double time = m_logger.GetAverage((KX_TimeCategory)i);
-		PyObject *val = PyTuple_New(2);
-		PyTuple_SetItem(val, 0, PyFloat_FromDouble(time * 1000.0));
-		PyTuple_SetItem(val, 1, PyFloat_FromDouble(time / m_tottime * 100.0));
-
-		PyDict_SetItemString(m_pyprofiledict, m_profileLabels[i].c_str(), val);
-		Py_DECREF(val);
-	}
-#endif
 
 	FrameTiming();
 }
@@ -840,6 +968,13 @@ void KX_KetsjiEngine::GetSceneViewport(KX_Scene *scene, KX_Camera *cam, const RA
 
 	if (cam->UseViewport()) {
 		area = cam->UpdateViewport(displayArea);
+		/* A viewport set in window pixels (camera.setViewport) does not follow the render scale,
+		 * which renders into a smaller off screen; scale it so the camera keeps its window region. */
+		const float scale = m_canvas->GetRenderScale();
+		if (!cam->GetCameraData()->m_useViewportRatios && scale < 1.0f) {
+			area = RAS_Rect((int)(area.GetLeft() * scale), (int)(area.GetRight() * scale),
+			                (int)(area.GetBottom() * scale), (int)(area.GetTop() * scale));
+		}
 	}
 	else {
 		area = displayArea;
@@ -884,6 +1019,9 @@ void KX_KetsjiEngine::StopEngine()
 		m_rasterizer->Exit();
 	}
 
+#ifndef __EMSCRIPTEN__
+    net::anastacioSteamService().unload(); // After scene components have been destroyed.
+#endif
 	// Shutdown KX_Imgui
 	if (m_imgui) {
 		m_imgui->Stop();
@@ -913,6 +1051,11 @@ void KX_KetsjiEngine::ClockTiming()
 void KX_KetsjiEngine::FrameOver()
 {
 	m_previousRealTime = m_clockTime;
+	if (m_useFixedTimestep) {
+		// Pacing comes from the accumulator; no drift to carry.
+		m_overframetime = 0.0;
+		return;
+	}
 	// With v-sync, SwapBuffers() blocks until the next refresh, so that wait lands in
 	// m_deltatime and would be counted as drift; the display already paces the frame.
 	if (m_canvas && m_canvas->GetSwapControl() != RAS_ICanvas::VSYNC_OFF) {
@@ -940,9 +1083,17 @@ void KX_KetsjiEngine::FrameTiming()
 	m_timestep = 1.0 / m_ticrate;
 	m_framestep = m_timestep * m_timescale;
 	m_deltaTime = m_framestep;
+	m_physicsTime = m_framestep;
+	// With the fixed timestep, NextFrame() advances the clocks once per simulation step.
+	if (!m_useFixedTimestep) {
+		AdvanceStepTime();
+	}
+}
+
+void KX_KetsjiEngine::AdvanceStepTime()
+{
 	m_frameTime += m_timestep;
 	m_logicTime += m_timestep;
-	m_physicsTime = m_framestep;
 	m_animationsTime += m_timestep;
 }
 
@@ -988,9 +1139,14 @@ void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool over
 	m_sceneScheduler->ConvertAndAddScene(scenename, overlay, asynchronous);
 }
 
-void KX_KetsjiEngine::RemoveScene(const std::string& scenename)
+bool KX_KetsjiEngine::PreloadScene(const std::string& scenename)
 {
-	m_sceneScheduler->RemoveScene(scenename);
+	return m_sceneScheduler->PreloadScene(scenename);
+}
+
+void KX_KetsjiEngine::RemoveScene(const std::string& scenename, bool keep)
+{
+	m_sceneScheduler->RemoveScene(scenename, keep);
 }
 
 KX_Scene *KX_KetsjiEngine::CreateScene(Scene *scene)
@@ -1090,6 +1246,9 @@ double KX_KetsjiEngine::GetTimeScale() const
 
 void KX_KetsjiEngine::SetTimeScale(double timeScale)
 {
+	if (timeScale != m_timescale) {
+		KX_AnimLog("TIMESCALE %.3f -> %.3f", m_timescale, timeScale);
+	}
 	m_timescale = timeScale;
 }
 
@@ -1159,6 +1318,12 @@ void KX_KetsjiEngine::SetDynamicResolution(bool enabled,
 
 	if (!enabled) {
 		m_dynamicResolutionQueryPending = false;
+	}
+	else if (m_canvas) {
+		// Apply a changed range now: a fixed scale (min == max) would otherwise only move when the
+		// GPU time leaves the target band.
+		const float scale = m_canvas->GetRenderScale();
+		m_canvas->SetRenderScale(std::max(m_dynamicResolutionMinScale, std::min(scale, m_dynamicResolutionMaxScale)));
 	}
 }
 

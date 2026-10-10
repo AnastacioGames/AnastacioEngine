@@ -38,7 +38,7 @@ Evidência no repositório:
 - `source/source/gameengine/Ketsji/KX_PythonInit.cpp`: `saveGlobalDict` já chama `syncfs(false, callback)` após escrever; aproveitar esse caminho, adicionando confirmação de persistência e serialização das solicitações se necessário.
 - `tools/web/verify-capabilities.cjs`: modo `touch` verifica toque convertido em clique de mouse, **não multitouch real**. Usa criação de aba CDP; adaptar para conectar ao alvo WebView existente via ADB.
 - `tools/web/make-runtime-manifest.py`: `touch` está `disabled`; não promover capacidades a validadas com base em emulação desktop.
-- `source/release/scripts/startup/bl_operators/wm.py`: grava `CompanyName`, `IconPath` e seletores desktop. `docs/export-presets-plan.md` registra a extensão já feita.
+- `source/release/scripts/startup/bl_operators/wm.py`: grava `CompanyName`, `IconPath` e seletores desktop. A extensão já feita está no changelog.
 
 As distinções de plataforma estão documentadas pelo [Chromium](https://chromium.googlesource.com/chromium/src/+/HEAD/android_webview/docs/web-platform-compatibility.md); a [Gamepad API](https://www.w3.org/TR/gamepad/) define leitura de controles, e a [API de FS do Emscripten](https://emscripten.org/docs/api_reference/Filesystem-API.html#FS.syncfs) define sincronização assíncrona. A política de pausa do WebView está na [referência Android](https://developer.android.com/reference/android/webkit/WebView#onPause()).
 

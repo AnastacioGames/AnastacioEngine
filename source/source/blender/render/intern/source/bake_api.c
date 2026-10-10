@@ -461,7 +461,7 @@ static TriTessFace *mesh_calc_tri_tessface(
 			copy_v3_v3(triangles[i].normal, no);
 		}
 		else {
-			copy_v3_v3(triangles[i].normal, &precomputed_normals[lt->poly]);
+			copy_v3_v3(triangles[i].normal, &precomputed_normals[lt->poly * 3]);
 		}
 	}
 
@@ -638,12 +638,18 @@ void RE_bake_pixels_populate(
 	unsigned int mpoly_prev_testindex = UINT_MAX;
 #endif
 
+	/* An absent UV must leave no valid primitives for the engine to evaluate. */
+	for (i = 0; i < num_pixels; i++) {
+		pixel_array[i].primitive_id = -1;
+		pixel_array[i].object_id = 0;
+	}
+
 	if ((uv_layer == NULL) || (uv_layer[0] == '\0')) {
 		mloopuv = CustomData_get_layer(&me->ldata, CD_MLOOPUV);
 	}
 	else {
 		int uv_id = CustomData_get_named_layer(&me->ldata, CD_MLOOPUV, uv_layer);
-		mloopuv = CustomData_get_layer_n(&me->ldata, CD_MTFACE, uv_id);
+		mloopuv = uv_id < 0 ? NULL : CustomData_get_layer_n(&me->ldata, CD_MLOOPUV, uv_id);
 	}
 
 	if (mloopuv == NULL)
@@ -652,12 +658,6 @@ void RE_bake_pixels_populate(
 
 	bd.pixel_array = pixel_array;
 	bd.zspan = MEM_callocN(sizeof(ZSpan) * bake_images->size, "bake zspan");
-
-	/* initialize all pixel arrays so we know which ones are 'blank' */
-	for (i = 0; i < num_pixels; i++) {
-		pixel_array[i].primitive_id = -1;
-		pixel_array[i].object_id = 0;
-	}
 
 	for (i = 0; i < bake_images->size; i++) {
 		zbuf_alloc_span(&bd.zspan[i], bake_images->data[i].width, bake_images->data[i].height, R.clipcrop);

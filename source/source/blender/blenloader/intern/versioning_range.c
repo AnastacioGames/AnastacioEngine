@@ -45,6 +45,7 @@
 #include "DNA_property_types.h"
 #include "DNA_python_component_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_sdna_types.h"
 #include "DNA_sensor_types.h"
 #include "DNA_space_types.h"
@@ -55,6 +56,7 @@
 #include "BLI_string_utils.h"
 
 #include "BKE_camera.h"
+#include "BKE_idprop.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_property.h"
@@ -550,6 +552,57 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 117)) {
+    /* The old Texture Paint default kept Normal falloff enabled at 80 degrees.
+     * That masks out nearly horizontal planes when the view is grazing the surface,
+     * making brush strokes appear to stop at a camera-angle-dependent distance.
+     * Preserve intentional custom angles, but migrate untouched defaults to the
+     * new behavior: flat projection unless the artist opts into normal falloff. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      if (scene->toolsettings && scene->toolsettings->imapaint.normal_angle == 80) {
+        scene->toolsettings->imapaint.flag |= IMAGEPAINT_PROJECT_FLAT;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 118)) {
+    /* The game lamp panel now has one "Use Shadow" checkbox for both the traditional and the
+     * PBR (Shading Nodes) path. PBR used to ignore that flag and cast shadows unconditionally,
+     * so lamps in PBR scenes would lose their shadow on load -- flag them as shadow casters,
+     * unless they were authored in Cycles with "Cast Shadow" explicitly off. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      if (!(scene->gm.flag & GAME_USE_SHADING_NODES)) {
+        continue;
+      }
+      LISTBASE_FOREACH (Base *, base, &scene->base) {
+        Object *ob = base->object;
+        if (!ob || ob->type != OB_LAMP || !ob->data) {
+          continue;
+        }
+        Lamp *la = ob->data;
+        if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
+          continue;
+        }
+        IDProperty *cycles = la->id.properties ?
+                                 IDP_GetPropertyFromGroup(la->id.properties, "cycles") :
+                                 NULL;
+        IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ?
+                               IDP_GetPropertyFromGroup(cycles, "cast_shadow") :
+                               NULL;
+        if (cast && IDP_Int(cast) == 0) {
+          continue;
+        }
+        /* Same test as lamp.use_shadow: only a Spot counts the legacy buffer bit. */
+        const bool use_shadow = (la->type == LA_SPOT) ?
+                                    ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+                                    ((la->mode & LA_SHAD_RAY) != 0);
+        if (!use_shadow) {
+          la->mode |= LA_SHAD_RAY;
+        }
+      }
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_lightning_intensity")) {
     /* Raios da chuva desligados por padrao (WO_WEATHER_RAIN_LIGHTNING nunca estava ligado). */
     LISTBASE_FOREACH (World *, wo, &main->world) {
@@ -557,6 +610,40 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       wo->rain_lightning_intensity = 1.0f;
       wo->rain_lightning_distance = 80.0f;
       wo->rain_lightning_width = 1.0f;
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_ripple_size")) {
+    /* Ripples e Splash ganharam os ajustes um do outro: os valores antigos fixos no shader.
+     * A propriedade da Aura passou de "aura_chuva" para "aura_rain_effect"; renomeia tambem
+     * a game property dos objetos para a cena continuar igual. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_ripple_size = 1.0f;
+      wo->rain_ripple_rate = 0.8f;
+      wo->rain_splash_normal = 1.0f;
+      wo->rain_splash_min_up = 0.7f;
+      if (STREQ(wo->rain_aura_prop, "aura_chuva")) {
+        BLI_strncpy(wo->rain_aura_prop, "aura_rain_effect", sizeof(wo->rain_aura_prop));
+      }
+    }
+    LISTBASE_FOREACH (Object *, ob, &main->object) {
+      LISTBASE_FOREACH (bProperty *, prop, &ob->prop) {
+        if (STREQ(prop->name, "aura_chuva")) {
+          BLI_strncpy(prop->name, "aura_rain_effect", sizeof(prop->name));
+        }
+      }
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_puddle_amount")) {
+    /* Pocas da chuva: desligadas (flag nova), so recebem os valores padrao. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_puddle_amount = 0.5f;
+      wo->rain_puddle_size = 4.0f;
+      wo->rain_puddle_darkness = 0.4f;
+      wo->rain_puddle_reflection = 0.8f;
+      wo->rain_puddle_distance = 40.0f;
+      wo->rain_puddle_min_up = 0.9f;
     }
   }
 

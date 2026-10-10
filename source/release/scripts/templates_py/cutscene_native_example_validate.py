@@ -1,7 +1,7 @@
 """Valida a estrutura nativa de um exemplo .blend de Cutscene.
 
 Uso:
-    RangeEngine.exe --background exemplo.blend --python cutscene_native_example_validate.py
+    AnastacioEngine.exe --background exemplo.blend --python cutscene_native_example_validate.py
 """
 
 import bpy

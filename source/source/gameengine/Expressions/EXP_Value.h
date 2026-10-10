@@ -135,8 +135,13 @@ public:
 	/// Clear all properties.
 	virtual void ClearProperties();
 
-	/// Get property number <inIndex>.
+	/// Get property number <inIndex>. O(n) per call: walks the map from the start, prefer GetProperties() in loops.
 	virtual EXP_Value *GetProperty(int inIndex);
+	/// Direct read-only access to the property map, for O(n) iteration.
+	const std::map<std::string, EXP_Value *>& GetProperties() const
+	{
+		return m_properties;
+	}
 	/// Get the amount of properties assiocated with this value.
 	virtual int GetPropertyCount();
 

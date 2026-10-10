@@ -72,6 +72,11 @@ BL_ShapeDeformer::BL_ShapeDeformer(KX_GameObject *gameobj,
 	m_lastShapeUpdate(-1)
 {
 	m_key = m_bmesh->key ? BKE_key_copy(G.main, m_bmesh->key) : nullptr;
+	if (m_key) {
+		for (KeyBlock *kb = (KeyBlock *)m_key->block.first; kb; kb = (KeyBlock *)kb->next) {
+			m_lastShapeValues.push_back(kb->curval);
+		}
+	}
 }
 
 BL_ShapeDeformer::~BL_ShapeDeformer()
@@ -111,10 +116,9 @@ bool BL_ShapeDeformer::LoadShapeDrivers(KX_GameObject *parent)
 		}
 	}
 
-	// This used to check if we had drivers from this armature,
-	// now we just assume we want to use shape drivers
-	// and let the animsys handle things.
-	m_useShapeDrivers = true;
+	// Evaluating animation data and forcing a mesh update is useful only when
+	// this key actually owns driver curves. A parent armature alone is not one.
+	m_useShapeDrivers = m_key->adt && m_key->adt->drivers.first;
 
 	return true;
 }
@@ -130,6 +134,38 @@ bool BL_ShapeDeformer::ExecuteShapeDrivers()
 		return true;
 	}
 	return false;
+}
+
+bool BL_ShapeDeformer::SetLastFrameIfShapeChanged(double lastFrame)
+{
+	if (!m_key) {
+		return false;
+	}
+
+	bool changed = false;
+	KeyBlock *kb = (KeyBlock *)m_key->block.first;
+	if (m_lastShapeValues.size() == BLI_listbase_count(&m_key->block)) {
+		for (size_t i = 0; kb; kb = (KeyBlock *)kb->next, ++i) {
+			if (m_lastShapeValues[i] != kb->curval) {
+				changed = true;
+				break;
+			}
+		}
+	}
+	else {
+		changed = true;
+	}
+
+	if (!changed) {
+		return false;
+	}
+
+	m_lastShapeValues.clear();
+	for (kb = (KeyBlock *)m_key->block.first; kb; kb = (KeyBlock *)kb->next) {
+		m_lastShapeValues.push_back(kb->curval);
+	}
+	SetLastFrame(lastFrame);
+	return true;
 }
 
 bool BL_ShapeDeformer::UpdateInternal(bool recalcNormal)

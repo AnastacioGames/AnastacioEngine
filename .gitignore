@@ -5,10 +5,14 @@ build_gtest/
 build_opencl/
 build_opencl_validate/
 build-web/
+build-wasm/
 build-android/
 build-cycles/
 build-linux/
 build-linux-editor/
+build-net/
+build-net-v6/
+build-steam/
 build-linux-gtest/
 build-linux-cycles/
 build-linux-cycles.*.log
@@ -26,6 +30,9 @@ projects-teste/**/*.range
 projects-teste/**/*.range1
 projects-teste/**/*.rasec
 projects-teste/**/*.blend1
+# Saidas geradas pelos testes de object_life (regeneradas pelos gen_*.py)
+projects-teste/object_life/*.blend
+projects-teste/object_life/*_log.txt
 projects-teste/__pycache__/
 projects-teste/scripts/__pycache__/
 projects-teste/benchmarks/
@@ -61,3 +68,9 @@ __pycache__/
 chrome-profile-web-test-vscode/
 projects-teste/teste-editor-web/web/
 tools/recastnavigation-upstream/
+
+# demos ficam fora do repo e da publicacao (repo proprio no futuro)
+demos/
+
+# projetos de teste ficam fora do repo e da publicacao
+projects-teste/

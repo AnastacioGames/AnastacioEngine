@@ -340,16 +340,63 @@ void BL_SkinDeformer::UpdateTransverts()
 	}
 }
 
+bool BL_SkinDeformer::PoseContentChanged()
+{
+	Object *armob = m_armobj->GetArmatureObject();
+	bPose *pose = armob->pose;
+
+	size_t count = 16;
+	if (pose) {
+		count += 32 * BLI_listbase_count(&pose->chanbase);
+	}
+
+	bool changed = (m_lastPoseSnapshot.size() != count);
+	if (changed) {
+		m_lastPoseSnapshot.assign(count, 0.0f);
+	}
+
+	float *dst = m_lastPoseSnapshot.data();
+	auto feed = [&changed, &dst](const float(*mat)[4]) {
+		const float *src = &mat[0][0];
+		if (!changed && memcmp(dst, src, sizeof(float) * 16) != 0) {
+			changed = true;
+		}
+		memcpy(dst, src, sizeof(float) * 16);
+		dst += 16;
+	};
+
+	feed(armob->obmat);
+	if (pose) {
+		for (bPoseChannel *pchan = (bPoseChannel *)pose->chanbase.first; pchan; pchan = pchan->next) {
+			feed(pchan->chan_mat);
+			feed(pchan->pose_mat);
+		}
+	}
+
+	return changed;
+}
+
 bool BL_SkinDeformer::UpdateInternal(bool shape_applied, bool recalcNormal)
 {
 	/* See if the armature has been updated for this frame */
 	if (PoseUpdated()) {
+		/* -1 means ForceUpdate() or first update: skin unconditionally. */
+		const bool forced = (m_lastArmaUpdate == -1.0);
+
+		m_armobj->ApplyPose();
+
+		/* CV4: an action holding a key (or an idle armature whose time still advances) bumps the
+		 * armature frame every tick. Skip the reskin + VBO upload when the pose matrices did not
+		 * change and the input vertices were not rewritten by a shape key. */
+		if (!PoseContentChanged() && !forced && !shape_applied) {
+			m_lastArmaUpdate = m_armobj->GetLastFrame();
+			return false;
+		}
+
 		if (!shape_applied) {
 			/* store verts locally */
 			VerifyStorage();
 		}
-
-		m_armobj->ApplyPose();
 
 		bool gpuSkinned = false;
 

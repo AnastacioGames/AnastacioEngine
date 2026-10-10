@@ -35,12 +35,15 @@
 
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
+#include "SCA_LogicManager.h"
 #include "KX_Mesh.h"
 #include "RAS_BucketManager.h"
 #include "KX_PhysicsEngineEnums.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_PythonInit.h" // So we can handle adding new text datablocks for Python to import
 #include "KX_LibLoadStatus.h"
+#include "KX_NodeRelationships.h"
+#include "KX_BoneParentNodeRelationship.h"
 #include "BL_ActionData.h"
 #include "BL_Converter.h"
 #include "BL_SceneConverter.h"
@@ -51,6 +54,7 @@
 #include <sstream>
 #include "BL_ActionActuator.h"
 #include "KX_BlenderMaterial.h"
+#include "KX_2DFilterManager.h"
 #include "KX_WorldInfo.h"
 
 #include "LA_SystemCommandLine.h"
@@ -59,6 +63,7 @@
 
 #ifdef WITH_BULLET
 #  include "CcdPhysicsEnvironment.h"
+#  include "CcdCookedData.h"
 #endif
 
 #include "EXP_StringValue.h"
@@ -85,17 +90,26 @@ extern "C" {
 #  include "BKE_idcode.h"
 #  include "BKE_report.h"
 #  include "BKE_scene.h" // BKE_scene_add, BKE_scene_base_add
+#  include "BKE_object.h" // BKE_object_to_mat4, BKE_object_free_derived_caches
+#  include "BKE_armature.h" // BKE_armature_from_object, BKE_armature_find_bone_name
+#  include "DNA_armature_types.h"
+#  include "BKE_customdata.h"
+#  include "BLI_math.h"
+#  include "DNA_mesh_types.h"
+#  include "MEM_guardedalloc.h"
 }
 
 #include "BLI_task.h"
 #include "CM_Message.h"
 
 #include "GPU_material.h" // GPU_shader_cache_stats
+#include "GPU_shader.h" // GPU_shader_binary_cache_set
 
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
 #include <memory>
+#include <set>
 
 BL_Converter::SceneSlot::SceneSlot() = default;
 
@@ -150,6 +164,18 @@ BL_Converter::BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUse
 	m_threadinfo.m_pool = BLI_task_pool_create(engine->GetTaskScheduler(), nullptr);
 
 	m_maggies.push_back(m_maggie);
+
+#ifdef WITH_BULLET
+	CcdCookedData::Open(maggie->name, GPU_shader_binary_device_key());
+	GPU_shader_binary_cache_set(CcdCookedData::FindShader, CcdCookedData::AddShader);
+	/* First start of an exported game on this GPU/driver: every shader is compiled once (once per file and
+	 * process, so a cache that can't be written doesn't restart the game forever). */
+	static std::set<std::string> warmedUp;
+	BL_SetShaderWarmUp(CcdCookedData::NeedsWarmUp() && warmedUp.insert(maggie->name).second);
+	if (BL_ShaderWarmUp()) {
+		CM_Message("[Cooked] compiling every shader once for this GPU/driver, then restarting");
+	}
+#endif
 }
 
 BL_Converter::~BL_Converter()
@@ -163,6 +189,12 @@ BL_Converter::~BL_Converter()
 	   Because it needs to lock the mutex, even if there's no active task when it's
 	   in the scene converter destructor. */
 	BLI_task_pool_free(m_threadinfo.m_pool);
+
+#ifdef WITH_BULLET
+	GPU_shader_binary_cache_set(nullptr, nullptr);
+	CcdCookedData::Close();
+	BL_SetShaderWarmUp(false);
+#endif
 }
 
 Scene *BL_Converter::GetBlenderSceneForName(const std::string &name)
@@ -225,13 +257,311 @@ KX_GameObject *BL_Converter::FindOrConvertMainObject(const std::string& name, KX
 
 	BKE_libblock_free(m_maggie, tempScene);
 
-	return scene_merge->GetInactiveList()->FindValue(name);
+	return scene_merge->FindInactiveObjectByName(name);
+}
+
+bool BL_Converter::IsChildOf(Object *ob, Object *parent)
+{
+	for (Object *par = ob->parent; par; par = par->parent) {
+		if (par == parent) {
+			return true;
+		}
+	}
+	return false;
+}
+
+Object *BL_Converter::FindSceneObject(Scene *blscene, const std::string& name)
+{
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		if (STREQ(base->object->id.name + 2, name.c_str())) {
+			return base->object;
+		}
+	}
+	return nullptr;
+}
+
+KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::string& name, bool children, std::string& error)
+{
+	Scene *blscene = scene->GetBlenderScene();
+	SCA_LogicManager *logicmgr = scene->GetLogicManager();
+
+	Object *target = FindSceneObject(blscene, name);
+	if (!target) {
+		error = "object not found in the scene";
+		return nullptr;
+	}
+	KX_GameObject *existing = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(target));
+	if (existing) {
+		return existing;
+	}
+	if (IsObjectDataFreed(target)) {
+		error = "its mesh data was released by freeUnconvertedData()";
+		return nullptr;
+	}
+	if (target->gameflag & OB_TASK_EDITOR_ONLY) {
+		error = "its Load Mode is Editor Only";
+		return nullptr;
+	}
+
+	int lay = blscene->lay;
+	if (BKE_scene_collections_game_exclude_any(blscene)) {
+		lay &= ~SCECOL_GAME_LAYER;
+	}
+
+	/* At load a child whose parent isn't converted, or sits on the other side of the active
+	 * layers, is dropped: refuse the same cases instead of silently converting nothing. */
+	Object *parentOb = target->parent;
+	KX_GameObject *liveParent = nullptr;
+	if (parentOb) {
+		liveParent = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(parentOb));
+		if (!liveParent) {
+			error = "its parent is not converted, convert the parent instead";
+			return nullptr;
+		}
+		const bool targetActive = (target->lay & lay) != 0;
+		const bool parentActive = scene->GetObjectList()->SearchValue(liveParent);
+		if (targetActive != parentActive) {
+			error = "it and its parent are not both on active (or both on inactive) layers";
+			return nullptr;
+		}
+	}
+
+	std::vector<std::pair<Object *, int> > objects;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		Object *ob = base->object;
+		if ((ob == target || (children && IsChildOf(ob, target))) &&
+		    !logicmgr->FindGameObjByBlendObj(ob) && !IsObjectDataFreed(ob) && !(ob->gameflag & OB_TASK_EDITOR_ONLY))
+		{
+			objects.emplace_back(ob, ob->gameflag);
+		}
+	}
+
+	// Same throwaway scene trick as FindOrConvertMainObject(), keeping the layers of the source scene.
+	Scene *tempScene = BKE_scene_add(m_maggie, "..ConvertSceneObject..");
+	tempScene->lay = lay;
+	for (const std::pair<Object *, int>& item : objects) {
+		BKE_scene_base_add(tempScene, item.first);
+		id_us_plus(&item.first->id);
+		item.first->gameflag |= OB_TASK_CONVERT;
+	}
+
+	// Converted as a root (the parent lives in the other scene), linked back after the merge.
+	target->parent = nullptr;
+	KX_Scene *kxTempScene = m_ketsjiEngine->CreateScene(tempScene);
+	BL_SceneConverter sceneConverter(kxTempScene, BL_Resource::Library(m_maggie));
+	ConvertScene(sceneConverter, true, false);
+	target->parent = parentOb;
+	for (const std::pair<Object *, int>& item : objects) {
+		item.first->gameflag = item.second;
+	}
+
+	MergeScene(scene, sceneConverter);
+	BKE_libblock_free(m_maggie, tempScene);
+
+	KX_GameObject *gameobj = static_cast<KX_GameObject *>(logicmgr->FindGameObjByBlendObj(target));
+	if (!gameobj) {
+		error = "conversion failed";
+		return nullptr;
+	}
+
+	if (liveParent) {
+		// SetParent() handles the root list and compound shapes, then the node chain is rebuilt as
+		// at load: parent -> parent-inverse node (carrying the vertex/slow/bone relation) -> child.
+		gameobj->SetParent(liveParent, true, false);
+
+		SG_ParentRelation *relation = nullptr;
+		switch (target->partype) {
+			case PARVERT1:
+				relation = new KX_VertexParentRelation();
+				break;
+			case PARSLOW:
+				relation = new KX_SlowParentRelation(target->sf);
+				break;
+			case PARBONE:
+			{
+				bArmature *arm = BKE_armature_from_object(parentOb);
+				Bone *bone = arm ? BKE_armature_find_bone_name(arm, target->parsubstr) : nullptr;
+				if (bone) {
+					relation = new KX_BoneParentRelation(bone);
+				}
+				break;
+			}
+		}
+		if (!relation) {
+			relation = new KX_NormalParentRelation();
+		}
+
+		SG_Callbacks callback(nullptr, nullptr, nullptr, KX_Scene::KX_ScenegraphUpdateFunc, KX_Scene::KX_ScenegraphRescheduleFunc);
+		SG_Node *inverseNode = new SG_Node(nullptr, scene, callback);
+		inverseNode->SetParentRelation(relation);
+		float loc[3], rot[3][3], size[3];
+		mat4_to_loc_rot_size(loc, rot, size, target->parentinv);
+		inverseNode->SetLocalPosition(mt::vec3(loc));
+		inverseNode->SetLocalOrientation(mt::mat3(rot));
+		inverseNode->SetLocalScale(mt::vec3(size));
+
+		SG_Node *childNode = gameobj->GetNode();
+		childNode->DisconnectFromParent();
+		inverseNode->AddChild(childNode);
+		liveParent->GetNode()->AddChild(inverseNode);
+
+		// The child keeps its own Blender transform, below the parent-inverse node.
+		float local[4][4];
+		BKE_object_to_mat4(target, local);
+		mat4_to_loc_rot_size(loc, rot, size, local);
+		gameobj->NodeSetLocalPosition(mt::vec3(loc));
+		gameobj->NodeSetLocalOrientation(mt::mat3(rot));
+		gameobj->NodeSetLocalScale(mt::vec3(size));
+		inverseNode->UpdateWorldData();
+	}
+
+	return gameobj;
+}
+
+/// The embedded player converts the editor's own Main: its data must never be released.
+static bool s_mainOwnedByGame = false;
+
+void BL_Converter::SetMainOwnedByGame(bool owned)
+{
+	s_mainOwnedByGame = owned;
+}
+
+bool BL_Converter::IsObjectDataFreed(Object *ob) const
+{
+	return m_freedObjects.count(ob) != 0;
+}
+
+size_t BL_Converter::FreeUnconvertedData(Scene *blscene, std::string& error)
+{
+	if (!s_mainOwnedByGame) {
+		error = "only available in the standalone player (the embedded one shares the editor data)";
+		return 0;
+	}
+
+	EXP_ListValue<KX_Scene> *scenes = m_ketsjiEngine->CurrentScenes();
+	auto isConverted = [scenes](Object *ob) {
+		for (KX_Scene *scene : scenes) {
+			if (scene->GetLogicManager()->FindGameObjByBlendObj(ob)) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	// Mesh objects of blscene left out by the Convert flag and not converted anywhere.
+	std::set<Object *> candidates;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blscene, sce_iter, base)) {
+		Object *ob = base->object;
+		if (ob->type == OB_MESH && !(ob->gameflag & OB_TASK_CONVERT) && !isConverted(ob)) {
+			candidates.insert(ob);
+		}
+	}
+
+	// A mesh is released only when every user is a candidate (no other scene or ID uses it).
+	std::map<Mesh *, int> users;
+	for (Object *ob = (Object *)m_maggie->object.first; ob; ob = (Object *)ob->id.next) {
+		if (ob->type == OB_MESH && ob->data) {
+			int& count = users[(Mesh *)ob->data];
+			count = (count < 0 || !candidates.count(ob)) ? -1 : count + 1;
+		}
+	}
+
+	const size_t before = MEM_get_memory_in_use();
+	for (const std::pair<Mesh * const, int>& item : users) {
+		Mesh *me = item.first;
+		const int idUsers = me->id.us - ((me->id.flag & LIB_FAKEUSER) ? 1 : 0);
+		if (item.second <= 0 || item.second != idUsers || m_freedMeshes.count(me)) {
+			continue;
+		}
+		CustomData_free(&me->vdata, me->totvert);
+		CustomData_free(&me->edata, me->totedge);
+		CustomData_free(&me->fdata, me->totface);
+		CustomData_free(&me->ldata, me->totloop);
+		CustomData_free(&me->pdata, me->totpoly);
+		me->totvert = me->totedge = me->totface = me->totloop = me->totpoly = me->totselect = 0;
+		MEM_SAFE_FREE(me->mselect);
+		BKE_mesh_update_customdata_pointers(me, false);
+		m_freedMeshes.insert(me);
+	}
+	for (Object *ob : candidates) {
+		if (m_freedMeshes.count((Mesh *)ob->data)) {
+			BKE_object_free_derived_caches(ob);
+			m_freedObjects.insert(ob);
+		}
+	}
+	const size_t after = MEM_get_memory_in_use();
+	return (before > after) ? before - after : 0;
 }
 
 /// Milliseconds, for the "[Load]" console report (see BL_LoadStats.h).
 static int load_ms(double seconds)
 {
 	return (int)(seconds * 1000.0 + 0.5);
+}
+
+/* Parallel shader compile (GL_ARB_parallel_shader_compile): the material programs are sent to the driver before
+ * they are built one by one (ReloadMaterial), so the driver threads compile them together and each build only takes
+ * its finished program. RANGE_NO_PARALLEL_SHADERS=1 keeps the one by one compile. */
+static bool parallel_shaders()
+{
+	static const bool disabled = getenv("RANGE_NO_PARALLEL_SHADERS") != nullptr;
+	if (disabled || !GPU_shader_prefetch_begin()) {
+		return false;
+	}
+	GPU_shader_prefetch_end();
+	return true;
+}
+
+/// Sends all the materials at once, for a compile that waits anyway (ReloadShaders).
+template <class List>
+static void prefetch_shaders(const List& materials)
+{
+	if (!parallel_shaders()) {
+		return;
+	}
+	GPU_shader_prefetch_begin();
+	for (const auto& mat : materials) {
+		mat->PrefetchMaterial();
+	}
+	GPU_shader_prefetch_end();
+}
+
+/* One frame of an async compile, until deadline: first sends all the materials to the driver, then builds them in
+ * the same order, by then mostly compiled. Spread over frames so the loading screen keeps drawing; a single call can
+ * still take a while (sending waits while the driver queue is full, building waits for its program). Not "build when
+ * ready": GL_COMPLETION_STATUS_ARB blocks until the compile ends on AMD drivers. Without parallel compile, builds one
+ * by one. send(i) / build(i) act on material i. Returns true when all count are built. */
+template <class Send, class Build>
+static bool step_shaders(unsigned int count, unsigned int& built, unsigned int& sent, double deadline, Send send,
+                         Build build)
+{
+	const bool parallel = parallel_shaders();
+	while (built < count) {
+		if (parallel && sent < count) {
+			GPU_shader_prefetch_begin();
+			send(sent++);
+			GPU_shader_prefetch_end();
+		}
+		else {
+			build(built++);
+		}
+		if (PIL_check_seconds_timer() >= deadline) {
+			break;
+		}
+	}
+	if (built < count) {
+		return false;
+	}
+	if (parallel) {
+		GPU_shader_prefetch_clear();
+	}
+	return true;
 }
 
 /// Clears the shader cache counters before a shader stage.
@@ -293,17 +623,33 @@ void BL_Converter::UseSceneWorld(KX_Scene *scene)
 	}
 }
 
-bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline)
+bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsigned int& sent, double deadline)
 {
 	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
+	KX_2DFilterManager *filters = scene->Get2DFilterManager();
 	UseSceneWorld(scene);
-	while (next < materials.size()) {
-		materials[next++]->ReloadMaterial();
-		if (PIL_check_seconds_timer() >= deadline) {
-			break;
+	// Step 0 is the Camera FX passes, built here instead of at the first frame that uses them.
+	return step_shaders((unsigned int)materials.size() + 1, next, sent, deadline,
+	                    [&](unsigned int i) {
+		if (i == 0) {
+			if (filters) {
+				filters->PrefetchCameraFX(scene);
+			}
 		}
-	}
-	return (next >= materials.size());
+		else {
+			materials[i - 1]->PrefetchMaterial();
+		}
+	},
+	                    [&](unsigned int i) {
+		if (i == 0) {
+			if (filters) {
+				filters->PrepareCameraFX(scene);
+			}
+		}
+		else {
+			materials[i - 1]->ReloadMaterial();
+		}
+	});
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
@@ -379,12 +725,30 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	}
 
 	const double convertTime = PIL_check_seconds_timer() - convertStart;
+	// Objects of the scene left out by their Load Mode (or by an ancestor's).
+	int leftOut = 0, editorOnly = 0;
+	{
+		Scene *sce_iter;
+		Base *base;
+		for (SETLOOPER(scene->GetBlenderScene(), sce_iter, base)) {
+			if (!converter.FindGameObject(base->object)) {
+				++leftOut;
+				editorOnly += (base->object->gameflag & OB_TASK_EDITOR_ONLY) != 0;
+			}
+		}
+	}
 	std::ostringstream detail;
-	detail << converter.GetObjects().size() << " objects, meshes " << loadStats.meshes << " (+"
-	       << loadStats.meshesReused << " reused) " << load_ms(loadStats.mesh) << "ms, tangents "
+	detail << converter.GetObjects().size() << " objects, " << leftOut << " left out (" << editorOnly
+	       << " editor only), meshes " << loadStats.meshes << " (+"
+	       << loadStats.meshesReused << " reused, " << loadStats.meshesCooked << " cooked "
+	       << load_ms(loadStats.meshCooked) << "ms) " << load_ms(loadStats.mesh) << "ms, mesh batch "
+	       << loadStats.meshesPrepared << " " << load_ms(loadStats.meshBatch) << "ms, tangents "
 	       << loadStats.tangentMeshes << " " << load_ms(loadStats.tangent) << "ms, normals/tangents copied "
 	       << loadStats.loopDataReused << " (hash " << load_ms(loadStats.loopHash) << "ms), physics "
-	       << load_ms(loadStats.physics) << "ms";
+	       << load_ms(loadStats.physics) << "ms (bvh " << load_ms(loadStats.bvh) << "ms; mesh: dm " << load_ms(loadStats.meshDm) << "ms, normals "
+	       << load_ms(loadStats.normals) << "ms, end " << load_ms(loadStats.meshEnd) << "ms), objects " << load_ms(loadStats.objects) << "ms, logic "
+	       << load_ms(loadStats.logic) << "ms, mesh users " << load_ms(loadStats.meshUsers) << "ms, culling "
+	       << load_ms(loadStats.culling) << "ms, bounds " << load_ms(loadStats.bounds) << "ms";
 	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(convertTime) << "ms, " << detail.str());
 	BL_LoadLog::Add(scene->GetName(), "convert", convertTime, detail.str());
 }
@@ -537,17 +901,24 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 				 * one per step. New lights recompile everything later anyway (StepReloads()), but this
 				 * way the new objects never draw without shader meanwhile. */
 				const std::vector<KX_BlenderMaterial *>& materials = converter.GetMaterials();
-				if (merge.m_material < materials.size()) {
-					KX_BlenderMaterial *mat = materials[merge.m_material++];
-					mat->ReplaceScene(mergeScene);
-					UseSceneWorld(mergeScene);
-					mat->ReloadMaterial();
-					set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
-					                   (float)merge.m_material / (float)materials.size());
+				UseSceneWorld(mergeScene);
+				const bool done = step_shaders((unsigned int)materials.size(), merge.m_material, merge.m_sent, deadline,
+					[&](unsigned int i) {
+						materials[i]->ReplaceScene(mergeScene);
+						materials[i]->PrefetchMaterial();
+					},
+					[&](unsigned int i) {
+						materials[i]->ReplaceScene(mergeScene);
+						materials[i]->ReloadMaterial();
+						set_scene_progress(status, merge.m_scene, progress_textures + (progress_shaders - progress_textures) *
+						                   (float)(i + 1) / (float)materials.size());
+					});
+				if (!done) {
+					// Out of time or waiting for the driver: next frame.
+					return false;
 				}
-				else {
-					merge.m_stage = PendingMerge::STAGE_MERGE;
-				}
+				merge.m_stage = PendingMerge::STAGE_MERGE;
+				merge.m_sent = 0;
 				break;
 			}
 			case PendingMerge::STAGE_MERGE:
@@ -556,6 +927,7 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 					// Restart the scene reload: materials already redone miss these lights.
 					PendingReload& reload = m_reloads[mergeScene];
 					reload.m_material = 0;
+					reload.m_sent = 0;
 					if (std::find(reload.m_waiting.begin(), reload.m_waiting.end(), status) == reload.m_waiting.end()) {
 						reload.m_waiting.push_back(status);
 					}
@@ -598,15 +970,18 @@ void BL_Converter::StepReloads(double deadline)
 		UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[it->first].m_materials;
 		const float total = (float)std::max<size_t>(materials.size(), 1);
 		UseSceneWorld(it->first);
-		while (reload.m_material < materials.size() && PIL_check_seconds_timer() < deadline) {
-			materials[materials.size() - 1 - reload.m_material++]->ReloadMaterial();
-			for (KX_LibLoadStatus *status : reload.m_waiting) {
-				const unsigned int lastScene = (unsigned int)std::max<size_t>(status->GetSceneConverters().size(), 1) - 1;
-				set_scene_progress(status, lastScene, progress_shaders + (1.0f - progress_shaders) *
-				                   (float)reload.m_material / total);
-			}
-		}
-		if (reload.m_material < materials.size()) {
+		const unsigned int count = (unsigned int)materials.size();
+		const bool done = step_shaders(count, reload.m_material, reload.m_sent, deadline,
+			[&](unsigned int i) { materials[count - 1 - i]->PrefetchMaterial(); },
+			[&](unsigned int i) {
+				materials[count - 1 - i]->ReloadMaterial();
+				for (KX_LibLoadStatus *status : reload.m_waiting) {
+					const unsigned int lastScene = (unsigned int)std::max<size_t>(status->GetSceneConverters().size(), 1) - 1;
+					set_scene_progress(status, lastScene, progress_shaders + (1.0f - progress_shaders) *
+					                   (float)(i + 1) / total);
+				}
+			});
+		if (!done) {
 			return;
 		}
 		CM_Message("[Load] async light reload \"" << it->first->GetName() << "\": " << materials.size()
@@ -959,6 +1334,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 		}
 	}
 
+	// Material shaders loop over lamps: only reload them if a lamp of this library goes away.
+	bool removedLights = false;
+
 	// For each scene try to remove any usage of ressources from the library.
 	for (KX_Scene *scene : m_ketsjiEngine->CurrentScenes()) {
 		// Both list containing all the scene objects.
@@ -974,6 +1352,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 
 				// Free object directly depending on blender object of the library.
 				if (info->Belong(libraryId)) {
+					if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
+						removedLights = true;
+					}
 					scene->DelayedRemoveObject(gameobj);
 				}
 				// Else try to remove used ressource (e.g actions, meshes, materials...).
@@ -1043,7 +1424,9 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 		}
 
 		// Reload materials cause they used lamps removed now.
-		scene->GetBucketManager()->ReloadMaterials();
+		if (removedLights) {
+			scene->GetBucketManager()->ReloadMaterials();
+		}
 	}
 
 	// Remove and destruct the KX_LibLoadStatus associated to the just free library.
@@ -1132,16 +1515,29 @@ void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter, 
 
 void BL_Converter::ReloadShaders(KX_Scene *scene)
 {
+	KX_2DFilterManager *filters = scene->Get2DFilterManager();
+	if (filters && parallel_shaders()) {
+		GPU_shader_prefetch_begin();
+		filters->PrefetchCameraFX(scene);
+		GPU_shader_prefetch_end();
+	}
+	prefetch_shaders(m_sceneSlots[scene].m_materials);
+	if (filters) {
+		filters->PrepareCameraFX(scene);
+	}
 	for (std::unique_ptr<KX_BlenderMaterial>& mat : m_sceneSlots[scene].m_materials) {
 		mat->ReloadMaterial();
 	}
+	GPU_shader_prefetch_clear();
 }
 
 void BL_Converter::ReloadShaders(const BL_SceneConverter& converter)
 {
+	prefetch_shaders(converter.m_materials);
 	for (KX_BlenderMaterial *mat : converter.m_materials) {
 		mat->ReloadMaterial();
 	}
+	GPU_shader_prefetch_clear();
 }
 
 /** This function merges a mesh from the current scene into another main
@@ -1160,6 +1556,10 @@ KX_Mesh *BL_Converter::ConvertMeshSpecial(KX_Scene *kx_scene, Main *maggie, cons
 
 	if (me == nullptr) {
 		CM_Error("could not be found \"" << name << "\"");
+		return nullptr;
+	}
+	if (m_freedMeshes.count((Mesh *)me)) {
+		CM_Error("mesh data was released by freeUnconvertedData() \"" << name << "\"");
 		return nullptr;
 	}
 

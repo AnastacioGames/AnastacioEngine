@@ -24,6 +24,8 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <map>
+#include <mutex>
 
 template <class T> class EXP_ListValue;
 class KX_Scene;
@@ -66,8 +68,28 @@ class KX_SceneScheduler
 		unsigned int m_material;
 		double m_start;
 		double m_shaderTime;
+		/// Materials already sent to the driver (parallel compile).
+		unsigned int m_sent = 0;
 	};
 	std::vector<PendingScene> m_pendingScenes;
+
+	/// Names scheduled with preloadScene(), converted at the end of the frame.
+	std::vector<std::string> m_preloadingScenes;
+	/// preloadScene can come from an async LibLoad conversion thread (Scene actuator with Preload).
+	std::mutex m_preloadingMutex;
+	/** Scenes converted ahead by preloadScene() (shaders and textures ready), kept out of the scene list until an
+	 * addScene/replaceScene of the same name only has to insert them. */
+	std::map<std::string, KX_Scene *> m_preparedScenes;
+	/// Names among m_preparedScenes that were running and got kept (removed with keep): resumed when added back.
+	std::vector<std::string> m_keptScenes;
+	/// Names of m_removingScenes to keep instead of destroy.
+	std::vector<std::string> m_removingKeep;
+	/// Resumes a scene taken from m_preparedScenes if it was paused by a keep.
+	void ResumeIfKept(KX_Scene *scene);
+
+	void PreloadScheduledScenes();
+	/// The scene preloaded under this name, removed from the prepared ones, or a new converted scene.
+	KX_Scene *TakeOrConvertScene(const std::string& scenename, Scene *blScene = nullptr);
 
 	void StepPendingScenes();
 	bool IsPending(const std::string& scenename) const;
@@ -94,7 +116,12 @@ public:
 	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
 	/// Free the scenes still compiling their shaders (engine stop).
 	void DestructPendingScenes();
-	void RemoveScene(const std::string& scenename);
+	/** Converts a scene ahead (end of frame), so a later add of it does not stall. False if it does not exist.
+	 * Thread safe: only queues the name. */
+	bool PreloadScene(const std::string& scenename);
+	/** keep: hide and pause the scene (out of the scene list, no logic, physics or drawing) instead of destroying
+	 * it; the next add of this name brings it back as it was left, without converting. */
+	void RemoveScene(const std::string& scenename, bool keep = false);
 	bool ReplaceScene(const std::string& oldscene, const std::string& newscene);
 	void SuspendScene(const std::string& scenename);
 	void ResumeScene(const std::string& scenename);

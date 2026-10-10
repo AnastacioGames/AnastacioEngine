@@ -22,6 +22,9 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [Atualização do RangeArmor](rangearmor-update-plan.md): integração com cooking, fonte recuperado,
+  exportação em staging, validação Windows e verificações ainda pendentes.
+
 - [Perfil Web e validação de exportação](web-profile-validation-plan.md): autoria na Range Engine com compatibilidade Web,
   catálogo de avisos/bloqueios, manifesto de capacidades e marcos de implementação; marcos A (painel) e B (núcleo puro) implementados.
 - [Empacotamento e hospedagem Web](web-deploy.md): `tools/web/package-web.py` gera pasta/ZIP hospedável a partir
@@ -46,12 +49,32 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
   validação para CPU, memória, GPU e ciclo de vida.
 
+### Frentes recentes
+
+- [Atlas de materiais](material-atlas-plan.md): ferramenta nativa em C++ para materiais PBR opacos, limites, validação e pesquisa de referência.
+
+- [Multiplayer nativo](multiplayer-plan.md): plano da rede integrada à engine, com [protocolo](multiplayer-protocol.md)
+  e notas de implementação em `source/source/gameengine/Network/`.
+  A implementação atual cobre host/cliente, replicação, RPC, predição, servidor headless, relevância,
+  troca de cena e cliente Web; o estado validado e as pendências ficam no [roadmap](roadmap.md).
+- [Complemento Steam para multiplayer](steam-multiplayer-plan.md): plano de componente reutilizável
+  entregue pela engine, salas, convites e transporte Steam opcional; primeira validação no RolimaRacer.
+  [Desenvolvimento do complemento](steam-complement-development.md): build local e API de inicialização.
+- [Efeitos de câmera](camera-fx.md): efeitos e integração
+  com o pipeline de renderização.
+- [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
+- [Demos de nós revisadas](../demos/revisados/README.md): cópias das 11 receitas, frames explicativos,
+  correções de controles e procedimento de validação no player.
+- [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
+- [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
+  [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).
+- [Exportação mobile/VR](mobile-export-plan.md), [Android WebView](android-export-plan.md) e
+  [controles de toque](android-touch-controls-plan.md).
+
 ## Referência e manutenção
 
 - [Pesquisa de áudio Web](web-audio-analysis.md): Audaspace/SDL2 e OpenAL do Emscripten,
   streaming, codecs e roteiro de validação para integração.
-- [Auditoria da emulação OpenGL Web](web-gl-emulation-analysis.md): flags verificadas,
-  incompatibilidade FULL_ES3/legacy e reprodução isolada de perda do VBO no VAO emulado.
 - [Arquitetura](architecture.md): fluxo do runtime e mapa dos módulos.
 - [Plano mestre de modernização do Ketsji](ketsji-engine-modernization-plan.md): sequência de correções,
   instrumentação, testes, extrações arquiteturais e otimizações do loop principal.
@@ -75,7 +98,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 ## Histórico
 
 - [Changelog](changelog.md): registro detalhado por sessão. Entradas antigas podem conter hipóteses depois
-  corrigidas; para decisões vigentes, use o roadmap e o relatório de melhorias.
+  corrigidas; para decisões vigentes, use o roadmap e o relatório de melhorias. Inclui o diagnóstico de 2026-10-05
+  do timeout IPv6 `::1` no Windows (isolado como bug de loopback local, não do ENet/engine).
 
 ## Regras de manutenção documental
 

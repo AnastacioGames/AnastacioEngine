@@ -3657,6 +3657,12 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show View Name", "Show the name of the view's direction in each 3D View");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "show_paint_hints", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "uiflag2", USER_HIDE_PAINT_HINTS);
+	RNA_def_property_ui_text(prop, "Paint Shortcut Hints",
+	                         "Show the main shortcuts at the bottom of the 3D View in sculpt and paint modes");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "show_splash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "uiflag", USER_SPLASH_DISABLE);
 	RNA_def_property_ui_text(prop, "Show Splash", "Display splash screen on startup");

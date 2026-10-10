@@ -31,6 +31,11 @@
 
 #include "render_intern.h" // own include
 
+/* Implemented in C++ without extending DNA or the runtime API. */
+void MATERIAL_OT_anastacio_atlas_bake(struct wmOperatorType *ot);
+void MATERIAL_OT_anastacio_atlas_restore(struct wmOperatorType *ot);
+void MATERIAL_OT_anastacio_atlas_cancel(struct wmOperatorType *ot);
+
 /***************************** render ***********************************/
 
 void ED_operatortypes_render(void)
@@ -44,6 +49,9 @@ void ED_operatortypes_render(void)
 	WM_operatortype_append(OBJECT_OT_material_slot_move);
 
 	WM_operatortype_append(MATERIAL_OT_new);
+	WM_operatortype_append(MATERIAL_OT_anastacio_atlas_bake);
+	WM_operatortype_append(MATERIAL_OT_anastacio_atlas_restore);
+	WM_operatortype_append(MATERIAL_OT_anastacio_atlas_cancel);
 	WM_operatortype_append(TEXTURE_OT_new);
 	WM_operatortype_append(WORLD_OT_new);
 	WM_operatortype_append(WORLD_OT_game_property_new);

@@ -854,6 +854,18 @@ eOLDrawState tree_element_type_active(
         TreeElement *te, TreeStoreElem *tselem, const eOLSetState set, bool recursive)
 {
 	switch (tselem->type) {
+		case TSE_ID_BASE:
+			if (tselem->nr == 3) {
+				if (set != OL_SETSEL_NONE) {
+					if (set == OL_SETSEL_NORMAL) {
+						outliner_flag_set(&soops->tree, TSE_SELECTED, 0);
+					}
+					tselem->flag |= TSE_SELECTED;
+					return OL_DRAWSEL_NORMAL;
+				}
+				return (tselem->flag & TSE_SELECTED) ? OL_DRAWSEL_NORMAL : OL_DRAWSEL_NONE;
+			}
+			break;
 		case TSE_DEFGROUP:
 			return tree_element_active_defgroup(C, scene, te, tselem, set);
 		case TSE_BONE:

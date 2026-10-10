@@ -86,8 +86,11 @@ void outliner_operatortypes(void)
 	WM_operatortype_append(OUTLINER_OT_collection_delete);
 	WM_operatortype_append(OUTLINER_OT_collection_objects_select);
 	WM_operatortype_append(OUTLINER_OT_collection_move_objects);
+	WM_operatortype_append(OUTLINER_OT_collection_move_scenes);
 	WM_operatortype_append(OUTLINER_OT_collection_object_drop);
 	WM_operatortype_append(OUTLINER_OT_collection_drop);
+	WM_operatortype_append(OUTLINER_OT_collection_scene_drop);
+	WM_operatortype_append(OUTLINER_OT_collection_scene_folder_drop);
 	WM_operatortype_append(OUTLINER_OT_collection_game_exclude);
 	WM_operatortype_append(OUTLINER_OT_collection_to_group);
 }

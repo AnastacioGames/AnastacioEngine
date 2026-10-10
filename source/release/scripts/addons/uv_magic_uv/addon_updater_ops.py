@@ -301,7 +301,7 @@ class addon_updater_update_target(bpy.types.Operator):
 		if updater.invalidupdater == True:
 			layout.label("Updater error")
 			return
-		split = layout.split(percentage=0.66)
+		split = layout.split(factor=0.66)
 		subcol = split.column()
 		subcol.label("Select install version")
 		subcol = split.column()
@@ -831,7 +831,7 @@ def update_settings_ui(self, context, element=None):
 			row.label("Restart blender to complete update", icon="ERROR")
 			return
 
-	split = row.split(percentage=0.3)
+	split = row.split(factor=0.3)
 	subcol = split.column()
 	subcol.prop(settings, "auto_check_update")
 	subcol = split.column()

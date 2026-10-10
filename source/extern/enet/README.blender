@@ -1,8 +1,15 @@
-Project: ENet
-URL: https://github.com/lsalzman/enet
+Project: ENet (fork)
+URL: https://github.com/zpl-c/enet
 License: MIT (see LICENSE)
-Upstream version: 1.3.18 (2662c0de09e36f2a2030ccc2c528a3e4c9e8138a)
+Upstream version: single-header release (ENET_VERSION 2.7.0), fetched 2026-10-05.
 Local modifications:
 
-- CMakeLists.txt rewritten to build the extern_enet static library.
-- Only the sources, headers, LICENSE, README and ChangeLog were copied.
+- Replaced the lsalzman/enet 1.3.18 multi-file vendor (IPv4-only) with the
+  zpl-c/enet single-header fork to get real IPv6 (dual-stack) support.
+  See source/source/gameengine/Network/NOTES-engine.md ("IPv6 no ENet/UDP").
+- include/enet/enet.h is the upstream single header, unmodified.
+- enet_impl.c is Blender-added: the one translation unit that defines
+  ENET_IMPLEMENTATION and includes enet.h to provide the implementation.
+- CMakeLists.txt rewritten to build the extern_enet static library from
+  enet_impl.c (header-only library, so no per-platform feature detection
+  is needed anymore -- the fork does it internally).

@@ -1,7 +1,7 @@
 """Importa o schema JSON legado para Scene.cutscene_settings.
 
 Uso no Range/Blender 2.79:
-    RangeEngine.exe --background arquivo.blend --python \
+    AnastacioEngine.exe --background arquivo.blend --python \
         source/release/scripts/templates_py/cutscene_native_import.py -- \
         scripts/cutscenes/cutscenes_data.json
 

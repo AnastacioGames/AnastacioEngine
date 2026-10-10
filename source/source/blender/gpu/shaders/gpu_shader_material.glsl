@@ -292,6 +292,13 @@ void direction_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 	vout = (mat * vec4(vin, 0.0)).xyz;
 }
 
+/* Normal from world to object space: transpose of the object matrix (the inverse is only right for
+ * uniform scale). */
+void normal_world_to_object_m4v3(vec3 vin, mat4 objmat, out vec3 vout)
+{
+	vout = normalize((vec4(vin, 0.0) * objmat).xyz);
+}
+
 void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 {
 	vout = (mat * vec4(vin, 1.0)).xyz;
@@ -2269,13 +2276,149 @@ void world_zen_mapping(vec3 view, float zenup, float zendown, out float zenfac)
 
 float world_stars(vec3 view, vec3 sundir, float factor){
 	if (view.z <= 0.0) return 0.0;
-	float pixel = 0.0005;
-	vec2 coord = pixel * floor(((view.xy / (view.z * 0.5 + 1.0)) * 0.25) / pixel);
-	vec2 starPos = vec2(rando(coord.xy + 1.0), rando(coord.yx + 3.0));
-	float stars = (smoothstep(0.02, 0.01, length(coord - starPos)) +
-	               smoothstep(0.02, 0.01, length(coord + starPos))) * view.z * view.z;
+	/* One possible star per grid cell over the upper hemisphere, so every
+	 * direction gets the same density (the old hash only hit coords where x and y
+	 * shared a sign, leaving two quadrants of the sky black). */
+	vec2 p = view.xy / (view.z + 1.0) * 300.0;
+	vec2 cell = floor(p);
+	float h = rando(cell);
+	vec2 starPos = vec2(rando(cell + 17.31), rando(cell + 41.73)) * 0.6 + 0.2;
+	float present = step(0.82, h);
+	float twinkle = 0.6 + 0.4 * fract(h * 37.0);
+	float stars = 1.8 * present * twinkle * smoothstep(0.22, 0.0, length(fract(p) - starPos)) *
+	              smoothstep(0.0, 0.15, view.z);
 
 	return stars * (max(0.0, dot(-sundir, vec3(0.0, 0.0, 1.0)) + 0.5) + factor);
+}
+
+/* ---- Realistic night sky (World > Night > Style) ---- */
+
+float stars_hash3(vec3 p)
+{
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float stars_noise3(vec3 p)
+{
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix(stars_hash3(i), stars_hash3(i + vec3(1, 0, 0)), f.x),
+	               mix(stars_hash3(i + vec3(0, 1, 0)), stars_hash3(i + vec3(1, 1, 0)), f.x), f.y),
+	           mix(mix(stars_hash3(i + vec3(0, 0, 1)), stars_hash3(i + vec3(1, 0, 1)), f.x),
+	               mix(stars_hash3(i + vec3(0, 1, 1)), stars_hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+
+float stars_fbm(vec3 p)
+{
+	return 0.5 * stars_noise3(p) + 0.25 * stars_noise3(p * 2.03) + 0.125 * stars_noise3(p * 4.01) +
+	       0.0625 * stars_noise3(p * 8.07);
+}
+
+/* Right ascension (hours) and declination (degrees) to a celestial unit vector. */
+vec3 stars_radec(float ra, float dec)
+{
+	float a = radians(ra * 15.0);
+	float d = radians(dec);
+	return vec3(cos(d) * cos(a), cos(d) * sin(a), sin(d));
+}
+
+vec3 stars_temperature(float t)
+{
+	return mix(vec3(0.62, 0.74, 1.0), vec3(1.0, 0.82, 0.6), t);
+}
+
+/* Procedural background stars: equal-area grid in (longitude, sin(latitude)) of the celestial sphere. */
+vec3 stars_field(vec3 c, float cells, float chance, float bmin, float bmax, float seed)
+{
+	float lon = atan(c.y, c.x) / (2.0 * M_PI) + 0.5;
+	float coslat = sqrt(max(1.0 - c.z * c.z, 1e-4));
+	vec2 p = vec2(lon * cells, (c.z * 0.5 + 0.5) * cells / M_PI);
+	vec2 cell = floor(p);
+	cell.x = mod(cell.x, cells);
+	float h = rando(cell + seed);
+	if (h > chance) return vec3(0.0);
+	vec2 pos = vec2(rando(cell + seed + 17.31), rando(cell + seed + 41.73)) * 0.7 + 0.15;
+	/* cell size in radians: longitude shrinks with latitude, sin(latitude) stretches */
+	float ang = 2.0 * M_PI / cells;
+	vec2 d = (fract(p) - pos) * vec2(ang * coslat, ang / coslat);
+	float b = mix(bmin, bmax, pow(rando(cell + seed + 7.7), 3.0));
+	float core = smoothstep(0.0014, 0.0, length(d));
+	return stars_temperature(rando(cell + seed + 3.1)) * b * core;
+}
+
+#define STARS_COUNT 58
+
+vec3 world_stars_real(vec3 view, vec3 sundir, float factor, bool vivid)
+{
+	if (view.z <= 0.0) return vec3(0.0);
+	vec3 v = normalize(view);
+
+	/* Celestial sphere seen from latitude -23 (southern Brazil); it turns with the sun azimuth. */
+	const float lat = radians(-23.0);
+	vec3 zc = vec3(0.0, cos(lat), sin(lat));
+	float spin = atan(sundir.y, sundir.x);
+	vec3 xc = vec3(cos(spin), 0.0, sin(spin));
+	xc = normalize(xc - zc * dot(xc, zc));
+	vec3 yc = cross(zc, xc);
+	vec3 c = vec3(dot(v, xc), dot(v, yc), dot(v, zc));
+
+	/* Milky Way */
+	vec3 gnp = stars_radec(12.857, 27.13);
+	vec3 gcen = stars_radec(17.761, -28.94);
+	float g = dot(c, gnp);
+	float band = exp(-g * g * 45.0);
+	float bulge = pow(max(dot(c, gcen), 0.0), 6.0);
+	float n = stars_fbm(c * 6.0);
+	float dust = smoothstep(0.45, 0.7, stars_fbm(c * 11.0 + 3.0)) * exp(-g * g * 260.0);
+	vec3 col = vec3(0.5, 0.55, 0.72) * (vivid ? 2.2 : 1.0) * band * (0.05 + 0.25 * bulge) * (0.4 + 1.2 * n) * (1.0 - 0.8 * dust);
+
+	/* background stars, denser along the galactic band */
+	col += stars_field(c, 1400.0, 0.20 + 0.35 * band, 0.08, 0.4, 0.0);
+	col += stars_field(c, 600.0, 0.18, 0.25, 1.1, 91.0);
+
+	/* Named stars: ra (h), dec (deg), visual magnitude. */
+	const vec3 cat[STARS_COUNT] = vec3[STARS_COUNT](
+		/* Orion 0-6 */
+		vec3(5.919, 7.41, 0.5), vec3(5.242, -8.20, 0.13), vec3(5.418, 6.35, 1.64), vec3(5.533, -0.30, 2.2),
+		vec3(5.603, -1.20, 1.69), vec3(5.679, -1.94, 1.77), vec3(5.796, -9.67, 2.07),
+		/* Crux 7-10, Centaurus pointers 11-12 */
+		vec3(12.443, -63.10, 0.77), vec3(12.795, -59.69, 1.25), vec3(12.519, -57.11, 1.6), vec3(12.252, -58.75, 2.8),
+		vec3(14.660, -60.83, -0.27), vec3(14.064, -60.37, 0.6),
+		/* Scorpius 13-25 */
+		vec3(16.490, -26.43, 1.0), vec3(16.006, -22.62, 2.3), vec3(16.091, -19.81, 2.6), vec3(15.981, -26.11, 2.9),
+		vec3(16.598, -28.22, 2.8), vec3(16.836, -34.29, 2.3), vec3(16.864, -38.05, 3.0), vec3(16.910, -42.36, 3.6),
+		vec3(17.203, -43.24, 3.3), vec3(17.622, -43.00, 1.86), vec3(17.793, -40.13, 3.0), vec3(17.708, -39.03, 2.4),
+		vec3(17.560, -37.10, 1.62),
+		/* Big Dipper 26-32 */
+		vec3(11.062, 61.75, 1.8), vec3(11.031, 56.38, 2.4), vec3(11.897, 53.69, 2.4), vec3(12.257, 57.03, 3.3),
+		vec3(12.900, 55.96, 1.8), vec3(13.399, 54.93, 2.2), vec3(13.792, 49.31, 1.9),
+		/* Cassiopeia 33-37 */
+		vec3(0.153, 59.15, 2.3), vec3(0.675, 56.54, 2.2), vec3(0.945, 60.72, 2.4), vec3(1.430, 60.24, 2.7),
+		vec3(1.907, 63.67, 3.4),
+		/* Canis Major 38-41: Sirius, Mirzam, Wezen, Adhara */
+		vec3(6.752, -16.72, -1.46), vec3(6.378, -17.96, 1.98), vec3(7.140, -26.39, 1.83), vec3(6.977, -28.97, 1.5),
+		/* Other bright stars 42-57: Canopus, Procyon, Aldebaran, Vega, Altair, Deneb, Arcturus, Spica,
+		 * Achernar, Fomalhaut, Capella, Polaris, Pleiades, Pollux, Regulus, Avior */
+		vec3(6.399, -52.70, -0.74), vec3(7.655, 5.22, 0.34), vec3(4.599, 16.51, 0.85), vec3(18.616, 38.78, 0.03),
+		vec3(19.846, 8.87, 0.77), vec3(20.690, 45.28, 1.25), vec3(14.261, 19.18, -0.05), vec3(13.420, -11.16, 0.97),
+		vec3(1.629, -57.24, 0.46), vec3(22.961, -29.62, 1.16), vec3(5.278, 46.0, 0.08), vec3(2.530, 89.26, 1.98),
+		vec3(3.791, 24.10, 1.6), vec3(7.755, 28.03, 1.14), vec3(10.140, 11.97, 1.35), vec3(8.159, -47.34, 1.8)
+	);
+	for (int i = 0; i < STARS_COUNT; i++) {
+		vec3 s = stars_radec(cat[i].x, cat[i].y);
+		float d = length(c - s);
+		if (d > 0.03) continue;
+		float b = clamp(pow(2.512, 1.0 - cat[i].z), 0.15, 6.0);
+		/* Constellations style: the named stars stand out a little more. */
+		if (vivid) b = min(b * 1.6 + 0.4, 4.0);
+		float r = 0.0011 + 0.0004 * sqrt(b);
+		vec3 tint = stars_temperature(rando(vec2(float(i), 5.0)));
+		col += tint * (smoothstep(r, 0.0, d) * min(b, 2.0) + 0.03 * b * exp(-d / (r * 1.2)));
+	}
+
+	float night = max(0.0, dot(-sundir, vec3(0.0, 0.0, 1.0)) + 0.5) + factor;
+	return col * night * smoothstep(0.0, 0.12, v.z);
 }
 
 vec2 rsi(vec3 r0, vec3 rd, float sr) {
@@ -2380,18 +2523,77 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 	return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
 }
 
+/* ---- Aurora (World > Night > Aurora) ---- */
+
+vec3 aurora_palette(float mode, float layer, float shift)
+{
+	vec3 green = vec3(0.1, 1.0, 0.45);
+	if (mode < 0.5)
+		return mix(green, vec3(0.25, 0.95, 0.75), layer);
+	if (mode < 1.5)
+		return mix(mix(green, vec3(0.65, 0.25, 0.95), smoothstep(0.2, 0.6, layer)),
+		           vec3(0.95, 0.2, 0.35), smoothstep(0.65, 1.0, layer));
+	vec3 c = 0.5 + 0.5 * cos(6.2831 * (shift + vec3(0.0, 0.33, 0.67)));
+	return mix(c, green, 0.25);
+}
+
+void sky_aurora(vec3 view, vec3 sundir, float time, float mode, vec4 col, out vec4 outcol)
+{
+	outcol = col;
+	vec3 v = normalize(view);
+	float night = smoothstep(0.1, -0.2, sundir.z);
+	if (v.z < 0.01 || night <= 0.0) return;
+
+	float t = time * 0.1;
+	vec3 acc = vec3(0.0);
+	/* march through stacked layers: the bottom edge is sharp and bright, the top fades out */
+	for (int i = 0; i < 28; i++) {
+		float fi = float(i) / 27.0;
+		float h = 1.0 + fi * 0.9;
+		vec2 q = v.xy / (v.z + 0.04) * h * 0.35;
+		float warp = stars_noise3(vec3(q * 0.35, t * 0.3)) * 3.0 + 0.6 * sin(q.x * 0.7 + t);
+		float d = sin(q.y * 0.9 + warp);
+		float ribbon = exp(-d * d * 18.0);
+		float rays = 0.35 + 0.65 * stars_noise3(vec3(q.x * 9.0 + warp * 2.0, t * 2.0, 3.0));
+		float a = ribbon * rays * exp(-fi * 2.2) * (1.0 - fi);
+		acc += aurora_palette(mode, fi, t * 0.5 + q.x * 0.05 + fi * 0.3) * a;
+	}
+	outcol.rgb += acc * 0.12 * night * smoothstep(0.01, 0.25, v.z);
+}
+
 void sky_moon(vec3 view, vec3 sundir, float enabled, float size, float brightness, out vec3 moon)
 {
-	/* Visual only: a cool disc with a deliberately short, dim halo.
-	 * Full inverse of the sun direction, so the moon sits opposite the sun
-	 * across the sky and rises above the horizon precisely when the sun sets. */
+	/* Moon opposite the sun, drawn as a lit sphere with maria and craters. */
+	moon = vec3(0.0);
 	vec3 moonDir = normalize(-sundir);
-	float radius = max(size * 0.05, 0.00005);
-	float alignment = dot(normalize(view), moonDir);
-	float disk = smoothstep(1.0 - radius, 1.0, alignment);
-	float halo = smoothstep(1.0 - radius * 4.0, 1.0, alignment) - disk;
 	float aboveHorizon = smoothstep(-0.02, 0.02, moonDir.z);
-	moon = vec3(0.72, 0.78, 0.90) * brightness * enabled * aboveHorizon * (disk + halo * 0.08);
+	if (enabled * aboveHorizon <= 0.0) return;
+	vec3 v = normalize(view);
+	float ang = sqrt(2.0 * max(size * 0.05, 0.00005)); /* angular radius */
+	float align = dot(v, moonDir);
+	if (align < cos(ang * 6.0)) return;
+
+	vec3 t = normalize(cross(moonDir, abs(moonDir.z) < 0.99 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
+	vec3 bt = cross(t, moonDir);
+	vec2 uv = vec2(dot(v, t), dot(v, bt)) / sin(ang);
+	float r2 = dot(uv, uv);
+	float edge = fwidth(length(uv)) + 0.002;
+	float disk = smoothstep(1.0 + edge, 1.0 - edge, sqrt(r2));
+	vec3 col = vec3(0.0);
+	if (r2 < 1.1) {
+		vec3 n = vec3(uv, sqrt(max(1.0 - r2, 0.0)));
+		/* maria: big dark basins */
+		float maria = smoothstep(0.48, 0.62, stars_fbm(n * 2.2 + vec3(4.1, 1.7, 0.3)));
+		/* craters and highlands roughness */
+		float fine = stars_fbm(n * 14.0 + 7.0);
+		float crat = smoothstep(0.62, 0.75, stars_fbm(n * 26.0 + 2.0));
+		float albedo = mix(0.95, 0.52, maria) * (0.82 + 0.3 * fine) + 0.15 * crat * (1.0 - maria);
+		float limb = 0.55 + 0.45 * pow(n.z, 0.35);
+		col = vec3(0.96, 0.94, 0.89) * albedo * limb * disk;
+	}
+	float d = acos(clamp(align, -1.0, 1.0)) / ang;
+	float glow = exp(-max(d - 1.0, 0.0) * 2.5) * (1.0 - disk) * 0.06;
+	moon = (col + vec3(0.6, 0.68, 0.85) * glow) * brightness * enabled * aboveHorizon;
 }
 
 void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float sunsize,
@@ -2435,7 +2637,10 @@ void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float suns
 	outcol.rgb += moon;
 
 	float starFactor = step(env_sky, 0.001);
-	outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
+	if (env_sky < -0.5)
+		outcol.rgb += world_stars_real(view, sundir, 0.0, env_sky < -1.5) * (1.0 - rough) * starFactor;
+	else
+		outcol += world_stars(view, sundir, 0.0) * (1.0 - rough) * starFactor;
 }
 
 /* rlh: Rayleigh coefficients (rgb) and w = 1 for the sky's own tonemap (0 when Filmic follows);
@@ -2467,7 +2672,10 @@ void do_sky_atmospheric(vec3 view, vec4 rlh, vec4 atmo, vec3 sundir, vec3 suncol
 
 	// Stars, only if (env_sky == 0.0)
 	float starFactor = step(env_sky, 0.001);
-	outcol.rgb += vec3(world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor);
+	if (env_sky < -0.5)
+		outcol.rgb += world_stars_real(view, sundir, 1.0 - Ssize, env_sky < -1.5) * (1.0 - rough) * starFactor;
+	else
+		outcol.rgb += vec3(world_stars(view, sundir, 1.0 - Ssize) * (1.0 - rough) * starFactor);
 }
 
 void world_blend_paper_real(vec3 vec, out float blend)
@@ -4485,8 +4693,8 @@ void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, vec3 I, vec
 
 void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 ambient, float glossy, out vec4 result)
 {
-	/* ambient light from the World color */
-	vec3 L = ambient;
+	/* ambient light from the World color (diffuse only: a glossy highlight has no ambient term) */
+	vec3 L = (glossy > 0.5) ? vec3(0.0) : ambient;
 
 	/* same banding as Cycles' diffuse toon: full light inside size, linear falloff over smooth */
 	float max_angle = clamp(size, 0.0, 1.0) * M_PI * 0.5;
@@ -4521,10 +4729,54 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, vec3 I, vec3 
 	result = vec4(L * color.rgb, color.a);
 }
 
+/* Baked lightmap atlas (RGBM, gamma 2, range 8, see anastacio_lightmap.py). Texels outside the charts
+ * have alpha 0: a = 0 means "not baked here". */
+void lightmap_sample(vec3 uv, sampler2D tex, out vec4 lm)
+{
+	vec4 c = texture2D(tex, uv.xy);
+	vec3 g = c.rgb * c.a * 8.0;
+	lm = vec4(g * g, (c.a > 0.004) ? 1.0 : 0.0);
+}
+
+/* One face of the baked light volume (ambient cube, RGBM like the lightmap) at grid position p (in cells,
+ * probe i at i + 0.5). Layout: x = face * dim.x + i, y = k * dim.y + j; x/y interpolate in the hardware,
+ * z between two slices here. */
+vec3 lightvol_face(sampler2D tex, vec3 p, vec3 dim, float face)
+{
+	vec2 size = vec2(dim.x * 6.0, dim.y * dim.z);
+	vec2 xy = clamp(p.xy, vec2(0.5), dim.xy - 0.5);
+	float z = clamp(p.z, 0.5, dim.z - 0.5) - 0.5;
+	float k0 = floor(z);
+	float k1 = min(k0 + 1.0, dim.z - 1.0);
+	vec4 a = texture2D(tex, (vec2(face * dim.x, k0 * dim.y) + xy) / size);
+	vec4 b = texture2D(tex, (vec2(face * dim.x, k1 * dim.y) + xy) / size);
+	vec3 ga = a.rgb * a.a * 8.0;
+	vec3 gb = b.rgb * b.a * 8.0;
+	return mix(ga * ga, gb * gb, z - k0);
+}
+
+/* Baked light volume for meshes outside the lightmap (moving objects): fills lm where lm.a = 0 with the
+ * irradiance of the probe grid around the shaded point (faces +X -X +Y -Y +Z -Z). */
+void lightvol_sample(vec4 lm, vec3 viewpos, mat4 viewinv, vec3 N, sampler2D tex, vec3 vmin, vec3 vinv, vec3 dim,
+                     out vec4 result)
+{
+	result = lm;
+	if (lm.a < 0.5) {
+		vec3 wpos = (viewinv * vec4(viewpos, 1.0)).xyz;
+		vec3 wn = normalize((viewinv * vec4(N, 0.0)).xyz);
+		vec3 p = (wpos - vmin) * vinv;
+		vec3 n2 = wn * wn;
+		vec3 irr = n2.x * lightvol_face(tex, p, dim, (wn.x >= 0.0) ? 0.0 : 1.0) +
+		           n2.y * lightvol_face(tex, p, dim, (wn.y >= 0.0) ? 2.0 : 3.0) +
+		           n2.z * lightvol_face(tex, p, dim, (wn.z >= 0.0) ? 4.0 : 5.0);
+		result = vec4(irr, 1.0);
+	}
+}
+
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
-	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, out vec4 result)
+	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result)
 {
 	/* ambient light */
 	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
@@ -4532,6 +4784,10 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	if (env_on > 0.5) {
 		/* world environment (sky/HDRI) as diffuse irradiance; specular is added after the lights */
 		L = env_diffuse.rgb * diffuse_albedo * (1.0 - metallic);
+	}
+	if (lightmap.a > 0.5) {
+		/* baked indirect light replaces the probe/World diffuse; direct light stays dynamic below */
+		L = lightmap.rgb * diffuse_albedo * (1.0 - metallic);
 	}
 
 	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
@@ -4720,11 +4976,9 @@ void node_wireframe(float size, float use_pixel_size, vec3 bary, vec3 co, out fl
 
 void node_bsdf_transparent(vec4 color, out vec4 result)
 {
-	/* this isn't right */
-	result.r = color.r;
-	result.g = color.g;
-	result.b = color.b;
-	result.a = 0.0;
+	/* Fully see-through: no light of its own (Add blend would add the color) and alpha 0. The tint
+	 * of colored transparency is not representable with plain alpha blending. */
+	result = vec4(0.0);
 }
 
 /* Game approximation of Velvet: sheen that grows toward grazing view angles (narrower for low Sigma). */
@@ -4971,7 +5225,11 @@ void node_background(vec4 color, float strength, vec3 N, out vec4 result)
 
 void node_mix_shader(float fac, vec4 shader1, vec4 shader2, out vec4 shader)
 {
-	shader = mix(shader1, shader2, fac);
+	/* Weight the colors by their alpha (premultiplied mix): mixing with a Transparent shader must
+	 * only lower alpha, not blend its color in (it washed the surface toward white). */
+	float a = mix(shader1.a, shader2.a, fac);
+	vec3 rgb = shader1.rgb * shader1.a * (1.0 - fac) + shader2.rgb * shader2.a * fac;
+	shader = vec4((a > 1e-6) ? rgb / a : mix(shader1.rgb, shader2.rgb, fac), a);
 }
 
 void node_add_shader(vec4 shader1, vec4 shader2, out vec4 shader)
@@ -5059,13 +5317,15 @@ void node_geometry(
 }
 
 void node_tex_coord(
-        vec3 I, vec3 N, mat4 viewinvmat, mat4 obinvmat, vec4 camerafac,
+        vec3 I, vec3 N, mat4 viewinvmat, mat4 obinvmat, mat4 obmat, vec4 camerafac,
         vec3 attr_orco, vec3 attr_uv,
         out vec3 generated, out vec3 normal, out vec3 uv, out vec3 object,
         out vec3 camera, out vec3 window, out vec3 reflection)
 {
 	generated = attr_orco * 0.5 + vec3(0.5);
-	normal = normalize((obinvmat * (viewinvmat * vec4(N, 0.0))).xyz);
+	/* Object-space normal = transpose(object matrix) * world normal, as Cycles; the inverse matrix
+	 * is only right for uniform scale. */
+	normal = normalize((vec4((viewinvmat * vec4(N, 0.0)).xyz, 0.0) * obmat).xyz);
 	uv = attr_uv;
 	object = (obinvmat * (viewinvmat * vec4(I, 1.0))).xyz;
 	camera = vec3(I.xy, -I.z);
@@ -5279,7 +5539,7 @@ void node_tex_image_box(vec3 texco,
 
 	/* project from direction vector to barycentric coordinates in triangles */
 	N = vec3(abs(N.x), abs(N.y), abs(N.z));
-	N /= (N.x + N.y + N.z);
+	N /= max(N.x + N.y + N.z, 1e-6);
 
 	/* basic idea is to think of this as a triangle, each corner representing
 	 * one of the 3 faces of the cube. in the corners we have single textures,
@@ -5332,28 +5592,21 @@ void node_tex_image_box(vec3 texco,
 		/* Desperate mode, no valid choice anyway, fallback to one side.*/
 		weight.x = 1.0;
 	}
-	color = vec4(0);
-	if (weight.x > 0.0) {
-		vec2 uv = texco.yz;
-		if(signed_N.x < 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.x * texture2D(ima, uv);
+	/* Sample all three projections unconditionally: texture2D inside a branch that changes per pixel
+	 * gets undefined derivatives, so the mip level breaks along the blend borders (seam lines). */
+	vec2 uvx = texco.yz;
+	if (signed_N.x < 0.0) {
+		uvx.x = 1.0 - uvx.x;
 	}
-	if (weight.y > 0.0) {
-		vec2 uv = texco.xz;
-		if(signed_N.y > 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.y * texture2D(ima, uv);
+	vec2 uvy = texco.xz;
+	if (signed_N.y > 0.0) {
+		uvy.x = 1.0 - uvy.x;
 	}
-	if (weight.z > 0.0) {
-		vec2 uv = texco.yx;
-		if(signed_N.z > 0.0) {
-			uv.x = 1.0 - uv.x;
-		}
-		color += weight.z * texture2D(ima, uv);
+	vec2 uvz = texco.yx;
+	if (signed_N.z > 0.0) {
+		uvz.x = 1.0 - uvz.x;
 	}
+	color = weight.x * texture2D(ima, uvx) + weight.y * texture2D(ima, uvy) + weight.z * texture2D(ima, uvz);
 
 	alpha = color.a;
 }
@@ -6337,8 +6590,17 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	// The component to extract the height information from
 	int ci = int(comp);
 
-	// The uv shift per depth step.
-	vec2 delta = (vec3(-vv.x, gl_FrontFacing ? vv.y : -vv.y, 0.0) * bumpscale / vv.z).xy;
+	// The uv shift per depth step. Clamp the view slope so grazing angles do not smear the map
+	// across the whole surface (1/vv.z grows without bound near the horizon).
+	float vz = (vv.z < 0.0) ? min(vv.z, -0.15) : max(vv.z, 0.15);
+	vec2 delta = (vec3(-vv.x, gl_FrontFacing ? vv.y : -vv.y, 0.0) * bumpscale / vz).xy;
+	// More steps at grazing angles, where each step covers a longer stretch of the map.
+	numsteps = clamp(numsteps * mix(2.0, 1.0, abs(vz)), 1.0, 256.0);
+
+	// Mip level from the unshifted uv: the shifted one jumps between steps and would pick level 0
+	// (aliasing/shimmer at distance); the shift is small so the footprint is the same.
+	vec2 duvdx = dFdx(texco.xy);
+	vec2 duvdy = dFdy(texco.xy);
 
 	float height = 0.0;
 
@@ -6352,7 +6614,7 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 
 	// Linear sample from top.
 	for (int i = 0; float(i) < numsteps; ++i) {
-		height = textureLod(ima, texco.xy - delta * (1.0 - depth), 0.0)[ci];
+		height = textureGrad(ima, texco.xy - delta * (1.0 - depth), duvdx, duvdy)[ci];
 		// Stop if the texture height is greater than current depth.
 		if (height > depth) {
 			break;
@@ -6361,30 +6623,21 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 		depth -= depthstep;
 	}
 
-	vec2 texuv = texco.xy - delta * (1.0 - depth);
-
-	/* Interpolation.
-	 * Compare the distance of the height texture with current level and previous level.
-	 */
-
-	// Compute the depth before the last step, reverse operation.
-	float depthprelay = depth + depthstep;
-	// Compute the uv with the pre depth.
-	vec2 texuvprelay = texco.xy - delta * (1.0 - depthprelay);
-
-	// The shift between the texture height and the last depth.
-	float depthshiftcurlay = height - depth;
-	// The shift between the texture height with precedent uv computed with pre detph and the pre depth.
-	float depthshiftprelay = textureLod(ima, texuvprelay, 0.0)[ci] - depthprelay;
-
-	float weight = 1.0;
-	// If the height is right in the middle of two step the difference of the two shifts will be null.
-	if ((depthshiftcurlay - depthshiftprelay) > 0.0) {
-		// Get shift ratio.
-		weight = depthshiftcurlay / (depthshiftcurlay - depthshiftprelay);
+	/* Binary refinement between the last step above the surface and the first one below it.
+	 * A linear interpolation fails on hard edges (block sides) and leaves stair-step streaks. */
+	float above = min(depth + depthstep, 1.0);
+	float below = depth;
+	for (int i = 0; i < 6; ++i) {
+		float mid = 0.5 * (above + below);
+		if (textureGrad(ima, texco.xy - delta * (1.0 - mid), duvdx, duvdy)[ci] > mid) {
+			below = mid;
+		}
+		else {
+			above = mid;
+		}
 	}
-
-	vec2 finaltexuv = mix(texuv, texuvprelay, weight);
+	// Take the point already inside the surface so hard edges (block sides) read a stable texel.
+	vec2 finaltexuv = texco.xy - delta * (1.0 - below);
 
 	// Discard if uv is out of the range 0 to 1.
 	vec2 clampmin = vec2(-0.5) * scale.xy;
@@ -6398,6 +6651,11 @@ void mtex_parallax(vec3 texco, vec3 vp, vec4 tangent, vec3 vn, sampler2D ima, fl
 	}
 
 	ptexcoord = vec3(finaltexuv, texco.z);
+}
+
+void parallax_uv_in(vec3 uv, out vec3 outuv)
+{
+	outuv = uv;
 }
 
 void parallax_uv_attribute(vec3 uv, out vec3 outuv)

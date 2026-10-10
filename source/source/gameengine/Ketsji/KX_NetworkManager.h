@@ -56,6 +56,7 @@ class KX_NetworkManager : public net::IWorld
 {
 public:
 	struct HostOptions {
+        bool steam = false;
 		/// ENet (UDP) port; 0 = scene setting.
 		int port = 0;
 		/// WebSocket (TCP) port; < 0 = scene setting, 0 = no WebSocket.
@@ -73,6 +74,8 @@ public:
 		int lateJoin = -1;
 		/// Server without local player.
 		bool dedicated = false;
+		/// Empty = open room; otherwise the client must send the same password.
+		std::string password;
 	};
 
 	/// What the game script learns about the session.
@@ -83,8 +86,10 @@ public:
 			REJECT,  // reason = RejectReason, text = detail
 			CHAT,  // client = sender
 			START,  // the host started the match
+			LOBBY,  // the host returned the session to its lobby
 			PLAYER_JOIN,  // client, text = name
 			PLAYER_LEAVE,  // client
+			SCENE,  // the session moved to another scene (text = name), after it is loaded
 		};
 		Type type = CONNECT;
 		int client = 0;
@@ -110,7 +115,8 @@ public:
 	/// Opens a server. The scene is the active scene (KX_GetActiveScene()) unless one is given.
 	bool Host(const HostOptions &options, std::string &error, KX_Scene *scene = nullptr);
 	/// Joins a server. port <= 0 = scene setting.
-	bool Join(const std::string &host, int port, std::string &error, KX_Scene *scene = nullptr);
+	bool Join(const std::string &host, int port, std::string &error, const std::string &password = "",
+	          KX_Scene *scene = nullptr, bool steam = false);
 	/// Leaves the session (Quit / ServerShutdown) and gives the objects back to the local simulation.
 	void Disconnect();
 	/// Engine stopping: Disconnect() without events, before the scenes are destroyed.
@@ -137,6 +143,11 @@ public:
 
 	/// KX_Scene::NewRemoveObject: forget an object before it is destroyed.
 	void OnObjectRemoved(KX_GameObject *obj);
+	/// Called by the scene scheduler before a scene is destroyed: the session lets go of its objects and
+	/// adopts the scene that replaces it on the next tick.
+	void OnSceneRemoved(KX_Scene *scene);
+	/// Server: replaces the session scene during the match; clients follow and load the same scene.
+	bool ChangeScene(const std::string &name, std::string &error);
 
 	/* -------------------------------------------------------------------- */
 	/** \name Replication
@@ -150,6 +161,15 @@ public:
 		float priority = 1.0f;
 		/// Names of the game properties to replicate (Bool, Int and Float only).
 		std::vector<std::string> props;
+		/// Float properties sent in `bits` bits between min and max (the Bits/Min/Max of the
+		/// property panel), instead of 32 bits.
+		struct Quantization {
+			std::string name;
+			float min;
+			float max;
+			int bits;
+		};
+		std::vector<Quantization> quantize;
 	};
 
 	/// Script registration of a scene object (same effect as the Replicate checkbox). Returns its net id
@@ -224,6 +244,12 @@ public:
 	/// Server: how the inputs of a client arrived and were applied. False when the client has no input queue.
 	bool GetInputStats(net::ClientId client, net::InputQueueStats &stats) const;
 
+	/// Server: relevance center of a client. obj (followed every tick) or position; radius < 0 keeps the
+	/// Relevance Radius of the scene, 0 makes everything relevant. Without a call, the center is the first
+	/// object the client owns. clear removes the override.
+	bool SetClientView(net::ClientId client, KX_GameObject *obj, const float *position, float radius, bool clear,
+	                   std::string &error);
+
 	/// Server: sphere (halfHeight 0) or capsule along the local Z axis, recorded every tick. radius <= 0 removes it.
 	bool SetHitbox(KX_GameObject *obj, float radius, float halfHeight);
 	/// Server: ray against the hitboxes as the client `viewOf` saw them (its view time, at most maxRewindMs back,
@@ -240,6 +266,7 @@ public:
 	bool SendChat(const std::string &text);
 	/// Server only. False when someone is not ready or there is no session.
 	bool StartGame();
+	bool ReturnToLobby();
 	std::vector<PlayerInfo> GetPlayers() const;
 	void SetEventSink(const std::function<void(const Event &)> &sink);
 	/** \} */
@@ -293,6 +320,7 @@ private:
 		uint32_t gameVersion = 1;
 		int tickRate = 0;
 		int snapshotRate = 20;
+		float relevanceRadius = 0.0f;
 		bool lan = true;
 		bool lateJoin = true;
 	};
@@ -310,6 +338,9 @@ private:
 		bool predicted = false;
 		std::unique_ptr<net::PredictionClient> prediction;
 		net::Tick lastReconciled = net::kNoTick;
+		/// Dynamic body predicted by this client: Bullet runs it, the state is recorded after physics (EndTick).
+		bool dynamicPredicted = false;
+		net::Tick pendingRecord = net::kNoTick;
 		/// Visual correction added to the position after the step (client).
 		float shownOffset[3] = {0.0f, 0.0f, 0.0f};
 		/* Lag compensation (server). */
@@ -328,9 +359,12 @@ private:
 	void CollectSceneObjects();
 	net::NetId AssignNetId(KX_GameObject *obj, net::NetId wanted);
 	bool BuildEntry(KX_GameObject *obj, net::NetId id, const ReplicateOptions *scriptOptions, Entry &entry) const;
+	static void FloatQuantization(KX_GameObject *obj, const std::string &name, net::PropertyDesc &desc);
 	void BuildSchema(KX_GameObject *obj, const std::vector<std::string> &names, Entry &entry) const;
 	static void CollectProps(KX_GameObject *obj, std::vector<std::string> &names);
 	uint64_t ComputeSceneHash(const std::string &sceneName) const;
+	/// After OnSceneRemoved(): takes the new scene, registers its objects and tells the other side.
+	void AdoptScene();
 	std::unique_ptr<net::ITransport> WrapSim(std::unique_ptr<net::ITransport> inner) const;
 	void BuildRpc();
 	void OpenSession();
@@ -342,9 +376,12 @@ private:
 	void Emit(const Event &event);
 	void ServerTickBegin(uint64_t now);
 	void ClientTickBegin(uint64_t now);
+	void ClientTickEnd();
+	void SetDynamicPredicted(Entry &entry, bool on);
 	void HandleServerEvent(const net::SessionEvent &event, uint64_t now, std::vector<net::SessionEvent> &events);
 	void HandleClientEvent(const net::SessionEvent &event, uint64_t now);
 	void UpdateLanInfo();
+	void UpdateClientViews();
 	Entry *FindEntry(net::NetId id);
 	const Entry *FindEntry(net::NetId id) const;
 	const std::vector<net::PropertyDesc> *SchemaFor(net::NetId id, const std::string &prototype);
@@ -380,8 +417,22 @@ private:
 	uint32_t m_gameVersion;
 	int m_maxPlayers;
 	int m_snapshotRate;
+	float m_relevanceRadius;
+	struct ViewOverride {
+		net::NetId follow = net::kInvalidNetId;
+		float position[3] = {0.0f, 0.0f, 0.0f};
+		bool fixed = false;  // position is the center
+		float radius = -1.0f;
+	};
+	std::map<net::ClientId, ViewOverride> m_views;
 	uint64_t m_sceneHash;
 	std::string m_sceneName;
+	/* Scene change: the session scene was destroyed and the next one is not adopted yet. */
+	bool m_sceneDetached;
+	int m_detachedIndex;
+	std::string m_targetScene;
+	uint64_t m_targetHash;
+	net::ReplicatorConfig m_replicatorConfig;
 	net::Tick m_tick;
 	net::NetSimSettings m_sim;
 	bool m_simEnabled;

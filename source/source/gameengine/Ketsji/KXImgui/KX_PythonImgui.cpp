@@ -33,11 +33,13 @@
 #include "implot.h"  // pulls in imgui.h
 #include "imgui_impl_opengl3.h"
 #include "imgui_internal.h"
+#include "KX_Imgui.h"
 #include "KX_Imgui_Impl_Inputs.h"
 
 #include "KX_KetsjiEngine.h"
 #include "KX_Globals.h"
 
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -370,9 +372,8 @@ static PyObject *gPyImgui_PopStyleColor(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
-/* Loading a font rebuilds the shared font atlas texture (ImGui_ImplOpenGL3_CreateFontsTexture),
- * which is only safe between frames, not mid Begin/End -- call this once (e.g. from a
- * component's start()), not every update() tick. */
+/* The atlas is locked while Python runs, so the font is queued and built before the next frame.
+ * The returned id is final; push_font() with it uses the current font until then. */
 static PyObject *gPyImgui_LoadFont(PyObject *, PyObject *args)
 {
 	const char *path;
@@ -380,18 +381,104 @@ static PyObject *gPyImgui_LoadFont(PyObject *, PyObject *args)
 	if (!PyArg_ParseTuple(args, "sf:load_font", &path, &size)) {
 		return nullptr;
 	}
-
-	ImGuiIO &io = ImGui::GetIO();
-	ImFont *font = io.Fonts->AddFontFromFileTTF(path, size);
-	if (!font) {
+	if (!(size >= 6.0f && size <= 96.0f)) {
+		PyErr_SetString(PyExc_ValueError, "load_font: size must be between 6 and 96");
+		return nullptr;
+	}
+	ImFileHandle file = ImFileOpen(path, "rb");
+	if (!file) {
 		PyErr_Format(PyExc_IOError, "load_font: failed to load font '%s'", path);
 		return nullptr;
 	}
-	io.Fonts->Build();
-	ImGui_ImplOpenGL3_CreateFontsTexture();
+	ImFileClose(file);
+	return PyLong_FromLong(KX_Imgui::RequestFileFont(path, size));
+}
 
-	int fontId = io.Fonts->Fonts.Size - 1;
+/* Engine font (Roboto + ForkAwesome icons) at another pixel size. The atlas is locked while
+ * Python runs, so a new size is built before the next frame: returns None until then. */
+static PyObject *gPyImgui_LoadDefaultFont(PyObject *, PyObject *args)
+{
+	float size;
+	if (!PyArg_ParseTuple(args, "f:load_default_font", &size)) {
+		return nullptr;
+	}
+	if (!(size >= 6.0f && size <= 96.0f)) {
+		PyErr_SetString(PyExc_ValueError, "load_default_font: size must be between 6 and 96");
+		return nullptr;
+	}
+	const int fontId = KX_Imgui::RequestDefaultFont(size);
+	if (fontId < 0) {
+		Py_RETURN_NONE;
+	}
 	return PyLong_FromLong(fontId);
+}
+
+/* push_style_var(idx, value) for float vars, push_style_var(idx, x, y) for ImVec2 vars. */
+static PyObject *gPyImgui_PushStyleVar(PyObject *, PyObject *args)
+{
+	int idx;
+	float x;
+	float y = NAN;
+	if (!PyArg_ParseTuple(args, "if|f:push_style_var", &idx, &x, &y)) {
+		return nullptr;
+	}
+	if (idx < 0 || idx >= ImGuiStyleVar_COUNT) {
+		PyErr_SetString(PyExc_ValueError, "push_style_var: invalid style var");
+		return nullptr;
+	}
+	const bool isVec2 = idx == ImGuiStyleVar_WindowPadding || idx == ImGuiStyleVar_WindowMinSize ||
+	                    idx == ImGuiStyleVar_WindowTitleAlign || idx == ImGuiStyleVar_FramePadding ||
+	                    idx == ImGuiStyleVar_ItemSpacing || idx == ImGuiStyleVar_ItemInnerSpacing ||
+	                    idx == ImGuiStyleVar_CellPadding || idx == ImGuiStyleVar_ButtonTextAlign ||
+	                    idx == ImGuiStyleVar_SelectableTextAlign;
+	if (isVec2 != !std::isnan(y)) {
+		PyErr_SetString(PyExc_TypeError, isVec2 ? "push_style_var: this style var needs (idx, x, y)"
+		                                        : "push_style_var: this style var needs (idx, value)");
+		return nullptr;
+	}
+	if (isVec2) {
+		ImGui::PushStyleVar(idx, ImVec2(x, y));
+	}
+	else {
+		ImGui::PushStyleVar(idx, x);
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyImgui_PopStyleVar(PyObject *, PyObject *args)
+{
+	int count = 1;
+	if (!PyArg_ParseTuple(args, "|i:pop_style_var", &count)) {
+		return nullptr;
+	}
+	ImGui::PopStyleVar(count);
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyImgui_PushItemWidth(PyObject *, PyObject *args)
+{
+	float width;
+	if (!PyArg_ParseTuple(args, "f:push_item_width", &width)) {
+		return nullptr;
+	}
+	ImGui::PushItemWidth(width);
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyImgui_PopItemWidth(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	ImGui::PopItemWidth();
+	Py_RETURN_NONE;
+}
+
+static PyObject *gPyImgui_SetNextItemWidth(PyObject *, PyObject *args)
+{
+	float width;
+	if (!PyArg_ParseTuple(args, "f:set_next_item_width", &width)) {
+		return nullptr;
+	}
+	ImGui::SetNextItemWidth(width);
+	Py_RETURN_NONE;
 }
 
 static PyObject *gPyImgui_PushFont(PyObject *, PyObject *args)
@@ -401,11 +488,12 @@ static PyObject *gPyImgui_PushFont(PyObject *, PyObject *args)
 		return nullptr;
 	}
 	ImGuiIO &io = ImGui::GetIO();
-	if (fontId < 0 || fontId >= io.Fonts->Fonts.Size) {
+	if (fontId < 0 || fontId >= io.Fonts->Fonts.Size + KX_Imgui::PendingFontCount()) {
 		PyErr_SetString(PyExc_ValueError, "push_font: invalid font id");
 		return nullptr;
 	}
-	ImGui::PushFont(io.Fonts->Fonts[fontId]);
+	// A font queued by load_font() is built before the next frame; keep push/pop balanced until then.
+	ImGui::PushFont(fontId < io.Fonts->Fonts.Size ? io.Fonts->Fonts[fontId] : ImGui::GetFont());
 	Py_RETURN_NONE;
 }
 
@@ -586,7 +674,17 @@ static struct PyMethodDef imgui_methods[] = {
     {"pop_style_color", (PyCFunction)gPyImgui_PopStyleColor, METH_VARARGS,
      "pop_style_color(count=1)"},
     {"load_font", (PyCFunction)gPyImgui_LoadFont, METH_VARARGS,
-     "load_font(path, size) -> font_id -- call once (e.g. from start()), not every frame"},
+     "load_font(path, size) -> font_id -- call once; the font is built before the next frame"},
+    {"load_default_font", (PyCFunction)gPyImgui_LoadDefaultFont, METH_VARARGS,
+     "load_default_font(size) -> font_id or None -- engine font with icons; None until built next frame"},
+    {"push_style_var", (PyCFunction)gPyImgui_PushStyleVar, METH_VARARGS,
+     "push_style_var(idx, value) or push_style_var(idx, x, y) -- idx is one of imgui.STYLE_*"},
+    {"pop_style_var", (PyCFunction)gPyImgui_PopStyleVar, METH_VARARGS, "pop_style_var(count=1)"},
+    {"push_item_width", (PyCFunction)gPyImgui_PushItemWidth, METH_VARARGS,
+     "push_item_width(width) -- >0 pixels, <0 right-aligned to the window edge (-1 = full width)"},
+    {"pop_item_width", (PyCFunction)gPyImgui_PopItemWidth, METH_NOARGS, "pop_item_width()"},
+    {"set_next_item_width", (PyCFunction)gPyImgui_SetNextItemWidth, METH_VARARGS,
+     "set_next_item_width(width) -- same convention as push_item_width, next widget only"},
     {"push_font", (PyCFunction)gPyImgui_PushFont, METH_VARARGS, "push_font(font_id)"},
     {"pop_font", (PyCFunction)gPyImgui_PopFont, METH_NOARGS, "pop_font()"},
     {"get_display_size", (PyCFunction)gPyImgui_GetDisplaySize, METH_NOARGS,
@@ -669,11 +767,27 @@ static void PyImgui_AddCondConstants(PyObject *m)
 	PyModule_AddIntConstant(m, "COND_APPEARING", ImGuiCond_Appearing);
 }
 
+static void PyImgui_AddStyleConstants(PyObject *m)
+{
+	PyModule_AddIntConstant(m, "STYLE_ALPHA", ImGuiStyleVar_Alpha);
+	PyModule_AddIntConstant(m, "STYLE_WINDOW_PADDING", ImGuiStyleVar_WindowPadding);
+	PyModule_AddIntConstant(m, "STYLE_WINDOW_ROUNDING", ImGuiStyleVar_WindowRounding);
+	PyModule_AddIntConstant(m, "STYLE_WINDOW_BORDER_SIZE", ImGuiStyleVar_WindowBorderSize);
+	PyModule_AddIntConstant(m, "STYLE_WINDOW_TITLE_ALIGN", ImGuiStyleVar_WindowTitleAlign);
+	PyModule_AddIntConstant(m, "STYLE_FRAME_PADDING", ImGuiStyleVar_FramePadding);
+	PyModule_AddIntConstant(m, "STYLE_FRAME_ROUNDING", ImGuiStyleVar_FrameRounding);
+	PyModule_AddIntConstant(m, "STYLE_FRAME_BORDER_SIZE", ImGuiStyleVar_FrameBorderSize);
+	PyModule_AddIntConstant(m, "STYLE_ITEM_SPACING", ImGuiStyleVar_ItemSpacing);
+	PyModule_AddIntConstant(m, "STYLE_GRAB_ROUNDING", ImGuiStyleVar_GrabRounding);
+	PyModule_AddIntConstant(m, "STYLE_BUTTON_TEXT_ALIGN", ImGuiStyleVar_ButtonTextAlign);
+}
+
 PyMODINIT_FUNC initImguiPythonBinding()
 {
 	PyObject *m = PyModule_Create(&Imgui_module_def);
 	PyImgui_AddColorConstants(m);
 	PyImgui_AddCondConstants(m);
+	PyImgui_AddStyleConstants(m);
 	PyDict_SetItemString(PySys_GetObject("modules"), Imgui_module_def.m_name, m);
 	return m;
 }

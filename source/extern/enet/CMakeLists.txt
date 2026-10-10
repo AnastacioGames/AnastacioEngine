@@ -1,61 +1,38 @@
-# ENet (https://github.com/lsalzman/enet), MIT license, see LICENSE.
+# ENet fork with real IPv6 support (https://github.com/zpl-c/enet), MIT license, see LICENSE.
+# Single-header library: enet_impl.c is the one translation unit that defines
+# ENET_IMPLEMENTATION and pulls in include/enet/enet.h's implementation.
 # Library target: extern_enet. Plain CMake so it also builds in the standalone network build.
-
-include(CheckFunctionExists)
-include(CheckStructHasMember)
-include(CheckTypeSize)
 
 set(ENET_DEFS)
 if(WIN32)
 	list(APPEND ENET_DEFS _WINSOCK_DEPRECATED_NO_WARNINGS _CRT_SECURE_NO_WARNINGS)
+endif()
+
+# The fork defaults to dual-stack (IPv6 socket, IPv4-mapped): ENetAddress.host becomes a
+# 16-byte in6_addr. The engine doesn't expose IPv6 in the net.host/net.join API yet (see
+# NOTES-engine.md, "IPv6 no ENet/UDP"), and some build/test environments have no IPv6 stack
+# at all (AF_INET6 unavailable), so default to IPv4-only for now -- same ENetAddress layout
+# and behavior as the previous vendor. Flip this once the API/test work for IPv6 is done.
+option(ENET_IPV4_ONLY "Build ENet in IPv4-only mode (no dual-stack IPv6)" ON)
+if(ENET_IPV4_ONLY)
+	list(APPEND ENET_DEFS ENET_IPV4_ONLY)
 else()
-	check_function_exists("fcntl" HAS_FCNTL)
-	check_function_exists("poll" HAS_POLL)
-	check_function_exists("getaddrinfo" HAS_GETADDRINFO)
-	check_function_exists("getnameinfo" HAS_GETNAMEINFO)
-	check_function_exists("gethostbyname_r" HAS_GETHOSTBYNAME_R)
-	check_function_exists("gethostbyaddr_r" HAS_GETHOSTBYADDR_R)
-	check_function_exists("inet_pton" HAS_INET_PTON)
-	check_function_exists("inet_ntop" HAS_INET_NTOP)
-	check_struct_has_member("struct msghdr" "msg_flags" "sys/types.h;sys/socket.h" HAS_MSGHDR_FLAGS)
-	set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h" "sys/socket.h")
-	check_type_size("socklen_t" HAS_SOCKLEN_T BUILTIN_TYPES_ONLY)
-	unset(CMAKE_EXTRA_INCLUDE_FILES)
-	foreach(_def
-		HAS_FCNTL HAS_POLL HAS_GETADDRINFO HAS_GETNAMEINFO HAS_GETHOSTBYNAME_R
-		HAS_GETHOSTBYADDR_R HAS_INET_PTON HAS_INET_NTOP HAS_MSGHDR_FLAGS HAS_SOCKLEN_T)
-		if(${_def})
-			list(APPEND ENET_DEFS ${_def}=1)
-		endif()
-	endforeach()
+	# Dual-stack: use the fork's IPv6-aware address functions (set_host/get_host resolve and
+	# format AF_INET6 too). Without this the macros fall back to the AF_INET-only *_old
+	# variants, so an IPv6 literal like "::1" never resolves on the dual-stack socket.
+	list(APPEND ENET_DEFS ENET_FEATURE_ADDRESS_MAPPING)
 endif()
 
 set(SRC
-	callbacks.c
-	compress.c
-	host.c
-	list.c
-	packet.c
-	peer.c
-	protocol.c
-	unix.c
-	win32.c
+	enet_impl.c
 
-	include/enet/callbacks.h
 	include/enet/enet.h
-	include/enet/list.h
-	include/enet/protocol.h
-	include/enet/time.h
-	include/enet/types.h
-	include/enet/unix.h
-	include/enet/utility.h
-	include/enet/win32.h
 )
 
 add_library(extern_enet STATIC ${SRC})
 set_target_properties(extern_enet PROPERTIES LINKER_LANGUAGE C)
 target_include_directories(extern_enet SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_definitions(extern_enet PRIVATE ${ENET_DEFS})
+target_compile_definitions(extern_enet PUBLIC ${ENET_DEFS})
 if(WIN32)
 	target_link_libraries(extern_enet PUBLIC ws2_32 winmm)
 endif()

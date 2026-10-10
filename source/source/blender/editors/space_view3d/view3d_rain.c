@@ -168,7 +168,8 @@ static void draw_bolt(World *world, RegionView3D *rv3d)
 	const float clip_end = rv3d->is_persp ? rv3d->winmat[3][2] / (rv3d->winmat[2][2] + 1.0f) : 0.0f;
 	RainLightningBolt bolt;
 	BKE_rain_lightning_view_bolt(seed, rv3d->viewinv, clip_end,
-	                             world->rain_lightning_distance, world->rain_lightning_width, &bolt);
+	                             world->rain_lightning_distance, world->rain_lightning_width,
+	                             (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &bolt);
 	draw_bolt_geometry(&bolt, bright, color, rv3d->viewinv[3]);
 }
 

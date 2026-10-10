@@ -1796,6 +1796,11 @@ endif()
 # Blender Player
 if(WITH_PLAYER)
 	add_subdirectory(source/blenderplayer)
+	if(WIN32 AND TARGET RangeEngine AND NOT WITH_PYTHON_MODULE)
+		# The editor's POST_BUILD installs all targets, including the player.
+		# Finish the player link before that install reads its executable.
+		add_dependencies(RangeEngine RangeRuntime)
+	endif()
 endif()
 
 

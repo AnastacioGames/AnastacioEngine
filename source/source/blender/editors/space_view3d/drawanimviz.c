@@ -34,6 +34,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_object_types.h"
+#include "DNA_userdef_types.h"
 
 #include "BLI_math.h"
 #include "BLI_dlrbTree.h"
@@ -65,6 +66,13 @@ void draw_motion_paths_init(View3D *v3d, ARegion *ar)
 
 	glPushMatrix();
 	glLoadMatrixf(rv3d->viewmat);
+
+	/* smooth path line and round frame/key dots */
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT);
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 /* set color
@@ -350,7 +358,7 @@ void draw_motion_path_instance(Scene *scene,
 			glPointSize(mpath->line_thickness + 3.0);
 		}
 		else {
-			glPointSize(4.0f);
+			glPointSize(6.0f * U.pixelsize);
 		}
 		glColor3ubv(col);
 
@@ -389,6 +397,8 @@ void draw_motion_path_instance(Scene *scene,
 /* Clean up drawing environment after drawing motion paths */
 void draw_motion_paths_cleanup(View3D *v3d)
 {
+	glPopAttrib();
+	glPointSize(1.0f);
 	if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 	glPopMatrix();
 }

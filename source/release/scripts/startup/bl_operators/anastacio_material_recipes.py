@@ -2,12 +2,14 @@
 # Cada receita funciona nos dois caminhos do Game: PBR (Shading Nodes ligado, nós do Cycles) e
 # legado (nós do Blender Internal). Os nós criados recebem nomes "AE_*" para o painel achá-los depois.
 
+import math
 import os
 import re
 
 import bpy
 from bpy.types import Operator
-from bpy.props import EnumProperty, FloatProperty, IntProperty, StringProperty, CollectionProperty
+from bpy.props import (
+    BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty, CollectionProperty)
 
 
 RECIPE_KEY = "anastacio_recipe"
@@ -15,6 +17,7 @@ LAYERS = ("AE_layer_base", "AE_layer_r", "AE_layer_g", "AE_layer_b")
 LAYER_LABELS = ("Base (black)", "Red", "Green", "Blue")
 MASK = "AE_mask"
 MAPPING = "AE_mapping"
+WET_MASK = "AE_wet_mask"
 
 # Sufixos comuns dos pacotes de textura (Poly Haven, ambientCG, Substance, Quixel...).
 MAP_WORDS = (
@@ -30,6 +33,32 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".bmp", ".dds", 
 
 def use_pbr(context):
     return context.scene.render.use_shading_nodes
+
+
+SHADING_MODES = (
+    ('AUTO', "Scene Setting", "Build for whatever PBR Shading Nodes is set to right now"),
+    ('PBR', "PBR", "Cycles-style nodes (Principled); turns PBR Shading Nodes on"),
+    ('LEGACY', "Classic", "Blender Internal nodes; turns PBR Shading Nodes off"),
+)
+
+
+def resolve_pbr(context, mode):
+    """Diz para que caminho montar o grafo e, se preciso, alinha a cena.
+
+    O toggle da cena é quem escolhe o caminho de desenho (GPU_material_from_blender chama
+    ntreeGPUMaterialNodes com NODE_NEW_SHADING ou NODE_OLD_SHADING conforme ele), então montar
+    nós de um modo com a cena no outro dá um material que simplesmente não aparece. Por isso
+    pedir um modo explícito também ajusta a cena. Devolve (pbr, mudou_a_cena).
+    """
+    if mode == 'AUTO':
+        return use_pbr(context), False
+    want = (mode == 'PBR')
+    # render.use_shading_nodes é derivado e somente leitura; o gravável é o do game_settings.
+    gs = context.scene.game_settings
+    switched = gs.use_shading_nodes != want
+    if switched:
+        gs.use_shading_nodes = want
+    return want, switched
 
 
 def classify(filename):
@@ -147,6 +176,28 @@ class TreeBuilder:
 
     def link(self, a, b):
         self.links.new(a, b)
+
+    def frame(self, label, nodes):
+        """Agrupa nós dentro de um Frame (caixa com título) para organizar o editor de nós."""
+        f = self.add("NodeFrame", 0, 0, label=label)
+        f.label_size = 18
+        for n in nodes:
+            n.parent = f
+        return f
+
+    def note(self, label, body, x, y, width=380, height=140):
+        """Caixa só com texto (sem nós dentro), para explicar o grafo no editor de nós.
+        O Frame do Blender mostra o conteúdo de um Text (bpy.data.texts) dentro dele."""
+        f = self.add("NodeFrame", x, y, label=label)
+        f.label_size = 16
+        f.shrink = False
+        f.width = width
+        f.height = height
+        name = "AE_Note_" + label
+        txt = bpy.data.texts.get(name) or bpy.data.texts.new(name)
+        txt.from_string(body)
+        f.text = txt
+        return f
 
     # Imagem: no PBR é o Image Texture; no legado é o nó Texture com um Texture do tipo Image.
     def image(self, pbr, img, x, y, name=None, label=None, data=False):
@@ -355,6 +406,95 @@ def build_mask_blend(mat, pbr, scale, mask_img, layers=None):
             b.link(normal, mnode.inputs["Normal"])
 
 
+def build_wet_patches(mat, pbr, scale, mask_img):
+    b = TreeBuilder(mat)
+    uv_raw = b.uv(pbr, -1500, 0)
+    uv = b.mapping(uv_raw, scale, -1250, 250)
+
+    mask, mask_color = b.image(pbr, mask_img, -1250, -250, WET_MASK, "Wet Mask (paint white)")
+    b.link(uv_raw, mask.inputs["Vector"])
+    sep = b.add("ShaderNodeSeparateRGB", -1000, -250)
+    b.link(mask_color, sep.inputs["Image"])
+    fac = sep.outputs["R"]
+
+    asphalt = b.add("ShaderNodeTexNoise", -1000, 350, "AE_asphalt_noise", "Asphalt Grain")
+    asphalt.inputs["Scale"].default_value = 55.0
+    asphalt.inputs["Detail"].default_value = 12.0
+    b.link(uv, asphalt.inputs["Vector"])
+
+    asphalt_color = b.add("ShaderNodeValToRGB", -760, 350, "AE_asphalt_color", "Asphalt Color")
+    asphalt_color.color_ramp.elements[0].position = 0.22
+    asphalt_color.color_ramp.elements[0].color = (0.035, 0.038, 0.04, 1.0)
+    asphalt_color.color_ramp.elements[1].position = 1.0
+    asphalt_color.color_ramp.elements[1].color = (0.22, 0.23, 0.22, 1.0)
+    b.link(asphalt.outputs["Fac"], asphalt_color.inputs["Fac"])
+
+    wet_tint = b.add("ShaderNodeMixRGB", -500, 320, "AE_wet_tint", "Wet Patch Darkens Surface")
+    wet_tint.blend_type = 'MIX'
+    wet_tint.inputs["Color2"].default_value = (0.015, 0.025, 0.035, 1.0)
+    b.link(fac, wet_tint.inputs["Fac"])
+    b.link(asphalt_color.outputs["Color"], wet_tint.inputs["Color1"])
+
+    rough = b.add("ShaderNodeMixRGB", -500, 40, "AE_wet_roughness", "Roughness: dry to wet")
+    rough.inputs["Color1"].default_value = (0.82, 0.82, 0.82, 1.0)
+    rough.inputs["Color2"].default_value = (0.025, 0.025, 0.025, 1.0)
+    b.link(fac, rough.inputs["Fac"])
+
+    wet_noise = b.add("ShaderNodeTexNoise", -760, -520, "AE_wet_micro_detail", "Wet Micro Detail")
+    wet_noise.inputs["Scale"].default_value = 95.0
+    wet_noise.inputs["Detail"].default_value = 8.0
+    b.link(uv, wet_noise.inputs["Vector"])
+
+    asphalt_bump = b.add("ShaderNodeBump", -260, -300, "AE_asphalt_bump", "Asphalt Bump")
+    asphalt_bump.inputs["Strength"].default_value = 0.06
+    asphalt_bump.inputs["Distance"].default_value = 0.055
+    b.link(asphalt.outputs["Fac"], asphalt_bump.inputs["Height"])
+
+    wet_bump = b.add("ShaderNodeBump", -260, -560, "AE_wet_bump", "Wet Smooth Bump")
+    wet_bump.inputs["Strength"].default_value = 0.018
+    wet_bump.inputs["Distance"].default_value = 0.018
+    b.link(wet_noise.outputs["Fac"], wet_bump.inputs["Height"])
+
+    normal_mix = b.add("ShaderNodeMixRGB", 0, -420, "AE_wet_normal_mix", "Mask mixes dry/wet normal")
+    b.link(fac, normal_mix.inputs["Fac"])
+    b.link(asphalt_bump.outputs["Normal"], normal_mix.inputs["Color1"])
+    b.link(wet_bump.outputs["Normal"], normal_mix.inputs["Color2"])
+
+    if pbr:
+        bsdf = b.pbr_output(260, 0)
+        b.link(wet_tint.outputs["Color"], bsdf.inputs["Base Color"])
+        b.link(rough.outputs["Color"], bsdf.inputs["Roughness"])
+        b.link(normal_mix.outputs["Color"], bsdf.inputs["Normal"])
+    else:
+        mnode = b.legacy_output(mat, 260, 0)
+        base = mnode.material
+        base.diffuse_color = (0.08, 0.085, 0.08)
+        base.specular_intensity = 0.95
+        base.specular_hardness = 420
+        base.specular_roughness_bsdf = 0.04
+        b.link(wet_tint.outputs["Color"], mnode.inputs["Color"])
+        inv = b.add("ShaderNodeInvert", 0, 40)
+        b.link(rough.outputs["Color"], inv.inputs["Color"])
+        b.link(inv.outputs["Color"], mnode.inputs["Spec"])
+        b.link(normal_mix.outputs["Color"], mnode.inputs["Normal"])
+
+    # Organiza o grafo em caixas (Frames) e deixa uma nota explicando a receita.
+    uv_node = uv_raw.node
+    b.frame("UV / Tiling", [uv_node, b.nodes[MAPPING]])
+    b.frame("Wet Mask (pinte branco = poça)", [mask, sep])
+    b.frame("Asfalto Procedural", [asphalt, asphalt_color])
+    b.frame("Mistura Seco / Molhado", [wet_tint, rough, wet_noise, asphalt_bump, wet_bump, normal_mix])
+    b.note(
+        "Como usar",
+        "Pinte BRANCO na mascara 'Wet Mask' para marcar poca/mancha\n"
+        "molhada (barro, oleo ou agua); PRETO volta ao asfalto seco.\n"
+        "Use o botao 'Paint the Mask' no painel: ele ja troca o pincel\n"
+        "para branco e da uma borda irregular (nao um circulo perfeito),\n"
+        "para parecer poca/mancha de verdade em vez de um disco liso.",
+        -1250, 650, width=620, height=260,
+    )
+
+
 def get_tiling(mapping):
     # Neste fork a escala do Mapping é uma entrada (socket); no 2.79 original, uma propriedade.
     if "Scale" in mapping.inputs:
@@ -367,6 +507,19 @@ def set_tiling(mapping, value):
         mapping.inputs["Scale"].default_value = (value, value, value)
     else:
         mapping.scale = (value, value, value)
+
+
+def set_mapping(mapping, translation, rotation, scale):
+    """Preenche um nó Mapping nas duas formas que ele já teve: sockets (Location/
+    Rotation/Scale) no nó atual, propriedades no antigo."""
+    if "Location" in mapping.inputs:
+        mapping.inputs["Location"].default_value = translation
+        mapping.inputs["Rotation"].default_value = rotation
+        mapping.inputs["Scale"].default_value = scale
+    else:
+        mapping.translation = translation
+        mapping.rotation = rotation
+        mapping.scale = scale
 
 
 def find_node(mat, name):
@@ -451,6 +604,42 @@ class MATERIAL_OT_recipe_mask_blend(Operator):
         return {'FINISHED'}
 
 
+class MATERIAL_OT_recipe_wet_patches(Operator):
+    """Asphalt material with a paintable wet mask: paint white where reflective wet patches should appear"""
+    bl_idname = "material.recipe_wet_patches"
+    bl_label = "Wet/Reflective Patches"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    tiling: FloatProperty(name="Surface Tiling", description="How many times the surface grain repeats over the UV",
+                           default=12.0, min=0.01, soft_max=256.0)
+    mask_size: IntProperty(name="Mask Size", description="Resolution of the wet/reflection mask image to paint",
+                            default=1024, min=64, max=8192)
+    shading: EnumProperty(name="Shading", description="Which of the two shading paths to build the nodes for",
+                           items=SHADING_MODES, default='AUTO')
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'MESH'
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        ob = context.object
+        pbr, switched = resolve_pbr(context, self.shading)
+        mat = target_material(context, ob.name + " Wet Surface")
+        mask = bpy.data.images.new(mat.name + " Wet Mask", self.mask_size, self.mask_size)
+        mask.generated_color = (0.0, 0.0, 0.0, 1.0)
+        mask.colorspace_settings.name = 'Non-Color'
+        build_wet_patches(mat, pbr, self.tiling, mask)
+        mat[RECIPE_KEY] = "wet_patches"
+        if switched:
+            self.report({'INFO'}, "PBR Shading Nodes was turned %s to match" % ("on" if pbr else "off"))
+        if ensure_uv(ob):
+            self.report({'WARNING'}, "The mesh had no UV map: one was created with Smart UV Project")
+        return {'FINISHED'}
+
+
 class MATERIAL_OT_recipe_layer_set(Operator):
     """Pick one texture of a set for this layer: its normal and roughness are found by name and connected too"""
     bl_idname = "material.recipe_layer_set"
@@ -492,6 +681,32 @@ class MATERIAL_OT_recipe_layer_set(Operator):
         return {'FINISHED'}
 
 
+def ensure_puddle_brush_texture():
+    """Textura 'Nuvens' para o pincel: dá borda irregular (poça), não um círculo perfeito.
+    Girando/redimensionando essa textura no pincel (R/S em modo pintura) muda o formato."""
+    tex = bpy.data.textures.get("AE_Puddle_Shape")
+    if tex is None:
+        tex = bpy.data.textures.new("AE_Puddle_Shape", 'CLOUDS')
+        tex.noise_basis = 'BLENDER_ORIGINAL'
+        tex.noise_scale = 0.6
+        tex.intensity = 1.3
+        tex.contrast = 2.2
+    return tex
+
+
+def apply_puddle_brush(context, color):
+    ip = context.scene.tool_settings.image_paint
+    brush = ip.brush
+    if not brush:
+        return
+    brush.color = color
+    brush.use_alpha = True
+    brush.texture = ensure_puddle_brush_texture()
+    # TILED: a textura acompanha o pincel no cursor (dá a borda irregular em cada
+    # pincelada); diferente de STENCIL, que fica fixa e grande sobre a 3D view.
+    brush.texture_slot.map_mode = 'TILED'
+
+
 class MATERIAL_OT_recipe_paint_mask(Operator):
     """Enter Texture Paint on the blend mask: paint red, green or blue to show each layer, black for the base"""
     bl_idname = "material.recipe_paint_mask"
@@ -499,20 +714,33 @@ class MATERIAL_OT_recipe_paint_mask(Operator):
 
     @classmethod
     def poll(cls, context):
-        return node_image(find_node(active_material(context), MASK)) is not None
+        mat = active_material(context)
+        return (node_image(find_node(mat, MASK)) is not None or
+                node_image(find_node(mat, WET_MASK)) is not None)
 
     def execute(self, context):
         mat = active_material(context)
-        img = node_image(find_node(mat, MASK))
+        img = node_image(find_node(mat, WET_MASK)) or node_image(find_node(mat, MASK))
         ip = context.scene.tool_settings.image_paint
         ip.mode = 'IMAGE'
         ip.canvas = img
+        if context.object.mode == 'EDIT':
+            bpy.ops.object.mode_set(mode='OBJECT')
         if context.object.mode != 'TEXTURE_PAINT':
+            if not bpy.ops.paint.texture_paint_toggle.poll():
+                self.report({'ERROR'}, "Can't enter Texture Paint on this object (needs to be a mesh, "
+                                        "not linked, and out of Edit Mode)")
+                return {'CANCELLED'}
             bpy.ops.paint.texture_paint_toggle()
-        brush = ip.brush
-        if brush:
-            brush.color = (1.0, 0.0, 0.0)
-        self.report({'INFO'}, "Red, green and blue show layers; black shows the base. Save the mask image when done")
+        if mat.get(RECIPE_KEY) == "wet_patches":
+            apply_puddle_brush(context, (1.0, 1.0, 1.0))
+            self.report({'INFO'}, "Paint white for wet/reflective patches, black for dry. The brush edge is "
+                                   "irregular (puddle-shaped) instead of a perfect circle")
+        else:
+            brush = ip.brush
+            if brush:
+                brush.color = (1.0, 0.0, 0.0)
+            self.report({'INFO'}, "Red, green and blue show layers; black shows the base. Save the mask image when done")
         return {'FINISHED'}
 
 
@@ -690,12 +918,314 @@ def build_legacy_preset(mat, preset, color, metal, rough, alpha, emit):
         b.link(pw.outputs["Value"], a.inputs[1])
         b.link(a.outputs["Value"], out.inputs["Alpha"])
 
+# ---------------------------------------------------------------------------
+# Converter material do jeito antigo (slots de textura) para nós PBR
+# ---------------------------------------------------------------------------
+
+# Que papel cada "Influence" do slot cumpre no grafo novo. A ordem importa: é a ordem
+# em que os slots são lidos e empilhados.
+SLOT_ROLES = (
+    ("use_map_color_diffuse", "color"),
+    ("use_map_normal", "normal"),
+    ("use_map_specular", "specular"),
+    ("use_map_hardness", "roughness"),
+    ("use_map_alpha", "alpha"),
+    ("use_map_emit", "emit"),
+)
+
+
+def legacy_slots(mat):
+    """Slots de textura ligados do material, como (slot, imagem ou None, [papéis])."""
+    out = []
+    for i, slot in enumerate(mat.texture_slots):
+        if slot is None or not mat.use_textures[i] or slot.texture is None:
+            continue
+        roles = [role for prop, role in SLOT_ROLES if getattr(slot, prop, False)]
+        if not roles:
+            continue
+        tex = slot.texture
+        img = tex.image if tex.type == 'IMAGE' else None
+        out.append((slot, img, roles))
+    return out
+
+
+def build_pbr_from_legacy(mat):
+    """Monta um grafo Principled a partir dos slots de textura do material.
+
+    Devolve (trazidos, ignorados): nomes de textura que entraram no grafo e os que não
+    deram (texturas procedurais do BI não têm equivalente direto em nó do Cycles).
+    """
+    slots = legacy_slots(mat)
+    b = TreeBuilder(mat)
+
+    bsdf = b.add("ShaderNodeBsdfPrincipled", 300, 0)
+    out = b.add("ShaderNodeOutputMaterial", 900, 0)
+
+    # Valores do material entram como ponto de partida; textura, quando houver, sobrescreve.
+    # O BI multiplica a cor pelo Intensity; sem isso o cubo padrão (0.8 x 0.8) clareia.
+    k = mat.diffuse_intensity
+    bsdf.inputs["Base Color"].default_value = tuple(c * k for c in mat.diffuse_color) + (1.0,)
+    # Metallic/Roughness BSDF só valem com os shaders GGX/Lambert Custom. Todo material
+    # nasce com metallic_bsdf = 0.5 (BKE_material_init), então copiar sem checar deixava
+    # o cubo padrão meio metálico: escuro e espelhado.
+    if mat.specular_shader == 'GGX' or mat.diffuse_shader == 'LAMBERT_CUSTOM':
+        metallic = mat.specular_metallic_bsdf
+        roughness = mat.specular_roughness_bsdf
+    else:
+        # Hardness do Phong/CookTorr para roughness (aprox. Blinn-Phong <-> Beckmann).
+        metallic = 0.0
+        roughness = math.sqrt(2.0 / (mat.specular_hardness + 2.0))
+    bsdf.inputs["Metallic"].default_value = metallic
+    bsdf.inputs["Roughness"].default_value = max(roughness, 0.02)
+    bsdf.inputs["Specular"].default_value = min(mat.specular_intensity, 1.0)
+
+    coords = {}
+
+    def coord_source(slot):
+        """Fonte de coordenada do slot, reaproveitada entre slots que usam a mesma."""
+        key = (slot.texture_coords, slot.uv_layer)
+        if key not in coords:
+            y = 400 - 220 * len(coords)
+            if slot.texture_coords == 'UV' and slot.uv_layer:
+                n = b.add("ShaderNodeUVMap", -1500, y, label="UV: " + slot.uv_layer)
+                n.uv_map = slot.uv_layer
+                coords[key] = n.outputs["UV"]
+            elif slot.texture_coords in {'REFLECTION', 'NORMAL'}:
+                # Matcap e afins: o BI usa o vetor em espaço de câmera e remapeia de -1..1
+                # para 0..1 (mtex_2d_mapping). O Texture Coordinate devolve em espaço de
+                # mundo, então volta para câmera e aplica o mesmo remapeamento.
+                n = b.add("ShaderNodeTexCoord", -1900, y)
+                vt = b.add("ShaderNodeVectorTransform", -1700, y,
+                           label=slot.texture_coords.title() + " (camera)")
+                vt.vector_type = 'NORMAL' if slot.texture_coords == 'NORMAL' else 'VECTOR'
+                vt.convert_from = 'WORLD'
+                vt.convert_to = 'CAMERA'
+                if slot.texture_coords == 'NORMAL':
+                    geo = b.add("ShaderNodeNewGeometry", -1900, y - 200)
+                    b.link(geo.outputs["Normal"], vt.inputs["Vector"])
+                else:
+                    b.link(n.outputs["Reflection"], vt.inputs["Vector"])
+                m = b.add("ShaderNodeMapping", -1500, y, label="-1..1 -> 0..1")
+                m.vector_type = 'POINT'
+                set_mapping(m, (0.5, 0.5, 0.0), (0.0, 0.0, 0.0), (0.5, 0.5, 1.0))
+                b.link(vt.outputs["Vector"], m.inputs["Vector"])
+                coords[key] = m.outputs["Vector"]
+            else:
+                n = b.add("ShaderNodeTexCoord", -1500, y)
+                coords[key] = n.outputs["Generated" if slot.texture_coords == 'ORCO' else "UV"]
+        return coords[key]
+
+    def place(slot, node, y):
+        """Liga a coordenada no nó de imagem com o Offset/Size/Rotation do painel.
+
+        O shader do jogo faz (gpu_shader_material.glsl, mtex_mapping_transform):
+
+            out = R(rot) * (co - 0.5) * size + 0.5 + ofs      # gira, depois escala
+
+        Já um Mapping -- tanto o nó quanto o texture_mapping embutido do nó de imagem,
+        que BKE_texture_mapping_init monta como loc*rot*size -- faz o contrário:
+
+            out = loc + R(rot) * (size * co)                  # escala, depois gira
+
+        Os dois batem quando a rotação e a escala comutam: sem rotação, ou com escala
+        igual em X e Y. Aí a conta toda cabe numa matriz só, com
+        loc = (ofs + 0.5) - R*(0.5*size), e vale a pena usar o texture_mapping do
+        próprio nó em vez de um nó Mapping separado: o modo Texture da 3D view não roda
+        GLSL, ele só carrega essa matriz (drawmesh.c, tex_mat_set_texture_cb), então
+        mapping que mora num nó à parte simplesmente some ali.
+
+        Com rotação E escala diferente em X/Y não existe matriz única equivalente, e aí
+        volta a cadeia de três nós (centraliza, gira, escala+offset) para não trocar a
+        ordem e cisalhar a textura. Nesse caso o modo Texture fica sem o mapping; o modo
+        Material e o jogo continuam certos.
+        """
+        src = coord_source(slot)
+        size = tuple(slot.scale)
+        ofs = tuple(slot.offset)
+        rot = slot.rotation
+
+        if size != (1.0, 1.0, 1.0) or ofs != (0.0, 0.0, 0.0) or rot != 0.0:
+            if rot == 0.0 or abs(size[0] - size[1]) < 1e-6:
+                c, s = math.cos(rot), math.sin(rot)
+                hx, hy, hz = 0.5 * size[0], 0.5 * size[1], 0.5 * size[2]
+                tm = node.texture_mapping
+                tm.vector_type = 'POINT'
+                tm.translation = (ofs[0] + 0.5 - (hx * c - hy * s),
+                                  ofs[1] + 0.5 - (hx * s + hy * c),
+                                  ofs[2] + 0.5 - hz)
+                tm.rotation = (0.0, 0.0, rot)
+                tm.scale = size
+            else:
+                steps = [
+                    ("Centro", (-0.5, -0.5, -0.5), 0.0, (1.0, 1.0, 1.0)),
+                    ("Rotation", (0.0, 0.0, 0.0), rot, (1.0, 1.0, 1.0)),
+                    ("Offset/Size", (ofs[0] + 0.5, ofs[1] + 0.5, ofs[2] + 0.5), 0.0, size),
+                ]
+                x = -1050 - 150 * (len(steps) - 1)
+                for label, translation, rotation, scale in steps:
+                    m = b.add("ShaderNodeMapping", x, y + 150, label=label)
+                    m.vector_type = 'POINT'
+                    set_mapping(m, translation, (0.0, 0.0, rotation), scale)
+                    b.link(src, m.inputs["Vector"])
+                    src = m.outputs["Vector"]
+                    x += 150
+
+        b.link(src, node.inputs["Vector"])
+
+    brought, skipped = [], []
+    color_out = None
+    alpha_out = None
+    emit_out = None
+    row = 0
+
+    for slot, img, roles in slots:
+        if img is None:
+            skipped.append("%s (%s)" % (slot.texture.name, slot.texture.type.lower()))
+            continue
+        y = 300 - 320 * row
+        row += 1
+        # Normal/specular/roughness/alpha são dados, não cor: fora do espaço sRGB.
+        data = roles != ["color"]
+        node, img_color = b.image(True, img, -850, y, label=slot.texture.name, data=data)
+        place(slot, node, y)
+        brought.append("%s -> %s" % (slot.texture.name, "/".join(roles)))
+
+        for role in roles:
+            if role == "color":
+                first = color_out is None
+                if first and slot.blend_type == 'MIX' and slot.diffuse_color_factor >= 1.0:
+                    color_out = img_color
+                    # Nó de textura ativo: é ele que o modo Texture da 3D view desenha
+                    # (nodeGetActiveTexture) e o que o Texture Paint pinta. Sem marcar,
+                    # sobra o primeiro nó de textura da lista, que pode ser o normal map.
+                    b.tree.nodes.active = node
+                else:
+                    # Segundo slot de cor em diante: empilha com o blend do próprio slot.
+                    m = b.add("ShaderNodeMixRGB", -550, y, label="Layer: " + slot.texture.name)
+                    # Os modos do slot do BI e os do MixRGB quase coincidem; o que não existir
+                    # lá vira MIX em vez de estourar.
+                    try:
+                        m.blend_type = slot.blend_type
+                    except TypeError:
+                        m.blend_type = 'MIX'
+                    m.inputs["Fac"].default_value = slot.diffuse_color_factor
+                    if first:
+                        # Primeiro slot com Multiply/Add/fator < 1: no BI ele se mistura
+                        # com a cor do material, não a substitui.
+                        m.inputs["Color1"].default_value = bsdf.inputs["Base Color"].default_value[:]
+                        b.tree.nodes.active = node
+                    else:
+                        b.link(color_out, m.inputs["Color1"])
+                    b.link(img_color, m.inputs["Color2"])
+                    color_out = m.outputs["Color"]
+            elif role == "normal" and not getattr(slot.texture, "use_normal_map", False):
+                # Sem "Normal Map" marcado na textura o BI usa a imagem como altura (bump),
+                # mesmo que ela seja um normal map: vira nó Bump, não Normal Map.
+                bp = b.add("ShaderNodeBump", -550, y - 150, label="Bump")
+                bp.invert = slot.normal_factor < 0.0
+                bp.inputs["Strength"].default_value = min(abs(slot.normal_factor), 1.0)
+                b.link(img_color, bp.inputs["Height"])
+                b.link(bp.outputs["Normal"], bsdf.inputs["Normal"])
+            elif role == "normal":
+                nm = b.add("ShaderNodeNormalMap", -550, y - 150)
+                nm.inputs["Strength"].default_value = abs(slot.normal_factor)
+                b.link(img_color, nm.inputs["Color"])
+                b.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
+            elif role == "specular":
+                b.link(img_color, bsdf.inputs["Specular"])
+            elif role == "roughness":
+                # No BI o mapa é de Hardness: mais claro = mais liso, ou seja, roughness invertido.
+                inv = b.add("ShaderNodeInvert", -550, y - 150, label="Hardness -> Roughness")
+                b.link(img_color, inv.inputs["Color"])
+                b.link(inv.outputs["Color"], bsdf.inputs["Roughness"])
+            elif role == "alpha":
+                alpha_out = node.outputs["Alpha"] if img.depth in {32, 64, 128} else img_color
+            elif role == "emit":
+                emit_out = img_color
+
+    if color_out is not None:
+        b.link(color_out, bsdf.inputs["Base Color"])
+
+    surface = bsdf.outputs["BSDF"]
+
+    if emit_out is not None:
+        em = b.add("ShaderNodeEmission", 550, -250, label="Emit")
+        em.inputs["Strength"].default_value = max(mat.emit, 0.1)
+        b.link(emit_out, em.inputs["Color"])
+        add = b.add("ShaderNodeAddShader", 720, -100)
+        b.link(surface, add.inputs[0])
+        b.link(em.outputs["Emission"], add.inputs[1])
+        surface = add.outputs["Shader"]
+
+    if alpha_out is not None:
+        tr = b.add("ShaderNodeBsdfTransparent", 550, 250)
+        mix = b.add("ShaderNodeMixShader", 720, 150, label="Alpha")
+        b.link(alpha_out, mix.inputs["Fac"])
+        b.link(tr.outputs["BSDF"], mix.inputs[1])
+        b.link(surface, mix.inputs[2])
+        surface = mix.outputs["Shader"]
+        # GPU_material_from_blender só liga o blend quando ma->alpha < 1, mesmo com a
+        # transparência vindo de nó; sem isto o mapa de alpha não recorta nada.
+        mat.use_transparency = True
+        if mat.alpha >= 1.0:
+            mat.alpha = 0.999
+
+    b.link(surface, out.inputs["Surface"])
+    return brought, skipped
+
+
+class MATERIAL_OT_material_to_pbr(Operator):
+    """Rebuild this material as PBR nodes, bringing its texture slots along as Image Texture nodes"""
+    bl_idname = "material.to_pbr_nodes"
+    bl_label = "Convert Material to PBR Nodes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    keep_slots: BoolProperty(
+        name="Keep Texture Slots", default=True,
+        description="Leave the old texture slots in place, so switching PBR Shading Nodes off "
+                    "brings the classic material back")
+
+    @classmethod
+    def poll(cls, context):
+        return active_material(context) is not None
+
+    def invoke(self, context, event):
+        mat = active_material(context)
+        # Converter apaga a árvore atual: se já houver um grafo novo, confirma antes.
+        if mat.use_nodes and mat.node_tree and any(
+                n.bl_idname == "ShaderNodeOutputMaterial" for n in mat.node_tree.nodes):
+            return context.window_manager.invoke_confirm(self, event)
+        return self.execute(context)
+
+    def execute(self, context):
+        mat = active_material(context)
+        brought, skipped = build_pbr_from_legacy(mat)
+        if not context.scene.game_settings.use_shading_nodes:
+            context.scene.game_settings.use_shading_nodes = True
+            self.report({'INFO'}, "PBR Shading Nodes was turned on so the new nodes render")
+        if not self.keep_slots:
+            for i, slot in enumerate(mat.texture_slots):
+                if slot is not None and slot.texture is not None:
+                    mat.texture_slots.clear(i)
+        if skipped:
+            self.report({'WARNING'},
+                        "Not converted (no node equivalent): " + ", ".join(skipped))
+        elif not brought:
+            self.report({'WARNING'},
+                        "The material had no active texture slot: only its colors were carried over")
+        else:
+            self.report({'INFO'}, "Converted %d texture(s) to nodes" % len(brought))
+        return {'FINISHED'}
+
+
 classes = (
     MATERIAL_OT_recipe_texture_set,
     MATERIAL_OT_recipe_mask_blend,
+    MATERIAL_OT_recipe_wet_patches,
     MATERIAL_OT_recipe_layer_set,
     MATERIAL_OT_recipe_paint_mask,
     MATERIAL_OT_recipe_brush_color,
     MATERIAL_OT_recipe_tiling,
     MATERIAL_OT_recipe_preset,
+    MATERIAL_OT_material_to_pbr,
 )

@@ -627,6 +627,54 @@ void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 }
 
 
+/* Blender 5 style bone axes (overlay_extra_vert.glsl VCLASS_EMPTY_AXES): OB_ARROWS with each axis
+ * in red/green/blue mixed with base_col by fac (0 = pure axis color), with smooth lines. */
+void drawaxes_colored(const float viewmat_local[4][4], float size, const float base_col[3], float fac)
+{
+	float viewmat_local_unit[3][3];
+	int axis;
+
+	copy_m3_m4(viewmat_local_unit, (float (*)[4])viewmat_local);
+	normalize_m3(viewmat_local_unit);
+
+	glLineWidth(U.pixelsize);
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+
+	for (axis = 0; axis < 3; axis++) {
+		const int arrow_axis = (axis == 0) ? 1 : 0;
+		float v1[3] = {0.0f, 0.0f, 0.0f}, v2[3] = {0.0f, 0.0f, 0.0f};
+		float axis_col[3] = {0.0f, 0.0f, 0.0f}, col[3];
+
+		axis_col[axis] = 1.0f;
+		interp_v3_v3v3(col, axis_col, base_col, fac);
+		glColor3fv(col);
+
+		glBegin(GL_LINES);
+		v2[axis] = size;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		v1[axis] = size * 0.85f;
+		v1[arrow_axis] = -size * 0.08f;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		v1[arrow_axis] = size * 0.08f;
+		glVertex3fv(v1);
+		glVertex3fv(v2);
+		glEnd();
+
+		/* letters a bit lighter, as the fract() offset of the axis color in Blender 5 */
+		add_v3_fl(axis_col, 0.4f);
+		interp_v3_v3v3(col, axis_col, base_col, fac);
+		glColor3f(min_ff(col[0], 1.0f), min_ff(col[1], 1.0f), min_ff(col[2], 1.0f));
+		v2[axis] += size * 0.125f;
+		draw_xyz_wire(viewmat_local_unit, v2, size, axis);
+	}
+
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+}
+
 /* Function to draw an Image on an empty Object */
 static void draw_empty_image(Object *ob, const short dflag, const unsigned char ob_wire_col[4], eStereoViews sview)
 {
@@ -715,13 +763,25 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 		glColor3ubv(ob_wire_col);
 	}
 
-	/* Calculate the outline vertex positions */
+	/* Calculate the outline vertex positions (smooth, like the other empties) */
+	const bool use_smooth = !(dflag & DRAW_PICKING);
+	if (use_smooth) {
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	glLineWidth(U.pixelsize);
 	glBegin(GL_LINE_LOOP);
 	glVertex2f(ofs_x, ofs_y);
 	glVertex2f(ofs_x + ima_x, ofs_y);
 	glVertex2f(ofs_x + ima_x, ofs_y + ima_y);
 	glVertex2f(ofs_x, ofs_y + ima_y);
 	glEnd();
+	glLineWidth(1.0f);
+	if (use_smooth) {
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
+	}
 
 	/* Reset GL settings */
 	glPopMatrix();
@@ -919,14 +979,17 @@ static void drawcentercircle(View3D *v3d, RegionView3D *rv3d, const float co[3],
 	glDepthRange(0.0, 0.0);
 	glEnable(GL_BLEND);
 
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	/* Blender 5 style: nearly opaque dot with a smooth dark rim */
 	if (special_color) {
-		if (selstate == ACTIVE || selstate == SELECT) glColor4ub(0x88, 0xFF, 0xFF, 155);
-		else glColor4ub(0x55, 0xCC, 0xCC, 155);
+		if (selstate == ACTIVE || selstate == SELECT) glColor4ub(0x88, 0xFF, 0xFF, 235);
+		else glColor4ub(0x55, 0xCC, 0xCC, 235);
 	}
 	else {
-		if (selstate == ACTIVE) UI_ThemeColorShadeAlpha(TH_ACTIVE, 0, -80);
-		else if (selstate == SELECT) UI_ThemeColorShadeAlpha(TH_SELECT, 0, -80);
-		else if (selstate == DESELECT) UI_ThemeColorShadeAlpha(TH_TRANSFORM, 0, -80);
+		if (selstate == ACTIVE) UI_ThemeColorShadeAlpha(TH_ACTIVE, 0, -20);
+		else if (selstate == SELECT) UI_ThemeColorShadeAlpha(TH_SELECT, 0, -20);
+		else if (selstate == DESELECT) UI_ThemeColorShadeAlpha(TH_TRANSFORM, 0, -20);
 	}
 
 	circball_array_fill(verts, co, size, rv3d->viewinv);
@@ -938,10 +1001,13 @@ static void drawcentercircle(View3D *v3d, RegionView3D *rv3d, const float co[3],
 	/* 1. draw filled, blended polygon */
 	glDrawArrays(GL_POLYGON, 0, CIRCLE_RESOL);
 
-	/* 2. draw outline */
-	glLineWidth(1);
-	UI_ThemeColorShadeAlpha(TH_WIRE, 0, -30);
+	/* 2. draw outline (also smooths the polygon edge) */
+	glEnable(GL_LINE_SMOOTH);
+	glLineWidth(U.pixelsize);
+	glColor4ub(0, 0, 0, 170);
 	glDrawArrays(GL_LINE_LOOP, 0, CIRCLE_RESOL);
+	glDisable(GL_LINE_SMOOTH);
+	glLineWidth(1.0f);
 
 	/* finish up */
 	glDisableClientState(GL_VERTEX_ARRAY);
@@ -1395,6 +1461,48 @@ static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camo
 	}
 }
 
+/* A Point has no shadow box: its shadow range is a sphere (6 cube faces sharing one radius),
+ * so the volume is drawn as a shaded ball at Clip End plus the Clip Start circles inside it. */
+static void draw_transp_point_shadow_volume(Lamp *la)
+{
+	GLUquadricObj *qobj = gluNewQuadric();
+
+	/* outer and inner silhouettes (three great circles each, like an empty sphere) */
+	glColor4f(0.2f, 0.2f, 0.2f, 1.0f);
+	draw_empty_sphere(la->clipend);
+	if (la->clipsta > 0.0f && la->clipsta < la->clipend) {
+		setlinestyle(3);
+		draw_empty_sphere(la->clipsta);
+		setlinestyle(0);
+	}
+
+	/* shaded shell, same two-pass look as draw_shadow_volume() */
+	gluQuadricDrawStyle(qobj, GLU_FILL);
+	gluQuadricNormals(qobj, GLU_NONE);
+
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glDepthMask(0);
+
+	glCullFace(GL_FRONT);
+	glBlendFunc(GL_ZERO, GL_SRC_ALPHA);
+	glColor4f(0.0f, 0.0f, 0.0f, 0.4f);
+	gluSphere(qobj, la->clipend, 32, 16);
+
+	glCullFace(GL_BACK);
+	glBlendFunc(GL_ONE, GL_ONE);
+	glColor4f(0.2f, 0.2f, 0.2f, 0.35f);
+	gluSphere(qobj, la->clipend, 32, 16);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_BLEND);
+	glDepthMask(1);
+	glDisable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	gluDeleteQuadric(qobj);
+}
+
 static void draw_transp_spot_shadow_volume(Lamp *la)
 {
 	float box[8][3];
@@ -1449,9 +1557,11 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 	        (dt > OB_WIRE) &&
 	        !(G.f & G_PICKSEL) &&
 	        ((la->type == LA_SUN) ||
-	        (la->type == LA_SPOT)) &&
-	        ((la->mode & LA_SHAD_BUF) ||
-	        (la->mode & LA_SHAD_RAY)) &&
+	        (la->type == LA_SPOT) ||
+	        (la->type == LA_LOCAL)) &&
+	        /* same test as lamp.use_shadow: only a Spot counts the legacy buffer bit */
+	        ((la->type == LA_SPOT) ? ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+	                                 ((la->mode & LA_SHAD_RAY) != 0)) &&
 	        ((la->mode & LA_SHOW_SHADOW_BOX) ||
 	        /* Cascade+Debug alone (without Show Shadow Box) also shows the
 	         * camera-fit cascade box, independent of the plain shadow box. */
@@ -1702,6 +1812,14 @@ static void drawlamp(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d,
 		}
 #endif
 
+	}
+	else if (la->type == LA_LOCAL) {
+#ifdef WITH_GAMEENGINE
+		if (drawshadowbox) {
+			setlinestyle(0);
+			draw_transp_point_shadow_volume(la);
+		}
+#endif
 	}
 	else if (la->type == LA_HEMI) {
 
@@ -2588,7 +2706,7 @@ static void lattice_draw_verts(Lattice *lt, DispList *dl, BPoint *actbp, short s
 	const int color = sel ? TH_VERTEX_SELECT : TH_VERTEX;
 	UI_ThemeColor(color);
 
-	glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE));
+	glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.4f * U.pixelsize);
 	glBegin(GL_POINTS);
 
 	for (int w = 0; w < lt->pntsw; w++) {
@@ -2702,7 +2820,17 @@ static void drawlattice(View3D *v3d, Object *ob)
 		}
 	}
 
-	glLineWidth(1);
+	/* smooth cage lines and round points, like the other edit overlays */
+	const bool use_smooth = !(G.f & G_PICKSEL);
+	const bool had_blend = glIsEnabled(GL_BLEND);
+	if (use_smooth) {
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_POINT_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+
+	glLineWidth(U.pixelsize);
 	glBegin(GL_LINES);
 	for (w = 0; w < lt->pntsw; w++) {
 		int wxt = (w == 0 || w == lt->pntsw - 1);
@@ -2738,6 +2866,13 @@ static void drawlattice(View3D *v3d, Object *ob)
 
 		if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 	}
+
+	if (use_smooth) {
+		glDisable(GL_POINT_SMOOTH);
+		glDisable(GL_LINE_SMOOTH);
+		if (!had_blend) glDisable(GL_BLEND);
+	}
+	glLineWidth(1.0f);
 }
 
 /* ***************** ******************** */
@@ -4208,9 +4343,15 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 
 		}
 		else {
+			/* seam/sharp/crease/bevel marks: smooth and DPI-scaled */
+			const bool had_blend_marks = glIsEnabled(GL_BLEND);
+			glEnable(GL_LINE_SMOOTH);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 			if (me->drawflag & ME_DRAWSEAMS) {
 				UI_ThemeColor(TH_EDGE_SEAM);
-				glLineWidth(2);
+				glLineWidth(2.0f * U.pixelsize);
 
 				draw_dm_edges_seams(em, cageDM);
 
@@ -4219,7 +4360,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 
 			if (me->drawflag & ME_DRAWSHARP) {
 				UI_ThemeColor(TH_EDGE_SHARP);
-				glLineWidth(2);
+				glLineWidth(2.0f * U.pixelsize);
 
 				draw_dm_edges_sharp(em, cageDM);
 
@@ -4229,7 +4370,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 #ifdef WITH_FREESTYLE
 			if (me->drawflag & ME_DRAW_FREESTYLE_EDGE && CustomData_has_layer(&em->bm->edata, CD_FREESTYLE_EDGE)) {
 				UI_ThemeColor(TH_FREESTYLE_EDGE_MARK);
-				glLineWidth(2);
+				glLineWidth(2.0f * U.pixelsize);
 
 				draw_dm_edges_freestyle(em, cageDM);
 
@@ -4244,6 +4385,9 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 				draw_dm_bweights(em, scene, cageDM);
 			}
 
+			glDisable(GL_LINE_SMOOTH);
+			if (!had_blend_marks) glDisable(GL_BLEND);
+
 			glLineWidth(1);
 			draw_em_fancy_edges(em, scene, v3d, me, cageDM, 0, eed_act);
 		}
@@ -4251,17 +4395,30 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 		{
 			draw_em_fancy_verts(scene, v3d, ob, em, cageDM, eve_act, rv3d);
 
-			if (me->drawflag & ME_DRAWNORMALS) {
-				UI_ThemeColor(TH_NORMAL);
-				draw_dm_face_normals(em, scene, ob, cageDM);
-			}
-			if (me->drawflag & ME_DRAW_VNORMALS) {
-				UI_ThemeColor(TH_VNORMAL);
-				draw_dm_vert_normals(em, scene, ob, cageDM);
-			}
-			if (me->drawflag & ME_DRAW_LNORMALS) {
-				UI_ThemeColor(TH_LNORMAL);
-				draw_dm_loop_normals(em, scene, ob, cageDM);
+			if (me->drawflag & (ME_DRAWNORMALS | ME_DRAW_VNORMALS | ME_DRAW_LNORMALS)) {
+				/* normals: smooth, DPI-scaled lines */
+				const bool had_blend_nor = glIsEnabled(GL_BLEND);
+				glEnable(GL_LINE_SMOOTH);
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				glLineWidth(U.pixelsize);
+
+				if (me->drawflag & ME_DRAWNORMALS) {
+					UI_ThemeColor(TH_NORMAL);
+					draw_dm_face_normals(em, scene, ob, cageDM);
+				}
+				if (me->drawflag & ME_DRAW_VNORMALS) {
+					UI_ThemeColor(TH_VNORMAL);
+					draw_dm_vert_normals(em, scene, ob, cageDM);
+				}
+				if (me->drawflag & ME_DRAW_LNORMALS) {
+					UI_ThemeColor(TH_LNORMAL);
+					draw_dm_loop_normals(em, scene, ob, cageDM);
+				}
+
+				glLineWidth(1.0f);
+				glDisable(GL_LINE_SMOOTH);
+				if (!had_blend_nor) glDisable(GL_BLEND);
 			}
 
 			if ((me->drawflag & (ME_DRAWEXTRA_EDGELEN |
@@ -4737,6 +4894,16 @@ static bool drawDispListwire_ex(ListBase *dlbase, unsigned int dl_type_mask)
 {
 	if (dlbase == NULL) return true;
 
+	/* curve/text/surface/metaball wire: anti-aliased like the mesh wireframe (not when picking) */
+	const bool use_smooth = !(G.f & G_PICKSEL);
+	const bool had_blend = glIsEnabled(GL_BLEND);
+	const bool had_smooth = glIsEnabled(GL_LINE_SMOOTH);
+	if (use_smooth) {
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -4820,6 +4987,11 @@ static bool drawDispListwire_ex(ListBase *dlbase, unsigned int dl_type_mask)
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	if (use_smooth) {
+		if (!had_blend) glDisable(GL_BLEND);
+		if (!had_smooth) glDisable(GL_LINE_SMOOTH);
+	}
 
 	return false;
 }
@@ -6158,6 +6330,10 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 	totkeys = (*edit->pathcache)->segments + 1;
 
 	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	/* smooth hair paths and round edit points */
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_POINT_SMOOTH);
 	pathcol = MEM_calloc_arrayN(totkeys, 4 * sizeof(float), "particle path color data");
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -6198,7 +6374,7 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 
 	/* draw edit vertices */
 	if (pset->selectmode != SCE_SELECT_PATH) {
-		glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE));
+		glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.4f * U.pixelsize);
 
 		if (pset->selectmode == SCE_SELECT_POINT) {
 			float *pd = NULL, *pdata = NULL;
@@ -6273,6 +6449,9 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 		}
 	}
 
+	glDisable(GL_POINT_SMOOTH);
+	glDisable(GL_LINE_SMOOTH);
+	glLineWidth(1.0f);
 	glDisable(GL_BLEND);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_NORMAL_ARRAY);
@@ -6434,7 +6613,7 @@ static void drawhandlesN(Nurb *nu, const char sel, const bool hide_handles)
 			UI_GetThemeColor3ubv(basecol + a, handle_cols[a]);
 		}
 
-		glLineWidth(1.0f);
+		glLineWidth(1.5f * U.pixelsize);
 
 		glBegin(GL_LINES);
 
@@ -6516,7 +6695,8 @@ static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, const 
 
 	UI_ThemeColor(color);
 
-	glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE));
+	/* round points need a bit more size to match the old squares visually */
+	glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.4f * U.pixelsize);
 
 	glBegin(GL_POINTS);
 
@@ -6767,6 +6947,13 @@ static void draw_editnurb(
 	if (v3d->flag2 & V3D_RENDER_SHADOW)
 		return;
 
+	/* Blender 5 style edit overlay: smooth handles/splines and round control points */
+	const bool had_blend = glIsEnabled(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	if (v3d->zbuf) glDepthFunc(GL_ALWAYS);
 
 	/* first non-selected and active handles */
@@ -6839,6 +7026,11 @@ static void draw_editnurb(
 	}
 
 	if (v3d->zbuf) glDepthFunc(GL_LEQUAL);
+
+	glLineWidth(1.0f);
+	glDisable(GL_POINT_SMOOTH);
+	glDisable(GL_LINE_SMOOTH);
+	if (!had_blend) glDisable(GL_BLEND);
 }
 
 static void draw_editfont_textcurs(RegionView3D *rv3d, float textcurs[4][2])
@@ -7529,7 +7721,37 @@ static void draw_bb_quadric(BoundBox *bb, char type, bool around_origin)
 	gluDeleteQuadric(qobj);
 }
 
+/* Wire overlays (bounds, collision shape, texture space): anti-aliased when not picking,
+ * restoring the caller's blend state. */
+static bool overlay_wire_smooth_begin(void)
+{
+	const bool had_blend = glIsEnabled(GL_BLEND);
+	if (!(G.f & G_PICKSEL)) {
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	return had_blend;
+}
+
+static void overlay_wire_smooth_end(bool had_blend)
+{
+	if (!(G.f & G_PICKSEL)) {
+		glDisable(GL_LINE_SMOOTH);
+		if (!had_blend) glDisable(GL_BLEND);
+	}
+}
+
+static void draw_bounding_volume_ex(Object *ob, char type);
+
 static void draw_bounding_volume(Object *ob, char type)
+{
+	const bool had_blend = overlay_wire_smooth_begin();
+	draw_bounding_volume_ex(ob, type);
+	overlay_wire_smooth_end(had_blend);
+}
+
+static void draw_bounding_volume_ex(Object *ob, char type)
 {
 	BoundBox  bb_local;
 	BoundBox *bb = NULL;
@@ -7638,11 +7860,13 @@ static void drawtexspace(Object *ob)
 	vec[0][2] = vec[3][2] = vec[4][2] = vec[7][2] = loc[2] - size[2];
 	vec[1][2] = vec[2][2] = vec[5][2] = vec[6][2] = loc[2] + size[2];
 
+	const bool had_blend = overlay_wire_smooth_begin();
 	setlinestyle(2);
 
 	draw_box(vec, false);
 
 	setlinestyle(0);
+	overlay_wire_smooth_end(had_blend);
 }
 
 /* draws wire outline */
@@ -7906,6 +8130,8 @@ static void draw_rigidbody_shape(Object *ob)
 	if (bb == NULL)
 		return;
 
+	const bool had_blend = overlay_wire_smooth_begin();
+
 	switch (ob->rigidbody_object->shape) {
 		case RB_SHAPE_BOX:
 			BKE_boundbox_calc_size_aabb(bb, size);
@@ -7932,6 +8158,8 @@ static void draw_rigidbody_shape(Object *ob)
 			draw_bb_quadric(bb, OB_BOUND_CAPSULE, true);
 			break;
 	}
+
+	overlay_wire_smooth_end(had_blend);
 }
 
 /**

@@ -281,10 +281,40 @@ public:
 	unsigned int AddVertex(const mt::vec3_packed& pos, const mt::vec3_packed& nor, const mt::vec4_packed& tan,
 			mt::vec2_packed uvs[RAS_Texture::MaxUnits], unsigned int colors[RAS_Texture::MaxUnits], unsigned int origIndex, uint8_t flag,
 			const mt::vec4_packed& boneIndices, const mt::vec4_packed& boneWeights);
+	/// Preallocates storage before a conversion fills the array (avoids repeated reallocations).
+	void Reserve(unsigned int vertices, unsigned int primitiveIndices, unsigned int triangleIndices);
+
+	/// Pointers to the vertices appended by AppendVertices(), written in place by the caller.
+	struct VertexSpan
+	{
+		mt::vec3_packed *positions;
+		mt::vec3_packed *normals;
+		mt::vec4_packed *tangents;
+		mt::vec2_packed *uvs[RAS_Texture::MaxUnits];
+		unsigned int *colors[RAS_Texture::MaxUnits];
+	};
+	/** Appends count vertices in bulk (cooked meshes): the caller fills the span and adds each vertex info.
+	 * Bone data is zeroed. */
+	VertexSpan AppendVertices(unsigned int count);
+
+	inline void AddVertexInfo(unsigned int origIndex, uint8_t flag)
+	{
+		m_maxOrigIndex = std::max(m_maxOrigIndex, origIndex);
+		m_vertexInfos.emplace_back(origIndex, flag);
+	}
+
+	inline void AddIndices(const unsigned int *primitives, unsigned int numPrimitives, const unsigned int *triangles,
+			unsigned int numTriangles)
+	{
+		m_primitiveIndices.insert(m_primitiveIndices.end(), primitives, primitives + numPrimitives);
+		InvalidatePolygonCenters();
+		m_triangleIndices.insert(m_triangleIndices.end(), triangles, triangles + numTriangles);
+	}
 
 	inline void AddPrimitiveIndex(const unsigned int index)
 	{
 		m_primitiveIndices.push_back(index);
+		InvalidatePolygonCenters();
 	}
 
 	inline void AddTriangleIndex(const unsigned int origIndex)

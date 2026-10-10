@@ -23,6 +23,9 @@ Versão atual: **[AnastacioEngine 0.4.6](https://github.com/AnastacioGames/Anast
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
+Nos builds Windows do fonte atual, editor/player passaram a se chamar
+`AnastacioEngine.exe`/`AnastacioRuntime.exe`; os pacotes já publicados acima ainda usam
+os nomes anteriores. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 Para rodar um jogo exportado, use `RangeRuntime`. No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
@@ -39,6 +42,8 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **Soft body no jogo:** escala, transformação, velocidade, suspend e deformer corrigidos.
 - **Outliner:** arrastar um objeto selecionado para uma coleção move toda a seleção.
 - MSAA mínimo do jogo passa de 4x para 2x (cenas novas vêm com 2x).
+
+Galeria de imagens por versão: [release-images/](release-images/README.md), com os [prints das novidades da 0.4.7](release-images/v0.4.7/README.md) (em desenvolvimento).
 
 ## Novidades da 0.4.5
 

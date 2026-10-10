@@ -58,6 +58,8 @@ public:
 	virtual bool Update();
 	bool LoadShapeDrivers(KX_GameObject *parent);
 	bool ExecuteShapeDrivers();
+	/** Set the action update marker only when a shape key coefficient changed. */
+	bool SetLastFrameIfShapeChanged(double lastFrame);
 
 	Key *GetKey();
 	bool GetShape(std::vector<float> &shape) const;
@@ -71,6 +73,7 @@ protected:
 	bool m_useShapeDrivers;
 	double m_lastShapeUpdate;
 	Key *m_key;
+	std::vector<float> m_lastShapeValues;
 };
 
 #endif

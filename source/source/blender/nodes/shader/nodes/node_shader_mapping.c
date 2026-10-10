@@ -37,6 +37,49 @@ static bNodeSocketTemplate sh_node_mapping_out[] = {
 	{	-1, 0, ""	}
 };
 
+static float mapping_safe_divide(float a, float b)
+{
+	return (b != 0.0f) ? a / b : 0.0f;
+}
+
+/* Versão CPU das funções mapping_* do GLSL: o bake do Blender Internal avalia
+ * a árvore pelo exec, sem ele a saída do nó ficava zerada (textura chapada). */
+static void node_shader_exec_mapping(void *UNUSED(data), int UNUSED(thread), bNode *node, bNodeExecData *UNUSED(execdata), bNodeStack **in, bNodeStack **out)
+{
+	float vec[3], loc[3], rot[3], scale[3], mat[3][3], tmp[3];
+	int i;
+
+	nodestack_get_vec(vec, SOCK_VECTOR, in[0]);
+	nodestack_get_vec(loc, SOCK_VECTOR, in[1]);
+	nodestack_get_vec(rot, SOCK_VECTOR, in[2]);
+	nodestack_get_vec(scale, SOCK_VECTOR, in[3]);
+	eul_to_mat3(mat, rot);
+
+	switch (node->custom1) {
+		case NODE_MAPPING_TYPE_POINT:
+			mul_v3_v3v3(tmp, vec, scale);
+			mul_m3_v3(mat, tmp);
+			add_v3_v3v3(out[0]->vec, tmp, loc);
+			break;
+		case NODE_MAPPING_TYPE_TEXTURE:
+			sub_v3_v3v3(tmp, vec, loc);
+			mul_transposed_m3_v3(mat, tmp);
+			for (i = 0; i < 3; i++)
+				out[0]->vec[i] = mapping_safe_divide(tmp[i], scale[i]);
+			break;
+		case NODE_MAPPING_TYPE_VECTOR:
+			mul_v3_v3v3(tmp, vec, scale);
+			mul_v3_m3v3(out[0]->vec, mat, tmp);
+			break;
+		case NODE_MAPPING_TYPE_NORMAL:
+			for (i = 0; i < 3; i++)
+				tmp[i] = mapping_safe_divide(vec[i], scale[i]);
+			mul_v3_m3v3(out[0]->vec, mat, tmp);
+			normalize_v3(out[0]->vec);
+			break;
+	}
+}
+
 static int gpu_shader_mapping(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
 	static const char *names[] = {
@@ -63,6 +106,7 @@ void register_node_type_sh_mapping(void)
 	sh_node_type_base(&ntype, SH_NODE_MAPPING, "Mapping", NODE_CLASS_OP_VECTOR, 0);
 	node_type_compatibility(&ntype, NODE_OLD_SHADING | NODE_NEW_SHADING);
 	node_type_socket_templates(&ntype, sh_node_mapping_in, sh_node_mapping_out);
+	node_type_exec(&ntype, NULL, NULL, node_shader_exec_mapping);
 	node_type_gpu(&ntype, gpu_shader_mapping);
 	node_type_update(&ntype, node_shader_update_mapping, NULL);
 

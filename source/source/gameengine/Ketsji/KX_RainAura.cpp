@@ -38,6 +38,7 @@
 #include "DNA_world_types.h"
 
 #include "GPU_glew.h"
+#include "GPU_draw.h"
 
 #include <algorithm>
 #include <cmath>
@@ -59,6 +60,8 @@ static const float kAnimatedRateScale = 0.12f;
 static const float kAnimatedGravity = 0.35f;
 /// How often the list of objects with the aura property is rebuilt (added objects).
 static const double kScanInterval = 0.5;
+/* No object with the property: only the nearest ones get the aura, so a big scene stays cheap. */
+static const unsigned int kMaxFallbackObjects = 32;
 
 static const char *kVertexSource =
 	"#version 130\n"
@@ -142,8 +145,23 @@ void KX_RainAura::RefreshTargets(KX_Scene *scene, const std::string& prop)
 			targets.push_back(gameobj);
 		}
 	}
+	// No object carries the property: every mesh object gets the aura (Distance still limits it).
+	const bool everyObject = targets.empty();
+	m_everyObject = everyObject;
+	if (everyObject) {
+		for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+			if (!gameobj->GetMeshList().empty()) {
+				targets.push_back(gameobj);
+			}
+		}
+	}
 	if (targets != m_targets) {
-		CM_Message("rain aura: " << targets.size() << " object(s) with the game property \"" << prop << "\"");
+		if (everyObject) {
+			CM_Message("rain aura: no object with the game property \"" << prop << "\", using all " << targets.size() << " mesh object(s)");
+		}
+		else {
+			CM_Message("rain aura: " << targets.size() << " object(s) with the game property \"" << prop << "\"");
+		}
 		m_targets.swap(targets);
 		// Meshes of removed objects may have been freed: never keep a stale pointer as key.
 		m_edgeCache.clear();
@@ -249,14 +267,31 @@ void KX_RainAura::Update(KX_Scene *scene, KX_Camera *camera, const World *world,
 	m_silhouette.clear();
 	m_cumulative.clear();
 	float total = 0.0f;
+	// Distance to the object's bounds, not its origin: a big floor near the camera still counts.
+	m_nearby.clear();
 	for (KX_GameObject *gameobj : m_targets) {
 		if (!gameobj->GetVisible() || gameobj->GetCullingNode().GetCulled()) {
 			continue;
 		}
-		const mt::vec3& pos = gameobj->NodeGetWorldPosition();
-		if ((pos - camPos).Length() > maxDist) {
-			continue;
+		const SG_BBox& box = gameobj->GetCullingNode().GetAabb();
+		const mt::vec3& scale = gameobj->NodeGetWorldScaling();
+		const float radius = box.GetRadius() * std::max(std::abs(scale.x), std::max(std::abs(scale.y), std::abs(scale.z)));
+		const float dist = std::max(0.0f, (gameobj->NodeGetWorldTransform() * box.GetCenter() - camPos).Length() - radius);
+		if (dist <= maxDist) {
+			m_nearby.emplace_back(dist, gameobj);
 		}
+	}
+	if (m_everyObject && m_nearby.size() > kMaxFallbackObjects) {
+		std::nth_element(m_nearby.begin(), m_nearby.begin() + kMaxFallbackObjects, m_nearby.end(),
+		                 [](const std::pair<float, KX_GameObject *>& a, const std::pair<float, KX_GameObject *>& b) {
+		                     return a.first < b.first;
+		                 });
+		m_nearby.resize(kMaxFallbackObjects);
+	}
+
+	for (const std::pair<float, KX_GameObject *>& item : m_nearby) {
+		KX_GameObject *gameobj = item.second;
+		const mt::vec3& pos = gameobj->NodeGetWorldPosition();
 		const mt::mat3& ori = gameobj->NodeGetWorldOrientation();
 		const mt::vec3& scale = gameobj->NodeGetWorldScaling();
 		if (std::abs(scale.x * scale.y * scale.z) < 1e-12f) {
@@ -481,5 +516,8 @@ void KX_RainAura::Draw(const mt::mat4& view, const mt::mat4& projection)
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+	// Blend mexido direto no GL: invalida o cache de GPU_set_material_alpha_blend(),
+	// senão o próximo material com o mesmo modo pula a chamada e sai sem blend.
+	GPU_set_material_alpha_blend(-1);
 	glUseProgram(0);
 }

@@ -352,3 +352,73 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	uiTemplateEditModeSelection(layout, C);
 #endif
 }
+
+void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
+{
+	bScreen *screen = CTX_wm_screen(C);
+	ScrArea *sa = CTX_wm_area(C);
+	View3D *v3d = sa->spacedata.first;
+	Scene *scene = CTX_data_scene(C);
+	const Object *ob = CTX_data_active_object(C);
+	const bool edit_mode = (ob != NULL) && ((ob->mode & OB_MODE_EDIT) != 0);
+	PointerRNA v3dptr;
+	PointerRNA gameptr;
+	PointerRNA toolptr;
+	uiLayout *row;
+
+	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
+	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
+	RNA_pointer_create(&scene->id, &RNA_ToolSettings, scene->toolsettings, &toolptr);
+
+	row = uiLayoutRow(layout, true);
+
+	{
+		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
+		uiLayout *game_row = uiLayoutRow(row, true);
+
+		uiLayoutSetEnabled(game_row, game_ok);
+		/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
+		uiItemO(game_row, "Cook", ICON_COOK, "GAME_OT_cook");
+		uiItemO(game_row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
+		uiItemO(game_row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
+		uiItemR(game_row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
+		        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
+		uiItemR(game_row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
+	}
+
+	uiItemS(row);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
+	uiItemR(row, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
+	uiItemR(row,
+	        &v3dptr,
+	        "show_only_render",
+	        UI_ITEM_R_TOGGLE,
+	        "",
+	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_TOGGLE, "", ICON_NONE);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
+	uiItemR(row, &v3dptr, "transform_manipulators", UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	uiTemplateHeader3D_mode(row, C);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_transform_orientations", "", ICON_DOWNARROW_HLT);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_pivot_point", "", ICON_ROTATECOLLECTION);
+	uiItemS(row);
+	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_snapping", "", ICON_DOWNARROW_HLT);
+	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
+	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	if (edit_mode) {
+		uiItemS(row);
+		uiItemR(row, &toolptr, "use_mesh_automerge", UI_ITEM_R_TOGGLE, "", ICON_AUTOMERGE_ON);
+		uiItemR(row, &v3dptr, "use_occlude_geometry", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_VIEW_ON);
+		uiItemPopoverPanel(row, C, "VIEW3D_PT_meshdisplay", "", ICON_IMAGE_COL);
+	}
+}

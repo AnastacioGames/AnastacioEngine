@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace net {
 
@@ -76,6 +77,38 @@ uint64_t cellKey(int64_t x, int64_t y, int64_t z)
 {
 	const uint64_t mask = (1ull << 21) - 1;
 	return ((uint64_t(x) & mask) << 42) | ((uint64_t(y) & mask) << 21) | (uint64_t(z) & mask);
+}
+
+bool sameFloats(const float *a, const float *b, size_t n)
+{
+	return std::memcmp(a, b, n * sizeof(float)) == 0;
+}
+
+/// Bitwise equality of the captured fields: equal raw state = same encoded fields and hash.
+bool sameCapturedState(const ObjectState &a, const ObjectState &b)
+{
+	if (a.hasTransform != b.hasTransform || a.hasVelocity != b.hasVelocity ||
+	    a.hasAngularVelocity != b.hasAngularVelocity || a.props.size() != b.props.size())
+	{
+		return false;
+	}
+	if (a.hasTransform && !(sameFloats(a.position, b.position, 3) && sameFloats(a.rotation, b.rotation, 4))) {
+		return false;
+	}
+	if (a.hasVelocity && !sameFloats(a.velocity, b.velocity, 3)) {
+		return false;
+	}
+	if (a.hasAngularVelocity && !sameFloats(a.angularVelocity, b.angularVelocity, 3)) {
+		return false;
+	}
+	for (size_t i = 0; i < a.props.size(); ++i) {
+		const PropValue &pa = a.props[i];
+		const PropValue &pb = b.props[i];
+		if (pa.kind != pb.kind || pa.b != pb.b || pa.i != pb.i || !sameFloats(&pa.f, &pb.f, 1)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 float distanceSq(const float a[3], const float b[3])
@@ -137,6 +170,7 @@ bool Replicator::addSceneObject(NetId id, const ReplicatedObjectDesc &desc)
 		return false;
 	}
 	m_objects[id].desc = desc;
+	m_gridDirty = true;
 	return true;
 }
 
@@ -151,6 +185,7 @@ NetId Replicator::spawn(const ReplicatedObjectDesc &desc)
 		m_nextRuntimeId = (m_nextRuntimeId == 0xFFFFFFFFu) ? kFirstRuntimeNetId : m_nextRuntimeId + 1;
 		if (!m_objects.count(id)) {
 			m_objects[id].desc = desc;
+			m_gridDirty = true;
 			return id;
 		}
 	}
@@ -162,6 +197,7 @@ bool Replicator::despawn(NetId id)
 	if (!m_objects.erase(id)) {
 		return false;
 	}
+	m_gridDirty = true;
 	for (auto &pair : m_clients) {
 		ClientRep &rep = pair.second;
 		rep.relevant.erase(std::remove(rep.relevant.begin(), rep.relevant.end(), id), rep.relevant.end());
@@ -355,7 +391,22 @@ void Replicator::capture()
 			}
 		}
 		// Missing objects or bad data keep the last good state.
+		// Unchanged raw state (static/kinematic objects) skips encoding and hashing.
+		if (ok && obj.hasState && sameCapturedState(s, obj.state)) {
+			continue;
+		}
 		if (ok) {
+			if (!obj.hasState || s.hasTransform != obj.state.hasTransform) {
+				m_gridDirty = true;
+			}
+			else if (s.hasTransform && !obj.desc.alwaysRelevant) {
+				for (int i = 0; i < 3; ++i) {
+					if (cellCoord(s.position[i]) != obj.cell[i]) {
+						m_gridDirty = true;
+						break;
+					}
+				}
+			}
 			obj.state = std::move(s);
 			obj.hasState = true;
 			m_scratch.clear();
@@ -376,6 +427,11 @@ int64_t Replicator::cellCoord(float v) const
 
 void Replicator::rebuildGrid()
 {
+	// Only rebuilt when an object was added/removed or changed cell (cells are stored per object).
+	if (!m_gridDirty) {
+		return;
+	}
+	m_gridDirty = false;
 	m_grid.clear();
 	m_ungridded.clear();
 	for (auto &pair : m_objects) {
@@ -720,6 +776,16 @@ void Replicator::update(Tick tick, uint64_t nowMs)
 		}
 		if (!rep.active) {
 			activate(rep);
+			// Scene objects have no Spawn: an owner set before the client was ready goes out now.
+			for (const auto &obj : m_objects) {
+				if (isRuntimeNetId(obj.first) || obj.second.desc.owner == kServerClientId) {
+					continue;
+				}
+				OwnershipMsg msg;
+				msg.netId = obj.first;
+				msg.newOwner = obj.second.desc.owner;
+				m_session.send(id, Channel::Control, makePacket(msg));
+			}
 		}
 		if (rep.hasLastMs && nowMs > rep.lastMs) {
 			rep.tokens = std::min(capTokens,

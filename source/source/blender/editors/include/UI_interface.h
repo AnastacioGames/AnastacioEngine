@@ -149,6 +149,8 @@ enum {
 #define UI_BLOCK_POPOVER_ONCE (1 << 22)
 /** Always show keymaps, even for non-menus. */
 #define UI_BLOCK_SHOW_SHORTCUT_ALWAYS (1 << 23)
+/** Delay mouse-move quit when leaving the popup bounds. */
+#define UI_BLOCK_DELAY_MOUSEOUT_QUIT (1 << 24)
 
 /* uiPopupBlockHandle->menuretval */
 #define UI_RETURN_CANCEL     (1 << 0)   /* cancel all menus cascading */
@@ -1130,6 +1132,7 @@ void uiTemplateOperatorPropertyButs(
         const char label_align, const short flag);
 void uiTemplateHeader3D_mode(uiLayout *layout, struct bContext *C);
 void uiTemplateHeader3D(uiLayout *layout, struct bContext *C);
+void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C);
 void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C);
 void uiTemplateReportsBanner(uiLayout *layout, struct bContext *C);
 void uiTemplateKeymapItemProperties(uiLayout *layout, struct PointerRNA *ptr);

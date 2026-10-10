@@ -31,6 +31,7 @@
 #include "mathfu.h"
 
 #include <deque>
+#include <memory>
 #include <random>
 #include <vector>
 
@@ -39,6 +40,9 @@ class KX_GameObject;
 class KX_Mesh;
 class KX_Scene;
 class PHY_ICollData;
+struct RangeDeformSettings;
+struct RangeDestructionSettings;
+struct RangeExplosiveSettings;
 
 class KX_DestructionManager
 {
@@ -99,6 +103,22 @@ public:
 	float GetFuse(KX_GameObject *gameobj) const;
 	bool SetFuse(KX_GameObject *gameobj, float seconds);
 
+	bool IsDeformable(KX_GameObject *gameobj) const;
+	/// Destruction, Explosive and Deformation settings of the object: per instance, they start from the
+	/// object panels. Templates never registered answer with the panel values.
+	const RangeDestructionSettings& GetDestructionSettings(KX_GameObject *gameobj) const;
+	const RangeExplosiveSettings& GetExplosiveSettings(KX_GameObject *gameobj) const;
+	const RangeDeformSettings& GetDeformSettings(KX_GameObject *gameobj) const;
+	/// Writable settings of a registered instance, nullptr when it isn't destructible / explosive /
+	/// deformable. Call SettingsChanged() after a change of the collision flags.
+	RangeDestructionSettings *EditDestructionSettings(KX_GameObject *gameobj);
+	RangeExplosiveSettings *EditExplosiveSettings(KX_GameObject *gameobj);
+	RangeDeformSettings *EditDeformSettings(KX_GameObject *gameobj);
+	/// Asks for or drops the collision callbacks when Break on Collision, Explode on Impact, Dent on
+	/// Collision or Scrape Marks changed. wantedBefore: WantsCollisions() before the change.
+	void SettingsChanged(KX_GameObject *gameobj, bool wantedBefore);
+	bool WantsCollisions(KX_GameObject *gameobj) const;
+
 	/// Most fragments alive at once (Scene > Game Physics > Max Debris), 0 = no limit. Past it the
 	/// oldest fragments are removed.
 	int GetMaxDebris() const;
@@ -112,11 +132,15 @@ public:
 	void Merge(KX_DestructionManager& other);
 
 private:
+	struct InstanceSettings;
+
 	struct Entry
 	{
 		KX_GameObject *m_object;
 		float m_breakImpulse;
 		float m_fuse;
+		/// Copies of the object settings, changed by Python per instance (heap: stable address).
+		std::shared_ptr<InstanceSettings> m_settings;
 		/// Explosive: detonates in Update() once m_frame reaches m_armFrame, -1 = not armed.
 		long long m_armFrame;
 		/// Broken or detonated, waiting for its removal: it never breaks or explodes twice.
@@ -188,6 +212,11 @@ private:
 
 	Entry *FindEntry(KX_GameObject *gameobj);
 	const Entry *FindEntry(KX_GameObject *gameobj) const;
+
+	bool DentsOnCollision(KX_GameObject *gameobj) const;
+	bool Scrapes(KX_GameObject *gameobj) const;
+	bool BreaksOnCollision(KX_GameObject *gameobj) const;
+	bool ExplodesOnImpact(KX_GameObject *gameobj) const;
 	void Arm(Entry *entry, long long frame);
 
 	/// Dents without the threshold checks, queues the physics shape update. True when a vertex moved.

@@ -60,7 +60,8 @@ class CLIP_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        CLIP_MT_tracking_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            CLIP_MT_tracking_editor_menus.draw_collapsible(context, layout)
 
         row = layout.row()
         row.template_ID(sc, "clip", open="clip.open")
@@ -126,7 +127,8 @@ class CLIP_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        CLIP_MT_masking_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            CLIP_MT_masking_editor_menus.draw_collapsible(context, layout)
 
         row = layout.row()
         row.template_ID(sc, "clip", open="clip.open")

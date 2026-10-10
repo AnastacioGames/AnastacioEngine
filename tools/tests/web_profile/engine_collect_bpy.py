@@ -1,6 +1,6 @@
 """Teste de integracao do coletor bpy (marco C). Precisa do motor:
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_collect_bpy.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_collect_bpy.py
 
 Sai com codigo != 0 se alguma verificacao falhar.
 """

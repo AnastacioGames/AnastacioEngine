@@ -303,7 +303,7 @@ typedef struct ARegion {
 /* area->flag */
 enum {
 	HEADER_NO_PULLDOWN           = (1 << 0),
-//	AREA_FLAG_DEPRECATED_1       = (1 << 1),
+	HEADER_HIDE_MENUS            = (1 << 1),
 //	AREA_FLAG_DEPRECATED_2       = (1 << 2),
 	AREA_TEMP_INFO               = (1 << 3),
 //	AREA_FLAG_DEPRECATED_4       = (1 << 4),

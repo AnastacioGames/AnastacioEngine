@@ -86,6 +86,7 @@ struct HelloMsg {
 	uint64_t sceneHash = 0;
 	std::string playerName;
 	uint64_t token = 0;
+	std::string password;
 };
 
 struct WelcomeMsg {

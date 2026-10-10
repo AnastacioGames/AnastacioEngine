@@ -31,11 +31,24 @@ struct BL_LoadStats
 	double mesh = 0.0;      // BL_ConvertMesh total (includes normals and tangents).
 	double tangent = 0.0;   // MikkTSpace tangents only.
 	double physics = 0.0;   // BL_CreatePhysicsObjectNew.
+	double bvh = 0.0;       // Triangle mesh BVH of the physics pass (CcdEndBvhBatch, part of physics).
 	double loopHash = 0.0;  // Content hash of meshes for the normal/tangent cache.
+	double meshDm = 0.0;    // CDDM_from_mesh.
+	double normals = 0.0;   // Loop normals.
+	double meshEnd = 0.0;   // KX_Mesh::EndConversion (bounding box, shared arrays).
+	double meshCooked = 0.0; // Key and reading of cooked display arrays.
+	double objects = 0.0;  // BL_GameObjectFromBlenderObject (includes mesh).
+	double logic = 0.0;     // Per object properties, logic bricks and components.
+	double meshUsers = 0.0; // Mesh users, mesh slots and deformers.
+	double culling = 0.0;   // Graphic controllers (DBVT culling).
+	double bounds = 0.0;    // Bounding volumes.
+	double meshBatch = 0.0; // BL_PrepareMeshes: derived meshes, normals and tangents computed in parallel.
 	int meshes = 0;         // Meshes actually converted.
 	int meshesReused = 0;   // Requests served by an already converted mesh.
 	int tangentMeshes = 0;  // Meshes that needed tangents (have UVs).
 	int loopDataReused = 0; // Meshes whose normals/tangents came from an identical mesh.
+	int meshesCooked = 0;   // Meshes whose display arrays came from the .cooked file.
+	int meshesPrepared = 0; // Meshes handed to BL_PrepareMeshes.
 
 	void Reset()
 	{

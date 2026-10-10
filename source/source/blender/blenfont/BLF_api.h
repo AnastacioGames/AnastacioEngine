@@ -140,6 +140,7 @@ void BLF_rotation_default(float angle);
 /* Enable/disable options to the default font. */
 void BLF_enable_default(int option);
 void BLF_disable_default(int option);
+void BLF_shadow_default(int level, const float rgba[4], int x, int y);
 
 /* By default, rotation and clipping are disable and
  * have to be enable/disable using BLF_enable/disable.

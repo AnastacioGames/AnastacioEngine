@@ -37,6 +37,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
 #include "KX_RainAura.h"
+#include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
 #include "RAS_ParticleBuffer.h" // Per-object GPU particle emitters, see KX_GameObject::GetParticleBuffer.
 #include "GPU_texture.h"
@@ -55,6 +56,14 @@
 #include "PHY_IPhysicsEnvironment.h"
 
 #include "CM_RefCount.h"
+
+#include "GPU_glew.h"
+
+#include "KX_EngineProfiler.h"
+
+#include <chrono>
+#include <memory>
+
 
 KX_CameraRenderData::KX_CameraRenderData(KX_Camera *rendercam, KX_Camera *cullingcam, const RAS_Rect& area,
                                           const RAS_Rect& viewport, RAS_Rasterizer::StereoMode stereoMode, RAS_Rasterizer::StereoEye eye)
@@ -114,6 +123,8 @@ void KX_RenderPipeline::Render()
 
 		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
+		KX_EngineProfiler::BeginGpuFrame();
+		KX_EngineProfiler::Sections prof;
 		m_engine->BeginFrame();
 
 		// Advance once before visiting any scene/light so the entire frame sees the same
@@ -137,6 +148,8 @@ void KX_RenderPipeline::Render()
 
 		EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
 
+		RANGE_PROFILE_MARK_GPU(prof, "render.begin");
+
 		for (KX_Scene *scene : scenes) {
 			// shadow buffers
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadows);
@@ -150,6 +163,8 @@ void KX_RenderPipeline::Render()
 			scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_INDEPENDENT, rasterizer, nullptr, nullptr, RAS_Rect(), RAS_Rect());
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 		}
+
+		RANGE_PROFILE_MARK_GPU(prof, "render.shadows");
 
 		KX_RenderData renderData = GetRenderData();
 
@@ -195,6 +210,8 @@ void KX_RenderPipeline::Render()
 					RenderCamera(scene, cameraFrameData, offScreen, pass++, isfirstscene);
 				}
 
+				RANGE_PROFILE_MARK_GPU(prof, "render.cameras");
+
 				/* Choose final render off screen target. If the current off screen is using multisamples we
 				 * are sure that it will be copied to a non-multisamples off screen before render the filters.
 				 * In this case the targeted off screen is the same as the current off screen. */
@@ -218,6 +235,8 @@ void KX_RenderPipeline::Render()
 				// Render filters and get output off screen.
 				offScreen = PostRenderScene(scene, offScreen, canvas->GetOffScreen(target));
 				frameData.m_ofsType = offScreen->GetType();
+
+				RANGE_PROFILE_MARK_GPU(prof, "render.filters");
 			}
 		}
 
@@ -243,8 +262,10 @@ void KX_RenderPipeline::Render()
 		else {
 			rasterizer->DrawOffScreen(canvas, canvas->GetOffScreen(renderData.m_frameDataList[0].m_ofsType));
 		}
+		RANGE_PROFILE_MARK_GPU(prof, "render.present");
 	}
 
+	RANGE_PROFILE_SCOPE("render.endframe");
 	m_engine->EndFrame();
 }
 
@@ -386,9 +407,10 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 	};
 
 	// Pre-compute the display area used for stereo or normal rendering.
-	std::vector<RAS_Rect> displayAreas;
+	// Fixed-size arrays: at most 2 eyes, avoids per-frame heap allocations.
+	RAS_Rect displayAreas[2];
 	for (unsigned short eye = 0; eye < numeyes; ++eye) {
-		displayAreas.push_back(rasterizer->GetRenderArea(m_engine->GetCanvas(), stereomode, (RAS_Rasterizer::StereoEye)eye));
+		displayAreas[eye] = rasterizer->GetRenderArea(m_engine->GetCanvas(), stereomode, (RAS_Rasterizer::StereoEye)eye);
 	}
 
 	EXP_ListValue<KX_Scene> *scenes = m_engine->GetScenes();
@@ -412,18 +434,23 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 		KX_FrameRenderData& frameData = renderData.m_frameDataList.back();
 
 		// Get the eyes managed per frame.
-		std::vector<RAS_Rasterizer::StereoEye> eyes;
+		RAS_Rasterizer::StereoEye eyes[2];
+		unsigned short numframeeyes;
 		// One eye per frame but different.
 		if (renderpereye) {
-			eyes = {(RAS_Rasterizer::StereoEye)frame};
+			eyes[0] = (RAS_Rasterizer::StereoEye)frame;
+			numframeeyes = 1;
 		}
 		// Two eyes for unique frame.
 		else if (usestereo) {
-			eyes = {RAS_Rasterizer::RAS_STEREO_LEFTEYE, RAS_Rasterizer::RAS_STEREO_RIGHTEYE};
+			eyes[0] = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+			eyes[1] = RAS_Rasterizer::RAS_STEREO_RIGHTEYE;
+			numframeeyes = 2;
 		}
 		// Only one eye for unique frame.
 		else {
-			eyes = {RAS_Rasterizer::RAS_STEREO_LEFTEYE};
+			eyes[0] = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+			numframeeyes = 1;
 		}
 
 		for (KX_Scene *scene : scenes) {
@@ -437,7 +464,8 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 					continue;
 				}
 
-				for (RAS_Rasterizer::StereoEye eye : eyes) {
+				for (unsigned short i = 0; i < numframeeyes; ++i) {
+					const RAS_Rasterizer::StereoEye eye = eyes[i];
 					sceneFrameData.m_cameraDataList.push_back(GetCameraRenderData(scene, cam, overrideCullingCam, displayAreas[eye],
 					                                                              stereomode, eye));
 				}
@@ -464,6 +492,35 @@ const std::vector<KX_GameObject *>& KX_RenderPipeline::GetVisibleMeshes(KX_Scene
 }
 
 // update graphics
+namespace {
+/// Profiler on: names a camera render phase slow enough to be a hitch, in the spike log.
+struct SlowPhaseNote
+{
+	const char *phase;
+	KX_Scene *scene;
+	const bool on = KX_EngineProfiler::Enabled();
+	std::chrono::steady_clock::time_point start;
+	SlowPhaseNote(const char *p, KX_Scene *s) : phase(p), scene(s)
+	{
+		if (on) {
+			start = std::chrono::steady_clock::now();
+		}
+	}
+	~SlowPhaseNote()
+	{
+		if (!on) {
+			return;
+		}
+		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		if (ms >= 3.0) {
+			char buf[32];
+			snprintf(buf, sizeof(buf), "=%.0fms", ms);
+			KX_EngineProfiler::Note(std::string(phase) + "(" + scene->GetName() + ")" + buf);
+		}
+	}
+};
+}
+
 void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData& cameraFrameData, RAS_OffScreen *offScreen,
                                       unsigned short pass, bool isFirstScene)
 {
@@ -480,7 +537,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	 * which need to be recomputed by each view in case of multi-viewport or stereo.
 	 */
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_texturerenderers);
-	scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_DEPENDENT, rasterizer, offScreen, rendercam, viewport, area);
+	{ SlowPhaseNote note("cam.texrenderers", scene); scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_DEPENDENT, rasterizer, offScreen, rendercam, viewport, area); }
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
 	// set the viewport for this frame and scene
@@ -507,7 +564,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		KX_WorldInfo *worldInfo = scene->GetWorldInfo();
 		// Update background and render it.
 		worldInfo->UpdateBackGround(rasterizer, scene->GetWorldSun());
-		worldInfo->RenderBackground(rasterizer);
+		{ SlowPhaseNote note("cam.background", scene); worldInfo->RenderBackground(rasterizer); }
 	}
 
 	// The following actually reschedules all vertices to be
@@ -519,7 +576,23 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 
 	// Culling + LOD update, reused across cameras of this scene/frame that share the same
 	// cullingcam/eye pair (see GetVisibleMeshes doc comment on the header).
-	const std::vector<KX_GameObject *>& objects = GetVisibleMeshes(scene, cullingcam, eye);
+	std::unique_ptr<SlowPhaseNote> cullingNote(new SlowPhaseNote("cam.culling", scene));
+	const std::vector<KX_GameObject *>& culledObjects = GetVisibleMeshes(scene, cullingcam, eye);
+	cullingNote.reset();
+
+	// gameOb.hiddenFromCamera: drop the objects this camera must not draw. The cached culling result
+	// is shared by cameras with the same cullingcam, so filter a copy, and only when some object asks.
+	std::vector<KX_GameObject *> cameraObjects;
+	if (KX_GameObject::s_hiddenFromCameraCount > 0) {
+		cameraObjects.reserve(culledObjects.size());
+		for (KX_GameObject *gameobj : culledObjects) {
+			if (gameobj->GetHiddenFromCamera() != rendercam) {
+				cameraObjects.push_back(gameobj);
+			}
+		}
+	}
+	const std::vector<KX_GameObject *>& objects =
+	    (KX_GameObject::s_hiddenFromCameraCount > 0) ? cameraObjects : culledObjects;
 
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 
@@ -532,10 +605,10 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 
 #ifdef WITH_PYTHON
 	// Run any pre-drawing python callbacks
-	scene->RunDrawingCallbacks(KX_Scene::PRE_DRAW, rendercam);
+	{ SlowPhaseNote note("cam.predraw", scene); scene->RunDrawingCallbacks(KX_Scene::PRE_DRAW, rendercam); }
 #endif
 
-	scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen);
+	{ SlowPhaseNote note("cam.buckets", scene); scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen); }
 
 	// GPU particle emitters (simulated once per frame in KX_Scene::UpdateGpuParticleEmitters,
 	// called from NextFrame -- not here, since RenderCamera runs once per camera and would
@@ -679,6 +752,39 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_splash_rate = world->rain_splash_rate;
 				rainParams->rain_splash_intensity = world->rain_splash_intensity;
 				rainParams->rain_splash_distance = world->rain_splash_distance;
+				rainParams->rain_ripple_size = world->rain_ripple_size;
+				rainParams->rain_ripple_rate = world->rain_ripple_rate;
+				rainParams->rain_splash_normal = world->rain_splash_normal;
+				rainParams->rain_splash_min_up = world->rain_splash_min_up;
+				rainParams->useRainPuddles = (world->weather_flag & WO_WEATHER_RAIN_PUDDLES) != 0;
+				rainParams->useRainPuddleSSR = (world->weather_flag & WO_WEATHER_RAIN_PUDDLE_SSR) != 0;
+				rainParams->useRainRipplePuddle = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) != 0;
+				rainParams->useRainSplashPuddle = (world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) != 0;
+				rainParams->rain_puddle_amount = world->rain_puddle_amount;
+				rainParams->rain_puddle_size = world->rain_puddle_size;
+				rainParams->rain_puddle_darkness = world->rain_puddle_darkness;
+				rainParams->rain_puddle_reflection = world->rain_puddle_reflection;
+				rainParams->rain_puddle_distance = world->rain_puddle_distance;
+				rainParams->rain_puddle_min_up = world->rain_puddle_min_up;
+				rainParams->rain_sky_horizon[0] = world->horr;
+				rainParams->rain_sky_horizon[1] = world->horg;
+				rainParams->rain_sky_horizon[2] = world->horb;
+				rainParams->rain_sky_zenith[0] = world->zenr;
+				rainParams->rain_sky_zenith[1] = world->zeng;
+				rainParams->rain_sky_zenith[2] = world->zenb;
+
+				// Ripples/Splash only on the objects with ripples_effect/splash_effect, when any
+				// object has them: those objects go into a mask with this camera's matrices.
+				rainParams->rain_mask_flags = 0;
+				if ((world->weather_flag & WO_WEATHER_RAIN) &&
+				    (world->weather_flag & (WO_WEATHER_RAIN_RIPPLE | WO_WEATHER_RAIN_SPLASH | WO_WEATHER_RAIN_PUDDLES)))
+				{
+					KX_RainSurfaceMask *mask = scene->GetRainSurfaceMask();
+					rainParams->rain_mask_flags = mask->Render(scene, world, m_engine->GetFrameTime(),
+					                                           rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix(),
+					                                           width, height);
+					rainParams->rain_mask_texture = mask->GetTexture();
+				}
 			}
 			// Lightning flash: flash, bolt brightness and where the bolt is on screen.
 			const mt::vec4 lightning = scene->GetRainLightning() ?

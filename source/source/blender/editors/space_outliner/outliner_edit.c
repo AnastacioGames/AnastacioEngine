@@ -2472,6 +2472,41 @@ static TreeElement *outliner_selected_collection_te(ListBase *lb)
 	return NULL;
 }
 
+static TreeElement *outliner_selected_scenes_root_te(ListBase *lb)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_ID_BASE && tselem->nr == 3 && (tselem->flag & TSE_SELECTED)) {
+			return te;
+		}
+		TreeElement *found = outliner_selected_scenes_root_te(&te->subtree);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static TreeElement *outliner_selected_scene_root_collection_te(ListBase *lb)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_ROOT_COLLECTION && (tselem->flag & TSE_SELECTED) && te->directdata) {
+			return te;
+		}
+		TreeElement *found = outliner_selected_scene_root_collection_te(&te->subtree);
+		if (found) {
+			return found;
+		}
+	}
+	return NULL;
+}
+
+static Scene *outliner_scene_root_collection_owner(Main *bmain)
+{
+	return bmain ? bmain->scene.first : NULL;
+}
+
 static void outliner_selected_collection_tes(ListBase *lb, LinkNode **r_tes)
 {
 	for (TreeElement *te = lb->first; te; te = te->next) {
@@ -2480,6 +2515,17 @@ static void outliner_selected_collection_tes(ListBase *lb, LinkNode **r_tes)
 			BLI_linklist_prepend(r_tes, te);
 		}
 		outliner_selected_collection_tes(&te->subtree, r_tes);
+	}
+}
+
+static void outliner_selected_scene_root_collection_tes(ListBase *lb, LinkNode **r_tes)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == TSE_SCENE_ROOT_COLLECTION && (tselem->flag & TSE_SELECTED)) {
+			BLI_linklist_prepend(r_tes, te);
+		}
+		outliner_selected_scene_root_collection_tes(&te->subtree, r_tes);
 	}
 }
 
@@ -2528,6 +2574,7 @@ static int outliner_collection_new_exec(bContext *C, wmOperator *op)
 	Scene *scene = CTX_data_scene(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
 	SceneCollection *parent = NULL;
+	bool scene_group = false;
 
 	if (RNA_boolean_get(op->ptr, "nested")) {
 		TreeElement *te = outliner_selected_collection_te(&soops->tree);
@@ -2536,9 +2583,24 @@ static int outliner_collection_new_exec(bContext *C, wmOperator *op)
 			scene = outliner_collection_te_scene(te);
 			TREESTORE(te)->flag &= ~TSE_CLOSED;
 		}
+		else if (outliner_selected_scenes_root_te(&soops->tree) ||
+		         outliner_selected_scene_root_collection_te(&soops->tree))
+		{
+			Main *bmain = CTX_data_main(C);
+			scene = outliner_scene_root_collection_owner(bmain);
+			scene_group = (scene != NULL);
+			te = outliner_selected_scene_root_collection_te(&soops->tree);
+			if (te) {
+				parent = te->directdata;
+				TREESTORE(te)->flag &= ~TSE_CLOSED;
+			}
+		}
 	}
 
-	BKE_scene_collection_add(scene, parent, NULL);
+	SceneCollection *sc = BKE_scene_collection_add(scene, parent, NULL);
+	if (scene_group) {
+		sc->flag |= SCECOL_SCENE_GROUP;
+	}
 	outliner_collection_notify(C, scene);
 	return OPERATOR_FINISHED;
 }
@@ -2574,6 +2636,24 @@ static int outliner_collection_delete_exec(bContext *C, wmOperator *UNUSED(op))
 		SceneCollection *sc = ID_IS_LINKED(te_scene) ? NULL : BKE_scene_collection_find(te_scene, te->index);
 		if (sc) {
 			BKE_scene_collection_remove(te_scene, sc);
+			changed = true;
+		}
+	}
+	BLI_linklist_free(tes, NULL);
+
+	tes = NULL;
+	outliner_selected_scene_root_collection_tes(&soops->tree, &tes);
+	for (LinkNode *link = tes; link; link = link->next) {
+		TreeElement *te = link->link;
+		Scene *owner = outliner_collection_te_scene(te);
+		SceneCollection *sc = ID_IS_LINKED(owner) ? NULL : BKE_scene_collection_find(owner, te->index);
+		if (sc && (sc->flag & SCECOL_SCENE_GROUP)) {
+			for (Scene *sce = CTX_data_main(C)->scene.first; sce; sce = sce->id.next) {
+				if (sce->collection_uid == sc->uid) {
+					sce->collection_uid = 0;
+				}
+			}
+			BKE_scene_collection_remove(owner, sc);
 			changed = true;
 		}
 	}
@@ -2785,6 +2865,119 @@ void OUTLINER_OT_collection_move_objects(wmOperatorType *ot)
 	ot->prop = prop;
 }
 
+/* Move Scenes to Collection --------------------------------------- */
+
+static void scene_root_collection_items_add(EnumPropertyItem **items, int *totitem, ListBase *lb)
+{
+	for (SceneCollection *sc = lb->first; sc; sc = sc->next) {
+		if ((sc->flag & SCECOL_SCENE_GROUP) == 0) {
+			continue;
+		}
+		EnumPropertyItem item = {sc->uid, sc->name, ICON_FILE_FOLDER, sc->name, ""};
+		RNA_enum_item_add(items, totitem, &item);
+	}
+}
+
+static const EnumPropertyItem *scene_root_collection_itemf(
+        bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	EnumPropertyItem *items = NULL;
+	int totitem = 0;
+	Main *bmain = C ? CTX_data_main(C) : NULL;
+	Scene *owner = outliner_scene_root_collection_owner(bmain);
+	EnumPropertyItem item_root = {COLLECTION_MOVE_ROOT, "SCENES_ROOT", ICON_SCENE_DATA, "Scenes Root", ""};
+	EnumPropertyItem item_new = {COLLECTION_MOVE_NEW, "NEW", ICON_ZOOMIN, "New Collection", ""};
+
+	RNA_enum_item_add(&items, &totitem, &item_root);
+	if (owner) {
+		scene_root_collection_items_add(&items, &totitem, &owner->collections);
+	}
+	RNA_enum_item_add_separator(&items, &totitem);
+	RNA_enum_item_add(&items, &totitem, &item_new);
+	RNA_enum_item_end(&items, &totitem);
+
+	*r_free = true;
+	return items;
+}
+
+static void outliner_selected_scenes(ListBase *lb, LinkNode **r_scenes)
+{
+	for (TreeElement *te = lb->first; te; te = te->next) {
+		TreeStoreElem *tselem = TREESTORE(te);
+		if (tselem->type == 0 && te->idcode == ID_SCE && (tselem->flag & TSE_SELECTED)) {
+			Scene *scene = (Scene *)tselem->id;
+			if (scene && BLI_linklist_index(*r_scenes, scene) == -1) {
+				BLI_linklist_prepend(r_scenes, scene);
+			}
+		}
+		outliner_selected_scenes(&te->subtree, r_scenes);
+	}
+}
+
+static int outliner_collection_move_scenes_exec(bContext *C, wmOperator *op)
+{
+	Main *bmain = CTX_data_main(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	Scene *owner = outliner_scene_root_collection_owner(bmain);
+	LinkNode *scenes = NULL;
+	int uid = RNA_enum_get(op->ptr, "collection");
+
+	if (owner == NULL || ID_IS_LINKED(owner)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	outliner_selected_scenes(&soops->tree, &scenes);
+	if (scenes == NULL) {
+		BKE_report(op->reports, RPT_WARNING, "No scenes selected");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (uid == COLLECTION_MOVE_NEW) {
+		SceneCollection *sc = BKE_scene_collection_add(owner, NULL, NULL);
+		sc->flag |= SCECOL_SCENE_GROUP;
+		uid = sc->uid;
+	}
+	else if (uid != COLLECTION_MOVE_ROOT) {
+		SceneCollection *sc = BKE_scene_collection_find(owner, uid);
+		if (sc == NULL || (sc->flag & SCECOL_SCENE_GROUP) == 0) {
+			BLI_linklist_free(scenes, NULL);
+			return OPERATOR_CANCELLED;
+		}
+	}
+
+	for (LinkNode *link = scenes; link; link = link->next) {
+		Scene *scene = link->link;
+		if (!ID_IS_LINKED(scene)) {
+			scene->collection_uid = uid;
+		}
+	}
+	BLI_linklist_free(scenes, NULL);
+
+	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+	WM_event_add_notifier(C, NC_SCENE, NULL);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_move_scenes(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Move Scenes to Collection";
+	ot->idname = "OUTLINER_OT_collection_move_scenes";
+	ot->description = "Move selected scenes to a collection under the Outliner Scenes root";
+
+	ot->invoke = WM_menu_invoke;
+	ot->exec = outliner_collection_move_scenes_exec;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	prop = RNA_def_enum(ot->srna, "collection", DummyRNA_NULL_items, COLLECTION_MOVE_ROOT, "Collection", "");
+	RNA_def_enum_funcs(prop, scene_root_collection_itemf);
+	RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
+	ot->prop = prop;
+}
+
 /* Drag and drop ---------------------------------------------------- */
 
 static int collection_object_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -2905,6 +3098,95 @@ void OUTLINER_OT_collection_drop(wmOperatorType *ot)
 	RNA_def_string(ot->srna, "scene", NULL, MAX_ID_NAME - 2, "Scene", "Scene of the dragged collection");
 }
 
+static int collection_scene_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Main *bmain = CTX_data_main(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	ARegion *ar = CTX_wm_region(C);
+	char name[MAX_ID_NAME - 2];
+	float fmval[2];
+	int uid = 0;
+
+	RNA_string_get(op->ptr, "scene", name);
+	Scene *scene = (Scene *)BKE_libblock_find_name(bmain, ID_SCE, name);
+	if (scene == NULL || ID_IS_LINKED(scene)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te && TREESTORE(te)->type == TSE_SCENE_ROOT_COLLECTION) {
+		uid = te->index;
+	}
+
+	scene->collection_uid = uid;
+	outliner_collection_notify(C, scene);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_scene_drop(wmOperatorType *ot)
+{
+	ot->name = "Drop Scene to Collection";
+	ot->idname = "OUTLINER_OT_collection_scene_drop";
+	ot->description = "Drag a scene to a collection under the Outliner Scenes root";
+
+	ot->invoke = collection_scene_drop_invoke;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+	RNA_def_string(ot->srna, "scene", "Scene", MAX_ID_NAME, "Scene", "Dragged scene");
+}
+
+static int collection_scene_folder_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Main *bmain = CTX_data_main(C);
+	Scene *owner = outliner_scene_root_collection_owner(bmain);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	ARegion *ar = CTX_wm_region(C);
+	char name[MAX_NAME];
+	float fmval[2];
+	SceneCollection *parent = NULL;
+
+	if (owner == NULL || ID_IS_LINKED(owner)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	RNA_string_get(op->ptr, "collection", name);
+	SceneCollection *sc = BKE_scene_collection_find_name(owner, name);
+	if (sc == NULL || (sc->flag & SCECOL_SCENE_GROUP) == 0) {
+		return OPERATOR_CANCELLED;
+	}
+
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
+	TreeElement *te = outliner_dropzone_find(soops, fmval, true);
+	if (te && TREESTORE(te)->type == TSE_SCENE_ROOT_COLLECTION) {
+		parent = te->directdata;
+	}
+
+	if (!BKE_scene_collection_move(owner, sc, parent)) {
+		BKE_report(op->reports, RPT_WARNING, "Cannot move a collection inside itself");
+		return OPERATOR_CANCELLED;
+	}
+
+	outliner_collection_notify(C, owner);
+	return OPERATOR_FINISHED;
+}
+
+void OUTLINER_OT_collection_scene_folder_drop(wmOperatorType *ot)
+{
+	ot->name = "Drop Scene Collection";
+	ot->idname = "OUTLINER_OT_collection_scene_folder_drop";
+	ot->description = "Drag a scene collection under another scene collection or back to the Scenes root";
+
+	ot->invoke = collection_scene_folder_drop_invoke;
+	ot->poll = outliner_collection_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+	RNA_def_string(ot->srna, "collection", "Collection", MAX_NAME, "Collection", "Dragged collection");
+}
+
 /* Not in Game ------------------------------------------------------ */
 
 /* Objects of a "not in game" collection move to layer 20 and start inactive in the
@@ -2921,6 +3203,15 @@ void outliner_collection_game_exclude_set(bContext *C, Scene *scene, SceneCollec
 	}
 	else {
 		sc->flag &= ~SCECOL_GAME_EXCLUDE;
+		/* Layer 20 was shown for the excluded objects; once none is left, hide it again, or
+		 * the game would start whatever else lives on it (e.g. Add Object templates). */
+		if (!BKE_scene_collections_game_exclude_any(scene) &&
+		    (scene->lay & SCECOL_GAME_LAYER) && (scene->lay & ~SCECOL_GAME_LAYER))
+		{
+			scene->lay &= ~SCECOL_GAME_LAYER;
+			BKE_screen_view3d_main_sync(&CTX_data_main(C)->screen, scene);
+			WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+		}
 	}
 	outliner_collection_notify(C, scene);
 }

@@ -647,6 +647,12 @@ class SCENE_PT_custom_props(SceneButtonsPanel, PropertyPanel, Panel):
 class RangeArmorExportSettings(bpy.types.PropertyGroup):
     """Project-level export preferences written to launcher/config.json before RangeArmor Panel opens."""
 
+    cook_before_export: bpy.props.BoolProperty(
+        name="Cook before export",
+        description="Prepare a fresh cooked cache for one-click export; disable to package without cooked files",
+        default=True,
+    )
+
     export_windows64: bpy.props.BoolProperty(
         name="Windows 64-bit",
         description="Include a Windows 64-bit build when exporting with RangeArmor Panel",
@@ -685,6 +691,9 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
+    def draw_header(self, context):
+        self.layout.label(text="", icon='DESKTOP')
+
     def draw(self, context):
         layout = self.layout
 
@@ -706,7 +715,8 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box.label(text="Empty fields keep the RangeArmor Panel defaults", icon='INFO')
 
         box = layout.box()
-        box.label(text="Export:", icon="RENDER_ANIMATION")
+        box.label(text="Export:", icon="EXPORT")
+        box.prop(export, "cook_before_export")
         box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
         box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
         box.label(text="The file must be saved in the project's data/ folder", icon='INFO')

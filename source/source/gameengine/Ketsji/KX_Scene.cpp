@@ -38,8 +38,10 @@
 #include <algorithm>
 #include <cmath>
 
+#include "CM_WorkCounters.h"
 #include "KX_Scene.h"
 #include "KX_RainAura.h"
+#include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
@@ -94,6 +96,8 @@
 #include "DNA_scene_types.h"
 #include "DNA_property_types.h"
 #include "DNA_world_types.h"
+#include "DNA_object_types.h"
+#include "BKE_scene.h" // SETLOOPER
 
 #include "KX_NodeRelationships.h"
 
@@ -291,6 +295,26 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_splash_rate = world->rain_splash_rate;
 			filters.rain_splash_intensity = world->rain_splash_intensity;
 			filters.rain_splash_distance = world->rain_splash_distance;
+			filters.rain_ripple_size = world->rain_ripple_size;
+			filters.rain_ripple_rate = world->rain_ripple_rate;
+			filters.rain_splash_normal = world->rain_splash_normal;
+			filters.rain_splash_min_up = world->rain_splash_min_up;
+			filters.useRainPuddles = (world->weather_flag & WO_WEATHER_RAIN_PUDDLES) ? true : false;
+			filters.useRainPuddleSSR = (world->weather_flag & WO_WEATHER_RAIN_PUDDLE_SSR) ? true : false;
+			filters.useRainRipplePuddle = (world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) ? true : false;
+			filters.useRainSplashPuddle = (world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) ? true : false;
+			filters.rain_puddle_amount = world->rain_puddle_amount;
+			filters.rain_puddle_size = world->rain_puddle_size;
+			filters.rain_puddle_darkness = world->rain_puddle_darkness;
+			filters.rain_puddle_reflection = world->rain_puddle_reflection;
+			filters.rain_puddle_distance = world->rain_puddle_distance;
+			filters.rain_puddle_min_up = world->rain_puddle_min_up;
+			filters.rain_sky_horizon[0] = world->horr;
+			filters.rain_sky_horizon[1] = world->horg;
+			filters.rain_sky_horizon[2] = world->horb;
+			filters.rain_sky_zenith[0] = world->zenr;
+			filters.rain_sky_zenith[1] = world->zeng;
+			filters.rain_sky_zenith[2] = world->zenb;
 		}
 
 		if (world->weather_flag & WO_WEATHER_CLOUDS) {
@@ -732,11 +756,22 @@ void KX_Scene::UpdateEarthquake(double curtime)
 
 void KX_Scene::Suspend()
 {
+	if (!m_suspend) {
+		// The logic that would stop the sounds does not run while suspended (pause menu): hold them here.
+		for (KX_Speaker *speaker : m_speakerlist) {
+			speaker->SuspendSound();
+		}
+	}
 	m_suspend = true;
 }
 
 void KX_Scene::Resume()
 {
+	if (m_suspend) {
+		for (KX_Speaker *speaker : m_speakerlist) {
+			speaker->ResumeSound();
+		}
+	}
 	m_suspend = false;
 }
 
@@ -810,8 +845,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	m_map_gameobject_to_replica[gameobj] = newobj;
 
 	// Also register 'timers' (time properties) of the replica.
-	for (unsigned short i = 0, numprops = newobj->GetPropertyCount(); i < numprops; ++i) {
-		EXP_Value *prop = newobj->GetProperty(i);
+	// Iterate the map directly: GetProperty(i) restarts the walk on every call (O(n^2)).
+	for (const auto& pair : newobj->GetProperties()) {
+		EXP_Value *prop = pair.second;
 
 		if (prop->GetProperty("timer")) {
 			m_timemgr->AddTimeProperty(prop);
@@ -846,9 +882,9 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 		}
 		AddNavMeshObstacle(newobj);
 	}
-	// Reconstruct nav mesh.
-	if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_NAVMESH) {
-		static_cast<KX_NavMeshObject *>(gameobj)->BuildNavMesh();
+	// Build the nav mesh of the replica (ProcessReplica leaves it empty); the original keeps its own.
+	if (newobj->GetGameObjectType() == SCA_IObject::OBJ_NAVMESH) {
+		static_cast<KX_NavMeshObject *>(newobj)->BuildNavMesh();
 	}
 
 	// Register object for component update.
@@ -960,6 +996,25 @@ void KX_Scene::StartInitSpeakers()
       speaker->startInitPlay();
     }
   }
+}
+
+bool KX_Scene::SetObjectLifeTime(KX_GameObject *gameobj, float seconds)
+{
+	if (m_inactivelist->SearchValue(gameobj)) {
+		return false;
+	}
+
+	const auto it = std::find(m_tempObjectList.begin(), m_tempObjectList.end(), gameobj);
+	if (seconds > 0.0f) {
+		if (it == m_tempObjectList.end()) {
+			m_tempObjectList.push_back(gameobj);
+		}
+	}
+	else if (it != m_tempObjectList.end()) {
+		m_tempObjectList.erase(it);
+	}
+	gameobj->SetLifeTime(seconds > 0.0f ? seconds : 0.0f);
+	return true;
 }
 
 /*
@@ -1209,18 +1264,49 @@ bool KX_Scene::IsObjectInGroup(KX_GameObject *gameobj) const
 
 KX_GameObject *KX_Scene::FindInactiveObjectAcrossScenes(const std::string& name)
 {
-	if (KX_GameObject *ob = m_inactivelist->FindValue(name)) {
+	if (KX_GameObject *ob = FindInactiveObjectByName(name)) {
 		return ob;
 	}
 	for (KX_Scene *scene : KX_GetActiveEngine()->CurrentScenes()) {
 		if (scene == this) {
 			continue;
 		}
-		if (KX_GameObject *ob = scene->GetInactiveList()->FindValue(name)) {
+		if (KX_GameObject *ob = scene->FindInactiveObjectByName(name)) {
 			return ob;
 		}
 	}
 	return nullptr;
+}
+
+KX_GameObject *KX_Scene::FindInactiveObjectByName(const std::string& name) const
+{
+	const auto it = m_inactiveNameIndex.find(name);
+	return (it != m_inactiveNameIndex.end()) ? it->second : nullptr;
+}
+
+void KX_Scene::IndexInactiveObject(KX_GameObject *gameobj)
+{
+	// emplace() never overwrites an existing key, matching the "first match in list order"
+	// behaviour of the old linear FindValue() scan when two inactive objects share a name.
+	m_inactiveNameIndex.emplace(gameobj->GetName(), gameobj);
+}
+
+void KX_Scene::UnindexInactiveObject(KX_GameObject *gameobj)
+{
+	const auto it = m_inactiveNameIndex.find(gameobj->GetName());
+	if (it == m_inactiveNameIndex.end() || it->second != gameobj) {
+		return;
+	}
+	m_inactiveNameIndex.erase(it);
+	// Rare case: another inactive object still shares this name (duplicate-named templates
+	// in the inactive layer). Re-index it so FindValue-by-name keeps finding the next one in
+	// list order, same as the old linear scan would after removing the first match.
+	for (KX_GameObject *other : m_inactivelist) {
+		if (other != gameobj && other->GetName() == gameobj->GetName()) {
+			m_inactiveNameIndex.emplace(other->GetName(), other);
+			break;
+		}
+	}
 }
 
 KX_GameObject *KX_Scene::AddReplicaObject(KX_GameObject *originalobj, KX_GameObject *referenceobj, float lifespan)
@@ -1237,13 +1323,9 @@ KX_GameObject *KX_Scene::AddReplicaObject(KX_GameObject *originalobj, KX_GameObj
 	/* Add a timebomb to this object
 	 * lifespan of zero means 'this object lives forever'. */
 	if (lifespan > 0.0f) {
-		// For now, convert between so called frames and realtime.
+		// lifespan is in legacy 50 Hz logic frames, stored as seconds.
 		m_tempObjectList.push_back(replica);
-		/* This convert the life from frames to sort-of seconds, hard coded 0.02 that assumes we have 50 frames per second
-		 * if you change this value, make sure you change it in KX_GameObject::pyattr_get_life property too. */
-		EXP_Value *fval = new EXP_FloatValue(lifespan * 0.02f);
-		replica->SetProperty("::timebomb", fval);
-		fval->Release();
+		replica->SetLifeTime(lifespan / KX_GameObject::LifeFramesPerSecond);
 	}
 
 	// Add to 'rootparent' list (this is the list of top hierarchy objects, updated each frame).
@@ -1424,8 +1506,8 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	// The sensors/controllers/actuators must also be released, this is done in ~SCA_IObject.
 
 	// Now remove the timer properties from the time manager.
-	for (unsigned short i = 0, numprops = gameobj->GetPropertyCount(); i < numprops; ++i) {
-		EXP_Value *propval = gameobj->GetProperty(i);
+	for (const auto& pair : gameobj->GetProperties()) {
+		EXP_Value *propval = pair.second;
 		if (propval->GetProperty("timer")) {
 			m_timemgr->RemoveTimeProperty(propval);
 		}
@@ -1455,6 +1537,14 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	m_componentManager.UnregisterObject(gameobj);
 	m_destructionManager.UnregisterObject(gameobj);
 
+	// Free the bitmap text meshes duplicated for this replica, the converter would keep them until the scene ends.
+	if (!gameobj->GetBitmapTextMeshes().empty()) {
+		BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+		for (KX_Mesh *mesh : gameobj->GetBitmapTextMeshes()) {
+			converter->UnregisterMesh(this, mesh);
+		}
+	}
+
 	gameobj->RemoveMeshes();
 
 	m_rendererManager->InvalidateViewpoint(gameobj);
@@ -1474,6 +1564,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_inactivelist->RemoveValue(gameobj)) {
+		UnindexInactiveObject(gameobj);
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_fontlist->RemoveValue(gameobj)) {
@@ -1483,6 +1574,8 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_cameralist->RemoveValue(gameobj)) {
+		// Nothing may keep pointing at the camera being removed (hiddenFromCamera).
+		KX_GameObject::ClearHiddenFromCamera(m_objectlist, static_cast<KX_Camera *>(gameobj));
 		ret = (gameobj->Release() != nullptr);
 	}
 	if (m_renderlist->RemoveValue(gameobj)) {
@@ -1498,6 +1591,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	CM_ListRemoveIfFound(m_gpuParticleColliderObjects, gameobj);
 	if (m_rainAura) {
 		m_rainAura->RemoveObject(gameobj);
+	}
+	if (m_rainSurfaceMask) {
+		m_rainSurfaceMask->RemoveObject(gameobj);
 	}
 	if (m_rainLightning) {
 		m_rainLightning->RemoveObject(gameobj);
@@ -1655,9 +1751,89 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, RA
 	return CalculateVisibleMeshes(cam, cam->GetFrustum(eye), layer, is_shadowbuf);
 }
 
+void KX_Scene::BeginShadowCulling()
+{
+	m_shadowCullScope = true;
+	m_shadowCullCacheValid = false;
+}
+
+void KX_Scene::BuildShadowCullCache()
+{
+	m_boundingBoxManager->Update(false);
+
+	m_shadowCullCache.clear();
+	m_shadowCullCache.reserve(m_renderlist->GetCount());
+	for (KX_GameObject *gameobj : m_renderlist) {
+		if (!gameobj->Renderable(0)) {
+			continue;
+		}
+		gameobj->UpdateBounds(false);
+
+		const SG_BBox& aabb = gameobj->GetCullingNode().GetAabb();
+		const mt::vec3& scale = gameobj->NodeGetWorldScaling();
+		const float maxscale = std::max(std::max(fabs(scale.x), fabs(scale.y)), fabs(scale.z));
+
+		ShadowCullEntry entry;
+		entry.m_object = gameobj;
+		entry.m_layer = gameobj->GetLayer();
+		entry.m_trans = gameobj->NodeGetWorldTransform();
+		entry.m_center = entry.m_trans * aabb.GetCenter();
+		entry.m_radius = maxscale * aabb.GetRadius();
+		entry.m_aabbMin = aabb.GetMin();
+		entry.m_aabbMax = aabb.GetMax();
+		m_shadowCullCache.push_back(entry);
+	}
+
+	m_boundingBoxManager->ClearModified();
+	m_shadowCullCacheValid = true;
+}
+
+const std::vector<KX_Scene::ShadowCullEntry>& KX_Scene::GetShadowCullSnapshot()
+{
+	if (m_shadowCullScope && !m_shadowCullCacheValid) {
+		BuildShadowCullCache();
+	}
+	return m_shadowCullCache;
+}
+
+void KX_Scene::EndShadowCulling()
+{
+	m_shadowCullScope = false;
+	m_shadowCullCacheValid = false;
+	m_shadowCullCache.clear();
+}
+
 std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf)
 {
 	std::vector<KX_GameObject *> objects;
+
+	if (is_shadowbuf && m_shadowCullScope) {
+		if (!m_shadowCullCacheValid) {
+			BuildShadowCullCache();
+		}
+		// Same sphere-then-box test as KX_CullingHandler, on the snapshot. The objects'
+		// culled flags are left alone: the main camera pass rewrites them after the shadows.
+		objects.reserve(m_shadowCullCache.size());
+		for (const ShadowCullEntry& entry : m_shadowCullCache) {
+			if (layer != 0 && !(entry.m_layer & layer)) {
+				continue;
+			}
+			const SG_Frustum::TestType sphereTest = frustum.SphereInsideFrustum(entry.m_center, entry.m_radius);
+			bool culled = true;
+			if (sphereTest == SG_Frustum::INSIDE) {
+				culled = false;
+			}
+			else if (sphereTest == SG_Frustum::INTERSECT) {
+				const mt::mat4 mat = mt::mat4::FromAffineTransform(entry.m_trans);
+				culled = (frustum.AabbInsideFrustum(entry.m_aabbMin, entry.m_aabbMax, mat) == SG_Frustum::OUTSIDE);
+			}
+			if (!culled) {
+				objects.push_back(entry.m_object);
+			}
+		}
+		return objects;
+	}
+
 	objects.reserve(m_renderlist->GetCount());
 	m_boundingBoxManager->Update(false);
 
@@ -1961,22 +2137,14 @@ void KX_Scene::LogicBeginFrame(double curtime, double framestep)
 {
 	// Have a look at temp objects.
 	for (KX_GameObject *gameobj : m_tempObjectList) {
-		EXP_FloatValue *propval = static_cast<EXP_FloatValue *>(gameobj->GetProperty("::timebomb"));
+		const float timeleft = gameobj->GetLifeTime() - (float)framestep;
 
-		if (propval) {
-			const float timeleft = propval->GetNumber() - framestep;
-
-			if (timeleft > 0) {
-				propval->SetFloat(timeleft);
-			}
-			else {
-				// Remove obj, remove the object from tempObjectList in NewRemoveObject only.
-				DelayedRemoveObject(gameobj);
-			}
+		if (timeleft > 0.0f) {
+			gameobj->SetLifeTime(timeleft);
 		}
 		else {
-			// All object is the tempObjectList should have a clock.
-			BLI_assert(false);
+			// Remove obj, remove the object from tempObjectList in NewRemoveObject only.
+			DelayedRemoveObject(gameobj);
 		}
 	}
 	m_logicmgr->BeginFrame(curtime, framestep);
@@ -1995,6 +2163,27 @@ void KX_Scene::AddCullingObject(KX_GameObject *gameobj)
 void KX_Scene::RemoveCullingObject(KX_GameObject *gameobj)
 {
 	CM_ListRemoveIfFound(m_cullinglist, gameobj);
+}
+
+/* Visit the same direct game-object children returned by KX_GameObject::GetChildren()
+ * without building a temporary vector. Nodes without a client object are inverse-parent
+ * links, so walk through them; a node that owns a game object ends this branch. */
+template<class Callback>
+static bool visit_child_game_objects(const SG_Node *node, Callback&& callback)
+{
+	const NodeList& children = node->GetChildren();
+	for (SG_Node *childNode : children) {
+		KX_GameObject *child = static_cast<KX_GameObject *>(childNode->GetClientObject());
+		if (child) {
+			if (!callback(child)) {
+				return false;
+			}
+		}
+		else if (!visit_child_game_objects(childNode, callback)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 // Shared by both passes: decide whether this object's pose is worth resolving in full this frame
@@ -2016,21 +2205,11 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 	if (!needs_update) {
 		// If we got here, we're looking to update an armature, so check its children meshes
 		// to see if we need to bother with a more expensive pose update
-		const std::vector<KX_GameObject *> children = gameobj->GetChildren();
-
-		bool has_mesh = false;
-		//, has_non_mesh = false
-
-		// Check for meshes that haven't been culled
-		for (KX_GameObject *child : children) {
+		// Check for meshes that haven't been culled. Stop as soon as a child requires a pose.
+		visit_child_game_objects(gameobj->GetNode(), [&needs_update](KX_GameObject *child) {
 			if (!child->GetCullingNode().GetCulled()) {
 				needs_update = true;
-				break;
-			}
-
-			if (!child->GetMeshList().empty()) {
-				has_mesh = true;
-				//has_non_mesh = true;
+				return false;
 			}
 
 			/* A skinned child's culling box follows the last applied pose, so skipping the pose
@@ -2038,19 +2217,10 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 			 * view from off-screen never shows up). Blender 2.4x always updated armatures. */
 			if (child->GetDeformer()) {
 				needs_update = true;
-				break;
+				return false;
 			}
-			//else {
-			//	has_mesh = true;
-			//}
-		}
-
-		// If we didn't find a non-culled mesh, check to see
-		// if we even have any meshes, and update if this
-		// armature has only non-mesh children.
-		//if (!needs_update && !has_mesh && has_non_mesh) {
-		//	needs_update = true;
-		//}
+			return true;
+		});
 	}
 
 	return needs_update;
@@ -2089,7 +2259,6 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 
 	KX_GameObject *gameobj = (KX_GameObject *)taskdata;
 
-	const std::vector<KX_GameObject *> children = gameobj->GetChildren();
 	KX_GameObject *parent = gameobj->GetParent();
 
 	// Only do deformers here if they are not parented to an armature, otherwise the armature will
@@ -2098,11 +2267,12 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 		gameobj->GetDeformer()->Update();
 	}
 
-	for (KX_GameObject *child : children) {
+	visit_child_game_objects(gameobj->GetNode(), [](KX_GameObject *child) {
 		if (child->GetDeformer()) {
 			child->GetDeformer()->Update();
 		}
-	}
+		return true;
+	});
 
 	if (doProfiling) {
 		// set time elapsed.
@@ -2203,6 +2373,17 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 	}
 #endif  // WITH_PYTHON
 
+	// Armatures stay registered: their pose can be driven by constraints and child deformers even
+	// without a KX action. Ordinary objects need this list only while one of their action layers is
+	// active. This runs after event callbacks so an action restarted by its final event remains in
+	// the list for the next frame.
+	m_animatedlist.erase(std::remove_if(m_animatedlist.begin(), m_animatedlist.end(),
+	                                    [](KX_GameObject *gameobj) {
+		                                    return gameobj->GetGameObjectType() != SCA_IObject::OBJ_ARMATURE &&
+		                                           !gameobj->HasActiveActions();
+	                                    }),
+	                     m_animatedlist.end());
+
 	return true;
 }
 
@@ -2219,8 +2400,12 @@ void KX_Scene::UpdateAnimationDeformers()
 
 void KX_Scene::LogicUpdateFrame(double curtime)
 {
+	// Python components and actuators are separate lines of the profile.
+	KX_TimeCategoryLogger& logger = KX_GetActiveEngine()->GetLogger();
+	logger.StartLog(KX_KetsjiEngine::tc_components);
 	m_componentManager.UpdateComponents();
 
+	logger.StartLog(KX_KetsjiEngine::tc_actuators);
 	m_logicmgr->UpdateFrame(curtime);
 
 	// 3D Audio Update. (only for speakers)
@@ -2267,9 +2452,12 @@ void KX_Scene::UpdateParents()
 	// We use the SG dynamic list
 	SG_Node *node;
 
+	int updatedNodes = 0;
 	while ((node = SG_Node::GetNextScheduled(m_sghead))) {
 		node->UpdateWorldData();
+		++updatedNodes;
 	}
+	CM_WorkCount(CM_WORK_SCENE_NODE_UPDATES, updatedNodes);
 
 	// The list must be empty here
 	BLI_assert(m_sghead.Empty());
@@ -2344,6 +2532,14 @@ void KX_Scene::UpdateRainAura(double time)
 KX_RainAura *KX_Scene::GetRainAura() const
 {
 	return m_rainAura.get();
+}
+
+KX_RainSurfaceMask *KX_Scene::GetRainSurfaceMask()
+{
+	if (!m_rainSurfaceMask) {
+		m_rainSurfaceMask.reset(new KX_RainSurfaceMask());
+	}
+	return m_rainSurfaceMask.get();
 }
 
 void KX_Scene::UpdateRainLightning(double time)
@@ -2808,9 +3004,20 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 	m_inactivelist->MergeList(other->GetInactiveList());
 	other->GetInactiveList()->ReleaseAndRemoveAll();
+	// emplace() keeps this scene's own entries winning on a name clash, matching the order
+	// FindInactiveObjectByName() would see them in after the merge (this scene's objects
+	// come before other's in m_inactivelist).
+	for (const auto& pair : other->m_inactiveNameIndex) {
+		m_inactiveNameIndex.emplace(pair.first, pair.second);
+	}
+	other->m_inactiveNameIndex.clear();
 
 	m_parentlist->MergeList(other->GetRootParentList());
 	other->GetRootParentList()->ReleaseAndRemoveAll();
+
+	// Timed objects keep counting down in the target scene.
+	m_tempObjectList.insert(m_tempObjectList.end(), other->m_tempObjectList.begin(), other->m_tempObjectList.end());
+	other->m_tempObjectList.clear();
 
 	m_lightlist->MergeList(other->GetLightList());
 	other->GetLightList()->ReleaseAndRemoveAll();
@@ -3497,6 +3704,7 @@ PyTypeObject KX_Scene::Type = {
 
 PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, addObject),
+	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, convertObject),
 	EXP_PYMETHODTABLE(KX_Scene, end),
 	EXP_PYMETHODTABLE(KX_Scene, restart),
 	EXP_PYMETHODTABLE(KX_Scene, replace),
@@ -3670,6 +3878,27 @@ PyObject *KX_Scene::pyattr_get_objects_inactive(EXP_PyObjectPlus *self_v, const 
 {
 	KX_Scene *self = static_cast<KX_Scene *>(self_v);
 	return self->GetInactiveList()->GetProxy();
+}
+
+PyObject *KX_Scene::pyattr_get_unconverted_objects(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	// Names scene.convertObject() can still create: left out at load, not Editor Only nor released.
+	KX_Scene *self = static_cast<KX_Scene *>(self_v);
+	BL_Converter *converter = KX_GetActiveEngine()->GetConverter();
+	PyObject *list = PyList_New(0);
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(self->GetBlenderScene(), sce_iter, base)) {
+		Object *ob = base->object;
+		if (!self->m_logicmgr->FindGameObjByBlendObj(ob) && !(ob->gameflag & OB_TASK_EDITOR_ONLY) &&
+		    !converter->IsObjectDataFreed(ob))
+		{
+			PyObject *name = PyUnicode_FromString(ob->id.name + 2);
+			PyList_Append(list, name);
+			Py_DECREF(name);
+		}
+	}
+	return list;
 }
 
 PyObject *KX_Scene::pyattr_get_lights(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
@@ -3896,6 +4125,7 @@ PyAttributeDef KX_Scene::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("name", KX_Scene, pyattr_get_name),
 	EXP_PYATTRIBUTE_RO_FUNCTION("objects", KX_Scene, pyattr_get_objects),
 	EXP_PYATTRIBUTE_RO_FUNCTION("objectsInactive", KX_Scene, pyattr_get_objects_inactive),
+	EXP_PYATTRIBUTE_RO_FUNCTION("unconvertedObjects", KX_Scene, pyattr_get_unconverted_objects),
 	EXP_PYATTRIBUTE_RO_FUNCTION("lights", KX_Scene, pyattr_get_lights),
 	EXP_PYATTRIBUTE_RO_FUNCTION("texts", KX_Scene, pyattr_get_texts),
     EXP_PYATTRIBUTE_RO_FUNCTION("speakers", KX_Scene, pyattr_get_speakers),
@@ -4033,12 +4263,41 @@ EXP_PYMETHODDEF_DOC(KX_Scene, addObject,
 	return replica->GetProxy();
 }
 
-EXP_PYMETHODDEF_DOC(KX_Scene, end,
-                    "end()\n"
-                    "Removes this scene from the game.\n")
+EXP_PYMETHODDEF_DOC(KX_Scene, convertObject,
+                    "convertObject(name, children=True)\n"
+                    "Converts an object of this scene left out at load by its Convert flag (and its\n"
+                    "unconverted children). It lands in objects when on an active layer, otherwise in\n"
+                    "objectsInactive (ready for addObject). Returns the object; an object already\n"
+                    "converted is returned as is.\n")
 {
+	const char *name;
+	int children = 1;
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "s|p:convertObject", {"name", "children", 0}, &name, &children)) {
+		return nullptr;
+	}
 
-	KX_GetActiveEngine()->RemoveScene(m_sceneName);
+	std::string error;
+	KX_GameObject *gameobj = KX_GetActiveEngine()->GetConverter()->ConvertSceneObject(this, name, children, error);
+	if (!gameobj) {
+		PyErr_Format(PyExc_ValueError, "scene.convertObject(): \"%s\": %s", name, error.c_str());
+		return nullptr;
+	}
+	return gameobj->GetProxy();
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, end,
+                    "end(keep=False)\n"
+                    "Removes this scene from the game.\n"
+                    " keep = Hide and pause the scene instead of destroying it; addScene of it brings it back at once,\n"
+                    "   in the state it was left.\n")
+{
+	int keep = 0;
+	static const char *kwlist[] = {"keep", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|p:end", const_cast<char **>(kwlist), &keep)) {
+		return nullptr;
+	}
+
+	KX_GetActiveEngine()->RemoveScene(m_sceneName, keep != 0);
 
 	Py_RETURN_NONE;
 }

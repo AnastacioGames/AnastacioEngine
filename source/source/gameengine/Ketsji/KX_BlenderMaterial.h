@@ -53,6 +53,8 @@ public:
 	virtual Scene *GetBlenderScene() const;
 	virtual SCA_IScene *GetScene() const;
 	virtual void ReloadMaterial();
+	/// Sends the shader to the driver ahead of ReloadMaterial(), see BL_Converter::PrefetchShaders().
+	void PrefetchMaterial();
 
 	void InitTextures();
 

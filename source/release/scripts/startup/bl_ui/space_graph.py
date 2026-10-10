@@ -36,7 +36,8 @@ class GRAPH_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        GRAPH_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            GRAPH_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.prop(st, "mode", text="")
 

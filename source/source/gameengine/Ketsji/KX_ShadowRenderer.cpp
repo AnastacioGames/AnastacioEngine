@@ -28,6 +28,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -349,6 +350,64 @@ struct CascadeMatrixCache
 };
 }  // namespace
 
+/* Auto shadow update (Spot/Point with m_autoShadow): true when the shadow drawn last time is
+ * still right, i.e. the lamp and every renderable object within its distance kept the same
+ * transform, none of them is deformed (armature/shape keys), and none entered or left the range.
+ * Objects moved only by vertex shader code (wind) are not seen; such lamps keep auto off. */
+static bool AutoShadowStillValid(KX_Scene *scene, KX_LightObject *light, RAS_ILightObject *raslight)
+{
+	const mt::mat3x4 lightTrans = light->NodeGetWorldTransform();
+	const float params[8] = { raslight->m_distance, raslight->m_spotsize, raslight->m_spotblend,
+	                          raslight->m_shadowclipstart, raslight->m_shadowclipend, raslight->m_shadowbias,
+	                          raslight->m_shadowbleedbias, (float)raslight->GetShadowLayer() };
+	const mt::vec3 lightPos = light->NodeGetWorldPosition();
+	const int layer = raslight->GetShadowLayer();
+
+	const auto& snapshot = scene->GetShadowCullSnapshot();
+	const auto inRange = [&](const KX_Scene::ShadowCullEntry& entry) {
+		if (layer != 0 && !(entry.m_layer & layer)) {
+			return false;
+		}
+		const float reach = raslight->m_distance + entry.m_radius;
+		return !((entry.m_center - lightPos).LengthSquared() > reach * reach);
+	};
+
+	bool valid = raslight->m_autoShadowValid &&
+	             Mat3x4NearlyEqual(lightTrans, raslight->m_autoShadowLightTrans) &&
+	             memcmp(params, raslight->m_autoShadowParams, sizeof(params)) == 0;
+	if (valid) {
+		size_t casterCount = 0;
+		for (const KX_Scene::ShadowCullEntry& entry : snapshot) {
+			if (!inRange(entry)) {
+				continue;
+			}
+			++casterCount;
+			const auto it = raslight->m_autoShadowCasters.find(entry.m_object);
+			if (entry.m_object->GetDeformer() || it == raslight->m_autoShadowCasters.end() ||
+			    !Mat3x4NearlyEqual(entry.m_trans, it->second)) {
+				valid = false;
+				break;
+			}
+		}
+		valid = valid && casterCount == raslight->m_autoShadowCasters.size();
+	}
+
+	if (!valid) {
+		// Allocate caster entries only when replacing an invalid shadow snapshot.
+		std::unordered_map<const void *, mt::mat3x4> casters;
+		for (const KX_Scene::ShadowCullEntry& entry : snapshot) {
+			if (inRange(entry)) {
+				casters.emplace(entry.m_object, entry.m_trans);
+			}
+		}
+		raslight->m_autoShadowLightTrans = lightTrans;
+		memcpy(raslight->m_autoShadowParams, params, sizeof(params));
+		raslight->m_autoShadowCasters.swap(casters);
+		raslight->m_autoShadowValid = true;
+	}
+	return valid;
+}
+
 void KX_ShadowRenderer::Render(KX_Scene *scene)
 {
 	static std::unordered_map<KX_LightObject *, CascadeMatrixCache> cascadeCache;
@@ -424,6 +483,13 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 		// a "ghost" of an object that's gone. Invalidate once per scene per frame, not per pass.
 		const bool staticCasterListDirty = scene->IsStaticShadowCasterListDirty();
 
+		// One bounds snapshot for every light/cascade/face culled below.
+		struct ShadowCullingScope {
+			KX_Scene *m_scene;
+			ShadowCullingScope(KX_Scene *scene) : m_scene(scene) { m_scene->BeginShadowCulling(); }
+			~ShadowCullingScope() { m_scene->EndShadowCulling(); }
+		} shadowCullingScope(scene);
+
 		for (KX_LightObject *light : lightlist) {
 			RAS_ILightObject *raslight = light->GetLightData();
 			if (staticCasterListDirty && raslight->m_staticShadow && raslight->HasCascadedShadow()) {
@@ -449,8 +515,18 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 			// self-gates per cascade (NeedStaticShadowUpdate), so this coarse gate is bypassed --
 			// otherwise, since nothing sets m_requestShadowUpdate automatically as the camera moves,
 			// the whole cascade block (both sub-passes) would simply stop running.
-			if (light->GetVisible() && !light->GetDistanceCulled() && raslight->HasShadowBuffer() &&
-			    (useStaticSplit || raslight->NeedShadowUpdate())) {
+			const bool lightActive = light->GetVisible() && !light->GetDistanceCulled() && raslight->HasShadowBuffer();
+			bool needUpdate = useStaticSplit || raslight->NeedShadowUpdate();
+			if (raslight->m_autoShadow && !useCascade && lightActive) {
+				// A manual request or a change in the caster list still forces the redraw.
+				const bool stillValid = AutoShadowStillValid(scene, light, raslight);
+				needUpdate = !stillValid || raslight->m_requestShadowUpdate || staticCasterListDirty;
+				raslight->m_requestShadowUpdate = false;
+			}
+			else if (!lightActive) {
+				raslight->m_autoShadowValid = false;
+			}
+			if (lightActive && needUpdate) {
 				const bool usePoint = raslight->HasPointShadow();
 				const short numPasses = useCascade ? 3 : (usePoint ? 6 : 1);
 				++shadowUpdatedLights;

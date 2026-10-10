@@ -29,7 +29,8 @@ class CONSOLE_HT_header(Header):
 
         layout.template_header()
 
-        CONSOLE_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            CONSOLE_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.operator("console.autocomplete", text="Autocomplete")
 

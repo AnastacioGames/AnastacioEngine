@@ -114,7 +114,7 @@ void node_parallax_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int
 {
 	const char *name;
 	RNA_enum_name(rna_enum_node_parallax_items, node->custom1, &name);
-	BLI_strncpy(label, IFACE_(name), maxlen);
+	BLI_snprintf(label, maxlen, "%s (%s)", IFACE_("Parallax"), IFACE_(name));
 }
 
 

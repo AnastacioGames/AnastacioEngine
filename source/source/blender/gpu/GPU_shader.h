@@ -43,7 +43,26 @@ enum {
 	GPU_SHADER_FLAGS_FOLIAGE			= (1 << 3),
 	GPU_SHADER_FLAGS_USER_CODE			= (1 << 4),
 	GPU_SHADER_FLAGS_SPECIAL_SKINNING	= (1 << 5),
+	/* Program binary may come from / go to the cooked file (only for programs never relinked later). */
+	GPU_SHADER_FLAGS_BINARY_CACHE		= (1 << 6),
 };
+
+/* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.
+ * find returns the binary of the key (valid until the hooks are cleared) or NULL. */
+typedef const void *(*GPUShaderBinaryFind)(unsigned long long key, unsigned int *format, int *size);
+typedef void (*GPUShaderBinaryAdd)(unsigned long long key, unsigned int format, const void *data, int size);
+void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add);
+/* Hash of the GPU and driver (binaries of another one are useless), 0 when program binaries are unsupported. */
+unsigned long long GPU_shader_binary_device_key(void);
+
+/* Parallel compile (GL_ARB_parallel_shader_compile): between begin and end, material programs (BINARY_CACHE flag)
+ * are only sent to the driver and kept pending, create returns NULL. The next create of the same sources takes
+ * the pending program. begin returns false (nothing changes) when the driver lacks the extension. */
+bool GPU_shader_prefetch_begin(void);
+void GPU_shader_prefetch_end(void);
+bool GPU_shader_prefetching(void);
+/* Deletes the pending programs nobody took. */
+void GPU_shader_prefetch_clear(void);
 
 GPUShader *GPU_shader_create(
         const char *vertexcode,
@@ -98,6 +117,8 @@ void GPU_shader_uniform_vector_int(GPUShader *shader, int location, int length,
 void GPU_shader_uniform_texture(GPUShader *shader, int location, struct GPUTexture *tex);
 void GPU_shader_uniform_int(GPUShader *shader, int location, int value);
 void GPU_shader_uniform_float(GPUShader *shader, int location, float value);
+bool GPU_shader_uniform_vector_cached(GPUShader *shader, int location, int length, const float *value);
+bool GPU_shader_uniform_int_cached(GPUShader *shader, int location, int value);
 void GPU_shader_geometry_stage_primitive_io(GPUShader *shader, int input, int output, int number);
 
 int GPU_shader_get_attribute(GPUShader *shader, const char *name);
@@ -155,6 +176,20 @@ typedef struct GPUVertexAttribs {
 	 * (attbary), 0 when unused. The Game unshares vertices and uses gl_VertexID instead. */
 	int barycentric;
 } GPUVertexAttribs;
+
+/* Per-frame counters read and cleared by the game engine profiler (KX_EngineProfiler). */
+enum {
+	GPU_PROFILE_SHADERS = 0,
+	GPU_PROFILE_TEXTURES,
+	GPU_PROFILE_IMAGE_UPLOADS,
+	GPU_PROFILE_TOT
+};
+extern int GPU_profile_counters[GPU_PROFILE_TOT];
+/* RANGE_SHADER_LOG on: shaders bound for the first time since the profiler last cleared it. */
+extern char GPU_profile_first_binds[1024];
+/* RANGE_SHADER_LOG on: profiler frame number written with each line, and a line per GPU texture created. */
+extern long GPU_profile_frame;
+void GPU_profile_log_texture(int w, int h, bool depth, int samples);
 
 #ifdef __cplusplus
 }

@@ -29,12 +29,16 @@
  *  \ingroup bgerast
  */
 
+#include "KX_RenderProfileSample.h"
+
 #include "RAS_MeshSlot.h"
 #include "RAS_MeshUser.h"
 #include "RAS_IMaterial.h"
 #include "RAS_DisplayArray.h"
 #include "RAS_DisplayArrayStorage.h"
 #include "RAS_Mesh.h"
+
+#include <chrono>
 
 #ifdef _MSC_VER
 #  pragma warning (disable:4786)
@@ -80,35 +84,72 @@ void RAS_MeshSlot::GenerateTree(RAS_DisplayArrayUpwardNode& root, RAS_UpwardTree
 
 void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 {
+	// Profiler on: names a draw slow enough to be a hitch (first use compiled by the driver, upload...).
+	struct SlowDrawNote
+	{
+		const RAS_MeshSlotNodeTuple& tuple;
+		const bool on = KX_EngineProfiler::Enabled();
+		std::chrono::steady_clock::time_point start;
+		SlowDrawNote(const RAS_MeshSlotNodeTuple& t) : tuple(t)
+		{
+			if (on) {
+				start = std::chrono::steady_clock::now();
+			}
+		}
+		~SlowDrawNote()
+		{
+			if (!on) {
+				return;
+			}
+			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			if (ms >= 3.0) {
+				char buf[32];
+				snprintf(buf, sizeof(buf), "=%.0fms", ms);
+				KX_EngineProfiler::Note("draw:" + tuple.m_materialData->m_material->GetName() +
+				                        (tuple.m_managerData->m_shaderOverride ? "(override)" : "") + buf);
+			}
+		}
+	} slowDrawNote(tuple);
+	RANGE_RENDER_SAMPLE("draw.mesh_slot");
+	{
+		// Empty block estimates the timer floor for these very short calls.
+		RANGE_RENDER_SAMPLE("draw.timer_floor");
+	}
 	RAS_ManagerNodeData *managerData = tuple.m_managerData;
 	RAS_MaterialNodeData *materialData = tuple.m_materialData;
 	RAS_DisplayArrayNodeData *displayArrayData = tuple.m_displayArrayData;
 	RAS_Rasterizer *rasty = managerData->m_rasty;
-	rasty->SetClientObject(m_meshUser->GetClientObject());
-	rasty->SetFrontFace(m_meshUser->GetFrontFace());
+	{
+		RANGE_RENDER_SAMPLE("draw.object_state");
+		rasty->SetClientObject(m_meshUser->GetClientObject());
+		rasty->SetFrontFace(m_meshUser->GetFrontFace());
+	}
 
 	RAS_DisplayArrayStorage *storage = displayArrayData->m_arrayStorage;
 
 	if (!managerData->m_shaderOverride) {
-		materialData->m_material->ActivateMeshUser(m_meshUser, rasty, managerData->m_trans);
+		{
+			RANGE_RENDER_SAMPLE("draw.material_activate");
+			materialData->m_material->ActivateMeshUser(m_meshUser, rasty, managerData->m_trans);
+		}
 
 		if (materialData->m_zsort && storage) {
-			unsigned int *indexmap = storage->GetIndexMap();
-			if (indexmap) {
-				displayArrayData->m_array->SortPolygons(
-						managerData->m_trans * mt::mat4::ToAffineTransform(m_meshUser->GetMatrix()), indexmap);
-				storage->FlushIndexMap();
-			}
+			storage->SortPolygons(displayArrayData->m_array,
+					managerData->m_trans * mt::mat4::ToAffineTransform(m_meshUser->GetMatrix()));
 		}
 	}
 
-	rasty->PushMatrix();
+	{
+		RANGE_RENDER_SAMPLE("draw.matrix_push");
+		rasty->PushMatrix();
+	}
 
 	if (materialData->m_text) {
 		rasty->IndexPrimitivesText(this);
 	}
 	else {
 		if (displayArrayData->m_applyMatrix) {
+			RANGE_RENDER_SAMPLE("draw.matrix_apply");
 			float mat[16];
 			rasty->GetTransform(m_meshUser->GetMatrix(), materialData->m_drawingMode, mat);
 			rasty->MultMatrix(mat);
@@ -123,7 +164,13 @@ void RAS_MeshSlot::RunNode(const RAS_MeshSlotNodeTuple& tuple)
 				materialData->m_material->UpdateObjectMatrix(m_meshUser, rasty, mat);
 			}
 		}
-		storage->IndexPrimitives();
+		{
+			RANGE_RENDER_SAMPLE("draw.submit");
+			storage->IndexPrimitives();
+		}
 	}
-	rasty->PopMatrix();
+	{
+		RANGE_RENDER_SAMPLE("draw.matrix_pop");
+		rasty->PopMatrix();
+	}
 }

@@ -2,7 +2,7 @@
 
 Execute no editor instalado:
 
-    RangeEngine.exe --background --factory-startup --python \
+    AnastacioEngine.exe --background --factory-startup --python \
         cutscene_native_import_regression.py
 
 O teste cobre os dois formatos aceitos, referências por nome e rejeição de

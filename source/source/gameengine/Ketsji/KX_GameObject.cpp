@@ -36,6 +36,7 @@
 #  pragma warning( disable:4786 )
 #endif
 
+#include "CM_WorkCounters.h"
 #include "KX_GameObject.h"
 #include "KX_RuntimePropertyRegistry.h"
 #include "KX_PythonComponent.h"
@@ -85,6 +86,11 @@
 #include "KX_ParticleSystem.h"
 
 #include "BKE_object.h"
+#include "BKE_global.h"
+#include "BKE_main.h"
+#include "BLI_listbase.h"
+#include "DNA_group_types.h"
+#include "DNA_object_types.h"
 
 #include "BL_BlenderDataConversion.h" // For BL_ConvertDeformer.
 #include "BL_ConvertObjectInfo.h"
@@ -139,6 +145,7 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_convertInfo(nullptr),
 	m_objectColor(mt::one4),
 	m_distance(0.0f),
+	m_lifeTime(0.0f),
 	m_bVisible(true),
 	m_bRender(true),
 	m_bVisibleLOD(true),
@@ -193,6 +200,8 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_convertInfo(other.m_convertInfo),
 	m_objectColor(other.m_objectColor),
 	m_distance(other.m_distance),
+	// Not inherited: a replica only dies if its own addObject()/life asks for it.
+	m_lifeTime(0.0f),
 	m_bVisible(other.m_bVisible),
 	m_bRender(other.m_bRender),
 	m_bVisibleLOD(other.m_bVisibleLOD),
@@ -260,8 +269,31 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 #endif  // WITH_PYTHON
 }
 
+int KX_GameObject::s_hiddenFromCameraCount = 0;
+
+void KX_GameObject::SetHiddenFromCamera(KX_Camera *cam)
+{
+	if ((m_hiddenFromCamera != nullptr) != (cam != nullptr)) {
+		s_hiddenFromCameraCount += cam ? 1 : -1;
+	}
+	m_hiddenFromCamera = cam;
+}
+
+void KX_GameObject::ClearHiddenFromCamera(EXP_ListValue<KX_GameObject> *objects, KX_Camera *cam)
+{
+	if (s_hiddenFromCameraCount == 0 || !objects) {
+		return;
+	}
+	for (KX_GameObject *obj : objects) {
+		if (obj->m_hiddenFromCamera == cam) {
+			obj->SetHiddenFromCamera(nullptr);
+		}
+	}
+}
+
 KX_GameObject::~KX_GameObject()
 {
+	SetHiddenFromCamera(nullptr);
 #ifdef WITH_PYTHON
 	if (m_attr_dict) {
 		PyDict_Clear(m_attr_dict); /* in case of circular refs or other weird cases */
@@ -677,7 +709,6 @@ BL_ActionManager *KX_GameObject::GetActionManager()
 {
 	// We only want to create an action manager if we need it
 	if (!m_actionManager) {
-		GetScene()->AddAnimatedObject(this);
 		m_actionManager.reset(new BL_ActionManager(this));
 	}
 	return m_actionManager.get();
@@ -695,7 +726,15 @@ bool KX_GameObject::PlayAction(const std::string& name,
                                float playback_speed,
                                short blend_mode)
 {
-	return GetActionManager()->PlayAction(name, start, end, layer, priority, blendin, play_mode, layer_weight, ipo_flags, playback_speed, blend_mode);
+	BL_ActionManager *actionManager = GetActionManager();
+	if (!actionManager->PlayAction(name, start, end, layer, priority, blendin, play_mode, layer_weight, ipo_flags, playback_speed, blend_mode)) {
+		return false;
+	}
+
+	// A finished action removes ordinary objects from the scene's update list. Register again only
+	// after PlayAction actually started a layer, so queries and failed action names stay idle.
+	GetScene()->AddAnimatedObject(this);
+	return true;
 }
 
 void KX_GameObject::StopAction(short layer)
@@ -706,6 +745,11 @@ void KX_GameObject::StopAction(short layer)
 bool KX_GameObject::IsActionDone(short layer)
 {
 	return GetActionManager()->IsActionDone(layer);
+}
+
+bool KX_GameObject::HasActiveActions()
+{
+	return m_actionManager && m_actionManager->HasActiveActions();
 }
 
 bool KX_GameObject::IsActionsSuspended()
@@ -991,17 +1035,16 @@ void KX_GameObject::RemoveRessources(const BL_Resource::Library& libraryId)
 
 	for (KX_Mesh *mesh : m_meshes) {
 		// If the mesh comes from this lirbary, remove all meshes.
+		// RemoveMeshes() clears m_meshes, so return right away instead of continuing the loop.
 		if (mesh->Belong(libraryId)) {
 			RemoveMeshes();
-			break;
+			return;
 		}
-		else {
-			// If one of the material used by the mesh comes from this library, remove all meshes too.
-			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
-				if (static_cast<KX_BlenderMaterial *>(meshmat->GetBucket()->GetMaterial())->Belong(libraryId)) {
-					RemoveMeshes();
-					break;
-				}
+		// If one of the material used by the mesh comes from this library, remove all meshes too.
+		for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+			if (static_cast<KX_BlenderMaterial *>(meshmat->GetBucket()->GetMaterial())->Belong(libraryId)) {
+				RemoveMeshes();
+				return;
 			}
 		}
 	}
@@ -1352,8 +1395,14 @@ void KX_GameObject::DuplicateBitmapTextMeshes()
 	for (KX_Mesh *&mesh : m_meshes) {
 		if (mesh->HasBitmapText()) {
 			mesh = mesh->Duplicate();
+			m_bitmapTextMeshes.push_back(mesh);
 		}
 	}
+}
+
+const std::vector<KX_Mesh *>& KX_GameObject::GetBitmapTextMeshes() const
+{
+	return m_bitmapTextMeshes;
 }
 
 void KX_GameObject::UpdateBuckets()
@@ -1381,16 +1430,27 @@ void KX_GameObject::UpdateBuckets()
 
 void KX_GameObject::ReplaceMesh(KX_Mesh *mesh, bool use_gfx, bool use_phys)
 {
+	// Same single mesh already assigned and no physics rebuild requested: nothing changes.
+	if (use_gfx && !use_phys && mesh && m_meshes.size() == 1 && m_meshes[0] == mesh && m_meshUser) {
+		return;
+	}
+
 	if (use_gfx && mesh) {
 		RemoveMeshes();
 		AddMesh(mesh);
 		AddMeshUser();
+		// The new deformer starts in bind pose (T-pose) until the next animation pass, and LOD switches run
+		// after that pass, right before drawing: apply the current pose now so the swap frame is not undeformed.
+		if (RAS_Deformer *deformer = GetDeformer()) {
+			deformer->Update();
+		}
 	}
 
 	// Update the new assigned mesh with the physics mesh.
 	if (use_phys) {
 		if (m_physicsController) {
-			m_physicsController->ReinstancePhysicsShape(nullptr, use_gfx ? nullptr : mesh);
+			// dupli: replicas share the shape info, give this object its own so siblings keep their collision.
+			m_physicsController->ReinstancePhysicsShape(nullptr, use_gfx ? nullptr : mesh, true);
 		}
 	}
 	// Always make sure that the bounding box is updated to the new mesh.
@@ -1402,6 +1462,10 @@ void KX_GameObject::RemoveMeshes()
 {
 	// Remove all mesh slots.
 	if (m_meshUser) {
+		KX_BatchGroup *batchGroup = static_cast<KX_BatchGroup *>(m_meshUser->GetBatchGroup());
+		if (batchGroup) {
+			batchGroup->RemoveObject(this);
+		}
 		delete m_meshUser;
 		m_meshUser = nullptr;
 	}
@@ -1505,8 +1569,22 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 				rot(0, 0) = ch;    rot(0, 1) = -sh;   rot(0, 2) = 0.0f;
 				rot(1, 0) = sh;    rot(1, 1) = ch;    rot(1, 2) = 0.0f;
 				rot(2, 0) = 0.0f;  rot(2, 1) = 0.0f;  rot(2, 2) = 1.0f;
-				this->NodeSetGlobalOrientation(rot);
-				this->NodeUpdate();
+				// Skip the scene graph update when the world turn is already right:
+				// rewriting it every frame adds float noise that splits batches.
+				const mt::mat3& cur = this->NodeGetWorldOrientation();
+				bool same = true;
+				for (unsigned short i = 0; i < 3 && same; ++i) {
+					for (unsigned short j = 0; j < 3; ++j) {
+						if (fabsf(cur(i, j) - rot(i, j)) > 1e-5f) {
+							same = false;
+							break;
+						}
+					}
+				}
+				if (!same) {
+					this->NodeSetGlobalOrientation(rot);
+					this->NodeUpdate();
+				}
 
 				if (lodLevel.GetFlag() & KX_LodLevel::USE_ATLAS) {
 					const int cols = lodLevel.GetAtlasColumns();
@@ -1627,6 +1705,7 @@ void KX_GameObject::UpdateActivity(float distance)
 
 void KX_GameObject::UpdateTransform()
 {
+	CM_WorkCount(CM_WORK_TRANSFORM_SYNCS);
 	// HACK: saves function call for dynamic object, they are handled differently
 	if (m_physicsController && !m_physicsController->IsDynamic()) {
 		m_physicsController->SetTransform();
@@ -2244,6 +2323,7 @@ void KX_GameObject::UpdateBounds(bool force)
 
 void KX_GameObject::SetBoundsAabb(const mt::vec3 &aabbMin, const mt::vec3 &aabbMax)
 {
+	CM_WorkCount(CM_WORK_BOUNDS_PUSHES);
 	// Set the AABB in culling node box.
 	m_cullingNode.GetAabb().Set(aabbMin, aabbMax);
 
@@ -2521,19 +2601,16 @@ void KX_GameObject::UpdateComponents()
 {
 #ifdef WITH_PYTHON
 	if (m_components) {
-		if (!m_suspended && (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) &&
-		    (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC)) {
-			for (KX_PythonComponent *comp : m_components) {
-				if (comp->GetActiveState()) {
-					comp->Update();
-				}
-			}
+		/* Activity culling suspends the logic (m_suspended) and clears m_bRender. Components only
+		 * follow that suspension when component culling is enabled; any other suspension stops them. */
+		const bool cullComponents = (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC_COMPONENTS) != 0;
+		const bool suspendedByCulling = m_suspended && !m_bRender;
+		if (m_suspended && (cullComponents || !suspendedByCulling)) {
+			return;
 		}
-		else if (!m_suspended) {
-			for (KX_PythonComponent *comp : m_components) {
-				if (comp->GetActiveState()) {
-					comp->Update();
-				}
+		for (KX_PythonComponent *comp : m_components) {
+			if (comp->GetActiveState()) {
+				comp->Update();
 			}
 		}
 	}
@@ -2853,7 +2930,7 @@ static int mathutils_kxgameob_matrix_set(BaseMathObject *bmo, int subtype)
 		case MATHUTILS_MAT_CB_ORI_GLOBAL:
 		{
 			mat3x3 = mt::mat3(bmo->data);
-			self->NodeSetLocalOrientation(mat3x3);
+			self->NodeSetGlobalOrientation(mat3x3);
 			self->NodeUpdate();
 			break;
 		}
@@ -3000,6 +3077,219 @@ static PyObject *KX_GameObject_pyattr_get_net(EXP_PyObjectPlus *self_v, const EX
 	return result;
 }
 
+/* Destruction, Explosive and Deformation settings (Physics panels), per instance: they start from
+ * the panels and only change this object. Writing needs an object that is destructible / explosive /
+ * deformable in the panels (the type itself is fixed, see isDestructible). */
+namespace {
+enum DestructionGroup { DESTRUCTION_SETTINGS, EXPLOSIVE_SETTINGS, DEFORM_SETTINGS };
+
+struct DestructionAttribute {
+	const char *name;
+	DestructionGroup group;
+	/// 'f' float, 'i' int, 'b' flag bit.
+	char kind;
+	size_t offset;
+	int flag;
+	float min, max;
+};
+}
+
+static const DestructionAttribute destruction_attributes[] = {
+	{"burstSpeed", DESTRUCTION_SETTINGS, 'f', offsetof(RangeDestructionSettings, burst_speed), 0, 0.0f, 1000.0f},
+	{"debrisLifetime", DESTRUCTION_SETTINGS, 'f', offsetof(RangeDestructionSettings, debris_lifetime), 0, 0.0f, 3600.0f},
+	{"useBreakOnCollision", DESTRUCTION_SETTINGS, 'b', offsetof(RangeDestructionSettings, flags), DESTRUCTION_BREAK_ON_COLLISION, 0, 0},
+	{"useInheritVelocity", DESTRUCTION_SETTINGS, 'b', offsetof(RangeDestructionSettings, flags), DESTRUCTION_INHERIT_VELOCITY, 0, 0},
+	{"impactImpulse", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, impact_impulse), 0, 0.0f, 100000.0f},
+	{"useExplodeOnImpact", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_ON_IMPACT, 0, 0},
+	{"useChainReaction", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_CHAIN_REACTION, 0, 0},
+	{"dentImpulse", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, dent_impulse), 0, 0.0f, 100000.0f},
+	{"useDentOnCollision", DEFORM_SETTINGS, 'b', offsetof(RangeDeformSettings, flags), DEFORM_ON_COLLISION, 0, 0},
+	{"bendAngle", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, bend_angle), 0, 0.0f, (float)M_PI},
+	{"bendMaxAngle", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, bend_max_angle), 0, 0.0f, (float)M_PI},
+	{"decalSize", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, decal_size), 0, 0.001f, 1000.0f},
+	{"decalLife", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, decal_life), 0, 0.0f, 100000.0f},
+	{"maxDecals", DEFORM_SETTINGS, 'i', offsetof(RangeDeformSettings, max_decals), 0, 1.0f, 1000.0f},
+};
+
+static const char *bend_axis_names[] = {"X", "Y", "Z"};
+
+static const char *destruction_group_names[] = {"destructible", "explosive", "deformable"};
+
+/// Settings of the group, from the instance (or the panels for an unregistered object).
+static const char *destruction_settings_read(KX_GameObject *gameobj, DestructionGroup group)
+{
+	const KX_DestructionManager& manager = gameobj->GetScene()->GetDestructionManager();
+	switch (group) {
+		case DESTRUCTION_SETTINGS: return (const char *)&manager.GetDestructionSettings(gameobj);
+		case EXPLOSIVE_SETTINGS: return (const char *)&manager.GetExplosiveSettings(gameobj);
+		default: return (const char *)&manager.GetDeformSettings(gameobj);
+	}
+}
+
+static char *destruction_settings_edit(KX_GameObject *gameobj, DestructionGroup group, const char *attr)
+{
+	KX_DestructionManager& manager = gameobj->GetScene()->GetDestructionManager();
+	char *settings = (group == DESTRUCTION_SETTINGS) ? (char *)manager.EditDestructionSettings(gameobj) :
+	                 (group == EXPLOSIVE_SETTINGS) ? (char *)manager.EditExplosiveSettings(gameobj) :
+	                 (char *)manager.EditDeformSettings(gameobj);
+	if (!settings) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.%s: KX_GameObject, \"%s\" is not %s", attr,
+		             gameobj->GetName().c_str(), destruction_group_names[group]);
+	}
+	return settings;
+}
+
+static PyObject *KX_GameObject_pyattr_get_destruction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const std::string& name = attrdef->m_name;
+	KX_DestructionManager& manager = self->GetScene()->GetDestructionManager();
+
+	if (name == "isDeformable") {
+		return PyBool_FromLong(manager.IsDeformable(self));
+	}
+	if (name == "fragments") {
+		const Group *group = manager.GetDestructionSettings(self).fragments;
+		if (!group) {
+			Py_RETURN_NONE;
+		}
+		return PyUnicode_FromString(group->id.name + 2);
+	}
+	if (name == "decal") {
+		Object *decal = manager.GetDeformSettings(self).decal;
+		KX_GameObject *decalobj = decal ? static_cast<KX_GameObject *>(
+			self->GetScene()->GetLogicManager()->FindGameObjByBlendObj(decal)) : nullptr;
+		if (!decalobj) {
+			Py_RETURN_NONE;
+		}
+		return decalobj->GetProxy();
+	}
+	if (name == "bendAxis") {
+		return PyUnicode_FromString(bend_axis_names[CLAMPIS(manager.GetDeformSettings(self).bend_axis, 0, 2)]);
+	}
+	for (const DestructionAttribute& attr : destruction_attributes) {
+		if (name == attr.name) {
+			const char *field = destruction_settings_read(self, attr.group) + attr.offset;
+			switch (attr.kind) {
+				case 'f': return PyFloat_FromDouble(*(const float *)field);
+				case 'i': return PyLong_FromLong(*(const int *)field);
+				default: return PyBool_FromLong((*(const int *)field & attr.flag) != 0);
+			}
+		}
+	}
+	Py_RETURN_NONE;
+}
+
+static int KX_GameObject_pyattr_set_destruction(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	const std::string& name = attrdef->m_name;
+	const char *attrname = name.c_str();
+	KX_DestructionManager& manager = self->GetScene()->GetDestructionManager();
+	const bool wanted = manager.WantsCollisions(self);
+
+	if (name == "fragments") {
+		RangeDestructionSettings *settings = (RangeDestructionSettings *)destruction_settings_edit(self, DESTRUCTION_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (value == Py_None) {
+			settings->fragments = nullptr;
+			return PY_SET_ATTR_SUCCESS;
+		}
+		const char *groupname = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+		Group *group = groupname ? (Group *)BLI_findstring(&G.main->group, groupname, offsetof(ID, name) + 2) : nullptr;
+		if (!group) {
+			PyErr_Format(PyExc_ValueError, "gameOb.fragments = str: KX_GameObject, expected the name of a group or None");
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->fragments = group;
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "decal") {
+		KX_GameObject *decalobj;
+		if (!ConvertPythonToGameObject(self->GetScene()->GetLogicManager(), value, &decalobj, true,
+		                               "gameOb.decal = KX_GameObject or None: KX_GameObject")) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (decalobj && !decalobj->GetBlenderObject()) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.decal = KX_GameObject: KX_GameObject, the decal must be an object of the scene file");
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeDeformSettings *settings = (RangeDeformSettings *)destruction_settings_edit(self, DEFORM_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->decal = decalobj ? decalobj->GetBlenderObject() : nullptr;
+		manager.SettingsChanged(self, wanted);
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "bendAxis") {
+		const char *axis = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+		int index = -1;
+		for (int i = 0; axis && i < 3; ++i) {
+			if (std::strcmp(axis, bend_axis_names[i]) == 0) {
+				index = i;
+			}
+		}
+		if (index < 0) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.bendAxis = str: KX_GameObject, expected 'X', 'Y' or 'Z'");
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeDeformSettings *settings = (RangeDeformSettings *)destruction_settings_edit(self, DEFORM_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		settings->bend_axis = index;
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	for (const DestructionAttribute& attr : destruction_attributes) {
+		if (name != attr.name) {
+			continue;
+		}
+		double number = 0.0;
+		int flag = 0;
+		if (attr.kind == 'b') {
+			flag = PyObject_IsTrue(value);
+			if (flag == -1) {
+				PyErr_Format(PyExc_TypeError, "gameOb.%s = bool: KX_GameObject, expected True or False", attrname);
+				return PY_SET_ATTR_FAIL;
+			}
+		}
+		else {
+			number = PyFloat_AsDouble(value);
+			if (number == -1.0 && PyErr_Occurred()) {
+				PyErr_Format(PyExc_TypeError, "gameOb.%s = %s: KX_GameObject, expected a number", attrname,
+				             (attr.kind == 'i') ? "int" : "float");
+				return PY_SET_ATTR_FAIL;
+			}
+			number = CLAMPIS(number, (double)attr.min, (double)attr.max);
+		}
+		char *settings = destruction_settings_edit(self, attr.group, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		void *field = settings + attr.offset;
+		switch (attr.kind) {
+			case 'f': *(float *)field = (float)number; break;
+			case 'i': *(int *)field = (int)number; break;
+			default: SET_FLAG_FROM_TEST(*(int *)field, flag, attr.flag); break;
+		}
+		manager.SettingsChanged(self, wanted);
+		return PY_SET_ATTR_SUCCESS;
+	}
+	return PY_SET_ATTR_FAIL;
+}
+
+/* EXP_PYATTRIBUTE_RW_FUNCTION spelled out: the getter and setter are free functions. */
+#define EXP_PYATTRIBUTE_RW_DESTRUCTION(name) \
+	{name, EXP_PYATTRIBUTE_TYPE_FUNCTION, EXP_PYATTRIBUTE_RW, 0, 0, 0.f, 0.f, false, false, 0, 0, 1, nullptr, \
+	 &KX_GameObject_pyattr_set_destruction, &KX_GameObject_pyattr_get_destruction}
+#define EXP_PYATTRIBUTE_RO_DESTRUCTION(name) \
+	{name, EXP_PYATTRIBUTE_TYPE_FUNCTION, EXP_PYATTRIBUTE_RO, 0, 0, 0.f, 0.f, false, false, 0, 0, 1, nullptr, \
+	 nullptr, &KX_GameObject_pyattr_get_destruction}
+
 PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_SHORT_RO("currentLodLevel", KX_GameObject, m_currentLodLevel),
 	EXP_PYATTRIBUTE_RW_FUNCTION("lodManager", KX_GameObject, pyattr_get_lodManager, pyattr_set_lodManager),
@@ -3010,7 +3300,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("groupMembers", KX_GameObject, pyattr_get_group_members),
 	EXP_PYATTRIBUTE_RO_FUNCTION("groupObject",  KX_GameObject, pyattr_get_group_object),
 	EXP_PYATTRIBUTE_RO_FUNCTION("scene",        KX_GameObject, pyattr_get_scene),
-	EXP_PYATTRIBUTE_RO_FUNCTION("life",     KX_GameObject, pyattr_get_life),
+	EXP_PYATTRIBUTE_RW_FUNCTION("life",     KX_GameObject, pyattr_get_life, pyattr_set_life),
 	EXP_PYATTRIBUTE_RW_FUNCTION("mass",     KX_GameObject, pyattr_get_mass,     pyattr_set_mass),
 	EXP_PYATTRIBUTE_RW_FUNCTION("friction", KX_GameObject, pyattr_get_friction, pyattr_set_friction),
 	EXP_PYATTRIBUTE_RW_FUNCTION("anisotropicFriction", KX_GameObject, pyattr_get_anisotropicFriction, pyattr_set_anisotropicFriction),
@@ -3023,6 +3313,24 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("onDent", KX_GameObject, pyattr_get_destruction_callbacks, pyattr_set_destruction_callbacks),
 	EXP_PYATTRIBUTE_RW_FUNCTION("breakImpulse", KX_GameObject, pyattr_get_break_impulse, pyattr_set_break_impulse),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fuse", KX_GameObject, pyattr_get_fuse, pyattr_set_fuse),
+	EXP_PYATTRIBUTE_RO_DESTRUCTION("isDeformable"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("fragments"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("burstSpeed"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("debrisLifetime"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useBreakOnCollision"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useInheritVelocity"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("impactImpulse"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useExplodeOnImpact"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useChainReaction"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("dentImpulse"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useDentOnCollision"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendAxis"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendAngle"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendMaxAngle"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decal"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalSize"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalLife"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("maxDecals"),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",       KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMax",       KX_GameObject, pyattr_get_lin_vel_max, pyattr_set_lin_vel_max),
 	EXP_PYATTRIBUTE_RW_FUNCTION("angularVelocityMin", KX_GameObject, pyattr_get_ang_vel_min, pyattr_set_ang_vel_min),
@@ -3030,6 +3338,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("layer", KX_GameObject, pyattr_get_layer, pyattr_set_layer),
 	EXP_PYATTRIBUTE_SHORT_RW("passIndex", 0, SHRT_MAX, false, KX_GameObject, m_passIndex),
 	EXP_PYATTRIBUTE_RW_FUNCTION("visible",  KX_GameObject, pyattr_get_visible,  pyattr_set_visible),
+	EXP_PYATTRIBUTE_RW_FUNCTION("hiddenFromCamera", KX_GameObject, pyattr_get_hidden_from_camera, pyattr_set_hidden_from_camera),
 	EXP_PYATTRIBUTE_RO_FUNCTION("culled", KX_GameObject, pyattr_get_culled),
 	EXP_PYATTRIBUTE_RO_FUNCTION("cullingBox",   KX_GameObject, pyattr_get_cullingBox),
 	EXP_PYATTRIBUTE_BOOL_RW("occlusion", KX_GameObject, m_bOccluder),
@@ -3624,15 +3933,36 @@ PyObject *KX_GameObject::pyattr_get_life(EXP_PyObjectPlus *self_v, const EXP_PYA
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 
-	EXP_Value *life = self->GetProperty("::timebomb");
-	if (life) {
-		// this convert the timebomb seconds to frames, hard coded 50.0f (assuming 50fps)
-		// value hardcoded in KX_Scene::AddReplicaObject()
-		return PyFloat_FromDouble(life->GetNumber() * 50.0);
+	// None (not 0.0) for objects without lifetime keeps the historical API.
+	if (self->m_lifeTime > 0.0f) {
+		return PyFloat_FromDouble(self->m_lifeTime * LifeFramesPerSecond);
 	}
-	else {
-		Py_RETURN_NONE;
+	Py_RETURN_NONE;
+}
+
+int KX_GameObject::pyattr_set_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+
+	float frames = 0.0f;
+	if (value != Py_None) {
+		frames = PyFloat_AsDouble(value);
+		if (frames == -1.0f && PyErr_Occurred()) {
+			PyErr_SetString(PyExc_TypeError, "gameOb.life = float or None: KX_GameObject, expected a number (frames) or None");
+			return PY_SET_ATTR_FAIL;
+		}
+		if (!(frames >= 0.0f)) {
+			PyErr_SetString(PyExc_ValueError, "gameOb.life = float: KX_GameObject, expected zero or above (0/None = lives forever)");
+			return PY_SET_ATTR_FAIL;
+		}
 	}
+
+	KX_Scene *scene = self->GetScene();
+	if (!scene->SetObjectLifeTime(self, frames / LifeFramesPerSecond)) {
+		PyErr_SetString(PyExc_ValueError, "gameOb.life: KX_GameObject, can't set life on an inactive (template) object");
+		return PY_SET_ATTR_FAIL;
+	}
+	return PY_SET_ATTR_SUCCESS;
 }
 
 PyObject *KX_GameObject::pyattr_get_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
@@ -3960,6 +4290,27 @@ PyObject *KX_GameObject::pyattr_get_visible(EXP_PyObjectPlus *self_v, const EXP_
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 	return PyBool_FromLong(self->GetVisible());
+}
+
+PyObject *KX_GameObject::pyattr_get_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	KX_Camera *cam = self->m_hiddenFromCamera;
+	if (!cam) {
+		Py_RETURN_NONE;
+	}
+	return cam->GetProxy();
+}
+
+int KX_GameObject::pyattr_set_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	KX_Camera *cam = nullptr;
+	if (!ConvertPythonToCamera(self->GetScene(), value, &cam, true, "gameOb.hiddenFromCamera = camera: KX_GameObject")) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->SetHiddenFromCamera(cam);
+	return PY_SET_ATTR_SUCCESS;
 }
 
 int KX_GameObject::pyattr_set_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)

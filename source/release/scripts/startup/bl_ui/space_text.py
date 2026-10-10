@@ -54,7 +54,8 @@ class TEXT_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        TEXT_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            TEXT_MT_editor_menus.draw_collapsible(context, layout)
 
         if text and text.is_modified:
             sub = row.row(align=True)

@@ -404,3 +404,28 @@ Functions
    Get the current vsync value
 
    :rtype: One of VSYNC_OFF, VSYNC_ON, VSYNC_ADAPTIVE
+
+.. function:: setDynamicResolution(enabled, targetFPS=60, minScale=50, maxScale=100, step=5)
+
+   Runtime version of the scene's Dynamic Resolution settings. The 3D scene is rendered at a
+   scale of the window size and stretched to the screen; the window itself does not change.
+   With dynamic resolution the scale goes down by ``step`` when the GPU time of a frame is above
+   the target and back up when there is time left. ``minScale == maxScale`` gives a fixed render
+   scale. Paused while "Show Render Queries" is on (both use a GPU timer query).
+
+   :arg enabled: False renders at 100%.
+   :type enabled: boolean
+   :arg targetFPS: Frame rate the GPU time is compared to.
+   :type targetFPS: integer
+   :arg minScale: Lowest scale, in percent (25-100).
+   :type minScale: integer
+   :arg maxScale: Highest scale, in percent (25-100).
+   :type maxScale: integer
+   :arg step: Scale change per adjustment, in percent (1-25).
+   :type step: integer
+
+.. function:: getRenderScale()
+
+   Current render scale, 1.0 = full resolution.
+
+   :rtype: float

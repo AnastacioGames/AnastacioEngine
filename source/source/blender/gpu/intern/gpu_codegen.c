@@ -1087,13 +1087,13 @@ static char *code_generate_vertex(ListBase *nodes, const char *usercode, const G
 			for (input = node->inputs.first; input; input = input->next) {
 				if (input->source == GPU_SOURCE_ATTRIB && input->attribfirst) {
 					if (input->attribtype == CD_MTFACE && input->type == 2)
-						BLI_dynstr_appendf(ds, "vec2 UV = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef UV\n#define UV att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_ORCO && input->type == 3)
-						BLI_dynstr_appendf(ds, "vec3 ORCO = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef ORCO\n#define ORCO att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_TANGENT && input->type == 4)
-						BLI_dynstr_appendf(ds, "vec4 TANGENT = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef TANGENT\n#define TANGENT att%d\n#endif\n", input->attribid);
 					if (input->attribtype == CD_MCOL && input->type == 4)
-						BLI_dynstr_appendf(ds, "vec4 COLOR = att%d;\n", input->attribid);
+						BLI_dynstr_appendf(ds, "#ifndef COLOR\n#define COLOR att%d\n#endif\n", input->attribid);
 				}
 			}
 		}
@@ -1642,9 +1642,13 @@ void GPU_code_generate_glsl_lib(void)
 
 /* GPU pass binding/unbinding */
 
+/* A material whose GLSL pass failed to generate keeps material->pass NULL (see
+ * GPU_material_from_blender), so callers that only guard on the returned shader -- the scene
+ * light/shadow/probe/damage binds -- would dereference it. Tolerate a NULL pass here instead of
+ * repeating the check at every call site. */
 GPUShader *GPU_pass_shader(GPUPass *pass)
 {
-	return pass->shader;
+	return pass ? pass->shader : NULL;
 }
 
 static void gpu_nodes_extract_dynamic_inputs(GPUPass *pass, ListBase *nodes)
@@ -1767,6 +1771,17 @@ void GPU_pass_bind(GPUPass *pass, double time, int mipmap)
 	}
 }
 
+/* glUniform calls of GPU_pass_update_uniforms(), for the game engine's per-frame work counters
+ * (passUniforms in getRenderStats()). */
+static int PASS_GL_CALLS = 0;
+
+int GPU_pass_uniform_gl_calls_take(void)
+{
+	const int count = PASS_GL_CALLS;
+	PASS_GL_CALLS = 0;
+	return count;
+}
+
 void GPU_pass_update_uniforms(GPUPass *pass)
 {
 	GPUInput *input;
@@ -1779,6 +1794,12 @@ void GPU_pass_update_uniforms(GPUPass *pass)
 	/* pass dynamic inputs to opengl, others were removed */
 	for (input = inputs->first; input; input = input->next) {
 		if (!(input->ima || input->tex || input->prv || input->texptr)) {
+			if (input->shaderloc == -1) {
+				continue;
+			}
+			/* Not cached: a last-value cache here skipped nothing in RolimaRacer (~1700 calls per
+			 * frame with and without it, 2026-10-09). */
+			PASS_GL_CALLS++;
 			if (input->type == GPU_INT) {
 				GPU_shader_uniform_vector_int(shader, input->shaderloc, 1, 1, (int *)input->dynamicvec);
 			}
@@ -1875,6 +1896,7 @@ static void gpu_node_input_link(GPUNode *node, GPUNodeLink *link, const GPUType 
 
 	input = MEM_callocN(sizeof(GPUInput), "GPUInput");
 	input->node = node;
+	input->shaderloc = -1;
 
 	if (link->builtin) {
 		/* builtin uniform */
@@ -2486,7 +2508,7 @@ GPUPass *GPU_generate_pass(
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :
 	                     NULL;
-	if (shader) {
+	if (shader && !GPU_shader_prefetching()) {
 		SHADER_CACHE_STAT_REUSED++;
 	}
 	else {
@@ -2500,11 +2522,13 @@ GPUPass *GPU_generate_pass(
 		                              0,
 		                              0,
 		                              0,
-		                              flags,
+		                              flags | GPU_SHADER_FLAGS_BINARY_CACHE,
 		                              name);
 		MEM_SAFE_FREE(libcode);
-		SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;
-		SHADER_CACHE_STAT_COMPILED++;
+		if (!GPU_shader_prefetching()) {
+			SHADER_CACHE_STAT_COMPILE_TIME += PIL_check_seconds_timer() - compile_start;
+			SHADER_CACHE_STAT_COMPILED++;
+		}
 		if (shader && use_cache) {
 			shader_cache_add(shader, vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash);
 		}

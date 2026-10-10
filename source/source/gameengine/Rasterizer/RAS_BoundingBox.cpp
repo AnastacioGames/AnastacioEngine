@@ -110,9 +110,14 @@ void RAS_BoundingBox::SetAabb(const mt::vec3& aabbMin, const mt::vec3& aabbMax)
 
 void RAS_BoundingBox::ExtendAabb(const mt::vec3& aabbMin, const mt::vec3& aabbMax)
 {
-	m_aabbMin = mt::vec3::Min(m_aabbMin, aabbMin);
-	m_aabbMax = mt::vec3::Max(m_aabbMax, aabbMax);
-	m_modified = true;
+	const mt::vec3 newMin = mt::vec3::Min(m_aabbMin, aabbMin);
+	const mt::vec3 newMax = mt::vec3::Max(m_aabbMax, aabbMax);
+	// Only flag a real change, like RAS_MeshBoundingBox::Update (98f54d7f).
+	if (newMin != m_aabbMin || newMax != m_aabbMax) {
+		m_aabbMin = newMin;
+		m_aabbMax = newMax;
+		m_modified = true;
+	}
 }
 
 void RAS_BoundingBox::CopyAabb(RAS_BoundingBox *other)
@@ -187,5 +192,9 @@ void RAS_MeshBoundingBox::Update(bool force)
 		}
 	}
 
-	m_modified = true;
+	/* Only flag a real change: an unconditional flag made every object with auto-updated
+	 * bounds push its AABB to the culling tree each frame (~0.3 ms with 1600 static objects). */
+	if (modified) {
+		m_modified = true;
+	}
 }

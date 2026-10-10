@@ -1,6 +1,6 @@
 """Integracao do painel Android (precisa do motor, de build-web-release/bin e do Android Studio):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_android_export.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_android_export.py
 
 Gera o APK de uma cena vazia pelo operador Gerar APK (que exporta o Web antes) e confere o APK.
 Sai com codigo != 0 se alguma verificacao falhar.

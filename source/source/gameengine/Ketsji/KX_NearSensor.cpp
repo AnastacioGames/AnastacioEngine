@@ -74,7 +74,8 @@ KX_NearSensor::KX_NearSensor(SCA_EventManager *eventmgr,
 	                    touchedpropname),
 	m_Margin(margin),
 	m_ResetMargin(resetmargin),
-	m_drawDebug(drawDebug)
+	m_drawDebug(drawDebug),
+	m_syncedTransformValid(false)
 
 {
 
@@ -96,12 +97,38 @@ void KX_NearSensor::SynchronizeTransform()
 	// The near and radar sensors are using a different physical object which is
 	// not linked to the parent object, must synchronize it.
 	if (m_physCtrl) {
-		PHY_IMotionState *motionState = m_physCtrl->GetMotionState();
 		KX_GameObject *parent = ((KX_GameObject *)GetParent());
-		motionState->SetWorldPosition(parent->NodeGetWorldPosition());
-		motionState->SetWorldOrientation(parent->NodeGetWorldOrientation());
-		m_physCtrl->WriteMotionStateToDynamics(true);
+		WriteSensorTransform(parent->NodeGetWorldPosition(), parent->NodeGetWorldOrientation());
 	}
+}
+
+void KX_NearSensor::WriteSensorTransform(const mt::vec3& position, const mt::mat3& orientation)
+{
+	if (!m_physCtrl) {
+		return;
+	}
+
+	if (m_syncedTransformValid && position == m_syncedPosition) {
+		bool same = true;
+		for (int i = 0; i < 9; ++i) {
+			if (orientation(i) != m_syncedOrientation(i)) {
+				same = false;
+				break;
+			}
+		}
+		if (same) {
+			return;
+		}
+	}
+
+	PHY_IMotionState *motionState = m_physCtrl->GetMotionState();
+	motionState->SetWorldPosition(position);
+	motionState->SetWorldOrientation(orientation);
+	m_physCtrl->WriteMotionStateToDynamics(true);
+
+	m_syncedPosition = position;
+	m_syncedOrientation = orientation;
+	m_syncedTransformValid = true;
 }
 
 EXP_Value *KX_NearSensor::GetReplica()
@@ -119,6 +146,7 @@ void KX_NearSensor::ProcessReplica()
 
 	if (m_physCtrl) {
 		m_physCtrl = m_physCtrl->GetReplicaForSensors();
+		m_syncedTransformValid = false;
 		if (m_physCtrl) {
 			//static_cast<KX_CollisionEventManager*>(m_eventmgr)->GetPhysicsEnvironment()->addSensor(replica->m_physCtrl);
 			m_physCtrl->SetMargin(m_Margin);
@@ -131,6 +159,7 @@ void KX_NearSensor::ProcessReplica()
 void KX_NearSensor::ReParent(SCA_IObject *parent)
 {
 	SCA_ISensor::ReParent(parent);
+	m_syncedTransformValid = false;
 	m_client_info->m_gameobject = static_cast<KX_GameObject *>(parent);
 	m_client_info->m_sensors.push_back(this);
 	//Synchronize here with the actual parent.

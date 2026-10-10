@@ -239,8 +239,17 @@ RAS_2DFilter *RAS_2DFilterManager::GetFilterPass(unsigned int passIndex, bool us
 
 RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
-	if (m_filters.empty()) {
-		// No filters, discard.
+	/* Camera FX passes stay built and are only toggled off, so the map is rarely empty.
+	 * When no pass would draw, skip the chain instead of copying the full screen every frame. */
+	bool anyActive = false;
+	for (const auto &pair : m_filters) {
+		if (pair.second->Ok()) {
+			anyActive = true;
+			break;
+		}
+	}
+	if (!anyActive) {
+		// No active filters, discard.
 		return inputofs;
 	}
 
@@ -276,24 +285,28 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		 * input off screen sent to RenderFilters. */
 		colorofs = previousofs;
 
-		RAS_OffScreen *ftargetofs;
-		// Computing the filter targeted off screen.
-		if (it == pend) {
-			// Render to the targeted off screen for the last filter.
-			ftargetofs = targetofs;
-		}
-		else {
-			// Else render to the next off screen compared to the input off screen.
-			ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType()));
-		}
-
-		/* A filter reading the depth texture must not draw into the off screen owning it:
-		 * desktop GL tolerates it (depth writes are off), WebGL rejects the draw as a feedback
-		 * loop. Draw into a free filter off screen instead; the copy below reaches targetofs. */
-		if (ftargetofs == depthofs && filter->UsesDepthTexture()) {
-			ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType()));
-			if (ftargetofs == colorofs || ftargetofs == depthofs) {
-				ftargetofs = canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(ftargetofs->GetType()));
+		/* Computing the filter targeted off screen: the targeted off screen for the last filter,
+		 * else the next filter off screen compared to the input off screen. The target must never
+		 * be an off screen the filter reads: drawing into the color input gives tile shaped garbage
+		 * (rows shifted in blocks), and drawing into the depth owner is a feedback loop rejected
+		 * by WebGL. With multisamples the depth lives in FILTER0, so the FILTER0/FILTER1 ping pong
+		 * can run out of free off screens; then the eye off screen targeted by the last filter
+		 * serves as the third one (the copy below reaches targetofs if needed). */
+		const bool usesDepth = filter->UsesDepthTexture();
+		auto isFree = [colorofs, depthofs, usesDepth](RAS_OffScreen *ofs) {
+			return ofs != colorofs && !(usesDepth && ofs == depthofs);
+		};
+		RAS_OffScreen *candidates[4] = {
+			(it == pend) ? targetofs : canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType())),
+			canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER0),
+			canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER1),
+			(targetofs->GetSamples() == 0) ? targetofs : nullptr
+		};
+		RAS_OffScreen *ftargetofs = candidates[0];
+		for (RAS_OffScreen *ofs : candidates) {
+			if (ofs && isFree(ofs)) {
+				ftargetofs = ofs;
+				break;
 			}
 		}
 

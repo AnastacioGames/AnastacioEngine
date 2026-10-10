@@ -52,6 +52,9 @@
 
 #include "CM_Message.h"
 
+#include <algorithm>
+#include <cmath>
+
 KX_RaySensor::KX_RaySensor(class SCA_EventManager *eventmgr,
 							   SCA_IObject *gameobj,
 							   const std::string& propname,
@@ -349,9 +352,25 @@ bool KX_RaySensor::Evaluate()
 		/* Gaze cone: the thin ray missed, take the visible target closest to the view center inside the cone.
 		 * The object already being looked at keeps a wider cone so small head shakes don't reset the gaze time. */
 		KX_GameObject *best = nullptr;
-		float bestAngle = m_gazeAngle;
+		/* Compare cosines instead of angles (no acos per object): angle <= limit <=> cos(angle) >= cos(limit)
+		 * on [0, pi]. Limits are clamped to pi, where acos always passed. */
+		const float coneCos = std::cos(std::min(m_gazeAngle, (float)M_PI));
+		const float stickyCos = std::cos(std::min(m_gazeAngle * 1.5f, (float)M_PI));
+		const float maxDistSq = m_distance * m_distance;
+		float bestCos = coneCos;
 		for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
 			if (gameobj == obj || !gameobj->GetVisible() || !(gameobj->GetCollisionGroup() & m_mask)) {
+				continue;
+			}
+			/* Cheap geometric rejection before the property/material lookups. */
+			const mt::vec3 to = gameobj->NodeGetWorldPosition() - frompoint;
+			const float distSq = to.LengthSquared();
+			if (distSq < 1e-8f || distSq > maxDistSq) {
+				continue;
+			}
+			const float cosAngle = mt::Clamp(mt::dot(to, todir) / std::sqrt(distSq), -1.0f, 1.0f);
+			const float limitCos = (gameobj == m_gazeObject) ? stickyCos : coneCos;
+			if (!(cosAngle >= limitCos && (!best || cosAngle > bestCos))) {
 				continue;
 			}
 			if (gazeSelf && !IsSelf(owner, gameobj)) {
@@ -374,17 +393,8 @@ bool KX_RaySensor::Evaluate()
 					continue;
 				}
 			}
-			const mt::vec3 to = gameobj->NodeGetWorldPosition() - frompoint;
-			const float dist = to.Length();
-			if (dist < 1e-4f || dist > m_distance) {
-				continue;
-			}
-			const float angle = std::acos(mt::Clamp(mt::dot(to / dist, todir), -1.0f, 1.0f));
-			const float limit = (gameobj == m_gazeObject) ? m_gazeAngle * 1.5f : m_gazeAngle;
-			if (angle <= limit && (!best || angle < bestAngle)) {
-				best = gameobj;
-				bestAngle = angle;
-			}
+			best = gameobj;
+			bestCos = cosAngle;
 		}
 		if (best) {
 			/* Line of sight: the ray toward the target must hit it first. */

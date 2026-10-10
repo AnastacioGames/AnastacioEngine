@@ -48,6 +48,10 @@ extern "C" {
 #include "imgui_impl_opengl3.h"
 
 #include "GPU_glew.h"
+
+#include <cmath>
+#include <map>
+#include <vector>
 #include "GPU_texture.h"
 
 KX_Imgui::KX_Imgui()
@@ -97,7 +101,7 @@ void KX_Imgui::Init(DEV_InputDevice *inputDevice)
 	// Add Blender Font in C to Dear ImGui.
     ImFontConfig font_cfg;
 	font_cfg.FontDataOwnedByAtlas = false; // Important to set this to false to prevent ImGui from trying to free memory.
-	io.Fonts->AddFontFromMemoryTTF((void*)datatoc_roboto_medium_ttf, (int)datatoc_roboto_medium_ttf_size, 12.0f, &font_cfg);
+	io.Fonts->AddFontFromMemoryTTF((void*)datatoc_roboto_medium_ttf, (int)datatoc_roboto_medium_ttf_size, 12.0f, &font_cfg, io.Fonts->GetGlyphRangesCyrillic());
 
 	/* Kenney Icons */
 	ImFontConfig icon_cfg;
@@ -121,9 +125,88 @@ void KX_Imgui::Init(DEV_InputDevice *inputDevice)
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 }
 
+/* Fonts requested from Python while the atlas is locked (mid-frame), built in request order by
+ * NextFrame() so the index handed out at request time stays valid. Default-font sizes are cached
+ * by quarter-pixel key. Cleared on Stop(), whose context destruction frees the atlas. */
+struct KX_PendingFont {
+	std::string path;  // Empty for the engine default font.
+	float size;
+	int defaultKey;
+};
+static std::vector<KX_PendingFont> g_pendingFonts;
+static std::map<int, ImFont *> g_defaultFonts;
+
+static ImFont *AddDefaultFont(ImFontAtlas *atlas, float size)
+{
+	ImFontConfig fontCfg;
+	fontCfg.FontDataOwnedByAtlas = false;
+	ImFont *font = atlas->AddFontFromMemoryTTF((void *)datatoc_roboto_medium_ttf,
+	    datatoc_roboto_medium_ttf_size, size, &fontCfg, atlas->GetGlyphRangesCyrillic());
+	if (!font) {
+		return nullptr;
+	}
+	ImFontConfig iconCfg;
+	iconCfg.MergeMode = true;
+	iconCfg.GlyphMinAdvanceX = size;
+	iconCfg.FontDataOwnedByAtlas = false;
+	static const ImWchar iconRanges[] = {ICON_MIN_FK, ICON_MAX_FK, 0};
+	atlas->AddFontFromMemoryTTF((void *)datatoc_forkawesome_icon_font_ttf,
+	    datatoc_forkawesome_icon_font_ttf_size, size, &iconCfg, iconRanges);
+	return font;
+}
+
+int KX_Imgui::RequestDefaultFont(float size)
+{
+	const int key = int(std::lround(size * 4.0f));
+	auto found = g_defaultFonts.find(key);
+	if (found != g_defaultFonts.end() && found->second) {
+		ImFontAtlas *atlas = ImGui::GetIO().Fonts;
+		for (int i = 0; i < atlas->Fonts.Size; ++i) {
+			if (atlas->Fonts[i] == found->second) {
+				return i;
+			}
+		}
+		found->second = nullptr;  // Atlas was replaced: rebuild before the next frame.
+	}
+	else if (found != g_defaultFonts.end()) {
+		return -1;  // Already queued.
+	}
+	g_defaultFonts[key] = nullptr;
+	g_pendingFonts.push_back({std::string(), key / 4.0f, key});
+	return -1;
+}
+
+int KX_Imgui::RequestFileFont(const char *path, float size)
+{
+	ImFontAtlas *atlas = ImGui::GetIO().Fonts;
+	const int fontId = atlas->Fonts.Size + int(g_pendingFonts.size());
+	g_pendingFonts.push_back({std::string(path), size, 0});
+	return fontId;
+}
+
+int KX_Imgui::PendingFontCount()
+{
+	return int(g_pendingFonts.size());
+}
+
 void KX_Imgui::NextFrame()
 {
 	ImGuiIO& io = ImGui::GetIO();
+	if (!g_pendingFonts.empty()) {
+		for (const KX_PendingFont &pending : g_pendingFonts) {
+			if (pending.path.empty()) {
+				g_defaultFonts[pending.defaultKey] = AddDefaultFont(io.Fonts, pending.size);
+			}
+			else if (!io.Fonts->AddFontFromFileTTF(pending.path.c_str(), pending.size)) {
+				// Keep later queued indices valid: fall back to the default font at that size.
+				AddDefaultFont(io.Fonts, pending.size);
+			}
+		}
+		g_pendingFonts.clear();
+		io.Fonts->Build();
+		ImGui_ImplOpenGL3_DestroyFontsTexture();
+		ImGui_ImplOpenGL3_CreateFontsTexture();
+	}
 	io.DisplaySize = ImVec2(KX_GetActiveEngine()->GetCanvas()->GetArea().GetWidth(), KX_GetActiveEngine()->GetCanvas()->GetArea().GetHeight());
 
 	ImGui_ImplOpenGL3_NewFrame();
@@ -199,6 +282,8 @@ void KX_Imgui::Stop()
 
 	ImPlot::DestroyContext();
 	ImGui::DestroyContext();
+	g_defaultFonts.clear();
+	g_pendingFonts.clear();
 
 	// Save vars
 	//SaveDebugMode();
@@ -408,8 +493,10 @@ void SetupDebugModeStyle() {
 
 	style.Colors[ImGuiCol_Text] = ImVec4(1.000f, 1.000f, 1.000f, 1.000f);
 	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.498f, 0.498f, 0.498f, 1.000f);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.059f, 0.059f, 0.059f, 0.25f); //
-	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.098f);
+	/* Nearly opaque: at the old 0.25 the game behind the panel showed through and the text was
+	 * hard to read over bright scenes. */
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.045f, 0.045f, 0.045f, 0.94f);
+	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.45f);
 	style.Colors[ImGuiCol_PopupBg] = ImVec4(0.078f, 0.078f, 0.078f, 0.940f);
 	style.Colors[ImGuiCol_Border] = ImVec4(0.427f, 0.427f, 0.498f, 0.502f);
 	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.000f, 0.000f, 0.000f, 0.000f);
@@ -419,7 +506,7 @@ void SetupDebugModeStyle() {
 	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.2f, 0.05f, 0.05f, 1.0f); // Dark and discreet red
 	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.3f, 0.1f, 0.1f, 1.0f); // A little brighter red, but still soft
 	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.000f, 0.000f, 0.000f, 0.510f);
-	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.137f, 0.137f, 0.137f, 0.5f);
+	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.100f, 0.100f, 0.100f, 0.94f);
 	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.020f, 0.020f, 0.020f, 0.530f);
 	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.310f, 0.310f, 0.310f, 1.000f);
 	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.408f, 0.408f, 0.408f, 1.000f);

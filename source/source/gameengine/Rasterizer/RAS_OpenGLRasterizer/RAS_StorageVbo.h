@@ -59,7 +59,7 @@ public:
 	void UpdateVertexData(unsigned int modifiedFlag);
 	void UpdateSize();
 	unsigned int *GetIndexMap();
-	void FlushIndexMap();
+	bool FlushIndexMap();
 
 	void IndexPrimitives();
 	void IndexPrimitivesInstancing(unsigned int numinstance);

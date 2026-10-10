@@ -48,7 +48,8 @@ class NODE_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        NODE_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            NODE_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.prop(snode, "tree_type", text="", expand=True)
 

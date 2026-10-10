@@ -13,7 +13,7 @@ O exemplo mínimo usa somente a ação nativa `Spawn Object`:
 Na raiz do checkout:
 
 ```text
-build\bin\RangeEngine.exe --background --factory-startup --python source\release\scripts\templates_py\cutscene_native_example.py -- docs\cutscene-native-example.blend
+build\bin\AnastacioEngine.exe --background --factory-startup --python source\release\scripts\templates_py\cutscene_native_example.py -- docs\cutscene-native-example.blend
 ```
 
 O arquivo é salvo em DNA nativo; não depende do add-on de referência em
@@ -22,7 +22,7 @@ O arquivo é salvo em DNA nativo; não depende do add-on de referência em
 ## Validar save/load
 
 ```text
-build\bin\RangeEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_example_validate.py
+build\bin\AnastacioEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_example_validate.py
 ```
 
 O resultado esperado é `[cutscene_native_example_validate] PASS`.
@@ -30,8 +30,8 @@ O resultado esperado é `[cutscene_native_example_validate] PASS`.
 ## Validar intercâmbio JSON
 
 ```text
-build\bin\RangeEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_export.py -- docs\cutscene-native-example.json
-build\bin\RangeEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_import.py -- docs\cutscene-native-example.json
+build\bin\AnastacioEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_export.py -- docs\cutscene-native-example.json
+build\bin\AnastacioEngine.exe --background docs\cutscene-native-example.blend --python source\release\scripts\templates_py\cutscene_native_import.py -- docs\cutscene-native-example.json
 ```
 
 O JSON é apenas intercâmbio versionado; a fonte de verdade continua sendo o

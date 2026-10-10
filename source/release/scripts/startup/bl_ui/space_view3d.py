@@ -44,7 +44,8 @@ class VIEW3D_HT_header(Header):
 
         object_mode = 'OBJECT' if obj is None else obj.mode
 
-        VIEW3D_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            VIEW3D_MT_editor_menus.draw_collapsible(context, layout)
 
         act_mode_item = bpy.types.Object.bl_rna.properties["mode"].enum_items[object_mode]
 
@@ -93,6 +94,8 @@ class VIEW3D_HT_header(Header):
         # manipulator toggle it used to sit beside. template_header_3D() also
         # draws the layers grid and the lock-camera-and-layers icon last.
         layout.template_header_3D()
+        if view.show_floating_controls_in_header:
+            layout.template_header_3D_controls()
 
         if obj:
             # Particle edit

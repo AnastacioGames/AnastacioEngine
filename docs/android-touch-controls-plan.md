@@ -143,7 +143,7 @@ Os layouts ficam num JSON do projeto e podem ser escolhidos no painel do editor.
    escondida (`visibilitychange`, como na troca de app) com o stick apertado. 25/25.
 
    **Roteiro no celular:**
-   1. Gerar a cena: `build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
+   1. Gerar a cena: `build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_pad_project.py`.
    2. Abrir `projects-teste/pad/pad.range` no editor. Em Android (Range), usar um applicationId de teste (ex.:
       `com.anastaciogames.pad`), gerar o APK debug e instalar com "Instalar no celular". Log:
       `adb logcat -s RangeWeb`, com o app aberto com `?debug=1` (`--es query "debug=1"`).
@@ -172,6 +172,10 @@ quando a engine pedir "abrir teclado"; entra só se algum jogo precisar.
 Exemplo para quem está começando (2026-09-25): o template de componente `03_jogador_celular.py`
 (Text Editor > Templates > Components) anda e pula lendo teclado e gamepad 0, então já funciona com os layouts
 `stick` e `dpad` sem nenhum código de toque.
+
+7. **T6, corrida (2026-10-09):** layout `race` com três jeitos de virar (stick, setas, inclinar o aparelho) trocados
+   por um botão da própria tela (`switch`), escolha guardada em `localStorage`. Pedais nos gatilhos (botão com alvo
+   `axis`). Conferido no Edge headless com toques simulados; falta o celular e o jogo real (RolimaRacer).
 
 Depois, fora deste escopo:
 - `logic.touches` (dedos crus via `SDL_FINGER*`);

@@ -81,7 +81,7 @@ def draw_game_properties(self, context, layout):
 
         # Coluna 1: Nome e Tipo
         # Split layout: 40% Nome, 60% Valor/Controles
-        split = row.split(percentage=0.4, align=True)
+        split = row.split(factor=0.4, align=True)
 
         row_left = split.row(align=True)
         row_left.prop(prop, "name", text="")

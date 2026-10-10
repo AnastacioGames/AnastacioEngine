@@ -1,6 +1,6 @@
 """Integracao dos operadores Abrir no navegador / Parar servidor (precisa do motor):
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/engine_web_serve.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/engine_web_serve.py
 
 Em background o navegador nao e aberto; so o servidor e a mensagem sao verificados.
 """

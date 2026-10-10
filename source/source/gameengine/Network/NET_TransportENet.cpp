@@ -76,7 +76,7 @@ public:
 		if (!m_initialized || m_host || maxPeers <= 0 || maxPeers > ENET_PROTOCOL_MAXIMUM_PEER_ID) {
 			return false;
 		}
-		ENetAddress address;
+		ENetAddress address = {};  // zero sin6_scope_id (and the rest): dual-stack bind fails on garbage
 		address.host = ENET_HOST_ANY;
 		address.port = port;
 		m_host = enet_host_create(&address, size_t(maxPeers), kChannelCount, 0, 0);
@@ -94,7 +94,19 @@ public:
 				return false;
 			}
 		}
-		ENetAddress address;
+#ifdef ENET_IPV4_ONLY
+		// This build compiles the ENet fork in ENET_IPV4_ONLY mode: ENetAddress keeps the old
+		// IPv4 layout and the socket has no IPv6 stack, so reject IPv6 literals up front instead
+		// of letting the resolver fail obscurely; a hostname with only AAAA records fails in
+		// enet_address_set_host for the same reason. Build the fork without ENET_IPV4_ONLY
+		// (dual-stack, the fork's default, needs an IPv6-capable host) and this path accepts them:
+		// ParseAddress() in the Python binding already strips the brackets, so a '[::1]:port'
+		// from net.join() reaches here as a bare '::1' that enet_address_set_host resolves.
+		if (host.find(':') != std::string::npos) {  // IPv6 literal (with or without brackets)
+			return false;
+		}
+#endif  // ENET_IPV4_ONLY
+		ENetAddress address = {};  // zero sin6_scope_id (and the rest) before set_host fills the address
 		if (enet_address_set_host(&address, host.c_str()) != 0) {
 			return false;
 		}
@@ -164,7 +176,8 @@ public:
 					events.push_back(std::move(ev));
 					break;
 				}
-				case ENET_EVENT_TYPE_DISCONNECT: {
+				case ENET_EVENT_TYPE_DISCONNECT:
+				case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
 					// Peers we disconnected ourselves were already reported.
 					if (event.peer->data) {
 						TransportEvent ev;

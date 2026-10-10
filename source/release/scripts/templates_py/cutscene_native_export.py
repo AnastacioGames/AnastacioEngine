@@ -1,7 +1,7 @@
 """Exporta Scene.cutscene_settings para o schema JSON nativo versionado.
 
 Uso no Range/Blender 2.79:
-    RangeEngine.exe --background arquivo.blend --python \
+    AnastacioEngine.exe --background arquivo.blend --python \
         source/release/scripts/templates_py/cutscene_native_export.py -- \
         cutscenes_native.json
 

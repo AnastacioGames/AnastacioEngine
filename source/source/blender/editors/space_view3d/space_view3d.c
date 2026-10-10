@@ -1450,7 +1450,8 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 		    ((world->weather_flag & WO_WEATHER_RAIN &&
 		      (world->rain_speed != 0.0f ||
 		       world->weather_flag & (WO_WEATHER_RAIN_SPLASH | WO_WEATHER_RAIN_AURA | WO_WEATHER_RAIN_LIGHTNING))) ||
-		     (world->weather_flag & WO_WEATHER_CLOUDS && world->cloud_speed != 0.0f)))
+		     (world->weather_flag & WO_WEATHER_CLOUDS && world->cloud_speed != 0.0f) ||
+		     (world->aurora_flag & WO_AURORA_ENABLE)))
 		{
 			want_timer = true;
 			break;

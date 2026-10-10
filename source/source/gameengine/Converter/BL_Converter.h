@@ -33,6 +33,7 @@
 #define __KX_BLENDERCONVERTER_H__
 
 #include <map>
+#include <set>
 #include <vector>
 
 #ifdef _MSC_VER // MSVC doesn't support incomplete type in std::unique_ptr.
@@ -113,6 +114,8 @@ private:
 		} m_stage;
 		/// Next material to compile in STAGE_SHADERS.
 		unsigned int m_material;
+		/// Materials already sent to the driver in STAGE_SHADERS (parallel compile).
+		unsigned int m_sent = 0;
 	};
 	/// Seconds per frame the async merge may use (Range.logic.setLibLoadFrameBudget).
 	double m_mergeFrameBudget;
@@ -125,6 +128,8 @@ private:
 	struct PendingReload {
 		/// Materials already recompiled, counted from the end of the scene list.
 		unsigned int m_material;
+		/// Materials already sent to the driver (parallel compile), same order.
+		unsigned int m_sent = 0;
 		/// Libraries finished once the reload ends.
 		std::vector<KX_LibLoadStatus *> m_waiting;
 	};
@@ -138,6 +143,10 @@ private:
 	std::vector<Main *> m_dynamicMaggies;
 	/// All maggies, original and loaded.
 	std::vector<Main *> m_maggies;
+	/// Objects and meshes whose geometry FreeUnconvertedData() released.
+	std::set<Object *> m_freedObjects;
+	std::set<Mesh *> m_freedMeshes;
+
 	/// Loaded library status associated to library.
 	std::unordered_map<Main *, std::unique_ptr<KX_LibLoadStatus> > m_libloadStatus;
 
@@ -214,7 +223,7 @@ public:
 	/** Compile the shaders of a scene converted without them, from material next, until the deadline (PIL
 	 * time) passes; at least one per call. True when all are compiled.
 	 */
-	bool CompileSceneShaders(KX_Scene *scene, unsigned int& next, double deadline);
+	bool CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsigned int& sent, double deadline);
 
 	/** This function removes all entities stored in the converter for that scene
 	 * It should be used instead of direct delete scene
@@ -241,6 +250,27 @@ public:
 	 * addObject(). Returns nullptr if no such object exists in bmain.
 	 */
 	KX_GameObject *FindOrConvertMainObject(const std::string& name, KX_Scene *scene_merge);
+
+	/** Convert into a running scene an object of its own blender scene left out at load by the
+	 * Convert flag, plus (with children) its unconverted descendants. Lands in the active list when
+	 * on an active layer, otherwise in the inactive one (ready for addObject()). A parent already in
+	 * the scene is linked back keeping the blender relative transform (plain object parenting).
+	 * Returns the object, or nullptr with error set.
+	 */
+	KX_GameObject *ConvertSceneObject(KX_Scene *scene, const std::string& name, bool children, std::string& error);
+
+	/** Standalone player only: frees the mesh geometry used solely by objects of blscene left out by
+	 * the Convert flag, which then can't be converted anymore. Returns the bytes released.
+	 */
+	size_t FreeUnconvertedData(Scene *blscene, std::string& error);
+	/// True once FreeUnconvertedData() released this object's mesh.
+	bool IsObjectDataFreed(Object *ob) const;
+	/// Set by the standalone player: the Main belongs to the game, not to the editor.
+	static void SetMainOwnedByGame(bool owned);
+	/// Object of the given name in blscene or its background sets, nullptr if absent.
+	static Object *FindSceneObject(Scene *blscene, const std::string& name);
+	/// True when parent is an ancestor of ob, at any depth.
+	static bool IsChildOf(Object *ob, Object *parent);
 
 	/// Return a new empty library of name path.
 	Main *CreateLibrary(const std::string& path);

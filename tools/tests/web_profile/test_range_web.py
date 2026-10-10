@@ -1,7 +1,7 @@
 """Testes puros do nucleo range_web (marco B). Sem bpy.
 
     python -m unittest discover -s tools/tests/web_profile -v
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/test_range_web.py  (Python do motor, 3.11)
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/test_range_web.py  (Python do motor, 3.11)
 """
 
 import hashlib
@@ -363,6 +363,10 @@ class TouchTest(unittest.TestCase):
             self.assertEqual(codes, set(touch.reach(layout)[0]) - always, layout)
         for layout in touch.LAYOUTS[1:4]:
             self.assertIn("\n    %s: [" % layout, src)
+        # Corrida: montado depois do objeto (stick, setas e inclinar partilham os botoes).
+        for layout in ("race", "race_arrows", "race_tilt"):
+            self.assertIn("\n  touchLayouts.%s = [" % layout, src)
+        self.assertIn(touch.JOY_TRIGGER_RIGHT, touch.reach("race")[1])
 
     def test_keyboard_sensor(self):
         self.assertEqual(touch.check_touch("wasd", [_kb("up", "W"), _kb("jump", "SPACE")], {}), [])

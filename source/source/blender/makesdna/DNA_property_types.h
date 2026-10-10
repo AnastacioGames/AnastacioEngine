@@ -38,6 +38,9 @@ typedef struct bProperty {
 	short type, flag;
 	int data;				/* data should be 4 bytes to store int,float stuff */
 	void *poin;				/* references data unless its a string which is malloc'd */
+	float net_min, net_max;	/* replicated Float: quantization range */
+	int net_bits;			/* replicated Float: bits over [net_min, net_max], 0 = raw 32 bits */
+	int pad;
 
 } bProperty;
 

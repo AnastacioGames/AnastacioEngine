@@ -29,6 +29,8 @@
  *  \ingroup bgerastogl
  */
 
+#include "KX_RenderProfileSample.h"
+
 #include "RAS_Rasterizer.h"
 #include "RAS_OpenGLRasterizer.h"
 #include "RAS_OpenGLDebugDraw.h"
@@ -116,14 +118,27 @@ RAS_Rasterizer::~RAS_Rasterizer()
 {
 }
 
+/* GPU_set_material_alpha_blend() guarda o último modo em cache e não reaplica o mesmo
+ * modo. Quem liga/desliga GL_BLEND ou GL_ALPHA_TEST por fora (filtros 2D, blend
+ * customizado de material) deixa esse cache mentindo: o próximo material com o mesmo
+ * modo pula a chamada e desenha sem blend. -1 marca o estado como desconhecido. */
+static void ras_invalidate_alpha_blend(RAS_Rasterizer::EnableBit bit)
+{
+	if (ELEM(bit, RAS_Rasterizer::RAS_BLEND, RAS_Rasterizer::RAS_ALPHA_TEST)) {
+		GPU_set_material_alpha_blend(-1);
+	}
+}
+
 void RAS_Rasterizer::Enable(RAS_Rasterizer::EnableBit bit)
 {
 	m_impl->Enable(bit);
+	ras_invalidate_alpha_blend(bit);
 }
 
 void RAS_Rasterizer::Disable(RAS_Rasterizer::EnableBit bit)
 {
 	m_impl->Disable(bit);
+	ras_invalidate_alpha_blend(bit);
 }
 
 void RAS_Rasterizer::SetDepthFunc(RAS_Rasterizer::DepthFunc func)
@@ -134,6 +149,7 @@ void RAS_Rasterizer::SetDepthFunc(RAS_Rasterizer::DepthFunc func)
 void RAS_Rasterizer::SetBlendFunc(BlendFunc src, BlendFunc dst)
 {
 	m_impl->SetBlendFunc(src, dst);
+	GPU_set_material_alpha_blend(-1);
 }
 
 void RAS_Rasterizer::SetAmbientColor(const mt::vec3& color)
@@ -195,8 +211,10 @@ void RAS_Rasterizer::Exit()
 namespace {
 int g_lastDrawCalls = 0;
 int g_lastMaterialChanges = 0;
+int g_lastLightBinds = 0;
 int g_drawCallsThisFrame = 0;
 int g_materialChangesThisFrame = 0;
+int g_lightBindsThisFrame = 0;
 
 /// Calls RAS_Rasterizer::PopMatrix on scope exit, matching a prior PushMatrix.
 class RAS_PopMatrixGuard
@@ -219,8 +237,10 @@ void RAS_Rasterizer::ResetDrawCallCounters()
 {
 	g_lastDrawCalls = g_drawCallsThisFrame;
 	g_lastMaterialChanges = g_materialChangesThisFrame;
+	g_lastLightBinds = g_lightBindsThisFrame;
 	g_drawCallsThisFrame = 0;
 	g_materialChangesThisFrame = 0;
+	g_lightBindsThisFrame = 0;
 }
 
 void RAS_Rasterizer::IncDrawCallCount()
@@ -233,6 +253,11 @@ void RAS_Rasterizer::IncMaterialChangeCount()
 	++g_materialChangesThisFrame;
 }
 
+void RAS_Rasterizer::IncLightBindCount()
+{
+	++g_lightBindsThisFrame;
+}
+
 int RAS_Rasterizer::GetLastDrawCalls()
 {
 	return g_lastDrawCalls;
@@ -241,6 +266,11 @@ int RAS_Rasterizer::GetLastDrawCalls()
 int RAS_Rasterizer::GetLastMaterialChanges()
 {
 	return g_lastMaterialChanges;
+}
+
+int RAS_Rasterizer::GetLastLightBinds()
+{
+	return g_lastLightBinds;
 }
 
 void RAS_Rasterizer::BeginFrame(double time)
@@ -1163,6 +1193,7 @@ void RAS_Rasterizer::ActivateOverrideShaderInstancing(RAS_InstancingBuffer *buff
 
 void RAS_Rasterizer::ProcessLighting(bool uselights, const mt::mat3x4& viewmat)
 {
+	RANGE_RENDER_SAMPLE("draw.light_selection");
 	bool enable = false;
 	int layer = -1;
 

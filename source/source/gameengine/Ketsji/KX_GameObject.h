@@ -140,6 +140,8 @@ protected:
 	/// Set on the first dent (OB_DEFORMABLE): AddMeshUser() gives the instance a KX_DentDeformer.
 	/// Lazy, so objects never hit keep the shared mesh (no copy, instancing kept).
 	bool								m_wantsDentDeformer;
+	/// Bitmap text meshes duplicated for this replica, unregistered from the converter when it is removed.
+	std::vector<KX_Mesh *>				m_bitmapTextMeshes;
 	/// True while a billboard LoD level drives the orientation; the original one is kept in
 	/// m_lodBillboardOrientation and restored when a non billboard level is reached.
 	bool								m_lodBillboardActive;
@@ -152,6 +154,8 @@ protected:
 	mt::vec4							m_objectColor;
 	/// objects activity culling distance
 	float							m_distance;
+	/// Seconds left before auto removal (addObject time), 0 = lives forever.
+	float							m_lifeTime;
 
 	// visible = user setting
 	// visibleLOD = LOD setting
@@ -160,6 +164,7 @@ protected:
 	bool       							m_bRender;
 	bool       							m_bVisibleLOD;
 	bool								m_bOccluder;
+	KX_Camera							*m_hiddenFromCamera = nullptr;
 	bool								m_halfAnimations;
 	bool								m_bDoAnimations;
 
@@ -403,6 +408,9 @@ public:
 	 */
 	bool IsActionDone(short layer);
 
+	/// True when an action layer still requires an animation update.
+	bool HasActiveActions();
+
 	bool IsActionsSuspended();
 
 	/**
@@ -523,6 +531,19 @@ public:
 	 */
 		float
 	GetActivityCullingDistance();
+
+	/// Legacy BGE lifetime unit: addObject()/life count "logic frames" at a fixed 50 Hz.
+	static constexpr float LifeFramesPerSecond = 50.0f;
+
+	/// Remaining lifetime in seconds, 0 = lives forever. Use KX_Scene::SetObjectLifeTime to change it.
+	float GetLifeTime() const
+	{
+		return m_lifeTime;
+	}
+	void SetLifeTime(float seconds)
+	{
+		m_lifeTime = seconds;
+	}
 
 	/**
 	 * Return the local inertia vector of the object
@@ -869,6 +890,7 @@ public:
 
 	/// Give a replica its own copy of the meshes showing 2.4x bitmap text, the text is stored in the mesh.
 	void DuplicateBitmapTextMeshes();
+	const std::vector<KX_Mesh *>& GetBitmapTextMeshes() const;
 	
 	/**
 	 * Update buckets with data about the mesh after
@@ -960,6 +982,19 @@ public:
 	// Same as GetVisible, but this is a specific exception to CalculateVisibleMeshes, which causes it to
 	// not render objects with invisible LoD active
 	bool GetVisibleLOD(void);
+
+	/** Camera that must not draw this object (others still do), e.g. a player's own body in a first
+	 * person view during split screen. Compared only, never dereferenced; cleared when the camera is
+	 * removed from the scene. Replicas start without one. */
+	KX_Camera *GetHiddenFromCamera() const
+	{
+		return m_hiddenFromCamera;
+	}
+	void SetHiddenFromCamera(KX_Camera *cam);
+	/// Clears every object of the list hidden from cam (cam is being removed).
+	static void ClearHiddenFromCamera(EXP_ListValue<KX_GameObject> *objects, KX_Camera *cam);
+	/// Objects hidden from some camera, engine wide: the render loop skips the filter when zero.
+	static int s_hiddenFromCameraCount;
     void UpdateVisibleLOD(KX_Camera *cam);
 
 	/**
@@ -1041,11 +1076,8 @@ public:
 	void RestorePhysics();
 
 	/// Suspend/resume this object's BL_ActionManager, so KX_Scene::UpdateAnimations skips it
-	/// entirely (IsActionsSuspended()) instead of still dispatching an update task every frame
-	/// for an object whose actions were merely stopped (stopAction only clears layers, it never
-	/// removes the object from KX_Scene::m_animatedlist -- that only happens when the object is
-	/// destroyed). Meant for pooled/recycled objects (e.g. particle effects) that are hidden but
-	/// never actually removed from the scene.
+	/// entirely (IsActionsSuspended()). Meant for pooled/recycled objects with an action that must
+	/// resume later (e.g. particle effects) while they are hidden from the scene.
 	void SuspendAnimations();
 	void ResumeAnimations();
 
@@ -1234,6 +1266,7 @@ public:
 	static PyObject*	pyattr_get_scene(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 	static PyObject*	pyattr_get_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_life(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_mass(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_friction(EXP_PyObjectPlus* self_v, const EXP_PYATTRIBUTE_DEF* attrdef);
@@ -1259,6 +1292,8 @@ public:
 	static int			pyattr_set_layer(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_visible(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject*	pyattr_get_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int			pyattr_set_hidden_from_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static int			pyattr_set_halfanimations(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject*	pyattr_get_culled(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_cullingBox(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

@@ -5,8 +5,8 @@ to Custom, the shape follows the Empty display. Game side: the camera walks
 through spheres/boxes (rotated, non-uniform scale, nested with priority) and
 the reverb/filter state of the speakers is compared with the expected fade.
 
-    build/bin/RangeEngine.exe -b --python tools/tests/reverb_area_test.py -- --make-scene reverb_area.range
-    build/bin/RangeRuntime.exe reverb_area.range
+    build/bin/AnastacioEngine.exe -b --python tools/tests/reverb_area_test.py -- --make-scene reverb_area.range
+    build/bin/AnastacioRuntime.exe reverb_area.range
 
 Results are printed with the REVERB_AREA prefix and written to
 reverb_area_test_result.txt next to the scene. The expected values are saved

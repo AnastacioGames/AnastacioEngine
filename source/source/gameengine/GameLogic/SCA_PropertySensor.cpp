@@ -261,8 +261,9 @@ bool SCA_PropertySensor::CheckPropertyCondition()
 			EXP_Value *orgprop = GetParent()->FindIdentifier(m_checkpropname);
 
 			if (!orgprop->IsError()) {
-				if (m_previoustext != orgprop->GetText()) {
-					m_previoustext = orgprop->GetText();
+				std::string text = orgprop->GetText();
+				if (m_previoustext != text) {
+					m_previoustext = std::move(text);
 					result = true;
 				}
 			}

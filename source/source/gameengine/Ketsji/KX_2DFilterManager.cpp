@@ -30,7 +30,10 @@
 #include "CM_Message.h"
 
 #include "KX_Camera.h"
+#include "KX_Scene.h"
 #include "DNA_camera_types.h"
+#include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
+#include "BLI_utildefines.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,7 +59,7 @@ extern "C" {
 
 KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filters) :
 	RAS_2DFilterManager(filters), m_canvas(canvas),
-	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength)
+	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength), m_sceneFilters(filters)
 {
 	/* This location doesn't seem very good to me but it works fine here, we need to generate the KX_2DFilter to have offscreen and not RAS_* */
 	/* Only for Range legacy, the code can be deprecated after Range 2.0+ */
@@ -359,6 +362,66 @@ void KX_2DFilterManager::EnsureLensFlareFilters(BuildInFilters filters)
 	AddFilter(flareData, true);
 }
 
+RAS_2DFilterData KX_2DFilterManager::CameraFXData(int pass)
+{
+	RAS_2DFilterData data;
+	data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	data.filterPassIndex = pass;
+	data.gameObject = nullptr;
+	data.mipmap = false;
+	data.propertyNames = {};
+	data.buildInFilters = {};
+	data.shaderText = (pass == FILTERPASS_CAMERA_DOF) ? datatoc_RAS_CameraDof2DFilter_glsl :
+	                                                    datatoc_RAS_CameraLens2DFilter_glsl;
+	return data;
+}
+
+void KX_2DFilterManager::CameraFXUsed(KX_Scene *scene, bool& dof, bool& lens) const
+{
+	/* Any camera: the effects are often turned on from Python only during the game (nitro, countdown), so the
+	 * flags at load say nothing. Disabled passes cost no draw. Inactive layers too: a camera spawned later (the
+	 * player's car) is there. */
+	dof = lens = false;
+	for (EXP_ListValue<KX_GameObject> *list : {scene->GetObjectList(), scene->GetInactiveList()}) {
+		for (KX_GameObject *gameobj : list) {
+			if (dynamic_cast<KX_Camera *>(gameobj)) {
+				dof = lens = true;
+				return;
+			}
+		}
+	}
+}
+
+void KX_2DFilterManager::PrefetchCameraFX(KX_Scene *scene)
+{
+	bool use[2];
+	CameraFXUsed(scene, use[0], use[1]);
+	const int passes[2] = {FILTERPASS_CAMERA_DOF, FILTERPASS_CAMERA_LENS};
+	for (int i = 0; i < 2; ++i) {
+		if (use[i] && !GetFilterPass(passes[i], true)) {
+			// Inside a prefetch pass the link only sends the program to the driver; the filter itself is dropped.
+			RAS_2DFilterData data = CameraFXData(passes[i]);
+			delete NewFilter(data);
+		}
+	}
+}
+
+void KX_2DFilterManager::PrepareCameraFX(KX_Scene *scene)
+{
+	bool use[2];
+	CameraFXUsed(scene, use[0], use[1]);
+	const int passes[2] = {FILTERPASS_CAMERA_DOF, FILTERPASS_CAMERA_LENS};
+	for (int i = 0; i < 2; ++i) {
+		if (use[i] && !GetFilterPass(passes[i], true)) {
+			RAS_2DFilterData data = CameraFXData(passes[i]);
+			if (RAS_2DFilter *filter = AddFilter(data, true)) {
+				// UpdateCameraFX turns it on when the active camera uses it.
+				filter->SetEnabled(false);
+			}
+		}
+	}
+}
+
 void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 {
 	bool useDof = false;
@@ -427,40 +490,28 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 
 	RAS_2DFilter *dof = GetFilterPass(FILTERPASS_CAMERA_DOF, true);
 	if (useDof && !dof) {
-		RAS_2DFilterData data;
-		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
-		data.filterPassIndex = FILTERPASS_CAMERA_DOF;
-		data.gameObject = nullptr;
-		data.mipmap = false;
-		data.propertyNames = {};
-		data.buildInFilters = {};
-		data.shaderText = datatoc_RAS_CameraDof2DFilter_glsl;
+		RAS_2DFilterData data = CameraFXData(FILTERPASS_CAMERA_DOF);
 		dof = AddFilter(data, true);
 	}
-	else if (!useDof && dof) {
-		RemoveReservedFilterPass(FILTERPASS_CAMERA_DOF);
-		dof = nullptr;
+	else if (dof) {
+		/* Keep the pass built and only toggle it: removing it here meant the shader was compiled
+		 * again every time the effect came back (nitro, camera switch), a visible hitch. */
+		dof->SetEnabled(useDof);
 	}
 
 	RAS_2DFilter *lens = GetFilterPass(FILTERPASS_CAMERA_LENS, true);
 	if (useLens && !lens) {
-		RAS_2DFilterData data;
-		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
-		data.filterPassIndex = FILTERPASS_CAMERA_LENS;
-		data.gameObject = nullptr;
-		data.mipmap = false;
-		data.propertyNames = {};
-		data.buildInFilters = {};
-		data.shaderText = datatoc_RAS_CameraLens2DFilter_glsl;
+		RAS_2DFilterData data = CameraFXData(FILTERPASS_CAMERA_LENS);
 		lens = AddFilter(data, true);
 	}
-	else if (!useLens && lens) {
-		RemoveReservedFilterPass(FILTERPASS_CAMERA_LENS);
-		lens = nullptr;
+	else if (lens) {
+		/* Keep the pass built and only toggle it: removing it here meant the shader was compiled
+		 * again every time the effect came back (nitro, camera switch), a visible hitch. */
+		lens->SetEnabled(useLens);
 	}
 
 	for (RAS_2DFilter *filter : {dof, lens}) {
-		if (filter) {
+		if (filter && filter->GetEnabled()) {
 			std::copy(fx, fx + 24, filter->GetBuildInFilters()->camera_fx);
 		}
 	}
@@ -494,6 +545,25 @@ KX_2DFilter *KX_2DFilterManager::BloomPass(BuildInFilters filters, int time, int
 	return bloom;
 }
 
+RAS_2DFilter *KX_2DFilterManager::EnsureFxaaPass()
+{
+	RAS_2DFilter *fxaa = GetFilterPass(FILTERPASS_FXAA, true);
+	if (!fxaa) {
+		fxaa = EnsureFxaaFilter(m_sceneFilters);
+		fxaa->SetEnabled(false);
+	}
+	BuildInFilters *params = fxaa->GetBuildInFilters();
+	// A pass without scene values (search steps 0) draws with the defaults: write them, so a
+	// single parameter can change.
+	if (params->fxaa_search_steps <= 0) {
+		params->fxaa_edge_threshold = SCENE_FX_FXAA_EDGE_THRESHOLD;
+		params->fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+		params->fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
+		params->fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+	}
+	return fxaa;
+}
+
 RAS_2DFilter *KX_2DFilterManager::NewFilter(RAS_2DFilterData& filterData)
 {
 	return new KX_2DFilter(filterData);
@@ -516,8 +586,83 @@ PyMethodDef KX_2DFilterManager::Methods[] = {
 };
 
 PyAttributeDef KX_2DFilterManager::Attributes[] = {
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEdgeThreshold", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEdgeThresholdMin", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSubpix", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSearchSteps", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("grainEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("grainStrength", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
+
+/* Scene > Post-process: FXAA and Film Grain, same names and ranges as the panel (rna_scene.c). */
+PyObject *KX_2DFilterManager::pyattr_get_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
+	const std::string& name = attrdef->m_name;
+	if (name == "grainEnabled") {
+		return PyBool_FromLong(self->m_useGrain);
+	}
+	if (name == "grainStrength") {
+		return PyFloat_FromDouble(self->m_grainStrength);
+	}
+
+	RAS_2DFilter *fxaa = self->GetFilterPass(FILTERPASS_FXAA, true);
+	if (name == "fxaaEnabled") {
+		return PyBool_FromLong(fxaa && fxaa->GetEnabled());
+	}
+	BuildInFilters params = fxaa ? *fxaa->GetBuildInFilters() : self->m_sceneFilters;
+	if (params.fxaa_search_steps <= 0) {
+		params.fxaa_edge_threshold = SCENE_FX_FXAA_EDGE_THRESHOLD;
+		params.fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
+		params.fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
+		params.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+	}
+	if (name == "fxaaEdgeThreshold") return PyFloat_FromDouble(params.fxaa_edge_threshold);
+	if (name == "fxaaEdgeThresholdMin") return PyFloat_FromDouble(params.fxaa_edge_threshold_min);
+	if (name == "fxaaSubpix") return PyFloat_FromDouble(params.fxaa_subpix);
+	return PyLong_FromLong(params.fxaa_search_steps);
+}
+
+int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
+	const std::string& name = attrdef->m_name;
+
+	if (name == "fxaaEnabled" || name == "grainEnabled") {
+		const int enabled = PyObject_IsTrue(value);
+		if (enabled == -1) {
+			PyErr_Format(PyExc_TypeError, "filterManager.%s = bool: KX_2DFilterManager, expected True or False", name.c_str());
+			return PY_SET_ATTR_FAIL;
+		}
+		if (name == "grainEnabled") {
+			self->m_useGrain = enabled;
+		}
+		else {
+			self->EnsureFxaaPass()->SetEnabled(enabled);
+		}
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	const double number = PyFloat_AsDouble(value);
+	if (number == -1.0 && PyErr_Occurred()) {
+		PyErr_Format(PyExc_TypeError, "filterManager.%s = number: KX_2DFilterManager, expected a number", name.c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	const float factor = (float)CLAMPIS(number, 0.0, 1.0);
+	if (name == "grainStrength") {
+		self->m_grainStrength = factor;
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	BuildInFilters *params = self->EnsureFxaaPass()->GetBuildInFilters();
+	if (name == "fxaaEdgeThreshold") params->fxaa_edge_threshold = factor;
+	else if (name == "fxaaEdgeThresholdMin") params->fxaa_edge_threshold_min = factor;
+	else if (name == "fxaaSubpix") params->fxaa_subpix = factor;
+	else params->fxaa_search_steps = (int)CLAMPIS(number, 2.0, (double)SCENE_FX_FXAA_SEARCH_STEPS_MAX);
+	return PY_SET_ATTR_SUCCESS;
+}
 
 PyTypeObject KX_2DFilterManager::Type = {
 	PyVarObject_HEAD_INIT(nullptr, 0)

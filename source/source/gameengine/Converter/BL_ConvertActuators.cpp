@@ -515,6 +515,13 @@ void BL_ConvertActuators(const char *maggiename,
 							mt::vec3(editobact->angVelocity),
 							(editobact->localflag & ACT_EDOB_LOCAL_ANGV) != 0);
 
+						// Load Mode "On Demand": nothing is converted until the actuator first adds it.
+						if (!originalval && editobact->ob && !editobact->ob->id.lib &&
+						    !(editobact->ob->gameflag & (OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY)))
+						{
+							tmpaddact->SetOnDemandObject(editobact->ob->id.name + 2);
+						}
+
 						if (editobact->flag & ACT_EDOB_ADD_FROM_PROP) {
 							tmpaddact->SetObjectProperty(editobact->name,
 							                             (editobact->flag & ACT_EDOB_ADD_PROP_GLOBAL) != 0);
@@ -534,8 +541,14 @@ void BL_ConvertActuators(const char *maggiename,
 					case ACT_EDOB_REPLACE_MESH:
 					{
 						KX_Mesh *tmpmesh = converter.FindGameMesh(editobact->me);
+						/* Mesh no object of the scene uses (e.g. HUD digits kept with a fake user):
+						 * converted here, as Blender 2.4x did. */
+						if (!tmpmesh && editobact->me) {
+							tmpmesh = BL_ConvertMesh(editobact->me, nullptr, scene, converter);
+						}
 
-						if (!tmpmesh) {
+						// No mesh is fine: scripts often set it by name (actuator.mesh = "...").
+						if (!tmpmesh && editobact->me) {
 							CM_Warning("object \"" << objectname << "\" from ReplaceMesh actuator \"" << uniquename
 							                       << "\" uses a mesh not owned by an object in scene \"" << scene->GetName() << "\".");
 						}
@@ -842,6 +855,11 @@ void BL_ConvertActuators(const char *maggiename,
 
 						if (sceneact->scene) {
 							nextSceneName = sceneact->scene->id.name + 2;
+							if ((sceneact->flag & ACT_SCENE_PRELOAD) && (sceneact->type == ACT_SCENE_ADD_FRONT ||
+							    sceneact->type == ACT_SCENE_ADD_BACK || sceneact->type == ACT_SCENE_SET))
+							{
+								ketsjiEngine->PreloadScene(nextSceneName);
+							}
 						}
 
 						break;
@@ -873,6 +891,7 @@ void BL_ConvertActuators(const char *maggiename,
 					ketsjiEngine,
 					nextSceneName,
 					cam);
+				tmpsceneact->SetKeep((sceneact->flag & ACT_SCENE_KEEP) != 0);
 				baseact = tmpsceneact;
 				break;
 			}

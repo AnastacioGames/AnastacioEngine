@@ -97,6 +97,8 @@ public:
 	bool UseSkinning() const;
 
 	void ReloadMaterial();
+	/// Sends the program of ma to the driver ahead of ReloadMaterial (GPU_shader_prefetch pass).
+	static void Prefetch(KX_Scene *scene, struct Material *ma);
 	int GetAlphaBlend();
 };
 

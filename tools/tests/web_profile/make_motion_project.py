@@ -1,6 +1,6 @@
 """Gera a cena de teste de bge.logic.motion em projects-teste/motion/motion.range:
 
-    build/bin/RangeEngine.exe -b --python tools/tests/web_profile/make_motion_project.py
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_motion_project.py
 
 Camera de cima olhando um tabuleiro. Inclinar o celular inclina o tabuleiro e rola a bola para o lado
 mais baixo; tocar na tela chama motion.calibrate() (posicao atual vira a neutra). Tabuleiro verde = sensor

@@ -98,7 +98,7 @@ typedef struct bEditObjectActuator {
 } bEditObjectActuator;
 
 typedef struct bSceneActuator {
-	short type, pad1;
+	short type, flag;
 	int pad;
 	struct Scene *scene;
 	struct Object *camera;
@@ -551,6 +551,10 @@ typedef struct bActuator {
 #define ACT_SCENE_REMOVE		5
 #define ACT_SCENE_SUSPEND		6
 #define ACT_SCENE_RESUME		7
+
+/* sceneactuator->flag */
+#define ACT_SCENE_PRELOAD		(1 << 0)
+#define ACT_SCENE_KEEP			(1 << 1)
 
 
 /* randomAct->distribution */

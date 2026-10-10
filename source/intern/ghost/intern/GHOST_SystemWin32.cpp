@@ -171,9 +171,13 @@ typedef enum MONITOR_DPI_TYPE {
 typedef HRESULT(API * GHOST_WIN32_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS);
 typedef BOOL(API * GHOST_WIN32_EnableNonClientDpiScaling)(HWND);
 
-GHOST_SystemWin32::GHOST_SystemWin32()
+GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 	: m_hasPerformanceCounter(false), m_freq(0), m_start(0)
 {
+	m_hiddenWindows = hiddenWindows;
+	if (m_hiddenWindows) {
+		m_windowFocus = false;
+	}
 	m_displayManager = new GHOST_DisplayManagerWin32();
 	GHOST_ASSERT(m_displayManager, "GHOST_SystemWin32::GHOST_SystemWin32(): m_displayManager==0\n");
 	m_displayManager->initialize();
@@ -277,7 +281,8 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(
 		        ((glSettings.flags & GHOST_glAlphaBackground) != 0),
 		        glSettings.numOfAASamples,
 		        parentWindow,
-		        ((glSettings.flags & GHOST_glDebugContext) != 0));
+		        ((glSettings.flags & GHOST_glDebugContext) != 0),
+		        m_hiddenWindows);
 
 	if (window->getValid()) {
 		// Store the pointer to the window
@@ -296,36 +301,14 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(
 
 void GHOST_SystemWin32::setFullScreen(bool enable, GHOST_IWindow *window)
 {
-	GHOST_DisplaySetting setting;
-
+	/* Tela cheia sem borda na resolucao do desktop: a janela vira popup maximizada
+	 * (GHOST_WindowWin32::setState). Nao troca o modo de video com ChangeDisplaySettings,
+	 * que derruba o player com EXCEPTION_ACCESS_VIOLATION em alguns drivers (AMD/OpenGL 4.6). */
 	if (enable) {
-		GHOST_Rect cBnds;
-
-		m_displayManager->getCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting);
-		window->getClientBounds(cBnds);
-
-		setting.xPixels   = cBnds.getWidth();
-		setting.yPixels   = cBnds.getHeight();
-		// default...
-		setting.bpp       = 32;
-		setting.frequency = 60;
-
-		if (m_displayManager->setCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting)) {
-			window->setState(GHOST_kWindowStateFullScreen);
-		} else {
-			ChangeDisplaySettings(NULL, 0);
-		}
+		window->setState(GHOST_kWindowStateFullScreen);
 	}
 	else {
-		m_displayManager->getCurrentDisplaySetting(GHOST_DisplayManager::kMainDisplay, setting);
-
-		ChangeDisplaySettings(NULL, 0);
-
 		window->setState(GHOST_kWindowStateNormal);
-
-		if (window->getState() != GHOST_kWindowStateMaximized) {
-			window->setClientSize(setting.xPixels, setting.yPixels);
-		}
 	}
 }
 
@@ -1641,10 +1624,10 @@ static bool isStartedFromCommandPrompt()
 
 		GetWindowThreadProcessId(hwnd, &pid);
 		if (getProcessName(ppid, parent_name, sizeof(parent_name))) {
-			char *filename = strrchr(parent_name, '\\');
-			if (filename != NULL) {
-				start_from_launcher = strstr(filename, "RangeEngine.exe") != NULL;
-			}
+			const char *filename = strrchr(parent_name, '\\');
+			filename = filename ? filename + 1 : parent_name;
+			start_from_launcher = _stricmp(filename, "AnastacioEngine.exe") == 0 ||
+			                      _stricmp(filename, "RangeEngine.exe") == 0;
 		}
 
 		/* When we're starting from a wrapper we need to compare with parent process ID. */

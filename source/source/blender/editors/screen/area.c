@@ -1941,6 +1941,8 @@ static void ui_area_type_menu_main(bContext *C, uiLayout *layout, void *arg1)
 	ScrArea *sa = (ScrArea *)arg1;
 	uiLayout *row = uiLayoutRow(layout, false);
 
+	UI_block_flag_enable(uiLayoutGetBlock(layout), UI_BLOCK_DELAY_MOUSEOUT_QUIT);
+
 	ui_area_type_menu_column(uiLayoutColumn(row, false), sa, "General", general_editors);
 	ui_area_type_menu_column(uiLayoutColumn(row, false), sa, "Animation", animation_editors);
 	ui_area_type_menu_column(uiLayoutColumn(row, false), sa, "Scripting / Data", scripting_editors);

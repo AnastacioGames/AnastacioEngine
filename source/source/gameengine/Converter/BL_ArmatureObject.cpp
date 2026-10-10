@@ -216,6 +216,11 @@ BL_ArmatureObject::BL_ArmatureObject(void *sgReplicationInfo,
 
 	// Keep a copy of the original armature so we can fix drivers later
 	m_origObjArma = armature;
+	/* An armature never evaluated in Blender (e.g. created by a script in a scene that was not
+	 * active when the file was saved) has no pose yet: build it like the depsgraph would. */
+	if (!armature->pose) {
+		BKE_pose_rebuild(armature, (bArmature *)armature->data);
+	}
 	m_objArma = BKE_object_copy(G.main, armature);
 	m_objArma->data = BKE_armature_copy(G.main, (bArmature *)armature->data);
 	// During object replication ob->data is increase, we decrease it now because we get a copy.
@@ -451,6 +456,17 @@ bool BL_ArmatureObject::UpdateTimestep(double curtime)
 		 */
 		m_objArma->pose->ctime = (float)(curtime - m_lastframe);
 		m_lastframe = curtime;
+
+		// Bone children used to reschedule themselves forever because the relation had
+		// no way to know whether this pose would advance. The timestep is that signal:
+		// wake only those children when an action, constraint actuator or Python update()
+		// actually requests a new pose.
+		for (SG_Node *child : GetNode()->GetChildren()) {
+			SG_ParentRelation *relation = child->GetParentRelation();
+			if (relation && relation->NeedsParentUpdate()) {
+				child->SetModified();
+			}
+		}
 	}
 
 	return false;

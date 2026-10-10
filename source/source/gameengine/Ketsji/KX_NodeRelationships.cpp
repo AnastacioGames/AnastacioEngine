@@ -134,8 +134,12 @@ bool KX_SlowParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node
 {
 	BLI_assert(child != nullptr);
 
-	// The child will move even if the parent is not.
-	parentUpdated = true;
+	// Keep copies: the world setters below overwrite the node's storage.
+	const mt::vec3 previousScale = child->GetWorldScaling();
+	const mt::vec3 previousPosition = child->GetWorldPosition();
+	const mt::mat3 previousOrientation = child->GetWorldOrientation();
+	const bool firstUpdate = !m_initialized && parent;
+
 
 	if (parent) {
 		/* This is a slow parent relation
@@ -178,11 +182,23 @@ bool KX_SlowParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node
 		child->SetWorldFromLocalTransform();
 	}
 
-	child->ClearModified();
-	// This node must always be updated, so reschedule it for next time.
-	child->ActivateRecheduleUpdateCallback();
+	bool changed = previousScale != child->GetWorldScaling() ||
+		previousPosition != child->GetWorldPosition();
+	for (int col = 0; col < 3; ++col) {
+		for (int row = 0; row < 3; ++row) {
+			changed |= previousOrientation(row, col) != child->GetWorldOrientation()(row, col);
+		}
+	}
 
-	return true;
+	// A floating-point fixed point needs no more interpolation. Parent/local edits
+	// schedule this node again through the normal scene graph update path.
+	parentUpdated = changed;
+	child->ClearModified();
+	if (parent && (changed || firstUpdate)) {
+		child->ActivateRecheduleUpdateCallback();
+	}
+
+	return changed || firstUpdate;
 }
 
 SG_ParentRelation *KX_SlowParentRelation::NewCopy()

@@ -6,7 +6,7 @@ Run as a source-level guard from the repository root:
 
 Run it in a game after building RangeRuntime (the test exits the game itself):
 
-    build/bin/RangeRuntime.exe -p tools/tests/constraint_abi_test.py game.range
+    build/bin/AnastacioRuntime.exe -p tools/tests/constraint_abi_test.py game.range
 """
 
 from __future__ import print_function

@@ -13,6 +13,8 @@ from collections import OrderedDict
 import sys
 import time
 
+from mathutils import Color
+
 import Range
 import Range.imgui as imgui
 
@@ -36,20 +38,26 @@ def _brighter(c, k=1.2):
 
 class NetworkMenu(Range.types.KX_PythonComponent):
 	args = OrderedDict([
+		("C_Icons", "WORLD"),
+		("C_Header /Geral/WORLD", True),
 		("title", "Multiplayer"),
 		("language", {"en", "pt", "es"}),
-		("default_port", 7777),
-		("max_players", 8),
 		("touch", {"auto", "on", "off"}),
 		("ui_scale", 1.0),
+		("C_Header /Rede/LINKED", True),
+		("default_port", 7777),
+		("max_players", 8),
+		("show_lan", True),
+		("C_Header /Fonte/FONT_DATA", True),
 		("font_path", ""),
 		("font_size", 18.0),
-		("accent_color", "#338CF2"),
-		("window_bg_color", "#16181CF0"),
-		("text_color", "#F2F2F7"),
-		("button_color", "#2E333D"),
-		("focus_color", "#FFCC33"),
-		("show_lan", True),
+		("C_Header /Cores/COLOR", True),
+		("accent_color", Color((0.200, 0.549, 0.949, 1.0))),
+		("window_bg_color", Color((0.086, 0.094, 0.110, 0.941))),
+		("text_color", Color((0.949, 0.949, 0.969, 1.0))),
+		("button_color", Color((0.180, 0.200, 0.239, 1.0))),
+		("focus_color", Color((1.000, 0.800, 0.200, 1.0))),
+		("C_Header /Avancado/SETTINGS", True),
 		("show_settings", True),
 		("dev_build", False),
 		("open_on_start", True),

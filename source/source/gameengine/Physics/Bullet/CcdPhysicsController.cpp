@@ -21,6 +21,7 @@
 #endif
 
 #include "CM_Message.h"
+#include "CM_List.h"
 
 #include "CcdPhysicsController.h"
 #include "btBulletDynamicsCommon.h"
@@ -43,14 +44,20 @@
 #include "BulletSoftBody/btSoftBodyHelpers.h"
 #include "LinearMath/btConvexHull.h"
 #include "LinearMath/btConvexHullComputer.h"
+
+#include "CcdCookedData.h"
 #include "BulletCollision/Gimpact/btGImpactShape.h"
 
 #include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
 
 #include "BLI_utildefines.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstring>
 #include <mutex>
 #include <map>
+#include <thread>
 #include <tuple>
 
 /** Building the BVH of a triangle mesh shape is most of the physics load time (~1.2 ms for a 2k triangle
@@ -58,7 +65,9 @@
  * are identical (linked duplicates, Shift+D copies) now share one btOptimizedBvh: it only stores triangle
  * indices and quantized bounds, never a pointer to the mesh, so it is valid for any identical array. Each
  * object keeps its own shape and arrays, so replacing one object's physics mesh never touches the others.
- * The BVH is freed with the last shape using it; the mutex covers asynchronous LibLoad. */
+ * The BVH is freed with the last shape using it; the mutex covers asynchronous LibLoad.
+ * Inside CcdBeginBvhBatch()/CcdEndBvhBatch() (the converter's physics pass) the hash and the build of
+ * each distinct mesh wait for the end of the pass and run on all cores. */
 namespace {
 
 struct SharedBvhKey
@@ -83,53 +92,254 @@ struct SharedBvhEntry
 std::mutex sharedBvhMutex;
 std::map<SharedBvhKey, SharedBvhEntry> sharedBvhs;
 
-/// Two independent 64 bit hashes (FNV-1a and a multiply-xorshift), so a false match is out of reach.
+/// Two independent 64 bit hashes (FNV-1a and a multiply-xorshift) over 8 byte words, so a false match is
+/// out of reach.
 void shared_bvh_hash(uint64_t hash[2], const void *data, size_t size)
 {
 	const unsigned char *bytes = (const unsigned char *)data;
-	for (size_t i = 0; i < size; ++i) {
-		hash[0] = (hash[0] ^ bytes[i]) * 1099511628211ULL;
-		hash[1] = (hash[1] + bytes[i] + 1) * 0x9E3779B97F4A7C15ULL;
+	auto mix = [hash](uint64_t word) {
+		hash[0] = (hash[0] ^ word) * 1099511628211ULL;
+		hash[1] = (hash[1] + word + 1) * 0x9E3779B97F4A7C15ULL;
 		hash[1] ^= hash[1] >> 29;
+	};
+	size_t i = 0;
+	for (; i + 8 <= size; i += 8) {
+		uint64_t word;
+		memcpy(&word, bytes + i, 8);
+		mix(word);
+	}
+	for (; i < size; ++i) {
+		mix(bytes[i]);
 	}
 }
+
+/// Key of the vertex and triangle arrays (contiguous, see CreateBulletShape()).
+SharedBvhKey shared_bvh_key(btStridingMeshInterface *meshInterface)
+{
+	const unsigned char *verts;
+	const unsigned char *indices;
+	int numVerts, vertStride, numFaces, indexStride;
+	PHY_ScalarType vertType, indexType;
+	meshInterface->getLockedReadOnlyVertexIndexBase(&verts, numVerts, vertType, vertStride, &indices, indexStride,
+	                                                numFaces, indexType, 0);
+	SharedBvhKey key = {{14695981039346656037ULL, 0x2545F4914F6CDD1DULL}, numVerts, numFaces};
+	shared_bvh_hash(key.hash, verts, (size_t)numVerts * vertStride);
+	shared_bvh_hash(key.hash, indices, (size_t)numFaces * indexStride);
+	meshInterface->unLockReadOnlyVertexBase(0);
+	return key;
+}
+
+/// Header of a cooked BVH (.cooked file): the full key, checked before the BVH is used.
+struct CookedBvhHeader
+{
+	uint64_t hash[2];
+	int32_t numVerts;
+	int32_t numTris;
+	uint32_t version;
+	uint32_t size;
+};
+
+uint64_t cooked_bvh_key(const SharedBvhKey& key)
+{
+	return key.hash[0] ^ (key.hash[1] * 0x9E3779B97F4A7C15ULL) ^ ((uint64_t)key.numVerts << 32) ^ (uint64_t)key.numTris;
+}
+
+/// BVH of key from the .cooked file, nullptr when not cooked. Loading is a copy (deSerializeInPlace).
+btOptimizedBvh *load_cooked_bvh(const SharedBvhKey& key)
+{
+	const std::vector<char> *data = CcdCookedData::FindBvh(cooked_bvh_key(key));
+	CookedBvhHeader head;
+	if (!data || data->size() <= sizeof(head)) {
+		return nullptr;
+	}
+	memcpy(&head, data->data(), sizeof(head));
+	if (head.hash[0] != key.hash[0] || head.hash[1] != key.hash[1] || head.numVerts != key.numVerts ||
+	    head.numTris != key.numTris || head.version != 1 || head.size != data->size() - sizeof(head))
+	{
+		return nullptr;
+	}
+	// The BVH lives at the start of its buffer: FreeBvh() releases both.
+	void *mem = btAlignedAlloc(head.size, 16);
+	memcpy(mem, data->data() + sizeof(head), head.size);
+	btOptimizedBvh *bvh = btOptimizedBvh::deSerializeInPlace(mem, head.size, false);
+	if (!bvh) {
+		btAlignedFree(mem);
+	}
+	return bvh;
+}
+
+void save_cooked_bvh(const SharedBvhKey& key, const btOptimizedBvh *bvh)
+{
+	if (!CcdCookedData::IsRecording()) {
+		return;
+	}
+	CookedBvhHeader head = {{key.hash[0], key.hash[1]}, key.numVerts, key.numTris, 1, bvh->calculateSerializeBufferSize()};
+	void *mem = btAlignedAlloc(head.size, 16);
+	if (bvh->serializeInPlace(mem, head.size, false)) {
+		std::vector<char> data(sizeof(head) + head.size);
+		memcpy(data.data(), &head, sizeof(head));
+		memcpy(data.data() + sizeof(head), mem, head.size);
+		CcdCookedData::AddBvh(cooked_bvh_key(key), data);
+	}
+	btAlignedFree(mem);
+}
+
+/// Runs func(0) .. func(count - 1) on all cores, returning when all are done.
+template <class Func>
+void shared_bvh_parallel(size_t count, const Func& func)
+{
+	const size_t numThreads = std::min<size_t>(count, std::max(1u, std::thread::hardware_concurrency()));
+	std::atomic<size_t> next(0);
+	auto work = [&]() {
+		for (size_t i = next++; i < count; i = next++) {
+			func(i);
+		}
+	};
+	std::vector<std::thread> threads;
+	for (size_t t = 1; t < numThreads; ++t) {
+		threads.emplace_back(work);
+	}
+	work();
+	for (std::thread& thread : threads) {
+		thread.join();
+	}
+}
+
+class CcdSharedBvhTriangleMeshShape;
+
+/// Shapes created on this thread inside CcdBeginBvhBatch()/CcdEndBvhBatch(), waiting for their BVH.
+struct PendingBvhBatch
+{
+	int depth = 0;
+	std::vector<CcdSharedBvhTriangleMeshShape *> shapes;
+};
+thread_local PendingBvhBatch pendingBvhBatch;
 
 class CcdSharedBvhTriangleMeshShape : public btBvhTriangleMeshShape
 {
 private:
 	SharedBvhKey m_key;
+	bool m_attached = false;
 
 public:
-	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface, const SharedBvhKey& key)
-		:btBvhTriangleMeshShape(meshInterface, true, false),
-		m_key(key)
+	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface)
+		:btBvhTriangleMeshShape(meshInterface, true, false)
 	{
-		std::lock_guard<std::mutex> lock(sharedBvhMutex);
-		SharedBvhEntry& entry = sharedBvhs[m_key];
-		if (!entry.bvh) {
-			// Same build as btBvhTriangleMeshShape::buildOptimizedBvh(), but owned by the cache.
-			void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
-			entry.bvh = new (mem) btOptimizedBvh();
-			entry.bvh->build(m_meshInterface, true, m_localAabbMin, m_localAabbMax);
-			entry.users = 0;
+		// In a batch the BVH waits for CcdEndBvhBatch(): adding the body to the world only reads the
+		// local bounds computed by the base constructor.
+		if (pendingBvhBatch.depth > 0) {
+			pendingBvhBatch.shapes.push_back(this);
 		}
-		++entry.users;
-		setOptimizedBvh(entry.bvh, btVector3(1.0f, 1.0f, 1.0f));
+		else {
+			Attach(shared_bvh_key(m_meshInterface), nullptr);
+		}
 	}
 
 	virtual ~CcdSharedBvhTriangleMeshShape()
 	{
+		if (!m_attached) {
+			// Freed before the end of its batch (e.g. an object dropped by the converter).
+			CM_ListRemoveIfFound(pendingBvhBatch.shapes, this);
+			return;
+		}
 		std::lock_guard<std::mutex> lock(sharedBvhMutex);
 		std::map<SharedBvhKey, SharedBvhEntry>::iterator it = sharedBvhs.find(m_key);
 		if (it != sharedBvhs.end() && --it->second.users == 0) {
-			it->second.bvh->~btOptimizedBvh();
-			btAlignedFree(it->second.bvh);
+			FreeBvh(it->second.bvh);
 			sharedBvhs.erase(it);
+		}
+	}
+
+	static void FreeBvh(btOptimizedBvh *bvh)
+	{
+		bvh->~btOptimizedBvh();
+		btAlignedFree(bvh);
+	}
+
+	/// The cooked BVH of key, else the same build as btBvhTriangleMeshShape::buildOptimizedBvh() (recorded
+	/// when playing a .blend). Owned by the cache.
+	btOptimizedBvh *BuildBvh(const SharedBvhKey& key)
+	{
+		if (btOptimizedBvh *cooked = load_cooked_bvh(key)) {
+			return cooked;
+		}
+		btOptimizedBvh *bvh = BuildBvh();
+		save_cooked_bvh(key, bvh);
+		return bvh;
+	}
+
+	btOptimizedBvh *BuildBvh()
+	{
+		void *mem = btAlignedAlloc(sizeof(btOptimizedBvh), 16);
+		btOptimizedBvh *bvh = new (mem) btOptimizedBvh();
+		bvh->build(m_meshInterface, true, m_localAabbMin, m_localAabbMax);
+		return bvh;
+	}
+
+	/// Uses the cached BVH of key, else 'built' (handed to the cache), else builds it now.
+	void Attach(const SharedBvhKey& key, btOptimizedBvh *built)
+	{
+		std::unique_lock<std::mutex> lock(sharedBvhMutex);
+		SharedBvhEntry& entry = sharedBvhs[key];
+		if (!entry.bvh) {
+			entry.bvh = built ? built : BuildBvh(key);
+			entry.users = 0;
+			built = nullptr;
+		}
+		++entry.users;
+		m_key = key;
+		m_attached = true;
+		setOptimizedBvh(entry.bvh, btVector3(1.0f, 1.0f, 1.0f));
+		lock.unlock();
+		// Another thread (asynchronous LibLoad) cached the same mesh meanwhile.
+		if (built) {
+			FreeBvh(built);
 		}
 	}
 };
 
 } // namespace
+
+void CcdBeginBvhBatch()
+{
+	++pendingBvhBatch.depth;
+}
+
+void CcdEndBvhBatch()
+{
+	BLI_assert(pendingBvhBatch.depth > 0);
+	if (--pendingBvhBatch.depth > 0) {
+		return;
+	}
+	std::vector<CcdSharedBvhTriangleMeshShape *> shapes;
+	shapes.swap(pendingBvhBatch.shapes);
+
+	std::vector<SharedBvhKey> keys(shapes.size());
+	shared_bvh_parallel(shapes.size(), [&](size_t i) {
+		keys[i] = shared_bvh_key(shapes[i]->getMeshInterface());
+	});
+
+	// One build per distinct mesh not cached yet, done for its first shape.
+	std::vector<size_t> builders;
+	{
+		std::lock_guard<std::mutex> lock(sharedBvhMutex);
+		std::map<SharedBvhKey, size_t> first;
+		for (size_t i = 0; i < shapes.size(); ++i) {
+			if (sharedBvhs.find(keys[i]) == sharedBvhs.end() && first.emplace(keys[i], i).second) {
+				builders.push_back(i);
+			}
+		}
+	}
+	std::vector<btOptimizedBvh *> built(shapes.size(), nullptr);
+	shared_bvh_parallel(builders.size(), [&](size_t j) {
+		built[builders[j]] = shapes[builders[j]]->BuildBvh(keys[builders[j]]);
+	});
+
+	// In order: the first shape of a mesh caches its BVH, the copies after it find it there.
+	for (size_t i = 0; i < shapes.size(); ++i) {
+		shapes[i]->Attach(keys[i], built[i]);
+	}
+}
 
 /// todo: fill all the empty CcdPhysicsController methods, hook them up to the btRigidBody class
 
@@ -157,7 +367,15 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	}
 
 	btKinematicCharacterController::updateAction(collisionWorld, dt);
-	m_motionState->setWorldTransform(getGhostObject()->getWorldTransform());
+
+	/* Publish to the scene node only when the ghost actually moved (idle characters
+	 * otherwise trigger a node update every substep). */
+	const btTransform &ghostTrans = getGhostObject()->getWorldTransform();
+	btTransform nodeTrans;
+	m_motionState->getWorldTransform(nodeTrans);
+	if (!(nodeTrans == ghostTrans)) {
+		m_motionState->setWorldTransform(ghostTrans);
+	}
 }
 
 unsigned char CcdCharacter::getMaxJumps() const
@@ -606,11 +824,20 @@ bool CcdPhysicsController::CreateSoftbody()
 	psb->m_cfg.diterations = m_cci.m_soft_diterations;
 	psb->m_cfg.citerations = m_cci.m_soft_citerations;
 
-	if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
-		psb->setPose(false, true);
+	/* Pose matching in Bullet inverts the covariance matrix of the rest shape.
+	 * A planar cloth has zero volume and a singular matrix, which makes node
+	 * positions grow without bounds after a few simulation steps.  Do not
+	 * create a pose for it; cloth constraints do not require one. */
+	if (btFabs(psb->getVolume()) > SIMD_EPSILON) {
+		if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
+			psb->setPose(false, true);
+		}
+		else {
+			psb->setPose(true, false);
+		}
 	}
-	else {
-		psb->setPose(true, false);
+	else if (m_cci.m_gamesoftFlag & CCD_BSB_SHAPE_MATCHING) {
+		CM_Warning("soft body shape matching requires a non-planar mesh; ignoring it");
 	}
 
 	psb->randomizeConstraints();
@@ -941,14 +1168,20 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 
 	btRigidBody *body = GetRigidBody();
 
+	// Sleeping dynamic body: its transform didn't move since the last sync, rewriting it only marks the
+	// node modified (PH2: "Use Frame Rate" syncs every controller twice per frame).
+	if (body && !body->isStaticOrKinematicObject() && !body->isActive()) {
+		SyncCollisionScaling();
+		return true;
+	}
+
 	if (body && !body->isStaticObject()) {
 		const btTransform& xform = body->getCenterOfMassTransform();
 		if (m_bulletMotionState) {
 			// Goes through BlenderBulletMotionState so the vehicle_com_offset compensation applies;
 			// writing the COM transform directly drew the chassis shifted by the offset.
 			m_bulletMotionState->setWorldTransform(xform);
-			const mt::vec3& scale = m_MotionState->GetWorldScaling();
-			GetCollisionShape()->setLocalScaling(ToBullet(scale));
+			SyncCollisionScaling();
 			return true;
 		}
 		const btMatrix3x3& worldOri = xform.getBasis();
@@ -958,10 +1191,19 @@ bool CcdPhysicsController::SynchronizeMotionStates(float time)
 		m_MotionState->CalculateWorldTransformations();
 	}
 
-	const mt::vec3& scale = m_MotionState->GetWorldScaling();
-	GetCollisionShape()->setLocalScaling(ToBullet(scale));
+	SyncCollisionScaling();
 
 	return true;
+}
+
+/* Only when the scale changed: compound and hull shapes recompute their AABB on every setLocalScaling. */
+void CcdPhysicsController::SyncCollisionScaling()
+{
+	btCollisionShape *shape = GetCollisionShape();
+	const btVector3 scale = ToBullet(m_MotionState->GetWorldScaling());
+	if (shape && !(shape->getLocalScaling() == scale)) {
+		shape->setLocalScaling(scale);
+	}
 }
 
 /**
@@ -1451,33 +1693,33 @@ void CcdPhysicsController::SetMass(float newmass)
 	}
 }
 
-bool CcdPhysicsController::GetAnisotropicFrictionEnabled() const
-{
-	return m_cci.m_do_anisotropic;
-}
-
-void CcdPhysicsController::SetAnisotropicFrictionEnabled(bool enabled)
-{
-	m_cci.m_do_anisotropic = enabled;
-	if (m_object) {
-		// Modo 0 desliga o atrito anisotrópico no Bullet sem perder os coeficientes.
-		m_object->setAnisotropicFriction(m_cci.m_anisotropicFriction,
-		                                 enabled ? btCollisionObject::CF_ANISOTROPIC_FRICTION : 0);
-	}
-}
-
-mt::vec3 CcdPhysicsController::GetAnisotropicFriction() const
-{
-	return ToMt(m_cci.m_anisotropicFriction);
-}
-
-void CcdPhysicsController::SetAnisotropicFriction(const mt::vec3& friction)
-{
-	m_cci.m_anisotropicFriction = ToBullet(friction);
-	SetAnisotropicFrictionEnabled(m_cci.m_do_anisotropic);
-}
-
-float CcdPhysicsController::GetFriction()
+bool CcdPhysicsController::GetAnisotropicFrictionEnabled() const
+{
+	return m_cci.m_do_anisotropic;
+}
+
+void CcdPhysicsController::SetAnisotropicFrictionEnabled(bool enabled)
+{
+	m_cci.m_do_anisotropic = enabled;
+	if (m_object) {
+		// Modo 0 desliga o atrito anisotrópico no Bullet sem perder os coeficientes.
+		m_object->setAnisotropicFriction(m_cci.m_anisotropicFriction,
+		                                 enabled ? btCollisionObject::CF_ANISOTROPIC_FRICTION : 0);
+	}
+}
+
+mt::vec3 CcdPhysicsController::GetAnisotropicFriction() const
+{
+	return ToMt(m_cci.m_anisotropicFriction);
+}
+
+void CcdPhysicsController::SetAnisotropicFriction(const mt::vec3& friction)
+{
+	m_cci.m_anisotropicFriction = ToBullet(friction);
+	SetAnisotropicFrictionEnabled(m_cci.m_do_anisotropic);
+}
+
+float CcdPhysicsController::GetFriction()
 {
 	btSoftBody *softBody = GetSoftBody();
 	if (softBody) {
@@ -2048,6 +2290,13 @@ void CcdPhysicsController::SetSoftPoseMatching(bool enableShapeMatching) {
     btSoftBody* softBody = GetSoftBody();
     if (!softBody)
         return;
+
+    if (btFabs(softBody->getVolume()) <= SIMD_EPSILON) {
+        if (enableShapeMatching) {
+            CM_Warning("soft body shape matching requires a non-planar mesh; ignoring it");
+        }
+        return;
+    }
 
     if (enableShapeMatching) {
         softBody->setPose(false, true); // Shape matching enabled: disable pose update, relative pose.
@@ -2740,11 +2989,22 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 
 			// Keep only the points that lie on the hull: exact same shape, but
 			// support queries no longer iterate over every interior vertex.
-			btConvexHullComputer hullComputer;
-			hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), m_vertexArray.size() / 3, 0.0f, 0.0f);
+			// The hull points come from the cooked file when this vertex set was already computed.
+			const unsigned int numVertices = m_vertexArray.size() / 3;
+			std::vector<btScalar> points;
+			if (!CcdCookedData::FindHull(&m_vertexArray[0], numVertices, points)) {
+				btConvexHullComputer hullComputer;
+				hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), numVertices, 0.0f, 0.0f);
+				points.reserve(hullComputer.vertices.size() * 3);
+				for (int i = 0; i < hullComputer.vertices.size(); ++i) {
+					const btVector3& point = hullComputer.vertices[i];
+					points.insert(points.end(), {point.x(), point.y(), point.z()});
+				}
+				CcdCookedData::AddHull(&m_vertexArray[0], numVertices, points.data(), points.size() / 3);
+			}
 			btConvexHullShape *hullShape;
-			if (hullComputer.vertices.size() >= 4) {
-				hullShape = new btConvexHullShape(&hullComputer.vertices[0].getX(), hullComputer.vertices.size(), sizeof(btVector3));
+			if (points.size() >= 12) {
+				hullShape = new btConvexHullShape(points.data(), points.size() / 3, 3 * sizeof(btScalar));
 			}
 			else {
 				hullShape = new btConvexHullShape(&m_vertexArray[0], m_vertexArray.size() / 3, 3 * sizeof(btScalar));
@@ -2822,14 +3082,29 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 					m_forceReInstance = false;
 				}
 
+				if (m_weldingThreshold1 == 0.0f) {
+					/* The bounds btTriangleMeshShape::recalcLocalAabb() would find (min/max of the triangle
+					 * vertices, the margin is still 0 there) in one pass instead of six passes over every
+					 * triangle. Set before each shape, as the arrays may have changed since the last one. */
+					btVector3 aabbMin(0.0f, 0.0f, 0.0f);
+					btVector3 aabbMax(0.0f, 0.0f, 0.0f);
+					if (!m_triFaceArray.empty()) {
+						aabbMin.setValue(BT_LARGE_FLOAT, BT_LARGE_FLOAT, BT_LARGE_FLOAT);
+						aabbMax.setValue(-BT_LARGE_FLOAT, -BT_LARGE_FLOAT, -BT_LARGE_FLOAT);
+						for (const int index : m_triFaceArray) {
+							const btScalar *co = &m_vertexArray[3 * index];
+							const btVector3 vertex(co[0], co[1], co[2]);
+							aabbMin.setMin(vertex);
+							aabbMax.setMax(vertex);
+						}
+					}
+					m_triangleIndexVertexArray->setPremadeAabb(aabbMin, aabbMax);
+				}
+
 				btBvhTriangleMeshShape *unscaledShape;
 				if (useBvh && m_weldingThreshold1 == 0.0f) {
 					// The BVH is shared with every shape of identical arrays (see CcdSharedBvhTriangleMeshShape).
-					SharedBvhKey key = {{14695981039346656037ULL, 0x2545F4914F6CDD1DULL},
-					                    (int)m_vertexArray.size(), (int)m_triFaceArray.size()};
-					shared_bvh_hash(key.hash, &m_vertexArray[0], m_vertexArray.size() * sizeof(btScalar));
-					shared_bvh_hash(key.hash, m_triFaceArray.data(), m_triFaceArray.size() * sizeof(int));
-					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray, key);
+					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray);
 				}
 				else {
 					unscaledShape = new btBvhTriangleMeshShape(m_triangleIndexVertexArray, true, useBvh);

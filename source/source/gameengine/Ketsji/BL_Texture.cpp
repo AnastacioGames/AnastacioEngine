@@ -24,8 +24,10 @@
 
 #include "BL_Texture.h"
 #include "KX_TextureRenderer.h"
+#include "KX_EngineProfiler.h"
 
 #include "DNA_texture_types.h"
+#include "DNA_image_types.h"
 
 #include "GPU_texture.h"
 #include "GPU_draw.h"
@@ -33,6 +35,7 @@
 #include "KX_PyMath.h"
 
 #include "BLI_math.h"
+#include "PIL_time.h"
 
 BL_Texture::BL_Texture(MTex *mtex)
 	:EXP_Value(),
@@ -138,7 +141,13 @@ void BL_Texture::CheckValidTexture()
 		GPU_texture_set_opengl_bindcode(m_gpuTex, m_savedData.bindcode);
 		GPU_texture_free(m_gpuTex);
 
+		const double reloadStart = PIL_check_seconds_timer();
 		m_gpuTex = (ima ? GPU_texture_from_blender(ima, &iuser, gltextarget, false, 0.0, true) : nullptr);
+		if (KX_EngineProfiler::Enabled() && ima) {
+			char buf[32];
+			snprintf(buf, sizeof(buf), "=%.0fms", (PIL_check_seconds_timer() - reloadStart) * 1000.0);
+			KX_EngineProfiler::Note(std::string("texreload:") + (ima->id.name + 2) + buf);
+		}
 
 		if (m_gpuTex) {
 			int bindCode = GPU_texture_opengl_bindcode(m_gpuTex);

@@ -447,7 +447,8 @@ class IMAGE_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        MASK_MT_editor_menus.draw_collapsible(context, layout)
+        if context.area.show_header_menus:
+            MASK_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.template_ID(sima, "image", new="image.new", open="image.open")
         if not show_render:

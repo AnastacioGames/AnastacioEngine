@@ -81,11 +81,23 @@ void main()
 		// Radial streaks grow away from the focus point.
 		vec2 radial = (uv - focus) * speed * 0.12;
 		vec2 dir = turn;
-		const int SAMPLES = 12;
+		// Sample count follows the streak length in pixels, so consecutive samples stay ~2 px apart.
+		// With a fixed count a long streak shows up as discrete ghost copies of the scene, visible
+		// as horizontal bands at the top and bottom of the screen.
+		vec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);
+		vec2 streak = (abs(radial) + abs(dir) * 0.5) * blurMask * res;
+		const int MAX_SAMPLES = 32;
+		int samples = int(clamp(length(streak) * 0.5, 4.0, float(MAX_SAMPLES)));
+		// Per-pixel jitter of the sample positions (interleaved gradient noise) hides what is left.
+		vec2 pix = uv * res;
+		float jitter = fract(52.9829189 * fract(dot(pix, vec2(0.06711056, 0.00583715))));
 		vec3 sum = vec3(0.0);
 		float weight = 0.0;
-		for (int i = 0; i < SAMPLES; ++i) {
-			float t = float(i) / float(SAMPLES - 1);
+		for (int i = 0; i < MAX_SAMPLES; ++i) {
+			if (i >= samples) {
+				break;
+			}
+			float t = (float(i) + jitter) / float(samples);
 			vec2 offset = (-radial * t + dir * (t - 0.5)) * blurMask;
 			float w = 1.0 - t * 0.5;
 			sum += fetchColor(uv + offset, chromaShift) * w;

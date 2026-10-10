@@ -60,13 +60,29 @@
 /* end of blender include block */
 
 KX_WorldInfo::KX_WorldInfo(Scene *blenderscene, World *blenderworld)
-	:m_scene(blenderscene)
+	:m_scene(blenderscene),
+	m_skyDirty(false),
+	m_skyChanged(false)
 #ifdef WITH_PYTHON
 	, m_attr_dict(nullptr)
 #endif
 {
 	if (blenderworld) {
 		m_name = blenderworld->id.name + 2;
+		SkySettings& sky = m_savedSky;
+		sky.skytype = blenderworld->skytype;
+		sky.star_style = blenderworld->star_style;
+		sky.aurora_flag = blenderworld->aurora_flag;
+		sky.aurora_colors = blenderworld->aurora_colors;
+		sky.moon_enabled = blenderworld->moon_enabled;
+		sky.moon_size = blenderworld->moon_size;
+		sky.moon_brightness = blenderworld->moon_brightness;
+		sky.atmo_intensity = blenderworld->atmo_intensity;
+		copy_v3_v3(sky.atmo_rayleigh_col, blenderworld->atmo_rayleigh_col);
+		sky.atmo_rayleigh_density = blenderworld->atmo_rayleigh_density;
+		sky.atmo_mie_density = blenderworld->atmo_mie_density;
+		sky.atmo_mie_g = blenderworld->atmo_mie_g;
+		sky.atmo_altitude = blenderworld->atmo_altitude;
 		m_do_color_management = BKE_scene_check_color_management_enabled(blenderscene);
 		m_hasworld = true;
 		m_hasmist = ((blenderworld->mode) & WO_MIST ? true : false);
@@ -142,6 +158,26 @@ KX_WorldInfo::~KX_WorldInfo()
 			blenderSun->b = m_savedData.m_worldsun_col[2];
 			blenderSun->energy = m_savedData.m_worldsun_energy;
 		}
+
+		// Restore the sky settings changed from Python, the editor rebuilds its world shader.
+		if (m_skyChanged) {
+			World *world = m_scene->world;
+			const SkySettings& sky = m_savedSky;
+			world->skytype = sky.skytype;
+			world->star_style = sky.star_style;
+			world->aurora_flag = sky.aurora_flag;
+			world->aurora_colors = sky.aurora_colors;
+			world->moon_enabled = sky.moon_enabled;
+			world->moon_size = sky.moon_size;
+			world->moon_brightness = sky.moon_brightness;
+			world->atmo_intensity = sky.atmo_intensity;
+			copy_v3_v3(world->atmo_rayleigh_col, sky.atmo_rayleigh_col);
+			world->atmo_rayleigh_density = sky.atmo_rayleigh_density;
+			world->atmo_mie_density = sky.atmo_mie_density;
+			world->atmo_mie_g = sky.atmo_mie_g;
+			world->atmo_altitude = sky.atmo_altitude;
+			GPU_material_free(&world->gpumaterial);
+		}
 	}
 }
 
@@ -161,6 +197,10 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.rain_darken") == 0) world->rain_darken = value;
 	else if (std::strcmp(identifier, "weather.ripple_intensity") == 0) world->rain_ripple = value;
 	else if (std::strcmp(identifier, "weather.ripple_normal") == 0) world->rain_ripple_normal = value;
+	else if (std::strcmp(identifier, "weather.ripple_size") == 0) world->rain_ripple_size = value;
+	else if (std::strcmp(identifier, "weather.ripple_rate") == 0) world->rain_ripple_rate = value;
+	else if (std::strcmp(identifier, "weather.splash_normal") == 0) world->rain_splash_normal = value;
+	else if (std::strcmp(identifier, "weather.splash_min_up") == 0) world->rain_splash_min_up = value;
 	else if (std::strcmp(identifier, "weather.rain") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN; else world->weather_flag &= ~WO_WEATHER_RAIN;
 	}
@@ -184,6 +224,25 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.splash_rate") == 0) world->rain_splash_rate = value;
 	else if (std::strcmp(identifier, "weather.splash_intensity") == 0) world->rain_splash_intensity = value;
 	else if (std::strcmp(identifier, "weather.splash_distance") == 0) world->rain_splash_distance = value;
+	else if (std::strcmp(identifier, "weather.puddles") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_PUDDLES;
+	}
+	else if (std::strcmp(identifier, "weather.ripple_puddle_only") == 0 && useBool) {
+		// Needs the puddles, like the checkbox.
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_RIPPLE_PUDDLE | WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_RIPPLE_PUDDLE;
+	}
+	else if (std::strcmp(identifier, "weather.splash_puddle_only") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_SPLASH_PUDDLE | WO_WEATHER_RAIN_PUDDLES; else world->weather_flag &= ~WO_WEATHER_RAIN_SPLASH_PUDDLE;
+	}
+	else if (std::strcmp(identifier, "weather.puddle_ssr") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_PUDDLE_SSR; else world->weather_flag &= ~WO_WEATHER_RAIN_PUDDLE_SSR;
+	}
+	else if (std::strcmp(identifier, "weather.puddle_amount") == 0) world->rain_puddle_amount = (std::max)(0.0f, (std::min)(1.0f, value));
+	else if (std::strcmp(identifier, "weather.puddle_size") == 0) world->rain_puddle_size = value;
+	else if (std::strcmp(identifier, "weather.puddle_darkness") == 0) world->rain_puddle_darkness = value;
+	else if (std::strcmp(identifier, "weather.puddle_reflection") == 0) world->rain_puddle_reflection = value;
+	else if (std::strcmp(identifier, "weather.puddle_distance") == 0) world->rain_puddle_distance = value;
+	else if (std::strcmp(identifier, "weather.puddle_min_up") == 0) world->rain_puddle_min_up = value;
 	else if (std::strcmp(identifier, "weather.aura") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_AURA; else world->weather_flag &= ~WO_WEATHER_RAIN_AURA;
 	}
@@ -194,6 +253,9 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.aura_distance") == 0) world->rain_aura_distance = value;
 	else if (std::strcmp(identifier, "weather.lightning") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_LIGHTNING; else world->weather_flag &= ~WO_WEATHER_RAIN_LIGHTNING;
+	}
+	else if (std::strcmp(identifier, "weather.lightning_side") == 0 && useBool) {
+		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_LIGHTNING_SIDE; else world->weather_flag &= ~WO_WEATHER_RAIN_LIGHTNING_SIDE;
 	}
 	else if (std::strcmp(identifier, "weather.lightning_rate") == 0) world->rain_lightning_rate = value;
 	else if (std::strcmp(identifier, "weather.lightning_intensity") == 0) world->rain_lightning_intensity = value;
@@ -231,7 +293,8 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 
 	static const struct { const char *name; int flag; } flags[] = {
 		{"rain", WO_WEATHER_RAIN}, {"ripples", WO_WEATHER_RAIN_RIPPLE}, {"droplets", WO_WEATHER_RAIN_DROPLETS},
-		{"splash", WO_WEATHER_RAIN_SPLASH}, {"aura", WO_WEATHER_RAIN_AURA}, {"lightning", WO_WEATHER_RAIN_LIGHTNING},
+		{"splash", WO_WEATHER_RAIN_SPLASH}, {"puddles", WO_WEATHER_RAIN_PUDDLES}, {"puddle_ssr", WO_WEATHER_RAIN_PUDDLE_SSR}, {"ripple_puddle_only", WO_WEATHER_RAIN_RIPPLE_PUDDLE}, {"splash_puddle_only", WO_WEATHER_RAIN_SPLASH_PUDDLE}, {"aura", WO_WEATHER_RAIN_AURA}, {"lightning", WO_WEATHER_RAIN_LIGHTNING},
+		{"lightning_side", WO_WEATHER_RAIN_LIGHTNING_SIDE},
 		{"clouds", WO_WEATHER_CLOUDS}, {"lens_flare", WO_WEATHER_LENSFLARE}, {"earthquake", WO_WEATHER_EARTHQUAKE},
 	};
 	for (const auto &f : flags) {
@@ -261,9 +324,14 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"rain_intensity", &world->rain_intensity}, {"rain_density", &world->rain_density},
 		{"rain_speed", &world->rain_speed}, {"rain_wind", &world->rain_wind},
 		{"rain_darken", &world->rain_darken}, {"ripple_intensity", &world->rain_ripple},
-		{"ripple_normal", &world->rain_ripple_normal}, {"rain_streak_width", &world->rain_streak_width},
+		{"ripple_normal", &world->rain_ripple_normal},
+		{"ripple_size", &world->rain_ripple_size}, {"ripple_rate", &world->rain_ripple_rate},
+		{"splash_normal", &world->rain_splash_normal}, {"splash_min_up", &world->rain_splash_min_up}, {"rain_streak_width", &world->rain_streak_width},
 		{"splash_size", &world->rain_splash_size}, {"splash_rate", &world->rain_splash_rate},
 		{"splash_intensity", &world->rain_splash_intensity}, {"splash_distance", &world->rain_splash_distance},
+		{"puddle_amount", &world->rain_puddle_amount}, {"puddle_size", &world->rain_puddle_size},
+		{"puddle_darkness", &world->rain_puddle_darkness}, {"puddle_reflection", &world->rain_puddle_reflection},
+		{"puddle_distance", &world->rain_puddle_distance}, {"puddle_min_up", &world->rain_puddle_min_up},
 		{"aura_size", &world->rain_aura_size}, {"aura_rate", &world->rain_aura_rate},
 		{"aura_intensity", &world->rain_aura_intensity}, {"aura_distance", &world->rain_aura_distance},
 		{"lightning_rate", &world->rain_lightning_rate}, {"lightning_intensity", &world->rain_lightning_intensity},
@@ -417,11 +485,16 @@ void KX_WorldInfo::RenderBackground(RAS_Rasterizer *rasty)
 		/* A node World (Sky Texture, Environment...) only shows through the world material. */
 		const bool node_world = BKE_scene_use_new_shading_nodes(m_scene) && m_scene->world->nodetree &&
 		                        m_scene->world->use_nodes;
+		if (m_skyDirty) {
+			// Sky type, stars, aurora and atmosphere are compiled into the world shader.
+			GPU_material_free(&m_scene->world->gpumaterial);
+			m_skyDirty = false;
+		}
 		if (node_world || (m_scene->world->skytype & (WO_SKYBLEND | WO_SKYPAPER | WO_SKYREAL))) {
 			GPUMaterial *gpumat = GPU_material_world(m_scene, m_scene->world);
 
 			static float texcofac[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-			GPU_material_bind(gpumat, m_scene->lay, 1.0f, true, rasty->GetViewMatrix().Data(),
+			GPU_material_bind(gpumat, m_scene->lay, fmod(KX_GetActiveEngine()->GetFrameTime(), 3600.0), true, rasty->GetViewMatrix().Data(),
 			                  rasty->GetViewInvMatrix().Data(), texcofac, false,
 			                  rasty->GetProjectionMatrix().Data());
 
@@ -713,10 +786,185 @@ PyAttributeDef KX_WorldInfo::Attributes[] = {
 	EXP_PYATTRIBUTE_BOOL_RO("envLightEnabled", KX_WorldInfo, m_hasEnvLight),
 	EXP_PYATTRIBUTE_SHORT_RO("envLightColor", KX_WorldInfo, m_envLightColor),
 	EXP_PYATTRIBUTE_FLOAT_RW("sunSize", 0.0f, 1.0f, KX_WorldInfo, m_sunSize),
+	EXP_PYATTRIBUTE_RW_FUNCTION("skyType", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("useSkyStars", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("starStyle", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("useSkyMoon", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("moonSize", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("moonBrightness", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("useSkyAurora", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("auroraColors", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereIntensity", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereRayleighColor", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereRayleighDensity", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereMieDensity", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereMieDirection", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atmosphereAltitude", KX_WorldInfo, pyattr_get_sky, pyattr_set_sky),
 	EXP_PYATTRIBUTE_NULL /* Sentinel */
 };
 
 /* Attribute get/set functions */
+
+/* Sky settings: same names and ranges as the World > Sky panel (rna_world.c), enums by their RNA
+ * identifier. The moon is a live uniform; the other settings rebuild the world shader (one compile,
+ * next frame). Object materials keep the sky type they were compiled with (atmospheric mist). */
+static const char *sky_type_names[] = {"FLAT", "GRADIENT", "PROCEDURAL", "ATMOSPHERIC", nullptr};
+static const char *star_style_names[] = {"SIMPLE", "REALISTIC", "CONSTELLATIONS", nullptr};
+static const char *aurora_colors_names[] = {"GREEN", "CLASSIC", "SHIFTING", nullptr};
+
+namespace {
+struct SkyFloat {
+	const char *name;
+	size_t offset;
+	float min, max;
+	/// Compiled into the world shader (not a live uniform).
+	bool compiled;
+};
+}
+
+static const SkyFloat sky_floats[] = {
+	{"moonSize", offsetof(World, moon_size), 0.001f, 0.1f, false},
+	{"moonBrightness", offsetof(World, moon_brightness), 0.0f, 1.0f, false},
+	{"atmosphereIntensity", offsetof(World, atmo_intensity), 0.0f, 1000.0f, true},
+	{"atmosphereRayleighDensity", offsetof(World, atmo_rayleigh_density), 0.0f, 20.0f, true},
+	{"atmosphereMieDensity", offsetof(World, atmo_mie_density), 0.0f, 50.0f, true},
+	{"atmosphereMieDirection", offsetof(World, atmo_mie_g), 0.0f, 0.99f, true},
+	{"atmosphereAltitude", offsetof(World, atmo_altitude), 1.0f, 60000.0f, true},
+};
+
+/// Same mapping as rna_World_sky_type_get.
+static int sky_type_index(short skytype)
+{
+	if (!(skytype & WO_SKYBLEND)) return 0;
+	if ((skytype & WO_SKYREAL) && !(skytype & WO_SKYPAPER)) return (skytype & WO_SKYATMOSPHERIC) ? 3 : 2;
+	return 1;
+}
+
+static int sky_enum_index(const char *const *names, PyObject *value, const char *attr)
+{
+	const char *str = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+	if (str) {
+		for (int i = 0; names[i]; ++i) {
+			if (std::strcmp(str, names[i]) == 0) {
+				return i;
+			}
+		}
+	}
+	std::string choices;
+	for (int i = 0; names[i]; ++i) {
+		choices += (i ? ", " : "") + std::string(names[i]);
+	}
+	PyErr_Format(PyExc_ValueError, "world.%s = str: KX_WorldInfo, expected one of %s", attr, choices.c_str());
+	return -1;
+}
+
+PyObject *KX_WorldInfo::pyattr_get_sky(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_WorldInfo *self = static_cast<KX_WorldInfo *>(self_v);
+	if (!self->m_hasworld) {
+		Py_RETURN_NONE;
+	}
+	const World *world = self->m_scene->world;
+	const std::string& name = attrdef->m_name;
+
+	if (name == "skyType") return PyUnicode_FromString(sky_type_names[sky_type_index(world->skytype)]);
+	if (name == "useSkyStars") return PyBool_FromLong((world->skytype & WO_SKYATMOSPHERIC_STARS) != 0);
+	if (name == "starStyle") return PyUnicode_FromString(star_style_names[CLAMPIS(world->star_style, 0, 2)]);
+	if (name == "useSkyMoon") return PyBool_FromLong(world->moon_enabled > 0.0f);
+	if (name == "useSkyAurora") return PyBool_FromLong((world->aurora_flag & WO_AURORA_ENABLE) != 0);
+	if (name == "auroraColors") return PyUnicode_FromString(aurora_colors_names[CLAMPIS(world->aurora_colors, 0, 2)]);
+	if (name == "atmosphereRayleighColor") return PyColorFromVector(mt::vec3(world->atmo_rayleigh_col));
+	for (const SkyFloat& f : sky_floats) {
+		if (name == f.name) {
+			return PyFloat_FromDouble(*(const float *)((const char *)world + f.offset));
+		}
+	}
+	Py_RETURN_NONE;
+}
+
+int KX_WorldInfo::pyattr_set_sky(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_WorldInfo *self = static_cast<KX_WorldInfo *>(self_v);
+	const std::string& name = attrdef->m_name;
+	if (!self->m_hasworld) {
+		PyErr_Format(PyExc_AttributeError, "world.%s: KX_WorldInfo, the scene has no World", name.c_str());
+		return PY_SET_ATTR_FAIL;
+	}
+	World *world = self->m_scene->world;
+	bool compiled = true;
+
+	if (name == "skyType") {
+		const int index = sky_enum_index(sky_type_names, value, name.c_str());
+		if (index < 0) {
+			return PY_SET_ATTR_FAIL;
+		}
+		// Same as rna_World_sky_type_set.
+		world->skytype &= ~(WO_SKYBLEND | WO_SKYREAL | WO_SKYATMOSPHERIC);
+		if (index >= 2) world->skytype &= ~WO_SKYPAPER;
+		if (index >= 1) world->skytype |= WO_SKYBLEND;
+		if (index >= 2) world->skytype |= WO_SKYREAL;
+		if (index == 3) world->skytype |= WO_SKYATMOSPHERIC;
+	}
+	else if (name == "starStyle" || name == "auroraColors") {
+		const bool stars = (name == "starStyle");
+		const int index = sky_enum_index(stars ? star_style_names : aurora_colors_names, value, name.c_str());
+		if (index < 0) {
+			return PY_SET_ATTR_FAIL;
+		}
+		(stars ? world->star_style : world->aurora_colors) = index;
+	}
+	else if (name == "useSkyStars" || name == "useSkyMoon" || name == "useSkyAurora") {
+		const int param = PyObject_IsTrue(value);
+		if (param == -1) {
+			PyErr_Format(PyExc_TypeError, "world.%s = bool: KX_WorldInfo, expected True or False", name.c_str());
+			return PY_SET_ATTR_FAIL;
+		}
+		if (name == "useSkyMoon") {
+			world->moon_enabled = param ? 1.0f : 0.0f;
+			compiled = false;
+		}
+		else if (name == "useSkyStars") {
+			SET_FLAG_FROM_TEST(world->skytype, param, WO_SKYATMOSPHERIC_STARS);
+		}
+		else {
+			SET_FLAG_FROM_TEST(world->aurora_flag, param, WO_AURORA_ENABLE);
+		}
+	}
+	else if (name == "atmosphereRayleighColor") {
+		mt::vec3 color;
+		if (!PyVecTo(value, color)) {
+			return PY_SET_ATTR_FAIL;
+		}
+		for (int i = 0; i < 3; ++i) {
+			world->atmo_rayleigh_col[i] = (std::max)(color[i], 0.0f);
+		}
+	}
+	else {
+		const SkyFloat *found = nullptr;
+		for (const SkyFloat& f : sky_floats) {
+			if (name == f.name) {
+				found = &f;
+				break;
+			}
+		}
+		if (!found) {
+			return PY_SET_ATTR_FAIL;
+		}
+		const float number = PyFloat_AsDouble(value);
+		if (number == -1.0f && PyErr_Occurred()) {
+			PyErr_Format(PyExc_TypeError, "world.%s = float: KX_WorldInfo, expected a float", name.c_str());
+			return PY_SET_ATTR_FAIL;
+		}
+		*(float *)((char *)world + found->offset) = CLAMPIS(number, found->min, found->max);
+		compiled = found->compiled;
+	}
+
+	self->m_skyChanged = true;
+	if (compiled) {
+		self->m_skyDirty = true;
+	}
+	return PY_SET_ATTR_SUCCESS;
+}
 
 #ifdef USE_MATHUTILS
 

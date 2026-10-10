@@ -111,6 +111,13 @@ KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, K
 		m_rasMode |= RAS_ALPHA;
 		m_rasMode |= (mat && (mat->game.alpha_blend & GEMAT_ALPHA_SORT)) ? RAS_ZSORT : 0;
 	}
+	/* Opaque materials that move vertices on the GPU (user vertex shader, Foliage Shader) must
+	 * cast their shadow with their own shader: the solid shadow bucket draws with a generic
+	 * override shader that ignores the deformation, so the shadow would not follow the wind.
+	 * (Variance shadows still override every bucket, see RAS_BucketManager.) */
+	if (mat && !(m_rasMode & (RAS_ALPHA | RAS_ALPHA_SHADOW)) && (mat->vertcode || (mat->shade_flag & MA_FOLIAGE))) {
+		m_rasMode |= RAS_ALPHA_SHADOW;
+	}
 
 	switch (mat->game.face_orientation) {
 		case GEMAT_NORMAL:
@@ -234,6 +241,13 @@ void KX_BlenderMaterial::ReloadMaterial()
 	}
 }
 
+void KX_BlenderMaterial::PrefetchMaterial()
+{
+	if (m_material) {
+		BL_BlenderShader::Prefetch(m_scene, m_material);
+	}
+}
+
 void KX_BlenderMaterial::ReplaceScene(KX_Scene *scene)
 {
 	m_scene = scene;
@@ -323,7 +337,10 @@ void KX_BlenderMaterial::ActivateBlenderShaders(RAS_Rasterizer *rasty)
 void KX_BlenderMaterial::Prepare(RAS_Rasterizer *rasty)
 {
 	UpdateTextures();
-	if (m_blenderShader && m_blenderShader->Ok()) {
+	/* Not in the shadow pass: the lamp's dynamic matrices (dynpersmat...) are shared by every
+	 * material and would be computed from the lamp's own view there, so the next materials
+	 * looked their shadows up with a wrong matrix (whole scene in shadow). */
+	if (m_blenderShader && m_blenderShader->Ok() && rasty->GetShadowMode() == RAS_Rasterizer::RAS_SHADOW_NONE) {
 		m_blenderShader->UpdateLights(rasty);
 	}
 }
@@ -403,7 +420,11 @@ void KX_BlenderMaterial::ActivateMeshUser(RAS_MeshUser *meshUser, RAS_Rasterizer
 		if (m_blenderShader->Ok()) {
 			/* Node materials never went through ProcessLighting(), so gl_LightSource[] and the
 			 * per-slot GPULamps (RAS_Rasterizer::GetShadowLamps()) were never set for this object. */
-			rasty->ProcessLighting(true, camtrans);
+			/* Not in the shadow pass: lights computed there use the lamp's view and get cached per
+			 * object, so the main pass then lit the scene with the wrong light directions. */
+			if (rasty->GetShadowMode() == RAS_Rasterizer::RAS_SHADOW_NONE) {
+				rasty->ProcessLighting(true, camtrans);
+			}
 			m_blenderShader->BindShadowLamps(rasty);
 		}
 

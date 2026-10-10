@@ -204,6 +204,13 @@ class GAME_PT_game_properties(GameButtonsPanel, Panel):
             props.index = i
             props.direction = 'DOWN'
             row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = i
+            if prop.use_replicate and prop.type == 'FLOAT':
+                row = box.row(align=True)
+                row.prop(prop, "net_bits", text="Bits")
+                sub = row.row(align=True)
+                sub.active = prop.net_bits > 0
+                sub.prop(prop, "net_min", text="Min")
+                sub.prop(prop, "net_max", text="Max")
 
 class PhysicsButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -410,6 +417,8 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             col.prop(game, "use_ghost")
             col.prop(ob, "hide_render", text="Invisible")
             col.prop(game, "use_occlude_culling", text="Occluder (keeps collision)")
+            if ob.type == 'MESH':
+                col.prop(ob, "use_static_batch")
 
             layout.separator()
 
@@ -439,6 +448,8 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
 
         elif physics_type in {'INVISIBLE', 'NO_COLLISION', 'OCCLUDER'}:
             layout.prop(ob, "hide_render", text="Invisible")
+            if physics_type == 'NO_COLLISION' and ob.type == 'MESH':
+                layout.prop(ob, "use_static_batch")
 
         elif physics_type == 'NAVMESH':
             layout.operator("mesh.navmesh_face_copy")
@@ -895,6 +906,31 @@ class RENDER_MT_game_refresh_rate(Menu):
         layout.prop(context.scene.game_settings, "frequency", text="Value")
 
 
+class RENDER_PT_game_cook(RenderButtonsPanel, Panel):
+    # Second panel, right after the engine selector: loading speed matters for every game.
+    bl_label = "Cook"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        import os
+        from bl_operators.anastacio_cook import cooked_path
+        layout = self.layout
+
+        row = layout.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.cook", icon='COOK')
+        row.operator("game.cook_clear", text="", icon='X')
+
+        path = cooked_path()
+        if not path:
+            layout.label(text="Save the .blend to cook", icon='INFO')
+        elif os.path.isfile(path):
+            layout.label(text="%s: %.1f MB" % (os.path.basename(path), os.path.getsize(path) / 1048576.0),
+                         icon='FILE_TICK')
+        else:
+            layout.label(text="Not cooked: shapes and shaders are computed while loading", icon='INFO')
+
+
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):
     # Embedded and Standalone players side by side, one column each.
     bl_label = "Player"
@@ -984,6 +1020,60 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
         col.label(text="Loss: every pixel computes the full material per light, so heavy", icon="ERROR")
         col.label(text="      scenes can lose up to half the FPS (18 lights: 60 to 31 fps).")
         col.label(text="Use for many materials and few lights. Game only, not the viewport.", icon="INFO")
+
+
+class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
+    bl_label = "Baked Lighting"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and
+                hasattr(context.scene, "ae_lightmap_settings"))
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        settings = scene.ae_lightmap_settings
+
+        if not scene.game_settings.use_shading_nodes:
+            layout.label(text="Needs PBR Shading Nodes (Shading panel)", icon='INFO')
+
+        box = layout.box()
+        row = box.row()
+        row.label(text="Lightmap:", icon="IMAGE_DATA")
+        if scene.ae_lightmap:
+            row.prop(scene, "ae_lightmap_use", text="Use in Game")
+        split = box.split()
+        split.active = scene.ae_lightmap_use or not scene.ae_lightmap
+        col = split.column(align=True)
+        col.prop(settings, "resolution", text="")
+        col.prop(settings, "samples")
+        col.prop(settings, "margin")
+        col = split.column()
+        col.prop(settings, "use_gpu")
+        col.prop(settings, "use_denoise")
+        col.prop(settings, "use_world")
+        ob = context.object
+        if ob and ob.type == 'MESH' and hasattr(ob, "ae_lightmap_scale"):
+            box.prop(ob, "ae_lightmap_scale", text="Scale (" + ob.name + ")")
+        if scene.ae_lightmap:
+            box.label(text="Image: " + scene.ae_lightmap, icon='FILE_IMAGE')
+
+        box = layout.box()
+        row = box.row()
+        row.label(text="Light Volume:", icon="SNAP_VOLUME")
+        row.prop(settings, "use_volume", text="Bake")
+        sub = box.row()
+        sub.active = settings.use_volume
+        sub.prop(settings, "volume_spacing")
+        if scene.ae_lightvol:
+            box.prop(scene, "ae_lightvol_use", text="Use in Game (moving objects)")
+
+        row = layout.row(align=True)
+        row.scale_y = 1.3
+        row.operator("scene.ae_lightmap_bake", icon='RENDER_STILL')
+        row.operator("scene.ae_lightmap_clear", text="", icon='X')
 
 
 class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
@@ -1387,6 +1477,8 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 col.prop(gs, "physics_step_sub", text="Physics Substeps")
             col.prop(gs, "sleep_timer", text="Max Logic Frames")
 
+            box.prop(gs, "use_fixed_timestep")
+
             if gs.physics_engine != 'NONE':
                 box = main_box.box()
                 box.label(text="Deactivation (Sleeping Objects):", icon="SNAP_FACE")
@@ -1494,6 +1586,9 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
     def poll(cls, context):
         return context.scene.render.engine in cls.COMPAT_ENGINES
 
+    def draw_header(self, context):
+        self.layout.label(text="", icon='NETWORK')
+
     def draw(self, context):
         layout = self.layout
         net = context.scene.game_settings.network
@@ -1518,6 +1613,7 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
         box.prop(net, "max_players")
         box.prop(net, "tick_rate")
         box.prop(net, "snapshot_rate")
+        box.prop(net, "relevance_radius")
         box.prop(net, "use_lan_discovery")
         box.prop(net, "use_late_join")
 
@@ -1772,7 +1868,7 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        COMPAT_LIGHTS = {'SPOT', 'SUN'}
+        COMPAT_LIGHTS = {'SPOT', 'SUN', 'POINT'}
         lamp = context.lamp
         engine = context.scene.render.engine
         return (lamp and lamp.type in COMPAT_LIGHTS) and (engine in cls.COMPAT_ENGINES)
@@ -1787,6 +1883,12 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
 
         lamp = context.lamp
 
+        # A Point has no single shadow direction, so the engine re-renders the casters once per
+        # cube face: 6 passes per frame against 1 for Spot/Sun. Warn before the panel is greyed
+        # out by layout.active, so it stays readable with the shadow off.
+        if lamp.type == 'POINT':
+            layout.label("Point shadow costs 6 render passes per frame", icon='ERROR')
+
         layout.active = lamp.use_shadow
 
         main_box = layout.box()
@@ -1794,11 +1896,19 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
         # --- General ---
         split = main_box.split()
 
+        # A Point renders its shadow as a 6-face cube atlas: no shadow box, no static cache
+        # and no VSM/CSM/filter variants (see gpu_lamp_create_point_shadow_buffer).
+        is_point = lamp.type == 'POINT'
+
         col = split.column()
         col.prop(lamp, "shadow_color", text="")
-        if lamp.type in ('SUN', 'SPOT'):
-            col.prop(lamp, "show_shadow_box")
-        col.prop(lamp, "static_shadow")
+        # Point draws its shadow range as a sphere instead of a box
+        # (draw_transp_point_shadow_volume).
+        col.prop(lamp, "show_shadow_box", text="Show Shadow Sphere" if is_point else "Show Shadow Box")
+        if not is_point:
+            col.prop(lamp, "static_shadow")
+        if lamp.type in {'SPOT', 'POINT'}:
+            col.prop(lamp, "use_auto_shadow_update", text="Auto Update")
 
         col = split.column()
         col.prop(lamp, "use_shadow_layer", text="This Layer Only")
@@ -1814,16 +1924,20 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
             box = main_box.box()
 
             col = box.column()
-            col.label("Buffer Type:")
-            col.prop(lamp, "ge_shadow_buffer_type", text="", toggle=True)
-            if lamp.ge_shadow_buffer_type == "SIMPLE":
-                col.label("Filter Type:")
-                col.prop(lamp, "shadow_filter", text="", toggle=True)
+            if not is_point:
+                col.label("Buffer Type:")
+                col.prop(lamp, "ge_shadow_buffer_type", text="", toggle=True)
+                if lamp.ge_shadow_buffer_type == "SIMPLE":
+                    col.label("Filter Type:")
+                    col.prop(lamp, "shadow_filter", text="", toggle=True)
 
             col.label("Quality:")
             col = box.column(align=True)
             col.prop(lamp, "shadow_buffer_size", text="Size")
-            if lamp.ge_shadow_buffer_type == "VARIANCE":
+            if is_point:
+                # The atlas is Size*3 x Size*2 texels, so the engine caps Size at 2048.
+                col.label("Size above 2048 is clamped (cube atlas)", icon='INFO')
+            elif lamp.ge_shadow_buffer_type == "VARIANCE":
                 col.prop(lamp, "shadow_buffer_sharp", text="Sharpness")
             elif lamp.shadow_filter in ("PCF", "PCF_BAIL", "PCF_JITTER", "PCF_PENUMBRA"):
                 col.prop(lamp, "shadow_buffer_samples", text="Samples")
@@ -1833,7 +1947,7 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
             row.label("Bias:")
             row = box.row(align=True)
             row.prop(lamp, "shadow_buffer_bias", text="Bias")
-            if lamp.ge_shadow_buffer_type == "VARIANCE":
+            if not is_point and lamp.ge_shadow_buffer_type == "VARIANCE":
                 row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
             else:
                 row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
@@ -1929,22 +2043,105 @@ class OBJECT_MT_lod_tools(Menu):
         layout.operator("object.lod_generate", text="Generate")
         layout.operator("object.lod_clear_all", text="Clear All", icon='PANEL_CLOSE')
         
+class OBJECT_OT_game_load_with_scene(Operator):
+    """Set the game Load Mode of the active and selected objects and their children"""
+    bl_idname = "object.game_load_with_scene"
+    bl_label = "Set Load Mode"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(
+        name="Load Mode",
+        items=(('SCENE', "With Scene", "Created in the game when its scene loads"),
+               ('ON_DEMAND', "On Demand", "Left out at load; a script creates it with scene.convertObject()"),
+               ('EDITOR_ONLY', "Editor Only", "Never created in the game, not even by scene.convertObject()")),
+        default='SCENE')
+    children: bpy.props.BoolProperty(name="Children", default=True,
+                                     description="Also set it on the children of the selected objects")
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.object or context.selected_objects)
+
+    def execute(self, context):
+        selected = set(context.selected_objects)
+        if context.object:
+            selected.add(context.object)
+        targets = set(selected)
+        if self.children:
+            for ob in context.scene.objects:
+                if any(BL_is_child_of(ob, sel) for sel in selected):
+                    targets.add(ob)
+        changed = 0
+        for ob in targets:
+            if ob.game_load_mode != self.mode:
+                ob.game_load_mode = self.mode
+                changed += 1
+        self.report({'INFO'}, "%d object(s) changed" % changed)
+        return {'FINISHED'}
+
+
 class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
-    bl_label = "Game Object Tasks"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_label = "Load Object with Scene"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob.type
+        return context.scene.render.engine in cls.COMPAT_ENGINES and ob and ob.type
 
     def draw(self, context):
         layout = self.layout
         ob = context.object
+        scene = context.scene
 
-        layout.prop(ob, "convert_object")
-        
+        box = layout.box()
+        row = box.row(align=True)
+        for mode, text in (('SCENE', "With Scene"), ('ON_DEMAND', "On Demand"), ('EDITOR_ONLY', "Editor Only")):
+            row.operator("object.game_load_with_scene", text=text,
+                         depress=(ob.game_load_mode == mode)).mode = mode
+        box.label(text="Applies to the selected objects and their children")
+
+        # The converter drops any object below an ancestor left out at load.
+        par = ob.parent
+        while par and par.game_load_mode == 'SCENE':
+            par = par.parent
+        if par and ob.game_load_mode == 'SCENE':
+            box.label(text="Left out anyway: parent \"%s\" doesn't load with the scene" % par.name, icon='ERROR')
+
+        if ob.game_load_mode == 'ON_DEMAND':
+            col = box.column(align=True)
+            col.label(text="Left out at load. Create it from a script with:", icon='INFO')
+            col.label(text="    scene.convertObject(\"%s\")" % ob.name)
+        elif ob.game_load_mode == 'EDITOR_ONLY':
+            box.label(text="Never created in the game, not even by scene.convertObject()", icon='INFO')
+
+        if ob.game_load_mode != 'SCENE':
+            descendants = [o for o in scene.objects if o.parent and BL_is_child_of(o, ob)]
+            if descendants:
+                box.label(text="%d child object(s) stay out with it" % len(descendants), icon='OUTLINER_OB_EMPTY')
+
+            for group in ob.users_group:
+                for inst in scene.objects:
+                    if inst.game_load_mode == 'SCENE' and inst.dupli_type == 'GROUP' and inst.dupli_group == group:
+                        box.label(text="Missing from the instances of group \"%s\" (\"%s\")" % (group.name, inst.name),
+                                  icon='ERROR')
+                        break
+
+            if ob.type == 'MESH' and ob.data and ob.data.users > 1:
+                if any(o.data == ob.data and o.game_load_mode == 'SCENE' for o in scene.objects if o != ob):
+                    box.label(text="Mesh shared with loaded objects: freeUnconvertedData() keeps it",
+                              icon='INFO')
+
+
+def BL_is_child_of(ob, parent):
+    par = ob.parent
+    while par:
+        if par == parent:
+            return True
+        par = par.parent
+    return False
+
+
 class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
     bl_label = "Culling Bounding Volume"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -1972,15 +2169,14 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
                 and ob.type not in {'CAMERA'})
 
-    def draw_header(self, context):
-        self.layout.prop(context.object.game.network, "use_replicate", text="")
-
     def draw(self, context):
         layout = self.layout
         net = context.object.game.network
 
-        layout.active = net.use_replicate
-        col = layout.column()
+        box = layout.box()
+        box.prop(net, "use_replicate", text="Replicate")
+        col = box.column()
+        col.active = net.use_replicate
         col.prop(net, "sync_transform")
         col.prop(net, "sync_velocity")
         col.prop(net, "sync_angular_velocity")
@@ -1988,9 +2184,9 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
         col.prop(net, "use_always_relevant")
         col.prop(net, "priority")
         if net.use_replicate:
-            layout.label(text="ID: %d" % net.net_id)
-            layout.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
-        layout.label(text="Room, ports and server: Export Game > Network", icon='EXPORT')
+            col.label(text="ID: %d" % net.net_id)
+            col.label(text="Properties with 'Rep' on are replicated too", icon='INFO')
+        box.label(text="Room, ports and server: Export Game > Network", icon='EXPORT')
 
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
@@ -2481,10 +2677,12 @@ classes = (
     RENDER_MT_game_animation_fps,
     RENDER_MT_game_bit_depth,
     RENDER_MT_game_refresh_rate,
+    RENDER_PT_game_cook,
     RENDER_PT_embedded,
     RENDER_PT_game_display,
     RENDER_PT_game_vr,
     RENDER_PT_game_shading,
+    RENDER_PT_game_baked_lighting,
     RENDER_PT_game_post_process_shaders,
     RENDER_PT_game_system,
     RENDER_PT_game_attachments,
@@ -2500,6 +2698,7 @@ classes = (
     DATA_PT_shadow_game,
     DATA_PT_light_culling_game,
     OBJECT_MT_lod_tools,
+    OBJECT_OT_game_load_with_scene,
     OBJECT_PT_game_object_tasks,
     OBJECT_MT_culling,
     OBJECT_PT_game_network,

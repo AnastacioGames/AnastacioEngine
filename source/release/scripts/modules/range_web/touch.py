@@ -7,7 +7,7 @@
 from .i18n import Msg
 from .results import EVIDENCE_POTENTIAL, SEVERITY_INFO, SEVERITY_WARNING, Finding
 
-LAYOUTS = ("none", "stick", "dpad", "twin", "wasd", "arrows", "fps")
+LAYOUTS = ("none", "stick", "dpad", "twin", "wasd", "arrows", "fps", "race")
 STICK_MODES = ("dynamic", "fixed")
 DEFAULT_LAYOUT = "stick"
 DEFAULT_STICK = "dynamic"
@@ -20,8 +20,10 @@ KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP = 69, 70, 71, 72
 MOUSE_LEFT, MOUSE_X, MOUSE_Y = 116, 126, 127
 # KX_PythonJoystick::JOYSTICK_EnumInputs (bindings JOYSTICK do Input System).
 JOY_A, JOY_B, JOY_X, JOY_Y = 1, 2, 3, 4
+JOY_START, JOY_RIGHTSHOULDER = 7, 11
 JOY_DPAD_UP, JOY_DPAD_DOWN, JOY_DPAD_LEFT, JOY_DPAD_RIGHT = 12, 13, 14, 15
 JOY_LEFTX, JOY_LEFTY, JOY_RIGHTX, JOY_RIGHTY = 100, 101, 102, 103
+JOY_TRIGGER_LEFT, JOY_TRIGGER_RIGHT = 104, 105
 
 # Nome da tecla no sensor Keyboard (RNA) -> codigo SCA, so para as teclas que algum layout aperta.
 _SENSOR_KEYS = {"RET": KEY_RET, "SPACE": KEY_SPACE, "W": KEY_W, "A": KEY_A, "S": KEY_S, "D": KEY_D,
@@ -43,6 +45,9 @@ _REACH = {
     "arrows": ((KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_RET), ()),
     # O stick direito move o mouse (MOUSE_X/Y) e um botao aperta o esquerdo, que o toque ja alcanca sempre.
     "fps": ((KEY_W, KEY_S, KEY_A, KEY_D, KEY_SPACE, MOUSE_LEFT), ()),
+    # Corrida: direcao (stick, setas ou inclinar, a escolha do jogador) no eixo X esquerdo e pedais nos gatilhos.
+    "race": ((), (JOY_LEFTX, JOY_LEFTY, JOY_TRIGGER_LEFT, JOY_TRIGGER_RIGHT, JOY_A, JOY_B, JOY_X, JOY_Y, JOY_START,
+                  JOY_RIGHTSHOULDER)),
 }
 
 RULE_ID = "WEB-INPUT-001"

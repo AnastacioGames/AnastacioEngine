@@ -543,8 +543,8 @@ static void usage(const std::string& program, bool isBlenderPlayer)
 	CM_Message("       show_shadow_frustum            0         Show debug light shadow frustum volume");
 	CM_Message("       ignore_deprecation_warnings    1         Ignore deprecation warnings" << std::endl);
 	CM_Message("  -p: override python main loop script");
-	CM_Message("  --server: headless game server: no render, no audio, smallest window (still needs a display,");
-	CM_Message("            e.g. xvfb-run on Linux); a Host scene runs as Dedicated");
+	CM_Message("  --server: headless game server: no render, no audio, no window; a Host scene runs as Dedicated");
+	CM_Message("            (Linux: offscreen EGL/Mesa context, no display or xvfb needed)");
 	CM_Message(std::endl);
 	CM_Message("  - : all arguments after this are ignored, allowing python to access them from sys.argv");
 	CM_Message(std::endl);
@@ -555,6 +555,11 @@ static void usage(const std::string& program, bool isBlenderPlayer)
 
 static void get_filename(int argc, char **argv, char *filename)
 {
+	/* Optional lobby invitations may be appended after the external game file.
+	 * Preserve the real argv for Python/complements; only trim filename lookup. */
+	while (argc > 2 && strcmp(argv[argc - 2], "+connect_lobby") == 0) {
+		argc -= 2;
+	}
 #ifdef __APPLE__
 	/* On Mac we park the game file (called game.blend) in the application bundle.
 	 * The executable is located in the bundle as well.
@@ -736,6 +741,17 @@ static void sigHandleAbort(int signum)
 	sigHandleCrash(signum);
 }
 
+/* `kill -TERM` (e.g. an orchestrator stopping a `--server` dedicated process) used to be
+ * ignored: no handler was installed, so the default disposition applied, which only works
+ * if the signal reaches the main thread outside of any syscall with a disposition that
+ * masks it (worker thread pools can shift where it lands). Set a flag here (the only
+ * async-signal-safe option) and let LA_Launcher::EngineNextFrame() check it once per frame,
+ * the same clean-shutdown path as closing the window. */
+static void sigHandleTerm(int /*signum*/)
+{
+	LA_SigTermRequested.store(true);
+}
+
 static void terminateHandler()
 {
 	fputs("\nstd::terminate() called (uncaught C++ exception)\n", stderr);
@@ -821,10 +837,10 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 		char text[FILE_MAX + 128];
 		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
 		BLI_snprintf(text, sizeof(text),
-		             "RangeRuntime crashed.\n\nLog: %s\n"
+		             "AnastacioRuntime crashed.\n\nLog: %s\n"
 		             "Backtrace: <file>.crash.txt in the same folder.",
 		             logPath);
-		MessageBox(NULL, text, "RangeRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
+		MessageBox(NULL, text, "AnastacioRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
 	}
 
 	/* If this is a stack overflow then we can't walk the stack, so just show
@@ -870,7 +886,7 @@ int main(int argc,
 	bool borderlessWindow = false;
 	bool fullScreenParFound = false;
 	bool windowParFound = false;
-	// --server: headless game server (no render, no audio device; GHOST still needs a small GL window).
+	// --server: headless game server (no render, no audio device, no window: headless GHOST system on Linux).
 	bool serverMode = false;
 #ifdef WIN32
 	bool closeConsole = true;
@@ -941,6 +957,7 @@ int main(int argc,
 #else
 	/* after parsing args */
 	signal(SIGSEGV, sigHandleCrash);
+	signal(SIGTERM, sigHandleTerm);
 #endif  // WIN32
 	signal(SIGABRT, sigHandleAbort);
 	std::set_terminate(terminateHandler);
@@ -972,7 +989,7 @@ int main(int argc,
 		_dup2(_fileno(stdout), _fileno(stderr));
 		setvbuf(stdout, nullptr, _IONBF, 0);
 		setvbuf(stderr, nullptr, _IONBF, 0);
-		printf("RangeRuntime log started, writing to: %s\n", logPath);
+		printf("AnastacioRuntime log started, writing to: %s\n", logPath);
 		fflush(stdout);
 	}
 #endif  // WIN32
@@ -1407,7 +1424,14 @@ int main(int argc,
 #endif
 	{
 		// Create the system
-		if (GHOST_ISystem::createSystem() == GHOST_kSuccess) {
+		// --server needs no display: a headless GHOST system with an offscreen GL context.
+		// The editor's Cook button (ANASTACIO_COOK) draws its own progress, so on Windows the game window stays hidden.
+#ifdef WIN32
+		const bool hiddenWindow = serverMode || getenv("ANASTACIO_COOK") != nullptr;
+#else
+		const bool hiddenWindow = serverMode;
+#endif
+		if ((hiddenWindow ?GHOST_ISystem::createSystemHeadless() : GHOST_ISystem::createSystem()) == GHOST_kSuccess) {
 			GHOST_ISystem *system = GHOST_ISystem::getSystem();
 			BLI_assert(system);
 
@@ -1617,9 +1641,25 @@ int main(int argc,
 								else
 #endif
 								{
+#ifdef WIN32
+									/* Tela cheia sem borda na resolucao do desktop. A tela cheia exclusiva
+									 * (beginFullScreen/ChangeDisplaySettings) crasha em alguns drivers. */
+									std::string fsTitle = "Anastacio Engine Standalone";
+									GHOST_TUns32 sysWidth = 0, sysHeight = 0;
+									system->getMainDisplayDimensions(sysWidth, sysHeight);
+									/* A janela nasce na resolucao do Display (volta a ela com setFullScreen(False)). */
+									int fsWidth = (fullScreenWidth > 0) ? (int)fullScreenWidth : (int)sysWidth;
+									int fsHeight = (fullScreenHeight > 0) ? (int)fullScreenHeight : (int)sysHeight;
+									window = startWindow(system, fsTitle, ((int)sysWidth - fsWidth) / 2,
+									                     ((int)sysHeight - fsHeight) / 2, fsWidth, fsHeight,
+									                     stereoWindow, alphaBackground);
+									window->setState(GHOST_kWindowStateFullScreen);
+									window->setCursorVisibility(false);
+#else
 									window = startFullScreen(system, fullScreenWidth, fullScreenHeight, fullScreenBpp,
 									                         fullScreenFrequency, stereoWindow, alphaBackground,
 									                         (scene->gm.playerflag & GAME_PLAYER_DESKTOP_RESOLUTION));
+#endif
 								}
 							}
 							else {

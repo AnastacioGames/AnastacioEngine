@@ -296,6 +296,8 @@ GPUNodeLink *GPU_material_builtin(GPUMaterial *mat, GPUBuiltin builtin);
 /* High level functions to create and use GPU materials */
 GPUMaterial *GPU_material_world(struct Scene *scene, struct World *wo);
 
+/* Sends the material program to the driver during a GPU_shader_prefetch pass (see GPU_shader.h). */
+void GPU_material_prefetch(struct Scene *scene, struct Material *ma, bool is_instancing, bool is_skinning);
 GPUMaterial *GPU_material_from_blender(struct Scene *scene, struct Material *ma, bool use_opensubdiv, bool is_instancing, bool is_skinning);
 GPUMaterial *GPU_material_matcap(struct Scene *scene, struct Material *ma, bool use_opensubdiv);
 void GPU_material_free(struct ListBase *gpumaterial);
@@ -503,6 +505,8 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);
+/* True when the linked shader consumes the Damage node's hit count. */
+bool GPU_material_use_damage(GPUMaterial *material);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);
 
 /* One slot of that same scene-light loop, with the values the fixed-function glLight* calls
@@ -529,6 +533,11 @@ typedef struct GPUSceneLight {
 	float iesaxes[3][3];
 } GPUSceneLight;
 void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS]);
+/* GL calls issued by the two light binds above since the last call (CM_WORK_LIGHT_UNIFORMS); resets. */
+int GPU_material_light_gl_calls_take(void);
+/* glUniform calls of the material's own dynamic inputs (node values, CSM/VSM lamp data) since the
+ * last call (CM_WORK_PASS_UNIFORMS); resets. */
+int GPU_pass_uniform_gl_calls_take(void);
 
 /* Material shader cache counters (gpu_codegen.c): programs reused, programs compiled and seconds spent
  * compiling since the last reset. Used by the game engine "[Load]" console lines. */

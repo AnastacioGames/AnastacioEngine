@@ -1261,7 +1261,6 @@ static void screen_px_from_persp(
 	interp_v3_v3v3v3(pixelScreenCo, v1co, v2co, v3co, w_int);
 }
 
-
 /**
  * Set a direction vector based on a screen location.
  * (use for perspective view, else we can simply use `ps->viewDir`)
@@ -2257,8 +2256,8 @@ static void project_bucket_clip_face(
 
 
 
-		/* Maximum possible 6 intersections when using a rectangle and triangle */
-		float isectVCosSS[8][3]; /* The 3rd float is used to store angle for qsort(), NOT as a Z location */
+		/* Rectangle corners + triangle vertices + up to 2 intersections for each triangle edge. */
+		float isectVCosSS[13][3]; /* The 3rd float is used to store angle for qsort(), NOT as a Z location */
 		float v1_clipSS[2], v2_clipSS[2];
 		float w[3];
 
@@ -3031,11 +3030,18 @@ static bool project_bucket_face_isect(ProjPaintState *ps, int bucket_x, int buck
 	    isect_point_tri_v2(p2, v1, v2, v3) ||
 	    isect_point_tri_v2(p3, v1, v2, v3) ||
 	    isect_point_tri_v2(p4, v1, v2, v3) ||
-	    /* we can avoid testing v3,v1 because another intersection MUST exist if this intersects */
-	    (isect_seg_seg_v2(p1, p2, v1, v2) || isect_seg_seg_v2(p1, p2, v2, v3)) ||
-	    (isect_seg_seg_v2(p2, p3, v1, v2) || isect_seg_seg_v2(p2, p3, v2, v3)) ||
-	    (isect_seg_seg_v2(p3, p4, v1, v2) || isect_seg_seg_v2(p3, p4, v2, v3)) ||
-	    (isect_seg_seg_v2(p4, p1, v1, v2) || isect_seg_seg_v2(p4, p1, v2, v3)))
+	    (isect_seg_seg_v2(p1, p2, v1, v2) ||
+	     isect_seg_seg_v2(p1, p2, v2, v3) ||
+	     isect_seg_seg_v2(p1, p2, v3, v1)) ||
+	    (isect_seg_seg_v2(p2, p3, v1, v2) ||
+	     isect_seg_seg_v2(p2, p3, v2, v3) ||
+	     isect_seg_seg_v2(p2, p3, v3, v1)) ||
+	    (isect_seg_seg_v2(p3, p4, v1, v2) ||
+	     isect_seg_seg_v2(p3, p4, v2, v3) ||
+	     isect_seg_seg_v2(p3, p4, v3, v1)) ||
+	    (isect_seg_seg_v2(p4, p1, v1, v2) ||
+	     isect_seg_seg_v2(p4, p1, v2, v3) ||
+	     isect_seg_seg_v2(p4, p1, v3, v1)))
 	{
 		return 1;
 	}
@@ -4139,6 +4145,53 @@ static bool project_bucket_iter_init(ProjPaintState *ps, const float mval_f[2])
 	return 1;
 }
 
+static bool project_paint_is_over_active_surface(const ProjPaintState *ps, const float pos[2])
+{
+	float w[3];
+	int tri_index;
+
+	tri_index = project_paint_PickFace(ps, pos, w);
+	if (tri_index == -1) {
+		return false;
+	}
+
+	/* The screen-space pick above only knows about the active mesh's own
+	 * triangles; it reports a hit even when a foreign object (e.g. a group
+	 * instance) is drawn in front of the painted surface at this pixel.
+	 * Cross-check against the viewport depth buffer, which reflects every
+	 * visible object, to reject that case instead of continuing to paint
+	 * (and accumulate image-undo tiles) on a surface the user can't see. */
+	if (ps->rv3d && ps->rv3d->depths && ps->ar) {
+		const MLoopTri *lt = &ps->dm_mlooptri[tri_index];
+		const int lt_vtri[3] = { PS_LOOPTRI_AS_VERT_INDEX_3(ps, lt) };
+		float co_local[3], visible_world[3], visible_local[3];
+		const int mval_i[2] = {(int)pos[0], (int)pos[1]};
+
+		interp_v3_v3v3v3(
+		        co_local,
+		        ps->dm_mvert[lt_vtri[0]].co,
+		        ps->dm_mvert[lt_vtri[1]].co,
+		        ps->dm_mvert[lt_vtri[2]].co,
+		        w);
+
+		if (ED_view3d_autodist_simple((ARegion *)ps->ar, mval_i, visible_world, 0, NULL)) {
+			mul_v3_m4v3(visible_local, ps->obmat_imat, visible_world);
+
+			{
+				const float dist_to_pick = len_v3v3(ps->viewPos, co_local);
+				const float dist_to_visible = len_v3v3(ps->viewPos, visible_local);
+				const float epsilon = max_ff(dist_to_pick * 1e-3f, 1e-4f);
+
+				if (dist_to_visible + epsilon < dist_to_pick) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
 
 static bool project_bucket_iter_next(
         ProjPaintState *ps, int *bucket_index,
@@ -5035,6 +5088,10 @@ static void paint_proj_stroke_ps(
 		}
 	}
 
+	if (ps->source == PROJ_SRC_VIEW && !project_paint_is_over_active_surface(ps, pos)) {
+		return;
+	}
+
 	if (project_paint_op(ps, prev_pos, pos)) {
 		ps_handle->need_redraw = true;
 		project_image_refresh_tagged(ps);
@@ -5246,6 +5303,23 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 		}
 	}
 
+	/* Capture the full-scene viewport depth buffer once per stroke, so the
+	 * active-surface check below can tell a real foreground occluder (e.g. a
+	 * group instance placed in front of the painted mesh) apart from empty
+	 * space or the painted mesh's own back faces. The view doesn't change
+	 * while a stroke is held, so one capture per stroke is sufficient. */
+	{
+		ProjPaintState *ps0 = ps_handle->ps_views[0];
+		if (ps0->v3d && ps0->ar) {
+			view3d_operator_needs_opengl(C);
+			ED_view3d_autodist_init(CTX_data_main(C), scene, ps0->ar, ps0->v3d, 0);
+			if (ps0->rv3d->depths) {
+				ps0->rv3d->depths->damaged = true;
+			}
+			ED_view3d_depth_update(ps0->ar);
+		}
+	}
+
 	/* Don't allow brush size below 2 */
 	if (BKE_brush_size_get(scene, ps_handle->brush) < 2)
 		BKE_brush_size_set(scene, ps_handle->brush, 2 * U.pixelsize);
@@ -5268,7 +5342,9 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 
 		paint_proj_begin_clone(ps, mouse);
 
-		if (ps->dm == NULL) {
+		if (ps->dm == NULL ||
+		    (ps->source == PROJ_SRC_VIEW && !project_paint_is_over_active_surface(ps, mouse)))
+		{
 			goto fail;
 			return NULL;
 		}

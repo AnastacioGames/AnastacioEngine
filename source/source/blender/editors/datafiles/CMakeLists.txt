@@ -118,6 +118,11 @@ set(ICON_NAMES
 	scene
 	edit
 	game
+	cook
+	network
+	web
+	android
+	desktop
 	radio
 	script
 	particles
@@ -528,6 +533,7 @@ set(ICON_NAMES
 
 data_to_c_simple(../../../../release/datafiles/roboto_medium.pfb SRC)
 data_to_c_simple(../../../../release/datafiles/roboto_medium.ttf SRC)
+data_to_c_simple(../../../../release/datafiles/inter_medium.ttf SRC)
 data_to_c_simple(../../../../release/datafiles/roboto_mono_medium.ttf SRC)
 
 # imgui icons

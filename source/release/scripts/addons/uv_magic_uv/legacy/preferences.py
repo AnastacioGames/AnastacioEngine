@@ -336,24 +336,24 @@ class Preferences(AddonPreferences):
                 else 'DISCLOSURE_TRI_RIGHT')
             if self.info_loc_expanded:
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("3D View > Tool shelf > Copy/Paste UV (Object mode)")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Copy/Paste UV (Among objects)")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("3D View > Tool shelf > Copy/Paste UV (Edit mode)")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Copy/Paste UV (Among faces in 3D View)")
                 col.label("Transfer UV")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("3D View > Tool shelf > UV Manipulation (Edit mode)")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Flip/Rotate UV")
                 col.label("Mirror UV")
@@ -365,25 +365,25 @@ class Preferences(AddonPreferences):
                 col.label("UV Sculpt")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("3D View > Tool shelf > UV Manipulation (Edit mode)")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Unwrap Constraint")
                 col.label("Texture Projection")
                 col.label("UVW")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("UV/Image Editor > Tool shelf > Copy/Paste UV")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Copy/Paste UV (Among faces in UV/Image Editor)")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("UV/Image Editor > Tool shelf > UV Manipulation")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Align UV")
                 col.label("Smooth UV")
@@ -391,9 +391,9 @@ class Preferences(AddonPreferences):
                 col.label("Pack UV (Extension)")
 
                 row = layout.row(align=True)
-                sp = row.split(percentage=0.5)
+                sp = row.split(factor=0.5)
                 sp.label("UV/Image Editor > Tool shelf > Editor Enhancement")
-                sp = sp.split(percentage=1.0)
+                sp = sp.split(factor=1.0)
                 col = sp.column(align=True)
                 col.label("Align UV Cursor")
                 col.label("UV Cursor Location")
@@ -410,9 +410,9 @@ class Preferences(AddonPreferences):
                 icon='DISCLOSURE_TRI_DOWN' if self.conf_uv_sculpt_expanded
                 else 'DISCLOSURE_TRI_RIGHT')
             if self.conf_uv_sculpt_expanded:
-                sp = layout.split(percentage=0.05)
+                sp = layout.split(factor=0.05)
                 col = sp.column()  # spacer
-                sp = sp.split(percentage=0.3)
+                sp = sp.split(factor=0.3)
                 col = sp.column()
                 col.label("Brush Color:")
                 col.prop(self, "uv_sculpt_brush_color", text="")
@@ -423,13 +423,13 @@ class Preferences(AddonPreferences):
                 icon='DISCLOSURE_TRI_DOWN' if self.conf_uv_inspection_expanded
                 else 'DISCLOSURE_TRI_RIGHT')
             if self.conf_uv_inspection_expanded:
-                sp = layout.split(percentage=0.05)
+                sp = layout.split(factor=0.05)
                 col = sp.column()  # spacer
-                sp = sp.split(percentage=0.3)
+                sp = sp.split(factor=0.3)
                 col = sp.column()
                 col.label("Overlapped UV Color:")
                 col.prop(self, "uv_inspection_overlapped_color", text="")
-                sp = sp.split(percentage=0.45)
+                sp = sp.split(factor=0.45)
                 col = sp.column()
                 col.label("Flipped UV Color:")
                 col.prop(self, "uv_inspection_flipped_color", text="")
@@ -442,9 +442,9 @@ class Preferences(AddonPreferences):
                 if self.conf_texture_projection_expanded
                 else 'DISCLOSURE_TRI_RIGHT')
             if self.conf_texture_projection_expanded:
-                sp = layout.split(percentage=0.05)
+                sp = layout.split(factor=0.05)
                 col = sp.column()       # spacer
-                sp = sp.split(percentage=0.3)
+                sp = sp.split(factor=0.3)
                 col = sp.column()
                 col.prop(self, "texture_projection_canvas_padding")
                 layout.separator()
@@ -455,9 +455,9 @@ class Preferences(AddonPreferences):
                 if self.conf_uv_bounding_box_expanded
                 else 'DISCLOSURE_TRI_RIGHT')
             if self.conf_uv_bounding_box_expanded:
-                sp = layout.split(percentage=0.05)
+                sp = layout.split(factor=0.05)
                 col = sp.column()       # spacer
-                sp = sp.split(percentage=0.3)
+                sp = sp.split(factor=0.3)
                 col = sp.column()
                 col.label("Control Point:")
                 col.prop(self, "uv_bounding_box_cp_size")

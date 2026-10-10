@@ -1,6 +1,6 @@
 """Rain test scene for the native World > Rain > Splash and Aura effects.
 Run with:  RangeEngine -b --python tools/create_rain_splash_scene.py -- <output.range> [auto_quit]
-In game: 1 splash on/off, UP/DOWN splash size, LEFT/RIGHT splash rate,
+In game: 1 splash on/off, 2 puddles on/off, 4/5 puddle amount, UP/DOWN splash size, LEFT/RIGHT splash rate,
 3 aura on/off, W/S aura size, A/D aura amount, O camera orbit,
 R lightning now, T automatic lightning on/off, C look at the sky (World > Rain > Lightning).
 The keys only call scene.world.setWeather(); everything else is in the engine.
@@ -33,8 +33,10 @@ weather.rain_darken = 0.3
 weather.rain_streak_width = 0.35
 weather.use_rain_splash = True
 weather.rain_splash_distance = 12.0
+weather.use_rain_puddles = True
+weather.rain_puddle_amount = 0.5
 weather.use_rain_aura = True
-weather.rain_aura_property = "aura_chuva"
+weather.rain_aura_property = "aura_rain_effect"
 weather.use_rain_lightning = True
 weather.rain_lightning_rate = 7.0
 
@@ -98,9 +100,9 @@ ev = Range.events
 hit = lambda k: logic.keyboard.events.get(k) == logic.KX_INPUT_JUST_ACTIVATED
 
 if "splash" not in cam:
-    for k, v in dict(splash=True, ssize=1.0, srate=0.9, aura=True, asize=1.0, arate=0.6, orbit=True, frame=0, raio=True, sky=False).items():
+    for k, v in dict(splash=True, puddles=True, pamount=0.5, ssize=1.0, srate=0.9, aura=True, asize=1.0, arate=0.6, orbit=True, frame=0, raio=True, sky=False).items():
         cam[k] = v
-    print("[chuva] 1 respingo, setas tamanho/frequencia | 3 aura, W/S tamanho, A/D quantidade | O orbita | R raio, T raio automatico, C ceu", flush=True)
+    print("[chuva] 1 respingo, 2 pocas, 4/5 quantidade de pocas, setas tamanho/frequencia | 3 aura, W/S tamanho, A/D quantidade | O orbita | R raio, T raio automatico, C ceu", flush=True)
 
 def change(name, key, factor, lo, hi, setting):
     cam[name] = min(max(cam[name] * factor, lo), hi)
@@ -110,6 +112,11 @@ def change(name, key, factor, lo, hi, setting):
 if hit(ev.ONEKEY):
     cam["splash"] = not cam["splash"]
     world.setWeather("splash", cam["splash"])
+if hit(ev.TWOKEY):
+    cam["puddles"] = not cam["puddles"]
+    world.setWeather("puddles", cam["puddles"])
+if hit(ev.FIVEKEY): change("pamount", 0, 1.25, 0.05, 1.0, "puddle_amount")
+if hit(ev.FOURKEY): change("pamount", 0, 1 / 1.25, 0.05, 1.0, "puddle_amount")
 if hit(ev.THREEKEY):
     cam["aura"] = not cam["aura"]
     world.setWeather("aura", cam["aura"])
@@ -157,12 +164,12 @@ cam.game.sensors[-1].use_pulse_true_level = True
 cam.game.controllers[-1].text = text
 cam.game.sensors[-1].link(cam.game.controllers[-1])
 
-# Objects that get the aura: game property "aura_chuva" = True.
+# Objects that get the aura: game property "aura_rain_effect" = True.
 for name in ("Caixa", "Banco", "Bola", "Tambor", "Carro"):
     ob = bpy.data.objects[name]
     bpy.context.scene.objects.active = ob
-    bpy.ops.object.game_property_new(type='BOOL', name="aura_chuva")
-    ob.game.properties["aura_chuva"].value = True
+    bpy.ops.object.game_property_new(type='BOOL', name="aura_rain_effect")
+    ob.game.properties["aura_rain_effect"].value = True
 
 bpy.ops.wm.save_as_mainfile(filepath=output)
 print("saved", output)

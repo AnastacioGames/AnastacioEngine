@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "PIL_time.h"
+
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_customdata_types.h"
@@ -707,7 +709,12 @@ static void drawfloor(Scene *scene, RegionView3D *rv3d, View3D *v3d, const char 
 	/* draw the Z axis line */
 	/* check for the 'show Z axis' preference */
 	if (v3d->gridflag & axis_flags) {
-		glLineWidth(3.0f);
+		/* thin anti-aliased axis line, matching the shader-drawn X/Y axes */
+		const bool had_blend = glIsEnabled(GL_BLEND);
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glLineWidth(1.5f * U.pixelsize);
 		glBegin(GL_LINES);
 		int axis;
 		for (axis = 0; axis < 3; axis++) {
@@ -726,6 +733,8 @@ static void drawfloor(Scene *scene, RegionView3D *rv3d, View3D *v3d, const char 
 			}
 		}
 		glEnd();
+		if (!had_blend) glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
 	}
 
 	glLineWidth(1.0f);
@@ -743,36 +752,62 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		const float f10 = 0.5f * U.widget_unit;
 		const float f20 = U.widget_unit;
 
-		glLineWidth(1);
+		/* Blender 5 style: ring of solid red/white dashes over a faint dark halo,
+		 * and a crosshair with a gap in the middle, all anti-aliased. */
+		const int segments = 64;
+		const int dashes = 8;
+		const float cross[8][2] = {
+			{co[0] - f20, co[1]}, {co[0] - f5, co[1]}, {co[0] + f5, co[1]}, {co[0] + f20, co[1]},
+			{co[0], co[1] - f20}, {co[0], co[1] - f5}, {co[0], co[1] + f5}, {co[0], co[1] + f20},
+		};
+
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glShadeModel(GL_FLAT);
+
+		/* halo, so the cursor reads on light and dark backgrounds */
+		glLineWidth(3.0f * U.pixelsize);
+		glColor4ub(0, 0, 0, 70);
 		glBegin(GL_LINE_LOOP);
-
-		const int segments = 16;
-		for (int i = 0; i < segments; ++i) {
-			float angle = 2 * M_PI * ((float)i / (float)segments);
-			float x = co[0] + f10 * cosf(angle);
-			float y = co[1] + f10 * sinf(angle);
-
-			if (i % 2 == 0)
-				glColor3ub(255, 0, 0);
-			else
-				glColor3ub(255, 255, 255);
-
-			glVertex2f(x, y);
+		for (int i = 0; i < segments; i++) {
+			const float angle = 2.0f * (float)M_PI * ((float)i / (float)segments);
+			glVertex2f(co[0] + f10 * cosf(angle), co[1] + f10 * sinf(angle));
+		}
+		glEnd();
+		glBegin(GL_LINES);
+		for (int i = 0; i < 8; i++) {
+			glVertex2fv(cross[i]);
 		}
 		glEnd();
 
+		/* dashed ring: each dash is its own strip so colors don't bleed */
+		glLineWidth(1.5f * U.pixelsize);
+		for (int d = 0; d < dashes; d++) {
+			const int per_dash = segments / dashes;
+			if (d % 2 == 0)
+				glColor4ub(255, 40, 40, 255);
+			else
+				glColor4ub(255, 255, 255, 255);
+			glBegin(GL_LINE_STRIP);
+			for (int i = 0; i <= per_dash; i++) {
+				const float angle = 2.0f * (float)M_PI * ((float)(d * per_dash + i) / (float)segments);
+				glVertex2f(co[0] + f10 * cosf(angle), co[1] + f10 * sinf(angle));
+			}
+			glEnd();
+		}
+
+		glLineWidth(U.pixelsize);
 		UI_ThemeColor(TH_VIEW_OVERLAY);
 		glBegin(GL_LINES);
-		glVertex2f(co[0] - f20, co[1]);
-		glVertex2f(co[0] - f5, co[1]);
-		glVertex2f(co[0] + f5, co[1]);
-		glVertex2f(co[0] + f20, co[1]);
-		glVertex2f(co[0], co[1] - f20);
-		glVertex2f(co[0], co[1] - f5);
-		glVertex2f(co[0], co[1] + f5);
-		glVertex2f(co[0], co[1] + f20);
+		for (int i = 0; i < 8; i++) {
+			glVertex2fv(cross[i]);
+		}
 		glEnd();
 
+		glLineWidth(1.0f);
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
 		glShadeModel(GL_SMOOTH);
 	}
 }
@@ -811,15 +846,19 @@ static void view_axis_disc(float x, float y, float radius, const uchar col[4], b
  * pull in an incompatible GPU/UI subsystem. */
 static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 {
-	const float k = U.rvisize * U.pixelsize;
-	const float axis_length = k * 0.95f;
-	const float disc_radius = max_ff(7.0f * U.pixelsize, k * 0.24f);
-	const float startx = rect->xmax - (k * 1.15f + UI_UNIT_X);
-	const float starty = rect->ymax - (k * 1.15f + UI_UNIT_Y);
+	/* Proportions of Blender 5's navigation gizmo: 80px wide, axis discs of 0.2 radius placed
+	 * at 0.8 of the radius, 2px lines that end at the disc edge. */
+	const float radius = 40.0f * U.pixelsize;
+	const float disc_radius = radius * 0.20f;
+	const float axis_length = radius - disc_radius;
+	const float startx = rect->xmax - (radius + 0.5f * UI_UNIT_X);
+	const float starty = rect->ymax - (radius + 0.5f * UI_UNIT_Y);
 	/* Blender 5 default theme axis colors */
 	const uchar axis_col[3][3] = {
 		{255, 51, 82}, {139, 220, 0}, {40, 144, 255}
 	};
+	const uiStyle *style = UI_style_get();
+	const int fontid = style->widget.uifont_id;
 	float axis_vec[3][3];
 	/* the six ends: index = axis * 2 + (negative ? 1 : 0) */
 	int order[6] = {0, 1, 2, 3, 4, 5};
@@ -840,6 +879,8 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		}
 	}
 
+	BLF_size(fontid, 12 * U.pixelsize, 72);
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_LINE_SMOOTH);
@@ -849,10 +890,12 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		const int axis = end / 2;
 		const bool negative = (end & 1) != 0;
 		const float sign = negative ? -1.0f : 1.0f;
-		const float x = startx + axis_vec[axis][0] * axis_length * sign;
-		const float y = starty + axis_vec[axis][1] * axis_length * sign;
+		const float dx = axis_vec[axis][0] * sign;
+		const float dy = axis_vec[axis][1] * sign;
+		const float x = startx + dx * axis_length;
+		const float y = starty + dy * axis_length;
 		/* ends pointing away from the viewer are slightly dimmer */
-		const float fade = 0.75f + 0.25f * (depth[end] * 0.5f + 0.5f);
+		const float fade = 0.80f + 0.20f * (depth[end] * 0.5f + 0.5f);
 		uchar col[4] = {
 			(uchar)(axis_col[axis][0] * fade),
 			(uchar)(axis_col[axis][1] * fade),
@@ -861,26 +904,35 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 		};
 
 		if (negative) {
-			uchar fill[4] = {col[0], col[1], col[2], 70};
+			/* translucent fill with a solid colored rim */
+			uchar fill[4] = {col[0], col[1], col[2], 64};
 			glLineWidth(1.5f * U.pixelsize);
-			view_axis_disc(x, y, disc_radius * 0.85f, fill, false);
+			view_axis_disc(x, y, disc_radius - 0.75f * U.pixelsize, fill, false);
 		}
 		else {
 			const char axis_text[2] = {'X' + axis, '\0'};
+			const float line_len = max_ff(0.0f, axis_length - disc_radius);
+			const float tx = x - BLF_width(fontid, axis_text, 1) * 0.5f;
+			const float ty = y - BLF_height(fontid, axis_text, 1) * 0.5f;
 
-			glLineWidth(2.0f * U.pixelsize);
-			glColor4ubv(col);
-			glBegin(GL_LINES);
-			glVertex2f(startx, starty);
-			glVertex2f(x, y);
-			glEnd();
+			if (line_len > 0.5f) {
+				glLineWidth(2.0f * U.pixelsize);
+				glColor4ubv(col);
+				glBegin(GL_LINES);
+				glVertex2f(startx, starty);
+				glVertex2f(startx + dx * line_len, starty + dy * line_len);
+				glEnd();
+			}
 
 			glLineWidth(1.0f);
 			view_axis_disc(x, y, disc_radius, col, true);
 
-			glColor4ub(20, 20, 20, 255);
-			BLF_draw_default_ascii(x - BLF_width_default(axis_text, 1) * 0.5f,
-			                       y - 4.0f * U.pixelsize, 0.0f, axis_text, 1);
+			/* dark letter, drawn twice with a sub-pixel offset to read as bold */
+			glColor4ub(0, 0, 0, 230);
+			BLF_position(fontid, tx, ty, 0.0f);
+			BLF_draw(fontid, axis_text, 1);
+			BLF_position(fontid, tx + 0.6f * U.pixelsize, ty, 0.0f);
+			BLF_draw(fontid, axis_text, 1);
 			glEnable(GL_BLEND); /* BLF changes the OpenGL blend state. */
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
@@ -1077,6 +1129,18 @@ static const char *view3d_get_name(View3D *v3d, RegionView3D *rv3d)
 	return name;
 }
 
+/* Blender 5 style: overlay text gets a soft dark shadow so it reads over any scene */
+static void view3d_overlay_text_shadow(bool enable)
+{
+	if (enable) {
+		BLF_enable_default(BLF_SHADOW);
+		BLF_shadow_default(3, (const float[4]){0.0f, 0.0f, 0.0f, 0.6f}, 1, -1);
+	}
+	else {
+		BLF_disable_default(BLF_SHADOW);
+	}
+}
+
 static void draw_viewport_name(ARegion *ar, View3D *v3d, rcti *rect)
 {
 	RegionView3D *rv3d = ar->regiondata;
@@ -1094,11 +1158,13 @@ static void draw_viewport_name(ARegion *ar, View3D *v3d, rcti *rect)
 	}
 
 	UI_ThemeColor(TH_TEXT_HI);
+	view3d_overlay_text_shadow(true);
 #ifdef WITH_INTERNATIONAL
 	BLF_draw_default(U.widget_unit + rect->xmin,  rect->ymax - U.widget_unit, 0.0f, name, sizeof(tmpstr));
 #else
 	BLF_draw_default_ascii(U.widget_unit + rect->xmin,  rect->ymax - U.widget_unit, 0.0f, name, sizeof(tmpstr));
 #endif
+	view3d_overlay_text_shadow(false);
 }
 
 /* draw info beside axes in bottom left-corner:
@@ -1211,7 +1277,9 @@ static void draw_selected_name(Scene *scene, Object *ob, const rcti *rect)
 	if (U.uiflag & USER_SHOW_ROTVIEWICON)
 		offset = (U.rvisize) + rect->xmin;
 
+	view3d_overlay_text_shadow(true);
 	BLF_draw_default(offset, 0.5f * U.widget_unit, 0.0f, info, sizeof(info));
+	view3d_overlay_text_shadow(false);
 }
 
 static void view3d_camera_border(
@@ -3533,7 +3601,7 @@ static void view3d_main_region_clear(Scene *scene, View3D *v3d, ARegion *ar)
 		GPUMaterial *gpumat = GPU_material_world(scene, scene->world);
 
 		/* calculate full shader for background */
-		GPU_material_bind(gpumat, 1, 1.0, true, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0), rv3d->winmat);
+		GPU_material_bind(gpumat, 1, fmod(PIL_check_seconds_timer(), 3600.0), true, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0), rv3d->winmat);
 
 		bool material_not_bound = !GPU_material_bound(gpumat);
 
@@ -4487,6 +4555,157 @@ static bool is_cursor_visible(Scene *scene)
 	return true;
 }
 
+
+/* Dicas de atalho dos modos de pintura/sculpt no rodapé da viewport (a 2.79 não tem Status Bar).
+ * Textos em inglês passam por IFACE_ e seguem a tradução das preferências. */
+typedef struct PaintHint {
+	const char *key;
+	const char *label;
+} PaintHint;
+
+#define PAINT_HINTS_MAX 16
+
+static int paint_hints_collect(Scene *scene, int mode, PaintHint hints[PAINT_HINTS_MAX])
+{
+	const Paint *p = BKE_paint_get_active(scene);
+	const Brush *br = p ? BKE_paint_brush((Paint *)p) : NULL;
+	int n = 0;
+
+#define HINT(k, l) { hints[n].key = k; hints[n].label = l; n++; } (void)0
+
+	if (br && (br->flag & BRUSH_LINE)) {
+		HINT(N_("Drag + release"), N_("Draw line"));
+		HINT(N_("Alt"), N_("Snap angle"));
+	}
+	else if (br && (br->flag & BRUSH_CURVE)) {
+		/* curva de pintura: só os atalhos dela, os do pincel confundem aqui */
+		HINT(N_("Ctrl LMB"), N_("Add point"));
+		HINT(N_("LMB drag"), N_("Move point"));
+		HINT(N_("RMB"), N_("Select"));
+		HINT("X", N_("Delete point"));
+		HINT(N_("Enter"), N_("Paint along curve"));
+		HINT("F", N_("Size"));
+		HINT(N_("Ctrl Z"), N_("Undo"));
+		return n;
+	}
+	else if (mode == OB_MODE_TEXTURE_PAINT && br &&
+	         br->imagepaint_tool == PAINT_TOOL_FILL && (br->flag & BRUSH_USE_GRADIENT))
+	{
+		HINT(N_("Drag"), N_("Gradient direction"));
+	}
+	else {
+		HINT(N_("LMB"), mode == OB_MODE_SCULPT ? N_("Sculpt") : N_("Paint"));
+	}
+	HINT("F", N_("Size"));
+	HINT(N_("Shift F"), N_("Strength"));
+
+	switch (mode) {
+		case OB_MODE_SCULPT:
+			HINT(N_("Ctrl LMB"), N_("Invert"));
+			HINT(N_("Shift LMB"), N_("Smooth"));
+			HINT("E", N_("Stroke type"));
+			HINT("X", N_("Draw"));
+			HINT("G", N_("Grab"));
+			HINT("C", N_("Clay"));
+			HINT("M", N_("Mask"));
+			break;
+		case OB_MODE_VERTEX_PAINT:
+			HINT(N_("Ctrl F"), N_("Rotate"));
+			HINT("E", N_("Stroke type"));
+			HINT("S", N_("Pick color"));
+			HINT("X", N_("Swap colors"));
+			HINT(N_("Shift K"), N_("Fill color"));
+			HINT("M", N_("Face mask"));
+			break;
+		case OB_MODE_WEIGHT_PAINT:
+			HINT("W", N_("Weight"));
+			HINT(N_("Ctrl LMB"), N_("Sample weight"));
+			HINT(N_("Alt LMB"), N_("Gradient"));
+			HINT(N_("Shift K"), N_("Fill weight"));
+			HINT("M", N_("Face mask"));
+			HINT("V", N_("Vertex mask"));
+			break;
+		default: /* OB_MODE_TEXTURE_PAINT */
+			HINT(N_("Ctrl F"), N_("Rotate"));
+			HINT("E", N_("Stroke type"));
+			HINT("S", N_("Pick color"));
+			HINT("X", N_("Swap colors"));
+			HINT(N_("Ctrl LMB"), N_("Invert"));
+			break;
+	}
+	HINT(N_("Ctrl Z"), N_("Undo"));
+
+#undef HINT
+	return n;
+}
+
+static void draw_paint_hints(Scene *scene, int mode, ARegion *ar, View3D *v3d, const rcti *rect)
+{
+	PaintHint hints[PAINT_HINTS_MAX];
+	const uiStyle *style = UI_style_get();
+	const uiFontStyle *fs = &style->widgetlabel;
+	const int n = paint_hints_collect(scene, mode, hints);
+	const int pad = U.widget_unit / 4;
+	const int gap = U.widget_unit;
+	const int line_h = UI_UNIT_Y;
+	int widths[PAINT_HINTS_MAX], key_w[PAINT_HINTS_MAX];
+	int line_start[PAINT_HINTS_MAX + 1];
+	int lines = 0, cur = 0, i;
+
+	/* Rodapé, alinhado à esquerda, acima da barra flutuante (Play/Standalone). */
+	const int x0 = rect->xmin + U.widget_unit;
+	const int base_y = rect->ymin + pad +
+	        ((v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) ? 0 : (UI_UNIT_Y / 2) + 20 + pad);
+	const int max_w = rect->xmax - U.widget_unit - x0;
+
+	(void)ar;
+	if (n == 0 || max_w <= 0) {
+		return;
+	}
+
+	line_start[0] = 0;
+	for (i = 0; i < n; i++) {
+		key_w[i] = UI_fontstyle_string_width(fs, IFACE_(hints[i].key));
+		widths[i] = key_w[i] + 2 * pad + pad + UI_fontstyle_string_width(fs, IFACE_(hints[i].label));
+		if (cur > 0 && cur + gap + widths[i] > max_w) {
+			line_start[++lines] = i;
+			cur = 0;
+		}
+		cur += (cur > 0 ? gap : 0) + widths[i];
+	}
+	line_start[++lines] = n;
+
+	glEnable(GL_BLEND);
+	for (int l = 0; l < lines; l++) {
+		/* última linha fica embaixo */
+		const int y = base_y + (lines - 1 - l) * (line_h + pad);
+		int x = x0;
+		int w = 0;
+
+		for (i = line_start[l]; i < line_start[l + 1]; i++) {
+			w += (w > 0 ? gap : 0) + widths[i];
+		}
+		glEnable(GL_BLEND);
+		glColor4f(0.0f, 0.0f, 0.0f, 0.55f);
+		glRecti(x - pad, y, x + w + pad, y + line_h);
+
+		for (i = line_start[l]; i < line_start[l + 1]; i++) {
+			const int ty = y + (line_h - (int)(fs->points * U.pixelsize)) / 2 + 1;
+
+			/* tecla com moldura clara, rótulo ao lado; o BLF desliga o blend a cada texto */
+			glEnable(GL_BLEND);
+			glColor4f(1.0f, 1.0f, 1.0f, 0.18f);
+			glRecti(x, y + 2, x + key_w[i] + 2 * pad, y + line_h - 2);
+			UI_ThemeColor(TH_TEXT_HI);
+			UI_fontstyle_draw_simple(fs, x + pad, ty, IFACE_(hints[i].key));
+			UI_ThemeColorShade(TH_TEXT_HI, -15);
+			UI_fontstyle_draw_simple(fs, x + key_w[i] + 3 * pad, ty, IFACE_(hints[i].label));
+			x += widths[i] + gap;
+		}
+	}
+	glDisable(GL_BLEND);
+}
+
 static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
                                        ARegion *ar, View3D *v3d,
                                        const char *grid_unit, bool render_border)
@@ -4533,6 +4752,17 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 		ob = OBACT;
 		if (U.uiflag & USER_DRAWVIEWINFO)
 			draw_selected_name(scene, ob, &rect);
+
+		if (ob && !(U.uiflag2 & USER_HIDE_PAINT_HINTS)) {
+			const int paint_modes[] = {OB_MODE_TEXTURE_PAINT, OB_MODE_SCULPT,
+			                           OB_MODE_VERTEX_PAINT, OB_MODE_WEIGHT_PAINT};
+			for (int m = 0; m < ARRAY_SIZE(paint_modes); m++) {
+				if (ob->mode & paint_modes[m]) {
+					draw_paint_hints(scene, paint_modes[m], ar, v3d, &rect);
+					break;
+				}
+			}
+		}
 	}
 
 	if (rv3d->render_engine) {
@@ -4565,6 +4795,10 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 
 static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
 {
+	if (v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) {
+		return;
+	}
+
 	bScreen *screen = CTX_wm_screen(C);
 	PointerRNA v3dptr;
 	PointerRNA gameptr;
@@ -4589,7 +4823,8 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 
 	/* Grupo do jogo (Play, Standalone, cadeado, console) em bloco próprio: fora do
 	 * Object Mode todos ficam desabilitados juntos, como o Play (game_engine_poll).
-	 * Botão desabilitado é desenhado com alpha 0.5, então pinta um fundo opaco antes
+	 * Botão desabilitado (o grupo fora do Object Mode, ou o Cook sem .blend salvo) é desenhado
+	 * com alpha 0.5, então sempre pinta um fundo opaco antes
 	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás. */
 	{
 		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
@@ -4601,6 +4836,8 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		row = uiLayoutRow(layout, true);
 		uiLayoutSetEnabled(row, game_ok);
 
+		/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
+		uiItemO(row, "Cook", ICON_COOK, "GAME_OT_cook");
 		uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
 		uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 		uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
@@ -4610,7 +4847,7 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		UI_block_layout_resolve(block, &end_x, &end_y);
 		UI_block_end(C, block);
 
-		if (!game_ok && end_x > x) {
+		if (end_x > x) {
 			bTheme *btheme = UI_GetTheme();
 			unsigned char col[4];
 
@@ -4689,6 +4926,10 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
  * (draw_viewport_name; os mesmos do menu Game > Overlays/Debug). Só ícones; o nome aparece na dica. */
 static void view3d_draw_floating_debug_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
 {
+	if (v3d->flag2 & V3D_HIDE_FLOATING_DEBUG_CONTROLS) {
+		return;
+	}
+
 	PointerRNA gameptr;
 	uiBlock *block;
 	uiLayout *layout;

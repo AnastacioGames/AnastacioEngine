@@ -58,7 +58,9 @@ public:
 		}
 		std::string url = host;
 		if (url.compare(0, 5, "ws://") != 0 && url.compare(0, 6, "wss://") != 0) {
-			url = "ws://" + host + ":" + std::to_string(port) + "/";
+			// A literal IPv6 address must be bracketed inside the URL (RFC 3986).
+			const bool ipv6 = host.find(':') != std::string::npos && host.front() != '[';
+			url = "ws://" + (ipv6 ? "[" + host + "]" : host) + ":" + std::to_string(port) + "/";
 		}
 		EmscriptenWebSocketCreateAttributes attr;
 		emscripten_websocket_init_create_attributes(&attr);

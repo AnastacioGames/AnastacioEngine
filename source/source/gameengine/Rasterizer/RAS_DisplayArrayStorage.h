@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include "mathfu.h"
 
 class RAS_DisplayArray;
 class RAS_StorageVbo;
@@ -14,6 +15,9 @@ class RAS_DisplayArrayStorage
 
 private:
 	std::unique_ptr<RAS_StorageVbo> m_vbo;
+	// Describes the last order actually written to this shared IBO, not a mesh user.
+	bool m_polygonOrderValid = false;
+	float m_polygonDirection[3] = {};
 
 	RAS_StorageVbo *GetVbo() const;
 
@@ -29,7 +33,9 @@ public:
 	/// Map the index data and return its pointer.
 	unsigned int *GetIndexMap();
 	/// Flush the index data map.
-	void FlushIndexMap();
+	bool FlushIndexMap();
+	void InvalidatePolygonOrder();
+	void SortPolygons(RAS_DisplayArray *array, const mt::mat3x4& transform);
 
 	/// Render the display array.
 	void IndexPrimitives();

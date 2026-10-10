@@ -52,7 +52,8 @@ const std::string profileTips[] = {
     "Time spent on the GPU particle screen-space collision depth pass.",           // tc_collisiondepth
     "Time spent rendering texture renderers (planar / mirror probes).",            // tc_texturerenderers
     "Time spent updating GPU particle emitters.",                                  // tc_particles
-    "Time spent updating actuators.",                                              // tc_actuators
+    "Time spent running Python components.",                                       // tc_components
+    "Time spent updating actuators and 3D audio.",                                 // tc_actuators
     "Time spent polling input devices and processing UI input.",                   // tc_input
     "Time spent on parent update after logic.",                                    // tc_scenegraph_logic
     "Time spent on parent update after actuators.",                                // tc_scenegraph_actuators
@@ -147,10 +148,13 @@ class KX_DebugMode
 
   /***************** No save variables ****************/
 
-  // s_physics, s_logic, s_animations, s_scenegraph, s_rasterizer, s_overhead. Note: Jump the
-  // s_network
-  ScrollingBuffer m_profileBuffer[8];
+  // One stacked series per Graph Profiler group (graphGroupLabels in KX_DebugMode.cpp).
+  ScrollingBuffer m_profileBuffer[10];
   float m_advprofileTime;
+  // Graph Profiler chart: 0 timeline, 1 bars, 2 pie.
+  int m_graphMode;
+  // Bars/pie count the idle time as a slice (percentages of the whole frame).
+  bool m_graphShowSleeping;
 
   // used for pick an GameObject by mouse position.
   bool m_pickSceneObject;

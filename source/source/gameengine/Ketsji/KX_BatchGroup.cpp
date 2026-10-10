@@ -25,6 +25,7 @@
  */
 
 #include "KX_BatchGroup.h"
+#include "KX_ClientObjectInfo.h"
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
 #include "RAS_MeshUser.h"
@@ -78,6 +79,30 @@ bool KX_BatchGroup::SetReferenceObject(KX_GameObject *object)
 	SetReferenceMeshUser(object ? object->GetMeshUser() : nullptr);
 
 	return true;
+}
+
+void KX_BatchGroup::RemoveObject(KX_GameObject *object)
+{
+	if (!m_objects->RemoveValue(object)) {
+		return;
+	}
+
+	if (object == m_referenceObject) {
+		m_referenceObject = nullptr;
+		SetReferenceMeshUser(nullptr);
+
+		if (!m_objects->Empty()) {
+			SetReferenceObject(m_objects->GetFront());
+		}
+	}
+}
+
+void KX_BatchGroup::OnMeshUserSplit(RAS_MeshUser *meshUser)
+{
+	KX_ClientObjectInfo *clientInfo = static_cast<KX_ClientObjectInfo *>(meshUser->GetClientObject());
+	if (clientInfo && clientInfo->m_gameobject) {
+		RemoveObject(clientInfo->m_gameobject);
+	}
 }
 
 void KX_BatchGroup::MergeObjects(const std::vector<KX_GameObject *>& objects)

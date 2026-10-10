@@ -60,6 +60,7 @@ public:
 
 	/// Create a copy of this relationship.
 	virtual SG_ParentRelation *NewCopy();
+	virtual bool NeedsParentUpdate();
 };
 
 #endif  // __KX_BONEPARENTNODERELATIONSHIP_H__
