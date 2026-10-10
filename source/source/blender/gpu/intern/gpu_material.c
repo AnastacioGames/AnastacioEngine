@@ -1028,6 +1028,13 @@ bool GPU_material_bound(GPUMaterial *material)
 	return material->bound;
 }
 
+void GPU_material_load_images(GPUMaterial *material, double time, int mipmap)
+{
+	if (material && material->pass) {
+		GPU_pass_load_images(material->pass, time, mipmap);
+	}
+}
+
 void GPU_material_set_foliage_reference_position(GPUMaterial *material, const float position[3])
 {
 	if (material && material->use_foliage) {

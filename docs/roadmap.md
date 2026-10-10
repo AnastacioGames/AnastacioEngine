@@ -580,6 +580,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
   [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Bugs do nível 0 (8/8)
   corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09 (corrigidos ou descartados; só CV3 aberto); ganho por item não demonstrado em A/B. Abertos: PY, LP, SP.
+- **Travadas do RolimaRacer (aberto, 2026-10-10):** corrigidos o pico de 39 ms (imagem de nó Material subindo no
+  1º desenho) e a resolução dinâmica descendo sem parar; `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo.
+  Abertos: ~800 ms no swap ao voltar do ragdoll, conferir com 10 pilotos pelo menu
+  (`tools/debug/abrir_rolima_profile.bat`) e o upload lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
+  Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
   `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
@@ -665,7 +670,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   validado pelo usuário em `probe_reflection_test.range`. Luz difusa local (amostras do mesmo cubemap) e World em nós
   capturado num cubemap em 2026-10-02, validados pelo usuário. Paralaxe por esfera do raio do probe em 2026-10-02. Mistura entre probes vizinhos (e com o World na borda) em 2026-10-02. Paralaxe por caixa (Empty desenhado como Cube) em 2026-10-02, validada pelo usuário. Recaptura do World quando o sol ou as cores mudam, e Sky Texture seguindo o World Sun, em 2026-10-02, validadas pelo usuário em `sky_follow_sun_test.range`. Mistura entre probes validada em `probe_blend_test.range`.
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
-  (aceite de 2026-09-20).
+  (aceite de 2026-09-20). Em 2026-10-10 o timer de GPU deixou de contar o sono do limite de FPS (a escala só
+  descia em jogo com folga); falta conferir no jogo que a escala volta a subir e fica parada quando sobra GPU.
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
 - Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado e texto de

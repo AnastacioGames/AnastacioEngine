@@ -951,6 +951,21 @@ void GPU_profile_log_texture(int w, int h, bool depth, int samples)
 	}
 }
 
+bool GPU_profile_log_enabled(void)
+{
+	return gpu_profile_log_file() != NULL;
+}
+
+void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms)
+{
+	FILE *log_file = gpu_profile_log_file();
+	if (log_file) {
+		fprintf(log_file, "t=%.3fs frame=%ld ms=%.2f image %dx%d%s %s\n", PIL_check_seconds_timer() - log_start,
+		        GPU_profile_frame, ms, w, h, mipmap ? " mipmap" : "", name ? name : "-");
+		fflush(log_file);
+	}
+}
+
 static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const char *fragcode,
                                             const char *geocode,

@@ -1771,6 +1771,32 @@ void GPU_pass_bind(GPUPass *pass, double time, int mipmap)
 	}
 }
 
+/* Upload the pass images now (as GPU_pass_bind() does on the first draw), without binding the shader.
+ * Images of Material nodes inside a node tree are not texture slots of the material itself, so the
+ * game loading did not upload them and the first draw paid it (decode + mipmaps, ~40 ms per image). */
+void GPU_pass_load_images(GPUPass *pass, double time, int mipmap)
+{
+	GLint bound2d = 0, boundcube = 0;
+	bool any = false;
+
+	for (GPUInput *input = pass->inputs.first; input; input = input->next) {
+		if (input->ima) {
+			if (!any) {
+				glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound2d);
+				glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &boundcube);
+				any = true;
+			}
+			input->tex = GPU_texture_from_blender(input->ima, input->iuser, input->textarget, input->image_isdata, time, mipmap);
+		}
+	}
+
+	if (any) {
+		/* The uploads bind on the active unit: restore it for the caller's GL state. */
+		glBindTexture(GL_TEXTURE_2D, bound2d);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, boundcube);
+	}
+}
+
 /* glUniform calls of GPU_pass_update_uniforms(), for the game engine's per-frame work counters
  * (passUniforms in getRenderStats()). */
 static int PASS_GL_CALLS = 0;

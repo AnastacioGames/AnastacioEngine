@@ -469,6 +469,14 @@ void KX_KetsjiEngine::EndFrame()
 		m_logger.StartLog(tc_rasterizer);
 		m_rasterizer->MotionBlur();
 	}
+	/* Dynamic resolution: end the GPU timer before the frame cap sleep. Ended after it, the
+	 * timer counted the sleep as GPU time (~16 ms at 60 FPS), so the scale only ever went down. */
+	if (m_dynamicResolutionQueryActive) {
+		m_dynamicResolutionQuery.End();
+		m_dynamicResolutionQueryActive = false;
+		m_dynamicResolutionQueryPending = true;
+	}
+
 	/// main frame timings
 	KX_EngineProfiler::Sections prof;
 	UpdateSleepTime();
@@ -515,12 +523,6 @@ void KX_KetsjiEngine::EndFrame()
 		m_logger.StartLog(tc_rasterizer);
 		m_rasterizer->EndFrame();
 		RANGE_PROFILE_MARK(prof, "endframe.rasterizer");
-
-		if (m_dynamicResolutionQueryActive) {
-			m_dynamicResolutionQuery.End();
-			m_dynamicResolutionQueryActive = false;
-			m_dynamicResolutionQueryPending = true;
-		}
 
 		m_logger.StartLog(tc_overhead);
 		m_canvas->FlushScreenshots(m_rasterizer);

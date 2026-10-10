@@ -190,6 +190,9 @@ extern char GPU_profile_first_binds[1024];
 /* RANGE_SHADER_LOG on: profiler frame number written with each line, and a line per GPU texture created. */
 extern long GPU_profile_frame;
 void GPU_profile_log_texture(int w, int h, bool depth, int samples);
+/* RANGE_SHADER_LOG on: true when the log is open, and a line per image uploaded (name, size, mipmaps, duration). */
+bool GPU_profile_log_enabled(void);
+void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms);
 
 #ifdef __cplusplus
 }

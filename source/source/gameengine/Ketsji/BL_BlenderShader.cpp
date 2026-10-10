@@ -215,6 +215,8 @@ void BL_BlenderShader::ReloadMaterial()
 	}
 
 	m_gpuMat = (m_mat) ? GPU_material_from_blender(m_blenderScene, m_mat, false, UseInstancing(), UseSkinning()) : nullptr;
+	// Load time, not the first draw: images of Material nodes are not in the material texture slots.
+	GPU_material_load_images(m_gpuMat, 0.0, 1);
 
 	// Also flag ATTRIBUTES_MODIFIED: GetInstancingAttribs() depends on m_gpuMat's builtins,
 	// which just changed. Without this, RAS_DisplayArrayBucket keeps an instancing buffer

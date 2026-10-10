@@ -19,8 +19,11 @@ com uma linha `START`.
 | `RANGE_PROFILE=<arquivo>` | liga o profiler e anexa as linhas nesse arquivo. Sem ela o custo é um branch por ponto de medição. |
 | `RANGE_PROFILE_SPIKE_MS=<ms>` | limite mínimo para um frame contar como pico (padrão 25). |
 | `RANGE_PROFILE_SYNC=1` | faz `glFinish` no fim do frame (`endframe.gpu_sync`). Sem ele, a espera pela GPU aparece dentro da etapa que bloqueou (normalmente `endframe.imgui` ou `endframe.swap`). Com ele, o FPS cai um pouco. |
+| `RANGE_SHADER_LOG=<arquivo>` | uma linha por shader criado, textura de GPU criada e imagem enviada (`image WxH [mipmap] <nome>` com o tempo, incluindo a leitura do arquivo). O `SPIKE` passa a listar `firstbind:`. Cruze o `frame=` com o do `SPIKE`. |
 
 Exemplo (PowerShell): `$env:RANGE_PROFILE="prof.txt"; AnastacioRuntime.exe jogo.range`.
+Para o RolimaRacer, `tools/debug/abrir_rolima_profile.bat` liga os dois logs e grava em
+`debug-logs/perfil-rolima-<data-hora>/`.
 Rodadas de ~10 s bastam; os primeiros 30 frames (carregamento) são ignorados.
 
 ## Como ler

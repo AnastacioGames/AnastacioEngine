@@ -550,6 +550,9 @@ int GPU_verify_image(
 	if (ima == NULL || ima->ok == 0)
 		return 0;
 
+	/* RANGE_SHADER_LOG: time an upload from here, as the image file may also be read now. */
+	const double log_start_time = GPU_profile_log_enabled() ? PIL_check_seconds_timer() : 0.0;
+
 	/* check if we have a valid image buffer */
 	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
 
@@ -704,6 +707,11 @@ int GPU_verify_image(
 		MEM_freeN(ftilerect);
 	if (srgb_frect)
 		MEM_freeN(srgb_frect);
+
+	if (log_start_time > 0.0) {
+		GPU_profile_log_image(ima->id.name + 2, rectw, recth, mipmap,
+		                      (PIL_check_seconds_timer() - log_start_time) * 1000.0);
+	}
 
 	BKE_image_release_ibuf(ima, ibuf, NULL);
 
