@@ -106,7 +106,8 @@ class DATA_PT_skeleton(ArmatureButtonsPanel, Panel):
                 col.label(text="%s: CPU (%d vertex groups, GPU max %d)" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
                           icon='ERROR')
             elif not any(m.use_gpu_skinning for m in mats):
-                col.label(text="%s: CPU (enable GPU Skinning on a material)" % ob.name, icon='ERROR')
+                col.label(text="%s: CPU, %d/%d groups OK, turn on GPU Skinning below" % (ob.name, groups, self.GPU_MAX_SKINNING_GROUPS),
+                          icon='ERROR')
             else:
                 col.label(text="%s: GPU (%d vertex groups)" % (ob.name, groups), icon='FILE_TICK')
             for m in mats:
