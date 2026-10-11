@@ -6,6 +6,54 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Cluster GPU cache: GP6 e RA2 corrigidos; GP3/GP4/GP5/GP7 analisados sem alteração
+
+Continuação do cluster "gpu / depsgraph" de `docs/auditoria-suspeitos.md` (GP1/GP2/RA1 corrigidos em
+2026-10-09 com o mesmo padrão). Worktree `D:\AnastacioEngine-auditoria-claude`, branch
+`claude/auditoria-gpu-cache`.
+
+- **GP6 corrigido** (`gpu_material.c` `GPU_material_update_lamps`): cache por `GPULamp` (campos
+  `dynupdate_*`) comparando viewmat/viewinv/vec/co/obmat por `memcmp` e um bitmask
+  `dynupdate_computed`, já que materiais diferentes podem pedir subconjuntos diferentes de
+  `DYN_LAMP_*` da mesma lamp. Hit evita `mul_m4_m4m4`/`mul_mat3_m4_v3` quando a mesma lamp é
+  atualizada de novo com a mesma view (caso comum: todos os materiais do frame compartilham a
+  câmera).
+- **RA2 corrigido** (`gpu_material.c` `GPU_material_bind_uniforms`): cache de inversas em
+  `GPUMaterial` (`invcache_*`, resetado por bind como `objectlay_valid`): quando o mesmo
+  `obmat`+`viewmat` repete dentro da mesma ativação do material (multi-passe do mesmo objeto —
+  z-prepass, sombra, principal, halo), `localtoviewmat`, `normalmat` e `invlocaltoviewmat` são
+  reaproveitados em vez de recalculados via `invert_m3_m3`/`invert_m4_m4`.
+- **GP3 analisado, não alterado**: o único chamador de `GPU_verify_image` com `compare=0`
+  (`GPU_texture_from_blender`) depende do `bindcode` real retornado pela função; o atalho
+  `compare=1` já existente devolve só um booleano, então trocar o flag corromperia o texture id.
+  Corrigir direito exige reescrever o atalho para devolver o bindcode já conhecido
+  (`ima->gputexture[gputt]->bindcode`), mudança mais profunda nos outros 4 chamadores da função —
+  fora do escopo seguro desta sessão.
+- **GP4 confirmado sem alteração**: mantém a conclusão de 2026-10-09 (cache de uniform já testado,
+  sem ganho mensurável no RolimaRacer porque os inputs dinâmicos desse caminho mudam de fato todo
+  frame nessa cena).
+- **GP5 analisado, não alterado**: `GPU_lamp_visible` depende de `material->ma`, então um cache
+  por lamp (como GP6) daria resultado incorreto entre materiais com visibilidade de camada
+  diferente para a mesma lamp; custo baixo/prioridade baixa já no relatório não justifica o cache
+  por par (lamp, material).
+- **GP7 analisado, não alterado**: cache de `FindProbe` por posição do objeto não cobre o caso da
+  sonda em si se mover com o objeto parado (regressão visual silenciosa); correção completa exige
+  contador de geração em `KX_TextureRendererManager` para as posições dos `viewpoint` das sondas,
+  desenho documentado para retomada.
+
+Build: `bf_gpu` (alvo específico contendo `gpu_material.c`) e `RangeRuntime`/`RangeEngine`
+completos compilados do zero neste worktree (sem build dir prévio) via CMake+Ninja com
+Cycles/CUDA desligados só para acelerar esta verificação (configuração de teste, não committada).
+Medição com `tools/debug/cenas/criar_cena_luzes_sombra.py` (40 cubos + chão, 2 materiais, 3 spots
+com sombra) via `tools/debug/auditar_trabalho_repetido.py`, rodadas de 10 s: contadores de GL
+(`lightUniforms` ~334, `drawCalls` 164, `physicsMs` ~0,05-0,06 ms) idênticos antes/depois do GP6 e
+do RA2 dentro do ruído de medição, confirmando ausência de regressão — a cena não tem materiais ×
+lamps nem passes por objeto suficientes para destacar o ganho de CPU acima do ruído dos
+instrumentos existentes (não há contador dedicado a "lamp matrix recompute" nem a
+`GPU_RENDER_INVERSE` nesta cena). Ambas as correções são estritamente redundantes com a mesma
+saída (zero risco identificado) e escalam com N_materiais × N_lamps (GP6) ou N_passes por objeto
+(RA2); cenas maiores devem mostrar o ganho que esta não evidenciou numericamente.
+
 ## 2026-10-10 - Troca de layer no editor: cache de shaders, aquecimento dos layers escondidos e medição
 
 - Cache de shaders do editor (`gpu_shader_editor_cache.c`): binários dos materiais da viewport ficam em `%LOCALAPPDATA%\AnastacioEngine\ShaderCache\editor.shaders` (chave da GPU/driver, limite 256 MB), lidos após `GPU_init` e gravados no `WM_exit` e ao fim do aquecimento. São os ganchos padrão de `GPU_shader_binary_cache_set`: o Play põe os do `.cooked` e, ao limpar, os do editor voltam. `RANGE_NO_EDITOR_SHADER_CACHE=1` desliga.
