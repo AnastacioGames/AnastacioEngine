@@ -138,11 +138,15 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainSkyZenith", // GE_RAIN_SKY_ZENITH_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
-	"ge_CloudsStyle", // GE_CLOUDS_STYLE_UNIFORM
+	"ge_CloudsMask", // GE_CLOUDS_MASK_UNIFORM
+	"ge_SkyLayersParams", // GE_SKYLAYERS_PARAMS_UNIFORM
+	"ge_SkyLayersColor", // GE_SKYLAYERS_COLOR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
 	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
 	"ge_FxaaParams", // GE_FXAA_PARAMETERS_UNIFORM
 	"ge_CameraFX[0]", // GE_CAMERAFX_UNIFORM
+	"ge_SSGIParams[0]", // GE_SSGI_PARAMETERS_UNIFORM
+	"ge_SSGIDisplay", // GE_SSGI_DISPLAY_UNIFORM
 
 	"bgl_ViewMatrix", // BGL_VIEW_MATRIX_UNIFORM
 	"bgl_ProjectionMatrix", // BGL_PROJECTION_MATRIX_UNIFORM
@@ -477,14 +481,17 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 	}
 
 	if (m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1) {
-		for (unsigned short i = 1, slots = colorofs->GetNumColorSlot(); i < slots; ++i) {
-			colorofs->BindColorTexture(i, 9 + i);
+		for (unsigned short i = 1, slots = depthofs->GetNumColorSlot(); i < slots; ++i) {
+			depthofs->BindColorTexture(i, 9 + i);
 		}
 	}
 
-	if (m_mipmap && (m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] != -1 ||
-	                 m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1)) {
+	if (m_mipmap && m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] != -1) {
 		colorofs->MipmapTextures();
+	}
+	if (m_mipmap && m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1 &&
+	    (depthofs != colorofs || m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] == -1)) {
+		depthofs->MipmapTextures();
 	}
 
 	if (m_predefinedUniforms[DEPTH_TEXTURE_UNIFORM] != -1) {
@@ -519,11 +526,12 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 	}
 
 	if (m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1) {
-		for (unsigned short i = 1, slots = colorofs->GetNumColorSlot(); i < slots; ++i) {
-			colorofs->UnbindColorTexture(i);
+		for (unsigned short i = 1, slots = depthofs->GetNumColorSlot(); i < slots; ++i) {
+			depthofs->UnbindColorTexture(i);
 		}
-		if (m_mipmap) {
-			colorofs->UnmipmapTextures();
+		if (m_mipmap && (depthofs != colorofs ||
+		                 m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] == -1)) {
+			depthofs->UnmipmapTextures();
 		}
 	}
 
@@ -624,6 +632,17 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 
 	/* BuildIn Uniforms */
+    if (m_predefinedUniforms[GE_SSGI_PARAMETERS_UNIFORM] != -1) {
+        float params[8] = {m_buildInFilters.ssgi_radius, m_buildInFilters.ssgi_strength,
+            m_buildInFilters.ssgi_thickness, (float)m_buildInFilters.ssgi_rays,
+            (float)m_buildInFilters.ssgi_steps, (float)(m_buildInFilters.ssgi_slot - 1),
+            (float)m_buildInFilters.ssgi_divisor, 0.0f};
+        SetUniformfv(m_predefinedUniforms[GE_SSGI_PARAMETERS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(params), 2);
+    }
+    if (m_predefinedUniforms[GE_SSGI_DISPLAY_UNIFORM] != -1) {
+        SetUniformfv(m_predefinedUniforms[GE_SSGI_DISPLAY_UNIFORM], RAS_Uniform::UNI_FLOAT4,
+            m_buildInFilters.ssgi_display, sizeof(float) * 4, 1);
+    }
 	if (m_predefinedUniforms[GE_FXAA_PARAMETERS_UNIFORM] != -1) {
 		float params[4] = {m_buildInFilters.fxaa_edge_threshold, m_buildInFilters.fxaa_edge_threshold_min,
 		                   m_buildInFilters.fxaa_subpix, (float)m_buildInFilters.fxaa_search_steps};
@@ -751,9 +770,17 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	if (m_predefinedUniforms[GE_CLOUDS_COLOR_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.cloud_color, sizeof(float) * 3, 1);
 	}
-	if (m_predefinedUniforms[GE_CLOUDS_STYLE_UNIFORM] != -1) {
-		float style = (float)m_buildInFilters.cloud_style;
-		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_STYLE_UNIFORM], RAS_Uniform::UNI_FLOAT, &style, sizeof(float), 1);
+	if (m_predefinedUniforms[GE_CLOUDS_MASK_UNIFORM] != -1) {
+		float mask = (float)m_buildInFilters.cloud_mask;
+		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_MASK_UNIFORM], RAS_Uniform::UNI_FLOAT, &mask, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_SKYLAYERS_PARAMS_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.sky_layer_coverage, m_buildInFilters.sky_layer_scale,
+						   m_buildInFilters.sky_layer_speed, m_buildInFilters.cloud_time};
+		SetUniformfv(m_predefinedUniforms[GE_SKYLAYERS_PARAMS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.sky_layer_color, sizeof(float) * 3, 1);
 	}
 
 	if (m_predefinedUniforms[GE_LENSFLARE_PARAMS_UNIFORM] != -1) {

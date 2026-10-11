@@ -55,6 +55,8 @@ public:
 	 * at the current textures again. */
 	void RefreshBloomTextures();
 	void EnsureSSRFilters(BuildInFilters filters);
+    void EnsureSSGIFilters(BuildInFilters filters);
+    void RefreshSSGITexture();
 	void EnsureLightScatterFilters(BuildInFilters filters);
 
 	/** Native World weather filters (Rain/Clouds/Lens Flare), driven entirely by
@@ -110,6 +112,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeLightScatterValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSRValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSAOValues);
+    EXP_PYMETHOD_DOC(KX_2DFilterManager, changeSSGIValues);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeGrainValues);
 
 	/* fxaa* and grain* attributes, one pair dispatched on the attribute name */

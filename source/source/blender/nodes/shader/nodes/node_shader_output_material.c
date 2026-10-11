@@ -38,6 +38,8 @@ static int node_shader_gpu_output_material(GPUMaterial *mat, bNode *UNUSED(node)
 	if (!in[0].link && in[1].link) {
 		in[0].link = in[1].link;
 	}
+	GPU_material_ssgi_outputs(mat, in[0].link);
+
 	/* Vertex Offset is not a parameter of node_output_material. */
 	GPUType offset_type = in[3].type;
 	in[3].type = GPU_NONE;

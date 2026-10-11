@@ -60,6 +60,17 @@ typedef struct BuildInFilters {
 	int scatter_step_max;
 
 	/* SSR */
+    /* Native SSGI: source slots are reserved at scene load, never inferred from display color. */
+    bool useSSGI;
+    int ssgi_slot;
+    int ssgi_rays;
+    int ssgi_steps;
+    int ssgi_divisor;
+    float ssgi_radius;
+    float ssgi_strength;
+    float ssgi_thickness;
+    float ssgi_display[4]; /* exposure, gamma, Filmic contrast (0 = Standard), color management */
+
 	bool useSSR;
 	int ssr_step_max;
 	int ssr_lod;
@@ -129,7 +140,9 @@ typedef struct BuildInFilters {
 	float cloud_scale;
 	float cloud_speed;
 	float cloud_color[3];
-	int cloud_style; /* World.cloud_style */
+	int cloud_mask; /* 1: Clouds, 2: Sky Layers */
+	float sky_layer_coverage, sky_layer_scale, sky_layer_speed;
+	float sky_layer_color[3];
 
 	/* Lens Flare (native World weather) */
 	bool useLensFlare;

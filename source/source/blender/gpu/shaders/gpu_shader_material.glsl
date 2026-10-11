@@ -236,6 +236,12 @@ void color_to_blender_normal_new_shading(vec3 color, out vec3 normal)
 #define M_PI 3.14159265358979323846
 #define M_1_PI 0.31830988618379069
 
+/* Piso minimo de roughness no specular: roughness 0 = espelho perfeito, cujo
+ * highlight de uma luz pontual/sol colapsa num pico sub-pixel (um ponto branco).
+ * Limitamos a nitidez a esse piso para o highlight ficar sempre visivel, como o
+ * "mais brilhante" classico do BGE. So afeta o specular, nunca o difuso. */
+#define RANGE_SPEC_MIN_ROUGHNESS 0.15
+
 /*********** SHADER NODES ***************/
 
 void vcol_attribute(vec4 attvcol, out vec4 vcol)
@@ -2796,6 +2802,7 @@ void lamp_area_spec(vec3 lampright, vec3 lampup, vec3 lampvec, vec3 lamppos, vec
 
 void shade_area_spec(vec2 dirspec, float anglespec, float distspec, vec2 size, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard = hard * hard * 0.25;
 
@@ -2823,6 +2830,7 @@ void area_diff_texture(sampler2D tex, float lodbias, vec2 diagonal, float dist, 
 
 void area_spec_texture(float energy, vec2 specdir, float specdist, sampler2D tex, float lodbias, vec2 size, float rough, out vec4 result)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard * 0.25;
 
@@ -2978,6 +2986,7 @@ void shade_add_to_diffuse(float i, vec3 lampcol, vec3 col, out vec3 outcol)
 void shade_hemi_spec(vec3 upcol, vec3 downcol, vec3 vn, vec3 lv, vec3 vp,
 					 float rough, float visifac, float energy, out vec4 outcol, out float t)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard;
 
@@ -3012,6 +3021,7 @@ vec3 linePlaneIntersect(in vec3 lp, in vec3 lv, in vec3 pc, in vec3 pn)
 
 void shade_phong_spec(float nl, vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard;
 
@@ -3024,6 +3034,7 @@ void shade_cooktorr_spec(vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 {
 	/* rough == 0 (comum) dava 1/0 = inf e depois 0 * inf = NaN; o desktop absorve o NaN no max(),
 	 * mas ANGLE/WebGL propaga e o pixel fica preto. Mesmo piso de shade_phong_spec. */
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard = hard * hard;
 
@@ -3039,6 +3050,7 @@ void shade_cooktorr_spec(vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 
 void shade_blinn_spec(vec3 n, vec3 l, vec3 v, float spec, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = (1.008-rough) * 512.0;
 	float refrac = mix(4.0, 10.0, spec);
 	hard = (hard < 100.0)? sqrt(1.0 / hard): 10.0 / hard;
@@ -4491,6 +4503,31 @@ void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 I, vec3
 	result = vec4(L * color.rgb, color.a);
 }
 
+/* Native SSGI companion. `direct` deliberately excludes the World ambient term: it is a source
+ * for nearby screen-space bounces, while `result`/`linear` keep the material's normal lighting. */
+void node_bsdf_diffuse_ambient_ssgi(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
+                                    out vec4 result, out vec4 ssgi_normal, out vec4 ssgi_albedo,
+                                    out vec4 ssgi_direct, out vec4 ssgi_linear)
+{
+	vec3 direct = vec3(0.0);
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = max(dot(N, l), 0.0);
+		direct += SCENE_LIGHT(i).diffuse.rgb * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
+	}
+	vec3 linear = (ambient + direct) * color.rgb;
+	result = vec4(linear, color.a);
+	/* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
+	ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+	ssgi_albedo = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
+	ssgi_direct = vec4(max(direct * color.rgb, vec3(0.0)), 1.0);
+	ssgi_linear = vec4(linear, color.a);
+}
+
 void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 {
 	/* used by BSDFs without their own GLSL approximation (no fragment position: lights as Sun) */
@@ -4509,7 +4546,7 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
 
 	vec3 V = scene_view_vector(I);
 	float NdotV = max(dot(N, V), 1e-4);
-	float a = max(sqr(roughness), 0.001);
+	float a = max(sqr(roughness), sqr(RANGE_SPEC_MIN_ROUGHNESS));
 	float roughg = sqr(roughness * 0.5 + 0.5);
 
 	for (int i = 0; i < NUM_LIGHTS; i++) {
@@ -4550,7 +4587,7 @@ void node_bsdf_anisotropic(
 		X = Xr;
 	}
 
-	float a = max(sqr(roughness), 0.001);
+	float a = max(sqr(roughness), sqr(RANGE_SPEC_MIN_ROUGHNESS));
 	float an = clamp(anisotropy, -0.99, 0.99);
 	float ax, ay;
 	if (an < 0.0) {
@@ -4776,8 +4813,14 @@ void lightvol_sample(vec4 lm, vec3 viewpos, mat4 viewinv, vec3 N, sampler2D tex,
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
-	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result)
+	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result,
+    out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
+    /* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
+    ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+    ssgi_albedo = vec4(clamp(mix(base_color.rgb, subsurface_color.rgb, subsurface) *
+        (1.0 - metallic) * (1.0 - transmission), 0.0, 1.0), 1.0 - step(0.5, lightmap.a));
+    vec3 direct_diffuse = vec3(0.0);
 	/* ambient light */
 	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
 	vec3 L = mix(0.1, 0.03, metallic) * diffuse_albedo;
@@ -4838,6 +4881,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		float LdotH = dot(light_position, H);
 
 		vec3 diffuse_and_specular_bsdf = vec3(0.0);
+		vec3 ssgi_light = vec3(0.0);
 		if (NdotL >= 0.0 && NdotV >= 0.0) {
 			float NdotH = dot(N, H);
 
@@ -4863,7 +4907,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 
 			// specular
 			float aspect = sqrt(1.0 - anisotropic * 0.9);
-			float a = sqr(roughness);
+			float a = sqr(max(roughness, RANGE_SPEC_MIN_ROUGHNESS));
 			float ax = max(0.001, a / aspect);
 			float ay = max(0.001, a * aspect);
 			float Ds = GTR2_aniso(NdotH, dot(H, X), dot(H, Y), ax, ay); //GTR2(NdotH, a);
@@ -4876,6 +4920,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			vec3 Fsheen = schlick_fresnel(LdotH) * sheen * Csheen;
 
 			vec3 diffuse_bsdf = (mix(Fd * base_color.rgb, ss * subsurface_color.rgb, subsurface) + Fsheen) * light_diffuse;
+            ssgi_light = diffuse_bsdf * (1.0 - metallic) * (1.0 - transmission);
 			vec3 specular_bsdf = Gs * Fs * Ds * light_specular;
 			diffuse_and_specular_bsdf = diffuse_bsdf * (1.0 - metallic) + specular_bsdf;
 		}
@@ -4899,6 +4944,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		clearcoat_bsdf *= max(CNdotL, 0.0);
 
 		diffuse_and_specular_bsdf *= light_atten;
+        ssgi_light *= max(NdotL, 0.0) * light_atten;
 		clearcoat_bsdf *= light_atten;
 
 		/* Shadow map for this light slot, bound by GPU_material_bind_shadow_lamps() (see
@@ -4907,10 +4953,12 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		if (i < NUM_SHADOW_LIGHTS) {
 			float shadowfac = scene_light_shadow(i, I, N, NdotL);
 			diffuse_and_specular_bsdf *= shadowfac;
+            ssgi_light *= shadowfac;
 			clearcoat_bsdf *= shadowfac;
 		}
 
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;
+        direct_diffuse += ssgi_light;
 	}
 
 	if (env_on > 0.5) {
@@ -4936,6 +4984,8 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	}
 
 	result = vec4(L, 1.0);
+    ssgi_direct = vec4(max(direct_diffuse, vec3(0.0)), 1.0);
+    ssgi_linear = result;
 }
 
 /* Light arriving from behind the surface (Lambert on -N), like Cycles' Translucent BSDF. */

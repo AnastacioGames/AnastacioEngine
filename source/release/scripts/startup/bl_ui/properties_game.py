@@ -1022,6 +1022,70 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
         col.label(text="Use for many materials and few lights. Game only, not the viewport.", icon="INFO")
 
 
+class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
+    bl_label = "Native SSGI (Experimental)"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return (super().poll(context) and hasattr(context.scene, "ae_ssgi_use"))
+
+    def draw(self, context):
+        # The operator/properties are registered from bl_operators at startup;
+        # keeping this panel here makes it part of the standard Game UI.
+        from bl_operators.anastacio_ssgi import QUALITY_PRESETS
+
+        layout = self.layout
+        scene = context.scene
+
+        settings_box = layout.box()
+        settings_box.prop(scene, "ae_ssgi_use", text="Use in Game")
+        settings_box.label(text="Desktop only; restart Play after changes", icon='INFO')
+        if not scene.game_settings.use_shading_nodes:
+            settings_box.label(text="Enable PBR Shading Nodes in Shading", icon='ERROR')
+        slots = list(scene.game_settings.attachment_slots)
+        if any(slot is not None for slot in slots[3:]):
+            settings_box.label(text="Needs the last four attachment slots free", icon='ERROR')
+
+        help_box = layout.box()
+        row = help_box.row(align=True)
+        row.prop(scene, "ae_ssgi_show_help", text="Requirements & Limits",
+                 icon='TRIA_DOWN' if scene.ae_ssgi_show_help else 'TRIA_RIGHT', emboss=True)
+        if scene.ae_ssgi_show_help:
+            help_box.label(text="Requires: desktop, PBR Shading Nodes and opaque supported materials.", icon='INFO')
+            help_box.label(text="Material: Principled/Diffuse directly to Output, or a simple material.")
+            help_box.label(text="World/Sky is optional; Environment Lighting fills fully dark areas.")
+            help_box.label(text="Direct visible lights bounce; Sky/World itself is not an SSGI source.")
+            help_box.label(text="Screen-space: hidden or offscreen surfaces cannot contribute.", icon='ERROR')
+            help_box.label(text="Baked Lightmaps/Volumes stay active; baked receivers are excluded.")
+            help_box.label(text="No transparency, emission, or complex/custom material graphs.")
+
+        quality_box = layout.box()
+        quality_box.label(text="Quality:", icon='PREFERENCES')
+        quality_box.active = scene.ae_ssgi_use
+        row = quality_box.row(align=True)
+        for quality in ('LOW', 'MEDIUM', 'HIGH', 'ULTRA'):
+            preset = QUALITY_PRESETS[quality]
+            op = row.operator("scene.anastacio_ssgi_quality", text=preset['label'],
+                              depress=(scene.ae_ssgi_quality == quality))
+            op.quality = quality
+        if scene.ae_ssgi_quality == 'CUSTOM':
+            quality_box.label(text="Custom settings", icon='SETTINGS')
+
+        advanced_box = layout.box()
+        advanced_box.label(text="Advanced:", icon='SETTINGS')
+        advanced_box.active = scene.ae_ssgi_use
+        split = advanced_box.split()
+        left = split.column(align=True)
+        right = split.column(align=True)
+        left.prop(scene, "ae_ssgi_radius")
+        right.prop(scene, "ae_ssgi_strength")
+        left.prop(scene, "ae_ssgi_rays")
+        right.prop(scene, "ae_ssgi_steps")
+        left.prop(scene, "ae_ssgi_divisor")
+        right.prop(scene, "ae_ssgi_thickness")
+
+
 class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
     bl_label = "Baked Lighting"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -2682,6 +2746,7 @@ classes = (
     RENDER_PT_game_display,
     RENDER_PT_game_vr,
     RENDER_PT_game_shading,
+    RENDER_PT_game_ssgi,
     RENDER_PT_game_baked_lighting,
     RENDER_PT_game_post_process_shaders,
     RENDER_PT_game_system,

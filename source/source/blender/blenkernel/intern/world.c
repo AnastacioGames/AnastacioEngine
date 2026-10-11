@@ -247,6 +247,11 @@ void BKE_world_init(World *wrld)
 	wrld->cloud_color[1] = 1.0f;
 	wrld->cloud_color[2] = 1.0f;
 
+	wrld->sky_layer_coverage = 0.5f;
+	wrld->sky_layer_scale = 1.0f;
+	wrld->sky_layer_speed = 0.05f;
+	wrld->sky_layer_color[0] = wrld->sky_layer_color[1] = wrld->sky_layer_color[2] = 1.0f;
+
 	wrld->flare_scale = 1.0f;
 	wrld->flare_intensity = 1.0f;
 

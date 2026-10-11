@@ -97815,19 +97815,30 @@ msgstr "En progreso"
 msgid "Starting"
 msgstr "Comenzando"
 
-# Anastacio Engine: World > Weather > Clouds > Style
-msgid "Procedural"
-msgstr "Procedural"
-
-msgid "Layered Sky"
+# Anastacio Engine: World > Weather > Sky Layers
+msgid "Sky Layers"
 msgstr "Cielo en capas"
 
-msgid "How the clouds are drawn"
-msgstr "Cómo se dibujan las nubes"
+msgid "Use Sky Layers"
+msgstr "Usar cielo en capas"
 
-msgid "3D noise clouds over the whole sky"
-msgstr "Nubes de ruido 3D sobre todo el cielo"
+msgid "Two drifting cloud layers projected on a sky plane, shaded with relief; works together with Clouds"
+msgstr "Dos capas de nubes en movimiento proyectadas en un plano del cielo, con relieve; funciona junto con Nubes"
 
-msgid "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"
-msgstr "Dos capas de nubes en movimiento proyectadas en un plano del cielo, con relieve (más ligero para la GPU)"
+msgid "Render Sky Layers"
+msgstr "Mostrar cielo en capas"
 
+msgid "Render Sky Layers in Viewport"
+msgstr "Mostrar cielo en capas en la vista"
+
+msgid "Amount of sky covered by the cloud layers"
+msgstr "Cuánto cielo cubren las capas de nubes"
+
+msgid "Scale of the cloud layers on the sky plane"
+msgstr "Escala de las capas de nubes en el plano del cielo"
+
+msgid "Speed at which the cloud layers drift"
+msgstr "Velocidad a la que se mueven las capas de nubes"
+
+msgid "Color tint of the cloud layers"
+msgstr "Tono de color de las capas de nubes"

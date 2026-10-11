@@ -159,11 +159,14 @@ typedef struct World {
 
 	float cloud_coverage, cloud_scale, cloud_speed;
 	float cloud_color[3];
+	/* Sky Layers (Ceu em Camadas): nuvens em plano com duas camadas, independentes das Clouds */
+	float sky_layer_coverage, sky_layer_scale, sky_layer_speed;
+	float sky_layer_color[3];
 
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
 	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */
 	short weather_editor_hide; /* bits WO_WEATHER_* (+ WO_WEATHER_FOG) escondidos so na viewport; era earthquake_pad2, 0 = tudo visivel */
-	short cloud_style; /* WO_CLOUD_STYLE_*; era weather_editor_pad, 0 = Procedural */
+	short sky_layer_flag; /* WO_SKY_LAYERS_*; era weather_editor_pad, 0 = desligado */
 	float earthquake_camera; /* tremor da camera ativa, 0 (off) a 2 (era earthquake_pad; arquivos antigos = 0) */
 
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
@@ -220,9 +223,10 @@ typedef struct World {
 #define WO_WEATHER_RAIN            (1 << 0)
 #define WO_WEATHER_CLOUDS          (1 << 1)
 
-/* World.cloud_style */
-#define WO_CLOUD_STYLE_PROCEDURAL  0
-#define WO_CLOUD_STYLE_LAYERED     1
+/* World.sky_layer_flag */
+#define WO_SKY_LAYERS_ENABLE       (1 << 0)
+#define WO_SKY_LAYERS_EXPANDED     (1 << 1)
+#define WO_SKY_LAYERS_EDITOR_HIDE  (1 << 2)
 #define WO_WEATHER_LENSFLARE       (1 << 2)
 #define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
 #define WO_WEATHER_RAIN_RIPPLE     (1 << 4)

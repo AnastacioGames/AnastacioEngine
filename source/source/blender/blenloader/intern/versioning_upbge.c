@@ -325,13 +325,6 @@ void blo_do_versions_upbge(FileData *fd, Library *lib, Main *main)
       }
     }
 
-    if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "roughness_bsdf")) {
-      for (Material *mat = main->mat.first; mat; mat = mat->id.next) {
-        mat->roughness_bsdf = 0.5f;
-        mat->metallic_bsdf = 0.0f;
-      }
-    }
-
     for (Material *ma = main->mat.first; ma; ma = ma->id.next) {
       if (ma->mtex) {
         MTex *mtex;
@@ -350,6 +343,16 @@ void blo_do_versions_upbge(FileData *fd, Library *lib, Main *main)
           }
         }
       }
+    }
+  }
+
+  /* Roda para QUALQUER arquivo sem o campo, independente do carimbo de versao UPBGE.
+   * Arquivos da Range original vem com versao >= 2.5 e pulam o bloco acima, deixando
+   * roughness_bsdf zerado -> hard = 1/0.001 = 1000 no specular legado (ponto branco). */
+  if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "roughness_bsdf")) {
+    for (Material *mat = main->mat.first; mat; mat = mat->id.next) {
+      mat->roughness_bsdf = 0.5f;
+      mat->metallic_bsdf = 0.0f;
     }
   }
 }

@@ -16,7 +16,9 @@ uniform mat4 unfinvprojmat;
 
 uniform vec4 ge_CloudsParams; // coverage, scale, speed, time
 uniform vec3 ge_CloudsColor;
-uniform float ge_CloudsStyle; // World.cloud_style: 0 Procedural, 1 Layered Sky
+uniform float ge_CloudsMask; // 1: Clouds, 2: Sky Layers (both can be on)
+uniform vec4 ge_SkyLayersParams; // coverage, scale, speed, time
+uniform vec3 ge_SkyLayersColor;
 
 vec2 texcoord;
 
@@ -76,7 +78,7 @@ vec3 skyViewDirection(vec2 uv)
 	return normalize((unfinvviewmat * vec4(viewSpace.xyz, 0.0)).xyz);
 }
 
-/* Layered Sky style (adapted from a node sky material): the view ray hits a flat sky plane, two value-noise
+/* Sky Layers (adapted from a node sky material): the view ray hits a flat sky plane, two value-noise
  * layers drift over it at different scale and speed and their difference is the cloud; a small offset sample
  * toward a fixed light direction gives the relief. Returns (alpha, shade). */
 float skyHash2(vec2 p)
@@ -133,47 +135,33 @@ void main()
 
 	vec4 direct = texture(bgl_RenderedTexture, texcoord);
 
-	float coverage = ge_CloudsParams.x;
-	float scale = max(0.0001, ge_CloudsParams.y);
-	float speed = ge_CloudsParams.z;
-	float time = ge_CloudsParams.w;
-
-	if (coverage <= 0.001) {
-		gl_FragColor = direct;
-		return;
-	}
-
-	/* Only draw over background/sky pixels (far-plane depth), same depth-mask
-	 * trick already used by the rain puddles -- never over near geometry. */
 	float depth = texture(bgl_DepthTexture, texcoord).x;
-	float isSky = step(0.9999, depth);
-
-	if (isSky < 0.5) {
+	if (depth < 0.9999) {
+		/* Only background/sky pixels (far-plane depth), never over near geometry. */
 		gl_FragColor = direct;
 		return;
 	}
 
 	/* World is Z-up (Blender/UPBGE convention) -- viewDir.z is elevation. */
 	vec3 viewDir = skyViewDirection(texcoord);
+	/* Clouds only belong above the horizon -- fade them out toward and below it instead of a hard cut, since the
+	 * depth test above can't tell an infinite ground plane's background fill from real sky. */
+	float horizonFade = smoothstep(-0.02, 0.18, viewDir.z);
+	vec3 color = direct.rgb;
 
-	if (ge_CloudsStyle > 0.5) {
-		vec2 layered = layeredClouds(viewDir, coverage, scale, speed, time);
-		float alpha = layered.x * smoothstep(-0.02, 0.18, viewDir.z);
-		gl_FragColor = vec4(mix(direct.rgb, ge_CloudsColor * layered.y, alpha), direct.a);
-		return;
+	float coverage = ge_CloudsParams.x;
+	if (mod(ge_CloudsMask, 2.0) > 0.5 && coverage > 0.001) {
+		float scale = max(0.0001, ge_CloudsParams.y);
+		vec3 p = viewDir * scale * 4.0 + vec3(ge_CloudsParams.w * ge_CloudsParams.z, 0.0, 0.0);
+		float density = cloudFbm(p);
+		float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density) * horizonFade;
+		color = mix(color, ge_CloudsColor, mask);
 	}
 
-	vec3 p = viewDir * scale * 4.0 + vec3(time * speed, 0.0, 0.0);
-	float density = cloudFbm(p);
-	float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density);
+	if (ge_CloudsMask > 1.5 && ge_SkyLayersParams.x > 0.001) {
+		vec2 layered = layeredClouds(viewDir, ge_SkyLayersParams.x, max(0.0001, ge_SkyLayersParams.y), ge_SkyLayersParams.z, ge_SkyLayersParams.w);
+		color = mix(color, ge_SkyLayersColor * layered.y, layered.x * horizonFade);
+	}
 
-	/* Clouds only belong above the horizon -- fade them out toward and below it instead of
-	 * a hard cut, since the "isSky" depth test above can't tell an infinite ground plane's
-	 * background fill from real sky. */
-	float horizonFade = smoothstep(-0.02, 0.18, viewDir.z);
-	mask *= horizonFade;
-
-	vec3 finalColor = mix(direct.rgb, ge_CloudsColor, mask);
-
-	gl_FragColor = vec4(finalColor, direct.a);
+	gl_FragColor = vec4(color, direct.a);
 }

@@ -36,6 +36,7 @@ _modules = [
     "image",
     "anastacio_cook",
     "anastacio_lightmap",
+    "anastacio_ssgi",
     "anastacio_material_recipes",
     "logic_to_python",
     "mask",

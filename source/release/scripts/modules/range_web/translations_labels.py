@@ -1368,6 +1368,39 @@ RENDER_PANELS = (
      "Только отображение в редакторе, игра всегда использует 1 единица = 1 м"),
 )
 
+# Native SSGI panel in Game properties.  Keep every fixed layout string here so
+# the editor's pt_BR, pt_PT, Spanish and Russian dictionaries stay complete.
+SSGI_PANELS = (
+    ("Native SSGI", "SSGI nativo", "SSGI nativo", "Нативный SSGI"),
+    ("Native SSGI (Experimental)", "SSGI nativo (experimental)", "SSGI nativo (experimental)", "Нативный SSGI (экспериментальный)"),
+    ("Low", "Baixa", "Baja", "Низкое"),
+    ("Medium", "Média", "Media", "Среднее"),
+    ("High", "Alta", "Alta", "Высокое"),
+    ("Ultra", "Ultra", "Ultra", "Ультра"),
+    ("Custom", "Personalizado", "Personalizado", "Пользовательское"),
+    ("Use in Game", "Usar no jogo", "Usar en el juego", "Использовать в игре"),
+    ("Desktop only; restart Play after changes", "Somente desktop; reinicie o Play após alterações", "Solo escritorio; reinicie Play tras los cambios", "Только для ПК; перезапустите Play после изменений"),
+    ("Enable PBR Shading Nodes in Shading", "Ative Nós de sombreamento PBR em Sombreamento", "Active Nodos de sombreado PBR en Sombreado", "Включите узлы PBR-шейдинга в разделе Затенение"),
+    ("Needs the last four attachment slots free", "Precisa dos últimos quatro slots de anexos livres", "Necesita libres los últimos cuatro slots de adjuntos", "Требуются четыре последних свободных слота вложений"),
+    ("Requirements & Limits", "Requisitos e limites", "Requisitos y límites", "Требования и ограничения"),
+    ("Requires: desktop, PBR Shading Nodes and opaque supported materials.", "Requer: desktop, Nós PBR e materiais opacos compatíveis.", "Requiere escritorio, Nodos PBR y materiales opacos compatibles.", "Требуются ПК, узлы PBR и поддерживаемые непрозрачные материалы."),
+    ("Material: Principled/Diffuse directly to Output, or a simple material.", "Material: Principled/Diffuse direto na Saída, ou material simples.", "Material: Principled/Diffuse directo a Salida, o material simple.", "Материал: Principled/Diffuse напрямую к Output или простой материал."),
+    ("World/Sky is optional; Environment Lighting fills fully dark areas.", "World/Sky é opcional; Luz de ambiente preenche áreas totalmente escuras.", "World/Sky es opcional; Iluminación ambiental llena zonas totalmente oscuras.", "World/Sky необязателен; окружающее освещение заполняет полностью тёмные области."),
+    ("Direct visible lights bounce; Sky/World itself is not an SSGI source.", "Luzes diretas visíveis rebatem; Sky/World não é fonte do SSGI.", "Las luces directas visibles rebotan; Sky/World no es fuente de SSGI.", "Видимые прямые источники отражаются; Sky/World не является источником SSGI."),
+    ("Screen-space: hidden or offscreen surfaces cannot contribute.", "Espaço de tela: superfícies ocultas ou fora da tela não contribuem.", "Espacio de pantalla: superficies ocultas o fuera de pantalla no contribuyen.", "Экранное пространство: скрытые или внеэкранные поверхности не участвуют."),
+    ("Baked Lightmaps/Volumes stay active; baked receivers are excluded.", "Lightmaps/Volumes baked continuam ativos; receptores baked são excluídos.", "Los Lightmaps/Volumes horneados siguen activos; los receptores horneados se excluyen.", "Запечённые Lightmaps/Volumes остаются активны; запечённые приёмники исключаются."),
+    ("No transparency, emission, or complex/custom material graphs.", "Sem transparência, emissão ou grafos de material complexos/customizados.", "Sin transparencia, emisión ni grafos de material complejos/personalizados.", "Без прозрачности, эмиссии и сложных/пользовательских графов материалов."),
+    ("Quality:", "Qualidade:", "Calidad:", "Качество:"),
+    ("Advanced:", "Avançado:", "Avanzado:", "Дополнительно:"),
+    ("Custom settings", "Configurações personalizadas", "Ajustes personalizados", "Пользовательские настройки"),
+    ("Radius", "Raio", "Radio", "Радиус"),
+    ("Strength", "Força", "Intensidad", "Сила"),
+    ("Rays", "Raios", "Rayos", "Лучи"),
+    ("Steps", "Passos", "Pasos", "Шаги"),
+    ("Resolution Divisor", "Divisor de resolução", "Divisor de resolución", "Делитель разрешения"),
+    ("Thickness", "Espessura", "Grosor", "Толщина"),
+)
+
 # Mensagens e dicas dos operadores da Range (flowmenu, veiculo, particulas) que estavam escritas em portugues no
 # codigo; o codigo passou ao ingles e o portugues original vem daqui.
 MESSAGES = (
@@ -1707,6 +1740,6 @@ MATERIAL_RECIPES = (
 )
 
 
-PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}
-ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}
-RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}
+PT_BR = {en: pt for en, pt, _es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + SSGI_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}
+ES = {en: es for en, _pt, es, _ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + SSGI_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}
+RU = {en: ru for en, _pt, _es, ru in TABLE + EXTRA + MESSAGES + RENDER_PANELS + SSGI_PANELS + EXPORT_PANELS + INPUT_PANELS + MATERIAL_RECIPES}

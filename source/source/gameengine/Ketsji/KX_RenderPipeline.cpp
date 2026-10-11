@@ -801,7 +801,14 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				cloudParams->cloud_coverage = world->cloud_coverage;
 				cloudParams->cloud_scale = world->cloud_scale;
 				cloudParams->cloud_speed = world->cloud_speed;
-				cloudParams->cloud_style = world->cloud_style;
+				cloudParams->cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
+				                          ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0);
+				cloudParams->sky_layer_coverage = world->sky_layer_coverage;
+				cloudParams->sky_layer_scale = world->sky_layer_scale;
+				cloudParams->sky_layer_speed = world->sky_layer_speed;
+				for (int i = 0; i < 3; ++i) {
+					cloudParams->sky_layer_color[i] = world->sky_layer_color[i];
+				}
 				for (int i = 0; i < 3; ++i) {
 					cloudParams->cloud_color[i] = world->cloud_color[i];
 				}
