@@ -6,6 +6,49 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Auditoria Spawn/remoção/LibLoad: SP4/SP5 medidos, SP12 confirmado, SP13 corrigido
+
+- **SP12 não era pendência:** `KX_AddObjectActuator::ResolveOriginalObject` já usa
+  `KX_Scene::FindInactiveObjectAcrossScenes`, apoiado no índice O(1)
+  `m_inactiveNameIndex` desde 2026-10-05. O índice cobre inserção, remoção, merge
+  de LibLoad e o raro nome duplicado preservando “primeiro da lista vence”.
+- **SP13:** `RAS_BatchGroup::SplitMeshUser` chama `OnMeshUserSplit`, que já remove o
+  objeto do `KX_BatchGroup` e atualiza a referência. `KX_BatchGroup::SplitObjects`
+  repetia a mesma remoção depois do retorno. A segunda busca linear foi removida;
+  o `Split` e o upload do VBO continuam necessários e inalterados.
+- **SP4/SP5, medição A/B:** uma cena temporária com uma icosfera subdividida 5 (hull) e um grid 128×128 (BVH),
+  18 spawns alternados de cada tipo e `time.perf_counter()` ao redor de `addObject()` descartou o primeiro de
+  cada sequência. Ao reconstruir reversivelmente o runtime base e depois restaurar a mudança: SP4 caiu de
+  **6,645 para 0,182 ms** na média de 17 spawns steady (−97,3%; ~36,5×). SP5 foi de **0,845 para 0,708 ms**;
+  confirma a rota sem regressão, mas não demonstra ganho de parede isolável, pois o setup restante do Bullet
+  domina. O runtime final foi reconstruído e repetiu 0,182/0,708 ms com `PASS`; uma
+  rodada adicional no binário final deu 0,154/0,600 ms e também passou.
+- **SP4:** o `CcdShapeConstructionInfo` já é compartilhado pelas réplicas da mesma
+  malha. Os pontos do hull agora são retidos nele após o primeiro `CreateBulletShape`;
+  os spawns seguintes não fazem hash, cópia do cache `.cooked` ou
+  `btConvexHullComputer`. `UpdateMesh` e `ProcessReplica` invalidam os pontos antes
+  de trocar a geometria, inclusive para um deformer/`ReplaceMesh`.
+- **SP5:** a chave da BVH também fica no
+  `CcdShapeConstructionInfo`, portanto cópias normais não re-hasham os vértices e
+  índices. A invalidação é junto da geometria em `UpdateMesh`/`ProcessReplica`; o
+  lote de conversão mantém o hash paralelo existente. SP6/SP7 foram avaliados e continuam adiados: `RemoveValue`
+  remove todas as ocorrências e a fila de eutanásia é FIFO para preservar a ordem e evitar dupla remoção de filho.
+  SP9/SP10/SP11/SP14/SP15 também foram confirmados como adiados pelos contratos de Bullet, hot-reload,
+  conversão/merge e ownership de meshes; a evidência por item está na tabela da auditoria.
+- Configurado build Release próprio do worktree e compilado com êxito
+  `KX_BatchGroup.cpp.obj`; após a alteração do header, recompilado e relinkado
+  com êxito `ge_physics_bullet` e `KX_SoftBodyDeformer.cpp.obj`.
+- **Regressão runtime SP4/SP5:** `RangeRuntime` foi relinkado e executou uma
+  cena temporária controlada. Ela instanciou alternadamente 48 réplicas
+  `RIGID_BODY`/`CONVEX_HULL` e 48 `STATIC`/`TRIANGLE_MESH` da mesma malha de
+  cada tipo; o resultado persistido foi `PASS`, com 96 criações, zero retornos
+  nulos e todos os objetos presentes ao fim. A cena foi reaberta em background:
+  confirmou câmera, os dois tipos de bounds e o controlador Python. Isso valida
+  o caminho funcional e o ciclo de vida do cache; não mede seu ganho. Uma
+  comparação de desempenho deve usar a mesma cena no baseline e nesta alteração,
+  com contadores temporários do cálculo de hull/hash BVH ou outra métrica
+  diretamente sensível ao trabalho removido.
+
 ## 2026-10-10 - Troca de layer no editor: cache de shaders, aquecimento dos layers escondidos e medição
 
 - Cache de shaders do editor (`gpu_shader_editor_cache.c`): binários dos materiais da viewport ficam em `%LOCALAPPDATA%\AnastacioEngine\ShaderCache\editor.shaders` (chave da GPU/driver, limite 256 MB), lidos após `GPU_init` e gravados no `WM_exit` e ao fim do aquecimento. São os ganchos padrão de `GPU_shader_binary_cache_set`: o Play põe os do `.cooked` e, ao limpar, os do editor voltam. `RANGE_NO_EDITOR_SHADER_CACHE=1` desliga.

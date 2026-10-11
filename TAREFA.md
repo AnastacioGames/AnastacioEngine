@@ -9,7 +9,24 @@ Branch: `codex/auditoria-spawn-liblod`. Worktree separado do projeto principal
 e do worktree do Claude (`D:\AnastacioEngine-auditoria-claude`, cluster GPU) —
 arquivos não se cruzam, pode trabalhar em paralelo sem medo de conflito.
 
-## Itens para investigar/corrigir (todos hoje "adiado" no relatório)
+## Resultado (concluído em 2026-10-11)
+
+- **SP4/SP5:** corrigidos, validados no runtime e medidos A/B. O cache do hull
+  reduziu `addObject()` de 6,645 para 0,182 ms no cenário controlado; a chave
+  BVH não mostrou ganho isolável de parede, mas eliminou o hash repetido sem
+  regressão.
+- **SP6/SP7, SP9–SP11, SP14/SP15:** avaliados no código e confirmados como
+  adiados; os contratos de ordem, ciclo de vida, hot-reload e ownership tornam
+  a troca mais arriscada que o ganho sem uma carga real específica.
+- **SP12:** já estava corrigido desde 2026-10-05 por `m_inactiveNameIndex`.
+- **SP13:** removida a segunda remoção redundante do `KX_BatchGroup`; o upload
+  de VBO inerente ao `Split` foi preservado.
+
+Evidência detalhada e estado vigente: `docs/auditoria-suspeitos.md`; histórico
+e resultados de teste: `docs/changelog.md`. Os artefatos temporários permanecem
+em `_tmp_sp45_validation/` fora do commit.
+
+## Itens investigados/corrigidos
 
 Ordem sugerida, da maior confiança/payoff pra menor:
 
