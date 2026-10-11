@@ -6,6 +6,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Presets nativos de constraints e leitura do tutorial Blender 2.69
+
+- `Shift+A > Constraints` agora oferece Hinge, Limited Hinge (6DOF), Slider (6DOF), Ball Socket e Cone
+  Twist (6DOF). Cada preset anexa da biblioteca distribuída `demos/Physics/constraintsTutorial.range`
+  o conjunto original do tutorial, centraliza-o no cursor 3D e preserva o `RIGID_BODY_JOINT`, alvo,
+  limites e forma visual. Cada conjunto inclui os dois corpos físicos e os dois filhos `NO_COLLISION` que
+  formam o acabamento central. A cena muda automaticamente para `BLENDER_GAME`.
+- Todo preset recebe dois materiais explícitos: `Constraint Anchor - Magenta` na âncora e
+  `Constraint Body - Cyan` no corpo móvel.
+- O arquivo externo `constraintsTutorial.blend` (Blender 2.69) foi aberto sem gravação: 1 cena, 28 objetos
+  e cinco joints de objeto lidos — Hinge, Ball e três Generic 6DOF. O conversor atual já suporta todos
+  esses tipos. O script histórico `snap` só usa `Rasterizer` e não participa da física.
+- Validação pela instalação real em `build/bin`: os cinco operadores terminaram com `FINISHED`, anexaram
+  20 objetos (10 corpos + 10 peças de acabamento), cinco joints com alvos válidos, aplicaram os dois
+  materiais e salvaram a cena já em `BLENDER_GAME` (`INSTALLED_FINISH_TEST: PASS`). A cena gerada rodou
+  no `AnastacioRuntime` por 20 frames e encontrou os cinco donos de constraint. Não há alteração C++ que
+  exija relink.
+
 ## 2026-10-11 - Qualidade de Clouds e Sky Layers (Low/Medium/High) e rótulos "Clouds - tipo"
 
 - Painel World > Weather: os três tipos de nuvem passam a se chamar "Clouds - Procedural", "Clouds -

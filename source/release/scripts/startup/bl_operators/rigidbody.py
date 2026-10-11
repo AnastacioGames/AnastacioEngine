@@ -19,11 +19,128 @@
 # <pep8-80 compliant>
 
 import bpy
+import os
 from bpy.types import Operator
 from bpy.props import (
     EnumProperty,
     IntProperty,
 )
+
+
+_constraint_presets = (
+    ('HINGE', "Hinge", "Two game-physics bodies joined by a free hinge"),
+    ('LIMITED_HINGE', "Limited Hinge (6DOF)", "Hinge with rotation limited to -57 to 57 degrees"),
+    ('SLIDER', "Slider (6DOF)", "Slider with one metre of travel on its local X axis"),
+    ('BALL', "Ball Socket", "Two game-physics bodies joined by a ball socket"),
+    ('CONE_TWIST', "Cone Twist (6DOF)", "Cone-twist joint with 29 degree angular limits"),
+)
+
+_constraint_asset_objects = {
+    'HINGE': ('HingeSocket', 'HingeAxis', 'HingeSocket.001', 'HingeAxis.001'),
+    'LIMITED_HINGE': ('HingeSocket.002', 'HingeAxis.002', 'HingeSocket.003', 'HingeAxis.003'),
+    'SLIDER': ('SliderSocket', 'SliderAxis', 'SliderSocket.001', 'SliderAxis.001'),
+    'BALL': ('Socket', 'Ball', 'Socket.001', 'Ball.001'),
+    'CONE_TWIST': ('Socket.002', 'Ball.002', 'Socket.003', 'Ball.003'),
+}
+
+
+class AddGameConstraintPreset(Operator):
+    '''Append an original, ready-to-play Bullet constraint example'''
+    bl_idname = "object.game_constraint_preset_add"
+    bl_label = "Add Game Constraint Preset"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    preset: EnumProperty(
+        name="Constraint",
+        description="Constraint example to add at the 3D cursor",
+        items=_constraint_presets,
+        default='HINGE',
+    )
+
+    @staticmethod
+    def _asset_path():
+        installed = os.path.join(os.path.dirname(bpy.app.binary_path),
+                                 "demos", "Physics", "constraintsTutorial.range")
+        bundled = os.path.normpath(os.path.join(os.path.dirname(__file__),
+                                                "..", "..", "..", "demos", "Physics",
+                                                "constraintsTutorial.range"))
+        for path in (installed, bundled):
+            if os.path.isfile(path):
+                return path
+        return None
+
+    @staticmethod
+    def _material(name, color):
+        material = bpy.data.materials.get(name)
+        if material is None:
+            material = bpy.data.materials.new(name)
+        material.diffuse_color = color
+        material.diffuse_intensity = 0.9
+        return material
+
+    @staticmethod
+    def _set_single_material(obj, material):
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+
+    def execute(self, context):
+        # A game-physics preset must be immediately playable even when added
+        # to a scene that was still using Blender Render.
+        context.scene.render.engine = 'BLENDER_GAME'
+        asset_path = self._asset_path()
+        if asset_path is None:
+            self.report({'ERROR'}, "Constraint tutorial asset was not found")
+            return {'CANCELLED'}
+
+        source_names = _constraint_asset_objects[self.preset]
+        with bpy.data.libraries.load(asset_path, link=False) as (data_from, data_to):
+            missing = [name for name in source_names if name not in data_from.objects]
+            if missing:
+                self.report({'ERROR'}, "Missing constraint objects: " + ", ".join(missing))
+                return {'CANCELLED'}
+            data_to.objects = list(source_names)
+
+        objects = [obj for obj in data_to.objects if obj is not None]
+        if len(objects) != len(source_names):
+            self.report({'ERROR'}, "Constraint preset could not be appended")
+            return {'CANCELLED'}
+
+        for obj in objects:
+            context.scene.objects.link(obj)
+
+        roots = [obj for obj in objects if obj.parent is None]
+        if len(roots) != 2:
+            for obj in objects:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            self.report({'ERROR'}, "Constraint preset has an invalid parent structure")
+            return {'CANCELLED'}
+
+        center = (roots[0].location + roots[1].location) * 0.5
+        offset = context.scene.cursor_location - center
+        for obj in roots:
+            obj.location += offset
+
+        owner = next((obj for obj in roots if obj.constraints), None)
+        joint = owner.constraints[0] if owner and owner.constraints else None
+        target = joint.target if joint else None
+        if joint is None or joint.type != 'RIGID_BODY_JOINT' or target not in roots:
+            for obj in objects:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            self.report({'ERROR'}, "Appended constraint lost its target relationship")
+            return {'CANCELLED'}
+
+        anchor_material = self._material("Constraint Anchor - Magenta", (0.85, 0.03, 0.28))
+        body_material = self._material("Constraint Body - Cyan", (0.02, 0.58, 0.88))
+        self._set_single_material(owner, anchor_material)
+        self._set_single_material(target, body_material)
+
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in objects:
+            obj.select = True
+        context.scene.objects.active = owner
+        label = dict((identifier, text) for identifier, text, description in _constraint_presets)[self.preset]
+        self.report({'INFO'}, label + " added from the original tutorial")
+        return {'FINISHED'}
 
 
 class CopyRigidbodySettings(Operator):
@@ -320,6 +437,7 @@ class ConnectRigidBodies(Operator):
 
 
 classes = (
+    AddGameConstraintPreset,
     BakeToKeyframes,
     ConnectRigidBodies,
     CopyRigidbodySettings,

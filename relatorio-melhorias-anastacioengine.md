@@ -308,6 +308,12 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   automaticamente a partir desses dados — não é mais só um marcador de design. `KX_GameObject::getVehicle()`
   expõe o veículo já pronto para Python. O painel Vehicle também tem um botão para criar/anexar o
   `vehicle_player_component.py` de controle jogável direto no objeto.
+- `Shift+A > Constraints` oferece exemplos prontos de Bullet para jogos: Hinge, Limited Hinge (6DOF),
+  Slider (6DOF), Ball Socket e Cone Twist (6DOF). Cada item anexa no cursor o conjunto original completo
+  da biblioteca do tutorial 2.69: dois corpos físicos e dois filhos `NO_COLLISION` que formam o acabamento
+  central, preservando o `RIGID_BODY_JOINT`, alvo e limites. A âncora recebe material magenta e o corpo
+  móvel, ciano. A cena é colocada em `BLENDER_GAME` automaticamente. Arquivos Blender 2.5x/2.6x que usam
+  esse formato legado continuam carregáveis pelo conversor Bullet existente.
 - "Export Game (1 Click)" (`Export Game > Export (RangeArmor)`) empacota o jogo direto do Blender sem
   precisar abrir o RangeArmor Panel manualmente antes: scaffold do projeto (`config.json`,
   `Launcher.exe`, ícones, runtime), geração do `.rasec` protegido e chamada do `build_release.py`

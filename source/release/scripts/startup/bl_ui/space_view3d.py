@@ -1371,6 +1371,23 @@ class INFO_MT_camera_add(Menu):
         layout.operator("object.camera_add", text="Camera", icon='OUTLINER_OB_CAMERA')
 
 
+class INFO_MT_game_constraints_add(Menu):
+    bl_idname = "INFO_MT_game_constraints_add"
+    bl_label = "Constraints"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_REGION_WIN'
+        for preset, label, description in (
+                ('HINGE', "Hinge", ""),
+                ('LIMITED_HINGE', "Limited Hinge (6DOF)", ""),
+                ('SLIDER', "Slider (6DOF)", ""),
+                ('BALL', "Ball Socket", ""),
+                ('CONE_TWIST', "Cone Twist (6DOF)", "")):
+            operator = layout.operator("object.game_constraint_preset_add", text=label, icon='CONSTRAINT')
+            operator.preset = preset
+
+
 class INFO_MT_add(Menu):
     bl_label = "Add"
 
@@ -1402,6 +1419,7 @@ class INFO_MT_add(Menu):
 
         layout.operator("object.speaker_add", text="Speaker", icon='OUTLINER_OB_SPEAKER')
         layout.operator_menu_enum("object.reverb_area_add", "preset", text="Reverb Area", icon='SOUND')
+        layout.menu("INFO_MT_game_constraints_add", text="Constraints", icon='CONSTRAINT')
         layout.separator(factor=1)
 
         if INFO_MT_camera_add.is_extended():
@@ -4258,6 +4276,7 @@ classes = (
     INFO_MT_edit_curve_add,
     INFO_MT_edit_armature_add,
     INFO_MT_armature_add,
+    INFO_MT_game_constraints_add,
     INFO_MT_lamp_add,
     INFO_MT_camera_add,
     INFO_MT_add,
