@@ -945,7 +945,9 @@ typedef enum eSCENEFXFlags {
   SCENE_FX_FLAG_RAIN         = (1 << 7),
   SCENE_FX_FLAG_CLOUDS       = (1 << 8),
   /* Viewport-only bit, derived from use_grain (Film Grain). */
-  SCENE_FX_FLAG_GRAIN        = (1 << 9)
+  SCENE_FX_FLAG_GRAIN        = (1 << 9),
+  /* Derived from World > Weather > Volumetric Fog (World.vfog_flag). */
+  SCENE_FX_FLAG_VFOG         = (1 << 10)
 } eSCENEFXFlags;
 
 /* RecastData.partitioning */

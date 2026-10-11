@@ -133,6 +133,10 @@ public:
 		return m_sunSize;
 	}
 	void setRange(float range);
+	void setSunSize(float size)
+	{
+		m_sunSize = size;
+	}
 	void setMistColor(const mt::vec3& mistcolor);
 	void setHorizonColor(const mt::vec4& horizoncolor);
 	void setZenithColor(const mt::vec4& zenithcolor);

@@ -120,6 +120,8 @@ public:
 	virtual bool NeedShadowUpdate() = 0;
 	virtual int GetShadowBindCode() = 0;
 	virtual mt::mat4 GetShadowMatrix() = 0;
+	/// World space -> shadow map texture coordinates (Volumetric Fog light shafts).
+	virtual mt::mat4 GetShadowWorldMatrix() = 0;
 	virtual mt::mat4 GetViewMat() = 0;
 	virtual mt::mat4 GetWinMat() = 0;
 	virtual int GetShadowLayer() = 0;

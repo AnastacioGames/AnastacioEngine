@@ -63,6 +63,7 @@ public:
 	 * KX_WorldInfo from World DNA/RNA settings -- no Python component/actuator needed. */
 	void EnsureRainFilters(BuildInFilters filters);
 	void EnsureCloudsFilters(BuildInFilters filters);
+	void EnsureVFogFilters(BuildInFilters filters);
 	void EnsureLensFlareFilters(BuildInFilters filters);
 	bool SetBuiltinFilterEnabled(FILTER_MODE mode, bool enabled) override;
 

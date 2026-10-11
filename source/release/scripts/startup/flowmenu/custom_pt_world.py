@@ -195,8 +195,9 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             box = layout.box()
             box.label(text="Sun:", icon='LAMP_SUN')
             col = box.column(align=True)
-            col.prop(scene, "world_sun_set", text="Object")
-            col.prop(scene, "use_auto_world_sun", text="Automatic")
+            # The sun object is picked/created when the scene is converted: next Play only.
+            not_live_layout(col).prop(scene, "world_sun_set", text="Object")
+            not_live_layout(col).prop(scene, "use_auto_world_sun", text="Automatic")
             row = box.row(align=True)
             sub = row.row(align=True)
             sub.active = scene.use_auto_world_sun
@@ -324,6 +325,50 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col = main_box.column()
             col.active = context.world.mist_settings.use_mist
             draw_fog_settings(col, context.world)
+
+        row = main_box.row(align=True)
+        row.prop(weather, "show_expanded_vfog", text="Fog - Volumetric", emboss=True)
+        row.prop(weather, "show_viewport_vfog", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
+        not_live_layout(row).prop(weather, "use_volumetric_fog", text="")
+
+        if weather.show_expanded_vfog:
+            col = main_box.column(align=True)
+            col.active = weather.use_volumetric_fog
+            col.prop(weather, "vfog_quality", text="Quality")
+            col.prop(weather, "vfog_color")
+            col.prop(weather, "vfog_density")
+            col.prop(weather, "vfog_base")
+            col.prop(weather, "vfog_falloff")
+            col.prop(weather, "vfog_distance")
+            col.separator()
+            col.prop(weather, "vfog_noise_amount", slider=True)
+            col.prop(weather, "vfog_noise_scale")
+            col.prop(weather, "vfog_speed")
+            col.separator()
+            col.prop(weather, "vfog_sun_intensity")
+            col.prop(weather, "vfog_ambient")
+            col.prop(weather, "vfog_anisotropy", slider=True)
+
+            sub = col.column(align=True)
+            sub.prop(weather, "vfog_use_lamps")
+            lamps = sub.column(align=True)
+            lamps.active = weather.vfog_use_lamps
+            lamps.prop(weather, "vfog_light_intensity")
+            lamps.prop(weather, "vfog_max_lights")
+            shafts = lamps.column(align=True)
+            shafts.active = weather.vfog_use_lamps and weather.vfog_quality != 'LOW'
+            shafts.prop(weather, "vfog_use_shafts")
+            shafts.prop(weather, "vfog_shaft_intensity")
+
+            sub = col.column(align=True)
+            sub.prop(weather, "vfog_volumes_only")
+            sub.prop(weather, "vfog_edge", slider=True)
+            info = col.column(align=True)
+            info.label(text="Fog Volume: game property \"fog_volume\" (density) on a cube", icon='INFO')
+            if context.world.mist_settings.use_mist:
+                info.label(text="Mist is also on: the scene gets fogged twice", icon='ERROR')
+            if weather.vfog_quality == 'HIGH':
+                info.label(text="High quality is costly on integrated GPUs", icon='INFO')
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_rain", text="Rain", emboss=True)

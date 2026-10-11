@@ -34,6 +34,12 @@
 #include "DNA_gpu_types.h"
 #include "DNA_object_types.h"
 #include "DNA_world_types.h"
+#include "DNA_lamp_types.h"
+#include "DNA_property_types.h"
+
+#include "BKE_property.h"
+
+#include "GPU_material.h"
 
 #include "GPU_compositing.h"
 #include "GPU_extensions.h"
@@ -138,7 +144,22 @@ typedef struct {
   int vclouds_params3_uniform;
   int vclouds_color_uniform;
   int vclouds_sundir_uniform;
+  int history_uniform;
+  int history_depth_uniform;
+  int history_valid_uniform;
+  int history_viewproj_uniform;
+  int frame_uniform;
 } GPUCLOUDSShaderInterface;
+
+typedef struct {
+  int color_uniform;
+  int depth_uniform;
+  int data_uniform;
+  int mats_uniform;
+  int shadow0_uniform;
+  int shadow1_uniform;
+  int frame_uniform;
+} GPUVFOGShaderInterface;
 
 typedef struct {
   int color_uniform;
@@ -274,6 +295,17 @@ struct GPUFX {
 
 	/* we have a stencil, restore the previous state */
 	bool restore_stencil;
+
+	/* Volumetric Clouds temporal reuse, same scheme as RAS_2DFilterManager: the clouds pass
+	 * output and depth of the last frame, with the view-projection they were drawn with. */
+	unsigned int cloud_history;
+	unsigned int cloud_history_depth;
+	int cloud_history_w, cloud_history_h;
+	bool cloud_history_valid;
+	int cloud_history_frame;
+	float cloud_history_persmat[4][4];
+
+	int vfog_frame;
 
 	unsigned int vbuffer;
 };
@@ -412,6 +444,14 @@ static void cleanup_fx_gl_data(GPUFX *fx, bool do_fbo)
 		fx->depth_buffer_xray = NULL;
 	}
 
+	if (fx->cloud_history) {
+		glDeleteTextures(1, &fx->cloud_history);
+		glDeleteTextures(1, &fx->cloud_history_depth);
+		fx->cloud_history = fx->cloud_history_depth = 0;
+		fx->cloud_history_w = fx->cloud_history_h = 0;
+	}
+	fx->cloud_history_valid = false;
+
 	cleanup_fx_dof_buffers(fx);
 
 	if (fx->ssao_spiral_samples_tex) {
@@ -516,11 +556,20 @@ bool GPU_fx_compositor_initialize_passes(
 
 	if (scene->world && ((scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_CLOUDS) ||
 	                     (scene->world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
-	                         WO_SKY_LAYERS_ENABLE)) {
+	                         WO_SKY_LAYERS_ENABLE ||
+	                     (scene->world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
+	                         WO_VCLOUDS_ENABLE)) {
 		scenefx_flag |= SCENE_FX_FLAG_CLOUDS;
 	}
 	else {
 		scenefx_flag &= ~SCENE_FX_FLAG_CLOUDS;
+	}
+
+	if (scene->world && (scene->world->vfog_flag & (WO_VFOG_ENABLE | WO_VFOG_EDITOR_HIDE)) == WO_VFOG_ENABLE) {
+		scenefx_flag |= SCENE_FX_FLAG_VFOG;
+	}
+	else {
+		scenefx_flag &= ~SCENE_FX_FLAG_VFOG;
 	}
 
 	if (scene->scenefx_settings.use_grain && scene->scenefx_settings.grain_strength > 0.0f &&
@@ -593,6 +642,9 @@ bool GPU_fx_compositor_initialize_passes(
 	if (scenefx_flag & SCENE_FX_FLAG_CLOUDS)
 		num_passes++;
 
+	if (scenefx_flag & SCENE_FX_FLAG_VFOG)
+		num_passes++;
+
 	if (scenefx_flag & SCENE_FX_FLAG_GRAIN)
 		num_passes++;
 
@@ -648,7 +700,7 @@ bool GPU_fx_compositor_initialize_passes(
 
 	if (scenefx_flag & SCENE_FX_FLAG_FXAA || scenefx_flag & SCENE_FX_FLAG_LIGHTSCATTER ||
 	    scenefx_flag & SCENE_FX_FLAG_LENSFLARE || scenefx_flag & SCENE_FX_FLAG_RAIN ||
-	    scenefx_flag & SCENE_FX_FLAG_CLOUDS)
+	    scenefx_flag & SCENE_FX_FLAG_CLOUDS || scenefx_flag & SCENE_FX_FLAG_VFOG)
 	{
 		fx->viewsize_w = w;
 		fx->viewsize_h = h;
@@ -904,6 +956,140 @@ void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
 	glPopAttrib();
+}
+
+/* Volumetric Fog data for the 3D View, mirrors KX_FillVolumetricFog (KX_RenderPipeline.cpp):
+ * layout in gpu_shader_vfog_lib.glsl. Returns how many Spot shadow maps were filled. */
+static int gpu_vfog_fill(Scene *scene, World *world, const float campos[3], float data[44][4],
+                         float mats[6][4][4], unsigned int shadow_tex[2])
+{
+	static const int preset_max[3] = {2, 4, 8};
+	const int quality = max_ii(0, min_ii(world->vfog_quality, 2));
+	int volumes = 0, lamps = 0, shadows = 0;
+
+	memset(data, 0, sizeof(float) * 44 * 4);
+	memset(mats, 0, sizeof(float) * 6 * 16);
+	shadow_tex[0] = shadow_tex[1] = 0;
+
+	data[0][0] = world->vfog_density;
+	data[0][1] = world->vfog_base;
+	data[0][2] = max_ff(world->vfog_falloff, 0.01f);
+	data[0][3] = max_ff(world->vfog_distance, 1.0f);
+	data[1][0] = world->vfog_noise_scale;
+	data[1][1] = world->vfog_noise_amount;
+	data[1][2] = (float)fmod(PIL_check_seconds_timer() * world->vfog_speed, 10000.0);
+	data[1][3] = world->vfog_anisotropy;
+	copy_v3_v3(data[2], world->vfog_color);
+	data[2][3] = (float)quality;
+	if (scene->world_sun && scene->world_sun->type == OB_LAMP) {
+		Lamp *la = scene->world_sun->data;
+		normalize_v3_v3(data[3], scene->world_sun->obmat[2]);
+		data[3][3] = 1.0f;
+		data[4][0] = la->r * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
+		data[4][1] = la->g * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
+		data[4][2] = la->b * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
+	}
+	data[5][0] = world->horr * world->vfog_ambient;
+	data[5][1] = world->horg * world->vfog_ambient;
+	data[5][2] = world->horb * world->vfog_ambient;
+	data[6][2] = world->vfog_light_intensity;
+	data[6][3] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
+	data[8][0] = world->vfog_edge;
+	data[8][1] = world->vfog_shaft_intensity;
+
+	/* Fog Volumes and lamps; lamps sorted by strength at the camera (insertion, at most 8 kept). */
+	{
+		Object *cand[8];
+		float score[8];
+		int ncand = 0;
+		const int max_lamps = max_ii(1, min_ii(min_ii(world->vfog_max_lights, 8), preset_max[quality]));
+		for (Base *base = scene->base.first; base; base = base->next) {
+			Object *ob = base->object;
+			if (!(base->lay & scene->lay) || (ob->restrictflag & OB_RESTRICT_VIEW)) {
+				continue;
+			}
+			if (volumes < 4) {
+				bProperty *prop = BKE_bproperty_object_get(ob, "fog_volume");
+				if (prop) {
+					float value = 1.0f;
+					if (prop->type == GPROP_FLOAT) {
+						value = *((float *)&prop->data);
+					}
+					else if (prop->type == GPROP_INT) {
+						value = (float)prop->data;
+					}
+					invert_m4_m4(mats[volumes], ob->obmat);
+					data[7][volumes] = max_ff(0.0f, value);
+					volumes++;
+				}
+			}
+			if (ob->type == OB_LAMP && (world->vfog_flag & WO_VFOG_LAMPS)) {
+				Lamp *la = ob->data;
+				if ((la->type != LA_LOCAL && la->type != LA_SPOT) || la->energy <= 0.0f) {
+					continue;
+				}
+				const float dist = len_v3v3(ob->obmat[3], campos);
+				if (dist > data[0][3] + la->dist) {
+					continue;
+				}
+				const float r = max_ff(la->dist, 0.01f);
+				const float s = la->energy * r * r / (r * r + dist * dist);
+				int pos = ncand;
+				while (pos > 0 && score[pos - 1] < s) {
+					if (pos < max_lamps) {
+						cand[pos] = cand[pos - 1];
+						score[pos] = score[pos - 1];
+					}
+					pos--;
+				}
+				if (pos < max_lamps) {
+					cand[pos] = ob;
+					score[pos] = s;
+					if (ncand < max_lamps) {
+						ncand++;
+					}
+				}
+			}
+		}
+		for (int i = 0; i < ncand; i++) {
+			Object *ob = cand[i];
+			Lamp *la = ob->data;
+			float *pos = data[12 + 4 * i];
+			float *col = data[13 + 4 * i];
+			float *spot = data[14 + 4 * i];
+			copy_v3_v3(pos, ob->obmat[3]);
+			pos[3] = la->dist;
+			col[0] = la->r * la->energy;
+			col[1] = la->g * la->energy;
+			col[2] = la->b * la->energy;
+			col[3] = -1.0f;
+			spot[3] = -2.0f;
+			if (la->type == LA_SPOT) {
+				const float cos_outer = cosf(la->spotsize * 0.5f);
+				normalize_v3_v3(spot, ob->obmat[2]);
+				negate_v3(spot);
+				spot[3] = cos_outer;
+				data[15 + 4 * i][0] = cos_outer + (1.0f - cos_outer) * la->spotblend;
+				if ((world->vfog_flag & WO_VFOG_SHAFTS) && quality > 0 && shadows < 2 &&
+				    (la->mode & LA_SHAD_BUF) && la->shadowmap_type != LA_SHADMAP_VARIANCE)
+				{
+					GPULamp *lamp = GPU_lamp_from_blender(scene, ob, NULL);
+					const int code = lamp && GPU_lamp_has_shadow_buffer(lamp) ? GPU_lamp_shadow_bind_code(lamp) : -1;
+					if (code > 0) {
+						shadow_tex[shadows] = (unsigned int)code;
+						memcpy(mats[4 + shadows], GPU_lamp_get_persmat(lamp), sizeof(float) * 16);
+						col[3] = (float)shadows;
+						data[15 + 4 * i][1] = 0.0005f;
+						shadows++;
+					}
+				}
+			}
+			lamps++;
+		}
+	}
+	data[6][0] = (float)lamps;
+	data[6][1] = (float)volumes;
+	return shadows;
 }
 
 bool GPU_fx_do_composite_pass(
@@ -1550,10 +1736,161 @@ bool GPU_fx_do_composite_pass(
 				GPU_shader_uniform_vector(clouds_shader, interface->vclouds_sundir_uniform, 3, 1, vclouds_sundir);
 			}
 
+			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy. */
+			const bool use_history = (world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
+			                         WO_VCLOUDS_ENABLE &&
+			                         (GLEW_VERSION_4_3 || GLEW_ARB_copy_image);
+			float cur_persmat[4][4];
+			mul_m4_m4m4(cur_persmat, projmat, viewmat);
+			{
+				/* In the 3D View the grid, outlines and gizmos are drawn into the color buffer without
+				 * depth, so the history holds them as "sky": reprojecting it while the view moves
+				 * smears them into trails. Only reuse while the view is still (clouds still animate). */
+				const bool valid = use_history && fx->cloud_history_valid &&
+				                   equals_m4m4(cur_persmat, fx->cloud_history_persmat);
+				const float valid_f = valid ? 1.0f : 0.0f;
+				const float frame_f = (float)(fx->cloud_history_frame & 3);
+				if (valid) {
+					glActiveTexture(GL_TEXTURE6);
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+					glActiveTexture(GL_TEXTURE7);
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
+					glActiveTexture(GL_TEXTURE0);
+					glUniform1i(interface->history_uniform, 6);
+					glUniform1i(interface->history_depth_uniform, 7);
+				}
+				GPU_shader_uniform_vector(clouds_shader, interface->history_valid_uniform, 1, 1, &valid_f);
+				GPU_shader_uniform_vector(clouds_shader, interface->frame_uniform, 1, 1, &frame_f);
+				GPU_shader_uniform_vector(clouds_shader, interface->history_viewproj_uniform, 16, 1,
+				                          valid ? (float *)fx->cloud_history_persmat : (float *)cur_persmat);
+			}
+
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
 
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			if (use_history) {
+				/* Copy the pass output (fx buffer or the window/offscreen, whichever is bound)
+				 * and the depth for the next redraw. */
+				int vp[4];
+				glGetIntegerv(GL_VIEWPORT, vp);
+				const int depth_w = GPU_texture_width(fx->depth_buffer);
+				const int depth_h = GPU_texture_height(fx->depth_buffer);
+				if (vp[2] != depth_w || vp[3] != depth_h) {
+					fx->cloud_history_valid = false;
+				}
+				else {
+					if (!fx->cloud_history || fx->cloud_history_w != vp[2] || fx->cloud_history_h != vp[3]) {
+						if (!fx->cloud_history) {
+							glGenTextures(1, &fx->cloud_history);
+							glGenTextures(1, &fx->cloud_history_depth);
+						}
+						glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+						glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, vp[2], vp[3], 0, GL_RGBA, GL_FLOAT, NULL);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+						/* glCopyImageSubData needs the exact same internal format as the source. */
+						GLint depth_format = GL_DEPTH_COMPONENT24;
+						glBindTexture(GL_TEXTURE_2D, GPU_texture_opengl_bindcode(fx->depth_buffer));
+						glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &depth_format);
+						glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
+						glTexImage2D(GL_TEXTURE_2D, 0, depth_format, vp[2], vp[3], 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+						fx->cloud_history_w = vp[2];
+						fx->cloud_history_h = vp[3];
+					}
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+					glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
+					glBindTexture(GL_TEXTURE_2D, 0);
+					glCopyImageSubData(GPU_texture_opengl_bindcode(fx->depth_buffer), GL_TEXTURE_2D, 0, 0, 0, 0,
+					                   fx->cloud_history_depth, GL_TEXTURE_2D, 0, 0, 0, 0, vp[2], vp[3], 1);
+					copy_m4_m4(fx->cloud_history_persmat, cur_persmat);
+					fx->cloud_history_valid = true;
+					fx->cloud_history_frame++;
+				}
+			}
+			else {
+				fx->cloud_history_valid = false;
+			}
+			if (use_history) {
+				glActiveTexture(GL_TEXTURE6);
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glActiveTexture(GL_TEXTURE7);
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glActiveTexture(GL_TEXTURE0);
+			}
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+			GPU_texture_unbind(fx->depth_buffer);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
+	/* Volumetric Fog pass, mirrors the in-game filter (RAS_VolumetricFog2DFilter.glsl) */
+	if (fx->sce_effects & SCENE_FX_FLAG_VFOG) {
+		GPUShader *vfog_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_VFOG, is_persp);
+		if (vfog_shader && scene->world) {
+			GPUVFOGShaderInterface *interface = GPU_shader_get_interface(vfog_shader);
+			float data[44][4], mats[6][4][4], viewinv[4][4];
+			unsigned int shadow_tex[2];
+			invert_m4_m4(viewinv, viewmat);
+			gpu_vfog_fill(scene, scene->world, viewinv[3], data, mats, shadow_tex);
+			const float frame_f = (float)(fx->vfog_frame++ & 63);
+
+			GPU_shader_bind(vfog_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(vfog_shader, interface->color_uniform, src);
+
+			GPU_texture_bind(fx->depth_buffer, numslots++);
+			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
+			GPU_shader_uniform_texture(vfog_shader, interface->depth_uniform, fx->depth_buffer);
+
+			GPU_shader_uniform_vector(vfog_shader, interface->data_uniform, 4, 44, (float *)data);
+			glUniformMatrix4fv(interface->mats_uniform, 6, GL_FALSE, (float *)mats);
+			GPU_shader_uniform_vector(vfog_shader, interface->frame_uniform, 1, 1, &frame_f);
+			/* Spot shadow maps on units 6/7 (free: the clouds history is unbound after its pass). */
+			for (int i = 0; i < 2; i++) {
+				glActiveTexture(GL_TEXTURE6 + i);
+				glBindTexture(GL_TEXTURE_2D, shadow_tex[i]);
+			}
+			glActiveTexture(GL_TEXTURE0);
+			glUniform1i(interface->shadow0_uniform, 6);
+			glUniform1i(interface->shadow1_uniform, 7);
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			for (int i = 0; i < 2; i++) {
+				glActiveTexture(GL_TEXTURE6 + i);
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
+			glActiveTexture(GL_TEXTURE0);
 
 			/* disable bindings */
 			GPU_texture_unbind(src);
@@ -2324,11 +2661,31 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->vclouds_params3_uniform = GPU_shader_get_uniform(shader, "vclouds_params3");
 			interface->vclouds_color_uniform = GPU_shader_get_uniform(shader, "vclouds_color");
 			interface->vclouds_sundir_uniform = GPU_shader_get_uniform(shader, "vclouds_sundir");
+			interface->history_uniform = GPU_shader_get_uniform(shader, "clouds_history");
+			interface->history_depth_uniform = GPU_shader_get_uniform(shader, "clouds_history_depth");
+			interface->history_valid_uniform = GPU_shader_get_uniform(shader, "clouds_history_valid");
+			interface->history_viewproj_uniform = GPU_shader_get_uniform(shader, "clouds_history_viewproj");
+			interface->frame_uniform = GPU_shader_get_uniform(shader, "clouds_frame");
 
 			GPU_shader_set_interface(shader, interface);
 			break;
 		}
 
+		case GPU_SHADER_FX_VFOG:
+		{
+			GPUVFOGShaderInterface *interface = MEM_mallocN(sizeof(GPUVFOGShaderInterface), "GPUVFOGShaderInterface");
+
+			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
+			interface->data_uniform = GPU_shader_get_uniform(shader, "vfog_data");
+			interface->mats_uniform = GPU_shader_get_uniform(shader, "vfog_mats");
+			interface->shadow0_uniform = GPU_shader_get_uniform(shader, "vfog_shadow0");
+			interface->shadow1_uniform = GPU_shader_get_uniform(shader, "vfog_shadow1");
+			interface->frame_uniform = GPU_shader_get_uniform(shader, "vfog_frame");
+
+			GPU_shader_set_interface(shader, interface);
+			break;
+		}
 		case GPU_SHADER_FX_GRAIN:
 		{
 			GPUGRAINShaderInterface *interface = MEM_mallocN(sizeof(GPUGRAINShaderInterface), "GPUGRAINShaderInterface");

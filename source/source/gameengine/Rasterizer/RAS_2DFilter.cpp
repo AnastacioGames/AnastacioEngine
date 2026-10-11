@@ -100,6 +100,8 @@ RAS_ScopeExit<Fn> MakeScopeExit(Fn fn)
 
 /// Texture unit of the rain mask (ge_RainMask); custom filters keep 0-7 but the rain filter has none.
 static const int kRainMaskUnit = 7;
+/// Volumetric Fog: Spot shadow maps on 20 and 21 (17-19 are the previous frame and clouds history).
+static const int kVFogShadowUnit = 20;
 
 static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_TYPE] = {
 	"bgl_RenderedTexture", // RENDERED_TEXTURE_UNIFORM
@@ -163,7 +165,17 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"bgl_Resolution", // BGL_RESOLUTION_UNIFORM
 	"bgl_Time", // BGL_TIME_UNIFORM
 	"bgl_Frame", // BGL_FRAME_UNIFORM
-	"bgl_PreviousTexture" // BGL_PREVIOUS_TEXTURE_UNIFORM
+	"bgl_PreviousTexture", // BGL_PREVIOUS_TEXTURE_UNIFORM
+
+	"ge_CloudsHistory", // GE_CLOUDS_HISTORY_UNIFORM
+	"ge_CloudsHistoryDepth", // GE_CLOUDS_HISTORY_DEPTH_UNIFORM
+	"ge_CloudsHistoryValid", // GE_CLOUDS_HISTORY_VALID_UNIFORM
+	"ge_CloudsHistoryViewProj", // GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM
+
+	"vfog_data", // GE_VFOG_DATA_UNIFORM
+	"vfog_mats", // GE_VFOG_MATS_UNIFORM
+	"vfog_shadow0", // GE_VFOG_SHADOW0_UNIFORM
+	"vfog_shadow1" // GE_VFOG_SHADOW1_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -516,6 +528,22 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs->previousTexture);
 	}
 
+	if (m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->cloudHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->cloudHistory);
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryDepthUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->cloudHistoryDepth);
+	}
+
+	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
+		for (int i = 0; i < 2; ++i) {
+			if (m_buildInFilters.vfog_shadow_tex[i]) {
+				glActiveTexture(GL_TEXTURE0 + kVFogShadowUnit + i);
+				glBindTexture(GL_TEXTURE_2D, m_buildInFilters.vfog_shadow_tex[i]);
+			}
+		}
+	}
+
 	// Bind custom textures.
 	for (const auto& pair : m_textures) {
 		glActiveTexture(GL_TEXTURE0 + pair.first);
@@ -554,6 +582,22 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1 && m_frameInputs && m_frameInputs->previousTexture) {
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->previousTextureUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+
+	if (m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->cloudHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryDepthUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+
+	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
+		for (int i = 0; i < 2; ++i) {
+			if (m_buildInFilters.vfog_shadow_tex[i]) {
+				glActiveTexture(GL_TEXTURE0 + kVFogShadowUnit + i);
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
+		}
 	}
 
 	// Unbind custom textures.
@@ -636,6 +680,33 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1) {
 		SetUniform(m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM], m_frameInputs ? m_frameInputs->previousTextureUnit : 17);
+	}
+	if (m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1) {
+		const bool valid = m_frameInputs && m_frameInputs->cloudHistory && m_frameInputs->cloudHistoryValid;
+		SetUniform(m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM], m_frameInputs ? m_frameInputs->cloudHistoryUnit : 18);
+		if (m_predefinedUniforms[GE_CLOUDS_HISTORY_DEPTH_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_CLOUDS_HISTORY_DEPTH_UNIFORM], m_frameInputs ? m_frameInputs->cloudHistoryDepthUnit : 19);
+		}
+		if (m_predefinedUniforms[GE_CLOUDS_HISTORY_VALID_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_CLOUDS_HISTORY_VALID_UNIFORM], valid ? 1.0f : 0.0f);
+		}
+		if (m_predefinedUniforms[GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM],
+			           valid ? m_frameInputs->cloudHistoryViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
+		}
+	}
+
+	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
+		glUniform4fv(m_predefinedUniforms[GE_VFOG_DATA_UNIFORM], BuildInFilters::VFOG_DATA_VEC4, m_buildInFilters.vfog_data);
+		if (m_predefinedUniforms[GE_VFOG_MATS_UNIFORM] != -1) {
+			glUniformMatrix4fv(m_predefinedUniforms[GE_VFOG_MATS_UNIFORM], 6, GL_FALSE, m_buildInFilters.vfog_mats);
+		}
+		if (m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM], kVFogShadowUnit);
+		}
+		if (m_predefinedUniforms[GE_VFOG_SHADOW1_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_VFOG_SHADOW1_UNIFORM], kVFogShadowUnit + 1);
+		}
 	}
 
 	/* BuildIn Uniforms */

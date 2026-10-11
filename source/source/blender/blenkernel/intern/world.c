@@ -267,6 +267,24 @@ void BKE_world_init(World *wrld)
 	wrld->vcloud_quality = 1; /* Medium */
 	wrld->vcloud_shadow_strength = 0.5f;
 
+	wrld->vfog_density = 0.05f;
+	wrld->vfog_base = 0.0f;
+	wrld->vfog_falloff = 10.0f;
+	wrld->vfog_distance = 200.0f;
+	wrld->vfog_noise_scale = 0.1f;
+	wrld->vfog_noise_amount = 0.5f;
+	wrld->vfog_speed = 0.3f;
+	wrld->vfog_anisotropy = 0.3f;
+	wrld->vfog_color[0] = wrld->vfog_color[1] = wrld->vfog_color[2] = 0.85f;
+	wrld->vfog_light_intensity = 1.0f;
+	wrld->vfog_sun_intensity = 1.0f;
+	wrld->vfog_ambient = 0.3f;
+	wrld->vfog_edge = 0.3f;
+	wrld->vfog_shaft_intensity = 1.0f;
+	wrld->vfog_quality = 1;
+	wrld->vfog_flag |= WO_VFOG_LAMPS | WO_VFOG_SHAFTS;
+	wrld->vfog_max_lights = 4;
+
 	wrld->flare_scale = 1.0f;
 	wrld->flare_intensity = 1.0f;
 

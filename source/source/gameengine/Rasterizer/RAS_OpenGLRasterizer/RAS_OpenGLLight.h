@@ -67,6 +67,7 @@ public:
 	mt::mat4 GetViewMat();
 	mt::mat4 GetWinMat();
 	mt::mat4 GetShadowMatrix();
+	mt::mat4 GetShadowWorldMatrix();
 	int GetShadowLayer();
 	void BindShadowBuffer(RAS_ICanvas *canvas, KX_Camera *cam, mt::mat3x4& camtrans);
 	void UnbindShadowBuffer();

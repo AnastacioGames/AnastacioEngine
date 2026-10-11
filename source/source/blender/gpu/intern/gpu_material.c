@@ -5416,6 +5416,11 @@ const float *GPU_lamp_dynpersmat(GPULamp *lamp)
 	return &lamp->dynpersmat[0][0];
 }
 
+const float *GPU_lamp_get_persmat(GPULamp *lamp)
+{
+	return &lamp->persmat[0][0];
+}
+
 const float *GPU_lamp_get_viewmat(GPULamp *lamp)
 {
 	return &lamp->viewmat[0][0];

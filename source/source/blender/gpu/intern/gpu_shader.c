@@ -105,6 +105,8 @@ extern char datatoc_gpu_shader_fx_fxaa_frag_glsl[];
 extern char datatoc_gpu_shader_fx_lensflare_frag_glsl[];
 extern char datatoc_gpu_shader_fx_rain_frag_glsl[];
 extern char datatoc_gpu_shader_fx_clouds_frag_glsl[];
+extern char datatoc_gpu_shader_fx_vfog_frag_glsl[];
+extern char datatoc_gpu_shader_vfog_lib_glsl[];
 extern char datatoc_gpu_shader_fx_grain_frag_glsl[];
 extern char datatoc_gpu_shader_fx_dof_frag_glsl[];
 extern char datatoc_gpu_shader_fx_dof_vert_glsl[];
@@ -1688,6 +1690,11 @@ GPUShader *GPU_shader_get_builtin_fx_shader(int effect, bool persp)
 
 			case GPU_SHADER_FX_CLOUDS:
 				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_clouds_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
+				break;
+
+			case GPU_SHADER_FX_VFOG:
+				/* The fog is shared with the game filter, passed as the library code. */
+				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_vfog_frag_glsl, NULL, datatoc_gpu_shader_vfog_lib_glsl, defines, 0, 0, 0);
 				break;
 
 			case GPU_SHADER_FX_GRAIN:

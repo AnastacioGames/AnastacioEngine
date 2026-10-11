@@ -197,6 +197,18 @@ typedef struct World {
 	float atmo_mie_g;              /* direcao do Mie: brilho em volta do sol */
 	float atmo_altitude;           /* altura da camera em metros */
 
+	/* Volumetric Fog: neblina de altura com ruido, iluminada pelo sol e tingida pelas lampadas
+	 * Point/Spot proximas; Fog Volumes (objetos com a propriedade de jogo "fog_volume") limitam
+	 * a neblina a caixas. vfog_falloff == 0 marca arquivo antigo (readfile.c). */
+	float vfog_density, vfog_base, vfog_falloff, vfog_distance;
+	float vfog_noise_scale, vfog_noise_amount, vfog_speed, vfog_anisotropy;
+	float vfog_color[3], vfog_light_intensity;
+	float vfog_sun_intensity, vfog_ambient, vfog_edge, vfog_shaft_intensity;
+	short vfog_quality;    /* 0=Low,1=Medium,2=High */
+	short vfog_flag;       /* WO_VFOG_* */
+	short vfog_max_lights; /* 1-8 lampadas que tingem a neblina */
+	short vfog_pad;
+
 	ListBase gpumaterial;		/* runtime */
 
 	/* game engine: properties shared by all objects through the World ("World Properties") */
@@ -276,6 +288,14 @@ typedef struct World {
 #define WO_VCLOUDS_EXPANDED        (1 << 1)
 #define WO_VCLOUDS_EDITOR_HIDE     (1 << 2)
 #define WO_VCLOUDS_SHADOW_ENABLE   (1 << 3)
+
+/* World.vfog_flag */
+#define WO_VFOG_ENABLE        (1 << 0)
+#define WO_VFOG_EXPANDED      (1 << 1)
+#define WO_VFOG_EDITOR_HIDE   (1 << 2)
+#define WO_VFOG_LAMPS         (1 << 3)
+#define WO_VFOG_SHAFTS        (1 << 4)
+#define WO_VFOG_VOLUMES_ONLY  (1 << 5)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

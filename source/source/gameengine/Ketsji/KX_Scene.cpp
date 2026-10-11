@@ -443,6 +443,11 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			}
 		}
 
+		/* Volumetric Fog: parameters, lamps and volumes are refreshed every frame (KX_RenderPipeline). */
+		if (world->vfog_flag & WO_VFOG_ENABLE) {
+			filters.useVFog = true;
+		}
+
 		if (world->weather_flag & WO_WEATHER_LENSFLARE) {
 			filters.useLensFlare = true;
 			filters.flare_scale = world->flare_scale;

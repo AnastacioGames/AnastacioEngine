@@ -36,6 +36,10 @@
 #include "RAS_FramingManager.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
+#include "DNA_lamp_types.h" // LA_SHADMAP_VARIANCE
+#include "RAS_ILightObject.h"
+#include <algorithm>
+#include <vector>
 #include "KX_RainAura.h"
 #include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
@@ -111,6 +115,139 @@ KX_RenderData::KX_RenderData(RAS_Rasterizer::StereoMode stereoMode, bool renderP
 KX_RenderPipeline::KX_RenderPipeline(KX_KetsjiEngine *engine)
 	:m_engine(engine)
 {
+}
+
+/* Volumetric Fog per frame data (layout in gpu_shader_vfog_lib.glsl): World settings, the sun,
+ * the strongest Point/Spot lamps around the camera, up to 2 Spot shadow maps for the light
+ * shafts and up to 4 Fog Volumes (objects with the game property "fog_volume"). */
+static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const World *world, float time,
+                                 const mt::vec3& camPos)
+{
+	float *d = params->vfog_data;
+	std::fill(d, d + BuildInFilters::VFOG_DATA_VEC4 * 4, 0.0f);
+	std::fill(params->vfog_mats, params->vfog_mats + 16 * 6, 0.0f);
+	params->vfog_shadow_tex[0] = params->vfog_shadow_tex[1] = 0;
+
+	const int quality = std::max(0, std::min<int>(world->vfog_quality, 2));
+	d[0] = world->vfog_density;
+	d[1] = world->vfog_base;
+	d[2] = std::max(world->vfog_falloff, 0.01f);
+	d[3] = std::max(world->vfog_distance, 1.0f);
+	d[4] = world->vfog_noise_scale;
+	d[5] = world->vfog_noise_amount;
+	d[6] = (float)std::fmod((double)time * world->vfog_speed, 10000.0);
+	d[7] = world->vfog_anisotropy;
+	d[8] = world->vfog_color[0];
+	d[9] = world->vfog_color[1];
+	d[10] = world->vfog_color[2];
+	d[11] = (float)quality;
+	if (KX_LightObject *sun = scene->GetWorldSun()) {
+		const mt::vec3 sunDir = sun->NodeGetWorldOrientation().GetColumn(2).Normalized();
+		const RAS_ILightObject *data = sun->GetLightData();
+		d[12] = sunDir.x;
+		d[13] = sunDir.y;
+		d[14] = sunDir.z;
+		d[15] = 1.0f;
+		for (int i = 0; i < 3; ++i) {
+			d[16 + i] = data->m_color[i] * std::min(data->m_energy, 4.0f) * world->vfog_sun_intensity;
+		}
+	}
+	d[20] = world->horr * world->vfog_ambient;
+	d[21] = world->horg * world->vfog_ambient;
+	d[22] = world->horb * world->vfog_ambient;
+	d[26] = world->vfog_light_intensity;
+	d[27] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
+	d[32] = world->vfog_edge;
+	d[33] = world->vfog_shaft_intensity;
+
+	/* Fog Volumes: unit box of the object (the default cube), world -> local. */
+	int volumes = 0;
+	for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+		if (volumes >= 4) {
+			break;
+		}
+		EXP_Value *prop = gameobj->GetProperty("fog_volume");
+		if (!prop) {
+			continue;
+		}
+		const mt::mat4 inv = mt::mat4::FromAffineTransform(gameobj->NodeGetWorldTransform()).Inverse();
+		inv.Pack(params->vfog_mats + 16 * volumes);
+		d[28 + volumes] = std::max(0.0f, (float)prop->GetNumber());
+		++volumes;
+	}
+	d[25] = (float)volumes;
+
+	/* Lamps: strongest at the camera first, only the ones whose reach gets near the fogged part. */
+	int lampCount = 0;
+	if (world->vfog_flag & WO_VFOG_LAMPS) {
+		static const int presetMax[3] = {2, 4, 8};
+		const int maxLamps = std::max(1, std::min<int>(std::min<int>(world->vfog_max_lights, 8), presetMax[quality]));
+		struct Candidate {
+			KX_LightObject *light;
+			float score;
+		};
+		std::vector<Candidate> candidates;
+		const float reach = d[3];
+		for (KX_LightObject *light : *scene->GetLightList()) {
+			RAS_ILightObject *data = light->GetLightData();
+			if (!light->GetVisible() || data->m_energy <= 0.0f ||
+			    (data->m_type != RAS_ILightObject::LIGHT_NORMAL && data->m_type != RAS_ILightObject::LIGHT_SPOT))
+			{
+				continue;
+			}
+			const float dist = (light->NodeGetWorldPosition() - camPos).Length();
+			if (dist > reach + data->m_distance) {
+				continue;
+			}
+			const float r = std::max(data->m_distance, 0.01f);
+			candidates.push_back({light, data->m_energy * r * r / (r * r + dist * dist)});
+		}
+		std::sort(candidates.begin(), candidates.end(),
+		          [](const Candidate& a, const Candidate& b) { return a.score > b.score; });
+		int shadows = 0;
+		for (const Candidate& c : candidates) {
+			if (lampCount >= maxLamps) {
+				break;
+			}
+			RAS_ILightObject *data = c.light->GetLightData();
+			float *l = d + 4 * (12 + 4 * lampCount);
+			const mt::vec3& pos = c.light->NodeGetWorldPosition();
+			l[0] = pos.x;
+			l[1] = pos.y;
+			l[2] = pos.z;
+			l[3] = data->m_distance;
+			for (int i = 0; i < 3; ++i) {
+				l[4 + i] = data->m_color[i] * data->m_energy;
+			}
+			l[7] = -1.0f;
+			l[11] = -2.0f;
+			if (data->m_type == RAS_ILightObject::LIGHT_SPOT) {
+				/* Blender spots point down their -Z; same cone/blend as the lamp shading. */
+				const mt::vec3 dir = -c.light->NodeGetWorldOrientation().GetColumn(2).Normalized();
+				const float cosOuter = std::cos(data->m_spotsize * 0.5f);
+				l[8] = dir.x;
+				l[9] = dir.y;
+				l[10] = dir.z;
+				l[11] = cosOuter;
+				l[12] = cosOuter + (1.0f - cosOuter) * data->m_spotblend;
+				/* Light shafts: shadow map of up to 2 Spot lamps (Variance maps are color textures). */
+				if ((world->vfog_flag & WO_VFOG_SHAFTS) && quality > 0 && shadows < 2 && data->HasShadowBuffer() &&
+				    data->m_shadowmaptype != LA_SHADMAP_VARIANCE)
+				{
+					const int code = data->GetShadowBindCode();
+					if (code > 0) {
+						params->vfog_shadow_tex[shadows] = (unsigned int)code;
+						data->GetShadowWorldMatrix().Pack(params->vfog_mats + 16 * (4 + shadows));
+						l[7] = (float)shadows;
+						l[13] = 0.0005f;
+						++shadows;
+					}
+				}
+			}
+			++lampCount;
+		}
+	}
+	d[24] = (float)lampCount;
 }
 
 void KX_RenderPipeline::Render()
@@ -845,6 +982,12 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 					cloudParams->vcloud_sundir[1] = sunDir.y;
 					cloudParams->vcloud_sundir[2] = sunDir.z;
 				}
+			}
+		}
+		if (RAS_2DFilter *vfog = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_VFOG, true)) {
+			if (const World *world = scene->GetBlenderScene()->world) {
+				KX_FillVolumetricFog(vfog->GetBuildInFilters(), scene, world, time,
+				                     rasterizer->GetViewMatrix().Inverse().TranslationVector3D());
 			}
 		}
 		if (flareFilter) {

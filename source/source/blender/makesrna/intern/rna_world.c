@@ -711,6 +711,142 @@ static void rna_def_world_weather(BlenderRNA *brna)
 		RNA_def_property_update(prop, 0, "rna_World_draw_update");
 	}
 
+	/* Volumetric Fog */
+	{
+		static const EnumPropertyItem vfog_quality_items[] = {
+			{0, "LOW", 0, "Low", "Analytic fog without raymarch, 2 lamps, no light shafts (cheapest, iGPU)"},
+			{1, "MEDIUM", 0, "Medium", "12 raymarch steps, 4 lamps, Spot light shafts"},
+			{2, "HIGH", 0, "High", "24 raymarch steps, 8 lamps, Spot light shafts"},
+			{0, NULL, 0, NULL, NULL}
+		};
+
+		prop = RNA_def_property(srna, "use_volumetric_fog", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_ENABLE);
+		RNA_def_property_ui_text(prop, "Use Volumetric Fog", "Height fog with noise, lit by the sun and tinted by nearby Point/Spot lamps");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "show_expanded_vfog", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_EXPANDED);
+		RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
+		RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+		RNA_def_property_update(prop, 0, NULL);
+
+		prop = RNA_def_property(srna, "show_viewport_vfog", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_negative_sdna(prop, NULL, "vfog_flag", WO_VFOG_EDITOR_HIDE);
+		RNA_def_property_ui_text(prop, "Render Volumetric Fog", "Render Volumetric Fog in Viewport");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_lamps", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_LAMPS);
+		RNA_def_property_ui_text(prop, "Lamps", "Nearby Point and Spot lamps light and tint the fog with their color");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_shafts", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_SHAFTS);
+		RNA_def_property_ui_text(prop, "Light Shafts", "Spot lamps with shadow cast light shafts in the fog (Medium/High)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_volumes_only", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_VOLUMES_ONLY);
+		RNA_def_property_ui_text(prop, "Only Fog Volumes", "Fog exists only inside objects with the game property fog_volume (box of the object, like the default cube)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_density", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 1.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Density", "Fog density at the base height");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_base", PROP_FLOAT, PROP_DISTANCE);
+		RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
+		RNA_def_property_ui_range(prop, -100.0f, 1000.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Base Height", "Height where the fog starts thinning out");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_falloff", PROP_FLOAT, PROP_DISTANCE);
+		RNA_def_property_range(prop, 0.01f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.1f, 500.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Height Falloff", "Height over which the fog thins out above the base");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_distance", PROP_FLOAT, PROP_DISTANCE);
+		RNA_def_property_range(prop, 1.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 10.0f, 5000.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Max Distance", "Fog is only computed up to this distance from the camera (also the sky)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_noise_scale", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0001f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.01f, 2.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Noise Scale", "Size of the fog puffs (smaller value = bigger puffs)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_noise_amount", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0f, 1.0f);
+		RNA_def_property_ui_range(prop, 0.0f, 1.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Noise", "How patchy the fog is; 0 is uniform and cheaper");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_speed", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
+		RNA_def_property_ui_range(prop, -2.0f, 2.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Speed", "Speed at which the fog drifts");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_anisotropy", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, -0.9f, 0.9f);
+		RNA_def_property_ui_range(prop, 0.0f, 0.9f, 10, 3);
+		RNA_def_property_ui_text(prop, "Anisotropy", "How much brighter the fog is when looking toward a light (0 = same in every direction)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_color", PROP_FLOAT, PROP_COLOR);
+		RNA_def_property_float_sdna(prop, NULL, "vfog_color");
+		RNA_def_property_array(prop, 3);
+		RNA_def_property_ui_text(prop, "Color", "Color of the fog");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_light_intensity", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Lamp Intensity", "How strongly the Point/Spot lamps light the fog");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_sun_intensity", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 5.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Sun Intensity", "How strongly the sun lights the fog");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_ambient", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 2.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Ambient", "Light from the sky (horizon color) on the fog, keeps it from going black");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_edge", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0f, 1.0f);
+		RNA_def_property_ui_range(prop, 0.0f, 1.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Volume Edge", "Softness of the Fog Volume edges");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_shaft_intensity", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 4.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Shaft Intensity", "Strength of the shadowed Spot light shafts");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_quality", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "vfog_quality");
+		RNA_def_property_enum_items(prop, vfog_quality_items);
+		RNA_def_property_ui_text(prop, "Quality", "Raymarch steps, lamp count and light shafts preset");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_max_lights", PROP_INT, PROP_NONE);
+		RNA_def_property_range(prop, 1, 8);
+		RNA_def_property_ui_text(prop, "Max Lamps", "Most lamps that tint the fog at once (the strongest near the camera); the quality preset can lower it");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	}
+
 	prop = RNA_def_property(srna, "show_viewport_lensflare", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_LENSFLARE);
 	RNA_def_property_ui_text(prop, "Render Lens Flare", "Render Lens Flare in Viewport");

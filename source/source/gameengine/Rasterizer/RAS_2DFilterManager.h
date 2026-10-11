@@ -56,10 +56,12 @@ public:
 		FILTERPASS_TONEMAP      = 16,
 		FILTERPASS_RAIN         = 17,
 		FILTERPASS_CLOUDS       = 18,
-		FILTERPASS_LENSFLARE    = 19,
+		/* Volumetric Fog after the clouds: the fog also covers the sky and the clouds behind it */
+		FILTERPASS_VFOG         = 19,
+		FILTERPASS_LENSFLARE    = 20,
 		/* Camera FX (KX_Camera game_fx), only present while their effects are on */
-		FILTERPASS_CAMERA_DOF   = 20,
-		FILTERPASS_CAMERA_LENS  = 21
+		FILTERPASS_CAMERA_DOF   = 21,
+		FILTERPASS_CAMERA_LENS  = 22
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
@@ -150,6 +152,15 @@ private:
 
 	/// Copy the final image of the chain for bgl_PreviousTexture of the next frame.
 	void UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs);
+
+	/// Size and viewport of the Volumetric Clouds history; a different viewport (another
+	/// split screen camera) or size invalidates it so the next frame marches every pixel.
+	int m_cloudHistoryWidth = 0;
+	int m_cloudHistoryHeight = 0;
+	int m_cloudHistoryViewport[4] = {0, 0, 0, 0};
+
+	/// Copy the clouds filter output (color) and the scene depth for the next frame's reuse.
+	void UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScreen *cloudofs, RAS_OffScreen *depthofs, const int viewport[4]);
 
 	/** Creates a filter matching the given filter data. Returns nullptr if no
 	 * filter can be created with such information.

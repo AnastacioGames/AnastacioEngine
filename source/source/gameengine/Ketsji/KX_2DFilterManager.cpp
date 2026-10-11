@@ -57,6 +57,8 @@ extern "C" {
 
 	extern char datatoc_RAS_Rain2DFilter_glsl[];
 	extern char datatoc_RAS_Clouds2DFilter_glsl[];
+	extern char datatoc_RAS_VolumetricFog2DFilter_glsl[];
+	extern char datatoc_gpu_shader_vfog_lib_glsl[];
 	extern char datatoc_RAS_LensFlare2DFilter_glsl[];
 	extern char datatoc_RAS_CameraDof2DFilter_glsl[];
 	extern char datatoc_RAS_CameraLens2DFilter_glsl[];
@@ -78,6 +80,7 @@ KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filte
 
 	EnsureRainFilters(filters);
 	EnsureCloudsFilters(filters);
+	EnsureVFogFilters(filters);
 	EnsureLensFlareFilters(filters);
 }
 
@@ -381,6 +384,29 @@ void KX_2DFilterManager::EnsureCloudsFilters(BuildInFilters filters)
 	cloudsData.shaderText = datatoc_RAS_Clouds2DFilter_glsl;
 
 	AddFilter(cloudsData, true);
+}
+
+void KX_2DFilterManager::EnsureVFogFilters(BuildInFilters filters)
+{
+	if (!filters.useVFog) {
+		return;
+	}
+	if (GetFilterPass(FILTERPASS_VFOG, true)) {
+		// Already built.
+		return;
+	}
+
+	RAS_2DFilterData fogData;
+	fogData.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	fogData.filterPassIndex = FILTERPASS_VFOG;
+	fogData.gameObject = nullptr;
+	fogData.mipmap = false;
+	fogData.propertyNames = {};
+	fogData.buildInFilters = filters;
+	/* The fog is shared with the 3D View pass (gpu_shader_vfog_lib.glsl). */
+	fogData.shaderText = std::string(datatoc_gpu_shader_vfog_lib_glsl) + datatoc_RAS_VolumetricFog2DFilter_glsl;
+
+	AddFilter(fogData, true);
 }
 
 void KX_2DFilterManager::EnsureLensFlareFilters(BuildInFilters filters)

@@ -301,6 +301,17 @@ mt::mat4 RAS_OpenGLLight::GetShadowMatrix()
 	return mt::mat4::Identity();
 }
 
+mt::mat4 RAS_OpenGLLight::GetShadowWorldMatrix()
+{
+	GPULamp *lamp;
+
+	if ((lamp = GetGPULamp())) {
+		return mt::mat4(GPU_lamp_get_persmat(lamp));
+	}
+
+	return mt::mat4::Identity();
+}
+
 int RAS_OpenGLLight::GetShadowLayer()
 {
 	GPULamp *lamp;

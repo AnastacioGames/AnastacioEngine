@@ -30,6 +30,15 @@ uniform vec4 ge_VCloudsParams3;
 uniform vec3 ge_VCloudsColor;
 uniform vec3 ge_VCloudsSunDir;
 
+/* Temporal reuse: each frame only 1 tile of every 2x2 tile block marches the volumetric clouds,
+ * the other 3 reproject this filter's previous output by view direction (clouds are far, so
+ * rotation dominates). History depth rejects pixels that were geometry last frame. */
+uniform sampler2D ge_CloudsHistory;
+uniform sampler2D ge_CloudsHistoryDepth;
+uniform float ge_CloudsHistoryValid;
+uniform mat4 ge_CloudsHistoryViewProj;
+uniform int bgl_Frame;
+
 vec2 texcoord;
 
 float cloudHash(vec3 p)
@@ -76,10 +85,17 @@ float cloudFbm(vec3 p)
 	return sum;
 }
 
-/* cloudFbm with a chosen octave count (Detail, 1-8). Normalized to the 5-octave range so the
- * coverage reads the same at any Detail; 5 octaves gives exactly cloudFbm. */
-float cloudFbmDetail(vec3 p, float octaves)
+/* Clouds coverage mask: smoothstep(lo, hi, fbm) where fbm is cloudFbm with a chosen octave count
+ * (Detail, 1-8), normalized to the 5-octave range so the coverage reads the same at any Detail.
+ * Adaptive octaves: cloudNoise is in [0, 1], so after each octave the final value is bounded by
+ * [sum, sum + remaining amplitudes] (times the normalization). Once that whole range is at or below
+ * lo (clear sky) or at or above hi (fully covered) the smoothstep is already 0 or 1 and the
+ * remaining octaves can't change it -- stop there. Pixels that do run every octave get exactly the
+ * same sum, in the same order, as before. */
+float cloudCoverageMask(vec3 p, float octaves, float lo, float hi)
 {
+	float ampEnd = 0.5 * exp2(-clamp(ceil(octaves), 0.0, 8.0)); /* amp after the last octave */
+	float norm = 0.96875 / (1.0 - 2.0 * ampEnd);
 	float sum = 0.0;
 	float amp = 0.5;
 	for (int i = 0; i < 8; i++) {
@@ -89,8 +105,14 @@ float cloudFbmDetail(vec3 p, float octaves)
 		sum += cloudNoise(p) * amp;
 		p *= 2.0;
 		amp *= 0.5;
+		if ((sum + 2.0 * (amp - ampEnd)) * norm <= lo) {
+			return 0.0;
+		}
+		if (sum * norm >= hi) {
+			return 1.0;
+		}
 	}
-	return sum * 0.96875 / (1.0 - 2.0 * amp);
+	return smoothstep(lo, hi, sum * 0.96875 / (1.0 - 2.0 * amp));
 }
 
 /* World-space view ray direction for this pixel, same trick used by the atmospheric
@@ -164,15 +186,32 @@ float cloudDensityAt(vec3 wp, float coverage, float scale, float detailScale, fl
 	return density * heightGrad * densityMul;
 }
 
-/* Mini-raymarch toward the sun (self-shadowing / light reaching the underside of the cloud). */
-float cloudLightMarch(vec3 wp, vec3 sunDir, float coverage, float scale, float detailScale, float altitude, float thickness, float densityMul)
+/* cloudDensityAt without the Worley erosion (the expensive part): used where the fine detail
+ * doesn't show -- light march, coarse empty-space skip and terrain shadow. */
+float cloudShapeAt(vec3 wp, float coverage, float scale, float altitude, float thickness, float densityMul)
 {
-	float stepLen = max(thickness, 1.0) * 0.15;
+	float hf = clamp((wp.z - altitude) / max(thickness, 1.0), 0.0, 1.0);
+	float heightGrad = smoothstep(0.0, 0.2, hf) * smoothstep(1.0, 0.65, hf);
+	if (heightGrad <= 0.001) {
+		return 0.0;
+	}
+	float shape = smoothstep(1.0 - coverage, 1.0, cloudFbm(wp * scale) + heightGrad * 0.15);
+	return shape * heightGrad * densityMul;
+}
+
+/* Mini-raymarch toward the sun (self-shadowing / light reaching the underside of the cloud).
+ * Fewer, longer steps on lower presets cover the same distance. */
+float cloudLightMarch(vec3 wp, vec3 sunDir, float coverage, float scale, float altitude, float thickness, float densityMul, int lightSteps)
+{
+	float stepLen = max(thickness, 1.0) * 0.9 / float(lightSteps);
 	float dens = 0.0;
 	vec3 p = wp;
 	for (int i = 0; i < 6; i++) {
+		if (i >= lightSteps) {
+			break;
+		}
 		p += sunDir * stepLen;
-		dens += cloudDensityAt(p, coverage, scale, detailScale, altitude, thickness, densityMul);
+		dens += cloudShapeAt(p, coverage, scale, altitude, thickness, densityMul);
 	}
 	return exp(-dens * stepLen * 0.25);
 }
@@ -220,6 +259,7 @@ vec4 volumetricCloudsRaymarch(vec3 camPos, vec3 rayDir, float maxDist, vec3 sunD
 
 	int coarseSteps = (quality <= 0) ? 24 : ((quality == 1) ? 48 : 64);
 	int detailSteps = (quality <= 0) ? 12 : ((quality == 1) ? 24 : 48);
+	int lightSteps = (quality <= 0) ? 3 : ((quality == 1) ? 4 : 6);
 
 	float top = altitude + thickness;
 	float t0, t1;
@@ -252,7 +292,7 @@ vec4 volumetricCloudsRaymarch(vec3 camPos, vec3 rayDir, float maxDist, vec3 sunD
 			break;
 		}
 		vec3 p = camPos + rayDir * t;
-		if (cloudDensityAt(p, coverage, scale, detailScale, altitude, thickness, densityMul) > 0.01) {
+		if (cloudShapeAt(p, coverage, scale, altitude, thickness, densityMul) > 0.01) {
 			inCloud = true;
 			enteredT = t;
 			break;
@@ -278,7 +318,7 @@ vec4 volumetricCloudsRaymarch(vec3 camPos, vec3 rayDir, float maxDist, vec3 sunD
 		vec3 p = camPos + rayDir * t;
 		float d = cloudDensityAt(p, coverage, scale, detailScale, altitude, thickness, densityMul);
 		if (d > 0.001) {
-			float lightT = cloudLightMarch(p, sunDir, coverage, scale, detailScale, altitude, thickness, densityMul);
+			float lightT = cloudLightMarch(p, sunDir, coverage, scale, altitude, thickness, densityMul, lightSteps);
 			float powder = 1.0 - exp(-d * 3.0);
 			float lit = lightT * mix(1.0, powder, 0.5) * phase;
 			float stepAbsorb = clamp(d * detailStep * 0.08, 0.0, 1.0);
@@ -290,8 +330,12 @@ vec4 volumetricCloudsRaymarch(vec3 camPos, vec3 rayDir, float maxDist, vec3 sunD
 			vec3 sampleColor = ambientColor * 0.25 + litColor * 1.3 * max(lit, 0.0);
 			accumColor += transmittance * stepAbsorb * sampleColor;
 			transmittance *= (1.0 - stepAbsorb);
+			t += detailStep;
 		}
-		t += detailStep;
+		else {
+			/* Empty gap inside the slab: stride over it at twice the step. */
+			t += detailStep * 2.0;
+		}
 	}
 
 	return vec4(accumColor, clamp(1.0 - transmittance, 0.0, 1.0));
@@ -323,13 +367,13 @@ float cloudTerrainShadow(vec3 worldPos, vec3 sunDir, vec4 p1, vec4 p2)
 		return 1.0;
 	}
 
-	const int steps = 12;
+	const int steps = 6;
 	float stepLen = (t1 - t0) / float(steps);
 	float dens = 0.0;
 	for (int i = 0; i < steps; i++) {
 		float t = t0 + stepLen * (float(i) + 0.5);
 		vec3 p = worldPos + sunDir * t;
-		dens += cloudDensityAt(p, coverage, scale, detailScale, altitude, thickness, densityMul);
+		dens += cloudShapeAt(p, coverage, scale, altitude, thickness, densityMul);
 	}
 	return exp(-dens * stepLen * 0.6);
 }
@@ -354,23 +398,36 @@ float skyNoise2(vec2 p)
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-/* Octaves = Detail (1-8), normalized to the 5-octave range; 5 gives the original look. */
-float skyFbm2(vec2 p, float octaves)
+/* skyNoise2 at p, plus skyNoise2 at q returned in nq. The relief sample q is a small offset of p, so
+ * on the low octaves it usually falls in the same lattice cell: then the 4 corner hashes are reused
+ * (same inputs, so bit-identical values) and only the interpolation is redone. */
+float skyNoise2Pair(vec2 p, vec2 q, out float nq)
 {
-	float sum = 0.0;
-	float amp = 0.5;
-	for (int i = 0; i < 8; i++) {
-		if (float(i) >= octaves) {
-			break;
-		}
-		sum += skyNoise2(p) * amp;
-		p = p * 2.03 + vec2(1.7, 9.2);
-		amp *= 0.5;
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = skyHash2(i);
+	float b = skyHash2(i + vec2(1.0, 0.0));
+	float c = skyHash2(i + vec2(0.0, 1.0));
+	float d = skyHash2(i + vec2(1.0, 1.0));
+	if (all(equal(floor(q), i))) {
+		vec2 g = fract(q);
+		vec2 v = g * g * (3.0 - 2.0 * g);
+		nq = mix(mix(a, b, v.x), mix(c, d, v.x), v.y);
 	}
-	return sum * 0.96875 / (1.0 - 2.0 * amp);
+	else {
+		nq = skyNoise2(q);
+	}
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-/* relief 0 skips the offset sample (one noise pass less) and leaves the layers flat. */
+/* Octaves = Detail (1-8), each FBM normalized to the 5-octave range; 5 gives the original look.
+ * The two layers (and the relief sample) are accumulated together, octave by octave, with the
+ * same per-layer math and order as separate FBMs. relief 0 skips the offset sample (one noise pass
+ * less) and leaves the layers flat.
+ * Adaptive octaves: alpha = clamp((a - b) * k) with k > 0 and noise in [0, 1]; once a can't catch up
+ * with b even if all its remaining octaves were 1 (and b's were 0), alpha is already 0 -- the caller
+ * mixes with alpha 0, so shade doesn't matter and the rest of the octaves (relief included) stop. */
 vec2 layeredClouds(vec3 viewDir, float coverage, float scale, float speed, float time, float octaves, float relief)
 {
 	float up = max(viewDir.z, 0.02);
@@ -378,12 +435,41 @@ vec2 layeredClouds(vec3 viewDir, float coverage, float scale, float speed, float
 	float t = time * speed;
 	vec2 pA = base + vec2(t * 0.5);
 	vec2 pB = (base + vec2(t)) * 0.5;
-	float a = skyFbm2(pA, octaves);
-	float b = skyFbm2(pB, octaves);
+	vec2 pL = pA + vec2(0.06, 0.04);
+	bool doRelief = relief > 0.001;
+	float ampEnd = 0.5 * exp2(-clamp(ceil(octaves), 0.0, 8.0)); /* amp after the last octave */
+	float sumA = 0.0;
+	float sumB = 0.0;
+	float sumL = 0.0;
+	float amp = 0.5;
+	for (int i = 0; i < 8; i++) {
+		if (float(i) >= octaves) {
+			break;
+		}
+		if (doRelief) {
+			float nL;
+			sumA += skyNoise2Pair(pA, pL, nL) * amp;
+			sumL += nL * amp;
+			pL = pL * 2.03 + vec2(1.7, 9.2);
+		}
+		else {
+			sumA += skyNoise2(pA) * amp;
+		}
+		sumB += skyNoise2(pB) * amp;
+		pA = pA * 2.03 + vec2(1.7, 9.2);
+		pB = pB * 2.03 + vec2(1.7, 9.2);
+		amp *= 0.5;
+		if (sumA - sumB + 2.0 * (amp - ampEnd) <= 0.0) {
+			return vec2(0.0, 0.8);
+		}
+	}
+	float norm = 1.0 - 2.0 * amp;
+	float a = sumA * 0.96875 / norm;
+	float b = sumB * 0.96875 / norm;
 	float alpha = clamp((a - b) * coverage * 20.0 * up, 0.0, 1.0);
 	float shade = 0.8;
-	if (relief > 0.001) {
-		float lit = skyFbm2(pA + vec2(0.06, 0.04), octaves);
+	if (doRelief) {
+		float lit = sumL * 0.96875 / norm;
 		shade = clamp(0.8 + (a - lit) * 6.0 * relief, 0.45, 1.2);
 	}
 	return vec2(alpha, shade);
@@ -416,21 +502,47 @@ void main()
 
 	/* World is Z-up (Blender/UPBGE convention) -- viewDir.z is elevation. */
 	vec3 viewDir = skyViewDirection(texcoord);
+
+	if (vcloudsOn && ge_CloudsHistoryValid > 0.5) {
+		/* Alternate whole 8x8 tiles, not single pixels: the GPU shades pixels in 32-64 wide
+		 * groups that wait for their slowest pixel, so a per-pixel checkerboard saves nothing. */
+		vec2 tile = mod(floor(gl_FragCoord.xy / 8.0), 2.0);
+		float slot = tile.x + 2.0 * tile.y;
+		if (slot != mod(float(bgl_Frame), 4.0)) {
+			/* Reproject the point where this ray crosses the middle of the cloud slab, not just
+			 * the direction: the camera also moves (orbit, driving), and the clouds are close
+			 * enough for that parallax to show as stale tiles. */
+			vec3 camPosH = (unfinvviewmat * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+			float midZ = ge_VCloudsParams2.x + max(1.0, ge_VCloudsParams2.y) * 0.5;
+			float tMid = (abs(viewDir.z) > 0.0001) ? (midZ - camPosH.z) / viewDir.z : -1.0;
+			vec4 clip = (tMid > 0.0) ? ge_CloudsHistoryViewProj * vec4(camPosH + viewDir * tMid, 1.0)
+			                         : ge_CloudsHistoryViewProj * vec4(viewDir, 0.0);
+			if (clip.w > 0.0) {
+				vec2 prevUV = clip.xy / clip.w * 0.5 + 0.5;
+				if (all(greaterThan(prevUV, vec2(0.0))) && all(lessThan(prevUV, vec2(1.0))) &&
+				    texture(ge_CloudsHistoryDepth, prevUV).x >= 0.9999)
+				{
+					gl_FragColor = vec4(texture(ge_CloudsHistory, prevUV).rgb, direct.a);
+					return;
+				}
+			}
+		}
+	}
 	/* Clouds only belong above the horizon -- fade them out toward and below it instead of a hard cut, since the
 	 * depth test above can't tell an infinite ground plane's background fill from real sky. */
 	float horizonFade = smoothstep(-0.02, 0.18, viewDir.z);
 	vec3 color = direct.rgb;
 
+	/* Below the horizon fade both 2D layers are multiplied by 0 -- skip their noise entirely. */
 	float coverage = ge_CloudsParams.x;
-	if (mod(ge_CloudsMask, 2.0) > 0.5 && coverage > 0.001) {
+	if (horizonFade > 0.0 && mod(ge_CloudsMask, 2.0) > 0.5 && coverage > 0.001) {
 		float scale = max(0.0001, ge_CloudsParams.y);
 		vec3 p = viewDir * scale * 4.0 + vec3(ge_CloudsParams.w * ge_CloudsParams.z, 0.0, 0.0);
-		float density = cloudFbmDetail(p, ge_CloudsQuality.x);
-		float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density) * horizonFade;
+		float mask = cloudCoverageMask(p, ge_CloudsQuality.x, 1.0 - coverage, 1.0 - coverage + 0.25) * horizonFade;
 		color = mix(color, ge_CloudsColor, mask);
 	}
 
-	if (mod(floor(ge_CloudsMask / 2.0), 2.0) > 0.5 && ge_SkyLayersParams.x > 0.001) {
+	if (horizonFade > 0.0 && mod(floor(ge_CloudsMask / 2.0), 2.0) > 0.5 && ge_SkyLayersParams.x > 0.001) {
 		vec2 layered = layeredClouds(viewDir, ge_SkyLayersParams.x, max(0.0001, ge_SkyLayersParams.y), ge_SkyLayersParams.z, ge_SkyLayersParams.w,
 		                               ge_CloudsQuality.y, ge_CloudsQuality.z);
 		color = mix(color, ge_SkyLayersColor * layered.y, layered.x * horizonFade);

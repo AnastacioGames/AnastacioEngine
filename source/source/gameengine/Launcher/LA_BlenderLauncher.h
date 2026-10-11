@@ -88,6 +88,19 @@ protected:
 	};
 	std::map<Object *, LiveObjectSnapshot> m_liveSnapshots;
 
+	/// World of each running scene, copied right before the UI step: KX_WorldInfo writes its own
+	/// copies (colors, sun size...) back into the World every frame, so only a difference to
+	/// this copy is a panel edit.
+	struct LiveWorldSnapshot {
+		float hor[3], zen[3], amb[3];
+		float sunSize, exposure, range, mistStart, mistDist, mistIntensity;
+		std::vector<LivePropSnapshot> props;
+	};
+	std::map<struct World *, LiveWorldSnapshot> m_liveWorlds;
+
+	void LiveWorldsTake();
+	void LiveSyncWorlds();
+
 	static void LiveSnapshotTake(Object *ob, LiveObjectSnapshot &snap);
 	void LiveSyncFromBlender();
 	static void LiveSyncVehicle(KX_GameObject *gameobj, Object *ob, const LiveObjectSnapshot &old);

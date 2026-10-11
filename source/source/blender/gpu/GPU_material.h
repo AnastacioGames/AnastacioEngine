@@ -456,6 +456,8 @@ void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp);
 int GPU_lamp_shadow_buffer_type(GPULamp *lamp);
 int GPU_lamp_shadow_bind_code(GPULamp *lamp);
 const float *GPU_lamp_dynpersmat(GPULamp *lamp);
+/* World space -> shadow map texture coordinates ([0, 1] range), without the camera. */
+const float *GPU_lamp_get_persmat(GPULamp *lamp);
 const float *GPU_lamp_get_viewmat(GPULamp *lamp);
 const float *GPU_lamp_get_winmat(GPULamp *lamp);
 

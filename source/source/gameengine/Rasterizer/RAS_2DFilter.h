@@ -104,6 +104,19 @@ public:
 		BGL_FRAME_UNIFORM,
 		BGL_PREVIOUS_TEXTURE_UNIFORM,
 
+		/* Volumetric Clouds temporal reuse (history of the clouds filter's own output). */
+		GE_CLOUDS_HISTORY_UNIFORM,
+		GE_CLOUDS_HISTORY_DEPTH_UNIFORM,
+		GE_CLOUDS_HISTORY_VALID_UNIFORM,
+		GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM,
+
+		/* Volumetric Fog (gpu_shader_vfog_lib.glsl): parameters/lamps, volume and shadow
+		 * matrices, and the shadow maps of up to 2 Spot lamps casting light shafts. */
+		GE_VFOG_DATA_UNIFORM,
+		GE_VFOG_MATS_UNIFORM,
+		GE_VFOG_SHADOW0_UNIFORM,
+		GE_VFOG_SHADOW1_UNIFORM,
+
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};
 
@@ -115,6 +128,16 @@ public:
 		unsigned int previousTexture = 0;
 		int previousTextureUnit = 17;
 		mt::mat4 prevViewProjection = mt::mat4::Identity();
+
+		/// Volumetric Clouds temporal reuse: color/depth the clouds filter output last time,
+		/// with the view-projection it was drawn with (per history, not per manager call, so
+		/// split screen cameras sharing the manager don't reuse each other's frames).
+		unsigned int cloudHistory = 0;
+		unsigned int cloudHistoryDepth = 0;
+		int cloudHistoryUnit = 18;
+		int cloudHistoryDepthUnit = 19;
+		bool cloudHistoryValid = false;
+		mt::mat4 cloudHistoryViewProjection = mt::mat4::Identity();
 	};
 
 protected:
@@ -192,6 +215,11 @@ public:
 	bool UsesPreviousTexture() const
 	{
 		return m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1;
+	}
+	/// True for the clouds filter when it reuses its previous output (ge_CloudsHistory).
+	bool UsesCloudHistory() const
+	{
+		return m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1;
 	}
 
 	const std::string& GetSourceName() const

@@ -3788,6 +3788,27 @@ static void direct_link_world(FileData *fd, World *wrld)
 		wrld->vcloud_shadow_strength = 0.5f;
 	}
 
+	/* Volumetric Fog: falloff is never 0 (range > 0), so 0 means the file predates it. */
+	if (wrld->vfog_falloff == 0.0f) {
+		wrld->vfog_density = 0.05f;
+		wrld->vfog_base = 0.0f;
+		wrld->vfog_falloff = 10.0f;
+		wrld->vfog_distance = 200.0f;
+		wrld->vfog_noise_scale = 0.1f;
+		wrld->vfog_noise_amount = 0.5f;
+		wrld->vfog_speed = 0.3f;
+		wrld->vfog_anisotropy = 0.3f;
+		wrld->vfog_color[0] = wrld->vfog_color[1] = wrld->vfog_color[2] = 0.85f;
+		wrld->vfog_light_intensity = 1.0f;
+		wrld->vfog_sun_intensity = 1.0f;
+		wrld->vfog_ambient = 0.3f;
+		wrld->vfog_edge = 0.3f;
+		wrld->vfog_shaft_intensity = 1.0f;
+		wrld->vfog_quality = 1;
+		wrld->vfog_flag |= WO_VFOG_LAMPS | WO_VFOG_SHAFTS;
+		wrld->vfog_max_lights = 4;
+	}
+
 	/* Quality of Clouds and Sky Layers: detail is never 0 (range 1-8), so 0 means the file
 	 * predates it. Medium (5 octaves, relief 1) is exactly the look those files had. */
 	if (wrld->cloud_detail == 0) {

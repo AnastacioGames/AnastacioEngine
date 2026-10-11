@@ -59,6 +59,7 @@ extern "C" {
 #  include "DNA_object_types.h"
 #  include "DNA_view3d_types.h"
 #  include "DNA_property_types.h"
+#  include "DNA_world_types.h"
 #  include "DNA_python_component_types.h"
 
 #  include "WM_types.h"
@@ -68,7 +69,10 @@ extern "C" {
 
 #  include "BLI_rect.h"
 #  include "BLI_listbase.h"
+#  include "BLI_math_vector.h"
 }
+
+#include "KX_WorldInfo.h"
 
 LA_BlenderLauncher::LA_BlenderLauncher(GHOST_ISystem *system, Main *maggie, Scene *scene, GlobalSettings *gs, RAS_Rasterizer::StereoMode stereoMode,
                                        int argc, char **argv, bContext *context, rcti *camframe, ARegion *ar, int alwaysUseExpandFraming)
@@ -181,6 +185,7 @@ void LA_BlenderLauncher::ExitEngine()
 		WM_game_live_ui_end();
 		m_liveUI = false;
 		m_liveSnapshots.clear();
+		m_liveWorlds.clear();
 	}
 
 	LA_Launcher::ExitEngine();
@@ -490,13 +495,119 @@ void LA_BlenderLauncher::LiveSyncFromBlender()
 	}
 }
 
+void LA_BlenderLauncher::LiveWorldsTake()
+{
+	for (KX_Scene *scene : *m_ketsjiEngine->CurrentScenes()) {
+		World *world = scene->GetBlenderScene()->world;
+		if (!world) {
+			continue;
+		}
+		LiveWorldSnapshot &snap = m_liveWorlds[world];
+		copy_v3_fl3(snap.hor, world->horr, world->horg, world->horb);
+		copy_v3_fl3(snap.zen, world->zenr, world->zeng, world->zenb);
+		copy_v3_fl3(snap.amb, world->ambr, world->ambg, world->ambb);
+		snap.sunSize = world->sun_size;
+		snap.exposure = world->exp;
+		snap.range = world->range;
+		snap.mistStart = world->miststa;
+		snap.mistDist = world->mistdist;
+		snap.mistIntensity = world->misi;
+		snap.props.clear();
+		for (bProperty *prop = (bProperty *)world->prop.first; prop; prop = prop->next) {
+			LivePropSnapshot ps;
+			ps.name = prop->name;
+			ps.type = prop->type;
+			ps.data = prop->data;
+			if (prop->type == GPROP_STRING && prop->poin) {
+				ps.str = (const char *)prop->poin;
+			}
+			snap.props.push_back(ps);
+		}
+	}
+}
+
+void LA_BlenderLauncher::LiveSyncWorlds()
+{
+	for (KX_Scene *scene : *m_ketsjiEngine->CurrentScenes()) {
+		World *world = scene->GetBlenderScene()->world;
+		KX_WorldInfo *wi = scene->GetWorldInfo();
+		auto it = m_liveWorlds.find(world);
+		if (!world || !wi || it == m_liveWorlds.end()) {
+			continue;
+		}
+		const LiveWorldSnapshot &snap = it->second;
+
+		const float hor[3] = {world->horr, world->horg, world->horb};
+		const float zen[3] = {world->zenr, world->zeng, world->zenb};
+		const float amb[3] = {world->ambr, world->ambg, world->ambb};
+		if (!equals_v3v3(hor, snap.hor)) {
+			wi->setHorizonColor(mt::vec4(hor[0], hor[1], hor[2], 1.0f));
+			wi->setMistColor(mt::vec3(hor));
+		}
+		if (!equals_v3v3(zen, snap.zen)) {
+			wi->setZenithColor(mt::vec4(zen[0], zen[1], zen[2], 1.0f));
+		}
+		if (!equals_v3v3(amb, snap.amb)) {
+			wi->setAmbientColor(mt::vec3(amb));
+		}
+		if (world->sun_size != snap.sunSize) {
+			wi->setSunSize(world->sun_size);
+		}
+		if (world->exp != snap.exposure) {
+			wi->setExposure(world->exp);
+		}
+		if (world->range != snap.range) {
+			wi->setRange(world->range);
+		}
+		if (world->miststa != snap.mistStart) {
+			wi->setMistStart(world->miststa);
+		}
+		if (world->mistdist != snap.mistDist) {
+			wi->setMistDistance(world->mistdist);
+		}
+		if (world->misi != snap.mistIntensity) {
+			wi->setMistIntensity(world->misi);
+		}
+
+		// World Properties (sun_hour, sun_direction...): the game reads its converted copy.
+		for (bProperty *prop = (bProperty *)world->prop.first; prop; prop = prop->next) {
+			const LivePropSnapshot *old = nullptr;
+			for (const LivePropSnapshot &ps : snap.props) {
+				if (ps.name == prop->name) {
+					old = &ps;
+					break;
+				}
+			}
+			if (old && old->type == prop->type && old->data == prop->data &&
+			    (prop->type != GPROP_STRING || old->str == (prop->poin ? (const char *)prop->poin : "")))
+			{
+				continue;
+			}
+			EXP_Value *value = live_create_property_value(prop);
+			if (!value) {
+				continue;
+			}
+			EXP_Value *existing = wi->GetProperty(prop->name);
+			if (existing) {
+				existing->SetValue(value);
+			}
+			else {
+				wi->SetProperty(prop->name, value);
+			}
+			value->Release();
+		}
+	}
+}
+
 KX_ExitInfo LA_BlenderLauncher::EngineNextFrame()
 {
 	if (m_liveUI) {
 		// Eventos fora da região do jogo vão para o editor; a UI é composta no back buffer
 		// antes do quadro do jogo, que desenha por cima na sua região e troca o buffer.
+		LiveWorldsTake();
 		if (WM_game_live_ui_step(m_context)) {
 			LiveSyncFromBlender();
+			LiveSyncWorlds();
 		}
 	}
 	else {

@@ -109,6 +109,10 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 	if (m_frameInputs.previousTexture) {
 		glDeleteTextures(1, &m_frameInputs.previousTexture);
 	}
+	if (m_frameInputs.cloudHistory) {
+		glDeleteTextures(1, &m_frameInputs.cloudHistory);
+		glDeleteTextures(1, &m_frameInputs.cloudHistoryDepth);
+	}
 }
 
 void RAS_2DFilterManager::SetFrameTime(float time)
@@ -156,6 +160,70 @@ void RAS_2DFilterManager::UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanv
 	                    std::min(height, (int)readofs->GetHeight()));
 	glBindTexture(GL_TEXTURE_2D, 0);
 	finalofs->Bind();
+#endif
+}
+
+void RAS_2DFilterManager::UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScreen *cloudofs, RAS_OffScreen *depthofs,
+                                             const int viewport[4])
+{
+#ifdef __EMSCRIPTEN__
+	// No depth texture copy on WebGL: the clouds filter keeps marching every pixel.
+	(void)rasty;
+	(void)cloudofs;
+	(void)depthofs;
+	(void)viewport;
+#else
+	// A multisampled frame buffer can't be copied to a texture; the filter chain targets
+	// resolved off screens, so this only skips an unusual setup (full march every frame).
+	if (cloudofs->GetSamples() || depthofs->GetSamples()) {
+		m_frameInputs.cloudHistoryValid = false;
+		return;
+	}
+	const int width = cloudofs->GetWidth();
+	const int height = cloudofs->GetHeight();
+	if (!m_frameInputs.cloudHistory) {
+		GLint maxUnits = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
+		if (maxUnits <= 19) {
+			return;
+		}
+		glGenTextures(1, &m_frameInputs.cloudHistory);
+		glGenTextures(1, &m_frameInputs.cloudHistoryDepth);
+	}
+	const bool resized = (width != m_cloudHistoryWidth || height != m_cloudHistoryHeight);
+	if (resized) {
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistory);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistoryDepth);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+		m_cloudHistoryWidth = width;
+		m_cloudHistoryHeight = height;
+	}
+
+	cloudofs->Bind();
+	glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistory);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+	depthofs->Bind();
+	glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistoryDepth);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, std::min(width, (int)depthofs->GetWidth()),
+	                    std::min(height, (int)depthofs->GetHeight()));
+	glBindTexture(GL_TEXTURE_2D, 0);
+	cloudofs->Bind();
+
+	m_frameInputs.cloudHistoryViewProjection = rasty->GetProjectionMatrix() * rasty->GetViewMatrix();
+	for (int i = 0; i < 4; ++i) {
+		m_cloudHistoryViewport[i] = viewport[i];
+	}
+	m_frameInputs.cloudHistoryValid = true;
 #endif
 }
 
@@ -334,6 +402,15 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	++m_frameInputs.frame;
 	bool usesPrevious = false;
 
+	/* The clouds history only matches this render if it came from the same viewport (split
+	 * screen cameras share this manager) at the same size. */
+	int viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	const bool historyValid = m_frameInputs.cloudHistoryValid;
+	m_frameInputs.cloudHistoryValid = historyValid && m_cloudHistoryWidth == (int)previousofs->GetWidth() &&
+	                                  m_cloudHistoryHeight == (int)previousofs->GetHeight() &&
+	                                  std::equal(viewport, viewport + 4, m_cloudHistoryViewport);
+
 	for (RAS_PassTo2DFilter::iterator begin = m_filters.begin(), it = begin, end = m_filters.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
 		filter->SetFrameInputs(&m_frameInputs);
@@ -377,6 +454,12 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		 * This output off screen is used for the next filter as input off screen */
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
 		usesPrevious = usesPrevious || (filter->Ok() && filter->UsesPreviousTexture());
+		// Only Volumetric Clouds (mask bit 4) reuses frames; Clouds/Sky Layers alone don't pay the copy.
+		if (filter->Ok() && filter->UsesCloudHistory() && (filter->GetBuildInFilters()->cloud_mask & 4) &&
+		    previousofs != colorofs)
+		{
+			UpdateCloudHistory(rasty, previousofs, depthofs, viewport);
+		}
 	}
 
 	// The last filter doesn't use its own off screen and didn't render to the targeted off screen ?
