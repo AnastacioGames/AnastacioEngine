@@ -77,6 +77,8 @@ void node_update_internal_links_default(struct bNodeTree *ntree, struct bNode *n
 
 float node_socket_get_float(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
 void node_socket_set_float(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock, float value);
+float node_socket_get_boolean_as_float(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
+float node_socket_get_int_as_float(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
 void node_socket_get_color(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock, float *value);
 void node_socket_set_color(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock, const float *value);
 void node_socket_get_vector(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock, float *value);

@@ -36,10 +36,13 @@
 #include "node_util.h"
 
 
-/* supported socket types in old nodes */
+/* supported socket types in old nodes. SOCK_BOOLEAN/SOCK_INT are scalars just like SOCK_FLOAT
+ * (see setup_stack() below) -- without them here, node_get_socket_stack() returns NULL for a
+ * bool/int socket and every stack-based reader downstream (e.g. the GPU material codegen's
+ * GPUNodeStack conversion) treats the node as if that input didn't exist at all. */
 int node_exec_socket_use_stack(bNodeSocket *sock)
 {
-	return ELEM(sock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER);
+	return ELEM(sock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER, SOCK_BOOLEAN, SOCK_INT);
 }
 
 /* for a given socket, find the actual stack entry */
@@ -135,6 +138,12 @@ static struct bNodeStack *setup_stack(bNodeStack *stack, bNodeTree *ntree, bNode
 			break;
 		case SOCK_RGBA:
 			node_socket_get_color(ntree, node, sock, ns->vec);
+			break;
+		case SOCK_BOOLEAN:
+			ns->vec[0] = node_socket_get_boolean_as_float(ntree, node, sock);
+			break;
+		case SOCK_INT:
+			ns->vec[0] = node_socket_get_int_as_float(ntree, node, sock);
 			break;
 	}
 

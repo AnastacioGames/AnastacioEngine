@@ -52,15 +52,21 @@ void sh_node_type_base(struct bNodeType *ntype, int type, const char *name, shor
 void nodestack_get_vec(float *in, short type_in, bNodeStack *ns)
 {
 	const float *from = ns->vec;
+	/* SOCK_BOOLEAN/SOCK_INT store their single value in vec[0] the same way SOCK_FLOAT does
+	 * (see setup_stack() in node_exec.c) -- treat them the same here too, instead of falling
+	 * into the "not a single float" branches below and averaging/broadcasting vec[0..2] as if
+	 * it held three separate components. */
+	const short sockettype = (ns->sockettype == SOCK_BOOLEAN || ns->sockettype == SOCK_INT) ?
+	                          SOCK_FLOAT : ns->sockettype;
 
 	if (type_in == SOCK_FLOAT) {
-		if (ns->sockettype == SOCK_FLOAT)
+		if (sockettype == SOCK_FLOAT)
 			*in = *from;
 		else
 			*in = (from[0] + from[1] + from[2]) / 3.0f;
 	}
 	else if (type_in == SOCK_VECTOR) {
-		if (ns->sockettype == SOCK_FLOAT) {
+		if (sockettype == SOCK_FLOAT) {
 			in[0] = from[0];
 			in[1] = from[0];
 			in[2] = from[0];
@@ -70,10 +76,10 @@ void nodestack_get_vec(float *in, short type_in, bNodeStack *ns)
 		}
 	}
 	else { /* type_in==SOCK_RGBA */
-		if (ns->sockettype == SOCK_RGBA) {
+		if (sockettype == SOCK_RGBA) {
 			copy_v4_v4(in, from);
 		}
-		else if (ns->sockettype == SOCK_FLOAT) {
+		else if (sockettype == SOCK_FLOAT) {
 			in[0] = from[0];
 			in[1] = from[0];
 			in[2] = from[0];
@@ -149,6 +155,14 @@ void node_gpu_stack_from_data(struct GPUNodeStack *gs, int type, bNodeStack *ns)
 		gs->sockettype = type;
 	}
 	else {
+		/* Boolean/int sockets store a single scalar in bNodeStack just like SOCK_FLOAT (no
+		 * dedicated vec layout of their own); treat them the same from here on so a node that
+		 * wires one straight into node_type_gpu's "in" stack (e.g. an Enable/Resolution toggle)
+		 * gets a real GPU_FLOAT slot instead of GPU_NONE, which silently throws off every stack
+		 * index after it in GPU_stack_link(). */
+		if (type == SOCK_BOOLEAN || type == SOCK_INT)
+			type = SOCK_FLOAT;
+
 		nodestack_get_vec(gs->vec, type, ns);
 		gs->link = ns->data;
 

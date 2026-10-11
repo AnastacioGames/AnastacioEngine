@@ -375,6 +375,24 @@ void node_socket_set_float(bNodeTree *ntree, bNode *UNUSED(node), bNodeSocket *s
 	RNA_float_set(&ptr, "default_value", value);
 }
 
+/* setup_stack() (node_exec.c) has no SOCK_FLOAT equivalent for these two: a plain float "default_value"
+ * RNA access (node_socket_get_float) assumes a FloatPropertyRNA layout, which a SOCK_BOOLEAN/SOCK_INT
+ * socket's default_value is not -- same scalar-in-a-bNodeStack idea as SOCK_FLOAT, just read through
+ * the matching RNA accessor instead of reinterpreting the wrong property struct. */
+float node_socket_get_boolean_as_float(bNodeTree *ntree, bNode *UNUSED(node), bNodeSocket *sock)
+{
+	PointerRNA ptr;
+	RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);
+	return RNA_boolean_get(&ptr, "default_value") ? 1.0f : 0.0f;
+}
+
+float node_socket_get_int_as_float(bNodeTree *ntree, bNode *UNUSED(node), bNodeSocket *sock)
+{
+	PointerRNA ptr;
+	RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);
+	return (float)RNA_int_get(&ptr, "default_value");
+}
+
 void node_socket_get_color(bNodeTree *ntree, bNode *UNUSED(node), bNodeSocket *sock, float *value)
 {
 	PointerRNA ptr;
