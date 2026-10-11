@@ -128,6 +128,19 @@ class TextureButtonsPanel:
         return tex and (tex.type != 'NONE' or tex.use_nodes) and (context.scene.render.engine in cls.COMPAT_ENGINES)
 
 
+def context_texture_poll(context):
+    return (context.material or
+            context.world or
+            context.lamp or
+            context.texture or
+            context.line_style or
+            context.particle_system or
+            isinstance(context.space_data.pin_id, ParticleSettings) or
+            context.texture_user)
+
+
+# Keeps the old idname: files store panel order by idname, so the context buttons stay on top
+# and the slots panel (new idname) is inserted right below them.
 class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
     bl_label = ""
     bl_options = {'HIDE_HEADER'}
@@ -136,20 +149,31 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         engine = context.scene.render.engine
-        # if not (hasattr(context, "texture_slot") or hasattr(context, "texture_node")):
-        #     return False
-        return ((context.material or
-                 context.world or
-                 context.lamp or
-                 context.texture or
-                 context.line_style or
-                 context.particle_system or
-                 isinstance(context.space_data.pin_id, ParticleSettings) or
-                 context.texture_user) and
-                (engine in cls.COMPAT_ENGINES))
+        return context_texture_poll(context) and (engine in cls.COMPAT_ENGINES)
 
     def draw(self, context):
         layout = self.layout
+        space = context.space_data
+
+        if space.use_pin_id:
+            layout.label(text="Pinned", icon='PINNED')
+        else:
+            layout.row().prop(space, "texture_context", expand=True)
+
+
+class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
+    bl_label = "Texture"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        # if not (hasattr(context, "texture_slot") or hasattr(context, "texture_node")):
+        #     return False
+        return context_texture_poll(context) and (engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout.box()
 
         slot = getattr(context, "texture_slot", None)
         node = getattr(context, "texture_node", None)
@@ -165,7 +189,6 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
             pin_id = None
 
         if not space.use_pin_id:
-            layout.row().prop(space, "texture_context", expand=True)
             pin_id = None
 
         if space.texture_context == 'OTHER':
@@ -1631,6 +1654,7 @@ classes = (
     TEXTURE_MT_envmap_specials,
     TEXTURE_UL_texslots,
     TEXTURE_PT_context_texture,
+    TEXTURE_PT_texture_slots,
     TEXTURE_PT_preview,
     TEXTURE_PT_colors,
     TEXTURE_PT_clouds,

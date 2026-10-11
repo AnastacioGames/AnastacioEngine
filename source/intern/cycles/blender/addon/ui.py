@@ -1811,6 +1811,7 @@ def get_panels():
         'RENDER_PT_shading',
         'SCENE_PT_simplify',
         'TEXTURE_PT_context_texture',
+        'TEXTURE_PT_texture_slots',
         'WORLD_PT_ambient_occlusion',
         'WORLD_PT_environment_lighting',
         'WORLD_PT_gather',

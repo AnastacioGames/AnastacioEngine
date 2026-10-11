@@ -76,8 +76,11 @@
 
 bool ED_texture_context_check_world(const bContext *C)
 {
+	/* Anastacio: world textures only while the world is the selection. Clicking the
+	 * world in the outliner clears the active object (tree_element_active_world), so
+	 * with an active object the world icon stays hidden in the Texture tab. */
 	Scene *scene = CTX_data_scene(C);
-	return (scene && scene->world);
+	return (scene && scene->world && CTX_data_active_object(C) == NULL);
 }
 
 bool ED_texture_context_check_material(const bContext *C)

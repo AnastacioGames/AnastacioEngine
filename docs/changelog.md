@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Aba Texture: ícone do mundo só com o mundo selecionado e slots num painel recolhível
+
+- `ED_texture_context_check_world` (`buttons_texture.c`) passou a exigir que não haja objeto ativo.
+  Clicar no World no Outliner limpa o objeto ativo, então o ícone do mundo só aparece nesse caso e o
+  contexto de textura não fica preso em World depois de visitar a aba World com um objeto ativo.
+- `properties_texture.py`: o painel sem cabeçalho `TEXTURE_PT_context_texture` ficou só com os botões
+  de contexto (agora com rótulo: Material, World, Lamp, Particles, Line Style, Other, definidos em
+  `rna_space.c`); lista de slots, nome e tipo foram para o novo painel recolhível
+  `TEXTURE_PT_texture_slots` ("Texture"), com o conteúdo numa caixa. O painel de botões mantém o
+  idname antigo de propósito: o arquivo salva a ordem dos painéis por idname e um idname novo sem
+  painel desenhado antes dele vai para o fim da região (`UI_panel_begin`). O addon Cycles exclui os
+  dois da lista de painéis compartilhados.
+
 ## 2026-10-11 - Avisos do `--debug`: feedback loop no 1º quadro e memória não liberada ao sair
 
 Investigação do que o editor imprimia com `--debug --debug-gpu` depois de três Plays na cena de

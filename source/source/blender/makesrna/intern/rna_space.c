@@ -210,12 +210,12 @@ static const EnumPropertyItem buttons_context_items[] = {
 
 /* Actually populated dynamically trough a function, but helps for context-less access (e.g. doc, i18n...). */
 static const EnumPropertyItem buttons_texture_context_items[] = {
-	{SB_TEXC_MATERIAL, "MATERIAL", ICON_MATERIAL, "", "Show material textures"},
-	{SB_TEXC_WORLD, "WORLD", ICON_WORLD, "", "Show world textures"},
-	{SB_TEXC_LAMP, "LAMP", ICON_LAMP, "", "Show lamp textures"},
-	{SB_TEXC_PARTICLES, "PARTICLES", ICON_PARTICLES, "", "Show particles textures"},
-	{SB_TEXC_LINESTYLE, "LINESTYLE", ICON_LINE_DATA, "", "Show linestyle textures"},
-	{SB_TEXC_OTHER, "OTHER", ICON_TEXTURE, "", "Show other data textures"},
+	{SB_TEXC_MATERIAL, "MATERIAL", ICON_MATERIAL, "Material", "Show material textures"},
+	{SB_TEXC_WORLD, "WORLD", ICON_WORLD, "World", "Show world textures"},
+	{SB_TEXC_LAMP, "LAMP", ICON_LAMP, "Lamp", "Show lamp textures"},
+	{SB_TEXC_PARTICLES, "PARTICLES", ICON_PARTICLES, "Particles", "Show particles textures"},
+	{SB_TEXC_LINESTYLE, "LINESTYLE", ICON_LINE_DATA, "Line Style", "Show linestyle textures"},
+	{SB_TEXC_OTHER, "OTHER", ICON_TEXTURE, "Other", "Show other data textures (brush, modifiers, force fields)"},
 	{0, NULL, 0, NULL, NULL}
 };
 
