@@ -862,9 +862,78 @@ class NODE_OT_shader_preset_add(Operator):
         return {'FINISHED'}
 
 
+class MATERIAL_OT_show_generated_code(Operator):
+    """Write the generated vertex, geometry and fragment GLSL of the material to Text """ \
+        """datablocks (game engine)"""
+    bl_idname = "material.show_generated_code"
+    bl_label = "Show Generated Code"
+    bl_options = {'REGISTER'}
+
+    _STAGES = (("fragment", ".frag"), ("vertex", ".vert"), ("geometry", ".geom"))
+
+    @staticmethod
+    def material(context):
+        mat = getattr(context, "material", None)
+        if mat is None:
+            space = context.space_data
+            if space is not None and space.type == 'NODE_EDITOR':
+                mat = space.id
+        return mat if isinstance(mat, bpy.types.Material) else None
+
+    @classmethod
+    def poll(cls, context):
+        return cls.material(context) is not None
+
+    def execute(self, context):
+        if bpy.app.background:
+            self.report({'ERROR'}, "The shader needs a window to compile")
+            return {'CANCELLED'}
+        import gpu
+        mat = self.material(context)
+        try:
+            shader = gpu.export_shader(context.scene, mat)
+        except RuntimeError:
+            self.report({'ERROR'}, "The shader did not compile, see the console for the error")
+            return {'CANCELLED'}
+
+        texts = []
+        for key, ext in self._STAGES:
+            # Text names hold 63 characters
+            name = mat.name[:44] + "_generated" + ext
+            code = shader.get(key)
+            text = bpy.data.texts.get(name)
+            if not code:
+                # a stage that is gone (geometry) must not keep the code of an older run
+                if text is not None:
+                    text.clear()
+                    text.write("// The material \"%s\" has no %s stage.\n" % (mat.name, key))
+                continue
+            if text is None:
+                text = bpy.data.texts.new(name)
+            text.clear()
+            text.write("// Generated from the material \"%s\" (%s stage). A copy to read: editing it "
+                       "changes nothing.\n" % (mat.name, key))
+            if key == "fragment":
+                text.write("// The node code is at the end, after the library functions.\n")
+            text.write(code)
+            text.current_line_index = 0
+            texts.append(text)
+
+        # show them in the Text Editors that are open: fragment first, then vertex and geometry
+        shown = 0
+        for area in context.screen.areas:
+            if area.type == 'TEXT_EDITOR' and shown < len(texts):
+                area.spaces.active.text = texts[shown]
+                area.tag_redraw()
+                shown += 1
+        self.report({'INFO'}, "Generated code in the Text Editor: " + ", ".join(t.name for t in texts))
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
+    MATERIAL_OT_show_generated_code,
     NODE_OT_damage_mix_add,
     NODE_OT_shader_preset_add,
 

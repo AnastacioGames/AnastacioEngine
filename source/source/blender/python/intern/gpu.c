@@ -220,7 +220,8 @@ PyDoc_STRVAR(GPU_export_shader_doc,
 "\n"
 "   Returns the GLSL shader that produces the visual effect of material in scene.\n"
 "\n"
-"   :return: Dictionary defining the shader, uniforms and attributes.\n"
+"   :return: Dictionary defining the shader, uniforms and attributes. The sources are in\n"
+"      \"vertex\", \"fragment\" and, with a geometry stage, \"geometry\".\n"
 "   :rtype: Dict"
 );
 static PyObject *GPU_export_shader(PyObject *UNUSED(self), PyObject *args, PyObject *kw)
@@ -271,6 +272,9 @@ static PyObject *GPU_export_shader(PyObject *UNUSED(self), PyObject *args, PyObj
 	}
 	if (shader->vertex) {
 		PY_DICT_ADD_STRING(result, shader, vertex);
+	}
+	if (shader->geometry) {
+		PY_DICT_ADD_STRING(result, shader, geometry);
 	}
 	seq = PyList_New(BLI_listbase_count(&shader->uniforms));
 	for (i = 0, uniform = shader->uniforms.first; uniform; uniform = uniform->next, i++) {

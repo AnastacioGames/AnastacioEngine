@@ -76,6 +76,16 @@ Mix Shader, nada é religado.
 O Fur Shells espalha os fios pelo mapa UV. Em malha sem UV ele usa as coordenadas geradas (Generated),
 projetadas pelo eixo principal de cada face.
 
+## Ver o código gerado
+
+Material > Node Shader > **Show Generated Code** (também no cabeçalho do Node Editor, ícone de texto) grava o
+GLSL final do material em três Texts: `<material>_generated.vert`, `.geom` e `.frag`. Os Text Editors abertos
+passam a mostrá-los, o fragment primeiro. São cópias para leitura: editar não muda o material; clique de novo
+para atualizar. No fragment, o código dos nós fica no fim, depois das funções da biblioteca. Em Python:
+`gpu.export_shader(scene, material)` devolve `vertex`, `fragment` e `geometry`.
+
+O botão precisa do shader compilado; com erro de compilação ele avisa e não gera os Texts.
+
 ## Sombras e cache
 
 - Material que move vértices (Vertex Offset, Fur Shells, Outline ou código do usuário) faz sombra com o próprio

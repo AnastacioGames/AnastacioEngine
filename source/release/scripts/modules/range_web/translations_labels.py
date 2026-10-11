@@ -893,6 +893,7 @@ TABLE = (
     ("Wind Leaves", "Folhas ao vento", "Hojas al viento", "Листья на ветру"),
     ("Triplanar", "Triplanar", "Triplanar", "Трипланар"),
     ("Hologram", "Holograma", "Holograma", "Голограмма"),
+    ("Show Generated Code", "Mostrar código gerado", "Mostrar código generado", "Показать сгенерированный код"),
     ("Geometry needs GPU support, it is skipped on the web", "Geometry precisa de suporte da GPU; na web é ignorado", "Geometry necesita soporte de la GPU; en la web se omite", "Geometry требует поддержки GPU; в вебе пропускается"),
     ("Shadow Cascade Cache:", "Cache das cascatas de sombra:", "Caché de cascadas de sombra:", "Кэш каскадов теней:"),
     ("Shadow:", "Sombra:", "Sombra:", "Тень:"),

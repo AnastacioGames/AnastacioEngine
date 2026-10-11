@@ -409,6 +409,7 @@ typedef struct GPUShaderExport {
 	ListBase attributes;
 	char *vertex;
 	char *fragment;
+	char *geometry; /* NULL without a geometry stage */
 } GPUShaderExport;
 
 GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma);

@@ -532,6 +532,7 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
             row.template_ID(mat, attr, new="text.new", open="text.open")
         if mat.script_geom:
             col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
+        layout.operator("material.show_generated_code", icon='TEXT')
 
 
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):

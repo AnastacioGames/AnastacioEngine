@@ -5625,6 +5625,8 @@ GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma)
 
 		/* export the vertex shader */
 		shader->vertex = BLI_strdup(pass->vertexcode);
+		if (pass->geometrycode)
+			shader->geometry = BLI_strdup(pass->geometrycode);
 	}
 
 	return shader;
@@ -5646,6 +5648,8 @@ void GPU_free_shader_export(GPUShaderExport *shader)
 		MEM_freeN(shader->vertex);
 	if (shader->fragment)
 		MEM_freeN(shader->fragment);
+	if (shader->geometry)
+		MEM_freeN(shader->geometry);
 
 	MEM_freeN(shader);
 }

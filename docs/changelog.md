@@ -9,6 +9,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 ## 2026-10-11 - Shader nodes: presets explicados em frames, código gerado, geometry livre e erro visível
 
 - Presets (`bl_operators/node.py`): cada grupo já nasce separado em frames coloridos com rótulo (Inputs, Vertex, Geometry, Colour, Output), uma coluna por parte (`_preset_frames`; `part=` em `_preset_node` escolhe o frame quando o tipo do nó não diz). Presets novos: **Wind Leaves** (Wind + manchas de cor, Offset ligado sozinho), **Triplanar** (uma textura por eixo misturada pela normal, sem UV) e **Hologram** (linhas que correm + borda de Fresnel, Alpha Clip). Nomes dos presets no dicionário de tradução. Teste: os 9 presets criados em `-b` (frames sem nó solto nem coluna sobreposta) e os 3 novos conferidos em captura do runtime.
+- **Show Generated Code** (`material.show_generated_code`; botão em Material > Node Shader e no cabeçalho do Node Editor): grava o GLSL final em `<material>_generated.vert/.geom/.frag` e mostra nos Text Editors abertos. Reusa `gpu.export_shader`, que passou a devolver também `geometry` (`GPUShaderExport.geometry`). Precisa de janela (sem contexto GL em `-b`) e do shader compilado. Teste no editor com janela: Toon Outline gerou os três Texts (geometry com `OUTLINE_WIDTH`), o Text Editor passou a mostrar o `.frag`; sem estágio geometry o `.geom` vira um aviso de uma linha.
 
 ## 2026-10-10 - Nós de material com estágios de vertex e geometry (fases 1-4 do plano shader-nodes)
 
