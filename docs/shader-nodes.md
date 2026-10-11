@@ -17,7 +17,11 @@ Nós da categoria **Vertex**: Vertex Offset, Wind e Wave.
 Nós da categoria **Geometry**:
 
 - **Fur Shells**: repete a malha em camadas ao longo da normal. Saídas Layer e Alpha para recortar os fios.
-  Length e Layers são lidos ao gerar o shader; mudar esses valores recompila.
+  Length e Layers são lidos ao gerar o shader; mudar esses valores recompila. **Direction** (vetor) e
+  **Direction Strength** (0-1, padrão 0) deixam o pelo "penteado" numa direção (vento, direção custom etc.):
+  com Direction Strength 0 (padrão) o comportamento é idêntico ao de antes, só a normal; conforme sobe até 1,
+  cada shell mistura `normalize(mix(normal, Direction, Direction Strength))` em vez de usar só a normal. Os dois
+  sockets também são lidos ao gerar o shader (mesma regra de Length/Layers).
 - **Outline**: casco invertido. Precisa de backface culling ligado no material.
 - **Shell Layer**: índice da camada atual, para variar cor ou alpha por camada.
 

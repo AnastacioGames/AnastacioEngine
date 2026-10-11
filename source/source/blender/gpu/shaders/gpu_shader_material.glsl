@@ -6922,8 +6922,12 @@ void node_shell_layer_info(float layer, out float fac, out float outline)
 	outline = (layer < -0.5) ? 1.0 : 0.0;
 }
 
-/* Strand mask for the shells: one strand per cell of the UV grid, thinner towards the tip. */
-void node_fur_shells(float length, float layers, float density, vec3 uv, float layer, vec3 orco, out float fac, out float alpha)
+/* Strand mask for the shells: one strand per cell of the UV grid, thinner towards the tip.
+ * direction/direction_strength only steer the geometry stage's offset (SHELL_DIR / SHELL_DIR_STRENGTH,
+ * set from the same node inputs in GPU_material_shells); they are unused here, kept so the socket
+ * order lines up with node_shader_gpu_fur_shells's GPU_stack_link call. */
+void node_fur_shells(float length, float layers, float density, vec3 uv, vec3 direction, float direction_strength,
+                      float layer, vec3 orco, out float fac, out float alpha)
 {
 	fac = max(layer, 0.0);
 	vec2 coord = uv.xy;

@@ -117,6 +117,8 @@ struct GPUMaterial {
 	GPUNodeLink *vertex_offset;
 	int shell_layers;
 	float shell_length;
+	float shell_dir[3];
+	float shell_dir_strength;
 	float outline_width;
 	int strand_density;
 	float strand_length;
@@ -460,6 +462,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	stages.geomcode = geomcode;
 	stages.shell_layers = material->shell_layers;
 	stages.shell_length = material->shell_length;
+	copy_v3_v3(stages.shell_dir, material->shell_dir);
+	stages.shell_dir_strength = material->shell_dir_strength;
 	stages.outline_width = material->outline_width;
 	stages.strand_density = material->strand_density;
 	stages.strand_length = material->strand_length;
@@ -1238,12 +1242,26 @@ void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link)
 	}
 }
 
-/* Fur Shells node: layers (the base surface included) pushed along the normal by the geometry stage. */
-void GPU_material_shells(GPUMaterial *material, int layers, float length)
+/* Fur Shells node: layers (the base surface included) pushed along the normal by the geometry stage.
+ * direction/direction_strength let the shells lean away from the normal (e.g. combed fur, wind):
+ * direction_strength 0.0 keeps the classic normal-only offset (default, 100% backward compatible). */
+void GPU_material_shells(GPUMaterial *material, int layers, float length,
+                          const float direction[3], float direction_strength)
 {
 	if (material->type == GPU_MATERIAL_TYPE_MESH) {
 		material->shell_layers = max_ii(material->shell_layers, min_ii(layers, 32));
 		material->shell_length = max_ff(material->shell_length, length);
+		/* Only the strongest request sets the direction, to keep a single, well-defined blend. */
+		if (direction_strength > material->shell_dir_strength) {
+			material->shell_dir_strength = CLAMPIS(direction_strength, 0.0f, 1.0f);
+			float len = len_v3(direction);
+			if (len > 0.0f) {
+				mul_v3_v3fl(material->shell_dir, direction, 1.0f / len);
+			}
+			else {
+				zero_v3(material->shell_dir);
+			}
+		}
 	}
 }
 

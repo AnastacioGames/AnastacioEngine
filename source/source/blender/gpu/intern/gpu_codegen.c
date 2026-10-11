@@ -1898,6 +1898,8 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		BLI_dynstr_appendf(ds,
 		        "#define SHELL_LAYERS %d\n"
 		        "#define SHELL_LENGTH %f\n"
+		        "#define SHELL_DIR vec3(%f, %f, %f)\n"
+		        "#define SHELL_DIR_STRENGTH %f\n"
 		        "#define OUTLINE_WIDTH %f\n"
 		        "#if __VERSION__ >= 400\n"
 		        "layout(triangles, invocations = %d) in;\n"
@@ -1910,7 +1912,9 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        "#define GEOM_LAYER_FIRST 0\n"
 		        "#define GEOM_LAYER_LAST %d\n"
 		        "#endif\n",
-		        layers, stages->shell_length, stages->outline_width,
+		        layers, stages->shell_length,
+		        stages->shell_dir[0], stages->shell_dir[1], stages->shell_dir[2], stages->shell_dir_strength,
+		        stages->outline_width,
 		        invocations, invocations * 3, invocations - 1);
 		*r_max_vertices = invocations * 3;
 	}
@@ -2044,7 +2048,8 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        "\t\t\tfor (int i = 0; i < 3; i++) {\n"
 		        "\t\t\t\tgeom_copy(i);\n"
 		        "\t\t\t\tif (layer > 0) {\n"
-		        "\t\t\t\t\tgeom_set_position(vs_varposition[i] + vs_varnormal[i] * (SHELL_LENGTH * t));\n"
+		        "\t\t\t\t\tvec3 shell_dir = normalize(mix(vs_varnormal[i], SHELL_DIR, SHELL_DIR_STRENGTH));\n"
+		        "\t\t\t\t\tgeom_set_position(vs_varposition[i] + shell_dir * (SHELL_LENGTH * t));\n"
 		        "\t\t\t\t}\n"
 		        "\t\t\t\tvarshelllayer = t;\n"
 		        "\t\t\t\tEmitVertex();\n"

@@ -694,6 +694,21 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   executaram de fato. **Falta** a inspeção visual desse `shot.png` (ninguém olhou se a grama/explosão/billboard
   parecem certos) e presets dedicados (Wind Leaves/Triplanar/Hologram, cor do cabeçalho por estágio, custo no
   painel) continuam pendentes, não fizeram parte deste lote.
+- **Fur Shells: direção do pelo configurável (2026-10-11, branch `claude/shader-nodes`)**: pendência do backlog
+  de shader-nodes marcada como feita. Dois sockets novos no nó Fur Shells (depois dos existentes, pra não
+  quebrar link salvo): **Direction** (vetor, padrão zero) e **Direction Strength** (0-1, padrão 0). Com
+  Direction Strength 0 o comportamento é idêntico ao de antes (só a normal, 100% retrocompatível); subindo até
+  1, cada shell desloca ao longo de `normalize(mix(normal, Direction, Direction Strength))` em vez de só a
+  normal — dá pra simular vento constante ou pelo penteado numa direção fixa. Implementado em
+  `GPU_material_shells` (`gpu_material.c`/`GPU_material.h`, parâmetros novos `direction`/`direction_strength`,
+  guarda o vetor normalizado e o maior strength pedido), `GPUPassStages` (`gpu_codegen.h`, campos
+  `shell_dir`/`shell_dir_strength`) e `code_generate_geometry_stage` (`gpu_codegen.c`, `#define SHELL_DIR`/
+  `SHELL_DIR_STRENGTH` e o `mix` no laço de shells). `node_fur_shells` em `gpu_shader_material.glsl` ganhou os
+  dois parâmetros (não usados no corpo, só pra manter a ordem dos sockets alinhada com `GPU_stack_link`). Ver
+  [shader-nodes.md](shader-nodes.md). Compilado limpo (`RangeEngine`/`RangeRuntime`, sem warning novo);
+  `tools/debug/cenas/criar_cena_fur_shells_direction.py` confirma os sockets em `bpy.types` e rodou 65 quadros
+  no `AnastacioRuntime.exe` sem crash, gerando `shot.png` — o geometry shader compilou e executou. **Falta** a
+  inspeção visual desse `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção certa).
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

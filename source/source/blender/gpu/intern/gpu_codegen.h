@@ -195,6 +195,8 @@ typedef struct GPUPassStages {
 	const char *geomcode;              /* Material.geomcode: user void geometry() */
 	int shell_layers;                  /* Fur Shells: layers including the base surface, < 2 disables */
 	float shell_length;                /* Fur Shells: distance of the last layer along the normal */
+	float shell_dir[3];                /* Fur Shells: normalized custom direction, zero uses the normal only */
+	float shell_dir_strength;          /* Fur Shells: 0 = normal only (default), 1 = shell_dir only */
 	float outline_width;               /* Outline: inverted hull width, 0 disables */
 	int strand_density;                /* Strands: thin triangles emitted per input triangle, < 2 disables */
 	float strand_length;               /* Strands: length along the normal */

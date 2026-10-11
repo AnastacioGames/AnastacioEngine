@@ -6,6 +6,36 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Fur Shells: direção do pelo configurável
+
+- Pendência do backlog de shader-nodes (ver [shader-nodes.md](shader-nodes.md)): o nó Fur Shells só inflava a
+  malha ao longo da normal, sem jeito de controlar a direção do "pelo" (vento, direção custom).
+- Dois sockets novos no nó Fur Shells, **depois** dos existentes (Length/Layers/Density/Vector) pra não quebrar
+  link salvo em `.range` antigo: **Direction** (vetor, padrão `(0,0,0)`) e **Direction Strength** (fator 0-1,
+  padrão 0). Com Direction Strength 0 (padrão) o resultado é idêntico ao de antes — só a normal, 100%
+  retrocompatível. Conforme sobe até 1, cada shell desloca ao longo de
+  `normalize(mix(normal, Direction, Direction Strength))` em vez de só `normal`.
+- `GPU_material_shells` (`gpu_material.c`/`GPU_material.h`) ganhou os parâmetros `direction`/`direction_strength`;
+  guarda o vetor já normalizado e o maior `direction_strength` pedido (igual ao padrão existente de
+  `max_ff`/`max_ii` pra `shell_length`/`shell_layers`, caso mais de um Fur Shells no mesmo material).
+- `GPUPassStages` (`gpu_codegen.h`) ganhou `shell_dir[3]`/`shell_dir_strength`, propagados em
+  `gpu_material.c` pra dentro da struct de estágios junto com `shell_length`.
+- `code_generate_geometry_stage` (`gpu_codegen.c`) emite `#define SHELL_DIR vec3(...)` e
+  `#define SHELL_DIR_STRENGTH ...` junto com `SHELL_LENGTH`/`OUTLINE_WIDTH`, e o laço de shells agora calcula
+  `vec3 shell_dir = normalize(mix(vs_varnormal[i], SHELL_DIR, SHELL_DIR_STRENGTH));` antes de deslocar o vértice
+  (`SHELL_DIR_STRENGTH` 0 cancela o `mix`, mantendo o resultado idêntico ao `vs_varnormal[i]` de antes). O
+  Outline (casco invertido) continua usando só a normal, sem mudança.
+- `node_fur_shells` em `gpu_shader_material.glsl` ganhou os parâmetros `direction`/`direction_strength` na
+  assinatura (não usados no corpo da função, que só calcula a máscara de fios) — necessário porque
+  `GPU_stack_link` passa todo o array `in[]` do nó posicionalmente pros parâmetros `in` da função GLSL, então a
+  ordem dos sockets novos (`in[4]`/`in[5]`) precisa bater com a ordem dos parâmetros novos na função.
+- Compilado limpo (`RangeEngine`/`RangeRuntime` via `build-anastacio`, sem warning novo). Validado sem display
+  com `tools/debug/cenas/criar_cena_fur_shells_direction.py`: sockets certos em `bpy.types`
+  (`['Length', 'Layers', 'Density', 'Vector', 'Direction', 'Direction Strength']`), `.range` salvo; e, com GL
+  disponível nesta sessão, `AnastacioRuntime.exe` rodou a cena 65 quadros sem crash e tirou um `shot.png` — o
+  geometry shader do Fur Shells com os novos defines compilou e executou de fato. **Falta**: inspeção visual
+  do `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção configurada).
+
 ## 2026-10-11 - Shader nodes: Billboard, Strands, Explode (pendentes da fase 3)
 
 - **Billboard** (`SH_NODE_BILLBOARD`, estágio vertex): entradas `Lock Axis`, `Scale`; saída `Offset` pro

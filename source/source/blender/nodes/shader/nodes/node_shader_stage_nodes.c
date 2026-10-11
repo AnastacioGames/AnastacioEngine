@@ -185,6 +185,10 @@ static bNodeSocketTemplate sh_node_fur_shells_in[] = {
 	{	SOCK_FLOAT, 1, N_("Layers"),  8.0f, 0.0f, 0.0f, 0.0f, 2.0f, 32.0f, PROP_NONE},
 	{	SOCK_FLOAT, 1, N_("Density"), 200.0f, 0.0f, 0.0f, 0.0f, 1.0f, 100000.0f, PROP_NONE},
 	{	SOCK_VECTOR, 1, N_("Vector"), 0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_NONE, SOCK_HIDE_VALUE},
+	/* Direction/Direction Strength added after the sockets above to keep old .range links valid.
+	 * Both default to zero: 100% retrocompatible, the shells push along the normal only. */
+	{	SOCK_VECTOR, 1, N_("Direction"), 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, PROP_NONE},
+	{	SOCK_FLOAT, 1, N_("Direction Strength"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
 	{	-1, 0, ""	}
 };
 
@@ -198,7 +202,7 @@ static int node_shader_gpu_fur_shells(GPUMaterial *mat, bNode *UNUSED(node), bNo
 {
 	GPUNodeLink *layer;
 
-	GPU_material_shells(mat, (int)(in[1].vec[0] + 0.5f), in[0].vec[0]);
+	GPU_material_shells(mat, (int)(in[1].vec[0] + 0.5f), in[0].vec[0], in[4].vec, in[5].vec[0]);
 
 	if (!(in[3].hasinput && in[3].link)) {
 		in[3].link = GPU_attribute(CD_MTFACE, "");

@@ -285,7 +285,8 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned short index);
 /* Vertex and geometry stages (see GPUPassStages in gpu_codegen.h). */
 void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link);
-void GPU_material_shells(GPUMaterial *material, int layers, float length);
+void GPU_material_shells(GPUMaterial *material, int layers, float length,
+                          const float direction[3], float direction_strength);
 void GPU_material_outline(GPUMaterial *material, float width);
 void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature);
 void GPU_material_explode(GPUMaterial *material, float factor);
