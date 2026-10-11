@@ -200,8 +200,11 @@ Reflexo planar por objeto (espelho/água real) já existe separado, pelo `KX_Pla
 (`KX_PlanarMap.h`/`.cpp`), amarrado a uma Image/EnvMap no objeto; ele não tem nó dedicado no shader-nodes
 ainda — fica para uma próxima etapa.
 
-**Não validado visualmente**: este ambiente não tem display/GPU; só a compilação (`RangeEngine`) foi
-conferida.
+**Validado sem GPU/display**: além da compilação, `AnastacioEngine.exe -b --python` confirmou que os dois
+nós existem em `bpy.types` com os sockets/nomes certos e que um World com eles salva normalmente num `.range`;
+`AnastacioRuntime.exe` rodou essa cena por 15 s sem crash (ou seja, `KX_Scene` lendo os nós na conversão não
+quebra nada). **Falta** a conferência visual (Bloom/SSR realmente aparecendo na tela) — este ambiente não tem
+display/GPU para isso.
 
 ## Ver o código gerado
 
