@@ -498,10 +498,53 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
             # The user GLSL is compiled even when Shadeless, so it is never greyed out.
             col = box.column()
             col.label(text="Shader Sources:")
-            for label, attr in (("Vertex:", "script_vert"), ("Fragment:", "script_frag")):
+            for label, attr in (("Vertex:", "script_vert"), ("Geometry:", "script_geom"),
+                                ("Fragment:", "script_frag")):
                 row = col.split()
                 row.label(text=label)
                 row.template_ID(mat, attr, new="text.new", open="text.open")
+            if mat.script_geom:
+                col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
+
+
+class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
+    bl_label = "Node Shader"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        engine = context.scene.render.engine
+        return (mat is not None) and mat.use_nodes and (engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+        # The node tree compiles with the sources of the material that owns it, not the ones of a Material node.
+        mat = context.material
+
+        col = layout.column()
+        col.label(text="Add nodes in the Node Editor (Shift+A): Vertex, Geometry, Script, Presets", icon='NODETREE')
+        col.label(text="Shader Sources:")
+        for label, attr in (("Vertex:", "script_vert"), ("Geometry:", "script_geom"),
+                            ("Fragment:", "script_frag")):
+            row = col.split()
+            row.label(text=label)
+            row.template_ID(mat, attr, new="text.new", open="text.open")
+        if mat.script_geom:
+            col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
+        layout.operator("material.show_generated_code", icon='TEXT')
+
+        # "uniform <type> u_<name>;" of the GLSL Script nodes, the same values as the node sockets.
+        nodes = mat.node_tree.nodes if mat.node_tree else ()
+        uniforms = [(node, sock) for node in nodes if node.bl_idname == 'ShaderNodeGLSLScript'
+                    for sock in node.inputs if sock.identifier.startswith("u_") and not sock.is_linked]
+        if uniforms:
+            col = layout.column()
+            col.label(text="Script Uniforms:")
+            for node, sock in uniforms:
+                row = col.split(percentage=0.4)
+                row.label(text="%s (%s)" % (sock.name, node.script.name if node.script else node.name))
+                row.prop(sock, "default_value", text="")
 
 
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):
@@ -1328,7 +1371,7 @@ class MATERIAL_PT_anastacio_atlas(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = 'material'
-    bl_label = "Anastacio Material Atlas"
+    bl_label = "Build Material Atlas"
 
     @classmethod
     def poll(cls, context):
@@ -1369,6 +1412,7 @@ classes = (
     MATERIAL_PT_diffuse,
     MATERIAL_PT_specular,
     MATERIAL_PT_shading,
+    MATERIAL_PT_node_shader_sources,
     MATERIAL_PT_transp,
     MATERIAL_PT_mirror,
     MATERIAL_PT_sss,

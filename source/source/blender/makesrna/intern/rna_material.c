@@ -2114,6 +2114,15 @@ void RNA_def_material(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Vertex Shader", "Define a vertex shader for this material");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
+	prop = RNA_def_property(srna, "script_geom", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "geomcode");
+	RNA_def_property_struct_type(prop, "Text");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Geometry Shader",
+	                         "Geometry shader for this material: defines void geometry(), every varying is passed "
+	                         "through (needs geometry shader support, ignored on the web)");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
 	prop = RNA_def_property(srna, "pass_index", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "index");
 	RNA_def_property_ui_text(prop, "Pass Index", "Index number for the \"Material Index\" render pass (game engine: read in shaders through the Object Info node)");

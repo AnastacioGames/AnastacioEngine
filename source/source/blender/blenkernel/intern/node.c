@@ -3586,6 +3586,20 @@ static void registerShaderNodes(void)
 	register_node_type_sh_object();
 	register_node_type_sh_time();
 	register_node_type_sh_damage();
+	register_node_type_sh_glsl_script();
+	register_node_type_sh_vertex_offset();
+	register_node_type_sh_vertex_wind();
+	register_node_type_sh_vertex_wave();
+	register_node_type_sh_camera_distance();
+	register_node_type_sh_shell_layer();
+	register_node_type_sh_fur_shells();
+	register_node_type_sh_outline();
+	register_node_type_sh_billboard();
+	register_node_type_sh_strands();
+	register_node_type_sh_explode();
+	register_node_type_sh_planar_reflection();
+	register_node_type_sh_world_bloom_fx();
+	register_node_type_sh_world_ssr_fx();
 	register_node_type_sh_lamp();
 	register_node_type_sh_gamma();
 	register_node_type_sh_brightcontrast();
@@ -3869,6 +3883,17 @@ bool BKE_node_shader_unsupported_in_game(const bNode *node, bool use_new)
 		case SH_NODE_TIME:
 		case SH_NODE_DAMAGE:
 		case SH_NODE_PARALLAX:
+		case SH_NODE_GLSL_SCRIPT:
+		case SH_NODE_FUR_SHELLS:
+		case SH_NODE_OUTLINE:
+		case SH_NODE_VERTEX_WIND:
+		case SH_NODE_VERTEX_WAVE:
+		case SH_NODE_SHELL_LAYER:
+		case SH_NODE_CAMERA_DISTANCE:
+		case SH_NODE_VERTEX_OFFSET:
+		case SH_NODE_BILLBOARD:
+		case SH_NODE_STRANDS:
+		case SH_NODE_EXPLODE:
 			return false;
 		case SH_NODE_OUTPUT_ATTACHMENT:
 			return use_new;

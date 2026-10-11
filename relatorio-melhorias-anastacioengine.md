@@ -55,7 +55,7 @@ visual no editor e no jogo real permanece pendente.
 
 ## Atlas de materiais nativo
 
-Properties > Material > Anastacio Material Atlas: operador C++ para um mesh ativo com materiais PBR
+Properties > Material > Build Material Atlas: operador C++ para um mesh ativo com materiais PBR
 opacos Principled. Gera Base Color, Roughness, Metallic, Specular e Normal, packed PNG 16 bits, UV
 AnastacioAtlas e material único; preserva malha fonte como backup e a UV Lightmap existente.
 Build editor/player, testes de dados/pixels e carregamento no standalone validados em 2026-10-07;
@@ -227,6 +227,11 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 - Novas Lamps já nascem com o preset de sombras para Sun: mapa Simple com filtro PCF, 1024 px na cascata
   Near, com CSM e debug desativados, splits 0,40/0,35 e cascatas Medium/Low em 512/128 px. Os valores continuam
   editáveis por lamp e dados existentes não são alterados.
+- Shaders do usuário seguem pelo editor de nós de material, com interface e conceitos do Blender 5 e sem portar
+  código dele ([docs/shader-nodes.md](docs/shader-nodes.md)): nós podem rodar no vertex (entrada Vertex Offset) e
+  há um estágio geometry gerado que repassa todas as varyings. O código à mão continua como modo avançado
+  (Shader Sources: Vertex, Geometry, Fragment; nó GLSL Script). Sem suporte a geometry shader (Web/GLES) o
+  estágio é ignorado. Materiais existentes geram o mesmo código.
 - FXAA foi atualizado para uma implementação no estilo 3.11 com nove amostras.
 - Bloom, SSAO, SSR, Tonemap e Light Scattering podem ser controlados pelo actuator Filter 2D com faixas de
   passes reservadas.

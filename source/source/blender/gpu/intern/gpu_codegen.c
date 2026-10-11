@@ -855,6 +855,12 @@ static int codegen_print_uniforms_functions(DynStr *ds, ListBase *nodes)
 	return builtins;
 }
 
+/* Nodes only reached from the vertex offset stay out of the fragment shader. */
+static bool codegen_node_in_fragment(const GPUNode *node)
+{
+	return node->stage == 0 || (node->stage & GPU_NODE_STAGE_FRAGMENT);
+}
+
 static void codegen_declare_tmps(DynStr *ds, ListBase *nodes)
 {
 	GPUNode *node;
@@ -862,6 +868,9 @@ static void codegen_declare_tmps(DynStr *ds, ListBase *nodes)
 	GPUOutput *output;
 
 	for (node = nodes->first; node; node = node->next) {
+		if (!codegen_node_in_fragment(node)) {
+			continue;
+		}
 		/* load pixels from textures */
 		for (input = node->inputs.first; input; input = input->next) {
 			if (input->source == GPU_SOURCE_TEX_PIXEL) {
@@ -890,6 +899,14 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 	GPUOutput *output;
 
 	for (node = nodes->first; node; node = node->next) {
+		if (!codegen_node_in_fragment(node)) {
+			continue;
+		}
+		if (STREQ(node->name, "node_shell_layer")) {
+			/* Fur Shells / Outline layer, from the generated geometry stage (see code_generate_fragment). */
+			BLI_dynstr_appendf(ds, "\ttmp%d = shell_layer;\n", ((GPUOutput *)node->outputs.first)->id);
+			continue;
+		}
 		BLI_dynstr_appendf(ds, "\t%s(", node->name);
 
 		for (input = node->inputs.first; input; input = input->next) {
@@ -953,7 +970,269 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 	}
 }
 
-static char *code_generate_fragment(ListBase *nodes, const char *usercode, const GPUMatType type, GPUNodeLink *outputs[8])
+static bool codegen_uses_node(ListBase *nodes, const char *name, int stage)
+{
+	for (GPUNode *node = nodes->first; node; node = node->next) {
+		const bool in_stage = (stage == GPU_NODE_STAGE_FRAGMENT) ? codegen_node_in_fragment(node) :
+		                      (node->stage & stage) != 0;
+		if (in_stage && STREQ(node->name, name)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+#define SCRIPT_MAX_NAMES 256
+
+typedef struct ScriptNames {
+	char (*names)[64];
+	int tot;
+	DynStr *defs, *undefs;
+	const char *prefix;
+} ScriptNames;
+
+static bool codegen_script_reserved(const char *word)
+{
+	static const char *reserved[] = {
+		"main", "void", "float", "int", "uint", "bool", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4",
+		"bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4", "sampler2D", "samplerCube", "sampler2DShadow",
+		"const", "uniform", "in", "out", "inout", "varying", "attribute", "highp", "mediump", "lowp",
+		"precision", "struct", "flat", "smooth", "layout", "TIME", NULL};
+	for (int i = 0; reserved[i]; i++) {
+		if (STREQ(word, reserved[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Renames a top level name of the script to <prefix>_<name>, or only forgets a macro of the script. */
+static void codegen_script_name(ScriptNames *sn, const char *name, bool macro)
+{
+	if (!name[0] || codegen_script_reserved(name) || sn->tot >= SCRIPT_MAX_NAMES) {
+		return;
+	}
+	for (int i = 0; i < sn->tot; i++) {
+		if (STREQ(sn->names[i], name)) {
+			return;
+		}
+	}
+	BLI_strncpy(sn->names[sn->tot++], name, sizeof(sn->names[0]));
+	if (!macro) {
+		/* Two underscores in a row are reserved in GLSL. */
+		BLI_dynstr_appendf(sn->defs, "#define %s %s%s%s\n", name, sn->prefix, (name[0] == '_') ? "x" : "_", name);
+	}
+	BLI_dynstr_appendf(sn->undefs, "#undef %s\n", name);
+}
+
+static bool codegen_ident_char(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+static const char *codegen_read_word(const char *p, char *r_word, int size)
+{
+	int n = 0;
+	while (codegen_ident_char(*p)) {
+		if (n < size - 1) {
+			r_word[n++] = *p;
+		}
+		p++;
+	}
+	r_word[n] = '\0';
+	return p;
+}
+
+/* Functions, global variables/constants and structs declared at the top level of a GLSL Script get
+ * a name of their own per node (by #define, so the lines of the Text stay as they are): two scripts
+ * may then declare helpers with the same name, also one that the material library already has.
+ * Macros of the script are forgotten at its end. */
+static void codegen_script_names(ScriptNames *sn, const char *code)
+{
+	const char *p = code;
+	int braces = 0, parens = 0, nwords = 0;
+	bool init = false, skip = false, line_start = true, prev_word = false, after_struct = false;
+	char prev[64] = "", word[64];
+
+	while (*p) {
+		if (p[0] == '/' && p[1] == '/') {
+			while (*p && *p != '\n') p++;
+			continue;
+		}
+		if (p[0] == '/' && p[1] == '*') {
+			const char *end = strstr(p + 2, "*/");
+			p = end ? end + 2 : p + strlen(p);
+			continue;
+		}
+		if (*p == '\n') {
+			line_start = true;
+			p++;
+			continue;
+		}
+		if (*p == ' ' || *p == '\t' || *p == '\r') {
+			p++;
+			continue;
+		}
+		if (*p == '#' && line_start) {
+			p++;
+			while (*p == ' ' || *p == '\t') p++;
+			p = codegen_read_word(p, word, sizeof(word));
+			if (STREQ(word, "define")) {
+				while (*p == ' ' || *p == '\t') p++;
+				p = codegen_read_word(p, word, sizeof(word));
+				codegen_script_name(sn, word, true);
+			}
+			while (*p && *p != '\n') {
+				if (p[0] == '\\' && p[1] == '\n') p++;
+				else if (p[0] == '\\' && p[1] == '\r' && p[2] == '\n') p += 2;
+				p++;
+			}
+			continue;
+		}
+		line_start = false;
+
+		if (*p >= '0' && *p <= '9') {
+			while (codegen_ident_char(*p) || *p == '.') p++;
+			prev_word = false;
+			continue;
+		}
+		if (codegen_ident_char(*p)) {
+			p = codegen_read_word(p, word, sizeof(word));
+			if (braces == 0 && parens == 0 && !init) {
+				if (nwords == 0 && (STREQ(word, "in") || STREQ(word, "out") || STREQ(word, "varying") ||
+				                    STREQ(word, "attribute") || STREQ(word, "precision") || STREQ(word, "layout") ||
+				                    STREQ(word, "flat") || STREQ(word, "smooth")))
+				{
+					/* Shared with the rest of the shader, or not the declaration of a name. */
+					skip = true;
+				}
+				if (after_struct && !skip) {
+					codegen_script_name(sn, word, false);
+				}
+				after_struct = STREQ(word, "struct");
+				BLI_strncpy(prev, word, sizeof(prev));
+				prev_word = true;
+				nwords++;
+			}
+			continue;
+		}
+
+		const char c = *p++;
+		const bool top = (braces == 0 && parens == 0);
+		const bool is_name = top && !init && prev_word && nwords >= 2 && !skip;
+		switch (c) {
+			case '{':
+				braces++;
+				break;
+			case '}':
+				braces = max_ii(braces - 1, 0);
+				if (braces == 0 && !init) {
+					/* End of a function body or of the members of a struct. */
+					nwords = 0;
+					skip = false;
+				}
+				break;
+			case '(':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				parens++;
+				break;
+			case ')':
+				parens = max_ii(parens - 1, 0);
+				break;
+			case '[':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				break;
+			case '=':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = true;
+				}
+				break;
+			case ',':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = false;
+				}
+				break;
+			case ';':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = false;
+					nwords = 0;
+					skip = false;
+				}
+				break;
+		}
+		prev_word = false;
+		after_struct = false;
+	}
+}
+
+/* GLSL Script node functions used by the given stage. The user writes a function called main;
+ * it is renamed to the unique name of its node, and so are the other names of the script. */
+static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts, int stage)
+{
+	if (!scripts) {
+		return;
+	}
+	for (GPUScriptCode *script = scripts->first; script; script = script->next) {
+		if (codegen_uses_node(nodes, script->name, stage)) {
+			ScriptNames sn = {NULL};
+			sn.names = MEM_mallocN(sizeof(*sn.names) * SCRIPT_MAX_NAMES, "ScriptNames");
+			sn.defs = BLI_dynstr_new();
+			sn.undefs = BLI_dynstr_new();
+			sn.prefix = script->name;
+			codegen_script_names(&sn, script->code);
+			char *defs = BLI_dynstr_get_cstring(sn.defs);
+			char *undefs = BLI_dynstr_get_cstring(sn.undefs);
+
+			BLI_dynstr_appendf(ds, "\n#define main %s_main\n", script->name);
+			if (script->use_time) {
+				/* Set by the wrapper from the time of the material. */
+				BLI_dynstr_appendf(ds, "float %s_TIME;\n#define TIME %s_TIME\n", script->name, script->name);
+			}
+			BLI_dynstr_append(ds, defs);
+			/* Compile errors give the line of the Text. The second #line argument (source string
+			 * number, GLSL spec) is this script's id + 1 (0 is the material's own Fragment/Vertex/
+			 * Geometry code): a compile error log then starts with "<id+1>:<line>" or "<id+1>(<line>)"
+			 * depending on the driver, which gpu_shader_error_find_node (gpu_material.c) matches back
+			 * to this node's name, so the editor can paint it red (node_draw.c). */
+			BLI_dynstr_appendf(ds, "#line 1 %d\n", script->id + 1);
+			BLI_dynstr_append(ds, script->code);
+			/* Back to source id 0 (no owning node) so a later script or the rest of the generated
+			 * code is never mistakenly blamed on this one. */
+			BLI_dynstr_append(ds, "\n#line 1 0\n");
+			BLI_dynstr_appendf(ds, "\n#define SCRIPT_MAIN %s_main\n#define SCRIPT_ENTRY %s\n",
+			                   script->name, script->name);
+			/* Inside the renames: the wrapper fills the uniforms of the script. */
+			BLI_dynstr_append(ds, script->wrapper);
+			BLI_dynstr_append(ds, "\n#undef main\n#undef SCRIPT_MAIN\n#undef SCRIPT_ENTRY\n");
+			if (script->use_time) {
+				BLI_dynstr_append(ds, "#undef TIME\n");
+			}
+			BLI_dynstr_append(ds, undefs);
+
+			MEM_freeN(defs);
+			MEM_freeN(undefs);
+			BLI_dynstr_free(sn.defs);
+			BLI_dynstr_free(sn.undefs);
+			MEM_freeN(sn.names);
+		}
+	}
+}
+
+static char *code_generate_fragment(ListBase *nodes, const char *usercode, const GPUMatType type, GPUNodeLink *outputs[8],
+                                    bool shell_varying, ListBase *scripts)
 {
 	DynStr *ds = BLI_dynstr_new();
 	char *code;
@@ -986,6 +1265,13 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 		}
 	}
 
+	const bool use_shell_layer = codegen_uses_node(nodes, "node_shell_layer", GPU_NODE_STAGE_FRAGMENT);
+	if (use_shell_layer && shell_varying) {
+		BLI_dynstr_appendf(ds, "%s float varshelllayer;\n", GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "varying");
+	}
+
+	codegen_print_scripts(ds, nodes, scripts, GPU_NODE_STAGE_FRAGMENT);
+
 	if (usercode) {
 		BLI_dynstr_append(ds, "void fragment();\n\n");
 	}
@@ -998,6 +1284,11 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 
 	if (builtins & GPU_VIEW_NORMAL)
 		BLI_dynstr_append(ds, "\tvec3 facingnormal = gl_FrontFacing? varnormal: -varnormal;\n");
+
+	if (use_shell_layer) {
+		/* Without the geometry stage (no support, or no Fur Shells/Outline) every pixel is the base layer. */
+		BLI_dynstr_appendf(ds, "\tfloat shell_layer = %s;\n", shell_varying ? "varshelllayer" : "0.0");
+	}
 
 	/* Calculate tangent space. */
 #ifdef WITH_OPENSUBDIV
@@ -1048,13 +1339,174 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 	return code;
 }
 
-static char *code_generate_vertex(ListBase *nodes, const char *usercode, const GPUMatType type, bool use_instancing)
+static char *glsl_lib_strip_vertex(const char *code);
+
+/* Vertex stage of the node tree: the nodes reached from the Material Output "Vertex Offset" become
+ * vertex_nodes(), called from gpu_shader_vertex.glsl (USE_VERTEX_NODES) before the vertex is
+ * projected. Library functions they call are copied from the material library. */
+static void codegen_vertex_input(DynStr *ds, GPUInput *input)
+{
+	if (input->source == GPU_SOURCE_TEX) {
+		BLI_dynstr_appendf(ds, "samp%d", input->texid);
+		if (input->link)
+			BLI_dynstr_append(ds, ", vec2(0.0)");
+	}
+	else if (input->source == GPU_SOURCE_TEX_PIXEL) {
+		BLI_dynstr_appendf(ds, "%s(0.0)", GPU_DATATYPE_STR[input->type]);
+	}
+	else if (input->source == GPU_SOURCE_BUILTIN) {
+		if (input->builtin == GPU_VIEW_POSITION)
+			BLI_dynstr_append(ds, "vn_viewpos");
+		else if (input->builtin == GPU_VIEW_NORMAL)
+			BLI_dynstr_append(ds, "vn_viewnor");
+		else if (input->builtin == GPU_VERTEX_ID)
+			BLI_dynstr_append(ds, "float(gl_VertexID)");
+		else
+			BLI_dynstr_append(ds, GPU_builtin_name(input->builtin));
+	}
+	else if (input->source == GPU_SOURCE_VEC_UNIFORM) {
+		if (codegen_input_is_uniform(input))
+			BLI_dynstr_appendf(ds, "unf%d", input->id);
+		else
+			BLI_dynstr_appendf(ds, "cons%d", input->id);
+	}
+	else if (input->source == GPU_SOURCE_ATTRIB) {
+		/* The varyings are only written at the end of main(), read the attribute itself. */
+		BLI_dynstr_appendf(ds, "att%d", input->attribid);
+	}
+	else if (input->source == GPU_SOURCE_OPENGL_BUILTIN) {
+		if (input->oglbuiltin == GPU_COLOR)
+			BLI_dynstr_append(ds, "gl_Color");
+		else
+			BLI_dynstr_append(ds, "vec4(0.5)");
+	}
+}
+
+static void codegen_vertex_nodes(DynStr *ds, ListBase *nodes, GPUNodeLink *vertex_offset, ListBase *scripts)
+{
+	DynStr *body = BLI_dynstr_new();
+	DynStr *decl = BLI_dynstr_new();
+	GPUNode *node;
+	GPUInput *input;
+	GPUOutput *output;
+	bool texdeclared[64] = {false};
+	int builtins = 0;
+
+	for (node = nodes->first; node; node = node->next) {
+		if (!(node->stage & GPU_NODE_STAGE_VERTEX)) {
+			continue;
+		}
+		for (input = node->inputs.first; input; input = input->next) {
+			if ((input->source == GPU_SOURCE_TEX) || (input->source == GPU_SOURCE_TEX_PIXEL)) {
+				if (codegen_input_has_texture(input) && input->texid >= 0 && input->texid < 64 &&
+				    !texdeclared[input->texid])
+				{
+					texdeclared[input->texid] = true;
+					BLI_dynstr_appendf(decl, "uniform %s samp%d;\n",
+						(input->textype == GPU_TEX2D) ? "sampler2D" :
+						(input->textype == GPU_TEXCUBE) ? "samplerCube" : "sampler2DShadow",
+						input->texid);
+				}
+			}
+			else if (input->source == GPU_SOURCE_BUILTIN) {
+				const char *name = GPU_builtin_name(input->builtin);
+				/* gpu_shader_vertex.glsl already declares the matrices, the time and its outputs. */
+				const bool declared = ELEM(input->builtin, GPU_VIEW_MATRIX, GPU_OBJECT_MATRIX, GPU_TIME,
+				                           GPU_PROJECTION_MATRIX, GPU_NORMAL_MATRIX);
+				if (!(builtins & input->builtin) && gpu_str_prefix(name, "unf") && !declared) {
+					BLI_dynstr_appendf(decl, "uniform %s %s;\n", GPU_DATATYPE_STR[input->type], name);
+				}
+				builtins |= input->builtin;
+			}
+			else if (input->source == GPU_SOURCE_VEC_UNIFORM) {
+				if (codegen_input_is_uniform(input)) {
+					BLI_dynstr_appendf(decl, "uniform %s unf%d;\n", GPU_DATATYPE_STR[input->type], input->id);
+				}
+				else {
+					BLI_dynstr_appendf(decl, "const %s cons%d = ", GPU_DATATYPE_STR[input->type], input->id);
+					codegen_print_datatype(decl, input->type, input->vec);
+					BLI_dynstr_append(decl, ";\n");
+				}
+			}
+		}
+	}
+
+	codegen_print_scripts(decl, nodes, scripts, GPU_NODE_STAGE_VERTEX);
+
+	BLI_dynstr_append(body, "void vertex_nodes(vec3 vn_co, vec3 vn_nor, out vec3 vn_offset)\n{\n");
+	BLI_dynstr_append(body, "\tvec3 vn_viewpos = (unfviewmat * unfobmat * vec4(vn_co, 1.0)).xyz;\n");
+	BLI_dynstr_append(body, "\tvec3 vn_viewnor = normalize(gl_NormalMatrix * vn_nor);\n");
+
+	for (node = nodes->first; node; node = node->next) {
+		if (!(node->stage & GPU_NODE_STAGE_VERTEX)) {
+			continue;
+		}
+		for (output = node->outputs.first; output; output = output->next) {
+			BLI_dynstr_appendf(body, "\t%s tmp%d;\n", GPU_DATATYPE_STR[output->type], output->id);
+		}
+	}
+
+	for (node = nodes->first; node; node = node->next) {
+		if (!(node->stage & GPU_NODE_STAGE_VERTEX)) {
+			continue;
+		}
+		if (STREQ(node->name, "node_shell_layer")) {
+			BLI_dynstr_appendf(body, "\ttmp%d = 0.0;\n", ((GPUOutput *)node->outputs.first)->id);
+			continue;
+		}
+		BLI_dynstr_appendf(body, "\t%s(", node->name);
+		for (input = node->inputs.first; input; input = input->next) {
+			if (input->source == GPU_SOURCE_TEX_PIXEL && input->link) {
+				codegen_convert_datatype(body, input->link->output->type, input->type, "tmp", input->link->output->id);
+			}
+			else {
+				codegen_vertex_input(body, input);
+			}
+			BLI_dynstr_append(body, ", ");
+		}
+		for (output = node->outputs.first; output; output = output->next) {
+			BLI_dynstr_appendf(body, "tmp%d", output->id);
+			if (output->next)
+				BLI_dynstr_append(body, ", ");
+		}
+		BLI_dynstr_append(body, ");\n");
+	}
+
+	BLI_dynstr_append(body, "\tvn_offset = ");
+	codegen_convert_datatype(body, vertex_offset->output->type, GPU_VEC3, "tmp", vertex_offset->output->id);
+	BLI_dynstr_append(body, ";\n}\n");
+
+	char *bodycode = BLI_dynstr_get_cstring(body);
+	char *declcode = BLI_dynstr_get_cstring(decl);
+	char *libcode = glsl_lib_strip_vertex(bodycode);
+
+	BLI_dynstr_append(ds, "\n/* Vertex nodes */\n");
+	if (libcode) {
+		BLI_dynstr_append(ds, libcode);
+		MEM_freeN(libcode);
+	}
+	BLI_dynstr_append(ds, "\n");
+	BLI_dynstr_append(ds, declcode);
+	BLI_dynstr_append(ds, bodycode);
+
+	MEM_freeN(bodycode);
+	MEM_freeN(declcode);
+	BLI_dynstr_free(body);
+	BLI_dynstr_free(decl);
+}
+
+static char *code_generate_vertex(ListBase *nodes, const char *usercode, const GPUMatType type, bool use_instancing,
+                                  const char *prefix, GPUNodeLink *vertex_offset, ListBase *scripts)
 {
 	DynStr *ds = BLI_dynstr_new();
 	GPUNode *node;
 	GPUInput *input;
 	char *code;
 	char *vertcode = NULL;
+
+	if (prefix) {
+		BLI_dynstr_append(ds, prefix);
+	}
 
 	for (node = nodes->first; node; node = node->next) {
 		for (input = node->inputs.first; input; input = input->next) {
@@ -1168,6 +1620,10 @@ static char *code_generate_vertex(ListBase *nodes, const char *usercode, const G
 
 	BLI_dynstr_append(ds, "}\n");
 
+	if (vertex_offset) {
+		codegen_vertex_nodes(ds, nodes, vertex_offset, scripts);
+	}
+
 	if (usercode && type == GPU_MATERIAL_TYPE_MESH) {
 		BLI_dynstr_append(ds, "\n"
 			"#define VIEW_MATRIX unfviewmat\n"
@@ -1247,6 +1703,447 @@ static char *code_generate_geometry(ListBase *nodes, bool use_opensubdiv)
 	UNUSED_VARS(nodes, use_opensubdiv);
 #endif
 	return NULL;
+}
+
+/* Geometry stage for materials (Material.geomcode, Fur Shells, Outline). Every varying the vertex
+ * shader writes is renamed to vs_<name> there (#define in front of the vertex code) and copied by
+ * the generated geometry shader, so neither the nodes nor the user code repeat the varyings. */
+
+static bool glsl_ident_char(char c);
+
+#define GEOM_MAX_VARYINGS 64
+
+typedef struct GeomVarying {
+	char type[16];
+	char name[64];
+	bool flat;
+} GeomVarying;
+
+static void geom_varying_add(GeomVarying *list, int *tot, const char *type, const char *name, bool flat)
+{
+	if (*tot >= GEOM_MAX_VARYINGS) {
+		return;
+	}
+	for (int i = 0; i < *tot; i++) {
+		if (STREQ(list[i].name, name)) {
+			return;
+		}
+	}
+	BLI_strncpy(list[*tot].type, type, sizeof(list[*tot].type));
+	BLI_strncpy(list[*tot].name, name, sizeof(list[*tot].name));
+	list[*tot].flat = flat;
+	(*tot)++;
+}
+
+/* Outputs declared by user vertex code: "[flat] out|varying <type> <name>;" at the start of a line. */
+static void geom_parse_user_varyings(const char *code, GeomVarying *list, int *tot)
+{
+	const char *line = code;
+	while (line && *line) {
+		const char *p = line;
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		bool flat = false;
+		if (strncmp(p, "flat ", 5) == 0) {
+			flat = true;
+			p += 5;
+			while (*p == ' ' || *p == '\t') p++;
+		}
+		int skip = 0;
+		if (strncmp(p, "out ", 4) == 0) skip = 4;
+		else if (strncmp(p, "varying ", 8) == 0) skip = 8;
+		if (skip) {
+			char type[16], name[64];
+			p += skip;
+			while (*p == ' ' || *p == '\t') p++;
+			int n = 0;
+			while (*p && glsl_ident_char(*p) && n < (int)sizeof(type) - 1) type[n++] = *p++;
+			type[n] = '\0';
+			while (*p == ' ' || *p == '\t') p++;
+			int m = 0;
+			while (*p && glsl_ident_char(*p) && m < (int)sizeof(name) - 1) name[m++] = *p++;
+			name[m] = '\0';
+			while (*p == ' ' || *p == '\t') p++;
+			/* Arrays and several names per line are left to the user. */
+			if (n && m && *p == ';') {
+				geom_varying_add(list, tot, type, name, flat);
+			}
+		}
+		line = strchr(line, '\n');
+		if (line) line++;
+	}
+}
+
+static int geom_collect_varyings(ListBase *nodes, const char *vertcode, bool use_instancing, GeomVarying *list)
+{
+	int tot = 0;
+	geom_varying_add(list, &tot, "vec3", "varposition", false);
+	geom_varying_add(list, &tot, "vec3", "varnormal", false);
+	geom_varying_add(list, &tot, "float", "varvertexid", false);
+	geom_varying_add(list, &tot, "vec3", "varbarycentric", false);
+	if (use_instancing) {
+		geom_varying_add(list, &tot, "vec4", "varinstcolor", false);
+		geom_varying_add(list, &tot, "mat4", "varinstmat", false);
+		geom_varying_add(list, &tot, "mat4", "varinstinvmat", false);
+		geom_varying_add(list, &tot, "int", "varinstlayer", true);
+		geom_varying_add(list, &tot, "vec3", "varinstinfo", false);
+	}
+	for (GPUNode *node = nodes->first; node; node = node->next) {
+		for (GPUInput *input = node->inputs.first; input; input = input->next) {
+			if (input->source == GPU_SOURCE_ATTRIB && input->attribfirst) {
+				char name[16];
+				BLI_snprintf(name, sizeof(name), "var%d", input->attribid);
+				geom_varying_add(list, &tot, GPU_DATATYPE_STR[input->type], name, false);
+			}
+		}
+	}
+	if (vertcode) {
+		geom_parse_user_varyings(vertcode, list, &tot);
+	}
+	return tot;
+}
+
+static char *geom_vertex_prefix(const GeomVarying *list, int tot)
+{
+	DynStr *ds = BLI_dynstr_new();
+	BLI_dynstr_append(ds, "#define USE_GEOMETRY_STAGE\n");
+	for (int i = 0; i < tot; i++) {
+		BLI_dynstr_appendf(ds, "#define %s vs_%s\n", list[i].name, list[i].name);
+	}
+	char *code = BLI_dynstr_get_cstring(ds);
+	BLI_dynstr_free(ds);
+	return code;
+}
+
+/* Raw mode of Material.geomcode: the Text has its own "void main(" instead of "void geometry()". */
+static bool geom_code_has_main(const char *code)
+{
+	for (const char *p = strstr(code, "main"); p; p = strstr(p + 4, "main")) {
+		const char *end = p + 4;
+		while (*end == ' ' || *end == '\t') {
+			end++;
+		}
+		if (*end != '(' || (p > code && glsl_ident_char(p[-1]))) {
+			continue;
+		}
+		const char *start = p;
+		while (start > code && ELEM(start[-1], ' ', '\t', '\n', '\r')) {
+			start--;
+		}
+		if (start - code >= 4 && strncmp(start - 4, "void", 4) == 0 &&
+		    (start - 4 == code || !glsl_ident_char(start[-5])))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Raw mode: the "layout(...) in;" and "layout(...) out;" lines of the user go to the top of the shader,
+ * as the input layout gives the size of the vs_ arrays that the helpers index. They are commented out
+ * in the returned copy of the code, so the line numbers of the Text stay. */
+static char *geom_hoist_layouts(const char *usercode, DynStr *ds, bool *r_has_in, bool *r_has_out)
+{
+	char *code = BLI_strdup(usercode);
+	char *line = code;
+	*r_has_in = *r_has_out = false;
+	while (line && *line) {
+		char *p = line;
+		char *eol = strchr(line, '\n');
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		if (strncmp(p, "layout", 6) == 0 && !glsl_ident_char(p[6])) {
+			char *semi = strchr(p, ';');
+			if (semi && (!eol || semi < eol)) {
+				const char *word_end = semi;
+				while (word_end > p && ELEM(word_end[-1], ' ', '\t')) {
+					word_end--;
+				}
+				const char *word = word_end;
+				while (word > p && glsl_ident_char(word[-1])) {
+					word--;
+				}
+				const int len = (int)(word_end - word);
+				const bool is_in = (len == 2 && strncmp(word, "in", 2) == 0);
+				const bool is_out = (len == 3 && strncmp(word, "out", 3) == 0);
+				/* "layout(location = 0) in vec3 name;" ends with a name: not a primitive layout */
+				if (is_in || is_out) {
+					BLI_dynstr_nappend(ds, p, (int)(semi + 1 - p));
+					BLI_dynstr_append(ds, "\n");
+					p[0] = p[1] = '/';
+					*r_has_in |= is_in;
+					*r_has_out |= is_out;
+				}
+			}
+		}
+		line = eol ? eol + 1 : NULL;
+	}
+	return code;
+}
+
+static char *code_generate_geometry_stage(const GeomVarying *list, int tot, const GPUPassStages *stages,
+                                          bool use_shells, bool use_strands, bool use_explode,
+                                          int *r_max_vertices)
+{
+	DynStr *ds = BLI_dynstr_new();
+	const bool use_raw = !use_shells && !use_strands && !use_explode && geom_code_has_main(stages->geomcode);
+	char *rawcode = NULL;
+
+	if (use_shells) {
+		const int layers = max_ii(stages->shell_layers, 1);
+		const int invocations = layers + (stages->outline_width != 0.0f ? 1 : 0);
+		/* One invocation per layer keeps max_vertices (and the output component limit) small. */
+		BLI_dynstr_appendf(ds,
+		        "#define SHELL_LAYERS %d\n"
+		        "#define SHELL_LENGTH %f\n"
+		        "#define SHELL_DIR vec3(%f, %f, %f)\n"
+		        "#define SHELL_DIR_STRENGTH %f\n"
+		        "#define OUTLINE_WIDTH %f\n"
+		        "#if __VERSION__ >= 400\n"
+		        "layout(triangles, invocations = %d) in;\n"
+		        "layout(triangle_strip, max_vertices = 3) out;\n"
+		        "#define GEOM_LAYER_FIRST gl_InvocationID\n"
+		        "#define GEOM_LAYER_LAST gl_InvocationID\n"
+		        "#else\n"
+		        "layout(triangles) in;\n"
+		        "layout(triangle_strip, max_vertices = %d) out;\n"
+		        "#define GEOM_LAYER_FIRST 0\n"
+		        "#define GEOM_LAYER_LAST %d\n"
+		        "#endif\n",
+		        layers, stages->shell_length,
+		        stages->shell_dir[0], stages->shell_dir[1], stages->shell_dir[2], stages->shell_dir_strength,
+		        stages->outline_width,
+		        invocations, invocations * 3, invocations - 1);
+		*r_max_vertices = invocations * 3;
+	}
+	else if (use_strands) {
+		const int density = max_ii(stages->strand_density, 1);
+		/* One invocation per strand, same reasoning as SHELL_LAYERS above: max_vertices stays at
+		 * 3 (one thin triangle) with GL 4.0 invocations, or density*3 on the fallback path. */
+		BLI_dynstr_appendf(ds,
+		        "#define STRAND_DENSITY %d\n"
+		        "#define STRAND_LENGTH %f\n"
+		        "#define STRAND_CURVATURE %f\n"
+		        "#if __VERSION__ >= 400\n"
+		        "layout(triangles, invocations = %d) in;\n"
+		        "layout(triangle_strip, max_vertices = 3) out;\n"
+		        "#define GEOM_STRAND_FIRST gl_InvocationID\n"
+		        "#define GEOM_STRAND_LAST gl_InvocationID\n"
+		        "#else\n"
+		        "layout(triangles) in;\n"
+		        "layout(triangle_strip, max_vertices = %d) out;\n"
+		        "#define GEOM_STRAND_FIRST 0\n"
+		        "#define GEOM_STRAND_LAST %d\n"
+		        "#endif\n",
+		        density, stages->strand_length, stages->strand_curvature,
+		        density, density * 3, density - 1);
+		*r_max_vertices = density * 3;
+	}
+	else if (use_explode) {
+		BLI_dynstr_appendf(ds,
+		        "#define EXPLODE_FACTOR %f\n"
+		        "layout(triangles) in;\n"
+		        "layout(triangle_strip, max_vertices = 3) out;\n",
+		        stages->explode_factor);
+		*r_max_vertices = 3;
+	}
+	else if (use_raw) {
+		bool has_in, has_out;
+		rawcode = geom_hoist_layouts(stages->geomcode, ds, &has_in, &has_out);
+		if (!has_in) {
+			BLI_dynstr_append(ds, "layout(triangles) in;\n");
+		}
+		if (!has_out) {
+			BLI_dynstr_append(ds, "layout(triangle_strip, max_vertices = 3) out;\n");
+		}
+		*r_max_vertices = 64;
+	}
+	else {
+		BLI_dynstr_append(ds, "layout(triangles) in;\n");
+		if (!strstr(stages->geomcode, "max_vertices")) {
+			BLI_dynstr_append(ds, "layout(triangle_strip, max_vertices = 3) out;\n");
+		}
+		*r_max_vertices = 64;
+	}
+
+	for (int i = 0; i < tot; i++) {
+		const char *flat = list[i].flat ? "flat " : "";
+		BLI_dynstr_appendf(ds, "%sin %s vs_%s[];\n", flat, list[i].type, list[i].name);
+		BLI_dynstr_appendf(ds, "%sout %s %s;\n", flat, list[i].type, list[i].name);
+	}
+	if (use_shells || use_strands) {
+		BLI_dynstr_append(ds, "out float varshelllayer;\n");
+	}
+
+	BLI_dynstr_append(ds,
+	        "#ifdef USE_CORE_PROFILE\n"
+	        "uniform mat4 unfprojmat;\n"
+	        "#define GEOM_PROJECTION unfprojmat\n"
+	        "#else\n"
+	        "#define GEOM_PROJECTION gl_ProjectionMatrix\n"
+	        "#endif\n"
+	        "#if !defined(USE_CORE_PROFILE) && !defined(GPU_ATI) && !defined(CLIP_WORKAROUND)\n"
+	        "#define GEOM_CLIP_VERTEX\n"
+	        "#endif\n"
+	        "#if defined(CLIP_WORKAROUND) && !defined(USE_CORE_PROFILE)\n"
+	        "out float gl_ClipDistance[6];\n"
+	        "#endif\n"
+	        "uniform float unftime;\n"
+	        "#define TIME unftime\n\n"
+	        "/* View space position and normal of input vertex i. */\n"
+	        "vec3 geom_position(int i) { return vs_varposition[i]; }\n"
+	        "vec3 geom_normal(int i) { return vs_varnormal[i]; }\n\n"
+	        "/* Copies every output from input vertex i. */\n"
+	        "void geom_copy(int i)\n{\n");
+	for (int i = 0; i < tot; i++) {
+		BLI_dynstr_appendf(ds, "\t%s = vs_%s[i];\n", list[i].name, list[i].name);
+	}
+	BLI_dynstr_append(ds,
+	        "\tgl_Position = gl_in[i].gl_Position;\n"
+	        "#ifndef USE_CORE_PROFILE\n"
+	        "\tgl_FrontColor = gl_in[i].gl_FrontColor;\n"
+	        "\tgl_FrontSecondaryColor = gl_in[i].gl_FrontSecondaryColor;\n"
+	        "#endif\n"
+	        "#ifdef GEOM_CLIP_VERTEX\n"
+	        "\tgl_ClipVertex = gl_in[i].gl_ClipVertex;\n"
+	        "#endif\n"
+	        "#if defined(CLIP_WORKAROUND) && !defined(USE_CORE_PROFILE)\n"
+	        "\t/* Same array size as the vertex shader (gl_ClipDistance[6]) or the stages do not link. */\n"
+	        "\tgl_ClipDistance[0] = gl_in[i].gl_ClipDistance[0];\n"
+	        "\tgl_ClipDistance[1] = gl_in[i].gl_ClipDistance[1];\n"
+	        "\tgl_ClipDistance[2] = gl_in[i].gl_ClipDistance[2];\n"
+	        "\tgl_ClipDistance[3] = gl_in[i].gl_ClipDistance[3];\n"
+	        "\tgl_ClipDistance[4] = gl_in[i].gl_ClipDistance[4];\n"
+	        "\tgl_ClipDistance[5] = gl_in[i].gl_ClipDistance[5];\n"
+	        "#endif\n"
+	        "}\n\n"
+	        "/* Moves the current output vertex to a view space position. */\n"
+	        "void geom_set_position(vec3 viewpos)\n{\n"
+	        "\tvarposition = viewpos;\n"
+	        "\tgl_Position = GEOM_PROJECTION * vec4(viewpos, 1.0);\n"
+	        "#ifdef GEOM_CLIP_VERTEX\n"
+	        "\tgl_ClipVertex = vec4(viewpos, 1.0);\n"
+	        "#endif\n"
+	        "#if defined(CLIP_WORKAROUND) && !defined(USE_CORE_PROFILE)\n"
+	        "\tgl_ClipDistance[0] = dot(vec4(viewpos, 1.0), gl_ClipPlane[0]);\n"
+	        "\tgl_ClipDistance[1] = dot(vec4(viewpos, 1.0), gl_ClipPlane[1]);\n"
+	        "\tgl_ClipDistance[2] = dot(vec4(viewpos, 1.0), gl_ClipPlane[2]);\n"
+	        "\tgl_ClipDistance[3] = dot(vec4(viewpos, 1.0), gl_ClipPlane[3]);\n"
+	        "\tgl_ClipDistance[4] = dot(vec4(viewpos, 1.0), gl_ClipPlane[4]);\n"
+	        "\tgl_ClipDistance[5] = dot(vec4(viewpos, 1.0), gl_ClipPlane[5]);\n"
+	        "#endif\n"
+	        "}\n\n"
+	        "void geom_emit(int i)\n{\n\tgeom_copy(i);\n\tEmitVertex();\n}\n\n"
+	        "void geom_emit_offset(int i, vec3 offset)\n{\n"
+	        "\tgeom_copy(i);\n\tgeom_set_position(vs_varposition[i] + offset);\n\tEmitVertex();\n}\n\n");
+
+	if (use_shells) {
+		BLI_dynstr_append(ds,
+		        "void main()\n{\n"
+		        "\tfor (int layer = GEOM_LAYER_FIRST; layer <= GEOM_LAYER_LAST; layer++) {\n"
+		        "\t\tif (layer < SHELL_LAYERS) {\n"
+		        "\t\t\tfloat t = float(layer) / float(max(SHELL_LAYERS - 1, 1));\n"
+		        "\t\t\tfor (int i = 0; i < 3; i++) {\n"
+		        "\t\t\t\tgeom_copy(i);\n"
+		        "\t\t\t\tif (layer > 0) {\n"
+		        "\t\t\t\t\tvec3 shell_dir = normalize(mix(vs_varnormal[i], SHELL_DIR, SHELL_DIR_STRENGTH));\n"
+		        "\t\t\t\t\tgeom_set_position(vs_varposition[i] + shell_dir * (SHELL_LENGTH * t));\n"
+		        "\t\t\t\t}\n"
+		        "\t\t\t\tvarshelllayer = t;\n"
+		        "\t\t\t\tEmitVertex();\n"
+		        "\t\t\t}\n"
+		        "\t\t}\n"
+		        "\t\telse {\n"
+		        "\t\t\t/* Outline: inverted hull, reversed winding so back face culling keeps the rim. */\n"
+		        "\t\t\tfor (int k = 0; k < 3; k++) {\n"
+		        "\t\t\t\tint i = 2 - k;\n"
+		        "\t\t\t\tgeom_copy(i);\n"
+		        "\t\t\t\tgeom_set_position(vs_varposition[i] + vs_varnormal[i] * OUTLINE_WIDTH);\n"
+		        "\t\t\t\tvarshelllayer = -1.0;\n"
+		        "\t\t\t\tEmitVertex();\n"
+		        "\t\t\t}\n"
+		        "\t\t}\n"
+		        "\t\tEndPrimitive();\n"
+		        "\t}\n"
+		        "}\n");
+	}
+	else if (use_strands) {
+		BLI_dynstr_append(ds,
+		        "float geom_strand_hash(vec2 p)\n{\n\treturn fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n}\n\n"
+		        "void main()\n{\n"
+		        "\tfor (int s = GEOM_STRAND_FIRST; s <= GEOM_STRAND_LAST; s++) {\n"
+		        "\t\tif (s >= STRAND_DENSITY) continue;\n"
+		        "\t\tfloat fid = float(gl_PrimitiveIDIn);\n"
+		        "\t\t/* Pseudo-random barycentric coordinate: where this strand grows from. */\n"
+		        "\t\tfloat b0 = geom_strand_hash(vec2(float(s), fid));\n"
+		        "\t\tfloat b1 = geom_strand_hash(vec2(float(s) + 17.0, fid + 3.0)) * (1.0 - b0);\n"
+		        "\t\tfloat b2 = 1.0 - b0 - b1;\n"
+		        "\t\t/* LOD: strands fade out progressively between 0 and ~20 units (view space puts\n"
+		        "\t\t * the camera at the origin, so length(base) is the camera distance). */\n"
+		        "\t\tfloat lod = geom_strand_hash(vec2(float(s) + 5.0, fid + 9.0));\n"
+		        "\t\tvec3 base = vs_varposition[0] * b0 + vs_varposition[1] * b1 + vs_varposition[2] * b2;\n"
+		        "\t\tvec3 normal = normalize(vs_varnormal[0] * b0 + vs_varnormal[1] * b1 + vs_varnormal[2] * b2);\n"
+		        "\t\tfloat camfade = clamp(1.0 - length(base) * 0.05, 0.0, 1.0);\n"
+		        "\t\tif (lod > camfade) continue;\n"
+		        "\t\tvec3 side = normalize(cross(normal, (abs(normal.z) < 0.9) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));\n"
+		        "\t\tconst float width = 0.015;\n"
+		        "\t\tvec3 bend = side * (STRAND_CURVATURE * STRAND_LENGTH * (b0 - 0.5));\n"
+		        "\t\tvec3 tip = base + normal * STRAND_LENGTH + bend;\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(base - side * width);\n"
+		        "\t\tvarshelllayer = 0.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(base + side * width);\n"
+		        "\t\tvarshelllayer = 0.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(tip);\n"
+		        "\t\tvarshelllayer = 1.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tEndPrimitive();\n"
+		        "\t}\n"
+		        "}\n");
+	}
+	else if (use_explode) {
+		BLI_dynstr_append(ds,
+		        "float geom_explode_hash(float p)\n{\n\treturn fract(sin(p * 12.9898) * 43758.5453);\n}\n\n"
+		        "void main()\n{\n"
+		        "\tvec3 normal = normalize(cross(vs_varposition[1] - vs_varposition[0], vs_varposition[2] - vs_varposition[0]));\n"
+		        "\tfloat h = geom_explode_hash(float(gl_PrimitiveIDIn) + 1.0);\n"
+		        "\tfloat ang = h * 6.28318530718;\n"
+		        "\t/* Mostly along the face normal, with a per-triangle random direction mixed in so\n"
+		        "\t * neighbouring triangles do not fly apart in lockstep. */\n"
+		        "\tvec3 randdir = vec3(cos(ang), sin(ang), geom_explode_hash(float(gl_PrimitiveIDIn) * 2.0 + 7.0) * 2.0 - 1.0);\n"
+		        "\tvec3 dir = normalize(normal + randdir * 0.5);\n"
+		        "\tvec3 offset = dir * (EXPLODE_FACTOR * (0.25 + h * 0.75));\n"
+		        "\tfor (int i = 0; i < 3; i++) {\n"
+		        "\t\tgeom_copy(i);\n"
+		        "\t\tgeom_set_position(vs_varposition[i] + offset);\n"
+		        "\t\tEmitVertex();\n"
+		        "\t}\n"
+		        "\tEndPrimitive();\n"
+		        "}\n");
+	}
+	else if (use_raw) {
+		/* The user's own main(): only the vs_ inputs, the outputs and the helpers above are added. */
+		BLI_dynstr_append(ds, "#line 1\n");
+		BLI_dynstr_append(ds, rawcode);
+		BLI_dynstr_append(ds, "\n");
+		MEM_freeN(rawcode);
+	}
+	else {
+		BLI_dynstr_append(ds, "void geometry();\n\nvoid main()\n{\n\tgeometry();\n}\n\n");
+		BLI_dynstr_append(ds, "#line 1\n");
+		BLI_dynstr_append(ds, stages->geomcode);
+		BLI_dynstr_append(ds, "\n");
+	}
+
+	char *code = BLI_dynstr_get_cstring(ds);
+	BLI_dynstr_free(ds);
+	return code;
 }
 
 /* GLSL library stripping: the material library (~200 KB) used to go whole into every fragment shader,
@@ -1619,6 +2516,80 @@ static char *glsl_lib_strip(const char *fragmentcode)
 	MEM_freeN(collect.seen);
 	MEM_freeN(collect.list);
 	return code;
+}
+
+/* Library functions for the vertex stage: the functions vertex_nodes() reaches and the preprocessor
+ * lines, without uniforms, varyings or the functions gpu_shader_vertex.glsl defines itself. */
+static char *glsl_lib_strip_vertex(const char *code)
+{
+	if (!code || !glsl_material_library) {
+		return NULL;
+	}
+	if (!GLSL_LIB_GROUPS) {
+		glsl_lib_strip_init(glsl_material_library);
+	}
+
+	const int groups = max_ii(GLSL_LIB_GROUPS_LEN, 1);
+	GLSLDepCollect collect;
+	collect.seen = MEM_callocN(groups, "glsl strip used");
+	collect.list = MEM_mallocN(sizeof(int) * groups, "glsl strip stack");
+	collect.len = 0;
+
+	char *excluded = MEM_callocN(groups, "glsl strip excluded");
+	const char *vertex_defined[] = {"srgb_to_linearrgb", "linearrgb_to_srgb", "is_srgb", "set_var_from_attr",
+	                                "vertex_position", "vertex_normal", "vertex_instance_position"};
+	for (int k = 0; k < ARRAY_SIZE(vertex_defined); k++) {
+		const int g = glsl_lib_group_lookup(vertex_defined[k], (int)strlen(vertex_defined[k]));
+		if (g >= 0) {
+			excluded[g] = 1;
+			collect.seen[g] = 1;
+		}
+	}
+
+	glsl_foreach_ident(code, 0, (int)strlen(code), glsl_collect_dep, &collect);
+	while (collect.len) {
+		const int g = collect.list[--collect.len];
+		for (int k = 0; k < GLSL_LIB_GROUP_DEPS_LEN[g]; k++) {
+			const int dep = GLSL_LIB_GROUP_DEPS[g][k];
+			if (!collect.seen[dep]) {
+				collect.seen[dep] = 1;
+				collect.list[collect.len++] = dep;
+			}
+		}
+	}
+
+	DynStr *ds = BLI_dynstr_new();
+	for (int c = 0; c < GLSL_LIB_CHUNKS_LEN; c++) {
+		const GLSLLibChunk *chunk = &GLSL_LIB_CHUNKS[c];
+		if (chunk->group == -1) {
+			int k = chunk->start;
+			while (k < chunk->end) {
+				const int skip = glsl_skip_comment(glsl_material_library, k, chunk->end);
+				if (skip != k) {
+					k = skip;
+				}
+				else if (ELEM(glsl_material_library[k], ' ', '\t', '\n', '\r')) {
+					k++;
+				}
+				else {
+					break;
+				}
+			}
+			if (k < chunk->end && glsl_material_library[k] == '#') {
+				BLI_dynstr_nappend(ds, glsl_material_library + chunk->start, chunk->end - chunk->start);
+			}
+		}
+		else if (collect.seen[chunk->group] && !excluded[chunk->group]) {
+			BLI_dynstr_nappend(ds, glsl_material_library + chunk->start, chunk->end - chunk->start);
+		}
+	}
+	char *result = BLI_dynstr_get_cstring(ds);
+	BLI_dynstr_free(ds);
+
+	MEM_freeN(excluded);
+	MEM_freeN(collect.seen);
+	MEM_freeN(collect.list);
+	return result;
 }
 
 void GPU_code_generate_glsl_lib(void)
@@ -2419,6 +3390,42 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 	return true;
 }
 
+/* GLSL Script node: the user function (called main in code) with one parameter per socket, the
+ * inputs first, then the outputs. */
+bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
+                     const char **uniform_names, bool use_time, const char *orig_node_name)
+{
+	const char *name = gpu_material_add_script(mat, code, wrapper, use_time, orig_node_name);
+	if (!name) {
+		return false;
+	}
+
+	GPUNode *node = GPU_node_begin(name);
+	if (in) {
+		for (int i = 0; in[i].type != GPU_NONE; i++) {
+			if (uniform_names && uniform_names[i] && !in[i].link) {
+				/* A real uniform, sent on every bind: changing it from the game does not compile. */
+				float *value = gpu_material_add_script_uniform(mat, uniform_names[i], in[i].vec,
+				                                               GPU_DATATYPE_SIZE[in[i].type]);
+				gpu_node_input_link(node, GPU_dynamic_uniform(value, GPU_DYNAMIC_NONE, NULL), in[i].type);
+			}
+			else {
+				gpu_node_input_socket(node, &in[i]);
+			}
+		}
+	}
+	if (use_time) {
+		gpu_node_input_link(node, GPU_builtin(GPU_TIME), GPU_FLOAT);
+	}
+	if (out) {
+		for (int i = 0; out[i].type != GPU_NONE; i++) {
+			gpu_node_output(node, out[i].type, &out[i].link);
+		}
+	}
+	gpu_material_add_node(mat, node);
+	return true;
+}
+
 int GPU_link_changed(GPUNodeLink *link)
 {
 	GPUNode *node;
@@ -2442,7 +3449,7 @@ int GPU_link_changed(GPUNodeLink *link)
 
 /* Pass create/free */
 
-static void gpu_nodes_tag(GPUNodeLink *link)
+static void gpu_nodes_tag(GPUNodeLink *link, char stage)
 {
 	GPUNode *node;
 	GPUInput *input;
@@ -2451,26 +3458,32 @@ static void gpu_nodes_tag(GPUNodeLink *link)
 		return;
 
 	node = link->output->node;
-	if (node->tag)
+	if (node->tag && (node->stage & stage))
 		return;
 
 	node->tag = true;
+	node->stage |= stage;
 	for (input = node->inputs.first; input; input = input->next)
 		if (input->link)
-			gpu_nodes_tag(input->link);
+			gpu_nodes_tag(input->link, stage);
 }
 
-static void gpu_nodes_prune(ListBase *nodes, GPUNodeLink *outlinks[8])
+static void gpu_nodes_prune(ListBase *nodes, GPUNodeLink *outlinks[8], GPUNodeLink *vertex_offset)
 {
 	GPUNode *node, *next;
 
-	for (node = nodes->first; node; node = node->next)
+	for (node = nodes->first; node; node = node->next) {
 		node->tag = false;
+		node->stage = 0;
+	}
 
 	for (unsigned short i = 0; i < 8; ++i) {
 		if (outlinks[i]) {
-			gpu_nodes_tag(outlinks[i]);
+			gpu_nodes_tag(outlinks[i], GPU_NODE_STAGE_FRAGMENT);
 		}
+	}
+	if (vertex_offset) {
+		gpu_nodes_tag(vertex_offset, GPU_NODE_STAGE_VERTEX);
 	}
 
 	for (node = nodes->first; node; node = next) {
@@ -2491,11 +3504,13 @@ GPUPass *GPU_generate_pass(
 		const bool use_instancing,
 		const bool use_skinning,
 		const bool use_foliage,
-        const bool use_new_shading)
+        const bool use_new_shading,
+        const GPUPassStages *stages)
 {
 	GPUShader *shader;
 	GPUPass *pass;
 	char *vertexcode, *geometrycode, *fragmentcode;
+	static bool geometry_warned = false;
 
 #if 0
 	if (!FUNCTION_LIB) {
@@ -2504,16 +3519,75 @@ GPUPass *GPU_generate_pass(
 	}
 #endif
 
+	const bool mesh_stages = stages && type == GPU_MATERIAL_TYPE_MESH && !use_opensubdiv;
+	GPUNodeLink *vertex_offset = (mesh_stages && stages->vertex_offset && stages->vertex_offset->output) ?
+	                             stages->vertex_offset : NULL;
+
 	/* prune unused nodes */
-	gpu_nodes_prune(nodes, outlinks);
+	gpu_nodes_prune(nodes, outlinks, vertex_offset);
 
 	gpu_nodes_get_vertex_attributes(nodes, attribs);
 	gpu_nodes_get_builtin_flag(nodes, builtins);
 
+	/* Geometry stage: user code, or Fur Shells/Outline. Without support (GLES/web) the material
+	 * draws as if it had none. */
+	bool use_geometry = false, use_shells = false, use_strands = false, use_explode = false;
+	if (mesh_stages) {
+		const bool wants_shells = stages->shell_layers > 1 || stages->outline_width != 0.0f;
+		const bool wants_strands = stages->strand_density > 1;
+		const bool wants_explode = stages->explode_factor != 0.0f;
+		if (stages->geomcode || wants_shells || wants_strands || wants_explode) {
+			if (GPU_geometry_shader_support()) {
+				use_geometry = true;
+				/* Shells/Outline, Strands and Explode are mutually exclusive generated geometry
+				 * stages (a material only gets one); Shells/Outline wins since it is the oldest
+				 * and most used, then Strands, then Explode. User geomcode always wins. */
+				use_shells = !stages->geomcode && wants_shells;
+				use_strands = !stages->geomcode && !use_shells && wants_strands;
+				use_explode = !stages->geomcode && !use_shells && !use_strands && wants_explode;
+			}
+			else if (!geometry_warned) {
+				geometry_warned = true;
+				fprintf(stderr, "GPU: no geometry shader support, material geometry stages are ignored\n");
+			}
+		}
+	}
+
+	char *vertex_prefix = NULL;
+	GeomVarying *geom_varyings = NULL;
+	int geom_varyings_len = 0, geom_max_vertices = 0;
+	if (use_geometry) {
+		geom_varyings = MEM_mallocN(sizeof(GeomVarying) * GEOM_MAX_VARYINGS, "GeomVarying");
+		geom_varyings_len = geom_collect_varyings(nodes, vertcode, use_instancing, geom_varyings);
+	}
+	if (use_geometry || vertex_offset) {
+		DynStr *ds = BLI_dynstr_new();
+		if (vertex_offset) {
+			BLI_dynstr_append(ds, "#define USE_VERTEX_NODES\n");
+		}
+		if (use_geometry) {
+			char *prefix = geom_vertex_prefix(geom_varyings, geom_varyings_len);
+			BLI_dynstr_append(ds, prefix);
+			MEM_freeN(prefix);
+		}
+		vertex_prefix = BLI_dynstr_get_cstring(ds);
+		BLI_dynstr_free(ds);
+	}
+
 	/* generate code and compile with opengl */
-	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks);
-	vertexcode = code_generate_vertex(nodes, vertcode, type, use_instancing);
-	geometrycode = code_generate_geometry(nodes, use_opensubdiv);
+	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks, use_shells || use_strands, stages ? stages->scripts : NULL);
+	vertexcode = code_generate_vertex(nodes, vertcode, type, use_instancing, vertex_prefix, vertex_offset,
+	                                  stages ? stages->scripts : NULL);
+	if (use_geometry) {
+		geometrycode = code_generate_geometry_stage(geom_varyings, geom_varyings_len, stages,
+		                                            use_shells, use_strands, use_explode,
+		                                            &geom_max_vertices);
+	}
+	else {
+		geometrycode = code_generate_geometry(nodes, use_opensubdiv);
+	}
+	MEM_SAFE_FREE(vertex_prefix);
+	MEM_SAFE_FREE(geom_varyings);
 
 	int flags = GPU_SHADER_FLAGS_NONE;
 	if (use_opensubdiv) {
@@ -2534,6 +3608,9 @@ GPUPass *GPU_generate_pass(
 	if (vertcode) {
 		flags |= GPU_SHADER_FLAGS_USER_CODE;
 	}
+	if (use_geometry) {
+		flags |= GPU_SHADER_FLAGS_USER_GEOMETRY;
+	}
 	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :
@@ -2549,9 +3626,9 @@ GPUPass *GPU_generate_pass(
 		                              geometrycode,
 		                              libcode ? libcode : glsl_material_library,
 		                              NULL,
-		                              0,
-		                              0,
-		                              0,
+		                              use_geometry ? GL_TRIANGLES : 0,
+		                              use_geometry ? GL_TRIANGLE_STRIP : 0,
+		                              use_geometry ? geom_max_vertices : 0,
 		                              flags | GPU_SHADER_FLAGS_BINARY_CACHE,
 		                              name);
 		MEM_SAFE_FREE(libcode);
@@ -2570,6 +3647,8 @@ GPUPass *GPU_generate_pass(
 			MEM_freeN(fragmentcode);
 		if (vertexcode)
 			MEM_freeN(vertexcode);
+		if (geometrycode)
+			MEM_freeN(geometrycode);
 		memset(attribs, 0, sizeof(*attribs));
 		memset(builtins, 0, sizeof(*builtins));
 		gpu_nodes_free(nodes);

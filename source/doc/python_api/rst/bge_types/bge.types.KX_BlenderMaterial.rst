@@ -152,6 +152,27 @@ base class --- :class:`EXP_PyObjectPlus`
 
       :type: List of :class:`BL_Texture` (read only)
 
+   .. method:: setScriptUniform(name, value)
+
+      Set a ``u_`` uniform declared in the Text of the GLSL Script nodes of this material
+      (``uniform float u_speed;``). The value is sent to the GPU on the next draw, the shader is not
+      compiled again. A uniform whose socket is linked to another node is not affected.
+
+      :arg name: Name of the uniform, as written in the Text (``"u_speed"``).
+      :type name: string
+      :arg value: A number, or a sequence of up to 4 numbers for vec2/vec3/vec4.
+      :type value: float or sequence of floats
+      :return: True when the material has that uniform.
+      :rtype: boolean
+
+   .. method:: getScriptUniform(name)
+
+      Current value of a ``u_`` uniform of the GLSL Script nodes of this material.
+
+      :arg name: Name of the uniform.
+      :type name: string
+      :return: A float, a tuple (3 values for vec2/vec3, 4 for vec4) or None when there is no such uniform.
+
    .. method:: setBlending(src, dest)
 
       Set the pixel color arithmetic functions.

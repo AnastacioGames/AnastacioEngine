@@ -12,6 +12,9 @@
 
 #include "EXP_Value.h"
 
+#include <map>
+#include <string>
+
 class SCA_IScene;
 class KX_Scene;
 class BL_BlenderShader;
@@ -106,10 +109,22 @@ public:
 	EXP_PYMETHOD_DOC(KX_BlenderMaterial, getTextureBindcode);
 
 	EXP_PYMETHOD_DOC(KX_BlenderMaterial, setBlending);
+	EXP_PYMETHOD_DOC(KX_BlenderMaterial, setScriptUniform);
+	EXP_PYMETHOD_DOC(KX_BlenderMaterial, getScriptUniform);
 
 #endif  // WITH_PYTHON
 
+	/// Value of a "u_" uniform of the GLSL Script nodes of the material; false when there is none.
+	bool SetScriptUniform(const std::string& name, const float *value, int len);
+
 private:
+	struct ScriptUniform {
+		float value[4];
+		int len;
+	};
+	/// Values set by the game, sent again when the material shader is generated again.
+	std::map<std::string, ScriptUniform> m_scriptUniforms;
+
 	Material *m_material;
 	BL_Shader *m_shader;
 	BL_BlenderShader *m_blenderShader;

@@ -25,6 +25,8 @@ static bNodeSocketTemplate sh_node_output_material_in[] = {
 	{	SOCK_SHADER, 1, N_("Surface")},
 	{	SOCK_SHADER, 1, N_("Volume")},
 	{	SOCK_VECTOR, 1, N_("Displacement"),	0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
+	/* Game engine: mesh space offset computed in the vertex shader. */
+	{	SOCK_VECTOR, 1, N_("Vertex Offset"),	0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_NONE, SOCK_HIDE_VALUE},
 	{	-1, 0, ""	}
 };
 
@@ -37,8 +39,17 @@ static int node_shader_gpu_output_material(GPUMaterial *mat, bNode *UNUSED(node)
 		in[0].link = in[1].link;
 	}
 	GPU_material_ssgi_outputs(mat, in[0].link);
+
+	/* Vertex Offset is not a parameter of node_output_material. */
+	GPUType offset_type = in[3].type;
+	in[3].type = GPU_NONE;
 	GPU_stack_link(mat, "node_output_material", in, out, &outlink);
+	in[3].type = offset_type;
 	GPU_material_output_link(mat, outlink, 0);
+
+	if (in[3].hasinput && in[3].link) {
+		GPU_material_vertex_offset(mat, in[3].link);
+	}
 
 	return true;
 }

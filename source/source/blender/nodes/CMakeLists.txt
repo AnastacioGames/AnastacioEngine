@@ -210,6 +210,9 @@ set(SRC
 	shader/nodes/node_shader_texture.c
 	shader/nodes/node_shader_time.c
 	shader/nodes/node_shader_damage.c
+	shader/nodes/node_shader_glsl_script.c
+	shader/nodes/node_shader_stage_nodes.c
+	shader/nodes/node_shader_world_fx.c
 	shader/nodes/node_shader_uvAlongStroke.c
 	shader/nodes/node_shader_uvmap.c
 	shader/nodes/node_shader_valToRgb.c

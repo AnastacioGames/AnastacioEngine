@@ -97,7 +97,9 @@
 #include "DNA_property_types.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
+#include "DNA_node_types.h"
 #include "BKE_scene.h" // SETLOOPER
+#include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
 extern "C" {
 #include "BKE_idprop.h"
 }
@@ -151,6 +153,56 @@ static void *KX_SceneDestructionFunc(SG_Node *node, void *gameobj, void *scene)
 	((KX_Scene *)scene)->RemoveNodeDestructObject((KX_GameObject *)gameobj);
 
 	return nullptr;
+}
+
+/* World FX nodes (Shader Editor, World mode): "Bloom" and "Screen Space Reflections",
+ * see node_shader_world_fx.c. They are not linked to anything (no GPU codegen), they only
+ * carry input socket values read here when the scene is converted, same spirit as the
+ * Weather effects below (World.cloud_coverage, World.rain_intensity, ...) read straight off
+ * the World DNA. When a node is present it overrides Scene > Scene FX (scenefx_settings) for
+ * that effect; with no node the Scene FX settings read above keep deciding, unchanged. */
+static bNode *KX_FindWorldFxNode(bNodeTree *ntree, int nodeType)
+{
+	if (!ntree) {
+		return nullptr;
+	}
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->type == nodeType) {
+			return node;
+		}
+	}
+	return nullptr;
+}
+
+static bNodeSocket *KX_FindNodeInputSocket(bNode *node, const char *name)
+{
+	for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
+		if (STREQ(sock->name, name)) {
+			return sock;
+		}
+	}
+	return nullptr;
+}
+
+static bool KX_WorldFxSocketBool(bNode *node, const char *name, bool defaultValue)
+{
+	bNodeSocket *sock = KX_FindNodeInputSocket(node, name);
+	return (sock && sock->default_value) ?
+	       (((bNodeSocketValueBoolean *)sock->default_value)->value != 0) : defaultValue;
+}
+
+static float KX_WorldFxSocketFloat(bNode *node, const char *name, float defaultValue)
+{
+	bNodeSocket *sock = KX_FindNodeInputSocket(node, name);
+	return (sock && sock->default_value) ?
+	       ((bNodeSocketValueFloat *)sock->default_value)->value : defaultValue;
+}
+
+static int KX_WorldFxSocketInt(bNode *node, const char *name, int defaultValue)
+{
+	bNodeSocket *sock = KX_FindNodeInputSocket(node, name);
+	return (sock && sock->default_value) ?
+	       ((bNodeSocketValueInt *)sock->default_value)->value : defaultValue;
 }
 
 bool KX_Scene::KX_ScenegraphUpdateFunc(SG_Node *node, void *gameobj, void *scene)
@@ -375,6 +427,23 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.useLensFlare = true;
 			filters.flare_scale = world->flare_scale;
 			filters.flare_intensity = world->flare_intensity;
+		}
+
+		/* World Bloom/SSR nodes (Shader Editor, World mode) override the Scene FX settings
+		 * read above when present; see the KX_FindWorldFxNode comment. */
+		if (world->use_nodes && world->nodetree) {
+			if (bNode *bloomNode = KX_FindWorldFxNode(world->nodetree, SH_NODE_WORLD_BLOOM_FX)) {
+				filters.useBloom = KX_WorldFxSocketBool(bloomNode, "Enable", filters.useBloom);
+				filters.bloom_threshold = KX_WorldFxSocketFloat(bloomNode, "Threshold", filters.bloom_threshold);
+				filters.bloom_intensity = KX_WorldFxSocketFloat(bloomNode, "Intensity", filters.bloom_intensity);
+			}
+			if (bNode *ssrNode = KX_FindWorldFxNode(world->nodetree, SH_NODE_WORLD_SSR_FX)) {
+				filters.useSSR = KX_WorldFxSocketBool(ssrNode, "Enable", filters.useSSR);
+				filters.ssr_step_max = KX_WorldFxSocketInt(ssrNode, "Max Steps", filters.ssr_step_max);
+				filters.ssr_lod = KX_WorldFxSocketInt(ssrNode, "Lod", filters.ssr_lod);
+				filters.ssr_bias = KX_WorldFxSocketFloat(ssrNode, "Bias", filters.ssr_bias);
+				filters.ssr_max_distance = KX_WorldFxSocketFloat(ssrNode, "Max Distance", filters.ssr_max_distance);
+			}
 		}
 	}
 

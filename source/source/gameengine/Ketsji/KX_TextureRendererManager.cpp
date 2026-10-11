@@ -29,6 +29,7 @@
 #include "KX_Scene.h"
 #include "KX_CubeMap.h"
 #include "KX_PlanarMap.h"
+#include "KX_PlanarReflector.h"
 #include "KX_LightProbe.h"
 #include "KX_GameObject.h"
 #include "KX_LightObject.h"
@@ -146,6 +147,30 @@ void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius,
 	KX_LightProbe *probe = new KX_LightProbe(viewpoint, radius, size, clipEnd, realtime);
 	m_renderers[VIEWPORT_INDEPENDENT].push_back(probe);
 	m_probes.push_back(probe);
+}
+
+KX_PlanarReflector *KX_TextureRendererManager::AddPlanarReflector(KX_GameObject *viewpoint, int size, float clipEnd)
+{
+	for (KX_PlanarReflector *reflector : m_planarReflectors) {
+		if (reflector->GetViewpointObject() == viewpoint) {
+			return reflector;
+		}
+	}
+
+	KX_PlanarReflector *reflector = new KX_PlanarReflector(viewpoint, size, clipEnd);
+	m_renderers[VIEWPORT_DEPENDENT].push_back(reflector);
+	m_planarReflectors.push_back(reflector);
+	return reflector;
+}
+
+KX_PlanarReflector *KX_TextureRendererManager::FindPlanarReflector(KX_GameObject *viewpoint) const
+{
+	for (KX_PlanarReflector *reflector : m_planarReflectors) {
+		if (reflector->GetViewpointObject() == viewpoint) {
+			return reflector;
+		}
+	}
+	return nullptr;
 }
 
 void KX_TextureRendererManager::AddWorldProbe(int size)
@@ -325,6 +350,9 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		rasty->SetViewMatrix(viewmat);
 		m_camera->SetModelviewMatrix(viewmat, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
 
+		// No-op for every renderer except KX_PlanarReflector, which caches it for the material node.
+		renderer->SetFrameViewProjection(viewmat, projmat);
+
 		if (worldOnly) {
 			renderer->BeginRenderFace(rasty);
 			m_scene->GetWorldInfo()->RenderBackground(rasty);
@@ -396,6 +424,8 @@ void KX_TextureRendererManager::Merge(KX_TextureRendererManager *other)
 
 	m_probes.insert(m_probes.end(), other->m_probes.begin(), other->m_probes.end());
 	other->m_probes.clear();
+	m_planarReflectors.insert(m_planarReflectors.end(), other->m_planarReflectors.begin(), other->m_planarReflectors.end());
+	other->m_planarReflectors.clear();
 	// The merged scene's World capture stays in the renderers list (owned there) but isn't used.
 	other->m_worldProbe = nullptr;
 }

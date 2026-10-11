@@ -6,6 +6,208 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Planar Reflection: crash no runtime e espelho preto corrigidos
+
+- **Crash no runtime (commit `9630e952`)**: a entrada abaixo dizia que o `AnastacioRuntime.exe` "não terminou
+  por falta de display/GPU". Estava errado: o ambiente tem GPU e o runtime caía com SIGSEGV em
+  `gpu_node_input_link` ← `GPU_stack_link` ← `node_shader_gpu_planar_reflection` (backtrace no
+  `%TEMP%\<cena>.crash.txt` que o próprio engine grava). Causa: `node_exec_socket_use_stack()`
+  (`nodes/intern/node_exec.c`) só dava slot de pilha a FLOAT/VECTOR/RGBA/SHADER. Os sockets `Enable`
+  (BOOLEAN) e `Resolution` (INT) ficavam sem `bNodeStack`, viravam `GPU_NONE` e encerravam cedo a contagem de
+  entradas do `GPU_stack_link`, que então lia os parâmetros restantes de um `va_list` sem argumentos. Agora
+  BOOLEAN e INT ganham slot e são lidos como escalar (`node_socket_get_boolean_as_float`/`_int_as_float` em
+  `node_util.c`; `nodestack_get_vec`/`node_gpu_stack_from_data` em `node_shader_util.c` os tratam como FLOAT).
+  Foi o primeiro nó a levar um socket BOOLEAN/INT ao codegen de GPU (os `Enable` de Bloom/SSR de World são
+  lidos direto em `KX_Scene.cpp`).
+- **Espelho preto**: a captura e a projeção da UV estavam certas. Eram duas coisas:
+  1. A cena de teste ligava `Color` no Base Color de um Principled, que ilumina o reflexo de novo com as luzes
+     da cena. Espelho puro é `Color` → shader **Emission** → Surface (o Emission existe e funciona no jogo).
+  2. A captura é desenhada com os materiais dos próprios objetos refletidos, que já terminam no Color
+     Management da cena (`gpu_material_link_display_transform`); o material do espelho aplicava de novo.
+     `node_planar_reflection` agora desfaz essa codificação (`game_view_untransform`, inversa de
+     `game_view_transform`, com exposure/gamma/contraste enviados em `unfplanarview` por
+     `GPU_material_bind_planar`) e devolve cor linear com alpha 1. Com Color Management desligado nada é
+     desfeito. A tabela de contraste do Filmic saiu para `gpu_view_transform_contrast()`, usada pelos dois
+     lados; o shading dos materiais existentes não muda.
+- Conferido por pixel em `criar_cena_planar_reflection.py` (1280x720): fundo direto e fundo no espelho
+  `63,63,80` nos dois; frente do cubo `184,93,68` direta e `184,94,70` refletida. Cena combinada
+  `criar_cena_tudo_junto.py` (Billboard, Strands, Fur com e sem direção, Explode, espelho): 65 frames, exit 0.
+- **Não conferido**: Filmic e exposure/gamma diferentes do padrão (só Standard foi testado); o Billboard, que
+  nos screenshots fica atrás do painel de profile. O Strands gera poucos fios num plano de 2 triângulos
+  (a densidade é por triângulo): para parecer grama a malha precisa ser subdividida.
+- Merge do `main` (Céu em Camadas + SSGI nativo) nesta branch: dois conflitos aditivos
+  (`node_shader_output_material.c`, includes de `KX_Scene.cpp`). O build incremental depois do merge crashava
+  em qualquer cena (`GPU_material_free` ← `ED_render_id_flush_update`): o Céu em Camadas acrescenta campos a
+  `World` antes de `gpumaterial` e o Ninja deste build não rastreia headers, então `render_update.c.obj`
+  ficou com o layout antigo. Rebuild limpo resolveu; não era bug do SSGI. Regra de
+  [build-notes.md](build-notes.md): depois de mudar `DNA_*.h`, inclusive por merge, `ninja -t clean`.
+
+## 2026-10-11 - Reflexo planar dedicado: implementado (compilador de material aberto, com supervisão)
+
+- Sessão seguinte à investigação abaixo ("Reflexo planar dedicado: investigado, não implementado"), mesmo
+  dia: o usuário autorizou explicitamente abrir o compilador de material para fazer o nó de verdade. Nó
+  novo `ShaderNodePlanarReflection` (`SH_NODE_PLANAR_REFLECTION`, categoria **Fragment** no Add menu do
+  Shader Editor): `Enable` (bool, padrão False) + `Resolution` (int 16–2048, padrão 512) + `Clip End`
+  (float, padrão 100) → saída `Color` (RGBA).
+- Associação objeto→espelho: o nó reflete pelo plano local do próprio objeto (XY local, normal +Z, mesma
+  convenção de `KX_TextureRenderer`/`KX_PlanarMap`) — não por um socket de objeto separado. Em
+  `BL_BlenderDataConversion.cpp`, depois do scan de probes de cubemap, cada objeto tem seus materiais
+  varridos (nível superior da árvore de nós, sem recursão em grupos); se o nó existe com `Enable` ligado,
+  cria/reaproveita um `KX_PlanarReflector` via `KX_TextureRendererManager::AddPlanarReflector()`.
+- Nova classe `KX_PlanarReflector` (`source/source/gameengine/Ketsji/KX_PlanarReflector.h`/`.cpp`),
+  subclasse de `KX_PlanarMap` — mesma relação que `KX_LightProbe` tem com `KX_CubeMap`: sintetiza um
+  `EnvMap` estático pra reusar o construtor de `KX_PlanarMap` sem slot de textura legado, e é dono de um
+  `GPUTexture*` 2D próprio (`GPU_texture_create_2D`), criado sob demanda em `SetupCamera()`.
+- Hook novo em `KX_TextureRenderer`/`KX_TextureRendererManager`: `SetFrameViewProjection(view, projection)`
+  — virtual no-op por padrão (zero custo/risco para cubemap/probe existentes), chamado por
+  `RenderRenderer()` logo depois de montar `view`/`projection` de cada face; `KX_PlanarReflector` o
+  sobrescreve pra cachear `projection * view` da câmera espelhada daquele frame, usada depois pelo GLSL
+  pra projetar a UV de tela.
+- GPU codegen (`gpu_material.c`/`GPU_material.h`): `GPU_material_planar_reflection(mat)` marca a flag
+  `use_planar_reflection` quando o nó existe no material (chamada em `node_shader_gpu_planar_reflection`,
+  `node_shader_stage_nodes.c`); `GPU_material_bind_planar(mat, tex, viewproj)` faz o bind por objeto, mesmo
+  padrão de `GPU_material_bind_probe` (unidade de textura própria, `unfplanarenabled` zerado quando não há
+  `KX_PlanarReflector` pra aquele objeto). GLSL novo `node_planar_reflection` em `gpu_shader_material.glsl`:
+  projeta a posição do fragmento (view→mundo via `GPU_INVERSE_VIEW_MATRIX`, mesmo builtin do `node_billboard`)
+  pela `unfplanarviewproj` cacheada, divide por `w`, remapeia pra `[0,1]` e amostra `unfplanartex`.
+- Binding em `BL_BlenderShader.cpp::Update()`, no mesmo bloco dos probes: se o material usa o nó, resolve
+  o `KX_GameObject` do `RAS_MeshUser` (mesmo padrão de `BL_Shader::Update()`), busca o
+  `KX_PlanarReflector` desse objeto via `FindPlanarReflector()` e chama `GPU_material_bind_planar()`. Nada
+  disso roda pra materiais sem o nó (flag checada primeiro) nem toca o binding de probes/SSR existente.
+- Build: `ninja RangeEngine` (via `vcvars64.bat`, skill `build-anastacio`) no worktree
+  `D:\AnastacioEngine-shadernodes`. 1ª tentativa falhou no link (`LNK2019`, `KX_PlanarReflector.cpp`/`.h`
+  esquecidos no `CMakeLists.txt` de `source/gameengine/Ketsji`); corrigido e `cmake . && ninja RangeEngine`
+  gerou `AnastacioEngine.exe`/`AnastacioRuntime.exe` limpos (sem warning novo).
+- Testado: `tools/debug/cenas/criar_cena_planar_reflection.py` via `AnastacioEngine.exe -b
+  --factory-startup --python ... --` confirma `ShaderNodePlanarReflection` em `bpy.types` com os três
+  sockets de entrada e a saída `Color`, e salva um `.range` com o nó ligado ao Base Color de um Principled.
+  **Não confirmado**: `AnastacioRuntime.exe -w <W> <H> <scene.range>` não terminou dentro do tempo de
+  espera neste ambiente (mesma limitação de display/GPU já documentada pro teste de Bloom/SSR) — nem a
+  sobrevivência no runtime nem o reflexo aparecendo corretamente na tela foram confirmados visualmente.
+  Depende do usuário testar com GPU/display real.
+- Detalhe completo em
+  [shader-nodes.md#reflexo-planar-planar-reflection](shader-nodes.md#reflexo-planar-planar-reflection).
+
+## 2026-10-11 - Reflexo planar dedicado: investigado, não implementado
+
+- Próximo item da fila de shader-nodes: um nó de material `ShaderNodePlanarReflection` para o `KX_PlanarMap`
+  já existente (espelho/água real). Esta entrada é só a investigação e a decisão de escopo — nenhum código
+  de engine foi alterado.
+- Confirmado: `KX_PlanarMap` (`source/source/gameengine/Ketsji/KX_PlanarMap.h`/`.cpp`) já é uma câmera
+  espelhada completa e funcional — reflete posição/orientação da câmera da cena pelo plano do objeto
+  espelho, recorta com near-plane oblíquo (sem `glClipPlane` fixo), inverte front-face na reflexão e
+  cacheia a projeção por câmera. Hoje é ligada só pelo sistema legado de Environment Map de slot de
+  textura (`EnvMap`/`MTex`, `ENVMAP_REFLECTION`, `stype == ENV_REALT`), lido em
+  `BL_BlenderDataConversion.cpp` (~linha 3715-3745) — fora do Shader Editor novo (`bNodeTree` de material).
+- Comparado com o padrão usado em Bloom/SSR (nós de World sem GPU codegen, só lidos na conversão de cena em
+  `KX_Scene.cpp`, ver entrada de 2026-10-11 "Bloom e SSR pelo World node graph"): esse padrão funciona pra
+  Bloom/SSR porque os dois já são filtros de tela cheia automáticos; o nó só liga um interruptor que já
+  existe. Reflexo planar não tem interruptor automático equivalente — produz uma textura por objeto que
+  precisa ser amostrada por um material para aparecer.
+- Também comparado com o reflexo de probes de cubemap que já funciona em qualquer material PBR com nós
+  (fase 4, `KX_LightProbe` + `KX_TextureRendererManager::FindProbe` + `GPU_material_bind_probe`/
+  `GPU_material_bind_probe2` em `BL_BlenderShader.cpp`): esse caminho é automático por posição do
+  fragmento, sem nó nenhum no material, mas é cubemap (direção 3D). Reflexo planar precisaria de um
+  binding por objeto/material equivalente (`sampler2D` + matriz view-projection da câmera espelhada,
+  projetando a UV no fragment shader) — não existe hoje, e criar isso é trabalho novo em
+  `gpu_material.c`/`GPU_material.h`/`BL_BlenderShader.cpp` (o compilador de nós e o binding de uniforms do
+  material), não uma leitura de socket na conversão de cena.
+- Alternativa "config only" (nó sem saída `Color`, só Enable/Clip Start/Clip End/Resolution, que criasse o
+  `EnvMap`/`MTex` legado por baixo dos panos na conversão) foi descartada: não há confirmação de que
+  material novo baseado em nós (Shader Editor, Principled) amostre esse slot legado hoje, então o nó
+  arriscava não aparecer em tela pra quem usa o Shader Editor — escondendo a mesma incerteza em vez de
+  resolvê-la.
+- Decisão: parar e documentar em vez de implementar um nó que arrisca ser enfeite, ou abrir o compilador de
+  material sem supervisão. Ver
+  [shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda](shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda)
+  e a entrada correspondente em `docs/roadmap.md`. Pendente: decisão do usuário sobre abrir esse codegen
+  novo (com supervisão) ou manter reflexo planar fora do Shader Editor por ora.
+
+## 2026-10-11 - Fur Shells: direção do pelo configurável
+
+- Pendência do backlog de shader-nodes (ver [shader-nodes.md](shader-nodes.md)): o nó Fur Shells só inflava a
+  malha ao longo da normal, sem jeito de controlar a direção do "pelo" (vento, direção custom).
+- Dois sockets novos no nó Fur Shells, **depois** dos existentes (Length/Layers/Density/Vector) pra não quebrar
+  link salvo em `.range` antigo: **Direction** (vetor, padrão `(0,0,0)`) e **Direction Strength** (fator 0-1,
+  padrão 0). Com Direction Strength 0 (padrão) o resultado é idêntico ao de antes — só a normal, 100%
+  retrocompatível. Conforme sobe até 1, cada shell desloca ao longo de
+  `normalize(mix(normal, Direction, Direction Strength))` em vez de só `normal`.
+- `GPU_material_shells` (`gpu_material.c`/`GPU_material.h`) ganhou os parâmetros `direction`/`direction_strength`;
+  guarda o vetor já normalizado e o maior `direction_strength` pedido (igual ao padrão existente de
+  `max_ff`/`max_ii` pra `shell_length`/`shell_layers`, caso mais de um Fur Shells no mesmo material).
+- `GPUPassStages` (`gpu_codegen.h`) ganhou `shell_dir[3]`/`shell_dir_strength`, propagados em
+  `gpu_material.c` pra dentro da struct de estágios junto com `shell_length`.
+- `code_generate_geometry_stage` (`gpu_codegen.c`) emite `#define SHELL_DIR vec3(...)` e
+  `#define SHELL_DIR_STRENGTH ...` junto com `SHELL_LENGTH`/`OUTLINE_WIDTH`, e o laço de shells agora calcula
+  `vec3 shell_dir = normalize(mix(vs_varnormal[i], SHELL_DIR, SHELL_DIR_STRENGTH));` antes de deslocar o vértice
+  (`SHELL_DIR_STRENGTH` 0 cancela o `mix`, mantendo o resultado idêntico ao `vs_varnormal[i]` de antes). O
+  Outline (casco invertido) continua usando só a normal, sem mudança.
+- `node_fur_shells` em `gpu_shader_material.glsl` ganhou os parâmetros `direction`/`direction_strength` na
+  assinatura (não usados no corpo da função, que só calcula a máscara de fios) — necessário porque
+  `GPU_stack_link` passa todo o array `in[]` do nó posicionalmente pros parâmetros `in` da função GLSL, então a
+  ordem dos sockets novos (`in[4]`/`in[5]`) precisa bater com a ordem dos parâmetros novos na função.
+- Compilado limpo (`RangeEngine`/`RangeRuntime` via `build-anastacio`, sem warning novo). Validado sem display
+  com `tools/debug/cenas/criar_cena_fur_shells_direction.py`: sockets certos em `bpy.types`
+  (`['Length', 'Layers', 'Density', 'Vector', 'Direction', 'Direction Strength']`), `.range` salvo; e, com GL
+  disponível nesta sessão, `AnastacioRuntime.exe` rodou a cena 65 quadros sem crash e tirou um `shot.png` — o
+  geometry shader do Fur Shells com os novos defines compilou e executou de fato. **Falta**: inspeção visual
+  do `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção configurada).
+
+## 2026-10-11 - Shader nodes: Billboard, Strands, Explode (pendentes da fase 3)
+
+- **Billboard** (`SH_NODE_BILLBOARD`, estágio vertex): entradas `Lock Axis`, `Scale`; saída `Offset` pro
+  Vertex Offset do Material Output. `node_billboard` (`gpu_shader_material.glsl`) gira a malha (autorada no
+  plano local XZ) pras direções direita/cima da câmera, lidas de `GPU_INVERSE_VIEW_MATRIX`/
+  `GPU_INVERSE_OBJECT_MATRIX`; cilíndrico (eixo Z fixo) ou esférico conforme `Lock Axis`.
+- **Strands** (`SH_NODE_STRANDS`, estágio geometry): entradas `Density`, `Length`, `Curvature`; saída
+  `Tip Factor`. Novo modo `use_strands` em `code_generate_geometry_stage` (`gpu_codegen.c`): um triângulo
+  fino por strand, origem pseudo-aleatória no triângulo de entrada, LOD por distância da câmera. Reaproveita
+  o canal `varshelllayer`/`node_shell_layer` do Fur Shells/Outline em vez de criar varying nova (por isso não
+  tem saída separada de índice da strand). `GPU_material_strands` novo em `gpu_material.c`/`GPU_material.h`.
+- **Explode** (`SH_NODE_EXPLODE`, estágio geometry): entrada `Factor`; saída `Amount` (passthrough). Novo
+  modo `use_explode`: cada triângulo sai inteiro deslocado por normal + direção aleatória por face (hash de
+  `gl_PrimitiveIDIn`), `max_vertices = 3`. `GPU_material_explode` novo.
+- Strands/Explode e Shells/Outline são mutuamente exclusivos no mesmo material (prioridade decidida em
+  `GPU_generate_pass`: Shells/Outline > Strands > Explode > `geomcode` do usuário).
+- Registro: `BKE_node.h` (1015-1017), `node.c`, `NOD_static_types.h`, `NOD_shader.h`, `nodeitems_builtins.py`
+  (Billboard em Vertex; Strands/Explode em Geometry).
+- Compilado limpo (`RangeEngine`/`RangeRuntime`, `ninja` via `build-anastacio`). Validado sem display com
+  `tools/debug/cenas/criar_cena_billboard_strands_explode.py`: tipos certos em `bpy.types`, `.range` salva; e,
+  com GL disponível nesta sessão, `AnastacioRuntime.exe` rodou a cena 65 quadros sem crash e tirou um
+  `shot.png` — os geometry shaders novos compilaram e executaram de fato. **Falta**: inspeção visual do
+  `shot.png`, cor do cabeçalho do nó por estágio, presets dedicados, custo no painel. Ver
+  [shader-nodes.md](shader-nodes.md#billboard-strands-explode-fase-3).
+
+## 2026-10-11 - GLSL Script: funções auxiliares sem conflito, uniforms `u_` e TIME
+
+- Antes: funções auxiliares já compilavam, mas iam para o shader com o nome original; dois nós GLSL Script com um helper, constante ou `#define` de mesmo nome (ou o mesmo Text em dois nós) davam redefinição.
+- Nomes por nó (`codegen_script_names` em `gpu_codegen.c`): funções, variáveis/constantes globais e structs do nível de cima do Text ganham `#define nome glsl_scriptN_nome` antes do `#line 1` e `#undef` no fim, junto com os macros do próprio script. As linhas do Text não mudam, então o erro de compilação continua na linha certa (conferido: erro posto na linha 9 saiu como `0:9`). Globais `in`/`out`/`varying` ficam como estão.
+- Uniforms `u_` (`node_shader_glsl_script.c`): `uniform float|int|vec2|vec3|vec4 u_nome;` vira entrada do nó depois dos parâmetros do `main`, com `// @min @max @default` opcionais (`@min`+`@max` em float usa socket de fator, com slider). O valor fica no socket (salvo no `.range`, ligável) e aparece também em Material > Node Shader > Script Uniforms. No shader a palavra `uniform` é apagada da cópia do código e o wrapper preenche o global a partir do socket.
+- Sem recompilar: entrada `u_` sem ligação entra como uniform dinâmico apontando para um valor guardado no `GPUMaterial` (`GPUScriptUniform`; a árvore de nós é uma cópia local durante a geração, então não dá para apontar para o socket). `GPU_material_script_uniform_set/get/reset` percorrem as três listas de variantes do material.
+- Python do jogo: `KX_BlenderMaterial.setScriptUniform(nome, valor)` e `getScriptUniform(nome)`. O material guarda os valores e os reaplica quando o shader é gerado de novo; ao sair do jogo voltam ao valor do nó.
+- `TIME` no script: quando o código usa a palavra, o nó recebe o tempo do material como entrada escondida e o wrapper preenche um global próprio do script.
+- Teste: `tools/debug/cenas/criar_cena_glsl_script_uniforms.py`. No runtime (AMD RX 6800M), print conferido: cubo com xadrez + anéis de dois scripts com `pattern()`, `SCALE` e `TINT` iguais; esfera com os `@default` (verde, 4 listras) e esfera com o mesmo Text alterada pelo jogo (magenta, 10 listras); grade ondulando pelo script no Vertex Offset com `TIME` e `u_height` trocado pelo jogo. Sem erro de shader no log.
+- Não testado: painel Script Uniforms e sliders no editor (só geração em background), embedded player, build Web.
+
+## 2026-10-11 - Shader nodes: presets explicados em frames, código gerado, geometry livre e erro visível
+
+- Presets (`bl_operators/node.py`): cada grupo já nasce separado em frames coloridos com rótulo (Inputs, Vertex, Geometry, Colour, Output), uma coluna por parte (`_preset_frames`; `part=` em `_preset_node` escolhe o frame quando o tipo do nó não diz). Presets novos: **Wind Leaves** (Wind + manchas de cor, Offset ligado sozinho), **Triplanar** (uma textura por eixo misturada pela normal, sem UV) e **Hologram** (linhas que correm + borda de Fresnel, Alpha Clip). Nomes dos presets no dicionário de tradução. Teste: os 9 presets criados em `-b` (frames sem nó solto nem coluna sobreposta) e os 3 novos conferidos em captura do runtime.
+- **Show Generated Code** (`material.show_generated_code`; botão em Material > Node Shader e no cabeçalho do Node Editor): grava o GLSL final em `<material>_generated.vert/.geom/.frag` e mostra nos Text Editors abertos. Reusa `gpu.export_shader`, que passou a devolver também `geometry` (`GPUShaderExport.geometry`). Precisa de janela (sem contexto GL em `-b`) e do shader compilado. Teste no editor com janela: Toon Outline gerou os três Texts (geometry com `OUTLINE_WIDTH`), o Text Editor passou a mostrar o `.frag`; sem estágio geometry o `.geom` vira um aviso de uma linha.
+- Campo Geometry em modo livre (`code_generate_geometry_stage`): Text com `void main()` em vez de `void geometry()` é usado como escrito. As linhas `layout(...) in;`/`layout(...) out;` do usuário sobem para o topo do shader (o layout de entrada dá o tamanho dos arrays `vs_*` que os helpers indexam) e ficam comentadas no lugar, mantendo a numeração de linhas do Text; sem elas valem `triangles` e `triangle_strip, max_vertices = 3`. Entradas `vs_*`, saídas e helpers `geom_*` continuam sendo declarados pela engine. Teste: `tools/debug/cenas/criar_cena_geometry_livre.py`; captura do runtime (RX 6800M) conferida com os três casos (faces afastadas, pirâmide por face com 12 vértices, triângulos encolhidos sem layout), sem erro de shader no log.
+
+## 2026-10-10 - Nós de material com estágios de vertex e geometry (fases 1-4 do plano shader-nodes)
+
+- Codegen (`gpu_codegen.c`): cada nó guarda os estágios em que roda. Os nós ligados à nova entrada **Vertex Offset** do Material Output (e do Output antigo) viram `vertex_nodes()` no vertex shader (`USE_VERTEX_NODES` em `gpu_shader_vertex.glsl`, depois do `vertex()` do usuário e antes da projeção); as funções da biblioteca que eles chamam são copiadas para o vertex (`glsl_lib_strip_vertex`). Atributos são lidos direto (`att`), posição/normal de view calculadas no próprio vertex. Nós só do vertex não entram no fragment.
+- Estágio geometry gerado: toda varying do vertex vira `vs_<nome>` por `#define` e o GS gerado copia tudo (incluindo varyings declaradas no código do usuário e `gl_ClipDistance[6]` do `CLIP_WORKAROUND`). Sem suporte a GS (web/GLES) o material desenha como se não tivesse o estágio, com aviso único no console. Flag `GPU_SHADER_FLAGS_USER_GEOMETRY` no hash do cache; programas com GS continuam fora do binário cozido.
+- `Material.geomcode` (linha "Geometry:" em Shader Sources, `script_geom` no RNA): o usuário escreve `void geometry()` com `geom_copy/geom_emit/geom_emit_offset/geom_set_position/geom_position/geom_normal` e `TIME`; `layout(... max_vertices = N) out;` opcional (padrão 3). DNA, readfile, library_query, material.c, atlas e recompilação ao editar o Text.
+- Sombras: materiais que movem vértices (código do usuário, Vertex Offset ligado, Fur Shells, Outline) passam a sombrear com o próprio shader (`GPU_material_moves_vertices` em `KX_BlenderMaterial`).
+- Nós novos (antigo e novo sistema): Vertex Offset, Wind, Wave (Vertex), Fur Shells, Outline, Shell Layer (Geometry), Camera Distance (Input) e **GLSL Script** (Script): o Text tem uma função `main`, seus parâmetros viram os sockets (float/int, vec2/vec3, vec4; `out` = saída), um wrapper converte os tipos; roda no fragment ou no vertex conforme o uso; editar o Text atualiza sockets e recompila.
+- Fur Shells: camadas pela normal com uma invocação de GS por camada (`invocations`, GL 4.0; laço no 3.x), máscara de fios por célula de UV (saídas Layer/Alpha). Outline: casco invertido com winding trocado (precisa de backface culling).
+- Menu Add no estilo do Blender 5: categorias Vertex, Geometry, Script e Presets nos dois sistemas de shading.
+- Presets como grupos editáveis (`node.shader_preset_add`): Fur, Grass, Toon + Rim, Toon Outline, Dissolve, Water Waves (Offset ligado sozinho ao Vertex Offset; presets com Alpha põem o material em Alpha Clip).
+- Materiais existentes geram o mesmo código (os acréscimos ao template ficam sob `#ifdef`); só o texto do template mudou, então o cache de shaders do usuário/`.cooked` recompila uma vez.
+- Fase 5 (parcial): `#line 1` antes do código do GLSL Script e do geomcode, então o erro de compilação aponta a linha do Text.
+- Teste: `tools/debug/cenas/criar_cena_shader_nodes.py` (água com Water Waves, esfera Fur, macaco Toon Outline, cubo GLSL Script, cubo de referência, cubo com geomcode). Runtime: 6 materiais compilados e linkados sem erro (AMD RX 6800M, GL 4.6 compat), 60 FPS. Avaliação visual pendente no jogo real.
 ## 2026-10-11 - CV3 corrigido: armature fora da tela não força mais pose+skinning todo frame
 
 - **SP12 não era pendência:** `KX_AddObjectActuator::ResolveOriginalObject` já usa

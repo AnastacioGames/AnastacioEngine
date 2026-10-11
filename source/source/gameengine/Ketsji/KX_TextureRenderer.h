@@ -105,6 +105,16 @@ public:
 	/// Setup camera position and orientation unique per faces, returns true when the render will be made.
 	virtual bool SetupCameraFace(KX_Camera *camera, unsigned short index) = 0;
 
+	/** Called by KX_TextureRendererManager::RenderRenderer right before a face renders, with the
+	 * view/projection matrices it just set on the rasterizer for that face. No-op by default (cube
+	 * maps/light probes don't need it); KX_PlanarReflector overrides it to cache view*projection so
+	 * the Planar Reflection material node can later project a screen-space UV from it
+	 * (BL_BlenderShader::Update()). Safe to call for every renderer type: the base cost is one
+	 * no-op virtual call. */
+	virtual void SetFrameViewProjection(const mt::mat4& view, const mt::mat4& projection)
+	{
+	}
+
 #ifdef WITH_PYTHON
 	EXP_PYMETHOD_DOC_NOARGS(KX_TextureRenderer, update);
 

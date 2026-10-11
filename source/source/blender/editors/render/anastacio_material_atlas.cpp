@@ -124,7 +124,7 @@ void validate_material(Material *mat, bNode *reference, Mesh *mesh)
   bNode *shader = surface_shader(mat);
   require(!BKE_animdata_from_id(&mat->id), "Animated materials cannot be baked to a static atlas");
   require(!BKE_animdata_from_id(&mat->nodetree->id), "Animated node trees cannot be baked to a static atlas");
-  require(!mat->fragcode && !mat->vertcode && !mat->group && mat->foliage_strength == 0,
+  require(!mat->fragcode && !mat->vertcode && !mat->geomcode && !mat->group && mat->foliage_strength == 0,
           "Custom shaders, light groups and foliage need a separate atlas implementation");
   for (bNodeSocket *sock = static_cast<bNodeSocket *>(shader->inputs.first); sock; sock = sock->next) {
     bool baked = STREQ(sock->identifier, "Normal");
@@ -816,7 +816,7 @@ void modal_cleanup(bContext *C, wmOperator *op)
 void modal_start_pass(bContext *C, wmOperator *op, AtlasModal &state)
 {
   state.result = OPERATOR_RUNNING_MODAL;
-  printf("Anastacio Material Atlas: baking %s (%d/5), Escape cancels\n",
+  printf("Build Material Atlas: baking %s (%d/5), Escape cancels\n",
          map_names[state.pass], state.pass + 1);
   fflush(stdout);
   const int status = start_bake_pass(C, op, *state.tx, state.pass, state.size,
@@ -910,7 +910,7 @@ int atlas_exec(bContext *C, wmOperator *op)
     const int margin = RNA_int_get(op->ptr, "margin");
     for (int pass = 0; pass < 5; pass++) {
       if (!G.background && CTX_wm_window(C)) WM_progress_set(CTX_wm_window(C), float(pass) / 5.0f);
-      printf("Anastacio Material Atlas: baking %s (%d/5)\n", map_names[pass], pass + 1);
+      printf("Build Material Atlas: baking %s (%d/5)\n", map_names[pass], pass + 1);
       bake_pass(C, op, tx, pass, size, margin);
     }
     build_result(C, tx);

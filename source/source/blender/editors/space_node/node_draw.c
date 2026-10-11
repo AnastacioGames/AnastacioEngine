@@ -44,6 +44,8 @@
 #include "BKE_node.h"
 #include "BKE_scene.h"
 
+#include "GPU_material.h"
+
 #include "BLF_api.h"
 
 #include "BIF_gl.h"
@@ -973,6 +975,26 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 	return !(compat & (use_new ? NODE_NEW_SHADING : NODE_OLD_SHADING));
 }
 
+/* GLSL Script node whose Text failed to compile in the material being edited: the editor's node
+ * tree is the real, editable one, but the compile runs on a localized copy of it (bNode->name
+ * survives that, see ntreeLocalize/BKE_node_copy_ex) and the result (error log + which node)
+ * stays on the real Material's cached GPUMaterial (ma->gpumaterial/instancing/skinning, see
+ * GPU_material_node_error in gpu_material.c). Same shape as node_engine_badge: a tooltip string
+ * and whether to paint the node red (always true when it returns one). */
+static const char *node_shader_error_badge(const bContext *C, bNodeTree *ntree, bNode *node)
+{
+	if (ntree->type != NTREE_SHADER || node->type != SH_NODE_GLSL_SCRIPT) {
+		return NULL;
+	}
+	SpaceNode *snode = CTX_wm_space_node(C);
+	if (!snode || !snode->id || GS(snode->id->name) != ID_MA) {
+		return NULL;
+	}
+	const char *message = NULL;
+	GPU_material_node_error((Material *)snode->id, node->name, &message);
+	return message;
+}
+
 static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeTree *ntree, bNode *node, bNodeInstanceKey key)
 {
 	bNodeInstanceHash *previews = CTX_data_pointer_get(C, "node_previews").data;
@@ -986,6 +1008,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	View2D *v2d = &ar->v2d;
 	const char *engine_badge, *engine_tip;
 	bool engine_incompatible = node_engine_badge(C, ntree, node, &engine_badge, &engine_tip);
+	const char *shader_error = node_shader_error_badge(C, ntree, node);
 
 	/* XXX hack: copy values from linked ID data where displayed as sockets */
 	if (node->block)
@@ -1010,7 +1033,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	else
 		UI_ThemeColor(color_id);
 
-	if (node->flag & NODE_MUTED || engine_incompatible)
+	if (node->flag & NODE_MUTED || engine_incompatible || shader_error)
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 
@@ -1046,6 +1069,17 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		but = uiDefIconBut(node->block, UI_BTYPE_BUT_TOGGLE, B_REDR, ICON_NODETREE,
 		                   iconofs, rct->ymax - NODE_DY, iconbutw, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
 		UI_but_func_set(but, node_toggle_button_cb, node, (void *)"NODE_OT_group_edit");
+		UI_block_emboss_set(node->block, UI_EMBOSS);
+	}
+
+	/* selo de erro de compilacao (GLSL Script): tooltip com a mensagem do compilador */
+	if (shader_error) {
+		float badgew = iconbutw + UI_fontstyle_string_width(UI_FSTYLE_WIDGET, "Error") + 0.4f * U.widget_unit;
+		iconofs -= badgew;
+		UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
+		uiDefIconTextBut(node->block, UI_BTYPE_LABEL, 0, ICON_ERROR,
+		                 "Error", iconofs, rct->ymax - NODE_DY, badgew, UI_UNIT_Y,
+		                 NULL, 0, 0, 0, 0, shader_error);
 		UI_block_emboss_set(node->block, UI_EMBOSS);
 	}
 
@@ -1186,7 +1220,8 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 
 	/* body */
 	UI_ThemeColor(color_id);
-	if (node->flag & NODE_MUTED || node_engine_badge(C, ntree, node, &engine_badge, &engine_tip))
+	if (node->flag & NODE_MUTED || node_engine_badge(C, ntree, node, &engine_badge, &engine_tip) ||
+	    node_shader_error_badge(C, ntree, node))
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad);

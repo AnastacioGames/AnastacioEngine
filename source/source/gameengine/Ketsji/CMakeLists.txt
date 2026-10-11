@@ -143,6 +143,7 @@ set(SRC
 	KX_ParticleDebugUI.cpp
 	KX_ParticleSystem.cpp
 	KX_PlanarMap.cpp
+	KX_PlanarReflector.cpp
 	KX_PolyProxy.cpp
 	KX_PyConstraintBinding.cpp
 	KX_PyMath.cpp
@@ -263,6 +264,7 @@ set(SRC
 	KX_ParticleSystem.h
 	KX_PhysicsEngineEnums.h
 	KX_PlanarMap.h
+	KX_PlanarReflector.h
 	KX_PolyProxy.h
 	KX_PyConstraintBinding.h
 	KX_PyMath.h

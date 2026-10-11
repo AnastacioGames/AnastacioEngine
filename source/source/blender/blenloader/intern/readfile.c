@@ -4097,6 +4097,7 @@ static void lib_link_material(FileData *fd, Main *main)
 			ma->group = newlibadr_us(fd, ma->id.lib, ma->group);
 			ma->fragcode = newlibadr_us(fd, ma->id.lib, ma->fragcode);
 			ma->vertcode = newlibadr_us(fd, ma->id.lib, ma->vertcode);
+			ma->geomcode = newlibadr_us(fd, ma->id.lib, ma->geomcode);
 
 			for (int a = 0; a < MAX_MTEX; a++) {
 				MTex *mtex = ma->mtex[a];
@@ -9594,6 +9595,9 @@ static void expand_material(FileData *fd, Main *mainvar, Material *ma)
 
 	if (ma->vertcode)
 		expand_doit(fd, mainvar, ma->vertcode);
+
+	if (ma->geomcode)
+		expand_doit(fd, mainvar, ma->geomcode);
 
 	if (ma->fragcode)
 		expand_doit(fd, mainvar, ma->fragcode);

@@ -212,6 +212,36 @@ void game_view_transform(vec4 col_from, float exposure, float gamma, float contr
 	col_to = vec4(d, col_from.a);
 }
 
+/* Inverse of game_filmic_curve (both branches are monotonic power curves). */
+float game_filmic_curve_inverse(float d, float contrast)
+{
+	const float s0 = 10.0 / 16.5;
+	float b = contrast * (1.0 - s0) / s0;
+	float s;
+	d = clamp(d, 0.0, 1.0);
+	if (d < 0.5)
+		s = s0 * pow(d / 0.5, 1.0 / contrast);
+	else
+		s = 1.0 - (1.0 - s0) * pow((1.0 - d) / 0.5, 1.0 / b);
+	return 0.18 * exp2(s * 16.5 - 10.0);
+}
+
+/* Inverse of game_view_transform: display encoded color back to linear. contrast < 0 means the
+ * color was never transformed (color management off) and is returned as is. */
+vec3 game_view_untransform(vec3 d, float exposure, float gamma, float contrast)
+{
+	if (contrast < 0.0)
+		return d;
+	if (gamma > 0.0 && gamma != 1.0)
+		d = pow(max(d, vec3(0.0)), vec3(gamma));
+	vec3 c;
+	if (contrast > 0.0)
+		c = vec3(game_filmic_curve_inverse(d.r, contrast), game_filmic_curve_inverse(d.g, contrast), game_filmic_curve_inverse(d.b, contrast));
+	else
+		c = vec3(srgb_to_linearrgb(d.r), srgb_to_linearrgb(d.g), srgb_to_linearrgb(d.b));
+	return c * exp2(-exposure);
+}
+
 void color_to_normal(vec3 color, out vec3 normal)
 {
 	normal.x =  2.0 * ((color.r) - 0.5);
@@ -6882,4 +6912,203 @@ void node_damage(float softness, vec3 I, mat4 viewinvmat, mat4 obinvmat, out flo
 		mask = max(mask, w);
 		strength = max(strength, w * unfdamagestrength[i]);
 	}
+}
+
+/* ********************** Vertex and geometry stage nodes ******************** */
+
+/* gpu_shader_vertex.glsl defines these for the vertex stage (USE_VERTEX_NODES), where the nodes
+ * linked to the Material Output "Vertex Offset" run. In the fragment stage there is no vertex to
+ * move: the vertex nodes give a zero offset. */
+vec3 vertex_position()
+{
+	return vec3(0.0);
+}
+
+vec3 vertex_normal()
+{
+	return vec3(0.0);
+}
+
+vec3 vertex_instance_position()
+{
+	return vec3(0.0);
+}
+
+void node_vertex_offset(float height, float scale, vec3 direction, out vec3 offset)
+{
+	offset = direction * (height * scale);
+}
+
+void node_vertex_offset_normal(float height, float scale, vec3 direction, out vec3 offset)
+{
+	offset = vertex_normal() * (height * scale);
+}
+
+float node_wind_hash(vec2 p)
+{
+	p = mod(p, 256.0);
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+float node_wind_noise(vec2 p)
+{
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = node_wind_hash(i);
+	float b = node_wind_hash(i + vec2(1.0, 0.0));
+	float c = node_wind_hash(i + vec2(0.0, 1.0));
+	float d = node_wind_hash(i + vec2(1.0, 1.0));
+	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+/* Same idea as the material Foliage wind: value noise over the mesh position plus the instance
+ * position (instanced copies sway out of phase), vertices below the anchor height stay still. */
+void node_vertex_wind(float strength, float speed, float scale, float anchor, vec3 direction, float time, out vec3 offset)
+{
+	vec3 co = vertex_position();
+	vec2 p = (co.xy + vertex_instance_position().xy) * scale;
+	float t = time * speed;
+	float wind = node_wind_noise(p + vec2(t, t * 0.7)) * 2.0 - 1.0;
+	float gust = node_wind_noise(p * 0.25 + vec2(t * 0.3)) * 0.5 + 0.5;
+	float h = max(co.z - anchor, 0.0);
+	vec3 dir = (dot(direction, direction) > 0.0) ? normalize(direction) : vec3(1.0, 0.0, 0.0);
+	offset = (dir * gust + vec3(-dir.y, dir.x, 0.0) * wind * 0.5) * (strength * h);
+}
+
+void node_vertex_wave(float amplitude, float wavelength, float speed, vec3 direction, float time, out vec3 offset)
+{
+	vec3 co = vertex_position();
+	vec3 dir = (dot(direction, direction) > 0.0) ? normalize(direction) : vec3(1.0, 0.0, 0.0);
+	float phase = dot(co, dir) * (2.0 * M_PI / max(wavelength, 0.0001)) - time * speed;
+	offset = vertex_normal() * (amplitude * sin(phase));
+}
+
+void node_camera_distance(vec3 viewpos, out float dist)
+{
+	dist = length(viewpos);
+}
+
+/* Fur Shells / Outline layer: replaced by the code generator with the value of the geometry stage
+ * (0 on the base surface, 1 on the outer shell, -1 on the outline hull, 0 without geometry stage). */
+void node_shell_layer(out float layer)
+{
+	layer = 0.0;
+}
+
+void node_shell_layer_info(float layer, out float fac, out float outline)
+{
+	fac = max(layer, 0.0);
+	outline = (layer < -0.5) ? 1.0 : 0.0;
+}
+
+/* Strand mask for the shells: one strand per cell of the UV grid, thinner towards the tip.
+ * direction/direction_strength only steer the geometry stage's offset (SHELL_DIR / SHELL_DIR_STRENGTH,
+ * set from the same node inputs in GPU_material_shells); they are unused here, kept so the socket
+ * order lines up with node_shader_gpu_fur_shells's GPU_stack_link call. */
+void node_fur_shells(float length, float layers, float density, vec3 uv, vec3 direction, float direction_strength,
+                      float layer, vec3 orco, out float fac, out float alpha)
+{
+	fac = max(layer, 0.0);
+	vec2 coord = uv.xy;
+	if (fwidth(coord.x) + fwidth(coord.y) == 0.0) {
+		/* No UV map (the attribute is constant): project the generated coordinates along the
+		 * main axis of the face. Every shell has the same coordinates, so the strands line up. */
+		vec3 n = abs(cross(dFdx(orco), dFdy(orco)));
+		coord = (n.z >= n.x && n.z >= n.y) ? orco.xy : ((n.x >= n.y) ? orco.yz : orco.xz);
+		coord *= 0.5;
+	}
+	vec2 grid = coord * max(density, 1.0);
+	vec2 cell = floor(grid);
+	float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+	vec2 local = fract(grid) - 0.5;
+	float radius = 0.5 * (1.0 - fac * h);
+	alpha = (fac <= 0.0) ? 1.0 : ((h > fac && dot(local, local) < radius * radius) ? 1.0 : 0.0);
+}
+
+void node_outline(float width, float layer, out float fac)
+{
+	fac = (layer < -0.5) ? 1.0 : 0.0;
+}
+
+/* Billboard: rotates the mesh around its local origin so it keeps facing the camera. Assumes the
+ * mesh was authored flat on the local XZ plane (X = width, Z = height), the usual convention for
+ * a sprite/grass quad -- the offset moves X/Z into the camera's right/up directions (in object
+ * space) and removes the original X/Z so the result replaces them rather than adding on top.
+ * Lock Axis keeps the up vector on local +Z (cylindrical billboard, e.g. grass/trees); otherwise
+ * the billboard is spherical (always fully faces the camera, e.g. particles/UI markers). */
+void node_billboard(float lock_axis, float scale, mat4 invviewmat, mat4 invobmat, out vec3 offset)
+{
+	vec3 cam_right = invviewmat[0].xyz;
+	vec3 cam_up = (lock_axis > 0.5) ? vec3(0.0, 0.0, 1.0) : invviewmat[1].xyz;
+	vec3 cam_fwd = invviewmat[2].xyz;
+
+	vec3 right_obj = normalize((invobmat * vec4(cam_right, 0.0)).xyz);
+	vec3 up_obj;
+	if (lock_axis > 0.5) {
+		/* Cylindrical: keep the local +Z axis fixed, only swing around it to face the camera. */
+		up_obj = vec3(0.0, 0.0, 1.0);
+		vec3 fwd_obj = normalize((invobmat * vec4(cam_fwd, 0.0)).xyz);
+		right_obj = normalize(cross(up_obj, fwd_obj));
+	}
+	else {
+		up_obj = normalize((invobmat * vec4(cam_up, 0.0)).xyz);
+	}
+
+	vec3 co = vertex_position();
+	vec3 billboarded = (right_obj * co.x + up_obj * co.z) * max(scale, 0.0001);
+	offset = billboarded - co;
+}
+
+/* Strands: the geometry stage emits Density thin triangles per input triangle, growing along the
+ * normal; "layer" is 0.0 on the two base vertices and 1.0 on the tip vertex (see
+ * code_generate_geometry_stage's STRAND branch), reused from the Fur Shells/Outline shell_layer
+ * channel so Strands needs no extra varying. */
+void node_strands_info(float density, float length, float curvature, float layer, out float tip)
+{
+	tip = clamp(layer, 0.0, 1.0);
+}
+
+/* Explode: the geometry stage offsets whole triangles along their normal (plus a per-triangle
+ * random direction) by Factor; this node has no geometry of its own to compute, "amount" just
+ * passes Factor through so it can be reused (e.g. to fade color/alpha with the same value). */
+void node_explode(float factor, out float amount)
+{
+	amount = factor;
+}
+
+/* Planar Reflection: samples the 2D render target of this object's KX_PlanarReflector (a real
+ * mirrored-camera capture, not the automatic cubemap probes Glossy already gets -- see
+ * BL_BlenderShader::Update()/GPU_material_bind_planar()). unfplanarenabled is 0 whenever no
+ * KX_PlanarReflector exists for this object yet (Enable off at scene conversion, or this material
+ * is reused by an object with no mirror set up): the node then returns transparent black instead
+ * of sampling an arbitrary/unbound texture unit. Resolution and Clip End are read directly off
+ * the node's sockets when the scene converts (not here): they stay unused parameters below so the
+ * function signature matches GPU_stack_link's "in" socket count one for one.
+ * The capture is drawn with the reflected objects' own materials, so it is already display encoded
+ * (game_view_transform); unfplanarview = (exposure, gamma, contrast) undoes that so Color is linear
+ * like any other node output and the material using it is encoded only once. Feed Color to an
+ * Emission shader for a pure mirror: through a BSDF Base Color the reflection is lit again by the
+ * scene lights and darkens with them. */
+uniform sampler2D unfplanartex;
+uniform mat4 unfplanarviewproj;
+uniform float unfplanarenabled;
+uniform vec3 unfplanarview;
+
+void node_planar_reflection(float enable, float resolution, float clipend, mat4 invviewmat, vec3 viewposition, out vec4 outcol)
+{
+	if (enable < 0.5 || unfplanarenabled < 0.5) {
+		outcol = vec4(0.0);
+		return;
+	}
+
+	vec4 worldpos = invviewmat * vec4(viewposition, 1.0);
+	vec4 clip = unfplanarviewproj * worldpos;
+	if (clip.w <= 0.0) {
+		outcol = vec4(0.0);
+		return;
+	}
+
+	vec2 uv = (clip.xy / clip.w) * 0.5 + 0.5;
+	outcol = vec4(game_view_untransform(texture(unfplanartex, uv).rgb, unfplanarview.x, unfplanarview.y, unfplanarview.z), 1.0);
 }

@@ -660,6 +660,74 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   máscara RGB e materiais prontos (ver changelog). Falta o usuário conferir no editor e no jogo
   (`tools/create_material_recipes_test.py`, PBR e `legacy`). Normal e rugosidade por camada feitas (botão de pasta). Próximos: mistura pela
   altura e Texture Array (só se 8+ camadas).
+- **Nós de material com estágios de vertex e geometry (2026-10-10, branch `claude/shader-nodes`)**: guia em
+  [shader-nodes.md](shader-nodes.md). Feito: entrada Vertex Offset no Material Output, campo Geometry em Shader
+  Sources, nós Vertex Offset/Wind/Wave/Fur Shells/Outline/Shell Layer/Camera Distance/GLSL Script, menu Add com
+  Vertex/Geometry/Script/Presets e presets Fur, Grass, Toon + Rim, Toon Outline, Dissolve e Water Waves. Os
+  shaders compilam e linkam no runtime; **falta o usuário conferir o visual** no jogo e no viewport
+  (`tools/debug/cenas/criar_cena_shader_nodes.py`) e validar com o caso real do Naut. Falta também: viewport
+  desenhando quads com geometry stage (não testado), build Web, cor do cabeçalho do nó por estágio, nós
+  Billboard/Explode/Strands, presets Wind Leaves/Triplanar/Hologram, Show Generated Code, custo/`max_vertices`
+  no painel e opção de sombra própria. Uniforms `u_`, helpers e `TIME` do GLSL Script feitos em 2026-10-11;
+  falta conferir o painel Script Uniforms no editor. Erro de compilação pinta o nó GLSL Script em vermelho e
+  mostra a mensagem do compilador no tooltip, feito em 2026-10-11 (ver "Erro de compilação no nó" em
+  [shader-nodes.md](shader-nodes.md)); compilado, **não validado visualmente** (sem display/GPU neste
+  ambiente) — falta o usuário abrir o editor, forçar um erro de sintaxe num GLSL Script e confirmar o nó
+  vermelho e o tooltip.
+- **Bloom e SSR pelo World node graph (2026-10-11, branch `claude/shader-nodes`)**: nós "Bloom" e "Screen
+  Space Reflections" no World (Shader Editor em modo World, categoria Output), para ligar/ajustar os filtros
+  Filter2D de Bloom e SSR que já existiam (`RAS_2DFilterData::BuildInFilters`, `KX_2DFilterManager`) sem passar
+  pelo painel Scene > Scene FX nem por Python. Não é um Bloom/SSR novo, nem mexe nos `.glsl` do filtro; os nós
+  só carregam os valores (sem GPU codegen, não ligados ao World Output) e `KX_Scene` os lê na conversão da cena,
+  sobrepondo o Scene FX quando presentes. Ver [shader-nodes.md](shader-nodes.md#bloom-e-ssr-pelo-world-node-graph).
+  Compilado limpo; **não validado visualmente** (sem display/GPU neste ambiente). Pendente, conscientemente fora
+  deste escopo: nó dedicado de Planar Reflection (espelho/água real) para o `KX_PlanarMap` existente, que hoje só
+  se liga por Image/EnvMap no objeto, fora do node graph.
+- **Billboard, Strands, Explode (2026-10-11, branch `claude/shader-nodes`)**: completa os três pendentes da
+  fase 3 listados acima. Ver [shader-nodes.md](shader-nodes.md#billboard-strands-explode-fase-3). Billboard
+  (vertex, cilíndrico/esférico via `Lock Axis`) não precisou de mudança em `gpu_codegen.c`. Strands e Explode
+  são novos modos do estágio de geometria em `code_generate_geometry_stage` (`gpu_codegen.c`), mutuamente
+  exclusivos com Fur Shells/Outline no mesmo material (prioridade Shells/Outline > Strands > Explode >
+  `geomcode` do usuário); `GPU_material_strands`/`GPU_material_explode` novos em `gpu_material.c`/
+  `GPU_material.h`. Strands reaproveita o canal `varshelllayer` existente pro "Tip Factor" em vez de criar
+  uma varying nova — por isso não tem uma saída separada de índice da strand (decisão de escopo documentada
+  em shader-nodes.md). Compilado limpo (`RangeEngine`/`RangeRuntime`); **validado além da conversão**: com GL
+  disponível nesta sessão, `tools/debug/cenas/criar_cena_billboard_strands_explode.py` rodou 65 quadros no
+  `AnastacioRuntime.exe` sem crash e gerou um `shot.png` — os geometry shaders de Strands/Explode compilaram e
+  executaram de fato. **Falta** a inspeção visual desse `shot.png` (ninguém olhou se a grama/explosão/billboard
+  parecem certos) e presets dedicados (Wind Leaves/Triplanar/Hologram, cor do cabeçalho por estágio, custo no
+  painel) continuam pendentes, não fizeram parte deste lote.
+- **Fur Shells: direção do pelo configurável (2026-10-11, branch `claude/shader-nodes`)**: pendência do backlog
+  de shader-nodes marcada como feita. Dois sockets novos no nó Fur Shells (depois dos existentes, pra não
+  quebrar link salvo): **Direction** (vetor, padrão zero) e **Direction Strength** (0-1, padrão 0). Com
+  Direction Strength 0 o comportamento é idêntico ao de antes (só a normal, 100% retrocompatível); subindo até
+  1, cada shell desloca ao longo de `normalize(mix(normal, Direction, Direction Strength))` em vez de só a
+  normal — dá pra simular vento constante ou pelo penteado numa direção fixa. Implementado em
+  `GPU_material_shells` (`gpu_material.c`/`GPU_material.h`, parâmetros novos `direction`/`direction_strength`,
+  guarda o vetor normalizado e o maior strength pedido), `GPUPassStages` (`gpu_codegen.h`, campos
+  `shell_dir`/`shell_dir_strength`) e `code_generate_geometry_stage` (`gpu_codegen.c`, `#define SHELL_DIR`/
+  `SHELL_DIR_STRENGTH` e o `mix` no laço de shells). `node_fur_shells` em `gpu_shader_material.glsl` ganhou os
+  dois parâmetros (não usados no corpo, só pra manter a ordem dos sockets alinhada com `GPU_stack_link`). Ver
+  [shader-nodes.md](shader-nodes.md). Compilado limpo (`RangeEngine`/`RangeRuntime`, sem warning novo);
+  `tools/debug/cenas/criar_cena_fur_shells_direction.py` confirma os sockets em `bpy.types` e rodou 65 quadros
+  no `AnastacioRuntime.exe` sem crash, gerando `shot.png` — o geometry shader compilou e executou. **Falta** a
+  inspeção visual desse `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção certa).
+- **Reflexo planar dedicado — implementado (2026-10-11, branch `claude/shader-nodes`)**: nó
+  `ShaderNodePlanarReflection` (categoria Fragment), com `Enable`/`Resolution`/`Clip End` → saída `Color`.
+  A investigação anterior (mesmo dia) tinha concluído que isso exigia abrir o compilador de material; o
+  usuário autorizou e foi feito de verdade na sessão seguinte, com supervisão: nova classe
+  `KX_PlanarReflector` (subclasse de `KX_PlanarMap`, dono de GPUTexture 2D próprio, mesma relação que
+  `KX_LightProbe` tem com `KX_CubeMap`), binding novo em `gpu_material.c`/`GPU_material.h`
+  (`GPU_material_bind_planar`, mesmo padrão de `GPU_material_bind_probe`) e GLSL novo
+  (`node_planar_reflection` em `gpu_shader_material.glsl`, projeção de UV de tela pela matriz
+  view-projection da câmera espelhada). Detalhe completo em
+  [shader-nodes.md#reflexo-planar-planar-reflection](shader-nodes.md#reflexo-planar-planar-reflection).
+  Compilado limpo (`ninja RangeEngine`, depois de corrigir um `CMakeLists.txt` esquecido na 1ª tentativa).
+  `tools/debug/cenas/criar_cena_planar_reflection.py` confirma os sockets em `bpy.types` e salva o `.range`.
+  Crash no runtime (sockets BOOLEAN/INT sem pilha no exec de nós) e espelho preto (reflexo no Base Color +
+  Color Management aplicado duas vezes) corrigidos no mesmo dia; a cena roda no `AnastacioRuntime.exe` e o
+  reflexo confere por pixel com a vista direta. Espelho puro liga `Color` num shader Emission.
+  **Falta**: aceite visual do usuário; conferir com Filmic e exposure/gamma fora do padrão.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

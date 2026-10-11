@@ -3768,6 +3768,64 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		kxscene->GetTextureRendererManager()->AddProbe(gameobj, radius, size, clipEnd, realtime);
 	}
 
+	/* Planar Reflection material node (Shader Editor): each object whose own material has the node
+	 * with Enable on gets its own KX_PlanarReflector, mirrored through that object's plane -- "this
+	 * object uses its own material as a planar mirror", same association the legacy EnvMap/ENV_REALT
+	 * texture slot uses by default (env->object falls back to the mesh's own object). Resolution/
+	 * Clip End come straight off the node's input sockets, same spirit as the World Bloom/SSR nodes
+	 * (KX_Scene.cpp) reading their sockets directly instead of going through GPU codegen. Only the
+	 * node's top level in the material tree is scanned (no recursion into node groups, like Bloom/SSR). */
+	for (KX_GameObject *gameobj : sumolist) {
+		for (KX_Mesh *mesh : gameobj->GetMeshList()) {
+			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+				RAS_IMaterial *mat = meshmat->GetBucket()->GetMaterial();
+				Material *ma = mat->GetBlenderMaterial();
+				if (!ma || !ma->use_nodes || !ma->nodetree) {
+					continue;
+				}
+
+				bNode *planarNode = nullptr;
+				for (bNode *node = (bNode *)ma->nodetree->nodes.first; node; node = node->next) {
+					if (node->type == SH_NODE_PLANAR_REFLECTION) {
+						planarNode = node;
+						break;
+					}
+				}
+				if (!planarNode) {
+					continue;
+				}
+
+				bool enable = false;
+				int size = 512;
+				float clipEnd = 100.0f;
+				for (bNodeSocket *sock = (bNodeSocket *)planarNode->inputs.first; sock; sock = sock->next) {
+					if (!sock->default_value) {
+						continue;
+					}
+					if (STREQ(sock->name, "Enable")) {
+						enable = ((bNodeSocketValueBoolean *)sock->default_value)->value != 0;
+					}
+					else if (STREQ(sock->name, "Resolution")) {
+						size = ((bNodeSocketValueInt *)sock->default_value)->value;
+					}
+					else if (STREQ(sock->name, "Clip End")) {
+						clipEnd = ((bNodeSocketValueFloat *)sock->default_value)->value;
+					}
+				}
+
+				if (!enable) {
+					continue;
+				}
+				CLAMP(size, 16, 2048);
+				if (clipEnd < 0.1f) {
+					clipEnd = 100.0f;
+				}
+
+				kxscene->GetTextureRendererManager()->AddPlanarReflector(gameobj, size, clipEnd);
+			}
+		}
+	}
+
 	/* A node World (Game PBR) isn't readable by the materials' reflection code, which falls back to
 	 * the Horizon/Zenith colors: capture its background to a cube map once at game start instead. */
 	Scene *bscene = kxscene->GetBlenderScene();

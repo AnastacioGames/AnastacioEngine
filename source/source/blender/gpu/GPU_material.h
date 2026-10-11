@@ -283,6 +283,35 @@ bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNodeStack *out, ...);
 
 void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned short index);
+/* Vertex and geometry stages (see GPUPassStages in gpu_codegen.h). */
+void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link);
+void GPU_material_shells(GPUMaterial *material, int layers, float length,
+                          const float direction[3], float direction_strength);
+void GPU_material_outline(GPUMaterial *material, float width);
+void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature);
+void GPU_material_explode(GPUMaterial *material, float factor);
+/* Planar Reflection node: marks the material as sampling a per-object planar reflector, so
+ * BL_BlenderShader::Update() knows to look one up and call GPU_material_bind_planar() below. */
+void GPU_material_planar_reflection(GPUMaterial *material);
+bool GPU_material_use_planar_reflection(GPUMaterial *material);
+bool GPU_material_geometry_stage_supported(void);
+/* uniform_names: one entry per input socket, the name of the "u_" uniform it feeds or NULL. An unlinked
+ * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */
+bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
+                     const char **uniform_names, bool use_time, const char *orig_node_name);
+/* GLSL Script "u_" uniforms of every compiled variant of the material. Set returns how many were found. */
+int GPU_material_script_uniform_set(struct Material *ma, const char *name, const float *value, int len);
+bool GPU_material_script_uniform_get(struct Material *ma, const char *name, float r_value[4], int *r_size);
+void GPU_material_script_uniforms_reset(struct Material *ma);
+/* Compile error of this GPUMaterial's last GPU_generate_pass, and the GLSL Script node (bNode->name)
+ * it was traced back to, if any (see gpu_material_construct_end in gpu_material.c). */
+bool GPU_material_has_error(GPUMaterial *material, const char **r_message, const char **r_node_name);
+/* Same lookup, but by the real Material datablock and a node name: checks every compiled variant
+ * (plain/instancing/skinning). Used by the shader node editor to paint a node red on a compile
+ * error (node_draw.c). */
+bool GPU_material_node_error(struct Material *ma, const char *node_name, const char **r_message);
+/* The material moves its vertices on the GPU (user vertex/geometry code, vertex or geometry nodes). */
+bool GPU_material_moves_vertices(struct Material *ma);
 void GPU_material_enable_alpha(GPUMaterial *material);
 struct GPUNodeLink *GPU_material_world_color(GPUMaterial *mat);
 GPUBuiltin GPU_get_material_builtins(GPUMaterial *material);
@@ -404,6 +433,7 @@ typedef struct GPUShaderExport {
 	ListBase attributes;
 	char *vertex;
 	char *fragment;
+	char *geometry; /* NULL without a geometry stage */
 } GPUShaderExport;
 
 GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma);
@@ -518,6 +548,11 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);
+/* Binds the planar reflector's 2D render target and its capturing camera's projection*view matrix
+ * (row-major float[16], as mt::mat4::Data() gives) for the Planar Reflection node. tex = NULL when
+ * no KX_PlanarReflector exists for this object (node present but not Enabled, or not yet captured):
+ * the node then reads unfplanarenabled = 0 and outputs transparent black instead of sampling. */
+void GPU_material_bind_planar(GPUMaterial *material, struct GPUTexture *tex, const float viewproj[16]);
 /* True when the linked shader consumes the Damage node's hit count. */
 bool GPU_material_use_damage(GPUMaterial *material);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);

@@ -66,6 +66,8 @@ struct GPUNode {
 
 	/* Internal flag to mark nodes during pruning */
 	bool tag;
+	/* Shader stages that use the node (GPU_NODE_STAGE_*), set by GPU_generate_pass. */
+	char stage;
 
 	ListBase inputs;
 	ListBase outputs;
@@ -162,6 +164,47 @@ struct GPUPass {
 
 typedef struct GPUPass GPUPass;
 
+/* Stages a node is generated in. A node reached from both the fragment outputs and the vertex
+ * offset is computed in both shaders. */
+enum {
+	GPU_NODE_STAGE_FRAGMENT = (1 << 0),
+	GPU_NODE_STAGE_VERTEX   = (1 << 1),
+};
+
+/* GLSL Script node, see GPU_link_script(). The user function main is renamed to <name>_main and
+ * the wrapper (SCRIPT_ENTRY calling SCRIPT_MAIN) becomes <name>, the function the node calls. */
+typedef struct GPUScriptCode {
+	struct GPUScriptCode *next, *prev;
+	char name[32];
+	char *code;
+	char *wrapper;
+	bool use_time; /* the code reads TIME */
+	/* Position in material->scripts when added (gpu_material_add_script), used as the GLSL
+	 * "#line 1 <source_id>" source string number so a compile error log can be traced back to
+	 * this node (source_id is id + 1; 0 is reserved for the material's own Fragment/Vertex/Geometry
+	 * code, which has no owning bNode). See codegen_print_scripts and GPU_material_node_error. */
+	int id;
+	/* bNode->name of the GLSL Script node this code came from, for the editor to highlight it on a
+	 * compile error. Empty when the caller did not pass one. */
+	char orig_node_name[64];
+} GPUScriptCode;
+
+/* Optional vertex and geometry stages of a material pass. All zero keeps the classic shaders. */
+typedef struct GPUPassStages {
+	struct GPUNodeLink *vertex_offset; /* Material Output "Vertex Offset", added to VERTEX (mesh space) */
+	const char *geomcode;              /* Material.geomcode: user void geometry() */
+	int shell_layers;                  /* Fur Shells: layers including the base surface, < 2 disables */
+	float shell_length;                /* Fur Shells: distance of the last layer along the normal */
+	float shell_dir[3];                /* Fur Shells: normalized custom direction, zero uses the normal only */
+	float shell_dir_strength;          /* Fur Shells: 0 = normal only (default), 1 = shell_dir only */
+	float outline_width;               /* Outline: inverted hull width, 0 disables */
+	int strand_density;                /* Strands: thin triangles emitted per input triangle, < 2 disables */
+	float strand_length;               /* Strands: length along the normal */
+	float strand_curvature;            /* Strands: bend of the tip away from the normal */
+	float explode_factor;              /* Explode: triangles pushed apart along their normal, 0 disables */
+	ListBase *scripts;                 /* GPUScriptCode */
+} GPUPassStages;
+
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],
                            struct GPUVertexAttribs *attribs, int *builtin, const char *fragcode, const char *vertcode,
                            const GPUMatType type, const char *name,
@@ -169,7 +212,8 @@ GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],
 						   const bool use_instancing,
 						   const bool use_skinning,
 						   const bool use_foliage,
-                           const bool use_new_shading);
+                           const bool use_new_shading,
+                           const GPUPassStages *stages);
 
 struct GPUShader *GPU_pass_shader(GPUPass *pass);
 
@@ -188,6 +232,10 @@ void gpu_codegen_exit(void);
 
 const char *GPU_builtin_name(GPUBuiltin builtin);
 void gpu_material_add_node(struct GPUMaterial *material, struct GPUNode *node);
+const char *gpu_material_add_script(struct GPUMaterial *material, const char *code, const char *wrapper,
+                                    bool use_time, const char *orig_node_name);
+/* Value of a GLSL Script "u_" uniform, owned by the material and read on every bind. */
+float *gpu_material_add_script_uniform(struct GPUMaterial *material, const char *name, const float *value, int size);
 int GPU_link_changed(struct GPUNodeLink *link);
 
 #endif

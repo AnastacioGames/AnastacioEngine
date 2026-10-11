@@ -67,6 +67,7 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Filtros 2D custom](2d-filters.md): entradas `bgl_*`, uniforms `u_*`, erros, recompilação e modelos
   com o pipeline de renderização.
 - [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
+- [Nós de vertex, geometry e GLSL Script](shader-nodes.md): Vertex Offset, campo Geometry, nós novos e presets.
 - [Demos de nós revisadas](../demos/revisados/README.md): cópias das 11 receitas, frames explicativos,
   correções de controles e procedimento de validação no player.
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).

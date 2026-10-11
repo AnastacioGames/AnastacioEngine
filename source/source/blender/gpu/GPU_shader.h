@@ -45,6 +45,8 @@ enum {
 	GPU_SHADER_FLAGS_SPECIAL_SKINNING	= (1 << 5),
 	/* Program binary may come from / go to the cooked file (only for programs never relinked later). */
 	GPU_SHADER_FLAGS_BINARY_CACHE		= (1 << 6),
+	/* Material geometry stage (Material.geomcode, Fur Shells, Outline). */
+	GPU_SHADER_FLAGS_USER_GEOMETRY		= (1 << 7),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.
@@ -64,6 +66,13 @@ void GPU_shader_prefetch_end(void);
 bool GPU_shader_prefetching(void);
 /* Deletes the pending programs nobody took. */
 void GPU_shader_prefetch_clear(void);
+
+/* Raw compiler log of the last failed vertex/fragment/geometry compile or link (shader_print_errors
+ * in gpu_shader.c), kept until the next compile attempt. Used by GPU_generate_pass's caller to find
+ * which GLSL Script node (source string number from "#line 1 <id>") caused the failure. Empty string
+ * when nothing failed yet. Never NULL. */
+const char *GPU_shader_get_last_error(void);
+void GPU_shader_clear_last_error(void);
 
 GPUShader *GPU_shader_create(
         const char *vertexcode,

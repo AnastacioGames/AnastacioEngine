@@ -113,8 +113,31 @@ struct GPUMaterial {
 	ListBase nodes;
 	GPUNodeLink *outlinks[8];
 
+	/* Vertex and geometry stages set by the nodes (see GPUPassStages). */
+	GPUNodeLink *vertex_offset;
+	int shell_layers;
+	float shell_length;
+	float shell_dir[3];
+	float shell_dir_strength;
+	float outline_width;
+	int strand_density;
+	float strand_length;
+	float strand_curvature;
+	float explode_factor;
+	/* True once node_shader_gpu_planar_reflection() runs (Planar Reflection node present). */
+	bool use_planar_reflection;
+	ListBase scripts; /* GPUScriptCode, only while the pass is generated */
+	ListBase script_uniforms; /* GPUScriptUniform, the pass inputs point to these values */
+	/* User vertex/geometry code or vertex nodes: the view/object matrices and the time are always sent. */
+	bool use_vertex_stage;
+
 	/* for binding the material */
 	GPUPass *pass;
+	/* Set by gpu_material_construct_end when GPU_generate_pass fails: the raw compiler log, and
+	 * the GLSL Script node's bNode->name when the log could be traced back to one (see
+	 * GPU_material_node_error / GPU_material_has_error). NULL while there is no error. */
+	char *error_log;
+	char error_node_name[64];
 #ifdef __EMSCRIPTEN__
 	unsigned int web_output_mask;
 	GLenum web_draw_buffers[8];
@@ -197,6 +220,9 @@ struct GPUMaterial {
 	 * must still bind per object; reactivation resets potentially shared programs. */
 	bool probe_absent_valid[2];
 	float probe_absent_maxlod[2];
+	/* Planar Reflection node (unfplanartex/unfplanarviewproj/unfplanarenabled/unfplanarview), bound
+	 * per object by GPU_material_bind_planar(). */
+	int planarteximgloc, planarviewprojloc, planarenabledloc, planarviewloc;
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 
@@ -352,6 +378,10 @@ GPUNodeLink *GPU_material_builtin(GPUMaterial *mat, GPUBuiltin builtin)
 	return GPU_builtin(builtin);
 }
 
+/* Forward declarations: implemented near gpu_material_add_script, used by gpu_material_construct_end
+ * right after a failed GPU_generate_pass to find which GLSL Script node caused the error. */
+static bool gpu_shader_error_find_node(const char *log, ListBase *scripts, char r_node_name[64]);
+
 static GPUMaterial *GPU_material_construct_begin(Material *ma)
 {
 	GPUMaterial *material = MEM_callocN(sizeof(GPUMaterial), "GPUMaterial");
@@ -434,11 +464,27 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 
 	char *fragcode = (material->ma && material->ma->fragcode) ? txt_to_buf(material->ma->fragcode) : NULL;
 	char *vertcode = (material->ma && material->ma->vertcode) ? txt_to_buf(material->ma->vertcode) : NULL;
+	char *geomcode = (material->ma && material->ma->geomcode && material->type == GPU_MATERIAL_TYPE_MESH) ?
+	                 txt_to_buf(material->ma->geomcode) : NULL;
 
 	if (vertcode && !fragcode) {
 		fragcode = MEM_mallocN(20, "text buffer");
 		BLI_strncpy(fragcode, "void fragment() {}", 20);
 	}
+
+	GPUPassStages stages = {NULL};
+	stages.vertex_offset = material->vertex_offset;
+	stages.geomcode = geomcode;
+	stages.shell_layers = material->shell_layers;
+	stages.shell_length = material->shell_length;
+	copy_v3_v3(stages.shell_dir, material->shell_dir);
+	stages.shell_dir_strength = material->shell_dir_strength;
+	stages.outline_width = material->outline_width;
+	stages.strand_density = material->strand_density;
+	stages.strand_length = material->strand_length;
+	stages.strand_curvature = material->strand_curvature;
+	stages.explode_factor = material->explode_factor;
+	stages.scripts = &material->scripts;
 
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,
@@ -448,13 +494,33 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->use_instancing,
 			material->use_skinning,
 			material->use_foliage,
-			GPU_material_use_new_shading_nodes(material));
+			GPU_material_use_new_shading_nodes(material),
+			&stages);
 	}
 
-	/* The user sources were only needed to generate the pass. */
+	/* The user sources were only needed to generate the pass. On failure, trace the compiler log
+	 * (GPU_shader_get_last_error) back to the GLSL Script node responsible, if any, while the
+	 * scripts list (source id -> bNode->name) is still alive; the editor paints that node red
+	 * (see node_draw.c / GPU_material_node_error). */
+	if (used && !material->pass) {
+		const char *log = GPU_shader_get_last_error();
+		MEM_SAFE_FREE(material->error_log);
+		material->error_log = log[0] ? BLI_strdup(log) : BLI_strdup("compile error");
+		material->error_node_name[0] = '\0';
+		gpu_shader_error_find_node(log, &material->scripts, material->error_node_name);
+	}
+
 	const bool has_user_vertcode = (vertcode != NULL);
+	material->use_vertex_stage = (vertcode || geomcode || material->vertex_offset);
 	MEM_SAFE_FREE(fragcode);
 	MEM_SAFE_FREE(vertcode);
+	MEM_SAFE_FREE(geomcode);
+	for (GPUScriptCode *script = material->scripts.first; script; script = script->next) {
+		MEM_freeN(script->code);
+		MEM_freeN(script->wrapper);
+	}
+	BLI_freelistN(&material->scripts);
+	material->vertex_offset = NULL;
 
 	if (used) {
 		if (!material->pass)
@@ -485,7 +551,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		/* User vertex code is told it can use VIEW_MATRIX/MODEL_MATRIX (#defines in
 		 * code_generate_vertex), but outside the core profile the uniforms are only uploaded
 		 * when a node asks for them: force them so they are never left uninitialized. */
-		if (has_user_vertcode) {
+		if (has_user_vertcode || material->use_vertex_stage) {
 			material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX;
 		}
 
@@ -515,7 +581,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->obautobumpscaleloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_AUTO_BUMPSCALE));
 		if (material->builtins & GPU_CAMERA_TEXCO_FACTORS)
 			material->cameratexcofacloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_CAMERA_TEXCO_FACTORS));
-		if (material->builtins & GPU_TIME || has_user_vertcode)
+		if (material->builtins & GPU_TIME || has_user_vertcode || material->use_vertex_stage)
 			material->timeloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_TIME));
 		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS)
 			material->partscalarpropsloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_SCALAR_PROPS));
@@ -572,6 +638,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probepos2loc = GPU_shader_get_uniform(shader, "unfprobepos2");
 		material->probeboxloc = GPU_shader_get_uniform(shader, "unfprobebox");
 		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
+		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
+		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
+		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
+		material->planarviewloc = GPU_shader_get_uniform(shader, "unfplanarview");
 		material->damagehitsloc = GPU_shader_get_uniform(shader, "unfdamagehits");
 		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
 		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
@@ -640,6 +710,8 @@ void GPU_material_free(ListBase *gpumaterial)
 
 		BLI_freelistN(&material->lamps);
 
+		BLI_freelistN(&material->script_uniforms);
+		MEM_SAFE_FREE(material->error_log);
 		MEM_freeN(material);
 	}
 
@@ -928,7 +1000,7 @@ void GPU_material_bind(
 				GPU_shader_uniform_vector(shader, material->cameratexcofacloc, 4, 1, (float *)borders);
 			}
 		}
-		if ((material->builtins & GPU_TIME) || (material->ma && material->ma->vertcode)) {
+		if ((material->builtins & GPU_TIME) || (material->ma && material->ma->vertcode) || material->use_vertex_stage) {
 			float ftime = (float)time;
 			GPU_shader_uniform_vector(shader, material->timeloc, 1, 1, &ftime);
 		}
@@ -1213,6 +1285,265 @@ void gpu_material_add_node(GPUMaterial *material, GPUNode *node)
 	BLI_addtail(&material->nodes, node);
 }
 
+/* Material Output "Vertex Offset": mesh space offset added to every vertex (vertex stage). */
+void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->vertex_offset = link;
+	}
+}
+
+/* Fur Shells node: layers (the base surface included) pushed along the normal by the geometry stage.
+ * direction/direction_strength let the shells lean away from the normal (e.g. combed fur, wind):
+ * direction_strength 0.0 keeps the classic normal-only offset (default, 100% backward compatible). */
+void GPU_material_shells(GPUMaterial *material, int layers, float length,
+                          const float direction[3], float direction_strength)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->shell_layers = max_ii(material->shell_layers, min_ii(layers, 32));
+		material->shell_length = max_ff(material->shell_length, length);
+		/* Only the strongest request sets the direction, to keep a single, well-defined blend. */
+		if (direction_strength > material->shell_dir_strength) {
+			material->shell_dir_strength = CLAMPIS(direction_strength, 0.0f, 1.0f);
+			float len = len_v3(direction);
+			if (len > 0.0f) {
+				mul_v3_v3fl(material->shell_dir, direction, 1.0f / len);
+			}
+			else {
+				zero_v3(material->shell_dir);
+			}
+		}
+	}
+}
+
+/* Outline node: inverted hull drawn by the geometry stage. */
+void GPU_material_outline(GPUMaterial *material, float width)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH && width != 0.0f) {
+		material->outline_width = width;
+	}
+}
+
+/* Strands node: Density thin triangles per input triangle, grown along the normal by Length. */
+void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->strand_density = max_ii(material->strand_density, min_ii(max_ii(density, 1), 32));
+		material->strand_length = max_ff(material->strand_length, length);
+		material->strand_curvature = curvature;
+	}
+}
+
+/* Explode node: every triangle pushed apart along its normal (plus a per-triangle random
+ * direction) by the geometry stage. */
+void GPU_material_explode(GPUMaterial *material, float factor)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH && factor != 0.0f) {
+		material->explode_factor = factor;
+	}
+}
+
+bool GPU_material_geometry_stage_supported(void)
+{
+	return GPU_geometry_shader_support();
+}
+
+/* Planar Reflection node: just raises the flag read by BL_BlenderShader::Update() to look up this
+ * object's KX_PlanarReflector and call GPU_material_bind_planar() every frame. The actual GLSL
+ * sampling (node_planar_reflection) is linked unconditionally by node_shader_gpu_planar_reflection
+ * -- Enable is a normal node socket value, read at runtime by the GLSL, not here. */
+void GPU_material_planar_reflection(GPUMaterial *material)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->use_planar_reflection = true;
+	}
+}
+
+bool GPU_material_use_planar_reflection(GPUMaterial *material)
+{
+	return material->use_planar_reflection;
+}
+
+const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper, bool use_time,
+                                    const char *orig_node_name)
+{
+	if (!code || !wrapper) {
+		return NULL;
+	}
+	GPUScriptCode *script = MEM_callocN(sizeof(GPUScriptCode), "GPUScriptCode");
+	script->id = BLI_listbase_count(&material->scripts);
+	BLI_snprintf(script->name, sizeof(script->name), "glsl_script%d", script->id);
+	script->code = BLI_strdup(code);
+	script->wrapper = BLI_strdup(wrapper);
+	script->use_time = use_time;
+	if (orig_node_name) {
+		BLI_strncpy(script->orig_node_name, orig_node_name, sizeof(script->orig_node_name));
+	}
+	BLI_addtail(&material->scripts, script);
+	return script->name;
+}
+
+/* Parses "<id>:<line>" or "<id>(<line>)" at the start of a compiler log line (NVIDIA/Mesa/ANGLE
+ * formats), optionally prefixed with "ERROR: " or whitespace. Returns the source string number
+ * (our "#line 1 <id>" from codegen_print_scripts) or -1 when nothing matches. */
+static int gpu_shader_error_source_id(const char *line)
+{
+	const char *p = line;
+	while (*p == ' ' || *p == '\t') p++;
+	if (STREQLEN(p, "ERROR:", 6)) {
+		p += 6;
+		while (*p == ' ' || *p == '\t') p++;
+	}
+	if (!(*p >= '0' && *p <= '9')) {
+		return -1;
+	}
+	char *end;
+	long id = strtol(p, &end, 10);
+	if (end == p || (*end != ':' && *end != '(')) {
+		return -1;
+	}
+	return (int)id;
+}
+
+/* Scans the whole log (one call per newline-separated line) for the first source id that matches
+ * a known GLSL Script node, used by gpu_material_construct_end right after a failed compile. */
+static bool gpu_shader_error_find_node(const char *log, ListBase *scripts, char r_node_name[64])
+{
+	if (!log || !log[0]) {
+		return false;
+	}
+	const char *line = log;
+	while (line && *line) {
+		const char *next = strchr(line, '\n');
+		int id = gpu_shader_error_source_id(line);
+		if (id > 0) {
+			for (GPUScriptCode *script = scripts->first; script; script = script->next) {
+				if (script->id + 1 == id && script->orig_node_name[0]) {
+					BLI_strncpy(r_node_name, script->orig_node_name, 64);
+					return true;
+				}
+			}
+		}
+		line = next ? next + 1 : NULL;
+	}
+	return false;
+}
+
+/* Error of the last failed compile of this GPUMaterial, and which GLSL Script node (bNode->name)
+ * caused it when the log could be traced back to one (see gpu_material_construct_end). */
+bool GPU_material_has_error(GPUMaterial *material, const char **r_message, const char **r_node_name)
+{
+	if (!material || !material->error_log) {
+		return false;
+	}
+	if (r_message) {
+		*r_message = material->error_log;
+	}
+	if (r_node_name) {
+		*r_node_name = material->error_node_name[0] ? material->error_node_name : NULL;
+	}
+	return true;
+}
+
+/* GLSL Script "u_" uniforms. The value lives in the material: the node tree is a localized copy
+ * while the pass is generated, so the socket itself cannot be pointed to. */
+typedef struct GPUScriptUniform {
+	struct GPUScriptUniform *next, *prev;
+	char name[64];
+	float value[4];
+	float init[4];
+	int size;
+} GPUScriptUniform;
+
+float *gpu_material_add_script_uniform(GPUMaterial *material, const char *name, const float *value, int size)
+{
+	GPUScriptUniform *uniform = MEM_callocN(sizeof(GPUScriptUniform), "GPUScriptUniform");
+	BLI_strncpy(uniform->name, name, sizeof(uniform->name));
+	uniform->size = CLAMPIS(size, 1, 4);
+	memcpy(uniform->value, value, sizeof(float) * uniform->size);
+	memcpy(uniform->init, value, sizeof(float) * uniform->size);
+	BLI_addtail(&material->script_uniforms, uniform);
+	return uniform->value;
+}
+
+#define SCRIPT_UNIFORM_LISTS(ma) {&(ma)->gpumaterial, &(ma)->gpumaterialinstancing, &(ma)->gpumaterialskinning}
+
+int GPU_material_script_uniform_set(Material *ma, const char *name, const float *value, int len)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	int found = 0;
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				if (STREQ(uniform->name, name)) {
+					for (int c = 0; c < uniform->size; c++) {
+						/* A single number fills a vector; a short list keeps the other components. */
+						if (c < len) uniform->value[c] = value[c];
+						else if (len == 1) uniform->value[c] = value[0];
+					}
+					found++;
+				}
+			}
+		}
+	}
+	return found;
+}
+
+bool GPU_material_script_uniform_get(Material *ma, const char *name, float r_value[4], int *r_size)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				if (STREQ(uniform->name, name)) {
+					memcpy(r_value, uniform->value, sizeof(float) * 4);
+					*r_size = uniform->size;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void GPU_material_script_uniforms_reset(Material *ma)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				memcpy(uniform->value, uniform->init, sizeof(uniform->value));
+			}
+		}
+	}
+}
+
+/* Looked up from the real Material (not a localized/eval copy): checks every compiled variant
+ * (plain, instancing, skinning) for one whose last compile error points at this node name. Used
+ * by the node editor (node_draw.c) to paint a GLSL Script node red on a compile error. */
+bool GPU_material_node_error(Material *ma, const char *node_name, const char **r_message)
+{
+	if (!ma || !node_name || !node_name[0]) {
+		return false;
+	}
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			if (material->error_log && STREQ(material->error_node_name, node_name)) {
+				if (r_message) {
+					*r_message = material->error_log;
+				}
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 /* Code generation */
 
 /* Atmospheric sky: World parameters as two vec4 for do_sky_atmospheric. The sky keeps its
@@ -1237,17 +1568,11 @@ static void gpu_world_atmosphere_links(GPUMaterial *mat, World *wo, GPUNodeLink 
  * contraste) aproximado antes da conversao linear -> sRGB da saida. Fora desse
  * caminho mantem a conversao sRGB pura de sempre. Valores lidos na compilacao
  * do shader; exposure/gamma usam ponteiros da cena. */
-static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
+/* Contraste do view transform da cena: 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
+static float *gpu_view_transform_contrast(const ColorManagedViewSettings *vs)
 {
-	/* 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
 	static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
-	ColorManagedViewSettings *vs = &scene->view_settings;
 	int idx = 0;
-
-	if (!BKE_scene_use_new_shading_nodes(scene)) {
-		GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
-		return;
-	}
 
 	if (STREQ(vs->view_transform, "Filmic")) {
 		idx = 4; /* Base Contrast (look None ou "Filmic - Base Contrast") */
@@ -1259,9 +1584,21 @@ static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
 		else if (strstr(vs->look, "High Contrast")) idx = 6;
 	}
 
+	return &contrast_table[idx];
+}
+
+static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
+{
+	ColorManagedViewSettings *vs = &scene->view_settings;
+
+	if (!BKE_scene_use_new_shading_nodes(scene)) {
+		GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
+		return;
+	}
+
 	GPU_link(mat, "game_view_transform", mat->outlinks[0],
 	         GPU_uniform(&vs->exposure), GPU_uniform(&vs->gamma),
-	         GPU_uniform(&contrast_table[idx]), &mat->outlinks[0]);
+	         GPU_uniform(gpu_view_transform_contrast(vs)), &mat->outlinks[0]);
 }
 
 bool GPU_material_do_color_management(GPUMaterial *mat)
@@ -4140,10 +4477,72 @@ void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool 
 		}
 		/* lamp->materials keeps ma: the kept material still uses these lamps. */
 		BLI_freelistN(&material->lamps);
+		BLI_freelistN(&material->script_uniforms);
+		MEM_SAFE_FREE(material->error_log);
 		MEM_freeN(material);
 	}
 	BLI_freelistN(gpumaterials);
 	*gpumaterials = kept;
+}
+
+/* GLSL Script nodes keep their Text in node->id (groups included). Their sockets follow the
+ * function in the Text, so the tree is updated too. */
+static bool gpu_nodetree_uses_text(Main *bmain, bNodeTree *ntree, struct Text *text, int depth)
+{
+	bool found = false;
+	if (depth > 16) {
+		return false;
+	}
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_GLSL_SCRIPT && node->id == (ID *)text) {
+			node->update |= NODE_UPDATE;
+			ntree->update |= NTREE_UPDATE_NODES;
+			found = true;
+		}
+		else if (node->type == NODE_GROUP && node->id && gpu_nodetree_uses_text(bmain, (bNodeTree *)node->id, text, depth + 1)) {
+			found = true;
+		}
+	}
+	if (found) {
+		ntreeUpdateTree(bmain, ntree);
+	}
+	return found;
+}
+
+static bool gpu_nodetree_moves_vertices(bNodeTree *ntree, int depth)
+{
+	if (depth > 16) {
+		return false;
+	}
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->flag & NODE_MUTED) {
+			continue;
+		}
+		if (ELEM(node->type, SH_NODE_FUR_SHELLS, SH_NODE_OUTLINE)) {
+			return true;
+		}
+		if (ELEM(node->type, SH_NODE_OUTPUT, SH_NODE_OUTPUT_MATERIAL)) {
+			bNodeSocket *sock = nodeFindSocket(node, SOCK_IN, "Vertex Offset");
+			if (sock && sock->link) {
+				return true;
+			}
+		}
+		if (node->type == NODE_GROUP && node->id && gpu_nodetree_moves_vertices((bNodeTree *)node->id, depth + 1)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool GPU_material_moves_vertices(Material *ma)
+{
+	if (!ma) {
+		return false;
+	}
+	if (ma->vertcode || ma->geomcode) {
+		return true;
+	}
+	return ma->use_nodes && ma->nodetree && gpu_nodetree_moves_vertices(ma->nodetree, 0);
 }
 
 bool GPU_material_prefetch_viewport(Scene *scene, Material *ma)
@@ -4163,7 +4562,9 @@ bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {
 	bool found = false;
 	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (ma->vertcode == text || ma->fragcode == text) {
+		if (ma->vertcode == text || ma->fragcode == text || ma->geomcode == text ||
+		    (ma->nodetree && gpu_nodetree_uses_text(bmain, ma->nodetree, text, 0)))
+		{
 			GPU_material_free(&ma->gpumaterial);
 			GPU_material_free(&ma->gpumaterialinstancing);
 			GPU_material_free(&ma->gpumaterialskinning);
@@ -5213,6 +5614,57 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	}
 }
 
+/* Binds the planar reflector for the Planar Reflection node (NULL = none: no KX_PlanarReflector
+ * for this object, node_planar_reflection then outputs transparent black). Must run per object
+ * with the program bound. Uses its own texture unit, right below the two probe cubes, so the
+ * sampler2D never shares a unit with a samplerCube. */
+void GPU_material_bind_planar(GPUMaterial *material, GPUTexture *tex, const float viewproj[16])
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->planarenabledloc == -1) {
+		return;
+	}
+
+	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
+	float enabled = 0.0f;
+
+	if (tex && material->planarteximgloc != -1) {
+		GPU_texture_bind(tex, texunit);
+		GPU_shader_uniform_texture(shader, material->planarteximgloc, tex);
+		enabled = 1.0f;
+	}
+	else if (material->planarteximgloc != -1) {
+		GPU_shader_uniform_int(shader, material->planarteximgloc, texunit);
+	}
+
+	GPU_shader_uniform_vector(shader, material->planarenabledloc, 1, 1, &enabled);
+
+	if (material->planarviewprojloc != -1) {
+		static const float identity[16] = {
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		};
+		GPU_shader_uniform_vector(shader, material->planarviewprojloc, 16, 1, (tex && viewproj) ? viewproj : identity);
+	}
+
+	if (material->planarviewloc != -1) {
+		/* The capture is drawn with the reflected objects' own materials, which already end in the
+		 * Scene > Color Management display transform (gpu_material_link_display_transform): the
+		 * node gets (exposure, gamma, contrast) to undo it and hand out linear color again.
+		 * contrast < 0 = nothing was applied (color management off), sample as is. */
+		float view[3] = {0.0f, 1.0f, -1.0f};
+		if (GPU_material_do_color_management(material)) {
+			const ColorManagedViewSettings *vs = &material->scene->view_settings;
+			view[0] = vs->exposure;
+			view[1] = vs->gamma;
+			view[2] = *gpu_view_transform_contrast(vs);
+		}
+		GPU_shader_uniform_vector(shader, material->planarviewloc, 3, 1, view);
+	}
+}
+
 /* Binds the object's damage hits for the Damage node: count hits of (local xyz, radius) and strength.
  * Must run per object with the program bound; count 0 clears the mask. */
 bool GPU_material_use_damage(GPUMaterial *material)
@@ -5633,6 +6085,8 @@ GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma)
 
 		/* export the vertex shader */
 		shader->vertex = BLI_strdup(pass->vertexcode);
+		if (pass->geometrycode)
+			shader->geometry = BLI_strdup(pass->geometrycode);
 	}
 
 	return shader;
@@ -5654,6 +6108,8 @@ void GPU_free_shader_export(GPUShaderExport *shader)
 		MEM_freeN(shader->vertex);
 	if (shader->fragment)
 		MEM_freeN(shader->fragment);
+	if (shader->geometry)
+		MEM_freeN(shader->geometry);
 
 	MEM_freeN(shader);
 }
