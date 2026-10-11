@@ -159,6 +159,12 @@ def shader_geometry_items(context):
     yield NodeItem("ShaderNodeExplode")
 
 
+# Per-object fragment-stage reflection (mirrored-camera render target, not the automatic cubemap
+# probes Glossy already samples).
+def shader_fragment_items(context):
+    yield NodeItem("ShaderNodePlanarReflection")
+
+
 # node group presets, see NODE_OT_shader_preset_add
 def shader_preset_draw(self, layout, context):
     from bl_operators.node import shader_presets
@@ -361,6 +367,7 @@ shader_node_categories = [
     ]),
     ShaderNewNodeCategory("SH_NEW_VERTEX", "Vertex", items=shader_vertex_items),
     ShaderNewNodeCategory("SH_NEW_GEOMETRY", "Geometry", items=shader_geometry_items),
+    ShaderNewNodeCategory("SH_NEW_FRAGMENT", "Fragment", items=shader_fragment_items),
     ShaderNewNodeCategory("SH_NEW_SCRIPT", "Script", items=[
         NodeItem("ShaderNodeGLSLScript"),
         NodeItem("ShaderNodeScript"),

@@ -709,24 +709,21 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `tools/debug/cenas/criar_cena_fur_shells_direction.py` confirma os sockets em `bpy.types` e rodou 65 quadros
   no `AnastacioRuntime.exe` sem crash, gerando `shot.png` — o geometry shader compilou e executou. **Falta** a
   inspeção visual desse `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção certa).
-- **Reflexo planar dedicado — investigado, não implementado (2026-10-11, branch `claude/shader-nodes`)**:
-  próximo item da fila era um nó `ShaderNodePlanarReflection` para o `KX_PlanarMap` existente. Investigação
-  confirmou que `KX_PlanarMap` é uma câmera espelhada completa e funcional (reflete posição/orientação pelo
-  plano do objeto, clip oblíquo, inversão de front-face), mas ligada hoje só pelo sistema legado de
-  Environment Map de slot de textura (`EnvMap`/`MTex`, lido em `BL_BlenderDataConversion.cpp`), fora do
-  Shader Editor novo. Diferente de Bloom/SSR (filtros de tela cheia automáticos, o nó só liga um
-  interruptor) e diferente dos probes de cubemap (já amostrados automaticamente por posição em qualquer
-  material PBR via `GPU_material_bind_probe`), reflexo planar precisa de uma textura 2D amostrada por UV de
-  tela projetada pela câmera espelhada — não existe esse caminho automático no codegen de material hoje.
-  Um nó de verdade (com saída `Color`) exige codegen novo em `gpu_material.c`/`GPU_material.h`/
-  `BL_BlenderShader.cpp` (uniform sampler2D + matriz view-projection por objeto, análogo a
-  `GPU_material_bind_probe` mas não é a mesma função); um nó "config only" sem essa saída arriscava não
-  aparecer em tela pra quem usa o Shader Editor novo, escondendo a mesma incerteza em vez de resolvê-la.
-  Decisão: parar e documentar em vez de implementar às pressas um nó enfeite ou abrir o compilador de
-  material sem supervisão — ver
-  [shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda](shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda).
-  Nenhum código de engine foi tocado neste item; só documentação. Decisão do usuário pendente: abrir esse
-  codegen novo (com supervisão) ou manter reflexo planar fora do Shader Editor por ora.
+- **Reflexo planar dedicado — implementado (2026-10-11, branch `claude/shader-nodes`)**: nó
+  `ShaderNodePlanarReflection` (categoria Fragment), com `Enable`/`Resolution`/`Clip End` → saída `Color`.
+  A investigação anterior (mesmo dia) tinha concluído que isso exigia abrir o compilador de material; o
+  usuário autorizou e foi feito de verdade na sessão seguinte, com supervisão: nova classe
+  `KX_PlanarReflector` (subclasse de `KX_PlanarMap`, dono de GPUTexture 2D próprio, mesma relação que
+  `KX_LightProbe` tem com `KX_CubeMap`), binding novo em `gpu_material.c`/`GPU_material.h`
+  (`GPU_material_bind_planar`, mesmo padrão de `GPU_material_bind_probe`) e GLSL novo
+  (`node_planar_reflection` em `gpu_shader_material.glsl`, projeção de UV de tela pela matriz
+  view-projection da câmera espelhada). Detalhe completo em
+  [shader-nodes.md#reflexo-planar-planar-reflection](shader-nodes.md#reflexo-planar-planar-reflection).
+  Compilado limpo (`ninja RangeEngine`, depois de corrigir um `CMakeLists.txt` esquecido na 1ª tentativa).
+  `tools/debug/cenas/criar_cena_planar_reflection.py` confirma os sockets em `bpy.types` e salva o `.range`.
+  **Falta**: `AnastacioRuntime.exe` não terminou dentro do tempo de espera neste ambiente (sem display/GPU,
+  mesma limitação já documentada para o teste de Bloom/SSR) — confirmação de que a cena não crasha no
+  runtime e de que o reflexo aparece corretamente na tela dependem do usuário testar com GPU/display real.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

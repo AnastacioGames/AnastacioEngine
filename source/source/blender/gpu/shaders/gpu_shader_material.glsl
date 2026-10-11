@@ -6996,3 +6996,33 @@ void node_explode(float factor, out float amount)
 {
 	amount = factor;
 }
+
+/* Planar Reflection: samples the 2D render target of this object's KX_PlanarReflector (a real
+ * mirrored-camera capture, not the automatic cubemap probes Glossy already gets -- see
+ * BL_BlenderShader::Update()/GPU_material_bind_planar()). unfplanarenabled is 0 whenever no
+ * KX_PlanarReflector exists for this object yet (Enable off at scene conversion, or this material
+ * is reused by an object with no mirror set up): the node then returns transparent black instead
+ * of sampling an arbitrary/unbound texture unit. Resolution and Clip End are read directly off
+ * the node's sockets when the scene converts (not here): they stay unused parameters below so the
+ * function signature matches GPU_stack_link's "in" socket count one for one. */
+uniform sampler2D unfplanartex;
+uniform mat4 unfplanarviewproj;
+uniform float unfplanarenabled;
+
+void node_planar_reflection(float enable, float resolution, float clipend, mat4 invviewmat, vec3 viewposition, out vec4 outcol)
+{
+	if (enable < 0.5 || unfplanarenabled < 0.5) {
+		outcol = vec4(0.0);
+		return;
+	}
+
+	vec4 worldpos = invviewmat * vec4(viewposition, 1.0);
+	vec4 clip = unfplanarviewproj * worldpos;
+	if (clip.w <= 0.0) {
+		outcol = vec4(0.0);
+		return;
+	}
+
+	vec2 uv = (clip.xy / clip.w) * 0.5 + 0.5;
+	outcol = texture(unfplanartex, uv);
+}

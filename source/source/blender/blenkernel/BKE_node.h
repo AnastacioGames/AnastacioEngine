@@ -809,6 +809,7 @@ struct ShadeResult;
 #define SH_NODE_BILLBOARD		1015
 #define SH_NODE_STRANDS			1016
 #define SH_NODE_EXPLODE			1017
+#define SH_NODE_PLANAR_REFLECTION	1018
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF			1 /* Unused */

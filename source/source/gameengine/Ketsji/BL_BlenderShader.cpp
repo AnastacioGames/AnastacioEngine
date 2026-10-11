@@ -51,8 +51,10 @@ extern "C" {
 #include "CM_Message.h"
 
 #include "KX_DentDeformer.h"
+#include "KX_GameObject.h"
 #include "KX_Scene.h"
 #include "KX_TextureRendererManager.h"
+#include "KX_PlanarReflector.h"
 
 #include <algorithm>
 #include <cstring>
@@ -337,6 +339,14 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box);
 		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probeWeight2);
 
+		/* Planar Reflection node: this object's own mirror (KX_PlanarReflector), not a cubemap probe.
+		 * Skipped for materials that don't use the node (cheap flag check, no lookup). */
+		if (GPU_material_use_planar_reflection(m_gpuMat)) {
+			KX_GameObject *gameobj = KX_GameObject::GetClientObject((KX_ClientObjectInfo *)meshUser->GetClientObject());
+			KX_PlanarReflector *reflector = gameobj ? m_scene->GetTextureRendererManager()->FindPlanarReflector(gameobj) : nullptr;
+			GPU_material_bind_planar(m_gpuMat, reflector ? reflector->GetTexture() : nullptr,
+			                          reflector ? (const float *)reflector->GetViewProjection().Data() : nullptr);
+		}
 	}
 
 	m_alphaBlend = GPU_material_alpha_blend(m_gpuMat, meshUser->GetColor().Data());

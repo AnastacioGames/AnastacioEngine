@@ -124,6 +124,8 @@ struct GPUMaterial {
 	float strand_length;
 	float strand_curvature;
 	float explode_factor;
+	/* True once node_shader_gpu_planar_reflection() runs (Planar Reflection node present). */
+	bool use_planar_reflection;
 	ListBase scripts; /* GPUScriptCode, only while the pass is generated */
 	ListBase script_uniforms; /* GPUScriptUniform, the pass inputs point to these values */
 	/* User vertex/geometry code or vertex nodes: the view/object matrices and the time are always sent. */
@@ -218,6 +220,9 @@ struct GPUMaterial {
 	 * must still bind per object; reactivation resets potentially shared programs. */
 	bool probe_absent_valid[2];
 	float probe_absent_maxlod[2];
+	/* Planar Reflection node (unfplanartex/unfplanarviewproj/unfplanarenabled), bound per object
+	 * by GPU_material_bind_planar(). */
+	int planarteximgloc, planarviewprojloc, planarenabledloc;
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 
@@ -623,6 +628,9 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probepos2loc = GPU_shader_get_uniform(shader, "unfprobepos2");
 		material->probeboxloc = GPU_shader_get_uniform(shader, "unfprobebox");
 		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
+		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
+		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
+		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
 		material->damagehitsloc = GPU_shader_get_uniform(shader, "unfdamagehits");
 		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
 		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
@@ -1295,6 +1303,22 @@ void GPU_material_explode(GPUMaterial *material, float factor)
 bool GPU_material_geometry_stage_supported(void)
 {
 	return GPU_geometry_shader_support();
+}
+
+/* Planar Reflection node: just raises the flag read by BL_BlenderShader::Update() to look up this
+ * object's KX_PlanarReflector and call GPU_material_bind_planar() every frame. The actual GLSL
+ * sampling (node_planar_reflection) is linked unconditionally by node_shader_gpu_planar_reflection
+ * -- Enable is a normal node socket value, read at runtime by the GLSL, not here. */
+void GPU_material_planar_reflection(GPUMaterial *material)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->use_planar_reflection = true;
+	}
+}
+
+bool GPU_material_use_planar_reflection(GPUMaterial *material)
+{
+	return material->use_planar_reflection;
 }
 
 const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper, bool use_time,
@@ -5524,6 +5548,42 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	}
 	if (material->probebox2loc != -1) {
 		GPU_shader_uniform_vector(shader, material->probebox2loc, 4, 1, ext);
+	}
+}
+
+/* Binds the planar reflector for the Planar Reflection node (NULL = none: no KX_PlanarReflector
+ * for this object, node_planar_reflection then outputs transparent black). Must run per object
+ * with the program bound. Uses its own texture unit, right below the two probe cubes, so the
+ * sampler2D never shares a unit with a samplerCube. */
+void GPU_material_bind_planar(GPUMaterial *material, GPUTexture *tex, const float viewproj[16])
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->planarenabledloc == -1) {
+		return;
+	}
+
+	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
+	float enabled = 0.0f;
+
+	if (tex && material->planarteximgloc != -1) {
+		GPU_texture_bind(tex, texunit);
+		GPU_shader_uniform_texture(shader, material->planarteximgloc, tex);
+		enabled = 1.0f;
+	}
+	else if (material->planarteximgloc != -1) {
+		GPU_shader_uniform_int(shader, material->planarteximgloc, texunit);
+	}
+
+	GPU_shader_uniform_vector(shader, material->planarenabledloc, 1, 1, &enabled);
+
+	if (material->planarviewprojloc != -1) {
+		static const float identity[16] = {
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		};
+		GPU_shader_uniform_vector(shader, material->planarviewprojloc, 16, 1, (tex && viewproj) ? viewproj : identity);
 	}
 }
 

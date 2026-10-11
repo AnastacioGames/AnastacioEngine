@@ -53,6 +53,7 @@ void register_node_type_sh_outline(void);
 void register_node_type_sh_billboard(void);
 void register_node_type_sh_strands(void);
 void register_node_type_sh_explode(void);
+void register_node_type_sh_planar_reflection(void);
 void register_node_type_sh_world_bloom_fx(void);
 void register_node_type_sh_world_ssr_fx(void);
 void register_node_type_sh_lamp(void);

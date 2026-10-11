@@ -71,6 +71,7 @@ DefNode( ShaderNode,     SH_NODE_OUTLINE,         0,                      "OUTLI
 DefNode( ShaderNode,     SH_NODE_BILLBOARD,       0,                      "BILLBOARD",      Billboard,        "Billboard",          ""              )
 DefNode( ShaderNode,     SH_NODE_STRANDS,         0,                      "STRANDS",        Strands,          "Strands",            ""              )
 DefNode( ShaderNode,     SH_NODE_EXPLODE,         0,                      "EXPLODE",        Explode,          "Explode",            ""              )
+DefNode( ShaderNode,     SH_NODE_PLANAR_REFLECTION, 0,                    "PLANAR_REFLECTION", PlanarReflection, "Planar Reflection", ""              )
 DefNode( ShaderNode,     SH_NODE_LAMP,            def_sh_lamp,            "LAMP",           LampData,         "Lamp Data",         ""              )
 DefNode( ShaderNode,     SH_NODE_MATH,            def_math,               "MATH",           Math,             "Math",              ""              )
 DefNode( ShaderNode,     SH_NODE_VECT_MATH,       def_vector_math,        "VECT_MATH",      VectorMath,       "Vector Math",       ""              )

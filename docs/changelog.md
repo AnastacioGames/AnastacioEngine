@@ -6,6 +6,52 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Reflexo planar dedicado: implementado (compilador de material aberto, com supervisão)
+
+- Sessão seguinte à investigação abaixo ("Reflexo planar dedicado: investigado, não implementado"), mesmo
+  dia: o usuário autorizou explicitamente abrir o compilador de material para fazer o nó de verdade. Nó
+  novo `ShaderNodePlanarReflection` (`SH_NODE_PLANAR_REFLECTION`, categoria **Fragment** no Add menu do
+  Shader Editor): `Enable` (bool, padrão False) + `Resolution` (int 16–2048, padrão 512) + `Clip End`
+  (float, padrão 100) → saída `Color` (RGBA).
+- Associação objeto→espelho: o nó reflete pelo plano local do próprio objeto (XY local, normal +Z, mesma
+  convenção de `KX_TextureRenderer`/`KX_PlanarMap`) — não por um socket de objeto separado. Em
+  `BL_BlenderDataConversion.cpp`, depois do scan de probes de cubemap, cada objeto tem seus materiais
+  varridos (nível superior da árvore de nós, sem recursão em grupos); se o nó existe com `Enable` ligado,
+  cria/reaproveita um `KX_PlanarReflector` via `KX_TextureRendererManager::AddPlanarReflector()`.
+- Nova classe `KX_PlanarReflector` (`source/source/gameengine/Ketsji/KX_PlanarReflector.h`/`.cpp`),
+  subclasse de `KX_PlanarMap` — mesma relação que `KX_LightProbe` tem com `KX_CubeMap`: sintetiza um
+  `EnvMap` estático pra reusar o construtor de `KX_PlanarMap` sem slot de textura legado, e é dono de um
+  `GPUTexture*` 2D próprio (`GPU_texture_create_2D`), criado sob demanda em `SetupCamera()`.
+- Hook novo em `KX_TextureRenderer`/`KX_TextureRendererManager`: `SetFrameViewProjection(view, projection)`
+  — virtual no-op por padrão (zero custo/risco para cubemap/probe existentes), chamado por
+  `RenderRenderer()` logo depois de montar `view`/`projection` de cada face; `KX_PlanarReflector` o
+  sobrescreve pra cachear `projection * view` da câmera espelhada daquele frame, usada depois pelo GLSL
+  pra projetar a UV de tela.
+- GPU codegen (`gpu_material.c`/`GPU_material.h`): `GPU_material_planar_reflection(mat)` marca a flag
+  `use_planar_reflection` quando o nó existe no material (chamada em `node_shader_gpu_planar_reflection`,
+  `node_shader_stage_nodes.c`); `GPU_material_bind_planar(mat, tex, viewproj)` faz o bind por objeto, mesmo
+  padrão de `GPU_material_bind_probe` (unidade de textura própria, `unfplanarenabled` zerado quando não há
+  `KX_PlanarReflector` pra aquele objeto). GLSL novo `node_planar_reflection` em `gpu_shader_material.glsl`:
+  projeta a posição do fragmento (view→mundo via `GPU_INVERSE_VIEW_MATRIX`, mesmo builtin do `node_billboard`)
+  pela `unfplanarviewproj` cacheada, divide por `w`, remapeia pra `[0,1]` e amostra `unfplanartex`.
+- Binding em `BL_BlenderShader.cpp::Update()`, no mesmo bloco dos probes: se o material usa o nó, resolve
+  o `KX_GameObject` do `RAS_MeshUser` (mesmo padrão de `BL_Shader::Update()`), busca o
+  `KX_PlanarReflector` desse objeto via `FindPlanarReflector()` e chama `GPU_material_bind_planar()`. Nada
+  disso roda pra materiais sem o nó (flag checada primeiro) nem toca o binding de probes/SSR existente.
+- Build: `ninja RangeEngine` (via `vcvars64.bat`, skill `build-anastacio`) no worktree
+  `D:\AnastacioEngine-shadernodes`. 1ª tentativa falhou no link (`LNK2019`, `KX_PlanarReflector.cpp`/`.h`
+  esquecidos no `CMakeLists.txt` de `source/gameengine/Ketsji`); corrigido e `cmake . && ninja RangeEngine`
+  gerou `AnastacioEngine.exe`/`AnastacioRuntime.exe` limpos (sem warning novo).
+- Testado: `tools/debug/cenas/criar_cena_planar_reflection.py` via `AnastacioEngine.exe -b
+  --factory-startup --python ... --` confirma `ShaderNodePlanarReflection` em `bpy.types` com os três
+  sockets de entrada e a saída `Color`, e salva um `.range` com o nó ligado ao Base Color de um Principled.
+  **Não confirmado**: `AnastacioRuntime.exe -w <W> <H> <scene.range>` não terminou dentro do tempo de
+  espera neste ambiente (mesma limitação de display/GPU já documentada pro teste de Bloom/SSR) — nem a
+  sobrevivência no runtime nem o reflexo aparecendo corretamente na tela foram confirmados visualmente.
+  Depende do usuário testar com GPU/display real.
+- Detalhe completo em
+  [shader-nodes.md#reflexo-planar-planar-reflection](shader-nodes.md#reflexo-planar-planar-reflection).
+
 ## 2026-10-11 - Reflexo planar dedicado: investigado, não implementado
 
 - Próximo item da fila de shader-nodes: um nó de material `ShaderNodePlanarReflection` para o `KX_PlanarMap`

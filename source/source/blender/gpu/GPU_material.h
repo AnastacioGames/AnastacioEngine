@@ -290,6 +290,10 @@ void GPU_material_shells(GPUMaterial *material, int layers, float length,
 void GPU_material_outline(GPUMaterial *material, float width);
 void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature);
 void GPU_material_explode(GPUMaterial *material, float factor);
+/* Planar Reflection node: marks the material as sampling a per-object planar reflector, so
+ * BL_BlenderShader::Update() knows to look one up and call GPU_material_bind_planar() below. */
+void GPU_material_planar_reflection(GPUMaterial *material);
+bool GPU_material_use_planar_reflection(GPUMaterial *material);
 bool GPU_material_geometry_stage_supported(void);
 /* uniform_names: one entry per input socket, the name of the "u_" uniform it feeds or NULL. An unlinked
  * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */
@@ -541,6 +545,11 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);
+/* Binds the planar reflector's 2D render target and its capturing camera's projection*view matrix
+ * (row-major float[16], as mt::mat4::Data() gives) for the Planar Reflection node. tex = NULL when
+ * no KX_PlanarReflector exists for this object (node present but not Enabled, or not yet captured):
+ * the node then reads unfplanarenabled = 0 and outputs transparent black instead of sampling. */
+void GPU_material_bind_planar(GPUMaterial *material, struct GPUTexture *tex, const float viewproj[16]);
 /* True when the linked shader consumes the Damage node's hit count. */
 bool GPU_material_use_damage(GPUMaterial *material);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);

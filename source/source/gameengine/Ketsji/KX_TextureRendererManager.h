@@ -34,6 +34,7 @@ class KX_Camera;
 class KX_Scene;
 class KX_TextureRenderer;
 class KX_LightProbe;
+class KX_PlanarReflector;
 
 class RAS_Rasterizer;
 class RAS_OffScreen;
@@ -61,6 +62,8 @@ private:
 
 	/// Light probes, also in m_renderers[VIEWPORT_INDEPENDENT] which owns them.
 	std::vector<KX_LightProbe *> m_probes;
+	/// Planar reflectors (Planar Reflection material node), also in m_renderers[VIEWPORT_DEPENDENT].
+	std::vector<KX_PlanarReflector *> m_planarReflectors;
 	/// World captured to a cube map (no viewpoint, background only), used where no local probe applies.
 	KX_LightProbe *m_worldProbe;
 	/// World values at the last World capture; a change recaptures it.
@@ -97,6 +100,14 @@ public:
 	void AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime);
 	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
 	void AddWorldProbe(int size);
+
+	/** Add a planar reflector mirrored through viewpoint's local XY plane (own normal +Z), for the
+	 * Planar Reflection material node. Returns the existing one instead of duplicating it when
+	 * viewpoint already has one (a material can be shared by several objects, each converted once).
+	 */
+	KX_PlanarReflector *AddPlanarReflector(KX_GameObject *viewpoint, int size, float clipEnd);
+	/// The planar reflector mirrored by this object, or nullptr if it has none.
+	KX_PlanarReflector *FindPlanarReflector(KX_GameObject *viewpoint) const;
 
 	/// A probe cube bound to a material: radius is the parallax sphere (0 for the World capture).
 	struct ProbeSlot {

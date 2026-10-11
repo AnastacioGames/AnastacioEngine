@@ -3597,6 +3597,7 @@ static void registerShaderNodes(void)
 	register_node_type_sh_billboard();
 	register_node_type_sh_strands();
 	register_node_type_sh_explode();
+	register_node_type_sh_planar_reflection();
 	register_node_type_sh_world_bloom_fx();
 	register_node_type_sh_world_ssr_fx();
 	register_node_type_sh_lamp();

@@ -354,3 +354,45 @@ void register_node_type_sh_explode(void)
 
 	nodeRegisterType(&ntype);
 }
+
+/* **************** PLANAR REFLECTION ******************** */
+
+/* Mirror reflection from this object's own plane (its local XY plane, normal +Z), rendered by a
+ * real mirrored camera (KX_PlanarReflector, same technique as the legacy KX_PlanarMap tied to an
+ * EnvMap texture slot) instead of the automatic cubemap probes Glossy already gets. Resolution/
+ * Clip End only matter at scene conversion (creating the KX_PlanarReflector render target, see
+ * BL_BlenderDataConversion.cpp): they are read off these sockets' default value there, not from
+ * the GPU codegen below, so they stay UNUSED function parameters in node_planar_reflection
+ * (gpu_shader_material.glsl) -- keeping them in the node's "in" sockets anyway so the whole thing
+ * is visible and editable from one node, like Resolution/Clip Start on a World probe would be. */
+static bNodeSocketTemplate sh_node_planar_reflection_in[] = {
+	{	SOCK_BOOLEAN, 1, N_("Enable"),     0.0f,   0.0f, 0.0f, 0.0f, 0.0f,  1.0f,    PROP_NONE},
+	{	SOCK_INT,     1, N_("Resolution"), 512.0f, 0.0f, 0.0f, 0.0f, 16.0f, 2048.0f, PROP_NONE},
+	{	SOCK_FLOAT,   1, N_("Clip End"),   100.0f, 0.0f, 0.0f, 0.0f, 0.1f,  10000.0f, PROP_DISTANCE},
+	{	-1, 0, ""	}
+};
+
+static bNodeSocketTemplate sh_node_planar_reflection_out[] = {
+	{	SOCK_RGBA, 0, N_("Color"), 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, PROP_NONE},
+	{	-1, 0, ""	}
+};
+
+static int node_shader_gpu_planar_reflection(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	GPU_material_planar_reflection(mat);
+	return GPU_stack_link(mat, "node_planar_reflection", in, out,
+	                       GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX),
+	                       GPU_material_builtin(mat, GPU_VIEW_POSITION));
+}
+
+void register_node_type_sh_planar_reflection(void)
+{
+	static bNodeType ntype;
+
+	sh_node_type_base(&ntype, SH_NODE_PLANAR_REFLECTION, "Planar Reflection", NODE_CLASS_CONVERTOR, 0);
+	node_type_compatibility(&ntype, NODE_NEW_SHADING);
+	node_type_socket_templates(&ntype, sh_node_planar_reflection_in, sh_node_planar_reflection_out);
+	node_type_gpu(&ntype, node_shader_gpu_planar_reflection);
+
+	nodeRegisterType(&ntype);
+}
