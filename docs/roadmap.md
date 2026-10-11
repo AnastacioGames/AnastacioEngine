@@ -663,9 +663,14 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Vertex/Geometry/Script/Presets e presets Fur, Grass, Toon + Rim, Toon Outline, Dissolve e Water Waves. Os
   shaders compilam e linkam no runtime; **falta o usuário conferir o visual** no jogo e no viewport
   (`tools/debug/cenas/criar_cena_shader_nodes.py`) e validar com o caso real do Naut. Falta também: viewport
-  desenhando quads com geometry stage (não testado), build Web, cor do cabeçalho do nó por estágio e erro do nó
-  em vermelho, nós Billboard/Explode/Strands, presets Wind Leaves/Triplanar/Hologram, Show Generated Code,
-  custo/`max_vertices` no painel e opção de sombra própria. Uniforms `u_`, helpers e `TIME` do GLSL Script feitos em 2026-10-11; falta conferir o painel Script Uniforms no editor.
+  desenhando quads com geometry stage (não testado), build Web, cor do cabeçalho do nó por estágio, nós
+  Billboard/Explode/Strands, presets Wind Leaves/Triplanar/Hologram, Show Generated Code, custo/`max_vertices`
+  no painel e opção de sombra própria. Uniforms `u_`, helpers e `TIME` do GLSL Script feitos em 2026-10-11;
+  falta conferir o painel Script Uniforms no editor. Erro de compilação pinta o nó GLSL Script em vermelho e
+  mostra a mensagem do compilador no tooltip, feito em 2026-10-11 (ver "Erro de compilação no nó" em
+  [shader-nodes.md](shader-nodes.md)); compilado, **não validado visualmente** (sem display/GPU neste
+  ambiente) — falta o usuário abrir o editor, forçar um erro de sintaxe num GLSL Script e confirmar o nó
+  vermelho e o tooltip.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

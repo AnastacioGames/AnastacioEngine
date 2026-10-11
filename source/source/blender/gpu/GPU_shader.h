@@ -67,6 +67,13 @@ bool GPU_shader_prefetching(void);
 /* Deletes the pending programs nobody took. */
 void GPU_shader_prefetch_clear(void);
 
+/* Raw compiler log of the last failed vertex/fragment/geometry compile or link (shader_print_errors
+ * in gpu_shader.c), kept until the next compile attempt. Used by GPU_generate_pass's caller to find
+ * which GLSL Script node (source string number from "#line 1 <id>") caused the failure. Empty string
+ * when nothing failed yet. Never NULL. */
+const char *GPU_shader_get_last_error(void);
+void GPU_shader_clear_last_error(void);
+
 GPUShader *GPU_shader_create(
         const char *vertexcode,
         const char *fragcode,

@@ -125,6 +125,11 @@ struct GPUMaterial {
 
 	/* for binding the material */
 	GPUPass *pass;
+	/* Set by gpu_material_construct_end when GPU_generate_pass fails: the raw compiler log, and
+	 * the GLSL Script node's bNode->name when the log could be traced back to one (see
+	 * GPU_material_node_error / GPU_material_has_error). NULL while there is no error. */
+	char *error_log;
+	char error_node_name[64];
 #ifdef __EMSCRIPTEN__
 	unsigned int web_output_mask;
 	GLenum web_draw_buffers[8];
@@ -340,6 +345,10 @@ GPUNodeLink *GPU_material_builtin(GPUMaterial *mat, GPUBuiltin builtin)
 	return GPU_builtin(builtin);
 }
 
+/* Forward declarations: implemented near gpu_material_add_script, used by gpu_material_construct_end
+ * right after a failed GPU_generate_pass to find which GLSL Script node caused the error. */
+static bool gpu_shader_error_find_node(const char *log, ListBase *scripts, char r_node_name[64]);
+
 static GPUMaterial *GPU_material_construct_begin(Material *ma)
 {
 	GPUMaterial *material = MEM_callocN(sizeof(GPUMaterial), "GPUMaterial");
@@ -440,7 +449,18 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			&stages);
 	}
 
-	/* The user sources were only needed to generate the pass. */
+	/* The user sources were only needed to generate the pass. On failure, trace the compiler log
+	 * (GPU_shader_get_last_error) back to the GLSL Script node responsible, if any, while the
+	 * scripts list (source id -> bNode->name) is still alive; the editor paints that node red
+	 * (see node_draw.c / GPU_material_node_error). */
+	if (used && !material->pass) {
+		const char *log = GPU_shader_get_last_error();
+		MEM_SAFE_FREE(material->error_log);
+		material->error_log = log[0] ? BLI_strdup(log) : BLI_strdup("compile error");
+		material->error_node_name[0] = '\0';
+		gpu_shader_error_find_node(log, &material->scripts, material->error_node_name);
+	}
+
 	const bool has_user_vertcode = (vertcode != NULL);
 	material->use_vertex_stage = (vertcode || geomcode || material->vertex_offset);
 	MEM_SAFE_FREE(fragcode);
@@ -638,6 +658,7 @@ void GPU_material_free(ListBase *gpumaterial)
 		BLI_freelistN(&material->lamps);
 
 		BLI_freelistN(&material->script_uniforms);
+		MEM_SAFE_FREE(material->error_log);
 		MEM_freeN(material);
 	}
 
@@ -1146,18 +1167,85 @@ bool GPU_material_geometry_stage_supported(void)
 	return GPU_geometry_shader_support();
 }
 
-const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper, bool use_time)
+const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper, bool use_time,
+                                    const char *orig_node_name)
 {
 	if (!code || !wrapper) {
 		return NULL;
 	}
 	GPUScriptCode *script = MEM_callocN(sizeof(GPUScriptCode), "GPUScriptCode");
-	BLI_snprintf(script->name, sizeof(script->name), "glsl_script%d", BLI_listbase_count(&material->scripts));
+	script->id = BLI_listbase_count(&material->scripts);
+	BLI_snprintf(script->name, sizeof(script->name), "glsl_script%d", script->id);
 	script->code = BLI_strdup(code);
 	script->wrapper = BLI_strdup(wrapper);
 	script->use_time = use_time;
+	if (orig_node_name) {
+		BLI_strncpy(script->orig_node_name, orig_node_name, sizeof(script->orig_node_name));
+	}
 	BLI_addtail(&material->scripts, script);
 	return script->name;
+}
+
+/* Parses "<id>:<line>" or "<id>(<line>)" at the start of a compiler log line (NVIDIA/Mesa/ANGLE
+ * formats), optionally prefixed with "ERROR: " or whitespace. Returns the source string number
+ * (our "#line 1 <id>" from codegen_print_scripts) or -1 when nothing matches. */
+static int gpu_shader_error_source_id(const char *line)
+{
+	const char *p = line;
+	while (*p == ' ' || *p == '\t') p++;
+	if (STREQLEN(p, "ERROR:", 6)) {
+		p += 6;
+		while (*p == ' ' || *p == '\t') p++;
+	}
+	if (!(*p >= '0' && *p <= '9')) {
+		return -1;
+	}
+	char *end;
+	long id = strtol(p, &end, 10);
+	if (end == p || (*end != ':' && *end != '(')) {
+		return -1;
+	}
+	return (int)id;
+}
+
+/* Scans the whole log (one call per newline-separated line) for the first source id that matches
+ * a known GLSL Script node, used by gpu_material_construct_end right after a failed compile. */
+static bool gpu_shader_error_find_node(const char *log, ListBase *scripts, char r_node_name[64])
+{
+	if (!log || !log[0]) {
+		return false;
+	}
+	const char *line = log;
+	while (line && *line) {
+		const char *next = strchr(line, '\n');
+		int id = gpu_shader_error_source_id(line);
+		if (id > 0) {
+			for (GPUScriptCode *script = scripts->first; script; script = script->next) {
+				if (script->id + 1 == id && script->orig_node_name[0]) {
+					BLI_strncpy(r_node_name, script->orig_node_name, 64);
+					return true;
+				}
+			}
+		}
+		line = next ? next + 1 : NULL;
+	}
+	return false;
+}
+
+/* Error of the last failed compile of this GPUMaterial, and which GLSL Script node (bNode->name)
+ * caused it when the log could be traced back to one (see gpu_material_construct_end). */
+bool GPU_material_has_error(GPUMaterial *material, const char **r_message, const char **r_node_name)
+{
+	if (!material || !material->error_log) {
+		return false;
+	}
+	if (r_message) {
+		*r_message = material->error_log;
+	}
+	if (r_node_name) {
+		*r_node_name = material->error_node_name[0] ? material->error_node_name : NULL;
+	}
+	return true;
 }
 
 /* GLSL Script "u_" uniforms. The value lives in the material: the node tree is a localized copy
@@ -1234,6 +1322,29 @@ void GPU_material_script_uniforms_reset(Material *ma)
 			}
 		}
 	}
+}
+
+/* Looked up from the real Material (not a localized/eval copy): checks every compiled variant
+ * (plain, instancing, skinning) for one whose last compile error points at this node name. Used
+ * by the node editor (node_draw.c) to paint a GLSL Script node red on a compile error. */
+bool GPU_material_node_error(Material *ma, const char *node_name, const char **r_message)
+{
+	if (!ma || !node_name || !node_name[0]) {
+		return false;
+	}
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			if (material->error_log && STREQ(material->error_node_name, node_name)) {
+				if (r_message) {
+					*r_message = material->error_log;
+				}
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 /* Code generation */
@@ -4150,6 +4261,7 @@ void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool 
 		/* lamp->materials keeps ma: the kept material still uses these lamps. */
 		BLI_freelistN(&material->lamps);
 		BLI_freelistN(&material->script_uniforms);
+		MEM_SAFE_FREE(material->error_log);
 		MEM_freeN(material);
 	}
 	BLI_freelistN(gpumaterials);

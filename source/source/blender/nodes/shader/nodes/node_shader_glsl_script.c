@@ -549,7 +549,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		}
 		const bool use_time = script_uses_word(code, "TIME");
 		char *wrapper = script_wrapper(params, tot, use_time);
-		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time);
+		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name);
 		MEM_freeN(wrapper);
 	}
 	MEM_SAFE_FREE(code);

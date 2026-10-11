@@ -1202,9 +1202,16 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 				BLI_dynstr_appendf(ds, "float %s_TIME;\n#define TIME %s_TIME\n", script->name, script->name);
 			}
 			BLI_dynstr_append(ds, defs);
-			/* Compile errors give the line of the Text. */
-			BLI_dynstr_append(ds, "#line 1\n");
+			/* Compile errors give the line of the Text. The second #line argument (source string
+			 * number, GLSL spec) is this script's id + 1 (0 is the material's own Fragment/Vertex/
+			 * Geometry code): a compile error log then starts with "<id+1>:<line>" or "<id+1>(<line>)"
+			 * depending on the driver, which gpu_shader_error_find_node (gpu_material.c) matches back
+			 * to this node's name, so the editor can paint it red (node_draw.c). */
+			BLI_dynstr_appendf(ds, "#line 1 %d\n", script->id + 1);
 			BLI_dynstr_append(ds, script->code);
+			/* Back to source id 0 (no owning node) so a later script or the rest of the generated
+			 * code is never mistakenly blamed on this one. */
+			BLI_dynstr_append(ds, "\n#line 1 0\n");
 			BLI_dynstr_appendf(ds, "\n#define SCRIPT_MAIN %s_main\n#define SCRIPT_ENTRY %s\n",
 			                   script->name, script->name);
 			/* Inside the renames: the wrapper fills the uniforms of the script. */
@@ -3291,9 +3298,9 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 /* GLSL Script node: the user function (called main in code) with one parameter per socket, the
  * inputs first, then the outputs. */
 bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
-                     const char **uniform_names, bool use_time)
+                     const char **uniform_names, bool use_time, const char *orig_node_name)
 {
-	const char *name = gpu_material_add_script(mat, code, wrapper, use_time);
+	const char *name = gpu_material_add_script(mat, code, wrapper, use_time, orig_node_name);
 	if (!name) {
 		return false;
 	}

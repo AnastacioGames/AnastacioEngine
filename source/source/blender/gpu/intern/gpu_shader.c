@@ -167,10 +167,27 @@ struct GPUShader {
 	bool bound_once;
 };
 
+/* Last compile/link log, for the editor to pin a failure to the GLSL Script node that caused it
+ * (see GPU_shader_get_last_error and "#line 1 <id>" in gpu_codegen.c codegen_print_scripts). Single
+ * buffer: shader compilation happens on the main thread, one at a time. */
+static char g_gpu_shader_last_error[4096] = "";
+
+const char *GPU_shader_get_last_error(void)
+{
+	return g_gpu_shader_last_error;
+}
+
+void GPU_shader_clear_last_error(void)
+{
+	g_gpu_shader_last_error[0] = '\0';
+}
+
 static void shader_print_errors(const char *task, const char *log, const char **code, int totcode)
 {
 	int i;
 	int line = 1;
+
+	BLI_strncpy(g_gpu_shader_last_error, log ? log : "", sizeof(g_gpu_shader_last_error));
 
 	fprintf(stderr, "GPUShader: %s error:\n", task);
 

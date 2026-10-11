@@ -291,11 +291,18 @@ bool GPU_material_geometry_stage_supported(void);
 /* uniform_names: one entry per input socket, the name of the "u_" uniform it feeds or NULL. An unlinked
  * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */
 bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
-                     const char **uniform_names, bool use_time);
+                     const char **uniform_names, bool use_time, const char *orig_node_name);
 /* GLSL Script "u_" uniforms of every compiled variant of the material. Set returns how many were found. */
 int GPU_material_script_uniform_set(struct Material *ma, const char *name, const float *value, int len);
 bool GPU_material_script_uniform_get(struct Material *ma, const char *name, float r_value[4], int *r_size);
 void GPU_material_script_uniforms_reset(struct Material *ma);
+/* Compile error of this GPUMaterial's last GPU_generate_pass, and the GLSL Script node (bNode->name)
+ * it was traced back to, if any (see gpu_material_construct_end in gpu_material.c). */
+bool GPU_material_has_error(GPUMaterial *material, const char **r_message, const char **r_node_name);
+/* Same lookup, but by the real Material datablock and a node name: checks every compiled variant
+ * (plain/instancing/skinning). Used by the shader node editor to paint a node red on a compile
+ * error (node_draw.c). */
+bool GPU_material_node_error(struct Material *ma, const char *node_name, const char **r_message);
 /* The material moves its vertices on the GPU (user vertex/geometry code, vertex or geometry nodes). */
 bool GPU_material_moves_vertices(struct Material *ma);
 void GPU_material_enable_alpha(GPUMaterial *material);

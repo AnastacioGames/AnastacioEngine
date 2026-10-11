@@ -66,6 +66,38 @@ Categoria **Script**. O nó aponta para um Text com uma função `main`. Os par�
 `vec2`/`vec3` e `vec4`; parâmetro `out` vira saída. O nó roda no fragment ou no vertex conforme onde for ligado.
 Editar o Text atualiza os sockets e recompila. Um erro de compilação aponta a linha do Text.
 
+### Erro de compilação no nó (2026-10-11)
+
+Quando a compilação do material falha por causa de um GLSL Script, o nó aparece com o cabeçalho/corpo em
+vermelho no editor (mesmo visual de `NODE_MUTED`/incompatibilidade de engine), e o mouse sobre o nó mostra
+um tooltip com a mensagem crua do compilador. Mecanismo:
+
+- `codegen_print_scripts` (`gpu_codegen.c`) usa `#line 1 <id>` (em vez de `#line 1`) antes do código de
+  cada GLSL Script, onde `<id>` é `GPUScriptCode->id + 1`; isso é o "source string number" do GLSL, que a
+  maioria dos drivers imprime como prefixo do log de erro (`"<id>:<linha>"` ou `"<id>(<linha>)"`). Depois do
+  código do nó, volta pra `#line 1 0` (0 = sem nó, código gerado/material) para não confundir o próximo bloco.
+- `gpu_material_construct_end` (`gpu_material.c`), quando `GPU_generate_pass` falha, lê
+  `GPU_shader_get_last_error()` (log cru do último compile/link, capturado em `shader_print_errors` em
+  `gpu_shader.c`) e usa `gpu_shader_error_find_node` pra achar, pelo prefixo `<id>`, qual `GPUScriptCode`
+  (e portanto qual `bNode->name`) é o dono; guarda a mensagem e o nome do nó em `GPUMaterial->error_log`/
+  `error_node_name`.
+- `GPU_material_node_error(Material *ma, node_name, &mensagem)` (`GPU_material.h`) procura nas listas
+  `ma->gpumaterial`/`gpumaterialinstancing`/`gpumaterialskinning` (as mesmas do `GPU_material_script_uniform_set`)
+  um erro cujo nó seja esse — funciona porque essas listas vivem no `Material` real, não na cópia localizada
+  da `bNodeTree` usada durante a geração do passe (`bNode->name` sobrevive à localização, ver `ntreeLocalize`).
+- `node_draw.c` ganhou `node_shader_error_badge()`, no mesmo padrão de `node_engine_badge()`: se
+  `snode->id` for um `Material` (`GS(snode->id->name) == ID_MA`) e `GPU_material_node_error` achar esse nó,
+  o cabeçalho pinta `TH_REDALERT` (como `NODE_MUTED`) e ganha um selo com ícone de erro cujo tooltip é a
+  mensagem do compilador; aplicado em `node_draw_basis` (nó aberto) e `node_draw_hidden` (nó colapsado).
+- Custo: só roda quando o editor desenha um nó dentro de um material com erro (um `STREQ` por material
+  compilado do objeto); nenhuma checagem nova no loop de jogo/runtime.
+- Limite conhecido: a mensagem de erro depende do formato do driver reconhecer o segundo argumento do
+  `#line` (padrão GLSL desde 1.10; NVIDIA/Mesa/ANGLE testados de olho no código, não visualmente — ver nota
+  abaixo); se o driver não imprimir o `<id>` no formato esperado, o nó não é identificado e o erro só aparece
+  no console (comportamento anterior), sem regressão.
+- **Não validado visualmente**: este ambiente não tem display/GPU para abrir o editor e ver o nó vermelho
+  nem o tooltip; só a compilação do engine foi conferida.
+
 ```glsl
 void main(vec3 color, float amount, out vec3 result)
 {

@@ -179,6 +179,14 @@ typedef struct GPUScriptCode {
 	char *code;
 	char *wrapper;
 	bool use_time; /* the code reads TIME */
+	/* Position in material->scripts when added (gpu_material_add_script), used as the GLSL
+	 * "#line 1 <source_id>" source string number so a compile error log can be traced back to
+	 * this node (source_id is id + 1; 0 is reserved for the material's own Fragment/Vertex/Geometry
+	 * code, which has no owning bNode). See codegen_print_scripts and GPU_material_node_error. */
+	int id;
+	/* bNode->name of the GLSL Script node this code came from, for the editor to highlight it on a
+	 * compile error. Empty when the caller did not pass one. */
+	char orig_node_name[64];
 } GPUScriptCode;
 
 /* Optional vertex and geometry stages of a material pass. All zero keeps the classic shaders. */
@@ -218,7 +226,8 @@ void gpu_codegen_exit(void);
 
 const char *GPU_builtin_name(GPUBuiltin builtin);
 void gpu_material_add_node(struct GPUMaterial *material, struct GPUNode *node);
-const char *gpu_material_add_script(struct GPUMaterial *material, const char *code, const char *wrapper, bool use_time);
+const char *gpu_material_add_script(struct GPUMaterial *material, const char *code, const char *wrapper,
+                                    bool use_time, const char *orig_node_name);
 /* Value of a GLSL Script "u_" uniform, owned by the material and read on every bind. */
 float *gpu_material_add_script_uniform(struct GPUMaterial *material, const char *name, const float *value, int size);
 int GPU_link_changed(struct GPUNodeLink *link);
