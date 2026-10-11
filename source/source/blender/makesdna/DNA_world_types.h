@@ -175,6 +175,10 @@ typedef struct World {
 	short vcloud_flag;         /* WO_VCLOUDS_* bits */
 	float vcloud_shadow_strength;
 	int   vcloud_pad;          /* keeps the World struct 8-byte aligned for makesdna (see align errors on gpumaterial/prop otherwise) */
+	/* Qualidade de Clouds e Sky Layers; os botoes Low/Medium/High do painel so preenchem estes valores */
+	short cloud_detail;        /* oitavas do ruido das Clouds, 1-8 (0 = arquivo antigo -> 5) */
+	short sky_layer_detail;    /* oitavas do ruido das Sky Layers, 1-8 (0 = arquivo antigo -> 5) */
+	float sky_layer_relief;    /* forca do relevo das Sky Layers, 0 desliga (sentinela em sky_layer_detail) */
 
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
 	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */

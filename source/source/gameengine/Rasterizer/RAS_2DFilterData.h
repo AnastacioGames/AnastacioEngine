@@ -145,6 +145,9 @@ typedef struct BuildInFilters {
 	int cloud_mask; /* 1: Clouds, 2: Sky Layers, 4: Volumetric Clouds */
 	float sky_layer_coverage, sky_layer_scale, sky_layer_speed;
 	float sky_layer_color[3];
+	/* Quality of Clouds and Sky Layers: noise octaves (1-8) and Sky Layers relief (0 = off) */
+	int cloud_detail, sky_layer_detail;
+	float sky_layer_relief;
 	/* Volumetric Clouds (Stage 1 scaffolding: flat shading reusing the same FBM; real
 	 * raymarch comes in Stage 2) */
 	float vcloud_coverage, vcloud_scale, vcloud_speed;

@@ -75,6 +75,58 @@ class WORLD_OT_atmosphere_reset(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# Clouds - Procedural e Clouds - Sky Layers: os botões Low/Medium/High só preenchem os valores abaixo,
+# que continuam editáveis. Medium é o visual de antes da opção existir.
+CLOUD_QUALITY_PRESETS = {
+    'CLOUDS': {
+        'LOW': {"cloud_detail": 3},
+        'MEDIUM': {"cloud_detail": 5},
+        'HIGH': {"cloud_detail": 7},
+    },
+    'SKY_LAYERS': {
+        'LOW': {"sky_layer_detail": 3, "sky_layer_relief": 0.0},
+        'MEDIUM': {"sky_layer_detail": 5, "sky_layer_relief": 1.0},
+        'HIGH': {"sky_layer_detail": 7, "sky_layer_relief": 1.0},
+    },
+}
+CLOUD_QUALITY_LEVELS = (('LOW', "Low"), ('MEDIUM', "Medium"), ('HIGH', "High"))
+
+
+class WORLD_OT_cloud_quality_preset(Operator):
+    """Fill the cloud quality values with a preset (they stay editable)"""
+    bl_idname = "world.cloud_quality_preset"
+    bl_label = "Cloud Quality Preset"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    effect: EnumProperty(items=(('CLOUDS', "Clouds", ""), ('SKY_LAYERS', "Sky Layers", "")))
+    level: EnumProperty(items=[(key, name, "") for key, name in CLOUD_QUALITY_LEVELS])
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene is not None and context.scene.world is not None
+
+    def execute(self, context):
+        world = getattr(context, "world", None) or context.scene.world
+        weather = world.weather_settings
+        for name, value in CLOUD_QUALITY_PRESETS[self.effect][self.level].items():
+            setattr(weather, name, value)
+        return {'FINISHED'}
+
+
+def draw_cloud_quality(layout, weather, effect):
+    """Botões Low/Medium/High (o que bate com os valores atuais fica pressionado) e os valores."""
+    presets = CLOUD_QUALITY_PRESETS[effect]
+    row = layout.row(align=True)
+    row.label(text="Quality:")
+    for key, name in CLOUD_QUALITY_LEVELS:
+        matches = all(abs(getattr(weather, prop) - value) < 1e-4 for prop, value in presets[key].items())
+        op = row.operator("world.cloud_quality_preset", text=name, depress=matches)
+        op.effect = effect
+        op.level = key
+    for prop in presets['MEDIUM']:
+        layout.prop(weather, prop)
+
+
 def _world_nodes_active(context):
     world = context.world
     return context.scene.game_settings.use_shading_nodes and world.use_nodes and world.node_tree
@@ -353,7 +405,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.prop(weather, "use_rain_lightning_side")
 
         row = main_box.row(align=True)
-        row.prop(weather, "show_expanded_clouds", text="Clouds", emboss=True)
+        row.prop(weather, "show_expanded_clouds", text="Clouds - Procedural", emboss=True)
         row.prop(weather, "show_viewport_clouds", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_clouds", text="")
 
@@ -364,9 +416,10 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "cloud_scale")
             col.prop(weather, "cloud_speed")
             col.prop(weather, "cloud_color", text="Cloud Color")
+            draw_cloud_quality(col.column(align=True), weather, 'CLOUDS')
 
         row = main_box.row(align=True)
-        row.prop(weather, "show_expanded_vclouds", text="Volumetric Clouds", emboss=True)
+        row.prop(weather, "show_expanded_vclouds", text="Clouds - Volumetric", emboss=True)
         row.prop(weather, "show_viewport_vclouds", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_volumetric_clouds", text="")
 
@@ -397,7 +450,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                 info.label(text="High quality is costly on integrated GPUs", icon='INFO')
 
         row = main_box.row(align=True)
-        row.prop(weather, "show_expanded_sky_layers", text="Sky Layers", emboss=True)
+        row.prop(weather, "show_expanded_sky_layers", text="Clouds - Sky Layers", emboss=True)
         row.prop(weather, "show_viewport_sky_layers", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_sky_layers", text="")
 
@@ -408,6 +461,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "sky_layer_scale")
             col.prop(weather, "sky_layer_speed")
             col.prop(weather, "sky_layer_color", text="Cloud Color")
+            draw_cloud_quality(col.column(align=True), weather, 'SKY_LAYERS')
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)

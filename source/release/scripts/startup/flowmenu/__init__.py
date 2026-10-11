@@ -57,6 +57,7 @@ from .custom_pt_physics import (
 from .custom_pt_world import (
     CUSTOM_PT_game_context_world,
     WORLD_OT_atmosphere_reset,
+    WORLD_OT_cloud_quality_preset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_weather,
@@ -112,6 +113,7 @@ classes = [
     # --- NOSSAS NOVAS CLASSES DO WORLD ---
     CUSTOM_PT_game_context_world,
     WORLD_OT_atmosphere_reset,
+    WORLD_OT_cloud_quality_preset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
     CUSTOM_PT_game_weather,

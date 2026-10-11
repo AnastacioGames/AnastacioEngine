@@ -813,6 +813,9 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				for (int i = 0; i < 3; ++i) {
 					cloudParams->sky_layer_color[i] = world->sky_layer_color[i];
 				}
+				cloudParams->cloud_detail = world->cloud_detail;
+				cloudParams->sky_layer_detail = world->sky_layer_detail;
+				cloudParams->sky_layer_relief = world->sky_layer_relief;
 				for (int i = 0; i < 3; ++i) {
 					cloudParams->cloud_color[i] = world->cloud_color[i];
 				}

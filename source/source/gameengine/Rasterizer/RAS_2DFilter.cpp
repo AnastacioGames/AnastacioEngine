@@ -142,6 +142,7 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_CloudsMask", // GE_CLOUDS_MASK_UNIFORM
 	"ge_SkyLayersParams", // GE_SKYLAYERS_PARAMS_UNIFORM
 	"ge_SkyLayersColor", // GE_SKYLAYERS_COLOR_UNIFORM
+	"ge_CloudsQuality", // GE_CLOUDS_QUALITY_UNIFORM
 	"ge_VCloudsParams1", // GE_VCLOUDS_PARAMS1_UNIFORM
 	"ge_VCloudsParams2", // GE_VCLOUDS_PARAMS2_UNIFORM
 	"ge_VCloudsParams3", // GE_VCLOUDS_PARAMS3_UNIFORM
@@ -790,6 +791,11 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.sky_layer_color, sizeof(float) * 3, 1);
+	}
+	if (m_predefinedUniforms[GE_CLOUDS_QUALITY_UNIFORM] != -1) {
+		float quality[3] = {(float)m_buildInFilters.cloud_detail, (float)m_buildInFilters.sky_layer_detail,
+							m_buildInFilters.sky_layer_relief};
+		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_QUALITY_UNIFORM], RAS_Uniform::UNI_FLOAT3, quality, sizeof(float) * 3, 1);
 	}
 
 	if (m_predefinedUniforms[GE_VCLOUDS_PARAMS1_UNIFORM] != -1) {

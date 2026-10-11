@@ -6,6 +6,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Qualidade de Clouds e Sky Layers (Low/Medium/High) e rótulos "Clouds - tipo"
+
+- Painel World > Weather: os três tipos de nuvem passam a se chamar "Clouds - Procedural", "Clouds -
+  Volumetric" e "Clouds - Sky Layers" (traduzidos em pt/es/ru em `translations_labels.py`).
+- Novos campos no DNA do World (depois de `vcloud_pad`): `cloud_detail` e `sky_layer_detail` (oitavas do
+  ruído, 1-8) e `sky_layer_relief` (0 desliga o relevo e pula uma passada de ruído). `cloud_detail == 0` /
+  `sky_layer_detail == 0` é a sentinela de arquivo antigo em `direct_link_world` → Medium (5 oitavas,
+  relevo 1), que é exatamente o visual de antes. As FBMs com Detail são normalizadas para a faixa de 5
+  oitavas, então a cobertura não muda com o Detail.
+- Botões Low/Medium/High (`world.cloud_quality_preset`, em `custom_pt_world.py`) só preenchem esses
+  valores, que continuam editáveis; o botão que bate com os valores atuais fica pressionado. Clouds:
+  Detail 3/5/7. Sky Layers: Detail 3/5/7, Relief 0/1/1.
+- Chegam ao shader pelo uniform `clouds_quality` (3D View, `gpu_compositing.c`) e `ge_CloudsQuality`
+  (jogo, `RAS_2DFilter` / `KX_Scene` / `KX_RenderPipeline`). A FBM da Volumetric continua com 5 oitavas.
+
 ## 2026-10-11 - Volumetric Clouds acendia o Céu em Camadas junto
 
 - Os três tipos de nuvem (Clouds, Sky Layers, Volumetric Clouds) são opções separadas e compartilham uma

@@ -604,6 +604,19 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Color", "Color tint of the cloud layers");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "sky_layer_detail", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 1, 8);
+	RNA_def_property_ui_text(prop, "Detail",
+	                         "Noise octaves of the cloud layers: more octaves give finer edges and cost more on the GPU");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "sky_layer_relief", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 3.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Relief",
+	                         "Strength of the light and shadow on the cloud layers; 0 turns it off and skips one noise pass");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	/* volumetric clouds (Stage 1 scaffolding: shading achatado, mesmo FBM; raymarch real na Stage 2) */
 	{
 		static const EnumPropertyItem vcloud_quality_items[] = {
@@ -1016,6 +1029,12 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "cloud_color");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Cloud Color", "Color tint of the clouds");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "cloud_detail", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 1, 8);
+	RNA_def_property_ui_text(prop, "Detail",
+	                         "Noise octaves of the clouds: more octaves give finer edges and cost more on the GPU");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	/* earthquake */

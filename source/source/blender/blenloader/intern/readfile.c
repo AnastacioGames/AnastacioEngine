@@ -3787,6 +3787,16 @@ static void direct_link_world(FileData *fd, World *wrld)
 		wrld->vcloud_quality = 1;
 		wrld->vcloud_shadow_strength = 0.5f;
 	}
+
+	/* Quality of Clouds and Sky Layers: detail is never 0 (range 1-8), so 0 means the file
+	 * predates it. Medium (5 octaves, relief 1) is exactly the look those files had. */
+	if (wrld->cloud_detail == 0) {
+		wrld->cloud_detail = 5;
+	}
+	if (wrld->sky_layer_detail == 0) {
+		wrld->sky_layer_detail = 5;
+		wrld->sky_layer_relief = 1.0f;
+	}
 }
 
 

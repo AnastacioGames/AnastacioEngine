@@ -424,6 +424,9 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			for (int i = 0; i < 3; ++i) {
 				filters.sky_layer_color[i] = world->sky_layer_color[i];
 			}
+			filters.cloud_detail = world->cloud_detail;
+			filters.sky_layer_detail = world->sky_layer_detail;
+			filters.sky_layer_relief = world->sky_layer_relief;
 			filters.vcloud_coverage = world->vcloud_coverage;
 			filters.vcloud_scale = world->vcloud_scale;
 			filters.vcloud_speed = world->vcloud_speed;

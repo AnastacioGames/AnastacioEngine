@@ -16,9 +16,10 @@ uniform mat4 unfinvprojmat;
 
 uniform vec4 ge_CloudsParams; // coverage, scale, speed, time
 uniform vec3 ge_CloudsColor;
-uniform float ge_CloudsMask; // 1: Clouds, 2: Sky Layers (both can be on)
+uniform float ge_CloudsMask; // bits: 1 Clouds, 2 Sky Layers, 4 Volumetric Clouds (any combination)
 uniform vec4 ge_SkyLayersParams; // coverage, scale, speed, time
 uniform vec3 ge_SkyLayersColor;
+uniform vec3 ge_CloudsQuality; // Clouds octaves, Sky Layers octaves, Sky Layers relief
 
 /* Volumetric Clouds (Stage 2 real raymarch). params1 = coverage, scale, speed, time;
  * params2 = altitude, thickness, density, detail_scale; params3 = silver_intensity,
@@ -73,6 +74,23 @@ float cloudFbm(vec3 p)
 		amp *= 0.5;
 	}
 	return sum;
+}
+
+/* cloudFbm with a chosen octave count (Detail, 1-8). Normalized to the 5-octave range so the
+ * coverage reads the same at any Detail; 5 octaves gives exactly cloudFbm. */
+float cloudFbmDetail(vec3 p, float octaves)
+{
+	float sum = 0.0;
+	float amp = 0.5;
+	for (int i = 0; i < 8; i++) {
+		if (float(i) >= octaves) {
+			break;
+		}
+		sum += cloudNoise(p) * amp;
+		p *= 2.0;
+		amp *= 0.5;
+	}
+	return sum * 0.96875 / (1.0 - 2.0 * amp);
 }
 
 /* World-space view ray direction for this pixel, same trick used by the atmospheric
@@ -336,30 +354,38 @@ float skyNoise2(vec2 p)
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-float skyFbm2(vec2 p)
+/* Octaves = Detail (1-8), normalized to the 5-octave range; 5 gives the original look. */
+float skyFbm2(vec2 p, float octaves)
 {
 	float sum = 0.0;
 	float amp = 0.5;
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 8; i++) {
+		if (float(i) >= octaves) {
+			break;
+		}
 		sum += skyNoise2(p) * amp;
 		p = p * 2.03 + vec2(1.7, 9.2);
 		amp *= 0.5;
 	}
-	return sum;
+	return sum * 0.96875 / (1.0 - 2.0 * amp);
 }
 
-vec2 layeredClouds(vec3 viewDir, float coverage, float scale, float speed, float time)
+/* relief 0 skips the offset sample (one noise pass less) and leaves the layers flat. */
+vec2 layeredClouds(vec3 viewDir, float coverage, float scale, float speed, float time, float octaves, float relief)
 {
 	float up = max(viewDir.z, 0.02);
 	vec2 base = viewDir.xy / up * scale * 0.5;
 	float t = time * speed;
 	vec2 pA = base + vec2(t * 0.5);
 	vec2 pB = (base + vec2(t)) * 0.5;
-	float a = skyFbm2(pA);
-	float b = skyFbm2(pB);
+	float a = skyFbm2(pA, octaves);
+	float b = skyFbm2(pB, octaves);
 	float alpha = clamp((a - b) * coverage * 20.0 * up, 0.0, 1.0);
-	float lit = skyFbm2(pA + vec2(0.06, 0.04));
-	float shade = clamp(0.8 + (a - lit) * 6.0, 0.45, 1.2);
+	float shade = 0.8;
+	if (relief > 0.001) {
+		float lit = skyFbm2(pA + vec2(0.06, 0.04), octaves);
+		shade = clamp(0.8 + (a - lit) * 6.0 * relief, 0.45, 1.2);
+	}
 	return vec2(alpha, shade);
 }
 
@@ -399,13 +425,14 @@ void main()
 	if (mod(ge_CloudsMask, 2.0) > 0.5 && coverage > 0.001) {
 		float scale = max(0.0001, ge_CloudsParams.y);
 		vec3 p = viewDir * scale * 4.0 + vec3(ge_CloudsParams.w * ge_CloudsParams.z, 0.0, 0.0);
-		float density = cloudFbm(p);
+		float density = cloudFbmDetail(p, ge_CloudsQuality.x);
 		float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density) * horizonFade;
 		color = mix(color, ge_CloudsColor, mask);
 	}
 
 	if (mod(floor(ge_CloudsMask / 2.0), 2.0) > 0.5 && ge_SkyLayersParams.x > 0.001) {
-		vec2 layered = layeredClouds(viewDir, ge_SkyLayersParams.x, max(0.0001, ge_SkyLayersParams.y), ge_SkyLayersParams.z, ge_SkyLayersParams.w);
+		vec2 layered = layeredClouds(viewDir, ge_SkyLayersParams.x, max(0.0001, ge_SkyLayersParams.y), ge_SkyLayersParams.z, ge_SkyLayersParams.w,
+		                               ge_CloudsQuality.y, ge_CloudsQuality.z);
 		color = mix(color, ge_SkyLayersColor * layered.y, layered.x * horizonFade);
 	}
 
