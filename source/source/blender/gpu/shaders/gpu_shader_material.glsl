@@ -6923,10 +6923,18 @@ void node_shell_layer_info(float layer, out float fac, out float outline)
 }
 
 /* Strand mask for the shells: one strand per cell of the UV grid, thinner towards the tip. */
-void node_fur_shells(float length, float layers, float density, vec3 uv, float layer, out float fac, out float alpha)
+void node_fur_shells(float length, float layers, float density, vec3 uv, float layer, vec3 orco, out float fac, out float alpha)
 {
 	fac = max(layer, 0.0);
-	vec2 grid = uv.xy * max(density, 1.0);
+	vec2 coord = uv.xy;
+	if (fwidth(coord.x) + fwidth(coord.y) == 0.0) {
+		/* No UV map (the attribute is constant): project the generated coordinates along the
+		 * main axis of the face. Every shell has the same coordinates, so the strands line up. */
+		vec3 n = abs(cross(dFdx(orco), dFdy(orco)));
+		coord = (n.z >= n.x && n.z >= n.y) ? orco.xy : ((n.x >= n.y) ? orco.yz : orco.xz);
+		coord *= 0.5;
+	}
+	vec2 grid = coord * max(density, 1.0);
 	vec2 cell = floor(grid);
 	float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
 	vec2 local = fract(grid) - 0.5;

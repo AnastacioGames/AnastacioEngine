@@ -554,6 +554,37 @@ class NODE_OT_shader_preset_add(Operator):
         return (space is not None and space.type == 'NODE_EDITOR' and
                 space.tree_type == 'ShaderNodeTree' and space.edit_tree is not None)
 
+    @staticmethod
+    def link_alpha(tree, node):
+        """Wire the preset: Color to the shader on the output and Alpha as a cut-out
+        (Mix Shader between a Transparent BSDF and that shader)."""
+        for output in tree.nodes:
+            if output.type != 'OUTPUT_MATERIAL' or "Surface" not in output.inputs:
+                continue
+            surface = output.inputs["Surface"]
+            if not surface.is_linked:
+                return
+            shader_socket = surface.links[0].from_socket
+            shader = shader_socket.node
+            if shader.type == 'MIX_SHADER':
+                # already has a cut-out (or another mix): leave the tree as the user built it
+                return
+            for name in ("Base Color", "Color"):
+                if name in shader.inputs:
+                    if not shader.inputs[name].is_linked:
+                        tree.links.new(node.outputs["Color"], shader.inputs[name])
+                    break
+            transparent = tree.nodes.new("ShaderNodeBsdfTransparent")
+            mix = tree.nodes.new("ShaderNodeMixShader")
+            mix.location = (output.location.x, output.location.y + 160.0)
+            transparent.location = (mix.location.x - 200.0, mix.location.y + 120.0)
+            output.location.x += 220.0
+            tree.links.new(node.outputs["Alpha"], mix.inputs[0])
+            tree.links.new(transparent.outputs[0], mix.inputs[1])
+            tree.links.new(shader_socket, mix.inputs[2])
+            tree.links.new(mix.outputs[0], surface)
+            return
+
     def execute(self, context):
         space = context.space_data
         tree = space.edit_tree
@@ -581,6 +612,7 @@ class NODE_OT_shader_preset_add(Operator):
         if "Alpha" in node.outputs and isinstance(mat, bpy.types.Material):
             if mat.game_settings.alpha_blend == 'OPAQUE':
                 mat.game_settings.alpha_blend = 'CLIP'
+            self.link_alpha(tree, node)
         return {'FINISHED'}
 
 

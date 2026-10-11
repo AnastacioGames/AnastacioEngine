@@ -204,7 +204,8 @@ static int node_shader_gpu_fur_shells(GPUMaterial *mat, bNode *UNUSED(node), bNo
 		in[3].link = GPU_attribute(CD_MTFACE, "");
 	}
 	GPU_link(mat, "node_shell_layer", &layer);
-	return GPU_stack_link(mat, "node_fur_shells", in, out, layer);
+	/* Generated coordinates place the strands when the mesh has no UV map. */
+	return GPU_stack_link(mat, "node_fur_shells", in, out, layer, GPU_attribute(CD_ORCO, ""));
 }
 
 void register_node_type_sh_fur_shells(void)

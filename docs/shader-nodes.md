@@ -61,6 +61,13 @@ Add > Presets cria grupos de nós editáveis (`node.shader_preset_add`): Fur, Gr
 Dissolve e Water Waves. Water Waves liga o Offset ao Vertex Offset sozinho. Os presets com Alpha põem o material
 em Alpha Clip.
 
+Presets com Alpha (Fur, Grass, Dissolve) também se ligam sozinhos: Color vai para a cor do shader que está na
+saída e o Alpha entra como recorte (Mix Shader entre um Transparent BSDF e esse shader). Se a saída já tem um
+Mix Shader, nada é religado.
+
+O Fur Shells espalha os fios pelo mapa UV. Em malha sem UV ele usa as coordenadas geradas (Generated),
+projetadas pelo eixo principal de cada face.
+
 ## Sombras e cache
 
 - Material que move vértices (Vertex Offset, Fur Shells, Outline ou código do usuário) faz sombra com o próprio
