@@ -6,7 +6,9 @@ uniform sampler2D depthbuffer; // depth buffer
 
 uniform vec4 clouds_params; // coverage, scale, speed, time
 uniform vec3 clouds_color;
-uniform float clouds_style; // World.cloud_style: 0 Procedural, 1 Layered Sky
+uniform float clouds_mask; // 1: Clouds, 2: Sky Layers (both can be on)
+uniform vec4 sky_layers_params; // coverage, scale, speed, time
+uniform vec3 sky_layers_color;
 
 float cloudHash(vec3 p)
 {
@@ -60,7 +62,7 @@ vec3 skyViewDirection(vec2 uv)
 	return normalize((gl_ModelViewMatrixInverse * vec4(viewSpace.xyz, 0.0)).xyz);
 }
 
-/* Layered Sky style (adapted from a node sky material): the view ray hits a flat sky plane, two value-noise
+/* Sky Layers (adapted from a node sky material): the view ray hits a flat sky plane, two value-noise
  * layers drift over it at different scale and speed and their difference is the cloud; a small offset sample
  * toward a fixed light direction gives the relief. Returns (alpha, shade). */
 float skyHash2(vec2 p)
@@ -112,41 +114,33 @@ void main()
 	vec2 texcoord = uvcoord.xy;
 	vec4 direct = texture(colorbuffer, texcoord);
 
-	float coverage = clouds_params.x;
-	float scale = max(0.0001, clouds_params.y);
-	float speed = clouds_params.z;
-	float time = clouds_params.w;
-
-	if (coverage <= 0.001) {
-		gl_FragColor = direct;
-		return;
-	}
-
 	float depth = texture(depthbuffer, texcoord).x;
-	float isSky = step(0.9999, depth);
-
-	if (isSky < 0.5) {
+	if (depth < 0.9999) {
+		/* Only background/sky pixels (far-plane depth), never over near geometry. */
 		gl_FragColor = direct;
 		return;
 	}
 
+	/* World is Z-up (Blender/UPBGE convention) -- viewDir.z is elevation. */
 	vec3 viewDir = skyViewDirection(texcoord);
+	/* Clouds only belong above the horizon -- fade them out toward and below it instead of a hard cut, since the
+	 * depth test above can't tell an infinite ground plane's background fill from real sky. */
+	float horizonFade = smoothstep(-0.02, 0.18, viewDir.z);
+	vec3 color = direct.rgb;
 
-	if (clouds_style > 0.5) {
-		vec2 layered = layeredClouds(viewDir, coverage, scale, speed, time);
-		float alpha = layered.x * smoothstep(-0.02, 0.18, viewDir.z);
-		gl_FragColor = vec4(mix(direct.rgb, clouds_color * layered.y, alpha), direct.a);
-		return;
+	float coverage = clouds_params.x;
+	if (mod(clouds_mask, 2.0) > 0.5 && coverage > 0.001) {
+		float scale = max(0.0001, clouds_params.y);
+		vec3 p = viewDir * scale * 4.0 + vec3(clouds_params.w * clouds_params.z, 0.0, 0.0);
+		float density = cloudFbm(p);
+		float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density) * horizonFade;
+		color = mix(color, clouds_color, mask);
 	}
 
-	vec3 p = viewDir * scale * 4.0 + vec3(time * speed, 0.0, 0.0);
-	float density = cloudFbm(p);
-	float mask = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density);
+	if (clouds_mask > 1.5 && sky_layers_params.x > 0.001) {
+		vec2 layered = layeredClouds(viewDir, sky_layers_params.x, max(0.0001, sky_layers_params.y), sky_layers_params.z, sky_layers_params.w);
+		color = mix(color, sky_layers_color * layered.y, layered.x * horizonFade);
+	}
 
-	float horizonFade = smoothstep(-0.02, 0.18, viewDir.z);
-	mask *= horizonFade;
-
-	vec3 finalColor = mix(direct.rgb, clouds_color, mask);
-
-	gl_FragColor = vec4(finalColor, direct.a);
+	gl_FragColor = vec4(color, direct.a);
 }

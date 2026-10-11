@@ -317,7 +317,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_sky_zenith[2] = world->zenb;
 		}
 
-		if (world->weather_flag & WO_WEATHER_CLOUDS) {
+		/* Clouds and Sky Layers share one filter pass (RAS_Clouds2DFilter.glsl). */
+		if (world->weather_flag & WO_WEATHER_CLOUDS || world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) {
 			filters.useClouds = true;
 			filters.cloud_coverage = world->cloud_coverage;
 			filters.cloud_scale = world->cloud_scale;
@@ -325,7 +326,14 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.cloud_color[0] = world->cloud_color[0];
 			filters.cloud_color[1] = world->cloud_color[1];
 			filters.cloud_color[2] = world->cloud_color[2];
-			filters.cloud_style = world->cloud_style;
+			filters.cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
+			                     ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0);
+			filters.sky_layer_coverage = world->sky_layer_coverage;
+			filters.sky_layer_scale = world->sky_layer_scale;
+			filters.sky_layer_speed = world->sky_layer_speed;
+			for (int i = 0; i < 3; ++i) {
+				filters.sky_layer_color[i] = world->sky_layer_color[i];
+			}
 		}
 
 		if (world->weather_flag & WO_WEATHER_LENSFLARE) {

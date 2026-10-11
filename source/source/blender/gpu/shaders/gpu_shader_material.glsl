@@ -236,6 +236,12 @@ void color_to_blender_normal_new_shading(vec3 color, out vec3 normal)
 #define M_PI 3.14159265358979323846
 #define M_1_PI 0.31830988618379069
 
+/* Piso minimo de roughness no specular: roughness 0 = espelho perfeito, cujo
+ * highlight de uma luz pontual/sol colapsa num pico sub-pixel (um ponto branco).
+ * Limitamos a nitidez a esse piso para o highlight ficar sempre visivel, como o
+ * "mais brilhante" classico do BGE. So afeta o specular, nunca o difuso. */
+#define RANGE_SPEC_MIN_ROUGHNESS 0.15
+
 /*********** SHADER NODES ***************/
 
 void vcol_attribute(vec4 attvcol, out vec4 vcol)
@@ -2796,6 +2802,7 @@ void lamp_area_spec(vec3 lampright, vec3 lampup, vec3 lampvec, vec3 lamppos, vec
 
 void shade_area_spec(vec2 dirspec, float anglespec, float distspec, vec2 size, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard = hard * hard * 0.25;
 
@@ -2823,6 +2830,7 @@ void area_diff_texture(sampler2D tex, float lodbias, vec2 diagonal, float dist, 
 
 void area_spec_texture(float energy, vec2 specdir, float specdist, sampler2D tex, float lodbias, vec2 size, float rough, out vec4 result)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard * 0.25;
 
@@ -2978,6 +2986,7 @@ void shade_add_to_diffuse(float i, vec3 lampcol, vec3 col, out vec3 outcol)
 void shade_hemi_spec(vec3 upcol, vec3 downcol, vec3 vn, vec3 lv, vec3 vp,
 					 float rough, float visifac, float energy, out vec4 outcol, out float t)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard;
 
@@ -3012,6 +3021,7 @@ vec3 linePlaneIntersect(in vec3 lp, in vec3 lv, in vec3 pc, in vec3 pn)
 
 void shade_phong_spec(float nl, vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard *= hard;
 
@@ -3024,6 +3034,7 @@ void shade_cooktorr_spec(vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 {
 	/* rough == 0 (comum) dava 1/0 = inf e depois 0 * inf = NaN; o desktop absorve o NaN no max(),
 	 * mas ANGLE/WebGL propaga e o pixel fica preto. Mesmo piso de shade_phong_spec. */
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = 1.0 / max(rough * rough, 0.001);
 	hard = hard * hard;
 
@@ -3039,6 +3050,7 @@ void shade_cooktorr_spec(vec3 n, vec3 l, vec3 v, float rough, out float specfac)
 
 void shade_blinn_spec(vec3 n, vec3 l, vec3 v, float spec, float rough, out float specfac)
 {
+	rough = max(rough, RANGE_SPEC_MIN_ROUGHNESS);
 	float hard = (1.008-rough) * 512.0;
 	float refrac = mix(4.0, 10.0, spec);
 	hard = (hard < 100.0)? sqrt(1.0 / hard): 10.0 / hard;
@@ -4509,7 +4521,7 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
 
 	vec3 V = scene_view_vector(I);
 	float NdotV = max(dot(N, V), 1e-4);
-	float a = max(sqr(roughness), 0.001);
+	float a = max(sqr(roughness), sqr(RANGE_SPEC_MIN_ROUGHNESS));
 	float roughg = sqr(roughness * 0.5 + 0.5);
 
 	for (int i = 0; i < NUM_LIGHTS; i++) {
@@ -4550,7 +4562,7 @@ void node_bsdf_anisotropic(
 		X = Xr;
 	}
 
-	float a = max(sqr(roughness), 0.001);
+	float a = max(sqr(roughness), sqr(RANGE_SPEC_MIN_ROUGHNESS));
 	float an = clamp(anisotropy, -0.99, 0.99);
 	float ax, ay;
 	if (an < 0.0) {
@@ -4863,7 +4875,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 
 			// specular
 			float aspect = sqrt(1.0 - anisotropic * 0.9);
-			float a = sqr(roughness);
+			float a = sqr(max(roughness, RANGE_SPEC_MIN_ROUGHNESS));
 			float ax = max(0.001, a / aspect);
 			float ay = max(0.001, a * aspect);
 			float Ds = GTR2_aniso(NdotH, dot(H, X), dot(H, Y), ax, ay); //GTR2(NdotH, a);

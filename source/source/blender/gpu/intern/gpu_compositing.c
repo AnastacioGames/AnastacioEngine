@@ -128,7 +128,9 @@ typedef struct {
   int depth_uniform;
   int clouds_params_uniform;
   int clouds_color_uniform;
-  int clouds_style_uniform;
+  int clouds_mask_uniform;
+  int sky_layers_params_uniform;
+  int sky_layers_color_uniform;
 } GPUCLOUDSShaderInterface;
 
 typedef struct {
@@ -505,7 +507,9 @@ bool GPU_fx_compositor_initialize_passes(
 		scenefx_flag &= ~SCENE_FX_FLAG_RAIN;
 	}
 
-	if (scene->world && (scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_CLOUDS)) {
+	if (scene->world && ((scene->world->weather_flag & ~scene->world->weather_editor_hide & WO_WEATHER_CLOUDS) ||
+	                     (scene->world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
+	                         WO_SKY_LAYERS_ENABLE)) {
 		scenefx_flag |= SCENE_FX_FLAG_CLOUDS;
 	}
 	else {
@@ -1495,8 +1499,16 @@ bool GPU_fx_do_composite_pass(
 
 			GPU_shader_uniform_vector(clouds_shader, interface->clouds_params_uniform, 4, 1, clouds_params);
 			GPU_shader_uniform_vector(clouds_shader, interface->clouds_color_uniform, 3, 1, world->cloud_color);
-			const float clouds_style = (float)world->cloud_style;
-			GPU_shader_uniform_vector(clouds_shader, interface->clouds_style_uniform, 1, 1, &clouds_style);
+			/* 1: Clouds, 2: Sky Layers (each only when not hidden in the viewport) */
+			const float clouds_mask =
+			        (float)(((world->weather_flag & ~world->weather_editor_hide & WO_WEATHER_CLOUDS) ? 1 : 0) +
+			                (((world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
+			                  WO_SKY_LAYERS_ENABLE) ? 2 : 0));
+			const float sky_layers_params[4] = {
+			    world->sky_layer_coverage, world->sky_layer_scale, world->sky_layer_speed, clouds_params[3]};
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_mask_uniform, 1, 1, &clouds_mask);
+			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_params_uniform, 4, 1, sky_layers_params);
+			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_color_uniform, 3, 1, world->sky_layer_color);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2262,7 +2274,9 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
 			interface->clouds_params_uniform = GPU_shader_get_uniform(shader, "clouds_params");
 			interface->clouds_color_uniform = GPU_shader_get_uniform(shader, "clouds_color");
-			interface->clouds_style_uniform = GPU_shader_get_uniform(shader, "clouds_style");
+			interface->clouds_mask_uniform = GPU_shader_get_uniform(shader, "clouds_mask");
+			interface->sky_layers_params_uniform = GPU_shader_get_uniform(shader, "sky_layers_params");
+			interface->sky_layers_color_uniform = GPU_shader_get_uniform(shader, "sky_layers_color");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

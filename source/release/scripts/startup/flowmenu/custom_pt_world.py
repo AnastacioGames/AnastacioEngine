@@ -360,11 +360,23 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         if weather.show_expanded_clouds:
             col = main_box.column(align=True)
             col.active = weather.use_clouds
-            col.prop(weather, "cloud_style")
             col.prop(weather, "cloud_coverage", slider=True)
             col.prop(weather, "cloud_scale")
             col.prop(weather, "cloud_speed")
             col.prop(weather, "cloud_color", text="Cloud Color")
+
+        row = main_box.row(align=True)
+        row.prop(weather, "show_expanded_sky_layers", text="Sky Layers", emboss=True)
+        row.prop(weather, "show_viewport_sky_layers", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
+        not_live_layout(row).prop(weather, "use_sky_layers", text="")
+
+        if weather.show_expanded_sky_layers:
+            col = main_box.column(align=True)
+            col.active = weather.use_sky_layers
+            col.prop(weather, "sky_layer_coverage", slider=True)
+            col.prop(weather, "sky_layer_scale")
+            col.prop(weather, "sky_layer_speed")
+            col.prop(weather, "sky_layer_color", text="Cloud Color")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)

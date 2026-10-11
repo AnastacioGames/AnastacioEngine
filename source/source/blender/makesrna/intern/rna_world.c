@@ -563,6 +563,47 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Render Clouds", "Render Clouds in Viewport");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	/* sky layers */
+	prop = RNA_def_property(srna, "use_sky_layers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "sky_layer_flag", WO_SKY_LAYERS_ENABLE);
+	RNA_def_property_ui_text(prop, "Use Sky Layers",
+	                         "Two drifting cloud layers projected on a sky plane, shaded with relief; works together with Clouds");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_expanded_sky_layers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "sky_layer_flag", WO_SKY_LAYERS_EXPANDED);
+	RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_viewport_sky_layers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "sky_layer_flag", WO_SKY_LAYERS_EDITOR_HIDE);
+	RNA_def_property_ui_text(prop, "Render Sky Layers", "Render Sky Layers in Viewport");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "sky_layer_coverage", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_text(prop, "Coverage", "Amount of sky covered by the cloud layers");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "sky_layer_scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0001, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.01, 10.0, 1, 3);
+	RNA_def_property_ui_text(prop, "Scale", "Scale of the cloud layers on the sky plane");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "sky_layer_speed", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
+	RNA_def_property_ui_range(prop, -1.0, 1.0, 1, 3);
+	RNA_def_property_ui_text(prop, "Speed", "Speed at which the cloud layers drift");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "sky_layer_color", PROP_FLOAT, PROP_COLOR);
+	RNA_def_property_float_sdna(prop, NULL, "sky_layer_color");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Color", "Color tint of the cloud layers");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "show_viewport_lensflare", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_LENSFLARE);
 	RNA_def_property_ui_text(prop, "Render Lens Flare", "Render Lens Flare in Viewport");
@@ -859,20 +900,6 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
 	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
 	RNA_def_property_update(prop, 0, NULL);
-
-	{
-		static const EnumPropertyItem cloud_style_items[] = {
-			{WO_CLOUD_STYLE_PROCEDURAL, "PROCEDURAL", 0, "Procedural", "3D noise clouds over the whole sky"},
-			{WO_CLOUD_STYLE_LAYERED, "LAYERED", 0, "Layered Sky",
-			 "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"},
-			{0, NULL, 0, NULL, NULL}
-		};
-		prop = RNA_def_property(srna, "cloud_style", PROP_ENUM, PROP_NONE);
-		RNA_def_property_enum_sdna(prop, NULL, "cloud_style");
-		RNA_def_property_enum_items(prop, cloud_style_items);
-		RNA_def_property_ui_text(prop, "Style", "How the clouds are drawn");
-		RNA_def_property_update(prop, 0, "rna_World_draw_update");
-	}
 
 	prop = RNA_def_property(srna, "cloud_coverage", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0, 1.0);

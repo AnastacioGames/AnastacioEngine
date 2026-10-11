@@ -88248,19 +88248,30 @@ msgstr "В процессе"
 msgid "Starting"
 msgstr "Недавно начатые"
 
-# Anastacio Engine: World > Weather > Clouds > Style
-msgid "Procedural"
-msgstr "Процедурные"
-
-msgid "Layered Sky"
+# Anastacio Engine: World > Weather > Sky Layers
+msgid "Sky Layers"
 msgstr "Слоистое небо"
 
-msgid "How the clouds are drawn"
-msgstr "Способ отрисовки облаков"
+msgid "Use Sky Layers"
+msgstr "Использовать слоистое небо"
 
-msgid "3D noise clouds over the whole sky"
-msgstr "Облака из 3D-шума по всему небу"
+msgid "Two drifting cloud layers projected on a sky plane, shaded with relief; works together with Clouds"
+msgstr "Два движущихся слоя облаков на плоскости неба, с рельефом; работает вместе с облаками"
 
-msgid "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"
-msgstr "Два движущихся слоя облаков, спроецированных на плоскость неба, с рельефом (легче для GPU)"
+msgid "Render Sky Layers"
+msgstr "Показывать слоистое небо"
 
+msgid "Render Sky Layers in Viewport"
+msgstr "Показывать слоистое небо во вьюпорте"
+
+msgid "Amount of sky covered by the cloud layers"
+msgstr "Какую часть неба покрывают слои облаков"
+
+msgid "Scale of the cloud layers on the sky plane"
+msgstr "Масштаб слоёв облаков на плоскости неба"
+
+msgid "Speed at which the cloud layers drift"
+msgstr "Скорость движения слоёв облаков"
+
+msgid "Color tint of the cloud layers"
+msgstr "Оттенок слоёв облаков"

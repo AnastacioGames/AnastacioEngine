@@ -3754,6 +3754,14 @@ static void direct_link_world(FileData *fd, World *wrld)
 	 * reads as "coverage 0" and silently skips drawing anything. cloud_scale
 	 * can never legitimately be 0 (its RNA range starts at 0.0001), so it is
 	 * a safe sentinel for "this World predates the feature". */
+	/* Same sentinel for Sky Layers (scale is never 0). */
+	if (wrld->sky_layer_scale == 0.0f) {
+		wrld->sky_layer_coverage = 0.5f;
+		wrld->sky_layer_scale = 1.0f;
+		wrld->sky_layer_speed = 0.05f;
+		copy_v3_fl(wrld->sky_layer_color, 1.0f);
+	}
+
 	if (wrld->cloud_scale == 0.0f) {
 		wrld->cloud_coverage = 0.5f;
 		wrld->cloud_scale = 1.0f;
@@ -8647,6 +8655,15 @@ static BHead *read_global(BlendFileData *bfd, FileData *fd, BHead *bhead)
 	bfd->main->rangeversionfile = fg->rangeversion;
 	bfd->main->rangesubversionfile = fg->rangesubversion;
 	bfd->main->rangeminsubversionfile = fg->rangeminsubversion;
+	/* The original Range Engine stamps its 1.6 releases as 1.6.1001 (Rev 1) and 1.6.1002 (Rev 2),
+	 * above every minsubversion this fork uses (102 and up), so none of the fork's versioning ran
+	 * on those files and the fields it added stayed at zero. The fork started from 1.6 Rev 1:
+	 * read them as the final 1.6 (101), which only skips the versioning Range already had. */
+	if (bfd->main->rangeversionfile == 1 && bfd->main->rangesubversionfile == 6 &&
+	    bfd->main->rangeminsubversionfile >= 1000)
+	{
+		bfd->main->rangeminsubversionfile = 101;
+	}
 	bfd->main->minversionfile = fg->minversion;
 	bfd->main->minsubversionfile = fg->minsubversion;
 	bfd->main->build_commit_timestamp = fg->build_commit_timestamp;
