@@ -709,6 +709,24 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   `tools/debug/cenas/criar_cena_fur_shells_direction.py` confirma os sockets em `bpy.types` e rodou 65 quadros
   no `AnastacioRuntime.exe` sem crash, gerando `shot.png` — o geometry shader compilou e executou. **Falta** a
   inspeção visual desse `shot.png` (ninguém olhou se o pelo realmente "penteia" na direção certa).
+- **Reflexo planar dedicado — investigado, não implementado (2026-10-11, branch `claude/shader-nodes`)**:
+  próximo item da fila era um nó `ShaderNodePlanarReflection` para o `KX_PlanarMap` existente. Investigação
+  confirmou que `KX_PlanarMap` é uma câmera espelhada completa e funcional (reflete posição/orientação pelo
+  plano do objeto, clip oblíquo, inversão de front-face), mas ligada hoje só pelo sistema legado de
+  Environment Map de slot de textura (`EnvMap`/`MTex`, lido em `BL_BlenderDataConversion.cpp`), fora do
+  Shader Editor novo. Diferente de Bloom/SSR (filtros de tela cheia automáticos, o nó só liga um
+  interruptor) e diferente dos probes de cubemap (já amostrados automaticamente por posição em qualquer
+  material PBR via `GPU_material_bind_probe`), reflexo planar precisa de uma textura 2D amostrada por UV de
+  tela projetada pela câmera espelhada — não existe esse caminho automático no codegen de material hoje.
+  Um nó de verdade (com saída `Color`) exige codegen novo em `gpu_material.c`/`GPU_material.h`/
+  `BL_BlenderShader.cpp` (uniform sampler2D + matriz view-projection por objeto, análogo a
+  `GPU_material_bind_probe` mas não é a mesma função); um nó "config only" sem essa saída arriscava não
+  aparecer em tela pra quem usa o Shader Editor novo, escondendo a mesma incerteza em vez de resolvê-la.
+  Decisão: parar e documentar em vez de implementar às pressas um nó enfeite ou abrir o compilador de
+  material sem supervisão — ver
+  [shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda](shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda).
+  Nenhum código de engine foi tocado neste item; só documentação. Decisão do usuário pendente: abrir esse
+  codegen novo (com supervisão) ou manter reflexo planar fora do Shader Editor por ora.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

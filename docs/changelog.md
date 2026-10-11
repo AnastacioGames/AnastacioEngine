@@ -6,6 +6,41 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Reflexo planar dedicado: investigado, não implementado
+
+- Próximo item da fila de shader-nodes: um nó de material `ShaderNodePlanarReflection` para o `KX_PlanarMap`
+  já existente (espelho/água real). Esta entrada é só a investigação e a decisão de escopo — nenhum código
+  de engine foi alterado.
+- Confirmado: `KX_PlanarMap` (`source/source/gameengine/Ketsji/KX_PlanarMap.h`/`.cpp`) já é uma câmera
+  espelhada completa e funcional — reflete posição/orientação da câmera da cena pelo plano do objeto
+  espelho, recorta com near-plane oblíquo (sem `glClipPlane` fixo), inverte front-face na reflexão e
+  cacheia a projeção por câmera. Hoje é ligada só pelo sistema legado de Environment Map de slot de
+  textura (`EnvMap`/`MTex`, `ENVMAP_REFLECTION`, `stype == ENV_REALT`), lido em
+  `BL_BlenderDataConversion.cpp` (~linha 3715-3745) — fora do Shader Editor novo (`bNodeTree` de material).
+- Comparado com o padrão usado em Bloom/SSR (nós de World sem GPU codegen, só lidos na conversão de cena em
+  `KX_Scene.cpp`, ver entrada de 2026-10-11 "Bloom e SSR pelo World node graph"): esse padrão funciona pra
+  Bloom/SSR porque os dois já são filtros de tela cheia automáticos; o nó só liga um interruptor que já
+  existe. Reflexo planar não tem interruptor automático equivalente — produz uma textura por objeto que
+  precisa ser amostrada por um material para aparecer.
+- Também comparado com o reflexo de probes de cubemap que já funciona em qualquer material PBR com nós
+  (fase 4, `KX_LightProbe` + `KX_TextureRendererManager::FindProbe` + `GPU_material_bind_probe`/
+  `GPU_material_bind_probe2` em `BL_BlenderShader.cpp`): esse caminho é automático por posição do
+  fragmento, sem nó nenhum no material, mas é cubemap (direção 3D). Reflexo planar precisaria de um
+  binding por objeto/material equivalente (`sampler2D` + matriz view-projection da câmera espelhada,
+  projetando a UV no fragment shader) — não existe hoje, e criar isso é trabalho novo em
+  `gpu_material.c`/`GPU_material.h`/`BL_BlenderShader.cpp` (o compilador de nós e o binding de uniforms do
+  material), não uma leitura de socket na conversão de cena.
+- Alternativa "config only" (nó sem saída `Color`, só Enable/Clip Start/Clip End/Resolution, que criasse o
+  `EnvMap`/`MTex` legado por baixo dos panos na conversão) foi descartada: não há confirmação de que
+  material novo baseado em nós (Shader Editor, Principled) amostre esse slot legado hoje, então o nó
+  arriscava não aparecer em tela pra quem usa o Shader Editor — escondendo a mesma incerteza em vez de
+  resolvê-la.
+- Decisão: parar e documentar em vez de implementar um nó que arrisca ser enfeite, ou abrir o compilador de
+  material sem supervisão. Ver
+  [shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda](shader-nodes.md#reflexo-planar-por-que-não-virou-nó-ainda)
+  e a entrada correspondente em `docs/roadmap.md`. Pendente: decisão do usuário sobre abrir esse codegen
+  novo (com supervisão) ou manter reflexo planar fora do Shader Editor por ora.
+
 ## 2026-10-11 - Fur Shells: direção do pelo configurável
 
 - Pendência do backlog de shader-nodes (ver [shader-nodes.md](shader-nodes.md)): o nó Fur Shells só inflava a

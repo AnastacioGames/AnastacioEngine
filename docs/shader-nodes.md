@@ -202,13 +202,81 @@ isso é uma limitação do próprio filtro SSR, não deste node.
 
 Reflexo planar por objeto (espelho/água real) já existe separado, pelo `KX_PlanarMap`
 (`KX_PlanarMap.h`/`.cpp`), amarrado a uma Image/EnvMap no objeto; ele não tem nó dedicado no shader-nodes
-ainda — fica para uma próxima etapa.
+ainda. Investigação de 2026-10-11 sobre dar um nó de Material a isso, com conclusão de que **não dá pra
+fazer no padrão Bloom/SSR sem codegen novo** — ver "Reflexo planar: por que não virou nó ainda" abaixo.
 
 **Validado sem GPU/display**: além da compilação, `AnastacioEngine.exe -b --python` confirmou que os dois
 nós existem em `bpy.types` com os sockets/nomes certos e que um World com eles salva normalmente num `.range`;
 `AnastacioRuntime.exe` rodou essa cena por 15 s sem crash (ou seja, `KX_Scene` lendo os nós na conversão não
 quebra nada). **Falta** a conferência visual (Bloom/SSR realmente aparecendo na tela) — este ambiente não tem
 display/GPU para isso.
+
+## Reflexo planar: por que não virou nó ainda
+
+Investigação de 2026-10-11 (branch `claude/shader-nodes`), item "reflexo planar dedicado (KX_PlanarMap
+como nó de material)" da fila. Resultado: **não implementado** — ficou só nesta investigação/decisão de
+escopo, documentada aqui em vez de codificada, porque o caminho simples (padrão Bloom/SSR) não produz um
+nó genuinamente útil e o caminho que funciona de verdade é um projeto de codegen novo, maior do que cabe
+numa sessão sem supervisão.
+
+**O que já existe, de verdade, e funciona:**
+
+- `KX_PlanarMap` (`source/source/gameengine/Ketsji/KX_PlanarMap.h`/`.cpp`) é uma câmera espelhada completa:
+  reflete posição/orientação da câmera da cena através do plano do objeto espelho (`SetupCamera`), recorta
+  o que fica atrás do espelho com near-plane oblíquo (técnica de Lengyel, em `BeginRenderFace`/
+  `EndRenderFace`, sem `glClipPlane` fixo), inverte a frente das faces na reflexão e cacheia a matriz de
+  projeção por câmera. Não é um esqueleto nem um nome solto — é a mesma classe que já roda em jogo hoje.
+- Ela é ligada hoje pelo sistema **legado** de Environment Map de slot de textura (`EnvMap` em
+  `DNA_texture_types.h`, `ENVMAP_REFLECTION`/`ENVMAP_REFRACTION`, `stype == ENV_REALT`): em
+  `BL_BlenderDataConversion.cpp` (~linha 3715-3745), a conversão de cena varre toda textura de todo material,
+  acha as que têm `tex->GetTex()->env` com `stype == ENV_REALT`, e manda
+  `KX_TextureRendererManager::AddRenderer(PLANAR ou CUBE, tex, viewpoint)` — decidido PLANAR/CUBE por
+  `tex->IsCubeMap()`, não por uma flag explícita de "é planar".
+- Isso é independente do Shader Editor novo (node-based): é o slot de textura clássico do Blender
+  (`MTex`/`Tex`/`EnvMap`), não um `bNodeTree` de material.
+
+**Por que o padrão Bloom/SSR (nó sem GPU codegen, só lido na conversão) não serve aqui:**
+
+Bloom e SSR funcionam como nó-sem-saída porque os dois já são filtros de tela cheia automáticos
+(`RAS_2DFilterData::BuildInFilters`, aplicados pelo `KX_2DFilterManager` independente de qualquer material).
+O nó só liga/ajusta um interruptor que já existe. Reflexo planar não tem esse interruptor automático: ele
+produz uma *textura* por objeto, que precisa ser *amostrada* por algum material para aparecer na tela.
+
+Hoje, dentro do Shader Editor novo (nós Principled/BSDF, `node_shader_stage_nodes.c` e companhia), a única
+reflexão que já é amostrada automaticamente por material é a de **probes de cubemap** — `KX_LightProbe` +
+`KX_TextureRendererManager::FindProbe` (busca por posição, com blend entre os dois probes mais próximos) +
+`GPU_material_bind_probe`/`GPU_material_bind_probe2`, chamado em `BL_BlenderShader.cpp` para todo material
+PBR com nós (reflexo no Glossy, fase 4). Isso é cubemap (direção 3D → amostra), calculado automaticamente
+por posição do fragmento, sem precisar de nó nenhum no material.
+
+Reflexo planar é fundamentalmente diferente: é uma textura **2D**, amostrada por uma UV de tela calculada
+projetando a posição do fragmento pela matriz view-projection da câmera espelhada daquele `KX_PlanarMap`
+específico — não existe hoje nenhum caminho automático parecido com o dos probes para isso no codegen PBR.
+Um nó `ShaderNodePlanarReflection` com saída `Color` só seria genuinamente útil (não um enfeite que não
+faz nada) se o codegen gerasse: (a) um uniform `sampler2D` novo ligado à `RAS_Texture` daquele
+`KX_PlanarMap` (algo como `GPU_material_bind_planar(mat, planarTex, viewProjMatrix)`, análogo a
+`GPU_material_bind_probe` mas por objeto/material em vez de por posição), e (b) a UV de projeção no
+fragment shader (dividir por `w`, remapear pra `[0,1]`, tipicamente com um fetch mip/blur pra suavizar —
+mesma família de problema que o SSR já resolve para tela cheia, mas aqui por textura dedicada). Isso é
+trabalho novo em `gpu_material.c`/`GPU_material.h`/`BL_BlenderShader.cpp` — o mesmo tipo de superfície que
+guarda o compilador de nós e o binding de uniforms do material —, não uma leitura de socket na conversão de
+cena. É comparável em tamanho/risco a introduzir um caminho de uniform/binding novo no compilador de
+material, e não foi feito sem supervisão nesta sessão.
+
+**Alternativa descartada**: um nó "config only" (Enable + Clip Start/Clip End + Resolution, sem saída
+Color, igual Bloom/SSR) que na conversão de cena criasse automaticamente o `EnvMap`/`MTex` legado por baixo
+dos panos, pra poupar o usuário de montar o slot de textura manualmente. Descartada porque o sistema
+`EnvMap`/`MTex` é do pipeline de material legado (Blender Internal/multitexture) — não há confirmação de
+que um material novo baseado em nós (Principled no Shader Editor) sequer amostre esse slot hoje; criar o nó
+assim arriscava entregar algo que ou não aparece em tela pra quem usa o Shader Editor novo (o público deste
+item), ou exigiria a mesma investigação de codegen do parágrafo acima pra confirmar e então ligar de verdade
+— ou seja, não evita o trabalho, só escondia a incerteza atrás de um nó que pareceria funcionar.
+
+**Conclusão**: nada foi implementado para este item. Fica documentado aqui como decisão de escopo
+consciente, não omissão. Próximo passo, se o usuário quiser seguir: decidir, com supervisão, se vale abrir o
+compilador de material (`gpu_material.c`/`GPU_material.h`/`BL_BlenderShader.cpp`) para um binding novo de
+textura por objeto análogo ao de probes, ou se reflexo planar continua fora do Shader Editor (configurado
+só pela via legada de Image/EnvMap, como hoje).
 
 ## Ver o código gerado
 
