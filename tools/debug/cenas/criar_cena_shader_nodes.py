@@ -75,7 +75,7 @@ mesh(bpy.ops.mesh.primitive_monkey_add, "Toon", (0, 0, 1.5), mat)
 # GLSL Script cube
 txt = bpy.data.texts.new("stripes.glsl")
 txt.from_string("void main(float Scale, vec3 Vector, out vec4 Color, out float Fac)\n"
-                "{\n    Fac = step(0.5, fract(Vector.z * Scale));\n"
+                "{\n    Fac = step(0.5, fract(Vector.z * Scale + 0.25));\n"
                 "    Color = mix(vec4(1.0, 0.2, 0.1, 1.0), vec4(1.0), Fac);\n}\n")
 mat, tree, out, bsdf = node_material("Script", (1, 1, 1, 1))
 script = tree.nodes.new("ShaderNodeGLSLScript")
