@@ -6,6 +6,7 @@ uniform sampler2D depthbuffer; // depth buffer
 
 uniform vec4 clouds_params; // coverage, scale, speed, time
 uniform vec3 clouds_color;
+uniform float clouds_style; // World.cloud_style: 0 Procedural, 1 Layered Sky
 
 float cloudHash(vec3 p)
 {
@@ -59,6 +60,53 @@ vec3 skyViewDirection(vec2 uv)
 	return normalize((gl_ModelViewMatrixInverse * vec4(viewSpace.xyz, 0.0)).xyz);
 }
 
+/* Layered Sky style (adapted from a node sky material): the view ray hits a flat sky plane, two value-noise
+ * layers drift over it at different scale and speed and their difference is the cloud; a small offset sample
+ * toward a fixed light direction gives the relief. Returns (alpha, shade). */
+float skyHash2(vec2 p)
+{
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float skyNoise2(vec2 p)
+{
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = skyHash2(i);
+	float b = skyHash2(i + vec2(1.0, 0.0));
+	float c = skyHash2(i + vec2(0.0, 1.0));
+	float d = skyHash2(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float skyFbm2(vec2 p)
+{
+	float sum = 0.0;
+	float amp = 0.5;
+	for (int i = 0; i < 5; i++) {
+		sum += skyNoise2(p) * amp;
+		p = p * 2.03 + vec2(1.7, 9.2);
+		amp *= 0.5;
+	}
+	return sum;
+}
+
+vec2 layeredClouds(vec3 viewDir, float coverage, float scale, float speed, float time)
+{
+	float up = max(viewDir.z, 0.02);
+	vec2 base = viewDir.xy / up * scale * 0.5;
+	float t = time * speed;
+	vec2 pA = base + vec2(t * 0.5);
+	vec2 pB = (base + vec2(t)) * 0.5;
+	float a = skyFbm2(pA);
+	float b = skyFbm2(pB);
+	float alpha = clamp((a - b) * coverage * 20.0 * up, 0.0, 1.0);
+	float lit = skyFbm2(pA + vec2(0.06, 0.04));
+	float shade = clamp(0.8 + (a - lit) * 6.0, 0.45, 1.2);
+	return vec2(alpha, shade);
+}
+
 void main()
 {
 	vec2 texcoord = uvcoord.xy;
@@ -83,6 +131,13 @@ void main()
 	}
 
 	vec3 viewDir = skyViewDirection(texcoord);
+
+	if (clouds_style > 0.5) {
+		vec2 layered = layeredClouds(viewDir, coverage, scale, speed, time);
+		float alpha = layered.x * smoothstep(-0.02, 0.18, viewDir.z);
+		gl_FragColor = vec4(mix(direct.rgb, clouds_color * layered.y, alpha), direct.a);
+		return;
+	}
 
 	vec3 p = viewDir * scale * 4.0 + vec3(time * speed, 0.0, 0.0);
 	float density = cloudFbm(p);

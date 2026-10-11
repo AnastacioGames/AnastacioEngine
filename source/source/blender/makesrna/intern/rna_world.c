@@ -860,6 +860,20 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
 	RNA_def_property_update(prop, 0, NULL);
 
+	{
+		static const EnumPropertyItem cloud_style_items[] = {
+			{WO_CLOUD_STYLE_PROCEDURAL, "PROCEDURAL", 0, "Procedural", "3D noise clouds over the whole sky"},
+			{WO_CLOUD_STYLE_LAYERED, "LAYERED", 0, "Layered Sky",
+			 "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "cloud_style", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "cloud_style");
+		RNA_def_property_enum_items(prop, cloud_style_items);
+		RNA_def_property_ui_text(prop, "Style", "How the clouds are drawn");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	}
+
 	prop = RNA_def_property(srna, "cloud_coverage", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Coverage", "Amount of sky covered by clouds");

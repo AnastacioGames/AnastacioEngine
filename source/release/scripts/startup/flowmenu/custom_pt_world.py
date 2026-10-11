@@ -360,6 +360,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         if weather.show_expanded_clouds:
             col = main_box.column(align=True)
             col.active = weather.use_clouds
+            col.prop(weather, "cloud_style")
             col.prop(weather, "cloud_coverage", slider=True)
             col.prop(weather, "cloud_scale")
             col.prop(weather, "cloud_speed")

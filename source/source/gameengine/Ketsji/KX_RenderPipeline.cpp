@@ -800,6 +800,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				cloudParams->cloud_coverage = world->cloud_coverage;
 				cloudParams->cloud_scale = world->cloud_scale;
 				cloudParams->cloud_speed = world->cloud_speed;
+				cloudParams->cloud_style = world->cloud_style;
 				for (int i = 0; i < 3; ++i) {
 					cloudParams->cloud_color[i] = world->cloud_color[i];
 				}
