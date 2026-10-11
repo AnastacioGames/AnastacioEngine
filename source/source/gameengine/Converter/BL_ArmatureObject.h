@@ -66,6 +66,10 @@ protected:
 
 	double m_lastapplyframe;
 
+	/// Consecutive frames skipped by anim_needs_update() (KX_Scene.cpp) while fully culled; forces
+	/// a periodic full update so a frozen AABB can never hide the armature from view forever.
+	unsigned short m_cullSkipFrames;
+
 public:
 	BL_ArmatureObject(void *sgReplicationInfo,
 	                  SG_Callbacks callbacks,
@@ -95,6 +99,9 @@ public:
 	Object *GetOrigArmatureObject();
 	int GetVertDeformType() const;
 	int GetCullingMethod() const;
+	/// Returns true (and resets the counter) once every CULL_SKIP_FORCE_INTERVAL calls.
+	bool TickCullSkip();
+	void ResetCullSkip();
 	bool GetDrawDebug() const;
 	void DrawDebug(RAS_DebugDraw& debugDraw);
 
