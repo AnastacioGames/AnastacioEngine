@@ -5,6 +5,7 @@
 # com uma placa de texto 3D identificando a variante.
 #   AnastacioEngine.exe -b --factory-startup --python criar_cena_vclouds_luz.py -- saida.range
 import bpy
+import bmesh
 import sys
 from mathutils import Vector
 
@@ -29,25 +30,47 @@ def principled(name, color):
     return mat
 
 
+def malha_plano(name, radius, location):
+    # Equivalente a bpy.ops.mesh.primitive_plane_add, mas via bmesh: nao depende de
+    # bpy.context.scene, que nao propaga de forma confiavel ao trocar de cena em loop
+    # dentro de um unico script em background mode (causava tela preta nas cenas B/C/D).
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=radius)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    obj.location = location
+    return obj
+
+
+def malha_icosfera(name, size, location):
+    mesh = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=2, diameter=size)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    obj.location = location
+    return obj
+
+
 def montar_variante(nome, label, sun_loc, silver_intensity, coverage, density, cam_para_sol):
     scene = bpy.data.scenes.new(nome)
     scene.render.engine = 'BLENDER_GAME'
     scene.game_settings.use_shading_nodes = True
-    bpy.context.screen.scene = scene
 
     mat_chao = principled(nome + '_chao', (0.25, 0.4, 0.15, 1.0))
     mat_monte = principled(nome + '_monte', (0.4, 0.35, 0.25, 1.0))
 
-    bpy.ops.mesh.primitive_plane_add(radius=200, location=(0, 0, 0))
-    terreno = scene.objects.active
-    terreno.name = nome + '_terreno'
+    terreno = malha_plano(nome + '_terreno', 200, (0, 0, 0))
     terreno.data.materials.append(mat_chao)
+    scene.objects.link(terreno)
 
-    bpy.ops.mesh.primitive_ico_sphere_add(size=25, location=(0, 0, 10))
-    monte = scene.objects.active
-    monte.name = nome + '_monte'
+    monte = malha_icosfera(nome + '_monte', 25, (0, 0, 10))
     monte.scale = (1.4, 1.4, 0.6)
     monte.data.materials.append(mat_monte)
+    scene.objects.link(monte)
 
     lamp = bpy.data.lamps.new(nome + '_sun', 'SUN')
     lamp.energy = 1.0
@@ -122,6 +145,9 @@ variantes = [
 total = len(variantes)
 for i, (scene, terreno) in enumerate(variantes):
     proxima = variantes[(i + 1) % total][0]
+    # bpy.ops.logic.*_add exige bpy.context.scene == cena do objeto (poll), mesmo passando
+    # object= explicito -- diferente da criacao de mesh, que agora e via bmesh e nao depende disso.
+    bpy.context.screen.scene = scene
     scene.objects.active = terreno
     bpy.ops.logic.sensor_add(type='DELAY', name='espera', object=terreno.name)
     sens = terreno.game.sensors['espera']
