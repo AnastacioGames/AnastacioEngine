@@ -1120,6 +1120,11 @@ static void node_shader_buts_script(uiLayout *layout, bContext *UNUSED(C), Point
 	uiItemO(row, "", ICON_FILE_REFRESH, "node.shader_script_update");
 }
 
+static void node_shader_buts_glsl_script(uiLayout *layout, bContext *C, PointerRNA *ptr)
+{
+	uiTemplateID(layout, C, ptr, "script", "TEXT_OT_new", "TEXT_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
+}
+
 static void node_shader_buts_script_ex(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
 	uiItemS(layout);
@@ -1288,6 +1293,9 @@ static void node_shader_set_butfunc(bNodeType *ntype)
 			break;
 		case SH_NODE_BSDF_HAIR_PRINCIPLED:
 			ntype->draw_buttons = 	node_shader_buts_principled_hair;
+			break;
+		case SH_NODE_GLSL_SCRIPT:
+			ntype->draw_buttons = node_shader_buts_glsl_script;
 			break;
 		case SH_NODE_SCRIPT:
 			ntype->draw_buttons = node_shader_buts_script;

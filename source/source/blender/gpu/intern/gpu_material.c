@@ -113,6 +113,15 @@ struct GPUMaterial {
 	ListBase nodes;
 	GPUNodeLink *outlinks[8];
 
+	/* Vertex and geometry stages set by the nodes (see GPUPassStages). */
+	GPUNodeLink *vertex_offset;
+	int shell_layers;
+	float shell_length;
+	float outline_width;
+	ListBase scripts; /* GPUScriptCode, only while the pass is generated */
+	/* User vertex/geometry code or vertex nodes: the view/object matrices and the time are always sent. */
+	bool use_vertex_stage;
+
 	/* for binding the material */
 	GPUPass *pass;
 #ifdef __EMSCRIPTEN__
@@ -402,11 +411,21 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 
 	char *fragcode = (material->ma && material->ma->fragcode) ? txt_to_buf(material->ma->fragcode) : NULL;
 	char *vertcode = (material->ma && material->ma->vertcode) ? txt_to_buf(material->ma->vertcode) : NULL;
+	char *geomcode = (material->ma && material->ma->geomcode && material->type == GPU_MATERIAL_TYPE_MESH) ?
+	                 txt_to_buf(material->ma->geomcode) : NULL;
 
 	if (vertcode && !fragcode) {
 		fragcode = MEM_mallocN(20, "text buffer");
 		BLI_strncpy(fragcode, "void fragment() {}", 20);
 	}
+
+	GPUPassStages stages = {NULL};
+	stages.vertex_offset = material->vertex_offset;
+	stages.geomcode = geomcode;
+	stages.shell_layers = material->shell_layers;
+	stages.shell_length = material->shell_length;
+	stages.outline_width = material->outline_width;
+	stages.scripts = &material->scripts;
 
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,
@@ -416,13 +435,22 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->use_instancing,
 			material->use_skinning,
 			material->use_foliage,
-			GPU_material_use_new_shading_nodes(material));
+			GPU_material_use_new_shading_nodes(material),
+			&stages);
 	}
 
 	/* The user sources were only needed to generate the pass. */
 	const bool has_user_vertcode = (vertcode != NULL);
+	material->use_vertex_stage = (vertcode || geomcode || material->vertex_offset);
 	MEM_SAFE_FREE(fragcode);
 	MEM_SAFE_FREE(vertcode);
+	MEM_SAFE_FREE(geomcode);
+	for (GPUScriptCode *script = material->scripts.first; script; script = script->next) {
+		MEM_freeN(script->code);
+		MEM_freeN(script->wrapper);
+	}
+	BLI_freelistN(&material->scripts);
+	material->vertex_offset = NULL;
 
 	if (used) {
 		if (!material->pass)
@@ -453,7 +481,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		/* User vertex code is told it can use VIEW_MATRIX/MODEL_MATRIX (#defines in
 		 * code_generate_vertex), but outside the core profile the uniforms are only uploaded
 		 * when a node asks for them: force them so they are never left uninitialized. */
-		if (has_user_vertcode) {
+		if (has_user_vertcode || material->use_vertex_stage) {
 			material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX;
 		}
 
@@ -483,7 +511,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->obautobumpscaleloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_AUTO_BUMPSCALE));
 		if (material->builtins & GPU_CAMERA_TEXCO_FACTORS)
 			material->cameratexcofacloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_CAMERA_TEXCO_FACTORS));
-		if (material->builtins & GPU_TIME || has_user_vertcode)
+		if (material->builtins & GPU_TIME || has_user_vertcode || material->use_vertex_stage)
 			material->timeloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_TIME));
 		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS)
 			material->partscalarpropsloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_SCALAR_PROPS));
@@ -864,7 +892,7 @@ void GPU_material_bind(
 				GPU_shader_uniform_vector(shader, material->cameratexcofacloc, 4, 1, (float *)borders);
 			}
 		}
-		if ((material->builtins & GPU_TIME) || (material->ma && material->ma->vertcode)) {
+		if ((material->builtins & GPU_TIME) || (material->ma && material->ma->vertcode) || material->use_vertex_stage) {
 			float ftime = (float)time;
 			GPU_shader_uniform_vector(shader, material->timeloc, 1, 1, &ftime);
 		}
@@ -1084,6 +1112,49 @@ GPUBlendMode GPU_material_alpha_blend(GPUMaterial *material, const float obcol[4
 void gpu_material_add_node(GPUMaterial *material, GPUNode *node)
 {
 	BLI_addtail(&material->nodes, node);
+}
+
+/* Material Output "Vertex Offset": mesh space offset added to every vertex (vertex stage). */
+void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->vertex_offset = link;
+	}
+}
+
+/* Fur Shells node: layers (the base surface included) pushed along the normal by the geometry stage. */
+void GPU_material_shells(GPUMaterial *material, int layers, float length)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->shell_layers = max_ii(material->shell_layers, min_ii(layers, 32));
+		material->shell_length = max_ff(material->shell_length, length);
+	}
+}
+
+/* Outline node: inverted hull drawn by the geometry stage. */
+void GPU_material_outline(GPUMaterial *material, float width)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH && width != 0.0f) {
+		material->outline_width = width;
+	}
+}
+
+bool GPU_material_geometry_stage_supported(void)
+{
+	return GPU_geometry_shader_support();
+}
+
+const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper)
+{
+	if (!code || !wrapper) {
+		return NULL;
+	}
+	GPUScriptCode *script = MEM_callocN(sizeof(GPUScriptCode), "GPUScriptCode");
+	BLI_snprintf(script->name, sizeof(script->name), "glsl_script%d", BLI_listbase_count(&material->scripts));
+	script->code = BLI_strdup(code);
+	script->wrapper = BLI_strdup(wrapper);
+	BLI_addtail(&material->scripts, script);
+	return script->name;
 }
 
 /* Code generation */
@@ -4005,12 +4076,74 @@ void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool 
 	*gpumaterials = kept;
 }
 
+/* GLSL Script nodes keep their Text in node->id (groups included). Their sockets follow the
+ * function in the Text, so the tree is updated too. */
+static bool gpu_nodetree_uses_text(Main *bmain, bNodeTree *ntree, struct Text *text, int depth)
+{
+	bool found = false;
+	if (depth > 16) {
+		return false;
+	}
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_GLSL_SCRIPT && node->id == (ID *)text) {
+			node->update |= NODE_UPDATE;
+			ntree->update |= NTREE_UPDATE_NODES;
+			found = true;
+		}
+		else if (node->type == NODE_GROUP && node->id && gpu_nodetree_uses_text(bmain, (bNodeTree *)node->id, text, depth + 1)) {
+			found = true;
+		}
+	}
+	if (found) {
+		ntreeUpdateTree(bmain, ntree);
+	}
+	return found;
+}
+
+static bool gpu_nodetree_moves_vertices(bNodeTree *ntree, int depth)
+{
+	if (depth > 16) {
+		return false;
+	}
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->flag & NODE_MUTED) {
+			continue;
+		}
+		if (ELEM(node->type, SH_NODE_FUR_SHELLS, SH_NODE_OUTLINE)) {
+			return true;
+		}
+		if (ELEM(node->type, SH_NODE_OUTPUT, SH_NODE_OUTPUT_MATERIAL)) {
+			bNodeSocket *sock = nodeFindSocket(node, SOCK_IN, "Vertex Offset");
+			if (sock && sock->link) {
+				return true;
+			}
+		}
+		if (node->type == NODE_GROUP && node->id && gpu_nodetree_moves_vertices((bNodeTree *)node->id, depth + 1)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool GPU_material_moves_vertices(Material *ma)
+{
+	if (!ma) {
+		return false;
+	}
+	if (ma->vertcode || ma->geomcode) {
+		return true;
+	}
+	return ma->use_nodes && ma->nodetree && gpu_nodetree_moves_vertices(ma->nodetree, 0);
+}
+
 /* Materials whose Shader Sources use this Text compile again on the next draw. */
 bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {
 	bool found = false;
 	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (ma->vertcode == text || ma->fragcode == text) {
+		if (ma->vertcode == text || ma->fragcode == text || ma->geomcode == text ||
+		    (ma->nodetree && gpu_nodetree_uses_text(bmain, ma->nodetree, text, 0)))
+		{
 			GPU_material_free(&ma->gpumaterial);
 			GPU_material_free(&ma->gpumaterialinstancing);
 			GPU_material_free(&ma->gpumaterialskinning);

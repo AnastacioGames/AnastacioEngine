@@ -6833,3 +6833,108 @@ void node_damage(float softness, vec3 I, mat4 viewinvmat, mat4 obinvmat, out flo
 		strength = max(strength, w * unfdamagestrength[i]);
 	}
 }
+
+/* ********************** Vertex and geometry stage nodes ******************** */
+
+/* gpu_shader_vertex.glsl defines these for the vertex stage (USE_VERTEX_NODES), where the nodes
+ * linked to the Material Output "Vertex Offset" run. In the fragment stage there is no vertex to
+ * move: the vertex nodes give a zero offset. */
+vec3 vertex_position()
+{
+	return vec3(0.0);
+}
+
+vec3 vertex_normal()
+{
+	return vec3(0.0);
+}
+
+vec3 vertex_instance_position()
+{
+	return vec3(0.0);
+}
+
+void node_vertex_offset(float height, float scale, vec3 direction, out vec3 offset)
+{
+	offset = direction * (height * scale);
+}
+
+void node_vertex_offset_normal(float height, float scale, vec3 direction, out vec3 offset)
+{
+	offset = vertex_normal() * (height * scale);
+}
+
+float node_wind_hash(vec2 p)
+{
+	p = mod(p, 256.0);
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+float node_wind_noise(vec2 p)
+{
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = node_wind_hash(i);
+	float b = node_wind_hash(i + vec2(1.0, 0.0));
+	float c = node_wind_hash(i + vec2(0.0, 1.0));
+	float d = node_wind_hash(i + vec2(1.0, 1.0));
+	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+/* Same idea as the material Foliage wind: value noise over the mesh position plus the instance
+ * position (instanced copies sway out of phase), vertices below the anchor height stay still. */
+void node_vertex_wind(float strength, float speed, float scale, float anchor, vec3 direction, float time, out vec3 offset)
+{
+	vec3 co = vertex_position();
+	vec2 p = (co.xy + vertex_instance_position().xy) * scale;
+	float t = time * speed;
+	float wind = node_wind_noise(p + vec2(t, t * 0.7)) * 2.0 - 1.0;
+	float gust = node_wind_noise(p * 0.25 + vec2(t * 0.3)) * 0.5 + 0.5;
+	float h = max(co.z - anchor, 0.0);
+	vec3 dir = (dot(direction, direction) > 0.0) ? normalize(direction) : vec3(1.0, 0.0, 0.0);
+	offset = (dir * gust + vec3(-dir.y, dir.x, 0.0) * wind * 0.5) * (strength * h);
+}
+
+void node_vertex_wave(float amplitude, float wavelength, float speed, vec3 direction, float time, out vec3 offset)
+{
+	vec3 co = vertex_position();
+	vec3 dir = (dot(direction, direction) > 0.0) ? normalize(direction) : vec3(1.0, 0.0, 0.0);
+	float phase = dot(co, dir) * (2.0 * M_PI / max(wavelength, 0.0001)) - time * speed;
+	offset = vertex_normal() * (amplitude * sin(phase));
+}
+
+void node_camera_distance(vec3 viewpos, out float dist)
+{
+	dist = length(viewpos);
+}
+
+/* Fur Shells / Outline layer: replaced by the code generator with the value of the geometry stage
+ * (0 on the base surface, 1 on the outer shell, -1 on the outline hull, 0 without geometry stage). */
+void node_shell_layer(out float layer)
+{
+	layer = 0.0;
+}
+
+void node_shell_layer_info(float layer, out float fac, out float outline)
+{
+	fac = max(layer, 0.0);
+	outline = (layer < -0.5) ? 1.0 : 0.0;
+}
+
+/* Strand mask for the shells: one strand per cell of the UV grid, thinner towards the tip. */
+void node_fur_shells(float length, float layers, float density, vec3 uv, float layer, out float fac, out float alpha)
+{
+	fac = max(layer, 0.0);
+	vec2 grid = uv.xy * max(density, 1.0);
+	vec2 cell = floor(grid);
+	float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+	vec2 local = fract(grid) - 0.5;
+	float radius = 0.5 * (1.0 - fac * h);
+	alpha = (fac <= 0.0) ? 1.0 : ((h > fac && dot(local, local) < radius * radius) ? 1.0 : 0.0);
+}
+
+void node_outline(float width, float layer, out float fac)
+{
+	fac = (layer < -0.5) ? 1.0 : 0.0;
+}

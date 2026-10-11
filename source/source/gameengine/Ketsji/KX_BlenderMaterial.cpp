@@ -111,11 +111,12 @@ KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, K
 		m_rasMode |= RAS_ALPHA;
 		m_rasMode |= (mat && (mat->game.alpha_blend & GEMAT_ALPHA_SORT)) ? RAS_ZSORT : 0;
 	}
-	/* Opaque materials that move vertices on the GPU (user vertex shader, Foliage Shader) must
+	/* Opaque materials that move vertices on the GPU (user vertex/geometry shader, vertex or
+	 * geometry nodes, Foliage Shader) must
 	 * cast their shadow with their own shader: the solid shadow bucket draws with a generic
 	 * override shader that ignores the deformation, so the shadow would not follow the wind.
 	 * (Variance shadows still override every bucket, see RAS_BucketManager.) */
-	if (mat && !(m_rasMode & (RAS_ALPHA | RAS_ALPHA_SHADOW)) && (mat->vertcode || (mat->shade_flag & MA_FOLIAGE))) {
+	if (mat && !(m_rasMode & (RAS_ALPHA | RAS_ALPHA_SHADOW)) && (GPU_material_moves_vertices(mat) || (mat->shade_flag & MA_FOLIAGE))) {
 		m_rasMode |= RAS_ALPHA_SHADOW;
 	}
 

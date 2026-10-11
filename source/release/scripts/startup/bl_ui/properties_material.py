@@ -498,10 +498,13 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
             # The user GLSL is compiled even when Shadeless, so it is never greyed out.
             col = box.column()
             col.label(text="Shader Sources:")
-            for label, attr in (("Vertex:", "script_vert"), ("Fragment:", "script_frag")):
+            for label, attr in (("Vertex:", "script_vert"), ("Geometry:", "script_geom"),
+                                ("Fragment:", "script_frag")):
                 row = col.split()
                 row.label(text=label)
                 row.template_ID(mat, attr, new="text.new", open="text.open")
+            if mat.script_geom:
+                col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
 
 
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):

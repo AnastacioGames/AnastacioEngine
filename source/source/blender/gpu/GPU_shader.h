@@ -45,6 +45,8 @@ enum {
 	GPU_SHADER_FLAGS_SPECIAL_SKINNING	= (1 << 5),
 	/* Program binary may come from / go to the cooked file (only for programs never relinked later). */
 	GPU_SHADER_FLAGS_BINARY_CACHE		= (1 << 6),
+	/* Material geometry stage (Material.geomcode, Fur Shells, Outline). */
+	GPU_SHADER_FLAGS_USER_GEOMETRY		= (1 << 7),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

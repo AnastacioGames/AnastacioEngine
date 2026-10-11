@@ -195,6 +195,31 @@ float TIME;
 
 void vertex(); /* declare here but user provides definition. */
 
+#ifdef USE_VERTEX_NODES
+/* Generated from the nodes linked to the Material Output "Vertex Offset" (gpu_codegen.c). */
+void vertex_nodes(vec3 co, vec3 nor, out vec3 offset);
+
+/* Read by the vertex nodes (the material library has zero versions for the fragment stage). */
+vec3 vertex_position()
+{
+	return VERTEX;
+}
+
+vec3 vertex_normal()
+{
+	return NORMAL;
+}
+
+vec3 vertex_instance_position()
+{
+#ifdef USE_INSTANCING
+	return ininstposition;
+#else
+	return vec3(0.0);
+#endif
+}
+#endif
+
 void main()
 {
 #ifdef USE_CORE_PROFILE
@@ -280,6 +305,14 @@ void main()
 	/* for user code */
 	vertex();
 	normal = NORMAL; /* user code may bend the normal too */
+#endif
+
+#ifdef USE_VERTEX_NODES
+	{
+		vec3 vertex_offset;
+		vertex_nodes(VERTEX, normal, vertex_offset);
+		VERTEX += vertex_offset;
+	}
 #endif
 
 #ifdef USE_CORE_PROFILE

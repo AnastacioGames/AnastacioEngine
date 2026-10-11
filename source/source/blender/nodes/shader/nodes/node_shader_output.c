@@ -28,6 +28,8 @@
 static bNodeSocketTemplate sh_node_output_in[] = {
 	{	SOCK_RGBA, 1, N_("Color"),		0.0f, 0.0f, 0.0f, 1.0f},
 	{	SOCK_FLOAT, 1, N_("Alpha"),		1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_NONE},
+	/* Game engine: mesh space offset computed in the vertex shader. */
+	{	SOCK_VECTOR, 1, N_("Vertex Offset"),	0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_NONE, SOCK_HIDE_VALUE},
 	{	-1, 0, ""	}
 };
 
@@ -66,8 +68,16 @@ static int gpu_shader_output(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecDat
 		GPU_material_enable_alpha(mat);
 #endif
 
+	/* Vertex Offset is not a parameter of output_node. */
+	GPUType offset_type = in[2].type;
+	in[2].type = GPU_NONE;
 	GPU_stack_link(mat, "output_node", in, out, &outlink);
+	in[2].type = offset_type;
 	GPU_material_output_link(mat, outlink, 0);
+
+	if (in[2].hasinput && in[2].link) {
+		GPU_material_vertex_offset(mat, in[2].link);
+	}
 
 	return 1;
 }

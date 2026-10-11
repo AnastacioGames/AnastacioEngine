@@ -362,10 +362,233 @@ class NODE_OT_damage_mix_add(Operator):
         return {'FINISHED'}
 
 
+# Shader presets (game engine): each preset is an editable node group, open it (Tab) to see how
+# it works. The groups only use nodes that exist in both shading systems and give plain values
+# (Color, Alpha, Offset), so they plug into any material.
+
+_SHADER_PRESETS = (
+    ('FUR', "Fur", "Fur Shells strands with a root to tip color (Alpha Clip)"),
+    ('GRASS', "Grass", "Long Fur Shells strands for grass on a ground mesh (Alpha Clip)"),
+    ('TOON_RIM', "Toon + Rim", "Flat color with a rim light from the Fresnel"),
+    ('TOON_OUTLINE', "Toon Outline", "Color with an inverted hull outline"),
+    ('DISSOLVE', "Dissolve", "Noise dissolve with a glowing edge (Alpha Clip)"),
+    ('WATER_WAVES', "Water Waves",
+     "Vertex waves (Offset goes to the Material Output Vertex Offset) and a Fresnel tint"),
+)
+
+
+def shader_presets():
+    return _SHADER_PRESETS
+
+
+def _preset_group(name, inputs, outputs):
+    group = bpy.data.node_groups.new(name, 'ShaderNodeTree')
+    for socket_type, socket_name, value in inputs:
+        socket = group.inputs.new(socket_type, socket_name)
+        if value is not None:
+            socket.default_value = value
+    for socket_type, socket_name in outputs:
+        group.outputs.new(socket_type, socket_name)
+    gin = group.nodes.new("NodeGroupInput")
+    gin.location = (-600.0, 0.0)
+    gout = group.nodes.new("NodeGroupOutput")
+    gout.location = (400.0, 0.0)
+    return group, gin, gout
+
+
+def _preset_node(group, idname, location, **values):
+    node = group.nodes.new(idname)
+    node.location = location
+    for key, value in values.items():
+        if key in node.inputs:
+            node.inputs[key].default_value = value
+        else:
+            setattr(node, key, value)
+    return node
+
+
+def _build_fur(name, length, layers, density, root, tip):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Root Color", root), ('NodeSocketColor', "Tip Color", tip)),
+        (('NodeSocketColor', "Color"), ('NodeSocketFloat', "Alpha")))
+    links = group.links
+    # Length and Layers build the geometry stage: change them on the Fur Shells node itself.
+    fur = _preset_node(group, "ShaderNodeFurShells", (-300.0, -150.0),
+                       Length=length, Layers=layers, Density=density)
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 100.0))
+    links.new(fur.outputs["Layer"], mix.inputs["Fac"])
+    links.new(gin.outputs["Root Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Tip Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    links.new(fur.outputs["Alpha"], gout.inputs["Alpha"])
+    return group
+
+
+def _build_toon_rim(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color", (0.8, 0.3, 0.2, 1.0)),
+         ('NodeSocketColor', "Rim Color", (1.0, 0.9, 0.7, 1.0)),
+         ('NodeSocketFloat', "Rim Size", 0.6)),
+        (('NodeSocketColor', "Color"),))
+    links = group.links
+    fresnel = _preset_node(group, "ShaderNodeFresnel", (-350.0, 150.0))
+    step = _preset_node(group, "ShaderNodeMath", (-150.0, 150.0), operation='GREATER_THAN')
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 50.0))
+    links.new(fresnel.outputs["Fac"], step.inputs[0])
+    links.new(gin.outputs["Rim Size"], step.inputs[1])
+    links.new(step.outputs[0], mix.inputs["Fac"])
+    links.new(gin.outputs["Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Rim Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    return group
+
+
+def _build_toon_outline(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color", (0.8, 0.8, 0.8, 1.0)),
+         ('NodeSocketColor', "Outline Color", (0.0, 0.0, 0.0, 1.0))),
+        (('NodeSocketColor', "Color"),))
+    links = group.links
+    outline = _preset_node(group, "ShaderNodeOutline", (-300.0, 150.0), Width=0.02)
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 50.0))
+    links.new(outline.outputs["Fac"], mix.inputs["Fac"])
+    links.new(gin.outputs["Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Outline Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    return group
+
+
+def _build_dissolve(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color", (0.8, 0.8, 0.8, 1.0)),
+         ('NodeSocketColor', "Edge Color", (1.0, 0.4, 0.0, 1.0)),
+         ('NodeSocketFloat', "Amount", 0.5),
+         ('NodeSocketFloat', "Edge Width", 0.05)),
+        (('NodeSocketColor', "Color"), ('NodeSocketFloat', "Alpha")))
+    links = group.links
+    noise = _preset_node(group, "ShaderNodeTexNoise", (-400.0, 200.0))
+    alpha = _preset_node(group, "ShaderNodeMath", (-150.0, 250.0), operation='GREATER_THAN')
+    edge_level = _preset_node(group, "ShaderNodeMath", (-350.0, -100.0), operation='ADD')
+    edge = _preset_node(group, "ShaderNodeMath", (-150.0, 0.0), operation='LESS_THAN')
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 50.0))
+    links.new(noise.outputs["Fac"], alpha.inputs[0])
+    links.new(gin.outputs["Amount"], alpha.inputs[1])
+    links.new(gin.outputs["Amount"], edge_level.inputs[0])
+    links.new(gin.outputs["Edge Width"], edge_level.inputs[1])
+    links.new(noise.outputs["Fac"], edge.inputs[0])
+    links.new(edge_level.outputs[0], edge.inputs[1])
+    links.new(edge.outputs[0], mix.inputs["Fac"])
+    links.new(gin.outputs["Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Edge Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    links.new(alpha.outputs[0], gout.inputs["Alpha"])
+    return group
+
+
+def _build_water_waves(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Shallow Color", (0.1, 0.5, 0.6, 1.0)),
+         ('NodeSocketColor', "Deep Color", (0.0, 0.1, 0.25, 1.0)),
+         ('NodeSocketFloat', "Amplitude", 0.15),
+         ('NodeSocketFloat', "Wavelength", 3.0),
+         ('NodeSocketFloat', "Speed", 1.5)),
+        (('NodeSocketColor', "Color"), ('NodeSocketVector', "Offset")))
+    links = group.links
+    wave = _preset_node(group, "ShaderNodeVertexWave", (-250.0, -150.0))
+    wave2 = _preset_node(group, "ShaderNodeVertexWave", (-250.0, -400.0),
+                         Direction=(0.3, 1.0, 0.0))
+    add = _preset_node(group, "ShaderNodeVectorMath", (50.0, -250.0), operation='ADD')
+    fresnel = _preset_node(group, "ShaderNodeFresnel", (-250.0, 200.0))
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 150.0))
+    for node in (wave, wave2):
+        links.new(gin.outputs["Amplitude"], node.inputs["Amplitude"])
+        links.new(gin.outputs["Wavelength"], node.inputs["Wavelength"])
+        links.new(gin.outputs["Speed"], node.inputs["Speed"])
+    links.new(wave.outputs["Offset"], add.inputs[0])
+    links.new(wave2.outputs["Offset"], add.inputs[1])
+    links.new(fresnel.outputs["Fac"], mix.inputs["Fac"])
+    links.new(gin.outputs["Deep Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Shallow Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    links.new(add.outputs["Vector"], gout.inputs["Offset"])
+    return group
+
+
+_PRESET_BUILDERS = {
+    'FUR': lambda name: _build_fur(name, 0.05, 12, 300.0,
+                                   (0.25, 0.15, 0.08, 1.0), (0.8, 0.65, 0.45, 1.0)),
+    'GRASS': lambda name: _build_fur(name, 0.3, 16, 60.0,
+                                     (0.05, 0.2, 0.03, 1.0), (0.45, 0.75, 0.2, 1.0)),
+    'TOON_RIM': _build_toon_rim,
+    'TOON_OUTLINE': _build_toon_outline,
+    'DISSOLVE': _build_dissolve,
+    'WATER_WAVES': _build_water_waves,
+}
+
+
+def shader_preset_group(preset):
+    """The node group of a preset, built the first time."""
+    name = dict((p[0], p[1]) for p in _SHADER_PRESETS)[preset]
+    group = bpy.data.node_groups.get(name)
+    if group is None or group.bl_idname != 'ShaderNodeTree':
+        group = _PRESET_BUILDERS[preset](name)
+    return group
+
+
+class NODE_OT_shader_preset_add(Operator):
+    """Add a shader preset as an editable node group (game engine)"""
+    bl_idname = "node.shader_preset_add"
+    bl_label = "Add Shader Preset"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    preset: EnumProperty(name="Preset", items=_SHADER_PRESETS)
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return (space is not None and space.type == 'NODE_EDITOR' and
+                space.tree_type == 'ShaderNodeTree' and space.edit_tree is not None)
+
+    def execute(self, context):
+        space = context.space_data
+        tree = space.edit_tree
+        group = shader_preset_group(self.preset)
+
+        for node in tree.nodes:
+            node.select = False
+        node = tree.nodes.new("ShaderNodeGroup")
+        node.node_tree = group
+        node.location = space.cursor_location
+        node.select = True
+        tree.nodes.active = node
+
+        # Offset goes to the Material Output "Vertex Offset" when it is free.
+        if "Offset" in node.outputs:
+            for output in tree.nodes:
+                if output.type in {'OUTPUT_MATERIAL', 'OUTPUT'} and "Vertex Offset" in output.inputs:
+                    socket = output.inputs["Vertex Offset"]
+                    if not socket.is_linked:
+                        tree.links.new(node.outputs["Offset"], socket)
+                    break
+
+        # Presets with an Alpha cut pixels out: the material needs Alpha Clip.
+        mat = getattr(space, "id", None)
+        if "Alpha" in node.outputs and isinstance(mat, bpy.types.Material):
+            if mat.game_settings.alpha_blend == 'OPAQUE':
+                mat.game_settings.alpha_blend = 'CLIP'
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
     NODE_OT_damage_mix_add,
+    NODE_OT_shader_preset_add,
 
     NODE_OT_add_and_link_node,
     NODE_OT_add_node,

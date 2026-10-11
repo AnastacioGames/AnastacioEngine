@@ -796,6 +796,14 @@ struct ShadeResult;
 #define SH_NODE_PARALLAX		1002
 #define SH_NODE_OUTPUT_ATTACHMENT 1003
 #define SH_NODE_DAMAGE			1004
+#define SH_NODE_GLSL_SCRIPT		1005
+#define SH_NODE_FUR_SHELLS		1006
+#define SH_NODE_OUTLINE			1007
+#define SH_NODE_VERTEX_WIND		1008
+#define SH_NODE_VERTEX_WAVE		1009
+#define SH_NODE_SHELL_LAYER		1010
+#define SH_NODE_CAMERA_DISTANCE	1011
+#define SH_NODE_VERTEX_OFFSET	1012
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF			1 /* Unused */

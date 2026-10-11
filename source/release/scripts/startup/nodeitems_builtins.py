@@ -142,6 +142,32 @@ def object_shader_nodes_poll(context):
             snode.shader_type == 'OBJECT')
 
 
+# Game engine stages (Blender 5 style Add menu): vertex nodes feed the Material Output
+# "Vertex Offset", geometry nodes turn on the generated geometry stage.
+def shader_vertex_items(context):
+    yield NodeItem("ShaderNodeVertexOffset")
+    yield NodeItem("ShaderNodeVertexWind")
+    yield NodeItem("ShaderNodeVertexWave")
+
+
+def shader_geometry_items(context):
+    yield NodeItem("ShaderNodeFurShells")
+    yield NodeItem("ShaderNodeOutline")
+    yield NodeItem("ShaderNodeShellLayer")
+
+
+# node group presets, see NODE_OT_shader_preset_add
+def shader_preset_draw(self, layout, context):
+    from bl_operators.node import shader_presets
+    for identifier, name, _description in shader_presets():
+        props = layout.operator("node.shader_preset_add", text=name)
+        props.preset = identifier
+
+
+def shader_preset_items(context):
+    yield NodeItemCustom(draw=shader_preset_draw)
+
+
 # All standard node categories currently used in nodes.
 
 shader_node_categories = [
@@ -162,6 +188,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeParticleInfo"),
         NodeItem("ShaderNodeObjectInfo"),
         NodeItem("ShaderNodeDamage"),
+        NodeItem("ShaderNodeCameraDistance"),
         NodeItem("NodeGroupInput", poll=group_input_output_item_poll),
     ]),
     ShaderOldNodeCategory("SH_OUTPUT", "Output", items=[
@@ -206,7 +233,13 @@ shader_node_categories = [
         NodeItem("ShaderNodeSeparateHSV"),
         NodeItem("ShaderNodeCombineHSV"),
     ]),
+    ShaderOldNodeCategory("SH_VERTEX", "Vertex", items=shader_vertex_items),
+    ShaderOldNodeCategory("SH_GEOMETRY", "Geometry", items=shader_geometry_items),
+    ShaderOldNodeCategory("SH_SCRIPT", "Script", items=[
+        NodeItem("ShaderNodeGLSLScript"),
+    ]),
     ShaderOldNodeCategory("SH_GROUP", "Group", items=node_group_items),
+    ShaderOldNodeCategory("SH_PRESETS", "Presets", items=shader_preset_items),
     
     ShaderOldNodeCategory("SH_NEW_RANGE", "Game Engine", items=[
         NodeItem("ShaderNodeSpritesAnimation"),
@@ -232,6 +265,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeAmbientOcclusion"),
         NodeItem("ShaderNodeObjectInfo"),
         NodeItem("ShaderNodeDamage"),
+        NodeItem("ShaderNodeCameraDistance"),
         NodeItem("ShaderNodeHairInfo"),
         NodeItem("ShaderNodeParticleInfo"),
         NodeItem("ShaderNodeCameraData"),
@@ -318,10 +352,14 @@ shader_node_categories = [
         NodeItem("ShaderNodeWavelength"),
         NodeItem("ShaderNodeBlackbody"),
     ]),
+    ShaderNewNodeCategory("SH_NEW_VERTEX", "Vertex", items=shader_vertex_items),
+    ShaderNewNodeCategory("SH_NEW_GEOMETRY", "Geometry", items=shader_geometry_items),
     ShaderNewNodeCategory("SH_NEW_SCRIPT", "Script", items=[
+        NodeItem("ShaderNodeGLSLScript"),
         NodeItem("ShaderNodeScript"),
     ]),
     ShaderNewNodeCategory("SH_NEW_GROUP", "Group", items=node_group_items),
+    ShaderNewNodeCategory("SH_NEW_PRESETS", "Presets", items=shader_preset_items),
     ShaderNewNodeCategory("SH_NEW_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),

@@ -283,6 +283,14 @@ bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNodeStack *out, ...);
 
 void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned short index);
+/* Vertex and geometry stages (see GPUPassStages in gpu_codegen.h). */
+void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link);
+void GPU_material_shells(GPUMaterial *material, int layers, float length);
+void GPU_material_outline(GPUMaterial *material, float width);
+bool GPU_material_geometry_stage_supported(void);
+bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out);
+/* The material moves its vertices on the GPU (user vertex/geometry code, vertex or geometry nodes). */
+bool GPU_material_moves_vertices(struct Material *ma);
 void GPU_material_enable_alpha(GPUMaterial *material);
 struct GPUNodeLink *GPU_material_world_color(GPUMaterial *mat);
 GPUBuiltin GPU_get_material_builtins(GPUMaterial *material);

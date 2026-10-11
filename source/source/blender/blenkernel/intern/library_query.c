@@ -718,6 +718,7 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 				/* User GLSL sources (Shading panel > Shader Sources); Text is not refcounted by RNA. */
 				CALLBACK_INVOKE(material->vertcode, IDWALK_CB_NOP);
 				CALLBACK_INVOKE(material->fragcode, IDWALK_CB_NOP);
+				CALLBACK_INVOKE(material->geomcode, IDWALK_CB_NOP);
 				if (material->texpaintslot != NULL) {
 					CALLBACK_INVOKE(material->texpaintslot->ima, IDWALK_CB_NOP);
 				}

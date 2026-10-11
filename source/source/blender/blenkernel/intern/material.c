@@ -109,6 +109,7 @@ void BKE_material_free(Material *ma)
 	/* user custom shader */
 	ma->vertcode = NULL;
 	ma->fragcode = NULL;
+	ma->geomcode = NULL;
 }
 
 void BKE_material_init(Material *ma)
@@ -213,6 +214,7 @@ void BKE_material_init(Material *ma)
 
 	ma->vertcode = NULL;
 	ma->fragcode = NULL;
+	ma->geomcode = NULL;
 
 	ma->constflag = MA_CONSTANT_MATERIAL | MA_CONSTANT_LAMP | MA_CONSTANT_TEXTURE | MA_CONSTANT_TEXTURE_UV | MA_CONSTANT_WORLD | MA_CONSTANT_MIST;
 }

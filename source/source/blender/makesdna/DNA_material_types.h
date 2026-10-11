@@ -170,7 +170,7 @@ typedef struct Material {
 	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	struct Group *group;	/* light group */
 	struct PreviewImage *preview;
-	struct Text *fragcode, *vertcode;
+	struct Text *fragcode, *vertcode, *geomcode;
 
 	/* dynamic properties */
 	float friction DNA_DEPRECATED, rolling_friction DNA_DEPRECATED;
