@@ -6,6 +6,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Shader nodes: Billboard, Strands, Explode (pendentes da fase 3)
+
+- **Billboard** (`SH_NODE_BILLBOARD`, estágio vertex): entradas `Lock Axis`, `Scale`; saída `Offset` pro
+  Vertex Offset do Material Output. `node_billboard` (`gpu_shader_material.glsl`) gira a malha (autorada no
+  plano local XZ) pras direções direita/cima da câmera, lidas de `GPU_INVERSE_VIEW_MATRIX`/
+  `GPU_INVERSE_OBJECT_MATRIX`; cilíndrico (eixo Z fixo) ou esférico conforme `Lock Axis`.
+- **Strands** (`SH_NODE_STRANDS`, estágio geometry): entradas `Density`, `Length`, `Curvature`; saída
+  `Tip Factor`. Novo modo `use_strands` em `code_generate_geometry_stage` (`gpu_codegen.c`): um triângulo
+  fino por strand, origem pseudo-aleatória no triângulo de entrada, LOD por distância da câmera. Reaproveita
+  o canal `varshelllayer`/`node_shell_layer` do Fur Shells/Outline em vez de criar varying nova (por isso não
+  tem saída separada de índice da strand). `GPU_material_strands` novo em `gpu_material.c`/`GPU_material.h`.
+- **Explode** (`SH_NODE_EXPLODE`, estágio geometry): entrada `Factor`; saída `Amount` (passthrough). Novo
+  modo `use_explode`: cada triângulo sai inteiro deslocado por normal + direção aleatória por face (hash de
+  `gl_PrimitiveIDIn`), `max_vertices = 3`. `GPU_material_explode` novo.
+- Strands/Explode e Shells/Outline são mutuamente exclusivos no mesmo material (prioridade decidida em
+  `GPU_generate_pass`: Shells/Outline > Strands > Explode > `geomcode` do usuário).
+- Registro: `BKE_node.h` (1015-1017), `node.c`, `NOD_static_types.h`, `NOD_shader.h`, `nodeitems_builtins.py`
+  (Billboard em Vertex; Strands/Explode em Geometry).
+- Compilado limpo (`RangeEngine`/`RangeRuntime`, `ninja` via `build-anastacio`). Validado sem display com
+  `tools/debug/cenas/criar_cena_billboard_strands_explode.py`: tipos certos em `bpy.types`, `.range` salva; e,
+  com GL disponível nesta sessão, `AnastacioRuntime.exe` rodou a cena 65 quadros sem crash e tirou um
+  `shot.png` — os geometry shaders novos compilaram e executaram de fato. **Falta**: inspeção visual do
+  `shot.png`, cor do cabeçalho do nó por estágio, presets dedicados, custo no painel. Ver
+  [shader-nodes.md](shader-nodes.md#billboard-strands-explode-fase-3).
+
 ## 2026-10-11 - GLSL Script: funções auxiliares sem conflito, uniforms `u_` e TIME
 
 - Antes: funções auxiliares já compilavam, mas iam para o shader com o nome original; dois nós GLSL Script com um helper, constante ou `#define` de mesmo nome (ou o mesmo Text em dois nós) davam redefinição.

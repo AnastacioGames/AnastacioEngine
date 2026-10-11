@@ -680,6 +680,20 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Compilado limpo; **não validado visualmente** (sem display/GPU neste ambiente). Pendente, conscientemente fora
   deste escopo: nó dedicado de Planar Reflection (espelho/água real) para o `KX_PlanarMap` existente, que hoje só
   se liga por Image/EnvMap no objeto, fora do node graph.
+- **Billboard, Strands, Explode (2026-10-11, branch `claude/shader-nodes`)**: completa os três pendentes da
+  fase 3 listados acima. Ver [shader-nodes.md](shader-nodes.md#billboard-strands-explode-fase-3). Billboard
+  (vertex, cilíndrico/esférico via `Lock Axis`) não precisou de mudança em `gpu_codegen.c`. Strands e Explode
+  são novos modos do estágio de geometria em `code_generate_geometry_stage` (`gpu_codegen.c`), mutuamente
+  exclusivos com Fur Shells/Outline no mesmo material (prioridade Shells/Outline > Strands > Explode >
+  `geomcode` do usuário); `GPU_material_strands`/`GPU_material_explode` novos em `gpu_material.c`/
+  `GPU_material.h`. Strands reaproveita o canal `varshelllayer` existente pro "Tip Factor" em vez de criar
+  uma varying nova — por isso não tem uma saída separada de índice da strand (decisão de escopo documentada
+  em shader-nodes.md). Compilado limpo (`RangeEngine`/`RangeRuntime`); **validado além da conversão**: com GL
+  disponível nesta sessão, `tools/debug/cenas/criar_cena_billboard_strands_explode.py` rodou 65 quadros no
+  `AnastacioRuntime.exe` sem crash e gerou um `shot.png` — os geometry shaders de Strands/Explode compilaram e
+  executaram de fato. **Falta** a inspeção visual desse `shot.png` (ninguém olhou se a grama/explosão/billboard
+  parecem certos) e presets dedicados (Wind Leaves/Triplanar/Hologram, cor do cabeçalho por estágio, custo no
+  painel) continuam pendentes, não fizeram parte deste lote.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

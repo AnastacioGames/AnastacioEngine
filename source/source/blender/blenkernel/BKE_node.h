@@ -806,6 +806,9 @@ struct ShadeResult;
 #define SH_NODE_VERTEX_OFFSET	1012
 #define SH_NODE_WORLD_BLOOM_FX	1013
 #define SH_NODE_WORLD_SSR_FX	1014
+#define SH_NODE_BILLBOARD		1015
+#define SH_NODE_STRANDS			1016
+#define SH_NODE_EXPLODE			1017
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF			1 /* Unused */

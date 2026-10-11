@@ -196,6 +196,10 @@ typedef struct GPUPassStages {
 	int shell_layers;                  /* Fur Shells: layers including the base surface, < 2 disables */
 	float shell_length;                /* Fur Shells: distance of the last layer along the normal */
 	float outline_width;               /* Outline: inverted hull width, 0 disables */
+	int strand_density;                /* Strands: thin triangles emitted per input triangle, < 2 disables */
+	float strand_length;               /* Strands: length along the normal */
+	float strand_curvature;            /* Strands: bend of the tip away from the normal */
+	float explode_factor;              /* Explode: triangles pushed apart along their normal, 0 disables */
 	ListBase *scripts;                 /* GPUScriptCode */
 } GPUPassStages;
 

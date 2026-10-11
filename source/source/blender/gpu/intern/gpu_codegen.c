@@ -1884,10 +1884,11 @@ static char *geom_hoist_layouts(const char *usercode, DynStr *ds, bool *r_has_in
 }
 
 static char *code_generate_geometry_stage(const GeomVarying *list, int tot, const GPUPassStages *stages,
-                                          bool use_shells, int *r_max_vertices)
+                                          bool use_shells, bool use_strands, bool use_explode,
+                                          int *r_max_vertices)
 {
 	DynStr *ds = BLI_dynstr_new();
-	const bool use_raw = !use_shells && geom_code_has_main(stages->geomcode);
+	const bool use_raw = !use_shells && !use_strands && !use_explode && geom_code_has_main(stages->geomcode);
 	char *rawcode = NULL;
 
 	if (use_shells) {
@@ -1913,6 +1914,37 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        invocations, invocations * 3, invocations - 1);
 		*r_max_vertices = invocations * 3;
 	}
+	else if (use_strands) {
+		const int density = max_ii(stages->strand_density, 1);
+		/* One invocation per strand, same reasoning as SHELL_LAYERS above: max_vertices stays at
+		 * 3 (one thin triangle) with GL 4.0 invocations, or density*3 on the fallback path. */
+		BLI_dynstr_appendf(ds,
+		        "#define STRAND_DENSITY %d\n"
+		        "#define STRAND_LENGTH %f\n"
+		        "#define STRAND_CURVATURE %f\n"
+		        "#if __VERSION__ >= 400\n"
+		        "layout(triangles, invocations = %d) in;\n"
+		        "layout(triangle_strip, max_vertices = 3) out;\n"
+		        "#define GEOM_STRAND_FIRST gl_InvocationID\n"
+		        "#define GEOM_STRAND_LAST gl_InvocationID\n"
+		        "#else\n"
+		        "layout(triangles) in;\n"
+		        "layout(triangle_strip, max_vertices = %d) out;\n"
+		        "#define GEOM_STRAND_FIRST 0\n"
+		        "#define GEOM_STRAND_LAST %d\n"
+		        "#endif\n",
+		        density, stages->strand_length, stages->strand_curvature,
+		        density, density * 3, density - 1);
+		*r_max_vertices = density * 3;
+	}
+	else if (use_explode) {
+		BLI_dynstr_appendf(ds,
+		        "#define EXPLODE_FACTOR %f\n"
+		        "layout(triangles) in;\n"
+		        "layout(triangle_strip, max_vertices = 3) out;\n",
+		        stages->explode_factor);
+		*r_max_vertices = 3;
+	}
 	else if (use_raw) {
 		bool has_in, has_out;
 		rawcode = geom_hoist_layouts(stages->geomcode, ds, &has_in, &has_out);
@@ -1937,7 +1969,7 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		BLI_dynstr_appendf(ds, "%sin %s vs_%s[];\n", flat, list[i].type, list[i].name);
 		BLI_dynstr_appendf(ds, "%sout %s %s;\n", flat, list[i].type, list[i].name);
 	}
-	if (use_shells) {
+	if (use_shells || use_strands) {
 		BLI_dynstr_append(ds, "out float varshelllayer;\n");
 	}
 
@@ -2030,6 +2062,64 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        "\t\t}\n"
 		        "\t\tEndPrimitive();\n"
 		        "\t}\n"
+		        "}\n");
+	}
+	else if (use_strands) {
+		BLI_dynstr_append(ds,
+		        "float geom_strand_hash(vec2 p)\n{\n\treturn fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n}\n\n"
+		        "void main()\n{\n"
+		        "\tfor (int s = GEOM_STRAND_FIRST; s <= GEOM_STRAND_LAST; s++) {\n"
+		        "\t\tif (s >= STRAND_DENSITY) continue;\n"
+		        "\t\tfloat fid = float(gl_PrimitiveIDIn);\n"
+		        "\t\t/* Pseudo-random barycentric coordinate: where this strand grows from. */\n"
+		        "\t\tfloat b0 = geom_strand_hash(vec2(float(s), fid));\n"
+		        "\t\tfloat b1 = geom_strand_hash(vec2(float(s) + 17.0, fid + 3.0)) * (1.0 - b0);\n"
+		        "\t\tfloat b2 = 1.0 - b0 - b1;\n"
+		        "\t\t/* LOD: strands fade out progressively between 0 and ~20 units (view space puts\n"
+		        "\t\t * the camera at the origin, so length(base) is the camera distance). */\n"
+		        "\t\tfloat lod = geom_strand_hash(vec2(float(s) + 5.0, fid + 9.0));\n"
+		        "\t\tvec3 base = vs_varposition[0] * b0 + vs_varposition[1] * b1 + vs_varposition[2] * b2;\n"
+		        "\t\tvec3 normal = normalize(vs_varnormal[0] * b0 + vs_varnormal[1] * b1 + vs_varnormal[2] * b2);\n"
+		        "\t\tfloat camfade = clamp(1.0 - length(base) * 0.05, 0.0, 1.0);\n"
+		        "\t\tif (lod > camfade) continue;\n"
+		        "\t\tvec3 side = normalize(cross(normal, (abs(normal.z) < 0.9) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));\n"
+		        "\t\tconst float width = 0.015;\n"
+		        "\t\tvec3 bend = side * (STRAND_CURVATURE * STRAND_LENGTH * (b0 - 0.5));\n"
+		        "\t\tvec3 tip = base + normal * STRAND_LENGTH + bend;\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(base - side * width);\n"
+		        "\t\tvarshelllayer = 0.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(base + side * width);\n"
+		        "\t\tvarshelllayer = 0.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tgeom_copy(0);\n"
+		        "\t\tgeom_set_position(tip);\n"
+		        "\t\tvarshelllayer = 1.0;\n"
+		        "\t\tEmitVertex();\n"
+		        "\t\tEndPrimitive();\n"
+		        "\t}\n"
+		        "}\n");
+	}
+	else if (use_explode) {
+		BLI_dynstr_append(ds,
+		        "float geom_explode_hash(float p)\n{\n\treturn fract(sin(p * 12.9898) * 43758.5453);\n}\n\n"
+		        "void main()\n{\n"
+		        "\tvec3 normal = normalize(cross(vs_varposition[1] - vs_varposition[0], vs_varposition[2] - vs_varposition[0]));\n"
+		        "\tfloat h = geom_explode_hash(float(gl_PrimitiveIDIn) + 1.0);\n"
+		        "\tfloat ang = h * 6.28318530718;\n"
+		        "\t/* Mostly along the face normal, with a per-triangle random direction mixed in so\n"
+		        "\t * neighbouring triangles do not fly apart in lockstep. */\n"
+		        "\tvec3 randdir = vec3(cos(ang), sin(ang), geom_explode_hash(float(gl_PrimitiveIDIn) * 2.0 + 7.0) * 2.0 - 1.0);\n"
+		        "\tvec3 dir = normalize(normal + randdir * 0.5);\n"
+		        "\tvec3 offset = dir * (EXPLODE_FACTOR * (0.25 + h * 0.75));\n"
+		        "\tfor (int i = 0; i < 3; i++) {\n"
+		        "\t\tgeom_copy(i);\n"
+		        "\t\tgeom_set_position(vs_varposition[i] + offset);\n"
+		        "\t\tEmitVertex();\n"
+		        "\t}\n"
+		        "\tEndPrimitive();\n"
 		        "}\n");
 	}
 	else if (use_raw) {
@@ -3436,13 +3526,20 @@ GPUPass *GPU_generate_pass(
 
 	/* Geometry stage: user code, or Fur Shells/Outline. Without support (GLES/web) the material
 	 * draws as if it had none. */
-	bool use_geometry = false, use_shells = false;
+	bool use_geometry = false, use_shells = false, use_strands = false, use_explode = false;
 	if (mesh_stages) {
 		const bool wants_shells = stages->shell_layers > 1 || stages->outline_width != 0.0f;
-		if (stages->geomcode || wants_shells) {
+		const bool wants_strands = stages->strand_density > 1;
+		const bool wants_explode = stages->explode_factor != 0.0f;
+		if (stages->geomcode || wants_shells || wants_strands || wants_explode) {
 			if (GPU_geometry_shader_support()) {
 				use_geometry = true;
+				/* Shells/Outline, Strands and Explode are mutually exclusive generated geometry
+				 * stages (a material only gets one); Shells/Outline wins since it is the oldest
+				 * and most used, then Strands, then Explode. User geomcode always wins. */
 				use_shells = !stages->geomcode && wants_shells;
+				use_strands = !stages->geomcode && !use_shells && wants_strands;
+				use_explode = !stages->geomcode && !use_shells && !use_strands && wants_explode;
 			}
 			else if (!geometry_warned) {
 				geometry_warned = true;
@@ -3473,11 +3570,12 @@ GPUPass *GPU_generate_pass(
 	}
 
 	/* generate code and compile with opengl */
-	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks, use_shells, stages ? stages->scripts : NULL);
+	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks, use_shells || use_strands, stages ? stages->scripts : NULL);
 	vertexcode = code_generate_vertex(nodes, vertcode, type, use_instancing, vertex_prefix, vertex_offset,
 	                                  stages ? stages->scripts : NULL);
 	if (use_geometry) {
-		geometrycode = code_generate_geometry_stage(geom_varyings, geom_varyings_len, stages, use_shells,
+		geometrycode = code_generate_geometry_stage(geom_varyings, geom_varyings_len, stages,
+		                                            use_shells, use_strands, use_explode,
 		                                            &geom_max_vertices);
 	}
 	else {

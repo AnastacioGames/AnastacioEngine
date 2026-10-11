@@ -6946,3 +6946,49 @@ void node_outline(float width, float layer, out float fac)
 {
 	fac = (layer < -0.5) ? 1.0 : 0.0;
 }
+
+/* Billboard: rotates the mesh around its local origin so it keeps facing the camera. Assumes the
+ * mesh was authored flat on the local XZ plane (X = width, Z = height), the usual convention for
+ * a sprite/grass quad -- the offset moves X/Z into the camera's right/up directions (in object
+ * space) and removes the original X/Z so the result replaces them rather than adding on top.
+ * Lock Axis keeps the up vector on local +Z (cylindrical billboard, e.g. grass/trees); otherwise
+ * the billboard is spherical (always fully faces the camera, e.g. particles/UI markers). */
+void node_billboard(float lock_axis, float scale, mat4 invviewmat, mat4 invobmat, out vec3 offset)
+{
+	vec3 cam_right = invviewmat[0].xyz;
+	vec3 cam_up = (lock_axis > 0.5) ? vec3(0.0, 0.0, 1.0) : invviewmat[1].xyz;
+	vec3 cam_fwd = invviewmat[2].xyz;
+
+	vec3 right_obj = normalize((invobmat * vec4(cam_right, 0.0)).xyz);
+	vec3 up_obj;
+	if (lock_axis > 0.5) {
+		/* Cylindrical: keep the local +Z axis fixed, only swing around it to face the camera. */
+		up_obj = vec3(0.0, 0.0, 1.0);
+		vec3 fwd_obj = normalize((invobmat * vec4(cam_fwd, 0.0)).xyz);
+		right_obj = normalize(cross(up_obj, fwd_obj));
+	}
+	else {
+		up_obj = normalize((invobmat * vec4(cam_up, 0.0)).xyz);
+	}
+
+	vec3 co = vertex_position();
+	vec3 billboarded = (right_obj * co.x + up_obj * co.z) * max(scale, 0.0001);
+	offset = billboarded - co;
+}
+
+/* Strands: the geometry stage emits Density thin triangles per input triangle, growing along the
+ * normal; "layer" is 0.0 on the two base vertices and 1.0 on the tip vertex (see
+ * code_generate_geometry_stage's STRAND branch), reused from the Fur Shells/Outline shell_layer
+ * channel so Strands needs no extra varying. */
+void node_strands_info(float density, float length, float curvature, float layer, out float tip)
+{
+	tip = clamp(layer, 0.0, 1.0);
+}
+
+/* Explode: the geometry stage offsets whole triangles along their normal (plus a per-triangle
+ * random direction) by Factor; this node has no geometry of its own to compute, "amount" just
+ * passes Factor through so it can be reused (e.g. to fade color/alpha with the same value). */
+void node_explode(float factor, out float amount)
+{
+	amount = factor;
+}

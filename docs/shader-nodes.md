@@ -216,10 +216,67 @@ para atualizar. No fragment, o código dos nós fica no fim, depois das funçõe
 
 O botão precisa do shader compilado; com erro de compilação ele avisa e não gera os Texts.
 
+## Billboard, Strands, Explode (fase 3)
+
+Três nós novos em `node_shader_stage_nodes.c`, completando os pendentes da fase 3 (ver `docs/roadmap.md`).
+
+**Billboard** (categoria Vertex, `SH_NODE_BILLBOARD`): entradas `Lock Axis` (0/1, padrão 1) e `Scale`;
+saída `Offset` pro Vertex Offset do Material Output, igual Wind/Wave. Implementado em
+`node_billboard` (`gpu_shader_material.glsl`): assume que a malha foi desenhada no plano local XZ
+(X = largura, Z = altura) em volta da origem — convenção comum de quad de sprite/grama — e troca X/Z
+pelas direções direita/cima da câmera, lidas de `GPU_INVERSE_VIEW_MATRIX`/`GPU_INVERSE_OBJECT_MATRIX`
+(mesmos builtins que `node_shader_bump.c`/`node_shader_damage.c` já usam). Com `Lock Axis` ligado
+(padrão) o billboard é cilíndrico: o eixo local +Z fica fixo (bom pra grama/árvores, não capota) e só
+gira pra encarar a câmera; desligado é esférico (sempre de frente total, bom pra partícula/ícone).
+Não precisou de nenhuma mudança em `gpu_codegen.c`/`gpu_material.c` — é só um nó de vertex como os outros.
+
+**Strands** (categoria Geometry, `SH_NODE_STRANDS`): entradas `Density` (1-32), `Length`, `Curvature`;
+saída `Tip Factor` (0 na base, 1 na ponta). Liga o estágio de geometria via
+`GPU_material_strands(mat, density, length, curvature)` (novo em `gpu_material.c`/`GPU_material.h`,
+mesmo padrão de `GPU_material_shells`). Em `gpu_codegen.c`, `code_generate_geometry_stage` ganhou um
+modo `use_strands`: um invocation por strand (`GL_VERSION >= 400`) ou um loop de `Density` iterações no
+fallback, cada um emitindo UM triângulo fino (3 vértices: base-esquerda, base-direita, ponta) a partir
+de um ponto pseudo-aleatório do triângulo de entrada (coordenada baricêntrica por hash de
+`gl_InvocationID`/`gl_PrimitiveIDIn`), com LOD por distância da câmera (`length(base)` em view space,
+que tem a câmera na origem — strands somem progressivamente depois de ~20 unidades, fator fixo
+`0.05`, ainda não exposto como socket). **Decisão de escopo**: em vez de criar uma varying nova pro Tip
+Factor, Strands reaproveita o canal `varshelllayer`/`node_shell_layer` que Fur Shells e Outline já
+usam (0 nas duas bases, 1 na ponta) — por isso não há uma segunda saída "Strand Index" separada, só
+`Tip Factor`; Strands e Shells/Outline são estágios de geometria mutuamente exclusivos no mesmo
+material (prioridade: Shells/Outline > Strands > Explode > `geomcode` do usuário, decidida em
+`GPU_generate_pass`). Custo documentado: `max_vertices` do GS é `Density * 3`; o GLSL do triângulo
+inteiro é copiado do vértice 0 (`geom_copy(0)`) pros três vértices do strand, então atributos como UV
+variam pouco dentro da fita — aceitável pra grama simples, não pra strand com textura própria ao longo
+do comprimento.
+
+**Explode** (categoria Geometry, `SH_NODE_EXPLODE`): entrada `Factor`; saída `Amount` (passthrough de
+Factor, pra encadear em outro nó, ex. sumir com o alfa conforme explode). Liga
+`GPU_material_explode(mat, factor)` (novo, mesmo arquivo). Modo `use_explode` em
+`code_generate_geometry_stage`: um único invocation, sem loop — cada triângulo de entrada sai inteiro
+(`geom_copy(i)` nos 3 vértices) deslocado por uma direção que mistura a normal da face com um vetor
+aleatório por triângulo (hash de `gl_PrimitiveIDIn`), pra os triângulos não voarem todos exatamente
+juntos. `max_vertices = 3`. Não tem noção de velocidade/tempo própria — se quiser animar a explosão,
+o `Factor` precisa variar no tempo por fora (ex. ligado a um Math com `TIME`, ou trocado via Python);
+não há integração com física/destruição real, é puro efeito visual de geometria.
+
+Os três foram adicionados em `BKE_node.h` (`SH_NODE_BILLBOARD` 1015, `SH_NODE_STRANDS` 1016,
+`SH_NODE_EXPLODE` 1017), `node.c` (registro + lista de nós compatíveis com os dois sistemas de
+shading), `NOD_static_types.h`, `NOD_shader.h` e no menu Add (`nodeitems_builtins.py`, categorias
+Vertex/Geometry, tanto a lista antiga quanto a nova).
+
+**Validado sem GPU/display** com `tools/debug/cenas/criar_cena_billboard_strands_explode.py`: os três
+tipos existem em `bpy.types` com os sockets certos (`CHECK BILLBOARD_INPUTS` etc.), dá pra criar e
+ligar no Material Output/BSDF e salvar num `.range`. Diferente dos nós de Bloom/SSR anteriores, este
+ambiente **tinha** GL disponível para o `AnastacioRuntime.exe`: a cena rodou 65 quadros sem crash e
+tirou um `shot.png` (câmera fixa olhando pros três objetos) — então o geometry shader de Strands e
+Explode realmente compilou e rodou nessa máquina, não só "não quebrou a conversão". **Falta** a
+inspeção visual do `shot.png` por alguém (confirmar que a grama parece grama, que o cubo do Explode
+abriu as faces, que o billboard girou certo) — isso não foi feito aqui.
+
 ## Sombras e cache
 
-- Material que move vértices (Vertex Offset, Fur Shells, Outline ou código do usuário) faz sombra com o próprio
-  shader.
+- Material que move vértices (Vertex Offset, Fur Shells, Outline, Billboard ou código do usuário) faz sombra
+  com o próprio shader. Strands e Explode também mudam a geometria no mesmo sentido (via geometry stage).
 - Materiais sem esses recursos geram o mesmo código de antes. O cache de shaders e o `.cooked` recompilam uma vez
   após a atualização.
 
@@ -233,3 +290,7 @@ Toon Outline, cubo com GLSL Script e cubo com o campo Geometry.
 
 `tools/debug/cenas/criar_cena_glsl_script_uniforms.py` testa o GLSL Script: dois scripts com helpers de mesmo
 nome no mesmo material, uniforms `u_` trocados pelo Python do jogo e script no Vertex Offset com `TIME`.
+
+`tools/debug/cenas/criar_cena_billboard_strands_explode.py` cria um plano com Billboard, um plano com Strands
+(ligado no Base Color pra inspecionar o Tip Factor) e um cubo com Explode (ligado no Metallic); salva o
+`.range` e roda alguns quadros no Runtime tirando um `shot.png`.

@@ -148,12 +148,15 @@ def shader_vertex_items(context):
     yield NodeItem("ShaderNodeVertexOffset")
     yield NodeItem("ShaderNodeVertexWind")
     yield NodeItem("ShaderNodeVertexWave")
+    yield NodeItem("ShaderNodeBillboard")
 
 
 def shader_geometry_items(context):
     yield NodeItem("ShaderNodeFurShells")
     yield NodeItem("ShaderNodeOutline")
     yield NodeItem("ShaderNodeShellLayer")
+    yield NodeItem("ShaderNodeStrands")
+    yield NodeItem("ShaderNodeExplode")
 
 
 # node group presets, see NODE_OT_shader_preset_add

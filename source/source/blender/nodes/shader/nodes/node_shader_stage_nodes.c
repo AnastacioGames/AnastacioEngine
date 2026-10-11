@@ -252,3 +252,101 @@ void register_node_type_sh_outline(void)
 
 	nodeRegisterType(&ntype);
 }
+
+/* **************** BILLBOARD ******************** */
+
+/* Vertex stage: offset that rotates the mesh around its local origin to face the camera (see
+ * node_billboard in gpu_shader_material.glsl for the assumptions on mesh layout). */
+static bNodeSocketTemplate sh_node_billboard_in[] = {
+	{	SOCK_FLOAT, 1, N_("Lock Axis"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
+	{	SOCK_FLOAT, 1, N_("Scale"),     1.0f, 0.0f, 0.0f, 0.0f, 0.0001f, 100.0f, PROP_NONE},
+	{	-1, 0, ""	}
+};
+
+static int node_shader_gpu_billboard(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	return GPU_stack_link(mat, "node_billboard", in, out,
+	                       GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX),
+	                       GPU_material_builtin(mat, GPU_INVERSE_OBJECT_MATRIX));
+}
+
+void register_node_type_sh_billboard(void)
+{
+	static bNodeType ntype;
+
+	sh_node_type_base(&ntype, SH_NODE_BILLBOARD, "Billboard", NODE_CLASS_OP_VECTOR, 0);
+	node_type_compatibility(&ntype, NODE_OLD_SHADING | NODE_NEW_SHADING);
+	node_type_socket_templates(&ntype, sh_node_billboard_in, sh_node_vertex_offset_only_out);
+	node_type_gpu(&ntype, node_shader_gpu_billboard);
+
+	nodeRegisterType(&ntype);
+}
+
+/* **************** STRANDS ******************** */
+
+/* Density/Length/Curvature are read when the shader is generated (the geometry stage is built
+ * for them), same as Fur Shells. Unlike Fur Shells (parallel layers over the whole surface) this
+ * emits thin strands/blades growing from random points of each triangle -- grass, fur tufts. */
+static bNodeSocketTemplate sh_node_strands_in[] = {
+	{	SOCK_FLOAT, 1, N_("Density"),   8.0f,  0.0f, 0.0f, 0.0f, 1.0f, 32.0f, PROP_NONE},
+	{	SOCK_FLOAT, 1, N_("Length"),    0.1f,  0.0f, 0.0f, 0.0f, 0.0f, 100.0f, PROP_DISTANCE},
+	{	SOCK_FLOAT, 1, N_("Curvature"), 0.0f,  0.0f, 0.0f, 0.0f, -10.0f, 10.0f, PROP_NONE},
+	{	-1, 0, ""	}
+};
+
+static bNodeSocketTemplate sh_node_strands_out[] = {
+	{	SOCK_FLOAT, 0, N_("Tip Factor"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
+	{	-1, 0, ""	}
+};
+
+static int node_shader_gpu_strands(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	GPUNodeLink *layer;
+
+	GPU_material_strands(mat, (int)(in[0].vec[0] + 0.5f), in[1].vec[0], in[2].vec[0]);
+
+	GPU_link(mat, "node_shell_layer", &layer);
+	return GPU_stack_link(mat, "node_strands_info", in, out, layer);
+}
+
+void register_node_type_sh_strands(void)
+{
+	static bNodeType ntype;
+
+	sh_node_type_base(&ntype, SH_NODE_STRANDS, "Strands", NODE_CLASS_CONVERTOR, 0);
+	node_type_compatibility(&ntype, NODE_OLD_SHADING | NODE_NEW_SHADING);
+	node_type_socket_templates(&ntype, sh_node_strands_in, sh_node_strands_out);
+	node_type_gpu(&ntype, node_shader_gpu_strands);
+
+	nodeRegisterType(&ntype);
+}
+
+/* **************** EXPLODE ******************** */
+
+static bNodeSocketTemplate sh_node_explode_in[] = {
+	{	SOCK_FLOAT, 1, N_("Factor"), 0.0f, 0.0f, 0.0f, 0.0f, -100.0f, 100.0f, PROP_DISTANCE},
+	{	-1, 0, ""	}
+};
+
+static bNodeSocketTemplate sh_node_explode_out[] = {
+	{	SOCK_FLOAT, 0, N_("Amount"), 0.0f, 0.0f, 0.0f, 0.0f, -100.0f, 100.0f, PROP_NONE},
+	{	-1, 0, ""	}
+};
+
+static int node_shader_gpu_explode(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+{
+	GPU_material_explode(mat, in[0].vec[0]);
+	return GPU_stack_link(mat, "node_explode", in, out);
+}
+
+void register_node_type_sh_explode(void)
+{
+	static bNodeType ntype;
+
+	sh_node_type_base(&ntype, SH_NODE_EXPLODE, "Explode", NODE_CLASS_CONVERTOR, 0);
+	node_type_compatibility(&ntype, NODE_OLD_SHADING | NODE_NEW_SHADING);
+	node_type_socket_templates(&ntype, sh_node_explode_in, sh_node_explode_out);
+	node_type_gpu(&ntype, node_shader_gpu_explode);
+
+	nodeRegisterType(&ntype);
+}

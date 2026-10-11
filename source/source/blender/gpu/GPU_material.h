@@ -287,6 +287,8 @@ void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned
 void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_shells(GPUMaterial *material, int layers, float length);
 void GPU_material_outline(GPUMaterial *material, float width);
+void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature);
+void GPU_material_explode(GPUMaterial *material, float factor);
 bool GPU_material_geometry_stage_supported(void);
 /* uniform_names: one entry per input socket, the name of the "u_" uniform it feeds or NULL. An unlinked
  * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */

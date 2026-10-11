@@ -118,6 +118,10 @@ struct GPUMaterial {
 	int shell_layers;
 	float shell_length;
 	float outline_width;
+	int strand_density;
+	float strand_length;
+	float strand_curvature;
+	float explode_factor;
 	ListBase scripts; /* GPUScriptCode, only while the pass is generated */
 	ListBase script_uniforms; /* GPUScriptUniform, the pass inputs point to these values */
 	/* User vertex/geometry code or vertex nodes: the view/object matrices and the time are always sent. */
@@ -457,6 +461,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	stages.shell_layers = material->shell_layers;
 	stages.shell_length = material->shell_length;
 	stages.outline_width = material->outline_width;
+	stages.strand_density = material->strand_density;
+	stages.strand_length = material->strand_length;
+	stages.strand_curvature = material->strand_curvature;
+	stages.explode_factor = material->explode_factor;
 	stages.scripts = &material->scripts;
 
 	if (used) {
@@ -1244,6 +1252,25 @@ void GPU_material_outline(GPUMaterial *material, float width)
 {
 	if (material->type == GPU_MATERIAL_TYPE_MESH && width != 0.0f) {
 		material->outline_width = width;
+	}
+}
+
+/* Strands node: Density thin triangles per input triangle, grown along the normal by Length. */
+void GPU_material_strands(GPUMaterial *material, int density, float length, float curvature)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH) {
+		material->strand_density = max_ii(material->strand_density, min_ii(max_ii(density, 1), 32));
+		material->strand_length = max_ff(material->strand_length, length);
+		material->strand_curvature = curvature;
+	}
+}
+
+/* Explode node: every triangle pushed apart along its normal (plus a per-triangle random
+ * direction) by the geometry stage. */
+void GPU_material_explode(GPUMaterial *material, float factor)
+{
+	if (material->type == GPU_MATERIAL_TYPE_MESH && factor != 0.0f) {
+		material->explode_factor = factor;
 	}
 }
 
