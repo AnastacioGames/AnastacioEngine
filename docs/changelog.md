@@ -6,6 +6,29 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - KX10 (cache de shadow cull) validado com Spot/armature/layers, fecha como corrigido
+
+Continuação do mesmo worktree (`claude/auditoria-gpu-cache`). O item KX10 (`AutoShadowStillValid`/
+`BuildShadowCullCache`) já tinha passado no benchmark estático (sombras 0,613 → 0,194 ms, FPS +28,3%)
+mas faltava a validação com Spot/deformadores/layers pedida em `docs/auditoria-suspeitos.md`.
+
+Nova cena `tools/debug/cenas/criar_cena_kx10_correcao.py` (não é benchmark, é teste de corretude):
+Spot com Auto Shadow, um personagem com modifier ARMATURE sempre dentro do alcance (parado, mas
+com deformador), um cubo rígido que entra/sai do alcance via Python em 3 fases (perto/longe/perto2,
+40 frames cada) e um objeto numa layer fora do `shadow_layer` do Spot. Roda com `--sem-armature`
+para isolar o teste do objeto que entra/sai sem a interferência do deformador.
+
+- **Com armature**: `lightsShadowUpdated` = 1 em todos os 150 frames das 3 fases — confirma que a
+  checagem `entry.m_object->GetDeformer()` nunca deixa o cache congelar com deformador em alcance,
+  mesmo com a pose parada.
+- **Sem armature**: 0 em repouso (39 frames seguidos por fase) e exatamente 1 no frame seguinte a
+  cada transição real de alcance do cubo (f=42 e f=82) — sem update perdido nem espúrio.
+- O objeto fora da layer do Spot nunca apareceu na contagem (filtro de layer correto).
+
+KX10 passa de "parcial" para **corrigido** em `docs/auditoria-suspeitos.md`. Checagem visual da
+sombra renderizada no jogo real (com/sem o cache) continua pendente do usuário, como os demais itens
+desta auditoria que dependem de avaliação visual.
+
 ## 2026-10-11 - Cluster GPU cache: GP6 e RA2 corrigidos; GP3/GP4/GP5/GP7 analisados sem alteração
 
 Continuação do cluster "gpu / depsgraph" de `docs/auditoria-suspeitos.md` (GP1/GP2/RA1 corrigidos em
