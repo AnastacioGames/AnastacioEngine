@@ -244,15 +244,92 @@ bpy.ops.object.mode_set(mode='OBJECT')
 dome.data.materials.append(sky)
 
 # ---------------------------------------------------------------- stormy sea
-sea = preset_material("Sea", 'WATER_WAVES',
-                      "1. Preset Water Waves: duas ondas somadas + cor por angulo de visao (Tab abre o grupo)",
-                      {"Shallow Color": (0.25, 0.95, 0.85, 1.0), "Deep Color": (0.0, 0.02, 0.08, 1.0),
-                       "Amplitude": 0.55, "Wavelength": 16.0, "Speed": 1.6})
-for node in sea.node_tree.nodes:
-    if node.bl_idname == "ShaderNodeBsdfPrincipled":
-        node.inputs["Roughness"].default_value = 0.12
-        node.inputs["Metallic"].default_value = 0.6
-mesh(bpy.ops.mesh.primitive_grid_add, "Sea", (0, 0, 0), sea, x_subdivisions=220, y_subdivisions=220, radius=260)
+def lit_glow_material(name, code, note, roughness, metallic, strength):
+    """Principled lit by the lamps + Emission, both coloured by one GLSL Script (outputs Color and Glow)."""
+    mat, tree, out, bsdf = node_material(name, (1, 1, 1, 1))
+    coord = tree.nodes.new("ShaderNodeTexCoord")
+    coord.location = (-600, 100)
+    time = tree.nodes.new("ShaderNodeTime")
+    time.location = (-600, -250)
+    script = script_node(tree, name.lower() + ".glsl", code, (-250, 0))
+    emit = tree.nodes.new("ShaderNodeEmission")
+    emit.location = (300, -420)
+    emit.inputs["Strength"].default_value = strength
+    add = tree.nodes.new("ShaderNodeAddShader")
+    add.location = (560, 0)
+    out.location = (800, 0)
+    bsdf.inputs["Roughness"].default_value = roughness
+    bsdf.inputs["Metallic"].default_value = metallic
+    tree.links.new(coord.outputs["Object"], script.inputs["Vector"])
+    tree.links.new(time.outputs["Time"], script.inputs["Time"])
+    tree.links.new(script.outputs["Color"], bsdf.inputs["Base Color"])
+    tree.links.new(script.outputs["Glow"], emit.inputs["Color"])
+    tree.links.new(bsdf.outputs[0], add.inputs[0])
+    tree.links.new(emit.outputs[0], add.inputs[1])
+    tree.links.new(add.outputs[0], out.inputs["Surface"])
+    frame(tree, "0. Entradas: posicao do ponto e tempo do jogo", 'IN', [coord, time])
+    frame(tree, note, 'GEOMETRY', [script])
+    frame(tree, "2. Luz: Color vai para o Principled (lampadas), Glow vira brilho proprio (Emission)", 'COLOR',
+          [bsdf, emit, add])
+    return mat, tree, out
+
+
+sea, tree, out = lit_glow_material("Sea", """// Mar: cor por ondulacao, espuma em volta do colosso, reflexo do portal e da aurora.
+void main(vec3 Vector, float Time, out vec4 Color, out vec4 Glow)
+{
+    vec2 p = Vector.xy;
+    float d = length(p);
+    // ondulacao larga (escolhe entre fundo escuro e agua clara)
+    float w = sin(p.x * 0.35 + Time * 1.3) + sin(p.y * 0.42 - Time * 1.1)
+            + sin((p.x + p.y) * 0.21 + Time * 0.7) + sin(d * 0.5 - Time * 2.0) * 0.6;
+    // ondinhas finas (cristas que brilham)
+    float fine = sin(p.x * 0.9 + p.y * 0.35 + w * 2.2 + Time * 1.5);
+    float fine2 = sin(p.y * 1.3 - p.x * 0.3 - w * 1.7 - Time * 1.2);
+    float crest = pow(max(fine, 0.0), 14.0) * 0.7 + pow(max(fine2, 0.0), 20.0) * 0.5;
+    vec3 c = mix(vec3(0.0, 0.015, 0.05), vec3(0.0, 0.13, 0.20), clamp(w * 0.2 + 0.45, 0.0, 1.0));
+    // espuma: aneis que se afastam do colosso
+    float a = atan(p.y, p.x);
+    float rings = sin(d * 0.9 - Time * 2.5 + sin(a * 5.0) * 0.8) * 0.5 + 0.5;
+    float foam = smoothstep(0.75, 1.0, rings) * (1.0 - smoothstep(13.0, 40.0, d)) * (0.6 + 0.4 * fine);
+    foam += (1.0 - smoothstep(0.0, 2.5, abs(d - 13.5 - sin(a * 7.0 + Time) * 1.2))) * 0.8;
+    c = mix(c, vec3(0.75, 0.95, 1.0), clamp(foam, 0.0, 1.0) * 0.85);
+    // reflexo do portal: faixa de luz que vem do portal (y = 55) ate a camera, tremendo com as ondas
+    float wobble = sin(p.y * 0.6 + Time * 2.0) * 1.3 + sin(p.y * 1.7 - Time * 3.0) * 0.5;
+    float streak = exp(-abs(p.x + wobble) / (5.0 + (55.0 - p.y) * 0.07)) * (1.0 - smoothstep(40.0, 58.0, p.y));
+    vec3 portal = 0.5 + 0.5 * cos(6.2831 * (p.y * 0.012 - Time * 0.1 + vec3(0.0, 0.33, 0.67)));
+    vec3 glow = mix(vec3(0.3, 0.9, 1.0), portal, 0.55) * streak * (0.55 + 0.45 * crest) * 0.8;
+    // aurora: verde e roxo cintilando nas cristas
+    glow += vec3(0.1, 0.8, 0.5) * crest * 0.30;
+    glow += vec3(0.5, 0.2, 0.8) * crest * 0.30 * (0.5 + 0.5 * sin(p.x * 0.05 + Time * 0.2));
+    Color = vec4(c, 1.0);
+    Glow = vec4(glow, 1.0);
+}
+""", "1. GLSL Script (sea.glsl): cor, espuma e reflexos. Saidas: Color (iluminada) e Glow (brilho)",
+                                roughness=0.22, metallic=0.0, strength=1.0)
+waves = tree.nodes.new("ShaderNodeGroup")
+waves.node_tree = shader_preset_group('WATER_WAVES')
+frame_group(waves.node_tree)
+waves.location = (300, -750)
+waves.width = 220
+waves.inputs["Amplitude"].default_value = 0.32
+waves.inputs["Wavelength"].default_value = 17.0
+waves.inputs["Speed"].default_value = 1.6
+ripple = tree.nodes.new("ShaderNodeVertexWave")
+ripple.location = (300, -1050)
+ripple.inputs["Amplitude"].default_value = 0.08
+ripple.inputs["Wavelength"].default_value = 5.0
+ripple.inputs["Speed"].default_value = 2.6
+ripple.inputs["Direction"].default_value = (-0.6, 0.8, 0.0)
+vadd = tree.nodes.new("ShaderNodeVectorMath")
+vadd.operation = 'ADD'
+vadd.location = (580, -850)
+tree.links.new(waves.outputs["Offset"], vadd.inputs[0])
+tree.links.new(ripple.outputs["Offset"], vadd.inputs[1])
+tree.links.new(vadd.outputs["Vector"], out.inputs["Vertex Offset"])
+frame(tree, "1b. Ondas na malha: preset Water Waves (grandes) + Wave (marolas), somadas -> Vertex Offset",
+      'VERTEX', [waves, ripple, vadd])
+frame(tree, "3. Saida: Surface = cor e luz, Vertex Offset = deslocamento da malha", 'OUT', [out])
+mesh(bpy.ops.mesh.primitive_grid_add, "Sea", (0, 0, 0), sea, x_subdivisions=300, y_subdivisions=300, radius=260)
 
 # ---------------------------------------------------------------- the colossus
 fur = preset_material("ColossusFur", 'FUR',
@@ -375,7 +452,89 @@ grass = preset_material("Grass", 'GRASS',
                         "1. Preset Grass (copia): camadas pela normal, cor da raiz ate a ponta (Tab abre)",
                         clip=True)
 copy_group(grass, Length=0.5, Layers=16, Density=240.0)
-rock = preset_material("Rock", 'TOON_OUTLINE', OUTLINE_NOTE, {"Color": (0.22, 0.2, 0.28, 1.0)})
+rock, tree, out = lit_glow_material("Rock", """// Rocha: camadas de pedra pela altura, musgo perto do topo e veios de cristal que pulsam.
+void main(vec3 Vector, float Time, out vec4 Color, out vec4 Glow)
+{
+    float depth = -Vector.z;                       // 0 no topo da ilha, cresce para baixo
+    // camadas (estratos) tortas
+    float bend = sin(Vector.x * 0.5) * 0.6 + sin(Vector.y * 0.43 + 1.7) * 0.6;
+    float layer = fract(depth * 0.55 + bend * 0.35);
+    float band = smoothstep(0.0, 0.12, layer) * (1.0 - smoothstep(0.75, 1.0, layer));
+    vec3 stone = mix(vec3(0.16, 0.12, 0.14), vec3(0.42, 0.33, 0.30), band);
+    stone *= mix(1.0, 0.45, clamp(depth * 0.08, 0.0, 1.0));     // mais escuro no fundo
+    // musgo e terra perto do topo
+    float moss = 1.0 - smoothstep(0.3, 2.2 + bend, depth);
+    stone = mix(stone, vec3(0.12, 0.30, 0.10), moss * 0.85);
+    // veios de cristal
+    float v = sin(Vector.x * 0.9 + sin(Vector.z * 1.3) * 2.0) * sin(Vector.y * 0.8 + sin(Vector.x * 1.1) * 2.0);
+    float vein = (1.0 - smoothstep(0.0, 0.07, abs(v))) * smoothstep(1.0, 3.0, depth);
+    float pulse = 0.55 + 0.45 * sin(Time * 2.0 - depth * 0.8);
+    Color = vec4(mix(stone, vec3(0.1, 0.5, 0.6), vein * 0.6), 1.0);
+    Glow = vec4(vec3(0.2, 0.95, 1.0) * vein * pulse * 1.6, 1.0);
+}
+""", "1. GLSL Script (rock.glsl): estratos, musgo no topo e veios de cristal pulsando",
+                                roughness=0.85, metallic=0.0, strength=1.0)
+frame(tree, "3. Saida do material", 'OUT', [out])
+
+from mathutils import noise, Vector as V
+
+
+def island_rock(name, loc, r, seed):
+    """Craggy rock hanging under an island: flat on top, tapering down in uneven spikes. Flat shaded."""
+    bpy.ops.mesh.primitive_ico_sphere_add(location=loc, subdivisions=4, size=1.0)
+    ob = bpy.context.active_object
+    ob.name = name
+    depth = r * 1.5
+    for vert in ob.data.vertices:
+        x, y, z = vert.co
+        n1 = noise.noise(V((x * 1.7 + seed, y * 1.7, z * 1.7)))
+        n2 = noise.noise(V((x * 4.5, y * 4.5 + seed, z * 4.5)))
+        if z >= 0.0:
+            # top: a low dome hidden by the grass
+            vert.co = (x * r, y * r, z * r * 0.12)
+            continue
+        t = -z                                         # 0 at the rim, 1 at the bottom
+        radius = (1.0 - t) ** 0.55 * (1.0 + n1 * 0.35 + n2 * 0.12)
+        length = math.sqrt(x * x + y * y) or 1.0
+        # hanging spikes: some directions go deeper than others
+        spike = 0.55 + 0.45 * noise.noise(V((x / length * 2.2 + seed, y / length * 2.2, 0.0)))
+        vert.co = (x / length * radius * r * (1.0 - t * 0.15), y / length * radius * r * (1.0 - t * 0.15),
+                   -t * depth * (0.55 + spike * 0.6) + n2 * r * 0.06)
+    ob.data.update()
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob.data.materials.append(rock)
+    return ob
+
+
+def debris(name, loc, size, seed):
+    """Small rock floating near an island."""
+    bpy.ops.mesh.primitive_ico_sphere_add(location=loc, subdivisions=2, size=size)
+    ob = bpy.context.active_object
+    ob.name = name
+    for vert in ob.data.vertices:
+        k = 1.0 + noise.noise(V(vert.co) * (1.5 / size) + V((seed, 0.0, 0.0))) * 0.45
+        vert.co = vert.co * k
+    ob.scale = (1.0, 0.8, 1.4)
+    bpy.ops.object.transform_apply(scale=True)
+    ob.rotation_euler = (seed, seed * 0.7, seed * 1.3)
+    ob.data.materials.append(rock)
+    return ob
+
+
+fall = glow_material("Waterfall", """// Cachoeira: fios de agua descendo, mais largos e brancos na queda.
+void main(vec3 Vector, float Time, out vec4 Color)
+{
+    float fallen = -Vector.z;                       // distancia desde o topo
+    float lines = sin(Vector.x * 9.0 + sin(fallen * 0.7) * 1.5) * 0.5 + 0.5;
+    float flow = sin(fallen * 1.6 - Time * 9.0 + lines * 4.0) * 0.5 + 0.5;
+    float edge = 1.0 - smoothstep(0.55, 1.0, abs(Vector.x) / 1.0);
+    vec3 c = mix(vec3(0.15, 0.55, 0.75), vec3(0.9, 1.0, 1.0), flow * lines);
+    Color = vec4(c * (0.5 + 0.5 * edge), 1.0);
+}
+""", "1. GLSL Script (waterfall.glsl): fios de agua correndo para baixo", strength=1.1)
 
 
 def wind_material(name, color):
@@ -397,8 +556,26 @@ leaves = [wind_material("Leaves%d" % i, c)
           for i, c in enumerate(((0.1, 0.6, 0.45, 1.0), (0.75, 0.25, 0.7, 1.0), (0.95, 0.55, 0.2, 1.0)))]
 for i, (x, y, z, r) in enumerate(((-34, -22, 14, 9), (36, -14, 20, 11), (-48, 20, 26, 12), (50, 28, 30, 10),
                                   (-78, -8, 18, 8), (80, -4, 15, 9))):
-    mesh(bpy.ops.mesh.primitive_cone_add, "Rocha%d" % i, (x, y, z - r * 0.55), rock,
-         scale=(r, r, r * 0.55), vertices=10, rotation=(math.pi, 0, i))
+    island_rock("Rocha%d" % i, (x, y, z - 0.3), r, i * 3.7)
+    for k in range(4):
+        ang = k * 1.9 + i * 0.8
+        debris("Pedra%d_%d" % (i, k), (x + math.cos(ang) * r * (1.15 + 0.12 * k),
+                                       y + math.sin(ang) * r * (1.15 + 0.12 * k), z - r * (0.3 + 0.28 * k)),
+               r * (0.16 - 0.025 * k), i + k * 2.3)
+    if i < 4:
+        # waterfall: narrow strip from the island rim down to the sea, facing the colossus
+        ang = math.atan2(-y, -x)
+        fx, fy = x + math.cos(ang) * r * 0.97, y + math.sin(ang) * r * 0.97
+        bpy.ops.mesh.primitive_grid_add(location=(fx, fy, z), x_subdivisions=4, y_subdivisions=40, radius=1.0)
+        ob = bpy.context.active_object
+        ob.name = "Cachoeira%d" % i
+        for vert in ob.data.vertices:
+            # local x = width (-1..1), local z = 0 at the top and -height at the sea
+            vert.co = (vert.co.x * (1.0 + (1.0 - vert.co.y) * 0.25), 0.0, (vert.co.y - 1.0) * 0.5 * (z + 0.6))
+        ob.data.update()
+        ob.rotation_euler = (0.0, 0.0, ang + math.pi * 0.5)
+        ob.data.materials.append(fall)
+        fall.game_settings.use_backface_culling = False
     mesh(bpy.ops.mesh.primitive_uv_sphere_add, "Topo%d" % i, (x, y, z - 0.2), grass,
          scale=(r * 0.98, r * 0.98, r * 0.16), segments=32, ring_count=16)
     for k in range(3):
