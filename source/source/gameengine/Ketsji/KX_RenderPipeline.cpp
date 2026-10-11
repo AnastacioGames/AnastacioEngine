@@ -738,6 +738,9 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_intensity = world->rain_intensity;
 				rainParams->rain_density = world->rain_density;
 				rainParams->rain_speed = world->rain_speed;
+				// Volumetric streaks scroll 500 cells per second: in the shader's float, time * speed * 500
+				// drops every fraction after a few minutes of play and the rain vanishes. Wrap it in double.
+				rainParams->rain_fall_phase = (float)std::fmod(m_engine->GetFrameTime() * world->rain_speed * 500.0, 20480.0);
 				rainParams->rain_wind = world->rain_wind;
 				rainParams->rain_darken = world->rain_darken;
 				rainParams->rain_ripple_distance = world->rain_ripple_distance;

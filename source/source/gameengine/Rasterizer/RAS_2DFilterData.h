@@ -91,6 +91,8 @@ typedef struct BuildInFilters {
 	bool useRainSplash;
 	int rain_style;
 	float rain_time;
+	/* Volumetric fall offset (time * speed * 500), wrapped in double on the CPU. */
+	float rain_fall_phase;
 	float rain_intensity;
 	float rain_density;
 	float rain_speed;

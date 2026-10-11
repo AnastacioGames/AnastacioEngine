@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Chuva Volumetric sumia na 3D View (precisão do tempo)
+
+- Os riscos do estilo Volumetric rolavam `time * speed * 500` no shader. Na 3D View `time` é o relógio
+  do Windows (tempo desde que o PC ligou, `fmod` 10000 s): com algumas horas de uptime e Fall Speed
+  alto o produto passava de 2^24, o `fract()` do risco ficava sempre 0 e a chuva não aparecia (o
+  Classic já fazia wrap com `mod 4096` e seguia funcionando). No jogo o mesmo acontecia após alguns
+  minutos de Play.
+- A fase de queda agora é calculada na CPU em double com wrap em 20480 e entra como uniform próprio:
+  `rain_fall_phase` (`gpu_compositing.c` → `gpu_shader_fx_rain_frag.glsl`) e `ge_RainFallPhase`
+  (`KX_RenderPipeline.cpp` → `RAS_2DFilter` → `RAS_Rain2DFilter.glsl`). Aparência inalterada; uma
+  troca de padrão a cada ~41 s / Fall Speed no wrap, imperceptível com a queda rápida.
+
 ## 2026-10-11 - Aba Texture: ícone do mundo só com o mundo selecionado e slots num painel recolhível
 
 - `ED_texture_context_check_world` (`buttons_texture.c`) passou a exigir que não haja objeto ativo.

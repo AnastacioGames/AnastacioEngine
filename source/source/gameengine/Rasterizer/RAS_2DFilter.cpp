@@ -125,6 +125,7 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainParams3", // GE_RAIN_PARAMS3_UNIFORM
 	"ge_RainColor", // GE_RAIN_COLOR_UNIFORM
 	"ge_RainStyle", // GE_RAIN_STYLE_UNIFORM
+	"ge_RainFallPhase", // GE_RAIN_FALL_PHASE_UNIFORM
 	"ge_RainParams4", // GE_RAIN_PARAMS4_UNIFORM
 	"ge_RainStreakWidth", // GE_RAIN_STREAK_WIDTH_UNIFORM
 	"ge_RainRippleNormal", // GE_RAIN_RIPPLE_NORMAL_UNIFORM
@@ -765,6 +766,9 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	if (m_predefinedUniforms[GE_RAIN_STYLE_UNIFORM] != -1) {
 		float style = (float)m_buildInFilters.rain_style;
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_STYLE_UNIFORM], RAS_Uniform::UNI_FLOAT, &style, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_FALL_PHASE_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_FALL_PHASE_UNIFORM], RAS_Uniform::UNI_FLOAT, &m_buildInFilters.rain_fall_phase, sizeof(float), 1);
 	}
 
 	if (m_predefinedUniforms[GE_CLOUDS_PARAMS_UNIFORM] != -1) {

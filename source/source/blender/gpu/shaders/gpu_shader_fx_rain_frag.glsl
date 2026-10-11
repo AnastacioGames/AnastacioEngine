@@ -18,6 +18,7 @@ uniform vec3 rain_sky_horizon; // World horizon/zenith: what the puddles reflect
 uniform vec3 rain_sky_zenith;
 uniform vec3 rain_color;
 uniform float rain_style; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
+uniform float rain_fall_phase; // Volumetric fall offset (time * speed * 500), wrapped on the CPU in double
 
 /* Classic streaks: thin anti-aliased lines measured in pixels, so they stay fine at any
  * resolution. Each column of cells scrolls down at its own speed and every cell holds at
@@ -114,10 +115,10 @@ vec3 getWorldPositionFromDepth(vec2 uv, float depthValue)
 	return worldSpacePosition.xyz;
 }
 
-float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, float time)
+float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, float phase)
 {
 	vec3 p_scaled = p * layerScale * 4.5;
-	p_scaled.z += time * 500.0 * speedMod;
+	p_scaled.z += phase * speedMod;
 
 	vec3 cell = floor(p_scaled);
 	vec3 f = fract(p_scaled);
@@ -132,18 +133,18 @@ float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, floa
 	return streak * verticalMask * h.z;
 }
 
-float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float time)
+float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float phase)
 {
 	float rain = 0.0;
 
 	if (sceneDepth > 1.5) {
-		rain += rainStreakLayer(camPos + viewDir * 1.5, 0.6, 1.2, 12.34, time) * 0.1;
+		rain += rainStreakLayer(camPos + viewDir * 1.5, 0.6, 1.2, 12.34, phase) * 0.1;
 	}
 	if (sceneDepth > 4.0) {
-		rain += rainStreakLayer(camPos + viewDir * 4.0, 1.2, 1.0, 56.78, time) * 0.3;
+		rain += rainStreakLayer(camPos + viewDir * 4.0, 1.2, 1.0, 56.78, phase) * 0.3;
 	}
 	if (sceneDepth > 10.0) {
-		rain += rainStreakLayer(camPos + viewDir * 10.0, 2.2, 0.8, 91.01, time) * 0.8;
+		rain += rainStreakLayer(camPos + viewDir * 10.0, 2.2, 0.8, 91.01, phase) * 0.8;
 	}
 
 	return rain;
@@ -477,7 +478,7 @@ void main()
 			vec3 viewDir = normalize(worldPos - camPos);
 			float sceneDepth = length(worldPos - camPos);
 
-			streaks = rainVolumetricStreaks(camPos, viewDir, sceneDepth, time * speed);
+			streaks = rainVolumetricStreaks(camPos, viewDir, sceneDepth, rain_fall_phase);
 		}
 		else {
 			streaks = rainClassicStreaks(texcoord, vec2(textureSize(colorbuffer, 0)), density, speed, wind, rain_streak_width, time);

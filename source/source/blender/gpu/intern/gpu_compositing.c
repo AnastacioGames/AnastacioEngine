@@ -112,6 +112,7 @@ typedef struct {
   int rain_params3_uniform;
   int rain_color_uniform;
   int rain_style_uniform;
+  int rain_fall_phase_uniform;
   int rain_params4_uniform;
   int rain_lightning_uniform;
   int rain_streak_width_uniform;
@@ -1417,6 +1418,10 @@ bool GPU_fx_do_composite_pass(
 				rain_lightning[1] = 0.0f;
 			}
 			float rain_style = (world->rain_style == WO_RAIN_STYLE_VOLUMETRIC) ? 1.0f : 0.0f;
+			/* Volumetric fall offset, wrapped in double: the timer is the PC uptime, and
+			 * time * speed * 500 in the shader's float lost every fraction after a few hours,
+			 * so the streaks' fract() stayed at 0 and the rain vanished. */
+			float rain_fall_phase = (float)fmod(PIL_check_seconds_timer() * world->rain_speed * 500.0, 20480.0);
 			float rain_puddle1[4] = {(world->weather_flag & WO_WEATHER_RAIN_PUDDLES) ?
 			                         1.0f + ((world->weather_flag & WO_WEATHER_RAIN_RIPPLE_PUDDLE) ? 1.0f : 0.0f) +
 			                         ((world->weather_flag & WO_WEATHER_RAIN_SPLASH_PUDDLE) ? 2.0f : 0.0f) : 0.0f,
@@ -1442,6 +1447,7 @@ bool GPU_fx_do_composite_pass(
 			GPU_shader_uniform_vector(rain_shader, interface->rain_params3_uniform, 4, 1, rain_params3);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_color_uniform, 3, 1, world->rain_color);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_style_uniform, 1, 1, &rain_style);
+			GPU_shader_uniform_vector(rain_shader, interface->rain_fall_phase_uniform, 1, 1, &rain_fall_phase);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_params4_uniform, 4, 1, rain_params4);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_lightning_uniform, 4, 1, rain_lightning);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_streak_width_uniform, 1, 1, &rain_streak_width);
@@ -2282,6 +2288,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_params3_uniform = GPU_shader_get_uniform(shader, "rain_params3");
 			interface->rain_color_uniform = GPU_shader_get_uniform(shader, "rain_color");
 			interface->rain_style_uniform = GPU_shader_get_uniform(shader, "rain_style");
+			interface->rain_fall_phase_uniform = GPU_shader_get_uniform(shader, "rain_fall_phase");
 			interface->rain_params4_uniform = GPU_shader_get_uniform(shader, "rain_params4");
 			interface->rain_lightning_uniform = GPU_shader_get_uniform(shader, "rain_lightning");
 			interface->rain_streak_width_uniform = GPU_shader_get_uniform(shader, "rain_streak_width");
