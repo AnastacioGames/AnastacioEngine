@@ -1,7 +1,7 @@
 """Cena de teste das ferramentas do 2D Filter (erros com linha, recompilacao, uniforms bgl_*/u_*).
 
 Uso:
-  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_filtro2d.py -- <saida.range> <dir_trabalho> [segundos]
+  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_filtro2d.py -- <saida.range> <dir_trabalho> [segundos] [pasta_templates]
 
 Cria em <dir_trabalho>:
   filtro_externo.glsl  texto externo usado pelo atuador 2D Filter (pass 1), recarregado ao salvar;
@@ -25,6 +25,8 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 output = os.path.abspath(argv[0])
 workdir = os.path.abspath(argv[1])
 seconds = float(argv[2]) if len(argv) > 2 else 10.0
+# Optional: folder with .glsl templates, each one added as a filter (pass 10, 11...) to check it compiles.
+templates_dir = os.path.abspath(argv[3]) if len(argv) > 3 else ""
 os.makedirs(workdir, exist_ok=True)
 
 glsl_path = os.path.join(workdir, "filtro_externo.glsl")
@@ -84,6 +86,7 @@ test.write('''import bge, os, time
 LOG = %r
 GLSL = %r
 SECONDS = %r
+TEMPLATES = %r
 BAD = """uniform sampler2D bgl_RenderedTexture;
 out vec4 fragColor;
 void main() { fragColor = vec4(undefined_name); }
@@ -143,6 +146,11 @@ def tick(cont):
             log("valueerror", False)
         except ValueError as e:
             log("valueerror", True, e)
+        if TEMPLATES:
+            for i, name in enumerate(sorted(os.listdir(TEMPLATES))):
+                with open(os.path.join(TEMPLATES, name)) as fh:
+                    tf = fm.addFilter(10 + i, bge.logic.RAS_2DFILTER_CUSTOMFILTER, fh.read())
+                log("template", name, "ok", tf.compileLog == "", repr(tf.compileLog))
         return
     own["frames"] += 1
     el = now - t0
@@ -171,7 +179,7 @@ def tick(cont):
             log("fps_medio", (own["frames"] - own["fps_f"]) / (el - own["fps_t"]))
         log("# fim")
         bge.logic.endGame()
-''' % (os.path.join(workdir, "filtro2d_log.txt"), glsl_path, seconds))
+''' % (os.path.join(workdir, "filtro2d_log.txt"), glsl_path, seconds, templates_dir))
 
 ctrl_obj = cam
 scene.objects.active = ctrl_obj

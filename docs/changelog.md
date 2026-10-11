@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-10 - Ferramentas do 2D Filter custom: erros na linha do texto, recarga, uniforms e modelos
+
+- Erro de compilação de filtro custom: o console cita o nome do Text (ou `addFilter(n)`) e as linhas do texto (`#line 1` só para fontes do usuário; antes `#line 0` deslocava uma linha). `GPU_shader_last_error_log()` guarda o log da última falha e ele fica em `filter.compileLog`. Embutidos continuam com `#line 0`, sem invalidar o cache de binários.
+- Texto externo (`.glsl` em disco) do atuador é conferido 2x/s durante o jogo (`KX_2DFilterManager::ReloadChangedSources`, `BLI_stat`) e recompilado ao salvar; falhou, o programa anterior continua. `filter.recompile(fonte=None)`, `sourceName`, `sourcePath`. Recompilar refaz as propriedades de jogo ligadas (antes a lista era filtrada na 1ª compilação).
+- Entradas estáveis: `bgl_ViewMatrix`, `bgl_ProjectionMatrix`, `bgl_InverseViewMatrix`, `bgl_InverseProjectionMatrix`, `bgl_PreviousViewProjectionMatrix`, `bgl_Resolution`, `bgl_Time`, `bgl_Frame` e `bgl_PreviousTexture` (imagem final do quadro anterior, RGBA16F na unidade 17; só alocada/copiada enquanto um filtro ativo a usa; desligada no Web). Normal: reconstruir da profundidade (exemplos na doc), sem buffer novo.
+- `filter.activeUniforms` (nome, tipo, tamanho via `glGetActiveUniform`) e `filter.setUniform(nome, valor)` com o tipo do shader, reaplicado após recompilar.
+- Modelos em Text Editor > Templates > 2D Filters (GLSL): SSAO, SSGI simples com reprojeção temporal, bloom em um passe e contorno. Referência em `docs/2d-filters.md`.
+- Teste: `tools/debug/cenas/criar_cena_filtro2d.py` (erro citado na linha 3; recompile OK; KeyError/ValueError do `setUniform`; arquivo externo com erro mantém o filtro e mostra o log, corrigido recompila; os 4 modelos compilam; 60 FPS com vsync, 10 s). Avaliação visual dos modelos pendente com o usuário.
+
 ## 2026-10-10 - Qualidade de textura por mipmap, filtros sem recarga e tamanho de sombra em tempo real
 
 - `Range.render.setTextureQuality(0/1/2)`/`getTextureQuality()`: só a textura em alta fica no projeto; no envio para a GPU caem os maiores níveis de mipmap (metade/um quarto), nunca abaixo de 256 px no lado maior e só em texturas com mipmap. DDS pula os níveis gravados no arquivo. Trocar recarrega as texturas do jogo e dos arquivos do LibLoad; no editor o valor volta ao sair do jogo.
