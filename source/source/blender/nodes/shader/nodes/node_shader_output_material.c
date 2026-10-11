@@ -36,6 +36,7 @@ static int node_shader_gpu_output_material(GPUMaterial *mat, bNode *UNUSED(node)
 	if (!in[0].link && in[1].link) {
 		in[0].link = in[1].link;
 	}
+	GPU_material_ssgi_outputs(mat, in[0].link);
 	GPU_stack_link(mat, "node_output_material", in, out, &outlink);
 	GPU_material_output_link(mat, outlink, 0);
 

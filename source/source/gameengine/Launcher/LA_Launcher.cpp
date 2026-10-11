@@ -276,12 +276,25 @@ void LA_Launcher::InitEngine()
 
 	RAS_OffScreen::AttachmentList attachments;
 	attachments.push_back({4, hdrTable[gm.hdr]});
+	const int ssgiSlot = GPU_material_ssgi_slot(m_startScene);
 	for (unsigned short i = 0; i < 7; ++i) {
 		RenderAttachment *attach = gm.attachments[i];
 		if (attach) {
 			attachments.push_back({(unsigned short)attach->size, hdrTable[attach->hdr]});
 		}
+        else if (ssgiSlot && i < ssgiSlot - 1) {
+            /* Keep shader output indices aligned when user attachment slots contain holes. */
+            attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
+        }
 	}
+    if (ssgiSlot) {
+        /* Normal and albedo are normalized data, so RGBA8 is sufficient. Keep only direct
+         * radiance and the pre-display scene color in half float; they can exceed 1.0. */
+        attachments.push_back({4, RAS_Rasterizer::RAS_HDR_NONE});
+        attachments.push_back({4, RAS_Rasterizer::RAS_HDR_NONE});
+        attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
+        attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
+    }
 
 	// Materiais com blend "Alpha Blend Hashed" (GPU_BLEND_ALPHA_TO_COVERAGE) caem para um
 	// dither por shader (gpu_material.c, shade_dither) quando gm.aasamples <= 1, em vez de

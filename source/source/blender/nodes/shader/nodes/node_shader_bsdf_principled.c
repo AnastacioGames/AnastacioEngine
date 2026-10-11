@@ -84,8 +84,10 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	GPUNodeLink *scol = (in[15].link || in[15].vec[0] > 0.0f) ? node_shader_gpu_scene_color(mat) :
 	                    GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
 
+	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol,
-	                      node_shader_gpu_lightmap(mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link));
+	                      node_shader_gpu_lightmap(mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link),
+	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)

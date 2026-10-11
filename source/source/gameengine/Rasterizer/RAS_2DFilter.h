@@ -83,6 +83,8 @@ public:
 		GE_LENSFLARE_SUNPOS_UNIFORM,
 		GE_FXAA_PARAMETERS_UNIFORM,
 		GE_CAMERAFX_UNIFORM,
+        GE_SSGI_PARAMETERS_UNIFORM,
+        GE_SSGI_DISPLAY_UNIFORM,
 
 		/* Stable names for custom filters (SSAO/SSGI/SSR/TAA), see docs/2d-filters.md. */
 		BGL_VIEW_MATRIX_UNIFORM,
@@ -164,6 +166,7 @@ public:
 	void SetMipmap(bool mipmap);
 
 	/// True when the shader samples the depth texture (bgl_DepthTexture).
+    bool UsesDataTextures() const { return m_predefinedUniforms[DATA_TEXTURES_UNIFORM] != -1; }
 	bool UsesDepthTexture() const
 	{
 		return m_predefinedUniforms[DEPTH_TEXTURE_UNIFORM] != -1;

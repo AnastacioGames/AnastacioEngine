@@ -22,6 +22,9 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [SSGI nativo experimental](ssgi-native-plan.md): escopo implementado em worktree, configuração,
+  medições e validações pendentes.
+
 - [Atualização do RangeArmor](rangearmor-update-plan.md): integração com cooking, fonte recuperado,
   exportação em staging, validação Windows e verificações ainda pendentes.
 

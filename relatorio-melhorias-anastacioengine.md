@@ -328,7 +328,11 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 ## Decisões técnicas vigentes
 
 - GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
-  objetos móveis), não GI em tempo real. Qualidade vem da densidade de texels (`ae_lightmap_scale` por objeto)
+  objetos móveis). Um [SSGI nativo experimental](docs/ssgi-native-plan.md) foi implementado em worktree
+  separado para desktop/Principled opaco: complemento em tela, não substituto do bake; exclui receptores
+  baked. Build e testes numéricos passaram; normal/albedo RGBA8 reduziram a reserva de attachments em 25%;
+  validação visual e medição da VRAM total permanecem pendentes.
+  Qualidade do bake vem da densidade de texels (`ae_lightmap_scale` por objeto)
   e da margem/dilatação das ilhas, não de uma textura por objeto. Cada recurso liga/desliga; Web/Android usam
   no máximo a textura da lightmap.
 - `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity

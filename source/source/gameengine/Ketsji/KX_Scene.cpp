@@ -98,6 +98,10 @@
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
 #include "BKE_scene.h" // SETLOOPER
+extern "C" {
+#include "BKE_idprop.h"
+}
+#include "GPU_material.h"
 
 #include "KX_NodeRelationships.h"
 
@@ -228,6 +232,37 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	filters.fxaa_search_steps = settings.fxaa_search_steps;
 	filters.useGrain = settings.use_grain != 0;
 	filters.grain_strength = settings.grain_strength;
+    filters.ssgi_slot = GPU_material_ssgi_slot(scene);
+    filters.useSSGI = filters.ssgi_slot != 0;
+    if (filters.useSSGI) {
+        auto setting = [scene](const char *name, float fallback) {
+            IDProperty *prop = IDP_GetPropertyFromGroup(scene->id.properties, name);
+            if (!prop) return fallback;
+            float value = prop->type == IDP_FLOAT ? IDP_Float(prop) :
+                prop->type == IDP_DOUBLE ? (float)IDP_Double(prop) :
+                prop->type == IDP_INT ? (float)IDP_Int(prop) : fallback;
+            return std::isfinite(value) ? value : fallback;
+        };
+        filters.ssgi_rays = (int)CLAMPIS(setting("ae_ssgi_rays", 4), 1, 16);
+        filters.ssgi_steps = (int)CLAMPIS(setting("ae_ssgi_steps", 8), 2, 32);
+        filters.ssgi_divisor = (int)CLAMPIS(setting("ae_ssgi_divisor", 2), 1, 4);
+        filters.ssgi_radius = CLAMPIS(setting("ae_ssgi_radius", 3), 0.01f, 100.0f);
+        filters.ssgi_strength = CLAMPIS(setting("ae_ssgi_strength", 1), 0.0f, 4.0f);
+        filters.ssgi_thickness = CLAMPIS(setting("ae_ssgi_thickness", 0.1f), 0.001f, 10.0f);
+        filters.ssgi_display[0] = scene->view_settings.exposure;
+        filters.ssgi_display[1] = scene->view_settings.gamma;
+        filters.ssgi_display[2] = 0.0f;
+        filters.ssgi_display[3] = BKE_scene_check_color_management_enabled(scene) ? 1.0f : 0.0f;
+        if (std::string(scene->view_settings.view_transform) == "Filmic") {
+            const std::string look(scene->view_settings.look);
+            filters.ssgi_display[2] = look.find("Very Low Contrast") != std::string::npos ? 1.10f :
+                look.find("Medium Low Contrast") != std::string::npos ? 1.45f :
+                look.find("Low Contrast") != std::string::npos ? 1.30f :
+                look.find("Very High Contrast") != std::string::npos ? 2.25f :
+                look.find("Medium High Contrast") != std::string::npos ? 1.80f :
+                look.find("High Contrast") != std::string::npos ? 2.00f : 1.60f;
+        }
+    }
 
 	if (settings.bloom) {
 		filters.useBloom = (scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_BLOOM) ? true : false;

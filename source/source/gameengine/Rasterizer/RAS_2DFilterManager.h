@@ -43,21 +43,23 @@ class RAS_2DFilterManager
 public:
 	// Note: Keep it in order of pass index!!
 	enum FILTER_RESERVED_PASS {
-		FILTERPASS_SSR          = 0,
-		FILTERPASS_SSR_BLUR     = 1,
-		FILTERPASS_SSAO         = 2,
-		FILTERPASS_BLOOM        = 3,
-		/* BLOOM HAS EXTRA PASSES .. [3 ~ 10] */
-		FILTERPASS_LIGHTSCATTER = 11,
-		/* LIGHTSCATTER HAS ONE EXTRA PASS = 12 */
-		FILTERPASS_FXAA         = 13,
-		FILTERPASS_TONEMAP      = 14,
-		FILTERPASS_RAIN         = 15,
-		FILTERPASS_CLOUDS       = 16,
-		FILTERPASS_LENSFLARE    = 17,
+		FILTERPASS_SSGI         = 0,
+        FILTERPASS_SSGI_IMAGE   = 1,
+		FILTERPASS_SSR          = 2,
+		FILTERPASS_SSR_BLUR     = 3,
+		FILTERPASS_SSAO         = 4,
+		FILTERPASS_BLOOM        = 5,
+		/* BLOOM HAS EXTRA PASSES .. [5 ~ 12] */
+		FILTERPASS_LIGHTSCATTER = 13,
+		/* LIGHTSCATTER HAS ONE EXTRA PASS = 14 */
+		FILTERPASS_FXAA         = 15,
+		FILTERPASS_TONEMAP      = 16,
+		FILTERPASS_RAIN         = 17,
+		FILTERPASS_CLOUDS       = 18,
+		FILTERPASS_LENSFLARE    = 19,
 		/* Camera FX (KX_Camera game_fx), only present while their effects are on */
-		FILTERPASS_CAMERA_DOF   = 18,
-		FILTERPASS_CAMERA_LENS  = 19
+		FILTERPASS_CAMERA_DOF   = 20,
+		FILTERPASS_CAMERA_LENS  = 21
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */

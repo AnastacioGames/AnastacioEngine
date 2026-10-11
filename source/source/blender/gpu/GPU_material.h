@@ -327,6 +327,9 @@ void GPU_material_load_images(GPUMaterial *material, double time, int mipmap);
  * NULL clears it, which disables the distance limit. */
 void GPU_material_set_foliage_reference_position(GPUMaterial *material, const float position[3]);
 struct Scene *GPU_material_scene(GPUMaterial *material);
+/* First native SSGI color slot, or 0 when disabled/unavailable. Four consecutive slots follow. */
+int GPU_material_ssgi_slot(struct Scene *scene);
+void GPU_material_ssgi_outputs(GPUMaterial *material, struct GPUNodeLink *surface);
 GPUMatType GPU_Material_get_type(GPUMaterial *material);
 
 void GPU_material_vertex_attributes(GPUMaterial *material,

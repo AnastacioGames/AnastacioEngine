@@ -414,6 +414,16 @@ void GPU_material_viewport_barycentric(bool enable)
 
 static int gpu_material_construct_end(GPUMaterial *material, const char *passname)
 {
+    /* Unsupported materials must overwrite the auxiliary buffers too, rather than leave data
+     * from an opaque surface behind them. Never enable these outputs for viewport/world passes. */
+    const int ssgi_slot = GPU_material_ssgi_slot(material->scene);
+    if (ssgi_slot && GPU_material_use_new_shading_nodes(material) && material->ma) {
+        for (int i = 0; i < 4; ++i) {
+            if (!material->outlinks[ssgi_slot + i]) {
+                GPU_link(material, "set_rgba_zero", &material->outlinks[ssgi_slot + i]);
+            }
+        }
+    }
 	bool used = false;
 	for (unsigned short i = 0; i < 8; ++i) {
 		if (material->outlinks[i]) {
@@ -1151,6 +1161,38 @@ void GPU_material_vertex_attributes(GPUMaterial *material, GPUVertexAttribs *att
 void GPU_material_output_link(GPUMaterial *material, GPUNodeLink *link, unsigned short index)
 {
 	material->outlinks[index] = link;
+}
+
+int GPU_material_ssgi_slot(Scene *scene)
+{
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    return 0;
+#else
+    if (!scene || !scene->id.properties || !BKE_scene_use_new_shading_nodes(scene)) return 0;
+    IDProperty *enabled = IDP_GetPropertyFromGroup(scene->id.properties, "ae_ssgi_use");
+    if (!enabled || enabled->type != IDP_INT || !IDP_Int(enabled)) return 0;
+    int slot = 1;
+    for (int i = 0; i < GAME_ATTACHMENT_COUNT; ++i) {
+        if (scene->gm.attachments[i]) slot = i + 2;
+    }
+    return slot <= 4 ? slot : 0;
+#endif
+}
+
+void GPU_material_ssgi_outputs(GPUMaterial *material, GPUNodeLink *surface)
+{
+    const int slot = GPU_material_ssgi_slot(material->scene);
+    if (!slot || !surface || !surface->output || !material->ma ||
+        material->ma->game.alpha_blend != GEMAT_SOLID || material->ma->fragcode ||
+        !GPU_material_use_new_shading_nodes(material)) return;
+    GPUNode *node = surface->output->node;
+    /* A mixed closure needs its own composition contract; only the actual Surface root is accepted. */
+    if (!STREQ(node->name, "node_bsdf_principled") &&
+        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi")) return;
+    GPUOutput *extra = ((GPUOutput *)node->outputs.first)->next;
+    for (int i = 0; i < 4 && extra; ++i, extra = extra->next) {
+        material->outlinks[slot + i] = extra->link;
+    }
 }
 
 void GPU_material_enable_alpha(GPUMaterial *material)
@@ -4037,9 +4079,23 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 			/* create simple diffuse material instead of nodes: same light loop as the Diffuse BSDF
 			 * node (scene lights with shadow maps, World color as ambient) */
 			static float roughness = 0.0f;
-			GPU_link(mat, "node_bsdf_diffuse_ambient",
-			         GPU_uniform(&ma->r), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
-			         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat), &outlink);
+			const int ssgi_slot = GPU_material_ssgi_slot(scene);
+			if (ssgi_slot && ma->game.alpha_blend == GEMAT_SOLID && !ma->fragcode) {
+				GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
+				GPU_link(mat, "node_bsdf_diffuse_ambient_ssgi",
+				         GPU_uniform(&ma->r), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+				         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat), &outlink,
+				         &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
+				mat->outlinks[ssgi_slot] = ssgi_normal;
+				mat->outlinks[ssgi_slot + 1] = ssgi_albedo;
+				mat->outlinks[ssgi_slot + 2] = ssgi_direct;
+				mat->outlinks[ssgi_slot + 3] = ssgi_linear;
+			}
+			else {
+				GPU_link(mat, "node_bsdf_diffuse_ambient",
+				         GPU_uniform(&ma->r), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+				         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat), &outlink);
+			}
 		}
 		else {
 			/* create blender material */

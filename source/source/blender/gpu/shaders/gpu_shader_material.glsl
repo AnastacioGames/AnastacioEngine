@@ -4503,6 +4503,31 @@ void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 I, vec3
 	result = vec4(L * color.rgb, color.a);
 }
 
+/* Native SSGI companion. `direct` deliberately excludes the World ambient term: it is a source
+ * for nearby screen-space bounces, while `result`/`linear` keep the material's normal lighting. */
+void node_bsdf_diffuse_ambient_ssgi(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
+                                    out vec4 result, out vec4 ssgi_normal, out vec4 ssgi_albedo,
+                                    out vec4 ssgi_direct, out vec4 ssgi_linear)
+{
+	vec3 direct = vec3(0.0);
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 l;
+		float atten;
+		if (!scene_light_dir(i, I, l, atten)) {
+			continue;
+		}
+		float NdotL = max(dot(N, l), 0.0);
+		direct += SCENE_LIGHT(i).diffuse.rgb * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
+	}
+	vec3 linear = (ambient + direct) * color.rgb;
+	result = vec4(linear, color.a);
+	/* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
+	ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+	ssgi_albedo = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
+	ssgi_direct = vec4(max(direct * color.rgb, vec3(0.0)), 1.0);
+	ssgi_linear = vec4(linear, color.a);
+}
+
 void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 {
 	/* used by BSDFs without their own GLSL approximation (no fragment position: lights as Sun) */
@@ -4788,8 +4813,14 @@ void lightvol_sample(vec4 lm, vec3 viewpos, mat4 viewinv, vec3 N, sampler2D tex,
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
-	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result)
+	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result,
+    out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
+    /* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
+    ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+    ssgi_albedo = vec4(clamp(mix(base_color.rgb, subsurface_color.rgb, subsurface) *
+        (1.0 - metallic) * (1.0 - transmission), 0.0, 1.0), 1.0 - step(0.5, lightmap.a));
+    vec3 direct_diffuse = vec3(0.0);
 	/* ambient light */
 	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
 	vec3 L = mix(0.1, 0.03, metallic) * diffuse_albedo;
@@ -4850,6 +4881,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		float LdotH = dot(light_position, H);
 
 		vec3 diffuse_and_specular_bsdf = vec3(0.0);
+		vec3 ssgi_light = vec3(0.0);
 		if (NdotL >= 0.0 && NdotV >= 0.0) {
 			float NdotH = dot(N, H);
 
@@ -4888,6 +4920,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			vec3 Fsheen = schlick_fresnel(LdotH) * sheen * Csheen;
 
 			vec3 diffuse_bsdf = (mix(Fd * base_color.rgb, ss * subsurface_color.rgb, subsurface) + Fsheen) * light_diffuse;
+            ssgi_light = diffuse_bsdf * (1.0 - metallic) * (1.0 - transmission);
 			vec3 specular_bsdf = Gs * Fs * Ds * light_specular;
 			diffuse_and_specular_bsdf = diffuse_bsdf * (1.0 - metallic) + specular_bsdf;
 		}
@@ -4911,6 +4944,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		clearcoat_bsdf *= max(CNdotL, 0.0);
 
 		diffuse_and_specular_bsdf *= light_atten;
+        ssgi_light *= max(NdotL, 0.0) * light_atten;
 		clearcoat_bsdf *= light_atten;
 
 		/* Shadow map for this light slot, bound by GPU_material_bind_shadow_lamps() (see
@@ -4919,10 +4953,12 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		if (i < NUM_SHADOW_LIGHTS) {
 			float shadowfac = scene_light_shadow(i, I, N, NdotL);
 			diffuse_and_specular_bsdf *= shadowfac;
+            ssgi_light *= shadowfac;
 			clearcoat_bsdf *= shadowfac;
 		}
 
 		L += diffuse_and_specular_bsdf + clearcoat_bsdf;
+        direct_diffuse += ssgi_light;
 	}
 
 	if (env_on > 0.5) {
@@ -4948,6 +4984,8 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	}
 
 	result = vec4(L, 1.0);
+    ssgi_direct = vec4(max(direct_diffuse, vec3(0.0)), 1.0);
+    ssgi_linear = result;
 }
 
 /* Light arriving from behind the surface (Lambert on -N), like Cycles' Translucent BSDF. */

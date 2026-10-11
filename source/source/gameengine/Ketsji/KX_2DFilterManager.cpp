@@ -42,6 +42,8 @@
 #include <cmath>
 
 extern "C" {
+    extern char datatoc_RAS_SSGI2DFilter_glsl[];
+    extern char datatoc_RAS_SSGIImage2DFilter_glsl[];
 	extern char datatoc_RAS_Bloom2DFilter_buf_glsl[];
 	extern char datatoc_RAS_Bloom2DFilter_bufH_glsl[];
 	extern char datatoc_RAS_Bloom2DFilter_bufV_glsl[];
@@ -67,6 +69,7 @@ KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filte
 	/* This location doesn't seem very good to me but it works fine here, we need to generate the KX_2DFilter to have offscreen and not RAS_* */
 	/* Only for Range legacy, the code can be deprecated after Range 2.0+ */
 	EnsureBloomFilters(filters);
+    EnsureSSGIFilters(filters);
 
 	// Need to be done before bloom passes
 	EnsureSSRFilters(filters);
@@ -217,6 +220,43 @@ void KX_2DFilterManager::RefreshBloomTextures()
 			pass[link.filter]->UpdateTextureBindCode(link.unit, bindCode);
 		}
 	}
+}
+
+void KX_2DFilterManager::EnsureSSGIFilters(BuildInFilters filters)
+{
+    if (!filters.useSSGI || GetFilterPass(FILTERPASS_SSGI, true)) return;
+    RAS_2DFilterData data;
+    data.filterMode = FILTER_CUSTOMFILTER;
+    data.filterPassIndex = FILTERPASS_SSGI;
+    data.gameObject = nullptr;
+    data.mipmap = false;
+    data.buildInFilters = filters;
+    const std::string define = "#define SSGI_SLOT " + std::to_string(filters.ssgi_slot - 1) + "\n";
+    data.shaderText = define + datatoc_RAS_SSGI2DFilter_glsl;
+    KX_2DFilter *trace = static_cast<KX_2DFilter *>(AddFilter(data, true));
+    trace->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+        std::max(1, m_canvas->GetRenderWidth() / filters.ssgi_divisor),
+        std::max(1, m_canvas->GetRenderHeight() / filters.ssgi_divisor),
+        RAS_Rasterizer::RAS_HDR_HALF_FLOAT, (float)filters.ssgi_divisor));
+    data.filterPassIndex = FILTERPASS_SSGI_IMAGE;
+    data.shaderText = define + datatoc_RAS_SSGIImage2DFilter_glsl;
+    KX_2DFilter *image = static_cast<KX_2DFilter *>(AddFilter(data, true));
+    image->SetTexture(0, trace->GetOffScreen()->GetColorBindCode(0), "ge_SSGIBuffer");
+    trace->GetOffScreen()->SetRebuildCallback([this]() { RefreshSSGITexture(); });
+    if (!trace->Ok() || !image->Ok() || !trace->GetOffScreen()->GetValid()) {
+        trace->SetEnabled(false);
+        image->SetEnabled(false);
+        CM_Error("Native SSGI disabled: shader or framebuffer creation failed");
+    }
+}
+
+void KX_2DFilterManager::RefreshSSGITexture()
+{
+    RAS_2DFilter *trace = GetFilterPass(FILTERPASS_SSGI, true);
+    KX_2DFilter *image = static_cast<KX_2DFilter *>(GetFilterPass(FILTERPASS_SSGI_IMAGE, true));
+    if (trace && image && trace->GetOffScreen()) {
+        image->UpdateTextureBindCode(0, trace->GetOffScreen()->GetColorBindCode(0));
+    }
 }
 
 void KX_2DFilterManager::EnsureSSRFilters(BuildInFilters filters)
@@ -638,6 +678,7 @@ PyMethodDef KX_2DFilterManager::Methods[] = {
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeLightScatterValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeSSRValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeSSAOValues),
+    EXP_PYMETHODTABLE(KX_2DFilterManager, changeSSGIValues),
 	{nullptr, nullptr} //Sentinel
 };
 
@@ -1065,6 +1106,50 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeSSRValues, "changeSSRValues(enable
 	filterParams->ssr_max_distance = max_distance;
 
 	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeSSGIValues,
+    "changeSSGIValues(enabled, radius=3.0, strength=1.0, rays=4, steps=8, thickness=0.1, divisor=0). "
+    "divisor 1/2/4 changes trace resolution; 0 keeps it. Requires Scene SSGI enabled before Play.")
+{
+    int enabled, rays = 4, steps = 8;
+    int divisor = 0;
+    float radius = 3.0f, strength = 1.0f, thickness = 0.1f;
+    if (!PyArg_ParseTuple(args, "i|ffiifi:changeSSGIValues", &enabled, &radius, &strength, &rays, &steps, &thickness, &divisor)) return nullptr;
+    if (!std::isfinite(radius) || !std::isfinite(strength) || !std::isfinite(thickness) ||
+        radius <= 0 || radius > 100 || strength < 0 || strength > 4 || rays < 1 || rays > 16 ||
+        steps < 2 || steps > 32 || thickness <= 0 || thickness > 10 ||
+        (divisor && divisor != 1 && divisor != 2 && divisor != 4)) {
+        PyErr_SetString(PyExc_ValueError, "SSGI: radius (0,100], strength [0,4], rays [1,16], steps [2,32], thickness (0,10], divisor 0/1/2/4");
+        return nullptr;
+    }
+    RAS_2DFilter *trace = GetFilterPass(FILTERPASS_SSGI, true);
+    RAS_2DFilter *image = GetFilterPass(FILTERPASS_SSGI_IMAGE, true);
+    if (!trace || !image) {
+        PyErr_SetString(PyExc_RuntimeError, "Enable Scene > Native SSGI before Play; its material buffers are allocated at scene load.");
+        return nullptr;
+    }
+    const int currentDivisor = trace->GetBuildInFilters()->ssgi_divisor;
+    const int selectedDivisor = divisor ? divisor : currentDivisor;
+    if (selectedDivisor != currentDivisor) {
+        trace->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+            std::max(1, m_canvas->GetRenderWidth() / selectedDivisor),
+            std::max(1, m_canvas->GetRenderHeight() / selectedDivisor),
+            RAS_Rasterizer::RAS_HDR_HALF_FLOAT, (float)selectedDivisor));
+        trace->GetOffScreen()->SetRebuildCallback([this]() { RefreshSSGITexture(); });
+        RefreshSSGITexture();
+    }
+    for (RAS_2DFilter *pass : {trace, image}) {
+        pass->SetEnabled(enabled != 0);
+        BuildInFilters *params = pass->GetBuildInFilters();
+        params->ssgi_radius = radius;
+        params->ssgi_strength = strength;
+        params->ssgi_rays = rays;
+        params->ssgi_steps = steps;
+        params->ssgi_thickness = thickness;
+        params->ssgi_divisor = selectedDivisor;
+    }
+    Py_RETURN_NONE;
 }
 
 EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeSSAOValues, "changeSSAOValues(enabled, samples, strength, distance, attenuation)")
