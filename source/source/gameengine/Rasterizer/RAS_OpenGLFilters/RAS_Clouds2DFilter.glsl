@@ -404,7 +404,7 @@ void main()
 		color = mix(color, ge_CloudsColor, mask);
 	}
 
-	if (ge_CloudsMask > 1.5 && ge_SkyLayersParams.x > 0.001) {
+	if (mod(floor(ge_CloudsMask / 2.0), 2.0) > 0.5 && ge_SkyLayersParams.x > 0.001) {
 		vec2 layered = layeredClouds(viewDir, ge_SkyLayersParams.x, max(0.0001, ge_SkyLayersParams.y), ge_SkyLayersParams.z, ge_SkyLayersParams.w);
 		color = mix(color, ge_SkyLayersColor * layered.y, layered.x * horizonFade);
 	}

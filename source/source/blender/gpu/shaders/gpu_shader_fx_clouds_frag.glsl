@@ -6,7 +6,7 @@ uniform sampler2D depthbuffer; // depth buffer
 
 uniform vec4 clouds_params; // coverage, scale, speed, time
 uniform vec3 clouds_color;
-uniform float clouds_mask; // 1: Clouds, 2: Sky Layers (both can be on)
+uniform float clouds_mask; // bits: 1 Clouds, 2 Sky Layers, 4 Volumetric Clouds (any combination)
 uniform vec4 sky_layers_params; // coverage, scale, speed, time
 uniform vec3 sky_layers_color;
 
@@ -360,7 +360,7 @@ void main()
 		color = mix(color, clouds_color, mask);
 	}
 
-	if (clouds_mask > 1.5 && sky_layers_params.x > 0.001) {
+	if (mod(floor(clouds_mask / 2.0), 2.0) > 0.5 && sky_layers_params.x > 0.001) {
 		vec2 layered = layeredClouds(viewDir, sky_layers_params.x, max(0.0001, sky_layers_params.y), sky_layers_params.z, sky_layers_params.w);
 		color = mix(color, sky_layers_color * layered.y, layered.x * horizonFade);
 	}

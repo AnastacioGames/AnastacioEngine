@@ -5,8 +5,11 @@ Rodar:
 
 Modo padrao: Sky Layers (Ceu em Camadas) + Clouds LIGADOS juntos:
   -> validar que as duas camadas COMPOEM (nao se excluem) - commits 86232060 / f4705337.
-  Tecla 2 no jogo liga/desliga so as nuvens (setWeather) p/ comparar layers sozinhas x compostas.
-Modo "vclouds" (2o arg): liga Volumetric Clouds (raymarch real) - commit 8d21976a.
+  Sky Layers em laranja, nuvens em branco. Tecla 2 liga/desliga so as nuvens brancas (setWeather);
+  o laranja tem que continuar.
+Modo "vclouds" (2o arg): liga SO as Volumetric Clouds (raymarch real); Sky Layers e Clouds
+desligadas, mas com cobertura > 0, para pegar o bug em que a Volumetric acendia as layers junto.
+Tecla 2 liga as nuvens brancas por cima, p/ conferir que a combinacao continua funcionando.
 O chao e um poste servem de referencia; a camera olha pro horizonte/ceu.
 """
 import bpy
@@ -33,13 +36,13 @@ scene.world = world
 
 ws = world.weather_settings
 # Sky Layers (Ceu em Camadas)
-ws.use_sky_layers = True
+ws.use_sky_layers = (modo != "vclouds")
 ws.sky_layer_coverage = 0.5
 ws.sky_layer_scale = 2.0
 ws.sky_layer_speed = 0.3
-ws.sky_layer_color = (1.0, 1.0, 1.0)
+ws.sky_layer_color = (1.0, 0.6, 0.35)  # laranja: distingue das nuvens brancas
 # Nuvens procedurais classicas (devem compor junto com as layers)
-ws.use_clouds = True
+ws.use_clouds = (modo != "vclouds")
 ws.cloud_coverage = 0.5
 ws.cloud_scale = 1.5
 ws.cloud_speed = 0.3
@@ -99,8 +102,9 @@ w = bge.logic.getCurrentScene().world
 
 if kb.events[bge.events.TWOKEY] == JUST:
     try:
+        # flags de clima so aceitam bool; 0.0/1.0 cai em "unknown setting"
         atual = w.getWeather("clouds")
-        w.setWeather("clouds", 0.0 if atual else 1.0)
+        w.setWeather("clouds", not atual)
         print("clouds ->", w.getWeather("clouds"))
     except Exception as e:
         print("setWeather indisponivel:", e)

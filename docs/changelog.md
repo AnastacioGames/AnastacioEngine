@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Volumetric Clouds acendia o Céu em Camadas junto
+
+- Os três tipos de nuvem (Clouds, Sky Layers, Volumetric Clouds) são opções separadas e compartilham uma
+  máscara de bits (1, 2, 4). O teste das Sky Layers era `mask > 1.5`, escrito quando só existiam os bits
+  1 e 2; com a Volumetric (4) ligada sozinha, as Sky Layers também eram desenhadas (se a cobertura
+  delas fosse > 0). Agora testa só o bit 2, `mod(floor(mask / 2.0), 2.0) > 0.5`, no jogo
+  (`RAS_Clouds2DFilter.glsl`) e na 3D View (`gpu_shader_fx_clouds_frag.glsl`).
+- `tools/debug/cenas/criar_cena_valida_ceu.py`: modo `layers` (Clouds + Sky Layers em cores distintas,
+  tecla 2 alterna Clouds) e modo `vclouds` (só Volumetric, com as outras desligadas mas com cobertura,
+  para pegar a regressão). A tecla 2 passa `bool` para `setWeather("clouds", ...)`: flags de clima
+  recusam `0.0`/`1.0`.
+
 ## 2026-10-11 - Chuva Volumetric sumia na 3D View (precisão do tempo)
 
 - Os riscos do estilo Volumetric rolavam `time * speed * 500` no shader. Na 3D View `time` é o relógio
