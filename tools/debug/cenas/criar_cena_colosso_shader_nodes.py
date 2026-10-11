@@ -261,28 +261,32 @@ def lit_glow_material(name, code, note, roughness, metallic, strength):
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
     tree.links.new(coord.outputs["Object"], script.inputs["Vector"])
+    if "Reflection" in script.inputs:
+        # world-space mirror direction of the view ray, used to ray trace the reflection in the script
+        tree.links.new(coord.outputs["Reflection"], script.inputs["Reflection"])
     tree.links.new(time.outputs["Time"], script.inputs["Time"])
     tree.links.new(script.outputs["Color"], bsdf.inputs["Base Color"])
     tree.links.new(script.outputs["Glow"], emit.inputs["Color"])
     tree.links.new(bsdf.outputs[0], add.inputs[0])
     tree.links.new(emit.outputs[0], add.inputs[1])
     tree.links.new(add.outputs[0], out.inputs["Surface"])
-    frame(tree, "0. Entradas: posicao do ponto e tempo do jogo", 'IN', [coord, time])
+    frame(tree, "0. Entradas: posicao do ponto, direcao do reflexo (Reflection) e tempo", 'IN', [coord, time])
     frame(tree, note, 'GEOMETRY', [script])
     frame(tree, "2. Luz: Color vai para o Principled (lampadas), Glow vira brilho proprio (Emission)", 'COLOR',
           [bsdf, emit, add])
     return mat, tree, out
 
 
-sea, tree, out = lit_glow_material("Sea", """// Mar: cor por ondulacao, espuma em volta do colosso, reflexo do portal e da aurora.
-void main(vec3 Vector, float Time, out vec4 Color, out vec4 Glow)
+sea, tree, out = lit_glow_material("Sea", """// Mar: cor por ondulacao, espuma em volta do colosso e REFLEXO do ceu, do portal e do colosso.
+// O reflexo e calculado aqui mesmo: o raio refletido (entrada Reflection) e testado contra as
+// formas da cena (esferas do colosso e dos olhos, plano do portal) e, se nao bater em nada, pega o ceu.
+void main(vec3 Vector, vec3 Reflection, float Time, out vec4 Color, out vec4 Glow)
 {
     vec2 p = Vector.xy;
     float d = length(p);
     // ondulacao larga (escolhe entre fundo escuro e agua clara)
     float w = sin(p.x * 0.35 + Time * 1.3) + sin(p.y * 0.42 - Time * 1.1)
             + sin((p.x + p.y) * 0.21 + Time * 0.7) + sin(d * 0.5 - Time * 2.0) * 0.6;
-    // ondinhas finas (cristas que brilham)
     float fine = sin(p.x * 0.9 + p.y * 0.35 + w * 2.2 + Time * 1.5);
     float fine2 = sin(p.y * 1.3 - p.x * 0.3 - w * 1.7 - Time * 1.2);
     float crest = pow(max(fine, 0.0), 14.0) * 0.7 + pow(max(fine2, 0.0), 20.0) * 0.5;
@@ -292,19 +296,76 @@ void main(vec3 Vector, float Time, out vec4 Color, out vec4 Glow)
     float rings = sin(d * 0.9 - Time * 2.5 + sin(a * 5.0) * 0.8) * 0.5 + 0.5;
     float foam = smoothstep(0.75, 1.0, rings) * (1.0 - smoothstep(13.0, 40.0, d)) * (0.6 + 0.4 * fine);
     foam += (1.0 - smoothstep(0.0, 2.5, abs(d - 13.5 - sin(a * 7.0 + Time) * 1.2))) * 0.8;
-    c = mix(c, vec3(0.75, 0.95, 1.0), clamp(foam, 0.0, 1.0) * 0.85);
-    // reflexo do portal: faixa de luz que vem do portal (y = 55) ate a camera, tremendo com as ondas
-    float wobble = sin(p.y * 0.6 + Time * 2.0) * 1.3 + sin(p.y * 1.7 - Time * 3.0) * 0.5;
-    float streak = exp(-abs(p.x + wobble) / (5.0 + (55.0 - p.y) * 0.07)) * (1.0 - smoothstep(40.0, 58.0, p.y));
-    vec3 portal = 0.5 + 0.5 * cos(6.2831 * (p.y * 0.012 - Time * 0.1 + vec3(0.0, 0.33, 0.67)));
-    vec3 glow = mix(vec3(0.3, 0.9, 1.0), portal, 0.55) * streak * (0.55 + 0.45 * crest) * 0.8;
-    // aurora: verde e roxo cintilando nas cristas
-    glow += vec3(0.1, 0.8, 0.5) * crest * 0.30;
-    glow += vec3(0.5, 0.2, 0.8) * crest * 0.30 * (0.5 + 0.5 * sin(p.x * 0.05 + Time * 0.2));
-    Color = vec4(c, 1.0);
+    foam = clamp(foam, 0.0, 1.0);
+
+    // ---- reflexo
+    // inclinacao das ondas entorta o raio refletido (reflexo tremido)
+    vec2 slope = vec2(cos(p.x * 0.35 + Time * 1.3) * 0.35 + cos((p.x + p.y) * 0.21 + Time * 0.7) * 0.21,
+                      -cos(p.y * 0.42 - Time * 1.1) * 0.42 + cos((p.x + p.y) * 0.21 + Time * 0.7) * 0.21) * 0.07;
+    slope += vec2(cos(p.x * 1.9 + Time * 2.0), cos(p.y * 2.3 - Time * 1.7)) * 0.012;
+    vec3 R = normalize(Reflection);
+    float facing = clamp(R.z, 0.0, 1.0);                 // 0 = olhando rente a agua, 1 = de cima
+    R = normalize(vec3(R.xy - slope, abs(R.z) + 0.03));
+    vec3 P = vec3(p, 0.0);
+
+    // ceu (o mesmo desenho de sky.glsl, sem estrelas)
+    float h = R.z;
+    float ra = atan(R.y, R.x);
+    vec3 refl = mix(vec3(0.03, 0.04, 0.10), vec3(0.0, 0.0, 0.02), clamp(h * 1.5, 0.0, 1.0));
+    refl += vec3(0.45, 0.12, 0.30) * pow(1.0 - abs(h), 7.0);
+    float band = sin(ra * 5.0 + Time * 0.25 + sin(ra * 11.0 - Time * 0.4) * 0.9);
+    float curtain = smoothstep(0.1, 1.0, band) * smoothstep(0.04, 0.22, h) * (1.0 - smoothstep(0.30, 0.85, h));
+    float rays = 0.55 + 0.45 * sin(ra * 110.0 + Time * 1.5 + sin(h * 20.0));
+    refl += mix(vec3(0.1, 1.0, 0.5), vec3(0.6, 0.2, 1.0), clamp(h * 2.0, 0.0, 1.0)) * curtain * rays * 1.6;
+
+    // portal: plano em y = 55.5, centro na altura 20
+    if (R.y > 0.001) {
+        float t = (55.5 - P.y) / R.y;
+        vec3 hit = P + R * t;
+        vec2 q = vec2(hit.x, hit.z - 20.0);
+        float qr = length(q);
+        float qa = atan(q.y, q.x);
+        if (qr < 35.0) {
+            float r = qr / 35.0;
+            float swirl = sin(qa * 4.0 + r * 16.0 - Time * 1.5) * 0.5 + 0.5;
+            vec3 pc = mix(vec3(0.10, 0.0, 0.25), vec3(0.2, 0.9, 1.0), pow(swirl, 3.0));
+            pc += vec3(1.0, 0.8, 0.9) * pow(1.0 - r, 4.0) * 2.0;
+            refl = pc * (1.0 - smoothstep(0.85, 1.0, r) * 0.7);
+        }
+        else if (qr < 37.8) {
+            float an = qa / 6.2831;
+            vec3 rc = 0.5 + 0.5 * cos(6.2831 * (an * 3.0 - Time * 0.12 + vec3(0.0, 0.33, 0.67)));
+            refl = rc * (0.55 + 0.45 * sin(an * 6.2831 * 28.0 - Time * 5.0)) * 4.0;
+        }
+    }
+
+    // colosso: esfera aproximando a cabeca (fica na frente do portal)
+    vec3 oc = P - vec3(0.0, 0.0, 8.0);
+    float bq = dot(oc, R);
+    float disc = bq * bq - (dot(oc, oc) - 12.5 * 12.5);
+    if (disc > 0.0 && -bq - sqrt(disc) > 0.0) {
+        vec3 n = (oc + R * (-bq - sqrt(disc))) / 12.5;
+        float shade = 0.25 + 0.75 * max(dot(n, vec3(-0.37, -0.78, 0.5)), 0.0);
+        refl = vec3(0.35, 0.60, 0.85) * shade;
+    }
+    // olhos: duas esferas de brasa
+    for (int i = 0; i < 2; i++) {
+        vec3 oe = P - vec3(i == 0 ? -4.75 : 4.75, -11.1, 10.5);
+        float be = dot(oe, R);
+        float de = be * be - (dot(oe, oe) - 4.0);
+        if (de > 0.0 && -be - sqrt(de) > 0.0)
+            refl = vec3(1.0, 0.75, 0.2) * 3.0 * (0.75 + 0.25 * sin(Time * 3.0));
+    }
+
+    // Fresnel: rente a agua reflete quase tudo, de cima deixa ver a cor da agua
+    float fres = mix(0.10, 1.0, pow(1.0 - facing, 3.0));
+    c = mix(c, vec3(0.75, 0.95, 1.0), foam * 0.85);
+    vec3 glow = refl * fres * 0.75 * (1.0 - foam * 0.8);
+    glow += vec3(0.1, 0.8, 0.5) * crest * 0.15;
+    Color = vec4(c * (1.0 - fres * 0.7), 1.0);
     Glow = vec4(glow, 1.0);
 }
-""", "1. GLSL Script (sea.glsl): cor, espuma e reflexos. Saidas: Color (iluminada) e Glow (brilho)",
+""", "1. GLSL Script (sea.glsl): cor, espuma e reflexo do ceu, portal e colosso. Saidas: Color e Glow",
                                 roughness=0.22, metallic=0.0, strength=1.0)
 waves = tree.nodes.new("ShaderNodeGroup")
 waves.node_tree = shader_preset_group('WATER_WAVES')
