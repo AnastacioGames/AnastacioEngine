@@ -58,8 +58,16 @@ void main(vec3 color, float amount, out vec3 result)
 ## Presets
 
 Add > Presets cria grupos de nós editáveis (`node.shader_preset_add`): Fur, Grass, Toon + Rim, Toon Outline,
-Dissolve e Water Waves. Water Waves liga o Offset ao Vertex Offset sozinho. Os presets com Alpha põem o material
-em Alpha Clip.
+Dissolve, Water Waves, Wind Leaves, Triplanar e Hologram. Water Waves e Wind Leaves ligam o Offset ao Vertex
+Offset sozinhos. Os presets com Alpha põem o material em Alpha Clip.
+
+Dentro do grupo (Tab) os nós ficam em frames coloridos com um rótulo que explica cada parte: Inputs, Vertex,
+Geometry, Colour e Output.
+
+- **Wind Leaves**: o nó Wind balança a malha acima da altura Anchor; a cor varia em manchas.
+- **Triplanar**: uma textura por eixo, misturada pela direção da face. Não precisa de UV. Troque os três Checker
+  por Image Texture para projetar uma imagem.
+- **Hologram**: linhas que correm pela altura do objeto e borda clara. Gap vai de -1 (sólido) a 1 (vazio).
 
 Presets com Alpha (Fur, Grass, Dissolve) também se ligam sozinhos: Color vai para a cor do shader que está na
 saída e o Alpha entra como recorte (Mix Shader entre um Transparent BSDF e esse shader). Se a saída já tem um

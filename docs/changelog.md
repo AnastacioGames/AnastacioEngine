@@ -6,6 +6,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Shader nodes: presets explicados em frames, código gerado, geometry livre e erro visível
+
+- Presets (`bl_operators/node.py`): cada grupo já nasce separado em frames coloridos com rótulo (Inputs, Vertex, Geometry, Colour, Output), uma coluna por parte (`_preset_frames`; `part=` em `_preset_node` escolhe o frame quando o tipo do nó não diz). Presets novos: **Wind Leaves** (Wind + manchas de cor, Offset ligado sozinho), **Triplanar** (uma textura por eixo misturada pela normal, sem UV) e **Hologram** (linhas que correm + borda de Fresnel, Alpha Clip). Nomes dos presets no dicionário de tradução. Teste: os 9 presets criados em `-b` (frames sem nó solto nem coluna sobreposta) e os 3 novos conferidos em captura do runtime.
+
 ## 2026-10-10 - Nós de material com estágios de vertex e geometry (fases 1-4 do plano shader-nodes)
 
 - Codegen (`gpu_codegen.c`): cada nó guarda os estágios em que roda. Os nós ligados à nova entrada **Vertex Offset** do Material Output (e do Output antigo) viram `vertex_nodes()` no vertex shader (`USE_VERTEX_NODES` em `gpu_shader_vertex.glsl`, depois do `vertex()` do usuário e antes da projeção); as funções da biblioteca que eles chamam são copiadas para o vertex (`glsl_lib_strip_vertex`). Atributos são lidos direto (`att`), posição/normal de view calculadas no próprio vertex. Nós só do vertex não entram no fragment.

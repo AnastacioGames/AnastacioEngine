@@ -374,6 +374,10 @@ _SHADER_PRESETS = (
     ('DISSOLVE', "Dissolve", "Noise dissolve with a glowing edge (Alpha Clip)"),
     ('WATER_WAVES', "Water Waves",
      "Vertex waves (Offset goes to the Material Output Vertex Offset) and a Fresnel tint"),
+    ('WIND_LEAVES', "Wind Leaves",
+     "Leaves swaying in the wind (Offset goes to the Material Output Vertex Offset)"),
+    ('TRIPLANAR', "Triplanar", "Texture projected from the three axes, no UV map needed"),
+    ('HOLOGRAM', "Hologram", "Moving scan lines with a rim glow (Alpha Clip)"),
 )
 
 
@@ -396,9 +400,75 @@ def _preset_group(name, inputs, outputs):
     return group, gin, gout
 
 
-def _preset_node(group, idname, location, **values):
+# Frames inside the preset groups: one column per part, so the frames never overlap.
+_FRAME_ORDER = ('IN', 'VERTEX', 'GEOMETRY', 'COLOR', 'OUT')
+_FRAME_COLORS = {
+    'IN': (0.25, 0.35, 0.5),
+    'VERTEX': (0.2, 0.45, 0.3),
+    'GEOMETRY': (0.5, 0.3, 0.5),
+    'COLOR': (0.5, 0.4, 0.2),
+    'OUT': (0.45, 0.25, 0.25),
+}
+_FRAME_LABELS = {
+    'IN': "Inputs: values shown on the group node",
+    'VERTEX': "Vertex: moves the mesh (vertex shader)",
+    'GEOMETRY': "Geometry: builds the layers / the hull (geometry shader)",
+    'COLOR': "Colour: mixes the colours (fragment shader)",
+    'OUT': "Output: what the group gives to the material",
+}
+_FRAME_VERTEX_NODES = {"ShaderNodeVertexWave", "ShaderNodeVertexWind", "ShaderNodeVertexOffset"}
+_FRAME_GEOMETRY_NODES = {"ShaderNodeFurShells", "ShaderNodeOutline", "ShaderNodeShellLayer"}
+_FRAME_PART = "preset_part"
+
+
+def _preset_frames(group, labels=None):
+    """Organise a preset group in labelled, coloured frames (inputs, vertex, geometry,
+    colour, output). `labels` replaces the text of a part."""
+    parts = {kind: [] for kind in _FRAME_ORDER}
+    for node in group.nodes:
+        if node.bl_idname == "NodeFrame":
+            continue
+        kind = node.get(_FRAME_PART)
+        if kind is not None:
+            del node[_FRAME_PART]
+        elif node.bl_idname == "NodeGroupInput":
+            kind = 'IN'
+        elif node.bl_idname == "NodeGroupOutput":
+            kind = 'OUT'
+        elif node.bl_idname in _FRAME_VERTEX_NODES:
+            kind = 'VERTEX'
+        elif node.bl_idname in _FRAME_GEOMETRY_NODES:
+            kind = 'GEOMETRY'
+        else:
+            kind = 'COLOR'
+        parts[kind].append(node)
+
+    x = 0.0
+    for kind in _FRAME_ORDER:
+        nodes = parts[kind]
+        if not nodes:
+            continue
+        # keep the layout of the part, moved to its own column
+        min_x = min(n.location.x for n in nodes)
+        max_x = max(n.location.x for n in nodes)
+        for n in nodes:
+            n.location.x = x + (n.location.x - min_x)
+        frame = group.nodes.new("NodeFrame")
+        frame.label = (labels or {}).get(kind, _FRAME_LABELS[kind])
+        frame.use_custom_color = True
+        frame.color = _FRAME_COLORS[kind]
+        frame.label_size = 16
+        for n in nodes:
+            n.parent = frame
+        x += (max_x - min_x) + 340.0
+
+
+def _preset_node(group, idname, location, part=None, **values):
     node = group.nodes.new(idname)
     node.location = location
+    if part is not None:
+        # the frame of the node, when its type does not tell (see _preset_frames)
+        node[_FRAME_PART] = part
     for key, value in values.items():
         if key in node.inputs:
             node.inputs[key].default_value = value
@@ -422,6 +492,12 @@ def _build_fur(name, length, layers, density, root, tip):
     links.new(gin.outputs["Tip Color"], mix.inputs["Color2"])
     links.new(mix.outputs["Color"], gout.inputs["Color"])
     links.new(fur.outputs["Alpha"], gout.inputs["Alpha"])
+    _preset_frames(group, {
+        'IN': "Inputs: colour at the root and at the tip of the strands",
+        'GEOMETRY': "Geometry: Fur Shells repeats the mesh in layers",
+        'COLOR': "Colour: root to tip by the layer",
+        'OUT': "Output: Color to the shader, Alpha cuts the strands",
+    })
     return group
 
 
@@ -442,6 +518,11 @@ def _build_toon_rim(name):
     links.new(gin.outputs["Color"], mix.inputs["Color1"])
     links.new(gin.outputs["Rim Color"], mix.inputs["Color2"])
     links.new(mix.outputs["Color"], gout.inputs["Color"])
+    _preset_frames(group, {
+        'IN': "Inputs: base colour, rim colour and size",
+        'COLOR': "Colour: Fresnel cut by Rim Size makes a hard rim",
+        'OUT': "Output: Color to the shader",
+    })
     return group
 
 
@@ -458,6 +539,12 @@ def _build_toon_outline(name):
     links.new(gin.outputs["Color"], mix.inputs["Color1"])
     links.new(gin.outputs["Outline Color"], mix.inputs["Color2"])
     links.new(mix.outputs["Color"], gout.inputs["Color"])
+    _preset_frames(group, {
+        'IN': "Inputs: colour of the object and of the outline",
+        'GEOMETRY': "Geometry: inverted hull (needs Backface Culling)",
+        'COLOR': "Colour: the hull gets the outline colour",
+        'OUT': "Output: Color to the shader",
+    })
     return group
 
 
@@ -486,6 +573,11 @@ def _build_dissolve(name):
     links.new(gin.outputs["Edge Color"], mix.inputs["Color2"])
     links.new(mix.outputs["Color"], gout.inputs["Color"])
     links.new(alpha.outputs[0], gout.inputs["Alpha"])
+    _preset_frames(group, {
+        'IN': "Inputs: Amount goes from 0 (whole) to 1 (gone)",
+        'COLOR': "Colour: noise above Amount stays, the band at the cut glows",
+        'OUT': "Output: Color to the shader, Alpha cuts the holes",
+    })
     return group
 
 
@@ -502,7 +594,8 @@ def _build_water_waves(name):
     wave = _preset_node(group, "ShaderNodeVertexWave", (-250.0, -150.0))
     wave2 = _preset_node(group, "ShaderNodeVertexWave", (-250.0, -400.0),
                          Direction=(0.3, 1.0, 0.0))
-    add = _preset_node(group, "ShaderNodeVectorMath", (50.0, -250.0), operation='ADD')
+    add = _preset_node(group, "ShaderNodeVectorMath", (50.0, -250.0), part='VERTEX',
+                       operation='ADD')
     fresnel = _preset_node(group, "ShaderNodeFresnel", (-250.0, 200.0))
     mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 150.0))
     for node in (wave, wave2):
@@ -516,6 +609,156 @@ def _build_water_waves(name):
     links.new(gin.outputs["Shallow Color"], mix.inputs["Color2"])
     links.new(mix.outputs["Color"], gout.inputs["Color"])
     links.new(add.outputs["Vector"], gout.inputs["Offset"])
+    _preset_frames(group, {
+        'IN': "Inputs: water colours and the shape of the waves",
+        'VERTEX': "Vertex: two waves in different directions, added",
+        'COLOR': "Colour: deep seen from above, shallow at grazing angles",
+        'OUT': "Output: Color to the shader, Offset to Vertex Offset",
+    })
+    return group
+
+
+def _build_wind_leaves(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color", (0.1, 0.35, 0.05, 1.0)),
+         ('NodeSocketColor', "Light Color", (0.45, 0.7, 0.15, 1.0)),
+         ('NodeSocketFloat', "Strength", 0.1),
+         ('NodeSocketFloat', "Speed", 1.5),
+         ('NodeSocketFloat', "Scale", 1.0)),
+        (('NodeSocketColor', "Color"), ('NodeSocketVector', "Offset")))
+    links = group.links
+    # Anchor (on the Wind node) is the height that stays still: the trunk does not move.
+    wind = _preset_node(group, "ShaderNodeVertexWind", (-250.0, -200.0))
+    noise = _preset_node(group, "ShaderNodeTexNoise", (-250.0, 200.0), Scale=8.0)
+    mix = _preset_node(group, "ShaderNodeMixRGB", (0.0, 150.0))
+    for socket in ("Strength", "Speed", "Scale"):
+        links.new(gin.outputs[socket], wind.inputs[socket])
+    links.new(noise.outputs["Fac"], mix.inputs["Fac"])
+    links.new(gin.outputs["Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Light Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    links.new(wind.outputs["Offset"], gout.inputs["Offset"])
+    _preset_frames(group, {
+        'IN': "Inputs: leaf colours and the wind",
+        'VERTEX': "Vertex: Wind sways the mesh above the Anchor height",
+        'COLOR': "Colour: noise patches between the two greens",
+        'OUT': "Output: Color to the shader, Offset to Vertex Offset",
+    })
+    return group
+
+
+def _build_triplanar(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color 1", (0.35, 0.3, 0.25, 1.0)),
+         ('NodeSocketColor', "Color 2", (0.7, 0.65, 0.55, 1.0)),
+         ('NodeSocketFloat', "Scale", 4.0)),
+        (('NodeSocketColor', "Color"), ('NodeSocketFloat', "Fac")))
+    links = group.links
+    coord = _preset_node(group, "ShaderNodeTexCoord", (-900.0, 0.0))
+    pos = _preset_node(group, "ShaderNodeSeparateRGB", (-700.0, 250.0))
+    nor = _preset_node(group, "ShaderNodeSeparateRGB", (-700.0, -350.0))
+    links.new(coord.outputs["Object"], pos.inputs[0])
+    links.new(coord.outputs["Normal"], nor.inputs[0])
+
+    # One texture per axis, each one seen along that axis. Swap them for Image Textures
+    # to project a picture.
+    textures = []
+    weights = []
+    for i, (axis, a, b) in enumerate((("X", 1, 2), ("Y", 0, 2), ("Z", 0, 1))):
+        y = 400.0 - i * 300.0
+        plane = _preset_node(group, "ShaderNodeCombineRGB", (-500.0, y))
+        links.new(pos.outputs[a], plane.inputs[0])
+        links.new(pos.outputs[b], plane.inputs[1])
+        tex = _preset_node(group, "ShaderNodeTexChecker", (-300.0, y))
+        tex.label = "Side " + axis
+        links.new(plane.outputs[0], tex.inputs["Vector"])
+        links.new(gin.outputs["Scale"], tex.inputs["Scale"])
+        weight = _preset_node(group, "ShaderNodeMath", (-500.0, -500.0 - i * 180.0),
+                              operation='ABSOLUTE')
+        weight.label = "Weight " + axis
+        links.new(nor.outputs[i], weight.inputs[0])
+        textures.append(tex)
+        weights.append(weight)
+
+    # fac = (X * wx + Y * wy + Z * wz) / (wx + wy + wz), as two mixes
+    sum_yz = _preset_node(group, "ShaderNodeMath", (-300.0, -600.0), operation='ADD')
+    fac_y = _preset_node(group, "ShaderNodeMath", (-100.0, -600.0), operation='DIVIDE')
+    sum_all = _preset_node(group, "ShaderNodeMath", (-100.0, -800.0), operation='ADD')
+    fac_x = _preset_node(group, "ShaderNodeMath", (100.0, -800.0), operation='DIVIDE')
+    links.new(weights[1].outputs[0], sum_yz.inputs[0])
+    links.new(weights[2].outputs[0], sum_yz.inputs[1])
+    links.new(weights[1].outputs[0], fac_y.inputs[0])
+    links.new(sum_yz.outputs[0], fac_y.inputs[1])
+    links.new(sum_yz.outputs[0], sum_all.inputs[0])
+    links.new(weights[0].outputs[0], sum_all.inputs[1])
+    links.new(weights[0].outputs[0], fac_x.inputs[0])
+    links.new(sum_all.outputs[0], fac_x.inputs[1])
+
+    mix_yz = _preset_node(group, "ShaderNodeMixRGB", (100.0, 0.0))
+    mix_all = _preset_node(group, "ShaderNodeMixRGB", (300.0, 0.0))
+    links.new(fac_y.outputs[0], mix_yz.inputs["Fac"])
+    links.new(textures[2].outputs["Fac"], mix_yz.inputs["Color1"])
+    links.new(textures[1].outputs["Fac"], mix_yz.inputs["Color2"])
+    links.new(fac_x.outputs[0], mix_all.inputs["Fac"])
+    links.new(mix_yz.outputs["Color"], mix_all.inputs["Color1"])
+    links.new(textures[0].outputs["Fac"], mix_all.inputs["Color2"])
+
+    color = _preset_node(group, "ShaderNodeMixRGB", (500.0, 100.0))
+    links.new(mix_all.outputs["Color"], color.inputs["Fac"])
+    links.new(gin.outputs["Color 1"], color.inputs["Color1"])
+    links.new(gin.outputs["Color 2"], color.inputs["Color2"])
+    links.new(color.outputs["Color"], gout.inputs["Color"])
+    links.new(mix_all.outputs["Color"], gout.inputs["Fac"])
+    _preset_frames(group, {
+        'IN': "Inputs: the two colours and the size of the pattern",
+        'COLOR': "Colour: one texture per axis, blended by the face direction",
+        'OUT': "Output: Color to the shader, Fac is the blended pattern",
+    })
+    return group
+
+
+def _build_hologram(name):
+    group, gin, gout = _preset_group(
+        name,
+        (('NodeSocketColor', "Color", (0.0, 0.5, 1.0, 1.0)),
+         ('NodeSocketColor', "Rim Color", (0.6, 1.0, 1.0, 1.0)),
+         ('NodeSocketFloat', "Lines", 40.0),
+         ('NodeSocketFloat', "Speed", 2.0),
+         ('NodeSocketFloat', "Gap", 0.0)),
+        (('NodeSocketColor', "Color"), ('NodeSocketFloat', "Alpha")))
+    links = group.links
+    coord = _preset_node(group, "ShaderNodeTexCoord", (-900.0, -200.0))
+    height = _preset_node(group, "ShaderNodeSeparateRGB", (-700.0, -200.0))
+    time = _preset_node(group, "ShaderNodeTime", (-900.0, -450.0))
+    lines = _preset_node(group, "ShaderNodeMath", (-500.0, -200.0), operation='MULTIPLY')
+    scroll = _preset_node(group, "ShaderNodeMath", (-700.0, -450.0), operation='MULTIPLY')
+    phase = _preset_node(group, "ShaderNodeMath", (-300.0, -300.0), operation='ADD')
+    sine = _preset_node(group, "ShaderNodeMath", (-100.0, -300.0), operation='SINE')
+    alpha = _preset_node(group, "ShaderNodeMath", (100.0, -300.0), operation='GREATER_THAN')
+    fresnel = _preset_node(group, "ShaderNodeFresnel", (-100.0, 200.0))
+    mix = _preset_node(group, "ShaderNodeMixRGB", (100.0, 150.0))
+    links.new(coord.outputs["Object"], height.inputs[0])
+    links.new(height.outputs[2], lines.inputs[0])
+    links.new(gin.outputs["Lines"], lines.inputs[1])
+    links.new(time.outputs["Time"], scroll.inputs[0])
+    links.new(gin.outputs["Speed"], scroll.inputs[1])
+    links.new(lines.outputs[0], phase.inputs[0])
+    links.new(scroll.outputs[0], phase.inputs[1])
+    links.new(phase.outputs[0], sine.inputs[0])
+    links.new(sine.outputs[0], alpha.inputs[0])
+    links.new(gin.outputs["Gap"], alpha.inputs[1])
+    links.new(fresnel.outputs["Fac"], mix.inputs["Fac"])
+    links.new(gin.outputs["Color"], mix.inputs["Color1"])
+    links.new(gin.outputs["Rim Color"], mix.inputs["Color2"])
+    links.new(mix.outputs["Color"], gout.inputs["Color"])
+    links.new(alpha.outputs[0], gout.inputs["Alpha"])
+    _preset_frames(group, {
+        'IN': "Inputs: colours, lines, speed, Gap (-1 solid, 1 empty)",
+        'COLOR': "Colour: sine of height + time makes the lines, Fresnel the rim",
+        'OUT': "Output: Color to an Emission shader, Alpha cuts the lines",
+    })
     return group
 
 
@@ -528,6 +771,9 @@ _PRESET_BUILDERS = {
     'TOON_OUTLINE': _build_toon_outline,
     'DISSOLVE': _build_dissolve,
     'WATER_WAVES': _build_water_waves,
+    'WIND_LEAVES': _build_wind_leaves,
+    'TRIPLANAR': _build_triplanar,
+    'HOLOGRAM': _build_hologram,
 }
 
 
