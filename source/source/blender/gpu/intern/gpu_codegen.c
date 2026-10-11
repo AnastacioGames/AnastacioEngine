@@ -1809,10 +1809,79 @@ static char *geom_vertex_prefix(const GeomVarying *list, int tot)
 	return code;
 }
 
+/* Raw mode of Material.geomcode: the Text has its own "void main(" instead of "void geometry()". */
+static bool geom_code_has_main(const char *code)
+{
+	for (const char *p = strstr(code, "main"); p; p = strstr(p + 4, "main")) {
+		const char *end = p + 4;
+		while (*end == ' ' || *end == '\t') {
+			end++;
+		}
+		if (*end != '(' || (p > code && glsl_ident_char(p[-1]))) {
+			continue;
+		}
+		const char *start = p;
+		while (start > code && ELEM(start[-1], ' ', '\t', '\n', '\r')) {
+			start--;
+		}
+		if (start - code >= 4 && strncmp(start - 4, "void", 4) == 0 &&
+		    (start - 4 == code || !glsl_ident_char(start[-5])))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Raw mode: the "layout(...) in;" and "layout(...) out;" lines of the user go to the top of the shader,
+ * as the input layout gives the size of the vs_ arrays that the helpers index. They are commented out
+ * in the returned copy of the code, so the line numbers of the Text stay. */
+static char *geom_hoist_layouts(const char *usercode, DynStr *ds, bool *r_has_in, bool *r_has_out)
+{
+	char *code = BLI_strdup(usercode);
+	char *line = code;
+	*r_has_in = *r_has_out = false;
+	while (line && *line) {
+		char *p = line;
+		char *eol = strchr(line, '\n');
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		if (strncmp(p, "layout", 6) == 0 && !glsl_ident_char(p[6])) {
+			char *semi = strchr(p, ';');
+			if (semi && (!eol || semi < eol)) {
+				const char *word_end = semi;
+				while (word_end > p && ELEM(word_end[-1], ' ', '\t')) {
+					word_end--;
+				}
+				const char *word = word_end;
+				while (word > p && glsl_ident_char(word[-1])) {
+					word--;
+				}
+				const int len = (int)(word_end - word);
+				const bool is_in = (len == 2 && strncmp(word, "in", 2) == 0);
+				const bool is_out = (len == 3 && strncmp(word, "out", 3) == 0);
+				/* "layout(location = 0) in vec3 name;" ends with a name: not a primitive layout */
+				if (is_in || is_out) {
+					BLI_dynstr_nappend(ds, p, (int)(semi + 1 - p));
+					BLI_dynstr_append(ds, "\n");
+					p[0] = p[1] = '/';
+					*r_has_in |= is_in;
+					*r_has_out |= is_out;
+				}
+			}
+		}
+		line = eol ? eol + 1 : NULL;
+	}
+	return code;
+}
+
 static char *code_generate_geometry_stage(const GeomVarying *list, int tot, const GPUPassStages *stages,
                                           bool use_shells, int *r_max_vertices)
 {
 	DynStr *ds = BLI_dynstr_new();
+	const bool use_raw = !use_shells && geom_code_has_main(stages->geomcode);
+	char *rawcode = NULL;
 
 	if (use_shells) {
 		const int layers = max_ii(stages->shell_layers, 1);
@@ -1836,6 +1905,17 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        layers, stages->shell_length, stages->outline_width,
 		        invocations, invocations * 3, invocations - 1);
 		*r_max_vertices = invocations * 3;
+	}
+	else if (use_raw) {
+		bool has_in, has_out;
+		rawcode = geom_hoist_layouts(stages->geomcode, ds, &has_in, &has_out);
+		if (!has_in) {
+			BLI_dynstr_append(ds, "layout(triangles) in;\n");
+		}
+		if (!has_out) {
+			BLI_dynstr_append(ds, "layout(triangle_strip, max_vertices = 3) out;\n");
+		}
+		*r_max_vertices = 64;
 	}
 	else {
 		BLI_dynstr_append(ds, "layout(triangles) in;\n");
@@ -1944,6 +2024,13 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 		        "\t\tEndPrimitive();\n"
 		        "\t}\n"
 		        "}\n");
+	}
+	else if (use_raw) {
+		/* The user's own main(): only the vs_ inputs, the outputs and the helpers above are added. */
+		BLI_dynstr_append(ds, "#line 1\n");
+		BLI_dynstr_append(ds, rawcode);
+		BLI_dynstr_append(ds, "\n");
+		MEM_freeN(rawcode);
 	}
 	else {
 		BLI_dynstr_append(ds, "void geometry();\n\nvoid main()\n{\n\tgeometry();\n}\n\n");

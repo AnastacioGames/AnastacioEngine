@@ -42,6 +42,24 @@ Python). O Text define `void geometry()`. As varyings do material são repassada
 
 `layout(... max_vertices = N) out;` é opcional (padrão 3). Quanto maior o N, mais caro.
 
+### Modo livre: `void main()`
+
+Se o Text define `void main()` no lugar de `void geometry()`, o geometry shader é o do usuário, como escrito,
+com os próprios `layout(...) in;` e `layout(...) out;` (sem eles valem `triangles` e `triangle_strip` com
+`max_vertices = 3`). A engine só acrescenta antes do código as entradas, as saídas e os helpers da tabela acima.
+
+| Disponível | O que é |
+|---|---|
+| `vs_varposition[i]`, `vs_varnormal[i]` | posição e normal do vértice `i`, em view space |
+| `vs_var0[i]`, `vs_var1[i]`, ... | atributos que os nós do material usam (UV, cor de vértice, tangente), na ordem em que aparecem no código gerado |
+| `vs_<nome>[i]` | cada `out`/`varying` declarado no Text do campo Vertex |
+| `gl_in[i].gl_Position` | posição já projetada |
+| `varposition`, `varnormal`, `var0`, `<nome>` | as saídas: mesmo nome, sem o `vs_`. Tudo que o fragment lê precisa ser escrito em cada vértice emitido; `geom_copy(i)` escreve todas de uma vez |
+| `GEOM_PROJECTION` | matriz de projeção, para posições novas (`geom_set_position` já a usa) |
+| `TIME` | tempo do jogo |
+
+A malha chega sempre em triângulos. Show Generated Code mostra a lista exata de `vs_*` do material no `.geom`.
+
 ## Nó GLSL Script
 
 Categoria **Script**. O nó aponta para um Text com uma função `main`. Os parâmetros viram os sockets: `float`/`int`,
@@ -138,6 +156,9 @@ O botão precisa do shader compilado; com erro de compilação ele avisa e não 
 
 `tools/debug/cenas/criar_cena_shader_nodes.py` gera uma cena com água (Water Waves), esfera com Fur, macaco com
 Toon Outline, cubo com GLSL Script e cubo com o campo Geometry.
+
+`tools/debug/cenas/criar_cena_geometry_livre.py` compara os modos do campo Geometry: `void geometry()`,
+`void main()` com layout próprio e `void main()` sem layout.
 
 `tools/debug/cenas/criar_cena_glsl_script_uniforms.py` testa o GLSL Script: dois scripts com helpers de mesmo
 nome no mesmo material, uniforms `u_` trocados pelo Python do jogo e script no Vertex Offset com `TIME`.
