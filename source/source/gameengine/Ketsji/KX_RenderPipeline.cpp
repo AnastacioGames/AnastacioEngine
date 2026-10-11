@@ -802,7 +802,8 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				cloudParams->cloud_scale = world->cloud_scale;
 				cloudParams->cloud_speed = world->cloud_speed;
 				cloudParams->cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
-				                          ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0);
+				                          ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
+				                          ((world->vcloud_flag & WO_VCLOUDS_ENABLE) ? 4 : 0);
 				cloudParams->sky_layer_coverage = world->sky_layer_coverage;
 				cloudParams->sky_layer_scale = world->sky_layer_scale;
 				cloudParams->sky_layer_speed = world->sky_layer_speed;
@@ -811,6 +812,32 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				}
 				for (int i = 0; i < 3; ++i) {
 					cloudParams->cloud_color[i] = world->cloud_color[i];
+				}
+				cloudParams->vcloud_coverage = world->vcloud_coverage;
+				cloudParams->vcloud_scale = world->vcloud_scale;
+				cloudParams->vcloud_speed = world->vcloud_speed;
+				cloudParams->vcloud_altitude = world->vcloud_altitude;
+				cloudParams->vcloud_thickness = world->vcloud_thickness;
+				cloudParams->vcloud_density = world->vcloud_density;
+				cloudParams->vcloud_detail_scale = world->vcloud_detail_scale;
+				cloudParams->vcloud_silver_intensity = world->vcloud_silver_intensity;
+				cloudParams->vcloud_quality = world->vcloud_quality;
+				cloudParams->vcloud_shadow_enable = (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) != 0;
+				cloudParams->vcloud_shadow_strength = world->vcloud_shadow_strength;
+				for (int i = 0; i < 3; ++i) {
+					cloudParams->vcloud_color[i] = world->vcloud_color[i];
+				}
+				/* World-space sun direction for the Stage 2 raymarch (self-shadow mini-march,
+				 * Henyey-Greenstein silver lining) and the terrain shadow approximation --
+				 * same lamp/axis as the Light Scattering/Lens Flare sun position above. */
+				cloudParams->vcloud_sundir[0] = 0.0f;
+				cloudParams->vcloud_sundir[1] = 0.0f;
+				cloudParams->vcloud_sundir[2] = 1.0f;
+				if (KX_LightObject *vcloud_sun = scene->GetWorldSun()) {
+					mt::vec3 sunDir = vcloud_sun->NodeGetWorldOrientation().GetColumn(2).Normalized();
+					cloudParams->vcloud_sundir[0] = sunDir.x;
+					cloudParams->vcloud_sundir[1] = sunDir.y;
+					cloudParams->vcloud_sundir[2] = sunDir.z;
 				}
 			}
 		}

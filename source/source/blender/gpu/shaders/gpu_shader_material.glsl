@@ -839,6 +839,14 @@ void mix_blend(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 	outcol.a = col1.a;
 }
 
+/* Plain vec3 blend for legacy World horizon/zenith colors (gpu_material_old_world) -- those
+ * links carry RGB only (set_rgb), never alpha, so blending them through a vec4-shader-typed
+ * function like node_mix_shader/mix_blend reads uninitialized alpha and can corrupt the result. */
+void mix_rgb3(float fac, vec3 col1, vec3 col2, out vec3 outcol)
+{
+	outcol = mix(col1, col2, clamp(fac, 0.0, 1.0));
+}
+
 void mix_add(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);

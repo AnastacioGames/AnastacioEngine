@@ -4146,7 +4146,12 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 					GPU_link(mat, "set_value", GPU_dynamic_uniform(&wo->moon_brightness, GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS, NULL), &moonBrightness);
 				}
 				else {
-					static float scol[3] = { 0.0f, 0.0f, 0.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
+					/* No Sun object: sundir stays straight up ("noon"), so the sun color must stay
+					 * bright white, not black -- do_sky_atmospheric() multiplies the whole sky by
+					 * suncolor, so a black fallback here used to make the entire atmospheric/real
+					 * sky render solid black whenever no Sun was linked, regardless of horizon/zenith
+					 * colors (see UI hint: "Without a Sun object the sky stays at noon..."). */
+					static float scol[3] = { 1.0f, 1.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(scol), &sunCol);
 					static float sdir[3] = { 0.0f, 0.0f, 1.0f }; GPU_link(mat, "set_rgb", GPU_uniform(sdir), &sunDir);
 					static float sunEng = 20.0f; GPU_link(mat, "set_value", GPU_uniform(&sunEng), &sunEnergy);
 					static float sunsi = 0.0f; GPU_link(mat, "set_value", GPU_uniform(&sunsi), &sunSize);
@@ -4194,14 +4199,14 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 				}
 			}
 			else
-				GPU_link(mat, "node_mix_shader", blend, hor, zen, &shi.rgb);
+				GPU_link(mat, "mix_rgb3", blend, hor, zen, &shi.rgb);
 		}
 		else {
 			if (wo->skytype & WO_SKYREAL) {
 				/* if not skyblend but skyreal use old real sky without ground color */
 				GPU_link(mat, "background_transform_to_world", GPU_material_builtin(mat, GPU_VIEW_POSITION), &ray);
 				GPU_link(mat, "world_blend_real", ray, GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), &blend);
-				GPU_link(mat, "node_mix_shader", blend, hor, zen, &shi.rgb);
+				GPU_link(mat, "mix_rgb3", blend, hor, zen, &shi.rgb);
 			} else
 				GPU_link(mat, "set_rgb", hor, &shi.rgb);
 		}

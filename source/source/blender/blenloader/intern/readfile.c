@@ -3770,6 +3770,23 @@ static void direct_link_world(FileData *fd, World *wrld)
 		wrld->cloud_color[1] = 1.0f;
 		wrld->cloud_color[2] = 1.0f;
 	}
+
+	/* Same sentinel for Volumetric Clouds (Stage 1 scaffolding). */
+	if (wrld->vcloud_scale == 0.0f) {
+		wrld->vcloud_coverage = 0.5f;
+		wrld->vcloud_scale = 1.0f;
+		wrld->vcloud_speed = 0.3f;
+		wrld->vcloud_color[0] = 1.0f;
+		wrld->vcloud_color[1] = 1.0f;
+		wrld->vcloud_color[2] = 1.0f;
+		wrld->vcloud_altitude = 500.0f;
+		wrld->vcloud_thickness = 200.0f;
+		wrld->vcloud_density = 1.0f;
+		wrld->vcloud_detail_scale = 1.0f;
+		wrld->vcloud_silver_intensity = 0.3f;
+		wrld->vcloud_quality = 1;
+		wrld->vcloud_shadow_strength = 0.5f;
+	}
 }
 
 

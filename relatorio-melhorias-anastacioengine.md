@@ -241,6 +241,8 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   e modelos em Templates > 2D Filters (GLSL). Filtros embutidos mantêm `#line 0` e o cache de binários.
 - Depth Transparency possui captura de profundidade dedicada e comportamento seguro fora do jogo.
 - Weather nativo no `World` oferece chuva, nuvens e lens flare; a chuva inclui modos Classic e Volumetric.
+- Nuvens têm 3 modos aditivos em World > Weather: Clouds e Sky Layers (ruído 2D) e Volumetric Clouds (raymarch
+  volumétrico real, com self-shadow, silver lining e sombra aproximada no terreno), combináveis entre si.
 - Automatic Sun orbits a ground reference 5 m ahead of the active camera at a 10 m radius and always targets it.
   The reference estimates ground elevation from the camera's initial height. Its `Sun Hour` is backed by the
   World World Property `sun_hour` (Float, 0-24; 12 is directly overhead), so Logic Bricks can control it.

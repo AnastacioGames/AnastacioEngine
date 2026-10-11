@@ -252,6 +252,18 @@ void BKE_world_init(World *wrld)
 	wrld->sky_layer_speed = 0.05f;
 	wrld->sky_layer_color[0] = wrld->sky_layer_color[1] = wrld->sky_layer_color[2] = 1.0f;
 
+	wrld->vcloud_coverage = 0.5f;
+	wrld->vcloud_scale = 1.0f;
+	wrld->vcloud_speed = 0.3f;
+	wrld->vcloud_color[0] = wrld->vcloud_color[1] = wrld->vcloud_color[2] = 1.0f;
+	wrld->vcloud_altitude = 500.0f;
+	wrld->vcloud_thickness = 200.0f;
+	wrld->vcloud_density = 1.0f;
+	wrld->vcloud_detail_scale = 1.0f;
+	wrld->vcloud_silver_intensity = 0.3f;
+	wrld->vcloud_quality = 1; /* Medium */
+	wrld->vcloud_shadow_strength = 0.5f;
+
 	wrld->flare_scale = 1.0f;
 	wrld->flare_intensity = 1.0f;
 

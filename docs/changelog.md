@@ -6,6 +6,46 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Volumetric Clouds (3º modo em World > Weather): raymarch real + 2 bugs legados corrigidos
+
+Novo modo "Volumetric Clouds" em World > Weather, aditivo aos dois já existentes (Clouds e Sky
+Layers, intocados). Raymarch volumétrico real num `RAS_2DFilter` (`RAS_Clouds2DFilter.glsl`,
+mesma cadeia de post-process dos outros dois modos, agora um `cloud_mask` de 3 bits): duas fases
+(coarse empty-space skip + detail com acumulação de luz Beer-Lambert), self-shadow via
+mini-raymarch em direção ao sol (`cloudLightMarch`), phase function Henyey-Greenstein dual-lobe
+para silver lining, sombra aproximada no terreno (`cloudTerrainShadow`, reusa o mesmo campo de
+densidade do ponto de vista do sol, sem exigir cascade shadow map), disco/glow de sol desenhado
+no próprio filtro (`sunAngle`/falloff gaussiano, tolerante a desalinhamento de câmera). Presets de
+qualidade Low/Medium/High (24/12, 48/24, 64/48 passos). DNA/RNA novos em `DNA_world_types.h` e
+`rna_world.c` (`vcloud_*`, flag `WO_VCLOUDS_ENABLE`), painel em `custom_pt_world.py` espelhando
+Sky Layers. Gerador de cena de teste reutilizável em `tools/debug/cenas/criar_cena_vclouds.py`.
+
+**Bug crítico corrigido:** o pass `RAS_2DFilter`/`FILTERPASS_CLOUDS` para todo o sistema de nuvens
+(Clouds + Sky Layers + Volumetric) só é criado quando `filters.useClouds` é verdadeiro
+(`KX_Scene.cpp`), e esse booleano ignorava a flag `WO_VCLOUDS_ENABLE` — com Volumetric Clouds
+ligado sozinho (sem Clouds nem Sky Layers), o filtro inteiro nunca era instanciado e nada
+aparecia. Corrigido somando `world->vcloud_flag & WO_VCLOUDS_ENABLE` à condição de criação e
+populando os campos `filters.vcloud_*` nesse mesmo bloco.
+
+**Bug legado separado corrigido (céu de fundo preto):** achado ao testar a cena de exemplo. Em
+`gpu_material_old_world()` (`gpu_material.c`), quando a cena não tem `Sun` lamp vinculado, a cor
+do sol de fallback usada pelo céu atmosférico (`do_sky_atmospheric`, que multiplica o céu inteiro
+por essa cor) estava fixada em preto — trocada para branco. Achado colateral de tipo também
+corrigido: a mistura horizonte↔zênite usava `node_mix_shader` (espera `vec4` com alpha) em cores
+`vec3` puras (`set_rgb`), lendo alpha de lixo; nova função `mix_rgb3` (vec3→vec3) em
+`gpu_shader_material.glsl` substitui as duas ocorrências. Também documentado: setar
+`world.use_sky_blend` direto por script (sem passar pelo enum real `world.sky_type`) deixa bits
+antigos Real/Atmospheric ligados e cai nesse caminho por engano — `criar_cena_vclouds.py` agora
+usa `world.sky_type = 'GRADIENT'`.
+
+**Validação:** bug crítico e bug do céu confirmados corrigidos via captura automática
+(`bge.render.makeScreenshot()` + leitura do PNG, sem depender de print manual) e visualmente pelo
+usuário. Composição com os 3 modos de nuvem simultâneos (`--all-modes` no gerador de cena) sem
+regressão. FPS por preset Low/Medium/High não mostrou diferença mensurável na máquina de
+desenvolvimento (GPU não é o gargalo nessa cena de teste — 93% do frame em espera de vsync mesmo
+no preset High); validar o critério original (Low não cai >15-20% numa iGPU fraca) exige rodar em
+hardware de referência real, não feito nesta sessão.
+
 ## 2026-10-11 - Planar Reflection: crash no runtime e espelho preto corrigidos
 
 - **Crash no runtime (commit `9630e952`)**: a entrada abaixo dizia que o `AnastacioRuntime.exe` "não terminou
@@ -394,6 +434,23 @@ saída (zero risco identificado) e escalam com N_materiais × N_lamps (GP6) ou N
   comparação de desempenho deve usar a mesma cena no baseline e nesta alteração,
   com contadores temporários do cálculo de hull/hash BVH ou outra métrica
   diretamente sensível ao trabalho removido.
+
+## 2026-10-11 - SP4/SP5 (cache de hull/BVH no spawn): cache implementado, validação ainda pendente
+
+Worktree `codex/auditoria-spawn-liblod`. O Codex implementou o cache por `KX_Mesh` para SP4
+(`btConvexHullComputer` por cópia) e SP5 (`shared_bvh_key`), mas reportou que o build completo do
+RangeRuntime com as mudanças foi interrompido antes de terminar — não conta como validação.
+
+Plano proposto para validar de fato: recompilar/linkar o RangeRuntime completo; criar uma cena
+temporária controlada (um template inativo com colisão convexa e outro com mesh/BVH, um script
+gera muitas réplicas da mesma malha, registra sucesso e fecha sozinho); rodar a cena no runtime e
+confirmar pelo log que todas as réplicas nascem, simulam física e são removidas sem crash; e, para
+medir o ganho, comparar baseline × alteração com um contador temporário de cálculo de hull/hash
+BVH (o medidor geral de frame tende a não ser sensível, já que o cache elimina trabalho interno de
+construção, não trabalho por frame) — instrumentação a ser removida antes de entregar.
+
+Status em `docs/auditoria-suspeitos.md`: SP4/SP5 passam de "adiado" para "implementado, validação
+pendente".
 
 ## 2026-10-10 - Troca de layer no editor: cache de shaders, aquecimento dos layers escondidos e medição
 

@@ -140,9 +140,23 @@ typedef struct BuildInFilters {
 	float cloud_scale;
 	float cloud_speed;
 	float cloud_color[3];
-	int cloud_mask; /* 1: Clouds, 2: Sky Layers */
+	int cloud_mask; /* 1: Clouds, 2: Sky Layers, 4: Volumetric Clouds */
 	float sky_layer_coverage, sky_layer_scale, sky_layer_speed;
 	float sky_layer_color[3];
+	/* Volumetric Clouds (Stage 1 scaffolding: flat shading reusing the same FBM; real
+	 * raymarch comes in Stage 2) */
+	float vcloud_coverage, vcloud_scale, vcloud_speed;
+	float vcloud_color[3];
+	float vcloud_altitude, vcloud_thickness;
+	float vcloud_density, vcloud_detail_scale;
+	float vcloud_silver_intensity;
+	float vcloud_shadow_strength;
+	int vcloud_quality;
+	bool vcloud_shadow_enable;
+	/* World-space direction toward the sun (lamp's +Z), for the Stage 2 raymarch's self-shadow
+	 * mini-march and Henyey-Greenstein silver lining; same source as the Light Scattering/Lens
+	 * Flare sun position (KX_RenderPipeline::RenderFilters). */
+	float vcloud_sundir[3];
 
 	/* Lens Flare (native World weather) */
 	bool useLensFlare;

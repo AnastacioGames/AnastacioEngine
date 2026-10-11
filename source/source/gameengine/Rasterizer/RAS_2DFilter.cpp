@@ -141,6 +141,11 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_CloudsMask", // GE_CLOUDS_MASK_UNIFORM
 	"ge_SkyLayersParams", // GE_SKYLAYERS_PARAMS_UNIFORM
 	"ge_SkyLayersColor", // GE_SKYLAYERS_COLOR_UNIFORM
+	"ge_VCloudsParams1", // GE_VCLOUDS_PARAMS1_UNIFORM
+	"ge_VCloudsParams2", // GE_VCLOUDS_PARAMS2_UNIFORM
+	"ge_VCloudsParams3", // GE_VCLOUDS_PARAMS3_UNIFORM
+	"ge_VCloudsColor", // GE_VCLOUDS_COLOR_UNIFORM
+	"ge_VCloudsSunDir", // GE_VCLOUDS_SUNDIR_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
 	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
 	"ge_FxaaParams", // GE_FXAA_PARAMETERS_UNIFORM
@@ -781,6 +786,28 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_SKYLAYERS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.sky_layer_color, sizeof(float) * 3, 1);
+	}
+
+	if (m_predefinedUniforms[GE_VCLOUDS_PARAMS1_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.vcloud_coverage, m_buildInFilters.vcloud_scale,
+						   m_buildInFilters.vcloud_speed, m_buildInFilters.cloud_time};
+		SetUniformfv(m_predefinedUniforms[GE_VCLOUDS_PARAMS1_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_VCLOUDS_PARAMS2_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.vcloud_altitude, m_buildInFilters.vcloud_thickness,
+						   m_buildInFilters.vcloud_density, m_buildInFilters.vcloud_detail_scale};
+		SetUniformfv(m_predefinedUniforms[GE_VCLOUDS_PARAMS2_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_VCLOUDS_PARAMS3_UNIFORM] != -1) {
+		float params[4] = {m_buildInFilters.vcloud_silver_intensity, (float)m_buildInFilters.vcloud_quality,
+						   m_buildInFilters.vcloud_shadow_enable ? 1.0f : 0.0f, m_buildInFilters.vcloud_shadow_strength};
+		SetUniformfv(m_predefinedUniforms[GE_VCLOUDS_PARAMS3_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_VCLOUDS_COLOR_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_VCLOUDS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.vcloud_color, sizeof(float) * 3, 1);
+	}
+	if (m_predefinedUniforms[GE_VCLOUDS_SUNDIR_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_VCLOUDS_SUNDIR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.vcloud_sundir, sizeof(float) * 3, 1);
 	}
 
 	if (m_predefinedUniforms[GE_LENSFLARE_PARAMS_UNIFORM] != -1) {

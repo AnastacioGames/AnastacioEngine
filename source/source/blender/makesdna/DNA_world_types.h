@@ -163,6 +163,19 @@ typedef struct World {
 	float sky_layer_coverage, sky_layer_scale, sky_layer_speed;
 	float sky_layer_color[3];
 
+	/* Volumetric Clouds (RDR2-style, Stage 1 scaffolding): terceiro modo de nuvens,
+	 * independente de Clouds e Sky Layers. Stage 1 usa shading achatado reaproveitando o
+	 * mesmo FBM; raymarch 3D real fica para a Stage 2. */
+	float vcloud_coverage, vcloud_scale, vcloud_speed;
+	float vcloud_color[3];
+	float vcloud_altitude, vcloud_thickness;
+	float vcloud_density, vcloud_detail_scale;
+	float vcloud_silver_intensity;
+	short vcloud_quality;      /* 0=Low,1=Medium,2=High */
+	short vcloud_flag;         /* WO_VCLOUDS_* bits */
+	float vcloud_shadow_strength;
+	int   vcloud_pad;          /* keeps the World struct 8-byte aligned for makesdna (see align errors on gpumaterial/prop otherwise) */
+
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
 	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */
 	short weather_editor_hide; /* bits WO_WEATHER_* (+ WO_WEATHER_FOG) escondidos so na viewport; era earthquake_pad2, 0 = tudo visivel */
@@ -250,6 +263,15 @@ typedef struct World {
 #define WO_WEATHER_RAIN_RIPPLE_PUDDLE (1 << 13)
 /* Splash so dentro da agua das pocas (liga as Pocas junto) */
 #define WO_WEATHER_RAIN_SPLASH_PUDDLE (1 << 14)
+/* Volumetric Clouds (3o modo de nuvens): bits 0-14 de weather_flag ja estavam ocupados
+ * (checado lendo todo o bloco acima), unico bit livre em short e o 15. */
+#define WO_WEATHER_VOLUMETRIC_CLOUDS  (1 << 15)
+
+/* World.vcloud_flag */
+#define WO_VCLOUDS_ENABLE          (1 << 0)
+#define WO_VCLOUDS_EXPANDED        (1 << 1)
+#define WO_VCLOUDS_EDITOR_HIDE     (1 << 2)
+#define WO_VCLOUDS_SHADOW_ENABLE   (1 << 3)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

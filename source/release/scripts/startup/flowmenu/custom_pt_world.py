@@ -379,6 +379,37 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "sky_layer_color", text="Cloud Color")
 
         row = main_box.row(align=True)
+        row.prop(weather, "show_expanded_vclouds", text="Volumetric Clouds", emboss=True)
+        row.prop(weather, "show_viewport_vclouds", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
+        not_live_layout(row).prop(weather, "use_volumetric_clouds", text="")
+
+        if weather.show_expanded_vclouds:
+            col = main_box.column(align=True)
+            col.active = weather.use_volumetric_clouds
+            col.prop(weather, "vcloud_coverage", slider=True)
+            col.prop(weather, "vcloud_scale")
+            col.prop(weather, "vcloud_detail_scale")
+            col.prop(weather, "vcloud_speed")
+            col.prop(weather, "vcloud_density", slider=True)
+            col.prop(weather, "vcloud_altitude")
+            col.prop(weather, "vcloud_thickness")
+            col.prop(weather, "vcloud_silver_intensity", slider=True)
+            col.prop(weather, "vcloud_color", text="Cloud Color")
+            col.prop(weather, "vcloud_quality", text="Quality")
+
+            sub = col.column()
+            sub_row = sub.row()
+            sub_row.prop(weather, "vcloud_shadow_enable", text="")
+            sub_row.label(text="Cast Shadow on Terrain")
+            shadow_col = sub.column()
+            shadow_col.active = weather.vcloud_shadow_enable
+            shadow_col.prop(weather, "vcloud_shadow_strength", text="Strength")
+
+            if weather.vcloud_quality == 'HIGH':
+                info = col.column(align=True)
+                info.label(text="High quality is costly on integrated GPUs", icon='INFO')
+
+        row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)
         row.prop(weather, "show_viewport_lensflare", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         not_live_layout(row).prop(weather, "use_lens_flare", text="")

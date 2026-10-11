@@ -604,6 +604,100 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Color", "Color tint of the cloud layers");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	/* volumetric clouds (Stage 1 scaffolding: shading achatado, mesmo FBM; raymarch real na Stage 2) */
+	{
+		static const EnumPropertyItem vcloud_quality_items[] = {
+			{0, "LOW", 0, "Low", "Fewer raymarch steps, lower internal resolution"},
+			{1, "MEDIUM", 0, "Medium", "Balanced raymarch steps and resolution"},
+			{2, "HIGH", 0, "High", "Full raymarch steps and resolution (costly on iGPU)"},
+			{0, NULL, 0, NULL, NULL}
+		};
+
+		prop = RNA_def_property(srna, "use_volumetric_clouds", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vcloud_flag", WO_VCLOUDS_ENABLE);
+		RNA_def_property_ui_text(prop, "Use Volumetric Clouds",
+		                         "Third cloud mode (RDR2-style volumetric look); works together with Clouds and Sky Layers");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "show_expanded_vclouds", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vcloud_flag", WO_VCLOUDS_EXPANDED);
+		RNA_def_property_ui_text(prop, "Expanded", "Set weather effect expanded in the user interface");
+		RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+		RNA_def_property_update(prop, 0, NULL);
+
+		prop = RNA_def_property(srna, "show_viewport_vclouds", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_negative_sdna(prop, NULL, "vcloud_flag", WO_VCLOUDS_EDITOR_HIDE);
+		RNA_def_property_ui_text(prop, "Render Volumetric Clouds", "Render Volumetric Clouds in Viewport");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_coverage", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0, 1.0);
+		RNA_def_property_ui_text(prop, "Coverage", "Amount of sky covered by the volumetric cloud layer");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_scale", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0001, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.01, 10.0, 1, 3);
+		RNA_def_property_ui_text(prop, "Scale", "Scale of the base cloud noise");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_speed", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
+		RNA_def_property_ui_range(prop, -1.0, 1.0, 1, 3);
+		RNA_def_property_ui_text(prop, "Speed", "Speed at which the volumetric cloud layer drifts");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_color", PROP_FLOAT, PROP_COLOR);
+		RNA_def_property_float_sdna(prop, NULL, "vcloud_color");
+		RNA_def_property_array(prop, 3);
+		RNA_def_property_ui_text(prop, "Color", "Color tint of the volumetric clouds");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_altitude", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0, 10000.0, 10, 1);
+		RNA_def_property_ui_text(prop, "Altitude", "Base altitude of the volumetric cloud layer");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_thickness", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0001, FLT_MAX);
+		RNA_def_property_ui_range(prop, 1.0, 5000.0, 10, 1);
+		RNA_def_property_ui_text(prop, "Thickness", "Vertical thickness of the volumetric cloud layer");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_density", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0, 1.0);
+		RNA_def_property_ui_text(prop, "Density", "Overall density of the volumetric clouds");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_detail_scale", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.0001, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.01, 10.0, 1, 3);
+		RNA_def_property_ui_text(prop, "Detail Scale", "Scale of the fine detail noise layered on top of the base shape");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_silver_intensity", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0, 1.0);
+		RNA_def_property_ui_text(prop, "Silver Intensity", "Intensity of the silver lining seen around the sun (Stage 2 will add real light scattering)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_quality", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "vcloud_quality");
+		RNA_def_property_enum_items(prop, vcloud_quality_items);
+		RNA_def_property_ui_text(prop, "Quality", "Raymarch step count and internal resolution preset (Stage 2)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_shadow_enable", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vcloud_flag", WO_VCLOUDS_SHADOW_ENABLE);
+		RNA_def_property_ui_text(prop, "Cast Shadow on Terrain", "Project an approximate shadow from the volumetric clouds onto the terrain (Stage 2)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vcloud_shadow_strength", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0, 1.0);
+		RNA_def_property_ui_text(prop, "Shadow Strength", "Strength of the volumetric cloud shadow on the terrain (Stage 2)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	}
+
 	prop = RNA_def_property(srna, "show_viewport_lensflare", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_editor_hide", WO_WEATHER_LENSFLARE);
 	RNA_def_property_ui_text(prop, "Render Lens Flare", "Render Lens Flare in Viewport");

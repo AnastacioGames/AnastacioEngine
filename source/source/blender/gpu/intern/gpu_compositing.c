@@ -131,6 +131,11 @@ typedef struct {
   int clouds_mask_uniform;
   int sky_layers_params_uniform;
   int sky_layers_color_uniform;
+  int vclouds_params1_uniform;
+  int vclouds_params2_uniform;
+  int vclouds_params3_uniform;
+  int vclouds_color_uniform;
+  int vclouds_sundir_uniform;
 } GPUCLOUDSShaderInterface;
 
 typedef struct {
@@ -1503,12 +1508,37 @@ bool GPU_fx_do_composite_pass(
 			const float clouds_mask =
 			        (float)(((world->weather_flag & ~world->weather_editor_hide & WO_WEATHER_CLOUDS) ? 1 : 0) +
 			                (((world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
-			                  WO_SKY_LAYERS_ENABLE) ? 2 : 0));
+			                  WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
+			                (((world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
+			                  WO_VCLOUDS_ENABLE) ? 4 : 0));
 			const float sky_layers_params[4] = {
 			    world->sky_layer_coverage, world->sky_layer_scale, world->sky_layer_speed, clouds_params[3]};
 			GPU_shader_uniform_vector(clouds_shader, interface->clouds_mask_uniform, 1, 1, &clouds_mask);
 			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_params_uniform, 4, 1, sky_layers_params);
 			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_color_uniform, 3, 1, world->sky_layer_color);
+
+			/* Volumetric Clouds (Stage 1 scaffolding): flat shading reusing the same FBM. */
+			const float vclouds_params1[4] = {
+			    world->vcloud_coverage, world->vcloud_scale, world->vcloud_speed, clouds_params[3]};
+			const float vclouds_params2[4] = {
+			    world->vcloud_altitude, world->vcloud_thickness, world->vcloud_density, world->vcloud_detail_scale};
+			const float vclouds_params3[4] = {
+			    world->vcloud_silver_intensity, (float)world->vcloud_quality,
+			    (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) ? 1.0f : 0.0f, world->vcloud_shadow_strength};
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params1_uniform, 4, 1, vclouds_params1);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params2_uniform, 4, 1, vclouds_params2);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params3_uniform, 4, 1, vclouds_params3);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_color_uniform, 3, 1, world->vcloud_color);
+
+			/* Sun direction for the volumetric raymarch (self-shadow/silver lining), same
+			 * source object used by the light scattering/lens flare passes above. */
+			{
+				float vclouds_sundir[3] = {0.0f, 0.0f, 1.0f};
+				if (scene->world_sun) {
+					copy_v3_v3(vclouds_sundir, scene->world_sun->obmat[2]);
+				}
+				GPU_shader_uniform_vector(clouds_shader, interface->vclouds_sundir_uniform, 3, 1, vclouds_sundir);
+			}
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2277,6 +2307,11 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->clouds_mask_uniform = GPU_shader_get_uniform(shader, "clouds_mask");
 			interface->sky_layers_params_uniform = GPU_shader_get_uniform(shader, "sky_layers_params");
 			interface->sky_layers_color_uniform = GPU_shader_get_uniform(shader, "sky_layers_color");
+			interface->vclouds_params1_uniform = GPU_shader_get_uniform(shader, "vclouds_params1");
+			interface->vclouds_params2_uniform = GPU_shader_get_uniform(shader, "vclouds_params2");
+			interface->vclouds_params3_uniform = GPU_shader_get_uniform(shader, "vclouds_params3");
+			interface->vclouds_color_uniform = GPU_shader_get_uniform(shader, "vclouds_color");
+			interface->vclouds_sundir_uniform = GPU_shader_get_uniform(shader, "vclouds_sundir");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

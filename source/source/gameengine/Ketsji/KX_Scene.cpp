@@ -404,8 +404,10 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_sky_zenith[2] = world->zenb;
 		}
 
-		/* Clouds and Sky Layers share one filter pass (RAS_Clouds2DFilter.glsl). */
-		if (world->weather_flag & WO_WEATHER_CLOUDS || world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) {
+		/* Clouds, Sky Layers and Volumetric Clouds share one filter pass (RAS_Clouds2DFilter.glsl). */
+		if (world->weather_flag & WO_WEATHER_CLOUDS || world->sky_layer_flag & WO_SKY_LAYERS_ENABLE ||
+		    world->vcloud_flag & WO_VCLOUDS_ENABLE)
+		{
 			filters.useClouds = true;
 			filters.cloud_coverage = world->cloud_coverage;
 			filters.cloud_scale = world->cloud_scale;
@@ -414,12 +416,27 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.cloud_color[1] = world->cloud_color[1];
 			filters.cloud_color[2] = world->cloud_color[2];
 			filters.cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
-			                     ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0);
+			                     ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
+			                     ((world->vcloud_flag & WO_VCLOUDS_ENABLE) ? 4 : 0);
 			filters.sky_layer_coverage = world->sky_layer_coverage;
 			filters.sky_layer_scale = world->sky_layer_scale;
 			filters.sky_layer_speed = world->sky_layer_speed;
 			for (int i = 0; i < 3; ++i) {
 				filters.sky_layer_color[i] = world->sky_layer_color[i];
+			}
+			filters.vcloud_coverage = world->vcloud_coverage;
+			filters.vcloud_scale = world->vcloud_scale;
+			filters.vcloud_speed = world->vcloud_speed;
+			filters.vcloud_altitude = world->vcloud_altitude;
+			filters.vcloud_thickness = world->vcloud_thickness;
+			filters.vcloud_density = world->vcloud_density;
+			filters.vcloud_detail_scale = world->vcloud_detail_scale;
+			filters.vcloud_silver_intensity = world->vcloud_silver_intensity;
+			filters.vcloud_quality = world->vcloud_quality;
+			filters.vcloud_shadow_enable = (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) != 0;
+			filters.vcloud_shadow_strength = world->vcloud_shadow_strength;
+			for (int i = 0; i < 3; ++i) {
+				filters.vcloud_color[i] = world->vcloud_color[i];
 			}
 		}
 
