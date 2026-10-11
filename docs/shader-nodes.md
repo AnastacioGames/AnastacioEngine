@@ -55,6 +55,47 @@ void main(vec3 color, float amount, out vec3 result)
 }
 ```
 
+### Funções auxiliares
+
+O Text pode ter outras funções, constantes, structs e `#define` além do `main`, nos dois estágios. Cada nó
+recebe nomes próprios na compilação, então dois scripts do mesmo material podem declarar `float noise(vec3 p)`
+ou `const float SCALE` sem conflito, e um helper pode ter o nome de uma função da biblioteca do material. O
+erro de compilação continua apontando a linha do Text. Variáveis globais declaradas com `in`, `out` ou
+`varying` não são renomeadas.
+
+### Uniforms `u_`
+
+Um uniform cujo nome começa com `u_` vira mais uma entrada do nó:
+
+```glsl
+uniform float u_speed;   // @min 0 @max 2 @default 0.5
+uniform vec4 u_color;    // @default 1 0.5 0 1
+
+float pulse(float t) { return 0.5 + 0.5 * sin(t * u_speed); }
+
+void main(out vec4 Color)
+{
+	Color = u_color * pulse(TIME);
+}
+```
+
+- Tipos: `float`, `int`, `vec2`, `vec3` e `vec4`, um uniform por linha.
+- O comentário no fim da linha é opcional. `@min` e `@max` juntos transformam o campo em slider; `@default`
+  vale quando a entrada é criada (um número, ou um por componente).
+- O valor é editado no próprio nó ou em Material > Node Shader > **Script Uniforms**, e é salvo no `.range`.
+  Como é um socket, também pode ser ligado a outro nó.
+- Entrada sem ligação é um uniform de verdade, enviado a cada desenho. Entrada ligada recebe o valor do outro
+  nó e deixa de ser alterável pelo jogo.
+- No jogo: `material.setScriptUniform("u_speed", 1.5)` e `material.getScriptUniform("u_speed")`
+  (`KX_BlenderMaterial`, por exemplo `obj.meshes[0].materials[0]`). Aceita um número ou uma sequência de até 4.
+  Não recompila o shader. Vale para todos os nós GLSL Script do material com esse nome; o retorno é `False`
+  quando o material não tem o uniform. O valor volta ao do nó quando o jogo termina.
+- Uniform sem o prefixo `u_` compila, mas ninguém o preenche.
+
+### TIME
+
+`TIME` (tempo do jogo, em segundos) pode ser usado no script sem ligar um nó Time.
+
 ## Presets
 
 Add > Presets cria grupos de nós editáveis (`node.shader_preset_add`): Fur, Grass, Toon + Rim, Toon Outline,
@@ -97,3 +138,6 @@ O botão precisa do shader compilado; com erro de compilação ele avisa e não 
 
 `tools/debug/cenas/criar_cena_shader_nodes.py` gera uma cena com água (Water Waves), esfera com Fur, macaco com
 Toon Outline, cubo com GLSL Script e cubo com o campo Geometry.
+
+`tools/debug/cenas/criar_cena_glsl_script_uniforms.py` testa o GLSL Script: dois scripts com helpers de mesmo
+nome no mesmo material, uniforms `u_` trocados pelo Python do jogo e script no Vertex Offset com `TIME`.

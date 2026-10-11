@@ -178,6 +178,7 @@ typedef struct GPUScriptCode {
 	char name[32];
 	char *code;
 	char *wrapper;
+	bool use_time; /* the code reads TIME */
 } GPUScriptCode;
 
 /* Optional vertex and geometry stages of a material pass. All zero keeps the classic shaders. */
@@ -217,7 +218,9 @@ void gpu_codegen_exit(void);
 
 const char *GPU_builtin_name(GPUBuiltin builtin);
 void gpu_material_add_node(struct GPUMaterial *material, struct GPUNode *node);
-const char *gpu_material_add_script(struct GPUMaterial *material, const char *code, const char *wrapper);
+const char *gpu_material_add_script(struct GPUMaterial *material, const char *code, const char *wrapper, bool use_time);
+/* Value of a GLSL Script "u_" uniform, owned by the material and read on every bind. */
+float *gpu_material_add_script_uniform(struct GPUMaterial *material, const char *name, const float *value, int size);
 int GPU_link_changed(struct GPUNodeLink *link);
 
 #endif

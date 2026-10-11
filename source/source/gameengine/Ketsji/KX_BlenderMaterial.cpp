@@ -169,6 +169,10 @@ KX_BlenderMaterial::~KX_BlenderMaterial()
 	m_material->emit = m_savedData.emit;
 	m_material->amb = m_savedData.ambient;
 	m_material->spectra = m_savedData.specularalpha;
+	if (!m_scriptUniforms.empty()) {
+		// The compiled material stays with the editor.
+		GPU_material_script_uniforms_reset(m_material);
+	}
 
 	if (m_shader) {
 		delete m_shader;
@@ -240,6 +244,20 @@ void KX_BlenderMaterial::ReloadMaterial()
 			m_blenderShader = nullptr;
 		}
 	}
+
+	for (const auto& pair : m_scriptUniforms) {
+		GPU_material_script_uniform_set(m_material, pair.first.c_str(), pair.second.value, pair.second.len);
+	}
+}
+
+bool KX_BlenderMaterial::SetScriptUniform(const std::string& name, const float *value, int len)
+{
+	ScriptUniform uniform = {{0.0f, 0.0f, 0.0f, 0.0f}, len};
+	for (int i = 0; i < len && i < 4; i++) {
+		uniform.value[i] = value[i];
+	}
+	m_scriptUniforms[name] = uniform;
+	return GPU_material_script_uniform_set(m_material, name.c_str(), value, len) > 0;
 }
 
 void KX_BlenderMaterial::PrefetchMaterial()
@@ -640,6 +658,8 @@ PyMethodDef KX_BlenderMaterial::Methods[] =
 	EXP_PYMETHODTABLE(KX_BlenderMaterial, getShader),
 	EXP_PYMETHODTABLE(KX_BlenderMaterial, getTextureBindcode),
 	EXP_PYMETHODTABLE(KX_BlenderMaterial, setBlending),
+	EXP_PYMETHODTABLE(KX_BlenderMaterial, setScriptUniform),
+	EXP_PYMETHODTABLE(KX_BlenderMaterial, getScriptUniform),
 	{nullptr, nullptr} //Sentinel
 };
 
@@ -1008,6 +1028,63 @@ EXP_PYMETHODDEF_DOC(KX_BlenderMaterial, setBlending, "setBlending(bge.logic.src,
 		Py_RETURN_NONE;
 	}
 	return nullptr;
+}
+
+EXP_PYMETHODDEF_DOC(KX_BlenderMaterial, setScriptUniform, "setScriptUniform(name, value)")
+{
+	const char *name;
+	PyObject *pyvalue;
+	if (!PyArg_ParseTuple(args, "sO:setScriptUniform", &name, &pyvalue)) {
+		return nullptr;
+	}
+
+	float value[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	int len = 0;
+	if (PyNumber_Check(pyvalue) && !PySequence_Check(pyvalue)) {
+		value[0] = (float)PyFloat_AsDouble(pyvalue);
+		len = 1;
+	}
+	else if (PySequence_Check(pyvalue)) {
+		const Py_ssize_t size = PySequence_Size(pyvalue);
+		if (size < 1 || size > 4) {
+			PyErr_SetString(PyExc_ValueError, "material.setScriptUniform(name, value): expected 1 to 4 numbers");
+			return nullptr;
+		}
+		for (Py_ssize_t i = 0; i < size; i++) {
+			PyObject *item = PySequence_GetItem(pyvalue, i);
+			value[i] = item ? (float)PyFloat_AsDouble(item) : 0.0f;
+			Py_XDECREF(item);
+		}
+		len = (int)size;
+	}
+	if (len == 0 || PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "material.setScriptUniform(name, value): expected a number or a sequence of numbers");
+		return nullptr;
+	}
+
+	return PyBool_FromLong(SetScriptUniform(name, value, len));
+}
+
+EXP_PYMETHODDEF_DOC(KX_BlenderMaterial, getScriptUniform, "getScriptUniform(name)")
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:getScriptUniform", &name)) {
+		return nullptr;
+	}
+
+	float value[4];
+	int size;
+	if (!GPU_material_script_uniform_get(m_material, name, value, &size)) {
+		Py_RETURN_NONE;
+	}
+	if (size == 1) {
+		return PyFloat_FromDouble(value[0]);
+	}
+	PyObject *tuple = PyTuple_New(size);
+	for (int i = 0; i < size; i++) {
+		PyTuple_SET_ITEM(tuple, i, PyFloat_FromDouble(value[i]));
+	}
+	return tuple;
 }
 
 EXP_PYMETHODDEF_DOC(KX_BlenderMaterial, getTextureBindcode, "getTextureBindcode(texslot)")

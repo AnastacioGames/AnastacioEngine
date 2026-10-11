@@ -982,8 +982,204 @@ static bool codegen_uses_node(ListBase *nodes, const char *name, int stage)
 	return false;
 }
 
+#define SCRIPT_MAX_NAMES 256
+
+typedef struct ScriptNames {
+	char (*names)[64];
+	int tot;
+	DynStr *defs, *undefs;
+	const char *prefix;
+} ScriptNames;
+
+static bool codegen_script_reserved(const char *word)
+{
+	static const char *reserved[] = {
+		"main", "void", "float", "int", "uint", "bool", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4",
+		"bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4", "sampler2D", "samplerCube", "sampler2DShadow",
+		"const", "uniform", "in", "out", "inout", "varying", "attribute", "highp", "mediump", "lowp",
+		"precision", "struct", "flat", "smooth", "layout", "TIME", NULL};
+	for (int i = 0; reserved[i]; i++) {
+		if (STREQ(word, reserved[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Renames a top level name of the script to <prefix>_<name>, or only forgets a macro of the script. */
+static void codegen_script_name(ScriptNames *sn, const char *name, bool macro)
+{
+	if (!name[0] || codegen_script_reserved(name) || sn->tot >= SCRIPT_MAX_NAMES) {
+		return;
+	}
+	for (int i = 0; i < sn->tot; i++) {
+		if (STREQ(sn->names[i], name)) {
+			return;
+		}
+	}
+	BLI_strncpy(sn->names[sn->tot++], name, sizeof(sn->names[0]));
+	if (!macro) {
+		/* Two underscores in a row are reserved in GLSL. */
+		BLI_dynstr_appendf(sn->defs, "#define %s %s%s%s\n", name, sn->prefix, (name[0] == '_') ? "x" : "_", name);
+	}
+	BLI_dynstr_appendf(sn->undefs, "#undef %s\n", name);
+}
+
+static bool codegen_ident_char(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+static const char *codegen_read_word(const char *p, char *r_word, int size)
+{
+	int n = 0;
+	while (codegen_ident_char(*p)) {
+		if (n < size - 1) {
+			r_word[n++] = *p;
+		}
+		p++;
+	}
+	r_word[n] = '\0';
+	return p;
+}
+
+/* Functions, global variables/constants and structs declared at the top level of a GLSL Script get
+ * a name of their own per node (by #define, so the lines of the Text stay as they are): two scripts
+ * may then declare helpers with the same name, also one that the material library already has.
+ * Macros of the script are forgotten at its end. */
+static void codegen_script_names(ScriptNames *sn, const char *code)
+{
+	const char *p = code;
+	int braces = 0, parens = 0, nwords = 0;
+	bool init = false, skip = false, line_start = true, prev_word = false, after_struct = false;
+	char prev[64] = "", word[64];
+
+	while (*p) {
+		if (p[0] == '/' && p[1] == '/') {
+			while (*p && *p != '\n') p++;
+			continue;
+		}
+		if (p[0] == '/' && p[1] == '*') {
+			const char *end = strstr(p + 2, "*/");
+			p = end ? end + 2 : p + strlen(p);
+			continue;
+		}
+		if (*p == '\n') {
+			line_start = true;
+			p++;
+			continue;
+		}
+		if (*p == ' ' || *p == '\t' || *p == '\r') {
+			p++;
+			continue;
+		}
+		if (*p == '#' && line_start) {
+			p++;
+			while (*p == ' ' || *p == '\t') p++;
+			p = codegen_read_word(p, word, sizeof(word));
+			if (STREQ(word, "define")) {
+				while (*p == ' ' || *p == '\t') p++;
+				p = codegen_read_word(p, word, sizeof(word));
+				codegen_script_name(sn, word, true);
+			}
+			while (*p && *p != '\n') {
+				if (p[0] == '\\' && p[1] == '\n') p++;
+				else if (p[0] == '\\' && p[1] == '\r' && p[2] == '\n') p += 2;
+				p++;
+			}
+			continue;
+		}
+		line_start = false;
+
+		if (*p >= '0' && *p <= '9') {
+			while (codegen_ident_char(*p) || *p == '.') p++;
+			prev_word = false;
+			continue;
+		}
+		if (codegen_ident_char(*p)) {
+			p = codegen_read_word(p, word, sizeof(word));
+			if (braces == 0 && parens == 0 && !init) {
+				if (nwords == 0 && (STREQ(word, "in") || STREQ(word, "out") || STREQ(word, "varying") ||
+				                    STREQ(word, "attribute") || STREQ(word, "precision") || STREQ(word, "layout") ||
+				                    STREQ(word, "flat") || STREQ(word, "smooth")))
+				{
+					/* Shared with the rest of the shader, or not the declaration of a name. */
+					skip = true;
+				}
+				if (after_struct && !skip) {
+					codegen_script_name(sn, word, false);
+				}
+				after_struct = STREQ(word, "struct");
+				BLI_strncpy(prev, word, sizeof(prev));
+				prev_word = true;
+				nwords++;
+			}
+			continue;
+		}
+
+		const char c = *p++;
+		const bool top = (braces == 0 && parens == 0);
+		const bool is_name = top && !init && prev_word && nwords >= 2 && !skip;
+		switch (c) {
+			case '{':
+				braces++;
+				break;
+			case '}':
+				braces = max_ii(braces - 1, 0);
+				if (braces == 0 && !init) {
+					/* End of a function body or of the members of a struct. */
+					nwords = 0;
+					skip = false;
+				}
+				break;
+			case '(':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				parens++;
+				break;
+			case ')':
+				parens = max_ii(parens - 1, 0);
+				break;
+			case '[':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				break;
+			case '=':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = true;
+				}
+				break;
+			case ',':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = false;
+				}
+				break;
+			case ';':
+				if (is_name) {
+					codegen_script_name(sn, prev, false);
+				}
+				if (top) {
+					init = false;
+					nwords = 0;
+					skip = false;
+				}
+				break;
+		}
+		prev_word = false;
+		after_struct = false;
+	}
+}
+
 /* GLSL Script node functions used by the given stage. The user writes a function called main;
- * it is renamed to the unique name of its node. */
+ * it is renamed to the unique name of its node, and so are the other names of the script. */
 static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts, int stage)
 {
 	if (!scripts) {
@@ -991,14 +1187,39 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 	}
 	for (GPUScriptCode *script = scripts->first; script; script = script->next) {
 		if (codegen_uses_node(nodes, script->name, stage)) {
+			ScriptNames sn = {NULL};
+			sn.names = MEM_mallocN(sizeof(*sn.names) * SCRIPT_MAX_NAMES, "ScriptNames");
+			sn.defs = BLI_dynstr_new();
+			sn.undefs = BLI_dynstr_new();
+			sn.prefix = script->name;
+			codegen_script_names(&sn, script->code);
+			char *defs = BLI_dynstr_get_cstring(sn.defs);
+			char *undefs = BLI_dynstr_get_cstring(sn.undefs);
+
 			BLI_dynstr_appendf(ds, "\n#define main %s_main\n", script->name);
+			if (script->use_time) {
+				/* Set by the wrapper from the time of the material. */
+				BLI_dynstr_appendf(ds, "float %s_TIME;\n#define TIME %s_TIME\n", script->name, script->name);
+			}
+			BLI_dynstr_append(ds, defs);
 			/* Compile errors give the line of the Text. */
 			BLI_dynstr_append(ds, "#line 1\n");
 			BLI_dynstr_append(ds, script->code);
-			BLI_dynstr_appendf(ds, "\n#undef main\n#define SCRIPT_MAIN %s_main\n#define SCRIPT_ENTRY %s\n",
+			BLI_dynstr_appendf(ds, "\n#define SCRIPT_MAIN %s_main\n#define SCRIPT_ENTRY %s\n",
 			                   script->name, script->name);
+			/* Inside the renames: the wrapper fills the uniforms of the script. */
 			BLI_dynstr_append(ds, script->wrapper);
-			BLI_dynstr_append(ds, "\n#undef SCRIPT_MAIN\n#undef SCRIPT_ENTRY\n");
+			BLI_dynstr_append(ds, "\n#undef main\n#undef SCRIPT_MAIN\n#undef SCRIPT_ENTRY\n");
+			if (script->use_time) {
+				BLI_dynstr_append(ds, "#undef TIME\n");
+			}
+			BLI_dynstr_append(ds, undefs);
+
+			MEM_freeN(defs);
+			MEM_freeN(undefs);
+			BLI_dynstr_free(sn.defs);
+			BLI_dynstr_free(sn.undefs);
+			MEM_freeN(sn.names);
 		}
 	}
 }
@@ -2982,9 +3203,10 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 
 /* GLSL Script node: the user function (called main in code) with one parameter per socket, the
  * inputs first, then the outputs. */
-bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out)
+bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
+                     const char **uniform_names, bool use_time)
 {
-	const char *name = gpu_material_add_script(mat, code, wrapper);
+	const char *name = gpu_material_add_script(mat, code, wrapper, use_time);
 	if (!name) {
 		return false;
 	}
@@ -2992,8 +3214,19 @@ bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GP
 	GPUNode *node = GPU_node_begin(name);
 	if (in) {
 		for (int i = 0; in[i].type != GPU_NONE; i++) {
-			gpu_node_input_socket(node, &in[i]);
+			if (uniform_names && uniform_names[i] && !in[i].link) {
+				/* A real uniform, sent on every bind: changing it from the game does not compile. */
+				float *value = gpu_material_add_script_uniform(mat, uniform_names[i], in[i].vec,
+				                                               GPU_DATATYPE_SIZE[in[i].type]);
+				gpu_node_input_link(node, GPU_dynamic_uniform(value, GPU_DYNAMIC_NONE, NULL), in[i].type);
+			}
+			else {
+				gpu_node_input_socket(node, &in[i]);
+			}
 		}
+	}
+	if (use_time) {
+		gpu_node_input_link(node, GPU_builtin(GPU_TIME), GPU_FLOAT);
 	}
 	if (out) {
 		for (int i = 0; out[i].type != GPU_NONE; i++) {

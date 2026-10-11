@@ -534,6 +534,18 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
             col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
         layout.operator("material.show_generated_code", icon='TEXT')
 
+        # "uniform <type> u_<name>;" of the GLSL Script nodes, the same values as the node sockets.
+        nodes = mat.node_tree.nodes if mat.node_tree else ()
+        uniforms = [(node, sock) for node in nodes if node.bl_idname == 'ShaderNodeGLSLScript'
+                    for sock in node.inputs if sock.identifier.startswith("u_") and not sock.is_linked]
+        if uniforms:
+            col = layout.column()
+            col.label(text="Script Uniforms:")
+            for node, sock in uniforms:
+                row = col.split(percentage=0.4)
+                row.label(text="%s (%s)" % (sock.name, node.script.name if node.script else node.name))
+                row.prop(sock, "default_value", text="")
+
 
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):
     bl_label = "Transparency"

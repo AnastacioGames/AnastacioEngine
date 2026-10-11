@@ -665,7 +665,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (`tools/debug/cenas/criar_cena_shader_nodes.py`) e validar com o caso real do Naut. Falta também: viewport
   desenhando quads com geometry stage (não testado), build Web, cor do cabeçalho do nó por estágio e erro do nó
   em vermelho, nós Billboard/Explode/Strands, presets Wind Leaves/Triplanar/Hologram, Show Generated Code,
-  uniforms `u_` no painel, custo/`max_vertices` no painel e opção de sombra própria.
+  custo/`max_vertices` no painel e opção de sombra própria. Uniforms `u_`, helpers e `TIME` do GLSL Script feitos em 2026-10-11; falta conferir o painel Script Uniforms no editor.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

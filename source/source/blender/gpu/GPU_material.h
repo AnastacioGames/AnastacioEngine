@@ -288,7 +288,14 @@ void GPU_material_vertex_offset(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_shells(GPUMaterial *material, int layers, float length);
 void GPU_material_outline(GPUMaterial *material, float width);
 bool GPU_material_geometry_stage_supported(void);
-bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out);
+/* uniform_names: one entry per input socket, the name of the "u_" uniform it feeds or NULL. An unlinked
+ * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */
+bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
+                     const char **uniform_names, bool use_time);
+/* GLSL Script "u_" uniforms of every compiled variant of the material. Set returns how many were found. */
+int GPU_material_script_uniform_set(struct Material *ma, const char *name, const float *value, int len);
+bool GPU_material_script_uniform_get(struct Material *ma, const char *name, float r_value[4], int *r_size);
+void GPU_material_script_uniforms_reset(struct Material *ma);
 /* The material moves its vertices on the GPU (user vertex/geometry code, vertex or geometry nodes). */
 bool GPU_material_moves_vertices(struct Material *ma);
 void GPU_material_enable_alpha(GPUMaterial *material);

@@ -119,6 +119,7 @@ struct GPUMaterial {
 	float shell_length;
 	float outline_width;
 	ListBase scripts; /* GPUScriptCode, only while the pass is generated */
+	ListBase script_uniforms; /* GPUScriptUniform, the pass inputs point to these values */
 	/* User vertex/geometry code or vertex nodes: the view/object matrices and the time are always sent. */
 	bool use_vertex_stage;
 
@@ -636,6 +637,7 @@ void GPU_material_free(ListBase *gpumaterial)
 
 		BLI_freelistN(&material->lamps);
 
+		BLI_freelistN(&material->script_uniforms);
 		MEM_freeN(material);
 	}
 
@@ -1144,7 +1146,7 @@ bool GPU_material_geometry_stage_supported(void)
 	return GPU_geometry_shader_support();
 }
 
-const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper)
+const char *gpu_material_add_script(GPUMaterial *material, const char *code, const char *wrapper, bool use_time)
 {
 	if (!code || !wrapper) {
 		return NULL;
@@ -1153,8 +1155,85 @@ const char *gpu_material_add_script(GPUMaterial *material, const char *code, con
 	BLI_snprintf(script->name, sizeof(script->name), "glsl_script%d", BLI_listbase_count(&material->scripts));
 	script->code = BLI_strdup(code);
 	script->wrapper = BLI_strdup(wrapper);
+	script->use_time = use_time;
 	BLI_addtail(&material->scripts, script);
 	return script->name;
+}
+
+/* GLSL Script "u_" uniforms. The value lives in the material: the node tree is a localized copy
+ * while the pass is generated, so the socket itself cannot be pointed to. */
+typedef struct GPUScriptUniform {
+	struct GPUScriptUniform *next, *prev;
+	char name[64];
+	float value[4];
+	float init[4];
+	int size;
+} GPUScriptUniform;
+
+float *gpu_material_add_script_uniform(GPUMaterial *material, const char *name, const float *value, int size)
+{
+	GPUScriptUniform *uniform = MEM_callocN(sizeof(GPUScriptUniform), "GPUScriptUniform");
+	BLI_strncpy(uniform->name, name, sizeof(uniform->name));
+	uniform->size = CLAMPIS(size, 1, 4);
+	memcpy(uniform->value, value, sizeof(float) * uniform->size);
+	memcpy(uniform->init, value, sizeof(float) * uniform->size);
+	BLI_addtail(&material->script_uniforms, uniform);
+	return uniform->value;
+}
+
+#define SCRIPT_UNIFORM_LISTS(ma) {&(ma)->gpumaterial, &(ma)->gpumaterialinstancing, &(ma)->gpumaterialskinning}
+
+int GPU_material_script_uniform_set(Material *ma, const char *name, const float *value, int len)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	int found = 0;
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				if (STREQ(uniform->name, name)) {
+					for (int c = 0; c < uniform->size; c++) {
+						/* A single number fills a vector; a short list keeps the other components. */
+						if (c < len) uniform->value[c] = value[c];
+						else if (len == 1) uniform->value[c] = value[0];
+					}
+					found++;
+				}
+			}
+		}
+	}
+	return found;
+}
+
+bool GPU_material_script_uniform_get(Material *ma, const char *name, float r_value[4], int *r_size)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				if (STREQ(uniform->name, name)) {
+					memcpy(r_value, uniform->value, sizeof(float) * 4);
+					*r_size = uniform->size;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void GPU_material_script_uniforms_reset(Material *ma)
+{
+	ListBase *lists[3] = SCRIPT_UNIFORM_LISTS(ma);
+	for (int i = 0; i < 3; i++) {
+		for (LinkData *link = lists[i]->first; link; link = link->next) {
+			GPUMaterial *material = link->data;
+			for (GPUScriptUniform *uniform = material->script_uniforms.first; uniform; uniform = uniform->next) {
+				memcpy(uniform->value, uniform->init, sizeof(uniform->value));
+			}
+		}
+	}
 }
 
 /* Code generation */
@@ -4070,6 +4149,7 @@ void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool 
 		}
 		/* lamp->materials keeps ma: the kept material still uses these lamps. */
 		BLI_freelistN(&material->lamps);
+		BLI_freelistN(&material->script_uniforms);
 		MEM_freeN(material);
 	}
 	BLI_freelistN(gpumaterials);
