@@ -256,7 +256,14 @@ reaproveitado por um objeto sem espelho configurado).
 (view-space, via `GPU_VIEW_POSITION`) pro mundo com a inversa da view matrix (`GPU_INVERSE_VIEW_MATRIX`,
 mesmo builtin que `node_billboard` já usa), multiplica pela `unfplanarviewproj` cacheada, divide por `w` e
 remapeia `[-1,1] → [0,1]` pra amostrar `unfplanartex`. `unfplanarenabled < 0.5` devolve preto transparente
-em vez de amostrar uma unidade de textura possivelmente vazia.
+em vez de amostrar uma unidade de textura possivelmente vazia. A captura é desenhada com os materiais dos
+objetos refletidos, que já terminam no Color Management da cena; o nó desfaz essa codificação
+(`game_view_untransform`, com exposure/gamma/contraste em `unfplanarview`) e devolve cor linear com alpha 1,
+para o material do espelho ser codificado uma vez só.
+
+**Como ligar**: para espelho puro, `Color` → shader **Emission** (Strength 1) → Surface. Pelo Base Color de
+um BSDF o reflexo é iluminado de novo pelas luzes da cena e escurece com elas. Para água ou piso polido,
+misture o Emission com o BSDF (Mix Shader, com Fresnel no fator).
 
 **Binding** (`BL_BlenderShader.cpp::Update()`): sob o mesmo bloco dos probes, se
 `GPU_material_use_planar_reflection(m_gpuMat)`, resolve o `KX_GameObject` do `RAS_MeshUser` (mesmo padrão
@@ -272,12 +279,12 @@ relacionados). Faltou adicionar `KX_PlanarReflector.cpp`/`.h` ao `CMakeLists.txt
 
 **Testado**: `tools/debug/cenas/criar_cena_planar_reflection.py` (`AnastacioEngine.exe -b --factory-startup
 --python ... --`) confirma `ShaderNodePlanarReflection` em `bpy.types` com os três sockets de entrada
-(`Enable`, `Resolution`, `Clip End`) e a saída `Color`, e salva um `.range` com o nó ligado ao Base Color de
-um Principled. **Não confirmado**: `AnastacioRuntime.exe -w <W> <H> <scene.range>` não terminou dentro do
-tempo de espera (processo parece abrir um contexto GL real e travar sem display, mesma limitação já
-documentada para o teste de Bloom/SSR — este ambiente não tem GPU/display). Portanto a reflexão realmente
-aparecendo na tela, e a confirmação de que a cena não crasha no runtime, dependem do usuário rodar
-`AnastacioRuntime.exe` com display/GPU disponível.
+(`Enable`, `Resolution`, `Clip End`) e a saída `Color`, e salva um `.range` com o nó num shader Emission.
+No `AnastacioRuntime.exe` a cena roda os 65 frames e o screenshot mostra o cubo refletido com a mesma cor
+da vista direta (conferido por pixel, view transform Standard). Passe o caminho do screenshot absoluto.
+O crash de runtime da primeira versão e o espelho preto estão em `docs/changelog.md`, entrada
+"2026-10-11 - Planar Reflection: crash no runtime e espelho preto corrigidos". Falta conferir com Filmic e
+com exposure/gamma diferentes do padrão.
 
 ## Ver o código gerado
 

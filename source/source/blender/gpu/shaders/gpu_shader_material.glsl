@@ -212,6 +212,36 @@ void game_view_transform(vec4 col_from, float exposure, float gamma, float contr
 	col_to = vec4(d, col_from.a);
 }
 
+/* Inverse of game_filmic_curve (both branches are monotonic power curves). */
+float game_filmic_curve_inverse(float d, float contrast)
+{
+	const float s0 = 10.0 / 16.5;
+	float b = contrast * (1.0 - s0) / s0;
+	float s;
+	d = clamp(d, 0.0, 1.0);
+	if (d < 0.5)
+		s = s0 * pow(d / 0.5, 1.0 / contrast);
+	else
+		s = 1.0 - (1.0 - s0) * pow((1.0 - d) / 0.5, 1.0 / b);
+	return 0.18 * exp2(s * 16.5 - 10.0);
+}
+
+/* Inverse of game_view_transform: display encoded color back to linear. contrast < 0 means the
+ * color was never transformed (color management off) and is returned as is. */
+vec3 game_view_untransform(vec3 d, float exposure, float gamma, float contrast)
+{
+	if (contrast < 0.0)
+		return d;
+	if (gamma > 0.0 && gamma != 1.0)
+		d = pow(max(d, vec3(0.0)), vec3(gamma));
+	vec3 c;
+	if (contrast > 0.0)
+		c = vec3(game_filmic_curve_inverse(d.r, contrast), game_filmic_curve_inverse(d.g, contrast), game_filmic_curve_inverse(d.b, contrast));
+	else
+		c = vec3(srgb_to_linearrgb(d.r), srgb_to_linearrgb(d.g), srgb_to_linearrgb(d.b));
+	return c * exp2(-exposure);
+}
+
 void color_to_normal(vec3 color, out vec3 normal)
 {
 	normal.x =  2.0 * ((color.r) - 0.5);
@@ -7054,10 +7084,16 @@ void node_explode(float factor, out float amount)
  * is reused by an object with no mirror set up): the node then returns transparent black instead
  * of sampling an arbitrary/unbound texture unit. Resolution and Clip End are read directly off
  * the node's sockets when the scene converts (not here): they stay unused parameters below so the
- * function signature matches GPU_stack_link's "in" socket count one for one. */
+ * function signature matches GPU_stack_link's "in" socket count one for one.
+ * The capture is drawn with the reflected objects' own materials, so it is already display encoded
+ * (game_view_transform); unfplanarview = (exposure, gamma, contrast) undoes that so Color is linear
+ * like any other node output and the material using it is encoded only once. Feed Color to an
+ * Emission shader for a pure mirror: through a BSDF Base Color the reflection is lit again by the
+ * scene lights and darkens with them. */
 uniform sampler2D unfplanartex;
 uniform mat4 unfplanarviewproj;
 uniform float unfplanarenabled;
+uniform vec3 unfplanarview;
 
 void node_planar_reflection(float enable, float resolution, float clipend, mat4 invviewmat, vec3 viewposition, out vec4 outcol)
 {
@@ -7074,5 +7110,5 @@ void node_planar_reflection(float enable, float resolution, float clipend, mat4 
 	}
 
 	vec2 uv = (clip.xy / clip.w) * 0.5 + 0.5;
-	outcol = texture(unfplanartex, uv);
+	outcol = vec4(game_view_untransform(texture(unfplanartex, uv).rgb, unfplanarview.x, unfplanarview.y, unfplanarview.z), 1.0);
 }

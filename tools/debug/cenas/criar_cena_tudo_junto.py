@@ -6,6 +6,7 @@
 # (sobrevivencia + screenshot pra inspecao manual; NAO confirma visualmente o resultado de
 # cada efeito, so que a cena toda convive sem conflito).
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_tudo_junto.py -- saida.range shot.png evidencia.txt
+#      (shot.png em caminho absoluto: com caminho relativo o screenshot nao aparece na pasta atual)
 # Objetos (da esquerda pra direita, eixo X):
 #   BillboardCard - plano fino com o no Billboard no Vertex Offset.
 #   Grama         - plano com o no Strands (geometry stage).
@@ -121,9 +122,15 @@ planar.location = (0, 250)
 checks["PLANAR_REFLECTION_INPUTS"] = [s.identifier for s in planar.inputs]
 checks["PLANAR_REFLECTION_OUTPUTS"] = [s.identifier for s in planar.outputs]
 planar.inputs["Enable"].default_value = True
-planar.inputs["Resolution"].default_value = 256
+planar.inputs["Resolution"].default_value = 1024
 planar.inputs["Clip End"].default_value = 50.0
-tree.links.new(planar.outputs["Color"], bsdf.inputs["Base Color"])
+# Emission, nao Base Color: pelo BSDF o reflexo seria iluminado de novo pelas luzes da cena.
+tree.nodes.remove(bsdf)
+emission = tree.nodes.new("ShaderNodeEmission")
+emission.location = (300, 0)
+emission.inputs["Strength"].default_value = 1.0
+tree.links.new(planar.outputs["Color"], emission.inputs["Color"])
+tree.links.new(emission.outputs[0], out.inputs["Surface"])
 mesh(bpy.ops.mesh.primitive_plane_add, "Espelho", (9, 0, 0), mat, radius=3.0)
 
 mat2, tree2, out2, bsdf2 = node_material("MatCuboEspelho")

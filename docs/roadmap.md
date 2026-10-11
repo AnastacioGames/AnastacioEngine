@@ -724,9 +724,10 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   [shader-nodes.md#reflexo-planar-planar-reflection](shader-nodes.md#reflexo-planar-planar-reflection).
   Compilado limpo (`ninja RangeEngine`, depois de corrigir um `CMakeLists.txt` esquecido na 1ª tentativa).
   `tools/debug/cenas/criar_cena_planar_reflection.py` confirma os sockets em `bpy.types` e salva o `.range`.
-  **Falta**: `AnastacioRuntime.exe` não terminou dentro do tempo de espera neste ambiente (sem display/GPU,
-  mesma limitação já documentada para o teste de Bloom/SSR) — confirmação de que a cena não crasha no
-  runtime e de que o reflexo aparece corretamente na tela dependem do usuário testar com GPU/display real.
+  Crash no runtime (sockets BOOLEAN/INT sem pilha no exec de nós) e espelho preto (reflexo no Base Color +
+  Color Management aplicado duas vezes) corrigidos no mesmo dia; a cena roda no `AnastacioRuntime.exe` e o
+  reflexo confere por pixel com a vista direta. Espelho puro liga `Color` num shader Emission.
+  **Falta**: aceite visual do usuário; conferir com Filmic e exposure/gamma fora do padrão.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

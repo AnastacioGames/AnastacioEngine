@@ -1,13 +1,15 @@
 # Cena de validacao headless (branch shader-nodes) do no Planar Reflection (ver
 # docs/shader-nodes.md). Confirma que o tipo existe em bpy.types com os sockets certos, que da
-# pra criar/ligar a saida Color num material Principled, que o Enable liga a criacao de um
+# pra criar/ligar a saida Color num material, que o Enable liga a criacao de um
 # KX_PlanarReflector na conversao de cena (objeto proprio como espelho, chao com normal +Z) e que
-# o .range salvo roda sem crash no AnastacioRuntime (sem checagem visual, so sobrevivencia +
-# screenshot pra inspecao manual).
+# o .range salvo roda sem crash no AnastacioRuntime (sobrevivencia + screenshot pra inspecao
+# manual: o cubo tem de aparecer no espelho com a mesma cor da vista direta).
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_planar_reflection.py -- saida.range shot.png evidencia.txt
+#      (shot.png em caminho absoluto: com caminho relativo o screenshot nao aparece na pasta atual)
 # Objetos:
-#   Espelho - plano horizontal com o no Planar Reflection (Enable=True) alimentando o Base Color
-#             do Principled (reflexo puro, sem Fresnel/Mix, so para confirmar que a textura chega).
+#   Espelho - plano horizontal com o no Planar Reflection (Enable=True) num shader Emission
+#             (espelho puro: pelo Base Color de um BSDF o reflexo seria iluminado de novo pelas
+#             luzes da cena e escureceria junto com elas).
 #   Cubo    - cubo colorido acima do espelho, o que deveria aparecer refletido.
 import sys
 import bpy
@@ -53,16 +55,21 @@ def mesh(op, name, loc, mat, **kw):
 
 checks = {}
 
-# --- Planar Reflection: fragment node, Color feeds Base Color directly (pure mirror, no blend)
+# --- Planar Reflection: fragment node, Color feeds an Emission shader (pure mirror, unlit)
 mat, tree, out, bsdf = node_material("MatEspelho")
 planar = tree.nodes.new("ShaderNodePlanarReflection")
 planar.location = (0, 250)
 checks["PLANAR_REFLECTION_INPUTS"] = [s.identifier for s in planar.inputs]
 checks["PLANAR_REFLECTION_OUTPUTS"] = [s.identifier for s in planar.outputs]
 planar.inputs["Enable"].default_value = True
-planar.inputs["Resolution"].default_value = 256
+planar.inputs["Resolution"].default_value = 1024
 planar.inputs["Clip End"].default_value = 50.0
-tree.links.new(planar.outputs["Color"], bsdf.inputs["Base Color"])
+tree.nodes.remove(bsdf)
+emission = tree.nodes.new("ShaderNodeEmission")
+emission.location = (300, 0)
+emission.inputs["Strength"].default_value = 1.0
+tree.links.new(planar.outputs["Color"], emission.inputs["Color"])
+tree.links.new(emission.outputs[0], out.inputs["Surface"])
 espelho = mesh(bpy.ops.mesh.primitive_plane_add, "Espelho", (0, 0, 0), mat, radius=3.0)
 
 # --- Cubo above the mirror, what the reflection should show

@@ -68,6 +68,7 @@ Erros de sintaxe GLSL aparecem somente em runtime, via `glCompileShader`, normal
 
 Após editar `DNA_*.h`, execute `ninja -t clean` e reconstrua os executáveis completos. O build incremental
 pode manter `dna.c` ou `dna_type_offsets.h` obsoletos e causar corrupção de heap ao carregar arquivos.
+Vale também quando a mudança chega por merge ou pull: confira com `git diff --stat <antes> <depois> -- '*.h'`.
 
 Se uma mudança em outro header provocar crash desproporcional ao diff após build incremental, faça um clean
 rebuild antes de investigar o crash como defeito funcional. Não repita a mesma tentativa de build mais de

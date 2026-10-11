@@ -6,6 +6,42 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Planar Reflection: crash no runtime e espelho preto corrigidos
+
+- **Crash no runtime (commit `9630e952`)**: a entrada abaixo dizia que o `AnastacioRuntime.exe` "não terminou
+  por falta de display/GPU". Estava errado: o ambiente tem GPU e o runtime caía com SIGSEGV em
+  `gpu_node_input_link` ← `GPU_stack_link` ← `node_shader_gpu_planar_reflection` (backtrace no
+  `%TEMP%\<cena>.crash.txt` que o próprio engine grava). Causa: `node_exec_socket_use_stack()`
+  (`nodes/intern/node_exec.c`) só dava slot de pilha a FLOAT/VECTOR/RGBA/SHADER. Os sockets `Enable`
+  (BOOLEAN) e `Resolution` (INT) ficavam sem `bNodeStack`, viravam `GPU_NONE` e encerravam cedo a contagem de
+  entradas do `GPU_stack_link`, que então lia os parâmetros restantes de um `va_list` sem argumentos. Agora
+  BOOLEAN e INT ganham slot e são lidos como escalar (`node_socket_get_boolean_as_float`/`_int_as_float` em
+  `node_util.c`; `nodestack_get_vec`/`node_gpu_stack_from_data` em `node_shader_util.c` os tratam como FLOAT).
+  Foi o primeiro nó a levar um socket BOOLEAN/INT ao codegen de GPU (os `Enable` de Bloom/SSR de World são
+  lidos direto em `KX_Scene.cpp`).
+- **Espelho preto**: a captura e a projeção da UV estavam certas. Eram duas coisas:
+  1. A cena de teste ligava `Color` no Base Color de um Principled, que ilumina o reflexo de novo com as luzes
+     da cena. Espelho puro é `Color` → shader **Emission** → Surface (o Emission existe e funciona no jogo).
+  2. A captura é desenhada com os materiais dos próprios objetos refletidos, que já terminam no Color
+     Management da cena (`gpu_material_link_display_transform`); o material do espelho aplicava de novo.
+     `node_planar_reflection` agora desfaz essa codificação (`game_view_untransform`, inversa de
+     `game_view_transform`, com exposure/gamma/contraste enviados em `unfplanarview` por
+     `GPU_material_bind_planar`) e devolve cor linear com alpha 1. Com Color Management desligado nada é
+     desfeito. A tabela de contraste do Filmic saiu para `gpu_view_transform_contrast()`, usada pelos dois
+     lados; o shading dos materiais existentes não muda.
+- Conferido por pixel em `criar_cena_planar_reflection.py` (1280x720): fundo direto e fundo no espelho
+  `63,63,80` nos dois; frente do cubo `184,93,68` direta e `184,94,70` refletida. Cena combinada
+  `criar_cena_tudo_junto.py` (Billboard, Strands, Fur com e sem direção, Explode, espelho): 65 frames, exit 0.
+- **Não conferido**: Filmic e exposure/gamma diferentes do padrão (só Standard foi testado); o Billboard, que
+  nos screenshots fica atrás do painel de profile. O Strands gera poucos fios num plano de 2 triângulos
+  (a densidade é por triângulo): para parecer grama a malha precisa ser subdividida.
+- Merge do `main` (Céu em Camadas + SSGI nativo) nesta branch: dois conflitos aditivos
+  (`node_shader_output_material.c`, includes de `KX_Scene.cpp`). O build incremental depois do merge crashava
+  em qualquer cena (`GPU_material_free` ← `ED_render_id_flush_update`): o Céu em Camadas acrescenta campos a
+  `World` antes de `gpumaterial` e o Ninja deste build não rastreia headers, então `render_update.c.obj`
+  ficou com o layout antigo. Rebuild limpo resolveu; não era bug do SSGI. Regra de
+  [build-notes.md](build-notes.md): depois de mudar `DNA_*.h`, inclusive por merge, `ninja -t clean`.
+
 ## 2026-10-11 - Reflexo planar dedicado: implementado (compilador de material aberto, com supervisão)
 
 - Sessão seguinte à investigação abaixo ("Reflexo planar dedicado: investigado, não implementado"), mesmo

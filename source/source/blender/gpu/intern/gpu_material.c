@@ -220,9 +220,9 @@ struct GPUMaterial {
 	 * must still bind per object; reactivation resets potentially shared programs. */
 	bool probe_absent_valid[2];
 	float probe_absent_maxlod[2];
-	/* Planar Reflection node (unfplanartex/unfplanarviewproj/unfplanarenabled), bound per object
-	 * by GPU_material_bind_planar(). */
-	int planarteximgloc, planarviewprojloc, planarenabledloc;
+	/* Planar Reflection node (unfplanartex/unfplanarviewproj/unfplanarenabled/unfplanarview), bound
+	 * per object by GPU_material_bind_planar(). */
+	int planarteximgloc, planarviewprojloc, planarenabledloc, planarviewloc;
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 
@@ -641,6 +641,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
 		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
 		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
+		material->planarviewloc = GPU_shader_get_uniform(shader, "unfplanarview");
 		material->damagehitsloc = GPU_shader_get_uniform(shader, "unfdamagehits");
 		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
 		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
@@ -1567,17 +1568,11 @@ static void gpu_world_atmosphere_links(GPUMaterial *mat, World *wo, GPUNodeLink 
  * contraste) aproximado antes da conversao linear -> sRGB da saida. Fora desse
  * caminho mantem a conversao sRGB pura de sempre. Valores lidos na compilacao
  * do shader; exposure/gamma usam ponteiros da cena. */
-static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
+/* Contraste do view transform da cena: 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
+static float *gpu_view_transform_contrast(const ColorManagedViewSettings *vs)
 {
-	/* 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
 	static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
-	ColorManagedViewSettings *vs = &scene->view_settings;
 	int idx = 0;
-
-	if (!BKE_scene_use_new_shading_nodes(scene)) {
-		GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
-		return;
-	}
 
 	if (STREQ(vs->view_transform, "Filmic")) {
 		idx = 4; /* Base Contrast (look None ou "Filmic - Base Contrast") */
@@ -1589,9 +1584,21 @@ static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
 		else if (strstr(vs->look, "High Contrast")) idx = 6;
 	}
 
+	return &contrast_table[idx];
+}
+
+static void gpu_material_link_display_transform(GPUMaterial *mat, Scene *scene)
+{
+	ColorManagedViewSettings *vs = &scene->view_settings;
+
+	if (!BKE_scene_use_new_shading_nodes(scene)) {
+		GPU_link(mat, "linearrgb_to_srgb", mat->outlinks[0], &mat->outlinks[0]);
+		return;
+	}
+
 	GPU_link(mat, "game_view_transform", mat->outlinks[0],
 	         GPU_uniform(&vs->exposure), GPU_uniform(&vs->gamma),
-	         GPU_uniform(&contrast_table[idx]), &mat->outlinks[0]);
+	         GPU_uniform(gpu_view_transform_contrast(vs)), &mat->outlinks[0]);
 }
 
 bool GPU_material_do_color_management(GPUMaterial *mat)
@@ -5640,6 +5647,21 @@ void GPU_material_bind_planar(GPUMaterial *material, GPUTexture *tex, const floa
 			0.0f, 0.0f, 0.0f, 1.0f
 		};
 		GPU_shader_uniform_vector(shader, material->planarviewprojloc, 16, 1, (tex && viewproj) ? viewproj : identity);
+	}
+
+	if (material->planarviewloc != -1) {
+		/* The capture is drawn with the reflected objects' own materials, which already end in the
+		 * Scene > Color Management display transform (gpu_material_link_display_transform): the
+		 * node gets (exposure, gamma, contrast) to undo it and hand out linear color again.
+		 * contrast < 0 = nothing was applied (color management off), sample as is. */
+		float view[3] = {0.0f, 1.0f, -1.0f};
+		if (GPU_material_do_color_management(material)) {
+			const ColorManagedViewSettings *vs = &material->scene->view_settings;
+			view[0] = vs->exposure;
+			view[1] = vs->gamma;
+			view[2] = *gpu_view_transform_contrast(vs);
+		}
+		GPU_shader_uniform_vector(shader, material->planarviewloc, 3, 1, view);
 	}
 }
 
