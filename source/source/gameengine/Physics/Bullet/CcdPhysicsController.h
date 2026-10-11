@@ -83,6 +83,8 @@ public:
 		m_userData(nullptr),
 		m_mesh(nullptr),
 		m_triangleIndexVertexArray(nullptr),
+		m_hullPointsValid(false),
+		m_bvhKeyValid(false),
 		m_forceReInstance(false),
 		m_weldingThreshold1(0.0f),
 		m_shapeProxy(nullptr)
@@ -166,6 +168,9 @@ public:
 	 * Each vertex is 3 consecutive values. In this case a triangle is made of 3 consecutive points
 	 */
 	btAlignedObjectArray<btScalar> m_vertexArray;
+	/** Hull points derived from m_vertexArray. They are shared by every replica
+	 * that uses this construction info and cleared whenever UpdateMesh changes it. */
+	std::vector<btScalar> m_hullPoints;
 	/** Contains the array of polygon index in the original mesh that correspond to shape triangles.
 	 * only set for concave mesh shape.
 	 */
@@ -190,6 +195,13 @@ protected:
 	RAS_Mesh *m_mesh;
 	/// The list of vertexes and indexes for the triangle mesh, shared between Bullet shape.
 	btTriangleIndexVertexArray *m_triangleIndexVertexArray;
+	/// m_hullPoints has been generated, including the degenerate empty result.
+	bool m_hullPointsValid;
+	/// Hash of the current triangle arrays; UpdateMesh invalidates it with those arrays.
+	unsigned long long m_bvhKeyHash[2];
+	int m_bvhKeyNumVerts;
+	int m_bvhKeyNumTris;
+	bool m_bvhKeyValid;
 	/// for compound shapes
 	std::vector<CcdShapeConstructionInfo *> m_shapeArray;
 	///use gimpact for concave dynamic/moving collision detection

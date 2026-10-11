@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-09 (`HEAD` `869cc1ad`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-11 (`HEAD` `8a8d28f1`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -13,7 +13,7 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 ---
 
-## `Ketsji/KX_Scene.cpp` (4.549 linhas)
+## `Ketsji/KX_Scene.cpp` (4.574 linhas)
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa, cutscene e bindings Python. O header é
 `Ketsji/KX_Scene.h` (794 linhas).
@@ -21,26 +21,26 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa, cutscene 
 | Domínio | Métodos (linha inicial) |
 |---|---|
 | Ciclo de vida da cena | funções `static` de réplica/destruição/atualização do SceneGraph 127–150, construtor 162, destrutor 334 |
-| Acessores e listas | `GetName`/`SetName` 483–488, managers e listas (`GetObjectList`, `GetLightList`, `GetCameraList`, `GetRenderList`, `GetLogicManager`…) 543–608, framing 515–520 |
-| Mundo, sol e terremoto | `Set/GetWorldInfo` 525–530, `SetWorldSun`/`GetWorldSun`/`SetAutoWorldSun`/`UpdateAutoWorldSun` 604–625, `UpdateEarthquake` 674 |
-| Suspensão e culling (config) | `Suspend`/`Resume`/`IsSuspended` 772–787, `SetActivityCulling` 767, `Set/GetDbvtCulling` e oclusão 719–734 |
-| Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 825, `ReplicateLogic` 1021, `DupliGroupRecurse` 1107, `IsObjectInGroup` 1249, `FindInactiveObjectAcrossScenes` 1254, `AddReplicaObject` 1301 |
-| Objetos: remoção | `RemoveNodeDestructObject` 815, `RemoveObject` 1399, `RemoveDupliGroup` 1412, `DelayedRemoveObject` 1421, `RemoveEuthanasyObjects` 1428, `NewRemoveObject` 1448 |
-| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 1677 |
-| Culling e listas visíveis | `PhysicsCullingCallback` 1698, `CalculateVisibleMeshes` 1717–1740, `UpdateObjectActivity` 2754 |
-| Debug (desenho e ImGui) | `GetDebugDraw` 1877, `DrawDebug` 1882, `RenderDebugProperties` 1919, `RenderDebugPropertiesImGui` 1972, `FlushDebugDraw` 2118, `AddObjectDebugProperties` 797 |
-| Frame lógico | `LogicBeginFrame` 2123, `LogicUpdateFrame` 2388, `LogicEndFrame` 2410, `UpdateParents` 2433 |
-| Animação | `AddAnimatedObject` 2140, `UpdateAnimPoseTask` 2219, `UpdateAnimDeformTask` 2241, `UpdateAnimations` 2270, `UpdateAnimationDeformers` 2377 |
-| Render | `RenderBuckets` 2453, `RenderTextureRenderers` 2466, `Get2DFilterManager` 3065, `Render2DFilters` 3070 |
-| LOD | `UpdateObjectLods` 2472, hysteresis 2185–2200 |
-| Partículas GPU | `UpdateGpuParticleEmitters` 2570, listas de emissores/colisores 2219–2250 |
+| Acessores e listas | `GetName`/`SetName` 484–489, managers e listas (`GetObjectList`, `GetLightList`, `GetCameraList`, `GetRenderList`, `GetLogicManager`…) 544–609, framing 515–520 |
+| Mundo, sol e terremoto | `Set/GetWorldInfo` 525–530, `SetWorldSun`/`GetWorldSun`/`SetAutoWorldSun`/`UpdateAutoWorldSun` 605–626, `UpdateEarthquake` 675 |
+| Suspensão e culling (config) | `Suspend`/`Resume`/`IsSuspended` 784–799, `SetActivityCulling` 779, `Set/GetDbvtCulling` e oclusão 719–734 |
+| Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 837, `ReplicateLogic` 1033, `DupliGroupRecurse` 1119, `IsObjectInGroup` 1261, `FindInactiveObjectAcrossScenes` 1266, `AddReplicaObject` 1313 |
+| Objetos: remoção | `RemoveNodeDestructObject` 827, `RemoveObject` 1411, `RemoveDupliGroup` 1424, `DelayedRemoveObject` 1433, `RemoveEuthanasyObjects` 1440, `NewRemoveObject` 1460 |
+| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 1691 |
+| Culling e listas visíveis | `PhysicsCullingCallback` 1712, `CalculateVisibleMeshes` 1731–1754, `UpdateObjectActivity` 2772 |
+| Debug (desenho e ImGui) | `GetDebugDraw` 1891, `DrawDebug` 1896, `RenderDebugProperties` 1933, `RenderDebugPropertiesImGui` 1986, `FlushDebugDraw` 2132, `AddObjectDebugProperties` 809 |
+| Frame lógico | `LogicBeginFrame` 2137, `LogicUpdateFrame` 2402, `LogicEndFrame` 2428, `UpdateParents` 2451 |
+| Animação | `AddAnimatedObject` 2154, `UpdateAnimPoseTask` 2233, `UpdateAnimDeformTask` 2255, `UpdateAnimations` 2284, `UpdateAnimationDeformers` 2391 |
+| Render | `RenderBuckets` 2471, `RenderTextureRenderers` 2484, `Get2DFilterManager` 3083, `Render2DFilters` 3088 |
+| LOD | `UpdateObjectLods` 2490, hysteresis 2185–2200 |
+| Partículas GPU | `UpdateGpuParticleEmitters` 2588, listas de emissores/colisores 2219–2250 |
 | Sombras (listas) | casters estáticos/dinâmicos e flag "dirty" 2255–2298 |
 | Física e rede | `Get/SetPhysicsEnvironment` 2339–2344, gravidade 2353–2358, `Get/SetNetworkMessageScene` 2329–2334, `Get/SetSuspendedDelta` 2363–2368 |
-| Merge de cenas | `MergeScene_LogicBrick` 2378, `MergeScene_GameObject` 2401, `MergeScene` 2927 |
+| Merge de cenas | `MergeScene_LogicBrick` 2378, `MergeScene_GameObject` 2401, `MergeScene` 2945 |
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
-| Cutscene | `SetCutsceneManager` 3080, `StopCutscene` 3091, `RestartCutscene` 3101, `UpdateCutscene` 3112, `TakePendingCutsceneEvents` 3219, `DispatchCutsceneEvents` 3275 (~280 linhas), `ClearCutsceneSpawnedObjects` 3578, `GetCutsceneManager` 3594 |
+| Cutscene | `SetCutsceneManager` 3098, `StopCutscene` 3109, `RestartCutscene` 3119, `UpdateCutscene` 3130, `TakePendingCutsceneEvents` 3237, `DispatchCutsceneEvents` 3293 (~280 linhas), `ClearCutsceneSpawnedObjects` 3596, `GetCutsceneManager` 3612 |
 | Busca e texto | `FindObjectWithComponent` 2655, `FindGameObject` 2677, `GetLocalizedText` 2695 |
-| Callbacks de Python | `RunDrawingCallbacks` 3636, `RunOnRemoveCallbacks` 3652 |
+| Callbacks de Python | `RunDrawingCallbacks` 3654, `RunOnRemoveCallbacks` 3670 |
 | Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 3711 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem
@@ -49,7 +49,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.700 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.782 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -81,9 +81,9 @@ Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o
 
 ---
 
-## `Physics/Bullet/CcdPhysicsEnvironment.cpp` (3.992 linhas)
+## `Physics/Bullet/CcdPhysicsEnvironment.cpp` (3.995 linhas)
 
-Ambiente físico Bullet. O header é `CcdPhysicsEnvironment.h` (363 linhas). `m_dynamicsWorld` é membro do
+Ambiente físico Bullet. O header é `CcdPhysicsEnvironment.h` (365 linhas). `m_dynamicsWorld` é membro do
 ambiente; o callback de subtick é registrado no construtor com `this`.
 
 | Domínio | Conteúdo (linha inicial) |
@@ -98,42 +98,42 @@ ambiente; o callback de subtick é registrado no construtor com `this`.
 | Raycast e consulta de esfera | `GetHitTriangle` 1544, `RayTest` 1623, `SphereQuery` 2335 (broadphase `aabbTest`, usado pelo `scene.explode()`) |
 | **Oclusão em software (não é física)** | `struct OcclusionBuffer` 1740 (~520 linhas, rasterizador de oclusão), `DbvtCullingCallback` 2262, `CullingTest` 2404 |
 | Contatos e broadphase | `GetNumContactPoints` 2432, `GetBroadphase`/`GetDispatcher` 2446–2451 |
-| Sensores e callbacks de colisão | `AddSensor` 2536, `Add/RemoveCollisionCallback` 2460–2471, `CallbackTriggers` 2565, `CheckCollision` 2612, `needBroadphaseCollision` 2652 |
-| Veículos e personagem | `GetVehicleConstraint`/`GetNumVehicles`/`GetVehicleFromIndex` 2715–2735, `GetCharacterController` 2723, `CreateVehicle` 3067, `DestroyVehicle` 3092 |
-| Criação de shapes | `CreateSphereController` 2730, `CreateConeController` 3101, `Ccd_FindClosestNode` 2675 |
-| Constraints (criação) | `CreateConstraint` 2774 (~290 linhas) |
-| Exportação e fábrica | `getAppliedImpulse` 3106, `ExportFile` 3148, `Create` 3212 |
-| Conversão de objeto | `ConvertObject` 3237 (~530 linhas), `SetupObjectConstraints` 3845 |
-| Dados de colisão | `CcdCollData` 3932–3988 (contatos, atrito, restituição) |
+| Sensores e callbacks de colisão | `AddSensor` 2536, `Add/RemoveCollisionCallback` 2460–2471, `CallbackTriggers` 2565, `CheckCollision` 2615, `needBroadphaseCollision` 2655 |
+| Veículos e personagem | `GetVehicleConstraint`/`GetNumVehicles`/`GetVehicleFromIndex` 2718–2738, `GetCharacterController` 2726, `CreateVehicle` 3070, `DestroyVehicle` 3095 |
+| Criação de shapes | `CreateSphereController` 2733, `CreateConeController` 3104, `Ccd_FindClosestNode` 2675 |
+| Constraints (criação) | `CreateConstraint` 2777 (~290 linhas) |
+| Exportação e fábrica | `getAppliedImpulse` 3106, `ExportFile` 3151, `Create` 3215 |
+| Conversão de objeto | `ConvertObject` 3240 (~530 linhas), `SetupObjectConstraints` 3848 |
+| Dados de colisão | `CcdCollData` 3935–3991 (contatos, atrito, restituição) |
 
 Observação: ~520 linhas de `OcclusionBuffer` estão neste arquivo sem relação com o mundo Bullet; é o candidato
 mais óbvio a viver em outro arquivo se um dia dividirem esse `.cpp`.
 
 ---
 
-## `Physics/Bullet/CcdPhysicsController.cpp` (3.173 linhas)
+## `Physics/Bullet/CcdPhysicsController.cpp` (3.210 linhas)
 
-Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdPhysicsController.h` (993 linhas).
+Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdPhysicsController.h` (1.005 linhas).
 
 | Domínio | Conteúdo (linha inicial) |
 |---|---|
 | Personagem | `CcdCharacter` 353–480 (pulo, caminhada, velocidade de queda, inclinação máxima) |
-| Ciclo de vida | construtor 199, `PostProcessReplica` 1215, `SetPhysicsEnvironment` 1280, `GetReplica` 2557, `GetReplicaForSensors` 2564 |
+| Ciclo de vida | construtor 199, `PostProcessReplica` 1223, `SetPhysicsEnvironment` 1288, `GetReplica` 2565, `GetReplicaForSensors` 2572 |
 | Constraints (referências) | `add/remove/getCcdConstraintRef` 236–254 |
-| Motion state e transformação | `GetTransformFromMotionState` 552, `SetCenterOfMassOffset` 606, `SimulationTick` 1101, `SynchronizeMotionStates` 1138, `Write*ToDynamics/MotionState` 849–855, `SetTransform`, posição/orientação/escala 936–1185, `DefaultMotionState` 2667–2713 |
-| Criação de corpos | `CreateSoftbody` 649 (~200 linhas), `CreateCharacterController` 886, `CreateRigidbody` 913 |
-| Shapes | `DeleteBulletShape` 654, `DeleteControllerShape` 1001, `ReplaceControllerShape` 1022, `ReinstancePhysicsShape` 2615, `ReplacePhysicsShape` 2640, `CreateBulletShape` 2934 (~160 linhas), `AddShape` 3142, `UpdateMesh` 2746 (~170 linhas), `FindMesh` 2713 |
-| Compound | `AddCompoundChild` 2426, `RemoveCompoundChild` 2503 |
-| Suspensão | `SuspendPhysics`/`RestorePhysics` 1482–1487, `SuspendDynamics`/`RestoreDynamics` 1573–1596, `IsPhysicsSuspended` 2600 |
+| Motion state e transformação | `GetTransformFromMotionState` 560, `SetCenterOfMassOffset` 614, `SimulationTick` 1109, `SynchronizeMotionStates` 1146, `Write*ToDynamics/MotionState` 849–855, `SetTransform`, posição/orientação/escala 936–1185, `DefaultMotionState` 2675–2721 |
+| Criação de corpos | `CreateSoftbody` 657 (~200 linhas), `CreateCharacterController` 894, `CreateRigidbody` 921 |
+| Shapes | `DeleteBulletShape` 654, `DeleteControllerShape` 1009, `ReplaceControllerShape` 1030, `ReinstancePhysicsShape` 2623, `ReplacePhysicsShape` 2648, `CreateBulletShape` 2951 (~160 linhas), `AddShape` 3179, `UpdateMesh` 2757 (~170 linhas), `FindMesh` 2721 |
+| Compound | `AddCompoundChild` 2434, `RemoveCompoundChild` 2511 |
+| Suspensão | `SuspendPhysics`/`RestorePhysics` 1490–1495, `SuspendDynamics`/`RestoreDynamics` 1581–1604, `IsPhysicsSuspended` 2608 |
 | Massa, atrito, forças, velocidades | 1185–1421 e 1791–1840 |
-| Colisão | group/mask 1425–1440, `SetActive` 1940, `RefreshCollisions` 1457 |
+| Colisão | group/mask 1425–1440, `SetActive` 1948, `RefreshCollisions` 1465 |
 | Damping e CCD | 1445–1495 |
 | **Soft body (parâmetros)** | `SetSoft*` e coeficientes 1506–1776 (~270 linhas de setters quase idênticos) |
-| Sleeping | `UpdateDeactivation` 2405, `WantsSleeping` 2413 |
+| Sleeping | `UpdateDeactivation` 2413, `WantsSleeping` 2421 |
 
 ---
 
-## `Converter/BL_BlenderDataConversion.cpp` (3.779 linhas)
+## `Converter/BL_BlenderDataConversion.cpp` (3.815 linhas)
 
 Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConversion.h` (97 linhas).
 

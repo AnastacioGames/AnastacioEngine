@@ -723,6 +723,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 	// shaders keep their speed under Time Scale; they do not slow down in slow motion.
 	if (filterManager) {
 		const float time = (float)m_engine->GetFrameTime();
+		filterManager->SetFrameTime(time);
 
 		if (RAS_2DFilter *rain = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_RAIN, true)) {
 			BuildInFilters *rainParams = rain->GetBuildInFilters();

@@ -310,12 +310,24 @@ class TEXT_MT_templates_components(Menu):
         )
 
 
+class TEXT_MT_templates_glsl(Menu):
+    bl_label = "2D Filters (GLSL)"
+
+    def draw(self, context):
+        self.path_menu(
+            bpy.utils.script_paths("templates_glsl"),
+            "text.open",
+            props_default={"internal": True},
+        )
+
+
 class TEXT_MT_templates(Menu):
     bl_label = "Templates"
 
     def draw(self, context):
         layout = self.layout
         layout.menu("TEXT_MT_templates_components")
+        layout.menu("TEXT_MT_templates_glsl")
 
 
 class TEXT_MT_edit_select(Menu):
@@ -433,6 +445,7 @@ classes = (
     TEXT_MT_text,
     TEXT_MT_templates,
     TEXT_MT_templates_components,
+    TEXT_MT_templates_glsl,
     TEXT_MT_edit_select,
     TEXT_MT_format,
     TEXT_MT_edit_to3d,

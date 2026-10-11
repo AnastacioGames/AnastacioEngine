@@ -34,6 +34,8 @@
 
 #include "GPU_glew.h"
 
+#include <algorithm>
+
 extern "C" {
 	extern char datatoc_RAS_Blur2DFilter_glsl[];
 	extern char datatoc_RAS_Sharpen2DFilter_glsl[];
@@ -104,6 +106,57 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 		RAS_2DFilter *filter = pair.second;
 		delete filter;
 	}
+	if (m_frameInputs.previousTexture) {
+		glDeleteTextures(1, &m_frameInputs.previousTexture);
+	}
+}
+
+void RAS_2DFilterManager::SetFrameTime(float time)
+{
+	m_frameInputs.time = time;
+}
+
+void RAS_2DFilterManager::UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs)
+{
+#ifdef __EMSCRIPTEN__
+	// WebGL can't copy an RGBA8 frame buffer into a float texture, bgl_PreviousTexture stays unbound.
+	(void)rasty;
+	(void)canvas;
+	(void)finalofs;
+#else
+	const int width = finalofs->GetWidth();
+	const int height = finalofs->GetHeight();
+	if (!m_frameInputs.previousTexture) {
+		GLint maxUnits = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
+		// Unit 17 is past every unit the filters use; on small GPUs share the last custom unit.
+		m_frameInputs.previousTextureUnit = (maxUnits > 17) ? 17 : 7;
+		glGenTextures(1, &m_frameInputs.previousTexture);
+	}
+	glBindTexture(GL_TEXTURE_2D, m_frameInputs.previousTexture);
+	if (width != m_previousWidth || height != m_previousHeight) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		m_previousWidth = width;
+		m_previousHeight = height;
+	}
+
+	RAS_OffScreen *readofs = finalofs;
+	if (finalofs->GetSamples()) {
+		// A multisampled frame buffer can't be copied to a texture, resolve it first.
+		readofs = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER0);
+		rasty->DrawOffScreen(finalofs, readofs);
+	}
+	readofs->Bind();
+	glBindTexture(GL_TEXTURE_2D, m_frameInputs.previousTexture);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, std::min(width, (int)readofs->GetWidth()),
+	                    std::min(height, (int)readofs->GetHeight()));
+	glBindTexture(GL_TEXTURE_2D, 0);
+	finalofs->Bind();
+#endif
 }
 
 RAS_2DFilter *RAS_2DFilterManager::EnsureTonemapFilter(const BuildInFilters& filters)
@@ -278,8 +331,12 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	// Used to know if a filter is the last of the container.
 	RAS_PassTo2DFilter::const_iterator pend = std::prev(m_filters.end());
 
+	++m_frameInputs.frame;
+	bool usesPrevious = false;
+
 	for (RAS_PassTo2DFilter::iterator begin = m_filters.begin(), it = begin, end = m_filters.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
+		filter->SetFrameInputs(&m_frameInputs);
 
 		/* Assign the previous off screen to the input off screen. At the first render it's the
 		 * input off screen sent to RenderFilters. */
@@ -314,6 +371,7 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		 * if no modifications were made to the targeted off screen.
 		 * This output off screen is used for the next filter as input off screen */
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
+		usesPrevious = usesPrevious || (filter->Ok() && filter->UsesPreviousTexture());
 	}
 
 	// The last filter doesn't use its own off screen and didn't render to the targeted off screen ?
@@ -322,6 +380,12 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		targetofs->Bind();
 		rasty->DrawOffScreen(previousofs, targetofs);
 	}
+
+	// Opt-in: nothing is allocated or copied until a filter samples bgl_PreviousTexture.
+	if (usesPrevious) {
+		UpdatePreviousTexture(rasty, canvas, targetofs);
+	}
+	m_frameInputs.prevViewProjection = rasty->GetProjectionMatrix() * rasty->GetViewMatrix();
 
 	rasty->Enable(RAS_Rasterizer::RAS_DEPTH_TEST);
 	rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);

@@ -36,6 +36,192 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Materiais existentes geram o mesmo código (os acréscimos ao template ficam sob `#ifdef`); só o texto do template mudou, então o cache de shaders do usuário/`.cooked` recompila uma vez.
 - Fase 5 (parcial): `#line 1` antes do código do GLSL Script e do geomcode, então o erro de compilação aponta a linha do Text.
 - Teste: `tools/debug/cenas/criar_cena_shader_nodes.py` (água com Water Waves, esfera Fur, macaco Toon Outline, cubo GLSL Script, cubo de referência, cubo com geomcode). Runtime: 6 materiais compilados e linkados sem erro (AMD RX 6800M, GL 4.6 compat), 60 FPS. Avaliação visual pendente no jogo real.
+## 2026-10-11 - CV3 corrigido: armature fora da tela não força mais pose+skinning todo frame
+
+- **SP12 não era pendência:** `KX_AddObjectActuator::ResolveOriginalObject` já usa
+  `KX_Scene::FindInactiveObjectAcrossScenes`, apoiado no índice O(1)
+  `m_inactiveNameIndex` desde 2026-10-05. O índice cobre inserção, remoção, merge
+  de LibLoad e o raro nome duplicado preservando “primeiro da lista vence”.
+- **SP13:** `RAS_BatchGroup::SplitMeshUser` chama `OnMeshUserSplit`, que já remove o
+  objeto do `KX_BatchGroup` e atualiza a referência. `KX_BatchGroup::SplitObjects`
+  repetia a mesma remoção depois do retorno. A segunda busca linear foi removida;
+  o `Split` e o upload do VBO continuam necessários e inalterados.
+- **SP4/SP5, medição A/B:** uma cena temporária com uma icosfera subdividida 5 (hull) e um grid 128×128 (BVH),
+  18 spawns alternados de cada tipo e `time.perf_counter()` ao redor de `addObject()` descartou o primeiro de
+  cada sequência. Ao reconstruir reversivelmente o runtime base e depois restaurar a mudança: SP4 caiu de
+  **6,645 para 0,182 ms** na média de 17 spawns steady (−97,3%; ~36,5×). SP5 foi de **0,845 para 0,708 ms**;
+  confirma a rota sem regressão, mas não demonstra ganho de parede isolável, pois o setup restante do Bullet
+  domina. O runtime final foi reconstruído e repetiu 0,182/0,708 ms com `PASS`; uma
+  rodada adicional no binário final deu 0,154/0,600 ms e também passou.
+- **SP4:** o `CcdShapeConstructionInfo` já é compartilhado pelas réplicas da mesma
+  malha. Os pontos do hull agora são retidos nele após o primeiro `CreateBulletShape`;
+  os spawns seguintes não fazem hash, cópia do cache `.cooked` ou
+  `btConvexHullComputer`. `UpdateMesh` e `ProcessReplica` invalidam os pontos antes
+  de trocar a geometria, inclusive para um deformer/`ReplaceMesh`.
+- **SP5:** a chave da BVH também fica no
+  `CcdShapeConstructionInfo`, portanto cópias normais não re-hasham os vértices e
+  índices. A invalidação é junto da geometria em `UpdateMesh`/`ProcessReplica`; o
+  lote de conversão mantém o hash paralelo existente. SP6/SP7 foram avaliados e continuam adiados: `RemoveValue`
+  remove todas as ocorrências e a fila de eutanásia é FIFO para preservar a ordem e evitar dupla remoção de filho.
+  SP9/SP10/SP11/SP14/SP15 também foram confirmados como adiados pelos contratos de Bullet, hot-reload,
+  conversão/merge e ownership de meshes; a evidência por item está na tabela da auditoria.
+- Configurado build Release próprio do worktree e compilado com êxito
+  `KX_BatchGroup.cpp.obj`; após a alteração do header, recompilado e relinkado
+  com êxito `ge_physics_bullet` e `KX_SoftBodyDeformer.cpp.obj`.
+- **Regressão runtime SP4/SP5:** `RangeRuntime` foi relinkado e executou uma
+  cena temporária controlada. Ela instanciou alternadamente 48 réplicas
+  `RIGID_BODY`/`CONVEX_HULL` e 48 `STATIC`/`TRIANGLE_MESH` da mesma malha de
+  cada tipo; o resultado persistido foi `PASS`, com 96 criações, zero retornos
+  nulos e todos os objetos presentes ao fim. A cena foi reaberta em background:
+  confirmou câmera, os dois tipos de bounds e o controlador Python. Isso valida
+  o caminho funcional e o ciclo de vida do cache; não mede seu ganho. Uma
+  comparação de desempenho deve usar a mesma cena no baseline e nesta alteração,
+  com contadores temporários do cálculo de hull/hash BVH ou outra métrica
+  diretamente sensível ao trabalho removido.
+
+Continuação do mesmo worktree (`claude/auditoria-gpu-cache`). CV3 estava marcado como "decisão de
+design" na auditoria: `anim_needs_update` (`KX_Scene.cpp:2192`) forçava pose + skinning completos
+todo frame para um armature mesmo com todos os meshes deformados fora da tela (culled), porque o
+código original (herdado do Blender 2.4x) sempre atualizou armaturas por segurança — o AABB usado
+no teste de culling segue a última pose aplicada, então uma pose congelada pode manter um
+personagem culled para sempre se uma ação movesse um membro para dentro da tela sem a raiz do
+objeto se mover.
+
+Usuário escolheu pular a pose/skinning quando culled, com uma rede de segurança em vez de manter o
+comportamento atual. Implementado:
+- `anim_needs_update` não força mais `needs_update = true` só por existir um filho deformado culled;
+  o ramo que já forçava update ao primeiro filho não-culled continua idêntico (nunca foi o problema).
+- `BL_ArmatureObject::TickCullSkip()` (novo campo `m_cullSkipFrames`, `BL_ArmatureObject.h`/`.cpp`)
+  conta quantos frames consecutivos a pose foi pulada e força um update completo a cada 15 frames
+  (`CULL_SKIP_FORCE_INTERVAL`), limitando a pose congelada a no máximo 15 frames mesmo no pior caso.
+  `ResetCullSkip()` zera o contador sempre que um update real acontece por qualquer motivo.
+
+`bf_ketsji`/`bf_converter` compilam limpos; build completo (`RangeEngine`/`RangeRuntime`) e smoke no
+player sem crash. Validado com `tools/debug/cenas/criar_cena_cv3_correcao.py`: armature fora do
+enquadramento da câmera com uma ação cíclica tocando (osso girando 0→1,2 rad em 20 frames, modo
+LOOPEND). Lendo `channels['Bone'].pose_matrix` via Python frame a frame (só muda quando
+`BL_Action::Update` aplica a pose de fato) em 180 frames: a pose ficou congelada em blocos de
+exatamente 15 frames consecutivos e deu um salto visível no frame seguinte a cada marca de
+15/30/45/.../180 — nunca mais que 15 frames sem atualizar, nunca atualizando fora da marca. Uma
+tentativa de mover o armature para dentro do enquadramento da câmera no frame 101 não ficou
+"visível" para o culling nessa cena específica (framing não cobriu a nova posição), então essa
+transição não foi exercitada por este teste — mas o ramo de código responsável por ela já existia
+antes e não foi alterado. Avaliação visual no jogo real (personagem culled não trava nem "pula"
+de forma perceptível ao reaparecer) pendente do usuário.
+
+## 2026-10-11 - KX10 (cache de shadow cull) validado com Spot/armature/layers, fecha como corrigido
+
+Continuação do mesmo worktree (`claude/auditoria-gpu-cache`). O item KX10 (`AutoShadowStillValid`/
+`BuildShadowCullCache`) já tinha passado no benchmark estático (sombras 0,613 → 0,194 ms, FPS +28,3%)
+mas faltava a validação com Spot/deformadores/layers pedida em `docs/auditoria-suspeitos.md`.
+
+Nova cena `tools/debug/cenas/criar_cena_kx10_correcao.py` (não é benchmark, é teste de corretude):
+Spot com Auto Shadow, um personagem com modifier ARMATURE sempre dentro do alcance (parado, mas
+com deformador), um cubo rígido que entra/sai do alcance via Python em 3 fases (perto/longe/perto2,
+40 frames cada) e um objeto numa layer fora do `shadow_layer` do Spot. Roda com `--sem-armature`
+para isolar o teste do objeto que entra/sai sem a interferência do deformador.
+
+- **Com armature**: `lightsShadowUpdated` = 1 em todos os 150 frames das 3 fases — confirma que a
+  checagem `entry.m_object->GetDeformer()` nunca deixa o cache congelar com deformador em alcance,
+  mesmo com a pose parada.
+- **Sem armature**: 0 em repouso (39 frames seguidos por fase) e exatamente 1 no frame seguinte a
+  cada transição real de alcance do cubo (f=42 e f=82) — sem update perdido nem espúrio.
+- O objeto fora da layer do Spot nunca apareceu na contagem (filtro de layer correto).
+
+KX10 passa de "parcial" para **corrigido** em `docs/auditoria-suspeitos.md`. Checagem visual da
+sombra renderizada no jogo real (com/sem o cache) continua pendente do usuário, como os demais itens
+desta auditoria que dependem de avaliação visual.
+
+## 2026-10-11 - Cluster GPU cache: GP6 e RA2 corrigidos; GP3/GP4/GP5/GP7 analisados sem alteração
+
+Continuação do cluster "gpu / depsgraph" de `docs/auditoria-suspeitos.md` (GP1/GP2/RA1 corrigidos em
+2026-10-09 com o mesmo padrão). Worktree `D:\AnastacioEngine-auditoria-claude`, branch
+`claude/auditoria-gpu-cache`.
+
+- **GP6 corrigido** (`gpu_material.c` `GPU_material_update_lamps`): cache por `GPULamp` (campos
+  `dynupdate_*`) comparando viewmat/viewinv/vec/co/obmat por `memcmp` e um bitmask
+  `dynupdate_computed`, já que materiais diferentes podem pedir subconjuntos diferentes de
+  `DYN_LAMP_*` da mesma lamp. Hit evita `mul_m4_m4m4`/`mul_mat3_m4_v3` quando a mesma lamp é
+  atualizada de novo com a mesma view (caso comum: todos os materiais do frame compartilham a
+  câmera).
+- **RA2 corrigido** (`gpu_material.c` `GPU_material_bind_uniforms`): cache de inversas em
+  `GPUMaterial` (`invcache_*`, resetado por bind como `objectlay_valid`): quando o mesmo
+  `obmat`+`viewmat` repete dentro da mesma ativação do material (multi-passe do mesmo objeto —
+  z-prepass, sombra, principal, halo), `localtoviewmat`, `normalmat` e `invlocaltoviewmat` são
+  reaproveitados em vez de recalculados via `invert_m3_m3`/`invert_m4_m4`.
+- **GP3 analisado, não alterado**: o único chamador de `GPU_verify_image` com `compare=0`
+  (`GPU_texture_from_blender`) depende do `bindcode` real retornado pela função; o atalho
+  `compare=1` já existente devolve só um booleano, então trocar o flag corromperia o texture id.
+  Corrigir direito exige reescrever o atalho para devolver o bindcode já conhecido
+  (`ima->gputexture[gputt]->bindcode`), mudança mais profunda nos outros 4 chamadores da função —
+  fora do escopo seguro desta sessão.
+- **GP4 confirmado sem alteração**: mantém a conclusão de 2026-10-09 (cache de uniform já testado,
+  sem ganho mensurável no RolimaRacer porque os inputs dinâmicos desse caminho mudam de fato todo
+  frame nessa cena).
+- **GP5 analisado, não alterado**: `GPU_lamp_visible` depende de `material->ma`, então um cache
+  por lamp (como GP6) daria resultado incorreto entre materiais com visibilidade de camada
+  diferente para a mesma lamp; custo baixo/prioridade baixa já no relatório não justifica o cache
+  por par (lamp, material).
+- **GP7 analisado, não alterado**: cache de `FindProbe` por posição do objeto não cobre o caso da
+  sonda em si se mover com o objeto parado (regressão visual silenciosa); correção completa exige
+  contador de geração em `KX_TextureRendererManager` para as posições dos `viewpoint` das sondas,
+  desenho documentado para retomada.
+
+Build: `bf_gpu` (alvo específico contendo `gpu_material.c`) e `RangeRuntime`/`RangeEngine`
+completos compilados do zero neste worktree (sem build dir prévio) via CMake+Ninja com
+Cycles/CUDA desligados só para acelerar esta verificação (configuração de teste, não committada).
+Medição com `tools/debug/cenas/criar_cena_luzes_sombra.py` (40 cubos + chão, 2 materiais, 3 spots
+com sombra) via `tools/debug/auditar_trabalho_repetido.py`, rodadas de 10 s: contadores de GL
+(`lightUniforms` ~334, `drawCalls` 164, `physicsMs` ~0,05-0,06 ms) idênticos antes/depois do GP6 e
+do RA2 dentro do ruído de medição, confirmando ausência de regressão — a cena não tem materiais ×
+lamps nem passes por objeto suficientes para destacar o ganho de CPU acima do ruído dos
+instrumentos existentes (não há contador dedicado a "lamp matrix recompute" nem a
+`GPU_RENDER_INVERSE` nesta cena). Ambas as correções são estritamente redundantes com a mesma
+saída (zero risco identificado) e escalam com N_materiais × N_lamps (GP6) ou N_passes por objeto
+(RA2); cenas maiores devem mostrar o ganho que esta não evidenciou numericamente.
+
+## 2026-10-11 - Auditoria Spawn/remoção/LibLoad: SP4/SP5 medidos, SP12 confirmado, SP13 corrigido
+
+- **SP12 não era pendência:** `KX_AddObjectActuator::ResolveOriginalObject` já usa
+  `KX_Scene::FindInactiveObjectAcrossScenes`, apoiado no índice O(1)
+  `m_inactiveNameIndex` desde 2026-10-05. O índice cobre inserção, remoção, merge
+  de LibLoad e o raro nome duplicado preservando “primeiro da lista vence”.
+- **SP13:** `RAS_BatchGroup::SplitMeshUser` chama `OnMeshUserSplit`, que já remove o
+  objeto do `KX_BatchGroup` e atualiza a referência. `KX_BatchGroup::SplitObjects`
+  repetia a mesma remoção depois do retorno. A segunda busca linear foi removida;
+  o `Split` e o upload do VBO continuam necessários e inalterados.
+- **SP4/SP5, medição A/B:** uma cena temporária com uma icosfera subdividida 5 (hull) e um grid 128×128 (BVH),
+  18 spawns alternados de cada tipo e `time.perf_counter()` ao redor de `addObject()` descartou o primeiro de
+  cada sequência. Ao reconstruir reversivelmente o runtime base e depois restaurar a mudança: SP4 caiu de
+  **6,645 para 0,182 ms** na média de 17 spawns steady (−97,3%; ~36,5×). SP5 foi de **0,845 para 0,708 ms**;
+  confirma a rota sem regressão, mas não demonstra ganho de parede isolável, pois o setup restante do Bullet
+  domina. O runtime final foi reconstruído e repetiu 0,182/0,708 ms com `PASS`; uma
+  rodada adicional no binário final deu 0,154/0,600 ms e também passou.
+- **SP4:** o `CcdShapeConstructionInfo` já é compartilhado pelas réplicas da mesma
+  malha. Os pontos do hull agora são retidos nele após o primeiro `CreateBulletShape`;
+  os spawns seguintes não fazem hash, cópia do cache `.cooked` ou
+  `btConvexHullComputer`. `UpdateMesh` e `ProcessReplica` invalidam os pontos antes
+  de trocar a geometria, inclusive para um deformer/`ReplaceMesh`.
+- **SP5:** a chave da BVH também fica no
+  `CcdShapeConstructionInfo`, portanto cópias normais não re-hasham os vértices e
+  índices. A invalidação é junto da geometria em `UpdateMesh`/`ProcessReplica`; o
+  lote de conversão mantém o hash paralelo existente. SP6/SP7 foram avaliados e continuam adiados: `RemoveValue`
+  remove todas as ocorrências e a fila de eutanásia é FIFO para preservar a ordem e evitar dupla remoção de filho.
+  SP9/SP10/SP11/SP14/SP15 também foram confirmados como adiados pelos contratos de Bullet, hot-reload,
+  conversão/merge e ownership de meshes; a evidência por item está na tabela da auditoria.
+- Configurado build Release próprio do worktree e compilado com êxito
+  `KX_BatchGroup.cpp.obj`; após a alteração do header, recompilado e relinkado
+  com êxito `ge_physics_bullet` e `KX_SoftBodyDeformer.cpp.obj`.
+- **Regressão runtime SP4/SP5:** `RangeRuntime` foi relinkado e executou uma
+  cena temporária controlada. Ela instanciou alternadamente 48 réplicas
+  `RIGID_BODY`/`CONVEX_HULL` e 48 `STATIC`/`TRIANGLE_MESH` da mesma malha de
+  cada tipo; o resultado persistido foi `PASS`, com 96 criações, zero retornos
+  nulos e todos os objetos presentes ao fim. A cena foi reaberta em background:
+  confirmou câmera, os dois tipos de bounds e o controlador Python. Isso valida
+  o caminho funcional e o ciclo de vida do cache; não mede seu ganho. Uma
+  comparação de desempenho deve usar a mesma cena no baseline e nesta alteração,
+  com contadores temporários do cálculo de hull/hash BVH ou outra métrica
+  diretamente sensível ao trabalho removido.
 
 ## 2026-10-10 - Troca de layer no editor: cache de shaders, aquecimento dos layers escondidos e medição
 
@@ -46,6 +232,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Troca pelos botões do cabeçalho (RNA `layers`) passa pelo mesmo caminho da tecla (`ED_view3d_layers_shown`).
 - Medição: com `RANGE_SHADER_LOG`, linhas `layer_switch` (total, dag, update, desenho, shaders, imagens, buffers), `draw_object` (objetos acima de 10 ms: buffers, shader, begin/bind de material, imagens), `buffer` e `warmup`; shader do cache sai como `cached`. `tools/debug/abrir_engine_log_layer.bat` abre o editor com o log em `debug-logs\layer_log.txt`.
 - RolimaRacer (RX 6800M): ligar todos os layers foi de 9–46 s para ~50 ms com caches quentes. Pendente: confirmar com caches frios que, esperando a barra terminar, a primeira troca fica curta.
+
+## 2026-10-10 - Ferramentas do 2D Filter custom: erros na linha do texto, recarga, uniforms e modelos
+
+- Erro de compilação de filtro custom: o console cita o nome do Text (ou `addFilter(n)`) e as linhas do texto (`#line 1` só para fontes do usuário; antes `#line 0` deslocava uma linha). `GPU_shader_last_error_log()` guarda o log da última falha e ele fica em `filter.compileLog`. Embutidos continuam com `#line 0`, sem invalidar o cache de binários.
+- Texto externo (`.glsl` em disco) do atuador é conferido 2x/s durante o jogo (`KX_2DFilterManager::ReloadChangedSources`, `BLI_stat`) e recompilado ao salvar; falhou, o programa anterior continua. `filter.recompile(fonte=None)`, `sourceName`, `sourcePath`. Recompilar refaz as propriedades de jogo ligadas (antes a lista era filtrada na 1ª compilação).
+- Entradas estáveis: `bgl_ViewMatrix`, `bgl_ProjectionMatrix`, `bgl_InverseViewMatrix`, `bgl_InverseProjectionMatrix`, `bgl_PreviousViewProjectionMatrix`, `bgl_Resolution`, `bgl_Time`, `bgl_Frame` e `bgl_PreviousTexture` (imagem final do quadro anterior, RGBA16F na unidade 17; só alocada/copiada enquanto um filtro ativo a usa; desligada no Web). Normal: reconstruir da profundidade (exemplos na doc), sem buffer novo.
+- `filter.activeUniforms` (nome, tipo, tamanho via `glGetActiveUniform`) e `filter.setUniform(nome, valor)` com o tipo do shader, reaplicado após recompilar.
+- Modelos em Text Editor > Templates > 2D Filters (GLSL): SSAO, SSGI simples com reprojeção temporal, bloom em um passe e contorno. Referência em `docs/2d-filters.md`.
+- Teste: `tools/debug/cenas/criar_cena_filtro2d.py` (erro citado na linha 3; recompile OK; KeyError/ValueError do `setUniform`; arquivo externo com erro mantém o filtro e mostra o log, corrigido recompila; os 4 modelos compilam; 60 FPS com vsync, 10 s). Avaliação visual dos modelos pendente com o usuário.
 
 ## 2026-10-10 - Qualidade de textura por mipmap, filtros sem recarga e tamanho de sombra em tempo real
 

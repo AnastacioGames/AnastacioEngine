@@ -169,7 +169,8 @@ RAS_Shader::RAS_Shader()
 	m_error(false),
 	m_dirty(true),
 	m_diagnosticName("engine-shader"),
-	m_binaryCache(false)
+	m_binaryCache(false),
+	m_firstSourceLine(0)
 {
 	for (unsigned short i = 0; i < MAX_PROGRAM; ++i) {
 		m_progs[i] = "";
@@ -298,7 +299,7 @@ std::string RAS_Shader::GetParsedProgram(ProgramType type) const
 		prog.erase(pos, nline - pos);
 	}
 
-	prog.insert(0, "#line 0\n");
+	prog.insert(0, "#line " + std::to_string(m_firstSourceLine) + "\n");
 
 	return prog;
 }

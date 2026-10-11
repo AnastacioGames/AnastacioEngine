@@ -235,6 +235,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 - FXAA foi atualizado para uma implementação no estilo 3.11 com nove amostras.
 - Bloom, SSAO, SSR, Tonemap e Light Scattering podem ser controlados pelo actuator Filter 2D com faixas de
   passes reservadas.
+- Filtros 2D custom ([docs/2d-filters.md](docs/2d-filters.md)): erro com a linha do texto (`filter.compileLog`),
+  recarga ao salvar o `.glsl` externo e `filter.recompile()`, entradas estáveis `bgl_*` (matrizes e inversas,
+  matriz do quadro anterior, resolução, tempo, `bgl_PreviousTexture` sob demanda), `activeUniforms`/`setUniform`
+  e modelos em Templates > 2D Filters (GLSL). Filtros embutidos mantêm `#line 0` e o cache de binários.
 - Depth Transparency possui captura de profundidade dedicada e comportamento seguro fora do jogo.
 - Weather nativo no `World` oferece chuva, nuvens e lens flare; a chuva inclui modos Classic e Volumetric.
 - Automatic Sun orbits a ground reference 5 m ahead of the active camera at a 10 m radius and always targets it.

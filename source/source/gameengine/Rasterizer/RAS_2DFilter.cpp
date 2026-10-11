@@ -31,6 +31,9 @@
 #include "EXP_Value.h"
 
 #include "GPU_glew.h"
+#include "GPU_shader.h"
+
+#include "CM_Message.h"
 
 #include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
 
@@ -139,11 +142,24 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
 	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
 	"ge_FxaaParams", // GE_FXAA_PARAMETERS_UNIFORM
-	"ge_CameraFX[0]" // GE_CAMERAFX_UNIFORM
+	"ge_CameraFX[0]", // GE_CAMERAFX_UNIFORM
+
+	"bgl_ViewMatrix", // BGL_VIEW_MATRIX_UNIFORM
+	"bgl_ProjectionMatrix", // BGL_PROJECTION_MATRIX_UNIFORM
+	"bgl_InverseViewMatrix", // BGL_INV_VIEW_MATRIX_UNIFORM
+	"bgl_InverseProjectionMatrix", // BGL_INV_PROJECTION_MATRIX_UNIFORM
+	"bgl_PreviousViewProjectionMatrix", // BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM
+	"bgl_Resolution", // BGL_RESOLUTION_UNIFORM
+	"bgl_Time", // BGL_TIME_UNIFORM
+	"bgl_Frame", // BGL_FRAME_UNIFORM
+	"bgl_PreviousTexture" // BGL_PREVIOUS_TEXTURE_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
-	:m_properties(data.propertyNames),
+	:m_sourceName(data.sourceName),
+	m_sourcePath(data.sourcePath),
+	m_allProperties(data.propertyNames),
+	m_properties(data.propertyNames),
 	m_gameObject(data.gameObject),
 	m_buildInFilters(data.buildInFilters),
 	m_uniformInitialized(false),
@@ -153,6 +169,11 @@ RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
 {
 	m_diagnosticName = "2d-filter";
 	m_binaryCache = true;
+	/* User sources (Text datablock or Python string): driver errors give the line of the text.
+	 * Built-in filters keep "#line 0" so their cached program binaries stay valid. */
+	if (!m_sourceName.empty()) {
+		m_firstSourceLine = 1;
+	}
 	for (unsigned int i = 0; i < TEXTURE_OFFSETS_SIZE; i++) {
 		m_textureOffsets[i] = 0;
 	}
@@ -328,9 +349,15 @@ RAS_OffScreen *RAS_2DFilter::Render(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, 
 bool RAS_2DFilter::LinkProgram()
 {
 	if (!RAS_Shader::LinkProgram()) {
+		m_compileLog = GPU_shader_last_error_log();
+		if (!m_sourceName.empty()) {
+			CM_Error("2D filter \"" << m_sourceName << "\" failed to compile, the line numbers below are the lines of the text:\n"
+			         << m_compileLog);
+		}
 		return false;
 	}
 
+	m_compileLog.clear();
 	m_uniformInitialized = false;
 
 #ifdef __EMSCRIPTEN__
@@ -369,6 +396,40 @@ bool RAS_2DFilter::LinkProgram()
 	return true;
 }
 
+bool RAS_2DFilter::Recompile(const std::string& fragment)
+{
+	GPUShader *oldShader = m_shader;
+	const std::string oldFragment = m_progs[FRAGMENT_PROGRAM];
+	const bool oldError = m_error;
+
+	m_shader = nullptr;
+	m_progs[FRAGMENT_PROGRAM] = fragment;
+	if (m_progs[VERTEX_PROGRAM].empty()) {
+		m_progs[VERTEX_PROGRAM] = std::string(datatoc_RAS_VertexShader2DFilter_glsl);
+	}
+
+	if (!LinkProgram()) {
+		// Keep the working program on screen, the error stays in m_compileLog.
+		const std::string log = m_compileLog;
+		m_shader = oldShader;
+		m_progs[FRAGMENT_PROGRAM] = oldFragment;
+		m_error = oldError;
+		m_compileLog = log;
+		return false;
+	}
+
+	if (oldShader) {
+		GPU_shader_free(oldShader);
+	}
+	// Locations of the old program are meaningless now.
+	ClearUniforms();
+	m_uniformInitialized = false;
+	if (!m_sourceName.empty()) {
+		CM_Message("2D filter \"" << m_sourceName << "\" recompiled.");
+	}
+	return true;
+}
+
 void RAS_2DFilter::ParseShaderProgram()
 {
 	// Parse shader to found used uniforms.
@@ -378,7 +439,8 @@ void RAS_2DFilter::ParseShaderProgram()
 
 	if (m_gameObject) {
 		std::vector<std::string> foundProperties;
-		for (const std::string& prop : m_properties) {
+		m_propertiesLoc.clear();
+		for (const std::string& prop : m_allProperties) {
 			const unsigned int loc = GetUniformLocation(prop, false);
 			if (loc != -1) {
 				m_propertiesLoc.push_back(loc);
@@ -435,6 +497,11 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		glBindTexture(GL_TEXTURE_2D, m_buildInFilters.rain_mask_texture);
 	}
 
+	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1 && m_frameInputs && m_frameInputs->previousTexture) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->previousTextureUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->previousTexture);
+	}
+
 	// Bind custom textures.
 	for (const auto& pair : m_textures) {
 		glActiveTexture(GL_TEXTURE0 + pair.first);
@@ -466,6 +533,11 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 
 	if (m_predefinedUniforms[GE_RAIN_MASK_UNIFORM] != -1 && m_buildInFilters.rain_mask_flags) {
 		glActiveTexture(GL_TEXTURE0 + kRainMaskUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+
+	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1 && m_frameInputs && m_frameInputs->previousTexture) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->previousTextureUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
@@ -518,6 +590,37 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		// Bind texture offsets.
 		SetUniformfv(m_predefinedUniforms[TEXTURE_COORDINATE_OFFSETS_UNIFORM], RAS_Uniform::UNI_FLOAT2, m_textureOffsets,
 		             sizeof(float) * TEXTURE_OFFSETS_SIZE, TEXTURE_OFFSETS_SIZE / 2);
+	}
+
+	/* Stable custom filter uniforms. */
+	if (m_predefinedUniforms[BGL_VIEW_MATRIX_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_VIEW_MATRIX_UNIFORM], rasty->GetViewMatrix());
+	}
+	if (m_predefinedUniforms[BGL_PROJECTION_MATRIX_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_PROJECTION_MATRIX_UNIFORM], rasty->GetProjectionMatrix());
+	}
+	if (m_predefinedUniforms[BGL_INV_VIEW_MATRIX_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_INV_VIEW_MATRIX_UNIFORM], rasty->GetViewMatrix().Inverse());
+	}
+	if (m_predefinedUniforms[BGL_INV_PROJECTION_MATRIX_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_INV_PROJECTION_MATRIX_UNIFORM], rasty->GetProjectionMatrix().Inverse());
+	}
+	if (m_predefinedUniforms[BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM],
+		           m_frameInputs ? m_frameInputs->prevViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
+	}
+	if (m_predefinedUniforms[BGL_RESOLUTION_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_RESOLUTION_UNIFORM],
+		           mt::vec2((float)canvas->GetRenderWidth(), (float)canvas->GetRenderHeight()));
+	}
+	if (m_predefinedUniforms[BGL_TIME_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_TIME_UNIFORM], m_frameInputs ? m_frameInputs->time : 0.0f);
+	}
+	if (m_predefinedUniforms[BGL_FRAME_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_FRAME_UNIFORM], m_frameInputs ? m_frameInputs->frame : 0);
+	}
+	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM], m_frameInputs ? m_frameInputs->previousTextureUnit : 17);
 	}
 
 	/* BuildIn Uniforms */

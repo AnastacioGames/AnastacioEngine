@@ -2263,9 +2263,10 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 	// Non-armature updates are fast enough, so just update them
 	bool needs_update = gameobj->GetGameObjectType() != SCA_IObject::OBJ_ARMATURE;
 
+	BL_ArmatureObject *armobj = nullptr;
 	if (!needs_update) {
 		// In this case, we'll check to see if the culling method makes an exception to allow need_update.
-		BL_ArmatureObject *armobj = static_cast<BL_ArmatureObject*>(gameobj);
+		armobj = static_cast<BL_ArmatureObject*>(gameobj);
 		if (armobj && armobj->GetCullingMethod() == 1) {
 			// GetCullingMethod() == 1 is NONE Culling. Throw the exception ( needs_update = true ).
 			needs_update = true;
@@ -2276,21 +2277,29 @@ static bool anim_needs_update(KX_GameObject *gameobj)
 		// If we got here, we're looking to update an armature, so check its children meshes
 		// to see if we need to bother with a more expensive pose update
 		// Check for meshes that haven't been culled. Stop as soon as a child requires a pose.
-		visit_child_game_objects(gameobj->GetNode(), [&needs_update](KX_GameObject *child) {
+		bool hasDeformedChild = false;
+		visit_child_game_objects(gameobj->GetNode(), [&needs_update, &hasDeformedChild](KX_GameObject *child) {
 			if (!child->GetCullingNode().GetCulled()) {
 				needs_update = true;
 				return false;
 			}
-
-			/* A skinned child's culling box follows the last applied pose, so skipping the pose
-			 * while it is culled can keep it culled forever (an action that moves the mesh into
-			 * view from off-screen never shows up). Blender 2.4x always updated armatures. */
 			if (child->GetDeformer()) {
-				needs_update = true;
-				return false;
+				hasDeformedChild = true;
 			}
 			return true;
 		});
+
+		/* Every deformed child is culled: skip the pose/skinning (CV3) instead of always forcing
+		 * it like Blender 2.4x did, but force a full update every CULL_SKIP_FORCE_INTERVAL frames
+		 * (BL_ArmatureObject::TickCullSkip) so a frozen AABB can never hide the armature from view
+		 * forever -- see the comment on CULL_SKIP_FORCE_INTERVAL for why that risk exists. */
+		if (!needs_update && hasDeformedChild && armobj->TickCullSkip()) {
+			needs_update = true;
+		}
+	}
+
+	if (needs_update && armobj) {
+		armobj->ResetCullSkip();
 	}
 
 	return needs_update;
@@ -3156,6 +3165,7 @@ KX_2DFilterManager *KX_Scene::Get2DFilterManager() const
 
 RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
+	m_filterManager->ReloadChangedSources();
 	return m_filterManager->RenderFilters(rasty, canvas, inputofs, targetofs, sun_screen_pos);
 }
 

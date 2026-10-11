@@ -142,6 +142,9 @@ protected:
 	std::string m_diagnosticName;
 	/// The program binary can go to / come from the shader cache (never relinked with other attributes).
 	bool m_binaryCache;
+	/** Number given by "#line" to the first line of the user sources, so the line numbers of the
+	 * driver errors match the text the sources came from (1 for Text datablocks). */
+	int m_firstSourceLine;
 
 	// Stored uniform variables
 	RAS_UniformVec m_uniforms;

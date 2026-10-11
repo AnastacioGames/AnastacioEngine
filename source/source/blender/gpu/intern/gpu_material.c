@@ -163,6 +163,15 @@ struct GPUMaterial {
 	bool objectlay_valid;
 	int objectlay_value;
 
+	/* RA2: localtoviewmat/normalmat/invlocaltoviewmat (GPU_material_bind_uniforms) only depend on
+	 * obmat+viewmat. Different objects legitimately have different obmat within one bind, but the
+	 * same object/obmat is drawn more than once per bind in several passes (z-prepass, shadow,
+	 * main, halo). Cache the last obmat+viewmat and the matrices derived from them, valid only
+	 * within the current material activation (reset in GPU_material_bind, like objectlay_valid). */
+	bool invcache_valid;
+	float invcache_obmat[4][4], invcache_viewmat[4][4];
+	float invcache_localtoviewmat[4][4], invcache_invlocaltoviewmat[4][4], invcache_normalmat[3][3];
+
 	int ininstposloc;
 	int ininstmatloc;
 	int ininstcolloc;
@@ -248,6 +257,19 @@ struct GPULamp {
 	float dynimat[4][4];
 	float dynarearight[3];
 	float dynareaup[3];
+
+	/* GP6 cache: dynvec/dynco/dynimat/dynpersmat/dynarearight only depend on this lamp's
+	 * transform/mode (vec, co, obmat) and the caller's viewmat/viewinv. GPU_material_update_lamps()
+	 * is called once per *material* per bind, so the same lamp gets its matrices recomputed many
+	 * times per frame with the same viewmat (shared by every material drawn under that camera).
+	 * Skip the matrix math when the inputs are byte-identical to the last update. */
+	float dynupdate_viewmat[4][4], dynupdate_viewinv[4][4];
+	float dynupdate_vec[3], dynupdate_co[3], dynupdate_obmat[4][4];
+	bool dynupdate_valid;
+	/* Which DYN_LAMP_* bits were actually computed for the cached key above; different
+	 * materials on the same lamp can request different subsets, so a cache hit on the key
+	 * only lets us skip bits already computed for it. */
+	int dynupdate_computed;
 
 	float spotsi, spotbl, k;
 	float areasize[2];
@@ -757,23 +779,54 @@ void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float
 		lamp->dynenergy = lamp->energy;
 		copy_v3_v3(lamp->dyncol, lamp->col);
 
-		if (material->dynproperty & DYN_LAMP_VEC) {
+		/* GP6: the matrix blocks below only depend on viewmat/viewinv and this lamp's
+		 * vec/co/obmat. GPU_material_update_lamps() is called once per *material* per bind,
+		 * so the same lamp gets recomputed many times per frame for the same viewmat (shared
+		 * by every material drawn under one camera). Cache the key and, on a hit, only
+		 * recompute the DYN_LAMP_* bits this call needs that weren't already computed for it
+		 * -- different materials can request different subsets of the same lamp. */
+		const int needed = material->dynproperty &
+		                   (DYN_LAMP_VEC | DYN_LAMP_CO | DYN_LAMP_IMAT | DYN_LAMP_PERSMAT | DYN_LAMP_AREAMAT);
+		bool key_match = lamp->dynupdate_valid &&
+		    memcmp(lamp->dynupdate_viewmat, viewmat, sizeof(lamp->dynupdate_viewmat)) == 0 &&
+		    memcmp(lamp->dynupdate_viewinv, viewinv, sizeof(lamp->dynupdate_viewinv)) == 0 &&
+		    memcmp(lamp->dynupdate_vec, lamp->vec, sizeof(lamp->dynupdate_vec)) == 0 &&
+		    memcmp(lamp->dynupdate_co, lamp->co, sizeof(lamp->dynupdate_co)) == 0 &&
+		    memcmp(lamp->dynupdate_obmat, lamp->obmat, sizeof(lamp->dynupdate_obmat)) == 0;
+
+		if (!key_match) {
+			copy_m4_m4(lamp->dynupdate_viewmat, viewmat);
+			copy_m4_m4(lamp->dynupdate_viewinv, viewinv);
+			copy_v3_v3(lamp->dynupdate_vec, lamp->vec);
+			copy_v3_v3(lamp->dynupdate_co, lamp->co);
+			copy_m4_m4(lamp->dynupdate_obmat, lamp->obmat);
+			lamp->dynupdate_valid = true;
+			lamp->dynupdate_computed = 0;
+		}
+
+		const int missing = needed & ~lamp->dynupdate_computed;
+		if (missing == 0) {
+			continue;
+		}
+		lamp->dynupdate_computed |= needed;
+
+		if (missing & DYN_LAMP_VEC) {
 			copy_v3_v3(lamp->dynvec, lamp->vec);
 			normalize_v3(lamp->dynvec);
 			negate_v3(lamp->dynvec);
 			mul_mat3_m4_v3(viewmat, lamp->dynvec);
 		}
 
-		if (material->dynproperty & DYN_LAMP_CO) {
+		if (missing & DYN_LAMP_CO) {
 			copy_v3_v3(lamp->dynco, lamp->co);
 			mul_m4_v3(viewmat, lamp->dynco);
 		}
 
-		if (material->dynproperty & DYN_LAMP_IMAT) {
+		if (missing & DYN_LAMP_IMAT) {
 			mul_m4_m4m4(lamp->dynimat, lamp->imat, viewinv);
 		}
 
-		if (material->dynproperty & DYN_LAMP_PERSMAT) {
+		if (missing & DYN_LAMP_PERSMAT) {
 			/* The lamp matrices are already updated if we're using shadow buffers */
 			if (!GPU_lamp_has_shadow_buffer(lamp)) {
 				GPU_lamp_update_buffer_mats(lamp);
@@ -786,7 +839,7 @@ void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float
 				mul_m4_m4m4(lamp->dynpersmat, lamp->persmat, viewinv);
 			}
 		}
-		if (material->dynproperty & DYN_LAMP_AREAMAT) {
+		if (missing & DYN_LAMP_AREAMAT) {
 			float areamat[4][4];
 			mul_m4_m4m4(areamat, viewmat, lamp->obmat);
 			copy_v3_v3(lamp->dynarearight, areamat[0]);
@@ -849,6 +902,7 @@ void GPU_material_bind(
 		material->probe_absent_valid[0] = false;
 		material->probe_absent_valid[1] = false;
 		material->objectlay_valid = false;
+		material->invcache_valid = false;
 
 		if (material->baryuniformloc != -1) {
 			float use = (gpu_viewport_barycentric && material->attribs.barycentric) ? 1.0f : 0.0f;
@@ -976,11 +1030,29 @@ void GPU_material_bind_uniforms(
 		}
 
 		/* All view-dependent builtins share this product within the current draw.
-		 * Do not cache across calls: objects, cameras and halo matrices can differ. */
+		 * Do not cache across calls: objects, cameras and halo matrices can differ -- except
+		 * RA2: the same object/obmat is drawn more than once within one material activation in
+		 * several passes (z-prepass, shadow, main, halo), with the same viewmat too. In that case
+		 * localtoviewmat and the inverses derived from it below are byte-identical; skip them on
+		 * a hit of invcache_* (reset per bind in GPU_material_bind, so this never spans frames). */
+		bool inv_cache_hit = false;
 		if (viewmat && (material->builtins &
 		               (GPU_LOC_TO_VIEW_MATRIX | GPU_NORMAL_MATRIX | GPU_INVERSE_LOC_TO_VIEW_MATRIX))) {
-			GPU_render_profile_count(GPU_RENDER_MUL);
-			mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+			inv_cache_hit = material->invcache_valid &&
+			    memcmp(material->invcache_obmat, obmat, sizeof(material->invcache_obmat)) == 0 &&
+			    memcmp(material->invcache_viewmat, viewmat, sizeof(material->invcache_viewmat)) == 0;
+
+			if (inv_cache_hit) {
+				copy_m4_m4(localtoviewmat, material->invcache_localtoviewmat);
+			}
+			else {
+				GPU_render_profile_count(GPU_RENDER_MUL);
+				mul_m4_m4m4(localtoviewmat, viewmat, obmat);
+				copy_m4_m4(material->invcache_obmat, obmat);
+				copy_m4_m4(material->invcache_viewmat, viewmat);
+				copy_m4_m4(material->invcache_localtoviewmat, localtoviewmat);
+				material->invcache_valid = true;
+			}
 		}
 
 		/* handle per object builtins */
@@ -999,18 +1071,31 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_NORMAL_MATRIX) {
 			if (viewmat) {
-				float mat3[3][3], normalmat[3][3];
-				copy_m3_m4(mat3, localtoviewmat);
-				GPU_render_profile_count(GPU_RENDER_INVERSE);
-				invert_m3_m3(normalmat, mat3);
-				transpose_m3(normalmat);
+				float normalmat[3][3];
+				if (inv_cache_hit) {
+					copy_m3_m3(normalmat, material->invcache_normalmat);
+				}
+				else {
+					float mat3[3][3];
+					copy_m3_m4(mat3, localtoviewmat);
+					GPU_render_profile_count(GPU_RENDER_INVERSE);
+					invert_m3_m3(normalmat, mat3);
+					transpose_m3(normalmat);
+					copy_m3_m3(material->invcache_normalmat, normalmat);
+				}
 				GPU_shader_uniform_vector(shader, material->normalmatloc, 9, 1, (float *)normalmat);
 			}
 		}
 		if (material->builtins & GPU_INVERSE_LOC_TO_VIEW_MATRIX) {
 			if (viewmat) {
-				GPU_render_profile_count(GPU_RENDER_INVERSE);
-				invert_m4_m4(invlocaltoviewmat, localtoviewmat);
+				if (inv_cache_hit) {
+					copy_m4_m4(invlocaltoviewmat, material->invcache_invlocaltoviewmat);
+				}
+				else {
+					GPU_render_profile_count(GPU_RENDER_INVERSE);
+					invert_m4_m4(invlocaltoviewmat, localtoviewmat);
+					copy_m4_m4(material->invcache_invlocaltoviewmat, invlocaltoviewmat);
+				}
 				GPU_shader_uniform_vector(shader, material->invlocaltoviewmatloc, 16, 1, (float *)invlocaltoviewmat);
 			}
 		}

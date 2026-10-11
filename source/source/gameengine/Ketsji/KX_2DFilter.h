@@ -30,6 +30,8 @@
 #include "RAS_2DFilter.h"
 #include "BL_Shader.h"
 
+#include <map>
+
 #ifdef _MSC_VER
 /* KX_2DFilter uses a diamond inheritance from a virtual pure base class. Only one branch of the diamond
  * define these virtual pure functions and come in the final class with dominance. This behaviour is wanted
@@ -50,6 +52,17 @@ public:
 	/// Replace the bind code of an already set texture unit; unlike SetTexture it never raises Python errors.
 	void UpdateTextureBindCode(int index, int bindCode);
 
+	/// Recompile and set again the uniforms given to setUniform().
+	virtual bool Recompile(const std::string& fragment);
+
+	struct ActiveUniform {
+		std::string name;
+		unsigned int glType;
+		int size;
+	};
+	/// Uniforms the linked program really uses (the driver drops unused ones).
+	std::vector<ActiveUniform> GetActiveUniforms() const;
+
 #ifdef WITH_PYTHON
 	bool CheckTexture(int index, int bindCode, const std::string& prefix) const;
 	bool SetTextureUniform(int index, const char *samplerName);
@@ -58,13 +71,29 @@ public:
 	static PyObject *pyattr_get_mipmap(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_mipmap(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_offScreen(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_compileLog(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_sourceName(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_sourcePath(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_activeUniforms(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 	EXP_PYMETHOD_DOC(KX_2DFilter, setTexture);
 	EXP_PYMETHOD_DOC(KX_2DFilter, setCubeMap);
 	EXP_PYMETHOD_DOC(KX_2DFilter, addOffScreen);
 	EXP_PYMETHOD_DOC_NOARGS(KX_2DFilter, removeOffScreen);
+	EXP_PYMETHOD_DOC(KX_2DFilter, recompile);
+	EXP_PYMETHOD_DOC(KX_2DFilter, setUniform);
 
 #endif
+
+private:
+	/// Values given to setUniform(), by name so they survive a recompile.
+	struct UniformValue {
+		bool isInt;
+		std::vector<float> floats;
+		std::vector<int> ints;
+	};
+	std::map<std::string, UniformValue> m_namedUniforms;
+	bool ApplyNamedUniform(const std::string& name, const UniformValue& value);
 };
 
 #endif  // __KX_2DFILTER_H__

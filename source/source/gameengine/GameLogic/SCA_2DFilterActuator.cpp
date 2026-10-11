@@ -132,6 +132,8 @@ bool SCA_2DFilterActuator::Update()
 				info.filterMode = m_type;
 				info.propertyNames = m_propNames;
 				info.shaderText = m_shaderText;
+				info.sourceName = m_sourceName;
+				info.sourcePath = m_sourcePath;
 				info.mipmap = m_mipmap;
 
 				m_filterManager->AddFilter(info, false);
@@ -158,6 +160,12 @@ void SCA_2DFilterActuator::SetScene(SCA_IScene *scene, RAS_2DFilterManager *filt
 void SCA_2DFilterActuator::SetShaderText(const std::string& text)
 {
 	m_shaderText = text;
+}
+
+void SCA_2DFilterActuator::SetShaderSource(const std::string& name, const std::string& path)
+{
+	m_sourceName = name;
+	m_sourcePath = path;
 }
 
 #ifdef WITH_PYTHON

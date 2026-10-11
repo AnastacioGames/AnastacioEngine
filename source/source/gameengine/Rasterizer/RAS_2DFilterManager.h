@@ -28,6 +28,7 @@
 #define __RAS_2DFILTERMANAGER_H__
 
 #include "RAS_2DFilterData.h"
+#include "RAS_2DFilter.h"
 #include <map>
 
 class RAS_ICanvas;
@@ -132,8 +133,21 @@ public:
 	 */
 	virtual bool SetBuiltinFilterEnabled(FILTER_MODE mode, bool enabled);
 
-private:
+	/// Time given to the filters as bgl_Time, in seconds.
+	void SetFrameTime(float time);
+
+protected:
 	RAS_PassTo2DFilter m_filters;
+
+private:
+	/// bgl_Time, bgl_Frame, bgl_PreviousTexture... shared by all the filters.
+	RAS_2DFilter::FrameInputs m_frameInputs;
+	/// Size of m_frameInputs.previousTexture, only allocated while a filter samples it.
+	int m_previousWidth = 0;
+	int m_previousHeight = 0;
+
+	/// Copy the final image of the chain for bgl_PreviousTexture of the next frame.
+	void UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs);
 
 	/** Creates a filter matching the given filter data. Returns nullptr if no
 	 * filter can be created with such information.

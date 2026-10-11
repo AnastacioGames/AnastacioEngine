@@ -692,6 +692,13 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Light probes**: reflection probe local feito em 2026-10-01 (propriedade `probe` num objeto, ver changelog);
   validado pelo usuário em `probe_reflection_test.range`. Luz difusa local (amostras do mesmo cubemap) e World em nós
   capturado num cubemap em 2026-10-02, validados pelo usuário. Paralaxe por esfera do raio do probe em 2026-10-02. Mistura entre probes vizinhos (e com o World na borda) em 2026-10-02. Paralaxe por caixa (Empty desenhado como Cube) em 2026-10-02, validada pelo usuário. Recaptura do World quando o sol ou as cores mudam, e Sky Texture seguindo o World Sun, em 2026-10-02, validadas pelo usuário em `sky_follow_sun_test.range`. Mistura entre probes validada em `probe_blend_test.range`.
+- **Filtros 2D custom (2026-10-10, branch `claude/filter2d-tools`)**: guia em [2d-filters.md](2d-filters.md).
+  Feito: erro com a linha do texto e `filter.compileLog`, recarga ao salvar o `.glsl` externo,
+  `filter.recompile()`, entradas `bgl_*` (matrizes, inversas, quadro anterior), `activeUniforms`/`setUniform` e
+  modelos SSAO, SSGI, bloom e contorno. **Falta o usuário avaliar o visual dos 4 modelos** no jogo real
+  (`tools/debug/cenas/criar_cena_filtro2d.py`). Falta também: erro no painel de lógica/editor, dica de
+  "propriedade = uniform" no atuador, `setUniform1f` e similares manterem o valor ao recompilar, propriedade Int
+  ligada a uniform `float` e buffer de normais (hoje reconstruídas da profundidade).
 - **Resolução dinâmica**: opt-in em `Game Render Properties > Dynamic Resolution`; validada em cena GPU-bound
   (aceite de 2026-09-20). Em 2026-10-10 o timer de GPU deixou de contar o sono do limite de FPS (a escala só
   descia em jogo com folga); falta conferir no jogo que a escala volta a subir e fica parada quando sobra GPU.

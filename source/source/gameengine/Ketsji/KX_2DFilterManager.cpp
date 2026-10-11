@@ -34,6 +34,9 @@
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
 #include "BLI_utildefines.h"
+#include "BLI_fileops.h"
+#include "MEM_guardedalloc.h"
+#include "PIL_time.h"
 
 #include <algorithm>
 #include <cmath>
@@ -569,6 +572,59 @@ RAS_2DFilter *KX_2DFilterManager::NewFilter(RAS_2DFilterData& filterData)
 	return new KX_2DFilter(filterData);
 }
 
+static bool source_file_time(const std::string& path, int64_t& time)
+{
+	BLI_stat_t st;
+	if (BLI_stat(path.c_str(), &st) != 0) {
+		return false;
+	}
+	time = (int64_t)st.st_mtime;
+	return true;
+}
+
+bool KX_2DFilterManager::ReloadSource(RAS_2DFilter *filter)
+{
+	const std::string& path = filter->GetSourcePath();
+	if (path.empty()) {
+		return false;
+	}
+	size_t size = 0;
+	char *buf = (char *)BLI_file_read_text_as_mem(path.c_str(), 1, &size);
+	if (!buf) {
+		CM_Error("2D filter \"" << filter->GetSourceName() << "\": can't read " << path);
+		return false;
+	}
+	buf[size] = '\0';
+	const bool ok = filter->Recompile(std::string(buf));
+	MEM_freeN(buf);
+	return ok;
+}
+
+void KX_2DFilterManager::ReloadChangedSources()
+{
+	const double now = PIL_check_seconds_timer();
+	if (now - m_lastSourceCheck < 0.5) {
+		return;
+	}
+	m_lastSourceCheck = now;
+
+	std::map<RAS_2DFilter *, int64_t> times;
+	for (const auto& pair : m_filters) {
+		RAS_2DFilter *filter = pair.second;
+		int64_t time;
+		if (filter->GetSourcePath().empty() || !source_file_time(filter->GetSourcePath(), time)) {
+			continue;
+		}
+		const auto it = m_sourceTimes.find(filter);
+		if (it != m_sourceTimes.end() && it->second != time) {
+			ReloadSource(filter);
+		}
+		times[filter] = time;
+	}
+	// Drops the removed filters.
+	m_sourceTimes.swap(times);
+}
+
 #ifdef WITH_PYTHON
 PyMethodDef KX_2DFilterManager::Methods[] = {
 	// creation
@@ -742,6 +798,10 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter, " addFilter(index, type, frag
 	data.filterPassIndex = index;
 	data.filterMode = type;
 	data.shaderText = std::string(frag);
+	if (type == FILTER_CUSTOMFILTER) {
+		// Turns on the error lines relative to the string and the named error messages.
+		data.sourceName = "addFilter(" + std::to_string(index) + ")";
+	}
 
 	KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, false));
 

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-worktree-remove-lib.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

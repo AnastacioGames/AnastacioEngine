@@ -151,13 +151,9 @@ void KX_BatchGroup::SplitObjects(const std::vector<KX_GameObject *>& objects)
 			continue;
 		}
 
-		if (SplitMeshUser(meshUser)) {
-			m_objects->RemoveValue(gameobj);
-			if (gameobj == m_referenceObject) {
-				SetReferenceObject(nullptr);
-			}
-		}
-		else {
+		/* SplitMeshUser() calls OnMeshUserSplit(), which has already removed
+		 * gameobj and updated the reference object. Do not scan m_objects again. */
+		if (!SplitMeshUser(meshUser)) {
 			CM_Error("failed split object \"" << gameobj->GetName() << "\"");
 		}
 	}
