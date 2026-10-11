@@ -6,6 +6,38 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - CV3 corrigido: armature fora da tela não força mais pose+skinning todo frame
+
+Continuação do mesmo worktree (`claude/auditoria-gpu-cache`). CV3 estava marcado como "decisão de
+design" na auditoria: `anim_needs_update` (`KX_Scene.cpp:2192`) forçava pose + skinning completos
+todo frame para um armature mesmo com todos os meshes deformados fora da tela (culled), porque o
+código original (herdado do Blender 2.4x) sempre atualizou armaturas por segurança — o AABB usado
+no teste de culling segue a última pose aplicada, então uma pose congelada pode manter um
+personagem culled para sempre se uma ação movesse um membro para dentro da tela sem a raiz do
+objeto se mover.
+
+Usuário escolheu pular a pose/skinning quando culled, com uma rede de segurança em vez de manter o
+comportamento atual. Implementado:
+- `anim_needs_update` não força mais `needs_update = true` só por existir um filho deformado culled;
+  o ramo que já forçava update ao primeiro filho não-culled continua idêntico (nunca foi o problema).
+- `BL_ArmatureObject::TickCullSkip()` (novo campo `m_cullSkipFrames`, `BL_ArmatureObject.h`/`.cpp`)
+  conta quantos frames consecutivos a pose foi pulada e força um update completo a cada 15 frames
+  (`CULL_SKIP_FORCE_INTERVAL`), limitando a pose congelada a no máximo 15 frames mesmo no pior caso.
+  `ResetCullSkip()` zera o contador sempre que um update real acontece por qualquer motivo.
+
+`bf_ketsji`/`bf_converter` compilam limpos; build completo (`RangeEngine`/`RangeRuntime`) e smoke no
+player sem crash. Validado com `tools/debug/cenas/criar_cena_cv3_correcao.py`: armature fora do
+enquadramento da câmera com uma ação cíclica tocando (osso girando 0→1,2 rad em 20 frames, modo
+LOOPEND). Lendo `channels['Bone'].pose_matrix` via Python frame a frame (só muda quando
+`BL_Action::Update` aplica a pose de fato) em 180 frames: a pose ficou congelada em blocos de
+exatamente 15 frames consecutivos e deu um salto visível no frame seguinte a cada marca de
+15/30/45/.../180 — nunca mais que 15 frames sem atualizar, nunca atualizando fora da marca. Uma
+tentativa de mover o armature para dentro do enquadramento da câmera no frame 101 não ficou
+"visível" para o culling nessa cena específica (framing não cobriu a nova posição), então essa
+transição não foi exercitada por este teste — mas o ramo de código responsável por ela já existia
+antes e não foi alterado. Avaliação visual no jogo real (personagem culled não trava nem "pula"
+de forma perceptível ao reaparecer) pendente do usuário.
+
 ## 2026-10-11 - KX10 (cache de shadow cull) validado com Spot/armature/layers, fecha como corrigido
 
 Continuação do mesmo worktree (`claude/auditoria-gpu-cache`). O item KX10 (`AutoShadowStillValid`/

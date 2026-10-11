@@ -210,7 +210,8 @@ BL_ArmatureObject::BL_ArmatureObject(void *sgReplicationInfo,
 	m_scene(scene),
 	m_lastframe(0.0),
 	m_drawDebug(false),
-	m_lastapplyframe(0.0)
+	m_lastapplyframe(0.0),
+	m_cullSkipFrames(0)
 {
 	m_controlledConstraints = new EXP_ListValue<BL_ArmatureConstraint>();
 
@@ -489,6 +490,25 @@ int BL_ArmatureObject::GetVertDeformType() const
 int BL_ArmatureObject::GetCullingMethod() const
 {
 	return ((bArmature*)m_objArma->data)->gearmculling;
+}
+
+/* Keep this short: if a culled armature stays frozen too long, an action that moves a limb back
+ * into view (without the root itself moving) could never un-cull it, since the AABB it's tested
+ * against follows the last applied pose (see KX_Scene.cpp, anim_needs_update). */
+static const unsigned short CULL_SKIP_FORCE_INTERVAL = 15;
+
+bool BL_ArmatureObject::TickCullSkip()
+{
+	if (++m_cullSkipFrames >= CULL_SKIP_FORCE_INTERVAL) {
+		m_cullSkipFrames = 0;
+		return true;
+	}
+	return false;
+}
+
+void BL_ArmatureObject::ResetCullSkip()
+{
+	m_cullSkipFrames = 0;
 }
 
 void BL_ArmatureObject::GetPose(bPose **pose) const

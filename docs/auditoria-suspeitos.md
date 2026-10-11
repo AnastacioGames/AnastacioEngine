@@ -31,7 +31,7 @@ objeto/feature específica > custo por evento (spawn/LibLoad) > trivial. Vai ser
 - CV1 = KX2: ação de armature força sync de transform da subárvore inteira.
 - LP1: depois do primeiro efeito de câmera (nitro), cópia de tela cheia por frame para sempre.
 - PH2: modo "Use Frame Rate" sincroniza todos os controllers 2×/frame (crítico só se os jogos usam esse modo).
-- CV3: armature fora da tela faz pose + skinning completos (decisão de design; custo alto por personagem).
+- ~~CV3~~: **corrigido 2026-10-11** (armature fora da tela não faz mais pose + skinning completos todo frame).
 
 **2. Alto — por frame, por objeto/feature comum**
 - RA3 (zsort refaz sort + IBO com tudo parado), KX6 (filhos de osso sempre atualizam), CV4/CV5 (reskin/shape key
@@ -63,7 +63,7 @@ Agrupado por causa raiz; vários IDs são o mesmo problema visto de áreas difer
 2. **Luzes reenviadas por objeto**: GP1 = GP2 = RA1; depois GP6/RA5, RA9 = KX11. Precisa de contador novo de uniforms.
 3. **Física**: PH2 (se os jogos usam "Use Frame Rate"), PH1, PH7.
 4. **Marca sempre ligada (forma de 98f54d7f)**: ~~KX9~~ e ~~PH3~~ corrigidos. `KX_SoftBodyDeformer::Apply` compara as posições e normais exatas antes de atualizar o array, notifica apenas os atributos alterados e só recalcula o AABB se as posições mudaram. Sem gravidade o solver Bullet ainda move os nós e o upload continua corretamente; com o corpo suspenso, uma grade de 6 561 nós passou de 1 para 0 `updateNotifies`/`boundsPushes` por frame. O custo do solver continua separado.
-5. **Animacao**: ~~CV5/CV8~~, KX5 (animacao das probes) e KX13 corrigidos; decisoes de design CV3/CV4.
+5. **Animacao**: ~~CV3~~/~~CV4~~/~~CV5~~/~~CV8~~, KX5 (animacao das probes) e KX13 corrigidos.
 6. **Render**: RA3 (zsort), KX4 (billboard), RA4 (instancing), RA6, KX10.
 7. **Resto de custo baixo**: GL2-GL4/GL7/GL8, RA2/RA7/RA8, GP3-GP5/GP7/GP8, PH9, KX7/KX12/KX14.
 
@@ -89,7 +89,7 @@ LP9/LP10 só afetam o Play embutido no editor.
 |---|---|---|---|---|---|
 | CV1 | `Ketsji/BL_Action.cpp:~457`, `UpdateIPOs` :569 | `m_requestIpo = true` sem condição, mesmo sem canais de objeto (armature só com bones) → `UpdateWorldDataThread` do nó e subárvore | transform sync por ação tocando × filhos | alta | **concluido** 2026-10-09: so pede update de mundo se a acao tem canais de transformacao do objeto (smoke `criar_cena_lote2_auditoria.py`; ganho nao medido, ruido > diferenca) |
 | CV2 | `Ketsji/KX_IpoController.cpp:84+`, `SceneGraph/SG_Node.cpp:381/409/426`, `SG_Controller.cpp:58` | IPO grava loc/rot/scale sem comparar; `SetLocal*` e `SetSimulatedTime` marcam modificado sempre | `sceneNodeUpdates`/`transformSyncs` com keys em hold | média | corrigido (ef80cf62): setters comparam e o sync só roda se o nó mudou; cena criar_cena_grava_igual.py 1600→0 syncs/frame |
-| CV3 | `Ketsji/KX_Scene.cpp:~2180` `anim_needs_update` | armature fora da tela faz pose + skinning completos (intencional: AABB segue o pose) | O(vértices × influências) por personagem culled | alta / decisão de design | suspeito |
+| CV3 | `Ketsji/KX_Scene.cpp:2192` `anim_needs_update`, `Converter/BL_ArmatureObject.cpp` `TickCullSkip` | armature fora da tela não faz mais pose + skinning completos todo frame (decisão de design aprovada: pular, com watchdog) | antes: O(vértices × influências) por personagem culled, todo frame | alta | **corrigido 2026-10-11** |
 | CV4 | `Converter/BL_SkinDeformer.h:70` `PoseUpdated` | compara tempo, não o conteúdo do pose → reskin + reenvio de VBO com bones parados | alto por personagem, só com ação ativa | média | **concluido** 2026-10-09: snapshot de matrizes da pose; pose igual nao refaz skin (smoke `criar_cena_lote_auditoria.py`; visual pendente) |
 | CV5 | `Ketsji/BL_Action.cpp:530` | ação de shape key chama `SetLastFrame` sem checar se `curval` mudou → `BKE_key_evaluate_relative` + malha inteira (modifier deformer: derived mesh) | alto | média | ja corrigido (`SetLastFrameIfShapeChanged`) |
 | CV6 | `Converter/BL_ShapeDeformer.cpp:117-132` | `m_useShapeDrivers` sempre true → avalia animdata + `ForceUpdate` mesmo sem drivers | médio | média | ja corrigido (`m_useShapeDrivers`) |
@@ -102,6 +102,30 @@ Verificados OK: `BL_Action::Update` (sai cedo se terminada/pausada/tempo repetid
 
 Validação sugerida: cena com personagens em idle loop; `transformSyncs` proporcional a ações tocando confirma CV1/CV2;
 CV5/CV6 corrigidos (2026-10-09): shape key constante nao remarca a malha e key sem driver nao avalia animdata; validacao no runtime pendente. CV7/CV8 corrigidos (2026-10-09): getters de acao nao inserem mais o objeto; apos eventos, objetos comuns sem layer ativa saem de `m_animatedlist`, enquanto armatures continuam para constraints/deformers. `PlayAction` reinseriu corretamente uma acao terminada no teste de runtime.
+
+**CV3 (2026-10-11)**: decisão de design tomada com o usuário — opção aprovada: parar de forçar pose + skinning
+completos todo frame quando o armature está 100% culled (todos os meshes deformados fora da tela), mas com uma
+rede de segurança para não repetir o risco original ("Blender 2.4x always updated armatures" porque o AABB usado
+no culling segue a última pose aplicada, e uma pose congelada pode manter um personagem culled para sempre mesmo
+que uma ação movesse um membro para dentro da tela sem a raiz do objeto se mover). Implementado em
+`anim_needs_update` (`KX_Scene.cpp:2192`): quando todo filho deformado está culled, a pose/skin não é mais forçada
+incondicionalmente; em vez disso `BL_ArmatureObject::TickCullSkip()` (novo campo `m_cullSkipFrames`) força um
+update completo a cada **15 frames** consecutivos pulados, e `ResetCullSkip()` zera o contador sempre que um
+update real acontece (por qualquer motivo: NONE Culling, filho realmente visível ou o próprio watchdog). O ramo
+que já forçava update ao primeiro filho **não** culled continua intocado — essa parte nunca foi o problema.
+Validado com `tools/debug/cenas/criar_cena_cv3_correcao.py`: armature com ação cíclica (osso gira de 0 a 1.2 rad
+em 20 frames, LOOPEND), sempre fora do enquadramento da câmera. Lendo `channels['Bone'].pose_matrix` por Python
+(só muda quando `BL_Action::Update` roda com `applyToObject=True`, isto é, quando `anim_needs_update` retornou
+`True`) confirmou exatamente o padrão esperado em 180 frames: a pose fica **congelada em blocos de 15 frames
+consecutivos** (14 frames no primeiro bloco, por causa do contador começando em 0) e dá um salto visível no
+frame seguinte a cada marca de 15/30/45/.../180 — nunca mais que 15 frames sem atualizar, nunca atualizando
+nos 14 frames intermediários. `bf_ketsji`/`bf_converter` compilam limpos; build completo
+(`RangeEngine`/`RangeRuntime`) e smoke no player sem crash. Uma tentativa de mover o armature para dentro do
+enquadramento da câmera no frame 101 não chegou a ficar "visível" para o culling nesta cena específica
+(framing da câmera não cobriu a nova posição) — não prova nem desmente a transição culled→visível, mas essa
+transição usa o ramo de código que já existia antes e não foi alterado por este fix, então não é um risco novo.
+Avaliação visual no jogo real (personagem culled não "trava" a pose nem suaviza errado ao reaparecer) pendente
+do usuário.
 
 ## Ketsji + SceneGraph
 
