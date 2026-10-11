@@ -1,0 +1,74 @@
+# Nós de vertex, geometry e GLSL Script
+
+Como deformar a malha, criar camadas (pelo, contorno) e escrever GLSL próprio dentro do material, sem material
+custom em Python. Estado e pendências em [roadmap.md](roadmap.md); detalhes técnicos na entrada de 2026-10-10 do
+[changelog.md](changelog.md).
+
+## Vertex Offset
+
+O Material Output (e o Output antigo) tem a entrada **Vertex Offset** (vetor). Os nós ligados a ela rodam no
+vertex shader e deslocam o vértice antes da projeção. Eles podem ler posição, normal, UV e tempo. Um nó usado só
+ali não entra no fragment.
+
+Nós da categoria **Vertex**: Vertex Offset, Wind e Wave.
+
+## Geometry
+
+Nós da categoria **Geometry**:
+
+- **Fur Shells**: repete a malha em camadas ao longo da normal. Saídas Layer e Alpha para recortar os fios.
+  Length e Layers são lidos ao gerar o shader; mudar esses valores recompila.
+- **Outline**: casco invertido. Precisa de backface culling ligado no material.
+- **Shell Layer**: índice da camada atual, para variar cor ou alpha por camada.
+
+Em **Input** há também **Camera Distance**, útil para reduzir o efeito longe da câmera.
+
+O estágio geometry precisa de geometry shader na GPU. Na Web e em GLES ele é ignorado: o material desenha sem o
+estágio e o console avisa uma vez.
+
+## Campo Geometry (código à mão)
+
+Em Material > Shading > Shader Sources há a linha **Geometry:**, ao lado de Vertex e Fragment (`script_geom` no
+Python). O Text define `void geometry()`. As varyings do material são repassadas sozinhas; use os helpers:
+
+| Helper | Função |
+|---|---|
+| `geom_copy` | copia as varyings de um vértice de entrada |
+| `geom_emit` | copia e emite um vértice de entrada |
+| `geom_emit_offset` | emite o vértice deslocado |
+| `geom_set_position` | define a posição do vértice a emitir |
+| `geom_position`, `geom_normal` | leem posição e normal de um vértice de entrada |
+| `TIME` | tempo do jogo |
+
+`layout(... max_vertices = N) out;` é opcional (padrão 3). Quanto maior o N, mais caro.
+
+## Nó GLSL Script
+
+Categoria **Script**. O nó aponta para um Text com uma função `main`. Os parâmetros viram os sockets: `float`/`int`,
+`vec2`/`vec3` e `vec4`; parâmetro `out` vira saída. O nó roda no fragment ou no vertex conforme onde for ligado.
+Editar o Text atualiza os sockets e recompila. Um erro de compilação aponta a linha do Text.
+
+```glsl
+void main(vec3 color, float amount, out vec3 result)
+{
+	result = mix(color, vec3(1.0, 0.0, 0.0), amount);
+}
+```
+
+## Presets
+
+Add > Presets cria grupos de nós editáveis (`node.shader_preset_add`): Fur, Grass, Toon + Rim, Toon Outline,
+Dissolve e Water Waves. Water Waves liga o Offset ao Vertex Offset sozinho. Os presets com Alpha põem o material
+em Alpha Clip.
+
+## Sombras e cache
+
+- Material que move vértices (Vertex Offset, Fur Shells, Outline ou código do usuário) faz sombra com o próprio
+  shader.
+- Materiais sem esses recursos geram o mesmo código de antes. O cache de shaders e o `.cooked` recompilam uma vez
+  após a atualização.
+
+## Cena de teste
+
+`tools/debug/cenas/criar_cena_shader_nodes.py` gera uma cena com água (Water Waves), esfera com Fur, macaco com
+Toon Outline, cubo com GLSL Script e cubo com o campo Geometry.

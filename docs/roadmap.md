@@ -657,6 +657,15 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   máscara RGB e materiais prontos (ver changelog). Falta o usuário conferir no editor e no jogo
   (`tools/create_material_recipes_test.py`, PBR e `legacy`). Normal e rugosidade por camada feitas (botão de pasta). Próximos: mistura pela
   altura e Texture Array (só se 8+ camadas).
+- **Nós de material com estágios de vertex e geometry (2026-10-10, branch `claude/shader-nodes`)**: guia em
+  [shader-nodes.md](shader-nodes.md). Feito: entrada Vertex Offset no Material Output, campo Geometry em Shader
+  Sources, nós Vertex Offset/Wind/Wave/Fur Shells/Outline/Shell Layer/Camera Distance/GLSL Script, menu Add com
+  Vertex/Geometry/Script/Presets e presets Fur, Grass, Toon + Rim, Toon Outline, Dissolve e Water Waves. Os
+  shaders compilam e linkam no runtime; **falta o usuário conferir o visual** no jogo e no viewport
+  (`tools/debug/cenas/criar_cena_shader_nodes.py`) e validar com o caso real do Naut. Falta também: viewport
+  desenhando quads com geometry stage (não testado), build Web, cor do cabeçalho do nó por estágio e erro do nó
+  em vermelho, nós Billboard/Explode/Strands, presets Wind Leaves/Triplanar/Hologram, Show Generated Code,
+  uniforms `u_` no painel, custo/`max_vertices` no painel e opção de sombra própria.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.
