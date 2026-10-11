@@ -1712,6 +1712,11 @@ void GPU_shader_free_builtin_shaders(void)
 		GG.shaders.vsm_store = NULL;
 	}
 
+	if (GG.shaders.vsm_store_instancing) {
+		GPU_shader_free(GG.shaders.vsm_store_instancing);
+		GG.shaders.vsm_store_instancing = NULL;
+	}
+
 	if (GG.shaders.sep_gaussian_blur) {
 		GPU_shader_free(GG.shaders.sep_gaussian_blur);
 		GG.shaders.sep_gaussian_blur = NULL;

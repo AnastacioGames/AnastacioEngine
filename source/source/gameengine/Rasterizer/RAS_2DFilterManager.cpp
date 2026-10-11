@@ -349,6 +349,11 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		 * by WebGL. With multisamples the depth lives in FILTER0, so the FILTER0/FILTER1 ping pong
 		 * can run out of free off screens; then the eye off screen targeted by the last filter
 		 * serves as the third one (the copy below reaches targetofs if needed). */
+		/* The uniforms a filter samples are only known after its first Initialize(). Without this
+		 * the first frame saw usesDepth == false and could target the depth owner. */
+		if (filter->Ok()) {
+			filter->Initialize(canvas);
+		}
 		const bool usesDepth = filter->UsesDepthTexture() || filter->UsesDataTextures();
 		auto isFree = [colorofs, depthofs, usesDepth](RAS_OffScreen *ofs) {
 			return ofs != colorofs && !(usesDepth && ofs == depthofs);

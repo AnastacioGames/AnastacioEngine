@@ -218,6 +218,7 @@ void draw_sim_debug_data(Scene *scene, View3D *v3d, ARegion *ar);
 /* view3d_rain.c */
 void view3d_draw_rain_effects(struct Scene *scene, struct View3D *v3d, struct RegionView3D *rv3d);
 bool view3d_lightning_emitter_preview(const struct Object *ob);
+void view3d_rain_shaders_free(void);
 
 /* view3d_draw.c */
 void view3d_main_region_draw(const struct bContext *C, struct ARegion *ar);

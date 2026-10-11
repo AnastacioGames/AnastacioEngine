@@ -3615,7 +3615,13 @@ GPUPass *GPU_generate_pass(
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :
 	                     NULL;
-	if (shader && !GPU_shader_prefetching()) {
+	if (shader && GPU_shader_prefetching()) {
+		/* Already compiled, nothing to send ahead. The reference just acquired has to be given back:
+		 * it used to be dropped here, which pinned the program for good and compiled it again. */
+		shader_cache_release(shader);
+		shader = NULL;
+	}
+	else if (shader) {
 		SHADER_CACHE_STAT_REUSED++;
 	}
 	else {

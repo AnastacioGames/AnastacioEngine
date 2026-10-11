@@ -606,6 +606,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 		GPU_global_buffer_pool_free();
 		GPU_free_unused_buffers(G_MAIN);
 
+		ED_view3d_shaders_free();
 		GPU_shader_editor_cache_exit();
 		GPU_exit();
 	}

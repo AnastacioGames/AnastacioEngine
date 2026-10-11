@@ -364,6 +364,8 @@ void ED_view3d_init_mats_rv3d(struct Object *ob, struct RegionView3D *rv3d);
 void ED_view3d_init_mats_rv3d_gl(struct Object *ob, struct RegionView3D *rv3d);
 extern void ED_view3d_icons_init(struct Main *bmain);
 extern void ED_view3d_icons_free(void);
+/* Frees the viewport own shaders (floor grid, rain lightning); needs the OpenGL context. */
+void ED_view3d_shaders_free(void);
 
 #ifdef DEBUG
 void ED_view3d_clear_mats_rv3d(struct RegionView3D *rv3d);

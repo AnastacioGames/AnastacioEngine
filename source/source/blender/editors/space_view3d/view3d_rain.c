@@ -107,6 +107,15 @@ static bool bolt_shader_ensure(void)
 	return bolt_shader != NULL;
 }
 
+void view3d_rain_shaders_free(void)
+{
+	if (bolt_shader) {
+		GPU_shader_free(bolt_shader);
+		bolt_shader = NULL;
+	}
+	bolt_shader_failed = false;
+}
+
 /* One camera facing ribbon per strip, with round caps (same as KX_RainLightning). */
 static void draw_bolt_geometry(const RainLightningBolt *bolt, float bright, const float color[3], const float cam_pos[3])
 {

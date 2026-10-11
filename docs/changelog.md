@@ -6,6 +6,47 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Avisos do `--debug`: feedback loop no 1º quadro e memória não liberada ao sair
+
+Investigação do que o editor imprimia com `--debug --debug-gpu` depois de três Plays na cena de
+startup: 3 avisos `Feedback loop warning` e 25 blocos não liberados (66 KB). Cinco causas, todas
+corrigidas; depois delas o editor (com 3 Plays e sem Play) e o runtime saem com zero blocos e sem o
+aviso.
+
+- **Feedback loop (1 por Play).** `RAS_2DFilterManager::RenderFilters` escolhe o off screen de
+  destino sem deixar o filtro desenhar no dono da profundidade que ele lê, mas `UsesDepthTexture()`
+  só responde certo depois do primeiro `Initialize()` do filtro, que acontecia dentro do `Render`.
+  No primeiro quadro o filtro de nuvens (`FILTERPASS_CLOUDS`) era tratado como se não lesse
+  profundidade e, com multisample, desenhava em `FILTER0` lendo a profundidade de `FILTER0`. Agora o
+  gerenciador chama `Initialize()` antes de decidir. No desktop era um quadro inofensivo; no WebGL
+  esse desenho é rejeitado.
+- **`GPUNodeLink` (2 por material por Play).** Em `gpu_material.c` o link da cor do horizonte era
+  criado antes de saber se o céu é atmosférico; `env_sky_atmospheric` não o consome e link sem nó
+  nunca é liberado. `hor`/`zen`/`nad` passaram a ser criados só no ramo `env_sky`, nos dois lugares
+  (material clássico e ambiente dos shader nodes).
+- **Programa preso no cache de shaders.** Em `GPU_generate_pass`, um acerto do cache durante o
+  prefetch (`9f440a1c`) caía no ramo de compilar: a referência recém-adquirida era perdida, o
+  programa nunca mais chegava a zero usuários e ainda era mandado compilar de novo. Acontecia a
+  partir do 2º Play no editor. Agora a referência é devolvida e nada é enviado.
+- **`vsm_store_instancing`** faltava em `GPU_shader_free_builtin_shaders` (shader e interface).
+- **Shaders próprios da viewport** (grade do chão em `view3d_draw.c` e raio da chuva em
+  `view3d_rain.c`) nunca eram liberados: novo `ED_view3d_shaders_free()`, chamado no `WM_exit`
+  antes do `GPU_exit()`.
+
+**`-d memory` do runtime consertado.** A troca para o alocador com checagem acontecia no meio da
+leitura dos argumentos, depois de `init_nodesystem()`; na saída o `free_nodesystem()` abortava com
+`Memoryblock free: pointer not in memlist` e o relatório de blocos nunca aparecia. A troca agora é
+feita no começo do `main`.
+
+**Ferramentas:** `tools/debug/cenas/criar_cena_startup_autosair.py` (cena de startup que encerra o
+jogo sozinha após ~3 s) e `tools/debug/editor_auto_play.py` (aperta Play N vezes dentro do editor e
+fecha), para repetir esta checagem sem ninguém apertar P.
+
+**Validação:** editor com 3 Plays e sem Play, runtime com `-d memory` na cena de startup, e runtime
+com `-d gpu` nas cenas `valida_materiais` e `vclouds_luz`, sem erro de shader nem crash. Não
+investigados: `Internal error, builtin font not loaded` nas placas de texto 3D do runtime e uma
+linha `AVG` do profiler com tempo negativo entre um Play e outro no editor.
+
 ## 2026-10-11 - Volumetric Clouds: luz com borda prateada mais fina e lado iluminado branco
 
 Ajuste do modelo de luz em `RAS_Clouds2DFilter.glsl` (jogo) e no espelho da viewport

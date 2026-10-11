@@ -3625,17 +3625,6 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 					GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&ma->refrac), &wv, &wn, &wr);
 
 				if (world->aocolor == WO_AOSKYCOL) {
-					GPUNodeLink *hor, *zen, *nad;
-					if (ma->fragcode || ma->vertcode) {
-						GPU_link(mat, "user_set_world", &hor, &zen, &nad);
-					}
-					else {
-						hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
-						if (!(mat->scene->world->skytype & WO_SKYATMOSPHERIC)) {
-							zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
-							nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
-						}
-					}
 					if (!(is_zero_v3(&world->horr) & is_zero_v3(&world->zenr)) || !(ma->constflag & MA_CONSTANT_WORLD)) {
 
 						GPUNodeLink *sunDir, *sunCol, *sunEnergy, *sunSize;
@@ -3663,6 +3652,16 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 								sunEnergy, sunSize, sunCol, GPU_uniform(&env_sky), &mirror, &radiosity, &transmit);
 						}
 						else {
+							/* Created only here: a link no node consumes is never freed. */
+							GPUNodeLink *hor, *zen, *nad;
+							if (ma->fragcode || ma->vertcode) {
+								GPU_link(mat, "user_set_world", &hor, &zen, &nad);
+							}
+							else {
+								hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
+								zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
+								nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
+							}
 							GPU_link(mat, "env_sky", hor, zen, nad, GPU_uniform(&world->ground),
 								shi->roughness_bsdf, GPU_uniform(&world->turbidity), sunDir, sunCol, sunEnergy, sunSize,
 								wv, wn, wr, &mirror, &radiosity, &transmit);
@@ -4312,12 +4311,7 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 		GPU_link(mat, "set_rgba", GPU_uniform(black), &diffibl);
 	}
 	else if (!use_tex) {
-		GPUNodeLink *hor, *zen = NULL, *nad = NULL, *sunDir, *sunCol, *sunEnergy, *sunSize;
-		hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
-		if (!(world->skytype & WO_SKYATMOSPHERIC)) {
-			zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
-			nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
-		}
+		GPUNodeLink *sunDir, *sunCol, *sunEnergy, *sunSize;
 
 		if (mat->scene->world_sun) {
 			Lamp *sun = mat->scene->world_sun->data;
@@ -4343,6 +4337,10 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 			         sunEnergy, sunSize, sunCol, GPU_uniform(&env_sky), &mirror, &diffibl, &transmit);
 		}
 		else {
+			/* Created only here: a link no node consumes is never freed. */
+			GPUNodeLink *hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
+			GPUNodeLink *zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
+			GPUNodeLink *nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
 			GPU_link(mat, "env_sky", hor, zen, nad, GPU_uniform(&world->ground),
 			         rough, GPU_uniform(&world->turbidity), sunDir, sunCol, sunEnergy, sunSize,
 			         wv, wn, wr, &mirror, &diffibl, &transmit);

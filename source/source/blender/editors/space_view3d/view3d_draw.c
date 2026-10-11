@@ -559,6 +559,16 @@ static const char *floor_frag =
 static GPUShader *floor_shader = NULL;
 static bool floor_shader_failed = false;
 
+void ED_view3d_shaders_free(void)
+{
+	if (floor_shader) {
+		GPU_shader_free(floor_shader);
+		floor_shader = NULL;
+	}
+	floor_shader_failed = false;
+	view3d_rain_shaders_free();
+}
+
 /* Returns false when the shader is unavailable, so the caller falls back to the line grid. */
 static bool drawfloor_shader(RegionView3D *rv3d, View3D *v3d, float grid_scale,
                              const unsigned char col_grid[3], const unsigned char col_emph[3])

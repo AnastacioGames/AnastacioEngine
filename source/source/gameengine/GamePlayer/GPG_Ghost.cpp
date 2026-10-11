@@ -946,6 +946,16 @@ int main(int argc,
 	}
 #endif  /* WIN32 */
 
+	/* "-d memory" has to switch allocators before the first MEM_ allocation: blocks allocated by
+	 * the default allocator and freed by the guarded one abort at exit ("pointer not in memlist"),
+	 * which also hid the unfreed block report. The option itself is still parsed further down. */
+	for (int a = 1; a + 1 < argc; ++a) {
+		if (strcmp(argv[a], "-d") == 0 && strcmp(argv[a + 1], "memory") == 0) {
+			MEM_use_guarded_allocator();
+			break;
+		}
+	}
+
 #ifdef __linux__
 #ifdef __alpha__
 	signal(SIGFPE, SIG_IGN);
@@ -1174,8 +1184,8 @@ int main(int argc,
 					else if (strcmp(argv[i], "memory") == 0) {
 						G.debug |= G_DEBUG;
 
+						/* The allocator itself was already switched at the top of main(). */
 						CM_Debug("Switching to fully guarded memory allocator.");
-						MEM_use_guarded_allocator();
 
 						MEM_set_memory_debug();
 #ifndef NDEBUG
