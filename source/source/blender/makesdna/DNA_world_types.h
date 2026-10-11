@@ -163,7 +163,7 @@ typedef struct World {
 	int   earthquake_level; /* 0 (off) a 5 (extremo), ver WO_WEATHER_EARTHQUAKE */
 	float earthquake_scale;  /* multiplicador da forca do terremoto, 0.1 a 5 (0 = arquivo antigo, tratado como 1) */
 	short weather_editor_hide; /* bits WO_WEATHER_* (+ WO_WEATHER_FOG) escondidos so na viewport; era earthquake_pad2, 0 = tudo visivel */
-	short weather_editor_pad;
+	short cloud_style; /* WO_CLOUD_STYLE_*; era weather_editor_pad, 0 = Procedural */
 	float earthquake_camera; /* tremor da camera ativa, 0 (off) a 2 (era earthquake_pad; arquivos antigos = 0) */
 
 	char  sun_object_name[64]; /* nome do objeto Lamp, resolvido em runtime */
@@ -219,6 +219,10 @@ typedef struct World {
 /* weather_flag */
 #define WO_WEATHER_RAIN            (1 << 0)
 #define WO_WEATHER_CLOUDS          (1 << 1)
+
+/* World.cloud_style */
+#define WO_CLOUD_STYLE_PROCEDURAL  0
+#define WO_CLOUD_STYLE_LAYERED     1
 #define WO_WEATHER_LENSFLARE       (1 << 2)
 #define WO_WEATHER_RAIN_DROPLETS   (1 << 3)
 #define WO_WEATHER_RAIN_RIPPLE     (1 << 4)

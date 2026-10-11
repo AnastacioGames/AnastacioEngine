@@ -138,6 +138,7 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainSkyZenith", // GE_RAIN_SKY_ZENITH_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
 	"ge_CloudsColor", // GE_CLOUDS_COLOR_UNIFORM
+	"ge_CloudsStyle", // GE_CLOUDS_STYLE_UNIFORM
 	"ge_LensFlareParams", // GE_LENSFLARE_PARAMS_UNIFORM
 	"ge_LensFlareSunPos", // GE_LENSFLARE_SUNPOS_UNIFORM
 	"ge_FxaaParams", // GE_FXAA_PARAMETERS_UNIFORM
@@ -749,6 +750,10 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_CLOUDS_COLOR_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_COLOR_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.cloud_color, sizeof(float) * 3, 1);
+	}
+	if (m_predefinedUniforms[GE_CLOUDS_STYLE_UNIFORM] != -1) {
+		float style = (float)m_buildInFilters.cloud_style;
+		SetUniformfv(m_predefinedUniforms[GE_CLOUDS_STYLE_UNIFORM], RAS_Uniform::UNI_FLOAT, &style, sizeof(float), 1);
 	}
 
 	if (m_predefinedUniforms[GE_LENSFLARE_PARAMS_UNIFORM] != -1) {

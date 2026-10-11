@@ -52,7 +52,8 @@ enum {
 typedef const void *(*GPUShaderBinaryFind)(unsigned long long key, unsigned int *format, int *size);
 typedef void (*GPUShaderBinaryAdd)(unsigned long long key, unsigned int format, const void *data, int size);
 void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add);
-/* Hash of the GPU and driver (binaries of another one are useless), 0 when program binaries are unsupported. */
+/* Hooks used when none are set (NULL find in GPU_shader_binary_cache_set restores them): the editor cache. */
+void GPU_shader_binary_cache_default_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add);/* Hash of the GPU and driver (binaries of another one are useless), 0 when program binaries are unsupported. */
 unsigned long long GPU_shader_binary_device_key(void);
 
 /* Parallel compile (GL_ARB_parallel_shader_compile): between begin and end, material programs (BINARY_CACHE flag)
@@ -202,6 +203,16 @@ void GPU_profile_log_texture(int w, int h, bool depth, int samples);
 /* RANGE_SHADER_LOG on: true when the log is open, and a line per image uploaded (name, size, mipmaps, duration). */
 bool GPU_profile_log_enabled(void);
 void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms);
+/* RANGE_SHADER_LOG on: a free line (e.g. layer switch timings in the editor). */
+void GPU_profile_log_line(const char *text);
+/* RANGE_SHADER_LOG on: seconds spent building mesh GPU buffers (gpu_buffers.c), creating shaders and
+ * uploading images; they only grow, readers take differences. */
+extern double GPU_profile_buffer_seconds;
+extern double GPU_profile_shader_seconds;
+extern double GPU_profile_image_seconds;
+/* Same, for GPU_begin_object_materials and GPU_object_material_bind (gpu_draw.c). */
+extern double GPU_profile_begin_seconds;
+extern double GPU_profile_bind_seconds;
 
 #ifdef __cplusplus
 }

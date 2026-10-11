@@ -222,7 +222,7 @@ private:
 	bool m_attached = false;
 
 public:
-	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface)
+	CcdSharedBvhTriangleMeshShape(btStridingMeshInterface *meshInterface, const SharedBvhKey *key = nullptr)
 		:btBvhTriangleMeshShape(meshInterface, true, false)
 	{
 		// In a batch the BVH waits for CcdEndBvhBatch(): adding the body to the world only reads the
@@ -231,7 +231,7 @@ public:
 			pendingBvhBatch.shapes.push_back(this);
 		}
 		else {
-			Attach(shared_bvh_key(m_meshInterface), nullptr);
+			Attach(key ? *key : shared_bvh_key(m_meshInterface), nullptr);
 		}
 	}
 
@@ -2742,6 +2742,9 @@ void CcdShapeConstructionInfo::ProcessReplica()
 	m_forceReInstance = false;
 	m_shapeProxy = nullptr;
 	m_vertexArray.clear();
+	m_hullPoints.clear();
+	m_hullPointsValid = false;
+	m_bvhKeyValid = false;
 	m_polygonIndexArray.clear();
 	m_triFaceArray.clear();
 	m_triFaceUVcoArray.clear();
@@ -2783,6 +2786,12 @@ bool CcdShapeConstructionInfo::UpdateMesh(KX_GameObject *gameobj, RAS_Mesh *mesh
 	if (!meshobj) {
 		return false;
 	}
+
+	// The collision vertices can change even when this is the same RAS_Mesh
+	// (for example after a deformer or ReplaceMesh), so its derived hull is stale.
+	m_hullPoints.clear();
+	m_hullPointsValid = false;
+	m_bvhKeyValid = false;
 
 	RAS_DisplayArrayList displayArrays;
 
@@ -2988,23 +2997,26 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 			}
 
 			// Keep only the points that lie on the hull: exact same shape, but
-			// support queries no longer iterate over every interior vertex.
-			// The hull points come from the cooked file when this vertex set was already computed.
-			const unsigned int numVertices = m_vertexArray.size() / 3;
-			std::vector<btScalar> points;
-			if (!CcdCookedData::FindHull(&m_vertexArray[0], numVertices, points)) {
-				btConvexHullComputer hullComputer;
-				hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), numVertices, 0.0f, 0.0f);
-				points.reserve(hullComputer.vertices.size() * 3);
-				for (int i = 0; i < hullComputer.vertices.size(); ++i) {
-					const btVector3& point = hullComputer.vertices[i];
-					points.insert(points.end(), {point.x(), point.y(), point.z()});
+			// support queries no longer iterate over every interior vertex. Cache
+			// them on the shared construction info: otherwise every spawned copy
+			// hashes all vertices (and computes the hull if there is no .cooked file).
+			if (!m_hullPointsValid) {
+				const unsigned int numVertices = m_vertexArray.size() / 3;
+				if (!CcdCookedData::FindHull(&m_vertexArray[0], numVertices, m_hullPoints)) {
+					btConvexHullComputer hullComputer;
+					hullComputer.compute(&m_vertexArray[0], 3 * sizeof(btScalar), numVertices, 0.0f, 0.0f);
+					m_hullPoints.reserve(hullComputer.vertices.size() * 3);
+					for (int i = 0; i < hullComputer.vertices.size(); ++i) {
+						const btVector3& point = hullComputer.vertices[i];
+						m_hullPoints.insert(m_hullPoints.end(), {point.x(), point.y(), point.z()});
+					}
+					CcdCookedData::AddHull(&m_vertexArray[0], numVertices, m_hullPoints.data(), m_hullPoints.size() / 3);
 				}
-				CcdCookedData::AddHull(&m_vertexArray[0], numVertices, points.data(), points.size() / 3);
+				m_hullPointsValid = true;
 			}
 			btConvexHullShape *hullShape;
-			if (points.size() >= 12) {
-				hullShape = new btConvexHullShape(points.data(), points.size() / 3, 3 * sizeof(btScalar));
+			if (m_hullPoints.size() >= 12) {
+				hullShape = new btConvexHullShape(m_hullPoints.data(), m_hullPoints.size() / 3, 3 * sizeof(btScalar));
 			}
 			else {
 				hullShape = new btConvexHullShape(&m_vertexArray[0], m_vertexArray.size() / 3, 3 * sizeof(btScalar));
@@ -3104,7 +3116,24 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 				btBvhTriangleMeshShape *unscaledShape;
 				if (useBvh && m_weldingThreshold1 == 0.0f) {
 					// The BVH is shared with every shape of identical arrays (see CcdSharedBvhTriangleMeshShape).
-					unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray);
+					// A construction info is already shared by normal spawned copies. Keep its key as
+					// well, so those copies do not hash all vertices and indices again. The converter
+					// batch retains its parallel hash pass below.
+					if (pendingBvhBatch.depth == 0 && !m_bvhKeyValid) {
+						const SharedBvhKey key = shared_bvh_key(m_triangleIndexVertexArray);
+						m_bvhKeyHash[0] = key.hash[0];
+						m_bvhKeyHash[1] = key.hash[1];
+						m_bvhKeyNumVerts = key.numVerts;
+						m_bvhKeyNumTris = key.numTris;
+						m_bvhKeyValid = true;
+					}
+					if (m_bvhKeyValid) {
+						const SharedBvhKey key = {{m_bvhKeyHash[0], m_bvhKeyHash[1]}, m_bvhKeyNumVerts, m_bvhKeyNumTris};
+						unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray, &key);
+					}
+					else {
+						unscaledShape = new CcdSharedBvhTriangleMeshShape(m_triangleIndexVertexArray);
+					}
 				}
 				else {
 					unscaledShape = new btBvhTriangleMeshShape(m_triangleIndexVertexArray, true, useBvh);

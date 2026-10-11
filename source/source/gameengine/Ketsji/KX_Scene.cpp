@@ -325,6 +325,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.cloud_color[0] = world->cloud_color[0];
 			filters.cloud_color[1] = world->cloud_color[1];
 			filters.cloud_color[2] = world->cloud_color[2];
+			filters.cloud_style = world->cloud_style;
 		}
 
 		if (world->weather_flag & WO_WEATHER_LENSFLARE) {

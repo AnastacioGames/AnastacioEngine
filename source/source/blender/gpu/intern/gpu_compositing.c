@@ -128,6 +128,7 @@ typedef struct {
   int depth_uniform;
   int clouds_params_uniform;
   int clouds_color_uniform;
+  int clouds_style_uniform;
 } GPUCLOUDSShaderInterface;
 
 typedef struct {
@@ -1494,6 +1495,8 @@ bool GPU_fx_do_composite_pass(
 
 			GPU_shader_uniform_vector(clouds_shader, interface->clouds_params_uniform, 4, 1, clouds_params);
 			GPU_shader_uniform_vector(clouds_shader, interface->clouds_color_uniform, 3, 1, world->cloud_color);
+			const float clouds_style = (float)world->cloud_style;
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_style_uniform, 1, 1, &clouds_style);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2259,6 +2262,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->depth_uniform = GPU_shader_get_uniform(shader, "depthbuffer");
 			interface->clouds_params_uniform = GPU_shader_get_uniform(shader, "clouds_params");
 			interface->clouds_color_uniform = GPU_shader_get_uniform(shader, "clouds_color");
+			interface->clouds_style_uniform = GPU_shader_get_uniform(shader, "clouds_style");
 
 			GPU_shader_set_interface(shader, interface);
 			break;

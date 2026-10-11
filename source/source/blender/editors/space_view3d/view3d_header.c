@@ -31,6 +31,8 @@
 
 #include "BLI_utildefines.h"
 
+#include "PIL_time.h"
+
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
@@ -107,6 +109,15 @@ static void view3d_layers_editmode_ensure(Scene *scene, View3D *v3d)
 	}
 }
 
+void ED_view3d_layers_shown(Main *bmain, Scene *scene, View3D *v3d, unsigned int lay_old, double t_begin,
+                            double dag_seconds)
+{
+	/* No parallel prefetch here: programs sent ahead and never used were deleted while the AMD driver still
+	 * compiled them, freezing the editor for ~30 s. The hidden layer warmup (view3d_draw.c) covers it. */
+	UNUSED_VARS(bmain, scene, lay_old);
+	view3d_layer_profile_begin(v3d->lay, t_begin, dag_seconds);
+}
+
 static int view3d_layers_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -114,6 +125,8 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 	View3D *v3d = sa->spacedata.first;
 	int nr = RNA_int_get(op->ptr, "nr");
 	const bool toggle = RNA_boolean_get(op->ptr, "toggle");
+	const double t_begin = PIL_check_seconds_timer();
+	const unsigned int lay_old = v3d->lay;
 
 	if (nr < 0)
 		return OPERATOR_CANCELLED;
@@ -165,7 +178,9 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 
 	if (v3d->scenelock) handle_view3d_lock(C);
 
+	const double t_dag = PIL_check_seconds_timer();
 	DAG_on_visible_update(CTX_data_main(C), false);
+	ED_view3d_layers_shown(CTX_data_main(C), scene, v3d, lay_old, t_begin, PIL_check_seconds_timer() - t_dag);
 
 	ED_area_tag_redraw(sa);
 
