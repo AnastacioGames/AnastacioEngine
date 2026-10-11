@@ -4005,6 +4005,18 @@ void GPU_material_prefetch(Scene *scene, Material *ma, bool is_instancing, bool 
 	*gpumaterials = kept;
 }
 
+bool GPU_material_prefetch_viewport(Scene *scene, Material *ma)
+{
+	for (LinkData *link = ma->gpumaterial.first; link; link = link->next) {
+		const GPUMaterial *material = link->data;
+		if (material->scene == scene && !material->is_opensubdiv) {
+			return false;
+		}
+	}
+	GPU_material_prefetch(scene, ma, false, false);
+	return true;
+}
+
 /* Materials whose Shader Sources use this Text compile again on the next draw. */
 bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {

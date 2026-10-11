@@ -60,6 +60,7 @@ set(SRC
 	intern/gpu_select_pick.c
 	intern/gpu_select_sample_query.c
 	intern/gpu_shader.c
+	intern/gpu_shader_editor_cache.c
 	intern/gpu_texture.c
 	intern/gpu_vertex_array.c
 

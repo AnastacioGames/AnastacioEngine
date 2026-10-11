@@ -466,12 +466,28 @@ static void gpu_dump_shaders(const char **code, const int num_shaders, const cha
 }
 
 static GPUShaderBinaryFind binary_find = NULL;
+/* Set when the last create loaded a cached binary (shader log only). */
+static bool binary_loaded = false;
 static GPUShaderBinaryAdd binary_add = NULL;
+/* Editor cache (gpu_shader_editor_cache.c), used whenever the game hooks are cleared. */
+static GPUShaderBinaryFind binary_find_default = NULL;
+static GPUShaderBinaryAdd binary_add_default = NULL;
 
 void GPU_shader_binary_cache_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add)
 {
-	binary_find = find;
-	binary_add = add;
+	binary_find = find ? find : binary_find_default;
+	binary_add = find ? add : binary_add_default;
+}
+
+void GPU_shader_binary_cache_default_set(GPUShaderBinaryFind find, GPUShaderBinaryAdd add)
+{
+	const bool in_use = binary_find == binary_find_default;
+	binary_find_default = find;
+	binary_add_default = add;
+	if (in_use) {
+		binary_find = find;
+		binary_add = add;
+	}
 }
 
 static void binary_hash_str(unsigned long long *h, const char *str)
@@ -701,6 +717,7 @@ static GPUShader *gpu_shader_create_ex_impl_raw(const char *vertexcode,
 			glProgramBinary(shader->program, format, binary, size);
 			glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
 			if (status) {
+				binary_loaded = true;
 				return shader;
 			}
 			/* Rejected by the driver: compile and link as usual (a fresh program, the failed load can leave state). */
@@ -961,12 +978,26 @@ bool GPU_profile_log_enabled(void)
 void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms)
 {
 	FILE *log_file = gpu_profile_log_file();
+	GPU_profile_image_seconds += ms / 1000.0;
 	if (log_file) {
 		fprintf(log_file, "t=%.3fs frame=%ld ms=%.2f image %dx%d%s %s\n", PIL_check_seconds_timer() - log_start,
 		        GPU_profile_frame, ms, w, h, mipmap ? " mipmap" : "", name ? name : "-");
 		fflush(log_file);
 	}
 }
+
+void GPU_profile_log_line(const char *text)
+{
+	FILE *log_file = gpu_profile_log_file();
+	if (log_file) {
+		fprintf(log_file, "t=%.3fs frame=%ld %s\n", PIL_check_seconds_timer() - log_start, GPU_profile_frame, text);
+		fflush(log_file);
+	}
+}
+
+double GPU_profile_buffer_seconds = 0.0;
+double GPU_profile_shader_seconds = 0.0;
+double GPU_profile_image_seconds = 0.0;
 
 static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
                                             const char *fragcode,
@@ -985,16 +1016,18 @@ static GPUShader *gpu_shader_create_ex_impl(const char *vertexcode,
 		                                     input, output, number, flags, diagnostic_name);
 	}
 	const bool was_prefetching = prefetching;
+	binary_loaded = false;
 	const double t0 = PIL_check_seconds_timer();
 	GPUShader *shader = gpu_shader_create_ex_impl_raw(vertexcode, fragcode, geocode, libcode, defines,
 	                                                   input, output, number, flags, diagnostic_name);
 	const double t1 = PIL_check_seconds_timer();
+	GPU_profile_shader_seconds += t1 - t0;
 	if (shader) {
 		BLI_snprintf(shader->profile_name, sizeof(shader->profile_name), "%s/%d", diagnostic_name ? diagnostic_name : "-",
 		             fragcode ? (int)strlen(fragcode) : 0);
 	}
 	fprintf(log_file, "t=%.3fs frame=%ld ms=%.2f %s flags=0x%x frag=%d %s\n", t0 - log_start, GPU_profile_frame,
-	        (t1 - t0) * 1000.0, was_prefetching ? "prefetch" : (shader ? "create" : "null"), flags,
+	        (t1 - t0) * 1000.0, was_prefetching ? "prefetch" : (shader ? (binary_loaded ? "cached" : "create") : "null"), flags,
 	        fragcode ? (int)strlen(fragcode) : 0, diagnostic_name ? diagnostic_name : "-");
 	fflush(log_file);
 	return shader;

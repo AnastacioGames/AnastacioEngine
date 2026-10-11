@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-10 - Troca de layer no editor: cache de shaders, aquecimento dos layers escondidos e medição
+
+- Cache de shaders do editor (`gpu_shader_editor_cache.c`): binários dos materiais da viewport ficam em `%LOCALAPPDATA%\AnastacioEngine\ShaderCache\editor.shaders` (chave da GPU/driver, limite 256 MB), lidos após `GPU_init` e gravados no `WM_exit` e ao fim do aquecimento. São os ganchos padrão de `GPU_shader_binary_cache_set`: o Play põe os do `.cooked` e, ao limpar, os do editor voltam. `RANGE_NO_EDITOR_SHADER_CACHE=1` desliga.
+- Buffers de malha (`gpu_buffer_setup`): preenchidos na CPU e enviados com `glBufferData`; o `glMapBuffer` esperava a GPU/driver (até 8,6 s para 137 KB no RolimaRacer).
+- Aquecimento dos layers escondidos (`view3d_warmup_step`): 3 s após abrir o arquivo ou trocar de cena, os objetos dos layers que a vista não mostra são desenhados com cor e profundidade desligadas, ~30 ms por quadro, com a barra "Preparing Layers" no Info (job, cancelável). O driver da AMD compila de fato no primeiro desenho real (mesmo com binário do cache), 1–3 s por objeto; assim isso acontece antes de ligar o layer. `RANGE_NO_SHADER_WARMUP=1` desliga.
+- Pré-compilação paralela na troca de layer foi tentada e desligada: programas enviados e não usados eram apagados enquanto o driver AMD compilava, congelando o editor ~30 s.
+- Troca pelos botões do cabeçalho (RNA `layers`) passa pelo mesmo caminho da tecla (`ED_view3d_layers_shown`).
+- Medição: com `RANGE_SHADER_LOG`, linhas `layer_switch` (total, dag, update, desenho, shaders, imagens, buffers), `draw_object` (objetos acima de 10 ms: buffers, shader, begin/bind de material, imagens), `buffer` e `warmup`; shader do cache sai como `cached`. `tools/debug/abrir_engine_log_layer.bat` abre o editor com o log em `debug-logs\layer_log.txt`.
+- RolimaRacer (RX 6800M): ligar todos os layers foi de 9–46 s para ~50 ms com caches quentes. Pendente: confirmar com caches frios que, esperando a barra terminar, a primeira troca fica curta.
+
 ## 2026-10-10 - Qualidade de textura por mipmap, filtros sem recarga e tamanho de sombra em tempo real
 
 - `Range.render.setTextureQuality(0/1/2)`/`getTextureQuality()`: só a textura em alta fica no projeto; no envio para a GPU caem os maiores níveis de mipmap (metade/um quarto), nunca abaixo de 256 px no lado maior e só em texturas com mipmap. DDS pula os níveis gravados no arquivo. Trocar recarrega as texturas do jogo e dos arquivos do LibLoad; no editor o valor volta ao sair do jogo.

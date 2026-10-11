@@ -373,6 +373,12 @@ void ED_view3d_check_mats_rv3d(struct RegionView3D *rv3d);
 #  define ED_view3d_check_mats_rv3d(rv3d) (void)(rv3d)
 #endif
 int ED_view3d_scene_layer_set(int lay, const bool *values, int *active);
+/* After a layer switch (DAG_on_visible_update done): sends the materials of the layers just shown to the driver
+ * in parallel and starts the layer_switch timing of the shader log. */
+/* A new file was read: its hidden layers get warmed on the next viewport draws (view3d_draw.c). */
+void ED_view3d_shader_warmup_reset(void);
+void ED_view3d_layers_shown(struct Main *bmain, struct Scene *scene, struct View3D *v3d, unsigned int lay_old,
+                            double t_begin, double dag_seconds);
 
 struct RV3DMatrixStore *ED_view3d_mats_rv3d_backup(struct RegionView3D *rv3d);
 void                    ED_view3d_mats_rv3d_restore(struct RegionView3D *rv3d, struct RV3DMatrixStore *rv3dmat);
