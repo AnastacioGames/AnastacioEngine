@@ -81,10 +81,39 @@ public:
 		GE_FXAA_PARAMETERS_UNIFORM,
 		GE_CAMERAFX_UNIFORM,
 
+		/* Stable names for custom filters (SSAO/SSGI/SSR/TAA), see docs/2d-filters.md. */
+		BGL_VIEW_MATRIX_UNIFORM,
+		BGL_PROJECTION_MATRIX_UNIFORM,
+		BGL_INV_VIEW_MATRIX_UNIFORM,
+		BGL_INV_PROJECTION_MATRIX_UNIFORM,
+		BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM,
+		BGL_RESOLUTION_UNIFORM,
+		BGL_TIME_UNIFORM,
+		BGL_FRAME_UNIFORM,
+		BGL_PREVIOUS_TEXTURE_UNIFORM,
+
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};
 
+	/// Per frame values shared by every filter of a manager, set before each Render().
+	struct FrameInputs {
+		float time = 0.0f;
+		int frame = 0;
+		/// Previous frame final color (bgl_PreviousTexture), 0 while no filter asks for it.
+		unsigned int previousTexture = 0;
+		int previousTextureUnit = 17;
+		mt::mat4 prevViewProjection = mt::mat4::Identity();
+	};
+
 protected:
+	const FrameInputs *m_frameInputs = nullptr;
+	/// Text name, external file path and last compile log of a custom filter.
+	std::string m_sourceName;
+	std::string m_sourcePath;
+	std::string m_compileLog;
+	/// Property names given at creation, kept to search them again after a recompile.
+	std::vector<std::string> m_allProperties;
+
 	int m_predefinedUniforms[MAX_PREDEFINED_UNIFORM_TYPE];
 
 	std::vector<std::string> m_properties;
@@ -141,6 +170,35 @@ public:
 	void SetOffScreen(RAS_2DFilterOffScreen *offScreen);
 
 	BuildInFilters *GetBuildInFilters();
+
+	void SetFrameInputs(const FrameInputs *inputs)
+	{
+		m_frameInputs = inputs;
+	}
+	/// True when the shader samples the previous frame (bgl_PreviousTexture).
+	bool UsesPreviousTexture() const
+	{
+		return m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1;
+	}
+
+	const std::string& GetSourceName() const
+	{
+		return m_sourceName;
+	}
+	const std::string& GetSourcePath() const
+	{
+		return m_sourcePath;
+	}
+	/// Driver info log of the last failed compile, empty after a successful one.
+	const std::string& GetCompileLog() const
+	{
+		return m_compileLog;
+	}
+
+	/** Compile a new fragment source. On failure the previous program keeps running and the
+	 * error is in GetCompileLog(). Uniforms set from Python must be set again on success.
+	 */
+	virtual bool Recompile(const std::string& fragment);
 
 	/// Called by the filter manager when it has informations like the display size, a gl context...
 	void Initialize(RAS_ICanvas *canvas);

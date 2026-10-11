@@ -167,8 +167,28 @@ struct GPUShader {
 	bool bound_once;
 };
 
+/* Info log of the last failed GPU_shader_create_ex_named() call, so callers (2D filters) can
+ * show the error to the user instead of only on stderr. Emptied at the start of each create. */
+static char g_shader_last_error[4096];
+
+static void shader_store_error(const char *log)
+{
+	const size_t used = strlen(g_shader_last_error);
+	if (strstr(g_shader_last_error, log)) {
+		return; /* Link errors are printed once per attached stage. */
+	}
+	BLI_strncpy(g_shader_last_error + used, log, sizeof(g_shader_last_error) - used);
+}
+
+const char *GPU_shader_last_error_log(void)
+{
+	return g_shader_last_error;
+}
+
 static void shader_print_errors(const char *task, const char *log, const char **code, int totcode)
 {
+	shader_store_error(log);
+
 	int i;
 	int line = 1;
 
@@ -1032,6 +1052,7 @@ GPUShader *GPU_shader_create_ex_named(const char *vertexcode,
                                       const int flags,
                                       const char *name)
 {
+	g_shader_last_error[0] = '\0';
 	GPU_profile_counters[GPU_PROFILE_SHADERS]++;
 	return gpu_shader_create_ex_impl(vertexcode, fragcode, geocode, libcode, defines,
 	                                 input, output, number, flags, name);

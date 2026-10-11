@@ -168,6 +168,10 @@ public:
 	unsigned int filterPassIndex;
 	/// This is the shader program source code IF the filter is not a predefined one.
 	std::string shaderText;
+	/// Name of the Text datablock the custom shader came from, only used in error messages.
+	std::string sourceName;
+	/// Absolute path of the external file behind that Text, empty if the Text is internal.
+	std::string sourcePath;
 };
 
 #endif // __RAS_2DFILTERDATA__

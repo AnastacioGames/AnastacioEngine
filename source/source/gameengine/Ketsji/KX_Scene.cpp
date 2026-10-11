@@ -3086,6 +3086,7 @@ KX_2DFilterManager *KX_Scene::Get2DFilterManager() const
 
 RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
+	m_filterManager->ReloadChangedSources();
 	return m_filterManager->RenderFilters(rasty, canvas, inputofs, targetofs, sun_screen_pos);
 }
 

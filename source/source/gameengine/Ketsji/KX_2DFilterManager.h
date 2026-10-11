@@ -73,7 +73,17 @@ public:
 	/** Scene load: builds those passes (disabled), instead of at the first frame that uses them. */
 	void PrepareCameraFX(KX_Scene *scene);
 
+	/** Custom filters made from an external text file: twice a second, recompile the ones whose
+	 * file changed on disk (edit the .glsl in another editor while the game runs). */
+	void ReloadChangedSources();
+	/// Read the source of a filter again (external file) and recompile it.
+	static bool ReloadSource(RAS_2DFilter *filter);
+
 private:
+	/// Last modification time seen for each filter with an external source.
+	std::map<RAS_2DFilter *, int64_t> m_sourceTimes;
+	double m_lastSourceCheck = 0.0;
+
 	RAS_2DFilterData CameraFXData(int pass);
 	void CameraFXUsed(KX_Scene *scene, bool& dof, bool& lens) const;
 

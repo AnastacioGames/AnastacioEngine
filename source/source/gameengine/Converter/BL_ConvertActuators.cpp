@@ -107,6 +107,7 @@
 #include "DNA_actuator_types.h"
 #include "DNA_actuator_weather.h"
 #include "DNA_packedFile_types.h"
+#include "DNA_text_types.h"
 #include "BL_ActionActuator.h"
 #include "BL_ArmatureActuator.h"
 #include "RNA_access.h"
@@ -1220,6 +1221,17 @@ void BL_ConvertActuators(const char *maggiename,
 						tmp->SetShaderText(buf);
 						MEM_freeN(buf);
 					}
+
+					/* An external text (.glsl file) is watched while the game runs, see
+					 * KX_2DFilterManager::ReloadChangedSources. */
+					std::string path;
+					if (_2dfilter->text->name && !(_2dfilter->text->flags & TXT_ISMEM)) {
+						char filepath[FILE_MAX];
+						BLI_strncpy(filepath, _2dfilter->text->name, sizeof(filepath));
+						BLI_path_abs(filepath, _2dfilter->text->id.lib ? _2dfilter->text->id.lib->filepath : maggiename);
+						path = filepath;
+					}
+					tmp->SetShaderSource(_2dfilter->text->id.name + 2, path);
 				}
 
 				baseact = tmp;

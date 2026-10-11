@@ -49,6 +49,9 @@ private:
 	int   m_int_arg;
 	bool  m_mipmap;
 	std::string m_shaderText;
+	/// Text name and external file of the custom shader (error messages, reload on save).
+	std::string m_sourceName;
+	std::string m_sourcePath;
 	RAS_Rasterizer* m_rasterizer;
 	RAS_2DFilterManager *m_filterManager;
 	SCA_IScene* m_scene;
@@ -66,6 +69,7 @@ public:
 	        SCA_IScene* scene);
 
 	void	SetShaderText(const std::string& text);
+	void	SetShaderSource(const std::string& name, const std::string& path);
 	virtual ~SCA_2DFilterActuator();
 	virtual bool Update();
 

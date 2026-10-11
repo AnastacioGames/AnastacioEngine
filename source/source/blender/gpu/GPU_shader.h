@@ -89,6 +89,8 @@ GPUShader *GPU_shader_create_ex_named(
         int input, int output, int number,
         const int flags,
         const char *name);
+/* Info log of the last failed GPU_shader_create_ex_named(), empty if it succeeded. */
+const char *GPU_shader_last_error_log(void);
 char *GPU_shader_validate(GPUShader *shader);
 void GPU_shader_free(GPUShader *shader);
 
