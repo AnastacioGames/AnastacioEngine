@@ -55,7 +55,7 @@ visual no editor e no jogo real permanece pendente.
 
 ## Atlas de materiais nativo
 
-Properties > Material > Anastacio Material Atlas: operador C++ para um mesh ativo com materiais PBR
+Properties > Material > Build Material Atlas: operador C++ para um mesh ativo com materiais PBR
 opacos Principled. Gera Base Color, Roughness, Metallic, Specular e Normal, packed PNG 16 bits, UV
 AnastacioAtlas e material único; preserva malha fonte como backup e a UV Lightmap existente.
 Build editor/player, testes de dados/pixels e carregamento no standalone validados em 2026-10-07;

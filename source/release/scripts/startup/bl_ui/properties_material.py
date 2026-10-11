@@ -1358,7 +1358,7 @@ class MATERIAL_PT_anastacio_atlas(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = 'material'
-    bl_label = "Anastacio Material Atlas"
+    bl_label = "Build Material Atlas"
 
     @classmethod
     def poll(cls, context):

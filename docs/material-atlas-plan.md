@@ -5,7 +5,7 @@ Pedido inicial: pesquisa sem implementação; depois o usuário autorizou implem
 
 ## Versão nativa atual
 
-Properties > Material > **Anastacio Material Atlas** > **Bake Material Atlas**.
+Properties > Material > **Build Material Atlas** > **Bake Material Atlas**.
 Operador `material.anastacio_atlas_bake`, implementado em
 [anastacio_material_atlas.cpp](../source/source/blender/editors/render/anastacio_material_atlas.cpp).
 A interface padrão do editor apenas chama o operador; não precisa instalar/ativar o addon antigo.
@@ -181,7 +181,7 @@ Nenhum candidato examinado demonstrou integração pronta com Anastacio Engine/B
 
 ## Contrato proposto da ferramenta
 
-Nome visível: **Anastacio Material Atlas**. Identificadores novos com prefixo `anastacio`.
+Nome visível: **Build Material Atlas**. Identificadores novos com prefixo `anastacio`.
 Local sugerido: Properties > Material, com acesso pela busca de operadores.
 
 Fluxo: **Analisar → configurar → gerar cópia com atlas → conferir → aplicar**, sendo aplicação explícita
