@@ -507,6 +507,33 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
                 col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
 
 
+class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
+    bl_label = "Node Shader"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        engine = context.scene.render.engine
+        return (mat is not None) and mat.use_nodes and (engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+        # The node tree compiles with the sources of the material that owns it, not the ones of a Material node.
+        mat = context.material
+
+        col = layout.column()
+        col.label(text="Add nodes in the Node Editor (Shift+A): Vertex, Geometry, Script, Presets", icon='NODETREE')
+        col.label(text="Shader Sources:")
+        for label, attr in (("Vertex:", "script_vert"), ("Geometry:", "script_geom"),
+                            ("Fragment:", "script_frag")):
+            row = col.split()
+            row.label(text=label)
+            row.template_ID(mat, attr, new="text.new", open="text.open")
+        if mat.script_geom:
+            col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
+
+
 class MATERIAL_PT_transp(MaterialButtonsPanel, Panel):
     bl_label = "Transparency"
     COMPAT_ENGINES = {'BLENDER_RENDER'}
@@ -1372,6 +1399,7 @@ classes = (
     MATERIAL_PT_diffuse,
     MATERIAL_PT_specular,
     MATERIAL_PT_shading,
+    MATERIAL_PT_node_shader_sources,
     MATERIAL_PT_transp,
     MATERIAL_PT_mirror,
     MATERIAL_PT_sss,
