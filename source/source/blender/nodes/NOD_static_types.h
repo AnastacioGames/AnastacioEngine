@@ -60,6 +60,8 @@ DefNode( ShaderNode,     SH_NODE_TIME,            0,                      "TIME"
 DefNode( ShaderNode,     SH_NODE_DAMAGE,          0,                      "DAMAGE",         Damage,           "Damage",            ""              )
 DefNode( ShaderNode,     SH_NODE_GLSL_SCRIPT,     def_sh_glsl_script,     "GLSL_SCRIPT",    GLSLScript,       "GLSL Script",       ""              )
 DefNode( ShaderNode,     SH_NODE_VERTEX_OFFSET,   0,                      "VERTEX_OFFSET",  VertexOffset,     "Vertex Offset",     ""              )
+DefNode( ShaderNode,     SH_NODE_WORLD_BLOOM_FX,  0,                      "WORLD_BLOOM_FX", WorldBloomFX,     "Bloom",             ""              )
+DefNode( ShaderNode,     SH_NODE_WORLD_SSR_FX,    0,                      "WORLD_SSR_FX",   WorldSSRFX,       "Screen Space Reflections", ""      )
 DefNode( ShaderNode,     SH_NODE_VERTEX_WIND,     0,                      "VERTEX_WIND",    VertexWind,       "Wind",              ""              )
 DefNode( ShaderNode,     SH_NODE_VERTEX_WAVE,     0,                      "VERTEX_WAVE",    VertexWave,       "Wave",              ""              )
 DefNode( ShaderNode,     SH_NODE_CAMERA_DISTANCE, 0,                      "CAMERA_DISTANCE",CameraDistance,   "Camera Distance",   ""              )

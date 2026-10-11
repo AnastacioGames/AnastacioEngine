@@ -167,6 +167,42 @@ Mix Shader, nada é religado.
 O Fur Shells espalha os fios pelo mapa UV. Em malha sem UV ele usa as coordenadas geradas (Generated),
 projetadas pelo eixo principal de cada face.
 
+## Bloom e SSR pelo World node graph
+
+No Shader Editor, com o cabeçalho em modo **World**, categoria **Output**, há dois nós além do World Output:
+
+- **Bloom**: `Enable` (bool), `Threshold` (0 a 1, padrão 0.75) e `Intensity` (0 a 10, padrão 2.0).
+- **Screen Space Reflections**: `Enable` (bool), `Max Steps` (0 a 1024, padrão 16), `Lod` (1 a 8, padrão 1),
+  `Bias` (0 a 10, padrão 3.0) e `Max Distance` (0 a 1000, padrão 100.0).
+
+Os ranges e os padrões são os mesmos de `GPUBLOOMSettings`/`GPUSSRSettings` (Scene > Scene FX, `rna_scene.c`) e
+dos métodos Python `changeBloomValues`/`changeSSRValues` do `KX_2DFilterManager`.
+
+**O que esses nós são, de verdade**: um jeito de ligar os mesmos filtros Filter2D de Bloom e SSR que já
+existem e já funcionam (`RAS_2DFilterData::BuildInFilters.useBloom/useSSR` e companhia, shaders em
+`RAS_OpenGLFilters/RAS_Bloom2DFilter*.glsl` e `RAS_SSR2DFilter.glsl`/`RAS_SSR_Blur2DFilter.glsl`). Não é um
+Bloom/SSR novo, e nenhum `.glsl` desses filtros foi tocado. Os dois nós (`node_shader_world_fx.c`) não têm
+saída nem função de GPU codegen — eles nunca ligam no World Output nem entram na compilação do material do
+céu; são só um cartão de valores. `KX_Scene` (`KX_Scene.cpp`) lê o `World.nodetree` na conversão da cena (igual
+Clouds/Rain lêem `World.cloud_coverage`/`World.rain_intensity` direto do DNA) e, se achar um nó Bloom e/ou SSR,
+usa os valores dele por cima do que Scene > Scene FX (`scenefx_settings`) já tinha configurado; sem o nó, o
+Scene FX de sempre continua decidindo, sem mudança de comportamento.
+
+Os valores são lidos uma vez, na montagem da cena — igual ao próprio Scene FX hoje (que também não é relido
+quadro a quadro). Para mudar Bloom/SSR com o jogo já rodando, o caminho continua sendo
+`changeBloomValues`/`changeSSRValues` via Python (API existente, sem mudança); o nó só decide o estado inicial.
+
+SSR lê roughness/metallic do G-buffer PBR, então funciona sem nenhum nó extra em qualquer material
+Principled. Um material com GLSL Script que não escreve esses canais do G-buffer não reflete corretamente —
+isso é uma limitação do próprio filtro SSR, não deste node.
+
+Reflexo planar por objeto (espelho/água real) já existe separado, pelo `KX_PlanarMap`
+(`KX_PlanarMap.h`/`.cpp`), amarrado a uma Image/EnvMap no objeto; ele não tem nó dedicado no shader-nodes
+ainda — fica para uma próxima etapa.
+
+**Não validado visualmente**: este ambiente não tem display/GPU; só a compilação (`RangeEngine`) foi
+conferida.
+
 ## Ver o código gerado
 
 Material > Node Shader > **Show Generated Code** (também no cabeçalho do Node Editor, ícone de texto) grava o

@@ -3594,6 +3594,8 @@ static void registerShaderNodes(void)
 	register_node_type_sh_shell_layer();
 	register_node_type_sh_fur_shells();
 	register_node_type_sh_outline();
+	register_node_type_sh_world_bloom_fx();
+	register_node_type_sh_world_ssr_fx();
 	register_node_type_sh_lamp();
 	register_node_type_sh_gamma();
 	register_node_type_sh_brightcontrast();

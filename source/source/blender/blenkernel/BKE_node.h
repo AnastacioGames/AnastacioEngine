@@ -804,6 +804,8 @@ struct ShadeResult;
 #define SH_NODE_SHELL_LAYER		1010
 #define SH_NODE_CAMERA_DISTANCE	1011
 #define SH_NODE_VERTEX_OFFSET	1012
+#define SH_NODE_WORLD_BLOOM_FX	1013
+#define SH_NODE_WORLD_SSR_FX	1014
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF			1 /* Unused */

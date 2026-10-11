@@ -671,6 +671,15 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   [shader-nodes.md](shader-nodes.md)); compilado, **não validado visualmente** (sem display/GPU neste
   ambiente) — falta o usuário abrir o editor, forçar um erro de sintaxe num GLSL Script e confirmar o nó
   vermelho e o tooltip.
+- **Bloom e SSR pelo World node graph (2026-10-11, branch `claude/shader-nodes`)**: nós "Bloom" e "Screen
+  Space Reflections" no World (Shader Editor em modo World, categoria Output), para ligar/ajustar os filtros
+  Filter2D de Bloom e SSR que já existiam (`RAS_2DFilterData::BuildInFilters`, `KX_2DFilterManager`) sem passar
+  pelo painel Scene > Scene FX nem por Python. Não é um Bloom/SSR novo, nem mexe nos `.glsl` do filtro; os nós
+  só carregam os valores (sem GPU codegen, não ligados ao World Output) e `KX_Scene` os lê na conversão da cena,
+  sobrepondo o Scene FX quando presentes. Ver [shader-nodes.md](shader-nodes.md#bloom-e-ssr-pelo-world-node-graph).
+  Compilado limpo; **não validado visualmente** (sem display/GPU neste ambiente). Pendente, conscientemente fora
+  deste escopo: nó dedicado de Planar Reflection (espelho/água real) para o `KX_PlanarMap` existente, que hoje só
+  se liga por Image/EnvMap no objeto, fora do node graph.
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.

@@ -278,6 +278,10 @@ shader_node_categories = [
         NodeItem("ShaderNodeOutputLamp", poll=object_shader_nodes_poll),
         NodeItem("ShaderNodeOutputWorld", poll=world_shader_nodes_poll),
         NodeItem("ShaderNodeOutputLineStyle", poll=line_style_shader_nodes_poll),
+        # Game engine: World-only post-processing switches (already working Filter2D
+        # Bloom/SSR, see RAS_2DFilterData.BuildInFilters), not linked to World Output.
+        NodeItem("ShaderNodeWorldBloomFX", poll=world_shader_nodes_poll),
+        NodeItem("ShaderNodeWorldSSRFX", poll=world_shader_nodes_poll),
         NodeItem("NodeGroupOutput", poll=group_input_output_item_poll),
     ]),
     ShaderNewNodeCategory("SH_NEW_SHADER", "Shader", items=[
