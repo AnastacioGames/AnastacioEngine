@@ -6,6 +6,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-11 - Volumetric Clouds: luz com borda prateada mais fina e lado iluminado branco
+
+Ajuste do modelo de luz em `RAS_Clouds2DFilter.glsl` (jogo) e no espelho da viewport
+`gpu_shader_fx_clouds_frag.glsl`. O lobo de silver lining em `cloudPhase` ficou mais estreito e
+mais forte (Henyey-Greenstein `g` 0.99 → 0.996, ganho 2 → 4), para dar a borda fina e brilhante em
+volta do sol em vez de um brilho largo. No acúmulo do raymarch a cor deixou de ser só a cor base
+escalada: a parte na sombra usa um ambiente frio (`cloudColor * vec3(0.72, 0.8, 0.95)`) e a parte
+iluminada mistura a cor base com branco conforme `lit`. Cenas de teste em `tools/debug/cenas/`:
+`criar_cena_vclouds_luz.py` (4 variantes no mesmo `.range`, alternadas por Scene Actuator),
+`inspecionar_vclouds_luz.py`, `criar_cena_vclouds_debug1.py`, `criar_cena_valida_ceu.py` e
+`criar_cena_valida_materiais.py`.
+
+**Validação:** o filtro compila sem erro e a cena `vclouds_luz` roda a 60 fps no
+`AnastacioRuntime.exe` trocando entre as 4 variantes. Aceite visual do usuário pendente. O log do
+runtime mostra `Internal error, builtin font not loaded` a cada cena (placas de texto 3D), não
+investigado.
+
+**Incidente de build do mesmo dia:** o editor fechava ao apertar P e o runtime caía na abertura
+com `0xc0000409` (estouro de pilha no construtor de `RAS_2DFilterManager`). Não era bug de código:
+depois de um build completo de `main` feito sem `VSLANG=1033` (2713 objetos com `#deps 0` em
+`ninja -t deps`), um checkout para outra branch trocou 17 headers (`RAS_2DFilterData.h`,
+`DNA_material_types.h` etc.) e o build incremental recompilou só 108 arquivos. Resolvido com
+`ninja -t clean` + build completo em `main` com `VSLANG=1033`.
+
 ## 2026-10-11 - Volumetric Clouds (3º modo em World > Weather): raymarch real + 2 bugs legados corrigidos
 
 Novo modo "Volumetric Clouds" em World > Weather, aditivo aos dois já existentes (Clouds e Sky

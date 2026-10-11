@@ -171,7 +171,9 @@ float cloudPhase(float cosAngle, float silver)
 {
 	float forward = henyeyGreenstein(cosAngle, 0.75);
 	float back = henyeyGreenstein(cosAngle, -0.2);
-	float silverLobe = henyeyGreenstein(cosAngle, 0.99) * silver * 2.0;
+	/* Narrower, hotter forward lobe than the base scattering -- this is the thin bright rim
+	 * RDR2-style clouds show around the sun, not a broad glow. */
+	float silverLobe = henyeyGreenstein(cosAngle, 0.996) * silver * 4.0;
 	return max(forward, back) + silverLobe;
 }
 
@@ -262,7 +264,13 @@ vec4 volumetricCloudsRaymarch(vec3 camPos, vec3 rayDir, float maxDist, vec3 sunD
 			float powder = 1.0 - exp(-d * 3.0);
 			float lit = lightT * mix(1.0, powder, 0.5) * phase;
 			float stepAbsorb = clamp(d * detailStep * 0.08, 0.0, 1.0);
-			accumColor += transmittance * stepAbsorb * cloudColor * (0.35 + 1.3 * max(lit, 0.0));
+			/* Shadowed cloud reads as cool/grey ambient; sun-facing cloud bleaches toward white
+			 * instead of just scaling the base tint, matching the punchy lit-vs-shadow look of
+			 * RDR2 clouds rather than a flat grey puff. */
+			vec3 ambientColor = cloudColor * vec3(0.72, 0.8, 0.95);
+			vec3 litColor = mix(cloudColor, vec3(1.0), clamp(lit * 0.5, 0.0, 1.0));
+			vec3 sampleColor = ambientColor * 0.25 + litColor * 1.3 * max(lit, 0.0);
+			accumColor += transmittance * stepAbsorb * sampleColor;
 			transmittance *= (1.0 - stepAbsorb);
 		}
 		t += detailStep;
