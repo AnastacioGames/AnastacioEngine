@@ -992,6 +992,8 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 	for (GPUScriptCode *script = scripts->first; script; script = script->next) {
 		if (codegen_uses_node(nodes, script->name, stage)) {
 			BLI_dynstr_appendf(ds, "\n#define main %s_main\n", script->name);
+			/* Compile errors give the line of the Text. */
+			BLI_dynstr_append(ds, "#line 1\n");
 			BLI_dynstr_append(ds, script->code);
 			BLI_dynstr_appendf(ds, "\n#undef main\n#define SCRIPT_MAIN %s_main\n#define SCRIPT_ENTRY %s\n",
 			                   script->name, script->name);
@@ -1724,6 +1726,7 @@ static char *code_generate_geometry_stage(const GeomVarying *list, int tot, cons
 	}
 	else {
 		BLI_dynstr_append(ds, "void geometry();\n\nvoid main()\n{\n\tgeometry();\n}\n\n");
+		BLI_dynstr_append(ds, "#line 1\n");
 		BLI_dynstr_append(ds, stages->geomcode);
 		BLI_dynstr_append(ds, "\n");
 	}

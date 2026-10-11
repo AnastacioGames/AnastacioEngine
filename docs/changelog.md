@@ -17,6 +17,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Menu Add no estilo do Blender 5: categorias Vertex, Geometry, Script e Presets nos dois sistemas de shading.
 - Presets como grupos editáveis (`node.shader_preset_add`): Fur, Grass, Toon + Rim, Toon Outline, Dissolve, Water Waves (Offset ligado sozinho ao Vertex Offset; presets com Alpha põem o material em Alpha Clip).
 - Materiais existentes geram o mesmo código (os acréscimos ao template ficam sob `#ifdef`); só o texto do template mudou, então o cache de shaders do usuário/`.cooked` recompila uma vez.
+- Fase 5 (parcial): `#line 1` antes do código do GLSL Script e do geomcode, então o erro de compilação aponta a linha do Text.
 - Teste: `tools/debug/cenas/criar_cena_shader_nodes.py` (água com Water Waves, esfera Fur, macaco Toon Outline, cubo GLSL Script, cubo de referência, cubo com geomcode). Runtime: 6 materiais compilados e linkados sem erro (AMD RX 6800M, GL 4.6 compat), 60 FPS. Avaliação visual pendente no jogo real.
 
 ## 2026-10-10 - Qualidade de textura por mipmap, filtros sem recarga e tamanho de sombra em tempo real
