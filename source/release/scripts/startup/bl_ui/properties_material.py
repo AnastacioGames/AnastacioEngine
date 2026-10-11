@@ -109,8 +109,7 @@ class MaterialButtonsPanel:
 
 
 class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
-    bl_label = ""
-    bl_options = {'HIDE_HEADER'}
+    bl_label = "Material Slot"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     @classmethod
@@ -122,7 +121,7 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
         return (context.material or context.object) and (engine in cls.COMPAT_ENGINES)
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.box()
 
         mat = context.material
         ob = context.object
@@ -201,7 +200,9 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
         layout = self.layout
         mat = context.material
 
-        col = layout.column(align=True)
+        box = layout.box()
+        box.label(text="Quick Material:", icon="MATERIAL")
+        col = box.column(align=True)
         col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
         col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
 
@@ -688,16 +689,17 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
 
         mat = active_node_mat(context.material)
         sss = mat.subsurface_scattering
+        is_game = (context.scene.render.engine == 'BLENDER_GAME')
 
-        row = layout.row()
-        row.active = (not mat.use_shadeless)
-        row.prop(sss, "use", text="Enabled")
-        layout = layout.column()
-        layout.active = (sss.use) and (not mat.use_shadeless)
+        if not is_game:
+            row = layout.row()
+            row.active = (not mat.use_shadeless)
+            row.prop(sss, "use", text="Enabled")
+            layout = layout.column()
+            layout.active = (sss.use) and (not mat.use_shadeless)
 
-        # Presets are tuned for the offline renderer (path length in mm, SSS color);
-        # the game only reads Scale and Radius, so they are not shown there.
-        if context.scene.render.engine != 'BLENDER_GAME':
+            # Presets are tuned for the offline renderer (path length in mm, SSS color);
+            # the game only reads Scale and Radius, so they are not shown there.
             row = layout.row().split()
             sub = row.row(align=True).split(align=True, factor=0.75)
             sub.menu("MATERIAL_MT_sss_presets", text=bpy.types.MATERIAL_MT_sss_presets.bl_label)
@@ -708,7 +710,7 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
         box.label(text="Scattering:", icon="STRANDS")
         split = box.split()
 
-        if context.scene.render.engine != 'BLENDER_GAME':
+        if not is_game:
             col = split.column()
             col.prop(sss, "ior")
             col.prop(sss, "scale")
@@ -725,9 +727,15 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
             col.separator(factor=1)
             col.prop(sss, "error_threshold", text="Error")
         else:
+            # Enabled lives here, beside Scale, instead of above the box: two columns,
+            # one for the toggle and one for the fields it gates.
             col = split.column()
+            col.active = (sss.use) and (not mat.use_shadeless)
             col.prop(sss, "scale")
             col.prop(sss, "game_radius", text="RGB Radius", expand=True)
+            col = split.column()
+            col.active = (not mat.use_shadeless)
+            col.prop(sss, "use", text="Enabled")
 
 
 class MATERIAL_PT_halo(MaterialButtonsPanel, Panel):
@@ -1367,37 +1375,50 @@ class MATERIAL_PT_custom_props(MaterialButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Material
 
 
-class MATERIAL_PT_anastacio_atlas(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = 'material'
-    bl_label = "Build Material Atlas"
+class MATERIAL_PT_anastacio_atlas(MaterialButtonsPanel, Panel):
+    bl_label = "Material Atlas"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return ob is not None and ob.type == 'MESH'
+        return (ob is not None and ob.type == 'MESH' and
+                context.material and context.scene.render.engine in cls.COMPAT_ENGINES)
 
     def draw(self, context):
         layout = self.layout
         ob = context.object
-        layout.label("Combine opaque PBR materials", icon='MATERIAL')
-        layout.label("Keeps original mesh and Lightmap UV", icon='INFO')
-        col = layout.column()
-        col.enabled = (ob.mode == 'OBJECT' and
-                       context.scene.game_settings.use_shading_nodes)
-        col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
-        layout.label("Escape cancels the bake and restores the source", icon='INFO')
-        if ob.data.get('_anastacio_atlas_source') is not None:
-            row = layout.row()
-            row.enabled = ob.mode == 'OBJECT'
-            row.operator("material.anastacio_atlas_restore", icon='LOOP_BACK')
-            layout.label("Restores the original mesh, including UVs", icon='INFO')
-            layout.label("Rebake lighting if baked after the atlas", icon='INFO')
+        wm = context.window_manager
+        has_source = ob.data.get('_anastacio_atlas_source') is not None
+        show_info = wm.ae_atlas_show_info
+
+        split = layout.split(factor=0.8, align=True)
+        action_col = split.column(align=True)
+        action_col.enabled = (ob.mode == 'OBJECT' and
+                               context.scene.game_settings.use_shading_nodes)
+        action_col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
+        if has_source:
+            restore_col = action_col.column(align=True)
+            restore_col.enabled = ob.mode == 'OBJECT'
+            restore_col.operator("material.anastacio_atlas_restore", icon='LOOP_BACK')
+
+        info_col = split.column(align=True)
+        info_col.prop(wm, "ae_atlas_show_info", text="", icon='INFO', toggle=True)
+
+        if not show_info:
+            return
+
+        box = layout.box()
+        box.label("Combine opaque PBR materials", icon='MATERIAL')
+        box.label("Keeps original mesh and Lightmap UV", icon='INFO')
+        box.label("Escape cancels the bake and restores the source", icon='INFO')
+        if has_source:
+            box.label("Restores the original mesh, including UVs", icon='INFO')
+            box.label("Rebake lighting if baked after the atlas", icon='INFO')
         if not context.scene.game_settings.use_shading_nodes:
-            layout.label("Enable PBR Shading Nodes", icon='INFO')
+            box.label("Enable PBR Shading Nodes", icon='INFO')
         if ob.mode != 'OBJECT':
-            layout.label("Switch to Object Mode", icon='INFO')
+            box.label("Switch to Object Mode", icon='INFO')
 
 
 classes = (
@@ -1433,6 +1454,12 @@ classes = (
     MATERIAL_PT_volume_integration,
     MATERIAL_PT_volume_options,
     # MATERIAL_PT_custom_props,  # disabled: Custom Properties panel unused
+)
+
+bpy.types.WindowManager.ae_atlas_show_info = bpy.props.BoolProperty(
+    name="Show Info",
+    description="Show help text for Material Atlas",
+    default=False,
 )
 
 if __name__ == "__main__":  # only for live edit.
