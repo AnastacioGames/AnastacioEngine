@@ -129,6 +129,7 @@ typedef struct BuildInFilters {
 	float cloud_scale;
 	float cloud_speed;
 	float cloud_color[3];
+	int cloud_style; /* World.cloud_style */
 
 	/* Lens Flare (native World weather) */
 	bool useLensFlare;

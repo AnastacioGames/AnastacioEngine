@@ -97818,3 +97818,19 @@ msgstr "Em progresso"
 msgid "Starting"
 msgstr "Iniciando"
 
+# Anastacio Engine: World > Weather > Clouds > Style
+msgid "Procedural"
+msgstr "Procedimental"
+
+msgid "Layered Sky"
+msgstr "Céu em Camadas"
+
+msgid "How the clouds are drawn"
+msgstr "Como as nuvens são desenhadas"
+
+msgid "3D noise clouds over the whole sky"
+msgstr "Nuvens de ruído 3D a cobrir todo o céu"
+
+msgid "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"
+msgstr "Duas camadas de nuvem em movimento projetadas num plano do céu, com relevo (mais leve para a GPU)"
+

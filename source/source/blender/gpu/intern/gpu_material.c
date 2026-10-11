@@ -4136,6 +4136,18 @@ bool GPU_material_moves_vertices(Material *ma)
 	return ma->use_nodes && ma->nodetree && gpu_nodetree_moves_vertices(ma->nodetree, 0);
 }
 
+bool GPU_material_prefetch_viewport(Scene *scene, Material *ma)
+{
+	for (LinkData *link = ma->gpumaterial.first; link; link = link->next) {
+		const GPUMaterial *material = link->data;
+		if (material->scene == scene && !material->is_opensubdiv) {
+			return false;
+		}
+	}
+	GPU_material_prefetch(scene, ma, false, false);
+	return true;
+}
+
 /* Materials whose Shader Sources use this Text compile again on the next draw. */
 bool GPU_materials_free_text(Main *bmain, struct Text *text)
 {

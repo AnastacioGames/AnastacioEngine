@@ -460,6 +460,7 @@ static void wm_file_read_post(bContext *C, const bool is_startup_file, const boo
 	CTX_wm_window_set(C, wm->windows.first);
 
 	ED_editors_init(C);
+	ED_view3d_shader_warmup_reset();
 	DAG_on_visible_update(bmain, true);
 
 #ifdef WITH_PYTHON

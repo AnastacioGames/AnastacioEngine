@@ -266,6 +266,7 @@ const EnumPropertyItem rna_enum_file_sort_items[] = {
 #include "ED_node.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
+#include "PIL_time.h"
 #include "ED_sequencer.h"
 #include "ED_clip.h"
 
@@ -483,10 +484,16 @@ static float rna_View3D_GridScaleUnit_get(PointerRNA *ptr)
 	return ED_view3d_grid_scale(scene, v3d, NULL);
 }
 
+/* Layers before the last set and when it started, for ED_view3d_layers_shown in the update. */
+static unsigned int view3d_layer_old = 0;
+static double view3d_layer_set_time = 0.0;
+
 static void rna_SpaceView3D_layer_set(PointerRNA *ptr, const bool *values)
 {
 	View3D *v3d = (View3D *)(ptr->data);
 
+	view3d_layer_old = v3d->lay;
+	view3d_layer_set_time = PIL_check_seconds_timer();
 	v3d->lay = ED_view3d_scene_layer_set(v3d->lay, values, &v3d->layact);
 }
 
@@ -497,9 +504,16 @@ static int rna_SpaceView3D_active_layer_get(PointerRNA *ptr)
 	return (int)(log(v3d->layact) / M_LN2);
 }
 
-static void rna_SpaceView3D_layer_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
+static void rna_SpaceView3D_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
+	View3D *v3d = (View3D *)(ptr->data);
+	const double t_dag = PIL_check_seconds_timer();
 	DAG_on_visible_update(bmain, false);
+	if (scene) {
+		ED_view3d_layers_shown(bmain, scene, v3d, view3d_layer_old, view3d_layer_set_time,
+		                       PIL_check_seconds_timer() - t_dag);
+	}
+	view3d_layer_old = v3d->lay;
 }
 
 static void rna_SpaceView3D_viewport_shade_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)

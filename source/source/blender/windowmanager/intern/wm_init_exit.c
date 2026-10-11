@@ -213,6 +213,8 @@ void WM_init(bContext *C, int argc, const char **argv)
 #endif
 
 		GPU_init();
+		/* Viewport material binaries from the previous sessions (the game player doesn't pass here). */
+		GPU_shader_editor_cache_init();
 
 		GPU_set_mipmap(G_MAIN, !(U.gameflags & USER_DISABLE_MIPMAP));
 		GPU_set_linear_mipmap(true);
@@ -604,6 +606,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 		GPU_global_buffer_pool_free();
 		GPU_free_unused_buffers(G_MAIN);
 
+		GPU_shader_editor_cache_exit();
 		GPU_exit();
 	}
 

@@ -37,6 +37,9 @@
 #include "BLI_ghash.h"
 #include "BLI_threads.h"
 
+#include "PIL_time.h"
+#include "BLI_string.h"
+
 #include "DNA_meshdata_types.h"
 
 #include "BKE_ccg.h"
@@ -48,6 +51,7 @@
 #include "GPU_buffers.h"
 #include "GPU_draw.h"
 #include "GPU_basic_shader.h"
+#include "GPU_shader.h"
 
 #include "bmesh.h"
 
@@ -431,36 +435,17 @@ void GPU_drawobject_free(DerivedMesh *dm)
 	dm->drawObject = NULL;
 }
 
-static GPUBuffer *gpu_try_realloc(GPUBufferPool *pool, GPUBuffer *buffer, size_t size)
-{
-	/* try freeing an entry from the pool
-	 * and reallocating the buffer */
-	gpu_buffer_free_intern(buffer);
-
-	buffer = NULL;
-
-	while (pool->totbuf && !buffer) {
-		gpu_buffer_pool_delete_last(pool);
-		buffer = gpu_buffer_alloc_intern(size);
-	}
-
-	return buffer;
-}
-
 static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
                                    int type, void *user, GPUBuffer *buffer)
 {
-	GPUBufferPool *pool;
 	float *varray;
 	int *mat_orig_to_new;
 	int i;
 	const GPUBufferTypeSettings *ts = &gpu_buffer_type_settings[type];
 	GLenum target = ts->gl_buffer_type;
 	size_t size = gpu_buffer_size_from_type(dm, type);
-	GLboolean uploaded;
 
-	pool = gpu_get_global_buffer_pool();
-
+	const double t_setup_begin = PIL_check_seconds_timer();
 	BLI_mutex_lock(&buffer_mutex);
 
 	/* alloc a GPUBuffer; fall back to legacy mode on failure */
@@ -479,33 +464,26 @@ static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
 		mat_orig_to_new[object->materials[i].mat_nr] = i;
 	}
 
-	/* bind the buffer and discard previous data,
-	 * avoids stalling gpu */
+	/* Filled on the CPU and sent with glBufferData: mapping the buffer (glMapBuffer) made the editor wait for the
+	 * GPU/driver to go idle, up to seconds on the first draw of a layer while materials compile in parallel. */
+	const bool profile = GPU_profile_log_enabled();
+	varray = MEM_mallocN(buffer->size, "GPU_buffer_setup.varray");
+	const double t_copy = profile ? PIL_check_seconds_timer() : 0.0;
+	dm->copy_gpu_data(dm, type, varray, mat_orig_to_new, user);
+	const double t_upload = profile ? PIL_check_seconds_timer() : 0.0;
 	glBindBuffer(target, buffer->id);
-	glBufferData(target, buffer->size, NULL, GL_STATIC_DRAW);
-
-	/* attempt to map the buffer */
-	if (!(varray = glMapBuffer(target, GL_WRITE_ONLY))) {
-		buffer = gpu_try_realloc(pool, buffer, size);
-
-		/* allocation still failed; unfortunately we need to exit */
-		if (!(buffer && (varray = glMapBuffer(target, GL_WRITE_ONLY)))) {
-			if (buffer)
-				gpu_buffer_free_intern(buffer);
-			BLI_mutex_unlock(&buffer_mutex);
-			return NULL;
+	glBufferData(target, buffer->size, varray, GL_STATIC_DRAW);
+	glBindBuffer(target, 0);
+	MEM_freeN(varray);
+	if (profile) {
+		const double t_end = PIL_check_seconds_timer();
+		if (t_end - t_setup_begin >= 0.005) {
+			char text[160];
+			BLI_snprintf(text, sizeof(text), "buffer type=%d size=%d alloc_ms=%.1f copy_ms=%.1f upload_ms=%.1f",
+			             type, (int)size, (t_copy - t_setup_begin) * 1000.0, (t_upload - t_copy) * 1000.0,
+			             (t_end - t_upload) * 1000.0);
+			GPU_profile_log_line(text);
 		}
-	}
-
-	uploaded = GL_FALSE;
-
-	/* attempt to upload the data to the VBO */
-	while (uploaded == GL_FALSE) {
-		dm->copy_gpu_data(dm, type, varray, mat_orig_to_new, user);
-		/* glUnmapBuffer returns GL_FALSE if
-		 * the data store is corrupted; retry
-		 * in that case */
-		uploaded = glUnmapBuffer(target);
 	}
 	glBindBuffer(target, 0);
 
@@ -597,10 +575,13 @@ static GPUBuffer *gpu_buffer_setup_common(DerivedMesh *dm, GPUBufferType type, b
 		dm->drawObject = dm->gpuObjectNew(dm);
 
 	buf = gpu_drawobject_buffer_from_type(dm->drawObject, type);
-	if (!(*buf))
-		*buf = gpu_buffer_setup_type(dm, type, NULL);
-	else if (update)
+	if (!(*buf) || update) {
+		const bool profile = GPU_profile_log_enabled();
+		const double t0 = profile ? PIL_check_seconds_timer() : 0.0;
 		*buf = gpu_buffer_setup_type(dm, type, *buf);
+		if (profile)
+			GPU_profile_buffer_seconds += PIL_check_seconds_timer() - t0;
+	}
 
 	return *buf;
 }

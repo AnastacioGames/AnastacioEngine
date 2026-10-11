@@ -88248,3 +88248,19 @@ msgstr "В процессе"
 msgid "Starting"
 msgstr "Недавно начатые"
 
+# Anastacio Engine: World > Weather > Clouds > Style
+msgid "Procedural"
+msgstr "Процедурные"
+
+msgid "Layered Sky"
+msgstr "Слоистое небо"
+
+msgid "How the clouds are drawn"
+msgstr "Способ отрисовки облаков"
+
+msgid "3D noise clouds over the whole sky"
+msgstr "Облака из 3D-шума по всему небу"
+
+msgid "Two drifting cloud layers projected on a sky plane, shaded with relief (lighter on the GPU)"
+msgstr "Два движущихся слоя облаков, спроецированных на плоскость неба, с рельефом (легче для GPU)"
+

@@ -1800,7 +1800,7 @@ void GPU_end_dupli_object(void)
 	GMS.dob = NULL;
 }
 
-void GPU_begin_object_materials(
+static void gpu_begin_object_materials_impl(
         View3D *v3d, RegionView3D *rv3d, Scene *scene, Object *ob,
         bool glsl, bool *do_alpha_after)
 {
@@ -2018,7 +2018,7 @@ static void GPU_get_object_info(float oi[3], Material *mat)
 	oi[2] = random * (1.0f / (float)0xFFFFFFFF);
 }
 
-int GPU_object_material_bind(int nr, void *attribs)
+static int gpu_object_material_bind_impl(int nr, void *attribs)
 {
 	GPUVertexAttribs *gattribs = attribs;
 
@@ -2706,3 +2706,30 @@ void GPU_select_to_index_array(unsigned int *col, const unsigned int size)
 }
 
 /** \} */
+
+double GPU_profile_bind_seconds = 0.0;
+double GPU_profile_begin_seconds = 0.0;
+
+void GPU_begin_object_materials(
+        View3D *v3d, RegionView3D *rv3d, Scene *scene, Object *ob,
+        bool glsl, bool *do_alpha_after)
+{
+	if (!GPU_profile_log_enabled()) {
+		gpu_begin_object_materials_impl(v3d, rv3d, scene, ob, glsl, do_alpha_after);
+		return;
+	}
+	const double t0 = PIL_check_seconds_timer();
+	gpu_begin_object_materials_impl(v3d, rv3d, scene, ob, glsl, do_alpha_after);
+	GPU_profile_begin_seconds += PIL_check_seconds_timer() - t0;
+}
+
+int GPU_object_material_bind(int nr, void *attribs)
+{
+	if (!GPU_profile_log_enabled()) {
+		return gpu_object_material_bind_impl(nr, attribs);
+	}
+	const double t0 = PIL_check_seconds_timer();
+	const int result = gpu_object_material_bind_impl(nr, attribs);
+	GPU_profile_bind_seconds += PIL_check_seconds_timer() - t0;
+	return result;
+}

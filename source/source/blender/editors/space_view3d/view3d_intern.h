@@ -183,6 +183,11 @@ enum {
 };
 
 int view3d_effective_drawtype(const struct View3D *v3d);
+/* RANGE_SHADER_LOG on: logs the layer switch timings at the end of the next viewport draw. */
+void view3d_layer_profile_begin(unsigned int lay, double t_begin, double dag_seconds);
+/* Sends the GLSL materials of the objects on lay_new to the driver's compiler threads at once
+ * (GL_ARB_parallel_shader_compile), so the next draw only takes the finished programs. */
+void view3d_layer_prefetch_materials(struct Main *bmain, Scene *scene, View3D *v3d, unsigned int lay_new);
 
 /* drawarmature.c */
 bool draw_armature(

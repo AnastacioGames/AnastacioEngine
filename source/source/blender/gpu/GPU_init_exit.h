@@ -31,6 +31,12 @@ extern "C" {
 void GPU_init(void);
 void GPU_exit(void);
 
+/* Editor shader cache (gpu_shader_editor_cache.c): binaries of the viewport materials kept between sessions.
+ * init needs a GL context; save writes it if it changed; exit saves and frees it. */
+void GPU_shader_editor_cache_init(void);
+void GPU_shader_editor_cache_save(void);
+void GPU_shader_editor_cache_exit(void);
+
 #ifdef __cplusplus
 }
 #endif

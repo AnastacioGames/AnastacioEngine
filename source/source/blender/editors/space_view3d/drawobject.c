@@ -41,6 +41,7 @@
 #include "BLI_listbase.h"
 #include "BLI_link_utils.h"
 #include "BLI_string.h"
+#include "PIL_time.h"
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 
@@ -8166,7 +8167,7 @@ static void draw_rigidbody_shape(Object *ob)
  * main object drawing function, draws in selection
  * \param dflag: (draw flag) can be DRAW_PICKING and/or DRAW_CONSTCOLOR, DRAW_SCENESET
  */
-void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
+static void draw_object_impl(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
 {
 	ModifierData *md = NULL;
 	Object *ob = base->object;
@@ -9364,5 +9365,30 @@ void draw_object_instance(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 				drawaxes(rv3d->viewmatob, ob->empty_drawsize, ob->empty_drawtype);
 			}
 			break;
+	}
+}
+
+/* Shader log on: a line per object whose draw took long (first draw after showing a layer). */
+void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
+{
+	if (!GPU_profile_log_enabled()) {
+		draw_object_impl(bmain, scene, ar, v3d, base, dflag);
+		return;
+	}
+	const double t0 = PIL_check_seconds_timer();
+	const double buffer0 = GPU_profile_buffer_seconds, shader0 = GPU_profile_shader_seconds;
+	const double begin0 = GPU_profile_begin_seconds, bind0 = GPU_profile_bind_seconds, image0 = GPU_profile_image_seconds;
+	draw_object_impl(bmain, scene, ar, v3d, base, dflag);
+	const double ms = (PIL_check_seconds_timer() - t0) * 1000.0;
+	if (ms >= 10.0) {
+		Object *ob = base->object;
+		DerivedMesh *dm = ob->derivedFinal;
+		char text[256];
+		BLI_snprintf(text, sizeof(text), "draw_object %s ms=%.1f buffer_ms=%.1f shader_ms=%.1f begin_ms=%.1f bind_ms=%.1f image_ms=%.1f verts=%d loops=%d polys=%d mats=%d dt=%d",
+		             ob->id.name + 2, ms, (GPU_profile_buffer_seconds - buffer0) * 1000.0,
+		             (GPU_profile_shader_seconds - shader0) * 1000.0, (GPU_profile_begin_seconds - begin0) * 1000.0,
+		             (GPU_profile_bind_seconds - bind0) * 1000.0, (GPU_profile_image_seconds - image0) * 1000.0, dm ? dm->getNumVerts(dm) : -1,
+		             dm ? dm->getNumLoops(dm) : -1, dm ? dm->getNumPolys(dm) : -1, ob->totcol, ob->dt);
+		GPU_profile_log_line(text);
 	}
 }
