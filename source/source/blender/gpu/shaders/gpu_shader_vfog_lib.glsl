@@ -107,7 +107,9 @@ float vfogVolumeFactor(vec3 p)
 		if (i >= count) {
 			break;
 		}
-		f = max(f, vfogVolume(i, p));
+		float localDensity = (vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 ||
+		                      vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001) ? 0.5 : vfog_data[0].x;
+		f = max(f, vfogVolume(i, p) * localDensity);
 	}
 	return f;
 }
@@ -160,7 +162,9 @@ float vfogDensityColor(vec3 p, out vec3 color, out vec3 emission)
 			if (i >= count) {
 				break;
 			}
-			float v = vfogVolume(i, p) * vfog_data[0].x;
+		float localDensity = (vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 ||
+		                      vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001) ? 0.5 : vfog_data[0].x;
+		float v = vfogVolume(i, p) * localDensity;
 			if (v > 0.0) {
 				vec4 tint = vfog_data[VFOG_VOLUME_COLOR + i];
 				sum += ((tint.w > 0.5) ? tint.rgb : vfog_data[2].rgb) * v;
@@ -246,6 +250,17 @@ vec2 vfogVolumeInterval(int i, vec3 ro, vec3 rd)
 {
 	vec3 o = (vfog_mats[i] * vec4(ro, 1.0)).xyz;
 	vec3 d = (vfog_mats[i] * vec4(rd, 0.0)).xyz;
+	if (vfog_data[10][i] > 0.5) {
+		float a = dot(d, d);
+		float b = dot(o, d);
+		float c = dot(o, o) - 1.0;
+		float h = b * b - a * c;
+		if (h < 0.0 || a < 1e-8) {
+			return vec2(1.0, 0.0);
+		}
+		h = sqrt(h);
+		return vec2((-b - h) / a, (-b + h) / a);
+	}
 	vec3 inv = 1.0 / (abs(d) + 1e-6) * sign(d + 1e-12);
 	vec3 a = (-1.0 - o) * inv;
 	vec3 b = (1.0 - o) * inv;
@@ -444,7 +459,7 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 {
 	dist = min(dist, vfog_data[0].w);
 	vec2 seg = vfogInterval(ro, rd, dist);
-	if (seg.x >= seg.y || vfog_data[0].x <= 0.0) {
+	if (seg.x >= seg.y || (vfog_data[0].x <= 0.0 && vfog_data[6].y < 0.5)) {
 		return vec4(0.0, 0.0, 0.0, 1.0);
 	}
 	float quality = vfog_data[2].w;
@@ -472,7 +487,7 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 			tau = vfog_data[0].x * exp(-za / f) * len * clamp(e, 0.0, 50.0);
 		}
 		if (vfog_data[6].y > 0.5) {
-			tau += vfog_data[0].x * vfogVolumeFactor(ro + rd * (seg.x + len * 0.5)) * len;
+			tau += vfogVolumeFactor(ro + rd * (seg.x + len * 0.5)) * len;
 		}
 		tau *= vfogPatches(ro + rd * (seg.x + min(len, 30.0) * 0.5));
 		if (vfog_data[9].w > 0.5) {
@@ -491,8 +506,11 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 				if (i >= lampCount) {
 					break;
 				}
+				vec3 mid = ro + rd * (0.5 * (seg.x + seg.y));
+				vec3 toPoint = mid - vfog_data[12 + 4 * i].xyz;
+				float phase = vfogPhase(dot(rd, normalize(toPoint)), g * 0.5) * 12.566371;
 				inscatter += vfogLampAnalytic(i, ro, rd, seg.x, seg.y, sigma) * fogColor * lampIntensity *
-				             (1.0 / 12.566371) * mix(1.0, T, 0.5);
+				             phase * mix(1.0, T, 0.5);
 			}
 		}
 		return vec4(inscatter, T);
@@ -509,6 +527,9 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 	vec3 L = vec3(0.0);
 	float Tsteps[25];
 	Tsteps[0] = 1.0;
+	for (int s = 1; s < 25; s++) {
+		Tsteps[s] = 0.0;
+	}
 	for (int s = 0; s < 24; s++) {
 		if (s >= steps) {
 			break;
@@ -521,11 +542,59 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 			sigma *= vfogPatches(p);
 			float stepT = exp(-sigma * ds);
 			L += T * (sunLight * vfogSunShadow(p) + ambient) * col * (1.0 - stepT);
-			L += T * emission * (1.0 - stepT);
+			L += T * emission * sigma * ds;
 			T *= stepT;
 		}
 		Tsteps[s + 1] = T;
 		t += ds;
+		if (T < 0.01) {
+			break;
+		}
+	}
+
+	/* A small local volume can fall between the 12 Medium samples. March it separately when its
+	 * ray interval is shorter than six regular steps, keeping smoke and fire visible at distance. */
+	int volumeCount = int(vfog_data[6].y);
+	for (int i = 0; i < 4; i++) {
+		if (i >= volumeCount) {
+			break;
+		}
+		vec2 vseg = vfogVolumeInterval(i, ro, rd);
+		float a = max(seg.x, vseg.x);
+		float b = min(seg.y, vseg.y);
+		if (b <= a || (b - a) >= 6.0 * ds) {
+			continue;
+		}
+		float vk = clamp((a - seg.x) / max(ds, 1e-4), 0.0, float(steps));
+		int vk0 = int(floor(vk));
+		int vk1 = min(vk0 + 1, steps);
+		float Tv = mix(Tsteps[vk0], Tsteps[vk1], fract(vk));
+		if (Tv < 0.01) {
+			continue;
+		}
+		float vds = (b - a) / 6.0;
+		float vt = a + vds * fract(jitter + 0.381966 * float(i + 1));
+		vec4 tint = vfog_data[VFOG_VOLUME_COLOR + i];
+		vec3 volColor = (tint.w > 0.5) ? tint.rgb : vfog_data[2].rgb;
+		float localDensity = (vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 ||
+		                      vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001) ? 0.5 : vfog_data[0].x;
+		for (int s = 0; s < 6; s++) {
+			vec3 p = ro + rd * vt;
+			float sigma = vfogVolume(i, p) * localDensity * vfogPatches(p);
+			vec3 emission = vfogFireEmission(i, p);
+			if (vfog_data[9].w > 0.5) {
+				float push = vfogPush(p);
+				sigma *= push;
+				emission *= push;
+			}
+			if (sigma > 1e-5) {
+				float stepT = exp(-sigma * vds);
+				L += Tv * (sunLight * vfogSunShadow(p) + ambient) * volColor * (1.0 - stepT);
+				L += Tv * emission * sigma * vds;
+				Tv *= stepT;
+			}
+			vt += vds;
+		}
 	}
 
 	int lampSteps = (quality > 1.5) ? 16 : 8;
@@ -546,6 +615,13 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 		float a = max(seg.x, tc - w);
 		float b = min(seg.y, tc + w);
 		if (b <= a) {
+			continue;
+		}
+		float entryK = clamp((a - seg.x) / max(ds, 1e-4), 0.0, float(steps));
+		int entryK0 = int(floor(entryK));
+		int entryK1 = min(entryK0 + 1, steps);
+		float entryT = mix(Tsteps[entryK0], Tsteps[entryK1], fract(entryK));
+		if (entryT < 0.01) {
 			continue;
 		}
 		vec2 cone = vfogConeInterval(i, ro, rd, a, b);

@@ -162,19 +162,20 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	if (KX_LightObject *sun = scene->GetWorldSun()) {
 		const mt::vec3 sunDir = sun->NodeGetWorldOrientation().GetColumn(2).Normalized();
 		const RAS_ILightObject *data = sun->GetLightData();
+		const float sunHeight = std::max(0.0f, std::min(1.0f, (sunDir.z + 0.05f) / 0.15f));
+		const float sunVisible = sunHeight * sunHeight * (3.0f - 2.0f * sunHeight);
 		d[12] = sunDir.x;
 		d[13] = sunDir.y;
 		d[14] = sunDir.z;
 		d[15] = 1.0f;
 		for (int i = 0; i < 3; ++i) {
-			d[16 + i] = data->m_color[i] * std::min(data->m_energy, 4.0f) * world->vfog_sun_intensity;
+			d[16 + i] = data->m_color[i] * std::min(data->m_energy, 4.0f) * world->vfog_sun_intensity * sunVisible;
 		}
 	}
-	/* Ambient: the horizon, but at least a quarter of the fog color so a night fog still shows
-	 * away from the lamps. */
-	d[20] = std::max(world->horr, world->vfog_color[0] * 0.25f) * world->vfog_ambient;
-	d[21] = std::max(world->horg, world->vfog_color[1] * 0.25f) * world->vfog_ambient;
-	d[22] = std::max(world->horb, world->vfog_color[2] * 0.25f) * world->vfog_ambient;
+	/* Keep a small fog-colored self-illumination floor, independent of the horizon. */
+	d[20] = (world->horr + world->vfog_color[0] * 0.06f) * world->vfog_ambient;
+	d[21] = (world->horg + world->vfog_color[1] * 0.06f) * world->vfog_ambient;
+	d[22] = (world->horb + world->vfog_color[2] * 0.06f) * world->vfog_ambient;
 	d[26] = world->vfog_light_intensity;
 	d[27] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	d[32] = world->vfog_edge;

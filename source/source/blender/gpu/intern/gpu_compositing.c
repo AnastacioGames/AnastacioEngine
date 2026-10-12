@@ -1023,17 +1023,19 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 	data[2][3] = (float)quality;
 	if (scene->world_sun && scene->world_sun->type == OB_LAMP) {
 		Lamp *la = scene->world_sun->data;
+		float sun_height, sun_visible;
 		normalize_v3_v3(data[3], scene->world_sun->obmat[2]);
+		sun_height = clamp_f((data[3][2] + 0.05f) / 0.15f, 0.0f, 1.0f);
+		sun_visible = sun_height * sun_height * (3.0f - 2.0f * sun_height);
 		data[3][3] = 1.0f;
-		data[4][0] = la->r * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
-		data[4][1] = la->g * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
-		data[4][2] = la->b * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
+		data[4][0] = la->r * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity * sun_visible;
+		data[4][1] = la->g * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity * sun_visible;
+		data[4][2] = la->b * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity * sun_visible;
 	}
-	/* Ambient: the horizon, but at least a quarter of the fog color so a night fog still shows
-	 * away from the lamps (as KX_FillVolumetricFog). */
-	data[5][0] = max_ff(world->horr, world->vfog_color[0] * 0.25f) * world->vfog_ambient;
-	data[5][1] = max_ff(world->horg, world->vfog_color[1] * 0.25f) * world->vfog_ambient;
-	data[5][2] = max_ff(world->horb, world->vfog_color[2] * 0.25f) * world->vfog_ambient;
+	/* Keep a small fog-colored self-illumination floor, independent of the horizon. */
+	data[5][0] = (world->horr + world->vfog_color[0] * 0.06f) * world->vfog_ambient;
+	data[5][1] = (world->horg + world->vfog_color[1] * 0.06f) * world->vfog_ambient;
+	data[5][2] = (world->horb + world->vfog_color[2] * 0.06f) * world->vfog_ambient;
 	data[6][2] = world->vfog_light_intensity;
 	data[6][3] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	data[8][0] = world->vfog_edge;
