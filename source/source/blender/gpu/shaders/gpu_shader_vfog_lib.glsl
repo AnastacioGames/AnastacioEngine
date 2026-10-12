@@ -162,6 +162,45 @@ vec3 vfogFireEmission(int i, vec3 p)
 	return vfogFireColor(heat) * (2.0 + 8.0 * heat);
 }
 
+/* Top of the fog for the ray interval: Layer = base + its waves, else base + 6 falloffs (under
+ * 0.25% of the base density). The haze up to the clouds is added in closed form by vfogScatter. */
+float vfogTop()
+{
+	float top = (vfog_data[4].w > 0.5) ? vfog_data[0].y + vfog_data[0].z * 1.5
+	                                   : vfog_data[0].y + vfog_data[0].z * 6.0;
+	return top;
+}
+
+/* Haze between the fog and the clouds: a small fraction of the density, fading out just under
+ * the cloud base. */
+float vfogHaze(float z)
+{
+	float clouds = vfog_data[5].w;
+	if (clouds <= 0.0) {
+		return 0.0;
+	}
+	/* Thin whatever the fog density: long rays cross hundreds of meters of it. */
+	return min(vfog_data[0].x * 0.02, 0.0015) * (1.0 - smoothstep(clouds * 0.6, clouds, z));
+}
+
+/* Height fog density at p (no volumes): exponential above the base, or the Layer, dense up to a
+ * top that waves with the noise by about one falloff (fills the valleys like a sea of fog). */
+float vfogHeightDensity(vec3 p)
+{
+	float d;
+	if (vfog_data[4].w > 0.5) {
+		vec2 q = (p.xy - vfog_data[9].xy) * vfog_data[1].x * 0.35 + vfog_data[1].z * 0.3;
+		float wave = vfogNoise(vec3(q, 0.0)) * 0.65 + vfogNoise(vec3(q * 2.3, 7.0)) * 0.35;
+		float top = vfog_data[0].y + (wave - 0.5) * 2.0 * vfog_data[0].z;
+		float soft = 0.25 + vfog_data[0].z * 0.3;
+		d = vfog_data[0].x * (1.0 - smoothstep(top - soft, top + soft, p.z));
+	}
+	else {
+		d = vfog_data[0].x * exp(-max(p.z - vfog_data[0].y, 0.0) / vfog_data[0].z);
+	}
+	return d;
+}
+
 /* Extinction coefficient at p (before the noise) and the fog color there: the height fog and the
  * volumes, each volume with its own tint, mixed by how much each contributes. */
 float vfogDensityColor(vec3 p, out vec3 color, out vec3 emission)
@@ -170,7 +209,7 @@ float vfogDensityColor(vec3 p, out vec3 color, out vec3 emission)
 	color = vfog_data[2].rgb;
 	emission = vec3(0.0);
 	if (vfog_data[6].w < 0.5) {
-		d = vfog_data[0].x * exp(-max(p.z - vfog_data[0].y, 0.0) / vfog_data[0].z);
+		d = vfogHeightDensity(p);
 	}
 	int count = int(vfog_data[6].y);
 	if (count > 0) {
@@ -298,8 +337,7 @@ vec2 vfogInterval(vec3 ro, vec3 rd, float dist)
 	float t0 = dist;
 	float t1 = 0.0;
 	if (vfog_data[6].w < 0.5) {
-		/* Above base + 6 falloffs the fog is under 0.25% of the base density. */
-		float top = vfog_data[0].y + vfog_data[0].z * 6.0;
+		float top = vfogTop();
 		if (ro.z <= top) {
 			t0 = 0.0;
 			t1 = (rd.z > 1e-4) ? min(dist, (top - ro.z) / rd.z) : dist;
@@ -475,9 +513,36 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 	return color * fog.a + fog.rgb;
 }
 
+vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame);
+
 /* The fog along the ray alone: in-scatter rgb, transmittance a (the scene color is multiplied by
- * a and the in-scatter added; the Half/Quarter resolution game pass stores this). */
+ * a and the in-scatter added; the Half/Quarter resolution game pass stores this). The thin haze
+ * up to the clouds is in closed form, in front of the fog (it is far thinner). */
 vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
+{
+	vec4 fog = vfogScatterFog(ro, rd, dist, fragCoord, frame);
+	float clouds = vfog_data[5].w;
+	if (clouds <= 0.0) {
+		return fog;
+	}
+	/* Length of the ray under the cloud base, the haze density at its middle height. */
+	float len = min(dist, vfog_data[0].w);
+	if (rd.z > 1e-4) {
+		len = min(len, max(clouds - ro.z, 0.0) / rd.z);
+	}
+	else if (ro.z > clouds) {
+		len = (rd.z < -1e-4) ? max(len - (ro.z - clouds) / -rd.z, 0.0) : 0.0;
+	}
+	float tau = vfogHaze(ro.z + rd.z * len * 0.5) * len;
+	float T = exp(-tau);
+	vec3 light = vfog_data[5].rgb;
+	if (vfog_data[3].w > 0.5) {
+		light += vfog_data[4].rgb * vfogPhase(dot(rd, vfog_data[3].xyz), vfog_data[1].w) * 12.566371;
+	}
+	return vec4(light * vfog_data[2].rgb * (1.0 - T) + fog.rgb * T, fog.a * T);
+}
+
+vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 {
 	dist = min(dist, vfog_data[0].w);
 	vec2 seg = vfogInterval(ro, rd, dist);
@@ -501,7 +566,16 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 		float len = seg.y - seg.x;
 		vec3 pa = ro + rd * seg.x;
 		float tau = 0.0;
-		if (vfog_data[6].w < 0.5) {
+		if (vfog_data[6].w < 0.5 && vfog_data[4].w > 0.5) {
+			/* Layer: the length of the ray under its (flat) top, plus the haze. */
+			float zb = (ro + rd * seg.y).z;
+			float lo = min(pa.z, zb);
+			float hi = max(pa.z, zb);
+			float under = (hi - lo > 1e-3) ? clamp((vfog_data[0].y - lo) / (hi - lo), 0.0, 1.0)
+			                               : step(lo, vfog_data[0].y);
+			tau = vfog_data[0].x * len * under;
+		}
+		else if (vfog_data[6].w < 0.5) {
 			float f = vfog_data[0].z;
 			float za = max(pa.z - vfog_data[0].y, 0.0);
 			float dz = rd.z * len;

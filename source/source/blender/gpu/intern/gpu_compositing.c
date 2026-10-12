@@ -1036,6 +1036,12 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 	data[5][0] = (world->horr + world->vfog_color[0] * 0.06f) * world->vfog_ambient;
 	data[5][1] = (world->horg + world->vfog_color[1] * 0.06f) * world->vfog_ambient;
 	data[5][2] = (world->horb + world->vfog_color[2] * 0.06f) * world->vfog_ambient;
+	/* Layer shape and the haze up to the clouds (as KX_FillVolumetricFog). */
+	data[4][3] = (world->vfog_flag & WO_VFOG_LAYER) ? 1.0f : 0.0f;
+	if (world->vfog_flag & WO_VFOG_REACH_CLOUDS) {
+		data[5][3] = (world->vcloud_flag & WO_VCLOUDS_ENABLE) ? max_ff(world->vcloud_altitude, world->vfog_base + 1.0f) :
+		                                                       max_ff(300.0f, world->vfog_base + 1.0f);
+	}
 	data[6][2] = world->vfog_light_intensity;
 	data[6][3] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	data[8][0] = world->vfog_edge;

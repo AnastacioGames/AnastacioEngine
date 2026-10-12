@@ -863,6 +863,16 @@ static void rna_def_world_weather(BlenderRNA *brna)
 		RNA_def_property_ui_text(prop, "Sun Shafts", "A Sun with shadow casts light shafts (god rays) in the fog (Medium/High)");
 		RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+		prop = RNA_def_property(srna, "vfog_use_layer", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_LAYER);
+		RNA_def_property_ui_text(prop, "Layer", "Dense fog up to Base Height that fills the valleys, its top waving by Falloff");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_reach_clouds", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_REACH_CLOUDS);
+		RNA_def_property_ui_text(prop, "Reach Clouds", "A thin haze rises from the fog up to the base of the clouds (Volumetric Clouds altitude, else 300 m)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 		prop = RNA_def_property(srna, "vfog_use_wind", PROP_BOOLEAN, PROP_NONE);
 		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_WIND);
 		RNA_def_property_ui_text(prop, "Wind", "The fog is carried by the wind (strength from Rain Wind)");

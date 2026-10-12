@@ -302,6 +302,8 @@ typedef struct World {
 #define WO_VFOG_WIND          (1 << 6)
 #define WO_VFOG_TIME_OF_DAY   (1 << 7)
 #define WO_VFOG_SUN_SHAFTS    (1 << 8)
+#define WO_VFOG_LAYER         (1 << 9)  /* camada densa ate vfog_base, topo ondulado (enche vales) */
+#define WO_VFOG_REACH_CLOUDS  (1 << 10) /* bruma fina subindo ate a base das nuvens */
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

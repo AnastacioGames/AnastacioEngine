@@ -176,6 +176,12 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	d[20] = (world->horr + world->vfog_color[0] * 0.06f) * world->vfog_ambient;
 	d[21] = (world->horg + world->vfog_color[1] * 0.06f) * world->vfog_ambient;
 	d[22] = (world->horb + world->vfog_color[2] * 0.06f) * world->vfog_ambient;
+	/* Layer shape and the haze up to the clouds (Volumetric Clouds altitude, else 300 m). */
+	d[19] = (world->vfog_flag & WO_VFOG_LAYER) ? 1.0f : 0.0f;
+	if (world->vfog_flag & WO_VFOG_REACH_CLOUDS) {
+		d[23] = (world->vcloud_flag & WO_VCLOUDS_ENABLE) ? std::max(world->vcloud_altitude, world->vfog_base + 1.0f) :
+		                                                  std::max(300.0f, world->vfog_base + 1.0f);
+	}
 	d[26] = world->vfog_light_intensity;
 	d[27] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	d[32] = world->vfog_edge;

@@ -31,7 +31,7 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 | 5 | Fumaça/vapor locais | ✅ feito (884e4d26), aguarda aceite visual | Codex |
 | 6 | Neblina que abre ao passar | ✅ feito, aguarda aceite visual | Claude |
 | 7 | Emission acendendo a névoa | ✅ feito (fog_glow), aguarda aceite visual | Claude |
-| 8 | Nuvens + névoa contínuas | pendente | |
+| 8 | Nuvens + névoa contínuas | ✅ | Layer (camada que enche vales) + Reach Clouds (bruma analítica até a base das nuvens); cena `criar_cena_vfog_camada.py` |
 | 9 | Froxels | pendente | |
 | 10 | Fogo/explosão volumétrico | ✅ feito (884e4d26), aguarda aceite visual | Codex |
 
