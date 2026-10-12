@@ -65,6 +65,8 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
                 row.label(c.name)
             
             row.operator("logic.python_component_reload", icon="RECOVER_LAST", text="").index = i
+            if c.module == "rigid_body_joint_component" and c.name == "RigidBodyJointComponent":
+                row.operator("object.rigid_body_joint_component_refresh", icon="FILE_REFRESH", text="").component_index = i
             # row.separator()
             row.operator("logic.python_component_move_up", icon="TRIA_UP", text="").index = i
             row.operator("logic.python_component_move_down", icon="TRIA_DOWN", text="").index = i

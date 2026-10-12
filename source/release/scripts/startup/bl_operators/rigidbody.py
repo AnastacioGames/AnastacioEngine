@@ -19,7 +19,9 @@
 # <pep8-80 compliant>
 
 import bpy
+import importlib
 import os
+import sys
 from bpy.types import Operator
 from bpy.props import (
     EnumProperty,
@@ -42,6 +44,152 @@ _constraint_asset_objects = {
     'BALL': ('Socket', 'Ball', 'Socket.001', 'Ball.001'),
     'CONE_TWIST': ('Socket.002', 'Ball.002', 'Socket.003', 'Ball.003'),
 }
+
+RIGID_BODY_JOINT_COMPONENT_MODULE = "rigid_body_joint_component"
+RIGID_BODY_JOINT_COMPONENT_CLASS = "RigidBodyJointComponent"
+
+_RIGID_BODY_JOINT_COMPONENT_TEMPLATE = '''"""Editable runtime Bullet joint created by Anastacio Engine."""
+from collections import OrderedDict
+import math
+import Range
+
+class RigidBodyJointComponent(Range.types.KX_PythonComponent):
+    args = OrderedDict([
+        ("C_Icons", "CONSTRAINT"),
+        ("C_Header /Rigid Body Joint/CONSTRAINT", True),
+        ("Target", %(targets)r),
+        ("Joint Type", {"Hinge", "Limited Hinge (6DOF)", "Slider (6DOF)", "Ball Socket", "Cone Twist (6DOF)"}),
+        ("Enabled", True), ("Disable Linked Collision", False),
+        ("Use Breaking", False), ("Breaking Threshold", 0.0),
+        ("C_Header /Pivot and Axis/EMPTY_AXIS", True),
+        ("Pivot", (0.0, 0.0, 0.0)), ("Axis (degrees)", (0.0, 0.0, 0.0)),
+        ("C_Header /Limits/CONSTRAINT", True),
+        ("Linear Min", (0.0, 0.0, 0.0)), ("Linear Max", (0.0, 0.0, 0.0)),
+        ("Angular Min (degrees)", (0.0, 0.0, 0.0)),
+        ("Angular Max (degrees)", (0.0, 0.0, 0.0)),
+        ("Cone Limits (degrees)", (29.0, 29.0, 29.0)),
+    ])
+    _TYPES = {"Hinge": "LINEHINGE_CONSTRAINT", "Limited Hinge (6DOF)": "GENERIC_6DOF_CONSTRAINT",
+              "Slider (6DOF)": "GENERIC_6DOF_CONSTRAINT", "Ball Socket": "POINTTOPOINT_CONSTRAINT",
+              "Cone Twist (6DOF)": "CONETWIST_CONSTRAINT"}
+
+    def start(self, args):
+        if not args["Enabled"]: return
+        target = self.object.scene.objects.get(args["Target"])
+        if target is None or target is self.object:
+            print("RigidBodyJointComponent: choose another Target; refresh the list if needed")
+            return
+        if not self.object.getPhysicsId() or not target.getPhysicsId():
+            print("RigidBodyJointComponent: owner and target need game physics")
+            return
+        pivot, axis = args["Pivot"], args["Axis (degrees)"]
+        flags = 0x80 if args["Disable Linked Collision"] else 0
+        joint_type = args["Joint Type"]
+        self.constraint = Range.constraints.createConstraint(
+            self.object.getPhysicsId(), target.getPhysicsId(),
+            getattr(Range.constraints, self._TYPES[joint_type]),
+            pivot[0], pivot[1], pivot[2], axis[0], axis[1], axis[2], flags)
+        if self.constraint is None:
+            print("RigidBodyJointComponent: Bullet could not create the joint")
+            return
+        if args["Use Breaking"]:
+            self.constraint.breakingThreshold = args["Breaking Threshold"]
+        self._apply_limits(args, joint_type)
+
+    def _apply_limits(self, args, joint_type):
+        if joint_type == "Hinge" or joint_type == "Ball Socket": return
+        if joint_type == "Cone Twist (6DOF)":
+            for dof, limit in enumerate(args["Cone Limits (degrees)"], 3):
+                self.constraint.setParam(dof, 0.0, math.radians(limit))
+            return
+        linear_min, linear_max = args["Linear Min"], args["Linear Max"]
+        angular_min, angular_max = args["Angular Min (degrees)"], args["Angular Max (degrees)"]
+        if joint_type == "Limited Hinge (6DOF)":
+            linear_min = linear_max = (0.0, 0.0, 0.0)
+            angular_min, angular_max = (angular_min[0], 0.0, 0.0), (angular_max[0], 0.0, 0.0)
+        elif joint_type == "Slider (6DOF)":
+            linear_min, linear_max = (linear_min[0], 0.0, 0.0), (linear_max[0], 0.0, 0.0)
+            angular_min = angular_max = (0.0, 0.0, 0.0)
+        for dof in range(3):
+            self.constraint.setParam(dof, linear_min[dof], linear_max[dof])
+            self.constraint.setParam(dof + 3, math.radians(angular_min[dof]), math.radians(angular_max[dof]))
+'''
+
+
+def _joint_component_path():
+    if not bpy.data.filepath:
+        return None
+    return os.path.join(os.path.dirname(bpy.data.filepath), "scripts", RIGID_BODY_JOINT_COMPONENT_MODULE + ".py")
+
+
+def _write_joint_component(path, owner, scene):
+    targets = {"None"}
+    targets.update(obj.name for obj in scene.objects if obj != owner)
+    directory = os.path.dirname(path)
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    with open(path, "w", encoding="utf-8") as component_file:
+        component_file.write(_RIGID_BODY_JOINT_COMPONENT_TEMPLATE % {"targets": targets})
+
+
+class OBJECT_OT_rigid_body_joint_component_add(Operator):
+    bl_idname = "object.rigid_body_joint_component_add"
+    bl_label = "Add Rigid Body Joint Component"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def execute(self, context):
+        path, owner = _joint_component_path(), context.active_object
+        if path is None:
+            self.report({'ERROR'}, "Save the .range file before adding the component")
+            return {'CANCELLED'}
+        try:
+            _write_joint_component(path, owner, context.scene)
+            scripts_dir = os.path.dirname(path)
+            if scripts_dir not in sys.path: sys.path.append(scripts_dir)
+            importlib.invalidate_caches()
+            module = sys.modules.get(RIGID_BODY_JOINT_COMPONENT_MODULE)
+            if module: importlib.reload(module)
+            else: importlib.import_module(RIGID_BODY_JOINT_COMPONENT_MODULE)
+        except OSError as exc:
+            self.report({'ERROR'}, "Could not create component: %s" % exc)
+            return {'CANCELLED'}
+        except Exception:
+            # Range is intentionally available only through the editor's fake
+            # module while python_component_register validates the class.
+            pass
+        full_name = "%s.%s" % (RIGID_BODY_JOINT_COMPONENT_MODULE, RIGID_BODY_JOINT_COMPONENT_CLASS)
+        if not any("%s.%s" % (component.module, component.name) == full_name for component in owner.game.components):
+            try: bpy.ops.logic.python_component_register(component_name=full_name)
+            except RuntimeError as exc:
+                self.report({'ERROR'}, "Could not add component: %s" % exc)
+                return {'CANCELLED'}
+        self.report({'INFO'}, "Rigid Body Joint component added")
+        return {'FINISHED'}
+
+
+class OBJECT_OT_rigid_body_joint_component_refresh(Operator):
+    bl_idname = "object.rigid_body_joint_component_refresh"
+    bl_label = "Refresh Target List"
+    bl_options = {'REGISTER', 'UNDO'}
+    component_index: IntProperty(default=-1)
+
+    def execute(self, context):
+        path = _joint_component_path()
+        if path is None:
+            self.report({'ERROR'}, "Save the .range file before refreshing the component")
+            return {'CANCELLED'}
+        try:
+            _write_joint_component(path, context.active_object, context.scene)
+            bpy.ops.logic.python_component_reload(index=self.component_index)
+        except (OSError, RuntimeError) as exc:
+            self.report({'ERROR'}, "Could not refresh target list: %s" % exc)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Target list refreshed")
+        return {'FINISHED'}
 
 
 class AddGameConstraintPreset(Operator):
@@ -438,6 +586,8 @@ class ConnectRigidBodies(Operator):
 
 classes = (
     AddGameConstraintPreset,
+    OBJECT_OT_rigid_body_joint_component_add,
+    OBJECT_OT_rigid_body_joint_component_refresh,
     BakeToKeyframes,
     ConnectRigidBodies,
     CopyRigidbodySettings,

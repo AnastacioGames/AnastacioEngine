@@ -1386,6 +1386,8 @@ class INFO_MT_game_constraints_add(Menu):
                 ('CONE_TWIST', "Cone Twist (6DOF)", "")):
             operator = layout.operator("object.game_constraint_preset_add", text=label, icon='CONSTRAINT')
             operator.preset = preset
+        layout.separator()
+        layout.operator("object.rigid_body_joint_component_add", text="Rigid Body Joint Component", icon='SCRIPT')
 
 
 class INFO_MT_add(Menu):

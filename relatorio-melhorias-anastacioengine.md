@@ -314,6 +314,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   central, preservando o `RIGID_BODY_JOINT`, alvo e limites. A âncora recebe material magenta e o corpo
   móvel, ciano. A cena é colocada em `BLENDER_GAME` automaticamente. Arquivos Blender 2.5x/2.6x que usam
   esse formato legado continuam carregáveis pelo conversor Bullet existente.
+- O mesmo submenu oferece **Rigid Body Joint Component**: salva um componente Python editável em
+  `scripts/rigid_body_joint_component.py`, anexa-o ao objeto ativo e cria a junta Bullet em runtime. O painel
+  do componente agrupa tipo, alvo, pivô/eixo, colisão, quebra e limites; o botão de recarregar atualiza a lista
+  de objetos-alvo da cena.
 - Em `Object Constraints`, quando a cena usa `BLENDER_GAME`, o editor mantém o menu completo, mas deixa
   clicável apenas **Rigid Body Joint**, a única constraint de objeto convertida pelo runtime; as demais
   aparecem esmaecidas. Um aviso identifica constraints herdadas que o jogo ignora; as constraints de ossos

@@ -23,6 +23,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Play: o conversor avisa no console quando um objeto entra no jogo com Decimate ligado (é recalculado na carga; todo quadro em malha animada) e o painel do modificador mostra "Apply before playing". Textos novos em pt-BR, es e ru.
 - Não medido: custo do aviso/recalculo em jogo real; aceite visual do usuário pendente.
 
+## 2026-10-12 - Componente Python de Rigid Body Joint
+
+- `Shift+A > Constraints > Rigid Body Joint Component` cria `scripts/rigid_body_joint_component.py` e o anexa
+  ao objeto ativo. O arquivo é deliberadamente editável: em `start()` procura o alvo e chama
+  `Range.constraints.createConstraint()` para Hinge, Limited Hinge/Slider 6DOF, Ball Socket ou Cone Twist.
+- O painel Game Components separa Joint, Pivot and Axis e Limits, com alvo em lista de objetos da cena,
+  colisão entre corpos ligados, quebra e limites lineares/angulares. O botão de recarregar do componente
+  refaz a lista de alvos sem apagar a escolha que ainda exista.
+- Validação: geração do arquivo compilada por Python; no editor instalado, operador criou o arquivo e registrou
+  `RigidBodyJointComponent` no objeto (`RIGID_BODY_JOINT_COMPONENT_EDITOR_SMOKE: PASS`). Teste visual/físico
+  no jogo real permanece necessário.
+
 ## 2026-10-12 - Object Constraints: menu compatível com Game Engine
 
 - Com `BLENDER_GAME`, o painel **Object Constraints** mantém o menu completo herdado, mas só deixa clicável
