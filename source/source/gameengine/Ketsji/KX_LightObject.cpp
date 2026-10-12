@@ -151,6 +151,20 @@ void KX_LightObject::UpdateFlicker(double time)
 	m_lightobj->m_color[0] = m_flickerColor[0];
 	m_lightobj->m_color[1] = m_flickerColor[1] * std::max(0.0f, 1.0f + 0.06f * amount * t);
 	m_lightobj->m_color[2] = m_flickerColor[2] * std::max(0.0f, 1.0f + 0.12f * amount * t);
+
+	// The flame moves, so do its shadows: wander up to ~6 cm (at 1) around wherever the lamp is,
+	// taking back last frame's offset so a lamp moved by logic or a parent keeps its motion.
+	const float reach = 0.06f * amount;
+	const mt::vec3 offset(
+		(KX_FlickerNoise(time * 5.1 + seed + 11.0) - 0.5f) * 2.0f * reach,
+		(KX_FlickerNoise(time * 4.7 + seed + 23.0) - 0.5f) * 2.0f * reach,
+		(KX_FlickerNoise(time * 6.3 + seed + 37.0) - 0.5f) * 1.2f * reach);
+	const mt::vec3 previous(m_flickerOffset[0], m_flickerOffset[1], m_flickerOffset[2]);
+	NodeSetLocalPosition(NodeGetLocalPosition() - previous + offset);
+	NodeUpdate();
+	for (int i = 0; i < 3; ++i) {
+		m_flickerOffset[i] = offset[i];
+	}
 }
 
 void KX_LightObject::Update()

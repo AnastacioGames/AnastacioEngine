@@ -66,10 +66,13 @@ protected:
 	bool m_flickerInit = false;
 	float m_flickerEnergy = 0.0f;
 	float m_flickerColor[3] = {0.0f, 0.0f, 0.0f};
+	/// Small wander added to the lamp position last frame (taken back before the next one).
+	float m_flickerOffset[3] = {0.0f, 0.0f, 0.0f};
 
 public:
 	/** Game property "light_flicker" (0..2): the energy wanders around its value with noise like a
-	 * flame (about +-35% at 1) and the tint warms slightly as it dims. No property: untouched. */
+	 * flame (about +-35% at 1), the tint warms slightly as it dims and the lamp wanders a few
+	 * centimeters so the shadows dance. No property: untouched. */
 	void UpdateFlicker(double time);
 
 	KX_LightObject(void *sgReplicationInfo, SG_Callbacks callbacks, RAS_Rasterizer *rasterizer, RAS_ILightObject *lightobj);

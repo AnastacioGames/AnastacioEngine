@@ -90,6 +90,7 @@ luz_data = bpy.data.lamps.new('brasa', 'POINT')
 luz_data.energy = 3.0
 luz_data.color = (1.0, 0.5, 0.15)
 luz_data.distance = 8.0
+luz_data.use_shadow = True
 luz = bpy.data.objects.new('brasa', luz_data)
 luz.location = (0, 0, 0.8)
 scene.objects.link(luz)
