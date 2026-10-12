@@ -78,6 +78,7 @@
 
 #include "RAS_Rasterizer.h"
 #include "RAS_ICanvas.h"
+#include "RAS_2DFilter.h"
 #include "RAS_2DFilterData.h"
 #include "KX_2DFilterManager.h"
 #include "RAS_BoundingBoxManager.h"
@@ -3233,6 +3234,31 @@ KX_2DFilterManager *KX_Scene::Get2DFilterManager() const
 
 RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
+	/* These World Properties deliberately remain optional: existing files that do not
+	 * have them continue using the authored World settings. Property Actuators write
+	 * the KX_WorldInfo values during logic, before this render pass. */
+	World *world = m_blenderScene ? m_blenderScene->world : nullptr;
+	if (world && m_worldinfo) {
+		if (EXP_Value *enabled = m_worldinfo->GetProperty("vfog_enabled")) {
+			if (enabled->GetNumber() != 0.0) world->vfog_flag |= WO_VFOG_ENABLE;
+			else world->vfog_flag &= ~WO_VFOG_ENABLE;
+		}
+		if (EXP_Value *density = m_worldinfo->GetProperty("vfog_density")) {
+			world->vfog_density = static_cast<float>(density->GetNumber());
+		}
+	}
+
+	/* The filter was previously created only while loading an enabled World. Keep
+	 * its program after disabling it, then reactivate it without a compilation hitch. */
+	if (world && (world->vfog_flag & WO_VFOG_ENABLE)) {
+		BuildInFilters filters = {};
+		filters.useVFog = true;
+		m_filterManager->EnsureVFogFilters(filters);
+	}
+	if (RAS_2DFilter *vfog = m_filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_VFOG, true)) {
+		vfog->SetEnabled(world && (world->vfog_flag & WO_VFOG_ENABLE));
+	}
+
 	m_filterManager->ReloadChangedSources();
 	return m_filterManager->RenderFilters(rasty, canvas, inputofs, targetofs, sun_screen_pos);
 }

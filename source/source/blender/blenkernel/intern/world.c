@@ -95,6 +95,8 @@ void BKE_world_status_props_ensure(World *wrld)
 		{"lightning_enabled",    GPROP_BOOL,  0.0f, 0},
 		{"earthquake_enabled",   GPROP_BOOL,  0.0f, 0},
 		{"earthquake_level",     GPROP_INT,   0.0f, wrld->earthquake_level},
+		{"vfog_enabled",         GPROP_BOOL,  0.0f, (wrld->vfog_flag & WO_VFOG_ENABLE) != 0},
+		{"vfog_density",         GPROP_FLOAT, wrld->vfog_density, 0},
 	};
 	/* Earlier Portuguese names, still stored in the embedded startup.blend. */
 	const char *wo_status_legacy[][2] = {

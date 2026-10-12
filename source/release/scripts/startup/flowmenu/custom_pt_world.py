@@ -544,6 +544,7 @@ BUILTIN_WORLD_PROPERTY_GROUPS = (
     ("Lightning", 'FORCE_CHARGE', ("lightning_enabled",)),
     ("Clouds", 'MOD_SMOKE', ("clouds_enabled", "cloud_type")),
     ("Mist", 'RESTRICT_VIEW_ON', ("mist_enabled", "mist_density")),
+    ("Fog - Volumetric", 'MOD_SMOKE', ("vfog_enabled", "vfog_density")),
     ("Lens Flare", 'LAMP_POINT', ("lens_flare_enabled",)),
     ("Earthquake", 'FORCE_TURBULENCE', ("earthquake_enabled", "earthquake_level")),
     ("Player", 'POSE_HLT', ("player_under_cover",)),

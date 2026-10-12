@@ -281,6 +281,21 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.mist_depth") == 0) { world->mistdist = value; m_mistdistance = value; }
 	else if (std::strcmp(identifier, "weather.mist_height") == 0) { world->mistheight = value; m_mistheight = value; }
 	else if (std::strcmp(identifier, "weather.mist_density") == 0) { world->mistdensity = value; m_mistdensity = value; }
+	else if (std::strcmp(identifier, "weather.vfog") == 0 && useBool) {
+		if (boolValue) world->vfog_flag |= WO_VFOG_ENABLE; else world->vfog_flag &= ~WO_VFOG_ENABLE;
+	}
+	else if (std::strcmp(identifier, "weather.vfog_density") == 0) world->vfog_density = value;
+	else if (std::strcmp(identifier, "weather.vfog_base") == 0) world->vfog_base = value;
+	else if (std::strcmp(identifier, "weather.vfog_falloff") == 0) world->vfog_falloff = value;
+	else if (std::strcmp(identifier, "weather.vfog_distance") == 0) world->vfog_distance = value;
+	else if (std::strcmp(identifier, "weather.vfog_noise_amount") == 0) world->vfog_noise_amount = value;
+	else if (std::strcmp(identifier, "weather.vfog_speed") == 0) world->vfog_speed = value;
+	else if (std::strcmp(identifier, "weather.vfog_light_intensity") == 0) world->vfog_light_intensity = value;
+	else if (std::strcmp(identifier, "weather.vfog_sun_intensity") == 0) world->vfog_sun_intensity = value;
+	else if (std::strcmp(identifier, "weather.vfog_ambient") == 0) world->vfog_ambient = value;
+	else if (std::strcmp(identifier, "weather.vfog_color_r") == 0) world->vfog_color[0] = value;
+	else if (std::strcmp(identifier, "weather.vfog_color_g") == 0) world->vfog_color[1] = value;
+	else if (std::strcmp(identifier, "weather.vfog_color_b") == 0) world->vfog_color[2] = value;
 	else return false;
 	return true;
 }
@@ -307,6 +322,11 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 	if (std::strcmp(identifier, "mist") == 0) {
 		isBool = true;
 		value = (world->mode & WO_MIST) ? 1.0f : 0.0f;
+		return true;
+	}
+	if (std::strcmp(identifier, "vfog") == 0) {
+		isBool = true;
+		value = (world->vfog_flag & WO_VFOG_ENABLE) ? 1.0f : 0.0f;
 		return true;
 	}
 	if (std::strcmp(identifier, "earthquake_level") == 0) {
@@ -341,6 +361,12 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"flare_intensity", &world->flare_intensity}, {"mist_intensity", &world->misi},
 		{"mist_start", &world->miststa}, {"mist_depth", &world->mistdist},
 		{"mist_height", &world->mistheight}, {"mist_density", &world->mistdensity},
+		{"vfog_density", &world->vfog_density}, {"vfog_base", &world->vfog_base},
+		{"vfog_falloff", &world->vfog_falloff}, {"vfog_distance", &world->vfog_distance},
+		{"vfog_noise_amount", &world->vfog_noise_amount}, {"vfog_speed", &world->vfog_speed},
+		{"vfog_light_intensity", &world->vfog_light_intensity}, {"vfog_sun_intensity", &world->vfog_sun_intensity},
+		{"vfog_ambient", &world->vfog_ambient}, {"vfog_color_r", &world->vfog_color[0]},
+		{"vfog_color_g", &world->vfog_color[1]}, {"vfog_color_b", &world->vfog_color[2]},
 		{"earthquake_scale", &world->earthquake_scale}, {"earthquake_camera", &world->earthquake_camera},
 	};
 	for (const auto &f : floats) {

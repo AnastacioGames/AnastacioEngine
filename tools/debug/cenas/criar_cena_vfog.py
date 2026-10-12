@@ -19,6 +19,14 @@ SCRIPT = (
     "def tick(cont):\n"
     "    own = cont.owner\n"
     "    agora = time.perf_counter()\n"
+    "    world = bge.logic.getCurrentScene().world\n"
+    "    if own['preset'] == 'medium_script':\n"
+    "        fase = agora * 0.8\n"
+    "        world.setWeather('vfog', True)\n"
+    "        world.setWeather('vfog_density', 0.04 + 0.03 * (1.0 + __import__('math').sin(fase)))\n"
+    "        world.setWeather('vfog_color_r', 0.35 + 0.35 * (1.0 + __import__('math').sin(fase)))\n"
+    "        world.setWeather('vfog_color_g', 0.30 + 0.20 * (1.0 + __import__('math').sin(fase + 2.1)))\n"
+    "        world.setWeather('vfog_color_b', 0.45 + 0.20 * (1.0 + __import__('math').sin(fase + 4.2)))\n"
     "    if 'inicio' not in own:\n"
     "        own['inicio'] = agora\n"
     "        own['frames'] = 0\n"
@@ -43,6 +51,8 @@ SCRIPT = (
     "        if caminho:\n"
     "            with open(caminho, 'a') as f:\n"
     "                f.write('%s fps=%.1f ms=%.2f\\n' % (own['preset'], fps, 1000.0 / fps))\n"
+    "                if own['preset'] == 'medium_script':\n"
+    "                    f.write('VFOG_SCRIPT enabled=%r density=%.4f color=(%.4f, %.4f, %.4f) property_density=%r\\n' % (world.getWeather('vfog'), world.getWeather('vfog_density'), world.getWeather('vfog_color_r'), world.getWeather('vfog_color_g'), world.getWeather('vfog_color_b'), world['vfog_density']))\n"
     "        bge.logic.endGame()\n"
 )
 
@@ -134,7 +144,7 @@ def gerar(preset):
     w.use_clouds = False
     w.use_sky_layers = False
     w.use_volumetric_clouds = False
-    w.use_volumetric_fog = preset != 'off'
+    w.use_volumetric_fog = preset not in ('off', 'medium_script')
     if preset != 'off':
         w.vfog_quality = preset.split('_')[0].upper()
     w.vfog_density = 0.08
@@ -144,6 +154,15 @@ def gerar(preset):
     w.vfog_noise_amount = 0.5
     w.vfog_ambient = 0.5
     w.vfog_light_intensity = 2.0
+
+    if preset == 'medium_script':
+        # Starts disabled: the runtime script below must create and enable the filter.
+        if not world.properties.get('vfog_enabled'):
+            bpy.ops.world.game_property_new(type='BOOL', name='vfog_enabled')
+        if not world.properties.get('vfog_density'):
+            bpy.ops.world.game_property_new(type='FLOAT', name='vfog_density')
+        world.properties['vfog_enabled'].value = False
+        world.properties['vfog_density'].value = w.vfog_density
 
     if preset.endswith('_noshaft'):
         w.vfog_use_shafts = False
@@ -189,10 +208,26 @@ def gerar(preset):
     ctrl.module = 'medir_fps.tick'
     sens.link(ctrl)
 
+    if preset == 'medium_script':
+        # Exercise the World Property path too, independently of setWeather().
+        bpy.ops.logic.sensor_add(type='DELAY', name='vfog_property_delay', object=chao.name)
+        sens = chao.game.sensors['vfog_property_delay']
+        sens.delay = 2
+        bpy.ops.logic.controller_add(type='LOGIC_AND', name='vfog_property', object=chao.name)
+        ctrl = chao.game.controllers['vfog_property']
+        bpy.ops.logic.actuator_add(type='PROPERTY', name='vfog_density_property', object=chao.name)
+        act = chao.game.actuators['vfog_density_property']
+        act.actuator_mode = 'GLOBAL_PROPERTY'
+        act.mode = 'ASSIGN'
+        act.property = 'vfog_density'
+        act.value = '0.11'
+        sens.link(ctrl)
+        act.link(ctrl)
+
     out = os.path.join(pasta, 'vfog_%s.range' % preset)
     bpy.ops.wm.save_as_mainfile(filepath=out, check_existing=False)
     print('CENA VFOG salva', out)
 
 
-for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft'):
+for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script'):
     gerar(p)

@@ -272,6 +272,7 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 		{"lens_flare_enabled", (blenderworld->weather_flag & WO_WEATHER_LENSFLARE) != 0},
 		{"lightning_enabled",  (blenderworld->weather_flag & WO_WEATHER_RAIN_LIGHTNING) != 0},
 		{"earthquake_enabled", (blenderworld->weather_flag & WO_WEATHER_EARTHQUAKE) != 0},
+		{"vfog_enabled",       (blenderworld->vfog_flag & WO_VFOG_ENABLE) != 0},
 	};
 	for (const auto &status : wo_status_bools) {
 		if (worldinfo->GetProperty(status.name)) {
@@ -284,6 +285,7 @@ void BL_ConvertWorldProperties(World *blenderworld, KX_WorldInfo *worldinfo)
 	struct { const char *name; float fval; } wo_status_floats[] = {
 		{"rain_intensity", blenderworld->rain_intensity},
 		{"mist_density",   blenderworld->mistdensity},
+		{"vfog_density",   blenderworld->vfog_density},
 	};
 	for (const auto &status : wo_status_floats) {
 		if (worldinfo->GetProperty(status.name)) {
