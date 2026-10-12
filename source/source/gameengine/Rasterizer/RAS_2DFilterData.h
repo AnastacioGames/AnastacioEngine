@@ -166,7 +166,7 @@ typedef struct BuildInFilters {
 	/* Volumetric Fog (native World weather), filled every frame by KX_RenderPipeline: layout in
 	 * gpu_shader_vfog_lib.glsl. Shadow maps of up to 2 Spot lamps and the Sun (0 = none). */
 	bool useVFog;
-	enum { VFOG_DATA_VEC4 = 12 + 4 * 8 + 4, VFOG_MATS = 7, VFOG_SHADOWS = 3 };
+	enum { VFOG_DATA_VEC4 = 12 + 4 * 8 + 4 + 4, VFOG_MATS = 7, VFOG_SHADOWS = 3 };
 	float vfog_data[VFOG_DATA_VEC4 * 4];
 	float vfog_mats[16 * VFOG_MATS];
 	unsigned int vfog_shadow_tex[VFOG_SHADOWS];

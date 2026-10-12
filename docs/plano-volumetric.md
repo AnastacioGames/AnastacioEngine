@@ -15,7 +15,7 @@ gravado em `VFOG_FPS_LOG` e captura em `VFOG_SHOT`).
 | 2 | Raios de sol (Sun Shafts) | feito, aguarda aceite visual | Claude |
 | 3 | Fog Volumes melhores | feito, aguarda aceite visual | Claude |
 | 4 | Controle por Python / Logic | feito (2ec9637b), aguarda aceite visual | Codex |
-| 5 | Fumaça/vapor locais | pendente | |
+| 5 | Fumaça/vapor locais | feito, aguarda aceite visual | Codex |
 | 6 | Neblina que abre ao passar | pendente | |
 | 7 | Emission acendendo a névoa | pendente | |
 | 8 | Nuvens + névoa contínuas | pendente | |
@@ -65,7 +65,9 @@ gravado em `VFOG_FPS_LOG` e captura em `VFOG_SHOT`).
 - Variante: `medium_script`.
 
 ## Itens pendentes (5-10)
-5. **Fumaça/vapor locais:** volume esfera com ruído que sobe (chaminé, bueiro, chaleira).
+5. **Fumaça/vapor locais:** `fog_smoke` (float, m/s) num Fog Volume faz o ruído subir no Z local,
+   dissipa a densidade no topo e preserva a borda corroída; `0` ou ausente mantém o volume normal.
+   Variante: `medium_fumaca` (chaminé).
 6. **Neblina que abre ao passar:** até 4 "pushers" (objetos com propriedade) que reduzem a densidade
    num raio em volta deles.
 7. **Emission acendendo a névoa:** materiais com Emission viram lâmpadas virtuais (ou um buffer de

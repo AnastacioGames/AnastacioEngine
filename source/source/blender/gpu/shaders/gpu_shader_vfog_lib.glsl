@@ -11,7 +11,7 @@
  *  6 lamp count, volume count, lamp intensity, only inside volumes
  *  7 density of volumes 0-3
  *  8 volume edge, shaft intensity, sun shadow bias, has sun shadow (vfog_shadow2)
- *  9 wind offset xy (world units), -, -
+ *  9 wind offset xy (world units), smoke time, -
  *  10 shape of volumes 0-3 (0 box, 1 sphere)
  *  11 edge of volumes 0-3
  *  12 + 4i lamp i: position xyz, falloff distance
@@ -19,13 +19,15 @@
  *  14 + 4i spot direction xyz (where it points), cos of half cone (-2 = Point)
  *  15 + 4i cos where the spot edge blend ends, shadow bias, -, -
  *  44 + i volume i color rgb, has color (0 = fog color)
+ *  48 + i volume i smoke rise speed (m/s; 0 = normal volume)
  * vfog_mats: 0-3 world -> volume local space (unit box/sphere), 4-5 world -> Spot shadow map,
  * 6 world -> Sun shadow map. */
 
 #define VFOG_MAX_LIGHTS 8
 #define VFOG_VOLUME_COLOR (12 + 4 * VFOG_MAX_LIGHTS)
+#define VFOG_VOLUME_SMOKE (VFOG_VOLUME_COLOR + 4)
 
-uniform vec4 vfog_data[VFOG_VOLUME_COLOR + 4];
+uniform vec4 vfog_data[VFOG_VOLUME_SMOKE + 4];
 uniform mat4 vfog_mats[7];
 uniform sampler2DShadow vfog_shadow0;
 uniform sampler2DShadow vfog_shadow1;
@@ -73,8 +75,18 @@ float vfogVolume(int i, vec3 p)
 	vec3 l = (vfog_mats[i] * vec4(p, 1.0)).xyz;
 	float inside = (vfog_data[10][i] > 0.5) ? 1.0 - length(l) : 1.0 - max(max(abs(l.x), abs(l.y)), abs(l.z));
 	float edge = max(vfog_data[11][i], 0.001);
+	float smoke = vfog_data[VFOG_VOLUME_SMOKE + i].x;
 	if (inside <= 0.0) {
 		return 0.0;
+	}
+	/* A smoke volume is a local plume: its noise rises in its own Z axis and fades out at the top. */
+	if (smoke > 0.001) {
+		vec3 q = l * max(vfog_data[1].x, 0.0001) * 2.5;
+		q.z -= smoke * vfog_data[9].z;
+		inside -= edge * 0.7 * vfogNoise(q);
+		return clamp(inside / edge, 0.0, 1.0) *
+		       (0.45 + 0.55 * vfogNoise(q * 2.03 + 17.0)) *
+		       (1.0 - smoothstep(-0.25, 1.0, l.z)) * vfog_data[7][i];
 	}
 	if (inside < edge && edge > 0.01) {
 		vec3 q = (p - vec3(vfog_data[9].xy, 0.0)) * max(vfog_data[1].x, 0.0001) * 2.5 + vfog_data[1].z * 0.5;

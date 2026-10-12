@@ -240,6 +240,30 @@ def gerar(preset):
             vol.game.properties['fog_volume'].value = 3.0
             bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
             vol.game.properties['fog_shape'].value = forma
+    if preset == 'medium_fumaca':
+        w.vfog_volumes_only = True
+        w.vfog_density = 0.22
+        w.vfog_noise_amount = 0.0
+        w.vfog_edge = 0.45
+        w.vfog_ambient = 0.8
+        chaminé = malha('chamine', lambda bm: bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False,
+                                                                  segments=20, diameter1=1.4, diameter2=1.0,
+                                                                  depth=7.0), (0, 8, 3.5))
+        chaminé.data.materials.append(principled('tijolo_chamine', (0.18, 0.09, 0.05, 1.0)))
+        scene.objects.link(chaminé)
+        vol = malha('fumaca', lambda bm: bmesh.ops.create_cube(bm, size=2.0), (0, 8, 10.0))
+        vol.scale = (1.5, 1.5, 5.0)
+        vol.color = (0.72, 0.74, 0.76, 1.0)
+        vol.game.physics_type = 'NO_COLLISION'
+        vol.hide_render = True
+        scene.objects.link(vol)
+        scene.objects.active = vol
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_volume')
+        vol.game.properties['fog_volume'].value = 3.0
+        bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
+        vol.game.properties['fog_shape'].value = 'sphere'
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_smoke')
+        vol.game.properties['fog_smoke'].value = 1.5
 
     txt = bpy.data.texts.new('medir_fps.py')
     txt.write(SCRIPT)
@@ -277,5 +301,5 @@ def gerar(preset):
 
 
 for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
-          'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes'):
+          'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca'):
     gerar(p)

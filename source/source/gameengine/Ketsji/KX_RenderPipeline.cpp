@@ -184,6 +184,7 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		d[36] = std::cos(angle) * travel;
 		d[37] = std::sin(angle) * travel;
 	}
+	d[38] = std::fmod(time, 10000.0f);
 
 	/* Sun shafts: the Sun's farthest shadow map (Medium/High). */
 	if ((world->vfog_flag & WO_VFOG_SUN_SHAFTS) && quality > 0 && d[15] > 0.5f) {
@@ -198,7 +199,8 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	}
 
 	/* Fog Volumes: unit box (the default cube) or sphere of the object, world -> local; optional
-	 * game properties fog_shape ("sphere") and fog_edge, tint from the object color. */
+	 * game properties fog_shape ("sphere"), fog_edge and fog_smoke (local rise speed in m/s), tint from
+	 * the object color. */
 	int volumes = 0;
 	for (KX_GameObject *gameobj : *scene->GetObjectList()) {
 		if (volumes >= 4) {
@@ -215,6 +217,8 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		d[40 + volumes] = (shape && shape->GetText() == "sphere") ? 1.0f : 0.0f;
 		EXP_Value *edge = gameobj->GetProperty("fog_edge");
 		d[44 + volumes] = edge ? std::max(0.0f, std::min(1.0f, (float)edge->GetNumber())) : world->vfog_edge;
+		EXP_Value *smoke = gameobj->GetProperty("fog_smoke");
+		d[4 * (48 + volumes)] = smoke ? std::max(0.0f, (float)smoke->GetNumber()) : 0.0f;
 		const mt::vec4& col = gameobj->GetObjectColor();
 		float *c = d + 4 * (44 + volumes);
 		if (col.x < 0.999f || col.y < 0.999f || col.z < 0.999f) {
