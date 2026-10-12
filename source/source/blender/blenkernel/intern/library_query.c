@@ -566,6 +566,7 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 				/* Native destruction / explosive (refcounted by RNA). */
 				CALLBACK_INVOKE(object->destruction.fragments, IDWALK_CB_USER);
 				CALLBACK_INVOKE(object->explosive.effect, IDWALK_CB_USER);
+				CALLBACK_INVOKE(object->explosive.mark, IDWALK_CB_USER);
 				/* Lightning emitter target (not refcounted, like track). */
 				CALLBACK_INVOKE(object->lightning.target, IDWALK_CB_NOP);
 				CALLBACK_INVOKE(object->deform.decal, IDWALK_CB_USER);

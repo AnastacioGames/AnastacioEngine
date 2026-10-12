@@ -111,6 +111,28 @@ struct OcclusionFilter
 	}
 };
 
+/// First static mesh surface under an explosion (Ground Mark).
+struct GroundFilter
+{
+	const std::vector<KX_GameObject *> *m_ignore;
+	KX_GameObject *m_hit;
+	mt::vec3 m_point;
+
+	bool NeedRayCast(KX_ClientObjectInfo *client, void *UNUSED(data))
+	{
+		KX_GameObject *gameobj = client->m_gameobject;
+		return gameobj && !client->isSensor() && !gameobj->IsDynamic() && !gameobj->GetMeshList().empty() &&
+		       !contains(*m_ignore, gameobj);
+	}
+
+	bool RayHit(KX_ClientObjectInfo *client, KX_RayCast *result, void *UNUSED(data))
+	{
+		m_hit = client->m_gameobject;
+		m_point = result->m_hitPoint;
+		return true;
+	}
+};
+
 KX_DestructionManager::KX_DestructionManager(KX_Scene *scene)
 	:m_scene(scene),
 	m_maxDebris(150),
@@ -648,17 +670,31 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 	if (!deformer || templateMesh->GetMeshMaterialList().empty()) {
 		return;
 	}
+
+	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+	std::vector<mt::vec3> triangles;
+	deformer->GetTriangles(triangles);
+	for (mt::vec3& corner : triangles) {
+		corner = trans * corner;
+	}
+	const float half = ((settings.decal_size > 0.0f) ? settings.decal_size : 0.5f) * 0.5f;
+	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	ProjectDecal(gameobj, templateobj, triangles, point, inward, along, half, lifespan,
+	             std::max(settings.max_decals, 1), true);
+}
+
+void KX_DestructionManager::ProjectDecal(KX_GameObject *gameobj, KX_GameObject *templateobj,
+                                         const std::vector<mt::vec3>& triangles, const mt::vec3& point,
+                                         const mt::vec3& inward, const mt::vec3 *along, float half, float lifespan,
+                                         int maxDecals, bool anchored)
+{
+	KX_Mesh *templateMesh = templateobj->GetMeshList().front();
 	RAS_MeshMaterial *meshmat = templateMesh->GetMeshMaterialList().front();
 
 	// Projection box: N out of the surface, U and V across it with a random turn.
 	const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
 	const mt::mat3x4 invtrans = trans.Inverse();
 	const mt::vec3 invOrigin = invtrans * mt::zero3;
-	std::vector<mt::vec3> triangles;
-	deformer->GetTriangles(triangles);
-	for (mt::vec3& corner : triangles) {
-		corner = trans * corner;
-	}
 
 	/* Out of the surface: the face normal of the triangle closest to the point (the hit direction can
 	 * point either way, see DentNow), the hit direction when no triangle is found. */
@@ -687,7 +723,6 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 		axisU = side * std::cos(turn) + mt::cross(normal, side) * std::sin(turn);
 	}
 	const mt::vec3 axisV = mt::cross(normal, axisU);
-	const float half = ((settings.decal_size > 0.0f) ? settings.decal_size : 0.5f) * 0.5f;
 	// Off the surface against z-fighting.
 	const float lift = std::max(half * 0.004f, 0.001f);
 
@@ -761,9 +796,84 @@ void KX_DestructionManager::AddDecal(KX_GameObject *gameobj, const mt::vec3& poi
 	mesh->EndConversion(m_scene->GetBoundingBoxManager());
 	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, mesh);
 
-	Decal *decal = SpawnDecal(gameobj, templateobj, mesh);
-	decal->m_anchors.swap(anchors);
+	Decal *decal = SpawnDecal(gameobj, templateobj, mesh, lifespan, maxDecals);
+	if (anchored) {
+		decal->m_anchors.swap(anchors);
+	}
 	decal->m_lift = lift;
+}
+
+void KX_DestructionManager::AddGroundMark(KX_GameObject *gameobj, const RangeExplosiveSettings& settings,
+                                          const mt::vec3& center, const std::vector<KX_GameObject *>& ignore)
+{
+	if (!settings.mark) {
+		return;
+	}
+	KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.mark));
+	if (!templateobj || templateobj->GetMeshList().empty() ||
+	    templateobj->GetMeshList().front()->GetMeshMaterialList().empty())
+	{
+		CM_Warning("\"" << gameobj->GetName() << "\": the Ground Mark \"" << (settings.mark->id.name + 2)
+		           << "\" is not a mesh object in this scene.");
+		return;
+	}
+
+	// Same scale as the particle explosion presets (SMALL, MEDIUM, LARGE, HUGE, TINY), Medium ~4.5 m wide.
+	static const float sizeScale[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
+	const float scale = sizeScale[std::max(0, std::min<int>(settings.particle_size, 4))];
+	const float half = 2.25f * scale * ((settings.mark_size > 0.0f) ? settings.mark_size : 1.0f);
+
+	// Down from the center, as far as the mark reaches: a blast high in the air leaves nothing.
+	GroundFilter filter{&ignore, nullptr, mt::zero3};
+	KX_RayCast::Callback<GroundFilter, void> callback(&filter);
+	KX_RayCast::RayTest(m_scene->GetPhysicsEnvironment(), center, center - mt::axisZ3 * (half * 1.5f + 1.0f), callback);
+	KX_GameObject *ground = filter.m_hit;
+	if (!ground) {
+		return;
+	}
+
+	// The dent mesh when the ground is dented (the mark then follows it), else the triangles near the point.
+	const mt::mat3x4 trans = ground->NodeGetWorldTransform();
+	std::vector<mt::vec3> triangles;
+	bool anchored = false;
+	if (KX_DentDeformer *deformer = ground->GetDentDeformer(false)) {
+		deformer->GetTriangles(triangles);
+		for (mt::vec3& corner : triangles) {
+			corner = trans * corner;
+		}
+		anchored = true;
+	}
+	else {
+		const float reach = half * 1.75f;
+		for (KX_Mesh *mesh : ground->GetMeshList()) {
+			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+				RAS_DisplayArray *array = meshmat->GetDisplayArray();
+				if (array->GetPrimitiveType() != RAS_DisplayArray::TRIANGLES) {
+					continue;
+				}
+				for (unsigned int i = 0, size = array->GetPrimitiveIndexCount(); i + 2 < size; i += 3) {
+					mt::vec3 corner[3];
+					mt::vec3 low(FLT_MAX, FLT_MAX, FLT_MAX), high(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+					for (unsigned int j = 0; j < 3; ++j) {
+						corner[j] = trans * mt::vec3(array->GetPosition(array->GetPrimitiveIndex(i + j)));
+						low = mt::vec3::Min(low, corner[j]);
+						high = mt::vec3::Max(high, corner[j]);
+					}
+					const mt::vec3 nearest = mt::vec3::Max(low, mt::vec3::Min(high, filter.m_point));
+					if ((nearest - filter.m_point).LengthSquared() > reach * reach) {
+						continue;
+					}
+					triangles.insert(triangles.end(), corner, corner + 3);
+				}
+			}
+		}
+	}
+	if (triangles.empty()) {
+		return;
+	}
+
+	const float lifespan = (settings.mark_life > 0.0f) ? settings.mark_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	ProjectDecal(ground, templateobj, triangles, filter.m_point, -mt::axisZ3, nullptr, half, lifespan, 64, anchored);
 }
 
 KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)
@@ -784,9 +894,8 @@ KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)
 	return templateobj;
 }
 
-void KX_DestructionManager::TrimDecals(KX_GameObject *gameobj)
+void KX_DestructionManager::TrimDecals(KX_GameObject *gameobj, int maxDecals)
 {
-	const int maxDecals = std::max(GetDeformSettings(gameobj).max_decals, 1);
 	int count = 0;
 	for (std::deque<Decal>::reverse_iterator it = m_decals.rbegin(); it != m_decals.rend(); ++it) {
 		if (it->m_target == gameobj && !it->m_removing && ++count >= maxDecals) {
@@ -797,13 +906,10 @@ void KX_DestructionManager::TrimDecals(KX_GameObject *gameobj)
 }
 
 KX_DestructionManager::Decal *KX_DestructionManager::SpawnDecal(KX_GameObject *gameobj, KX_GameObject *templateobj,
-                                                                KX_Mesh *mesh)
+                                                                KX_Mesh *mesh, float lifespan, int maxDecals)
 {
 	// Over Max Decals: the oldest ones of this target go.
-	TrimDecals(gameobj);
-
-	const RangeDeformSettings settings = GetDeformSettings(gameobj);
-	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	TrimDecals(gameobj, maxDecals);
 	KX_GameObject *decalobj = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
 	decalobj->ReplaceMesh(mesh, true, false);
 	decalobj->NodeSetWorldPosition(gameobj->NodeGetWorldPosition());
@@ -903,7 +1009,9 @@ KX_DestructionManager::Decal *KX_DestructionManager::NewStrip(KX_GameObject *gam
 	mesh->EndConversion(m_scene->GetBoundingBoxManager());
 	KX_GetActiveEngine()->GetConverter()->RegisterMesh(m_scene, mesh);
 
-	Decal *decal = SpawnDecal(gameobj, templateobj, mesh);
+	const RangeDeformSettings settings = GetDeformSettings(gameobj);
+	const float lifespan = (settings.decal_life > 0.0f) ? settings.decal_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	Decal *decal = SpawnDecal(gameobj, templateobj, mesh, lifespan, std::max(settings.max_decals, 1));
 	decal->m_edge[0] = left;
 	decal->m_edge[1] = right;
 	return decal;
@@ -1174,6 +1282,12 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 	if (settings.flags & EXPLOSIVE_PARTICLES) {
 		m_scene->SpawnParticleExplosion(center, settings);
 	}
+	// A water Particle Explosion leaves no fog.
+	if ((settings.flags & EXPLOSIVE_FOG) &&
+	    !((settings.flags & EXPLOSIVE_PARTICLES) && settings.particle_style == EXPLOSIVE_STYLE_WATER))
+	{
+		m_scene->SpawnExplosionFog(center, settings);
+	}
 
 	std::vector<KX_GameObject *> pieces;
 	if (is_destructible(gameobj)) {
@@ -1185,6 +1299,9 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 
 	std::vector<KX_GameObject *> ignore = pieces;
 	ignore.push_back(gameobj);
+	if (settings.flags & EXPLOSIVE_GROUND_MARK) {
+		AddGroundMark(gameobj, settings, center, ignore);
+	}
 	Explode(center, settings.radius, settings.force, settings.up_bias, settings.flags & EXPLOSIVE_OCCLUSION, 0xFFFF, ignore);
 
 	// The fragments start at the center, nothing can shield them.

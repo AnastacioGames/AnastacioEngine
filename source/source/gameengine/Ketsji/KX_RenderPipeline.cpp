@@ -241,7 +241,33 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		}
 		++volumes;
 	}
+	/* Explosive > Explosion Fog clouds take the free slots: a sphere that grows to its radius and fades. */
+	for (const KX_Scene::ExplosionFog& fog : scene->GetExplosionFogs()) {
+		if (volumes >= 4) {
+			break;
+		}
+		const float t = std::min(fog.age / std::max(fog.life, 0.01f), 1.0f);
+		const float radius = fog.radius * (0.6f + 0.4f * std::sqrt(t));
+		const float fade = (1.0f - t) * (1.0f - t) * std::min(fog.age / 0.35f, 1.0f);
+		const mt::mat3x4 trans(mt::mat3::Identity(), fog.position, mt::vec3(radius, radius, radius));
+		mt::mat4::FromAffineTransform(trans).Inverse().Pack(params->vfog_mats + 16 * volumes);
+		d[28 + volumes] = fog.density * fade;
+		d[40 + volumes] = 1.0f;
+		d[44 + volumes] = 1.0f;
+		float *c = d + 4 * (44 + volumes);
+		c[0] = fog.color.x;
+		c[1] = fog.color.y;
+		c[2] = fog.color.z;
+		c[3] = 1.0f;
+		++volumes;
+	}
 	d[25] = (float)volumes;
+	/* Only explosion fog (the World fog is off, see KX_Scene::Render2DFilters): no global fog. */
+	if (!(world->vfog_flag & WO_VFOG_ENABLE)) {
+		d[0] = 0.0f;
+		d[3] = std::max(d[3], 150.0f);
+		d[27] = 1.0f;
+	}
 
 	/* Fog pushers: objects with the game property fog_push (radius in m) open a hole in the fog. */
 	int pushers = 0;

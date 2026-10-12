@@ -11,13 +11,16 @@ from mathutils import Vector
 args = sys.argv[sys.argv.index('--') + 1:]
 saida = args[0]
 # --estilos: quatro bombas Medium, uma de cada Explosion Style (Fire, Electric, Concrete, Water).
-ESTILOS = ('FIRE', 'ELECTRIC', 'CONCRETE', 'WATER') if '--estilos' in args else None
+# --marca: os quatro estilos com Ground Mark (New) e Explosion Fog; grava tambem final.png no fim.
+MARCA = '--marca' in args
+ESTILOS = ('FIRE', 'ELECTRIC', 'CONCRETE', 'WATER') if '--estilos' in args or MARCA else None
 TAMANHOS = ('MEDIUM',) * 4 if ESTILOS else ('TINY', 'SMALL', 'MEDIUM', 'LARGE', 'HUGE')
 PAVIOS = (1.0, 3.5, 6.0, 8.5) if ESTILOS else (1.0, 3.0, 5.0, 7.0, 9.0)
 
 SCRIPT = (
     "import bge, os\n"
     "PAVIOS = %r\n"
+    "FINAL = %r\n"
     "def tick(cont):\n"
     "    own = cont.owner\n"
     "    pasta = os.environ.get('FUMACA_SHOT')\n"
@@ -32,9 +35,12 @@ SCRIPT = (
     "        own['feitas'] = feitas + 1\n"
     "        os.makedirs(pasta, exist_ok=True)\n"
     "        bge.render.makeScreenshot(os.path.join(pasta, 'tamanho_%%d.png' %% feitas))\n"
-    "    if dt > PAVIOS[-1] + 1.0:\n"
+    "    if FINAL and dt > PAVIOS[-1] + 3.0 and not own.get('final'):\n"
+    "        own['final'] = True\n"
+    "        bge.render.makeScreenshot(os.path.join(pasta, 'final.png'))\n"
+    "    if dt > PAVIOS[-1] + (3.5 if FINAL else 1.0):\n"
     "        bge.logic.endGame()\n"
-) % (PAVIOS,)
+) % (PAVIOS, MARCA)
 
 scene = bpy.context.scene
 for ob in list(scene.objects):
@@ -88,12 +94,18 @@ for i, (tam, pavio) in enumerate(zip(TAMANHOS, PAVIOS)):
         ex.particle_style = ESTILOS[i]
         bomba.name = 'bomba_%s' % ESTILOS[i].lower()
         bomba.location.x = -18 + i * 12
+    if MARCA:
+        ex.use_ground_mark = True
+        ex.use_explosion_fog = True
+        bomba.location.x = -9 + i * 6
+        scene.objects.active = bomba
+        bpy.ops.object.explosive_mark_add(style=ESTILOS[i])
 
 cam_data = bpy.data.cameras.new('cam')
 cam_data.lens = 22
 cam = bpy.data.objects.new('cam', cam_data)
-cam.location = (0, -42, 9)
-cam.rotation_euler = (Vector((0, 0, 5)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+cam.location = (0, -20, 6) if MARCA else (0, -42, 9)
+cam.rotation_euler = (Vector((0, 0, 1.5 if MARCA else 5)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
 scene.objects.link(cam)
 scene.camera = cam
 

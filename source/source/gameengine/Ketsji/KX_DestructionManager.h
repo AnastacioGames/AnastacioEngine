@@ -231,17 +231,26 @@ private:
 	/// Projects the Decal object's material on the target surface around point (mesh decal), parented
 	/// to the target. inward points into the surface.
 	void AddDecal(KX_GameObject *gameobj, const mt::vec3& point, const mt::vec3& inward, const mt::vec3 *along = nullptr);
+	/// Clips the triangles (world) of gameobj inside the box of half size around point and adds the
+	/// decal mesh with the material of templateobj. anchored: triangles are the full dent mesh, the
+	/// decal follows its dents.
+	void ProjectDecal(KX_GameObject *gameobj, KX_GameObject *templateobj, const std::vector<mt::vec3>& triangles,
+	                  const mt::vec3& point, const mt::vec3& inward, const mt::vec3 *along, float half,
+	                  float lifespan, int maxDecals, bool anchored);
+	/// Explosive Ground Mark: the Mark object painted on the static surface under center.
+	void AddGroundMark(KX_GameObject *gameobj, const RangeExplosiveSettings& settings, const mt::vec3& center,
+	                   const std::vector<KX_GameObject *>& ignore);
 	/// Scrape Strip: extends the strip of the object to point, or starts one.
 	void AddStripSegment(Entry *entry, const mt::vec3& point, const mt::vec3& normal, const mt::vec3& along);
 	/// Mesh of a strip starting at the edge left-right (target space), parented to the target, counted
 	/// in its Max Decals.
 	Decal *NewStrip(KX_GameObject *gameobj, const mt::vec3& left, const mt::vec3& right);
 	/// Over Max Decals: the oldest decals of gameobj go, keeping room for one more.
-	void TrimDecals(KX_GameObject *gameobj);
+	void TrimDecals(KX_GameObject *gameobj, int maxDecals);
 	/// The Decal object of gameobj in this scene, warns once when it isn't a mesh object.
 	KX_GameObject *GetDecalTemplate(KX_GameObject *gameobj);
 	/// Adds the decal object showing mesh, parented to gameobj, in m_decals.
-	Decal *SpawnDecal(KX_GameObject *gameobj, KX_GameObject *templateobj, KX_Mesh *mesh);
+	Decal *SpawnDecal(KX_GameObject *gameobj, KX_GameObject *templateobj, KX_Mesh *mesh, float lifespan, int maxDecals);
 	/// Moves the decals of a dented target back on its surface.
 	void FollowDents(KX_GameObject *gameobj);
 	/// Sliding contact on an object with Scrape Marks: queues a mark every Scrape Spacing.

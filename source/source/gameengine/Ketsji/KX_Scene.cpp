@@ -588,6 +588,15 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 		if (world->vfog_flag & WO_VFOG_ENABLE) {
 			filters.useVFog = true;
 		}
+		/* Explosion Fog: compiled at load (no hitch at the first blast), on while a cloud lives. */
+		for (Base *base = (Base *)scene->base.first; base && !filters.useVFog; base = base->next) {
+			const Object *ob = base->object;
+			if ((ob->gameflag2 & OB_EXPLOSIVE) && (ob->explosive.flags & EXPLOSIVE_FOG) &&
+			    !((ob->explosive.flags & EXPLOSIVE_PARTICLES) && ob->explosive.particle_style == EXPLOSIVE_STYLE_WATER))
+			{
+				filters.useVFog = true;
+			}
+		}
 		filters.vfog_lod = KX_VFogLodDivisor(world);
 
 		if (world->weather_flag & WO_WEATHER_LENSFLARE) {
@@ -2905,6 +2914,45 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 	m_particleBlasts.erase(std::remove_if(m_particleBlasts.begin(), m_particleBlasts.end(),
 	                                      [](const std::unique_ptr<KX_ParticleBlast> &blast) { return blast->age > blast->life; }),
 	                       m_particleBlasts.end());
+
+	for (ExplosionFog &fog : m_explosionFogs) {
+		fog.age += deltaTime;
+		fog.position.z += fog.rise * deltaTime;
+	}
+	m_explosionFogs.erase(std::remove_if(m_explosionFogs.begin(), m_explosionFogs.end(),
+	                                     [](const ExplosionFog &fog) { return fog.age > fog.life; }),
+	                      m_explosionFogs.end());
+}
+
+void KX_Scene::SpawnExplosionFog(const mt::vec3 &position, const RangeExplosiveSettings &settings)
+{
+	// Same scale as the particle presets (Small, Medium, Large, Huge, Tiny), Medium ~5 m wide cloud.
+	static const float kScales[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
+	// Tint by style (Fire, Electric, Concrete), files without custom colors.
+	static const float kColors[3][3] = {{0.3f, 0.28f, 0.27f}, {0.5f, 0.55f, 0.65f}, {0.7f, 0.65f, 0.58f}};
+	const float scale = kScales[std::max(0, std::min(4, (int)settings.particle_size))];
+	const int style = std::max(0, std::min(2, (int)settings.particle_style));
+
+	ExplosionFog fog;
+	fog.position = position + mt::axisZ3 * (0.8f * scale);
+	if ((settings.flags & EXPLOSIVE_PARTICLE_COLORS) != 0) {
+		// Lit fog looks darker than the particles: the smoke color lifted towards grey.
+		fog.color = mt::vec3(0.3f + 0.7f * settings.smoke_color[0], 0.3f + 0.7f * settings.smoke_color[1],
+		                     0.3f + 0.7f * settings.smoke_color[2]);
+	}
+	else {
+		fog.color = mt::vec3(kColors[style][0], kColors[style][1], kColors[style][2]);
+	}
+	fog.radius = 4.0f * scale;
+	fog.density = 0.5f * ((settings.fog_density > 0.0f) ? settings.fog_density : 1.0f);
+	fog.rise = 0.25f * std::sqrt(scale);
+	fog.age = 0.0f;
+	fog.life = (settings.fog_duration > 0.0f) ? settings.fog_duration : 8.0f;
+	// Fog Volumes are 4 at most, the oldest cloud makes room.
+	if (m_explosionFogs.size() >= 4) {
+		m_explosionFogs.erase(m_explosionFogs.begin());
+	}
+	m_explosionFogs.push_back(fog);
 }
 
 void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings)
@@ -3448,7 +3496,9 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 
 	/* The filter was previously created only while loading an enabled World. Keep
 	 * its program after disabling it, then reactivate it without a compilation hitch. */
-	if (world && (world->vfog_flag & WO_VFOG_ENABLE)) {
+	/* Explosion Fog runs the volumetric pass for its clouds even with the World fog off. */
+	const bool fogOn = world && ((world->vfog_flag & WO_VFOG_ENABLE) || !m_explosionFogs.empty());
+	if (fogOn) {
 		BuildInFilters filters = {};
 		filters.useVFog = true;
 		filters.vfog_lod = KX_VFogLodDivisor(world);
@@ -3456,7 +3506,7 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 	}
 	for (int pass : {RAS_2DFilterManager::FILTERPASS_VFOG, RAS_2DFilterManager::FILTERPASS_VFOG_IMAGE}) {
 		if (RAS_2DFilter *vfog = m_filterManager->GetFilterPass(pass, true)) {
-			vfog->SetEnabled(world && (world->vfog_flag & WO_VFOG_ENABLE));
+			vfog->SetEnabled(fogOn);
 		}
 	}
 

@@ -35,6 +35,7 @@ _modules = [
     "file",
     "image",
     "anastacio_cook",
+    "anastacio_explosive",
     "anastacio_lightmap",
     "anastacio_ssgi",
     "anastacio_material_recipes",

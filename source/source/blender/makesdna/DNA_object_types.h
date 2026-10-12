@@ -359,6 +359,14 @@ typedef struct RangeExplosiveSettings {
 	float spark_amount;    /* 0 = no sparks */
 	float smoke_duration;  /* smoke lifetime */
 	float blast_speed;     /* how far everything is thrown */
+	/* Ground Mark (EXPLOSIVE_GROUND_MARK): the material of this object (Impact Decal style) projected
+	 * on the surface under the blast. */
+	struct Object *mark;
+	float mark_size;       /* multiplier of the size preset (0 = 1) */
+	float mark_life;       /* seconds, 0 = stays */
+	/* Explosion Fog (EXPLOSIVE_FOG): a Fog Volume sphere left by the blast, fading away. */
+	float fog_density;     /* 0 = 1 */
+	float fog_duration;    /* seconds, 0 = 8 */
 } RangeExplosiveSettings;
 
 /* RangeExplosiveSettings.flags */
@@ -368,6 +376,8 @@ enum {
 	EXPLOSIVE_CHAIN_REACTION = 1 << 2,
 	EXPLOSIVE_PARTICLES      = 1 << 3,  /* GPU particle fireball + smoke + debris at the blast */
 	EXPLOSIVE_PARTICLE_COLORS = 1 << 4, /* fire/smoke/spark_color initialized */
+	EXPLOSIVE_GROUND_MARK    = 1 << 5,  /* project the mark object on the ground */
+	EXPLOSIVE_FOG            = 1 << 6,  /* volumetric fog cloud that fades */
 };
 
 /* RangeExplosiveSettings.particle_size */
