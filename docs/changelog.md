@@ -15,7 +15,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Correção: efeito Float de Weather Effects com valor exatamente 0 ou 1 gravava 0 (o texto era lido como bool).
 - Correção: o campo Target do sensor Property (Runtime API) não aceitava objeto (faltava `PROP_EDITABLE`).
 - API Python nova para o conversor: `KX_Camera.getScreenRay(x, y, dist, property="", xray=False, mask=0xFFFF)`, `filterManager.addFilter(index, type, fragmentProgram="", owner=None, mipmap=False)` (aceita `RAS_2DFILTER_OUTLINE`; `owner` liga as game properties aos uniforms) e `filterManager.setBuiltinFilterEnabled(type, enabled=True)`.
-- Validado em background: 57 controllers com todos os bricks novos (inclusive ligados de outro objeto) convertem e o código gerado compila. **Não rodado em jogo ainda.**
+- Validado em background: 57 controllers com todos os bricks novos (inclusive ligados de outro objeto) convertem e o código gerado compila (`tools/test_logic_convert_f7_codegen.py`).
+- Validado em jogo com `tools/create_logic_convert_scene_f7.py` (10 amostras de 24 valores, bricks × convertido, `LEFT_AS_BRICK 0`): no modo Component os 240 valores batem, com o convertido agindo **um quadro depois** dos bricks (amostras com `shift`). Com a ação em loop de comprimento inteiro (1-40), Loop Stop/Loop End variam 1 quadro na virada do loop (arredondamento do tempo no limite; some com fim 38,5). Nos modos Module/Script batem 204 de 240; o resto (física e ação) fica a 1 quadro de fase, como o `cam y` já conhecido. Não cobertos em jogo: Vibration (sem joystick), Screenshot, Load Config, Motion Blur e sensor Armature por erro de IK.
 
 ## 2026-10-12 - Bindings Python: partículas GPU, Explosive e clima
 

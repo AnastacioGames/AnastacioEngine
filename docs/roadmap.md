@@ -396,7 +396,8 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   (loop recomeça, ping-pong, 3D), cena `tools/create_logic_manual_test.py`.
 - F7 (2026-10-12): Action, Armature, Filter 2D, Vibration, Motion Servo/Character/Set Position, Change Color, Game Save/Load/Screenshot,
   Property Level e Runtime API, Mouse Over com material/x-ray; Weather Effects ganhou Fog/Clouds - Volumetric. Geração validada em
-  background (código compila); **falta rodar em jogo e comparar com os bricks**, principalmente Action e Character.
+  background e em jogo (`tools/create_logic_convert_scene_f7.py`: 240/240 valores iguais no modo Component, com 1 quadro de atraso;
+  ver changelog). Falta o teste do usuário num jogo real e os bricks sem cobertura em jogo (Vibration, Screenshot, Load Config).
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
   Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.
