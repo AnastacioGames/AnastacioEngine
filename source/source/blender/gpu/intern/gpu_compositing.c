@@ -965,13 +965,13 @@ void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
 
 /* Volumetric Fog data for the 3D View, mirrors KX_FillVolumetricFog (KX_RenderPipeline.cpp):
  * layout in gpu_shader_vfog_lib.glsl. Fills shadow_tex 0-1 (Spots) and 2 (Sun). */
-#define GPU_VFOG_DATA_VEC4 52
+#define GPU_VFOG_DATA_VEC4 56
 static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], float data[GPU_VFOG_DATA_VEC4][4],
                           float mats[7][4][4], unsigned int shadow_tex[3])
 {
 	static const int preset_max[3] = {2, 4, 8};
 	const int quality = max_ii(0, min_ii(world->vfog_quality, 2));
-	int volumes = 0, lamps = 0, shadows = 0;
+	int volumes = 0, lamps = 0, shadows = 0, pushers = 0;
 	float morning = 0.0f;
 
 	memset(data, 0, sizeof(float) * GPU_VFOG_DATA_VEC4 * 4);
@@ -1096,6 +1096,21 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 					volumes++;
 				}
 			}
+			if (pushers < 4) {
+				bProperty *push = BKE_bproperty_object_get(ob, "fog_push");
+				float radius = 0.0f;
+				if (push && push->type == GPROP_FLOAT) {
+					radius = *((float *)&push->data);
+				}
+				else if (push && push->type == GPROP_INT) {
+					radius = (float)push->data;
+				}
+				if (radius > 0.0f) {
+					copy_v3_v3(data[52 + pushers], ob->obmat[3]);
+					data[52 + pushers][3] = radius;
+					pushers++;
+				}
+			}
 			if (ob->type == OB_LAMP && (world->vfog_flag & WO_VFOG_LAMPS)) {
 				Lamp *la = ob->data;
 				if ((la->type != LA_LOCAL && la->type != LA_SPOT) || la->energy <= 0.0f) {
@@ -1162,6 +1177,7 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 	}
 	data[6][0] = (float)lamps;
 	data[6][1] = (float)volumes;
+	data[9][3] = (float)pushers;
 }
 
 bool GPU_fx_do_composite_pass(

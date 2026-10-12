@@ -28,7 +28,7 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 | 3 | Fog Volumes melhores | feito, aguarda aceite visual | Claude |
 | 4 | Controle por Python / Logic | feito (2ec9637b), aguarda aceite visual | Codex |
 | 5 | Fumaça/vapor locais | feito, aguarda aceite visual | Codex |
-| 6 | Neblina que abre ao passar | pendente | |
+| 6 | Neblina que abre ao passar | feito, aguarda aceite visual | Claude |
 | 7 | Emission acendendo a névoa | pendente | |
 | 8 | Nuvens + névoa contínuas | pendente | |
 | 9 | Froxels | pendente | |
@@ -90,3 +90,12 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
    compute/RTT. Muitas lâmpadas a custo fixo; é o caminho para qualidade AAA.
 10. **Fogo/explosão volumétrico:** volume com temperatura → cor (corpo negro) e ruído turbulento,
     ligado ao sistema de destruição/explosões.
+
+## 6. Neblina que abre ao passar
+- Propriedade de jogo `fog_push` (float, raio em m) em qualquer objeto, até 4 por cena.
+- Dados: `vfog_data[52+i]` = posição xyz e raio; `[9].w` = quantidade (layout 56 vec4).
+- Shader: `vfogPush` multiplica a densidade por `smoothstep(0.35, 1, d/r)`, com a borda ondulada por
+  ruído. No Low (sem raymarch), `vfogPushAnalytic` reduz a profundidade óptica pelo trecho do raio
+  dentro da esfera.
+- O buraco acompanha o objeto, sem rastro que se fecha com o tempo (fica para depois, se precisar).
+- Variante: `medium_abre` (bola amarela indo e voltando na névoa baixa).

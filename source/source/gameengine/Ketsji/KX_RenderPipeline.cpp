@@ -231,6 +231,27 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	}
 	d[25] = (float)volumes;
 
+	/* Fog pushers: objects with the game property fog_push (radius in m) open a hole in the fog. */
+	int pushers = 0;
+	for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+		if (pushers >= 4) {
+			break;
+		}
+		EXP_Value *push = gameobj->GetProperty("fog_push");
+		const float radius = push ? (float)push->GetNumber() : 0.0f;
+		if (radius <= 0.0f) {
+			continue;
+		}
+		const mt::vec3& pos = gameobj->NodeGetWorldPosition();
+		float *p = d + 4 * (52 + pushers);
+		p[0] = pos.x;
+		p[1] = pos.y;
+		p[2] = pos.z;
+		p[3] = radius;
+		++pushers;
+	}
+	d[39] = (float)pushers;
+
 	/* Lamps: strongest at the camera first, only the ones whose reach gets near the fogged part. */
 	int lampCount = 0;
 	if (world->vfog_flag & WO_VFOG_LAMPS) {

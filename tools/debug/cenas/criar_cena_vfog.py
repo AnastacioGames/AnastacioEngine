@@ -27,6 +27,9 @@ SCRIPT = (
     "        world.setWeather('vfog_color_r', 0.35 + 0.35 * (1.0 + __import__('math').sin(fase)))\n"
     "        world.setWeather('vfog_color_g', 0.30 + 0.20 * (1.0 + __import__('math').sin(fase + 2.1)))\n"
     "        world.setWeather('vfog_color_b', 0.45 + 0.20 * (1.0 + __import__('math').sin(fase + 4.2)))\n"
+    "    if own['preset'] == 'medium_abre':\n"
+    "        bola = bge.logic.getCurrentScene().objects['bola_push']\n"
+    "        bola.worldPosition.x = 8.0 * __import__('math').sin(agora * 0.6)\n"
     "    if 'inicio' not in own:\n"
     "        own['inicio'] = agora\n"
     "        own['frames'] = 0\n"
@@ -264,8 +267,20 @@ def gerar(preset):
         vol.game.properties['fog_shape'].value = 'sphere'
         bpy.ops.object.game_property_new(type='FLOAT', name='fog_smoke')
         vol.game.properties['fog_smoke'].value = 1.5
+    if preset == 'medium_abre':
+        # Neblina baixa e densa; a bola com fog_push vai e volta abrindo um buraco.
+        w.vfog_density = 0.25
+        w.vfog_falloff = 2.0
+        bola = malha('bola_push', lambda bm: bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12,
+                                                                       diameter=1.0), (0, 6, 1.0))
+        bola.data.materials.append(principled('bola_amarela', (1.0, 0.8, 0.1, 1.0)))
+        bola.game.physics_type = 'NO_COLLISION'
+        scene.objects.link(bola)
+        scene.objects.active = bola
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_push')
+        bola.game.properties['fog_push'].value = 3.5
 
-    txt = bpy.data.texts.new('medir_fps.py')
+    txt =bpy.data.texts.new('medir_fps.py')
     txt.write(SCRIPT)
     scene.objects.active = chao
     bpy.ops.object.game_property_new(type='STRING', name='preset')
@@ -301,5 +316,6 @@ def gerar(preset):
 
 
 for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
-          'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca'):
+          'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca',
+          'medium_abre'):
     gerar(p)

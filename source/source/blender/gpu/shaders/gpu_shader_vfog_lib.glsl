@@ -11,7 +11,7 @@
  *  6 lamp count, volume count, lamp intensity, only inside volumes
  *  7 density of volumes 0-3
  *  8 volume edge, shaft intensity, sun shadow bias, has sun shadow (vfog_shadow2)
- *  9 wind offset xy (world units), smoke time, -
+ *  9 wind offset xy (world units), smoke time, pusher count
  *  10 shape of volumes 0-3 (0 box, 1 sphere)
  *  11 edge of volumes 0-3
  *  12 + 4i lamp i: position xyz, falloff distance
@@ -20,14 +20,16 @@
  *  15 + 4i cos where the spot edge blend ends, shadow bias, -, -
  *  44 + i volume i color rgb, has color (0 = fog color)
  *  48 + i volume i smoke rise speed (m/s; 0 = normal volume)
+ *  52 + i pusher i (fog_push): position xyz, radius
  * vfog_mats: 0-3 world -> volume local space (unit box/sphere), 4-5 world -> Spot shadow map,
  * 6 world -> Sun shadow map. */
 
 #define VFOG_MAX_LIGHTS 8
 #define VFOG_VOLUME_COLOR (12 + 4 * VFOG_MAX_LIGHTS)
 #define VFOG_VOLUME_SMOKE (VFOG_VOLUME_COLOR + 4)
+#define VFOG_PUSHER (VFOG_VOLUME_SMOKE + 4)
 
-uniform vec4 vfog_data[VFOG_VOLUME_SMOKE + 4];
+uniform vec4 vfog_data[VFOG_PUSHER + 4];
 uniform mat4 vfog_mats[7];
 uniform sampler2DShadow vfog_shadow0;
 uniform sampler2DShadow vfog_shadow1;
@@ -108,6 +110,8 @@ float vfogVolumeFactor(vec3 p)
 	return f;
 }
 
+float vfogPush(vec3 p);
+
 /* Extinction coefficient at p (before the noise) and the fog color there: the height fog and the
  * volumes, each volume with its own tint, mixed by how much each contributes. */
 float vfogDensityColor(vec3 p, out vec3 color)
@@ -140,7 +144,55 @@ float vfogDensityColor(vec3 p, out vec3 color)
 		}
 		d += f;
 	}
+	if (vfog_data[9].w > 0.5 && d > 0.0) {
+		d *= vfogPush(p);
+	}
 	return d;
+}
+
+/* Fog left at p by the pushers: 0 at their center .. 1 out of their radius, the rim wobbling with
+ * the noise so the hole does not look like a ball. */
+float vfogPush(vec3 p)
+{
+	float k = 1.0;
+	int count = int(vfog_data[9].w);
+	for (int i = 0; i < 4; i++) {
+		if (i >= count) {
+			break;
+		}
+		vec4 push = vfog_data[VFOG_PUSHER + i];
+		float x = length(p - push.xyz) / max(push.w, 0.01);
+		if (x < 1.0) {
+			x += (vfogNoise(p * 1.7 + vfog_data[1].z) - 0.5) * 0.3;
+			k *= smoothstep(0.35, 1.0, x);
+		}
+	}
+	return k;
+}
+
+/* Fraction of the optical depth over [t0, t1] that the pushers leave (Low, no raymarch): the part
+ * of the ray inside each pusher counts about 70% less. */
+float vfogPushAnalytic(vec3 ro, vec3 rd, float t0, float t1)
+{
+	float k = 1.0;
+	int count = int(vfog_data[9].w);
+	float len = max(t1 - t0, 1e-3);
+	for (int i = 0; i < 4; i++) {
+		if (i >= count) {
+			break;
+		}
+		vec4 push = vfog_data[VFOG_PUSHER + i];
+		float tc = dot(push.xyz - ro, rd);
+		vec3 c = ro + rd * tc - push.xyz;
+		float h2 = dot(c, c);
+		float r2 = push.w * push.w;
+		if (h2 < r2) {
+			float w = sqrt(r2 - h2);
+			float chord = max(0.0, min(t1, tc + w) - max(t0, tc - w));
+			k *= 1.0 - 0.7 * min(chord / len, 1.0);
+		}
+	}
+	return k;
 }
 
 float vfogDensityBase(vec3 p)
@@ -379,6 +431,9 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 			tau += vfog_data[0].x * vfogVolumeFactor(ro + rd * (seg.x + len * 0.5)) * len;
 		}
 		tau *= vfogPatches(ro + rd * (seg.x + min(len, 30.0) * 0.5));
+		if (vfog_data[9].w > 0.5) {
+			tau *= vfogPushAnalytic(ro, rd, seg.x, seg.y);
+		}
 		float T = exp(-tau);
 		if (vfog_data[6].y > 0.5) {
 			vfogDensityColor(ro + rd * (seg.x + len * 0.5), fogColor);
