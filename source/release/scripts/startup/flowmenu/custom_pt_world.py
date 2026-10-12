@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Panel, Operator
+from bpy.types import Menu, Panel, Operator
 from bpy.props import StringProperty, EnumProperty, BoolProperty, IntProperty
 from bpy.app.translations import pgettext_iface as iface_
 
@@ -73,6 +73,108 @@ class WORLD_OT_atmosphere_reset(bpy.types.Operator):
         for name, value in ATMOSPHERE_EARTH.items():
             setattr(context.world, name, value)
         return {'FINISHED'}
+
+
+def _fog_add_property(obj, name, value, prop_type):
+    bpy.context.scene.objects.active = obj
+    bpy.ops.object.game_property_new(name=name, type=prop_type)
+    obj.game.properties[name].value = value
+
+
+def _fog_add_finish(context, obj):
+    for other in context.scene.objects:
+        other.select = False
+    obj.select = True
+    context.scene.objects.active = obj
+
+
+def _fog_add_volume(context, sphere=False, smoke=False):
+    cursor = context.scene.cursor_location
+    if sphere:
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, location=cursor)
+    else:
+        bpy.ops.mesh.primitive_cube_add(location=cursor)
+    obj = context.active_object
+    obj.name = "Smoke Source" if smoke else ("Fog Volume (Sphere)" if sphere else "Fog Volume (Box)")
+    obj.draw_type = 'WIRE'
+    obj.show_wire = True
+    obj.show_all_edges = True
+    obj.hide_render = True
+    obj.game.physics_type = 'NO_COLLISION'
+    _fog_add_property(obj, 'fog_volume', 1.0, 'FLOAT')
+    if sphere:
+        _fog_add_property(obj, 'fog_shape', 'sphere', 'STRING')
+    if smoke:
+        obj.scale = (0.6, 0.6, 2.5)
+        obj.color = (0.72, 0.74, 0.76, 1.0)
+        _fog_add_property(obj, 'fog_smoke', 1.5, 'FLOAT')
+    _fog_add_finish(context, obj)
+
+
+class OBJECT_OT_fog_volume_box_add(Operator):
+    bl_idname = "object.fog_volume_box_add"
+    bl_label = "Fog Volume (Box)"
+    bl_description = "Add an invisible box Fog Volume at the 3D Cursor"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        _fog_add_volume(context)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_fog_volume_sphere_add(Operator):
+    bl_idname = "object.fog_volume_sphere_add"
+    bl_label = "Fog Volume (Sphere)"
+    bl_description = "Add an invisible sphere Fog Volume at the 3D Cursor"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        _fog_add_volume(context, sphere=True)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_fog_smoke_source_add(Operator):
+    bl_idname = "object.fog_smoke_source_add"
+    bl_label = "Smoke Source"
+    bl_description = "Add an invisible local smoke plume at the 3D Cursor"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        _fog_add_volume(context, sphere=True, smoke=True)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_fog_pusher_add(Operator):
+    bl_idname = "object.fog_pusher_add"
+    bl_label = "Fog Pusher"
+    bl_description = "Add an Empty that opens fog within its radius"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.ops.object.empty_add(type='PLAIN_AXES', location=context.scene.cursor_location)
+        obj = context.active_object
+        obj.name = "Fog Pusher"
+        _fog_add_property(obj, 'fog_push', 3.0, 'FLOAT')
+        _fog_add_finish(context, obj)
+        return {'FINISHED'}
+
+
+class INFO_MT_fog_add(Menu):
+    bl_idname = "INFO_MT_fog_add"
+    bl_label = "Fog"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator(OBJECT_OT_fog_volume_box_add.bl_idname, icon='MESH_CUBE')
+        layout.operator(OBJECT_OT_fog_volume_sphere_add.bl_idname, icon='MESH_UVSPHERE')
+        layout.separator()
+        layout.operator(OBJECT_OT_fog_smoke_source_add.bl_idname, icon='MOD_SMOKE')
+        layout.operator(OBJECT_OT_fog_pusher_add.bl_idname, icon='OUTLINER_OB_EMPTY')
+
+
+def draw_fog_add_menu(self, context):
+    self.layout.separator()
+    self.layout.menu(INFO_MT_fog_add.bl_idname, icon='MOD_SMOKE')
 
 
 # Clouds - Procedural e Clouds - Sky Layers: os botões Low/Medium/High só preenchem os valores abaixo,
@@ -377,8 +479,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.prop(weather, "vfog_volumes_only")
             sub.prop(weather, "vfog_edge", slider=True)
             info = col.column(align=True)
-            info.label(text="Fog Volume: game property \"fog_volume\" (density) on a cube", icon='INFO')
-            info.label(text="Optional: \"fog_shape\" = sphere, \"fog_edge\"; Object Color tints it", icon='INFO')
+            info.label(text="Add > Fog creates volumes, smoke sources and pushers", icon='INFO')
+            info.label(text="fog_volume=density; fog_shape=sphere; fog_edge=soft edge", icon='INFO')
+            info.label(text="fog_smoke=rise m/s; fog_push=radius m; Object Color tints", icon='INFO')
             if context.world.mist_settings.use_mist:
                 info.label(text="Mist is also on: the scene gets fogged twice", icon='ERROR')
             if weather.vfog_quality == 'HIGH':

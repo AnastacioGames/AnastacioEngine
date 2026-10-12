@@ -9,6 +9,18 @@ O layout de `vfog_data` está documentado no topo da lib. Quando ele mudar, mude
 Cena de teste: `tools/debug/cenas/criar_cena_vfog.py` (uma variante por recurso, com FPS de ~10 s
 gravado em `VFOG_FPS_LOG` e captura em `VFOG_SHOT`).
 
+## Como usar
+
+Na 3D View, use **Add > Fog** para criar os auxiliares já configurados no cursor 3D. Eles ficam invisíveis
+no jogo e aparecem em wireframe na viewport. As propriedades de jogo também podem ser aplicadas manualmente:
+
+- `fog_volume`: densidade do volume (float).
+- `fog_shape`: use `"sphere"` para volume esférico; ausente mantém caixa.
+- `fog_edge`: largura da borda suave (float), sobrepõe o Volume Edge do World.
+- `fog_smoke`: velocidade de subida da fumaça no Z local, em m/s (float); `0` ou ausente é volume normal.
+- `fog_push`: raio, em metros (float), que abre a neblina em torno do objeto.
+- **Object Color**: tinge o volume quando diferente de branco.
+
 | # | Item | Status | Quem |
 |---|------|--------|------|
 | 1 | Vento e hora do dia | feito, aguarda aceite visual | Claude |
