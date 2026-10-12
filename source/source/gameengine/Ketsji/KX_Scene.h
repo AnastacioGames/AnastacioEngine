@@ -160,18 +160,6 @@ private:
 	std::vector<KX_GameObject *> m_gpuParticleObjects;
 	/// Explosive > Particle Explosion: live fireball/smoke/debris bursts, not tied to any object.
 	std::vector<std::unique_ptr<KX_ParticleBlast>> m_particleBlasts;
-	/// Explosive > Explosion Fog: a sphere Fog Volume (Fog - Volumetric) that grows and fades.
-	struct ExplosionFog {
-		mt::vec3 position;
-		mt::vec3 color;
-		float radius;   ///< at the end, it starts at 60 %
-		float density;  ///< peak fog_volume
-		float rise;     ///< m/s
-		float age;
-		float life;
-	};
-	/// Explosive > Explosion Fog: live fog clouds, added to the Fog Volumes each frame.
-	std::vector<ExplosionFog> m_explosionFogs;
 
 	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
 	std::unique_ptr<KX_RainAura> m_rainAura;
@@ -659,9 +647,6 @@ public:
 	void SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings);
 	void DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex);
 	bool HasParticleBlasts() const { return !m_particleBlasts.empty(); }
-
-	void SpawnExplosionFog(const mt::vec3 &position, const RangeExplosiveSettings &settings);
-	const std::vector<ExplosionFog> &GetExplosionFogs() const { return m_explosionFogs; }
 
 	/// Same as AddGpuParticleObject/RemoveGpuParticleObject/GetGpuParticleObjects, but for
 	/// objects flagged use_gpu_particle_collider (Screen-Space collision depth pass).

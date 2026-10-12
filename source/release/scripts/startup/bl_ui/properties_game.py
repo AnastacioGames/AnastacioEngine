@@ -710,20 +710,6 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
             elif es.mark.is_visible(context.scene):
                 col.label(text="Move the Mark object to an inactive layer", icon='ERROR')
 
-        # Explosion Fog: a Fog Volume (Fog - Volumetric) cloud; water leaves no fog.
-        col = layout.box()
-        water = es.use_particle_explosion and es.particle_style == 'WATER'
-        row = col.row()
-        row.active = not water
-        row.prop(es, "use_explosion_fog")
-        if es.use_explosion_fog:
-            if water:
-                col.label(text="Water explosions leave no fog", icon='INFO')
-            else:
-                row = col.row()
-                row.prop(es, "fog_density", text="Density")
-                row.prop(es, "fog_duration", text="Duration")
-
 
 class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
     bl_label = "Deformation"

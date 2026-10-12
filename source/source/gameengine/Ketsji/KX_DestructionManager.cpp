@@ -1282,12 +1282,6 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 	if (settings.flags & EXPLOSIVE_PARTICLES) {
 		m_scene->SpawnParticleExplosion(center, settings);
 	}
-	// A water Particle Explosion leaves no fog.
-	if ((settings.flags & EXPLOSIVE_FOG) &&
-	    !((settings.flags & EXPLOSIVE_PARTICLES) && settings.particle_style == EXPLOSIVE_STYLE_WATER))
-	{
-		m_scene->SpawnExplosionFog(center, settings);
-	}
 
 	std::vector<KX_GameObject *> pieces;
 	if (is_destructible(gameobj)) {

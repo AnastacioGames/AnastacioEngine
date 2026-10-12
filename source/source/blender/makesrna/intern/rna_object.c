@@ -447,22 +447,6 @@ static void rna_RangeExplosiveSettings_use_ground_mark_set(PointerRNA *ptr, bool
 	}
 }
 
-static void rna_RangeExplosiveSettings_use_explosion_fog_set(PointerRNA *ptr, bool value)
-{
-	RangeExplosiveSettings *es = ptr->data;
-
-	if (value) {
-		es->flags |= EXPLOSIVE_FOG;
-		if (es->fog_density == 0.0f) {
-			es->fog_density = 1.0f;
-			es->fog_duration = 8.0f;
-		}
-	}
-	else {
-		es->flags &= ~EXPLOSIVE_FOG;
-	}
-}
-
 static void rna_Object_internal_update_draw(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	DAG_id_tag_update(ptr->id.data, OB_RECALC_OB);
@@ -3177,24 +3161,6 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 3600.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 120.0f, 100, 1);
 	RNA_def_property_ui_text(prop, "Mark Life", "Seconds the ground mark stays (0 = forever)");
-	RNA_def_property_update(prop, NC_OBJECT, NULL);
-
-	prop = RNA_def_property(srna, "use_explosion_fog", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_FOG);
-	RNA_def_property_boolean_funcs(prop, NULL, "rna_RangeExplosiveSettings_use_explosion_fog_set");
-	RNA_def_property_ui_text(prop, "Explosion Fog",
-	                         "Volumetric fog cloud left by the blast that slowly fades away (a Fog Volume; "
-	                         "costs about as much as Fog - Volumetric while it lasts)");
-	RNA_def_property_update(prop, NC_OBJECT, NULL);
-
-	prop = RNA_def_property(srna, "fog_density", PROP_FLOAT, PROP_FACTOR);
-	RNA_def_property_range(prop, 0.05f, 4.0f);
-	RNA_def_property_ui_text(prop, "Fog Density", "Thickness of the explosion fog");
-	RNA_def_property_update(prop, NC_OBJECT, NULL);
-
-	prop = RNA_def_property(srna, "fog_duration", PROP_FLOAT, PROP_TIME);
-	RNA_def_property_range(prop, 0.5f, 120.0f);
-	RNA_def_property_ui_text(prop, "Fog Duration", "Seconds until the explosion fog is gone");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 

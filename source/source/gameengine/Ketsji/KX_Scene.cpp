@@ -173,7 +173,7 @@ const KX_BlastLayer kBlastStyles[4][3] = {
 		{GPU_PARTICLE_LOOK_FIRE, 160, 1.1f, 0.4f, 9.0f, 1.0f, 4.5f, 2.0f, 1.4f, 2.6f,
 		 {1.0f, 1.0f, 1.0f, 0.7f}, {1.0f, 1.0f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
 		// Smoke: dark billows pushed out with the blast, then drifting up and thinning.
-		{GPU_PARTICLE_LOOK_SMOKE, 120, 4.5f, 0.5f, 6.0f, 0.8f, 2.5f, 0.5f, 1.2f, 4.5f,
+		{GPU_PARTICLE_LOOK_SMOKE, 120, 9.0f, 0.5f, 6.0f, 0.8f, 2.5f, 0.5f, 1.2f, 4.5f,
 		 {0.18f, 0.16f, 0.15f, 0.75f}, {0.4f, 0.39f, 0.38f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
 		// Debris sparks thrown far and falling.
 		{GPU_PARTICLE_LOOK_SPARKLE, 220, 1.8f, 0.3f, 14.0f, 3.0f, 0.8f, -9.8f, 0.09f, 0.03f,
@@ -184,7 +184,7 @@ const KX_BlastLayer kBlastStyles[4][3] = {
 		{GPU_PARTICLE_LOOK_FIRE, 120, 0.5f, 0.3f, 7.0f, 0.0f, 6.0f, 0.0f, 1.0f, 1.8f,
 		 {0.45f, 0.7f, 1.0f, 0.8f}, {0.45f, 0.7f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
 		// Thin grey-blue smoke of burnt insulation.
-		{GPU_PARTICLE_LOOK_SMOKE, 50, 2.5f, 0.3f, 3.0f, 0.5f, 3.0f, 0.4f, 0.8f, 3.0f,
+		{GPU_PARTICLE_LOOK_SMOKE, 50, 6.0f, 0.3f, 3.0f, 0.5f, 3.0f, 0.4f, 0.8f, 3.0f,
 		 {0.35f, 0.38f, 0.45f, 0.4f}, {0.5f, 0.52f, 0.56f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
 		// Many fast electric sparks that die quickly.
 		{GPU_PARTICLE_LOOK_SPARKLE, 320, 0.9f, 0.2f, 18.0f, 1.0f, 2.5f, -4.0f, 0.07f, 0.02f,
@@ -195,7 +195,7 @@ const KX_BlastLayer kBlastStyles[4][3] = {
 		{GPU_PARTICLE_LOOK_SMOKE, 90, 2.0f, 0.5f, 10.0f, 0.5f, 5.0f, 0.0f, 1.0f, 3.0f,
 		 {0.6f, 0.56f, 0.5f, 0.8f}, {0.65f, 0.62f, 0.58f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
 		// Big dust cloud that hangs and slowly rises.
-		{GPU_PARTICLE_LOOK_SMOKE, 120, 6.0f, 0.6f, 5.0f, 0.6f, 2.0f, 0.25f, 1.5f, 6.0f,
+		{GPU_PARTICLE_LOOK_SMOKE, 120, 10.0f, 0.6f, 5.0f, 0.6f, 2.0f, 0.25f, 1.5f, 6.0f,
 		 {0.55f, 0.52f, 0.48f, 0.6f}, {0.62f, 0.6f, 0.57f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
 		// Chunks of debris thrown up and falling.
 		{GPU_PARTICLE_LOOK_DEFAULT, 160, 2.2f, 0.3f, 12.0f, 4.0f, 0.6f, -9.8f, 0.14f, 0.1f,
@@ -587,15 +587,6 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 		/* Volumetric Fog: parameters, lamps and volumes are refreshed every frame (KX_RenderPipeline). */
 		if (world->vfog_flag & WO_VFOG_ENABLE) {
 			filters.useVFog = true;
-		}
-		/* Explosion Fog: compiled at load (no hitch at the first blast), on while a cloud lives. */
-		for (Base *base = (Base *)scene->base.first; base && !filters.useVFog; base = base->next) {
-			const Object *ob = base->object;
-			if ((ob->gameflag2 & OB_EXPLOSIVE) && (ob->explosive.flags & EXPLOSIVE_FOG) &&
-			    !((ob->explosive.flags & EXPLOSIVE_PARTICLES) && ob->explosive.particle_style == EXPLOSIVE_STYLE_WATER))
-			{
-				filters.useVFog = true;
-			}
 		}
 		filters.vfog_lod = KX_VFogLodDivisor(world);
 
@@ -2914,45 +2905,6 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 	m_particleBlasts.erase(std::remove_if(m_particleBlasts.begin(), m_particleBlasts.end(),
 	                                      [](const std::unique_ptr<KX_ParticleBlast> &blast) { return blast->age > blast->life; }),
 	                       m_particleBlasts.end());
-
-	for (ExplosionFog &fog : m_explosionFogs) {
-		fog.age += deltaTime;
-		fog.position.z += fog.rise * deltaTime;
-	}
-	m_explosionFogs.erase(std::remove_if(m_explosionFogs.begin(), m_explosionFogs.end(),
-	                                     [](const ExplosionFog &fog) { return fog.age > fog.life; }),
-	                      m_explosionFogs.end());
-}
-
-void KX_Scene::SpawnExplosionFog(const mt::vec3 &position, const RangeExplosiveSettings &settings)
-{
-	// Same scale as the particle presets (Small, Medium, Large, Huge, Tiny), Medium ~5 m wide cloud.
-	static const float kScales[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
-	// Tint by style (Fire, Electric, Concrete), files without custom colors.
-	static const float kColors[3][3] = {{0.3f, 0.28f, 0.27f}, {0.5f, 0.55f, 0.65f}, {0.7f, 0.65f, 0.58f}};
-	const float scale = kScales[std::max(0, std::min(4, (int)settings.particle_size))];
-	const int style = std::max(0, std::min(2, (int)settings.particle_style));
-
-	ExplosionFog fog;
-	fog.position = position + mt::axisZ3 * (0.8f * scale);
-	if ((settings.flags & EXPLOSIVE_PARTICLE_COLORS) != 0) {
-		// Lit fog looks darker than the particles: the smoke color lifted towards grey.
-		fog.color = mt::vec3(0.3f + 0.7f * settings.smoke_color[0], 0.3f + 0.7f * settings.smoke_color[1],
-		                     0.3f + 0.7f * settings.smoke_color[2]);
-	}
-	else {
-		fog.color = mt::vec3(kColors[style][0], kColors[style][1], kColors[style][2]);
-	}
-	fog.radius = 4.0f * scale;
-	fog.density = 0.5f * ((settings.fog_density > 0.0f) ? settings.fog_density : 1.0f);
-	fog.rise = 0.25f * std::sqrt(scale);
-	fog.age = 0.0f;
-	fog.life = (settings.fog_duration > 0.0f) ? settings.fog_duration : 8.0f;
-	// Fog Volumes are 4 at most, the oldest cloud makes room.
-	if (m_explosionFogs.size() >= 4) {
-		m_explosionFogs.erase(m_explosionFogs.begin());
-	}
-	m_explosionFogs.push_back(fog);
 }
 
 void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings)
@@ -3496,9 +3448,7 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 
 	/* The filter was previously created only while loading an enabled World. Keep
 	 * its program after disabling it, then reactivate it without a compilation hitch. */
-	/* Explosion Fog runs the volumetric pass for its clouds even with the World fog off. */
-	const bool fogOn = world && ((world->vfog_flag & WO_VFOG_ENABLE) || !m_explosionFogs.empty());
-	if (fogOn) {
+	if (world && (world->vfog_flag & WO_VFOG_ENABLE)) {
 		BuildInFilters filters = {};
 		filters.useVFog = true;
 		filters.vfog_lod = KX_VFogLodDivisor(world);
@@ -3506,7 +3456,7 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 	}
 	for (int pass : {RAS_2DFilterManager::FILTERPASS_VFOG, RAS_2DFilterManager::FILTERPASS_VFOG_IMAGE}) {
 		if (RAS_2DFilter *vfog = m_filterManager->GetFilterPass(pass, true)) {
-			vfog->SetEnabled(fogOn);
+			vfog->SetEnabled(world && (world->vfog_flag & WO_VFOG_ENABLE));
 		}
 	}
 

@@ -11,7 +11,7 @@ from mathutils import Vector
 args = sys.argv[sys.argv.index('--') + 1:]
 saida = args[0]
 # --estilos: quatro bombas Medium, uma de cada Explosion Style (Fire, Electric, Concrete, Water).
-# --marca: os quatro estilos com Ground Mark (New) e Explosion Fog; grava tambem final.png no fim.
+# --marca: os quatro estilos com Ground Mark (New); grava tambem final.png no fim.
 MARCA = '--marca' in args
 ESTILOS = ('FIRE', 'ELECTRIC', 'CONCRETE', 'WATER') if '--estilos' in args or MARCA else None
 TAMANHOS = ('MEDIUM',) * 4 if ESTILOS else ('TINY', 'SMALL', 'MEDIUM', 'LARGE', 'HUGE')
@@ -96,7 +96,6 @@ for i, (tam, pavio) in enumerate(zip(TAMANHOS, PAVIOS)):
         bomba.location.x = -18 + i * 12
     if MARCA:
         ex.use_ground_mark = True
-        ex.use_explosion_fog = True
         bomba.location.x = -9 + i * 6
         scene.objects.active = bomba
         bpy.ops.object.explosive_mark_add(style=ESTILOS[i])

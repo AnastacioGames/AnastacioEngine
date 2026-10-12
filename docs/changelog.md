@@ -6,11 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
-## 2026-10-12 - Explosive: estilos, Ground Mark e Explosion Fog
+## 2026-10-12 - Explosive: estilos, Ground Mark e fumaça mais longa
 
 - Particle Explosion ganha o tamanho Tiny, os estilos Fire/Electric/Concrete/Water e cores, quantidades, Smoke Duration e Blast Speed editáveis.
 - **Ground Mark**: projeta o material do objeto Mark no chão estático sob a explosão. Usa a mesma projeção do Impact Decal (`KX_DestructionManager::ProjectDecal`). O botão **New** cria a marca do estilo na camada 20: queimado, queimadura elétrica, poeira ou mancha molhada. Size e Life são editáveis.
-- **Explosion Fog**: deixa uma esfera de Fog Volume (Fog - Volumetric) que cresce e some aos poucos (Density, Duration). Funciona mesmo com a névoa do World desligada: o passe volumétrico liga só enquanto a nuvem existe e é compilado no load. A explosão de água não gera névoa. São no máximo 4 volumes, somando os objetos `fog_volume`.
+- A fumaça final dura mais: Fire 9 s, Electric 6 s, Concrete 10 s (antes 4,5/2,5/6). A névoa da água continua curta.
 - Cena: `tools/debug/cenas/criar_cena_explosao_tamanhos.py --marca`.
 
 ## 2026-10-12 - Explosão de partículas: modo Burst, Drag, partículas suaves e Explosive > Particle Explosion
