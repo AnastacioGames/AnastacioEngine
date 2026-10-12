@@ -25,7 +25,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Brick Property: os 16 rótulos fixos do modo Runtime API / Weather Effects / World Property em `logic_window.c` passam por `IFACE_()`; o item "Edge" da neblina volumétrica virou "Edge Softness" (caía na tradução de aresta de malha). Traduções novas em pt-BR, es e ru.
 - Doc da API: assinatura de `KX_Camera.getScreenRay` corrigida no `.rst` (`dist` é obrigatório e `property` tem padrão `""`).
 - Validado em jogo, bricks × convertido, `LEFT_AS_BRICK 0`: `create_logic_convert_scene_f11.py` (sensores) e `create_logic_convert_scene_f12.py` (Track To, 13 rastreadores) idênticos, também no modo Module; F10 ampliada (ordem dos actuators, World de texto) 361 de 361; F7, F8, F9, F6 e Steering iguais como antes. Na F11 as colunas de Mouse Over só valem quando a janela do runtime recebe o cursor (`cursor=centro` no arquivo); com outra janela na frente saem zeradas nos dois lados.
-- Não verificado: caracteres realmente digitados no registro de teclas (o teste não gera teclado) e o brick Property no editor com os rótulos traduzidos (o link do editor ficou pendente porque o executável estava aberto; o runtime foi recompilado).
+- Registro de teclas conferido depois com teclas simuladas pelo Windows (`tools/create_logic_convert_scene_keylog.py`; a, b, c, Backspace, d, Enter, e, z, z, cada tecla segurada 100 ms): texto registrado idêntico em bricks e convertido (`xabd
+ezz`) e 9 disparos do sensor All Keys nos dois, nos mesmos intervalos de quadros. Teclas enviadas enquanto o jogo ainda carrega entram no texto mas não disparam o sensor, nos dois lados; por isso o teste espera 4,5 s antes de digitar.
+- Mouse Over da F11 e Mouse Look da F5 repetidos com o cursor dentro da janela: iguais (F11 345 de 345).
+- Editor religado depois; o item "Edge Softness" e os rótulos traduzidos foram conferidos em background pela consulta de tradução, não na tela do Logic Editor.
 - Diferenças que são da arquitetura e ficam: ordem entre objetos (bricks reordenam a lista de actuators ativos; componentes rodam na ordem dos objetos), navmesh refeito em jogo no Steering, alvo procurado por nome.
 
 ## 2026-10-12 - Logic Bricks → Python: disparo dos controllers como na engine, casos que faltavam e traduções

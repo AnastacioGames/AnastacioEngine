@@ -404,7 +404,8 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   (ver changelog). Nenhum caso conhecido fica como brick além do controller Python.
 - F11-F12 (2026-10-12): fechadas as lacunas da auditoria (Pulse do Collision e do Mouse Over, registro de teclas, Random com
   Delta Time, Track To com alvo de propriedade, ordem dos actuators pela pilha). Cenas `create_logic_convert_scene_f11.py` e
-  `_f12`. Falta testar o registro de teclas digitando de verdade e conferir no editor os rótulos traduzidos do brick Property.
+  `_f12`; registro de teclas conferido com teclas simuladas (`create_logic_convert_scene_keylog.py`). Falta só o usuário olhar no
+  editor os rótulos traduzidos do brick Property.
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; no modo Module/Script outro controller Python
   que leia o objeto no mesmo quadro vê a mudança um quadro antes do que veria com bricks; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.
