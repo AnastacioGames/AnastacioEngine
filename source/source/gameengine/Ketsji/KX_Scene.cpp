@@ -67,6 +67,7 @@
 #include "KX_Camera.h"
 #include "KX_WorldInfo.h"
 #include "KX_Speaker.h"
+#include "KX_AudioManager.h"
 #include "KX_NavMeshObject.h"
 #include "SCA_JoystickManager.h"
 #include "KX_PyMath.h"
@@ -3070,6 +3071,11 @@ void KX_Scene::UpdateReverbAreas()
 		if ((speaker->GetLayer() & GetBlenderScene()->lay) != 0) {
 			speaker->ApplyAreaReverb(best, bestInfluence);
 		}
+	}
+
+	// World Sound modules with Use Reverb Areas get the same area as the speakers.
+	if (KX_AudioManager *audioManager = KX_GetActiveEngine()->GetAudioManager()) {
+		audioManager->SetAreaReverb(best, bestInfluence);
 	}
 
 	m_reverbAreasActive = !m_reverbAreaObjects.empty();

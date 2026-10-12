@@ -3749,6 +3749,11 @@ static void direct_link_world(FileData *fd, World *wrld)
 			prop->poin = &prop->data;
 	}
 
+	link_list(fd, &wrld->sound_modules);
+	for (WorldSoundModule *module = wrld->sound_modules.first; module; module = module->next) {
+		link_list(fd, &module->sounds);
+	}
+
 	/* Files saved before the Clouds weather effect existed have this field
 	 * zeroed out (never present in the file), which the compositor shader
 	 * reads as "coverage 0" and silently skips drawing anything. cloud_scale

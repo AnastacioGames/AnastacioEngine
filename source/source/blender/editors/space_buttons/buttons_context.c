@@ -595,6 +595,7 @@ static int buttons_context_path(const bContext *C, ButsContextPath *path, int ma
 			found = buttons_context_path_scene(path);
 			break;
 		case BCONTEXT_WORLD:
+		case BCONTEXT_WORLD_SOUND:
 			found = buttons_context_path_world(path);
 			break;
 		case BCONTEXT_OBJECT:

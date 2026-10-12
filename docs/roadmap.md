@@ -26,6 +26,7 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
   - [Linux x86_64](#linux-x86_64)
   - [Cutscene nativo](#cutscene-nativo)
   - [World Status](#world-status)
+  - [World Sound (gerenciador de áudio nativo)](#world-sound-gerenciador-de-áudio-nativo)
   - [Animation Events](#animation-events)
   - [Vehicle System / Vehicle Lab](#vehicle-system--vehicle-lab)
   - [Destruição e explosões](#destruição-e-explosões)
@@ -330,6 +331,23 @@ Causa raiz achada e corrigida em 2026-09-20 (o World do `startup.blend` não pas
 propriedades aparecem em `scene.world.properties` num File > New. Painel Global Properties aceito pelo usuário na janela
 do editor (2026-09-20). Nomes passados para inglês em 2026-09-25 (`horario_sol` virou `sun_hour`); falta o usuário
 conferir o File > New na janela do editor. Ver changelog, seções "World Status".
+
+### World Sound (gerenciador de áudio nativo)
+
+Etapas 1 e 2 feitas em 2026-10-12 (aba no editor, `KX_AudioManager`, `Range.audio`; ver changelog e relatório).
+Pendente:
+
+- **Ouvir no jogo real**: só a parte sem som foi testada (registro, API, troca de cena, em `--server`). Falta o
+  usuário conferir a aba na janela e ouvir crossfade, avanço da playlist, pausa/retomada e o eco das Reverb
+  Areas em Music/Ambient (som 2D com efeito OpenAL nunca foi ouvido aqui). Cena:
+  `tools/debug/cenas/criar_cena_world_sound.py`.
+- **Relinkar o editor**: o `AnastacioEngine.exe` estava aberto no build da etapa 2; rodar `ninja RangeEngine`
+  com ele fechado.
+- **Etapa 3**: comando por mensagem (assunto `audio`), para usar com logic bricks.
+- Escopo fechado pelo usuário em 2026-10-12: só os módulos Music e Ambient. Efeitos e fala continuam nos
+  próprios objetos (Speaker / Sound actuator); não haverá módulos Efeitos nem Voz.
+- Depois: salvar volumes do jogador, música atravessando a carga de outro `.range`, conferir se o export
+  Web/Android leva os áudios externos.
 
 ### Animation Events
 

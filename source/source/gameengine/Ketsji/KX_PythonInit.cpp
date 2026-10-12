@@ -138,6 +138,7 @@ extern "C" {
 
 #include "KX_PyMath.h"
 #include "KX_PyNetwork.h"
+#include "KX_AudioManager.h"
 
 #include "EXP_PyObjectPlus.h"
 #include "EXP_PythonCallBack.h"
@@ -2803,6 +2804,7 @@ PyMODINIT_FUNC initRANGE()
 	addSubModule(modules, mod, initGameTypesPythonBinding(), "Range.types");
 	addSubModule(modules, mod, initImguiPythonBinding(), "Range.imgui");
 	addSubModule(modules, mod, initNetworkPythonBinding(), "Range.network");
+	addSubModule(modules, mod, initAudioPythonBinding(), "Range.audio");
 	addSubModule(modules, mod, initVideoTexturePythonBinding(), "Range.texture");
 
 	/* Keep projects authored for BGE/UPBGE working without modifying their scripts.
@@ -2817,6 +2819,7 @@ PyMODINIT_FUNC initRANGE()
 	PyDict_SetItemString(modules, "bge.types", PyDict_GetItemString(modules, "Range.types"));
 	PyDict_SetItemString(modules, "bge.imgui", PyDict_GetItemString(modules, "Range.imgui"));
 	PyDict_SetItemString(modules, "bge.network", PyDict_GetItemString(modules, "Range.network"));
+	PyDict_SetItemString(modules, "bge.audio", PyDict_GetItemString(modules, "Range.audio"));
 	PyDict_SetItemString(modules, "bge.texture", PyDict_GetItemString(modules, "Range.texture"));
 
 	return mod;

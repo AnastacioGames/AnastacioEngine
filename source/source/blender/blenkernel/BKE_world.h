@@ -25,8 +25,11 @@
  *  \author nzc
  */
 
+struct ListBase;
 struct Main;
 struct World;
+struct WorldSoundEntry;
+struct WorldSoundModule;
 
 void BKE_world_free(struct World *sc);
 void BKE_world_init(struct World *wrld);
@@ -37,5 +40,15 @@ void BKE_world_copy_data(struct Main *bmain, struct World *wrld_dst, const struc
 struct World *BKE_world_copy(struct Main *bmain, const struct World *wrld);
 struct World *BKE_world_localize(struct World *wrld);
 void BKE_world_make_local(struct Main *bmain, struct World *wrld, const bool lib_local);
+
+/* World Sound modules (see WorldSoundModule). */
+struct WorldSoundModule *BKE_world_sound_module_add(struct World *wrld, const char *name, int type);
+void BKE_world_sound_module_remove(struct World *wrld, struct WorldSoundModule *module);
+void BKE_world_sound_module_unique_name(struct World *wrld, struct WorldSoundModule *module);
+struct WorldSoundEntry *BKE_world_sound_entry_add(struct WorldSoundModule *module, const char *name, const char *filepath);
+void BKE_world_sound_entry_remove(struct WorldSoundModule *module, struct WorldSoundEntry *entry);
+void BKE_world_sound_entry_unique_name(struct WorldSoundModule *module, struct WorldSoundEntry *entry);
+void BKE_world_sound_modules_free(struct ListBase *modules);
+void BKE_world_sound_modules_copy(struct ListBase *modules_dst, const struct ListBase *modules_src);
 
 #endif  /* __BKE_WORLD_H__ */

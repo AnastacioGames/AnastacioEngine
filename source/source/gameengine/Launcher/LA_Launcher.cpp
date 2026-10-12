@@ -53,6 +53,7 @@
 #include "KX_DebugMode.h"
 
 #include "KX_NetworkMessageManager.h"
+#include "KX_AudioManager.h"
 #include "KX_NetworkManager.h"
 
 #ifdef WITH_PYTHON
@@ -121,6 +122,7 @@ LA_Launcher::LA_Launcher(GHOST_ISystem *system, Main *maggie, Scene *scene, Glob
 	m_converter(nullptr),
 	m_imgui(nullptr),
 	m_networkMessageManager(nullptr),
+	m_audioManager(nullptr),
 #ifdef WITH_PYTHON
 	m_globalDict(nullptr),
 #endif  // WITH_PYTHON
@@ -338,6 +340,7 @@ void LA_Launcher::InitEngine()
 	m_debugMode->SetShowConsole(showConsole);
 
 	m_networkMessageManager = new KX_NetworkMessageManager();
+	m_audioManager = new KX_AudioManager(!m_serverMode);
 
 	// Create the ketsjiengine.
 	m_ketsjiEngine = new KX_KetsjiEngine();
@@ -350,6 +353,7 @@ void LA_Launcher::InitEngine()
 	m_ketsjiEngine->SetImgui(m_imgui);
 	m_ketsjiEngine->SetDebugMode(m_debugMode);
 	m_ketsjiEngine->SetNetworkMessageManager(m_networkMessageManager);
+	m_ketsjiEngine->SetAudioManager(m_audioManager);
 
 	DEV_Joystick::Init();
 
@@ -534,6 +538,10 @@ void LA_Launcher::ExitEngine()
 	if (m_networkMessageManager) {
 		delete m_networkMessageManager;
 		m_networkMessageManager = nullptr;
+	}
+	if (m_audioManager) {
+		delete m_audioManager;
+		m_audioManager = nullptr;
 	}
 
 	// Call this after we're sure nothing needs Python anymore (e.g., destructors).

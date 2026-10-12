@@ -62,6 +62,7 @@ class KX_GameObject;
 class KX_Imgui;
 class KX_DebugMode;
 class KX_NetworkMessageManager;
+class KX_AudioManager;
 class KX_NetworkManager;
 class RAS_ICanvas;
 class RAS_OffScreen;
@@ -176,6 +177,8 @@ private:
 	KX_Imgui	 *m_imgui;
 	KX_DebugMode *m_debugMode;
 	KX_NetworkMessageManager *m_networkMessageManager;
+	/// World Sound, owned by the launcher. nullptr when the launcher gave none.
+	KX_AudioManager *m_audioManager;
 #ifdef WITH_PYTHON
 	PyObject *m_pyprofiledict;
 #endif
@@ -431,6 +434,7 @@ public:
 	void SetImgui(KX_Imgui *imgui);
 	void SetDebugMode(KX_DebugMode *debugmode);
 	void SetNetworkMessageManager(KX_NetworkMessageManager *manager);
+	void SetAudioManager(KX_AudioManager *manager);
 	void SetCustomMouseCursor(CustomMouseCursor *customCursor);
 #ifdef WITH_PYTHON
 	PyObject *GetPyProfileDict();
@@ -562,6 +566,11 @@ public:
 	KX_NetworkMessageManager *GetNetworkMessageManager() const
 	{
 		return m_networkMessageManager;
+	}
+
+	KX_AudioManager *GetAudioManager() const
+	{
+		return m_audioManager;
 	}
 
 	/// nullptr until the game uses the network (Range.network or a scene started in Host/Client mode).

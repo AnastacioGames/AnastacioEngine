@@ -37,6 +37,29 @@ struct bNodeTree;
 #endif
 
 
+/* World Sound: sound bank of the game, edited in the World Sound tab and played in the game
+ * engine by KX_AudioManager, which outlives the scenes. A module is one kind of sound (music,
+ * ambient...) with its own volume; an entry is one audio file of the module, played by name. */
+typedef struct WorldSoundEntry {
+	struct WorldSoundEntry *next, *prev;
+	char name[64];
+	char filepath[1024];   /* FILE_MAX, may be relative to the file */
+	float volume, pitch;
+	int flag;
+	int pad;
+} WorldSoundEntry;
+
+typedef struct WorldSoundModule {
+	struct WorldSoundModule *next, *prev;
+	char name[64];
+	short type;            /* WO_SOUND_MODULE_* */
+	short flag;            /* WO_SOUND_* */
+	float volume;
+	float fade_time;       /* seconds of fade in/out and of the crossfade between tracks */
+	int active_sound;
+	ListBase sounds;       /* WorldSoundEntry */
+} WorldSoundModule;
+
 /**
  * World defines general modeling data such as a background fill,
  * gravity, color model etc. It mixes game-data, rendering
@@ -216,9 +239,26 @@ typedef struct World {
 
 	/* game engine: properties shared by all objects through the World ("World Properties") */
 	ListBase prop;
+
+	/* game engine: World Sound modules (WorldSoundModule) */
+	ListBase sound_modules;
+	int active_sound_module;
+	int sound_pad;
 } World;
 
 /* **************** WORLD ********************* */
+
+/* WorldSoundModule.type */
+#define WO_SOUND_MODULE_MUSIC   0  /* one track at a time, crossfade, playlist */
+#define WO_SOUND_MODULE_AMBIENT 1  /* looping layers playing together */
+
+/* WorldSoundModule.flag */
+#define WO_SOUND_AUTOPLAY       (1 << 0)  /* starts playing when the module is loaded */
+#define WO_SOUND_SHUFFLE        (1 << 1)  /* music: random track order */
+#define WO_SOUND_LOOP           (1 << 2)  /* music: starts over after the last track */
+#define WO_SOUND_MUTE           (1 << 3)
+#define WO_SOUND_EXPANDED       (1 << 4)  /* UI: module open in the World Sound tab */
+#define WO_SOUND_USE_REVERB     (1 << 5)  /* gets the echo of the Reverb Area the camera is in */
 
 /* skytype */
 #define WO_SKYBLEND             (1 << 0)

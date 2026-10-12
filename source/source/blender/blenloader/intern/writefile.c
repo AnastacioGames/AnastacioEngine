@@ -2542,6 +2542,11 @@ static void write_world(WriteData *wd, World *wrld)
 
 		write_properties(wd, &wrld->prop);
 
+		writelist(wd, DATA, WorldSoundModule, &wrld->sound_modules);
+		for (WorldSoundModule *module = wrld->sound_modules.first; module; module = module->next) {
+			writelist(wd, DATA, WorldSoundEntry, &module->sounds);
+		}
+
 		for (int a = 0; a < MAX_MTEX; a++) {
 			if (wrld->mtex[a]) {
 				writestruct(wd, DATA, MTex, 1, wrld->mtex[a]);

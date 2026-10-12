@@ -190,6 +190,7 @@ static const EnumPropertyItem buttons_context_items[] = {
 	{BCONTEXT_RENDER_LAYER, "RENDER_LAYER", ICON_RENDERLAYERS, "Render Layers", "Render layers"},
 	{BCONTEXT_SCENE, "SCENE", ICON_SCENE_DATA, "Scene", "Scene"},
 	{BCONTEXT_WORLD, "WORLD", ICON_WORLD, "World", "World"},
+	{BCONTEXT_WORLD_SOUND, "WORLD_SOUND", ICON_SOUND, "World Sound", "Music and ambient sound modules of the game"},
 	{BCONTEXT_CUTSCENE, "CUTSCENE", ICON_SEQUENCE, "Cutscene", "Cutscene"},
 	{BCONTEXT_EXPORT, "EXPORT", ICON_EXPORT, "Export Game", "Export the game for Windows, Linux, Web and Android"},
 	{BCONTEXT_INPUT, "INPUT", ICON_GAME, "Input", "Game input maps: actions bound to keyboard, mouse, gamepad and touch controls"},
@@ -1074,6 +1075,9 @@ static const EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSE
 
 	if (sbuts->pathflag & (1 << BCONTEXT_WORLD)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_WORLD);
+	}
+	if (sbuts->pathflag & (1 << BCONTEXT_WORLD_SOUND)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_WORLD_SOUND);
 	}
 	if (sbuts->pathflag & (1 << BCONTEXT_CUTSCENE)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_CUTSCENE);

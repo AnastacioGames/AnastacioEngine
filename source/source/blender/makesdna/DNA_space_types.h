@@ -194,6 +194,7 @@ typedef enum eSpaceButtons_Context {
 	BCONTEXT_CUTSCENE = 16,
 	BCONTEXT_EXPORT = 17,
 	BCONTEXT_INPUT = 18,
+	BCONTEXT_WORLD_SOUND = 19,
 
 	/* always as last... */
 	BCONTEXT_TOT

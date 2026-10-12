@@ -23,6 +23,7 @@
 
 
 #include <string.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <math.h>
 #include "MEM_guardedalloc.h"
@@ -35,6 +36,7 @@
 #include "BLI_utildefines.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_string_utils.h"
 
 #include "BKE_animsys.h"
 #include "BKE_icons.h"
@@ -69,9 +71,93 @@ void BKE_world_free(World *wrld)
 	GPU_material_free(&wrld->gpumaterial);
 
 	BKE_bproperty_free_list(&wrld->prop);
+	BKE_world_sound_modules_free(&wrld->sound_modules);
 
 	BKE_icon_id_delete((struct ID *)wrld);
 	BKE_previewimg_free(&wrld->preview);
+}
+
+/* World Sound modules. The game engine finds modules and sounds by name, so names are unique. */
+
+void BKE_world_sound_module_unique_name(World *wrld, WorldSoundModule *module)
+{
+	BLI_uniquename(&wrld->sound_modules, module, "Module", '.', offsetof(WorldSoundModule, name), sizeof(module->name));
+}
+
+void BKE_world_sound_entry_unique_name(WorldSoundModule *module, WorldSoundEntry *entry)
+{
+	BLI_uniquename(&module->sounds, entry, "Sound", '.', offsetof(WorldSoundEntry, name), sizeof(entry->name));
+}
+
+WorldSoundModule *BKE_world_sound_module_add(World *wrld, const char *name, int type)
+{
+	WorldSoundModule *module = MEM_callocN(sizeof(WorldSoundModule), "WorldSoundModule");
+
+	BLI_strncpy(module->name, name, sizeof(module->name));
+	module->type = type;
+	module->flag = WO_SOUND_AUTOPLAY | WO_SOUND_LOOP | WO_SOUND_EXPANDED;
+	module->volume = 1.0f;
+	module->fade_time = 1.0f;
+
+	BLI_addtail(&wrld->sound_modules, module);
+	BKE_world_sound_module_unique_name(wrld, module);
+	wrld->active_sound_module = BLI_listbase_count(&wrld->sound_modules) - 1;
+
+	return module;
+}
+
+void BKE_world_sound_module_remove(World *wrld, WorldSoundModule *module)
+{
+	BLI_remlink(&wrld->sound_modules, module);
+	BLI_freelistN(&module->sounds);
+	MEM_freeN(module);
+
+	CLAMP_MAX(wrld->active_sound_module, BLI_listbase_count(&wrld->sound_modules) - 1);
+	CLAMP_MIN(wrld->active_sound_module, 0);
+}
+
+WorldSoundEntry *BKE_world_sound_entry_add(WorldSoundModule *module, const char *name, const char *filepath)
+{
+	WorldSoundEntry *entry = MEM_callocN(sizeof(WorldSoundEntry), "WorldSoundEntry");
+
+	BLI_strncpy(entry->name, name, sizeof(entry->name));
+	BLI_strncpy(entry->filepath, filepath, sizeof(entry->filepath));
+	entry->volume = 1.0f;
+	entry->pitch = 1.0f;
+
+	BLI_addtail(&module->sounds, entry);
+	BKE_world_sound_entry_unique_name(module, entry);
+	module->active_sound = BLI_listbase_count(&module->sounds) - 1;
+
+	return entry;
+}
+
+void BKE_world_sound_entry_remove(WorldSoundModule *module, WorldSoundEntry *entry)
+{
+	BLI_freelinkN(&module->sounds, entry);
+
+	CLAMP_MAX(module->active_sound, BLI_listbase_count(&module->sounds) - 1);
+	CLAMP_MIN(module->active_sound, 0);
+}
+
+void BKE_world_sound_modules_free(ListBase *modules)
+{
+	for (WorldSoundModule *module = modules->first; module; module = module->next) {
+		BLI_freelistN(&module->sounds);
+	}
+	BLI_freelistN(modules);
+}
+
+void BKE_world_sound_modules_copy(ListBase *modules_dst, const ListBase *modules_src)
+{
+	BLI_duplicatelist(modules_dst, modules_src);
+
+	WorldSoundModule *module_dst = modules_dst->first;
+	for (const WorldSoundModule *module_src = modules_src->first; module_src;
+	     module_src = module_src->next, module_dst = module_dst->next)
+	{
+		BLI_duplicatelist(&module_dst->sounds, &module_src->sounds);
+	}
 }
 
 /**
@@ -337,6 +423,8 @@ void BKE_world_copy_data(Main *bmain, World *wrld_dst, const World *wrld_src, co
 	BLI_listbase_clear(&wrld_dst->prop);
 	BKE_bproperty_copy_list(&wrld_dst->prop, &wrld_src->prop);
 
+	BKE_world_sound_modules_copy(&wrld_dst->sound_modules, &wrld_src->sound_modules);
+
 	if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0) {
 		BKE_previewimg_id_copy(&wrld_dst->id, &wrld_src->id);
 	}
@@ -385,6 +473,8 @@ World *BKE_world_localize(World *wrld)
 
 	BLI_listbase_clear(&wrldn->prop);
 	BKE_bproperty_copy_list(&wrldn->prop, &wrld->prop);
+
+	BKE_world_sound_modules_copy(&wrldn->sound_modules, &wrld->sound_modules);
 
 	return wrldn;
 }

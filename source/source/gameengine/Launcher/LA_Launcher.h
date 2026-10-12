@@ -45,6 +45,7 @@ extern std::atomic<bool> LA_SigTermRequested;
 class KX_Scene;
 class BL_Converter;
 class KX_NetworkMessageManager;
+class KX_AudioManager;
 class RAS_ICanvas;
 class DEV_EventConsumer;
 class DEV_InputDevice;
@@ -86,6 +87,8 @@ protected:
 	KX_DebugMode *m_debugMode;
 	/// Manage messages.
 	KX_NetworkMessageManager *m_networkMessageManager;
+	/// World Sound: music and ambient modules, alive across the scenes.
+	KX_AudioManager *m_audioManager;
 
 #ifdef WITH_PYTHON
 	PyObject *m_globalDict;

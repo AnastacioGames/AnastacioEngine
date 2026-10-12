@@ -53,6 +53,7 @@ extern "C" {
 
 #include "CM_WorkCounters.h"
 #include "CM_Message.h"
+#include "KX_AudioManager.h"
 
 #include "BLI_task.h"
 
@@ -171,6 +172,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_imgui(nullptr),
 	m_debugMode(nullptr),
 	m_networkMessageManager(nullptr),
+	m_audioManager(nullptr),
 #ifdef WITH_PYTHON
 	m_pyprofiledict(PyDict_New()),
 #endif
@@ -321,6 +323,11 @@ void KX_KetsjiEngine::SetNetworkMessageManager(KX_NetworkMessageManager *manager
 {
 	BLI_assert(manager);
 	m_networkMessageManager = manager;
+}
+
+void KX_KetsjiEngine::SetAudioManager(KX_AudioManager *manager)
+{
+	m_audioManager = manager;
 }
 
 void KX_KetsjiEngine::FreeCustomMouseCursor(CustomMouseCursor *cursor)
@@ -702,6 +709,14 @@ bool KX_KetsjiEngine::NextFrame()
 #endif  // WITH_SDL
 
 
+	// World Sound: the modules of the Worlds in use stay registered after their scene ends.
+	// Before the logic, so the scripts of a scene's first frame already find them.
+	if (m_audioManager) {
+		for (KX_Scene *scene : m_scenes) {
+			m_audioManager->RegisterWorld(scene->GetBlenderScene()->world);
+		}
+	}
+
 	// for each scene, call the proceed functions
 	int steps = 1;
 	if (m_useFixedTimestep) {
@@ -767,6 +782,10 @@ bool KX_KetsjiEngine::NextFrame()
 	m_logger.StartLog(tc_overhead);
 	if (steps > 0) {
 		m_networkMessageManager->ClearMessages();
+	}
+
+	if (m_audioManager) {
+		m_audioManager->Update();
 	}
 
 

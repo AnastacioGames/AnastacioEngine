@@ -66,6 +66,7 @@ _modules = [
     "properties_input",
     "properties_texture",
     "properties_world",
+    "properties_world_sound",
     "space_clip",
     "space_console",
     "space_dopesheet",

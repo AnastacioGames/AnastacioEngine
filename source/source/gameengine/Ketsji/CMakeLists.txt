@@ -104,6 +104,7 @@ set(SRC
 	KX_LightProbe.cpp
 	KX_ConsoleWindow.cpp
 	KX_CullingHandler.cpp
+	KX_AudioManager.cpp
 	KX_CutsceneManager.cpp
 	KX_DestructionManager.cpp
 	KX_DebugMode.cpp
@@ -224,6 +225,7 @@ set(SRC
 	KX_CubeMap.h
 	KX_LightProbe.h
 	KX_CullingHandler.h
+	KX_AudioManager.h
 	KX_CutsceneManager.h
 	KX_DestructionManager.h
 	KX_DebugMode.h

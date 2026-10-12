@@ -33,14 +33,27 @@
 
 #include "WM_types.h"
 
+static const EnumPropertyItem rna_enum_world_sound_module_type_items[] = {
+	{WO_SOUND_MODULE_MUSIC, "MUSIC", ICON_PLAY_AUDIO, "Music", "One track at a time, with crossfade and playlist"},
+	{WO_SOUND_MODULE_AMBIENT, "AMBIENT", ICON_FORCE_WIND, "Ambient", "Looping layers that play together"},
+	{0, NULL, 0, NULL, NULL}
+};
+
 #ifdef RNA_RUNTIME
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_listbase.h"
+#include "BLI_string.h"
+
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_main.h"
+#include "BKE_report.h"
 #include "BKE_texture.h"
+#include "BKE_world.h"
+
+#include "RNA_access.h"
 
 #include "ED_node.h"
 #include "ED_view3d.h"
@@ -72,6 +85,101 @@ static void rna_World_string_properties_begin(CollectionPropertyIterator *iter, 
 {
 	World *wo = (World *)ptr->data;
 	rna_iterator_listbase_begin(iter, &wo->prop, rna_World_string_properties_skip);
+}
+
+/* World Sound: modules and their sounds are found by name in the game engine, so the setters keep
+ * the names unique. */
+
+static WorldSoundModule *rna_World_sound_modules_new(World *wo, const char *name, int type)
+{
+	WorldSoundModule *module = BKE_world_sound_module_add(wo, name, type);
+	WM_main_add_notifier(NC_WORLD, wo);
+	return module;
+}
+
+static void rna_World_sound_modules_remove(World *wo, ReportList *reports, PointerRNA *module_ptr)
+{
+	WorldSoundModule *module = module_ptr->data;
+
+	if (BLI_findindex(&wo->sound_modules, module) == -1) {
+		BKE_reportf(reports, RPT_ERROR, "Sound module '%s' not in world '%s'", module->name, wo->id.name + 2);
+		return;
+	}
+
+	BKE_world_sound_module_remove(wo, module);
+	RNA_POINTER_INVALIDATE(module_ptr);
+	WM_main_add_notifier(NC_WORLD, wo);
+}
+
+static void rna_World_sound_modules_move(World *wo, ReportList *reports, int from, int to)
+{
+	WorldSoundModule *module = BLI_findlink(&wo->sound_modules, from);
+
+	if (module == NULL || to < 0 || to >= BLI_listbase_count(&wo->sound_modules)) {
+		BKE_report(reports, RPT_ERROR, "Sound module index out of range");
+		return;
+	}
+
+	BLI_listbase_link_move(&wo->sound_modules, module, to - from);
+	WM_main_add_notifier(NC_WORLD, wo);
+}
+
+static WorldSoundEntry *rna_WorldSoundModule_sounds_new(WorldSoundModule *module, const char *name, const char *filepath)
+{
+	WorldSoundEntry *entry = BKE_world_sound_entry_add(module, name, filepath);
+	WM_main_add_notifier(NC_WORLD, NULL);
+	return entry;
+}
+
+static void rna_WorldSoundModule_sounds_remove(WorldSoundModule *module, ReportList *reports, PointerRNA *entry_ptr)
+{
+	WorldSoundEntry *entry = entry_ptr->data;
+
+	if (BLI_findindex(&module->sounds, entry) == -1) {
+		BKE_reportf(reports, RPT_ERROR, "Sound '%s' not in module '%s'", entry->name, module->name);
+		return;
+	}
+
+	BKE_world_sound_entry_remove(module, entry);
+	RNA_POINTER_INVALIDATE(entry_ptr);
+	WM_main_add_notifier(NC_WORLD, NULL);
+}
+
+static void rna_WorldSoundModule_sounds_move(WorldSoundModule *module, ReportList *reports, int from, int to)
+{
+	WorldSoundEntry *entry = BLI_findlink(&module->sounds, from);
+
+	if (entry == NULL || to < 0 || to >= BLI_listbase_count(&module->sounds)) {
+		BKE_report(reports, RPT_ERROR, "Sound index out of range");
+		return;
+	}
+
+	BLI_listbase_link_move(&module->sounds, entry, to - from);
+	WM_main_add_notifier(NC_WORLD, NULL);
+}
+
+static void rna_WorldSoundModule_name_set(PointerRNA *ptr, const char *value)
+{
+	World *wo = ptr->id.data;
+	WorldSoundModule *module = ptr->data;
+
+	BLI_strncpy_utf8(module->name, value, sizeof(module->name));
+	BKE_world_sound_module_unique_name(wo, module);
+}
+
+static void rna_WorldSoundEntry_name_set(PointerRNA *ptr, const char *value)
+{
+	World *wo = ptr->id.data;
+	WorldSoundEntry *entry = ptr->data;
+
+	BLI_strncpy_utf8(entry->name, value, sizeof(entry->name));
+
+	for (WorldSoundModule *module = wo->sound_modules.first; module; module = module->next) {
+		if (BLI_findindex(&module->sounds, entry) != -1) {
+			BKE_world_sound_entry_unique_name(module, entry);
+			break;
+		}
+	}
 }
 
 static void rna_World_mtex_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
@@ -1294,6 +1402,188 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 }
 
+static void rna_def_world_sound_entries(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "WorldSoundEntries");
+	srna = RNA_def_struct(brna, "WorldSoundEntries", NULL);
+	RNA_def_struct_sdna(srna, "WorldSoundModule");
+	RNA_def_struct_ui_text(srna, "World Sound Entries", "Sounds of a World Sound module");
+
+	func = RNA_def_function(srna, "new", "rna_WorldSoundModule_sounds_new");
+	RNA_def_function_ui_description(func, "Add a sound to the module");
+	parm = RNA_def_string(func, "name", "Sound", 64, "Name", "Name the game plays the sound by");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_string_file_path(func, "filepath", NULL, 1024, "File Path", "Audio file");
+	parm = RNA_def_pointer(func, "sound", "WorldSoundEntry", "", "The newly created sound");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_WorldSoundModule_sounds_remove");
+	RNA_def_function_ui_description(func, "Remove a sound from the module");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_pointer(func, "sound", "WorldSoundEntry", "", "The sound to remove");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+	func = RNA_def_function(srna, "move", "rna_WorldSoundModule_sounds_move");
+	RNA_def_function_ui_description(func, "Move a sound to another position of the playlist");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_int(func, "from_index", 0, 0, INT_MAX, "From", "Index of the sound to move", 0, 10000);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_int(func, "to_index", 0, 0, INT_MAX, "To", "Target index", 0, 10000);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+}
+
+static void rna_def_world_sound_modules(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "WorldSoundModules");
+	srna = RNA_def_struct(brna, "WorldSoundModules", NULL);
+	RNA_def_struct_sdna(srna, "World");
+	RNA_def_struct_ui_text(srna, "World Sound Modules", "World Sound modules of a World");
+
+	func = RNA_def_function(srna, "new", "rna_World_sound_modules_new");
+	RNA_def_function_ui_description(func, "Add a World Sound module");
+	parm = RNA_def_string(func, "name", "Module", 64, "Name", "Name the game controls the module by");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_enum(func, "type", rna_enum_world_sound_module_type_items, WO_SOUND_MODULE_MUSIC, "Type", "");
+	parm = RNA_def_pointer(func, "module", "WorldSoundModule", "", "The newly created module");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_World_sound_modules_remove");
+	RNA_def_function_ui_description(func, "Remove a World Sound module and its sounds");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_pointer(func, "module", "WorldSoundModule", "", "The module to remove");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+	func = RNA_def_function(srna, "move", "rna_World_sound_modules_move");
+	RNA_def_function_ui_description(func, "Move a module to another position");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_int(func, "from_index", 0, 0, INT_MAX, "From", "Index of the module to move", 0, 10000);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_int(func, "to_index", 0, 0, INT_MAX, "To", "Target index", 0, 10000);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+}
+
+static void rna_def_world_sound(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "WorldSoundEntry", NULL);
+	RNA_def_struct_sdna(srna, "WorldSoundEntry");
+	RNA_def_struct_ui_text(srna, "World Sound Entry", "One audio file of a World Sound module");
+	RNA_def_struct_ui_icon(srna, ICON_SOUND);
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_WorldSoundEntry_name_set");
+	RNA_def_property_ui_text(prop, "Name", "Name the game plays the sound by");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
+	RNA_def_property_ui_text(prop, "File Path", "Audio file, relative to the .range when it starts with //");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "volume", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Volume", "Volume of this sound, multiplied by the volume of its module");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "pitch", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.1f, 4.0f);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Pitch", "Playback speed of this sound (1 is the original)");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	srna = RNA_def_struct(brna, "WorldSoundModule", NULL);
+	RNA_def_struct_sdna(srna, "WorldSoundModule");
+	RNA_def_struct_ui_text(srna, "World Sound Module",
+	                       "One kind of game sound (music, ambient) with its own volume and sound list");
+	RNA_def_struct_ui_icon(srna, ICON_SOUND);
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_WorldSoundModule_name_set");
+	RNA_def_property_ui_text(prop, "Name", "Name the game controls the module by");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, rna_enum_world_sound_module_type_items);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Type", "How the module plays its sounds");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "volume", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Volume", "Volume of every sound of the module");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "fade_time", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 60.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Fade Time", "Seconds a sound takes to fade in and out, and to cross to the next track");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "use_autoplay", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_AUTOPLAY);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Play on Start", "Start playing as soon as a scene using this World is loaded");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "use_shuffle", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_SHUFFLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Shuffle", "Play the tracks in random order");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "use_loop", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_LOOP);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Loop", "Start over after the last track");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "mute", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_MUTE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Mute", "Silence the module");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "use_reverb_areas", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_USE_REVERB);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Use Reverb Areas",
+	                         "Give the sounds of the module the echo of the Reverb Area the camera is in");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_EXPANDED);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the settings and the sounds of the module");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "sounds", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "sounds", NULL);
+	RNA_def_property_struct_type(prop, "WorldSoundEntry");
+	RNA_def_property_ui_text(prop, "Sounds", "Audio files of the module");
+	rna_def_world_sound_entries(brna, prop);
+
+	prop = RNA_def_property(srna, "active_sound_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "active_sound");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Active Sound Index", "");
+}
+
 void RNA_def_world(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -1538,6 +1828,19 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "GameProperty");
 	RNA_def_property_ui_text(prop, "String Properties", "Game engine string properties shared through the World");
 
+	/* game engine: World Sound */
+	prop = RNA_def_property(srna, "sound_modules", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "sound_modules", NULL);
+	RNA_def_property_struct_type(prop, "WorldSoundModule");
+	RNA_def_property_ui_text(prop, "Sound Modules", "World Sound modules: music and ambient sounds of the game");
+	rna_def_world_sound_modules(brna, prop);
+
+	prop = RNA_def_property(srna, "active_sound_module_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "active_sound_module");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Active Sound Module Index", "");
+
+	rna_def_world_sound(brna);
 	rna_def_lighting(brna);
 	rna_def_world_mist(brna);
 	rna_def_world_weather(brna);

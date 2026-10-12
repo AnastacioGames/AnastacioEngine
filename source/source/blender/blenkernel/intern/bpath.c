@@ -61,6 +61,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_freestyle_types.h"
+#include "DNA_world_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -523,6 +524,16 @@ void BKE_bpath_traverse_id(Main *bmain, ID *id, BPathVisitor visit_cb, const int
 			bSound *sound = (bSound *)id;
 			if (sound->packedfile == NULL || (flag & BKE_BPATH_TRAVERSE_SKIP_PACKED) == 0) {
 				rewrite_path_fixed(sound->name, visit_cb, absbase, bpath_user_data);
+			}
+			break;
+		}
+		case ID_WO:
+		{
+			World *wrld = (World *)id;
+			for (WorldSoundModule *module = wrld->sound_modules.first; module; module = module->next) {
+				for (WorldSoundEntry *entry = module->sounds.first; entry; entry = entry->next) {
+					rewrite_path_fixed(entry->filepath, visit_cb, absbase, bpath_user_data);
+				}
 			}
 			break;
 		}

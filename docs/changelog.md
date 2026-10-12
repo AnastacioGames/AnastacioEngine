@@ -6,6 +6,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - World Sound, etapa 2: `KX_AudioManager` e `Range.audio`
+
+- Escopo fechado pelo usuário: só Music e Ambient (sem módulos de Efeitos/Voz), com opção de eco das Reverb Areas nos dois.
+- `Ketsji/KX_AudioManager.{h,cpp}`: criado no launcher ao lado do `KX_NetworkMessageManager` (`LA_Launcher.cpp`) e entregue ao engine (`Set/GetAudioManager`). O engine registra, antes da lógica de cada quadro, o World de cada cena ativa (uma vez por World; módulo de nome já registrado só recebe os sons que faltam) e chama `Update()` uma vez por quadro, com relógio real próprio.
+- Music: uma faixa por vez, crossfade com o Fade do módulo, avanço automático ao fim da faixa (Shuffle/Loop), faixa única em Loop sem intervalo. Ambient: todas as camadas em loop, com fade. Volume final = módulo x som x fade; Mute zera.
+- Diferença do plano: não usa `AUD_PlaybackManager`. O fade já exige ajustar o volume de cada handle a cada quadro, então o volume do módulo entra na mesma conta e pause/stop percorrem os handles do módulo.
+- Eco: flag nova `WO_SOUND_USE_REVERB` (bit no `flag` existente) / `use_reverb_areas`. `KX_Scene::UpdateReverbAreas` passa a área vencedora ao gerenciador; com várias cenas no quadro vale a mais forte, e sem relato por 0,5 s o eco sai (a cena das áreas acabou).
+- Python `Range.audio` (alias `bge.audio`): `play(module, sound="", fade=-1)`, `stop(...)`, `pause`, `resume`, `next`, `previous`, `setVolume`, `getVolume`, `isPlaying`, `playing`, `sounds`, `modules`. Nome inexistente devolve `False`/`None`, sem exceção.
+- Headless (`--server`): os módulos existem e a API responde, nada toca.
+- Testado sem janela (`AnastacioRuntime.exe --server`, cena de `tools/debug/cenas/criar_cena_world_sound.py`): módulos e sons visíveis já no primeiro quadro, API responde, troca da cena A para a B (World sem módulos) mantém os módulos registrados, encerra sem erro.
+- **Não testado**: som de verdade (crossfade, avanço da playlist, pausa, eco num som 2D), porque o modo sem janela não tem dispositivo de áudio; depende do usuário abrir a cena. O `AnastacioEngine.exe` não foi relinkado nesta rodada porque o editor estava aberto (os objetos compilaram; o player foi linkado).
+
+## 2026-10-12 - World Sound, etapa 1: dados no World e aba no editor
+
+- Motivo: todo jogo refaz música, volumes e troca de faixa (no RolimaRacer é um componente Python numa cena sempre viva). Plano em três etapas; esta é só a parte do editor, ainda **sem som no jogo**.
+- DNA (`DNA_world_types.h`): `WorldSoundModule` (nome, tipo Music/Ambient, volume, fade, flags Play on Start/Shuffle/Loop/Mute) e `WorldSoundEntry` (nome, caminho, volume, pitch); `World.sound_modules`. Lista vazia é o padrão, então arquivos antigos e da Range original abrem sem versioning.
+- Cópia/liberação em `world.c`, gravação/leitura em `writefile.c`/`readfile.c`, caminhos dos áudios no `bpath.c` (Make Relative/Absolute e Save As cuidam deles).
+- RNA (`rna_world.c`): `world.sound_modules` e `module.sounds` com `new/remove/move`; nomes únicos, porque o jogo vai achar módulo e som por nome.
+- Aba **World Sound** ao lado de World (`BCONTEXT_WORLD_SOUND = 19`; `rna_space.c`, `buttons_context.c`, `space_buttons.c`) e painel em `bl_ui/properties_world_sound.py`: adicionar módulo, escolher vários arquivos de uma vez, ordenar, remover.
+- Testado em background: criar, renomear, mover, remover, copiar o World, salvar e reabrir (valores e caminhos conferem); arquivo antigo (`tools/ProjetoCutscene/Cutscene_test.range`) abre com a lista vazia; a aba aparece no enum de contextos. Não conferido: a aba desenhada na janela do editor (aceite do usuário).
+- Gotcha: `"//"` dentro de comentário de um `DNA_*.h` quebra o makesdna (erros de alinhamento num struct vizinho).
+- Posição da aba: a fileira de cima do editor é controlada pela lista `top_context` em `bl_ui/space_properties.py` (cabeçalho e navigation bar). Sem `WORLD_SOUND` nela, a aba caía na coluna lateral com as abas de objeto. Corrigido e instalado em `build/bin`; conferência visual pendente.
+- `docs/code-map-gameengine.md` e `docs/code-map-kx-gameobject.md`: números de linha atualizados com `check_docs.py --fix` (54 erros de linhas defasadas).
+
 ## 2026-10-12 - Decimate (Collapse): opção High Quality
 
 - Queixa: objeto simples com muita subdivisão saía "torto" e com a UV deformada. Medição (`tools/debug/cenas/medir_decimate.py`, cinco formas com superfície e UV analíticas) mostrou que a forma em si quase não desviava; o defeito era triangulação (num cubo arredondado em Ratio 0,1, 144 de 480 triângulos com ângulo abaixo de 5°) e UV (erro de até 16% da textura).
@@ -28,6 +52,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `Shift+A > Constraints > Rigid Body Joint Component` cria `scripts/rigid_body_joint_component.py` e o anexa
   ao objeto ativo. O arquivo é deliberadamente editável: em `start()` procura o alvo e chama
   `Range.constraints.createConstraint()` para Hinge, Limited Hinge/Slider 6DOF, Ball Socket ou Cone Twist.
+- O mesmo botão também fica na aba **Object Constraints** quando a cena usa `BLENDER_GAME`, abaixo de
+  **Add Object Constraint**.
 - O painel Game Components separa Joint, Pivot and Axis e Limits, com alvo em lista de objetos da cena,
   colisão entre corpos ligados, quebra e limites lineares/angulares. O botão de recarregar do componente
   refaz a lista de alvos sem apagar a escolha que ainda exista.

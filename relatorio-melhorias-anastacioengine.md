@@ -285,6 +285,13 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   (Generic, Underwater, Cavern, Hall, Forest ou Custom). Enquanto a câmera ativa está dentro, o reverb/filtro
   OpenAL entra com fade em todos os speakers 3D da cena; speakers 2D e efeitos ligados por script (`SetEffect`)
   não são tocados. Substitui o componente Python `Range_SoundReverb`. Teste: `tools/tests/reverb_area_test.py`.
+- World Sound: aba ao lado de World com módulos **Music** (uma faixa por vez, crossfade, playlist) e **Ambient**
+  (camadas em loop), gravados no World. No jogo, `KX_AudioManager` pertence ao launcher e não à cena: o que
+  toca atravessa a troca de cena, e os módulos de um World continuam registrados depois que a cena dele sai.
+  API `Range.audio` (alias `bge.audio`): `play/stop/pause/resume/next/previous/setVolume/getVolume/isPlaying/
+  playing/sounds/modules`. Opção por módulo **Use Reverb Areas** aplica o eco da Reverb Area da câmera. Escopo
+  fechado em Music e Ambient; efeitos e falas continuam nos objetos (Speaker / Sound actuator). Recarregar o
+  jogo ou abrir outro `.range` recria o gerenciador. Cena de teste: `tools/debug/cenas/criar_cena_world_sound.py`.
 - Menu in-game em ImGui com suporte por mouse, teclado e bindings de gamepad.
 - Debug Mode expõe bounding boxes, frusta de câmera/sombra e render queries.
 - Console ImGui espelha o log da engine no Play e no standalone.

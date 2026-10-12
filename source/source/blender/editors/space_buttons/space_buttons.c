@@ -158,6 +158,9 @@ static void buttons_main_region_draw(const bContext *C, ARegion *ar)
 	case BCONTEXT_WORLD:
 		contexts[0] = "world";
 		break;
+	case BCONTEXT_WORLD_SOUND:
+		contexts[0] = "world_sound";
+		break;
 	case BCONTEXT_CUTSCENE:
 		contexts[0] = "cutscene";
 		break;
@@ -287,6 +290,7 @@ static void buttons_area_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *
 					break;
 				case ND_WORLD:
 					buttons_area_redraw(sa, BCONTEXT_WORLD);
+					buttons_area_redraw(sa, BCONTEXT_WORLD_SOUND);
 					sbuts->preview = 1;
 					break;
 				case ND_FRAME:
@@ -389,6 +393,7 @@ static void buttons_area_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *
 			break;
 		case NC_WORLD:
 			buttons_area_redraw(sa, BCONTEXT_WORLD);
+			buttons_area_redraw(sa, BCONTEXT_WORLD_SOUND);
 			sbuts->preview = 1;
 			break;
 		case NC_LAMP:
