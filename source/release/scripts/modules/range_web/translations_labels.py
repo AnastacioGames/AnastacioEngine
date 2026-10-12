@@ -31,8 +31,6 @@ TABLE = (
     ("Add Image", "Adicionar imagem", "Añadir imagen", "Добавить изображение"),
     ("Add Object Constraint", "Adicionar restrição de objeto", "Añadir restricción de objeto",
      "Добавить ограничение объекта"),
-    ("Add Rigid Body Joint", "Adicionar junta de corpo rígido", "Añadir junta de cuerpo rígido",
-     "Добавить шарнир твёрдого тела"),
     ("Add Paint Slot", "Adicionar espaço de pintura", "Añadir ranura de pintura", "Добавить слот рисования"),
     ("Add Passive", "Adicionar passivo", "Añadir pasivo", "Добавить пассивный"),
     ("Add Pose...", "Adicionar pose...", "Añadir pose...", "Добавить позу..."),

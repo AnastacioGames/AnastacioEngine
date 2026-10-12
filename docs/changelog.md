@@ -8,9 +8,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-10-12 - Object Constraints: menu compatível com Game Engine
 
-- Com `BLENDER_GAME`, o painel **Object Constraints** substitui o menu completo herdado por **Add Rigid Body
-  Joint**. Esta é a única constraint de objeto que `BL_BlenderDataConversion` converte para o runtime
-  Bullet; as demais eram editáveis, mas ignoradas ao rodar o jogo.
+- Com `BLENDER_GAME`, o painel **Object Constraints** mantém o menu completo herdado, mas só deixa clicável
+  **Rigid Body Joint**. Esta é a única constraint de objeto que `BL_BlenderDataConversion` converte para o
+  runtime Bullet; as demais aparecem esmaecidas em vez de serem editáveis e depois ignoradas ao rodar o jogo.
 - Arquivos existentes permanecem intactos: se o objeto contiver uma constraint incompatível, o painel mostra
   um aviso. O menu e o comportamento dos outros motores não mudam; constraints de osso continuam separadas.
 - Textos novos traduzidos para pt-BR, espanhol e russo.

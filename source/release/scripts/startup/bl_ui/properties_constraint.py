@@ -18,7 +18,7 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.types import Panel
+from bpy.types import Menu, Panel
 
 
 class ConstraintButtonsPanel:
@@ -903,6 +903,64 @@ class ConstraintButtonsPanel:
         layout.label("Blender 2.6 doesn't support python constraints yet")
 
 
+class OBJECT_MT_game_constraint_add(Menu):
+    bl_label = "Add Object Constraint"
+
+    @staticmethod
+    def constraint_item(layout, constraint_type, text):
+        row = layout.row()
+        row.enabled = constraint_type == 'RIGID_BODY_JOINT'
+        op = row.operator("object.constraint_add", icon='CONSTRAINT', text=text)
+        op.type = constraint_type
+
+    def draw(self, context):
+        # Keep the familiar Blender menu visible. Only rigid body joints are
+        # converted for ordinary game objects; disabled entries document that
+        # limitation without inviting a constraint that the runtime will ignore.
+        row = self.layout.row()
+        motion, transform, tracking, relationship = [row.column() for _ in range(4)]
+
+        motion.label(text="Motion Tracking")
+        for item in (('CAMERA_SOLVER', "Camera Solver"),
+                     ('FOLLOW_TRACK', "Follow Track"),
+                     ('OBJECT_SOLVER', "Object Solver")):
+            self.constraint_item(motion, *item)
+
+        transform.label(text="Transform")
+        for item in (('COPY_LOCATION', "Copy Location"),
+                     ('COPY_ROTATION', "Copy Rotation"),
+                     ('COPY_SCALE', "Copy Scale"),
+                     ('COPY_TRANSFORMS', "Copy Transforms"),
+                     ('LIMIT_DISTANCE', "Limit Distance"),
+                     ('LIMIT_LOCATION', "Limit Location"),
+                     ('LIMIT_ROTATION', "Limit Rotation"),
+                     ('LIMIT_SCALE', "Limit Scale"),
+                     ('MAINTAIN_VOLUME', "Maintain Volume"),
+                     ('TRANSFORM', "Transformation"),
+                     ('TRANSFORM_CACHE', "Transform Cache")):
+            self.constraint_item(transform, *item)
+
+        tracking.label(text="Tracking")
+        for item in (('CLAMP_TO', "Clamp To"),
+                     ('DAMPED_TRACK', "Damped Track"),
+                     ('IK', "Inverse Kinematics"),
+                     ('LOCKED_TRACK', "Locked Track"),
+                     ('SPLINE_IK', "Spline IK"),
+                     ('STRETCH_TO', "Stretch To"),
+                     ('TRACK_TO', "Track To")):
+            self.constraint_item(tracking, *item)
+
+        relationship.label(text="Relationship")
+        for item in (('ACTION', "Action"),
+                     ('CHILD_OF', "Child Of"),
+                     ('FLOOR', "Floor"),
+                     ('FOLLOW_PATH', "Follow Path"),
+                     ('PIVOT', "Pivot"),
+                     ('RIGID_BODY_JOINT', "Rigid Body Joint"),
+                     ('SHRINKWRAP', "Shrinkwrap")):
+            self.constraint_item(relationship, *item)
+
+
 class OBJECT_PT_constraints(ConstraintButtonsPanel, Panel):
     bl_label = "Object Constraints"
     bl_context = "constraint"
@@ -924,16 +982,13 @@ class OBJECT_PT_constraints(ConstraintButtonsPanel, Panel):
             box.operator("wm.properties_context_change", icon='CONSTRAINT_BONE',
                          text="Go to Bone Constraints tab...").context = 'BONE_CONSTRAINT'
         elif context.scene.render.engine == 'BLENDER_GAME':
-            # The game converter only reads object-level rigid body joints. Bone
-            # constraints have their own compatibility list in the panel below.
-            box = layout.box()
-            box.label(icon='INFO', text="Game Engine only supports Rigid Body Joint object constraints")
-            op = box.operator("object.constraint_add", icon='CONSTRAINT', text="Add Rigid Body Joint")
-            op.type = 'RIGID_BODY_JOINT'
+            layout.label(icon='INFO', text="Game Engine only supports Rigid Body Joint object constraints")
+            layout.menu("OBJECT_MT_game_constraint_add", text="Add Object Constraint")
 
             if any(con.type != 'RIGID_BODY_JOINT' for con in obj.constraints):
-                box.alert = True
-                box.label(icon='ERROR', text="Unsupported object constraints are ignored when the game runs")
+                row = layout.row()
+                row.alert = True
+                row.label(icon='ERROR', text="Unsupported object constraints are ignored when the game runs")
         else:
             layout.operator_menu_enum("object.constraint_add", "type", text="Add Object Constraint")
 
@@ -960,6 +1015,7 @@ class BONE_PT_constraints(ConstraintButtonsPanel, Panel):
 
 
 classes = (
+    OBJECT_MT_game_constraint_add,
     OBJECT_PT_constraints,
     BONE_PT_constraints,
 )
