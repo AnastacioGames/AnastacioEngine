@@ -3929,6 +3929,73 @@ void shadow_fade(vec3 rco, float fadefac, mat4 shadowpersmat, float shadfac, out
 	result = mix(shadfac, 1.0, length(uv));
 }
 
+/* Colored shadows. In a lamp's shadow color pass (pass = 1) a Colored Shadows caster outputs the
+ * light it lets through: its color blended toward white as it gets more transparent, nothing where
+ * it is almost opaque (lead lines of a stained glass). Alpha carries the depth, kept at its nearest
+ * by the pass blending (GPU_lamp_shadow_color_begin). alpha < 0: use the surface alpha. */
+void shadow_color_output(vec4 surface, vec3 base, float alpha, float pass, out vec4 result)
+{
+	if (pass < 0.5) {
+		result = surface;
+		return;
+	}
+	float a = clamp((alpha < 0.0) ? surface.a : alpha, 0.0, 1.0);
+	vec3 trans = mix(vec3(1.0), clamp(base, 0.0, 1.0), min(a * 1.5, 1.0)) * (1.0 - smoothstep(0.9, 1.0, a));
+	result = vec4(trans, gl_FragCoord.z);
+}
+
+/* Light reaching a receiver through the Colored Shadows casters: the transmittance stored in the
+ * lamp's color target where the receiver lies behind the nearest one, white elsewhere. */
+vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias)
+{
+	vec4 co = shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
+	if (co.x < 0.0 || co.x > 1.0 || co.y < 0.0 || co.y > 1.0 || co.z > 1.0) {
+		return vec3(1.0);
+	}
+	vec4 c = texture2D(colormap, co.xy);
+	return (co.z > c.a) ? c.rgb : vec3(1.0);
+}
+
+void shade_shadow_tint(vec3 lcol, vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias,
+                       out vec3 outcol)
+{
+	outcol = lcol * shadow_color_tint(rco, vn, colormap, shadowpersmat, bias, slopebias);
+}
+
+/* Same for a Sun with cascades: the cascade picked as in shadow_simple_csm, cross-faded over the
+ * same band. */
+void shade_shadow_tint_csm(vec3 lcol, vec3 rco, vec3 vn,
+                           sampler2D colormap0, mat4 shadowpersmat0, float bias0, float slopebias0,
+                           sampler2D colormap1, mat4 shadowpersmat1, float bias1, float slopebias1,
+                           sampler2D colormap2, mat4 shadowpersmat2, float bias2, float slopebias2,
+                           float split0, float split1, out vec3 outcol)
+{
+	float viewdist = -rco.z;
+	float blend0 = split0 * 0.1;
+	float blend1 = split1 * 0.1;
+	vec3 tint;
+	if (viewdist < split0 - blend0) {
+		tint = shadow_color_tint(rco, vn, colormap0, shadowpersmat0, bias0, slopebias0);
+	}
+	else if (viewdist < split0 + blend0) {
+		tint = mix(shadow_color_tint(rco, vn, colormap0, shadowpersmat0, bias0, slopebias0),
+		           shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1),
+		           smoothstep(split0 - blend0, split0 + blend0, viewdist));
+	}
+	else if (viewdist < split1 - blend1) {
+		tint = shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1);
+	}
+	else if (viewdist < split1 + blend1) {
+		tint = mix(shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1),
+		           shadow_color_tint(rco, vn, colormap2, shadowpersmat2, bias2, slopebias2),
+		           smoothstep(split1 - blend1, split1 + blend1, viewdist));
+	}
+	else {
+		tint = shadow_color_tint(rco, vn, colormap2, shadowpersmat2, bias2, slopebias2);
+	}
+	outcol = lcol * tint;
+}
+
 void shadows_only(float inp, float shadfac, vec3 shadowcolor, out vec3 result)
 {
 	result = vec3(1.0);
@@ -4346,6 +4413,9 @@ uniform mat4 unfshadowpersmat[NUM_SHADOW_LIGHTS];
 uniform vec2 unfshadowbias[NUM_SHADOW_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
 uniform float unfshadowenabled[NUM_SHADOW_LIGHTS]; /* 0 off, 1 Sun/Spot, 2 Point */
 uniform vec4 unfshadowpoint[NUM_SHADOW_LIGHTS]; /* Point: x = clip start, y = clip end, z = 1 / face size */
+/* Colored shadows of slot i (GPU_lamp_shadow_color_*), used when unfshadowcolored[i] > 0.5. */
+uniform sampler2D unfshadowcolor[NUM_SHADOW_LIGHTS];
+uniform float unfshadowcolored[NUM_SHADOW_LIGHTS];
 
 /* Point lamp shadow from a 3x2 atlas of cube faces (+X -X +Y; -Y +Z -Z), lightmat = view to light
  * space. Face axes match gpu_point_face_rot[] in gpu_material.c. */
@@ -4448,6 +4518,24 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 	return shadowfac;
 }
 
+/* Colored shadows tint of scene-light slot i (white without Colored Shadows casters). */
+vec3 scene_light_shadow_tint(int i, vec3 rco, vec3 vn)
+{
+	if (i == 0 && unfshadowcolored[0] > 0.5) {
+		return shadow_color_tint(rco, vn, unfshadowcolor[0], unfshadowpersmat[0], unfshadowbias[0].x, unfshadowbias[0].y);
+	}
+	else if (i == 1 && unfshadowcolored[1] > 0.5) {
+		return shadow_color_tint(rco, vn, unfshadowcolor[1], unfshadowpersmat[1], unfshadowbias[1].x, unfshadowbias[1].y);
+	}
+	else if (i == 2 && unfshadowcolored[2] > 0.5) {
+		return shadow_color_tint(rco, vn, unfshadowcolor[2], unfshadowpersmat[2], unfshadowbias[2].x, unfshadowbias[2].y);
+	}
+	else if (i == 3 && unfshadowcolored[3] > 0.5) {
+		return shadow_color_tint(rco, vn, unfshadowcolor[3], unfshadowpersmat[3], unfshadowbias[3].x, unfshadowbias[3].y);
+	}
+	return vec3(1.0);
+}
+
 /* IES Texture node of the lamp in slot i (GPU_material_bind_scene_lights, GPU_lamp_ies_slot):
  * x = atlas band + 1 (0 = none), y = Strength; the lamp's X, Y, Z axes in view space. One band per profile,
  * horizontal angle along s (wraps), vertical angle along t. */
@@ -4543,7 +4631,7 @@ void node_bsdf_diffuse_ambient(vec4 color, float roughness, vec3 N, vec3 I, vec3
 
 /* Native SSGI companion. `direct` deliberately excludes the World ambient term: it is a source
  * for nearby screen-space bounces, while `result`/`linear` keep the material's normal lighting. */
-void node_bsdf_diffuse_ambient_ssgi(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
+void node_bsdf_diffuse_ambient_ssgi(vec4 color, float emit, float roughness, vec3 N, vec3 I, vec3 ambient,
                                     out vec4 result, out vec4 ssgi_normal, out vec4 ssgi_albedo,
                                     out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
@@ -4557,12 +4645,16 @@ void node_bsdf_diffuse_ambient_ssgi(vec4 color, float roughness, vec3 N, vec3 I,
 		float NdotL = max(dot(N, l), 0.0);
 		direct += SCENE_LIGHT(i).diffuse.rgb * NdotL * scene_light_visibility(i, I, N, NdotL, atten);
 	}
-	vec3 linear = (ambient + direct) * color.rgb;
+	/* The legacy material Emit slider is radiance, not diffuse irradiance.  Keep it
+	 * separate from color so the SSGI source is not tinted a second time by the
+	 * receiver's albedo in the filter. */
+	vec3 emission = max(color.rgb * emit, vec3(0.0));
+	vec3 linear = (ambient + direct) * color.rgb + emission;
 	result = vec4(linear, color.a);
 	/* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
 	ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
 	ssgi_albedo = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
-	ssgi_direct = vec4(max(direct * color.rgb, vec3(0.0)), 1.0);
+	ssgi_direct = vec4(max(direct * color.rgb, vec3(0.0)) + emission, 1.0);
 	ssgi_linear = vec4(linear, color.a);
 }
 
@@ -4989,7 +5081,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		 * unfshadowmap/unfshadowpersmat/unfshadowbias/unfshadowenabled above). Mirrors what the
 		 * legacy (non-node) material path does per-lamp via shadow_simple(). */
 		if (i < NUM_SHADOW_LIGHTS) {
-			float shadowfac = scene_light_shadow(i, I, N, NdotL);
+			vec3 shadowfac = scene_light_shadow(i, I, N, NdotL) * scene_light_shadow_tint(i, I, N);
 			diffuse_and_specular_bsdf *= shadowfac;
             ssgi_light *= shadowfac;
 			clearcoat_bsdf *= shadowfac;
@@ -5022,7 +5114,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	}
 
 	result = vec4(L, 1.0);
-    ssgi_direct = vec4(max(direct_diffuse, vec3(0.0)), 1.0);
+	ssgi_direct = vec4(max(direct_diffuse, vec3(0.0)), 1.0);
     ssgi_linear = result;
 }
 
@@ -5291,6 +5383,21 @@ void node_ambient_occlusion(vec4 color, float distance, vec3 normal, vec3 viewno
 void node_emission(vec4 color, float strength, vec3 N, out vec4 result)
 {
 	result = color * strength;
+}
+
+/* An Emission closure has no diffuse lobe to receive SSGI, but its linear
+ * radiance is a valid source for other visible surfaces. */
+void node_emission_ssgi(vec4 color, float strength, vec3 N, out vec4 result,
+                        out vec4 ssgi_normal, out vec4 ssgi_albedo,
+                        out vec4 ssgi_direct, out vec4 ssgi_linear)
+{
+	vec4 emission = color * strength;
+	result = emission;
+	ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+	/* alpha zero deliberately excludes the emitter from receiving its own bounce. */
+	ssgi_albedo = vec4(0.0);
+	ssgi_direct = vec4(max(emission.rgb, vec3(0.0)), 1.0);
+	ssgi_linear = emission;
 }
 
 /* background */

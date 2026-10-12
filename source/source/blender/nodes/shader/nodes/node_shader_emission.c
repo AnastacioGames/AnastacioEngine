@@ -34,7 +34,9 @@ static bNodeSocketTemplate sh_node_emission_out[] = {
 
 static int node_shader_gpu_emission(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
-	return GPU_stack_link(mat, "node_emission", in, out, GPU_material_builtin(mat, GPU_VIEW_NORMAL));
+	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
+	return GPU_stack_link(mat, "node_emission_ssgi", in, out, GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }
 
 /* node type definition */

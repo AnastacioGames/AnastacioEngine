@@ -84,6 +84,12 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	GPUNodeLink *scol = (in[15].link || in[15].vec[0] > 0.0f) ? node_shader_gpu_scene_color(mat) :
 	                    GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
 
+	/* Colored shadows: the light passing through takes the Base Color (alpha from the surface,
+	 * e.g. a Mix with a Transparent BSDF). */
+	GPUNodeLink *shadow_base;
+	GPU_link(mat, "set_rgba", in[0].link ? in[0].link : GPU_uniform(in[0].vec), &shadow_base);
+	GPU_material_shadow_color_link(mat, shadow_base, NULL);
+
 	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol,
 	                      node_shader_gpu_lightmap(mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link),

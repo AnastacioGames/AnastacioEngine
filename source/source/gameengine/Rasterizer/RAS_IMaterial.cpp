@@ -60,6 +60,11 @@ bool RAS_IMaterial::IsAlphaShadow() const
 	return (m_rasMode & RAS_ALPHA_SHADOW);
 }
 
+bool RAS_IMaterial::IsColorShadow() const
+{
+	return (m_rasMode & RAS_COLOR_SHADOW);
+}
+
 bool RAS_IMaterial::IsWire() const
 {
 	return (m_rasMode & RAS_WIRE);

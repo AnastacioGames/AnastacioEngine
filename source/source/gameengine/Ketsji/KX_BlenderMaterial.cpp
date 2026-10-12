@@ -110,6 +110,10 @@ KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, K
 	else if (ELEM(m_alphablend, GEMAT_ALPHA, GEMAT_ALPHA_SORT, GEMAT_ADD)) {
 		m_rasMode |= RAS_ALPHA;
 		m_rasMode |= (mat && (mat->game.alpha_blend & GEMAT_ALPHA_SORT)) ? RAS_ZSORT : 0;
+		// Additive materials emit light, they have no transmittance to tint a shadow with.
+		if ((mat->mode2 & MA_COLORED_SHADOW) && m_alphablend != GEMAT_ADD) {
+			m_rasMode |= RAS_COLOR_SHADOW;
+		}
 	}
 	/* Opaque materials that move vertices on the GPU (user vertex/geometry shader, vertex or
 	 * geometry nodes, Foliage Shader) must

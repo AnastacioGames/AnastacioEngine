@@ -72,7 +72,9 @@ public:
 		RAS_TEXT = (1 << 6),
 		RAS_TWOSIDED = (1 << 7),
 		RAS_VISIBLE = (1 << 8),
-		RAS_COLLIDER = (1 << 9)
+		RAS_COLLIDER = (1 << 9),
+		/// Alpha blended caster drawn in the shadow color pass instead of the depth pass.
+		RAS_COLOR_SHADOW = (1 << 10)
 	};
 
 	enum DrawingModes
@@ -134,6 +136,7 @@ public:
 	virtual std::string GetName();
 	unsigned int GetFlag() const;
 	bool IsAlphaShadow() const;
+	bool IsColorShadow() const;
 	bool CastsShadows() const;
 	bool OnlyShadow() const;
 	short GetPassIndex() const;

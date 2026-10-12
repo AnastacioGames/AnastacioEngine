@@ -128,6 +128,12 @@ public:
 	virtual void BindShadowBuffer(RAS_ICanvas *canvas, KX_Camera *cam, mt::mat3x4& camtrans) = 0;
 	virtual void UnbindShadowBuffer() = 0;
 
+	/** Colored shadows: switches the shadow buffer bound for this pass (cascadeIndex 0 also for a
+	 * lamp without cascades) to its color target, cleared to white, with multiply blending. False
+	 * when the lamp has no color target (Point, Variance, no Colored Shadows material at load). */
+	virtual bool BeginShadowColor(short cascadeIndex) = 0;
+	virtual void EndShadowColor(short cascadeIndex) = 0;
+
 	/* Cascaded Shadow Mapping (Sun lamps only). cascadeIndex: 0=Near, 1=Medium, 2=Low.
 	 * The view/win matrices for the cascade (camera-frustum-fit ortho, computed by the caller)
 	 * are written directly into the underlying shadow buffer instead of being re-derived from
@@ -140,6 +146,8 @@ public:
 	/// Sun shadow map reaching the farthest (last cascade, or the only map) for the Volumetric Fog
 	/// sun shafts: bind code and world -> shadow map matrix. False without a usable depth map.
 	virtual bool GetFarShadow(int& bindCode, mt::mat4& worldToShadow) = 0;
+	/// Colored Shadows color target matching GetShadowWorldMatrix()/GetFarShadow(), -1 without one.
+	virtual int GetShadowColorBindCode() = 0;
 
 	/* Point lamp cube shadow (Shading Nodes): 6 passes, one per face, closed with UnbindShadowBuffer(). */
 	virtual bool HasPointShadow() = 0;

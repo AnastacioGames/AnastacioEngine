@@ -943,6 +943,13 @@ static void rna_def_world_weather(BlenderRNA *brna)
 		RNA_def_property_ui_text(prop, "Shaft Intensity", "Strength of the shadowed Spot light shafts");
 		RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+		prop = RNA_def_property(srna, "vfog_dust", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_range(prop, 0.0f, 1.0f);
+		RNA_def_property_ui_text(prop, "Dust",
+		                         "Dust motes floating in the light beams, seen only where the sun or a lamp reaches "
+		                         "(0 = none)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 		prop = RNA_def_property(srna, "vfog_quality", PROP_ENUM, PROP_NONE);
 		RNA_def_property_enum_sdna(prop, NULL, "vfog_quality");
 		RNA_def_property_enum_items(prop, vfog_quality_items);

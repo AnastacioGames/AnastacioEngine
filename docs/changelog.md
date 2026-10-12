@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Sombra colorida (vitral), feixe colorido na névoa, poeira no feixe e emissivos no SSGI
+
+- **Sombra colorida:** opção **Material > Shadow > Colored** (`MA_COLORED_SHADOW`, só com Alpha Blend e Cast). Depois da passada de profundidade, cada Sun/Spot desenha esses materiais numa textura RGBA16F da lâmpada (`colortex`, criada só se algum material usa a opção): rgb = luz que passa (Base Color do Principled ou cor do material antigo, mais branca quanto mais transparente), alpha = profundidade do vidro mais próximo (blend MIN). O receptor atrás dele multiplica a luz por essa cor. Caminhos: material antigo (`shade_shadow_tint`, `shade_shadow_tint_csm` para Sun com cascatas) e loop de luzes do Principled (`scene_light_shadow_tint`). Bucket novo `COLOR_SHADOW` em `RAS_BucketManager`; passada em `KX_ShadowRenderer`, também com o cache estático.
+- **Feixe colorido na névoa:** os shafts do Sun e das Spots leem a mesma textura (`vfog_shadowcolor0-2`, unidades 23-25 do filtro) e o feixe sai com a cor do vidro.
+- **Poeira no feixe:** World > Volumetric Fog > **Dust** (`vfog_dust`, 0 = desligado, arquivos antigos iguais). Pontinhos claros só onde a luz chega (sol e lâmpadas, respeitando sombra e vidro), derivando com o vento; desligado em Low. `vfog_data` ganhou o índice 56.
+- **Emissivos no SSGI** (Codex): Emission ligado direto no Material Output e Emit do material antigo viram fonte de luz do SSGI.
+- Não feito: Point lamp, sombra Variance e nó Lamp Data seguem com sombra preta; Sun com cascatas no Principled não tem sombra nenhuma hoje, então também não tem cor.
+- Teste: `tools/debug/cenas/criar_cena_vitral.py` (modos sun, spot, csm, legacy, nodes_off). Aceite visual do usuário no runtime: sombra colorida OK em sun/spot/csm, nodes_off preta como antes, névoa e feixes visíveis. Valores da poeira ajustados no olho.
+
 ## 2026-10-12 - Culling de atividade: desligar uma flag tirava o objeto da lista da outra
 
 - Causa: `KX_GameObject::SetActivityCulling(..., false)` removia o objeto de `m_cullinglist` ao desligar só a fisica (ou só a logica), mesmo com a outra flag ligada. Sem estar na lista, `UpdateActivity` nunca rodava nele e a logica não era mais suspensa por distância. Mesmo caso para o contrário.

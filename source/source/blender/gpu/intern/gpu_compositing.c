@@ -965,7 +965,7 @@ void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
 
 /* Volumetric Fog data for the 3D View, mirrors KX_FillVolumetricFog (KX_RenderPipeline.cpp):
  * layout in gpu_shader_vfog_lib.glsl. Fills shadow_tex 0-1 (Spots) and 2 (Sun). */
-#define GPU_VFOG_DATA_VEC4 56
+#define GPU_VFOG_DATA_VEC4 57
 
 /* Reach of a fog_glow object: fog_glow_radius, else 4x its largest scale (as KX_VFogGlow.cpp). */
 static float gpu_vfog_glow_radius(Object *ob)
@@ -1046,6 +1046,7 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 	data[6][3] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	data[8][0] = world->vfog_edge;
 	data[8][1] = world->vfog_shaft_intensity;
+	data[56][0] = (world->vfog_quality > 0) ? world->vfog_dust : 0.0f;
 
 	/* Wind: the noise is carried along the heading vfog_wind_dir, at Rain Wind * 20 m/s. */
 	if (world->vfog_flag & WO_VFOG_WIND) {

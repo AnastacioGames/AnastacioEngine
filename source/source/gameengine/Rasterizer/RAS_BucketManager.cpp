@@ -184,6 +184,20 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 		{
 			const bool isVarianceShadow = rasty->GetShadowMode() == RAS_Rasterizer::RAS_SHADOW_VARIANCE;
 
+			if (rasty->GetShadowColorPass()) {
+				/* Colored shadows: the casters multiply their transmittance into the lamp's color
+				 * buffer, tested against the depth of the opaque casters but not written to it. */
+				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
+				rasty->SetOverrideShader(RAS_Rasterizer::RAS_OVERRIDE_SHADER_NONE);
+				m_nodeData.m_shaderOverride = false;
+
+				RenderBasicBuckets(rasty, COLOR_SHADOW_INSTANCING_BUCKET);
+				RenderBasicBuckets(rasty, COLOR_SHADOW_BUCKET);
+
+				rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);
+				break;
+			}
+
 			rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);
 
 			/* Rendering solid regular materials with an override shader for
@@ -404,7 +418,10 @@ RAS_MaterialBucket *RAS_BucketManager::FindBucket(RAS_IMaterial *material, bool 
 		}
 	}
 	if (material->CastsShadows()) {
-		if (material->IsAlphaShadow()) {
+		if (material->IsColorShadow()) {
+			m_buckets[useinstancing ? COLOR_SHADOW_INSTANCING_BUCKET : COLOR_SHADOW_BUCKET].push_back(bucket);
+		}
+		else if (material->IsAlphaShadow()) {
 			m_buckets[useinstancing ? ALPHA_SHADOW_INSTANCING_BUCKET : ALPHA_SHADOW_BUCKET].push_back(bucket);
 		}
 		else {
@@ -415,6 +432,11 @@ RAS_MaterialBucket *RAS_BucketManager::FindBucket(RAS_IMaterial *material, bool 
 	// Used to free the bucket.
 	m_buckets[ALL_BUCKET].push_back(bucket);
 	return bucket;
+}
+
+bool RAS_BucketManager::HasColorShadowBuckets() const
+{
+	return !m_buckets[COLOR_SHADOW_BUCKET].empty() || !m_buckets[COLOR_SHADOW_INSTANCING_BUCKET].empty();
 }
 
 RAS_DisplayArrayBucket *RAS_BucketManager::GetTextDisplayArrayBucket() const

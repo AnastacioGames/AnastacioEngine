@@ -138,7 +138,7 @@ base class --- :class:`EXP_PyObjectPlus`
       floats ``vfog_density``, ``vfog_base``, ``vfog_falloff``, ``vfog_distance``, ``vfog_noise_scale``,
       ``vfog_noise_amount``, ``vfog_speed``, ``vfog_anisotropy``, ``vfog_edge``, ``vfog_light_intensity``,
       ``vfog_sun_intensity``, ``vfog_shaft_intensity``, ``vfog_ambient``, ``vfog_morning_boost``,
-      ``vfog_wind_direction`` (degrees), ``vfog_color_r/_g/_b``. The fog resolution is fixed at load.
+      ``vfog_wind_direction`` (degrees), ``vfog_dust`` (0-1, motes in the light beams), ``vfog_color_r/_g/_b``. The fog resolution is fixed at load.
 
       .. code-block:: python
 

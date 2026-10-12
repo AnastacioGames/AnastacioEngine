@@ -316,6 +316,8 @@ private:
 
 	DrawType m_drawingmode;
 	ShadowType m_shadowMode;
+	/// Colored shadows pass of the lamp being drawn, see SetShadowColorPass.
+	bool m_shadowColorPass;
 
 	bool m_invertFrontFace;
 
@@ -548,6 +550,11 @@ public:
 
 	/// \return the current drawing mode: RAS_SHADOW_SIMPLE, RAS_SHADOW_VARIANCE.
 	ShadowType GetShadowMode();
+
+	/** Colored shadows: between RAS_ILightObject::BeginShadowColor and EndShadowColor the lamp owns
+	 * the blending (multiply), so the materials drawn must not change it (see SetAlphaBlend). */
+	void SetShadowColorPass(bool enable);
+	bool GetShadowColorPass() const;
 
 	/**
 	 * Sets face culling

@@ -2230,6 +2230,14 @@ void RNA_def_material(BlenderRNA *brna)
 		"Generates shadows on both sides of an object, use with 'Translucency' slider in the Shading tab");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
+	prop = RNA_def_property(srna, "use_colored_shadows", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "mode2", MA_COLORED_SHADOW);
+	RNA_def_property_ui_text(prop, "Colored Shadows",
+	                         "Tint the light passing through this material with its color instead of blocking it "
+	                         "(game engine: needs Cast Shadows, an Alpha Blend mode and a Sun or Spot lamp "
+	                         "with a non Variance shadow)");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
 	prop = RNA_def_property(srna, "use_mist", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "mode", MA_NOMIST);
 	RNA_def_property_ui_text(prop, "Use Mist", "Use mist with this material (in world settings)");

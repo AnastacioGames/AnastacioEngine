@@ -44,6 +44,7 @@
 #include "RAS_ILightObject.h"
 #include "RAS_DebugDraw.h"
 #include "RAS_CameraData.h"
+#include "RAS_BucketManager.h"
 
 KX_ShadowRenderer::KX_ShadowRenderer(KX_KetsjiEngine *engine)
 	:m_engine(engine)
@@ -674,6 +675,13 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						}
 						else {
 							scene->RenderBuckets(objects, RAS_Rasterizer::RAS_SHADOW, camtrans, rasty, nullptr);
+						}
+
+						// Colored shadows: the Colored Shadows casters, tested against the depth just drawn.
+						if (!usePoint && scene->GetBucketManager()->HasColorShadowBuckets() &&
+						    raslight->BeginShadowColor(useCascade ? pass : 0)) {
+							scene->RenderBuckets(objects, RAS_Rasterizer::RAS_SHADOW, camtrans, rasty, nullptr);
+							raslight->EndShadowColor(useCascade ? pass : 0);
 						}
 					}
 					else {

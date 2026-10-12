@@ -227,6 +227,7 @@ typedef enum GPUDynamicType {
 	GPU_DYNAMIC_WORLD_MOON_ENABLED   = 12 | GPU_DYNAMIC_GROUP_WORLD,
 	GPU_DYNAMIC_WORLD_MOON_SIZE      = 13 | GPU_DYNAMIC_GROUP_WORLD,
 	GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS = 14 | GPU_DYNAMIC_GROUP_WORLD,
+	GPU_DYNAMIC_SHADOW_COLOR_PASS    = 15 | GPU_DYNAMIC_GROUP_WORLD,
 
 	GPU_DYNAMIC_MAT_DIFFRGB          = 1  | GPU_DYNAMIC_GROUP_MAT,
 	GPU_DYNAMIC_MAT_REF              = 2  | GPU_DYNAMIC_GROUP_MAT,
@@ -359,6 +360,9 @@ struct Scene *GPU_material_scene(GPUMaterial *material);
 /* First native SSGI color slot, or 0 when disabled/unavailable. Four consecutive slots follow. */
 int GPU_material_ssgi_slot(struct Scene *scene);
 void GPU_material_ssgi_outputs(GPUMaterial *material, struct GPUNodeLink *surface);
+/* Colored shadows: the color and alpha the material casts with (alpha NULL: the surface alpha).
+ * Ignored unless the material has Colored Shadows. The links must be node outputs. */
+void GPU_material_shadow_color_link(GPUMaterial *material, struct GPUNodeLink *base, struct GPUNodeLink *alpha);
 GPUMatType GPU_Material_get_type(GPUMaterial *material);
 
 void GPU_material_vertex_attributes(GPUMaterial *material,
@@ -454,6 +458,12 @@ void GPU_lamp_update_buffer_mats(GPULamp *lamp);
 void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[4][4], int *winsize, float winmat[4][4]);
 void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp);
 int GPU_lamp_shadow_buffer_type(GPULamp *lamp);
+/* Colored shadows (Sun/Spot, not Variance): between begin and end the bound shadow buffer draws
+ * to the lamp's color target, cleared to white, where the Colored Shadows casters multiply their
+ * transmittance (rgb) and keep their nearest depth (alpha). False without a color target. */
+bool GPU_lamp_shadow_color_begin(GPULamp *lamp);
+void GPU_lamp_shadow_color_end(GPULamp *lamp);
+int GPU_lamp_shadow_color_bind_code(GPULamp *lamp);
 int GPU_lamp_shadow_bind_code(GPULamp *lamp);
 const float *GPU_lamp_dynpersmat(GPULamp *lamp);
 /* World space -> shadow map texture coordinates ([0, 1] range), without the camera. */

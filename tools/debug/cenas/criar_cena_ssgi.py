@@ -1,5 +1,5 @@
 """Native SSGI integration scene. Usage: editor -b --factory-startup --python this.py -- out.range [mode].
-mode: standard (default), filmic, baked, disabled. Runtime logs go to SSGI_TEST_LOG.
+mode: standard (default), filmic, baked, disabled, emissive. Runtime logs go to SSGI_TEST_LOG.
 No screenshots: numerical buffer checks and shader errors only; appearance needs real-game validation.
 """
 import bpy
@@ -20,9 +20,9 @@ scene.game_settings.resolution_y = 480
 scene.game_settings.vsync = 'OFF'
 scene.game_settings.use_frame_rate = False
 scene['ae_ssgi_use'] = mode != 'disabled'
-scene['ae_ssgi_rays'] = 8
-scene['ae_ssgi_steps'] = 16
-scene['ae_ssgi_radius'] = 5.0
+scene['ae_ssgi_rays'] = 16 if mode == 'emissive' else 8
+scene['ae_ssgi_steps'] = 24 if mode == 'emissive' else 16
+scene['ae_ssgi_radius'] = 3.0 if mode == 'emissive' else 5.0
 scene['ae_ssgi_divisor'] = 2
 scene['ae_ssgi_thickness'] = 0.15
 scene['ae_ssgi_strength'] = 1.0
@@ -99,11 +99,25 @@ emission.inputs['Color'].default_value = (0.02, 0.05, 0.8, 1)
 out = unsupported.node_tree.nodes.new('ShaderNodeOutputMaterial')
 unsupported.node_tree.links.new(emission.outputs[0], out.inputs[0])
 cube('UnsupportedCube', (1, -2, 0.4), (0.4, 0.4, 0.4), unsupported)
-lamp = bpy.data.lamps.new('Sun', 'SUN')
-lamp.energy = 1.0
-sun = bpy.data.objects.new('Sun', lamp)
-scene.objects.link(sun)
-sun.rotation_euler = Vector((-1, 0.5, -2)).to_track_quat('-Z', 'Y').to_euler()
+if mode == 'emissive':
+    # The blue panel is the only light source.  It is placed beside, not in front
+    # of, the eligible white wall so the probe can isolate bounced blue light.
+    panel = bpy.data.materials.new('BlueEmissionPanel')
+    panel.use_nodes = True
+    for node in list(panel.node_tree.nodes):
+        panel.node_tree.nodes.remove(node)
+    panel_emission = panel.node_tree.nodes.new('ShaderNodeEmission')
+    panel_emission.inputs['Color'].default_value = (0.01, 0.08, 1.0, 1.0)
+    panel_emission.inputs['Strength'].default_value = 8.0
+    panel_output = panel.node_tree.nodes.new('ShaderNodeOutputMaterial')
+    panel.node_tree.links.new(panel_emission.outputs[0], panel_output.inputs['Surface'])
+    cube('BlueEmissionPanel', (1.8, 1.8, 1.5), (0.55, 0.05, 1.0), panel)
+else:
+    lamp = bpy.data.lamps.new('Sun', 'SUN')
+    lamp.energy = 1.0
+    sun = bpy.data.objects.new('Sun', lamp)
+    scene.objects.link(sun)
+    sun.rotation_euler = Vector((-1, 0.5, -2)).to_track_quat('-Z', 'Y').to_euler()
 for name, kind in (('Camera', 'PERSP'), ('OrthoCamera', 'ORTHO')):
     cam = bpy.data.objects.new(name, bpy.data.cameras.new(name))
     scene.objects.link(cam)

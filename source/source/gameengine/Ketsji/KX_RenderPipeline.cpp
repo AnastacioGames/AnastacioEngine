@@ -128,6 +128,7 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	std::fill(d, d + BuildInFilters::VFOG_DATA_VEC4 * 4, 0.0f);
 	std::fill(params->vfog_mats, params->vfog_mats + 16 * BuildInFilters::VFOG_MATS, 0.0f);
 	std::fill(params->vfog_shadow_tex, params->vfog_shadow_tex + BuildInFilters::VFOG_SHADOWS, 0u);
+	std::fill(params->vfog_shadow_color_tex, params->vfog_shadow_color_tex + BuildInFilters::VFOG_SHADOWS, 0u);
 
 	/* Morning Fog: denser and lower around dawn (World Property sun_hour, peak at 6h). */
 	float morning = 0.0f;
@@ -200,11 +201,18 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	if ((world->vfog_flag & WO_VFOG_SUN_SHAFTS) && quality > 0 && d[15] > 0.5f) {
 		int code = 0;
 		mt::mat4 mat;
-		if (scene->GetWorldSun()->GetLightData()->GetFarShadow(code, mat)) {
+		RAS_ILightObject *sunData = scene->GetWorldSun()->GetLightData();
+		if (sunData->GetFarShadow(code, mat)) {
 			params->vfog_shadow_tex[2] = (unsigned int)code;
 			mat.Pack(params->vfog_mats + 16 * 6);
 			d[34] = 0.001f;
 			d[35] = 1.0f;
+			/* Shafts tinted by the Colored Shadows casters (glass, stained glass). */
+			const int color = sunData->GetShadowColorBindCode();
+			if (color > 0) {
+				params->vfog_shadow_color_tex[2] = (unsigned int)color;
+				d[35] = 2.0f;
+			}
 		}
 	}
 
@@ -263,6 +271,7 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		++pushers;
 	}
 	d[39] = (float)pushers;
+	d[4 * 56] = (quality > 0) ? world->vfog_dust : 0.0f;
 
 	/* Lamps: strongest at the camera first, only the ones whose reach gets near the fogged part. */
 	int lampCount = 0;
@@ -347,6 +356,11 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 						data->GetShadowWorldMatrix().Pack(params->vfog_mats + 16 * (4 + shadows));
 						l[7] = (float)shadows;
 						l[13] = 0.0005f;
+						const int color = data->GetShadowColorBindCode();
+						if (color > 0) {
+							params->vfog_shadow_color_tex[shadows] = (unsigned int)color;
+							l[14] = 1.0f;
+						}
 						++shadows;
 					}
 				}

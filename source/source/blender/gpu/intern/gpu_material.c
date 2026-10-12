@@ -56,6 +56,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "GPU_extensions.h"
+#include "GPU_draw.h"
 #include "GPU_framebuffer.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
@@ -112,6 +113,8 @@ struct GPUMaterial {
 	/* for creating the material */
 	ListBase nodes;
 	GPUNodeLink *outlinks[8];
+	/* Colored shadows: what the material casts with, see GPU_material_shadow_color_link(). */
+	GPUNodeLink *shadowcol_base, *shadowcol_alpha;
 
 	/* Vertex and geometry stages set by the nodes (see GPUPassStages). */
 	GPUNodeLink *vertex_offset;
@@ -211,6 +214,8 @@ struct GPUMaterial {
 	int shadowbiasloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowpointloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowcolorloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowcoloredloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 
 	/* Local reflection probe (unfprobecube/unfprobeinfo), bound per object by GPU_material_bind_probe(). */
 	int probecubeloc, probeinfoloc, probeposloc;
@@ -306,6 +311,9 @@ struct GPULamp {
 	GPUTexture *tex;
 	GPUTexture *depthtex;
 	GPUTexture *blurtex;
+	/* Colored shadows: transmittance (rgb) and nearest depth (a) of the Colored Shadows casters,
+	 * a second attachment of `fb`. Only made when some material asks for it at lamp creation. */
+	GPUTexture *colortex;
 
 	/* Static shadow cache (Sun/CSM only, see GPU_lamp_shadow_static_*). Holds the depth of the
 	 * static shadow casters only, re-rendered rarely (dirty flag or view/win matrix drift beyond
@@ -626,6 +634,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->shadowbiasloc[i] = GPU_shader_get_uniform(shader, name);
 			BLI_snprintf(name, sizeof(name), "unfshadowenabled[%d]", i);
 			material->shadowenabledloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowcolor[%d]", i);
+			material->shadowcolorloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowcolored[%d]", i);
+			material->shadowcoloredloc[i] = GPU_shader_get_uniform(shader, name);
 			BLI_snprintf(name, sizeof(name), "unfshadowpoint[%d]", i);
 			material->shadowpointloc[i] = GPU_shader_get_uniform(shader, name);
 		}
@@ -1251,6 +1263,44 @@ int GPU_material_ssgi_slot(Scene *scene)
 #endif
 }
 
+static float GPU_shadow_color_pass; /* defined with GPU_lamp_shadow_color_begin() */
+
+void GPU_material_shadow_color_link(GPUMaterial *material, GPUNodeLink *base, GPUNodeLink *alpha)
+{
+	const Material *ma = material->ma;
+	if (ma && material->type == GPU_MATERIAL_TYPE_MESH &&
+	    (ma->mode2 & MA_COLORED_SHADOW) && (ma->mode2 & MA_CASTSHADOW))
+	{
+		material->shadowcol_base = base;
+		material->shadowcol_alpha = alpha;
+	}
+}
+
+/* Colored shadows: in a lamp's shadow color pass the surface output becomes the transmittance.
+ * Without a registered color (node graphs other than Principled) the material color is used. */
+static void gpu_material_link_shadow_color(GPUMaterial *mat, Material *ma)
+{
+	static float surface_alpha = -1.0f;
+	GPUNodeLink *base = mat->shadowcol_base;
+	GPUNodeLink *alpha = mat->shadowcol_alpha;
+
+	if (!mat->outlinks[0] || mat->type != GPU_MATERIAL_TYPE_MESH ||
+	    !(ma->mode2 & MA_COLORED_SHADOW) || !(ma->mode2 & MA_CASTSHADOW) ||
+	    !(ma->game.alpha_blend & (GEMAT_ALPHA | GEMAT_ALPHA_SORT)))
+	{
+		return;
+	}
+
+	if (!base) {
+		GPU_link(mat, "set_rgb", GPU_uniform(&ma->r), &base);
+	}
+	if (!alpha) {
+		alpha = GPU_uniform(&surface_alpha);
+	}
+	GPU_link(mat, "shadow_color_output", mat->outlinks[0], base, alpha,
+	         GPU_dynamic_uniform(&GPU_shadow_color_pass, GPU_DYNAMIC_SHADOW_COLOR_PASS, NULL), &mat->outlinks[0]);
+}
+
 void GPU_material_ssgi_outputs(GPUMaterial *material, GPUNodeLink *surface)
 {
     const int slot = GPU_material_ssgi_slot(material->scene);
@@ -1260,7 +1310,8 @@ void GPU_material_ssgi_outputs(GPUMaterial *material, GPUNodeLink *surface)
     GPUNode *node = surface->output->node;
     /* A mixed closure needs its own composition contract; only the actual Surface root is accepted. */
     if (!STREQ(node->name, "node_bsdf_principled") &&
-        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi")) return;
+        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi") &&
+        !STREQ(node->name, "node_emission_ssgi")) return;
     GPUOutput *extra = ((GPUOutput *)node->outputs.first)->next;
     for (int i = 0; i < 4 && extra; ++i, extra = extra->next) {
         material->outlinks[slot + i] = extra->link;
@@ -2300,6 +2351,35 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				GPU_link(mat, "shadow_fade", GPU_material_builtin(mat, GPU_VIEW_POSITION),
 					GPU_select_uniform(&lamp->spotbl, GPU_DYNAMIC_LAMP_SPOTBLEND, lamp->ob, ma),
 					GPU_dynamic_uniform((float*)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob), shadfac, &shadfac);
+			}
+
+			/* Colored shadows. */
+			if (lamp->colortex && GPU_lamp_has_cascaded_shadow(lamp) &&
+			    lamp->cascade[0]->colortex && lamp->cascade[1]->colortex)
+			{
+				GPULamp *cascade0 = lamp->cascade[0];
+				GPULamp *cascade1 = lamp->cascade[1];
+				GPU_link(mat, "shade_shadow_tint_csm", lcol,
+				         GPU_material_builtin(mat, GPU_VIEW_POSITION),
+				         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+				         GPU_dynamic_texture(lamp->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
+				         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+				         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+				         GPU_dynamic_texture(cascade0->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
+				         GPU_dynamic_uniform((float *)cascade0->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+				         GPU_uniform(&cascade0->bias), GPU_uniform(&cascade0->slopebias),
+				         GPU_dynamic_texture(cascade1->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
+				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+				         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
+				         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]), &lcol);
+			}
+			else if (lamp->colortex && !GPU_lamp_has_cascaded_shadow(lamp)) {
+				GPU_link(mat, "shade_shadow_tint", lcol,
+				         GPU_material_builtin(mat, GPU_VIEW_POSITION),
+				         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+				         GPU_dynamic_texture(lamp->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
+				         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+				         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias), &lcol);
 			}
 
 			if (lamp->mode & LA_ONLYSHADOW) {
@@ -3751,6 +3831,8 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 	if ((ma->game.alpha_blend == GPU_BLEND_ALPHA_TO_COVERAGE) && (mat->scene->gm.aasamples <= 1))
 		GPU_link(mat, "shade_dither", shr->alpha, &shr->alpha);
 
+	GPU_material_shadow_color_link(mat, shi->rgb, shr->alpha);
+
 	GPU_link(mat, "mtex_alpha_to_col", shr->combined, shr->alpha, &shr->combined);
 
 	if (ma->shade_flag & MA_OBCOLOR) {
@@ -4423,7 +4505,7 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 			if (ssgi_slot && ma->game.alpha_blend == GEMAT_SOLID && !ma->fragcode) {
 				GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 				GPU_link(mat, "node_bsdf_diffuse_ambient_ssgi",
-				         GPU_uniform(&ma->r), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+				         GPU_uniform(&ma->r), GPU_uniform(&ma->emit), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),
 				         GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat), &outlink,
 				         &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 				mat->outlinks[ssgi_slot] = ssgi_normal;
@@ -4450,6 +4532,8 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 			gpu_material_link_display_transform(mat, scene);
 		}
 	}
+
+	gpu_material_link_shadow_color(mat, ma);
 
 	gpu_material_construct_end(mat, ma->id.name);
 
@@ -4785,6 +4869,10 @@ static void gpu_lamp_shadow_free(GPULamp *lamp)
 		GPU_texture_free(lamp->depthtex);
 		lamp->depthtex = NULL;
 	}
+	if (lamp->colortex) {
+		GPU_texture_free(lamp->colortex);
+		lamp->colortex = NULL;
+	}
 	if (lamp->fb) {
 		GPU_framebuffer_free(lamp->fb);
 		lamp->fb = NULL;
@@ -4806,6 +4894,54 @@ static void gpu_lamp_shadow_free(GPULamp *lamp)
 		lamp->static_fb = NULL;
 	}
 	lamp->static_valid = false;
+}
+
+/* Colored shadows: 1 while a lamp's shadow color pass is drawn, so the casters output their
+ * transmittance instead of their shading (shadow_color_output in gpu_shader_material.glsl). */
+static float GPU_shadow_color_pass = 0.0f;
+
+static bool gpu_colored_shadows_used(void)
+{
+	for (Material *ma = G.main->mat.first; ma; ma = ma->id.next) {
+		if ((ma->mode2 & MA_COLORED_SHADOW) && (ma->mode2 & MA_CASTSHADOW)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void gpu_lamp_shadow_color_clear(void)
+{
+	float clear[4];
+	const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+
+	glGetFloatv(GL_COLOR_CLEAR_VALUE, clear);
+	glDisable(GL_SCISSOR_TEST);
+	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(clear[0], clear[1], clear[2], clear[3]);
+	if (scissor) {
+		glEnable(GL_SCISSOR_TEST);
+	}
+}
+
+/* Adds the color target to lamp->fb, left white (no tint) for whoever never draws the color pass
+ * (the 3D View). A failure only leaves the lamp without colored shadows. */
+static void gpu_lamp_shadow_color_create(GPULamp *lamp)
+{
+	lamp->colortex = GPU_texture_create_2D(lamp->size, lamp->size, NULL, GPU_HDR_HALF_FLOAT, NULL);
+	if (!lamp->colortex) {
+		return;
+	}
+	if (!GPU_framebuffer_texture_attach(lamp->fb, lamp->colortex, 0, NULL)) {
+		GPU_texture_free(lamp->colortex);
+		lamp->colortex = NULL;
+		return;
+	}
+	gpu_lamp_shadow_color_clear();
+	glDrawBuffer(GL_NONE);
 }
 
 /* Creates lamp->fb/tex/depthtex/blurfb/blurtex for lamp->size, per lamp->la->shadowmap_type.
@@ -4879,6 +5015,10 @@ static bool gpu_lamp_create_shadow_buffer(GPULamp *lamp)
 
 		if (!GPU_framebuffer_check_valid(lamp->fb, NULL)) {
 			return false;
+		}
+
+		if (gpu_colored_shadows_used()) {
+			gpu_lamp_shadow_color_create(lamp);
 		}
 	}
 
@@ -5164,6 +5304,8 @@ static bool gpu_lamp_shadow_resize(GPULamp *lamp, int size)
 		return false;
 	if (lamp->static_depthtex && !GPU_texture_resize_2D(lamp->static_depthtex, size, size))
 		return false;
+	if (lamp->colortex && !GPU_texture_resize_2D(lamp->colortex, size, size))
+		return false;
 	lamp->static_valid = false;
 	lamp->size = size;
 	return true;
@@ -5298,6 +5440,42 @@ void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp)
 int GPU_lamp_shadow_buffer_type(GPULamp *lamp)
 {
 	return lamp->la->shadowmap_type;
+}
+
+bool GPU_lamp_shadow_color_begin(GPULamp *lamp)
+{
+	if (!lamp->fb || !lamp->colortex) {
+		return false;
+	}
+
+	gpu_lamp_shadow_color_clear();
+
+	/* rgb: multiply by the caster's transmittance; alpha: keep the nearest caster depth */
+	glEnable(GL_BLEND);
+	glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_ONE, GL_ONE);
+	glBlendEquationSeparate(GL_FUNC_ADD, GL_MIN);
+#if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
+	glDisable(GL_ALPHA_TEST);
+#endif
+
+	GPU_shadow_color_pass = 1.0f;
+	return true;
+}
+
+void GPU_lamp_shadow_color_end(GPULamp *UNUSED(lamp))
+{
+	GPU_shadow_color_pass = 0.0f;
+
+	glBlendEquation(GL_FUNC_ADD);
+	glDrawBuffer(GL_NONE);
+	/* The blend state was changed behind the material blend cache: make it apply Solid again. */
+	GPU_set_material_alpha_blend(GPU_BLEND_ALPHA);
+	GPU_set_material_alpha_blend(GPU_BLEND_SOLID);
+}
+
+int GPU_lamp_shadow_color_bind_code(GPULamp *lamp)
+{
+	return lamp->colortex ? GPU_texture_opengl_bindcode(lamp->colortex) : -1;
 }
 
 /* Static shadow cache (Sun/CSM static/dynamic split). Not called from anywhere yet -- the RAS
@@ -5502,6 +5680,17 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				float bias[2] = {lamp->bias, lamp->slopebias};
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowbiasloc[i], 2, bias);
 			}
+			/* Colored shadows: below the units of the other lamp samplers (shadow maps, probes...). */
+			const bool colored = lamp->colortex && !GPU_lamp_has_point_shadow(lamp);
+			if (colored && material->shadowcolorloc[i] != -1) {
+				const int colorunit = GPU_max_textures() - 2 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - i;
+				GPU_texture_bind(lamp->colortex, colorunit);
+				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->shadowcolorloc[i], colorunit);
+			}
+			if (material->shadowcoloredloc[i] != -1) {
+				const float colored_f = colored ? 1.0f : 0.0f;
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowcoloredloc[i], 1, &colored_f);
+			}
 			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
 				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpointloc[i], 4, point);
@@ -5519,6 +5708,15 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			glBindTexture(GL_TEXTURE_2D, 0);
 			glActiveTexture(GL_TEXTURE0);
 			LIGHT_GL_CALLS += 3;
+		}
+		if (!has_shadow && material->shadowcoloredloc[i] != -1) {
+			const float zero = 0.0f;
+			LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowcoloredloc[i], 1, &zero);
+		}
+		if (!has_shadow && material->shadowcolorloc[i] != -1) {
+			/* Its own unit, so the sampler2D never shares one with a sampler2DShadow. */
+			const int colorunit = GPU_max_textures() - 2 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - i;
+			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->shadowcolorloc[i], colorunit);
 		}
 
 		if (material->shadowenabledloc[i] != -1) {

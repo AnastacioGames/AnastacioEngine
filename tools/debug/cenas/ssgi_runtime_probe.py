@@ -72,6 +72,11 @@ def _summary(frame):
         report['onOffDifference'] = sum(abs(a - b) for a, b in zip(_state['on'], display))
         red = [i for i in valid if albedo[i] > 0.5 and albedo[i + 1] < 0.1]
         report['redReceiverDelta'] = [sum(_state['on'][i + c] - display[i + c] for i in red) for c in range(3)]
+        # Emission sources deliberately have ineligible albedo alpha, so this
+        # mask reads only the diffuse white wall in the emissive fixture.
+        white = [i for i in valid if albedo[i + 3] > 0.99 and min(albedo[i:i + 3]) > 0.5]
+        report['whiteReceiverPixels'] = len(white)
+        report['whiteReceiverDelta'] = [sum(_state['on'][i + c] - display[i + c] for i in white) for c in range(3)]
     _write(report)
 
 

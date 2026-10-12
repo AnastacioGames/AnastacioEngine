@@ -96,6 +96,7 @@ RAS_Rasterizer::RAS_Rasterizer()
 	m_auxilaryClientInfo(nullptr),
 	m_drawingmode(RAS_TEXTURED),
 	m_shadowMode(RAS_SHADOW_NONE),
+	m_shadowColorPass(false),
 	m_invertFrontFace(false),
 	m_overrideShader(RAS_OVERRIDE_SHADER_NONE)
 {
@@ -335,6 +336,16 @@ void RAS_Rasterizer::SetShadowMode(RAS_Rasterizer::ShadowType shadowmode)
 RAS_Rasterizer::ShadowType RAS_Rasterizer::GetShadowMode()
 {
 	return m_shadowMode;
+}
+
+void RAS_Rasterizer::SetShadowColorPass(bool enable)
+{
+	m_shadowColorPass = enable;
+}
+
+bool RAS_Rasterizer::GetShadowColorPass() const
+{
+	return m_shadowColorPass;
 }
 
 void RAS_Rasterizer::SetDepthMask(DepthMask depthmask)
@@ -970,6 +981,9 @@ void RAS_Rasterizer::SetMotionBlur(unsigned short state)
 
 void RAS_Rasterizer::SetAlphaBlend(int alphablend)
 {
+	if (m_shadowColorPass) {
+		return;
+	}
 	GPU_set_material_alpha_blend(alphablend);
 }
 

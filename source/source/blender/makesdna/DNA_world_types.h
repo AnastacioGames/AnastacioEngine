@@ -234,6 +234,8 @@ typedef struct World {
 	/* Mais neblina ao amanhecer (World Property sun_hour) e direcao do vento (graus em Z, forca
 	 * vem de rain_wind). vfog_morning_boost == 0 marca arquivo antigo (readfile.c). */
 	float vfog_morning_boost, vfog_wind_dir;
+	/* Poeira no feixe: pontinhos claros so onde a luz passa (0 = desligado, arquivos antigos). */
+	float vfog_dust, vfog_pad;
 
 	ListBase gpumaterial;		/* runtime */
 

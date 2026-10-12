@@ -71,12 +71,15 @@ public:
 	int GetShadowLayer();
 	void BindShadowBuffer(RAS_ICanvas *canvas, KX_Camera *cam, mt::mat3x4& camtrans);
 	void UnbindShadowBuffer();
+	bool BeginShadowColor(short cascadeIndex);
+	void EndShadowColor(short cascadeIndex);
 	bool HasCascadedShadow();
 	void BindCascadeShadowBuffer(RAS_ICanvas *canvas, short cascadeIndex, KX_Camera *cam, mt::mat3x4& camtrans,
 	                             const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);
 	void UnbindCascadeShadowBuffer(short cascadeIndex);
 	void SetCascadeSplits(float split0, float split1);
 	bool GetFarShadow(int& bindCode, mt::mat4& worldToShadow);
+	int GetShadowColorBindCode();
 	bool HasPointShadow();
 	void BindPointShadowFace(RAS_ICanvas *canvas, short face, KX_Camera *cam, mt::mat3x4& camtrans);
 	bool NeedStaticShadowUpdate(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);

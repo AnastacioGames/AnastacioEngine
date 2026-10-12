@@ -373,6 +373,25 @@ void RAS_OpenGLLight::UnbindShadowBuffer()
 	m_requestShadowUpdate = false;
 }
 
+bool RAS_OpenGLLight::BeginShadowColor(short cascadeIndex)
+{
+	GPULamp *lamp = GetGPULamp();
+	GPULamp *passLamp = (cascadeIndex == 0 || !lamp) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+	if (!passLamp || !GPU_lamp_shadow_color_begin(passLamp)) {
+		return false;
+	}
+	m_rasterizer->SetShadowColorPass(true);
+	return true;
+}
+
+void RAS_OpenGLLight::EndShadowColor(short cascadeIndex)
+{
+	GPULamp *lamp = GetGPULamp();
+	GPULamp *passLamp = (cascadeIndex == 0) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+	m_rasterizer->SetShadowColorPass(false);
+	GPU_lamp_shadow_color_end(passLamp);
+}
+
 bool RAS_OpenGLLight::HasPointShadow()
 {
 	GPULamp *lamp = GetGPULamp();
@@ -427,6 +446,19 @@ bool RAS_OpenGLLight::GetFarShadow(int& bindCode, mt::mat4& worldToShadow)
 	bindCode = GPU_lamp_shadow_bind_code(lamp);
 	worldToShadow = mt::mat4(GPU_lamp_get_persmat(lamp));
 	return bindCode > 0;
+}
+
+int RAS_OpenGLLight::GetShadowColorBindCode()
+{
+	GPULamp *lamp = GetGPULamp();
+	if (!lamp || GPU_lamp_has_point_shadow(lamp)) {
+		return -1;
+	}
+	/* Same map as GetFarShadow(): the last cascade. */
+	if (GPU_lamp_has_cascaded_shadow(lamp)) {
+		lamp = GPU_lamp_get_cascade(lamp, 1);
+	}
+	return GPU_lamp_shadow_color_bind_code(lamp);
 }
 
 void RAS_OpenGLLight::BindCascadeShadowBuffer(RAS_ICanvas *canvas, short cascadeIndex, KX_Camera *cam, mt::mat3x4& camtrans,

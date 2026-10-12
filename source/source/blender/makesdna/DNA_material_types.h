@@ -327,6 +327,7 @@ typedef struct Material {
 #define MA_DEPTH_TRANSP		(1 << 2)
 #define MA_TWOSIDEDSHADOWS  (1 << 3)
 #define MA_USEFULLSKY	    (1 << 4) /* Full sky */
+#define MA_COLORED_SHADOW   (1 << 5) /* Alpha Blend caster tints the light instead of blocking it */
 
 /* mapflag */
 #define MA_MAPFLAG_UVPROJECT (1 << 0)

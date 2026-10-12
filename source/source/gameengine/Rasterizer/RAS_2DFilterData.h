@@ -168,10 +168,12 @@ typedef struct BuildInFilters {
 	bool useVFog;
 	/* Divisor of the fog raymarch resolution (World vfog_lod): 1 full, 2 half, 4 quarter. */
 	int vfog_lod;
-	enum { VFOG_DATA_VEC4 = 12 + 4 * 8 + 4 + 4 + 4, VFOG_MATS = 7, VFOG_SHADOWS = 3 };
+	enum { VFOG_DATA_VEC4 = 12 + 4 * 8 + 4 + 4 + 4 + 1, VFOG_MATS = 7, VFOG_SHADOWS = 3 };
 	float vfog_data[VFOG_DATA_VEC4 * 4];
 	float vfog_mats[16 * VFOG_MATS];
 	unsigned int vfog_shadow_tex[VFOG_SHADOWS];
+	/// Colored Shadows targets of the same lamps (0 = none).
+	unsigned int vfog_shadow_color_tex[VFOG_SHADOWS];
 
 	/* Lens Flare (native World weather) */
 	bool useLensFlare;

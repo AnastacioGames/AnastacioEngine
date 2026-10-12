@@ -227,6 +227,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 		{"vfog_anisotropy", &world->vfog_anisotropy}, {"vfog_edge", &world->vfog_edge},
 		{"vfog_noise_scale", &world->vfog_noise_scale}, {"vfog_shaft_intensity", &world->vfog_shaft_intensity},
 		{"vfog_morning_boost", &world->vfog_morning_boost}, {"vfog_wind_direction", &world->vfog_wind_dir},
+		{"vfog_dust", &world->vfog_dust},
 	};
 	{
 		const char *key = (std::strncmp(identifier, "weather.", 8) == 0) ? identifier + 8 : identifier;
@@ -403,6 +404,7 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"vfog_anisotropy", &world->vfog_anisotropy}, {"vfog_edge", &world->vfog_edge},
 		{"vfog_noise_scale", &world->vfog_noise_scale}, {"vfog_shaft_intensity", &world->vfog_shaft_intensity},
 		{"vfog_morning_boost", &world->vfog_morning_boost}, {"vfog_wind_direction", &world->vfog_wind_dir},
+		{"vfog_dust", &world->vfog_dust},
 	};
 	for (const auto &f : extraFlags) {
 		if (std::strcmp(identifier, f.name) == 0) {

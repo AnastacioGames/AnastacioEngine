@@ -10,30 +10,43 @@
  *  5 ambient color rgb, -
  *  6 lamp count, volume count, lamp intensity, only inside volumes
  *  7 density of volumes 0-3
- *  8 volume edge, shaft intensity, sun shadow bias, has sun shadow (vfog_shadow2)
+ *  8 volume edge, shaft intensity, sun shadow bias, has sun shadow (vfog_shadow2; 2 = also colored)
  *  9 wind offset xy (world units), smoke time, pusher count
  *  10 shape of volumes 0-3 (0 box, 1 sphere)
  *  11 edge of volumes 0-3
  *  12 + 4i lamp i: position xyz, falloff distance
  *  13 + 4i color * energy rgb, shadow slot (-1 none, 0/1 -> vfog_shadow0/1)
  *  14 + 4i spot direction xyz (where it points), cos of half cone (-2 = Point)
- *  15 + 4i cos where the spot edge blend ends, shadow bias, -, -
+ *  15 + 4i cos where the spot edge blend ends, shadow bias, colored shadow (vfog_shadowcolor0/1), -
  *  44 + i volume i color rgb, has color (0 = fog color)
  *  48 + i volume i: smoke rise speed x (m/s; 0 = normal volume), fire temperature y (0..1)
  *  52 + i pusher i (fog_push): position xyz, radius
+ *  56 dust in the light beams, -, -, -
  * vfog_mats: 0-3 world -> volume local space (unit box/sphere), 4-5 world -> Spot shadow map,
- * 6 world -> Sun shadow map. */
+ * 6 world -> Sun shadow map. vfog_shadowcolorN: Colored Shadows of the same lamp (rgb light let
+ * through, a nearest caster depth). */
 
 #define VFOG_MAX_LIGHTS 8
 #define VFOG_VOLUME_COLOR (12 + 4 * VFOG_MAX_LIGHTS)
 #define VFOG_VOLUME_SMOKE (VFOG_VOLUME_COLOR + 4)
 #define VFOG_PUSHER (VFOG_VOLUME_SMOKE + 4)
+#define VFOG_DUST (VFOG_PUSHER + 4)
 
-uniform vec4 vfog_data[VFOG_PUSHER + 4];
+uniform vec4 vfog_data[VFOG_DUST + 1];
 uniform mat4 vfog_mats[7];
 uniform sampler2DShadow vfog_shadow0;
 uniform sampler2DShadow vfog_shadow1;
 uniform sampler2DShadow vfog_shadow2;
+uniform sampler2D vfog_shadowcolor0;
+uniform sampler2D vfog_shadowcolor1;
+uniform sampler2D vfog_shadowcolor2;
+
+/* Light let through by the Colored Shadows casters in front of uvz.z, white elsewhere. */
+vec3 vfogShadowTint(sampler2D colormap, vec3 uvz)
+{
+	vec4 c = texture(colormap, uvz.xy);
+	return (uvz.z > c.a) ? c.rgb : vec3(1.0);
+}
 
 float vfogHash(vec3 p)
 {
@@ -68,6 +81,23 @@ float vfogPatches(vec3 p)
 		n = n * 0.8 + vfogNoise(q * 4.1 + 41.0) * 0.2;
 	}
 	return max(0.0, 1.0 + (n * 2.0 - 1.0) * 2.0 * amount);
+}
+
+/* Dust in the light beams: a thin haze plus sparse bright motes drifting slowly with the wind,
+ * as extra scattering (not attenuation) lit only where the sun or a lamp reaches. */
+float vfogDust(vec3 p)
+{
+	float amount = vfog_data[VFOG_DUST].x;
+	if (amount <= 0.001) {
+		return 0.0;
+	}
+	float time = vfog_data[9].z;
+	vec3 q = (p - vec3(vfog_data[9].xy, 0.0)) * 5.0 +
+	         vec3(sin(time * 0.31) * 0.6, cos(time * 0.23) * 0.6, -time * 0.15);
+	float motes = smoothstep(0.7, 0.95, vfogNoise(q) * 0.7 + vfogNoise(q * 2.7 + 13.0) * 0.3);
+	/* Almost all of it in the motes: a continuous base adds up along tens of meters of lit air and
+	 * washes the whole picture out. */
+	return amount * (0.0015 + 0.06 * motes);
 }
 
 /* Fog Volume i at p: 0 outside .. its density inside, the soft edge eroded by noise so it does
@@ -384,38 +414,46 @@ vec3 vfogLamp(int i, vec3 p, out vec3 toPoint)
 	return vfog_data[13 + 4 * i].rgb * att * vfogSpot(i, toPoint);
 }
 
-float vfogShadow(int i, vec3 p)
+vec3 vfogShadow(int i, vec3 p)
 {
 	float slot = vfog_data[13 + 4 * i].w;
 	if (slot < -0.5) {
-		return 1.0;
+		return vec3(1.0);
 	}
 	int m = (slot < 0.5) ? 4 : 5;
 	vec4 sc = vfog_mats[m] * vec4(p, 1.0);
 	if (sc.w <= 0.0) {
-		return 1.0;
+		return vec3(1.0);
 	}
 	sc.z -= vfog_data[15 + 4 * i].y * sc.w;
 	vec3 uvz = sc.xyz / sc.w;
 	if (any(lessThan(uvz.xy, vec2(0.0))) || any(greaterThan(uvz.xy, vec2(1.0)))) {
-		return 1.0;
+		return vec3(1.0);
 	}
-	return (slot < 0.5) ? texture(vfog_shadow0, uvz) : texture(vfog_shadow1, uvz);
+	float s = (slot < 0.5) ? texture(vfog_shadow0, uvz) : texture(vfog_shadow1, uvz);
+	if (vfog_data[15 + 4 * i].z > 0.5 && s > 0.0) {
+		return s * ((slot < 0.5) ? vfogShadowTint(vfog_shadowcolor0, uvz) : vfogShadowTint(vfog_shadowcolor1, uvz));
+	}
+	return vec3(s);
 }
 
 /* Sun light reaching p through the Sun's shadow map (sun shafts), 1 without one. */
-float vfogSunShadow(vec3 p)
+vec3 vfogSunShadow(vec3 p)
 {
 	if (vfog_data[8].w < 0.5) {
-		return 1.0;
+		return vec3(1.0);
 	}
 	vec4 sc = vfog_mats[6] * vec4(p, 1.0);
 	vec3 uvz = sc.xyz / sc.w;
 	if (any(lessThan(uvz, vec3(0.0))) || any(greaterThan(uvz, vec3(1.0)))) {
-		return 1.0;
+		return vec3(1.0);
 	}
 	uvz.z -= vfog_data[8].z;
-	return texture(vfog_shadow2, uvz);
+	float s = texture(vfog_shadow2, uvz);
+	if (vfog_data[8].w > 1.5 && s > 0.0) {
+		return s * vfogShadowTint(vfog_shadowcolor2, uvz);
+	}
+	return vec3(s);
 }
 
 /* Narrows [a, b] to the part of the ray inside a Spot's cone (apex at the lamp), so the lamp march
@@ -635,12 +673,17 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 		vec3 col;
 		vec3 emission;
 		float sigma = vfogDensityColor(p, col, emission);
-		if (sigma > 1e-5) {
-			sigma *= vfogPatches(p);
-			float stepT = exp(-sigma * ds);
-			L += T * (sunLight * vfogSunShadow(p) + ambient) * col * (1.0 - stepT);
-			L += T * emission * sigma * ds;
-			T *= stepT;
+		float dust = vfogDust(p);
+		if (sigma > 1e-5 || dust > 0.0) {
+			vec3 sunLit = sunLight * vfogSunShadow(p);
+			L += T * sunLit * dust * ds;
+			if (sigma > 1e-5) {
+				sigma *= vfogPatches(p);
+				float stepT = exp(-sigma * ds);
+				L += T * (sunLit + ambient) * col * (1.0 - stepT);
+				L += T * emission * sigma * ds;
+				T *= stepT;
+			}
 		}
 		Tsteps[s + 1] = T;
 		t += ds;
@@ -773,14 +816,15 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 				vec3 col;
 				vec3 emission;
 				float sigma = vfogDensityColor(p, col, emission);
-				if (sigma > 1e-5) {
-					sigma *= vfogPatches(p);
+				float dust = vfogDust(p);
+				if (sigma > 1e-5 || dust > 0.0) {
+					sigma = (sigma > 1e-5) ? sigma * vfogPatches(p) : 0.0;
 					float k = clamp((lt - seg.x) / max(ds, 1e-4), 0.0, float(steps));
 					int k0 = int(floor(k));
 					int k1 = min(k0 + 1, steps);
 					float Tl = mix(Tsteps[k0], Tsteps[k1], fract(k));
 					float phase = vfogPhase(dot(rd, normalize(toPoint)), phaseG) * 12.566371;
-					acc += Tl * lamp * col * phase * vfogShadow(i, p) * sigma * lds;
+					acc += Tl * lamp * (col * sigma + vec3(dust)) * phase * vfogShadow(i, p) * lds;
 				}
 			}
 			lt += lds;

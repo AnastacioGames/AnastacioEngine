@@ -495,6 +495,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             shafts.active = weather.vfog_use_lamps and weather.vfog_quality != 'LOW'
             shafts.prop(weather, "vfog_use_shafts")
             shafts.prop(weather, "vfog_shaft_intensity")
+            dust = col.column(align=True)
+            dust.active = weather.vfog_quality != 'LOW'
+            dust.prop(weather, "vfog_dust", slider=True)
 
             sub = col.column(align=True)
             sub.prop(weather, "vfog_volumes_only")

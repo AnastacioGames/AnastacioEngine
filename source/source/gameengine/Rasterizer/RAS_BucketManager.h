@@ -87,6 +87,10 @@ protected:
 		ALPHA_SHADOW_BUCKET,
 		SOLID_SHADOW_INSTANCING_BUCKET,
 		ALPHA_SHADOW_INSTANCING_BUCKET,
+		/* Alpha blended casters with Colored Shadows: kept out of the depth pass and drawn in the
+		 * shadow color pass (RAS_Rasterizer::SetShadowColorPass) with their own shader. */
+		COLOR_SHADOW_BUCKET,
+		COLOR_SHADOW_INSTANCING_BUCKET,
 		ALL_BUCKET,
 		NUM_BUCKET_TYPE,
 	};
@@ -116,6 +120,9 @@ public:
 
 	RAS_MaterialBucket *FindBucket(RAS_IMaterial *material, bool &bucketCreated);
 	RAS_DisplayArrayBucket *GetTextDisplayArrayBucket() const;
+
+	/// True when some material casts a colored shadow (see COLOR_SHADOW_BUCKET).
+	bool HasColorShadowBuckets() const;
 
 	void ReloadMaterials(RAS_IMaterial *material = nullptr);
 
