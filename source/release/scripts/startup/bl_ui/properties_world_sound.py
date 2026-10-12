@@ -18,8 +18,8 @@
 
 # <pep8 compliant>
 
-# Aba World Sound das Propriedades: os modulos de som do jogo (Music, Ambient) e os arquivos de audio de cada
-# um. Os dados ficam no World (World.sound_modules) e o jogo toca tudo por nome pelo gerenciador de audio, que
+# Aba World Sound das Propriedades: os modulos de som do jogo (Music, Ambient, Effects) e os arquivos de audio de
+# cada um. No Effects o motor toca sozinho (explosao, destruicao, chuva, trovao) pelo Event de cada som. Os dados ficam no World (World.sound_modules) e o jogo toca tudo por nome pelo gerenciador de audio, que
 # continua vivo quando a cena troca.
 
 import os
@@ -31,6 +31,26 @@ from bpy.types import Operator, Panel
 MODULE_TYPES = (
     ('MUSIC', "Music", "One track at a time, with crossfade and playlist", 'PLAY_AUDIO', 0),
     ('AMBIENT', "Ambient", "Looping layers that play together", 'FORCE_WIND', 1),
+    ('EFFECTS', "Effects", "Sounds the engine plays by itself (explosions, destruction, rain, thunder)",
+     'MOD_EXPLODE', 2),
+)
+
+# Slots criados com um modulo Effects novo, sem arquivo: o usuario so escolhe o audio de cada um.
+EFFECT_SLOTS = (
+    ("Explosion Tiny", 'EXPLOSION_TINY'),
+    ("Explosion Small", 'EXPLOSION_SMALL'),
+    ("Explosion Medium", 'EXPLOSION_MEDIUM'),
+    ("Explosion Large", 'EXPLOSION_LARGE'),
+    ("Explosion Huge", 'EXPLOSION_HUGE'),
+    ("Destruction Tiny", 'DESTRUCTION_TINY'),
+    ("Destruction Small", 'DESTRUCTION_SMALL'),
+    ("Destruction Medium", 'DESTRUCTION_MEDIUM'),
+    ("Destruction Large", 'DESTRUCTION_LARGE'),
+    ("Destruction Huge", 'DESTRUCTION_HUGE'),
+    ("Rain", 'RAIN'),
+    ("Thunder 1", 'THUNDER'),
+    ("Thunder 2", 'THUNDER'),
+    ("Thunder 3", 'THUNDER'),
 )
 MODULE_ICONS = {item[0]: item[3] for item in MODULE_TYPES}
 MODULE_NAMES = {item[0]: item[1] for item in MODULE_TYPES}
@@ -40,7 +60,7 @@ bpy.types.WindowManager.world_sound_filter = EnumProperty(
     name="Module Filter",
     description="Show only the modules of this type",
     items=MODULE_TYPES,
-    default='MUSIC',
+    default='EFFECTS',
 )
 
 
@@ -69,7 +89,11 @@ class WORLD_OT_sound_module_add(Operator):
         return _world(context) is not None
 
     def execute(self, context):
-        _world(context).sound_modules.new(MODULE_NAMES[self.type], type=self.type)
+        module = _world(context).sound_modules.new(MODULE_NAMES[self.type], type=self.type)
+        if self.type == 'EFFECTS':
+            for name, event in EFFECT_SLOTS:
+                module.sounds.new(name, filepath="").event = event
+        context.window_manager.world_sound_filter = self.type
         return {'FINISHED'}
 
 
@@ -173,6 +197,29 @@ class WORLD_OT_sound_entry_remove(Operator):
         return {'FINISHED'}
 
 
+class WORLD_OT_sound_entry_variation(Operator):
+    """Add another sound for the same event: the engine picks one at random, so it doesn't repeat"""
+    bl_idname = "world.sound_entry_variation"
+    bl_label = "Add Variation"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    module: IntProperty(options={'HIDDEN'})
+    sound: IntProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        module = _module(context, self.module)
+        if module is None or not 0 <= self.sound < len(module.sounds):
+            return {'CANCELLED'}
+        source = module.sounds[self.sound]
+        base = source.name.rstrip("0123456789").rstrip() or source.name
+        number = sum(1 for sound in module.sounds if sound.event == source.event) + 1
+        sound = module.sounds.new("%s %d" % (base, number), filepath="")
+        sound.event = source.event
+        sound.volume = source.volume
+        module.sounds.move(len(module.sounds) - 1, self.sound + 1)
+        return {'FINISHED'}
+
+
 class WORLD_OT_sound_entry_move(Operator):
     """Move this sound up or down in the play order"""
     bl_idname = "world.sound_entry_move"
@@ -193,8 +240,9 @@ class WORLD_OT_sound_entry_move(Operator):
 
 
 def _draw_sounds(layout, module, module_index):
+    effects = module.type == 'EFFECTS'
     row = layout.row()
-    row.label(text="Tracks:" if module.type == 'MUSIC' else "Layers:")
+    row.label(text={'MUSIC': "Tracks:", 'AMBIENT': "Layers:"}.get(module.type, "Sounds:"))
     row.operator("world.sound_entry_add", text="Add Sounds", icon='ZOOMIN').module = module_index
 
     if not module.sounds:
@@ -204,16 +252,34 @@ def _draw_sounds(layout, module, module_index):
     for index, sound in enumerate(module.sounds):
         box = layout.box()
         row = box.row(align=True)
+        row.prop(sound, "show_expanded", text="", emboss=False,
+                 icon='TRIA_DOWN' if sound.show_expanded else 'TRIA_RIGHT')
         row.prop(sound, "name", text="", icon='SOUND')
+        if not sound.show_expanded:
+            # Fechado: so o estado do arquivo, para achar rapido o slot que falta.
+            if sound.filepath:
+                row.label(text=os.path.basename(bpy.path.abspath(sound.filepath)), icon='FILE_SOUND')
+            else:
+                row.label(text="No file", icon='ERROR' if effects else 'INFO')
         for direction, icon in (('UP', 'TRIA_UP'), ('DOWN', 'TRIA_DOWN')):
             move = row.operator("world.sound_entry_move", text="", icon=icon)
             move.module = module_index
             move.sound = index
             move.direction = direction
+        if effects:
+            variation = row.operator("world.sound_entry_variation", text="", icon='ZOOMIN')
+            variation.module = module_index
+            variation.sound = index
         remove = row.operator("world.sound_entry_remove", text="", icon='X')
         remove.module = module_index
         remove.sound = index
+        if not sound.show_expanded:
+            continue
+        if effects:
+            box.prop(sound, "event")
         box.prop(sound, "filepath", text="")
+        if effects and not sound.filepath:
+            box.label(text="No file yet: silent until you pick one", icon='INFO')
         row = box.row(align=True)
         row.prop(sound, "volume", slider=True)
         row.prop(sound, "pitch")
@@ -240,6 +306,13 @@ def _draw_module(layout, module, index):
     col.prop(module, "type")
     row = col.row(align=True)
     row.prop(module, "volume", slider=True)
+    if module.type == 'EFFECTS':
+        col.label(text="Every play is a new voice: a sound never cuts the one before", icon='INFO')
+        col.label(text="Same Event on several sounds = variations picked at random", icon='INFO')
+        col.prop(module, "use_reverb_areas")
+        col.separator()
+        _draw_sounds(col, module, index)
+        return
     row.prop(module, "fade_time", text="Fade")
     row = col.row()
     row.prop(module, "use_autoplay")
@@ -272,7 +345,7 @@ class WORLD_SOUND_PT_modules(WorldSoundButtonsPanel, Panel):
         layout.operator_menu_enum("world.sound_module_add", "type", text="Add Sound Module", icon='ZOOMIN')
 
         if not world.sound_modules:
-            layout.label(text="No module yet: add Music for the soundtrack or Ambient for wind, rain...",
+            layout.label(text="No module yet: Music for the soundtrack, Ambient for wind, Effects for explosions...",
                          icon='INFO')
             return
 
@@ -296,6 +369,7 @@ classes = (
     WORLD_OT_sound_module_move,
     WORLD_OT_sound_entry_add,
     WORLD_OT_sound_entry_remove,
+    WORLD_OT_sound_entry_variation,
     WORLD_OT_sound_entry_move,
     WORLD_SOUND_PT_modules,
 )

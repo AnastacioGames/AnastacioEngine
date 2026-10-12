@@ -266,6 +266,7 @@ static void rna_GameObjectSettings_use_destruction_set(PointerRNA *ptr, bool val
 			ds->burst_speed = 2.0f;
 			ds->debris_lifetime = 10.0f;
 			ds->flags = DESTRUCTION_BREAK_ON_COLLISION | DESTRUCTION_INHERIT_VELOCITY;
+			ds->fx.effect_life = 0.25f;
 		}
 	}
 	else {
@@ -2970,6 +2971,14 @@ static void rna_def_object_destruction(BlenderRNA *brna)
 	                         "Seconds before the fragments disappear (0 = permanent, still limited by the "
 	                         "scene's Max Debris)");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "fx", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "fx");
+	RNA_def_property_struct_type(prop, "RangeExplosiveSettings");
+	RNA_def_property_ui_text(prop, "Break Effect",
+	                         "Effect object, Particle Explosion and Ground Mark when the object breaks "
+	                         "(only the effect settings are used)");
 }
 
 static void rna_def_object_explosive(BlenderRNA *brna)

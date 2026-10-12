@@ -60,6 +60,8 @@ struct KX_AudioManager::Sound
 	std::string path;
 	float volume;
 	float pitch;
+	/// WO_SOUND_EVENT_*.
+	int event;
 	/// The file could not be opened: warned once, not tried again.
 	bool missing;
 #ifdef WITH_AUDASPACE
@@ -73,6 +75,10 @@ struct KX_AudioManager::Voice
 	int sound;
 	/// 0..1, multiplies the volume.
 	float fade;
+	/// Effects: multiplies the volume (PlayEvent gain).
+	float gain;
+	/// Effects: a Rain loop, stopped when the rain ends.
+	bool rain;
 	/// Per second: positive fades in, negative fades out and ends the voice, 0 holds.
 	float fadeSpeed;
 	float volume;
@@ -116,7 +122,7 @@ struct KX_AudioManager::Module
 
 	float VoiceVolume(const Voice& voice) const
 	{
-		return mute ? 0.0f : volume * sounds[voice.sound].volume * voice.fade;
+		return mute ? 0.0f : volume * sounds[voice.sound].volume * voice.fade * voice.gain;
 	}
 };
 
@@ -132,7 +138,9 @@ KX_AudioManager::KX_AudioManager(bool enabled)
 	m_pendingReverb(new RangeReverbAreaSettings()),
 	m_pendingSource(nullptr),
 	m_pendingInfluence(0.0f),
-	m_pendingValid(false)
+	m_pendingValid(false),
+	m_rainTime(0.0),
+	m_rainPlaying(false)
 {
 }
 
@@ -199,7 +207,9 @@ void KX_AudioManager::RegisterWorld(const World *world)
 
 			Sound sound;
 			sound.name = entry->name;
-			sound.path = path;
+			// Effects slots are made without a file: they stay silent until one is picked.
+			sound.path = entry->filepath[0] ? path : "";
+			sound.event = entry->event;
 			sound.volume = entry->volume;
 			sound.pitch = (entry->pitch > 0.0f) ? entry->pitch : 1.0f;
 			sound.missing = false;
@@ -246,7 +256,7 @@ bool KX_AudioManager::StartVoice(Module& module, int soundIndex, float fade)
 
 #ifdef WITH_AUDASPACE
 	Sound& sound = module.sounds[soundIndex];
-	if (!m_enabled || sound.missing) {
+	if (!m_enabled || sound.missing || sound.path.empty()) {
 		return false;
 	}
 
@@ -279,6 +289,8 @@ bool KX_AudioManager::StartVoice(Module& module, int soundIndex, float fade)
 	voice.sound = soundIndex;
 	voice.fade = (fade > 0.0f) ? 0.0f : 1.0f;
 	voice.fadeSpeed = (fade > 0.0f) ? 1.0f / fade : 0.0f;
+	voice.gain = 1.0f;
+	voice.rain = false;
 	voice.reverb = false;
 	voice.reverbSerial = 0;
 	voice.reverbFilter = 0;
@@ -502,6 +514,18 @@ void KX_AudioManager::Update()
 		m_reverbSource = nullptr;
 	}
 
+	// No scene with rain for a while: the rain loops fade out.
+	if (m_rainPlaying && now - m_rainTime > REVERB_TIMEOUT) {
+		m_rainPlaying = false;
+		for (std::unique_ptr<Module>& module : m_modules) {
+			for (Voice& voice : module->voices) {
+				if (voice.rain) {
+					voice.fadeSpeed = -0.5f;
+				}
+			}
+		}
+	}
+
 	for (std::unique_ptr<Module>& module : m_modules) {
 		UpdateModule(*module, dt);
 	}
@@ -544,6 +568,11 @@ bool KX_AudioManager::Play(const std::string& moduleName, const std::string& sou
 
 	if (module->paused) {
 		Resume(moduleName);
+	}
+
+	if (module->type == WO_SOUND_MODULE_EFFECTS) {
+		// One-shots are played one at a time, by name.
+		return (index != -1) && StartOneShot(*module, index, 1.0f, false, 0.0f);
 	}
 
 	if (module->type == WO_SOUND_MODULE_MUSIC) {
@@ -727,6 +756,128 @@ bool KX_AudioManager::HasModule(const std::string& moduleName) const
 	return FindModule(moduleName) != nullptr;
 }
 
+bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade)
+{
+#ifdef WITH_AUDASPACE
+	Sound& sound = module.sounds[soundIndex];
+	if (!m_enabled || sound.missing || sound.path.empty()) {
+		return false;
+	}
+
+	// Many blasts at once: the oldest voice goes, not the new one.
+	static const unsigned int MAX_VOICES = 32;
+	if (module.voices.size() >= MAX_VOICES) {
+		StopVoice(module.voices.front());
+		module.voices.erase(module.voices.begin());
+	}
+
+	if (!sound.sound) {
+		sound.sound = BLI_exists(sound.path.c_str()) ? AUD_Sound_file(sound.path.c_str()) : nullptr;
+	}
+	AUD_Handle *handle = nullptr;
+	if (sound.sound) {
+		AUD_Device *device = AUD_Device_getCurrent();
+		if (device) {
+			handle = AUD_Device_play(device, sound.sound, false);
+			AUD_Device_free(device);
+		}
+	}
+	if (!handle) {
+		CM_Warning("World Sound: cannot play \"" << sound.name << "\" of module \"" << module.name << "\" ("
+		           << sound.path << ")");
+		sound.missing = true;
+		return false;
+	}
+	if (loop) {
+		AUD_Handle_setLoopCount(handle, -1);
+	}
+	AUD_Handle_setPitch(handle, sound.pitch);
+
+	Voice voice;
+	voice.sound = soundIndex;
+	voice.fade = (fade > 0.0f) ? 0.0f : 1.0f;
+	voice.fadeSpeed = (fade > 0.0f) ? 1.0f / fade : 0.0f;
+	voice.gain = gain;
+	voice.rain = loop;
+	voice.reverb = false;
+	voice.reverbSerial = 0;
+	voice.reverbFilter = 0;
+	voice.reverbInfluence = 0.0f;
+	voice.handle = handle;
+	voice.volume = module.VoiceVolume(voice);
+	AUD_Handle_setVolume(handle, voice.volume);
+	if (module.paused) {
+		AUD_Handle_pause(handle);
+	}
+	module.voices.push_back(voice);
+	return true;
+#else
+	(void)module;
+	(void)soundIndex;
+	(void)gain;
+	(void)loop;
+	(void)fade;
+	return false;
+#endif
+}
+
+bool KX_AudioManager::PlayEvent(int event, float gain)
+{
+	if (event <= WO_SOUND_EVENT_NONE || gain <= 0.0f) {
+		return false;
+	}
+
+	std::vector<std::pair<Module *, int> > candidates;
+	for (std::unique_ptr<Module>& module : m_modules) {
+		if (module->type != WO_SOUND_MODULE_EFFECTS) {
+			continue;
+		}
+		for (unsigned int i = 0, size = module->sounds.size(); i < size; ++i) {
+			const Sound& sound = module->sounds[i];
+			if (sound.event == event && !sound.missing && !sound.path.empty()) {
+				candidates.emplace_back(module.get(), i);
+			}
+		}
+	}
+	if (candidates.empty()) {
+		return false;
+	}
+
+	// A variation at random, never the last one twice in a row.
+	if (m_lastEvent.size() <= (size_t)event) {
+		m_lastEvent.resize(event + 1, std::pair<const Module *, int>(nullptr, -1));
+	}
+	std::pair<const Module *, int>& last = m_lastEvent[event];
+	unsigned int pick = rand() % candidates.size();
+	if (candidates.size() > 1 && candidates[pick].first == last.first && candidates[pick].second == last.second) {
+		pick = (pick + 1 + rand() % (candidates.size() - 1)) % candidates.size();
+	}
+	last = candidates[pick];
+
+	return StartOneShot(*candidates[pick].first, candidates[pick].second, gain, false, 0.0f);
+}
+
+void KX_AudioManager::ReportRain()
+{
+	m_rainTime = PIL_check_seconds_timer();
+	if (m_rainPlaying) {
+		return;
+	}
+	m_rainPlaying = true;
+
+	// Every Rain sound is a layer (light rain, roof, gutter...), faded in.
+	for (std::unique_ptr<Module>& module : m_modules) {
+		if (module->type != WO_SOUND_MODULE_EFFECTS) {
+			continue;
+		}
+		for (unsigned int i = 0, size = module->sounds.size(); i < size; ++i) {
+			if (module->sounds[i].event == WO_SOUND_EVENT_RAIN) {
+				StartOneShot(*module, i, 1.0f, true, 2.0f);
+			}
+		}
+	}
+}
+
 void KX_AudioManager::StopAll()
 {
 	for (std::unique_ptr<Module>& module : m_modules) {
@@ -734,6 +885,7 @@ void KX_AudioManager::StopAll()
 		module->playing = false;
 		module->paused = false;
 	}
+	m_rainPlaying = false;
 }
 
 #ifdef WITH_PYTHON

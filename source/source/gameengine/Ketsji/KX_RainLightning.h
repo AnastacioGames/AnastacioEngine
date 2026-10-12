@@ -70,6 +70,9 @@ public:
 	mt::vec4 GetFilterParams(const mt::mat4& view, const mt::mat4& projection) const;
 
 private:
+	/// World Sound > Effects: a Thunder sound (variations at random).
+	static void PlayThunder(float gain);
+
 	/// One lit strike: the World one or the latest of an emitter.
 	struct StrikeState {
 		RainLightningBolt bolt;

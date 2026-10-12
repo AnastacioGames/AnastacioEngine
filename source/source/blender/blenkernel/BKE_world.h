@@ -49,6 +49,7 @@ struct WorldSoundEntry *BKE_world_sound_entry_add(struct WorldSoundModule *modul
 void BKE_world_sound_entry_remove(struct WorldSoundModule *module, struct WorldSoundEntry *entry);
 void BKE_world_sound_entry_unique_name(struct WorldSoundModule *module, struct WorldSoundEntry *entry);
 void BKE_world_sound_modules_free(struct ListBase *modules);
+void BKE_world_sound_effects_ensure(struct World *wrld);
 void BKE_world_sound_modules_copy(struct ListBase *modules_dst, const struct ListBase *modules_src);
 
 #endif  /* __BKE_WORLD_H__ */

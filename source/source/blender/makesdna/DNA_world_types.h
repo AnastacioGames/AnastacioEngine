@@ -46,7 +46,7 @@ typedef struct WorldSoundEntry {
 	char filepath[1024];   /* FILE_MAX, may be relative to the file */
 	float volume, pitch;
 	int flag;
-	int pad;
+	int event;             /* WO_SOUND_EVENT_*: the engine plays it by itself (Effects modules) */
 } WorldSoundEntry;
 
 typedef struct WorldSoundModule {
@@ -245,7 +245,7 @@ typedef struct World {
 	/* game engine: World Sound modules (WorldSoundModule) */
 	ListBase sound_modules;
 	int active_sound_module;
-	int sound_pad;
+	int sound_flag;            /* reserved; its presence marks files that already got the Effects module */
 } World;
 
 /* **************** WORLD ********************* */
@@ -253,13 +253,30 @@ typedef struct World {
 /* WorldSoundModule.type */
 #define WO_SOUND_MODULE_MUSIC   0  /* one track at a time, crossfade, playlist */
 #define WO_SOUND_MODULE_AMBIENT 1  /* looping layers playing together */
+#define WO_SOUND_MODULE_EFFECTS 2  /* one-shots: every play is a new voice, nothing is cut */
+
+/* WorldSoundEntry.event: what makes the engine play the sound. Sounds with the same event are
+ * variations, one is picked at random (never the last one twice in a row). */
+#define WO_SOUND_EVENT_NONE              0
+#define WO_SOUND_EVENT_EXPLOSION_TINY    1  /* Explosive detonating, by Particle Explosion size */
+#define WO_SOUND_EVENT_EXPLOSION_SMALL   2
+#define WO_SOUND_EVENT_EXPLOSION_MEDIUM  3
+#define WO_SOUND_EVENT_EXPLOSION_LARGE   4
+#define WO_SOUND_EVENT_EXPLOSION_HUGE    5
+#define WO_SOUND_EVENT_DESTRUCTION_TINY  6  /* Destruction breaking, by Break Effect size */
+#define WO_SOUND_EVENT_DESTRUCTION_SMALL 7
+#define WO_SOUND_EVENT_DESTRUCTION_MEDIUM 8
+#define WO_SOUND_EVENT_DESTRUCTION_LARGE 9
+#define WO_SOUND_EVENT_DESTRUCTION_HUGE  10
+#define WO_SOUND_EVENT_RAIN              11 /* loops while World > Rain is on */
+#define WO_SOUND_EVENT_THUNDER           12 /* each lightning strike */
 
 /* WorldSoundModule.flag */
 #define WO_SOUND_AUTOPLAY       (1 << 0)  /* starts playing when the module is loaded */
 #define WO_SOUND_SHUFFLE        (1 << 1)  /* music: random track order */
 #define WO_SOUND_LOOP           (1 << 2)  /* music: starts over after the last track */
 #define WO_SOUND_MUTE           (1 << 3)
-#define WO_SOUND_EXPANDED       (1 << 4)  /* UI: module open in the World Sound tab */
+#define WO_SOUND_EXPANDED       (1 << 4)  /* UI: module (or WorldSoundEntry.flag: sound) open in the World Sound tab */
 #define WO_SOUND_USE_REVERB     (1 << 5)  /* gets the echo of the Reverb Area the camera is in */
 
 /* skytype */

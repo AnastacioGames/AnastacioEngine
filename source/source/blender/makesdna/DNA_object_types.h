@@ -316,24 +316,6 @@ enum {
 	REVERB_AREA_FILTER_BANDPASS = 3,
 };
 
-/* Native pre-fractured destruction (opt-in via gameflag2 & OB_DESTRUCTIBLE). On a strong enough
- * impact (or explosion) the object is replaced in game by the objects of the 'fragments' group,
- * which were fractured around the origin (see "Generate Fragments..."). break_impulse == 0 means
- * not initialized yet (old files): rna_object.c fills the defaults on first enable. */
-typedef struct RangeDestructionSettings {
-	struct Group *fragments;
-	float break_impulse;   /* summed contact appliedImpulse that breaks the object */
-	float burst_speed;     /* outward speed (m/s) added to every fragment */
-	float debris_lifetime; /* seconds before fragments disappear, 0 = permanent */
-	int flags;             /* DESTRUCTION_* */
-} RangeDestructionSettings;
-
-/* RangeDestructionSettings.flags */
-enum {
-	DESTRUCTION_BREAK_ON_COLLISION = 1 << 0,
-	DESTRUCTION_INHERIT_VELOCITY   = 1 << 1,
-};
-
 /* Native explosive (opt-in via gameflag2 & OB_EXPLOSIVE): radial impulse with linear falloff,
  * breaks destructibles and detonates other explosives in range. radius == 0 means not initialized
  * yet (old files): rna_object.c fills the defaults on first enable. */
@@ -365,6 +347,28 @@ typedef struct RangeExplosiveSettings {
 	float mark_size;       /* multiplier of the size preset (0 = 1) */
 	float mark_life;       /* seconds, 0 = stays */
 } RangeExplosiveSettings;
+
+/* Native pre-fractured destruction (opt-in via gameflag2 & OB_DESTRUCTIBLE). On a strong enough
+ * impact (or explosion) the object is replaced in game by the objects of the 'fragments' group,
+ * which were fractured around the origin (see "Generate Fragments..."). break_impulse == 0 means
+ * not initialized yet (old files): rna_object.c fills the defaults on first enable. */
+typedef struct RangeDestructionSettings {
+	struct Group *fragments;
+	float break_impulse;   /* summed contact appliedImpulse that breaks the object */
+	float burst_speed;     /* outward speed (m/s) added to every fragment */
+	float debris_lifetime; /* seconds before fragments disappear, 0 = permanent */
+	int flags;             /* DESTRUCTION_* */
+	/* Effect, Particle Explosion and Ground Mark when it breaks: only the effect fields are used
+	 * (effect, effect_life, particle_*, colors, amounts, mark*, EXPLOSIVE_PARTICLES / GROUND_MARK /
+	 * MARK_NEARBY / PARTICLE_COLORS). Zeroed in older files: nothing extra happens. */
+	struct RangeExplosiveSettings fx;
+} RangeDestructionSettings;
+
+/* RangeDestructionSettings.flags */
+enum {
+	DESTRUCTION_BREAK_ON_COLLISION = 1 << 0,
+	DESTRUCTION_INHERIT_VELOCITY   = 1 << 1,
+};
 
 /* RangeExplosiveSettings.flags */
 enum {

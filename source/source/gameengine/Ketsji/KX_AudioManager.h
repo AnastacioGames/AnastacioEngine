@@ -87,6 +87,15 @@ public:
 	/// Stop everything now, without fade.
 	void StopAll();
 
+	/** Play a sound of the Effects modules for an engine event (WO_SOUND_EVENT_*): one of the
+	 * sounds with this event, at random, as a new voice; the voices already playing go on.
+	 * \param gain Multiplies the sound volume (e.g. a far thunder).
+	 * \return false when no sound has this event or it cannot play.
+	 */
+	bool PlayEvent(int event, float gain = 1.0f);
+	/// A scene with World > Rain on, every frame: the Rain sounds loop while some scene reports.
+	void ReportRain();
+
 private:
 	struct Sound;
 	struct Voice;
@@ -100,6 +109,8 @@ private:
 	void UpdateModule(Module& module, float dt);
 	void UpdateVoiceReverb(const Module& module, Voice& voice);
 	void StopVoice(Voice& voice);
+	/// Effects module: a new voice of the sound, whatever else plays.
+	bool StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade);
 	/// \param wrap Go around the ends even without Loop (the player asked for next/previous).
 	int NextTrack(const Module& module, int step, bool wrap) const;
 
@@ -124,6 +135,11 @@ private:
 	const RangeReverbAreaSettings *m_pendingSource;
 	float m_pendingInfluence;
 	bool m_pendingValid;
+
+	/// Last sound played for each event (module, sound), not picked twice in a row.
+	std::vector<std::pair<const Module *, int> > m_lastEvent;
+	double m_rainTime;
+	bool m_rainPlaying;
 };
 
 #ifdef WITH_PYTHON

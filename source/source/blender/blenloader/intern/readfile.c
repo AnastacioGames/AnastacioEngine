@@ -5248,6 +5248,8 @@ static void lib_link_object(FileData *fd, Main *main)
 			ob->destruction.fragments = newlibadr_us(fd, ob->id.lib, ob->destruction.fragments);
 			ob->explosive.effect = newlibadr_us(fd, ob->id.lib, ob->explosive.effect);
 			ob->explosive.mark = newlibadr_us(fd, ob->id.lib, ob->explosive.mark);
+			ob->destruction.fx.effect = newlibadr_us(fd, ob->id.lib, ob->destruction.fx.effect);
+			ob->destruction.fx.mark = newlibadr_us(fd, ob->id.lib, ob->destruction.fx.mark);
 			ob->lightning.target = newlibadr(fd, ob->id.lib, ob->lightning.target);
 			ob->deform.decal = newlibadr_us(fd, ob->id.lib, ob->deform.decal);
 			{
@@ -10057,6 +10059,8 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 	expand_doit(fd, mainvar, ob->destruction.fragments);
 	expand_doit(fd, mainvar, ob->explosive.effect);
 	expand_doit(fd, mainvar, ob->explosive.mark);
+	expand_doit(fd, mainvar, ob->destruction.fx.effect);
+	expand_doit(fd, mainvar, ob->destruction.fx.mark);
 	expand_doit(fd, mainvar, ob->lightning.target);
 	expand_doit(fd, mainvar, ob->deform.decal);
 

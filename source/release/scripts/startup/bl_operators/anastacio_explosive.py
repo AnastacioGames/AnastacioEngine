@@ -2,7 +2,7 @@
 import bpy
 import math
 import random
-from bpy.props import EnumProperty
+from bpy.props import BoolProperty, EnumProperty
 
 # Per style: color at the center, color at the edge, opacity, how much the edge is torn by rays/cracks.
 MARK_STYLES = {
@@ -75,6 +75,7 @@ class OBJECT_OT_explosive_mark_add(bpy.types.Operator):
         ('CONCRETE', "Dust", "Grey dust and debris marks"),
         ('WATER', "Wet", "Dark wet stain"),
     ))
+    destruction: BoolProperty(name="Destruction", description="Use it as the Ground Mark of the Destruction panel")
 
     @classmethod
     def poll(cls, context):
@@ -121,7 +122,10 @@ class OBJECT_OT_explosive_mark_add(bpy.types.Operator):
         if scene.layers[19]:
             self.report({'WARNING'}, "Layer 20 is visible: hide it so the Mark template isn't drawn in the game")
 
-        target.game.explosive.mark = ob
+        if self.destruction:
+            target.game.destruction.fx.mark = ob
+        else:
+            target.game.explosive.mark = ob
         return {'FINISHED'}
 
 

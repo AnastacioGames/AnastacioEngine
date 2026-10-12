@@ -26,9 +26,12 @@
  */
 
 #include "KX_RainLightning.h"
+#include "KX_AudioManager.h"
 #include "KX_Camera.h"
 #include "KX_ClientObjectInfo.h"
 #include "KX_GameObject.h"
+#include "KX_Globals.h"
+#include "KX_KetsjiEngine.h"
 #include "KX_RayCast.h"
 #include "KX_Scene.h"
 #include "CM_Message.h"
@@ -137,6 +140,14 @@ void KX_RainLightning::Manual::Take(double time, unsigned int salt)
 	big = pendingBig;
 }
 
+void KX_RainLightning::PlayThunder(float gain)
+{
+	KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
+	if (audio) {
+		audio->PlayEvent(WO_SOUND_EVENT_THUNDER, gain);
+	}
+}
+
 void KX_RainLightning::Strike(bool bolt)
 {
 	m_worldManual.pending = true;
@@ -242,6 +253,7 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 		strike.seed = seed;
 		strike.big = big;
 		strike.hasBolt = false;
+		PlayThunder(big ? 1.0f : 0.6f);
 		if (big) {
 			// Keep the whole bolt inside the camera range: a closer bolt is also smaller,
 			// so it looks the same.
@@ -296,10 +308,12 @@ void KX_RainLightning::UpdateEmitter(KX_Scene *scene, Emitter& emitter, double t
 
 	StrikeState& strike = emitter.strike;
 	strike.color = mt::vec3(settings.color);
+	bool thunder = false;
 	if (start != strike.start || seed != strike.seed) {
 		strike.start = start;
 		strike.seed = seed;
 		strike.big = big;
+		thunder = true;
 
 		// The Empty's world matrix: the area follows its position, rotation and scale (and a parent).
 		const mt::vec3& pos = gameobj->NodeGetWorldPosition();
@@ -360,6 +374,10 @@ void KX_RainLightning::UpdateEmitter(KX_Scene *scene, Emitter& emitter, double t
 	bool over;
 	const float flash = BKE_rain_lightning_flash(strike.seed, strike.big, (float)(time - strike.start), &over);
 	const float fade = BKE_rain_lightning_distance_fade((strike.center - m_camPos).Length(), settings.flash_distance);
+	if (thunder) {
+		// A far strike still rumbles, softer.
+		PlayThunder((strike.big ? 1.0f : 0.6f) * std::max(fade, 0.3f));
+	}
 	strike.flash = flash * settings.intensity * fade;
 	strike.boltBright = strike.hasBolt ? std::min(flash * 1.6f, 1.0f) * settings.intensity : 0.0f;
 }

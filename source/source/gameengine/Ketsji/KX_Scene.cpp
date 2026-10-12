@@ -2841,6 +2841,13 @@ KX_RainSurfaceMask *KX_Scene::GetRainSurfaceMask()
 void KX_Scene::UpdateRainLightning(double time)
 {
 	const World *world = m_blenderScene ? m_blenderScene->world : nullptr;
+	// World Sound > Effects: the Rain sounds loop while it rains.
+	if (world && (world->weather_flag & WO_WEATHER_RAIN)) {
+		KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
+		if (audio) {
+			audio->ReportRain();
+		}
+	}
 	if (!m_rainLightning) {
 		if (!world || !(world->weather_flag & WO_WEATHER_RAIN) || !(world->weather_flag & WO_WEATHER_RAIN_LIGHTNING)) {
 			return;

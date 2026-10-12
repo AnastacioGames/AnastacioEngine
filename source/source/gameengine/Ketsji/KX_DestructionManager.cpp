@@ -22,6 +22,7 @@
 #include "KX_Mesh.h"
 #include "KX_RayCast.h"
 #include "KX_Scene.h"
+#include "KX_AudioManager.h"
 
 #include "SCA_LogicManager.h"
 #include "BL_Converter.h"
@@ -36,6 +37,7 @@
 
 #include "DNA_group_types.h"
 #include "DNA_object_types.h"
+#include "DNA_world_types.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -1282,6 +1284,10 @@ std::vector<KX_GameObject *> KX_DestructionManager::ShatterNow(KX_GameObject *ga
 
 	m_scene->DelayedRemoveObject(gameobj);
 
+	std::vector<KX_GameObject *> ignore = pieces;
+	ignore.push_back(gameobj);
+	SpawnBlastEffects(gameobj, settings.fx, position, ignore, false);
+
 	AddDebris(pieces);
 	gameobj->RunBreakCallbacks(pieces);
 
@@ -1300,6 +1306,43 @@ void KX_DestructionManager::AddDebris(const std::vector<KX_GameObject *>& pieces
 	}
 }
 
+void KX_DestructionManager::SpawnBlastEffects(KX_GameObject *gameobj, const RangeExplosiveSettings& settings,
+                                              const mt::vec3& center, const std::vector<KX_GameObject *>& ignore,
+                                              bool explosion)
+{
+	if (settings.effect) {
+		KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.effect));
+		if (templateobj) {
+			const float lifespan = (settings.effect_life > 0.0f) ? settings.effect_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+			KX_GameObject *effect = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
+			effect->NodeSetWorldPosition(center);
+			effect->NodeUpdate();
+			effect->Release();
+		}
+		else {
+			CM_Warning("\"" << gameobj->GetName() << "\": the Effect \"" << (settings.effect->id.name + 2)
+			           << "\" is not in this scene.");
+		}
+	}
+
+	if (settings.flags & EXPLOSIVE_PARTICLES) {
+		m_scene->SpawnParticleExplosion(center, settings);
+	}
+
+	if (settings.flags & EXPLOSIVE_GROUND_MARK) {
+		AddGroundMark(gameobj, settings, center, ignore);
+	}
+
+	// World Sound > Effects: the sound of this size (EXPLOSIVE_PARTICLES_* order: small, medium,
+	// large, huge, tiny), a new voice even when another blast is still sounding.
+	static const int sizeOffset[5] = {1, 2, 3, 4, 0};
+	const int size = std::max(0, std::min<int>(settings.particle_size, 4));
+	KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
+	if (audio) {
+		audio->PlayEvent((explosion ? WO_SOUND_EVENT_EXPLOSION_TINY : WO_SOUND_EVENT_DESTRUCTION_TINY) + sizeOffset[size]);
+	}
+}
+
 bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_GameObject *> *fragments)
 {
 	Entry *entry = gameobj ? FindEntry(gameobj) : nullptr;
@@ -1315,25 +1358,6 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 	const RangeExplosiveSettings settings = GetExplosiveSettings(gameobj);
 	const mt::vec3 center = gameobj->NodeGetWorldPosition();
 
-	if (settings.effect) {
-		KX_GameObject *templateobj = static_cast<KX_GameObject *>(m_scene->GetLogicManager()->FindGameObjByBlendObj(settings.effect));
-		if (templateobj) {
-			const float lifespan = (settings.effect_life > 0.0f) ? settings.effect_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
-			KX_GameObject *effect = m_scene->AddReplicaObject(templateobj, nullptr, lifespan);
-			effect->NodeSetWorldPosition(center);
-			effect->NodeUpdate();
-			effect->Release();
-		}
-		else {
-			CM_Warning("\"" << gameobj->GetName() << "\": the explosion Effect \"" << (settings.effect->id.name + 2)
-			           << "\" is not in this scene.");
-		}
-	}
-
-	if (settings.flags & EXPLOSIVE_PARTICLES) {
-		m_scene->SpawnParticleExplosion(center, settings);
-	}
-
 	std::vector<KX_GameObject *> pieces;
 	if (is_destructible(gameobj)) {
 		pieces = ShatterNow(gameobj, center, 0.0f);
@@ -1344,9 +1368,7 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 
 	std::vector<KX_GameObject *> ignore = pieces;
 	ignore.push_back(gameobj);
-	if (settings.flags & EXPLOSIVE_GROUND_MARK) {
-		AddGroundMark(gameobj, settings, center, ignore);
-	}
+	SpawnBlastEffects(gameobj, settings, center, ignore, true);
 	Explode(center, settings.radius, settings.force, settings.up_bias, settings.flags & EXPLOSIVE_OCCLUSION, 0xFFFF, ignore);
 
 	// The fragments start at the center, nothing can shield them.

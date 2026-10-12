@@ -240,6 +240,12 @@ private:
 	/// Explosive Ground Mark: the Mark object painted on the static surface under center.
 	void AddGroundMark(KX_GameObject *gameobj, const RangeExplosiveSettings& settings, const mt::vec3& center,
 	                   const std::vector<KX_GameObject *>& ignore);
+	/** Effect object, Particle Explosion and Ground Mark of settings at center (explosion, or a
+	 * destructible breaking with its Break Effect), then the World Sound > Effects sound of the
+	 * size preset (Explosion or Destruction Tiny...Huge).
+	 */
+	void SpawnBlastEffects(KX_GameObject *gameobj, const RangeExplosiveSettings& settings, const mt::vec3& center,
+	                       const std::vector<KX_GameObject *>& ignore, bool explosion);
 	/// Scrape Strip: extends the strip of the object to point, or starts one.
 	void AddStripSegment(Entry *entry, const mt::vec3& point, const mt::vec3& normal, const mt::vec3& along);
 	/// Mesh of a strip starting at the edge left-right (target space), parented to the target, counted

@@ -116,6 +116,43 @@ void BKE_world_sound_module_remove(World *wrld, WorldSoundModule *module)
 	CLAMP_MIN(wrld->active_sound_module, 0);
 }
 
+/* The Effects module with one empty slot per engine event (same list as EFFECT_SLOTS in
+ * properties_world_sound.py), unless the World already has one. */
+void BKE_world_sound_effects_ensure(World *wrld)
+{
+	static const struct { const char *name; int event; } slots[] = {
+		{"Explosion Tiny", WO_SOUND_EVENT_EXPLOSION_TINY},
+		{"Explosion Small", WO_SOUND_EVENT_EXPLOSION_SMALL},
+		{"Explosion Medium", WO_SOUND_EVENT_EXPLOSION_MEDIUM},
+		{"Explosion Large", WO_SOUND_EVENT_EXPLOSION_LARGE},
+		{"Explosion Huge", WO_SOUND_EVENT_EXPLOSION_HUGE},
+		{"Destruction Tiny", WO_SOUND_EVENT_DESTRUCTION_TINY},
+		{"Destruction Small", WO_SOUND_EVENT_DESTRUCTION_SMALL},
+		{"Destruction Medium", WO_SOUND_EVENT_DESTRUCTION_MEDIUM},
+		{"Destruction Large", WO_SOUND_EVENT_DESTRUCTION_LARGE},
+		{"Destruction Huge", WO_SOUND_EVENT_DESTRUCTION_HUGE},
+		{"Rain", WO_SOUND_EVENT_RAIN},
+		{"Thunder 1", WO_SOUND_EVENT_THUNDER},
+		{"Thunder 2", WO_SOUND_EVENT_THUNDER},
+		{"Thunder 3", WO_SOUND_EVENT_THUNDER},
+	};
+
+	for (WorldSoundModule *module = wrld->sound_modules.first; module; module = module->next) {
+		if (module->type == WO_SOUND_MODULE_EFFECTS) {
+			return;
+		}
+	}
+
+	const int active = wrld->active_sound_module;
+	WorldSoundModule *module = BKE_world_sound_module_add(wrld, "Effects", WO_SOUND_MODULE_EFFECTS);
+	module->flag = WO_SOUND_EXPANDED;
+	for (int i = 0; i < (int)ARRAY_SIZE(slots); i++) {
+		BKE_world_sound_entry_add(module, slots[i].name, "")->event = slots[i].event;
+	}
+	module->active_sound = 0;
+	wrld->active_sound_module = (BLI_listbase_count(&wrld->sound_modules) > 1) ? active : 0;
+}
+
 WorldSoundEntry *BKE_world_sound_entry_add(WorldSoundModule *module, const char *name, const char *filepath)
 {
 	WorldSoundEntry *entry = MEM_callocN(sizeof(WorldSoundEntry), "WorldSoundEntry");
@@ -392,6 +429,7 @@ World *BKE_world_add(Main *bmain, const char *name)
 	wrld = BKE_libblock_alloc(bmain, ID_WO, name, 0);
 
 	BKE_world_init(wrld);
+	BKE_world_sound_effects_ensure(wrld);
 
 	return wrld;
 }

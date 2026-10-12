@@ -565,6 +565,59 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
                 layout.label(text="No dynamic navmesh in the scene: the navmesh won't be carved", icon='ERROR')
 
 
+def draw_blast_effect(layout, context, es, enabled, destruction):
+    """Effect object, Particle Explosion and Ground Mark of an explosive (or of a destructible when it breaks)."""
+    col = layout.box()
+    col.label(text="Effect:", icon='PARTICLES')
+    split = col.split(factor=0.65)
+    split.prop(es, "effect", text="")
+    sub = split.row()
+    sub.active = es.effect is not None
+    sub.prop(es, "effect_life", text="Life")
+    if enabled and es.effect is not None and es.effect.is_visible(context.scene):
+        col.label(text="Move the Effect object to an inactive layer", icon='ERROR')
+    row = col.row()
+    row.prop(es, "use_particle_explosion")
+    if es.use_particle_explosion:
+        row.prop(es, "particle_size", text="")
+        col.prop(es, "particle_style")
+        # The three layers are named after what they are in the chosen style.
+        names = {
+            'FIRE': ("Fire", "Smoke", "Sparks"),
+            'ELECTRIC': ("Plasma", "Smoke", "Sparks"),
+            'CONCRETE': ("Dust", "Dust Cloud", "Debris"),
+            'WATER': ("Splash", "Mist", "Droplets"),
+        }[es.particle_style]
+        split = col.split()
+        for color_prop, amount_prop, name in zip(("fire_color", "smoke_color", "spark_color"),
+                                                 ("fire_amount", "smoke_amount", "spark_amount"), names):
+            sub = split.column(align=True)
+            sub.label(text=name + ":")
+            sub.prop(es, color_prop, text="")
+            sub.prop(es, amount_prop, text="Amount")
+        row = col.row()
+        row.prop(es, "smoke_duration", text=names[1] + " Duration")
+        row.prop(es, "blast_speed")
+
+    # Ground Mark: the Impact Decal projection, on the static surface under the blast.
+    col = layout.box()
+    col.prop(es, "use_ground_mark")
+    if es.use_ground_mark:
+        row = col.row(align=True)
+        row.prop(es, "mark", text="")
+        op = row.operator("object.explosive_mark_add", text="New" if es.mark is None else "", icon='ZOOMIN')
+        op.style = es.particle_style
+        op.destruction = destruction
+        row = col.row()
+        row.prop(es, "mark_size", text="Size")
+        row.prop(es, "mark_life", text="Life")
+        col.prop(es, "use_mark_nearby")
+        if es.mark is None:
+            col.label(text="Pick a Mark object or press New (a mark for the explosion style)", icon='INFO')
+        elif es.mark.is_visible(context.scene):
+            col.label(text="Move the Mark object to an inactive layer", icon='ERROR')
+
+
 class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
     bl_label = "Destruction"
     bl_options = {'DEFAULT_CLOSED'}
@@ -606,6 +659,8 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
         sub.prop(ds, "burst_speed")
         sub.prop(ds, "debris_lifetime", text="Lifetime")
         col.prop(ds, "use_inherit_velocity")
+
+        draw_blast_effect(layout, context, ds.fx, game.use_destruction, True)
 
     @staticmethod
     def draw_fragments_check(layout, scene, ob, group):
@@ -664,54 +719,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         sub.active = (can_collide and es.use_explode_on_impact) or es.use_chain_reaction
         sub.prop(es, "impact_impulse")
 
-        col = layout.box()
-        col.label(text="Effect:", icon='PARTICLES')
-        split = col.split(factor=0.65)
-        split.prop(es, "effect", text="")
-        sub = split.row()
-        sub.active = es.effect is not None
-        sub.prop(es, "effect_life", text="Life")
-        if game.use_explosive and es.effect is not None and es.effect.is_visible(context.scene):
-            col.label(text="Move the Effect object to an inactive layer", icon='ERROR')
-        row = col.row()
-        row.prop(es, "use_particle_explosion")
-        if es.use_particle_explosion:
-            row.prop(es, "particle_size", text="")
-            col.prop(es, "particle_style")
-            # The three layers are named after what they are in the chosen style.
-            names = {
-                'FIRE': ("Fire", "Smoke", "Sparks"),
-                'ELECTRIC': ("Plasma", "Smoke", "Sparks"),
-                'CONCRETE': ("Dust", "Dust Cloud", "Debris"),
-                'WATER': ("Splash", "Mist", "Droplets"),
-            }[es.particle_style]
-            split = col.split()
-            for color_prop, amount_prop, name in zip(("fire_color", "smoke_color", "spark_color"),
-                                                     ("fire_amount", "smoke_amount", "spark_amount"), names):
-                sub = split.column(align=True)
-                sub.label(text=name + ":")
-                sub.prop(es, color_prop, text="")
-                sub.prop(es, amount_prop, text="Amount")
-            row = col.row()
-            row.prop(es, "smoke_duration", text=names[1] + " Duration")
-            row.prop(es, "blast_speed")
-
-        # Ground Mark: the Impact Decal projection, on the static surface under the blast.
-        col = layout.box()
-        col.prop(es, "use_ground_mark")
-        if es.use_ground_mark:
-            row = col.row(align=True)
-            row.prop(es, "mark", text="")
-            op = row.operator("object.explosive_mark_add", text="New" if es.mark is None else "", icon='ZOOMIN')
-            op.style = es.particle_style
-            row = col.row()
-            row.prop(es, "mark_size", text="Size")
-            row.prop(es, "mark_life", text="Life")
-            col.prop(es, "use_mark_nearby")
-            if es.mark is None:
-                col.label(text="Pick a Mark object or press New (a mark for the explosion style)", icon='INFO')
-            elif es.mark.is_visible(context.scene):
-                col.label(text="Move the Mark object to an inactive layer", icon='ERROR')
+        draw_blast_effect(layout, context, es, game.use_explosive, False)
 
 
 class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):

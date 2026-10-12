@@ -2174,11 +2174,15 @@ static int game_physics_copy_exec(bContext *C, wmOperator *UNUSED(op))
 			id_us_min((ID *)ob_iter->destruction.fragments);
 			id_us_min((ID *)ob_iter->explosive.effect);
 			id_us_min((ID *)ob_iter->explosive.mark);
+			id_us_min((ID *)ob_iter->destruction.fx.effect);
+			id_us_min((ID *)ob_iter->destruction.fx.mark);
 			ob_iter->destruction = ob->destruction;
 			ob_iter->explosive = ob->explosive;
 			id_us_plus((ID *)ob_iter->destruction.fragments);
 			id_us_plus((ID *)ob_iter->explosive.effect);
 			id_us_plus((ID *)ob_iter->explosive.mark);
+			id_us_plus((ID *)ob_iter->destruction.fx.effect);
+			id_us_plus((ID *)ob_iter->destruction.fx.mark);
 		}
 	}
 	CTX_DATA_END;

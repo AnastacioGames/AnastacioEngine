@@ -36,6 +36,26 @@
 static const EnumPropertyItem rna_enum_world_sound_module_type_items[] = {
 	{WO_SOUND_MODULE_MUSIC, "MUSIC", ICON_PLAY_AUDIO, "Music", "One track at a time, with crossfade and playlist"},
 	{WO_SOUND_MODULE_AMBIENT, "AMBIENT", ICON_FORCE_WIND, "Ambient", "Looping layers that play together"},
+	{WO_SOUND_MODULE_EFFECTS, "EFFECTS", ICON_MOD_EXPLODE, "Effects",
+	 "Sounds the engine plays by itself (explosions, destruction, rain, thunder); every play is a new voice, "
+	 "so a sound never cuts the one before"},
+	{0, NULL, 0, NULL, NULL}
+};
+
+static const EnumPropertyItem rna_enum_world_sound_event_items[] = {
+	{WO_SOUND_EVENT_NONE, "NONE", 0, "None", "Played only by name (Range.audio)"},
+	{WO_SOUND_EVENT_EXPLOSION_TINY, "EXPLOSION_TINY", 0, "Explosion Tiny", "Explosive with Tiny explosion size"},
+	{WO_SOUND_EVENT_EXPLOSION_SMALL, "EXPLOSION_SMALL", 0, "Explosion Small", "Explosive with Small explosion size"},
+	{WO_SOUND_EVENT_EXPLOSION_MEDIUM, "EXPLOSION_MEDIUM", 0, "Explosion Medium", "Explosive with Medium explosion size"},
+	{WO_SOUND_EVENT_EXPLOSION_LARGE, "EXPLOSION_LARGE", 0, "Explosion Large", "Explosive with Large explosion size"},
+	{WO_SOUND_EVENT_EXPLOSION_HUGE, "EXPLOSION_HUGE", 0, "Explosion Huge", "Explosive with Huge explosion size"},
+	{WO_SOUND_EVENT_DESTRUCTION_TINY, "DESTRUCTION_TINY", 0, "Destruction Tiny", "Destructible breaking, Tiny Break Effect size"},
+	{WO_SOUND_EVENT_DESTRUCTION_SMALL, "DESTRUCTION_SMALL", 0, "Destruction Small", "Destructible breaking, Small Break Effect size"},
+	{WO_SOUND_EVENT_DESTRUCTION_MEDIUM, "DESTRUCTION_MEDIUM", 0, "Destruction Medium", "Destructible breaking, Medium Break Effect size"},
+	{WO_SOUND_EVENT_DESTRUCTION_LARGE, "DESTRUCTION_LARGE", 0, "Destruction Large", "Destructible breaking, Large Break Effect size"},
+	{WO_SOUND_EVENT_DESTRUCTION_HUGE, "DESTRUCTION_HUGE", 0, "Destruction Huge", "Destructible breaking, Huge Break Effect size"},
+	{WO_SOUND_EVENT_RAIN, "RAIN", 0, "Rain", "Loops while World > Rain is on"},
+	{WO_SOUND_EVENT_THUNDER, "THUNDER", 0, "Thunder", "Each lightning strike; add several Thunder sounds so it doesn't repeat"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -1509,6 +1529,20 @@ static void rna_def_world_sound(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.1f, 4.0f);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Pitch", "Playback speed of this sound (1 is the original)");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", WO_SOUND_EXPANDED);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the settings of this sound");
+	RNA_def_property_update(prop, NC_WORLD, NULL);
+
+	prop = RNA_def_property(srna, "event", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, rna_enum_world_sound_event_items);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Event",
+	                         "What makes the engine play this sound (Effects modules). Sounds with the same event "
+	                         "are variations picked at random");
 	RNA_def_property_update(prop, NC_WORLD, NULL);
 
 	srna = RNA_def_struct(brna, "WorldSoundModule", NULL);

@@ -691,6 +691,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "int", "sound_flag")) {
+    /* World Sound: every World gets the Effects module with its empty slots, once (a module the
+     * user removes later stays removed). */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      BKE_world_sound_effects_ensure(wo);
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "atmo_intensity")) {
     /* Atmospheric sky got its own parameters; old Worlds start with Earth air. */
     LISTBASE_FOREACH (World *, wo, &main->world) {
