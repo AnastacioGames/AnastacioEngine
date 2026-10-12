@@ -99,9 +99,22 @@ def _game_prop_type(ob, name):
     return prop.type if prop else None
 
 
-def _literal(ob, prop_name, text):
+def _literal(ob, prop_name, text, assign=False):
     """Valor de sensor/actuator (sempre string no RNA) convertido para o tipo da game property."""
     ptype = _game_prop_type(ob, prop_name)
+    if ptype == 'STRING' and assign:
+        # O Property actuator avalia o valor como expressao e grava o texto do resultado:
+        # "abc" (com aspas) vira abc, um inteiro vira o proprio texto, um nome vira o valor da propriedade.
+        word = text.strip()
+        try:
+            value = ast.literal_eval(word)
+        except (ValueError, SyntaxError):
+            value = None
+        if isinstance(value, str) or (isinstance(value, int) and not isinstance(value, bool)):
+            return repr(str(value))
+        if word and ob.game.properties.get(word):
+            return "str(ob[%r])" % word
+        raise Unsupported("valor '%s' da propriedade de texto %s (use aspas)" % (text, prop_name))
     if ptype == 'STRING':
         return repr(text)
     if ptype == 'BOOL':
@@ -204,10 +217,10 @@ def _key_arg(name, rna_key):
     return _arg(name, default, "key")
 
 
-def _lit_arg(ob, prop_name, text, name):
+def _lit_arg(ob, prop_name, text, name, assign=False):
     """Como _literal, mas constante vira arg (referencia a outra propriedade fica fixa)."""
-    lit = _literal(ob, prop_name, text)
-    if lit.startswith("ob["):
+    lit = _literal(ob, prop_name, text, assign)
+    if lit.startswith(("ob[", "str(ob[")):
         return lit
     return _arg(name, ast.literal_eval(lit))
 
@@ -362,14 +375,14 @@ def _sensor_expr(ob, sens, key=None):
         expr = "self._anim_event(%r, %d, %d, own=ob)" % (key, sens.event_index - 1, trigger)
     elif t == 'ARMATURE':
         # Estado da constraint do bone (KX_ArmatureSensor); sem a constraint, sempre falso.
-        expr = "self._arm_test(ob, %s, %s, %r, %s)" % (A("Bone", sens.bone), A("Constraint", sens.constraint),
-                                                       sens.test_type, A("Value", sens.value))
+        expr = "self._arm_test(ob, %s, %s, %r, %s, %s)" % (A("Bone", sens.bone), A("Constraint", sens.constraint),
+                                                           sens.test_type, A("Value", sens.value), sens.invert)
     elif t == 'MESSAGE':
         # Mensagens enviadas no frame anterior para este objeto (ou sem destino), como o sensor.
         expr = "bool(logic.getMessages(ob.name, %s))" % A("Subject", sens.subject)
     else:
         raise Unsupported("sensor %s" % t)
-    if sens.invert:
+    if sens.invert and t != 'ARMATURE':
         expr = "not (%s)" % expr
     # Liga/desliga do sensor pelos args (desligado = sensor falso).
     return "%s and (%s)" % (A("Enabled", True), expr)
@@ -630,7 +643,7 @@ def _actuator_code(ob, act):
         m = act.mode
         pa = _act_arg("Property", p)
         if m == 'ASSIGN':
-            return ["ob[%s] = %s" % (pa, _lit_arg(ob, p, act.value, _ACT_LABEL[0] + " Value"))], False
+            return ["ob[%s] = %s" % (pa, _lit_arg(ob, p, act.value, _ACT_LABEL[0] + " Value", True))], False
         if m == 'ADD':
             return ["ob[%s] = ob.get(%s, 0) + %s" % (pa, pa, _lit_arg(ob, p, act.value,
                                                                     _ACT_LABEL[0] + " Value"))], False
@@ -678,8 +691,11 @@ def _actuator_code(ob, act):
         if act.mode in {'SAVECFG', 'LOADCFG'}:
             # globalDict em <pasta do jogo>/<Save Location>.<Extension>, como o actuator.
             call = "saveGlobalDict" if act.mode == 'SAVECFG' else "loadGlobalDict"
-            return ["logic.%s(%s, %s)" % (call, _act_arg("Save Location", act.saveloc),
-                                          _act_arg("Extension", act.extension_name))], False
+            # Campo vazio nao vai na chamada: a engine usa o padrao (<jogo>.save), como o actuator.
+            return ["logic.%s(*((%s, %s) if %s else (%s,) if %s else ()))" % (
+                call, _act_arg("Save Location", act.saveloc), _act_arg("Extension", act.extension_name),
+                _act_arg("Extension", act.extension_name), _act_arg("Save Location", act.saveloc),
+                _act_arg("Save Location", act.saveloc))], False
         if act.mode == 'SCREENSHOT':
             return ["render.makeScreenshot(%s)" % _act_arg("File", act.filename)], False
         raise Unsupported("game %s" % act.mode)
@@ -782,15 +798,14 @@ def _servo_code(act):
 
 def _character_code(act):
     # Character Motion: direcao de andar do personagem; o pulso negativo para (roda todo frame).
-    if act.use_vr_gaze:
-        raise Unsupported("motion character com vr gaze")
     A = _act_arg
     substeps = max(bpy.context.scene.game_settings.physics_step_sub, 1)
     _ACT_ALWAYS[0] = True
-    return ["self._char_move(%r, %s, %s, %s, %s, %s, %s, %s, %d, own=ob)" % (
+    # VR Gaze: Loc segue o olhar da camera ativa no chao (vr_gaze_offset), no lugar do eixo local.
+    return ["self._char_move(%r, %s, %s, %s, %s, %s, %s, %s, %d%s, own=ob)" % (
         "chr:" + _ACT_LABEL[0], _ON, A("Loc", act.offset_location), act.use_local_location,
         act.use_add_character_location, A("Rot", act.offset_rotation), act.use_local_rotation,
-        A("Jump", act.use_character_jump), substeps)], True
+        A("Jump", act.use_character_jump), substeps, ", gaze=True" if act.use_vr_gaze else "")], True
 
 
 _ACTION_MODES = {'PLAY': 0, 'PINGPONG': 1, 'FLIPPER': 2, 'LOOPSTOP': 3, 'LOOPEND': 4, 'PROPERTY': 6}
@@ -800,8 +815,6 @@ def _action_code(act):
     # Mesmo fluxo de BL_ActionActuator::Update, por cima de playAction/stopAction (roda todo frame).
     if act.action is None:
         raise Unsupported("action sem acao")
-    if act.use_children:
-        raise Unsupported("action com Child (a acao propria de cada filho nao e exposta em Python)")
     if act.play_mode not in _ACTION_MODES:
         raise Unsupported("action %s" % act.play_mode)
     A = _act_arg
@@ -812,11 +825,13 @@ def _action_code(act):
     ipo = (1 if act.use_force else 0) | (2 if act.use_local else 0) | (4 if act.use_additive else 0)
     _ACT_ALWAYS[0] = True
     _ACT_STATE[0] = "self._action_on(%r)" % key
-    return ["self._action(%r, %s, %s, %s, %s, %s, %d, %d, %s, %s, %s, %s, %d, %s, %s, %s, own=ob)" % (
+    # Child: cada filho toca a propria acao (self._child_actions, montado no start) nos mesmos quadros.
+    return ["self._action(%r, %s, %s, %s, %s, %s, %d, %d, %s, %s, %s, %s, %d, %s, %s, %s%s, own=ob)" % (
         key, _FIRE, _ON, A("Action", name), A("Start", act.frame_start), A("End", act.frame_end),
         _ACTION_MODES[act.play_mode], act.blend_mode == 'ADD', A("Blendin", act.frame_blend_in),
         A("Priority", act.priority), A("Layer", act.layer), A("Layer Weight", act.layer_weight), ipo,
-        act.use_continue_last_frame, A("Property", act.property), A("Frame Property", act.frame_property))], False
+        act.use_continue_last_frame, A("Property", act.property), A("Frame Property", act.frame_property),
+        ", child=True" if act.use_children else "")], False
 
 
 def _armature_code(act):
@@ -936,14 +951,28 @@ def _steering_code(ob, act):
     if mode == 2 and navmesh is None:
         raise Unsupported("steering path following sem navmesh")
     facing = ['X', 'Y', 'Z', 'NEG_X', 'NEG_Y', 'NEG_Z'].index(act.facing_axis) + 1 if act.facing else 0
+    plm = ""
+    if facing and ob.parent is not None:
+        # m_parentlocalmat: orientacao local do pai quando a cena e convertida (BKE_object_rot_to_mat3,
+        # sem delta), e nao a do instante em que o actuator liga.
+        par = ob.parent
+        if par.rotation_mode == 'QUATERNION':
+            rot = par.rotation_quaternion.normalized().to_matrix()
+        elif par.rotation_mode == 'AXIS_ANGLE':
+            from mathutils import Quaternion
+            rot = Quaternion(par.rotation_axis_angle[1:], par.rotation_axis_angle[0]).to_matrix()
+        else:
+            rot = par.rotation_euler.to_matrix()
+        plm = ", plm=%r" % (tuple(tuple(round(x, 6) for x in row) for row in rot),)
     key = "str:" + _ACT_LABEL[0]
     _ACT_STATE[0] = "%r in self._ticks" % key
-    call = "self._steer(%r, %s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s, own=ob)" % (
+    call = ("self._steer(%r, %s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s, %s, own=ob" + plm + ")") % (
         key, _FIRE, mode, A("Target", act.target.name), A("Navmesh", navmesh) if navmesh else None,
         A("Distance", act.distance), A("Velocity", act.velocity), A("Update Period", act.update_period),
         A("Self Terminated", act.self_terminated), facing, ob.game.physics_type in _DYNAMIC,
         A("Lock Z Velocity", act.lock_z_velocity), A("Visualize", act.show_visualization))
-    return [call], True, ["self._ticks.pop(%r, None)" % key]
+    # Pulso negativo: esquece tambem o estado guardado depois do auto termino (m_isActive = false).
+    return [call], True, ["self._ticks.pop(%r, None)" % key, "self._ticks.pop(%r, None)" % (key + ":idle")]
 
 
 def _random_act_code(act):
@@ -994,16 +1023,41 @@ _DYNAMICS = {
 def _edit_object_code(act):
     m = act.mode
     if m == 'ADDOBJECT':
-        if act.object is None or act.use_object_from_property:
+        from_prop = act.use_object_from_property and bool(act.object_property)
+        if act.object is None and not from_prop:
             raise Unsupported("add object sem objeto fixo")
-        lines = ["new = scene.addObject(%s, ob, %s)" % (_act_arg("Object", act.object.name),
-                                                        _act_arg("Time", act.time))]
+        vel = []
         if _nonzero(act.linear_velocity):
-            lines.append("new.setLinearVelocity(%s, %s)" % (_act_arg("Linear Velocity", act.linear_velocity),
-                                                            act.use_local_linear_velocity))
+            # A engine aplica o campo Linear Velocity como forca (KX_AddObjectActuator::InstantAddObject).
+            vel.append("new.applyForce(%s, %s)" % (_act_arg("Linear Velocity", act.linear_velocity),
+                                                   act.use_local_linear_velocity))
         if _nonzero(act.angular_velocity):
-            lines.append("new.setAngularVelocity(%s, %s)" % (_act_arg("Angular Velocity", act.angular_velocity),
-                                                             act.use_local_angular_velocity))
+            vel.append("new.setAngularVelocity(%s, %s)" % (_act_arg("Angular Velocity", act.angular_velocity),
+                                                           act.use_local_angular_velocity))
+        if not from_prop:
+            return ["new = scene.addObject(%s, ob, %s)" % (_act_arg("Object", act.object.name),
+                                                           _act_arg("Time", act.time))] + vel
+        # From Property (KX_AddObjectActuator::ResolveOriginalObject): o nome vem de uma propriedade do
+        # objeto ou do World, lida a cada disparo; vazio ou sem objeto inativo com esse nome nao adiciona.
+        pa = _act_arg("Object Property", act.object_property)
+        add = "new = scene.addObject(_n, ob, %s)" % _act_arg("Time", act.time)
+        if act.use_global_object_property:
+            lines = ["try:", "    _n = str(scene.world[%s])" % pa, "except KeyError:", "    _n = ''"]
+        else:
+            lines = ["_n = str(ob.get(%s, ''))" % pa]
+        lines += ["new = None",
+                  "if _n:",
+                  "    try:",
+                  "        " + add,
+                  "    except ValueError:",
+                  "        try:",
+                  "            # Load Mode On Demand: converte o objeto na hora, como o actuator.",
+                  "            scene.convertObject(_n)",
+                  "            " + add,
+                  "        except ValueError:",
+                  "            print(\"Add Object: nenhum objeto inativo chamado '%s'\" % _n)"]
+        if vel:
+            lines += ["if new is not None:"] + ["    " + line for line in vel]
         return lines
     if m == 'ENDOBJECT':
         return ["ob.endObject()"]
@@ -1394,11 +1448,28 @@ class %(classname)s(%(base)s):
                 return getattr(events, n)
         raise ValueError("tecla invalida: %%r" %% name)
 
-    def _tick(self, key, skip):
-        """Pulso repetido (True level) a cada skip + 1 frames."""
-        n = self._ticks.get(key, 0)
-        self._ticks[key] = (n + 1) %% (skip + 1)
-        return n == 0
+    def _trig(self, key, value, prev=False):
+        """Evento do sensor: True no frame em que o valor muda (prev = valor antes do primeiro frame)."""
+        changed = self._prev.get(key, prev) != value
+        self._prev[key] = value
+        return changed
+
+    def _tick(self, key, skip, value, changed, dt=False):
+        """Pulso repetido do sensor: a contagem zera quando ele muda e dispara ao passar de skip, se value."""
+        n = 0 if changed else self._ticks.get(key, 0) + (logic.deltaTime() if dt else 1)
+        fire = n > skip
+        self._ticks[key] = 0 if fire else n
+        return fire and value
+
+    def _latch(self, key, active, value, trig):
+        """Resultado do controller: so e reavaliado quando algum sensor dele gera evento, como na engine."""
+        key = "lt:" + key
+        if not active:
+            self._prev.pop(key, None)
+            return False
+        if trig:
+            self._prev[key] = value
+        return self._prev.get(key, False)
 
     def update(self):
         ob = self.object
@@ -1548,17 +1619,22 @@ _EXTRA["_cst"] = '''
 '''
 _EXTRA["_steer"] = '''
     def _steer(self, key, fire, mode, target, navmesh, dist, speed, period, self_term, facing, dyn,
-               lock_z, show, own=None):
+               lock_z, show, own=None, plm=None):
         """Steering actuator (KX_SteeringActuator): 0 seek, 1 flee, 2 path following."""
         now = logic.getFrameTime()
         st = self._ticks.get(key)
         if st is None:
-            # Ativacao: so marca o tempo; o movimento comeca no proximo frame.
-            if fire:
-                parent = (own or self.object).parent
+            if not fire:
+                return
+            # Depois do auto termino a engine deixa m_isActive ligado: o proximo pulso positivo continua
+            # de onde parou (delta desde o ultimo update, mesmo caminho) em vez de comecar de novo.
+            st = self._ticks.pop(key + ":idle", None)
+            if st is None:
+                # Ativacao: so marca o tempo; o movimento comeca no proximo frame.
                 self._ticks[key] = {"t": now, "pt": -1.0, "path": [], "wp": -1,
-                                    "plm": parent.localOrientation.copy() if parent else None}
-            return
+                                    "plm": Matrix(plm) if plm else None}
+                return
+            self._ticks[key] = st
         delta = now - st["t"]
         st["t"] = now
         if not delta:
@@ -1566,8 +1642,10 @@ _EXTRA["_steer"] = '''
         ob = own or self.object
         tgt = ob.scene.objects.get(target)
         if tgt is None:
-            self._ticks.pop(key, None)
+            self._ticks[key + ":idle"] = self._ticks.pop(key)
             return
+        # IsDynamic() da engine e falso enquanto a dinamica esta suspensa.
+        dyn = dyn and not ob.isSuspendDynamics
         pos = ob.worldPosition.copy()
         to = tgt.worldPosition - pos
         steer = None
@@ -1613,7 +1691,7 @@ _EXTRA["_steer"] = '''
             else:
                 ob.applyMovement(delta * vel, False)
         if done and self_term:
-            self._ticks.pop(key, None)
+            self._ticks[key + ":idle"] = self._ticks.pop(key)
 
     def _steer_face(self, st, facing, vel, own=None):
         """Aponta o eixo escolhido (1 X, 2 Y, 3 Z, 4-6 negativos) na direcao do movimento."""
@@ -1645,7 +1723,9 @@ _EXTRA["_steer"] = '''
         ob = own or self.object
         if ob.parent is not None:
             pos = ob.localPosition.copy()
-            ob.localOrientation = st["plm"] * ob.parent.worldOrientation.inverted() * mat
+            mat = ob.parent.worldOrientation.inverted() * mat
+            # Sem pai na conversao da cena a engine usa a identidade.
+            ob.localOrientation = st["plm"] * mat if st["plm"] is not None else mat
             ob.localPosition = pos
         else:
             ob.localOrientation = mat
@@ -1943,10 +2023,11 @@ _EXTRA["_vr_walk"] = '''
         self._prev[key] = f
         if f > 0:
             self.object.applyMovement(self._vr_offset(Vector(loc) * (60.0 * f * logic.deltaTime())), False)
-
-    def _vr_offset(self, v):
+'''
+_EXTRA["_vr_offset"] = '''
+    def _vr_offset(self, v, own=None):
         """x = direita, y = frente do olhar projetado no chao, z = cima do mundo."""
-        ob = self.object
+        ob = own or self.object
         fwd = ob.worldOrientation.col[1].copy()
         cam = ob.scene.active_camera
         if cam is not None:
@@ -2093,7 +2174,7 @@ _EXTRA["_servo"] = '''
             ob.applyForce(f, local)
 '''
 _EXTRA["_char_move"] = '''
-    def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, own=None):
+    def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, gaze=False, own=None):
         """Motion Character (KX_ObjectActuator): anda com o personagem; ao soltar, para."""
         from Range import constraints
         ob = own or self.object
@@ -2106,7 +2187,9 @@ _EXTRA["_char_move"] = '''
             return
         step = 60.0 * logic.deltaTime()
         d = Vector(loc) * step
-        if local:
+        if gaze:
+            d = self._vr_offset(d, ob)
+        elif local:
             d = ob.worldOrientation * d
         if add:
             old = Vector(ch.walkDirection)
@@ -2149,11 +2232,14 @@ _EXTRA["_arm_con"] = '''
             return None
 '''
 _EXTRA["_arm_test"] = '''
-    def _arm_test(self, o, bone, name, test, value):
+    def _arm_test(self, o, bone, name, test, value, invert=False):
         """Armature sensor (KX_ArmatureSensor): estado ou erro da constraint."""
         c = self._arm_con(o, bone, name)
         if c is None:
+            # Sem a constraint o sensor nunca dispara, nem com Invert.
             return False
+        if invert:
+            return not self._arm_test(o, bone, name, test, value)
         if test == 'STATECHG':
             return bool(c.active)
         err = c.lin_error if test.startswith('LIN') else c.rot_error
@@ -2164,7 +2250,7 @@ _EXTRA["_action"] = '''
         return self.__dict__.get("_actn", {}).get(key, {}).get("on", False)
 
     def _action(self, key, fire, on, name, start, end, mode, add, blendin, priority, layer, weight, ipo,
-                cont, prop, frame_prop, own=None):
+                cont, prop, frame_prop, child=False, own=None):
         """Action actuator (BL_ActionActuator): modo 0 play, 1 ping pong, 2 flipper, 3 loop stop,
         4 loop end, 6 property. Roda todo frame para acompanhar o fim da acao e o pulso negativo."""
         ob = own or self.object
@@ -2180,14 +2266,38 @@ _EXTRA["_action"] = '''
         st["pending"] = False
 
         def play(s, e, loop):
+            # playAction nao diz se tocou: repete as recusas de BL_Action::Play (camada ocupada por uma
+            # prioridade maior, ou pela mesma acao com os mesmos quadros e prioridade).
+            lays = self.__dict__.setdefault("_actl", {})
+            lay = lays.get((id(ob), layer))
+            if lay and ob.isPlayingAction(layer) and ob.getActionName(layer) == lay[0]:
+                if priority > lay[3]:
+                    return False
+                if lay[:3] == (name, s, e):
+                    # A engine grava a prioridade nova antes de recusar a acao repetida.
+                    lays[(id(ob), layer)] = (name, s, e, priority)
+                    return False
+                # Ja decidido aqui: libera a camada para a engine nao recusar pelo estado real dela.
+                ob.stopAction(layer)
             ob.playAction(name, s, e, layer, priority, blendin, 1 if loop else 0, weight, ipo, 1.0, 1 if add else 0)
-            return ob.getActionName(layer) == name
+            if ob.getActionName(layer) != name:
+                return False
+            lays[(id(ob), layer)] = (name, s, e, priority)
+            if child:
+                # Child: os filhos tocam a acao deles nos mesmos quadros (no Ping Pong ficam indo e voltando).
+                cmode = 2 if mode == 1 else (1 if loop else 0)
+                for c in ob.childrenRecursive:
+                    cname = self._child_actions.get(c.name)
+                    if cname:
+                        c.playAction(cname, s, e, layer, priority, blendin, cmode, weight, ipo, 1.0, 1 if add else 0)
+            return True
 
         def begin(loop):
             s, e = st["se"]
             if not play(s, e, loop):
                 return False
             st["active"] = True
+            st["bt"], st["le"] = logic.getFrameTime(), False
             if cont:
                 ob.setActionFrame(st["t"], layer)
             return True
@@ -2237,15 +2347,33 @@ _EXTRA["_action"] = '''
                 st["active"] = False
             elif mode in (3, 6):
                 ob.stopAction(layer)
+                if child:
+                    for c in ob.childrenRecursive:
+                        c.stopAction(layer)
                 st["active"] = False
             elif mode == 4:
                 # Loop End: termina a volta atual (mesma acao em modo Play a partir do quadro atual).
-                ob.playAction(name, st["t"], e, layer, priority, 0, 0, weight, ipo, 1.0, 1 if add else 0)
+                # A engine so troca o modo da acao em curso (sem equivalente em Python): ver "le" abaixo.
+                st["le"] = True
                 st["end"] = True
             elif mode == 2:
                 # Flipper: volta ate o inicio.
                 play(st["t"] if cur else e, s, False)
                 st["end"] = True
+        if st.get("le"):
+            if not st["active"] or not ob.isPlayingAction(layer) or ob.getActionName(layer) != name:
+                st["le"] = False
+            else:
+                # Loop End a terminar: para e toca de novo em modo Play ate o fim da faixa em curso. Tocar
+                # de novo recomeca o Blendin, entao espera ele acabar (ou a volta chegar ao fim).
+                lay = self.__dict__.get("_actl", {}).get((id(ob), layer))
+                le, lp = (lay[2], lay[3]) if lay and lay[0] == name else (e, priority)
+                t, rate = ob.getActionFrame(layer), logic.getAnimationRate()
+                left = blendin - (logic.getFrameTime() - st.get("bt", 0.0)) * rate if blendin else 0.0
+                if left <= 0.0 or abs(le - t) < 1.5 * rate / max(logic.getLogicTicRate(), 1.0):
+                    st["le"] = False
+                    ob.stopAction(layer)
+                    ob.playAction(name, t, le, layer, lp, max(left, 0.0), 0, weight, ipo, 1.0, 1 if add else 0)
         st["on"] = st["active"] or st["pending"]
 '''
 
@@ -2309,6 +2437,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     todos = []
     sensor_exprs = {}  # nome da variavel -> (expressao, nome original); cada sensor avaliado uma vez
     sensor_masks = {}
+    sensor_trigs = {}  # nome da variavel -> expressao do gatilho do sensor
     _GROUP[0] = ""
     _GROUP_ICON.clear()
     _SND3D[0] = False
@@ -2330,12 +2459,19 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
         return [sub(line) for line in lines_or_expr]
 
     for cont in ob.game.controllers:
+        if not cont.active:
+            # Controller desativado nao e criado pela engine.
+            continue
         if cont.name in _skip:
             todos.append("%s: sensor Actuator le um actuator nao convertido" % cont.name)
             continue
         try:
             sensors = [(o, s) for o in bpy.data.objects for s in o.game.sensors
-                       if _owns(s.controllers, cont)]
+                       if s.active and _owns(s.controllers, cont)]
+            if not sensors:
+                # Sem sensor ativo ligado o controller nunca roda.
+                continue
+            trigs = {}
             exprs = {}
             sensor_vars = {}
             pulse = []
@@ -2359,14 +2495,48 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                     expr = "%s is not None and (%s)" % (foreign[owner.name], expr)
                 exprs[var] = (expr, s.name if owner == ob else "%s/%s" % (owner.name, s.name))
                 sensor_vars[s.name] = var
-                if s.use_pulse_true_level:
-                    pulse.append("self._tick(%r, %d)" % (key, s.tick_skip))
-                elif s.type == 'MESSAGE':
-                    # A engine dispara todo frame com mensagem, para nao perder nenhuma.
-                    pulse.append("True")
+                # Gatilho do sensor, como SCA_ISensor::Activate: mudou de valor, ou pulso repetido.
+                # Todo gatilho faz o controller reenviar o resultado dele aos actuators.
+                # Tap generico (Keyboard/Mouse ja usam "activated"): positivo so nos frames com evento.
+                tap = s.use_tap and ".activated" not in expr
+                raw = var + "_r" if tap else var
+                # Antes do 1o frame a engine considera o sensor negativo; Delay e Always invertidos ja
+                # comecam positivos sem gerar evento.
+                init = ", True" if s.invert and s.type in {'DELAY', 'ALWAYS'} else ""
+                lines = ["%s_c = self._trig(%r, %s%s)" % (var, "s:" + key, raw, init)]
+
+                def tick(tkey, value, s=s, var=var):
+                    return "self._tick(%r, %s, %s, %s_c%s)" % (
+                        tkey, repr(round(s.tick_skip_dt, 6)) if s.use_dt else s.tick_skip, value, var,
+                        ", True" if s.use_dt else "")
+
+                if tap:
+                    event = "%s_c" % var
+                    if s.use_pulse_true_level:
+                        event = "(%s | %s)" % (event, tick(key, raw))
+                    lines.append("%s = %s & %s" % (var, raw, event))
+                    # Positivo dispara em todo frame com evento; no frame seguinte sai o pulso negativo.
+                    lines.append("%s_t = %s | self._trig(%r, %s)" % (var, var, "tap:" + key, var))
+                else:
+                    trig = [var + "_c"]
+                    if s.use_pulse_true_level:
+                        trig.append(tick(key, var))
+                    if s.use_pulse_false_level:
+                        trig.append(tick(key + ":neg", "not " + var))
+                    if s.type == 'MESSAGE' or (s.type == 'JOYSTICK' and s.use_all_events):
+                        # A engine dispara todo frame enquanto positivo (mensagem nova; All Events do joystick).
+                        trig.append(var)
+                    lines.append("%s_t = %s" % (var, " | ".join(trig)))
+                trigs[var] = (raw, lines)
+                pulse.append(var + "_t")
+                if s.use_level and not any(p.startswith("self._rise(") for p in pulse):
+                    # Level: o sensor tambem dispara o controller que acabou de entrar no estado ativo.
+                    pulse.append("self._rise(%r, bool(state & %d))" % ("lv:" + cont.name, 1 << (cont.states - 1)))
             cont_expr = _controller_expr(ob, cont, sensor_vars)
             actuators = []
             for a in cont.actuators:
+                if not a.active:
+                    continue
                 owner = ob if _owns(ob.game.actuators, a) else next(
                     o for o in bpy.data.objects if _owns(o.game.actuators, a))
                 _ACT_LABEL[0] = a.name if owner == ob else "%s/%s" % (owner.name, a.name)
@@ -2387,6 +2557,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             todos.append("%s: %s" % (cont.name, ex))
             continue
         sensor_exprs.update(exprs)
+        sensor_trigs.update(trigs)
         for sname in exprs:
             sensor_masks[sname] = sensor_masks.get(sname, 0) | (1 << (cont.states - 1))
         plans.append((cont, cont_expr, pulse, actuators))
@@ -2414,23 +2585,30 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     if uses_hits:
         # Colisoes do passo de fisica anterior, como o Collision sensor.
         out.append("        hits, self._hits = self._hits, []")
+    one_shot = {cont.name: not all(code[1] and not any(_FIRE in line for line in code[0])
+                                   for _act, _owner, code in actuators)
+                for cont, _expr, _pulse, actuators in plans}
     for sname, (expr, orig) in sensor_exprs.items():
         # Sensor so e avaliado com algum controller dele no estado ativo (Delay/Near contam certo).
+        raw, lines = sensor_trigs[sname]
         out.append("        %s = bool(state & %d) and (%s)  # sensor '%s'" %
-                   (sname, sensor_masks[sname], expr, orig))
+                   (raw, sensor_masks[sname], expr, orig))
+        # Evento do sensor (sem curto-circuito: a contagem de cada sensor anda todo frame, como na engine).
+        out += ["        " + line for line in lines]
 
     out.append("\n        # Controllers (so rodam no estado deles)")
     for cont, cont_expr, pulse, actuators in plans:
         cname = _ident(cont.name, "c")
-        one_shot = not all(code[1] and not any(_FIRE in line for line in code[0])
-                           for _act, _owner, code in actuators)
-        fire = "self._rise(%r, %s)" % (cont.name, cname)
-        if pulse:
-            fire = "%s or (%s and (%s))" % (fire, cname, " or ".join(pulse))
         out.append("        # controller '%s' (%s, estado %d)" % (cont.name, cont.type, cont.states))
-        out.append("        %s = bool(state & %d) and (%s)" % (cname, 1 << (cont.states - 1), cont_expr))
-        if one_shot:
-            out.append("        %s_fire = %s" % (cname, fire))
+        trig = pulse[0]
+        if len(pulse) > 1:
+            trig = cname + "_t"
+            out.append("        %s = %s" % (trig, " | ".join(pulse)))
+        out.append("        %s = self._latch(%r, bool(state & %d), %s, %s)" % (
+            cname, cont.name, 1 << (cont.states - 1), cont_expr, trig))
+        if one_shot[cont.name]:
+            # Todo evento de sensor faz o controller reenviar o resultado aos actuators.
+            out.append("        %s_fire = %s & %s" % (cname, cname, trig))
         if any(code[2] for _act, _owner, code in actuators):
             out.append("        %s_off = self._fall(%r, %s)" % (cname, cont.name, cname))
 
@@ -2489,6 +2667,12 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     if "self._near(" in body or "self._radar(" in body:
         actors = sorted(o.name for o in bpy.data.objects if o.game.use_actor)
         start_extra += "        self._actors = frozenset(%r)\n" % (actors,)
+    if "child=True" in body:
+        # Action com Child: acao propria de cada objeto (o que a engine le do objeto Blender do filho).
+        child_actions = {o.name: o.animation_data.action.name + (
+            " [%s]" % o.animation_data.action.library.name if o.animation_data.action.library else "")
+            for o in bpy.data.objects if o.animation_data and o.animation_data.action}
+        start_extra += "        self._child_actions = %r\n" % (child_actions,)
     if "self._track_parent(" in body:
         # Pai e orientacao local inicial dele (a engine guarda no carregamento), por dono do actuator.
         for own in sorted(set(re.findall(r"self\._track_parent\([^\n]*own=(\w+)\)", body))):
@@ -2512,6 +2696,40 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                         "first_update": "        self.update()\n" if component else "",
                         "extra": extra}
     return header + "\n" + body + "\n", converted, todos
+
+
+# Propriedade do objeto com os bricks que a conversao desativou: {objeto convertido: {tipo: [nomes]}}.
+_OFF_PROP = "logic_to_python_off"
+
+
+def _reactivate(ob):
+    """Reativa os bricks que uma conversao anterior de ob desativou, para converter de novo."""
+    found = False
+    for o in bpy.data.objects:
+        record = o.get(_OFF_PROP)
+        if record is None or ob.name not in record:
+            continue
+        found = True
+        record = record.to_dict()
+        names = record.pop(ob.name)
+        for kind, bricks in (("s", o.game.sensors), ("c", o.game.controllers), ("a", o.game.actuators)):
+            for b in bricks:
+                if b.name in names.get(kind, ()):
+                    b.active = True
+        if record:
+            o[_OFF_PROP] = record
+        else:
+            del o[_OFF_PROP]
+    conts = [c for c in ob.game.controllers if not c.name.startswith("LC_state_")]
+    if not found and conts and not any(c.active for c in conts):
+        # Convertido antes de existir o registro: todos os controllers estao desativados.
+        for c in conts:
+            c.active = True
+            for a in c.actuators:
+                a.active = True
+        for s in (s for o in bpy.data.objects for s in o.game.sensors):
+            if any(_owns(conts, c) for c in s.controllers):
+                s.active = True
 
 
 def _class_name(obname):
@@ -2561,6 +2779,7 @@ class LOGIC_OT_convert_to_component(Operator):
         classname = _class_name(ob.name)
 
         component = self.mode == 'COMPONENT'
+        _reactivate(ob)
         code, converted, todos = convert_object(ob, classname, component)
         if not converted:
             self.report({'WARNING'}, "Nenhum controller suportado; nada convertido")
@@ -2582,6 +2801,8 @@ class LOGIC_OT_convert_to_component(Operator):
                 return {'CANCELLED'}
 
         if self.disable_originals:
+            was_on = {(o.name, kind, b.name) for o in bpy.data.objects for kind, bricks in (
+                ("s", o.game.sensors), ("c", o.game.controllers), ("a", o.game.actuators)) for b in bricks if b.active}
             for cont in converted:
                 cont.active = False
             # Sensor/actuator so e desativado se todos os controllers ligados foram convertidos;
@@ -2595,6 +2816,16 @@ class LOGIC_OT_convert_to_component(Operator):
                 links = [c for c in all_conts if _owns(c.actuators, a)]
                 if (links and all(_owns(converted, c) for c in links)) or (not links and _owns(ob.game.actuators, a)):
                     a.active = False
+            # Guarda o que esta conversao desativou: converter de novo reativa so esses bricks.
+            for o in bpy.data.objects:
+                off = {kind: [b.name for b in bricks if not b.active and (o.name, kind, b.name) in was_on]
+                       for kind, bricks in (("s", o.game.sensors), ("c", o.game.controllers),
+                                            ("a", o.game.actuators))}
+                if any(off.values()):
+                    record = o.get(_OFF_PROP)
+                    record = record.to_dict() if record is not None else {}
+                    record[ob.name] = {kind: names for kind, names in off.items() if names}
+                    o[_OFF_PROP] = record
 
         msg = "%d controller(s) convertido(s) em %s" % (len(converted), filename)
         if todos:

@@ -11,7 +11,19 @@ import importlib.util
 import os
 import sys
 import types
-from types import SimpleNamespace as NS
+from types import SimpleNamespace
+
+
+class NS(SimpleNamespace):
+    # Padroes dos bricks falsos: flags comuns que o conversor le em todo sensor/controller/actuator.
+    active = True
+    use_tap = False
+    use_dt = False
+    tick_skip_dt = 0.0
+    use_pulse_false_level = False
+    use_all_events = False
+
+
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +96,7 @@ calls = []
 rt = types.ModuleType("Range")
 rt.logic = NS(getFrameTime=lambda: 0.0, deltaTime=lambda: 1 / 60.0, keyboard=NS(inputs={}), mouse=NS(inputs={}))
 rt.events = NS()
+rt.render = NS()
 rt.types = NS(KX_PythonComponent=object)
 sys.modules["Range"] = rt
 sys.modules["mathutils"] = NS(Matrix=object, Vector=object)

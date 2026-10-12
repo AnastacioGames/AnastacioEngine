@@ -398,8 +398,15 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   Property Level e Runtime API, Mouse Over com material/x-ray; Weather Effects ganhou Fog/Clouds - Volumetric. Geração validada em
   background e em jogo (`tools/create_logic_convert_scene_f7.py`: 240/240 valores iguais no modo Component, no mesmo quadro;
   ver changelog). Falta o teste do usuário num jogo real e os bricks sem cobertura em jogo (Vibration, Screenshot, Load Config).
-- Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
-  Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
+- F8-F10 (2026-10-12): disparo dos controllers igual ao da engine (evento por sensor, Tap em todo sensor, pulso False Level,
+  Skip, Delta Time, Level), bricks desativados ficam de fora, Action com Child, Character com VR Gaze, Add Object de propriedade,
+  Property Assign de texto. Cenas `create_logic_convert_scene_f8.py`, `_f9`, `_f10` e `_steering`, todas iguais aos bricks
+  (ver changelog). Nenhum caso conhecido fica como brick além do controller Python.
+- Lacunas conhecidas do conversor: `use_pulse` do Collision e do Mouse Over, Track To com alvo de propriedade, `log`/`target`
+  do Keyboard, `use_priority`, Random com Delta Time. No brick Weather Effects: `IFACE_()` nos rótulos fixos de
+  `logic_window.c` e trocar o rótulo "Edge" da neblina por "Edge Softness".
+- Pendente: usuário testar no editor com um objeto real lotado de bricks; no modo Module/Script outro controller Python
+  que leia o objeto no mesmo quadro vê a mudança um quadro antes do que veria com bricks; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.
 
 ### Android / iOS

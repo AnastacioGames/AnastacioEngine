@@ -13,7 +13,19 @@ import importlib.util
 import os
 import sys
 import types
-from types import SimpleNamespace as NS
+from types import SimpleNamespace
+
+
+class NS(SimpleNamespace):
+    # Padroes dos bricks falsos: flags comuns que o conversor le em todo sensor/controller/actuator.
+    active = True
+    use_tap = False
+    use_dt = False
+    tick_skip_dt = 0.0
+    use_pulse_false_level = False
+    use_all_events = False
+
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(HERE, "..", "source", "release", "scripts", "startup", "bl_operators", "logic_to_python.py")
@@ -75,7 +87,7 @@ hit = sensor(obs["Bumper"], 'COLLISION', "Hit", use_material=False, property="",
 near = sensor(obs["Sentry"], 'NEAR', "Close", property="intruder", distance=5.0, reset_distance=6.0)
 radar = sensor(obs["Radar"], 'RADAR', "Cone", property="intruder", axis='YAXIS', angle=90.0, distance=10.0)
 moving = sensor(obs["Mover"], 'MOVEMENT', "Moving", axis='XAXIS', threshold=0.001, use_local=False)
-wait = sensor(driver, 'DELAY', "Wait", delay=1, duration=0, use_repeat=False, repeat_times=0, use_deltatime=True)
+wait = sensor(driver, 'DELAY', "Wait", delay=1, delay_time=1.0, duration_time=0.0, duration=0, use_repeat=False, repeat_times=0, use_deltatime=True)
 tick = sensor(driver, 'ALWAYS', "Tick", use_pulse_true_level=True)
 
 aim = brick(obs["Turret"], "actuators", 'EDIT_OBJECT', "Aim", mode='TRACKTO', object=obs["Target"],
@@ -186,6 +198,7 @@ rt = types.ModuleType("Range")
 rt.logic = NS(getFrameTime=lambda: 0.0, deltaTime=lambda: 1 / 60.0, keyboard=NS(inputs={}), mouse=NS(inputs={}),
               expandPath=lambda p: p, getMessages=lambda *a: [])
 rt.events = NS()
+rt.render = NS()
 rt.types = NS(KX_PythonComponent=object)
 sys.modules["Range"] = rt
 sys.modules["mathutils"] = NS(Matrix=object, Vector=object)

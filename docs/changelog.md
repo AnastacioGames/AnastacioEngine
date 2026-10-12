@@ -6,6 +6,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Logic Bricks → Python: disparo dos controllers como na engine, casos que faltavam e traduções
+
+- **Quando o controller dispara.** O código convertido agora segue `SCA_ISensor::Activate`: cada sensor gera um evento quando muda de valor ou por pulso repetido, e o controller só reavalia e reenvia o resultado aos actuators em quadro com evento de algum sensor dele. Antes o controller disparava só na própria subida ou no pulso True Level. Consequências:
+  - controller que continua positivo dispara de novo quando outro sensor dele muda (ex.: Or de duas teclas com Property Add);
+  - sensor que já começa positivo sem gerar evento (Delay ou Always com Invert, controller Nand/Nor parado) não dispara no 1º quadro;
+  - **Tap** vale para todos os sensores (antes só Keyboard e Mouse), inclusive combinado com pulso True Level;
+  - **pulso False Level** é lido; o **Skip** conta a partir da última mudança do sensor (antes saía em 1, 2, 5, 8 em vez de 1, 4, 7) e é do sensor, não de cada controller ligado nele;
+  - **Delta Time** do pulso (`use_dt` / `tick_skip_dt`) é lido; **Level** dispara o controller que acabou de entrar no estado; Joystick com All Events dispara todo quadro enquanto positivo.
+- **Bricks desativados** (sensor, controller ou actuator) não entram mais no código convertido, como a engine, que nem cria esses bricks. Para converter de novo, o operador guarda na propriedade `logic_to_python_off` do objeto quais bricks ele mesmo desativou e reativa só esses antes de converter. Objeto convertido antes deste registro (todos os controllers desativados) é reativado inteiro.
+- **Casos que ficavam como brick e agora convertem:** Action com **Child** (os filhos tocam a própria ação; o mapa objeto → ação é gravado no `start()`), Motion Character com **VR Gaze** (`cam.gazeDirection`) e Add Object com o objeto vindo de **propriedade** (do objeto ou do World; tenta `scene.convertObject` no Load Mode On Demand).
+- Correções achadas pelas cenas novas:
+  - Add Object: Linear Velocity vira `applyForce`, como `InstantAddObject` (antes `setLinearVelocity`; num corpo dinâmico dava vx 2,98 contra 0,05 dos bricks);
+  - Property Assign em propriedade de **texto**: o valor é expressão, então `"abc"` grava abc, inteiro grava o texto dele e nome de propriedade copia o valor; texto sem aspas que não é propriedade fica como brick;
+  - Steering: retomada depois do Self Terminate, orientação inicial do pai usada pelo Facing e corpo com dinâmica suspensa. `acceleration` e `turn_speed` só são usados pela engine com simulação de obstáculos, que o conversor já recusa;
+  - Action: repete as recusas de `BL_Action::Play` (camada ocupada por prioridade maior ou pela mesma ação); sensor Armature com Invert e constraint inexistente; Game Save/Load Config com campos vazios usa o padrão da engine.
+- Traduções (pt-BR, es, ru) dos rótulos e dicas do brick Weather Effects: 73 do Fog/Clouds - Volumetric e 53 mais antigos (chuva, respingos, aura, raio, terremoto). Cinco rótulos fixos de `logic_window.c` estão no dicionário mas seguem em inglês até ganharem `IFACE_()` no C; o rótulo "Edge" da neblina cai na tradução de aresta de malha.
+- Testes de geração: `test_logic_convert_f5_codegen.py` e `_f6_` estavam quebrados desde a F7 (faltava `render` no módulo falso e `delay_time` no sensor); corrigidos, e os bricks falsos ganharam os padrões das flags comuns.
+- Validado em jogo, bricks × convertido (Component), `LEFT_AS_BRICK 0` em todas:
+  - `create_logic_convert_scene_f8.py` (Child, VR Gaze, Add Object de propriedade): 281 de 281; um valor de ação de filho oscila de uma rodada para outra até entre duas rodadas de bricks;
+  - `create_logic_convert_scene_f9.py` (Action com Blendin, camadas e conflito de prioridade; sensor Armature nos 5 testes com IK; Save/Load Config; Screenshot; Filter 2D): 1155 de 1155. Do Screenshot e do Motion Blur só se confere que rodam e que o arquivo é criado;
+  - `create_logic_convert_scene_f10.py` (regra de disparo acima, bricks desativados, Assign de texto): 301 de 301, também no modo Module e convertendo duas vezes seguidas (`twice`);
+  - `create_logic_convert_scene_steering.py` (22 objetos): 1101 de 1101;
+  - regressão: F7 241 de 241, F6 igual, base e F5 iguais a menos de um `-0.00` contra `0.00` que já existia. O Mouse Look da F5 depende do mouse real e não é comparável com o mouse em uso.
+- Lacunas conhecidas (auditoria das propriedades de todos os bricks): `use_pulse` do Collision e do Mouse Over (re-disparo ao trocar de objeto), Track To com alvo vindo de propriedade, `log`/`target` do sensor Keyboard, `use_priority` dos controllers, Random com Delta Time, navmesh refeito em jogo no Steering.
+
 ## 2026-10-12 - Logic Bricks → Python: bricks que faltavam e Weather Effects volumétrico
 
 - Conversor (`bl_operators/logic_to_python.py`) passa a converter: atuador **Action** (Play, Ping Pong, Flipper, Loop Stop, Loop End, Property; mesmo fluxo de `BL_ActionActuator::Update` por cima de `playAction`), sensor e atuador **Armature**, **Filter 2D**, **Vibration**, Motion **Servo Control**, **Character Motion** e **Set Position**, Edit Object **Change Color**, Game **Save/Load Config** e **Screenshot**, Property **Level** e **Runtime API** (sensor e atuador), e **Mouse Over** com material, x-ray e máscara.

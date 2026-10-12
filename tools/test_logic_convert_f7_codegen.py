@@ -1,6 +1,7 @@
 # Teste de geracao (F7) do conversor Logic Bricks -> Python: Action, Armature, Filter 2D, Vibration,
 # Motion Servo/Character/Set Position, Change Color, Game Save/Load/Screenshot, Property Level/Runtime API,
-# Mouse Over com material/x-ray e Weather Effects volumetrico. Converte e compila o codigo gerado; nao roda o jogo.
+# Mouse Over com material/x-ray, Weather Effects volumetrico e os casos da F8 (Action Child, Character VR Gaze,
+# Add Object From Property). Converte e compila o codigo gerado; nao roda o jogo.
 # Uso: GEN_OUT=<prefixo> AnastacioEngine.exe -b --factory-startup --python tools/test_logic_convert_f7_codegen.py
 # Saida: <prefixo>.txt (resumo) e <prefixo>_<objeto>.py (codigo gerado).
 import bpy, os, traceback
@@ -56,6 +57,13 @@ for tt in ('STATECHG','LINERRORBELOW','ROTERRORABOVE'):
 for m in ('ENABLE','DISABLE','SETTARGET','SETWEIGHT','SETINFLUENCE'):
     wire(arm, 'ALWAYS', {}, 'ARMATURE', dict(mode=m, bone='B', constraint='IK', target=alvo))
 wire(arm, 'ALWAYS', {}, 'ACTION', dict(action=act))
+# F8: Action com Child, Character com VR Gaze e Add Object com o nome vindo de propriedade (objeto e World)
+filho = mk('filho'); filho.parent = ob; filho.animation_data_create().action = bpy.data.actions.new('Girar')
+for pm in ('PLAY','PINGPONG','FLIPPER','LOOPSTOP','LOOPEND','PROPERTY'):
+    wire(ob, 'ALWAYS', {}, 'ACTION', dict(action=act, play_mode=pm, frame_end=20, property='p', use_children=True))
+wire(ob, 'ALWAYS', {}, 'MOTION', dict(mode='OBJECT_CHARACTER', offset_location=(0,.1,0), use_vr_gaze=True))
+wire(ob, 'ALWAYS', {}, 'EDIT_OBJECT', dict(mode='ADDOBJECT', use_object_from_property=True, object_property='qual', linear_velocity=(1,0,0)))
+wire(ob, 'ALWAYS', {}, 'EDIT_OBJECT', dict(mode='ADDOBJECT', use_object_from_property=True, use_global_object_property=True, object_property='qual', time=30))
 # links de outro objeto: sensor do alvo dispara actuators do heroi
 sc.objects.active = alvo
 bpy.ops.logic.sensor_add(type='ALWAYS', name='fs', object=alvo.name); bpy.ops.logic.controller_add(type='LOGIC_AND', name='fc', object=alvo.name)
@@ -67,6 +75,9 @@ for o in (ob, arm, alvo):
         compile(code, o.name, 'exec')
         out.append('%s: %d de %d controllers convertidos, codigo compila (%d linhas)' % (o.name, len(conv), len(o.game.controllers), code.count('\n')))
         out += ['   TODO ' + t for t in todos]
+        if o is ob:
+            for need in ('child=True', "self._child_actions = {'filho': 'Girar'}", 'gaze=True', 'def _vr_offset(', 'scene.convertObject(_n)', 'scene.world['):
+                out.append('   F8 %s: %s' % (need, 'ok' if need in code else 'FALTA'))
         open(os.environ['GEN_OUT'] + '_' + o.name + '.py', 'w', encoding='utf-8').write(code)
     except Exception:
         out.append('%s: ERRO\n%s' % (o.name, traceback.format_exc()))
