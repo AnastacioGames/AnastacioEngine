@@ -4,8 +4,8 @@ Change Color, Property Level e Runtime API, Armature, Filter 2D, Mouse Over, Gam
 Run with:  AnastacioEngine -b --python tools/create_logic_convert_scene_f7.py -- <output.range> [convert[:MODULE|SCRIPT] [shift]]
 Cada objeto de teste tem os proprios bricks; com "convert" todos sao convertidos. Rodar o .range sem e com
 "convert" no AnastacioRuntime grava <cena>_check_f7.txt ao lado do .range: uma linha por amostra (a cada 20
-quadros, ate o quadro 200). LEFT_AS_BRICK deve ser 0. O codigo convertido age um quadro depois dos bricks;
-com "convert shift" as amostras atrasam um quadro e os dois arquivos devem ficar iguais.
+quadros, ate o quadro 200). As duas rodadas devem dar o mesmo arquivo, e LEFT_AS_BRICK deve ser 0.
+"shift[:N]" atrasa as amostras em N quadros (so para investigar diferencas de fase, ex.: modos MODULE/SCRIPT).
 """
 import bpy
 import sys
@@ -14,9 +14,7 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 output = argv[0] if argv else "logic_convert_f7.range"
 convert = len(argv) > 1 and argv[1].startswith("convert")
 mode = argv[1].split(":", 1)[1] if convert and ":" in argv[1] else "COMPONENT"
-# O codigo convertido roda um quadro depois dos bricks (o Checker le antes do update do componente);
-# "shift" atrasa as amostras da rodada convertida em um quadro para comparar os mesmos instantes.
-# Nos modos MODULE/SCRIPT e o contrario (o controller Python age antes do Checker ler): use "shift:-1".
+# Nos modos MODULE/SCRIPT o controller Python age antes do Checker ler: "shift:-1" alinha a logica.
 shift = 0
 if len(argv) > 2 and argv[2].startswith("shift"):
     shift = int(argv[2].split(":", 1)[1]) if ":" in argv[2] else 1
