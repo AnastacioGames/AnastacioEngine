@@ -92,6 +92,10 @@ private:
 	/// Fase N: runtime on/off, independent of the owning object's visibility. When false,
 	/// Update()/Draw() are no-ops -- no simulation step, no draw call.
 	bool m_enabled = true;
+	/// Simulate one lifetime before the first frame (smoke starts as a full column).
+	bool m_prewarm = false;
+	/// Re-stagger the ages over the real lifetime on the first Update (see Update).
+	bool m_restagger = true;
 
 	/// Fase M: mirrors RangeGPUParticleSettings.blend_mode (GPU_PARTICLE_BLEND_*). Only affects
 	/// the glBlendFunc used in Draw() -- no shader/uniform involved.
@@ -229,6 +233,7 @@ public:
 	/// GetVisible() -- both gates are checked before Update()/Draw() run).
 	bool GetEnabled() const { return m_enabled; }
 	void SetEnabled(bool v) { m_enabled = v; }
+	void SetPrewarm(bool v) { m_prewarm = v; }
 	void SetEmissionAngle(float v) { m_emissionAngle = v; }
 
 	/// Fase M: GPU_PARTICLE_BLEND_ALPHA (default) or GPU_PARTICLE_BLEND_ADDITIVE, see DNA_object_types.h.

@@ -48,6 +48,8 @@
 #include "BLI_string.h"
 #include "KX_Globals.h"
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -314,6 +316,27 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 {
 	if (!m_valid || !m_enabled) {
 		return;
+	}
+
+	// Create() staggered the ages over the default lifetime, before the object's settings were
+	// applied; stagger them again over the real one, else a longer lifetime emits in bursts
+	// (every particle respawning within the default lifetime, then nothing for the rest).
+	if (m_restagger && !m_static) {
+		m_restagger = false;
+		const std::vector<float> initial = BuildInitialPool(m_particleCount);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo[m_readIndex]);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, initial.size() * sizeof(float), initial.data());
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	// Pre-warm: run one lifetime at 30 steps/s before the first frame, so a smoke column is
+	// already up when the scene starts instead of growing for Lifetime seconds.
+	if (m_prewarm && !m_static) {
+		m_prewarm = false;
+		const int steps = std::min(600, (int)std::ceil(m_lifetime * 30.0f));
+		for (int i = 0; i < steps; ++i) {
+			Update(1.0f / 30.0f, worldOrigin);
+		}
 	}
 
 	m_simTime += deltaTime;

@@ -183,6 +183,7 @@ const char *updateVertexSource =
 // needing separate camera right/up uniforms (in view space those axes are always X/Y).
 const char *drawVertexSource =
 	"#version 130\n"
+	"#extension GL_ARB_draw_instanced : enable\n"
 	"in vec2 in_corner;\n"
 	"in vec3 in_particlePos;\n"
 	"in float in_particleAge;\n"
@@ -190,6 +191,8 @@ const char *drawVertexSource =
 	"out float v_alpha;\n"
 	"out float v_lifeFrac;\n"
 	"out vec3 v_viewPos;\n"
+	// Per particle random 0..1 (its slot, stable over its life) so looks can vary each sprite.
+	"out float v_seed;\n"
 	"uniform mat4 u_view;\n"
 	// Static (GPU_PARTICLE_EMIT_VERTICES) buffers store local positions placed by u_model and
 	// never age; simulated buffers are already in world space and get an identity u_model.
@@ -235,6 +238,11 @@ const char *drawVertexSource =
 	"	}\n"
 	"	v_uv = in_corner;\n"
 	"	v_lifeFrac = lifeFrac;\n"
+	"#ifdef GL_ARB_draw_instanced\n"
+	"	v_seed = fract(float(gl_InstanceIDARB) * 0.6180339 + 0.137);\n"
+	"#else\n"
+	"	v_seed = 0.5;\n"
+	"#endif\n"
 	// Fade in over the first 10% of life, fade out over the last 30% -- avoids a hard pop
 	// on respawn/death.
 	"	v_alpha = min(lifeFrac / 0.1, (1.0 - lifeFrac) / 0.3);\n"
@@ -254,6 +262,7 @@ const char *drawFragmentPreamble =
 	"in float v_lifeFrac;\n"
 	// Particle center in view space (camera at origin looking down -Z).
 	"in vec3 v_viewPos;\n"
+	"in float v_seed;\n"
 	"out vec4 fragColor;\n"
 	"uniform vec4 u_color;\n"
 	"uniform vec4 u_endColor;\n"
@@ -311,13 +320,26 @@ float noise(vec2 p) {
 	float d = hash21(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
+float fbm(vec2 p) {
+	return noise(p) * 0.5 + noise(p * 2.03 + 7.1) * 0.3 + noise(p * 4.1 + 3.3) * 0.2;
+}
+/* A billow: each sprite turned and shaped by its own seed, a round core with a lumpy edge that
+ * frays as it ages, lit as a ball from above (lighter top, shaded bottom). */
 void main() {
-	float d = length(v_uv) * 2.0;
-	float drift = noise(v_uv * 3.0 + u_time * 0.15) - 0.5;
-	float mask = smoothstep(1.0, 0.0, d + drift * 0.35);
-	vec3 rgb = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac);
-	float fadeByLife = (1.0 - v_lifeFrac) * 0.7;
-	float alpha = mask * v_alpha * fadeByLife * u_color.a;
+	float a = v_seed * 6.2831 + v_lifeFrac * 1.5 * (v_seed - 0.5);
+	vec2 uv = mat2(cos(a), -sin(a), sin(a), cos(a)) * (v_uv * 2.0);
+	float d = length(uv);
+	float n = fbm(uv * 1.6 + vec2(v_seed * 37.0, v_seed * 11.0) + v_lifeFrac * 0.6);
+	float shape = 1.0 - d + (n - 0.5) * (0.7 + 0.5 * v_lifeFrac);
+	float mask = smoothstep(0.0, 0.35, shape);
+	vec2 sv = v_uv * 2.0;
+	vec3 nrm = vec3(sv, sqrt(max(1.0 - dot(sv, sv), 0.0)));
+	float lit = mix(0.55, 1.08, clamp(0.5 + 0.5 * dot(nrm, normalize(vec3(0.25, 0.8, 0.5))), 0.0, 1.0));
+	lit *= mix(0.85, 1.0, n);
+	vec3 rgb = mix(u_color.rgb, u_endColor.rgb, v_lifeFrac) * lit;
+	/* Shows up right at the emitter (no gap above a chimney), fades over the last third. */
+	float fade = clamp(v_lifeFrac / 0.02, 0.0, 1.0) * clamp((1.0 - v_lifeFrac) / 0.35, 0.0, 1.0);
+	float alpha = mask * fade * u_color.a * mix(0.9, 0.35, v_lifeFrac);
 	if (alpha <= 0.001) { discard; }
 	fragColor = vec4(rgb, alpha);
 }

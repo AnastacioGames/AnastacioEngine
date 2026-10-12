@@ -872,6 +872,8 @@ void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> 
 	if (settings.particle_look != GPU_PARTICLE_LOOK_DEFAULT) {
 		bufferSlot->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(settings.particle_look));
 	}
+	// Smoke is a column that should already be standing when the scene starts.
+	bufferSlot->SetPrewarm(settings.particle_look == GPU_PARTICLE_LOOK_SMOKE);
 
 	if (settings.texture_path[0] != '\0') {
 		bufferSlot->LoadTextureFromPath(settings.texture_path);
