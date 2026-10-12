@@ -108,6 +108,16 @@ public:
 	/// RAS_ParticleBuffer::LoadFragShaderFromPath.
 	static PyObject *pyattr_get_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_fragment_shader(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+
+	/// Burst emission (GPU_PARTICLE_EMISSION_BURST) and air drag.
+	static PyObject *pyattr_get_burst_mode(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_burst_mode(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_burst_interval(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_burst_interval(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+
+	EXP_PYMETHOD_DOC_NOARGS(KX_ParticleSystem, burst);
 };
 
 #endif  // WITH_PYTHON

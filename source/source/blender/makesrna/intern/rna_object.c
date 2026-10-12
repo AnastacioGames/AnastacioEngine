@@ -2318,6 +2318,13 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static const EnumPropertyItem rna_enum_gpu_particle_emission_mode_items[] = {
+		{GPU_PARTICLE_EMISSION_CONTINUOUS, "CONTINUOUS", 0, "Continuous", "Each particle is born again as soon as it dies"},
+		{GPU_PARTICLE_EMISSION_BURST, "BURST", 0, "Burst",
+		 "The whole pool is born at once and stays dead until the next burst (explosions)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	srna = RNA_def_struct(brna, "RangeGPUParticleSettings", NULL);
 	RNA_def_struct_sdna(srna, "RangeGPUParticleSettings");
 	RNA_def_struct_nested(brna, srna, "Object");
@@ -2401,6 +2408,35 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "emit_from");
 	RNA_def_property_enum_items(prop, rna_enum_gpu_particle_emit_from_items);
 	RNA_def_property_ui_text(prop, "Emit From", "Where the particles come from");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "emission_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "emission_mode");
+	RNA_def_property_enum_items(prop, rna_enum_gpu_particle_emission_mode_items);
+	RNA_def_property_ui_text(prop, "Emission Mode", "Steady stream or the whole pool at once");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_burst_on_start", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "burst_flags", GPU_PARTICLE_BURST_ON_START);
+	RNA_def_property_ui_text(prop, "Burst on Start",
+	                          "Fire one burst as soon as the object enters the game "
+	                          "(e.g. an explosion effect added by an Explosive)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "burst_interval", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_range(prop, 0.0f, 3600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 30.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Repeat Every",
+	                          "Seconds between automatic bursts, 0 = only on start or from Python "
+	                          "(object.particles.burst())");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "drag", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Drag",
+	                          "Air resistance: how fast particles lose their speed (0 = none); "
+	                          "a fast burst with drag slows down like a fireball");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "use_vortex", PROP_BOOLEAN, PROP_NONE);
@@ -2940,6 +2976,26 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 3600.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 30.0f, 10, 2);
 	RNA_def_property_ui_text(prop, "Effect Life", "Seconds the effect object lives (0 = until removed by its own logic)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	static const EnumPropertyItem particle_size_items[] = {
+		{EXPLOSIVE_PARTICLES_SMALL, "SMALL", 0, "Small", "Grenade or small barrel, about 2 m wide"},
+		{EXPLOSIVE_PARTICLES_MEDIUM, "MEDIUM", 0, "Medium", "Gas cylinder or crate, about 4 m wide"},
+		{EXPLOSIVE_PARTICLES_LARGE, "LARGE", 0, "Large", "Car or fuel tank, about 8 m wide"},
+		{EXPLOSIVE_PARTICLES_HUGE, "HUGE", 0, "Huge", "Truck or building, about 14 m wide"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	prop = RNA_def_property(srna, "use_particle_explosion", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_PARTICLES);
+	RNA_def_property_ui_text(prop, "Particle Explosion",
+	                         "Built-in fireball, smoke and debris (GPU particles) at the blast, no Effect object needed");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "particle_size", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "particle_size");
+	RNA_def_property_enum_items(prop, particle_size_items);
+	RNA_def_property_ui_text(prop, "Explosion Size", "Preset size of the built-in particle explosion");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 

@@ -1375,6 +1375,8 @@ public:
 	/// Fase I.2: KX_ParticleSystem proxy wrapping this object's GPU particle buffer, or None
 	/// if use_gpu_particles is unset. Mirrors the removed KX_Scene::pyattr_get_particles.
 	static PyObject*	pyattr_get_particles(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	/// Same for the second "Mix GPU Particle System" emitter (None if use_gpu_particles_mix is unset).
+	static PyObject*	pyattr_get_particles_mix(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 	static PyObject*	pyattr_get_sensors(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_controllers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

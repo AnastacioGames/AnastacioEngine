@@ -858,6 +858,13 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	// called from NextFrame -- not here, since RenderCamera runs once per camera and would
 	// otherwise step the simulation multiple times per frame). Drawn as camera-facing
 	// billboards, one buffer per opted-in object (Fase I.2).
+	// Soft particles: snapshot the solid depth once for every emitter of this camera (the same
+	// blit Depth Transparency uses), so sprites fade where they meet the geometry.
+	unsigned int softDepthTex = 0;
+	if ((!scene->GetGpuParticleObjects().empty() || scene->HasParticleBlasts()) && offScreen && rasterizer->GetDrawingMode() == RAS_Rasterizer::RAS_TEXTURED) {
+		rasterizer->UpdateGlobalDepthTexture(offScreen, m_engine->GetCanvas());
+		softDepthTex = GPU_texture_opengl_bindcode(*GPU_texture_global_depth_ptr());
+	}
 	for (KX_GameObject *particleObj : scene->GetGpuParticleObjects()) {
 		// Fase N: mirrors the visibility gate in KX_Scene::UpdateGpuParticleEmitters -- an
 		// invisible emitter isn't simulated this frame, so its buffer holds stale positions.
@@ -869,15 +876,18 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		}
 		RAS_ParticleBuffer *particleBuffer = particleObj->GetParticleBuffer();
 		if (particleBuffer) {
-			particleBuffer->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
+			particleBuffer->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix(), softDepthTex);
 		}
 		// Fase Q: second "Mix" emitter, drawn right after the first so the two looks blend on
 		// the same object instead of one replacing the other.
 		RAS_ParticleBuffer *particleBufferMix = particleObj->GetParticleBufferMix();
 		if (particleBufferMix) {
-			particleBufferMix->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix());
+			particleBufferMix->Draw(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix(), softDepthTex);
 		}
 	}
+
+	// Explosive > Particle Explosion bursts.
+	scene->DrawParticleBlasts(rasterizer->GetViewMatrix(), rasterizer->GetProjectionMatrix(), softDepthTex);
 
 	// World > Rain > Aura: every live stroke of the scene in one draw call.
 	if (KX_RainAura *rainAura = scene->GetRainAura()) {

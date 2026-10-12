@@ -40,6 +40,7 @@
 #include "RAS_ParticleShaderCache.h"
 #include "mathfu.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -96,6 +97,15 @@ private:
 	bool m_prewarm = false;
 	/// Re-stagger the ages over the real lifetime on the first Update (see Update).
 	bool m_restagger = true;
+
+	/// Burst emission (GPU_PARTICLE_EMISSION_BURST): the pool starts dead and is born all at
+	/// once on the next Update after Burst(), and again every m_burstInterval seconds if > 0.
+	bool m_burstMode = false;
+	bool m_burstPending = false;
+	float m_burstInterval = 0.0f;
+	float m_burstTimer = 0.0f;
+	/// Velocity loss per second, exp(-drag * dt).
+	float m_drag = 0.0f;
 
 	/// Fase M: mirrors RangeGPUParticleSettings.blend_mode (GPU_PARTICLE_BLEND_*). Only affects
 	/// the glBlendFunc used in Draw() -- no shader/uniform involved.
@@ -178,7 +188,8 @@ public:
 
 	/// Draws the current particle set as camera-facing billboards (instanced quads, view-space
 	/// offset so the quad always faces the camera without needing separate right/up uniforms).
-	void Draw(const mt::mat4 &view, const mt::mat4 &projection);
+	/// softDepthTex: GL bindcode of the scene depth snapshot for soft particles, 0 = none.
+	void Draw(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex = 0);
 
 	bool Ok() const
 	{
@@ -234,6 +245,15 @@ public:
 	bool GetEnabled() const { return m_enabled; }
 	void SetEnabled(bool v) { m_enabled = v; }
 	void SetPrewarm(bool v) { m_prewarm = v; }
+
+	bool GetBurstMode() const { return m_burstMode; }
+	void SetBurstMode(bool v) { m_burstMode = v; }
+	float GetBurstInterval() const { return m_burstInterval; }
+	void SetBurstInterval(float v) { m_burstInterval = std::max(v, 0.0f); }
+	/// Asks for a burst on the next Update (ignored by continuous emitters).
+	void Burst() { m_burstPending = true; m_burstTimer = 0.0f; }
+	float GetDrag() const { return m_drag; }
+	void SetDrag(float v) { m_drag = std::max(v, 0.0f); }
 	void SetEmissionAngle(float v) { m_emissionAngle = v; }
 
 	/// Fase M: GPU_PARTICLE_BLEND_ALPHA (default) or GPU_PARTICLE_BLEND_ADDITIVE, see DNA_object_types.h.

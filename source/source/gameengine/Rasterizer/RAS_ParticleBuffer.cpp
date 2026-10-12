@@ -83,7 +83,8 @@ std::vector<float> RAS_ParticleBuffer::BuildInitialPool(unsigned int count) cons
 		p[3] = m_velocityBase[0];
 		p[4] = m_velocityBase[1];
 		p[5] = m_velocityBase[2];
-		p[6] = ((float)i / (float)count) * m_lifetime;
+		// A burst emitter starts with the whole pool dead, waiting for its first burst.
+		p[6] = m_burstMode ? m_lifetime : ((float)i / (float)count) * m_lifetime;
 	}
 	return initial;
 }
@@ -331,7 +332,7 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 
 	// Pre-warm: run one lifetime at 30 steps/s before the first frame, so a smoke column is
 	// already up when the scene starts instead of growing for Lifetime seconds.
-	if (m_prewarm && !m_static) {
+	if (m_prewarm && !m_static && !m_burstMode) {
 		m_prewarm = false;
 		const int steps = std::min(600, (int)std::ceil(m_lifetime * 30.0f));
 		for (int i = 0; i < steps; ++i) {
@@ -347,6 +348,19 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	}
 
 	const unsigned int writeIndex = 1 - m_readIndex;
+
+	bool burstNow = false;
+	if (m_burstMode) {
+		if (m_burstInterval > 0.0f) {
+			m_burstTimer += deltaTime;
+			if (m_burstTimer >= m_burstInterval) {
+				m_burstTimer = std::fmod(m_burstTimer, m_burstInterval);
+				m_burstPending = true;
+			}
+		}
+		burstNow = m_burstPending;
+		m_burstPending = false;
+	}
 
 	const float emitterPos[3] = {
 		worldOrigin[0] + m_emitterPos[0],
@@ -367,6 +381,9 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	glUniform3fv(m_shaderCache->GetVelocityBaseLoc(), 1, m_velocityBase);
 	glUniform3fv(m_shaderCache->GetEmissionDirLoc(), 1, m_emissionDir);
 	glUniform1f(m_shaderCache->GetEmissionAngleLoc(), m_emissionAngle);
+	glUniform1i(m_shaderCache->GetBurstModeLoc(), m_burstMode ? 1 : 0);
+	glUniform1i(m_shaderCache->GetBurstNowLoc(), burstNow ? 1 : 0);
+	glUniform1f(m_shaderCache->GetDragLoc(), m_drag);
 
 	glUniform1i(m_shaderCache->GetCollisionModeLoc(), (int)m_collisionMode);
 	glUniform1f(m_shaderCache->GetCollisionHeightLoc(), m_collisionHeight);
@@ -415,7 +432,7 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 	m_readIndex = writeIndex;
 }
 
-void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
+void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex)
 {
 	if (!m_valid || !m_enabled) {
 		return;
@@ -454,6 +471,18 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 		glBindTexture(GL_TEXTURE_2D, m_colorCurveTexture);
 		glUniform1i(m_shaderCache->GetDrawColorCurveTexLoc(), 2);
 	}
+	// Soft particles only with a perspective camera (ortho depth is already linear and rare
+	// here) and for simulated sprites -- road reflectors are tiny and sit on the geometry.
+	const float *proj = (const float *)projection.Data();
+	const bool soft = softDepthTex != 0 && !m_static && proj[15] == 0.0f;
+	glUniform1i(m_shaderCache->GetDrawSoftValidLoc(), soft ? 1 : 0);
+	if (soft) {
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, softDepthTex);
+		glUniform1i(m_shaderCache->GetDrawSoftDepthTexLoc(), 4);
+		glUniform2f(m_shaderCache->GetDrawProjZLoc(), proj[10], proj[14]);
+		glUniform1f(m_shaderCache->GetDrawSoftDistanceLoc(), std::max(0.05f, 0.35f * std::max(m_billboardSize, m_endSize)));
+	}
 	glActiveTexture(GL_TEXTURE0);
 
 	// Keep depth testing (occluded by scene geometry) but don't write depth, so overlapping
@@ -488,6 +517,11 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection)
 	GPU_set_material_alpha_blend(-1);
 	if (m_texture != 0) {
 		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	if (soft) {
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0);
 	}
 
 	glUseProgram(0);

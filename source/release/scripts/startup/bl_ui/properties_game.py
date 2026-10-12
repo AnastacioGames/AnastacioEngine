@@ -671,6 +671,10 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         sub.prop(es, "effect_life", text="Life")
         if game.use_explosive and es.effect is not None and es.effect.is_visible(context.scene):
             col.label(text="Move the Effect object to an inactive layer", icon='ERROR')
+        row = col.row()
+        row.prop(es, "use_particle_explosion")
+        if es.use_particle_explosion:
+            row.prop(es, "particle_size", text="")
 
 
 class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):

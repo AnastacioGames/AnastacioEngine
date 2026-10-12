@@ -272,6 +272,8 @@ static bool ApplyToBpy(const std::string &objectName, RAS_ParticleBuffer *buffer
 					TrySetAttr(gp, "vortex_rotation_speed", PyFloat_FromDouble(buffer->GetVortexRotationSpeed()));
 					TrySetAttr(gp, "vortex_radius_top", PyFloat_FromDouble(buffer->GetVortexRadiusTop()));
 					TrySetAttr(gp, "vortex_height", PyFloat_FromDouble(buffer->GetVortexHeight()));
+					TrySetAttr(gp, "drag", PyFloat_FromDouble(buffer->GetDrag()));
+					TrySetAttr(gp, "burst_interval", PyFloat_FromDouble(buffer->GetBurstInterval()));
 
 					applied = true;
 					Py_DECREF(gp);
@@ -351,6 +353,8 @@ static void WriteJsonSidecar(const std::string &objectName, RAS_ParticleBuffer *
 	cJSON_AddNumberToObject(entry, "vortex_rotation_speed", buffer->GetVortexRotationSpeed());
 	cJSON_AddNumberToObject(entry, "vortex_radius_top", buffer->GetVortexRadiusTop());
 	cJSON_AddNumberToObject(entry, "vortex_height", buffer->GetVortexHeight());
+	cJSON_AddNumberToObject(entry, "drag", buffer->GetDrag());
+	cJSON_AddNumberToObject(entry, "burst_interval", buffer->GetBurstInterval());
 
 	cJSON_AddItemToObject(root, objectName.c_str(), entry);
 

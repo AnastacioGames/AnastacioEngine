@@ -6,6 +6,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Explosão de partículas: modo Burst, Drag, partículas suaves e Explosive > Particle Explosion
+
+- GPU particles ganharam `emission_mode` (Continuous/Burst). No Burst o lote inteiro nasce de uma vez
+  e fica morto até a próxima rajada: `use_burst_on_start`, `burst_interval` (0 = só no início ou por
+  Python) e `particles.burst()`. Na rajada, a velocidade de cada partícula varia de 30 a 100% para encher
+  a esfera. Novo `drag` (perda de velocidade por segundo, `exp(-drag*dt)`). Python: `burstMode`,
+  `burstInterval`, `drag` e `obj.particlesMix` (segundo emissor).
+- Correção: objetos adicionados em jogo (Add Object / Effect do Explosive) não recriavam o emissor Mix.
+- Partículas suaves: o `main` de cada look (built-in ou custom) é embrulhado e o alpha some perto da
+  geometria, usando a mesma cópia de profundidade da Depth Transparency (blit uma vez por câmera
+  quando há emissores). Tira o corte reto onde os sprites cruzam o chão.
+- Look Smoke: a máscara zera antes da borda do quad (sprites grandes mostravam canto reto).
+- Physics > Explosive > **Particle Explosion** com **Explosion Size** (Small/Medium/Large/Huge, escala
+  0.5/1/2/3.5): bola de fogo + fumaça + estilhaços nativos no ponto da detonação, sem objeto Effect
+  (`KX_Scene::SpawnParticleExplosion`). Arquivos antigos: flag desligada.
+- Cenas: `tools/debug/cenas/criar_cena_explosao_particulas.py` (rajada repetida ou `--explosivo` com
+  Effect) e `criar_cena_explosao_tamanhos.py` (os 4 tamanhos). Conferido por capturas no Runtime.
+
 ## 2026-10-11 - Presets nativos de constraints e leitura do tutorial Blender 2.69
 
 - `Shift+A > Constraints` agora oferece Hinge, Limited Hinge (6DOF), Slider (6DOF), Ball Socket e Cone

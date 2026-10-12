@@ -64,10 +64,13 @@ private:
 
 	/// Fase K: optional curve-driven size/color over lifetime.
 	int m_drawUseSizeCurveLoc, m_drawSizeCurveTexLoc, m_drawUseColorCurveLoc, m_drawColorCurveTexLoc;
+	/// Soft particles: scene depth snapshot + projection terms to linearize it.
+	int m_drawSoftDepthTexLoc = -1, m_drawSoftValidLoc = -1, m_drawProjZLoc = -1, m_drawSoftDistanceLoc = -1;
 
 	int m_deltaTimeLoc, m_lifetimeLoc, m_emitterRadiusLoc, m_velocityRandomnessLoc;
 	int m_timeLoc, m_gravityLoc, m_emitterPosLoc, m_velocityBaseLoc;
 	int m_emissionDirLoc, m_emissionAngleLoc;
+	int m_burstModeLoc = -1, m_burstNowLoc = -1, m_dragLoc = -1;
 
 	/// Fase O: collision (Ground Plane / Screen-Space).
 	int m_collisionModeLoc, m_collisionHeightLoc, m_collisionBounceLoc, m_collisionFrictionLoc;
@@ -110,6 +113,10 @@ public:
 	int GetDrawSizeCurveTexLoc() const { return m_drawSizeCurveTexLoc; }
 	int GetDrawUseColorCurveLoc() const { return m_drawUseColorCurveLoc; }
 	int GetDrawColorCurveTexLoc() const { return m_drawColorCurveTexLoc; }
+	int GetDrawSoftDepthTexLoc() const { return m_drawSoftDepthTexLoc; }
+	int GetDrawSoftValidLoc() const { return m_drawSoftValidLoc; }
+	int GetDrawProjZLoc() const { return m_drawProjZLoc; }
+	int GetDrawSoftDistanceLoc() const { return m_drawSoftDistanceLoc; }
 
 	int GetDeltaTimeLoc() const { return m_deltaTimeLoc; }
 	int GetLifetimeLoc() const { return m_lifetimeLoc; }
@@ -121,6 +128,9 @@ public:
 	int GetVelocityBaseLoc() const { return m_velocityBaseLoc; }
 	int GetEmissionDirLoc() const { return m_emissionDirLoc; }
 	int GetEmissionAngleLoc() const { return m_emissionAngleLoc; }
+	int GetBurstModeLoc() const { return m_burstModeLoc; }
+	int GetBurstNowLoc() const { return m_burstNowLoc; }
+	int GetDragLoc() const { return m_dragLoc; }
 
 	int GetCollisionModeLoc() const { return m_collisionModeLoc; }
 	int GetCollisionHeightLoc() const { return m_collisionHeightLoc; }

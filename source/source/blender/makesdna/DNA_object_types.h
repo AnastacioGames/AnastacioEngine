@@ -249,7 +249,15 @@ typedef struct RangeGPUParticleSettings {
 	float vortex_rotation_speed;
 	float vortex_radius_top;
 	float vortex_height;
-	char pad4[4];
+	/* GPU_PARTICLE_EMISSION_*: CONTINUOUS respawns each particle when it dies; BURST keeps dead
+	 * particles dead and respawns the whole pool at once (explosions), on start (burst_flags &
+	 * GPU_PARTICLE_BURST_ON_START), every burst_interval seconds (0 = never) or from Python
+	 * (object.particles.burst()). Zero (old files) = CONTINUOUS. */
+	short emission_mode;
+	short burst_flags;
+	float burst_interval;
+	/* Air drag: the velocity loses this fraction per second (exp(-drag * t)), 0 = none. */
+	float drag;
 } RangeGPUParticleSettings;
 
 /* Native reverb area (opt-in on an Empty via gameflag2 & OB_REVERB_AREA). While the active camera
@@ -338,7 +346,8 @@ typedef struct RangeExplosiveSettings {
 	float impact_impulse;  /* summed contact appliedImpulse that detonates (impact / chain) */
 	float effect_life;     /* seconds the effect object lives */
 	int flags;             /* EXPLOSIVE_* */
-	int pad;
+	short particle_size;   /* EXPLOSIVE_PARTICLES_*: built-in fire/smoke/debris burst (EXPLOSIVE_PARTICLES) */
+	short pad;
 } RangeExplosiveSettings;
 
 /* RangeExplosiveSettings.flags */
@@ -346,6 +355,15 @@ enum {
 	EXPLOSIVE_OCCLUSION      = 1 << 0,
 	EXPLOSIVE_ON_IMPACT      = 1 << 1,
 	EXPLOSIVE_CHAIN_REACTION = 1 << 2,
+	EXPLOSIVE_PARTICLES      = 1 << 3,  /* GPU particle fireball + smoke + debris at the blast */
+};
+
+/* RangeExplosiveSettings.particle_size */
+enum {
+	EXPLOSIVE_PARTICLES_SMALL  = 0,
+	EXPLOSIVE_PARTICLES_MEDIUM = 1,
+	EXPLOSIVE_PARTICLES_LARGE  = 2,
+	EXPLOSIVE_PARTICLES_HUGE   = 3,
 };
 
 /* Native impact deformation (opt-in via gameflag2 & OB_DEFORMABLE): a hit stronger than
@@ -445,6 +463,17 @@ enum {
 enum {
 	GPU_PARTICLE_EMIT_VOLUME = 0,
 	GPU_PARTICLE_EMIT_VERTICES = 1,
+};
+
+/* RangeGPUParticleSettings.emission_mode */
+enum {
+	GPU_PARTICLE_EMISSION_CONTINUOUS = 0,
+	GPU_PARTICLE_EMISSION_BURST = 1,
+};
+
+/* RangeGPUParticleSettings.burst_flags */
+enum {
+	GPU_PARTICLE_BURST_ON_START = 1 << 0,
 };
 
 enum {

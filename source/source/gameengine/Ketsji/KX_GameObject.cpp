@@ -804,6 +804,9 @@ void KX_GameObject::ApplyGPUParticleParams(RAS_ParticleBuffer *buffer, const Ran
 	buffer->SetVortexRotationSpeed(settings.vortex_rotation_speed);
 	buffer->SetVortexRadiusTop(settings.vortex_radius_top);
 	buffer->SetVortexHeight(settings.vortex_height);
+	buffer->SetBurstMode(settings.emission_mode == GPU_PARTICLE_EMISSION_BURST);
+	buffer->SetBurstInterval(settings.burst_interval);
+	buffer->SetDrag(settings.drag);
 }
 
 void KX_GameObject::ApplyGPUParticlesLive(const RangeGPUParticleSettings &oldSettings, const RangeGPUParticleSettings &settings, bool mix)
@@ -875,6 +878,9 @@ void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> 
 	// Smoke and fire should already be burning when the scene starts.
 	bufferSlot->SetPrewarm(settings.particle_look == GPU_PARTICLE_LOOK_SMOKE ||
 	                       settings.particle_look == GPU_PARTICLE_LOOK_FIRE);
+	if (settings.emission_mode == GPU_PARTICLE_EMISSION_BURST && (settings.burst_flags & GPU_PARTICLE_BURST_ON_START)) {
+		bufferSlot->Burst();
+	}
 
 	if (settings.texture_path[0] != '\0') {
 		bufferSlot->LoadTextureFromPath(settings.texture_path);
@@ -3401,6 +3407,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("controllers",  KX_GameObject, pyattr_get_controllers),
 	EXP_PYATTRIBUTE_RO_FUNCTION("actuators",        KX_GameObject, pyattr_get_actuators),
 	EXP_PYATTRIBUTE_RO_FUNCTION("particles", KX_GameObject, pyattr_get_particles),
+	EXP_PYATTRIBUTE_RO_FUNCTION("particlesMix", KX_GameObject, pyattr_get_particles_mix),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
 
@@ -5162,6 +5169,18 @@ PyObject *KX_GameObject::pyattr_get_particles(EXP_PyObjectPlus *self_v, const EX
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 	RAS_ParticleBuffer *buffer = self->GetParticleBuffer();
+
+	if (!buffer) {
+		Py_RETURN_NONE;
+	}
+
+	return (new KX_ParticleSystem(buffer))->NewProxy(true);
+}
+
+PyObject *KX_GameObject::pyattr_get_particles_mix(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
+	RAS_ParticleBuffer *buffer = self->GetParticleBufferMix();
 
 	if (!buffer) {
 		Py_RETURN_NONE;

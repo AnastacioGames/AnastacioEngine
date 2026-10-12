@@ -76,6 +76,7 @@ class KX_Camera;
 class KX_RainAura;
 class KX_RainSurfaceMask;
 class KX_RainLightning;
+struct KX_ParticleBlast;
 class KX_FontObject;
 class KX_Speaker;
 class KX_GameObject;
@@ -156,6 +157,8 @@ private:
 	/// cached so UpdateGpuParticleEmitters/RenderCamera don't need to scan every object
 	/// every frame. Not exposed to Python -- mirrors the m_animatedlist pattern.
 	std::vector<KX_GameObject *> m_gpuParticleObjects;
+	/// Explosive > Particle Explosion: live fireball/smoke/debris bursts, not tied to any object.
+	std::vector<std::unique_ptr<KX_ParticleBlast>> m_particleBlasts;
 
 	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
 	std::unique_ptr<KX_RainAura> m_rainAura;
@@ -638,6 +641,11 @@ public:
 	void AddGpuParticleObject(KX_GameObject *gameobj);
 	void RemoveGpuParticleObject(KX_GameObject *gameobj);
 	const std::vector<KX_GameObject *> &GetGpuParticleObjects() const;
+	/// Explosive > Particle Explosion: a built-in GPU particle blast at a world position, sized by
+	/// EXPLOSIVE_PARTICLES_* (DNA_object_types.h). Stepped with the emitters, freed when it ends.
+	void SpawnParticleExplosion(const mt::vec3 &position, int size);
+	void DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex);
+	bool HasParticleBlasts() const { return !m_particleBlasts.empty(); }
 
 	/// Same as AddGpuParticleObject/RemoveGpuParticleObject/GetGpuParticleObjects, but for
 	/// objects flagged use_gpu_particle_collider (Screen-Space collision depth pass).

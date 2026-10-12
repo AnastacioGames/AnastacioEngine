@@ -137,6 +137,78 @@ extern "C" {
 
 #include "CM_Message.h"
 #include "CM_List.h"
+#include "RAS_ParticleBuffer.h"
+
+/// Explosive > Particle Explosion: one fireball, smoke and debris burst at a world position.
+struct KX_ParticleBlast {
+	std::unique_ptr<RAS_ParticleBuffer> buffers[3];
+	mt::vec3 position;
+	float age = 0.0f;
+	float life = 0.0f;
+};
+
+namespace {
+
+/// One layer of the built-in explosion at size 1 (Medium); KX_MakeBlastLayer scales it.
+struct KX_BlastLayer {
+	int look;
+	int count;
+	float life;
+	float radius;
+	float speed;    // burst speed (velocity randomness)
+	float up;       // extra upward speed
+	float drag;
+	float gravity;  // Z, a positive lift grows with the size, a fall does not
+	float size, endSize;
+	float color[4], endColor[4];
+	short blend;
+};
+
+const KX_BlastLayer kBlastLayers[3] = {
+	// Fireball: fast white-hot puffs slowed by drag, rising and cooling to red.
+	{GPU_PARTICLE_LOOK_FIRE, 160, 1.1f, 0.4f, 9.0f, 1.0f, 4.5f, 2.0f, 1.4f, 2.6f,
+	 {1.0f, 1.0f, 1.0f, 0.7f}, {1.0f, 1.0f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+	// Smoke: dark billows pushed out with the blast, then drifting up and thinning.
+	{GPU_PARTICLE_LOOK_SMOKE, 120, 4.5f, 0.5f, 6.0f, 0.8f, 2.5f, 0.5f, 1.2f, 4.5f,
+	 {0.18f, 0.16f, 0.15f, 0.75f}, {0.4f, 0.39f, 0.38f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+	// Debris sparks thrown far and falling.
+	{GPU_PARTICLE_LOOK_SPARKLE, 220, 1.8f, 0.3f, 14.0f, 3.0f, 0.8f, -9.8f, 0.09f, 0.03f,
+	 {1.0f, 0.75f, 0.3f, 1.0f}, {1.0f, 0.25f, 0.05f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+};
+
+std::unique_ptr<RAS_ParticleBuffer> KX_MakeBlastLayer(const KX_BlastLayer &layer, float scale)
+{
+	const unsigned int count = (unsigned int)(layer.count * (0.6f + 0.4f * scale));
+	std::unique_ptr<RAS_ParticleBuffer> buffer(new RAS_ParticleBuffer(count));
+	if (!buffer->Create()) {
+		return nullptr;
+	}
+	const float zero[3] = {0.0f, 0.0f, 0.0f};
+	const float up[3] = {0.0f, 0.0f, 1.0f};
+	const float velocity[3] = {0.0f, 0.0f, layer.up * scale};
+	const float gravity[3] = {0.0f, 0.0f, layer.gravity > 0.0f ? layer.gravity * scale : layer.gravity};
+	buffer->SetEmitterPos(zero);
+	buffer->SetEmitterRadius(layer.radius * scale);
+	buffer->SetVelocityBase(velocity);
+	buffer->SetVelocityRandomness(layer.speed * scale);
+	buffer->SetEmissionDirection(up);
+	buffer->SetEmissionAngle(179.9f);  // whole sphere
+	buffer->SetDrag(layer.drag);
+	buffer->SetGravity(gravity);
+	buffer->SetLifetime(layer.life * (0.75f + 0.25f * scale));
+	buffer->SetBillboardSize(layer.size * scale);
+	buffer->SetEndSize(layer.endSize * scale);
+	buffer->SetColor(layer.color);
+	buffer->SetEndColor(layer.endColor);
+	buffer->SetBlendMode(layer.blend);
+	buffer->SetBillboardMode(GPU_PARTICLE_BILLBOARD_CAMERA_FACING);
+	buffer->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(layer.look));
+	buffer->SetBurstMode(true);
+	buffer->Burst();
+	return buffer;
+}
+
+} // namespace
 
 /* Volumetric Fog raymarch resolution divisor from World vfog_lod (0 Half, 1 Full, 2 Quarter). */
 static int KX_VFogLodDivisor(const World *world)
@@ -1092,6 +1164,12 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	if (newblenderobj && (newblenderobj->gameflag2 & OB_GPU_PARTICLES)) {
 		newobj->SetupGPUParticles(newblenderobj->gpu_particles);
 		AddGpuParticleObject(newobj);
+	}
+	if (newblenderobj && (newblenderobj->gameflag2 & OB_GPU_PARTICLES_MIX)) {
+		newobj->SetupGPUParticlesMix(newblenderobj->gpu_particles_mix);
+		if (!(newblenderobj->gameflag2 & OB_GPU_PARTICLES)) {
+			AddGpuParticleObject(newobj);
+		}
 	}
 	if (newblenderobj && (newblenderobj->gameflag2 & OB_GPU_PARTICLE_COLLIDER)) {
 		AddGpuParticleColliderObject(newobj);
@@ -2758,6 +2836,45 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 		if (gameobj->GetVisible() && (!gameobj->GetCullingNode().GetCulled() || gameobj->HasStaticParticles() ||
 		                              gameobj->GetMeshList().empty())) {
 			gameobj->UpdateParticles(deltaTime);
+		}
+	}
+
+	for (std::unique_ptr<KX_ParticleBlast> &blast : m_particleBlasts) {
+		blast->age += deltaTime;
+		for (std::unique_ptr<RAS_ParticleBuffer> &buffer : blast->buffers) {
+			if (buffer) {
+				buffer->Update(deltaTime, blast->position);
+			}
+		}
+	}
+	m_particleBlasts.erase(std::remove_if(m_particleBlasts.begin(), m_particleBlasts.end(),
+	                                      [](const std::unique_ptr<KX_ParticleBlast> &blast) { return blast->age > blast->life; }),
+	                       m_particleBlasts.end());
+}
+
+void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, int size)
+{
+	static const float kScales[4] = {0.5f, 1.0f, 2.0f, 3.5f};
+	const float scale = kScales[std::max(0, std::min(3, size))];
+
+	std::unique_ptr<KX_ParticleBlast> blast(new KX_ParticleBlast());
+	blast->position = position;
+	for (int i = 0; i < 3; ++i) {
+		blast->buffers[i] = KX_MakeBlastLayer(kBlastLayers[i], scale);
+		if (blast->buffers[i]) {
+			blast->life = std::max(blast->life, blast->buffers[i]->GetLifetime());
+		}
+	}
+	m_particleBlasts.push_back(std::move(blast));
+}
+
+void KX_Scene::DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex)
+{
+	for (std::unique_ptr<KX_ParticleBlast> &blast : m_particleBlasts) {
+		for (std::unique_ptr<RAS_ParticleBuffer> &buffer : blast->buffers) {
+			if (buffer) {
+				buffer->Draw(view, projection, softDepthTex);
+			}
 		}
 	}
 }

@@ -71,6 +71,7 @@ PyTypeObject KX_ParticleSystem::Type = {
 };
 
 PyMethodDef KX_ParticleSystem::Methods[] = {
+	EXP_PYMETHODTABLE_NOARGS(KX_ParticleSystem, burst),
 	{nullptr, nullptr} // Sentinel
 };
 
@@ -96,8 +97,68 @@ PyAttributeDef KX_ParticleSystem::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("collisionBounce", KX_ParticleSystem, pyattr_get_collision_bounce, pyattr_set_collision_bounce),
 	EXP_PYATTRIBUTE_RW_FUNCTION("collisionFriction", KX_ParticleSystem, pyattr_get_collision_friction, pyattr_set_collision_friction),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fragmentShaderPath", KX_ParticleSystem, pyattr_get_fragment_shader, pyattr_set_fragment_shader),
+	EXP_PYATTRIBUTE_RW_FUNCTION("burstMode", KX_ParticleSystem, pyattr_get_burst_mode, pyattr_set_burst_mode),
+	EXP_PYATTRIBUTE_RW_FUNCTION("burstInterval", KX_ParticleSystem, pyattr_get_burst_interval, pyattr_set_burst_interval),
+	EXP_PYATTRIBUTE_RW_FUNCTION("drag", KX_ParticleSystem, pyattr_get_drag, pyattr_set_drag),
 	EXP_PYATTRIBUTE_NULL // Sentinel
 };
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_ParticleSystem, burst, "burst(): Births the whole particle pool at once on the next frame (burstMode emitters only).\n")
+{
+	m_buffer->Burst();
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_ParticleSystem::pyattr_get_burst_mode(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	return PyBool_FromLong(self->m_buffer->GetBurstMode());
+}
+
+int KX_ParticleSystem::pyattr_set_burst_mode(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	int v = PyObject_IsTrue(value);
+	if (v == -1) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_buffer->SetBurstMode(v != 0);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_ParticleSystem::pyattr_get_burst_interval(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	return PyFloat_FromDouble(self->m_buffer->GetBurstInterval());
+}
+
+int KX_ParticleSystem::pyattr_set_burst_interval(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	const double v = PyFloat_AsDouble(value);
+	if (v == -1.0 && PyErr_Occurred()) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_buffer->SetBurstInterval((float)v);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_ParticleSystem::pyattr_get_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	return PyFloat_FromDouble(self->m_buffer->GetDrag());
+}
+
+int KX_ParticleSystem::pyattr_set_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	const double v = PyFloat_AsDouble(value);
+	if (v == -1.0 && PyErr_Occurred()) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_buffer->SetDrag((float)v);
+	return PY_SET_ATTR_SUCCESS;
+}
 
 PyObject *KX_ParticleSystem::pyattr_get_enabled(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {

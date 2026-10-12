@@ -304,6 +304,10 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             box = col.box()
             box.label(text="Emission:", icon="PLAY")
             box.prop(gp, "enabled", text="Emit at Game Start")
+            box.prop(gp, "emission_mode", text="")
+            if gp.emission_mode == 'BURST':
+                box.prop(gp, "use_burst_on_start")
+                box.prop(gp, "burst_interval")
 
             split = main_box.split()
             col = split.column()
@@ -371,6 +375,7 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             col.label(text="Velocity:")
             col.prop(gp, "velocity", text="")
             box.prop(gp, "velocity_randomness")
+            box.prop(gp, "drag")
 
             box = main_box.box()
             box.prop(gp, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
@@ -456,6 +461,10 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             sub = split.column()
             sub.label(text="Emitter:", icon="OUTLINER_DATA_EMPTY")
             sub.prop(gpm, "emit_from", text="")
+            sub.prop(gpm, "emission_mode", text="")
+            if gpm.emission_mode == 'BURST':
+                sub.prop(gpm, "use_burst_on_start")
+                sub.prop(gpm, "burst_interval")
             sub.prop(gpm, "emitter_position")
             sub.prop(gpm, "emitter_radius")
             sub.prop(gpm, "particle_count")
@@ -465,6 +474,7 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             sub.prop(gpm, "gravity")
             sub.prop(gpm, "velocity")
             sub.prop(gpm, "velocity_randomness")
+            sub.prop(gpm, "drag")
             sub.prop(gpm, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
             if gpm.use_vortex:
                 sub.prop(gpm, "vortex_rotation_speed")
@@ -1699,7 +1709,8 @@ def _apply_gpu_debug_values(filepath):
                     "end_size", "particle_count", "emission_direction",
                     "emission_angle", "billboard_mode", "use_backface_culling",
                     "collision_mode", "collision_height", "collision_bounce", "collision_friction",
-                    "use_vortex", "vortex_rotation_speed", "vortex_radius_top", "vortex_height"):
+                    "use_vortex", "vortex_rotation_speed", "vortex_radius_top", "vortex_height",
+                    "drag", "burst_interval"):
             if key in values:
                 setattr(gp, key, values[key])
         applied.append(object_name)

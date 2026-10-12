@@ -88,6 +88,11 @@ const char *updateVertexSource =
 	"uniform float u_vortexRotationSpeed;\n"
 	"uniform float u_vortexRadiusTop;\n"
 	"uniform float u_vortexHeight;\n"
+	// Burst emission: dead particles stay dead (parked far below, age held at the lifetime)
+	// until u_burstNow respawns the whole pool in the same frame.
+	"uniform bool u_burstMode;\n"
+	"uniform bool u_burstNow;\n"
+	"uniform float u_drag;\n"
 	"float hash(float n) {\n"
 	"	return fract(sin(n) * 43758.5453123);\n"
 	"}\n"
@@ -95,7 +100,13 @@ const char *updateVertexSource =
 	"	float age = in_age + u_deltaTime;\n"
 	"	vec3 pos = in_position;\n"
 	"	vec3 vel = in_velocity;\n"
-	"	if (age >= u_lifetime) {\n"
+	"	if (u_burstMode && !u_burstNow && age >= u_lifetime) {\n"
+	"		out_position = vec3(0.0, 0.0, -10000.0);\n"
+	"		out_velocity = vec3(0.0);\n"
+	"		out_age = u_lifetime;\n"
+	"		return;\n"
+	"	}\n"
+	"	if (u_burstMode ? u_burstNow : (age >= u_lifetime)) {\n"
 	"		float seed = float(gl_VertexID) + u_time;\n"
 	"		vec3 r = vec3(hash(seed), hash(seed + 1.0), hash(seed + 2.0)) * 2.0 - 1.0;\n"
 	"		vec3 rv = vec3(hash(seed + 3.0), hash(seed + 4.0), hash(seed + 5.0)) * 2.0 - 1.0;\n"
@@ -119,11 +130,17 @@ const char *updateVertexSource =
 	"			vec3 coneDir = tangent * (sinTheta * cos(phi)) + bitangent * (sinTheta * sin(phi)) + fwd * cosTheta;\n"
 	"			vel = u_velocityBase + coneDir * u_velocityRandomness;\n"
 	"		}\n"
+	// A burst with every particle at the same speed would be a thin shell; vary the speed so
+	// the blast fills the sphere.
+	"		if (u_burstMode) {\n"
+	"			vel = u_velocityBase + (vel - u_velocityBase) * mix(0.3, 1.0, hash(seed + 8.0));\n"
+	"		}\n"
 	// Propagate the remainder instead of zeroing -- staggered particles cross the lifetime
 	// threshold on different frames, so discarding the remainder would drift their phase apart.
-	"		age = mod(age, u_lifetime);\n"
+	"		age = u_burstMode ? hash(seed + 9.0) * 0.04 * u_lifetime : mod(age, u_lifetime);\n"
 	"	} else {\n"
 	"		vel += u_gravity * u_deltaTime;\n"
+	"		vel *= exp(-u_drag * u_deltaTime);\n"
 	"		pos += vel * u_deltaTime;\n"
 	"		if (u_useVortex) {\n"
 	// Snap XY onto a cone around the emitter's vertical axis: radius grows from
@@ -272,6 +289,28 @@ const char *drawFragmentPreamble =
 	"uniform bool u_useColorCurve;\n"
 	"uniform float u_time;\n";
 
+// Soft particles: compares this fragment's view distance with the scene depth snapshot (solid
+// pass only, see RAS_Rasterizer::UpdateGlobalDepthTexture) and fades the sprite over
+// u_softDistance in front of the geometry, so it never shows a straight cut where it crosses the
+// ground or a wall. u_projZ = (P[2][2], P[3][2]) of a perspective projection.
+const char *drawFragmentSoftMain =
+	"uniform sampler2D u_softDepthTex;\n"
+	"uniform bool u_softValid;\n"
+	"uniform vec2 u_projZ;\n"
+	"uniform float u_softDistance;\n"
+	"float particle_view_distance(float depth) {\n"
+	"	return u_projZ.y / ((depth * 2.0 - 1.0) + u_projZ.x);\n"
+	"}\n"
+	"void main() {\n"
+	"	particle_look_main();\n"
+	"	if (u_softValid) {\n"
+	"		vec2 uv = gl_FragCoord.xy / vec2(textureSize(u_softDepthTex, 0));\n"
+	"		float scene = particle_view_distance(texture(u_softDepthTex, uv).r);\n"
+	"		float frag = particle_view_distance(gl_FragCoord.z);\n"
+	"		fragColor.a *= clamp((scene - frag) / u_softDistance, 0.0, 1.0);\n"
+	"	}\n"
+	"}\n";
+
 const char *drawFragmentDefaultMain =
 	"void main() {\n"
 	"	vec4 baseColor;\n"
@@ -331,7 +370,9 @@ void main() {
 	float d = length(uv);
 	float n = fbm(uv * 1.6 + vec2(v_seed * 37.0, v_seed * 11.0) + v_lifeFrac * 0.6);
 	float shape = 1.0 - d + (n - 0.5) * (0.7 + 0.5 * v_lifeFrac);
-	float mask = smoothstep(0.0, 0.35, shape);
+	/* The noise can push the edge past the quad when old; fade to zero before the quad border
+	 * so big, dense puffs (a burst) never show a straight cut. */
+	float mask = smoothstep(0.0, 0.35, shape) * smoothstep(1.0, 0.72, d);
 	vec2 sv = v_uv * 2.0;
 	vec3 nrm = vec3(sv, sqrt(max(1.0 - dot(sv, sv), 0.0)));
 	float lit = mix(0.55, 1.08, clamp(0.5 + 0.5 * dot(nrm, normalize(vec3(0.25, 0.8, 0.5))), 0.0, 1.0));
@@ -624,8 +665,12 @@ unsigned int CompileDrawProgram(const std::string &customFragShader)
 
 	// A custom script supplies its own `void main()`; the preamble already declares every
 	// varying/uniform it might use (see drawFragmentPreamble above).
+	// The look's main() is renamed and wrapped so soft particles (fade where the sprite meets
+	// the scene geometry) apply to every look, built-in or custom, without each one doing it.
 	const std::string fragSourceStr = std::string(drawFragmentPreamble) +
-		(customFragShader.empty() ? drawFragmentDefaultMain : customFragShader);
+		"#define main particle_look_main\n" +
+		(customFragShader.empty() ? drawFragmentDefaultMain : customFragShader) +
+		"\n#undef main\n" + drawFragmentSoftMain;
 	const char *fragSource = fragSourceStr.c_str();
 
 	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
@@ -761,6 +806,10 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_drawSizeCurveTexLoc = glGetUniformLocation(m_drawProgram, "u_sizeCurveTex");
 	m_drawUseColorCurveLoc = glGetUniformLocation(m_drawProgram, "u_useColorCurve");
 	m_drawColorCurveTexLoc = glGetUniformLocation(m_drawProgram, "u_colorCurveTex");
+	m_drawSoftDepthTexLoc = glGetUniformLocation(m_drawProgram, "u_softDepthTex");
+	m_drawSoftValidLoc = glGetUniformLocation(m_drawProgram, "u_softValid");
+	m_drawProjZLoc = glGetUniformLocation(m_drawProgram, "u_projZ");
+	m_drawSoftDistanceLoc = glGetUniformLocation(m_drawProgram, "u_softDistance");
 
 	const GLuint updateProgram = m_updateShader->GetProgram();
 	m_deltaTimeLoc = glGetUniformLocation(updateProgram, "u_deltaTime");
@@ -773,6 +822,9 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_velocityBaseLoc = glGetUniformLocation(updateProgram, "u_velocityBase");
 	m_emissionDirLoc = glGetUniformLocation(updateProgram, "u_emissionDir");
 	m_emissionAngleLoc = glGetUniformLocation(updateProgram, "u_emissionAngle");
+	m_burstModeLoc = glGetUniformLocation(updateProgram, "u_burstMode");
+	m_burstNowLoc = glGetUniformLocation(updateProgram, "u_burstNow");
+	m_dragLoc = glGetUniformLocation(updateProgram, "u_drag");
 
 	m_collisionModeLoc = glGetUniformLocation(updateProgram, "u_collisionMode");
 	m_collisionHeightLoc = glGetUniformLocation(updateProgram, "u_collisionHeight");
