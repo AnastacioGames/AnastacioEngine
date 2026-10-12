@@ -84,9 +84,10 @@ cam.rotation_euler = (Vector((0, 0, 17)) - cam.location).to_track_quat('-Z', 'Y'
 scene.objects.link(cam)
 scene.camera = cam
 
-# Emissor: cubinho escondido no topo da chamine; um Empty como emissor nao aparece no jogo.
-fumaca = malha('fumaca', lambda bm: bmesh.ops.create_cube(bm, size=0.3), (0, 0, 13.85))
-fumaca.data.materials.append(mat('emissor', (0.1, 0.1, 0.1)))
+# Emissor: um Empty no topo da chamine.
+fumaca = bpy.data.objects.new('fumaca', None)
+fumaca.location = (0, 0, 14.0)
+scene.objects.link(fumaca)
 fumaca.use_gpu_particles = True
 gp = fumaca.gpu_particles
 gp.particle_look = 'SMOKE'

@@ -2754,7 +2754,9 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 		// which the object stays visible under (e.g. a wheel that keeps spinning without dust).
 		// Also honor frustum culling (Override Culling included) so emitters outside the
 		// active camera's view don't keep spawning particles unseen.
-		if (gameobj->GetVisible() && (!gameobj->GetCullingNode().GetCulled() || gameobj->HasStaticParticles())) {
+		// An Empty emitter has no bounds to cull with (it stays culled), so it always counts as in view.
+		if (gameobj->GetVisible() && (!gameobj->GetCullingNode().GetCulled() || gameobj->HasStaticParticles() ||
+		                              gameobj->GetMeshList().empty())) {
 			gameobj->UpdateParticles(deltaTime);
 		}
 	}
