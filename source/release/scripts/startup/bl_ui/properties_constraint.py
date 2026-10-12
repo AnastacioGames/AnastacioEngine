@@ -923,6 +923,17 @@ class OBJECT_PT_constraints(ConstraintButtonsPanel, Panel):
             box.label(icon='INFO', text="Constraints for active bone do not live here")
             box.operator("wm.properties_context_change", icon='CONSTRAINT_BONE',
                          text="Go to Bone Constraints tab...").context = 'BONE_CONSTRAINT'
+        elif context.scene.render.engine == 'BLENDER_GAME':
+            # The game converter only reads object-level rigid body joints. Bone
+            # constraints have their own compatibility list in the panel below.
+            box = layout.box()
+            box.label(icon='INFO', text="Game Engine only supports Rigid Body Joint object constraints")
+            op = box.operator("object.constraint_add", icon='CONSTRAINT', text="Add Rigid Body Joint")
+            op.type = 'RIGID_BODY_JOINT'
+
+            if any(con.type != 'RIGID_BODY_JOINT' for con in obj.constraints):
+                box.alert = True
+                box.label(icon='ERROR', text="Unsupported object constraints are ignored when the game runs")
         else:
             layout.operator_menu_enum("object.constraint_add", "type", text="Add Object Constraint")
 

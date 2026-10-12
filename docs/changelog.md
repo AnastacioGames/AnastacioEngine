@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Object Constraints: menu compatível com Game Engine
+
+- Com `BLENDER_GAME`, o painel **Object Constraints** substitui o menu completo herdado por **Add Rigid Body
+  Joint**. Esta é a única constraint de objeto que `BL_BlenderDataConversion` converte para o runtime
+  Bullet; as demais eram editáveis, mas ignoradas ao rodar o jogo.
+- Arquivos existentes permanecem intactos: se o objeto contiver uma constraint incompatível, o painel mostra
+  um aviso. O menu e o comportamento dos outros motores não mudam; constraints de osso continuam separadas.
+- Textos novos traduzidos para pt-BR, espanhol e russo.
+
 ## 2026-10-12 - Logic Bricks → Python: lacunas da auditoria fechadas e rótulos do brick Property
 
 - Conversor, sensores: **Collision com Pulse** gera evento quando muda a quantidade de objetos colidindo (é o que `KX_CollisionSensor` de fato compara; Near e Radar não têm a opção); **Mouse Over Any com Pulse** gera evento quando o cursor passa para outro objeto; **Keyboard `log`/`target`** convertido (`logic.keyboard.text`, backspace e enter como a engine; alvo que não é texto vira texto), e o sensor de registro sem controller continua como brick ativo, porque a engine o registra à força; **Random com Delta Time** usa `tick_skip_dt` e deixou de sortear no 1º quadro.
