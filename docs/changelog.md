@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - World Sound: filtro Music / Ambient no painel
+
+- Painel **Sound Modules** ganhou dois botões em linha (Music e Ambient); a lista mostra só os módulos do tipo escolhido.
+- O filtro é `WindowManager.world_sound_filter` (estado da tela, não entra no `.range`). Padrão: Music.
+- Testado em background: propriedade existe, padrão MUSIC, troca para AMBIENT e volta. Desenho do painel na janela: pendente de conferência do usuário.
+
 ## 2026-10-12 - World Sound, etapa 2: `KX_AudioManager` e `Range.audio`
 
 - Escopo fechado pelo usuário: só Music e Ambient (sem módulos de Efeitos/Voz), com opção de eco das Reverb Areas nos dois.

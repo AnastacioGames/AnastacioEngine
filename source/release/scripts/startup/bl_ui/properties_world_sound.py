@@ -35,6 +35,14 @@ MODULE_TYPES = (
 MODULE_ICONS = {item[0]: item[3] for item in MODULE_TYPES}
 MODULE_NAMES = {item[0]: item[1] for item in MODULE_TYPES}
 
+# Filtro dos botoes Music / Ambient do painel: so estado da tela (WindowManager), nao vai para o .range.
+bpy.types.WindowManager.world_sound_filter = EnumProperty(
+    name="Module Filter",
+    description="Show only the modules of this type",
+    items=MODULE_TYPES,
+    default='MUSIC',
+)
+
 
 def _world(context):
     world = getattr(context, "world", None)
@@ -268,7 +276,17 @@ class WORLD_SOUND_PT_modules(WorldSoundButtonsPanel, Panel):
                          icon='INFO')
             return
 
-        for index, module in enumerate(world.sound_modules):
+        wm = context.window_manager
+        layout.row().prop(wm, "world_sound_filter", expand=True)
+
+        shown = [(index, module) for index, module in enumerate(world.sound_modules)
+                 if module.type == wm.world_sound_filter]
+        if not shown:
+            label = MODULE_NAMES[wm.world_sound_filter]
+            layout.label(text="No %s module yet: use Add Sound Module" % label.lower(), icon='INFO')
+            return
+
+        for index, module in shown:
             _draw_module(layout, module, index)
 
 
