@@ -803,6 +803,46 @@ void KX_DestructionManager::ProjectDecal(KX_GameObject *gameobj, KX_GameObject *
 	decal->m_lift = lift;
 }
 
+/* World triangles of gameobj for a decal: the whole dent mesh when it is dented (anchored, the
+ * decal follows the dents), else the triangles within reach of point. */
+static bool decal_triangles(KX_GameObject *ground, const mt::vec3& point, float reach, std::vector<mt::vec3>& triangles)
+{
+	const mt::mat3x4 trans = ground->NodeGetWorldTransform();
+	bool anchored = false;
+	if (KX_DentDeformer *deformer = ground->GetDentDeformer(false)) {
+		deformer->GetTriangles(triangles);
+		for (mt::vec3& corner : triangles) {
+			corner = trans * corner;
+		}
+		anchored = true;
+	}
+	else {
+		for (KX_Mesh *mesh : ground->GetMeshList()) {
+			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+				RAS_DisplayArray *array = meshmat->GetDisplayArray();
+				if (array->GetPrimitiveType() != RAS_DisplayArray::TRIANGLES) {
+					continue;
+				}
+				for (unsigned int i = 0, size = array->GetPrimitiveIndexCount(); i + 2 < size; i += 3) {
+					mt::vec3 corner[3];
+					mt::vec3 low(FLT_MAX, FLT_MAX, FLT_MAX), high(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+					for (unsigned int j = 0; j < 3; ++j) {
+						corner[j] = trans * mt::vec3(array->GetPosition(array->GetPrimitiveIndex(i + j)));
+						low = mt::vec3::Min(low, corner[j]);
+						high = mt::vec3::Max(high, corner[j]);
+					}
+					const mt::vec3 nearest = mt::vec3::Max(low, mt::vec3::Min(high, point));
+					if ((nearest - point).LengthSquared() > reach * reach) {
+						continue;
+					}
+					triangles.insert(triangles.end(), corner, corner + 3);
+				}
+			}
+		}
+	}
+	return anchored;
+}
+
 void KX_DestructionManager::AddGroundMark(KX_GameObject *gameobj, const RangeExplosiveSettings& settings,
                                           const mt::vec3& center, const std::vector<KX_GameObject *>& ignore)
 {
@@ -828,52 +868,63 @@ void KX_DestructionManager::AddGroundMark(KX_GameObject *gameobj, const RangeExp
 	KX_RayCast::Callback<GroundFilter, void> callback(&filter);
 	KX_RayCast::RayTest(m_scene->GetPhysicsEnvironment(), center, center - mt::axisZ3 * (half * 1.5f + 1.0f), callback);
 	KX_GameObject *ground = filter.m_hit;
-	if (!ground) {
+
+	std::vector<mt::vec3> triangles;
+	const bool anchored = ground && decal_triangles(ground, filter.m_point, half * 1.75f, triangles);
+	const float lifespan = (settings.mark_life > 0.0f) ? settings.mark_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
+	if (ground && !triangles.empty()) {
+		ProjectDecal(ground, templateobj, triangles, filter.m_point, -mt::axisZ3, nullptr, half, lifespan, 64, anchored);
+	}
+	if (!(settings.flags & EXPLOSIVE_MARK_NEARBY)) {
 		return;
 	}
 
-	// The dent mesh when the ground is dented (the mark then follows it), else the triangles near the point.
-	const mt::mat3x4 trans = ground->NodeGetWorldTransform();
-	std::vector<mt::vec3> triangles;
-	bool anchored = false;
-	if (KX_DentDeformer *deformer = ground->GetDentDeformer(false)) {
-		deformer->GetTriangles(triangles);
-		for (mt::vec3& corner : triangles) {
-			corner = trans * corner;
+	/* Mark Nearby Objects: a smaller mark on the side facing the blast of each mesh object within
+	 * the mark reach (decals and the marked ground excluded), closest first, 12 at most. */
+	const float reach = half * 1.5f;
+	std::vector<std::pair<float, KX_GameObject *> > nearby;
+	for (KX_GameObject *other : *m_scene->GetObjectList()) {
+		if (other == ground || !other->GetVisible() || other->GetMeshList().empty() || contains(ignore, other) ||
+		    std::any_of(m_decals.begin(), m_decals.end(), [other](const Decal& decal) { return decal.m_object == other; }))
+		{
+			continue;
 		}
-		anchored = true;
+		// Distance to its bounds (local box, the center brought into it).
+		mt::vec3 aabbMin, aabbMax;
+		other->GetBoundsAabb(aabbMin, aabbMax);
+		const mt::mat3x4 trans = other->NodeGetWorldTransform();
+		const mt::vec3 nearest = trans * mt::vec3::Max(aabbMin, mt::vec3::Min(aabbMax, trans.Inverse() * center));
+		const float distance = (nearest - center).Length();
+		if (distance < reach) {
+			nearby.emplace_back(distance, other);
+		}
 	}
-	else {
-		const float reach = half * 1.75f;
-		for (KX_Mesh *mesh : ground->GetMeshList()) {
-			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
-				RAS_DisplayArray *array = meshmat->GetDisplayArray();
-				if (array->GetPrimitiveType() != RAS_DisplayArray::TRIANGLES) {
-					continue;
-				}
-				for (unsigned int i = 0, size = array->GetPrimitiveIndexCount(); i + 2 < size; i += 3) {
-					mt::vec3 corner[3];
-					mt::vec3 low(FLT_MAX, FLT_MAX, FLT_MAX), high(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-					for (unsigned int j = 0; j < 3; ++j) {
-						corner[j] = trans * mt::vec3(array->GetPosition(array->GetPrimitiveIndex(i + j)));
-						low = mt::vec3::Min(low, corner[j]);
-						high = mt::vec3::Max(high, corner[j]);
-					}
-					const mt::vec3 nearest = mt::vec3::Max(low, mt::vec3::Min(high, filter.m_point));
-					if ((nearest - filter.m_point).LengthSquared() > reach * reach) {
-						continue;
-					}
-					triangles.insert(triangles.end(), corner, corner + 3);
-				}
+	std::sort(nearby.begin(), nearby.end(),
+	          [](const std::pair<float, KX_GameObject *>& a, const std::pair<float, KX_GameObject *>& b) { return a.first < b.first; });
+	if (nearby.size() > 12) {
+		nearby.resize(12);
+	}
+	for (const std::pair<float, KX_GameObject *>& near : nearby) {
+		KX_GameObject *other = near.second;
+		triangles.clear();
+		const bool otherAnchored = decal_triangles(other, center, reach, triangles);
+		// The point of the object closest to the blast.
+		float closest = FLT_MAX;
+		mt::vec3 point = center;
+		for (unsigned int t = 0, size = triangles.size(); t + 2 < size; t += 3) {
+			const mt::vec3 onTriangle = closest_on_triangle(center, triangles[t], triangles[t + 1], triangles[t + 2]);
+			const float distance = (onTriangle - center).LengthSquared();
+			if (distance < closest) {
+				closest = distance;
+				point = onTriangle;
 			}
 		}
+		if (closest > reach * reach) {
+			continue;
+		}
+		ProjectDecal(other, templateobj, triangles, point, (point - center).SafeNormalized(-mt::axisZ3), nullptr,
+		             half * 0.5f, lifespan, 16, otherAnchored);
 	}
-	if (triangles.empty()) {
-		return;
-	}
-
-	const float lifespan = (settings.mark_life > 0.0f) ? settings.mark_life * LIFESPAN_TICKS_PER_SECOND : 0.0f;
-	ProjectDecal(ground, templateobj, triangles, filter.m_point, -mt::axisZ3, nullptr, half, lifespan, 64, anchored);
 }
 
 KX_GameObject *KX_DestructionManager::GetDecalTemplate(KX_GameObject *gameobj)

@@ -374,6 +374,7 @@ enum {
 	EXPLOSIVE_PARTICLES      = 1 << 3,  /* GPU particle fireball + smoke + debris at the blast */
 	EXPLOSIVE_PARTICLE_COLORS = 1 << 4, /* fire/smoke/spark_color initialized */
 	EXPLOSIVE_GROUND_MARK    = 1 << 5,  /* project the mark object on the ground */
+	EXPLOSIVE_MARK_NEARBY    = 1 << 6,  /* Ground Mark also on the objects around the blast */
 };
 
 /* RangeExplosiveSettings.particle_size */

@@ -10,6 +10,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 - Particle Explosion ganha o tamanho Tiny, os estilos Fire/Electric/Concrete/Water e cores, quantidades, Smoke Duration e Blast Speed editáveis.
 - **Ground Mark**: projeta o material do objeto Mark no chão estático sob a explosão. Usa a mesma projeção do Impact Decal (`KX_DestructionManager::ProjectDecal`). O botão **New** cria a marca do estilo na camada 20: queimado, queimadura elétrica, poeira ou mancha molhada. Size e Life são editáveis.
+- **Mark Nearby Objects** (opção do Ground Mark): marca menor (metade) no lado virado para a explosão dos objetos com malha no alcance da marca, até 12, os mais perto primeiro; segue o objeto (parented) e as amassadas se ele tiver Deformation.
 - A fumaça final dura mais: Fire 9 s, Electric 6 s, Concrete 10 s (antes 4,5/2,5/6). A névoa da água continua curta.
 - Cena: `tools/debug/cenas/criar_cena_explosao_tamanhos.py --marca`.
 

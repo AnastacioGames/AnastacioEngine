@@ -96,9 +96,16 @@ for i, (tam, pavio) in enumerate(zip(TAMANHOS, PAVIOS)):
         bomba.location.x = -18 + i * 12
     if MARCA:
         ex.use_ground_mark = True
+        ex.use_mark_nearby = True
         bomba.location.x = -9 + i * 6
         scene.objects.active = bomba
         bpy.ops.object.explosive_mark_add(style=ESTILOS[i])
+
+if MARCA:
+    # Parede atras das bombas e uma caixa ao lado da Fire, para o Mark Nearby Objects.
+    parede = malha('parede', lambda bm: bmesh.ops.create_cube(bm, size=1.0), (0, 2.2, 1.5), (0.5, 0.5, 0.5))
+    parede.scale = (24, 0.4, 3)
+    malha('caixa', lambda bm: bmesh.ops.create_cube(bm, size=1.2), (-10.8, -0.4, 0.6), (0.4, 0.3, 0.2))
 
 cam_data = bpy.data.cameras.new('cam')
 cam_data.lens = 22

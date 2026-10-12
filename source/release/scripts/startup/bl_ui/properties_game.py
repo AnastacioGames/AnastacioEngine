@@ -705,6 +705,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
             row = col.row()
             row.prop(es, "mark_size", text="Size")
             row.prop(es, "mark_life", text="Life")
+            col.prop(es, "use_mark_nearby")
             if es.mark is None:
                 col.label(text="Pick a Mark object or press New (a mark for the explosion style)", icon='INFO')
             elif es.mark.is_visible(context.scene):

@@ -3152,6 +3152,13 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	                         "e.g. a scorch with alpha");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_mark_nearby", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_MARK_NEARBY);
+	RNA_def_property_ui_text(prop, "Mark Nearby Objects",
+	                         "Also paint a smaller mark on the side facing the blast of the objects around it "
+	                         "(12 closest at most)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "mark_size", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.1f, 4.0f);
 	RNA_def_property_ui_text(prop, "Mark Size", "Size of the ground mark, relative to the explosion size");
