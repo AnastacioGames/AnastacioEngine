@@ -25,7 +25,8 @@ void BM_mesh_decimate_collapse(
         BMesh *bm, const float factor,
         float *vweights, float vweight_factor,
         const bool do_triangulate,
-        const int symmetry_axis, const float symmetry_eps);
+        const int symmetry_axis, const float symmetry_eps,
+        const bool use_quality);
 
 void BM_mesh_decimate_unsubdivide_ex(BMesh *bm, const int iterations, const bool tag_only);
 void BM_mesh_decimate_unsubdivide(BMesh *bm, const int iterations);

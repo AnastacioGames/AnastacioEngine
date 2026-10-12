@@ -315,6 +315,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             row = col.split(factor=0.75)
             row.prop(md, "use_symmetry")
             row.prop(md, "symmetry_axis", text="")
+            col.prop(md, "use_collapse_quality")
 
         elif decimate_type == 'UNSUBDIV':
             layout.prop(md, "iterations")
@@ -329,6 +330,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         layout_info.label(text=iface_("Face Count: {:,}".format(md.face_count)),
                           translate=False)
+        layout.label(text="Apply before playing: recalculated when the game starts", icon='INFO')
 
     def DISPLACE(self, layout, ob, md):
         has_texture = (md.texture is not None)

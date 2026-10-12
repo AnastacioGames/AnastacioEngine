@@ -342,6 +342,12 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   o contador de hits usa o cache por GPUShader, preservando transicoes entre objetos.
   Arrays de hits/strength continuam enviados quando count > 0.
 
+- Decimate (Collapse) tem a opção **High Quality** (`use_collapse_quality`): posição estável do vértice com
+  preservação de volume, triângulos mais regulares e UV/costuras preservadas. Ligada em modificadores novos;
+  arquivos antigos ficam com ela desligada para não mudar de forma. Medição e regressão por
+  `tools/debug/cenas/medir_decimate.py <saida.txt> <antigo|novo>`. O conversor avisa quando um Decimate não
+  aplicado entra no jogo. Detalhes em `docs/changelog.md` (2026-10-12).
+
 ## Decisões técnicas vigentes
 
 - GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para

@@ -6,6 +6,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Decimate (Collapse): opção High Quality
+
+- Queixa: objeto simples com muita subdivisão saía "torto" e com a UV deformada. Medição (`tools/debug/cenas/medir_decimate.py`, cinco formas com superfície e UV analíticas) mostrou que a forma em si quase não desviava; o defeito era triangulação (num cubo arredondado em Ratio 0,1, 144 de 480 triângulos com ângulo abaixo de 5°) e UV (erro de até 16% da textura).
+- Opção nova **High Quality** no modificador (`use_collapse_quality`, bit `MOD_DECIM_FLAG_QUALITY` no `flag` existente, sem campo novo no DNA). Modificadores novos nascem com ela ligada; arquivos salvos antes ficam com ela desligada e o resultado deles continua idêntico (conferido contra o build anterior nas cinco formas). O Decimate do modo de edição usa sempre o método novo.
+- O que muda em `bmesh_decimate_collapse.c` com a opção ligada:
+  - quádricos pesados pela área da face, normalizados pela área média (independente da escala da malha);
+  - posição do vértice por decomposição em autovalores: só as direções bem definidas do quádrico movem o vértice a partir do centro da aresta; quinas e vincos ficam exatos e áreas planas ou cilíndricas não jogam o vértice longe;
+  - plano de preservação de volume (Lindstrom-Turk) somado ao sistema;
+  - custo de forma (`comprimento² / qualidade do pior triângulo`), que ordena as áreas planas e evita triângulos finos; substitui o fallback de topologia;
+  - UV lida no triângulo em que o vértice cai (da mesma ilha), em vez de interpolada só ao longo da aresta; os dois lados da aresta recebem o mesmo valor quando não há costura;
+  - costuras de UV: vértice de dentro da ilha só colapsa para cima do vértice da costura, vértice de costura só desliza pela costura, encontro/fim de costura e polo de UV ficam no lugar. Colapso que move costura é permitido com custo alto, para o Ratio pedido continuar alcançável;
+  - no modo Symmetry a aresta espelhada passa a ser conferida contra face virada (o método antigo não confere).
+- Resultado nas cinco formas, Ratio 0,5 a 0,02, novo contra antigo: erro de UV médio 0,34x e máximo 0,22x; triângulos abaixo de 5° de 358 para 113; erro de volume menor (esfera a 2%: -10,9% para -7,8%); desvio de forma médio 1,06x (o método antigo já era bom nisso). Custa mais: cerca de 3x o tempo (esfera de 199 mil triângulos para 10%: 1,9 s para 5,4 s).
+- Robustez conferida: quads mantidos (Triangulate desligado), malha sem UV, 2 UVs + cor de vértice, grupo de vértices, Symmetry (0 faces viradas contra 5 do antigo), malha em escala 0,001 e 1000, `validate()` sem correções em todos.
+- Play: o conversor avisa no console quando um objeto entra no jogo com Decimate ligado (é recalculado na carga; todo quadro em malha animada) e o painel do modificador mostra "Apply before playing". Textos novos em pt-BR, es e ru.
+- Não medido: custo do aviso/recalculo em jogo real; aceite visual do usuário pendente.
+
 ## 2026-10-12 - Object Constraints: menu compatível com Game Engine
 
 - Com `BLENDER_GAME`, o painel **Object Constraints** mantém o menu completo herdado, mas só deixa clicável

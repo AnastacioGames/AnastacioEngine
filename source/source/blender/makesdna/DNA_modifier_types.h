@@ -455,6 +455,7 @@ enum {
 	MOD_DECIM_FLAG_TRIANGULATE         = (1 << 1),  /* for collapse only. dont convert tri pairs back to quads */
 	MOD_DECIM_FLAG_ALL_BOUNDARY_VERTS  = (1 << 2),  /* for dissolve only. collapse all verts between 2 faces */
 	MOD_DECIM_FLAG_SYMMETRY            = (1 << 3),
+	MOD_DECIM_FLAG_QUALITY             = (1 << 4),  /* for collapse only. off in files saved before the option existed, keeping their result */
 };
 
 enum {

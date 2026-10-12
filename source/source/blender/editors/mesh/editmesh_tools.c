@@ -4309,7 +4309,7 @@ static int edbm_decimate_exec(bContext *C, wmOperator *op)
 
 	BM_mesh_decimate_collapse(
 	        em->bm, ratio_adjust, vweights, vertex_group_factor, false,
-	        symmetry_axis, symmetry_eps);
+	        symmetry_axis, symmetry_eps, true);
 
 	MEM_freeN(vweights);
 

@@ -51,6 +51,7 @@ static void initData(ModifierData *md)
 	dmd->percent = 1.0;
 	dmd->angle   = DEG2RADF(5.0f);
 	dmd->defgrp_factor = 1.0;
+	dmd->flag |= MOD_DECIM_FLAG_QUALITY;
 }
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
@@ -147,9 +148,10 @@ static DerivedMesh *applyModifier(
 			const bool do_triangulate = (dmd->flag & MOD_DECIM_FLAG_TRIANGULATE) != 0;
 			const int symmetry_axis = (dmd->flag & MOD_DECIM_FLAG_SYMMETRY) ? dmd->symmetry_axis : -1;
 			const float symmetry_eps = 0.00002f;
+			const bool use_quality = (dmd->flag & MOD_DECIM_FLAG_QUALITY) != 0;
 			BM_mesh_decimate_collapse(
 			        bm, dmd->percent, vweights, dmd->defgrp_factor, do_triangulate,
-			        symmetry_axis, symmetry_eps);
+			        symmetry_axis, symmetry_eps, use_quality);
 			break;
 		}
 		case MOD_DECIM_MODE_UNSUBDIV:

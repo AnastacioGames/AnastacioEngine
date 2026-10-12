@@ -21,6 +21,8 @@
  */
 
 #include <stddef.h>
+#include <float.h>
+#include <string.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -67,6 +69,32 @@
 #define OPTIMIZE_EPS 1e-8
 #define COST_INVALID FLT_MAX
 
+/* High quality mode (DecimQuality), see BM_mesh_decimate_collapse. */
+#define QUALITY_UV_LAYERS_MAX 8
+/* eigenvalues below this fraction of the largest are treated as zero when placing the vertex */
+#define QUALITY_EIGEN_EPS 1e-3
+/* strength of the volume preserving plane, relative to the quadric trace */
+#define QUALITY_VOLUME_WEIGHT 0.5
+/* weight of the boundary and uv-seam planes, relative to a face of the same size */
+#define QUALITY_BOUNDARY_WEIGHT 25.0
+#define QUALITY_SEAM_WEIGHT 5.0
+/* cost of creating thin triangles, scaled by the squared edge length */
+#define QUALITY_SHAPE_WEIGHT 3e-4
+/* cost added to collapses that move a uv-seam, so they only happen when nothing else is left */
+#define QUALITY_SEAM_BREAK_WEIGHT 100.0
+/* reject an optimized location further than this many edge lengths from the edge center */
+#define QUALITY_TARGET_DIST_MAX 1.5
+
+typedef struct DecimQuality {
+	int cd_loop_uv_offset[QUALITY_UV_LAYERS_MAX];
+	int uv_layer_tot;
+	/* 1 / average face area, keeps the quadric weights independent of the mesh scale */
+	double face_area_inv;
+	/* #bm_decim_quality_vert_seam_count for each vertex, -1 when it has to be counted again.
+	 * NULL without uv's. */
+	int *vert_seam_tot;
+} DecimQuality;
+
 typedef enum CD_UseFlag {
 	CD_DO_VERT = (1 << 0),
 	CD_DO_EDGE = (1 << 1),
@@ -77,10 +105,385 @@ typedef enum CD_UseFlag {
 /* BMesh Helper Functions
  * ********************** */
 
+/* High Quality Helpers
+ * ******************** */
+
+/* double precision, the results don't depend on the size of the mesh */
+static void bm_decim_quality_sub_v3(double r[3], const float a[3], const float b[3])
+{
+	r[0] = (double)a[0] - (double)b[0];
+	r[1] = (double)a[1] - (double)b[1];
+	r[2] = (double)a[2] - (double)b[2];
+}
+
+static void bm_decim_quality_cross_v3(double r[3], const double a[3], const double b[3])
+{
+	r[0] = a[1] * b[2] - a[2] * b[1];
+	r[1] = a[2] * b[0] - a[0] * b[2];
+	r[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+static double bm_decim_quality_dot_v3(const double a[3], const double b[3])
+{
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+/**
+ * Check for a uv-seam: the 2 faces using the edge don't share the same uv's.
+ *
+ * \param v: Only check the uv's at this vertex of the edge, NULL to check both.
+ */
+static bool bm_decim_quality_edge_is_seam(const DecimQuality *dq, const BMEdge *e, const BMVert *v)
+{
+	const BMLoop *l_a = e->l, *l_b;
+	const BMLoop *l_pair[2][2];
+
+	if (dq->uv_layer_tot == 0 || l_a == NULL) {
+		return false;
+	}
+	l_b = l_a->radial_next;
+	if (l_b == l_a || l_b->radial_next != l_a) {
+		return false;
+	}
+
+	/* the loops of each face, at each vertex of the edge */
+	l_pair[0][0] = l_a;
+	l_pair[1][0] = l_a->next;
+	if (l_b->v == l_a->v) {
+		l_pair[0][1] = l_b;
+		l_pair[1][1] = l_b->next;
+	}
+	else {
+		l_pair[0][1] = l_b->next;
+		l_pair[1][1] = l_b;
+	}
+
+	for (int side = 0; side < 2; side++) {
+		if (v && l_pair[side][0]->v != v) {
+			continue;
+		}
+		for (int i = 0; i < dq->uv_layer_tot; i++) {
+			const int offset = dq->cd_loop_uv_offset[i];
+			if (!CustomData_data_equals(
+			            CD_MLOOPUV,
+			            POINTER_OFFSET(l_pair[side][0]->head.data, offset),
+			            POINTER_OFFSET(l_pair[side][1]->head.data, offset)))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Number of edges where the uv's of \a v are split: 0 inside a uv island, 2 along a seam,
+ * anything else where seams meet or end and on uv poles.
+ */
+static int bm_decim_quality_vert_seam_count(const DecimQuality *dq, const BMVert *v)
+{
+	int count = 0;
+	if (dq->uv_layer_tot != 0 && v->e) {
+		int *count_p = &dq->vert_seam_tot[BM_elem_index_get(v)];
+		if (*count_p == -1) {
+			const BMEdge *e_iter, *e_first;
+			e_iter = e_first = v->e;
+			do {
+				count += bm_decim_quality_edge_is_seam(dq, e_iter, v);
+			} while ((e_iter = bmesh_disk_edge_next(e_iter, v)) != e_first);
+			*count_p = count;
+		}
+		count = *count_p;
+	}
+	return count;
+}
+
+/**
+ * Where the uv-seams allow the collapsed vertex to go.
+ *
+ * A vertex can leave its place when its uv's aren't split, or by sliding along the seam it's on.
+ * So a vertex inside a uv island merges into a seam vertex (never the reverse),
+ * and a vertex where seams meet or end stays where it is.
+ *
+ * \return the vertex that must be kept in place, or NULL when the location is free.
+ * \param r_seam_break: the collapse moves a seam whatever the location is.
+ */
+static BMVert *bm_decim_quality_target_vert(const DecimQuality *dq, BMEdge *e, bool *r_seam_break)
+{
+	*r_seam_break = false;
+
+	if (dq->uv_layer_tot == 0) {
+		return NULL;
+	}
+
+	const int seam_tot_v1 = bm_decim_quality_vert_seam_count(dq, e->v1);
+	const int seam_tot_v2 = bm_decim_quality_vert_seam_count(dq, e->v2);
+
+	if (seam_tot_v1 == 0 && seam_tot_v2 == 0) {
+		return NULL;
+	}
+
+	const bool can_move_v1 = (seam_tot_v1 == 0) ||
+	                         (seam_tot_v1 == 2 && bm_decim_quality_edge_is_seam(dq, e, e->v1));
+	const bool can_move_v2 = (seam_tot_v2 == 0) ||
+	                         (seam_tot_v2 == 2 && bm_decim_quality_edge_is_seam(dq, e, e->v2));
+
+	if (can_move_v1 && can_move_v2) {
+		if (seam_tot_v1 == 0) {
+			return e->v2;
+		}
+		if (seam_tot_v2 == 0) {
+			return e->v1;
+		}
+		/* both slide along the seam */
+		return NULL;
+	}
+	if (can_move_v1) {
+		return e->v2;
+	}
+	if (can_move_v2) {
+		return e->v1;
+	}
+
+	/* a seam gets moved either way, keep the vertex with more seams */
+	*r_seam_break = true;
+	if (seam_tot_v1 != seam_tot_v2) {
+		return (seam_tot_v1 > seam_tot_v2) ? e->v1 : e->v2;
+	}
+	return NULL;
+}
+
+/**
+ * Eigen decomposition of a symmetric matrix (cyclic Jacobi), \a r_vec columns are the eigenvectors.
+ */
+static void bm_decim_quality_eigen_m3(double a[3][3], double r_val[3], double r_vec[3][3])
+{
+	static const int pairs[3][2] = {{0, 1}, {0, 2}, {1, 2}};
+
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			r_vec[i][j] = (i == j) ? 1.0 : 0.0;
+		}
+	}
+
+	for (int sweep = 0; sweep < 16; sweep++) {
+		const double off = fabs(a[0][1]) + fabs(a[0][2]) + fabs(a[1][2]);
+		const double diag = fabs(a[0][0]) + fabs(a[1][1]) + fabs(a[2][2]);
+		if (off <= diag * 1e-15) {
+			break;
+		}
+		for (int i = 0; i < 3; i++) {
+			const int p = pairs[i][0], q = pairs[i][1];
+			if (fabs(a[p][q]) <= DBL_MIN) {
+				continue;
+			}
+			const double theta = (a[q][q] - a[p][p]) / (2.0 * a[p][q]);
+			const double t = ((theta >= 0.0) ? 1.0 : -1.0) / (fabs(theta) + sqrt(theta * theta + 1.0));
+			const double c = 1.0 / sqrt(t * t + 1.0);
+			const double s = t * c;
+			for (int k = 0; k < 3; k++) {
+				const double a_kp = a[k][p], a_kq = a[k][q];
+				a[k][p] = c * a_kp - s * a_kq;
+				a[k][q] = s * a_kp + c * a_kq;
+			}
+			for (int k = 0; k < 3; k++) {
+				const double a_pk = a[p][k], a_qk = a[q][k];
+				a[p][k] = c * a_pk - s * a_qk;
+				a[q][k] = s * a_pk + c * a_qk;
+			}
+			for (int k = 0; k < 3; k++) {
+				const double v_kp = r_vec[k][p], v_kq = r_vec[k][q];
+				r_vec[k][p] = c * v_kp - s * v_kq;
+				r_vec[k][q] = s * v_kp + c * v_kq;
+			}
+		}
+	}
+
+	r_val[0] = a[0][0];
+	r_val[1] = a[1][1];
+	r_val[2] = a[2][2];
+}
+
+/**
+ * Plane the collapsed vertex has to stay on for the volume not to change,
+ * from the triangles around the edge (Lindstrom & Turk).
+ *
+ * \return false when the triangles don't define a plane.
+ */
+static bool bm_decim_quality_volume_plane(BMEdge *e, double r_plane[4])
+{
+	double g[3] = {0.0, 0.0, 0.0};
+	double d = 0.0;
+
+	for (int i = 0; i < 2; i++) {
+		BMVert *v = i ? e->v2 : e->v1;
+		BMIter liter;
+		BMLoop *l;
+		BM_ITER_ELEM (l, &liter, v, BM_LOOPS_OF_VERT) {
+			if (l->f->len != 3) {
+				return false;
+			}
+			/* the faces of the edge are only counted once */
+			if (i == 1 && ELEM(e->v1, l->next->v, l->prev->v)) {
+				continue;
+			}
+			const float *a = l->v->co, *b = l->next->v->co, *c = l->prev->v->co;
+			double ab[3], ac[3], n[3];
+			bm_decim_quality_sub_v3(ab, b, a);
+			bm_decim_quality_sub_v3(ac, c, a);
+			bm_decim_quality_cross_v3(n, ab, ac);
+			g[0] += n[0];
+			g[1] += n[1];
+			g[2] += n[2];
+			d += n[0] * a[0] + n[1] * a[1] + n[2] * a[2];
+		}
+	}
+
+	const double g_len = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+	if (g_len <= DBL_MIN) {
+		return false;
+	}
+	r_plane[0] = g[0] / g_len;
+	r_plane[1] = g[1] / g_len;
+	r_plane[2] = g[2] / g_len;
+	r_plane[3] = -d / g_len;
+	return true;
+}
+
+/**
+ * Edge contraction target for high quality mode.
+ *
+ * The quadric is minimized only along its well defined directions, starting from the edge center,
+ * so flat and cylindrical areas don't throw the vertex away, while corners and creases stay exact.
+ */
+static void bm_decim_quality_target_co(
+        const DecimQuality *dq, BMEdge *e, double optimize_co[3],
+        const Quadric *vquadrics, bool *r_seam_break)
+{
+	const BMVert *v_target = bm_decim_quality_target_vert(dq, e, r_seam_break);
+	if (v_target) {
+		copy_v3db_v3fl(optimize_co, v_target->co);
+		return;
+	}
+
+	const Quadric *q1 = &vquadrics[BM_elem_index_get(e->v1)];
+	const Quadric *q2 = &vquadrics[BM_elem_index_get(e->v2)];
+	Quadric q;
+	BLI_quadric_add_qu_ququ(&q, q1, q2);
+
+	double m[3][3] = {
+		{q.a2, q.ab, q.ac},
+		{q.ab, q.b2, q.bc},
+		{q.ac, q.bc, q.c2},
+	};
+	double b[3] = {q.ad, q.bd, q.cd};
+	double plane[4];
+
+	if (bm_decim_quality_volume_plane(e, plane)) {
+		const double w = QUALITY_VOLUME_WEIGHT * (q.a2 + q.b2 + q.c2);
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				m[i][j] += w * plane[i] * plane[j];
+			}
+			b[i] += w * plane[i] * plane[3];
+		}
+	}
+
+	const double mid[3] = {
+		0.5 * ((double)e->v1->co[0] + (double)e->v2->co[0]),
+		0.5 * ((double)e->v1->co[1] + (double)e->v2->co[1]),
+		0.5 * ((double)e->v1->co[2] + (double)e->v2->co[2]),
+	};
+
+	/* residual of 'm * x = -b' at the edge center */
+	double r[3];
+	for (int i = 0; i < 3; i++) {
+		r[i] = -b[i] - (m[i][0] * mid[0] + m[i][1] * mid[1] + m[i][2] * mid[2]);
+	}
+
+	double eig_val[3], eig_vec[3][3];
+	bm_decim_quality_eigen_m3(m, eig_val, eig_vec);
+	const double eig_max = MAX3(eig_val[0], eig_val[1], eig_val[2]);
+
+	optimize_co[0] = mid[0];
+	optimize_co[1] = mid[1];
+	optimize_co[2] = mid[2];
+	if (eig_max > 0.0) {
+		for (int i = 0; i < 3; i++) {
+			if (eig_val[i] > eig_max * QUALITY_EIGEN_EPS) {
+				const double fac =
+				        (eig_vec[0][i] * r[0] + eig_vec[1][i] * r[1] + eig_vec[2][i] * r[2]) / eig_val[i];
+				optimize_co[0] += eig_vec[0][i] * fac;
+				optimize_co[1] += eig_vec[1][i] * fac;
+				optimize_co[2] += eig_vec[2][i] * fac;
+			}
+		}
+	}
+
+	/* a location far from the edge isn't to be trusted, use the best of the simple candidates */
+	const double dist_sq_max = SQUARE(QUALITY_TARGET_DIST_MAX) * (double)len_squared_v3v3(e->v1->co, e->v2->co);
+	const double delta[3] = {optimize_co[0] - mid[0], optimize_co[1] - mid[1], optimize_co[2] - mid[2]};
+	if (!(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2] <= dist_sq_max)) {
+		double cost_best = BLI_quadric_evaluate(&q, mid);
+		optimize_co[0] = mid[0];
+		optimize_co[1] = mid[1];
+		optimize_co[2] = mid[2];
+		for (int i = 0; i < 2; i++) {
+			double co[3];
+			copy_v3db_v3fl(co, i ? e->v2->co : e->v1->co);
+			const double cost = BLI_quadric_evaluate(&q, co);
+			if (cost < cost_best) {
+				cost_best = cost;
+				optimize_co[0] = co[0];
+				optimize_co[1] = co[1];
+				optimize_co[2] = co[2];
+			}
+		}
+	}
+}
+
+/**
+ * How thin the worst triangle around the edge gets once collapsed to \a co, 1 for equilateral triangles.
+ */
+static float bm_decim_quality_shape(BMEdge *e, const float co[3])
+{
+	float quality_min = 1.0f;
+
+	for (int i = 0; i < 2; i++) {
+		BMVert *v = i ? e->v2 : e->v1;
+		BMVert *v_other = i ? e->v1 : e->v2;
+		BMIter liter;
+		BMLoop *l;
+		BM_ITER_ELEM (l, &liter, v, BM_LOOPS_OF_VERT) {
+			if (ELEM(v_other, l->next->v, l->prev->v)) {
+				continue;
+			}
+			const float *co_next = l->next->v->co;
+			const float *co_prev = l->prev->v->co;
+			const float len_sq_sum = (len_squared_v3v3(co, co_next) +
+			                          len_squared_v3v3(co_next, co_prev) +
+			                          len_squared_v3v3(co_prev, co));
+			float no_old[3], no_new[3];
+			float quality = 0.0f;
+			cross_tri_v3(no_old, v->co, co_next, co_prev);
+			cross_tri_v3(no_new, co, co_next, co_prev);
+			/* a triangle turned over is as bad as it gets */
+			if (len_sq_sum > FLT_MIN && dot_v3v3(no_old, no_new) > 0.0f) {
+				quality = 3.4641016f * len_v3(no_new) / len_sq_sum;
+			}
+			quality_min = min_ff(quality_min, quality);
+		}
+	}
+
+	return 1.0f / max_ff(quality_min, 0.05f);
+}
+
+
 /**
  * \param vquadrics: must be calloc'd
+ * \param dq: high quality settings, NULL for the original behavior.
  */
-static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
+static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics, const DecimQuality *dq)
 {
 	BMIter iter;
 	BMFace *f;
@@ -99,6 +502,10 @@ static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
 		plane_db[3] = -dot_v3db_v3fl(plane_db, center);
 
 		BLI_quadric_from_plane(&q, plane_db);
+		if (dq) {
+			/* without this a tiny face counts as much as a huge one */
+			BLI_quadric_mul(&q, (double)BM_face_calc_area(f) * dq->face_area_inv);
+		}
 
 		l_iter = l_first = BM_FACE_FIRST_LOOP(f);
 		do {
@@ -106,31 +513,42 @@ static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
 		} while ((l_iter = l_iter->next) != l_first);
 	}
 
-	/* boundary edges */
+	/* boundary edges (and uv-seams in high quality mode) */
 	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-		if (UNLIKELY(BM_edge_is_boundary(e))) {
+		const bool is_boundary = BM_edge_is_boundary(e);
+		if (UNLIKELY(is_boundary || (dq && bm_decim_quality_edge_is_seam(dq, e, NULL)))) {
+			BMLoop *l_iter, *l_first;
 			float edge_vector[3];
-			float edge_plane[3];
-			double edge_plane_db[4];
+			double weight = BOUNDARY_PRESERVE_WEIGHT;
 			sub_v3_v3v3(edge_vector, e->v2->co, e->v1->co);
-			f = e->l->f;
-
-			cross_v3_v3v3(edge_plane, edge_vector, f->no);
-			copy_v3db_v3fl(edge_plane_db, edge_plane);
-
-			if (normalize_v3_d(edge_plane_db) > (double)FLT_EPSILON) {
-				Quadric q;
-				float center[3];
-
-				mid_v3_v3v3(center, e->v1->co, e->v2->co);
-
-				edge_plane_db[3] = -dot_v3db_v3fl(edge_plane_db, center);
-				BLI_quadric_from_plane(&q, edge_plane_db);
-				BLI_quadric_mul(&q, BOUNDARY_PRESERVE_WEIGHT);
-
-				BLI_quadric_add_qu_qu(&vquadrics[BM_elem_index_get(e->v1)], &q);
-				BLI_quadric_add_qu_qu(&vquadrics[BM_elem_index_get(e->v2)], &q);
+			if (dq) {
+				weight = (is_boundary ? QUALITY_BOUNDARY_WEIGHT : QUALITY_SEAM_WEIGHT) *
+				         (double)len_squared_v3(edge_vector) * dq->face_area_inv;
 			}
+
+			/* a plane for each face using the edge (a single one for boundaries) */
+			l_iter = l_first = e->l;
+			do {
+				float edge_plane[3];
+				double edge_plane_db[4];
+
+				cross_v3_v3v3(edge_plane, edge_vector, l_iter->f->no);
+				copy_v3db_v3fl(edge_plane_db, edge_plane);
+
+				if (normalize_v3_d(edge_plane_db) > (double)FLT_EPSILON) {
+					Quadric q;
+					float center[3];
+
+					mid_v3_v3v3(center, e->v1->co, e->v2->co);
+
+					edge_plane_db[3] = -dot_v3db_v3fl(edge_plane_db, center);
+					BLI_quadric_from_plane(&q, edge_plane_db);
+					BLI_quadric_mul(&q, weight);
+
+					BLI_quadric_add_qu_qu(&vquadrics[BM_elem_index_get(e->v1)], &q);
+					BLI_quadric_add_qu_qu(&vquadrics[BM_elem_index_get(e->v2)], &q);
+				}
+			} while ((l_iter = l_iter->radial_next) != l_first);
 		}
 	}
 }
@@ -138,12 +556,18 @@ static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
 
 static void bm_decim_calc_target_co_db(
         BMEdge *e, double optimize_co[3],
-        const Quadric *vquadrics)
+        const Quadric *vquadrics, const DecimQuality *dq)
 {
 	/* compute an edge contraction target for edge 'e'
 	 * this is computed by summing it's vertices quadrics and
 	 * optimizing the result. */
 	Quadric q;
+
+	if (dq) {
+		bool seam_break;
+		bm_decim_quality_target_co(dq, e, optimize_co, vquadrics, &seam_break);
+		return;
+	}
 
 	BLI_quadric_add_qu_ququ(
 	        &q,
@@ -162,10 +586,10 @@ static void bm_decim_calc_target_co_db(
 
 static void bm_decim_calc_target_co_fl(
         BMEdge *e, float optimize_co[3],
-        const Quadric *vquadrics)
+        const Quadric *vquadrics, const DecimQuality *dq)
 {
 	double optimize_co_db[3];
-	bm_decim_calc_target_co_db(e, optimize_co_db, vquadrics);
+	bm_decim_calc_target_co_db(e, optimize_co_db, vquadrics, dq);
 	copy_v3fl_v3db(optimize_co, optimize_co_db);
 }
 
@@ -246,7 +670,8 @@ static void bm_decim_build_edge_cost_single(
         BMEdge *e,
         const Quadric *vquadrics,
         const float *vweights, const float vweight_factor,
-        Heap *eheap, HeapNode **eheap_table)
+        Heap *eheap, HeapNode **eheap_table,
+        const DecimQuality *dq)
 {
 	float cost;
 
@@ -281,9 +706,31 @@ static void bm_decim_build_edge_cost_single(
 	}
 	/* end sanity check */
 
-	{
+	if (dq) {
+		const Quadric *q1 = &vquadrics[BM_elem_index_get(e->v1)];
+		const Quadric *q2 = &vquadrics[BM_elem_index_get(e->v2)];
+		const float len_sq = len_squared_v3v3(e->v1->co, e->v2->co);
 		double optimize_co[3];
-		bm_decim_calc_target_co_db(e, optimize_co, vquadrics);
+		float optimize_co_fl[3];
+		bool seam_break;
+
+		bm_decim_quality_target_co(dq, e, optimize_co, vquadrics, &seam_break);
+		copy_v3fl_v3db(optimize_co_fl, optimize_co);
+
+		cost = fabsf((float)(BLI_quadric_evaluate(q1, optimize_co) +
+		                     BLI_quadric_evaluate(q2, optimize_co)));
+
+		/* Flat areas have no quadric cost: this is what orders them (short edges first, no thin triangles),
+		 * it replaces the topology fallback. */
+		cost += (float)QUALITY_SHAPE_WEIGHT * len_sq * bm_decim_quality_shape(e, optimize_co_fl);
+
+		if (seam_break) {
+			cost += (float)QUALITY_SEAM_BREAK_WEIGHT * len_sq;
+		}
+	}
+	else {
+		double optimize_co[3];
+		bm_decim_calc_target_co_db(e, optimize_co, vquadrics, NULL);
 
 		const Quadric *q1, *q2;
 		q1 = &vquadrics[BM_elem_index_get(e->v1)];
@@ -298,7 +745,7 @@ static void bm_decim_build_edge_cost_single(
 	cost = fabsf(cost);
 
 #ifdef USE_TOPOLOGY_FALLBACK
-	if (UNLIKELY(cost < TOPOLOGY_FALLBACK_EPS)) {
+	if (UNLIKELY((dq == NULL) && (cost < TOPOLOGY_FALLBACK_EPS))) {
 		/* subtract existing cost to further differentiate edges from one another
 		 *
 		 * keep topology cost below 0.0 so their values don't interfere with quadric cost,
@@ -356,7 +803,8 @@ static void bm_decim_build_edge_cost(
         BMesh *bm,
         const Quadric *vquadrics,
         const float *vweights, const float vweight_factor,
-        Heap *eheap, HeapNode **eheap_table)
+        Heap *eheap, HeapNode **eheap_table,
+        const DecimQuality *dq)
 {
 	BMIter iter;
 	BMEdge *e;
@@ -364,7 +812,7 @@ static void bm_decim_build_edge_cost(
 
 	BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
 		eheap_table[i] = NULL;  /* keep sanity check happy */
-		bm_decim_build_edge_cost_single(e, vquadrics, vweights, vweight_factor, eheap, eheap_table);
+		bm_decim_build_edge_cost_single(e, vquadrics, vweights, vweight_factor, eheap, eheap_table, dq);
 	}
 }
 
@@ -691,6 +1139,199 @@ static void bm_decim_triangulate_end(BMesh *bm, const int edges_tri_tot)
 #ifdef USE_CUSTOMDATA
 
 /**
+ * Keep the triangle of \a l when \a co is closer to being inside it than the best one so far.
+ */
+static void bm_edge_collapse_loop_tri_test(
+        BMLoop *l, const float co[3],
+        float *score_best, BMLoop *r_l_tri[3], float r_w[3])
+{
+	BMLoop *l_tri[3] = {l, l->next, l->prev};
+	float w[3], score;
+
+	if (l->f->len != 3) {
+		return;
+	}
+
+	/* Barycentric weights of 'co' projected on the triangle,
+	 * #interp_weights_tri_v3 isn't used because its epsilon gives up on small triangles. */
+	{
+		const float *a = l_tri[0]->v->co, *b = l_tri[1]->v->co, *c = l_tri[2]->v->co;
+		double ab[3], ac[3], pa[3], pb[3], pc[3], n[3], t[3];
+		bm_decim_quality_sub_v3(ab, b, a);
+		bm_decim_quality_sub_v3(ac, c, a);
+		bm_decim_quality_sub_v3(pa, a, co);
+		bm_decim_quality_sub_v3(pb, b, co);
+		bm_decim_quality_sub_v3(pc, c, co);
+		bm_decim_quality_cross_v3(n, ab, ac);
+		const double n_len_sq = bm_decim_quality_dot_v3(n, n);
+		if (n_len_sq <= DBL_MIN) {
+			return;
+		}
+		bm_decim_quality_cross_v3(t, pb, pc);
+		w[0] = (float)(bm_decim_quality_dot_v3(t, n) / n_len_sq);
+		bm_decim_quality_cross_v3(t, pc, pa);
+		w[1] = (float)(bm_decim_quality_dot_v3(t, n) / n_len_sq);
+		w[2] = 1.0f - (w[0] + w[1]);
+	}
+	score = min_fff(w[0], w[1], w[2]);
+	if (score > *score_best) {
+		*score_best = score;
+		copy_v3_v3(r_w, w);
+		r_l_tri[0] = l_tri[0];
+		r_l_tri[1] = l_tri[1];
+		r_l_tri[2] = l_tri[2];
+	}
+}
+
+/**
+ * Walk the 2 fans starting at the face of \a l (as #bm_edge_collapse_loop_customdata does),
+ * over the corners sharing the value of this face (the same uv island).
+ *
+ * \param value: When NULL look for the triangle \a co is on, otherwise assign it to the corners.
+ */
+static void bm_edge_collapse_loop_fans_quality(
+        BMLoop *l, BMVert *v_clear, const int type, const int offset,
+        const float co[3], float *score_best, BMLoop *r_l_tri[3], float r_w[3],
+        const void *value, const size_t value_size)
+{
+	BMFace *f_exit = BM_edge_is_manifold(l->e) ? l->radial_next->f : NULL;
+
+	if (value == NULL) {
+		bm_edge_collapse_loop_tri_test(l, co, score_best, r_l_tri, r_w);
+	}
+
+	for (int side = 0; side < 2; side++) {
+		BMLoop *l_first = ((l->v == v_clear) == (side == 0)) ? l : l->next;
+		BMLoop *l_iter = l_first;
+		const void *cd_src = POINTER_OFFSET(l_first->head.data, offset);
+		BMEdge *e_prev = l->e;
+
+		while (((l_iter = BM_vert_step_fan_loop(l_iter, &e_prev)) != l_first) && (l_iter != NULL)) {
+			/* quit once we hit the opposite face, if we have one */
+			if (f_exit && UNLIKELY(f_exit == l_iter->f)) {
+				break;
+			}
+			void *cd_iter = POINTER_OFFSET(l_iter->head.data, offset);
+			if (CustomData_data_equals(type, cd_src, cd_iter)) {
+				if (value == NULL) {
+					bm_edge_collapse_loop_tri_test(l_iter, co, score_best, r_l_tri, r_w);
+				}
+				else {
+					memcpy(cd_iter, value, value_size);
+				}
+			}
+		}
+	}
+}
+
+/**
+ * High quality version of #bm_edge_collapse_loop_customdata, for both faces of the edge at once.
+ *
+ * Interpolating along the edge is only right while the vertex ends up on the edge.
+ * Here the value is read at \a co_target, from the triangle (of the same uv island) it lands on,
+ * so the uv's don't drift when the vertex moves sideways or slides along a crease.
+ *
+ * \param l_b: The other face of the edge, NULL for boundaries.
+ */
+static void bm_edge_collapse_loop_customdata_quality(
+        BMesh *bm, BMLoop *l_a, BMLoop *l_b, BMVert *v_clear,
+        const float customdata_fac, const float co_target[3])
+{
+	BMLoop *l_pair[2] = {l_a, l_b};
+
+	for (int i = 0; i < bm->ldata.totlayer; i++) {
+		if (!CustomData_layer_has_math(&bm->ldata, i)) {
+			continue;
+		}
+
+		const int offset = bm->ldata.layers[i].offset;
+		const int type = bm->ldata.layers[i].type;
+		const size_t size = (size_t)CustomData_sizeof(type);
+		bool is_joined = false;
+
+		if (size > 64) {
+			BLI_assert(0);
+			continue;
+		}
+
+		/* Without a seam between the faces both sides have to end up with the same value,
+		 * so they look for the triangle together. */
+		if (l_b) {
+			const BMLoop *l_a_clear = (l_a->v == v_clear) ? l_a : l_a->next;
+			const BMLoop *l_a_other = (l_a->v == v_clear) ? l_a->next : l_a;
+			const BMLoop *l_b_clear = (l_b->v == v_clear) ? l_b : l_b->next;
+			const BMLoop *l_b_other = (l_b->v == v_clear) ? l_b->next : l_b;
+			is_joined = (CustomData_data_equals(
+			                     type,
+			                     POINTER_OFFSET(l_a_clear->head.data, offset),
+			                     POINTER_OFFSET(l_b_clear->head.data, offset)) &&
+			             CustomData_data_equals(
+			                     type,
+			                     POINTER_OFFSET(l_a_other->head.data, offset),
+			                     POINTER_OFFSET(l_b_other->head.data, offset)));
+		}
+
+		for (int group = 0; group < 2; group++) {
+			char value[64] = {0};
+			BMLoop *l_tri[3] = {NULL, NULL, NULL};
+			float w[3];
+			float score_best = -FLT_MAX;
+
+			if (l_pair[group] == NULL || (is_joined && group == 1)) {
+				continue;
+			}
+
+			for (int j = group; j < 2; j++) {
+				if (l_pair[j] && (j == group || is_joined)) {
+					bm_edge_collapse_loop_fans_quality(
+					        l_pair[j], v_clear, type, offset, co_target, &score_best, l_tri, w, NULL, 0);
+				}
+			}
+
+			if (l_tri[0]) {
+				float w_sum;
+				/* don't extrapolate */
+				w[0] = max_ff(w[0], 0.0f);
+				w[1] = max_ff(w[1], 0.0f);
+				w[2] = max_ff(w[2], 0.0f);
+				w_sum = w[0] + w[1] + w[2];
+				if (w_sum > FLT_EPSILON) {
+					mul_v3_fl(w, 1.0f / w_sum);
+				}
+				else {
+					l_tri[0] = NULL;
+				}
+			}
+			if (l_tri[0] == NULL) {
+				BMLoop *l = l_pair[group];
+				l_tri[0] = (l->v == v_clear) ? l : l->next;
+				l_tri[1] = (l->v == v_clear) ? l->next : l;
+				l_tri[2] = l_tri[1];
+				w[0] = customdata_fac;
+				w[1] = 1.0f - customdata_fac;
+				w[2] = 0.0f;
+			}
+
+			{
+				const void *cd_tri[3] = {
+				    POINTER_OFFSET(l_tri[0]->head.data, offset),
+				    POINTER_OFFSET(l_tri[1]->head.data, offset),
+				    POINTER_OFFSET(l_tri[2]->head.data, offset),
+				};
+				CustomData_bmesh_interp_n(&bm->ldata, cd_tri, w, NULL, 3, value, i);
+			}
+
+			for (int j = group; j < 2; j++) {
+				if (l_pair[j] && (j == group || is_joined)) {
+					bm_edge_collapse_loop_fans_quality(
+					        l_pair[j], v_clear, type, offset, co_target, NULL, NULL, NULL, value, size);
+				}
+			}
+		}
+	}
+}
+
+/**
  * \param l: defines the vert to collapse into.
  */
 static void bm_edge_collapse_loop_customdata(
@@ -947,6 +1588,7 @@ static bool bm_edge_collapse_is_degenerate_topology(BMEdge *e_first)
  *
  * \param r_e_clear_other: Let caller know what edges we remove besides \a e_clear
  * \param customdata_flag: Merge factor, scales from 0 - 1 ('v_clear' -> 'v_other')
+ * \param co_target: Final location of the vertex (high quality mode), may be NULL.
  */
 static bool bm_edge_collapse(
         BMesh *bm, BMEdge *e_clear, BMVert *v_clear, int r_e_clear_other[2],
@@ -955,10 +1597,10 @@ static bool bm_edge_collapse(
 #endif
 #ifdef USE_CUSTOMDATA
         const CD_UseFlag customdata_flag,
-        const float customdata_fac
+        const float customdata_fac, const float *co_target
 #else
         const CD_UseFlag UNUSED(customdata_flag),
-        const float UNUSED(customdata_fac)
+        const float UNUSED(customdata_fac), const float *UNUSED(co_target)
 #endif
         )
 {
@@ -1028,8 +1670,14 @@ static bool bm_edge_collapse(
 			BM_data_interp_from_edges(bm, e_b_other[1], e_b_other[0], e_b_other[1], customdata_fac);
 		}
 		if (customdata_flag & CD_DO_LOOP) {
-			bm_edge_collapse_loop_customdata(bm, e_clear->l,              v_clear, v_other, customdata_fac);
-			bm_edge_collapse_loop_customdata(bm, e_clear->l->radial_next, v_clear, v_other, customdata_fac);
+			if (co_target) {
+				bm_edge_collapse_loop_customdata_quality(
+				        bm, e_clear->l, e_clear->l->radial_next, v_clear, customdata_fac, co_target);
+			}
+			else {
+				bm_edge_collapse_loop_customdata(bm, e_clear->l,              v_clear, v_other, customdata_fac);
+				bm_edge_collapse_loop_customdata(bm, e_clear->l->radial_next, v_clear, v_other, customdata_fac);
+			}
 		}
 #endif
 
@@ -1090,7 +1738,12 @@ static bool bm_edge_collapse(
 			BM_data_interp_from_edges(bm, e_a_other[1], e_a_other[0], e_a_other[1], customdata_fac);
 		}
 		if (customdata_flag & CD_DO_LOOP) {
-			bm_edge_collapse_loop_customdata(bm, e_clear->l, v_clear, v_other, customdata_fac);
+			if (co_target) {
+				bm_edge_collapse_loop_customdata_quality(bm, e_clear->l, NULL, v_clear, customdata_fac, co_target);
+			}
+			else {
+				bm_edge_collapse_loop_customdata(bm, e_clear->l, v_clear, v_other, customdata_fac);
+			}
 		}
 #endif
 
@@ -1135,7 +1788,8 @@ static bool bm_decim_edge_collapse(
         int *edge_symmetry_map,
 #endif
         const CD_UseFlag customdata_flag,
-        float optimize_co[3], bool optimize_co_calc
+        float optimize_co[3], bool optimize_co_calc,
+        const DecimQuality *dq
         )
 {
 	int e_clear_other[2];
@@ -1157,7 +1811,7 @@ static bool bm_decim_edge_collapse(
 			return false;
 		}
 
-		bm_decim_calc_target_co_fl(e, optimize_co, vquadrics);
+		bm_decim_calc_target_co_fl(e, optimize_co, vquadrics, dq);
 
 		/* check if this would result in an overlapping face */
 		if (UNLIKELY(bm_edge_collapse_is_degenerate_flip(e, optimize_co))) {
@@ -1181,12 +1835,17 @@ static bool bm_decim_edge_collapse(
 		customdata_fac = 0.5f;
 	}
 
+	if (dq) {
+		/* never extrapolate vertex and edge data */
+		CLAMP(customdata_fac, 0.0f, 1.0f);
+	}
+
 	if (bm_edge_collapse(
 	        bm, e, e->v2, e_clear_other,
 #ifdef USE_SYMMETRY
 	        edge_symmetry_map,
 #endif
-	        customdata_flag, customdata_fac))
+	        customdata_flag, customdata_fac, dq ? optimize_co : NULL))
 	{
 		/* update collapse info */
 		int i;
@@ -1200,6 +1859,18 @@ static bool bm_decim_edge_collapse(
 		e = NULL;  /* paranoid safety check */
 
 		copy_v3_v3(v_other->co, optimize_co);
+
+		if (dq && dq->vert_seam_tot) {
+			/* the uv's of this vertex and the faces of the ones around it changed */
+			dq->vert_seam_tot[v_other_index] = -1;
+			if (v_other->e) {
+				BMEdge *e_iter, *e_first;
+				e_iter = e_first = v_other->e;
+				do {
+					dq->vert_seam_tot[BM_elem_index_get(BM_edge_other_vert(e_iter, v_other))] = -1;
+				} while ((e_iter = bmesh_disk_edge_next(e_iter, v_other)) != e_first);
+			}
+		}
 
 		/* remove eheap */
 		for (i = 0; i < 2; i++) {
@@ -1232,7 +1903,7 @@ static bool bm_decim_edge_collapse(
 			e_iter = e_first = v_other->e;
 			do {
 				BLI_assert(BM_edge_find_double(e_iter) == NULL);
-				bm_decim_build_edge_cost_single(e_iter, vquadrics, vweights, vweight_factor, eheap, eheap_table);
+				bm_decim_build_edge_cost_single(e_iter, vquadrics, vweights, vweight_factor, eheap, eheap_table, dq);
 			} while ((e_iter = bmesh_disk_edge_next(e_iter, v_other)) != e_first);
 		}
 
@@ -1254,7 +1925,7 @@ static bool bm_decim_edge_collapse(
 
 					BLI_assert(BM_vert_in_edge(e_outer, l->v) == false);
 
-					bm_decim_build_edge_cost_single(e_outer, vquadrics, vweights, vweight_factor, eheap, eheap_table);
+					bm_decim_build_edge_cost_single(e_outer, vquadrics, vweights, vweight_factor, eheap, eheap_table, dq);
 				}
 			}
 		}
@@ -1281,13 +1952,17 @@ static bool bm_decim_edge_collapse(
  *        a vertex group is the usual source for this.
  * \param symmetry_axis: Axis of symmetry, -1 to disable mirror decimate.
  * \param symmetry_eps: Threshold when matching mirror verts.
+ * \param use_quality: High quality mode: area weighted quadrics, stable vertex placement that
+ *        preserves the volume, evenly shaped triangles and uv-seams kept in place.
+ *        When false the result is the same as it always was (existing files rely on it).
  */
 void BM_mesh_decimate_collapse(
         BMesh *bm,
         const float factor,
         float *vweights, float vweight_factor,
         const bool do_triangulate,
-        const int symmetry_axis, const float symmetry_eps)
+        const int symmetry_axis, const float symmetry_eps,
+        const bool use_quality)
 {
 	Heap *eheap;             /* edge heap */
 	HeapNode **eheap_table;  /* edge index aligned table pointing to the eheap */
@@ -1296,6 +1971,9 @@ void BM_mesh_decimate_collapse(
 	int face_tot_target;
 
 	CD_UseFlag customdata_flag = 0;
+
+	DecimQuality dq_buf;
+	const DecimQuality *dq = NULL;
 
 #ifdef USE_SYMMETRY
 	bool use_symmetry = (symmetry_axis != -1);
@@ -1319,10 +1997,34 @@ void BM_mesh_decimate_collapse(
 	tot_edge_orig = bm->totedge;
 
 
-	/* build initial edge collapse cost data */
-	bm_decim_build_quadrics(bm, vquadrics);
+	if (use_quality) {
+		BMIter iter;
+		BMFace *f;
+		double area_tot = 0.0;
 
-	bm_decim_build_edge_cost(bm, vquadrics, vweights, vweight_factor, eheap, eheap_table);
+		dq_buf.uv_layer_tot = min_ii(CustomData_number_of_layers(&bm->ldata, CD_MLOOPUV), QUALITY_UV_LAYERS_MAX);
+		for (int i = 0; i < dq_buf.uv_layer_tot; i++) {
+			dq_buf.cd_loop_uv_offset[i] = CustomData_get_n_offset(&bm->ldata, CD_MLOOPUV, i);
+		}
+
+		BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+			area_tot += (double)BM_face_calc_area(f);
+		}
+		dq_buf.face_area_inv = (area_tot > DBL_MIN) ? ((double)bm->totface / area_tot) : 1.0;
+
+		dq_buf.vert_seam_tot = NULL;
+		if (dq_buf.uv_layer_tot != 0) {
+			dq_buf.vert_seam_tot = MEM_mallocN(sizeof(int) * bm->totvert, __func__);
+			copy_vn_i(dq_buf.vert_seam_tot, bm->totvert, -1);
+		}
+
+		dq = &dq_buf;
+	}
+
+	/* build initial edge collapse cost data */
+	bm_decim_build_quadrics(bm, vquadrics, dq);
+
+	bm_decim_build_edge_cost(bm, vquadrics, vweights, vweight_factor, eheap, eheap_table, dq);
 
 	face_tot_target = bm->totface * factor;
 	bm->elem_index_dirty |= BM_ALL;
@@ -1365,7 +2067,7 @@ void BM_mesh_decimate_collapse(
 			        edge_symmetry_map,
 #endif
 			        customdata_flag,
-			        optimize_co, true
+			        optimize_co, true, dq
 			        );
 		}
 	}
@@ -1429,7 +2131,7 @@ void BM_mesh_decimate_collapse(
 					goto invalidate;
 				}
 
-				bm_decim_calc_target_co_fl(e, optimize_co, vquadrics);
+				bm_decim_calc_target_co_fl(e, optimize_co, vquadrics, dq);
 
 				if (e_index_mirr == e_index) {
 					optimize_co[symmetry_axis] = 0.0f;
@@ -1440,13 +2142,24 @@ void BM_mesh_decimate_collapse(
 					e_invalidate |= (1 | (e_mirr ? 2 : 0));
 					goto invalidate;
 				}
+
+				/* the mirrored edge was never checked, asymmetric meshes got faces turned over */
+				if (dq && e_mirr) {
+					float optimize_co_mirr[3];
+					copy_v3_v3(optimize_co_mirr, optimize_co);
+					optimize_co_mirr[symmetry_axis] *= -1.0f;
+					if (UNLIKELY(bm_edge_collapse_is_degenerate_flip(e_mirr, optimize_co_mirr))) {
+						e_invalidate |= (1 | 2);
+						goto invalidate;
+					}
+				}
 			}
 
 			if (bm_decim_edge_collapse(
 			        bm, e, vquadrics, vweights, vweight_factor, eheap, eheap_table,
 			        edge_symmetry_map,
 			        customdata_flag,
-			        optimize_co, false))
+			        optimize_co, false, dq))
 			{
 				if (e_mirr && (eheap_table[e_index_mirr])) {
 					BLI_assert(e_index_mirr != e_index);
@@ -1457,7 +2170,7 @@ void BM_mesh_decimate_collapse(
 					        bm, e_mirr, vquadrics, vweights, vweight_factor, eheap, eheap_table,
 					        edge_symmetry_map,
 					        customdata_flag,
-					        optimize_co, false);
+					        optimize_co, false, dq);
 				}
 			}
 			else {
@@ -1498,6 +2211,9 @@ invalidate:
 #endif
 
 	/* free vars */
+	if (dq && dq->vert_seam_tot) {
+		MEM_freeN(dq->vert_seam_tot);
+	}
 	MEM_freeN(vquadrics);
 	MEM_freeN(eheap_table);
 	BLI_heap_free(eheap, NULL);

@@ -1758,6 +1758,13 @@ RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj)
 	else
 #endif
 	if (bHasModifier) {
+		for (ModifierData *md = (ModifierData *)blenderobj->modifiers.first; md; md = md->next) {
+			if (md->type == eModifierType_Decimate && (md->mode & eModifierMode_Realtime)) {
+				CM_Warning("object \"" << (blenderobj->id.name + 2) << "\": Decimate modifier is recalculated when the game starts"
+				           " (every frame on animated meshes), apply it to avoid the cost");
+				break;
+			}
+		}
 		if (isParentArmature) {
 			BL_ModifierDeformer *modifierDeformer = new BL_ModifierDeformer(object, blenderScene, meshblendobj, blenderobj,
 			                                                                meshobj, static_cast<BL_ArmatureObject *>(parentobj));
