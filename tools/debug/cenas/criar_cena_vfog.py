@@ -7,7 +7,7 @@ import bmesh
 import math
 import os
 import sys
-from mathutils import Vector
+from mathutils import Vector, noise
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 pasta = argv[0]
@@ -93,6 +93,17 @@ def malha(name, criar, location):
     return obj
 
 
+def criar_montanhas(bm):
+    """Terreno de 60 x 60 m, com relevo fixo de ruído para a cena de nuvens/fog."""
+    bmesh.ops.create_grid(bm, x_segments=64, y_segments=64, size=30.0)
+    for vert in bm.verts:
+        p = vert.co
+        baixo = noise.noise(Vector((p.x * 0.075, p.y * 0.075, 3.1)))
+        medio = noise.noise(Vector((p.x * 0.19, p.y * 0.19, 17.3)))
+        alto = noise.noise(Vector((p.x * 0.52, p.y * 0.52, 41.7)))
+        vert.co.z = baixo * 5.0 + medio * 1.6 + alto * 0.45
+
+
 
 def lampada(name, tipo, location, color, energy, dist, alvo=None):
     la = bpy.data.lamps.new(name, tipo)
@@ -118,26 +129,32 @@ def gerar(preset):
     gs.resolution_x = 1280
     gs.resolution_y = 720
 
-    chao = malha('chao', lambda bm: bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=60), (0, 0, 0))
-    chao.data.materials.append(principled('chao', (0.35, 0.35, 0.38, 1.0)))
+    if preset == 'medium_montanhas':
+        chao = malha('montanhas', criar_montanhas, (0, 0, 0))
+        chao.data.materials.append(principled('grama_montanhas', (0.12, 0.36, 0.10, 1.0)))
+    else:
+        chao = malha('chao', lambda bm: bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=60), (0, 0, 0))
+        chao.data.materials.append(principled('chao', (0.35, 0.35, 0.38, 1.0)))
     scene.objects.link(chao)
-    for i, x in enumerate((-12, -4, 4, 12)):
-        col = malha('coluna%d' % i, lambda bm: bmesh.ops.create_cube(bm, size=1.0), (x, 18, 6))
-        col.scale = (2.5, 2.5, 12)
-        col.data.materials.append(principled('coluna%d' % i, (0.5, 0.45, 0.4, 1.0)))
-        scene.objects.link(col)
-    cubo = malha('cubo_no_cone', lambda bm: bmesh.ops.create_cube(bm, size=1.5), (6, 4, 4))
-    cubo.data.materials.append(principled('cubo', (0.2, 0.6, 0.2, 1.0)))
-    scene.objects.link(cubo)
+    if preset != 'medium_montanhas':
+        for i, x in enumerate((-12, -4, 4, 12)):
+            col = malha('coluna%d' % i, lambda bm: bmesh.ops.create_cube(bm, size=1.0), (x, 18, 6))
+            col.scale = (2.5, 2.5, 12)
+            col.data.materials.append(principled('coluna%d' % i, (0.5, 0.45, 0.4, 1.0)))
+            scene.objects.link(col)
+        cubo = malha('cubo_no_cone', lambda bm: bmesh.ops.create_cube(bm, size=1.5), (6, 4, 4))
+        cubo.data.materials.append(principled('cubo', (0.2, 0.6, 0.2, 1.0)))
+        scene.objects.link(cubo)
 
     sun = lampada('sun', 'SUN', (0, 60, 40), (1.0, 0.95, 0.85), 0.3, 100, alvo=(0, 0, 0))
-    lampada('vermelha', 'POINT', (-8, 6, 2.5), (1.0, 0.15, 0.1), 4.0, 12)
-    lampada('azul', 'POINT', (-2, 12, 2.5), (0.15, 0.3, 1.0), 4.0, 12)
-    spot = lampada('spot', 'SPOT', (6, 4, 12), (1.0, 0.9, 0.7), 6.0, 30, alvo=(6, 4, 0))
-    spot.data.spot_size = math.radians(50)
-    spot.data.spot_blend = 0.3
-    spot.data.use_shadow = True
-    spot.data.shadow_buffer_size = 1024
+    if preset != 'medium_montanhas':
+        lampada('vermelha', 'POINT', (-8, 6, 2.5), (1.0, 0.15, 0.1), 4.0, 12)
+        lampada('azul', 'POINT', (-2, 12, 2.5), (0.15, 0.3, 1.0), 4.0, 12)
+        spot = lampada('spot', 'SPOT', (6, 4, 12), (1.0, 0.9, 0.7), 6.0, 30, alvo=(6, 4, 0))
+        spot.data.spot_size = math.radians(50)
+        spot.data.spot_blend = 0.3
+        spot.data.use_shadow = True
+        spot.data.shadow_buffer_size = 1024
 
     cam = bpy.data.objects.new('camera', bpy.data.cameras.new('camera'))
     cam.data.type = 'PERSP'
@@ -194,6 +211,22 @@ def gerar(preset):
         w.vfog_color = (0.95, 0.95, 0.92)
         cam.location = (0, -22, 14)
         cam.rotation_euler = (Vector((0, 10, 2)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+
+    if preset == 'medium_montanhas':
+        # Base para o item 8: terreno amplo sob uma neblina de altitude, visto de cima.
+        sun.data.energy = 1.4
+        sun.location = (28, -35, 45)
+        sun.rotation_euler = (Vector((0, 0, 0)) - sun.location).to_track_quat('-Z', 'Y').to_euler()
+        world.horizon_color = (0.42, 0.57, 0.76)
+        world.zenith_color = (0.16, 0.30, 0.58)
+        w.vfog_base = 2.0
+        w.vfog_falloff = 1.5
+        w.vfog_density = 0.25
+        w.vfog_distance = 100.0
+        w.vfog_noise_amount = 0.35
+        w.vfog_ambient = 0.7
+        cam.location = (0, -34, 31)
+        cam.rotation_euler = (Vector((0, 0, 1.5)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
 
     if preset.endswith('_volume'):
         w.vfog_volumes_only = True
@@ -252,7 +285,7 @@ def gerar(preset):
             vol.game.properties['fog_volume'].value = 3.0
             bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
             vol.game.properties['fog_shape'].value = forma
-    if preset == 'medium_fumaca':
+    if preset in ('medium_fumaca', 'medium_fumaca_dia'):
         w.vfog_volumes_only = True
         w.vfog_density = 0.22
         w.vfog_noise_amount = 0.0
@@ -381,5 +414,6 @@ def gerar(preset):
 
 for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
           'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca',
-          'medium_abre', 'medium_fogo', 'medium_explosao', 'medium_brilho'):
+          'medium_fumaca_dia', 'medium_abre', 'medium_fogo', 'medium_explosao', 'medium_brilho',
+          'medium_montanhas'):
     gerar(p)

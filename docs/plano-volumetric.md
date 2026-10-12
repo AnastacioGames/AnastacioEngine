@@ -24,16 +24,28 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 
 | # | Item | Status | Quem |
 |---|------|--------|------|
-| 1 | Vento e hora do dia | feito, aguarda aceite visual | Claude |
-| 2 | Raios de sol (Sun Shafts) | feito, aguarda aceite visual | Claude |
-| 3 | Fog Volumes melhores | feito, aguarda aceite visual | Claude |
-| 4 | Controle por Python / Logic | feito (2ec9637b), aguarda aceite visual | Codex |
-| 5 | Fumaça/vapor locais | feito, aguarda aceite visual | Codex |
-| 6 | Neblina que abre ao passar | feito, aguarda aceite visual | Claude |
-| 7 | Emission acendendo a névoa | feito (fog_glow), aguarda aceite visual | Claude |
+| 1 | Vento e hora do dia | ✅ feito, aguarda aceite visual | Claude |
+| 2 | Raios de sol (Sun Shafts) | ✅ feito, aguarda aceite visual | Claude |
+| 3 | Fog Volumes melhores | ✅ feito, aguarda aceite visual | Claude |
+| 4 | Controle por Python / Logic | ✅ feito (2ec9637b), aguarda aceite visual | Codex |
+| 5 | Fumaça/vapor locais | ✅ feito (884e4d26), aguarda aceite visual | Codex |
+| 6 | Neblina que abre ao passar | ✅ feito, aguarda aceite visual | Claude |
+| 7 | Emission acendendo a névoa | ✅ feito (fog_glow), aguarda aceite visual | Claude |
 | 8 | Nuvens + névoa contínuas | pendente | |
 | 9 | Froxels | pendente | |
-| 10 | Fogo/explosão volumétrico | feito, aguarda aceite visual | Codex |
+| 10 | Fogo/explosão volumétrico | ✅ feito (884e4d26), aguarda aceite visual | Codex |
+
+## Performance
+
+Medição na cena `high`, em 1280×720:
+
+| Resolução da neblina | GPU |
+|---|---:|
+| Full | 2,76 ms |
+| Half | 1,03 ms |
+| Quarter | 0,58 ms |
+
+✅ A opção Resolution Full/Half/Quarter foi entregue em `b5f270f0`; ✅ as correções de qualidade em `68e70635`.
 
 ## 1. Vento e hora do dia
 - **Wind** (`vfog_use_wind`, `vfog_wind_direction` em graus em Z): o ruído é levado pelo vento.
