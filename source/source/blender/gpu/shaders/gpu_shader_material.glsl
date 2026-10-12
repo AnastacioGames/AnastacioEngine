@@ -3954,8 +3954,10 @@ vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat
 		return vec3(1.0);
 	}
 	vec4 c = texture2D(colormap, co.xy);
-	/* Margin: a glass pane must not catch its own tint (acne, very visible with Glow). */
-	return (co.z > c.a + 0.002) ? c.rgb : vec3(1.0);
+	/* Margin: a glass pane must not catch its own tint (acne, very visible with Glow). Only the half
+	 * float error of the stored depth (up to ~0.0005): a Sun cascade spans hundreds of meters, so a
+	 * larger margin hides the tint from a floor right behind the glass. */
+	return (co.z > c.a + 0.0008) ? c.rgb : vec3(1.0);
 }
 
 void shade_shadow_tint(vec3 lcol, vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias,

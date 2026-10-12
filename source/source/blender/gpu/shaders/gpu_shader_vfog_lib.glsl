@@ -45,7 +45,7 @@ uniform sampler2D vfog_shadowcolor2;
 vec3 vfogShadowTint(sampler2D colormap, vec3 uvz)
 {
 	vec4 c = texture(colormap, uvz.xy);
-	return (uvz.z > c.a + 0.002) ? c.rgb : vec3(1.0);
+	return (uvz.z > c.a + 0.0008) ? c.rgb : vec3(1.0);
 }
 
 float vfogHash(vec3 p)
@@ -655,6 +655,7 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 	 * reach, so a narrow Spot cone gets all its samples instead of 1-2 of the main march. */
 	int steps = (quality > 1.5) ? 24 : 12;
 	float ds = (seg.y - seg.x) / float(steps);
+	bool dustOn = vfog_data[VFOG_DUST].x > 0.001;
 	float jitter = vfogJitter(fragCoord, frame);
 	float t = seg.x + ds * jitter;
 	float T = 1.0;
@@ -673,10 +674,12 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 		vec3 col;
 		vec3 emission;
 		float sigma = vfogDensityColor(p, col, emission);
-		float dust = vfogDust(p);
-		if (sigma > 1e-5 || dust > 0.0) {
+		if (sigma > 1e-5 || dustOn) {
 			vec3 sunLit = sunLight * vfogSunShadow(p);
-			L += T * sunLit * dust * ds;
+			/* Dust only where the sun reaches: no noise in the shadowed steps. */
+			if (dustOn && dot(sunLit, sunLit) > 1e-8) {
+				L += T * sunLit * vfogDust(p) * ds;
+			}
 			if (sigma > 1e-5) {
 				sigma *= vfogPatches(p);
 				float stepT = exp(-sigma * ds);
@@ -812,11 +815,13 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 			vec3 p = ro + rd * lt;
 			vec3 toPoint;
 			vec3 lamp = vfogLamp(i, p, toPoint);
-			if (dot(lamp, lamp) > 1e-8) {
+			/* Shadow first: a shadowed step adds nothing, skip its density and dust. */
+			vec3 shadow = (dot(lamp, lamp) > 1e-8) ? vfogShadow(i, p) : vec3(0.0);
+			if (dot(shadow, shadow) > 1e-8) {
 				vec3 col;
 				vec3 emission;
 				float sigma = vfogDensityColor(p, col, emission);
-				float dust = vfogDust(p);
+				float dust = dustOn ? vfogDust(p) : 0.0;
 				if (sigma > 1e-5 || dust > 0.0) {
 					sigma = (sigma > 1e-5) ? sigma * vfogPatches(p) : 0.0;
 					float k = clamp((lt - seg.x) / max(ds, 1e-4), 0.0, float(steps));
@@ -824,7 +829,7 @@ vec4 vfogScatterFog(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 					int k1 = min(k0 + 1, steps);
 					float Tl = mix(Tsteps[k0], Tsteps[k1], fract(k));
 					float phase = vfogPhase(dot(rd, normalize(toPoint)), phaseG) * 12.566371;
-					acc += Tl * lamp * (col * sigma + vec3(dust)) * phase * vfogShadow(i, p) * lds;
+					acc += Tl * lamp * (col * sigma + vec3(dust)) * phase * shadow * lds;
 				}
 			}
 			lt += lds;

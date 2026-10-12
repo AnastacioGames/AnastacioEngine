@@ -72,7 +72,8 @@ public:
 	void BindShadowBuffer(RAS_ICanvas *canvas, KX_Camera *cam, mt::mat3x4& camtrans);
 	void UnbindShadowBuffer();
 	bool BeginShadowColor(short cascadeIndex);
-	void EndShadowColor(short cascadeIndex);
+	void EndShadowColor(short cascadeIndex, bool drewCasters);
+	bool ShadowColorDirty(short cascadeIndex);
 	bool HasCascadedShadow();
 	void BindCascadeShadowBuffer(RAS_ICanvas *canvas, short cascadeIndex, KX_Camera *cam, mt::mat3x4& camtrans,
 	                             const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);

@@ -45,6 +45,10 @@
 #include "RAS_DebugDraw.h"
 #include "RAS_CameraData.h"
 #include "RAS_BucketManager.h"
+#include "RAS_MaterialBucket.h"
+#include "RAS_IMaterial.h"
+#include "RAS_MeshMaterial.h"
+#include "KX_Mesh.h"
 
 KX_ShadowRenderer::KX_ShadowRenderer(KX_KetsjiEngine *engine)
 	:m_engine(engine)
@@ -263,6 +267,29 @@ public:
 		m_cam->Release();
 	}
 };
+
+/// Objects with a Colored Shadows material among the shadow casters of a pass.
+static void KX_CollectColorShadowCasters(const std::vector<KX_GameObject *>& objects, std::vector<KX_GameObject *>& casters)
+{
+	casters.clear();
+	for (KX_GameObject *obj : objects) {
+		bool colored = false;
+		for (KX_Mesh *mesh : obj->GetMeshList()) {
+			for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+				if (meshmat->GetBucket()->GetMaterial()->IsColorShadow()) {
+					colored = true;
+					break;
+				}
+			}
+			if (colored) {
+				break;
+			}
+		}
+		if (colored) {
+			casters.push_back(obj);
+		}
+	}
+}
 
 /// Unbinds the static shadow sub-pass framebuffer on scope exit, so a future early return
 /// added between BindStaticShadowBuffer and the matching UnbindStaticShadowBuffer (e.g. an
@@ -678,10 +705,19 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						}
 
 						// Colored shadows: the Colored Shadows casters, tested against the depth just drawn.
-						if (!usePoint && scene->GetBucketManager()->HasColorShadowBuckets() &&
-						    raslight->BeginShadowColor(useCascade ? pass : 0)) {
-							scene->RenderBuckets(objects, RAS_Rasterizer::RAS_SHADOW, camtrans, rasty, nullptr);
-							raslight->EndShadowColor(useCascade ? pass : 0);
+						// Only those objects are drawn, and with none in view of this pass the pass is
+						// skipped once its target has been left white.
+						if (!usePoint && scene->GetBucketManager()->HasColorShadowBuckets()) {
+							static std::vector<KX_GameObject *> colorCasters;
+							const short colorPass = useCascade ? pass : 0;
+							KX_CollectColorShadowCasters(objects, colorCasters);
+							const bool drew = !colorCasters.empty();
+							if ((drew || raslight->ShadowColorDirty(colorPass)) && raslight->BeginShadowColor(colorPass)) {
+								if (drew) {
+									scene->RenderBuckets(colorCasters, RAS_Rasterizer::RAS_SHADOW, camtrans, rasty, nullptr);
+								}
+								raslight->EndShadowColor(colorPass, drew);
+							}
 						}
 					}
 					else {

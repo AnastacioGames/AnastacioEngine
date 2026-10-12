@@ -384,12 +384,19 @@ bool RAS_OpenGLLight::BeginShadowColor(short cascadeIndex)
 	return true;
 }
 
-void RAS_OpenGLLight::EndShadowColor(short cascadeIndex)
+void RAS_OpenGLLight::EndShadowColor(short cascadeIndex, bool drewCasters)
 {
 	GPULamp *lamp = GetGPULamp();
 	GPULamp *passLamp = (cascadeIndex == 0) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
 	m_rasterizer->SetShadowColorPass(false);
-	GPU_lamp_shadow_color_end(passLamp);
+	GPU_lamp_shadow_color_end(passLamp, drewCasters);
+}
+
+bool RAS_OpenGLLight::ShadowColorDirty(short cascadeIndex)
+{
+	GPULamp *lamp = GetGPULamp();
+	GPULamp *passLamp = (cascadeIndex == 0 || !lamp) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+	return passLamp && GPU_lamp_shadow_color_dirty(passLamp);
 }
 
 bool RAS_OpenGLLight::HasPointShadow()

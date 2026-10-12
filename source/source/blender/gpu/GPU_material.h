@@ -462,7 +462,9 @@ int GPU_lamp_shadow_buffer_type(GPULamp *lamp);
  * to the lamp's color target, cleared to white, where the Colored Shadows casters multiply their
  * transmittance (rgb) and keep their nearest depth (alpha). False without a color target. */
 bool GPU_lamp_shadow_color_begin(GPULamp *lamp);
-void GPU_lamp_shadow_color_end(GPULamp *lamp);
+/* drew_casters false: the target was only cleared, white (see GPU_lamp_shadow_color_dirty). */
+void GPU_lamp_shadow_color_end(GPULamp *lamp, bool drew_casters);
+bool GPU_lamp_shadow_color_dirty(GPULamp *lamp);
 int GPU_lamp_shadow_color_bind_code(GPULamp *lamp);
 int GPU_lamp_shadow_bind_code(GPULamp *lamp);
 const float *GPU_lamp_dynpersmat(GPULamp *lamp);

@@ -132,7 +132,10 @@ public:
 	 * lamp without cascades) to its color target, cleared to white, with multiply blending. False
 	 * when the lamp has no color target (Point, Variance, no Colored Shadows material at load). */
 	virtual bool BeginShadowColor(short cascadeIndex) = 0;
-	virtual void EndShadowColor(short cascadeIndex) = 0;
+	/// drewCasters false: only cleared to white, the next passes may be skipped (ShadowColorDirty).
+	virtual void EndShadowColor(short cascadeIndex, bool drewCasters) = 0;
+	/// The color target of that pass holds something other than white.
+	virtual bool ShadowColorDirty(short cascadeIndex) = 0;
 
 	/* Cascaded Shadow Mapping (Sun lamps only). cascadeIndex: 0=Near, 1=Medium, 2=Low.
 	 * The view/win matrices for the cascade (camera-frustum-fit ortho, computed by the caller)

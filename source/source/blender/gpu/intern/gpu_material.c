@@ -314,6 +314,11 @@ struct GPULamp {
 	/* Colored shadows: transmittance (rgb) and nearest depth (a) of the Colored Shadows casters,
 	 * a second attachment of `fb`. Only made when some material asks for it at lamp creation. */
 	GPUTexture *colortex;
+	/* colortex holds something other than white (cleared and left white when no caster is drawn). */
+	bool color_dirty;
+	/* colortex has its own framebuffer at half the shadow size (gpu_lamp_shadow_color_size): no depth
+	 * test needed, the depth of the nearest caster is kept in alpha. */
+	GPUFrameBuffer *colorfb;
 
 	/* Static shadow cache (Sun/CSM only, see GPU_lamp_shadow_static_*). Holds the depth of the
 	 * static shadow casters only, re-rendered rarely (dirty flag or view/win matrix drift beyond
@@ -4873,6 +4878,10 @@ static void gpu_lamp_shadow_free(GPULamp *lamp)
 		GPU_texture_free(lamp->colortex);
 		lamp->colortex = NULL;
 	}
+	if (lamp->colorfb) {
+		GPU_framebuffer_free(lamp->colorfb);
+		lamp->colorfb = NULL;
+	}
 	if (lamp->fb) {
 		GPU_framebuffer_free(lamp->fb);
 		lamp->fb = NULL;
@@ -4927,21 +4936,34 @@ static void gpu_lamp_shadow_color_clear(void)
 	}
 }
 
-/* Adds the color target to lamp->fb, left white (no tint) for whoever never draws the color pass
- * (the 3D View). A failure only leaves the lamp without colored shadows. */
+/* Half the shadow map: the colored light is soft enough, a quarter of the memory and bandwidth. */
+static int gpu_lamp_shadow_color_size(int size)
+{
+	return max_ii(size / 2, 64);
+}
+
+/* Creates the color target and its framebuffer, left white (no tint) for whoever never draws the
+ * color pass (the 3D View). A failure only leaves the lamp without colored shadows. */
 static void gpu_lamp_shadow_color_create(GPULamp *lamp)
 {
-	lamp->colortex = GPU_texture_create_2D(lamp->size, lamp->size, NULL, GPU_HDR_HALF_FLOAT, NULL);
-	if (!lamp->colortex) {
+	const int size = gpu_lamp_shadow_color_size(lamp->size);
+	lamp->colortex = GPU_texture_create_2D(size, size, NULL, GPU_HDR_HALF_FLOAT, NULL);
+	lamp->colorfb = lamp->colortex ? GPU_framebuffer_create() : NULL;
+	if (!lamp->colorfb || !GPU_framebuffer_texture_attach(lamp->colorfb, lamp->colortex, 0, NULL) ||
+	    !GPU_framebuffer_check_valid(lamp->colorfb, NULL))
+	{
+		if (lamp->colorfb) {
+			GPU_framebuffer_free(lamp->colorfb);
+			lamp->colorfb = NULL;
+		}
+		if (lamp->colortex) {
+			GPU_texture_free(lamp->colortex);
+			lamp->colortex = NULL;
+		}
 		return;
 	}
-	if (!GPU_framebuffer_texture_attach(lamp->fb, lamp->colortex, 0, NULL)) {
-		GPU_texture_free(lamp->colortex);
-		lamp->colortex = NULL;
-		return;
-	}
+	GPU_framebuffer_bind_no_save(lamp->colorfb, 0);
 	gpu_lamp_shadow_color_clear();
-	glDrawBuffer(GL_NONE);
 }
 
 /* Creates lamp->fb/tex/depthtex/blurfb/blurtex for lamp->size, per lamp->la->shadowmap_type.
@@ -5304,8 +5326,10 @@ static bool gpu_lamp_shadow_resize(GPULamp *lamp, int size)
 		return false;
 	if (lamp->static_depthtex && !GPU_texture_resize_2D(lamp->static_depthtex, size, size))
 		return false;
-	if (lamp->colortex && !GPU_texture_resize_2D(lamp->colortex, size, size))
+	if (lamp->colortex && !GPU_texture_resize_2D(lamp->colortex, gpu_lamp_shadow_color_size(size),
+	                                             gpu_lamp_shadow_color_size(size)))
 		return false;
+	lamp->color_dirty = (lamp->colortex != NULL);
 	lamp->static_valid = false;
 	lamp->size = size;
 	return true;
@@ -5442,12 +5466,22 @@ int GPU_lamp_shadow_buffer_type(GPULamp *lamp)
 	return lamp->la->shadowmap_type;
 }
 
+/* Framebuffer, viewport and depth test of the shadow pass, restored by GPU_lamp_shadow_color_end. */
+static GLint shadow_color_prev_fb;
+static int shadow_color_viewport[4];
+static GLboolean shadow_color_depth_test;
+
 bool GPU_lamp_shadow_color_begin(GPULamp *lamp)
 {
-	if (!lamp->fb || !lamp->colortex) {
+	if (!lamp->fb || !lamp->colortex || !lamp->colorfb) {
 		return false;
 	}
 
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &shadow_color_prev_fb);
+	glGetIntegerv(GL_VIEWPORT, shadow_color_viewport);
+	shadow_color_depth_test = glIsEnabled(GL_DEPTH_TEST);
+	GPU_framebuffer_bind_no_save(lamp->colorfb, 0);
+	glDisable(GL_DEPTH_TEST);
 	gpu_lamp_shadow_color_clear();
 
 	/* rgb: multiply by the caster's transmittance; alpha: keep the nearest caster depth */
@@ -5462,15 +5496,27 @@ bool GPU_lamp_shadow_color_begin(GPULamp *lamp)
 	return true;
 }
 
-void GPU_lamp_shadow_color_end(GPULamp *UNUSED(lamp))
+void GPU_lamp_shadow_color_end(GPULamp *lamp, bool drew_casters)
 {
 	GPU_shadow_color_pass = 0.0f;
+	lamp->color_dirty = drew_casters;
 
 	glBlendEquation(GL_FUNC_ADD);
+	/* Back to the shadow map framebuffer the pass was drawn in. */
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, (GLuint)shadow_color_prev_fb);
 	glDrawBuffer(GL_NONE);
+	glViewport(shadow_color_viewport[0], shadow_color_viewport[1], shadow_color_viewport[2], shadow_color_viewport[3]);
+	if (shadow_color_depth_test) {
+		glEnable(GL_DEPTH_TEST);
+	}
 	/* The blend state was changed behind the material blend cache: make it apply Solid again. */
 	GPU_set_material_alpha_blend(GPU_BLEND_ALPHA);
 	GPU_set_material_alpha_blend(GPU_BLEND_SOLID);
+}
+
+bool GPU_lamp_shadow_color_dirty(GPULamp *lamp)
+{
+	return lamp->colortex && lamp->color_dirty;
 }
 
 int GPU_lamp_shadow_color_bind_code(GPULamp *lamp)
