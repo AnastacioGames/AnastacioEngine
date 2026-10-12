@@ -2381,13 +2381,29 @@ void KX_GameObject::SetActivityCulling(ActivityCullingInfo::Flag flag, bool enab
 		// Restore physics or logic when disabling activity culling.
 		if (flag & ActivityCullingInfo::ACTIVITY_PHYSICS) {
 			RestorePhysics();
-			KX_Scene *scene = GetScene();
-			scene->RemoveCullingObject(this);
 		}
 		if (flag & ActivityCullingInfo::ACTIVITY_LOGIC) {
 			ResumeLogic();
+			if (m_actionManager) {
+				m_actionManager->Resume();
+			}
+		}
+
+		// Only stop tracking the object when no activity flag is left: the other flag
+		// still needs UpdateActivity() to run on it.
+		const ActivityCullingInfo::Flag activityFlags = (ActivityCullingInfo::Flag)(ActivityCullingInfo::ACTIVITY_PHYSICS | ActivityCullingInfo::ACTIVITY_LOGIC);
+		if (!(m_activityCullingInfo.m_flags & activityFlags)) {
 			KX_Scene *scene = GetScene();
 			scene->RemoveCullingObject(this);
+
+			// The object may have been culled while it was tracked; nothing else restores it now.
+			if (!m_bRender) {
+				m_bRender = true;
+				m_cullingNode.SetCulled(false);
+				if (m_bVisible) {
+					scene->GetRenderList()->Add(CM_AddRef(this));
+				}
+			}
 		}
 	}
 }

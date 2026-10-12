@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Culling de atividade: desligar uma flag tirava o objeto da lista da outra
+
+- Causa: `KX_GameObject::SetActivityCulling(..., false)` removia o objeto de `m_cullinglist` ao desligar só a fisica (ou só a logica), mesmo com a outra flag ligada. Sem estar na lista, `UpdateActivity` nunca rodava nele e a logica não era mais suspensa por distância. Mesmo caso para o contrário.
+- Outros dois problemas no mesmo ramo: se o objeto estava culled ao perder a última flag, ficava fora da render list para sempre (`m_bRender` nunca voltava a true); e desligar a logica de um objeto culled não retomava o `m_actionManager`.
+- Correção em `KX_GameObject.cpp` (`SetActivityCulling`): a lista só é limpa quando não sobra nenhuma flag de fisica/logica; ao sair da lista, o objeto é restaurado se estava culled; a logica retoma também o action manager.
+- Hipótese de Kitsuy (Discord, 2026-10-11) de `m_cullinglist.clear()` no construtor de `KX_Scene`: não se aplica, a lista é um `std::vector` membro e já nasce vazia.
+- Sugestão de Kitsuy de remover `PIL_sleep_ms(1)` em `wm_window.c` (`wm_window_process_events`, linha 1570): esse trecho só roda no `WM_main` do editor, com a UI ociosa. O jogo (Play no editor via `LA_BlenderLauncher` e player standalone via `GPG_Ghost`/`LA_PlayerLauncher`) roda no loop próprio `LA_Launcher::EngineMainLoop` (`while ... EngineNextFrame()`), que lê eventos direto do GHOST e não passa por esse sleep. Remover não ganha nada no jogo e faria o editor ocioso girar a CPU a 100%. Não alterado.
+- Teste: `tools/debug/cenas/criar_cena_activity_culling_logic.py` (headless). A (fisica desligada no frame 5) e B (controle) saem do raio no frame 60. Antes: A contava 59 / 99 / 179 nos frames 60 / 100 / 180; depois: 59 / 60 / 60, igual ao controle.
+- Não testado: o caso de objeto culled que perde a última flag (restauração de `m_bRender`/render list) e o retorno do action manager. Não há leitura de `m_bRender` no Python; dependem de visual ou de um probe em C++.
+
 ## 2026-10-12 - World Sound: filtro Music / Ambient no painel
 
 - Painel **Sound Modules** ganhou dois botões em linha (Music e Ambient); a lista mostra só os módulos do tipo escolhido.

@@ -1,10 +1,10 @@
 # Mapa de código — `KX_GameObject.cpp`
 
 Guia de navegação para achar rápido onde fica cada responsabilidade de
-[`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (7.005 linhas) sem ler o
+[`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (7.021 linhas) sem ler o
 arquivo inteiro. Não descreve arquitetura nem decisões; é só um índice.
 
-**Linhas conferidas em 2026-10-12 (`HEAD` `3f17c8f6`).** Números de linha são aproximados e envelhecem a cada
+**Linhas conferidas em 2026-10-12 (`HEAD` `8f87ad55`).** Números de linha são aproximados e envelhecem a cada
 edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`. Se o arquivo
 for dividido, este mapa deve
 ser refeito.
@@ -25,17 +25,17 @@ Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animaç�
 | Controllers (física/gráfico) | `GetPhysicsController` 363, `SetPhysicsController` 491, `Get/SetGraphicController` 436–441, `ActivateGraphicController` 994, `GetDeformer` 358 |
 | Grupos/instâncias e constraints | `Get/SetDupliGroupObject` 446/481, `Get/Add/RemoveInstanceObject(s)` 451–473, `GetConstraints`/`ReplicateConstraints` 557–562 |
 | Hierarquia | `GetParent` 575, `SetParent` 591, `RemoveParent` 662 |
-| Animação | `GetActionManager` 708, `PlayAction` 717, `StopAction` 740, `IsActionDone` 745, `IsActionsSuspended` 755, `UpdateActionManager` 760, frames/nomes/camadas 688–698 e 803–818, `SetPlayMode` 972, `SuspendAnimations`/`ResumeAnimations` 2419–2429, `Get/SetAnimationEventManager` 1389–1402, `GetDoAnimations`/`SetHalfAnimations` 1773–1785 |
+| Animação | `GetActionManager` 708, `PlayAction` 717, `StopAction` 740, `IsActionDone` 745, `IsActionsSuspended` 755, `UpdateActionManager` 760, frames/nomes/camadas 688–698 e 803–818, `SetPlayMode` 972, `SuspendAnimations`/`ResumeAnimations` 2435–2445, `Get/SetAnimationEventManager` 1389–1402, `GetDoAnimations`/`SetHalfAnimations` 1773–1785 |
 | Partículas GPU | `SetupGPUParticlesBuffer` 835, `SetupGPUParticles` 901, `SetupGPUParticlesMix` 906, `UpdateParticles` 911, `GetParticleBuffer(Mix)` 793–798 |
-| Colisão | `Set/GetCollisionGroup` 850/865, `Set/GetCollisionMask` 857/869, `Register/UnregisterCollisionCallbacks` 2157–2178, `RunCollisionCallbacks` 2467 |
+| Colisão | `Set/GetCollisionGroup` 850/865, `Set/GetCollisionMask` 857/869, `Register/UnregisterCollisionCallbacks` 2157–2178, `RunCollisionCallbacks` 2483 |
 | Física: parâmetros | `IsDynamic` 1062, damping 925–956, CCD 964–970, **soft body** (`SetSoft*`, coeficientes, solver iterations) 981–1154 |
-| Física: forças e velocidades | `ApplyForce/Torque/Movement/Rotation` 1166–1189, `Add/SetLinearVelocity`, `SetAngularVelocity` 1937–1952, `GetMass`…`GetVelocity` 2128–2195, `SuspendPhysics`/`RestorePhysics` 2402–2409 |
+| Física: forças e velocidades | `ApplyForce/Torque/Movement/Rotation` 1166–1189, `Add/SetLinearVelocity`, `SetAngularVelocity` 1937–1952, `GetMass`…`GetVelocity` 2128–2195, `SuspendPhysics`/`RestorePhysics` 2418–2425 |
 | Malhas e renderização | `UpdateBlenderObjectMatrix` 1354, `AddMeshUser` 1365, `UpdateBuckets` 1417, `ReplaceMesh` 1440, `RemoveMeshes` 1470, `GetMeshList` 1487, `Renderable` 1497, cor 1686–1691, `Get/SetPassIndex` 1654–1659, `Get/SetLayer` 1644–1649 |
 | LOD | `Set/GetLodManager` 1291–1313, `UpdateLod` 1529, `GetVisibleLOD`/`UpdateVisibleLOD` 1784–1789 |
 | Visibilidade e depuração | `GetVisible`/`SetVisible` 1821/1563, `SetOccluder` 1849, `SetUseDebugProperties` 1884, helpers `static` `setVisible_recursive` 1546, `setOccluder_recursive` 1575, `setDebug_recursive` 1603 |
 | Atividade e culling | `UpdateActivity` 1664, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2371, `UpdateBounds` 2309, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2356 |
 | SceneGraph e transformação | `UpdateTransform`/`SynchronizeTransform` 1739–1768, `AlignAxisToVect` 1954, `NodeSet*`/`NodeGet*` 1878–2015, `SetNode` 2304 |
-| Componentes Python | `SetComponents` 2609, `UpdateComponents` 2614 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
+| Componentes Python | `SetComponents` 2625, `UpdateComponents` 2630 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
 | Helpers `static` do núcleo | `setGraphicController_recursive` 823, `walk_children`/`walk_parent` 2224–2246 (servem a `GetChildren*`) |
 
 ## Bindings Python (linhas 2363–5979)
