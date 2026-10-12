@@ -1070,6 +1070,11 @@ def _edit_object_code(act):
             vel.append("new.setAngularVelocity(%s, %s)" % (_act_arg("Angular Velocity", act.angular_velocity),
                                                            act.use_local_angular_velocity))
         if not from_prop:
+            if any(layer and shown for sc in act.object.users_scene
+                   for layer, shown in zip(act.object.layers, sc.layers)):
+                # O actuator copia tambem um objeto de camada ativa; scene.addObject so aceita camada inativa.
+                raise Unsupported("add object de '%s', que esta numa camada ativa (mova para uma camada inativa)"
+                                  % act.object.name)
             return ["new = scene.addObject(%s, ob, %s)" % (_act_arg("Object", act.object.name),
                                                            _act_arg("Time", act.time))] + vel
         # From Property (KX_AddObjectActuator::ResolveOriginalObject): o nome vem de uma propriedade do
@@ -1278,7 +1283,9 @@ class %(classname)s(%(base)s):
         return changed
 
     def _on_hit(self, other, *_args):
-        self._hits.append(other)
+        # O Collision sensor ignora objetos de fisica Sensor (KX_CollisionSensor::NewHandleCollision, isActor()).
+        if other.name not in self._sensor_objs:
+            self._hits.append(other)
 
     def _take(self, o):
         """Colisoes de outro objeto desde a ultima leitura (registra o callback na primeira vez)."""
@@ -1289,7 +1296,7 @@ class %(classname)s(%(base)s):
             del reg[dead]
         if o not in reg:
             lst = reg[o] = []
-            o.collisionCallbacks.append(lambda other, *_a: lst.append(other))
+            o.collisionCallbacks.append(lambda other, *_a: other.name not in self._sensor_objs and lst.append(other))
         hits, reg[o][:] = list(reg[o]), []
         return hits
 
@@ -1297,8 +1304,8 @@ class %(classname)s(%(base)s):
         """Near sensor com histerese: depois de detectar, so solta alem de reset."""
         key = "near:" + key
         limit = reset if self._prev.get(key) else dist
-        found = any(o is not ob and self._actor(o) and (not prop or prop in o) and ob.getDistanceTo(o) <= limit
-                    for o in ob.scene.objects)
+        found = any(o is not ob and self._actor(o) and (not prop or prop in o)
+                    and ob.getDistanceTo(o) <= limit + self._actors[o.name] for o in ob.scene.objects)
         self._prev[key] = found
         return found
 
@@ -2662,7 +2669,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                         # A engine dispara todo frame enquanto positivo (mensagem nova; All Events do joystick).
                         trig.append(var)
                     lines.append("%s_t = %s" % (var, " | ".join(trig)))
-                trigs[var] = (raw, lines)
+                # Contagens internas que a engine zera quando o sensor volta a ser usado (SCA_ISensor::Init).
+                resets = {'DELAY': ["dly:" + key], 'RANDOM': ["rnd:" + key]}.get(s.type, [])
+                trigs[var] = (raw, lines, resets)
                 pulse.append(var + "_t")
                 if s.use_level and not any(p.startswith("self._rise(") for p in pulse):
                     # Level: o sensor tambem dispara o controller que acabou de entrar no estado ativo.
@@ -2724,9 +2733,16 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     one_shot = {cont.name: not all(code[1] and not any(_FIRE in line for line in code[0])
                                    for _act, _owner, code in actuators)
                 for cont, _expr, _pulse, actuators in plans}
+    all_states = 0
+    for cont, _expr, _pulse, _acts in plans:
+        all_states |= 1 << (cont.states - 1)
     for sname, (expr, orig) in sensor_exprs.items():
         # Sensor so e avaliado com algum controller dele no estado ativo (Delay/Near contam certo).
-        raw, lines = sensor_trigs[sname]
+        raw, lines, resets = sensor_trigs[sname]
+        if resets and sensor_masks[sname] != all_states:
+            # Fora do estado o sensor e desligado; ao voltar ele recomeca do zero, como na engine.
+            out.append("        if not state & %d:" % sensor_masks[sname])
+            out += ["            self._ticks.pop(%r, None)" % k for k in resets]
         log_s, log_owner = sensor_logs.get(sname, (None, None))
         if log_s is not None and all(_owns(converted, c) for c in log_s.controllers if c.active):
             # Log de teclas: a engine grava sempre que o sensor roda, antes de avalia-lo. Se algum
@@ -2812,9 +2828,15 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             mask |= 1 << (cont.states - 1)
         out.append(_RUNNER % {"classname": classname, "mask": mask})
     body = "\n".join(out)
+    if uses_hits or "self._take(" in body:
+        sensor_objs = sorted(o.name for o in bpy.data.objects if o.game.physics_type == 'SENSOR')
+        start_extra += "        self._sensor_objs = frozenset(%r)\n" % (sensor_objs,)
     if "self._near(" in body or "self._radar(" in body:
-        actors = sorted(o.name for o in bpy.data.objects if o.game.use_actor)
-        start_extra += "        self._actors = frozenset(%r)\n" % (actors,)
+        # Nome -> raio da esfera de colisao (0 para as outras formas): o Near da engine e uma esfera fisica
+        # e dispara quando ela toca a forma do outro objeto, nao o centro dele.
+        actors = {o.name: _sphere_radius(o) for o in bpy.data.objects if o.game.use_actor}
+        actors = dict(sorted(actors.items()))
+        start_extra += "        self._actors = %r\n" % (actors,)
     if "child=True" in body:
         # Action com Child: acao propria de cada objeto (o que a engine le do objeto Blender do filho).
         child_actions = {o.name: o.animation_data.action.name + (
@@ -2878,6 +2900,17 @@ def _reactivate(ob):
         for s in (s for o in bpy.data.objects for s in o.game.sensors):
             if any(_owns(conts, c) for c in s.controllers):
                 s.active = True
+
+
+def _sphere_radius(o):
+    """Raio da esfera de colisao do objeto no jogo, ou 0 se a forma nao e esfera."""
+    game = o.game
+    if game.use_collision_bounds:
+        sphere = game.collision_bounds_type == 'SPHERE'
+    else:
+        # Sem Collision Bounds a engine usa esfera nos objetos dinamicos e malha nos demais.
+        sphere = game.physics_type in {'DYNAMIC', 'RIGID_BODY', 'CHARACTER'}
+    return round(game.radius * abs(o.matrix_world.to_scale().x), 4) if sphere else 0.0
 
 
 def _class_name(obname):
