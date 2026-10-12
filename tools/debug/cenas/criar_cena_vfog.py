@@ -194,6 +194,53 @@ def gerar(preset):
         bpy.ops.object.game_property_new(type='FLOAT', name='fog_volume')
         vol.game.properties['fog_volume'].value = 2.0
 
+    # Itens 1-3 do docs/plano-volumetric.md.
+    if preset == 'medium_sol':
+        # Sol baixo atras das colunas, com sombra: raios de sol (Sun Shafts) vindo para a camera.
+        sun.location = (0, 45, 10)
+        sun.rotation_euler = (Vector((0, 0, 0)) - sun.location).to_track_quat('-Z', 'Y').to_euler()
+        sun.data.energy = 1.5
+        sun.data.use_shadow = True
+        sun.data.shadow_buffer_size = 2048
+        sun.data.shadow_frustum_size = 70.0
+        sun.data.shadow_buffer_clip_start = 1.0
+        sun.data.shadow_buffer_clip_end = 120.0
+        world.horizon_color = (0.5, 0.4, 0.3)
+        w.vfog_density = 0.12
+        w.vfog_falloff = 10.0
+        w.vfog_ambient = 0.15
+        w.vfog_sun_intensity = 2.5
+        w.vfog_anisotropy = 0.6
+        w.vfog_use_sun_shafts = True
+    if preset == 'medium_vento':
+        w.vfog_use_wind = True
+        w.vfog_wind_direction = 30.0
+        world.weather_settings.rain_wind = 0.5
+        w.vfog_noise_amount = 0.9
+    if preset == 'medium_manha':
+        w.vfog_use_time_of_day = True
+        w.vfog_morning_boost = 2.0
+        if not world.properties.get('sun_hour'):
+            bpy.ops.world.game_property_new(type='FLOAT', name='sun_hour')
+        world.properties['sun_hour'].value = 6.0
+    if preset == 'medium_volumes':
+        w.vfog_volumes_only = True
+        w.vfog_edge = 0.5
+        formas = (('fog_esfera', 'sphere', (-6, 8, 3), (4, 4, 4), (1.0, 0.45, 0.2, 1.0)),
+                  ('fog_caixa', 'box', (6, 10, 2.5), (5, 4, 2.5), (0.3, 0.9, 0.5, 1.0)))
+        for nome, forma, loc, escala, cor in formas:
+            vol = malha(nome, lambda bm: bmesh.ops.create_cube(bm, size=2.0), loc)
+            vol.scale = escala
+            vol.color = cor
+            vol.game.physics_type = 'NO_COLLISION'
+            vol.hide_render = True
+            scene.objects.link(vol)
+            scene.objects.active = vol
+            bpy.ops.object.game_property_new(type='FLOAT', name='fog_volume')
+            vol.game.properties['fog_volume'].value = 3.0
+            bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
+            vol.game.properties['fog_shape'].value = forma
+
     txt = bpy.data.texts.new('medir_fps.py')
     txt.write(SCRIPT)
     scene.objects.active = chao
@@ -229,5 +276,6 @@ def gerar(preset):
     print('CENA VFOG salva', out)
 
 
-for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script'):
+for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
+          'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes'):
     gerar(p)

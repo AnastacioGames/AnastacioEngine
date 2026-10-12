@@ -125,13 +125,30 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 {
 	float *d = params->vfog_data;
 	std::fill(d, d + BuildInFilters::VFOG_DATA_VEC4 * 4, 0.0f);
-	std::fill(params->vfog_mats, params->vfog_mats + 16 * 6, 0.0f);
-	params->vfog_shadow_tex[0] = params->vfog_shadow_tex[1] = 0;
+	std::fill(params->vfog_mats, params->vfog_mats + 16 * BuildInFilters::VFOG_MATS, 0.0f);
+	std::fill(params->vfog_shadow_tex, params->vfog_shadow_tex + BuildInFilters::VFOG_SHADOWS, 0u);
+
+	/* Morning Fog: denser and lower around dawn (World Property sun_hour, peak at 6h). */
+	float morning = 0.0f;
+	if (world->vfog_flag & WO_VFOG_TIME_OF_DAY) {
+		float hour = 12.0f;
+		if (KX_WorldInfo *info = scene->GetWorldInfo()) {
+			if (EXP_Value *prop = info->GetProperty("sun_hour")) {
+				hour = (float)prop->GetNumber();
+			}
+		}
+		hour = std::fmod(hour, 24.0f);
+		if (hour < 0.0f) {
+			hour += 24.0f;
+		}
+		const float x = (hour - 6.0f) / 1.5f;
+		morning = std::exp(-x * x);
+	}
 
 	const int quality = std::max(0, std::min<int>(world->vfog_quality, 2));
-	d[0] = world->vfog_density;
+	d[0] = world->vfog_density * (1.0f + world->vfog_morning_boost * morning);
 	d[1] = world->vfog_base;
-	d[2] = std::max(world->vfog_falloff, 0.01f);
+	d[2] = std::max(world->vfog_falloff * (1.0f - 0.5f * morning), 0.01f);
 	d[3] = std::max(world->vfog_distance, 1.0f);
 	d[4] = world->vfog_noise_scale;
 	d[5] = world->vfog_noise_amount;
@@ -160,7 +177,28 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	d[32] = world->vfog_edge;
 	d[33] = world->vfog_shaft_intensity;
 
-	/* Fog Volumes: unit box of the object (the default cube), world -> local. */
+	/* Wind: the noise is carried along the heading vfog_wind_dir, at Rain Wind * 20 m/s. */
+	if (world->vfog_flag & WO_VFOG_WIND) {
+		const float angle = world->vfog_wind_dir * 0.017453292f;
+		const float travel = (float)std::fmod((double)time * world->rain_wind * 20.0, 10000.0);
+		d[36] = std::cos(angle) * travel;
+		d[37] = std::sin(angle) * travel;
+	}
+
+	/* Sun shafts: the Sun's farthest shadow map (Medium/High). */
+	if ((world->vfog_flag & WO_VFOG_SUN_SHAFTS) && quality > 0 && d[15] > 0.5f) {
+		int code = 0;
+		mt::mat4 mat;
+		if (scene->GetWorldSun()->GetLightData()->GetFarShadow(code, mat)) {
+			params->vfog_shadow_tex[2] = (unsigned int)code;
+			mat.Pack(params->vfog_mats + 16 * 6);
+			d[34] = 0.001f;
+			d[35] = 1.0f;
+		}
+	}
+
+	/* Fog Volumes: unit box (the default cube) or sphere of the object, world -> local; optional
+	 * game properties fog_shape ("sphere") and fog_edge, tint from the object color. */
 	int volumes = 0;
 	for (KX_GameObject *gameobj : *scene->GetObjectList()) {
 		if (volumes >= 4) {
@@ -173,6 +211,18 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		const mt::mat4 inv = mt::mat4::FromAffineTransform(gameobj->NodeGetWorldTransform()).Inverse();
 		inv.Pack(params->vfog_mats + 16 * volumes);
 		d[28 + volumes] = std::max(0.0f, (float)prop->GetNumber());
+		EXP_Value *shape = gameobj->GetProperty("fog_shape");
+		d[40 + volumes] = (shape && shape->GetText() == "sphere") ? 1.0f : 0.0f;
+		EXP_Value *edge = gameobj->GetProperty("fog_edge");
+		d[44 + volumes] = edge ? std::max(0.0f, std::min(1.0f, (float)edge->GetNumber())) : world->vfog_edge;
+		const mt::vec4& col = gameobj->GetObjectColor();
+		float *c = d + 4 * (44 + volumes);
+		if (col.x < 0.999f || col.y < 0.999f || col.z < 0.999f) {
+			c[0] = col.x;
+			c[1] = col.y;
+			c[2] = col.z;
+			c[3] = 1.0f;
+		}
 		++volumes;
 	}
 	d[25] = (float)volumes;

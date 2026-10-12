@@ -28,6 +28,10 @@
 #include "BLI_math.h"
 
 #include "BLI_rand.h"
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
+
+#include <stddef.h>
 
 #include "DNA_vec_types.h"
 #include "DNA_scene_types.h"
@@ -158,6 +162,7 @@ typedef struct {
   int mats_uniform;
   int shadow0_uniform;
   int shadow1_uniform;
+  int shadow2_uniform;
   int frame_uniform;
 } GPUVFOGShaderInterface;
 
@@ -959,21 +964,41 @@ void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
 }
 
 /* Volumetric Fog data for the 3D View, mirrors KX_FillVolumetricFog (KX_RenderPipeline.cpp):
- * layout in gpu_shader_vfog_lib.glsl. Returns how many Spot shadow maps were filled. */
-static int gpu_vfog_fill(Scene *scene, World *world, const float campos[3], float data[44][4],
-                         float mats[6][4][4], unsigned int shadow_tex[2])
+ * layout in gpu_shader_vfog_lib.glsl. Fills shadow_tex 0-1 (Spots) and 2 (Sun). */
+#define GPU_VFOG_DATA_VEC4 48
+static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], float data[GPU_VFOG_DATA_VEC4][4],
+                          float mats[7][4][4], unsigned int shadow_tex[3])
 {
 	static const int preset_max[3] = {2, 4, 8};
 	const int quality = max_ii(0, min_ii(world->vfog_quality, 2));
 	int volumes = 0, lamps = 0, shadows = 0;
+	float morning = 0.0f;
 
-	memset(data, 0, sizeof(float) * 44 * 4);
-	memset(mats, 0, sizeof(float) * 6 * 16);
-	shadow_tex[0] = shadow_tex[1] = 0;
+	memset(data, 0, sizeof(float) * GPU_VFOG_DATA_VEC4 * 4);
+	memset(mats, 0, sizeof(float) * 7 * 16);
+	shadow_tex[0] = shadow_tex[1] = shadow_tex[2] = 0;
 
-	data[0][0] = world->vfog_density;
+	/* Morning Fog: denser and lower around dawn (World Property sun_hour, peak at 6h). */
+	if (world->vfog_flag & WO_VFOG_TIME_OF_DAY) {
+		bProperty *prop = BLI_findstring(&world->prop, "sun_hour", offsetof(bProperty, name));
+		float hour = 12.0f, x;
+		if (prop && prop->type == GPROP_FLOAT) {
+			hour = *((float *)&prop->data);
+		}
+		else if (prop && prop->type == GPROP_INT) {
+			hour = (float)prop->data;
+		}
+		hour = fmodf(hour, 24.0f);
+		if (hour < 0.0f) {
+			hour += 24.0f;
+		}
+		x = (hour - 6.0f) / 1.5f;
+		morning = expf(-x * x);
+	}
+
+	data[0][0] = world->vfog_density * (1.0f + world->vfog_morning_boost * morning);
 	data[0][1] = world->vfog_base;
-	data[0][2] = max_ff(world->vfog_falloff, 0.01f);
+	data[0][2] = max_ff(world->vfog_falloff * (1.0f - 0.5f * morning), 0.01f);
 	data[0][3] = max_ff(world->vfog_distance, 1.0f);
 	data[1][0] = world->vfog_noise_scale;
 	data[1][1] = world->vfog_noise_amount;
@@ -997,6 +1022,34 @@ static int gpu_vfog_fill(Scene *scene, World *world, const float campos[3], floa
 	data[8][0] = world->vfog_edge;
 	data[8][1] = world->vfog_shaft_intensity;
 
+	/* Wind: the noise is carried along the heading vfog_wind_dir, at Rain Wind * 20 m/s. */
+	if (world->vfog_flag & WO_VFOG_WIND) {
+		const float angle = DEG2RADF(world->vfog_wind_dir);
+		const float travel = (float)fmod(PIL_check_seconds_timer() * world->rain_wind * 20.0, 10000.0);
+		data[9][0] = cosf(angle) * travel;
+		data[9][1] = sinf(angle) * travel;
+	}
+
+	/* Sun shafts: the Sun's farthest shadow map (last cascade). */
+	if ((world->vfog_flag & WO_VFOG_SUN_SHAFTS) && quality > 0 && data[3][3] > 0.5f) {
+		Lamp *la = scene->world_sun->data;
+		if ((la->mode & LA_SHAD_BUF) && la->shadowmap_type != LA_SHADMAP_VARIANCE) {
+			GPULamp *lamp = GPU_lamp_from_blender(scene, scene->world_sun, NULL);
+			if (lamp && GPU_lamp_has_shadow_buffer(lamp)) {
+				if (GPU_lamp_has_cascaded_shadow(lamp)) {
+					lamp = GPU_lamp_get_cascade(lamp, 1);
+				}
+				const int code = GPU_lamp_shadow_bind_code(lamp);
+				if (code > 0) {
+					shadow_tex[2] = (unsigned int)code;
+					memcpy(mats[6], GPU_lamp_get_persmat(lamp), sizeof(float) * 16);
+					data[8][2] = 0.001f;
+					data[8][3] = 1.0f;
+				}
+			}
+		}
+	}
+
 	/* Fog Volumes and lamps; lamps sorted by strength at the camera (insertion, at most 8 kept). */
 	{
 		Object *cand[8];
@@ -1018,8 +1071,20 @@ static int gpu_vfog_fill(Scene *scene, World *world, const float campos[3], floa
 					else if (prop->type == GPROP_INT) {
 						value = (float)prop->data;
 					}
+					bProperty *shape = BKE_bproperty_object_get(ob, "fog_shape");
+					bProperty *edge = BKE_bproperty_object_get(ob, "fog_edge");
 					invert_m4_m4(mats[volumes], ob->obmat);
 					data[7][volumes] = max_ff(0.0f, value);
+					data[10][volumes] = (shape && shape->type == GPROP_STRING && STREQ((char *)shape->poin, "sphere")) ?
+					                    1.0f : 0.0f;
+					data[11][volumes] = world->vfog_edge;
+					if (edge && edge->type == GPROP_FLOAT) {
+						data[11][volumes] = clamp_f(*((float *)&edge->data), 0.0f, 1.0f);
+					}
+					if (ob->col[0] < 0.999f || ob->col[1] < 0.999f || ob->col[2] < 0.999f) {
+						copy_v3_v3(data[44 + volumes], ob->col);
+						data[44 + volumes][3] = 1.0f;
+					}
 					volumes++;
 				}
 			}
@@ -1089,7 +1154,6 @@ static int gpu_vfog_fill(Scene *scene, World *world, const float campos[3], floa
 	}
 	data[6][0] = (float)lamps;
 	data[6][1] = (float)volumes;
-	return shadows;
 }
 
 bool GPU_fx_do_composite_pass(
@@ -1854,8 +1918,8 @@ bool GPU_fx_do_composite_pass(
 		GPUShader *vfog_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_VFOG, is_persp);
 		if (vfog_shader && scene->world) {
 			GPUVFOGShaderInterface *interface = GPU_shader_get_interface(vfog_shader);
-			float data[44][4], mats[6][4][4], viewinv[4][4];
-			unsigned int shadow_tex[2];
+			float data[GPU_VFOG_DATA_VEC4][4], mats[7][4][4], viewinv[4][4];
+			unsigned int shadow_tex[3];
 			invert_m4_m4(viewinv, viewmat);
 			gpu_vfog_fill(scene, scene->world, viewinv[3], data, mats, shadow_tex);
 			const float frame_f = (float)(fx->vfog_frame++ & 63);
@@ -1869,24 +1933,25 @@ bool GPU_fx_do_composite_pass(
 			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
 			GPU_shader_uniform_texture(vfog_shader, interface->depth_uniform, fx->depth_buffer);
 
-			GPU_shader_uniform_vector(vfog_shader, interface->data_uniform, 4, 44, (float *)data);
-			glUniformMatrix4fv(interface->mats_uniform, 6, GL_FALSE, (float *)mats);
+			GPU_shader_uniform_vector(vfog_shader, interface->data_uniform, 4, GPU_VFOG_DATA_VEC4, (float *)data);
+			glUniformMatrix4fv(interface->mats_uniform, 7, GL_FALSE, (float *)mats);
 			GPU_shader_uniform_vector(vfog_shader, interface->frame_uniform, 1, 1, &frame_f);
-			/* Spot shadow maps on units 6/7 (free: the clouds history is unbound after its pass). */
-			for (int i = 0; i < 2; i++) {
+			/* Spot shadow maps on units 6/7, Sun on 8 (free: the clouds history is unbound after its pass). */
+			for (int i = 0; i < 3; i++) {
 				glActiveTexture(GL_TEXTURE6 + i);
 				glBindTexture(GL_TEXTURE_2D, shadow_tex[i]);
 			}
 			glActiveTexture(GL_TEXTURE0);
 			glUniform1i(interface->shadow0_uniform, 6);
 			glUniform1i(interface->shadow1_uniform, 7);
+			glUniform1i(interface->shadow2_uniform, 8);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
 
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-			for (int i = 0; i < 2; i++) {
+			for (int i = 0; i < 3; i++) {
 				glActiveTexture(GL_TEXTURE6 + i);
 				glBindTexture(GL_TEXTURE_2D, 0);
 			}
@@ -2681,6 +2746,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->mats_uniform = GPU_shader_get_uniform(shader, "vfog_mats");
 			interface->shadow0_uniform = GPU_shader_get_uniform(shader, "vfog_shadow0");
 			interface->shadow1_uniform = GPU_shader_get_uniform(shader, "vfog_shadow1");
+			interface->shadow2_uniform = GPU_shader_get_uniform(shader, "vfog_shadow2");
 			interface->frame_uniform = GPU_shader_get_uniform(shader, "vfog_frame");
 
 			GPU_shader_set_interface(shader, interface);

@@ -208,6 +208,9 @@ typedef struct World {
 	short vfog_flag;       /* WO_VFOG_* */
 	short vfog_max_lights; /* 1-8 lampadas que tingem a neblina */
 	short vfog_pad;
+	/* Mais neblina ao amanhecer (World Property sun_hour) e direcao do vento (graus em Z, forca
+	 * vem de rain_wind). vfog_morning_boost == 0 marca arquivo antigo (readfile.c). */
+	float vfog_morning_boost, vfog_wind_dir;
 
 	ListBase gpumaterial;		/* runtime */
 
@@ -296,6 +299,9 @@ typedef struct World {
 #define WO_VFOG_LAMPS         (1 << 3)
 #define WO_VFOG_SHAFTS        (1 << 4)
 #define WO_VFOG_VOLUMES_ONLY  (1 << 5)
+#define WO_VFOG_WIND          (1 << 6)
+#define WO_VFOG_TIME_OF_DAY   (1 << 7)
+#define WO_VFOG_SUN_SHAFTS    (1 << 8)
 
 /* earthquake_mode */
 #define WO_EARTHQUAKE_HORIZONTAL   0

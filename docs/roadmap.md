@@ -630,6 +630,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Iluminação e gráficos
 
+- **Fog - Volumetric (evolução):** 10 itens em [plano-volumetric.md](plano-volumetric.md); itens 1-3
+  (vento/manhã, raios de sol, Fog Volumes) feitos e aguardando aceite visual; item 4 (Python/Logic) com o Codex.
 - **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
   GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
   validar no Linux e no build Web. UV da lightmap por xatlas. [SSGI nativo experimental](ssgi-native-plan.md)

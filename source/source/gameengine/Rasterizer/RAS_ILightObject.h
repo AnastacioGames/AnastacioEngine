@@ -137,6 +137,9 @@ public:
 	                                     const mt::mat4& lightViewMat, const mt::mat4& lightWinMat) = 0;
 	virtual void UnbindCascadeShadowBuffer(short cascadeIndex) = 0;
 	virtual void SetCascadeSplits(float split0, float split1) = 0;
+	/// Sun shadow map reaching the farthest (last cascade, or the only map) for the Volumetric Fog
+	/// sun shafts: bind code and world -> shadow map matrix. False without a usable depth map.
+	virtual bool GetFarShadow(int& bindCode, mt::mat4& worldToShadow) = 0;
 
 	/* Point lamp cube shadow (Shading Nodes): 6 passes, one per face, closed with UnbindShadowBuffer(). */
 	virtual bool HasPointShadow() = 0;

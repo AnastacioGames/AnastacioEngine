@@ -415,6 +415,20 @@ bool RAS_OpenGLLight::HasCascadedShadow()
 	return lamp && GPU_lamp_has_cascaded_shadow(lamp);
 }
 
+bool RAS_OpenGLLight::GetFarShadow(int& bindCode, mt::mat4& worldToShadow)
+{
+	GPULamp *lamp = GetGPULamp();
+	if (!lamp || !GPU_lamp_has_shadow_buffer(lamp) || GPU_lamp_shadow_buffer_type(lamp) == LA_SHADMAP_VARIANCE) {
+		return false;
+	}
+	if (GPU_lamp_has_cascaded_shadow(lamp)) {
+		lamp = GPU_lamp_get_cascade(lamp, 1);
+	}
+	bindCode = GPU_lamp_shadow_bind_code(lamp);
+	worldToShadow = mt::mat4(GPU_lamp_get_persmat(lamp));
+	return bindCode > 0;
+}
+
 void RAS_OpenGLLight::BindCascadeShadowBuffer(RAS_ICanvas *canvas, short cascadeIndex, KX_Camera *cam, mt::mat3x4& camtrans,
                                               const mt::mat4& lightViewMat, const mt::mat4& lightWinMat)
 {

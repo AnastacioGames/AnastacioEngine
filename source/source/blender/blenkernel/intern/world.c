@@ -284,8 +284,9 @@ void BKE_world_init(World *wrld)
 	wrld->vfog_edge = 0.3f;
 	wrld->vfog_shaft_intensity = 1.0f;
 	wrld->vfog_quality = 1;
-	wrld->vfog_flag |= WO_VFOG_LAMPS | WO_VFOG_SHAFTS;
+	wrld->vfog_flag |= WO_VFOG_LAMPS | WO_VFOG_SHAFTS | WO_VFOG_SUN_SHAFTS;
 	wrld->vfog_max_lights = 4;
+	wrld->vfog_morning_boost = 2.0f;
 
 	wrld->flare_scale = 1.0f;
 	wrld->flare_intensity = 1.0f;

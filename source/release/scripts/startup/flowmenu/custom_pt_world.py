@@ -348,6 +348,19 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.prop(weather, "vfog_sun_intensity")
             col.prop(weather, "vfog_ambient")
             col.prop(weather, "vfog_anisotropy", slider=True)
+            sun = col.column(align=True)
+            sun.active = weather.vfog_quality != 'LOW'
+            sun.prop(weather, "vfog_use_sun_shafts")
+
+            sub = col.column(align=True)
+            sub.prop(weather, "vfog_use_wind")
+            wind = sub.column(align=True)
+            wind.active = weather.vfog_use_wind
+            wind.prop(weather, "vfog_wind_direction")
+            sub.prop(weather, "vfog_use_time_of_day")
+            morning = sub.column(align=True)
+            morning.active = weather.vfog_use_time_of_day
+            morning.prop(weather, "vfog_morning_boost")
 
             sub = col.column(align=True)
             sub.prop(weather, "vfog_use_lamps")
@@ -365,6 +378,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             sub.prop(weather, "vfog_edge", slider=True)
             info = col.column(align=True)
             info.label(text="Fog Volume: game property \"fog_volume\" (density) on a cube", icon='INFO')
+            info.label(text="Optional: \"fog_shape\" = sphere, \"fog_edge\"; Object Color tints it", icon='INFO')
             if context.world.mist_settings.use_mist:
                 info.label(text="Mist is also on: the scene gets fogged twice", icon='ERROR')
             if weather.vfog_quality == 'HIGH':

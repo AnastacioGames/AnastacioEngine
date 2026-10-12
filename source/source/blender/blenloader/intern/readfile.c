@@ -3808,6 +3808,12 @@ static void direct_link_world(FileData *fd, World *wrld)
 		wrld->vfog_flag |= WO_VFOG_LAMPS | WO_VFOG_SHAFTS;
 		wrld->vfog_max_lights = 4;
 	}
+	/* Morning boost/wind/sun shafts came later: the boost is never 0 (range > 0). */
+	if (wrld->vfog_morning_boost == 0.0f) {
+		wrld->vfog_morning_boost = 2.0f;
+		wrld->vfog_wind_dir = 0.0f;
+		wrld->vfog_flag |= WO_VFOG_SUN_SHAFTS;
+	}
 
 	/* Quality of Clouds and Sky Layers: detail is never 0 (range 1-8), so 0 means the file
 	 * predates it. Medium (5 octaves, relief 1) is exactly the look those files had. */

@@ -111,11 +111,12 @@ public:
 		GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM,
 
 		/* Volumetric Fog (gpu_shader_vfog_lib.glsl): parameters/lamps, volume and shadow
-		 * matrices, and the shadow maps of up to 2 Spot lamps casting light shafts. */
+		 * matrices, and the shadow maps of up to 2 Spot lamps and the Sun casting light shafts. */
 		GE_VFOG_DATA_UNIFORM,
 		GE_VFOG_MATS_UNIFORM,
 		GE_VFOG_SHADOW0_UNIFORM,
 		GE_VFOG_SHADOW1_UNIFORM,
+		GE_VFOG_SHADOW2_UNIFORM,
 
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};

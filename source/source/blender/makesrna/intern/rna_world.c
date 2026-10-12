@@ -845,6 +845,33 @@ static void rna_def_world_weather(BlenderRNA *brna)
 		RNA_def_property_range(prop, 1, 8);
 		RNA_def_property_ui_text(prop, "Max Lamps", "Most lamps that tint the fog at once (the strongest near the camera); the quality preset can lower it");
 		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_sun_shafts", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_SUN_SHAFTS);
+		RNA_def_property_ui_text(prop, "Sun Shafts", "A Sun with shadow casts light shafts (god rays) in the fog (Medium/High)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_wind", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_WIND);
+		RNA_def_property_ui_text(prop, "Wind", "The fog is carried by the wind (strength from Rain Wind)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_wind_direction", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_float_sdna(prop, NULL, "vfog_wind_dir");
+		RNA_def_property_range(prop, -360.0f, 360.0f);
+		RNA_def_property_ui_text(prop, "Wind Direction", "Heading the wind blows toward, in degrees around Z (0 = +X)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_use_time_of_day", PROP_BOOLEAN, PROP_NONE);
+		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_TIME_OF_DAY);
+		RNA_def_property_ui_text(prop, "Morning Fog", "Thicker, lower fog at dawn following the World Property sun_hour (peak at 6h)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+		prop = RNA_def_property(srna, "vfog_morning_boost", PROP_FLOAT, PROP_NONE);
+		RNA_def_property_range(prop, 0.001f, FLT_MAX);
+		RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 3);
+		RNA_def_property_ui_text(prop, "Morning Boost", "How much denser the fog gets at dawn (2 = three times the density at 6h)");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
 	}
 
 	prop = RNA_def_property(srna, "show_viewport_lensflare", PROP_BOOLEAN, PROP_NONE);

@@ -100,7 +100,7 @@ RAS_ScopeExit<Fn> MakeScopeExit(Fn fn)
 
 /// Texture unit of the rain mask (ge_RainMask); custom filters keep 0-7 but the rain filter has none.
 static const int kRainMaskUnit = 7;
-/// Volumetric Fog: Spot shadow maps on 20 and 21 (17-19 are the previous frame and clouds history).
+/// Volumetric Fog: Spot shadow maps on 20 and 21, Sun on 22 (17-19 are the previous frame and clouds history).
 static const int kVFogShadowUnit = 20;
 
 static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_TYPE] = {
@@ -175,7 +175,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"vfog_data", // GE_VFOG_DATA_UNIFORM
 	"vfog_mats", // GE_VFOG_MATS_UNIFORM
 	"vfog_shadow0", // GE_VFOG_SHADOW0_UNIFORM
-	"vfog_shadow1" // GE_VFOG_SHADOW1_UNIFORM
+	"vfog_shadow1", // GE_VFOG_SHADOW1_UNIFORM
+	"vfog_shadow2" // GE_VFOG_SHADOW2_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -536,7 +537,7 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 	}
 
 	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
-		for (int i = 0; i < 2; ++i) {
+		for (int i = 0; i < BuildInFilters::VFOG_SHADOWS; ++i) {
 			if (m_buildInFilters.vfog_shadow_tex[i]) {
 				glActiveTexture(GL_TEXTURE0 + kVFogShadowUnit + i);
 				glBindTexture(GL_TEXTURE_2D, m_buildInFilters.vfog_shadow_tex[i]);
@@ -592,7 +593,7 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 	}
 
 	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
-		for (int i = 0; i < 2; ++i) {
+		for (int i = 0; i < BuildInFilters::VFOG_SHADOWS; ++i) {
 			if (m_buildInFilters.vfog_shadow_tex[i]) {
 				glActiveTexture(GL_TEXTURE0 + kVFogShadowUnit + i);
 				glBindTexture(GL_TEXTURE_2D, 0);
@@ -699,13 +700,13 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {
 		glUniform4fv(m_predefinedUniforms[GE_VFOG_DATA_UNIFORM], BuildInFilters::VFOG_DATA_VEC4, m_buildInFilters.vfog_data);
 		if (m_predefinedUniforms[GE_VFOG_MATS_UNIFORM] != -1) {
-			glUniformMatrix4fv(m_predefinedUniforms[GE_VFOG_MATS_UNIFORM], 6, GL_FALSE, m_buildInFilters.vfog_mats);
+			glUniformMatrix4fv(m_predefinedUniforms[GE_VFOG_MATS_UNIFORM], BuildInFilters::VFOG_MATS, GL_FALSE,
+			                   m_buildInFilters.vfog_mats);
 		}
-		if (m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM] != -1) {
-			SetUniform(m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM], kVFogShadowUnit);
-		}
-		if (m_predefinedUniforms[GE_VFOG_SHADOW1_UNIFORM] != -1) {
-			SetUniform(m_predefinedUniforms[GE_VFOG_SHADOW1_UNIFORM], kVFogShadowUnit + 1);
+		for (int i = 0; i < BuildInFilters::VFOG_SHADOWS; ++i) {
+			if (m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM + i] != -1) {
+				SetUniform(m_predefinedUniforms[GE_VFOG_SHADOW0_UNIFORM + i], kVFogShadowUnit + i);
+			}
 		}
 	}
 
