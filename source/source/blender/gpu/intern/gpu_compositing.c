@@ -966,6 +966,21 @@ void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
 /* Volumetric Fog data for the 3D View, mirrors KX_FillVolumetricFog (KX_RenderPipeline.cpp):
  * layout in gpu_shader_vfog_lib.glsl. Fills shadow_tex 0-1 (Spots) and 2 (Sun). */
 #define GPU_VFOG_DATA_VEC4 56
+
+/* Reach of a fog_glow object: fog_glow_radius, else 4x its largest scale (as KX_VFogGlow.cpp). */
+static float gpu_vfog_glow_radius(Object *ob)
+{
+	bProperty *prop = BKE_bproperty_object_get(ob, "fog_glow_radius");
+	if (prop && prop->type == GPROP_FLOAT) {
+		return max_ff(*((float *)&prop->data), 0.01f);
+	}
+	if (prop && prop->type == GPROP_INT) {
+		return max_ff((float)prop->data, 0.01f);
+	}
+	float scale[3];
+	mat4_to_size(scale, ob->obmat);
+	return max_ff(4.0f * max_fff(fabsf(scale[0]), fabsf(scale[1]), fabsf(scale[2])), 0.01f);
+}
 static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], float data[GPU_VFOG_DATA_VEC4][4],
                           float mats[7][4][4], unsigned int shadow_tex[3])
 {
@@ -1014,9 +1029,11 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 		data[4][1] = la->g * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
 		data[4][2] = la->b * min_ff(la->energy, 4.0f) * world->vfog_sun_intensity;
 	}
-	data[5][0] = world->horr * world->vfog_ambient;
-	data[5][1] = world->horg * world->vfog_ambient;
-	data[5][2] = world->horb * world->vfog_ambient;
+	/* Ambient: the horizon, but at least a quarter of the fog color so a night fog still shows
+	 * away from the lamps (as KX_FillVolumetricFog). */
+	data[5][0] = max_ff(world->horr, world->vfog_color[0] * 0.25f) * world->vfog_ambient;
+	data[5][1] = max_ff(world->horg, world->vfog_color[1] * 0.25f) * world->vfog_ambient;
+	data[5][2] = max_ff(world->horb, world->vfog_color[2] * 0.25f) * world->vfog_ambient;
 	data[6][2] = world->vfog_light_intensity;
 	data[6][3] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	data[8][0] = world->vfog_edge;
@@ -1118,17 +1135,39 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 					pushers++;
 				}
 			}
-			if (ob->type == OB_LAMP && (world->vfog_flag & WO_VFOG_LAMPS)) {
+			if (!(world->vfog_flag & WO_VFOG_LAMPS)) {
+				continue;
+			}
+			/* A real Point/Spot lamp, or an object with fog_glow seen as a Point lamp (KX_VFogGlow.cpp). */
+			float energy = 0.0f, r = 0.0f;
+			if (ob->type == OB_LAMP) {
 				Lamp *la = ob->data;
 				if ((la->type != LA_LOCAL && la->type != LA_SPOT) || la->energy <= 0.0f) {
 					continue;
 				}
-				const float dist = len_v3v3(ob->obmat[3], campos);
-				if (dist > data[0][3] + la->dist) {
+				energy = la->energy;
+				r = la->dist;
+			}
+			else {
+				bProperty *glow = BKE_bproperty_object_get(ob, "fog_glow");
+				if (glow && glow->type == GPROP_FLOAT) {
+					energy = *((float *)&glow->data);
+				}
+				else if (glow && glow->type == GPROP_INT) {
+					energy = (float)glow->data;
+				}
+				if (energy <= 0.0f) {
 					continue;
 				}
-				const float r = max_ff(la->dist, 0.01f);
-				const float s = la->energy * r * r / (r * r + dist * dist);
+				r = gpu_vfog_glow_radius(ob);
+			}
+			{
+				const float dist = len_v3v3(ob->obmat[3], campos);
+				if (dist > data[0][3] + r) {
+					continue;
+				}
+				r = max_ff(r, 0.01f);
+				const float s = energy * r * r / (r * r + dist * dist);
 				int pos = ncand;
 				while (pos > 0 && score[pos - 1] < s) {
 					if (pos < max_lamps) {
@@ -1148,10 +1187,21 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 		}
 		for (int i = 0; i < ncand; i++) {
 			Object *ob = cand[i];
-			Lamp *la = ob->data;
 			float *pos = data[12 + 4 * i];
 			float *col = data[13 + 4 * i];
 			float *spot = data[14 + 4 * i];
+			if (ob->type != OB_LAMP) {
+				bProperty *glow = BKE_bproperty_object_get(ob, "fog_glow");
+				const float energy = (glow->type == GPROP_FLOAT) ? *((float *)&glow->data) : (float)glow->data;
+				copy_v3_v3(pos, ob->obmat[3]);
+				pos[3] = gpu_vfog_glow_radius(ob);
+				mul_v3_v3fl(col, ob->col, energy);
+				col[3] = -1.0f;
+				spot[3] = -2.0f;
+				lamps++;
+				continue;
+			}
+			Lamp *la = ob->data;
 			copy_v3_v3(pos, ob->obmat[3]);
 			pos[3] = la->dist;
 			col[0] = la->r * la->energy;

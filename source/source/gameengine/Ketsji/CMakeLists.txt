@@ -192,6 +192,7 @@ set(SRC
 	KX_VehiclePreset.cpp
 	KX_VehicleWrapper.cpp
 	KX_VertexProxy.cpp
+	KX_VFogGlow.cpp
 	KX_VisibilityActuator.cpp
 	KX_WorldInfo.cpp
 	KX_WorldIpoController.cpp
@@ -315,6 +316,7 @@ set(SRC
 	KX_VehiclePreset.h
 	KX_VehicleWrapper.h
 	KX_VertexProxy.h
+	KX_VFogGlow.h
 	KX_VisibilityActuator.h
 	KX_WorldInfo.h
 	KX_WorldIpoController.h

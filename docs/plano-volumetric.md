@@ -30,7 +30,7 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 | 4 | Controle por Python / Logic | feito (2ec9637b), aguarda aceite visual | Codex |
 | 5 | Fumaça/vapor locais | feito, aguarda aceite visual | Codex |
 | 6 | Neblina que abre ao passar | feito, aguarda aceite visual | Claude |
-| 7 | Emission acendendo a névoa | pendente | |
+| 7 | Emission acendendo a névoa | feito (fog_glow), aguarda aceite visual | Claude |
 | 8 | Nuvens + névoa contínuas | pendente | |
 | 9 | Froxels | pendente | |
 | 10 | Fogo/explosão volumétrico | feito, aguarda aceite visual | Codex |
@@ -101,3 +101,10 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
   dentro da esfera.
 - O buraco acompanha o objeto, sem rastro que se fecha com o tempo (fica para depois, se precisar).
 - Variante: `medium_abre` (bola amarela indo e voltando na névoa baixa).
+
+## 7. Emission acendendo a névoa
+- Propriedade de jogo `fog_glow` (força) em qualquer objeto: vira uma lâmpada Point virtual na névoa,
+  com a cor do Object Color e alcance `fog_glow_radius` (ou 4× a maior escala). Disputa as vagas de
+  lâmpada com as reais (Medium 4, High 8). Código: `KX_VFogGlow.cpp` e `gpu_vfog_fill`. Sem mudança no shader.
+- Variante: `medium_brilho` (neons verde e magenta).
+- Ambiente da névoa: no mínimo 25% da cor da névoa, para não sumir de noite fora das luzes.

@@ -276,6 +276,25 @@ def gerar(preset):
         vol.game.properties['fog_shape'].value = 'sphere'
         bpy.ops.object.game_property_new(type='FLOAT', name='fog_smoke')
         vol.game.properties['fog_smoke'].value = 1.5
+    if preset == 'medium_brilho':
+        # Dois neons (fog_glow) acendem a nevoa sem lampada: verde e magenta. High = 8 vagas de luz.
+        w.vfog_quality = 'HIGH'
+        for nome, loc, cor in (('neon_verde', (-4, 4, 1.5), (0.2, 1.0, 0.3, 1.0)),
+                               ('neon_magenta', (4, 4, 1.5), (1.0, 0.2, 0.8, 1.0))):
+            neon = malha(nome, lambda bm: bmesh.ops.create_cube(bm, size=2.0), loc)
+            neon.scale = (0.15, 0.15, 1.2)
+            neon.color = cor
+            mat = bpy.data.materials.new(nome + '_mat')
+            mat.diffuse_color = cor[:3]
+            mat.emit = 2.0
+            neon.data.materials.append(mat)
+            neon.game.physics_type = 'NO_COLLISION'
+            scene.objects.link(neon)
+            scene.objects.active = neon
+            bpy.ops.object.game_property_new(type='FLOAT', name='fog_glow')
+            neon.game.properties['fog_glow'].value = 12.0
+            bpy.ops.object.game_property_new(type='FLOAT', name='fog_glow_radius')
+            neon.game.properties['fog_glow_radius'].value = 7.0
     if preset == 'medium_abre':
         # Neblina baixa e densa; a bola com fog_push vai e volta abrindo um buraco.
         w.vfog_density = 0.25
@@ -362,5 +381,5 @@ def gerar(preset):
 
 for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
           'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca',
-          'medium_abre', 'medium_fogo', 'medium_explosao'):
+          'medium_abre', 'medium_fogo', 'medium_explosao', 'medium_brilho'):
     gerar(p)

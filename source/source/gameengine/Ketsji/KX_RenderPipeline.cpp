@@ -43,6 +43,7 @@
 #include "KX_RainAura.h"
 #include "KX_RainSurfaceMask.h"
 #include "KX_RainLightning.h"
+#include "KX_VFogGlow.h"
 #include "RAS_ParticleBuffer.h" // Per-object GPU particle emitters, see KX_GameObject::GetParticleBuffer.
 #include "GPU_texture.h"
 
@@ -169,9 +170,11 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 			d[16 + i] = data->m_color[i] * std::min(data->m_energy, 4.0f) * world->vfog_sun_intensity;
 		}
 	}
-	d[20] = world->horr * world->vfog_ambient;
-	d[21] = world->horg * world->vfog_ambient;
-	d[22] = world->horb * world->vfog_ambient;
+	/* Ambient: the horizon, but at least a quarter of the fog color so a night fog still shows
+	 * away from the lamps. */
+	d[20] = std::max(world->horr, world->vfog_color[0] * 0.25f) * world->vfog_ambient;
+	d[21] = std::max(world->horg, world->vfog_color[1] * 0.25f) * world->vfog_ambient;
+	d[22] = std::max(world->horb, world->vfog_color[2] * 0.25f) * world->vfog_ambient;
 	d[26] = world->vfog_light_intensity;
 	d[27] = (world->vfog_flag & WO_VFOG_VOLUMES_ONLY) ? 1.0f : 0.0f;
 	d[32] = world->vfog_edge;
@@ -259,12 +262,19 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	if (world->vfog_flag & WO_VFOG_LAMPS) {
 		static const int presetMax[3] = {2, 4, 8};
 		const int maxLamps = std::max(1, std::min<int>(std::min<int>(world->vfog_max_lights, 8), presetMax[quality]));
+		/* A candidate is a real lamp or a glowing object (fog_glow) seen as a Point lamp. */
 		struct Candidate {
 			KX_LightObject *light;
+			const KX_VFogGlow *glow;
 			float score;
 		};
 		std::vector<Candidate> candidates;
 		const float reach = d[3];
+		static std::vector<KX_VFogGlow> glows;
+		KX_VFogCollectGlows(scene, camPos, reach, glows);
+		for (const KX_VFogGlow& glow : glows) {
+			candidates.push_back({nullptr, &glow, glow.score});
+		}
 		for (KX_LightObject *light : *scene->GetLightList()) {
 			RAS_ILightObject *data = light->GetLightData();
 			if (!light->GetVisible() || data->m_energy <= 0.0f ||
@@ -277,7 +287,7 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 				continue;
 			}
 			const float r = std::max(data->m_distance, 0.01f);
-			candidates.push_back({light, data->m_energy * r * r / (r * r + dist * dist)});
+			candidates.push_back({light, nullptr, data->m_energy * r * r / (r * r + dist * dist)});
 		}
 		std::sort(candidates.begin(), candidates.end(),
 		          [](const Candidate& a, const Candidate& b) { return a.score > b.score; });
@@ -286,8 +296,21 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 			if (lampCount >= maxLamps) {
 				break;
 			}
-			RAS_ILightObject *data = c.light->GetLightData();
 			float *l = d + 4 * (12 + 4 * lampCount);
+			if (c.glow) {
+				l[0] = c.glow->position.x;
+				l[1] = c.glow->position.y;
+				l[2] = c.glow->position.z;
+				l[3] = c.glow->radius;
+				l[4] = c.glow->color.x;
+				l[5] = c.glow->color.y;
+				l[6] = c.glow->color.z;
+				l[7] = -1.0f;
+				l[11] = -2.0f;
+				++lampCount;
+				continue;
+			}
+			RAS_ILightObject *data = c.light->GetLightData();
 			const mt::vec3& pos = c.light->NodeGetWorldPosition();
 			l[0] = pos.x;
 			l[1] = pos.y;
