@@ -1151,7 +1151,7 @@ class %(classname)s(%(base)s):
         self._ticks = {}
         self._hits = []
         self._act_on = {}
-%(start_extra)s%(extra)s
+%(start_extra)s%(first_update)s%(extra)s
     def _rise(self, key, value):
         """Pulso positivo: True so no frame em que value passa a True."""
         prev = self._prev.get(key, False)
@@ -2507,6 +2507,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra, "awake": awake,
                         "base": "types.KX_PythonComponent" if component else "object",
                         "args": _args_source(), "args_start": _args_start(),
+                        # A engine roda o start() no 1o quadro e o update() so a partir do 2o; os bricks
+                        # ja agem no 1o. Chamar o update() no fim do start() mantem o mesmo quadro.
+                        "first_update": "        self.update()\n" if component else "",
                         "extra": extra}
     return header + "\n" + body + "\n", converted, todos
 
