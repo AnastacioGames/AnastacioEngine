@@ -1,5 +1,5 @@
-# Cena de teste: Explosive > Particle Explosion nos 4 tamanhos (Small, Medium, Large, Huge).
-# Quatro caixas explosivas em fila, pavios de 1, 3, 5 e 7 s, sem objeto Effect.
+# Cena de teste: Explosive > Particle Explosion nos 5 tamanhos (Tiny, Small, Medium, Large, Huge).
+# Cinco caixas explosivas em fila, pavios de 1, 3, 5, 7 e 9 s, sem objeto Effect.
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_explosao_tamanhos.py -- <saida.range>
 # No jogo: FUMACA_SHOT=<pasta> grava tamanho_<n>.png 0.4 s depois de cada explosao e fecha no fim.
 import bpy
@@ -9,8 +9,8 @@ from math import radians
 from mathutils import Vector
 
 saida = sys.argv[sys.argv.index('--') + 1]
-TAMANHOS = ('SMALL', 'MEDIUM', 'LARGE', 'HUGE')
-PAVIOS = (1.0, 3.0, 5.0, 7.0)
+TAMANHOS = ('TINY', 'SMALL', 'MEDIUM', 'LARGE', 'HUGE')
+PAVIOS = (1.0, 3.0, 5.0, 7.0, 9.0)
 
 SCRIPT = (
     "import bge, os\n"
@@ -73,7 +73,7 @@ scene.objects.link(sol)
 
 for i, (tam, pavio) in enumerate(zip(TAMANHOS, PAVIOS)):
     bomba = malha('bomba_%s' % tam.lower(), lambda bm: bmesh.ops.create_cube(bm, size=0.8),
-                  (-18 + i * 12, 0, 0.4), (0.6, 0.1, 0.05))
+                  (-20 + i * 10, 0, 0.4), (0.6, 0.1, 0.05))
     bomba.game.use_explosive = True
     ex = bomba.game.explosive
     ex.fuse = pavio

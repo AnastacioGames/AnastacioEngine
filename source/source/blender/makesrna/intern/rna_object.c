@@ -2979,6 +2979,7 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	static const EnumPropertyItem particle_size_items[] = {
+		{EXPLOSIVE_PARTICLES_TINY, "TINY", 0, "Tiny", "Firecracker or small charge, about 1 m wide"},
 		{EXPLOSIVE_PARTICLES_SMALL, "SMALL", 0, "Small", "Grenade or small barrel, about 2 m wide"},
 		{EXPLOSIVE_PARTICLES_MEDIUM, "MEDIUM", 0, "Medium", "Gas cylinder or crate, about 4 m wide"},
 		{EXPLOSIVE_PARTICLES_LARGE, "LARGE", 0, "Large", "Car or fuel tank, about 8 m wide"},

@@ -2854,8 +2854,9 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 
 void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, int size)
 {
-	static const float kScales[4] = {0.5f, 1.0f, 2.0f, 3.5f};
-	const float scale = kScales[std::max(0, std::min(3, size))];
+	// Indexed by EXPLOSIVE_PARTICLES_* (Small, Medium, Large, Huge, Tiny).
+	static const float kScales[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
+	const float scale = kScales[std::max(0, std::min(4, size))];
 
 	std::unique_ptr<KX_ParticleBlast> blast(new KX_ParticleBlast());
 	blast->position = position;

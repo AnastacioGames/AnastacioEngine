@@ -364,6 +364,7 @@ enum {
 	EXPLOSIVE_PARTICLES_MEDIUM = 1,
 	EXPLOSIVE_PARTICLES_LARGE  = 2,
 	EXPLOSIVE_PARTICLES_HUGE   = 3,
+	EXPLOSIVE_PARTICLES_TINY   = 4,  /* added later, kept last so saved values don't shift */
 };
 
 /* Native impact deformation (opt-in via gameflag2 & OB_DEFORMABLE): a hit stronger than
