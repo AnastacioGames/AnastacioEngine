@@ -273,6 +273,58 @@ static void rna_GameObjectSettings_use_destruction_set(PointerRNA *ptr, bool val
 	}
 }
 
+/* Default colors of each Particle Explosion style; same values as kBlastStyles in KX_Scene.cpp. */
+static void rna_explosive_style_colors(RangeExplosiveSettings *es)
+{
+	switch (es->particle_style) {
+		case EXPLOSIVE_STYLE_ELECTRIC:
+			copy_v3_fl3(es->fire_color, 0.45f, 0.7f, 1.0f);
+			copy_v3_fl3(es->smoke_color, 0.35f, 0.38f, 0.45f);
+			copy_v3_fl3(es->spark_color, 0.6f, 0.85f, 1.0f);
+			break;
+		case EXPLOSIVE_STYLE_WATER:
+			copy_v3_fl3(es->fire_color, 0.85f, 0.92f, 1.0f);
+			copy_v3_fl3(es->smoke_color, 0.8f, 0.88f, 0.95f);
+			copy_v3_fl3(es->spark_color, 0.7f, 0.85f, 1.0f);
+			break;
+		case EXPLOSIVE_STYLE_CONCRETE:
+			copy_v3_fl3(es->fire_color, 0.6f, 0.56f, 0.5f);
+			copy_v3_fl3(es->smoke_color, 0.55f, 0.52f, 0.48f);
+			copy_v3_fl3(es->spark_color, 0.35f, 0.33f, 0.3f);
+			break;
+		default:
+			copy_v3_fl3(es->fire_color, 1.0f, 1.0f, 1.0f);
+			copy_v3_fl3(es->smoke_color, 0.18f, 0.16f, 0.15f);
+			copy_v3_fl3(es->spark_color, 1.0f, 0.75f, 0.3f);
+			break;
+	}
+}
+
+static void rna_RangeExplosiveSettings_particle_style_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	RangeExplosiveSettings *es = ptr->data;
+	rna_explosive_style_colors(es);
+	es->flags |= EXPLOSIVE_PARTICLE_COLORS;
+}
+
+static void rna_RangeExplosiveSettings_use_particle_explosion_set(PointerRNA *ptr, bool value)
+{
+	RangeExplosiveSettings *es = ptr->data;
+
+	if (value) {
+		es->flags |= EXPLOSIVE_PARTICLES;
+		if (!(es->flags & EXPLOSIVE_PARTICLE_COLORS)) {
+			rna_explosive_style_colors(es);
+			es->fire_amount = es->smoke_amount = es->spark_amount = 1.0f;
+			es->smoke_duration = es->blast_speed = 1.0f;
+			es->flags |= EXPLOSIVE_PARTICLE_COLORS;
+		}
+	}
+	else {
+		es->flags &= ~EXPLOSIVE_PARTICLES;
+	}
+}
+
 static void rna_GameObjectSettings_use_explosive_set(PointerRNA *ptr, bool value)
 {
 	Object *ob = ptr->data;
@@ -2989,6 +3041,7 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_particle_explosion", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_PARTICLES);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_RangeExplosiveSettings_use_particle_explosion_set");
 	RNA_def_property_ui_text(prop, "Particle Explosion",
 	                         "Built-in fireball, smoke and debris (GPU particles) at the blast, no Effect object needed");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
@@ -2997,6 +3050,64 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "particle_size");
 	RNA_def_property_enum_items(prop, particle_size_items);
 	RNA_def_property_ui_text(prop, "Explosion Size", "Preset size of the built-in particle explosion");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	static const EnumPropertyItem particle_style_items[] = {
+		{EXPLOSIVE_STYLE_FIRE, "FIRE", 0, "Fire", "Fireball, dark smoke and sparks (gas, fuel, grenade)"},
+		{EXPLOSIVE_STYLE_ELECTRIC, "ELECTRIC", 0, "Electric", "Plasma flash, thin smoke and fast electric sparks (transformer, battery)"},
+		{EXPLOSIVE_STYLE_CONCRETE, "CONCRETE", 0, "Concrete", "No fire: dust ring, big dust cloud and falling debris (wall, rock)"},
+		{EXPLOSIVE_STYLE_WATER, "WATER", 0, "Water",
+		 "Foam splash thrown up, mist and falling droplets (depth charge, water tank, mine in a lake)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	prop = RNA_def_property(srna, "particle_style", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "particle_style");
+	RNA_def_property_enum_items(prop, particle_style_items);
+	RNA_def_property_ui_text(prop, "Explosion Style", "What the explosion is made of; picking one resets its colors");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_RangeExplosiveSettings_particle_style_update");
+
+	prop = RNA_def_property(srna, "fire_color", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Fire Color", "Tint of the fireball (white = natural fire colors)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "smoke_color", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Smoke Color", "Color of the smoke when born; it gets lighter as it rises");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "spark_color", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Particle Color", "Color of the flying debris sparks; they darken as they cool");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "fire_amount", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_text(prop, "Fire Amount", "How many fire puffs, relative to the size preset (0 = no fireball)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "smoke_amount", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_text(prop, "Smoke Amount", "How much smoke, relative to the size preset (0 = no smoke)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "spark_amount", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_text(prop, "Particle Amount", "How many debris sparks, relative to the size preset (0 = none)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "smoke_duration", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.2f, 4.0f);
+	RNA_def_property_ui_text(prop, "Smoke Duration", "How long the smoke lasts, relative to the size preset");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "blast_speed", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.2f, 4.0f);
+	RNA_def_property_ui_text(prop, "Blast Speed", "How hard fire, smoke and sparks are thrown out, relative to the size preset");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 }
 

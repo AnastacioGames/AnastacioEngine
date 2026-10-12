@@ -347,7 +347,18 @@ typedef struct RangeExplosiveSettings {
 	float effect_life;     /* seconds the effect object lives */
 	int flags;             /* EXPLOSIVE_* */
 	short particle_size;   /* EXPLOSIVE_PARTICLES_*: built-in fire/smoke/debris burst (EXPLOSIVE_PARTICLES) */
-	short pad;
+	short particle_style;  /* EXPLOSIVE_STYLE_*: what the burst is made of */
+	/* Particle Explosion colors, valid once EXPLOSIVE_PARTICLE_COLORS is set (filled with the
+	 * defaults the first time Particle Explosion is enabled; older files use the defaults). */
+	float fire_color[3];   /* tint of the fire ramp, white = natural */
+	float smoke_color[3];
+	float spark_color[3];
+	/* Multipliers of the size preset (1 = preset), also valid once EXPLOSIVE_PARTICLE_COLORS is set. */
+	float fire_amount;     /* particle count, 0 = no fireball */
+	float smoke_amount;    /* 0 = no smoke */
+	float spark_amount;    /* 0 = no sparks */
+	float smoke_duration;  /* smoke lifetime */
+	float blast_speed;     /* how far everything is thrown */
 } RangeExplosiveSettings;
 
 /* RangeExplosiveSettings.flags */
@@ -356,6 +367,7 @@ enum {
 	EXPLOSIVE_ON_IMPACT      = 1 << 1,
 	EXPLOSIVE_CHAIN_REACTION = 1 << 2,
 	EXPLOSIVE_PARTICLES      = 1 << 3,  /* GPU particle fireball + smoke + debris at the blast */
+	EXPLOSIVE_PARTICLE_COLORS = 1 << 4, /* fire/smoke/spark_color initialized */
 };
 
 /* RangeExplosiveSettings.particle_size */
@@ -365,6 +377,14 @@ enum {
 	EXPLOSIVE_PARTICLES_LARGE  = 2,
 	EXPLOSIVE_PARTICLES_HUGE   = 3,
 	EXPLOSIVE_PARTICLES_TINY   = 4,  /* added later, kept last so saved values don't shift */
+};
+
+/* RangeExplosiveSettings.particle_style: the three layers (core, smoke, debris) of the burst */
+enum {
+	EXPLOSIVE_STYLE_FIRE     = 0,  /* fireball, dark smoke, sparks */
+	EXPLOSIVE_STYLE_ELECTRIC = 1,  /* plasma flash, thin smoke, fast electric sparks */
+	EXPLOSIVE_STYLE_CONCRETE = 2,  /* dust ring, big dust cloud, falling debris */
+	EXPLOSIVE_STYLE_WATER    = 3,  /* foam splash thrown up, mist, falling droplets */
 };
 
 /* Native impact deformation (opt-in via gameflag2 & OB_DEFORMABLE): a hit stronger than

@@ -77,6 +77,7 @@ class KX_RainAura;
 class KX_RainSurfaceMask;
 class KX_RainLightning;
 struct KX_ParticleBlast;
+struct RangeExplosiveSettings;
 class KX_FontObject;
 class KX_Speaker;
 class KX_GameObject;
@@ -642,8 +643,8 @@ public:
 	void RemoveGpuParticleObject(KX_GameObject *gameobj);
 	const std::vector<KX_GameObject *> &GetGpuParticleObjects() const;
 	/// Explosive > Particle Explosion: a built-in GPU particle blast at a world position, sized by
-	/// EXPLOSIVE_PARTICLES_* (DNA_object_types.h). Stepped with the emitters, freed when it ends.
-	void SpawnParticleExplosion(const mt::vec3 &position, int size);
+	/// EXPLOSIVE_PARTICLES_* and styled by EXPLOSIVE_STYLE_* (DNA_object_types.h). Stepped with the emitters, freed when it ends.
+	void SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings);
 	void DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex);
 	bool HasParticleBlasts() const { return !m_particleBlasts.empty(); }
 

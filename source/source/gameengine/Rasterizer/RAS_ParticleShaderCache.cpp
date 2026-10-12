@@ -425,7 +425,14 @@ void main() {
 	float mask = smoothstep(0.0, 0.45, shape);
 	float heat = clamp((1.0 - v_lifeFrac * 1.25) * (0.45 + 0.75 * mask), 0.0, 1.0);
 	float flicker = 0.85 + 0.15 * sin(u_time * 13.0 + v_seed * 40.0);
-	vec3 rgb = fireRamp(heat) * u_color.rgb * flicker * 1.4;
+	vec3 ramp = fireRamp(heat);
+	/* White Color keeps the natural black body ramp; a saturated Color recolors the flame
+	 * (blue fire, electric plasma) while the hottest core stays white. */
+	float lum = dot(ramp, vec3(0.3, 0.59, 0.11));
+	vec3 hue = u_color.rgb / max(max(u_color.r, max(u_color.g, u_color.b)), 0.001);
+	vec3 tinted = mix(hue * hue * lum * 1.2, vec3(lum), smoothstep(0.85, 1.0, heat) * 0.5);
+	float chroma = clamp((max(u_color.r, max(u_color.g, u_color.b)) - min(u_color.r, min(u_color.g, u_color.b))) * 2.0, 0.0, 1.0);
+	vec3 rgb = mix(ramp * u_color.rgb, tinted, chroma) * flicker * 1.4;
 	float fade = clamp(v_lifeFrac / 0.04, 0.0, 1.0) * clamp((1.0 - v_lifeFrac) / 0.5, 0.0, 1.0);
 	float alpha = mask * fade * u_color.a;
 	if (alpha <= 0.001) { discard; }

@@ -164,45 +164,100 @@ struct KX_BlastLayer {
 	short blend;
 };
 
-const KX_BlastLayer kBlastLayers[3] = {
-	// Fireball: fast white-hot puffs slowed by drag, rising and cooling to red.
-	{GPU_PARTICLE_LOOK_FIRE, 160, 1.1f, 0.4f, 9.0f, 1.0f, 4.5f, 2.0f, 1.4f, 2.6f,
-	 {1.0f, 1.0f, 1.0f, 0.7f}, {1.0f, 1.0f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
-	// Smoke: dark billows pushed out with the blast, then drifting up and thinning.
-	{GPU_PARTICLE_LOOK_SMOKE, 120, 4.5f, 0.5f, 6.0f, 0.8f, 2.5f, 0.5f, 1.2f, 4.5f,
-	 {0.18f, 0.16f, 0.15f, 0.75f}, {0.4f, 0.39f, 0.38f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
-	// Debris sparks thrown far and falling.
-	{GPU_PARTICLE_LOOK_SPARKLE, 220, 1.8f, 0.3f, 14.0f, 3.0f, 0.8f, -9.8f, 0.09f, 0.03f,
-	 {1.0f, 0.75f, 0.3f, 1.0f}, {1.0f, 0.25f, 0.05f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+/// Per EXPLOSIVE_STYLE_*: core, smoke and debris layers. The colors here are the style defaults
+/// (same as rna_explosive_style_colors in rna_object.c); the user's colors replace .color and tint
+/// .endColor by the same ratio, so each layer keeps its own fade.
+const KX_BlastLayer kBlastStyles[4][3] = {
+	{ // EXPLOSIVE_STYLE_FIRE
+		// Fireball: fast white-hot puffs slowed by drag, rising and cooling to red.
+		{GPU_PARTICLE_LOOK_FIRE, 160, 1.1f, 0.4f, 9.0f, 1.0f, 4.5f, 2.0f, 1.4f, 2.6f,
+		 {1.0f, 1.0f, 1.0f, 0.7f}, {1.0f, 1.0f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+		// Smoke: dark billows pushed out with the blast, then drifting up and thinning.
+		{GPU_PARTICLE_LOOK_SMOKE, 120, 4.5f, 0.5f, 6.0f, 0.8f, 2.5f, 0.5f, 1.2f, 4.5f,
+		 {0.18f, 0.16f, 0.15f, 0.75f}, {0.4f, 0.39f, 0.38f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Debris sparks thrown far and falling.
+		{GPU_PARTICLE_LOOK_SPARKLE, 220, 1.8f, 0.3f, 14.0f, 3.0f, 0.8f, -9.8f, 0.09f, 0.03f,
+		 {1.0f, 0.75f, 0.3f, 1.0f}, {1.0f, 0.25f, 0.05f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+	},
+	{ // EXPLOSIVE_STYLE_ELECTRIC
+		// Plasma flash: short, bright, blue-white.
+		{GPU_PARTICLE_LOOK_FIRE, 120, 0.5f, 0.3f, 7.0f, 0.0f, 6.0f, 0.0f, 1.0f, 1.8f,
+		 {0.45f, 0.7f, 1.0f, 0.8f}, {0.45f, 0.7f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+		// Thin grey-blue smoke of burnt insulation.
+		{GPU_PARTICLE_LOOK_SMOKE, 50, 2.5f, 0.3f, 3.0f, 0.5f, 3.0f, 0.4f, 0.8f, 3.0f,
+		 {0.35f, 0.38f, 0.45f, 0.4f}, {0.5f, 0.52f, 0.56f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Many fast electric sparks that die quickly.
+		{GPU_PARTICLE_LOOK_SPARKLE, 320, 0.9f, 0.2f, 18.0f, 1.0f, 2.5f, -4.0f, 0.07f, 0.02f,
+		 {0.6f, 0.85f, 1.0f, 1.0f}, {0.3f, 0.5f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ADDITIVE},
+	},
+	{ // EXPLOSIVE_STYLE_CONCRETE
+		// Dust ring: dense puffs thrown sideways, stopped fast by drag.
+		{GPU_PARTICLE_LOOK_SMOKE, 90, 2.0f, 0.5f, 10.0f, 0.5f, 5.0f, 0.0f, 1.0f, 3.0f,
+		 {0.6f, 0.56f, 0.5f, 0.8f}, {0.65f, 0.62f, 0.58f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Big dust cloud that hangs and slowly rises.
+		{GPU_PARTICLE_LOOK_SMOKE, 120, 6.0f, 0.6f, 5.0f, 0.6f, 2.0f, 0.25f, 1.5f, 6.0f,
+		 {0.55f, 0.52f, 0.48f, 0.6f}, {0.62f, 0.6f, 0.57f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Chunks of debris thrown up and falling.
+		{GPU_PARTICLE_LOOK_DEFAULT, 160, 2.2f, 0.3f, 12.0f, 4.0f, 0.6f, -9.8f, 0.14f, 0.1f,
+		 {0.35f, 0.33f, 0.3f, 1.0f}, {0.35f, 0.33f, 0.3f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+	},
+	{ // EXPLOSIVE_STYLE_WATER
+		// Foam splash: white puffs thrown up in a column and falling back.
+		{GPU_PARTICLE_LOOK_SMOKE, 110, 1.6f, 0.4f, 5.0f, 7.0f, 1.5f, -6.0f, 0.8f, 2.0f,
+		 {0.85f, 0.92f, 1.0f, 0.8f}, {0.9f, 0.95f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Mist that hangs over the water.
+		{GPU_PARTICLE_LOOK_SMOKE, 80, 3.5f, 0.5f, 4.0f, 1.0f, 2.0f, 0.1f, 1.2f, 4.0f,
+		 {0.8f, 0.88f, 0.95f, 0.35f}, {0.9f, 0.95f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+		// Droplets thrown high, raining back down.
+		{GPU_PARTICLE_LOOK_DEFAULT, 300, 2.0f, 0.3f, 7.0f, 8.0f, 0.3f, -9.8f, 0.07f, 0.05f,
+		 {0.7f, 0.85f, 1.0f, 0.9f}, {0.7f, 0.85f, 1.0f, 0.0f}, GPU_PARTICLE_BLEND_ALPHA},
+	},
 };
 
-std::unique_ptr<RAS_ParticleBuffer> KX_MakeBlastLayer(const KX_BlastLayer &layer, float scale)
+/// Builds one layer. rgb (nullptr = style default) replaces the layer color; amount scales the
+/// particle count, speed the burst speed and life the lifetime, all relative to the preset.
+std::unique_ptr<RAS_ParticleBuffer> KX_MakeBlastLayer(const KX_BlastLayer &layer, float scale, const float *rgb,
+                                                      float amount, float speed, float life)
 {
-	const unsigned int count = (unsigned int)(layer.count * (0.6f + 0.4f * scale));
+	const unsigned int count = (unsigned int)(layer.count * (0.6f + 0.4f * scale) * amount);
+	if (count == 0) {
+		return nullptr;
+	}
 	std::unique_ptr<RAS_ParticleBuffer> buffer(new RAS_ParticleBuffer(count));
 	if (!buffer->Create()) {
 		return nullptr;
 	}
+	float color[4] = {layer.color[0], layer.color[1], layer.color[2], layer.color[3]};
+	float endColor[4] = {layer.endColor[0], layer.endColor[1], layer.endColor[2], layer.endColor[3]};
+	if (rgb) {
+		for (int i = 0; i < 3; ++i) {
+			const float ratio = (layer.color[i] > 0.001f) ? layer.endColor[i] / layer.color[i] : 1.0f;
+			color[i] = rgb[i];
+			endColor[i] = std::min(1.0f, rgb[i] * ratio);
+		}
+	}
 	const float zero[3] = {0.0f, 0.0f, 0.0f};
 	const float up[3] = {0.0f, 0.0f, 1.0f};
-	const float velocity[3] = {0.0f, 0.0f, layer.up * scale};
+	const float velocity[3] = {0.0f, 0.0f, layer.up * scale * speed};
 	const float gravity[3] = {0.0f, 0.0f, layer.gravity > 0.0f ? layer.gravity * scale : layer.gravity};
 	buffer->SetEmitterPos(zero);
 	buffer->SetEmitterRadius(layer.radius * scale);
 	buffer->SetVelocityBase(velocity);
-	buffer->SetVelocityRandomness(layer.speed * scale);
+	buffer->SetVelocityRandomness(layer.speed * scale * speed);
 	buffer->SetEmissionDirection(up);
 	buffer->SetEmissionAngle(179.9f);  // whole sphere
 	buffer->SetDrag(layer.drag);
 	buffer->SetGravity(gravity);
-	buffer->SetLifetime(layer.life * (0.75f + 0.25f * scale));
+	buffer->SetLifetime(layer.life * (0.75f + 0.25f * scale) * life);
 	buffer->SetBillboardSize(layer.size * scale);
 	buffer->SetEndSize(layer.endSize * scale);
-	buffer->SetColor(layer.color);
-	buffer->SetEndColor(layer.endColor);
+	buffer->SetColor(color);
+	buffer->SetEndColor(endColor);
 	buffer->SetBlendMode(layer.blend);
 	buffer->SetBillboardMode(GPU_PARTICLE_BILLBOARD_CAMERA_FACING);
-	buffer->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(layer.look));
+	if (layer.look != GPU_PARTICLE_LOOK_DEFAULT) {
+		buffer->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(layer.look));
+	}
 	buffer->SetBurstMode(true);
 	buffer->Burst();
 	return buffer;
@@ -2852,16 +2907,25 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 	                       m_particleBlasts.end());
 }
 
-void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, int size)
+void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings)
 {
 	// Indexed by EXPLOSIVE_PARTICLES_* (Small, Medium, Large, Huge, Tiny).
 	static const float kScales[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
-	const float scale = kScales[std::max(0, std::min(4, size))];
+	const float scale = kScales[std::max(0, std::min(4, (int)settings.particle_size))];
+	const KX_BlastLayer *layers = kBlastStyles[std::max(0, std::min(3, (int)settings.particle_style))];
+
+	// Files saved before the colors/amounts existed use the style preset as is.
+	const bool custom = (settings.flags & EXPLOSIVE_PARTICLE_COLORS) != 0;
+	const float *colors[3] = {settings.fire_color, settings.smoke_color, settings.spark_color};
+	const float amounts[3] = {settings.fire_amount, settings.smoke_amount, settings.spark_amount};
+	const float speed = custom ? settings.blast_speed : 1.0f;
 
 	std::unique_ptr<KX_ParticleBlast> blast(new KX_ParticleBlast());
 	blast->position = position;
 	for (int i = 0; i < 3; ++i) {
-		blast->buffers[i] = KX_MakeBlastLayer(kBlastLayers[i], scale);
+		const float life = (custom && i == 1) ? settings.smoke_duration : 1.0f;
+		blast->buffers[i] = KX_MakeBlastLayer(layers[i], scale, custom ? colors[i] : nullptr,
+		                                      custom ? amounts[i] : 1.0f, speed, life);
 		if (blast->buffers[i]) {
 			blast->life = std::max(blast->life, blast->buffers[i]->GetLifetime());
 		}

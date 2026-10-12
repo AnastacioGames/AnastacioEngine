@@ -8,9 +8,12 @@ import sys
 from math import radians
 from mathutils import Vector
 
-saida = sys.argv[sys.argv.index('--') + 1]
-TAMANHOS = ('TINY', 'SMALL', 'MEDIUM', 'LARGE', 'HUGE')
-PAVIOS = (1.0, 3.0, 5.0, 7.0, 9.0)
+args = sys.argv[sys.argv.index('--') + 1:]
+saida = args[0]
+# --estilos: quatro bombas Medium, uma de cada Explosion Style (Fire, Electric, Concrete, Water).
+ESTILOS = ('FIRE', 'ELECTRIC', 'CONCRETE', 'WATER') if '--estilos' in args else None
+TAMANHOS = ('MEDIUM',) * 4 if ESTILOS else ('TINY', 'SMALL', 'MEDIUM', 'LARGE', 'HUGE')
+PAVIOS = (1.0, 3.5, 6.0, 8.5) if ESTILOS else (1.0, 3.0, 5.0, 7.0, 9.0)
 
 SCRIPT = (
     "import bge, os\n"
@@ -81,6 +84,10 @@ for i, (tam, pavio) in enumerate(zip(TAMANHOS, PAVIOS)):
     ex.use_chain_reaction = False
     ex.use_particle_explosion = True
     ex.particle_size = tam
+    if ESTILOS:
+        ex.particle_style = ESTILOS[i]
+        bomba.name = 'bomba_%s' % ESTILOS[i].lower()
+        bomba.location.x = -18 + i * 12
 
 cam_data = bpy.data.cameras.new('cam')
 cam_data.lens = 22

@@ -1172,7 +1172,7 @@ bool KX_DestructionManager::Detonate(KX_GameObject *gameobj, std::vector<KX_Game
 	}
 
 	if (settings.flags & EXPLOSIVE_PARTICLES) {
-		m_scene->SpawnParticleExplosion(center, settings.particle_size);
+		m_scene->SpawnParticleExplosion(center, settings);
 	}
 
 	std::vector<KX_GameObject *> pieces;

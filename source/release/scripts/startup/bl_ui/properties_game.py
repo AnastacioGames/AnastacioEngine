@@ -675,6 +675,24 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
         row.prop(es, "use_particle_explosion")
         if es.use_particle_explosion:
             row.prop(es, "particle_size", text="")
+            col.prop(es, "particle_style")
+            # The three layers are named after what they are in the chosen style.
+            names = {
+                'FIRE': ("Fire", "Smoke", "Sparks"),
+                'ELECTRIC': ("Plasma", "Smoke", "Sparks"),
+                'CONCRETE': ("Dust", "Dust Cloud", "Debris"),
+                'WATER': ("Splash", "Mist", "Droplets"),
+            }[es.particle_style]
+            split = col.split()
+            for color_prop, amount_prop, name in zip(("fire_color", "smoke_color", "spark_color"),
+                                                     ("fire_amount", "smoke_amount", "spark_amount"), names):
+                sub = split.column(align=True)
+                sub.label(text=name + ":")
+                sub.prop(es, color_prop, text="")
+                sub.prop(es, amount_prop, text="Amount")
+            row = col.row()
+            row.prop(es, "smoke_duration", text=names[1] + " Duration")
+            row.prop(es, "blast_speed")
 
 
 class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
