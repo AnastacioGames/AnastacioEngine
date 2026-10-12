@@ -82,15 +82,25 @@ float vfogVolume(int i, vec3 p)
 	if (inside <= 0.0) {
 		return 0.0;
 	}
-	/* Smoke and fire are local plumes: their noise rises in their own Z axis and fades at the top. */
+	/* Smoke and fire are local plumes in their own Z axis (-1 bottom .. 1 top): a column narrow at
+	 * the bottom that opens upward and sways, cut into round billows by rising noise (a threshold
+	 * on it, as clouds), thinning out at the top. */
 	if (smoke > 0.001 || fire > 0.001) {
 		float rise = max(smoke, (fire > 0.001) ? 1.5 : 0.0);
-		vec3 q = l * max(vfog_data[1].x, 0.0001) * 2.5;
-		q.z -= rise * vfog_data[9].z;
-		inside -= edge * 0.7 * vfogNoise(q);
-		return clamp(inside / edge, 0.0, 1.0) *
-		       (0.45 + 0.55 * vfogNoise(q * 2.03 + 17.0)) *
-		       (1.0 - smoothstep(-0.25, 1.0, l.z)) * vfog_data[7][i];
+		float time = vfog_data[9].z;
+		float h = clamp(l.z * 0.5 + 0.5, 0.0, 1.0);
+		vec2 sway = vec2(vfogNoise(vec3(l.z * 1.3 - time * 0.35, 3.0, 7.0)),
+		                 vfogNoise(vec3(l.z * 1.3 - time * 0.35, 11.0, 5.0))) - 0.5;
+		vec2 xy = l.xy - sway * 0.5 * h;
+		/* Smoke opens upward; a flame is a tongue that narrows upward. */
+		float radius = (smoke > 0.001 && fire <= 0.001) ? mix(0.42, 0.95, sqrt(h)) : mix(0.85, 0.25, h);
+		float column = 1.0 - length(xy) / radius;
+		vec3 q = vec3(l.xy * 4.0, l.z * 3.0 - rise * time * 0.8);
+		float n = vfogNoise(q) * 0.55 + vfogNoise(q * 2.07 + 17.0) * 0.3 + vfogNoise(q * 4.3 + 41.0) * 0.15;
+		float billow = column + 0.12 + (n - 0.5) * (0.6 + 0.6 * h);
+		float shape = smoothstep(0.0, 0.18, billow) * smoothstep(-1.0, -0.85, l.z) *
+		              (1.0 - smoothstep(0.35, 1.0, l.z));
+		return min(shape, clamp(inside * 6.0, 0.0, 1.0)) * vfog_data[7][i];
 	}
 	if (inside < edge && edge > 0.01) {
 		vec3 q = (p - vec3(vfog_data[9].xy, 0.0)) * max(vfog_data[1].x, 0.0001) * 2.5 + vfog_data[1].z * 0.5;
@@ -98,6 +108,15 @@ float vfogVolume(int i, vec3 p)
 	}
 	return clamp(inside / edge, 0.0, 1.0) * vfog_data[7][i];
 }
+
+bool vfogIsPlume(int i)
+{
+	return vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 || vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001;
+}
+
+/* Medium/High march the smoke/fire plumes on their own (more samples, self shadow); the main
+ * march then leaves them out. */
+bool vfogSkipPlumes = false;
 
 float vfogVolumeFactor(vec3 p)
 {
@@ -161,6 +180,9 @@ float vfogDensityColor(vec3 p, out vec3 color, out vec3 emission)
 		for (int i = 0; i < 4; i++) {
 			if (i >= count) {
 				break;
+			}
+			if (vfogSkipPlumes && vfogIsPlume(i)) {
+				continue;
 			}
 		float localDensity = (vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 ||
 		                      vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001) ? 0.5 : vfog_data[0].x;
@@ -530,6 +552,7 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 	for (int s = 1; s < 25; s++) {
 		Tsteps[s] = 0.0;
 	}
+	vfogSkipPlumes = true;
 	for (int s = 0; s < 24; s++) {
 		if (s >= steps) {
 			break;
@@ -551,18 +574,21 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 			break;
 		}
 	}
+	vfogSkipPlumes = false;
 
-	/* A small local volume can fall between the 12 Medium samples. March it separately when its
-	 * ray interval is shorter than six regular steps, keeping smoke and fire visible at distance. */
+	/* Smoke/fire plumes always, and a small local volume that can fall between the 12 Medium
+	 * samples (its ray interval shorter than six regular steps), are marched on their own. */
 	int volumeCount = int(vfog_data[6].y);
+	int plumeSteps = (quality > 1.5) ? 16 : 10;
 	for (int i = 0; i < 4; i++) {
 		if (i >= volumeCount) {
 			break;
 		}
+		bool plume = vfogIsPlume(i);
 		vec2 vseg = vfogVolumeInterval(i, ro, rd);
 		float a = max(seg.x, vseg.x);
 		float b = min(seg.y, vseg.y);
-		if (b <= a || (b - a) >= 6.0 * ds) {
+		if (b <= a || (!plume && (b - a) >= 6.0 * ds)) {
 			continue;
 		}
 		float vk = clamp((a - seg.x) / max(ds, 1e-4), 0.0, float(steps));
@@ -572,15 +598,26 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 		if (Tv < 0.01) {
 			continue;
 		}
-		float vds = (b - a) / 6.0;
+		int vsteps = plume ? plumeSteps : 6;
+		float vds = (b - a) / float(vsteps);
 		float vt = a + vds * fract(jitter + 0.381966 * float(i + 1));
 		vec4 tint = vfog_data[VFOG_VOLUME_COLOR + i];
 		vec3 volColor = (tint.w > 0.5) ? tint.rgb : vfog_data[2].rgb;
-		float localDensity = (vfog_data[VFOG_VOLUME_SMOKE + i].x > 0.001 ||
-		                      vfog_data[VFOG_VOLUME_SMOKE + i].y > 0.001) ? 0.5 : vfog_data[0].x;
-		for (int s = 0; s < 6; s++) {
+		float localDensity = plume ? 0.5 : vfog_data[0].x;
+		/* Self shadow of a plume: two taps toward the sun, about a third and the whole of the volume
+		 * radius away, so the billows get a lit and a shaded side. */
+		vec3 sunDir = vfog_data[3].xyz;
+		float radius = 1.0 / max(length((vfog_mats[i] * vec4(sunDir, 0.0)).xyz), 1e-4);
+		float Tin = Tv;
+		for (int s = 0; s < 16; s++) {
+			if (s >= vsteps) {
+				break;
+			}
 			vec3 p = ro + rd * vt;
-			float sigma = vfogVolume(i, p) * localDensity * vfogPatches(p);
+			float sigma = vfogVolume(i, p) * localDensity;
+			if (!plume) {
+				sigma *= vfogPatches(p);
+			}
 			vec3 emission = vfogFireEmission(i, p);
 			if (vfog_data[9].w > 0.5) {
 				float push = vfogPush(p);
@@ -589,11 +626,27 @@ vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 			}
 			if (sigma > 1e-5) {
 				float stepT = exp(-sigma * vds);
-				L += Tv * (sunLight * vfogSunShadow(p) + ambient) * volColor * (1.0 - stepT);
-				L += Tv * emission * sigma * vds;
+				vec3 sun = sunLight * vfogSunShadow(p);
+				vec3 amb = ambient;
+				if (plume) {
+					float occ = vfogVolume(i, p + sunDir * radius * 0.35) * 0.35 +
+					            vfogVolume(i, p + sunDir * radius) * 0.65;
+					sun *= exp(-occ * localDensity * radius * 1.6);
+					/* Thick inner parts see less of the sky too. */
+					amb *= mix(1.0, 0.75, clamp(occ, 0.0, 1.0));
+					/* A little light of its own so a night plume is not a black hole in the sky. */
+					amb += vfog_data[2].rgb * 0.15;
+				}
+				L += Tv * (sun + amb) * volColor * (1.0 - stepT);
+				/* Plume fire: bounded by its own color instead of summing over a dense core. */
+				L += Tv * emission * (plume ? (1.0 - stepT) * 0.07 : sigma * vds);
 				Tv *= stepT;
 			}
 			vt += vds;
+		}
+		/* What the plume hides of the scene behind it. */
+		if (plume && Tin > 1e-4) {
+			T *= Tv / Tin;
 		}
 	}
 
