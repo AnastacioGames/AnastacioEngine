@@ -394,6 +394,9 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
 - F6 (2026-10-04, na main): Track To com pai, Sound loop/ping-pong/3D, Movement e Animation Event de outro objeto;
   Delay em segundos. Runtime validado no Windows (CHECK idêntico nos 4 modos, `LEFT_AS_BRICK 0`); áudio testado à mão
   (loop recomeça, ping-pong, 3D), cena `tools/create_logic_manual_test.py`.
+- F7 (2026-10-12): Action, Armature, Filter 2D, Vibration, Motion Servo/Character/Set Position, Change Color, Game Save/Load/Screenshot,
+  Property Level e Runtime API, Mouse Over com material/x-ray; Weather Effects ganhou Fog/Clouds - Volumetric. Geração validada em
+  background (código compila); **falta rodar em jogo e comparar com os bricks**, principalmente Action e Character.
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; decidir se o `cam y` do modo
   Module/Script merece ajuste de ordem; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.

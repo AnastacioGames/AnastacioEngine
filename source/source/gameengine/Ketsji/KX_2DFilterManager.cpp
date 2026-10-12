@@ -31,6 +31,8 @@
 
 #include "KX_Camera.h"
 #include "KX_Scene.h"
+#include "KX_GameObject.h"
+#include "KX_Globals.h"
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
 #include "BLI_utildefines.h"
@@ -733,6 +735,7 @@ PyMethodDef KX_2DFilterManager::Methods[] = {
 	EXP_PYMETHODTABLE(KX_2DFilterManager, getFilter),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, addFilter),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, removeFilter),
+	EXP_PYMETHODTABLE(KX_2DFilterManager, setBuiltinFilterEnabled),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeFxaaValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeTonemapValues),
 	EXP_PYMETHODTABLE(KX_2DFilterManager, changeBloomValues),
@@ -868,13 +871,23 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, getFilter, " getFilter(index)")
 	Py_RETURN_NONE;
 }
 
-EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter, " addFilter(index, type, fragmentProgram)")
+EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter,
+                    " addFilter(index, type, fragmentProgram=\"\", owner=None, mipmap=False)\n"
+                    "owner: object whose game properties feed the uniforms of the same name, like the Filter 2D actuator.")
 {
 	int index = 0;
 	int type = 0;
 	const char *frag = "";
+	PyObject *pyowner = Py_None;
+	int mipmap = 0;
 
-	if (!PyArg_ParseTuple(args, "ii|s:addFilter", &index, &type, &frag)) {
+	if (!PyArg_ParseTuple(args, "ii|sOi:addFilter", &index, &type, &frag, &pyowner, &mipmap)) {
+		return nullptr;
+	}
+
+	KX_GameObject *owner = nullptr;
+	if (!ConvertPythonToGameObject(KX_GetActiveScene()->GetLogicManager(), pyowner, &owner, true,
+	                               "filterManager.addFilter(index, type, fragmentProgram, owner, mipmap)")) {
 		return nullptr;
 	}
 
@@ -888,7 +901,7 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter, " addFilter(index, type, frag
 		return nullptr;
 	}
 
-	if (type < FILTER_BLUR || type > FILTER_CUSTOMFILTER) {
+	if ((type < FILTER_BLUR || type > FILTER_CUSTOMFILTER) && type != FILTER_OUTLINE) {
 		PyErr_SetString(PyExc_ValueError, "filterManager.addFilter(index, type, fragmentProgram): KX_2DFilterManager, type invalid");
 		return nullptr;
 	}
@@ -901,6 +914,11 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter, " addFilter(index, type, frag
 	data.filterPassIndex = index;
 	data.filterMode = type;
 	data.shaderText = std::string(frag);
+	data.mipmap = (mipmap != 0);
+	if (owner) {
+		data.gameObject = owner;
+		data.propertyNames = owner->GetPropertyNames();
+	}
 	if (type == FILTER_CUSTOMFILTER) {
 		// Turns on the error lines relative to the string and the named error messages.
 		data.sourceName = "addFilter(" + std::to_string(index) + ")";
@@ -909,6 +927,27 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, addFilter, " addFilter(index, type, frag
 	KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, false));
 
 	return filter->GetProxy();
+}
+
+EXP_PYMETHODDEF_DOC(KX_2DFilterManager, setBuiltinFilterEnabled,
+                    " setBuiltinFilterEnabled(type, enabled=True)\n"
+                    "Turns a built-in filter on or off with its current values, like the Filter 2D actuator.\n"
+                    "type: RAS_2DFILTER_FXAA, _BLOOM, _TONEMAP, _SSAO, _LIGHTSCATTER or _SSR. Returns False when unavailable.")
+{
+	int type = 0;
+	int enabled = 1;
+
+	if (!PyArg_ParseTuple(args, "i|i:setBuiltinFilterEnabled", &type, &enabled)) {
+		return nullptr;
+	}
+
+	if (type != FILTER_FXAA && type != FILTER_BLOOM && type != FILTER_TONEMAP && type != FILTER_SSAO &&
+	    type != FILTER_LIGHTSCATTER && type != FILTER_SSR) {
+		PyErr_SetString(PyExc_ValueError, "filterManager.setBuiltinFilterEnabled(type, enabled): type is not a built-in filter");
+		return nullptr;
+	}
+
+	return PyBool_FromLong(SetBuiltinFilterEnabled(static_cast<FILTER_MODE>(type), enabled != 0));
 }
 
 EXP_PYMETHODDEF_DOC(KX_2DFilterManager, removeFilter, " removeFilter(index)")

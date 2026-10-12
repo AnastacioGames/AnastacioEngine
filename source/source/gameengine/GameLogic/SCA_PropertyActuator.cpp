@@ -141,7 +141,11 @@ bool SCA_PropertyActuator::Update()
 			float weatherValue = 0.0f;
 			bool weatherBool = false;
 			const bool isBool = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1" || m_exprtxt == "False" || m_exprtxt == "false" || m_exprtxt == "0");
-			if (isBool) weatherBool = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1");
+			if (isBool) {
+				weatherBool = (m_exprtxt == "True" || m_exprtxt == "true" || m_exprtxt == "1");
+				/* "0"/"1" tambem sao valores Float validos (ex.: vfog_density = 1). */
+				weatherValue = weatherBool ? 1.0f : 0.0f;
+			}
 			else if (!CM_StringTo(m_exprtxt, weatherValue)) return false;
 			KX_WorldInfo *world = dynamic_cast<KX_WorldInfo *>(m_worldPropOwner);
 			return world && world->SetWeatherRuntimeProperty(m_runtimeProperty.c_str(), weatherValue, weatherBool, isBool);

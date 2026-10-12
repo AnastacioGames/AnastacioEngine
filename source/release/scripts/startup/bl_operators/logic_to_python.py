@@ -166,6 +166,9 @@ _ACT_STATE = [None]  # expressao "actuator ativo" do tradutor atual (None = padr
 _FIRE = "%FIRE%"  # trocado pela variavel de pulso do controller na saida
 _ON = "%ON%"  # trocado pela variavel do controller (actuator que roda todo frame)
 _ACT_ALWAYS = [False]  # actuator roda todo frame, fora do "if controller" (usa _ON)
+# Runtime API dos bricks Property (sensor e actuator) que tem equivalente direto no objeto.
+_RUNTIME_PROPS = {'LOCAL_POSITION', 'LOCAL_SCALE', 'VISIBLE', 'MASS', 'LINEAR_VELOCITY', 'ANGULAR_VELOCITY',
+                  'GRAVITY'}
 _MOVE_AXES = {'XAXIS': (0, 1), 'YAXIS': (1, 1), 'ZAXIS': (2, 1),
               'NEGXAXIS': (0, -1), 'NEGYAXIS': (1, -1), 'NEGZAXIS': (2, -1), 'ALLAXIS': (-1, 0)}
 
@@ -246,17 +249,36 @@ def _sensor_expr(ob, sens, key=None):
         elif ev == 'MOVEMENT':
             expr = "self._changed(%r, tuple(logic.mouse.position))" % key
         elif ev in {'MOUSEOVER', 'MOUSEOVERANY'}:
-            if sens.use_x_ray or sens.use_material:
-                raise Unsupported("mouse over com x-ray/material")
-            hit = "self._mouse_hit(%s)" % A("Property", sens.property)
+            mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
+            mat = sens.use_material == 'MATERIAL'  # enum Property/Material, nao bool
+            if sens.use_x_ray or mat or mask != 0xFFFF:
+                # Mesmo filtro de KX_MouseFocusSensor: material ou propriedade, x-ray e grupos de colisao.
+                name = A("Material", sens.material) if mat else A("Property", sens.property)
+                hit = "self._mouse_hit(%s, %s, %s, %d)" % (name, mat, sens.use_x_ray, mask)
+            else:
+                hit = "self._mouse_hit(%s)" % A("Property", sens.property)
             expr = ("%s is ob" if ev == 'MOUSEOVER' else "%s is not None") % hit
         else:
             raise Unsupported("mouse %s" % ev)
     elif t == 'PROPERTY':
-        if sens.use_runtime_property:
-            raise Unsupported("property sensor com runtime API")
-        p = sens.property
         ev = sens.evaluation_type
+        if sens.use_runtime_property:
+            # Runtime API: le o objeto (ou o Target) em vez de uma game property.
+            rp = sens.runtime_property
+            if rp not in _RUNTIME_PROPS:
+                raise Unsupported("property sensor runtime %s" % rp)
+            tgt = "ob" if sens.runtime_target is None else "scene.objects.get(%r)" % sens.runtime_target.name
+            if rp == 'VISIBLE':
+                value, vmax = A("Value", sens.runtime_bool_value), "0.0"
+            elif rp == 'MASS':
+                value, vmax = A("Value", sens.runtime_value[0]), A("Max", sens.runtime_value_max[0])
+            else:
+                value, vmax = A("Value", tuple(sens.runtime_value)), "0.0"
+            expr = "self._rt_test(%s, %r, %r, %s, %s)" % (tgt, rp, ev, value, vmax)
+            if sens.invert:
+                expr = "not (%s)" % expr
+            return "%s and (%s)" % (A("Enabled", True), expr)
+        p = sens.property
         cur = "ob.get(%s)" % A("Property", p)
         val = lambda text, field="Value": _lit_arg(ob, p, text, "%s %s" % (key, field))
         if ev == 'PROPEQUAL':
@@ -317,7 +339,8 @@ def _sensor_expr(ob, sens, key=None):
             expr = ("ob.rayCast(ob.worldPosition + %s * %s, ob, %s, %s, 0, %d, 0, %d)[0] is not None" %
                     (_axis(sens.axis), rng, rng, prop, sens.use_x_ray, mask))
     elif t == 'DELAY':
-        expr = "self._delay(%r, %s, %s, %s, %s, %s)" % (key, A("Delay", sens.delay), A("Duration", sens.duration),
+        expr = "self._delay(%r, %s, %s, %s, %s, %s)" % (key, A("Delay", sens.delay_time if sens.use_deltatime else sens.delay),
+                                                       A("Duration", sens.duration),
                                                        A("Repeat", sens.use_repeat),
                                                        A("Repeat Times", sens.repeat_times), sens.use_deltatime)
     elif t == 'RANDOM':
@@ -337,6 +360,10 @@ def _sensor_expr(ob, sens, key=None):
     elif t == 'ANIMATIONEVENT':
         trigger = -1 if sens.trigger_all else sens.trigger_index - 1
         expr = "self._anim_event(%r, %d, %d, own=ob)" % (key, sens.event_index - 1, trigger)
+    elif t == 'ARMATURE':
+        # Estado da constraint do bone (KX_ArmatureSensor); sem a constraint, sempre falso.
+        expr = "self._arm_test(ob, %s, %s, %r, %s)" % (A("Bone", sens.bone), A("Constraint", sens.constraint),
+                                                       sens.test_type, A("Value", sens.value))
     elif t == 'MESSAGE':
         # Mensagens enviadas no frame anterior para este objeto (ou sem destino), como o sensor.
         expr = "bool(logic.getMessages(ob.name, %s))" % A("Subject", sens.subject)
@@ -454,11 +481,16 @@ _WEATHER_EFFECT_PROPS = {
     'AURA': "aura_effect",
     'LIGHTNING': "lightning_effect",
     'EARTHQUAKE': "earthquake_effect",
+    'VOLUMETRIC_FOG': "vfog_effect",
+    'VOLUMETRIC_CLOUDS': "vcloud_effect",
 }
 
 # Efeitos liga/desliga (os demais sao Float); nome = setWeather() de KX_WorldInfo.
 _WEATHER_BOOLS = {"rain", "ripples", "droplets", "clouds", "lens_flare", "mist",
-                  "splash", "aura", "lightning", "earthquake"}
+                  "splash", "aura", "lightning", "earthquake", "use_sky_layers",
+                  "vfog", "vfog_use_lamps", "vfog_use_shafts", "vfog_use_sun_shafts", "vfog_volumes_only",
+                  "vfog_use_wind", "vfog_use_time_of_day", "vfog_use_layer", "vfog_use_reach_clouds",
+                  "use_volumetric_clouds", "vcloud_shadow_enable"}
 
 
 def _weather_code(act):
@@ -512,17 +544,29 @@ def _world_property_code(act):
 
 # Helpers do componente que agem sobre o objeto passado em own= (atuador de outro objeto).
 # Estado (self._ticks) e chaves por 'dono/atuador'; o resto de self.* continua sendo brick.
-_OWN_CALLS = r"self\._(follow|mouse_look|cst\w*|steer|track_parent|snd_play|snd_stop)\(|self\._ticks\.pop\("
+_OWN_CALLS = (r"self\._(follow|mouse_look|cst\w*|steer|track_parent|snd_play|snd_stop|ramp|servo|char_move|vibrate|"
+              r"filter2d|arm_con|action|rt_set)\(|self\._ticks\.pop\(")
 
 
 def _actuator_code(ob, act):
     t = act.type
     if t == 'MOTION':
-        if act.mode != 'OBJECT_NORMAL':
+        if act.mode == 'OBJECT_SERVO':
+            return _servo_code(act)
+        if act.mode == 'OBJECT_CHARACTER':
+            return _character_code(act)
+        if act.mode not in {'OBJECT_NORMAL', 'OBJECT_NORMAL_SET'}:
             raise Unsupported("motion %s" % act.mode)
         lines = []
         vr = []
-        if act.use_vr_gaze and _nonzero(act.offset_location):
+        off = []
+        # Loc e Rot sao por tic de 60 Hz: a engine escala por 60 * deltaTime (KX_ObjectActuator).
+        step = "(60.0 * logic.deltaTime())"
+        if act.mode == 'OBJECT_NORMAL_SET':
+            # Set Position: Loc e a posicao de mundo.
+            if _nonzero(act.offset_location):
+                lines.append("ob.worldPosition = %s" % _act_arg("Loc", act.offset_location))
+        elif act.use_vr_gaze and _nonzero(act.offset_location):
             # Roda todo frame (_ON = controller): acelera/freia pelo Damping, teleporte 1x por toque.
             if act.use_vr_teleport:
                 vr.append("if self._rise(%r, %s):" % ("tp:" + act.name, _ON))
@@ -531,11 +575,11 @@ def _actuator_code(ob, act):
                 vr.append("self._vr_walk(%r, %s, %s, %s)" % (act.name, _ON, _act_arg("Loc", act.offset_location),
                                                            _act_arg("Damping", act.damping)))
         elif _nonzero(act.offset_location):
-            lines.append("ob.applyMovement(%s, %s)" % (_act_arg("Loc", act.offset_location),
-                                                       act.use_local_location))
+            lines.append("ob.applyMovement(Vector(%s) * %s, %s)" % (_act_arg("Loc", act.offset_location), step,
+                                                                    act.use_local_location))
         if _nonzero(act.offset_rotation):
-            lines.append("ob.applyRotation(%s, %s)" % (_act_arg("Rot", act.offset_rotation),
-                                                       act.use_local_rotation))
+            lines.append("ob.applyRotation(Vector(%s) * %s, %s)" % (_act_arg("Rot", act.offset_rotation), step,
+                                                                    act.use_local_rotation))
         if _nonzero(act.force):
             lines.append("ob.applyForce(%s, %s)" % (_act_arg("Force", act.force), act.use_local_force))
         if _nonzero(act.torque):
@@ -546,19 +590,39 @@ def _actuator_code(ob, act):
             if act.use_add_linear_velocity:
                 lines.append("ob.setLinearVelocity(ob.getLinearVelocity(%s) + Vector(%s), %s)" %
                              (local, vel, local))
+            elif act.damping > 0:
+                # Damping: chega na velocidade em Damping frames (o pulso negativo recomeca a rampa).
+                key = "lin:" + _ACT_LABEL[0]
+                lines.append("ob.setLinearVelocity(self._ramp(%r, ob.getLinearVelocity(%s), %s, %s), %s)" %
+                             (key, local, vel, _act_arg("Damping", act.damping), local))
+                off.append("self._ticks.pop(%r, None)" % key)
             else:
                 lines.append("ob.setLinearVelocity(%s, %s)" % (vel, local))
         if _nonzero(act.angular_velocity):
-            lines.append("ob.setAngularVelocity(%s, %s)" % (_act_arg("Angular Velocity", act.angular_velocity),
-                                                            act.use_local_angular_velocity))
+            local = act.use_local_angular_velocity
+            vel = _act_arg("Angular Velocity", act.angular_velocity)
+            if act.damping > 0:
+                key = "ang:" + _ACT_LABEL[0]
+                lines.append("ob.setAngularVelocity(self._ramp(%r, ob.getAngularVelocity(%s), %s, %s), %s)" %
+                             (key, local, vel, _act_arg("Damping", act.damping), local))
+                off.append("self._ticks.pop(%r, None)" % key)
+            else:
+                lines.append("ob.setAngularVelocity(%s, %s)" % (vel, local))
         if vr:
             _ACT_ALWAYS[0] = True
             return vr + (["if %s:" % _ON] + ["    " + line for line in lines] if lines else []), True
-        return lines or ["pass"], True
+        return lines or ["pass"], True, off
     if t == 'PROPERTY':
         if act.actuator_mode == 'WEATHER_EFFECTS':
             return _weather_code(act), False
-        if act.actuator_mode == 'GLOBAL_PROPERTY' or (act.actuator_mode == 'NONE' and act.use_world_property):
+        if act.actuator_mode == 'RUNTIME_API':
+            return _runtime_property_code(act), False
+        world = act.actuator_mode == 'GLOBAL_PROPERTY' or (act.actuator_mode == 'NONE' and act.use_world_property)
+        if act.mode == 'LEVEL' and act.actuator_mode in {'NONE', 'GLOBAL_PROPERTY'}:
+            # Level: True enquanto o controller esta positivo, False no pulso negativo.
+            target = "%s[%s]" % ("scene.world" if world else "ob", _act_arg("Property", act.property))
+            return ["%s = True" % target], False, ["%s = False" % target]
+        if world:
             return _world_property_code(act), False
         if act.actuator_mode != 'NONE':
             raise Unsupported("property actuator %s" % act.actuator_mode)
@@ -611,6 +675,13 @@ def _actuator_code(ob, act):
             return ["logic.restartGame()"], False
         if act.mode in {'START', 'LOAD'}:
             return ["logic.startGame(%s)" % _act_arg("File", act.filename)], False
+        if act.mode in {'SAVECFG', 'LOADCFG'}:
+            # globalDict em <pasta do jogo>/<Save Location>.<Extension>, como o actuator.
+            call = "saveGlobalDict" if act.mode == 'SAVECFG' else "loadGlobalDict"
+            return ["logic.%s(%s, %s)" % (call, _act_arg("Save Location", act.saveloc),
+                                          _act_arg("Extension", act.extension_name))], False
+        if act.mode == 'SCREENSHOT':
+            return ["render.makeScreenshot(%s)" % _act_arg("File", act.filename)], False
         raise Unsupported("game %s" % act.mode)
     if t == 'CAMERA':
         if act.object is None:
@@ -660,7 +731,145 @@ def _actuator_code(ob, act):
         return _constraint_code(ob, act)
     if t == 'STEERING':
         return _steering_code(ob, act)
+    if t == 'ACTION':
+        return _action_code(act)
+    if t == 'ARMATURE':
+        return _armature_code(act)
+    if t == 'FILTER_2D':
+        return _filter2d_code(act), False
+    if t == 'VIBRATION':
+        return ["self._vibrate(%s, %s, %s, %s, %s)" % (
+            _act_arg("Joystick", act.joy_index), act.mode == 'PLAY', _act_arg("Strength Left", act.joy_strength_left),
+            _act_arg("Strength Right", act.joy_strength_right), _act_arg("Duration", act.joy_duration))], False
     raise Unsupported("actuator %s" % t)
+
+
+def _runtime_property_code(act):
+    # Property actuator com Runtime API (SCA_PropertyActuator): so Assign e Add.
+    rp = act.runtime_property
+    if rp not in _RUNTIME_PROPS:
+        raise Unsupported("property actuator runtime %s" % rp)
+    if act.mode not in {'ASSIGN', 'ADD'}:
+        raise Unsupported("property actuator runtime %s" % act.mode)
+    if rp == 'VISIBLE':
+        if act.mode == 'ADD':
+            raise Unsupported("property actuator runtime ADD em VISIBLE")
+        value = _act_arg("Value", act.runtime_bool_value)
+    elif rp == 'MASS':
+        value = _act_arg("Value", act.runtime_value[0])
+    else:
+        value = _act_arg("Value", tuple(act.runtime_value))
+    tgt = "ob" if act.object is None else "scene.objects.get(%r)" % act.object.name
+    return ["self._rt_set(%s, %r, %s, %s)" % (tgt, rp, act.mode == 'ADD', value)]
+
+
+def _servo_code(act):
+    # Servo Control: PID sobre a velocidade (linear ou angular), com limite de forca por eixo.
+    A = _act_arg
+    ang = act.servo_mode == 'SERVO_ANGULAR'
+    key = "srv:" + _ACT_LABEL[0]
+    call = "self._servo(%r, %s, (%s, %s, %s), %s, %s, %r, %s, %s, %s, own=ob)" % (
+        key, A("Angular Velocity", act.angular_velocity) if ang else A("Linear Velocity", act.linear_velocity),
+        A("Proportional", act.proportional_coefficient), A("Integral", act.integral_coefficient),
+        A("Derivate", act.derivate_coefficient), ang,
+        act.use_local_angular_velocity if ang else act.use_local_linear_velocity,
+        (act.use_servo_limit_x, act.use_servo_limit_y, act.use_servo_limit_z),
+        A("Force Max", (act.force_max_x, act.force_max_y, act.force_max_z)),
+        A("Force Min", (act.force_min_x, act.force_min_y, act.force_min_z)),
+        A("Reference", act.reference_object.name if act.reference_object else ""))
+    return [call], True, ["self._ticks.pop(%r, None)" % key]
+
+
+def _character_code(act):
+    # Character Motion: direcao de andar do personagem; o pulso negativo para (roda todo frame).
+    if act.use_vr_gaze:
+        raise Unsupported("motion character com vr gaze")
+    A = _act_arg
+    substeps = max(bpy.context.scene.game_settings.physics_step_sub, 1)
+    _ACT_ALWAYS[0] = True
+    return ["self._char_move(%r, %s, %s, %s, %s, %s, %s, %s, %d, own=ob)" % (
+        "chr:" + _ACT_LABEL[0], _ON, A("Loc", act.offset_location), act.use_local_location,
+        act.use_add_character_location, A("Rot", act.offset_rotation), act.use_local_rotation,
+        A("Jump", act.use_character_jump), substeps)], True
+
+
+_ACTION_MODES = {'PLAY': 0, 'PINGPONG': 1, 'FLIPPER': 2, 'LOOPSTOP': 3, 'LOOPEND': 4, 'PROPERTY': 6}
+
+
+def _action_code(act):
+    # Mesmo fluxo de BL_ActionActuator::Update, por cima de playAction/stopAction (roda todo frame).
+    if act.action is None:
+        raise Unsupported("action sem acao")
+    if act.use_children:
+        raise Unsupported("action com Child (a acao propria de cada filho nao e exposta em Python)")
+    if act.play_mode not in _ACTION_MODES:
+        raise Unsupported("action %s" % act.play_mode)
+    A = _act_arg
+    name = act.action.name
+    if act.action.library is not None:
+        name += " [%s]" % act.action.library.name
+    key = _ACT_LABEL[0]
+    ipo = (1 if act.use_force else 0) | (2 if act.use_local else 0) | (4 if act.use_additive else 0)
+    _ACT_ALWAYS[0] = True
+    _ACT_STATE[0] = "self._action_on(%r)" % key
+    return ["self._action(%r, %s, %s, %s, %s, %s, %d, %d, %s, %s, %s, %s, %d, %s, %s, %s, own=ob)" % (
+        key, _FIRE, _ON, A("Action", name), A("Start", act.frame_start), A("End", act.frame_end),
+        _ACTION_MODES[act.play_mode], act.blend_mode == 'ADD', A("Blendin", act.frame_blend_in),
+        A("Priority", act.priority), A("Layer", act.layer), A("Layer Weight", act.layer_weight), ipo,
+        act.use_continue_last_frame, A("Property", act.property), A("Frame Property", act.frame_property))], False
+
+
+def _armature_code(act):
+    # BL_ArmatureActuator: Run atualiza a pose todo frame; os demais mexem na constraint do bone.
+    A = _act_arg
+    m = act.mode
+    if m == 'RUN':
+        return ["ob.update()"], True
+    lines = ["_c = self._arm_con(ob, %s, %s)" % (A("Bone", act.bone), A("Constraint", act.constraint)),
+             "if _c is not None:"]
+    if m in {'ENABLE', 'DISABLE'}:
+        lines.append("    _c.active = %s" % (m == 'ENABLE'))
+    elif m == 'SETTARGET':
+        for attr, tgt in (("target", act.target), ("subtarget", act.secondary_target)):
+            lines.append("    _c.%s = %s" % (attr, "scene.objects.get(%r)" % tgt.name if tgt else "None"))
+    elif m == 'SETWEIGHT':
+        lines.append("    _c.ik_weight = %s" % A("Weight", act.weight))
+    elif m == 'SETINFLUENCE':
+        lines.append("    _c.enforce = %s" % A("Influence", act.influence))
+    else:
+        raise Unsupported("armature %s" % m)
+    return lines, False
+
+
+_FILTER_BUILTIN = {'FXAA', 'BLOOM', 'TONEMAP', 'SSAO', 'LIGHTSCATTER', 'SSR'}
+
+
+def _filter2d_code(act):
+    # SCA_2DFilterActuator: so age no pulso positivo.
+    A = _act_arg
+    m = act.mode
+    fm = "scene.filterManager"
+    if m == 'MOTIONBLUR':
+        if act.use_motion_blur:
+            return ["render.enableMotionBlur(%s)" % A("Factor", act.motion_blur_factor)]
+        return ["render.disableMotionBlur()"]
+    if m in _FILTER_BUILTIN:
+        return ["%s.setBuiltinFilterEnabled(logic.RAS_2DFILTER_%s, True)" % (fm, m)]
+    index = A("Pass", act.filter_pass)
+    if m in {'ENABLE', 'DISABLE'}:
+        return ["_f = %s.getFilter(%s)" % (fm, index),
+                "if _f is not None:",
+                "    _f.enabled = %s" % (m == 'ENABLE')]
+    if m == 'REMOVE':
+        return ["%s.removeFilter(%s)" % (fm, index)]
+    text = ""
+    if m == 'CUSTOMFILTER':
+        if act.glsl_shader is None:
+            raise Unsupported("filter 2d custom sem shader")
+        text = act.glsl_shader.as_string()
+    # O dono entra como owner: as game properties dele alimentam os uniforms de mesmo nome.
+    return ["if %s.getFilter(%s) is None:" % (fm, index),
+            "    %s.addFilter(%s, logic.RAS_2DFILTER_%s, %r, ob, %s)" % (fm, index, m, text, act.use_mipmap)]
 
 
 def _constraint_code(ob, act):
@@ -808,6 +1017,11 @@ def _edit_object_code(act):
         if op == 'SETMASS':
             return ["ob.mass = %s" % _act_arg("Mass", act.mass)]
         return [_DYNAMICS[op]]
+    if m == 'CHANGECOLOR':
+        col = _act_arg("Color", tuple(act.change_col))
+        if act.use_lerp_col:
+            return ["ob.color = [a + (b - a) * %s for a, b in zip(ob.color, %s)]" % (_act_arg("Lerp", act.lerp_col), col)]
+        return ["ob.color = %s" % col]
     if m == 'LIGHTNINGSTRIKE':
         # O dono precisa ser um Empty com Lightning ligado (senão TypeError, como o actuator recusa).
         return ["ob.strikeLightning(%s)" % (not act.use_lightning_flash_only)]
@@ -920,7 +1134,7 @@ _HEADER = '''\
 # Gerado por "Logic Bricks -> Python Component" a partir do objeto %(obname)r.
 # Cada bloco corresponde a um controller; o comentario traz o nome original.
 
-from Range import logic, events, types
+from Range import logic, events, types, render
 from mathutils import Matrix, Vector
 from collections import OrderedDict
 import math
@@ -1011,10 +1225,16 @@ class %(classname)s(%(base)s):
         return o is not None and any(m.getMaterialName(i)[2:] == name
                                      for m in o.meshes for i in range(m.numMaterials))
 
-    def _mouse_hit(self, prop):
+    def _mouse_hit(self, prop, material=False, xray=False, mask=0xFFFF):
+        """Objeto sob o cursor (KX_MouseFocusSensor): filtra por propriedade ou material; x-ray atravessa os outros."""
         cam = self.object.scene.active_camera
+        if cam is None:
+            return None
         x, y = logic.mouse.position
-        return cam.getScreenRay(x, y, 10000.0, prop) if cam else None
+        if not material:
+            return cam.getScreenRay(x, y, 10000.0, prop, xray, mask)
+        hit = cam.getScreenRay(x, y, 10000.0, self._mat_mark(prop) if xray and prop else "", xray, mask)
+        return hit if not prop or self._has_mat(hit, prop) else None
 
     def _delay(self, key, delay, duration, repeat, times, seconds=False):
         """Mesma contagem de SCA_DelaySensor (frames; com seconds o atraso conta deltaTime e a duracao, frames)."""
@@ -1757,6 +1977,279 @@ _EXTRA["_vr_teleport"] = '''
 '''
 
 
+_EXTRA["_rt_get"] = '''
+    @staticmethod
+    def _rt_get(o, name):
+        """Runtime API dos bricks Property: valor atual (None se o objeto nao tem fisica para a propriedade)."""
+        if name == 'VISIBLE':
+            return o.visible
+        if name == 'LOCAL_POSITION':
+            return o.localPosition.copy()
+        if name == 'LOCAL_SCALE':
+            return o.localScale.copy()
+        if o.getPhysicsId() == 0:
+            return None
+        if name == 'MASS':
+            return o.mass
+        if name == 'LINEAR_VELOCITY':
+            return o.getLinearVelocity(False)
+        if name == 'ANGULAR_VELOCITY':
+            return o.getAngularVelocity(False)
+        return o.gravity
+'''
+_EXTRA["_rt_test"] = '''
+    def _rt_test(self, o, name, test, value, vmax):
+        """Property sensor com Runtime API (SCA_PropertySensor): tolerancia de 0.0001 nas igualdades."""
+        cur = self._rt_get(o, name) if o is not None else None
+        if cur is None:
+            return False
+        if isinstance(cur, bool):
+            res = cur == bool(value)
+        elif isinstance(cur, (int, float)):
+            if test in ('PROPEQUAL', 'PROPNEQUAL'):
+                res = abs(cur - value) <= 0.0001
+            elif test == 'PROPGREATERTHAN':
+                res = cur > value
+            elif test == 'PROPLESSTHAN':
+                res = cur < value
+            else:
+                res = test == 'PROPINTERVAL' and value <= cur <= vmax
+        else:
+            res = all(abs(a - b) <= 0.0001 for a, b in zip(cur, value))
+        return not res if test == 'PROPNEQUAL' else res
+'''
+_EXTRA["_rt_set"] = '''
+    def _rt_set(self, o, name, add, value):
+        """Property actuator com Runtime API: Assign ou Add no objeto (ignora o que a engine recusa)."""
+        if o is None:
+            return
+        if add:
+            cur = self._rt_get(o, name)
+            if cur is None:
+                return
+            value = cur + value if name == 'MASS' else Vector(cur) + Vector(value)
+        if name == 'VISIBLE':
+            o.setVisible(bool(value), False)
+        elif name == 'LOCAL_POSITION':
+            o.localPosition = value
+        elif name == 'LOCAL_SCALE':
+            o.localScale = value
+        elif o.getPhysicsId() == 0:
+            return
+        elif name == 'MASS':
+            if o.mass != 0.0 and value > 0.0:
+                o.mass = value
+        elif name == 'LINEAR_VELOCITY':
+            o.setLinearVelocity(value, False)
+        elif name == 'ANGULAR_VELOCITY':
+            o.setAngularVelocity(value, False)
+        else:
+            o.gravity = value
+'''
+_EXTRA["_ramp"] = '''
+    def _ramp(self, key, cur, target, damping):
+        """Motion com Damping: parte da projecao da velocidade atual e chega no alvo em damping frames."""
+        target = Vector(target)
+        f = self._ticks.get(key)
+        if f is None:
+            f = cur.dot(target) / target.length_squared
+        if f < 1.0:
+            f += 1.0 / damping
+        f = min(f, 1.0)
+        self._ticks[key] = f
+        return f * target
+'''
+_EXTRA["_servo"] = '''
+    def _servo(self, key, target, pid, angular, local, limits, fmax, fmin, ref, own=None):
+        """Motion Servo Control (KX_ObjectActuator): forca = P*erro + I*soma + D*variacao, limitada por eixo."""
+        ob = own or self.object
+        mass = ob.mass
+        if abs(mass) < 1e-6:
+            return
+        v = ob.getAngularVelocity(local) if angular else ob.getLinearVelocity(local)
+        r = ob.scene.objects.get(ref) if ref else None
+        if r is not None:
+            if angular:
+                v = v - r.getAngularVelocity(local)
+            else:
+                vel = r.getVelocity(ob.worldPosition - r.worldPosition)
+                v = v - (ob.worldOrientation.transposed() * vel if local else vel)
+        e = Vector(target) - v
+        prev, acc = self._ticks.get(key) or (Vector((0.0, 0.0, 0.0)), Vector((0.0, 0.0, 0.0)))
+        total = acc + e
+        f = pid[0] * e + pid[1] * total + pid[2] * (e - prev)
+        scale = ob.localInertia if angular else (mass, mass, mass)
+        for i in range(3):
+            f[i] *= scale[i]
+            if limits[i]:
+                if f[i] > fmax[i]:
+                    f[i], total[i] = fmax[i], acc[i]
+                elif f[i] < fmin[i]:
+                    f[i], total[i] = fmin[i], acc[i]
+        self._ticks[key] = (e, total)
+        if angular:
+            ob.applyTorque(f, local)
+        else:
+            ob.applyForce(f, local)
+'''
+_EXTRA["_char_move"] = '''
+    def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, own=None):
+        """Motion Character (KX_ObjectActuator): anda com o personagem; ao soltar, para."""
+        from Range import constraints
+        ob = own or self.object
+        ch = constraints.getCharacter(ob)
+        if ch is None:
+            return
+        if not on:
+            if self._ticks.pop(key, None) is not None:
+                ch.walkDirection = (0.0, 0.0, 0.0)
+            return
+        step = 60.0 * logic.deltaTime()
+        d = Vector(loc) * step
+        if local:
+            d = ob.worldOrientation * d
+        if add:
+            old = Vector(ch.walkDirection)
+            if old.length > 1e-6:
+                d = d + old * step
+                if d.length > 1e-6:
+                    d = d.normalized() * old.length
+        ch.walkDirection = d / substeps
+        if any(rot):
+            ob.applyRotation(Vector(rot) * step, rot_local)
+        jumping = self._ticks.get(key, False)
+        if jump:
+            if not jumping:
+                ch.jump()
+                jumping = True
+            elif ch.onGround:
+                jumping = False
+        self._ticks[key] = jumping
+'''
+_EXTRA["_vibrate"] = '''
+    @staticmethod
+    def _vibrate(index, play, left, right, duration):
+        """Vibration actuator: liga (forcas e duracao em ms) ou para a vibracao do joystick."""
+        js = logic.joysticks[index] if 0 <= index < len(logic.joysticks) else None
+        if js is None:
+            return
+        if play:
+            js.strengthLeft, js.strengthRight, js.duration = left, right, duration
+            js.startVibration()
+        else:
+            js.stopVibration()
+'''
+_EXTRA["_arm_con"] = '''
+    @staticmethod
+    def _arm_con(o, bone, name):
+        """Constraint 'bone:nome' da armature (None se o objeto nao e armature ou ela nao existe)."""
+        try:
+            return o.constraints["%s:%s" % (bone, name)]
+        except (AttributeError, KeyError, TypeError):
+            return None
+'''
+_EXTRA["_arm_test"] = '''
+    def _arm_test(self, o, bone, name, test, value):
+        """Armature sensor (KX_ArmatureSensor): estado ou erro da constraint."""
+        c = self._arm_con(o, bone, name)
+        if c is None:
+            return False
+        if test == 'STATECHG':
+            return bool(c.active)
+        err = c.lin_error if test.startswith('LIN') else c.rot_error
+        return err < value if test.endswith('BELOW') else err > value
+'''
+_EXTRA["_action"] = '''
+    def _action_on(self, key):
+        return self.__dict__.get("_actn", {}).get(key, {}).get("on", False)
+
+    def _action(self, key, fire, on, name, start, end, mode, add, blendin, priority, layer, weight, ipo,
+                cont, prop, frame_prop, own=None):
+        """Action actuator (BL_ActionActuator): modo 0 play, 1 ping pong, 2 flipper, 3 loop stop,
+        4 loop end, 6 property. Roda todo frame para acompanhar o fim da acao e o pulso negativo."""
+        ob = own or self.object
+        acts = self.__dict__.setdefault("_actn", {})
+        st = acts.get(key)
+        if st is None:
+            st = acts[key] = {"active": False, "end": False, "pending": False, "t": start,
+                              "se": (start, end), "lvl": False, "on": False}
+        neg = st["lvl"] and not on
+        st["lvl"] = on
+        # Loop Stop barrado por uma acao de prioridade maior tenta de novo enquanto o pulso segue positivo.
+        pos = fire or (st["pending"] and not neg)
+        st["pending"] = False
+
+        def play(s, e, loop):
+            ob.playAction(name, s, e, layer, priority, blendin, 1 if loop else 0, weight, ipo, 1.0, 1 if add else 0)
+            return ob.getActionName(layer) == name
+
+        def begin(loop):
+            s, e = st["se"]
+            if not play(s, e, loop):
+                return False
+            st["active"] = True
+            if cont:
+                ob.setActionFrame(st["t"], layer)
+            return True
+
+        if st["active"]:
+            st["t"] = ob.getActionFrame(layer)
+            if frame_prop:
+                ob[frame_prop] = st["t"]
+        done = not ob.isPlayingAction(layer)
+        if st["end"] and st["active"] and done:
+            st["active"] = st["end"] = st["on"] = False
+            return
+        if not done and ob.getActionName(layer) != name:
+            # Outra acao tomou a camada.
+            if st["active"] and mode == 3 and not neg:
+                st["pending"] = True
+            st["active"] = False
+        s, e = st["se"]
+        if pos:
+            if mode == 0:
+                if not st["active"]:
+                    st["t"] = s
+                    st["end"] = True
+                    begin(False)
+            elif mode == 4:
+                if not st["active"]:
+                    begin(True)
+            elif mode == 3:
+                if not st["active"] and not begin(True):
+                    st["pending"] = True
+            elif mode == 1:
+                # Ping Pong: cada pulso toca uma vez e inverte inicio e fim.
+                if not st["active"] and begin(False):
+                    st["end"] = True
+                    st["se"] = (e, s)
+            elif mode == 6:
+                frame = ob.get(prop)
+                if frame is not None and play(float(frame), float(frame), False):
+                    st["active"] = True
+            elif mode == 2:
+                if (not st["active"] or st["end"]) and begin(False):
+                    st["end"] = False
+        elif st["active"] and neg:
+            st["t"] = ob.getActionFrame(layer)
+            cur = ob.getActionName(layer)
+            if cur and cur != name:
+                st["active"] = False
+            elif mode in (3, 6):
+                ob.stopAction(layer)
+                st["active"] = False
+            elif mode == 4:
+                # Loop End: termina a volta atual (mesma acao em modo Play a partir do quadro atual).
+                ob.playAction(name, st["t"], e, layer, priority, 0, 0, weight, ipo, 1.0, 1 if add else 0)
+                st["end"] = True
+            elif mode == 2:
+                # Flipper: volta ate o inicio.
+                play(st["t"] if cur else e, s, False)
+                st["end"] = True
+        st["on"] = st["active"] or st["pending"]
+'''
+
+
 _RUNNER = '''
 
 # Modo controller: um sensor Always (pulso continuo) liga um controller Python
@@ -1960,8 +2453,13 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             if owner != ob:
                 cond += " and %s is not None" % foreign[owner.name]
             if code[4]:
+                # Roda todo frame: _ON e o nivel do controller e _FIRE o pulso positivo dele.
                 out.append("        # actuator '%s' <- controller '%s' (todo frame)" % (act.name, cont.name))
-                out += ["        " + line.replace(_ON, cond) for line in lines]
+                pad = "        "
+                if owner != ob:
+                    out.append("        if %s is not None:" % foreign[owner.name])
+                    pad += "    "
+                out += [pad + line.replace(_ON, cname).replace(_FIRE, cname + "_fire") for line in lines]
             else:
                 out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
                 out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
@@ -2001,7 +2499,11 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     if _PRELOAD:
         # Scene com Preload: a cena comeca a ser preparada um quadro antes do start().
         awake = "    def awake(self, args):\n" + "".join("        %s\n" % call for call in _PRELOAD) + "\n"
-    extra = "".join(text for name, text in _EXTRA.items() if "self.%s(" % name in body)
+    # Helpers usados no update(), mais os que esses helpers chamam.
+    used = [name for name in _EXTRA if "self.%s(" % name in body]
+    for name in used:
+        used += [n for n in _EXTRA if n not in used and "self.%s(" % n in _EXTRA[name]]
+    extra = "".join(text for name, text in _EXTRA.items() if name in used)
     header = _HEADER % {"obname": ob.name, "classname": classname, "start_extra": start_extra, "awake": awake,
                         "base": "types.KX_PythonComponent" if component else "object",
                         "args": _args_source(), "args_start": _args_start(),

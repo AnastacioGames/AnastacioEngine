@@ -105,6 +105,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, getFilter);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, addFilter);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, removeFilter);
+	EXP_PYMETHOD_DOC(KX_2DFilterManager, setBuiltinFilterEnabled);
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, createOffScreen);
 
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeFxaaValues);

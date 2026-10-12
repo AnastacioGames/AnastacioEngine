@@ -311,7 +311,7 @@ base class --- :class:`KX_GameObject`
          # Gets the vector of the camera front direction:
          m_vect = camera.getScreenVect(0.5, 0.5)
 
-   .. method:: getScreenRay(x, y, dist=inf, property=None)
+   .. method:: getScreenRay(x, y, dist=inf, property=None, xray=False, mask=0xFFFF)
 
       Look towards a screen coordinate (x, y) and find first object hit within dist that matches prop.
       The ray is similar to KX_GameObject->rayCastTo.
@@ -324,6 +324,10 @@ base class --- :class:`KX_GameObject`
       :type dist: float
       :arg property: property name that object must have; can be omitted => detect any object
       :type property: string
+      :arg xray: the ray goes through objects without the property, like the X-Ray option of the Mouse sensor
+      :type xray: boolean
+      :arg mask: collision mask, only objects of these collision groups are hit
+      :type mask: bitfield
       :rtype: :class:`KX_GameObject`
       :return: the first object hit or None if no object or object does not match prop
 

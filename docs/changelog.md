@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Logic Bricks → Python: bricks que faltavam e Weather Effects volumétrico
+
+- Conversor (`bl_operators/logic_to_python.py`) passa a converter: atuador **Action** (Play, Ping Pong, Flipper, Loop Stop, Loop End, Property; mesmo fluxo de `BL_ActionActuator::Update` por cima de `playAction`), sensor e atuador **Armature**, **Filter 2D**, **Vibration**, Motion **Servo Control**, **Character Motion** e **Set Position**, Edit Object **Change Color**, Game **Save/Load Config** e **Screenshot**, Property **Level** e **Runtime API** (sensor e atuador), e **Mouse Over** com material, x-ray e máscara.
+- Correções no conversor: Delay em segundos usava o campo de frames (`delay` em vez de `delay_time`); Mouse Over nunca convertia (`use_material` do sensor Mouse é enum, sempre verdadeiro); Motion Loc/Rot agora escalam por `60 * deltaTime` como a engine; Linear/Angular Velocity com Damping fazem a rampa da engine.
+- Continuam como brick: Action com Child (a ação de cada filho não é exposta em Python), Motion Character com VR Gaze, Add Object com objeto vindo de propriedade.
+- Brick Property > Weather Effects: categorias novas **Fog - Volumetric** (`vfog_effect`) e **Clouds - Volumetric** (`vcloud_effect`), e Sky Layers e cor das nuvens em Clouds. Valores novos de `ACT_RUNTIME_PROP_WEATHER_*` (50 a 91), sem renumerar os antigos.
+- Correção: efeito Float de Weather Effects com valor exatamente 0 ou 1 gravava 0 (o texto era lido como bool).
+- Correção: o campo Target do sensor Property (Runtime API) não aceitava objeto (faltava `PROP_EDITABLE`).
+- API Python nova para o conversor: `KX_Camera.getScreenRay(x, y, dist, property="", xray=False, mask=0xFFFF)`, `filterManager.addFilter(index, type, fragmentProgram="", owner=None, mipmap=False)` (aceita `RAS_2DFILTER_OUTLINE`; `owner` liga as game properties aos uniforms) e `filterManager.setBuiltinFilterEnabled(type, enabled=True)`.
+- Validado em background: 57 controllers com todos os bricks novos (inclusive ligados de outro objeto) convertem e o código gerado compila. **Não rodado em jogo ainda.**
+
 ## 2026-10-12 - Bindings Python: partículas GPU, Explosive e clima
 
 - `KX_ParticleSystem`: `blendMode`, `billboardMode`, `emissionMode` (strings), `useBackfaceCulling`, `useDebugUi`, `useVortex`, `vortexHeight`, `vortexRadiusTop`, `vortexRotationSpeed`.

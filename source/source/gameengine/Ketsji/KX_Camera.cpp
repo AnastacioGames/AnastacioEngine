@@ -965,7 +965,7 @@ mathfu::vec3 KX_Camera::GetObjectProjectedOnScreenSpace(mathfu::vec3 gameObjWorl
 	return gameObjWorldSpace;
 }
 
-KX_GameObject::RayCastData KX_Camera::GetScreenRayCast(float x, float y, float dist, char *propName) {
+KX_GameObject::RayCastData KX_Camera::GetScreenRayCast(float x, float y, float dist, char *propName, bool xray, int mask) {
 	y = 1.0 - y; //to follow Blender window coordinate system (Top-Down)
 
 	const mt::mat4 modelmatrix = mt::mat4::FromAffineTransform(this->GetWorldToCamera());
@@ -1005,7 +1005,7 @@ KX_GameObject::RayCastData KX_Camera::GetScreenRayCast(float x, float y, float d
 
 	// RayCastData rayData("", false, (1u << OB_MAX_COL_MASKS) - 1);
 	std::string prop = propName ? (std::string)propName : "";
-	RayCastData rayData(prop, false, (1u << OB_MAX_COL_MASKS) - 1);
+	RayCastData rayData(prop, xray, mask & ((1u << OB_MAX_COL_MASKS) - 1));
 
 	KX_RayCast::Callback<KX_Camera, RayCastData> callback(this, spc, &rayData);
 
@@ -1733,17 +1733,21 @@ EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, getScreenVect,
 }
 
 EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, getScreenRay,
-                            "getScreenRay()\n"
+                            "getScreenRay(x, y, dist, property=\"\", xray=False, mask=0xFFFF)\n"
+                            "Object hit by the ray under the screen point, or None. With xray the ray goes through\n"
+                            "objects without the property; mask filters by collision group.\n"
                             )
 {
 	float x, y, dist;
 	char *propName = nullptr;
+	int xray = 0;
+	int mask = (1 << OB_MAX_COL_MASKS) - 1;
 
-	if (!PyArg_ParseTuple(args, "fff|s:getScreenRay", &x, &y, &dist, &propName)) {
+	if (!PyArg_ParseTuple(args, "fff|sii:getScreenRay", &x, &y, &dist, &propName, &xray, &mask)) {
 		return nullptr;
 	}
 
-	RayCastData rayData = GetScreenRayCast(x, y, dist, propName);
+	RayCastData rayData = GetScreenRayCast(x, y, dist, propName, xray != 0, mask);
 
 	if (rayData.m_hitObject) {
 		return rayData.m_hitObject->GetProxy();

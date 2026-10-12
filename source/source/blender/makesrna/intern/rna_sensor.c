@@ -644,6 +644,7 @@ static void rna_def_property_sensor(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "runtime_target", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "runtime_target");
 	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Target", "Object to read; empty uses the owner object");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 

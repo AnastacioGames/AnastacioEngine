@@ -360,7 +360,7 @@ public:
 	virtual int GetGameObjectType() const { return OBJ_CAMERA; }
 
 	mathfu::vec3 GetObjectProjectedOnScreenSpace(mathfu::vec3 gameObjWorldSpace);
-	RayCastData GetScreenRayCast(float x, float y, float dist, char *propName);
+	RayCastData GetScreenRayCast(float x, float y, float dist, char *propName, bool xray = false, int mask = 0xFFFF);
 
 #ifdef WITH_PYTHON
 	EXP_PYMETHOD_DOC_VARARGS(KX_Camera, sphereInsideFrustum);

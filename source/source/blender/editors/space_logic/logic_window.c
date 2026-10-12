@@ -2195,6 +2195,7 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 			static const char *effect_props[] = {
 				"weather_effect", "cloud_effect", "lens_flare_effect", "mist_effect",
 				"splash_effect", "aura_effect", "lightning_effect", "earthquake_effect",
+				"vfog_effect", "vcloud_effect",
 			};
 			const int weather_category = RNA_enum_get(ptr, "weather_category");
 			uiItemR(runtime_box, ptr, "weather_category", 0, NULL, ICON_NONE);

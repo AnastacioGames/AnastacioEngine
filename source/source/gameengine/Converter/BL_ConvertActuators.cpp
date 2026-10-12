@@ -441,7 +441,7 @@ void BL_ConvertActuators(const char *maggiename,
 					if (propact->pad == 2 && !weather) {
 						/* Mesmo fallback da UI (rna_PropertyActuator_weather_effect_get). */
 						const int category = (propact->runtime_enabled >= 0 &&
-						                      propact->runtime_enabled <= ACT_WEATHER_CAT_EARTHQUAKE) ? propact->runtime_enabled : 0;
+						                      propact->runtime_enabled <= ACT_WEATHER_CAT_MAX) ? propact->runtime_enabled : 0;
 						runtimeProp = act_weather_category_default(category);
 						weather = act_weather_runtime_find(runtimeProp);
 					}

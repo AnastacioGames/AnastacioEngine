@@ -145,7 +145,7 @@ static int rna_PropertyActuator_weather_category_get(PointerRNA *ptr)
 	 * runtime_property ainda nao e um efeito de clima. */
 	if (info)
 		return info->category;
-	return (pa->runtime_enabled >= 0 && pa->runtime_enabled <= ACT_WEATHER_CAT_EARTHQUAKE) ? pa->runtime_enabled : 0;
+	return (pa->runtime_enabled >= 0 && pa->runtime_enabled <= ACT_WEATHER_CAT_MAX) ? pa->runtime_enabled : 0;
 }
 
 static void rna_PropertyActuator_weather_category_set(PointerRNA *ptr, int value)
@@ -1193,7 +1193,9 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 		{ACT_WEATHER_CAT_LIGHTNING, "LIGHTNING", 0, "Lightning", "Lightning settings"},
 		{ACT_WEATHER_CAT_CLOUDS, "CLOUDS", 0, "Clouds", "Procedural cloud settings"},
 		{ACT_WEATHER_CAT_LENS_FLARE, "LENS_FLARE", 0, "Lens Flare", "Lens flare settings"},
+		{ACT_WEATHER_CAT_VCLOUDS, "VOLUMETRIC_CLOUDS", 0, "Clouds - Volumetric", "Volumetric cloud settings"},
 		{ACT_WEATHER_CAT_MIST, "MIST", 0, "Fog / Mist", "World fog and mist settings"},
+		{ACT_WEATHER_CAT_VFOG, "VOLUMETRIC_FOG", 0, "Fog - Volumetric", "Volumetric fog settings"},
 		{ACT_WEATHER_CAT_EARTHQUAKE, "EARTHQUAKE", 0, "Earthquake", "Earthquake settings"},
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -1233,6 +1235,54 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 		{ACT_RUNTIME_PROP_WEATHER_CLOUD_COVERAGE, "WEATHER_CLOUD_COVERAGE", 0, "Coverage", "Amount of sky covered by clouds"},
 		{ACT_RUNTIME_PROP_WEATHER_CLOUD_SCALE, "WEATHER_CLOUD_SCALE", 0, "Scale", "Cloud noise scale"},
 		{ACT_RUNTIME_PROP_WEATHER_CLOUD_SPEED, "WEATHER_CLOUD_SPEED", 0, "Speed", "Cloud drift speed"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_COLOR_R, "WEATHER_CLOUD_COLOR_R", 0, "Color Red", "Cloud color, red channel"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_COLOR_G, "WEATHER_CLOUD_COLOR_G", 0, "Color Green", "Cloud color, green channel"},
+		{ACT_RUNTIME_PROP_WEATHER_CLOUD_COLOR_B, "WEATHER_CLOUD_COLOR_B", 0, "Color Blue", "Cloud color, blue channel"},
+		{ACT_RUNTIME_PROP_WEATHER_USE_SKY_LAYERS, "WEATHER_USE_SKY_LAYERS", 0, "Sky Layers Enabled", "Enable or disable the Sky Layers"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem vfog_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_VFOG, "WEATHER_VFOG", 0, "Volumetric Fog Enabled", "Enable or disable volumetric fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_DENSITY, "WEATHER_VFOG_DENSITY", 0, "Density", "Fog density"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_BASE, "WEATHER_VFOG_BASE", 0, "Base Height", "Height where the fog is densest"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_FALLOFF, "WEATHER_VFOG_FALLOFF", 0, "Height Falloff", "How fast the fog thins with height"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_DISTANCE, "WEATHER_VFOG_DISTANCE", 0, "Distance", "Fog distance"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_EDGE, "WEATHER_VFOG_EDGE", 0, "Edge", "Fog edge softness"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_ANISOTROPY, "WEATHER_VFOG_ANISOTROPY", 0, "Anisotropy", "Forward scattering of light in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_COLOR_R, "WEATHER_VFOG_COLOR_R", 0, "Color Red", "Fog color, red channel"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_COLOR_G, "WEATHER_VFOG_COLOR_G", 0, "Color Green", "Fog color, green channel"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_COLOR_B, "WEATHER_VFOG_COLOR_B", 0, "Color Blue", "Fog color, blue channel"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_AMBIENT, "WEATHER_VFOG_AMBIENT", 0, "Ambient", "Ambient light in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_NOISE_SCALE, "WEATHER_VFOG_NOISE_SCALE", 0, "Noise Scale", "Fog noise scale"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_NOISE_AMOUNT, "WEATHER_VFOG_NOISE_AMOUNT", 0, "Noise Amount", "Fog noise amount"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_SPEED, "WEATHER_VFOG_SPEED", 0, "Speed", "Fog drift speed"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_WIND, "WEATHER_VFOG_USE_WIND", 0, "Wind Enabled", "Enable or disable the fog wind direction"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_WIND_DIRECTION, "WEATHER_VFOG_WIND_DIRECTION", 0, "Wind Direction", "Fog wind direction"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_TIME_OF_DAY, "WEATHER_VFOG_USE_TIME_OF_DAY", 0, "Time of Day Enabled", "Enable or disable the fog following the time of day"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_MORNING_BOOST, "WEATHER_VFOG_MORNING_BOOST", 0, "Morning Boost", "Extra fog in the morning"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_SUN_INTENSITY, "WEATHER_VFOG_SUN_INTENSITY", 0, "Sun Intensity", "Sun light in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_SUN_SHAFTS, "WEATHER_VFOG_USE_SUN_SHAFTS", 0, "Sun Shafts Enabled", "Enable or disable sun shafts in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_LAMPS, "WEATHER_VFOG_USE_LAMPS", 0, "Lamps Enabled", "Enable or disable lamps lighting the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_LIGHT_INTENSITY, "WEATHER_VFOG_LIGHT_INTENSITY", 0, "Lamp Intensity", "Lamp light in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_SHAFTS, "WEATHER_VFOG_USE_SHAFTS", 0, "Lamp Shafts Enabled", "Enable or disable lamp shafts in the fog"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_SHAFT_INTENSITY, "WEATHER_VFOG_SHAFT_INTENSITY", 0, "Shaft Intensity", "Light shaft intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_VOLUMES_ONLY, "WEATHER_VFOG_VOLUMES_ONLY", 0, "Volumes Only", "Enable or disable fog only inside Fog Volumes"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_LAYER, "WEATHER_VFOG_USE_LAYER", 0, "Fog Layer Enabled", "Enable or disable the fog layer"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_USE_REACH_CLOUDS, "WEATHER_VFOG_USE_REACH_CLOUDS", 0, "Reach Clouds Enabled", "Enable or disable the fog reaching the clouds"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	static const EnumPropertyItem vcloud_effect_items[] = {
+		{ACT_RUNTIME_PROP_WEATHER_USE_VOLUMETRIC_CLOUDS, "WEATHER_USE_VOLUMETRIC_CLOUDS", 0, "Volumetric Clouds Enabled", "Enable or disable volumetric clouds"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_COVERAGE, "WEATHER_VCLOUD_COVERAGE", 0, "Coverage", "Amount of sky covered by volumetric clouds"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_SCALE, "WEATHER_VCLOUD_SCALE", 0, "Scale", "Volumetric cloud scale"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_SPEED, "WEATHER_VCLOUD_SPEED", 0, "Speed", "Volumetric cloud drift speed"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_ALTITUDE, "WEATHER_VCLOUD_ALTITUDE", 0, "Altitude", "Volumetric cloud altitude"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_THICKNESS, "WEATHER_VCLOUD_THICKNESS", 0, "Thickness", "Volumetric cloud layer thickness"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_DENSITY, "WEATHER_VCLOUD_DENSITY", 0, "Density", "Volumetric cloud density"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_DETAIL_SCALE, "WEATHER_VCLOUD_DETAIL_SCALE", 0, "Detail Scale", "Volumetric cloud detail scale"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_SILVER_INTENSITY, "WEATHER_VCLOUD_SILVER_INTENSITY", 0, "Silver Lining", "Silver lining intensity"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_SHADOW_ENABLE, "WEATHER_VCLOUD_SHADOW_ENABLE", 0, "Shadows Enabled", "Enable or disable volumetric cloud shadows"},
+		{ACT_RUNTIME_PROP_WEATHER_VCLOUD_SHADOW_STRENGTH, "WEATHER_VCLOUD_SHADOW_STRENGTH", 0, "Shadow Strength", "Volumetric cloud shadow strength"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	static const EnumPropertyItem lens_flare_effect_items[] = {
@@ -1340,6 +1390,22 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 	                            "rna_PropertyActuator_weather_effect_set", NULL);
 	RNA_def_property_enum_items(prop, earthquake_effect_items);
 	RNA_def_property_ui_text(prop, "Earthquake Property", "Weather setting to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "vfog_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_funcs(prop, "rna_PropertyActuator_weather_effect_get",
+	                            "rna_PropertyActuator_weather_effect_set", NULL);
+	RNA_def_property_enum_items(prop, vfog_effect_items);
+	RNA_def_property_ui_text(prop, "Volumetric Fog Property", "Volumetric fog setting to write");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "vcloud_effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "runtime_property");
+	RNA_def_property_enum_funcs(prop, "rna_PropertyActuator_weather_effect_get",
+	                            "rna_PropertyActuator_weather_effect_set", NULL);
+	RNA_def_property_enum_items(prop, vcloud_effect_items);
+	RNA_def_property_ui_text(prop, "Volumetric Clouds Property", "Volumetric cloud setting to write");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "use_runtime_property", PROP_BOOLEAN, PROP_NONE);
