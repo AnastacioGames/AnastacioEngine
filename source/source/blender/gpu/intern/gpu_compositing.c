@@ -1075,6 +1075,7 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 					bProperty *shape = BKE_bproperty_object_get(ob, "fog_shape");
 					bProperty *edge = BKE_bproperty_object_get(ob, "fog_edge");
 					bProperty *smoke = BKE_bproperty_object_get(ob, "fog_smoke");
+					bProperty *fire = BKE_bproperty_object_get(ob, "fog_fire");
 					invert_m4_m4(mats[volumes], ob->obmat);
 					data[7][volumes] = max_ff(0.0f, value);
 					data[10][volumes] = (shape && shape->type == GPROP_STRING && STREQ((char *)shape->poin, "sphere")) ?
@@ -1088,6 +1089,12 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 					}
 					else if (smoke && smoke->type == GPROP_INT) {
 						data[48 + volumes][0] = max_ff(0.0f, (float)smoke->data);
+					}
+					if (fire && fire->type == GPROP_FLOAT) {
+						data[48 + volumes][1] = clamp_f(*((float *)&fire->data), 0.0f, 1.0f);
+					}
+					else if (fire && fire->type == GPROP_INT) {
+						data[48 + volumes][1] = clamp_f((float)fire->data, 0.0f, 1.0f);
 					}
 					if (ob->col[0] < 0.999f || ob->col[1] < 0.999f || ob->col[2] < 0.999f) {
 						copy_v3_v3(data[44 + volumes], ob->col);

@@ -18,6 +18,7 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 - `fog_shape`: use `"sphere"` para volume esférico; ausente mantém caixa.
 - `fog_edge`: largura da borda suave (float), sobrepõe o Volume Edge do World.
 - `fog_smoke`: velocidade de subida da fumaça no Z local, em m/s (float); `0` ou ausente é volume normal.
+- `fog_fire`: temperatura do fogo, de `0` a `1` (float); emite luz própria e combina com `fog_smoke`.
 - `fog_push`: raio, em metros (float), que abre a neblina em torno do objeto.
 - **Object Color**: tinge o volume quando diferente de branco.
 
@@ -32,7 +33,7 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 | 7 | Emission acendendo a névoa | pendente | |
 | 8 | Nuvens + névoa contínuas | pendente | |
 | 9 | Froxels | pendente | |
-| 10 | Fogo/explosão volumétrico | pendente | |
+| 10 | Fogo/explosão volumétrico | feito, aguarda aceite visual | Codex |
 
 ## 1. Vento e hora do dia
 - **Wind** (`vfog_use_wind`, `vfog_wind_direction` em graus em Z): o ruído é levado pelo vento.
@@ -89,7 +90,8 @@ no jogo e aparecem em wireframe na viewport. As propriedades de jogo também pod
 9. **Froxels:** grade 3D presa à câmera (por exemplo 160×90×64), com injeção de luz e integração em
    compute/RTT. Muitas lâmpadas a custo fixo; é o caminho para qualidade AAA.
 10. **Fogo/explosão volumétrico:** volume com temperatura → cor (corpo negro) e ruído turbulento,
-    ligado ao sistema de destruição/explosões.
+    ligado ao sistema de destruição/explosões. `fog_fire` (0..1) emite sem lâmpada; ao mudar a propriedade
+    e a escala do objeto, acompanha uma explosão. Variantes: `medium_fogo` e `medium_explosao`.
 
 ## 6. Neblina que abre ao passar
 - Propriedade de jogo `fog_push` (float, raio em m) em qualquer objeto, até 4 por cena.

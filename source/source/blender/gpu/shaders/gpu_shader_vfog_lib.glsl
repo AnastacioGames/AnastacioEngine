@@ -19,7 +19,7 @@
  *  14 + 4i spot direction xyz (where it points), cos of half cone (-2 = Point)
  *  15 + 4i cos where the spot edge blend ends, shadow bias, -, -
  *  44 + i volume i color rgb, has color (0 = fog color)
- *  48 + i volume i smoke rise speed (m/s; 0 = normal volume)
+ *  48 + i volume i: smoke rise speed x (m/s; 0 = normal volume), fire temperature y (0..1)
  *  52 + i pusher i (fog_push): position xyz, radius
  * vfog_mats: 0-3 world -> volume local space (unit box/sphere), 4-5 world -> Spot shadow map,
  * 6 world -> Sun shadow map. */
@@ -78,13 +78,15 @@ float vfogVolume(int i, vec3 p)
 	float inside = (vfog_data[10][i] > 0.5) ? 1.0 - length(l) : 1.0 - max(max(abs(l.x), abs(l.y)), abs(l.z));
 	float edge = max(vfog_data[11][i], 0.001);
 	float smoke = vfog_data[VFOG_VOLUME_SMOKE + i].x;
+	float fire = vfog_data[VFOG_VOLUME_SMOKE + i].y;
 	if (inside <= 0.0) {
 		return 0.0;
 	}
-	/* A smoke volume is a local plume: its noise rises in its own Z axis and fades out at the top. */
-	if (smoke > 0.001) {
+	/* Smoke and fire are local plumes: their noise rises in their own Z axis and fades at the top. */
+	if (smoke > 0.001 || fire > 0.001) {
+		float rise = max(smoke, (fire > 0.001) ? 1.5 : 0.0);
 		vec3 q = l * max(vfog_data[1].x, 0.0001) * 2.5;
-		q.z -= smoke * vfog_data[9].z;
+		q.z -= rise * vfog_data[9].z;
 		inside -= edge * 0.7 * vfogNoise(q);
 		return clamp(inside / edge, 0.0, 1.0) *
 		       (0.45 + 0.55 * vfogNoise(q * 2.03 + 17.0)) *
@@ -112,12 +114,40 @@ float vfogVolumeFactor(vec3 p)
 
 float vfogPush(vec3 p);
 
+/* Approximation of black-body flame colors, from dark red through orange to yellow-white. */
+vec3 vfogFireColor(float temperature)
+{
+	temperature = clamp(temperature, 0.0, 1.0);
+	if (temperature < 0.5) {
+		return mix(vec3(0.35, 0.005, 0.0), vec3(1.0, 0.16, 0.005), temperature * 2.0);
+	}
+	return mix(vec3(1.0, 0.16, 0.005), vec3(1.0, 0.95, 0.62), (temperature - 0.5) * 2.0);
+}
+
+/* Fire emission at p from volume i. Its hotter turbulent core is kept below the smoke plume. */
+vec3 vfogFireEmission(int i, vec3 p)
+{
+	float temperature = vfog_data[VFOG_VOLUME_SMOKE + i].y;
+	if (temperature <= 0.001) {
+		return vec3(0.0);
+	}
+	vec3 l = (vfog_mats[i] * vec4(p, 1.0)).xyz;
+	float rise = max(vfog_data[VFOG_VOLUME_SMOKE + i].x, 1.5);
+	vec3 q = l * max(vfog_data[1].x, 0.0001) * 4.0;
+	q.z -= rise * vfog_data[9].z;
+	float turbulence = vfogNoise(q) * 0.65 + vfogNoise(q * 2.17 + 23.0) * 0.35;
+	float lower = 1.0 - smoothstep(-0.55, 0.45, l.z);
+	float heat = temperature * lower * (0.3 + 0.7 * turbulence);
+	return vfogFireColor(heat) * (2.0 + 8.0 * heat);
+}
+
 /* Extinction coefficient at p (before the noise) and the fog color there: the height fog and the
  * volumes, each volume with its own tint, mixed by how much each contributes. */
-float vfogDensityColor(vec3 p, out vec3 color)
+float vfogDensityColor(vec3 p, out vec3 color, out vec3 emission)
 {
 	float d = 0.0;
 	color = vfog_data[2].rgb;
+	emission = vec3(0.0);
 	if (vfog_data[6].w < 0.5) {
 		d = vfog_data[0].x * exp(-max(p.z - vfog_data[0].y, 0.0) / vfog_data[0].z);
 	}
@@ -136,6 +166,7 @@ float vfogDensityColor(vec3 p, out vec3 color)
 				sum += ((tint.w > 0.5) ? tint.rgb : vfog_data[2].rgb) * v;
 				weight += v;
 				f = max(f, v);
+				emission += vfogFireEmission(i, p);
 			}
 		}
 		/* Overlapping volumes: the densest sets the density (as before), the color is their mix. */
@@ -145,7 +176,9 @@ float vfogDensityColor(vec3 p, out vec3 color)
 		d += f;
 	}
 	if (vfog_data[9].w > 0.5 && d > 0.0) {
-		d *= vfogPush(p);
+		float push = vfogPush(p);
+		d *= push;
+		emission *= push;
 	}
 	return d;
 }
@@ -198,7 +231,8 @@ float vfogPushAnalytic(vec3 ro, vec3 rd, float t0, float t1)
 float vfogDensityBase(vec3 p)
 {
 	vec3 color;
-	return vfogDensityColor(p, color);
+	vec3 emission;
+	return vfogDensityColor(p, color, emission);
 }
 
 float vfogPhase(float cosTheta, float g)
@@ -435,10 +469,12 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 			tau *= vfogPushAnalytic(ro, rd, seg.x, seg.y);
 		}
 		float T = exp(-tau);
+		vec3 emission = vec3(0.0);
 		if (vfog_data[6].y > 0.5) {
-			vfogDensityColor(ro + rd * (seg.x + len * 0.5), fogColor);
+			vfogDensityColor(ro + rd * (seg.x + len * 0.5), fogColor, emission);
 		}
 		vec3 inscatter = (sunLight + ambient) * fogColor * (1.0 - T);
+		inscatter += emission * (1.0 - T);
 		if (lampCount > 0) {
 			float sigma = tau / max(len, 1e-3);
 			for (int i = 0; i < VFOG_MAX_LIGHTS; i++) {
@@ -469,11 +505,13 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 		}
 		vec3 p = ro + rd * t;
 		vec3 col;
-		float sigma = vfogDensityColor(p, col);
+		vec3 emission;
+		float sigma = vfogDensityColor(p, col, emission);
 		if (sigma > 1e-5) {
 			sigma *= vfogPatches(p);
 			float stepT = exp(-sigma * ds);
 			L += T * (sunLight * vfogSunShadow(p) + ambient) * col * (1.0 - stepT);
+			L += T * emission * (1.0 - stepT);
 			T *= stepT;
 		}
 		Tsteps[s + 1] = T;
@@ -520,7 +558,8 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 			vec3 lamp = vfogLamp(i, p, toPoint);
 			if (dot(lamp, lamp) > 1e-8) {
 				vec3 col;
-				float sigma = vfogDensityColor(p, col);
+				vec3 emission;
+				float sigma = vfogDensityColor(p, col, emission);
 				if (sigma > 1e-5) {
 					sigma *= vfogPatches(p);
 					float k = clamp((lt - seg.x) / max(ds, 1e-4), 0.0, float(steps));

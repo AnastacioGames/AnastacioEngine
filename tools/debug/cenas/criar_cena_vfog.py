@@ -30,6 +30,12 @@ SCRIPT = (
     "    if own['preset'] == 'medium_abre':\n"
     "        bola = bge.logic.getCurrentScene().objects['bola_push']\n"
     "        bola.worldPosition.x = 8.0 * __import__('math').sin(agora * 0.6)\n"
+    "    if own['preset'] == 'medium_explosao':\n"
+    "        explosao = bge.logic.getCurrentScene().objects['explosao']\n"
+    "        fase = (agora % 1.5) / 1.5\n"
+    "        explosao['fog_fire'] = 1.0 - fase\n"
+    "        escala = 0.35 + 2.15 * fase\n"
+    "        explosao.localScale = (escala, escala, escala)\n"
     "    if 'inicio' not in own:\n"
     "        own['inicio'] = agora\n"
     "        own['frames'] = 0\n"
@@ -56,6 +62,9 @@ SCRIPT = (
     "                f.write('%s fps=%.1f ms=%.2f\\n' % (own['preset'], fps, 1000.0 / fps))\n"
     "                if own['preset'] == 'medium_script':\n"
     "                    f.write('VFOG_SCRIPT enabled=%r density=%.4f color=(%.4f, %.4f, %.4f) property_density=%r\\n' % (world.getWeather('vfog'), world.getWeather('vfog_density'), world.getWeather('vfog_color_r'), world.getWeather('vfog_color_g'), world.getWeather('vfog_color_b'), world['vfog_density']))\n"
+    "                if own['preset'] == 'medium_explosao':\n"
+    "                    explosao = bge.logic.getCurrentScene().objects['explosao']\n"
+    "                    f.write('VFOG_EXPLOSAO fire=%.3f scale=%.3f\\n' % (explosao['fog_fire'], explosao.localScale.x))\n"
     "        bge.logic.endGame()\n"
 )
 
@@ -279,6 +288,42 @@ def gerar(preset):
         scene.objects.active = bola
         bpy.ops.object.game_property_new(type='FLOAT', name='fog_push')
         bola.game.properties['fog_push'].value = 3.5
+    if preset == 'medium_fogo':
+        w.vfog_volumes_only = True
+        w.vfog_density = 0.28
+        w.vfog_noise_amount = 0.0
+        w.vfog_ambient = 0.0
+        fogo = malha('fogueira', lambda bm: bmesh.ops.create_cube(bm, size=2.0), (0, 8, 2.0))
+        fogo.scale = (1.4, 1.4, 2.4)
+        fogo.game.physics_type = 'NO_COLLISION'
+        fogo.hide_render = True
+        scene.objects.link(fogo)
+        scene.objects.active = fogo
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_volume')
+        fogo.game.properties['fog_volume'].value = 3.0
+        bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
+        fogo.game.properties['fog_shape'].value = 'sphere'
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_smoke')
+        fogo.game.properties['fog_smoke'].value = 1.2
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_fire')
+        fogo.game.properties['fog_fire'].value = 0.9
+    if preset == 'medium_explosao':
+        w.vfog_volumes_only = True
+        w.vfog_density = 0.32
+        w.vfog_noise_amount = 0.0
+        w.vfog_ambient = 0.0
+        explosao = malha('explosao', lambda bm: bmesh.ops.create_cube(bm, size=2.0), (0, 8, 2.2))
+        explosao.scale = (0.35, 0.35, 0.35)
+        explosao.game.physics_type = 'NO_COLLISION'
+        explosao.hide_render = True
+        scene.objects.link(explosao)
+        scene.objects.active = explosao
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_volume')
+        explosao.game.properties['fog_volume'].value = 3.5
+        bpy.ops.object.game_property_new(type='STRING', name='fog_shape')
+        explosao.game.properties['fog_shape'].value = 'sphere'
+        bpy.ops.object.game_property_new(type='FLOAT', name='fog_fire')
+        explosao.game.properties['fog_fire'].value = 1.0
 
     txt =bpy.data.texts.new('medir_fps.py')
     txt.write(SCRIPT)
@@ -317,5 +362,5 @@ def gerar(preset):
 
 for p in ('off', 'low', 'medium', 'high', 'medium_volume', 'low_dia', 'medium_dia', 'medium_noshaft', 'medium_script',
           'medium_sol', 'medium_vento', 'medium_manha', 'medium_volumes', 'medium_fumaca',
-          'medium_abre'):
+          'medium_abre', 'medium_fogo', 'medium_explosao'):
     gerar(p)

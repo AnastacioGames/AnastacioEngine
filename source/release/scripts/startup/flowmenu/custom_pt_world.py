@@ -88,14 +88,14 @@ def _fog_add_finish(context, obj):
     context.scene.objects.active = obj
 
 
-def _fog_add_volume(context, sphere=False, smoke=False):
+def _fog_add_volume(context, sphere=False, smoke=False, fire=False):
     cursor = context.scene.cursor_location
     if sphere:
         bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, location=cursor)
     else:
         bpy.ops.mesh.primitive_cube_add(location=cursor)
     obj = context.active_object
-    obj.name = "Smoke Source" if smoke else ("Fog Volume (Sphere)" if sphere else "Fog Volume (Box)")
+    obj.name = "Fire Source" if fire else ("Smoke Source" if smoke else ("Fog Volume (Sphere)" if sphere else "Fog Volume (Box)"))
     obj.draw_type = 'WIRE'
     obj.show_wire = True
     obj.show_all_edges = True
@@ -108,6 +108,11 @@ def _fog_add_volume(context, sphere=False, smoke=False):
         obj.scale = (0.6, 0.6, 2.5)
         obj.color = (0.72, 0.74, 0.76, 1.0)
         _fog_add_property(obj, 'fog_smoke', 1.5, 'FLOAT')
+    if fire:
+        obj.scale = (0.8, 0.8, 1.5)
+        obj.color = (1.0, 0.18, 0.02, 1.0)
+        _fog_add_property(obj, 'fog_smoke', 1.2, 'FLOAT')
+        _fog_add_property(obj, 'fog_fire', 0.9, 'FLOAT')
     _fog_add_finish(context, obj)
 
 
@@ -144,6 +149,17 @@ class OBJECT_OT_fog_smoke_source_add(Operator):
         return {'FINISHED'}
 
 
+class OBJECT_OT_fog_fire_source_add(Operator):
+    bl_idname = "object.fog_fire_source_add"
+    bl_label = "Fire Source"
+    bl_description = "Add an invisible local fire source at the 3D Cursor"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        _fog_add_volume(context, sphere=True, fire=True)
+        return {'FINISHED'}
+
+
 class OBJECT_OT_fog_pusher_add(Operator):
     bl_idname = "object.fog_pusher_add"
     bl_label = "Fog Pusher"
@@ -169,6 +185,7 @@ class INFO_MT_fog_add(Menu):
         layout.operator(OBJECT_OT_fog_volume_sphere_add.bl_idname, icon='MESH_UVSPHERE')
         layout.separator()
         layout.operator(OBJECT_OT_fog_smoke_source_add.bl_idname, icon='MOD_SMOKE')
+        layout.operator(OBJECT_OT_fog_fire_source_add.bl_idname, icon='LAMP_HEMI')
         layout.operator(OBJECT_OT_fog_pusher_add.bl_idname, icon='OUTLINER_OB_EMPTY')
 
 
@@ -481,7 +498,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             info = col.column(align=True)
             info.label(text="Add > Fog creates volumes, smoke sources and pushers", icon='INFO')
             info.label(text="fog_volume=density; fog_shape=sphere; fog_edge=soft edge", icon='INFO')
-            info.label(text="fog_smoke=rise m/s; fog_push=radius m; Object Color tints", icon='INFO')
+            info.label(text="fog_smoke=rise m/s; fog_fire=temperature; fog_push=radius m", icon='INFO')
             if context.world.mist_settings.use_mist:
                 info.label(text="Mist is also on: the scene gets fogged twice", icon='ERROR')
             if weather.vfog_quality == 'HIGH':

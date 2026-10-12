@@ -199,8 +199,8 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 	}
 
 	/* Fog Volumes: unit box (the default cube) or sphere of the object, world -> local; optional
-	 * game properties fog_shape ("sphere"), fog_edge and fog_smoke (local rise speed in m/s), tint from
-	 * the object color. */
+	 * game properties fog_shape ("sphere"), fog_edge, fog_smoke (local rise speed in m/s) and fog_fire
+	 * (temperature 0..1), tint from the object color. */
 	int volumes = 0;
 	for (KX_GameObject *gameobj : *scene->GetObjectList()) {
 		if (volumes >= 4) {
@@ -219,6 +219,8 @@ static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const 
 		d[44 + volumes] = edge ? std::max(0.0f, std::min(1.0f, (float)edge->GetNumber())) : world->vfog_edge;
 		EXP_Value *smoke = gameobj->GetProperty("fog_smoke");
 		d[4 * (48 + volumes)] = smoke ? std::max(0.0f, (float)smoke->GetNumber()) : 0.0f;
+		EXP_Value *fire = gameobj->GetProperty("fog_fire");
+		d[4 * (48 + volumes) + 1] = fire ? std::max(0.0f, std::min(1.0f, (float)fire->GetNumber())) : 0.0f;
 		const mt::vec4& col = gameobj->GetObjectColor();
 		float *c = d + 4 * (44 + volumes);
 		if (col.x < 0.999f || col.y < 0.999f || col.z < 0.999f) {
