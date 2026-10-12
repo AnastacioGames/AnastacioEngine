@@ -311,7 +311,7 @@ base class --- :class:`KX_GameObject`
          # Gets the vector of the camera front direction:
          m_vect = camera.getScreenVect(0.5, 0.5)
 
-   .. method:: getScreenRay(x, y, dist=inf, property=None, xray=False, mask=0xFFFF)
+   .. method:: getScreenRay(x, y, dist, property="", xray=False, mask=0xFFFF)
 
       Look towards a screen coordinate (x, y) and find first object hit within dist that matches prop.
       The ray is similar to KX_GameObject->rayCastTo.

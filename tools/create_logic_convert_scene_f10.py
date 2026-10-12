@@ -157,6 +157,24 @@ for i, value in enumerate(('"hello"', '7', 'src')):
     wire(o, "Set%d" % i, [sensor(o, 'DELAY', "W%d" % i, delay=20 + 40 * i, duration=5)],
          [actuator(o, 'PROPERTY', "Assign%d" % i, mode='ASSIGN', property="s", value=value)])
 
+# --- Dois controllers no mesmo quadro: os actuators rodam na ordem da pilha de actuators (Assign, depois Add).
+o = counter("Order", ("x",))
+a_set = actuator(o, 'PROPERTY', "Set5", mode='ASSIGN', property="x", value="5")
+a_add = add(o, "x")
+wire(o, "CAdd", [sensor(o, 'DELAY', "W1", delay=20, duration=5)], [a_add])
+wire(o, "CSet", [sensor(o, 'DELAY', "W2", delay=20, duration=5)], [a_set])
+
+# --- World Property de texto: Assign com aspas e com inteiro.
+scene.world = scene.world or bpy.data.worlds.new("World")
+bpy.ops.world.game_property_new(type='STRING', name="wtxt")
+scene.world.properties["wtxt"].value = "a"
+o = counter("WorldStr", ())
+names[-1] = ("WorldStr", ())
+for i, value in enumerate(('"hello"', '7')):
+    wire(o, "Set%d" % i, [sensor(o, 'DELAY', "W%d" % i, delay=20 + 40 * i, duration=5)],
+         [actuator(o, 'PROPERTY', "Assign%d" % i, actuator_mode='GLOBAL_PROPERTY', mode='ASSIGN', property="wtxt",
+                   value=value)])
+
 checker = bpy.data.objects.new("Checker", None)
 scene.objects.link(checker)
 text = bpy.data.texts.new("checker.py")
@@ -171,7 +189,7 @@ def sample(n):
     parts = ['f=%d' % n]
     for name, props in NAMES:
         parts.append('%s=%s' % (name, '/'.join(str(o[name][p]) for p in props)))
-    parts.append('tapy=%.2f' % o['TapDelay'].worldPosition.y)
+    parts.append('tapy=%.2f wtxt=%s' % (o['TapDelay'].worldPosition.y, own.scene.world['wtxt']))
     own['log'] = own.get('log', '') + ' '.join(parts) + '\\n'
 def after_frame():
     n = own['frames']

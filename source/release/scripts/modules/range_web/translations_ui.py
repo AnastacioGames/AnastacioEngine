@@ -1764,6 +1764,12 @@ PT_BR = {
     "Exposed Property": "Propriedade exposta",
     "Category: Weather  |  Type: Boolean": "Categoria: Clima  |  Tipo: Booleano",
     "Category: Weather  |  Type: Float": "Categoria: Clima  |  Tipo: Float",
+    "Category: Render  |  Type: Boolean": "Categoria: Render  |  Tipo: Booleano",
+    "Category: Physics  |  Type: Float": "Categoria: Física  |  Tipo: Float",
+    "Category: Transform  |  Type: Vector3": "Categoria: Transformação  |  Tipo: Vector3",
+    "Category: Physics  |  Type: Vector3": "Categoria: Física  |  Tipo: Vector3",
+    "Edge Softness": "Suavidade da borda",
+    "No World in this scene": "Esta cena não tem World",
 }
 
 ES = {
@@ -3529,6 +3535,12 @@ ES = {
     "Exposed Property": "Propiedad expuesta",
     "Category: Weather  |  Type: Boolean": "Categoría: Clima  |  Tipo: Booleano",
     "Category: Weather  |  Type: Float": "Categoría: Clima  |  Tipo: Float",
+    "Category: Render  |  Type: Boolean": "Categoría: Render  |  Tipo: Booleano",
+    "Category: Physics  |  Type: Float": "Categoría: Física  |  Tipo: Float",
+    "Category: Transform  |  Type: Vector3": "Categoría: Transformación  |  Tipo: Vector3",
+    "Category: Physics  |  Type: Vector3": "Categoría: Física  |  Tipo: Vector3",
+    "Edge Softness": "Suavidad del borde",
+    "No World in this scene": "Esta escena no tiene World",
 }
 
 RU = {
@@ -5294,4 +5306,10 @@ RU = {
     "Exposed Property": "Доступное свойство",
     "Category: Weather  |  Type: Boolean": "Категория: Погода  |  Тип: логический",
     "Category: Weather  |  Type: Float": "Категория: Погода  |  Тип: Float",
+    "Category: Render  |  Type: Boolean": "Категория: Рендер  |  Тип: логический",
+    "Category: Physics  |  Type: Float": "Категория: Физика  |  Тип: Float",
+    "Category: Transform  |  Type: Vector3": "Категория: Трансформация  |  Тип: Vector3",
+    "Category: Physics  |  Type: Vector3": "Категория: Физика  |  Тип: Vector3",
+    "Edge Softness": "Мягкость края",
+    "No World in this scene": "В этой сцене нет World",
 }

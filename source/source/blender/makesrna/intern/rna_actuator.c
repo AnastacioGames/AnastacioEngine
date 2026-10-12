@@ -1247,7 +1247,7 @@ static void rna_def_property_actuator(BlenderRNA *brna)
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_BASE, "WEATHER_VFOG_BASE", 0, "Base Height", "Height where the fog is densest"},
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_FALLOFF, "WEATHER_VFOG_FALLOFF", 0, "Height Falloff", "How fast the fog thins with height"},
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_DISTANCE, "WEATHER_VFOG_DISTANCE", 0, "Distance", "Fog distance"},
-		{ACT_RUNTIME_PROP_WEATHER_VFOG_EDGE, "WEATHER_VFOG_EDGE", 0, "Edge", "Fog edge softness"},
+		{ACT_RUNTIME_PROP_WEATHER_VFOG_EDGE, "WEATHER_VFOG_EDGE", 0, "Edge Softness", "Fog edge softness"},
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_ANISOTROPY, "WEATHER_VFOG_ANISOTROPY", 0, "Anisotropy", "Forward scattering of light in the fog"},
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_COLOR_R, "WEATHER_VFOG_COLOR_R", 0, "Color Red", "Fog color, red channel"},
 		{ACT_RUNTIME_PROP_WEATHER_VFOG_COLOR_G, "WEATHER_VFOG_COLOR_G", 0, "Color Green", "Fog color, green channel"},

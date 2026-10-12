@@ -2187,9 +2187,9 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 		uiLayout *runtime_box = uiLayoutBox(layout);
 		const int runtime_property = RNA_enum_get(ptr, "runtime_property");
 		if (actuator_mode == 1) {
-			uiItemL(runtime_box, "Runtime API", ICON_INFO);
-			uiItemR(runtime_box, ptr, "object", 0, "Target (empty = self)", ICON_NONE);
-			uiItemR(runtime_box, ptr, "runtime_property", 0, "Exposed Property", ICON_NONE);
+			uiItemL(runtime_box, IFACE_("Runtime API"), ICON_INFO);
+			uiItemR(runtime_box, ptr, "object", 0, IFACE_("Target (empty = self)"), ICON_NONE);
+			uiItemR(runtime_box, ptr, "runtime_property", 0, IFACE_("Exposed Property"), ICON_NONE);
 		}
 		else {
 			static const char *effect_props[] = {
@@ -2199,46 +2199,46 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 			};
 			const int weather_category = RNA_enum_get(ptr, "weather_category");
 			uiItemR(runtime_box, ptr, "weather_category", 0, NULL, ICON_NONE);
-			uiItemR(runtime_box, ptr, effect_props[weather_category], 0, "Property", ICON_NONE);
+			uiItemR(runtime_box, ptr, effect_props[weather_category], 0, IFACE_("Property"), ICON_NONE);
 		}
 		if (actuator_mode == 2) {
 			/* O clima so faz Assign: o valor gravado substitui o do World. */
 			const ActWeatherRuntimeInfo *info = act_weather_runtime_find(RNA_enum_get(ptr, "weather_effect"));
 			if (info && info->is_bool) {
-				uiItemL(runtime_box, "Category: Weather  |  Type: Boolean", ICON_NONE);
+				uiItemL(runtime_box, IFACE_("Category: Weather  |  Type: Boolean"), ICON_NONE);
 				uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
 			}
 			else {
-				uiItemL(runtime_box, "Category: Weather  |  Type: Float", ICON_NONE);
-				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
+				uiItemL(runtime_box, IFACE_("Category: Weather  |  Type: Float"), ICON_NONE);
+				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, IFACE_("Value"), ICON_NONE);
 			}
 			return;
 		}
 		uiItemR(runtime_box, ptr, "mode", 0, NULL, ICON_NONE);
 		if (runtime_property == ACT_RUNTIME_PROP_VISIBLE) {
-			uiItemL(runtime_box, "Category: Render  |  Type: Boolean", ICON_NONE);
+			uiItemL(runtime_box, IFACE_("Category: Render  |  Type: Boolean"), ICON_NONE);
 			uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
 		}
 		else if (runtime_property == ACT_RUNTIME_PROP_MASS) {
-			uiItemL(runtime_box, "Category: Physics  |  Type: Float", ICON_NONE);
-			uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
+			uiItemL(runtime_box, IFACE_("Category: Physics  |  Type: Float"), ICON_NONE);
+			uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, IFACE_("Value"), ICON_NONE);
 		}
 		else if (act_weather_runtime_find(runtime_property)) {
 			const ActWeatherRuntimeInfo *info = act_weather_runtime_find(runtime_property);
-			uiItemL(runtime_box, info->is_bool ? "Category: Weather  |  Type: Boolean" :
-			        "Category: Weather  |  Type: Float", ICON_NONE);
+			uiItemL(runtime_box, info->is_bool ? IFACE_("Category: Weather  |  Type: Boolean") :
+			        IFACE_("Category: Weather  |  Type: Float"), ICON_NONE);
 			if (info->is_bool)
 				uiItemR(runtime_box, ptr, "runtime_bool_value", 0, NULL, ICON_NONE);
 			else
-				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, "Value", ICON_NONE);
+				uiItemFullR(runtime_box, ptr, RNA_struct_find_property(ptr, "runtime_value"), 0, 0, 0, IFACE_("Value"), ICON_NONE);
 		}
 		else {
 			if (RNA_enum_get(ptr, "runtime_property") == ACT_RUNTIME_PROP_LOCAL_POSITION ||
 			    RNA_enum_get(ptr, "runtime_property") == ACT_RUNTIME_PROP_LOCAL_SCALE) {
-				uiItemL(runtime_box, "Category: Transform  |  Type: Vector3", ICON_NONE);
+				uiItemL(runtime_box, IFACE_("Category: Transform  |  Type: Vector3"), ICON_NONE);
 			}
 			else {
-				uiItemL(runtime_box, "Category: Physics  |  Type: Vector3", ICON_NONE);
+				uiItemL(runtime_box, IFACE_("Category: Physics  |  Type: Vector3"), ICON_NONE);
 			}
 			uiItemR(runtime_box, ptr, "runtime_value", 0, NULL, ICON_NONE);
 		}
@@ -2249,7 +2249,7 @@ static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr, bContext *
 	uiItemR(row, ptr, "mode", 0, NULL, ICON_NONE);
 
 	if ((RNA_boolean_get(ptr, "use_world_property") || actuator_mode == 3) && !world)
-		uiItemL(layout, "No World in this scene", ICON_ERROR);
+		uiItemL(layout, IFACE_("No World in this scene"), ICON_ERROR);
 	else
 		uiItemPointerR(layout, ptr, "property", &settings_ptr, "properties", NULL, ICON_NONE);
 

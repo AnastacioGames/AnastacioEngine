@@ -270,7 +270,10 @@ def _sensor_expr(ob, sens, key=None):
                 hit = "self._mouse_hit(%s, %s, %s, %d)" % (name, mat, sens.use_x_ray, mask)
             else:
                 hit = "self._mouse_hit(%s)" % A("Property", sens.property)
-            expr = ("%s is ob" if ev == 'MOUSEOVER' else "%s is not None") % hit
+            if _focus_pulse(sens):
+                # Pulse: guarda o objeto sob o cursor para o evento de troca (ver convert_object).
+                hit = "self._over(%r, %s)" % (key, hit)
+            expr =("%s is ob" if ev == 'MOUSEOVER' else "%s is not None") % hit
         else:
             raise Unsupported("mouse %s" % ev)
     elif t == 'PROPERTY':
@@ -358,7 +361,9 @@ def _sensor_expr(ob, sens, key=None):
                                                        A("Repeat Times", sens.repeat_times), sens.use_deltatime)
     elif t == 'RANDOM':
         # Mesma cadencia (um sorteio a cada tick_skip + 1 frames), sequencia do random do Python.
-        expr = "self._random(%r, %s, %d)" % (key, A("Seed", sens.seed), sens.tick_skip)
+        # Com Delta Time a engine compara a mesma contagem de frames com tick_skip_dt (BL_ConvertSensors).
+        skip = repr(round(sens.tick_skip_dt, 6)) if sens.use_dt else "%d" % sens.tick_skip
+        expr = "self._random(%r, %s, %s)" % (key, A("Seed", sens.seed), skip)
     elif t == 'MOVEMENT':
         axis, sign = _MOVE_AXES[sens.axis]
         expr = "self._moved(%r, %s, %d, %d, %s, own=ob)" % (key, sens.use_local, axis, sign,
@@ -386,6 +391,29 @@ def _sensor_expr(ob, sens, key=None):
         expr = "not (%s)" % expr
     # Liga/desliga do sensor pelos args (desligado = sensor falso).
     return "%s and (%s)" % (A("Enabled", True), expr)
+
+
+def _focus_pulse(sens):
+    """Mouse Over Any com Pulse: trocar de objeto sob o cursor gera evento (KX_MouseFocusSensor::Evaluate).
+    No Mouse Over simples o objeto e sempre o dono, entao o Pulse nao muda nada."""
+    return sens.type == 'MOUSE' and sens.mouse_event == 'MOUSEOVERANY' and getattr(sens, "use_pulse", False)
+
+
+def _collision_count(sens, key, hits):
+    """Quantos objetos diferentes o Collision sensor enxerga no frame (mesmo filtro do valor do sensor)."""
+    _GROUP[0] = "Sensor " + key
+    if sens.use_material and sens.material:
+        cond = " if self._has_mat(o, %s)" % _arg("%s Material" % key, sens.material)
+    elif not sens.use_material and sens.property:
+        cond = " if %s in o" % _arg("%s Property" % key, sens.property)
+    else:
+        cond = ""
+    return "len({id(o) for o in %s%s})" % (hits, cond)
+
+
+def _key_logs(sens):
+    """Keyboard sensor que grava o texto digitado (Log Toggle e Target preenchidos)."""
+    return sens.type == 'KEYBOARD' and bool(getattr(sens, "log", "")) and bool(getattr(sens, "target", ""))
 
 
 def _joystick_expr(sens, A):
@@ -523,7 +551,14 @@ def _world_literal(name, text, label):
     prop = world.properties.get(name) if world else None
     ptype = prop.type if prop else None
     if ptype == 'STRING':
-        return _arg(label, text)
+        # O actuator avalia o valor como expressao: "abc" (com aspas) grava abc e um inteiro grava o texto dele.
+        try:
+            value = ast.literal_eval(text.strip())
+        except (ValueError, SyntaxError):
+            value = None
+        if isinstance(value, str) or (isinstance(value, int) and not isinstance(value, bool)):
+            return _arg(label, str(value))
+        raise Unsupported("valor '%s' da World Property de texto %s (use aspas)" % (text, name))
     if ptype == 'BOOL':
         return _arg(label, text.strip().lower() in {"true", "1"})
     try:
@@ -557,7 +592,7 @@ def _world_property_code(act):
 
 # Helpers do componente que agem sobre o objeto passado em own= (atuador de outro objeto).
 # Estado (self._ticks) e chaves por 'dono/atuador'; o resto de self.* continua sendo brick.
-_OWN_CALLS = (r"self\._(follow|mouse_look|cst\w*|steer|track_parent|snd_play|snd_stop|ramp|servo|char_move|vibrate|"
+_OWN_CALLS = (r"self\._(follow|mouse_look|cst\w*|steer|track_parent|track_tgt|snd_play|snd_stop|ramp|servo|char_move|vibrate|"
               r"filter2d|arm_con|action|rt_set)\(|self\._ticks\.pop\(")
 
 
@@ -1119,33 +1154,50 @@ _TRACK_AXES = {
 
 
 def _track_to_code(ob, act):
-    if act.object is None:
+    # From Property so vale com o nome da propriedade preenchido (BL_ConvertActuators: SetObjectProperty
+    # com nome vazio deixa m_objectProperty vazio e a engine segue o objeto fixo).
+    from_prop = getattr(act, "use_object_from_property", False) and bool(act.object_property)
+    if act.object is None and not from_prop:
         raise Unsupported("track to sem objeto fixo")
+    if from_prop:
+        # KX_TrackToActuator::Update: a cada frame positivo le o nome numa propriedade do objeto ou do
+        # World; o objeto fixo so e o alvo inicial e nao volta depois (ver _track_tgt).
+        target = "tgt = self._track_tgt(%r, %s, %s, %r, own=ob)" % (
+            "trk:" + _ACT_LABEL[0], _act_arg("Object Property", act.object_property),
+            act.use_global_object_property, act.object.name if act.object is not None else None)
+    else:
+        target = "tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name)
     axis, sign = _TRACK_AXES[act.track_axis]
     up = {'UPAXISX': 0, 'UPAXISY': 1, 'UPAXISZ': 2}[act.up_axis]
     if axis == up:
         raise Unsupported("track to com eixo de track igual ao up")
+    if ob.parent is not None and ob.parent_type in {'VERTEX', 'VERTEX_3'}:
+        # A engine ignora o pai de vertice e grava a orientacao de mundo como local.
+        raise Unsupported("track to com pai de vertice (a engine grava a orientacao de mundo como local)")
+    # Conta do KX_TrackToActuator portada inteira (_track_parent), com ou sem pai: com pai a engine corrige
+    # pela orientacao inicial dele (m_parentlocalmat); com Time > 0 interpola os angulos de euler
+    # (matrix3x3_interpol); e o up sai sempre do Z do mundo. alignAxisToVect nao reproduz nada disso (mistura
+    # vetores e usa o X antigo do objeto como pivo: 3D ou Time > 0 davam orientacao diferente dos bricks).
+    plm = ""
     if ob.parent is not None:
-        if ob.parent_type in {'VERTEX', 'VERTEX_3'}:
-            # A engine ignora o pai de vertice e grava a orientacao de mundo como local.
-            raise Unsupported("track to com pai de vertice (a engine grava a orientacao de mundo como local)")
-        # Com pai a engine corrige pela orientacao inicial do pai (m_parentlocalmat); conta portada inteira.
-        return ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
-                "if tgt is not None:",
-                "    self._track_parent(tgt, %d, %d, %s, %s, own=ob)" % (axis + (3 if sign else 0), up,
-                                                                       _act_arg("Time", act.time),
-                                                                       act.use_3d_tracking)]
-    # KX_TrackToActuator: orientacao = (antiga * time + nova) / (time + 1).
-    factor = 1.0 / (act.time + 1) if act.time > 0 else 1.0
-    lines = ["tgt = scene.objects.get(%s)" % _act_arg("Object", act.object.name),
-             "if tgt is not None:",
-             "    vec = tgt.worldPosition - ob.worldPosition"]
-    if not act.use_3d_tracking:
-        lines.append("    vec.z = 0.0")
-    lines += ["    if vec.length > 1e-6:",
-              "        ob.alignAxisToVect((0.0, 0.0, 1.0), %d, 1.0)" % up,
-              "        ob.alignAxisToVect(%svec, %d, %g)" % (sign, axis, factor)]
-    return lines
+        # m_parentlocalmat: orientacao local do pai quando a cena e convertida (BKE_object_rot_to_mat3, sem
+        # delta), como no Steering. Lida no start() ela ja viria girada se o pai se mexe no 1o frame.
+        par = ob.parent
+        rmode = getattr(par, "rotation_mode", None)  # None: sem dados de rotacao, fica a leitura do start()
+        if rmode == 'QUATERNION':
+            rot = par.rotation_quaternion.normalized().to_matrix()
+        elif rmode == 'AXIS_ANGLE':
+            from mathutils import Quaternion
+            rot = Quaternion(par.rotation_axis_angle[1:], par.rotation_axis_angle[0]).to_matrix()
+        elif rmode is not None:
+            rot = par.rotation_euler.to_matrix()
+        if rmode is not None:
+            plm = ", %r" % (tuple(tuple(round(x, 6) for x in row) for row in rot),)
+    return [target,
+            "if tgt is not None:",
+            "    self._track_parent(tgt, %d, %d, %s, %s%s, own=ob)" % (axis + (3 if sign else 0), up,
+                                                                     _act_arg("Time", act.time),
+                                                                     act.use_3d_tracking, plm)]
 
 
 _PRELOAD = []  # cenas de actuators Scene com Preload (viram logic.preloadScene no start)
@@ -1310,9 +1362,10 @@ class %(classname)s(%(base)s):
         return on
 
     def _random(self, key, seed, skip):
-        """Random sensor: sorteia um bool a cada skip + 1 frames e mantem entre sorteios."""
+        """Random sensor: sorteia um bool quando a contagem de frames passa de skip (o 1o sorteio tambem
+        espera, como SCA_RandomSensor) e mantem entre sorteios; skip pode ser fracionario (Delta Time)."""
         key = "rnd:" + key
-        gen, n, value = self._ticks.get(key) or (random.Random(seed or None), skip, False)
+        gen, n, value = self._ticks.get(key) or (random.Random(seed or None), 0, False)
         n += 1
         if n > skip:
             n = 0
@@ -1482,6 +1535,45 @@ class %(classname)s(%(base)s):
 
 
 _EXTRA = OrderedDict()
+_EXTRA["_over"] = '''
+    def _over(self, key, hit):
+        """Mouse Over Any com Pulse: anota se o objeto sob o cursor trocou sem o cursor sair de cima de um."""
+        last = self._prev.get("mo:" + key)
+        self._prev["mo:" + key] = hit
+        self._prev["mop:" + key] = hit is not None and last is not None and hit is not last
+        return hit
+'''
+_EXTRA["_key_log"] = '''
+    def _key_log(self, ob, toggle, target):
+        """Log do Keyboard sensor (SCA_KeyboardSensor::LogKeystrokes): com a propriedade toggle diferente de
+        zero, o texto digitado no frame vai para o fim da propriedade target (que passa a ser texto)."""
+        on = ob.get(toggle)
+        # Como (int)GetNumber() da engine: propriedade de texto vale -1 (ligado), float trunca.
+        if not (isinstance(on, str) or (isinstance(on, (int, float)) and int(on) != 0)) or target not in ob:
+            return
+        typed = logic.keyboard.text
+        text = ob[target]
+        if isinstance(text, str):
+            if not typed:
+                return
+        else:
+            # A engine troca a propriedade por uma de texto mesmo sem tecla; atribuir texto a uma
+            # propriedade numerica manteria o tipo dela, por isso ela e recriada.
+            if isinstance(text, bool):
+                text = "TRUE" if text else "FALSE"
+            elif isinstance(text, float):
+                text = "%f" % text
+            else:
+                text = str(text)
+            del ob[target]
+        for ch in typed:
+            if ch in (chr(8), chr(127)):
+                # Backspace e Delete apagam o ultimo caractere.
+                text = text[:-1]
+            else:
+                text += chr(10) if ch == chr(13) else ch
+        ob[target] = text
+'''
 _EXTRA["_anim_event"] = '''
     def _anim_event(self, key, index, trigger, own=None):
         """Animation Event sensor: positivo no frame em que o gatilho disparou (-1 = qualquer)."""
@@ -1778,9 +1870,10 @@ _EXTRA["_track_parent"] = '''
             p = o.parent
             self.__dict__.setdefault("_plm", {})[o.name] = (p, p.localOrientation.copy() if p is not None else None)
 
-    def _track_parent(self, tgt, axis, up, time, use3d, own=None):
-        """Track To de objeto com pai: mesma conta do KX_TrackToActuator (vectomat, interpolacao em
-        euler com 'time', correcao pela orientacao inicial do pai, posicao local mantida)."""
+    def _track_parent(self, tgt, axis, up, time, use3d, plm0=None, own=None):
+        """Track To (com ou sem pai): mesma conta do KX_TrackToActuator (vectomat, interpolacao em
+        euler com 'time', correcao pela orientacao inicial do pai, posicao local mantida).
+        plm0 = orientacao local do pai na conversao da cena."""
         ob = own or self.object
         mat = self._track_vectomat(ob.worldPosition - tgt.worldPosition, axis, up, use3d)
         old, new = self._track_eul(ob.worldOrientation), self._track_eul(mat)
@@ -1791,12 +1884,39 @@ _EXTRA["_track_parent"] = '''
             new[i] = (time * old[i] + new[i]) / (1.0 + time)
         mat = self._track_mat(new)
         parent, plm = self.__dict__.get("_plm", {}).get(ob.name, (None, None))
+        if plm0 is not None:
+            plm = Matrix(plm0)
         if parent is not None and not parent.invalid:
             pos = ob.localPosition.copy()
             ob.localOrientation = plm * (parent.worldOrientation.inverted() * mat)
             ob.localPosition = pos
         else:
             ob.localOrientation = mat
+'''
+_EXTRA["_track_tgt"] = '''
+    def _track_tgt(self, key, prop, world, fixed, own=None):
+        """Alvo do Track To com From Property, como KX_TrackToActuator::Update: o nome vem de uma
+        propriedade do objeto (ou do World), lida a cada frame positivo. O alvo atual fica enquanto tiver
+        esse nome; se nao, procura nos objetos ativos da cena. Propriedade ausente, vazia ou nome sem
+        objeto = sem alvo (nao volta para o objeto fixo, que so e o alvo inicial)."""
+        ob = own or self.object
+        scene = ob.scene
+        cache = self.__dict__.setdefault("_trk", {})
+        if key in cache:
+            tgt = cache[key]
+        else:
+            # Objeto fixo do actuator (pode estar numa camada inativa), como a engine guarda ao carregar.
+            tgt = (scene.objects.get(fixed) or scene.objectsInactive.get(fixed)) if fixed else None
+        if tgt is not None and tgt.invalid:
+            tgt = None
+        try:
+            name = str((scene.world if world else ob)[prop])
+        except (KeyError, TypeError):
+            name = ""
+        if tgt is None or tgt.name != name:
+            tgt = scene.objects.get(name) if name else None
+        cache[key] = tgt
+        return tgt
 '''
 _EXTRA["_snd_play"] = '''
     def _snd_play(self, key, path, volume, pitch, loop, pingpong, d3, own=None):
@@ -2438,6 +2558,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     sensor_exprs = {}  # nome da variavel -> (expressao, nome original); cada sensor avaliado uma vez
     sensor_masks = {}
     sensor_trigs = {}  # nome da variavel -> expressao do gatilho do sensor
+    sensor_logs = {}  # nome da variavel -> (sensor Keyboard que grava o texto digitado, dono)
     _GROUP[0] = ""
     _GROUP_ICON.clear()
     _SND3D[0] = False
@@ -2472,6 +2593,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 # Sem sensor ativo ligado o controller nunca roda.
                 continue
             trigs = {}
+            logs = {}
             exprs = {}
             sensor_vars = {}
             pulse = []
@@ -2504,6 +2626,19 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                 # comecam positivos sem gerar evento.
                 init = ", True" if s.invert and s.type in {'DELAY', 'ALWAYS'} else ""
                 lines = ["%s_c = self._trig(%r, %s%s)" % (var, "s:" + key, raw, init)]
+                # Eventos proprios do tipo do sensor (contam como mudanca: tambem zeram o pulso repetido).
+                more = []
+                if s.type == 'COLLISION' and getattr(s, "use_pulse", False):
+                    # Pulse: mudou a quantidade de objetos encostados (KX_CollisionSensor::Evaluate).
+                    more.append("self._trig(%r, %s, 0)" % ("cp:" + key, _collision_count(
+                        s, key, "hits" if owner == ob else "hits_" + foreign[owner.name])))
+                if _focus_pulse(s):
+                    # Pulse: o cursor passou para outro objeto (anotado por _over).
+                    more.append("self._prev.pop(%r, False)" % ("mop:" + key))
+                if more:
+                    lines.append("%s_c = %s_c | %s" % (var, var, " | ".join(more)))
+                if _key_logs(s):
+                    logs[var] = (s, owner)
 
                 def tick(tkey, value, s=s, var=var):
                     return "self._tick(%r, %s, %s, %s_c%s)" % (
@@ -2558,6 +2693,7 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             continue
         sensor_exprs.update(exprs)
         sensor_trigs.update(trigs)
+        sensor_logs.update(logs)
         for sname in exprs:
             sensor_masks[sname] = sensor_masks.get(sname, 0) | (1 << (cont.states - 1))
         plans.append((cont, cont_expr, pulse, actuators))
@@ -2591,6 +2727,15 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     for sname, (expr, orig) in sensor_exprs.items():
         # Sensor so e avaliado com algum controller dele no estado ativo (Delay/Near contam certo).
         raw, lines = sensor_trigs[sname]
+        log_s, log_owner = sensor_logs.get(sname, (None, None))
+        if log_s is not None and all(_owns(converted, c) for c in log_s.controllers if c.active):
+            # Log de teclas: a engine grava sempre que o sensor roda, antes de avalia-lo. Se algum
+            # controller ativo do sensor nao foi convertido, o brick continua rodando e ele mesmo grava.
+            cond = "state & %d" % sensor_masks[sname]
+            if log_owner != ob:
+                cond += " and %s is not None" % foreign[log_owner.name]
+            out.append("        if %s:  # log de teclas do sensor '%s'" % (cond, orig))
+            out.append("            " + on(log_owner, "self._key_log(ob, %r, %r)" % (log_s.log, log_s.target)))
         out.append("        %s = bool(state & %d) and (%s)  # sensor '%s'" %
                    (raw, sensor_masks[sname], expr, orig))
         # Evento do sensor (sem curto-circuito: a contagem de cada sensor anda todo frame, como na engine).
@@ -2623,34 +2768,37 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     out.append("\n        # Actuators")
     if watched:
         out.append("        self._act_on = {}")
-    for cont, _expr, _pulse, actuators in plans:
+    # A engine roda os actuators de um objeto na ordem da pilha de actuators dele, nao na dos controllers.
+    stack = {a.name: i for i, a in enumerate(ob.game.actuators)}
+    flat = [(cont, act, owner, code) for cont, _expr, _pulse, actuators in plans for act, owner, code in actuators]
+    flat.sort(key=lambda item: (item[2] != ob, stack.get(item[1].name, 0) if item[2] == ob else 0))
+    for cont, act, owner, code in flat:
         cname = _ident(cont.name, "c")
-        for act, owner, code in actuators:
-            lines, continuous = code[:2]
-            cond = cname if continuous else cname + "_fire"
+        lines, continuous = code[:2]
+        cond = cname if continuous else cname + "_fire"
+        if owner != ob:
+            cond += " and %s is not None" % foreign[owner.name]
+        if code[4]:
+            # Roda todo frame: _ON e o nivel do controller e _FIRE o pulso positivo dele.
+            out.append("        # actuator '%s' <- controller '%s' (todo frame)" % (act.name, cont.name))
+            pad = "        "
             if owner != ob:
-                cond += " and %s is not None" % foreign[owner.name]
-            if code[4]:
-                # Roda todo frame: _ON e o nivel do controller e _FIRE o pulso positivo dele.
-                out.append("        # actuator '%s' <- controller '%s' (todo frame)" % (act.name, cont.name))
-                pad = "        "
-                if owner != ob:
-                    out.append("        if %s is not None:" % foreign[owner.name])
-                    pad += "    "
-                out += [pad + line.replace(_ON, cname).replace(_FIRE, cname + "_fire") for line in lines]
-            else:
-                out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
-                out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
-            if code[2]:
-                off = cname + "_off"
-                if owner != ob:
-                    off += " and %s is not None" % foreign[owner.name]
-                out.append("        if %s:  # pulso negativo de '%s'" % (off, act.name))
-                out += ["            " + line for line in code[2]]
-            if owner == ob and act.name in watched:
-                # Estado lido pelos sensores Actuator no proximo frame.
-                out.append("        if %s:" % (code[3] or cond))
-                out.append("            self._act_on[%r] = True" % act.name)
+                out.append("        if %s is not None:" % foreign[owner.name])
+                pad += "    "
+            out += [pad + line.replace(_ON, cname).replace(_FIRE, cname + "_fire") for line in lines]
+        else:
+            out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
+            out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
+        if code[2]:
+            off = cname + "_off"
+            if owner != ob:
+                off += " and %s is not None" % foreign[owner.name]
+            out.append("        if %s:  # pulso negativo de '%s'" % (off, act.name))
+            out += ["            " + line for line in code[2]]
+        if owner == ob and act.name in watched:
+            # Estado lido pelos sensores Actuator no proximo frame.
+            out.append("        if %s:" % (code[3] or cond))
+            out.append("            self._act_on[%r] = True" % act.name)
 
     if _SND3D[0] and any("self._snd_play(" in line for line in out):
         out.append("        self._snd_update()")
@@ -2809,6 +2957,10 @@ class LOGIC_OT_convert_to_component(Operator):
             # os soltos do proprio objeto (sem controller) nao fazem nada e tambem saem.
             for s in (s for o in bpy.data.objects for s in o.game.sensors):
                 links = list(s.controllers)
+                if not links and _key_logs(s):
+                    # Keyboard sem controller que grava o texto digitado: a engine roda esse sensor
+                    # mesmo solto (BL_ConvertSensors), entao ele fica ativo como brick.
+                    continue
                 if (links and all(_owns(converted, c) for c in links)) or (not links and _owns(ob.game.sensors, s)):
                     s.active = False
             all_conts = [c for o in bpy.data.objects for c in o.game.controllers]

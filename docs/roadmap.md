@@ -402,9 +402,9 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
   Skip, Delta Time, Level), bricks desativados ficam de fora, Action com Child, Character com VR Gaze, Add Object de propriedade,
   Property Assign de texto. Cenas `create_logic_convert_scene_f8.py`, `_f9`, `_f10` e `_steering`, todas iguais aos bricks
   (ver changelog). Nenhum caso conhecido fica como brick além do controller Python.
-- Lacunas conhecidas do conversor: `use_pulse` do Collision e do Mouse Over, Track To com alvo de propriedade, `log`/`target`
-  do Keyboard, `use_priority`, Random com Delta Time. No brick Weather Effects: `IFACE_()` nos rótulos fixos de
-  `logic_window.c` e trocar o rótulo "Edge" da neblina por "Edge Softness".
+- F11-F12 (2026-10-12): fechadas as lacunas da auditoria (Pulse do Collision e do Mouse Over, registro de teclas, Random com
+  Delta Time, Track To com alvo de propriedade, ordem dos actuators pela pilha). Cenas `create_logic_convert_scene_f11.py` e
+  `_f12`. Falta testar o registro de teclas digitando de verdade e conferir no editor os rótulos traduzidos do brick Property.
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; no modo Module/Script outro controller Python
   que leia o objeto no mesmo quadro vê a mudança um quadro antes do que veria com bricks; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.

@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Logic Bricks → Python: lacunas da auditoria fechadas e rótulos do brick Property
+
+- Conversor, sensores: **Collision com Pulse** gera evento quando muda a quantidade de objetos colidindo (é o que `KX_CollisionSensor` de fato compara; Near e Radar não têm a opção); **Mouse Over Any com Pulse** gera evento quando o cursor passa para outro objeto; **Keyboard `log`/`target`** convertido (`logic.keyboard.text`, backspace e enter como a engine; alvo que não é texto vira texto), e o sensor de registro sem controller continua como brick ativo, porque a engine o registra à força; **Random com Delta Time** usa `tick_skip_dt` e deixou de sortear no 1º quadro.
+- Conversor, **Track To**: alvo vindo de propriedade do objeto ou do World (o nome é relido a cada atualização; sem alvo a orientação fica onde estava e o objeto fixo não volta). Todo Track To passa a usar a conta exata da engine: sem pai usava `alignAxisToVect`, que com Time > 0 errava bastante (-0,04 contra -0,19 dos bricks). A orientação local inicial do pai agora é gravada na conversão, não lida no `start()`.
+- Conversor, **ordem dos actuators**: dentro de um objeto eles rodam na ordem da pilha de actuators, como a engine, e não na dos controllers (dois controllers no mesmo quadro com Assign 5 e Add 1 davam 5; os bricks dão 6).
+- Conversor: Assign de texto em **World Property** segue a mesma regra de expressão do Assign de objeto.
+- `use_priority` dos controllers: conferido no C++ e em jogo, não muda nada dentro de um objeto para os controllers que o conversor converte (só importa para controller Python e para a ordem entre objetos). Nada a fazer.
+- Brick Property: os 16 rótulos fixos do modo Runtime API / Weather Effects / World Property em `logic_window.c` passam por `IFACE_()`; o item "Edge" da neblina volumétrica virou "Edge Softness" (caía na tradução de aresta de malha). Traduções novas em pt-BR, es e ru.
+- Doc da API: assinatura de `KX_Camera.getScreenRay` corrigida no `.rst` (`dist` é obrigatório e `property` tem padrão `""`).
+- Validado em jogo, bricks × convertido, `LEFT_AS_BRICK 0`: `create_logic_convert_scene_f11.py` (sensores) e `create_logic_convert_scene_f12.py` (Track To, 13 rastreadores) idênticos, também no modo Module; F10 ampliada (ordem dos actuators, World de texto) 361 de 361; F7, F8, F9, F6 e Steering iguais como antes. Na F11 as colunas de Mouse Over só valem quando a janela do runtime recebe o cursor (`cursor=centro` no arquivo); com outra janela na frente saem zeradas nos dois lados.
+- Não verificado: caracteres realmente digitados no registro de teclas (o teste não gera teclado) e o brick Property no editor com os rótulos traduzidos (o link do editor ficou pendente porque o executável estava aberto; o runtime foi recompilado).
+- Diferenças que são da arquitetura e ficam: ordem entre objetos (bricks reordenam a lista de actuators ativos; componentes rodam na ordem dos objetos), navmesh refeito em jogo no Steering, alvo procurado por nome.
+
 ## 2026-10-12 - Logic Bricks → Python: disparo dos controllers como na engine, casos que faltavam e traduções
 
 - **Quando o controller dispara.** O código convertido agora segue `SCA_ISensor::Activate`: cada sensor gera um evento quando muda de valor ou por pulso repetido, e o controller só reavalia e reenvia o resultado aos actuators em quadro com evento de algum sensor dele. Antes o controller disparava só na própria subida ou no pulso True Level. Consequências:
