@@ -22,6 +22,10 @@ class NS(SimpleNamespace):
     tick_skip_dt = 0.0
     use_pulse_false_level = False
     use_all_events = False
+    use_collision_bounds = False
+    collision_bounds_type = 'BOX'
+    radius = 1.0
+    matrix_world = SimpleNamespace(to_scale=lambda: SimpleNamespace(x=1.0))
 
 
 from unittest import mock

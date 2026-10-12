@@ -15,6 +15,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   um aviso. O menu e o comportamento dos outros motores não mudam; constraints de osso continuam separadas.
 - Textos novos traduzidos para pt-BR, espanhol e russo.
 
+## 2026-10-12 - Logic Bricks → Python: teste integrado (mini-jogo) e o que ele achou
+
+- Cena nova `tools/create_logic_convert_scene_game.py`: mini-jogo sem entrada do jogador com os sistemas interagindo (Player em dois estados que atira e perde vida, dois pontos que criam Enemies a partir de um modelo em camada inativa com os próprios bricks, Steering, colisões, placar por mensagem, level up que toca uma ação, Track To, Near, Ray, Visibility, Camera). 40 amostras de 20 valores, lidas no fim do quadro.
+- Quatro diferenças reais entre bricks e convertido apareceram e foram corrigidas no conversor (o código entrou no commit `afef97e5`):
+  - **Delay ao voltar para um estado:** a engine reinicia o sensor quando ele volta a ser usado (`SCA_ISensor::RegisterToManager` chama `Init`); o convertido continuava a contagem antiga e a máquina de estados ficava trocando de estado todo quadro. Delay e Random agora zeram fora do estado.
+  - **Collision com objeto de física Sensor:** o sensor da engine ignora quem é do tipo Sensor e enxerga todo o resto, com ou sem Actor (`isActor()` em `KX_ClientObjectInfo` quer dizer "não é sensor"). O convertido enxergava todo mundo.
+  - **Near:** a engine usa uma esfera física que dispara ao tocar a forma do outro objeto; o convertido media até o centro. Agora soma o raio da esfera de colisão do outro (objetos dinâmicos sem Collision Bounds, ou Bounds Sphere); as outras formas continuam pelo centro.
+  - **Add Object de objeto em camada ativa:** o actuator copia; `scene.addObject` recusa e o erro parava o componente inteiro. Esse controller agora fica como brick, com o motivo no TODO.
+- Resultado: bricks duas vezes idênticos; bricks × Component 800 de 800; bricks × Module 800 de 800; `LEFT_AS_BRICK 0`. Regressão: F6 a F12 e Steering iguais como antes, base e F5 só com o `-0.00` de sempre; testes de geração F5/F6/F7 passam.
+- Levantamento só de leitura no RolimaRacer (42 arquivos, nada salvo): 324 controllers, 272 convertem, 12 são Python, 24 estão desativados e 22 ficam como brick (12 som empacotado, 6 Filter 2D custom sem shader, 3 Sound sem som, 1 Action sem ação); nenhum erro e todo o código gerado compila. Não foi rodado em jogo.
+
 ## 2026-10-12 - Logic Bricks → Python: lacunas da auditoria fechadas e rótulos do brick Property
 
 - Conversor, sensores: **Collision com Pulse** gera evento quando muda a quantidade de objetos colidindo (é o que `KX_CollisionSensor` de fato compara; Near e Radar não têm a opção); **Mouse Over Any com Pulse** gera evento quando o cursor passa para outro objeto; **Keyboard `log`/`target`** convertido (`logic.keyboard.text`, backspace e enter como a engine; alvo que não é texto vira texto), e o sensor de registro sem controller continua como brick ativo, porque a engine o registra à força; **Random com Delta Time** usa `tick_skip_dt` e deixou de sortear no 1º quadro.
