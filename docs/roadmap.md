@@ -351,6 +351,10 @@ pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Expl
 `scene.explode()`, em fases F0–F5. Protótipo Python validado por teste automático no runtime
 0.4.5 (fora do git, em `tools/ADD na engine anastacioEngine/`).
 
+Em 2026-10-12 o painel Explosive ganhou Particle Explosion (5 tamanhos, estilos Fire/Electric/Concrete/Water, cores e
+quantidades), Ground Mark (decal no chão) e Mark Nearby Objects, todos com binding Python em `KX_GameObject` (ver
+changelog). Em aberto: a explosão de partículas não tem clarão de luz.
+
 ### Deformação por impacto
 
 Implementada em 2026-10-02 (painel Deformation, `KX_DentDeformer`, `dent()`/`resetDent()`; ver changelog). Falta validar no
