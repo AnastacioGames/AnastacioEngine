@@ -645,6 +645,8 @@ public:
 	/// Explosive > Particle Explosion: a built-in GPU particle blast at a world position, sized by
 	/// EXPLOSIVE_PARTICLES_* and styled by EXPLOSIVE_STYLE_* (DNA_object_types.h). Stepped with the emitters, freed when it ends.
 	void SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings);
+	/// Default fire, smoke and spark colors of an EXPLOSIVE_STYLE_* (the ones the panel fills in).
+	static void GetExplosionStyleColors(int style, float fire[3], float smoke[3], float spark[3]);
 	void DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex);
 	bool HasParticleBlasts() const { return !m_particleBlasts.empty(); }
 

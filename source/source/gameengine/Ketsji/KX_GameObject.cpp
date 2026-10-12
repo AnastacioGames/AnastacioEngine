@@ -3100,7 +3100,7 @@ enum DestructionGroup { DESTRUCTION_SETTINGS, EXPLOSIVE_SETTINGS, DEFORM_SETTING
 struct DestructionAttribute {
 	const char *name;
 	DestructionGroup group;
-	/// 'f' float, 'i' int, 'b' flag bit.
+	/// 'f' float, 'i' int, 'b' flag bit, 'F' float of the Particle Explosion (see explosive_particles_init).
 	char kind;
 	size_t offset;
 	int flag;
@@ -3116,6 +3116,21 @@ static const DestructionAttribute destruction_attributes[] = {
 	{"impactImpulse", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, impact_impulse), 0, 0.0f, 100000.0f},
 	{"useExplodeOnImpact", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_ON_IMPACT, 0, 0},
 	{"useChainReaction", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_CHAIN_REACTION, 0, 0},
+	{"explosionRadius", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, radius), 0, 0.01f, 10000.0f},
+	{"explosionForce", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, force), 0, 0.0f, 100000.0f},
+	{"upBias", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, up_bias), 0, 0.0f, 5.0f},
+	{"effectLife", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, effect_life), 0, 0.0f, 3600.0f},
+	{"useOcclusion", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_OCCLUSION, 0, 0},
+	{"useParticleExplosion", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_PARTICLES, 0, 0},
+	{"fireAmount", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, fire_amount), 0, 0.0f, 4.0f},
+	{"smokeAmount", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, smoke_amount), 0, 0.0f, 4.0f},
+	{"sparkAmount", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, spark_amount), 0, 0.0f, 4.0f},
+	{"smokeDuration", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, smoke_duration), 0, 0.2f, 4.0f},
+	{"blastSpeed", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, blast_speed), 0, 0.2f, 4.0f},
+	{"useGroundMark", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_GROUND_MARK, 0, 0},
+	{"useMarkNearby", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_MARK_NEARBY, 0, 0},
+	{"markSize", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, mark_size), 0, 0.1f, 4.0f},
+	{"markLife", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, mark_life), 0, 0.0f, 3600.0f},
 	{"dentImpulse", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, dent_impulse), 0, 0.0f, 100000.0f},
 	{"useDentOnCollision", DEFORM_SETTINGS, 'b', offsetof(RangeDeformSettings, flags), DEFORM_ON_COLLISION, 0, 0},
 	{"bendAngle", DEFORM_SETTINGS, 'f', offsetof(RangeDeformSettings, bend_angle), 0, 0.0f, (float)M_PI},
@@ -3126,6 +3141,44 @@ static const DestructionAttribute destruction_attributes[] = {
 };
 
 static const char *bend_axis_names[] = {"X", "Y", "Z"};
+// Indexed by EXPLOSIVE_PARTICLES_* and EXPLOSIVE_STYLE_*.
+static const char *explosion_size_names[] = {"SMALL", "MEDIUM", "LARGE", "HUGE", "TINY"};
+static const char *explosion_style_names[] = {"FIRE", "ELECTRIC", "CONCRETE", "WATER"};
+
+struct ExplosionColor {
+	const char *name;
+	size_t offset;
+};
+static const ExplosionColor explosion_colors[] = {
+	{"fireColor", offsetof(RangeExplosiveSettings, fire_color)},
+	{"smokeColor", offsetof(RangeExplosiveSettings, smoke_color)},
+	{"sparkColor", offsetof(RangeExplosiveSettings, spark_color)},
+};
+
+/// The colors and amounts of the Particle Explosion only count once they are initialized (the panel
+/// does it when the option is first enabled): the style colors and every multiplier at 1.
+static void explosive_particles_init(RangeExplosiveSettings *settings)
+{
+	if (settings->flags & EXPLOSIVE_PARTICLE_COLORS) {
+		return;
+	}
+	KX_Scene::GetExplosionStyleColors(settings->particle_style, settings->fire_color, settings->smoke_color,
+	                                  settings->spark_color);
+	settings->fire_amount = settings->smoke_amount = settings->spark_amount = 1.0f;
+	settings->smoke_duration = settings->blast_speed = 1.0f;
+	settings->flags |= EXPLOSIVE_PARTICLE_COLORS;
+}
+
+/// The game object of a template of the scene file, None when it isn't in this scene.
+static PyObject *template_proxy(KX_GameObject *self, Object *ob)
+{
+	KX_GameObject *gameobj = ob ? static_cast<KX_GameObject *>(
+		self->GetScene()->GetLogicManager()->FindGameObjByBlendObj(ob)) : nullptr;
+	if (!gameobj) {
+		Py_RETURN_NONE;
+	}
+	return gameobj->GetProxy();
+}
 
 static const char *destruction_group_names[] = {"destructible", "explosive", "deformable"};
 
@@ -3181,10 +3234,35 @@ static PyObject *KX_GameObject_pyattr_get_destruction(EXP_PyObjectPlus *self_v, 
 	if (name == "bendAxis") {
 		return PyUnicode_FromString(bend_axis_names[CLAMPIS(manager.GetDeformSettings(self).bend_axis, 0, 2)]);
 	}
+	if (name == "explosionEffect") {
+		return template_proxy(self, manager.GetExplosiveSettings(self).effect);
+	}
+	if (name == "groundMark") {
+		return template_proxy(self, manager.GetExplosiveSettings(self).mark);
+	}
+	if (name == "particleSize") {
+		return PyUnicode_FromString(explosion_size_names[CLAMPIS(manager.GetExplosiveSettings(self).particle_size, 0, 4)]);
+	}
+	if (name == "particleStyle") {
+		return PyUnicode_FromString(explosion_style_names[CLAMPIS(manager.GetExplosiveSettings(self).particle_style, 0, 3)]);
+	}
+	for (const ExplosionColor& color : explosion_colors) {
+		if (name == color.name) {
+			RangeExplosiveSettings settings = manager.GetExplosiveSettings(self);
+			explosive_particles_init(&settings);
+			const float *rgb = (const float *)((const char *)&settings + color.offset);
+			return PyObjectFrom(mt::vec3(rgb[0], rgb[1], rgb[2]));
+		}
+	}
 	for (const DestructionAttribute& attr : destruction_attributes) {
 		if (name == attr.name) {
 			const char *field = destruction_settings_read(self, attr.group) + attr.offset;
 			switch (attr.kind) {
+				case 'F': {
+					// Not initialized yet: every multiplier counts as 1.
+					const bool custom = (manager.GetExplosiveSettings(self).flags & EXPLOSIVE_PARTICLE_COLORS) != 0;
+					return PyFloat_FromDouble(custom ? *(const float *)field : 1.0f);
+				}
 				case 'f': return PyFloat_FromDouble(*(const float *)field);
 				case 'i': return PyLong_FromLong(*(const int *)field);
 				default: return PyBool_FromLong((*(const int *)field & attr.flag) != 0);
@@ -3258,6 +3336,73 @@ static int KX_GameObject_pyattr_set_destruction(EXP_PyObjectPlus *self_v, const 
 		return PY_SET_ATTR_SUCCESS;
 	}
 
+	if (name == "explosionEffect" || name == "groundMark") {
+		KX_GameObject *templateobj;
+		if (!ConvertPythonToGameObject(self->GetScene()->GetLogicManager(), value, &templateobj, true,
+		                               "gameOb.explosionEffect/groundMark = KX_GameObject or None: KX_GameObject")) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (templateobj && !templateobj->GetBlenderObject()) {
+			PyErr_Format(PyExc_ValueError, "gameOb.%s = KX_GameObject: KX_GameObject, it must be an object of the scene file", attrname);
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeExplosiveSettings *settings = (RangeExplosiveSettings *)destruction_settings_edit(self, EXPLOSIVE_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		((name == "groundMark") ? settings->mark : settings->effect) = templateobj ? templateobj->GetBlenderObject() : nullptr;
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "particleSize" || name == "particleStyle") {
+		const bool size = (name == "particleSize");
+		const char **names = size ? explosion_size_names : explosion_style_names;
+		const int count = size ? 5 : 4;
+		const char *text = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+		int index = -1;
+		for (int i = 0; text && i < count; ++i) {
+			if (std::strcmp(text, names[i]) == 0) {
+				index = i;
+			}
+		}
+		if (index < 0) {
+			PyErr_Format(PyExc_ValueError, "gameOb.%s = str: KX_GameObject, expected %s", attrname,
+			             size ? "'TINY', 'SMALL', 'MEDIUM', 'LARGE' or 'HUGE'" : "'FIRE', 'ELECTRIC', 'CONCRETE' or 'WATER'");
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeExplosiveSettings *settings = (RangeExplosiveSettings *)destruction_settings_edit(self, EXPLOSIVE_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		if (size) {
+			settings->particle_size = index;
+		}
+		else {
+			// Like the panel: a new style brings its own colors.
+			explosive_particles_init(settings);
+			settings->particle_style = index;
+			KX_Scene::GetExplosionStyleColors(index, settings->fire_color, settings->smoke_color, settings->spark_color);
+		}
+		return PY_SET_ATTR_SUCCESS;
+	}
+	for (const ExplosionColor& color : explosion_colors) {
+		if (name != color.name) {
+			continue;
+		}
+		mt::vec3 rgb;
+		if (!PyVecTo(value, rgb)) {
+			return PY_SET_ATTR_FAIL;
+		}
+		RangeExplosiveSettings *settings = (RangeExplosiveSettings *)destruction_settings_edit(self, EXPLOSIVE_SETTINGS, attrname);
+		if (!settings) {
+			return PY_SET_ATTR_FAIL;
+		}
+		explosive_particles_init(settings);
+		float *field = (float *)((char *)settings + color.offset);
+		for (int i = 0; i < 3; ++i) {
+			field[i] = CLAMPIS(rgb[i], 0.0f, 1.0f);
+		}
+		return PY_SET_ATTR_SUCCESS;
+	}
 	for (const DestructionAttribute& attr : destruction_attributes) {
 		if (name != attr.name) {
 			continue;
@@ -3286,6 +3431,10 @@ static int KX_GameObject_pyattr_set_destruction(EXP_PyObjectPlus *self_v, const 
 		}
 		void *field = settings + attr.offset;
 		switch (attr.kind) {
+			case 'F':
+				explosive_particles_init((RangeExplosiveSettings *)settings);
+				*(float *)field = (float)number;
+				break;
 			case 'f': *(float *)field = (float)number; break;
 			case 'i': *(int *)field = (int)number; break;
 			default: SET_FLAG_FROM_TEST(*(int *)field, flag, attr.flag); break;
@@ -3343,6 +3492,29 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_DESTRUCTION("bendMaxAngle"),
 	EXP_PYATTRIBUTE_RW_DESTRUCTION("decal"),
 	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalSize"),
+	/* Explosive panel (explosive objects only, AttributeError otherwise). */
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("explosionRadius"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("explosionForce"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("upBias"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useOcclusion"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("explosionEffect"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("effectLife"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useParticleExplosion"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("particleSize"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("particleStyle"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("fireColor"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("smokeColor"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("sparkColor"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("fireAmount"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("smokeAmount"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("sparkAmount"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("smokeDuration"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("blastSpeed"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useGroundMark"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("useMarkNearby"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("groundMark"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("markSize"),
+	EXP_PYATTRIBUTE_RW_DESTRUCTION("markLife"),
 	EXP_PYATTRIBUTE_RW_DESTRUCTION("decalLife"),
 	EXP_PYATTRIBUTE_RW_DESTRUCTION("maxDecals"),
 	EXP_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",       KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),

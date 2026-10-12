@@ -190,6 +190,66 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 {
 	if (!m_scene || !m_scene->world || !identifier) return false;
 	World *world = m_scene->world;
+	/* Volumetric fog, clouds, Sky Layers and Volumetric Clouds controls read from the World every
+	 * frame (KX_RenderPipeline). Names are the World panel properties; colors go by channel. The
+	 * cloud toggles need the clouds pass, built at load when any of the three kinds is enabled.
+	 * Left out on purpose: vfog_resolution (the size of the fog buffers, fixed at load). */
+	static const struct { const char *name; short World::*field; int flag; } extraFlags[] = {
+		{"use_sky_layers", &World::sky_layer_flag, WO_SKY_LAYERS_ENABLE},
+		{"use_volumetric_clouds", &World::vcloud_flag, WO_VCLOUDS_ENABLE},
+		{"vcloud_shadow_enable", &World::vcloud_flag, WO_VCLOUDS_SHADOW_ENABLE},
+		{"vfog_use_lamps", &World::vfog_flag, WO_VFOG_LAMPS},
+		{"vfog_use_shafts", &World::vfog_flag, WO_VFOG_SHAFTS},
+		{"vfog_use_sun_shafts", &World::vfog_flag, WO_VFOG_SUN_SHAFTS},
+		{"vfog_volumes_only", &World::vfog_flag, WO_VFOG_VOLUMES_ONLY},
+		{"vfog_use_wind", &World::vfog_flag, WO_VFOG_WIND},
+		{"vfog_use_time_of_day", &World::vfog_flag, WO_VFOG_TIME_OF_DAY},
+		{"vfog_use_layer", &World::vfog_flag, WO_VFOG_LAYER},
+		{"vfog_use_reach_clouds", &World::vfog_flag, WO_VFOG_REACH_CLOUDS},
+	};
+	static const struct { const char *name; short World::*field; short min, max; } extraShorts[] = {
+		{"cloud_detail", &World::cloud_detail, 1, 8},
+		{"vcloud_quality", &World::vcloud_quality, 0, 2},
+		{"vfog_quality", &World::vfog_quality, 0, 2},
+		{"vfog_max_lights", &World::vfog_max_lights, 1, 8},
+	};
+	const struct { const char *name; float *ptr; } extraFloats[] = {
+		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
+		{"cloud_color_b", &world->cloud_color[2]},
+		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
+		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},
+		{"vcloud_thickness", &world->vcloud_thickness}, {"vcloud_density", &world->vcloud_density},
+		{"vcloud_detail_scale", &world->vcloud_detail_scale},
+		{"vcloud_silver_intensity", &world->vcloud_silver_intensity},
+		{"vcloud_shadow_strength", &world->vcloud_shadow_strength},
+		{"vcloud_color_r", &world->vcloud_color[0]}, {"vcloud_color_g", &world->vcloud_color[1]},
+		{"vcloud_color_b", &world->vcloud_color[2]},
+		{"vfog_anisotropy", &world->vfog_anisotropy}, {"vfog_edge", &world->vfog_edge},
+		{"vfog_noise_scale", &world->vfog_noise_scale}, {"vfog_shaft_intensity", &world->vfog_shaft_intensity},
+		{"vfog_morning_boost", &world->vfog_morning_boost}, {"vfog_wind_direction", &world->vfog_wind_dir},
+	};
+	{
+		const char *key = (std::strncmp(identifier, "weather.", 8) == 0) ? identifier + 8 : identifier;
+		for (const auto &f : extraFlags) {
+			if (std::strcmp(key, f.name) == 0) {
+				if (!useBool) return false;
+				if (boolValue) world->*f.field |= f.flag; else world->*f.field &= ~f.flag;
+				return true;
+			}
+		}
+		for (const auto &f : extraShorts) {
+			if (std::strcmp(key, f.name) == 0) {
+				world->*f.field = (short)((value < f.min) ? f.min : (value > f.max) ? f.max : value);
+				return true;
+			}
+		}
+		for (const auto &f : extraFloats) {
+			if (std::strcmp(key, f.name) == 0) {
+				*f.ptr = value;
+				return true;
+			}
+		}
+	}
 	if (std::strcmp(identifier, "weather.rain_intensity") == 0) world->rain_intensity = value;
 	else if (std::strcmp(identifier, "weather.rain_density") == 0) world->rain_density = value;
 	else if (std::strcmp(identifier, "weather.rain_speed") == 0) world->rain_speed = value;
@@ -305,6 +365,66 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 	if (!m_scene || !m_scene->world || !identifier) return false;
 	World *world = m_scene->world;
 	if (std::strncmp(identifier, "weather.", 8) == 0) identifier += 8;
+
+	/* Volumetric fog, clouds, Sky Layers and Volumetric Clouds controls read from the World every
+	 * frame (KX_RenderPipeline). Names are the World panel properties; colors go by channel. The
+	 * cloud toggles need the clouds pass, built at load when any of the three kinds is enabled.
+	 * Left out on purpose: vfog_resolution (the size of the fog buffers, fixed at load). */
+	static const struct { const char *name; short World::*field; int flag; } extraFlags[] = {
+		{"use_sky_layers", &World::sky_layer_flag, WO_SKY_LAYERS_ENABLE},
+		{"use_volumetric_clouds", &World::vcloud_flag, WO_VCLOUDS_ENABLE},
+		{"vcloud_shadow_enable", &World::vcloud_flag, WO_VCLOUDS_SHADOW_ENABLE},
+		{"vfog_use_lamps", &World::vfog_flag, WO_VFOG_LAMPS},
+		{"vfog_use_shafts", &World::vfog_flag, WO_VFOG_SHAFTS},
+		{"vfog_use_sun_shafts", &World::vfog_flag, WO_VFOG_SUN_SHAFTS},
+		{"vfog_volumes_only", &World::vfog_flag, WO_VFOG_VOLUMES_ONLY},
+		{"vfog_use_wind", &World::vfog_flag, WO_VFOG_WIND},
+		{"vfog_use_time_of_day", &World::vfog_flag, WO_VFOG_TIME_OF_DAY},
+		{"vfog_use_layer", &World::vfog_flag, WO_VFOG_LAYER},
+		{"vfog_use_reach_clouds", &World::vfog_flag, WO_VFOG_REACH_CLOUDS},
+	};
+	static const struct { const char *name; short World::*field; short min, max; } extraShorts[] = {
+		{"cloud_detail", &World::cloud_detail, 1, 8},
+		{"vcloud_quality", &World::vcloud_quality, 0, 2},
+		{"vfog_quality", &World::vfog_quality, 0, 2},
+		{"vfog_max_lights", &World::vfog_max_lights, 1, 8},
+	};
+	const struct { const char *name; float *ptr; } extraFloats[] = {
+		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
+		{"cloud_color_b", &world->cloud_color[2]},
+		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
+		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},
+		{"vcloud_thickness", &world->vcloud_thickness}, {"vcloud_density", &world->vcloud_density},
+		{"vcloud_detail_scale", &world->vcloud_detail_scale},
+		{"vcloud_silver_intensity", &world->vcloud_silver_intensity},
+		{"vcloud_shadow_strength", &world->vcloud_shadow_strength},
+		{"vcloud_color_r", &world->vcloud_color[0]}, {"vcloud_color_g", &world->vcloud_color[1]},
+		{"vcloud_color_b", &world->vcloud_color[2]},
+		{"vfog_anisotropy", &world->vfog_anisotropy}, {"vfog_edge", &world->vfog_edge},
+		{"vfog_noise_scale", &world->vfog_noise_scale}, {"vfog_shaft_intensity", &world->vfog_shaft_intensity},
+		{"vfog_morning_boost", &world->vfog_morning_boost}, {"vfog_wind_direction", &world->vfog_wind_dir},
+	};
+	for (const auto &f : extraFlags) {
+		if (std::strcmp(identifier, f.name) == 0) {
+			isBool = true;
+			value = (world->*f.field & f.flag) ? 1.0f : 0.0f;
+			return true;
+		}
+	}
+	for (const auto &f : extraShorts) {
+		if (std::strcmp(identifier, f.name) == 0) {
+			isBool = false;
+			value = (float)(world->*f.field);
+			return true;
+		}
+	}
+	for (const auto &f : extraFloats) {
+		if (std::strcmp(identifier, f.name) == 0) {
+			isBool = false;
+			value = *f.ptr;
+			return true;
+		}
+	}
 
 	static const struct { const char *name; int flag; } flags[] = {
 		{"rain", WO_WEATHER_RAIN}, {"ripples", WO_WEATHER_RAIN_RIPPLE}, {"droplets", WO_WEATHER_RAIN_DROPLETS},

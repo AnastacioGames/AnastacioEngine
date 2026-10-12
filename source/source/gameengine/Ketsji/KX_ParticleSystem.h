@@ -117,6 +117,12 @@ public:
 	static PyObject *pyattr_get_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_drag(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 
+	/// The remaining panel controls that can change while the game runs (see the table in
+	/// KX_ParticleSystem.cpp): blendMode, billboardMode, emissionMode, useBackfaceCulling,
+	/// useDebugUi, useVortex, vortexHeight, vortexRadiusTop, vortexRotationSpeed.
+	static PyObject *pyattr_get_panel(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_panel(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+
 	EXP_PYMETHOD_DOC_NOARGS(KX_ParticleSystem, burst);
 };
 

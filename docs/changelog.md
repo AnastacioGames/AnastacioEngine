@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Bindings Python: partículas GPU, Explosive e clima
+
+- `KX_ParticleSystem`: `blendMode`, `billboardMode`, `emissionMode` (strings), `useBackfaceCulling`, `useDebugUi`, `useVortex`, `vortexHeight`, `vortexRadiusTop`, `vortexRotationSpeed`.
+- `KX_GameObject` (painel Explosive): `explosionRadius`, `explosionForce`, `upBias`, `useOcclusion`, `explosionEffect`, `effectLife`, `useParticleExplosion`, `particleSize`, `particleStyle`, `fireColor`, `smokeColor`, `sparkColor`, `fireAmount`, `smokeAmount`, `sparkAmount`, `smokeDuration`, `blastSpeed`, `useGroundMark`, `useMarkNearby`, `groundMark`, `markSize`, `markLife`. Documentados no RST.
+- `KX_WorldInfo.setWeather/getWeather`: Sky Layers, Volumetric Clouds (`vcloud_*`), `cloud_detail`, `cloud_color_r/g/b` e o restante do Fog - Volumetric (`vfog_use_*`, `vfog_quality`, `vfog_max_lights`, `vfog_anisotropy`, `vfog_edge`, `vfog_noise_scale`, `vfog_shaft_intensity`, `vfog_morning_boost`, `vfog_wind_direction`).
+- Sem binding de propósito: curvas de tamanho/cor, `emit_from`, `particle_look`, `collision_ground_object`, `use_burst_on_start`, `use_fragment_shader` (resolvidos na conversão da cena; `fragmentShaderPath` já liga/desliga o shader) e `vfog_resolution` (buffers criados no load).
+- Teste: `tools/debug/cenas/criar_cena_teste_bindings_fx.py` (71 verificações, `BINDINGS_LOG`).
+
 ## 2026-10-12 - Explosive: estilos, Ground Mark e fumaça mais longa
 
 - Particle Explosion ganha o tamanho Tiny, os estilos Fire/Electric/Concrete/Water e cores, quantidades, Smoke Duration e Blast Speed editáveis.

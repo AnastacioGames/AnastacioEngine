@@ -2907,6 +2907,15 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 	                       m_particleBlasts.end());
 }
 
+void KX_Scene::GetExplosionStyleColors(int style, float fire[3], float smoke[3], float spark[3])
+{
+	const KX_BlastLayer *layers = kBlastStyles[std::max(0, std::min(3, style))];
+	float *colors[3] = {fire, smoke, spark};
+	for (int i = 0; i < 3; ++i) {
+		std::copy(layers[i].color, layers[i].color + 3, colors[i]);
+	}
+}
+
 void KX_Scene::SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings)
 {
 	// Indexed by EXPLOSIVE_PARTICLES_* (Small, Medium, Large, Huge, Tiny).

@@ -603,6 +603,141 @@ base class --- :class:`SCA_IObject`
 
       :type: float
 
+   .. attribute:: explosionRadius
+
+      Radius of the blast of this explosive object, in meters. Like every attribute of the
+      Explosive panel below, setting it on an object that is not explosive raises AttributeError.
+
+      :type: float
+
+   .. attribute:: explosionForce
+
+      Impulse of the blast at its center; it falls to 0 at :attr:`explosionRadius`.
+
+      :type: float
+
+   .. attribute:: upBias
+
+      Extra upward push of the blast (0 to 5), so objects fly up instead of sliding on the floor.
+
+      :type: float
+
+   .. attribute:: useOcclusion
+
+      Static geometry between the blast and an object shields it.
+
+      :type: bool
+
+   .. attribute:: explosionEffect
+
+      Object of an inactive layer added at the blast (fire, smoke, a sound). It must be an object of the scene file.
+
+      :type: :class:`KX_GameObject` or None
+
+   .. attribute:: effectLife
+
+      Seconds :attr:`explosionEffect` lives (0 = until its own logic removes it).
+
+      :type: float
+
+   .. attribute:: useParticleExplosion
+
+      Built-in GPU particle explosion (core, smoke and debris) at the blast.
+
+      :type: bool
+
+   .. attribute:: particleSize
+
+      Size preset of the particle explosion: ``'TINY'``, ``'SMALL'``, ``'MEDIUM'``, ``'LARGE'`` or ``'HUGE'``.
+      It also scales the ground mark.
+
+      :type: str
+
+   .. attribute:: particleStyle
+
+      What the particle explosion is made of: ``'FIRE'``, ``'ELECTRIC'``, ``'CONCRETE'`` or ``'WATER'``.
+      Setting it resets :attr:`fireColor`, :attr:`smokeColor` and :attr:`sparkColor` to the colors of the style.
+
+      :type: str
+
+   .. attribute:: fireColor
+
+      Tint of the core of the particle explosion (white = the natural colors of the style).
+
+      :type: Vector((r, g, b))
+
+   .. attribute:: smokeColor
+
+      Color of the smoke (dust cloud, mist) of the particle explosion when it is born.
+
+      :type: Vector((r, g, b))
+
+   .. attribute:: sparkColor
+
+      Color of the sparks (debris, droplets) of the particle explosion.
+
+      :type: Vector((r, g, b))
+
+   .. attribute:: fireAmount
+
+      How many core particles, relative to the size preset (0 to 4, 0 = none).
+
+      :type: float
+
+   .. attribute:: smokeAmount
+
+      How much smoke, relative to the size preset (0 to 4, 0 = none).
+
+      :type: float
+
+   .. attribute:: sparkAmount
+
+      How many sparks, relative to the size preset (0 to 4, 0 = none).
+
+      :type: float
+
+   .. attribute:: smokeDuration
+
+      How long the smoke lasts, relative to the style (0.2 to 4).
+
+      :type: float
+
+   .. attribute:: blastSpeed
+
+      How hard the particles are thrown out, relative to the size preset (0.2 to 4).
+
+      :type: float
+
+   .. attribute:: useGroundMark
+
+      Paint the material of :attr:`groundMark` on the static surface under the blast.
+
+      :type: bool
+
+   .. attribute:: useMarkNearby
+
+      With :attr:`useGroundMark`: also paint a smaller mark on the objects around the blast (12 closest).
+
+      :type: bool
+
+   .. attribute:: groundMark
+
+      Mesh object of an inactive layer whose material is the ground mark. It must be an object of the scene file.
+
+      :type: :class:`KX_GameObject` or None
+
+   .. attribute:: markSize
+
+      Size of the ground mark, relative to :attr:`particleSize` (0.1 to 4).
+
+      :type: float
+
+   .. attribute:: markLife
+
+      Seconds the ground mark stays (0 = forever).
+
+      :type: float
+
    .. attribute:: onBreak
 
       A list of functions called when this object breaks, with the arguments `(object, fragments)`.

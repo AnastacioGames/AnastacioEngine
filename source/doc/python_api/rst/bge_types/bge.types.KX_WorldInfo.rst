@@ -125,6 +125,21 @@ base class --- :class:`EXP_PyObjectPlus`
       ``lightning_rate``, ``lightning_intensity``, ``lightning_distance``, ``lightning_width``,
       ``cloud_coverage``, ``cloud_scale``, ``cloud_speed``, ``flare_scale``, ``flare_intensity``, ``mist_*``.
 
+      Clouds, Sky Layers and Volumetric Clouds (the toggles need the clouds pass, built at load when any of
+      the three is enabled in the World): booleans ``use_sky_layers``, ``use_volumetric_clouds``,
+      ``vcloud_shadow_enable``; integers ``cloud_detail`` (1-8), ``vcloud_quality`` (0 Low, 1 Medium, 2 High);
+      floats ``cloud_color_r/_g/_b``, ``vcloud_coverage``, ``vcloud_scale``, ``vcloud_speed``,
+      ``vcloud_altitude``, ``vcloud_thickness``, ``vcloud_density``, ``vcloud_detail_scale``,
+      ``vcloud_silver_intensity``, ``vcloud_shadow_strength``, ``vcloud_color_r/_g/_b``.
+
+      Fog - Volumetric: booleans ``vfog``, ``vfog_use_lamps``, ``vfog_use_shafts``, ``vfog_use_sun_shafts``,
+      ``vfog_volumes_only``, ``vfog_use_wind``, ``vfog_use_time_of_day``, ``vfog_use_layer``,
+      ``vfog_use_reach_clouds``; integers ``vfog_quality`` (0 Low, 1 Medium, 2 High), ``vfog_max_lights`` (1-8);
+      floats ``vfog_density``, ``vfog_base``, ``vfog_falloff``, ``vfog_distance``, ``vfog_noise_scale``,
+      ``vfog_noise_amount``, ``vfog_speed``, ``vfog_anisotropy``, ``vfog_edge``, ``vfog_light_intensity``,
+      ``vfog_sun_intensity``, ``vfog_shaft_intensity``, ``vfog_ambient``, ``vfog_morning_boost``,
+      ``vfog_wind_direction`` (degrees), ``vfog_color_r/_g/_b``. The fog resolution is fixed at load.
+
       .. code-block:: python
 
          scene.world.setWeather("aura", True)
