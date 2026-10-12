@@ -421,6 +421,21 @@ static void rna_GPUParticleSettings_particle_look_update(Main *bmain, Scene *sce
 			gp->blend_mode = GPU_PARTICLE_BLEND_ALPHA;
 			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
 			break;
+		case GPU_PARTICLE_LOOK_FIRE:
+			gp->use_vortex = 0;
+			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = 1.2f;
+			gp->lifetime = 1.1f;
+			gp->emitter_radius = 0.35f;
+			gp->velocity[0] = 0.0f; gp->velocity[1] = 0.0f; gp->velocity[2] = 1.4f;
+			gp->velocity_randomness = 0.5f;
+			gp->size = 0.9f; gp->end_size = 0.35f;
+			gp->color[0] = 1.0f; gp->color[1] = 1.0f; gp->color[2] = 1.0f; gp->color[3] = 0.5f;
+			gp->end_color[0] = 1.0f; gp->end_color[1] = 1.0f; gp->end_color[2] = 1.0f; gp->end_color[3] = 0.0f;
+			gp->particle_count = 110;
+			gp->emission_angle = 20.0f;
+			gp->blend_mode = GPU_PARTICLE_BLEND_ADDITIVE;
+			gp->billboard_mode = GPU_PARTICLE_BILLBOARD_VERTICAL;
+			break;
 		case GPU_PARTICLE_LOOK_SPARKLE:
 			gp->use_vortex = 0;
 			gp->gravity[0] = 0.0f; gp->gravity[1] = 0.0f; gp->gravity[2] = -1.0f;
@@ -2290,6 +2305,9 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 		{GPU_PARTICLE_LOOK_REFLECTOR, "REFLECTOR", 0, "Reflector",
 		 "Fake road reflector (cat's eye): glows in Color when the camera looks at it, End Color when unlit. "
 		 "No real light, use with Emit From: Mesh Vertices"},
+		{GPU_PARTICLE_LOOK_FIRE, "FIRE", 0, "Fire",
+		 "Flickering flame tongues, white-yellow when born, then orange, red and gone; Color tints it. "
+		 "Put Smoke on the Mix emitter for smoke above"},
 		{0, NULL, 0, NULL, NULL}
 	};
 

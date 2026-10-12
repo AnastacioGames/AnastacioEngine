@@ -26,6 +26,8 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
 #include "KX_Camera.h"
+#include "KX_LightObject.h"
+#include "EXP_ListValue.h"
 #include "KX_Globals.h"
 #include "KX_NetworkManager.h"
 #include "EXP_ListValue.h"
@@ -162,6 +164,10 @@ void KX_SimulationPipeline::Update()
 			scene->UpdateGpuParticleEmitters(m_engine->GetPhysicsTime());
 			scene->UpdateRainAura(m_engine->GetFrameTime());
 			scene->UpdateRainLightning(m_engine->GetFrameTime());
+			// Lamps with the "light_flicker" game property (fire, candles, torches).
+			for (KX_LightObject *light : *scene->GetLightList()) {
+				light->UpdateFlicker(m_engine->GetFrameTime());
+			}
 		}
 	}
 

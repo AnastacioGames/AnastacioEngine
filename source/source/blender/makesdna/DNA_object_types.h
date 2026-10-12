@@ -437,6 +437,8 @@ enum {
 	GPU_PARTICLE_LOOK_AURORA = 7,
 	/* Retroreflector (road cat's eye): glows when the camera/headlight looks at it. */
 	GPU_PARTICLE_LOOK_REFLECTOR = 8,
+	/* Flame tongues colored by temperature over the lifetime (additive). */
+	GPU_PARTICLE_LOOK_FIRE = 9,
 };
 
 /* RangeGPUParticleSettings.emit_from */

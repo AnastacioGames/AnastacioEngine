@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "KX_LightObject.h"
 #include "KX_Camera.h"
@@ -114,6 +115,42 @@ bool KX_LightObject::GetShowShadowFrustum() const
 void KX_LightObject::SetShowShadowFrustum(bool show)
 {
 	m_showShadowFrustum = show;
+}
+
+/* Smooth 1D value noise in [0, 1]. */
+static float KX_FlickerNoise(double x)
+{
+	const double i = std::floor(x);
+	const float f = (float)(x - i);
+	auto hash = [](double n) { return (float)(std::fmod(std::sin(n * 127.1) * 43758.5453, 1.0) * 0.5 + 0.5); };
+	const float u = f * f * (3.0f - 2.0f * f);
+	return hash(i) + (hash(i + 1.0) - hash(i)) * u;
+}
+
+void KX_LightObject::UpdateFlicker(double time)
+{
+	EXP_Value *prop = GetProperty("light_flicker");
+	if (!prop) {
+		return;
+	}
+	if (!m_flickerInit) {
+		m_flickerInit = true;
+		m_flickerEnergy = m_lightobj->m_energy;
+		for (int i = 0; i < 3; ++i) {
+			m_flickerColor[i] = m_lightobj->m_color[i];
+		}
+	}
+	const float amount = std::max(0.0f, std::min(2.0f, (float)prop->GetNumber()));
+	// Each lamp gets its own phase; a slow wander, a faster flutter and quick sparks of flicker.
+	const double seed = (double)(((uintptr_t)this >> 4) % 1000) * 3.17;
+	const float n = KX_FlickerNoise(time * 2.3 + seed) * 0.5f + KX_FlickerNoise(time * 7.9 + seed * 1.7) * 0.32f +
+	                KX_FlickerNoise(time * 19.0 + seed * 2.3) * 0.18f;
+	const float t = (n - 0.5f) * 2.0f; // -1..1
+	m_lightobj->m_energy = m_flickerEnergy * std::max(0.0f, 1.0f + 0.35f * amount * t);
+	// Dimmer is redder: green and blue follow the energy a little.
+	m_lightobj->m_color[0] = m_flickerColor[0];
+	m_lightobj->m_color[1] = m_flickerColor[1] * std::max(0.0f, 1.0f + 0.06f * amount * t);
+	m_lightobj->m_color[2] = m_flickerColor[2] * std::max(0.0f, 1.0f + 0.12f * amount * t);
 }
 
 void KX_LightObject::Update()

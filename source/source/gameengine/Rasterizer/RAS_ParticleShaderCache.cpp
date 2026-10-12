@@ -345,6 +345,53 @@ void main() {
 }
 )GLSL";
 
+const char *lookFireSource = R"GLSL(
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm(vec2 p) {
+	return noise(p) * 0.55 + noise(p * 2.1 + 5.3) * 0.3 + noise(p * 4.3 + 1.7) * 0.15;
+}
+/* Black body ramp: dark red, orange, yellow-white. */
+vec3 fireRamp(float t) {
+	t = clamp(t, 0.0, 1.0);
+	if (t < 0.5) {
+		return mix(vec3(0.5, 0.04, 0.0), vec3(1.0, 0.35, 0.03), t * 2.0);
+	}
+	return mix(vec3(1.0, 0.35, 0.03), vec3(1.0, 0.92, 0.6), (t - 0.5) * 2.0);
+}
+/* A flame tongue: round at the bottom, narrowing and torn upward by noise rising through it,
+ * hot (white-yellow) in its core while young, cooling to red as it ages; flickers per sprite. */
+void main() {
+	vec2 uv = v_uv * 2.0;
+	uv.x *= 1.0 + max(uv.y, 0.0) * 0.9;
+	vec2 q = vec2(uv.x * 1.6 + v_seed * 31.0, uv.y * 1.2 - u_time * 2.2 - v_seed * 7.0);
+	float n = fbm(q);
+	float d = length(vec2(uv.x, uv.y * 0.8 + 0.15));
+	float shape = 1.0 - d + (n - 0.5) * (0.8 + 0.6 * max(uv.y, 0.0));
+	float mask = smoothstep(0.0, 0.45, shape);
+	float heat = clamp((1.0 - v_lifeFrac * 1.25) * (0.45 + 0.75 * mask), 0.0, 1.0);
+	float flicker = 0.85 + 0.15 * sin(u_time * 13.0 + v_seed * 40.0);
+	vec3 rgb = fireRamp(heat) * u_color.rgb * flicker * 1.4;
+	float fade = clamp(v_lifeFrac / 0.04, 0.0, 1.0) * clamp((1.0 - v_lifeFrac) / 0.5, 0.0, 1.0);
+	float alpha = mask * fade * u_color.a;
+	if (alpha <= 0.001) { discard; }
+	fragColor = vec4(rgb, alpha);
+}
+)GLSL";
+
 const char *lookSparkleSource = R"GLSL(
 float hash11(float p) {
 	p = fract(p * 0.1031);
@@ -562,6 +609,7 @@ const char *RAS_GetBuiltinParticleLookSource(int look)
 		case GPU_PARTICLE_LOOK_TORNADO: return lookTornadoSource;
 		case GPU_PARTICLE_LOOK_WIND: return lookWindSource;
 		case GPU_PARTICLE_LOOK_AURORA: return lookAuroraSource;
+		case GPU_PARTICLE_LOOK_FIRE: return lookFireSource;
 		default: return "";
 	}
 }
