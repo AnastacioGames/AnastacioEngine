@@ -2230,6 +2230,14 @@ void RNA_def_material(BlenderRNA *brna)
 		"Generates shadows on both sides of an object, use with 'Translucency' slider in the Shading tab");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
+	prop = RNA_def_property(srna, "colored_shadow_glow", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "shadow_color_emit");
+	RNA_def_property_range(prop, 0.0f, 3.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 3.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Glow",
+	                         "Extra brightness of the colored light passing through (0 = as is, 3 = four times)");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
 	prop = RNA_def_property(srna, "use_colored_shadows", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode2", MA_COLORED_SHADOW);
 	RNA_def_property_ui_text(prop, "Colored Shadows",

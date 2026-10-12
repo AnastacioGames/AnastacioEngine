@@ -1138,6 +1138,9 @@ class MATERIAL_PT_game_shadow(MaterialButtonsPanel, Panel):
             sub = col.column()
             sub.active = mat.use_cast_shadows
             sub.prop(mat, "use_colored_shadows", text="Colored")
+            glow = sub.column()
+            glow.active = mat.use_cast_shadows and mat.use_colored_shadows
+            glow.prop(mat, "colored_shadow_glow", slider=True)
 
         col = split.column()
         col.prop(mat, "use_shadows", text="Receive")

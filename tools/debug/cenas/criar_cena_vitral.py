@@ -1,4 +1,4 @@
-﻿"""Colored shadows (stained glass) scene. Usage:
+"""Colored shadows (stained glass) scene. Usage:
 editor -b --factory-startup --python this.py -- out.range [mode]
 mode: sun (default), spot, csm (legacy materials, Sun with cascades), nodes_off (Colored Shadows
 unchecked, old black shadow), legacy (Blender Internal materials instead of nodes).
@@ -28,14 +28,17 @@ world = bpy.data.worlds.new('Vitral World')
 world.horizon_color = (0.02, 0.02, 0.03)
 world.ambient_color = (0.03, 0.03, 0.04)
 scene.world = world
+# SSGI on so the colored light bounces onto the walls around
+scene['ae_ssgi_use'] = os.environ.get('VITRAL_SSGI', '1') == '1'
+scene['ae_ssgi_strength'] = 1.0
 weather = world.weather_settings
-weather.use_volumetric_fog = True
+weather.use_volumetric_fog = os.environ.get('VITRAL_FOG', '1') == '1'
 weather.vfog_quality = 'HIGH'
 weather.vfog_density = 0.05
 weather.vfog_use_sun_shafts = True
 weather.vfog_use_lamps = True
 weather.vfog_use_shafts = True
-weather.vfog_dust = 0.5
+weather.vfog_dust = float(os.environ.get('VITRAL_DUST', '0.5'))
 
 
 def node_material(name, rgba, glass=False, checker=None):
@@ -84,6 +87,7 @@ def material(name, rgba, glass=False, checker=None):
         mat.game_settings.use_backface_culling = False
         mat.use_cast_shadows = True
         mat.use_colored_shadows = colored
+        mat.colored_shadow_glow = 1.5
     return mat
 
 
@@ -135,6 +139,29 @@ cam.location = (0, -12, 7)
 cam.rotation_euler = (Vector((0, 2, 0.5)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
 cam.data.lens = 24
 scene.camera = cam
+
+# Measurement (VITRAL_BENCH=file): no frame cap, average frame rate after a warm-up appended to the file.
+bench = os.environ.get('VITRAL_BENCH')
+if bench:
+    scene.game_settings.use_frame_rate = False
+    scene.game_settings.vsync = 'OFF'
+    text = bpy.data.texts.new('vitral_bench.py')
+    text.write('''import Range, time, json
+s = Range.logic.globalDict.setdefault('vitral_bench', {'t0': time.perf_counter(), 'fps': []})
+t = time.perf_counter() - s['t0']
+if t > 3.0:
+    s['fps'].append(Range.logic.getAverageFrameRate())
+if t > 10.0:
+    with open(%r, 'a') as f:
+        f.write(json.dumps({'label': %r, 'fps': sum(s['fps']) / max(len(s['fps']), 1)}) + chr(10))
+    Range.logic.endGame()
+''' % (bench, os.environ.get('VITRAL_LABEL', mode)))
+    bpy.context.scene.objects.active = cam
+    bpy.ops.logic.sensor_add(type='ALWAYS', name='Bench', object=cam.name)
+    bpy.ops.logic.controller_add(type='PYTHON', name='Bench', object=cam.name)
+    cam.game.sensors['Bench'].use_pulse_true_level = True
+    cam.game.controllers['Bench'].text = text
+    cam.game.sensors['Bench'].link(cam.game.controllers['Bench'])
 
 bpy.ops.wm.save_as_mainfile(filepath=destination, check_existing=False)
 print('Vitral scene saved:', destination, mode)

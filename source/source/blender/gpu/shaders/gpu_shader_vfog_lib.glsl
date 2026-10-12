@@ -45,7 +45,7 @@ uniform sampler2D vfog_shadowcolor2;
 vec3 vfogShadowTint(sampler2D colormap, vec3 uvz)
 {
 	vec4 c = texture(colormap, uvz.xy);
-	return (uvz.z > c.a) ? c.rgb : vec3(1.0);
+	return (uvz.z > c.a + 0.002) ? c.rgb : vec3(1.0);
 }
 
 float vfogHash(vec3 p)

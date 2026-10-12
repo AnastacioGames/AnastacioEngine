@@ -14,6 +14,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - **Emissivos no SSGI** (Codex): Emission ligado direto no Material Output e Emit do material antigo viram fonte de luz do SSGI.
 - Não feito: Point lamp, sombra Variance e nó Lamp Data seguem com sombra preta; Sun com cascatas no Principled não tem sombra nenhuma hoje, então também não tem cor.
 - Teste: `tools/debug/cenas/criar_cena_vitral.py` (modos sun, spot, csm, legacy, nodes_off). Aceite visual do usuário no runtime: sombra colorida OK em sun/spot/csm, nodes_off preta como antes, névoa e feixes visíveis. Valores da poeira ajustados no olho.
+- Depois: **Glow** no material (`shadow_color_emit`, no lugar do antigo `pad8`; 0 = como antes, até 3 = luz 4x mais forte), aceito no runtime. Margem de 0.002 na comparação de profundidade tira a acne (pontos coloridos no próprio vidro, visíveis com Glow). Tentativa de borrar a mancha (9 amostras) desfeita: pesada e feia. Com SSGI ligado o vidro transparente sai cortado em degraus (limitação antiga do SSGI com Alpha Blend, não desta entrada). Medição de FPS (`VITRAL_BENCH`) não liberou o limite de 60; no profile a cena fica 94% ociosa.
 
 ## 2026-10-12 - Culling de atividade: desligar uma flag tirava o objeto da lista da outra
 

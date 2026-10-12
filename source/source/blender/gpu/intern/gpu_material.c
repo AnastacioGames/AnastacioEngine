@@ -1297,7 +1297,7 @@ static void gpu_material_link_shadow_color(GPUMaterial *mat, Material *ma)
 	if (!alpha) {
 		alpha = GPU_uniform(&surface_alpha);
 	}
-	GPU_link(mat, "shadow_color_output", mat->outlinks[0], base, alpha,
+	GPU_link(mat, "shadow_color_output", mat->outlinks[0], base, alpha, GPU_uniform(&ma->shadow_color_emit),
 	         GPU_dynamic_uniform(&GPU_shadow_color_pass, GPU_DYNAMIC_SHADOW_COLOR_PASS, NULL), &mat->outlinks[0]);
 }
 

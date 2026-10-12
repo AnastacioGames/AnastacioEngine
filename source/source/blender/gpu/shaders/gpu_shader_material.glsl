@@ -3933,7 +3933,7 @@ void shadow_fade(vec3 rco, float fadefac, mat4 shadowpersmat, float shadfac, out
  * light it lets through: its color blended toward white as it gets more transparent, nothing where
  * it is almost opaque (lead lines of a stained glass). Alpha carries the depth, kept at its nearest
  * by the pass blending (GPU_lamp_shadow_color_begin). alpha < 0: use the surface alpha. */
-void shadow_color_output(vec4 surface, vec3 base, float alpha, float pass, out vec4 result)
+void shadow_color_output(vec4 surface, vec3 base, float alpha, float glow, float pass, out vec4 result)
 {
 	if (pass < 0.5) {
 		result = surface;
@@ -3941,7 +3941,8 @@ void shadow_color_output(vec4 surface, vec3 base, float alpha, float pass, out v
 	}
 	float a = clamp((alpha < 0.0) ? surface.a : alpha, 0.0, 1.0);
 	vec3 trans = mix(vec3(1.0), clamp(base, 0.0, 1.0), min(a * 1.5, 1.0)) * (1.0 - smoothstep(0.9, 1.0, a));
-	result = vec4(trans, gl_FragCoord.z);
+	/* Glow: the target is half float, the light let through may exceed the unshadowed light. */
+	result = vec4(trans * (1.0 + max(glow, 0.0)), gl_FragCoord.z);
 }
 
 /* Light reaching a receiver through the Colored Shadows casters: the transmittance stored in the
@@ -3953,7 +3954,8 @@ vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat
 		return vec3(1.0);
 	}
 	vec4 c = texture2D(colormap, co.xy);
-	return (co.z > c.a) ? c.rgb : vec3(1.0);
+	/* Margin: a glass pane must not catch its own tint (acne, very visible with Glow). */
+	return (co.z > c.a + 0.002) ? c.rgb : vec3(1.0);
 }
 
 void shade_shadow_tint(vec3 lcol, vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias,
