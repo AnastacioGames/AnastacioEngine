@@ -430,12 +430,22 @@ vec3 vfogLampAnalytic(int i, vec3 ro, vec3 rd, float t0, float t1, float sigmaAt
 
 /* Applies the fog to a pixel: ro camera, rd normalized view ray, dist distance to the scene
  * (the max distance for the sky). */
+vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame);
+
 vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
+{
+	vec4 fog = vfogScatter(ro, rd, dist, fragCoord, frame);
+	return color * fog.a + fog.rgb;
+}
+
+/* The fog along the ray alone: in-scatter rgb, transmittance a (the scene color is multiplied by
+ * a and the in-scatter added; the Half/Quarter resolution game pass stores this). */
+vec4 vfogScatter(vec3 ro, vec3 rd, float dist, vec2 fragCoord, float frame)
 {
 	dist = min(dist, vfog_data[0].w);
 	vec2 seg = vfogInterval(ro, rd, dist);
 	if (seg.x >= seg.y || vfog_data[0].x <= 0.0) {
-		return color;
+		return vec4(0.0, 0.0, 0.0, 1.0);
 	}
 	float quality = vfog_data[2].w;
 	vec3 fogColor = vfog_data[2].rgb;
@@ -485,7 +495,7 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 				             (1.0 / 12.566371) * mix(1.0, T, 0.5);
 			}
 		}
-		return color * T + inscatter;
+		return vec4(inscatter, T);
 	}
 
 	/* Medium/High: raymarch with per pixel jitter for the sun, sky and transmittance, keeping the
@@ -574,5 +584,5 @@ vec3 vfogApply(vec3 color, vec3 ro, vec3 rd, float dist, vec2 fragCoord, float f
 		}
 		L += acc * shaft * lampIntensity;
 	}
-	return color * T + L;
+	return vec4(L, T);
 }

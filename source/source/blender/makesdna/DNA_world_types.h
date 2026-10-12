@@ -207,7 +207,7 @@ typedef struct World {
 	short vfog_quality;    /* 0=Low,1=Medium,2=High */
 	short vfog_flag;       /* WO_VFOG_* */
 	short vfog_max_lights; /* 1-8 lampadas que tingem a neblina */
-	short vfog_pad;
+	short vfog_lod;        /* resolucao do raymarch: 0=Half (padrao),1=Full,2=Quarter */
 	/* Mais neblina ao amanhecer (World Property sun_hour) e direcao do vento (graus em Z, forca
 	 * vem de rain_wind). vfog_morning_boost == 0 marca arquivo antigo (readfile.c). */
 	float vfog_morning_boost, vfog_wind_dir;

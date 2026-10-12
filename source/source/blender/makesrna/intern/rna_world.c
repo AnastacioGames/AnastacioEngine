@@ -846,6 +846,18 @@ static void rna_def_world_weather(BlenderRNA *brna)
 		RNA_def_property_ui_text(prop, "Max Lamps", "Most lamps that tint the fog at once (the strongest near the camera); the quality preset can lower it");
 		RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+		static EnumPropertyItem vfog_lod_items[] = {
+			{1, "FULL", 0, "Full", "The fog is computed for every pixel (best edges, slowest)"},
+			{0, "HALF", 0, "Half", "The fog is computed at half resolution and upscaled following the depth (about 4x faster)"},
+			{2, "QUARTER", 0, "Quarter", "The fog is computed at a quarter of the resolution (fastest, softer edges)"},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "vfog_resolution", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "vfog_lod");
+		RNA_def_property_enum_items(prop, vfog_lod_items);
+		RNA_def_property_ui_text(prop, "Resolution", "Resolution of the fog computation in the game; restart the game to apply");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 		prop = RNA_def_property(srna, "vfog_use_sun_shafts", PROP_BOOLEAN, PROP_NONE);
 		RNA_def_property_boolean_sdna(prop, NULL, "vfog_flag", WO_VFOG_SUN_SHAFTS);
 		RNA_def_property_ui_text(prop, "Sun Shafts", "A Sun with shadow casts light shafts (god rays) in the fog (Medium/High)");

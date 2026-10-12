@@ -138,6 +138,19 @@ extern "C" {
 #include "CM_Message.h"
 #include "CM_List.h"
 
+/* Volumetric Fog raymarch resolution divisor from World vfog_lod (0 Half, 1 Full, 2 Quarter). */
+static int KX_VFogLodDivisor(const World *world)
+{
+	switch (world->vfog_lod) {
+		case 1:
+			return 1;
+		case 2:
+			return 4;
+		default:
+			return 2;
+	}
+}
+
 static void *KX_SceneReplicationFunc(SG_Node *node, void *gameobj, void *scene)
 {
 	KX_GameObject *replica = ((KX_Scene *)scene)->AddNodeReplicaObject(node, (KX_GameObject *)gameobj);
@@ -448,6 +461,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 		if (world->vfog_flag & WO_VFOG_ENABLE) {
 			filters.useVFog = true;
 		}
+		filters.vfog_lod = KX_VFogLodDivisor(world);
 
 		if (world->weather_flag & WO_WEATHER_LENSFLARE) {
 			filters.useLensFlare = true;
@@ -3253,10 +3267,13 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 	if (world && (world->vfog_flag & WO_VFOG_ENABLE)) {
 		BuildInFilters filters = {};
 		filters.useVFog = true;
+		filters.vfog_lod = KX_VFogLodDivisor(world);
 		m_filterManager->EnsureVFogFilters(filters);
 	}
-	if (RAS_2DFilter *vfog = m_filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_VFOG, true)) {
-		vfog->SetEnabled(world && (world->vfog_flag & WO_VFOG_ENABLE));
+	for (int pass : {RAS_2DFilterManager::FILTERPASS_VFOG, RAS_2DFilterManager::FILTERPASS_VFOG_IMAGE}) {
+		if (RAS_2DFilter *vfog = m_filterManager->GetFilterPass(pass, true)) {
+			vfog->SetEnabled(world && (world->vfog_flag & WO_VFOG_ENABLE));
+		}
 	}
 
 	m_filterManager->ReloadChangedSources();

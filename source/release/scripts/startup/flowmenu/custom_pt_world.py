@@ -454,6 +454,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col = main_box.column(align=True)
             col.active = weather.use_volumetric_fog
             col.prop(weather, "vfog_quality", text="Quality")
+            col.prop(weather, "vfog_resolution")
             col.prop(weather, "vfog_color")
             col.prop(weather, "vfog_density")
             col.prop(weather, "vfog_base")

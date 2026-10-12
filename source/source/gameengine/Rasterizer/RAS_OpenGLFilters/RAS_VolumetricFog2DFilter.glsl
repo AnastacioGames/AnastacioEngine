@@ -37,5 +37,11 @@ void main()
 		dist = 1e9;
 	}
 
+#ifdef VFOG_LOW_RES
+	/* Small offscreen: only the fog (in-scatter, transmittance); RAS_VolumetricFogImage2DFilter.glsl
+	 * composites it onto the image. */
+	gl_FragColor = vfogScatter(camPos, rd, dist, gl_FragCoord.xy, float(bgl_Frame));
+#else
 	gl_FragColor = vec4(vfogApply(direct.rgb, camPos, rd, dist, gl_FragCoord.xy, float(bgl_Frame)), direct.a);
+#endif
 }

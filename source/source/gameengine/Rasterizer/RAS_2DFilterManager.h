@@ -58,10 +58,13 @@ public:
 		FILTERPASS_CLOUDS       = 18,
 		/* Volumetric Fog after the clouds: the fog also covers the sky and the clouds behind it */
 		FILTERPASS_VFOG         = 19,
-		FILTERPASS_LENSFLARE    = 20,
+		/* At Half/Quarter resolution the fog pass renders into a small offscreen and this pass
+		 * upscales it onto the image */
+		FILTERPASS_VFOG_IMAGE   = 20,
+		FILTERPASS_LENSFLARE    = 21,
 		/* Camera FX (KX_Camera game_fx), only present while their effects are on */
-		FILTERPASS_CAMERA_DOF   = 21,
-		FILTERPASS_CAMERA_LENS  = 22
+		FILTERPASS_CAMERA_DOF   = 22,
+		FILTERPASS_CAMERA_LENS  = 23
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */

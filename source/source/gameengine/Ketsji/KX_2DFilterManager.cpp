@@ -58,6 +58,7 @@ extern "C" {
 	extern char datatoc_RAS_Rain2DFilter_glsl[];
 	extern char datatoc_RAS_Clouds2DFilter_glsl[];
 	extern char datatoc_RAS_VolumetricFog2DFilter_glsl[];
+	extern char datatoc_RAS_VolumetricFogImage2DFilter_glsl[];
 	extern char datatoc_gpu_shader_vfog_lib_glsl[];
 	extern char datatoc_RAS_LensFlare2DFilter_glsl[];
 	extern char datatoc_RAS_CameraDof2DFilter_glsl[];
@@ -406,7 +407,42 @@ void KX_2DFilterManager::EnsureVFogFilters(BuildInFilters filters)
 	/* The fog is shared with the 3D View pass (gpu_shader_vfog_lib.glsl). */
 	fogData.shaderText = std::string(datatoc_gpu_shader_vfog_lib_glsl) + datatoc_RAS_VolumetricFog2DFilter_glsl;
 
-	AddFilter(fogData, true);
+	const int lod = std::max(1, filters.vfog_lod);
+	if (lod == 1) {
+		AddFilter(fogData, true);
+		return;
+	}
+
+	/* Half/Quarter: like the Light Scattering, the fog (in-scatter rgb, transmittance a) goes to a
+	 * small offscreen and the image pass upscales it following the depth. */
+	fogData.shaderText = "#define VFOG_LOW_RES\n" + fogData.shaderText;
+	KX_2DFilter *fog = static_cast<KX_2DFilter *>(AddFilter(fogData, true));
+	fog->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+	        std::max(1, m_canvas->GetRenderWidth() / lod), std::max(1, m_canvas->GetRenderHeight() / lod),
+	        RAS_Rasterizer::RAS_HDR_HALF_FLOAT, (float)lod));
+
+	RAS_2DFilterData imageData;
+	imageData.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	imageData.filterPassIndex = FILTERPASS_VFOG_IMAGE;
+	imageData.gameObject = nullptr;
+	imageData.mipmap = false;
+	imageData.propertyNames = {};
+	imageData.buildInFilters = filters;
+	imageData.shaderText = datatoc_RAS_VolumetricFogImage2DFilter_glsl;
+	KX_2DFilter *image = static_cast<KX_2DFilter *>(AddFilter(imageData, true));
+	image->SetTexture(0, fog->GetOffScreen()->GetColorBindCode(0), "vfog_buffer");
+	fog->GetOffScreen()->SetRebuildCallback([this]() {
+		RAS_2DFilter *f = GetFilterPass(FILTERPASS_VFOG, true);
+		KX_2DFilter *img = static_cast<KX_2DFilter *>(GetFilterPass(FILTERPASS_VFOG_IMAGE, true));
+		if (f && img && f->GetOffScreen()) {
+			img->UpdateTextureBindCode(0, f->GetOffScreen()->GetColorBindCode(0));
+		}
+	});
+	if (!fog->Ok() || !image->Ok() || !fog->GetOffScreen()->GetValid()) {
+		fog->SetEnabled(false);
+		image->SetEnabled(false);
+		CM_Error("Volumetric Fog disabled: shader or framebuffer creation failed");
+	}
 }
 
 void KX_2DFilterManager::EnsureLensFlareFilters(BuildInFilters filters)
