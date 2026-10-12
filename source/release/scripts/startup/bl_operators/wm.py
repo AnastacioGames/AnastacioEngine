@@ -2453,35 +2453,114 @@ class WM_MT_splash(Menu):
 
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
-        split = layout.split(factor=0.5)
+        split = layout.split(factor=0.3)
 
-        # Keep the splash actions visually light, like Blender's modern splash.
+        # Left: big project actions.
         col1 = split.column()
-        col1.emboss = 'NONE'
+        col1.scale_y = 1.4
         col1.label(text="Project")
         col1.operator_context = "INVOKE_DEFAULT"
-        col1.operator("wm.create_project", text="Create Project", icon='FILE_FOLDER')
-        col1.separator()
+        col1.operator("wm.create_project", text="Create Project", icon='NEW')
         col1.operator("wm.open_mainfile", text="Open Project", icon='FILE_FOLDER')
         col1.operator_context = "EXEC_DEFAULT"
         col1.operator("wm.recover_last_session", icon='RECOVER_LAST')
-        col1.separator()
-        col1.label(text="Range Engine Network")
-        col1.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
-        col1.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
-        api_url = ("https://rangeengine.tech/api/" +
-                   (bpy.app.range_version_string[0] + bpy.app.range_version_string[2]) + "/html/index.html")
-        col1.operator("wm.url_open", text="Range Engine - Python API", icon='FILE_SCRIPT').url = api_url
-        col1.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
 
+        # Right: pinned files first, then recent files, filling columns as tall as
+        # the action buttons and wrapping into the next column.
         col2 = split.column()
-        col2.emboss = 'NONE'
+        pinned = _splash_pinned_read()
+        files = [(p, True) for p in pinned]
+        files += [(p, False) for p in _splash_recent_read() if p not in pinned]
         col2.label(text="Recent Files")
-        found_recent = col2.template_recent_files(rows=8)
-        if not found_recent:
+        if not files:
             col2.label(text="No recent files")
-        col2.separator()
-        col2.operator("wm.url_open", text="AnastacioGames - GitHub", icon='URL').url = "https://github.com/AnastacioGames"
+        rows_per_column = 5
+        columns = 3
+        grid = col2.row()
+        for c in range(columns):
+            chunk = files[c * rows_per_column:(c + 1) * rows_per_column]
+            column = grid.column()
+            for filepath, is_pinned in chunk:
+                _splash_draw_file_row(column, filepath, is_pinned)
+
+        # Bottom bar: links side by side, below a divider line.
+        layout.separator()
+        layout.separator(factor=2.0, type='LINE')
+        row = layout.row()
+        row.emboss = 'NONE'
+        row.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT').url = "https://anastaciogames.github.io/anastacio-docs/"
+        row.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
+        row.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
+        row.operator("wm.url_open", text="Support", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+        layout.separator(factor=1.5)
+
+
+_SPLASH_PINNED_FILE = "pinned-files.txt"
+
+
+def _splash_config_path(name):
+    return os.path.join(bpy.utils.user_resource('CONFIG'), name)
+
+
+def _splash_read_lines(name):
+    try:
+        with open(_splash_config_path(name), encoding='utf-8') as fh:
+            return [line.strip() for line in fh if line.strip()]
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
+def _splash_recent_read():
+    return _splash_read_lines("recent-files.txt")
+
+
+def _splash_pinned_read():
+    return _splash_read_lines(_SPLASH_PINNED_FILE)
+
+
+def _splash_pinned_write(paths):
+    filepath = _splash_config_path(_SPLASH_PINNED_FILE)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as fh:
+        for path in paths:
+            print(path, file=fh)
+
+
+def _splash_draw_file_row(layout, filepath, is_pinned):
+    exists = os.path.isfile(filepath)
+    row = layout.row(align=True)
+    sub = row.row(align=True)
+    sub.emboss = 'NONE'
+    sub.enabled = exists
+    sub.operator_context = "EXEC_DEFAULT"
+    sub.operator("wm.open_mainfile", text=os.path.basename(filepath), icon='FILE_BLEND').filepath = filepath
+    pin = row.row(align=True)
+    pin.emboss = 'NONE'
+    pin.operator("wm.splash_pin_toggle", text="",
+                 icon='PINNED' if is_pinned else 'UNPINNED').filepath = filepath
+
+
+class WM_OT_splash_pin_toggle(Operator):
+    """Pin or unpin this file on the splash screen"""
+    bl_idname = "wm.splash_pin_toggle"
+    bl_label = "Pin File"
+    bl_options = {'INTERNAL'}
+
+    filepath: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
+
+    def execute(self, context):
+        pinned = _splash_pinned_read()
+        if self.filepath in pinned:
+            pinned.remove(self.filepath)
+        else:
+            pinned.append(self.filepath)
+        try:
+            _splash_pinned_write(pinned)
+        except OSError as ex:
+            self.report({'ERROR'}, "Could not save pinned files: %s" % ex)
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
 
 class WM_MT_splash_about(Menu):
     """RanGE Splash About"""
@@ -2495,7 +2574,7 @@ class WM_MT_splash_about(Menu):
         
         col = split.column(align=True)
         col.scale_y = 0.8
-        col.label(text="Anastacio Engine 0.4.6", translate=False)
+        col.label(text="Anastacio Engine 0.5.0", translate=False)
         col.label(text="Fork of Range Engine 1.6 / Blender {version}".format(version=bpy.app.version_string), translate=False)
         col.separator(factor=2.5)
         col.label(text="Powered by Anastacio Games", translate=False)
@@ -2505,7 +2584,7 @@ class WM_MT_splash_about(Menu):
         
         col.emboss = 'PULLDOWN_MENU'
         col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
-        col.operator("wm.url_open", text="Range Engine Website", icon='URL').url = "https://rangeengine.tech"
+        col.operator("wm.url_open", text="Anastacio Engine - Python API", icon='FILE_SCRIPT').url = "https://anastaciogames.github.io/anastacio-docs/"
         col.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
 
@@ -3436,6 +3515,7 @@ classes = (
     WM_OT_theme_install,
     WM_OT_url_open,
     WM_MT_splash,
+    WM_OT_splash_pin_toggle,
     WM_MT_splash_about,
     WM_OT_create_project,
     WM_OT_export_with_rangearmor,

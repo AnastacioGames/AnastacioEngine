@@ -88,6 +88,16 @@ const char *rna_translate_ui_text(
 	return BLT_pgettext(BLT_I18NCONTEXT_DEFAULT, text);
 }
 
+static void rna_uiItemS(uiLayout *layout, float factor, int type)
+{
+	if (type == 0) {
+		uiItemS_ex(layout, factor);
+	}
+	else {
+		uiItemS_type(layout, factor, type == 2);
+	}
+}
+
 static void rna_uiItemR(
         uiLayout *layout, PointerRNA *ptr, const char *propname, const char *name, const char *text_ctxt,
         bool translate, int icon, bool expand, bool slider, bool toggle, bool icon_only, bool event,
@@ -742,12 +752,19 @@ void RNA_api_ui_layout(StructRNA *srna)
 	parm = RNA_def_string(func, "category", NULL, 0, "", "panel type category");
 	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
-	func = RNA_def_function(srna, "separator", "uiItemS_ex");
+	func = RNA_def_function(srna, "separator", "rna_uiItemS");
 	RNA_def_function_ui_description(func, "Item. Inserts empty space into the layout between items");
 	RNA_def_float(
 		func, "factor", 0.0f, 0.0f, FLT_MAX, "Percentage",
 		"Percentage of width to space (leave unset for default space)",
 		0.0f, FLT_MAX);
+	static const EnumPropertyItem separator_type_items[] = {
+		{0, "AUTO", 0, "Auto", "Line inside menus, empty space elsewhere"},
+		{1, "SPACE", 0, "Empty Space", "Only empty space"},
+		{2, "LINE", 0, "Line", "Horizontal line, also outside menus"},
+		{0, NULL, 0, NULL, NULL},
+	};
+	RNA_def_enum(func, "type", separator_type_items, 0, "Type", "The type of the separator");
 
 	func = RNA_def_function(srna, "separator_spacer", "uiItemSpacer");
 	RNA_def_function_ui_description(func, "Item. Inserts horizontal spacing empty space into the layout between items");

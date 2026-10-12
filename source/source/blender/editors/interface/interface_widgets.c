@@ -3968,8 +3968,12 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 				break;
 
 			case UI_BTYPE_SEPR:
-			case UI_BTYPE_SEPR_LINE:
 			case UI_BTYPE_SEPR_SPACER:
+				break;
+
+			/* Lines outside menus come from layout.separator(type='LINE'). */
+			case UI_BTYPE_SEPR_LINE:
+				ui_draw_separator(rect, &tui->wcol_menu_item);
 				break;
 
 			case UI_BTYPE_BUT:

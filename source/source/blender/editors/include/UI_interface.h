@@ -1212,6 +1212,7 @@ void uiItemM(uiLayout *layout, const char *menuname, const char *name, int icon)
 void uiItemV(uiLayout *layout, const char *name, int icon, int argval); /* value */
 void uiItemS(uiLayout *layout); /* separator */
 void uiItemS_ex(uiLayout *layout, float factor);
+void uiItemS_type(uiLayout *layout, float factor, bool line);
 void uiItemSpacer(uiLayout *layout); /* Special separator. */
 
 void uiItemPopoverPanel_ptr(

@@ -41,6 +41,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_rect.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_appdir.h"
@@ -180,6 +181,41 @@ static void wm_block_splash_image_roundcorners_add(ImBuf *ibuf)
   }
 }
 
+/* Wide splash: crop the image to 2:1 (keeping a bit more of the bottom, where the scene is)
+ * and fade its lower part into the popup background color, so the art blends into the panel. */
+static void wm_block_splash_image_widen_and_fade(ImBuf *ibuf, int *r_height)
+{
+  const int target_height = ibuf->x / 2;
+  if (ibuf->y > target_height) {
+    const int excess = ibuf->y - target_height;
+    /* ImBuf rows go bottom-up: drop 35% of the excess at the bottom, 65% at the top. */
+    const int ymin = (excess * 35) / 100;
+    rcti crop;
+    BLI_rcti_init(&crop, 0, ibuf->x - 1, ymin, ymin + target_height - 1);
+    IMB_rect_crop(ibuf, &crop);
+  }
+  *r_height = ibuf->y;
+
+  uchar *rct = (uchar *)ibuf->rect;
+  if (rct == NULL) {
+    return;
+  }
+  bTheme *btheme = UI_GetTheme();
+  const uchar *back = btheme->tui.wcol_menu_back.inner;
+  const int fade_rows = ibuf->y / 4;
+  for (int y = 0; y < fade_rows; y++) {
+    /* 1 at the bottom row, 0 at the top of the fade band, smoothstep for a soft edge. */
+    float t = 1.0f - (float)y / (float)fade_rows;
+    t = t * t * (3.0f - 2.0f * t);
+    uchar *row = rct + 4 * y * ibuf->x;
+    for (int x = 0; x < ibuf->x; x++, row += 4) {
+      for (int c = 0; c < 3; c++) {
+        row[c] = (uchar)(row[c] + (back[c] - row[c]) * t);
+      }
+    }
+  }
+}
+
 static ImBuf *wm_block_splash_image(int width, int *r_height)
 {
 #ifndef WITH_HEADLESS
@@ -211,6 +247,7 @@ static ImBuf *wm_block_splash_image(int width, int *r_height)
       IMB_scaleImBuf(ibuf, width, height);
 	}
 
+    wm_block_splash_image_widen_and_fade(ibuf, &height);
     wm_block_splash_image_roundcorners_add(ibuf);
     IMB_premultiply_alpha(ibuf);
   }
@@ -238,7 +275,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *region, void *UNUSE
   UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
 
   const int text_points_max = MAX2(style->widget.points, style->widgetlabel.points);
-  int splash_width = text_points_max * 45 * U.dpi_fac;
+  int splash_width = text_points_max * 58 * U.dpi_fac;
   CLAMP_MAX(splash_width, CTX_wm_window(C)->sizex * 0.7f);
   int splash_height;
 

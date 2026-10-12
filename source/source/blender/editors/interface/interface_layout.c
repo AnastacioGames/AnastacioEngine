@@ -2417,6 +2417,16 @@ void uiItemS_ex(uiLayout* layout, float factor)
 	uiDefBut(block, (is_menu) ? UI_BTYPE_SEPR_LINE : UI_BTYPE_SEPR, 0, "", 0, 0, space, space, NULL, 0.0, 0.0, 0, 0, "");
 }
 
+/* Separator with an explicit kind: a line (also outside menus) or plain space. */
+void uiItemS_type(uiLayout *layout, float factor, bool line)
+{
+	uiBlock *block = layout->root->block;
+	int space = (int)(0.3f * UI_UNIT_X * factor);
+
+	UI_block_layout_set_current(block, layout);
+	uiDefBut(block, line ? UI_BTYPE_SEPR_LINE : UI_BTYPE_SEPR, 0, "", 0, 0, space, space, NULL, 0.0, 0.0, 0, 0, "");
+}
+
 /* separator item */
 void uiItemS(uiLayout *layout)
 {
