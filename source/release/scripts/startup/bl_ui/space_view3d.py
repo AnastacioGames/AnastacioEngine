@@ -1422,6 +1422,8 @@ class INFO_MT_add(Menu):
         layout.operator("object.speaker_add", text="Speaker", icon='OUTLINER_OB_SPEAKER')
         layout.operator_menu_enum("object.reverb_area_add", "preset", text="Reverb Area", icon='SOUND')
         layout.menu("INFO_MT_game_constraints_add", text="Constraints", icon='CONSTRAINT')
+        if hasattr(bpy.types, "INFO_MT_fog_add"):
+            layout.menu("INFO_MT_fog_add", text="Fog", icon='MOD_SMOKE')
         layout.separator(factor=1)
 
         if INFO_MT_camera_add.is_extended():

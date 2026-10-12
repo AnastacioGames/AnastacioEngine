@@ -63,7 +63,6 @@ from .custom_pt_world import (
     OBJECT_OT_fog_fire_source_add,
     OBJECT_OT_fog_pusher_add,
     INFO_MT_fog_add,
-    draw_fog_add_menu,
     WORLD_OT_cloud_quality_preset,
     CUSTOM_PT_game_world,
     CUSTOM_PT_game_environment_lighting,
@@ -178,8 +177,6 @@ def register():
         except Exception as e:
             print("[FlowMenu Error]: " + str(e))
 
-    bpy.types.INFO_MT_add.append(draw_fog_add_menu)
-
     # 2.1 "CREATE OBSTACLE" POR ÚLTIMO NA ABA PHYSICS: painéis entram na ordem de registro,
     # então ele é re-registrado depois dos painéis de física acima (o addon de Ragdoll faz o mesmo).
     obstacle_panel = getattr(bpy.types, "PHYSICS_PT_game_obstacle_create", None)
@@ -222,7 +219,6 @@ def register():
 
 def unregister():
 
-    bpy.types.INFO_MT_add.remove(draw_fog_add_menu)
     for km, kmi in addon_keymaps:
         km.keymap_items.remove(kmi)
     addon_keymaps.clear()

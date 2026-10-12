@@ -984,6 +984,8 @@ class OBJECT_PT_constraints(ConstraintButtonsPanel, Panel):
         elif context.scene.render.engine == 'BLENDER_GAME':
             layout.label(icon='INFO', text="Game Engine only supports Rigid Body Joint object constraints")
             layout.menu("OBJECT_MT_game_constraint_add", text="Add Object Constraint")
+            layout.operator("object.rigid_body_joint_component_add",
+                            text="Add Rigid Body Joint Component", icon='SCRIPT')
 
             if any(con.type != 'RIGID_BODY_JOINT' for con in obj.constraints):
                 row = layout.row()
