@@ -1,11 +1,14 @@
 """Logic Bricks -> Python F7: Action (6 modos), Motion (escala, Damping, Servo, Character, Set Position),
 Change Color, Property Level e Runtime API, Armature, Filter 2D, Mouse Over, Game Save Config e Weather Effects.
 
-Run with:  AnastacioEngine -b --python tools/create_logic_convert_scene_f7.py -- <output.range> [convert[:MODULE|SCRIPT] [shift]]
+Run with:  AnastacioEngine -b --python tools/create_logic_convert_scene_f7.py -- <output.range> [convert[:MODULE|SCRIPT]|none [shift] [post]]
 Cada objeto de teste tem os proprios bricks; com "convert" todos sao convertidos. Rodar o .range sem e com
 "convert" no AnastacioRuntime grava <cena>_check_f7.txt ao lado do .range: uma linha por amostra (a cada 20
 quadros, ate o quadro 200). As duas rodadas devem dar o mesmo arquivo, e LEFT_AS_BRICK deve ser 0.
-"shift[:N]" atrasa as amostras em N quadros (so para investigar diferencas de fase, ex.: modos MODULE/SCRIPT).
+"shift[:N]" atrasa as amostras em N quadros (so para investigar diferencas de fase).
+"post" amostra no post_draw, depois da logica e da fisica do quadro. Use nos modos MODULE/SCRIPT (e na rodada
+de bricks que serve de referencia): neles o controller Python age antes do Checker ler, e sem "post" a
+amostra pega o quadro pela metade.
 """
 import bpy
 import sys
@@ -16,6 +19,7 @@ convert = len(argv) > 1 and argv[1].startswith("convert")
 mode = argv[1].split(":", 1)[1] if convert and ":" in argv[1] else "COMPONENT"
 # Nos modos MODULE/SCRIPT o controller Python age antes do Checker ler: "shift:-1" alinha a logica.
 shift = 0
+post = int("post" in argv[2:])
 if len(argv) > 2 and argv[2].startswith("shift"):
     shift = int(argv[2].split(":", 1)[1]) if ":" in argv[2] else 1
 
@@ -219,7 +223,7 @@ wire(o, "Fog", [window(o, "At20", 20, 5)],
 checker = bpy.data.objects.new("Checker", None)
 scene.objects.link(checker)
 text = bpy.data.texts.new("checker.py")
-text.from_string(('SHIFT = %d' % shift) + '''
+text.from_string(('SHIFT = %d\nPOST = %d' % (shift, post)) + '''
 from Range import logic
 import os
 cont = logic.getCurrentController()
@@ -229,9 +233,12 @@ n = own['frames'] - SHIFT
 logic.mouse.position = (0.5, 0.5)
 o = own.scene.objects
 logic.globalDict.setdefault('lv', 0)
-if o['Level']['lv']:
-    logic.globalDict['lv'] += 1
-if n > 0 and n % 20 == 0:
+def count_level():
+    if o['Level']['lv']:
+        logic.globalDict['lv'] += 1
+if not POST:
+    count_level()
+def sample(n):
     v = lambda vec: ','.join('%.2f' % x for x in vec)
     fm = own.scene.filterManager
     f1, f2 = fm.getFilter(1), fm.getFilter(2)
@@ -262,7 +269,22 @@ if n > 0 and n % 20 == 0:
                                             w.getWeather('vcloud_coverage'), w.getWeather('use_sky_layers')),
     ]
     own['log'] = own.get('log', '') + ' '.join(parts) + '\\n'
-if n == 200:
+def after_frame():
+    n = own['frames'] - SHIFT
+    if POST and own.get('counted') != n:
+        own['counted'] = n
+        count_level()
+    if n > 0 and n % 20 == 0 and own.get('sampled') != n:
+        own['sampled'] = n
+        sample(n)
+if POST:
+    # Amostra depois da logica e da fisica do quadro: nao depende de quem roda antes do Checker.
+    if not own.get('hooked'):
+        own['hooked'] = True
+        own.scene.post_draw.append(after_frame)
+else:
+    after_frame()
+if n == 200 + POST:
     print(own['log'], flush=True)
     with open(logic.expandPath('//' + own.scene.name + '_check_f7.txt'), 'w') as f:
         f.write(own['log'])
