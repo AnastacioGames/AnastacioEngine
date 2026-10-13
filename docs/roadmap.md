@@ -46,6 +46,13 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
 
 ## Prioridade atual
 
+- **Windows: compilar e testar de novo** (após 2026-10-13). Entraram no `main` mudanças em código compartilhado
+  que só foram compiladas no Linux: FFmpeg 5+ (`ffmpeg_compat.h`, `writeffmpeg`, `anim_movie`, `indexer`,
+  `VideoFFmpeg`), OpenColorIO 2.x (`intern/opencolorio`, Cycles, `config.ocio`), caminho do `imgui.ini`
+  (`KX_Imgui.cpp`), `ge_logic_imgui` passando a linkar `bf_editor_datafiles` e a dependência do `RangeEngine`
+  nos helpers de bake fora do `if(WIN32)` (`creator/CMakeLists.txt`). Conferir: build do editor e do player,
+  export de vídeo, video texture, views do Color Management (Filmic etc.), menu ImGui no jogo (fonte e
+  `imgui.ini` ao lado do executável) e bake de lightmap.
 - Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
   Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
   confirmou que o jogo funciona após a migração. Pendente: console,
