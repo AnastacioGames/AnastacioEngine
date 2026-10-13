@@ -320,15 +320,16 @@ if(WITH_BUILDINFO)
 	add_dependencies(RangeEngine buildinfo)
 endif()
 
+# The bake helpers are loaded by Python rather than linked into the exe, so a targeted
+# RangeEngine build must depend on them explicitly or install will not find them.
+foreach(_ae_bake_helper ae_denoise ae_uvatlas)
+	if(TARGET ${_ae_bake_helper})
+		add_dependencies(RangeEngine ${_ae_bake_helper})
+	endif()
+endforeach()
+
 if(WIN32)
 	# keep build/bin runnable/debuggable without a full "cmake --install" each time
-    # The post-build install also copies the bake helpers. A clean targeted RangeEngine build
-    # must build them first, even though they are loaded by Python rather than linked into the exe.
-    foreach(_ae_bake_helper ae_denoise ae_uvatlas)
-        if(TARGET ${_ae_bake_helper})
-            add_dependencies(RangeEngine ${_ae_bake_helper})
-        endif()
-    endforeach()
 	add_custom_command(TARGET RangeEngine POST_BUILD
 		COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix ${CMAKE_BINARY_DIR}/bin
 		COMMENT "Copying runtime dependencies into bin/"
