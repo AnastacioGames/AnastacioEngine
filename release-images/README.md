@@ -9,7 +9,7 @@ Tudo que é imagem de divulgação da engine mora aqui, organizado por versão.
 | [v0.2.0/](v0.2.0/) | Splash + [34 prints de novidades](v0.2.0/prints/) |
 | [v0.4.1/](v0.4.1/) | Splash |
 | [v0.4.2/](v0.4.2/) | Splash (usado no README da raiz) |
-| [v0.4.7/](v0.4.7/) | [Prints das novidades da 0.4.7](v0.4.7/README.md) |
+| [v0.5.0/](v0.5.0/) | [Prints das novidades da 0.5.0](v0.5.0/README.md) |
 
 ## Convenção
 

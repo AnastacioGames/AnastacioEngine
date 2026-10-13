@@ -46,12 +46,12 @@ No GitHub, mantenha o código-fonte no repositório e anexe o ZIP à Release com
 `build/dist/` é a área local de entrega. Ela é ignorada pelo Git e contém somente arquivos finais
 prontos para anexar a uma GitHub Release; **nunca** deve ser commitada como código-fonte.
 
-A partir da versão `0.3.0` (exemplo abaixo na `0.4.0`), os artefatos Windows são:
+A partir da versão `0.3.0` (exemplo abaixo na `0.5.0`), os artefatos Windows são:
 
 ```text
 build/dist/
-  AnastacioEngine-0.3.0-windows-x64.zip
-  RangeArmor-0.3.0-windows-x64.zip
+  AnastacioEngine-0.5.0-windows-x64.zip
+  RangeArmor-0.5.0-windows-x64.zip
   SHA256SUMS.txt
 ```
 
@@ -94,6 +94,13 @@ Antes de publicar, confirme que `AnastacioEngine.exe` e `AnastacioRuntime.exe` i
 do pacote e que os scripts, datafiles e DLLs necessários continuam presentes.
 
 ## Linux x86_64
+
+**Procedimento atual (desde a 0.4.5):** compilar dentro de um container `ubuntu:22.04` com
+`tools/linux/container-build-22.04.sh` (instrucoes no cabecalho do script; `VERSION=0.5.0` e o padrao). Ele
+compila editor e runtime, chama `tools/linux/package-runtime.sh` e confere no tar a libsndfile com MP3, a OCIO,
+as `libae_*.so`, os atlas de icones e o modulo `anastacio_network`. Saida:
+`build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz` + `.sha256`. As secoes abaixo (`.tar.gz`
+montado a mao) sao historicas.
 
 Publicado a partir da versão `0.3.0` como `AnastacioEngine-<versao>-linux-x64.tar.gz`, com o conteúdo
 completo de `build-linux/bin/` e `SHA256SUMS.txt` na mesma release. Validado em máquina Linux limpa (fora

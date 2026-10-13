@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-12 - Preparacao da release 0.5.0 (Windows, Linux e Web)
+
+- Versao: `ANASTACIO_VERSION_STRING` e About (`wm.py`) ja em 0.5.0 (6eec04e2); `container-build-22.04.sh` com `VERSION` padrao 0.5.0.
+- README: downloads apontam para `v0.5.0`, "Como usar" com `AnastacioEngine.exe`/`AnastacioRuntime.exe`, secao "Novidades da 0.5.0". Galeria `release-images/v0.4.7/` renomeada para `v0.5.0/` (o nome 0.4.7 era provisorio).
+- Linux: `package-runtime.sh` remove `Range_Components_Label.rar` (antes so o procedimento manual da doc removia). `container-build-22.04.sh` confere no tar `libae_uvatlas.so`, `libae_denoise.so`, `icons_upbge/`, `icons_blender5/`, `anastacio_network/` e a ausencia do `.rar`.
+- Docs: `distribution-0.1.md` ganhou o procedimento atual do Linux (container, `.tar.xz`); `linux-build.md` e `roadmap.md` sem referencias velhas de versao.
+- Nao feito: OIDN nao esta no apt do container, entao o bake de lightmap no Linux usa o box blur. Nenhum pacote foi gerado nem testado nesta entrada.
+
 ## 2026-10-12 - Sombra colorida (vitral), feixe colorido na névoa, poeira no feixe e emissivos no SSGI
 
 - **Sombra colorida:** opção **Material > Shadow > Colored** (`MA_COLORED_SHADOW`, só com Alpha Blend e Cast). Depois da passada de profundidade, cada Sun/Spot desenha esses materiais numa textura RGBA16F da lâmpada (`colortex`, criada só se algum material usa a opção): rgb = luz que passa (Base Color do Principled ou cor do material antigo, mais branca quanto mais transparente), alpha = profundidade do vidro mais próximo (blend MIN). O receptor atrás dele multiplica a luz por essa cor. Caminhos: material antigo (`shade_shadow_tint`, `shade_shadow_tint_csm` para Sun com cascatas) e loop de luzes do Principled (`scene_light_shadow_tint`). Bucket novo `COLOR_SHADOW` em `RAS_BucketManager`; passada em `KX_ShadowRenderer`, também com o cache estático.

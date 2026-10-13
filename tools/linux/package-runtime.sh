@@ -59,6 +59,8 @@ cp "$repo_root/source/release/linux/range-engine.png" "$repo_root/source/release
 # Ferramentas de build (geradores de codigo) e estado local do ImGui nao vao para o usuario.
 rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna" "$staging_dir/makesrna" \
   "$staging_dir/msgfmt" "$staging_dir/imgui.ini" "$staging_dir/\\imgui.ini"
+# Addon nao usado (so um .rar), nao entra no pacote.
+rm -f "$staging_dir"/[0-9].[0-9]*/scripts/addons/Range_Components_Label.rar
 
 missing=""
 [ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"

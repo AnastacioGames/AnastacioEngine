@@ -4,7 +4,7 @@
 
 **Se voce baixou o release 0.4.1**: ele tem bugs de empacotamento (so um executavel na primeira
 versao; e o Python embutido no caminho errado, que da `No module named 'encodings'` fora da maquina
-de build). Use o release **0.4.5 ou mais recente**, que traz o editor e o `RangeRuntime`.
+de build). Use o release **0.5.0 ou mais recente**, que traz o editor e o `RangeRuntime`.
 
 **Se voce baixou o release 0.4.4 ou anterior** e aparece `libOpenImageIO.so.2.4: cannot open shared object file`
 (Ubuntu 26.04 e outras distros) ou erro de `GLIBC_2.38`: a 0.4.5 corrige os dois. Ela e compilada no Ubuntu 22.04
@@ -98,7 +98,7 @@ Passos:
    (idem `linux-runtime`/`build-linux` para o `RangeRuntime`).
 3. `readelf -d build-linux-editor/bin/RangeEngine | grep -E 'RPATH|RUNPATH'` -> deve ser `$ORIGIN/lib`; `ls build-linux-editor/bin/lib`
    -> `libpython3.11.so.1.0`; `ldd build-linux-editor/bin/RangeEngine | grep "not found"` -> vazio.
-4. `BIN_DIR=build-linux-editor/bin bash tools/linux/package-runtime.sh 0.4.1` (o `.tar.xz` sai em `build-linux/dist/`).
+4. `BIN_DIR=build-linux-editor/bin bash tools/linux/package-runtime.sh 0.5.0` (o `.tar.xz` sai em `build-linux/dist/`).
 5. Extrair o tar num diretorio limpo, renomear `/opt/anastacio-python311` temporariamente e rodar `./RangeEngine` (janela) e `-b`.
    Se o Python reclamar de `encodings`/stdlib, o problema e a stdlib (ver `python311/lib/python3.11`), nao o libpython.
 6. Corrigir se algo falhar, atualizar changelog/este doc e so entao publicar 0.4.1 (seguir `docs/distribution-*.md`/AGENTS.md).

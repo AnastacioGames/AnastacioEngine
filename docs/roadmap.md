@@ -229,7 +229,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 
 ### Linux x86_64
 
-`RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote 0.4.0 publicado. Ver
+`RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; ultimo pacote publicado 0.4.6; 0.5.0 em preparacao. Ver
 [linux-build.md](linux-build.md). Pendente:
 
 - **Bugs do Kitsuy (2026-09-28)**: corrigidos e validados no Windows e no Linux (Intel integrada,
@@ -256,7 +256,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
     confirmar no Ubuntu 26.04 (o pacote antigo falhava com `libOpenImageIO.so.2.4`).
   - **Som no player Linux (Kitsuy):** jogo com tela preta no 0.4.5 Linux; causa: `aud` nao lia `.mp3` (libsndfile
     1.0.31 do 22.04 sem MPEG, FFmpeg desligado no Linux). **Feito 2026-09-30:** container compila e empacota a
-    libsndfile 1.2.2 com MP3; pacote 0.4.6 toca `.mp3`/`.ogg`. Falta publicar a 0.4.6 e o Kitsuy confirmar.
+    libsndfile 1.2.2 com MP3; pacote 0.4.6 toca `.mp3`/`.ogg` (publicado). Falta o Kitsuy confirmar.
   - **`colormanagement` no pacote Linux (Kitsuy, 2026-09-30):** falta `2.79/datafiles/colormanagement`; so e
     instalada com `WITH_OPENCOLORIO`, que estava desligado no Linux; player rodava em "fallback mode". **Feito
     2026-09-30:** o apt do 22.04 tem a OCIO 1.1.1 (API 1.x do codigo); presets Linux ligam `WITH_OPENCOLORIO`,

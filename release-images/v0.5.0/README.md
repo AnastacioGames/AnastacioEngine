@@ -1,4 +1,4 @@
-# Novidades da versão 0.4.7
+# Novidades da versão 0.5.0
 
 Prints da interface da engine (a UI é em inglês; as legendas, em português).
 

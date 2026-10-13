@@ -55,3 +55,10 @@ grep -aq 'libsndfile-1\.2\.2' /tmp/libsndfile-pkg.so
 tar -tJf build-linux/dist/$pkg.tar.xz > /tmp/pkg-list.txt
 grep -q "$pkg/lib/libOpenColorIO.so.1" /tmp/pkg-list.txt
 grep -q "$pkg/2.79/datafiles/colormanagement/config.ocio" /tmp/pkg-list.txt
+# Arquivos novos da 0.5.0: bibliotecas do bake (UV atlas e denoise), atlas de icones e modulo de rede.
+grep -q "$pkg/libae_uvatlas.so" /tmp/pkg-list.txt
+grep -q "$pkg/libae_denoise.so" /tmp/pkg-list.txt
+grep -q "$pkg/2.79/datafiles/icons_upbge/" /tmp/pkg-list.txt
+grep -q "$pkg/2.79/datafiles/icons_blender5/" /tmp/pkg-list.txt
+grep -q "$pkg/2.79/scripts/modules/anastacio_network/" /tmp/pkg-list.txt
+if grep -q "Range_Components_Label.rar" /tmp/pkg-list.txt; then exit 1; fi

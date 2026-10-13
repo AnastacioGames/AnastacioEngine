@@ -14,21 +14,38 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.4.6](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.6)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.0)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.4.6)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.4.6)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.6/AnastacioEngine-0.4.6-linux-x86_64.tar.xz.sha256) |
+| [Windows x64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip.sha256) |
+| [Linux x86_64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz.sha256) |
 | [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
 
-**Como usar:** extraia o pacote numa pasta própria e abra `RangeEngine.exe` (Windows) ou `RangeEngine` (Linux).
-Nos builds Windows do fonte atual, editor/player passaram a se chamar
-`AnastacioEngine.exe`/`AnastacioRuntime.exe`; os pacotes já publicados acima ainda usam
-os nomes anteriores. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
-Para rodar um jogo exportado, use `RangeRuntime`. No Linux não é preciso instalar bibliotecas: o pacote já traz
+**Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `RangeEngine` (Linux).
+Para rodar um jogo exportado no Windows, use `AnastacioRuntime.exe`; no Linux, `RangeRuntime`. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
+No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.5.0
+
+- **Clima e névoa:** Volumetric Fog (lâmpadas coloridas, raios de sol e de spot, Fog Volumes de fumaça e fogo,
+  neblina nos vales, poeira no feixe), Volumetric Clouds com raymarch e Céu em Camadas junto com as nuvens.
+- **Sombra colorida (vitral):** vidro com Alpha Blend projeta luz colorida, também no feixe da névoa, com Glow.
+- **Partículas e explosões:** modo Burst, Particle Explosion (Fire/Electric/Concrete/Water), marca no chão,
+  fumaça e fogo de partículas e luz que tremula.
+- **World Sound:** música, ambiente e efeitos (explosão, destruição, chuva, trovão) no World, com eco opcional.
+- **Shader Nodes:** Planar Reflection, Fur Shells, Billboard, Strands, Explode, World Bloom e SSR como nós.
+- **SSGI** experimental nativo, com emissivos.
+- **Logic Bricks → Python:** conversor que gera componentes equivalentes aos bricks.
+- **Web:** áudio por AudioWorklet, controle de toque para corrida (stick, setas ou inclinar), pré-voo de shaders,
+  rede por WebSocket no navegador e VR no celular.
+- **Rede:** servidor WebSocket com transporte múltiplo e predição de corpos dinâmicos.
+- **Decimate High Quality**, constraints de física prontas, splash novo com arquivos fixados (Pin).
+- Executáveis Windows renomeados para `AnastacioEngine.exe` e `AnastacioRuntime.exe`.
+
+Galeria de imagens por versão: [release-images/](release-images/README.md), com os [prints das novidades da 0.5.0](release-images/v0.5.0/README.md).
 
 ## Novidades da 0.4.6
 
@@ -42,8 +59,6 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **Soft body no jogo:** escala, transformação, velocidade, suspend e deformer corrigidos.
 - **Outliner:** arrastar um objeto selecionado para uma coleção move toda a seleção.
 - MSAA mínimo do jogo passa de 4x para 2x (cenas novas vêm com 2x).
-
-Galeria de imagens por versão: [release-images/](release-images/README.md), com os [prints das novidades da 0.4.7](release-images/v0.4.7/README.md) (em desenvolvimento).
 
 ## Novidades da 0.4.5
 
