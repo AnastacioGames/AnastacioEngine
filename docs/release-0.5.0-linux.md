@@ -25,8 +25,9 @@ podman run --rm -v $PWD:/work:Z -v $PWD/tools/linux/container-build-22.04.sh:/bu
 (`docker` funciona igual, sem os `:Z`.) A versão padrão do script é 0.5.0. Saída:
 `AnastacioEngine-0.5.0-linux-x86_64.tar.xz`.
 
-O script já falha se faltar no tar: `libae_uvatlas.so`, `libae_denoise.so`, `icons_upbge/`,
-`icons_blender5/`, `anastacio_network/`, ou se o `Range_Components_Label.rar` entrar.
+O script já falha se faltar no tar: `libae_uvatlas.so`, `icons_upbge/`, `icons_blender5/`,
+`anastacio_network/`, ou se o `Range_Components_Label.rar` entrar. O `libae_denoise.so` só é conferido
+quando foi compilado (precisa do OIDN).
 
 Conhecido: o OIDN não está no apt do container, então o bake de lightmap no Linux usa o box blur. Não é bug.
 
