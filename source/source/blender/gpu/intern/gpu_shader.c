@@ -240,7 +240,10 @@ static const char *gpu_shader_version(void)
 	#ifdef __EMSCRIPTEN__
 	return "#version 300 es\n"
 	       "precision highp float;\n"
-	       "precision highp int;\n";
+	       "precision highp int;\n"
+	       /* GLSL ES nao tem precisao padrao para sampler2DShadow (vfog, sombras). */
+	       "precision highp sampler2DShadow;\n"
+	       "precision highp sampler3D;\n";
 	#else
 	return "#version 330 core\n";
 	#endif

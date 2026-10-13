@@ -14,6 +14,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Docs: `distribution-0.1.md` ganhou o procedimento atual do Linux (container, `.tar.xz`); `linux-build.md` e `roadmap.md` sem referencias velhas de versao.
 - Nao feito: OIDN nao esta no apt do container, entao o bake de lightmap no Linux usa o box blur. Nenhum pacote foi gerado nem testado nesta entrada.
 - Correcoes achadas nos testes do pacote: (1) **crash com SSGI** no nó Diffuse: o GLSL `node_bsdf_diffuse_ambient_ssgi` ganhou `emit` (emissivos no SSGI) e o nó nao passava o argumento (access violation no `GPU_stack_link`); novo wrapper `node_bsdf_diffuse_ambient_ssgi_node` com emit 0, reconhecido em `GPU_material_ssgi_outputs`. (2) Build Web: historico das nuvens em `gpu_compositing.c` so com `GL_VERSION_4_3` (`glCopyImageSubData`). (3) wasm-ld: stubs de `uiTemplateHeader3D_controls`, `uiItemS_type` e `ED_view3d_layers_shown` no blenderplayer. (4) Exportar Web acha o runtime e o empacotador em `web/runtime` e `web/tools` ao lado do exe (zip da release) e usa o Python embutido.
+- Web: Volumetric Fog nao compilava no navegador (`sampler2DShadow` sem precisao no GLSL ES); o cabecalho `#version 300 es` agora declara `precision highp sampler2DShadow` e `sampler3D`. Teste no Chrome headless: nevoa liga sem erro a 60 FPS, mas o feixe do Spot nao aparece (no desktop aparece) — pendente.
 
 ## 2026-10-12 - Sombra colorida (vitral), feixe colorido na névoa, poeira no feixe e emissivos no SSGI
 
