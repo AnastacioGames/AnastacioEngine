@@ -6,6 +6,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Release: template Android e pasta web/ no pacote
+
+Usuário da 0.5.0 não conseguia gerar APK: `range_web/android.py` só achava o template em
+`tools/android/webview-template` (árvore de desenvolvimento) e o zip não o trazia. O tar Linux da 0.5.0 não
+tinha `web/` nenhuma (Export Web também quebrado no Linux).
+
+- `android.template_dir()` procura também `web/android-template/` ao lado do executável.
+- `tools/stage_release_web.py` monta `web/runtime`, `web/tools` e `web/android-template` (só arquivos do git;
+  ~55 MB, quase tudo o runtime). `tools/linux/package-runtime.sh` passa a chamá-lo; no Windows é passo do
+  procedimento em `docs/distribution-0.1.md`.
+- Testes (2026-10-13): `test_android.py` (21, inclui layout da release); zip 0.5.0 extraído com o `android.py`
+  novo e `web/` montada pelo script gerou o APK por `engine_android_export.py` (12/12). Build Linux com o
+  script ainda não rodado.
+
 ## 2026-10-13 - Export: jogo publicado sem overlays de depuração
 
 Um usuário publicou o jogo Web com o painel de framerate/profile ligado (flag salva na cena, não do export).

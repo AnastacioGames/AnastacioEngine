@@ -443,6 +443,10 @@ Android v1 concluído (2026-09-24): APK/AAB com WebView embutindo o pacote Web, 
 para o futuro por decisão do usuário. Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
 por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
 
+- **Release sem template Android (aberto, 2026-10-13)**: zip Windows da 0.5.0 sem `web/android-template` (Build APK
+  falha) e tar Linux sem `web/` (Export Web e Android falham). Corrigido no código (`stage_release_web.py`,
+  `android.template_dir()`); falta publicar a versão corrigida e rodar o pacote Linux com o script novo.
+
 - **Sensores (`bge.logic.motion`)**: antecipados por decisão do usuário (2026-09-23) e implementados no runtime Web;
   verificados com sensores emulados (`tools/web/verify-motion.cjs`) e aprovados no aparelho real dentro do APK
   (inclinação e `calibrate()`). `orientation`, taxa (~30 Hz) e latência (1–2 frames) conferidas no APK e no Chrome

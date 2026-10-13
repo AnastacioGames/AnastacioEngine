@@ -61,6 +61,10 @@ rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna"
   "$staging_dir/msgfmt" "$staging_dir/imgui.ini" "$staging_dir/\\imgui.ini"
 # Addon nao usado (so um .rar), nao entra no pacote.
 rm -f "$staging_dir"/[0-9].[0-9]*/scripts/addons/Range_Components_Label.rar
+# web/ (runtime Web, empacotadores e template Android): sem ela Export Web e Build APK nao funcionam.
+# O runtime Web e o mesmo do Windows; WEB_RUNTIME_DIR aponta para a saida do preset web-runtime-release.
+python3 "$repo_root/tools/stage_release_web.py" "$staging_dir" \
+  --runtime-dir "${WEB_RUNTIME_DIR:-$repo_root/build-web-release/bin}"
 
 missing=""
 [ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"

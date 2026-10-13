@@ -73,6 +73,12 @@ partir de `0.3.0` em favor do asset separado acima.
 
 **Não copie `concrt140.dll`, `msvcp140*.dll`, `vcruntime140.dll` nem `vccorlib140.dll` soltos ao lado do `.exe`**: além de não resolverem a dependência, com eles presentes o `RangeRuntime.exe` encerra com código 11 ao abrir um `.range` (o `RangeEngine.exe` continua abrindo). A `0.3.0` foi publicada assim; a `0.4.0` usa só `blender.crt/` + `ucrtbase.dll`.
 
+**Pasta `web/` (Export Web e Android):** não vem do `build/bin/`. Monte no staging com
+`python tools/stage_release_web.py <pasta do pacote>`, que copia `web/runtime/` (saída do preset
+`web-runtime-release`), `web/tools/` e `web/android-template/` (só os arquivos versionados do template). Sem
+`web/android-template/` o **Build APK** falha com "Android template not found" (zip da 0.5.0). No Linux o
+`tools/linux/package-runtime.sh` já chama o script (`WEB_RUNTIME_DIR` troca a pasta do runtime).
+
 A criação dos ZIPs deve preservar o build original. Primeiro monte as pastas descartáveis em
 `build/release-staging/`, valide que `AnastacioEngine.exe`, `AnastacioRuntime.exe` e, no pacote ampliado, o
 `RangeArmor Panel.exe` e `release/launcher/Launcher.exe` existem. Depois compacte para `build/dist/`

@@ -65,13 +65,15 @@ class AndroidError(Exception):
 
 
 def template_dir():
-    """tools/android/webview-template da arvore de desenvolvimento, ou None."""
+    """web/android-template ao lado do executavel (zip da release) ou tools/android/webview-template
+    da arvore de desenvolvimento, ou None."""
     here = os.path.dirname(os.path.abspath(__file__))
     while here != os.path.dirname(here):
         here = os.path.dirname(here)
-        candidate = os.path.join(here, "tools", "android", "webview-template")
-        if os.path.isfile(os.path.join(candidate, "app", "build.gradle.kts")):
-            return candidate
+        for candidate in (os.path.join(here, "web", "android-template"),
+                          os.path.join(here, "tools", "android", "webview-template")):
+            if os.path.isfile(os.path.join(candidate, "app", "build.gradle.kts")):
+                return candidate
     return None
 
 

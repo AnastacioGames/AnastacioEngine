@@ -260,5 +260,21 @@ class ProjectTests(unittest.TestCase):
         self.assertIn('android:screenOrientation="fullUser"', self.read("app", "src", "main", "AndroidManifest.xml"))
 
 
+class TemplateLocationTests(unittest.TestCase):
+    def test_release_layout(self):
+        # Zip da release: <exe>/2.79/scripts/modules/range_web/android.py e <exe>/web/android-template.
+        import importlib.util
+        with tempfile.TemporaryDirectory() as tmp:
+            module = os.path.join(tmp, "2.79", "scripts", "modules", "range_web", "android.py")
+            with open(android.__file__, "rb") as f:
+                touch(module, f.read())
+            template = os.path.join(tmp, "web", "android-template")
+            touch(os.path.join(template, "app", "build.gradle.kts"))
+            spec = importlib.util.spec_from_file_location("range_web.android_release", module)
+            copy = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(copy)
+            self.assertEqual(os.path.normcase(copy.template_dir()), os.path.normcase(template))
+
+
 if __name__ == "__main__":
     unittest.main()
