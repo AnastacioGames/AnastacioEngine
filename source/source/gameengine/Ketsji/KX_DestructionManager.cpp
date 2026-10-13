@@ -23,6 +23,7 @@
 #include "KX_RayCast.h"
 #include "KX_Scene.h"
 #include "KX_AudioManager.h"
+#include "KX_Camera.h"
 
 #include "SCA_LogicManager.h"
 #include "BL_Converter.h"
@@ -1340,6 +1341,20 @@ void KX_DestructionManager::SpawnBlastEffects(KX_GameObject *gameobj, const Rang
 	KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
 	if (audio) {
 		audio->PlayEvent((explosion ? WO_SOUND_EVENT_EXPLOSION_TINY : WO_SOUND_EVENT_DESTRUCTION_TINY) + sizeOffset[size]);
+	}
+
+	// Camera shake: the camera already has trauma-based shake (KX_Camera::AddShake / cam.shake()),
+	// it just wasn't wired to blasts. Bigger size = more trauma; falls off with distance so a huge
+	// blast far away barely moves the camera while the same blast up close rattles it hard.
+	KX_Camera *cam = m_scene->GetActiveCamera();
+	if (cam) {
+		const float dist = (cam->NodeGetWorldPosition() - center).Length();
+		const float range = std::max(settings.radius, 1.0f) * 4.0f; // shake reaches further than the push
+		const float falloff = std::max(0.0f, 1.0f - dist / range);
+		if (falloff > 0.0f) {
+			const float trauma = std::min(1.0f, 0.2f + 0.2f * size) * falloff;
+			cam->AddShake(trauma, 0.6f + 0.15f * size);
+		}
 	}
 }
 
