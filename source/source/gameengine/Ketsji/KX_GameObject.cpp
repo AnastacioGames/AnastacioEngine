@@ -36,6 +36,8 @@
 #  pragma warning( disable:4786 )
 #endif
 
+#include <cstring>
+
 #include "CM_WorkCounters.h"
 #include "KX_GameObject.h"
 #include "KX_RuntimePropertyRegistry.h"
