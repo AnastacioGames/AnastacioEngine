@@ -53,6 +53,10 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
   nos helpers de bake fora do `if(WIN32)` (`creator/CMakeLists.txt`). Conferir: build do editor e do player,
   export de vídeo, video texture, views do Color Management (Filmic etc.), menu ImGui no jogo (fonte e
   `imgui.ini` ao lado do executável) e bake de lightmap.
+  Soma-se, da preparação da release 0.5.1 (build e `ctest` só rodados no Linux): `bmesh_bevel.c`
+  (`adjust_offsets` recebe `bm` e usa `BM_ITER_MESH` em vez de `GHASH_ITER` na primeira passada, corrigindo
+  um `ctest bmesh_bevel` intermitente) e `selection_utils.py` (`bpy.utils.register_class` no lugar de
+  `register_module`, que não existe). Rodar `ctest` completo no Windows depois de compilar.
 - Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
   Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
   confirmou que o jogo funciona após a migração. Pendente: console,
