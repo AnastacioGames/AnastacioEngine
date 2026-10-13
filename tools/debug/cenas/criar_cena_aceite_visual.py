@@ -4,7 +4,10 @@
 #   Tecla 3 - Decimate Collapse 0.1: original | High Quality desligado | ligado (textura UV grid).
 #   Tecla 4 - Planar Reflection (ja aceito, fica como referencia).
 #   Som: World Sound com Music (2 faixas) e Ambient (vento, chiado) tocando desde o inicio.
-#   Tecla 5 liga/desliga a Music, para ouvir o Ambient sozinho. Log em <pasta>/som_log.txt.
+#   Tecla 5 liga/desliga a Music, para ouvir o Ambient sozinho (modulo Effects nao tem toggle,
+#   sao sons avulsos). Tecla 6 liga a chuva (evento Rain, loop). Tecla 7 da um raio manual
+#   (evento Thunder, um som por vez). Tecla 8 faz uma explosao perto da camera 1 (evento
+#   Explosion, tamanho conforme o raio). Log em <pasta>/som_log.txt.
 #   Esc sai.
 # Uso:
 #   AnastacioEngine.exe -b --factory-startup --python criar_cena_aceite_visual.py -- <pasta>
@@ -239,6 +242,75 @@ def write_wind(path, seconds):
 
 
 write_wind(os.path.join(folder, "audio", "vento.wav"), 4.0)
+
+
+def write_boom(path, seconds=0.8):
+    import random
+    rate = 22050
+    rnd = random.Random(2)
+    frames = bytearray()
+    n = int(rate * seconds)
+    low = 0.0
+    for i in range(n):
+        t = i / rate
+        decay = math.exp(-t * 4.5)
+        low += 0.3 * (rnd.uniform(-1.0, 1.0) - low)
+        thump = math.sin(2.0 * math.pi * 60.0 * t) * math.exp(-t * 10.0)
+        frames += struct.pack('<h', int(32767 * max(-1.0, min(1.0, decay * low * 0.8 + thump * 0.6))))
+    w = wave.open(path, 'wb')
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(rate)
+    w.writeframes(bytes(frames))
+    w.close()
+
+
+def write_thunder(path, seed, seconds=1.4):
+    import random
+    rate = 22050
+    rnd = random.Random(seed)
+    frames = bytearray()
+    n = int(rate * seconds)
+    low = 0.0
+    crack_end = 0.08
+    for i in range(n):
+        t = i / rate
+        low += 0.08 * (rnd.uniform(-1.0, 1.0) - low)
+        if t < crack_end:
+            gain = 1.0
+        else:
+            gain = math.exp(-(t - crack_end) * 1.8)
+        frames += struct.pack('<h', int(32767 * max(-1.0, min(1.0, gain * low))))
+    w = wave.open(path, 'wb')
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(rate)
+    w.writeframes(bytes(frames))
+    w.close()
+
+
+def write_rain(path, seconds=3.0):
+    import random
+    rate = 22050
+    rnd = random.Random(3)
+    frames = bytearray()
+    n = int(rate * seconds)
+    low = 0.0
+    for i in range(n):
+        low += 0.4 * (rnd.uniform(-1.0, 1.0) - low)  # chiado mais agudo que o vento
+        frames += struct.pack('<h', int(32767 * 0.5 * low))
+    w = wave.open(path, 'wb')
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(rate)
+    w.writeframes(bytes(frames))
+    w.close()
+
+
+write_boom(os.path.join(folder, "audio", "boom.wav"))
+write_thunder(os.path.join(folder, "audio", "trovao.wav"), 10)
+write_thunder(os.path.join(folder, "audio", "trovao2.wav"), 11)
+write_rain(os.path.join(folder, "audio", "chuva.wav"))
 music = world.sound_modules.new("Music", type='MUSIC')
 music.fade_time = 0.5
 music.sounds.new("tema1", filepath="//audio/tema1.wav")
@@ -246,6 +318,23 @@ music.sounds.new("tema2", filepath="//audio/tema2.wav")
 ambient = world.sound_modules.new("Ambient", type='AMBIENT')
 ambient.volume = 1.0
 ambient.sounds.new("vento", filepath="//audio/vento.wav")
+
+effects = world.sound_modules.new("Effects", type='EFFECTS')
+entry = effects.sounds.new("boom", filepath="//audio/boom.wav")
+entry.event = 'EXPLOSION_TINY'
+entry = effects.sounds.new("boom2", filepath="//audio/boom.wav")
+entry.event = 'DESTRUCTION_TINY'
+entry = effects.sounds.new("trovao1", filepath="//audio/trovao.wav")
+entry.event = 'THUNDER'
+entry = effects.sounds.new("trovao2", filepath="//audio/trovao2.wav")
+entry.event = 'THUNDER'
+entry = effects.sounds.new("chuva", filepath="//audio/chuva.wav")
+entry.event = 'RAIN'
+
+world.weather_settings.use_rain = False
+world.weather_settings.rain_intensity = 0.6
+world.weather_settings.use_rain_lightning = True
+world.weather_settings.rain_lightning_rate = 0.0  # so manual (tecla 7), pra nao disparar sozinho no teste
 
 # ---------------- troca de camera nas teclas 1-4
 text = bpy.data.texts.new("cams.py")
@@ -255,9 +344,12 @@ KEYS = (bge.events.ONEKEY, bge.events.TWOKEY, bge.events.THREEKEY, bge.events.FO
 NAMES = %r
 
 def _log(text):
-    with open(bge.logic.expandPath("//som_log.txt"), "a") as f:
-        f.write(text + "
+    try:
+        with open(bge.logic.expandPath("//som_log.txt"), "a") as f:
+            f.write(text + "
 ")
+    except Exception as e:
+        print("LOG_FAIL", e)
 
 def tick(cont):
     scene = bge.logic.getCurrentScene()
@@ -273,23 +365,31 @@ def tick(cont):
         else:
             bge.audio.play("Music")
         _log("tecla5 music=%%s ambient=%%s" %% (bge.audio.playing("Music"), bge.audio.playing("Ambient")))
+    if keys[bge.events.SIXKEY] == bge.logic.KX_INPUT_JUST_ACTIVATED:
+        scene.world.rain = not scene.world.rain
+        _log("tecla6 rain=%%s" %% scene.world.rain)
+    if keys[bge.events.SEVENKEY] == bge.logic.KX_INPUT_JUST_ACTIVATED:
+        scene.world.strikeLightning()
+        _log("tecla7 strikeLightning")
+    if keys[bge.events.EIGHTKEY] == bge.logic.KX_INPUT_JUST_ACTIVATED:
+        scene.explode((0, -18, 1.0), radius=4.0)
+        _log("tecla8 explode")
     for key, name in zip(KEYS, NAMES):
         if keys[key] == bge.logic.KX_INPUT_JUST_ACTIVATED:
             scene.active_camera = scene.objects[name]
 ''' % [c.name for c in cameras])
 ctrl = cameras[0]
 scene.objects.active = ctrl
-bpy.ops.logic.sensor_add(type='KEYBOARD', object=ctrl.name)
+# Always com pulso continuo: tick() roda todo frame e poll do teclado nao depende de
+# borda de sensor (mais confiavel que um sensor Keyboard pra detectar toque rapido de tecla).
+bpy.ops.logic.sensor_add(type='ALWAYS', object=ctrl.name)
 bpy.ops.logic.controller_add(type='PYTHON', object=ctrl.name)
 s = ctrl.game.sensors[-1]
-s.use_all_keys = True
+s.use_pulse_true_level = True
 c = ctrl.game.controllers[-1]
 c.mode = 'MODULE'
 c.module = 'cams.tick'
 s.link(c)
-# Always (uma vez) para o log do inicio sair sem precisar apertar tecla
-bpy.ops.logic.sensor_add(type='ALWAYS', object=ctrl.name)
-ctrl.game.sensors[-1].link(c)
 
 path = os.path.join(folder, "aceite_visual.range")
 bpy.ops.wm.save_as_mainfile(filepath=path)
