@@ -10,7 +10,7 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 > **Para baixar a engine, use a seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
 > O botão verde **Code → Download ZIP** baixa só o código-fonte, sem os executáveis.
 
-![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.4.2/splash.png)
+![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.5.0/splash.png)
 
 ## Download
 
