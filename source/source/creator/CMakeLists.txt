@@ -1215,30 +1215,24 @@ unset(BLENDER_TEXT_FILES_DESTINATION)
 
 add_dependencies(RangeEngine makesdna)
 
-# On Linux the hand-sorted ${LIB} order can still leave forward references
-# unresolved under GNU ld's single-pass archive scanning (e.g. datatoc
-# symbols from bf_editor_datafiles needed by libraries linked after it).
-# --start-group/--end-group makes ld re-scan the group until everything
-# resolves, regardless of order. Same fix as RangeRuntime in
-# source/blenderplayer/CMakeLists.txt.
-#
-# Wrapping just this target_link_libraries(${LIB}) call isn't enough: CMake
-# expands ${LIB}'s transitive usage requirements and re-emits a second copy
-# of some libraries (still in the wrong order) *after* our --end-group, out
-# of the group. So --start-group has to be the very first library-related
-# call and --end-group the very last (after setup_liblinks), since CMake
-# appends each target_link_libraries call, and any transitive expansion it
-# injects, strictly in call order.
-if(UNIX AND NOT APPLE)
-	target_link_libraries(RangeEngine -Wl,--start-group)
-endif()
 target_link_libraries(RangeEngine ${LIB})
 unset(LIB)
 
 setup_liblinks(RangeEngine)
 
+# On Linux, CMake appends a transitive usage-requirements closure of ${LIB}
+# at the very end of the generated link command, after every explicit
+# target_link_libraries() call (wrapping those calls in --start-group/
+# --end-group does not reach into that auto-appended closure, since it is
+# emitted after the whole target_link_libraries graph is resolved, not in
+# call order). That closure still has bf_editor_datafiles (which defines the
+# datatoc_roboto_medium_ttf symbols) ordered before libge_logic_imgui.a
+# (which needs them), so GNU ld's single-pass archive scanning leaves it
+# unresolved. Re-adding the archive's file path (a plain string, not a
+# target name, so it does not retrigger another closure expansion) as the
+# truly last link item makes ld re-scan it after libge_logic_imgui.a.
 if(UNIX AND NOT APPLE)
-	target_link_libraries(RangeEngine -Wl,--end-group)
+	target_link_libraries(RangeEngine "$<TARGET_FILE:bf_editor_datafiles>")
 endif()
 
 # -----------------------------------------------------------------------------
