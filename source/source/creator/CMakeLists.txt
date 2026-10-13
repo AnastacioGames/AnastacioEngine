@@ -1215,7 +1215,17 @@ unset(BLENDER_TEXT_FILES_DESTINATION)
 
 add_dependencies(RangeEngine makesdna)
 
-target_link_libraries(RangeEngine ${LIB})
+# On Linux the hand-sorted ${LIB} order can still leave forward references
+# unresolved under GNU ld's single-pass archive scanning (e.g. datatoc
+# symbols from bf_editor_datafiles needed by libraries linked after it).
+# --start-group/--end-group makes ld re-scan the group until everything
+# resolves, regardless of order. Same fix as RangeRuntime in
+# source/blenderplayer/CMakeLists.txt.
+if(UNIX AND NOT APPLE)
+	target_link_libraries(RangeEngine -Wl,--start-group ${LIB} -Wl,--end-group)
+else()
+	target_link_libraries(RangeEngine ${LIB})
+endif()
 unset(LIB)
 
 setup_liblinks(RangeEngine)
