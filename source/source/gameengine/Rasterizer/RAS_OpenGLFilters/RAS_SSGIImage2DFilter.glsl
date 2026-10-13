@@ -74,6 +74,12 @@ void main()
     if (dot(indirect, indirect) < 1e-12) return;
     vec3 linear_scene = texture2D(bgl_DataTextures[SSGI_SLOT + 3], uv).rgb;
     vec3 result = max(linear_scene + indirect, vec3(0.0));
-    if (ge_SSGIDisplay.w > 0.5) result = vec3(display_channel(result.r), display_channel(result.g), display_channel(result.b));
-    gl_FragColor = vec4(result, scene.a);
+    vec3 base = linear_scene;
+    if (ge_SSGIDisplay.w > 0.5) {
+        result = vec3(display_channel(result.r), display_channel(result.g), display_channel(result.b));
+        base = vec3(display_channel(base.r), display_channel(base.g), display_channel(base.b));
+    }
+    /* Add only what the GI changed: transparent surfaces drawn over the opaque one (glass)
+     * are not in linear_scene, so replacing the pixel would erase them. */
+    gl_FragColor = vec4(scene.rgb + (result - base), scene.a);
 }

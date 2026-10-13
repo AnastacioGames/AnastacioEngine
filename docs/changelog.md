@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - SSGI não corta mais vidro transparente
+
+Com SSGI ligado, vidros em Alpha Blend sumiam pela metade, com borda em degraus (`vitral_sun.range`). A
+composição (`RAS_SSGIImage2DFilter.glsl`) trocava o pixel pela cor linear do opaco + GI, e essa cor não tem
+o que foi desenhado por cima; a troca era decidida por bloco de meia resolução. Agora soma só a diferença
+que o GI causa (`scene + display(linear+gi) - display(linear)`). Conferido por screenshot: vidros inteiros
+com SSGI, sem os quadradinhos soltos.
+
 ## 2026-10-13 - Release: template Android e pasta web/ no pacote
 
 Usuário da 0.5.0 não conseguia gerar APK: `range_web/android.py` só achava o template em
