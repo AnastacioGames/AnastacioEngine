@@ -775,7 +775,7 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   Crash no runtime (sockets BOOLEAN/INT sem pilha no exec de nós) e espelho preto (reflexo no Base Color +
   Color Management aplicado duas vezes) corrigidos no mesmo dia; a cena roda no `AnastacioRuntime.exe` e o
   reflexo confere por pixel com a vista direta. Espelho puro liga `Color` num shader Emission.
-  **Falta**: aceite visual do usuário; conferir com Filmic e exposure/gamma fora do padrão.
+  **Aceito pelo usuário em 2026-10-13**: conferido por pixel com Standard, Filmic, Filmic + exposure 1.5 e Filmic + gamma 1.6 (cubo direto e refletido iguais, ±1).
 - **Principled/PBR no Web**: luzes de cena e sombra portadas para o perfil CORE (`unflightsource[]`, changelog de
   2026-09-23); aceite visual do usuário no navegador com GPU real em 2026-09-23 (brilhos das luzes e sombras
   das esferas corretos). Falta só reconferir o desktop.
