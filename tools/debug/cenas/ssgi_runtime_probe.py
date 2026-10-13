@@ -6,6 +6,10 @@ import ctypes
 import time
 
 _state = {}
+
+
+def _libgl():
+    return ctypes.WinDLL('opengl32.dll') if os.name == 'nt' else ctypes.CDLL('libGL.so.1')
 _shader = r'''
 #ifdef USE_CORE_PROFILE
 #define texture2D texture
@@ -38,7 +42,7 @@ def _write(data):
 
 
 def _readback():
-    gl = ctypes.WinDLL('opengl32.dll')
+    gl = _libgl()
     gl.glGetTexImage.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p]
     previous = ctypes.c_int()
     gl.glGetIntegerv(0x8069, ctypes.byref(previous))  # GL_TEXTURE_BINDING_2D
@@ -84,14 +88,16 @@ def _compile_core_fragments():
     directory = os.environ.get('SSGI_SHADER_DIR')
     if not directory:
         return
-    gl = ctypes.WinDLL('opengl32.dll')
-    gl.wglGetProcAddress.argtypes = [ctypes.c_char_p]
-    gl.wglGetProcAddress.restype = ctypes.c_void_p
+    gl = _libgl()
+    get_proc = gl.wglGetProcAddress if os.name == 'nt' else gl.glXGetProcAddressARB
+    get_proc.argtypes = [ctypes.c_char_p]
+    get_proc.restype = ctypes.c_void_p
+    functype = ctypes.WINFUNCTYPE if os.name == 'nt' else ctypes.CFUNCTYPE
     def function(name, result, *args):
-        address = gl.wglGetProcAddress(name.encode('ascii'))
+        address = get_proc(name.encode('ascii'))
         if not address:
             raise RuntimeError('Missing GL entry point ' + name)
-        return ctypes.WINFUNCTYPE(result, *args)(address)
+        return functype(result, *args)(address)
     create = function('glCreateShader', ctypes.c_uint, ctypes.c_uint)
     source = function('glShaderSource', None, ctypes.c_uint, ctypes.c_int, ctypes.POINTER(ctypes.c_char_p), ctypes.c_void_p)
     compile_shader = function('glCompileShader', None, ctypes.c_uint)
@@ -143,11 +149,10 @@ def tick(cont):
         if frame == 1:
             _state['start'] = time.perf_counter()
             _write(dict(event='start', objects=[ob.name for ob in scene.objects]))
-            if os.name == 'nt':
-                gl = ctypes.WinDLL('opengl32.dll')
-                gl.glGetString.argtypes = [ctypes.c_uint]
-                gl.glGetString.restype = ctypes.c_char_p
-                _write(dict(event='gpu', renderer=gl.glGetString(0x1F01).decode('utf-8'), version=gl.glGetString(0x1F02).decode('utf-8')))
+            gl = _libgl()
+            gl.glGetString.argtypes = [ctypes.c_uint]
+            gl.glGetString.restype = ctypes.c_char_p
+            _write(dict(event='gpu', renderer=gl.glGetString(0x1F01).decode('utf-8'), version=gl.glGetString(0x1F02).decode('utf-8')))
             try:
                 manager.changeSSGIValues(True, 5.0, 1.0, 8, 16, 0.15)
             except RuntimeError as error:
