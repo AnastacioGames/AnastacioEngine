@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Release 0.5.1: ORM Occlusion por canal e versão
+
+`ANASTACIO_VERSION_STRING` e o splash (`wm.py`) foram para `0.5.1`. A Occlusion (canal R) do "RGB to ORM"
+sobrescrevia Diffuse Ref, Specular Intensity e Ambient ao mesmo tempo, sem opção de restringir a um
+subconjunto, mesmo quando a textura tinha `mapto` ligado nas três por outro motivo. `MTex.orm_occlusion_to`
+(novo campo, reaproveita o byte de padding existente em `MTex`) deixa escolher quais das três influências
+recebem a Occlusion; default e migração de arquivos antigos preservam o comportamento anterior (as três
+ligadas). UI em `properties_texture.py` (checkboxes "Diffuse"/"Specular"/"Ambient" sob "ORM").
+
 ## 2026-10-13 - Sombra colorida no Sun com cascatas
 
 No Sun com CSM (`vitral_csm.range`) só apareciam fios coloridos na base dos vidros, sem a mancha no chão.
