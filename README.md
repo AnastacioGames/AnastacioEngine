@@ -45,6 +45,15 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **Decimate High Quality**, constraints de física prontas, splash novo com arquivos fixados (Pin).
 - Executáveis Windows renomeados para `AnastacioEngine.exe` e `AnastacioRuntime.exe`.
 
+**Efeitos ainda em ajuste.** Os efeitos novos desta versão funcionam, mas ainda vão receber ajustes visuais e
+correções nas próximas versões. Pontos já conhecidos:
+
+- Sombra colorida (vitral): alguns pontinhos coloridos soltos no próprio vidro; no Sun com cascatas (CSM) a
+  mancha colorida no chão ainda não aparece.
+- Volumetric Fog na Web: a névoa funciona no navegador, mas o feixe de luz do Spot ainda não aparece.
+- SSGI é experimental: vidro transparente (Alpha Blend) pode sair cortado em degraus.
+- Linux: o bake de lightmap usa um filtro mais simples (sem o denoiser OIDN).
+
 Galeria de imagens por versão: [release-images/](release-images/README.md), com os [prints das novidades da 0.5.0](release-images/v0.5.0/README.md).
 
 ## Novidades da 0.4.6
