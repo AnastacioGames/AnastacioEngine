@@ -43,7 +43,7 @@ static int node_shader_gpu_bsdf_diffuse(GPUMaterial *mat, bNode *UNUSED(node), b
 	/* Keep the regular shader result and also expose its physically unambiguous diffuse terms.
 	 * The Material Output connects these additional links only when native SSGI reserved slots exist. */
 	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
-	return GPU_stack_link(mat, "node_bsdf_diffuse_ambient_ssgi", in, out,
+	return GPU_stack_link(mat, "node_bsdf_diffuse_ambient_ssgi_node", in, out,
 	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_material_world_color(mat),
 	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }

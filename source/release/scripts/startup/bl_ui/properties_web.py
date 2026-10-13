@@ -2,6 +2,8 @@
 # Somente autoria: guarda configuracoes e mostra o estado. Nao faz I/O no draw()
 # e ainda nao valida nem exporta; o botao Exportar Web fica indisponivel com motivo unico.
 
+import os
+
 import bpy
 from bpy.types import Operator, Panel, PropertyGroup
 
@@ -17,9 +19,11 @@ _MAX_ROWS_SHOWN = 30
 _ENGINE_API_MODULES = frozenset(("Range", "mathutils", "bgl", "blf", "aud"))
 _SEVERITY_ICONS = {'ERROR': 'CANCEL', 'WARNING': 'ERROR', 'INFO': 'INFO'}
 
-# Onde procurar o runtime instalado: variável de ambiente e, em árvore de desenvolvimento,
-# a saída dos presets web-runtime*. Sem layout de instalação definido (marco F).
+# Onde procurar o runtime instalado: variável de ambiente, a pasta web/ do pacote da release
+# (web/runtime e web/tools ao lado do executável) e, em árvore de desenvolvimento, a saída dos presets web-runtime*.
 _DEV_RUNTIME_DIRS = {"web-runtime-release": "build-web-release/bin", "web-runtime": "build-web/bin"}
+_RELEASE_RUNTIME_DIR = os.path.join("web", "runtime")
+_RELEASE_PACKAGER = os.path.join("web", "tools", "package-web.py")
 
 
 def _runtime_candidates():
@@ -28,6 +32,9 @@ def _runtime_candidates():
     env = os.environ.get("RANGE_WEB_RUNTIME_DIR")
     if env:
         dirs.append(env)
+    release = os.path.join(os.path.dirname(bpy.app.binary_path), _RELEASE_RUNTIME_DIR)
+    if os.path.isdir(release):
+        dirs.append(release)
     rel = _DEV_RUNTIME_DIRS.get(bpy.context.scene.range_web.runtime_id)
     here = os.path.dirname(os.path.abspath(__file__))
     while rel and here != os.path.dirname(here):
@@ -41,6 +48,9 @@ def _runtime_candidates():
 
 def _packager_path():
     import os
+    release = os.path.join(os.path.dirname(bpy.app.binary_path), _RELEASE_PACKAGER)
+    if os.path.isfile(release):
+        return release
     here = os.path.dirname(os.path.abspath(__file__))
     while here != os.path.dirname(here):
         here = os.path.dirname(here)
@@ -330,7 +340,8 @@ class SCENE_OT_range_web_export(Operator):
             self.report({'WARNING'}, _("Save the file before exporting: the package uses the saved .range."))
             return {'CANCELLED'}
         packager = _packager_path()
-        python = shutil.which("python") or shutil.which("python3")
+        # O Python embutido no pacote vem primeiro: o usuário da release pode não ter Python instalado.
+        python = bpy.app.binary_path_python or shutil.which("python") or shutil.which("python3")
         if packager is None or python is None:
             self.report({'WARNING'}, _(WEB_EXPORT_BLOCKED_REASON))
             return {'CANCELLED'}

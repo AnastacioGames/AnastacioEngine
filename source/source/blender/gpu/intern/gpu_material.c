@@ -1316,6 +1316,7 @@ void GPU_material_ssgi_outputs(GPUMaterial *material, GPUNodeLink *surface)
     /* A mixed closure needs its own composition contract; only the actual Surface root is accepted. */
     if (!STREQ(node->name, "node_bsdf_principled") &&
         !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi") &&
+        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi_node") &&
         !STREQ(node->name, "node_emission_ssgi")) return;
     GPUOutput *extra = ((GPUOutput *)node->outputs.first)->next;
     for (int i = 0; i < 4 && extra; ++i, extra = extra->next) {

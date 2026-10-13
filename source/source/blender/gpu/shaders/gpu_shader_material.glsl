@@ -4662,6 +4662,16 @@ void node_bsdf_diffuse_ambient_ssgi(vec4 color, float emit, float roughness, vec
 	ssgi_linear = vec4(linear, color.a);
 }
 
+/* Diffuse BSDF node: same as above without Emit (the node has only Color, Roughness and Normal
+ * sockets, and GPU_stack_link maps them in order onto the first parameters). */
+void node_bsdf_diffuse_ambient_ssgi_node(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
+                                         out vec4 result, out vec4 ssgi_normal, out vec4 ssgi_albedo,
+                                         out vec4 ssgi_direct, out vec4 ssgi_linear)
+{
+	node_bsdf_diffuse_ambient_ssgi(color, 0.0, roughness, N, I, ambient, result, ssgi_normal, ssgi_albedo,
+	                               ssgi_direct, ssgi_linear);
+}
+
 void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 {
 	/* used by BSDFs without their own GLSL approximation (no fragment position: lights as Sun) */

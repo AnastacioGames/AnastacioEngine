@@ -1890,10 +1890,15 @@ bool GPU_fx_do_composite_pass(
 				GPU_shader_uniform_vector(clouds_shader, interface->vclouds_sundir_uniform, 3, 1, vclouds_sundir);
 			}
 
-			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy. */
+			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy.
+			 * WebGL/GLES headers don't declare GL 4.3, so the history is off there. */
+#ifdef GL_VERSION_4_3
 			const bool use_history = (world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
 			                         WO_VCLOUDS_ENABLE &&
 			                         (GLEW_VERSION_4_3 || GLEW_ARB_copy_image);
+#else
+			const bool use_history = false;
+#endif
 			float cur_persmat[4][4];
 			mul_m4_m4m4(cur_persmat, projmat, viewmat);
 			{
@@ -1963,8 +1968,10 @@ bool GPU_fx_do_composite_pass(
 					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
 					glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
 					glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef GL_VERSION_4_3
 					glCopyImageSubData(GPU_texture_opengl_bindcode(fx->depth_buffer), GL_TEXTURE_2D, 0, 0, 0, 0,
 					                   fx->cloud_history_depth, GL_TEXTURE_2D, 0, 0, 0, 0, vp[2], vp[3], 1);
+#endif
 					copy_m4_m4(fx->cloud_history_persmat, cur_persmat);
 					fx->cloud_history_valid = true;
 					fx->cloud_history_frame++;
