@@ -112,19 +112,6 @@ if(WITH_GAMEENGINE)
 	blender_include_dirs(../gameengine/Launcher)
 
 	add_definitions(-DWITH_GAMEENGINE)
-
-	if(UNIX AND NOT APPLE)
-		# ge_logic_imgui (KX_Imgui.cpp) uses datatoc_roboto_medium_ttf, defined in
-		# bf_editor_datafiles. Both only reach the link line through CMake's
-		# transitive closure of ${LIB} (via bf_windowmanager), not through this
-		# explicit list, so GNU ld's single-pass archive scan sees datafiles
-		# before imgui and leaves the symbol unresolved. Adding ge_logic_imgui
-		# here puts it inside the --start-group/--end-group wrap below,
-		# alongside bf_editor_datafiles, so ld re-scans until both resolve.
-		list(APPEND LIB
-			ge_logic_imgui
-		)
-	endif()
 endif()
 
 if(WITH_SDL)
@@ -1228,18 +1215,7 @@ unset(BLENDER_TEXT_FILES_DESTINATION)
 
 add_dependencies(RangeEngine makesdna)
 
-# bf_editor_datafiles (datatoc_roboto_medium_ttf) and ge_logic_imgui (which
-# uses it) both only reach this target's link line through CMake's
-# transitive closure, in an order GNU ld's single-pass archive scan can't
-# resolve. ge_logic_imgui was added to ${LIB} above (WITH_GAMEENGINE block)
-# specifically so both land inside this group: --start-group/--end-group
-# makes ld re-scan the group until every symbol resolves, regardless of
-# order. Same fix as RangeRuntime in source/blenderplayer/CMakeLists.txt.
-if(UNIX AND NOT APPLE)
-	target_link_libraries(RangeEngine -Wl,--start-group ${LIB} -Wl,--end-group)
-else()
-	target_link_libraries(RangeEngine ${LIB})
-endif()
+target_link_libraries(RangeEngine ${LIB})
 unset(LIB)
 
 setup_liblinks(RangeEngine)

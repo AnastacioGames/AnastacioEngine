@@ -58,6 +58,7 @@ set(SRC
 )
 
 set(LIB
+	bf_editor_datafiles
 )
 
 if(WITH_SDL)
