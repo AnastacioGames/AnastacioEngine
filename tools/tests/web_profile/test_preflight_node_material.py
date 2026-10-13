@@ -2,7 +2,7 @@
 
 A falha é injetada pelo GLSL de usuário do material (`script_frag`/`script_vert`), que o codegen acrescenta ao
 shader gerado a partir do grafo; a cena de teste é gerada por
-`projects-teste/teste-editor-web/criar_m1c_nos.py`. O fixture `preflight-node-material.json` tem o formato que
+`tools/debug/cenas/criar_cena_m1c_nos.py`. O fixture `preflight-node-material.json` tem o formato que
 `package-web.py` grava a partir de `Module.onDiagnostic` (origem = nome do ID, `MA` + nome do material); o log
 é ilustrativo, não capturado de um navegador.
 """
@@ -65,8 +65,8 @@ class NodeMaterialReportTests(unittest.TestCase):
 class NodeMaterialInjectionPathTests(unittest.TestCase):
     """Guarda estática: o GLSL de usuário continua chegando ao shader gerado de material de nós.
 
-    Se algum destes pontos mudar, `criar_m1c_nos.py` deixa de provocar a falha e o teste no navegador perde o
-    sentido; revise a cena de teste junto com a mudança.
+    Se algum destes pontos mudar, `criar_cena_m1c_nos.py` deixa de provocar a falha e o teste no navegador perde
+    o sentido; revise a cena de teste junto com a mudança.
     """
 
     def test_node_materials_pass_user_code_to_generate_pass(self):
@@ -91,7 +91,7 @@ class NodeMaterialInjectionPathTests(unittest.TestCase):
 
     def test_test_scene_uses_rna_properties_that_exist(self):
         rna = read(os.path.join(ROOT, "source", "source", "blender", "makesrna", "intern", "rna_material.c"))
-        scene = read(os.path.join(ROOT, "projects-teste", "teste-editor-web", "criar_m1c_nos.py"))
+        scene = read(os.path.join(ROOT, "tools", "debug", "cenas", "criar_cena_m1c_nos.py"))
         for prop, field in (("script_frag", "fragcode"), ("script_vert", "vertcode")):
             self.assertIn('RNA_def_property(srna, "%s"' % prop, rna)
             self.assertIn('RNA_def_property_pointer_sdna(prop, NULL, "%s")' % field, rna)
