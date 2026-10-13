@@ -159,6 +159,13 @@ pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-v
 
 Aberto:
 
+- **Preset `web-runtime-release` só compila no Windows/WSL**: `source/CMakePresets.json` tem caminhos fixos
+  (`ninja.exe`, `PYTHON_ROOT_DIR=D:/python-wasm-web`, `CMAKE_CROSSCOMPILING_EMULATOR=D:/emsdk/node.exe`); no
+  Linux falta também um CPython 3.11 cross-compilado para `wasm32-emscripten` (emsdk 6.0.9 instalado em
+  2026-10-13, mas o Python wasm nunca foi montado nesta máquina). Por isso o pacote 0.5.1 Linux saiu sem
+  `web/` (`tools/linux/package-runtime.sh` ganhou `SKIP_WEB=1` para esse caso; Export Web/Build APK ficam
+  indisponíveis nessa cópia). Falta: preset Linux-nativo (caminhos via `$ORIGIN`/variável de ambiente, já
+  parcialmente assim no `toolchainFile`) e o Python wasm32 cross-compilado fora do Windows/WSL.
 - **Patch do SDL2/Emscripten** (gate de timestamp do gamepad): versionado em `tools/web/patch-sdl2-gamepad.py`
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat

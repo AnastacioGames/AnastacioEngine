@@ -63,8 +63,13 @@ rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna"
 rm -f "$staging_dir"/[0-9].[0-9]*/scripts/addons/Range_Components_Label.rar
 # web/ (runtime Web, empacotadores e template Android): sem ela Export Web e Build APK nao funcionam.
 # O runtime Web e o mesmo do Windows; WEB_RUNTIME_DIR aponta para a saida do preset web-runtime-release.
-python3 "$repo_root/tools/stage_release_web.py" "$staging_dir" \
-  --runtime-dir "${WEB_RUNTIME_DIR:-$repo_root/build-web-release/bin}"
+# SKIP_WEB=1 pula essa etapa (ex.: maquina sem o CPython wasm32 cross-compilado); o pacote sai sem web/.
+if [ "${SKIP_WEB:-0}" != "1" ]; then
+  python3 "$repo_root/tools/stage_release_web.py" "$staging_dir" \
+    --runtime-dir "${WEB_RUNTIME_DIR:-$repo_root/build-web-release/bin}"
+else
+  printf 'SKIP_WEB=1: pacote sem web/ (Export Web/Build APK ficam indisponiveis nesta copia).\n' >&2
+fi
 
 missing=""
 [ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"

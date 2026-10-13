@@ -6,6 +6,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Release 0.5.1 Linux: pacote sem web/, testes e pacote
+
+Testes do pacote de release 0.5.1: `ctest` completo (10/10, ver entrada do bevel abaixo) e a suite
+`tools/tests/web_profile` (133/133, 4 skip esperados por falta de JDK/Android SDK/Node). Dois bugs achados e
+corrigidos no caminho: `script_load_modules` usava `bpy.utils.register_module` (não existe neste `bpy.utils`;
+trocado por `register_class`) e um teste do `web_profile` apontava para
+`projects-teste/teste-editor-web/criar_m1c_nos.py`, removido do versionamento desde `794225d0`; o gerador de
+cena foi recuperado do histórico para `tools/debug/cenas/criar_cena_m1c_nos.py` (local correto para geradores
+versionados) e o teste atualizado. `tools/linux/package-runtime.sh` gerou
+`AnastacioEngine-0.5.1-linux-x86_64.tar.xz` com `SKIP_WEB=1` (ver item aberto em
+[roadmap.md](roadmap.md#web-webglwebassembly): preset `web-runtime-release` só compila no Windows/WSL,
+faltando aqui o Python wasm32 cross-compilado); o pacote Linux saiu sem `web/`, então Export Web/Build APK
+ficam indisponíveis nessa cópia especificamente.
+
 ## 2026-10-13 - Bevel: resultado não-determinístico em vértice com muitas arestas
 
 `ctest bmesh_bevel` falhava de forma intermitente (~1 em 6 execuções) no caso `Bentstar_test` (10 arestas
