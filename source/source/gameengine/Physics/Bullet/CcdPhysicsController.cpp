@@ -356,7 +356,9 @@ CcdCharacter::CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionStat
 	m_ctrl(ctrl),
 	m_motionState(motionState),
 	m_jumps(0),
-	m_maxJumps(1)
+	m_maxJumps(1),
+	m_platform(nullptr),
+	m_platformPrevTrans(btTransform::getIdentity())
 {
 }
 
@@ -367,6 +369,7 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	}
 
 	btKinematicCharacterController::updateAction(collisionWorld, dt);
+	FollowPlatform(collisionWorld);
 
 	/* Publish to the scene node only when the ghost actually moved (idle characters
 	 * otherwise trigger a node update every substep). */
@@ -375,6 +378,48 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	m_motionState->getWorldTransform(nodeTrans);
 	if (!(nodeTrans == ghostTrans)) {
 		m_motionState->setWorldTransform(ghostTrans);
+	}
+}
+
+void CcdCharacter::FollowPlatform(btCollisionWorld *collisionWorld)
+{
+	// Short ray from just above the capsule's bottom, straight down: whatever it hits is
+	// what the character is standing on this frame (independent of the base class's own
+	// internal ground test, which only cares about penetration, not the ground's motion).
+	btVector3 aabbMin, aabbMax;
+	getGhostObject()->getCollisionShape()->getAabb(getGhostObject()->getWorldTransform(), aabbMin, aabbMax);
+	const btVector3 up = getUp();
+	const btVector3 bottom = (aabbMin + aabbMax) * 0.5f - up * ((aabbMax - aabbMin).dot(up) * 0.5f);
+	const btVector3 from = bottom + up * 0.02f;
+	const btVector3 to = bottom - up * (m_stepHeight + 0.08f);
+
+	btCollisionWorld::ClosestRayResultCallback callback(from, to);
+	callback.m_collisionFilterGroup = getGhostObject()->getBroadphaseHandle()->m_collisionFilterGroup;
+	callback.m_collisionFilterMask = getGhostObject()->getBroadphaseHandle()->m_collisionFilterMask;
+	collisionWorld->rayTest(from, to, callback);
+
+	const btCollisionObject *ground = (callback.hasHit() && callback.m_collisionObject != getGhostObject())
+	                                   ? callback.m_collisionObject : nullptr;
+
+	if (ground && ground == m_platform) {
+		// Whatever rigid transform took the platform from its previous pose to its current
+		// one, apply that same transform to the character's position: translation carries it
+		// along, rotation swings it around the platform's pivot (like standing on a turntable).
+		const btTransform &platformTrans = ground->getWorldTransform();
+		if (!(platformTrans == m_platformPrevTrans)) {
+			const btTransform delta = platformTrans * m_platformPrevTrans.inverse();
+			btTransform trans = getGhostObject()->getWorldTransform();
+			trans.setOrigin(delta * trans.getOrigin());
+			// Also turn the character's own facing with the platform, not just its position,
+			// so it keeps facing the same way relative to the platform (e.g. a turntable).
+			trans.setBasis(delta.getBasis() * trans.getBasis());
+			getGhostObject()->setWorldTransform(trans);
+		}
+	}
+
+	m_platform = ground;
+	if (ground) {
+		m_platformPrevTrans = ground->getWorldTransform();
 	}
 }
 

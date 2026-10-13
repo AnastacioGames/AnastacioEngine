@@ -468,6 +468,10 @@ private:
 	unsigned char m_jumps;
 	unsigned char m_maxJumps;
 
+	/// Moving platform tracking (see FollowPlatform()).
+	const btCollisionObject *m_platform;
+	btTransform m_platformPrevTrans;
+
 public:
 	CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionState, btPairCachingGhostObject *ghost, btConvexShape *shape, float stepHeight);
 
@@ -491,6 +495,11 @@ public:
 
 	/// Replace current convex shape.
 	void ReplaceShape(btConvexShape *shape);
+
+	/// Carries the character along whatever rigid body it stands on (moving platform),
+	/// since btKinematicCharacterController on its own only cancels penetration and
+	/// doesn't track the ground's own motion. Translation only, no rotation.
+	void FollowPlatform(btCollisionWorld *collisionWorld);
 
 	// PHY_ICharacter interface
 	virtual void Jump()
