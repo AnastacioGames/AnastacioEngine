@@ -310,10 +310,9 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
   varios minutos. Cubins CUDA para sm_75/sm_86/sm_89/sm_120 (RTX 20/30/40/50) no release desde 2026-09-26;
   so sm_120 testado em hardware real. OSL fica desligado (sem pacote no Ubuntu
   24.04; exige OSL 1.9 com LLVM antigo).
-- Portar `WITH_OPENCOLORIO` (API 1 → 2.x, dezenas de call sites em `intern/opencolorio`) e `WITH_CODEC_FFMPEG`
-  do editor para OpenColorIO 2.x/FFmpeg 5+. Só necessário fora do container 22.04 (Ubuntu 24.04+ só tem OCIO
-  2.x): o container usa a OCIO 1.1.1 do apt desde 2026-09-30. FFmpeg segue desligado; só o wrapper `audaspace`
-  do FFmpeg foi ajustado.
+- ~~Portar `WITH_OPENCOLORIO` e `WITH_CODEC_FFMPEG` para OpenColorIO 2.x/FFmpeg 5+~~ **Feito (2026-10-13)**:
+  compila e passa nos testes no Ubuntu 24.04 (ver changelog). Falta: compilar no Windows/MSVC e decidir se o
+  pacote Linux liga o FFmpeg (presets seguem com `WITH_CODEC_FFMPEG=OFF`).
 
 ### Cutscene nativo
 

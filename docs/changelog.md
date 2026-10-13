@@ -6,6 +6,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Linux: OpenColorIO 2.x, FFmpeg 5+, Ctrl+C no player e imgui.ini
+
+Trazido do branch `claude/project-thread-q8gfb3` (trabalho de 2026-10-04 que nunca tinha entrado no `main`).
+
+- **OpenColorIO 2.x** (`intern/opencolorio`, caminho 2.x atras de `OCIO_VERSION_HEX`, 1.x intocado; Cycles usa
+  o CPU processor da 2.x). A 2.x escondia Filmic, Film e False Color (fora de `active_views`): o wrapper lista
+  todas, como a 1.x. `config.ocio`: papel `XYZ` virou `cie_xyz_d65_interchange` (a 2.x recusava o arquivo) e
+  `DCIP3`, display inexistente, saiu de `active_displays`.
+- **FFmpeg 5+/6.x**: shims em `ffmpeg_compat.h` so para libavcodec >= 59; `VideoFFmpeg`, `anim_movie`, `util`,
+  `indexer` e `writeffmpeg` (export de video e audio) funcionam com 4.x e 6.x. Presets Linux seguem com
+  `WITH_CODEC_FFMPEG=OFF` (decisao de empacotamento); ligar com `-DWITH_CODEC_FFMPEG=ON`.
+- **Player: SIGINT e segundo sinal.** Mantido o mecanismo do `main` (`LA_SigTermRequested`, 570c1108); Ctrl+C
+  (SIGINT) usa o mesmo caminho e um segundo SIGTERM/SIGINT mata o processo (jogo travado antes do proximo frame).
+- **`imgui.ini`**: no Linux nascia um arquivo chamado `\imgui.ini`; agora `program_dir + "imgui.ini"`.
+- Testes (2026-10-13): build no Ubuntu 24.04 (OCIO 2.1.3, FFmpeg 6.1, `-DWITH_CODEC_FFMPEG=ON`):
+  `tools/linux/av_ports_test.py` 14/14 (views do OCIO, export MP4/MKV/OGG/AVI com audio e cores, filme como
+  imagem e strip, proxy); `tools/linux/video_texture_test.py` H.264, MPEG-4, VP9 e MJPEG em ordem e em loop;
+  SIGTERM e SIGINT fecham em ~0,05 s com codigo 0, jogo preso em loop Python sai no segundo SIGTERM. Container
+  22.04 (OCIO 1.1.1, pacote oficial) compila e empacota sem regressao. Windows/MSVC nao compilado.
+
 ## 2026-10-12 - Preparacao da release 0.5.0 (Windows, Linux e Web)
 
 - Versao: `ANASTACIO_VERSION_STRING` e About (`wm.py`) ja em 0.5.0 (6eec04e2); `container-build-22.04.sh` com `VERSION` padrao 0.5.0.
