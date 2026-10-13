@@ -76,6 +76,19 @@ def check_crash(fnc, args=None):
     print_fail_msg_and_exit("test failed")
 
 
+def read_factory_settings():
+    # AnastacioEngine: the factory scene has no "Lamp"/"Camera" objects
+    # (it uses "Auto World Sun"), so create the ones this test relies on.
+    bpy.ops.wm.read_factory_settings()
+    scene = bpy.context.scene
+    for name, data in (
+            ("Lamp", lambda: bpy.data.lamps.new("Lamp", 'POINT')),
+            ("Camera", lambda: bpy.data.cameras.new("Camera")),
+    ):
+        if name not in bpy.data.objects:
+            scene.objects.link(bpy.data.objects.new(name, data()))
+
+
 def init():
     bpy.utils.register_class(TestClass)
     bpy.types.Object.prop_array = bpy.props.CollectionProperty(
@@ -85,7 +98,7 @@ def init():
 
 
 def make_lib():
-    bpy.ops.wm.read_factory_settings()
+    read_factory_settings()
 
     # datablock pointer to the Camera object
     bpy.data.objects["Cube"].prop = bpy.data.objects['Camera']
@@ -129,7 +142,7 @@ def check_lib():
 
 def check_lib_linking():
     # open startup file
-    bpy.ops.wm.read_factory_settings()
+    read_factory_settings()
 
     # link scene to the startup file
     with bpy.data.libraries.load(lib_path, link=True) as (data_from, data_to):
@@ -147,7 +160,8 @@ def check_lib_linking():
 def check_linked_scene_copying():
     # full copy of the scene with datablock props
     bpy.ops.wm.open_mainfile(filepath=test_path)
-    bpy.data.screens['Default'].scene = bpy.data.scenes["Scene_lib"]
+    # AnastacioEngine startup has no "Default" screen.
+    bpy.data.screens[0].scene = bpy.data.scenes["Scene_lib"]
     bpy.ops.scene.new(type='FULL_COPY')
 
     # check save/open
@@ -167,7 +181,8 @@ def check_linked_scene_copying():
 def check_scene_copying():
     # full copy of the scene with datablock props
     bpy.ops.wm.open_mainfile(filepath=lib_path)
-    bpy.data.screens['Default'].scene = bpy.data.scenes["Scene_lib"]
+    # AnastacioEngine startup has no "Default" screen.
+    bpy.data.screens[0].scene = bpy.data.scenes["Scene_lib"]
     bpy.ops.scene.new(type='FULL_COPY')
 
     path = test_path + "_"
@@ -186,7 +201,7 @@ def check_scene_copying():
 
 # count users
 def test_users_counting():
-    bpy.ops.wm.read_factory_settings()
+    read_factory_settings()
     lamp_us = bpy.data.objects["Lamp"].data.users
     n = 1000
     for i in range(0, n):

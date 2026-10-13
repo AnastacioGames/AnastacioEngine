@@ -39,6 +39,14 @@ BLACKLIST = {
 
     # The unpacked wheel is only loaded when actually used, not directly on import:
     os.path.join("io_blend_utils", "blender_bam-unpacked.whl"),
+
+    # AnastacioEngine: game-only modules, they import the `Range` runtime module.
+    os.path.join("Range_Particle_Emitter", "Range_Emitter"),
+    os.path.join("anastacio_network", "component"),
+    # Not an importable package name (space and hyphen).
+    "BGE Post-Process",
+    # Helper modules imported by add-ons through `sys.path`, not add-ons themselves.
+    os.path.join("addons", "modules"),
 }
 
 # Some modules need to add to the `sys.path`.
@@ -221,14 +229,14 @@ def load_modules():
     # check which filepaths we didn't load
     source_files = []
     for mod_dir in module_paths:
-        source_files.extend(source_list(mod_dir, filename_check=lambda f: f.endswith(".py")))
+        source_files.extend(os.path.normpath(f) for f in source_list(mod_dir, filename_check=lambda f: f.endswith(".py")))
 
     source_files = list(set(source_files))
     source_files.sort()
 
     #
     # remove loaded files
-    loaded_files = list({m.__file__ for m in modules})
+    loaded_files = list({os.path.normpath(m.__file__) for m in modules})
     loaded_files.sort()
 
     for f in loaded_files:

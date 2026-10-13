@@ -114,22 +114,32 @@ add_test(
 	--python ${CMAKE_CURRENT_LIST_DIR}/bl_pyapi_idprop_datablock.py
 )
 
-# ------------------------------------------------------------------------------
-# MODELING TESTS
-add_test(
-	NAME bmesh_bevel
-	COMMAND "$<TARGET_FILE:RangeEngine>" ${TEST_BLENDER_EXE_PARAMS}
-	${TEST_SRC_DIR}/modeling/bevel_regression.blend
-	--python-text run_tests
-)
-
+# AnastacioEngine: own boolean test (upstream bool_regression.blend is only
+# available in a newer, unreadable format).
 add_test(
 	NAME bmesh_boolean
 	COMMAND "$<TARGET_FILE:RangeEngine>" ${TEST_BLENDER_EXE_PARAMS}
-	${TEST_SRC_DIR}/modeling/bool_regression.blend
+	--python ${CMAKE_CURRENT_LIST_DIR}/bl_bmesh_boolean.py
+)
+
+# AnastacioEngine: bevel reference regenerated with our bevel (2.80 backport:
+# offset_on_edge_between, square profile, adjustment solver), kept in the repo.
+add_test(
+	NAME bmesh_bevel
+	COMMAND "$<TARGET_FILE:RangeEngine>" ${TEST_BLENDER_EXE_PARAMS}
+	${CMAKE_CURRENT_LIST_DIR}/../data/modeling/bevel_regression.blend
 	--python-text run_tests
 )
 
+# AnastacioEngine: the tests below need the upstream test data (lib/tests),
+# which is not part of the repository. Skip them when it is missing.
+if(NOT IS_DIRECTORY ${TEST_SRC_DIR})
+	message(STATUS "Test data not found (${TEST_SRC_DIR}), skipping data-dependent Python tests")
+	return()
+endif()
+
+# ------------------------------------------------------------------------------
+# MODELING TESTS
 add_test(
 	NAME bmesh_split_faces
 	COMMAND "$<TARGET_FILE:RangeEngine>" ${TEST_BLENDER_EXE_PARAMS}
@@ -220,6 +230,8 @@ endif()
 
 
 # PLY Import tests
+# AnastacioEngine: the io_mesh_ply add-on is not shipped.
+if(FALSE)
 add_test(
 	NAME import_ply_cube
 	COMMAND "$<TARGET_FILE:RangeEngine>" ${TEST_BLENDER_EXE_PARAMS}
@@ -280,6 +292,7 @@ add_test(
 	--md5_source=${TEST_OUT_DIR}/export_ply_vertices.ply
 	--md5=37faba0aa2014451b27f951afa92f870 --md5_method=FILE
 )
+endif()
 
 
 # STL Import tests

@@ -14,13 +14,14 @@ class TestHelper:
         return self._id
 
     def setUp(self):
-        self._id = bpy.context.scene
-        self._id.pop("cycles", None)
+        # AnastacioEngine addons store ID properties on the scene, use a clean ID.
+        self._id = bpy.data.texts.new("idprop_test")
         assert(len(self._id.keys()) == 0)
 
     def tearDown(self):
         for key in list(self._id.keys()):
             del self._id[key]
+        bpy.data.texts.remove(self._id)
 
     def assertAlmostEqualSeq(self, list1, list2):
         self.assertEqual(len(list1), len(list2))

@@ -4746,19 +4746,19 @@ def register():
     from bpy.utils import register_class
 
     # props
-    bpy.types.Scene.NWBusyDrawing : StringProperty(
+    bpy.types.Scene.NWBusyDrawing = StringProperty(
         name="Busy Drawing!",
         default="",
         description="An internal property used to store only the first mouse position")
-    bpy.types.Scene.NWLazySource : StringProperty(
+    bpy.types.Scene.NWLazySource = StringProperty(
         name="Lazy Source!",
         default="x",
         description="An internal property used to store the first node in a Lazy Connect operation")
-    bpy.types.Scene.NWLazyTarget : StringProperty(
+    bpy.types.Scene.NWLazyTarget = StringProperty(
         name="Lazy Target!",
         default="x",
         description="An internal property used to store the last node in a Lazy Connect operation")
-    bpy.types.Scene.NWSourceSocket : IntProperty(
+    bpy.types.Scene.NWSourceSocket = IntProperty(
         name="Source Socket!",
         default=0,
         description="An internal property used to store the source socket in a Lazy Connect operation")

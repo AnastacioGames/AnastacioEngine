@@ -7529,6 +7529,40 @@ static int pyrna_deferred_register_class_recursive(StructRNA *srna, PyTypeObject
 	return pyrna_deferred_register_props(srna, py_class->tp_dict); /* getattr(..., "__dict__") returns a proxy */
 }
 
+/**
+ * AnastacioEngine: 2.79 style `name = bpy.props.XxxProperty()` class attributes.
+ * The type-hints path only reads annotations, register these too so older add-ons keep working.
+ */
+static int pyrna_deferred_register_class_attrs_recursive(StructRNA *srna, PyTypeObject *py_class)
+{
+	const int len = PyTuple_GET_SIZE(py_class->tp_bases);
+	PyObject *item, *key;
+	Py_ssize_t pos = 0;
+	int i, ret;
+
+	for (i = 0; i < len; i++) {
+		PyTypeObject *py_superclass = (PyTypeObject *)PyTuple_GET_ITEM(py_class->tp_bases, i);
+		if (py_superclass != &PyBaseObject_Type &&
+		    !PyObject_IsSubclass((PyObject *)py_superclass, (PyObject *)&pyrna_struct_Type))
+		{
+			ret = pyrna_deferred_register_class_attrs_recursive(srna, py_superclass);
+			if (ret != 0) {
+				return ret;
+			}
+		}
+	}
+
+	while (PyDict_Next(py_class->tp_dict, &pos, &key, &item)) {
+		if (BPy_PropDeferred_CheckTypeExact(item)) {
+			ret = deferred_register_prop(srna, key, item);
+			if (ret != 0) {
+				return ret;
+			}
+		}
+	}
+	return 0;
+}
+
 int pyrna_deferred_register_class(StructRNA *srna, PyTypeObject *py_class)
 {
 	/* Panels and Menus don't need this
@@ -7544,7 +7578,11 @@ int pyrna_deferred_register_class(StructRNA *srna, PyTypeObject *py_class)
 #endif
 
 	if (use_postponed_annotations) {
-		return pyrna_deferred_register_class_from_type_hints(srna, py_class);
+		int ret = pyrna_deferred_register_class_from_type_hints(srna, py_class);
+		if (ret == 0) {
+			ret = pyrna_deferred_register_class_attrs_recursive(srna, py_class);
+		}
+		return ret;
 	}
 
 	return pyrna_deferred_register_class_recursive(srna, py_class);
