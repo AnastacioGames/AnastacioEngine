@@ -623,7 +623,7 @@ PyObject *KX_MeshBuilder::pyattr_get_slots(EXP_PyObjectPlus *self_v, const EXP_P
 PyObject *KX_MeshBuilder::PyAddSlot(PyObject *args, PyObject *kwds)
 {
 	PyObject *pymat;
-	int primitive;
+	int primitive = RAS_DisplayArray::TRIANGLES;
 
 	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "O|i:addSlot", {"material", "primitive", 0}, &pymat, &primitive)) {
 		return nullptr;
