@@ -14,19 +14,38 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.0)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.5.1](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.1)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz.sha256) |
-| [RangeArmor 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/RangeArmor-0.5.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/SHA256SUMS.txt) |
+| [Windows x64 (0.5.1)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/AnastacioEngine-0.5.1-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
+| [Linux x86_64 (0.5.1)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/AnastacioEngine-0.5.1-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. Sem `web/` nesta build (ver notas da release). |
+| [RangeArmor 0.5.1](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/RangeArmor-0.5.1-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. |
+| [SHA-256 dos pacotes acima](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `RangeEngine` (Linux).
 Para rodar um jogo exportado no Windows, use `AnastacioRuntime.exe`; no Linux, `RangeRuntime`. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.5.1
+
+Versão de correções sobre a 0.5.0, com foco em estabilidade no Linux, export Web/Android e no shading PBR.
+
+- **Export Web/Android:** o template Android e a pasta `web/` completa agora vão para o pacote (zip Windows
+  e tar Linux); faltando isso, o Build APK falhava com "Android template not found" na 0.5.0.
+- **Linux:** OpenColorIO 2.x (Ubuntu 24.04+, mantendo 1.x), Cycles com OpenColorIO 2.x, FFmpeg 5+/6.x,
+  correções de link que impediam a build em alguns ambientes, `SIGTERM`/`SIGINT` encerrando o jogo
+  corretamente, probe de SSGI sem depender de `ctypes.WinDLL`.
+- **ORM:** dá para escolher quais das três influências (Diffuse Ref, Specular Intensity, Ambient) recebem a
+  Occlusion do "RGB to ORM", em vez de sobrescrever as três sempre; arquivos antigos continuam iguais.
+- **Sombra colorida (Sun com CSM):** a mancha colorida no chão sob vitrais aparece corretamente com cascatas.
+- **SSGI:** não corta mais vidros em Alpha Blend pela metade.
+- Destruição treme a câmera ativa; personagem acompanha plataformas móveis; `MeshBuilder.addSlot` sem
+  `primitive` usa triângulos; validação de componentes não trava mais em projetos sem `Range.network`/`audio`/`texture`.
+
+Lista completa na [página da release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.1).
 
 ## Novidades da 0.5.0
 
