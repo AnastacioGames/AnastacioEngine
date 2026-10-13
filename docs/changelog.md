@@ -17,7 +17,8 @@ Um usuário publicou o jogo Web com o painel de framerate/profile ligado (flag s
   Framerate/Profile e Debug Properties só durante o salvamento da cópia (`.rasec`/runtime) e os religa depois;
   mesma opção "Keep debug overlays" nos dois. Physics Visualization fica de fora (o player não lê `-g show_physics`).
 - Testes (2026-10-13): cópias salvas em background saem com as flags desligadas (ligadas com a opção) e a cena
-  volta ao estado anterior; `index.html` gerado com e sem `--debug-overlays`. Não rodado no navegador.
+  volta ao estado anterior; no Chrome headless o mesmo `.range` (overlay ligado) roda sem o painel no pacote
+  padrão e com o painel usando `--debug-overlays`.
 
 ## 2026-10-13 - Linux: OpenColorIO 2.x, FFmpeg 5+, Ctrl+C no player e imgui.ini
 
