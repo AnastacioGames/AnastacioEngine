@@ -58,7 +58,7 @@ typedef struct MTex {
 	char projx, projy, projz, mapping;
 	char brush_map_mode, brush_angle_mode;
 	char gray_mode;
-	char pad[1];
+	char orm_occlusion_to;	/* MTEX_ORM_OCC_* : which non-PBR influences the ORM red channel drives */
 	float ofs[3], size[3], rot, random_angle;
 
 	short texflag, colormodel, pmapto, pmaptoneg;
@@ -523,6 +523,12 @@ typedef struct ColorMapping {
 
 #define MTEX_PARALLAX_UV		32768 // texflag
 #define MTEX_DISCARD_AT_EDGES	1     // parflag
+
+/* orm_occlusion_to: which non-PBR influences the ORM red channel (Occlusion) overrides
+ * when MTEX_ALPHAMIX (use_rgb_to_orm) is set, instead of always hitting all three. */
+#define MTEX_ORM_OCC_DIFFUSE	(1 << 0)
+#define MTEX_ORM_OCC_SPECULAR	(1 << 1)
+#define MTEX_ORM_OCC_AMBIENT	(1 << 2)
 
 
 /* blendtype */

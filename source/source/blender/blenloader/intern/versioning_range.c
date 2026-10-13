@@ -49,6 +49,7 @@
 #include "DNA_sdna_types.h"
 #include "DNA_sensor_types.h"
 #include "DNA_space_types.h"
+#include "DNA_texture_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 
@@ -703,6 +704,22 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     /* Atmospheric sky got its own parameters; old Worlds start with Earth air. */
     LISTBASE_FOREACH (World *, wo, &main->world) {
       BKE_world_atmosphere_defaults(wo);
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "MTex", "char", "orm_occlusion_to")) {
+    /* MTex.orm_occlusion_to replaces a repurposed pad[1] byte and lets the "RGB to ORM"
+     * Occlusion channel target only some of Diffuse Ref/Specular/Ambient instead of all
+     * three unconditionally. It always reads 0 from an old file, which would silently
+     * stop Occlusion from reaching any of them, so seed every slot with all three set
+     * to match the previous, unconditional behavior. */
+    LISTBASE_FOREACH (Material *, ma, &main->mat) {
+      for (int i = 0; i < MAX_MTEX; i++) {
+        MTex *mtex = ma->mtex[i];
+        if (mtex != NULL) {
+          mtex->orm_occlusion_to = MTEX_ORM_OCC_DIFFUSE | MTEX_ORM_OCC_SPECULAR | MTEX_ORM_OCC_AMBIENT;
+        }
+      }
     }
   }
 }

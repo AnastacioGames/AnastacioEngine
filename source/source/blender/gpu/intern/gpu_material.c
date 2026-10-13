@@ -3325,7 +3325,8 @@ static void do_material_tex(GPUShadeInput *shi)
 					if (mtex->difffac == 1.0f && (ma->constflag & MA_CONSTANT_TEXTURE)) difffac = stencil;
 					else GPU_link(mat, "math_multiply", GPU_select_uniform(&mtex->difffac, GPU_DYNAMIC_TEX_COLINTENS, NULL, ma), stencil, &difffac);
 
-					if (mtex->texflag & MTEX_ALPHAMIX) GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
+					if ((mtex->texflag & MTEX_ALPHAMIX) && (mtex->orm_occlusion_to & MTEX_ORM_OCC_DIFFUSE))
+						GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
 
 					texture_value_blend(
 					        mat, GPU_uniform(&mtex->def_var), shi->refl, tin, difffac,
@@ -3338,7 +3339,8 @@ static void do_material_tex(GPUShadeInput *shi)
 					if (mtex->specfac == 1.0f && (ma->constflag & MA_CONSTANT_TEXTURE)) specfac = stencil;
 					else GPU_link(mat, "math_multiply", GPU_select_uniform(&mtex->specfac, GPU_DYNAMIC_TEX_SPECINTENS, NULL, ma), stencil, &specfac);
 
-					if (mtex->texflag & MTEX_ALPHAMIX) GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
+					if ((mtex->texflag & MTEX_ALPHAMIX) && (mtex->orm_occlusion_to & MTEX_ORM_OCC_SPECULAR))
+						GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
 
 					texture_value_blend(
 					        mat, GPU_uniform(&mtex->def_var), shi->spec, tin, specfac,
@@ -3385,7 +3387,8 @@ static void do_material_tex(GPUShadeInput *shi)
 					if (mtex->ambfac == 1.0f) ambfac = stencil;
 					else GPU_link(mat, "math_multiply", GPU_uniform(&mtex->ambfac), stencil, &ambfac);
 
-					if (mtex->texflag & MTEX_ALPHAMIX) GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
+					if ((mtex->texflag & MTEX_ALPHAMIX) && (mtex->orm_occlusion_to & MTEX_ORM_OCC_AMBIENT))
+						GPU_link(mat, "mtex_red_from_col", trgb, &tin); // ORM occlusion
 
 					texture_value_blend(
 					        mat, GPU_uniform(&mtex->def_var), shi->amb, tin, ambfac,

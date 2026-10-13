@@ -1374,6 +1374,13 @@ class TEXTURE_PT_game_influence(TextureSlotPanel, Panel):
 
             col = split.column()
             col.prop(tex, "use_rgb_to_orm", text="ORM")
+            sub = col.column()
+            sub.active = getattr(tex, "use_rgb_to_orm")
+            sub.label(text="Occlusion applies to:")
+            subrow = sub.row(align=True)
+            subrow.prop(tex, "use_orm_occlusion_diffuse", text="Diffuse", toggle=True)
+            subrow.prop(tex, "use_orm_occlusion_specular", text="Specular", toggle=True)
+            subrow.prop(tex, "use_orm_occlusion_ambient", text="Ambient", toggle=True)
             row = col.row()
             row.prop(tex, "use_stencil")
             sub = row.row()

@@ -708,6 +708,21 @@ static void rna_def_mtex(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "RGB to ORM", "Interpret texture RGB as Occlusion, Roughness and Metalness");
 	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
 
+	prop = RNA_def_property(srna, "use_orm_occlusion_diffuse", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "orm_occlusion_to", MTEX_ORM_OCC_DIFFUSE);
+	RNA_def_property_ui_text(prop, "Diffuse Ref", "ORM Occlusion (red channel) multiplies this slot's Diffuse Ref influence");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+
+	prop = RNA_def_property(srna, "use_orm_occlusion_specular", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "orm_occlusion_to", MTEX_ORM_OCC_SPECULAR);
+	RNA_def_property_ui_text(prop, "Specular Intensity", "ORM Occlusion (red channel) multiplies this slot's Specular Intensity influence");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+
+	prop = RNA_def_property(srna, "use_orm_occlusion_ambient", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "orm_occlusion_to", MTEX_ORM_OCC_AMBIENT);
+	RNA_def_property_ui_text(prop, "Ambient", "ORM Occlusion (red channel) multiplies this slot's Ambient influence");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+
 	prop = RNA_def_property(srna, "channel", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "gray_mode");
 	RNA_def_property_enum_items(prop, prop_tex_channel_items);

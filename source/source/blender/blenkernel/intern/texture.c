@@ -368,6 +368,7 @@ void BKE_texture_mtex_default(MTex *mtex)
 	mtex->size[2] = 1.0;
 	mtex->tex = NULL;
 	mtex->texflag = MTEX_3TAP_BUMP | MTEX_BUMP_OBJECTSPACE | MTEX_MAPTO_BOUNDS;
+	mtex->orm_occlusion_to = MTEX_ORM_OCC_DIFFUSE | MTEX_ORM_OCC_SPECULAR | MTEX_ORM_OCC_AMBIENT;
 	mtex->colormodel = 0;
 	mtex->r = 1.0;
 	mtex->g = 0.0;
