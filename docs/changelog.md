@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Bevel: resultado não-determinístico em vértice com muitas arestas
+
+`ctest bmesh_bevel` falhava de forma intermitente (~1 em 6 execuções) no caso `Bentstar_test` (10 arestas
+convergindo num vértice), por "Vertex Coordinate Mismatch". `adjust_offsets` (`bmesh_bevel.c`) percorria
+`bp->vert_hash` (GHash indexado por ponteiro `BMVert *`) para decidir por qual vértice começar a caminhada
+de cada cadeia/ciclo de offsets; a ordem de iteração de um GHash por ponteiro depende do endereço de alocação
+e não é reprodutível entre execuções, e o ponto de partida do ciclo muda o arredondamento final do float
+(dentro da tolerância apertada do teste, `FLT_EPSILON * 60`). A própria `BM_mesh_bevel` já evita esse problema
+em outro trecho (comentário no código: usa `BM_ITER_MESH`, ordem determinística por índice do vértice, em vez
+de `GHASH_ITER`); `adjust_offsets` passou a fazer o mesmo na primeira passada (a sensível à ordem), recebendo
+`bm` como parâmetro. Testado: `ctest -R bmesh_bevel` 10/10 em execuções separadas, suite completa 100%.
+
 ## 2026-10-13 - Release 0.5.1: ORM Occlusion por canal e versão
 
 `ANASTACIO_VERSION_STRING` e o splash (`wm.py`) foram para `0.5.1`. A Occlusion (canal R) do "RGB to ORM"

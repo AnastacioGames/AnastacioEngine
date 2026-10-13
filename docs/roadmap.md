@@ -805,12 +805,6 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 
 ## Validações manuais pendentes
 
-- `ctest bmesh_bevel` intermitente: `Bentstar_test` (10 arestas convergindo num vértice) falha por "Vertex
-  Coordinate Mismatch" em ~1 de 6 execuções, tolerância `FLT_EPSILON * 60` em `rna_Mesh_unit_test_compare`.
-  `bmesh_bevel.c` não foi alterado em nenhum commit recente (pré-existente, não é regressão da 0.5.1).
-  Investigar a fonte da não-determinismo (suspeita: ordem de iteração de hash/ponteiro no caso degenerado de
-  muitas arestas no mesmo vértice) antes de tocar no algoritmo do bevel.
-
 - Tesla Rhythm: avaliar overlay, enquadramento e latência percebida no jogo real;
   [modo de cinco pistas via Python Component](tesla-rhythm.md) passou sonda no runtime.
 
