@@ -445,6 +445,9 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 		PyDict_DelItemString(sys_modules, "Range.constraints"); \
 		PyDict_DelItemString(sys_modules, "Range.application"); \
 		PyDict_DelItemString(sys_modules, "Range.imgui"); \
+		PyDict_DelItemString(sys_modules, "Range.network"); \
+		PyDict_DelItemString(sys_modules, "Range.audio"); \
+		PyDict_DelItemString(sys_modules, "Range.texture"); \
 		BLI_split_dir_part(maggie->name, path, sizeof(path)); \
 		pypath = PyC_UnicodeFromByte(path); \
 		index = PySequence_Index(sys_path, pypath); \
@@ -497,6 +500,14 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 	PyModule_AddObject(rangemod, "types", rangesubmod);
 	PyType_Ready(&PythonComponentType);
 	PyModule_AddObject(rangesubmod, "KX_PythonComponent", (PyObject *)&PythonComponentType);
+	/* "from Range.network import steam" resolves "steam" as an attribute of whatever
+	 * module "Range.network" names (rangesubmod here, since every fake submodule
+	 * aliases it) rather than falling back to a "Range.network.steam" sys.modules
+	 * entry -- CPython's _handle_fromlist uses the module's own __name__ ("types")
+	 * for that fallback, so a sys.modules alias under "Range.network.steam" would
+	 * never be found. Setting the attribute directly makes the import succeed. */
+	Py_INCREF(Py_None);
+	PyModule_AddObject(rangesubmod, "steam", Py_None);
 
 	PyDict_SetItemString(sys_modules, "Range", rangemod);
 	PyDict_SetItemString(sys_modules, "Range.types", rangesubmod);
@@ -507,6 +518,9 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 	PyDict_SetItemString(sys_modules, "Range.constraints", rangesubmod);
 	PyDict_SetItemString(sys_modules, "Range.application", rangesubmod);
 	PyDict_SetItemString(sys_modules, "Range.imgui", rangesubmod);
+	PyDict_SetItemString(sys_modules, "Range.network", rangesubmod);
+	PyDict_SetItemString(sys_modules, "Range.audio", rangesubmod);
+	PyDict_SetItemString(sys_modules, "Range.texture", rangesubmod);
 	PyDict_SetItemString(PyModule_GetDict(rangemod), "__component__", Py_True);
 
 	// Try to load up the module
