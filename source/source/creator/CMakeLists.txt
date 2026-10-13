@@ -1221,14 +1221,25 @@ add_dependencies(RangeEngine makesdna)
 # --start-group/--end-group makes ld re-scan the group until everything
 # resolves, regardless of order. Same fix as RangeRuntime in
 # source/blenderplayer/CMakeLists.txt.
+#
+# Wrapping just this target_link_libraries(${LIB}) call isn't enough: CMake
+# expands ${LIB}'s transitive usage requirements and re-emits a second copy
+# of some libraries (still in the wrong order) *after* our --end-group, out
+# of the group. So --start-group has to be the very first library-related
+# call and --end-group the very last (after setup_liblinks), since CMake
+# appends each target_link_libraries call, and any transitive expansion it
+# injects, strictly in call order.
 if(UNIX AND NOT APPLE)
-	target_link_libraries(RangeEngine -Wl,--start-group ${LIB} -Wl,--end-group)
-else()
-	target_link_libraries(RangeEngine ${LIB})
+	target_link_libraries(RangeEngine -Wl,--start-group)
 endif()
+target_link_libraries(RangeEngine ${LIB})
 unset(LIB)
 
 setup_liblinks(RangeEngine)
+
+if(UNIX AND NOT APPLE)
+	target_link_libraries(RangeEngine -Wl,--end-group)
+endif()
 
 # -----------------------------------------------------------------------------
 # Setup launcher
