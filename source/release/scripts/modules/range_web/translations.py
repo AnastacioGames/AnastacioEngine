@@ -21,6 +21,10 @@ _PT_BR = {
     "Open after export": "Abrir após exportar",
     "After exporting, starts a local server and opens the game in the default browser":
         "Depois de exportar, sobe um servidor local e abre o jogo no navegador padrão",
+    "Keep debug overlays": "Manter overlays de depuração",
+    "Keeps the framerate/profile and debug properties overlays in the exported game "
+        "as saved in the scene. Off: the published game never shows them":
+        "Mantém no jogo exportado os overlays de framerate/profile e de propriedades de depuração como estão na cena. Desligado: o jogo publicado nunca os mostra",
     "Destination": "Destino",
     "Output directory of the Web package": "Diretório de saída do pacote Web",
 

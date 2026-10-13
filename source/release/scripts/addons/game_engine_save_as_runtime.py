@@ -80,7 +80,7 @@ def WriteAppleRuntime(player_path, output_path, copy_python, overwrite_lib):
     # Python doesn't need to be copied for OS X since it's already inside blenderplayer.app
 
 
-def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls, copy_scripts, copy_datafiles, report=print, steam_complement_dir=""):
+def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls, copy_scripts, copy_datafiles, report=print, steam_complement_dir="", keep_debug_overlays=False):
     import struct
     if steam_complement_dir:
         steam_complement_dir = bpy.path.abspath(steam_complement_dir)
@@ -112,11 +112,13 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     # Create a tmp blend file (Blenderplayer doesn't like compressed blends)
     tempdir = tempfile.mkdtemp()
     blend_path = os.path.join(tempdir, bpy.path.clean_name(output_path))
-    bpy.ops.wm.save_as_mainfile(filepath=blend_path,
-                                relative_remap=True,
-                                compress=False,
-                                copy=True,
-                                )
+    from bl_operators.wm import export_debug_overlays_off
+    with export_debug_overlays_off(keep_debug_overlays):
+        bpy.ops.wm.save_as_mainfile(filepath=blend_path,
+                                    relative_remap=True,
+                                    compress=False,
+                                    copy=True,
+                                    )
 
     # Get the blend data
     blend_file = open(blend_path, 'rb')
@@ -283,6 +285,13 @@ class SaveAsRuntime(bpy.types.Operator):
             default=True,
             )
 
+    keep_debug_overlays: BoolProperty(
+            name="Keep debug overlays",
+            description="Keeps the framerate/profile and debug properties overlays in the exported game "
+                        "as saved in the scene. Off: the published game never shows them",
+            default=False,
+            )
+
     steam_complement_dir: StringProperty(
             name="Steam Complement Folder",
             description="Optional: include Steam DLLs from this folder; leave empty for LAN/IP",
@@ -312,6 +321,7 @@ class SaveAsRuntime(bpy.types.Operator):
                      self.copy_datafiles,
                      self.report,
                      steam_complement_dir=self.steam_complement_dir,
+                     keep_debug_overlays=self.keep_debug_overlays,
                      )
         if not success:
             return {'CANCELLED'}

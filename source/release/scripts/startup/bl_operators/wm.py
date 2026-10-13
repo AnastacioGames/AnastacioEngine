@@ -19,7 +19,7 @@
 # <pep8 compliant>
 from __future__ import annotations
 
-import bpy, os, json, shutil
+import bpy, os, json, shutil, contextlib
 from bpy.types import (
     Menu,
     Operator,
@@ -2667,6 +2667,28 @@ class WM_OT_create_project(Operator):
         return {'FINISHED'}
 
 
+# Overlays de depuração que o jogo exportado lê das flags da cena. O usuário costuma esquecê-los
+# ligados; a cópia publicada sai sem eles, e as cenas voltam ao estado anterior logo depois.
+_EXPORT_DEBUG_OVERLAYS = ("show_framerate_profile", "show_debug_properties")
+
+
+@contextlib.contextmanager
+def export_debug_overlays_off(keep=False):
+    changed = []
+    if not keep:
+        for scene in bpy.data.scenes:
+            gs = scene.game_settings
+            for prop in _EXPORT_DEBUG_OVERLAYS:
+                if getattr(gs, prop):
+                    setattr(gs, prop, False)
+                    changed.append((gs, prop))
+    try:
+        yield
+    finally:
+        for gs, prop in changed:
+            setattr(gs, prop, True)
+
+
 def _rangearmor_write_export_preset(context):
     """Sync the export preset fields from Scene.rangearmor_export into the
     project's launcher/config.json, without touching any other key.
@@ -2709,13 +2731,14 @@ def _rangearmor_write_export_preset(context):
     # again must never reuse an old snapshot.
     rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
     rasec_path = os.path.join(data_dir, rasec_name)
-    saved = bpy.ops.wm.save_as_mainfile_protected(
-        'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    export_settings = getattr(context.scene, "rangearmor_export", None)
+    with export_debug_overlays_off(export_settings is not None and export_settings.keep_debug_overlays):
+        saved = bpy.ops.wm.save_as_mainfile_protected(
+            'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
     if 'FINISHED' not in saved or not os.path.isfile(rasec_path):
         return False
     config_data["MainFile"] = rasec_name
 
-    export_settings = getattr(context.scene, "rangearmor_export", None)
     if export_settings is None:
         try:
             with open(config_path, "w", encoding="utf-8") as config_file:

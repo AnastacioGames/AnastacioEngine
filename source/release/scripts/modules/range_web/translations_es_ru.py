@@ -18,6 +18,10 @@ ES = {
     "Open after export": "Abrir tras exportar",
     "After exporting, starts a local server and opens the game in the default browser":
         "Tras exportar, inicia un servidor local y abre el juego en el navegador predeterminado",
+    "Keep debug overlays": "Mantener overlays de depuración",
+    "Keeps the framerate/profile and debug properties overlays in the exported game "
+        "as saved in the scene. Off: the published game never shows them":
+        "Mantiene en el juego exportado los overlays de framerate/profile y de propiedades de depuración tal como están en la escena. Desactivado: el juego publicado nunca los muestra",
     "Destination": "Destino",
     "Output directory of the Web package": "Directorio de salida del paquete Web",
     "Validate Web": "Validar Web",
@@ -119,6 +123,10 @@ RU = {
     "Open after export": "Открыть после экспорта",
     "After exporting, starts a local server and opens the game in the default browser":
         "После экспорта запускает локальный сервер и открывает игру в браузере по умолчанию",
+    "Keep debug overlays": "Сохранить отладочные оверлеи",
+    "Keeps the framerate/profile and debug properties overlays in the exported game "
+        "as saved in the scene. Off: the published game never shows them":
+        "Оставляет в экспортированной игре оверлеи framerate/profile и отладочных свойств, как они сохранены в сцене. Выключено: опубликованная игра их не показывает",
     "Destination": "Назначение",
     "Output directory of the Web package": "Папка вывода веб-пакета",
     "Validate Web": "Проверить Web",

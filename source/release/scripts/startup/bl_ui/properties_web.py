@@ -169,6 +169,12 @@ class RangeWebSettings(PropertyGroup):
         description="After exporting, starts a local server and opens the game in the default browser",
         default=False,
     )
+    keep_debug_overlays: bpy.props.BoolProperty(
+        name="Keep debug overlays",
+        description="Keeps the framerate/profile and debug properties overlays in the exported game "
+                    "as saved in the scene. Off: the published game never shows them",
+        default=False,
+    )
     output_directory: bpy.props.StringProperty(
         name="Destination",
         description="Output directory of the Web package",
@@ -247,6 +253,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         row = box.row()
         row.prop(web, "auto_preflight")
         row.prop(web, "open_after_export")
+        box.prop(web, "keep_debug_overlays")
         box.operator("scene.range_web_export", icon='EXPORT')
         box.label(text="Validates again before exporting; errors block the export", icon='INFO')
 
@@ -364,6 +371,8 @@ class SCENE_OT_range_web_export(Operator):
                        "--runtime-dir", info.directory, "--out-dir", scratch]
                 cmd += ["--extra-root", collect_bpy.project_root()]
                 cmd += ["--touch-layout", web.touch_layout.lower(), "--touch-stick", web.touch_stick.lower()]
+                if web.keep_debug_overlays:
+                    cmd.append("--debug-overlays")
                 for extra in extras:
                     cmd += ["--extra", extra]
                 result = subprocess.run(cmd, capture_output=True, text=True)

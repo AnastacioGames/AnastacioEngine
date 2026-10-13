@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Export: jogo publicado sem overlays de depuração
+
+Um usuário publicou o jogo Web com o painel de framerate/profile ligado (flag salva na cena, não do export).
+
+- **Web**: `package-web.py` passa `-g show_framerate/show_profile/show_properties/show_render_queries = 0` ao
+  player no `index.html`; `--debug-overlays` mantém o que está no `.range`. Painel Web ganhou "Keep debug
+  overlays" (desligado por padrão). O `.range` não é alterado.
+- **Desktop** (RangeArmor e Save As Runtime): `export_debug_overlays_off` (`bl_operators/wm.py`) desliga
+  Framerate/Profile e Debug Properties só durante o salvamento da cópia (`.rasec`/runtime) e os religa depois;
+  mesma opção "Keep debug overlays" nos dois. Physics Visualization fica de fora (o player não lê `-g show_physics`).
+- Testes (2026-10-13): cópias salvas em background saem com as flags desligadas (ligadas com a opção) e a cena
+  volta ao estado anterior; `index.html` gerado com e sem `--debug-overlays`. Não rodado no navegador.
+
 ## 2026-10-13 - Linux: OpenColorIO 2.x, FFmpeg 5+, Ctrl+C no player e imgui.ini
 
 Trazido do branch `claude/project-thread-q8gfb3` (trabalho de 2026-10-04 que nunca tinha entrado no `main`).

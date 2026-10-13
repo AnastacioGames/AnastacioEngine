@@ -684,6 +684,12 @@ class RangeArmorExportSettings(bpy.types.PropertyGroup):
         default="",
         subtype='FILE_PATH',
     )
+    keep_debug_overlays: bpy.props.BoolProperty(
+        name="Keep debug overlays",
+        description="Keeps the framerate/profile and debug properties overlays in the exported game "
+                    "as saved in the scene. Off: the published game never shows them",
+        default=False,
+    )
 
 
 class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
@@ -717,6 +723,7 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box = layout.box()
         box.label(text="Export:", icon="EXPORT")
         box.prop(export, "cook_before_export")
+        box.prop(export, "keep_debug_overlays")
         box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
         box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
         box.label(text="The file must be saved in the project's data/ folder", icon='INFO')

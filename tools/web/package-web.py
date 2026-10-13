@@ -768,7 +768,7 @@ __PERF_SCRIPT__
 
   window.Module = {
     canvas: el("canvas"),
-    arguments: [GAME],
+    arguments: __PLAYER_ARGS__.concat([GAME]),
     rangeMotion: motion,
     rangePad: pad,
     print: function (t) { log("[out] " + t); console.log(t); },
@@ -1058,6 +1058,20 @@ def extra_rel(path, root):
     return path.name
 
 
+# Opcoes de depuracao que o player respeita via -g; o jogo publicado sai sem elas,
+# mesmo que o .range tenha sido salvo com o overlay ligado.
+EXPORT_HIDDEN_DEBUG = ("show_framerate", "show_profile", "show_properties", "show_render_queries")
+
+
+def player_args(keep_debug):
+    if keep_debug:
+        return []
+    args = []
+    for name in EXPORT_HIDDEN_DEBUG:
+        args += ["-g", name, "=", "0"]
+    return args
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--game", required=True, type=Path, help="arquivo .range do jogo")
@@ -1082,6 +1096,9 @@ def main():
                          "(padrao: stick + botoes A/B)")
     ap.add_argument("--touch-stick", choices=["dynamic", "fixed"], default="dynamic",
                     help="stick dinamico (nasce onde o dedo toca) ou fixo")
+    ap.add_argument("--debug-overlays", action="store_true",
+                    help="mantem framerate/profile, propriedades de debug e render queries como estao no .range "
+                         "(padrao: desligados no jogo exportado)")
     ap.add_argument("--cardboard", action="store_true",
                     help="preset VR Cardboard: sem controle na tela (o toque vira gatilho), botao 'Entrar em VR' "
                          "sempre visivel; o APK gerado deste pacote sai em paisagem")
@@ -1137,6 +1154,7 @@ def main():
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
             .replace("__CARDBOARD__", "true" if args.cardboard else "false")
+            .replace("__PLAYER_ARGS__", json.dumps(player_args(args.debug_overlays)))
             .replace("__TOUCH__", json.dumps({"layout": args.touch_layout, "stick": args.touch_stick}))
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))
