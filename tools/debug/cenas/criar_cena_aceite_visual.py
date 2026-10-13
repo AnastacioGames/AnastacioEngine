@@ -3,7 +3,8 @@
 #   Tecla 2 - Specular com roughness 0 (piso 0.15): esferas rough 0 / 0.15 / 0.4, dieletrico e metal.
 #   Tecla 3 - Decimate Collapse 0.1: original | High Quality desligado | ligado (textura UV grid).
 #   Tecla 4 - Planar Reflection (ja aceito, fica como referencia).
-#   Som: World Sound com Music (2 faixas) e Ambient (vento) tocando desde o inicio.
+#   Som: World Sound com Music (2 faixas) e Ambient (vento, chiado) tocando desde o inicio.
+#   Tecla 5 liga/desliga a Music, para ouvir o Ambient sozinho. Log em <pasta>/som_log.txt.
 #   Esc sai.
 # Uso:
 #   AnastacioEngine.exe -b --factory-startup --python criar_cena_aceite_visual.py -- <pasta>
@@ -216,13 +217,34 @@ def write_tone(path, frequency, seconds, tremolo=0.0):
 
 write_tone(os.path.join(folder, "audio", "tema1.wav"), 440.0, 3.0)
 write_tone(os.path.join(folder, "audio", "tema2.wav"), 660.0, 3.0)
-write_tone(os.path.join(folder, "audio", "vento.wav"), 110.0, 2.0, tremolo=0.8)
+def write_wind(path, seconds):
+    import random
+    rate = 22050
+    rnd = random.Random(1)
+    frames = bytearray()
+    low = 0.0
+    n = int(rate * seconds)
+    for i in range(n):
+        t = i / rate
+        low += 0.15 * (rnd.uniform(-1.0, 1.0) - low)  # ruido suavizado = chiado de vento
+        # rajadas; termina igual ao inicio para o loop nao estalar
+        gust = 0.55 + 0.45 * math.sin(2.0 * math.pi * t / seconds) ** 2
+        frames += struct.pack('<h', int(32767 * 0.8 * gust * low))
+    w = wave.open(path, 'wb')
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(rate)
+    w.writeframes(bytes(frames))
+    w.close()
+
+
+write_wind(os.path.join(folder, "audio", "vento.wav"), 4.0)
 music = world.sound_modules.new("Music", type='MUSIC')
 music.fade_time = 0.5
 music.sounds.new("tema1", filepath="//audio/tema1.wav")
 music.sounds.new("tema2", filepath="//audio/tema2.wav")
 ambient = world.sound_modules.new("Ambient", type='AMBIENT')
-ambient.volume = 0.6
+ambient.volume = 1.0
 ambient.sounds.new("vento", filepath="//audio/vento.wav")
 
 # ---------------- troca de camera nas teclas 1-4
@@ -232,9 +254,25 @@ text.from_string('''import bge
 KEYS = (bge.events.ONEKEY, bge.events.TWOKEY, bge.events.THREEKEY, bge.events.FOURKEY)
 NAMES = %r
 
+def _log(text):
+    with open(bge.logic.expandPath("//som_log.txt"), "a") as f:
+        f.write(text + "
+")
+
 def tick(cont):
     scene = bge.logic.getCurrentScene()
     keys = bge.logic.keyboard.events
+    own = cont.owner
+    if "logged" not in own:
+        own["logged"] = True
+        _log("inicio modulos=%%s music=%%s ambient=%%s" %% (bge.audio.modules(), bge.audio.playing("Music"),
+                                                       bge.audio.playing("Ambient")))
+    if keys[bge.events.FIVEKEY] == bge.logic.KX_INPUT_JUST_ACTIVATED:
+        if bge.audio.playing("Music"):
+            bge.audio.stop("Music")
+        else:
+            bge.audio.play("Music")
+        _log("tecla5 music=%%s ambient=%%s" %% (bge.audio.playing("Music"), bge.audio.playing("Ambient")))
     for key, name in zip(KEYS, NAMES):
         if keys[key] == bge.logic.KX_INPUT_JUST_ACTIVATED:
             scene.active_camera = scene.objects[name]
@@ -249,6 +287,9 @@ c = ctrl.game.controllers[-1]
 c.mode = 'MODULE'
 c.module = 'cams.tick'
 s.link(c)
+# Always (uma vez) para o log do inicio sair sem precisar apertar tecla
+bpy.ops.logic.sensor_add(type='ALWAYS', object=ctrl.name)
+ctrl.game.sensors[-1].link(c)
 
 path = os.path.join(folder, "aceite_visual.range")
 bpy.ops.wm.save_as_mainfile(filepath=path)
