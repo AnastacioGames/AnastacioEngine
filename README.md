@@ -14,13 +14,13 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.0)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.0)** (Windows; Linux em breve)
 
 | Pacote | Conteúdo |
 |---|---|
 | [Windows x64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-windows-x64.zip.sha256) |
-| [Linux x86_64 (0.5.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz) | Editor e runtime nativos, com as bibliotecas incluídas. Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora e Arch recentes. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/AnastacioEngine-0.5.0-linux-x86_64.tar.xz.sha256) |
-| [RangeArmor 0.4.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/RangeArmor-0.4.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.4.0/SHA256SUMS.txt) |
+| Linux x86_64 (0.5.0) | **Em breve.** Enquanto isso, a [0.4.6 para Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.4.6). |
+| [RangeArmor 0.5.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/RangeArmor-0.5.0-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. [SHA-256](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.0/SHA256SUMS.txt) |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `RangeEngine` (Linux).
 Para rodar um jogo exportado no Windows, use `AnastacioRuntime.exe`; no Linux, `RangeRuntime`. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
@@ -44,6 +44,12 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **Rede:** servidor WebSocket com transporte múltiplo e predição de corpos dinâmicos.
 - **Decimate High Quality**, constraints de física prontas, splash novo com arquivos fixados (Pin).
 - Executáveis Windows renomeados para `AnastacioEngine.exe` e `AnastacioRuntime.exe`.
+
+**Correções:** crash do SSGI com o nó Diffuse, crash do Planar Reflection, crash no setFullScreen, crash no
+aquecimento de shaders, sombra com GPU Skinning em pose T, pose na troca de LOD, sons com a cena suspensa,
+emissor Empty de partículas, chuva na 3D View, filtros 2D no 1º quadro, texto do jogo parando de renderizar,
+culling de atividade, batch ao mover objeto, parallax e triplanar, travadas na pintura de textura, SIGTERM no
+runtime. Lista completa na [página da release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.0).
 
 **Efeitos ainda em ajuste.** Os efeitos novos desta versão funcionam, mas ainda vão receber ajustes visuais e
 correções nas próximas versões. Pontos já conhecidos:
