@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Sombra colorida no Sun com cascatas
+
+No Sun com CSM (`vitral_csm.range`) só apareciam fios coloridos na base dos vidros, sem a mancha no chão.
+Visto da luz, o vidro é uma faixa de poucos texels no alvo de cor (meia resolução, e cada texel da cascata
+cobre muito chão); o filtro linear misturava a profundidade dele (alpha) com o 1.0 limpo em volta, e o vidro
+"ficava atrás" do chão. `shadow_color_tint` agora lê a profundidade dos 4 texels com `texelFetch`, ignora os
+limpos e usa o caster mais distante (o mais próximo pintava o próprio vidro inclinado). Conferido por
+screenshot: CSM com mancha no chão; Sun sem CSM, Spot e cena legada iguais a antes. Resta um serrilhado
+pequeno na borda do vidro no CSM.
+
 ## 2026-10-13 - SSGI não corta mais vidro transparente
 
 Com SSGI ligado, vidros em Alpha Blend sumiam pela metade, com borda em degraus (`vitral_sun.range`). A

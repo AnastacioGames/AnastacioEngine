@@ -3954,10 +3954,26 @@ vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat
 		return vec3(1.0);
 	}
 	vec4 c = texture2D(colormap, co.xy);
+	/* Depth: the farthest caster among the 4 texels the filter blends, cleared texels (1.0) left
+	 * out. Seen from the light a pane is a strip a few texels wide (most of all in a Sun cascade):
+	 * the filtered alpha mixes its depth with the clear around it and puts the caster behind the
+	 * floor it shades, and the nearest texel of a tilted pane would tint the pane itself. */
+	vec2 size = vec2(textureSize(colormap, 0));
+	ivec2 t = ivec2(floor(co.xy * size - 0.5));
+	ivec2 lim = ivec2(size) - 1;
+	vec4 d = vec4(texelFetch(colormap, clamp(t, ivec2(0), lim), 0).a,
+	              texelFetch(colormap, clamp(t + ivec2(1, 0), ivec2(0), lim), 0).a,
+	              texelFetch(colormap, clamp(t + ivec2(0, 1), ivec2(0), lim), 0).a,
+	              texelFetch(colormap, clamp(t + ivec2(1, 1), ivec2(0), lim), 0).a);
+	d = mix(d, vec4(-1.0), step(vec4(0.9999), d));
+	float depth = max(max(d.x, d.y), max(d.z, d.w));
+	if (depth < 0.0) {
+		return vec3(1.0);
+	}
 	/* Margin: a glass pane must not catch its own tint (acne, very visible with Glow). Only the half
 	 * float error of the stored depth (up to ~0.0005): a Sun cascade spans hundreds of meters, so a
 	 * larger margin hides the tint from a floor right behind the glass. */
-	return (co.z > c.a + 0.0008) ? c.rgb : vec3(1.0);
+	return (co.z > depth + 0.0008) ? c.rgb : vec3(1.0);
 }
 
 void shade_shadow_tint(vec3 lcol, vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias,
