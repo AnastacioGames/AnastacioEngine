@@ -259,8 +259,13 @@
       "name": "web-runtime-release-linux",
       "displayName": "AnastacioEngine Runtime (Web/Emscripten wasm32, release, Linux host)",
       "description": "web-runtime-release com os mesmos caminhos de web-runtime-linux. Use para gerar pacotes com tools/web/package-web.py --runtime-dir build-web-release/bin.",
-      "inherits": ["web-runtime-release", "web-runtime-linux"],
-      "binaryDir": "${sourceDir}/../build-web-release"
+      "inherits": ["web-runtime-linux", "web-runtime-release"],
+      "binaryDir": "${sourceDir}/../build-web-release",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -Wno-sign-conversion",
+        "CMAKE_CXX_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -Wno-sign-conversion",
+        "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=5MB"
+      }
     }
   ],
   "buildPresets": [
