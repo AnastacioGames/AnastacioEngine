@@ -109,7 +109,7 @@ fn launch(matches: &ArgMatches) -> Result<std::process::ExitStatus, String> {
 
     let mut command = Command::new(&engine);
     command.current_dir(&data_dir);
-    // RangeRuntime is not reliable when it receives a relative project path:
+    // AnastacioRuntime is not reliable when it receives a relative project path:
     // depending on its installation layout it can resolve it against the
     // launcher directory rather than `current_dir`. Pass the validated full
     // path so packaged games work independently of where they are extracted.
@@ -129,6 +129,8 @@ fn resolve_runtime(path: PathBuf) -> PathBuf {
     let alternate = match path.file_name().and_then(|name| name.to_str()) {
         Some("RangeRuntime.exe") => "AnastacioRuntime.exe",
         Some("AnastacioRuntime.exe") => "RangeRuntime.exe",
+        Some("RangeRuntime") => "AnastacioRuntime",
+        Some("AnastacioRuntime") => "RangeRuntime",
         _ => return path,
     };
     let candidate = path.with_file_name(alternate);
@@ -201,6 +203,20 @@ mod tests {
     }
 
     #[test]
+    fn legacy_linux_config_uses_new_runtime_but_existing_path_wins() {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = env::temp_dir().join(format!("armor-runtime-linux-{}-{stamp}", std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        let old = dir.join("RangeRuntime");
+        let new = dir.join("AnastacioRuntime");
+        fs::write(&new, b"new").unwrap();
+        assert_eq!(resolve_runtime(old.clone()), new);
+        fs::write(&old, b"old").unwrap();
+        assert_eq!(resolve_runtime(old.clone()), old);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn selects_the_native_64_bit_engine_key() {
         assert_eq!(
             default_engine_key(),
@@ -214,11 +230,11 @@ mod tests {
 
     #[test]
     fn parses_a_project_config() {
-        let config = json::parse(r#"{"DataSource":"./data","MainFile":"game.rasec","EngineLinux64":"./engine/Linux64/RangeRuntime"}"#).unwrap();
+        let config = json::parse(r#"{"DataSource":"./data","MainFile":"game.rasec","EngineLinux64":"./engine/Linux64/AnastacioRuntime"}"#).unwrap();
         assert_eq!(config["DataSource"].as_str(), Some("./data"));
         assert_eq!(
             config["EngineLinux64"].as_str(),
-            Some("./engine/Linux64/RangeRuntime")
+            Some("./engine/Linux64/AnastacioRuntime")
         );
     }
 }

@@ -23,8 +23,8 @@ Versão atual: **[AnastacioEngine 0.5.1](https://github.com/AnastacioGames/Anast
 | [RangeArmor 0.5.1](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/RangeArmor-0.5.1-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. |
 | [SHA-256 dos pacotes acima](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.1/SHA256SUMS.txt) | Hashes para conferir o download. |
 
-**Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `RangeEngine` (Linux).
-Para rodar um jogo exportado no Windows, use `AnastacioRuntime.exe`; no Linux, `RangeRuntime`. Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
+**Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).
+Para rodar um jogo exportado, use `AnastacioRuntime.exe` (Windows) ou `AnastacioRuntime` (Linux). Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.

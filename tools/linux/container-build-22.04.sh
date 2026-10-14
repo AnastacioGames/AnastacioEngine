@@ -53,6 +53,9 @@ tar -xOJf build-linux/dist/$pkg.tar.xz $pkg/lib/libsndfile.so.1 > /tmp/libsndfil
 grep -aq 'libsndfile-1\.2\.2' /tmp/libsndfile-pkg.so
 # E a OCIO 1.1.1 do apt (libopencolorio-dev, a API 1.x que o intern/opencolorio usa): biblioteca e configs.
 tar -tJf build-linux/dist/$pkg.tar.xz > /tmp/pkg-list.txt
+grep -q "$pkg/AnastacioEngine" /tmp/pkg-list.txt
+grep -q "$pkg/AnastacioRuntime" /tmp/pkg-list.txt
+if grep -q "$pkg/RangeEngine$\|$pkg/RangeRuntime$" /tmp/pkg-list.txt; then exit 1; fi
 grep -q "$pkg/lib/libOpenColorIO.so.1" /tmp/pkg-list.txt
 grep -q "$pkg/2.79/datafiles/colormanagement/config.ocio" /tmp/pkg-list.txt
 # Arquivos novos da 0.5.0: bibliotecas do bake (UV atlas e denoise), atlas de icones e modulo de rede.

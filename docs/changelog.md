@@ -6,6 +6,35 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-14 - Linux: ícone do cubo dourado no menu e dock
+
+- O pacote e o instalador de atalho Linux agora usam o mesmo cubo dourado do
+  recurso do executável Windows e do ícone de janela X11. O antigo ícone
+  vermelho `range-engine.png` deixou de ser incluído no pacote.
+- `AnastacioEngine.desktop` declara `Icon=AnastacioEngine`; ao executar
+  `install-desktop.sh`, o PNG é registrado em
+  `~/.local/share/icons/hicolor/256x256/apps/AnastacioEngine.png` (ou no
+  equivalente de `XDG_DATA_HOME`). O instalador aceita tanto o nome-fonte
+  legado `RangeEngine.desktop` quanto o arquivo já renomeado no pacote.
+
+## 2026-10-14 - Linux: executáveis AnastacioEngine e AnastacioRuntime
+
+- O desktop Linux agora segue o Windows: os alvos CMake internos `RangeEngine` e
+  `RangeRuntime` produzem `AnastacioEngine` e `AnastacioRuntime`. Web/Android/macOS,
+  APIs e formatos continuam com os nomes de compatibilidade anteriores.
+- Atualizados pacote portátil, atalho do desktop, quickstarts, teste de rede e RangeArmor.
+  O RangeArmor prefere o nome novo no Linux e continua aceitando `RangeRuntime` em
+  projetos antigos, sem alterar caminhos personalizados.
+- Os dois presets Linux foram reconfigurados, recompilados e instalados. `AnastacioEngine
+  --background --version` passou; o player novo respondeu com a ajuda esperada sem arquivo.
+  A suíte Python do RangeArmor passou (13 testes). O teste Rust do launcher não rodou nesta
+  máquina porque `cargo` não está instalado.
+- Pacote de validação local, sem `web/`: `build-linux/dist/AnastacioEngine-0.5.1-rename-test-linux-x86_64.tar.xz`.
+  SHA-256 conferido após extração; contém os dois binários e `AnastacioEngine.desktop`, sem
+  `RangeEngine`/`RangeRuntime`. O editor e player extraídos abriram pelos nomes novos.
+- Durante a validação, o empacotador passou a executar `ldd` com `lib/` do staging no
+  `LD_LIBRARY_PATH`; sem isso a própria `libpython` copiada podia gerar falso “not found”.
+
 ## 2026-10-13 - Web: PNG no wasm32 e runtime release carregam a cena
 
 `ImBuf` contém `double ppm[2]`, mas `IMB_allocImBuf` o criava por `MEM_mallocN`; no caminho lock-free do wasm32 a alocação pode ter só 4 bytes de alinhamento, e a primeira escrita de `ppm` em `IMB_initImBuf` abortava como `alignment fault` no decoder PNG. A struct agora usa `MEM_mallocN_aligned(..., 8)` (liberação normal por `MEM_freeN`). Reconfigurado o preset Linux release, o `RangeRuntime` recompilou e o pacote da `WEB_TESTE_2D.range` passou no Chrome headless: Python inicializou, a cena converteu 34 objetos, carregou texturas em 90 ms e compilou oito materiais sem aborto. Falta teste jogável/visual antes de incluir `web/` num novo pacote Linux.

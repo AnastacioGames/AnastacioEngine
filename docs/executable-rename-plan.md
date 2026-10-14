@@ -1,8 +1,8 @@
 # Plano de migração: RangeEngine.exe → AnastacioEngine.exe
 
-Plano de 2026-10-07, atualizado em 2026-10-08: renomeação do editor Windows implementada;
-segunda etapa do player Windows autorizada pelo usuário e validada localmente (seção 14).
-Build e execução local passaram; validações e limites da entrega estão na seção 9.
+Plano de 2026-10-07, atualizado em 2026-10-14: renomeação do desktop Windows e Linux implementada;
+a segunda etapa do player foi validada nas duas plataformas. Build e execução local passaram;
+validações e limites da entrega estão nas seções 9 e 14.
 
 ## 1. Objetivo e decisões de escopo
 
@@ -19,7 +19,8 @@ Proposta de escopo para a primeira entrega:
 | `.range`, `.blend`, `.rasec`, `.bgeconf`, APIs `Range`/`bge` | Mesmos nomes | Preservar arquivos, scripts e jogos existentes. |
 | ProgIDs `RangeEngine.BlendFile` e `RangeEngine.RangeFile` | Mesmos nomes | Atualizar os caminhos dos comandos/ícones, preservando os identificadores do Registro. |
 | Diretórios de configuração herdados `RangeEngine` | Mesmos nomes | Preservar preferências. O código Windows inclui `RangeEngine/Blender/`; não assumir apenas a pasta indicada informalmente. |
-| Linux `RangeEngine` e bundles macOS | Mesmos nomes inicialmente | Expansão multiplataforma em fase própria. |
+| Linux `RangeEngine` / `RangeRuntime` | `AnastacioEngine` / `AnastacioRuntime` | Implementado em 2026-10-14; alvos CMake internos preservados. |
+| Bundles macOS | Mesmos nomes inicialmente | Expansão multiplataforma em fase própria. |
 
 Este plano registra a migração solicitada como exceção à preservação do nome do executável em `AGENTS.md`. Não autoriza uma substituição global de toda ocorrência de “Range”. Créditos e licenças dos projetos originais permanecem.
 
