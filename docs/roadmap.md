@@ -159,19 +159,14 @@ pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-v
 
 Aberto:
 
-- **`web-runtime`/`web-runtime-release` só compilam no Windows/WSL (caminhos fixos)**: resolvido em
-  2026-10-13 com os presets `web-runtime-linux`/`web-runtime-release-linux` (mesmas opções, `ninja`/`node`
-  resolvidos via `PATH`/`$env{EMSDK_NODE}` em vez de `ninja.exe`/`D:/emsdk/node.exe`).
-  **Atualização 2026-10-13 (mesmo dia, sessão seguinte): CPython 3.11 wasm32-emscripten agora compila
-  nesta máquina Linux** (detalhe completo em `docs/web-python-poc-plan.md`, seção "build em host Linux
-  nativo"), destravando o `FindPythonLibsUnix` que travava o configure. O build completo do `RangeRuntime`
-  (1887 alvos, incluindo `ge_ketsji`/`bf_python`) termina com sucesso e roda num Chrome real (headless):
-  Python executa de verdade dentro do engine, a cena carrega, e o runtime trava num **alignment fault em
-  `IMB_initImBuf`/`imb_loadpng`** (carregamento de textura PNG) ao converter o primeiro material da cena —
-  mesma classe de bug já corrigida no loader `.range`/SDNA (struct sem alinhamento de 8 bytes em wasm32),
-  mas num ponto diferente do código. Stack trace completo e próximo passo sugerido estão na seção de
-  atualização do plano. Pacote 0.5.1 Linux atual continua sem `web/` (`SKIP_WEB=1`); refazer esse pacote
-  só depois do alignment fault resolvido e de um teste de ponta a ponta (cena jogável, não só carregada).
+- **Build Linux com Python wasm32 e primeiro carregamento completo:** os presets
+  `web-runtime-linux`/`web-runtime-release-linux` e o CPython 3.11 wasm32-emscripten local destravam o
+  configure e o build do `RangeRuntime` nesta máquina (detalhes em `web-python-poc-plan.md`). O alinhamento
+  de 8 bytes de `ImBuf` foi corrigido em 2026-10-13: `ppm[2]` é `double`, portanto `IMB_allocImBuf` usa
+  `MEM_mallocN_aligned(..., 8)` no wasm32. Reconfigure e rebuild release completos passaram; Chrome
+  headless carregou a cena, as texturas (90 ms) e os oito materiais sem `alignment fault`/aborto. Ainda falta
+  teste ponta a ponta jogável/visual antes de refazer o pacote Linux 0.5.1 com `web/` (o atual usa
+  `SKIP_WEB=1`).
 - **Patch do SDL2/Emscripten** (gate de timestamp do gamepad): versionado em `tools/web/patch-sdl2-gamepad.py`
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat

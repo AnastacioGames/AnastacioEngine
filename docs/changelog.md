@@ -6,6 +6,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-13 - Web: PNG no wasm32 e runtime release carregam a cena
+
+`ImBuf` contém `double ppm[2]`, mas `IMB_allocImBuf` o criava por `MEM_mallocN`; no caminho lock-free do wasm32 a alocação pode ter só 4 bytes de alinhamento, e a primeira escrita de `ppm` em `IMB_initImBuf` abortava como `alignment fault` no decoder PNG. A struct agora usa `MEM_mallocN_aligned(..., 8)` (liberação normal por `MEM_freeN`). Reconfigurado o preset Linux release, o `RangeRuntime` recompilou e o pacote da `WEB_TESTE_2D.range` passou no Chrome headless: Python inicializou, a cena converteu 34 objetos, carregou texturas em 90 ms e compilou oito materiais sem aborto. Falta teste jogável/visual antes de incluir `web/` num novo pacote Linux.
+
 ## 2026-10-13 - Release 0.5.1 Linux: pacote sem web/, testes e pacote
 
 Testes do pacote de release 0.5.1: `ctest` completo (10/10, ver entrada do bevel abaixo) e a suite

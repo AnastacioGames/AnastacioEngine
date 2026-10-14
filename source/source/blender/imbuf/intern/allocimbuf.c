@@ -441,7 +441,12 @@ ImBuf *IMB_allocImBuf(unsigned int x, unsigned int y, uchar planes, unsigned int
 {
 	ImBuf *ibuf;
 
-	ibuf = MEM_mallocN(sizeof(ImBuf), "ImBuf_struct");
+	/* ImBuf contains the double ppm[2].  The lock-free allocator can return
+	 * only 4-byte aligned storage from mallocN on wasm32, while the
+	 * store in IMB_initImBuf requires the natural 8-byte alignment of double.
+	 * Keep this aligned on every platform; MEM_freeN accepts this allocation
+	 * just like the regular mallocN variant. */
+	ibuf = MEM_mallocN_aligned(sizeof(ImBuf), 8, "ImBuf_struct");
 
 	if (ibuf) {
 		if (!IMB_initImBuf(ibuf, x, y, planes, flags)) {

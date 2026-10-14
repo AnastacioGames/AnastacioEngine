@@ -461,9 +461,9 @@ convergirem.
 - `blo_nextbhead` também passou a calcular o endereço do `BHeadN` com aritmética explícita em `char *`, evitando o underflow unsigned de `POINTER_OFFSET`.
 - O build incremental de `RangeRuntime` terminou com sucesso após a limpeza da instrumentação temporária. O teste em Chrome com janela real confirmou que `could not create main window` também ocorria fora do headless. O SDL agora solicita GLES 2 explicitamente e cria um canvas WebGL de 640×480; a inicialização também usa a extensão WebGL de VAO e ignora placeholders 1D/3D inexistentes no WebGL 1. O bloqueio seguinte é portar os shaders GLSL desktop (`#version 120`) para GLSL ES antes de executar a cena.
 
-### Atualização 2026-10-13 — build em host Linux nativo (sem WSL) + Python wasm32 compilado + novo alignment fault
+### Atualização 2026-10-13 — build em host Linux nativo (sem WSL) + Python wasm32 compilado + correção de alignment fault
 
-**Resumo para quem continuar (Codex ou outra sessão): o build Web completo agora funciona de ponta a ponta num host Linux puro, Python roda dentro do engine, a cena carrega, e o crash atual é um alignment fault isolado e localizado — não um bloqueio arquitetural.**
+**Resumo para quem continuar (Codex ou outra sessão): o build Web completo agora funciona num host Linux puro, Python roda dentro do engine e a cena com PNG carrega. O próximo marco é validar uma sessão jogável/visual; não há mais crash de alinhamento nesse caminho.**
 
 O que foi feito nesta sessão:
 
@@ -486,5 +486,6 @@ O que foi feito nesta sessão:
    - **Hipótese provável**: mesma classe de bug já corrigida no bloco acima (structs alocadas sem alinhamento de 8 bytes em wasm32) — mas agora dentro do decoder PNG (`imb_loadpng`/`IMB_initImBuf`), não no loader `.range`/SDNA. Provavelmente um campo de `ImBuf` ou da struct interna do libpng acessado como tipo largo (uint64/double) num endereço não alinhado, ou um `malloc` que a libc do CPython/Emscripten não garante alinhado a 8 nesse caminho específico.
    - **Próximo passo sugerido**: inspecionar `IMB_allocImBuf`/`IMB_initImBuf` em `source/blender/imbuf/intern/allocimbuf.c` (ou equivalente) e `imb_loadpng` em `source/blender/imbuf/intern/png.c`, seguindo o mesmo padrão dos fixes de 2026-09-13 acima (alocação alinhada a 8 bytes para a struct afetada). Regra anti-loop do `AGENTS.md` continua valendo: se duas tentativas de fix não resolverem ou mudarem o erro, parar e reportar.
 7. **Pacote de teste gerado** com `tools/web/package-web.py --runtime-dir build-web-release/bin` (109 MiB, build ainda com flags de debug na hora do teste — o fix do item 3 veio depois; refazer o build e reempacotar antes do próximo teste para medir o tamanho real de release).
+8. **Correção e validação do alignment fault (continuação em 2026-10-13):** `ImBuf` tem `double ppm[2]`, mas `IMB_allocImBuf` usava `MEM_mallocN`, cujo caminho lock-free do wasm32 pode retornar alinhamento de apenas 4 bytes. A primeira escrita de `ppm` em `IMB_initImBuf` causava o aborto. A alocação passou a usar `MEM_mallocN_aligned(sizeof(ImBuf), 8, "ImBuf_struct")`; `MEM_freeN` continua sendo o par correto. Após reconfigurar o preset Linux release (removendo também as flags de debug antigas) e recompilar o `RangeRuntime`, `tools/web/verify-package.cjs` no Chrome headless confirmou: cena convertida, texturas em 90 ms, oito materiais compilados e nenhum `alignment fault`/aborto. O pacote temporário mediu 102,2 MiB; isso fecha o carregamento automatizado, não uma avaliação visual/jogável.
 
 Nada disso foi commitado como binário: `~/web-python-poc/` inteiro (CPython fonte, builddir, diretório curado `python-wasm-web`) fica fora do repositório. Só o fix do `CMakePresets.json` e esta nota de status vão para o git.
