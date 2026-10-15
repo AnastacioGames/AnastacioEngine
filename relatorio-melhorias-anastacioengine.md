@@ -379,14 +379,23 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ## Decisões técnicas vigentes
 
-- GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
-  objetos móveis). Um [SSGI nativo experimental](docs/ssgi-native-plan.md) foi implementado em worktree
+- GI: o painel moderno de Baked Lighting produz luz indireta (lightmap RGBM 8 bits num atlas compartilhado +
+  light volume de ambient cubes para objetos móveis), AO baked ou iluminação estática com sombras no mesmo
+  atlas. O AO tem distância/intensidade e multiplica somente o ambiente. O modo estático grava irradiância
+  direta/indireta e sombras nos receptores do atlas, evita difuso direto duplicado, preserva especular dinâmico
+  e mantém luz completa nos objetos móveis; o Light Volume continua somente com indireta/World. Arquivos antigos
+  continuam no modo indireto. Detalhes no [plano](docs/baked-lighting-plan.md). Um
+  [SSGI nativo experimental](docs/ssgi-native-plan.md) foi implementado em worktree
   separado para desktop/Principled opaco: complemento em tela, não substituto do bake; exclui receptores
   baked. Build e testes numéricos passaram; normal/albedo RGBA8 reduziram a reserva de attachments em 25%;
   validação visual e medição da VRAM total permanecem pendentes.
   Qualidade do bake vem da densidade de texels (`ae_lightmap_scale` por objeto)
   e da margem/dilatação das ilhas, não de uma textura por objeto. Cada recurso liga/desliga; Web/Android usam
   no máximo a textura da lightmap.
+  O seletor de bake força CPU quando `GPU` está desligado; no OpenCL usa uma única GPU dedicada e restaura
+  a configuração anterior ao terminar. Falha reportada pelo Cycles interrompe o bake sem publicar novo atlas.
+  No bake OpenCL, a engine aguarda o kernel próprio de bake sem tentar carregar kernels split de renderização
+  não compilados para esse modo; o aviso indevido `kernel_lamp_emission` foi eliminado na cena de reprodução.
 - `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity
   Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
   will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity

@@ -18,14 +18,15 @@
 
 # <pep8 compliant>
 
-"""Baked indirect light (lightmap) for the Game PBR (Shading Nodes) path.
+"""Baked lighting (lightmap) for the Game PBR (Shading Nodes) path.
 
 One atlas for the whole scene: every static mesh gets a UV layer named "Lightmap" packed together, and
 Cycles bakes into a single image the light that the game does not compute live:
   - the bounces of every lamp (INDIRECT), with the lamps rebuilt to match the game falloff/units;
   - the direct light of the World and of emissive meshes (lamps hidden), which the lightmap replaces
     in the game (it takes the place of the probe/World diffuse).
-Direct lamp light and its shadows stay dynamic in the game shader.
+In the default INDIRECT mode, direct lamp light and its shadows stay dynamic in the game shader. The AO
+mode stores a grayscale occlusion factor and applies it only to the ambient diffuse contribution in game.
 
 The image is stored as RGBM (gamma 2, range 8) in an 8-bit PNG packed in the file, so it also works on
 the Web/Android export. node_bsdf_principled reads it through node_shader_gpu_lightmap (C), which looks
@@ -45,6 +46,9 @@ VOLUME_IMAGE_NAME = "AE_LightVolume"
 VOLUME_MAX_PROBES = 32  # per axis
 NODE_NAME = "AE_lightmap_bake"
 RGBM_RANGE = 8.0
+MODE_INDIRECT = 'INDIRECT'
+MODE_AO = 'AO'
+MODE_STATIC = 'STATIC'
 
 # Cycles units -> game units, measured with a light-only DIFFUSE bake of a white plane:
 # Sun strength 1 gives 1/pi, a point light with "Constant" falloff strength 1 gives 1/(4 pi^2),
@@ -53,23 +57,75 @@ SUN_SCALE = math.pi
 POINT_SCALE = 4.0 * math.pi * math.pi
 
 
+def tag_lightmap_materials(scene=None, context=None):
+    """The baked image and its mode are compiled into the Game PBR material graph."""
+    for mat in bpy.data.materials:
+        if mat.use_nodes:
+            mat.update_tag()
+
+
+def clear_light_volume(scene):
+    """Deactivate the volume when the committed bake mode does not produce one."""
+    image = bpy.data.images.get(scene.ae_lightvol)
+    if image:
+        image.use_fake_user = False
+        if image.users == 0:
+            bpy.data.images.remove(image)
+    scene.ae_lightvol = ""
+    scene.ae_lightvol_use = False
+
+
+def lightmap_exclusion_reason(scene, ob):
+    """One reason an object will not receive the *next* scene lightmap bake."""
+    if ob.type != 'MESH' or not ob.data.polygons:
+        return "Not a mesh with faces"
+    if ob.hide_render:
+        return "Hidden from render"
+    if not any(ob.layers[i] and scene.layers[i] for i in range(20)):
+        return "Outside active scene layers"
+    if ob.game.physics_type not in {'STATIC', 'NO_COLLISION', 'OCCLUDER', 'NAVMESH'}:
+        return "Dynamic physics (set Static to bake)"
+    if ob.game.controllers:
+        return "Has logic controllers"
+    if not ob.ae_lightmap_include:
+        return "Excluded from bake"
+    if not any(slot.material and slot.material.use_nodes for slot in ob.material_slots):
+        return "Needs a node material"
+    return None
+
+
 def lightmap_objects(scene):
-    """Static meshes that receive the lightmap. Moving things (rigid/dynamic bodies, objects with
-    logic) keep the probe ambient, as do objects with the "ae_lightmap_exclude" property."""
-    result = []
+    """Static meshes that receive the lightmap; selection does not limit the scene bake."""
+    return [ob for ob in scene.objects if ob.type == 'MESH' and
+            lightmap_exclusion_reason(scene, ob) is None]
+
+
+def lightmap_excluded_counts(scene):
+    """Reasons shown in the panel before baking; count only mesh objects with faces."""
+    counts = {}
     for ob in scene.objects:
-        if ob.type != 'MESH' or ob.hide_render or not ob.data.polygons:
-            continue
-        if not any(ob.layers[i] and scene.layers[i] for i in range(20)):
-            continue
-        if ob.game.physics_type not in {'STATIC', 'NO_COLLISION', 'OCCLUDER', 'NAVMESH'}:
-            continue
-        if ob.game.controllers or "ae_lightmap_exclude" in ob.game.properties or ob.get("ae_lightmap_exclude"):
-            continue
-        if not any(slot.material and slot.material.use_nodes for slot in ob.material_slots):
-            continue
-        result.append(ob)
-    return result
+        if ob.type == 'MESH' and ob.data.polygons:
+            reason = lightmap_exclusion_reason(scene, ob)
+            if reason:
+                counts[reason] = counts.get(reason, 0) + 1
+    return counts
+
+
+def get_lightmap_include(ob):
+    return not (bool(ob.get("ae_lightmap_exclude")) or
+                "ae_lightmap_exclude" in ob.game.properties)
+
+
+def set_lightmap_include(ob, include):
+    # Keep old files' explicit game-property exclusion readable and editable in the new UI.
+    if include:
+        if "ae_lightmap_exclude" in ob:
+            del ob["ae_lightmap_exclude"]
+        index = ob.game.properties.find("ae_lightmap_exclude")
+        if index != -1:
+            ob.game.properties.remove(index)
+    else:
+        ob["ae_lightmap_exclude"] = True
 
 
 def moving_objects(scene, static):
@@ -397,27 +453,48 @@ def emulate_game_lamp(ob):
     return original, la
 
 
-def use_gpu_device(scene):
-    """Bakes on the GPU when Cycles finds one (CUDA first, then OpenCL); returns the old setting so it
-    can be put back. Without a GPU the bake stays on the CPU."""
+def configure_bake_device(scene, use_gpu):
+    """Select the actual Cycles bake device and return the user settings to restore."""
     import _cycles
     addon = bpy.context.user_preferences.addons.get("cycles")
     if addon is None:
         return None
     prefs = addon.preferences
-    old = (prefs.compute_device_type, scene.cycles.device)
-    for kind in ('CUDA', 'OPENCL'):
-        if any(d[1] == kind for d in _cycles.available_devices(kind)):
+    old = (prefs.compute_device_type, scene.cycles.device,
+           {d.id: d.use for d in prefs.devices})
+    if use_gpu:
+        for kind in ('CUDA', 'OPENCL'):
+            if not any(d[1] == kind for d in _cycles.available_devices(kind)):
+                continue
             prefs.compute_device_type = kind
             prefs.get_devices()
             gpus = [d for d in prefs.devices if d.type == kind]
-            # with a dedicated card, leave out the integrated one ("... Graphics"): it slows the bake down
+            # Prefer a dedicated card over integrated graphics. On old OpenCL drivers the same physical
+            # Radeon can appear twice; use one device so it is not scheduled twice by Cycles.
             dedicated = [d for d in gpus if not d.name.endswith("Graphics")]
-            for d in prefs.devices:
-                d.use = d in (dedicated or gpus)
-            scene.cycles.device = 'GPU'
-            return old
+            selected = (dedicated or gpus)[:1] if kind == 'OPENCL' else (dedicated or gpus)
+            if selected:
+                for d in prefs.devices:
+                    d.use = d in selected
+                scene.cycles.device = 'GPU'
+                print("AE lightmap: Cycles bake device %s (%s)" %
+                      (kind, ", ".join(d.name for d in selected)))
+                return old
+    scene.cycles.device = 'CPU'
+    print("AE lightmap: Cycles bake device CPU")
     return old
+
+
+def restore_bake_device(scene, old):
+    if old is None:
+        return
+    prefs = bpy.context.user_preferences.addons["cycles"].preferences
+    prefs.compute_device_type = old[0]
+    prefs.get_devices()
+    for d in prefs.devices:
+        if d.id in old[2]:
+            d.use = old[2][d.id]
+    scene.cycles.device = old[1]
 
 
 def oidn_library():
@@ -518,10 +595,9 @@ def encode_rgbm(pixels, alpha_mask):
 
 
 class SCENE_OT_lightmap_bake(Operator):
-    """Bake the indirect light of the static meshes into one lightmap (Cycles), used by the """ \
-        """Game PBR materials instead of the probe/World ambient"""
+    """Bake lighting for the static meshes into one automatic atlas used by Game PBR materials"""
     bl_idname = "scene.ae_lightmap_bake"
-    bl_label = "Bake Lightmap"
+    bl_label = "Bake Scene"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -532,6 +608,7 @@ class SCENE_OT_lightmap_bake(Operator):
         import numpy as np
         scene = context.scene
         settings = scene.ae_lightmap_settings
+        mode = settings.mode
         objects = lightmap_objects(scene)
         if not objects:
             self.report({'WARNING'}, "No static mesh with a node material to bake")
@@ -555,21 +632,34 @@ class SCENE_OT_lightmap_bake(Operator):
             mat.node_tree.nodes.active = node
 
         render = scene.render
-        old = (render.engine, scene.cycles.samples if hasattr(scene, "cycles") else 0)
+        old = (render.engine, scene.cycles.samples if hasattr(scene, "cycles") else 0,
+               scene.cycles.max_bounces, scene.cycles.diffuse_bounces)
         render.engine = 'CYCLES'
         scene.cycles.samples = settings.samples
         scene.cycles.max_bounces = max(scene.cycles.max_bounces, 4)
         scene.cycles.diffuse_bounces = max(scene.cycles.diffuse_bounces, 4)
-        old_device = use_gpu_device(scene) if settings.use_gpu else None
+        old_device = configure_bake_device(scene, settings.use_gpu)
         lamps = [ob for ob in scene.objects if ob.type == 'LAMP' and not ob.hide_render]
         hidden = moving_objects(scene, objects)
         swapped = []
         probe_ob = probe_mat = probe_target = None
         volume_passes = []
+        old_world = scene.world
+        temporary_world = None
+        ao_state = None
         try:
             for ob in hidden:
                 ob.hide_render = True
-            if settings.use_volume:
+            if mode == MODE_AO:
+                if scene.world is None:
+                    temporary_world = bpy.data.worlds.new("AE_AO_Bake_World")
+                    scene.world = temporary_world
+                light = scene.world.light_settings
+                ao_state = (light.use_ambient_occlusion, light.ao_factor, light.distance)
+                light.use_ambient_occlusion = True
+                light.ao_factor = settings.ao_strength
+                light.distance = settings.ao_distance
+            elif settings.use_volume:
                 grid = volume_grid(objects, settings.volume_spacing)
                 probe_ob, probe_mat, probe_size = make_volume_mesh(scene, grid)
                 node = probe_mat.node_tree.nodes.new("ShaderNodeTexImage")
@@ -578,7 +668,7 @@ class SCENE_OT_lightmap_bake(Operator):
                                 max(settings.samples * 32, 512))  # few texels: cheap
                 scene.update()
 
-            def bake_target(passes, target, percent, status):
+            def bake_target(passes, target, percent, status, bake_type='DIFFUSE'):
                 bake_progress(percent, status)
                 targets, nodes, (width, height), margin, samples = target
                 select_only(scene, targets)
@@ -587,14 +677,21 @@ class SCENE_OT_lightmap_bake(Operator):
                 # bake into a stale buffer; alpha stays 0 where no chart was baked
                 work = bpy.data.images.new("AE_lightmap_work", width, height, alpha=True, float_buffer=True)
                 work.generated_color = (0.0, 0.0, 0.0, 0.0)
-                for mat, node, active in nodes:
-                    node.image = work
-                bpy.ops.object.bake(type='DIFFUSE', pass_filter=passes, margin=margin,
-                                    use_clear=False)  # the active UV layer is "Lightmap"
-                result = np.array(work.pixels[:], dtype=np.float32)
-                for mat, node, active in nodes:
-                    node.image = None
-                bpy.data.images.remove(work)
+                try:
+                    for mat, node, active in nodes:
+                        node.image = work
+                    kwargs = dict(type=bake_type, margin=margin, use_clear=False)
+                    if passes is not None:
+                        kwargs['pass_filter'] = passes
+                    result_status = bpy.ops.object.bake(**kwargs)  # the active UV layer is "Lightmap"
+                    if result_status != {'FINISHED'}:
+                        raise RuntimeError("Cycles bake failed; no lightmap was saved. "
+                                           "If GPU was enabled, turn it off and bake on CPU.")
+                    result = np.array(work.pixels[:], dtype=np.float32)
+                finally:
+                    for mat, node, active in nodes:
+                        node.image = None
+                    bpy.data.images.remove(work)
                 return result
 
             lightmap_target = (objects, added, (size, size), settings.margin, settings.samples)
@@ -606,29 +703,67 @@ class SCENE_OT_lightmap_bake(Operator):
                     percent += 10
                 return bake_target(passes, lightmap_target, percent, status)
 
-            # 1. bounces of the game lamps
-            for ob in lamps:
-                swapped.append((ob, ) + emulate_game_lamp(ob))
-            indirect = bake({'INDIRECT'}, 8, "Baking lamp bounces")
-            for ob, original, temp in swapped:
-                ob.data = original
-                bpy.data.lamps.remove(temp)
-            swapped = []
-            # 2. World and emissive meshes, direct (the game lamps stay live)
-            for ob in lamps:
-                ob.hide_render = True
-            direct = (bake({'DIRECT'}, 45, "Baking World light") if settings.use_world
-                      else np.zeros_like(indirect))
-            for ob in lamps:
-                ob.hide_render = False
+            if mode == MODE_AO:
+                total = bake_target(None, lightmap_target, 8, "Baking ambient occlusion", 'AO')
+                total = total.reshape(-1, 4).copy()
+                # Cycles' AO pass is a linear visibility factor. Keep it grayscale; Strength is an
+                # artistic blend from unoccluded (1) to the measured result.
+                ao = np.clip(total[:, :3].mean(axis=1), 0.0, 1.0)
+                total[:, :3] = ao[:, None]
+            else:
+                # 1. bounces of the game lamps
+                for ob in lamps:
+                    swapped.append((ob, ) + emulate_game_lamp(ob))
 
-            total = indirect.reshape(-1, 4).copy()
-            total[:, :3] += direct.reshape(-1, 4)[:, :3]
+                if mode == MODE_STATIC:
+                    # The atlas receives the complete diffuse lighting, including shadows cast by
+                    # static geometry. The volume remains indirect-only because moving objects still
+                    # receive direct lamps at runtime.
+                    if probe_target:
+                        volume_passes.append(bake_target(
+                            {'INDIRECT'}, probe_target, 8, "Baking indirect light (light volume)"))
+                    total = bake_target(
+                        {'DIRECT', 'INDIRECT'}, lightmap_target, 20, "Baking static lighting and shadows")
+                    total = total.reshape(-1, 4).copy()
+
+                    # DIRECT is additive. Removing the pass with lamps hidden keeps lamp direct light
+                    # while honoring the World Light switch (and removes direct emissive contribution).
+                    for ob in lamps:
+                        ob.hide_render = True
+                    if settings.use_world:
+                        if probe_target:
+                            volume_passes.append(bake_target(
+                                {'DIRECT'}, probe_target, 55, "Baking World light (light volume)"))
+                    else:
+                        world_direct = bake_target(
+                            {'DIRECT'}, lightmap_target, 55, "Removing World light from static bake")
+                        total[:, :3] = np.maximum(
+                            0.0, total[:, :3] - world_direct.reshape(-1, 4)[:, :3])
+                    for ob in lamps:
+                        ob.hide_render = False
+                else:
+                    indirect = bake({'INDIRECT'}, 8, "Baking lamp bounces")
+                    # 2. World and emissive meshes, direct (the game lamps stay live)
+                    for ob in lamps:
+                        ob.hide_render = True
+                    direct = (bake({'DIRECT'}, 45, "Baking World light") if settings.use_world
+                              else np.zeros_like(indirect))
+                    for ob in lamps:
+                        ob.hide_render = False
+
+                    total = indirect.reshape(-1, 4).copy()
+                    total[:, :3] += direct.reshape(-1, 4)[:, :3]
+
+                for ob, original, temp in swapped:
+                    ob.data = original
+                    bpy.data.lamps.remove(temp)
+                swapped = []
             mask = total[:, 3].copy()
             # (0,0) and the wrapped corners stay empty: meshes without the UV layer read there
             corners = np.zeros((size, size), dtype=bool)
             corners[:2, :2] = corners[:2, -2:] = corners[-2:, :2] = corners[-2:, -2:] = True
             mask[corners.reshape(-1)] = 0.0
+            atlas_coverage = 100.0 * float(np.count_nonzero(mask > 0.5)) / float(size * size)
             # fill the gutters before denoising so OIDN does not pull black into the chart borders
             bake_progress(80, "Denoising" if settings.use_denoise else "Filling margins")
             pad = max(4, settings.margin * 2)
@@ -639,6 +774,10 @@ class SCENE_OT_lightmap_bake(Operator):
                 result = denoise_oidn(lib, total, mask, size) if lib else None
                 total = result if result is not None else denoise(total, mask, size)
                 print("AE lightmap: denoise", "OIDN" if result is not None else "box blur")
+            if mode == MODE_AO:
+                ao = np.clip(total[:, :3].mean(axis=1), 0.0, 1.0)
+                ao = np.clip(1.0 - settings.ao_strength * (1.0 - ao), 0.0, 1.0)
+                total[:, :3] = ao[:, None]
             # denoise only trusted the charts: rebuild the padding from the denoised chart texels
             total[mask <= 0.5, :3] = 0.0
             total, mask = dilate(total, mask, size, pad, corners)
@@ -667,11 +806,17 @@ class SCENE_OT_lightmap_bake(Operator):
                 mat.node_tree.nodes.remove(node)
                 if active:
                     mat.node_tree.nodes.active = active
-            if old_device:
-                bpy.context.user_preferences.addons["cycles"].preferences.compute_device_type = old_device[0]
-                scene.cycles.device = old_device[1]
+            restore_bake_device(scene, old_device)
+            if ao_state and scene.world:
+                light = scene.world.light_settings
+                light.use_ambient_occlusion, light.ao_factor, light.distance = ao_state
+            if temporary_world:
+                scene.world = old_world
+                bpy.data.worlds.remove(temporary_world)
             render.engine = old[0]
             scene.cycles.samples = old[1] or scene.cycles.samples
+            scene.cycles.max_bounces = old[2]
+            scene.cycles.diffuse_bounces = old[3]
 
         image = bpy.data.images.get(scene.ae_lightmap) or bpy.data.images.get(IMAGE_NAME)
         if image and (image.size[0] != size or image.size[1] != size):
@@ -688,6 +833,8 @@ class SCENE_OT_lightmap_bake(Operator):
 
         scene.ae_lightmap = image.name
         scene.ae_lightmap_use = True
+        scene.ae_lightmap_mode = mode
+        scene.ae_lightmap_atlas_coverage = atlas_coverage
 
         if probe_target:
             width, height = probe_size
@@ -707,10 +854,17 @@ class SCENE_OT_lightmap_bake(Operator):
             scene.ae_lightvol_grid = list(grid[0]) + list(grid[1]) + [float(d) for d in grid[2]]
             scene.ae_lightvol_use = True
             print("AE lightmap: light volume %dx%dx%d probes" % tuple(grid[2]))
+        else:
+            clear_light_volume(scene)
         # recompile the game materials with the new texture
-        for mat in materials:
-            mat.update_tag()
-        self.report({'INFO'}, "Lightmap baked: %d objects, %dx%d" % (len(objects), size, size))
+        tag_lightmap_materials()
+        mode_names = {
+            MODE_INDIRECT: "Indirect + Dynamic Shadows",
+            MODE_AO: "Ambient Occlusion",
+            MODE_STATIC: "Static Lighting + Shadows",
+        }
+        mode_name = mode_names.get(mode, "Baked Lighting")
+        self.report({'INFO'}, "%s baked: %d objects, %dx%d" % (mode_name, len(objects), size, size))
         return {'FINISHED'}
 
 
@@ -735,17 +889,24 @@ class SCENE_OT_lightmap_clear(Operator):
                     ob.data.uv_textures.remove(layer)
         scene.ae_lightmap = ""
         scene.ae_lightmap_use = False
-        vimage = bpy.data.images.get(scene.ae_lightvol)
-        if vimage:
-            vimage.use_fake_user = False
-            if vimage.users == 0:
-                bpy.data.images.remove(vimage)
-        scene.ae_lightvol = ""
-        scene.ae_lightvol_use = False
+        scene.ae_lightmap_mode = MODE_INDIRECT
+        scene.ae_lightmap_atlas_coverage = -1.0
+        clear_light_volume(scene)
+        tag_lightmap_materials()
         return {'FINISHED'}
 
 
 class AnastacioLightmapSettings(bpy.types.PropertyGroup):
+    mode: EnumProperty(
+        name="Bake Mode",
+        description="Lighting result to produce on the next bake",
+        items=((MODE_INDIRECT, "Indirect + Dynamic Shadows",
+                "Bake indirect and World light; direct lamps and shadows remain dynamic"),
+               (MODE_AO, "Ambient Occlusion",
+                "Bake contact occlusion and apply it only to ambient diffuse lighting"),
+               (MODE_STATIC, "Static Lighting + Shadows",
+                "Bake direct and indirect diffuse lighting with shadows for static objects")),
+        default=MODE_INDIRECT)
     resolution: EnumProperty(
         name="Resolution",
         description="Size of the lightmap atlas (one texture for the whole scene)",
@@ -763,6 +924,12 @@ class AnastacioLightmapSettings(bpy.types.PropertyGroup):
     margin: IntProperty(
         name="Margin", description="Pixels the baked charts are extended by (avoids dark seams)",
         default=4, min=0, max=32)
+    ao_distance: FloatProperty(
+        name="Distance", description="Maximum world-space distance searched for ambient occlusion",
+        default=3.0, min=0.01, max=1000.0, soft_max=50.0, subtype='DISTANCE', unit='LENGTH')
+    ao_strength: FloatProperty(
+        name="Strength", description="Amount of baked ambient occlusion (1 is physically neutral)",
+        default=1.0, min=0.0, max=2.0, soft_max=1.0)
     use_world: BoolProperty(
         name="World Light",
         description="Also bake the sky/World and emissive meshes (the lightmap replaces the probe/World "
@@ -790,6 +957,10 @@ def register_props():
         name="Lightmap Scale",
         description="Texel density of this object in the lightmap atlas (2 = twice as sharp, 0.5 = half)",
         default=1.0, min=0.05, max=16.0, soft_min=0.1, soft_max=8.0)
+    bpy.types.Object.ae_lightmap_include = BoolProperty(
+        name="Receive Baked Lighting",
+        description="Receive the next lightmap when eligible; excluded static meshes can still cast baked shadows",
+        get=get_lightmap_include, set=set_lightmap_include)
     bpy.types.Scene.ae_lightmap_settings = bpy.props.PointerProperty(type=AnastacioLightmapSettings)
     # Plain scene properties: read by name from C (node_shader_gpu_lightmap).
     bpy.types.Scene.ae_lightmap = StringProperty(
@@ -797,13 +968,20 @@ def register_props():
     bpy.types.Scene.ae_lightmap_use = BoolProperty(
         name="Use Lightmap",
         description="Light the static meshes with the baked lightmap (works on Desktop, Web and Android)",
-        default=False)
+        default=False, update=tag_lightmap_materials)
+    bpy.types.Scene.ae_lightmap_mode = StringProperty(
+        name="Baked Lighting Mode",
+        description="Mode stored in the current baked lightmap; changing Bake Mode does not alter it",
+        default=MODE_INDIRECT, options={'HIDDEN'})
+    bpy.types.Scene.ae_lightmap_atlas_coverage = FloatProperty(
+        name="Atlas Coverage", description="Percentage of image pixels covered by baked UV charts",
+        default=-1.0, min=-1.0, max=100.0, options={'HIDDEN'})
     bpy.types.Scene.ae_lightvol = StringProperty(
         name="Light Volume Image", description="Baked light volume (ambient cube per probe) for moving objects")
     bpy.types.Scene.ae_lightvol_use = BoolProperty(
         name="Use Light Volume",
         description="Light the moving objects with the baked light volume (6 texture reads per pixel)",
-        default=False)
+        default=False, update=tag_lightmap_materials)
     bpy.types.WindowManager.ae_bake_progress = FloatProperty(
         name="Bake Progress", subtype='PERCENTAGE', min=0.0, max=100.0, options={'SKIP_SAVE'})
     bpy.types.WindowManager.ae_bake_status = StringProperty(options={'SKIP_SAVE'})
@@ -816,9 +994,12 @@ def unregister_props():
     del bpy.types.WindowManager.ae_bake_status
     del bpy.types.WindowManager.ae_bake_progress
     del bpy.types.Object.ae_lightmap_scale
+    del bpy.types.Object.ae_lightmap_include
     del bpy.types.Scene.ae_lightvol_grid
     del bpy.types.Scene.ae_lightvol_use
     del bpy.types.Scene.ae_lightvol
+    del bpy.types.Scene.ae_lightmap_mode
+    del bpy.types.Scene.ae_lightmap_atlas_coverage
     del bpy.types.Scene.ae_lightmap_use
     del bpy.types.Scene.ae_lightmap
     del bpy.types.Scene.ae_lightmap_settings

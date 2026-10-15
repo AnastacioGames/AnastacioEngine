@@ -90,9 +90,11 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	GPU_link(mat, "set_rgba", in[0].link ? in[0].link : GPU_uniform(in[0].vec), &shadow_base);
 	GPU_material_shadow_color_link(mat, shadow_base, NULL);
 
+	GPUNodeLink *lightmap = node_shader_gpu_lightmap(
+	        mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link);
 	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol,
-	                      node_shader_gpu_lightmap(mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link),
+	                      lightmap,
 	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }
 

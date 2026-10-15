@@ -476,7 +476,7 @@ class RENDER_PT_encoding(RenderButtonsPanel, Panel):
 
 
 class RENDER_PT_bake(RenderButtonsPanel, Panel):
-    bl_label = "Bake"
+    bl_label = "Texture Bake (Legacy)"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
@@ -488,6 +488,9 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
         # Keep the bake controls grouped inside the panel, matching the
         # internal layout used by the other Render property sections.
         layout = layout.box()
+
+        if rd.engine == 'BLENDER_GAME':
+            layout.label(text="For game lighting, use Baked Lighting above", icon='INFO')
 
         layout.operator("object.bake_image", icon='RENDER_STILL')
         

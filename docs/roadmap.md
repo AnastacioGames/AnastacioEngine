@@ -722,6 +722,19 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Fog - Volumetric (evolução):** 10 itens em [plano-volumetric.md](plano-volumetric.md); itens 1-3
   (vento/manhã, raios de sol, Fog Volumes) feitos e aguardando aceite visual; item 4 (Python/Logic) com o Codex.
 - **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
+  Evolução aprovada para um painel moderno com modos de GI dinâmica, AO e iluminação estática com sombras:
+  [plano técnico](baked-lighting-plan.md). Interface contextual + AO implementados em 2026-10-15; o usuário
+  validou o AO em Play e Standalone. `Static Lighting + Shadows` também foi implementado, com cobertura do
+  atlas separada da origem Light Volume, difuso direto sem duplicação nos estáticos e especular/luz completa
+  preservados respectivamente nos estáticos/móveis. Build, bake numérico e runtime automatizado passaram;
+  o usuário confirmou o modo estático em uma cena simples após trocar o Rigid Body para Static;
+  falta avaliação visual em cena maior e nos materiais variados. A seleção CPU/GPU do bake foi corrigida
+  em 2026-10-15; o aviso OpenCL `kernel_lamp_emission` foi reproduzido em `baked_gpu.range` e corrigido:
+  o caminho de bake tentava carregar um kernel split que não é compilado para bake. AO, Static e Indirect
+  passaram sem o aviso no executável de teste e no executável principal instalado por cópia idêntica;
+  falta confirmar visualmente no jogo. O link normal do executável principal ainda falha com `LNK1104`
+  mesmo depois de fechar o editor; falta diagnosticar o bloqueio. Falhas reais reportadas pelo motor
+  impedem o salvamento de um bake supostamente válido.
   GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
   validar no Linux e no build Web. UV da lightmap por xatlas. [SSGI nativo experimental](ssgi-native-plan.md)
   implementado no worktree: pendentes avaliação visual no jogo/Play, MSAA, core profile completo,

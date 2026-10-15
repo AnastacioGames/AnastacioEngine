@@ -371,9 +371,19 @@ GPUNodeLink *node_shader_gpu_lightmap(GPUMaterial *mat, GPUNodeLink *normal)
 {
 	Scene *scene = GPU_material_scene(mat);
 	Image *ima = scene_baked_image(scene, "ae_lightmap", "ae_lightmap_use");
+	IDProperty *mode_prop = (ima && scene && scene->id.properties) ?
+	                        IDP_GetPropertyFromGroup(scene->id.properties, "ae_lightmap_mode") : NULL;
+	const bool is_ao = mode_prop && mode_prop->type == IDP_STRING && STREQ(IDP_String(mode_prop), "AO");
+	const bool is_static = mode_prop && mode_prop->type == IDP_STRING && STREQ(IDP_String(mode_prop), "STATIC");
 	GPUNodeLink *lm;
 	if (ima) {
 		GPU_link(mat, "lightmap_sample", GPU_attribute(CD_MTFACE, "Lightmap"), GPU_image(ima, NULL, true), &lm);
+		/* Keep the established Principled node ABI.  The alpha tag distinguishes map kinds:
+		 * 1 = indirect/light-volume, 2 = AO atlas, 3 = static-lighting atlas. */
+		if (is_static)
+			GPU_link(mat, "lightmap_mark_static", lm, &lm);
+		else if (is_ao)
+			GPU_link(mat, "lightmap_mark_ao", lm, &lm);
 	}
 	else {
 		GPU_link(mat, "set_rgba_zero", &lm);

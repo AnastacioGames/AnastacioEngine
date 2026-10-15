@@ -6,6 +6,66 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-15 - OpenCL bake: aviso indevido de `kernel_lamp_emission`
+
+- Reproduzido em `projects-teste/baked_gpu.range`: o plano tem material de nós sem texture slot,
+  mas isso não causava o aviso. O cubo está como Rigid Body; só o plano Static participa do bake.
+- `OpenCLSplitPrograms::load_kernels` não compila os kernels split quando `use_baking` está ativo,
+  mas `OpenCLDevice::wait_for_availability` tentava carregá-los assim mesmo. O erro vinha dessa
+  checagem indevida; o kernel OpenCL de bake separado continuava funcionando, por isso a operação
+  podia terminar com imagem válida apesar do aviso. Agora o caminho de bake ignora os kernels split.
+- O executável de teste atualizado, linkado separadamente porque o editor do usuário estava aberto,
+  fez AO, Static e Indirect na RX 6800M sem o aviso, todos com atlas de 256x256 e 99,98% de cobertura.
+  AO na CPU teve a mesma cobertura e faixa de valores do AO na GPU. Após fechar o editor, o link normal
+  ainda falhou com `LNK1104` para `bin/AnastacioEngine.exe` e removeu o executável antigo. Uma cópia
+  byte a byte do executável de teste corrigido foi instalada sob o nome principal; SHA-256 idêntico.
+  AO, Static e Indirect foram repetidos no executável principal, todos sem o aviso e com a mesma
+  cobertura. A causa do `LNK1104` no link normal e a validação visual no jogo seguem pendentes.
+
+## 2026-10-15 - Bake CPU/GPU: seleção explícita e erro de kernel não vira sucesso
+
+- `GPU` desligado agora força Cycles na CPU durante o bake, mesmo se a cena estiver configurada para GPU;
+  o dispositivo original e as preferências de GPU são restaurados ao final. O console informa o dispositivo usado.
+- No OpenCL, selecionamos apenas uma entrada da GPU dedicada. Nesta máquina a RX 6800M aparecia duas vezes
+  na lista de dispositivos e o bake anterior habilitava ambas.
+- `RE_bake_engine` agora devolve falha quando o motor registra erro; o operador de lightmap verifica o retorno
+  de cada passe e não salva uma imagem nova após falha. Um erro de kernel exige novo bake, preferencialmente
+  com `GPU` desligado se persistir.
+- Build `RangeEngine`/`AnastacioRuntime` passou (6/6). Smokes CPU Static e AO passaram; smoke OpenCL
+  `Indirect + Dynamic Shadows` passou em 512x512 com light volume 20x20x5, sem aviso de kernel. A falha
+  exata da cena do usuário ainda não foi reproduzida; validação visual nessa cena permanece pendente.
+
+## 2026-10-15 - Baked Lighting moderno: interface contextual, AO e iluminação estática
+
+- Acabamento do fluxo: `Bake Scene` mostra contagem de receptores e motivos de exclusão, deixa o controle
+  `Receive Baked Lighting` visível para o objeto ativo, informa cobertura real dos pixels baked no atlas e explica
+  que mover luzes ou objetos após o modo estático exige novo bake. O antigo painel virou `Texture Bake (Legacy)`
+  e o X virou `Clear Baked Lighting`. O novo controle preserva o atributo legado `ae_lightmap_exclude`.
+- O smoke estático foi repetido com o plano ativo e confirmou que a seleção não limita o bake da cena; também
+  confirmou inclusão/exclusão por objeto e cobertura do atlas. Scripts da UI sincronizados em `build/bin`.
+- `Render > Baked Lighting` agora escolhe entre `Indirect + Dynamic Shadows` (comportamento anterior e
+  padrão compatível) e `Ambient Occlusion`. O painel mostra separadamente o modo do resultado atual e o
+  modo do próximo bake, oculta controles sem efeito e agrupa Lightmap, Moving Objects e Advanced.
+- O AO usa o atlas/UV automático existente, com `Distance` e `Strength`, restaura as configurações temporárias
+  do World e não cria Light Volume. No Game PBR ele multiplica somente a parcela ambiente; luz direta,
+  especular, sombras e elegibilidade para SSGI permanecem dinâmicas.
+- O novo modo `Static Lighting + Shadows` grava no atlas a irradiância difusa direta e indireta com sombras.
+  A marca interna do atlas distingue-o do Light Volume: somente os receptores estáticos deixam de somar
+  difuso direto em tempo real; especular permanece dinâmico, e objetos móveis conservam luz direta completa.
+  O Light Volume continua contendo apenas indireta/World.
+- Correção posterior: o primeiro encaixe de AO/estático ampliava a assinatura GLSL do Principled e causava
+  `node_bsdf_principled: no matching overloaded function` ao converter um material para PBR. A interface
+  legada foi preservada; o tipo do bake passou a ser uma marca interna na amostra da lightmap. Build
+  `ge_rasterizer_shaders` + `RangeEngine` passou novamente e o smoke estático passou sem erro GLSL.
+- `Use in Game`, conclusão e limpeza do bake invalidam os materiais explicitamente. Arquivos antigos sem
+  `ae_lightmap_mode` continuam sendo interpretados como iluminação indireta.
+- Build `ge_rasterizer_shaders` + `RangeEngine` passou (105/105). `tools/test_baked_ao_smoke.py` validou bake
+  256x256, RGBM grayscale, faixa 0..1, restauração do World, persistência do modo e reabertura da cena; o
+  usuário confirmou o AO em Play e Standalone. `tools/test_baked_static_smoke.py` validou dois receptores
+  estáticos, exclusão de objeto dinâmico do atlas, RGBM com contraste, Light Volume 1x1x1 e persistência do
+  modo; `AnastacioRuntime` encerrou com código 0 e sem erros GLSL. O usuário validou uma cena simples com
+  cubo e plano Static; uma cena maior com materiais variados ainda não foi testada visualmente.
+
 ## 2026-10-14 - Web/Android: alternar controles para acessar menus
 
 - Diagnóstico no jogo externo do itch.io: pacote usa `fps`/stick dinâmico; zonas invisíveis dos sticks
