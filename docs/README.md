@@ -22,6 +22,11 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [Ragdoll: análise e plano](ragdoll-modernization-plan.md): fonte do addon, auditoria dos scripts
+  do RolimaRacer, prévia de colisores e núcleo comum para personagem livre ou vinculado a veículo.
+  [Guia da autoria](ragdoll-authoring.md): painel de prévia, ajustes por osso e limites da primeira entrega.
+  [Componente comum](ragdoll-runtime.md): presets, física, NPCs e recuperação livre/âncora.
+
 - [SSGI nativo experimental](ssgi-native-plan.md): escopo implementado em worktree, configuração,
   medições e validações pendentes.
 

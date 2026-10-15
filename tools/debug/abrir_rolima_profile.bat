@@ -12,6 +12,8 @@ set OUT=%ROOT%\debug-logs\perfil-rolima-%STAMP%
 mkdir "%OUT%\tmp"
 set RANGE_PROFILE=%OUT%\profile.txt
 set RANGE_SHADER_LOG=%OUT%\shaders.txt
+rem Diagnostico opt-in dos scripts do RolimaRacer; outros jogos ignoram a variavel.
+set ROLIMA_RAGDOLL_TRACE=%OUT%\ragdoll.jsonl
 rem O player grava range_runtime.log.txt no TEMP: uma pasta por rodada.
 set TEMP=%OUT%\tmp
 set TMP=%OUT%\tmp

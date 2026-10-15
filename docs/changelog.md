@@ -6,6 +6,118 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-14 - Ragdoll: componente comum, NPCs e presets passivos
+
+- Addon 0.3 prepara rigid bodies, juntas cone-twist e anexa automaticamente
+  `anastacio_ragdoll_runtime.AnastacioRagdoll`, módulo compartilhado da instalação. Geração
+  inicial de autoria continua separada. Atualização não duplica componente/objetos;
+  remoção e Undo/Redo incluem física, componente e pasta, preservando o controlador.
+- FREE para controlador Rigid Body/Dynamic BOX e ANCHOR para assento/empty, recuperação
+  automática opcional/tempo de simulação; NPC sem retorno automático permanece caído.
+  Confirmação explícita de transições, flags preservadas em falha, callbacks do jogo,
+  herança linear e angular, sem setters de damping/velocidade por quadro.
+- Presets Duro/Equilibrado/Leve ajustam amplitudes e damping, sem músculos/motores.
+  Massa total independente distribuída por volume/peso relativo; campos por osso.
+- Diagnóstico: nomes de constraints ganham sufixo durante staging; runtime usa nome
+  real exportado no pivô. Esta API não expõe blenderObject; bounds consultados por
+  cullingBox. Cache mundial é diferido: composição de localTransform na transição.
+  Escala não uniforme do controlador distorcia ciclos até NaN; agora recusada, com
+  validação finita antes de escrever poses. Raycast com máscara precisa xray=1 para
+  atravessar os corpos excluídos e alcançar o chão.
+- Testes no player: cinco rigs simultâneos, 100 ciclos por modo, Active inicial,
+  automático/permanente, herança angular/linear, obstáculo/veto e alvo inválido;
+  demo de cinco humanoides/50 corpos passou 370 frames. UI validou Undo/Redo completo.
+  Evidências em `debug-logs/ragdoll-runtime-final-20261014/`; guia em
+  [ragdoll-runtime.md](ragdoll-runtime.md). Não houve C++ ou migração do jogo.
+- FREE usa AABB com limites documentados; cápsulas/Character, compounds/terreno
+  complexo, colisões configuráveis, blend, instâncias dinâmicas e Web ainda pendentes.
+  A avaliação visual dos presets pelo usuário permanece aberta.
+
+## 2026-10-14 - Ragdoll: retirada do addon antigo e escopo de NPCs
+
+- Removido `easy_ragdoll_RangeEngine.py` do fonte distribuído e da instalação atual,
+  incluindo bytecode instalado, por autorização explícita do usuário. Backup fora dos
+  scripts em `debug-logs/ragdoll-legacy-removed-20261014/`; referência original de tools
+  e scripts externos do RolimaRacer preservados. Novo addon Anastacio Ragdoll mantido.
+- Usuário confirmou autoria em rig próprio e decidiu manter addon/componentes Python
+  enquanto a API atender, sem C++ novo. Acrescentado ao plano: NPCs usando o mesmo
+  núcleo, recuperação automática opcional e atraso configurável; não implementado ainda.
+
+## 2026-10-14 - Ragdoll: collections no Outliner e acesso ao painel
+
+- Addon Anastacio Ragdoll 0.2: collection por armature, dentro da pasta do rig, contendo
+  caixas e pivôs sem mudar parenting. UID por cena e referência do rig preservam a pasta
+  após renomear; atualização não duplica; remoção limpa somente pasta vazia. Conteúdo
+  alheio e subpastas são preservados. Falha ao organizar descarta a pasta recém-criada.
+- Painel disponível pela armature em Object Mode sem seleção de osso, e por corpo/empty
+  gerado. Incluída escolha Pose/Rest Position. Usuário validou prévia em rig próprio.
+- Novo exemplo desativa a constraint externa usada no teste de preservação, responsável
+  pelo deslocamento do Root em Pose Mode na primeira cena. Nenhum arquivo aberto pelo
+  usuário foi sobrescrito, incluindo seu novo esqueleto.
+- Regressão bpy/editor em `debug-logs/ragdoll-collections-20261014`: geração, reabertura,
+  Undo/Redo de atualização e remoção, callback de prévia. Mantém autoria NO_COLLISION;
+  runtime comum e dois modos de recuperação continuam na próxima etapa.
+
+## 2026-10-14 - Ragdoll: autoria por osso e validação no jogo
+
+- Usuário confirmou bom funcionamento dos scripts corrigidos. Rodada `194141`:
+  três ativações por input, duas por impacto, cinco retornos; sem erros e sem SPIKE
+  nas janelas das quedas/retornos. Dados em `debug-logs/perfil-rolima-20261014-194141/`.
+- Novo addon `anastacio_ragdoll.py`, fonte e cópia instalada, separado do legado:
+  prévia sem criar objetos, ajustes de caixas por osso, geração em staging com rollback,
+  substituição/remoção somente dos dados próprios, Undo/Redo e persistência. Primeira
+  entrega de autoria, com NO_COLLISION e influência zero; runtime/juntas ainda pendentes.
+- `validar_autoria_ragdoll.py` passou em geração, geometria, rollback, referências
+  externas, independência de rigs, salvar/reabrir, Undo/Redo de atualização/remoção
+  e execução real do callback POST_VIEW sem exceções. Aparência ainda não avaliada.
+  No primeiro teste UI, `open_mainfile` dentro do script de startup invalidou contexto
+  da janela; corrigido passando o arquivo na linha de comando antes de `--python`.
+  Teste desativa confirmação de saída só na sessão, sem salvar preferências globais.
+  C++ e `.range` original do jogo não alterados.
+
+## 2026-10-14 - Ragdoll: auditoria e planejamento
+
+- Implementada primeira correção nos dois scripts externos do RolimaRacer:
+  inicialização completa, transições síncronas/idempotentes com sucesso confirmado,
+  constraints próprias, cache por ligação real, fonte física/assento explícitos,
+  remoção de damping manual por quadro e refresh sem deriva. Recuperação com falha
+  mantém flags e erro explícito; fumaça não invalida retorno. Sem alteração de C++,
+  do addon instalado ou do `.range` original. Validação visual ainda pendente.
+- Regressão no player: 100 ciclos alternando input/impacto com trace ligado/desligado,
+  Active inicial, menu, constraints extras, colisores auxiliares e referência alterada
+  sem falso retorno. Quatro rigs reais: 100 ciclos por rig, simultaneamente,
+  20/20/22/23 corpos, 800 transições e nenhum erro. Geradores reutilizáveis em
+  `tools/debug/cenas/validar_correcao_ragdoll.py` e `validar_rigs_rolima.py`.
+  No gerador isolado, arquivo de biblioteca sem bloco de startup não serviu ao player;
+  corrigido exportando cena + texto do driver e regravando como mainfile completo.
+- Rodada instrumentada em jogo real `perfil-rolima-20261014-192125`: confirmados os
+  módulos externos por caminho/hash, três ativações por V e três por impacto, seis
+  retornos e nenhum erro registrado. Componente com 20 corpos: ativação 0,436–0,538 ms,
+  desativação 0,233–0,295 ms; retorno completo do controlador até 1,076 ms. Nenhum
+  SPIKE nas janelas das quedas/retornos (+2 s); pausas de 1606,3 e 693,9 ms entre
+  quedas, dominadas por swap. Sem prova da causa de GPU/driver ou da lâmpada de
+  faísca relatada pelo usuário. Resumo e dados brutos preservados na pasta da rodada.
+- Continuação: inspeção bpy confirmou quatro armatures com o componente externo
+  `scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll`, sem texto embutido de ragdoll.
+  Duas rodadas em jogo real registraram picos dominados por `endframe.swap`, sem eventos
+  para vincular cada pico a uma queda. Preparado diagnóstico opt-in no RolimaRacer:
+  motivos/etapas, origem dos módulos, câmeras e filtros observados, ativado pelo iniciador
+  com `ROLIMA_RAGDOLL_TRACE`; resumo em `tools/debug/analisar_ragdoll.py`.
+- Validação: cena isolada de um osso/corpo percorreu impacto, input e retorno no player,
+  com diagnóstico ligado e desligado; duas quedas, quatro transições e nenhum erro de
+  observação. Exceção intencional preservada pelo decorator; AST sem instrumentação igual
+  ao código anterior. Cena gerada foi reaberta e inspecionada. Próxima rodada no jogo
+  completo ainda pendente. Sem mudanças em C++ ou no `.range` do jogo.
+- `tools/check_docs.py` continua com 31 erros e 73 avisos preexistentes (links de demos
+  e mapas desatualizados); os links novos e diffs foram conferidos separadamente.
+
+- Localizados o fonte do addon em `source/release/scripts/addons/`, a cópia instalada
+  (hash idêntico), a referência original em `tools/` e os dois scripts do RolimaRacer.
+- Registrados os riscos de inicialização, seleção de constraints, retorno, damping que
+  acorda corpos e contornos de culling/compound no [plano](ragdoll-modernization-plan.md).
+- Proposta: prévia no editor por Python, núcleo comum e modos livre/vinculado; C++ somente
+  para lacunas verificadas. Nenhum código ou `.range` alterado, nenhum build ou teste físico.
+
 ## 2026-10-13 - Release 0.5.1: ORM Occlusion por canal e versão
 
 `ANASTACIO_VERSION_STRING` e o splash (`wm.py`) foram para `0.5.1`. A Occlusion (canal R) do "RGB to ORM"

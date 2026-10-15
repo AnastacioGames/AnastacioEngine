@@ -363,6 +363,32 @@ e sensor Animation Event).
 
 ### Vehicle System / Vehicle Lab
 
+[Ragdoll — plano de evolução](ragdoll-modernization-plan.md) (2026-10-14):
+módulos confirmados e dois scripts do RolimaRacer corrigidos; 100 ciclos por cada um
+dos quatro rigs reais passaram no player (20/20/22/23 corpos), além de regressão de
+menu, Active inicial e falha de alvo. Usuário validou os scripts no jogo; rodada
+`194141` teve três inputs, dois impactos, cinco retornos, sem erros ou SPIKE próximo.
+Novo addon de [autoria](ragdoll-authoring.md) com prévia por osso, caixas, geração
+transacional e Undo/Redo passou no editor; usuário validou a prévia em rig próprio.
+Collections por armature organizam corpos e empties, com persistência e Undo/Redo
+verificados; painel acessível pela armature em Object Mode ou por um objeto gerado.
+Addon legado removido do fonte/instalação a pedido do usuário; scripts do jogo preservados.
+Novo [componente comum](ragdoll-runtime.md) passou em cinco rigs simultâneos, 100 ciclos
+por modo FREE/ANCHOR, Active inicial, NPC permanente, retorno automático, herança
+angular/linear, bloqueio/veto de retorno e Undo/Redo da preparação completa. Demo com
+cinco humanoides/50 corpos passou 370 frames. Presets Duro/Equilibrado/Leve, massa e
+juntas por osso implementados. Pendentes: avaliação visual dos presets/personagem real,
+migração do adaptador RolimaRacer, colisões configuráveis, cápsulas/Character, volume
+de retorno em cenários complexos, blend/animação de levantar, instâncias por grupo e
+exportadores/Web. Não houve C++ novo; adicionar somente por limitação demonstrada.
+Baseline: duas rodadas com picos dominados por `endframe.swap`. Instrumentação opt-in dos
+scripts validada em jogo real: rodada `20261014-192125`, três inputs e três impactos,
+seis retornos sem erros; nenhum SPIKE nas janelas das quedas. Ativação do componente
+0,436–0,538 ms (20 corpos), retorno do controlador até 1,076 ms; pausas longas entre
+quedas dominadas por swap. Esse baseline é do componente legado corrigido; não é
+benchmark do novo núcleo. Refinamentos e validações restantes estão indicados acima.
+Ver [eventos](engine-profiling.md#eventos-de-ragdoll-do-rolimaracer).
+
 [Plano 2](vehicle-system-plan-2.md): Fases B (direção em graus, direção sensível à velocidade, freio de mão,
 volante visual), C (`has_drive`, torque/RPM, gearbox automático/manual) e A (`vehicle_com_offset` via compound
 shape) já estão no código desde o snapshot 28775369. Falta validar cada uma no jogo real (usuário). Fase D
@@ -628,8 +654,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09 (corrigidos ou descartados; só CV3 aberto); ganho por item não demonstrado em A/B. Abertos: PY, LP, SP.
 - **Travadas do RolimaRacer (aberto, 2026-10-10):** corrigidos o pico de 39 ms (imagem de nó Material subindo no
   1º desenho) e a resolução dinâmica descendo sem parar; `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo.
-  Abertos: ~800 ms no swap ao voltar do ragdoll, conferir com 10 pilotos pelo menu
-  (`tools/debug/abrir_rolima_profile.bat`) e o upload lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
+  Abertos: picos longos no swap, inicialmente observados ao voltar do ragdoll; a rodada
+  instrumentada de 2026-10-14 teve seis quedas sem SPIKE próximo e duas pausas entre
+  quedas, sem causa identificada. Conferir novamente após correção dos scripts, com
+  10 pilotos pelo menu (`tools/debug/abrir_rolima_profile.bat`). Também aberto: upload
+  lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
   Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
   `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.

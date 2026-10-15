@@ -6,6 +6,24 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+Ragdoll do RolimaRacer: os dois scripts externos receberam correção de ciclo de vida,
+transições com confirmação, isolamento de constraints próprias e fonte física explícita.
+Os quatro rigs reais passaram 100 ciclos simultâneos por rig no player; usuário validou
+o funcionamento no jogo. Novo addon de [autoria](docs/ragdoll-authoring.md) oferece
+prévia e ajuste de caixas por osso, geração transacional e Undo/Redo, validados no editor;
+usuário validou a prévia em rig próprio. Corpos e empties são organizados em collections
+por armature, com atualização sem duplicar pastas e remoção preservando conteúdo alheio.
+Novo [componente comum](docs/ragdoll-runtime.md) com FREE/ANCHOR e NPC permanente,
+presets Duro/Equilibrado/Leve, massa distribuída, juntas e herança angular/linear:
+cinco rigs e 100 ciclos por modo passaram no player; demo de 50 corpos passou 370 frames.
+Preparação/remoção de física e componente com Undo/Redo verificadas. Retorno livre inicial
+usa BOX/chão plano e AABBs; volumes complexos, Character, blend e integração do novo
+componente ao RolimaRacer seguem no [plano](docs/ragdoll-modernization-plan.md).
+Nenhuma ponte C++ nova nesta etapa.
+Addon antigo removido do fonte distribuído e da instalação por solicitação do usuário.
+Arquitetura confirmada: addon e componentes Python; NPCs compartilham o núcleo,
+com recuperação automática opcional. Validação visual dos presets ainda pendente.
+
 Editor Windows: `AnastacioEngine.exe`, produzido pelo alvo interno `RangeEngine` desde 2026-10-08.
 Player Windows: `AnastacioRuntime.exe`, produzido pelo alvo `RangeRuntime` desde 2026-10-08.
 Resolução do player aceita o nome legado nos projetos; formatos, APIs e preferências mantêm compatibilidade.

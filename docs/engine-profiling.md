@@ -26,6 +26,20 @@ Para o RolimaRacer, `tools/debug/abrir_rolima_profile.bat` liga os dois logs e g
 `debug-logs/perfil-rolima-<data-hora>/`.
 Rodadas de ~10 s bastam; os primeiros 30 frames (carregamento) são ignorados.
 
+### Eventos de ragdoll do RolimaRacer
+
+O iniciador também define `ROLIMA_RAGDOLL_TRACE=<pasta>/ragdoll.jsonl`. Os scripts do jogo
+instrumentados registram origem dos módulos, motivo e número de cada queda, etapas de
+ativação/retorno, erros, trocas de câmera e estado observado de Camera FX/filtros custom.
+Fora desse iniciador, sem a variável, o diagnóstico fica desligado.
+
+Depois de fechar o jogo, rode `python tools/debug/analisar_ragdoll.py <pasta-dos-logs>`.
+O resultado `ragdoll-summary.md` cruza quedas com picos próximos; proximidade não prova causa.
+`engine_t` usa o mesmo relógio do profiler. `frame_t` é tempo de simulação, não frame ID.
+Funções aninhadas têm tempos sobrepostos; não somar os totais. Snapshots são amostrados
+a cada 100 ms e não enumeram todos os filtros built-in. O teste controlado dos hooks fica
+em `tools/debug/cenas/validar_diagnostico_ragdoll.py`; não modifica o `.range` do jogo.
+
 ## Como ler
 
 - `AVG ...`: média de 120 frames (~2 s), picos incluídos. Primeiro vêm as categorias do profile da engine
