@@ -868,6 +868,11 @@ bool OpenCLDevice::wait_for_availability(const DeviceRequestedFeatures& requeste
 			use_preview_kernels = !load_kernel_task_pool.finished();
 		}
 	}
+	/* Baking runs the separate bake_program; split path-tracing kernels are not
+	 * compiled for this feature set and must not be requested here. */
+	if (requested_features.use_baking) {
+		return true;
+	}
 	return split_kernel->load_kernels(requested_features);
 }
 

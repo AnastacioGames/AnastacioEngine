@@ -66,15 +66,17 @@ scene.objects.link(camera)
 scene.camera = camera
 
 settings = scene.ae_lightmap_settings
-settings.mode = 'STATIC'
-settings.resolution = '256'
+test_mode = os.environ.get('AE_TEST_MODE', 'STATIC')
+assert test_mode in {'STATIC', 'INDIRECT'}
+settings.mode = test_mode
+settings.resolution = os.environ.get('AE_TEST_RESOLUTION', '256')
 settings.samples = 8
 settings.margin = 2
-settings.use_gpu = False
+settings.use_gpu = os.environ.get('AE_TEST_GPU') == '1'
 settings.use_denoise = False
 settings.use_world = True
 settings.use_volume = True
-settings.volume_spacing = 20.0
+settings.volume_spacing = float(os.environ.get('AE_TEST_VOLUME_SPACING', '20.0'))
 
 from bl_operators.anastacio_lightmap import lightmap_objects, lightmap_excluded_counts
 assert len(lightmap_objects(scene)) == 2
@@ -89,10 +91,14 @@ scene.objects.active = floor
 
 result = bpy.ops.scene.ae_lightmap_bake()
 assert result == {'FINISHED'}, result
-assert scene.ae_lightmap_mode == 'STATIC'
+assert scene.cycles.device == 'CPU'  # The bake must restore the scene's original device.
+assert scene.ae_lightmap_mode == test_mode
 assert scene.ae_lightmap_use
 assert scene.ae_lightvol and scene.ae_lightvol_use
-assert list(scene.ae_lightvol_grid[6:]) == [1.0, 1.0, 1.0]
+if settings.volume_spacing >= 20.0:
+    assert list(scene.ae_lightvol_grid[6:]) == [1.0, 1.0, 1.0]
+else:
+    assert all(d >= 1.0 for d in scene.ae_lightvol_grid[6:])
 assert floor.data.uv_textures.get('Lightmap')
 assert cube.data.uv_textures.get('Lightmap')
 assert not moving.data.uv_textures.get('Lightmap')
@@ -111,10 +117,10 @@ assert decoded.max() - decoded.min() > 0.1
 
 # The next-bake selector must never reinterpret the committed image.
 settings.mode = 'AO'
-assert scene.ae_lightmap_mode == 'STATIC'
-settings.mode = 'STATIC'
-print("AE_STATIC_SMOKE_OK covered=%d min=%.4f max=%.4f" %
-      (covered.sum(), decoded.min(), decoded.max()))
+assert scene.ae_lightmap_mode == test_mode
+settings.mode = test_mode
+print("AE_%s_SMOKE_OK covered=%d min=%.4f max=%.4f" %
+      (test_mode, covered.sum(), decoded.min(), decoded.max()))
 
 if '--' in sys.argv:
     output = os.path.abspath(sys.argv[sys.argv.index('--') + 1])

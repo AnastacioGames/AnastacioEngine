@@ -392,6 +392,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   Qualidade do bake vem da densidade de texels (`ae_lightmap_scale` por objeto)
   e da margem/dilatação das ilhas, não de uma textura por objeto. Cada recurso liga/desliga; Web/Android usam
   no máximo a textura da lightmap.
+  O seletor de bake força CPU quando `GPU` está desligado; no OpenCL usa uma única GPU dedicada e restaura
+  a configuração anterior ao terminar. Falha reportada pelo Cycles interrompe o bake sem publicar novo atlas.
+  No bake OpenCL, a engine aguarda o kernel próprio de bake sem tentar carregar kernels split de renderização
+  não compilados para esse modo; o aviso indevido `kernel_lamp_emission` foi eliminado na cena de reprodução.
 - `KX_Scene::GetOptimizationReferencePosition()` exposes one optimization reference, refreshed before Activity
   Culling and after physics by `UpdateOptimizationReference()`. It currently follows the active Scene camera and
   will be replaceable by the Player later. The Camera Properties tab identifies this active reference. Activity

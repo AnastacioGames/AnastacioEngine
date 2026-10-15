@@ -509,6 +509,7 @@ bool RE_bake_engine(
 	RenderEngineType *type = RE_engines_find(re->r.engine);
 	RenderEngine *engine;
 	bool persistent_data = (re->r.mode & R_PERSISTENT_DATA) != 0;
+	bool bake_error;
 
 	/* set render info */
 	re->i.cfra = re->scene->r.cfra;
@@ -557,10 +558,11 @@ bool RE_bake_engine(
 	RE_parts_free(re);
 	BLI_rw_mutex_unlock(&re->partsmutex);
 
-	if (BKE_reports_contain(re->reports, RPT_ERROR))
+	bake_error = BKE_reports_contain(re->reports, RPT_ERROR);
+	if (bake_error)
 		G.is_break = true;
 
-	return true;
+	return !bake_error;
 }
 
 void RE_engine_frame_set(RenderEngine *engine, int frame, float subframe)

@@ -6,6 +6,35 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-15 - OpenCL bake: aviso indevido de `kernel_lamp_emission`
+
+- Reproduzido em `projects-teste/baked_gpu.range`: o plano tem material de nós sem texture slot,
+  mas isso não causava o aviso. O cubo está como Rigid Body; só o plano Static participa do bake.
+- `OpenCLSplitPrograms::load_kernels` não compila os kernels split quando `use_baking` está ativo,
+  mas `OpenCLDevice::wait_for_availability` tentava carregá-los assim mesmo. O erro vinha dessa
+  checagem indevida; o kernel OpenCL de bake separado continuava funcionando, por isso a operação
+  podia terminar com imagem válida apesar do aviso. Agora o caminho de bake ignora os kernels split.
+- O executável de teste atualizado, linkado separadamente porque o editor do usuário estava aberto,
+  fez AO, Static e Indirect na RX 6800M sem o aviso, todos com atlas de 256x256 e 99,98% de cobertura.
+  AO na CPU teve a mesma cobertura e faixa de valores do AO na GPU. Após fechar o editor, o link normal
+  ainda falhou com `LNK1104` para `bin/AnastacioEngine.exe` e removeu o executável antigo. Uma cópia
+  byte a byte do executável de teste corrigido foi instalada sob o nome principal; SHA-256 idêntico.
+  AO, Static e Indirect foram repetidos no executável principal, todos sem o aviso e com a mesma
+  cobertura. A causa do `LNK1104` no link normal e a validação visual no jogo seguem pendentes.
+
+## 2026-10-15 - Bake CPU/GPU: seleção explícita e erro de kernel não vira sucesso
+
+- `GPU` desligado agora força Cycles na CPU durante o bake, mesmo se a cena estiver configurada para GPU;
+  o dispositivo original e as preferências de GPU são restaurados ao final. O console informa o dispositivo usado.
+- No OpenCL, selecionamos apenas uma entrada da GPU dedicada. Nesta máquina a RX 6800M aparecia duas vezes
+  na lista de dispositivos e o bake anterior habilitava ambas.
+- `RE_bake_engine` agora devolve falha quando o motor registra erro; o operador de lightmap verifica o retorno
+  de cada passe e não salva uma imagem nova após falha. Um erro de kernel exige novo bake, preferencialmente
+  com `GPU` desligado se persistir.
+- Build `RangeEngine`/`AnastacioRuntime` passou (6/6). Smokes CPU Static e AO passaram; smoke OpenCL
+  `Indirect + Dynamic Shadows` passou em 512x512 com light volume 20x20x5, sem aviso de kernel. A falha
+  exata da cena do usuário ainda não foi reproduzida; validação visual nessa cena permanece pendente.
+
 ## 2026-10-15 - Baked Lighting moderno: interface contextual, AO e iluminação estática
 
 - Acabamento do fluxo: `Bake Scene` mostra contagem de receptores e motivos de exclusão, deixa o controle

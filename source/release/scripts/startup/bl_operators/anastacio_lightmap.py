@@ -453,27 +453,48 @@ def emulate_game_lamp(ob):
     return original, la
 
 
-def use_gpu_device(scene):
-    """Bakes on the GPU when Cycles finds one (CUDA first, then OpenCL); returns the old setting so it
-    can be put back. Without a GPU the bake stays on the CPU."""
+def configure_bake_device(scene, use_gpu):
+    """Select the actual Cycles bake device and return the user settings to restore."""
     import _cycles
     addon = bpy.context.user_preferences.addons.get("cycles")
     if addon is None:
         return None
     prefs = addon.preferences
-    old = (prefs.compute_device_type, scene.cycles.device)
-    for kind in ('CUDA', 'OPENCL'):
-        if any(d[1] == kind for d in _cycles.available_devices(kind)):
+    old = (prefs.compute_device_type, scene.cycles.device,
+           {d.id: d.use for d in prefs.devices})
+    if use_gpu:
+        for kind in ('CUDA', 'OPENCL'):
+            if not any(d[1] == kind for d in _cycles.available_devices(kind)):
+                continue
             prefs.compute_device_type = kind
             prefs.get_devices()
             gpus = [d for d in prefs.devices if d.type == kind]
-            # with a dedicated card, leave out the integrated one ("... Graphics"): it slows the bake down
+            # Prefer a dedicated card over integrated graphics. On old OpenCL drivers the same physical
+            # Radeon can appear twice; use one device so it is not scheduled twice by Cycles.
             dedicated = [d for d in gpus if not d.name.endswith("Graphics")]
-            for d in prefs.devices:
-                d.use = d in (dedicated or gpus)
-            scene.cycles.device = 'GPU'
-            return old
+            selected = (dedicated or gpus)[:1] if kind == 'OPENCL' else (dedicated or gpus)
+            if selected:
+                for d in prefs.devices:
+                    d.use = d in selected
+                scene.cycles.device = 'GPU'
+                print("AE lightmap: Cycles bake device %s (%s)" %
+                      (kind, ", ".join(d.name for d in selected)))
+                return old
+    scene.cycles.device = 'CPU'
+    print("AE lightmap: Cycles bake device CPU")
     return old
+
+
+def restore_bake_device(scene, old):
+    if old is None:
+        return
+    prefs = bpy.context.user_preferences.addons["cycles"].preferences
+    prefs.compute_device_type = old[0]
+    prefs.get_devices()
+    for d in prefs.devices:
+        if d.id in old[2]:
+            d.use = old[2][d.id]
+    scene.cycles.device = old[1]
 
 
 def oidn_library():
@@ -617,7 +638,7 @@ class SCENE_OT_lightmap_bake(Operator):
         scene.cycles.samples = settings.samples
         scene.cycles.max_bounces = max(scene.cycles.max_bounces, 4)
         scene.cycles.diffuse_bounces = max(scene.cycles.diffuse_bounces, 4)
-        old_device = use_gpu_device(scene) if settings.use_gpu else None
+        old_device = configure_bake_device(scene, settings.use_gpu)
         lamps = [ob for ob in scene.objects if ob.type == 'LAMP' and not ob.hide_render]
         hidden = moving_objects(scene, objects)
         swapped = []
@@ -662,7 +683,10 @@ class SCENE_OT_lightmap_bake(Operator):
                     kwargs = dict(type=bake_type, margin=margin, use_clear=False)
                     if passes is not None:
                         kwargs['pass_filter'] = passes
-                    bpy.ops.object.bake(**kwargs)  # the active UV layer is "Lightmap"
+                    result_status = bpy.ops.object.bake(**kwargs)  # the active UV layer is "Lightmap"
+                    if result_status != {'FINISHED'}:
+                        raise RuntimeError("Cycles bake failed; no lightmap was saved. "
+                                           "If GPU was enabled, turn it off and bake on CPU.")
                     result = np.array(work.pixels[:], dtype=np.float32)
                 finally:
                     for mat, node, active in nodes:
@@ -782,9 +806,7 @@ class SCENE_OT_lightmap_bake(Operator):
                 mat.node_tree.nodes.remove(node)
                 if active:
                     mat.node_tree.nodes.active = active
-            if old_device:
-                bpy.context.user_preferences.addons["cycles"].preferences.compute_device_type = old_device[0]
-                scene.cycles.device = old_device[1]
+            restore_bake_device(scene, old_device)
             if ao_state and scene.world:
                 light = scene.world.light_settings
                 light.use_ambient_occlusion, light.ao_factor, light.distance = ao_state
