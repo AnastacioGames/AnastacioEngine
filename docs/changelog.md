@@ -6,6 +6,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-14 - Web/Android: alternar controles para acessar menus
+
+- Diagnóstico no jogo externo do itch.io: pacote usa `fps`/stick dinâmico; zonas invisíveis dos sticks
+  capturam toques sobre Start. Usuário confirmou que `?touch=0` permite iniciar. O link direto também
+  mudou o contexto de exibição em relação ao iframe; dimensionamento e movimento lateral da nave
+  não foram diagnosticados nem alterados nesta entrega.
+- `tools/web/package-web.py`: botão persistente **Controles: ligados/desligados**, canto superior
+  direito com safe area e estado acessível (`aria-pressed`). Começa ligado; esconder remove controles
+  e captura, solta eixos/botões/teclas virtuais e cancela o loop de olhar/zera giro acumulado.
+  Religamento preserva o layout atual, incluindo escolha feita pelo botão de troca. Layout `none`,
+  `?touch=0` e desktop sem toque forçado não exibem o botão. Sem alteração de C++ ou dimensionamento.
+- Pacote gerado com `build-web-release/bin` e cena existente `projects-teste/pad`; execução no
+  Edge headless/CDP: `verify-touch.cjs` **39/39**, incluindo toque no canvas recebido como mouse
+  pelo runtime, liberação durante movimento/tiro/olhar e rotação com controles desligados.
+  O painel de logs do teste cobria o ponto de toque: desabilitada sua captura apenas durante essa
+  verificação. Sintaxe JS conferida; `test_range_web.py` **40/40**, `test_android.py` **21/21**.
+- Documentação atualizada. `python tools/check_docs.py`: 31 erros e 73 avisos em links/mapas
+  anteriores e alheios a esta mudança (incluindo `demos/revisados/README.md` ausente).
+- Pendente: teste em celular real, Web no iframe do itch.io e APK. Pacotes já publicados precisam
+  de nova exportação; não houve publicação ou alteração no jogo do amigo.
+
 ## 2026-10-14 - Ragdoll: componente comum, NPCs e presets passivos
 
 - Addon 0.3 prepara rigid bodies, juntas cone-twist e anexa automaticamente

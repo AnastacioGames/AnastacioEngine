@@ -433,6 +433,8 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   movimento do mouse (stick de olhar move o cursor virtual do GHOST, igual a arrastar o dedo). Estende o input existente
   (gamepad, sensores, Range Input System); não criar sistema de ações paralelo. Texto usa o teclado do sistema.
   O overlay só aparece em tela de toque (`pointer: coarse`) ou com `?touch=1`; layout padrão stick + A/B.
+  O botão **Controles: ligados/desligados** permite liberar os toques para menus e restaurar o layout atual;
+  desligar remove as áreas de captura e zera as entradas virtuais, sem mudar o tamanho do canvas.
   O layout é configuração do export Web (Properties > Export Game > Web (Range) > Controle na tela, gravado no `.range`);
   o APK embute esse pacote e herda o layout, sem campo próprio no `android-export.json`.
   Plano em [`docs/android-touch-controls-plan.md`](docs/android-touch-controls-plan.md).

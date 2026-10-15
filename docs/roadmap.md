@@ -503,6 +503,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   stick e `wasd`) e no First Person com o layout `wasd` (2026-09-24). A1 concluído. Extensão T5 (2026-09-24): layout
   `fps` (segundo stick move o mouse para olhar; botões espaço e clique) e áudio suspenso em segundo plano,
   verificados no navegador e aprovados pelo usuário no Find X3 Pro (APK 0.1.7 do First Person).
+  Alternância manual de controles para menus (2026-10-14): implementada no template Web compartilhado
+  com APK; pendente validar em celular real (menu, retorno à partida e rotação), incluindo iframe do itch.io.
 
 ### Outros
 

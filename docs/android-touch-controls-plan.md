@@ -177,6 +177,14 @@ Exemplo para quem está começando (2026-09-25): o template de componente `03_jo
    por um botão da própria tela (`switch`), escolha guardada em `localStorage`. Pedais nos gatilhos (botão com alvo
    `axis`). Conferido no Edge headless com toques simulados; falta o celular e o jogo real (RolimaRacer).
 
+8. **Alternância manual para menus (2026-10-14):** botão persistente
+   **Controles: ligados/desligados** no pacote Web compartilhado com o APK. Começa ligado;
+   desligar remove os controles e suas áreas de captura, solta eixos, teclas/botões e giro acumulado;
+   religar reconstrói o layout atual. Não depende do código do jogo e não detecta menus automaticamente.
+   Sem layout, `?touch=0` ou desktop sem `?touch=1`, o botão não aparece.
+   `verify-touch.cjs` cobre soltura durante movimento/ação, toque na antiga área do stick chegando
+   como mouse ao runtime, retorno dos controles, FPS e rotação. Validação em aparelho permanece pendente.
+
 Depois, fora deste escopo:
 - `logic.touches` (dedos crus via `SDL_FINGER*`);
 - vibração;

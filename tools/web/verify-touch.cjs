@@ -172,6 +172,49 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
         `${JSON.stringify(moving.axes.slice(0, 2))} -> ${JSON.stringify(p.axes.slice(0, 2))}`);
   await touch('touchEnd', []);
 
+  // Menu: esconder enquanto stick e A estao pressionados libera captura e todas as entradas.
+  await touch('touchStart', [[bx, by, 30]]);
+  await touch('touchMove', [[bx + br, by, 30]]);
+  await touch('touchStart', [[bx + br, by, 30], [ax, ay, 31]]);
+  await sleep(200);
+  const beforeHide = await padState();
+  await evalJs(`document.getElementById('touch-toggle').click()`);
+  await sleep(300);
+  p = await padState();
+  check('desligar controles solta stick e A', beforeHide.buttons === 1 && beforeHide.axes[0] > 0.9 &&
+    !p.active && p.buttons === 0 && p.axes.every(v => v === 0) && p.keys.length === 0 && p.look.every(v => v === 0), JSON.stringify(p));
+  await touch('touchEnd', []);
+  check('botao continua acessivel com controles desligados', await evalJs(`(function(){
+    var b=document.getElementById('touch-toggle'); return !b.hidden && b.getAttribute('aria-pressed')==='false' &&
+      document.getElementById('touch').hidden && !document.querySelector('#touch .zone');})()`), '-');
+  mark = (await logText()).length;
+  await evalJs(`window.menuTouches=0; document.getElementById('log').style.pointerEvents='none';
+    document.getElementById('canvas').addEventListener('touchstart',function(){window.menuTouches++;});`);
+  await touch('touchStart', [[bx, by, 32]]);
+  await sleep(250);
+  await touch('touchEnd', []);
+  await sleep(300);
+  const menuLog = (await logText()).slice(mark);
+  const menuTarget = await evalJs(`document.elementFromPoint(${bx},${by}).id`);
+  const menuTouches = await evalJs(`window.menuTouches`);
+  check('toque na antiga area do stick vira mouse no runtime', await evalJs(`window.menuTouches`) === 1 &&
+    /\[pad\] mouse LEFT down/.test(menuLog) && /\[pad\] mouse LEFT up/.test(menuLog),
+    `target=${menuTarget}, touches=${menuTouches}, ${menuLog.match(/\[pad\] mouse[^\n]*/g)?.join('; ') || '-'}`);
+  await evalJs(`document.getElementById('log').style.pointerEvents=''`);
+  const [tx, ty] = await center('#touch-toggle');
+  await touch('touchStart', [[tx, ty, 33]]);
+  await touch('touchEnd', []);
+  await sleep(300);
+  p = await padState();
+  check('toque no botao restaura layout sem entradas presas', p.active && p.buttons === 0 && p.axes.every(v => v === 0) &&
+    await evalJs(`document.querySelectorAll('#touch .zone').length===1 && document.querySelectorAll('#touch .btn').length===2 &&
+      document.getElementById('touch-toggle').getAttribute('aria-pressed')==='true'`), JSON.stringify(p));
+  await touch('touchStart', [[bx, by, 34]]);
+  await touch('touchMove', [[bx + br, by, 34]]);
+  await sleep(200);
+  check('stick funciona depois de religar', (await padState()).axes[0] > 0.9, '-');
+  await touch('touchEnd', []);
+
   // 6. Alvo tecla (layout wasd): o stick vira W/A/S/D e o botao, espaco, pelo teclado do jogo.
   if (!await open('&touchlayout=wasd')) { process.exitCode = 1; return; }
   let log6 = await logText();
@@ -255,6 +298,34 @@ if (!url) { console.error('uso: verify-touch.cjs <url> [porta-cdp]'); process.ex
   log8 = (await logText()).slice(mark);
   check('botao de tiro = botao esquerdo do mouse', JSON.stringify(p.keys) === '[116]' &&
         /\[pad\] mouse LEFT down/.test(log8) && /\[pad\] mouse LEFT up/.test(log8), JSON.stringify(p.keys));
+
+  mark = (await logText()).length;
+  const [wx, wy, wr] = await center('#touch .zone.left .base');
+  const [rx, ry, rr] = await center('#touch .zone.right .base');
+  await touch('touchStart', [[wx, wy, 36], [rx, ry, 37], [fx, fy, 35]]);
+  await touch('touchMove', [[wx, wy - wr, 36], [rx + rr, ry, 37], [fx, fy, 35]]);
+  await sleep(250);
+  const fpsHeld = await padState();
+  await evalJs(`document.getElementById('touch-toggle').click()`);
+  await touch('touchEnd', []);
+  await sleep(500);
+  p = await padState();
+  log8 = (await logText()).slice(mark);
+  check('desligar no FPS solta movimento, olhar e tiro no runtime', fpsHeld.keys.includes(45) && fpsHeld.keys.includes(116) &&
+    !p.active && p.keys.length === 0 && p.look.every(v => v === 0) &&
+    /\[pad\] key W up/.test(log8) && /\[pad\] mouse LEFT down/.test(log8) && /\[pad\] mouse LEFT up/.test(log8), JSON.stringify(p));
+  await call('Emulation.setDeviceMetricsOverride', { width: 540, height: 960, deviceScaleFactor: 1, mobile: false });
+  check('rotacao mantem modo de menu e botao acessivel', await evalJs(`(function(){
+    var b=document.getElementById('touch-toggle'),r=b.getBoundingClientRect();
+    return document.getElementById('touch').hidden && r.left>=0 && r.right<=innerWidth &&
+      document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===b;})()`), '-');
+  await evalJs(`document.getElementById('touch-toggle').click()`);
+  check('FPS restaurado apos rotacao', await evalJs(`!document.getElementById('touch').hidden &&
+    document.querySelectorAll('#touch .zone').length===2 && document.querySelectorAll('#touch .btn').length===2`), '-');
+
+  if (!await open('&touchlayout=none')) { process.exitCode = 1; return; }
+  check('layout sem controles nao mostra botao de troca', await evalJs(`document.getElementById('touch-toggle').hidden &&
+    document.getElementById('touch').hidden && !Module.rangePad.active`), '-');
 
   if (errors.length) console.log('--- excecoes JS ---\n' + errors.join('\n'));
   process.exitCode = results.every(Boolean) && !errors.length ? 0 : 1;

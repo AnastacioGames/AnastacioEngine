@@ -107,6 +107,11 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
         background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
   #fs[hidden] { display: none; }
+  #touch-toggle { position: fixed; right: calc(8px + env(safe-area-inset-right, 0px));
+                  top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 30;
+                  font-size: 14px; min-height: 44px; padding: 8px 12px; background: rgba(0,0,0,.5); color: #fff;
+                  border: 1px solid rgba(255,255,255,.35); touch-action: manipulation; }
+  #touch-toggle[hidden] { display: none; }
   #touch { position: fixed; inset: 0; z-index: 20; pointer-events: none; --u: clamp(46px, 12vmin, 80px);
            --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px);
            --sb: env(safe-area-inset-bottom, 0px);
@@ -150,6 +155,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 <button id="fs" hidden>Tela cheia</button>
+<button id="touch-toggle" hidden aria-controls="touch" aria-pressed="true">Controles: ligados</button>
 <div id="touch" hidden></div>
 <pre id="log"></pre>
 __PERF_SCRIPT__
@@ -458,7 +464,7 @@ __PERF_SCRIPT__
     if (right) held.push(codes[3]);
     return held;
   }
-  var touchControls = [], touchLogAt = 0, touchLogButtons = "";
+  var touchControls = [], touchLogAt = 0, touchLogButtons = "", activeTouchLayout = null;
   function touchParam(name) {
     var m = new RegExp("[?&]" + name + "=(\\\\w+)").exec(location.search);
     return m ? m[1] : null;
@@ -678,10 +684,15 @@ __PERF_SCRIPT__
   }
   function clearTouch() {
     releaseTouch();
+    cancelAnimationFrame(lookRequest);
+    lookRequest = null;
+    lookAt = 0;
+    pad.look = [0, 0];
     touchControls.forEach(function (c) { if (c.node.parentNode) c.node.parentNode.removeChild(c.node); });
     touchControls = [];
   }
   function buildTouch(chosen) {
+    activeTouchLayout = chosen;
     var layout = Array.isArray(chosen) ? chosen : touchLayouts[chosen];
     var dynamic = (touchParam("touchstick") || TOUCH.stick) !== "fixed";
     layout.forEach(function (c) {
@@ -692,13 +703,14 @@ __PERF_SCRIPT__
     });
     el("touch").hidden = false;
     pad.active = true;
-    if (touchControls.some(function (c) { return c.look; })) requestAnimationFrame(lookFrame);
+    syncTouchToggle();
+    if (touchControls.some(function (c) { return c.look; })) lookRequest = requestAnimationFrame(lookFrame);
     log("[touch] controle na tela: " + (Array.isArray(chosen) ? "personalizado" : chosen) +
         (dynamic ? " (stick dinamico)" : ""));
   }
   // Stick de olhar: acumula o giro a cada quadro da pagina; o runtime zera pad.look ao consumir. Curva quadratica:
   // pouco desvio mira fino, desvio todo gira rapido.
-  var lookAt = 0;
+  var lookAt = 0, lookRequest = null;
   function lookFrame(now) {
     var dt = lookAt ? Math.min(0.1, (now - lookAt) / 1000) : 0;
     lookAt = now;
@@ -707,7 +719,7 @@ __PERF_SCRIPT__
       pad.look[0] += c.value[0] * Math.abs(c.value[0]) * c.look * dt;
       pad.look[1] += c.value[1] * Math.abs(c.value[1]) * c.look * dt;
     });
-    if (pad.active) requestAnimationFrame(lookFrame);
+    if (pad.active) lookRequest = requestAnimationFrame(lookFrame);
     else lookAt = 0;
   }
   // Soltar tudo quando a pagina perde o foco ou some: sem isso um dedo "preso" seguia andando ao voltar.
@@ -717,10 +729,22 @@ __PERF_SCRIPT__
     updatePad();
   }
   function stopTouch() {
-    releaseTouch();
+    clearTouch();
     pad.active = false;
     el("touch").hidden = true;
+    syncTouchToggle();
   }
+  function syncTouchToggle() {
+    var b = el("touch-toggle");
+    b.hidden = activeTouchLayout === null || failed;
+    b.textContent = pad.active ? "Controles: ligados" : "Controles: desligados";
+    b.setAttribute("aria-pressed", String(pad.active));
+  }
+  el("touch-toggle").addEventListener("click", function () {
+    if (pad.active) stopTouch();
+    else if (activeTouchLayout !== null && !failed) buildTouch(activeTouchLayout);
+    el("canvas").focus();
+  });
   window.addEventListener("blur", releaseTouch);
   window.addEventListener("pagehide", releaseTouch);
   window.addEventListener("orientationchange", releaseTouch);

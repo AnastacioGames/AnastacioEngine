@@ -51,6 +51,11 @@ Abra http://localhost:8080/, espere o botão **Jogar** e clique (dá foco ao can
 Controle na tela: aparece sozinho em tela de toque (`pointer: coarse`) e vira o gamepad 0 do jogo (`logic.joysticks[0]`,
 sensor Joystick, Input System), somado a um controle físico. `?touch=1` mostra no PC (clique e arraste com o mouse),
 `?touch=0` esconde; `?touchlayout=` e `?touchstick=dynamic|fixed` trocam o layout só nessa visita.
+Com um layout ativo, o botão **Controles: ligados/desligados** fica no canto superior direito, disponível
+também em tela cheia. Desligue para tocar nos menus do jogo: direcionais, botões e suas áreas invisíveis
+são removidos, e as entradas virtuais são zeradas. Ligue novamente para jogar; o layout atual é preservado.
+A troca é manual, começa ligada e não altera o tamanho do canvas. `none` e `?touch=0` não mostram esse botão.
+Pacotes já publicados precisam ser exportados novamente para receber a mudança; o APK herda o mesmo HTML.
 Layouts `stick`, `dpad` e `twin` viram o gamepad 0; `wasd` (stick = W/A/S/D, botão = espaço) e `arrows` (d-pad = setas,
 espaço e Enter) apertam teclas, para jogos que leem teclado — somadas às do teclado físico sem uma soltar a outra.
 `fps` é para primeira pessoa com teclado e mouse: stick esquerdo = W/A/S/D, stick direito move o mouse (olhar em volta,
