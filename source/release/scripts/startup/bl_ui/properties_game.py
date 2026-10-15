@@ -1144,48 +1144,90 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
                 hasattr(context.scene, "ae_lightmap_settings"))
 
     def draw(self, context):
+        from bl_operators.anastacio_lightmap import lightmap_objects, lightmap_excluded_counts, lightmap_exclusion_reason
         layout = self.layout
         scene = context.scene
         settings = scene.ae_lightmap_settings
+        is_ao = settings.mode == 'AO'
+        is_static = settings.mode == 'STATIC'
 
         if not scene.game_settings.use_shading_nodes:
             layout.label(text="Needs PBR Shading Nodes (Shading panel)", icon='INFO')
 
-        box = layout.box()
-        row = box.row()
-        row.label(text="Lightmap:", icon="IMAGE_DATA")
         if scene.ae_lightmap:
+            current_names = {
+                'INDIRECT': "Indirect + Dynamic Shadows",
+                'AO': "Ambient Occlusion",
+                'STATIC': "Static Lighting + Shadows",
+            }
+            row = layout.row()
+            row.label(text="Current: " + current_names.get(scene.ae_lightmap_mode,
+                                                            "Indirect + Dynamic Shadows"),
+                      icon='FILE_TICK')
             row.prop(scene, "ae_lightmap_use", text="Use in Game")
+
+        layout.prop(settings, "mode", text="Bake Mode")
+        if is_static:
+            layout.label(text="Sun and static shadows are baked", icon='INFO')
+            layout.label(text="Moving a light or object requires a new bake")
+
+        box = layout.box()
+        box.label(text="Bake Receivers", icon='OBJECT_DATA')
+        included = lightmap_objects(scene)
+        excluded = lightmap_excluded_counts(scene)
+        box.label(text="Next bake: %d receivers, %d excluded" %
+                  (len(included), sum(excluded.values())))
+        for reason, count in sorted(excluded.items()):
+            box.label(text="%d: %s" % (count, reason), icon='INFO')
+        ob = context.object
+        if ob and ob.type == 'MESH':
+            box.prop(ob, "ae_lightmap_include", text="Bake lighting on %s" % ob.name)
+            reason = lightmap_exclusion_reason(scene, ob)
+            if reason and reason != "Excluded from bake":
+                box.label(text="Active: " + reason, icon='ERROR')
+
+        box = layout.box()
+        box.label(text="Lightmap", icon="IMAGE_DATA")
         split = box.split()
-        split.active = scene.ae_lightmap_use or not scene.ae_lightmap
         col = split.column(align=True)
-        col.prop(settings, "resolution", text="")
+        col.prop(settings, "resolution")
         col.prop(settings, "samples")
-        col.prop(settings, "margin")
         col = split.column()
         col.prop(settings, "use_gpu")
         col.prop(settings, "use_denoise")
-        col.prop(settings, "use_world")
-        ob = context.object
-        if ob and ob.type == 'MESH' and hasattr(ob, "ae_lightmap_scale"):
-            box.prop(ob, "ae_lightmap_scale", text="Scale (" + ob.name + ")")
+        if is_ao:
+            box.prop(settings, "ao_distance")
+            box.prop(settings, "ao_strength")
+        else:
+            box.prop(settings, "use_world")
         if scene.ae_lightmap:
             box.label(text="Image: " + scene.ae_lightmap, icon='FILE_IMAGE')
+            if scene.ae_lightmap_atlas_coverage >= 0.0:
+                box.label(text="Atlas coverage: %.1f%% of baked pixels" %
+                          scene.ae_lightmap_atlas_coverage)
+
+        if not is_ao:
+            box = layout.box()
+            row = box.row()
+            row.label(text="Moving Objects", icon="SNAP_VOLUME")
+            row.prop(settings, "use_volume", text="Bake Light Volume")
+            if settings.use_volume:
+                box.prop(settings, "volume_spacing")
+            if scene.ae_lightvol:
+                box.prop(scene, "ae_lightvol_use", text="Use in Game")
 
         box = layout.box()
-        row = box.row()
-        row.label(text="Light Volume:", icon="SNAP_VOLUME")
-        row.prop(settings, "use_volume", text="Bake")
-        sub = box.row()
-        sub.active = settings.use_volume
-        sub.prop(settings, "volume_spacing")
-        if scene.ae_lightvol:
-            box.prop(scene, "ae_lightvol_use", text="Use in Game (moving objects)")
+        box.label(text="Advanced", icon='PREFERENCES')
+        box.prop(settings, "margin")
+        if ob and ob.type == 'MESH' and hasattr(ob, "ae_lightmap_scale"):
+            box.prop(ob, "ae_lightmap_scale", text="Scale (" + ob.name + ")")
 
-        row = layout.row(align=True)
+        row = layout.row()
         row.scale_y = 1.3
         row.operator("scene.ae_lightmap_bake", icon='RENDER_STILL')
-        row.operator("scene.ae_lightmap_clear", text="", icon='X')
+        row = layout.row()
+        row.enabled = bool(scene.ae_lightmap)
+        row.operator("scene.ae_lightmap_clear", text="Clear Baked Lighting", icon='X')
 
 
 class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):

@@ -379,8 +379,13 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ## Decisões técnicas vigentes
 
-- GI: luz indireta é baked (lightmap RGBM 8 bits num atlas compartilhado + light volume de ambient cubes para
-  objetos móveis). Um [SSGI nativo experimental](docs/ssgi-native-plan.md) foi implementado em worktree
+- GI: o painel moderno de Baked Lighting produz luz indireta (lightmap RGBM 8 bits num atlas compartilhado +
+  light volume de ambient cubes para objetos móveis), AO baked ou iluminação estática com sombras no mesmo
+  atlas. O AO tem distância/intensidade e multiplica somente o ambiente. O modo estático grava irradiância
+  direta/indireta e sombras nos receptores do atlas, evita difuso direto duplicado, preserva especular dinâmico
+  e mantém luz completa nos objetos móveis; o Light Volume continua somente com indireta/World. Arquivos antigos
+  continuam no modo indireto. Detalhes no [plano](docs/baked-lighting-plan.md). Um
+  [SSGI nativo experimental](docs/ssgi-native-plan.md) foi implementado em worktree
   separado para desktop/Principled opaco: complemento em tela, não substituto do bake; exclui receptores
   baked. Build e testes numéricos passaram; normal/albedo RGBA8 reduziram a reserva de attachments em 25%;
   validação visual e medição da VRAM total permanecem pendentes.

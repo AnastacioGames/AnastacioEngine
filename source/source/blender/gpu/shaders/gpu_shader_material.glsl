@@ -4935,6 +4935,19 @@ void lightmap_sample(vec3 uv, sampler2D tex, out vec4 lm)
 	lm = vec4(g * g, (c.a > 0.004) ? 1.0 : 0.0);
 }
 
+/* Alpha is an internal tag after RGBM was decoded: 1 = indirect/light volume,
+ * 2 = AO atlas and 3 = static-lighting atlas.  Keeping it in this one vec4 avoids
+ * changing the legacy GPU_stack_link ABI of the Principled node. */
+void lightmap_mark_ao(vec4 lm, out vec4 result)
+{
+	result = vec4(lm.rgb, lm.a * 2.0);
+}
+
+void lightmap_mark_static(vec4 lm, out vec4 result)
+{
+	result = vec4(lm.rgb, lm.a * 3.0);
+}
+
 /* One face of the baked light volume (ambient cube, RGBM like the lightmap) at grid position p (in cells,
  * probe i at i + 0.5). Layout: x = face * dim.x + i, y = k * dim.y + j; x/y interpolate in the hardware,
  * z between two slices here. */
@@ -4973,13 +4986,20 @@ void lightvol_sample(vec4 lm, vec3 viewpos, mat4 viewinv, vec3 N, sampler2D tex,
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
-	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap, out vec4 result,
+	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap,
+	out vec4 result,
     out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
     /* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
     ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+	float ao_mode = step(1.5, lightmap.a) * (1.0 - step(2.5, lightmap.a));
+	float static_mode = step(2.5, lightmap.a);
+	/* AO only modulates ambient at runtime, so it must remain eligible for dynamic SSGI. */
+	float baked_gi = step(0.5, lightmap.a) * (1.0 - ao_mode);
+	/* A Light Volume sample remains tagged 1, so it never suppresses live direct diffuse. */
+	float baked_static_diffuse = static_mode;
     ssgi_albedo = vec4(clamp(mix(base_color.rgb, subsurface_color.rgb, subsurface) *
-        (1.0 - metallic) * (1.0 - transmission), 0.0, 1.0), 1.0 - step(0.5, lightmap.a));
+        (1.0 - metallic) * (1.0 - transmission), 0.0, 1.0), 1.0 - baked_gi);
     vec3 direct_diffuse = vec3(0.0);
 	/* ambient light */
 	vec3 diffuse_albedo = mix(base_color.rgb, subsurface_color.rgb, subsurface * (1.0 - metallic));
@@ -4989,8 +5009,14 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		L = env_diffuse.rgb * diffuse_albedo * (1.0 - metallic);
 	}
 	if (lightmap.a > 0.5) {
-		/* baked indirect light replaces the probe/World diffuse; direct light stays dynamic below */
-		L = lightmap.rgb * diffuse_albedo * (1.0 - metallic);
+		if (ao_mode > 0.5) {
+			/* Baked AO affects ambient diffuse only; the direct-light loop below stays untouched. */
+			L *= clamp(lightmap.rgb, vec3(0.0), vec3(1.0));
+		}
+		else {
+			/* baked indirect light replaces the probe/World diffuse; direct light stays dynamic below */
+			L = lightmap.rgb * diffuse_albedo * (1.0 - metallic);
+		}
 	}
 
 	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
@@ -5082,7 +5108,8 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			vec3 diffuse_bsdf = (mix(Fd * base_color.rgb, ss * subsurface_color.rgb, subsurface) + Fsheen) * light_diffuse;
             ssgi_light = diffuse_bsdf * (1.0 - metallic) * (1.0 - transmission);
 			vec3 specular_bsdf = Gs * Fs * Ds * light_specular;
-			diffuse_and_specular_bsdf = diffuse_bsdf * (1.0 - metallic) + specular_bsdf;
+			diffuse_and_specular_bsdf = diffuse_bsdf * (1.0 - metallic) *
+			                            (1.0 - baked_static_diffuse) + specular_bsdf;
 		}
 		diffuse_and_specular_bsdf *= max(NdotL, 0.0);
 
@@ -5104,7 +5131,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		clearcoat_bsdf *= max(CNdotL, 0.0);
 
 		diffuse_and_specular_bsdf *= light_atten;
-        ssgi_light *= max(NdotL, 0.0) * light_atten;
+		ssgi_light *= max(NdotL, 0.0) * light_atten * (1.0 - baked_static_diffuse);
 		clearcoat_bsdf *= light_atten;
 
 		/* Shadow map for this light slot, bound by GPU_material_bind_shadow_lamps() (see

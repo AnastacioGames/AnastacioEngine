@@ -6,6 +6,37 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-15 - Baked Lighting moderno: interface contextual, AO e iluminação estática
+
+- Acabamento do fluxo: `Bake Scene` mostra contagem de receptores e motivos de exclusão, deixa o controle
+  `Receive Baked Lighting` visível para o objeto ativo, informa cobertura real dos pixels baked no atlas e explica
+  que mover luzes ou objetos após o modo estático exige novo bake. O antigo painel virou `Texture Bake (Legacy)`
+  e o X virou `Clear Baked Lighting`. O novo controle preserva o atributo legado `ae_lightmap_exclude`.
+- O smoke estático foi repetido com o plano ativo e confirmou que a seleção não limita o bake da cena; também
+  confirmou inclusão/exclusão por objeto e cobertura do atlas. Scripts da UI sincronizados em `build/bin`.
+- `Render > Baked Lighting` agora escolhe entre `Indirect + Dynamic Shadows` (comportamento anterior e
+  padrão compatível) e `Ambient Occlusion`. O painel mostra separadamente o modo do resultado atual e o
+  modo do próximo bake, oculta controles sem efeito e agrupa Lightmap, Moving Objects e Advanced.
+- O AO usa o atlas/UV automático existente, com `Distance` e `Strength`, restaura as configurações temporárias
+  do World e não cria Light Volume. No Game PBR ele multiplica somente a parcela ambiente; luz direta,
+  especular, sombras e elegibilidade para SSGI permanecem dinâmicas.
+- O novo modo `Static Lighting + Shadows` grava no atlas a irradiância difusa direta e indireta com sombras.
+  A marca interna do atlas distingue-o do Light Volume: somente os receptores estáticos deixam de somar
+  difuso direto em tempo real; especular permanece dinâmico, e objetos móveis conservam luz direta completa.
+  O Light Volume continua contendo apenas indireta/World.
+- Correção posterior: o primeiro encaixe de AO/estático ampliava a assinatura GLSL do Principled e causava
+  `node_bsdf_principled: no matching overloaded function` ao converter um material para PBR. A interface
+  legada foi preservada; o tipo do bake passou a ser uma marca interna na amostra da lightmap. Build
+  `ge_rasterizer_shaders` + `RangeEngine` passou novamente e o smoke estático passou sem erro GLSL.
+- `Use in Game`, conclusão e limpeza do bake invalidam os materiais explicitamente. Arquivos antigos sem
+  `ae_lightmap_mode` continuam sendo interpretados como iluminação indireta.
+- Build `ge_rasterizer_shaders` + `RangeEngine` passou (105/105). `tools/test_baked_ao_smoke.py` validou bake
+  256x256, RGBM grayscale, faixa 0..1, restauração do World, persistência do modo e reabertura da cena; o
+  usuário confirmou o AO em Play e Standalone. `tools/test_baked_static_smoke.py` validou dois receptores
+  estáticos, exclusão de objeto dinâmico do atlas, RGBM com contraste, Light Volume 1x1x1 e persistência do
+  modo; `AnastacioRuntime` encerrou com código 0 e sem erros GLSL. O usuário validou uma cena simples com
+  cubo e plano Static; uma cena maior com materiais variados ainda não foi testada visualmente.
+
 ## 2026-10-14 - Web/Android: alternar controles para acessar menus
 
 - Diagnóstico no jogo externo do itch.io: pacote usa `fps`/stick dinâmico; zonas invisíveis dos sticks

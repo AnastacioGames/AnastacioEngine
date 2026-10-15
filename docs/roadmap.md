@@ -710,6 +710,13 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
 - **Fog - Volumetric (evolução):** 10 itens em [plano-volumetric.md](plano-volumetric.md); itens 1-3
   (vento/manhã, raios de sol, Fog Volumes) feitos e aguardando aceite visual; item 4 (Python/Logic) com o Codex.
 - **Luz indireta (GI) baked:** lightmap Cycles + OIDN + light volume prontos (changelog 2026-10-06).
+  Evolução aprovada para um painel moderno com modos de GI dinâmica, AO e iluminação estática com sombras:
+  [plano técnico](baked-lighting-plan.md). Interface contextual + AO implementados em 2026-10-15; o usuário
+  validou o AO em Play e Standalone. `Static Lighting + Shadows` também foi implementado, com cobertura do
+  atlas separada da origem Light Volume, difuso direto sem duplicação nos estáticos e especular/luz completa
+  preservados respectivamente nos estáticos/móveis. Build, bake numérico e runtime automatizado passaram;
+  o usuário confirmou o modo estático em uma cena simples após trocar o Rigid Body para Static;
+  falta avaliação visual em cena maior e nos materiais variados.
   GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
   validar no Linux e no build Web. UV da lightmap por xatlas. [SSGI nativo experimental](ssgi-native-plan.md)
   implementado no worktree: pendentes avaliação visual no jogo/Play, MSAA, core profile completo,
